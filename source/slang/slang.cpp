@@ -46,12 +46,16 @@ static const Guid IID_IModule = SLANG_UUID_IModule;
 
 Session::Session()
 {
+    ::memset(m_downstreamCompilerLocators, 0, sizeof(m_downstreamCompilerLocators));
+    DownstreamCompilerUtil::setDefaultLocators(m_downstreamCompilerLocators);
+    m_downstreamCompilerSet = new DownstreamCompilerSet;
+
     // Initialize name pool
     getNamePool()->setRootNamePool(getRootNamePool());
 
-    sharedLibraryLoader = DefaultSharedLibraryLoader::getSingleton();
+    m_sharedLibraryLoader = DefaultSharedLibraryLoader::getSingleton();
     // Set all the shared library function pointers to nullptr
-    ::memset(sharedLibraryFunctions, 0, sizeof(sharedLibraryFunctions));
+    ::memset(m_sharedLibraryFunctions, 0, sizeof(m_sharedLibraryFunctions));
 
     // Initialize the lookup table of syntax classes:
 
@@ -169,44 +173,8 @@ SLANG_NO_THROW void SLANG_MCALL Session::setDownstreamCompilerPath(
     
     if (m_downstreamCompilerPaths[int(passThrough)] != path)
     {
-        // If it's changed we should unload any shared libraries that use it
-        switch (passThrough)
-        {
-            case PassThroughMode::Dxc:
-            {
-                setSharedLibrary(SharedLibraryType::Dxc, nullptr);
-                setSharedLibrary(SharedLibraryType::Dxil, nullptr);
-                break;
-            }
-            case PassThroughMode::Fxc:
-            {
-                setSharedLibrary(SharedLibraryType::Fxc, nullptr);
-                break;
-            }
-            case PassThroughMode::Glslang:
-            {
-                setSharedLibrary(SharedLibraryType::Glslang, nullptr);
-                break;
-            }
-            case PassThroughMode::VisualStudio:
-            case PassThroughMode::Gcc:
-            case PassThroughMode::Clang:
-            case PassThroughMode::GenericCCpp:
-            {
-                // If any compiler path set changed, require all to be refreshed
-                downstreamCompilerSet.setNull();
-                break;
-            }
-            case PassThroughMode::NVRTC:
-            {
-                // TODO(JS): We need a way to set the NVRTC path.
-                // We want to unload... and try again...
-                downstreamCompilerSet.setNull();
-                break;
-            }
-            default: break;
-        }
-
+        // Make access redetermine compiler
+        resetDownstreamCompiler(passThrough);
         // Set the path
         m_downstreamCompilerPaths[int(passThrough)] = path;
     }
@@ -287,26 +255,9 @@ SlangPassThrough SLANG_MCALL Session::getDefaultDownstreamCompiler(SlangSourceLa
     return SlangPassThrough(m_defaultDownstreamCompilers[int(sourceLanguage)]);
 }
 
-DownstreamCompiler* Session::getDownstreamCompiler(PassThroughMode inCompiler)
-{
-    DownstreamCompilerSet* compilerSet = requireDownstreamCompilerSet();
-    switch (inCompiler)
-    {
-        case PassThroughMode::GenericCCpp:
-        {
-            return compilerSet->getDefaultCompiler(DownstreamCompiler::SourceType::CPP);
-        }
-        default: break;
-    }
-
-    const SlangPassThrough compiler = SlangPassThrough(inCompiler);
-    DownstreamCompiler::Desc desc(compiler);
-    return DownstreamCompilerUtil::findCompiler(compilerSet, DownstreamCompilerUtil::MatchType::Newest, desc);
-}
-
 DownstreamCompiler* Session::getDefaultDownstreamCompiler(SourceLanguage sourceLanguage)
 {
-    return getDownstreamCompiler(m_defaultDownstreamCompilers[int(sourceLanguage)]);
+    return getOrLoadDownstreamCompiler(m_defaultDownstreamCompilers[int(sourceLanguage)], nullptr);
 }
 
 ISlangFileSystemExt* IncludeHandlerImpl::_getFileSystemExt()
@@ -2620,34 +2571,15 @@ SLANG_API void spSessionSetSharedLibraryLoader(
     ISlangSharedLibraryLoader* loader)
 {
     auto s = Slang::asInternal(session);
-
-    if (!loader)
-    {
-        // If null set the default
-        loader = Slang::DefaultSharedLibraryLoader::getSingleton();
-    }
-
-    if (s->sharedLibraryLoader != loader)
-    {
-        // Need to clear all of the libraries
-        for (int i = 0; i < SLANG_COUNT_OF(s->sharedLibraries); ++i)
-        {
-            s->sharedLibraries[i].setNull();
-        }
-
-        // Clear all of the functions
-        ::memset(s->sharedLibraryFunctions, 0, sizeof(s->sharedLibraryFunctions));
-
-        // Set the loader
-        s->sharedLibraryLoader = loader;
-    }
+    loader = loader ? loader : Slang::DefaultSharedLibraryLoader::getSingleton();
+    s->setSharedLibraryLoader(loader);
 }
 
 SLANG_API ISlangSharedLibraryLoader* spSessionGetSharedLibraryLoader(
     SlangSession*               session)
 {
     auto s = Slang::asInternal(session);
-    return (s->sharedLibraryLoader == Slang::DefaultSharedLibraryLoader::getSingleton()) ? nullptr : s->sharedLibraryLoader.get();
+    return (s->m_sharedLibraryLoader == Slang::DefaultSharedLibraryLoader::getSingleton()) ? nullptr : s->m_sharedLibraryLoader.get();
 }
 
 SLANG_API SlangResult spSessionCheckCompileTargetSupport(

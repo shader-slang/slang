@@ -13,18 +13,6 @@
 namespace Slang
 {
 
-/* NOTE! Do not change this enum without making the appropriate changes to DefaultSharedLibraryLoader::s_libraryNames */
-enum class SharedLibraryType
-{
-    Unknown,            ///< Unknown compiler
-    Dxc,                ///< Dxc compiler
-    Fxc,                ///< Fxc compiler
-    Glslang,            ///< Slang specific glslang compiler
-    Dxil,               ///< Dxil is used with dxc
-    NVRTC,              ///< Nvrtc compiler
-    CountOf,
-};
-
 class DefaultSharedLibraryLoader : public ISlangSharedLibraryLoader
 {
 public:
@@ -44,14 +32,8 @@ public:
         /// Get the singleton
     static DefaultSharedLibraryLoader* getSingleton() { return &s_singleton; }
 
-        /// Get the type from the name
-    static SharedLibraryType getSharedLibraryTypeFromName(const UnownedStringSlice& name);
 
-        /// Get the name from the type, or nullptr if not known
-    static const char* getSharedLibraryNameFromType(SharedLibraryType type) { return s_libraryNames[int(type)]; }
-
-        /// Make a shared library to it's name
-    static const char* s_libraryNames[int(SharedLibraryType::CountOf)];
+    static SlangResult load(ISlangSharedLibraryLoader* loader, const String& path, const String& name, ISlangSharedLibrary** outLibrary);
 
 private:
         /// Make so not constructible
@@ -110,39 +92,6 @@ public:
 
 protected:
     String m_path;
-};
-
-class ConfigurableSharedLibraryLoader: public ISlangSharedLibraryLoader, public RefObject
-{
-public:
-    typedef Result (*Func)(const char* pathIn, const String& entryString, SharedLibrary::Handle& handleOut);
-
-    // IUnknown
-    SLANG_REF_OBJECT_IUNKNOWN_ALL
-
-    // ISlangSharedLibraryLoader
-    virtual SLANG_NO_THROW SlangResult SLANG_MCALL loadSharedLibrary(const char* path, ISlangSharedLibrary** sharedLibraryOut) SLANG_OVERRIDE;
-
-        /// Function to replace the the path with entryString
-    static Result replace(const char* pathIn, const String& entryString, SharedLibrary::Handle& handleOut);
-        /// Function to change the path using the entryString
-    static Result changePath(const char* pathIn, const String& entryString, SharedLibrary::Handle& handleOut);
-
-    void addEntry(const String& libName, Func func, const String& entryString) { m_entryMap.Add(libName, Entry{ func, entryString} ); }
-    void addEntry(SharedLibraryType libType, Func func, const String& entryString) { m_entryMap.Add(DefaultSharedLibraryLoader::getSharedLibraryNameFromType(libType), Entry { func, entryString} ); }
-
-    virtual ~ConfigurableSharedLibraryLoader() {}
-    protected:
-
-    struct Entry
-    {
-        Func func;
-        String entryString;
-    };
-
-    ISlangUnknown* getInterface(const Guid& guid);
-
-    Dictionary<String, Entry> m_entryMap;
 };
 
 }

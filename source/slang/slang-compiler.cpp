@@ -427,6 +427,7 @@ namespace Slang
         { "glsl", SourceLanguage::GLSL },
         { "c", SourceLanguage::C },
         { "cxx", SourceLanguage::CPP },
+        { "cuda", SourceLanguage::CUDA },
     };
 
     SourceLanguage findSourceLanguageByName(String const& name)
@@ -444,6 +445,7 @@ namespace Slang
 
     SlangResult checkExternalCompilerSupport(Session* session, PassThroughMode passThrough)
     {
+        // Check if the type is supported on this compile
         switch (passThrough)
         {
             case PassThroughMode::None:
@@ -451,45 +453,20 @@ namespace Slang
                 // If no pass through -> that will always work!
                 return SLANG_OK;
             }
-            case PassThroughMode::Dxc:
-            {
-#if SLANG_ENABLE_DXIL_SUPPORT
-                // Must have dxc
-                return session->getOrLoadSharedLibrary(SharedLibraryType::Dxc, nullptr) ? SLANG_OK : SLANG_E_NOT_FOUND;
+#if !SLANG_ENABLE_DXIL_SUPPORT
+            case PassThroughMode::Dxc: return SLANG_E_NOT_IMPLEMENTED;
 #endif
-                break;
-            }
-            case PassThroughMode::Fxc:
-            {
-#if SLANG_ENABLE_DXBC_SUPPORT
-                // Must have fxc
-                return session->getOrLoadSharedLibrary(SharedLibraryType::Fxc, nullptr) ? SLANG_OK : SLANG_E_NOT_FOUND;
+#if !SLANG_ENABLE_DXBC_SUPPORT
+            case PassThroughMode::Fxc: return SLANG_E_NOT_IMPLEMENTED;
 #endif
-                break;
-            }
-            case PassThroughMode::Glslang:
-            {
-#if SLANG_ENABLE_GLSLANG_SUPPORT
-                return session->getOrLoadSharedLibrary(Slang::SharedLibraryType::Glslang, nullptr) ? SLANG_OK : SLANG_E_NOT_FOUND;
+#if !SLANG_ENABLE_GLSLANG_SUPPORT
+            case PassThroughMode::Glslang: return SLANG_E_NOT_IMPLEMENTED;
 #endif
-                break;
-            }
-            case PassThroughMode::Clang:
-            case PassThroughMode::VisualStudio:
-            case PassThroughMode::Gcc:
-            case PassThroughMode::NVRTC:
-            {
-                return session->requireDownstreamCompilerSet()->hasCompiler(SlangPassThrough(passThrough)) ? SLANG_OK: SLANG_E_NOT_FOUND;
-            }
-            case PassThroughMode::GenericCCpp:
-            {
-                List<DownstreamCompiler::Desc> descs;
-                session->requireDownstreamCompilerSet()->getCompilerDescs(descs);
 
-                return descs.getCount() ? SLANG_OK: SLANG_E_NOT_FOUND;
-            }
+            default: break;
         }
-        return SLANG_E_NOT_IMPLEMENTED;
+
+        return session->getOrLoadDownstreamCompiler(passThrough, nullptr) ? SLANG_OK: SLANG_E_NOT_FOUND;
     }
 
     PassThroughMode getDownstreamCompilerRequiredForTarget(CodeGenTarget target)
@@ -1267,7 +1244,7 @@ SlangResult dissassembleDXILUsingDXC(
         return SLANG_OK;
     }
 
-    SlangResult emitDownstreamForEntryPoint(
+    SlangResult emitWithDownstreamForEntryPoint(
         BackEndCompileRequest*  slangRequest,
         Int                     entryPointIndex,
         TargetRequest*          targetReq,
@@ -1307,8 +1284,8 @@ SlangResult dissassembleDXILUsingDXC(
             }
         }
         
-        // Get the required downstream CPP compiler
-        DownstreamCompiler* compiler = session->getDownstreamCompiler(downstreamCompiler);
+        // Get the required downstream compiler
+        DownstreamCompiler* compiler = session->getOrLoadDownstreamCompiler(downstreamCompiler, sink);
 
         if (!compiler)
         {
@@ -1691,7 +1668,7 @@ SlangResult dissassembleDXILUsingDXC(
             {
                 RefPtr<DownstreamCompileResult> downstreamResult;
 
-                if (SLANG_SUCCEEDED(emitDownstreamForEntryPoint(
+                if (SLANG_SUCCEEDED(emitWithDownstreamForEntryPoint(
                     compileRequest,
                     entryPointIndex,
                     targetReq,

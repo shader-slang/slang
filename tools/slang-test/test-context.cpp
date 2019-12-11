@@ -87,8 +87,19 @@ DownstreamCompilerSet* TestContext::getCompilerSet()
     {
         compilerSet = new DownstreamCompilerSet;
 
-        DownstreamCompilerUtil::InitializeSetDesc desc;
-        DownstreamCompilerUtil::initializeSet(desc, DefaultSharedLibraryLoader::getSingleton(), compilerSet);
+        DownstreamCompilerLocatorFunc locators[int(SLANG_PASS_THROUGH_COUNT_OF)] = { nullptr };
+
+        DownstreamCompilerUtil::setDefaultLocators(locators);
+        for (Index i = 0; i < Index(SLANG_PASS_THROUGH_COUNT_OF); ++i)
+        {
+            auto locator = locators[i];
+            if (locator)
+            {
+                locator(String(), DefaultSharedLibraryLoader::getSingleton(), compilerSet);
+            }
+        }
+
+        DownstreamCompilerUtil::updateDefaults(compilerSet);
     }
     return compilerSet;
 }

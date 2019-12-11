@@ -95,6 +95,7 @@ public:
 
     // DownstreamCompiler
     virtual SlangResult compile(const CompileOptions& options, RefPtr<DownstreamCompileResult>& outResult) SLANG_OVERRIDE;
+    virtual ISlangSharedLibrary* getSharedLibrary() SLANG_OVERRIDE { return m_sharedLibrary; }
 
         /// Must be called before use
     SlangResult init(ISlangSharedLibrary* library);

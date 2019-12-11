@@ -1834,8 +1834,6 @@ namespace Slang
 
         SLANG_NO_THROW SlangPassThrough SLANG_MCALL getDefaultDownstreamCompiler(SlangSourceLanguage sourceLanguage) override;
 
-            /// Get the specified compiler
-        DownstreamCompiler* getDownstreamCompiler(PassThroughMode downstreamCompiler);
             /// Get the default cpp compiler for a language
         DownstreamCompiler* getDefaultDownstreamCompiler(SourceLanguage sourceLanguage);
 
@@ -1893,12 +1891,7 @@ namespace Slang
         RefPtr<Type> stringType;
         RefPtr<Type> enumTypeType;
 
-        RefPtr<DownstreamCompilerSet> downstreamCompilerSet;                                          ///< Information about available C/C++ compilers. null unless information is requested (because slow)
-
-        ComPtr<ISlangSharedLibraryLoader> sharedLibraryLoader;                          ///< The shared library loader (never null)
-        ComPtr<ISlangSharedLibrary> sharedLibraries[int(SharedLibraryType::CountOf)];   ///< The loaded shared libraries
-        SlangFuncPtr sharedLibraryFunctions[int(SharedLibraryFuncType::CountOf)];
-
+        
         Dictionary<int, RefPtr<Type>> builtinTypes;
         Dictionary<String, Decl*> magicDecls;
 
@@ -1961,21 +1954,17 @@ namespace Slang
         void destroyTypeCheckingCache();
         //
 
-            /// Will try to load the library by specified name (using the set loader), if not one already available.
-        ISlangSharedLibrary* getOrLoadSharedLibrary(SharedLibraryType type, DiagnosticSink* sink);
-            /// Will unload the specified shared library if it's currently loaded 
-        void setSharedLibrary(SharedLibraryType type, ISlangSharedLibrary* library);
+        void setSharedLibraryLoader(ISlangSharedLibraryLoader* loader);
 
-            /// Gets a shared library by type, or null if not loaded
-        ISlangSharedLibrary* getSharedLibrary(SharedLibraryType type) const { return sharedLibraries[int(type)]; }
+            /// Will try to load the library by specified name (using the set loader), if not one already available.
+        DownstreamCompiler* getOrLoadDownstreamCompiler(PassThroughMode type, DiagnosticSink* sink);
+            /// Will unload the specified shared library if it's currently loaded 
+        void resetDownstreamCompiler(PassThroughMode type);
 
         SlangFuncPtr getSharedLibraryFunc(SharedLibraryFuncType type, DiagnosticSink* sink);
 
             /// Get the downstream compiler prelude
         const String& getDownstreamCompilerPrelude(PassThroughMode mode) { return m_downstreamCompilerPreludes[int(mode)]; }
-
-            /// Finds out what compilers are present and caches the result
-        DownstreamCompilerSet* requireDownstreamCompilerSet();
 
         Session();
 
@@ -1985,10 +1974,20 @@ namespace Slang
             String const&           source);
         ~Session();
 
+        ComPtr<ISlangSharedLibraryLoader> m_sharedLibraryLoader;                    ///< The shared library loader (never null)
+        SlangFuncPtr m_sharedLibraryFunctions[int(SharedLibraryFuncType::CountOf)]; ///< Functions from shared libraries
+
+        int m_downstreamCompilerInitialized = 0;                                        
+
+        RefPtr<DownstreamCompilerSet> m_downstreamCompilerSet;                      ///< Information about all available downstream compilers.
+        RefPtr<DownstreamCompiler> m_downstreamCompilers[int(PassThroughMode::CountOf)];    ///< A downstream compiler for a pass through
+        DownstreamCompilerLocatorFunc m_downstreamCompilerLocators[int(PassThroughMode::CountOf)];
+
     private:
 
         SlangResult _loadRequest(EndToEndCompileRequest* request, const void* data, size_t size);
 
+        
             /// Linkage used for all built-in (stdlib) code.
         RefPtr<Linkage> m_builtinLinkage;
 

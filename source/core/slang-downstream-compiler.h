@@ -140,9 +140,11 @@ public:
         Int getVersionValue() const { return majorVersion * 100 + minorVersion;  }
 
         void appendAsText(StringBuilder& out) const;
+            /// true if has a version set
+        bool hasVersion() const { return majorVersion || minorVersion; }
 
             /// Ctor
-        Desc(SlangPassThrough inType = SLANG_PASS_THROUGH_NONE, Int inMajorVersion = 0, Int inMinorVersion = 0):type(inType), majorVersion(inMajorVersion), minorVersion(inMinorVersion) {}
+        explicit Desc(SlangPassThrough inType = SLANG_PASS_THROUGH_NONE, Int inMajorVersion = 0, Int inMinorVersion = 0):type(inType), majorVersion(inMajorVersion), minorVersion(inMinorVersion) {}
 
         SlangPassThrough type;                      ///< The type of the compiler
         Int majorVersion;               ///< Major version (interpretation is type specific)
@@ -254,7 +256,9 @@ public:
     const Desc& getDesc() const { return m_desc;  }
         /// Compile using the specified options. The result is in resOut
     virtual SlangResult compile(const CompileOptions& options, RefPtr<DownstreamCompileResult>& outResult) = 0;
- 
+        /// Some downstream compilers are backed by a shared library. This allows access to the shared library to access internal functions. 
+    virtual ISlangSharedLibrary* getSharedLibrary() { return nullptr; }
+
         /// Return the compiler type as name
     static UnownedStringSlice getCompilerTypeAsText(SlangPassThrough type);
 
@@ -330,6 +334,24 @@ public:
     CommandLine m_cmdLine;
 };
 
+class SharedLibraryDownstreamCompiler: public DownstreamCompiler
+{
+public:
+    typedef DownstreamCompiler Super;
+
+    // DownstreamCompiler
+    virtual SlangResult compile(const CompileOptions& options, RefPtr<DownstreamCompileResult>& outResult) SLANG_OVERRIDE { SLANG_UNUSED(options); SLANG_UNUSED(outResult); return SLANG_E_NOT_IMPLEMENTED; }
+    virtual ISlangSharedLibrary* getSharedLibrary() SLANG_OVERRIDE { return m_library; }
+
+    SharedLibraryDownstreamCompiler(const Desc& desc, ISlangSharedLibrary* library):
+        Super(desc),
+        m_library(library)
+    {
+    }
+protected:
+    ComPtr<ISlangSharedLibrary> m_library;
+};
+
 class DownstreamCompilerSet : public RefObject
 {
 public:
@@ -354,6 +376,10 @@ public:
         /// True if has a compiler of the specified type
     bool hasCompiler(SlangPassThrough compilerType) const;
 
+    void remove(SlangPassThrough compilerType);
+
+    void clear() { m_compilers.clear(); }
+
 protected:
 
     Index _findIndex(const DownstreamCompiler::Desc& desc) const;
@@ -364,7 +390,7 @@ protected:
     List<RefPtr<DownstreamCompiler>> m_compilers;
 };
 
-typedef SlangResult (*DownstreamCompilerLocatorFunc)(const char* path, ISlangSharedLibraryLoader* loader, DownstreamCompilerSet* set);
+typedef SlangResult (*DownstreamCompilerLocatorFunc)(const String& path, ISlangSharedLibraryLoader* loader, DownstreamCompilerSet* set);
 
 /* Only purpose of having base-class here is to make all the DownstreamCompiler types available directly in derived Utils */
 struct DownstreamCompilerBaseUtil
@@ -391,14 +417,6 @@ struct DownstreamCompilerUtil: public DownstreamCompilerBaseUtil
         Newest,
     };
 
-    struct InitializeSetDesc
-    {
-        const String& getPath(SlangPassThrough type) const { return paths[int(type)]; }
-        void setPath(SlangPassThrough type, const String& path) { paths[int(type)] = path; }
-
-        String paths[int(SLANG_PASS_THROUGH_COUNT_OF)];
-    };
-
         /// Find a compiler
     static DownstreamCompiler* findCompiler(const DownstreamCompilerSet* set, MatchType matchType, const DownstreamCompiler::Desc& desc);
     static DownstreamCompiler* findCompiler(const List<DownstreamCompiler*>& compilers, MatchType matchType, const DownstreamCompiler::Desc& desc);
@@ -410,11 +428,10 @@ struct DownstreamCompilerUtil: public DownstreamCompilerBaseUtil
         /// Get the information on the compiler used to compile this source
     static const DownstreamCompiler::Desc& getCompiledWithDesc();
 
-        /// Given a set, registers compilers found through standard means and determines a reasonable default compiler if possible
-    static SlangResult initializeSet(const InitializeSetDesc& desc, ISlangSharedLibraryLoader* loader, DownstreamCompilerSet* set);
-        
     static void updateDefault(DownstreamCompilerSet* set, DownstreamCompiler::SourceType type);
     static void updateDefaults(DownstreamCompilerSet* set);
+
+    static void setDefaultLocators(DownstreamCompilerLocatorFunc outFuncs[int(SLANG_PASS_THROUGH_COUNT_OF)]);
 };
 
 }

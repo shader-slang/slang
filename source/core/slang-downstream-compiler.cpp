@@ -362,7 +362,7 @@ SlangResult CommandLineDownstreamCompiler::compile(const CompileOptions& inOptio
 
 static DownstreamCompiler::Desc _calcCompiledWithDesc()
 {
-    DownstreamCompiler::Desc desc = {};
+    DownstreamCompiler::Desc desc;
 
 #if SLANG_VC
     desc = WinVisualStudioUtil::getDesc(WinVisualStudioUtil::getCompiledVersion());
@@ -402,6 +402,11 @@ const DownstreamCompiler::Desc& DownstreamCompilerUtil::getCompiledWithDesc()
 
 /* static */DownstreamCompiler* DownstreamCompilerUtil::findCompiler(const List<DownstreamCompiler*>& compilers, MatchType matchType, const DownstreamCompiler::Desc& desc)
 {
+    if (compilers.getCount() <= 0)
+    {
+        return nullptr;
+    }
+
     Int bestIndex = -1;
 
     const SlangPassThrough type = desc.type;
@@ -409,7 +414,14 @@ const DownstreamCompiler::Desc& DownstreamCompilerUtil::getCompiledWithDesc()
     Int maxVersionValue = 0;
     Int minVersionDiff = 0x7fffffff;
 
-    const auto descVersionValue = desc.getVersionValue();
+    Int descVersionValue = desc.getVersionValue();
+
+    // If we don't have version set, then anything 0 or above is good enough, and just take newest
+    if (descVersionValue == 0)
+    {
+        maxVersionValue = -1;
+        matchType = MatchType::Newest;
+    }
 
     for (Index i = 0; i < compilers.getCount(); ++i)
     {
@@ -539,15 +551,59 @@ const DownstreamCompiler::Desc& DownstreamCompilerUtil::getCompiledWithDesc()
     }
 }
 
-/* static */SlangResult DownstreamCompilerUtil::initializeSet(const InitializeSetDesc& initDesc, ISlangSharedLibraryLoader* loader, DownstreamCompilerSet* set)
+static SlangResult _locateDXCCompilers(const String& path, ISlangSharedLibraryLoader* loader, DownstreamCompilerSet* set)
 {
-    VisualStudioCompilerUtil::locateCompilers(initDesc.getPath(SLANG_PASS_THROUGH_VISUAL_STUDIO), loader, set);
-    GCCDownstreamCompilerUtil::locateClangCompilers(initDesc.getPath(SLANG_PASS_THROUGH_CLANG), loader, set);
-    GCCDownstreamCompilerUtil::locateGCCCompilers(initDesc.getPath(SLANG_PASS_THROUGH_GCC), loader, set);
-    NVRTCDownstreamCompilerUtil::locateCompilers(initDesc.getPath(SLANG_PASS_THROUGH_NVRTC), loader, set);
+    // First try dxil, so it's loaded from the same path if it's there
+    ComPtr<ISlangSharedLibrary> dxil;
+    DefaultSharedLibraryLoader::load(loader, path, "dxil", dxil.writeRef());
 
-    updateDefaults(set);
+    ComPtr<ISlangSharedLibrary> sharedLibrary;
+    if (SLANG_SUCCEEDED(DefaultSharedLibraryLoader::load(loader, path, "dxcompiler", sharedLibrary.writeRef())))
+    {
+        // Can we determine the version?
+        DownstreamCompiler::Desc desc(SLANG_PASS_THROUGH_DXC);
+        RefPtr<DownstreamCompiler> compiler(new SharedLibraryDownstreamCompiler(desc, sharedLibrary));
+
+        set->addCompiler(compiler);
+    }
     return SLANG_OK;
+}
+
+static SlangResult _locateFXCCompilers(const String& path, ISlangSharedLibraryLoader* loader, DownstreamCompilerSet* set)
+{
+    ComPtr<ISlangSharedLibrary> sharedLibrary;
+    if (SLANG_SUCCEEDED(DefaultSharedLibraryLoader::load(loader, path, "d3dcompiler_47", sharedLibrary.writeRef())))
+    {
+        // Can we determine the version?
+        DownstreamCompiler::Desc desc(SLANG_PASS_THROUGH_FXC);
+        RefPtr<DownstreamCompiler> compiler(new SharedLibraryDownstreamCompiler(desc, sharedLibrary));
+        set->addCompiler(compiler);
+    }
+    return SLANG_OK;
+}
+
+static SlangResult _locateGlslangCompilers(const String& path, ISlangSharedLibraryLoader* loader, DownstreamCompilerSet* set)
+{
+    ComPtr<ISlangSharedLibrary> sharedLibrary;
+    if (SLANG_SUCCEEDED(DefaultSharedLibraryLoader::load(loader, path, "slang-glslang", sharedLibrary.writeRef())))
+    {
+        // Can we determine the version?
+        DownstreamCompiler::Desc desc(SLANG_PASS_THROUGH_GLSLANG);
+        RefPtr<DownstreamCompiler> compiler(new SharedLibraryDownstreamCompiler(desc, sharedLibrary));
+        set->addCompiler(compiler);
+    }
+    return SLANG_OK;
+}
+
+/* static */void DownstreamCompilerUtil::setDefaultLocators(DownstreamCompilerLocatorFunc outFuncs[int(SLANG_PASS_THROUGH_COUNT_OF)])
+{
+    outFuncs[int(SLANG_PASS_THROUGH_VISUAL_STUDIO)] = &VisualStudioCompilerUtil::locateCompilers;
+    outFuncs[int(SLANG_PASS_THROUGH_CLANG)] = &GCCDownstreamCompilerUtil::locateClangCompilers;
+    outFuncs[int(SLANG_PASS_THROUGH_GCC)] = &GCCDownstreamCompilerUtil::locateGCCCompilers;
+    outFuncs[int(SLANG_PASS_THROUGH_NVRTC)] = &NVRTCDownstreamCompilerUtil::locateCompilers;
+    outFuncs[int(SLANG_PASS_THROUGH_DXC)] = &_locateDXCCompilers;
+    outFuncs[int(SLANG_PASS_THROUGH_FXC)] = &_locateFXCCompilers;
+    outFuncs[int(SLANG_PASS_THROUGH_GLSLANG)] = &_locateGlslangCompilers;
 }
 
 /* !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! DownstreamCompilerSet !!!!!!!!!!!!!!!!!!!!!!*/
@@ -597,6 +653,20 @@ bool DownstreamCompilerSet::hasCompiler(SlangPassThrough compilerType) const
         }
     }
     return false;
+}
+
+
+void DownstreamCompilerSet::remove(SlangPassThrough compilerType)
+{
+    for (Index i = 0; i < m_compilers.getCount(); ++i)
+    {
+        DownstreamCompiler* compiler = m_compilers[i];
+        if (compiler->getDesc().type == compilerType)
+        {
+            m_compilers.fastRemoveAt(i);
+            i--;
+        }
+    }
 }
 
 void DownstreamCompilerSet::addCompiler(DownstreamCompiler* compiler)

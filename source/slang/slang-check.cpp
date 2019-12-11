@@ -13,86 +13,151 @@ namespace Slang
     struct FunctionInfo
     {
         const char* name;
-        SharedLibraryType libraryType;
+        PassThroughMode compilerType;
     };
+
+    const Guid IID_ISlangSharedLibraryLoader = SLANG_UUID_ISlangSharedLibraryLoader;
+    const Guid IID_ISlangUnknown = SLANG_UUID_ISlangUnknown;
+
+    class SinkSharedLibraryLoader : public RefObject, public ISlangSharedLibraryLoader
+    {
+    public:
+        SLANG_REF_OBJECT_IUNKNOWN_ALL
+
+            virtual SLANG_NO_THROW SlangResult SLANG_MCALL loadSharedLibrary(
+                const char*     path,
+                ISlangSharedLibrary** outSharedLibrary) SLANG_OVERRIDE
+        {
+            SlangResult res = m_loader->loadSharedLibrary(path, outSharedLibrary);
+
+            // Special handling for failure...
+            if (SLANG_FAILED(res) && m_sink)
+            {
+                String filename = Path::getFileNameWithoutExt(path);
+                if (filename == "dxil")
+                {
+                    m_sink->diagnose(SourceLoc(), Diagnostics::dxilNotFound);
+                }
+                else
+                {
+                    m_sink->diagnose(SourceLoc(), Diagnostics::failedToLoadDynamicLibrary, path);
+                }
+            }
+            return res;
+        }
+
+        SinkSharedLibraryLoader(ISlangSharedLibraryLoader* loader, DiagnosticSink* sink) :
+            m_loader(loader),
+            m_sink(sink)
+        {
+        }
+
+    protected:
+        ISlangUnknown* getInterface(const Guid& guid)
+        {
+            return (guid == IID_ISlangUnknown || guid == IID_ISlangSharedLibraryLoader) ? static_cast<ISlangSharedLibraryLoader*>(this) : nullptr;
+        }
+        ISlangSharedLibraryLoader* m_loader;
+        DiagnosticSink* m_sink;
+    };
+
     } // anonymous
 
     static FunctionInfo _getFunctionInfo(Session::SharedLibraryFuncType funcType)
     {
         typedef Session::SharedLibraryFuncType FuncType;
-        typedef SharedLibraryType LibType;
-
+        
         switch (funcType)
         {
-            case FuncType::Glslang_Compile:   return { "glslang_compile", LibType::Glslang } ;
-            case FuncType::Fxc_D3DCompile:     return { "D3DCompile", LibType::Fxc };
-            case FuncType::Fxc_D3DDisassemble: return { "D3DDisassemble", LibType::Fxc };
-            case FuncType::Dxc_DxcCreateInstance:  return { "DxcCreateInstance", LibType::Dxc };
-            default: return { nullptr, LibType::Unknown };
+            case FuncType::Glslang_Compile:   return { "glslang_compile", PassThroughMode::Glslang} ;
+            case FuncType::Fxc_D3DCompile:     return { "D3DCompile", PassThroughMode::Fxc};
+            case FuncType::Fxc_D3DDisassemble: return { "D3DDisassemble", PassThroughMode::Fxc };
+            case FuncType::Dxc_DxcCreateInstance:  return { "DxcCreateInstance", PassThroughMode::Dxc };
+            default: return { nullptr, PassThroughMode::None };
         } 
     }
 
-    static PassThroughMode _toPassThroughMode(SharedLibraryType type)
+    void Session::setSharedLibraryLoader(ISlangSharedLibraryLoader* loader)
     {
-        switch (type)
+        if (m_sharedLibraryLoader != loader)
         {
-            case SharedLibraryType::Dxil:
-            case SharedLibraryType::Dxc:
-            {
-                return PassThroughMode::Dxc;
-            }
-            case SharedLibraryType::Fxc:        return PassThroughMode::Fxc;
-            case SharedLibraryType::Glslang:    return PassThroughMode::Glslang;
-            default: break;
-        }
+            // Need to clear all of the libraries
+            m_downstreamCompilerSet->clear();
+            m_downstreamCompilerInitialized = 0;
 
-        return PassThroughMode::None;    
+            for (Index i = 0; i < Index(SLANG_PASS_THROUGH_COUNT_OF); ++i)
+            {
+                m_downstreamCompilers[i].setNull();
+            }
+
+            // Clear all of the functions
+            ::memset(m_sharedLibraryFunctions, 0, sizeof(m_sharedLibraryFunctions));
+
+            // Set the loader
+            m_sharedLibraryLoader = loader;
+        }
     }
 
-    void Session::setSharedLibrary(SharedLibraryType type, ISlangSharedLibrary* library)
+    void Session::resetDownstreamCompiler(PassThroughMode type)
     {
-        sharedLibraries[int(type)] = library;
+        // Mark as initialized
+        m_downstreamCompilerInitialized &= ~(1 << int(type));
+        m_downstreamCompilers[int(type)].setNull();
     }
 
-    ISlangSharedLibrary* Session::getOrLoadSharedLibrary(SharedLibraryType type, DiagnosticSink* sink)
+    DownstreamCompiler* Session::getOrLoadDownstreamCompiler(PassThroughMode type, DiagnosticSink* sink)
     {
-        // If not loaded, try loading it
-        if (!sharedLibraries[int(type)])
+        if (m_downstreamCompilerInitialized & (1 << int(type)))
         {
-            // Try to preload dxil first, if loading dxc
-            if (type == SharedLibraryType::Dxc)
-            {
-                // Pass nullptr as the sink, because if it fails we don't want to report as error
-                getOrLoadSharedLibrary(SharedLibraryType::Dxil, nullptr);
-            }
-
-            const char* libName = DefaultSharedLibraryLoader::getSharedLibraryNameFromType(type);
-
-            StringBuilder builder;
-            PassThroughMode passThrough = _toPassThroughMode(type);
-            if (passThrough != PassThroughMode::None && m_downstreamCompilerPaths[int(passThrough)].getLength() > 0)
-            {
-                Path::combineIntoBuilder(m_downstreamCompilerPaths[int(passThrough)].getUnownedSlice(), UnownedStringSlice(libName), builder);
-                libName = builder.getBuffer();
-            }
-
-            if (SLANG_FAILED(sharedLibraryLoader->loadSharedLibrary(libName, sharedLibraries[int(type)].writeRef())))
-            {
-                if (sink)
-                {
-                    sink->diagnose(SourceLoc(), Diagnostics::failedToLoadDynamicLibrary, libName);
-                }
-                return nullptr;
-            }
+            return m_downstreamCompilers[int(type)];
         }
-        return sharedLibraries[int(type)];
+
+        if (type == PassThroughMode::GenericCCpp)
+        {
+            // try loading all C/C++ compilers
+            getOrLoadDownstreamCompiler(PassThroughMode::Clang, sink);
+            getOrLoadDownstreamCompiler(PassThroughMode::Gcc, sink);
+            getOrLoadDownstreamCompiler(PassThroughMode::VisualStudio, sink);
+        }
+
+        // Mark that we have tried to load it
+        m_downstreamCompilerInitialized |= (1 << int(type));
+        m_downstreamCompilers[int(type)].setNull();
+
+        // Do we have a locator
+        auto locator = m_downstreamCompilerLocators[int(type)];
+        if (!locator)
+        {
+            return nullptr;
+        }
+
+        m_downstreamCompilerSet->remove(SlangPassThrough(type));
+
+        SinkSharedLibraryLoader loader(m_sharedLibraryLoader, sink);
+        locator(m_downstreamCompilerPaths[int(type)], &loader, m_downstreamCompilerSet);
+
+        DownstreamCompilerUtil::updateDefaults(m_downstreamCompilerSet);
+
+        if (type == PassThroughMode::GenericCCpp)
+        {
+            m_downstreamCompilers[int(type)] = m_downstreamCompilerSet->getDefaultCompiler(DownstreamCompiler::SourceType::CPP);
+        }
+        else
+        {
+            DownstreamCompiler::Desc desc;
+            desc.type = SlangPassThrough(type);
+
+            m_downstreamCompilers[int(type)] = DownstreamCompilerUtil::findCompiler(m_downstreamCompilerSet, DownstreamCompilerUtil::MatchType::Newest, desc);
+        }
+
+        return m_downstreamCompilers[int(type)];
     }
 
     SlangFuncPtr Session::getSharedLibraryFunc(SharedLibraryFuncType type, DiagnosticSink* sink)
     {
-        if (sharedLibraryFunctions[int(type)])
+        if (m_sharedLibraryFunctions[int(type)])
         {
-            return sharedLibraryFunctions[int(type)];
+            return m_sharedLibraryFunctions[int(type)];
         }
         // do we have the library
         FunctionInfo info = _getFunctionInfo(type);
@@ -101,41 +166,29 @@ namespace Slang
             return nullptr;
         }
         // Try loading the library
-        ISlangSharedLibrary* sharedLib = getOrLoadSharedLibrary(info.libraryType, sink);
-        if (!sharedLib)
+        DownstreamCompiler* compiler = getOrLoadDownstreamCompiler(info.compilerType, sink);
+        if (!compiler)
+        {
+            return nullptr;
+        }
+        ISlangSharedLibrary* sharedLibrary = compiler->getSharedLibrary();
+        if (!sharedLibrary)
         {
             return nullptr;
         }
 
         // Okay now access the func
-        SlangFuncPtr func = sharedLib->findFuncByName(info.name);
+        SlangFuncPtr func = sharedLibrary->findFuncByName(info.name);
         if (!func)
         {
-            const char* libName = DefaultSharedLibraryLoader::getSharedLibraryNameFromType(info.libraryType);
-            sink->diagnose(SourceLoc(), Diagnostics::failedToFindFunctionInSharedLibrary, info.name, libName);
+            UnownedStringSlice compilerName = DownstreamCompiler::getCompilerTypeAsText(SlangPassThrough(info.compilerType));
+            sink->diagnose(SourceLoc(), Diagnostics::failedToFindFunctionForCompiler, info.name, compilerName);
             return nullptr;
         }
 
         // Store in the function cache
-        sharedLibraryFunctions[int(type)] = func;
+        m_sharedLibraryFunctions[int(type)] = func;
         return func;
-    }
-
-    DownstreamCompilerSet* Session::requireDownstreamCompilerSet()
-    {
-        if (downstreamCompilerSet == nullptr)
-        {
-            downstreamCompilerSet = new DownstreamCompilerSet;
-
-            DownstreamCompilerUtil::InitializeSetDesc desc;
-            for (Index i = 0; i < Index(SLANG_PASS_THROUGH_COUNT_OF); ++i)
-            {
-                desc.paths[i] = m_downstreamCompilerPaths[i];
-            }
-            DownstreamCompilerUtil::initializeSet(desc, sharedLibraryLoader, downstreamCompilerSet);
-        }
-        SLANG_ASSERT(downstreamCompilerSet);
-        return downstreamCompilerSet;
     }
 
     TypeCheckingCache* Session::getTypeCheckingCache()
