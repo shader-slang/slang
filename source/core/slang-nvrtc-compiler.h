@@ -11,8 +11,7 @@ namespace Slang
 
 struct NVRTCDownstreamCompilerUtil
 {
-        /// Create a NVRTC downstream compiler. Note on success the created compiler will own the shared library handle. 
-    static SlangResult createCompiler(ISlangSharedLibrary* library, RefPtr<DownstreamCompiler>& outCompiler);
+    static SlangResult locateCompilers(const String& path, ISlangSharedLibraryLoader* loader, DownstreamCompilerSet* set);
 };
 
 }

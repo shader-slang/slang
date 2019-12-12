@@ -536,8 +536,8 @@ extern "C"
         SLANG_CONTAINER_FORMAT_SLANG_MODULE,
     };
 
-    typedef int SlangPassThrough;
-    enum
+    typedef int SlangPassThroughIntegral;
+    enum SlangPassThrough : SlangPassThroughIntegral
     {
         SLANG_PASS_THROUGH_NONE,
         SLANG_PASS_THROUGH_FXC,

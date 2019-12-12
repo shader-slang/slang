@@ -5,6 +5,11 @@
 #include "../../slang-com-helper.h"
 #include "slang-string-util.h"
 
+// if Visual Studio import the visual studio platform specific header
+#if SLANG_VC
+#   include "windows/slang-win-visual-studio-util.h"
+#endif
+
 #include "slang-io.h"
 
 namespace Slang
@@ -424,6 +429,21 @@ static SlangResult _parseVisualStudioLine(const UnownedStringSlice& line, Downst
     if (outDiagnostics.has(Diagnostic::Type::Error))
     {
         outDiagnostics.result = SLANG_FAIL;
+    }
+
+    return SLANG_OK;
+}
+
+/* static */SlangResult VisualStudioCompilerUtil::locateCompilers(const String& path, ISlangSharedLibraryLoader* loader, DownstreamCompilerSet* set)
+{
+    SLANG_UNUSED(loader);
+
+    // TODO(JS): We don't support fixed path for visual studio just yet
+    if (path.getLength() == 0)
+    {
+#if SLANG_VC
+        return WinVisualStudioUtil::find(set);
+#endif
     }
 
     return SLANG_OK;

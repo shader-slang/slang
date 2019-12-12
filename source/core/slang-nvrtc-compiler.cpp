@@ -95,6 +95,7 @@ public:
 
     // DownstreamCompiler
     virtual SlangResult compile(const CompileOptions& options, RefPtr<DownstreamCompileResult>& outResult) SLANG_OVERRIDE;
+    virtual ISlangSharedLibrary* getSharedLibrary() SLANG_OVERRIDE { return m_sharedLibrary; }
 
         /// Must be called before use
     SlangResult init(ISlangSharedLibrary* library);
@@ -139,7 +140,7 @@ SlangResult NVRTCDownstreamCompiler::init(ISlangSharedLibrary* library)
 
     m_sharedLibrary = library;
 
-    m_desc.type = CompilerType::NVRTC;
+    m_desc.type = SLANG_PASS_THROUGH_NVRTC;
 
     int major, minor;
     m_nvrtcVersion(&major, &minor);
@@ -356,14 +357,26 @@ SlangResult NVRTCDownstreamCompiler::compile(const CompileOptions& options, RefP
     return SLANG_OK;
 }
 
-/* static */SlangResult NVRTCDownstreamCompilerUtil::createCompiler(ISlangSharedLibrary* library, RefPtr<DownstreamCompiler>& outCompiler)
+/* static */SlangResult NVRTCDownstreamCompilerUtil::locateCompilers(const String& path, ISlangSharedLibraryLoader* loader, DownstreamCompilerSet* set)
 {
-    RefPtr<NVRTCDownstreamCompiler> compiler(new NVRTCDownstreamCompiler);
+    ComPtr<ISlangSharedLibrary> library;
 
+    if (path.getLength() != 0)
+    {
+        SLANG_RETURN_ON_FAIL(loader->loadSharedLibrary(path.getBuffer(), library.writeRef()));
+    }
+    else
+    {
+        const char* libraryName = "nvrtc64_102_0";
+        SLANG_RETURN_ON_FAIL(loader->loadSharedLibrary(libraryName, library.writeRef()));
+    }
+
+    RefPtr<NVRTCDownstreamCompiler> compiler(new NVRTCDownstreamCompiler);
     SLANG_RETURN_ON_FAIL(compiler->init(library));
 
-    outCompiler = compiler;
+    set->addCompiler(compiler);
     return SLANG_OK;
 }
+
 
 }

@@ -87,13 +87,19 @@ DownstreamCompilerSet* TestContext::getCompilerSet()
     {
         compilerSet = new DownstreamCompilerSet;
 
-        DownstreamCompilerUtil::InitializeSetDesc desc;
+        DownstreamCompilerLocatorFunc locators[int(SLANG_PASS_THROUGH_COUNT_OF)] = { nullptr };
 
-        ComPtr<ISlangSharedLibrary> nvrtcSharedLibrary;
-        DefaultSharedLibraryLoader::getSingleton()->loadSharedLibrary(DefaultSharedLibraryLoader::getSharedLibraryNameFromType(SharedLibraryType::NVRTC), nvrtcSharedLibrary.writeRef());
-        desc.sharedLibraries[int(DownstreamCompiler::CompilerType::NVRTC)] = nvrtcSharedLibrary;
+        DownstreamCompilerUtil::setDefaultLocators(locators);
+        for (Index i = 0; i < Index(SLANG_PASS_THROUGH_COUNT_OF); ++i)
+        {
+            auto locator = locators[i];
+            if (locator)
+            {
+                locator(String(), DefaultSharedLibraryLoader::getSingleton(), compilerSet);
+            }
+        }
 
-        DownstreamCompilerUtil::initializeSet(desc, compilerSet);
+        DownstreamCompilerUtil::updateDefaults(compilerSet);
     }
     return compilerSet;
 }

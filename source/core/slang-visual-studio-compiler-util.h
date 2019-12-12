@@ -17,6 +17,8 @@ struct VisualStudioCompilerUtil : public DownstreamCompilerBaseUtil
     static SlangResult calcModuleFilePath(const CompileOptions& options, StringBuilder& outPath);
 
     static SlangResult calcCompileProducts(const CompileOptions& options, ProductFlags flags, List<String>& outPaths);
+
+    static SlangResult locateCompilers(const String& path, ISlangSharedLibraryLoader* loader, DownstreamCompilerSet* set);
 };
 
 class VisualStudioDownstreamCompiler : public CommandLineDownstreamCompiler

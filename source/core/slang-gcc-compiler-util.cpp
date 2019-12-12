@@ -70,11 +70,11 @@ SlangResult GCCDownstreamCompilerUtil::calcVersion(const String& exeName, Downst
         UnownedStringSlice::fromLiteral("gcc version"),
         UnownedStringSlice::fromLiteral("Apple LLVM version"),
     };
-    const DownstreamCompiler::CompilerType types[] =
+    const SlangPassThrough types[] =
     {
-        DownstreamCompiler::CompilerType::Clang,
-        DownstreamCompiler::CompilerType::GCC,
-        DownstreamCompiler::CompilerType::Clang,
+        SLANG_PASS_THROUGH_CLANG,
+        SLANG_PASS_THROUGH_GCC,
+        SLANG_PASS_THROUGH_CLANG,
     };
 
     SLANG_COMPILE_TIME_ASSERT(SLANG_COUNT_OF(prefixes) == SLANG_COUNT_OF(types));
@@ -578,6 +578,47 @@ static SlangResult _parseGCCFamilyLine(const UnownedStringSlice& line, LineParse
         cmdLine.addArg("-lm");
     }
 
+    return SLANG_OK;
+}
+
+/* static */SlangResult GCCDownstreamCompilerUtil::createCompiler(const String& path, const String& inExeName, RefPtr<DownstreamCompiler>& outCompiler)
+{
+    String exeName(inExeName);
+    if (path.getLength() > 0)
+    {
+        exeName = Path::combine(path, inExeName);
+    }
+
+    DownstreamCompiler::Desc desc;
+    SLANG_RETURN_ON_FAIL(GCCDownstreamCompilerUtil::calcVersion(exeName, desc));
+
+    RefPtr<CommandLineDownstreamCompiler> compiler(new GCCDownstreamCompiler(desc));
+    compiler->m_cmdLine.setExecutableFilename(exeName);
+
+    outCompiler = compiler;
+    return SLANG_OK;
+}
+
+/* static */SlangResult GCCDownstreamCompilerUtil::locateGCCCompilers(const String& path, ISlangSharedLibraryLoader* loader, DownstreamCompilerSet* set)
+{
+    SLANG_UNUSED(loader);
+    RefPtr<DownstreamCompiler> compiler;
+    if (SLANG_SUCCEEDED(createCompiler(path, "g++", compiler)))
+    {
+        set->addCompiler(compiler);
+    }
+    return SLANG_OK;
+}
+
+/* static */SlangResult GCCDownstreamCompilerUtil::locateClangCompilers(const String& path, ISlangSharedLibraryLoader* loader, DownstreamCompilerSet* set)
+{
+    SLANG_UNUSED(loader);
+
+    RefPtr<DownstreamCompiler> compiler;
+    if (SLANG_SUCCEEDED(createCompiler(path, "clang", compiler)))
+    {
+        set->addCompiler(compiler);
+    }
     return SLANG_OK;
 }
 

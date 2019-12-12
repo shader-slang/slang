@@ -586,7 +586,7 @@ String emitEntryPointSource(
             DownstreamCompiler* compiler = session->getDefaultDownstreamCompiler(sourceLanguage);
             if (compiler)
             {
-                passThru = getPassThroughModeForDownstreamCompiler(compiler->getDesc().type);
+                passThru = PassThroughMode(compiler->getDesc().type);
             }
         }
 

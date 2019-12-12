@@ -35,6 +35,8 @@ namespace Slang
         TargetRequest*          targetReq,
         EndToEndCompileRequest* endToEndReq);
 
+    SlangResult locateDXCCompilers(const String& path, ISlangSharedLibraryLoader* loader, DownstreamCompilerSet* set);
+
     static UnownedStringSlice _getSlice(IDxcBlob* blob)
     {
         if (blob)
@@ -67,15 +69,6 @@ namespace Slang
         if (!dxcCreateInstance)
         {
             return SLANG_FAIL;
-        }
-
-        {
-            if (!session->getSharedLibrary(SharedLibraryType::Dxil))
-            {
-                // If can't load dxil - dxc will not be able to sign output
-                // Output a suitable warning to the user
-                sink->diagnose(SourceLoc(), Diagnostics::dxilNotFound);
-            }
         }
 
         ComPtr<IDxcCompiler> dxcCompiler;
