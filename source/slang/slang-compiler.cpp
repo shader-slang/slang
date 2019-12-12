@@ -76,6 +76,7 @@
 namespace Slang
 {
 
+// NOTE! These must be in the same order as the SlangCompileTarget enum 
 #define SLANG_CODE_GEN_TARGETS(x) \
     x("unknown", Unknown) \
     x("none", None) \
@@ -93,7 +94,9 @@ namespace Slang
     x("cpp", CPPSource) \
     x("exe,executable", Executable) \
     x("sharedlib,sharedlibrary,dll", SharedLibrary) \
-    x("callable,host-callable", HostCallable)
+    x("callable,host-callable", HostCallable) \
+    x("cu,cuda", CUDASource) \
+    x("ptx", PTX) 
 
 #define SLANG_CODE_GEN_INFO(names, e) \
     { CodeGenTarget::e, UnownedStringSlice::fromLiteral(names) },
@@ -115,6 +118,7 @@ namespace Slang
         {
             const auto& info = s_codeGenTargetInfos[i];
 
+            // If this assert fails, then the SLANG_CODE_GEN_TARGETS macro has the wrong order
             SLANG_ASSERT(i == int(info.target));
 
             if (StringUtil::indexOfInSplit(info.names, ',', name) >= 0)
@@ -472,22 +476,26 @@ namespace Slang
             }
             case PassThroughMode::Clang:
             {
-                return session->requireCPPCompilerSet()->hasCompiler(DownstreamCompiler::CompilerType::Clang) ? SLANG_OK: SLANG_E_NOT_FOUND;
+                return session->requireDownstreamCompilerSet()->hasCompiler(DownstreamCompiler::CompilerType::Clang) ? SLANG_OK: SLANG_E_NOT_FOUND;
             }
             case PassThroughMode::VisualStudio:
             {
-                return session->requireCPPCompilerSet()->hasCompiler(DownstreamCompiler::CompilerType::VisualStudio) ? SLANG_OK: SLANG_E_NOT_FOUND;
+                return session->requireDownstreamCompilerSet()->hasCompiler(DownstreamCompiler::CompilerType::VisualStudio) ? SLANG_OK: SLANG_E_NOT_FOUND;
             }
             case PassThroughMode::Gcc:
             {
-                return session->requireCPPCompilerSet()->hasCompiler(DownstreamCompiler::CompilerType::GCC) ? SLANG_OK: SLANG_E_NOT_FOUND;
+                return session->requireDownstreamCompilerSet()->hasCompiler(DownstreamCompiler::CompilerType::GCC) ? SLANG_OK: SLANG_E_NOT_FOUND;
             }
             case PassThroughMode::GenericCCpp:
             {
                 List<DownstreamCompiler::Desc> descs;
-                session->requireCPPCompilerSet()->getCompilerDescs(descs);
+                session->requireDownstreamCompilerSet()->getCompilerDescs(descs);
 
                 return descs.getCount() ? SLANG_OK: SLANG_E_NOT_FOUND;
+            }
+            case PassThroughMode::NVRTC:
+            {
+                return session->requireDownstreamCompilerSet()->hasCompiler(DownstreamCompiler::CompilerType::NVRTC) ? SLANG_OK: SLANG_E_NOT_FOUND;
             }
         }
         return SLANG_E_NOT_IMPLEMENTED;
@@ -541,6 +549,10 @@ namespace Slang
                 // We need some C/C++ compiler
                 return PassThroughMode::GenericCCpp;
             }
+            case CodeGenTarget::PTX:
+            {
+                return PassThroughMode::NVRTC;
+            }
 
             default: break;
         }
@@ -549,7 +561,7 @@ namespace Slang
         return PassThroughMode::None;
     }
 
-    PassThroughMode getPassThroughModeForCPPCompiler(DownstreamCompiler::CompilerType type)
+    PassThroughMode getPassThroughModeForDownstreamCompiler(DownstreamCompiler::CompilerType type)
     {
         typedef DownstreamCompiler::CompilerType CompilerType;
 
@@ -558,6 +570,7 @@ namespace Slang
             case CompilerType::VisualStudio:        return PassThroughMode::VisualStudio;
             case CompilerType::GCC:                 return PassThroughMode::Gcc;
             case CompilerType::Clang:               return PassThroughMode::Clang;
+            case CompilerType::NVRTC:               return PassThroughMode::NVRTC;
             default:                                return PassThroughMode::None;
         }
     }
@@ -1277,7 +1290,7 @@ SlangResult dissassembleDXILUsingDXC(
         return SLANG_OK;
     }
 
-    SlangResult emitCPUBinaryForEntryPoint(
+    SlangResult emitDownstreamForEntryPoint(
         BackEndCompileRequest*  slangRequest,
         Int                     entryPointIndex,
         TargetRequest*          targetReq,
@@ -1297,7 +1310,24 @@ SlangResult dissassembleDXILUsingDXC(
         // If we are not in pass through, lookup the default compiler for the emitted source type
         if (downstreamCompiler == PassThroughMode::None)
         {
-            downstreamCompiler = PassThroughMode(session->getDefaultDownstreamCompiler(SLANG_SOURCE_LANGUAGE_CPP));
+            auto target = targetReq->target;
+            
+            switch (target)
+            {
+                case CodeGenTarget::PTX:
+                {
+                    downstreamCompiler = PassThroughMode(session->getDefaultDownstreamCompiler(SLANG_SOURCE_LANGUAGE_CUDA));
+                    break;
+                }
+                case CodeGenTarget::HostCallable:
+                case CodeGenTarget::SharedLibrary:
+                case CodeGenTarget::Executable:
+                {
+                    downstreamCompiler = PassThroughMode(session->getDefaultDownstreamCompiler(SLANG_SOURCE_LANGUAGE_CPP));
+                    break;
+                }
+                default: break;
+            }
         }
         
         // Get the required downstream CPP compiler
@@ -1382,39 +1412,13 @@ SlangResult dissassembleDXILUsingDXC(
                 const PathInfo& pathInfo = sourceFile->getPathInfo();
                 if (pathInfo.type == PathInfo::Type::FoundPath || pathInfo.type == PathInfo::Type::Normal)
                 {
-                    String compileSourcePath = pathInfo.foundPath;
-                    // We can see if we can load it
-                    if (File::exists(compileSourcePath))
-                    {
-                        // Here we look for the file on the regular file system (as opposed to using the 
-                        // ISlangFileSystem. This is unfortunate but necessary - because when we call out
-                        // to the CPP compiler all it is able to (currently) see are files on the file system.
-                        //
-                        // Note that it could be coincidence that the filesystem has a file that's identical in
-                        // contents/name. That being the case though, any includes wouldn't work for a generated
-                        // file either from some specialized ISlangFileSystem, so this is probably as good as it gets
-                        // until we can integrate directly to a C/C++ compiler through say a shared library where we can control
-                        // file system access.
-                        try
-                        {
-                            String readContents = File::readAllText(compileSourcePath);
-                            // We should see if they are the same
-                            if ((sourceFile->getContent() == readContents.getUnownedSlice()))
-                            {
-                                // We just say use this file
-                                options.sourceFiles.add(compileSourcePath);
-                            }
-                        }
-                        catch (const Slang::IOException&)
-                        {
-                        }
-                    }
+                    options.sourceContentsPath = pathInfo.foundPath;
                 }
+                options.sourceContents = sourceFile->getContent();
             }
-
-            // If can't just use file, concat together and make
-            if (options.sourceFiles.getCount() == 0)
+            else
             {
+                // If can't just use file, concat together and make
                 StringBuilder codeBuilder;
                 for (auto sourceFile : translationUnit->getSourceFiles())
                 {
@@ -1437,8 +1441,18 @@ SlangResult dissassembleDXILUsingDXC(
         }
 
         // Set the source type
-        options.sourceType = (rawSourceLanguage == SourceLanguage::C) ? DownstreamCompiler::SourceType::C : DownstreamCompiler::SourceType::CPP;
-
+        switch (rawSourceLanguage)
+        {
+            case SourceLanguage::C:       options.sourceType = DownstreamCompiler::SourceType::C;   break;
+            case SourceLanguage::CPP:     options.sourceType = DownstreamCompiler::SourceType::CPP; break;
+            case SourceLanguage::CUDA:    options.sourceType = DownstreamCompiler::SourceType::CUDA; break;
+            default:
+            {
+                SLANG_ASSERT(!"Unhandled source language");
+                return SLANG_FAIL;
+            }
+        }
+        
         // Disable exceptions and security checks
         options.flags &= ~(CompileOptions::Flag::EnableExceptionHandling | CompileOptions::Flag::EnableSecurityChecks);
 
@@ -1453,6 +1467,13 @@ SlangResult dissassembleDXILUsingDXC(
             }
             case CodeGenTarget::Executable:
             {
+                options.targetType = DownstreamCompiler::TargetType::Executable;
+                break;
+            }
+            case CodeGenTarget::PTX:
+            {
+                // TODO(JS): Not clear what to do here.
+                // For example should 'Kernel' be distinct from 'Executable'. For now just use executable.
                 options.targetType = DownstreamCompiler::TargetType::Executable;
                 break;
             }
@@ -1488,7 +1509,7 @@ SlangResult dissassembleDXILUsingDXC(
                 case FloatingPointMode::Default:    options.floatingPointMode = DownstreamCompiler::FloatingPointMode::Default; break;
                 case FloatingPointMode::Precise:    options.floatingPointMode = DownstreamCompiler::FloatingPointMode::Precise; break;
                 case FloatingPointMode::Fast:       options.floatingPointMode = DownstreamCompiler::FloatingPointMode::Fast; break;
-                default: SLANG_ASSERT(!"Unhanlde floating point mode");
+                default: SLANG_ASSERT(!"Unhandled floating point mode");
             }
 
             // Add all the search paths (as calculated earlier - they will only be set if this is a pass through else will be empty)
@@ -1686,13 +1707,14 @@ SlangResult dissassembleDXILUsingDXC(
 
         switch (target)
         {
+        case CodeGenTarget::PTX:
         case CodeGenTarget::HostCallable:
         case CodeGenTarget::SharedLibrary:
         case CodeGenTarget::Executable:
             {
                 RefPtr<DownstreamCompileResult> downstreamResult;
 
-                if (SLANG_SUCCEEDED(emitCPUBinaryForEntryPoint(
+                if (SLANG_SUCCEEDED(emitDownstreamForEntryPoint(
                     compileRequest,
                     entryPointIndex,
                     targetReq,
@@ -2012,7 +2034,6 @@ SlangResult dissassembleDXILUsingDXC(
                 const void* blobData = blob->getBufferPointer();
                 size_t blobSize = blob->getBufferSize();
 
-          
                 if (writer->isConsole())
                 {
                     // Writing to console, so we need to generate text output.
@@ -2047,11 +2068,15 @@ SlangResult dissassembleDXILUsingDXC(
                         }
                         break;
 
+                    case CodeGenTarget::PTX:
+                        // For now we just dump PTX out as hex
+
                     case CodeGenTarget::HostCallable:
                     case CodeGenTarget::SharedLibrary:
                     case CodeGenTarget::Executable:
                         HexDumpUtil::dumpWithMarkers((const uint8_t*)blobData, blobSize, 24, writer);
                         break;
+
 
                     default:
                         SLANG_UNEXPECTED("unhandled output format");

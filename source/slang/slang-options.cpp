@@ -55,7 +55,8 @@ SlangResult tryReadCommandLineArgument(DiagnosticSink* sink, char const* option,
         x(clang, CLANG) \
         x(gcc, GCC) \
         x(c, GENERIC_C_CPP) \
-        x(cpp, GENERIC_C_CPP)
+        x(cpp, GENERIC_C_CPP) \
+        x(nvrtc, NVRTC)
 
 static SlangResult _parsePassThrough(const UnownedStringSlice& name, SlangPassThrough& outPassThrough)
 {
@@ -86,6 +87,10 @@ static SlangSourceLanguage _findSourceLanguage(const UnownedStringSlice& text)
     else if (text == "hlsl")
     {
         return SLANG_SOURCE_LANGUAGE_HLSL;
+    }
+    else if (text == "cu" || text == "cuda")
+    {
+        return SLANG_SOURCE_LANGUAGE_CUDA;
     }
     return SLANG_SOURCE_LANGUAGE_UNKNOWN;
 }
@@ -334,6 +339,8 @@ struct OptionsParser
 
             { ".c",    SLANG_SOURCE_LANGUAGE_C,     SLANG_STAGE_NONE },
             { ".cpp",  SLANG_SOURCE_LANGUAGE_CPP,   SLANG_STAGE_NONE },
+            { ".cu",   SLANG_SOURCE_LANGUAGE_CUDA,  SLANG_STAGE_NONE }
+
         };
 
         for (int i = 0; i < SLANG_COUNT_OF(entries); ++i)

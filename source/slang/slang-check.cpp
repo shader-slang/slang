@@ -121,11 +121,11 @@ namespace Slang
         return func;
     }
 
-    DownstreamCompilerSet* Session::requireCPPCompilerSet()
+    DownstreamCompilerSet* Session::requireDownstreamCompilerSet()
     {
-        if (cppCompilerSet == nullptr)
+        if (downstreamCompilerSet == nullptr)
         {
-            cppCompilerSet = new DownstreamCompilerSet;
+            downstreamCompilerSet = new DownstreamCompilerSet;
 
             typedef DownstreamCompiler::CompilerType CompilerType;
             DownstreamCompilerUtil::InitializeSetDesc desc;
@@ -134,10 +134,12 @@ namespace Slang
             desc.paths[int(CompilerType::Clang)] = m_downstreamCompilerPaths[int(PassThroughMode::Clang)];
             desc.paths[int(CompilerType::VisualStudio)] = m_downstreamCompilerPaths[int(PassThroughMode::VisualStudio)];
 
-            DownstreamCompilerUtil::initializeSet(desc, cppCompilerSet);
+            desc.sharedLibraries[int(CompilerType::NVRTC)] = getOrLoadSharedLibrary(SharedLibraryType::NVRTC, nullptr);
+
+            DownstreamCompilerUtil::initializeSet(desc, downstreamCompilerSet);
         }
-        SLANG_ASSERT(cppCompilerSet);
-        return cppCompilerSet;
+        SLANG_ASSERT(downstreamCompilerSet);
+        return downstreamCompilerSet;
     }
 
     TypeCheckingCache* Session::getTypeCheckingCache()

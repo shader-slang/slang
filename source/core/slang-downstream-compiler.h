@@ -94,6 +94,25 @@ protected:
     DownstreamDiagnostics m_diagnostics;
 };
 
+
+class BlobDownstreamCompileResult : public DownstreamCompileResult
+{
+public:
+    typedef DownstreamCompileResult Super;
+
+    virtual SlangResult getHostCallableSharedLibrary(ComPtr<ISlangSharedLibrary>& outLibrary) SLANG_OVERRIDE { SLANG_UNUSED(outLibrary); return SLANG_FAIL; }
+    virtual SlangResult getBinary(ComPtr<ISlangBlob>& outBlob) SLANG_OVERRIDE { outBlob = m_blob; return m_blob ? SLANG_OK : SLANG_FAIL; }
+
+    BlobDownstreamCompileResult(const DownstreamDiagnostics& diags, ISlangBlob* blob):
+        Super(diags),
+        m_blob(blob)
+    {
+
+    }
+protected:
+    ComPtr<ISlangBlob> m_blob;
+};
+
 class DownstreamCompiler: public RefObject
 {
 public:
@@ -109,12 +128,15 @@ public:
         Clang,
         SNC,
         GHS,
+        NVRTC,
         CountOf,
     };
     enum class SourceType
     {
         C,              ///< C source
         CPP,            ///< C++ source
+        CUDA,           ///< The CUDA language
+        CountOf,
     };
 
     struct Desc
@@ -205,6 +227,9 @@ public:
             /// The contents of the source to compile. This can be empty is sourceFiles is set.
             /// If the compiler is a commandLine file this source will be written to a temporary file.
         String sourceContents;
+            /// 'Path' that the contents originated from. NOTE! This is for reporting only and doesn't have to exist on file system
+        String sourceContentsPath;
+
             /// The names/paths of source to compile. This can be empty if sourceContents is set.
         List<String> sourceFiles;           
 
@@ -249,6 +274,7 @@ protected:
     DownstreamCompiler(const Desc& desc) :
         m_desc(desc)
     {}
+    DownstreamCompiler() {}
 
     Desc m_desc;
 };
@@ -332,9 +358,9 @@ public:
     void addCompiler(DownstreamCompiler* compiler);
 
         /// Get a default compiler
-    DownstreamCompiler* getDefaultCompiler() const { return m_defaultCompiler;  }
+    DownstreamCompiler* getDefaultCompiler(DownstreamCompiler::SourceType sourceType) const { return m_defaultCompilers[int(sourceType)];  }
         /// Set the default compiler
-    void setDefaultCompiler(DownstreamCompiler* compiler) { m_defaultCompiler = compiler;  }
+    void setDefaultCompiler(DownstreamCompiler::SourceType sourceType, DownstreamCompiler* compiler) { m_defaultCompilers[int(sourceType)] = compiler;  }
 
         /// True if has a compiler of the specified type
     bool hasCompiler(DownstreamCompiler::CompilerType compilerType) const;
@@ -343,7 +369,7 @@ protected:
 
     Index _findIndex(const DownstreamCompiler::Desc& desc) const;
 
-    RefPtr<DownstreamCompiler> m_defaultCompiler;
+    RefPtr<DownstreamCompiler> m_defaultCompilers[int(DownstreamCompiler::SourceType::CountOf)];
     // This could be a dictionary/map - but doing a linear search is going to be fine and it makes
     // somethings easier.
     List<RefPtr<DownstreamCompiler>> m_compilers;
@@ -380,7 +406,10 @@ struct DownstreamCompilerUtil: public DownstreamCompilerBaseUtil
         const String& getPath(CompilerType type) const { return paths[int(type)]; }
         void setPath(CompilerType type, const String& path) { paths[int(type)] = path; }
 
+        InitializeSetDesc() { memset(sharedLibraries, 0, sizeof(sharedLibraries)); }
+
         String paths[int(DownstreamCompiler::CompilerType::CountOf)];
+        ISlangSharedLibrary* sharedLibraries[int(DownstreamCompiler::CompilerType::CountOf)];
     };
 
         /// Find a compiler

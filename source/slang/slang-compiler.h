@@ -67,6 +67,8 @@ namespace Slang
         Executable          = SLANG_EXECUTABLE,
         SharedLibrary       = SLANG_SHARED_LIBRARY,
         HostCallable        = SLANG_HOST_CALLABLE,
+        CUDASource          = SLANG_CUDA_SOURCE,
+        PTX                 = SLANG_PTX,
         CountOf             = SLANG_TARGET_COUNT_OF,
     };
 
@@ -777,6 +779,7 @@ namespace Slang
         VisualStudio = SLANG_PASS_THROUGH_VISUAL_STUDIO,    ///< Visual studio compiler
         Gcc = SLANG_PASS_THROUGH_GCC,                       ///< Gcc compiler
         GenericCCpp = SLANG_PASS_THROUGH_GENERIC_C_CPP,     ///< Generic C/C++ compiler
+        NVRTC = SLANG_PASS_THROUGH_NVRTC,
         CountOf = SLANG_PASS_THROUGH_COUNT_OF,              
     };
 
@@ -1074,7 +1077,7 @@ namespace Slang
         /// Given a target returns the required downstream compiler
     PassThroughMode getDownstreamCompilerRequiredForTarget(CodeGenTarget target);
 
-    PassThroughMode getPassThroughModeForCPPCompiler(DownstreamCompiler::CompilerType type);
+    PassThroughMode getPassThroughModeForDownstreamCompiler(DownstreamCompiler::CompilerType type);
 
 
         /// A context for loading and re-using code modules.
@@ -1836,7 +1839,7 @@ namespace Slang
             /// Get the specified compiler
         DownstreamCompiler* getDownstreamCompiler(PassThroughMode downstreamCompiler);
             /// Get the default cpp compiler for a language
-        DownstreamCompiler* getDefaultCPPCompiler(SourceLanguage sourceLanguage);
+        DownstreamCompiler* getDefaultDownstreamCompiler(SourceLanguage sourceLanguage);
 
         enum class SharedLibraryFuncType
         {
@@ -1892,7 +1895,7 @@ namespace Slang
         RefPtr<Type> stringType;
         RefPtr<Type> enumTypeType;
 
-        RefPtr<DownstreamCompilerSet> cppCompilerSet;                                          ///< Information about available C/C++ compilers. null unless information is requested (because slow)
+        RefPtr<DownstreamCompilerSet> downstreamCompilerSet;                                          ///< Information about available C/C++ compilers. null unless information is requested (because slow)
 
         ComPtr<ISlangSharedLibraryLoader> sharedLibraryLoader;                          ///< The shared library loader (never null)
         ComPtr<ISlangSharedLibrary> sharedLibraries[int(SharedLibraryType::CountOf)];   ///< The loaded shared libraries
@@ -1974,7 +1977,7 @@ namespace Slang
         const String& getDownstreamCompilerPrelude(PassThroughMode mode) { return m_downstreamCompilerPreludes[int(mode)]; }
 
             /// Finds out what compilers are present and caches the result
-        DownstreamCompilerSet* requireCPPCompilerSet();
+        DownstreamCompilerSet* requireDownstreamCompilerSet();
 
         Session();
 

@@ -11,6 +11,8 @@
 #include "../../source/core/slang-render-api-util.h"
 #include "../../source/core/slang-downstream-compiler.h"
 
+#include "../../slang-com-ptr.h"
+
 #include "options.h"
 
 typedef uint32_t PassThroughFlags;
@@ -25,6 +27,7 @@ struct PassThroughFlag
         GCC = 1 << int(SLANG_PASS_THROUGH_GCC),
         Clang = 1 << int(SLANG_PASS_THROUGH_CLANG),
         Generic_C_CPP = 1 << int(SLANG_PASS_THROUGH_GENERIC_C_CPP),
+        NVRTC = 1 << int(SLANG_PASS_THROUGH_NVRTC)
     };
 };
 
@@ -94,7 +97,7 @@ class TestContext
 
         /// Get compiler set
     Slang::DownstreamCompilerSet* getCompilerSet();
-    Slang::DownstreamCompiler* getDefaultCompiler();
+    Slang::DownstreamCompiler* getDefaultCompiler(Slang::DownstreamCompiler::SourceType sourceType);
 
         /// Ctor
     TestContext();
@@ -117,7 +120,7 @@ class TestContext
 protected:
     struct SharedLibraryTool
     {
-        Slang::SharedLibrary::Handle m_sharedLibrary;
+        Slang::ComPtr<ISlangSharedLibrary> m_sharedLibrary;
         InnerMainFunc m_func;
     };
 

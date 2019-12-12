@@ -188,6 +188,7 @@
     <ClInclude Include="slang-list.h" />
     <ClInclude Include="slang-math.h" />
     <ClInclude Include="slang-memory-arena.h" />
+    <ClInclude Include="slang-nvrtc-compiler.h" />
     <ClInclude Include="slang-object-scope-manager.h" />
     <ClInclude Include="slang-offset-container.h" />
     <ClInclude Include="slang-platform.h" />
@@ -221,6 +222,7 @@
     <ClCompile Include="slang-hex-dump-util.cpp" />
     <ClCompile Include="slang-io.cpp" />
     <ClCompile Include="slang-memory-arena.cpp" />
+    <ClCompile Include="slang-nvrtc-compiler.cpp" />
     <ClCompile Include="slang-object-scope-manager.cpp" />
     <ClCompile Include="slang-offset-container.cpp" />
     <ClCompile Include="slang-platform.cpp" />

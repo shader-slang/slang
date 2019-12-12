@@ -21,6 +21,8 @@ using namespace Slang;
 
 #include "../../source/core/slang-downstream-compiler.h"
 
+#include "../../source/core/slang-nvrtc-compiler.h"
+
 #include "../../source/core/slang-process-util.h"
 
 #define STB_IMAGE_IMPLEMENTATION
@@ -523,6 +525,10 @@ static SlangPassThrough _toPassThroughType(const UnownedStringSlice& slice)
     {
         return SLANG_PASS_THROUGH_VISUAL_STUDIO;
     }
+    else if (slice == "nvrtc")
+    {
+        return SLANG_PASS_THROUGH_NVRTC;
+    }
 
     return SLANG_PASS_THROUGH_NONE;
 }
@@ -562,6 +568,10 @@ static PassThroughFlags _getPassThroughFlagsForTarget(SlangCompileTarget target)
         {
             return PassThroughFlag::Generic_C_CPP;
         }
+        case SLANG_PTX:
+        {
+            return PassThroughFlag::NVRTC;
+        }
 
         default:
         {
@@ -593,6 +603,8 @@ static SlangCompileTarget _getCompileTarget(const UnownedStringSlice& name)
         CASE("dll", SHARED_LIBRARY)
         CASE("callable", HOST_CALLABLE)
         CASE("host-callable", HOST_CALLABLE)
+        CASE("ptx", PTX)
+        CASE("cuda", CUDA_SOURCE)
 #undef CASE
 
         return SLANG_TARGET_UNKNOWN;
@@ -1088,7 +1100,6 @@ TestResult runSimpleTest(TestContext* context, TestInput& input)
 
 TestResult runCompile(TestContext* context, TestInput& input)
 {
-    // need to execute the stand-alone Slang compiler on the file, and compare its output to what we expect
     auto outputStem = input.outputStem;
 
     CommandLine cmdLine;
@@ -1280,9 +1291,9 @@ static String _calcModulePath(const TestInput& input)
     return Path::combine(directory, moduleName);
 }
 
-static TestResult runCompilerCompile(TestContext* context, TestInput& input)
+static TestResult runCPPCompilerCompile(TestContext* context, TestInput& input)
 {
-    DownstreamCompiler* compiler = context->getDefaultCompiler();   
+    DownstreamCompiler* compiler = context->getDefaultCompiler(DownstreamCompiler::SourceType::CPP);   
     if (!compiler)
     {
         return TestResult::Ignored;
@@ -1322,9 +1333,9 @@ static TestResult runCompilerCompile(TestContext* context, TestInput& input)
     return TestResult::Pass;
 }
 
-static TestResult runCompilerSharedLibrary(TestContext* context, TestInput& input)
+static TestResult runCPPCompilerSharedLibrary(TestContext* context, TestInput& input)
 {
-    DownstreamCompiler* compiler = context->getDefaultCompiler();
+    DownstreamCompiler* compiler = context->getDefaultCompiler(DownstreamCompiler::SourceType::CPP);
     if (!compiler)
     {
         return TestResult::Ignored;
@@ -1440,9 +1451,9 @@ static TestResult runCompilerSharedLibrary(TestContext* context, TestInput& inpu
     return TestResult::Pass;
 }
 
-static TestResult runCompilerExecute(TestContext* context, TestInput& input)
+static TestResult runCPPCompilerExecute(TestContext* context, TestInput& input)
 {
-    DownstreamCompiler* compiler = context->getDefaultCompiler();
+    DownstreamCompiler* compiler = context->getDefaultCompiler(DownstreamCompiler::SourceType::CPP);
     if (!compiler)
     {
         return TestResult::Ignored;
@@ -2442,9 +2453,9 @@ static const TestCommandInfo s_testCommandInfos[] =
     { "COMPARE_RENDER_COMPUTE",                 &runSlangRenderComputeComparisonTest},
     { "COMPARE_GLSL",                           &runGLSLComparisonTest},
     { "CROSS_COMPILE",                          &runCrossCompilerTest},
-    { "CPP_COMPILER_EXECUTE",                   &runCompilerExecute},
-    { "CPP_COMPILER_SHARED_LIBRARY",            &runCompilerSharedLibrary},
-    { "CPP_COMPILER_COMPILE",                   &runCompilerCompile},
+    { "CPP_COMPILER_EXECUTE",                   &runCPPCompilerExecute},
+    { "CPP_COMPILER_SHARED_LIBRARY",            &runCPPCompilerSharedLibrary},
+    { "CPP_COMPILER_COMPILE",                   &runCPPCompilerCompile},
     { "PERFORMANCE_PROFILE",                    &runPerformanceProfile},
     { "COMPILE",                                &runCompile},
 };
@@ -2777,6 +2788,7 @@ static bool endsWithAllowedExtension(
         ".rgen",
         ".c",
         ".cpp",
+        ".cu",
         };
 
     for( auto allowedExtension : allowedExtensions)
@@ -2870,6 +2882,7 @@ SlangResult innerMain(int argc, char** argv)
 #if SLANG_UNIX_FAMILY
     auto unixCatagory = categorySet.add("unix", fullTestCategory);
 #endif
+
 
     // An un-categorized test will always belong to the `full` category
     categorySet.defaultCategory = fullTestCategory;

@@ -21,6 +21,7 @@ enum class SharedLibraryType
     Fxc,                ///< Fxc compiler
     Glslang,            ///< Slang specific glslang compiler
     Dxil,               ///< Dxil is used with dxc
+    NVRTC,              ///< Nvrtc compiler
     CountOf,
 };
 
@@ -36,7 +37,9 @@ public:
 
     // ISlangSharedLibraryLoader
     virtual SLANG_NO_THROW SlangResult SLANG_MCALL loadSharedLibrary(const char* path, 
-        ISlangSharedLibrary** sharedLibraryOut) SLANG_OVERRIDE;
+        ISlangSharedLibrary** outSharedLibrary) SLANG_OVERRIDE;
+
+    SlangResult loadPlatformSharedLibrary(const char* path, ISlangSharedLibrary** outSharedLibrary);
 
         /// Get the singleton
     static DefaultSharedLibraryLoader* getSingleton() { return &s_singleton; }

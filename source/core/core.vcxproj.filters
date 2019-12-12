@@ -63,6 +63,9 @@
     <ClInclude Include="slang-memory-arena.h">
       <Filter>Header Files</Filter>
     </ClInclude>
+    <ClInclude Include="slang-nvrtc-compiler.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
     <ClInclude Include="slang-object-scope-manager.h">
       <Filter>Header Files</Filter>
     </ClInclude>
@@ -156,6 +159,9 @@
       <Filter>Source Files</Filter>
     </ClCompile>
     <ClCompile Include="slang-memory-arena.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="slang-nvrtc-compiler.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
     <ClCompile Include="slang-object-scope-manager.cpp">
