@@ -449,6 +449,8 @@ static SlangResult _parseVisualStudioLine(const UnownedStringSlice& line, Downst
         return WinVisualStudioUtil::find(set);
 #endif
     }
+
+    return SLANG_OK;
 }
 
 }
