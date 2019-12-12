@@ -438,12 +438,8 @@ static SlangResult _parseVisualStudioLine(const UnownedStringSlice& line, Downst
 {
     SLANG_UNUSED(loader);
 
-    if (path.getLength() != 0)
-    {
-        // TODO(JS): We don't support fixed path for visual studio just yet
-        return SLANG_OK;
-    }
-    else
+    // TODO(JS): We don't support fixed path for visual studio just yet
+    if (path.getLength() == 0)
     {
 #if SLANG_VC
         return WinVisualStudioUtil::find(set);
