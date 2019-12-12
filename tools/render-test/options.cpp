@@ -11,6 +11,7 @@
 
 #include "../../source/core/slang-list.h"
 #include "../../source/core/slang-string-util.h"
+#include "../../source/core/slang-downstream-compiler.h"
 
 namespace renderer_test {
 using namespace Slang;
@@ -43,36 +44,6 @@ static SlangResult _setRendererType(RendererType type, const char* arg, Slang::W
     gOptions.rendererType = type;
     return SLANG_OK;
 }
-
-static SlangSourceLanguage _findSourceLanguage(const UnownedStringSlice& text)
-{
-    if (text == "c" || text == "C")
-    {
-        return SLANG_SOURCE_LANGUAGE_C;
-    }
-    else if (text == "cpp" || text == "c++" || text == "C++" || text == "cxx")
-    {
-        return SLANG_SOURCE_LANGUAGE_CPP;
-    }
-    else if (text == "slang")
-    {
-        return SLANG_SOURCE_LANGUAGE_SLANG;
-    }
-    else if (text == "glsl")
-    {
-        return SLANG_SOURCE_LANGUAGE_GLSL;
-    }
-    else if (text == "hlsl")
-    {
-        return SLANG_SOURCE_LANGUAGE_HLSL;
-    }
-    else if (text == "cu" || text == "cuda")
-    {
-        return SLANG_SOURCE_LANGUAGE_CUDA;
-    }
-    return SLANG_SOURCE_LANGUAGE_UNKNOWN;
-}
-
 
 SlangResult parseOptions(int argc, const char*const* argv, Slang::WriterHelper stdError)
 {
@@ -250,7 +221,7 @@ SlangResult parseOptions(int argc, const char*const* argv, Slang::WriterHelper s
             }
             UnownedStringSlice sourceLanguageText(*argCursor++);
 
-            SlangSourceLanguage sourceLanguage = _findSourceLanguage(sourceLanguageText);
+            SlangSourceLanguage sourceLanguage = DownstreamCompiler::getSourceLanguageFromName(sourceLanguageText);
             if (sourceLanguage == SLANG_SOURCE_LANGUAGE_UNKNOWN)
             {
                 stdError.print("error: expecting unknown source language name '%s' for '%s'\n", String(sourceLanguageText).getBuffer(), arg);
