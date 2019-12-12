@@ -10,6 +10,307 @@
 
 namespace Slang {
 
+/* static */ UnownedStringSlice CUDASourceEmitter::getBuiltinTypeName(IROp op)
+{
+    switch (op)
+    {
+        case kIROp_VoidType:    return UnownedStringSlice("void");
+        case kIROp_BoolType:    return UnownedStringSlice("bool");
+
+        case kIROp_Int8Type:    return UnownedStringSlice("char");
+        case kIROp_Int16Type:   return UnownedStringSlice("short");
+        case kIROp_IntType:     return UnownedStringSlice("int");
+        case kIROp_Int64Type:   return UnownedStringSlice("long long");
+
+        case kIROp_UInt8Type:   return UnownedStringSlice("unsigned char");
+        case kIROp_UInt16Type:  return UnownedStringSlice("unsigned short");
+        case kIROp_UIntType:    return UnownedStringSlice("unsigned int");
+        case kIROp_UInt64Type:  return UnownedStringSlice("unsigned long long");
+
+            // Not clear just yet how we should handle half... we want all processing as float probly, but when reading/writing to memory converting
+        case kIROp_HalfType:    return UnownedStringSlice("half");
+
+        case kIROp_FloatType:   return UnownedStringSlice("float");
+        case kIROp_DoubleType:  return UnownedStringSlice("double");
+        default:                return UnownedStringSlice();
+    }
+}
+
+
+/* static */ UnownedStringSlice CUDASourceEmitter::getVectorPrefix(IROp op)
+{
+    switch (op)
+    {
+        case kIROp_BoolType:    return UnownedStringSlice("bool");
+
+        case kIROp_Int8Type:    return UnownedStringSlice("char");
+        case kIROp_Int16Type:   return UnownedStringSlice("short");
+        case kIROp_IntType:     return UnownedStringSlice("int");
+        case kIROp_Int64Type:   return UnownedStringSlice("longlong");
+
+        case kIROp_UInt8Type:   return UnownedStringSlice("uchar");
+        case kIROp_UInt16Type:  return UnownedStringSlice("ushort");
+        case kIROp_UIntType:    return UnownedStringSlice("uint");
+        case kIROp_UInt64Type:  return UnownedStringSlice("ulonglong");
+
+            // Not clear just yet how we should handle half... we want all processing as float probly, but when reading/writing to memory converting
+        case kIROp_HalfType:    return UnownedStringSlice("half");
+
+        case kIROp_FloatType:   return UnownedStringSlice("float");
+        case kIROp_DoubleType:  return UnownedStringSlice("double");
+        default:                return UnownedStringSlice();
+    }
+}
+
+SlangResult CUDASourceEmitter::_calcCUDATextureTypeName(IRTextureTypeBase* texType, StringBuilder& outName)
+{
+    // texture<float, cudaTextureType2D, cudaReadModeElementType> texRef;
+
+    // Not clear how to do this yet
+    if (texType->isMultisample() || texType->isArray())
+    {
+        return SLANG_FAIL;
+    }
+
+    outName << "texture<";
+    outName << _getCUDATypeName(texType->getElementType());
+    outName << ", ";
+
+    switch (texType->GetBaseShape())
+    {
+        case TextureFlavor::Shape::Shape1D:		outName << "cudaTextureType1D";		break;
+        case TextureFlavor::Shape::Shape2D:		outName << "cudaTextureType2D";		break;
+        case TextureFlavor::Shape::Shape3D:		outName << "cudaTextureType3D";		break;
+        case TextureFlavor::Shape::ShapeCube:	outName << "cudaTextureTypeCubemap";	break;
+        case TextureFlavor::Shape::ShapeBuffer: outName << "Buffer";         break;
+        default:
+            SLANG_DIAGNOSE_UNEXPECTED(getSink(), SourceLoc(), "unhandled resource shape");
+            return SLANG_FAIL;
+    }
+
+    outName << ", ";
+
+    switch (texType->getAccess())
+    {
+        case SLANG_RESOURCE_ACCESS_READ:
+        {
+            // Other value is cudaReadModeNormalizedFloat 
+
+            outName << "cudaReadModeElementType";
+            break;
+        }
+        default:
+        {
+            SLANG_DIAGNOSE_UNEXPECTED(getSink(), SourceLoc(), "unhandled resource access mode");
+            return SLANG_FAIL;
+        }
+    }
+
+    outName << ">";
+    return SLANG_OK;
+}
+
+// This is junk.. 
+static UnownedStringSlice _getCUDAResourceTypePrefix(IROp op)
+{
+    switch (op)
+    {
+        case kIROp_HLSLStructuredBufferType:            return UnownedStringSlice::fromLiteral("StructuredBuffer");
+        case kIROp_HLSLRWStructuredBufferType:          return UnownedStringSlice::fromLiteral("RWStructuredBuffer");
+        case kIROp_HLSLRWByteAddressBufferType:         return UnownedStringSlice::fromLiteral("RWByteAddressBuffer");
+        case kIROp_HLSLByteAddressBufferType:           return UnownedStringSlice::fromLiteral("ByteAddressBuffer");
+        case kIROp_SamplerStateType:                    return UnownedStringSlice::fromLiteral("SamplerState");
+        case kIROp_SamplerComparisonStateType:                  return UnownedStringSlice::fromLiteral("SamplerComparisonState");
+        case kIROp_HLSLRasterizerOrderedStructuredBufferType:   return UnownedStringSlice::fromLiteral("RasterizerOrderedStructuredBuffer");
+        case kIROp_HLSLAppendStructuredBufferType:              return UnownedStringSlice::fromLiteral("AppendStructuredBuffer");
+        case kIROp_HLSLConsumeStructuredBufferType:             return UnownedStringSlice::fromLiteral("ConsumeStructuredBuffer");
+        case kIROp_HLSLRasterizerOrderedByteAddressBufferType:  return UnownedStringSlice::fromLiteral("RasterizerOrderedByteAddressBuffer");
+        case kIROp_RaytracingAccelerationStructureType:         return UnownedStringSlice::fromLiteral("RaytracingAccelerationStructure");
+
+        default:                                        return UnownedStringSlice();
+    }
+}
+
+SlangResult CUDASourceEmitter::_calcCUDATypeName(IRType* type, StringBuilder& out)
+{
+    switch (type->op)
+    {
+        case kIROp_HalfType:
+        {
+            // Special case half
+            out << getBuiltinTypeName(kIROp_FloatType);
+            return SLANG_OK;
+        }
+        case kIROp_VectorType:
+        {
+            auto vecType = static_cast<IRVectorType*>(type);
+            auto vecCount = int(GetIntVal(vecType->getElementCount()));
+            const IROp elemType = vecType->getElementType()->op;
+
+            UnownedStringSlice prefix = getVectorPrefix(elemType);
+            if (prefix.size() <= 0)
+            {
+                return SLANG_FAIL;
+            }
+            out << prefix << vecCount;
+            return SLANG_OK;
+        }
+#if 0
+        case kIROp_MatrixType:
+        {
+            auto matType = static_cast<IRMatrixType*>(type);
+
+            auto elementType = matType->getElementType();
+            const auto rowCount = int(GetIntVal(matType->getRowCount()));
+            const auto colCount = int(GetIntVal(matType->getColumnCount()));
+
+            if (target == CodeGenTarget::CPPSource)
+            {
+                out << "Matrix<" << getBuiltinTypeName(elementType->op) << ", " << rowCount << ", " << colCount << ">";
+            }
+            else
+            {
+                out << "Mat";
+                const UnownedStringSlice postFix = _getCTypeVecPostFix(_getCType(elementType->op));
+                out << postFix;
+                if (postFix.size() > 1)
+                {
+                    out << "_";
+                }
+                out << rowCount;
+                out << colCount;
+            }
+            return SLANG_OK;
+        }
+        case kIROp_ArrayType:
+        {
+            auto arrayType = static_cast<IRArrayType*>(type);
+            auto elementType = arrayType->getElementType();
+            int elementCount = int(GetIntVal(arrayType->getElementCount()));
+
+            out << "FixedArray<";
+            SLANG_RETURN_ON_FAIL(_calcTypeName(elementType, target, out));
+            out << ", " << elementCount << ">";
+            return SLANG_OK;
+        }
+        case kIROp_UnsizedArrayType:
+        {
+            auto arrayType = static_cast<IRUnsizedArrayType*>(type);
+            auto elementType = arrayType->getElementType();
+
+            out << "Array<";
+            SLANG_RETURN_ON_FAIL(_calcTypeName(elementType, target, out));
+            out << ">";
+            return SLANG_OK;
+        }
+#endif
+        default:
+        {
+            if (isNominalOp(type->op))
+            {
+                out << getName(type);
+                return SLANG_OK;
+            }
+
+            if (IRBasicType::isaImpl(type->op))
+            {
+                out << getBuiltinTypeName(type->op);
+                return SLANG_OK;
+            }
+
+            if (auto texType = as<IRTextureTypeBase>(type))
+            {
+                // We don't support TextureSampler, so ignore that
+                if (texType->op != kIROp_TextureSamplerType)
+                {
+                    return _calcCUDATextureTypeName(texType, out);
+                }
+            }
+
+            // If _getResourceTypePrefix returns something, we assume can output any specialization after it in order.
+            {
+                UnownedStringSlice prefix = _getCUDAResourceTypePrefix(type->op);
+                if (prefix.size() > 0)
+                {
+                    auto oldWriter = m_writer;
+                    SourceManager* sourceManager = oldWriter->getSourceManager();
+
+                    // TODO(JS): This is a bit of a hack. We don't want to emit the result here,
+                    // so we replace the writer, write out the type, grab the contents, and restore the writer
+
+                    SourceWriter writer(sourceManager, LineDirectiveMode::None);
+                    m_writer = &writer;
+
+                    m_writer->emit(prefix);
+
+                    // TODO(JS).
+                    // Assumes ordering of types matches ordering of operands.
+
+                    UInt operandCount = type->getOperandCount();
+                    if (operandCount)
+                    {
+                        m_writer->emit("<");
+                        for (UInt ii = 0; ii < operandCount; ++ii)
+                        {
+                            if (ii != 0)
+                            {
+                                m_writer->emit(", ");
+                            }
+                            emitVal(type->getOperand(ii), getInfo(EmitOp::General));
+                        }
+                        m_writer->emit(">");
+                    }
+
+                    out << writer.getContent();
+
+                    m_writer = oldWriter;
+                    return SLANG_OK;
+                }
+            }
+
+            break;
+        }
+    }
+
+    SLANG_DIAGNOSE_UNEXPECTED(getSink(), SourceLoc(), "unhandled type for CUDA emit");
+    return SLANG_FAIL;
+}
+
+
+UnownedStringSlice CUDASourceEmitter::_getCUDATypeName(IRType* type)
+{
+    StringSlicePool::Handle handle = StringSlicePool::kNullHandle;
+    if (m_typeNameMap.TryGetValue(type, handle))
+    {
+        return m_slicePool.getSlice(handle);
+    }
+
+#if 0
+    if (type->op == kIROp_MatrixType)
+    {
+        auto matType = static_cast<IRMatrixType*>(type);
+
+        auto elementType = matType->getElementType();
+        const auto rowCount = int(GetIntVal(matType->getRowCount()));
+        const auto colCount = int(GetIntVal(matType->getColumnCount()));
+
+        // Make sure the vector type the matrix is built on is added
+        useType(_getVecType(elementType, colCount));
+    }
+#endif
+
+    StringBuilder builder;
+    if (SLANG_SUCCEEDED(_calcCUDATypeName(type, builder)))
+    {
+        handle = m_slicePool.add(builder);
+    }
+
+    m_typeNameMap.Add(type, handle);
+
+    SLANG_ASSERT(handle != StringSlicePool::kNullHandle);
+    return m_slicePool.getSlice(handle);
+}
+
 void CUDASourceEmitter::_emitCUDADecorationSingleString(const char* name, IRFunc* entryPoint, IRStringLit* val)
 {
     SLANG_UNUSED(entryPoint);
@@ -220,59 +521,6 @@ void CUDASourceEmitter::_emitCUDAParameterGroup(IRGlobalParam* varDecl, IRUnifor
     m_writer->emit("}\n");
 }
 
-void CUDASourceEmitter::_emitCUDATextureType(IRTextureTypeBase* texType)
-{
-    switch (texType->getAccess())
-    {
-        case SLANG_RESOURCE_ACCESS_READ:
-            break;
-
-        case SLANG_RESOURCE_ACCESS_READ_WRITE:
-            m_writer->emit("RW");
-            break;
-
-        case SLANG_RESOURCE_ACCESS_RASTER_ORDERED:
-            m_writer->emit("RasterizerOrdered");
-            break;
-
-        case SLANG_RESOURCE_ACCESS_APPEND:
-            m_writer->emit("Append");
-            break;
-
-        case SLANG_RESOURCE_ACCESS_CONSUME:
-            m_writer->emit("Consume");
-            break;
-
-        default:
-            SLANG_DIAGNOSE_UNEXPECTED(getSink(), SourceLoc(), "unhandled resource access mode");
-            break;
-    }
-
-    switch (texType->GetBaseShape())
-    {
-        case TextureFlavor::Shape::Shape1D:		m_writer->emit("Texture1D");		break;
-        case TextureFlavor::Shape::Shape2D:		m_writer->emit("Texture2D");		break;
-        case TextureFlavor::Shape::Shape3D:		m_writer->emit("Texture3D");		break;
-        case TextureFlavor::Shape::ShapeCube:	m_writer->emit("TextureCube");	break;
-        case TextureFlavor::Shape::ShapeBuffer:  m_writer->emit("Buffer");         break;
-        default:
-            SLANG_DIAGNOSE_UNEXPECTED(getSink(), SourceLoc(), "unhandled resource shape");
-            break;
-    }
-
-    if (texType->isMultisample())
-    {
-        m_writer->emit("MS");
-    }
-    if (texType->isArray())
-    {
-        m_writer->emit("Array");
-    }
-    m_writer->emit("<");
-    emitType(texType->getElementType());
-    m_writer->emit(" >");
-}
-
 void CUDASourceEmitter::emitLayoutSemanticsImpl(IRInst* inst, char const* uniformSemanticSpelling)
 {
     auto layout = getVarLayout(inst); 
@@ -292,20 +540,6 @@ void CUDASourceEmitter::emitEntryPointAttributesImpl(IRFunc* irFunc, IREntryPoin
     auto profile = m_effectiveProfile;
     auto stage = entryPointDecor->getProfile().GetStage();
 
-    if (profile.getFamily() == ProfileFamily::DX)
-    {
-        if (profile.GetVersion() >= ProfileVersion::DX_6_1)
-        {
-            char const* stageName = getStageName(stage);
-            if (stageName)
-            {
-                m_writer->emit("[shader(\"");
-                m_writer->emit(stageName);
-                m_writer->emit("\")]");
-            }
-        }
-    }
-
     switch (stage)
     {
         case Stage::Compute:
@@ -313,6 +547,7 @@ void CUDASourceEmitter::emitEntryPointAttributesImpl(IRFunc* irFunc, IREntryPoin
             Int sizeAlongAxis[kThreadGroupAxisCount];
             getComputeThreadGroupSize(irFunc, sizeAlongAxis);
 
+#if 0
             m_writer->emit("[numthreads(");
             for (int ii = 0; ii < kThreadGroupAxisCount; ++ii)
             {
@@ -320,85 +555,12 @@ void CUDASourceEmitter::emitEntryPointAttributesImpl(IRFunc* irFunc, IREntryPoin
                 m_writer->emit(sizeAlongAxis[ii]);
             }
             m_writer->emit(")]\n");
-        }
-        break;
-        case Stage::Geometry:
-        {
-            if (auto decor = irFunc->findDecoration<IRMaxVertexCountDecoration>())
-            {
-                auto count = GetIntVal(decor->getCount());
-                m_writer->emit("[maxvertexcount(");
-                m_writer->emit(Int(count));
-                m_writer->emit(")]\n");
-            }
+#endif
 
-            if (auto decor = irFunc->findDecoration<IRInstanceDecoration>())
-            {
-                auto count = GetIntVal(decor->getCount());
-                m_writer->emit("[instance(");
-                m_writer->emit(Int(count));
-                m_writer->emit(")]\n");
-            }
+            m_writer->emit("__global__\n");
             break;
         }
-        case Stage::Domain:
-        {
-            /* [domain("isoline")] */
-            if (auto decor = irFunc->findDecoration<IRDomainDecoration>())
-            {
-                _emitCUDADecorationSingleString("domain", irFunc, decor->getDomain());
-            }
-            break;
-        }
-        case Stage::Hull:
-        {
-            // Lists these are only attributes for hull shader
-            // https://docs.microsoft.com/en-us/windows/desktop/direct3d11/direct3d-11-advanced-stages-hull-shader-design
-
-            /* [domain("isoline")] */
-            if (auto decor = irFunc->findDecoration<IRDomainDecoration>())
-            {
-                _emitCUDADecorationSingleString("domain", irFunc, decor->getDomain());
-            }
-
-            /* [domain("partitioning")] */
-            if (auto decor = irFunc->findDecoration<IRPartitioningDecoration>())
-            {
-                _emitCUDADecorationSingleString("partitioning", irFunc, decor->getPartitioning());
-            }
-
-            /* [outputtopology("line")] */
-            if (auto decor = irFunc->findDecoration<IROutputTopologyDecoration>())
-            {
-                _emitCUDADecorationSingleString("outputtopology", irFunc, decor->getTopology());
-            }
-
-            /* [outputcontrolpoints(4)] */
-            if (auto decor = irFunc->findDecoration<IROutputControlPointsDecoration>())
-            {
-                _emitCUDADecorationSingleInt("outputcontrolpoints", irFunc, decor->getControlPointCount());
-            }
-
-            /* [patchconstantfunc("HSConst")] */
-            if (auto decor = irFunc->findDecoration<IRPatchConstantFuncDecoration>())
-            {
-                const String irName = getName(decor->getFunc());
-
-                m_writer->emit("[patchconstantfunc(\"");
-                m_writer->emit(irName);
-                m_writer->emit("\")]\n");
-            }
-
-            break;
-        }
-        case Stage::Pixel:
-        {
-            if (irFunc->findDecoration<IREarlyDepthStencilDecoration>())
-            {
-                m_writer->emit("[earlydepthstencil]\n");
-            }
-            break;
-        }
+        
         // TODO: There are other stages that will need this kind of handling.
         default:
             break;
@@ -411,7 +573,6 @@ bool CUDASourceEmitter::tryEmitInstExprImpl(IRInst* inst, const EmitOpInfo& inOu
     {
         case kIROp_Construct:
         case kIROp_makeVector:
-        case kIROp_MakeMatrix:
         {
             if (inst->getOperandCount() == 1)
             {
@@ -420,6 +581,9 @@ bool CUDASourceEmitter::tryEmitInstExprImpl(IRInst* inst, const EmitOpInfo& inOu
 
                 auto prec = getInfo(EmitOp::Prefix);
                 needClose = maybeEmitParens(outerPrec, prec);
+
+                
+
 
                 // Need to emit as cast for HLSL
                 m_writer->emit("(");
@@ -431,7 +595,17 @@ bool CUDASourceEmitter::tryEmitInstExprImpl(IRInst* inst, const EmitOpInfo& inOu
                 // Handled
                 return true;
             }
+            else
+            {
+                m_writer->emit("make_");
+                m_writer->emit(_getCUDATypeName(inst->getDataType()));
+                emitArgs(inst);
+            }
             break;
+        }
+        case kIROp_MakeMatrix:
+        {
+            return false;
         }
         case kIROp_BitCast:
         {
@@ -480,150 +654,13 @@ void CUDASourceEmitter::emitLayoutDirectivesImpl(TargetRequest* targetReq)
 
 void CUDASourceEmitter::emitVectorTypeNameImpl(IRType* elementType, IRIntegerValue elementCount)
 {
-    // TODO(tfoley) : should really emit these with sugar
-    m_writer->emit("vector<");
-    emitType(elementType);
-    m_writer->emit(",");
+    m_writer->emit(getVectorPrefix(elementType->op));
     m_writer->emit(elementCount);
-    m_writer->emit(">");
 }
 
 void CUDASourceEmitter::emitSimpleTypeImpl(IRType* type)
 {
-    switch (type->op)
-    {
-        case kIROp_VoidType:
-        case kIROp_BoolType:
-        case kIROp_Int8Type:
-        case kIROp_Int16Type:
-        case kIROp_IntType:
-        case kIROp_Int64Type:
-        case kIROp_UInt8Type:
-        case kIROp_UInt16Type:
-        case kIROp_UIntType:
-        case kIROp_UInt64Type:
-        case kIROp_FloatType:
-        case kIROp_DoubleType:
-        case kIROp_HalfType:
-        {
-            m_writer->emit(getDefaultBuiltinTypeName(type->op));
-            return;
-        }
-        case kIROp_StructType:
-            m_writer->emit(getName(type));
-            return;
-
-        case kIROp_VectorType:
-        {
-            auto vecType = (IRVectorType*)type;
-            emitVectorTypeNameImpl(vecType->getElementType(), GetIntVal(vecType->getElementCount()));
-            return;
-        }
-        case kIROp_MatrixType:
-        {
-            auto matType = (IRMatrixType*)type;
-
-            // TODO(tfoley): should really emit these with sugar
-            m_writer->emit("matrix<");
-            emitType(matType->getElementType());
-            m_writer->emit(",");
-            emitVal(matType->getRowCount(), getInfo(EmitOp::General));
-            m_writer->emit(",");
-            emitVal(matType->getColumnCount(), getInfo(EmitOp::General));
-            m_writer->emit("> ");           
-            return;
-        }
-        case kIROp_SamplerStateType:
-        case kIROp_SamplerComparisonStateType:
-        {
-            auto samplerStateType = cast<IRSamplerStateTypeBase>(type);
-
-            switch (samplerStateType->op)
-            {
-                case kIROp_SamplerStateType:			m_writer->emit("SamplerState");			break;
-                case kIROp_SamplerComparisonStateType:	m_writer->emit("SamplerComparisonState");	break;
-                default:
-                    SLANG_DIAGNOSE_UNEXPECTED(getSink(), SourceLoc(), "unhandled sampler state flavor");
-                    break;
-            }
-            return;
-        }
-        default: break;
-    }
-
-    // TODO: Ideally the following should be data-driven,
-    // based on meta-data attached to the definitions of
-    // each of these IR opcodes.
-    if (auto texType = as<IRTextureType>(type))
-    {
-        _emitCUDATextureType(texType);
-        return;
-    }
-    else if (auto textureSamplerType = as<IRTextureSamplerType>(type))
-    {
-        SLANG_DIAGNOSE_UNEXPECTED(getSink(), SourceLoc(), "this target should see combined texture-sampler types");
-        return;
-    }
-    else if (auto imageType = as<IRGLSLImageType>(type))
-    {
-        _emitCUDATextureType(imageType);
-        return;
-    }
-    else if (auto structuredBufferType = as<IRHLSLStructuredBufferTypeBase>(type))
-    {
-        switch (structuredBufferType->op)
-        {
-            case kIROp_HLSLStructuredBufferType:                    m_writer->emit("StructuredBuffer");                   break;
-            case kIROp_HLSLRWStructuredBufferType:                  m_writer->emit("RWStructuredBuffer");                 break;
-            case kIROp_HLSLRasterizerOrderedStructuredBufferType:   m_writer->emit("RasterizerOrderedStructuredBuffer");  break;
-            case kIROp_HLSLAppendStructuredBufferType:              m_writer->emit("AppendStructuredBuffer");             break;
-            case kIROp_HLSLConsumeStructuredBufferType:             m_writer->emit("ConsumeStructuredBuffer");            break;
-
-            default:
-                SLANG_DIAGNOSE_UNEXPECTED(getSink(), SourceLoc(), "unhandled structured buffer type");
-                break;
-        }
-
-        m_writer->emit("<");
-        emitType(structuredBufferType->getElementType());
-        m_writer->emit(" >");
-
-        return;
-    }
-    else if (auto untypedBufferType = as<IRUntypedBufferResourceType>(type))
-    {
-        switch (type->op)
-        {
-            case kIROp_HLSLByteAddressBufferType:                   m_writer->emit("ByteAddressBuffer");                  break;
-            case kIROp_HLSLRWByteAddressBufferType:                 m_writer->emit("RWByteAddressBuffer");                break;
-            case kIROp_HLSLRasterizerOrderedByteAddressBufferType:  m_writer->emit("RasterizerOrderedByteAddressBuffer"); break;
-            case kIROp_RaytracingAccelerationStructureType:         m_writer->emit("RaytracingAccelerationStructure");    break;
-
-            default:
-                SLANG_DIAGNOSE_UNEXPECTED(getSink(), SourceLoc(), "unhandled buffer type");
-                break;
-        }
-
-        return;
-    }
-
-    // HACK: As a fallback for HLSL targets, assume that the name of the
-    // instruction being used is the same as the name of the HLSL type.
-    {
-        auto opInfo = getIROpInfo(type->op);
-        m_writer->emit(opInfo.name);
-        UInt operandCount = type->getOperandCount();
-        if (operandCount)
-        {
-            m_writer->emit("<");
-            for (UInt ii = 0; ii < operandCount; ++ii)
-            {
-                if (ii != 0) m_writer->emit(", ");
-                emitVal(type->getOperand(ii), getInfo(EmitOp::General));
-            }
-            m_writer->emit(" >");
-        }
-    }
+    m_writer->emit(_getCUDATypeName(type));
 }
 
 void CUDASourceEmitter::emitRateQualifiersImpl(IRRate* rate)
@@ -631,6 +668,19 @@ void CUDASourceEmitter::emitRateQualifiersImpl(IRRate* rate)
     if (as<IRGroupSharedRate>(rate))
     {
         m_writer->emit("groupshared ");
+    }
+}
+
+void CUDASourceEmitter::emitSimpleFuncImpl(IRFunc* func)
+{
+    if (IREntryPointDecoration* entryPointDecor = func->findDecoration<IREntryPointDecoration>())
+    {
+        Super::emitSimpleFuncImpl(func);
+    }
+    else
+    {
+        m_writer->emit("__device__ ");
+        Super::emitSimpleFuncImpl(func);
     }
 }
 

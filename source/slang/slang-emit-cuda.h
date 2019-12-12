@@ -12,8 +12,13 @@ class CUDASourceEmitter : public CLikeSourceEmitter
 public:
     typedef CLikeSourceEmitter Super;
 
+
+    static UnownedStringSlice getBuiltinTypeName(IROp op);
+    static UnownedStringSlice getVectorPrefix(IROp op);
+
     CUDASourceEmitter(const Desc& desc) :
-        Super(desc)
+        Super(desc),
+        m_slicePool(StringSlicePool::Style::Default)
     {}
 
 protected:
@@ -24,6 +29,7 @@ protected:
     virtual void emitLayoutDirectivesImpl(TargetRequest* targetReq) SLANG_OVERRIDE;
     virtual void emitRateQualifiersImpl(IRRate* rate) SLANG_OVERRIDE;
     virtual void emitSemanticsImpl(IRInst* inst) SLANG_OVERRIDE;
+    virtual void emitSimpleFuncImpl(IRFunc* func) SLANG_OVERRIDE;
     virtual void emitSimpleFuncParamImpl(IRParam* param) SLANG_OVERRIDE;
     virtual void emitInterpolationModifiersImpl(IRInst* varInst, IRType* valueType, IRVarLayout* layout) SLANG_OVERRIDE;
     virtual void emitSimpleTypeImpl(IRType* type) SLANG_OVERRIDE;
@@ -46,11 +52,15 @@ protected:
 
     void _emitCUDAParameterGroup(IRGlobalParam* varDecl, IRUniformParameterGroupType* type);
 
-    void _emitCUDATextureType(IRTextureTypeBase* texType);
-
     void _emitCUDADecorationSingleString(const char* name, IRFunc* entryPoint, IRStringLit* val);
     void _emitCUDADecorationSingleInt(const char* name, IRFunc* entryPoint, IRIntLit* val);
-    
+
+    SlangResult _calcCUDATypeName(IRType* type, StringBuilder& out);
+    UnownedStringSlice _getCUDATypeName(IRType* inType);
+    SlangResult _calcCUDATextureTypeName(IRTextureTypeBase* texType, StringBuilder& outName);
+
+    Dictionary<IRType*, StringSlicePool::Handle> m_typeNameMap;
+    StringSlicePool m_slicePool;
 };
 
 }
