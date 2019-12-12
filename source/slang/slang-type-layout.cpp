@@ -398,6 +398,13 @@ struct CPULayoutRulesImpl : DefaultLayoutRulesImpl
     }
 };
 
+// TODO(JS): Most likely wrong. For layout for CUDA, we'll just do the default to get things up and running
+struct CUDALayoutRulesImpl : DefaultLayoutRulesImpl
+{
+    typedef DefaultLayoutRulesImpl Super;
+};
+
+
 struct HLSLStructuredBufferLayoutRulesImpl : DefaultLayoutRulesImpl
 {
     // HLSL structured buffers drop the restrictions added for constant buffers,
@@ -653,9 +660,29 @@ struct CPULayoutRulesFamilyImpl : LayoutRulesFamilyImpl
     LayoutRulesImpl* getStructuredBufferRules() override;
 };
 
+struct CUDALayoutRulesFamilyImpl : LayoutRulesFamilyImpl
+{
+    virtual LayoutRulesImpl* getConstantBufferRules() override;
+    virtual LayoutRulesImpl* getPushConstantBufferRules() override;
+    virtual LayoutRulesImpl* getTextureBufferRules() override;
+    virtual LayoutRulesImpl* getVaryingInputRules() override;
+    virtual LayoutRulesImpl* getVaryingOutputRules() override;
+    virtual LayoutRulesImpl* getSpecializationConstantRules() override;
+    virtual LayoutRulesImpl* getShaderStorageBufferRules() override;
+    virtual LayoutRulesImpl* getParameterBlockRules() override;
+
+    LayoutRulesImpl* getRayPayloadParameterRules()      override;
+    LayoutRulesImpl* getCallablePayloadParameterRules() override;
+    LayoutRulesImpl* getHitAttributesParameterRules()   override;
+
+    LayoutRulesImpl* getShaderRecordConstantBufferRules() override;
+    LayoutRulesImpl* getStructuredBufferRules() override;
+};
+
 GLSLLayoutRulesFamilyImpl kGLSLLayoutRulesFamilyImpl;
 HLSLLayoutRulesFamilyImpl kHLSLLayoutRulesFamilyImpl;
 CPULayoutRulesFamilyImpl kCPULayoutRulesFamilyImpl;
+CUDALayoutRulesFamilyImpl kCUDALayoutRulesFamilyImpl;
 
 // CPU case
 
@@ -703,6 +730,12 @@ struct CPUObjectLayoutRulesImpl : ObjectLayoutRulesImpl
 };
 
 
+// TODO(JS): Most likely wrong! Use CPU layout for CUDA for now
+struct CUDAObjectLayoutRulesImpl : CPUObjectLayoutRulesImpl
+{
+    typedef CPUObjectLayoutRulesImpl Super;
+
+};
 
 static CPUObjectLayoutRulesImpl kCPUObjectLayoutRulesImpl;
 static CPULayoutRulesImpl kCPULayoutRulesImpl;
@@ -710,6 +743,16 @@ static CPULayoutRulesImpl kCPULayoutRulesImpl;
 LayoutRulesImpl kCPULayoutRulesImpl_ = {
     &kCPULayoutRulesFamilyImpl, &kCPULayoutRulesImpl, &kCPUObjectLayoutRulesImpl,
 };
+
+// CUDA
+
+static CUDAObjectLayoutRulesImpl kCUDAObjectLayoutRulesImpl;
+static CUDALayoutRulesImpl kCUALayoutRulesImpl;
+
+LayoutRulesImpl kCUDALayoutRulesImpl_ = {
+    &kCPULayoutRulesFamilyImpl, &kCUALayoutRulesImpl, &kCUDAObjectLayoutRulesImpl,
+};
+
 
 // GLSL cases
 
@@ -986,6 +1029,69 @@ LayoutRulesImpl* CPULayoutRulesFamilyImpl::getStructuredBufferRules()
     return &kCPULayoutRulesImpl_;
 }
 
+// CUDA Family
+
+LayoutRulesImpl* CUDALayoutRulesFamilyImpl::getConstantBufferRules()
+{
+    return &kCPULayoutRulesImpl_;
+}
+
+LayoutRulesImpl* CUDALayoutRulesFamilyImpl::getPushConstantBufferRules()
+{
+    return &kCPULayoutRulesImpl_;
+}
+
+LayoutRulesImpl* CUDALayoutRulesFamilyImpl::getTextureBufferRules()
+{
+    return nullptr;
+}
+
+LayoutRulesImpl* CUDALayoutRulesFamilyImpl::getVaryingInputRules()
+{
+    return nullptr;
+}
+LayoutRulesImpl* CUDALayoutRulesFamilyImpl::getVaryingOutputRules()
+{
+    return nullptr;
+}
+LayoutRulesImpl* CUDALayoutRulesFamilyImpl::getSpecializationConstantRules()
+{
+    return nullptr;
+}
+LayoutRulesImpl* CUDALayoutRulesFamilyImpl::getShaderStorageBufferRules()
+{
+    return nullptr;
+}
+LayoutRulesImpl* CUDALayoutRulesFamilyImpl::getParameterBlockRules()
+{
+    // Not clear - just use similar to CPU 
+    return &kCUDALayoutRulesImpl_;
+}
+LayoutRulesImpl* CUDALayoutRulesFamilyImpl::getRayPayloadParameterRules()
+{
+    return nullptr;
+}
+LayoutRulesImpl* CUDALayoutRulesFamilyImpl::getCallablePayloadParameterRules()
+{
+    return nullptr;
+}
+LayoutRulesImpl* CUDALayoutRulesFamilyImpl::getHitAttributesParameterRules()
+{
+    return nullptr;
+}
+LayoutRulesImpl* CUDALayoutRulesFamilyImpl::getShaderRecordConstantBufferRules()
+{
+    // Just following HLSLs lead for the moment
+    return &kCUDALayoutRulesImpl_;
+}
+
+LayoutRulesImpl* CUDALayoutRulesFamilyImpl::getStructuredBufferRules()
+{
+    return &kCUDALayoutRulesImpl_;
+}
+
+
+
 LayoutRulesFamilyImpl* getDefaultLayoutRulesFamilyForTarget(TargetRequest* targetReq)
 {
     switch (targetReq->getTarget())
@@ -1018,6 +1124,13 @@ LayoutRulesFamilyImpl* getDefaultLayoutRulesFamilyForTarget(TargetRequest* targe
 
         return &kCPULayoutRulesFamilyImpl;
     }
+
+    case CodeGenTarget::PTX:
+    case CodeGenTarget::CUDASource:
+    {
+        return &kCUDALayoutRulesFamilyImpl;
+    }
+
 
     default:
         return nullptr;

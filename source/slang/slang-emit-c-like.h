@@ -47,6 +47,7 @@ public:
         HLSL,
         C,
         CPP,
+        CUDA,
         CountOf,
     };
     

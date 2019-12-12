@@ -32,22 +32,11 @@
 #include "slang-emit-glsl.h"
 #include "slang-emit-hlsl.h"
 #include "slang-emit-cpp.h"
+#include "slang-emit-cuda.h"
 
 #include <assert.h>
 
 namespace Slang {
-
-enum class BuiltInCOp
-{
-    Splat,                  //< Splat a single value to all values of a vector or matrix type
-    Init,                   //< Initialize with parameters (must match the type)
-};
-
-
-//
-
-
-//
 
 EntryPointLayout* findEntryPointLayout(
     ProgramLayout*          programLayout,
@@ -497,6 +486,11 @@ String emitEntryPointSource(
         case SourceStyle::HLSL:
         {
             sourceEmitter = new HLSLSourceEmitter(desc);
+            break;
+        }
+        case SourceStyle::CUDA:
+        {
+            sourceEmitter = new CUDASourceEmitter(desc);
             break;
         }
         default: break;

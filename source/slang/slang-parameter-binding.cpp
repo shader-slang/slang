@@ -2585,6 +2585,19 @@ static bool _isCPUTarget(CodeGenTarget target)
     }
 }
 
+static bool _isPTXTarget(CodeGenTarget target)
+{
+    switch (target)
+    {
+        case CodeGenTarget::CUDASource:
+        case CodeGenTarget::PTX:
+        {
+            return true;
+        }
+        default: return false;
+    }
+}
+
     /// Keep track of the running global counter for entry points and global parameters visited.
     ///
     /// Because of explicit `register` and `[[vk::binding(...)]]` support, parameter binding
@@ -2970,7 +2983,8 @@ RefPtr<ProgramLayout> generateParameterBindings(
 
     // On a CPU target, it's okay to have global scope parameters that use Uniform resources (because on CPU
     // all resources are 'Uniform')
-    if (!_isCPUTarget(targetReq->target))
+    // TODO(JS): We'll just assume the same with CUDA target for now..
+    if (!_isCPUTarget(targetReq->target) && !_isPTXTarget(targetReq->target))
     {
         for( auto& parameterInfo : sharedContext.parameters )
         {

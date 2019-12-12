@@ -478,8 +478,6 @@ namespace Slang
                 return PassThroughMode::None;
             }
             case CodeGenTarget::GLSL:
-            case CodeGenTarget::GLSL_Vulkan:
-            case CodeGenTarget::GLSL_Vulkan_OneDesc:
             {
                 // Can always output GLSL
                 return PassThroughMode::None; 
@@ -487,6 +485,11 @@ namespace Slang
             case CodeGenTarget::HLSL:
             {
                 // Can always output HLSL
+                return PassThroughMode::None;
+            }
+            case CodeGenTarget::CUDASource:
+            {
+                // Can always output CUDA
                 return PassThroughMode::None;
             }
             case CodeGenTarget::SPIRVAssembly:
@@ -503,6 +506,11 @@ namespace Slang
             case CodeGenTarget::DXILAssembly:
             {
                 return PassThroughMode::Dxc;
+            }
+            case CodeGenTarget::GLSL_Vulkan:
+            case CodeGenTarget::GLSL_Vulkan_OneDesc:
+            {
+                return PassThroughMode::Glslang;
             }
             case CodeGenTarget::CPPSource:
             case CodeGenTarget::CSource:
@@ -1695,6 +1703,7 @@ SlangResult dissassembleDXILUsingDXC(
             }
             break;
 
+        case CodeGenTarget::CUDASource:
         case CodeGenTarget::CPPSource:
         case CodeGenTarget::CSource:
             {
