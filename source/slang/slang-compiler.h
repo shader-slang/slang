@@ -1797,6 +1797,15 @@ namespace Slang
     @return the appropriate source filename */
     String calcSourcePathForEntryPoint(EndToEndCompileRequest* endToEndReq, UInt entryPointIndex);
 
+    /* Emits entry point source taking into account if a pass-through or not. Uses 'target' to determine
+    the target (not targetReq) */
+    String emitEntryPointSource(
+        BackEndCompileRequest*  compileRequest,
+        Int                     entryPointIndex,
+        TargetRequest*          targetReq,
+        CodeGenTarget           target,
+        EndToEndCompileRequest* endToEndReq);
+
     struct TypeCheckingCache;
     //
 

@@ -433,7 +433,7 @@ Result linkAndOptimizeIR(
     return SLANG_OK;
 }
 
-String emitEntryPointSource(
+String emitEntryPointSourceFromIR(
     BackEndCompileRequest*  compileRequest,
     Int                     entryPointIndex,
     CodeGenTarget           target,

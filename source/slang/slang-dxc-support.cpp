@@ -29,11 +29,7 @@
 namespace Slang
 {
     String GetHLSLProfileName(Profile profile);
-    String emitHLSLForEntryPoint(
-        BackEndCompileRequest*  compileRequest,
-        Int                     entryPointIndex,
-        TargetRequest*          targetReq,
-        EndToEndCompileRequest* endToEndReq);
+
 
     SlangResult locateDXCCompilers(const String& path, ISlangSharedLibraryLoader* loader, DownstreamCompilerSet* set);
 
@@ -85,10 +81,11 @@ namespace Slang
 
         // Now let's go ahead and generate HLSL for the entry
         // point, since we'll need that to feed into dxc.
-        auto hlslCode = emitHLSLForEntryPoint(
+        auto hlslCode = emitEntryPointSource(
             compileRequest,
             entryPointIndex,
             targetReq,
+            CodeGenTarget::HLSL,
             endToEndReq);
         maybeDumpIntermediate(compileRequest, hlslCode.getBuffer(), CodeGenTarget::HLSL);
 
