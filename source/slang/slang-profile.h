@@ -7,7 +7,7 @@
 namespace Slang
 {
     // Flavors of translation unit
-    enum class SourceLanguage : SlangSourceLanguage
+    enum class SourceLanguage : SlangSourceLanguageIntegral
     {
         Unknown = SLANG_SOURCE_LANGUAGE_UNKNOWN, // should not occur
         Slang = SLANG_SOURCE_LANGUAGE_SLANG,

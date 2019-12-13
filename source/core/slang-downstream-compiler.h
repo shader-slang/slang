@@ -120,12 +120,33 @@ public:
 
     typedef DownstreamCompileResult CompileResult;
 
-    enum class SourceType
+    typedef uint32_t SourceLanguageFlags;
+    struct SourceLanguageFlag
     {
-        C,              ///< C source
-        CPP,            ///< C++ source
-        CUDA,           ///< The CUDA language
-        CountOf,
+        enum Enum : SourceLanguageFlags
+        {
+            Unknown = SourceLanguageFlags(1) <<  SLANG_SOURCE_LANGUAGE_UNKNOWN,
+            Slang   = SourceLanguageFlags(1) <<  SLANG_SOURCE_LANGUAGE_SLANG,
+            HLSL    = SourceLanguageFlags(1) <<  SLANG_SOURCE_LANGUAGE_HLSL,
+            GLSL    = SourceLanguageFlags(1) << SLANG_SOURCE_LANGUAGE_GLSL,
+            C       = SourceLanguageFlags(1) << SLANG_SOURCE_LANGUAGE_C,
+            CPP     = SourceLanguageFlags(1) << SLANG_SOURCE_LANGUAGE_CPP,
+            CUDA    = SourceLanguageFlags(1) << SLANG_SOURCE_LANGUAGE_CUDA,
+        };
+    };
+
+    struct Info
+    {
+        Info():sourceLanguageFlags(0) {}
+
+        Info(SourceLanguageFlags inSourceLanguageFlags):
+            sourceLanguageFlags(inSourceLanguageFlags)
+        {}
+        SourceLanguageFlags sourceLanguageFlags;
+    };
+    struct Infos
+    {
+        Info infos[int(SLANG_PASS_THROUGH_COUNT_OF)];
     };
 
     struct Desc
@@ -202,7 +223,7 @@ public:
         OptimizationLevel optimizationLevel = OptimizationLevel::Default;
         DebugInfoType debugInfoType = DebugInfoType::Standard;
         TargetType targetType = TargetType::Executable;
-        SourceType sourceType = SourceType::CPP;
+        SlangSourceLanguage sourceLanguage = SLANG_SOURCE_LANGUAGE_CPP;
         FloatingPointMode floatingPointMode = FloatingPointMode::Default;
 
         Flags flags = Flag::EnableExceptionHandling;
@@ -262,7 +283,21 @@ public:
         /// Return the compiler type as name
     static UnownedStringSlice getCompilerTypeAsText(SlangPassThrough type);
 
+        /// Get info for a compiler type
+    static const Info& getInfo(SlangPassThrough compiler) { return s_infos.infos[int(compiler)]; }
+        /// True if this compiler can compile the specified language
+    static bool canCompile(SlangPassThrough compiler, SlangSourceLanguage sourceLanguage);
+
+        /// Given a source language name returns a source language. Name here is distinct from extension
+    static SlangSourceLanguage getSourceLanguageFromName(const UnownedStringSlice& text);
+        /// Given a name returns the pass through
+    static SlangPassThrough getPassThroughFromName(const UnownedStringSlice& slice);
+    static SlangResult getPassThroughFromName(const UnownedStringSlice& slice, SlangPassThrough& outPassThrough);
+        /// Get the compilers name
+    static UnownedStringSlice getPassThroughName(SlangPassThrough passThru);
+
 protected:
+    static Infos s_infos;
 
     DownstreamCompiler(const Desc& desc) :
         m_desc(desc)
@@ -369,9 +404,9 @@ public:
     void addCompiler(DownstreamCompiler* compiler);
 
         /// Get a default compiler
-    DownstreamCompiler* getDefaultCompiler(DownstreamCompiler::SourceType sourceType) const { return m_defaultCompilers[int(sourceType)];  }
+    DownstreamCompiler* getDefaultCompiler(SlangSourceLanguage sourceLanguage) const { return m_defaultCompilers[int(sourceLanguage)];  }
         /// Set the default compiler
-    void setDefaultCompiler(DownstreamCompiler::SourceType sourceType, DownstreamCompiler* compiler) { m_defaultCompilers[int(sourceType)] = compiler;  }
+    void setDefaultCompiler(SlangSourceLanguage sourceLanguage, DownstreamCompiler* compiler) { m_defaultCompilers[int(sourceLanguage)] = compiler;  }
 
         /// True if has a compiler of the specified type
     bool hasCompiler(SlangPassThrough compilerType) const;
@@ -384,7 +419,7 @@ protected:
 
     Index _findIndex(const DownstreamCompiler::Desc& desc) const;
 
-    RefPtr<DownstreamCompiler> m_defaultCompilers[int(DownstreamCompiler::SourceType::CountOf)];
+    RefPtr<DownstreamCompiler> m_defaultCompilers[int(SLANG_SOURCE_LANGUAGE_COUNT_OF)];
     // This could be a dictionary/map - but doing a linear search is going to be fine and it makes
     // somethings easier.
     List<RefPtr<DownstreamCompiler>> m_compilers;
@@ -399,7 +434,6 @@ struct DownstreamCompilerBaseUtil
     typedef DownstreamCompiler::OptimizationLevel OptimizationLevel;
     typedef DownstreamCompiler::TargetType TargetType;
     typedef DownstreamCompiler::DebugInfoType DebugInfoType;
-    typedef DownstreamCompiler::SourceType SourceType;
     
     typedef DownstreamDiagnostics::Diagnostic Diagnostic;
 
@@ -428,7 +462,7 @@ struct DownstreamCompilerUtil: public DownstreamCompilerBaseUtil
         /// Get the information on the compiler used to compile this source
     static const DownstreamCompiler::Desc& getCompiledWithDesc();
 
-    static void updateDefault(DownstreamCompilerSet* set, DownstreamCompiler::SourceType type);
+    static void updateDefault(DownstreamCompilerSet* set, SlangSourceLanguage sourceLanguage);
     static void updateDefaults(DownstreamCompilerSet* set);
 
     static void setDefaultLocators(DownstreamCompilerLocatorFunc outFuncs[int(SLANG_PASS_THROUGH_COUNT_OF)]);

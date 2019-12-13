@@ -97,7 +97,7 @@ class TestContext
 
         /// Get compiler set
     Slang::DownstreamCompilerSet* getCompilerSet();
-    Slang::DownstreamCompiler* getDefaultCompiler(Slang::DownstreamCompiler::SourceType sourceType);
+    Slang::DownstreamCompiler* getDefaultCompiler(SlangSourceLanguage sourceLanguage);
 
         /// Ctor
     TestContext();

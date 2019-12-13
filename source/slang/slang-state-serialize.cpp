@@ -1228,7 +1228,7 @@ static SlangResult _calcCommandLine(OffsetBase& base, StateSerializeUtil::Reques
             default:
             {
                 cmd.addArg("-pass-through");
-                cmd.addArg(getPassThroughName(SlangPassThrough(requestState->passThroughMode)));
+                cmd.addArg(DownstreamCompiler::getPassThroughName(SlangPassThrough(requestState->passThroughMode)));
                 break;
             }
         }

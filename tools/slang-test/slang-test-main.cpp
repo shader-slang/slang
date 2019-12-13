@@ -495,44 +495,6 @@ static bool _hasOption(const List<String>& args, const String& argName)
     return args.indexOf(argName) != Index(-1);
 }
 
-static SlangPassThrough _toPassThroughType(const UnownedStringSlice& slice)
-{
-    if (slice == "dxc")
-    {
-        return SLANG_PASS_THROUGH_DXC;
-    }
-    else if (slice == "fxc")
-    {
-        return SLANG_PASS_THROUGH_FXC;
-    }
-    else if (slice == "glslang")
-    {
-        return SLANG_PASS_THROUGH_GLSLANG;
-    }
-    else if (slice == "c" || slice == "cpp")
-    {
-        return SLANG_PASS_THROUGH_GENERIC_C_CPP; 
-    }
-    else if (slice == "clang")
-    {
-        return SLANG_PASS_THROUGH_CLANG;
-    }
-    else if (slice == "gcc")
-    {
-        return SLANG_PASS_THROUGH_GCC;
-    }
-    else if (slice == "vs" || slice == "visualstudio")
-    {
-        return SLANG_PASS_THROUGH_VISUAL_STUDIO;
-    }
-    else if (slice == "nvrtc")
-    {
-        return SLANG_PASS_THROUGH_NVRTC;
-    }
-
-    return SLANG_PASS_THROUGH_NONE;
-}
-
 static PassThroughFlags _getPassThroughFlagsForTarget(SlangCompileTarget target)
 {
     switch (target)
@@ -740,7 +702,7 @@ static SlangResult _extractSlangCTestRequirements(const CommandLine& cmdLine, Te
         String passThrough;
         if (SLANG_SUCCEEDED(_extractArg(cmdLine, "-pass-through", passThrough)))
         {
-            ioRequirements->addUsedBackEnd(_toPassThroughType(passThrough.getUnownedSlice()));
+            ioRequirements->addUsedBackEnd(DownstreamCompiler::getPassThroughFromName(passThrough.getUnownedSlice()));
         }
     }
 
@@ -1293,7 +1255,7 @@ static String _calcModulePath(const TestInput& input)
 
 static TestResult runCPPCompilerCompile(TestContext* context, TestInput& input)
 {
-    DownstreamCompiler* compiler = context->getDefaultCompiler(DownstreamCompiler::SourceType::CPP);   
+    DownstreamCompiler* compiler = context->getDefaultCompiler(SLANG_SOURCE_LANGUAGE_CPP);
     if (!compiler)
     {
         return TestResult::Ignored;
@@ -1335,7 +1297,7 @@ static TestResult runCPPCompilerCompile(TestContext* context, TestInput& input)
 
 static TestResult runCPPCompilerSharedLibrary(TestContext* context, TestInput& input)
 {
-    DownstreamCompiler* compiler = context->getDefaultCompiler(DownstreamCompiler::SourceType::CPP);
+    DownstreamCompiler* compiler = context->getDefaultCompiler(SLANG_SOURCE_LANGUAGE_CPP);
     if (!compiler)
     {
         return TestResult::Ignored;
@@ -1365,7 +1327,7 @@ static TestResult runCPPCompilerSharedLibrary(TestContext* context, TestInput& i
     // Set up the compilation options
     DownstreamCompiler::CompileOptions options;
 
-    options.sourceType = (ext == "c") ? DownstreamCompiler::SourceType::C : DownstreamCompiler::SourceType::CPP;
+    options.sourceLanguage = (ext == "c") ? SLANG_SOURCE_LANGUAGE_C : SLANG_SOURCE_LANGUAGE_CPP;
 
     // Build a shared library
     options.targetType = DownstreamCompiler::TargetType::SharedLibrary;
@@ -1453,7 +1415,7 @@ static TestResult runCPPCompilerSharedLibrary(TestContext* context, TestInput& i
 
 static TestResult runCPPCompilerExecute(TestContext* context, TestInput& input)
 {
-    DownstreamCompiler* compiler = context->getDefaultCompiler(DownstreamCompiler::SourceType::CPP);
+    DownstreamCompiler* compiler = context->getDefaultCompiler(SLANG_SOURCE_LANGUAGE_CPP);
     if (!compiler)
     {
         return TestResult::Ignored;
@@ -1487,7 +1449,7 @@ static TestResult runCPPCompilerExecute(TestContext* context, TestInput& input)
     // Set up the compilation options
     DownstreamCompiler::CompileOptions options;
 
-    options.sourceType = (ext == "c") ? DownstreamCompiler::SourceType::C : DownstreamCompiler::SourceType::CPP;
+    options.sourceLanguage = (ext == "c") ? SLANG_SOURCE_LANGUAGE_C : SLANG_SOURCE_LANGUAGE_CPP;
 
     // Compile this source
     options.sourceFiles.add(filePath);

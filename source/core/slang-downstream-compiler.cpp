@@ -20,6 +20,29 @@
 namespace Slang
 {
 
+static DownstreamCompiler::Infos _calcInfos()
+{
+    typedef DownstreamCompiler::Info Info;
+    typedef DownstreamCompiler::SourceLanguageFlag SourceLanguageFlag;
+    typedef DownstreamCompiler::SourceLanguageFlags SourceLanguageFlags;
+
+    DownstreamCompiler::Infos infos;
+
+    infos.infos[int(SLANG_PASS_THROUGH_CLANG)] = Info(SourceLanguageFlag::CPP | SourceLanguageFlag::C);
+    infos.infos[int(SLANG_PASS_THROUGH_VISUAL_STUDIO)] = Info(SourceLanguageFlag::CPP | SourceLanguageFlag::C);
+    infos.infos[int(SLANG_PASS_THROUGH_GCC)] = Info(SourceLanguageFlag::CPP | SourceLanguageFlag::C);
+
+    infos.infos[int(SLANG_PASS_THROUGH_NVRTC)] = Info(SourceLanguageFlag::CUDA);
+
+    infos.infos[int(SLANG_PASS_THROUGH_DXC)] = Info(SourceLanguageFlag::HLSL);
+    infos.infos[int(SLANG_PASS_THROUGH_FXC)] = Info(SourceLanguageFlag::HLSL);
+    infos.infos[int(SLANG_PASS_THROUGH_GLSLANG)] = Info(SourceLanguageFlag::GLSL);
+
+    return infos;
+}
+
+/* static */DownstreamCompiler::Infos DownstreamCompiler::s_infos = _calcInfos();
+
 /* !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! DownstreamCompiler::Desc !!!!!!!!!!!!!!!!!!!!!!*/
 
 void DownstreamCompiler::Desc::appendAsText(StringBuilder& out) const
@@ -65,6 +88,98 @@ void DownstreamCompiler::Desc::appendAsText(StringBuilder& out) const
         case SLANG_PASS_THROUGH_DXC:            return UnownedStringSlice::fromLiteral("dxc");
         case SLANG_PASS_THROUGH_GLSLANG:        return UnownedStringSlice::fromLiteral("glslang");
     }
+}
+
+/* static */bool DownstreamCompiler::canCompile(SlangPassThrough compiler, SlangSourceLanguage sourceLanguage)
+{
+    const auto& info = getInfo(compiler);
+    return (info.sourceLanguageFlags & (SourceLanguageFlags(1) << int(sourceLanguage))) != 0;
+}
+
+/* static */SlangSourceLanguage DownstreamCompiler::getSourceLanguageFromName(const UnownedStringSlice& text)
+{
+    if (text == "c" || text == "C")
+    {
+        return SLANG_SOURCE_LANGUAGE_C;
+    }
+    else if (text == "cpp" || text == "c++" || text == "C++" || text == "cxx")
+    {
+        return SLANG_SOURCE_LANGUAGE_CPP;
+    }
+    else if (text == "slang")
+    {
+        return SLANG_SOURCE_LANGUAGE_SLANG;
+    }
+    else if (text == "glsl")
+    {
+        return SLANG_SOURCE_LANGUAGE_GLSL;
+    }
+    else if (text == "hlsl")
+    {
+        return SLANG_SOURCE_LANGUAGE_HLSL;
+    }
+    else if (text == "cu" || text == "cuda")
+    {
+        return SLANG_SOURCE_LANGUAGE_CUDA;
+    }
+    return SLANG_SOURCE_LANGUAGE_UNKNOWN;
+}
+
+#define SLANG_PASS_THROUGH_TYPES(x) \
+        x(none, NONE) \
+        x(fxc, FXC) \
+        x(dxc, DXC) \
+        x(glslang, GLSLANG) \
+        x(visualstudio, VISUAL_STUDIO) \
+        x(clang, CLANG) \
+        x(gcc, GCC) \
+        x(genericcpp, GENERIC_C_CPP) \
+        x(nvrtc, NVRTC)
+
+
+
+/* static */SlangPassThrough DownstreamCompiler::getPassThroughFromName(const UnownedStringSlice& slice)
+{
+#define SLANG_PASS_THROUGH_NAME_TO_TYPE(x, y) \
+    if (slice == UnownedStringSlice::fromLiteral(#x)) return SLANG_PASS_THROUGH_##y;
+
+    SLANG_PASS_THROUGH_TYPES(SLANG_PASS_THROUGH_NAME_TO_TYPE)
+
+    // Other options
+    if (slice == "c" || slice == "cpp")
+    {
+        return SLANG_PASS_THROUGH_GENERIC_C_CPP;
+    }
+    else if (slice == "vs")
+    {
+        return SLANG_PASS_THROUGH_VISUAL_STUDIO;
+    }
+
+    return SLANG_PASS_THROUGH_NONE;
+}
+
+/* static */SlangResult DownstreamCompiler::getPassThroughFromName(const UnownedStringSlice& slice, SlangPassThrough& outPassThrough)
+{
+    outPassThrough = getPassThroughFromName(slice);
+    // It could be none on error - if it's not equal to "none" then it msut be an error
+    if (outPassThrough == SLANG_PASS_THROUGH_NONE && slice != UnownedStringSlice::fromLiteral("none"))
+    {
+        return SLANG_FAIL;
+    }
+    return SLANG_OK;
+}
+
+/* static */UnownedStringSlice DownstreamCompiler::getPassThroughName(SlangPassThrough passThru)
+{
+#define SLANG_PASS_THROUGH_TYPE_TO_NAME(x, y) \
+    case SLANG_PASS_THROUGH_##y: return UnownedStringSlice::fromLiteral(#x);
+
+    switch (passThru)
+    {
+        SLANG_PASS_THROUGH_TYPES(SLANG_PASS_THROUGH_TYPE_TO_NAME)
+        default: break;
+    }
+    return UnownedStringSlice::fromLiteral("unknown");
 }
 
 /* !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! DownstreamDiagnostics !!!!!!!!!!!!!!!!!!!!!!*/
@@ -284,7 +399,7 @@ SlangResult CommandLineDownstreamCompiler::compile(const CompileOptions& inOptio
             compileSourcePath.append("-src");
 
             // Make the temporary filename have the appropriate extension.
-            if (options.sourceType == DownstreamCompiler::SourceType::C)
+            if (options.sourceLanguage == SLANG_SOURCE_LANGUAGE_C)
             {
                 compileSourcePath.append(".c");
             }
@@ -515,19 +630,19 @@ const DownstreamCompiler::Desc& DownstreamCompilerUtil::getCompiledWithDesc()
     return findClosestCompiler(compilers, desc);
 }
 
-/* static */void DownstreamCompilerUtil::updateDefault(DownstreamCompilerSet* set, DownstreamCompiler::SourceType type)
+/* static */void DownstreamCompilerUtil::updateDefault(DownstreamCompilerSet* set, SlangSourceLanguage sourceLanguage)
 {
     DownstreamCompiler* compiler = nullptr;
 
-    switch (type)
+    switch (sourceLanguage)
     {
-        case DownstreamCompiler::SourceType::CPP:
-        case DownstreamCompiler::SourceType::C:
+        case SLANG_SOURCE_LANGUAGE_CPP:
+        case SLANG_SOURCE_LANGUAGE_C:
         {
             compiler = findClosestCompiler(set, getCompiledWithDesc());
             break;
         }
-        case DownstreamCompiler::SourceType::CUDA:
+        case SLANG_SOURCE_LANGUAGE_CUDA:
         {
             DownstreamCompiler::Desc desc;
             desc.type = SLANG_PASS_THROUGH_NVRTC;
@@ -537,14 +652,14 @@ const DownstreamCompiler::Desc& DownstreamCompilerUtil::getCompiledWithDesc()
         default: break;
     }
 
-    set->setDefaultCompiler(type, compiler);
+    set->setDefaultCompiler(sourceLanguage, compiler);
 }
 
 /* static */void DownstreamCompilerUtil::updateDefaults(DownstreamCompilerSet* set)
 {
-    for (Index i = 0; i < Index(DownstreamCompiler::SourceType::CountOf); ++i)
+    for (Index i = 0; i < Index(SLANG_SOURCE_LANGUAGE_COUNT_OF); ++i)
     {
-        updateDefault(set, DownstreamCompiler::SourceType(i));
+        updateDefault(set, SlangSourceLanguage(i));
     }
 }
 

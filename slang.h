@@ -609,8 +609,8 @@ extern "C"
         SLANG_LINE_DIRECTIVE_MODE_GLSL,         /**< Emit GLSL-style directives with file *number* instead of name */
     };
 
-    typedef int SlangSourceLanguage;
-    enum
+    typedef int SlangSourceLanguageIntegral;
+    enum SlangSourceLanguage : SlangSourceLanguageIntegral
     {
         SLANG_SOURCE_LANGUAGE_UNKNOWN,
         SLANG_SOURCE_LANGUAGE_SLANG,

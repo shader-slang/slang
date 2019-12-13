@@ -1975,12 +1975,13 @@ namespace Slang
         ~Session();
 
         ComPtr<ISlangSharedLibraryLoader> m_sharedLibraryLoader;                    ///< The shared library loader (never null)
+
         SlangFuncPtr m_sharedLibraryFunctions[int(SharedLibraryFuncType::CountOf)]; ///< Functions from shared libraries
 
         int m_downstreamCompilerInitialized = 0;                                        
 
-        RefPtr<DownstreamCompilerSet> m_downstreamCompilerSet;                      ///< Information about all available downstream compilers.
-        RefPtr<DownstreamCompiler> m_downstreamCompilers[int(PassThroughMode::CountOf)];    ///< A downstream compiler for a pass through
+        RefPtr<DownstreamCompilerSet> m_downstreamCompilerSet;                                  ///< Information about all available downstream compilers.
+        RefPtr<DownstreamCompiler> m_downstreamCompilers[int(PassThroughMode::CountOf)];        ///< A downstream compiler for a pass through
         DownstreamCompilerLocatorFunc m_downstreamCompilerLocators[int(PassThroughMode::CountOf)];
 
     private:
