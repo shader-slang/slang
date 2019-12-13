@@ -557,7 +557,7 @@ void CUDASourceEmitter::emitEntryPointAttributesImpl(IRFunc* irFunc, IREntryPoin
             m_writer->emit(")]\n");
 #endif
 
-            m_writer->emit("__global__\n");
+            m_writer->emit("__global__ ");
             break;
         }
         
@@ -565,6 +565,55 @@ void CUDASourceEmitter::emitEntryPointAttributesImpl(IRFunc* irFunc, IREntryPoin
         default:
             break;
     }
+}
+
+void CUDASourceEmitter::emitOperandImpl(IRInst* inst, EmitOpInfo const&  outerPrec)
+{
+    if (shouldFoldInstIntoUseSites(inst))
+    {
+        emitInstExpr(inst, outerPrec);
+        return;
+    }
+
+    switch (inst->op)
+    {
+        case kIROp_Param:
+        {
+            auto varLayout = getVarLayout(inst);
+            if (varLayout)
+            {
+                if (auto systemValueSemantic = varLayout->findSystemValueSemanticAttr())
+                {
+                    String semanticNameSpelling = systemValueSemantic->getName();
+                    semanticNameSpelling = semanticNameSpelling.toLower();
+
+                    if (semanticNameSpelling == "sv_dispatchthreadid")
+                    {
+                        m_semanticUsedFlags |= SemanticUsedFlag::DispatchThreadID;
+                        m_writer->emit("((blockIdx * blockDim) + threadIdx)");
+
+                        return;
+                    }
+                    else if (semanticNameSpelling == "sv_groupid")
+                    {
+                        m_semanticUsedFlags |= SemanticUsedFlag::GroupID;
+                        m_writer->emit("blockIdx");
+                        return;
+                    }
+                    else if (semanticNameSpelling == "sv_groupthreadid")
+                    {
+                        m_semanticUsedFlags |= SemanticUsedFlag::GroupThreadID;
+                        m_writer->emit("threadIdx");
+                        return;
+                    }
+                }
+            }
+
+            break;
+        }
+        default: break;
+    }
+    m_writer->emit(getName(inst));
 }
 
 bool CUDASourceEmitter::tryEmitInstExprImpl(IRInst* inst, const EmitOpInfo& inOuterPrec)
@@ -582,9 +631,6 @@ bool CUDASourceEmitter::tryEmitInstExprImpl(IRInst* inst, const EmitOpInfo& inOu
                 auto prec = getInfo(EmitOp::Prefix);
                 needClose = maybeEmitParens(outerPrec, prec);
 
-                
-
-
                 // Need to emit as cast for HLSL
                 m_writer->emit("(");
                 emitType(inst->getDataType());
@@ -600,6 +646,7 @@ bool CUDASourceEmitter::tryEmitInstExprImpl(IRInst* inst, const EmitOpInfo& inOu
                 m_writer->emit("make_");
                 m_writer->emit(_getCUDATypeName(inst->getDataType()));
                 emitArgs(inst);
+                return true;
             }
             break;
         }
@@ -640,16 +687,7 @@ bool CUDASourceEmitter::tryEmitInstExprImpl(IRInst* inst, const EmitOpInfo& inOu
 
 void CUDASourceEmitter::emitLayoutDirectivesImpl(TargetRequest* targetReq)
 {
-    switch (targetReq->getDefaultMatrixLayoutMode())
-    {
-        case kMatrixLayoutMode_RowMajor:
-        default:
-            m_writer->emit("#pragma pack_matrix(row_major)\n");
-            break;
-        case kMatrixLayoutMode_ColumnMajor:
-            m_writer->emit("#pragma pack_matrix(column_major)\n");
-            break;
-    }
+    SLANG_UNUSED(targetReq);
 }
 
 void CUDASourceEmitter::emitVectorTypeNameImpl(IRType* elementType, IRIntegerValue elementCount)
@@ -671,14 +709,41 @@ void CUDASourceEmitter::emitRateQualifiersImpl(IRRate* rate)
     }
 }
 
+void CUDASourceEmitter::emitSimpleFuncParamsImpl(IRFunc* func)
+{
+    m_writer->emit("(");
+
+    bool hasEmittedParam = false;
+    auto firstParam = func->getFirstParam();
+    for (auto pp = firstParam; pp; pp = pp->getNextParam())
+    {
+        auto varLayout = getVarLayout(pp);
+        if (varLayout && varLayout->findSystemValueSemanticAttr())
+        {
+            // If it has a semantic don't output, it will be accessed via a global
+            continue;
+        }
+
+        if (hasEmittedParam)
+            m_writer->emit(", ");
+
+        emitSimpleFuncParamImpl(pp);
+        hasEmittedParam = true;
+    }
+
+    m_writer->emit(")");
+}
+
 void CUDASourceEmitter::emitSimpleFuncImpl(IRFunc* func)
 {
     if (IREntryPointDecoration* entryPointDecor = func->findDecoration<IREntryPointDecoration>())
     {
+        // If its an entry point, we let the entry point attribute control the output
         Super::emitSimpleFuncImpl(func);
     }
     else
     {
+        // If it's not an entry point mark as device
         m_writer->emit("__device__ ");
         Super::emitSimpleFuncImpl(func);
     }
@@ -708,24 +773,6 @@ void CUDASourceEmitter::emitSemanticsImpl(IRInst* inst)
             }
         }
     }
-}
-
-void CUDASourceEmitter::emitSimpleFuncParamImpl(IRParam* param)
-{
-    if (auto decor = param->findDecoration<IRGeometryInputPrimitiveTypeDecoration>())
-    {
-        switch (decor->op)
-        {
-            case kIROp_TriangleInputPrimitiveTypeDecoration:             m_writer->emit("triangle "); break;
-            case kIROp_PointInputPrimitiveTypeDecoration:                m_writer->emit("point "); break;
-            case kIROp_LineInputPrimitiveTypeDecoration:                 m_writer->emit("line "); break;
-            case kIROp_LineAdjInputPrimitiveTypeDecoration:              m_writer->emit("lineadj "); break;
-            case kIROp_TriangleAdjInputPrimitiveTypeDecoration:          m_writer->emit("triangleadj "); break;
-            default: SLANG_ASSERT(!"Unknown primitive type"); break;
-        }
-    }
-
-    Super::emitSimpleFuncParamImpl(param);
 }
 
 static UnownedStringSlice _getInterpolationModifierText(IRInterpolationMode mode)

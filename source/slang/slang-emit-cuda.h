@@ -12,6 +12,16 @@ class CUDASourceEmitter : public CLikeSourceEmitter
 public:
     typedef CLikeSourceEmitter Super;
 
+    typedef uint32_t SemanticUsedFlags;
+    struct SemanticUsedFlag
+    {
+        enum Enum : SemanticUsedFlags
+        {
+            DispatchThreadID = 0x01,
+            GroupThreadID = 0x02,
+            GroupID = 0x04,
+        };
+    };
 
     static UnownedStringSlice getBuiltinTypeName(IROp op);
     static UnownedStringSlice getVectorPrefix(IROp op);
@@ -30,12 +40,13 @@ protected:
     virtual void emitRateQualifiersImpl(IRRate* rate) SLANG_OVERRIDE;
     virtual void emitSemanticsImpl(IRInst* inst) SLANG_OVERRIDE;
     virtual void emitSimpleFuncImpl(IRFunc* func) SLANG_OVERRIDE;
-    virtual void emitSimpleFuncParamImpl(IRParam* param) SLANG_OVERRIDE;
+    virtual void emitSimpleFuncParamsImpl(IRFunc* func) SLANG_OVERRIDE;
     virtual void emitInterpolationModifiersImpl(IRInst* varInst, IRType* valueType, IRVarLayout* layout) SLANG_OVERRIDE;
     virtual void emitSimpleTypeImpl(IRType* type) SLANG_OVERRIDE;
     virtual void emitVectorTypeNameImpl(IRType* elementType, IRIntegerValue elementCount) SLANG_OVERRIDE;
     virtual void emitVarDecorationsImpl(IRInst* varDecl) SLANG_OVERRIDE;
     virtual void emitMatrixLayoutModifiersImpl(IRVarLayout* layout) SLANG_OVERRIDE;
+    virtual void emitOperandImpl(IRInst* inst, EmitOpInfo const&  outerPrec) SLANG_OVERRIDE;
 
     virtual bool tryEmitInstExprImpl(IRInst* inst, const EmitOpInfo& inOuterPrec) SLANG_OVERRIDE;
 
@@ -61,6 +72,8 @@ protected:
 
     Dictionary<IRType*, StringSlicePool::Handle> m_typeNameMap;
     StringSlicePool m_slicePool;
+
+    UInt m_semanticUsedFlags = 0;
 };
 
 }
