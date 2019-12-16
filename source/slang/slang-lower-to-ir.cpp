@@ -1999,6 +1999,67 @@ LoweredValInfo tryGetAddress(
     LoweredValInfo const&   inVal,
     TryGetAddressMode       mode);
 
+    /// Represents the "direction" that a parameter is being passed (e.g., `in` or `out`
+enum ParameterDirection
+{
+    kParameterDirection_In,     ///< Copy in
+    kParameterDirection_Out,    ///< Copy out
+    kParameterDirection_InOut,  ///< Copy in, copy out
+    kParameterDirection_Ref,    ///< By-reference
+};
+
+    /// Compute the direction for a parameter based on its declaration
+ParameterDirection getParameterDirection(VarDeclBase* paramDecl)
+{
+    if( paramDecl->HasModifier<RefModifier>() )
+    {
+        // The AST specified `ref`:
+        return kParameterDirection_Ref;
+    }
+    if( paramDecl->HasModifier<InOutModifier>() )
+    {
+        // The AST specified `inout`:
+        return kParameterDirection_InOut;
+    }
+    if (paramDecl->HasModifier<OutModifier>())
+    {
+        // We saw an `out` modifier, so now we need
+        // to check if there was a paired `in`.
+        if(paramDecl->HasModifier<InModifier>())
+            return kParameterDirection_InOut;
+        else
+            return kParameterDirection_Out;
+    }
+    else
+    {
+        // No direction modifier, or just `in`:
+        return kParameterDirection_In;
+    }
+}
+
+    /// Compute the direction for a `this` parameter based on the declaration of its parent function
+ParameterDirection getThisParamDirection(Decl* parentDecl)
+{
+    // Applications can opt in to a mutable `this` parameter,
+    // by applying the `[mutating]` attribute to their
+    // declaration.
+    //
+    if( parentDecl->HasModifier<MutatingAttribute>() )
+    {
+        return kParameterDirection_InOut;
+    }
+
+    // TODO: If/when we support user-defined subscripts or properties,
+    // we should probably make the `set` accessor on those default to
+    // `[mutating]` rather than require users to specify it. There
+    // might need to be a `[nonmutating]` modifier for the rare case
+    // where a user wants to opt out.
+
+    // For now we make any `this` parameter default to `in`.
+    //
+    return kParameterDirection_In;
+}
+
 
 //
 
@@ -2419,6 +2480,118 @@ struct ExprLoweringVisitorBase : ExprVisitor<Derived, LoweredValInfo>
         LoweredValInfo src;
     };
 
+        /// Add argument(s) corresponding to one parameter to a call
+        ///
+        /// The `argExpr` is the AST-level expression being passed as an argument to the call.
+        /// The `paramType` and `paramDirection` represent what is known about the receiving
+        /// parameter of the callee (e.g., if the parameter `in`, `inout`, etc.).
+        /// The `ioArgs` array receives the IR-level argument(s) that are added for the given
+        /// argument expression.
+        /// The `ioFixups` array receives any "fixup" code that needs to be run *after* the
+        /// call completes (e.g., to move from a scratch variable used for an `inout` argument back
+        /// into the original location).
+        ///
+    void addCallArgsForParam(
+        IRType*                 paramType,
+        ParameterDirection      paramDirection,
+        Expr*                   argExpr,
+        List<IRInst*>*          ioArgs,
+        List<OutArgumentFixup>* ioFixups)
+    {
+        switch(paramDirection)
+        {
+        case kParameterDirection_Ref:
+            {
+                // A `ref` qualified parameter must be implemented with by-reference
+                // parameter passing, so the argument value should be lowered as
+                // an l-value.
+                //
+                LoweredValInfo loweredArg = lowerLValueExpr(context, argExpr);
+
+                // According to our "calling convention" we need to
+                // pass a pointer into the callee. Unlike the case for
+                // `out` and `inout` below, it is never valid to do
+                // copy-in/copy-out for a `ref` parameter, so we just
+                // pass in the actual pointer.
+                //
+                IRInst* argPtr = getAddress(context, loweredArg, argExpr->loc);
+                (*ioArgs).add(argPtr);
+            }
+            break;
+
+        case kParameterDirection_Out:
+        case kParameterDirection_InOut:
+            {
+                // This is a `out` or `inout` parameter, and so
+                // the argument must be lowered as an l-value.
+
+                LoweredValInfo loweredArg = lowerLValueExpr(context, argExpr);
+
+                // According to our "calling convention" we need to
+                // pass a pointer into the callee.
+                //
+                // A naive approach would be to just take the address
+                // of `loweredArg` above and pass it in, but that
+                // has two issues:
+                //
+                // 1. The l-value might not be something that has a single
+                //    well-defined "address" (e.g., `foo.xzy`).
+                //
+                // 2. The l-value argument might actually alias some other
+                //    storage that the callee will access (e.g., we are
+                //    passing in a global variable, or two `out` parameters
+                //    are being passed the same location in an array).
+                //
+                // In each of these cases, the safe option is to create
+                // a temporary variable to use for argument-passing,
+                // and then do copy-in/copy-out around the call.
+                //
+                // TODO: We should consider ruling out case (2) as undefined
+                // behavior, and specify that whether `inout` and `out` are
+                // handled via copy-in-copy-out or by-reference parameter
+                // passing is an implementation detail. That would allow
+                // us to avoid introducing a copy except where it is required
+                // for the semantics of (1).
+
+                LoweredValInfo tempVar = createVar(context, paramType);
+
+                // If the parameter is `in out` or `inout`, then we need
+                // to ensure that we pass in the original value stored
+                // in the argument, which we accomplish by assigning
+                // from the l-value to our temp.
+                if(paramDirection == kParameterDirection_InOut)
+                {
+                    assign(context, tempVar, loweredArg);
+                }
+
+                // Now we can pass the address of the temporary variable
+                // to the callee as the actual argument for the `in out`
+                SLANG_ASSERT(tempVar.flavor == LoweredValInfo::Flavor::Ptr);
+                (*ioArgs).add(tempVar.val);
+
+                // Finally, after the call we will need
+                // to copy in the other direction: from our
+                // temp back to the original l-value.
+                OutArgumentFixup fixup;
+                fixup.src = tempVar;
+                fixup.dst = loweredArg;
+
+                (*ioFixups).add(fixup);
+
+            }
+            break;
+
+        default:
+            {
+                // This is a pure input parameter, and so we will
+                // pass it as an r-value.
+                LoweredValInfo loweredArg = lowerRValueExpr(context, argExpr);
+                addArgs(context, ioArgs, loweredArg);
+            }
+            break;
+        }
+    }
+
     void addDirectCallArgs(
         InvokeExpr*             expr,
         DeclRef<CallableDecl>   funcDeclRef,
@@ -2431,6 +2604,7 @@ struct ExprLoweringVisitorBase : ExprVisitor<Derived, LoweredValInfo>
         {
             auto paramDecl = paramDeclRef.getDecl();
             IRType* paramType = lowerType(context, GetType(paramDeclRef));
+            auto paramDirection = getParameterDirection(paramDecl);
 
             UInt argIndex = argCounter++;
             RefPtr<Expr> argExpr;
@@ -2465,84 +2639,7 @@ struct ExprLoweringVisitorBase : ExprVisitor<Derived, LoweredValInfo>
                 // make a conscious decision at some point.
             }
 
-            if(paramDecl->HasModifier<RefModifier>())
-            {
-                // A `ref` qualified parameter must be implemented with by-reference
-                // parameter passing, so the argument value should be lowered as
-                // an l-value.
-                //
-                LoweredValInfo loweredArg = lowerLValueExpr(context, argExpr);
-
-                // According to our "calling convention" we need to
-                // pass a pointer into the callee. Unlike the case for
-                // `out` and `inout` below, it is never valid to do
-                // copy-in/copy-out for a `ref` parameter, so we just
-                // pass in the actual pointer.
-                //
-                IRInst* argPtr = getAddress(context, loweredArg, argExpr->loc);
-                (*ioArgs).add(argPtr);
-            }
-            else if (paramDecl->HasModifier<OutModifier>()
-                || paramDecl->HasModifier<InOutModifier>())
-            {
-                // This is a `out` or `inout` parameter, and so
-                // the argument must be lowered as an l-value.
-
-                LoweredValInfo loweredArg = lowerLValueExpr(context, argExpr);
-
-                // According to our "calling convention" we need to
-                // pass a pointer into the callee.
-                //
-                // A naive approach would be to just take the address
-                // of `loweredArg` above and pass it in, but that
-                // has two issues:
-                //
-                // 1. The l-value might not be something that has a single
-                //    well-defined "address" (e.g., `foo.xzy`).
-                //
-                // 2. The l-value argument might actually alias some other
-                //    storage that the callee will access (e.g., we are
-                //    passing in a global variable, or two `out` parameters
-                //    are being passed the same location in an array).
-                //
-                // In each of these cases, the safe option is to create
-                // a temporary variable to use for argument-passing,
-                // and then do copy-in/copy-out around the call.
-
-                LoweredValInfo tempVar = createVar(context, paramType);
-
-                // If the parameter is `in out` or `inout`, then we need
-                // to ensure that we pass in the original value stored
-                // in the argument, which we accomplish by assigning
-                // from the l-value to our temp.
-                if (paramDecl->HasModifier<InModifier>()
-                    || paramDecl->HasModifier<InOutModifier>())
-                {
-                    assign(context, tempVar, loweredArg);
-                }
-
-                // Now we can pass the address of the temporary variable
-                // to the callee as the actual argument for the `in out`
-                SLANG_ASSERT(tempVar.flavor == LoweredValInfo::Flavor::Ptr);
-                (*ioArgs).add(tempVar.val);
-
-                // Finally, after the call we will need
-                // to copy in the other direction: from our
-                // temp back to the original l-value.
-                OutArgumentFixup fixup;
-                fixup.src = tempVar;
-                fixup.dst = loweredArg;
-
-                (*ioFixups).add(fixup);
-
-            }
-            else
-            {
-                // This is a pure input parameter, and so we will
-                // pass it as an r-value.
-                LoweredValInfo loweredArg = lowerRValueExpr(context, argExpr);
-                addArgs(context, ioArgs, loweredArg);
-            }
+            addCallArgsForParam(paramType, paramDirection, argExpr, ioArgs, ioFixups);
         }
     }
 
@@ -2693,8 +2790,13 @@ struct ExprLoweringVisitorBase : ExprVisitor<Derived, LoweredValInfo>
             // a member function:
             if( baseExpr )
             {
-                auto loweredBaseVal = lowerRValueExpr(context, baseExpr);
-                addArgs(context, &irArgs, loweredBaseVal);
+                auto thisType = lowerType(context, baseExpr->type);
+                addCallArgsForParam(
+                    thisType,
+                    getThisParamDirection(funcDeclRef.getDecl()),
+                    baseExpr,
+                    &irArgs,
+                    &argFixups);
             }
 
             // Then we have the "direct" arguments to the call.
@@ -5295,13 +5397,6 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
     // To handle this we break out the relevant data into derived
     // structures:
     //
-    enum ParameterDirection
-    {
-        kParameterDirection_In,     ///< Copy in
-        kParameterDirection_Out,    ///< Copy out
-        kParameterDirection_InOut,  ///< Copy in, copy out
-        kParameterDirection_Ref,    ///< By-reference
-    };
     struct ParameterInfo
     {
         // This AST-level type of the parameter
@@ -5318,36 +5413,6 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
         bool                isThisParam = false;
     };
     //
-    // We need a way to compute the appropriate `ParameterDirection` for a
-    // declared parameter:
-    //
-    ParameterDirection getParameterDirection(VarDeclBase* paramDecl)
-    {
-        if( paramDecl->HasModifier<RefModifier>() )
-        {
-            // The AST specified `ref`:
-            return kParameterDirection_Ref;
-        }
-        if( paramDecl->HasModifier<InOutModifier>() )
-        {
-            // The AST specified `inout`:
-            return kParameterDirection_InOut;
-        }
-        if (paramDecl->HasModifier<OutModifier>())
-        {
-            // We saw an `out` modifier, so now we need
-            // to check if there was a paired `in`.
-            if(paramDecl->HasModifier<InModifier>())
-                return kParameterDirection_InOut;
-            else
-                return kParameterDirection_Out;
-        }
-        else
-        {
-            // No direction modifier, or just `in`:
-            return kParameterDirection_In;
-        }
-    }
     // We need a way to be able to create a `ParameterInfo` given the declaration
     // of a parameter:
     //
@@ -5457,18 +5522,7 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
             // parameter corresponding to the outer declaration.
             if( innerMode != kParameterListCollectMode_Static )
             {
-                // For now we make any `this` parameter default to `in`.
-                //
-                ParameterDirection direction = kParameterDirection_In;
-                //
-                // Applications can opt in to a mutable `this` parameter,
-                // by applying the `[mutating]` attribute to their
-                // declaration.
-                //
-                if( decl->HasModifier<MutatingAttribute>() )
-                {
-                    direction = kParameterDirection_InOut;
-                }
+                ParameterDirection direction = getThisParamDirection(decl);
 
                 if( auto aggTypeDecl = as<AggTypeDecl>(parentDecl) )
                 {
