@@ -126,17 +126,15 @@ namespace Slang
 
         // Do we have a locator
         auto locator = m_downstreamCompilerLocators[int(type)];
-        if (!locator)
+        if (locator)
         {
-            return nullptr;
+            m_downstreamCompilerSet->remove(SlangPassThrough(type));
+
+            SinkSharedLibraryLoader loader(m_sharedLibraryLoader, sink);
+            locator(m_downstreamCompilerPaths[int(type)], &loader, m_downstreamCompilerSet);
+
+            DownstreamCompilerUtil::updateDefaults(m_downstreamCompilerSet);
         }
-
-        m_downstreamCompilerSet->remove(SlangPassThrough(type));
-
-        SinkSharedLibraryLoader loader(m_sharedLibraryLoader, sink);
-        locator(m_downstreamCompilerPaths[int(type)], &loader, m_downstreamCompilerSet);
-
-        DownstreamCompilerUtil::updateDefaults(m_downstreamCompilerSet);
 
         DownstreamCompiler* compiler = nullptr;
 
