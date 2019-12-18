@@ -240,9 +240,15 @@ public:
     
     HLSLIntrinsic* add(const HLSLIntrinsic& intrinsic);
 
+        /// Returns the intrinsic constructed if there is one from the inst. If not possible to construct returns nullptr.
+    HLSLIntrinsic* add(IRInst* inst);
+
     HLSLIntrinsicSet(IRTypeSet* typeSet, HLSLIntrinsicOpLookup* lookup);
     
 protected:
+    // All calcs must go through this choke point for some special case handling.
+    // NOTE that this function must only be called with unique types (ie from the m_typeSet)
+    void _calcIntrinsic(HLSLIntrinsic::Op op, IRType* returnType, IRType*const* inArgs, Index argsCount, HLSLIntrinsic& out);
     
     Dictionary<HLSLIntrinsicRef, HLSLIntrinsic*> m_intrinsics;
 

@@ -22,92 +22,77 @@ HLSLIntrinsicSet::HLSLIntrinsicSet(IRTypeSet* typeSet, HLSLIntrinsicOpLookup* lo
 {
 }
 
-void HLSLIntrinsicSet::calcIntrinsic(HLSLIntrinsic::Op op, IRType* returnType, IRType*const* inArgs, Index argsCount, HLSLIntrinsic& out)
+static IRBasicType* _getElementType(IRType* type)
 {
-    out.op = op;
-    out.returnType = m_typeSet->getType(returnType);
+    switch (type->op)
+    {
+        case kIROp_VectorType:      type = static_cast<IRVectorType*>(type)->getElementType(); break;
+        case kIROp_MatrixType:      type = static_cast<IRMatrixType*>(type)->getElementType(); break;
+        default:                    break;
+    }
+    return dynamicCast<IRBasicType>(type);
+}
 
+void HLSLIntrinsicSet::_calcIntrinsic(HLSLIntrinsic::Op op, IRType* returnType, IRType*const* inArgs, Index argsCount, HLSLIntrinsic& out)
+{
     IRBuilder& builder = m_typeSet->getBuilder();
 
-    if (argsCount <= 8)
+    // Check all types belong to the module
+
+    IRModule* module = builder.getModule();
+
+    SLANG_UNUSED(module);
+    SLANG_ASSERT(returnType->getModule() == module);
+
+    for (Index i = 0; i < argsCount; ++i)
     {
-        IRType* args[8];
-        for (Index i = 0; i < argsCount; ++i)
-        {
-            // Can't be any nominal types!
-            SLANG_ASSERT(isNominalOp(inArgs[i]->op) == false);
-            args[i] = m_typeSet->getType(inArgs[i]);
-        }
-        out.signatureType = builder.getFuncType(argsCount, args, builder.getVoidType());
+        SLANG_ASSERT(inArgs[i]->getModule() == module);
     }
-    else
+
+    // Set up the out
+    out.op = op;
+    out.returnType = returnType;
+
+    switch (op)
     {
-        List<IRType*> args;
-        args.setCount(argsCount);
-        for (Index i = 0; i < argsCount; ++i)
+        case Op::ConstructFromScalar:
         {
-            // Can't be any nominal types!
-            SLANG_ASSERT(isNominalOp(inArgs[i]->op) == false);
-            args[i] = m_typeSet->getType(inArgs[i]);
+            //SLANG_ASSERT(argsCount == 1);
+            IRType* srcType = _getElementType(returnType);
+            IRType* argTypes[2] = { returnType, srcType };
+
+            out.signatureType = builder.getFuncType(2, argTypes, builder.getVoidType());
+            break;
         }
-        out.signatureType = builder.getFuncType(argsCount, args.getBuffer(), builder.getVoidType());
+        case Op::ConstructConvert:
+        {
+            // Make the return type a parameter, to make the signature take into account 
+            SLANG_ASSERT(argsCount == 1);
+            IRType* argTypes[2] = { returnType, inArgs[0] };
+
+            out.signatureType = builder.getFuncType(2, argTypes, builder.getVoidType());
+            break;
+        }
+        default:
+        {
+            out.signatureType = builder.getFuncType(argsCount, inArgs, builder.getVoidType());
+            break;
+        }
     }
 }
 
-void HLSLIntrinsicSet::calcIntrinsic(HLSLIntrinsic::Op op, IRInst* inst, Index operandCount, HLSLIntrinsic& out)
+void HLSLIntrinsicSet::calcIntrinsic(HLSLIntrinsic::Op op, IRType* returnType, IRType*const* inArgTypes, Index argCount, HLSLIntrinsic& out)
 {
-    out.op = op;
-    out.returnType = m_typeSet->getType(inst->getDataType());
-
-    IRBuilder& builder = m_typeSet->getBuilder();
-
-    if (operandCount <= 8)
-    {
-        IRType* args[8];
-
-        for (Index i = 0; i < operandCount; ++i)
-        {
-            auto operand = inst->getOperand(i);
-            args[i] = m_typeSet->getType(operand->getDataType());
-        }
-
-        out.signatureType = builder.getFuncType(operandCount, args, builder.getVoidType());
-    }
-    else
-    {
-        List<IRType*> args;
-        args.setCount(operandCount);
-
-        for (Index i = 0; i < operandCount; ++i)
-        {
-            auto operand = inst->getOperand(i);
-            args[i] = m_typeSet->getType(operand->getDataType());
-        }
-
-        out.signatureType = builder.getFuncType(operandCount, args.getBuffer(), builder.getVoidType());
-    }
-}
-
-void HLSLIntrinsicSet::calcIntrinsic(HLSLIntrinsic::Op op, IRType* returnType, IRUse* inArgs, Index argCount, HLSLIntrinsic& out)
-{
-    out.op = op;
-    out.returnType = m_typeSet->getType(returnType);
-
-    SLANG_ASSERT(argCount > 0);
-
-    IRBuilder& builder = m_typeSet->getBuilder();
+    returnType = m_typeSet->getType(returnType);
 
     if (argCount <= 8)
     {
         IRType* args[8];
-
         for (Index i = 0; i < argCount; ++i)
         {
-            auto operand = inArgs[i].get();
-            args[i] = m_typeSet->getType(operand->getDataType());
+            args[i] = m_typeSet->getType(inArgTypes[i]);
         }
-
-        out.signatureType = builder.getFuncType(argCount, args, builder.getVoidType());
+        _calcIntrinsic(op, returnType, args, argCount, out);
     }
     else
     {
@@ -116,12 +101,76 @@ void HLSLIntrinsicSet::calcIntrinsic(HLSLIntrinsic::Op op, IRType* returnType, I
 
         for (Index i = 0; i < argCount; ++i)
         {
-            auto operand = inArgs[i].get();
-            args[i] = m_typeSet->getType(operand->getDataType());
+            args[i] = m_typeSet->getType(inArgTypes[i]);
         }
-
-        out.signatureType = builder.getFuncType(argCount, args.getBuffer(), builder.getVoidType());
+        _calcIntrinsic(op, returnType, args.getBuffer(), argCount, out);
     }
+}
+
+void HLSLIntrinsicSet::calcIntrinsic(HLSLIntrinsic::Op op, IRInst* inst, Index operandCount, HLSLIntrinsic& out)
+{
+    IRType* returnType = m_typeSet->getType(inst->getDataType());
+    if (operandCount <= 8)
+    {
+        IRType* argTypes[8];
+        for (Index i = 0; i < operandCount; ++i)
+        {
+            auto operand = inst->getOperand(i);
+            argTypes[i] = m_typeSet->getType(operand->getDataType());
+        }
+        _calcIntrinsic(op, returnType, argTypes, operandCount, out);
+    }
+    else
+    {
+        List<IRType*> argTypes;
+        argTypes.setCount(operandCount);
+
+        for (Index i = 0; i < operandCount; ++i)
+        {
+            auto operand = inst->getOperand(i);
+            argTypes[i] = m_typeSet->getType(operand->getDataType());
+        }
+        _calcIntrinsic(op, returnType, argTypes.getBuffer(), operandCount, out);
+    }
+}
+
+void HLSLIntrinsicSet::calcIntrinsic(HLSLIntrinsic::Op op, IRType* returnType, IRUse* inArgs, Index argCount, HLSLIntrinsic& out)
+{
+    returnType = m_typeSet->getType(returnType);
+
+    if (argCount <= 8)
+    {
+        IRType* argTypes[8];
+
+        for (Index i = 0; i < argCount; ++i)
+        {
+            auto operand = inArgs[i].get();
+            argTypes[i] = m_typeSet->getType(operand->getDataType());
+        }
+        _calcIntrinsic(op, returnType, argTypes, argCount, out);
+    }
+    else
+    {
+        List<IRType*> argTypes;
+        argTypes.setCount(argCount);
+
+        for (Index i = 0; i < argCount; ++i)
+        {
+            auto operand = inArgs[i].get();
+            argTypes[i] = m_typeSet->getType(operand->getDataType());
+        }
+        _calcIntrinsic(op, returnType, argTypes.getBuffer(), argCount, out);
+    }
+}
+
+HLSLIntrinsic* HLSLIntrinsicSet::add(IRInst* inst)
+{
+    HLSLIntrinsic intrinsic;
+    if (SLANG_SUCCEEDED(makeIntrinsic(inst, intrinsic)))
+    {
+        return add(intrinsic);
+    }
+    return nullptr;
 }
 
 SlangResult HLSLIntrinsicSet::makeIntrinsic(IRInst* inst, HLSLIntrinsic& out)
@@ -162,7 +211,7 @@ SlangResult HLSLIntrinsicSet::makeIntrinsic(IRInst* inst, HLSLIntrinsic& out)
                 }
                 else
                 {
-                    SLANG_ASSERT(getType(dstType) != getType(srcType));
+                    SLANG_ASSERT(m_typeSet->getType(dstType) != m_typeSet->getType(srcType));
                     // If it's constructed from a type conversion
                     calcIntrinsic(Op::ConstructConvert, inst, out);
                 }
