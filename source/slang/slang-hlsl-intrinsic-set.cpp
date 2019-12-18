@@ -1,0 +1,417 @@
+// slang-hlsl-intrinsic-set.cpp
+#include "slang-hlsl-intrinsic-set.h"
+
+#include "slang-ir.h"
+#include "slang-ir-insts.h"
+
+namespace Slang
+{
+
+/* static */const HLSLIntrinsic::Info HLSLIntrinsic::s_operationInfos[] =
+{
+#define SLANG_HLSL_INTRINSIC_OP_INFO(x, funcName, numOperands) { UnownedStringSlice::fromLiteral(#x), UnownedStringSlice::fromLiteral(funcName), int8_t(numOperands)  },
+    SLANG_HLSL_INTRINSIC_OP(SLANG_HLSL_INTRINSIC_OP_INFO)
+};
+
+// !!!!!!!!!!!!!!!!!!!!!!!!!!!!! BuiltInSet !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+
+HLSLIntrinsicSet::HLSLIntrinsicSet(IRTypeSet* typeSet, HLSLIntrinsicOpLookup* lookup):
+    m_typeSet(typeSet),
+    m_opLookup(lookup)
+{
+}
+
+void HLSLIntrinsicSet::calcIntrinsic(HLSLIntrinsic::Op op, IRType* returnType, IRType*const* inArgs, Index argsCount, HLSLIntrinsic& out)
+{
+    out.op = op;
+    out.returnType = m_typeSet->getType(returnType);
+
+    IRBuilder& builder = m_typeSet->getBuilder();
+
+    if (argsCount <= 8)
+    {
+        IRType* args[8];
+        for (Index i = 0; i < argsCount; ++i)
+        {
+            // Can't be any nominal types!
+            SLANG_ASSERT(isNominalOp(inArgs[i]->op) == false);
+            args[i] = m_typeSet->getType(inArgs[i]);
+        }
+        out.signatureType = builder.getFuncType(argsCount, args, builder.getVoidType());
+    }
+    else
+    {
+        List<IRType*> args;
+        args.setCount(argsCount);
+        for (Index i = 0; i < argsCount; ++i)
+        {
+            // Can't be any nominal types!
+            SLANG_ASSERT(isNominalOp(inArgs[i]->op) == false);
+            args[i] = m_typeSet->getType(inArgs[i]);
+        }
+        out.signatureType = builder.getFuncType(argsCount, args.getBuffer(), builder.getVoidType());
+    }
+}
+
+void HLSLIntrinsicSet::calcIntrinsic(HLSLIntrinsic::Op op, IRInst* inst, Index operandCount, HLSLIntrinsic& out)
+{
+    out.op = op;
+    out.returnType = m_typeSet->getType(inst->getDataType());
+
+    IRBuilder& builder = m_typeSet->getBuilder();
+
+    if (operandCount <= 8)
+    {
+        IRType* args[8];
+
+        for (Index i = 0; i < operandCount; ++i)
+        {
+            auto operand = inst->getOperand(i);
+            args[i] = m_typeSet->getType(operand->getDataType());
+        }
+
+        out.signatureType = builder.getFuncType(operandCount, args, builder.getVoidType());
+    }
+    else
+    {
+        List<IRType*> args;
+        args.setCount(operandCount);
+
+        for (Index i = 0; i < operandCount; ++i)
+        {
+            auto operand = inst->getOperand(i);
+            args[i] = m_typeSet->getType(operand->getDataType());
+        }
+
+        out.signatureType = builder.getFuncType(operandCount, args.getBuffer(), builder.getVoidType());
+    }
+}
+
+void HLSLIntrinsicSet::calcIntrinsic(HLSLIntrinsic::Op op, IRType* returnType, IRUse* inArgs, Index argCount, HLSLIntrinsic& out)
+{
+    out.op = op;
+    out.returnType = m_typeSet->getType(returnType);
+
+    SLANG_ASSERT(argCount > 0);
+
+    IRBuilder& builder = m_typeSet->getBuilder();
+
+    if (argCount <= 8)
+    {
+        IRType* args[8];
+
+        for (Index i = 0; i < argCount; ++i)
+        {
+            auto operand = inArgs[i].get();
+            args[i] = m_typeSet->getType(operand->getDataType());
+        }
+
+        out.signatureType = builder.getFuncType(argCount, args, builder.getVoidType());
+    }
+    else
+    {
+        List<IRType*> args;
+        args.setCount(argCount);
+
+        for (Index i = 0; i < argCount; ++i)
+        {
+            auto operand = inArgs[i].get();
+            args[i] = m_typeSet->getType(operand->getDataType());
+        }
+
+        out.signatureType = builder.getFuncType(argCount, args.getBuffer(), builder.getVoidType());
+    }
+}
+
+void HLSLIntrinsicSet::calcIntrinsic(IRInst* inst, HLSLIntrinsic& out)
+{
+    out.op = Op::Invalid;
+
+    {
+        // See if we can just directly convert
+        Op op = HLSLIntrinsicOpLookup::getOp(inst->op);
+        if (op != Op::Invalid)
+        {
+            calcIntrinsic(op, inst, inst->getOperandCount(), out);
+            return;
+        }
+    }
+
+    // All the special cases
+    switch (inst->op)
+    {
+        case kIROp_constructVectorFromScalar:
+        {
+            SLANG_ASSERT(inst->getOperandCount() == 1);
+            calcIntrinsic(Op::ConstructFromScalar, inst, 1, out);
+            break;
+        }
+        case kIROp_Construct:
+        {
+            IRType* dstType = inst->getDataType();
+            IRType* srcType = inst->getOperand(0)->getDataType();
+
+            if ((dstType->op == kIROp_VectorType || dstType->op == kIROp_MatrixType) &&
+                inst->getOperandCount() == 1)
+            {
+                if (as<IRBasicType>(srcType))
+                {
+                    calcIntrinsic(Op::ConstructFromScalar, inst, out);
+                }
+                else
+                {
+                    SLANG_ASSERT(getType(dstType) != getType(srcType));
+                    // If it's constructed from a type conversion
+                    calcIntrinsic(Op::ConstructConvert, inst, out);
+                }
+            }
+            else
+            {
+                // We only emit as if it has one operand, but we can tell how many it actually has from the return type
+                calcIntrinsic(Op::Init, inst, 1, out);
+            }
+            break;
+        }
+        case kIROp_makeVector:
+        case kIROp_MakeMatrix:
+        {
+            // We only emit as if it has one operand, but we can tell how many it actually has from the return type
+            calcIntrinsic(Op::Init, inst, 1, out);
+            break;
+        }
+        case kIROp_swizzle:
+        {
+            // We don't need to add swizzle function, but we do output the need for some other functions 
+
+            // For C++ we don't need to emit a swizzle function
+            // For C we need a construction function
+            auto swizzleInst = static_cast<IRSwizzle*>(inst);
+
+            IRInst* baseInst = swizzleInst->getBase();
+            IRType* baseType = baseInst->getDataType();
+
+            // If we are swizzling from a built in type, 
+            if (as<IRBasicType>(baseType))
+            {
+                // We can swizzle a scalar type to be a vector, or just a scalar
+                IRType* dstType = swizzleInst->getDataType();
+                if (!as<IRBasicType>(dstType))
+                {
+                    // If it's a scalar make sure we have construct from scalar, because we will want to use that
+                    SLANG_ASSERT(dstType->op == kIROp_VectorType);
+                    calcIntrinsic(Op::ConstructFromScalar, inst, out);
+                }
+            }
+            else
+            {
+                const Index elementCount = Index(swizzleInst->getElementCount());
+                if (elementCount >= 1)
+                {
+                    // Will need to generate a swizzle method
+                    calcIntrinsic(Op::Swizzle, inst, out);
+                }
+            }
+            break;
+        }
+        case kIROp_getElement:
+        case kIROp_getElementPtr:
+        {
+            IRInst* target = inst->getOperand(0);
+            if (target->getDataType()->op == kIROp_VectorType)
+            {
+                // Specially handle this
+                calcIntrinsic(Op::GetAt, inst, out);
+            }
+            break;
+        }
+        case kIROp_Call:
+        {
+            IRCall* callInst = (IRCall*)inst;
+            auto funcValue = callInst->getCallee();
+
+            const Op op = m_opLookup->getOpFromTargetDecoration(funcValue);
+            if (op != Op::Invalid)
+            {
+                calcIntrinsic(op, inst->getDataType(), callInst->getArgs(), callInst->getArgCount(), out);
+            }
+            break;
+        }
+
+        default: break;
+    }
+}
+
+HLSLIntrinsic* HLSLIntrinsicSet::add(const HLSLIntrinsic& intrinsic)
+{
+    HLSLIntrinsic* copy = (HLSLIntrinsic*)m_intrinsicFreeList.allocate();
+    *copy = intrinsic;
+    HLSLIntrinsicRef ref(copy);
+    HLSLIntrinsic** found =  m_intrinsics.TryGetValueOrAdd(ref, copy);
+    if (found)
+    {
+        return *found;
+    }
+    return copy;
+}
+
+// !!!!!!!!!!!!!!!!!!!!!!!!!!!!! HLSLIntrinsicOpLookup !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+
+HLSLIntrinsicOpLookup::HLSLIntrinsicOpLookup():
+    m_slicePool(StringSlicePool::Style::Default)
+{
+    // Add all the operations with names (not ops like -, / etc) to the lookup map
+    for (int i = 0; i < SLANG_COUNT_OF(HLSLIntrinsic::s_operationInfos); ++i)
+    {
+        const auto& info = HLSLIntrinsic::getInfo(Op(i));
+        UnownedStringSlice slice = info.funcName;
+
+        if (slice.size() > 0 && slice[0] >= 'a' && slice[0] <= 'z')
+        {
+            auto handle = m_slicePool.add(slice);
+            Index index = Index(handle);
+            // Make sure there is space
+            if (index >= m_sliceToOpMap.getCount())
+            {
+                Index oldSize = m_sliceToOpMap.getCount();
+                m_sliceToOpMap.setCount(index + 1);
+                for (Index j = oldSize; j < index; j++)
+                {
+                    m_sliceToOpMap[j] = Op::Invalid;
+                }
+            }
+            m_sliceToOpMap[index] = Op(i);
+        }
+    }
+}
+
+HLSLIntrinsic::Op HLSLIntrinsicOpLookup::getOpByName(const UnownedStringSlice& slice)
+{
+    const Index index = m_slicePool.findIndex(slice);
+    return (index >= 0 && index < m_sliceToOpMap.getCount()) ? m_sliceToOpMap[index] : Op::Invalid;
+}
+
+static IRInst* _getSpecializedValue(IRSpecialize* specInst)
+{
+    auto base = specInst->getBase();
+    auto baseGeneric = as<IRGeneric>(base);
+    if (!baseGeneric)
+        return base;
+
+    auto lastBlock = baseGeneric->getLastBlock();
+    if (!lastBlock)
+        return base;
+
+    auto returnInst = as<IRReturnVal>(lastBlock->getTerminator());
+    if (!returnInst)
+        return base;
+
+    return returnInst->getVal();
+}
+
+HLSLIntrinsic::Op HLSLIntrinsicOpLookup::getOpFromTargetDecoration(IRInst* inInst)
+{
+    // An intrinsic generic function will be invoked through a `specialize` instruction,
+    // so the callee won't directly be the thing that is decorated. We will look up
+    // through specializations until we can see the actual thing being called.
+    //
+    IRInst* inst = inInst;
+    while (auto specInst = as<IRSpecialize>(inst))
+    {
+        inst = _getSpecializedValue(specInst);
+
+        // If `getSpecializedValue` can't find the result value
+        // of the generic being specialized, then it returns
+        // the original instruction. This would be a disaster
+        // for use because this loop would go on forever.
+        //
+        // This case should never happen if the stdlib is well-formed
+        // and the compiler is doing its job right.
+        //
+        SLANG_ASSERT(inst != specInst);
+    }
+
+    // We are just looking for the original name so we can match against it
+    for (auto dd : inst->getDecorations())
+    {
+        if (auto decor = as<IRTargetIntrinsicDecoration>(dd))
+        {
+            // TODO(JS): Should confirm that we'll always have this entry - which we need for lookups to work (we need the name
+            // not a targets transformation)
+            // 
+            // It turns out that addCatchAllIntrinsicDecorationIfNeeded will add a target intrinsic with the
+            // original HLSL name, which has a target of ""
+            // 
+            // It's not 100% clear this covers all the cases, but for now lets go with that
+            if (decor->getTargetName().size() == 0)
+            {
+                Op op = getOpByName(decor->getDefinition());
+                if (op != Op::Invalid)
+                {
+                    return op;
+                }
+            }
+        }
+    }
+
+    return Op::Invalid;
+}
+
+HLSLIntrinsic::Op HLSLIntrinsicOpLookup::getOp(IRInst* inst)
+{
+    switch (inst->op)
+    {
+        case kIROp_Call:
+        {
+            return getOpFromTargetDecoration(inst);
+        }
+        default: break;
+    }
+    return getOp(inst->op);
+}
+
+/* static */HLSLIntrinsic::Op HLSLIntrinsicOpLookup::getOp(IROp op)
+{
+    switch (op)
+    {
+        case kIROp_Add:     return Op::Add;
+        case kIROp_Mul:     return Op::Mul;
+        case kIROp_Sub:     return Op::Sub;
+        case kIROp_Div:     return Op::Div;
+        case kIROp_Lsh:     return Op::Lsh;
+        case kIROp_Rsh:     return Op::Rsh;
+        case kIROp_IRem:    return Op::IRem;
+        case kIROp_FRem:    return Op::FRem;
+
+        case kIROp_Eql:     return Op::Eql;
+        case kIROp_Neq:     return Op::Neq;
+        case kIROp_Greater: return Op::Greater;
+        case kIROp_Less:    return Op::Less;
+        case kIROp_Geq:     return Op::Geq;
+        case kIROp_Leq:     return Op::Leq;
+
+        case kIROp_BitAnd:  return Op::BitAnd;
+        case kIROp_BitXor:  return Op::BitXor;
+        case kIROp_BitOr:   return Op::BitOr;
+
+        case kIROp_And:     return Op::And;
+        case kIROp_Or:      return Op::Or;
+
+        case kIROp_Neg:     return Op::Neg;
+        case kIROp_Not:     return Op::Not;
+        case kIROp_BitNot:  return Op::BitNot;
+
+        case kIROp_constructVectorFromScalar: return Op::ConstructFromScalar;
+
+        case kIROp_Mul_Matrix_Matrix:
+        case kIROp_Mul_Matrix_Vector:
+        case kIROp_Mul_Vector_Matrix:
+        {
+            return Op::VecMatMul;
+        }
+        case kIROp_Dot:     return Op::Dot;
+
+        default:            return Op::Invalid;
+    }
+}
+
+}
