@@ -191,12 +191,12 @@ public:
     Op getOpFromTargetDecoration(IRInst* inInst);
     Op getOpByName(const UnownedStringSlice& slice);
 
-    Op getOp(IRInst* inst);
+    Op getOpForIROp(IRInst* inst);
 
     HLSLIntrinsicOpLookup();
 
-        /// Given an IROp returns the BuiltInOp equivalent on BuiltInOp::Invalid if not found
-    static Op getOp(IROp op);
+        /// Given an IROp returns the Op equivalent or Op::Invalid if not found
+    static Op getOpForIROp(IROp op);
 
 protected:
     
@@ -234,9 +234,9 @@ public:
     void calcIntrinsic(Op op, IRType* returnType, IRType*const* args, Index argsCount, HLSLIntrinsic& out);
     void calcIntrinsic(Op op, IRInst* inst, Index argsCount, HLSLIntrinsic& out);
     void calcIntrinsic(Op op, IRType* returnType, IRUse* args, Index argCount, HLSLIntrinsic& out);
-    void calcIntrinsic(Op op, IRInst* inst, HLSLIntrinsic& out) { calcIntrinsic(op, inst, Index(inst->getOperandCount()), out); }
+    void  calcIntrinsic(Op op, IRInst* inst, HLSLIntrinsic& out) { calcIntrinsic(op, inst, Index(inst->getOperandCount()), out); }
 
-    void calcIntrinsic(IRInst* inst, HLSLIntrinsic& out);
+    SlangResult makeIntrinsic(IRInst* inst, HLSLIntrinsic& out);
     
     HLSLIntrinsic* add(const HLSLIntrinsic& intrinsic);
 

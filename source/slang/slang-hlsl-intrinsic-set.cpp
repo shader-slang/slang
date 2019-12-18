@@ -13,9 +13,10 @@ namespace Slang
     SLANG_HLSL_INTRINSIC_OP(SLANG_HLSL_INTRINSIC_OP_INFO)
 };
 
-// !!!!!!!!!!!!!!!!!!!!!!!!!!!!! BuiltInSet !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+// !!!!!!!!!!!!!!!!!!!!!!!!!!!!! HLSLIntrinsicSet !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 
 HLSLIntrinsicSet::HLSLIntrinsicSet(IRTypeSet* typeSet, HLSLIntrinsicOpLookup* lookup):
+    m_intrinsicFreeList(sizeof(HLSLIntrinsic), SLANG_ALIGN_OF(HLSLIntrinsic), 1024),
     m_typeSet(typeSet),
     m_opLookup(lookup)
 {
@@ -123,17 +124,18 @@ void HLSLIntrinsicSet::calcIntrinsic(HLSLIntrinsic::Op op, IRType* returnType, I
     }
 }
 
-void HLSLIntrinsicSet::calcIntrinsic(IRInst* inst, HLSLIntrinsic& out)
+SlangResult HLSLIntrinsicSet::makeIntrinsic(IRInst* inst, HLSLIntrinsic& out)
 {
+    // Mark as invalid... 
     out.op = Op::Invalid;
 
     {
         // See if we can just directly convert
-        Op op = HLSLIntrinsicOpLookup::getOp(inst->op);
+        Op op = HLSLIntrinsicOpLookup::getOpForIROp(inst->op);
         if (op != Op::Invalid)
         {
             calcIntrinsic(op, inst, inst->getOperandCount(), out);
-            return;
+            return SLANG_OK;
         }
     }
 
@@ -144,7 +146,7 @@ void HLSLIntrinsicSet::calcIntrinsic(IRInst* inst, HLSLIntrinsic& out)
         {
             SLANG_ASSERT(inst->getOperandCount() == 1);
             calcIntrinsic(Op::ConstructFromScalar, inst, 1, out);
-            break;
+            return SLANG_OK;
         }
         case kIROp_Construct:
         {
@@ -170,14 +172,14 @@ void HLSLIntrinsicSet::calcIntrinsic(IRInst* inst, HLSLIntrinsic& out)
                 // We only emit as if it has one operand, but we can tell how many it actually has from the return type
                 calcIntrinsic(Op::Init, inst, 1, out);
             }
-            break;
+            return SLANG_OK;
         }
         case kIROp_makeVector:
         case kIROp_MakeMatrix:
         {
             // We only emit as if it has one operand, but we can tell how many it actually has from the return type
             calcIntrinsic(Op::Init, inst, 1, out);
-            break;
+            return SLANG_OK;
         }
         case kIROp_swizzle:
         {
@@ -200,6 +202,7 @@ void HLSLIntrinsicSet::calcIntrinsic(IRInst* inst, HLSLIntrinsic& out)
                     // If it's a scalar make sure we have construct from scalar, because we will want to use that
                     SLANG_ASSERT(dstType->op == kIROp_VectorType);
                     calcIntrinsic(Op::ConstructFromScalar, inst, out);
+                    return SLANG_OK;
                 }
             }
             else
@@ -209,6 +212,7 @@ void HLSLIntrinsicSet::calcIntrinsic(IRInst* inst, HLSLIntrinsic& out)
                 {
                     // Will need to generate a swizzle method
                     calcIntrinsic(Op::Swizzle, inst, out);
+                    return SLANG_OK;
                 }
             }
             break;
@@ -221,6 +225,7 @@ void HLSLIntrinsicSet::calcIntrinsic(IRInst* inst, HLSLIntrinsic& out)
             {
                 // Specially handle this
                 calcIntrinsic(Op::GetAt, inst, out);
+                return SLANG_OK;
             }
             break;
         }
@@ -233,16 +238,22 @@ void HLSLIntrinsicSet::calcIntrinsic(IRInst* inst, HLSLIntrinsic& out)
             if (op != Op::Invalid)
             {
                 calcIntrinsic(op, inst->getDataType(), callInst->getArgs(), callInst->getArgCount(), out);
+                return SLANG_OK;
             }
             break;
         }
 
         default: break;
     }
+
+    return SLANG_FAIL;
 }
 
 HLSLIntrinsic* HLSLIntrinsicSet::add(const HLSLIntrinsic& intrinsic)
 {
+    // Make sure it's valid(!)
+    SLANG_ASSERT(intrinsic.op != Op::Invalid);
+
     HLSLIntrinsic* copy = (HLSLIntrinsic*)m_intrinsicFreeList.allocate();
     *copy = intrinsic;
     HLSLIntrinsicRef ref(copy);
@@ -356,7 +367,7 @@ HLSLIntrinsic::Op HLSLIntrinsicOpLookup::getOpFromTargetDecoration(IRInst* inIns
     return Op::Invalid;
 }
 
-HLSLIntrinsic::Op HLSLIntrinsicOpLookup::getOp(IRInst* inst)
+HLSLIntrinsic::Op HLSLIntrinsicOpLookup::getOpForIROp(IRInst* inst)
 {
     switch (inst->op)
     {
@@ -366,10 +377,10 @@ HLSLIntrinsic::Op HLSLIntrinsicOpLookup::getOp(IRInst* inst)
         }
         default: break;
     }
-    return getOp(inst->op);
+    return getOpForIROp(inst->op);
 }
 
-/* static */HLSLIntrinsic::Op HLSLIntrinsicOpLookup::getOp(IROp op)
+/* static */HLSLIntrinsic::Op HLSLIntrinsicOpLookup::getOpForIROp(IROp op)
 {
     switch (op)
     {
