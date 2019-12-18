@@ -311,6 +311,8 @@ HLSLIntrinsic* HLSLIntrinsicSet::add(const HLSLIntrinsic& intrinsic)
     HLSLIntrinsic** found =  m_intrinsics.TryGetValueOrAdd(ref, copy);
     if (found)
     {
+        // If we have found an intrinsic, we can free the copy
+        m_intrinsicFreeList.deallocate(copy);
         return *found;
     }
     return copy;
