@@ -58,6 +58,7 @@ void HLSLIntrinsicSet::_calcIntrinsic(HLSLIntrinsic::Op op, IRType* returnType, 
         case Op::ConstructFromScalar:
         {
             //SLANG_ASSERT(argsCount == 1);
+            SLANG_ASSERT(argsCount == 1);
             IRType* srcType = _getElementType(returnType);
             IRType* argTypes[2] = { returnType, srcType };
 
@@ -250,7 +251,8 @@ SlangResult HLSLIntrinsicSet::makeIntrinsic(IRInst* inst, HLSLIntrinsic& out)
                 {
                     // If it's a scalar make sure we have construct from scalar, because we will want to use that
                     SLANG_ASSERT(dstType->op == kIROp_VectorType);
-                    calcIntrinsic(Op::ConstructFromScalar, inst, out);
+                    IRType* argTypes[] = { baseType };
+                    calcIntrinsic(Op::ConstructFromScalar, inst->getDataType(), argTypes, 1,  out);
                     return SLANG_OK;
                 }
             }
