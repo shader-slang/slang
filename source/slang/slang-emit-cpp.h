@@ -5,6 +5,8 @@
 #include "slang-emit-c-like.h"
 #include "slang-ir-clone.h"
 
+#include "slang-ir-type-set.h"
+
 #include "../core/slang-string-slice-pool.h"
 
 namespace Slang
@@ -254,11 +256,6 @@ protected:
     static TypeDimension _getTypeDimension(IRType* type, bool vecSwap);
     static void _emitAccess(const UnownedStringSlice& name, const TypeDimension& dimension, int row, int col, SourceWriter* writer);
 
-    IRType* _getVecType(IRType* elementType, int elementCount);
-
-    IRInst* _clone(IRInst* inst);
-    IRType* _cloneType(IRType* type) { return (IRType*)_clone((IRInst*)type); }
-
     StringSlicePool::Handle _calcScalarFuncName(IntrinsicOp op, IRBasicType* type);
     UnownedStringSlice _getScalarFuncName(IntrinsicOp operation, IRBasicType* scalarType);
 
@@ -282,30 +279,8 @@ protected:
     Dictionary<SpecializedIntrinsic, StringSlicePool::Handle> m_intrinsicNameMap;
     Dictionary<IRType*, StringSlicePool::Handle> m_typeNameMap;
 
-    /* This is used so as to try and use slangs type system to uniquely identify types and specializations on intrinsic.
-    That we want to have a pointer to a type be unique, and slang supports this through the m_sharedIRBuilder. BUT for this to
-    work all work on the module must use the same sharedIRBuilder, and that appears to not be the case in terms
-    of other passes.
-    Even if it was the case when we may want to add types as part of emitting, we can't use the previously used
-    shared builder, so again we end up with pointers to the same things not being the same thing.
-
-    To work around this we clone types we want to use as keys into the 'unique module'.
-    This is not necessary for all types though - as we assume nominal types *must* have unique pointers (that is the
-    definition of nominal).
-
-    This could be handled in other ways (for example not testing equality on pointer equality). Anyway for now this
-    works, but probably needs to be handled in a better way. The better way may involve having guarantees about equality
-    enabled in other code generation and making de-duping possible in emit code.
-
-    Note that one pro for this approach is that it does not alter the source module. That as it stands it's not necessary
-    for the source module to be immutable, because it is created for emitting and then discarded. 
-     */
-    RefPtr<IRModule> m_uniqueModule;            
-    SharedIRBuilder m_sharedIRBuilder;
-    IRBuilder m_irBuilder;
-
-    Dictionary<IRInst*, IRInst*> m_cloneMap;
-
+    IRTypeSet m_typeSet;
+    
     Dictionary<IRType*, bool> m_typeEmittedMap;
     Dictionary<SpecializedIntrinsic, bool> m_intrinsicEmittedMap;
 
