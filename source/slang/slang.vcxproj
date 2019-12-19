@@ -230,6 +230,7 @@
     <ClInclude Include="slang-ir-ssa.h" />
     <ClInclude Include="slang-ir-string-hash.h" />
     <ClInclude Include="slang-ir-strip.h" />
+    <ClInclude Include="slang-ir-type-set.h" />
     <ClInclude Include="slang-ir-union.h" />
     <ClInclude Include="slang-ir-validate.h" />
     <ClInclude Include="slang-ir.h" />
@@ -310,6 +311,7 @@
     <ClCompile Include="slang-ir-ssa.cpp" />
     <ClCompile Include="slang-ir-string-hash.cpp" />
     <ClCompile Include="slang-ir-strip.cpp" />
+    <ClCompile Include="slang-ir-type-set.cpp" />
     <ClCompile Include="slang-ir-union.cpp" />
     <ClCompile Include="slang-ir-validate.cpp" />
     <ClCompile Include="slang-ir.cpp" />

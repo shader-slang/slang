@@ -141,6 +141,9 @@
     <ClInclude Include="slang-ir-strip.h">
       <Filter>Header Files</Filter>
     </ClInclude>
+    <ClInclude Include="slang-ir-type-set.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
     <ClInclude Include="slang-ir-union.h">
       <Filter>Header Files</Filter>
     </ClInclude>
@@ -375,6 +378,9 @@
       <Filter>Source Files</Filter>
     </ClCompile>
     <ClCompile Include="slang-ir-strip.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="slang-ir-type-set.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
     <ClCompile Include="slang-ir-union.cpp">

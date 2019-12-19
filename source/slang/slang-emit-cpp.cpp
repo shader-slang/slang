@@ -265,13 +265,13 @@ void CPPSourceEmitter::emitTypeDefinition(IRType* inType)
         return;
     }
 
-    IRType* type = _cloneType(inType);
+    IRType* type = m_typeSet.getType(inType);
     if (m_typeEmittedMap.TryGetValue(type))
     {
         return;
     }
 
-    if (type->getModule() != m_uniqueModule)
+    if (!m_typeSet.isOwned(type))
     {
         // If defined in a different module, we assume they are emitted already. (Assumed to
         // be a nominal type)
@@ -322,7 +322,7 @@ void CPPSourceEmitter::emitTypeDefinition(IRType* inType)
             const auto rowCount = int(GetIntVal(matType->getRowCount()));
             const auto colCount = int(GetIntVal(matType->getColumnCount()));
 
-            IRType* vecType = _getVecType(matType->getElementType(), colCount);
+            IRType* vecType = m_typeSet.addVectorType(matType->getElementType(), colCount);
             emitTypeDefinition(vecType);
 
             UnownedStringSlice typeName = _getTypeName(type);
@@ -373,7 +373,7 @@ void CPPSourceEmitter::emitTypeDefinition(IRType* inType)
 
 UnownedStringSlice CPPSourceEmitter::_getTypeName(IRType* inType)
 { 
-    IRType* type = _cloneType(inType);
+    IRType* type = m_typeSet.getType(inType);
 
     StringSlicePool::Handle handle = StringSlicePool::kNullHandle;
     if (m_typeNameMap.TryGetValue(type, handle))
@@ -390,7 +390,7 @@ UnownedStringSlice CPPSourceEmitter::_getTypeName(IRType* inType)
         const auto colCount = int(GetIntVal(matType->getColumnCount()));
 
         // Make sure the vector type the matrix is built on is added
-        useType(_getVecType(elementType, colCount));
+        useType(m_typeSet.addVectorType(elementType, colCount));
     }
 
     StringBuilder builder;
@@ -629,115 +629,6 @@ SlangResult CPPSourceEmitter::_calcTypeName(IRType* type, CodeGenTarget target, 
 void CPPSourceEmitter::useType(IRType* type)
 {
     _getTypeName(type);
-}
-
-IRInst* CPPSourceEmitter::_clone(IRInst* inst)
-{
-    if (inst == nullptr)
-    {
-        return nullptr;
-    }
-
-    IRModule* module = inst->getModule();
-    // All inst's must belong to a module
-    SLANG_ASSERT(module);
-
-    // If it's in this module then we don't need to clone
-    if (module == m_uniqueModule)
-    {
-        return inst;
-    }
-
-    if (IRInst*const* newInstPtr = m_cloneMap.TryGetValue(inst))
-    {
-        return *newInstPtr;
-    }
-
-    if (isNominalOp(inst->op))
-    {
-        // TODO(JS)
-        // This is arguably problematic - I'm adding an instruction from another module to the map, to be it's self.
-        // I did have code which created a copy of the nominal instruction and name hint, but because nominality means
-        // 'same address' other code would generate a different name for that instruction (say as compared to being a member in
-        // the original instruction)
-        //
-        // Because I use findOrAddInst which doesn't hoist instructions, the hoisting doesn't rely on parenting, that would
-        // break.
-
-        // If nominal, we just use the original inst
-        m_cloneMap.Add(inst, inst);
-        return inst;
-    }
-
-    // It would be nice if I could use ir-clone.cpp to do this -> but it doesn't clone
-    // operands. We wouldn't want to clone decorations, and it can't clone IRConstant(!) so
-    // it's no use
-
-    IRInst* clone = nullptr;
-    switch (inst->op)
-    {
-        case kIROp_IntLit:
-        {
-            auto intLit = static_cast<IRConstant*>(inst);
-            IRType* cloneType = _cloneType(intLit->getDataType());
-            clone = m_irBuilder.getIntValue(cloneType, intLit->value.intVal);
-            break;
-        }
-        case kIROp_StringLit:
-        {
-            auto stringLit = static_cast<IRStringLit*>(inst);
-            clone =  m_irBuilder.getStringValue(stringLit->getStringSlice());
-            break;
-        }
-        default:
-        {
-            if (IRBasicType::isaImpl(inst->op))
-            {
-                clone = m_irBuilder.getType(inst->op);
-            }
-            else
-            {
-                IRType* irType = dynamicCast<IRType>(inst);
-                if (irType)
-                {
-                    auto cloneType = _cloneType(inst->getFullType());
-                    Index operandCount = Index(inst->getOperandCount());
-
-                    List<IRInst*> cloneOperands;
-                    cloneOperands.setCount(operandCount);
-
-                    for (Index i = 0; i < operandCount; ++i)
-                    {
-                        cloneOperands[i] = _clone(inst->getOperand(i));
-                    }
-
-                    //clone = m_irBuilder.findOrEmitHoistableInst(cloneType, inst->op, operandCount, cloneOperands.getBuffer());
-
-                    UInt operandCounts[1] = { UInt(operandCount) };
-                    IRInst*const* listOperands[1] = { cloneOperands.getBuffer() };
-
-                    clone = m_irBuilder.findOrAddInst(cloneType, inst->op, 1, operandCounts, listOperands);
-                }
-                else
-                {
-                    // This cloning style only works on insts that are not unique
-                    auto cloneType = _cloneType(inst->getFullType());
-            
-                    Index operandCount = Index(inst->getOperandCount());
-                    clone = m_irBuilder.emitIntrinsicInst(cloneType, inst->op, operandCount, nullptr);
-                    for (Index i = 0; i < operandCount; ++i)
-                    {
-                        auto cloneOperand = _clone(inst->getOperand(i));
-                        clone->getOperands()[i].init(clone, cloneOperand);
-                    }
-                }
-            }
-            break;
-        }
-    }
-
-    m_cloneMap.Add(inst, clone);
-    return clone;
 }
 
 static IRBasicType* _getElementType(IRType* type)
@@ -1102,10 +993,13 @@ void CPPSourceEmitter::_emitCrossDefinition(const UnownedStringSlice& funcName, 
 
 UnownedStringSlice CPPSourceEmitter::_getAndEmitSpecializedOperationDefinition(IntrinsicOp op, IRType*const* argTypes, Int argCount, IRType* retType)
 {
+    // Use the type sets builder... 
+    IRBuilder& builder = m_typeSet.getBuilder();
+
     SpecializedIntrinsic specOp;
     specOp.op = op;
     specOp.returnType = retType;
-    specOp.signatureType = m_irBuilder.getFuncType(argCount, argTypes, m_irBuilder.getVoidType());
+    specOp.signatureType = builder.getFuncType(argCount, argTypes, builder.getVoidType());
 
     emitSpecializedOperationDefinition(specOp);
     return  _getFuncName(specOp);
@@ -1443,12 +1337,6 @@ void CPPSourceEmitter::emitSpecializedOperationDefinition(const SpecializedIntri
     SLANG_ASSERT(!"Unhandled");
 }
 
-IRType* CPPSourceEmitter::_getVecType(IRType* elementType, int elementCount)
-{
-    elementType = _cloneType(elementType);
-    return m_irBuilder.getVectorType(elementType, m_irBuilder.getIntValue(m_irBuilder.getIntType(), elementCount));
-}
-
 CPPSourceEmitter::SpecializedIntrinsic CPPSourceEmitter::getSpecializedOperation(IntrinsicOp op, IRType*const* inArgTypes, int argTypesCount, IRType* retType)
 {
     SpecializedIntrinsic specOp;
@@ -1459,11 +1347,14 @@ CPPSourceEmitter::SpecializedIntrinsic CPPSourceEmitter::getSpecializedOperation
 
     for (int i = 0; i < argTypesCount; ++i)
     {
-        argTypes[i] = _cloneType(inArgTypes[i]->getCanonicalType());
+        argTypes[i] = m_typeSet.getType(inArgTypes[i]->getCanonicalType());
     }
 
-    specOp.returnType = _cloneType(retType);
-    specOp.signatureType = m_irBuilder.getFuncType(argTypes, m_irBuilder.getBasicType(BaseType::Void));
+    specOp.returnType = m_typeSet.getType(retType);
+
+    // Use the typesets builder
+    IRBuilder& builder = m_typeSet.getBuilder();
+    specOp.signatureType = builder.getFuncType(argTypes, builder.getBasicType(BaseType::Void));
 
     return specOp;
 }
@@ -1786,20 +1677,11 @@ void CPPSourceEmitter::emitOperationCall(IntrinsicOp op, IRInst* inst, IRUse* op
 
 CPPSourceEmitter::CPPSourceEmitter(const Desc& desc):
     Super(desc),
-    m_slicePool(StringSlicePool::Style::Default)
+    m_slicePool(StringSlicePool::Style::Default),
+    m_typeSet(desc.compileRequest->getSession())
 {
     m_semanticUsedFlags = 0;
     //m_semanticUsedFlags = SemanticUsedFlag::GroupID | SemanticUsedFlag::GroupThreadID | SemanticUsedFlag::DispatchThreadID;
-
-    m_sharedIRBuilder.module = nullptr;
-    m_sharedIRBuilder.session = desc.compileRequest->getSession();
-
-    m_irBuilder.sharedBuilder = &m_sharedIRBuilder;
-
-    m_uniqueModule = m_irBuilder.createModule();
-    m_sharedIRBuilder.module = m_uniqueModule;
-
-    m_irBuilder.setInsertInto(m_irBuilder.getModule()->getModuleInst());
 
     // Add all the operations with names (not ops like -, / etc) to the lookup map
     for (int i = 0; i < SLANG_COUNT_OF(s_operationInfos); ++i)
@@ -2028,13 +1910,12 @@ void CPPSourceEmitter::emitSimpleValueImpl(IRInst* inst)
 
 void CPPSourceEmitter::emitVectorTypeNameImpl(IRType* elementType, IRIntegerValue elementCount)
 {
-    emitSimpleType(_getVecType(elementType, int(elementCount)));
+    emitSimpleType(m_typeSet.addVectorType(elementType, int(elementCount)));
 }
 
 void CPPSourceEmitter::emitSimpleTypeImpl(IRType* inType)
 {
-     
-    UnownedStringSlice slice = _getTypeName(_cloneType(inType));
+    UnownedStringSlice slice = _getTypeName(m_typeSet.getType(inType));
     m_writer->emit(slice);
 }
 
