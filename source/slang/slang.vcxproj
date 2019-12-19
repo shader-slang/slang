@@ -199,6 +199,7 @@
     <ClInclude Include="slang-diagnostics.h" />
     <ClInclude Include="slang-emit-c-like.h" />
     <ClInclude Include="slang-emit-cpp.h" />
+    <ClInclude Include="slang-emit-cuda.h" />
     <ClInclude Include="slang-emit-glsl-extension-tracker.h" />
     <ClInclude Include="slang-emit-glsl.h" />
     <ClInclude Include="slang-emit-hlsl.h" />
@@ -280,6 +281,7 @@
     <ClCompile Include="slang-dxc-support.cpp" />
     <ClCompile Include="slang-emit-c-like.cpp" />
     <ClCompile Include="slang-emit-cpp.cpp" />
+    <ClCompile Include="slang-emit-cuda.cpp" />
     <ClCompile Include="slang-emit-glsl-extension-tracker.cpp" />
     <ClCompile Include="slang-emit-glsl.cpp" />
     <ClCompile Include="slang-emit-hlsl.cpp" />
@@ -373,4 +375,4 @@
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">
   </ImportGroup>
-</Project> 
+</Project>

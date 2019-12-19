@@ -478,8 +478,6 @@ namespace Slang
                 return PassThroughMode::None;
             }
             case CodeGenTarget::GLSL:
-            case CodeGenTarget::GLSL_Vulkan:
-            case CodeGenTarget::GLSL_Vulkan_OneDesc:
             {
                 // Can always output GLSL
                 return PassThroughMode::None; 
@@ -487,6 +485,11 @@ namespace Slang
             case CodeGenTarget::HLSL:
             {
                 // Can always output HLSL
+                return PassThroughMode::None;
+            }
+            case CodeGenTarget::CUDASource:
+            {
+                // Can always output CUDA
                 return PassThroughMode::None;
             }
             case CodeGenTarget::SPIRVAssembly:
@@ -503,6 +506,11 @@ namespace Slang
             case CodeGenTarget::DXILAssembly:
             {
                 return PassThroughMode::Dxc;
+            }
+            case CodeGenTarget::GLSL_Vulkan:
+            case CodeGenTarget::GLSL_Vulkan_OneDesc:
+            {
+                return PassThroughMode::Glslang;
             }
             case CodeGenTarget::CPPSource:
             case CodeGenTarget::CSource:
@@ -581,10 +589,11 @@ namespace Slang
         outCodeBuilder << fileContent << "\n";
     }
 
-    String emitHLSLForEntryPoint(
+    String emitEntryPointSource(
         BackEndCompileRequest*  compileRequest,
         Int                     entryPointIndex,
         TargetRequest*          targetReq,
+        CodeGenTarget           target,
         EndToEndCompileRequest* endToEndReq)
     {
         if(auto translationUnit = findPassThroughTranslationUnit(endToEndReq, entryPointIndex))
@@ -596,91 +605,41 @@ namespace Slang
             // mode.
 
             StringBuilder codeBuilder;
-            for(auto sourceFile : translationUnit->getSourceFiles())
+            if (target == CodeGenTarget::GLSL)
             {
-                _appendCodeWithPath(sourceFile->getPathInfo().foundPath.getUnownedSlice(), sourceFile->getContent(), codeBuilder);
-            }
-
-            return codeBuilder.ProduceString();
-        }
-        else
-        {
-            return emitEntryPointSource(
-                compileRequest,
-                entryPointIndex,
-                CodeGenTarget::HLSL,
-                targetReq);
-        }
-    }
-
-    String emitCPPForEntryPoint(
-        BackEndCompileRequest*  compileRequest,
-        Int                     entryPointIndex,
-        TargetRequest*          targetReq,
-        EndToEndCompileRequest* endToEndReq)
-    {
-        if (auto translationUnit = findPassThroughTranslationUnit(endToEndReq, entryPointIndex))
-        {
-            // Generate a string that includes the content of
-            // the source file(s), along with a line directive
-            // to ensure that we get reasonable messages
-            // from the downstream compiler when in pass-through
-            // mode.
-
-            StringBuilder codeBuilder;
-            for (auto sourceFile : translationUnit->getSourceFiles())
-            {
-                _appendCodeWithPath(sourceFile->getPathInfo().foundPath.getUnownedSlice(), sourceFile->getContent(), codeBuilder);
-            }
-
-            return codeBuilder.ProduceString();
-        }
-        else
-        {
-            return emitEntryPointSource(compileRequest, entryPointIndex, CodeGenTarget::CPPSource, targetReq);
-        }
-    }
-
-    String emitGLSLForEntryPoint(
-        BackEndCompileRequest*  compileRequest,
-        Int                     entryPointIndex,
-        TargetRequest*          targetReq,
-        EndToEndCompileRequest* endToEndReq)
-    {
-        if(auto translationUnit = findPassThroughTranslationUnit(endToEndReq, entryPointIndex))
-        {
-            // Generate a string that includes the content of
-            // the source file(s), along with a line directive
-            // to ensure that we get reasonable messages
-            // from the downstream compiler when in pass-through
-            // mode.
-
-            StringBuilder codeBuilder;
-            int translationUnitCounter = 0;
-            for(auto sourceFile : translationUnit->getSourceFiles())
-            {
-                int translationUnitIndex = translationUnitCounter++;
-
-                // We want to output `#line` directives, but we need
-                // to skip this for the first file, since otherwise
-                // some GLSL implementations will get tripped up by
-                // not having the `#version` directive be the first
-                // thing in the file.
-                if(translationUnitIndex != 0)
+                // Special case GLSL
+                int translationUnitCounter = 0;
+                for (auto sourceFile : translationUnit->getSourceFiles())
                 {
-                    codeBuilder << "#line 1 " << translationUnitIndex << "\n";
-                }
-                codeBuilder << sourceFile->getContent() << "\n";
-            }
+                    int translationUnitIndex = translationUnitCounter++;
 
+                    // We want to output `#line` directives, but we need
+                    // to skip this for the first file, since otherwise
+                    // some GLSL implementations will get tripped up by
+                    // not having the `#version` directive be the first
+                    // thing in the file.
+                    if (translationUnitIndex != 0)
+                    {
+                        codeBuilder << "#line 1 " << translationUnitIndex << "\n";
+                    }
+                    codeBuilder << sourceFile->getContent() << "\n";
+                }
+            }
+            else
+            {
+                for(auto sourceFile : translationUnit->getSourceFiles())
+                {
+                    _appendCodeWithPath(sourceFile->getPathInfo().foundPath.getUnownedSlice(), sourceFile->getContent(), codeBuilder);
+                }
+            }
             return codeBuilder.ProduceString();
         }
         else
         {
-            return emitEntryPointSource(
+            return emitEntryPointSourceFromIR(
                 compileRequest,
                 entryPointIndex,
-                CodeGenTarget::GLSL,
+                target,
                 targetReq);
         }
     }
@@ -964,7 +923,7 @@ namespace Slang
             return SLANG_FAIL;
         }
 
-        auto hlslCode = emitHLSLForEntryPoint(compileRequest, entryPointIndex, targetReq, endToEndReq);
+        auto hlslCode = emitEntryPointSource(compileRequest, entryPointIndex, targetReq, CodeGenTarget::HLSL, endToEndReq);
         maybeDumpIntermediate(compileRequest, hlslCode.getBuffer(), CodeGenTarget::HLSL);
 
         auto profile = getEffectiveProfile(entryPoint, targetReq);
@@ -1251,13 +1210,16 @@ SlangResult dissassembleDXILUsingDXC(
         EndToEndCompileRequest* endToEndReq,
         RefPtr<DownstreamCompileResult>& outResult)
     {
+        outResult.setNull();
+
         auto sink = slangRequest->getSink();
 
         auto session = slangRequest->getSession();
 
         const String originalSourcePath = calcSourcePathForEntryPoint(endToEndReq, entryPointIndex);
 
-        outResult.setNull();
+        CodeGenTarget sourceTarget = CodeGenTarget::None;
+        SourceLanguage sourceLanguage = SourceLanguage::Unknown;
 
         PassThroughMode downstreamCompiler = endToEndReq->passThrough;
 
@@ -1265,23 +1227,26 @@ SlangResult dissassembleDXILUsingDXC(
         if (downstreamCompiler == PassThroughMode::None)
         {
             auto target = targetReq->target;
-            
             switch (target)
             {
                 case CodeGenTarget::PTX:
                 {
-                    downstreamCompiler = PassThroughMode(session->getDefaultDownstreamCompiler(SLANG_SOURCE_LANGUAGE_CUDA));
+                    sourceTarget = CodeGenTarget::CUDASource;
+                    sourceLanguage = SourceLanguage::CUDA;
                     break;
                 }
                 case CodeGenTarget::HostCallable:
                 case CodeGenTarget::SharedLibrary:
                 case CodeGenTarget::Executable:
                 {
-                    downstreamCompiler = PassThroughMode(session->getDefaultDownstreamCompiler(SLANG_SOURCE_LANGUAGE_CPP));
+                    sourceTarget = CodeGenTarget::CPPSource;
+                    sourceLanguage = SourceLanguage::CPP;
                     break;
                 }
                 default: break;
             }
+
+            downstreamCompiler = PassThroughMode(session->getDefaultDownstreamCompiler(SlangSourceLanguage(sourceLanguage)));
         }
         
         // Get the required downstream compiler
@@ -1300,8 +1265,6 @@ SlangResult dissassembleDXILUsingDXC(
             }
             return SLANG_FAIL;
         }
-
-        SourceLanguage rawSourceLanguage = SourceLanguage::Unknown;
 
         Dictionary<String, String> preprocessorDefinitions;
         List<String> includePaths;
@@ -1357,8 +1320,10 @@ SlangResult dissassembleDXILUsingDXC(
             }
 
             // We are just passing thru, so it's whatever it originally was
-            rawSourceLanguage = translationUnit->sourceLanguage;
+            sourceLanguage = translationUnit->sourceLanguage;
+            sourceTarget = CodeGenTarget(DownstreamCompiler::getCompileTarget(SlangSourceLanguage(sourceLanguage)));
 
+            // Special case if we have a single file, so that we pass the path, and the contents
             const auto& sourceFiles = translationUnit->getSourceFiles();
             if (sourceFiles.getCount() == 1)
             {
@@ -1372,30 +1337,18 @@ SlangResult dissassembleDXILUsingDXC(
             }
             else
             {
-                // If can't just use file, concat together and make
-                StringBuilder codeBuilder;
-                for (auto sourceFile : translationUnit->getSourceFiles())
-                {
-                    _appendCodeWithPath(sourceFile->getPathInfo().foundPath.getUnownedSlice(), sourceFile->getContent(), codeBuilder);
-                }
-                options.sourceContents = codeBuilder.ProduceString();
+                options.sourceContents = emitEntryPointSource(slangRequest, entryPointIndex, targetReq, sourceTarget, endToEndReq);
             }
         }
         else
         {
-            options.sourceContents = emitCPPForEntryPoint(
-                slangRequest,
-                entryPointIndex,
-                targetReq,
-                endToEndReq);
+            options.sourceContents = emitEntryPointSource(slangRequest, entryPointIndex, targetReq, sourceTarget, endToEndReq);
 
-            maybeDumpIntermediate(slangRequest, options.sourceContents.getBuffer(), CodeGenTarget::CPPSource);
-
-            rawSourceLanguage = SourceLanguage::CPP;
+            maybeDumpIntermediate(slangRequest, options.sourceContents.getBuffer(), sourceTarget);
         }
 
         // Set the source type
-        options.sourceLanguage = SlangSourceLanguage(rawSourceLanguage);
+        options.sourceLanguage = SlangSourceLanguage(sourceLanguage);
 
         // Disable exceptions and security checks
         options.flags &= ~(CompileOptions::Flag::EnableExceptionHandling | CompileOptions::Flag::EnableSecurityChecks);
@@ -1556,10 +1509,11 @@ SlangResult dissassembleDXILUsingDXC(
     {
         spirvOut.clear();
 
-        String rawGLSL = emitGLSLForEntryPoint(
+        String rawGLSL = emitEntryPointSource(
             slangRequest,
             entryPointIndex,
             targetReq,
+            CodeGenTarget::GLSL,
             endToEndReq);
         maybeDumpIntermediate(slangRequest, rawGLSL.getBuffer(), CodeGenTarget::GLSL);
 
@@ -1671,38 +1625,18 @@ SlangResult dissassembleDXILUsingDXC(
                 }
             }
             break;
-        case CodeGenTarget::HLSL:
-            {
-                String code = emitHLSLForEntryPoint(
-                    compileRequest,
-                    entryPointIndex,
-                    targetReq,
-                    endToEndReq);
-                maybeDumpIntermediate(compileRequest, code.getBuffer(), target);
-                result = CompileResult(code);
-            }
-            break;
-
         case CodeGenTarget::GLSL:
-            {
-                String code = emitGLSLForEntryPoint(
-                    compileRequest,
-                    entryPointIndex,
-                    targetReq,
-                    endToEndReq);
-                maybeDumpIntermediate(compileRequest, code.getBuffer(), target);
-                result = CompileResult(code);
-            }
-            break;
-
+        case CodeGenTarget::HLSL:
+        case CodeGenTarget::CUDASource:
         case CodeGenTarget::CPPSource:
         case CodeGenTarget::CSource:
             {
                 String code = emitEntryPointSource(
                     compileRequest,
                     entryPointIndex,
-                    target, 
-                    targetReq);
+                    targetReq,
+                    target,
+                    endToEndReq);
                 maybeDumpIntermediate(compileRequest, code.getBuffer(), target);
                 result = CompileResult(code);
             }

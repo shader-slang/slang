@@ -98,6 +98,7 @@ struct CLikeSourceEmitter::ComputeEmitActionsContext
         {
             return SourceStyle::HLSL;
         }
+        case CodeGenTarget::PTX:
         case CodeGenTarget::SPIRV:
         case CodeGenTarget::SPIRVAssembly:
         case CodeGenTarget::DXBytecode:
@@ -114,6 +115,10 @@ struct CLikeSourceEmitter::ComputeEmitActionsContext
         case CodeGenTarget::CPPSource:
         {
             return SourceStyle::CPP;
+        }
+        case CodeGenTarget::CUDASource:
+        {
+            return SourceStyle::CUDA;
         }
     }
 }
@@ -343,6 +348,7 @@ bool CLikeSourceEmitter::isTargetIntrinsicModifierApplicable(const String& targe
     case SourceStyle::CPP:  return targetName == "cpp";
     case SourceStyle::GLSL: return targetName == "glsl";
     case SourceStyle::HLSL: return targetName == "hlsl";
+    case SourceStyle::CUDA: return targetName == "cuda";
     }
 }
 
@@ -1021,6 +1027,7 @@ void CLikeSourceEmitter::emitInstResultDecl(IRInst* inst)
 
         switch (getSourceStyle())
         {
+        case SourceStyle::CUDA:
         case SourceStyle::HLSL:
         case SourceStyle::C:
         case SourceStyle::CPP:
@@ -2507,6 +2514,22 @@ void CLikeSourceEmitter::emitSimpleFuncParamImpl(IRParam* param)
     emitSemantics(param);
 }
 
+void CLikeSourceEmitter::emitSimpleFuncParamsImpl(IRFunc* func)
+{
+    m_writer->emit("(");
+
+    auto firstParam = func->getFirstParam();
+    for (auto pp = firstParam; pp; pp = pp->getNextParam())
+    {
+        if (pp != firstParam)
+            m_writer->emit(", ");
+
+        emitSimpleFuncParamImpl(pp);
+    }
+
+    m_writer->emit(")");
+}
+
 void CLikeSourceEmitter::emitSimpleFuncImpl(IRFunc* func)
 {
     auto resultType = func->getResultType();
@@ -2521,18 +2544,7 @@ void CLikeSourceEmitter::emitSimpleFuncImpl(IRFunc* func)
     auto name = getName(func);
 
     emitType(resultType, name);
-
-    m_writer->emit("(");
-    auto firstParam = func->getFirstParam();
-    for( auto pp = firstParam; pp; pp = pp->getNextParam())
-    {
-        if(pp != firstParam)
-            m_writer->emit(", ");
-
-        emitSimpleFuncParamImpl(pp);
-    }
-    m_writer->emit(")");
-
+    emitSimpleFuncParamsImpl(func);
     emitSemantics(func);
 
     // TODO: encode declaration vs. definition

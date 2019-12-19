@@ -919,8 +919,12 @@ String getTargetName(IRSpecContext* context)
     case CodeGenTarget::CPPSource:
         return "cpp";
 
+    case CodeGenTarget::CUDASource:
+        return "cuda";
+
     case CodeGenTarget::SPIRV:
         return "spirv";
+
 
     default:
         SLANG_UNEXPECTED("unhandled case");

@@ -47,6 +47,7 @@ public:
         HLSL,
         C,
         CPP,
+        CUDA,
         CountOf,
     };
     
@@ -315,6 +316,7 @@ public:
     virtual void emitRateQualifiersImpl(IRRate* rate) { SLANG_UNUSED(rate); }
     virtual void emitSemanticsImpl(IRInst* inst) { SLANG_UNUSED(inst);  }
     virtual void emitSimpleFuncParamImpl(IRParam* param);
+    virtual void emitSimpleFuncParamsImpl(IRFunc* func);
     virtual void emitInterpolationModifiersImpl(IRInst* varInst, IRType* valueType, IRVarLayout* layout) { SLANG_UNUSED(varInst); SLANG_UNUSED(valueType); SLANG_UNUSED(layout); }
     virtual void emitSimpleTypeImpl(IRType* type) = 0;
     virtual void emitVarDecorationsImpl(IRInst* varDecl) { SLANG_UNUSED(varDecl);  }
