@@ -168,12 +168,6 @@ static UnownedStringSlice _getCTypeVecPostFix(IROp op)
 
 /* !!!!!!!!!!!!!!!!!!!!!!!! CPPEmitHandler !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! */
 
-static const CPPSourceEmitter::OperationInfo s_operationInfos[] =
-{
-#define SLANG_CPP_INTRINSIC_OP_INFO(x, funcName, numOperands) { UnownedStringSlice::fromLiteral(#x), UnownedStringSlice::fromLiteral(funcName), int8_t(numOperands)  },
-    SLANG_CPP_INTRINSIC_OP(SLANG_CPP_INTRINSIC_OP_INFO)
-};
-
 /* static */ UnownedStringSlice CPPSourceEmitter::getBuiltinTypeName(IROp op)
 {
     switch (op)
@@ -199,62 +193,6 @@ static const CPPSourceEmitter::OperationInfo s_operationInfos[] =
         case kIROp_DoubleType:  return UnownedStringSlice("double");
         default:                return UnownedStringSlice();
     }
-}
-
-
-/* static */const CPPSourceEmitter::OperationInfo& CPPSourceEmitter::getOperationInfo(IntrinsicOp op)
-{
-    return s_operationInfos[int(op)];
-}
-
-/* static */CPPSourceEmitter::IntrinsicOp CPPSourceEmitter::getOperation(IROp op)
-{
-    switch (op)
-    {
-        case kIROp_Add:     return IntrinsicOp::Add;
-        case kIROp_Mul:     return IntrinsicOp::Mul;
-        case kIROp_Sub:     return IntrinsicOp::Sub;
-        case kIROp_Div:     return IntrinsicOp::Div;
-        case kIROp_Lsh:     return IntrinsicOp::Lsh;
-        case kIROp_Rsh:     return IntrinsicOp::Rsh;
-        case kIROp_IRem:    return IntrinsicOp::IRem;
-        case kIROp_FRem:    return IntrinsicOp::FRem;
-
-        case kIROp_Eql:     return IntrinsicOp::Eql;
-        case kIROp_Neq:     return IntrinsicOp::Neq;
-        case kIROp_Greater: return IntrinsicOp::Greater;
-        case kIROp_Less:    return IntrinsicOp::Less;
-        case kIROp_Geq:     return IntrinsicOp::Geq;
-        case kIROp_Leq:     return IntrinsicOp::Leq;
-
-        case kIROp_BitAnd:  return IntrinsicOp::BitAnd;
-        case kIROp_BitXor:  return IntrinsicOp::BitXor;
-        case kIROp_BitOr:   return IntrinsicOp::BitOr;
-                
-        case kIROp_And:     return IntrinsicOp::And;
-        case kIROp_Or:      return IntrinsicOp::Or;
-
-        case kIROp_Neg:     return IntrinsicOp::Neg;
-        case kIROp_Not:     return IntrinsicOp::Not;
-        case kIROp_BitNot:  return IntrinsicOp::BitNot;
-
-        default:            return IntrinsicOp::Invalid;
-    }
-}
-
-CPPSourceEmitter::IntrinsicOp CPPSourceEmitter::getOperationByName(const UnownedStringSlice& slice)
-{
-    Index index = m_slicePool.findIndex(slice);
-    if (index >= 0 && index < m_intrinsicOpMap.getCount())
-    {
-        IntrinsicOp op = m_intrinsicOpMap[index];
-        if (op != IntrinsicOp::Invalid)
-        {
-            return op;
-        }
-    }
-
-    return IntrinsicOp::Invalid;
 }
 
 void CPPSourceEmitter::emitTypeDefinition(IRType* inType)
@@ -704,9 +642,9 @@ static bool _isOperator(const UnownedStringSlice& funcName)
     return false;
 }
 
-void CPPSourceEmitter::_emitAryDefinition(const SpecializedIntrinsic& specOp)
+void CPPSourceEmitter::_emitAryDefinition(const HLSLIntrinsic* specOp)
 {
-    auto info = getOperationInfo(specOp.op);
+    auto info = HLSLIntrinsic::getInfo(specOp->op);
     auto funcName = info.funcName;
     SLANG_ASSERT(funcName.size() > 0);
 
@@ -714,7 +652,7 @@ void CPPSourceEmitter::_emitAryDefinition(const SpecializedIntrinsic& specOp)
 
     SourceWriter* writer = getSourceWriter();
 
-    IRFuncType* funcType = specOp.signatureType;
+    IRFuncType* funcType = specOp->signatureType;
     const int numParams = int(funcType->getParamCount());
     SLANG_ASSERT(numParams <= 3);
 
@@ -732,7 +670,7 @@ void CPPSourceEmitter::_emitAryDefinition(const SpecializedIntrinsic& specOp)
         return;
     }
 
-    IRType* retType = specOp.returnType;
+    IRType* retType = specOp->returnType;
     TypeDimension retDim = _getTypeDimension(retType, false);
 
     UnownedStringSlice scalarFuncName(funcName);
@@ -745,7 +683,7 @@ void CPPSourceEmitter::_emitAryDefinition(const SpecializedIntrinsic& specOp)
     }
     else
     {
-        scalarFuncName = _getScalarFuncName(specOp.op, _getElementType(funcType->getParamType(0)));
+        scalarFuncName = _getScalarFuncName(specOp->op, _getElementType(funcType->getParamType(0)));
         _emitSignature(funcName, specOp);
     }
     
@@ -808,9 +746,9 @@ void CPPSourceEmitter::_emitAryDefinition(const SpecializedIntrinsic& specOp)
     writer->emit("}\n\n");
 }
 
-void CPPSourceEmitter::_emitAnyAllDefinition(const UnownedStringSlice& funcName, const SpecializedIntrinsic& specOp)
+void CPPSourceEmitter::_emitAnyAllDefinition(const UnownedStringSlice& funcName, const HLSLIntrinsic* specOp)
 {
-    IRFuncType* funcType = specOp.signatureType;
+    IRFuncType* funcType = specOp->signatureType;
     SLANG_ASSERT(funcType->getParamCount() == 1);
     IRType* paramType0 = funcType->getParamType(0);
 
@@ -818,7 +756,7 @@ void CPPSourceEmitter::_emitAnyAllDefinition(const UnownedStringSlice& funcName,
 
     IRType* elementType = _getElementType(paramType0);
     SLANG_ASSERT(elementType);
-    IRType* retType = specOp.returnType;
+    IRType* retType = specOp->returnType;
     auto retTypeName = _getTypeName(retType);
 
     IROp style = _getTypeStyle(elementType->op);
@@ -837,7 +775,7 @@ void CPPSourceEmitter::_emitAnyAllDefinition(const UnownedStringSlice& funcName,
         {
             if (i > 0 || j > 0)
             {
-                if (specOp.op == IntrinsicOp::All)
+                if (specOp->op == HLSLIntrinsic::Op::All)
                 {
                     writer->emit(" && ");
                 }
@@ -878,11 +816,11 @@ void CPPSourceEmitter::_emitAnyAllDefinition(const UnownedStringSlice& funcName,
     writer->emit("}\n\n");
 }
 
-void CPPSourceEmitter::_emitSignature(const UnownedStringSlice& funcName, const SpecializedIntrinsic& specOp)
+void CPPSourceEmitter::_emitSignature(const UnownedStringSlice& funcName, const HLSLIntrinsic* specOp)
 {
-    IRFuncType* funcType = specOp.signatureType;
+    IRFuncType* funcType = specOp->signatureType;
     const int paramsCount = int(funcType->getParamCount());
-    IRType* retType = specOp.returnType;
+    IRType* retType = specOp->returnType;
 
     SourceWriter* writer = getSourceWriter();
 
@@ -924,13 +862,13 @@ void CPPSourceEmitter::_emitSignature(const UnownedStringSlice& funcName, const 
     writer->emit(")");
 }
 
-void CPPSourceEmitter::_emitVecMatMulDefinition(const UnownedStringSlice& funcName, const SpecializedIntrinsic& specOp)
+void CPPSourceEmitter::_emitVecMatMulDefinition(const UnownedStringSlice& funcName, const HLSLIntrinsic* specOp)
 {
-    IRFuncType* funcType = specOp.signatureType;
+    IRFuncType* funcType = specOp->signatureType;
     SLANG_ASSERT(funcType->getParamCount() == 2);
     IRType* paramType0 = funcType->getParamType(0);
     IRType* paramType1 = funcType->getParamType(1);
-    IRType* retType = specOp.returnType;
+    IRType* retType = specOp->returnType;
 
     SourceWriter* writer = getSourceWriter();
 
@@ -974,7 +912,7 @@ void CPPSourceEmitter::_emitVecMatMulDefinition(const UnownedStringSlice& funcNa
     writer->emit("}\n\n");
 }
 
-void CPPSourceEmitter::_emitCrossDefinition(const UnownedStringSlice& funcName, const SpecializedIntrinsic& specOp)
+void CPPSourceEmitter::_emitCrossDefinition(const UnownedStringSlice& funcName, const HLSLIntrinsic* specOp)
 {
     _emitSignature(funcName, specOp);
 
@@ -984,32 +922,27 @@ void CPPSourceEmitter::_emitCrossDefinition(const UnownedStringSlice& funcName, 
     writer->indent();
 
     writer->emit("return ");
-    emitType(specOp.returnType);
+    emitType(specOp->returnType);
     writer->emit("{ a.y * b.z - a.z * b.y, a.z * b.x - a.x * b.z, a.x * b.y - a.y * b.x }; \n");
 
     writer->dedent();
     writer->emit("}\n\n");
 }
 
-UnownedStringSlice CPPSourceEmitter::_getAndEmitSpecializedOperationDefinition(IntrinsicOp op, IRType*const* argTypes, Int argCount, IRType* retType)
+UnownedStringSlice CPPSourceEmitter::_getAndEmitSpecializedOperationDefinition(HLSLIntrinsic::Op op, IRType*const* argTypes, Int argCount, IRType* retType)
 {
-    // Use the type sets builder... 
-    IRBuilder& builder = m_typeSet.getBuilder();
-
-    SpecializedIntrinsic specOp;
-    specOp.op = op;
-    specOp.returnType = retType;
-    specOp.signatureType = builder.getFuncType(argCount, argTypes, builder.getVoidType());
-
+    HLSLIntrinsic intrinsic;
+    m_intrinsicSet.calcIntrinsic(op, retType, argTypes, argCount, intrinsic);
+    auto specOp = m_intrinsicSet.add(intrinsic);
     emitSpecializedOperationDefinition(specOp);
     return  _getFuncName(specOp);
 }
 
-void CPPSourceEmitter::_emitLengthDefinition(const UnownedStringSlice& funcName, const SpecializedIntrinsic& specOp)
+void CPPSourceEmitter::_emitLengthDefinition(const UnownedStringSlice& funcName, const HLSLIntrinsic* specOp)
 {
     SourceWriter* writer = getSourceWriter();
 
-    IRFuncType* funcType = specOp.signatureType;
+    IRFuncType* funcType = specOp->signatureType;
     SLANG_ASSERT(funcType->getParamCount() == 1);
     IRType* paramType0 = funcType->getParamType(0);
 
@@ -1018,9 +951,9 @@ void CPPSourceEmitter::_emitLengthDefinition(const UnownedStringSlice& funcName,
     IRBasicType* elementType = as<IRBasicType>(static_cast<IRVectorType*>(paramType0)->getElementType());
 
     IRType* dotArgs[] = { paramType0, paramType0 };
-    UnownedStringSlice dotFuncName = _getAndEmitSpecializedOperationDefinition(IntrinsicOp::Dot, dotArgs, SLANG_COUNT_OF(dotArgs), elementType);
+    UnownedStringSlice dotFuncName = _getAndEmitSpecializedOperationDefinition(HLSLIntrinsic::Op::Dot, dotArgs, SLANG_COUNT_OF(dotArgs), elementType);
 
-    UnownedStringSlice sqrtName = _getScalarFuncName(IntrinsicOp::Sqrt, elementType);
+    UnownedStringSlice sqrtName = _getScalarFuncName(HLSLIntrinsic::Op::Sqrt, elementType);
 
     _emitSignature(funcName, specOp);
 
@@ -1037,16 +970,16 @@ void CPPSourceEmitter::_emitLengthDefinition(const UnownedStringSlice& funcName,
     writer->emit("}\n\n");
 }
 
-void CPPSourceEmitter::_emitGetAtDefinition(const UnownedStringSlice& funcName, const SpecializedIntrinsic& specOp)
+void CPPSourceEmitter::_emitGetAtDefinition(const UnownedStringSlice& funcName, const HLSLIntrinsic* specOp)
 {
     SourceWriter* writer = getSourceWriter();
 
-    IRFuncType* funcType = specOp.signatureType;
+    IRFuncType* funcType = specOp->signatureType;
     SLANG_ASSERT(funcType->getParamCount() == 2);
 
     IRType* srcType = funcType->getParamType(0);
 
-    IRType* retType = specOp.returnType;
+    IRType* retType = specOp->returnType;
     emitType(retType);
     m_writer->emit("& ");
 
@@ -1073,11 +1006,11 @@ void CPPSourceEmitter::_emitGetAtDefinition(const UnownedStringSlice& funcName, 
     writer->emit("}\n\n");
 }
 
-void CPPSourceEmitter::_emitNormalizeDefinition(const UnownedStringSlice& funcName, const SpecializedIntrinsic& specOp)
+void CPPSourceEmitter::_emitNormalizeDefinition(const UnownedStringSlice& funcName, const HLSLIntrinsic* specOp)
 {    
     SourceWriter* writer = getSourceWriter();
 
-    IRFuncType* funcType = specOp.signatureType;
+    IRFuncType* funcType = specOp->signatureType;
     SLANG_ASSERT(funcType->getParamCount() == 1);
     IRType* paramType0 = funcType->getParamType(0);
 
@@ -1086,10 +1019,10 @@ void CPPSourceEmitter::_emitNormalizeDefinition(const UnownedStringSlice& funcNa
     IRBasicType* elementType = as<IRBasicType>(static_cast<IRVectorType*>(paramType0)->getElementType());
 
     IRType* dotArgs[] = { paramType0, paramType0 };
-    UnownedStringSlice dotFuncName = _getAndEmitSpecializedOperationDefinition(IntrinsicOp::Dot, dotArgs, SLANG_COUNT_OF(dotArgs), elementType);
-    UnownedStringSlice rsqrtName = _getScalarFuncName(IntrinsicOp::RecipSqrt, elementType);
+    UnownedStringSlice dotFuncName = _getAndEmitSpecializedOperationDefinition(HLSLIntrinsic::Op::Dot, dotArgs, SLANG_COUNT_OF(dotArgs), elementType);
+    UnownedStringSlice rsqrtName = _getScalarFuncName(HLSLIntrinsic::Op::RecipSqrt, elementType);
     IRType* vecMulScalarArgs[] = { paramType0, elementType };
-    UnownedStringSlice vecMulScalarName = _getAndEmitSpecializedOperationDefinition(IntrinsicOp::Mul, vecMulScalarArgs, SLANG_COUNT_OF(vecMulScalarArgs), paramType0);
+    UnownedStringSlice vecMulScalarName = _getAndEmitSpecializedOperationDefinition(HLSLIntrinsic::Op::Mul, vecMulScalarArgs, SLANG_COUNT_OF(vecMulScalarArgs), paramType0);
 
     TypeDimension dimA = _getTypeDimension(paramType0, false);
 
@@ -1113,15 +1046,15 @@ void CPPSourceEmitter::_emitNormalizeDefinition(const UnownedStringSlice& funcNa
     writer->emit("}\n\n");
 }
 
-void CPPSourceEmitter::_emitConstructConvertDefinition(const UnownedStringSlice& funcName, const SpecializedIntrinsic& specOp)
+void CPPSourceEmitter::_emitConstructConvertDefinition(const UnownedStringSlice& funcName, const HLSLIntrinsic* specOp)
 {
     SourceWriter* writer = getSourceWriter();
-    IRFuncType* funcType = specOp.signatureType;
+    IRFuncType* funcType = specOp->signatureType;
 
     SLANG_ASSERT(funcType->getParamCount() == 2);
 
     IRType* srcType = funcType->getParamType(1);
-    IRType* retType = specOp.returnType;
+    IRType* retType = specOp->returnType;
 
     emitType(retType);
     writer->emit(" ");
@@ -1179,15 +1112,15 @@ void CPPSourceEmitter::_emitConstructConvertDefinition(const UnownedStringSlice&
     writer->emit("}\n\n");
 }
 
-void CPPSourceEmitter::_emitConstructFromScalarDefinition(const UnownedStringSlice& funcName, const SpecializedIntrinsic& specOp)
+void CPPSourceEmitter::_emitConstructFromScalarDefinition(const UnownedStringSlice& funcName, const HLSLIntrinsic* specOp)
 {
     SourceWriter* writer = getSourceWriter();
-    IRFuncType* funcType = specOp.signatureType;
+    IRFuncType* funcType = specOp->signatureType;
 
     SLANG_ASSERT(funcType->getParamCount() == 2);
 
     IRType* srcType = funcType->getParamType(1);
-    IRType* retType = specOp.returnType;
+    IRType* retType = specOp->returnType;
 
     emitType(retType);
     writer->emit(" ");
@@ -1237,11 +1170,11 @@ void CPPSourceEmitter::_emitConstructFromScalarDefinition(const UnownedStringSli
     writer->emit("}\n\n");
 }
 
-void CPPSourceEmitter::_emitReflectDefinition(const UnownedStringSlice& funcName, const SpecializedIntrinsic& specOp)
+void CPPSourceEmitter::_emitReflectDefinition(const UnownedStringSlice& funcName, const HLSLIntrinsic* specOp)
 {
     SourceWriter* writer = getSourceWriter();
 
-    IRFuncType* funcType = specOp.signatureType;
+    IRFuncType* funcType = specOp->signatureType;
     SLANG_ASSERT(funcType->getParamCount() == 2);
     IRType* paramType0 = funcType->getParamType(0);
 
@@ -1249,15 +1182,15 @@ void CPPSourceEmitter::_emitReflectDefinition(const UnownedStringSlice& funcName
 
     IRBasicType* elementType = as<IRBasicType>(static_cast<IRVectorType*>(paramType0)->getElementType());
 
-    // Make sure we have all these functions defined before emtting 
+    // Make sure we have all these functions defined before emitting 
     IRType* dotArgs[] = { paramType0, paramType0 };
-    UnownedStringSlice dotFuncName = _getAndEmitSpecializedOperationDefinition(IntrinsicOp::Dot, dotArgs, SLANG_COUNT_OF(dotArgs), elementType);
+    UnownedStringSlice dotFuncName = _getAndEmitSpecializedOperationDefinition(HLSLIntrinsic::Op::Dot, dotArgs, SLANG_COUNT_OF(dotArgs), elementType);
 
     IRType* subArgs[] = { paramType0, paramType0};
-    UnownedStringSlice subFuncName = _getAndEmitSpecializedOperationDefinition(IntrinsicOp::Sub, subArgs, SLANG_COUNT_OF(subArgs), paramType0);
+    UnownedStringSlice subFuncName = _getAndEmitSpecializedOperationDefinition(HLSLIntrinsic::Op::Sub, subArgs, SLANG_COUNT_OF(subArgs), paramType0);
 
     IRType* vecMulScalarArgs[] = { paramType0, elementType };
-    UnownedStringSlice vecMulScalarFuncName = _getAndEmitSpecializedOperationDefinition(IntrinsicOp::Mul, vecMulScalarArgs, SLANG_COUNT_OF(vecMulScalarArgs), paramType0);
+    UnownedStringSlice vecMulScalarFuncName = _getAndEmitSpecializedOperationDefinition(HLSLIntrinsic::Op::Mul, vecMulScalarArgs, SLANG_COUNT_OF(vecMulScalarArgs), paramType0);
 
     // Assumes C++
 
@@ -1273,58 +1206,60 @@ void CPPSourceEmitter::_emitReflectDefinition(const UnownedStringSlice& funcName
     writer->emit("}\n\n");
 }
 
-void CPPSourceEmitter::emitSpecializedOperationDefinition(const SpecializedIntrinsic& specOp)
+void CPPSourceEmitter::emitSpecializedOperationDefinition(const HLSLIntrinsic* specOp)
 {
+    typedef HLSLIntrinsic::Op Op;
+
     // Check if it's been emitted already, if not add it.
     if (!m_intrinsicEmittedMap.AddIfNotExists(specOp, true))
     {
         return;
     }
 
-    switch (specOp.op)
+    switch (specOp->op)
     {
-        case IntrinsicOp::VecMatMul:
-        case IntrinsicOp::Dot:
+        case Op::VecMatMul:
+        case Op::Dot:
         {
             return _emitVecMatMulDefinition(_getFuncName(specOp), specOp);
         }
-        case IntrinsicOp::Any:
-        case IntrinsicOp::All:
+        case Op::Any:
+        case Op::All:
         {
             return _emitAnyAllDefinition(_getFuncName(specOp), specOp);
         }
-        case IntrinsicOp::Cross:
+        case Op::Cross:
         {
             return _emitCrossDefinition(_getFuncName(specOp), specOp);
         }
-        case IntrinsicOp::Normalize:
+        case Op::Normalize:
         {
             return _emitNormalizeDefinition(_getFuncName(specOp), specOp);
         }
-        case IntrinsicOp::Length:
+        case Op::Length:
         {
             return _emitLengthDefinition(_getFuncName(specOp), specOp);
         }
-        case IntrinsicOp::Reflect:
+        case Op::Reflect:
         {
             return _emitReflectDefinition(_getFuncName(specOp), specOp);
         }
-        case IntrinsicOp::ConstructConvert:
+        case Op::ConstructConvert:
         {
             return _emitConstructConvertDefinition(_getFuncName(specOp), specOp);
         }
-        case IntrinsicOp::ConstructFromScalar:
+        case Op::ConstructFromScalar:
         {
             return _emitConstructFromScalarDefinition(_getFuncName(specOp), specOp);
         }
-        case IntrinsicOp::GetAt:
+        case Op::GetAt:
         {
             return _emitGetAtDefinition(_getFuncName(specOp), specOp);
         }
         default:
         {
-            const auto& info = getOperationInfo(specOp.op);
-            const int paramCount = (info.numOperands < 0) ? int(specOp.signatureType->getParamCount()) : info.numOperands;
+            const auto& info = HLSLIntrinsic::getInfo(specOp->op);
+            const int paramCount = (info.numOperands < 0) ? int(specOp->signatureType->getParamCount()) : info.numOperands;
 
             if (paramCount >= 1 && paramCount <= 3)
             {
@@ -1337,44 +1272,24 @@ void CPPSourceEmitter::emitSpecializedOperationDefinition(const SpecializedIntri
     SLANG_ASSERT(!"Unhandled");
 }
 
-CPPSourceEmitter::SpecializedIntrinsic CPPSourceEmitter::getSpecializedOperation(IntrinsicOp op, IRType*const* inArgTypes, int argTypesCount, IRType* retType)
+void CPPSourceEmitter::emitCall(const HLSLIntrinsic* specOp, IRInst* inst, const IRUse* operands, int numOperands, const EmitOpInfo& inOuterPrec)
 {
-    SpecializedIntrinsic specOp;
-    specOp.op = op;
+    typedef HLSLIntrinsic::Op Op;
 
-    List<IRType*> argTypes;
-    argTypes.setCount(argTypesCount);
-
-    for (int i = 0; i < argTypesCount; ++i)
-    {
-        argTypes[i] = m_typeSet.getType(inArgTypes[i]->getCanonicalType());
-    }
-
-    specOp.returnType = m_typeSet.getType(retType);
-
-    // Use the typesets builder
-    IRBuilder& builder = m_typeSet.getBuilder();
-    specOp.signatureType = builder.getFuncType(argTypes, builder.getBasicType(BaseType::Void));
-
-    return specOp;
-}
-
-void CPPSourceEmitter::emitCall(const SpecializedIntrinsic& specOp, IRInst* inst, const IRUse* operands, int numOperands, const EmitOpInfo& inOuterPrec)
-{
     SLANG_UNUSED(inOuterPrec);
     SourceWriter* writer = getSourceWriter();
 
     // Getting the name means that this op is registered as used
     
-    switch (specOp.op)
+    switch (specOp->op)
     {
-        case IntrinsicOp::Init:
+        case Op::Init:
         {
             // For C++ we don't need an init function
             // For C we'll need the construct function for the return type
             //UnownedStringSlice name = _getFuncName(specOp);
 
-            IRType* retType = specOp.returnType;
+            IRType* retType = specOp->returnType;
 
             switch (retType->op)
             {
@@ -1440,7 +1355,7 @@ void CPPSourceEmitter::emitCall(const SpecializedIntrinsic& specOp, IRInst* inst
             }
             break;
         }
-        case IntrinsicOp::Swizzle:
+        case Op::Swizzle:
         {
             // Currently only works for C++ (we use {} constuction) - which means we don't need to generate a function.
             // For C we need to generate suitable construction function
@@ -1448,7 +1363,7 @@ void CPPSourceEmitter::emitCall(const SpecializedIntrinsic& specOp, IRInst* inst
             const Index elementCount = Index(swizzleInst->getElementCount());
 
             // TODO(JS): Not 100% sure this is correct on the parens handling front
-            IRType* retType = specOp.returnType;
+            IRType* retType = specOp->returnType;
             emitType(retType);
             writer->emit("{");
 
@@ -1480,16 +1395,30 @@ void CPPSourceEmitter::emitCall(const SpecializedIntrinsic& specOp, IRInst* inst
         }
         default:
         {
-            const auto& info = getOperationInfo(specOp.op);
+            const auto& info = HLSLIntrinsic::getInfo(specOp->op);
             // Make sure that the return type is available
             bool isOperator = _isOperator(info.funcName);
 
             UnownedStringSlice funcName = _getFuncName(specOp);
 
-            useType(specOp.returnType);
+            switch (specOp->op)
+            {
+                case Op::ConstructFromScalar:
+                {
+                    // We need to special case, because this may have come from a swizzle from a built in
+                    // type, in that case the only parameter we want is the first one 
+                    numOperands = 1;
+                    break;
+                }
+
+                default: break;
+            }
+
             // add that we want a function
             SLANG_ASSERT(info.numOperands < 0 || numOperands == info.numOperands);
 
+            useType(specOp->returnType);
+            
             if (isOperator)
             {
                 // Just do the default output
@@ -1516,19 +1445,19 @@ void CPPSourceEmitter::emitCall(const SpecializedIntrinsic& specOp, IRInst* inst
     }
 }
 
-StringSlicePool::Handle CPPSourceEmitter::_calcScalarFuncName(IntrinsicOp op, IRBasicType* type)
+StringSlicePool::Handle CPPSourceEmitter::_calcScalarFuncName(HLSLIntrinsic::Op op, IRBasicType* type)
 {
     StringBuilder builder;
-    builder << _getTypePrefix(type->op) << "_" << getOperationInfo(op).funcName;
+    builder << _getTypePrefix(type->op) << "_" << HLSLIntrinsic::getInfo(op).funcName;
     return m_slicePool.add(builder);
 }
 
-UnownedStringSlice CPPSourceEmitter::_getScalarFuncName(IntrinsicOp op, IRBasicType* type)
+UnownedStringSlice CPPSourceEmitter::_getScalarFuncName(HLSLIntrinsic::Op op, IRBasicType* type)
 {
     return m_slicePool.getSlice(_calcScalarFuncName(op, type));
 }
 
-UnownedStringSlice CPPSourceEmitter::_getFuncName(const SpecializedIntrinsic& specOp)
+UnownedStringSlice CPPSourceEmitter::_getFuncName(const HLSLIntrinsic* specOp)
 {
     StringSlicePool::Handle handle = StringSlicePool::kNullHandle;
     if (m_intrinsicNameMap.TryGetValue(specOp, handle))
@@ -1543,23 +1472,25 @@ UnownedStringSlice CPPSourceEmitter::_getFuncName(const SpecializedIntrinsic& sp
     return m_slicePool.getSlice(handle);
 }
 
-StringSlicePool::Handle CPPSourceEmitter::_calcFuncName(const SpecializedIntrinsic& specOp)
+StringSlicePool::Handle CPPSourceEmitter::_calcFuncName(const HLSLIntrinsic* specOp)
 {
-    if (specOp.isScalar())
+    typedef HLSLIntrinsic::Op Op;
+
+    if (specOp->isScalar())
     {
-        IRType* paramType = specOp.signatureType->getParamType(0);
+        IRType* paramType = specOp->signatureType->getParamType(0);
         IRBasicType* basicType = as<IRBasicType>(paramType);
         SLANG_ASSERT(basicType);
-        return _calcScalarFuncName(specOp.op, basicType);
+        return _calcScalarFuncName(specOp->op, basicType);
     }
     else
     {
-        switch (specOp.op)
+        switch (specOp->op)
         {
-            case IntrinsicOp::ConstructConvert:
+            case Op::ConstructConvert:
             {
                 // Work out the function name
-                IRFuncType* signatureType = specOp.signatureType;
+                IRFuncType* signatureType = specOp->signatureType;
                 SLANG_ASSERT(signatureType->getParamCount() == 2);
 
                 IRType* dstType = signatureType->getParamType(0);
@@ -1574,10 +1505,10 @@ StringSlicePool::Handle CPPSourceEmitter::_calcFuncName(const SpecializedIntrins
                 }
                 return m_slicePool.add(builder);
             }
-            case IntrinsicOp::ConstructFromScalar:
+            case Op::ConstructFromScalar:
             {
                 // Work out the function name
-                IRFuncType* signatureType = specOp.signatureType;
+                IRFuncType* signatureType = specOp->signatureType;
                 SLANG_ASSERT(signatureType->getParamCount() == 2);
 
                 IRType* dstType = signatureType->getParamType(0);
@@ -1591,18 +1522,18 @@ StringSlicePool::Handle CPPSourceEmitter::_calcFuncName(const SpecializedIntrins
                 }
                 return m_slicePool.add(builder);
             }
-            case IntrinsicOp::GetAt:
+            case Op::GetAt:
             {
                 return m_slicePool.add(UnownedStringSlice::fromLiteral("getAt"));
             }
-            case IntrinsicOp::SetAt:
+            case Op::SetAt:
             {
                 return m_slicePool.add(UnownedStringSlice::fromLiteral("setAt"));
             }
             default: break;
         }
 
-        const auto& info = getOperationInfo(specOp.op);
+        const auto& info = HLSLIntrinsic::getInfo(specOp->op);
         if (info.funcName.size())
         {
             if (!_isOperator(info.funcName))
@@ -1614,98 +1545,17 @@ StringSlicePool::Handle CPPSourceEmitter::_calcFuncName(const SpecializedIntrins
     }
 }
 
-void CPPSourceEmitter::emitOperationCall(IntrinsicOp op, IRInst* inst, IRUse* operands, int operandCount, IRType* retType, const EmitOpInfo& inOuterPrec)
-{
-    switch (op)
-    {
-        case IntrinsicOp::ConstructFromScalar:
-        {
-            SLANG_ASSERT(operandCount == 1);
-            IRType* dstType = inst->getDataType();
-            IRType* srcType = _getElementType(dstType);
-            IRType* argTypes[2] = { dstType, srcType };
-
-            SpecializedIntrinsic specOp = getSpecializedOperation(op, argTypes, 2, retType);
-
-            emitCall(specOp, inst, operands, operandCount, inOuterPrec);
-            return;
-        }
-        case IntrinsicOp::ConstructConvert:
-        {
-            SLANG_ASSERT(inst->getOperandCount() == 1);
-            IRType* argTypes[2] = {inst->getDataType(), inst->getOperand(0)->getDataType() };
-
-            SpecializedIntrinsic specOp = getSpecializedOperation(op, argTypes, 2, retType);
-
-            IRFuncType* signatureType = specOp.signatureType;
-            SLANG_UNUSED(signatureType);
-
-            SLANG_ASSERT(signatureType->getParamType(0) != signatureType->getParamType(1));
-
-            emitCall(specOp, inst, operands, operandCount, inOuterPrec);
-            return;
-        }
-        default: break;
-    }
-
-    if (operandCount > 8)
-    {
-        List<IRType*> argTypes;
-        argTypes.setCount(operandCount);
-        for (int i = 0; i < operandCount; ++i)
-        {
-            // Hmm.. I'm assuming here that the operands exactly match the usage (ie no casting)
-            argTypes[i] = operands[i].get()->getDataType();
-        }
-        SpecializedIntrinsic specOp = getSpecializedOperation(op, argTypes.getBuffer(), operandCount, retType);
-        emitCall(specOp, inst, operands, operandCount, inOuterPrec);
-    }
-    else
-    {
-        IRType* argTypes[8];
-        for (int i = 0; i < operandCount; ++i)
-        {
-            // Hmm.. I'm assuming here that the operands exactly match the usage (ie no casting)
-            argTypes[i] = operands[i].get()->getDataType();
-        }
-        SpecializedIntrinsic specOp = getSpecializedOperation(op, argTypes, operandCount, retType);
-        emitCall(specOp, inst, operands, operandCount, inOuterPrec);
-    }
-}
-
 /* !!!!!!!!!!!!!!!!!!!!!! CPPSourceEmitter !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! */
 
 CPPSourceEmitter::CPPSourceEmitter(const Desc& desc):
     Super(desc),
     m_slicePool(StringSlicePool::Style::Default),
-    m_typeSet(desc.compileRequest->getSession())
+    m_typeSet(desc.compileRequest->getSession()),
+    m_opLookup(new HLSLIntrinsicOpLookup),
+    m_intrinsicSet(&m_typeSet, m_opLookup)
 {
     m_semanticUsedFlags = 0;
     //m_semanticUsedFlags = SemanticUsedFlag::GroupID | SemanticUsedFlag::GroupThreadID | SemanticUsedFlag::DispatchThreadID;
-
-    // Add all the operations with names (not ops like -, / etc) to the lookup map
-    for (int i = 0; i < SLANG_COUNT_OF(s_operationInfos); ++i)
-    {
-        const auto& info = s_operationInfos[i];
-        UnownedStringSlice slice = info.funcName;
-
-        if (slice.size() > 0 && slice[0] >= 'a' && slice[0] <= 'z')
-        {
-            auto handle = m_slicePool.add(slice);
-            Index index = Index(handle);
-            // Make sure there is space
-            if (index >= m_intrinsicOpMap.getCount())
-            {
-                Index oldSize = m_intrinsicOpMap.getCount();
-                m_intrinsicOpMap.setCount(index + 1);
-                for (Index j = oldSize; j < index; j++)
-                {
-                    m_intrinsicOpMap[j] = IntrinsicOp::Invalid;
-                }
-            }
-            m_intrinsicOpMap[index] = IntrinsicOp(i);
-        }
-    }
 }
 
 void CPPSourceEmitter::_emitInOutParamType(IRType* type, String const& name, IRType* valueType)
@@ -1936,6 +1786,8 @@ void CPPSourceEmitter::emitIntrinsicCallExpr(
     IRTargetIntrinsicDecoration*    targetIntrinsic,
     EmitOpInfo const&               inOuterPrec)
 {
+    typedef HLSLIntrinsic::Op Op;
+
     // TODO: Much of this logic duplicates code that is already
     // in `CLikeSourceEmitter::emitIntrinsicCallExpr`. The only
     // real difference is that when things bottom out on an ordinary
@@ -1994,11 +1846,17 @@ void CPPSourceEmitter::emitIntrinsicCallExpr(
     }
     else
     {
-        IntrinsicOp op = getOperationByName(name);
-        if (op != IntrinsicOp::Invalid)
+        Op op = m_opLookup->getOpByName(name);
+        if (op != Op::Invalid)
         {
             IRUse* operands = inst->getOperands() + operandIndex;
-            emitOperationCall(op, inst, operands, int(operandCount - operandIndex), inst->getDataType(), inOuterPrec);
+
+            // Work out the intrinsic used
+            HLSLIntrinsic intrinsic;
+            m_intrinsicSet.calcIntrinsic(op, inst->getDataType(), operands, int(operandCount - operandIndex), intrinsic);
+            HLSLIntrinsic* specOp = m_intrinsicSet.add(intrinsic);
+            
+            emitCall(specOp, inst, operands, int(operandCount - operandIndex), inOuterPrec);
             return;
         }
     }
@@ -2016,67 +1874,32 @@ void CPPSourceEmitter::emitIntrinsicCallExpr(
     maybeCloseParens(needClose);
 }
 
+bool CPPSourceEmitter::_tryEmitInstExprAsIntrinsic(IRInst* inst, const EmitOpInfo& inOuterPrec)
+{
+    HLSLIntrinsic* specOp = m_intrinsicSet.add(inst);
+    if (specOp)
+    {
+        if (inst->op == kIROp_Call)
+        {
+            IRCall* call = static_cast<IRCall*>(inst);
+            emitCall(specOp, inst, call->getArgs(), int(call->getArgCount()), inOuterPrec);
+        }
+        else
+        {
+            emitCall(specOp, inst, inst->getOperands(), int(inst->getOperandCount()), inOuterPrec);
+        }
+        return true;
+    }
+    return false;
+}
+
 bool CPPSourceEmitter::tryEmitInstExprImpl(IRInst* inst, const EmitOpInfo& inOuterPrec)
 {
-    SLANG_UNUSED(inOuterPrec);
-
     switch (inst->op)
     {
-        case kIROp_constructVectorFromScalar:
+        default:
         {
-            SLANG_ASSERT(inst->getOperandCount() == 1);
-            IRType* dstType = inst->getDataType();
-
-            // Check it's a vector
-            SLANG_ASSERT(dstType->op == kIROp_VectorType);
-            // Source must be a scalar
-            SLANG_ASSERT(as<IRBasicType>(inst->getOperand(0)->getDataType()));
-
-            emitOperationCall(IntrinsicOp::ConstructFromScalar, inst, inst->getOperands(), int(inst->getOperandCount()), dstType, inOuterPrec);
-            return true;
-        }
-        case kIROp_Construct:
-        {
-            IRType* dstType = inst->getDataType();
-            IRType* srcType = inst->getOperand(0)->getDataType();
-
-            if ((dstType->op == kIROp_VectorType || dstType->op == kIROp_MatrixType) &&
-                inst->getOperandCount() == 1)
-            {
-                if (as<IRBasicType>(srcType))
-                {
-                    emitOperationCall(IntrinsicOp::ConstructFromScalar, inst, inst->getOperands(), int(inst->getOperandCount()), dstType, inOuterPrec);
-                }
-                else
-                {
-                    SLANG_ASSERT(_getElementType(dstType) != _getElementType(srcType));
-                    // If it's constructed from a type conversion
-                    emitOperationCall(IntrinsicOp::ConstructConvert, inst, inst->getOperands(), int(inst->getOperandCount()), dstType, inOuterPrec);
-                }
-            }
-            else
-            {
-                emitOperationCall(IntrinsicOp::Init, inst, inst->getOperands(), int(inst->getOperandCount()), inst->getDataType(), inOuterPrec);
-            }
-            return true;
-        }
-        case kIROp_makeVector:
-        case kIROp_MakeMatrix:
-        {
-            emitOperationCall(IntrinsicOp::Init, inst, inst->getOperands(), int(inst->getOperandCount()), inst->getDataType(), inOuterPrec);
-            return true;
-        }
-        case kIROp_Mul_Matrix_Matrix:
-        case kIROp_Mul_Matrix_Vector:
-        case kIROp_Mul_Vector_Matrix:
-        {
-            emitOperationCall(IntrinsicOp::VecMatMul, inst, inst->getOperands(), int(inst->getOperandCount()), inst->getDataType(), inOuterPrec);
-            return true;
-        }
-        case kIROp_Dot:
-        {
-            emitOperationCall(IntrinsicOp::Dot, inst, inst->getOperands(), int(inst->getOperandCount()), inst->getDataType(), inOuterPrec);
-            return true;
+            return _tryEmitInstExprAsIntrinsic(inst, inOuterPrec);
         }
         case kIROp_swizzle:
         {
@@ -2096,11 +1919,7 @@ bool CPPSourceEmitter::tryEmitInstExprImpl(IRInst* inst, const EmitOpInfo& inOut
                 {
                     // If the output is a scalar, then could only have been a .x, which we can just ignore the '.x' part
                     emitOperand(baseInst, inOuterPrec);
-                }
-                else
-                {
-                    SLANG_ASSERT(dstType->op == kIROp_VectorType);
-                    emitOperationCall(IntrinsicOp::ConstructFromScalar, inst, inst->getOperands(), 1, dstType, inOuterPrec);
+                    return true;
                 }
             }
             else
@@ -2110,15 +1929,11 @@ bool CPPSourceEmitter::tryEmitInstExprImpl(IRInst* inst, const EmitOpInfo& inOut
                 {
                     // If just one thing is extracted then the . syntax will just work 
                     defaultEmitInstExpr(inst, inOuterPrec);
-                }
-                else
-                {
-                    // Will need to generate a swizzle method
-                    emitOperationCall(IntrinsicOp::Swizzle, inst, inst->getOperands(), int(inst->getOperandCount()), inst->getDataType(), inOuterPrec);
+                    return true;
                 }
             }
-
-            return true;
+            // try doing automatically
+            return _tryEmitInstExprAsIntrinsic(inst, inOuterPrec);
         }
         case kIROp_Call:
         {
@@ -2127,37 +1942,8 @@ bool CPPSourceEmitter::tryEmitInstExprImpl(IRInst* inst, const EmitOpInfo& inOut
             // Does this function declare any requirements.
             handleCallExprDecorationsImpl(funcValue);
 
-            // We want to detect any call to an intrinsic operation,
-            // that we can emit it directly without mangling, etc.
-            if(auto targetIntrinsic = findTargetIntrinsicDecoration(funcValue))
-            {
-                emitIntrinsicCallExpr(static_cast<IRCall*>(inst), targetIntrinsic, inOuterPrec);
-                return true;
-            }
-
-            return false;
-        }
-        case kIROp_getElement:
-        case kIROp_getElementPtr:
-        {
-            IRInst* target = inst->getOperand(0);
-            if (target->getDataType()->op == kIROp_VectorType)
-            {
-                // Specially handle this
-                emitOperationCall(IntrinsicOp::GetAt, inst, inst->getOperands(), int(inst->getOperandCount()), inst->getDataType(), inOuterPrec);
-                return true;
-            }
-            return false;
-        }
-        default:
-        {
-            IntrinsicOp op = getOperation(inst->op);
-            if (op != IntrinsicOp::Invalid)
-            {
-                emitOperationCall(op, inst, inst->getOperands(), int(inst->getOperandCount()), inst->getDataType(), inOuterPrec);
-                return true;
-            }
-            return false;
+            // try doing automatically
+            return _tryEmitInstExprAsIntrinsic(inst, inOuterPrec);
         }
     }
 }

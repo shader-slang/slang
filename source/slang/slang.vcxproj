@@ -208,6 +208,7 @@
     <ClInclude Include="slang-emit.h" />
     <ClInclude Include="slang-expr-defs.h" />
     <ClInclude Include="slang-file-system.h" />
+    <ClInclude Include="slang-hlsl-intrinsic-set.h" />
     <ClInclude Include="slang-image-format-defs.h" />
     <ClInclude Include="slang-ir-bind-existentials.h" />
     <ClInclude Include="slang-ir-clone.h" />
@@ -291,6 +292,7 @@
     <ClCompile Include="slang-emit-spirv.cpp" />
     <ClCompile Include="slang-emit.cpp" />
     <ClCompile Include="slang-file-system.cpp" />
+    <ClCompile Include="slang-hlsl-intrinsic-set.cpp" />
     <ClCompile Include="slang-ir-bind-existentials.cpp" />
     <ClCompile Include="slang-ir-clone.cpp" />
     <ClCompile Include="slang-ir-constexpr.cpp" />

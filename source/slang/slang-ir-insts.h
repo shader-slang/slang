@@ -1063,6 +1063,7 @@ struct IRCall : IRInst
     IRInst* getCallee() { return getOperand(0); }
 
     UInt getArgCount() { return getOperandCount() - 1; }
+    IRUse* getArgs() { return getOperands() + 1; }
     IRInst* getArg(UInt index) { return getOperand(index + 1); }
 };
 
