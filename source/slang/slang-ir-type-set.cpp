@@ -215,6 +215,7 @@ IRType* IRTypeSet::addVectorType(IRType* inElementType, int colsCount)
 
 void IRTypeSet::addVectorForMatrixTypes()
 {
+#if 0
     // Make a copy so we can alter m_types dictionary
     List<IRType*> types;
     getTypes(Kind::Matrix, types);
@@ -224,6 +225,31 @@ void IRTypeSet::addVectorForMatrixTypes()
         IRMatrixType* matType = static_cast<IRMatrixType*>(type);
         m_builder.getVectorType(matType->getElementType(), matType->getColumnCount());
     }
+#endif
+}
+
+void IRTypeSet::_addAllBuiltinTypesRec(IRInst* inst)
+{
+    for (IRInst* child = inst->getFirstDecorationOrChild(); child; child = child->getNextInst())
+    {
+        if (auto vectorType = as<IRVectorType>(child))
+        {
+            add(vectorType);
+            continue;
+        }
+        if (auto matrixType = as<IRMatrixType>(child))
+        {
+            add(matrixType);
+            continue;
+        }
+        _addAllBuiltinTypesRec(child);
+    }
+}
+
+void IRTypeSet::addAllBuiltinTypes(IRModule* module)
+{
+    SLANG_UNUSED(module);
+    //_addAllBuiltinTypesRec(module->getModuleInst());
 }
 
 }
