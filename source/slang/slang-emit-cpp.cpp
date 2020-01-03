@@ -197,13 +197,11 @@ static UnownedStringSlice _getCTypeVecPostFix(IROp op)
 
 void CPPSourceEmitter::emitTypeDefinition(IRType* inType)
 {
-#if 0
     if (m_target == CodeGenTarget::CPPSource)
     {
         // All types are templates in C++
         return;
     }
-#endif
 
     IRType* type = m_typeSet.getType(inType);
     if (!m_typeSet.isOwned(type))
@@ -1190,6 +1188,12 @@ void CPPSourceEmitter::emitSpecializedOperationDefinition(const HLSLIntrinsic* s
 {
     typedef HLSLIntrinsic::Op Op;
 
+    // Check if it's been emitted already, if not add it.
+    if (!m_intrinsicEmitted.Add(specOp))
+    {
+        return;
+    }
+
     switch (specOp->op)
     {
         case Op::VecMatMul:
@@ -1951,11 +1955,13 @@ void CPPSourceEmitter::emitPreprocessorDirectivesImpl()
 
     writer->emit("\n");
 
-    if (m_target == CodeGenTarget::CPPSource)
+    if (m_target == CodeGenTarget::CSource)
     {
+        // For C output we need to emit type definitions.
         List<IRType*> types;
         m_typeSet.getTypes(types);
 
+        // Remove ones we don't need to emit
         for (Index i = 0; i < types.getCount(); ++i)
         {
             if (_calcTypeOrder(types[i]) < 0)
@@ -1965,6 +1971,7 @@ void CPPSourceEmitter::emitPreprocessorDirectivesImpl()
             }
         }
 
+        // Sort them so that vectors come before matrices and everything else after that
         types.sort([&](IRType* a, IRType* b) { return _calcTypeOrder(a) < _calcTypeOrder(b); });
 
         // Emit the type definitions

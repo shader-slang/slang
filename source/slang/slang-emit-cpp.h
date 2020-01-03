@@ -122,7 +122,9 @@ protected:
     IRTypeSet m_typeSet;
     RefPtr<HLSLIntrinsicOpLookup> m_opLookup;
     HLSLIntrinsicSet m_intrinsicSet;
-    
+
+    HashSet<const HLSLIntrinsic*> m_intrinsicEmitted;
+
     StringSlicePool m_slicePool;
 
     SemanticUsedFlags m_semanticUsedFlags;
