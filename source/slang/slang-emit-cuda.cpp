@@ -227,6 +227,24 @@ SlangResult CUDASourceEmitter::_calcCUDATypeName(IRType* type, StringBuilder& ou
                 }
             }
 
+#if 0
+            switch (type->op)
+            {
+                case kIROp_HLSLStructuredBufferType:
+                case kIROp_HLSLRWStructuredBufferType:
+                {
+                    auto structuredBufferType = as<IRHLSLStructuredBufferType>(type);
+                    auto elementType = structuredBufferType->getElementType();
+
+                    // Is the same as a pointer to the item
+
+
+
+                }
+                default: break;
+            }
+#endif
+
             // If _getResourceTypePrefix returns something, we assume can output any specialization after it in order.
             {
                 UnownedStringSlice prefix = _getCUDAResourceTypePrefix(type->op);

@@ -204,11 +204,6 @@ void CPPSourceEmitter::emitTypeDefinition(IRType* inType)
     }
 
     IRType* type = m_typeSet.getType(inType);
-    if (m_typeEmittedMap.TryGetValue(type))
-    {
-        return;
-    }
-
     if (!m_typeSet.isOwned(type))
     {
         // If defined in a different module, we assume they are emitted already. (Assumed to
@@ -249,8 +244,6 @@ void CPPSourceEmitter::emitTypeDefinition(IRType* inType)
 
             writer->dedent();
             writer->emit("};\n\n");
-
-            m_typeEmittedMap.Add(type, true);
             break;
         }
         case kIROp_MatrixType:
@@ -261,8 +254,7 @@ void CPPSourceEmitter::emitTypeDefinition(IRType* inType)
             const auto colCount = int(GetIntVal(matType->getColumnCount()));
 
             IRType* vecType = m_typeSet.addVectorType(matType->getElementType(), colCount);
-            emitTypeDefinition(vecType);
-
+            
             UnownedStringSlice typeName = _getTypeName(type);
             UnownedStringSlice rowTypeName = _getTypeName(vecType);
 
@@ -278,8 +270,6 @@ void CPPSourceEmitter::emitTypeDefinition(IRType* inType)
 
             writer->dedent();
             writer->emit("};\n\n");
-
-            m_typeEmittedMap.Add(type, true);
             break;
         }
         case kIROp_PtrType:
@@ -317,18 +307,6 @@ UnownedStringSlice CPPSourceEmitter::_getTypeName(IRType* inType)
     if (m_typeNameMap.TryGetValue(type, handle))
     {
         return m_slicePool.getSlice(handle);
-    }
-
-    if (type->op == kIROp_MatrixType)
-    {
-        auto matType = static_cast<IRMatrixType*>(type);
-
-        auto elementType = matType->getElementType();
-        const auto rowCount = int(GetIntVal(matType->getRowCount()));
-        const auto colCount = int(GetIntVal(matType->getColumnCount()));
-
-        // Make sure the vector type the matrix is built on is added
-        useType(m_typeSet.addVectorType(elementType, colCount));
     }
 
     StringBuilder builder;
@@ -1211,7 +1189,7 @@ void CPPSourceEmitter::emitSpecializedOperationDefinition(const HLSLIntrinsic* s
     typedef HLSLIntrinsic::Op Op;
 
     // Check if it's been emitted already, if not add it.
-    if (!m_intrinsicEmittedMap.AddIfNotExists(specOp, true))
+    if (!m_intrinsicEmitted.Add(specOp))
     {
         return;
     }
@@ -1948,20 +1926,62 @@ bool CPPSourceEmitter::tryEmitInstExprImpl(IRInst* inst, const EmitOpInfo& inOut
     }
 }
 
+// We want order of built in types (typically output nothing), vector, matrix, other types
+// Types that aren't output have negative indices
+static Index _calcTypeOrder(IRType* a)
+{
+    switch (a->op)
+    {
+        case kIROp_FuncType:
+        {
+            return -2;
+        }
+        case kIROp_VectorType: return 1;
+        case kIROp_MatrixType: return 2;
+        default:
+        {
+            if (as<IRBasicType>(a))
+            {
+                return -1;
+            }
+            return 3;
+        }
+    }
+}
+
 void CPPSourceEmitter::emitPreprocessorDirectivesImpl()
 {
     SourceWriter* writer = getSourceWriter();
 
     writer->emit("\n");
 
-    // Emit the type definitions
-    for (const auto& keyValue : m_typeNameMap)
+    if (m_target == CodeGenTarget::CSource)
     {
-        emitTypeDefinition(keyValue.Key);
+        // For C output we need to emit type definitions.
+        List<IRType*> types;
+        m_typeSet.getTypes(types);
+
+        // Remove ones we don't need to emit
+        for (Index i = 0; i < types.getCount(); ++i)
+        {
+            if (_calcTypeOrder(types[i]) < 0)
+            {
+                types.fastRemoveAt(i);
+                --i;
+            }
+        }
+
+        // Sort them so that vectors come before matrices and everything else after that
+        types.sort([&](IRType* a, IRType* b) { return _calcTypeOrder(a) < _calcTypeOrder(b); });
+
+        // Emit the type definitions
+        for (auto type : types)
+        {
+            emitTypeDefinition(type);
+        }
     }
 
     // Emit all the intrinsics that were used
-
     for (const auto& keyValue : m_intrinsicNameMap)
     {
         emitSpecializedOperationDefinition(keyValue.Key);
@@ -2297,6 +2317,11 @@ void CPPSourceEmitter::_emitInitAxisValues(const Int sizeAlongAxis[kThreadGroupA
 
 void CPPSourceEmitter::emitModuleImpl(IRModule* module)
 {
+    // Setup all built in types used in the module
+    m_typeSet.addAllBuiltinTypes(module);
+    // If any matrix types are used, then we need appropriate vector types too.
+    m_typeSet.addVectorForMatrixTypes();
+
     List<EmitAction> actions;
     computeEmitActions(module, actions);
 

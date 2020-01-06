@@ -23,6 +23,22 @@ IRTypeSet::IRTypeSet(Session* session)
 
 IRTypeSet::~IRTypeSet()
 {
+    _clearTypes();
+}
+
+void IRTypeSet::clear()
+{
+    _clearTypes();
+
+    m_cloneMap.Clear();
+
+    m_module = m_builder.createModule();
+    m_sharedBuilder.module = m_module;
+    m_builder.setInsertInto(m_module->getModuleInst());
+}
+
+void IRTypeSet::_clearTypes()
+{
     List<IRType*> types;
     getTypes(types);
 
@@ -224,6 +240,53 @@ void IRTypeSet::addVectorForMatrixTypes()
         IRMatrixType* matType = static_cast<IRMatrixType*>(type);
         m_builder.getVectorType(matType->getElementType(), matType->getColumnCount());
     }
+}
+
+static bool _hasNominalOperand(IRInst* inst)
+{
+    const Index operandCount = Index(inst->getOperandCount());
+    auto operands = inst->getOperands();
+
+    for (Index i = 0; i < operandCount; ++i)
+    {
+        IRInst* operand = operands[i].get();
+        if (isNominalOp(operand->op))
+        {
+            return true;
+        }
+    }
+
+    return false;
+}
+
+void IRTypeSet::_addAllBuiltinTypesRec(IRInst* inst)
+{
+    for (IRInst* child = inst->getFirstDecorationOrChild(); child; child = child->getNextInst())
+    {
+        IRType* type = nullptr;
+
+        if (auto vectorType = as<IRVectorType>(child))
+        {
+            type = vectorType;
+        }
+        else if (auto matrixType = as<IRMatrixType>(child))
+        {
+            type = matrixType;
+        }
+        if (type && !_hasNominalOperand(type))
+        {
+            add(type);
+        }
+        else
+        {
+            _addAllBuiltinTypesRec(child);
+        }
+    }
+}
+
+void IRTypeSet::addAllBuiltinTypes(IRModule* module)
+{
+    _addAllBuiltinTypesRec(module->getModuleInst());
 }
 
 }

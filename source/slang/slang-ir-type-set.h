@@ -50,6 +50,8 @@ public:
     IRType* add(IRType* type);    
     IRType* addVectorType(IRType* elementType, int colsCount);
 
+    void addAllBuiltinTypes(IRModule* module);
+
     void addVectorForMatrixTypes();
 
     void getTypes(List<IRType*>& outTypes) const;
@@ -66,11 +68,15 @@ public:
     IRBuilder& getBuilder() { return m_builder; }
     IRModule* getModule() const { return m_module; }
 
+    void clear();
+
     IRTypeSet(Session* session);
     ~IRTypeSet();
 
 protected:
-    
+    void _addAllBuiltinTypesRec(IRInst* inst);
+    void _clearTypes();
+
         // Maps insts from source modules into m_module.
         // NOTE! That nominal types are not cloned, as they are identified by pointer. They are just 
     Dictionary<IRInst*, IRInst*> m_cloneMap;

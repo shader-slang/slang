@@ -466,6 +466,10 @@ String emitEntryPointSourceFromIR(
     desc.effectiveProfile = getEffectiveProfile(entryPoint, targetRequest);
     desc.sourceWriter = &sourceWriter;
 
+    // Define here, because must be in scope longer than the sourceEmitter, as sourceEmitter might reference
+    // items in the linkedIR module
+    LinkedIR linkedIR;
+
     RefPtr<CLikeSourceEmitter> sourceEmitter;
 
     typedef CLikeSourceEmitter::SourceStyle SourceStyle;
@@ -502,8 +506,6 @@ String emitEntryPointSourceFromIR(
         return String();
     }
 
-    // Outside because we want to keep IR in scope whilst we are processing emits
-    LinkedIR linkedIR;
     {
         LinkingAndOptimizationOptions linkingAndOptimizationOptions;
 

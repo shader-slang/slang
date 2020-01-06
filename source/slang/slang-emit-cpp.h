@@ -101,7 +101,7 @@ protected:
     StringSlicePool::Handle _calcFuncName(const HLSLIntrinsic* specOp);
 
     UnownedStringSlice _getTypeName(IRType* type);
-    StringSlicePool::Handle _calcTypeName(IRType* type);
+    //StringSlicePool::Handle _calcTypeName(IRType* type);
 
     SlangResult _calcTypeName(IRType* type, CodeGenTarget target, StringBuilder& out);
 
@@ -122,9 +122,8 @@ protected:
     IRTypeSet m_typeSet;
     RefPtr<HLSLIntrinsicOpLookup> m_opLookup;
     HLSLIntrinsicSet m_intrinsicSet;
-    
-    Dictionary<IRType*, bool> m_typeEmittedMap;
-    Dictionary<const HLSLIntrinsic*, bool> m_intrinsicEmittedMap;
+
+    HashSet<const HLSLIntrinsic*> m_intrinsicEmitted;
 
     StringSlicePool m_slicePool;
 

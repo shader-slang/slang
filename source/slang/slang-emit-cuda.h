@@ -70,6 +70,8 @@ protected:
     UnownedStringSlice _getCUDATypeName(IRType* inType);
     SlangResult _calcCUDATextureTypeName(IRTextureTypeBase* texType, StringBuilder& outName);
 
+
+
     Dictionary<IRType*, StringSlicePool::Handle> m_typeNameMap;
     StringSlicePool m_slicePool;
 
