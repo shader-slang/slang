@@ -18,6 +18,7 @@ namespace Slang {
     { RenderApiType::D3D12,  "dx12,d3d12",      ""},
     { RenderApiType::D3D11,  "dx11,d3d11",      "hlsl,hlsl-rewrite,slang"},
     { RenderApiType::CPU,    "cpu",             ""},
+    { RenderApiType::CUDA,   "cuda",            "cuda,ptx"},
 };
 
 static int _calcAvailableApis()

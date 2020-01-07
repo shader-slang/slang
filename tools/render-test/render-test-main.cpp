@@ -25,6 +25,10 @@
 
 #include "cpu-compute-util.h"
 
+#if RENDER_TEST_CUDA
+#   include "cuda/cuda-compute-util.h"
+#endif
+
 namespace renderer_test {
 
 using Slang::Result;
@@ -461,6 +465,13 @@ SLANG_TEST_TOOL_API SlangResult innerMain(Slang::StdWriters* stdWriters, SlangSe
             nativeLanguage = SLANG_SOURCE_LANGUAGE_CPP;
             slangPassThrough = SLANG_PASS_THROUGH_GENERIC_C_CPP;
             break;
+        case RendererType::CUDA:
+            input.target = SLANG_PTX;
+            input.profile = "";
+            nativeLanguage = SLANG_SOURCE_LANGUAGE_CUDA;
+            slangPassThrough = SLANG_PASS_THROUGH_NVRTC;
+            break;
+
 		default:
 			fprintf(stderr, "error: unexpected\n");
 			return SLANG_FAIL;
@@ -502,20 +513,26 @@ SLANG_TEST_TOOL_API SlangResult innerMain(Slang::StdWriters* stdWriters, SlangSe
         rendererName << "'" << gOptions.adapter << "'";
     }
 
+    if (gOptions.onlyStartup)
+    {
+        switch (gOptions.rendererType)
+        {
+            case RendererType::CUDA:
+            {
+                return SLANG_SUCCEEDED(spSessionCheckPassThroughSupport(session, SLANG_PASS_THROUGH_NVRTC)) && CUDAComputeUtil::canCreateDevice() ? SLANG_OK : SLANG_FAIL;
+            }
+            case RendererType::CPU:
+            {
+                // As long as we have CPU, then this should work
+                return spSessionCheckPassThroughSupport(session, SLANG_PASS_THROUGH_GENERIC_C_CPP);
+            }
+            default: break;
+        }
+    }
+
     // If it's CPU testing we don't need a window or a renderer
     if (gOptions.rendererType == RendererType::CPU)
     {
-        if (gOptions.onlyStartup)
-        {
-            // Need generic C/C++
-            if (SLANG_FAILED(spSessionCheckPassThroughSupport(session, SLANG_PASS_THROUGH_GENERIC_C_CPP)))
-            {
-                return SLANG_FAIL;
-            }
-            // Should work ... 
-            return SLANG_OK;
-        }
-
         ShaderCompilerUtil::OutputAndLayout compilationAndLayout;
         SLANG_RETURN_ON_FAIL(ShaderCompilerUtil::compileWithLayout(session, gOptions.sourcePath, gOptions.compileArgs, gOptions.shaderType, input, compilationAndLayout));
 
@@ -564,7 +581,17 @@ SLANG_TEST_TOOL_API SlangResult innerMain(Slang::StdWriters* stdWriters, SlangSe
             }
         }
 
-        
+        return SLANG_OK;
+    }
+
+    if (gOptions.rendererType == RendererType::CUDA)
+    {
+        ShaderCompilerUtil::OutputAndLayout compilationAndLayout;
+        SLANG_RETURN_ON_FAIL(ShaderCompilerUtil::compileWithLayout(session, gOptions.sourcePath, gOptions.compileArgs, gOptions.shaderType, input, compilationAndLayout));
+
+        // TODO(JS):
+        // We don't know how to execute it yet..
+
         return SLANG_OK;
     }
 
