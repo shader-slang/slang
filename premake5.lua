@@ -537,14 +537,15 @@ toolSharedLibrary "render-test"
         addSourceDir "tools/render-test/cuda"
         defines { "RENDER_TEST_CUDA" }
         includedirs { cudaPath .. "/include" }
+        includedirs { cudaPath .. "/include", cudaPath .. "/common/inc" }
         
         filter { "platforms:x86" }
             libdirs { cudaPath .. "/lib/Win32/" }
            
         filter { "platforms:x64" }
-            libdirs { cudaPath .. "/lib/x64/" }
+            libdirs { cudaPath .. "/lib/x64/" }   
            
-        links { "cuda" }   
+        links { "cuda", "cudart" }   
     end
   
 --
