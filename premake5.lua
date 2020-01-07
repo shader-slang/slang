@@ -84,10 +84,19 @@ newoption {
    allowed     = { { "true", "True"}, { "false", "False" } }
 }
 
+newoption {
+   trigger     = "cuda",
+   description = "(Optional) If true will build with cuda test support",
+   value       = "bool",
+   default     = "false",
+   allowed     = { { "true", "True"}, { "false", "False" } }
+}
+
 buildLocation = _OPTIONS["build-location"]
 executeBinary = (_OPTIONS["execute-binary"] == "true")
 targetDetail = _OPTIONS["target-detail"]
 buildGlslang = (_OPTIONS["build-glslang"] == "true")
+hasCuda = (_OPTIONS["cuda"] == "true")
 
 -- Is true when the target is really windows (ie not something on top of windows like cygwin)
 local isTargetWindows = (os.target() == "windows") and not (targetDetail == "mingw" or targetDetail == "cygwin")
@@ -528,6 +537,11 @@ toolSharedLibrary "render-test"
         -- directory into the output directory.
         -- d3dcompiler_47.dll is copied from the external/slang-binaries submodule.
         postbuildcommands { '"$(SolutionDir)tools\\copy-hlsl-libs.bat" "$(WindowsSdkDir)Redist/D3D/%{cfg.platform:lower()}/" "%{cfg.targetdir}/" "windows-%{cfg.platform:lower()}"'}    
+    end
+  
+    if hasCuda then
+        addSourceDir "tools/render-test/cuda"
+        defines { "RENDER_TEST_CUDA" }
     end
   
 --
