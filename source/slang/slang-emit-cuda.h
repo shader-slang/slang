@@ -2,15 +2,15 @@
 #ifndef SLANG_EMIT_CUDA_H
 #define SLANG_EMIT_CUDA_H
 
-#include "slang-emit-c-like.h"
+#include "slang-emit-cpp.h"
 
 namespace Slang
 {
 
-class CUDASourceEmitter : public CLikeSourceEmitter
+class CUDASourceEmitter : public CPPSourceEmitter
 {
 public:
-    typedef CLikeSourceEmitter Super;
+    typedef CPPSourceEmitter Super;
 
     typedef uint32_t SemanticUsedFlags;
     struct SemanticUsedFlag
@@ -27,8 +27,7 @@ public:
     static UnownedStringSlice getVectorPrefix(IROp op);
 
     CUDASourceEmitter(const Desc& desc) :
-        Super(desc),
-        m_slicePool(StringSlicePool::Style::Default)
+        Super(desc)
     {}
 
 protected:
@@ -48,34 +47,18 @@ protected:
     virtual void emitMatrixLayoutModifiersImpl(IRVarLayout* layout) SLANG_OVERRIDE;
     virtual void emitOperandImpl(IRInst* inst, EmitOpInfo const&  outerPrec) SLANG_OVERRIDE;
 
+    virtual bool tryEmitGlobalParamImpl(IRGlobalParam* varDecl, IRType* varType) SLANG_OVERRIDE;
     virtual bool tryEmitInstExprImpl(IRInst* inst, const EmitOpInfo& inOuterPrec) SLANG_OVERRIDE;
 
-        // Emit a single `register` semantic, as appropriate for a given resource-type-specific layout info
-        // Keyword to use in the uniform case (`register` for globals, `packoffset` inside a `cbuffer`)
-    void _emitCUDARegisterSemantic(LayoutResourceKind kind, EmitVarChain* chain, char const* uniformSemanticSpelling = "register");
+    virtual void emitPreprocessorDirectivesImpl() SLANG_OVERRIDE;
 
-        // Emit all the `register` semantics that are appropriate for a particular variable layout
-    void _emitCUDARegisterSemantics(EmitVarChain* chain, char const* uniformSemanticSpelling = "register");
-    void _emitCUDARegisterSemantics(IRVarLayout* varLayout, char const* uniformSemanticSpelling = "register");
+    virtual void emitModuleImpl(IRModule* module) SLANG_OVERRIDE;
 
-    void _emitCUDAParameterGroupFieldLayoutSemantics(EmitVarChain* chain);
-    void _emitCUDAParameterGroupFieldLayoutSemantics(IRVarLayout* fieldLayout, EmitVarChain* inChain);
+    // CPPSourceEmitter overrides 
+    virtual SlangResult calcTypeName(IRType* type, CodeGenTarget target, StringBuilder& out) SLANG_OVERRIDE;
+    virtual void emitSpecializedOperationDefinition(const HLSLIntrinsic* specOp) SLANG_OVERRIDE;
 
-    void _emitCUDAParameterGroup(IRGlobalParam* varDecl, IRUniformParameterGroupType* type);
-
-    void _emitCUDADecorationSingleString(const char* name, IRFunc* entryPoint, IRStringLit* val);
-    void _emitCUDADecorationSingleInt(const char* name, IRFunc* entryPoint, IRIntLit* val);
-
-    SlangResult _calcCUDATypeName(IRType* type, StringBuilder& out);
-    UnownedStringSlice _getCUDATypeName(IRType* inType);
     SlangResult _calcCUDATextureTypeName(IRTextureTypeBase* texType, StringBuilder& outName);
-
-
-
-    Dictionary<IRType*, StringSlicePool::Handle> m_typeNameMap;
-    StringSlicePool m_slicePool;
-
-    UInt m_semanticUsedFlags = 0;
 };
 
 }

@@ -66,6 +66,10 @@ protected:
 
     virtual bool tryEmitGlobalParamImpl(IRGlobalParam* varDecl, IRType* varType) SLANG_OVERRIDE;
 
+    // Replaceable for classes derived from CPPSourceEmitter
+    virtual SlangResult calcTypeName(IRType* type, CodeGenTarget target, StringBuilder& out);
+
+
     void emitIntrinsicCallExpr(
         IRCall*                         inst,
         IRTargetIntrinsicDecoration*    targetIntrinsic,
@@ -101,11 +105,8 @@ protected:
     StringSlicePool::Handle _calcFuncName(const HLSLIntrinsic* specOp);
 
     UnownedStringSlice _getTypeName(IRType* type);
-    //StringSlicePool::Handle _calcTypeName(IRType* type);
-
-    SlangResult _calcTypeName(IRType* type, CodeGenTarget target, StringBuilder& out);
-
-    SlangResult _calcTextureTypeName(IRTextureTypeBase* texType, StringBuilder& outName);
+    
+    SlangResult _calcCPPTextureTypeName(IRTextureTypeBase* texType, StringBuilder& outName);
 
     void _emitEntryPointDefinitionStart(IRFunc* func, IRGlobalParam* entryPointGlobalParams, const String& funcName, const UnownedStringSlice& varyingTypeName);
     void _emitEntryPointDefinitionEnd(IRFunc* func);
@@ -115,6 +116,8 @@ protected:
     void _emitInitAxisValues(const Int sizeAlongAxis[kThreadGroupAxisCount], const UnownedStringSlice& mulName, const UnownedStringSlice& addName);
 
     bool _tryEmitInstExprAsIntrinsic(IRInst* inst, const EmitOpInfo& inOuterPrec);
+
+    HLSLIntrinsic* _addIntrinsic(HLSLIntrinsic::Op op, IRType* returnType, IRType*const* argTypes, Index argTypeCount);
 
     Dictionary<IRType*, StringSlicePool::Handle> m_typeNameMap;
     Dictionary<const HLSLIntrinsic*, StringSlicePool::Handle> m_intrinsicNameMap;

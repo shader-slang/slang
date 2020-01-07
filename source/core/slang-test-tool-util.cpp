@@ -37,6 +37,61 @@ namespace Slang
     }
 }
 
+static SlangResult _calcIncludePath(const String& parentPath, const char* path, String& outIncludePath)
+{
+    String includePath;
+    SLANG_RETURN_ON_FAIL(Path::getCanonical(Path::combine(parentPath, path), includePath));
+
+    // Use forward slashes, to avoid escaping the path
+    includePath = StringUtil::calcCharReplaced(includePath, '\\', '/');
+
+    // It must exist!
+    if (!File::exists(includePath))
+    {
+        return SLANG_FAIL;
+    }
+
+    outIncludePath = includePath;
+    return SLANG_OK;
+}
+
+static SlangResult _addCPPPrelude(const String& parentPath, slang::IGlobalSession* session)
+{
+    String includePath;
+    SLANG_RETURN_ON_FAIL(_calcIncludePath(parentPath, "../../../prelude/slang-cpp-prelude.h", includePath));
+
+    StringBuilder prelude;
+    prelude << "#include \"" << includePath << "\"\n\n";
+    const SlangPassThrough downstreamCompilers[] = {
+        SLANG_PASS_THROUGH_CLANG,                   ///< Clang C/C++ compiler 
+        SLANG_PASS_THROUGH_VISUAL_STUDIO,           ///< Visual studio C/C++ compiler
+        SLANG_PASS_THROUGH_GCC,                     ///< GCC C/C++ compiler
+        SLANG_PASS_THROUGH_GENERIC_C_CPP,
+    };
+    for (auto downstreamCompiler : downstreamCompilers)
+    {
+        session->setDownstreamCompilerPrelude(downstreamCompiler, prelude.getBuffer());
+    }
+    return SLANG_OK;
+}
+
+static SlangResult _addCUDAPrelude(const String& parentPath, slang::IGlobalSession* session)
+{
+    String includePath;
+    SLANG_RETURN_ON_FAIL(_calcIncludePath(parentPath, "../../../prelude/slang-cuda-prelude.h", includePath));
+
+    StringBuilder prelude;
+    prelude << "#include \"" << includePath << "\"\n\n";
+    const SlangPassThrough downstreamCompilers[] = {
+        SLANG_PASS_THROUGH_NVRTC,                   ///< nvrtc CUDA compiler
+    };
+    for (auto downstreamCompiler : downstreamCompilers)
+    {
+        session->setDownstreamCompilerPrelude(downstreamCompiler, prelude.getBuffer());
+    }
+    return SLANG_OK;
+}
+
 /* static */SlangResult TestToolUtil::setSessionDefaultPrelude(const char* exePath, slang::IGlobalSession* session)
 {
     // Set the prelude to a path
@@ -44,33 +99,16 @@ namespace Slang
     if (SLANG_SUCCEEDED(Path::getCanonical(exePath, canonicalPath)))
     {
         // Get the directory
-        canonicalPath = Path::getParentDirectory(canonicalPath);
+        String parentPath = Path::getParentDirectory(canonicalPath);
 
-        String path = Path::combine(canonicalPath, "../../../prelude/slang-cpp-prelude.h");
-        if (SLANG_SUCCEEDED(Path::getCanonical(path, canonicalPath)))
+        if (SLANG_FAILED(_addCPPPrelude(parentPath, session)))
         {
-            // Use forward slashes, to avoid escaping the path
-            canonicalPath = StringUtil::calcCharReplaced(canonicalPath, '\\', '/');
+            SLANG_ASSERT(!"Couldn't find the C++ prelude relative to the executable");
+        }
 
-            // It must exist!
-            if (!File::exists(canonicalPath))
-            {
-                SLANG_ASSERT(!"Couldn't find the prelude relative to the executable");
-                return SLANG_FAIL;
-            }
-
-            StringBuilder prelude;
-            prelude << "#include \"" << canonicalPath << "\"\n\n";
-            const SlangPassThrough downstreamCompilers[] = {
-                SLANG_PASS_THROUGH_CLANG,                   ///< Clang C/C++ compiler 
-                SLANG_PASS_THROUGH_VISUAL_STUDIO,           ///< Visual studio C/C++ compiler
-                SLANG_PASS_THROUGH_GCC,                     ///< GCC C/C++ compiler
-                SLANG_PASS_THROUGH_GENERIC_C_CPP,
-            };
-            for (auto downstreamCompiler : downstreamCompilers)
-            {
-                session->setDownstreamCompilerPrelude(downstreamCompiler, prelude.getBuffer());
-            }
+        if (SLANG_FAILED(_addCUDAPrelude(parentPath, session)))
+        {
+            SLANG_ASSERT(!"Couldn't find the CUDA prelude relative to the executable");
         }
     }
 

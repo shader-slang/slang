@@ -310,7 +310,7 @@ UnownedStringSlice CPPSourceEmitter::_getTypeName(IRType* inType)
     }
 
     StringBuilder builder;
-    if (SLANG_SUCCEEDED(_calcTypeName(type, m_target, builder)))
+    if (SLANG_SUCCEEDED(calcTypeName(type, m_target, builder)))
     {
         handle = m_slicePool.add(builder);
     }
@@ -321,7 +321,7 @@ UnownedStringSlice CPPSourceEmitter::_getTypeName(IRType* inType)
     return m_slicePool.getSlice(handle);
 }
 
-SlangResult CPPSourceEmitter::_calcTextureTypeName(IRTextureTypeBase* texType, StringBuilder& outName)
+SlangResult CPPSourceEmitter::_calcCPPTextureTypeName(IRTextureTypeBase* texType, StringBuilder& outName)
 {
     switch (texType->getAccess())
     {
@@ -389,7 +389,7 @@ static UnownedStringSlice _getResourceTypePrefix(IROp op)
     }
 }
 
-SlangResult CPPSourceEmitter::_calcTypeName(IRType* type, CodeGenTarget target, StringBuilder& out)
+SlangResult CPPSourceEmitter::calcTypeName(IRType* type, CodeGenTarget target, StringBuilder& out)
 {
     switch (type->op)
     {
@@ -456,7 +456,7 @@ SlangResult CPPSourceEmitter::_calcTypeName(IRType* type, CodeGenTarget target, 
             int elementCount = int(GetIntVal(arrayType->getElementCount()));
 
             out << "FixedArray<";
-            SLANG_RETURN_ON_FAIL(_calcTypeName(elementType, target, out));
+            SLANG_RETURN_ON_FAIL(calcTypeName(elementType, target, out));
             out << ", " << elementCount << ">";
             return SLANG_OK;
         }
@@ -466,7 +466,7 @@ SlangResult CPPSourceEmitter::_calcTypeName(IRType* type, CodeGenTarget target, 
             auto elementType = arrayType->getElementType();
 
             out << "Array<";
-            SLANG_RETURN_ON_FAIL(_calcTypeName(elementType, target, out));
+            SLANG_RETURN_ON_FAIL(calcTypeName(elementType, target, out));
             out << ">";
             return SLANG_OK;
         }
@@ -489,7 +489,7 @@ SlangResult CPPSourceEmitter::_calcTypeName(IRType* type, CodeGenTarget target, 
                 // We don't support TextureSampler, so ignore that
                 if (texType->op != kIROp_TextureSamplerType)
                 {
-                    return _calcTextureTypeName(texType, out);   
+                    return _calcCPPTextureTypeName(texType, out);   
                 }
             }
 
@@ -1423,6 +1423,15 @@ void CPPSourceEmitter::emitCall(const HLSLIntrinsic* specOp, IRInst* inst, const
     }
 }
 
+HLSLIntrinsic* CPPSourceEmitter::_addIntrinsic(HLSLIntrinsic::Op op, IRType* returnType, IRType*const* argTypes, Index argTypeCount)
+{
+    HLSLIntrinsic intrinsic;
+    m_intrinsicSet.calcIntrinsic(op, returnType, argTypes, argTypeCount, intrinsic);
+    HLSLIntrinsic* addedIntrinsic = m_intrinsicSet.add(intrinsic);
+    _getFuncName(addedIntrinsic);
+    return addedIntrinsic;
+}
+
 StringSlicePool::Handle CPPSourceEmitter::_calcScalarFuncName(HLSLIntrinsic::Op op, IRBasicType* type)
 {
     StringBuilder builder;
@@ -1477,7 +1486,7 @@ StringSlicePool::Handle CPPSourceEmitter::_calcFuncName(const HLSLIntrinsic* spe
                 StringBuilder builder;
                 builder << "convert_";
                 // I need a function that is called that will construct this
-                if (SLANG_FAILED(_calcTypeName(dstType, CodeGenTarget::CSource, builder)))
+                if (SLANG_FAILED(calcTypeName(dstType, CodeGenTarget::CSource, builder)))
                 {
                     return StringSlicePool::kNullHandle;
                 }
@@ -1494,7 +1503,7 @@ StringSlicePool::Handle CPPSourceEmitter::_calcFuncName(const HLSLIntrinsic* spe
                 StringBuilder builder;
                 builder << "constructFromScalar_";
                 // I need a function that is called that will construct this
-                if (SLANG_FAILED(_calcTypeName(dstType, CodeGenTarget::CSource, builder)))
+                if (SLANG_FAILED(calcTypeName(dstType, CodeGenTarget::CSource, builder)))
                 {
                     return StringSlicePool::kNullHandle;
                 }
