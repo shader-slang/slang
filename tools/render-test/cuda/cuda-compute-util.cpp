@@ -124,11 +124,6 @@ static SlangResult _initCuda()
     return SLANG_OK;
 }
 
-/* static */SlangResult CUDAComputeUtil::execute()
-{
-
-    return SLANG_OK;
-}
 
 
 /* static */SlangResult _createDevice(CUcontext* outContext)
@@ -144,6 +139,7 @@ static SlangResult _initCuda()
     // Create context
     SLANG_CUDA_RETURN_ON_FAIL(cuCtxCreate(&context, 0, deviceId));
 
+    *outContext = context;
     return SLANG_OK;
 }
 
@@ -158,5 +154,53 @@ static SlangResult _initCuda()
 
     return false;
 }
+
+static SlangResult _compute(CUcontext context, CUmodule module, const ShaderCompilerUtil::OutputAndLayout& outputAndLayout)
+{
+    auto request = outputAndLayout.output.request;
+    auto reflection = (slang::ShaderReflection*) spGetReflection(request);
+
+    slang::EntryPointReflection* entryPoint = nullptr;
+    auto entryPointCount = reflection->getEntryPointCount();
+    SLANG_ASSERT(entryPointCount == 1);
+
+    entryPoint = reflection->getEntryPointByIndex(0);
+
+    const char* entryPointName = entryPoint->getName();
+
+    // Get the entry point
+    CUfunction kernel;
+
+    SLANG_CUDA_RETURN_ON_FAIL(cuModuleGetFunction(&kernel, module, entryPointName));
+
+
+    return SLANG_OK;
+}
+
+/* static */SlangResult CUDAComputeUtil::execute(const ShaderCompilerUtil::OutputAndLayout& outputAndLayout)
+{
+    CUcontext context;
+    SLANG_RETURN_ON_FAIL(_createDevice(&context));
+
+    const Index index = outputAndLayout.output.findKernelDescIndex(StageType::Compute);
+    if (index < 0)
+    {
+        return SLANG_FAIL;
+    }
+
+    const auto& kernel = outputAndLayout.output.kernelDescs[index];
+
+    CUmodule module = 0;
+    SLANG_CUDA_RETURN_ON_FAIL(cuModuleLoadData(&module, kernel.codeBegin));
+
+    SLANG_RETURN_ON_FAIL(_compute(context, module, outputAndLayout));
+
+    SLANG_CUDA_RETURN_ON_FAIL(cuModuleUnload(module));
+
+    cuCtxDestroy(context);
+
+    return SLANG_OK;
+}
+
 
 } // renderer_test

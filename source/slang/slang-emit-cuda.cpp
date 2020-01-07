@@ -270,7 +270,7 @@ void CUDASourceEmitter::emitEntryPointAttributesImpl(IRFunc* irFunc, IREntryPoin
             m_writer->emit(")]\n");
 #endif
 
-            m_writer->emit("__global__ ");
+            m_writer->emit("extern \"C\" __global__ ");
             break;
         }
         

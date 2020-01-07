@@ -519,7 +519,11 @@ SLANG_TEST_TOOL_API SlangResult innerMain(Slang::StdWriters* stdWriters, SlangSe
         {
             case RendererType::CUDA:
             {
+#if RENDER_TEST_CUDA
                 return SLANG_SUCCEEDED(spSessionCheckPassThroughSupport(session, SLANG_PASS_THROUGH_NVRTC)) && CUDAComputeUtil::canCreateDevice() ? SLANG_OK : SLANG_FAIL;
+#else
+                return SLANG_FAIL;
+#endif
             }
             case RendererType::CPU:
             {
@@ -589,10 +593,17 @@ SLANG_TEST_TOOL_API SlangResult innerMain(Slang::StdWriters* stdWriters, SlangSe
         ShaderCompilerUtil::OutputAndLayout compilationAndLayout;
         SLANG_RETURN_ON_FAIL(ShaderCompilerUtil::compileWithLayout(session, gOptions.sourcePath, gOptions.compileArgs, gOptions.shaderType, input, compilationAndLayout));
 
+#if RENDER_TEST_CUDA
+
         // TODO(JS):
         // We don't know how to execute it yet..
 
+        SLANG_RETURN_ON_FAIL(CUDAComputeUtil::execute(compilationAndLayout));
+
         return SLANG_OK;
+#else
+        return SLANG_FAIL;
+#endif
     }
 
     Slang::RefPtr<Renderer> renderer;
