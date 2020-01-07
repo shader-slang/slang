@@ -36,6 +36,25 @@ standard output = {
                             "binding": {"kind": "uniform", "offset": 0, "size": 4}
                         }
                     ]
+                },
+                "containerVarLayout": {
+                    "binding": {"kind": "constantBuffer", "index": 0}
+                },
+                "elementVarLayout": {
+                    "type": {
+                        "kind": "struct",
+                        "fields": [
+                            {
+                                "name": "c",
+                                "type": {
+                                    "kind": "scalar",
+                                    "scalarType": "float32"
+                                },
+                                "binding": {"kind": "uniform", "offset": 0, "size": 4}
+                            }
+                        ]
+                    },
+                    "binding": {"kind": "uniform", "offset": 0, "size": 4}
                 }
             }
         }
@@ -43,7 +62,20 @@ standard output = {
     "entryPoints": [
         {
             "name": "main",
-            "stage:": "fragment"
+            "stage:": "fragment",
+            "result:": {
+                "stage": "fragment",
+                "binding": {"kind": "varyingOutput", "index": 0},
+                "semanticName": "SV_TARGET",
+                "type": {
+                    "kind": "vector",
+                    "elementCount": 4,
+                    "elementType": {
+                        "kind": "scalar",
+                        "scalarType": "float32"
+                    }
+                }
+            }
         }
     ]
 }

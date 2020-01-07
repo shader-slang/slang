@@ -52,6 +52,60 @@ standard output = {
                             "binding": {"kind": "samplerState", "index": 0}
                         }
                     ]
+                },
+                "containerVarLayout": {
+                    "bindings": [
+                        {"kind": "constantBuffer", "index": 0},
+                        {"kind": "registerSpace", "index": 0}
+                    ]
+                },
+                "elementVarLayout": {
+                    "type": {
+                        "kind": "struct",
+                        "name": "A",
+                        "fields": [
+                            {
+                                "name": "au",
+                                "type": {
+                                    "kind": "vector",
+                                    "elementCount": 4,
+                                    "elementType": {
+                                        "kind": "scalar",
+                                        "scalarType": "float32"
+                                    }
+                                },
+                                "binding": {"kind": "uniform", "offset": 0, "size": 16}
+                            },
+                            {
+                                "name": "at1",
+                                "type": {
+                                    "kind": "resource",
+                                    "baseShape": "texture2D"
+                                },
+                                "binding": {"kind": "shaderResource", "index": 0}
+                            },
+                            {
+                                "name": "at2",
+                                "type": {
+                                    "kind": "resource",
+                                    "baseShape": "texture2D"
+                                },
+                                "binding": {"kind": "shaderResource", "index": 1}
+                            },
+                            {
+                                "name": "as",
+                                "type": {
+                                    "kind": "samplerState"
+                                },
+                                "binding": {"kind": "samplerState", "index": 0}
+                            }
+                        ]
+                    },
+                    "bindings": [
+                        {"kind": "shaderResource", "index": 0, "count": 2},
+                        {"kind": "samplerState", "index": 0},
+                        {"kind": "uniform", "offset": 0, "size": 16}
+                    ]
                 }
             }
         },
@@ -95,6 +149,52 @@ standard output = {
                             "binding": {"kind": "samplerState", "index": 0}
                         }
                     ]
+                },
+                "containerVarLayout": {
+                    "bindings": [
+                        {"kind": "constantBuffer", "index": 0},
+                        {"kind": "registerSpace", "index": 0}
+                    ]
+                },
+                "elementVarLayout": {
+                    "type": {
+                        "kind": "struct",
+                        "name": "B",
+                        "fields": [
+                            {
+                                "name": "bu",
+                                "type": {
+                                    "kind": "vector",
+                                    "elementCount": 4,
+                                    "elementType": {
+                                        "kind": "scalar",
+                                        "scalarType": "float32"
+                                    }
+                                },
+                                "binding": {"kind": "uniform", "offset": 0, "size": 16}
+                            },
+                            {
+                                "name": "bt",
+                                "type": {
+                                    "kind": "resource",
+                                    "baseShape": "texture2D"
+                                },
+                                "binding": {"kind": "shaderResource", "index": 0}
+                            },
+                            {
+                                "name": "bs",
+                                "type": {
+                                    "kind": "samplerState"
+                                },
+                                "binding": {"kind": "samplerState", "index": 0}
+                            }
+                        ]
+                    },
+                    "bindings": [
+                        {"kind": "shaderResource", "index": 0},
+                        {"kind": "samplerState", "index": 0},
+                        {"kind": "uniform", "offset": 0, "size": 16}
+                    ]
                 }
             }
         }
@@ -102,7 +202,20 @@ standard output = {
     "entryPoints": [
         {
             "name": "main",
-            "stage:": "fragment"
+            "stage:": "fragment",
+            "result:": {
+                "stage": "fragment",
+                "binding": {"kind": "varyingOutput", "index": 0},
+                "semanticName": "SV_TARGET",
+                "type": {
+                    "kind": "vector",
+                    "elementCount": 4,
+                    "elementType": {
+                        "kind": "scalar",
+                        "scalarType": "float32"
+                    }
+                }
+            }
         }
     ]
 }
