@@ -22,6 +22,26 @@ standard output = {
                             "binding": {"kind": "generic", "index": 0}
                         }
                     ]
+                },
+                "containerVarLayout": {
+
+                },
+                "elementVarLayout": {
+                    "type": {
+                        "kind": "struct",
+                        "name": "S",
+                        "fields": [
+                            {
+                                "name": "p",
+                                "type": {
+                                    "kind": "GenericTypeParameter",
+                                    "name": "TParam2"
+                                },
+                                "binding": {"kind": "generic", "index": 0}
+                            }
+                        ]
+                    },
+                    "binding": {"kind": "generic", "index": 0}
                 }
             }
         },
@@ -33,6 +53,16 @@ standard output = {
                 "elementType": {
                     "kind": "GenericTypeParameter",
                     "name": "TParam"
+                },
+                "containerVarLayout": {
+
+                },
+                "elementVarLayout": {
+                    "type": {
+                        "kind": "GenericTypeParameter",
+                        "name": "TParam"
+                    },
+                    "binding": {"kind": "generic", "index": 0}
                 }
             }
         },
@@ -96,6 +126,53 @@ standard output = {
                             "binding": {"kind": "uniform", "offset": 32, "size": 16}
                         }
                     ]
+                },
+                "containerVarLayout": {
+                    "binding": {"kind": "constantBuffer", "index": 0}
+                },
+                "elementVarLayout": {
+                    "type": {
+                        "kind": "struct",
+                        "fields": [
+                            {
+                                "name": "u",
+                                "type": {
+                                    "kind": "vector",
+                                    "elementCount": 4,
+                                    "elementType": {
+                                        "kind": "scalar",
+                                        "scalarType": "float32"
+                                    }
+                                },
+                                "binding": {"kind": "uniform", "offset": 0, "size": 16}
+                            },
+                            {
+                                "name": "v",
+                                "type": {
+                                    "kind": "vector",
+                                    "elementCount": 4,
+                                    "elementType": {
+                                        "kind": "scalar",
+                                        "scalarType": "float32"
+                                    }
+                                },
+                                "binding": {"kind": "uniform", "offset": 16, "size": 16}
+                            },
+                            {
+                                "name": "w",
+                                "type": {
+                                    "kind": "vector",
+                                    "elementCount": 4,
+                                    "elementType": {
+                                        "kind": "scalar",
+                                        "scalarType": "float32"
+                                    }
+                                },
+                                "binding": {"kind": "uniform", "offset": 32, "size": 16}
+                            }
+                        ]
+                    },
+                    "binding": {"kind": "uniform", "offset": 0, "size": 48}
                 }
             }
         }
@@ -103,7 +180,20 @@ standard output = {
     "entryPoints": [
         {
             "name": "main",
-            "stage:": "fragment"
+            "stage:": "fragment",
+            "result:": {
+                "stage": "fragment",
+                "binding": {"kind": "varyingOutput", "index": 0},
+                "semanticName": "SV_TARGET",
+                "type": {
+                    "kind": "vector",
+                    "elementCount": 4,
+                    "elementType": {
+                        "kind": "scalar",
+                        "scalarType": "float32"
+                    }
+                }
+            }
         }
     ],
     "typeParams":
