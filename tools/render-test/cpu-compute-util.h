@@ -64,4 +64,4 @@ struct CPUComputeUtil
 
 } // renderer_test
 
-#endif //CPU_MEMORY_BINDING_H
+#endif //CPU_COMPUTE_UTIL_H

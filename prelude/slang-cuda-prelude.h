@@ -1,5 +1,5 @@
-#line 1 "slang-cuda-prelude.h"
 
+// For now we'll disable any asserts in this prelude
 #define SLANG_PRELUDE_ASSERT(x) 
 
 template <typename T, size_t SIZE>

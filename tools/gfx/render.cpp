@@ -75,6 +75,7 @@ const Resource::DescBase& Resource::getDescBase() const
     BindingStyle::OpenGl,       // OpenGl,
     BindingStyle::Vulkan,       // Vulkan
     BindingStyle::CPU,          // CPU
+    BindingStyle::CUDA,         // CUDA
 };
 
 /* static */void RendererUtil::compileTimeAsserts()
@@ -405,6 +406,7 @@ ProjectionStyle RendererUtil::getProjectionStyle(RendererType type)
         case RendererType::Vulkan:          return UnownedStringSlice::fromLiteral("Vulkan");
         case RendererType::Unknown:         return UnownedStringSlice::fromLiteral("Unknown");
         case RendererType::CPU:             return UnownedStringSlice::fromLiteral("CPU");
+        case RendererType::CUDA:            return UnownedStringSlice::fromLiteral("CUDA");
         default:                            return UnownedStringSlice::fromLiteral("?!?");
     }
 }

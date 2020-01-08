@@ -18,6 +18,7 @@ namespace Slang {
     { RenderApiType::D3D12,  "dx12,d3d12",      ""},
     { RenderApiType::D3D11,  "dx11,d3d11",      "hlsl,hlsl-rewrite,slang"},
     { RenderApiType::CPU,    "cpu",             ""},
+    { RenderApiType::CUDA,   "cuda",            "cuda,ptx"},
 };
 
 static int _calcAvailableApis()
@@ -268,6 +269,11 @@ static bool _canLoadSharedLibrary(const char* libName)
         case RenderApiType::D3D11:     return _canLoadSharedLibrary("d3d11"); 
         case RenderApiType::D3D12:     return _canLoadSharedLibrary("d3d12");
         case RenderApiType::CPU:       return true;
+        case RenderApiType::CUDA:
+        {
+            // We'll assume it's available, and if not trying to create it will detect it
+            return true;
+        }
         default: break; 
     }
 #elif SLANG_UNIX_FAMILY

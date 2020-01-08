@@ -670,6 +670,11 @@ static SlangResult _extractRenderTestRequirements(const CommandLine& cmdLine, Te
             nativeLanguage = SLANG_SOURCE_LANGUAGE_CPP;
             passThru = SLANG_PASS_THROUGH_GENERIC_C_CPP;
             break;
+        case RenderApiType::CUDA:
+            target = SLANG_PTX;
+            nativeLanguage = SLANG_SOURCE_LANGUAGE_CUDA;
+            passThru = SLANG_PASS_THROUGH_NVRTC;
+            break;
     }
 
     SlangSourceLanguage sourceLanguage = nativeLanguage;
