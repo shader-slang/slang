@@ -73,7 +73,7 @@ SlangResult CUDASourceEmitter::_calcCUDATextureTypeName(IRTextureTypeBase* texTy
     }
 
     outName << "texture<";
-    outName << _getCUDATypeName(texType->getElementType());
+    outName << _getTypeName(texType->getElementType());
     outName << ", ";
 
     switch (texType->GetBaseShape())
@@ -110,29 +110,17 @@ SlangResult CUDASourceEmitter::_calcCUDATextureTypeName(IRTextureTypeBase* texTy
     return SLANG_OK;
 }
 
-// This is junk.. 
-static UnownedStringSlice _getCUDAResourceTypePrefix(IROp op)
+void CUDASourceEmitter::emitSpecializedOperationDefinition(const HLSLIntrinsic* specOp)
 {
-    switch (op)
-    {
-        case kIROp_HLSLStructuredBufferType:            return UnownedStringSlice::fromLiteral("StructuredBuffer");
-        case kIROp_HLSLRWStructuredBufferType:          return UnownedStringSlice::fromLiteral("RWStructuredBuffer");
-        case kIROp_HLSLRWByteAddressBufferType:         return UnownedStringSlice::fromLiteral("RWByteAddressBuffer");
-        case kIROp_HLSLByteAddressBufferType:           return UnownedStringSlice::fromLiteral("ByteAddressBuffer");
-        case kIROp_SamplerStateType:                    return UnownedStringSlice::fromLiteral("SamplerState");
-        case kIROp_SamplerComparisonStateType:                  return UnownedStringSlice::fromLiteral("SamplerComparisonState");
-        case kIROp_HLSLRasterizerOrderedStructuredBufferType:   return UnownedStringSlice::fromLiteral("RasterizerOrderedStructuredBuffer");
-        case kIROp_HLSLAppendStructuredBufferType:              return UnownedStringSlice::fromLiteral("AppendStructuredBuffer");
-        case kIROp_HLSLConsumeStructuredBufferType:             return UnownedStringSlice::fromLiteral("ConsumeStructuredBuffer");
-        case kIROp_HLSLRasterizerOrderedByteAddressBufferType:  return UnownedStringSlice::fromLiteral("RasterizerOrderedByteAddressBuffer");
-        case kIROp_RaytracingAccelerationStructureType:         return UnownedStringSlice::fromLiteral("RaytracingAccelerationStructure");
-
-        default:                                        return UnownedStringSlice();
-    }
+    m_writer->emit("__device__ ");
+    Super::emitSpecializedOperationDefinition(specOp);
 }
 
-SlangResult CUDASourceEmitter::_calcCUDATypeName(IRType* type, StringBuilder& out)
+SlangResult CUDASourceEmitter::calcTypeName(IRType* type, CodeGenTarget target, StringBuilder& out)
 {
+    SLANG_UNUSED(target);
+    SLANG_ASSERT(target == CodeGenTarget::CUDASource);
+
     switch (type->op)
     {
         case kIROp_HalfType:
@@ -155,6 +143,22 @@ SlangResult CUDASourceEmitter::_calcCUDATypeName(IRType* type, StringBuilder& ou
             out << prefix << vecCount;
             return SLANG_OK;
         }
+        case kIROp_HLSLStructuredBufferType:
+        {
+            auto bufferType = as<IRHLSLStructuredBufferType>(type);
+            out << "const ";
+            calcTypeName(bufferType->getElementType(), target, out);
+            out << "* ";
+            return SLANG_OK;
+        }
+        case kIROp_HLSLRWStructuredBufferType:
+        {
+            auto bufferType = as<IRHLSLRWStructuredBufferType>(type);
+            calcTypeName(bufferType->getElementType(), target, out);
+            out << "* ";
+            return SLANG_OK;
+        }
+
 #if 0
         case kIROp_MatrixType:
         {
@@ -227,330 +231,21 @@ SlangResult CUDASourceEmitter::_calcCUDATypeName(IRType* type, StringBuilder& ou
                 }
             }
 
-#if 0
-            switch (type->op)
-            {
-                case kIROp_HLSLStructuredBufferType:
-                case kIROp_HLSLRWStructuredBufferType:
-                {
-                    auto structuredBufferType = as<IRHLSLStructuredBufferType>(type);
-                    auto elementType = structuredBufferType->getElementType();
-
-                    // Is the same as a pointer to the item
-
-
-
-                }
-                default: break;
-            }
-#endif
-
-            // If _getResourceTypePrefix returns something, we assume can output any specialization after it in order.
-            {
-                UnownedStringSlice prefix = _getCUDAResourceTypePrefix(type->op);
-                if (prefix.size() > 0)
-                {
-                    auto oldWriter = m_writer;
-                    SourceManager* sourceManager = oldWriter->getSourceManager();
-
-                    // TODO(JS): This is a bit of a hack. We don't want to emit the result here,
-                    // so we replace the writer, write out the type, grab the contents, and restore the writer
-
-                    SourceWriter writer(sourceManager, LineDirectiveMode::None);
-                    m_writer = &writer;
-
-                    m_writer->emit(prefix);
-
-                    // TODO(JS).
-                    // Assumes ordering of types matches ordering of operands.
-
-                    UInt operandCount = type->getOperandCount();
-                    if (operandCount)
-                    {
-                        m_writer->emit("<");
-                        for (UInt ii = 0; ii < operandCount; ++ii)
-                        {
-                            if (ii != 0)
-                            {
-                                m_writer->emit(", ");
-                            }
-                            emitVal(type->getOperand(ii), getInfo(EmitOp::General));
-                        }
-                        m_writer->emit(">");
-                    }
-
-                    out << writer.getContent();
-
-                    m_writer = oldWriter;
-                    return SLANG_OK;
-                }
-            }
-
             break;
         }
     }
 
-    SLANG_DIAGNOSE_UNEXPECTED(getSink(), SourceLoc(), "unhandled type for CUDA emit");
-    return SLANG_FAIL;
-}
-
-
-UnownedStringSlice CUDASourceEmitter::_getCUDATypeName(IRType* type)
-{
-    StringSlicePool::Handle handle = StringSlicePool::kNullHandle;
-    if (m_typeNameMap.TryGetValue(type, handle))
-    {
-        return m_slicePool.getSlice(handle);
-    }
-
-#if 0
-    if (type->op == kIROp_MatrixType)
-    {
-        auto matType = static_cast<IRMatrixType*>(type);
-
-        auto elementType = matType->getElementType();
-        const auto rowCount = int(GetIntVal(matType->getRowCount()));
-        const auto colCount = int(GetIntVal(matType->getColumnCount()));
-
-        // Make sure the vector type the matrix is built on is added
-        useType(_getVecType(elementType, colCount));
-    }
-#endif
-
-    StringBuilder builder;
-    if (SLANG_SUCCEEDED(_calcCUDATypeName(type, builder)))
-    {
-        handle = m_slicePool.add(builder);
-    }
-
-    m_typeNameMap.Add(type, handle);
-
-    SLANG_ASSERT(handle != StringSlicePool::kNullHandle);
-    return m_slicePool.getSlice(handle);
-}
-
-void CUDASourceEmitter::_emitCUDADecorationSingleString(const char* name, IRFunc* entryPoint, IRStringLit* val)
-{
-    SLANG_UNUSED(entryPoint);
-    assert(val);
-
-    m_writer->emit("[");
-    m_writer->emit(name);
-    m_writer->emit("(\"");
-    m_writer->emit(val->getStringSlice());
-    m_writer->emit("\")]\n");
-}
-
-void CUDASourceEmitter::_emitCUDADecorationSingleInt(const char* name, IRFunc* entryPoint, IRIntLit* val)
-{
-    SLANG_UNUSED(entryPoint);
-    SLANG_ASSERT(val);
-
-    auto intVal = GetIntVal(val);
-
-    m_writer->emit("[");
-    m_writer->emit(name);
-    m_writer->emit("(");
-    m_writer->emit(intVal);
-    m_writer->emit(")]\n");
-}
-
-void CUDASourceEmitter::_emitCUDARegisterSemantic(LayoutResourceKind kind, EmitVarChain* chain, char const* uniformSemanticSpelling)
-{
-    if (!chain)
-        return;
-    if (!chain->varLayout->usesResourceKind(kind))
-        return;
-
-    UInt index = getBindingOffset(chain, kind);
-    UInt space = getBindingSpace(chain, kind);
-
-    switch (kind)
-    {
-        case LayoutResourceKind::Uniform:
-        {
-            UInt offset = index;
-
-            // The HLSL `c` register space is logically grouped in 16-byte registers,
-            // while we try to traffic in byte offsets. That means we need to pick
-            // a register number, based on the starting offset in 16-byte register
-            // units, and then a "component" within that register, based on 4-byte
-            // offsets from there. We cannot support more fine-grained offsets than that.
-
-            m_writer->emit(" : ");
-            m_writer->emit(uniformSemanticSpelling);
-            m_writer->emit("(c");
-
-            // Size of a logical `c` register in bytes
-            auto registerSize = 16;
-
-            // Size of each component of a logical `c` register, in bytes
-            auto componentSize = 4;
-
-            size_t startRegister = offset / registerSize;
-            m_writer->emit(int(startRegister));
-
-            size_t byteOffsetInRegister = offset % registerSize;
-
-            // If this field doesn't start on an even register boundary,
-            // then we need to emit additional information to pick the
-            // right component to start from
-            if (byteOffsetInRegister != 0)
-            {
-                // The value had better occupy a whole number of components.
-                SLANG_RELEASE_ASSERT(byteOffsetInRegister % componentSize == 0);
-
-                size_t startComponent = byteOffsetInRegister / componentSize;
-
-                static const char* kComponentNames[] = { "x", "y", "z", "w" };
-                m_writer->emit(".");
-                m_writer->emit(kComponentNames[startComponent]);
-            }
-            m_writer->emit(")");
-        }
-        break;
-
-        case LayoutResourceKind::RegisterSpace:
-        case LayoutResourceKind::GenericResource:
-        case LayoutResourceKind::ExistentialTypeParam:
-        case LayoutResourceKind::ExistentialObjectParam:
-            // ignore
-            break;
-        default:
-        {
-            m_writer->emit(" : register(");
-            switch (kind)
-            {
-                case LayoutResourceKind::ConstantBuffer:
-                    m_writer->emit("b");
-                    break;
-                case LayoutResourceKind::ShaderResource:
-                    m_writer->emit("t");
-                    break;
-                case LayoutResourceKind::UnorderedAccess:
-                    m_writer->emit("u");
-                    break;
-                case LayoutResourceKind::SamplerState:
-                    m_writer->emit("s");
-                    break;
-                default:
-                    SLANG_DIAGNOSE_UNEXPECTED(getSink(), SourceLoc(), "unhandled HLSL register type");
-                    break;
-            }
-            m_writer->emit(index);
-            if (space)
-            {
-                m_writer->emit(", space");
-                m_writer->emit(space);
-            }
-            m_writer->emit(")");
-        }
-    }
-}
-
-void CUDASourceEmitter::_emitCUDARegisterSemantics(EmitVarChain* chain, char const* uniformSemanticSpelling)
-{
-    if (!chain) return;
-
-    auto layout = chain->varLayout;
-
-    switch (getSourceStyle())
-    {
-        default:
-            return;
-
-        case SourceStyle::HLSL:
-            break;
-    }
-
-    for (auto rr : layout->getOffsetAttrs())
-    {
-        _emitCUDARegisterSemantic(rr->getResourceKind(), chain, uniformSemanticSpelling);
-    }
-}
-
-void CUDASourceEmitter::_emitCUDARegisterSemantics(IRVarLayout* varLayout, char const* uniformSemanticSpelling)
-{
-    if (!varLayout)
-        return;
-
-    EmitVarChain chain(varLayout);
-    _emitCUDARegisterSemantics(&chain, uniformSemanticSpelling);
-}
-
-void CUDASourceEmitter::_emitCUDAParameterGroupFieldLayoutSemantics(EmitVarChain* chain)
-{
-    if (!chain)
-        return;
-
-    auto layout = chain->varLayout;
-    for (auto rr : layout->getOffsetAttrs())
-    {
-        _emitCUDARegisterSemantic(rr->getResourceKind(), chain, "packoffset");
-    }
-}
-
-void CUDASourceEmitter::_emitCUDAParameterGroupFieldLayoutSemantics(IRVarLayout* fieldLayout, EmitVarChain* inChain)
-{
-    EmitVarChain chain(fieldLayout, inChain);
-    _emitCUDAParameterGroupFieldLayoutSemantics(&chain);
-}
-
-void CUDASourceEmitter::_emitCUDAParameterGroup(IRGlobalParam* varDecl, IRUniformParameterGroupType* type)
-{
-    if (as<IRTextureBufferType>(type))
-    {
-        m_writer->emit("tbuffer ");
-    }
-    else
-    {
-        m_writer->emit("cbuffer ");
-    }
-    m_writer->emit(getName(varDecl));
-
-    auto varLayout = getVarLayout(varDecl);
-    SLANG_RELEASE_ASSERT(varLayout);
-
-    EmitVarChain blockChain(varLayout);
-
-    EmitVarChain containerChain = blockChain;
-    EmitVarChain elementChain = blockChain;
-
-    auto typeLayout = varLayout->getTypeLayout();
-    if (auto parameterGroupTypeLayout = as<IRParameterGroupTypeLayout>(typeLayout))
-    {
-        containerChain = EmitVarChain(parameterGroupTypeLayout->getContainerVarLayout(), &blockChain);
-        elementChain = EmitVarChain(parameterGroupTypeLayout->getElementVarLayout(), &blockChain);
-
-        typeLayout = parameterGroupTypeLayout->getElementVarLayout()->getTypeLayout();
-    }
-
-    _emitCUDARegisterSemantic(LayoutResourceKind::ConstantBuffer, &containerChain);
-
-    m_writer->emit("\n{\n");
-    m_writer->indent();
-
-    auto elementType = type->getElementType();
-
-    emitType(elementType, getName(varDecl));
-    m_writer->emit(";\n");
-
-    m_writer->dedent();
-    m_writer->emit("}\n");
+    return Super::calcTypeName(type, target, out);
 }
 
 void CUDASourceEmitter::emitLayoutSemanticsImpl(IRInst* inst, char const* uniformSemanticSpelling)
 {
-    auto layout = getVarLayout(inst); 
-    if (layout)
-    {
-        _emitCUDARegisterSemantics(layout, uniformSemanticSpelling);
-    }
+    Super::emitLayoutSemanticsImpl(inst, uniformSemanticSpelling);
 }
 
 void CUDASourceEmitter::emitParameterGroupImpl(IRGlobalParam* varDecl, IRUniformParameterGroupType* type)
 {
-    _emitCUDAParameterGroup(varDecl, type);
+    Super::emitParameterGroupImpl(varDecl, type);
 }
 
 void CUDASourceEmitter::emitEntryPointAttributesImpl(IRFunc* irFunc, IREntryPointDecoration* entryPointDecor)
@@ -565,8 +260,8 @@ void CUDASourceEmitter::emitEntryPointAttributesImpl(IRFunc* irFunc, IREntryPoin
             Int sizeAlongAxis[kThreadGroupAxisCount];
             getComputeThreadGroupSize(irFunc, sizeAlongAxis);
 
-#if 0
-            m_writer->emit("[numthreads(");
+#if 1
+            m_writer->emit("// [numthreads(");
             for (int ii = 0; ii < kThreadGroupAxisCount; ++ii)
             {
                 if (ii != 0) m_writer->emit(", ");
@@ -662,7 +357,7 @@ bool CUDASourceEmitter::tryEmitInstExprImpl(IRInst* inst, const EmitOpInfo& inOu
             else
             {
                 m_writer->emit("make_");
-                m_writer->emit(_getCUDATypeName(inst->getDataType()));
+                m_writer->emit(_getTypeName(inst->getDataType()));
                 emitArgs(inst);
                 return true;
             }
@@ -703,6 +398,19 @@ bool CUDASourceEmitter::tryEmitInstExprImpl(IRInst* inst, const EmitOpInfo& inOu
     return false;
 }
 
+bool CUDASourceEmitter::tryEmitGlobalParamImpl(IRGlobalParam* varDecl, IRType* varType)
+{
+    SLANG_UNUSED(varDecl);
+    SLANG_UNUSED(varType);
+
+    // (__device__/__constant__/__shared__/__managed__)
+
+    m_writer->emit("__device__ ");
+
+    // Use the default impl otherwise
+    return false;
+}
+
 void CUDASourceEmitter::emitLayoutDirectivesImpl(TargetRequest* targetReq)
 {
     SLANG_UNUSED(targetReq);
@@ -716,7 +424,7 @@ void CUDASourceEmitter::emitVectorTypeNameImpl(IRType* elementType, IRIntegerVal
 
 void CUDASourceEmitter::emitSimpleTypeImpl(IRType* type)
 {
-    m_writer->emit(_getCUDATypeName(type));
+    m_writer->emit(_getTypeName(type));
 }
 
 void CUDASourceEmitter::emitRateQualifiersImpl(IRRate* rate)
@@ -757,105 +465,90 @@ void CUDASourceEmitter::emitSimpleFuncImpl(IRFunc* func)
     if (IREntryPointDecoration* entryPointDecor = func->findDecoration<IREntryPointDecoration>())
     {
         // If its an entry point, we let the entry point attribute control the output
-        Super::emitSimpleFuncImpl(func);
     }
     else
     {
         // If it's not an entry point mark as device
-        m_writer->emit("__device__ ");
-        Super::emitSimpleFuncImpl(func);
+        m_writer->emit("__device__ ");    
     }
+
+    CLikeSourceEmitter::emitSimpleFuncImpl(func);
 }
 
 void CUDASourceEmitter::emitSemanticsImpl(IRInst* inst)
 {
-    if (auto semanticDecoration = inst->findDecoration<IRSemanticDecoration>())
-    {
-        m_writer->emit(" : ");
-        m_writer->emit(semanticDecoration->getSemanticName());
-        return;
-    }
-
-    if (auto layoutDecoration = inst->findDecoration<IRLayoutDecoration>())
-    {
-        auto layout = layoutDecoration->getLayout();
-        if (auto varLayout = as<IRVarLayout>(layout))
-        {
-            emitSemanticsUsingVarLayout(varLayout);
-        }
-        else if (auto entryPointLayout = as<IREntryPointLayout>(layout))
-        {
-            if (auto resultLayout = entryPointLayout->getResultLayout())
-            {
-                emitSemanticsUsingVarLayout(resultLayout);
-            }
-        }
-    }
-}
-
-static UnownedStringSlice _getInterpolationModifierText(IRInterpolationMode mode)
-{
-    switch (mode)
-    {
-        case IRInterpolationMode::NoInterpolation:      return UnownedStringSlice::fromLiteral("nointerpolation");
-        case IRInterpolationMode::NoPerspective:        return UnownedStringSlice::fromLiteral("noperspective");
-        case IRInterpolationMode::Linear:               return UnownedStringSlice::fromLiteral("linear");
-        case IRInterpolationMode::Sample:               return UnownedStringSlice::fromLiteral("sample");
-        case IRInterpolationMode::Centroid:             return UnownedStringSlice::fromLiteral("centroid");
-        default:                                        return UnownedStringSlice();
-    }
+    Super::emitSemanticsImpl(inst);
 }
 
 void CUDASourceEmitter::emitInterpolationModifiersImpl(IRInst* varInst, IRType* valueType, IRVarLayout* layout)
 {
-    SLANG_UNUSED(layout);
-    SLANG_UNUSED(valueType);
-
-    for (auto dd : varInst->getDecorations())
-    {
-        if (dd->op != kIROp_InterpolationModeDecoration)
-            continue;
-
-        auto decoration = (IRInterpolationModeDecoration*)dd;
-  
-        UnownedStringSlice modeText = _getInterpolationModifierText(decoration->getMode());
-        if (modeText.size() > 0)
-        {
-            m_writer->emit(modeText);
-            m_writer->emitChar(' ');
-        }
-    }
+    Super::emitInterpolationModifiersImpl(varInst, valueType, layout);
 }
 
 void CUDASourceEmitter::emitVarDecorationsImpl(IRInst* varDecl)
 {
-    if (varDecl->findDecoration<IRGloballyCoherentDecoration>())
-    {
-        m_writer->emit("globallycoherent\n");
-    }
+    Super::emitVarDecorationsImpl(varDecl);
 }
 
 void CUDASourceEmitter::emitMatrixLayoutModifiersImpl(IRVarLayout* layout)
 {
-    // When a variable has a matrix type, we want to emit an explicit
-    // layout qualifier based on what the layout has been computed to be.
-    //
+    Super::emitMatrixLayoutModifiersImpl(layout);
+}
 
-    auto typeLayout = layout->getTypeLayout()->unwrapArray();
+void CUDASourceEmitter::emitPreprocessorDirectivesImpl()
+{
+    SourceWriter* writer = getSourceWriter();
 
-    if (auto matrixTypeLayout = as<IRMatrixTypeLayout>(typeLayout))
+    writer->emit("\n");
+
     {
-        switch (matrixTypeLayout->getMode())
-        {
-            case kMatrixLayoutMode_ColumnMajor:
-                m_writer->emit("column_major ");
-                break;
+        List<IRType*> types;
+        m_typeSet.getTypes(IRTypeSet::Kind::Matrix, types);
 
-            case kMatrixLayoutMode_RowMajor:
-                m_writer->emit("row_major ");
-                break;
+        // Emit the type definitions
+        for (auto type : types)
+        {
+            emitTypeDefinition(type);
         }
     }
+
+    // Emit all the intrinsics that were used
+    for (const auto& keyValue : m_intrinsicNameMap)
+    {
+        emitSpecializedOperationDefinition(keyValue.Key);
+    }
+}
+
+void CUDASourceEmitter::emitModuleImpl(IRModule* module)
+{
+    // Setup all built in types used in the module
+    m_typeSet.addAllBuiltinTypes(module);
+    // If any matrix types are used, then we need appropriate vector types too.
+    m_typeSet.addVectorForMatrixTypes();
+
+    // We need to add some vector intrinsics - used for calculating thread ids 
+    {
+        IRType* type = m_typeSet.addVectorType(m_typeSet.getBuilder().getBasicType(BaseType::UInt), 3);
+        IRType* args[] = { type, type };
+
+        _addIntrinsic(HLSLIntrinsic::Op::Add,  type, args, SLANG_COUNT_OF(args));
+        _addIntrinsic(HLSLIntrinsic::Op::Mul,  type, args, SLANG_COUNT_OF(args));
+    }
+
+    // TODO(JS): We may need to generate types (for example for matrices)
+
+    // TODO(JS): We need to determine which functions we need to inline
+
+    // The IR will usually come in an order that respects
+    // dependencies between global declarations, but this
+    // isn't guaranteed, so we need to be careful about
+    // the order in which we emit things.
+
+    List<EmitAction> actions;
+
+    computeEmitActions(module, actions);
+    executeEmitActions(actions);
+
 }
 
 
