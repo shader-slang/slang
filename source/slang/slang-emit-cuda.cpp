@@ -168,33 +168,7 @@ SlangResult CUDASourceEmitter::calcTypeName(IRType* type, CodeGenTarget target, 
             const auto rowCount = int(GetIntVal(matType->getRowCount()));
             const auto colCount = int(GetIntVal(matType->getColumnCount()));
 
-            if (target == CodeGenTarget::CPPSource)
-            {
-                out << "Matrix<" << getBuiltinTypeName(elementType->op) << ", " << rowCount << ", " << colCount << ">";
-            }
-            else
-            {
-                out << "Mat";
-                const UnownedStringSlice postFix = _getCTypeVecPostFix(_getCType(elementType->op));
-                out << postFix;
-                if (postFix.size() > 1)
-                {
-                    out << "_";
-                }
-                out << rowCount;
-                out << colCount;
-            }
-            return SLANG_OK;
-        }
-        case kIROp_ArrayType:
-        {
-            auto arrayType = static_cast<IRArrayType*>(type);
-            auto elementType = arrayType->getElementType();
-            int elementCount = int(GetIntVal(arrayType->getElementCount()));
-
-            out << "FixedArray<";
-            SLANG_RETURN_ON_FAIL(_calcTypeName(elementType, target, out));
-            out << ", " << elementCount << ">";
+            out << "Matrix<" << getBuiltinTypeName(elementType->op) << ", " << rowCount << ", " << colCount << ">";
             return SLANG_OK;
         }
         case kIROp_UnsizedArrayType:
@@ -250,37 +224,11 @@ void CUDASourceEmitter::emitParameterGroupImpl(IRGlobalParam* varDecl, IRUniform
 
 void CUDASourceEmitter::emitEntryPointAttributesImpl(IRFunc* irFunc, IREntryPointDecoration* entryPointDecor)
 {
-    auto profile = m_effectiveProfile;
-    auto stage = entryPointDecor->getProfile().GetStage();
-
-    switch (stage)
-    {
-        case Stage::Compute:
-        {
-            Int sizeAlongAxis[kThreadGroupAxisCount];
-            getComputeThreadGroupSize(irFunc, sizeAlongAxis);
-
-#if 1
-            m_writer->emit("// [numthreads(");
-            for (int ii = 0; ii < kThreadGroupAxisCount; ++ii)
-            {
-                if (ii != 0) m_writer->emit(", ");
-                m_writer->emit(sizeAlongAxis[ii]);
-            }
-            m_writer->emit(")]\n");
-#endif
-
-            m_writer->emit("extern \"C\" __global__ ");
-            break;
-        }
-        
-        // TODO: There are other stages that will need this kind of handling.
-        default:
-            break;
-    }
+    SLANG_UNUSED(irFunc);
+    SLANG_UNUSED(entryPointDecor);
 }
 
-void CUDASourceEmitter::emitOperandImpl(IRInst* inst, EmitOpInfo const&  outerPrec)
+void CUDASourceEmitter::emitOperandImpl(IRInst* inst, EmitOpInfo const& outerPrec)
 {
     if (shouldFoldInstIntoUseSites(inst))
     {
@@ -326,7 +274,8 @@ void CUDASourceEmitter::emitOperandImpl(IRInst* inst, EmitOpInfo const&  outerPr
         }
         default: break;
     }
-    m_writer->emit(getName(inst));
+
+    Super::emitOperandImpl(inst, outerPrec);
 }
 
 bool CUDASourceEmitter::tryEmitInstExprImpl(IRInst* inst, const EmitOpInfo& inOuterPrec)
@@ -398,19 +347,6 @@ bool CUDASourceEmitter::tryEmitInstExprImpl(IRInst* inst, const EmitOpInfo& inOu
     return false;
 }
 
-bool CUDASourceEmitter::tryEmitGlobalParamImpl(IRGlobalParam* varDecl, IRType* varType)
-{
-    SLANG_UNUSED(varDecl);
-    SLANG_UNUSED(varType);
-
-    // (__device__/__constant__/__shared__/__managed__)
-
-    m_writer->emit("__device__ ");
-
-    // Use the default impl otherwise
-    return false;
-}
-
 void CUDASourceEmitter::emitLayoutDirectivesImpl(TargetRequest* targetReq)
 {
     SLANG_UNUSED(targetReq);
@@ -462,15 +398,8 @@ void CUDASourceEmitter::emitSimpleFuncParamsImpl(IRFunc* func)
 
 void CUDASourceEmitter::emitSimpleFuncImpl(IRFunc* func)
 {
-    if (IREntryPointDecoration* entryPointDecor = func->findDecoration<IREntryPointDecoration>())
-    {
-        // If its an entry point, we let the entry point attribute control the output
-    }
-    else
-    {
-        // If it's not an entry point mark as device
-        m_writer->emit("__device__ ");    
-    }
+    // Mark as run on device. Don't need to worry about entry point, as that is output separtely to call the __device_ implementation
+    m_writer->emit("__device__ ");    
 
     CLikeSourceEmitter::emitSimpleFuncImpl(func);
 }
@@ -547,8 +476,125 @@ void CUDASourceEmitter::emitModuleImpl(IRModule* module)
     List<EmitAction> actions;
 
     computeEmitActions(module, actions);
-    executeEmitActions(actions);
 
+
+    _emitForwardDeclarations(actions);
+
+    IRGlobalParam* entryPointGlobalParams = nullptr;
+
+    // Output the global parameters in a 'UniformState' structure
+    {
+        m_writer->emit("struct UniformState\n{\n");
+        m_writer->indent();
+
+        // We need these to be prefixed by __device__
+        _emitUniformStateMembers(actions, &entryPointGlobalParams);
+
+        m_writer->dedent();
+        m_writer->emit("\n};\n\n");
+    }
+
+    // Output the 'Context' which will be used for execution
+    {
+        m_writer->emit("struct Context\n{\n");
+        m_writer->indent();
+
+        m_writer->emit("UniformState* uniformState;\n");
+
+        if (entryPointGlobalParams)
+        {
+            emitGlobalInst(entryPointGlobalParams);
+        }
+
+        // Output all the thread locals 
+        for (auto action : actions)
+        {
+            if (action.level == EmitAction::Level::Definition && _isVariable(action.inst->op))
+            {
+                emitGlobalInst(action.inst);
+            }
+        }
+
+        // Finally output the functions as methods on the context
+        for (auto action : actions)
+        {
+            if (action.level == EmitAction::Level::Definition && as<IRFunc>(action.inst))
+            {
+                emitGlobalInst(action.inst);
+            }
+        }
+
+        m_writer->dedent();
+        m_writer->emit("};\n\n");
+    }
+
+    // Finally we need to output dll entry points
+
+    for (auto action : actions)
+    {
+        if (action.level == EmitAction::Level::Definition && as<IRFunc>(action.inst))
+        {
+            IRFunc* func = as<IRFunc>(action.inst);
+
+            IREntryPointDecoration* entryPointDecor = func->findDecoration<IREntryPointDecoration>();
+
+            if (entryPointDecor && entryPointDecor->getProfile().GetStage() == Stage::Compute)
+            {
+                Int sizeAlongAxis[kThreadGroupAxisCount];
+                getComputeThreadGroupSize(func, sizeAlongAxis);
+
+                // 
+                m_writer->emit("// [numthreads(");
+                for (int ii = 0; ii < kThreadGroupAxisCount; ++ii)
+                {
+                    if (ii != 0) m_writer->emit(", ");
+                    m_writer->emit(sizeAlongAxis[ii]);
+                }
+                m_writer->emit(")]\n");
+
+                String funcName = getName(func);
+
+                m_writer->emit("extern \"C\" __global__  ");
+               
+                auto resultType = func->getResultType();
+
+                // Emit the actual function
+                emitEntryPointAttributes(func, entryPointDecor);
+                emitType(resultType, funcName);
+
+                m_writer->emit("(UniformEntryPointParams* params, UniformState* uniformState)");
+                emitSemantics(func);
+                m_writer->emit("\n{\n");
+                m_writer->indent();
+
+                // Initialize when constructing so that globals are zeroed
+                m_writer->emit("Context context = {};\n");
+                m_writer->emit("context.uniformState = uniformState;\n");
+
+                if (entryPointGlobalParams)
+                {
+                    auto varDecl = entryPointGlobalParams;
+                    auto rawType = varDecl->getDataType();
+
+                    auto varType = rawType;
+
+                    m_writer->emit("context.");
+                    m_writer->emit(getName(varDecl));
+                    m_writer->emit(" =  (");
+                    emitType(varType);
+                    m_writer->emit("*)params; \n");
+                }
+
+                m_writer->emit("context.");
+                m_writer->emit(funcName);
+                m_writer->emit("();\n");
+
+                m_writer->dedent();
+                m_writer->emit("}\n");
+            }
+        }
+    }
+    
 }
 
 
