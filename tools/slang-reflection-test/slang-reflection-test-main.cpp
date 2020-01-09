@@ -12,8 +12,14 @@
 
 struct PrettyWriter
 {
+    struct CommaState
+    {
+        bool needComma = false;
+    };
+
     bool startOfLine = true;
     int indent = 0;
+    CommaState* commaState = nullptr;
 };
 
 static void writeRaw(PrettyWriter& writer, char const* begin, char const* end)
@@ -154,6 +160,44 @@ static void write(PrettyWriter& writer, float val)
     Slang::StdWriters::getOut().print("%f", val);
 }
 
+    /// Type for tracking whether a comma is needed in a comma-separated JSON list
+struct CommaTrackerRAII
+{
+    CommaTrackerRAII(PrettyWriter& writer)
+        : m_writer(&writer)
+        , m_previousState(writer.commaState)
+    {
+        writer.commaState = &m_state;
+    }
+
+    ~CommaTrackerRAII()
+    {
+        m_writer->commaState = m_previousState;
+    }
+
+private:
+    PrettyWriter::CommaState    m_state;
+
+    PrettyWriter*               m_writer;
+    PrettyWriter::CommaState*   m_previousState;
+};
+
+    /// Call before items in a comma-separated JSON list to emit the comma if/when needed
+static void comma(PrettyWriter& writer)
+{
+    if( auto state = writer.commaState )
+    {
+        if( !state->needComma )
+        {
+            state->needComma = true;
+            return;
+        }
+    }
+
+    write(writer, ",\n");
+}
+
+
 static void emitReflectionVarInfoJSON(PrettyWriter& writer, slang::VariableReflection* var);
 static void emitReflectionTypeLayoutJSON(PrettyWriter& writer, slang::TypeLayoutReflection* type);
 static void emitReflectionTypeJSON(PrettyWriter& writer, slang::TypeReflection* type);
@@ -234,7 +278,7 @@ static void emitReflectionVarBindingInfoJSON(
     auto stage = var->getStage();
     if (stage != SLANG_STAGE_NONE)
     {
-        write(writer, ",\n");
+        comma(writer);
         char const* stageName = "UNKNOWN";
         switch (stage)
         {
@@ -259,7 +303,7 @@ static void emitReflectionVarBindingInfoJSON(
 
     if (categoryCount)
     {
-        write(writer, ",\n");
+        comma(writer);
         if( categoryCount != 1 )
         {
             write(writer,"\"bindings\": [\n");
@@ -298,14 +342,14 @@ static void emitReflectionVarBindingInfoJSON(
 
     if (auto semanticName = var->getSemanticName())
     {
-        write(writer, ",\n");
+        comma(writer);
         write(writer,"\"semanticName\": \"");
         write(writer, semanticName);
         write(writer, "\"");
 
         if (auto semanticIndex = var->getSemanticIndex())
         {
-            write(writer, ",\n");
+            comma(writer);
             write(writer,"\"semanticIndex\": ");
             write(writer, int(semanticIndex));
         }
@@ -328,7 +372,8 @@ static void emitReflectionModifierInfoJSON(
 {
     if( var->findModifier(slang::Modifier::Shared) )
     {
-        write(writer, ",\n\"shared\": true");
+        comma(writer);
+        write(writer, "\"shared\": true");
     }
 }
 
@@ -409,9 +454,15 @@ static void emitReflectionVarLayoutJSON(
     write(writer, "{\n");
     indent(writer);
 
-    emitReflectionNameInfoJSON(writer, var->getName());
-    write(writer, ",\n");
+    CommaTrackerRAII commaTracker(writer);
 
+    if( auto name = var->getName() )
+    {
+        comma(writer);
+        emitReflectionNameInfoJSON(writer, name);
+    }
+
+    comma(writer);
     write(writer, "\"type\": ");
     emitReflectionTypeLayoutJSON(writer, var->getTypeLayout());
 
@@ -456,8 +507,9 @@ static void emitReflectionResourceTypeBaseInfoJSON(
 {
     auto shape  = type->getResourceShape();
     auto access = type->getResourceAccess();
+    comma(writer);
     write(writer, "\"kind\": \"resource\"");
-    write(writer, ",\n");
+    comma(writer);
     write(writer, "\"baseShape\": \"");
     switch (shape & SLANG_RESOURCE_BASE_SHAPE_MASK)
     {
@@ -479,18 +531,19 @@ static void emitReflectionResourceTypeBaseInfoJSON(
     write(writer, "\"");
     if (shape & SLANG_TEXTURE_ARRAY_FLAG)
     {
-        write(writer, ",\n");
+        comma(writer);
         write(writer, "\"array\": true");
     }
     if (shape & SLANG_TEXTURE_MULTISAMPLE_FLAG)
     {
-        write(writer, ",\n");
+        comma(writer);
         write(writer, "\"multisample\": true");
     }
 
     if( access != SLANG_RESOURCE_ACCESS_READ )
     {
-        write(writer, ",\n\"access\": \"");
+        comma(writer);
+        write(writer, "\"access\": \"");
         switch(access)
         {
         default:
@@ -519,6 +572,7 @@ static void emitReflectionTypeInfoJSON(
     switch(kind)
     {
     case slang::TypeReflection::Kind::SamplerState:
+        comma(writer);
         write(writer, "\"kind\": \"samplerState\"");
         break;
 
@@ -539,7 +593,7 @@ static void emitReflectionTypeInfoJSON(
             case SLANG_STRUCTURED_BUFFER:
                 if( auto resultType = type->getResourceResultType() )
                 {
-                    write(writer, ",\n");
+                    comma(writer);
                     write(writer, "\"resultType\": ");
                     emitReflectionTypeJSON(
                         writer,
@@ -551,8 +605,9 @@ static void emitReflectionTypeInfoJSON(
         break;
 
     case slang::TypeReflection::Kind::ConstantBuffer:
+        comma(writer);
         write(writer, "\"kind\": \"constantBuffer\"");
-        write(writer, ",\n");
+        comma(writer);
         write(writer, "\"elementType\": ");
         emitReflectionTypeJSON(
             writer,
@@ -560,8 +615,9 @@ static void emitReflectionTypeInfoJSON(
         break;
 
     case slang::TypeReflection::Kind::ParameterBlock:
+        comma(writer);
         write(writer, "\"kind\": \"parameterBlock\"");
-        write(writer, ",\n");
+        comma(writer);
         write(writer, "\"elementType\": ");
         emitReflectionTypeJSON(
             writer,
@@ -569,8 +625,9 @@ static void emitReflectionTypeInfoJSON(
         break;
 
     case slang::TypeReflection::Kind::TextureBuffer:
+        comma(writer);
         write(writer, "\"kind\": \"textureBuffer\"");
-        write(writer, ",\n");
+        comma(writer);
         write(writer, "\"elementType\": ");
         emitReflectionTypeJSON(
             writer,
@@ -578,8 +635,9 @@ static void emitReflectionTypeInfoJSON(
         break;
 
     case slang::TypeReflection::Kind::ShaderStorageBuffer:
+        comma(writer);
         write(writer, "\"kind\": \"shaderStorageBuffer\"");
-        write(writer, ",\n");
+        comma(writer);
         write(writer, "\"elementType\": ");
         emitReflectionTypeJSON(
             writer,
@@ -587,19 +645,21 @@ static void emitReflectionTypeInfoJSON(
         break;
 
     case slang::TypeReflection::Kind::Scalar:
+        comma(writer);
         write(writer, "\"kind\": \"scalar\"");
-        write(writer, ",\n");
+        comma(writer);
         emitReflectionScalarTypeInfoJSON(
             writer,
             type->getScalarType());
         break;
 
     case slang::TypeReflection::Kind::Vector:
+        comma(writer);
         write(writer, "\"kind\": \"vector\"");
-        write(writer, ",\n");
+        comma(writer);
         write(writer, "\"elementCount\": ");
         write(writer, int(type->getElementCount()));
-        write(writer, ",\n");
+        comma(writer);
         write(writer, "\"elementType\": ");
         emitReflectionTypeJSON(
             writer,
@@ -607,14 +667,15 @@ static void emitReflectionTypeInfoJSON(
         break;
 
     case slang::TypeReflection::Kind::Matrix:
+        comma(writer);
         write(writer, "\"kind\": \"matrix\"");
-        write(writer, ",\n");
+        comma(writer);
         write(writer, "\"rowCount\": ");
         write(writer, type->getRowCount());
-        write(writer, ",\n");
+        comma(writer);
         write(writer, "\"columnCount\": ");
         write(writer, type->getColumnCount());
-        write(writer, ",\n");
+        comma(writer);
         write(writer, "\"elementType\": ");
         emitReflectionTypeJSON(
             writer,
@@ -624,11 +685,12 @@ static void emitReflectionTypeInfoJSON(
     case slang::TypeReflection::Kind::Array:
         {
             auto arrayType = type;
+            comma(writer);
             write(writer, "\"kind\": \"array\"");
-            write(writer, ",\n");
+            comma(writer);
             write(writer, "\"elementCount\": ");
             write(writer, int(arrayType->getElementCount()));
-            write(writer, ",\n");
+            comma(writer);
             write(writer, "\"elementType\": ");
             emitReflectionTypeJSON(writer, arrayType->getElementType());
         }
@@ -636,7 +698,9 @@ static void emitReflectionTypeInfoJSON(
 
     case slang::TypeReflection::Kind::Struct:
         {
-            write(writer, "\"kind\": \"struct\",\n");
+            comma(writer);
+            write(writer, "\"kind\": \"struct\"");
+            comma(writer);
             write(writer, "\"fields\": [\n");
             indent(writer);
 
@@ -655,11 +719,15 @@ static void emitReflectionTypeInfoJSON(
         break;
 
     case slang::TypeReflection::Kind::GenericTypeParameter:
-        write(writer, "\"kind\": \"GenericTypeParameter\",\n");
+        comma(writer);
+        write(writer, "\"kind\": \"GenericTypeParameter\"");
+        comma(writer);
         emitReflectionNameInfoJSON(writer, type->getName());
         break;
     case slang::TypeReflection::Kind::Interface:
-        write(writer, "\"kind\": \"Interface\",\n");
+        comma(writer);
+        write(writer, "\"kind\": \"Interface\"");
+        comma(writer);
         emitReflectionNameInfoJSON(writer, type->getName());
         break;
     default:
@@ -669,6 +737,66 @@ static void emitReflectionTypeInfoJSON(
     emitUserAttributes(writer, type);
 }
 
+static void emitReflectionParameterGroupTypeLayoutInfoJSON(
+    PrettyWriter&                   writer,
+    slang::TypeLayoutReflection*    typeLayout,
+    const char*                     kind)
+{
+    write(writer, "\"kind\": \"");
+    write(writer, kind);
+    write(writer, "\"");
+
+    write(writer, ",\n\"elementType\": ");
+    emitReflectionTypeLayoutJSON(
+        writer,
+        typeLayout->getElementTypeLayout());
+
+    // Note: There is a subtle detail below when it comes to the
+    // container/element variable layouts that get nested inside
+    // a parameter group type layout.
+    //
+    // A top-level parameter group type layout like `ConstantBuffer<Foo>`
+    // needs to store both information about the `ConstantBuffer` part of
+    // things (e.g., it might consume 1 `binding`), as well as the `Foo`
+    // part (e.g., it might consume 4 bytes plus 1 `binding`), and there
+    // is offset information for each.
+    //
+    // The "element" part is easy: it is a variable layout for a variable
+    // of type `Foo`. The actual variable will be null, but everything else
+    // will be filled in as a client would expect.
+    //
+    // The "container" part is thornier: what should the type and type
+    // layout of the "container" variable be? The obvious answer (which
+    // the Slang reflection implementation uses today) is that the type
+    // is the type of the parameter group itself (e.g., `ConstantBuffer<Foo>`),
+    // and the layout is a dummy `TypeLayout` that just reflects the
+    // resource usage of the "container" part of things.
+    //
+    // That means that at runtime the "container var layout" will have
+    // a parameter group type (e.g., `TYPE_KIND_CONSTANT_BUFFER`)
+    // but its type layotu will be a base `TypeLayout` and not a
+    // `ParameterGroupLayout` (since that would introduce infinite regress).
+    //
+    // We thus have to guard here against the recursive path where
+    // we are emitting reflection info for the "container" part of things.
+    //
+    // TODO: We should probably 
+
+    {
+        CommaTrackerRAII commaTracker(writer);
+
+        write(writer, ",\n\"containerVarLayout\": {\n");
+        indent(writer);
+        emitReflectionVarBindingInfoJSON(writer, typeLayout->getContainerVarLayout());
+        dedent(writer);
+        write(writer, "\n}");
+    }
+
+    write(writer, ",\n\"elementVarLayout\": ");
+    emitReflectionVarLayoutJSON(
+        writer,
+        typeLayout->getElementVarLayout());
+}
 
 static void emitReflectionTypeLayoutInfoJSON(
     PrettyWriter&                   writer,
@@ -684,18 +812,22 @@ static void emitReflectionTypeLayoutInfoJSON(
         {
             auto arrayTypeLayout = typeLayout;
             auto elementTypeLayout = arrayTypeLayout->getElementTypeLayout();
+            comma(writer);
             write(writer, "\"kind\": \"array\"");
-            write(writer, ",\n");
+
+            comma(writer);
             write(writer, "\"elementCount\": ");
             write(writer, int(arrayTypeLayout->getElementCount()));
-            write(writer, ",\n");
+
+            comma(writer);
             write(writer, "\"elementType\": ");
             emitReflectionTypeLayoutJSON(
                 writer,
                 elementTypeLayout);
+
             if (arrayTypeLayout->getSize(SLANG_PARAMETER_CATEGORY_UNIFORM) != 0)
             {
-                write(writer, ",\n");
+                comma(writer);
                 write(writer, "\"uniformStride\": ");
                 write(writer, int(arrayTypeLayout->getElementStride(SLANG_PARAMETER_CATEGORY_UNIFORM)));
             }
@@ -706,12 +838,14 @@ static void emitReflectionTypeLayoutInfoJSON(
         {
             auto structTypeLayout = typeLayout;
 
-            write(writer, "\"kind\": \"struct\",\n");
+            comma(writer);
+            write(writer, "\"kind\": \"struct\"");
             if( auto name = structTypeLayout->getName() )
             {
+                comma(writer);
                 emitReflectionNameInfoJSON(writer, structTypeLayout->getName());
-                write(writer, ",\n");
             }
+            comma(writer);
             write(writer, "\"fields\": [\n");
             indent(writer);
 
@@ -731,48 +865,39 @@ static void emitReflectionTypeLayoutInfoJSON(
         break;
 
     case slang::TypeReflection::Kind::ConstantBuffer:
-        write(writer, "\"kind\": \"constantBuffer\"");
-        write(writer, ",\n");
-        write(writer, "\"elementType\": ");
-        emitReflectionTypeLayoutJSON(
-            writer,
-            typeLayout->getElementTypeLayout());
+        emitReflectionParameterGroupTypeLayoutInfoJSON(writer, typeLayout, "constantBuffer");
         break;
 
     case slang::TypeReflection::Kind::ParameterBlock:
-        write(writer, "\"kind\": \"parameterBlock\"");
-        write(writer, ",\n");
-        write(writer, "\"elementType\": ");
-        emitReflectionTypeLayoutJSON(
-            writer,
-            typeLayout->getElementTypeLayout());
+        emitReflectionParameterGroupTypeLayoutInfoJSON(writer, typeLayout, "parameterBlock");
         break;
 
     case slang::TypeReflection::Kind::TextureBuffer:
-        write(writer, "\"kind\": \"textureBuffer\"");
-        write(writer, ",\n");
-        write(writer, "\"elementType\": ");
-        emitReflectionTypeLayoutJSON(
-            writer,
-            typeLayout->getElementTypeLayout());
+        emitReflectionParameterGroupTypeLayoutInfoJSON(writer, typeLayout, "textureBuffer");
         break;
 
     case slang::TypeReflection::Kind::ShaderStorageBuffer:
+        comma(writer);
         write(writer, "\"kind\": \"shaderStorageBuffer\"");
-        write(writer, ",\n");
+
+        comma(writer);
         write(writer, "\"elementType\": ");
         emitReflectionTypeLayoutJSON(
             writer,
             typeLayout->getElementTypeLayout());
         break;
     case slang::TypeReflection::Kind::GenericTypeParameter:
+        comma(writer);
         write(writer, "\"kind\": \"GenericTypeParameter\"");
-        write(writer, ",\n");
+
+        comma(writer);
         emitReflectionNameInfoJSON(writer, typeLayout->getName());
         break;
     case slang::TypeReflection::Kind::Interface:
-        write(writer, "\"kind\": \"Interface\",\n");
-        write(writer, ",\n");
+        comma(writer);
+        write(writer, "\"kind\": \"Interface\"");
+
+        comma(writer);
         emitReflectionNameInfoJSON(writer, typeLayout->getName());
         break;
 
@@ -792,7 +917,7 @@ static void emitReflectionTypeLayoutInfoJSON(
 
                 if( auto resultTypeLayout = typeLayout->getElementTypeLayout() )
                 {
-                    write(writer, ",\n");
+                    comma(writer);
                     write(writer, "\"resultType\": ");
                     emitReflectionTypeLayoutJSON(
                         writer,
@@ -812,6 +937,7 @@ static void emitReflectionTypeLayoutJSON(
     PrettyWriter&                   writer,
     slang::TypeLayoutReflection*    typeLayout)
 {
+    CommaTrackerRAII commaTracker(writer);
     write(writer, "{\n");
     indent(writer);
     emitReflectionTypeLayoutInfoJSON(writer, typeLayout);
@@ -823,6 +949,7 @@ static void emitReflectionTypeJSON(
     PrettyWriter&           writer,
     slang::TypeReflection*  type)
 {
+    CommaTrackerRAII commaTracker(writer);
     write(writer, "{\n");
     indent(writer);
     emitReflectionTypeInfoJSON(writer, type);
@@ -847,16 +974,25 @@ static void emitReflectionParamJSON(
     PrettyWriter&                       writer,
     slang::VariableLayoutReflection*    param)
 {
+    // TODO: This function is likely redundant with `emitReflectionVarLayoutJSON`
+    // and we should try to collapse them into one.
+
     write(writer, "{\n");
     indent(writer);
 
-    emitReflectionNameInfoJSON(writer, param->getName());
+    CommaTrackerRAII commaTracker(writer);
+
+    if( auto name = param->getName() )
+    {
+        comma(writer);
+        emitReflectionNameInfoJSON(writer, name);
+    }
 
     emitReflectionModifierInfoJSON(writer, param->getVariable());
 
     emitReflectionVarBindingInfoJSON(writer, param);
-    write(writer, ",\n");
 
+    comma(writer);
     write(writer, "\"type\": ");
     emitReflectionTypeLayoutJSON(writer, param->getTypeLayout());
 
@@ -931,6 +1067,7 @@ static void emitReflectionTypeParamJSON(
         if (ee != 0) write(writer, ",\n");
         write(writer, "{\n");
         indent(writer);
+        CommaTrackerRAII commaTracker(writer);
         emitReflectionTypeInfoJSON(writer, typeParam->getConstraintByIndex(ee));
         dedent(writer);
         write(writer, "\n}");
@@ -982,6 +1119,11 @@ static void emitReflectionEntryPointJSON(
     if (entryPoint->usesAnySampleRateInput())
     {
         write(writer, ",\n\"usesAnySampleRateInput\": true");
+    }
+    if( auto resultVarLayout = entryPoint->getResultVarLayout() )
+    {
+        write(writer, ",\n\"result:\": ");
+        emitReflectionParamJSON(writer, resultVarLayout);
     }
 
     if (entryPoint->getStage() == SLANG_STAGE_COMPUTE)

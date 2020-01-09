@@ -160,7 +160,18 @@ standard output = {
                         ]
                     }
                 }
-            ]
+            ],
+            "result:": {
+                "semanticName": "SV_POSITION",
+                "type": {
+                    "kind": "vector",
+                    "elementCount": 4,
+                    "elementType": {
+                        "kind": "scalar",
+                        "scalarType": "float32"
+                    }
+                }
+            }
         }
     ]
 }

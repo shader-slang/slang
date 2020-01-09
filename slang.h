@@ -1986,12 +1986,14 @@ extern "C"
 
     SLANG_API SlangReflectionType* spReflectionTypeLayout_GetType(SlangReflectionTypeLayout* type);
     SLANG_API size_t spReflectionTypeLayout_GetSize(SlangReflectionTypeLayout* type, SlangParameterCategory category);
+    SLANG_API int32_t spReflectionTypeLayout_getAlignment(SlangReflectionTypeLayout* type, SlangParameterCategory category);
 
     SLANG_API SlangReflectionVariableLayout* spReflectionTypeLayout_GetFieldByIndex(SlangReflectionTypeLayout* type, unsigned index);
 
     SLANG_API size_t spReflectionTypeLayout_GetElementStride(SlangReflectionTypeLayout* type, SlangParameterCategory category);
     SLANG_API SlangReflectionTypeLayout* spReflectionTypeLayout_GetElementTypeLayout(SlangReflectionTypeLayout* type);
     SLANG_API SlangReflectionVariableLayout* spReflectionTypeLayout_GetElementVarLayout(SlangReflectionTypeLayout* type);
+    SLANG_API SlangReflectionVariableLayout* spReflectionTypeLayout_getContainerVarLayout(SlangReflectionTypeLayout* type);
 
     SLANG_API SlangParameterCategory spReflectionTypeLayout_GetParameterCategory(SlangReflectionTypeLayout* type);
 
@@ -2070,6 +2072,9 @@ extern "C"
         SlangReflectionEntryPoint* entryPoint);
 
     SLANG_API SlangReflectionVariableLayout* spReflectionEntryPoint_getVarLayout(
+        SlangReflectionEntryPoint* entryPoint);
+
+    SLANG_API SlangReflectionVariableLayout* spReflectionEntryPoint_getResultVarLayout(
         SlangReflectionEntryPoint* entryPoint);
 
     SLANG_API int spReflectionEntryPoint_hasDefaultConstantBuffer(
@@ -2346,6 +2351,11 @@ namespace slang
             return spReflectionTypeLayout_GetSize((SlangReflectionTypeLayout*) this, category);
         }
 
+        int32_t getAlignment(SlangParameterCategory category = SLANG_PARAMETER_CATEGORY_UNIFORM)
+        {
+            return spReflectionTypeLayout_getAlignment((SlangReflectionTypeLayout*) this, category);
+        }
+
         unsigned int getFieldCount()
         {
             return getType()->getFieldCount();
@@ -2392,6 +2402,11 @@ namespace slang
         VariableLayoutReflection* getElementVarLayout()
         {
             return (VariableLayoutReflection*)spReflectionTypeLayout_GetElementVarLayout((SlangReflectionTypeLayout*) this);
+        }
+
+        VariableLayoutReflection* getContainerVarLayout()
+        {
+            return (VariableLayoutReflection*)spReflectionTypeLayout_getContainerVarLayout((SlangReflectionTypeLayout*) this);
         }
 
         // How is this type supposed to be bound?
@@ -2634,6 +2649,11 @@ namespace slang
         TypeLayoutReflection* getTypeLayout()
         {
             return getVarLayout()->getTypeLayout();
+        }
+
+        VariableLayoutReflection* getResultVarLayout()
+        {
+            return (VariableLayoutReflection*) spReflectionEntryPoint_getResultVarLayout((SlangReflectionEntryPoint*) this);
         }
 
         bool hasDefaultConstantBuffer()
