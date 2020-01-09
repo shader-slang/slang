@@ -598,8 +598,15 @@ SLANG_API SlangReflectionType * spReflection_FindTypeByName(SlangReflection * re
     Slang::DiagnosticSink sink(
         programLayout->getTargetReq()->getLinkage()->getSourceManager());
 
-    RefPtr<Type> result = program->getTypeFromString(name, &sink);
-    return (SlangReflectionType*)result.Ptr();
+    try
+    {
+        RefPtr<Type> result = program->getTypeFromString(name, &sink);
+        return (SlangReflectionType*)result.Ptr();
+    }
+    catch( ... )
+    {
+        return nullptr;
+    }
 }
 
 SLANG_API SlangReflectionTypeLayout* spReflection_GetTypeLayout(
