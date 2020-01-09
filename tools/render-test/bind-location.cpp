@@ -31,18 +31,12 @@ void BindSet::setAt(BindSet::Resource* resource, size_t offset, BindSet::Resourc
     UniformLocation location;
     location.m_offset = offset;
     location.m_resource = resource;
-    
-    if (value == nullptr)
+
+    // Note we don't remove when value == null, such that it is stored if should be nullptr
+    Resource** resourcePtr = m_uniformBindings.TryGetValueOrAdd(location, value);
+    if (resourcePtr)
     {
-        m_uniformBindings.Remove(location);
-    }
-    else
-    {
-        Resource** resourcePtr = m_uniformBindings.TryGetValueOrAdd(location, value);
-        if (resourcePtr)
-        {
-            *resourcePtr = value;
-        }
+        *resourcePtr = value;
     }
 }
 
@@ -65,17 +59,11 @@ void BindSet::setAt(SlangParameterCategory category, Slang::Index space, size_t 
     location.m_offset = offset;
     location.m_space = space;
 
-    if (value == nullptr)
+    // Note we don't remove when value == null, such that it is stored if should be nullptr
+    Resource** resourcePtr = m_registerBindings.TryGetValueOrAdd(location, value);
+    if (resourcePtr)
     {
-        m_registerBindings.Remove(location);
-    }
-    else
-    {
-        Resource** resourcePtr = m_registerBindings.TryGetValueOrAdd(location, value);
-        if (resourcePtr)
-        {
-            *resourcePtr = value;
-        }
+        *resourcePtr = value;
     }
 }
 
@@ -196,6 +184,111 @@ BindSet::Resource* BindSet::newBufferResource(slang::TypeReflection::Kind kind, 
     return resource;
 }
 
+SlangResult BindSet::init(slang::ShaderReflection* reflection, int entryPointIndex, List<BindLocation>& outRoots, Slang::List<slang::VariableLayoutReflection*>& outVars)
+{
+    outRoots.clear();
+    outVars.clear();
+
+    m_reflection = reflection;
+    m_rootBuffer = nullptr;
+    m_entryPointBuffer = nullptr;
+
+    m_resources.clear();
+    m_arena.deallocateAll();
+
+    {
+        size_t globalConstantBuffer = reflection->getGlobalConstantBufferSize();
+
+        size_t rootSizeInBytes = 0;
+        const int parameterCount = reflection->getParameterCount();
+        for (int i = 0; i < parameterCount; ++i)
+        {
+            auto parameter = reflection->getParameterByIndex(i);
+
+            auto offset = parameter->getOffset();
+
+            auto typeLayout = parameter->getTypeLayout();
+            auto sizeInBytes = typeLayout->getSize();
+
+            size_t endOffset = offset + sizeInBytes;
+
+            rootSizeInBytes = (endOffset > rootSizeInBytes) ? endOffset : rootSizeInBytes;
+        }
+        SLANG_ASSERT(rootSizeInBytes == globalConstantBuffer);
+
+        if (rootSizeInBytes)
+        {
+            // Allocate the 'root' buffer
+            m_rootBuffer = newBufferResource(slang::TypeReflection::Kind::ConstantBuffer, nullptr,  rootSizeInBytes);
+
+            for (int i = 0; i < parameterCount; ++i)
+            {
+                auto parameter = reflection->getParameterByIndex(i);
+                auto typeLayout = parameter->getTypeLayout();
+
+                BindLocation location(this, typeLayout, m_rootBuffer, parameter->getOffset());
+                outRoots.add(location);
+                outVars.add(parameter);
+            }
+        }
+    }
+
+    {
+        auto entryPointCount = int(reflection->getEntryPointCount());
+        if (entryPointIndex < 0 || entryPointIndex >= entryPointCount)
+        {
+            SLANG_ASSERT(!"Entry point index out of range");
+            return SLANG_FAIL;
+        }
+
+        m_entryPoint = reflection->getEntryPointByIndex(entryPointIndex);
+        size_t entryPointParamsSizeInBytes = 0;
+
+        const int parameterCount = int(m_entryPoint->getParameterCount());
+        for (int i = 0; i < parameterCount; i++)
+        {
+            slang::VariableLayoutReflection* parameter = m_entryPoint->getParameterByIndex(i);
+
+            // If has a semantic, then isn't uniform parameter
+            if (auto semanticName = parameter->getSemanticName())
+            {
+                continue;
+            }
+
+            auto offset = parameter->getOffset();
+
+            auto typeLayout = parameter->getTypeLayout();
+            auto sizeInBytes = typeLayout->getSize();
+
+            size_t endOffset = offset + sizeInBytes;
+            entryPointParamsSizeInBytes = (endOffset > entryPointParamsSizeInBytes) ? endOffset : entryPointParamsSizeInBytes;
+        }
+
+        if (entryPointParamsSizeInBytes)
+        {
+            m_entryPointBuffer = newBufferResource(slang::TypeReflection::Kind::ConstantBuffer, nullptr, entryPointParamsSizeInBytes);
+
+            for (int i = 0; i < parameterCount; ++i)
+            {
+                auto parameter = m_entryPoint->getParameterByIndex(i);
+                // If has a semantic, then isn't uniform parameter
+                if (auto semanticName = parameter->getSemanticName())
+                {
+                    continue;
+                }
+
+                auto typeLayout = parameter->getTypeLayout();
+
+                BindLocation location(this, typeLayout, m_rootBuffer, parameter->getOffset());
+                outRoots.add(location);
+                outVars.add(parameter);
+            }
+        }
+    }
+
+    return SLANG_OK;
+}
+
 // !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! BindLocation !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 
 size_t BindLocation::getOffset(SlangParameterCategory category) const
@@ -227,7 +320,10 @@ BindLocation BindLocation::toField(const char* name) const
     }
 
     auto typeLayout = m_typeLayout;
-    
+
+    // TODO(JS): Is this reasonable in the general case? Constant buffer seems reasonable
+    // parameter block not so much. We could just see if m_resource is set, and then do that in that case.
+    //
     // Strip constantBuffer wrapping
     {
         const auto kind = typeLayout->getKind();
@@ -413,5 +509,7 @@ BindLocation BindLocation::toIndex(int index) const
     // Invalid
     return BindLocation();
 }
+
+
 
 } // renderer_test

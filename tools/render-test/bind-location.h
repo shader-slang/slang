@@ -101,6 +101,7 @@ struct BindLocation
     {
         SLANG_ASSERT(bindSet);
     }
+
     size_t getOffset(SlangParameterCategory category) const;
 
     BindLocation(const ThisType& rhs) = default;
@@ -172,6 +173,8 @@ public:
     Resource* newBufferResource(slang::TypeLayoutReflection* type, size_t sizeInBytes, const void* initialData);
     Resource* newBufferResource(slang::TypeReflection::Kind kind, slang::TypeLayoutReflection* typeLayout, size_t sizeInBytes, const void* initialData);
 
+    SlangResult init(slang::ShaderReflection* reflection, int entryPointIndex, Slang::List<BindLocation>& outRootLocations, Slang::List<slang::VariableLayoutReflection*>& outVars);
+
     BindSet();
 protected:
 
@@ -181,6 +184,12 @@ protected:
     Slang::Dictionary<UniformLocation, Resource*> m_uniformBindings;
 
     Slang::MemoryArena m_arena;
+
+    // Used when we have uniform buffers (as used on CPU/CUDA)
+    slang::ShaderReflection* m_reflection = nullptr;
+    Resource* m_rootBuffer = nullptr;
+    Resource* m_entryPointBuffer = nullptr;
+    slang::EntryPointReflection* m_entryPoint;
 };
 
 
