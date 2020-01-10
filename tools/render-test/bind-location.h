@@ -227,11 +227,17 @@ public:
         /// Now we have a few options. We could
         /// 1) Store the location type. It couldn't be part of the key, it would have to be stored with the resource(!)
         /// 2) Traverse from roots, looking for references, and then work out which ones have a binding
+        /// 3) A hybrid? Get the roots we know their types. Go through all resources which have types, and add them.
         ///
         /// Note we can't just look at what resources exist and traverse their types, because in the case of CPU binding, too
         /// non typed constant buffers are created. 
         ///
-        /// Get all of the set bindings. This can be used to set the final actual desired output
+        /// In some respects 2 is the cleanest, but for it to work we'd also need to keep track of resources that have already been
+        /// traversed in a map. 
+        ///
+        /// I suppose this stuff only counts for uniform binding. 
+
+        /// Get all of the set bindings. This can be used to set the final actual desired output.
     void getBindings(Slang::List<BindLocation>& outLocations, Slang::List<Resource*>& outResources);
 
     BindSet();
