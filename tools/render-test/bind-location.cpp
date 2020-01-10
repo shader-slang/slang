@@ -721,11 +721,16 @@ void BindSet::calcChildResourceLocations(const BindLocation& location, Slang::Li
     const auto kind = typeLayout->getKind();
     switch (kind)
     {
+        case slang::TypeReflection::Kind::SamplerState:
+
         case slang::TypeReflection::Kind::ParameterBlock:
         case slang::TypeReflection::Kind::ConstantBuffer:
+        case slang::TypeReflection::Kind::Resource:
+        case slang::TypeReflection::Kind::TextureBuffer:
+        case slang::TypeReflection::Kind::ShaderStorageBuffer:
         {
-            auto elementTypeLayout = typeLayout->getElementTypeLayout();
-            const size_t elementSize = elementTypeLayout->getSize();
+            //auto elementTypeLayout = typeLayout->getElementTypeLayout();
+            //const size_t elementSize = elementTypeLayout->getSize();
 
             outLocations.add(location);
             break;

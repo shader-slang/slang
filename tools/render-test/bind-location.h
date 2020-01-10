@@ -220,6 +220,17 @@ public:
 
     void destroyResource(Resource* resource);
 
+        /// TODO(JS): Arghh! This doesn't work, quite as needed. I want to be able to get not only the binding locations
+        /// and resources but I need to also know the type of where the binding is set.
+        /// The map that stores whats where, does not store the type of the origin of the reference, only the resource it points to
+        ///
+        /// Now we have a few options. We could
+        /// 1) Store the location type. It couldn't be part of the key, it would have to be stored with the resource(!)
+        /// 2) Traverse from roots, looking for references, and then work out which ones have a binding
+        ///
+        /// Note we can't just look at what resources exist and traverse their types, because in the case of CPU binding, too
+        /// non typed constant buffers are created. 
+        ///
         /// Get all of the set bindings. This can be used to set the final actual desired output
     void getBindings(Slang::List<BindLocation>& outLocations, Slang::List<Resource*>& outResources);
 
