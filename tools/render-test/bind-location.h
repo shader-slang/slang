@@ -102,7 +102,15 @@ struct BindLocation
         SLANG_ASSERT(bindSet);
     }
 
+    
+        /// Add an offset
+    void addOffset(SlangParameterCategory category, ptrdiff_t offset);
+
+        /// True if holds tracking for this category
+    bool hasCategory(SlangParameterCategory category) const;
+
     size_t getOffset(SlangParameterCategory category) const;
+    slang::TypeLayoutReflection* getTypeLayout() const { return m_typeLayout; }
 
     BindLocation(const ThisType& rhs) = default;
 
@@ -166,15 +174,20 @@ public:
     void setAt(SlangParameterCategory category, Slang::Index space, size_t offset, Resource* value);
 
     Resource* getAt(const BindLocation& loc);
+    void setAt(const BindLocation& loc, Resource* resource);
+    void setAt(const BindLocation& loc, SlangParameterCategory category, Resource* resource);
 
-    Resource* newBufferResource(slang::TypeLayoutReflection* type, size_t sizeInBytes, const void* initialData = nullptr);
-    Resource* newBufferResource(slang::TypeReflection::Kind kind, size_t sizeInBytes, const void* initialData = nullptr);
+    Resource* createBufferResource(slang::TypeLayoutReflection* type, size_t sizeInBytes, const void* initialData = nullptr);
+    Resource* createBufferResource(slang::TypeReflection::Kind kind, size_t sizeInBytes, const void* initialData = nullptr);
 
-    SlangResult init(slang::ShaderReflection* reflection, int entryPointIndex, Slang::List<BindLocation>& outRootLocations, Slang::List<slang::VariableLayoutReflection*>& outVars);
+        /// Calculate from the current location everything that is referenced
+    //void calcResourceLocations(const BindLocation& location, Slang::List<BindLocation>& outLocations);
 
+    void destroyResource(Resource* resource);
+    
     BindSet();
 protected:
-    Resource* _newBufferResource(slang::TypeReflection::Kind kind, slang::TypeLayoutReflection* typeLayout, size_t bufferSizeInBytes, size_t sizeInBytes, const void* initalData);
+    Resource* _createBufferResource(slang::TypeReflection::Kind kind, slang::TypeLayoutReflection* typeLayout, size_t bufferSizeInBytes, size_t sizeInBytes, const void* initalData);
     
     Slang::List<Resource*> m_resources;
 
@@ -182,16 +195,45 @@ protected:
     Slang::Dictionary<UniformLocation, Resource*> m_uniformBindings;
 
     Slang::MemoryArena m_arena;
+};
+
+class BindRoot : public Slang::RefObject
+{
+public:
+    typedef RefObject Super;
+
+    virtual BindLocation find(const char* name) = 0;
+        /// The setting of an array count is dependent on the underlying implementation.
+        /// On the CPU this means making sure there is a buffer that is large enough
+        /// And using that for storage.
+        /// But this does NOT set the actual location in the appropriate manner - that is
+        /// something that has to be done by the process that sets all the 'resource' handles etc elsewhere
+    virtual SlangResult setArrayCount(const BindLocation& location, int count) = 0;
+};
+
+class CPULikeBindRoot : public BindRoot
+{
+public:
+    typedef BindRoot Super;
+
+    typedef BindSet::Resource Resource;
+
+    // BindRoot
+    virtual BindLocation find(const char* name) SLANG_OVERRIDE;
+    virtual SlangResult setArrayCount(const BindLocation& location, int count) SLANG_OVERRIDE;
+
+    slang::VariableLayoutReflection* getParameterByName(const char* name);
+    slang::VariableLayoutReflection* getEntryPointParameterByName(const char* name);
+    
+    SlangResult init(BindSet* bindSet, slang::ShaderReflection* reflection, int entryPointIndex); 
 
     // Used when we have uniform buffers (as used on CPU/CUDA)
     slang::ShaderReflection* m_reflection = nullptr;
     Resource* m_rootBuffer = nullptr;
     Resource* m_entryPointBuffer = nullptr;
     slang::EntryPointReflection* m_entryPoint;
+    BindSet* m_bindSet = nullptr;
 };
-
-
-
 
 } // renderer_test
 
