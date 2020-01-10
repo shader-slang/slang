@@ -11,12 +11,69 @@ namespace renderer_test {
 
 struct BindPoint
 {
+    typedef BindPoint ThisType;
+
+        /// 
+    bool isValid() const { return m_space >= 0; }
+    bool isInvalid() const { return m_space < 0; }
+
+    void setInvalid() { m_space = -1; }
+
+    bool operator==(const ThisType& rhs) const { return m_space == rhs.m_space && m_offset == rhs.m_offset; }
+    bool operator!=(const ThisType& rhs) const { return !(*this == rhs); }
+
+    int GetHashCode() const { return Slang::combineHash(Slang::GetHashCode(m_space), Slang::GetHashCode(m_offset)); }
+
+    BindPoint() = default;
+    BindPoint(Slang::Index space, size_t offset):m_space(space), m_offset(offset) {}
+
+    static BindPoint makeInvalid() { return BindPoint(-1, 0); }
+
     Slang::Index m_space = 0;               ///< The register space 
     size_t m_offset = 0;                    ///< The offset, might be a byte address or a register index
 };
 
 struct BindPoints
 {
+    Slang::Index findSingle() const
+    {
+        Slang::Index found; 
+        if (calcValidCount(&found) == 1)
+        {
+            return found;
+        }
+        return -1;
+    }
+    Slang::Index calcValidCount(Slang::Index* outFoundIndex) const
+    {
+        using namespace Slang;
+        Index found = -1;
+        Index validCount = 0;
+        for (Index i = 0; i < Index(SLANG_PARAMETER_CATEGORY_COUNT); ++i)
+        {
+            const auto& point = m_points[i];
+            if (point.isValid())
+            {
+                found = i;
+                validCount++;
+            }
+        }
+        if (outFoundIndex)
+        {
+            *outFoundIndex = found;
+        }
+        return validCount;
+    }
+    void setInvalid()
+    {
+        for (auto& point : m_points) 
+        {
+            point.setInvalid();
+        }
+    }
+    BindPoint& operator[](SlangParameterCategory category) { return m_points[Slang::Index(category)]; }
+    const BindPoint& operator[](SlangParameterCategory category) const { return m_points[Slang::Index(category)]; }
+
     BindPoint m_points[SLANG_PARAMETER_CATEGORY_COUNT];
 };
 
@@ -36,7 +93,7 @@ public:
 
 struct BindSet_Resource
 {
-    slang::TypeReflection::Kind m_kind;              ///< The kind, used if type is not set. Same as m_type.kind othewise
+    slang::TypeReflection::Kind m_kind;              ///< The kind, used if type is not set. Same as m_type.kind otherwise
     slang::TypeLayoutReflection* m_type;            ///< The type
     uint8_t* m_data;
     size_t m_sizeInBytes;                           ///< Total size in bytes
@@ -57,71 +114,40 @@ struct BindLocation
     bool isValid() const { return m_typeLayout != nullptr; }
     bool isInvalid() const { return m_typeLayout == nullptr; }
 
+    BindLocation toField(slang::VariableLayoutReflection* var) const;
     BindLocation toField(const char* name) const;
-    BindLocation toIndex(int index) const;
+    BindLocation toIndex(Slang::Index index) const;
 
     const BindPointSet* getPointSet() const { return m_bindPointSet; }
-    void setRanges(const BindPoints& points)
-    {
-        SLANG_ASSERT(m_bindPointSet);
-        if (m_bindPointSet->isUniquelyReferenced())
-        {
-            m_bindPointSet->m_points = points;
-        }
-        else
-        {
-            m_bindPointSet = new BindPointSet(points);
-        }
-    }
+    void setPoints(const BindPoints& points);
 
-    BindLocation() {}
-
-    BindLocation(BindSet* bindSet, slang::TypeLayoutReflection* typeLayout, const BindPoints& points) :
-        m_bindSet(bindSet),
-        m_typeLayout(typeLayout)
-    {
-        SLANG_ASSERT(bindSet);
-        m_bindPointSet = new BindPointSet(points);
-    }
-    BindLocation(BindSet* bindSet, slang::TypeLayoutReflection* typeLayout, BindSet_Resource* resource, size_t offset) :
-        m_bindSet(bindSet),
-        m_resource(resource),
-        m_offset(offset),
-        m_typeLayout(typeLayout)
-    {
-        SLANG_ASSERT(bindSet);
-    }
-
-    BindLocation(BindSet* bindSet, slang::TypeLayoutReflection* typeLayout, SlangParameterCategory category, size_t categoryOffset, Slang::Index space) :
-        m_bindSet(bindSet),
-        m_category(category),
-        m_offset(categoryOffset),
-        m_typeLayout(typeLayout),
-        m_space(space)
-    {
-        SLANG_ASSERT(bindSet);
-    }
-
-    
         /// Add an offset
     void addOffset(SlangParameterCategory category, ptrdiff_t offset);
 
         /// True if holds tracking for this category
-    bool hasCategory(SlangParameterCategory category) const;
+    bool hasCategory(SlangParameterCategory category) const { return getBindPointForCategory(category).isValid(); }
 
-    size_t getOffset(SlangParameterCategory category) const;
+    BindPoint getBindPointForCategory(SlangParameterCategory category) const;
+    BindPoint* getValidBindPointForCategory(SlangParameterCategory category);
     slang::TypeLayoutReflection* getTypeLayout() const { return m_typeLayout; }
+
+    void setEmptyBinding() { m_bindPointSet.setNull(); m_point = BindPoint::makeInvalid(); m_category = SLANG_PARAMETER_CATEGORY_NONE; }
+
+    BindSet* getBindSet() const { return m_bindSet; }
+
+    BindLocation() {}
+    BindLocation(BindSet* bindSet, slang::TypeLayoutReflection* typeLayout, const BindPoints& points, BindSet_Resource* resource = nullptr);
+    BindLocation(BindSet* bindSet, slang::TypeLayoutReflection* typeLayout, SlangParameterCategory category, const BindPoint& point, BindSet_Resource* resource = nullptr);
 
     BindLocation(const ThisType& rhs) = default;
 
     BindSet* m_bindSet = nullptr;                           ///< Bind set we are traversing
     slang::TypeLayoutReflection* m_typeLayout = nullptr;    ///< The type layout
 
-    BindSet_Resource* m_resource = nullptr;                ///< The resource if we are in (or nullptr if not in a resource)
+    BindSet_Resource* m_resource = nullptr;                 ///< The resource if we are in 
 
-    SlangParameterCategory m_category = SLANG_PARAMETER_CATEGORY_NONE;          
-    size_t m_offset = 0;                                    ///< The offset within the resource or category. 
-    Slang::Index m_space = 0;                               ///< Only applicable when m_category is used
+    SlangParameterCategory m_category = SLANG_PARAMETER_CATEGORY_NONE;  ///< If there isn't a set this defines the category
+    BindPoint m_point;                                     ///< If there isn't a bind point set, this defines the point
 
     Slang::RefPtr<BindPointSet> m_bindPointSet;             ///< NOTE! Can only be written to if there is a single reference
 };
@@ -152,26 +178,23 @@ public:
 
         int GetHashCode() const
         {
-            return Slang::combineHash(Slang::combineHash(Slang::GetHashCode(m_space), Slang::GetHashCode(m_offset)), Slang::GetHashCode(m_category));
+            return Slang::combineHash(m_point.GetHashCode(), Slang::GetHashCode(m_category));
         }
         bool operator==(const ThisType& rhs) const
         {
-            return m_category == rhs.m_category &&
-                m_space == rhs.m_space &&
-                m_offset == rhs.m_offset;
+            return m_category == rhs.m_category && m_point == rhs.m_point;
         }
         bool operator!=(const ThisType& rhs) const { return !(*this == rhs); }
 
         SlangParameterCategory m_category;      ///< The category of parameter
-        Slang::Index m_space;                   ///< Space (not applicable when it's in a resource)
-        size_t m_offset;                        ///< Can be a byte offset (say in a resource), or a register offset
+        BindPoint m_point;
     };
 
     Resource* getAt(Resource* resource, size_t offset) const;
     void setAt(Resource* resource, size_t offset, Resource* value);
 
-    Resource* getAt(SlangParameterCategory category, Slang::Index space, size_t offset);
-    void setAt(SlangParameterCategory category, Slang::Index space, size_t offset, Resource* value);
+    Resource* getAt(SlangParameterCategory category, const BindPoint& point);
+    void setAt(SlangParameterCategory category, const BindPoint& point, Resource* value);
 
     Resource* getAt(const BindLocation& loc);
     void setAt(const BindLocation& loc, Resource* resource);
@@ -181,7 +204,8 @@ public:
     Resource* createBufferResource(slang::TypeReflection::Kind kind, size_t sizeInBytes, const void* initialData = nullptr);
 
         /// Calculate from the current location everything that is referenced
-    //void calcResourceLocations(const BindLocation& location, Slang::List<BindLocation>& outLocations);
+    void calcResourceLocations(const BindLocation& location, Slang::List<BindLocation>& outLocations);
+    void calcChildResourceLocations(const BindLocation& location, Slang::List<BindLocation>& outLocations);
 
     void destroyResource(Resource* resource);
     
@@ -209,6 +233,9 @@ public:
         /// But this does NOT set the actual location in the appropriate manner - that is
         /// something that has to be done by the process that sets all the 'resource' handles etc elsewhere
     virtual SlangResult setArrayCount(const BindLocation& location, int count) = 0;
+
+        /// Find all of the roots 
+    virtual void getRoots(Slang::List<BindLocation>& outLocations) = 0;
 };
 
 class CPULikeBindRoot : public BindRoot
@@ -221,10 +248,13 @@ public:
     // BindRoot
     virtual BindLocation find(const char* name) SLANG_OVERRIDE;
     virtual SlangResult setArrayCount(const BindLocation& location, int count) SLANG_OVERRIDE;
+    virtual void getRoots(Slang::List<BindLocation>& outLocations) SLANG_OVERRIDE;
 
     slang::VariableLayoutReflection* getParameterByName(const char* name);
     slang::VariableLayoutReflection* getEntryPointParameterByName(const char* name);
-    
+
+    void addDefaultBuffers();
+
     SlangResult init(BindSet* bindSet, slang::ShaderReflection* reflection, int entryPointIndex); 
 
     // Used when we have uniform buffers (as used on CPU/CUDA)
