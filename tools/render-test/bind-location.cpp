@@ -3,8 +3,7 @@
 
 #include "../../slang-com-helper.h"
 
-#define SLANG_PRELUDE_NAMESPACE CPPPrelude
-#include "../../prelude/slang-cpp-types.h"
+#include "../../source/core/slang-token-reader.h"
 
 namespace renderer_test {
 using namespace Slang;
@@ -514,6 +513,40 @@ BindLocation BindLocation::toIndex(Index index) const
     return BindLocation();
 }
 
+SlangResult BindLocation::setInplace(const void* data, size_t sizeInBytes)
+{
+    BindPoint* point = getValidBindPointForCategory(SLANG_PARAMETER_CATEGORY_UNIFORM);
+    if (m_resource && point)
+    {
+        size_t offset = point->m_offset;
+        // Make sure it's in range
+        SLANG_ASSERT(offset + sizeInBytes <= m_resource->m_sizeInBytes);
+
+        // Okay copy the contents
+
+        ::memcpy(m_resource->m_data + offset, data, sizeInBytes);
+        return SLANG_OK;
+    }
+    return SLANG_FAIL;
+}
+
+SlangResult BindLocation::setBufferContents(const void* initialData, size_t sizeInBytes)
+{
+    BindSet::Resource* resource = m_bindSet->getAt(*this);
+
+    if (resource)
+    {
+        SLANG_ASSERT(resource->m_sizeInBytes >= sizeInBytes);
+        ::memcpy(resource->m_data, initialData, sizeInBytes);
+        return SLANG_OK;
+    }
+    return SLANG_FAIL;
+}
+
+
+
+// !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! BindSet !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+
 void BindSet::calcResourceLocations(const BindLocation& location, List<BindLocation>& outLocations)
 {
     auto typeLayout = location.getTypeLayout();
@@ -581,6 +614,74 @@ void BindSet::calcChildResourceLocations(const BindLocation& location, Slang::Li
             break;
         }
     }
+}
+
+// !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! BindRoot !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+
+SlangResult BindRoot::parse(const String& text, const String& sourcePath, WriterHelper outStream, BindLocation& outLocation)
+{
+    // We will parse the 'name' as may be path to a resource
+    TokenReader parser(text);
+
+    BindLocation location; 
+
+    {
+        Token nameToken = parser.ReadToken();
+        if (nameToken.Type != TokenType::Identifier)
+        {
+            outStream.print("Invalid input syntax at line %d", int(parser.NextToken().Position.Line));
+            return SLANG_FAIL;
+        }
+        location = find(nameToken.Content.getBuffer());
+        if (location.isInvalid())
+        {
+            outStream.print("Unable to find entry in '%s' for '%s' (for CPU name must be specified) \n", sourcePath.getBuffer(), text.getBuffer());
+            return SLANG_FAIL;
+        }
+    }
+
+    while (!parser.IsEnd())
+    {
+        Token token = parser.NextToken(0);
+
+        if (token.Type == TokenType::LBracket)
+        {
+            parser.ReadToken();
+            int index = parser.ReadInt();
+            SLANG_ASSERT(index >= 0);
+
+            location = location.toIndex(index);
+            if (location.isInvalid())
+            {
+                outStream.print("Unable to find entry in '%d' in '%s'\n", index, text.getBuffer());
+                return SLANG_FAIL;
+            }
+            parser.ReadMatchingToken(TokenType::RBracket);
+        }
+        else if (token.Type == TokenType::Dot)
+        {
+            parser.ReadToken();
+            Token identifierToken = parser.ReadMatchingToken(TokenType::Identifier);
+
+            location = location.toField(identifierToken.Content.getBuffer());
+            if (location.isInvalid())
+            {
+                outStream.print("Unable to find field '%s' in '%s'\n", identifierToken.Content.getBuffer(), text.getBuffer());
+                return SLANG_FAIL;
+            }
+        }
+        else if (token.Type == TokenType::Comma)
+        {
+            // Break out
+            break;
+        }
+        else
+        {
+           return SLANG_FAIL;
+        }
+    }
+
+    return SLANG_OK;
 }
 
 // !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! CPULikeBindRoot !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!

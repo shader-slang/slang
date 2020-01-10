@@ -4,6 +4,7 @@
 #include "core/slang-basic.h"
 #include "core/slang-free-list.h"
 #include "core/slang-memory-arena.h"
+#include "core/slang-writer.h"
 
 #include "slang.h"
 
@@ -135,6 +136,9 @@ struct BindLocation
 
     BindSet* getBindSet() const { return m_bindSet; }
 
+    SlangResult setInplace(const void* data, size_t sizeInBytes);
+    SlangResult setBufferContents(const void* initialData, size_t sizeInBytes);
+
     BindLocation() {}
     BindLocation(BindSet* bindSet, slang::TypeLayoutReflection* typeLayout, const BindPoints& points, BindSet_Resource* resource = nullptr);
     BindLocation(BindSet* bindSet, slang::TypeLayoutReflection* typeLayout, SlangParameterCategory category, const BindPoint& point, BindSet_Resource* resource = nullptr);
@@ -236,6 +240,9 @@ public:
 
         /// Find all of the roots 
     virtual void getRoots(Slang::List<BindLocation>& outLocations) = 0;
+
+        /// Parse (specifying some location in HLSL style expression) slice to get to a location.
+    SlangResult parse(const Slang::String& text, const Slang::String& sourcePath, Slang::WriterHelper streamOut, BindLocation& outLocation);
 };
 
 class CPULikeBindRoot : public BindRoot
