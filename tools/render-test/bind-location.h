@@ -167,17 +167,15 @@ public:
 
     Resource* getAt(const BindLocation& loc);
 
-    Resource* newBufferResource(slang::TypeLayoutReflection* type, size_t sizeInBytes);
-    Resource* newBufferResource(slang::TypeReflection::Kind kind, slang::TypeLayoutReflection* typeLayout, size_t sizeInBytes);
-
-    Resource* newBufferResource(slang::TypeLayoutReflection* type, size_t sizeInBytes, const void* initialData);
-    Resource* newBufferResource(slang::TypeReflection::Kind kind, slang::TypeLayoutReflection* typeLayout, size_t sizeInBytes, const void* initialData);
+    Resource* newBufferResource(slang::TypeLayoutReflection* type, size_t sizeInBytes, const void* initialData = nullptr);
+    Resource* newBufferResource(slang::TypeReflection::Kind kind, size_t sizeInBytes, const void* initialData = nullptr);
 
     SlangResult init(slang::ShaderReflection* reflection, int entryPointIndex, Slang::List<BindLocation>& outRootLocations, Slang::List<slang::VariableLayoutReflection*>& outVars);
 
     BindSet();
 protected:
-
+    Resource* _newBufferResource(slang::TypeReflection::Kind kind, slang::TypeLayoutReflection* typeLayout, size_t bufferSizeInBytes, size_t sizeInBytes, const void* initalData);
+    
     Slang::List<Resource*> m_resources;
 
     Slang::Dictionary<RegisterLocation, Resource*> m_registerBindings;
