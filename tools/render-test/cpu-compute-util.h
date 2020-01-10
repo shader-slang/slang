@@ -54,6 +54,11 @@ struct CPUComputeUtil
 
     static SlangResult calcBindings(const ShaderCompilerUtil::OutputAndLayout& compilationAndLayout, Context& outContext);
 
+
+        /// This function currently just calculates bindings using BindSet
+    static SlangResult calcBindSet(const ShaderCompilerUtil::OutputAndLayout& compilationAndLayout);
+
+
     static SlangResult calcExecuteInfo(ExecuteStyle style, ISlangSharedLibrary* sharedLib, const uint32_t dispatchSize[3], const ShaderCompilerUtil::OutputAndLayout& compilationAndLayout, Context& context, ExecuteInfo& out);
 
     static SlangResult execute(const ExecuteInfo& info);

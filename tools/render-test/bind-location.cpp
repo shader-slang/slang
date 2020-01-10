@@ -165,7 +165,7 @@ BindSet::Resource* BindSet::_createBufferResource(slang::TypeReflection::Kind ki
 
     resource->m_data = (uint8_t*)m_arena.allocateAligned(bufferSizeInBytes, 16);
 
-    SLANG_ASSERT(sizeInBytes <= resource->m_sizeInBytes);
+    SLANG_ASSERT(initialSizeInBytes <= resource->m_sizeInBytes);
     if (initialData)
     {
         ::memcpy(resource->m_data, initialData, initialSizeInBytes);
@@ -177,6 +177,56 @@ BindSet::Resource* BindSet::_createBufferResource(slang::TypeReflection::Kind ki
     }
 
     m_resources.add(resource);
+    return resource;
+}
+
+/* static */bool BindSet::isTextureType(slang::TypeLayoutReflection* typeLayout)
+{
+    switch (typeLayout->getKind())
+    {
+        case slang::TypeReflection::Kind::Resource:
+        {
+            auto type = typeLayout->getType();
+            auto shape = type->getResourceShape();
+
+            switch (shape & SLANG_RESOURCE_BASE_SHAPE_MASK)
+            {
+                case SLANG_TEXTURE_2D:
+                case SLANG_TEXTURE_1D:
+                case SLANG_TEXTURE_3D:
+                case SLANG_TEXTURE_CUBE:
+                case SLANG_TEXTURE_BUFFER:
+                {
+                    return true;
+                }
+            }
+        }
+        default: break;
+    }
+
+    return false;
+
+}
+
+BindSet::Resource* BindSet::createTextureResource(slang::TypeLayoutReflection* typeLayout)
+{
+    if (!isTextureType(typeLayout))
+    {
+        SLANG_ASSERT(!"Not a texture type");
+        return nullptr;
+    }
+
+    Resource* resource = new (m_arena.allocateAligned(sizeof(Resource), SLANG_ALIGN_OF(Resource))) Resource();
+
+    resource->m_kind = typeLayout->getKind();
+    resource->m_sizeInBytes = 0;
+    resource->m_elementCount = 0;
+    resource->m_type = typeLayout;
+    resource->m_data = nullptr;
+    resource->m_userData = nullptr;
+
+    m_resources.add(resource);
+
     return resource;
 }
 
@@ -236,6 +286,52 @@ void BindSet::destroyResource(Resource* resource)
     if (index >= 0)
     {
         m_resources.fastRemoveAt(index);
+
+        // I guess we should remove any bindings to it whilst we are at it
+        List<UniformLocation> locations;
+        for (const auto& pair : m_uniformBindings)
+        {
+            const UniformLocation& location = pair.Key;
+            //Resource* resource = pair.Value;
+
+            if (location.m_resource == resource)
+            {
+                locations.add(location);
+            }
+        }
+
+        for (auto location : locations)
+        {
+            m_uniformBindings.Remove(location);
+        }
+    }
+}
+
+void BindSet::getBindings(Slang::List<BindLocation>& outLocations, Slang::List<Resource*>& outResources)
+{
+    outLocations.clear();
+    outResources.clear();
+
+    for (const auto& pair : m_uniformBindings)
+    {
+        const UniformLocation& location = pair.Key;
+        Resource* resource = pair.Value;
+
+        // 
+        BindLocation bindLocation(this, nullptr, SLANG_PARAMETER_CATEGORY_UNIFORM, BindPoint(0, location.m_offset), location.m_resource);
+        outResources.add(resource);
+        outLocations.add(bindLocation);
+    }
+
+    for (const auto& pair : m_registerBindings)
+    {
+        const RegisterLocation& location = pair.Key;
+        Resource* resource = pair.Value;
+
+        BindLocation bindLocation(this, nullptr, location.m_category, location.m_point);
+
+        outResources.add(resource);
+        outLocations.add(bindLocation);
     }
 }
 
@@ -270,12 +366,26 @@ BindLocation::BindLocation(BindSet* bindSet, slang::TypeLayoutReflection* typeLa
     SLANG_ASSERT(bindSet);
 }
 
-BindPoint* BindLocation::getValidBindPointForCategory(SlangParameterCategory category) 
+BindPoint* BindLocation::getValidBindPointForCategory(SlangParameterCategory category)
 {
     BindPoint* point = nullptr;
     if (m_bindPointSet)
     {
          point = &m_bindPointSet->m_points.m_points[category];
+    }
+    else if (m_category == category)
+    {
+        point = &m_point;
+    }
+    return (point && point->isValid()) ? point : nullptr;
+}
+
+const BindPoint* BindLocation::getValidBindPointForCategory(SlangParameterCategory category) const
+{
+    const BindPoint* point = nullptr;
+    if (m_bindPointSet)
+    {
+        point = &m_bindPointSet->m_points.m_points[category];
     }
     else if (m_category == category)
     {
@@ -513,9 +623,24 @@ BindLocation BindLocation::toIndex(Index index) const
     return BindLocation();
 }
 
-SlangResult BindLocation::setInplace(const void* data, size_t sizeInBytes)
+void* BindLocation::getUniform(size_t sizeInBytes) const
 {
-    BindPoint* point = getValidBindPointForCategory(SLANG_PARAMETER_CATEGORY_UNIFORM);
+    const BindPoint* point = getValidBindPointForCategory(SLANG_PARAMETER_CATEGORY_UNIFORM);
+    if (m_resource && point)
+    {
+        size_t offset = point->m_offset;
+        // Make sure it's in range
+        if (offset + sizeInBytes <= m_resource->m_sizeInBytes)
+        {
+            return m_resource->m_data + offset;
+        }
+    }
+    return nullptr;
+}
+
+SlangResult BindLocation::setInplace(const void* data, size_t sizeInBytes) const
+{
+    const BindPoint* point = getValidBindPointForCategory(SLANG_PARAMETER_CATEGORY_UNIFORM);
     if (m_resource && point)
     {
         size_t offset = point->m_offset;
@@ -530,10 +655,9 @@ SlangResult BindLocation::setInplace(const void* data, size_t sizeInBytes)
     return SLANG_FAIL;
 }
 
-SlangResult BindLocation::setBufferContents(const void* initialData, size_t sizeInBytes)
+SlangResult BindLocation::setBufferContents(const void* initialData, size_t sizeInBytes) const
 {
     BindSet::Resource* resource = m_bindSet->getAt(*this);
-
     if (resource)
     {
         SLANG_ASSERT(resource->m_sizeInBytes >= sizeInBytes);
@@ -542,8 +666,6 @@ SlangResult BindLocation::setBufferContents(const void* initialData, size_t size
     }
     return SLANG_FAIL;
 }
-
-
 
 // !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! BindSet !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 
@@ -681,6 +803,7 @@ SlangResult BindRoot::parse(const String& text, const String& sourcePath, Writer
         }
     }
 
+    outLocation = location;
     return SLANG_OK;
 }
 

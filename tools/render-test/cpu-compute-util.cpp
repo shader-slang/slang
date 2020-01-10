@@ -7,6 +7,8 @@
 #include "../../source/core/slang-std-writers.h"
 #include "../../source/core/slang-token-reader.h"
 
+#include "bind-location.h"
+
 #define SLANG_PRELUDE_NAMESPACE CPPPrelude
 #include "../../prelude/slang-cpp-types.h"
 
@@ -92,8 +94,287 @@ static CPUComputeUtil::Resource* _newOneTexture2D(int elemCount)
     }
 }
 
+/* static */SlangResult CPUComputeUtil::calcBindSet(const ShaderCompilerUtil::OutputAndLayout& compilationAndLayout)
+{
+    auto request = compilationAndLayout.output.request;
+    auto reflection = (slang::ShaderReflection*) spGetReflection(request);
+
+    const auto& sourcePath = compilationAndLayout.sourcePath;
+
+    BindSet bindSet;
+
+    CPULikeBindRoot bindRoot;
+    bindRoot.init(&bindSet, reflection, 0);
+    bindRoot.addDefaultBuffers();
+
+    // Okay lets iterate adding buffers
+
+    // Okay we need to find all of the bindings and match up to those in the layout
+    const ShaderInputLayout& layout = compilationAndLayout.layout;
+
+    {
+        auto outStream = StdWriters::getOut();
+        auto& entries = layout.entries;
+        
+        for (int entryIndex = 0; entryIndex < entries.getCount(); ++entryIndex)
+        {
+            auto& entry = entries[entryIndex];
+
+            if (entry.name.getLength() == 0)
+            {
+                outStream.print("No 'name' specified for resources in '%s'\n", sourcePath.getBuffer());
+                return SLANG_FAIL;
+            }
+
+            BindLocation location;
+            SLANG_RETURN_ON_FAIL(bindRoot.parse(entry.name, sourcePath, outStream, location));
+
+            auto& srcEntry = layout.entries[entryIndex];
+
+            auto typeLayout = location.getTypeLayout();
+            const auto kind = typeLayout->getKind();
+            switch (kind)
+            {
+                case slang::TypeReflection::Kind::Array:
+                {
+                    auto elementCount = int(typeLayout->getElementCount());
+                    if (elementCount == 0)
+                    {
+                        if (srcEntry.type == ShaderInputType::Array)
+                        {
+                            // Set the size
+                            SLANG_RETURN_ON_FAIL(bindRoot.setArrayCount(location, srcEntry.arrayDesc.size));
+                        }
+                        break;
+                    }
+                    SLANG_RETURN_ON_FAIL(location.setInplace(srcEntry.bufferData.getBuffer(), srcEntry.bufferData.getCount() * sizeof(unsigned int)));
+                    break;
+                }
+                case slang::TypeReflection::Kind::Vector:
+                case slang::TypeReflection::Kind::Matrix:
+                case slang::TypeReflection::Kind::Scalar:
+                case slang::TypeReflection::Kind::Struct:
+                {
+                    SLANG_RETURN_ON_FAIL(location.setInplace(srcEntry.bufferData.getBuffer(), srcEntry.bufferData.getCount() * sizeof(unsigned int)));
+                    break;
+                }
+                default:
+                    break;
+                case slang::TypeReflection::Kind::ConstantBuffer:
+                {
+                    SLANG_RETURN_ON_FAIL(location.setBufferContents(srcEntry.bufferData.getBuffer(), srcEntry.bufferData.getCount() * sizeof(unsigned int)));
+                    break;
+                }
+                case slang::TypeReflection::Kind::ParameterBlock:
+                {
+                    auto elementTypeLayout = typeLayout->getElementTypeLayout();
+                    SLANG_UNUSED(elementTypeLayout);
+                    break;
+                }
+                case slang::TypeReflection::Kind::TextureBuffer:
+                {
+                    auto elementTypeLayout = typeLayout->getElementTypeLayout();
+                    SLANG_UNUSED(elementTypeLayout);
+                    break;
+                }
+                case slang::TypeReflection::Kind::ShaderStorageBuffer:
+                {
+                    auto elementTypeLayout = typeLayout->getElementTypeLayout();
+                    SLANG_UNUSED(elementTypeLayout);
+                    break;
+                }
+                case slang::TypeReflection::Kind::GenericTypeParameter:
+                {
+                    const char* name = typeLayout->getName();
+                    SLANG_UNUSED(name);
+                    break;
+                }
+                case slang::TypeReflection::Kind::Interface:
+                {
+                    const char* name = typeLayout->getName();
+                    SLANG_UNUSED(name);
+                    break;
+                }
+                case slang::TypeReflection::Kind::Resource:
+                {
+                    if (BindSet::isTextureType(typeLayout))
+                    {
+                        // We don't bother setting any data
+                        BindSet::Resource* resource = bindSet.createTextureResource(typeLayout);
+                        resource->m_userData = (void*)&srcEntry;;
+
+                        bindSet.setAt(location, resource);
+                        break;
+                    }
+
+                    auto type = typeLayout->getType();
+                    auto shape = type->getResourceShape();
+
+                    //auto access = type->getResourceAccess();
+
+                    switch (shape & SLANG_RESOURCE_BASE_SHAPE_MASK)
+                    {
+                        default:
+                            assert(!"unhandled case");
+                            break;
+                        case SLANG_BYTE_ADDRESS_BUFFER:
+                        case SLANG_STRUCTURED_BUFFER:
+                        {
+                            size_t bufferSize = srcEntry.bufferData.getCount() * sizeof(unsigned int);
+
+                            BindSet::Resource* resource = bindSet.createBufferResource(typeLayout, bufferSize, srcEntry.bufferData.getBuffer());
+                            resource->m_userData = (void*)&srcEntry;
+
+                            bindSet.setAt(location, resource);
+                            break;
+                        }
+                    }
+                    if (shape & SLANG_TEXTURE_ARRAY_FLAG)
+                    {
+
+                    }
+                    if (shape & SLANG_TEXTURE_MULTISAMPLE_FLAG)
+                    {
+
+                    }
+
+                    break;
+                }
+            }
+        }
+    }
+
+    // The final stage is to actual set up the CPU based variables
+
+    {
+        List<BindLocation> locations;
+        List<BindSet::Resource*> resources;
+        List<RefPtr<Resource>> scopeResources;
+
+        bindSet.getBindings(locations, resources);
+
+        for (Index i = 0; i < locations.getCount(); ++i)
+        {
+            const auto& location = locations[i];
+            BindSet::Resource* resource = resources[i];
+
+            // Okay now we need to set up the actual handles that CPU will follow.
+
+            auto typeLayout = location.getTypeLayout();
+
+            const auto kind = typeLayout->getKind();
+            switch (kind)
+            {
+                case slang::TypeReflection::Kind::Array:
+                {
+                    auto elementCount = int(typeLayout->getElementCount());
+                    if (elementCount == 0)
+                    {
+                        BindSet::Resource* resource = bindSet.getAt(location);
+                        CPPPrelude::Array<uint8_t>* array = location.getUniform<CPPPrelude::Array<uint8_t> >();
+
+                        // If set, we setup the data needed for array on CPU side
+                        if (resource && array)
+                        {
+                            array->data = resource->m_data;
+                            array->count = resource->m_elementCount;
+                        }
+                    }
+                    break;
+                }
+                case slang::TypeReflection::Kind::ConstantBuffer:
+                case slang::TypeReflection::Kind::ParameterBlock:
+                {
+                    // These map down to pointers. In our case the contents of the resource
+                    BindSet::Resource* resource = bindSet.getAt(location);
+
+                    void* data = resource ? resource->m_data : nullptr;
+                    location.setInplace(&data, sizeof(data));
+                    break;
+                }
+                case slang::TypeReflection::Kind::Resource:
+                {
+                    auto type = typeLayout->getType();
+                    auto shape = type->getResourceShape();
+
+                    //auto access = type->getResourceAccess();
+
+                    switch (shape & SLANG_RESOURCE_BASE_SHAPE_MASK)
+                    {
+                        default:
+                            assert(!"unhandled case");
+                            break;
+                        case SLANG_TEXTURE_2D:
+                        {
+                            slang::TypeReflection* typeReflection = location.getTypeLayout()->getResourceResultType();
+
+                            int count = 1;
+                            if (typeReflection->getKind() == slang::TypeReflection::Kind::Vector)
+                            {
+                                count = int(typeReflection->getElementCount());
+                            }
+
+                            RefPtr<Resource> resource = _newOneTexture2D(count);
+                            scopeResources.add(resource);
+
+                            location.setInplace(resource.readRef(), sizeof(*resource.readRef()));
+                            break;
+                        }
+                        case SLANG_TEXTURE_1D:
+                        case SLANG_TEXTURE_3D:
+                        case SLANG_TEXTURE_CUBE:
+                        case SLANG_TEXTURE_BUFFER:
+                        {
+                            // Just set to null for now
+                            Resource* resource = nullptr;
+                            location.setInplace(&resource, sizeof(resource));
+                            break;
+                        }
+                        case SLANG_STRUCTURED_BUFFER:
+                        {
+                            BindSet::Resource* resource = bindSet.getAt(location);
+                            if (resource)
+                            {
+                                auto& dstBuf = *location.getUniform<CPPPrelude::StructuredBuffer<uint8_t> >();
+                                dstBuf.data = (uint8_t*)resource->m_data;
+                                dstBuf.count = resource->m_elementCount;
+                            }
+                            return SLANG_OK;
+                        }
+                        case SLANG_BYTE_ADDRESS_BUFFER:
+                        {
+                            BindSet::Resource* resource = bindSet.getAt(location);
+
+                            if (resource)
+                            {
+                                auto& dstBuf = *location.getUniform<CPPPrelude::ByteAddressBuffer>();
+                                dstBuf.data = (uint32_t*)resource->m_data;
+                                dstBuf.sizeInBytes = resource->m_sizeInBytes;
+                            }
+                            return SLANG_OK;
+                        }
+                    }
+                }
+            }
+        }
+    }
+    
+    return SLANG_OK;
+}
+
 /* static */SlangResult CPUComputeUtil::calcBindings(const ShaderCompilerUtil::OutputAndLayout& compilationAndLayout, Context& outContext)
 {
+    {
+        // Hack! To check out the new binding path works
+        SlangResult res = calcBindSet(compilationAndLayout);
+
+        if (SLANG_FAILED(res))
+        {
+            SLANG_BREAKPOINT(0);
+            calcBindSet(compilationAndLayout);
+        }
+    }
+
     auto request = compilationAndLayout.output.request;
     auto reflection = (slang::ShaderReflection*) spGetReflection(request);
 

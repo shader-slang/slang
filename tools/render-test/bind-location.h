@@ -130,14 +130,19 @@ struct BindLocation
 
     BindPoint getBindPointForCategory(SlangParameterCategory category) const;
     BindPoint* getValidBindPointForCategory(SlangParameterCategory category);
+    const BindPoint* getValidBindPointForCategory(SlangParameterCategory category) const;
     slang::TypeLayoutReflection* getTypeLayout() const { return m_typeLayout; }
 
     void setEmptyBinding() { m_bindPointSet.setNull(); m_point = BindPoint::makeInvalid(); m_category = SLANG_PARAMETER_CATEGORY_NONE; }
 
     BindSet* getBindSet() const { return m_bindSet; }
 
-    SlangResult setInplace(const void* data, size_t sizeInBytes);
-    SlangResult setBufferContents(const void* initialData, size_t sizeInBytes);
+    template <typename T>
+    T* getUniform() const { return reinterpret_cast<T*>(getUniform(sizeof(T))); }
+    void* getUniform(size_t size) const;
+
+    SlangResult setInplace(const void* data, size_t sizeInBytes) const;
+    SlangResult setBufferContents(const void* initialData, size_t sizeInBytes) const;
 
     BindLocation() {}
     BindLocation(BindSet* bindSet, slang::TypeLayoutReflection* typeLayout, const BindPoints& points, BindSet_Resource* resource = nullptr);
@@ -207,13 +212,22 @@ public:
     Resource* createBufferResource(slang::TypeLayoutReflection* type, size_t sizeInBytes, const void* initialData = nullptr);
     Resource* createBufferResource(slang::TypeReflection::Kind kind, size_t sizeInBytes, const void* initialData = nullptr);
 
+    Resource* createTextureResource(slang::TypeLayoutReflection* type);
+
         /// Calculate from the current location everything that is referenced
     void calcResourceLocations(const BindLocation& location, Slang::List<BindLocation>& outLocations);
     void calcChildResourceLocations(const BindLocation& location, Slang::List<BindLocation>& outLocations);
 
     void destroyResource(Resource* resource);
-    
+
+        /// Get all of the set bindings. This can be used to set the final actual desired output
+    void getBindings(Slang::List<BindLocation>& outLocations, Slang::List<Resource*>& outResources);
+
     BindSet();
+
+        /// True if is a texture type
+    static bool isTextureType(slang::TypeLayoutReflection* typeLayout);
+
 protected:
     Resource* _createBufferResource(slang::TypeReflection::Kind kind, slang::TypeLayoutReflection* typeLayout, size_t bufferSizeInBytes, size_t sizeInBytes, const void* initalData);
     
