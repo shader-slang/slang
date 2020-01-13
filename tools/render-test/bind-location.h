@@ -111,7 +111,7 @@ class BindSet;
 struct BindLocation
 {
     typedef BindLocation ThisType;
-    
+
     bool isValid() const { return m_typeLayout != nullptr; }
     bool isInvalid() const { return m_typeLayout == nullptr; }
 
@@ -137,11 +137,16 @@ struct BindLocation
 
     SlangResult setInplace(const void* data, size_t sizeInBytes) const;
 
+        /// Default Ctor - constructs as invalid
     BindLocation() {}
     BindLocation(slang::TypeLayoutReflection* typeLayout, const BindPoints& points, BindSet_Resource* resource = nullptr);
     BindLocation(slang::TypeLayoutReflection* typeLayout, SlangParameterCategory category, const BindPoint& point, BindSet_Resource* resource = nullptr);
 
     BindLocation(const ThisType& rhs) = default;
+
+        /// An invalid location.
+        /// Better to return this than use default Ctor as indicates validity in code directly.
+    static const BindLocation Invalid;
 
     slang::TypeLayoutReflection* m_typeLayout = nullptr;    ///< The type layout
 

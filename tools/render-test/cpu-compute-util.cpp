@@ -126,7 +126,7 @@ static CPUComputeUtil::Resource* _newOneTexture2D(int elemCount)
                 return SLANG_FAIL;
             }
 
-            BindLocation location;
+            BindLocation location = BindLocation::Invalid;
             SLANG_RETURN_ON_FAIL(bindRoot.parse(bindSet, entry.name, sourcePath, outStream, location));
 
             auto& srcEntry = layout.entries[entryIndex];

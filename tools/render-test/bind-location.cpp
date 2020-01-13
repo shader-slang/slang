@@ -8,6 +8,8 @@
 namespace renderer_test {
 using namespace Slang;
 
+/* static */const BindLocation BindLocation::Invalid;
+
 // !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! BindSet !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 
 BindSet::BindSet():
@@ -415,7 +417,7 @@ BindLocation BindSet::toField(const BindLocation& loc, slang::VariableLayoutRefl
     const Index categoryCount = Index(field->getCategoryCount());
     if (categoryCount == 0)
     {
-        return BindLocation();
+        return BindLocation::Invalid;
     }
 
     if (loc.m_bindPointSet)
@@ -431,7 +433,7 @@ BindLocation BindSet::toField(const BindLocation& loc, slang::VariableLayoutRefl
             auto const& point = loc.m_bindPointSet->m_points[category];
             if (point.isInvalid())
             {
-                return BindLocation();
+                return BindLocation::Invalid;
             }
 
             auto space = field->getBindingSpace(category);
@@ -464,8 +466,7 @@ BindLocation BindSet::toField(const BindLocation& loc, slang::VariableLayoutRefl
         }
     }
 
-    // Invalid
-    return BindLocation();
+    return BindLocation::Invalid;
 }
 
 BindLocation BindSet::toField(const BindLocation& loc, const char* name) const
@@ -507,7 +508,7 @@ BindLocation BindSet::toField(const BindLocation& loc, const char* name) const
     }
 
     // Invalid
-    return BindLocation();
+    return BindLocation::Invalid; 
 }
 
 BindLocation BindSet::toIndex(const BindLocation& loc, Index index) const
@@ -519,7 +520,7 @@ BindLocation BindSet::toIndex(const BindLocation& loc, Index index) const
     SLANG_ASSERT(index >= 0);
     if (index < 0)
     {
-        return BindLocation();
+        return BindLocation::Invalid;
     }
 
     auto typeLayout = loc.m_typeLayout;
@@ -528,7 +529,7 @@ BindLocation BindSet::toIndex(const BindLocation& loc, Index index) const
     // If it's a zero sized array, we may need to special case indirecting through a buffer that holds it's contents
     if (kind != slang::TypeReflection::Kind::Array)
     {
-        return BindLocation();
+        return BindLocation::Invalid;
     }
 
     // Find where the uniform aspect will be held
@@ -583,8 +584,7 @@ BindLocation BindSet::toIndex(const BindLocation& loc, Index index) const
         return BindLocation(elementTypeLayout, category, point, uniformResource);
     }
 
-    // Invalid
-    return BindLocation();
+    return BindLocation::Invalid;
 }
 
 
@@ -747,7 +747,7 @@ SlangResult BindRoot::parse(const BindSet& bindSet, const String& text, const St
     // We will parse the 'name' as may be path to a resource
     TokenReader parser(text);
 
-    BindLocation location; 
+    BindLocation location = BindLocation::Invalid; 
 
     {
         Token nameToken = parser.ReadToken();
@@ -940,7 +940,7 @@ BindLocation CPULikeBindRoot::find(const char* name)
 
     if (!varLayout)
     {
-        return BindLocation();
+        return BindLocation::Invalid;
     }
 
     // We don't need to worry about bindSpace because variable must be stored in the buffer 
