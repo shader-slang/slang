@@ -740,6 +740,46 @@ SlangResult BindLocation::setInplace(const void* data, size_t sizeInBytes) const
     return SLANG_FAIL;
 }
 
+bool BindLocation::operator==(const ThisType& rhs) const
+{
+    if (m_typeLayout != rhs.m_typeLayout ||
+        m_resource != rhs.m_resource)
+    {
+        return false;
+    }
+
+    if ((!m_bindPointSet) != (!rhs.m_bindPointSet))
+    {
+        return false;
+    }
+
+    if (m_bindPointSet)
+    {
+        return m_bindPointSet->m_points == rhs.m_bindPointSet->m_points;
+    }
+    else
+    {
+        return m_category == rhs.m_category && m_point == rhs.m_point;
+    }
+}
+
+int BindLocation::GetHashCode() const
+{
+    if (!m_typeLayout)
+    {
+        return 1;
+    }
+    if (m_bindPointSet)
+    {
+        return m_bindPointSet->GetHashCode();
+    }
+    else
+    {
+        return Slang::combineHash(Slang::combineHash(m_category, Slang::GetHashCode(m_typeLayout)), m_point.GetHashCode());
+    }
+}
+
+
 // !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! BindRoot !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 
 SlangResult BindRoot::parse(const BindSet& bindSet, const String& text, const String& sourcePath, WriterHelper outStream, BindLocation& outLocation)

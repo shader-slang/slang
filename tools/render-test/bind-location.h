@@ -36,6 +36,8 @@ struct BindPoint
 
 struct BindPoints
 {
+    typedef BindPoints ThisType;
+
     Slang::Index findSingle() const
     {
         Slang::Index found; 
@@ -72,6 +74,39 @@ struct BindPoints
             point.setInvalid();
         }
     }
+
+    bool operator==(const ThisType& rhs) const
+    {
+        for (Slang::Index i = 0; i < SLANG_PARAMETER_CATEGORY_COUNT; ++i)
+        {
+            if (m_points[i] != rhs.m_points[i])
+            {
+                return false;
+            }
+        }
+        return true;
+    }
+    bool operator!=(const ThisType& rhs) const { return !(*this == rhs); }
+
+    int GetHashCode() const
+    {
+        int hash = 0x5435abbc;
+        int bits = 0;
+        int bit = 1;
+        for (Slang::Index i = 0; i < SLANG_PARAMETER_CATEGORY_COUNT; ++i)
+        {
+            const auto& point = m_points[i];
+            if (point.isValid())
+            {
+                hash = Slang::combineHash(hash, point.GetHashCode());
+                bits |= bit;
+            }
+            bit += bit;
+        }
+        // The categories set is important too, so merge that in
+        return Slang::combineHash(bits, hash);
+    }
+
     BindPoint& operator[](SlangParameterCategory category) { return m_points[Slang::Index(category)]; }
     const BindPoint& operator[](SlangParameterCategory category) const { return m_points[Slang::Index(category)]; }
 
@@ -82,6 +117,8 @@ class BindPointSet : public Slang::RefObject
 {
 public:
     typedef Slang::RefObject Super;
+
+    int GetHashCode() const { return m_points.GetHashCode(); }
 
     BindPointSet(const BindPoints& points) :
         m_points(points)
@@ -137,6 +174,12 @@ struct BindLocation
 
     SlangResult setInplace(const void* data, size_t sizeInBytes) const;
 
+    bool operator==(const ThisType& rhs) const;
+    bool operator!=(const ThisType& rhs) const { return !(*this == rhs); }
+
+        /// Get the hash code
+    int GetHashCode() const;
+
         /// Default Ctor - constructs as invalid
     BindLocation() {}
     BindLocation(slang::TypeLayoutReflection* typeLayout, const BindPoints& points, BindSet_Resource* resource = nullptr);
@@ -155,7 +198,11 @@ struct BindLocation
     SlangParameterCategory m_category = SLANG_PARAMETER_CATEGORY_NONE;  ///< If there isn't a set this defines the category
     BindPoint m_point;                                     ///< If there isn't a bind point set, this defines the point
 
-    Slang::RefPtr<BindPointSet> m_bindPointSet;             ///< NOTE! Can only be written to if there is a single reference
+        /// Holds multiple BindPoints.
+        /// To keep invariants (such that GetHashCode and == work), it can only be set if
+        /// there is more than one category. If there is just one, m_category and m_point *MUST* be used. 
+        /// NOTE! Can only be written to if there is a single reference.
+    Slang::RefPtr<BindPointSet> m_bindPointSet;             
 };
 
 class BindSet
