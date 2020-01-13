@@ -210,45 +210,6 @@ class BindSet
 public:
     typedef BindSet_Resource Resource;
 
-    struct UniformLocation
-    {
-        typedef UniformLocation ThisType;
-
-        int GetHashCode() const
-        {
-            return Slang::combineHash(Slang::GetHashCode(m_resource), Slang::GetHashCode(m_offset));
-        }
-        bool operator==(const ThisType& rhs) const { return m_resource == rhs.m_resource && m_offset == rhs.m_offset; }
-        bool operator!=(const ThisType& rhs) const { return !(*this == rhs); }
-
-        Resource* m_resource;               ///< Resource it's in
-        size_t m_offset;                    ///< Offset in the resource
-    };
-
-    struct RegisterLocation
-    {
-        typedef RegisterLocation ThisType;
-
-        int GetHashCode() const
-        {
-            return Slang::combineHash(m_point.GetHashCode(), Slang::GetHashCode(m_category));
-        }
-        bool operator==(const ThisType& rhs) const
-        {
-            return m_category == rhs.m_category && m_point == rhs.m_point;
-        }
-        bool operator!=(const ThisType& rhs) const { return !(*this == rhs); }
-
-        SlangParameterCategory m_category;      ///< The category of parameter
-        BindPoint m_point;
-    };
-
-    Resource* getAt(Resource* resource, size_t offset) const;
-    void setAt(Resource* resource, size_t offset, Resource* value);
-
-    Resource* getAt(SlangParameterCategory category, const BindPoint& point) const;
-    void setAt(SlangParameterCategory category, const BindPoint& point, Resource* value);
-
     Resource* getAt(const BindLocation& loc) const;
     void setAt(const BindLocation& loc, Resource* resource);
     void setAt(const BindLocation& loc, SlangParameterCategory category, Resource* resource);
@@ -263,26 +224,6 @@ public:
     void calcChildResourceLocations(const BindLocation& location, Slang::List<BindLocation>& outLocations);
 
     void destroyResource(Resource* resource);
-
-        /// TODO(JS): Arghh! This doesn't work, quite as needed. I want to be able to get not only the binding locations
-        /// and resources but I need to also know the type of where the binding is set.
-        /// The map that stores whats where, does not store the type of the origin of the reference, only the resource it points to
-        ///
-        /// Now we have a few options. We could
-        /// 1) Store the location type. It couldn't be part of the key, it would have to be stored with the resource(!)
-        /// 2) Traverse from roots, looking for references, and then work out which ones have a binding
-        /// 3) A hybrid? Get the roots we know their types. Go through all resources which have types, and add them.
-        ///
-        /// Note we can't just look at what resources exist and traverse their types, because in the case of CPU binding, too
-        /// non typed constant buffers are created. 
-        ///
-        /// In some respects 2 is the cleanest, but for it to work we'd also need to keep track of resources that have already been
-        /// traversed in a map. 
-        ///
-        /// I suppose this stuff only counts for uniform binding. 
-
-        /// Get all of the set bindings. This can be used to set the final actual desired output.
-    void getBindings(Slang::List<BindLocation>& outLocations, Slang::List<Resource*>& outResources);
 
     BindLocation toField(const BindLocation& loc, slang::VariableLayoutReflection* field) const;
     BindLocation toField(const BindLocation& loc, const char* name) const;
@@ -300,8 +241,7 @@ protected:
     
     Slang::List<Resource*> m_resources;
 
-    Slang::Dictionary<RegisterLocation, Resource*> m_registerBindings;
-    Slang::Dictionary<UniformLocation, Resource*> m_uniformBindings;
+    Slang::Dictionary<BindLocation, Resource*> m_bindings;
 
     Slang::MemoryArena m_arena;
 };

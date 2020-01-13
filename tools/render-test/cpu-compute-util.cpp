@@ -251,7 +251,7 @@ static CPUComputeUtil::Resource* _newOneTexture2D(int elemCount)
         List<BindSet::Resource*> resources;
         List<RefPtr<Resource>> scopeResources;
 
-        bindSet.getBindings(locations, resources);
+        //bindSet.getBindings(locations, resources);
 
         for (Index i = 0; i < locations.getCount(); ++i)
         {

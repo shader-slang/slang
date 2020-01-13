@@ -17,55 +17,6 @@ BindSet::BindSet():
 {
 }
 
-BindSet::Resource* BindSet::getAt(Resource* resource, size_t offset) const
-{
-    UniformLocation location;
-    location.m_offset = offset;
-    location.m_resource = resource;
-
-    Resource** resourcePtr = m_uniformBindings.TryGetValue(location);
-    return resourcePtr ? *resourcePtr : nullptr;
-}
-
-void BindSet::setAt(BindSet::Resource* resource, size_t offset, BindSet::Resource* value)
-{
-    UniformLocation location;
-    location.m_offset = offset;
-    location.m_resource = resource;
-
-    // Note we don't remove when value == null, such that it is stored if should be nullptr
-    Resource** resourcePtr = m_uniformBindings.TryGetValueOrAdd(location, value);
-    if (resourcePtr)
-    {
-        *resourcePtr = value;
-    }
-}
-
-BindSet::Resource* BindSet::getAt(SlangParameterCategory category, const BindPoint& point) const
-{
-    RegisterLocation location;
-    location.m_category = category;
-    location.m_point = point;
-    
-    Resource** resourcePtr = m_registerBindings.TryGetValue(location);
-    return resourcePtr ? *resourcePtr : nullptr;
-}
-
-void BindSet::setAt(SlangParameterCategory category, const BindPoint& point, Resource* value)
-{
-    RegisterLocation location;
-
-    location.m_category = category;
-    location.m_point = point;
-    
-    // Note we don't remove when value == null, such that it is stored if should be nullptr
-    Resource** resourcePtr = m_registerBindings.TryGetValueOrAdd(location, value);
-    if (resourcePtr)
-    {
-        *resourcePtr = value;
-    }
-}
-
 void BindSet::setAt(const BindLocation& loc, Resource* resource)
 {
     SLANG_ASSERT(loc.isValid());
@@ -74,26 +25,11 @@ void BindSet::setAt(const BindLocation& loc, Resource* resource)
         return;
     }
 
-    if (loc.m_resource)
+    // Note we don't remove when value == null, such that it is stored if should be nullptr
+    Resource** resourcePtr = m_bindings.TryGetValueOrAdd(loc, resource);
+    if (resourcePtr)
     {
-        setAt(loc.m_resource, loc.m_point.m_offset, resource);
-    }
-    else
-    {
-        // We should have a single category to be able to lookup
-        SLANG_ASSERT(loc.m_bindPointSet == nullptr);
-        if (loc.m_bindPointSet)
-        {
-            // It's ambiguous. I guess strictly speaking we could search to see if there is a unique entry
-            // but getting to this point implies there is more than one option.
-
-            SLANG_ASSERT(!"Setting is ambiguous, so nothing set");
-            return;
-        }
-        else
-        {
-            setAt(loc.m_category, loc.m_point, resource);
-        }
+        *resourcePtr = resource;
     }
 }
 
@@ -105,24 +41,24 @@ void BindSet::setAt(const BindLocation& loc, SlangParameterCategory category, Re
         return;
     }
 
-    if (loc.m_resource)
+    const BindPoint* point = loc.getValidBindPointForCategory(category);
+    if (point)
     {
-        setAt(loc.m_resource, loc.m_point.m_offset, resource);
-    }
-    else
-    {
-        // We should have a single category to be able to lookup
-        SLANG_ASSERT(loc.m_bindPointSet == nullptr);
-        if (loc.m_bindPointSet)
+        if (loc.m_bindPointSet == nullptr)
         {
-            const auto& point = loc.m_bindPointSet->m_points.m_points[category];
-            setAt(category, point, resource);
+            // Can only have one category, so just set on that
+            setAt(loc, resource);
         }
         else
         {
-            SLANG_ASSERT(loc.m_category == category);
-            setAt(loc.m_category, loc.m_point, resource);
+
+            BindLocation catLoc(loc.m_typeLayout, category, *point, loc.m_resource);
+            setAt(catLoc, resource);
         }
+    }
+    else
+    {
+        SLANG_ASSERT(!"Does not have category");
     }
 }
 
@@ -133,24 +69,8 @@ BindSet::Resource* BindSet::getAt(const BindLocation& loc) const
     {
         return nullptr;
     }
-
-    if (loc.m_resource)
-    {
-        return getAt(loc.m_resource, loc.m_point.m_offset);
-    }
-    else
-    {
-        // We should have a single category to be able to lookup
-        SLANG_ASSERT(loc.m_bindPointSet == nullptr);
-        if (loc.m_bindPointSet)
-        {
-            // It's ambiguous. I guess strictly speaking we could search to see if there is a unique entry
-            // but getting to this point implies there is more than one option.
-            return nullptr;
-        }
-
-        return getAt(loc.m_category, loc.m_point);
-    }
+    Resource** resourcePtr = m_bindings.TryGetValue(loc);
+    return resourcePtr ? *resourcePtr : nullptr;
 }
 
 BindSet::Resource* BindSet::_createBufferResource(slang::TypeReflection::Kind kind, slang::TypeLayoutReflection* typeLayout, size_t bufferSizeInBytes, size_t initialSizeInBytes, const void* initialData)
@@ -289,12 +209,10 @@ void BindSet::destroyResource(Resource* resource)
         m_resources.fastRemoveAt(index);
 
         // I guess we should remove any bindings to it whilst we are at it
-        List<UniformLocation> locations;
-        for (const auto& pair : m_uniformBindings)
+        List<BindLocation> locations;
+        for (const auto& pair : m_bindings)
         {
-            const UniformLocation& location = pair.Key;
-            //Resource* resource = pair.Value;
-
+            const auto& location = pair.Key;
             if (location.m_resource == resource)
             {
                 locations.add(location);
@@ -303,36 +221,8 @@ void BindSet::destroyResource(Resource* resource)
 
         for (auto location : locations)
         {
-            m_uniformBindings.Remove(location);
+            m_bindings.Remove(location);
         }
-    }
-}
-
-void BindSet::getBindings(Slang::List<BindLocation>& outLocations, Slang::List<Resource*>& outResources)
-{
-    outLocations.clear();
-    outResources.clear();
-
-    for (const auto& pair : m_uniformBindings)
-    {
-        const UniformLocation& location = pair.Key;
-        Resource* resource = pair.Value;
-
-        // 
-        BindLocation bindLocation(nullptr, SLANG_PARAMETER_CATEGORY_UNIFORM, BindPoint(0, location.m_offset), location.m_resource);
-        outResources.add(resource);
-        outLocations.add(bindLocation);
-    }
-
-    for (const auto& pair : m_registerBindings)
-    {
-        const RegisterLocation& location = pair.Key;
-        Resource* resource = pair.Value;
-
-        BindLocation bindLocation(nullptr, location.m_category, location.m_point);
-
-        outResources.add(resource);
-        outLocations.add(bindLocation);
     }
 }
 
@@ -450,13 +340,11 @@ BindLocation BindSet::toField(const BindLocation& loc, slang::VariableLayoutRefl
         SLANG_ASSERT(categoryCount == 1);
         auto category = field->getCategoryByIndex(0);
 
-        // TODO(JS): This is a field so I don't need to call
         // If I'm going from mixed, then I will have multiple items being tracked (so won't be here)
         // If I'm not, then I'm getting an inplace field. It must be relative
-        // So it would seem I never need to call, and since I can't do that it must be relative.
+        // So it would seem I never need to call getBindingIndex, and since I can't do that it must be relative.
         // AND if it's relative well it must be in the same category.
-        // var->getBindingIndex()
-
+      
         if (category == loc.m_category)
         {
             auto space = field->getBindingSpace(category);
@@ -484,8 +372,8 @@ BindLocation BindSet::toField(const BindLocation& loc, const char* name) const
     if (loc.m_resource &&
         (kind == slang::TypeReflection::Kind::ConstantBuffer || kind == slang::TypeReflection::Kind::ParameterBlock))
     {
-        // Follow the pointer
-        BindSet::Resource* value = getAt(loc.m_resource, loc.m_point.m_offset);
+        // Follow the to associated resource
+        BindSet::Resource* value = getAt(loc);
         if (value)
         {
             typeLayout = typeLayout->getElementTypeLayout();
