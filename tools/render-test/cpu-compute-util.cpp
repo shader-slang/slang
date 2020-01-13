@@ -127,7 +127,7 @@ static CPUComputeUtil::Resource* _newOneTexture2D(int elemCount)
             }
 
             BindLocation location;
-            SLANG_RETURN_ON_FAIL(bindRoot.parse(entry.name, sourcePath, outStream, location));
+            SLANG_RETURN_ON_FAIL(bindRoot.parse(bindSet, entry.name, sourcePath, outStream, location));
 
             auto& srcEntry = layout.entries[entryIndex];
 
@@ -162,7 +162,7 @@ static CPUComputeUtil::Resource* _newOneTexture2D(int elemCount)
                     break;
                 case slang::TypeReflection::Kind::ConstantBuffer:
                 {
-                    SLANG_RETURN_ON_FAIL(location.setBufferContents(srcEntry.bufferData.getBuffer(), srcEntry.bufferData.getCount() * sizeof(unsigned int)));
+                    SLANG_RETURN_ON_FAIL(bindSet.setBufferContents(location, srcEntry.bufferData.getBuffer(), srcEntry.bufferData.getCount() * sizeof(unsigned int)));
                     break;
                 }
                 case slang::TypeReflection::Kind::ParameterBlock:

@@ -115,10 +115,6 @@ struct BindLocation
     bool isValid() const { return m_typeLayout != nullptr; }
     bool isInvalid() const { return m_typeLayout == nullptr; }
 
-    BindLocation toField(slang::VariableLayoutReflection* var) const;
-    BindLocation toField(const char* name) const;
-    BindLocation toIndex(Slang::Index index) const;
-
     const BindPointSet* getPointSet() const { return m_bindPointSet; }
     void setPoints(const BindPoints& points);
 
@@ -135,22 +131,18 @@ struct BindLocation
 
     void setEmptyBinding() { m_bindPointSet.setNull(); m_point = BindPoint::makeInvalid(); m_category = SLANG_PARAMETER_CATEGORY_NONE; }
 
-    BindSet* getBindSet() const { return m_bindSet; }
-
     template <typename T>
     T* getUniform() const { return reinterpret_cast<T*>(getUniform(sizeof(T))); }
     void* getUniform(size_t size) const;
 
     SlangResult setInplace(const void* data, size_t sizeInBytes) const;
-    SlangResult setBufferContents(const void* initialData, size_t sizeInBytes) const;
 
     BindLocation() {}
-    BindLocation(BindSet* bindSet, slang::TypeLayoutReflection* typeLayout, const BindPoints& points, BindSet_Resource* resource = nullptr);
-    BindLocation(BindSet* bindSet, slang::TypeLayoutReflection* typeLayout, SlangParameterCategory category, const BindPoint& point, BindSet_Resource* resource = nullptr);
+    BindLocation(slang::TypeLayoutReflection* typeLayout, const BindPoints& points, BindSet_Resource* resource = nullptr);
+    BindLocation(slang::TypeLayoutReflection* typeLayout, SlangParameterCategory category, const BindPoint& point, BindSet_Resource* resource = nullptr);
 
     BindLocation(const ThisType& rhs) = default;
 
-    BindSet* m_bindSet = nullptr;                           ///< Bind set we are traversing
     slang::TypeLayoutReflection* m_typeLayout = nullptr;    ///< The type layout
 
     BindSet_Resource* m_resource = nullptr;                 ///< The resource if we are in 
@@ -202,10 +194,10 @@ public:
     Resource* getAt(Resource* resource, size_t offset) const;
     void setAt(Resource* resource, size_t offset, Resource* value);
 
-    Resource* getAt(SlangParameterCategory category, const BindPoint& point);
+    Resource* getAt(SlangParameterCategory category, const BindPoint& point) const;
     void setAt(SlangParameterCategory category, const BindPoint& point, Resource* value);
 
-    Resource* getAt(const BindLocation& loc);
+    Resource* getAt(const BindLocation& loc) const;
     void setAt(const BindLocation& loc, Resource* resource);
     void setAt(const BindLocation& loc, SlangParameterCategory category, Resource* resource);
 
@@ -240,6 +232,12 @@ public:
         /// Get all of the set bindings. This can be used to set the final actual desired output.
     void getBindings(Slang::List<BindLocation>& outLocations, Slang::List<Resource*>& outResources);
 
+    BindLocation toField(const BindLocation& loc, slang::VariableLayoutReflection* field) const;
+    BindLocation toField(const BindLocation& loc, const char* name) const;
+    BindLocation toIndex(const BindLocation& location, Slang::Index index) const;
+
+    SlangResult setBufferContents(const BindLocation& loc, const void* initialData, size_t sizeInBytes) const;
+
     BindSet();
 
         /// True if is a texture type
@@ -273,7 +271,7 @@ public:
     virtual void getRoots(Slang::List<BindLocation>& outLocations) = 0;
 
         /// Parse (specifying some location in HLSL style expression) slice to get to a location.
-    SlangResult parse(const Slang::String& text, const Slang::String& sourcePath, Slang::WriterHelper streamOut, BindLocation& outLocation);
+    SlangResult parse(const BindSet& bindSet, const Slang::String& text, const Slang::String& sourcePath, Slang::WriterHelper streamOut, BindLocation& outLocation);
 };
 
 class CPULikeBindRoot : public BindRoot

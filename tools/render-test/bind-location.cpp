@@ -39,7 +39,7 @@ void BindSet::setAt(BindSet::Resource* resource, size_t offset, BindSet::Resourc
     }
 }
 
-BindSet::Resource* BindSet::getAt(SlangParameterCategory category, const BindPoint& point)
+BindSet::Resource* BindSet::getAt(SlangParameterCategory category, const BindPoint& point) const
 {
     RegisterLocation location;
     location.m_category = category;
@@ -124,7 +124,7 @@ void BindSet::setAt(const BindLocation& loc, SlangParameterCategory category, Re
     }
 }
 
-BindSet::Resource* BindSet::getAt(const BindLocation& loc)
+BindSet::Resource* BindSet::getAt(const BindLocation& loc) const
 {
     SLANG_ASSERT(loc.isValid());
     if (loc.isInvalid())
@@ -205,7 +205,6 @@ BindSet::Resource* BindSet::_createBufferResource(slang::TypeReflection::Kind ki
     }
 
     return false;
-
 }
 
 BindSet::Resource* BindSet::createTextureResource(slang::TypeLayoutReflection* typeLayout)
@@ -318,7 +317,7 @@ void BindSet::getBindings(Slang::List<BindLocation>& outLocations, Slang::List<R
         Resource* resource = pair.Value;
 
         // 
-        BindLocation bindLocation(this, nullptr, SLANG_PARAMETER_CATEGORY_UNIFORM, BindPoint(0, location.m_offset), location.m_resource);
+        BindLocation bindLocation(nullptr, SLANG_PARAMETER_CATEGORY_UNIFORM, BindPoint(0, location.m_offset), location.m_resource);
         outResources.add(resource);
         outLocations.add(bindLocation);
     }
@@ -328,20 +327,285 @@ void BindSet::getBindings(Slang::List<BindLocation>& outLocations, Slang::List<R
         const RegisterLocation& location = pair.Key;
         Resource* resource = pair.Value;
 
-        BindLocation bindLocation(this, nullptr, location.m_category, location.m_point);
+        BindLocation bindLocation(nullptr, location.m_category, location.m_point);
 
         outResources.add(resource);
         outLocations.add(bindLocation);
     }
 }
 
+// !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! BindSet !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+
+void BindSet::calcResourceLocations(const BindLocation& location, List<BindLocation>& outLocations)
+{
+    auto typeLayout = location.getTypeLayout();
+
+    const auto kind = typeLayout->getKind();
+    switch (kind)
+    {
+        case slang::TypeReflection::Kind::Array:
+        {
+            auto elementTypeLayout = typeLayout->getElementTypeLayout();
+            auto elementCount = int(typeLayout->getElementCount());
+
+            if (elementCount == 0)
+            {
+                outLocations.add(location);
+            }
+            else
+            {
+                for (Index i = 0; i < elementCount; ++i)
+                {
+                    BindLocation elementLocation = toIndex(location, i);
+                    calcChildResourceLocations(elementLocation, outLocations);
+                }
+            }
+            break;
+        }
+        case slang::TypeReflection::Kind::Struct:
+        {
+            auto structTypeLayout = typeLayout;
+
+            auto fieldCount = structTypeLayout->getFieldCount();
+            for (uint32_t ff = 0; ff < fieldCount; ++ff)
+            {
+                auto field = structTypeLayout->getFieldByIndex(ff);
+                BindLocation fieldLocation = toField(location, field);
+
+                calcChildResourceLocations(fieldLocation, outLocations);
+            }
+            break;
+        }
+
+        default: break;
+    }
+}
+
+void BindSet::calcChildResourceLocations(const BindLocation& location, Slang::List<BindLocation>& outLocations)
+{
+    auto typeLayout = location.getTypeLayout();
+
+    const auto kind = typeLayout->getKind();
+    switch (kind)
+    {
+        case slang::TypeReflection::Kind::SamplerState:
+
+        case slang::TypeReflection::Kind::ParameterBlock:
+        case slang::TypeReflection::Kind::ConstantBuffer:
+        case slang::TypeReflection::Kind::Resource:
+        case slang::TypeReflection::Kind::TextureBuffer:
+        case slang::TypeReflection::Kind::ShaderStorageBuffer:
+        {
+            //auto elementTypeLayout = typeLayout->getElementTypeLayout();
+            //const size_t elementSize = elementTypeLayout->getSize();
+
+            outLocations.add(location);
+            break;
+        }
+        default:
+        {
+            calcResourceLocations(location, outLocations);
+            break;
+        }
+    }
+}
+
+BindLocation BindSet::toField(const BindLocation& loc, slang::VariableLayoutReflection* field) const
+{
+    const Index categoryCount = Index(field->getCategoryCount());
+    if (categoryCount == 0)
+    {
+        return BindLocation();
+    }
+
+    if (loc.m_bindPointSet)
+    {
+        BindPoints bindPoints;
+        bindPoints.setInvalid();
+
+        // Copy over and add the ones found here
+        for (Index i = 0; i < categoryCount; ++i)
+        {
+            auto category = field->getCategoryByIndex(unsigned int(i));
+
+            auto const& point = loc.m_bindPointSet->m_points[category];
+            if (point.isInvalid())
+            {
+                return BindLocation();
+            }
+
+            auto space = field->getBindingSpace(category);
+            auto offset = field->getOffset(category);
+
+            // Set using new space, and offset
+            bindPoints[category] = BindPoint(space, point.m_offset + offset);
+        }
+
+        return BindLocation(field->getTypeLayout(), bindPoints, loc.m_resource);
+    }
+    else
+    {
+        SLANG_ASSERT(categoryCount == 1);
+        auto category = field->getCategoryByIndex(0);
+
+        // TODO(JS): This is a field so I don't need to call
+        // If I'm going from mixed, then I will have multiple items being tracked (so won't be here)
+        // If I'm not, then I'm getting an inplace field. It must be relative
+        // So it would seem I never need to call, and since I can't do that it must be relative.
+        // AND if it's relative well it must be in the same category.
+        // var->getBindingIndex()
+
+        if (category == loc.m_category)
+        {
+            auto space = field->getBindingSpace(category);
+            auto offset = field->getOffset(category);
+
+            return BindLocation(field->getTypeLayout(), category, BindPoint(space, loc.m_point.m_offset + offset), loc.m_resource);
+        }
+    }
+
+    // Invalid
+    return BindLocation();
+}
+
+BindLocation BindSet::toField(const BindLocation& loc, const char* name) const
+{
+    if (!loc.isValid())
+    {
+        return loc;
+    }
+
+    auto typeLayout = loc.m_typeLayout;
+    const auto kind = typeLayout->getKind();
+
+    // Strip constantBuffer wrapping, only really applies when we have handles to resources
+    // embedded in other types (like on CPU and CUDA)
+    if (loc.m_resource &&
+        (kind == slang::TypeReflection::Kind::ConstantBuffer || kind == slang::TypeReflection::Kind::ParameterBlock))
+    {
+        // Follow the pointer
+        BindSet::Resource* value = getAt(loc.m_resource, loc.m_point.m_offset);
+        if (value)
+        {
+            typeLayout = typeLayout->getElementTypeLayout();
+            return toField(BindLocation(typeLayout, SLANG_PARAMETER_CATEGORY_UNIFORM, BindPoint(0, 0), value), name);
+        }
+    }
+
+    if (kind == slang::TypeReflection::Kind::Struct)
+    {
+        slang::VariableLayoutReflection* varLayout = nullptr;
+        auto fieldCount = typeLayout->getFieldCount();
+        for (uint32_t ff = 0; ff < fieldCount; ++ff)
+        {
+            auto field = typeLayout->getFieldByIndex(ff);
+            if (strcmp(field->getName(), name) == 0)
+            {
+                return toField(loc, field);
+            }
+        }
+    }
+
+    // Invalid
+    return BindLocation();
+}
+
+BindLocation BindSet::toIndex(const BindLocation& loc, Index index) const
+{
+    if (!loc.isValid())
+    {
+        return loc;
+    }
+    SLANG_ASSERT(index >= 0);
+    if (index < 0)
+    {
+        return BindLocation();
+    }
+
+    auto typeLayout = loc.m_typeLayout;
+    const auto kind = typeLayout->getKind();
+
+    // If it's a zero sized array, we may need to special case indirecting through a buffer that holds it's contents
+    if (kind != slang::TypeReflection::Kind::Array)
+    {
+        return BindLocation();
+    }
+
+    // Find where the uniform aspect will be held
+    BindSet::Resource* uniformResource = loc.m_resource;
+    if (typeLayout->getElementCount() == 0)
+    {
+        // If we have a resource at this location, then we need to offset through that
+        BindSet::Resource* arrayResource = getAt(loc);
+        if (arrayResource)
+        {
+            uniformResource = arrayResource;
+        }
+    }
+
+    auto elementTypeLayout = typeLayout->getElementTypeLayout();
+
+    const Index categoryCount = Index(elementTypeLayout->getCategoryCount());
+
+    if (loc.m_bindPointSet)
+    {
+        BindPoints bindPoints;
+        bindPoints.setInvalid();
+
+        // Copy over and add the ones found here
+        for (Index i = 0; i < categoryCount; ++i)
+        {
+            auto category = elementTypeLayout->getCategoryByIndex(unsigned int(i));
+            const auto elementStride = typeLayout->getElementStride(category);
+            const auto& basePoint = loc.m_bindPointSet->m_points[category];
+            SLANG_ASSERT(basePoint.isValid());
+
+            bindPoints[category] = BindPoint(basePoint.m_space, basePoint.m_offset + elementStride * index);
+        }
+
+        return BindLocation(elementTypeLayout, bindPoints, uniformResource);
+    }
+    else
+    {
+        SLANG_ASSERT(categoryCount == 1);
+        auto category = elementTypeLayout->getCategoryByIndex(0);
+
+        const auto elementStride = typeLayout->getElementStride(category);
+
+        // TODO(JS): 
+        // Hmm, if its a different category, then not entirely clear what to do here.
+        // Just zero as we can't use the base we have.
+        // This might just be an error
+        const size_t base = (category == loc.m_category) ? loc.m_point.m_offset : 0;
+
+        BindPoint point(loc.m_point.m_space, base + elementStride * index);
+
+        return BindLocation(elementTypeLayout, category, point, uniformResource);
+    }
+
+    // Invalid
+    return BindLocation();
+}
+
+
+SlangResult BindSet::setBufferContents(const BindLocation& loc, const void* initialData, size_t sizeInBytes) const
+{
+    BindSet::Resource* resource = getAt(loc);
+    if (resource)
+    {
+        SLANG_ASSERT(resource->m_sizeInBytes >= sizeInBytes);
+        ::memcpy(resource->m_data, initialData, sizeInBytes);
+        return SLANG_OK;
+    }
+    return SLANG_FAIL;
+}
+
+
 // !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! BindLocation !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 
-BindLocation::BindLocation(BindSet* bindSet, slang::TypeLayoutReflection* typeLayout, const BindPoints& points, BindSet_Resource* resource) :
-    m_bindSet(bindSet),
+BindLocation::BindLocation(slang::TypeLayoutReflection* typeLayout, const BindPoints& points, BindSet_Resource* resource) :
     m_typeLayout(typeLayout)
 {
-    SLANG_ASSERT(bindSet);
     Slang::Index categoryIndex = points.findSingle();
     if (categoryIndex >= 0)
     {
@@ -356,14 +620,12 @@ BindLocation::BindLocation(BindSet* bindSet, slang::TypeLayoutReflection* typeLa
     }
 }
 
-BindLocation::BindLocation(BindSet* bindSet, slang::TypeLayoutReflection* typeLayout, SlangParameterCategory category, const BindPoint& point, BindSet_Resource* resource) :
-    m_bindSet(bindSet),
+BindLocation::BindLocation(slang::TypeLayoutReflection* typeLayout, SlangParameterCategory category, const BindPoint& point, BindSet_Resource* resource) :
     m_category(category),
     m_point(point),
     m_typeLayout(typeLayout),
     m_resource(resource)
 {
-    SLANG_ASSERT(bindSet);
 }
 
 BindPoint* BindLocation::getValidBindPointForCategory(SlangParameterCategory category)
@@ -446,183 +708,6 @@ void BindLocation::addOffset(SlangParameterCategory category, ptrdiff_t offset)
     }
 }
 
-BindLocation BindLocation::toField(slang::VariableLayoutReflection* field) const
-{
-    const Index categoryCount = Index(field->getCategoryCount());
-    if (categoryCount == 0)
-    {
-        return BindLocation();
-    }
-
-    if (m_bindPointSet)
-    {
-        BindPoints bindPoints;
-        bindPoints.setInvalid();
-
-        // Copy over and add the ones found here
-        for (Index i = 0; i < categoryCount; ++i)
-        {
-            auto category = field->getCategoryByIndex(unsigned int(i));
-
-            auto const& point = m_bindPointSet->m_points[category];
-            if (point.isInvalid())
-            {
-                return BindLocation();
-            }
-
-            auto space = field->getBindingSpace(category);
-            auto offset = field->getOffset(category);
-
-            // Set using new space, and offset
-            bindPoints[category] = BindPoint(space, point.m_offset + offset);
-        }
-
-        return BindLocation(m_bindSet, field->getTypeLayout(), bindPoints, m_resource);
-    }
-    else
-    {
-        SLANG_ASSERT(categoryCount == 1);
-        auto category = field->getCategoryByIndex(0);
- 
-        // TODO(JS): This is a field so I don't need to call
-        // If I'm going from mixed, then I will have multiple items being tracked (so won't be here)
-        // If I'm not, then I'm getting an inplace field. It must be relative
-        // So it would seem I never need to call, and since I can't do that it must be relative.
-        // AND if it's relative well it must be in the same category.
-        // var->getBindingIndex()
-
-        if (category == m_category)
-        {
-            auto space = field->getBindingSpace(category);
-            auto offset = field->getOffset(category);
-
-            return BindLocation(m_bindSet, field->getTypeLayout(), category, BindPoint(space, m_point.m_offset + offset), m_resource);
-        }
-    }
-
-    // Invalid
-    return BindLocation();
-}
-
-BindLocation BindLocation::toField(const char* name) const
-{
-    if (!isValid())
-    {
-        return *this;
-    }
-
-    auto typeLayout = m_typeLayout;
-    const auto kind = typeLayout->getKind();
-
-    // Strip constantBuffer wrapping, only really applies when we have handles to resources
-    // embedded in other types (like on CPU and CUDA)
-    if (m_resource && 
-        (kind == slang::TypeReflection::Kind::ConstantBuffer || kind == slang::TypeReflection::Kind::ParameterBlock))
-    {
-        // Follow the pointer
-        BindSet::Resource* value = m_bindSet->getAt(m_resource, m_point.m_offset);
-        if (value)
-        {
-            typeLayout = typeLayout->getElementTypeLayout();
-            return BindLocation(m_bindSet, typeLayout, SLANG_PARAMETER_CATEGORY_UNIFORM, BindPoint(0, 0), value).toField(name);
-        }
-    }
-
-    if (kind == slang::TypeReflection::Kind::Struct)
-    {
-        slang::VariableLayoutReflection* varLayout = nullptr;
-        auto fieldCount = typeLayout->getFieldCount();
-        for (uint32_t ff = 0; ff < fieldCount; ++ff)
-        {
-            auto field = typeLayout->getFieldByIndex(ff);
-            if (strcmp(field->getName(), name) == 0)
-            {
-                return toField(field);
-            }
-        }
-    }
-
-    // Invalid
-    return BindLocation();
-}
-
-BindLocation BindLocation::toIndex(Index index) const
-{
-    if (!isValid())
-    {
-        return *this;
-    }
-    SLANG_ASSERT(index >= 0);
-    if (index < 0)
-    {
-        return BindLocation();
-    }
-
-    auto typeLayout = m_typeLayout;
-    const auto kind = typeLayout->getKind();
-
-    // If it's a zero sized array, we may need to special case indirecting through a buffer that holds it's contents
-    if (kind != slang::TypeReflection::Kind::Array)
-    {
-        return BindLocation();
-    }
-
-    // Find where the uniform aspect will be held
-    BindSet::Resource* uniformResource = m_resource;
-    if (typeLayout->getElementCount() == 0)
-    {
-        // If we have a resource at this location, then we need to offset through that
-        BindSet::Resource* arrayResource = m_bindSet->getAt(*this);
-        if (arrayResource)
-        {
-            uniformResource = arrayResource;
-        }
-    }
-
-    auto elementTypeLayout = typeLayout->getElementTypeLayout();
-
-    const Index categoryCount = Index(elementTypeLayout->getCategoryCount());
-
-    if (m_bindPointSet)
-    {
-        BindPoints bindPoints;
-        bindPoints.setInvalid();
-
-        // Copy over and add the ones found here
-        for (Index i = 0; i < categoryCount; ++i)
-        {
-            auto category = elementTypeLayout->getCategoryByIndex(unsigned int(i));
-            const auto elementStride = typeLayout->getElementStride(category);
-            const auto& basePoint = m_bindPointSet->m_points[category];
-            SLANG_ASSERT(basePoint.isValid());
-
-            bindPoints[category] = BindPoint(basePoint.m_space, basePoint.m_offset + elementStride * index);
-        }
-
-        return BindLocation(m_bindSet, elementTypeLayout, bindPoints, uniformResource);
-    }
-    else
-    {
-        SLANG_ASSERT(categoryCount == 1);
-        auto category = elementTypeLayout->getCategoryByIndex(0);
-
-        const auto elementStride = typeLayout->getElementStride(category);
-
-        // TODO(JS): 
-        // Hmm, if its a different category, then not entirely clear what to do here.
-        // Just zero as we can't use the base we have.
-        // This might just be an error
-        const size_t base = (category == m_category) ? m_point.m_offset : 0;
-
-        BindPoint point(m_point.m_space, base + elementStride * index);
-
-        return BindLocation(m_bindSet, elementTypeLayout, category, point, uniformResource);
-    }
-
-    // Invalid
-    return BindLocation();
-}
-
 void* BindLocation::getUniform(size_t sizeInBytes) const
 {
     const BindPoint* point = getValidBindPointForCategory(SLANG_PARAMETER_CATEGORY_UNIFORM);
@@ -655,97 +740,9 @@ SlangResult BindLocation::setInplace(const void* data, size_t sizeInBytes) const
     return SLANG_FAIL;
 }
 
-SlangResult BindLocation::setBufferContents(const void* initialData, size_t sizeInBytes) const
-{
-    BindSet::Resource* resource = m_bindSet->getAt(*this);
-    if (resource)
-    {
-        SLANG_ASSERT(resource->m_sizeInBytes >= sizeInBytes);
-        ::memcpy(resource->m_data, initialData, sizeInBytes);
-        return SLANG_OK;
-    }
-    return SLANG_FAIL;
-}
-
-// !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! BindSet !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-
-void BindSet::calcResourceLocations(const BindLocation& location, List<BindLocation>& outLocations)
-{
-    auto typeLayout = location.getTypeLayout();
-
-    const auto kind = typeLayout->getKind();
-    switch (kind)
-    {
-        case slang::TypeReflection::Kind::Array:
-        {
-            auto elementTypeLayout = typeLayout->getElementTypeLayout();
-            auto elementCount = int(typeLayout->getElementCount());
-
-            if (elementCount == 0)
-            {
-                outLocations.add(location);
-            }
-            else
-            {
-                for (Index i = 0; i < elementCount; ++i)
-                {
-                    BindLocation elementLocation = location.toIndex(i);
-                    calcChildResourceLocations(elementLocation, outLocations);
-                }
-            }
-            break;
-        }
-        case slang::TypeReflection::Kind::Struct:
-        {
-            auto structTypeLayout = typeLayout;
-           
-            auto fieldCount = structTypeLayout->getFieldCount();
-            for (uint32_t ff = 0; ff < fieldCount; ++ff)
-            {
-                auto field = structTypeLayout->getFieldByIndex(ff);
-                BindLocation fieldLocation = location.toField(field);
-
-                calcChildResourceLocations(fieldLocation, outLocations);
-            }
-            break;
-        }
-        
-        default: break;
-    }
-}
-
-void BindSet::calcChildResourceLocations(const BindLocation& location, Slang::List<BindLocation>& outLocations)
-{
-    auto typeLayout = location.getTypeLayout();
-
-    const auto kind = typeLayout->getKind();
-    switch (kind)
-    {
-        case slang::TypeReflection::Kind::SamplerState:
-
-        case slang::TypeReflection::Kind::ParameterBlock:
-        case slang::TypeReflection::Kind::ConstantBuffer:
-        case slang::TypeReflection::Kind::Resource:
-        case slang::TypeReflection::Kind::TextureBuffer:
-        case slang::TypeReflection::Kind::ShaderStorageBuffer:
-        {
-            //auto elementTypeLayout = typeLayout->getElementTypeLayout();
-            //const size_t elementSize = elementTypeLayout->getSize();
-
-            outLocations.add(location);
-            break;
-        }
-        default:
-        {
-            calcResourceLocations(location, outLocations);
-            break;
-        }
-    }
-}
-
 // !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! BindRoot !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 
-SlangResult BindRoot::parse(const String& text, const String& sourcePath, WriterHelper outStream, BindLocation& outLocation)
+SlangResult BindRoot::parse(const BindSet& bindSet, const String& text, const String& sourcePath, WriterHelper outStream, BindLocation& outLocation)
 {
     // We will parse the 'name' as may be path to a resource
     TokenReader parser(text);
@@ -777,7 +774,7 @@ SlangResult BindRoot::parse(const String& text, const String& sourcePath, Writer
             int index = parser.ReadInt();
             SLANG_ASSERT(index >= 0);
 
-            location = location.toIndex(index);
+            location = bindSet.toIndex(location, index);
             if (location.isInvalid())
             {
                 outStream.print("Unable to find entry in '%d' in '%s'\n", index, text.getBuffer());
@@ -790,7 +787,7 @@ SlangResult BindRoot::parse(const String& text, const String& sourcePath, Writer
             parser.ReadToken();
             Token identifierToken = parser.ReadMatchingToken(TokenType::Identifier);
 
-            location = location.toField(identifierToken.Content.getBuffer());
+            location = bindSet.toField(location, identifierToken.Content.getBuffer());
             if (location.isInvalid())
             {
                 outStream.print("Unable to find field '%s' in '%s'\n", identifierToken.Content.getBuffer(), text.getBuffer());
@@ -951,7 +948,7 @@ BindLocation CPULikeBindRoot::find(const char* name)
     // TODO(JS): Where is getBindingIndex supposed to be used. It seems the offset here will do the right thing
     auto offset = varLayout->getOffset(SLANG_PARAMETER_CATEGORY_UNIFORM);
 
-    return BindLocation(m_bindSet, varLayout->getTypeLayout(), SLANG_PARAMETER_CATEGORY_UNIFORM, BindPoint(0, offset), resource);
+    return BindLocation(varLayout->getTypeLayout(), SLANG_PARAMETER_CATEGORY_UNIFORM, BindPoint(0, offset), resource);
 }
 
 SlangResult CPULikeBindRoot::setArrayCount(const BindLocation& location, int count)
@@ -1035,7 +1032,7 @@ void CPULikeBindRoot::getRoots(Slang::List<BindLocation>& outLocations)
 
             auto offset = parameter->getOffset(SLANG_PARAMETER_CATEGORY_UNIFORM);
 
-            BindLocation location(m_bindSet, parameter->getTypeLayout(), SLANG_PARAMETER_CATEGORY_UNIFORM, BindPoint(0, offset), m_entryPointBuffer);
+            BindLocation location(parameter->getTypeLayout(), SLANG_PARAMETER_CATEGORY_UNIFORM, BindPoint(0, offset), m_entryPointBuffer);
             outLocations.add(location);
         }
     }
@@ -1049,16 +1046,15 @@ void CPULikeBindRoot::getRoots(Slang::List<BindLocation>& outLocations)
 
             auto offset = parameter->getOffset(SLANG_PARAMETER_CATEGORY_UNIFORM);
 
-            BindLocation location(m_bindSet, parameter->getTypeLayout(), SLANG_PARAMETER_CATEGORY_UNIFORM, BindPoint(0, offset), m_rootBuffer);
+            BindLocation location(parameter->getTypeLayout(), SLANG_PARAMETER_CATEGORY_UNIFORM, BindPoint(0, offset), m_rootBuffer);
             outLocations.add(location);
         }
     }
 }
 
-static void _addDefaultBuffersRec(const BindLocation& loc)
+static void _addDefaultBuffersRec(BindSet* bindSet, const BindLocation& loc)
 {
     // See if there is a resource attached there
-    BindSet* bindSet = loc.getBindSet();
     auto typeLayout = loc.getTypeLayout();
 
     const auto kind = typeLayout->getKind();
@@ -1081,8 +1077,8 @@ static void _addDefaultBuffersRec(const BindLocation& loc)
             }
 
             // Recurse into buffer
-            BindLocation childLocation(bindSet, elementTypeLayout, SLANG_PARAMETER_CATEGORY_UNIFORM, BindPoint(0, 0), resource );
-            _addDefaultBuffersRec(childLocation);
+            BindLocation childLocation(elementTypeLayout, SLANG_PARAMETER_CATEGORY_UNIFORM, BindPoint(0, 0), resource );
+            _addDefaultBuffersRec(bindSet, childLocation);
             return;
         }
         default: break;    
@@ -1094,7 +1090,7 @@ static void _addDefaultBuffersRec(const BindLocation& loc)
         bindSet->calcResourceLocations(loc, childLocations);
         for (auto& childLocation : childLocations)
         {
-            _addDefaultBuffersRec(childLocation);
+            _addDefaultBuffersRec(bindSet, childLocation);
         }
     }
 }
@@ -1106,7 +1102,7 @@ void CPULikeBindRoot::addDefaultBuffers()
 
     for (auto& location : rootLocations)
     {
-        _addDefaultBuffersRec(location);
+        _addDefaultBuffersRec(m_bindSet, location);
     }
 }
 
