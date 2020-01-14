@@ -135,9 +135,12 @@ struct BindSet_Resource
     uint8_t* m_data;
     size_t m_sizeInBytes;                           ///< Total size in bytes
     size_t m_elementCount;                          ///< Only applicable on an array like type, else 0
-    void* m_userData;                               
 
-    Slang::RefPtr<Slang::RefObject> m_target;                     ///< The resource on the target. Allows an implementation to store.  
+        /// Can be set by user code to indicate the origin of contents/definition of a resource, such that actual resource can be later constructed.
+        /// -1 is used to indicate it is not set.
+    Slang::Index m_userIndex = -1;                  
+
+    Slang::RefPtr<Slang::RefObject> m_target;       ///< Can be used to store data related to an actual target resource. 
 };
 
 class BindSet;
@@ -275,6 +278,9 @@ public:
 
         /// Parse (specifying some location in HLSL style expression) slice to get to a location.
     SlangResult parse(const Slang::String& text, const Slang::String& sourcePath, Slang::WriterHelper streamOut, BindLocation& outLocation);
+
+        /// Get the bindset
+    BindSet* getBindSet() const { return m_bindSet; }
 
 protected:
     

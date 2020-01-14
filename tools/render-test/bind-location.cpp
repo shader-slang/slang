@@ -91,7 +91,7 @@ BindSet::Resource* BindSet::_createBufferResource(slang::TypeReflection::Kind ki
     resource->m_sizeInBytes = bufferSizeInBytes;
     resource->m_elementCount = 0;
     resource->m_type = typeLayout;
-    resource->m_userData = nullptr;
+    resource->m_userIndex = -1;
 
     resource->m_data = (uint8_t*)m_arena.allocateAligned(bufferSizeInBytes, 16);
 
@@ -152,7 +152,7 @@ BindSet::Resource* BindSet::createTextureResource(slang::TypeLayoutReflection* t
     resource->m_elementCount = 0;
     resource->m_type = typeLayout;
     resource->m_data = nullptr;
-    resource->m_userData = nullptr;
+    resource->m_userIndex = -1;
 
     m_resources.add(resource);
 

@@ -4,6 +4,10 @@
 #include "core/slang-basic.h"
 #include "core/slang-random-generator.h"
 
+#include "core/slang-writer.h"
+
+#include "bind-location.h"
+
 #include "render.h"
 
 namespace renderer_test {
@@ -92,6 +96,12 @@ public:
     void updateForTarget(SlangCompileTarget target);
 
     void parse(Slang::RandomGenerator* rand, const char* source);
+
+        /// Adds to bind set resources as defined in entries.
+        /// Note: No actual resources are created on a device, these are just the 'Resource' structures that are held on the BindSet
+        /// For buffers, the Resources will be setup with the contents of the entry.
+        /// That if a resource is created that maps to an entry, the m_userData member of Resource will be set to it's index
+    static SlangResult addBindSetResources(const Slang::List<ShaderInputLayoutEntry>& entries, const Slang::String& sourcePath, Slang::WriterHelper outError, BindRoot& bindRoot);
 };
 
 void generateTextureDataRGB8(TextureData& output, const InputTextureDesc& desc);
