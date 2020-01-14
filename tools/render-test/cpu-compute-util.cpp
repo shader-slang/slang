@@ -105,6 +105,8 @@ static CPUComputeUtil::Resource* _newOneTexture2D(int elemCount)
 
     CPULikeBindRoot bindRoot;
     bindRoot.init(&bindSet, reflection, 0);
+
+    // This will set up constant buffer that are contained from the roots
     bindRoot.addDefaultBuffers();
 
     // Okay lets iterate adding buffers
@@ -127,7 +129,7 @@ static CPUComputeUtil::Resource* _newOneTexture2D(int elemCount)
             }
 
             BindLocation location = BindLocation::Invalid;
-            SLANG_RETURN_ON_FAIL(bindRoot.parse(bindSet, entry.name, sourcePath, outStream, location));
+            SLANG_RETURN_ON_FAIL(bindRoot.parse(entry.name, sourcePath, outStream, location));
 
             auto& srcEntry = layout.entries[entryIndex];
 
@@ -147,7 +149,6 @@ static CPUComputeUtil::Resource* _newOneTexture2D(int elemCount)
                         }
                         break;
                     }
-                    SLANG_RETURN_ON_FAIL(location.setInplace(srcEntry.bufferData.getBuffer(), srcEntry.bufferData.getCount() * sizeof(unsigned int)));
                     break;
                 }
                 case slang::TypeReflection::Kind::Vector:
@@ -155,7 +156,7 @@ static CPUComputeUtil::Resource* _newOneTexture2D(int elemCount)
                 case slang::TypeReflection::Kind::Scalar:
                 case slang::TypeReflection::Kind::Struct:
                 {
-                    SLANG_RETURN_ON_FAIL(location.setInplace(srcEntry.bufferData.getBuffer(), srcEntry.bufferData.getCount() * sizeof(unsigned int)));
+                    SLANG_RETURN_ON_FAIL(location.setUniform(srcEntry.bufferData.getBuffer(), srcEntry.bufferData.getCount() * sizeof(unsigned int)));
                     break;
                 }
                 default:
@@ -201,7 +202,7 @@ static CPUComputeUtil::Resource* _newOneTexture2D(int elemCount)
                     {
                         // We don't bother setting any data
                         BindSet::Resource* resource = bindSet.createTextureResource(typeLayout);
-                        resource->m_userData = (void*)&srcEntry;;
+                        resource->m_userData = (void*)&srcEntry;
 
                         bindSet.setAt(location, resource);
                         break;
@@ -223,6 +224,8 @@ static CPUComputeUtil::Resource* _newOneTexture2D(int elemCount)
                             size_t bufferSize = srcEntry.bufferData.getCount() * sizeof(unsigned int);
 
                             BindSet::Resource* resource = bindSet.createBufferResource(typeLayout, bufferSize, srcEntry.bufferData.getBuffer());
+                            SLANG_ASSERT(resource);
+
                             resource->m_userData = (void*)&srcEntry;
 
                             bindSet.setAt(location, resource);
@@ -247,111 +250,160 @@ static CPUComputeUtil::Resource* _newOneTexture2D(int elemCount)
     // The final stage is to actual set up the CPU based variables
 
     {
-        List<BindLocation> locations;
-        List<BindSet::Resource*> resources;
-        List<RefPtr<Resource>> scopeResources;
-
-        //bindSet.getBindings(locations, resources);
-
-        for (Index i = 0; i < locations.getCount(); ++i)
+        // First create all of the resources
+        // We don't need to create anything backed by a buffer on CPU, as the memory buffer as provided
+        // by BindSet::Resource can just be used
         {
-            const auto& location = locations[i];
-            BindSet::Resource* resource = resources[i];
+            const auto& resources = bindSet.getResources();
 
-            // Okay now we need to set up the actual handles that CPU will follow.
-
-            auto typeLayout = location.getTypeLayout();
-
-            const auto kind = typeLayout->getKind();
-            switch (kind)
+            for (BindSet::Resource* resource : resources)
             {
-                case slang::TypeReflection::Kind::Array:
+                auto typeLayout = resource->m_type;
+                if (typeLayout == nullptr)
                 {
-                    auto elementCount = int(typeLayout->getElementCount());
-                    if (elementCount == 0)
-                    {
-                        BindSet::Resource* resource = bindSet.getAt(location);
-                        CPPPrelude::Array<uint8_t>* array = location.getUniform<CPPPrelude::Array<uint8_t> >();
+                    // We need type layout here to create anything
+                    continue;
+                }
 
-                        // If set, we setup the data needed for array on CPU side
-                        if (resource && array)
+                // TODO(JS):
+                // Here we should be using information about what textures hold to create appropriate
+                // textures. For now we only support 2d textures that always return 1.
+                const auto kind = typeLayout->getKind();
+                switch (kind)
+                {
+                    case slang::TypeReflection::Kind::Resource:
+                    {
+                        auto type = typeLayout->getType();
+                        auto shape = type->getResourceShape();
+
+                        //auto access = type->getResourceAccess();
+
+                        switch (shape & SLANG_RESOURCE_BASE_SHAPE_MASK)
                         {
-                            array->data = resource->m_data;
-                            array->count = resource->m_elementCount;
+                            case SLANG_TEXTURE_2D:
+                            {
+                                ShaderInputLayoutEntry* input = (ShaderInputLayoutEntry*)resource->m_userData;
+
+                                slang::TypeReflection* typeReflection = typeLayout->getResourceResultType();
+
+                                int count = 1;
+                                if (typeReflection->getKind() == slang::TypeReflection::Kind::Vector)
+                                {
+                                    count = int(typeReflection->getElementCount());
+                                }
+
+                                // TODO(JS): Should use the input setup to work how to create this texture
+                                // Store the target specific value
+                                resource->m_target = _newOneTexture2D(count);
+                                break;
+                            }
+                            case SLANG_TEXTURE_1D:
+                            case SLANG_TEXTURE_3D:
+                            case SLANG_TEXTURE_CUBE:
+                            case SLANG_TEXTURE_BUFFER:
+                            {
+                                // Need a CPU impl for these...
+                                // For now we can just leave as target will just be nullptr
+                                break;
+                            }
+
+                            case SLANG_BYTE_ADDRESS_BUFFER:
+                            case SLANG_STRUCTURED_BUFFER:
+                            {
+                                // On CPU we just use the memory in the BindSet buffer, so don't need to create anything
+                                break;
+                            }
+
                         }
                     }
-                    break;
+                    default: break;
                 }
-                case slang::TypeReflection::Kind::ConstantBuffer:
-                case slang::TypeReflection::Kind::ParameterBlock:
+            }
+        }
+
+        // Now we need to go through all of the bindings and set the appropriate data
+        {
+            List<BindLocation> locations;
+            List<BindSet::Resource*> values;
+            bindSet.getBindings(locations, values);
+
+            for (Index i = 0; i < locations.getCount(); ++i)
+            {
+                const auto& location = locations[i];
+                BindSet::Resource* value = values[i];
+
+                // Okay now we need to set up the actual handles that CPU will follow.
+                auto typeLayout = location.getTypeLayout();
+
+                const auto kind = typeLayout->getKind();
+                switch (kind)
                 {
-                    // These map down to pointers. In our case the contents of the resource
-                    BindSet::Resource* resource = bindSet.getAt(location);
-
-                    void* data = resource ? resource->m_data : nullptr;
-                    location.setInplace(&data, sizeof(data));
-                    break;
-                }
-                case slang::TypeReflection::Kind::Resource:
-                {
-                    auto type = typeLayout->getType();
-                    auto shape = type->getResourceShape();
-
-                    //auto access = type->getResourceAccess();
-
-                    switch (shape & SLANG_RESOURCE_BASE_SHAPE_MASK)
+                    case slang::TypeReflection::Kind::Array:
                     {
-                        default:
-                            assert(!"unhandled case");
-                            break;
-                        case SLANG_TEXTURE_2D:
+                        auto elementCount = int(typeLayout->getElementCount());
+                        if (elementCount == 0)
                         {
-                            slang::TypeReflection* typeReflection = location.getTypeLayout()->getResourceResultType();
+                            CPPPrelude::Array<uint8_t>* array = location.getUniform<CPPPrelude::Array<uint8_t> >();
 
-                            int count = 1;
-                            if (typeReflection->getKind() == slang::TypeReflection::Kind::Vector)
+                            // If set, we setup the data needed for array on CPU side
+                            if (value && array)
                             {
-                                count = int(typeReflection->getElementCount());
+                                array->data = value->m_data;
+                                array->count = value->m_elementCount;
                             }
-
-                            RefPtr<Resource> resource = _newOneTexture2D(count);
-                            scopeResources.add(resource);
-
-                            location.setInplace(resource.readRef(), sizeof(*resource.readRef()));
-                            break;
                         }
-                        case SLANG_TEXTURE_1D:
-                        case SLANG_TEXTURE_3D:
-                        case SLANG_TEXTURE_CUBE:
-                        case SLANG_TEXTURE_BUFFER:
+                        break;
+                    }
+                    case slang::TypeReflection::Kind::ConstantBuffer:
+                    case slang::TypeReflection::Kind::ParameterBlock:
+                    {
+                        // These map down to pointers. In our case the contents of the resource
+                        void* data = value ? value->m_data : nullptr;
+                        location.setUniform(&data, sizeof(data));
+                        break;
+                    }
+                    case slang::TypeReflection::Kind::Resource:
+                    {
+                        auto type = typeLayout->getType();
+                        auto shape = type->getResourceShape();
+
+                        //auto access = type->getResourceAccess();
+
+                        switch (shape & SLANG_RESOURCE_BASE_SHAPE_MASK)
                         {
-                            // Just set to null for now
-                            Resource* resource = nullptr;
-                            location.setInplace(&resource, sizeof(resource));
-                            break;
-                        }
-                        case SLANG_STRUCTURED_BUFFER:
-                        {
-                            BindSet::Resource* resource = bindSet.getAt(location);
-                            if (resource)
+                            default:
+                                assert(!"unhandled case");
+                                break;
+                            case SLANG_TEXTURE_1D:
+                            case SLANG_TEXTURE_3D:
+                            case SLANG_TEXTURE_CUBE:
+                            case SLANG_TEXTURE_BUFFER:
+                            case SLANG_TEXTURE_2D:
                             {
-                                auto& dstBuf = *location.getUniform<CPPPrelude::StructuredBuffer<uint8_t> >();
-                                dstBuf.data = (uint8_t*)resource->m_data;
-                                dstBuf.count = resource->m_elementCount;
+                                Resource* targetResource = value ? static_cast<Resource*>(value->m_target.Ptr()) : nullptr;
+                                *location.getUniform<void*>() = targetResource ? targetResource->getInterface() : nullptr;
+                                break;
                             }
-                            return SLANG_OK;
-                        }
-                        case SLANG_BYTE_ADDRESS_BUFFER:
-                        {
-                            BindSet::Resource* resource = bindSet.getAt(location);
-
-                            if (resource)
+                            case SLANG_STRUCTURED_BUFFER:
                             {
-                                auto& dstBuf = *location.getUniform<CPPPrelude::ByteAddressBuffer>();
-                                dstBuf.data = (uint32_t*)resource->m_data;
-                                dstBuf.sizeInBytes = resource->m_sizeInBytes;
+                                if (value)
+                                {
+                                    auto& dstBuf = *location.getUniform<CPPPrelude::StructuredBuffer<uint8_t> >();
+                                    dstBuf.data = (uint8_t*)value->m_data;
+                                    dstBuf.count = value->m_elementCount;
+                                }
+                                return SLANG_OK;
                             }
-                            return SLANG_OK;
+                            case SLANG_BYTE_ADDRESS_BUFFER:
+                            {
+                                if (value)
+                                {
+                                    auto& dstBuf = *location.getUniform<CPPPrelude::ByteAddressBuffer>();
+                                    dstBuf.data = (uint32_t*)value->m_data;
+                                    dstBuf.sizeInBytes = value->m_sizeInBytes;
+                                }
+                                return SLANG_OK;
+                            }
                         }
                     }
                 }

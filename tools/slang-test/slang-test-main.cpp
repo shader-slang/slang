@@ -2841,8 +2841,10 @@ SlangResult innerMain(int argc, char** argv)
     /*auto computeTestCategory = */categorySet.add("compute", fullTestCategory);
     auto vulkanTestCategory = categorySet.add("vulkan", fullTestCategory);
     auto unitTestCatagory = categorySet.add("unit-test", fullTestCategory);
+    auto cudaTestCategory = categorySet.add("cuda", fullTestCategory);
+
     auto compatibilityIssueCategory = categorySet.add("compatibility-issue", fullTestCategory);
-    
+        
 #if SLANG_WINDOWS_FAMILY
     auto windowsCategory = categorySet.add("windows", fullTestCategory);
 #endif
@@ -2851,13 +2853,13 @@ SlangResult innerMain(int argc, char** argv)
     auto unixCatagory = categorySet.add("unix", fullTestCategory);
 #endif
 
-
     // An un-categorized test will always belong to the `full` category
     categorySet.defaultCategory = fullTestCategory;
 
     TestCategory* fxcCategory = nullptr;
     TestCategory* dxcCategory = nullptr;
     TestCategory* glslangCategory = nullptr;
+    TestCategory* nvrtcCategory = nullptr; 
 
     // Work out what backends/pass-thrus are available
     {
@@ -2884,6 +2886,10 @@ SlangResult innerMain(int argc, char** argv)
         if (context.availableBackendFlags & PassThroughFlag::Dxc)
         {
             dxcCategory = categorySet.add("dxc", fullTestCategory);
+        }
+        if (context.availableBackendFlags & PassThroughFlag::NVRTC)
+        {
+            nvrtcCategory = categorySet.add("nvrtc", fullTestCategory);
         }
     }
 

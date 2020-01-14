@@ -18,7 +18,7 @@ struct BindPoint
     bool isValid() const { return m_space >= 0; }
     bool isInvalid() const { return m_space < 0; }
 
-    void setInvalid() { m_space = -1; }
+    void setInvalid() { m_space = -1; m_offset = 0; }
 
     bool operator==(const ThisType& rhs) const { return m_space == rhs.m_space && m_offset == rhs.m_offset; }
     bool operator!=(const ThisType& rhs) const { return !(*this == rhs); }
@@ -93,7 +93,7 @@ struct BindPoints
         int hash = 0x5435abbc;
         int bits = 0;
         int bit = 1;
-        for (Slang::Index i = 0; i < SLANG_PARAMETER_CATEGORY_COUNT; ++i)
+        for (Slang::Index i = 0; i < SLANG_PARAMETER_CATEGORY_COUNT; ++i, bit += bit)
         {
             const auto& point = m_points[i];
             if (point.isValid())
@@ -101,7 +101,6 @@ struct BindPoints
                 hash = Slang::combineHash(hash, point.GetHashCode());
                 bits |= bit;
             }
-            bit += bit;
         }
         // The categories set is important too, so merge that in
         return Slang::combineHash(bits, hash);
@@ -136,7 +135,9 @@ struct BindSet_Resource
     uint8_t* m_data;
     size_t m_sizeInBytes;                           ///< Total size in bytes
     size_t m_elementCount;                          ///< Only applicable on an array like type, else 0
-    void* m_userData;
+    void* m_userData;                               
+
+    Slang::RefPtr<Slang::RefObject> m_target;                     ///< The resource on the target. Allows an implementation to store.  
 };
 
 class BindSet;
@@ -172,7 +173,8 @@ struct BindLocation
     T* getUniform() const { return reinterpret_cast<T*>(getUniform(sizeof(T))); }
     void* getUniform(size_t size) const;
 
-    SlangResult setInplace(const void* data, size_t sizeInBytes) const;
+        /// Set uniform data
+    SlangResult setUniform(const void* data, size_t sizeInBytes) const;
 
     bool operator==(const ThisType& rhs) const;
     bool operator!=(const ThisType& rhs) const { return !(*this == rhs); }
@@ -231,7 +233,16 @@ public:
 
     SlangResult setBufferContents(const BindLocation& loc, const void* initialData, size_t sizeInBytes) const;
 
+        /// Get all of the resources
+    const Slang::List<Resource*>& getResources() const { return m_resources; }
+        /// Get all of the bindings
+    void getBindings(Slang::List<BindLocation>& outLocations, Slang::List<Resource*>& outResources) const;
+
+        /// Ctor
     BindSet();
+
+        /// Dtor
+    ~BindSet();
 
         /// True if is a texture type
     static bool isTextureType(slang::TypeLayoutReflection* typeLayout);
@@ -263,7 +274,11 @@ public:
     virtual void getRoots(Slang::List<BindLocation>& outLocations) = 0;
 
         /// Parse (specifying some location in HLSL style expression) slice to get to a location.
-    SlangResult parse(const BindSet& bindSet, const Slang::String& text, const Slang::String& sourcePath, Slang::WriterHelper streamOut, BindLocation& outLocation);
+    SlangResult parse(const Slang::String& text, const Slang::String& sourcePath, Slang::WriterHelper streamOut, BindLocation& outLocation);
+
+protected:
+    
+    BindSet* m_bindSet = nullptr;
 };
 
 class CPULikeBindRoot : public BindRoot
@@ -290,7 +305,6 @@ public:
     Resource* m_rootBuffer = nullptr;
     Resource* m_entryPointBuffer = nullptr;
     slang::EntryPointReflection* m_entryPoint;
-    BindSet* m_bindSet = nullptr;
 };
 
 } // renderer_test

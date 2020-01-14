@@ -17,6 +17,14 @@ BindSet::BindSet():
 {
 }
 
+BindSet::~BindSet()
+{
+    for (auto resource : m_resources)
+    {
+        resource->~Resource();
+    }
+}
+
 void BindSet::setAt(const BindLocation& loc, Resource* resource)
 {
     SLANG_ASSERT(loc.isValid());
@@ -193,8 +201,12 @@ BindSet::Resource* BindSet::createBufferResource(slang::TypeLayoutReflection* ty
             }
             break;
         }
+
+
         default: break;
     }
+
+    SLANG_ASSERT(!"Unable to construct this type of buffer");
     return nullptr;
 }
 
@@ -223,12 +235,13 @@ void BindSet::destroyResource(Resource* resource)
         {
             m_bindings.Remove(location);
         }
+
+        // Run the dtor
+        resource->~Resource();
     }
 }
 
-// !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! BindSet !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-
-void BindSet::calcResourceLocations(const BindLocation& location, List<BindLocation>& outLocations)
+void BindSet::calcChildResourceLocations(const BindLocation& location, List<BindLocation>& outLocations)
 {
     auto typeLayout = location.getTypeLayout();
 
@@ -237,14 +250,12 @@ void BindSet::calcResourceLocations(const BindLocation& location, List<BindLocat
     {
         case slang::TypeReflection::Kind::Array:
         {
-            auto elementTypeLayout = typeLayout->getElementTypeLayout();
+            auto elementTypeLayout = typeLayout->getElementTypeLayout(); 
             auto elementCount = int(typeLayout->getElementCount());
 
-            if (elementCount == 0)
-            {
-                outLocations.add(location);
-            }
-            else
+            // We only iterate over the array, if it's a fixed array (not an unbounded array)
+            // as it is then the elements are much like the fields of a struct and so 'children'.
+            if (elementCount != 0)
             {
                 for (Index i = 0; i < elementCount; ++i)
                 {
@@ -273,13 +284,28 @@ void BindSet::calcResourceLocations(const BindLocation& location, List<BindLocat
     }
 }
 
-void BindSet::calcChildResourceLocations(const BindLocation& location, Slang::List<BindLocation>& outLocations)
+void BindSet::calcResourceLocations(const BindLocation& location, Slang::List<BindLocation>& outLocations)
 {
     auto typeLayout = location.getTypeLayout();
 
     const auto kind = typeLayout->getKind();
     switch (kind)
     {
+        case slang::TypeReflection::Kind::Array:
+        {
+            auto elementTypeLayout = typeLayout->getElementTypeLayout();
+            auto elementCount = int(typeLayout->getElementCount());
+
+            // If it's unbounded, it could point directly to a resource. We can't iterate over it
+            // as 'children' because being an external resource (or in a register space) they
+            // are not part of the underling location. 
+            if (elementCount == 0)
+            {
+                outLocations.add(location);
+            }
+            break;
+        }
+
         case slang::TypeReflection::Kind::SamplerState:
 
         case slang::TypeReflection::Kind::ParameterBlock:
@@ -296,7 +322,7 @@ void BindSet::calcChildResourceLocations(const BindLocation& location, Slang::Li
         }
         default:
         {
-            calcResourceLocations(location, outLocations);
+            calcChildResourceLocations(location, outLocations);
             break;
         }
     }
@@ -481,6 +507,9 @@ SlangResult BindSet::setBufferContents(const BindLocation& loc, const void* init
     BindSet::Resource* resource = getAt(loc);
     if (resource)
     {
+        // Truncate if initial data is larger than the buffer
+        sizeInBytes = (sizeInBytes > resource->m_sizeInBytes) ? resource->m_sizeInBytes : sizeInBytes;
+
         SLANG_ASSERT(resource->m_sizeInBytes >= sizeInBytes);
         ::memcpy(resource->m_data, initialData, sizeInBytes);
         return SLANG_OK;
@@ -488,6 +517,16 @@ SlangResult BindSet::setBufferContents(const BindLocation& loc, const void* init
     return SLANG_FAIL;
 }
 
+void BindSet::getBindings(List<BindLocation>& outLocations, List<Resource*>& outResources) const
+{
+    outResources.clear();
+    outLocations.clear();
+    for (const auto& pair : m_bindings)
+    {
+        outLocations.add(pair.Key);
+        outResources.add(pair.Value);
+    }
+}
 
 // !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! BindLocation !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 
@@ -611,8 +650,9 @@ void* BindLocation::getUniform(size_t sizeInBytes) const
     return nullptr;
 }
 
-SlangResult BindLocation::setInplace(const void* data, size_t sizeInBytes) const
+SlangResult BindLocation::setUniform(const void* data, size_t sizeInBytes) const
 {
+    // It has to be a location with uniform
     const BindPoint* point = getValidBindPointForCategory(SLANG_PARAMETER_CATEGORY_UNIFORM);
     if (m_resource && point)
     {
@@ -621,7 +661,6 @@ SlangResult BindLocation::setInplace(const void* data, size_t sizeInBytes) const
         SLANG_ASSERT(offset + sizeInBytes <= m_resource->m_sizeInBytes);
 
         // Okay copy the contents
-
         ::memcpy(m_resource->m_data + offset, data, sizeInBytes);
         return SLANG_OK;
     }
@@ -636,19 +675,15 @@ bool BindLocation::operator==(const ThisType& rhs) const
         return false;
     }
 
-    if ((!m_bindPointSet) != (!rhs.m_bindPointSet))
+    // If same, then if it's set they must be equal
+    // If not set, then must be the same category/point
+    if (m_bindPointSet == rhs.m_bindPointSet)
     {
-        return false;
+        return m_bindPointSet || (m_category == rhs.m_category && m_point == rhs.m_point);
     }
 
-    if (m_bindPointSet)
-    {
-        return m_bindPointSet->m_points == rhs.m_bindPointSet->m_points;
-    }
-    else
-    {
-        return m_category == rhs.m_category && m_point == rhs.m_point;
-    }
+    // Only way these can be equal now, is if both are m_bindPointSet are different pointers, but same value
+    return (m_bindPointSet && rhs.m_bindPointSet) && (m_bindPointSet->m_points == rhs.m_bindPointSet->m_points);
 }
 
 int BindLocation::GetHashCode() const
@@ -670,8 +705,10 @@ int BindLocation::GetHashCode() const
 
 // !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! BindRoot !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 
-SlangResult BindRoot::parse(const BindSet& bindSet, const String& text, const String& sourcePath, WriterHelper outStream, BindLocation& outLocation)
+SlangResult BindRoot::parse(const String& text, const String& sourcePath, WriterHelper outStream, BindLocation& outLocation)
 {
+    SLANG_ASSERT(m_bindSet);
+
     // We will parse the 'name' as may be path to a resource
     TokenReader parser(text);
 
@@ -702,7 +739,7 @@ SlangResult BindRoot::parse(const BindSet& bindSet, const String& text, const St
             int index = parser.ReadInt();
             SLANG_ASSERT(index >= 0);
 
-            location = bindSet.toIndex(location, index);
+            location = m_bindSet->toIndex(location, index);
             if (location.isInvalid())
             {
                 outStream.print("Unable to find entry in '%d' in '%s'\n", index, text.getBuffer());
@@ -715,7 +752,7 @@ SlangResult BindRoot::parse(const BindSet& bindSet, const String& text, const St
             parser.ReadToken();
             Token identifierToken = parser.ReadMatchingToken(TokenType::Identifier);
 
-            location = bindSet.toField(location, identifierToken.Content.getBuffer());
+            location = m_bindSet->toField(location, identifierToken.Content.getBuffer());
             if (location.isInvalid())
             {
                 outStream.print("Unable to find field '%s' in '%s'\n", identifierToken.Content.getBuffer(), text.getBuffer());
@@ -898,6 +935,7 @@ SlangResult CPULikeBindRoot::setArrayCount(const BindLocation& location, int cou
     }
 
     const size_t elementStride = typeLayout->getElementStride(SLANG_PARAMETER_CATEGORY_UNIFORM);
+    auto elementTypeLayout = typeLayout->getElementTypeLayout();
 
     if (resource)
     {
@@ -914,7 +952,7 @@ SlangResult CPULikeBindRoot::setArrayCount(const BindLocation& location, int cou
         if (count <= maxElementCount)
         {
             // Just initialize the space
-            memset(resource->m_data + elementStride * resource->m_elementCount, 0, (count - resource->m_elementCount) * elementStride);
+            ::memset(resource->m_data + elementStride * resource->m_elementCount, 0, (count - resource->m_elementCount) * elementStride);
             resource->m_elementCount = count;
             return SLANG_OK;
         }
@@ -923,7 +961,9 @@ SlangResult CPULikeBindRoot::setArrayCount(const BindLocation& location, int cou
     // Ok allocate a buffer that can hold all the elements
     
     const size_t newBufferSize = count * elementStride;
-    Resource* newBuffer = m_bindSet->createBufferResource(typeLayout, newBufferSize);
+
+    Resource* newBuffer = m_bindSet->createBufferResource(slang::TypeReflection::Kind::Array, newBufferSize);
+    newBuffer->m_elementCount = count;
 
     // Copy over the data from the old buffer if there is any
     if (resource && resource->m_elementCount)
@@ -1000,11 +1040,15 @@ static void _addDefaultBuffersRec(BindSet* bindSet, const BindLocation& loc)
                 //SLANG_ASSERT(typeLayout->getSize() == sizeof(void*));
                 const size_t elementSize = elementTypeLayout->getSize();
 
-                resource = bindSet->createBufferResource(elementTypeLayout, elementSize);
+                // We create using typeLayout (as opposed to elementTypeLayout), because it also holds the wrapping
+                // 'resource' type.
+                resource = bindSet->createBufferResource(typeLayout, elementSize);
+                SLANG_ASSERT(resource);
+
                 bindSet->setAt(loc, resource);
             }
 
-            // Recurse into buffer
+            // Recurse into buffer, using the elementType
             BindLocation childLocation(elementTypeLayout, SLANG_PARAMETER_CATEGORY_UNIFORM, BindPoint(0, 0), resource );
             _addDefaultBuffersRec(bindSet, childLocation);
             return;
@@ -1015,7 +1059,7 @@ static void _addDefaultBuffersRec(BindSet* bindSet, const BindLocation& loc)
     // Recurse
     {
         List<BindLocation> childLocations;
-        bindSet->calcResourceLocations(loc, childLocations);
+        bindSet->calcChildResourceLocations(loc, childLocations);
         for (auto& childLocation : childLocations)
         {
             _addDefaultBuffersRec(bindSet, childLocation);
@@ -1025,6 +1069,7 @@ static void _addDefaultBuffersRec(BindSet* bindSet, const BindLocation& loc)
 
 void CPULikeBindRoot::addDefaultBuffers()
 {
+
     List<BindLocation> rootLocations;
     getRoots(rootLocations);
 
