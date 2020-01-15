@@ -1,3 +1,6 @@
+// Stop warnings from Visual Studio
+#define _CRT_SECURE_NO_WARNINGS 1
+
 #include "shader-input-layout.h"
 #include "core/slang-token-reader.h"
 
@@ -673,6 +676,61 @@ namespace renderer_test
             }
         }
 
+        return SLANG_OK;
+    }
+
+    /* static */void ShaderInputLayout::getValueBuffers(const Slang::List<ShaderInputLayoutEntry>& entries, const BindSet& bindSet, List<BindSet::Value*>& outBuffers)
+    {
+        outBuffers.setCount(entries.getCount());
+
+        for (Index i = 0; i< outBuffers.getCount(); ++i)
+        {
+            outBuffers[i] = nullptr;
+        }
+
+        const auto& values = bindSet.getValues();
+        for (BindSet::Value* value : values)
+        {
+            if (value->m_userIndex >= 0)
+            {
+                outBuffers[value->m_userIndex] = value;
+            }
+        }
+    }
+
+
+    /* static */SlangResult ShaderInputLayout::writeBindings(const ShaderInputLayout& layout, const List<BindSet::Value*>& buffers, const String& fileName)
+    {
+        FILE * f = fopen(fileName.getBuffer(), "wb");
+        if (!f)
+        {
+            return SLANG_FAIL;
+        }
+
+        const auto& entries = layout.entries;
+
+        for (int i = 0; i < entries.getCount(); ++i)
+        {
+            const auto& entry = entries[i];
+            if (entry.isOutput)
+            {
+                BindSet::Value* buffer = buffers[i];
+
+                unsigned int* ptr = (unsigned int*)buffer->m_data;
+
+                const int size = int(entry.bufferData.getCount());
+                // Must be the same size or less than allocated buffer
+                SLANG_ASSERT(size * sizeof(unsigned int) <= buffer->m_sizeInBytes);
+
+                for (int i = 0; i < size; ++i)
+                {
+                    unsigned int v = ptr[i];
+
+                    fprintf(f, "%X\n", v);
+                }
+            }
+        }
+        fclose(f);
         return SLANG_OK;
     }
 

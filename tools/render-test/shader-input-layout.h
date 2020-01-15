@@ -102,6 +102,12 @@ public:
         /// For buffers, the Resources will be setup with the contents of the entry.
         /// That if a resource is created that maps to an entry, the m_userData member of Resource will be set to it's index
     static SlangResult addBindSetValues(const Slang::List<ShaderInputLayoutEntry>& entries, const Slang::String& sourcePath, Slang::WriterHelper outError, BindRoot& bindRoot);
+
+        /// Put into outBuffer the value buffers that were set via addbindSetValues (which will set m_userIndex to be the entries index)
+    static void getValueBuffers(const Slang::List<ShaderInputLayoutEntry>& entries, const BindSet& bindSet, Slang::List<BindSet::Value*>& outBuffers);
+
+        /// Write bindings from values in memory from buffers
+    static SlangResult writeBindings(const ShaderInputLayout& layout, const Slang::List<BindSet::Value*>& buffers, const Slang::String& fileName);
 };
 
 void generateTextureDataRGB8(TextureData& output, const InputTextureDesc& desc);

@@ -10,7 +10,7 @@ namespace renderer_test {
 
 struct CUDAComputeUtil
 {
-    static SlangResult execute(const ShaderCompilerUtil::OutputAndLayout& outputAndLayout);
+    static SlangResult execute(const ShaderCompilerUtil::OutputAndLayout& outputAndLayout, Slang::List<BindSet::Value*>& outBuffers);
 
     static bool canCreateDevice();
 };

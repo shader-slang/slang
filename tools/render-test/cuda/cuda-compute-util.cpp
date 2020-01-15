@@ -6,6 +6,8 @@
 #include "../../source/core/slang-std-writers.h"
 #include "../../source/core/slang-token-reader.h"
 
+#include "../bind-location.h"
+
 #include <cuda.h>
 #include <cuda_runtime_api.h>
 
@@ -13,6 +15,40 @@ namespace renderer_test {
 using namespace Slang;
 
 #define SLANG_CUDA_RETURN_ON_FAIL(x) { int _res = (int)(x); if (_res != 0) return SLANG_FAIL; }
+
+#define SLANG_CUDA_ASSERT_ON_FAIL(x) { int _res = (int)(x); if (_res !=0) { SLANG_ASSERT(!"Failed CUDA call"); }; }
+
+class CUDAResource : public RefObject
+{
+public:
+    typedef RefObject Super;
+
+        /// Dtor
+    CUDAResource(): m_cudaMemory(nullptr) {}
+    CUDAResource(void* cudaMemory): m_cudaMemory(cudaMemory) {}
+
+    ~CUDAResource()
+    {
+        if (m_cudaMemory)
+        {
+            SLANG_CUDA_ASSERT_ON_FAIL(cudaFree(&m_cudaMemory));
+        }
+    }
+
+        /// Helper function to get the cuda memory pointer when given a value
+    static void* getCUDAData(BindSet::Value* value)
+    {
+        if (value)
+        {
+            auto resource = dynamic_cast<CUDAResource*>(value->m_target.Ptr());
+            return resource ? resource->m_cudaMemory : nullptr;
+        }
+        return nullptr;
+    }
+
+    void* m_cudaMemory;
+};
+
 
 static int _calcSMCountPerMultiProcessor(int major, int minor)
 {
@@ -124,8 +160,6 @@ static SlangResult _initCuda()
     return SLANG_OK;
 }
 
-
-
 /* static */SlangResult _createDevice(CUcontext* outContext)
 {
     SLANG_RETURN_ON_FAIL(_initCuda());
@@ -155,7 +189,7 @@ static SlangResult _initCuda()
     return false;
 }
 
-static SlangResult _compute(CUcontext context, CUmodule module, const ShaderCompilerUtil::OutputAndLayout& outputAndLayout)
+static SlangResult _compute(CUcontext context, CUmodule module, const ShaderCompilerUtil::OutputAndLayout& outputAndLayout, List<BindSet::Value*>& outBuffers)
 {
     auto request = outputAndLayout.output.request;
     auto reflection = (slang::ShaderReflection*) spGetReflection(request);
@@ -170,14 +204,242 @@ static SlangResult _compute(CUcontext context, CUmodule module, const ShaderComp
 
     // Get the entry point
     CUfunction kernel;
-
     SLANG_CUDA_RETURN_ON_FAIL(cuModuleGetFunction(&kernel, module, entryPointName));
 
+    // Let's not bother with a stream for now..
+    //cudaStream_t stream;
+    //SLANG_CUDA_RETURN_ON_FAIL(cudaStreamCreateWithFlags(&stream, cudaStreamNonBlocking));
+
+    {
+        // Okay now we need to set up binding
+        BindSet bindSet;
+        CPULikeBindRoot bindRoot;
+        bindRoot.init(&bindSet, reflection, 0);
+
+        // Will set up any root buffers
+        bindRoot.addDefaultValues();
+
+        // Now set up the Values from the test
+
+        auto outStream = StdWriters::getOut();
+        SLANG_RETURN_ON_FAIL(ShaderInputLayout::addBindSetValues(outputAndLayout.layout.entries, outputAndLayout.sourcePath, outStream, bindRoot));
+
+        ShaderInputLayout::getValueBuffers(outputAndLayout.layout.entries, bindSet, outBuffers);
+
+        // First create all of the resources for the values
+
+        {
+            const auto& values = bindSet.getValues();
+            const auto& entries = outputAndLayout.layout.entries;
+
+            for (BindSet::Value* value : values)
+            {
+                auto typeLayout = value->m_type;
+                if (typeLayout == nullptr)
+                {
+                    // We need type layout here to create anything
+                    continue;
+                }
+
+                // TODO(JS):
+                // Here we should be using information about what textures hold to create appropriate
+                // textures. For now we only support 2d textures that always return 1.
+                const auto kind = typeLayout->getKind();
+                switch (kind)
+                {
+                    case slang::TypeReflection::Kind::ConstantBuffer:
+                    case slang::TypeReflection::Kind::ParameterBlock:
+                    {
+                        // We can construct the buffers. We can't copy into yet, as we need to set all of the bindings first
+
+                        void* cudaMem;
+                        SLANG_CUDA_RETURN_ON_FAIL(cudaMalloc(&cudaMem, value->m_sizeInBytes));
+                        value->m_target = new CUDAResource(cudaMem);
+                        break;
+                    }
+                    case slang::TypeReflection::Kind::Resource:
+                    {
+                        auto type = typeLayout->getType();
+                        auto shape = type->getResourceShape();
+
+                        //auto access = type->getResourceAccess();
+
+                        switch (shape & SLANG_RESOURCE_BASE_SHAPE_MASK)
+                        {
+                            case SLANG_TEXTURE_2D:
+                            {
+                                SLANG_ASSERT(value->m_userIndex >= 0);
+                                auto& srcEntry = entries[value->m_userIndex];
+
+                                // TODO(JS):
+                                // We should use the srcEntry to determine what data to store in the texture,
+                                // it's dimensions etc. For now we just support it being 1.
+
+                                slang::TypeReflection* typeReflection = typeLayout->getResourceResultType();
+
+                                int count = 1;
+                                if (typeReflection->getKind() == slang::TypeReflection::Kind::Vector)
+                                {
+                                    count = int(typeReflection->getElementCount());
+                                }
+
+                                // TODO(JS): Should use the input setup to work how to create this texture
+                                // Store the target specific value
+                                //value->m_target = _newOneTexture2D(count);
+                                break;
+                            }
+                            case SLANG_TEXTURE_1D:
+                            case SLANG_TEXTURE_3D:
+                            case SLANG_TEXTURE_CUBE:
+                            case SLANG_TEXTURE_BUFFER:
+                            {
+                                // Need a CPU impl for these...
+                                // For now we can just leave as target will just be nullptr
+                                break;
+                            }
+
+                            case SLANG_BYTE_ADDRESS_BUFFER:
+                            case SLANG_STRUCTURED_BUFFER:
+                            {
+                                // On CPU we just use the memory in the BindSet buffer, so don't need to create anything
+
+                                void* cudaMem;
+                                SLANG_CUDA_RETURN_ON_FAIL(cudaMalloc(&cudaMem, value->m_sizeInBytes));
+                                value->m_target = new CUDAResource(cudaMem);
+
+                                break;
+                            }
+                        }
+                    }
+                    default: break;
+                }
+            }
+        }
+    
+        // Now we need to go through all of the bindings and set the appropriate data
+
+        {
+            List<BindLocation> locations;
+            List<BindSet::Value*> values;
+            bindSet.getBindings(locations, values);
+
+            for (Index i = 0; i < locations.getCount(); ++i)
+            {
+                const auto& location = locations[i];
+                BindSet::Value* value = values[i];
+
+                // Okay now we need to set up the actual handles that CPU will follow.
+                auto typeLayout = location.getTypeLayout();
+
+                const auto kind = typeLayout->getKind();
+                switch (kind)
+                {
+                    case slang::TypeReflection::Kind::Array:
+                    {
+                        auto elementCount = int(typeLayout->getElementCount());
+                        if (elementCount == 0)
+                        {
+                            void** array = location.getUniform<void*>();
+
+                            // If set, we setup the data needed for array on CPU side
+                            if (value && array)
+                            {
+                                // TODO(JS): For now we'll just assume a pointer...
+                                *array = dynamic_cast<CUDAResource*>(value->m_target.Ptr())->m_cudaMemory;
+                            }
+                        }
+                        break;
+                    }
+                    case slang::TypeReflection::Kind::ConstantBuffer:
+                    case slang::TypeReflection::Kind::ParameterBlock:
+                    {
+                        void** ptrPtr = location.getUniform<void*>();
+                        // These map down to pointers. In our case the contents of the resource
+                        void* cudaMem = (value && value->m_target) ? dynamic_cast<CUDAResource*>(value->m_target.Ptr())->m_cudaMemory : nullptr;
+                        *ptrPtr = cudaMem;
+                        break;
+                    }
+                    default: break;
+                }
+            }
+        }
+
+        // Okay now the memory is all set up, we can copy everything over
+        {
+            const auto& values = bindSet.getValues();
+            const auto& entries = outputAndLayout.layout.entries;
+
+            for (BindSet::Value* value : values)
+            {
+                if (value == nullptr || value->m_target == nullptr)
+                {
+                    continue;
+                }
+                CUDAResource* cudaResource = dynamic_cast<CUDAResource*>(value->m_target.Ptr());
+
+                // Okay copy the data over...
+                cudaMemcpy(value->m_data, cudaResource->m_cudaMemory, value->m_sizeInBytes, cudaMemcpyHostToDevice);
+            }
+        }
+
+        // Now we can execute the kernel
+
+        {
+            // Get the max threads per block for this function
+
+            int maxTheadsPerBlock;
+            SLANG_CUDA_RETURN_ON_FAIL(cuFuncGetAttribute(&maxTheadsPerBlock, CU_FUNC_ATTRIBUTE_MAX_THREADS_PER_BLOCK, kernel));
+
+            // Work out the args
+            void* uniformCUDAData = CUDAResource::getCUDAData(bindRoot.getRootValue());
+            void* entryPointCUDAData = CUDAResource::getCUDAData(bindRoot.getEntryPointValue());
+
+            void* args[] = { uniformCUDAData, entryPointCUDAData };
+
+            SlangUInt numThreadsPerAxis[3];
+            entryPoint->getComputeThreadGroupSize(3, numThreadsPerAxis);
+
+            // Launch
+            // TODO(JS): We probably want to do something a little more clever here using the maxThreadsPerBlock,
+            // but for now just launch a single block, and hope it all fits.
+
+            SLANG_CUDA_RETURN_ON_FAIL(cuLaunchKernel(kernel, 1, 1, 1,
+                int(numThreadsPerAxis[0]), int(numThreadsPerAxis[1]), int(numThreadsPerAxis[2]),
+                0,
+                0, args, nullptr));
+        }
+
+        // Finally we need to copy the data back
+
+        {
+            const auto& entries = outputAndLayout.layout.entries;
+
+            for (Index i = 0; i < entries.getCount(); ++i)
+            {
+                const auto& entry = entries[i];
+                BindSet::Value* value = outBuffers[i];
+
+                if (entry.isOutput)
+                {
+                    // Copy back to CPU memory
+
+                    if (value == nullptr || value->m_target == nullptr)
+                    {
+                        continue;
+                    }
+                    CUDAResource* cudaResource = dynamic_cast<CUDAResource*>(value->m_target.Ptr());
+
+                    // Okay copy the data back...
+                    cudaMemcpy(cudaResource->m_cudaMemory, value->m_data, value->m_sizeInBytes, cudaMemcpyDeviceToHost);
+                }
+            }
+        }
+    }
 
     return SLANG_OK;
 }
 
-/* static */SlangResult CUDAComputeUtil::execute(const ShaderCompilerUtil::OutputAndLayout& outputAndLayout)
+/* static */SlangResult CUDAComputeUtil::execute(const ShaderCompilerUtil::OutputAndLayout& outputAndLayout, List<BindSet::Value*>& outBuffers)
 {
     CUcontext context;
     SLANG_RETURN_ON_FAIL(_createDevice(&context));
@@ -193,7 +455,7 @@ static SlangResult _compute(CUcontext context, CUmodule module, const ShaderComp
     CUmodule module = 0;
     SLANG_CUDA_RETURN_ON_FAIL(cuModuleLoadData(&module, kernel.codeBegin));
 
-    SLANG_RETURN_ON_FAIL(_compute(context, module, outputAndLayout));
+    SLANG_RETURN_ON_FAIL(_compute(context, module, outputAndLayout, outBuffers));
 
     SLANG_CUDA_RETURN_ON_FAIL(cuModuleUnload(module));
 
