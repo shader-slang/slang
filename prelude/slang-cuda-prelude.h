@@ -10,3 +10,9 @@ struct FixedArray
     
     T m_data[SIZE];
 };
+
+/* Type that defines the uniform entry point params. The actual content of this type is dependent on the entry point parameters, and can be
+found via reflection or defined such that it matches the shader appropriately.
+*/
+struct UniformEntryPointParams;
+struct UniformState;

@@ -2085,7 +2085,7 @@ void CPPSourceEmitter::emitOperandImpl(IRInst* inst, EmitOpInfo const&  outerPre
     }
 }
 
-static bool _isVariable(IROp op)
+/* static */bool CPPSourceEmitter::_isVariable(IROp op)
 {
     switch (op)
     {
@@ -2104,18 +2104,6 @@ static bool _isFunction(IROp op)
     return op == kIROp_Func;
 }
 
-struct GlobalParamInfo
-{
-    typedef GlobalParamInfo ThisType;
-    bool operator<(const ThisType& rhs) const { return offset < rhs.offset; }
-    bool operator==(const ThisType& rhs) const { return offset == rhs.offset; }
-    bool operator!=(const ThisType& rhs) const { return !(*this == rhs);  }
-
-    IRInst* inst;
-    UInt offset;
-    UInt size;
-};
-
 void CPPSourceEmitter::_emitEntryPointDefinitionStart(IRFunc* func, IRGlobalParam* entryPointGlobalParams, const String& funcName, const UnownedStringSlice& varyingTypeName)
 {
     auto resultType = func->getResultType();
@@ -2129,8 +2117,9 @@ void CPPSourceEmitter::_emitEntryPointDefinitionStart(IRFunc* func, IRGlobalPara
 
     m_writer->emit("(");
     m_writer->emit(varyingTypeName);
-    m_writer->emit("* varyingInput, UniformEntryPointParams* params, UniformState* uniformState)\n{\n");
+    m_writer->emit("* varyingInput, UniformEntryPointParams* params, UniformState* uniformState)");
     emitSemantics(func);
+    m_writer->emit("\n{\n");
 
     m_writer->indent();
     // Initialize when constructing so that globals are zeroed
@@ -2324,16 +2313,8 @@ void CPPSourceEmitter::_emitInitAxisValues(const Int sizeAlongAxis[kThreadGroupA
     m_writer->emit("};\n");
 }
 
-void CPPSourceEmitter::emitModuleImpl(IRModule* module)
+void CPPSourceEmitter::_emitForwardDeclarations(const List<EmitAction>& actions)
 {
-    // Setup all built in types used in the module
-    m_typeSet.addAllBuiltinTypes(module);
-    // If any matrix types are used, then we need appropriate vector types too.
-    m_typeSet.addVectorForMatrixTypes();
-
-    List<EmitAction> actions;
-    computeEmitActions(module, actions);
-
     // Emit forward declarations. Don't emit variables that need to be grouped or function definitions (which will ref those types)
     for (auto action : actions)
     {
@@ -2355,6 +2336,85 @@ void CPPSourceEmitter::emitModuleImpl(IRModule* module)
                 break;
         }
     }
+}
+
+void CPPSourceEmitter::_calcGlobalParams(const List<EmitAction>& actions, List<GlobalParamInfo>& outParams, IRGlobalParam** outEntryPointGlobalParams)
+{
+    outParams.clear();
+    *outEntryPointGlobalParams = nullptr;
+
+    IRGlobalParam* entryPointGlobalParams = nullptr;
+    for (auto action : actions)
+    {
+        if (action.level == EmitAction::Level::Definition && action.inst->op == kIROp_GlobalParam)
+        {
+            auto inst = action.inst;
+
+            if (inst->findDecorationImpl(kIROp_EntryPointParamDecoration))
+            {
+                // Should only be one instruction marked this way
+                SLANG_ASSERT(entryPointGlobalParams == nullptr);
+                entryPointGlobalParams = as<IRGlobalParam>(inst);
+                continue;
+            }
+
+            IRVarLayout* varLayout = CLikeSourceEmitter::getVarLayout(action.inst);
+            SLANG_ASSERT(varLayout);
+
+            IRVarOffsetAttr* offsetAttr = varLayout->findOffsetAttr(LayoutResourceKind::Uniform);
+            IRTypeLayout* typeLayout = varLayout->getTypeLayout();
+            IRTypeSizeAttr* sizeAttr = typeLayout->findSizeAttr(LayoutResourceKind::Uniform);
+
+            GlobalParamInfo paramInfo;
+            paramInfo.inst = action.inst;
+            // Index is the byte offset for uniform
+            paramInfo.offset = offsetAttr ? offsetAttr->getOffset() : 0;
+            paramInfo.size = sizeAttr ? sizeAttr->getFiniteSize() : 0;
+
+            outParams.add(paramInfo);
+        }
+    }
+
+    // We want to sort by layout offset, and insert suitable padding
+    outParams.sort();
+
+    *outEntryPointGlobalParams = entryPointGlobalParams;
+}
+
+void CPPSourceEmitter::_emitUniformStateMembers(const List<EmitAction>& actions, IRGlobalParam** outEntryPointGlobalParams)
+{
+    List<GlobalParamInfo> params;
+    _calcGlobalParams(actions, params, outEntryPointGlobalParams);
+
+    int padIndex = 0;
+    size_t offset = 0;
+    for (const auto& paramInfo : params)
+    {
+        if (offset < paramInfo.offset)
+        {
+            // We want to output some padding
+            StringBuilder builder;
+            builder << "uint8_t _pad" << (padIndex++) << "[" << (paramInfo.offset - offset) << "];\n";
+        }
+
+        emitGlobalInst(paramInfo.inst);
+        // Set offset after this 
+        offset = paramInfo.offset + paramInfo.size;
+    }
+    m_writer->emit("\n");
+}
+
+void CPPSourceEmitter::emitModuleImpl(IRModule* module)
+{
+    // Setup all built in types used in the module
+    m_typeSet.addAllBuiltinTypes(module);
+    // If any matrix types are used, then we need appropriate vector types too.
+    m_typeSet.addVectorForMatrixTypes();
+
+    List<EmitAction> actions;
+    computeEmitActions(module, actions);
+
+    _emitForwardDeclarations(actions);
 
     IRGlobalParam* entryPointGlobalParams = nullptr;
 
@@ -2363,59 +2423,8 @@ void CPPSourceEmitter::emitModuleImpl(IRModule* module)
         m_writer->emit("struct UniformState\n{\n");
         m_writer->indent();
 
-        List<GlobalParamInfo> params;
+        _emitUniformStateMembers(actions, &entryPointGlobalParams);
 
-        for (auto action : actions)
-        {
-            if (action.level == EmitAction::Level::Definition && action.inst->op == kIROp_GlobalParam)
-            {
-                auto inst = action.inst;
-
-                if (inst->findDecorationImpl(kIROp_EntryPointParamDecoration))
-                {
-                    // Should only be one instruction marked this way
-                    SLANG_ASSERT(entryPointGlobalParams == nullptr);
-                    entryPointGlobalParams = as<IRGlobalParam>(inst);
-                    continue;
-                }
-
-                IRVarLayout* varLayout = CLikeSourceEmitter::getVarLayout(action.inst);
-                SLANG_ASSERT(varLayout);
-
-                IRVarOffsetAttr* offsetAttr = varLayout->findOffsetAttr(LayoutResourceKind::Uniform);
-                IRTypeLayout* typeLayout = varLayout->getTypeLayout();
-                IRTypeSizeAttr* sizeAttr = typeLayout->findSizeAttr(LayoutResourceKind::Uniform);
-
-                GlobalParamInfo paramInfo;
-                paramInfo.inst = action.inst;
-                // Index is the byte offset for uniform
-                paramInfo.offset = offsetAttr ? offsetAttr->getOffset() : 0;
-                paramInfo.size = sizeAttr ? sizeAttr->getFiniteSize() : 0;
-
-                params.add(paramInfo);
-            }
-        }
-
-        // We want to sort by layout offset, and insert suitable padding
-        params.sort();
-
-        int padIndex = 0;
-        size_t offset = 0;
-        for (const auto& paramInfo : params)
-        {
-            if (offset < paramInfo.offset)
-            {
-                // We want to output some padding
-                StringBuilder builder;
-                builder << "uint8_t _pad" << (padIndex++) << "[" << (paramInfo.offset - offset) << "];\n";
-            }
-
-            emitGlobalInst(paramInfo.inst);
-            // Set offset after this 
-            offset = paramInfo.offset + paramInfo.size;
-        }
-
-        m_writer->emit("\n");
         m_writer->dedent();
         m_writer->emit("\n};\n\n");
     }

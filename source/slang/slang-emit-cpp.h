@@ -37,6 +37,18 @@ public:
         int colCount;
     };
 
+    struct GlobalParamInfo
+    {
+        typedef GlobalParamInfo ThisType;
+        bool operator<(const ThisType& rhs) const { return offset < rhs.offset; }
+        bool operator==(const ThisType& rhs) const { return offset == rhs.offset; }
+        bool operator!=(const ThisType& rhs) const { return !(*this == rhs); }
+
+        IRInst* inst;
+        UInt offset;
+        UInt size;
+    };
+
     virtual void useType(IRType* type);
     virtual void emitCall(const HLSLIntrinsic* specOp, IRInst* inst, const IRUse* operands, int numOperands, const EmitOpInfo& inOuterPrec);
     virtual void emitTypeDefinition(IRType* type);
@@ -69,11 +81,16 @@ protected:
     // Replaceable for classes derived from CPPSourceEmitter
     virtual SlangResult calcTypeName(IRType* type, CodeGenTarget target, StringBuilder& out);
 
+    
 
     void emitIntrinsicCallExpr(
         IRCall*                         inst,
         IRTargetIntrinsicDecoration*    targetIntrinsic,
         EmitOpInfo const&               inOuterPrec);
+
+    void _emitForwardDeclarations(const List<EmitAction>& actions);
+    void _calcGlobalParams(const List<EmitAction>& actions, List<GlobalParamInfo>& outParams, IRGlobalParam** outEntryPointGlobalParams);
+    void _emitUniformStateMembers(const List<EmitAction>& actions, IRGlobalParam** outEntryPointGlobalParams);
 
     void _emitVecMatMulDefinition(const UnownedStringSlice& funcName, const HLSLIntrinsic* specOp);
 
@@ -118,6 +135,8 @@ protected:
     bool _tryEmitInstExprAsIntrinsic(IRInst* inst, const EmitOpInfo& inOuterPrec);
 
     HLSLIntrinsic* _addIntrinsic(HLSLIntrinsic::Op op, IRType* returnType, IRType*const* argTypes, Index argTypeCount);
+
+    static bool _isVariable(IROp op);
 
     Dictionary<IRType*, StringSlicePool::Handle> m_typeNameMap;
     Dictionary<const HLSLIntrinsic*, StringSlicePool::Handle> m_intrinsicNameMap;
