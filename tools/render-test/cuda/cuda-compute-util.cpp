@@ -206,8 +206,8 @@ static SlangResult _compute(CUcontext context, CUmodule module, const ShaderComp
     CUfunction kernel;
     SLANG_CUDA_RETURN_ON_FAIL(cuModuleGetFunction(&kernel, module, entryPointName));
 
-    // Let's not bother with a stream for now..
-    //cudaStream_t stream;
+    // A stream of 0 means no stream
+    cudaStream_t stream = 0;
     //SLANG_CUDA_RETURN_ON_FAIL(cudaStreamCreateWithFlags(&stream, cudaStreamNonBlocking));
 
     {
@@ -338,12 +338,11 @@ static SlangResult _compute(CUcontext context, CUmodule module, const ShaderComp
                         if (elementCount == 0)
                         {
                             void** array = location.getUniform<void*>();
-
                             // If set, we setup the data needed for array on CPU side
                             if (value && array)
                             {
                                 // TODO(JS): For now we'll just assume a pointer...
-                                *array = dynamic_cast<CUDAResource*>(value->m_target.Ptr())->m_cudaMemory;
+                                *array = CUDAResource::getCUDAData(value);
                             }
                         }
                         break;
@@ -387,14 +386,12 @@ static SlangResult _compute(CUcontext context, CUmodule module, const ShaderComp
 
             for (BindSet::Value* value : values)
             {
-                if (value == nullptr || value->m_target == nullptr)
+                void* cudaMem = CUDAResource::getCUDAData(value);
+                if (value && value->m_data && cudaMem)
                 {
-                    continue;
+                    // Okay copy the data over...
+                    cudaMemcpy(cudaMem, value->m_data, value->m_sizeInBytes, cudaMemcpyHostToDevice);
                 }
-                CUDAResource* cudaResource = dynamic_cast<CUDAResource*>(value->m_target.Ptr());
-
-                // Okay copy the data over...
-                cudaMemcpy(value->m_data, cudaResource->m_cudaMemory, value->m_sizeInBytes, cudaMemcpyHostToDevice);
             }
         }
 
@@ -405,6 +402,9 @@ static SlangResult _compute(CUcontext context, CUmodule module, const ShaderComp
 
             int maxTheadsPerBlock;
             SLANG_CUDA_RETURN_ON_FAIL(cuFuncGetAttribute(&maxTheadsPerBlock, CU_FUNC_ATTRIBUTE_MAX_THREADS_PER_BLOCK, kernel));
+
+            int sharedSizeInBytes;
+            SLANG_CUDA_RETURN_ON_FAIL(cuFuncGetAttribute(&sharedSizeInBytes, CU_FUNC_ATTRIBUTE_SHARED_SIZE_BYTES, kernel));
 
             // Work out the args
             void* uniformCUDAData = CUDAResource::getCUDAData(bindRoot.getRootValue());
@@ -423,11 +423,17 @@ static SlangResult _compute(CUcontext context, CUmodule module, const ShaderComp
                 1, 1, 1,                                                                                // Blocks
                 int(numThreadsPerAxis[0]), int(numThreadsPerAxis[1]), int(numThreadsPerAxis[2]),        // Threads per block
                 0,                                                                                      // Shared memory size
-                0,                                                                                      // Stream. 0 is no stream.
-                args, nullptr);
-
+                stream,                                                                                 // Stream. 0 is no stream.
+                args,                                                                                   // Args
+                nullptr);                                                                               // extra
 
             SLANG_CUDA_RETURN_ON_FAIL(cudaLaunchResult);
+
+            if (stream)
+            {
+                SLANG_CUDA_RETURN_ON_FAIL(cudaStreamSynchronize(stream));
+                SLANG_CUDA_RETURN_ON_FAIL(cudaStreamDestroy(stream));
+            }
         }
 
         // Finally we need to copy the data back
@@ -443,15 +449,12 @@ static SlangResult _compute(CUcontext context, CUmodule module, const ShaderComp
                 if (entry.isOutput)
                 {
                     // Copy back to CPU memory
-
-                    if (value == nullptr || value->m_target == nullptr)
+                    void* cudaMem = CUDAResource::getCUDAData(value);
+                    if (value && value->m_data && cudaMem)
                     {
-                        continue;
+                        // Okay copy the data back...
+                        cudaMemcpy(value->m_data, cudaMem, value->m_sizeInBytes, cudaMemcpyDeviceToHost);
                     }
-                    CUDAResource* cudaResource = dynamic_cast<CUDAResource*>(value->m_target.Ptr());
-
-                    // Okay copy the data back...
-                    cudaMemcpy(cudaResource->m_cudaMemory, value->m_data, value->m_sizeInBytes, cudaMemcpyDeviceToHost);
                 }
             }
         }
