@@ -235,16 +235,14 @@ static SlangResult _compute(CUcontext context, CUmodule module, const ShaderComp
             for (BindSet::Value* value : values)
             {
                 auto typeLayout = value->m_type;
-                if (typeLayout == nullptr)
-                {
-                    // We need type layout here to create anything
-                    continue;
-                }
-
+               
+                // Get the type kind, if typeLayout is not set we'll assume a 'constant buffer' will do
+                slang::TypeReflection::Kind kind = typeLayout ? typeLayout->getKind() : slang::TypeReflection::Kind::ConstantBuffer;
+               
                 // TODO(JS):
                 // Here we should be using information about what textures hold to create appropriate
                 // textures. For now we only support 2d textures that always return 1.
-                const auto kind = typeLayout->getKind();
+                
                 switch (kind)
                 {
                     case slang::TypeReflection::Kind::ConstantBuffer:
@@ -353,10 +351,28 @@ static SlangResult _compute(CUcontext context, CUmodule module, const ShaderComp
                     case slang::TypeReflection::Kind::ConstantBuffer:
                     case slang::TypeReflection::Kind::ParameterBlock:
                     {
-                        void** ptrPtr = location.getUniform<void*>();
-                        // These map down to pointers. In our case the contents of the resource
-                        void* cudaMem = (value && value->m_target) ? dynamic_cast<CUDAResource*>(value->m_target.Ptr())->m_cudaMemory : nullptr;
-                        *ptrPtr = cudaMem;
+                        // These map down to just pointers
+                        *location.getUniform<void*>() = CUDAResource::getCUDAData(value);
+                        break;
+                    }
+                    case slang::TypeReflection::Kind::Resource:
+                    {
+                        auto type = typeLayout->getType();
+                        auto shape = type->getResourceShape();
+
+                        //auto access = type->getResourceAccess();
+
+                        switch (shape & SLANG_RESOURCE_BASE_SHAPE_MASK)
+                        {
+                            case SLANG_BYTE_ADDRESS_BUFFER:
+                            case SLANG_STRUCTURED_BUFFER:
+                            {
+                                // TODO(JS): These will need bounds ... 
+                                // For the moment these are just pointers
+                                *location.getUniform<void*>() = CUDAResource::getCUDAData(value);
+                                break;
+                            }
+                        }
                         break;
                     }
                     default: break;
@@ -403,10 +419,15 @@ static SlangResult _compute(CUcontext context, CUmodule module, const ShaderComp
             // TODO(JS): We probably want to do something a little more clever here using the maxThreadsPerBlock,
             // but for now just launch a single block, and hope it all fits.
 
-            SLANG_CUDA_RETURN_ON_FAIL(cuLaunchKernel(kernel, 1, 1, 1,
-                int(numThreadsPerAxis[0]), int(numThreadsPerAxis[1]), int(numThreadsPerAxis[2]),
-                0,
-                0, args, nullptr));
+            auto cudaLaunchResult = cuLaunchKernel(kernel,
+                1, 1, 1,                                                                                // Blocks
+                int(numThreadsPerAxis[0]), int(numThreadsPerAxis[1]), int(numThreadsPerAxis[2]),        // Threads per block
+                0,                                                                                      // Shared memory size
+                0,                                                                                      // Stream. 0 is no stream.
+                args, nullptr);
+
+
+            SLANG_CUDA_RETURN_ON_FAIL(cudaLaunchResult);
         }
 
         // Finally we need to copy the data back
