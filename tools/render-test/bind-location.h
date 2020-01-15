@@ -10,6 +10,74 @@
 
 namespace renderer_test {
 
+/*
+Bind Set/Point/Value
+====================
+
+The following classes are designed as a mechanism to simplify binding within the test system. The underlying issues are
+
+* How binding occurs is very dependent on the underlying target (CPU is different from Dx for example)
+  + CPU everything is just backed by uniform 'memory'/GPU uses different registers for different types
+  + With unbound arrays CPU can just indirect to a buffer, on GPU it might need use of register spaces or some other mechanism (as in VK)
+  + CPU groups together global/entry point parameters, GPU typically does not
+* Having a mechanism that will the data/binding for the test independent of the actual target, allows that code/implementation to be shared across many targets.
+* How a resource/state is configured within binding also varies significantly between targets
+
+One way to handle this disparity, would be to build an abstraction layer, that could create the device specific
+resources/state and set them. This is not the approach taken here though. The idea here is to have a mechanism to
+be able to build structures in memory, and record where binding takes place without having to create any
+device specific resources or state. This data can then be used to construct and then bind as is appropriate.
+
+The process broadly for test system is is
+
+1) Set up any default buffers required for a target (for example the uniform/entry point buffers for CPU)
+2) Add any default Value/buffers that are needed by traversing reflection
+3) Create/Set the Values for the elements of ShaderInputLayoutEntry
+4) Go through the values set on the BindSet, creating Resources/State etc appropriate for the target
+5) Go through the bindings setting the Resource bindings as appropriate for the target
+6) Execute
+7) If the computation takes place outside of Values backing memory, copy back the data for output entries
+8) Write the output entries
+
+To do this we need a mechanism to store a binding location. In the general case a BindingLocation might
+track the location of many different categories of data.
+
+We also need a way to record what we want to create on the device for execution. To do this we have the
+BindSet::Value. 'Value' was used instead of 'Resource' because the types of things the Value might represent
+may not be resource like or might be multiple resources. In simple use cases though a 'Value' is typically
+synonymous with some kind of Resource on the device.
+
+A Value knows the underlying type it represents as was determined via the slang layout/reflection. That an added
+feature of 'Values' is there are able hold a buffer that is typically mapped onto some linear buffer on the
+device. Doing so means that we do not need to store BindLocation mappings for say uniform data (like float or
+matrix), it can just be stored in the memory buffer. When the resources are constructed for execution, we can
+just copy over that data.
+
+This all sounds well and good but there is a final underlying important aspect. That is that some resource
+like bindings may have to be stored in a buffer. For example on a CPU we could have a constant buffer that contained
+another constant buffer as a field. On CPU this field would be converted into a pointer which needs to be set up. On CUDA this might be some
+device specific value. So before we can copy the memory representation to a device specific buffer we must convert
+any such bindings into something appropriate in the memory buffer associated with the Value. To do this we can traverse
+a record of all of the bindings (which are held on the BindSet), and then set the appropriate date for the device from
+data stored in the associated 'Value'.
+
+A final observation is that on CPU targets, the memory buffer held in the Value can just be used directly. 
+
+NOTE: 
+
+That these classes are written so they can be used to track locations across multiple categories such that binding
+can work across many different types of targets. For the moment the mechanism/s are only tested on CPU like binding,
+and there are quirks in how locations are traversed that have knowledge of how such bindings work. It may be necessary
+for this to work more generally to only allow certain kinds of transitions based on some well defined specific
+binding styles. 
+*/
+
+/* A bind point records a specific binding point (typically for a category). It records a space and an offset.
+As with Slangs layout reflection, the offset meaning is dependent on category. It might be an offset to
+a 'register'. If category is 'uniform' it might be a memory offset. The space defines the 'space' a register
+is in.
+Note that m_space is ignored (but must be valid) for uniform offsets. 
+*/
 struct BindPoint
 {
     typedef BindPoint ThisType;
@@ -34,6 +102,7 @@ struct BindPoint
     size_t m_offset = 0;                    ///< The offset, might be a byte address or a register index
 };
 
+/* Stores the BindPoints by category. */
 struct BindPoints
 {
     typedef BindPoints ThisType;
@@ -112,6 +181,8 @@ struct BindPoints
     BindPoint m_points[SLANG_PARAMETER_CATEGORY_COUNT];
 };
 
+/* A BindPointSet is really just a reference counted 'BindPoints'. This allows for BindPoints to be shared between
+multiple BindLocations if they hold the same value. */
 class BindPointSet : public Slang::RefObject
 {
 public:
@@ -128,6 +199,14 @@ public:
     BindPoints m_points;
 };
 
+/* A BindSet::Value represents a 'value' associated with a binding. Typically it will be a Resource type
+like a Buffer/Texture on a target device. As well as recording type information, it can also store a chunk
+of memory that can hold uniform data, and may hold bindings for some kinds of targets (for example CPU pointers).
+Additionally if the Value holds some kind of array, the amount of elements in the array can be stored in m_elementCount.
+
+All Value are constructed stored and tracked on a BindSet. When a BindSet is destroyed any associated Value will become
+destroyed.
+*/
 struct BindSet_Value
 {
     slang::TypeReflection::Kind m_kind;              ///< The kind, used if type is not set. Same as m_type.kind otherwise
@@ -145,7 +224,20 @@ struct BindSet_Value
 
 class BindSet;
 
-// Specifies a binding location (including the associated slang reflection type information
+/* Specifies a binding location (including the associated slang reflection type information)
+
+It really can be in 3 type of state.
+1) Invalid - not a valid binding (m_typeLayout is null, m_pointSet is not used. 
+2) Holds a single bind point defined by category and BindPoint m_point (m_category and m_point are used)
+3) Hold multiple bind points by category (in this case m_bindPointSet is used)
+
+NOTE! it is an invariant - that the BindLocation must always be in the 'simplest' form that can represent it.
+That is if there is only a single binding it *cannot* be stored as a m_bindPointSet with a single category
+
+That construction through BindPoints, will do this determination automatically.
+
+A BindLocation can be stored in a Hash.
+*/
 struct BindLocation
 {
     typedef BindLocation ThisType;
@@ -207,6 +299,12 @@ struct BindLocation
     Slang::RefPtr<BindPointSet> m_bindPointSet;             
 };
 
+/* A BindSet holds all of the Value and bindings. It is designed to be used such that it can hold
+all of the bind state needed for setting up a specific binding.
+
+Unfortunately it is not enough to lookup via a path for a Binding, because different targets represents the
+'root' variables and values in different ways. The BindRoot interface is designed to handle this aspect. 
+*/ 
 class BindSet
 {
 public:
@@ -257,6 +355,10 @@ protected:
     Slang::MemoryArena m_arena;
 };
 
+/* BindRoot is an interface for finding the roots bindings by name. It is an interface because different targets have different ways of
+representing how root values are located.
+More specifically a CPU target holds the uniform and entry point variables in two buffers. 
+*/
 class BindRoot : public Slang::RefObject
 {
 public:
@@ -286,6 +388,10 @@ protected:
     BindSet* m_bindSet = nullptr;
 };
 
+/* A CPULike implementation of the BindRoot. This can be used for any binding that holds
+the entry point variables/uniforms in buffers. This type also stores the Value/Buffers for
+the 'root', and entry point, so they can be directly accessed. 
+*/
 class CPULikeBindRoot : public BindRoot
 {
 public:
