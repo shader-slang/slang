@@ -304,8 +304,15 @@ public:
 
     void addDefaultBuffers();
 
+    Resource* getRootBuffer() const { return m_rootBuffer; }
+    Resource* getEntryPointBuffer() const { return m_entryPointBuffer; }
+
+    void* getRootData() { return m_rootBuffer ? m_rootBuffer->m_data : nullptr; }
+    void* getEntryPointData() { return m_entryPointBuffer ? m_entryPointBuffer->m_data : nullptr; } 
+
     SlangResult init(BindSet* bindSet, slang::ShaderReflection* reflection, int entryPointIndex); 
 
+protected:
     // Used when we have uniform buffers (as used on CPU/CUDA)
     slang::ShaderReflection* m_reflection = nullptr;
     Resource* m_rootBuffer = nullptr;

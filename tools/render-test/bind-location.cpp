@@ -446,7 +446,7 @@ BindLocation BindSet::toIndex(const BindLocation& loc, Index index) const
         return BindLocation::Invalid;
     }
 
-    // Find where the uniform aspect will be held
+    // Find where the uniform data will be held. If we have a unsized array, for some targets the actual content's might be in a different location
     BindSet::Resource* uniformResource = loc.m_resource;
     if (typeLayout->getElementCount() == 0)
     {
@@ -455,6 +455,13 @@ BindLocation BindSet::toIndex(const BindLocation& loc, Index index) const
         if (arrayResource)
         {
             uniformResource = arrayResource;
+
+            // Check it's in range.
+            // NOTE we can't check this if the unbounded binding is in another space for example. 
+            if (index >= Index(uniformResource->m_elementCount))
+            {
+                return BindLocation::Invalid;
+            }
         }
     }
 
@@ -472,10 +479,17 @@ BindLocation BindSet::toIndex(const BindLocation& loc, Index index) const
         {
             auto category = elementTypeLayout->getCategoryByIndex(unsigned int(i));
             const auto elementStride = typeLayout->getElementStride(category);
+
+            size_t baseOffset = loc.m_bindPointSet->m_points[category].m_offset;
+
+            if (category == SLANG_PARAMETER_CATEGORY_UNIFORM && uniformResource != loc.m_resource)
+            {
+                baseOffset = 0;
+            }
+             
             const auto& basePoint = loc.m_bindPointSet->m_points[category];
             SLANG_ASSERT(basePoint.isValid());
-
-            bindPoints[category] = BindPoint(basePoint.m_space, basePoint.m_offset + elementStride * index);
+            bindPoints[category] = BindPoint(basePoint.m_space, baseOffset + elementStride * index);
         }
 
         return BindLocation(elementTypeLayout, bindPoints, uniformResource);
@@ -487,13 +501,22 @@ BindLocation BindSet::toIndex(const BindLocation& loc, Index index) const
 
         const auto elementStride = typeLayout->getElementStride(category);
 
-        // TODO(JS): 
-        // Hmm, if its a different category, then not entirely clear what to do here.
-        // Just zero as we can't use the base we have.
-        // This might just be an error
-        const size_t base = (category == loc.m_category) ? loc.m_point.m_offset : 0;
+        size_t baseOffset = 0;
+        if (category == SLANG_PARAMETER_CATEGORY_UNIFORM && uniformResource != loc.m_resource)
+        {
+            // base of 0 is appropriate as it is the child resource
+        }
+        else
+        {
+            // TODO(JS): 
+            // Hmm, if its a different category, then not entirely clear what to do here.
+            // Just zero as we can't use the base we have.
+            // This might just be an error
 
-        BindPoint point(loc.m_point.m_space, base + elementStride * index);
+            baseOffset = (category == loc.m_category) ? loc.m_point.m_offset : 0;
+        }
+
+        BindPoint point(loc.m_point.m_space, baseOffset + elementStride * index);
 
         return BindLocation(elementTypeLayout, category, point, uniformResource);
     }

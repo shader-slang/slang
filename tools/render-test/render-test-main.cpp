@@ -583,7 +583,7 @@ SLANG_TEST_TOOL_API SlangResult innerMain(Slang::StdWriters* stdWriters, SlangSe
             if (gOptions.outputPath)
             {
                 // Dump everything out that was written
-                SLANG_RETURN_ON_FAIL(CPUComputeUtil::writeBindings(compilationAndLayout.layout, context.buffers, gOptions.outputPath));
+                SLANG_RETURN_ON_FAIL(CPUComputeUtil::writeBindings(compilationAndLayout.layout, context.m_buffers, gOptions.outputPath));
 
                 // Check all execution styles produce the same result
                 SLANG_RETURN_ON_FAIL(CPUComputeUtil::checkStyleConsistency(sharedLibrary, gOptions.computeDispatchSize, compilationAndLayout));
