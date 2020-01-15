@@ -545,6 +545,11 @@ SLANG_TEST_TOOL_API SlangResult innerMain(Slang::StdWriters* stdWriters, SlangSe
             ComPtr<ISlangSharedLibrary> sharedLibrary;
             SLANG_RETURN_ON_FAIL(spGetEntryPointHostCallable(compilationAndLayout.output.request, 0, 0, sharedLibrary.writeRef()));
 
+            // This is a hack to work around, reflection when compiling straight C/C++ code. In that case the code is just passed
+            // straight through to the C++ compiler so no reflection. In these tests though we should have conditional code
+            // (performance-profile.slang for example), such that there is both a slang and C++ code, and it is the job
+            // of the test implementer to *ensure* that the straight C++ code has the same layout as the slang C++ backend.
+            //
             // If we are running c/c++ we still need binding information, so compile again as slang source
             if (gOptions.sourceLanguage == SLANG_SOURCE_LANGUAGE_C || input.sourceLanguage == SLANG_SOURCE_LANGUAGE_CPP)
             {
@@ -578,7 +583,7 @@ SLANG_TEST_TOOL_API SlangResult innerMain(Slang::StdWriters* stdWriters, SlangSe
             if (gOptions.outputPath)
             {
                 // Dump everything out that was written
-                SLANG_RETURN_ON_FAIL(CPUComputeUtil::writeBindings(compilationAndLayout.layout, context.buffers, gOptions.outputPath));
+                SLANG_RETURN_ON_FAIL(CPUComputeUtil::writeBindings(compilationAndLayout.layout, context.m_buffers, gOptions.outputPath));
 
                 // Check all execution styles produce the same result
                 SLANG_RETURN_ON_FAIL(CPUComputeUtil::checkStyleConsistency(sharedLibrary, gOptions.computeDispatchSize, compilationAndLayout));

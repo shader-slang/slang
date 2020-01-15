@@ -9,10 +9,10 @@
     </Filter>
   </ItemGroup>
   <ItemGroup>
-    <ClInclude Include="cpu-compute-util.h">
+    <ClInclude Include="bind-location.h">
       <Filter>Header Files</Filter>
     </ClInclude>
-    <ClInclude Include="cpu-memory-binding.h">
+    <ClInclude Include="cpu-compute-util.h">
       <Filter>Header Files</Filter>
     </ClInclude>
     <ClInclude Include="options.h">
@@ -35,10 +35,10 @@
     </ClInclude>
   </ItemGroup>
   <ItemGroup>
-    <ClCompile Include="cpu-compute-util.cpp">
+    <ClCompile Include="bind-location.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
-    <ClCompile Include="cpu-memory-binding.cpp">
+    <ClCompile Include="cpu-compute-util.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
     <ClCompile Include="options.cpp">

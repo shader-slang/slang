@@ -541,6 +541,141 @@ namespace renderer_test
         }
     }
 
+    /* static */SlangResult ShaderInputLayout::addBindSetValues(const Slang::List<ShaderInputLayoutEntry>& entries, const String& sourcePath, WriterHelper outStream, BindRoot& bindRoot)
+    {
+        BindSet* bindSet = bindRoot.getBindSet();
+        SLANG_ASSERT(bindSet);
+
+        for (Index entryIndex = 0; entryIndex < entries.getCount(); ++entryIndex)
+        {
+            auto& entry = entries[entryIndex];
+
+            if (entry.name.getLength() == 0)
+            {
+                outStream.print("No 'name' specified for value in '%s'\n", sourcePath.getBuffer());
+                return SLANG_FAIL;
+            }
+
+            BindLocation location = BindLocation::Invalid;
+            SLANG_RETURN_ON_FAIL(bindRoot.parse(entry.name, sourcePath, outStream, location));
+
+            auto& srcEntry = entries[entryIndex];
+
+            auto typeLayout = location.getTypeLayout();
+            const auto kind = typeLayout->getKind();
+            switch (kind)
+            {
+                case slang::TypeReflection::Kind::Array:
+                {
+                    auto elementCount = int(typeLayout->getElementCount());
+                    if (elementCount == 0)
+                    {
+                        if (srcEntry.type == ShaderInputType::Array)
+                        {
+                            // Set the size
+                            SLANG_RETURN_ON_FAIL(bindRoot.setArrayCount(location, srcEntry.arrayDesc.size));
+                        }
+                        break;
+                    }
+                    break;
+                }
+                case slang::TypeReflection::Kind::Vector:
+                case slang::TypeReflection::Kind::Matrix:
+                case slang::TypeReflection::Kind::Scalar:
+                case slang::TypeReflection::Kind::Struct:
+                {
+                    SLANG_RETURN_ON_FAIL(location.setUniform(srcEntry.bufferData.getBuffer(), srcEntry.bufferData.getCount() * sizeof(unsigned int)));
+                    break;
+                }
+                default:
+                    break;
+                case slang::TypeReflection::Kind::ConstantBuffer:
+                {
+                    SLANG_RETURN_ON_FAIL(bindSet->setBufferContents(location, srcEntry.bufferData.getBuffer(), srcEntry.bufferData.getCount() * sizeof(unsigned int)));
+                    break;
+                }
+                case slang::TypeReflection::Kind::ParameterBlock:
+                {
+                    auto elementTypeLayout = typeLayout->getElementTypeLayout();
+                    SLANG_UNUSED(elementTypeLayout);
+                    break;
+                }
+                case slang::TypeReflection::Kind::TextureBuffer:
+                {
+                    auto elementTypeLayout = typeLayout->getElementTypeLayout();
+                    SLANG_UNUSED(elementTypeLayout);
+                    break;
+                }
+                case slang::TypeReflection::Kind::ShaderStorageBuffer:
+                {
+                    auto elementTypeLayout = typeLayout->getElementTypeLayout();
+                    SLANG_UNUSED(elementTypeLayout);
+                    break;
+                }
+                case slang::TypeReflection::Kind::GenericTypeParameter:
+                {
+                    const char* name = typeLayout->getName();
+                    SLANG_UNUSED(name);
+                    break;
+                }
+                case slang::TypeReflection::Kind::Interface:
+                {
+                    const char* name = typeLayout->getName();
+                    SLANG_UNUSED(name);
+                    break;
+                }
+                case slang::TypeReflection::Kind::Resource:
+                {
+                    if (BindSet::isTextureType(typeLayout))
+                    {
+                        // We don't bother setting any data
+                        BindSet::Value* value = bindSet->createTextureValue(typeLayout);
+                        value->m_userIndex = entryIndex;
+                        bindSet->setAt(location, value);
+                        break;
+                    }
+
+                    auto type = typeLayout->getType();
+                    auto shape = type->getResourceShape();
+
+                    //auto access = type->getResourceAccess();
+
+                    switch (shape & SLANG_RESOURCE_BASE_SHAPE_MASK)
+                    {
+                        default:
+                            assert(!"unhandled case");
+                            break;
+                        case SLANG_BYTE_ADDRESS_BUFFER:
+                        case SLANG_STRUCTURED_BUFFER:
+                        {
+                            size_t bufferSize = srcEntry.bufferData.getCount() * sizeof(unsigned int);
+
+                            BindSet::Value* value = bindSet->createBufferValue(typeLayout, bufferSize, srcEntry.bufferData.getBuffer());
+                            SLANG_ASSERT(value);
+
+                            value->m_userIndex = entryIndex;
+
+                            bindSet->setAt(location, value);
+                            break;
+                        }
+                    }
+                    if (shape & SLANG_TEXTURE_ARRAY_FLAG)
+                    {
+
+                    }
+                    if (shape & SLANG_TEXTURE_MULTISAMPLE_FLAG)
+                    {
+
+                    }
+
+                    break;
+                }
+            }
+        }
+
+        return SLANG_OK;
+    }
+
     void generateTextureData(TextureData& output, const InputTextureDesc& desc)
     {
         switch (desc.format)
