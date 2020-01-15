@@ -19,13 +19,13 @@ BindSet::BindSet():
 
 BindSet::~BindSet()
 {
-    for (auto resource : m_resources)
+    for (auto value : m_values)
     {
-        resource->~Resource();
+        value->~Value();
     }
 }
 
-void BindSet::setAt(const BindLocation& loc, Resource* resource)
+void BindSet::setAt(const BindLocation& loc, Value* value)
 {
     SLANG_ASSERT(loc.isValid());
     if (loc.isInvalid())
@@ -34,14 +34,14 @@ void BindSet::setAt(const BindLocation& loc, Resource* resource)
     }
 
     // Note we don't remove when value == null, such that it is stored if should be nullptr
-    Resource** resourcePtr = m_bindings.TryGetValueOrAdd(loc, resource);
-    if (resourcePtr)
+    Value** valuePtr = m_bindings.TryGetValueOrAdd(loc, value);
+    if (valuePtr)
     {
-        *resourcePtr = resource;
+        *valuePtr = value;
     }
 }
 
-void BindSet::setAt(const BindLocation& loc, SlangParameterCategory category, Resource* resource)
+void BindSet::setAt(const BindLocation& loc, SlangParameterCategory category, Value* value)
 {
     SLANG_ASSERT(loc.isValid());
     if (loc.isInvalid())
@@ -55,13 +55,13 @@ void BindSet::setAt(const BindLocation& loc, SlangParameterCategory category, Re
         if (loc.m_bindPointSet == nullptr)
         {
             // Can only have one category, so just set on that
-            setAt(loc, resource);
+            setAt(loc, value);
         }
         else
         {
 
-            BindLocation catLoc(loc.m_typeLayout, category, *point, loc.m_resource);
-            setAt(catLoc, resource);
+            BindLocation catLoc(loc.m_typeLayout, category, *point, loc.m_value);
+            setAt(catLoc, value);
         }
     }
     else
@@ -70,44 +70,44 @@ void BindSet::setAt(const BindLocation& loc, SlangParameterCategory category, Re
     }
 }
 
-BindSet::Resource* BindSet::getAt(const BindLocation& loc) const
+BindSet::Value* BindSet::getAt(const BindLocation& loc) const
 {
     SLANG_ASSERT(loc.isValid());
     if (loc.isInvalid())
     {
         return nullptr;
     }
-    Resource** resourcePtr = m_bindings.TryGetValue(loc);
-    return resourcePtr ? *resourcePtr : nullptr;
+    Value** valuePtr = m_bindings.TryGetValue(loc);
+    return valuePtr ? *valuePtr : nullptr;
 }
 
-BindSet::Resource* BindSet::_createBufferResource(slang::TypeReflection::Kind kind, slang::TypeLayoutReflection* typeLayout, size_t bufferSizeInBytes, size_t initialSizeInBytes, const void* initialData)
+BindSet::Value* BindSet::_createBufferValue(slang::TypeReflection::Kind kind, slang::TypeLayoutReflection* typeLayout, size_t bufferSizeInBytes, size_t initialSizeInBytes, const void* initialData)
 {
     SLANG_ASSERT(typeLayout == nullptr || typeLayout->getKind() == kind);
 
-    Resource* resource = new (m_arena.allocateAligned(sizeof(Resource), SLANG_ALIGN_OF(Resource))) Resource();
+    Value* value = new (m_arena.allocateAligned(sizeof(Value), SLANG_ALIGN_OF(Value))) Value();
 
-    resource->m_kind = kind;
-    resource->m_sizeInBytes = bufferSizeInBytes;
-    resource->m_elementCount = 0;
-    resource->m_type = typeLayout;
-    resource->m_userIndex = -1;
+    value->m_kind = kind;
+    value->m_sizeInBytes = bufferSizeInBytes;
+    value->m_elementCount = 0;
+    value->m_type = typeLayout;
+    value->m_userIndex = -1;
 
-    resource->m_data = (uint8_t*)m_arena.allocateAligned(bufferSizeInBytes, 16);
+    value->m_data = (uint8_t*)m_arena.allocateAligned(bufferSizeInBytes, 16);
 
-    SLANG_ASSERT(initialSizeInBytes <= resource->m_sizeInBytes);
+    SLANG_ASSERT(initialSizeInBytes <= value->m_sizeInBytes);
     if (initialData)
     {
-        ::memcpy(resource->m_data, initialData, initialSizeInBytes);
-        ::memset(resource->m_data + initialSizeInBytes, 0, bufferSizeInBytes - initialSizeInBytes);
+        ::memcpy(value->m_data, initialData, initialSizeInBytes);
+        ::memset(value->m_data + initialSizeInBytes, 0, bufferSizeInBytes - initialSizeInBytes);
     }
     else
     {
-        ::memset(resource->m_data, 0, resource->m_sizeInBytes);
+        ::memset(value->m_data, 0, value->m_sizeInBytes);
     }
 
-    m_resources.add(resource);
-    return resource;
+    m_values.add(value);
+    return value;
 }
 
 /* static */bool BindSet::isTextureType(slang::TypeLayoutReflection* typeLayout)
@@ -137,7 +137,7 @@ BindSet::Resource* BindSet::_createBufferResource(slang::TypeReflection::Kind ki
     return false;
 }
 
-BindSet::Resource* BindSet::createTextureResource(slang::TypeLayoutReflection* typeLayout)
+BindSet::Value* BindSet::createTextureValue(slang::TypeLayoutReflection* typeLayout)
 {
     if (!isTextureType(typeLayout))
     {
@@ -145,26 +145,26 @@ BindSet::Resource* BindSet::createTextureResource(slang::TypeLayoutReflection* t
         return nullptr;
     }
 
-    Resource* resource = new (m_arena.allocateAligned(sizeof(Resource), SLANG_ALIGN_OF(Resource))) Resource();
+    Value* value = new (m_arena.allocateAligned(sizeof(Value), SLANG_ALIGN_OF(Value))) Value();
 
-    resource->m_kind = typeLayout->getKind();
-    resource->m_sizeInBytes = 0;
-    resource->m_elementCount = 0;
-    resource->m_type = typeLayout;
-    resource->m_data = nullptr;
-    resource->m_userIndex = -1;
+    value->m_kind = typeLayout->getKind();
+    value->m_sizeInBytes = 0;
+    value->m_elementCount = 0;
+    value->m_type = typeLayout;
+    value->m_data = nullptr;
+    value->m_userIndex = -1;
 
-    m_resources.add(resource);
+    m_values.add(value);
 
-    return resource;
+    return value;
 }
 
-BindSet::Resource* BindSet::createBufferResource(slang::TypeReflection::Kind kind, size_t sizeInBytes, const void* initialData)
+BindSet::Value* BindSet::createBufferValue(slang::TypeReflection::Kind kind, size_t sizeInBytes, const void* initialData)
 {
-    return _createBufferResource(kind, nullptr, sizeInBytes, sizeInBytes, initialData);
+    return _createBufferValue(kind, nullptr, sizeInBytes, sizeInBytes, initialData);
 }
 
-BindSet::Resource* BindSet::createBufferResource(slang::TypeLayoutReflection* typeLayout, size_t sizeInBytes, const void* initialData)
+BindSet::Value* BindSet::createBufferValue(slang::TypeLayoutReflection* typeLayout, size_t sizeInBytes, const void* initialData)
 {
     const auto kind = typeLayout->getKind();
     switch (kind)
@@ -172,7 +172,7 @@ BindSet::Resource* BindSet::createBufferResource(slang::TypeLayoutReflection* ty
         case slang::TypeReflection::Kind::ParameterBlock:
         case slang::TypeReflection::Kind::ConstantBuffer:
         {
-            return _createBufferResource(kind, typeLayout, sizeInBytes, sizeInBytes, initialData);
+            return _createBufferValue(kind, typeLayout, sizeInBytes, sizeInBytes, initialData);
         }
         case slang::TypeReflection::Kind::Resource:
         {
@@ -190,13 +190,13 @@ BindSet::Resource* BindSet::createBufferResource(slang::TypeLayoutReflection* ty
                     size_t elementCount = size_t((sizeInBytes + elementSize - 1) / elementSize);
                     size_t bufferSize = elementCount * elementSize;
 
-                    Resource* resource = _createBufferResource(kind, typeLayout, bufferSize, sizeInBytes, initialData);
-                    resource->m_elementCount = elementCount;
-                    return resource;
+                    Value* value = _createBufferValue(kind, typeLayout, bufferSize, sizeInBytes, initialData);
+                    value->m_elementCount = elementCount;
+                    return value;
                 }
                 case SLANG_BYTE_ADDRESS_BUFFER:
                 {
-                    return _createBufferResource(kind, typeLayout,  (sizeInBytes + 3) & ~size_t(3), sizeInBytes, initialData);
+                    return _createBufferValue(kind, typeLayout,  (sizeInBytes + 3) & ~size_t(3), sizeInBytes, initialData);
                 }
             }
             break;
@@ -210,22 +210,22 @@ BindSet::Resource* BindSet::createBufferResource(slang::TypeLayoutReflection* ty
     return nullptr;
 }
 
-void BindSet::destroyResource(Resource* resource)
+void BindSet::destroyValue(Value* value)
 {
     // TODO(JS): NOTE we do not free the old buffer. This is not a memory leak, because
     // it is tracked elsewhere, but there is an argument to destroy it.
-    const Index index = m_resources.indexOf(resource);
+    const Index index = m_values.indexOf(value);
     SLANG_ASSERT(index >= 0);
     if (index >= 0)
     {
-        m_resources.fastRemoveAt(index);
+        m_values.fastRemoveAt(index);
 
         // I guess we should remove any bindings to it whilst we are at it
         List<BindLocation> locations;
         for (const auto& pair : m_bindings)
         {
             const auto& location = pair.Key;
-            if (location.m_resource == resource)
+            if (location.m_value == value)
             {
                 locations.add(location);
             }
@@ -237,7 +237,7 @@ void BindSet::destroyResource(Resource* resource)
         }
 
         // Run the dtor
-        resource->~Resource();
+        value->~Value();
     }
 }
 
@@ -284,7 +284,7 @@ void BindSet::calcChildResourceLocations(const BindLocation& location, List<Bind
     }
 }
 
-void BindSet::calcResourceLocations(const BindLocation& location, Slang::List<BindLocation>& outLocations)
+void BindSet::calcValueLocations(const BindLocation& location, Slang::List<BindLocation>& outLocations)
 {
     auto typeLayout = location.getTypeLayout();
 
@@ -296,8 +296,8 @@ void BindSet::calcResourceLocations(const BindLocation& location, Slang::List<Bi
             auto elementTypeLayout = typeLayout->getElementTypeLayout();
             auto elementCount = int(typeLayout->getElementCount());
 
-            // If it's unbounded, it could point directly to a resource. We can't iterate over it
-            // as 'children' because being an external resource (or in a register space) they
+            // If it's unbounded, it could point directly to a value/resource. We can't iterate over it
+            // as 'children' because being an external value/resource (or in a register space) they
             // are not part of the underling location. 
             if (elementCount == 0)
             {
@@ -359,7 +359,7 @@ BindLocation BindSet::toField(const BindLocation& loc, slang::VariableLayoutRefl
             bindPoints[category] = BindPoint(space, point.m_offset + offset);
         }
 
-        return BindLocation(field->getTypeLayout(), bindPoints, loc.m_resource);
+        return BindLocation(field->getTypeLayout(), bindPoints, loc.m_value);
     }
     else
     {
@@ -376,7 +376,7 @@ BindLocation BindSet::toField(const BindLocation& loc, slang::VariableLayoutRefl
             auto space = field->getBindingSpace(category);
             auto offset = field->getOffset(category);
 
-            return BindLocation(field->getTypeLayout(), category, BindPoint(space, loc.m_point.m_offset + offset), loc.m_resource);
+            return BindLocation(field->getTypeLayout(), category, BindPoint(space, loc.m_point.m_offset + offset), loc.m_value);
         }
     }
 
@@ -393,13 +393,13 @@ BindLocation BindSet::toField(const BindLocation& loc, const char* name) const
     auto typeLayout = loc.m_typeLayout;
     const auto kind = typeLayout->getKind();
 
-    // Strip constantBuffer wrapping, only really applies when we have handles to resources
+    // Strip constantBuffer wrapping, only really applies when we have handles to value/resource
     // embedded in other types (like on CPU and CUDA)
-    if (loc.m_resource &&
+    if (loc.m_value &&
         (kind == slang::TypeReflection::Kind::ConstantBuffer || kind == slang::TypeReflection::Kind::ParameterBlock))
     {
-        // Follow the to associated resource
-        BindSet::Resource* value = getAt(loc);
+        // Follow the to associated value/resource
+        BindSet::Value* value = getAt(loc);
         if (value)
         {
             typeLayout = typeLayout->getElementTypeLayout();
@@ -447,18 +447,18 @@ BindLocation BindSet::toIndex(const BindLocation& loc, Index index) const
     }
 
     // Find where the uniform data will be held. If we have a unsized array, for some targets the actual content's might be in a different location
-    BindSet::Resource* uniformResource = loc.m_resource;
+    BindSet::Value* uniformValue = loc.m_value;
     if (typeLayout->getElementCount() == 0)
     {
-        // If we have a resource at this location, then we need to offset through that
-        BindSet::Resource* arrayResource = getAt(loc);
-        if (arrayResource)
+        // If we have a value/resource at this location, then we need to offset through that
+        BindSet::Value* arrayValue = getAt(loc);
+        if (arrayValue)
         {
-            uniformResource = arrayResource;
+            uniformValue = arrayValue;
 
             // Check it's in range.
             // NOTE we can't check this if the unbounded binding is in another space for example. 
-            if (index >= Index(uniformResource->m_elementCount))
+            if (index >= Index(uniformValue->m_elementCount))
             {
                 return BindLocation::Invalid;
             }
@@ -482,7 +482,7 @@ BindLocation BindSet::toIndex(const BindLocation& loc, Index index) const
 
             size_t baseOffset = loc.m_bindPointSet->m_points[category].m_offset;
 
-            if (category == SLANG_PARAMETER_CATEGORY_UNIFORM && uniformResource != loc.m_resource)
+            if (category == SLANG_PARAMETER_CATEGORY_UNIFORM && uniformValue != loc.m_value)
             {
                 baseOffset = 0;
             }
@@ -492,7 +492,7 @@ BindLocation BindSet::toIndex(const BindLocation& loc, Index index) const
             bindPoints[category] = BindPoint(basePoint.m_space, baseOffset + elementStride * index);
         }
 
-        return BindLocation(elementTypeLayout, bindPoints, uniformResource);
+        return BindLocation(elementTypeLayout, bindPoints, uniformValue);
     }
     else
     {
@@ -502,9 +502,9 @@ BindLocation BindSet::toIndex(const BindLocation& loc, Index index) const
         const auto elementStride = typeLayout->getElementStride(category);
 
         size_t baseOffset = 0;
-        if (category == SLANG_PARAMETER_CATEGORY_UNIFORM && uniformResource != loc.m_resource)
+        if (category == SLANG_PARAMETER_CATEGORY_UNIFORM && uniformValue != loc.m_value)
         {
-            // base of 0 is appropriate as it is the child resource
+            // base of 0 is appropriate as it is the child value
         }
         else
         {
@@ -518,7 +518,7 @@ BindLocation BindSet::toIndex(const BindLocation& loc, Index index) const
 
         BindPoint point(loc.m_point.m_space, baseOffset + elementStride * index);
 
-        return BindLocation(elementTypeLayout, category, point, uniformResource);
+        return BindLocation(elementTypeLayout, category, point, uniformValue);
     }
 
     return BindLocation::Invalid;
@@ -527,20 +527,20 @@ BindLocation BindSet::toIndex(const BindLocation& loc, Index index) const
 
 SlangResult BindSet::setBufferContents(const BindLocation& loc, const void* initialData, size_t sizeInBytes) const
 {
-    BindSet::Resource* resource = getAt(loc);
-    if (resource)
+    BindSet::Value* value = getAt(loc);
+    if (value)
     {
         // Truncate if initial data is larger than the buffer
-        sizeInBytes = (sizeInBytes > resource->m_sizeInBytes) ? resource->m_sizeInBytes : sizeInBytes;
+        sizeInBytes = (sizeInBytes > value->m_sizeInBytes) ? value->m_sizeInBytes : sizeInBytes;
 
-        SLANG_ASSERT(resource->m_sizeInBytes >= sizeInBytes);
-        ::memcpy(resource->m_data, initialData, sizeInBytes);
+        SLANG_ASSERT(value->m_sizeInBytes >= sizeInBytes);
+        ::memcpy(value->m_data, initialData, sizeInBytes);
         return SLANG_OK;
     }
     return SLANG_FAIL;
 }
 
-void BindSet::getBindings(List<BindLocation>& outLocations, List<Resource*>& outResources) const
+void BindSet::getBindings(List<BindLocation>& outLocations, List<Value*>& outResources) const
 {
     outResources.clear();
     outLocations.clear();
@@ -553,7 +553,7 @@ void BindSet::getBindings(List<BindLocation>& outLocations, List<Resource*>& out
 
 // !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! BindLocation !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 
-BindLocation::BindLocation(slang::TypeLayoutReflection* typeLayout, const BindPoints& points, BindSet_Resource* resource) :
+BindLocation::BindLocation(slang::TypeLayoutReflection* typeLayout, const BindPoints& points, BindSet_Value* value) :
     m_typeLayout(typeLayout)
 {
     Slang::Index categoryIndex = points.findSingle();
@@ -570,11 +570,11 @@ BindLocation::BindLocation(slang::TypeLayoutReflection* typeLayout, const BindPo
     }
 }
 
-BindLocation::BindLocation(slang::TypeLayoutReflection* typeLayout, SlangParameterCategory category, const BindPoint& point, BindSet_Resource* resource) :
+BindLocation::BindLocation(slang::TypeLayoutReflection* typeLayout, SlangParameterCategory category, const BindPoint& point, BindSet_Value* value) :
     m_category(category),
     m_point(point),
     m_typeLayout(typeLayout),
-    m_resource(resource)
+    m_value(value)
 {
 }
 
@@ -661,13 +661,13 @@ void BindLocation::addOffset(SlangParameterCategory category, ptrdiff_t offset)
 void* BindLocation::getUniform(size_t sizeInBytes) const
 {
     const BindPoint* point = getValidBindPointForCategory(SLANG_PARAMETER_CATEGORY_UNIFORM);
-    if (m_resource && point)
+    if (m_value && point)
     {
         size_t offset = point->m_offset;
         // Make sure it's in range
-        if (offset + sizeInBytes <= m_resource->m_sizeInBytes)
+        if (offset + sizeInBytes <= m_value->m_sizeInBytes)
         {
-            return m_resource->m_data + offset;
+            return m_value->m_data + offset;
         }
     }
     return nullptr;
@@ -677,14 +677,14 @@ SlangResult BindLocation::setUniform(const void* data, size_t sizeInBytes) const
 {
     // It has to be a location with uniform
     const BindPoint* point = getValidBindPointForCategory(SLANG_PARAMETER_CATEGORY_UNIFORM);
-    if (m_resource && point)
+    if (m_value && point)
     {
         size_t offset = point->m_offset;
         // Make sure it's in range
-        SLANG_ASSERT(offset + sizeInBytes <= m_resource->m_sizeInBytes);
+        SLANG_ASSERT(offset + sizeInBytes <= m_value->m_sizeInBytes);
 
         // Okay copy the contents
-        ::memcpy(m_resource->m_data + offset, data, sizeInBytes);
+        ::memcpy(m_value->m_data + offset, data, sizeInBytes);
         return SLANG_OK;
     }
     return SLANG_FAIL;
@@ -693,7 +693,7 @@ SlangResult BindLocation::setUniform(const void* data, size_t sizeInBytes) const
 bool BindLocation::operator==(const ThisType& rhs) const
 {
     if (m_typeLayout != rhs.m_typeLayout ||
-        m_resource != rhs.m_resource)
+        m_value != rhs.m_value)
     {
         return false;
     }
@@ -732,7 +732,7 @@ SlangResult BindRoot::parse(const String& text, const String& sourcePath, Writer
 {
     SLANG_ASSERT(m_bindSet);
 
-    // We will parse the 'name' as may be path to a resource
+    // We will parse the 'name' as may be path to a value/resource
     TokenReader parser(text);
 
     BindLocation location = BindLocation::Invalid; 
@@ -804,8 +804,8 @@ SlangResult CPULikeBindRoot::init(BindSet* bindSet, slang::ShaderReflection* ref
     m_bindSet = bindSet;
         
     m_reflection = reflection;
-    m_rootBuffer = nullptr;
-    m_entryPointBuffer = nullptr;
+    m_rootValue = nullptr;
+    m_entryPointValue = nullptr;
 
     {
         size_t globalConstantBuffer = reflection->getGlobalConstantBufferSize();
@@ -830,7 +830,7 @@ SlangResult CPULikeBindRoot::init(BindSet* bindSet, slang::ShaderReflection* ref
         if (rootSizeInBytes)
         {
             // Allocate the 'root' buffer
-            m_rootBuffer = m_bindSet->createBufferResource(slang::TypeReflection::Kind::ConstantBuffer, rootSizeInBytes);
+            m_rootValue = m_bindSet->createBufferValue(slang::TypeReflection::Kind::ConstantBuffer, rootSizeInBytes);
         }
     }
 
@@ -867,7 +867,7 @@ SlangResult CPULikeBindRoot::init(BindSet* bindSet, slang::ShaderReflection* ref
 
         if (entryPointParamsSizeInBytes)
         {
-            m_entryPointBuffer = m_bindSet->createBufferResource(slang::TypeReflection::Kind::ConstantBuffer, entryPointParamsSizeInBytes);
+            m_entryPointValue = m_bindSet->createBufferValue(slang::TypeReflection::Kind::ConstantBuffer, entryPointParamsSizeInBytes);
         }
     }
 
@@ -911,18 +911,18 @@ slang::VariableLayoutReflection* CPULikeBindRoot::getEntryPointParameterByName(c
 
 BindLocation CPULikeBindRoot::find(const char* name)
 {
-    Resource* resource = nullptr;
+    Value* value = nullptr;
     slang::VariableLayoutReflection* varLayout = nullptr;
 
-    if (m_rootBuffer)
+    if (m_rootValue)
     {
         varLayout = getParameterByName(name);
-        resource = m_rootBuffer;
+        value = m_rootValue;
     }
         
-    if (!varLayout && m_entryPointBuffer)
+    if (!varLayout && m_entryPointValue)
     {
-        resource = m_entryPointBuffer;
+        value = m_entryPointValue;
         varLayout = getEntryPointParameterByName(name);
     }
 
@@ -936,7 +936,7 @@ BindLocation CPULikeBindRoot::find(const char* name)
     // TODO(JS): Where is getBindingIndex supposed to be used. It seems the offset here will do the right thing
     auto offset = varLayout->getOffset(SLANG_PARAMETER_CATEGORY_UNIFORM);
 
-    return BindLocation(varLayout->getTypeLayout(), SLANG_PARAMETER_CATEGORY_UNIFORM, BindPoint(0, offset), resource);
+    return BindLocation(varLayout->getTypeLayout(), SLANG_PARAMETER_CATEGORY_UNIFORM, BindPoint(0, offset), value);
 }
 
 SlangResult CPULikeBindRoot::setArrayCount(const BindLocation& location, int count)
@@ -947,7 +947,7 @@ SlangResult CPULikeBindRoot::setArrayCount(const BindLocation& location, int cou
     }
 
     // I can see if a resource has already been set
-    Resource* resource = m_bindSet->getAt(location);
+    Value* value = m_bindSet->getAt(location);
     
     auto typeLayout = location.getTypeLayout();
     const auto kind = typeLayout->getKind();
@@ -960,23 +960,23 @@ SlangResult CPULikeBindRoot::setArrayCount(const BindLocation& location, int cou
     const size_t elementStride = typeLayout->getElementStride(SLANG_PARAMETER_CATEGORY_UNIFORM);
     auto elementTypeLayout = typeLayout->getElementTypeLayout();
 
-    if (resource)
+    if (value)
     {
         // Making smaller, just reduce the count.
         // NOTE! Nothing is done here about deallocating resources which are perhaps no longer reachable.
         // This isn't a leakage problem tho, as all buffers are released automatically when scope is left.
-        if (count <= int(resource->m_elementCount) || count <= int(resource->m_sizeInBytes / elementStride))
+        if (count <= int(value->m_elementCount) || count <= int(value->m_sizeInBytes / elementStride))
         {
-            resource->m_elementCount = count;
+            value->m_elementCount = count;
             return SLANG_OK;
         }
 
-        const size_t maxElementCount = (resource->m_sizeInBytes / elementStride);
+        const size_t maxElementCount = (value->m_sizeInBytes / elementStride);
         if (count <= maxElementCount)
         {
             // Just initialize the space
-            ::memset(resource->m_data + elementStride * resource->m_elementCount, 0, (count - resource->m_elementCount) * elementStride);
-            resource->m_elementCount = count;
+            ::memset(value->m_data + elementStride * value->m_elementCount, 0, (count - value->m_elementCount) * elementStride);
+            value->m_elementCount = count;
             return SLANG_OK;
         }
     }
@@ -985,31 +985,31 @@ SlangResult CPULikeBindRoot::setArrayCount(const BindLocation& location, int cou
     
     const size_t newBufferSize = count * elementStride;
 
-    Resource* newBuffer = m_bindSet->createBufferResource(slang::TypeReflection::Kind::Array, newBufferSize);
-    newBuffer->m_elementCount = count;
+    Value* newValue = m_bindSet->createBufferValue(slang::TypeReflection::Kind::Array, newBufferSize);
+    newValue->m_elementCount = count;
 
     // Copy over the data from the old buffer if there is any
-    if (resource && resource->m_elementCount)
+    if (value && value->m_elementCount)
     {
-        ::memcpy(newBuffer->m_data, resource->m_data, resource->m_elementCount * elementStride);
+        ::memcpy(newValue->m_data, value->m_data, value->m_elementCount * elementStride);
     }
 
     // Remove the old buffer as no longer needed
 
-    if (resource)
+    if (value)
     {
-        m_bindSet->destroyResource(resource);
+        m_bindSet->destroyValue(value);
     }
 
     // Set the new buffer
-    m_bindSet->setAt(location, newBuffer);
+    m_bindSet->setAt(location, newValue);
     return SLANG_OK;
 }
 
 
 void CPULikeBindRoot::getRoots(Slang::List<BindLocation>& outLocations)
 {
-    if (m_entryPointBuffer)
+    if (m_entryPointValue)
     {
         const int parameterCount = int(m_entryPoint->getParameterCount());
         for (int i = 0; i < parameterCount; ++i)
@@ -1023,12 +1023,12 @@ void CPULikeBindRoot::getRoots(Slang::List<BindLocation>& outLocations)
 
             auto offset = parameter->getOffset(SLANG_PARAMETER_CATEGORY_UNIFORM);
 
-            BindLocation location(parameter->getTypeLayout(), SLANG_PARAMETER_CATEGORY_UNIFORM, BindPoint(0, offset), m_entryPointBuffer);
+            BindLocation location(parameter->getTypeLayout(), SLANG_PARAMETER_CATEGORY_UNIFORM, BindPoint(0, offset), m_entryPointValue);
             outLocations.add(location);
         }
     }
 
-    if (m_rootBuffer)
+    if (m_rootValue)
     {
         const int parameterCount = m_reflection->getParameterCount();
         for (int i = 0; i < parameterCount; ++i)
@@ -1037,7 +1037,7 @@ void CPULikeBindRoot::getRoots(Slang::List<BindLocation>& outLocations)
 
             auto offset = parameter->getOffset(SLANG_PARAMETER_CATEGORY_UNIFORM);
 
-            BindLocation location(parameter->getTypeLayout(), SLANG_PARAMETER_CATEGORY_UNIFORM, BindPoint(0, offset), m_rootBuffer);
+            BindLocation location(parameter->getTypeLayout(), SLANG_PARAMETER_CATEGORY_UNIFORM, BindPoint(0, offset), m_rootValue);
             outLocations.add(location);
         }
     }
@@ -1045,7 +1045,7 @@ void CPULikeBindRoot::getRoots(Slang::List<BindLocation>& outLocations)
 
 static void _addDefaultBuffersRec(BindSet* bindSet, const BindLocation& loc)
 {
-    // See if there is a resource attached there
+    // See if there is a value/resource attached there
     auto typeLayout = loc.getTypeLayout();
 
     const auto kind = typeLayout->getKind();
@@ -1054,25 +1054,25 @@ static void _addDefaultBuffersRec(BindSet* bindSet, const BindLocation& loc)
         case slang::TypeReflection::Kind::ParameterBlock:
         case slang::TypeReflection::Kind::ConstantBuffer:
         {
-            BindSet::Resource* resource = bindSet->getAt(loc);
+            BindSet::Value* value = bindSet->getAt(loc);
 
             auto elementTypeLayout = typeLayout->getElementTypeLayout();
 
-            if (!resource)
+            if (!value)
             {
                 //SLANG_ASSERT(typeLayout->getSize() == sizeof(void*));
                 const size_t elementSize = elementTypeLayout->getSize();
 
                 // We create using typeLayout (as opposed to elementTypeLayout), because it also holds the wrapping
                 // 'resource' type.
-                resource = bindSet->createBufferResource(typeLayout, elementSize);
-                SLANG_ASSERT(resource);
+                value = bindSet->createBufferValue(typeLayout, elementSize);
+                SLANG_ASSERT(value);
 
-                bindSet->setAt(loc, resource);
+                bindSet->setAt(loc, value);
             }
 
             // Recurse into buffer, using the elementType
-            BindLocation childLocation(elementTypeLayout, SLANG_PARAMETER_CATEGORY_UNIFORM, BindPoint(0, 0), resource );
+            BindLocation childLocation(elementTypeLayout, SLANG_PARAMETER_CATEGORY_UNIFORM, BindPoint(0, 0), value );
             _addDefaultBuffersRec(bindSet, childLocation);
             return;
         }
@@ -1090,7 +1090,7 @@ static void _addDefaultBuffersRec(BindSet* bindSet, const BindLocation& loc)
     }
 }
 
-void CPULikeBindRoot::addDefaultBuffers()
+void CPULikeBindRoot::addDefaultValues()
 {
 
     List<BindLocation> rootLocations;

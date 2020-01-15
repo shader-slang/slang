@@ -128,7 +128,7 @@ public:
     BindPoints m_points;
 };
 
-struct BindSet_Resource
+struct BindSet_Value
 {
     slang::TypeReflection::Kind m_kind;              ///< The kind, used if type is not set. Same as m_type.kind otherwise
     slang::TypeLayoutReflection* m_type;            ///< The type
@@ -136,7 +136,7 @@ struct BindSet_Resource
     size_t m_sizeInBytes;                           ///< Total size in bytes
     size_t m_elementCount;                          ///< Only applicable on an array like type, else 0
 
-        /// Can be set by user code to indicate the origin of contents/definition of a resource, such that actual resource can be later constructed.
+        /// Can be set by user code to indicate the origin of contents/definition of a value, such that actual resource can be later constructed.
         /// -1 is used to indicate it is not set.
     Slang::Index m_userIndex = -1;                  
 
@@ -145,10 +145,7 @@ struct BindSet_Resource
 
 class BindSet;
 
-// A problem is how to handle the root case.
-// We know the roots are constant buffers on CPU and CUDA
-// On other bindings, that isn't the case. In that case it's target specific how to handle that.
-// We can add some assumptions to make this work though by assuming first X resources are something specific for a specific lookup
+// Specifies a binding location (including the associated slang reflection type information
 struct BindLocation
 {
     typedef BindLocation ThisType;
@@ -187,8 +184,8 @@ struct BindLocation
 
         /// Default Ctor - constructs as invalid
     BindLocation() {}
-    BindLocation(slang::TypeLayoutReflection* typeLayout, const BindPoints& points, BindSet_Resource* resource = nullptr);
-    BindLocation(slang::TypeLayoutReflection* typeLayout, SlangParameterCategory category, const BindPoint& point, BindSet_Resource* resource = nullptr);
+    BindLocation(slang::TypeLayoutReflection* typeLayout, const BindPoints& points, BindSet_Value* value = nullptr);
+    BindLocation(slang::TypeLayoutReflection* typeLayout, SlangParameterCategory category, const BindPoint& point, BindSet_Value* value = nullptr);
 
     BindLocation(const ThisType& rhs) = default;
 
@@ -198,7 +195,7 @@ struct BindLocation
 
     slang::TypeLayoutReflection* m_typeLayout = nullptr;    ///< The type layout
 
-    BindSet_Resource* m_resource = nullptr;                 ///< The resource if we are in 
+    BindSet_Value* m_value = nullptr;                       ///< The value if we are in one. 
 
     SlangParameterCategory m_category = SLANG_PARAMETER_CATEGORY_NONE;  ///< If there isn't a set this defines the category
     BindPoint m_point;                                     ///< If there isn't a bind point set, this defines the point
@@ -213,22 +210,22 @@ struct BindLocation
 class BindSet
 {
 public:
-    typedef BindSet_Resource Resource;
+    typedef BindSet_Value Value;
 
-    Resource* getAt(const BindLocation& loc) const;
-    void setAt(const BindLocation& loc, Resource* resource);
-    void setAt(const BindLocation& loc, SlangParameterCategory category, Resource* resource);
+    Value* getAt(const BindLocation& loc) const;
+    void setAt(const BindLocation& loc, Value* value);
+    void setAt(const BindLocation& loc, SlangParameterCategory category, Value* value);
 
-    Resource* createBufferResource(slang::TypeLayoutReflection* type, size_t sizeInBytes, const void* initialData = nullptr);
-    Resource* createBufferResource(slang::TypeReflection::Kind kind, size_t sizeInBytes, const void* initialData = nullptr);
+    Value* createBufferValue(slang::TypeLayoutReflection* type, size_t sizeInBytes, const void* initialData = nullptr);
+    Value* createBufferValue(slang::TypeReflection::Kind kind, size_t sizeInBytes, const void* initialData = nullptr);
 
-    Resource* createTextureResource(slang::TypeLayoutReflection* type);
+    Value* createTextureValue(slang::TypeLayoutReflection* type);
 
         /// Calculate from the current location everything that is referenced
-    void calcResourceLocations(const BindLocation& location, Slang::List<BindLocation>& outLocations);
+    void calcValueLocations(const BindLocation& location, Slang::List<BindLocation>& outLocations);
     void calcChildResourceLocations(const BindLocation& location, Slang::List<BindLocation>& outLocations);
 
-    void destroyResource(Resource* resource);
+    void destroyValue(Value* value);
 
     BindLocation toField(const BindLocation& loc, slang::VariableLayoutReflection* field) const;
     BindLocation toField(const BindLocation& loc, const char* name) const;
@@ -236,10 +233,10 @@ public:
 
     SlangResult setBufferContents(const BindLocation& loc, const void* initialData, size_t sizeInBytes) const;
 
-        /// Get all of the resources
-    const Slang::List<Resource*>& getResources() const { return m_resources; }
+        /// Get all of the values
+    const Slang::List<Value*>& getValues() const { return m_values; }
         /// Get all of the bindings
-    void getBindings(Slang::List<BindLocation>& outLocations, Slang::List<Resource*>& outResources) const;
+    void getBindings(Slang::List<BindLocation>& outLocations, Slang::List<Value*>& outValues) const;
 
         /// Ctor
     BindSet();
@@ -251,11 +248,11 @@ public:
     static bool isTextureType(slang::TypeLayoutReflection* typeLayout);
 
 protected:
-    Resource* _createBufferResource(slang::TypeReflection::Kind kind, slang::TypeLayoutReflection* typeLayout, size_t bufferSizeInBytes, size_t sizeInBytes, const void* initalData);
+    Value* _createBufferValue(slang::TypeReflection::Kind kind, slang::TypeLayoutReflection* typeLayout, size_t bufferSizeInBytes, size_t sizeInBytes, const void* initalData);
     
-    Slang::List<Resource*> m_resources;
+    Slang::List<Value*> m_values;
 
-    Slang::Dictionary<BindLocation, Resource*> m_bindings;
+    Slang::Dictionary<BindLocation, Value*> m_bindings;
 
     Slang::MemoryArena m_arena;
 };
@@ -264,6 +261,8 @@ class BindRoot : public Slang::RefObject
 {
 public:
     typedef RefObject Super;
+
+    typedef BindSet::Value Value;
 
     virtual BindLocation find(const char* name) = 0;
         /// The setting of an array count is dependent on the underlying implementation.
@@ -292,8 +291,6 @@ class CPULikeBindRoot : public BindRoot
 public:
     typedef BindRoot Super;
 
-    typedef BindSet::Resource Resource;
-
     // BindRoot
     virtual BindLocation find(const char* name) SLANG_OVERRIDE;
     virtual SlangResult setArrayCount(const BindLocation& location, int count) SLANG_OVERRIDE;
@@ -302,21 +299,21 @@ public:
     slang::VariableLayoutReflection* getParameterByName(const char* name);
     slang::VariableLayoutReflection* getEntryPointParameterByName(const char* name);
 
-    void addDefaultBuffers();
+    void addDefaultValues();
 
-    Resource* getRootBuffer() const { return m_rootBuffer; }
-    Resource* getEntryPointBuffer() const { return m_entryPointBuffer; }
+    Value* getRootValue() const { return m_rootValue; }
+    Value* getEntryPointValue() const { return m_entryPointValue; }
 
-    void* getRootData() { return m_rootBuffer ? m_rootBuffer->m_data : nullptr; }
-    void* getEntryPointData() { return m_entryPointBuffer ? m_entryPointBuffer->m_data : nullptr; } 
+    void* getRootData() { return m_rootValue ? m_rootValue->m_data : nullptr; }
+    void* getEntryPointData() { return m_entryPointValue ? m_entryPointValue->m_data : nullptr; } 
 
     SlangResult init(BindSet* bindSet, slang::ShaderReflection* reflection, int entryPointIndex); 
 
 protected:
     // Used when we have uniform buffers (as used on CPU/CUDA)
     slang::ShaderReflection* m_reflection = nullptr;
-    Resource* m_rootBuffer = nullptr;
-    Resource* m_entryPointBuffer = nullptr;
+    Value* m_rootValue = nullptr;
+    Value* m_entryPointValue = nullptr;
     slang::EntryPointReflection* m_entryPoint;
 };
 

@@ -539,13 +539,10 @@ namespace renderer_test
                 }
             }
         }
-
-
     }
 
-    /* static */SlangResult ShaderInputLayout::addBindSetResources(const Slang::List<ShaderInputLayoutEntry>& entries, const String& sourcePath, WriterHelper outStream, BindRoot& bindRoot)
+    /* static */SlangResult ShaderInputLayout::addBindSetValues(const Slang::List<ShaderInputLayoutEntry>& entries, const String& sourcePath, WriterHelper outStream, BindRoot& bindRoot)
     {
-        
         BindSet* bindSet = bindRoot.getBindSet();
         SLANG_ASSERT(bindSet);
 
@@ -555,7 +552,7 @@ namespace renderer_test
 
             if (entry.name.getLength() == 0)
             {
-                outStream.print("No 'name' specified for resources in '%s'\n", sourcePath.getBuffer());
+                outStream.print("No 'name' specified for value in '%s'\n", sourcePath.getBuffer());
                 return SLANG_FAIL;
             }
 
@@ -632,9 +629,9 @@ namespace renderer_test
                     if (BindSet::isTextureType(typeLayout))
                     {
                         // We don't bother setting any data
-                        BindSet::Resource* resource = bindSet->createTextureResource(typeLayout);
-                        resource->m_userIndex = entryIndex;
-                        bindSet->setAt(location, resource);
+                        BindSet::Value* value = bindSet->createTextureValue(typeLayout);
+                        value->m_userIndex = entryIndex;
+                        bindSet->setAt(location, value);
                         break;
                     }
 
@@ -653,12 +650,12 @@ namespace renderer_test
                         {
                             size_t bufferSize = srcEntry.bufferData.getCount() * sizeof(unsigned int);
 
-                            BindSet::Resource* resource = bindSet->createBufferResource(typeLayout, bufferSize, srcEntry.bufferData.getBuffer());
-                            SLANG_ASSERT(resource);
+                            BindSet::Value* value = bindSet->createBufferValue(typeLayout, bufferSize, srcEntry.bufferData.getBuffer());
+                            SLANG_ASSERT(value);
 
-                            resource->m_userIndex = entryIndex;
+                            value->m_userIndex = entryIndex;
 
-                            bindSet->setAt(location, resource);
+                            bindSet->setAt(location, value);
                             break;
                         }
                     }

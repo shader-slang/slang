@@ -15,7 +15,7 @@
 namespace renderer_test {
 using namespace Slang;
 
-/* static */SlangResult CPUComputeUtil::writeBindings(const ShaderInputLayout& layout, const List<BindSet::Resource*>& buffers, const String& fileName)
+/* static */SlangResult CPUComputeUtil::writeBindings(const ShaderInputLayout& layout, const List<BindSet::Value*>& buffers, const String& fileName)
 {
     FILE * f = fopen(fileName.getBuffer(), "wb");
     if (!f)
@@ -30,7 +30,7 @@ using namespace Slang;
         const auto& entry = entries[i];
         if (entry.isOutput)
         {
-            BindSet::Resource* buffer = buffers[i];
+            BindSet::Value* buffer = buffers[i];
 
             unsigned int* ptr = (unsigned int*)buffer->m_data;
 
@@ -104,22 +104,22 @@ static CPUComputeUtil::Resource* _newOneTexture2D(int elemCount)
     outContext.m_bindRoot.init(&outContext.m_bindSet, reflection, 0);
 
     // This will set up constant buffer that are contained from the roots
-    outContext.m_bindRoot.addDefaultBuffers();
+    outContext.m_bindRoot.addDefaultValues();
 
     // Okay lets iterate adding buffers
     auto outStream = StdWriters::getOut();
-    SLANG_RETURN_ON_FAIL(ShaderInputLayout::addBindSetResources(compilationAndLayout.layout.entries, compilationAndLayout.sourcePath, outStream, outContext.m_bindRoot));
+    SLANG_RETURN_ON_FAIL(ShaderInputLayout::addBindSetValues(compilationAndLayout.layout.entries, compilationAndLayout.sourcePath, outStream, outContext.m_bindRoot));
 
     {
         const auto& entries = compilationAndLayout.layout.entries;
         outContext.m_buffers.setCount(entries.getCount());
 
-        const auto& resources = outContext.m_bindSet.getResources();
-        for (BindSet::Resource* resource : resources)
+        const auto& values = outContext.m_bindSet.getValues();
+        for (BindSet::Value* value : values)
         {
-            if (resource->m_userIndex >= 0)
+            if (value->m_userIndex >= 0)
             {
-                outContext.m_buffers[resource->m_userIndex] = resource;
+                outContext.m_buffers[value->m_userIndex] = value;
             }
         }
     }
@@ -130,15 +130,15 @@ static CPUComputeUtil::Resource* _newOneTexture2D(int elemCount)
     // The final stage is to actual set up the CPU based variables
 
     {
-        // First create all of the resources
+        // First create all of the resources for the values
         // We don't need to create anything backed by a buffer on CPU, as the memory buffer as provided
         // by BindSet::Resource can just be used
         {
-            const auto& resources = outContext.m_bindSet.getResources();
+            const auto& values = outContext.m_bindSet.getValues();
 
-            for (BindSet::Resource* resource : resources)
+            for (BindSet::Value* value : values)
             {
-                auto typeLayout = resource->m_type;
+                auto typeLayout = value->m_type;
                 if (typeLayout == nullptr)
                 {
                     // We need type layout here to create anything
@@ -162,8 +162,8 @@ static CPUComputeUtil::Resource* _newOneTexture2D(int elemCount)
                         {
                             case SLANG_TEXTURE_2D:
                             {
-                                SLANG_ASSERT(resource->m_userIndex >= 0);
-                                auto& srcEntry = layout.entries[resource->m_userIndex];
+                                SLANG_ASSERT(value->m_userIndex >= 0);
+                                auto& srcEntry = layout.entries[value->m_userIndex];
 
                                 // TODO(JS):
                                 // We should use the srcEntry to determine what data to store in the texture,
@@ -179,7 +179,7 @@ static CPUComputeUtil::Resource* _newOneTexture2D(int elemCount)
 
                                 // TODO(JS): Should use the input setup to work how to create this texture
                                 // Store the target specific value
-                                resource->m_target = _newOneTexture2D(count);
+                                value->m_target = _newOneTexture2D(count);
                                 break;
                             }
                             case SLANG_TEXTURE_1D:
@@ -209,13 +209,13 @@ static CPUComputeUtil::Resource* _newOneTexture2D(int elemCount)
         // Now we need to go through all of the bindings and set the appropriate data
         {
             List<BindLocation> locations;
-            List<BindSet::Resource*> values;
+            List<BindSet::Value*> values;
             outContext.m_bindSet.getBindings(locations, values);
 
             for (Index i = 0; i < locations.getCount(); ++i)
             {
                 const auto& location = locations[i];
-                BindSet::Resource* value = values[i];
+                BindSet::Value* value = values[i];
 
                 // Okay now we need to set up the actual handles that CPU will follow.
                 auto typeLayout = location.getTypeLayout();
@@ -495,8 +495,8 @@ static CPUComputeUtil::Resource* _newOneTexture2D(int elemCount)
             const auto& entry = entries[i];
             if (entry.isOutput)
             {
-                BindSet::Resource* buffer = context.m_buffers[i];
-                BindSet::Resource* checkBuffer = checkContext.m_buffers[i];
+                BindSet::Value* buffer = context.m_buffers[i];
+                BindSet::Value* checkBuffer = checkContext.m_buffers[i];
 
                 if (buffer->m_sizeInBytes != checkBuffer->m_sizeInBytes ||
                     ::memcmp(buffer->m_data, checkBuffer->m_data, buffer->m_sizeInBytes) != 0)

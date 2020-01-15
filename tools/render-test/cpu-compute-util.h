@@ -33,7 +33,7 @@ struct CPUComputeUtil
         CPULikeBindRoot m_bindRoot;
 
             /// Buffers are held in same order as entries in layout (useful for dumping out bindings)
-        List<BindSet::Resource*> m_buffers;
+        List<BindSet::Value*> m_buffers;
     };
 
     struct ExecuteInfo
@@ -59,7 +59,7 @@ struct CPUComputeUtil
 
     static SlangResult execute(const ExecuteInfo& info);
 
-    static SlangResult writeBindings(const ShaderInputLayout& layout, const List<BindSet::Resource*>& buffers, const Slang::String& fileName);
+    static SlangResult writeBindings(const ShaderInputLayout& layout, const List<BindSet::Value*>& buffers, const Slang::String& fileName);
 };
 
 

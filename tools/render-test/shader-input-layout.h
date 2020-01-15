@@ -101,7 +101,7 @@ public:
         /// Note: No actual resources are created on a device, these are just the 'Resource' structures that are held on the BindSet
         /// For buffers, the Resources will be setup with the contents of the entry.
         /// That if a resource is created that maps to an entry, the m_userData member of Resource will be set to it's index
-    static SlangResult addBindSetResources(const Slang::List<ShaderInputLayoutEntry>& entries, const Slang::String& sourcePath, Slang::WriterHelper outError, BindRoot& bindRoot);
+    static SlangResult addBindSetValues(const Slang::List<ShaderInputLayoutEntry>& entries, const Slang::String& sourcePath, Slang::WriterHelper outError, BindRoot& bindRoot);
 };
 
 void generateTextureDataRGB8(TextureData& output, const InputTextureDesc& desc);
