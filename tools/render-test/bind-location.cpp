@@ -344,7 +344,7 @@ BindLocation BindSet::toField(const BindLocation& loc, slang::VariableLayoutRefl
         // Copy over and add the ones found here
         for (Index i = 0; i < categoryCount; ++i)
         {
-            auto category = field->getCategoryByIndex(unsigned int(i));
+            auto category = field->getCategoryByIndex((unsigned int)i);
 
             auto const& point = loc.m_bindPointSet->m_points[category];
             if (point.isInvalid())
@@ -477,7 +477,7 @@ BindLocation BindSet::toIndex(const BindLocation& loc, Index index) const
         // Copy over and add the ones found here
         for (Index i = 0; i < categoryCount; ++i)
         {
-            auto category = elementTypeLayout->getCategoryByIndex(unsigned int(i));
+            auto category = elementTypeLayout->getCategoryByIndex((unsigned int)i);
             const auto elementStride = typeLayout->getElementStride(category);
 
             size_t baseOffset = loc.m_bindPointSet->m_points[category].m_offset;
@@ -502,7 +502,7 @@ BindLocation BindSet::toIndex(const BindLocation& loc, Index index) const
         const auto elementStride = typeLayout->getElementStride(category);
 
         size_t baseOffset = 0;
-        if (category == SLANG_PARAMETER_CATEGORY_UNIFORM && uniformValue != loc.m_value)
+        if (category == slang::ParameterCategory::Uniform && uniformValue != loc.m_value)
         {
             // base of 0 is appropriate as it is the child value
         }
@@ -556,16 +556,28 @@ void BindSet::getBindings(List<BindLocation>& outLocations, List<Value*>& outRes
 BindLocation::BindLocation(slang::TypeLayoutReflection* typeLayout, const BindPoints& points, BindSet_Value* value) :
     m_typeLayout(typeLayout)
 {
-    Slang::Index categoryIndex = points.findSingle();
-    if (categoryIndex >= 0)
+    Slang::Index categoryIndex;
+    auto categoryCount = points.calcValidCount(&categoryIndex);
+
+    if (categoryCount == 0)
     {
+        // If no categories - mark as invalid
+        m_typeLayout = nullptr;
+        m_category = slang::ParameterCategory::None;
+    }
+    else if (categoryCount == 1)
+    {
+        // If 1, we don't want m_bindPointSet
         m_category = SlangParameterCategory(categoryIndex);
         m_point = points.m_points[categoryIndex];
     }
     else
     {
+        // We don't use these
         m_category = SLANG_PARAMETER_CATEGORY_NONE;
         m_point.setInvalid();
+
+        // Create a bindpoint set
         m_bindPointSet = new BindPointSet(points);
     }
 }
