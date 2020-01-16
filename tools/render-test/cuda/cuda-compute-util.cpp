@@ -14,9 +14,12 @@
 namespace renderer_test {
 using namespace Slang;
 
-#define SLANG_CUDA_RETURN_ON_FAIL(x) { int _res = (int)(x); if (_res != 0) return SLANG_FAIL; }
+SLANG_FORCE_INLINE static bool _isError(CUresult result) { return result != 0; }
+SLANG_FORCE_INLINE static bool _isError(cudaError_t result) { return result != 0; }
 
-#define SLANG_CUDA_ASSERT_ON_FAIL(x) { int _res = (int)(x); if (_res !=0) { SLANG_ASSERT(!"Failed CUDA call"); }; }
+#define SLANG_CUDA_RETURN_ON_FAIL(x) { auto _res = x; if (_isError(_res)) return SLANG_FAIL; }
+
+#define SLANG_CUDA_ASSERT_ON_FAIL(x) { auto _res = x; if (_isError(_res)) { SLANG_ASSERT(!"Failed CUDA call"); }; }
 
 class CUDAResource : public RefObject
 {
