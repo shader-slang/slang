@@ -730,10 +730,54 @@ struct CPUObjectLayoutRulesImpl : ObjectLayoutRulesImpl
 };
 
 
-// TODO(JS): Most likely wrong! Use CPU layout for CUDA for now
+// TODO(JS): Most likely wrong! Assumes largely CPU layout which is probably not right
 struct CUDAObjectLayoutRulesImpl : CPUObjectLayoutRulesImpl
 {
     typedef CPUObjectLayoutRulesImpl Super;
+
+    virtual SimpleLayoutInfo GetObjectLayout(ShaderParameterKind kind) override
+    {
+        switch (kind)
+        {
+            case ShaderParameterKind::ConstantBuffer:
+                // It's a pointer to the actual uniform data
+                return SimpleLayoutInfo(LayoutResourceKind::Uniform, sizeof(void*), sizeof(void*));
+
+            case ShaderParameterKind::MutableTexture:
+            case ShaderParameterKind::TextureUniformBuffer:
+            case ShaderParameterKind::Texture:
+                // It's a pointer to a texture interface 
+                return SimpleLayoutInfo(LayoutResourceKind::Uniform, sizeof(void*), sizeof(void*));
+
+            case ShaderParameterKind::StructuredBuffer:
+            case ShaderParameterKind::MutableStructuredBuffer:
+                // TODO(JS): We are just storing as a pointer for now
+                // It's a ptr and a size of the amount of elements
+                return SimpleLayoutInfo(LayoutResourceKind::Uniform, sizeof(void*), sizeof(void*));
+
+            case ShaderParameterKind::RawBuffer:
+            case ShaderParameterKind::Buffer:
+            case ShaderParameterKind::MutableRawBuffer:
+            case ShaderParameterKind::MutableBuffer:
+
+                // TODO(JS): We are storing as a pointer for now
+
+                // It's a pointer and a size in bytes
+                return SimpleLayoutInfo(LayoutResourceKind::Uniform, sizeof(void*), sizeof(void*));
+
+            case ShaderParameterKind::SamplerState:
+                // It's a pointer
+                return SimpleLayoutInfo(LayoutResourceKind::Uniform, sizeof(void*), sizeof(void*));
+
+            case ShaderParameterKind::TextureSampler:
+            case ShaderParameterKind::MutableTextureSampler:
+            case ShaderParameterKind::InputRenderTarget:
+                // TODO: how to handle these?
+            default:
+                SLANG_UNEXPECTED("unhandled shader parameter kind");
+                UNREACHABLE_RETURN(SimpleLayoutInfo());
+        }
+    }
 
 };
 
@@ -747,10 +791,10 @@ LayoutRulesImpl kCPULayoutRulesImpl_ = {
 // CUDA
 
 static CUDAObjectLayoutRulesImpl kCUDAObjectLayoutRulesImpl;
-static CUDALayoutRulesImpl kCUALayoutRulesImpl;
+static CUDALayoutRulesImpl kCUDALayoutRulesImpl;
 
 LayoutRulesImpl kCUDALayoutRulesImpl_ = {
-    &kCPULayoutRulesFamilyImpl, &kCUALayoutRulesImpl, &kCUDAObjectLayoutRulesImpl,
+    &kCUDALayoutRulesFamilyImpl, &kCUDALayoutRulesImpl, &kCUDAObjectLayoutRulesImpl,
 };
 
 
@@ -1033,12 +1077,12 @@ LayoutRulesImpl* CPULayoutRulesFamilyImpl::getStructuredBufferRules()
 
 LayoutRulesImpl* CUDALayoutRulesFamilyImpl::getConstantBufferRules()
 {
-    return &kCPULayoutRulesImpl_;
+    return &kCUDALayoutRulesImpl_;
 }
 
 LayoutRulesImpl* CUDALayoutRulesFamilyImpl::getPushConstantBufferRules()
 {
-    return &kCPULayoutRulesImpl_;
+    return &kCUDALayoutRulesImpl_;
 }
 
 LayoutRulesImpl* CUDALayoutRulesFamilyImpl::getTextureBufferRules()
