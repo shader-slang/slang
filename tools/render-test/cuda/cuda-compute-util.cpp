@@ -473,7 +473,11 @@ static SlangResult _compute(CUcontext context, CUmodule module, const ShaderComp
             if (stream)
             {
                 SLANG_CUDA_RETURN_ON_FAIL(cudaStreamSynchronize(stream));
-                SLANG_CUDA_RETURN_ON_FAIL(cudaStreamDestroy(stream));
+            }
+            else
+            {
+                // Do a sync here. Makes sure any issues are detected early and not on some implicit sync
+                SLANG_CUDA_RETURN_ON_FAIL(cudaDeviceSynchronize()); 
             }
         }
 
@@ -498,6 +502,11 @@ static SlangResult _compute(CUcontext context, CUmodule module, const ShaderComp
                     }
                 }
             }
+        }
+
+        if (stream)
+        {
+            SLANG_CUDA_RETURN_ON_FAIL(cudaStreamDestroy(stream));
         }
     }
 
