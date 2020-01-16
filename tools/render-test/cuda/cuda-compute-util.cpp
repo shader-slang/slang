@@ -451,7 +451,7 @@ static SlangResult _compute(CUcontext context, CUmodule module, const ShaderComp
             void* entryPointCUDAData = CUDAResource::getCUDAData(bindRoot.getEntryPointValue());
 
             // NOTE! These are pointers to the cuda memory pointers
-            void* args[] = { &uniformCUDAData, &entryPointCUDAData };
+            void* args[] = { &entryPointCUDAData , &uniformCUDAData };
 
             SlangUInt numThreadsPerAxis[3];
             entryPoint->getComputeThreadGroupSize(3, numThreadsPerAxis);
