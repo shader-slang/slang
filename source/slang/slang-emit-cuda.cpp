@@ -509,7 +509,7 @@ void CUDASourceEmitter::emitModuleImpl(IRModule* module)
         // Output all the thread locals 
         for (auto action : actions)
         {
-            if (action.level == EmitAction::Level::Definition && _isVariable(action.inst->op))
+            if (action.level == EmitAction::Level::Definition && action.inst->op == kIROp_GlobalVar)
             {
                 emitGlobalInst(action.inst);
             }
