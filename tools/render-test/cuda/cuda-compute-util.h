@@ -10,7 +10,16 @@ namespace renderer_test {
 
 struct CUDAComputeUtil
 {
-    static SlangResult execute(const ShaderCompilerUtil::OutputAndLayout& outputAndLayout, Slang::List<BindSet::Value*>& outBuffers);
+    struct Context
+    {
+            /// Holds the binding information
+        BindSet m_bindSet;
+        CPULikeBindRoot m_bindRoot;
+            /// Buffers are held in same order as entries in layout (useful for dumping out bindings)
+        List<BindSet::Value*> m_buffers;
+    };
+
+    static SlangResult execute(const ShaderCompilerUtil::OutputAndLayout& outputAndLayout, Context& outContext);
 
     static bool canCreateDevice();
 };

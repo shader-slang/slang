@@ -17,7 +17,13 @@ using namespace Slang;
 SLANG_FORCE_INLINE static bool _isError(CUresult result) { return result != 0; }
 SLANG_FORCE_INLINE static bool _isError(cudaError_t result) { return result != 0; }
 
+#if 0
 #define SLANG_CUDA_RETURN_ON_FAIL(x) { auto _res = x; if (_isError(_res)) return SLANG_FAIL; }
+#else
+
+#define SLANG_CUDA_RETURN_ON_FAIL(x) { auto _res = x; if (_isError(_res)) { SLANG_ASSERT(!"Failed CUDA call"); return SLANG_FAIL; } }
+
+#endif
 
 #define SLANG_CUDA_ASSERT_ON_FAIL(x) { auto _res = x; if (_isError(_res)) { SLANG_ASSERT(!"Failed CUDA call"); }; }
 
@@ -34,7 +40,7 @@ public:
     {
         if (m_cudaMemory)
         {
-            SLANG_CUDA_ASSERT_ON_FAIL(cudaFree(&m_cudaMemory));
+            SLANG_CUDA_ASSERT_ON_FAIL(cudaFree(m_cudaMemory));
         }
     }
 
@@ -224,8 +230,11 @@ public:
     return SLANG_SUCCEEDED(context.init(0));
 }
 
-static SlangResult _compute(CUcontext context, CUmodule module, const ShaderCompilerUtil::OutputAndLayout& outputAndLayout, List<BindSet::Value*>& outBuffers)
+static SlangResult _compute(CUcontext context, CUmodule module, const ShaderCompilerUtil::OutputAndLayout& outputAndLayout, CUDAComputeUtil::Context& outContext)
 {
+    auto& bindSet = outContext.m_bindSet;
+    auto& bindRoot = outContext.m_bindRoot;
+
     auto request = outputAndLayout.output.request;
     auto reflection = (slang::ShaderReflection*) spGetReflection(request);
 
@@ -247,8 +256,6 @@ static SlangResult _compute(CUcontext context, CUmodule module, const ShaderComp
 
     {
         // Okay now we need to set up binding
-        BindSet bindSet;
-        CPULikeBindRoot bindRoot;
         bindRoot.init(&bindSet, reflection, 0);
 
         // Will set up any root buffers
@@ -259,7 +266,7 @@ static SlangResult _compute(CUcontext context, CUmodule module, const ShaderComp
         auto outStream = StdWriters::getOut();
         SLANG_RETURN_ON_FAIL(ShaderInputLayout::addBindSetValues(outputAndLayout.layout.entries, outputAndLayout.sourcePath, outStream, bindRoot));
 
-        ShaderInputLayout::getValueBuffers(outputAndLayout.layout.entries, bindSet, outBuffers);
+        ShaderInputLayout::getValueBuffers(outputAndLayout.layout.entries, bindSet, outContext.m_buffers);
 
         // First create all of the resources for the values
 
@@ -417,15 +424,13 @@ static SlangResult _compute(CUcontext context, CUmodule module, const ShaderComp
         // Okay now the memory is all set up, we can copy everything over
         {
             const auto& values = bindSet.getValues();
-            const auto& entries = outputAndLayout.layout.entries;
-
             for (BindSet::Value* value : values)
             {
                 void* cudaMem = CUDAResource::getCUDAData(value);
                 if (value && value->m_data && cudaMem)
                 {
                     // Okay copy the data over...
-                    cudaMemcpy(cudaMem, value->m_data, value->m_sizeInBytes, cudaMemcpyHostToDevice);
+                    SLANG_CUDA_RETURN_ON_FAIL(cudaMemcpy(cudaMem, value->m_data, value->m_sizeInBytes, cudaMemcpyHostToDevice));
                 }
             }
         }
@@ -480,7 +485,7 @@ static SlangResult _compute(CUcontext context, CUmodule module, const ShaderComp
             for (Index i = 0; i < entries.getCount(); ++i)
             {
                 const auto& entry = entries[i];
-                BindSet::Value* value = outBuffers[i];
+                BindSet::Value* value = outContext.m_buffers[i];
 
                 if (entry.isOutput)
                 {
@@ -489,20 +494,23 @@ static SlangResult _compute(CUcontext context, CUmodule module, const ShaderComp
                     if (value && value->m_data && cudaMem)
                     {
                         // Okay copy the data back...
-                        cudaMemcpy(value->m_data, cudaMem, value->m_sizeInBytes, cudaMemcpyDeviceToHost);
+                        SLANG_CUDA_RETURN_ON_FAIL(cudaMemcpy(value->m_data, cudaMem, value->m_sizeInBytes, cudaMemcpyDeviceToHost));
                     }
                 }
             }
         }
     }
 
+    // Release all othe CUDA resource/allocations
+    bindSet.releaseValueTargets();
+
     return SLANG_OK;
 }
 
-/* static */SlangResult CUDAComputeUtil::execute(const ShaderCompilerUtil::OutputAndLayout& outputAndLayout, List<BindSet::Value*>& outBuffers)
+/* static */SlangResult CUDAComputeUtil::execute(const ShaderCompilerUtil::OutputAndLayout& outputAndLayout, Context& outContext)
 {
-    ScopeCUDAContext context;
-    SLANG_RETURN_ON_FAIL(context.init(0));
+    ScopeCUDAContext cudaContext;
+    SLANG_RETURN_ON_FAIL(cudaContext.init(0));
 
     const Index index = outputAndLayout.output.findKernelDescIndex(StageType::Compute);
     if (index < 0)
@@ -515,7 +523,7 @@ static SlangResult _compute(CUcontext context, CUmodule module, const ShaderComp
     CUmodule module = 0;
     SLANG_CUDA_RETURN_ON_FAIL(cuModuleLoadData(&module, kernel.codeBegin));
 
-    SLANG_RETURN_ON_FAIL(_compute(context, module, outputAndLayout, outBuffers));
+    SLANG_RETURN_ON_FAIL(_compute(cudaContext, module, outputAndLayout, outContext));
 
     SLANG_CUDA_RETURN_ON_FAIL(cuModuleUnload(module));
 

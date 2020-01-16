@@ -600,14 +600,13 @@ SLANG_TEST_TOOL_API SlangResult innerMain(Slang::StdWriters* stdWriters, SlangSe
 
 #if RENDER_TEST_CUDA
 
-        List<BindSet::Value*> buffers;
-
-        SLANG_RETURN_ON_FAIL(CUDAComputeUtil::execute(compilationAndLayout, buffers));
+        CUDAComputeUtil::Context context;
+        SLANG_RETURN_ON_FAIL(CUDAComputeUtil::execute(compilationAndLayout, context));
 
         if (gOptions.outputPath)
         {
             // Dump everything out that was written
-            SLANG_RETURN_ON_FAIL(ShaderInputLayout::writeBindings(compilationAndLayout.layout, buffers, gOptions.outputPath));
+            SLANG_RETURN_ON_FAIL(ShaderInputLayout::writeBindings(compilationAndLayout.layout, context.m_buffers, gOptions.outputPath));
         }
 
         return SLANG_OK;

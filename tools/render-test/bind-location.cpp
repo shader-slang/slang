@@ -551,6 +551,14 @@ void BindSet::getBindings(List<BindLocation>& outLocations, List<Value*>& outRes
     }
 }
 
+void BindSet::releaseValueTargets()
+{
+    for (Value* value : m_values)
+    {
+        value->m_target.setNull();
+    }
+}
+
 // !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! BindLocation !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 
 BindLocation::BindLocation(slang::TypeLayoutReflection* typeLayout, const BindPoints& points, BindSet_Value* value) :

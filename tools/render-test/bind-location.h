@@ -336,6 +336,9 @@ public:
         /// Get all of the bindings
     void getBindings(Slang::List<BindLocation>& outLocations, Slang::List<Value*>& outValues) const;
 
+        /// 
+    void releaseValueTargets();
+
         /// Ctor
     BindSet();
 
