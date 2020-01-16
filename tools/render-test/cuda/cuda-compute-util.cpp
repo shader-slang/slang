@@ -53,6 +53,8 @@ public:
 };
 
 
+
+
 static int _calcSMCountPerMultiProcessor(int major, int minor)
 {
     // Defines for GPU Architecture types (using the SM version to determine
@@ -163,33 +165,63 @@ static SlangResult _initCuda()
     return SLANG_OK;
 }
 
-/* static */SlangResult _createDevice(CUcontext* outContext)
+class ScopeCUDAContext
 {
-    SLANG_RETURN_ON_FAIL(_initCuda());
+public:
+    ScopeCUDAContext() : m_context(nullptr) {}
 
-    int deviceId;
-    SLANG_RETURN_ON_FAIL(_findMaxFlopsDeviceId(&deviceId));
-    SLANG_CUDA_RETURN_ON_FAIL(cudaSetDevice(deviceId));
+    SlangResult init(unsigned int flags, CUdevice device)
+    {
+        SLANG_RETURN_ON_FAIL(_initCuda());
 
-    CUcontext context;
+        if (m_context)
+        {
+            cuCtxDestroy(m_context);
+            m_context = nullptr;
+        }
+        if (_isError(cuCtxCreate(&m_context, flags, device)))
+        {
+            return SLANG_FAIL;
+        }
+        return SLANG_OK;
+    }
 
-    // Create context
-    SLANG_CUDA_RETURN_ON_FAIL(cuCtxCreate(&context, 0, deviceId));
+    SlangResult init(unsigned int flags)
+    {
+        SLANG_RETURN_ON_FAIL(_initCuda());
 
-    *outContext = context;
-    return SLANG_OK;
-}
+        int deviceId;
+        SLANG_RETURN_ON_FAIL(_findMaxFlopsDeviceId(&deviceId));
+        SLANG_CUDA_RETURN_ON_FAIL(cudaSetDevice(deviceId));
+
+        if (m_context)
+        {
+            cuCtxDestroy(m_context);
+            m_context = nullptr;
+        }
+        if (_isError(cuCtxCreate(&m_context, flags, deviceId)))
+        {
+            return SLANG_FAIL;
+        }
+        return SLANG_OK;
+    }
+
+    ~ScopeCUDAContext()
+    {
+        if (m_context)
+        {
+            cuCtxDestroy(m_context);
+        }
+    }
+    SLANG_FORCE_INLINE operator CUcontext () const { return m_context; }
+
+    CUcontext m_context;
+};
 
 /* static */bool CUDAComputeUtil::canCreateDevice()
 {
-    CUcontext context;
-    if (SLANG_SUCCEEDED(_createDevice(&context)))
-    {
-        cuCtxDestroy(context);
-        return true;
-    }
-
-    return false;
+    ScopeCUDAContext context;
+    return SLANG_SUCCEEDED(context.init(0));
 }
 
 static SlangResult _compute(CUcontext context, CUmodule module, const ShaderCompilerUtil::OutputAndLayout& outputAndLayout, List<BindSet::Value*>& outBuffers)
@@ -253,7 +285,7 @@ static SlangResult _compute(CUcontext context, CUmodule module, const ShaderComp
                     {
                         // We can construct the buffers. We can't copy into yet, as we need to set all of the bindings first
 
-                        void* cudaMem;
+                        void* cudaMem = nullptr;
                         SLANG_CUDA_RETURN_ON_FAIL(cudaMalloc(&cudaMem, value->m_sizeInBytes));
                         value->m_target = new CUDAResource(cudaMem);
                         break;
@@ -304,7 +336,7 @@ static SlangResult _compute(CUcontext context, CUmodule module, const ShaderComp
                             {
                                 // On CPU we just use the memory in the BindSet buffer, so don't need to create anything
 
-                                void* cudaMem;
+                                void* cudaMem = nullptr;
                                 SLANG_CUDA_RETURN_ON_FAIL(cudaMalloc(&cudaMem, value->m_sizeInBytes));
                                 value->m_target = new CUDAResource(cudaMem);
 
@@ -413,7 +445,8 @@ static SlangResult _compute(CUcontext context, CUmodule module, const ShaderComp
             void* uniformCUDAData = CUDAResource::getCUDAData(bindRoot.getRootValue());
             void* entryPointCUDAData = CUDAResource::getCUDAData(bindRoot.getEntryPointValue());
 
-            void* args[] = { uniformCUDAData, entryPointCUDAData };
+            // NOTE! These are pointers to the cuda memory pointers
+            void* args[] = { &uniformCUDAData, &entryPointCUDAData };
 
             SlangUInt numThreadsPerAxis[3];
             entryPoint->getComputeThreadGroupSize(3, numThreadsPerAxis);
@@ -468,8 +501,8 @@ static SlangResult _compute(CUcontext context, CUmodule module, const ShaderComp
 
 /* static */SlangResult CUDAComputeUtil::execute(const ShaderCompilerUtil::OutputAndLayout& outputAndLayout, List<BindSet::Value*>& outBuffers)
 {
-    CUcontext context;
-    SLANG_RETURN_ON_FAIL(_createDevice(&context));
+    ScopeCUDAContext context;
+    SLANG_RETURN_ON_FAIL(context.init(0));
 
     const Index index = outputAndLayout.output.findKernelDescIndex(StageType::Compute);
     if (index < 0)
@@ -485,8 +518,6 @@ static SlangResult _compute(CUcontext context, CUmodule module, const ShaderComp
     SLANG_RETURN_ON_FAIL(_compute(context, module, outputAndLayout, outBuffers));
 
     SLANG_CUDA_RETURN_ON_FAIL(cuModuleUnload(module));
-
-    cuCtxDestroy(context);
 
     return SLANG_OK;
 }
