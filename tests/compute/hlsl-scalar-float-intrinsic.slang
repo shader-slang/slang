@@ -75,7 +75,7 @@ void computeMain(uint3 dispatchThreadID : SV_DispatchThreadID)
 
     ft += clamp(f, 0.1, 0.3);
 
-    //ft += step(f, 0.5);
+    ft += step(f, 0.5);
 
     int vi = asint(f - f) + idx;
     

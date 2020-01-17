@@ -64,7 +64,7 @@ SLANG_CUDA_CALL float F32_frac(float f) { return f - floorf(f); }
 // Binary
 SLANG_CUDA_CALL float F32_min(float a, float b) { return a < b ? a : b; }
 SLANG_CUDA_CALL float F32_max(float a, float b) { return a > b ? a : b; }
-SLANG_CUDA_CALL float F32_step(float a, float b) { return float(a >= b); }
+SLANG_CUDA_CALL float F32_step(float a, float b) { return float(b >= a); }
 
 // Ternary 
 SLANG_CUDA_CALL float F32_lerp(float x, float y, float s) { return x + s * (y - x); }
@@ -90,7 +90,7 @@ SLANG_CUDA_CALL double F64_frac(double f) { return f - floor(f); }
 // Binary
 SLANG_CUDA_CALL double F64_min(double a, double b) { return a < b ? a : b; }
 SLANG_CUDA_CALL double F64_max(double a, double b) { return a > b ? a : b; }
-SLANG_CUDA_CALL double F64_step(double a, double b) { return double(a >= b); }
+SLANG_CUDA_CALL double F64_step(double a, double b) { return double(b >= a); }
 
 // Ternary 
 SLANG_CUDA_CALL double F64_lerp(double x, double y, double s) { return x + s * (y - x); }
