@@ -1316,7 +1316,9 @@ SLANG_RAW("__generic<T : __BuiltinFloatingPointType, let N : int> vector<T,N> si
 SLANG_RAW("__generic<T : __BuiltinFloatingPointType, let N : int, let M : int> matrix<T,N,M> sin(matrix<T,N,M> x);\n")
 SLANG_RAW("\n")
 SLANG_RAW("// Sine and cosine\n")
-SLANG_RAW("__generic<T : __BuiltinFloatingPointType> void sincos(T x, out T s, out T c);\n")
+SLANG_RAW("__generic<T : __BuiltinFloatingPointType>\n")
+SLANG_RAW("__target_intrinsic(glsl, \"$1 = sin($0); $2 = cos($0);\")\n")
+SLANG_RAW("void sincos(T x, out T s, out T c);\n")
 SLANG_RAW("__generic<T : __BuiltinFloatingPointType, let N : int> void sincos(vector<T,N> x, out vector<T,N> s, out vector<T,N> c);\n")
 SLANG_RAW("__generic<T : __BuiltinFloatingPointType, let N : int, let M : int> void sincos(matrix<T,N,M> x, out matrix<T,N,M> s, out matrix<T,N,M> c);\n")
 SLANG_RAW("\n")
@@ -1577,7 +1579,7 @@ for (int aa = 0; aa < kBaseBufferAccessLevelCount; ++aa)
 
     sb << "};\n";
 }
-SLANG_RAW("#line 1504 \"hlsl.meta.slang\"")
+SLANG_RAW("#line 1506 \"hlsl.meta.slang\"")
 SLANG_RAW("\n")
 SLANG_RAW("\n")
 SLANG_RAW("\n")
