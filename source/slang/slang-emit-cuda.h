@@ -58,7 +58,7 @@ protected:
     // CPPSourceEmitter overrides 
     virtual SlangResult calcTypeName(IRType* type, CodeGenTarget target, StringBuilder& out) SLANG_OVERRIDE;
     virtual SlangResult calcScalarFuncName(HLSLIntrinsic::Op op, IRBasicType* type, StringBuilder& outBuilder) SLANG_OVERRIDE;
-    virtual void emitSpecializedOperationDefinitionPreamble(const HLSLIntrinsic* specOp) { SLANG_UNUSED(specOp); m_writer->emit("__device__ "); }
+    virtual void emitSpecializedOperationDefinitionPreamble(const HLSLIntrinsic* specOp) SLANG_OVERRIDE { SLANG_UNUSED(specOp); m_writer->emit("__device__ "); }
 
     SlangResult _calcCUDATextureTypeName(IRTextureTypeBase* texType, StringBuilder& outName);
 };
