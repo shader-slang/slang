@@ -5,7 +5,10 @@
 //
 #define SLANG_FORCE_INLINE inline
 
-#define SLANG_CUDA_CALL __device__ inline
+#define SLANG_CUDA_CALL __device__ 
+
+#define SLANG_FORCE_INLINE inline
+#define SLANG_INLINE inline
 
 template <typename T, size_t SIZE>
 struct FixedArray
