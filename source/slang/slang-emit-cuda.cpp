@@ -127,24 +127,90 @@ SlangResult CUDASourceEmitter::_calcCUDATextureTypeName(IRTextureTypeBase* texTy
     return SLANG_OK;
 }
 
+
 SlangResult CUDASourceEmitter::calcScalarFuncName(HLSLIntrinsic::Op op, IRBasicType* type, StringBuilder& outBuilder)
 {
-    if (type->op == kIROp_FloatType)
-    {
-        const auto& info = HLSLIntrinsic::getInfo(op);
-        SLANG_ASSERT(info.funcName.size());
+    typedef HLSLIntrinsic::Op Op;
 
-        outBuilder << info.funcName << "f";
+    UnownedStringSlice funcName;
+    
+    switch (op)
+    {
+        case Op::Sin:
+        case Op::Cos:
+        case Op::Tan:
+        case Op::ArcSin:
+        case Op::ArcCos:
+        case Op::ArcTan:
+        case Op::ArcTan2:
+        case Op::Floor:
+        case Op::Ceil:
+        case Op::FMod:
+        case Op::Exp2:
+        case Op::Exp:
+        case Op::Log:
+        case Op::Log2:
+        case Op::Log10:
+        case Op::FRem:
+        case Op::Sqrt:
+        case Op::RecipSqrt:
+        case Op::Pow:
+        case Op::Trunc:
+        {
+            if (type->op == kIROp_FloatType || type->op == kIROp_DoubleType)
+            {
+                funcName = HLSLIntrinsic::getInfo(op).funcName;
+            }
+            break;
+        }
+        case Op::Max:
+        case Op::Min:
+        case Op::Abs:
+        {
+            // There are only floating point built in versions of these, prefixed with f
+            if (type->op == kIROp_FloatType || type->op == kIROp_DoubleType)
+            {
+                outBuilder << "f";
+                outBuilder << HLSLIntrinsic::getInfo(op).funcName;
+
+                if (type->op == kIROp_FloatType)
+                {
+                    outBuilder << "f";
+                }
+                return SLANG_OK;
+            }
+            break;
+        }
+
+        default: break;
+    }
+
+    if (funcName.size())
+    {
+        outBuilder << funcName;
+        if (type->op == kIROp_FloatType)
+        {
+            outBuilder << "f";
+        }
         return SLANG_OK;
     }
-    else if (type->op == kIROp_DoubleType)
-    {
-        const auto& info = HLSLIntrinsic::getInfo(op);
-        SLANG_ASSERT(info.funcName.size());
 
-        outBuilder << info.funcName;
-        return SLANG_OK;
-    }
+    // Missing ones:
+    // 
+    // sincos - the built in uses pointer, so we'll just define in prelude
+    // rcp
+    // sign
+    // saturate
+    // frac
+    // smoothstep
+    // lerp
+    // clamp
+    // step
+    // 
+    // For integer types
+    // abs
+    // min
+    // max
 
     // Defer to the supers impl
     return Super::calcScalarFuncName(op, type, outBuilder);
@@ -310,6 +376,49 @@ void CUDASourceEmitter::emitOperandImpl(IRInst* inst, EmitOpInfo const& outerPre
     }
 
     Super::emitOperandImpl(inst, outerPrec);
+}
+
+void CUDASourceEmitter::emitCall(const HLSLIntrinsic* specOp, IRInst* inst, const IRUse* operands, int numOperands, const EmitOpInfo& inOuterPrec)
+{
+    switch (specOp->op)
+    {
+        case HLSLIntrinsic::Op::Init:
+        {
+            // For CUDA vector types we construct with make_
+
+            auto writer = m_writer;
+
+            IRType* retType = specOp->returnType;
+
+            switch (retType->op)
+            {
+                case kIROp_VectorType:
+                {
+                    // Get the type name
+                    writer->emit("make_");
+                    emitType(retType);
+                    writer->emitChar('(');
+
+                    for (int i = 0; i < numOperands; ++i)
+                    {
+                        if (i > 0)
+                        {
+                            writer->emit(", ");
+                        }
+                        emitOperand(operands[i].get(), getInfo(EmitOp::General));
+                    }
+
+                    writer->emitChar(')');
+                    return;
+                }
+                default: break; 
+            }
+            break;
+        }
+        default: break;
+    }
+
+    return Super::emitCall(specOp, inst, operands, numOperands, inOuterPrec);
 }
 
 bool CUDASourceEmitter::tryEmitInstExprImpl(IRInst* inst, const EmitOpInfo& inOuterPrec)

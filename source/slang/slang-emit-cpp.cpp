@@ -405,7 +405,7 @@ SlangResult CPPSourceEmitter::calcTypeName(IRType* type, CodeGenTarget target, S
             auto vecCount = int(GetIntVal(vecType->getElementCount()));
             auto elemType = vecType->getElementType();
 
-            if (target == CodeGenTarget::CPPSource)
+            if (target == CodeGenTarget::CPPSource || target == CodeGenTarget::CUDASource)
             {
                 out << "Vector<" << _getTypeName(elemType) << ", " << vecCount << ">";
             }
@@ -431,7 +431,7 @@ SlangResult CPPSourceEmitter::calcTypeName(IRType* type, CodeGenTarget target, S
             const auto rowCount = int(GetIntVal(matType->getRowCount()));
             const auto colCount = int(GetIntVal(matType->getColumnCount()));
 
-            if (target == CodeGenTarget::CPPSource)
+            if (target == CodeGenTarget::CPPSource || target == CodeGenTarget::CUDASource)
             {
                 out << "Matrix<" << _getTypeName(elementType) << ", " << rowCount << ", " << colCount << ">";
             }
@@ -902,9 +902,19 @@ void CPPSourceEmitter::_emitCrossDefinition(const UnownedStringSlice& funcName, 
     writer->indent();
 
     writer->emit("return ");
-    emitType(specOp->returnType);
-    writer->emit("{ a.y * b.z - a.z * b.y, a.z * b.x - a.x * b.z, a.x * b.y - a.y * b.x }; \n");
+    if (m_target == CodeGenTarget::CUDASource)
+    {
+        m_writer->emit("make_");
+        emitType(specOp->returnType);
+        writer->emit("( a.y * b.z - a.z * b.y, a.z * b.x - a.x * b.z, a.x * b.y - a.y * b.x ); \n");
+    }
+    else
+    {
+        emitType(specOp->returnType);
+        writer->emit("{ a.y * b.z - a.z * b.y, a.z * b.x - a.x * b.z, a.x * b.y - a.y * b.x }; \n");
+    }
 
+    
     writer->dedent();
     writer->emit("}\n\n");
 }

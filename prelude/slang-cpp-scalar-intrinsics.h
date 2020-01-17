@@ -127,6 +127,22 @@ SLANG_FORCE_INLINE double F64_lerp(double x, double y, double s) { return x + s 
 SLANG_FORCE_INLINE double F64_clamp(double x, double min, double max) { return (x < min) ? min : ((x > max) ? max : x); }
 SLANG_FORCE_INLINE void F64_sincos(double f, double& outSin, double& outCos) { outSin = F64_sin(f); outCos = F64_cos(f); }
 
+SLANG_FORCE_INLINE void F64_asuint(double d, uint32_t& low, uint32_t& hi)
+{
+    Union64 u;
+    u.d = d;
+    low = uint32_t(u.u);
+    hi = uint32_t(u.u >> 32);
+}
+
+SLANG_FORCE_INLINE void F64_asint(double d, int32_t& low, int32_t& hi)
+{
+    Union64 u;
+    u.d = d;
+    low = int32_t(u.u);
+    hi = int32_t(u.u >> 32);
+}
+
 // ----------------------------- I32 -----------------------------------------
 
 SLANG_FORCE_INLINE int32_t I32_abs(int32_t f) { return (f < 0) ? -f : f; }
@@ -164,23 +180,7 @@ SLANG_FORCE_INLINE double U32_asdouble(uint32_t low, uint32_t hi)
     return u.d;
 }
 
-// ----------------------------- F64 -----------------------------------------
 
-SLANG_FORCE_INLINE void F64_asuint(double d, uint32_t& low, uint32_t& hi)
-{
-    Union64 u;
-    u.d = d;
-    low = uint32_t(u.u);
-    hi = uint32_t(u.u >> 32);
-}
-
-SLANG_FORCE_INLINE void F64_asint(double d, int32_t& low, int32_t& hi)
-{
-    Union64 u;
-    u.d = d;
-    low = int32_t(u.u);
-    hi = int32_t(u.u >> 32);
-}
 
 
 #ifdef SLANG_PRELUDE_NAMESPACE

@@ -96,6 +96,10 @@ just constructXXXFromScalar. Would be good if there was a suitable name to encom
         x(Exp2, "exp2", 1) \
         x(Exp, "exp", 1) \
         \
+        x(Log, "log", 1) \
+        x(Log2, "log2", 1) \
+        x(Log10, "log10", 1) \
+        \
         x(Abs, "abs", 1) \
         \
         x(Min, "min", 2) \
