@@ -69,7 +69,11 @@ SLANG_CUDA_CALL float F32_step(float a, float b) { return float(a >= b); }
 // Ternary 
 SLANG_CUDA_CALL float F32_lerp(float x, float y, float s) { return x + s * (y - x); }
 SLANG_CUDA_CALL void F32_sincos(float f, float& outSin, float& outCos) { sincosf(f, &outSin, &outCos); }
-SLANG_CUDA_CALL float F32_smoothstep(float min, float max, float x) { return x < min ? min : ((x > max) ? max : x / (max - min)); }
+SLANG_CUDA_CALL float F32_smoothstep(float min, float max, float x) 
+{
+    const float t = x < min ? 0.0f : ((x > max) ? 1.0f : (x - min) / (max - min)); 
+    return t * t * (3.0 - 2.0 * t);
+}
 SLANG_CUDA_CALL float F32_clamp(float x, float min, float max) { return ( x < min) ? min : ((x > max) ? max : x); }
 
 SLANG_CUDA_CALL uint32_t F32_asuint(float f) { Union32 u; u.f = f; return u.u; }
@@ -91,7 +95,11 @@ SLANG_CUDA_CALL double F64_step(double a, double b) { return double(a >= b); }
 // Ternary 
 SLANG_CUDA_CALL double F64_lerp(double x, double y, double s) { return x + s * (y - x); }
 SLANG_CUDA_CALL void F64_sincos(double f, double& outSin, double& outCos) { sincos(f, &outSin, &outCos); }
-SLANG_CUDA_CALL double F64_smoothstep(double min, double max, double x) { return x < min ? min : ((x > max) ? max : x / (max - min)); }
+SLANG_CUDA_CALL double F64_smoothstep(double min, double max, double x) 
+{ 
+    const double t = x < min ? 0.0 : ((x > max) ? 1.0 : (x - min) / (max - min)); 
+    return t * t * (3.0 - 2.0 * t);
+}
 SLANG_CUDA_CALL double F64_clamp(double x, double min, double max) { return (x < min) ? min : ((x > max) ? max : x); }
 
 SLANG_CUDA_CALL void F64_asuint(double d, uint32_t& low, uint32_t& hi)

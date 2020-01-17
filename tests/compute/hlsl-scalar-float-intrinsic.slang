@@ -69,7 +69,7 @@ void computeMain(uint3 dispatchThreadID : SV_DispatchThreadID)
 
     ft += pow(0.5, f);
 
-    //ft += smoothstep(0.2, 0.7, f);
+    ft += smoothstep(0.2, 0.7, f);
     ft += lerp(-100, 100, f);
 
 

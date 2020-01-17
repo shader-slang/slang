@@ -71,7 +71,11 @@ SLANG_FORCE_INLINE float F32_step(float a, float b) { return float(a >= b); }
 SLANG_FORCE_INLINE float F32_atan2(float a, float b) { return float(atan2(a, b)); }
 
 // Ternary 
-SLANG_FORCE_INLINE float F32_smoothstep(float min, float max, float x) { return x < min ? min : ((x > max) ? max : x / (max - min)); }
+SLANG_FORCE_INLINE float F32_smoothstep(float min, float max, float x) 
+{ 
+    const float t = x < min ? 0.0f : ((x > max) ? 1.0f : (x - min) / (max - min)); 
+    return t * t * (3.0 - 2.0 * t);
+}
 SLANG_FORCE_INLINE float F32_lerp(float x, float y, float s) { return x + s * (y - x); }
 SLANG_FORCE_INLINE float F32_clamp(float x, float min, float max) { return ( x < min) ? min : ((x > max) ? max : x); }
 SLANG_FORCE_INLINE void F32_sincos(float f, float& outSin, float& outCos) { outSin = F32_sin(f); outCos = F32_cos(f); }
@@ -124,7 +128,11 @@ SLANG_FORCE_INLINE double F64_step(double a, double b) { return double(a >= b); 
 SLANG_FORCE_INLINE double F64_atan2(double a, double b) { return atan2(a, b); }
 
 // Ternary 
-SLANG_FORCE_INLINE double F64_smoothstep(double min, double max, double x) { return x < min ? min : ((x > max) ? max : x / (max - min)); }
+SLANG_FORCE_INLINE double F64_smoothstep(double min, double max, double x) 
+{ 
+    const double t = x < min ? 0.0 : ((x > max) ? 1.0 : (x - min) / (max - min)); 
+    return t * t * (3.0 - 2.0 * t);
+}
 SLANG_FORCE_INLINE double F64_lerp(double x, double y, double s) { return x + s * (y - x); }
 SLANG_FORCE_INLINE double F64_clamp(double x, double min, double max) { return (x < min) ? min : ((x > max) ? max : x); }
 SLANG_FORCE_INLINE void F64_sincos(double f, double& outSin, double& outCos) { outSin = F64_sin(f); outCos = F64_cos(f); }
