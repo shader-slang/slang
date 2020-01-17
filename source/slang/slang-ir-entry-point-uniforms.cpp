@@ -452,6 +452,8 @@ void moveEntryPointUniformParamsToGlobalScope(
         case CodeGenTarget::Executable:
         case CodeGenTarget::SharedLibrary:
         case CodeGenTarget::HostCallable:
+        case CodeGenTarget::CUDASource:
+        case CodeGenTarget::PTX:
         {
             context.targetNeedsConstantBuffer = false;
             break;

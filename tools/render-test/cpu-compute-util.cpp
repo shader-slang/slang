@@ -15,42 +15,6 @@
 namespace renderer_test {
 using namespace Slang;
 
-/* static */SlangResult CPUComputeUtil::writeBindings(const ShaderInputLayout& layout, const List<BindSet::Value*>& buffers, const String& fileName)
-{
-    FILE * f = fopen(fileName.getBuffer(), "wb");
-    if (!f)
-    {
-        return SLANG_FAIL;
-    }
-
-    const auto& entries = layout.entries;
-
-    for (int i = 0; i < entries.getCount(); ++i)
-    {
-        const auto& entry = entries[i];
-        if (entry.isOutput)
-        {
-            BindSet::Value* buffer = buffers[i];
-
-            unsigned int* ptr = (unsigned int*)buffer->m_data;
-
-            const int size = int(entry.bufferData.getCount());
-            // Must be the same size or less than allocated buffer
-            SLANG_ASSERT(size * sizeof(unsigned int) <= buffer->m_sizeInBytes);
-
-            for (int i = 0; i < size; ++i)
-            {
-                unsigned int v = ptr[i];
-
-                fprintf(f, "%X\n", v);
-            }
-        }
-    }
-    fclose(f);
-    return SLANG_OK;
-}
-
-
 template <int COUNT>
 struct OneTexture2D : public CPUComputeUtil::Resource, public CPPPrelude::ITexture2D
 {
@@ -109,21 +73,8 @@ static CPUComputeUtil::Resource* _newOneTexture2D(int elemCount)
     // Okay lets iterate adding buffers
     auto outStream = StdWriters::getOut();
     SLANG_RETURN_ON_FAIL(ShaderInputLayout::addBindSetValues(compilationAndLayout.layout.entries, compilationAndLayout.sourcePath, outStream, outContext.m_bindRoot));
-
-    {
-        const auto& entries = compilationAndLayout.layout.entries;
-        outContext.m_buffers.setCount(entries.getCount());
-
-        const auto& values = outContext.m_bindSet.getValues();
-        for (BindSet::Value* value : values)
-        {
-            if (value->m_userIndex >= 0)
-            {
-                outContext.m_buffers[value->m_userIndex] = value;
-            }
-        }
-    }
-
+    ShaderInputLayout::getValueBuffers(compilationAndLayout.layout.entries, outContext.m_bindSet, outContext.m_buffers);
+    
     // Okay we need to find all of the bindings and match up to those in the layout
     const ShaderInputLayout& layout = compilationAndLayout.layout;
 

@@ -58,8 +58,6 @@ struct CPUComputeUtil
     static SlangResult calcExecuteInfo(ExecuteStyle style, ISlangSharedLibrary* sharedLib, const uint32_t dispatchSize[3], const ShaderCompilerUtil::OutputAndLayout& compilationAndLayout, Context& context, ExecuteInfo& out);
 
     static SlangResult execute(const ExecuteInfo& info);
-
-    static SlangResult writeBindings(const ShaderInputLayout& layout, const List<BindSet::Value*>& buffers, const Slang::String& fileName);
 };
 
 
