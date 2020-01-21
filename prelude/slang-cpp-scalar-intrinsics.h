@@ -49,6 +49,7 @@ SLANG_FORCE_INLINE float F32_acos(float f) { return ::acosf(f); }
 SLANG_FORCE_INLINE float F32_atan(float f) { return ::atanf(f); }
 SLANG_FORCE_INLINE float F32_log2(float f) { return ::log2f(f); }
 SLANG_FORCE_INLINE float F32_log(float f) { return ::logf(f); }
+SLANG_FORCE_INLINE float F32_log10(float f) { return ::log10f(f); }
 SLANG_FORCE_INLINE float F32_exp2(float f) { return ::exp2f(f); }
 SLANG_FORCE_INLINE float F32_exp(float f) { return ::expf(f); }
 SLANG_FORCE_INLINE float F32_abs(float f) { return ::fabsf(f); }
@@ -106,6 +107,7 @@ SLANG_FORCE_INLINE double F64_acos(double f) { return ::acos(f); }
 SLANG_FORCE_INLINE double F64_atan(double f) { return ::atan(f); }
 SLANG_FORCE_INLINE double F64_log2(double f) { return ::log2(f); }
 SLANG_FORCE_INLINE double F64_log(double f) { return ::log(f); }
+SLANG_FORCE_INLINE double F64_log10(float f) { return ::log10(f); }
 SLANG_FORCE_INLINE double F64_exp2(double f) { return ::exp2(f); }
 SLANG_FORCE_INLINE double F64_exp(double f) { return ::exp(f); }
 SLANG_FORCE_INLINE double F64_abs(double f) { return ::fabs(f); }

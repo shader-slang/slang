@@ -12,13 +12,13 @@ void computeMain(uint3 dispatchThreadID : SV_DispatchThreadID)
 {
     int idx = int(dispatchThreadID.x);
     
-    float f = idx * (1.0f / (4.0f - 1));
+    float f = idx * (1.0f / (4.0f));
 
     int it = 0;
     float ft = 0.0f;
     
     // fmod
-    // ft += f % 0.5f;
+    ft += int(((f % 0.11f) * 100) + 0.5);
     
     ft += sin(f);
     ft += cos(f);
@@ -51,7 +51,7 @@ void computeMain(uint3 dispatchThreadID : SV_DispatchThreadID)
         
         
     ft += frac(f * 3);
-//    ft += ceil(f * 5 - 3);
+    ft += ceil(f * 5 - 3);
     
     ft += floor(f * 10 - 7);
     ft += trunc(f * 7);
@@ -59,9 +59,12 @@ void computeMain(uint3 dispatchThreadID : SV_DispatchThreadID)
    
     ft += log(f + 10.0);
     ft += log2(f * 3 + 2);
-    
-    // ft += log10(f * 10 + 4);
-    
+
+    {
+        float v[] = { 1, 10, 100, 1000 };
+        ft += int(log10(v[idx]) + 0.5f);
+    }
+       
     ft += abs(f * 4 - 2.0f);
     
     ft += min(0.5, f);

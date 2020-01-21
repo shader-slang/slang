@@ -952,9 +952,17 @@ __generic<T : __BuiltinFloatingPointType, let N : int> vector<T,N> log(vector<T,
 __generic<T : __BuiltinFloatingPointType, let N : int, let M : int> matrix<T,N,M> log(matrix<T,N,M> x);
 
 // Base-10 logarithm
-__generic<T : __BuiltinFloatingPointType> T log10(T x);
-__generic<T : __BuiltinFloatingPointType, let N : int> vector<T,N> log10(vector<T,N> x);
-__generic<T : __BuiltinFloatingPointType, let N : int, let M : int> matrix<T,N,M> log10(matrix<T,N,M> x);
+__generic<T : __BuiltinFloatingPointType> 
+__target_intrinsic(glsl, "(log( $0 ) * $S0( 0.43429448190325182765112891891661) )" )
+T log10(T x);
+
+__generic<T : __BuiltinFloatingPointType, let N : int>
+__target_intrinsic(glsl, "(log( $0 ) * $S0(0.43429448190325182765112891891661) )" )
+vector<T,N> log10(vector<T,N> x);
+
+__generic<T : __BuiltinFloatingPointType, let N : int, let M : int> 
+__target_intrinsic(glsl, "(log( $0 ) * $S0(0.43429448190325182765112891891661) )" )
+matrix<T,N,M> log10(matrix<T,N,M> x);
 
 // Base-2 logarithm
 __generic<T : __BuiltinFloatingPointType> T log2(T x);
