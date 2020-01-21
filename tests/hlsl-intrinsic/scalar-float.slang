@@ -59,9 +59,7 @@ void computeMain(uint3 dispatchThreadID : SV_DispatchThreadID)
    
     ft += log(f + 10.0);
     ft += log2(f * 3 + 2);
-    
-    // ft += log10(f * 10 + 4);
-    
+
     ft += abs(f * 4 - 2.0f);
     
     ft += min(0.5, f);

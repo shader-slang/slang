@@ -1236,6 +1236,37 @@ void CLikeSourceEmitter::emitIntrinsicCallExpr(
                 }
                 break;
 
+            case 'S':
+                // Get the scalar type of a generic at specified index
+                {
+                    SLANG_RELEASE_ASSERT(*cursor >= '0' && *cursor <= '9');
+                    Index argIndex = (*cursor++) - '0';
+                    SLANG_RELEASE_ASSERT(argCount > argIndex);
+
+                    IRType* type = args[argIndex].get()->getDataType();
+
+                    IRBasicType* underlyingType = nullptr;
+                    if (auto basicType = as<IRBasicType>(type))
+                    {
+                        underlyingType = basicType;
+                    }
+                    else if (auto vectorType = as<IRVectorType>(type))
+                    {
+                        underlyingType = as<IRBasicType>(vectorType->getElementType());
+                    }
+                    else if (auto matrixType = as<IRMatrixType>(type))
+                    {
+                        underlyingType = as<IRBasicType>(matrixType->getElementType());
+                    }
+
+                    SLANG_ASSERT(underlyingType);
+
+                    emitSimpleType(underlyingType);
+                    m_writer->emit("(");
+                    openParenCount++;
+
+                }
+                break;
             case 'p':
                 {
                     // If we are calling a D3D texturing operation in the form t.Foo(s, ...),
