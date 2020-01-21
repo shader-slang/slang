@@ -210,7 +210,7 @@ SLANG_FORCE_INLINE uint32_t U32_countbits(uint32_t v)
         c++;
         v &= v - 1;
     }
-    return v;
+    return c;
 #endif
 }
 
