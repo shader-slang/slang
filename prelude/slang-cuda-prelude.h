@@ -161,6 +161,13 @@ SLANG_CUDA_CALL double U32_asdouble(uint32_t low, uint32_t hi)
     return u.d;
 }
 
+SLANG_CUDA_CALL uint32_t U32_countbits(uint32_t v)
+{
+    // https://docs.nvidia.com/cuda/cuda-math-api/group__CUDA__MATH__INTRINSIC__INT.html#group__CUDA__MATH__INTRINSIC__INT_1g43c9c7d2b9ebf202ff1ef5769989be46
+    return __popc(v);
+}
+
+
 /* !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! */
 
 
