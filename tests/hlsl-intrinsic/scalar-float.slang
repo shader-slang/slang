@@ -51,7 +51,7 @@ void computeMain(uint3 dispatchThreadID : SV_DispatchThreadID)
         
         
     ft += frac(f * 3);
-//    ft += ceil(f * 5 - 3);
+    ft += ceil(f * 5 - 3);
     
     ft += floor(f * 10 - 7);
     ft += trunc(f * 7);
