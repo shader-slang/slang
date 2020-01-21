@@ -1262,9 +1262,6 @@ void CLikeSourceEmitter::emitIntrinsicCallExpr(
                     SLANG_ASSERT(underlyingType);
 
                     emitSimpleType(underlyingType);
-                    m_writer->emit("(");
-                    openParenCount++;
-
                 }
                 break;
             case 'p':
