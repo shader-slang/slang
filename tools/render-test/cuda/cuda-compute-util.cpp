@@ -58,6 +58,76 @@ public:
     void* m_cudaMemory;
 };
 
+class ScopeCUDAModule
+{
+public:
+
+    operator CUmodule () const { return m_module; }
+
+    ScopeCUDAModule(): m_module(nullptr) {}
+    SlangResult load(const void* image)
+    {
+        release(); 
+        SLANG_CUDA_RETURN_ON_FAIL(cuModuleLoadData(&m_module, image));
+        return SLANG_OK;
+    }
+    void release()
+    {
+        if (m_module)
+        {
+            cuModuleUnload(m_module);
+            m_module = nullptr;
+        }
+    }
+
+    ~ScopeCUDAModule() { release(); }
+
+    CUmodule m_module;
+};
+
+class ScopeCUDAStream
+{
+public:
+
+    SlangResult init(unsigned int flags)
+    {
+        release();
+        SLANG_ASSERT(m_stream == nullptr);
+        SLANG_CUDA_RETURN_ON_FAIL(cudaStreamCreateWithFlags(&m_stream, flags));
+        return SLANG_OK;
+    }
+
+    SlangResult sync()
+    {
+        if (m_stream)
+        {
+            SLANG_CUDA_RETURN_ON_FAIL(cudaStreamSynchronize(m_stream));
+        }
+        else
+        {
+            SLANG_CUDA_RETURN_ON_FAIL(cudaDeviceSynchronize());
+        }
+        return SLANG_OK;
+    }
+
+    void release()
+    {
+        if (m_stream)
+        {
+            sync();
+            SLANG_CUDA_ASSERT_ON_FAIL(cudaStreamDestroy(m_stream));
+            m_stream = nullptr;
+        }
+    }
+
+    ScopeCUDAStream():m_stream(nullptr) {}
+
+    ~ScopeCUDAStream() { release(); }
+
+    operator cudaStream_t () const { return m_stream; }
+
+    cudaStream_t m_stream;
+};
 
 
 
@@ -250,9 +320,9 @@ static SlangResult _compute(CUcontext context, CUmodule module, const ShaderComp
     CUfunction kernel;
     SLANG_CUDA_RETURN_ON_FAIL(cuModuleGetFunction(&kernel, module, entryPointName));
 
-    // A stream of 0 means no stream
-    cudaStream_t stream = 0;
-    //SLANG_CUDA_RETURN_ON_FAIL(cudaStreamCreateWithFlags(&stream, cudaStreamNonBlocking));
+    // A default stream, will act as a global stream. Calling sync will globally sync
+    ScopeCUDAStream cudaStream;
+    //SLANG_CUDA_RETURN_ON_FAIL(cudaStream.init(cudaStreamNonBlocking));
 
     {
         // Okay now we need to set up binding
@@ -464,21 +534,14 @@ static SlangResult _compute(CUcontext context, CUmodule module, const ShaderComp
                 1, 1, 1,                                                                                // Blocks
                 int(numThreadsPerAxis[0]), int(numThreadsPerAxis[1]), int(numThreadsPerAxis[2]),        // Threads per block
                 0,                                                                                      // Shared memory size
-                stream,                                                                                 // Stream. 0 is no stream.
+                cudaStream,                                                                                 // Stream. 0 is no stream.
                 args,                                                                                   // Args
                 nullptr);                                                                               // extra
 
             SLANG_CUDA_RETURN_ON_FAIL(cudaLaunchResult);
 
-            if (stream)
-            {
-                SLANG_CUDA_RETURN_ON_FAIL(cudaStreamSynchronize(stream));
-            }
-            else
-            {
-                // Do a sync here. Makes sure any issues are detected early and not on some implicit sync
-                SLANG_CUDA_RETURN_ON_FAIL(cudaDeviceSynchronize()); 
-            }
+            // Do a sync here. Makes sure any issues are detected early and not on some implicit sync
+            SLANG_RETURN_ON_FAIL(cudaStream.sync());
         }
 
         // Finally we need to copy the data back
@@ -503,11 +566,6 @@ static SlangResult _compute(CUcontext context, CUmodule module, const ShaderComp
                 }
             }
         }
-
-        if (stream)
-        {
-            SLANG_CUDA_RETURN_ON_FAIL(cudaStreamDestroy(stream));
-        }
     }
 
     // Release all othe CUDA resource/allocations
@@ -529,12 +587,9 @@ static SlangResult _compute(CUcontext context, CUmodule module, const ShaderComp
 
     const auto& kernel = outputAndLayout.output.kernelDescs[index];
 
-    CUmodule module = 0;
-    SLANG_CUDA_RETURN_ON_FAIL(cuModuleLoadData(&module, kernel.codeBegin));
-
-    SLANG_RETURN_ON_FAIL(_compute(cudaContext, module, outputAndLayout, outContext));
-
-    SLANG_CUDA_RETURN_ON_FAIL(cuModuleUnload(module));
+    ScopeCUDAModule cudaModule;
+    SLANG_RETURN_ON_FAIL(cudaModule.load(kernel.codeBegin));
+    SLANG_RETURN_ON_FAIL(_compute(cudaContext, cudaModule, outputAndLayout, outContext));
 
     return SLANG_OK;
 }

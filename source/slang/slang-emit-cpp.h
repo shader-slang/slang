@@ -80,8 +80,12 @@ protected:
 
     // Replaceable for classes derived from CPPSourceEmitter
     virtual SlangResult calcTypeName(IRType* type, CodeGenTarget target, StringBuilder& out);
+    virtual SlangResult calcFuncName(const HLSLIntrinsic* specOp, StringBuilder& out);
+    virtual SlangResult calcScalarFuncName(HLSLIntrinsic::Op op, IRBasicType* type, StringBuilder& outBuilder);
+    virtual void emitSpecializedOperationDefinitionPreamble(const HLSLIntrinsic* specOp) { SLANG_UNUSED(specOp); }
 
-    
+
+    void _maybeEmitSpecializedOperationDefinition(const HLSLIntrinsic* specOp);
 
     void emitIntrinsicCallExpr(
         IRCall*                         inst,
@@ -115,11 +119,9 @@ protected:
     static TypeDimension _getTypeDimension(IRType* type, bool vecSwap);
     static void _emitAccess(const UnownedStringSlice& name, const TypeDimension& dimension, int row, int col, SourceWriter* writer);
 
-    StringSlicePool::Handle _calcScalarFuncName(HLSLIntrinsic::Op, IRBasicType* type);
     UnownedStringSlice _getScalarFuncName(HLSLIntrinsic::Op operation, IRBasicType* scalarType);
 
     UnownedStringSlice _getFuncName(const HLSLIntrinsic* specOp);
-    StringSlicePool::Handle _calcFuncName(const HLSLIntrinsic* specOp);
 
     UnownedStringSlice _getTypeName(IRType* type);
     

@@ -403,16 +403,16 @@ SlangResult CPPSourceEmitter::calcTypeName(IRType* type, CodeGenTarget target, S
         {
             auto vecType = static_cast<IRVectorType*>(type);
             auto vecCount = int(GetIntVal(vecType->getElementCount()));
-            const IROp elemType = vecType->getElementType()->op;
+            auto elemType = vecType->getElementType();
 
-            if (target == CodeGenTarget::CPPSource)
+            if (target == CodeGenTarget::CPPSource || target == CodeGenTarget::CUDASource)
             {
-                out << "Vector<" << getBuiltinTypeName(elemType) << ", " << vecCount << ">";
+                out << "Vector<" << _getTypeName(elemType) << ", " << vecCount << ">";
             }
             else
             {             
                 out << "Vec";
-                UnownedStringSlice postFix = _getCTypeVecPostFix(elemType);
+                UnownedStringSlice postFix = _getCTypeVecPostFix(elemType->op);
 
                 out << postFix;
                 if (postFix.size() > 1)
@@ -431,9 +431,9 @@ SlangResult CPPSourceEmitter::calcTypeName(IRType* type, CodeGenTarget target, S
             const auto rowCount = int(GetIntVal(matType->getRowCount()));
             const auto colCount = int(GetIntVal(matType->getColumnCount()));
 
-            if (target == CodeGenTarget::CPPSource)
+            if (target == CodeGenTarget::CPPSource || target == CodeGenTarget::CUDASource)
             {
-                out << "Matrix<" << getBuiltinTypeName(elementType->op) << ", " << rowCount << ", " << colCount << ">";
+                out << "Matrix<" << _getTypeName(elementType) << ", " << rowCount << ", " << colCount << ">";
             }
             else
             {
@@ -800,6 +800,8 @@ void CPPSourceEmitter::_emitSignature(const UnownedStringSlice& funcName, const 
     const int paramsCount = int(funcType->getParamCount());
     IRType* retType = specOp->returnType;
 
+    emitSpecializedOperationDefinitionPreamble(specOp);
+
     SourceWriter* writer = getSourceWriter();
 
     emitType(retType);
@@ -900,9 +902,19 @@ void CPPSourceEmitter::_emitCrossDefinition(const UnownedStringSlice& funcName, 
     writer->indent();
 
     writer->emit("return ");
-    emitType(specOp->returnType);
-    writer->emit("{ a.y * b.z - a.z * b.y, a.z * b.x - a.x * b.z, a.x * b.y - a.y * b.x }; \n");
+    if (m_target == CodeGenTarget::CUDASource)
+    {
+        m_writer->emit("make_");
+        emitType(specOp->returnType);
+        writer->emit("( a.y * b.z - a.z * b.y, a.z * b.x - a.x * b.z, a.x * b.y - a.y * b.x ); \n");
+    }
+    else
+    {
+        emitType(specOp->returnType);
+        writer->emit("{ a.y * b.z - a.z * b.y, a.z * b.x - a.x * b.z, a.x * b.y - a.y * b.x }; \n");
+    }
 
+    
     writer->dedent();
     writer->emit("}\n\n");
 }
@@ -912,7 +924,7 @@ UnownedStringSlice CPPSourceEmitter::_getAndEmitSpecializedOperationDefinition(H
     HLSLIntrinsic intrinsic;
     m_intrinsicSet.calcIntrinsic(op, retType, argTypes, argCount, intrinsic);
     auto specOp = m_intrinsicSet.add(intrinsic);
-    emitSpecializedOperationDefinition(specOp);
+    _maybeEmitSpecializedOperationDefinition(specOp);
     return  _getFuncName(specOp);
 }
 
@@ -1184,15 +1196,19 @@ void CPPSourceEmitter::_emitReflectDefinition(const UnownedStringSlice& funcName
     writer->emit("}\n\n");
 }
 
-void CPPSourceEmitter::emitSpecializedOperationDefinition(const HLSLIntrinsic* specOp)
+void CPPSourceEmitter::_maybeEmitSpecializedOperationDefinition(const HLSLIntrinsic* specOp)
 {
-    typedef HLSLIntrinsic::Op Op;
-
     // Check if it's been emitted already, if not add it.
     if (!m_intrinsicEmitted.Add(specOp))
     {
         return;
     }
+    emitSpecializedOperationDefinition(specOp);
+}
+
+void CPPSourceEmitter::emitSpecializedOperationDefinition(const HLSLIntrinsic* specOp)
+{
+    typedef HLSLIntrinsic::Op Op;
 
     switch (specOp->op)
     {
@@ -1318,8 +1334,8 @@ void CPPSourceEmitter::emitCall(const HLSLIntrinsic* specOp, IRInst* inst, const
                     if (IRBasicType::isaImpl(retType->op))
                     {
                         SLANG_ASSERT(numOperands == 1);
-
-                        writer->emit(getBuiltinTypeName(retType->op));
+                        
+                        writer->emit(_getTypeName(retType));
                         writer->emitChar('(');
 
                         emitOperand(operands[0].get(), getInfo(EmitOp::General));
@@ -1432,16 +1448,29 @@ HLSLIntrinsic* CPPSourceEmitter::_addIntrinsic(HLSLIntrinsic::Op op, IRType* ret
     return addedIntrinsic;
 }
 
-StringSlicePool::Handle CPPSourceEmitter::_calcScalarFuncName(HLSLIntrinsic::Op op, IRBasicType* type)
+SlangResult CPPSourceEmitter::calcScalarFuncName(HLSLIntrinsic::Op op, IRBasicType* type, StringBuilder& outBuilder)
 {
-    StringBuilder builder;
-    builder << _getTypePrefix(type->op) << "_" << HLSLIntrinsic::getInfo(op).funcName;
-    return m_slicePool.add(builder);
+    outBuilder << _getTypePrefix(type->op) << "_" << HLSLIntrinsic::getInfo(op).funcName;
+    return SLANG_OK;   
 }
 
 UnownedStringSlice CPPSourceEmitter::_getScalarFuncName(HLSLIntrinsic::Op op, IRBasicType* type)
 {
-    return m_slicePool.getSlice(_calcScalarFuncName(op, type));
+    /* TODO(JS): This is kind of fast and loose. That we don't know all the parameters that are taken or
+    what the return type is, so we can't add to the HLSLIntrinsic map - we just generate the scalar
+    function name and use it (whilst also adding to the slice pool, so that we can return an
+    unowned slice). */
+
+    StringBuilder builder;
+    if (SLANG_FAILED(calcScalarFuncName(op, type, builder)))
+    {
+        SLANG_ASSERT(!"Unable to create scalar function name");
+        return UnownedStringSlice();
+    }
+
+    // Add to the pool. 
+    auto handle = m_slicePool.add(builder);
+    return m_slicePool.getSlice(handle);
 }
 
 UnownedStringSlice CPPSourceEmitter::_getFuncName(const HLSLIntrinsic* specOp)
@@ -1452,14 +1481,22 @@ UnownedStringSlice CPPSourceEmitter::_getFuncName(const HLSLIntrinsic* specOp)
         return m_slicePool.getSlice(handle);
     }
 
-    handle = _calcFuncName(specOp);
+    StringBuilder builder;
+    if (SLANG_FAILED(calcFuncName(specOp, builder)))
+    {
+        SLANG_ASSERT(!"Unable to create function name");
+        // Return an empty slice, as an error...
+        return UnownedStringSlice();
+    }
+
+    handle = m_slicePool.add(builder);
     m_intrinsicNameMap.Add(specOp, handle);
 
     SLANG_ASSERT(handle != StringSlicePool::kNullHandle);
     return m_slicePool.getSlice(handle);
 }
 
-StringSlicePool::Handle CPPSourceEmitter::_calcFuncName(const HLSLIntrinsic* specOp)
+SlangResult CPPSourceEmitter::calcFuncName(const HLSLIntrinsic* specOp, StringBuilder& outBuilder)
 {
     typedef HLSLIntrinsic::Op Op;
 
@@ -1468,7 +1505,7 @@ StringSlicePool::Handle CPPSourceEmitter::_calcFuncName(const HLSLIntrinsic* spe
         IRType* paramType = specOp->signatureType->getParamType(0);
         IRBasicType* basicType = as<IRBasicType>(paramType);
         SLANG_ASSERT(basicType);
-        return _calcScalarFuncName(specOp->op, basicType);
+        return calcScalarFuncName(specOp->op, basicType, outBuilder);
     }
     else
     {
@@ -1483,14 +1520,10 @@ StringSlicePool::Handle CPPSourceEmitter::_calcFuncName(const HLSLIntrinsic* spe
                 IRType* dstType = signatureType->getParamType(0);
                 //IRType* srcType = signatureType->getParamType(1);
 
-                StringBuilder builder;
-                builder << "convert_";
+                outBuilder << "convert_";
                 // I need a function that is called that will construct this
-                if (SLANG_FAILED(calcTypeName(dstType, CodeGenTarget::CSource, builder)))
-                {
-                    return StringSlicePool::kNullHandle;
-                }
-                return m_slicePool.add(builder);
+                SLANG_RETURN_ON_FAIL(calcTypeName(dstType, CodeGenTarget::CSource, outBuilder));
+                return SLANG_OK;
             }
             case Op::ConstructFromScalar:
             {
@@ -1500,22 +1533,20 @@ StringSlicePool::Handle CPPSourceEmitter::_calcFuncName(const HLSLIntrinsic* spe
 
                 IRType* dstType = signatureType->getParamType(0);
                 
-                StringBuilder builder;
-                builder << "constructFromScalar_";
+                outBuilder << "constructFromScalar_";
                 // I need a function that is called that will construct this
-                if (SLANG_FAILED(calcTypeName(dstType, CodeGenTarget::CSource, builder)))
-                {
-                    return StringSlicePool::kNullHandle;
-                }
-                return m_slicePool.add(builder);
+                SLANG_RETURN_ON_FAIL(calcTypeName(dstType, CodeGenTarget::CSource, outBuilder));
+                return SLANG_OK;
             }
             case Op::GetAt:
             {
-                return m_slicePool.add(UnownedStringSlice::fromLiteral("getAt"));
+                outBuilder << "getAt";
+                return SLANG_OK;
             }
             case Op::SetAt:
             {
-                return m_slicePool.add(UnownedStringSlice::fromLiteral("setAt"));
+                outBuilder << "setAt";
+                return SLANG_OK;
             }
             default: break;
         }
@@ -1525,10 +1556,15 @@ StringSlicePool::Handle CPPSourceEmitter::_calcFuncName(const HLSLIntrinsic* spe
         {
             if (!_isOperator(info.funcName))
             {
-                return m_slicePool.add(info.funcName);
+                // If there is a standard default name, just use that
+                outBuilder << info.funcName;
+                return SLANG_OK;
             }
         }
-        return m_slicePool.add(info.name);
+
+        // Just use the name of the Op. This is probably wrong, but gives a pretty good idea of what the desired (presumably missing) op is.
+        outBuilder << info.name;
+        return SLANG_OK;
     }
 }
 
@@ -1993,7 +2029,7 @@ void CPPSourceEmitter::emitPreprocessorDirectivesImpl()
     // Emit all the intrinsics that were used
     for (const auto& keyValue : m_intrinsicNameMap)
     {
-        emitSpecializedOperationDefinition(keyValue.Key);
+        _maybeEmitSpecializedOperationDefinition(keyValue.Key);
     }
 }
 

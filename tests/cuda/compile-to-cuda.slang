@@ -8,12 +8,10 @@ RWStructuredBuffer<int> outputBuffer : register(u0);
 [numthreads(4, 1, 1)]
 void computeMain(uint3 dispatchThreadID : SV_DispatchThreadID)
 {
-
 	int tid = int(dispatchThreadID.x);
     
     outputBuffer[tid * 4] = tid;
     outputBuffer[tid * 4 + 1] = tid + 1;
     outputBuffer[tid * 4 + 2] = tid + 2; 
     outputBuffer[tid * 4 + 3] = tid + 3;
- 
 }

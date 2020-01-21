@@ -10,6 +10,23 @@
 
 namespace Slang {
 
+static bool _isSingleNameBasicType(IROp op)
+{
+    switch (op)
+    {
+        case kIROp_Int64Type:   
+        case kIROp_UInt8Type: 
+        case kIROp_UInt16Type:
+        case kIROp_UIntType: 
+        case kIROp_UInt64Type:
+        {
+            return false;
+        }
+        default: return true;
+
+    }
+}
+
 /* static */ UnownedStringSlice CUDASourceEmitter::getBuiltinTypeName(IROp op)
 {
     switch (op)
@@ -110,10 +127,93 @@ SlangResult CUDASourceEmitter::_calcCUDATextureTypeName(IRTextureTypeBase* texTy
     return SLANG_OK;
 }
 
-void CUDASourceEmitter::emitSpecializedOperationDefinition(const HLSLIntrinsic* specOp)
+
+SlangResult CUDASourceEmitter::calcScalarFuncName(HLSLIntrinsic::Op op, IRBasicType* type, StringBuilder& outBuilder)
 {
-    m_writer->emit("__device__ ");
-    Super::emitSpecializedOperationDefinition(specOp);
+    typedef HLSLIntrinsic::Op Op;
+
+    UnownedStringSlice funcName;
+    
+    switch (op)
+    {
+        case Op::Sin:
+        case Op::Cos:
+        case Op::Tan:
+        case Op::ArcSin:
+        case Op::ArcCos:
+        case Op::ArcTan:
+        case Op::ArcTan2:
+        case Op::Floor:
+        case Op::Ceil:
+        case Op::FMod:
+        case Op::Exp2:
+        case Op::Exp:
+        case Op::Log:
+        case Op::Log2:
+        case Op::Log10:
+        case Op::FRem:
+        case Op::Sqrt:
+        case Op::RecipSqrt:
+        case Op::Pow:
+        case Op::Trunc:
+        {
+            if (type->op == kIROp_FloatType || type->op == kIROp_DoubleType)
+            {
+                funcName = HLSLIntrinsic::getInfo(op).funcName;
+            }
+            break;
+        }
+        case Op::Max:
+        case Op::Min:
+        case Op::Abs:
+        {
+            // There are only floating point built in versions of these, prefixed with f
+            if (type->op == kIROp_FloatType || type->op == kIROp_DoubleType)
+            {
+                outBuilder << "f";
+                outBuilder << HLSLIntrinsic::getInfo(op).funcName;
+
+                if (type->op == kIROp_FloatType)
+                {
+                    outBuilder << "f";
+                }
+                return SLANG_OK;
+            }
+            break;
+        }
+
+        default: break;
+    }
+
+    if (funcName.size())
+    {
+        outBuilder << funcName;
+        if (type->op == kIROp_FloatType)
+        {
+            outBuilder << "f";
+        }
+        return SLANG_OK;
+    }
+
+    // Missing ones:
+    // 
+    // sincos - the built in uses pointer, so we'll just define in prelude
+    // rcp
+    // sign
+    // saturate
+    // frac
+    // smoothstep
+    // lerp
+    // clamp
+    // step
+    // 
+    // For integer types
+    // abs
+    // min
+    // max
+
+    // Defer to the supers impl
+    return Super::calcScalarFuncName(op, type, outBuilder);
 }
 
 SlangResult CUDASourceEmitter::calcTypeName(IRType* type, CodeGenTarget target, StringBuilder& out)
@@ -278,73 +378,73 @@ void CUDASourceEmitter::emitOperandImpl(IRInst* inst, EmitOpInfo const& outerPre
     Super::emitOperandImpl(inst, outerPrec);
 }
 
+void CUDASourceEmitter::emitCall(const HLSLIntrinsic* specOp, IRInst* inst, const IRUse* operands, int numOperands, const EmitOpInfo& inOuterPrec)
+{
+    switch (specOp->op)
+    {
+        case HLSLIntrinsic::Op::Init:
+        {
+            // For CUDA vector types we construct with make_
+
+            auto writer = m_writer;
+
+            IRType* retType = specOp->returnType;
+
+            switch (retType->op)
+            {
+                case kIROp_VectorType:
+                {
+                    // Get the type name
+                    writer->emit("make_");
+                    emitType(retType);
+                    writer->emitChar('(');
+
+                    for (int i = 0; i < numOperands; ++i)
+                    {
+                        if (i > 0)
+                        {
+                            writer->emit(", ");
+                        }
+                        emitOperand(operands[i].get(), getInfo(EmitOp::General));
+                    }
+
+                    writer->emitChar(')');
+                    return;
+                }
+                default: break; 
+            }
+            break;
+        }
+        default: break;
+    }
+
+    return Super::emitCall(specOp, inst, operands, numOperands, inOuterPrec);
+}
+
 bool CUDASourceEmitter::tryEmitInstExprImpl(IRInst* inst, const EmitOpInfo& inOuterPrec)
 {
-    switch (inst->op)
+    switch(inst->op)
     {
         case kIROp_Construct:
-        case kIROp_makeVector:
         {
-            if (inst->getOperandCount() == 1)
+            // Simple constructor call
+            // On CUDA some of the built in types can't be used as constructors directly
+
+            IRType* type = inst->getDataType();
+            if (auto basicType = as<IRBasicType>(type) && !_isSingleNameBasicType(type->op))
             {
-                EmitOpInfo outerPrec = inOuterPrec;
-                bool needClose = false;
-
-                auto prec = getInfo(EmitOp::Prefix);
-                needClose = maybeEmitParens(outerPrec, prec);
-
-                // Need to emit as cast for HLSL
                 m_writer->emit("(");
                 emitType(inst->getDataType());
-                m_writer->emit(") ");
-                emitOperand(inst->getOperand(0), rightSide(outerPrec, prec));
-
-                maybeCloseParens(needClose);
-                // Handled
-                return true;
-            }
-            else
-            {
-                m_writer->emit("make_");
-                m_writer->emit(_getTypeName(inst->getDataType()));
+                m_writer->emit(")");
                 emitArgs(inst);
                 return true;
             }
             break;
         }
-        case kIROp_MakeMatrix:
-        {
-            return false;
-        }
-        case kIROp_BitCast:
-        {
-            auto toType = extractBaseType(inst->getDataType());
-            switch (toType)
-            {
-                default:
-                    m_writer->emit("/* unhandled */");
-                    break;
-                case BaseType::UInt:
-                    break;
-                case BaseType::Int:
-                    m_writer->emit("(");
-                    emitType(inst->getDataType());
-                    m_writer->emit(")");
-                    break;
-                case BaseType::Float:
-                    m_writer->emit("asfloat");
-                    break;
-            }
-
-            m_writer->emit("(");
-            emitOperand(inst->getOperand(0), getInfo(EmitOp::General));
-            m_writer->emit(")");
-            return true;
-        }
         default: break;
     }
-    // Not handled
-    return false;
+
+    return Super::tryEmitInstExprImpl(inst, inOuterPrec);
 }
 
 void CUDASourceEmitter::emitLayoutDirectivesImpl(TargetRequest* targetReq)
@@ -398,7 +498,7 @@ void CUDASourceEmitter::emitSimpleFuncParamsImpl(IRFunc* func)
 
 void CUDASourceEmitter::emitSimpleFuncImpl(IRFunc* func)
 {
-    // Mark as run on device. Don't need to worry about entry point, as that is output separtely to call the __device_ implementation
+    // Mark as run on device. Don't need to worry about entry point, as that is output separately to call the __device_ implementation
     m_writer->emit("__device__ ");    
 
     CLikeSourceEmitter::emitSimpleFuncImpl(func);
@@ -444,7 +544,7 @@ void CUDASourceEmitter::emitPreprocessorDirectivesImpl()
     // Emit all the intrinsics that were used
     for (const auto& keyValue : m_intrinsicNameMap)
     {
-        emitSpecializedOperationDefinition(keyValue.Key);
+        _maybeEmitSpecializedOperationDefinition(keyValue.Key);
     }
 }
 

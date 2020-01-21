@@ -276,7 +276,10 @@ SlangResult NVRTCDownstreamCompiler::compile(const CompileOptions& options, RefP
         cmdLine.addArg("-I");
         cmdLine.addArg(include);
     }
-    
+
+    {
+        cmdLine.addArg("-std=c++14");
+    }
 
     nvrtcProgram program = nullptr;
     nvrtcResult res = m_nvrtcCreateProgram(&program, options.sourceContents.getBuffer(), options.sourceContentsPath.getBuffer(), 0, nullptr, nullptr);
