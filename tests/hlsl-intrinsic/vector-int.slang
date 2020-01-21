@@ -23,6 +23,28 @@ void computeMain(uint3 dispatchThreadID : SV_DispatchThreadID)
     t += b % 5;
     
     t += clamp(a, int3(10), int3(23));
+   
+    // Swizzle
+    t += a.zyx;
+    // Swizzle from scalar
+    t += idx.xxx;
     
+#if 0 
+    // TODO(JS): On C++ not all accesses are turned into getAt/setAt, so disable for now.
+    // Reads
+    {   
+        t += int3(a[idx % 3], a[0], b[2]);
+    }
+   
+    // Writes 
+    {   
+        int3 v = int3(b[(idx + 1) % 3], b[(idx + 2) % 3], b[(idx + 3) % 3]);
+        v[1] += v[0];
+        v[idx & 1] += v[2];
+    
+        t += v;
+    }
+#endif   
+   
     outputBuffer[idx] = t.x + t.y + t.z;
 }
