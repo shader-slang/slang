@@ -80,19 +80,11 @@ void computeMain(uint3 dispatchThreadID : SV_DispatchThreadID)
 
     ft += step(f, 0.5l);
 
-#if 0 
-    {
-        int low, high;
-        asint(f * 0.5l, low, high);
-        ft += asdouble(low, high);
-    }
-        
     {
         uint low, high;
         asuint(f * 2.0l, low, high);
         ft += asdouble(low, high);
     }
-#endif 
     
     outputBuffer[idx] = int(ft * 16);
 }
