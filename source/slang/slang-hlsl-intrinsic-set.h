@@ -39,7 +39,7 @@ just constructXXXFromScalar. Would be good if there was a suitable name to encom
         x(Lsh, "<<", 2) \
         x(Rsh, ">>", 2) \
         x(IRem, "%", 2) \
-        x(FRem, "remainder", 2) \
+        x(FRem, "fmod", 2) \
         \
         x(Eql, "==", 2) \
         x(Neq, "!=", 2) \

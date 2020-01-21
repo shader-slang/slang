@@ -12,13 +12,13 @@ void computeMain(uint3 dispatchThreadID : SV_DispatchThreadID)
 {
     int idx = int(dispatchThreadID.x);
     
-    float f = idx * (1.0f / (4.0f - 1));
+    float f = idx * (1.0f / (4.0f));
 
     int it = 0;
     float ft = 0.0f;
     
     // fmod
-    // ft += f % 0.5f;
+    ft += int(((f % 0.11f) * 100) + 0.5);
     
     ft += sin(f);
     ft += cos(f);
