@@ -1,4 +1,7 @@
 // slang-platform.cpp
+
+#define _CRT_SECURE_NO_WARNINGS
+
 #include "slang-platform.h"
 
 #include "slang-common.h"
@@ -196,6 +199,18 @@ SLANG_COMPILE_TIME_ASSERT(E_OUTOFMEMORY == SLANG_E_OUT_OF_MEMORY);
 }
 
 #endif // _WIN32
+
+
+/* static */SlangResult PlatformUtil::getEnvironmentVariable(const UnownedStringSlice& name, StringBuilder& out)
+{
+    const char* value = getenv(String(name).getBuffer());
+    if (value)
+    {
+        out.append(value);
+        return SLANG_OK;
+    }
+    return SLANG_E_NOT_FOUND;
+}
 
 /* static */PlatformKind PlatformUtil::getPlatformKind()
 {

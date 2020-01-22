@@ -19,6 +19,10 @@ struct FixedArray
     T m_data[SIZE];
 };
 
+// Typically defined in cuda.h, but we can't ship/rely on that, so just define here
+typedef unsigned long long CUtexObject;                   
+typedef unsigned long long CUsurfObject;                  
+
 // Code generator will generate the specific type
 template <typename T, int ROWS, int COLS>
 struct Matrix;
