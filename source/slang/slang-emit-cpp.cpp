@@ -969,6 +969,8 @@ void CPPSourceEmitter::_emitGetAtDefinition(const UnownedStringSlice& funcName, 
 
     IRType* srcType = funcType->getParamType(0);
 
+    emitSpecializedOperationDefinitionPreamble(specOp);
+
     IRType* retType = specOp->returnType;
     emitType(retType);
     m_writer->emit("& ");
@@ -1046,6 +1048,8 @@ void CPPSourceEmitter::_emitConstructConvertDefinition(const UnownedStringSlice&
     IRType* srcType = funcType->getParamType(1);
     IRType* retType = specOp->returnType;
 
+    emitSpecializedOperationDefinitionPreamble(specOp);
+
     emitType(retType);
     writer->emit(" ");
     writer->emit(funcName);
@@ -1111,6 +1115,8 @@ void CPPSourceEmitter::_emitConstructFromScalarDefinition(const UnownedStringSli
 
     IRType* srcType = funcType->getParamType(1);
     IRType* retType = specOp->returnType;
+
+    emitSpecializedOperationDefinitionPreamble(specOp);
 
     emitType(retType);
     writer->emit(" ");

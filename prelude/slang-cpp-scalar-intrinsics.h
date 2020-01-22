@@ -3,6 +3,11 @@
 
 #include "../slang.h"
 
+#if SLANG_PROCESSOR_X86_64 && SLANG_VC
+// If we have visual studio and 64 bit processor, we can assume we have popcnt, and can include x86 intrinsics
+#   include <intrin.h>
+#endif
+
 #ifdef SLANG_PRELUDE_NAMESPACE
 namespace SLANG_PRELUDE_NAMESPACE {
 #endif
@@ -192,7 +197,22 @@ SLANG_FORCE_INLINE double U32_asdouble(uint32_t low, uint32_t hi)
     return u.d;
 }
 
-
+SLANG_FORCE_INLINE uint32_t U32_countbits(uint32_t v)
+{
+#if SLANG_GCC_FAMILY    
+    return __builtin_popcount(v);
+#elif SLANG_PROCESSOR_X86_64 && SLANG_VC
+    return __popcnt(v);
+#else     
+    uint32_t c = 0;
+    while (v)
+    {
+        c++;
+        v &= v - 1;
+    }
+    return c;
+#endif
+}
 
 
 #ifdef SLANG_PRELUDE_NAMESPACE
