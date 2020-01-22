@@ -123,7 +123,6 @@ just constructXXXFromScalar. Would be good if there was a suitable name to encom
         x(ConstructFromScalar, "", 1) \
         \
         x(GetAt, "", 2) \
-        x(SetAt, "", 3) \
         \
         x(CountBits, "countbits", 1)
 
@@ -153,6 +152,13 @@ struct HLSLIntrinsic
         for (Index i = 0; i < paramCount; ++i)
         {
             IRType* paramType = signatureType->getParamType(i);
+
+            // Strip off ptr if it's an operand type
+            if (paramType->op == kIROp_PtrType)
+            {
+                paramType = as<IRType>(paramType->getOperand(0));
+            }
+
             // If any are vec or matrix, then we
             if (paramType->op == kIROp_MatrixType || paramType->op == kIROp_VectorType)
             {

@@ -1114,7 +1114,13 @@ IRTargetIntrinsicDecoration* CLikeSourceEmitter::findTargetIntrinsicDecoration(I
     return true;
 }
 
-void CLikeSourceEmitter::emitIntrinsicCallExpr(
+
+void CLikeSourceEmitter::emitIntrinsicCallExpr(IRCall* inst, IRTargetIntrinsicDecoration* targetIntrinsic, EmitOpInfo const& inOuterPrec)
+{
+    emitIntrinsicCallExprImpl(inst, targetIntrinsic, inOuterPrec);
+}
+
+void CLikeSourceEmitter::emitIntrinsicCallExprImpl(
     IRCall*                         inst,
     IRTargetIntrinsicDecoration*    targetIntrinsic,
     EmitOpInfo const&               inOuterPrec)

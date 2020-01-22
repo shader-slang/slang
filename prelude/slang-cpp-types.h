@@ -82,9 +82,6 @@ typedef Vector<uint32_t, 4> uint4;
 template <typename T, int ROWS, int COLS>
 struct Matrix
 {
-    Vector<T, COLS>& operator[](int i) { SLANG_PRELUDE_ASSERT(i >= 0 && i < ROWS); return rows[i]; }
-    const Vector<T, COLS>& operator[](int i) const { SLANG_PRELUDE_ASSERT(i >= 0 && i < ROWS); return rows[i]; }
-    
     Vector<T, COLS> rows[ROWS];
 };
 
