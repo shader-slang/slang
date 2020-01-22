@@ -26,8 +26,13 @@ void computeMain(uint3 dispatchThreadID : SV_DispatchThreadID)
     t += abs(a);
     t += b % 5;
    
-    //t += clamp(a, int3(10), int3(23));
-   
+    {
+        int3 v11 = int3(11 + idx * 4);
+        int3 v23 = int3(23 - idx * 2);
+       
+        t += clamp(a, matrix<int, 3, 3>(v11, v11, v11), matrix<int, 3, 3>(v23, v23, v23));
+    }
+       
     // Access rows and elements, both read and write
    
     a[0].x ++;
