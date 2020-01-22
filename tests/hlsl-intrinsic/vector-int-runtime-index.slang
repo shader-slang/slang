@@ -1,5 +1,5 @@
 //TEST(compute):COMPARE_COMPUTE_EX:-cpu -compute 
-//TEST(compute):COMPARE_COMPUTE_EX:-slang -compute
+//DISABLE_TEST(compute):COMPARE_COMPUTE_EX:-slang -compute
 //TEST(compute):COMPARE_COMPUTE_EX:-slang -compute -dx12 -use-dxil
 //TEST(compute, vulkan):COMPARE_COMPUTE_EX:-vk -compute
 //TEST(compute, vulkan):COMPARE_COMPUTE_EX:-cuda -compute
@@ -28,6 +28,19 @@ void computeMain(uint3 dispatchThreadID : SV_DispatchThreadID)
     t += a.zyx;
     // Swizzle from scalar
     t += idx.xxx;
-       
+    
+    {   
+        t += int3(a[idx % 3], a[0], b[2]);
+    }
+   
+    // Writes 
+    {   
+        int3 v = int3(b[(idx + 1) % 3], b[(idx + 2) % 3], b[(idx + 3) % 3]);
+        v[1] += v[0];
+        v[idx & 1] += v[2];
+    
+        t += v;
+    }
+   
     outputBuffer[idx] = t.x + t.y + t.z;
 }
