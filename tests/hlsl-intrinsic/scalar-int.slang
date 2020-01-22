@@ -17,7 +17,7 @@ void computeMain(uint3 dispatchThreadID : SV_DispatchThreadID)
     ti += max(2, idx);
     ti += min(idx, 1);
     ti += abs(idx - 2);
-    ti += (idx * 3) %5;
+    ti += (idx * 3) % 5;
     
     ti += clamp(idx * 10, 11, 23);
     
