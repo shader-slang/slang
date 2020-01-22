@@ -482,7 +482,7 @@ BindLocation BindSet::toIndex(const BindLocation& loc, Index index) const
 
             size_t baseOffset = loc.m_bindPointSet->m_points[category].m_offset;
 
-            if (category == SLANG_PARAMETER_CATEGORY_UNIFORM && uniformValue != loc.m_value)
+            if (category == slang::ParameterCategory::Uniform && uniformValue != loc.m_value)
             {
                 baseOffset = 0;
             }
