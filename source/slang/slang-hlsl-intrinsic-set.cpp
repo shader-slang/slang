@@ -300,7 +300,8 @@ SlangResult HLSLIntrinsicSet::makeIntrinsic(IRInst* inst, HLSLIntrinsic& out)
         case kIROp_getElement:
         {
             IRInst* target = inst->getOperand(0);
-            if (target->getDataType()->op == kIROp_VectorType)
+            IRType* targetType = target->getDataType();
+            if (targetType->op == kIROp_VectorType || targetType->op == kIROp_MatrixType)
             {
                 // Specially handle this
                 calcIntrinsic(Op::GetAt, inst, out);
@@ -315,7 +316,8 @@ SlangResult HLSLIntrinsicSet::makeIntrinsic(IRInst* inst, HLSLIntrinsic& out)
 
             if (auto ptrType = as<IRPtrType>(targetType))
             {
-                if (ptrType->getOperand(0)->op == kIROp_VectorType)
+                targetType = as<IRType>(ptrType->getOperand(0));
+                if (targetType->op == kIROp_VectorType || targetType->op == kIROp_MatrixType)
                 {
                     // Specially handle this
                     calcIntrinsic(Op::GetAt, inst, out);

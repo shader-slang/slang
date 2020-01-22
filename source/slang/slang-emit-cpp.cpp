@@ -998,14 +998,27 @@ void CPPSourceEmitter::_emitGetAtDefinition(const UnownedStringSlice& funcName, 
 
         writer->indent();
 
-        IRVectorType* vectorType = as<IRVectorType>(srcType);
-        int vecSize = int(GetIntVal(vectorType->getElementCount()));
+        if (auto vectorType = as<IRVectorType>(srcType))
+        {
+            int vecSize = int(GetIntVal(vectorType->getElementCount()));
 
-        writer->emit("assert(b >= 0 && b < ");
-        writer->emit(vecSize);
-        writer->emit(");\n");
+            writer->emit("assert(b >= 0 && b < ");
+            writer->emit(vecSize);
+            writer->emit(");\n");
 
-        writer->emit("return (&a.x)[b];\n");
+            writer->emit("return (&a.x)[b];\n");
+        }
+        else if (auto matrixType = as<IRMatrixType>(srcType))
+        {
+            //int colCount = int(GetIntVal(matrixType->getColumnCount()));
+            int rowCount = int(GetIntVal(matrixType->getRowCount()));
+
+            writer->emit("assert(b >= 0 && b < ");
+            writer->emit(rowCount);
+            writer->emit(");\n");
+
+            writer->emit("return a.rows[b];\n");
+        }
 
         writer->dedent();
         writer->emit("}\n\n");
