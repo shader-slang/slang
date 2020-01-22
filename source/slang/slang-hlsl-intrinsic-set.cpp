@@ -55,6 +55,35 @@ void HLSLIntrinsicSet::_calcIntrinsic(HLSLIntrinsic::Op op, IRType* returnType, 
 
     switch (op)
     {
+        case Op::GetAt:
+        {
+            IRType* argTypes[3];
+
+            SLANG_ASSERT(argsCount == 2 || argsCount == 3);
+            // TODO(JS):
+            // HACK! GetAt can be from getElementPtr or from getElement. Get element ptr means the return type will be
+            // a pointer. We don't want to deal with that, so strip it
+            if (returnType->op == kIROp_PtrType)
+            {
+                returnType = as<IRType>(returnType->getOperand(0));
+            }
+
+            // TODO(JS): Similarly for the input parameters 
+            for (Index i = 0; i < argsCount; ++i)
+            {
+                IRType* argType = inArgs[i];
+
+                if (argType->op == kIROp_PtrType)
+                {
+                    argType = as<IRType>(argType->getOperand(0));
+                }
+                argTypes[i] = argType;
+            }
+
+            out.returnType = returnType;
+            out.signatureType = builder.getFuncType(argsCount, argTypes, builder.getVoidType());
+            break;
+        }
         case Op::ConstructFromScalar:
         {
             //SLANG_ASSERT(argsCount == 1);
@@ -269,7 +298,6 @@ SlangResult HLSLIntrinsicSet::makeIntrinsic(IRInst* inst, HLSLIntrinsic& out)
             break;
         }
         case kIROp_getElement:
-        case kIROp_getElementPtr:
         {
             IRInst* target = inst->getOperand(0);
             if (target->getDataType()->op == kIROp_VectorType)
@@ -277,6 +305,22 @@ SlangResult HLSLIntrinsicSet::makeIntrinsic(IRInst* inst, HLSLIntrinsic& out)
                 // Specially handle this
                 calcIntrinsic(Op::GetAt, inst, out);
                 return SLANG_OK;
+            }
+            break;
+        }
+        case kIROp_getElementPtr:
+        {
+            IRInst* target = inst->getOperand(0);
+            IRType* targetType = target->getDataType();
+
+            if (auto ptrType = as<IRPtrType>(targetType))
+            {
+                if (ptrType->getOperand(0)->op == kIROp_VectorType)
+                {
+                    // Specially handle this
+                    calcIntrinsic(Op::GetAt, inst, out);
+                    return SLANG_OK;
+                }
             }
             break;
         }

@@ -219,6 +219,13 @@ SlangResult CUDASourceEmitter::calcScalarFuncName(HLSLIntrinsic::Op op, IRBasicT
 SlangResult CUDASourceEmitter::calcTypeName(IRType* type, CodeGenTarget target, StringBuilder& out)
 {
     SLANG_UNUSED(target);
+
+    if (target == CodeGenTarget::CSource)
+    {
+        return Super::calcTypeName(type, target, out);
+    }
+
+    // We allow C source, because if we need a name 
     SLANG_ASSERT(target == CodeGenTarget::CUDASource);
 
     switch (type->op)

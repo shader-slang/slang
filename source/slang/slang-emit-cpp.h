@@ -77,6 +77,8 @@ protected:
     virtual void emitParamTypeImpl(IRType* type, String const& name) SLANG_OVERRIDE;
 
     virtual bool tryEmitGlobalParamImpl(IRGlobalParam* varDecl, IRType* varType) SLANG_OVERRIDE;
+    virtual void emitIntrinsicCallExprImpl(IRCall* inst, IRTargetIntrinsicDecoration* targetIntrinsic, EmitOpInfo const& inOuterPrec) SLANG_OVERRIDE;
+
 
     // Replaceable for classes derived from CPPSourceEmitter
     virtual SlangResult calcTypeName(IRType* type, CodeGenTarget target, StringBuilder& out);
@@ -86,11 +88,6 @@ protected:
 
 
     void _maybeEmitSpecializedOperationDefinition(const HLSLIntrinsic* specOp);
-
-    void emitIntrinsicCallExpr(
-        IRCall*                         inst,
-        IRTargetIntrinsicDecoration*    targetIntrinsic,
-        EmitOpInfo const&               inOuterPrec);
 
     void _emitForwardDeclarations(const List<EmitAction>& actions);
     void _calcGlobalParams(const List<EmitAction>& actions, List<GlobalParamInfo>& outParams, IRGlobalParam** outEntryPointGlobalParams);

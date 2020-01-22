@@ -544,6 +544,14 @@ SlangResult CPPSourceEmitter::calcTypeName(IRType* type, CodeGenTarget target, S
 
 void CPPSourceEmitter::useType(IRType* type)
 {
+    if (type->op == kIROp_PtrType)
+    {
+        // TODO(JS):
+        // If it's a pointer type we ignore. We may want to strip but in practice it's
+        // probably not necessary.
+        return;
+    }
+
     _getTypeName(type);
 }
 
@@ -969,33 +977,39 @@ void CPPSourceEmitter::_emitGetAtDefinition(const UnownedStringSlice& funcName, 
 
     IRType* srcType = funcType->getParamType(0);
 
-    emitSpecializedOperationDefinitionPreamble(specOp);
+    for (Index i = 0; i < 2; ++i)
+    {
+        UnownedStringSlice typePrefix = (i == 0) ? UnownedStringSlice::fromLiteral("const ") : UnownedStringSlice();
 
-    IRType* retType = specOp->returnType;
-    emitType(retType);
-    m_writer->emit("& ");
+        emitSpecializedOperationDefinitionPreamble(specOp);
 
-    writer->emit(funcName);
-    writer->emit("(");
+        writer->emit(typePrefix);
+        emitType(specOp->returnType);
+        m_writer->emit("& ");
 
-    emitType(funcType->getParamType(0));
-    writer->emit("& a,  ");
-    emitType(funcType->getParamType(1));
-    writer->emit(" b)\n{\n");
+        writer->emit(funcName);
+        writer->emit("(");
 
-    writer->indent();
+        writer->emit(typePrefix);
+        emitType(funcType->getParamType(0));
+        writer->emit("& a,  ");
+        emitType(funcType->getParamType(1));
+        writer->emit(" b)\n{\n");
 
-    IRVectorType* vectorType = as<IRVectorType>(srcType);
-    int vecSize = int(GetIntVal(vectorType->getElementCount()));
+        writer->indent();
 
-    writer->emit("assert(b >= 0 && b < ");
-    writer->emit(vecSize);
-    writer->emit(");\n");
+        IRVectorType* vectorType = as<IRVectorType>(srcType);
+        int vecSize = int(GetIntVal(vectorType->getElementCount()));
 
-    writer->emit("return (&a.x)[b];\n");
+        writer->emit("assert(b >= 0 && b < ");
+        writer->emit(vecSize);
+        writer->emit(");\n");
 
-    writer->dedent();
-    writer->emit("}\n\n");
+        writer->emit("return (&a.x)[b];\n");
+
+        writer->dedent();
+        writer->emit("}\n\n");
+    }
 }
 
 void CPPSourceEmitter::_emitNormalizeDefinition(const UnownedStringSlice& funcName, const HLSLIntrinsic* specOp)
@@ -1810,7 +1824,7 @@ void CPPSourceEmitter::emitTypeImpl(IRType* type, const StringSliceLoc* nameLoc)
     }
 }
 
-void CPPSourceEmitter::emitIntrinsicCallExpr(
+void CPPSourceEmitter::emitIntrinsicCallExprImpl(
     IRCall*                         inst,
     IRTargetIntrinsicDecoration*    targetIntrinsic,
     EmitOpInfo const&               inOuterPrec)
@@ -1826,13 +1840,9 @@ void CPPSourceEmitter::emitIntrinsicCallExpr(
     auto outerPrec = inOuterPrec;
     bool needClose = false;
 
-    // For a call with N arguments, the instruction will
-    // have N+1 operands. We will start consuming operands
-    // starting at the index 1.
-    UInt operandCount = inst->getOperandCount();
-    UInt operandIndex = 1;
-
-
+    Index argCount = Index(inst->getArgCount());
+    auto args = inst->getArgs();
+    
     auto name = targetIntrinsic->getDefinition();
 
     // We will special-case some names here, that
@@ -1841,23 +1851,56 @@ void CPPSourceEmitter::emitIntrinsicCallExpr(
     // syntax.
     if (name == ".operator[]")
     {
-        // The user is invoking a built-in subscript operator
+        SLANG_ASSERT(argCount == 2 || argCount == 3);
 
-        auto prec = getInfo(EmitOp::Postfix);
-        needClose = maybeEmitParens(outerPrec, prec);
-
-        emitOperand(inst->getOperand(operandIndex++), leftSide(outerPrec, prec));
-        m_writer->emit("[");
-        emitOperand(inst->getOperand(operandIndex++), getInfo(EmitOp::General));
-        m_writer->emit("]");
-
-        if (operandIndex < operandCount)
+        // If the first item is either a matrix or a vector, we use 'getAt' logic
+        IRType* targetType = args[0].get()->getDataType();
+        if (targetType->op == kIROp_VectorType || targetType->op == kIROp_MatrixType)
         {
-            m_writer->emit(" = ");
-            emitOperand(inst->getOperand(operandIndex++), getInfo(EmitOp::General));
+            // Work out the intrinsic used
+            HLSLIntrinsic intrinsic;
+            m_intrinsicSet.calcIntrinsic(HLSLIntrinsic::Op::GetAt, inst->getDataType(), args, 2, intrinsic);
+            HLSLIntrinsic* specOp = m_intrinsicSet.add(intrinsic);
+
+            if (argCount == 2)
+            {
+                // Load
+                emitCall(specOp, inst, args, 2, inOuterPrec);
+            }
+            else
+            {
+                // Store
+                auto prec = getInfo(EmitOp::Postfix);
+                needClose = maybeEmitParens(outerPrec, prec);
+
+                emitCall(specOp, inst, inst->getOperands(), 2, inOuterPrec);
+
+                m_writer->emit(" = ");
+                emitOperand(inst->getOperand(2), getInfo(EmitOp::General));
+
+                maybeCloseParens(needClose);
+            }
+        }
+        else
+        {
+            // The user is invoking a built-in subscript operator
+            auto prec = getInfo(EmitOp::Postfix);
+            needClose = maybeEmitParens(outerPrec, prec);
+
+            emitOperand(args[0].get(), leftSide(outerPrec, prec));
+            m_writer->emit("[");
+            emitOperand(args[1].get(), getInfo(EmitOp::General));
+            m_writer->emit("]");
+
+            if (argCount == 3)
+            {
+                m_writer->emit(" = ");
+                emitOperand(args[2].get(), getInfo(EmitOp::General));
+            }
+
+            maybeCloseParens(needClose);
         }
 
-        maybeCloseParens(needClose);
         return;
     }
 
@@ -1867,37 +1910,39 @@ void CPPSourceEmitter::emitIntrinsicCallExpr(
     if (name[0] == '.')
     {
         // Looks like a member function call
-        emitOperand(inst->getOperand(operandIndex), leftSide(outerPrec, prec));
+        emitOperand(args[0].get(), leftSide(outerPrec, prec));
         m_writer->emit(".");
 
-        name = UnownedStringSlice(name.begin()+1, name.end());
-        operandIndex++;
+        name = UnownedStringSlice(name.begin() + 1, name.end());
+
+        args++;
+        argCount--;
     }
     else
     {
         Op op = m_opLookup->getOpByName(name);
         if (op != Op::Invalid)
         {
-            IRUse* operands = inst->getOperands() + operandIndex;
-
+            
             // Work out the intrinsic used
             HLSLIntrinsic intrinsic;
-            m_intrinsicSet.calcIntrinsic(op, inst->getDataType(), operands, int(operandCount - operandIndex), intrinsic);
+            m_intrinsicSet.calcIntrinsic(op, inst->getDataType(), args, argCount, intrinsic);
             HLSLIntrinsic* specOp = m_intrinsicSet.add(intrinsic);
             
-            emitCall(specOp, inst, operands, int(operandCount - operandIndex), inOuterPrec);
+            emitCall(specOp, inst, args, int(argCount), inOuterPrec);
             return;
         }
     }
   
     m_writer->emit(name);
     m_writer->emit("(");
-    bool first = true;
-    for (; operandIndex < operandCount; ++operandIndex)
+    for (Index i = 0; i < argCount; ++i)
     {
-        if (!first) m_writer->emit(", ");
-        emitOperand(inst->getOperand(operandIndex), getInfo(EmitOp::General));
-        first = false;
+        if (i != 0)
+        {
+            m_writer->emit(", ");
+        }
+        emitOperand(args[i].get(), getInfo(EmitOp::General));
     }
     m_writer->emit(")");
     maybeCloseParens(needClose);
