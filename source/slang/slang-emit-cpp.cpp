@@ -1563,11 +1563,6 @@ SlangResult CPPSourceEmitter::calcFuncName(const HLSLIntrinsic* specOp, StringBu
                 outBuilder << "getAt";
                 return SLANG_OK;
             }
-            case Op::SetAt:
-            {
-                outBuilder << "setAt";
-                return SLANG_OK;
-            }
             default: break;
         }
 

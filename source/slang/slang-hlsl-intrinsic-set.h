@@ -123,7 +123,6 @@ just constructXXXFromScalar. Would be good if there was a suitable name to encom
         x(ConstructFromScalar, "", 1) \
         \
         x(GetAt, "", 2) \
-        x(SetAt, "", 3) \
         \
         x(CountBits, "countbits", 1)
 
