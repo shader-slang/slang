@@ -1,0 +1,157 @@
+result code = 0
+standard error = {
+}
+standard output = {
+{
+    "parameters": [
+        {
+            "name": "a",
+            "bindings": [
+                {"kind": "constantBuffer", "index": 0, "count": 0},
+                {"kind": "registerSpace", "index": 0}
+            ],
+            "type": {
+                "kind": "parameterBlock",
+                "elementType": {
+                    "kind": "struct",
+                    "name": "A",
+                    "fields": [
+                        {
+                            "name": "x",
+                            "type": {
+                                "kind": "scalar",
+                                "scalarType": "float32"
+                            },
+                            "binding": {"kind": "uniform", "offset": 0, "size": 4}
+                        }
+                    ]
+                },
+                "containerVarLayout": {
+                    "bindings": [
+                        {"kind": "constantBuffer", "index": 0},
+                        {"kind": "registerSpace", "index": 0}
+                    ]
+                },
+                "elementVarLayout": {
+                    "type": {
+                        "kind": "struct",
+                        "name": "A",
+                        "fields": [
+                            {
+                                "name": "x",
+                                "type": {
+                                    "kind": "scalar",
+                                    "scalarType": "float32"
+                                },
+                                "binding": {"kind": "uniform", "offset": 0, "size": 4}
+                            }
+                        ]
+                    },
+                    "binding": {"kind": "uniform", "offset": 0, "size": 4}
+                }
+            }
+        },
+        {
+            "name": "b",
+            "bindings": [
+                {"kind": "constantBuffer", "index": 0, "count": 0},
+                {"kind": "registerSpace", "index": 1}
+            ],
+            "type": {
+                "kind": "parameterBlock",
+                "elementType": {
+                    "kind": "struct",
+                    "name": "B",
+                    "fields": [
+                        {
+                            "name": "y",
+                            "type": {
+                                "kind": "scalar",
+                                "scalarType": "float32"
+                            },
+                            "binding": {"kind": "uniform", "offset": 0, "size": 4}
+                        }
+                    ]
+                },
+                "containerVarLayout": {
+                    "bindings": [
+                        {"kind": "constantBuffer", "index": 0},
+                        {"kind": "registerSpace", "index": 0}
+                    ]
+                },
+                "elementVarLayout": {
+                    "type": {
+                        "kind": "struct",
+                        "name": "B",
+                        "fields": [
+                            {
+                                "name": "y",
+                                "type": {
+                                    "kind": "scalar",
+                                    "scalarType": "float32"
+                                },
+                                "binding": {"kind": "uniform", "offset": 0, "size": 4}
+                            }
+                        ]
+                    },
+                    "binding": {"kind": "uniform", "offset": 0, "size": 4}
+                }
+            }
+        },
+        {
+            "name": "c",
+            "bindings": [
+                {"kind": "constantBuffer", "index": 0, "count": 0},
+                {"kind": "registerSpace", "index": 2}
+            ],
+            "type": {
+                "kind": "parameterBlock",
+                "elementType": {
+                    "kind": "struct",
+                    "name": "C",
+                    "fields": [
+                        {
+                            "name": "z",
+                            "type": {
+                                "kind": "scalar",
+                                "scalarType": "float32"
+                            },
+                            "binding": {"kind": "uniform", "offset": 0, "size": 4}
+                        }
+                    ]
+                },
+                "containerVarLayout": {
+                    "bindings": [
+                        {"kind": "constantBuffer", "index": 0},
+                        {"kind": "registerSpace", "index": 0}
+                    ]
+                },
+                "elementVarLayout": {
+                    "type": {
+                        "kind": "struct",
+                        "name": "C",
+                        "fields": [
+                            {
+                                "name": "z",
+                                "type": {
+                                    "kind": "scalar",
+                                    "scalarType": "float32"
+                                },
+                                "binding": {"kind": "uniform", "offset": 0, "size": 4}
+                            }
+                        ]
+                    },
+                    "binding": {"kind": "uniform", "offset": 0, "size": 4}
+                }
+            }
+        }
+    ],
+    "entryPoints": [
+        {
+            "name": "main",
+            "stage:": "compute",
+            "threadGroupSize": [1, 1, 1]
+        }
+    ]
+}
+}
