@@ -64,14 +64,50 @@ public:
     void* m_cudaMemory;
 };
 
-class CUDATextureResource
+class CUDATextureResource : public RefObject
 {
 public:
-    
+    typedef RefObject Super;
+
+    CUDATextureResource(CUtexObject cudaTexObj, CUdeviceptr cudaMemory, CUarray cudaArray):
+        m_cudaTexObj(cudaTexObj),
+        m_cudaMemory(cudaMemory),
+        m_cudaArray(cudaArray)
+    {
+    }
+    ~CUDATextureResource()
+    {
+        if (m_cudaTexObj)
+        {
+            SLANG_CUDA_ASSERT_ON_FAIL(cuTexObjectDestroy(m_cudaTexObj));
+        }
+        if (m_cudaMemory)
+        {
+            SLANG_CUDA_ASSERT_ON_FAIL(cuMemFree(m_cudaMemory));
+        }
+        if (m_cudaArray)
+        {
+            SLANG_CUDA_ASSERT_ON_FAIL(cuArrayDestroy(m_cudaArray));
+        }
+    }
+
+    static CUtexObject getCUDATexObject(BindSet::Value* value)
+    {
+        if (value)
+        {
+            auto resource = dynamic_cast<CUDATextureResource*>(value->m_target.Ptr());
+            // It's an assumption here that 0 is okay for null. Seems to work...
+            return resource ? resource->m_cudaTexObj : CUtexObject(0);
+        }
+
+        return CUtexObject(0);
+    }
 
 protected:
     // This is an opaque type, that's backed by a long long
-    CUtexObject m_texObject;
+    CUtexObject m_cudaTexObj = CUtexObject();
+    CUdeviceptr m_cudaMemory = CUdeviceptr();
+    CUarray m_cudaArray = CUarray();
 };
 
 class ScopeCUDAModule
@@ -397,10 +433,6 @@ static SlangResult _compute(CUcontext context, CUmodule module, const ShaderComp
                                 SLANG_ASSERT(value->m_userIndex >= 0);
                                 auto& srcEntry = entries[value->m_userIndex];
 
-                                // TODO(JS):
-                                // We should use the srcEntry to determine what data to store in the texture,
-                                // it's dimensions etc. For now we just support it being 1.
-
                                 slang::TypeReflection* typeReflection = typeLayout->getResourceResultType();
 
                                 int count = 1;
@@ -409,9 +441,90 @@ static SlangResult _compute(CUcontext context, CUmodule module, const ShaderComp
                                     count = int(typeReflection->getElementCount());
                                 }
 
-                                // TODO(JS): Should use the input setup to work how to create this texture
-                                // Store the target specific value
-                                //value->m_target = _newOneTexture2D(count);
+                                const auto& textureDesc = srcEntry.textureDesc;
+
+                                int width = textureDesc.size;
+                                int height = textureDesc.size;
+
+                                TextureData texData;
+                                generateTextureData(texData, textureDesc);
+
+                                size_t elementSize = 0;
+
+                                CUarray cudaArray;
+                                {
+                                    CUDA_ARRAY_DESCRIPTOR arrayDesc;
+                                    arrayDesc.Width = width;
+                                    arrayDesc.Height = height;
+
+                                    switch (textureDesc.format)
+                                    {
+                                        case Format::R_Float32:
+                                        {
+                                            arrayDesc.Format = CU_AD_FORMAT_FLOAT;
+                                            arrayDesc.NumChannels = 1;
+                                            elementSize = sizeof(float);
+                                            break;
+                                        }
+                                        case Format::RGBA_Unorm_UInt8:
+                                        {
+                                            arrayDesc.Format = CU_AD_FORMAT_UNSIGNED_INT8;
+                                            arrayDesc.NumChannels = 4;
+                                            elementSize = sizeof(uint32_t);
+                                            break;
+                                        }
+                                        default:
+                                        {
+                                            SLANG_ASSERT(!"Only support R_Float32/RGBA_Unorm_UInt8 formats for now");
+                                            return SLANG_FAIL;
+                                        }
+                                    }
+
+                                    // Allocate the array
+                                    SLANG_CUDA_RETURN_ON_FAIL(cuArrayCreate(&cudaArray, &arrayDesc));
+                                }
+
+                                CUdeviceptr cudaMemory = (CUdeviceptr)nullptr;
+                                {
+                                    const size_t size = width  * height * elementSize;
+                                     // allocate device memory for result
+                                    SLANG_CUDA_RETURN_ON_FAIL(cuMemAlloc(&cudaMemory, size));
+                                }
+
+                                {
+                                    CUDA_MEMCPY2D copyParam;
+                                    memset(&copyParam, 0, sizeof(copyParam));
+                                    copyParam.dstMemoryType = CU_MEMORYTYPE_ARRAY;
+                                    copyParam.dstArray = cudaArray;
+                                    copyParam.srcMemoryType = CU_MEMORYTYPE_HOST;
+                                    copyParam.srcHost = texData.dataBuffer[0].getBuffer();
+                                    copyParam.srcPitch = width * elementSize;
+                                    copyParam.WidthInBytes = copyParam.srcPitch;
+                                    copyParam.Height = height;
+                                    SLANG_CUDA_RETURN_ON_FAIL(cuMemcpy2D(&copyParam));
+                                }
+
+                                // set texture parameters
+
+                                CUtexObject cudaTexObj;
+                                {
+                                    CUDA_RESOURCE_DESC resDesc;
+                                    memset(&resDesc, 0, sizeof(CUDA_RESOURCE_DESC));
+                                    resDesc.resType = CU_RESOURCE_TYPE_ARRAY;
+                                    resDesc.res.array.hArray = cudaArray;
+
+                                    CUDA_TEXTURE_DESC texDesc;
+                                    memset(&texDesc, 0, sizeof(CUDA_TEXTURE_DESC));
+                                    texDesc.addressMode[0] = CU_TR_ADDRESS_MODE_WRAP;
+                                    texDesc.addressMode[1] = CU_TR_ADDRESS_MODE_WRAP;
+                                    texDesc.addressMode[2] = CU_TR_ADDRESS_MODE_WRAP;
+                                    texDesc.filterMode = CU_TR_FILTER_MODE_LINEAR;
+                                    texDesc.flags = CU_TRSF_NORMALIZED_COORDINATES;
+
+                                    SLANG_CUDA_RETURN_ON_FAIL(cuTexObjectCreate(&cudaTexObj, &resDesc, &texDesc, nullptr));
+                                }
+
+                                value->m_target = new CUDATextureResource(cudaTexObj, cudaMemory, cudaArray);
                                 break;
                             }
                             case SLANG_TEXTURE_1D:
@@ -499,6 +612,15 @@ static SlangResult _compute(CUcontext context, CUmodule module, const ShaderComp
                                 *location.getUniform<void*>() = CUDAResource::getCUDAData(value);
                                 break;
                             }
+                            case SLANG_TEXTURE_1D:
+                            case SLANG_TEXTURE_2D:
+                            case SLANG_TEXTURE_3D:
+                            case SLANG_TEXTURE_CUBE:
+                            {
+                                *location.getUniform<CUtexObject>() = CUDATextureResource::getCUDATexObject(value);
+                                break;
+                            }
+
                         }
                         break;
                     }
