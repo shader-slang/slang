@@ -89,6 +89,9 @@ SlangResult CUDASourceEmitter::_calcCUDATextureTypeName(IRTextureTypeBase* texTy
         return SLANG_FAIL;
     }
 
+    outName << "CUtexObject";
+
+#if 0
     outName << "texture<";
     outName << _getTypeName(texType->getElementType());
     outName << ", ";
@@ -124,6 +127,7 @@ SlangResult CUDASourceEmitter::_calcCUDATextureTypeName(IRTextureTypeBase* texTy
     }
 
     outName << ">";
+#endif
     return SLANG_OK;
 }
 
