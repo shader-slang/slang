@@ -68,7 +68,7 @@ struct UniformEntryPointParams
 struct UniformState
 {
     CUtexObject tex;                // This is the combination of a texture and a sampler(!)
-    //SamplerState sampler;         // CUDA doesn't have separate sampler objects - so this is just ignored.
+    SamplerState sampler;           // This variable exists within the layout, but it's value is not used.
     int32_t* outputBuffer;          // Currently Structured buffers are converted to pointers - this will likely change in the future (for bounds checking and other reasons)
     Thing* thing3;                  // Constant buffers map to pointers
 };   
