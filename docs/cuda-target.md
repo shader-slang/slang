@@ -14,7 +14,7 @@ Slang has preliminary support for producing CUDA source, and PTX binaries using 
 
 These limitations apply to Slang transpiling to CUDA. 
 
-* Only supports the 'texture object' style binding 
+* Only supports the 'texture object' style binding (The texture object API is only supported on devices of compute capability 3.0 or higher. )
 * Samplers are not separate objects in CUDA - they are combined into a single 'TextureObject'. So samplers are effectively ignored on CUDA targets. 
 * Whilst there is tex1Dfetch there are no equivalents for higher dimensions - so such accesses are not currently supported
 

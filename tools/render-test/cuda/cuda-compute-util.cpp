@@ -25,12 +25,6 @@ SLANG_FORCE_INLINE static bool _isError(cudaError_t result) { return result != 0
 
 #endif
 
-// file:///C:/Program%20Files/NVIDIA%20GPU%20Computing%20Toolkit/CUDA/v10.2/doc/html/cuda-driver-api/group__CUDA__TEXOBJECT.html
-// It looks like we can store 'texture objects' as these handles. Layout will have to handle correctly.
-// CUtexObject thing;
-// __device__ float doSomething(float x, float y) { return tex2D<float>(thing, x+0.5f, y+0.5f); } 
-// cuTexObjectCreate
-
 #define SLANG_CUDA_ASSERT_ON_FAIL(x) { auto _res = x; if (_isError(_res)) { SLANG_ASSERT(!"Failed CUDA call"); }; }
 
 class CUDAResource : public RefObject
