@@ -771,7 +771,12 @@ struct CUDAObjectLayoutRulesImpl : CPUObjectLayoutRulesImpl
                 return SimpleLayoutInfo(LayoutResourceKind::Uniform, sizeof(void*), SLANG_ALIGN_OF(void*));
 
             case ShaderParameterKind::SamplerState:
-                // It's a pointer
+                // In CUDA it seems that sampler states are combined into texture objects.
+                // So it's a binding issue to combine a sampler with a texture - and sampler are ignored
+                // For simplicity here though - we do create a variable and that variable takes up
+                // uniform binding space.
+                // TODO(JS): If we wanted to remove these variables we'd want to do it as a pass. The pass
+                // would presumably have to remove use of variables of this kind throughout IR. 
                 return SimpleLayoutInfo(LayoutResourceKind::Uniform, sizeof(void*), SLANG_ALIGN_OF(void*));
 
             case ShaderParameterKind::TextureSampler:

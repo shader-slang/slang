@@ -316,6 +316,13 @@ SlangResult CUDASourceEmitter::calcTypeName(IRType* type, CodeGenTarget target, 
                 }
             }
 
+            switch (type->op)
+            {
+                case kIROp_SamplerStateType:                    out << "SamplerState"; return SLANG_OK;
+                case kIROp_SamplerComparisonStateType:          out << "SamplerComparisonState"; return SLANG_OK;
+                default: break;
+            }
+
             break;
         }
     }

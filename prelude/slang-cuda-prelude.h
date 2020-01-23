@@ -23,6 +23,13 @@ struct FixedArray
 typedef unsigned long long CUtexObject;                   
 typedef unsigned long long CUsurfObject;                  
 
+// On CUDA sampler state is actually bound up with the texture object. We have a SamplerState type, 
+// backed as a pointer, to simplify code generation, with the downside that such a binding will take up 
+// uniform space, even though it will have no effect. 
+// TODO(JS): Consider ways to strip use of variables of this type so have no binding,
+struct SamplerStateUnused;
+typedef SamplerStateUnused* SamplerState;
+
 // Code generator will generate the specific type
 template <typename T, int ROWS, int COLS>
 struct Matrix;
