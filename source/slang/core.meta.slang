@@ -770,6 +770,7 @@ for (int tt = 0; tt < kBaseTextureTypeCount; ++tt)
                         sb << "$1";
                     }
                     sb << ")$z\")\n";
+
                 }
                 sb << "T Load(";
                 sb << "int" << loadCoordCount << " location";
@@ -887,6 +888,24 @@ for (int tt = 0; tt < kBaseTextureTypeCount; ++tt)
                 // `Sample()`
 
                 sb << "__target_intrinsic(glsl, \"$ctexture($p, $2)$z\")\n";
+
+                if( baseShape != TextureFlavor::Shape::ShapeCube )
+                {
+                    sb << "__target_intrinsic(cuda, \"tex" << kBaseTextureTypes[tt].coordCount << "D<$S0>($0";
+                    if (kBaseTextureTypes[tt].coordCount == 1)
+                    {
+                        sb << ", $2";
+                    }
+                    else
+                    {
+                        for (int i = 0; i < kBaseTextureTypes[tt].coordCount; ++i)
+                        {
+                            sb << ", ($2)." << char(i + 'x');
+                        }
+                    }
+                    sb << ")\")\n";
+                }
+
                 sb << "T Sample(SamplerState s, ";
                 sb << "float" << kBaseTextureTypes[tt].coordCount + isArray << " location);\n";
 

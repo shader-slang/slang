@@ -128,6 +128,9 @@ namespace Slang
             /// True if the kind is part of the family
         static bool isFamily(PlatformFamily family, PlatformKind kind) { return (getPlatformFlags(family) & (PlatformFlags(1) << int(kind))) != 0; }
 
+            /// Given an environment name returns the set system variable.
+            /// Will return SLANG_E_NOT_FOUND if the variable is not set
+        static SlangResult getEnvironmentVariable(const UnownedStringSlice& name, StringBuilder& out);
     };
 
 #ifndef _MSC_VER

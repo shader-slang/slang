@@ -14,7 +14,7 @@ Slang has preliminary support for producing CUDA source, and PTX binaries using 
 
 These limitations apply to Slang transpiling to CUDA. 
 
-* Only supports the 'texture object' style binding 
+* Only supports the 'texture object' style binding (The texture object API is only supported on devices of compute capability 3.0 or higher. )
 * Samplers are not separate objects in CUDA - they are combined into a single 'TextureObject'. So samplers are effectively ignored on CUDA targets. 
 * Whilst there is tex1Dfetch there are no equivalents for higher dimensions - so such accesses are not currently supported
 
@@ -68,7 +68,7 @@ struct UniformEntryPointParams
 struct UniformState
 {
     CUtexObject tex;                // This is the combination of a texture and a sampler(!)
-    //SamplerState sampler;         // CUDA doesn't have separate sampler objects - so this is just ignored.
+    SamplerState sampler;           // This variable exists within the layout, but it's value is not used.
     int32_t* outputBuffer;          // Currently Structured buffers are converted to pointers - this will likely change in the future (for bounds checking and other reasons)
     Thing* thing3;                  // Constant buffers map to pointers
 };   
