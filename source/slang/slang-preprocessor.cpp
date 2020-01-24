@@ -535,7 +535,7 @@ static bool _isMacroBusy(PreprocessorMacro* macro)
     // can invoke a macro as part of an argument to an
     // invocation of the same macro:
     //
-    //     FOO( 1, FOO(22), 333 );
+    //     FOO( 1, FOO(22, 2, 2), 333 );
     //
     // In our implementation, the "inner" invocation of `FOO`
     // gets expanded at the point where it gets referenced
