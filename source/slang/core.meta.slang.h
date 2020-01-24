@@ -791,6 +791,7 @@ for (int tt = 0; tt < kBaseTextureTypeCount; ++tt)
                         sb << "$1";
                     }
                     sb << ")$z\")\n";
+
                 }
                 sb << "T Load(";
                 sb << "int" << loadCoordCount << " location";
@@ -908,6 +909,24 @@ for (int tt = 0; tt < kBaseTextureTypeCount; ++tt)
                 // `Sample()`
 
                 sb << "__target_intrinsic(glsl, \"$ctexture($p, $2)$z\")\n";
+
+                if( baseShape != TextureFlavor::Shape::ShapeCube )
+                {
+                    sb << "__target_intrinsic(cuda, \"tex" << kBaseTextureTypes[tt].coordCount << "D<$S0>($0";
+                    if (kBaseTextureTypes[tt].coordCount == 1)
+                    {
+                        sb << ", $2";
+                    }
+                    else
+                    {
+                        for (int i = 0; i < kBaseTextureTypes[tt].coordCount; ++i)
+                        {
+                            sb << ", ($2)." << char(i + 'x');
+                        }
+                    }
+                    sb << ")\")\n";
+                }
+
                 sb << "T Sample(SamplerState s, ";
                 sb << "float" << kBaseTextureTypes[tt].coordCount + isArray << " location);\n";
 
@@ -1258,7 +1277,7 @@ for (auto op : binaryOps)
         sb << "__intrinsic_op(" << int(op.opCode) << ") matrix<" << resultType << ",N,M> operator" << op.opName << "(" << leftQual << "matrix<" << leftType << ",N,M> left, " << rightType << " right);\n";
     }
 }
-SLANG_RAW("#line 1240 \"core.meta.slang\"")
+SLANG_RAW("#line 1259 \"core.meta.slang\"")
 SLANG_RAW("\n")
 SLANG_RAW("\n")
 SLANG_RAW("// Specialized function\n")

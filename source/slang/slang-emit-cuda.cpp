@@ -89,6 +89,9 @@ SlangResult CUDASourceEmitter::_calcCUDATextureTypeName(IRTextureTypeBase* texTy
         return SLANG_FAIL;
     }
 
+    outName << "CUtexObject";
+
+#if 0
     outName << "texture<";
     outName << _getTypeName(texType->getElementType());
     outName << ", ";
@@ -124,6 +127,7 @@ SlangResult CUDASourceEmitter::_calcCUDATextureTypeName(IRTextureTypeBase* texTy
     }
 
     outName << ">";
+#endif
     return SLANG_OK;
 }
 
@@ -310,6 +314,13 @@ SlangResult CUDASourceEmitter::calcTypeName(IRType* type, CodeGenTarget target, 
                 {
                     return _calcCUDATextureTypeName(texType, out);
                 }
+            }
+
+            switch (type->op)
+            {
+                case kIROp_SamplerStateType:                    out << "SamplerState"; return SLANG_OK;
+                case kIROp_SamplerComparisonStateType:          out << "SamplerComparisonState"; return SLANG_OK;
+                default: break;
             }
 
             break;

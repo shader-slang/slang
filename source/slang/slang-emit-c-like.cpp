@@ -1250,6 +1250,10 @@ void CLikeSourceEmitter::emitIntrinsicCallExprImpl(
                     SLANG_RELEASE_ASSERT(argCount > argIndex);
 
                     IRType* type = args[argIndex].get()->getDataType();
+                    if (auto baseTextureType = as<IRTextureType>(type))
+                    {
+                        type = baseTextureType->getElementType();
+                    }
 
                     IRBasicType* underlyingType = nullptr;
                     if (auto basicType = as<IRBasicType>(type))

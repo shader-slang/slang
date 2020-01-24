@@ -1912,48 +1912,23 @@ void CPPSourceEmitter::emitIntrinsicCallExprImpl(
         return;
     }
 
-    auto prec = getInfo(EmitOp::Postfix);
-    needClose = maybeEmitParens(outerPrec, prec);
-
-    if (name[0] == '.')
-    {
-        // Looks like a member function call
-        emitOperand(args[0].get(), leftSide(outerPrec, prec));
-        m_writer->emit(".");
-
-        name = UnownedStringSlice(name.begin() + 1, name.end());
-
-        args++;
-        argCount--;
-    }
-    else
     {
         Op op = m_opLookup->getOpByName(name);
         if (op != Op::Invalid)
         {
-            
+
             // Work out the intrinsic used
             HLSLIntrinsic intrinsic;
             m_intrinsicSet.calcIntrinsic(op, inst->getDataType(), args, argCount, intrinsic);
             HLSLIntrinsic* specOp = m_intrinsicSet.add(intrinsic);
-            
+
             emitCall(specOp, inst, args, int(argCount), inOuterPrec);
             return;
         }
     }
-  
-    m_writer->emit(name);
-    m_writer->emit("(");
-    for (Index i = 0; i < argCount; ++i)
-    {
-        if (i != 0)
-        {
-            m_writer->emit(", ");
-        }
-        emitOperand(args[i].get(), getInfo(EmitOp::General));
-    }
-    m_writer->emit(")");
-    maybeCloseParens(needClose);
+
+    // Use default impl (which will do intrinsic special macro expansion as necessary)
+    return Super::emitIntrinsicCallExprImpl(inst, targetIntrinsic, inOuterPrec);
 }
 
 bool CPPSourceEmitter::_tryEmitInstExprAsIntrinsic(IRInst* inst, const EmitOpInfo& inOuterPrec)

@@ -735,25 +735,30 @@ struct CUDAObjectLayoutRulesImpl : CPUObjectLayoutRulesImpl
 {
     typedef CPUObjectLayoutRulesImpl Super;
 
+    // cuda.h defines a variety of handle types. We don't want to have to include cuda.h though - as it may not be available
+    // on a build target. So for we define this handle type, that matches cuda.h and is used for types that use this kind
+    // of opaque handle (as opposed to a pointer) such as CUsurfObject, CUtexObject
+    typedef unsigned long long ObjectHandle;
+
     virtual SimpleLayoutInfo GetObjectLayout(ShaderParameterKind kind) override
     {
         switch (kind)
         {
             case ShaderParameterKind::ConstantBuffer:
                 // It's a pointer to the actual uniform data
-                return SimpleLayoutInfo(LayoutResourceKind::Uniform, sizeof(void*), sizeof(void*));
+                return SimpleLayoutInfo(LayoutResourceKind::Uniform, sizeof(void*), SLANG_ALIGN_OF(void*));
 
             case ShaderParameterKind::MutableTexture:
             case ShaderParameterKind::TextureUniformBuffer:
             case ShaderParameterKind::Texture:
                 // It's a pointer to a texture interface 
-                return SimpleLayoutInfo(LayoutResourceKind::Uniform, sizeof(void*), sizeof(void*));
+                return SimpleLayoutInfo(LayoutResourceKind::Uniform, sizeof(ObjectHandle), SLANG_ALIGN_OF(ObjectHandle));
 
             case ShaderParameterKind::StructuredBuffer:
             case ShaderParameterKind::MutableStructuredBuffer:
                 // TODO(JS): We are just storing as a pointer for now
                 // It's a ptr and a size of the amount of elements
-                return SimpleLayoutInfo(LayoutResourceKind::Uniform, sizeof(void*), sizeof(void*));
+                return SimpleLayoutInfo(LayoutResourceKind::Uniform, sizeof(void*), SLANG_ALIGN_OF(void*));
 
             case ShaderParameterKind::RawBuffer:
             case ShaderParameterKind::Buffer:
@@ -763,11 +768,16 @@ struct CUDAObjectLayoutRulesImpl : CPUObjectLayoutRulesImpl
                 // TODO(JS): We are storing as a pointer for now
 
                 // It's a pointer and a size in bytes
-                return SimpleLayoutInfo(LayoutResourceKind::Uniform, sizeof(void*), sizeof(void*));
+                return SimpleLayoutInfo(LayoutResourceKind::Uniform, sizeof(void*), SLANG_ALIGN_OF(void*));
 
             case ShaderParameterKind::SamplerState:
-                // It's a pointer
-                return SimpleLayoutInfo(LayoutResourceKind::Uniform, sizeof(void*), sizeof(void*));
+                // In CUDA it seems that sampler states are combined into texture objects.
+                // So it's a binding issue to combine a sampler with a texture - and sampler are ignored
+                // For simplicity here though - we do create a variable and that variable takes up
+                // uniform binding space.
+                // TODO(JS): If we wanted to remove these variables we'd want to do it as a pass. The pass
+                // would presumably have to remove use of variables of this kind throughout IR. 
+                return SimpleLayoutInfo(LayoutResourceKind::Uniform, sizeof(void*), SLANG_ALIGN_OF(void*));
 
             case ShaderParameterKind::TextureSampler:
             case ShaderParameterKind::MutableTextureSampler:
