@@ -700,6 +700,17 @@ SlangResult BindLocation::setUniform(const void* data, size_t sizeInBytes) const
     if (m_value && point)
     {
         size_t offset = point->m_offset;
+        ptrdiff_t maxSizeInBytes = m_value->m_sizeInBytes - offset;
+        SLANG_ASSERT(maxSizeInBytes > 0);
+
+        if (maxSizeInBytes <= 0)
+        {
+            return SLANG_FAIL;
+        }
+
+        // Clamp such that only fill in what's available to write
+        sizeInBytes = sizeInBytes > size_t(maxSizeInBytes) ? size_t(maxSizeInBytes) : sizeInBytes;
+
         // Make sure it's in range
         SLANG_ASSERT(offset + sizeInBytes <= m_value->m_sizeInBytes);
 
@@ -992,7 +1003,7 @@ SlangResult CPULikeBindRoot::setArrayCount(const BindLocation& location, int cou
         }
 
         const size_t maxElementCount = (value->m_sizeInBytes / elementStride);
-        if (count <= maxElementCount)
+        if (size_t(count) <= maxElementCount)
         {
             // Just initialize the space
             ::memset(value->m_data + elementStride * value->m_elementCount, 0, (count - value->m_elementCount) * elementStride);
