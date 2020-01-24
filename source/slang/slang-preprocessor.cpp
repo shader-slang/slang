@@ -14,7 +14,6 @@
 // specification, but the goal is to have it accept the most common
 // idioms for using the preprocessor, found in shader code in the wild.
 
-
 namespace Slang {
 
 // State of a preprocessor conditional, which can change when
@@ -116,6 +115,9 @@ struct SimpleTokenInputStream : PretokenizedInputStream
 
 struct MacroExpansion : PretokenizedInputStream
 {
+        // In Dtor we want to mark the macro as no longer being busy
+    ~MacroExpansion();
+
     // The macro we will expand
     PreprocessorMacro*  macro;
 };
@@ -130,7 +132,7 @@ struct FunctionLikeMacroExpansion : MacroExpansion
     PreprocessorEnvironment     argumentEnvironment;
 };
 
-// An enumeration for the diferent types of macros
+// An enumeration for the different types of macros
 enum class PreprocessorMacroFlavor
 {
     ObjectLike,
@@ -172,6 +174,9 @@ struct PreprocessorMacro
     {
         return nameAndLoc.loc;
     }
+
+    // Set to true during a macros expansion
+    bool isBusy = false;
 };
 
 // State of the preprocessor
@@ -207,6 +212,19 @@ struct Preprocessor
     NamePool* getNamePool() { return linkage->getNamePool(); }
     SourceManager* getSourceManager() { return linkage->getSourceManager(); }
 };
+
+
+static Token AdvanceToken(Preprocessor* preprocessor);
+
+MacroExpansion::~MacroExpansion()
+{
+    if (macro)
+    {
+        SLANG_ASSERT(macro->isBusy);
+        macro->isBusy = false;
+    }
+}
+
 
 // Convenience routine to access the diagnostic sink
 static DiagnosticSink* GetSink(Preprocessor* preprocessor)
@@ -317,7 +335,8 @@ static Token AdvanceRawToken(PreprocessorInputStream* inputStream, LexerFlags le
     }
     else
     {
-        PretokenizedInputStream* pretokenized = (PretokenizedInputStream*) inputStream;
+        PretokenizedInputStream* pretokenized = dynamic_cast<PretokenizedInputStream*>(inputStream);
+        SLANG_ASSERT(pretokenized);
         return pretokenized->tokenReader.AdvanceToken();
     }
 }
@@ -331,7 +350,8 @@ static Token PeekRawToken(PreprocessorInputStream* inputStream)
     }
     else
     {
-        PretokenizedInputStream* pretokenized = (PretokenizedInputStream*) inputStream;
+        PretokenizedInputStream* pretokenized = dynamic_cast<PretokenizedInputStream*>(inputStream);
+        SLANG_ASSERT(pretokenized);
         return pretokenized->tokenReader.PeekToken();
     }
 }
@@ -345,7 +365,8 @@ static TokenType PeekRawTokenType(PreprocessorInputStream* inputStream)
     }
     else
     {
-        PretokenizedInputStream* pretokenized = (PretokenizedInputStream*) inputStream;
+        PretokenizedInputStream* pretokenized = dynamic_cast<PretokenizedInputStream*>(inputStream);
+        SLANG_ASSERT(pretokenized);
         return pretokenized->tokenReader.PeekTokenType();
     }
 }
@@ -503,12 +524,10 @@ static PreprocessorMacro* LookupMacro(Preprocessor* preprocessor, Name* name)
 
 // A macro is "busy" if it is currently being used for expansion.
 // A macro cannot be expanded again while busy, to avoid infinite recursion.
-static bool IsMacroBusy(PreprocessorMacro* /*macro*/)
+static bool _isMacroBusy(PreprocessorMacro* macro)
 {
-    // TODO: need to implement this correctly
-    //
     // The challenge here is that we are implementing expansion
-    // for argumenst to function-like macros in a "lazy" fashion.
+    // for arguments to function-like macros in a "lazy" fashion.
     //
     // The letter of the spec is that we should macro expand
     // each argument *before* substitution, and then go and
@@ -529,7 +548,7 @@ static bool IsMacroBusy(PreprocessorMacro* /*macro*/)
     // use of a macro when it occurs (indirectly) through
     // the *body* of the expansion, but not when it occcurs
     // only through an *argument*.
-    return false;
+    return macro->isBusy;
 }
 
 //
@@ -555,9 +574,16 @@ static void PushMacroExpansion(
     Preprocessor*   preprocessor,
     MacroExpansion* expansion)
 {
+    SLANG_ASSERT(expansion->macro->isBusy == false);
+
+    // We are now expanding so mark the macro as busy.
+    // Will be when the MacroExpansion is release
+    expansion->macro->isBusy = true;
+
     PushInputStream(preprocessor, expansion);
 }
 
+#if 0
 static void AddEndOfStreamToken(
     Preprocessor*       preprocessor,
     PreprocessorMacro*  macro)
@@ -566,6 +592,7 @@ static void AddEndOfStreamToken(
     token.type = TokenType::EndOfFile;
     macro->tokens.mTokens.add(token);
 }
+#endif
 
 static SimpleTokenInputStream* createSimpleInputStream(
     Preprocessor*   preprocessor,
@@ -574,17 +601,86 @@ static SimpleTokenInputStream* createSimpleInputStream(
     SimpleTokenInputStream* inputStream = new SimpleTokenInputStream();
     initializeInputStream(preprocessor, inputStream);
 
-    inputStream->lexedTokens.mTokens.add(token);
+    inputStream->lexedTokens.add(token);
 
     Token eofToken;
     eofToken.type = TokenType::EndOfFile;
     eofToken.loc = token.loc;
     eofToken.flags = TokenFlag::AfterWhitespace | TokenFlag::AtStartOfLine;
-    inputStream->lexedTokens.mTokens.add(eofToken);
+    inputStream->lexedTokens.add(eofToken);
 
     inputStream->tokenReader = TokenReader(inputStream->lexedTokens);
 
     return inputStream;
+}
+
+static void _addEndOfStreamToken(Preprocessor* preprocessor, List<Token>& outTokens)
+{
+    Token token = PeekRawToken(preprocessor);
+    token.type = TokenType::EndOfFile;
+    outTokens.add(token);
+}
+
+static SlangResult _parseArgTokens(Preprocessor* preprocessor, List<Token>& outTokens)
+{
+    // Read tokens for the argument
+    // We track the nesting depth, since we don't break
+    // arguments on a `,` nested in balanced parentheses
+    //
+    // Note: Does not consume the closing ')' or ','
+
+    int nesting = 0;
+    for (;;)
+    {
+        switch (PeekRawTokenType(preprocessor))
+        {
+            case TokenType::EndOfFile:
+            {
+                // if we reach the end of the file,
+                // then we have an error, and need to
+                // bail out
+                _addEndOfStreamToken(preprocessor, outTokens);
+                return SLANG_FAIL;
+            }
+            case TokenType::RParent:
+            {
+                // If we see a right paren when we aren't nested
+                // then we are at the end of an argument
+                if (nesting == 0)
+                {
+                    _addEndOfStreamToken(preprocessor, outTokens);
+                    return SLANG_OK;
+                }
+                // Otherwise we decrease our nesting depth, add
+                // the token, and keep going
+                nesting--;
+                break;
+            }
+            case TokenType::Comma:
+            {
+                // If we see a comma when we aren't nested
+                // then we are at the end of an argument
+                if (nesting == 0)
+                {
+                    _addEndOfStreamToken(preprocessor, outTokens);
+                    return SLANG_OK;
+                }
+                // Otherwise we add it as a normal token
+                break;
+            }
+            case TokenType::LParent:
+            {
+                // If we see a left paren then we need to
+                // increase our tracking of nesting
+                nesting++;
+                break;
+            }
+            default: break;
+        }
+
+        // Add the token and continue parsing.
+        outTokens.add(AdvanceRawToken(preprocessor));
+    }            
 }
 
 // Check whether the current token on the given input stream should be
@@ -614,7 +710,7 @@ static void MaybeBeginMacroExpansion(
 
         // If the macro is busy (already being expanded),
         // don't try to trigger recursive expansion
-        if (IsMacroBusy(macro))
+        if (_isMacroBusy(macro))
             return;
 
         // We might already have looked at this token,
@@ -653,118 +749,114 @@ static void MaybeBeginMacroExpansion(
             // Consume the opening `(`
             Token leftParen = AdvanceRawToken(preprocessor);
 
+          
             FunctionLikeMacroExpansion* expansion = new FunctionLikeMacroExpansion();
             InitializeMacroExpansion(preprocessor, expansion, macro);
             expansion->argumentEnvironment.parent = &preprocessor->globalEnv;
             expansion->environment = &expansion->argumentEnvironment;
 
             // Try to read any arguments present.
-            UInt paramCount = macro->params.getCount();
-            UInt argIndex = 0;
+            const Index paramCount = Index(macro->params.getCount());
 
-            switch (PeekRawTokenType(preprocessor))
+            // Set to invalid value initially
+            Index argCount = -1;
+            for (Index argIndex = 0; true; argIndex++)
             {
-            case TokenType::EndOfFile:
-            case TokenType::RParent:
-                // No arguments.
-                break;
-
-            default:
-                // At least one argument
-                while(argIndex < paramCount)
+                // Read an argument, as tokens
+                List<Token> argTokens;
+                if (SLANG_FAILED(_parseArgTokens(preprocessor, argTokens)))
                 {
-                    // Read an argument
+                    GetSink(preprocessor)->diagnose(PeekLoc(preprocessor), Diagnostics::errorParsingToMacroInvocationArgument, paramCount, macro->getName());
+                    return;
+                }
 
+                // We always have eof in argTokens, so if 1 or less there are no values. If we are at ')' means it had no parameters
+                // at all
+                if (argTokens.getCount() <= 1 && PeekRawTokenType(preprocessor) == TokenType::RParent)
+                {
+                    argCount = 0;
+                    break;
+                }
+
+                // Only bother adding the argument if the index is valid.
+                // Would need to do something different here if we supported var args
+                // Doing this way means we can report the amount of args passed correctly.
+                if (argIndex < paramCount)
+                {
                     // Create the argument, represented as a special flavor of macro
                     PreprocessorMacro* arg = CreateMacro(preprocessor);
                     arg->flavor = PreprocessorMacroFlavor::FunctionArg;
                     arg->environment = GetCurrentEnvironment(preprocessor);
+
+                    // Now we need to expand these tokens by applying macros (and in doing so we do
+                    // allow the expansion of args that invoke this macro)
+
+                    {
+                        SimpleTokenInputStream argExpandStream;
+                        argExpandStream.primaryStream = nullptr;
+                        argExpandStream.parent = nullptr;
+
+                        argExpandStream.lexedTokens.m_tokens.swapWith(argTokens);
+                        argExpandStream.tokenReader = TokenReader(argExpandStream.lexedTokens);
+
+                        // TODO(JS): What environment should be used for the expansion? For now we'll just use the environment set on the the macro
+                        argExpandStream.environment = macro->environment; // &preprocessor->globalEnv;
+
+                        auto prevInputStream = preprocessor->inputStream;
+
+                        preprocessor->inputStream = &argExpandStream;
+
+                        // Lets read some tokens until we hit the end of the file
+
+                        while (true)
+                        {
+                            Token expandToken = AdvanceToken(preprocessor);
+                            // Add the token to the expanded arg
+                            arg->tokens.add(expandToken);
+                            // If we hit the end then handle
+                            if (expandToken.type == TokenType::EndOfFile)
+                            {
+                                break;
+                            }
+                        }
+
+                        // Restore the previous input stream
+                        preprocessor->inputStream = prevInputStream;
+                    }
 
                     // Associate the new macro with its parameter name
                     NameLoc paramNameAndLoc = macro->params[argIndex];
                     Name* paramName = paramNameAndLoc.name;
                     arg->nameAndLoc = paramNameAndLoc;
                     expansion->argumentEnvironment.macros[paramName] = arg;
-                    argIndex++;
-
-                    // Read tokens for the argument
-
-                    // We track the nesting depth, since we don't break
-                    // arguments on a `,` nested in balanced parentheses
-                    //
-                    int nesting = 0;
-                    for (;;)
-                    {
-                        switch (PeekRawTokenType(preprocessor))
-                        {
-                        case TokenType::EndOfFile:
-                            // if we reach the end of the file,
-                            // then we have an error, and need to
-                            // bail out
-                            AddEndOfStreamToken(preprocessor, arg);
-                            goto doneWithAllArguments;
-
-                        case TokenType::RParent:
-                            // If we see a right paren when we aren't nested
-                            // then we are at the end of an argument
-                            if (nesting == 0)
-                            {
-                                AddEndOfStreamToken(preprocessor, arg);
-                                goto doneWithAllArguments;
-                            }
-                            // Otherwise we decrease our nesting depth, add
-                            // the token, and keep going
-                            nesting--;
-                            break;
-
-                        case TokenType::Comma:
-                            // If we see a comma when we aren't nested
-                            // then we are at the end of an argument
-                            if (nesting == 0)
-                            {
-                                AddEndOfStreamToken(preprocessor, arg);
-                                AdvanceRawToken(preprocessor);
-                                goto doneWithArgument;
-                            }
-                            // Otherwise we add it as a normal token
-                            break;
-
-                        case TokenType::LParent:
-                            // If we see a left paren then we need to
-                            // increase our tracking of nesting
-                            nesting++;
-                            break;
-
-                        default:
-                            break;
-                        }
-
-                        // Add the token and continue parsing.
-                        arg->tokens.mTokens.add(AdvanceRawToken(preprocessor));
-                    }
-                doneWithArgument: {}
-                    // We've parsed an argument and should move onto
-                    // the next one.
                 }
-                break;
-            }
-        doneWithAllArguments:
-            // TODO: handle possible varargs
 
-            // Expect closing right paren
-            if (PeekRawTokenType(preprocessor) == TokenType::RParent)
-            {
-                AdvanceRawToken(preprocessor);
-            }
-            else
-            {
-                GetSink(preprocessor)->diagnose(PeekLoc(preprocessor), Diagnostics::expectedTokenInMacroArguments, TokenType::RParent, PeekRawTokenType(preprocessor));
+                // Do the peek to see what's next
+                auto tokenType = PeekRawTokenType(preprocessor);
+                if (tokenType == TokenType::RParent)
+                {
+                    // Expect closing right paren
+                    AdvanceRawToken(preprocessor);
+                    argCount = argIndex + 1;
+                    break;
+                }
+                else if (tokenType == TokenType::Comma)
+                {
+                    // Consume the comma
+                    AdvanceRawToken(preprocessor);
+                }
+                else
+                {
+                    // Anything else is an error
+                    GetSink(preprocessor)->diagnose(PeekLoc(preprocessor), Diagnostics::errorParsingToMacroInvocationArgument, paramCount, macro->getName());
+                    return;
+                }
             }
 
-            UInt argCount = argIndex;
             if (argCount != paramCount)
             {
                 GetSink(preprocessor)->diagnose(PeekLoc(preprocessor), Diagnostics::wrongNumberOfArgumentsToMacro, paramCount, argCount);
+                return;
             }
 
             // We are ready to expand.
@@ -1755,12 +1847,12 @@ static void HandleDefineDirective(PreprocessorDirectiveContext* context)
             // Last token on line will be turned into a conceptual end-of-file
             // token for the sub-stream that the macro expands into.
             token.type = TokenType::EndOfFile;
-            macro->tokens.mTokens.add(token);
+            macro->tokens.add(token);
             break;
         }
 
         // In the ordinary case, we just add the token to the definition
-        macro->tokens.mTokens.add(token);
+        macro->tokens.add(token);
     }
 }
 
@@ -2236,7 +2328,7 @@ static TokenList ReadAllTokens(
     {
         Token token = ReadToken(preprocessor);
 
-        tokens.mTokens.add(token);
+        tokens.add(token);
 
         // Note: we include the EOF token in the list,
         // since that is expected by the `TokenList` type.
