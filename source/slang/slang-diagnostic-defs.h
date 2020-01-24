@@ -175,6 +175,7 @@ DIAGNOSTIC(15403, Error, expectedTokenInMacroParameters, "expected '$0' in macro
 // 155xx - macro expansion
 DIAGNOSTIC(15500, Warning, expectedTokenInMacroArguments, "expected '$0' in macro invocation")
 DIAGNOSTIC(15501, Error, wrongNumberOfArgumentsToMacro, "wrong number of arguments to macro (expected $0, got $1)")
+DIAGNOSTIC(15502, Error, errorParsingToMacroInvocationArgument, "error parsing macro '$0' invocation argument to '$1'")
 
 // 156xx - pragmas
 DIAGNOSTIC(15600, Error, expectedPragmaDirectiveName, "expected a name after '#pragma'")

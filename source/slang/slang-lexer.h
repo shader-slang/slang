@@ -15,7 +15,9 @@ namespace Slang
         Token* begin() const;
         Token* end() const;
 
-        List<Token> mTokens;
+        SLANG_FORCE_INLINE void add(const Token& token) { m_tokens.add(token); }
+
+        List<Token> m_tokens;
     };
 
     struct TokenSpan
