@@ -254,21 +254,6 @@ SlangResult CUDASourceEmitter::calcTypeName(IRType* type, CodeGenTarget target, 
             out << prefix << vecCount;
             return SLANG_OK;
         }
-        case kIROp_HLSLStructuredBufferType:
-        {
-            auto bufferType = as<IRHLSLStructuredBufferType>(type);
-            out << "const ";
-            calcTypeName(bufferType->getElementType(), target, out);
-            out << "* ";
-            return SLANG_OK;
-        }
-        case kIROp_HLSLRWStructuredBufferType:
-        {
-            auto bufferType = as<IRHLSLRWStructuredBufferType>(type);
-            calcTypeName(bufferType->getElementType(), target, out);
-            out << "* ";
-            return SLANG_OK;
-        }
 
 #if 0
         case kIROp_MatrixType:
