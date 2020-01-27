@@ -38,6 +38,18 @@ struct FixedArray
     T m_data[SIZE];
 };
 
+// An array that has no specified size, becomes a 'Array'. This stores the size so it can potentially 
+// do bounds checking.  
+template <typename T>
+struct Array
+{
+    SLANG_CUDA_CALL const T& operator[](size_t index) const { SLANG_CUDA_BOUND_CHECK(index, count); return data[index]; }
+    SLANG_CUDA_CALL T& operator[](size_t index) { SLANG_CUDA_BOUND_CHECK(index, count); return data[index]; }
+    
+    T* data;
+    size_t count;
+};
+
 // Typically defined in cuda.h, but we can't ship/rely on that, so just define here
 typedef unsigned long long CUtexObject;                   
 typedef unsigned long long CUsurfObject;                  

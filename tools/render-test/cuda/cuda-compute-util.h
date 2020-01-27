@@ -21,6 +21,11 @@ struct CUDAComputeUtil
         void* data;
         size_t count;
     };
+    struct Array
+    {
+        void* data;
+        size_t count;
+    };
 
     struct Context
     {
