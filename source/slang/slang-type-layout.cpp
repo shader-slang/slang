@@ -694,29 +694,29 @@ struct CPUObjectLayoutRulesImpl : ObjectLayoutRulesImpl
         {
             case ShaderParameterKind::ConstantBuffer:
                 // It's a pointer to the actual uniform data
-                return SimpleLayoutInfo(LayoutResourceKind::Uniform, sizeof(void*), sizeof(void*));
+                return SimpleLayoutInfo(LayoutResourceKind::Uniform, sizeof(void*), SLANG_ALIGN_OF(void*));
 
             case ShaderParameterKind::MutableTexture:
             case ShaderParameterKind::TextureUniformBuffer:
             case ShaderParameterKind::Texture:
                 // It's a pointer to a texture interface 
-                return SimpleLayoutInfo(LayoutResourceKind::Uniform, sizeof(void*), sizeof(void*));
+                return SimpleLayoutInfo(LayoutResourceKind::Uniform, sizeof(void*), SLANG_ALIGN_OF(void*));
                 
             case ShaderParameterKind::StructuredBuffer:            
             case ShaderParameterKind::MutableStructuredBuffer:
                 // It's a ptr and a size of the amount of elements
-                return SimpleLayoutInfo(LayoutResourceKind::Uniform, sizeof(void*) * 2, sizeof(void*));
+                return SimpleLayoutInfo(LayoutResourceKind::Uniform, sizeof(void*) * 2, SLANG_ALIGN_OF(void*));
 
             case ShaderParameterKind::RawBuffer:
             case ShaderParameterKind::Buffer:
             case ShaderParameterKind::MutableRawBuffer:
             case ShaderParameterKind::MutableBuffer:
                 // It's a pointer and a size in bytes
-                return SimpleLayoutInfo(LayoutResourceKind::Uniform, sizeof(void*) * 2, sizeof(void*));
+                return SimpleLayoutInfo(LayoutResourceKind::Uniform, sizeof(void*) * 2, SLANG_ALIGN_OF(void*));
 
             case ShaderParameterKind::SamplerState:
                 // It's a pointer
-                return SimpleLayoutInfo(LayoutResourceKind::Uniform, sizeof(void*), sizeof(void*));
+                return SimpleLayoutInfo(LayoutResourceKind::Uniform, sizeof(void*), SLANG_ALIGN_OF(void*));
  
             case ShaderParameterKind::TextureSampler:
             case ShaderParameterKind::MutableTextureSampler:
@@ -756,19 +756,15 @@ struct CUDAObjectLayoutRulesImpl : CPUObjectLayoutRulesImpl
 
             case ShaderParameterKind::StructuredBuffer:
             case ShaderParameterKind::MutableStructuredBuffer:
-                // TODO(JS): We are just storing as a pointer for now
-                // It's a ptr and a size of the amount of elements
-                return SimpleLayoutInfo(LayoutResourceKind::Uniform, sizeof(void*), SLANG_ALIGN_OF(void*));
+                // It's a pointer and a size
+                return SimpleLayoutInfo(LayoutResourceKind::Uniform, sizeof(void*) * 2, SLANG_ALIGN_OF(void*));
 
             case ShaderParameterKind::RawBuffer:
             case ShaderParameterKind::Buffer:
             case ShaderParameterKind::MutableRawBuffer:
             case ShaderParameterKind::MutableBuffer:
-
-                // TODO(JS): We are storing as a pointer for now
-
                 // It's a pointer and a size in bytes
-                return SimpleLayoutInfo(LayoutResourceKind::Uniform, sizeof(void*), SLANG_ALIGN_OF(void*));
+                return SimpleLayoutInfo(LayoutResourceKind::Uniform, sizeof(void*) * 2, SLANG_ALIGN_OF(void*));
 
             case ShaderParameterKind::SamplerState:
                 // In CUDA it seems that sampler states are combined into texture objects.

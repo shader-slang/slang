@@ -174,6 +174,16 @@ static SlangResult _parseLocation(const UnownedStringSlice& in, DownstreamDiagno
     return SLANG_OK;
 }
 
+static bool _isDriveLetter(char c)
+{
+    return (c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z');
+}
+
+static bool _hasDriveLetter(const UnownedStringSlice& line)
+{
+    return line.size() > 2 && line[1] == ':' && _isDriveLetter(line[0]);
+}
+
 static SlangResult _parseNVRTCLine(const UnownedStringSlice& line, DownstreamDiagnostic& outDiagnostic)
 {
     typedef DownstreamDiagnostic Diagnostic;
@@ -182,7 +192,17 @@ static SlangResult _parseNVRTCLine(const UnownedStringSlice& line, DownstreamDia
     outDiagnostic.stage = Diagnostic::Stage::Compile;
 
     List<UnownedStringSlice> split;
-    StringUtil::split(line, ':', split);
+    if (_hasDriveLetter(line))
+    {
+        // The drive letter has :, which confuses things, so skip that and then fix up first entry 
+        UnownedStringSlice lineWithoutDrive(line.begin() + 2, line.end());
+        StringUtil::split(lineWithoutDrive, ':', split);
+        split[0] = UnownedStringSlice(line.begin(), split[0].end());
+    }
+    else
+    {
+        StringUtil::split(line, ':', split);
+    }
 
     if (split.getCount() == 3)
     {

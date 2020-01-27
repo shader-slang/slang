@@ -69,7 +69,7 @@ struct UniformState
 {
     CUtexObject tex;                // This is the combination of a texture and a sampler(!)
     SamplerState sampler;           // This variable exists within the layout, but it's value is not used.
-    int32_t* outputBuffer;          // Currently Structured buffers are converted to pointers - this will likely change in the future (for bounds checking and other reasons)
+    RWStructuredBuffer<int32_t> outputBuffer;    // This is implemented as a template in the CUDA prelude. It's just a pointer, and a size
     Thing* thing3;                  // Constant buffers map to pointers
 };   
 
@@ -80,6 +80,20 @@ extern "C" __global__  void computeMain(UniformEntryPointParams* params, Uniform
 With CUDA - the caller specifies how threading is broken up, so `[numthreads]` is available through reflection, and in a comment in output source code but does not produce varying code. 
 
 The UniformState and UniformEntryPointParams struct typically vary by shader. UniformState holds 'normal' bindings, whereas UniformEntryPointParams hold the uniform entry point parameters. Where specific bindings or parameters are located can be determined by reflection. The structures for the example above would be something like the following... 
+
+`StructuredBuffer<T>`,`RWStructuredBuffer<T>` become
+
+```
+    T* data;
+    size_t count;
+```    
+
+`ByteAddressBuffer`, `RWByteAddressBuffer` become 
+
+```
+    uint32_t* data;
+    size_t sizeInBytes;
+```  
 
 ## Unsized arrays
 

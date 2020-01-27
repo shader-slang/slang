@@ -10,11 +10,30 @@
 #define SLANG_FORCE_INLINE inline
 #define SLANG_INLINE inline
 
+// Bound checks. Can be replaced by defining before including header. 
+// NOTE! 
+// The default behaviour, if out of bounds is to index 0. This is of course quite wrong - and different 
+// behavior to hlsl typically. The problem here though is more around a write reference. That unless 
+// some kind of proxy is used it is hard and/or slow to emulate the typical GPU behavior.
+
+#ifndef SLANG_CUDA_BOUND_CHECK
+#   define SLANG_CUDA_BOUND_CHECK(index, count) SLANG_PRELUDE_ASSERT(index < count); index = (index < count) ? index : 0; 
+#endif
+
+#ifndef SLANG_CUDA_BYTE_ADDRESS_BOUND_CHECK
+#   define SLANG_CUDA_BYTE_ADDRESS_BOUND_CHECK(index, size, count) SLANG_PRELUDE_ASSERT(index + 4 <= sizeInBytes && (index & 3) == 0); index = (index + 4 <= sizeInBytes) ? index : 0; 
+#endif    
+
+// Here we don't have the index zeroing behavior, as such bounds checks are generally not on GPU targets either. 
+#ifndef SLANG_CUDA_FIXED_ARRAY_BOUND_CHECK
+#   define SLANG_CUDA_FIXED_ARRAY_BOUND_CHECK(index, count) SLANG_PRELUDE_ASSERT(index < count); 
+#endif
+
 template <typename T, size_t SIZE>
 struct FixedArray
 {
-    SLANG_CUDA_CALL const T& operator[](size_t index) const { SLANG_PRELUDE_ASSERT(index < SIZE); return m_data[index]; }
-    SLANG_CUDA_CALL T& operator[](size_t index) { SLANG_PRELUDE_ASSERT(index < SIZE); return m_data[index]; }
+    SLANG_CUDA_CALL const T& operator[](size_t index) const { SLANG_CUDA_FIXED_ARRAY_BOUND_CHECK(index, SIZE); return m_data[index]; }
+    SLANG_CUDA_CALL T& operator[](size_t index) { SLANG_CUDA_FIXED_ARRAY_BOUND_CHECK(index, SIZE); return m_data[index]; }
     
     T m_data[SIZE];
 };
@@ -178,6 +197,131 @@ SLANG_CUDA_CALL uint32_t U32_countbits(uint32_t v)
     return __popc(v);
 }
 
+// ----------------------------- ResourceType -----------------------------------------
+
+
+// https://docs.microsoft.com/en-us/windows/win32/direct3dhlsl/sm5-object-structuredbuffer-getdimensions
+// Missing  Load(_In_  int  Location, _Out_ uint Status);
+
+template <typename T>
+struct RWStructuredBuffer
+{
+    SLANG_CUDA_CALL T& operator[](size_t index) const { SLANG_CUDA_BOUND_CHECK(index, count); return data[index]; }
+    SLANG_CUDA_CALL const T& Load(size_t index) const { SLANG_CUDA_BOUND_CHECK(index, count); return data[index]; }  
+    SLANG_CUDA_CALL void GetDimensions(uint32_t& outNumStructs, uint32_t& outStride) { outNumStructs = uint32_t(count); outStride = uint32_t(sizeof(T)); }
+  
+    T* data;
+    size_t count;
+};
+
+template <typename T>
+struct StructuredBuffer
+{
+    SLANG_CUDA_CALL const T& operator[](size_t index) const { SLANG_CUDA_BOUND_CHECK(index, count); return data[index]; }
+    SLANG_CUDA_CALL const T& Load(size_t index) const { SLANG_CUDA_BOUND_CHECK(index, count); return data[index]; }
+    SLANG_CUDA_CALL void GetDimensions(uint32_t& outNumStructs, uint32_t& outStride) { outNumStructs = uint32_t(count); outStride = uint32_t(sizeof(T)); }
+    
+    T* data;
+    size_t count;
+};
+
+    
+// Missing  Load(_In_  int  Location, _Out_ uint Status);
+struct ByteAddressBuffer
+{
+    SLANG_CUDA_CALL void GetDimensions(uint32_t& outDim) const { outDim = uint32_t(sizeInBytes); }
+    SLANG_CUDA_CALL uint32_t Load(size_t index) const 
+    { 
+        SLANG_CUDA_BYTE_ADDRESS_BOUND_CHECK(index, 4, sizeInBytes);
+        return data[index >> 2]; 
+    }
+    SLANG_CUDA_CALL uint2 Load2(size_t index) const 
+    { 
+        SLANG_CUDA_BYTE_ADDRESS_BOUND_CHECK(index, 8, sizeInBytes); 
+        const size_t dataIdx = index >> 2; 
+        return uint2{data[dataIdx], data[dataIdx + 1]}; 
+    }
+    SLANG_CUDA_CALL uint3 Load3(size_t index) const 
+    { 
+        SLANG_CUDA_BYTE_ADDRESS_BOUND_CHECK(index, 12, sizeInBytes);
+        const size_t dataIdx = index >> 2; 
+        return uint3{data[dataIdx], data[dataIdx + 1], data[dataIdx + 2]}; 
+    }
+    SLANG_CUDA_CALL uint4 Load4(size_t index) const 
+    { 
+        SLANG_CUDA_BYTE_ADDRESS_BOUND_CHECK(index, 16, sizeInBytes);
+        const size_t dataIdx = index >> 2; 
+        return uint4{data[dataIdx], data[dataIdx + 1], data[dataIdx + 2], data[dataIdx + 3]}; 
+    }
+    
+    const uint32_t* data;
+    size_t sizeInBytes;  //< Must be multiple of 4
+};
+
+// https://docs.microsoft.com/en-us/windows/win32/direct3dhlsl/sm5-object-rwbyteaddressbuffer
+// Missing support for Atomic operations 
+// Missing support for Load with status
+struct RWByteAddressBuffer
+{
+    SLANG_CUDA_CALL void GetDimensions(uint32_t& outDim) const { outDim = uint32_t(sizeInBytes); }
+    
+    SLANG_CUDA_CALL uint32_t Load(size_t index) const 
+    { 
+        SLANG_CUDA_BYTE_ADDRESS_BOUND_CHECK(index, 4, sizeInBytes);
+        return data[index >> 2]; 
+    }
+    SLANG_CUDA_CALL uint2 Load2(size_t index) const 
+    { 
+        SLANG_CUDA_BYTE_ADDRESS_BOUND_CHECK(index, 8, sizeInBytes);
+        const size_t dataIdx = index >> 2; 
+        return uint2{data[dataIdx], data[dataIdx + 1]}; 
+    }
+    SLANG_CUDA_CALL uint3 Load3(size_t index) const 
+    { 
+        SLANG_CUDA_BYTE_ADDRESS_BOUND_CHECK(index, 12, sizeInBytes);
+        const size_t dataIdx = index >> 2; 
+        return uint3{data[dataIdx], data[dataIdx + 1], data[dataIdx + 2]}; 
+    }
+    SLANG_CUDA_CALL uint4 Load4(size_t index) const 
+    { 
+        SLANG_CUDA_BYTE_ADDRESS_BOUND_CHECK(index, 16, sizeInBytes);
+        const size_t dataIdx = index >> 2; 
+        return uint4{data[dataIdx], data[dataIdx + 1], data[dataIdx + 2], data[dataIdx + 3]}; 
+    }
+    
+    SLANG_CUDA_CALL void Store(size_t index, uint32_t v) const 
+    { 
+        SLANG_CUDA_BYTE_ADDRESS_BOUND_CHECK(index, 4, sizeInBytes);
+        data[index >> 2] = v; 
+    }
+    SLANG_CUDA_CALL void Store2(size_t index, uint2 v) const 
+    { 
+        SLANG_CUDA_BYTE_ADDRESS_BOUND_CHECK(index, 8, sizeInBytes);
+        const size_t dataIdx = index >> 2; 
+        data[dataIdx + 0] = v.x;
+        data[dataIdx + 1] = v.y;
+    }
+    SLANG_CUDA_CALL void Store3(size_t index, uint3 v) const 
+    { 
+        SLANG_CUDA_BYTE_ADDRESS_BOUND_CHECK(index, 12, sizeInBytes);
+        const size_t dataIdx = index >> 2; 
+        data[dataIdx + 0] = v.x;
+        data[dataIdx + 1] = v.y;
+        data[dataIdx + 2] = v.z;
+    }
+    SLANG_CUDA_CALL void Store4(size_t index, uint4 v) const 
+    { 
+        SLANG_CUDA_BYTE_ADDRESS_BOUND_CHECK(index, 16, sizeInBytes);
+        const size_t dataIdx = index >> 2; 
+        data[dataIdx + 0] = v.x;
+        data[dataIdx + 1] = v.y;
+        data[dataIdx + 2] = v.z;
+        data[dataIdx + 3] = v.w;
+    }
+    
+    uint32_t* data;
+    size_t sizeInBytes; //< Must be multiple of 4 
+};
 
 /* !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! */
 
