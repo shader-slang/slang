@@ -10,6 +10,18 @@ namespace renderer_test {
 
 struct CUDAComputeUtil
 {
+        /// NOTE! MUST match up to definitions in the CUDA prelude
+    struct ByteAddressBuffer
+    {
+        void* data;
+        size_t sizeInBytes;
+    };
+    struct StructuredBuffer
+    {
+        void* data;
+        size_t count;
+    };
+
     struct Context
     {
             /// Holds the binding information
