@@ -49,6 +49,11 @@ typedef unsigned long long CUsurfObject;
 struct SamplerStateUnused;
 typedef SamplerStateUnused* SamplerState;
 
+
+// TODO(JS): Not clear yet if this can be handled on CUDA, by just ignoring.
+// For now, just map to the index type. 
+typedef size_t NonUniformResourceIndex;
+
 // Code generator will generate the specific type
 template <typename T, int ROWS, int COLS>
 struct Matrix;

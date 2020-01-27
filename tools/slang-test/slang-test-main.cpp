@@ -2528,6 +2528,34 @@ static void _calcSynthesizedTests(TestContext* context, RenderApiType synthRende
             {
                 continue;
             }
+
+            // If the source language is defined, and it's
+
+            const Index index = srcTest.options.args.indexOf("-source-language");
+            if (index >= 0)
+            {
+                //
+                const auto& language = srcTest.options.args[index + 1];
+                SlangSourceLanguage sourceLanguage = DownstreamCompiler::getSourceLanguageFromName(language.getUnownedSlice());
+
+                bool isCrossCompile = true;
+
+                switch (sourceLanguage)
+                {
+                    case SLANG_SOURCE_LANGUAGE_GLSL:
+                    case SLANG_SOURCE_LANGUAGE_C:
+                    case SLANG_SOURCE_LANGUAGE_CPP:
+                    {
+                        isCrossCompile = false;
+                    }
+                    default: break;
+                }
+
+                if (!isCrossCompile)
+                {
+                    continue;
+                }
+            }
         }
         else
         {
@@ -2555,8 +2583,16 @@ static void _calcSynthesizedTests(TestContext* context, RenderApiType synthRende
         // If the target is vulkan remove the -hlsl option
         if (synthRenderApiType == RenderApiType::Vulkan)
         {
-            Index index = synthOptions.args.indexOf("-hlsl");
-            if (index != Index(-1))
+            const Index index = synthOptions.args.indexOf("-hlsl");
+            if (index >= 0)
+            {
+                synthOptions.args.removeAt(index);
+            }
+        }
+        else if (synthRenderApiType == RenderApiType::CUDA)
+        {
+            const Index index = synthOptions.args.indexOf("-cpu");
+            if (index >= 0)
             {
                 synthOptions.args.removeAt(index);
             }
