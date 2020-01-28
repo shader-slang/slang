@@ -97,7 +97,26 @@ The UniformState and UniformEntryPointParams struct typically vary by shader. Un
 
 ## Unsized arrays
 
-WIP: Not implemented yet.
+Unsized arrays can be used, which are indicated by an array with no size as in `[]`. For example 
+
+```
+    RWStructuredBuffer<int> arrayOfArrays[];
+```
+
+With normal 'sized' arrays, the elements are just stored contiguously within wherever they are defined. With an unsized array they map to `Array<T>` which is...
+
+```
+    T* data;
+    size_t count;
+```    
+
+Note that there is no method in the shader source to get the `count`, even though on the CUDA target it is stored and easily available. This is because of the behavior on GPU targets 
+
+* That the count has to be stored elsewhere (unlike with CUDA) 
+* On some GPU targets there is no bounds checking - accessing outside the bound values can cause *undefined behavior*
+* The elements may be laid out *contiguously* on GPU
+
+In practice this means if you want to access the `count` in shader code it will need to be passed by another mechanism - such as within a constant buffer. It is possible in the future support may be added to allow direct access of `count` work across targets transparently. 
 
 ## Prelude
 

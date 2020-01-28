@@ -572,13 +572,15 @@ static SlangResult _compute(CUcontext context, CUmodule module, const ShaderComp
                         auto elementCount = int(typeLayout->getElementCount());
                         if (elementCount == 0)
                         {
-                            void** array = location.getUniform<void*>();
-                            // If set, we setup the data needed for array on CPU side
-                            if (value && array)
+                            CUDAComputeUtil::Array array = { nullptr, 0 };
+                            auto resource = CUDAResource::getCUDAResource(value);
+                            if (resource)
                             {
-                                // TODO(JS): For now we'll just assume a pointer...
-                                *array = CUDAResource::getCUDAData(value);
+                                array.data = resource->m_cudaMemory;
+                                array.count = value->m_elementCount;
                             }
+
+                            location.setUniform(&array, sizeof(array));
                         }
                         break;
                     }
