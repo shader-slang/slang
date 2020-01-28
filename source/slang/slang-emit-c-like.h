@@ -328,6 +328,7 @@ public:
     virtual void emitOperandImpl(IRInst* inst, EmitOpInfo const& outerPrec);
     virtual void emitParamTypeImpl(IRType* type, String const& name);
     virtual void emitIntrinsicCallExprImpl(IRCall* inst, IRTargetIntrinsicDecoration* targetIntrinsic, EmitOpInfo const& inOuterPrec);
+    virtual void emitFunctionPreambleImpl(IRInst* inst) { SLANG_UNUSED(inst); }
 
         // Only needed for glsl output with $ prefix intrinsics - so perhaps removable in the future
     virtual void emitTextureOrTextureSamplerTypeImpl(IRTextureTypeBase*  type, char const* baseName) { SLANG_UNUSED(type); SLANG_UNUSED(baseName); }

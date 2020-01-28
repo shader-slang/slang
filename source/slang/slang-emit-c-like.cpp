@@ -2579,6 +2579,8 @@ void CLikeSourceEmitter::emitSimpleFuncImpl(IRFunc* func)
         emitEntryPointAttributes(func, entryPointDecor);
     }
 
+    emitFunctionPreambleImpl(func);
+
     auto name = getName(func);
 
     emitType(resultType, name);
@@ -2963,6 +2965,8 @@ void CLikeSourceEmitter::emitGlobalVar(IRGlobalVar* varDecl)
     String initFuncName;
     if (varDecl->getFirstBlock())
     {
+        emitFunctionPreambleImpl(varDecl);
+
         // A global variable with code means it has an initializer
         // associated with it. Eventually we'd like to emit that
         // initializer directly as an expression here, but for

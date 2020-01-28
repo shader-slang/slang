@@ -502,7 +502,7 @@ void CUDASourceEmitter::emitSimpleFuncParamsImpl(IRFunc* func)
 void CUDASourceEmitter::emitSimpleFuncImpl(IRFunc* func)
 {
     // Mark as run on device. Don't need to worry about entry point, as that is output separately to call the __device_ implementation
-    m_writer->emit("__device__ ");    
+    //m_writer->emit("__device__ ");    
 
     CLikeSourceEmitter::emitSimpleFuncImpl(func);
 }

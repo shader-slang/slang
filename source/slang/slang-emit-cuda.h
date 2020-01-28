@@ -47,6 +47,8 @@ protected:
     virtual void emitMatrixLayoutModifiersImpl(IRVarLayout* layout) SLANG_OVERRIDE;
     virtual void emitOperandImpl(IRInst* inst, EmitOpInfo const&  outerPrec) SLANG_OVERRIDE;
     virtual void emitCall(const HLSLIntrinsic* specOp, IRInst* inst, const IRUse* operands, int numOperands, const EmitOpInfo& inOuterPrec) SLANG_OVERRIDE;
+    virtual void emitFunctionPreambleImpl(IRInst* inst) SLANG_OVERRIDE { SLANG_UNUSED(inst); m_writer->emit("__device__ "); }
+
 
     //virtual bool tryEmitGlobalParamImpl(IRGlobalParam* varDecl, IRType* varType) SLANG_OVERRIDE;
     virtual bool tryEmitInstExprImpl(IRInst* inst, const EmitOpInfo& inOuterPrec) SLANG_OVERRIDE;
@@ -58,8 +60,7 @@ protected:
     // CPPSourceEmitter overrides 
     virtual SlangResult calcTypeName(IRType* type, CodeGenTarget target, StringBuilder& out) SLANG_OVERRIDE;
     virtual SlangResult calcScalarFuncName(HLSLIntrinsic::Op op, IRBasicType* type, StringBuilder& outBuilder) SLANG_OVERRIDE;
-    virtual void emitSpecializedOperationDefinitionPreamble(const HLSLIntrinsic* specOp) SLANG_OVERRIDE { SLANG_UNUSED(specOp); m_writer->emit("__device__ "); }
-
+    
     SlangResult _calcCUDATextureTypeName(IRTextureTypeBase* texType, StringBuilder& outName);
 };
 

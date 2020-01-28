@@ -808,7 +808,7 @@ void CPPSourceEmitter::_emitSignature(const UnownedStringSlice& funcName, const 
     const int paramsCount = int(funcType->getParamCount());
     IRType* retType = specOp->returnType;
 
-    emitSpecializedOperationDefinitionPreamble(specOp);
+    emitFunctionPreambleImpl(nullptr);
 
     SourceWriter* writer = getSourceWriter();
 
@@ -981,7 +981,7 @@ void CPPSourceEmitter::_emitGetAtDefinition(const UnownedStringSlice& funcName, 
     {
         UnownedStringSlice typePrefix = (i == 0) ? UnownedStringSlice::fromLiteral("const ") : UnownedStringSlice();
 
-        emitSpecializedOperationDefinitionPreamble(specOp);
+        emitFunctionPreambleImpl(nullptr);
 
         writer->emit(typePrefix);
         emitType(specOp->returnType);
@@ -1075,7 +1075,7 @@ void CPPSourceEmitter::_emitConstructConvertDefinition(const UnownedStringSlice&
     IRType* srcType = funcType->getParamType(1);
     IRType* retType = specOp->returnType;
 
-    emitSpecializedOperationDefinitionPreamble(specOp);
+    emitFunctionPreambleImpl(nullptr);
 
     emitType(retType);
     writer->emit(" ");
@@ -1143,7 +1143,7 @@ void CPPSourceEmitter::_emitConstructFromScalarDefinition(const UnownedStringSli
     IRType* srcType = funcType->getParamType(1);
     IRType* retType = specOp->returnType;
 
-    emitSpecializedOperationDefinitionPreamble(specOp);
+    emitFunctionPreambleImpl(nullptr);
 
     emitType(retType);
     writer->emit(" ");
