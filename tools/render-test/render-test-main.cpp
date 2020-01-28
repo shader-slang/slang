@@ -267,6 +267,7 @@ Result RenderTestApp::writeBindingOutput(const char* fileName)
     {
         return SLANG_FAIL;
     }
+    FileWriter writer(f, WriterFlags(0));
 
     for(auto binding : m_bindingState->outputBindings)
     {
@@ -274,34 +275,30 @@ Result RenderTestApp::writeBindingOutput(const char* fileName)
         const auto& layoutBinding = m_shaderInputLayout.entries[i];
 
         assert(layoutBinding.isOutput);
+        
+        if (binding.resource && binding.resource->isBuffer())
         {
-            if (binding.resource && binding.resource->isBuffer())
-            {
-                BufferResource* bufferResource = static_cast<BufferResource*>(binding.resource.Ptr());
-                const size_t bufferSize = bufferResource->getDesc().sizeInBytes;
+            BufferResource* bufferResource = static_cast<BufferResource*>(binding.resource.Ptr());
+            const size_t bufferSize = bufferResource->getDesc().sizeInBytes;
 
-                unsigned int* ptr = (unsigned int*)m_renderer->map(bufferResource, MapFlavor::HostRead);
-                if (!ptr)
-                {
-                    fclose(f);
-                    return SLANG_FAIL;
-                }
-
-                const int size = int(bufferSize / sizeof(unsigned int));
-                for (int i = 0; i < size; ++i)
-                {
-                    fprintf(f, "%X\n", ptr[i]);
-                }
-                m_renderer->unmap(bufferResource);
-            }
-            else
+            unsigned int* ptr = (unsigned int*)m_renderer->map(bufferResource, MapFlavor::HostRead);
+            if (!ptr)
             {
-                printf("invalid output type at %d.\n", int(i));
+                return SLANG_FAIL;
             }
+
+            const SlangResult res = ShaderInputLayout::writeBinding(ptr, bufferSize, &writer);
+
+            m_renderer->unmap(bufferResource);
+
+            SLANG_RETURN_ON_FAIL(res);
+        }
+        else
+        {
+            printf("invalid output type at %d.\n", int(i));
         }
     }
-    fclose(f);
-
+    
     return SLANG_OK;
 }
 

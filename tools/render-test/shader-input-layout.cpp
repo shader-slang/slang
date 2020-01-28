@@ -698,6 +698,34 @@ namespace renderer_test
         }
     }
 
+    /* static */SlangResult ShaderInputLayout::writeBinding(const void* data, size_t sizeInBytes, WriterHelper writer)
+    {
+        const uint32_t* ptr = (const uint32_t*)data;
+        size_t size = sizeInBytes / sizeof(uint32_t);
+        for (int i = 0; i < size; ++i)
+        {
+            unsigned int v = ptr[i];
+            writer.print("%X\n", v);
+        }
+
+        return SLANG_OK;
+    }
+
+    /* static */SlangResult ShaderInputLayout::writeBindings(const ShaderInputLayout& layout, const List<BindSet::Value*>& buffers, WriterHelper writer)
+    {
+        const auto& entries = layout.entries;
+        for (int i = 0; i < entries.getCount(); ++i)
+        {
+            const auto& entry = entries[i];
+            if (entry.isOutput)
+            {
+                BindSet::Value* buffer = buffers[i];
+                writeBinding(buffer->m_data, buffer->m_sizeInBytes, writer);
+            }
+        }
+
+        return SLANG_OK;
+    }
 
     /* static */SlangResult ShaderInputLayout::writeBindings(const ShaderInputLayout& layout, const List<BindSet::Value*>& buffers, const String& fileName)
     {
@@ -706,32 +734,8 @@ namespace renderer_test
         {
             return SLANG_FAIL;
         }
-
-        const auto& entries = layout.entries;
-
-        for (int i = 0; i < entries.getCount(); ++i)
-        {
-            const auto& entry = entries[i];
-            if (entry.isOutput)
-            {
-                BindSet::Value* buffer = buffers[i];
-
-                unsigned int* ptr = (unsigned int*)buffer->m_data;
-
-                const int size = int(entry.bufferData.getCount());
-                // Must be the same size or less than allocated buffer
-                SLANG_ASSERT(size * sizeof(unsigned int) <= buffer->m_sizeInBytes);
-
-                for (int i = 0; i < size; ++i)
-                {
-                    unsigned int v = ptr[i];
-
-                    fprintf(f, "%X\n", v);
-                }
-            }
-        }
-        fclose(f);
-        return SLANG_OK;
+        FileWriter fileWriter(f, WriterFlags(0));
+        return writeBindings(layout, buffers, &fileWriter);
     }
 
     void generateTextureData(TextureData& output, const InputTextureDesc& desc)
