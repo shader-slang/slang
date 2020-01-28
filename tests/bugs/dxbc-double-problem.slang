@@ -2,11 +2,13 @@
 //TEST(compute, vulkan):COMPARE_COMPUTE_EX:-vk -compute -output-using-type
 //TEST(compute):COMPARE_COMPUTE_EX:-cpu -compute -output-using-type
 //TEST(compute):COMPARE_COMPUTE_EX:-dx12 -compute -use-dxil -output-using-type
-//TEST(compute):COMPARE_COMPUTE_EX:-dx12 -compute -output-using-type
+//DISABLE_TEST(compute):COMPARE_COMPUTE_EX:-dx12 -compute -output-using-type
 
 // The problem this test shows is around handling of double with dxbc on D3D12. In that combination
 // this code does not write the correct value into the first element - it appears as 0, where 
 // clearly w * pi_180 where w = 1 means the answer is not zero.
+//
+// To demonstrate the problem, renable the -dx12 -compute -output-using-type test. It will output 0 for the first item.
 
 //TEST_INPUT:ubuffer(data=[0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0], stride=4):out, name outputBuffer
 RWStructuredBuffer<double> outputBuffer;
