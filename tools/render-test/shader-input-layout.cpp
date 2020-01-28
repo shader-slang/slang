@@ -698,22 +698,156 @@ namespace renderer_test
         }
     }
 
-    /* static */SlangResult ShaderInputLayout::writeBinding(const ShaderInputLayoutEntry& entry, const void* data, size_t sizeInBytes, WriterHelper writer)
+    /* static */SlangResult ShaderInputLayout::writeBinding(BindRoot* bindRoot, const ShaderInputLayoutEntry& entry, const void* data, size_t sizeInBytes, WriterHelper writer)
     {
-        SLANG_UNUSED(entry);
+        typedef slang::TypeReflection::ScalarType ScalarType;
 
-        const uint32_t* ptr = (const uint32_t*)data;
-        size_t size = sizeInBytes / sizeof(uint32_t);
-        for (int i = 0; i < size; ++i)
+        slang::TypeReflection::ScalarType scalarType = slang::TypeReflection::ScalarType::None;
+
+        slang::TypeLayoutReflection* typeLayout = nullptr;
+
+        if (bindRoot && entry.name.getLength())
         {
-            unsigned int v = ptr[i];
-            writer.print("%X\n", v);
+            BindLocation location;
+            if (SLANG_SUCCEEDED(bindRoot->parse(entry.name, "", writer, location)))
+            {
+                // We should have the type of the item
+                typeLayout = location.m_typeLayout;
+            }
+        }
+
+        slang::TypeLayoutReflection* elementTypeLayout = nullptr;
+
+        if (typeLayout)
+        {
+            switch (typeLayout->getKind())
+            {
+                
+                //case slang::TypeReflection::Kind::Struct:
+                case slang::TypeReflection::Kind::Array:
+                case slang::TypeReflection::Kind::Matrix:
+                case slang::TypeReflection::Kind::Vector:
+                {
+                    elementTypeLayout = typeLayout->getElementTypeLayout();
+                    break;
+                }
+                case slang::TypeReflection::Kind::Scalar:
+                {
+                    elementTypeLayout = typeLayout;
+                    break;
+                }
+                case slang::TypeReflection::Kind::Resource:
+                {
+                    elementTypeLayout = typeLayout->getElementTypeLayout();
+                    break;
+                }   
+                case slang::TypeReflection::Kind::TextureBuffer:
+                case slang::TypeReflection::Kind::ShaderStorageBuffer:
+                {
+                    elementTypeLayout = typeLayout->getElementTypeLayout();
+                    break;
+                }
+            }
+        }
+
+        if (elementTypeLayout)
+        {
+            scalarType = elementTypeLayout->getScalarType();
+        }
+
+
+        switch (scalarType)
+        {
+            // TODO(JS):
+            // Bool is here, because it's not clear across APIs how bool is laid out in memory
+            // Float16 is here as we don't have a convert Float16 to float function laying around
+            default:
+            case ScalarType::None:
+            case ScalarType::Void:
+            case ScalarType::Bool:
+            case ScalarType::Float16:
+            {
+                auto ptr = (const uint32_t*)data;
+                const size_t size = sizeInBytes / sizeof(ptr[0]);
+                for (size_t i = 0; i < size; ++i)
+                {
+                    uint32_t v = ptr[i];
+                    writer.print("%X\n", v);
+                }
+                break;
+            }
+            case ScalarType::UInt32:
+            {
+                auto ptr = (const uint32_t*)data;
+                const size_t size = sizeInBytes / sizeof(ptr[0]);
+                for (size_t i = 0; i < size; ++i)
+                {
+                    uint32_t v = ptr[i];
+                    writer.print("%u\n", v);
+                }
+                break;
+            }
+            case ScalarType::Int32:
+            {
+                auto ptr = (const int32_t*)data;
+                const size_t size = sizeInBytes / sizeof(ptr[0]);
+                for (size_t i = 0; i < size; ++i)
+                {
+                    int32_t v = ptr[i];
+                    writer.print("%i\n", v);
+                }
+                break;
+            }
+            case ScalarType::Int64:
+            {
+                auto ptr = (const int64_t*)data;
+                const size_t size = sizeInBytes / sizeof(ptr[0]);
+                for (size_t i = 0; i < size; ++i)
+                {
+                    int64_t v = ptr[i];
+                    writer.print("%" PRId64 "\n", v);
+                }
+                break;
+            }
+            case ScalarType::UInt64:
+            {
+                auto ptr = (const uint64_t*)data;
+                const size_t size = sizeInBytes / sizeof(ptr[0]);
+                for (size_t i = 0; i < size; ++i)
+                {
+                    uint64_t v = ptr[i];
+                    writer.print("%" PRIu64 "\n", v);
+                }
+                break;
+            }
+            case ScalarType::Float32:
+            {
+                auto ptr = (const float*)data;
+                const size_t size = sizeInBytes / sizeof(ptr[0]);
+                for (size_t i = 0; i < size; ++i)
+                {
+                    const float v = ptr[i];
+                    writer.print("%f\n", v);
+                }
+                break;
+            }
+            case ScalarType::Float64:
+            {
+                auto ptr = (const double*)data;
+                const size_t size = sizeInBytes / sizeof(ptr[0]);
+                for (size_t i = 0; i < size; ++i)
+                {
+                    const double v = ptr[i];
+                    writer.print("%f\n", v);
+                }
+                break;
+            }
         }
 
         return SLANG_OK;
     }
 
-    /* static */SlangResult ShaderInputLayout::writeBindings(const ShaderInputLayout& layout, const List<BindSet::Value*>& buffers, WriterHelper writer)
+    /* static */SlangResult ShaderInputLayout::writeBindings(BindRoot* bindRoot, const ShaderInputLayout& layout, const List<BindSet::Value*>& buffers, WriterHelper writer)
     {
         const auto& entries = layout.entries;
         for (int i = 0; i < entries.getCount(); ++i)
@@ -722,14 +856,14 @@ namespace renderer_test
             if (entry.isOutput)
             {
                 BindSet::Value* buffer = buffers[i];
-                writeBinding(entries[i], buffer->m_data, buffer->m_sizeInBytes, writer);
+                writeBinding(bindRoot, entries[i], buffer->m_data, buffer->m_sizeInBytes, writer);
             }
         }
 
         return SLANG_OK;
     }
 
-    /* static */SlangResult ShaderInputLayout::writeBindings(const ShaderInputLayout& layout, const List<BindSet::Value*>& buffers, const String& fileName)
+    /* static */SlangResult ShaderInputLayout::writeBindings(BindRoot* bindRoot, const ShaderInputLayout& layout, const List<BindSet::Value*>& buffers, const String& fileName)
     {
         FILE * f = fopen(fileName.getBuffer(), "wb");
         if (!f)
@@ -737,7 +871,7 @@ namespace renderer_test
             return SLANG_FAIL;
         }
         FileWriter fileWriter(f, WriterFlags(0));
-        return writeBindings(layout, buffers, &fileWriter);
+        return writeBindings(bindRoot, layout, buffers, &fileWriter);
     }
 
     void generateTextureData(TextureData& output, const InputTextureDesc& desc)

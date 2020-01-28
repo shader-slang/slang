@@ -82,7 +82,7 @@ class RenderTestApp : public WindowListener
 
 	BindingStateImpl* getBindingState() const { return m_bindingState; }
 
-    Result writeBindingOutput(const char* fileName);
+    Result writeBindingOutput(BindRoot* bindRoot, const char* fileName);
 
     Result writeScreen(const char* filename);
 
@@ -103,6 +103,8 @@ class RenderTestApp : public WindowListener
 	RefPtr<ShaderProgram>   m_shaderProgram;
     RefPtr<PipelineState>   m_pipelineState;
 	RefPtr<BindingStateImpl>    m_bindingState;
+
+    ShaderCompilerUtil::OutputAndLayout m_compilationOutput;
 
 	ShaderInputLayout m_shaderInputLayout;              ///< The binding layout
     int m_numAddedConstantBuffers;                      ///< Constant buffers can be added to the binding directly. Will be added at the end.
@@ -210,10 +212,9 @@ SlangResult RenderTestApp::initialize(SlangSession* session, Renderer* renderer,
 
 Result RenderTestApp::_initializeShaders(SlangSession* session, Renderer* renderer, Options::ShaderProgramType shaderType, const ShaderCompilerUtil::Input& input)
 {
-    ShaderCompilerUtil::OutputAndLayout output;
-    SLANG_RETURN_ON_FAIL(ShaderCompilerUtil::compileWithLayout(session, gOptions.sourcePath, gOptions.compileArgs, gOptions.shaderType, input,  output));
-    m_shaderInputLayout = output.layout;
-    m_shaderProgram = renderer->createProgram(output.output.desc);
+    SLANG_RETURN_ON_FAIL(ShaderCompilerUtil::compileWithLayout(session, gOptions.sourcePath, gOptions.compileArgs, gOptions.shaderType, input,  m_compilationOutput));
+    m_shaderInputLayout = m_compilationOutput.layout;
+    m_shaderProgram = renderer->createProgram(m_compilationOutput.output.desc);
     return m_shaderProgram ? SLANG_OK : SLANG_FAIL;
 }
 
@@ -255,7 +256,7 @@ void RenderTestApp::finalize()
 {
 }
 
-Result RenderTestApp::writeBindingOutput(const char* fileName)
+Result RenderTestApp::writeBindingOutput(BindRoot* bindRoot, const char* fileName)
 {
     // Submit the work
     m_renderer->submitGpuWork();
@@ -287,7 +288,7 @@ Result RenderTestApp::writeBindingOutput(const char* fileName)
                 return SLANG_FAIL;
             }
 
-            const SlangResult res = ShaderInputLayout::writeBinding(m_shaderInputLayout.entries[i], ptr, bufferSize, &writer);
+            const SlangResult res = ShaderInputLayout::writeBinding(bindRoot, m_shaderInputLayout.entries[i], ptr, bufferSize, &writer);
 
             m_renderer->unmap(bufferResource);
 
@@ -371,7 +372,16 @@ Result RenderTestApp::update(Window* window)
         {
             if (gOptions.shaderType == Options::ShaderProgramType::Compute || gOptions.shaderType == Options::ShaderProgramType::GraphicsCompute)
             {
-                SLANG_RETURN_ON_FAIL(writeBindingOutput(gOptions.outputPath));
+                auto request = m_compilationOutput.output.request;
+                auto slangReflection = (slang::ShaderReflection*) spGetReflection(request);
+
+                BindSet bindSet;
+                GPULikeBindRoot bindRoot;
+                bindRoot.init(&bindSet, slangReflection, 0);
+
+                BindRoot* outputBindRoot = gOptions.outputUsingType ? &bindRoot : nullptr;
+
+                SLANG_RETURN_ON_FAIL(writeBindingOutput(outputBindRoot, gOptions.outputPath));
             }
             else
             {
@@ -579,8 +589,11 @@ SLANG_TEST_TOOL_API SlangResult innerMain(Slang::StdWriters* stdWriters, SlangSe
 
             if (gOptions.outputPath)
             {
+                BindRoot* outputBindRoot = gOptions.outputUsingType ? &context.m_bindRoot : nullptr;
+
+
                 // Dump everything out that was written
-                SLANG_RETURN_ON_FAIL(ShaderInputLayout::writeBindings(compilationAndLayout.layout, context.m_buffers, gOptions.outputPath));
+                SLANG_RETURN_ON_FAIL(ShaderInputLayout::writeBindings(outputBindRoot, compilationAndLayout.layout, context.m_buffers, gOptions.outputPath));
 
                 // Check all execution styles produce the same result
                 SLANG_RETURN_ON_FAIL(CPUComputeUtil::checkStyleConsistency(sharedLibrary, gOptions.computeDispatchSize, compilationAndLayout));
@@ -602,8 +615,10 @@ SLANG_TEST_TOOL_API SlangResult innerMain(Slang::StdWriters* stdWriters, SlangSe
 
         if (gOptions.outputPath)
         {
+            BindRoot* outputBindRoot = gOptions.outputUsingType ? &context.m_bindRoot : nullptr;
+
             // Dump everything out that was written
-            SLANG_RETURN_ON_FAIL(ShaderInputLayout::writeBindings(compilationAndLayout.layout, context.m_buffers, gOptions.outputPath));
+            SLANG_RETURN_ON_FAIL(ShaderInputLayout::writeBindings(outputBindRoot, compilationAndLayout.layout, context.m_buffers, gOptions.outputPath));
         }
 
         return SLANG_OK;

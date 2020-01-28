@@ -106,14 +106,14 @@ public:
         /// Put into outBuffer the value buffers that were set via addbindSetValues (which will set m_userIndex to be the entries index)
     static void getValueBuffers(const Slang::List<ShaderInputLayoutEntry>& entries, const BindSet& bindSet, Slang::List<BindSet::Value*>& outBuffers);
 
-
-    static SlangResult writeBinding(const ShaderInputLayoutEntry& entry, const void* data, size_t sizeInBytes, Slang::WriterHelper writer);
+        /// Writes a binding, if bindRoot is set, will try to honor the underlying type when outputting. If not will dump as uint32_t hex.
+    static SlangResult writeBinding(BindRoot* bindRoot, const ShaderInputLayoutEntry& entry, const void* data, size_t sizeInBytes, Slang::WriterHelper writer);
 
         /// Write all bindings, using data from buffers
-    static SlangResult writeBindings(const ShaderInputLayout& layout, const List<BindSet::Value*>& buffers, Slang::WriterHelper writer);
+    static SlangResult writeBindings(BindRoot* bindRoot, const ShaderInputLayout& layout, const List<BindSet::Value*>& buffers, Slang::WriterHelper writer);
 
         /// Write bindings from values in memory from buffers
-    static SlangResult writeBindings(const ShaderInputLayout& layout, const Slang::List<BindSet::Value*>& buffers, const Slang::String& fileName);
+    static SlangResult writeBindings(BindRoot* bindRoot, const ShaderInputLayout& layout, const Slang::List<BindSet::Value*>& buffers, const Slang::String& fileName);
 };
 
 void generateTextureDataRGB8(TextureData& output, const InputTextureDesc& desc);
