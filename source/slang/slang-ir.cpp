@@ -2120,6 +2120,13 @@ namespace Slang
         return getType(op, 0, nullptr);
     }
 
+    IRType* IRBuilder::getType(
+        IROp            op,
+        IRInst*         operand0)
+    {
+        return getType(op, 1, &operand0);
+    }
+
     IRBasicType* IRBuilder::getBasicType(BaseType baseType)
     {
         return (IRBasicType*)getType(

@@ -15,6 +15,7 @@
 #include "slang-ir-ssa.h"
 #include "slang-ir-union.h"
 #include "slang-ir-validate.h"
+#include "slang-ir-wrap-structured-buffers.h"
 #include "slang-legalize-types.h"
 #include "slang-lower-to-ir.h"
 #include "slang-mangle.h"
@@ -384,6 +385,28 @@ Result linkAndOptimizeIR(
 #endif
     validateIRModuleIfEnabled(compileRequest, irModule);
 
+    // For HLSL (and fxc/dxc) only, we need to "wrap" any
+    // structured buffers defined over matrix types so
+    // that they instead use an intermediate `struct`.
+    // This is required to get those targets to respect
+    // the options for matrix layout set via `#pragma`
+    // or command-line options.
+    //
+    switch(target)
+    {
+    case CodeGenTarget::HLSL:
+        {
+            wrapStructuredBuffersOfMatrices(irModule);
+#if 0
+                dumpIRIfEnabled(compileRequest, irModule, "STRUCTURED BUFFERS WRAPPED");
+#endif
+                validateIRModuleIfEnabled(compileRequest, irModule);
+        }
+        break;
+
+    default:
+        break;
+    }
 
     // For GLSL only, we will need to perform "legalization" of
     // the entry point and any entry-point parameters.
