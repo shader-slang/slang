@@ -600,8 +600,16 @@ SLANG_TEST_TOOL_API SlangResult innerMain(Slang::StdWriters* stdWriters, SlangSe
 
 #if RENDER_TEST_CUDA
 
+        const uint64_t startTicks = ProcessUtil::getClockTick();
+
         CUDAComputeUtil::Context context;
         SLANG_RETURN_ON_FAIL(CUDAComputeUtil::execute(compilationAndLayout, context));
+
+        if (gOptions.performanceProfile)
+        {
+            const uint64_t endTicks = ProcessUtil::getClockTick();
+            _outputProfileTime(startTicks, endTicks);
+        }
 
         if (gOptions.outputPath)
         {

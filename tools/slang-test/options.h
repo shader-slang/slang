@@ -86,7 +86,7 @@ struct Options
     // OpenGL is disabled for now
     // CPU is disabled by default
     // CUDA is disabled by default
-    Slang::RenderApiFlags synthesizedTestApis = Slang::RenderApiFlag::AllOf & ~(Slang::RenderApiFlag::Vulkan | Slang::RenderApiFlag::OpenGl | Slang::RenderApiFlag::CPU | Slang::RenderApiFlag::CUDA);
+    Slang::RenderApiFlags synthesizedTestApis = Slang::RenderApiFlag::AllOf & ~(Slang::RenderApiFlag::Vulkan | Slang::RenderApiFlag::OpenGl | Slang::RenderApiFlag::CPU); 
 
     // The adapter to use. If empty will match first found adapter.
     Slang::String adapter;

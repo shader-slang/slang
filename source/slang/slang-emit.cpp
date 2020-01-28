@@ -541,6 +541,7 @@ String emitEntryPointSourceFromIR(
 
         case SourceStyle::CPP:
         case SourceStyle::C:
+        case SourceStyle::CUDA:
             linkingAndOptimizationOptions.shouldLegalizeExistentialAndResourceTypes = false;
             break;
         }
