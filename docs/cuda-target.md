@@ -69,7 +69,7 @@ struct UniformState
 {
     CUtexObject tex;                // This is the combination of a texture and a sampler(!)
     SamplerState sampler;           // This variable exists within the layout, but it's value is not used.
-    int32_t* outputBuffer;          // Currently Structured buffers are converted to pointers - this will likely change in the future (for bounds checking and other reasons)
+    RWStructuredBuffer<int32_t> outputBuffer;    // This is implemented as a template in the CUDA prelude. It's just a pointer, and a size
     Thing* thing3;                  // Constant buffers map to pointers
 };   
 
@@ -81,9 +81,42 @@ With CUDA - the caller specifies how threading is broken up, so `[numthreads]` i
 
 The UniformState and UniformEntryPointParams struct typically vary by shader. UniformState holds 'normal' bindings, whereas UniformEntryPointParams hold the uniform entry point parameters. Where specific bindings or parameters are located can be determined by reflection. The structures for the example above would be something like the following... 
 
+`StructuredBuffer<T>`,`RWStructuredBuffer<T>` become
+
+```
+    T* data;
+    size_t count;
+```    
+
+`ByteAddressBuffer`, `RWByteAddressBuffer` become 
+
+```
+    uint32_t* data;
+    size_t sizeInBytes;
+```  
+
 ## Unsized arrays
 
-WIP: Not implemented yet.
+Unsized arrays can be used, which are indicated by an array with no size as in `[]`. For example 
+
+```
+    RWStructuredBuffer<int> arrayOfArrays[];
+```
+
+With normal 'sized' arrays, the elements are just stored contiguously within wherever they are defined. With an unsized array they map to `Array<T>` which is...
+
+```
+    T* data;
+    size_t count;
+```    
+
+Note that there is no method in the shader source to get the `count`, even though on the CUDA target it is stored and easily available. This is because of the behavior on GPU targets 
+
+* That the count has to be stored elsewhere (unlike with CUDA) 
+* On some GPU targets there is no bounds checking - accessing outside the bound values can cause *undefined behavior*
+* The elements may be laid out *contiguously* on GPU
+
+In practice this means if you want to access the `count` in shader code it will need to be passed by another mechanism - such as within a constant buffer. It is possible in the future support may be added to allow direct access of `count` work across targets transparently. 
 
 ## Prelude
 

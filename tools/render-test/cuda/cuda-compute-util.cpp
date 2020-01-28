@@ -44,15 +44,15 @@ public:
         }
     }
 
+    static CUDAResource* getCUDAResource(BindSet::Value* value)
+    {
+        return value ? dynamic_cast<CUDAResource*>(value->m_target.Ptr()) : nullptr;
+    }
         /// Helper function to get the cuda memory pointer when given a value
     static void* getCUDAData(BindSet::Value* value)
     {
-        if (value)
-        {
-            auto resource = dynamic_cast<CUDAResource*>(value->m_target.Ptr());
-            return resource ? resource->m_cudaMemory : nullptr;
-        }
-        return nullptr;
+        auto resource = getCUDAResource(value);
+        return resource ? resource->m_cudaMemory : nullptr;
     }
 
     void* m_cudaMemory;
@@ -63,6 +63,7 @@ class CUDATextureResource : public RefObject
 public:
     typedef RefObject Super;
 
+    CUDATextureResource() {}
     CUDATextureResource(CUtexObject cudaTexObj, CUdeviceptr cudaMemory, CUarray cudaArray):
         m_cudaTexObj(cudaTexObj),
         m_cudaMemory(cudaMemory),
@@ -85,16 +86,16 @@ public:
         }
     }
 
+    static CUDATextureResource* getCUDATextureResource(BindSet::Value* value)
+    {
+        return value ? dynamic_cast<CUDATextureResource*>(value->m_target.Ptr()) : nullptr;
+    }
+
     static CUtexObject getCUDATexObject(BindSet::Value* value)
     {
-        if (value)
-        {
-            auto resource = dynamic_cast<CUDATextureResource*>(value->m_target.Ptr());
-            // It's an assumption here that 0 is okay for null. Seems to work...
-            return resource ? resource->m_cudaTexObj : CUtexObject(0);
-        }
-
-        return CUtexObject(0);
+        auto resource = getCUDATextureResource(value);
+        // It's an assumption here that 0 is okay for null. Seems to work...
+        return resource ? resource->m_cudaTexObj : CUtexObject(0);
     }
 
 protected:
@@ -526,7 +527,7 @@ static SlangResult _compute(CUcontext context, CUmodule module, const ShaderComp
                             case SLANG_TEXTURE_CUBE:
                             case SLANG_TEXTURE_BUFFER:
                             {
-                                // Need a CPU impl for these...
+                                // Need a CUDA impl for these...
                                 // For now we can just leave as target will just be nullptr
                                 break;
                             }
@@ -535,7 +536,6 @@ static SlangResult _compute(CUcontext context, CUmodule module, const ShaderComp
                             case SLANG_STRUCTURED_BUFFER:
                             {
                                 // On CPU we just use the memory in the BindSet buffer, so don't need to create anything
-
                                 void* cudaMem = nullptr;
                                 SLANG_CUDA_RETURN_ON_FAIL(cudaMalloc(&cudaMem, value->m_sizeInBytes));
                                 value->m_target = new CUDAResource(cudaMem);
@@ -572,13 +572,15 @@ static SlangResult _compute(CUcontext context, CUmodule module, const ShaderComp
                         auto elementCount = int(typeLayout->getElementCount());
                         if (elementCount == 0)
                         {
-                            void** array = location.getUniform<void*>();
-                            // If set, we setup the data needed for array on CPU side
-                            if (value && array)
+                            CUDAComputeUtil::Array array = { nullptr, 0 };
+                            auto resource = CUDAResource::getCUDAResource(value);
+                            if (resource)
                             {
-                                // TODO(JS): For now we'll just assume a pointer...
-                                *array = CUDAResource::getCUDAData(value);
+                                array.data = resource->m_cudaMemory;
+                                array.count = value->m_elementCount;
                             }
+
+                            location.setUniform(&array, sizeof(array));
                         }
                         break;
                     }
@@ -598,12 +600,31 @@ static SlangResult _compute(CUcontext context, CUmodule module, const ShaderComp
 
                         switch (shape & SLANG_RESOURCE_BASE_SHAPE_MASK)
                         {
-                            case SLANG_BYTE_ADDRESS_BUFFER:
                             case SLANG_STRUCTURED_BUFFER:
                             {
-                                // TODO(JS): These will need bounds ... 
-                                // For the moment these are just pointers
-                                *location.getUniform<void*>() = CUDAResource::getCUDAData(value);
+                                CUDAComputeUtil::StructuredBuffer buffer = { nullptr, 0 };
+                                auto resource = CUDAResource::getCUDAResource(value);
+                                if (resource)
+                                {
+                                    buffer.data = resource->m_cudaMemory;
+                                    buffer.count = value->m_elementCount;
+                                }
+
+                                location.setUniform(&buffer, sizeof(buffer));
+                                break;
+                            }
+                            case SLANG_BYTE_ADDRESS_BUFFER:
+                            {
+                                CUDAComputeUtil::ByteAddressBuffer buffer = { nullptr, 0 };
+
+                                auto resource = CUDAResource::getCUDAResource(value);
+                                if (resource)
+                                {
+                                    buffer.data = resource->m_cudaMemory;
+                                    buffer.sizeInBytes = value->m_sizeInBytes;
+                                }
+
+                                location.setUniform(&buffer, sizeof(buffer));
                                 break;
                             }
                             case SLANG_TEXTURE_1D:

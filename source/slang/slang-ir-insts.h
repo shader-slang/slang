@@ -1770,6 +1770,9 @@ struct IRBuilder
         IRInst* const*  operands);
     IRType* getType(
         IROp            op);
+    IRType* getType(
+        IROp            op,
+        IRInst*         operand0);
 
         /// Create an empty basic block.
         ///
