@@ -698,8 +698,10 @@ namespace renderer_test
         }
     }
 
-    /* static */SlangResult ShaderInputLayout::writeBinding(const void* data, size_t sizeInBytes, WriterHelper writer)
+    /* static */SlangResult ShaderInputLayout::writeBinding(const ShaderInputLayoutEntry& entry, const void* data, size_t sizeInBytes, WriterHelper writer)
     {
+        SLANG_UNUSED(entry);
+
         const uint32_t* ptr = (const uint32_t*)data;
         size_t size = sizeInBytes / sizeof(uint32_t);
         for (int i = 0; i < size; ++i)
@@ -720,7 +722,7 @@ namespace renderer_test
             if (entry.isOutput)
             {
                 BindSet::Value* buffer = buffers[i];
-                writeBinding(buffer->m_data, buffer->m_sizeInBytes, writer);
+                writeBinding(entries[i], buffer->m_data, buffer->m_sizeInBytes, writer);
             }
         }
 

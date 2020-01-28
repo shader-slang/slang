@@ -107,7 +107,7 @@ public:
     static void getValueBuffers(const Slang::List<ShaderInputLayoutEntry>& entries, const BindSet& bindSet, Slang::List<BindSet::Value*>& outBuffers);
 
 
-    static SlangResult writeBinding(const void* data, size_t sizeInBytes, Slang::WriterHelper writer);
+    static SlangResult writeBinding(const ShaderInputLayoutEntry& entry, const void* data, size_t sizeInBytes, Slang::WriterHelper writer);
 
         /// Write all bindings, using data from buffers
     static SlangResult writeBindings(const ShaderInputLayout& layout, const List<BindSet::Value*>& buffers, Slang::WriterHelper writer);

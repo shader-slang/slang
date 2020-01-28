@@ -287,7 +287,7 @@ Result RenderTestApp::writeBindingOutput(const char* fileName)
                 return SLANG_FAIL;
             }
 
-            const SlangResult res = ShaderInputLayout::writeBinding(ptr, bufferSize, &writer);
+            const SlangResult res = ShaderInputLayout::writeBinding(m_shaderInputLayout.entries[i], ptr, bufferSize, &writer);
 
             m_renderer->unmap(bufferResource);
 
