@@ -900,6 +900,72 @@ bool CLikeSourceEmitter::shouldFoldInstIntoUseSites(IRInst* inst)
         }
     }
 
+    // If it's single uses we check for target intrinsic usage.
+    // We have to do this before the later single use, because the global test below
+    // makes fold when we don't want that
+    if (inst->firstUse && inst->firstUse->nextUse == nullptr)
+    {
+        auto use = inst->firstUse;
+        auto user = use->getUser();
+
+        if (auto callInst = as<IRCall>(user))
+        {
+            auto funcValue = callInst->getCallee();
+
+            // Let's see if this instruction is a intrinsic call
+            // This is significant, because we can within a target intrinsics definition multiple accesses to the same
+            // parameter. This is not indicated into the call, and can lead to output code computes something multiple
+            // times as it is folding into the expression of the the target intrinsic.
+            if (auto targetIntrinsicDecoration = findTargetIntrinsicDecoration(funcValue))
+            {
+                // Find the index of the parameter. If we don't determine, use -1 and if
+                // any parameter is used more than once we won't fold
+
+                // We work out the operand index for the invocation and see if that
+                // is used multiple times, but that depends on how operands are interpreted for the specific instruction
+                // we know call, but for others will just look for any multiple use.
+                
+                IRUse* args = callInst->getArgs();
+                
+                // Find the index
+                const Index paramIndex = Index(use - args);
+                SLANG_ASSERT(index >= 0 && index < Index(callInst->getArgCount()));
+
+                {
+                    UnownedStringSlice slice = targetIntrinsicDecoration->getDefinition();
+                    // Look through the slice to see if any of the the parameters are indexed more than one.
+
+                    const char* cur = slice.begin();
+                    const char* end = slice.end();
+
+                    // Count the amount of uses
+                    Index useCount = 0;
+                    while (cur < end)
+                    {
+                        const char c = *cur;
+                        if (c == '$' && cur + 1 < end && cur[1] >= '0' && cur[1] <= '9')
+                        {
+                            const Index index = Index(cur[1] - '0');
+                            useCount += Index(index == paramIndex);
+                            cur += 2;
+                        }
+                        else
+                        {
+                            cur++;
+                        }
+                    }
+
+                    // If there is more than one use can't fold.
+                    if (useCount > 1)
+                    {
+                        return false;
+                    }
+                }
+            }
+        }
+    }
+
+
     // If the instruction is at global scope, then it might represent
     // a constant (e.g., the value of an enum case).
     //
