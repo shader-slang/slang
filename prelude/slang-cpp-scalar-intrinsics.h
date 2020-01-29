@@ -3,6 +3,11 @@
 
 #include "../slang.h"
 
+#if SLANG_PROCESSOR_X86_64 && SLANG_VC
+// If we have visual studio and 64 bit processor, we can assume we have popcnt, and can include x86 intrinsics
+#   include <intrin.h>
+#endif
+
 #ifdef SLANG_PRELUDE_NAMESPACE
 namespace SLANG_PRELUDE_NAMESPACE {
 #endif
@@ -48,6 +53,8 @@ SLANG_FORCE_INLINE float F32_asin(float f) { return ::asinf(f); }
 SLANG_FORCE_INLINE float F32_acos(float f) { return ::acosf(f); }
 SLANG_FORCE_INLINE float F32_atan(float f) { return ::atanf(f); }
 SLANG_FORCE_INLINE float F32_log2(float f) { return ::log2f(f); }
+SLANG_FORCE_INLINE float F32_log(float f) { return ::logf(f); }
+SLANG_FORCE_INLINE float F32_log10(float f) { return ::log10f(f); }
 SLANG_FORCE_INLINE float F32_exp2(float f) { return ::exp2f(f); }
 SLANG_FORCE_INLINE float F32_exp(float f) { return ::expf(f); }
 SLANG_FORCE_INLINE float F32_abs(float f) { return ::fabsf(f); }
@@ -66,11 +73,15 @@ SLANG_FORCE_INLINE float F32_max(float a, float b) { return a > b ? a : b; }
 SLANG_FORCE_INLINE float F32_pow(float a, float b) { return ::powf(a, b); }
 SLANG_FORCE_INLINE float F32_fmod(float a, float b) { return ::fmodf(a, b); }
 SLANG_FORCE_INLINE float F32_remainder(float a, float b) { return ::remainderf(a, b); }
-SLANG_FORCE_INLINE float F32_step(float a, float b) { return float(a >= b); }
+SLANG_FORCE_INLINE float F32_step(float a, float b) { return float(b >= a); }
 SLANG_FORCE_INLINE float F32_atan2(float a, float b) { return float(atan2(a, b)); }
 
 // Ternary 
-SLANG_FORCE_INLINE float F32_smoothstep(float min, float max, float x) { return x < min ? min : ((x > max) ? max : x / (max - min)); }
+SLANG_FORCE_INLINE float F32_smoothstep(float min, float max, float x) 
+{ 
+    const float t = x < min ? 0.0f : ((x > max) ? 1.0f : (x - min) / (max - min)); 
+    return t * t * (3.0 - 2.0 * t);
+}
 SLANG_FORCE_INLINE float F32_lerp(float x, float y, float s) { return x + s * (y - x); }
 SLANG_FORCE_INLINE float F32_clamp(float x, float min, float max) { return ( x < min) ? min : ((x > max) ? max : x); }
 SLANG_FORCE_INLINE void F32_sincos(float f, float& outSin, float& outCos) { outSin = F32_sin(f); outCos = F32_cos(f); }
@@ -100,6 +111,8 @@ SLANG_FORCE_INLINE double F64_asin(double f) { return ::asin(f); }
 SLANG_FORCE_INLINE double F64_acos(double f) { return ::acos(f); }
 SLANG_FORCE_INLINE double F64_atan(double f) { return ::atan(f); }
 SLANG_FORCE_INLINE double F64_log2(double f) { return ::log2(f); }
+SLANG_FORCE_INLINE double F64_log(double f) { return ::log(f); }
+SLANG_FORCE_INLINE double F64_log10(float f) { return ::log10(f); }
 SLANG_FORCE_INLINE double F64_exp2(double f) { return ::exp2(f); }
 SLANG_FORCE_INLINE double F64_exp(double f) { return ::exp(f); }
 SLANG_FORCE_INLINE double F64_abs(double f) { return ::fabs(f); }
@@ -118,14 +131,34 @@ SLANG_FORCE_INLINE double F64_max(double a, double b) { return a > b ? a : b; }
 SLANG_FORCE_INLINE double F64_pow(double a, double b) { return ::pow(a, b); }
 SLANG_FORCE_INLINE double F64_fmod(double a, double b) { return ::fmod(a, b); }
 SLANG_FORCE_INLINE double F64_remainder(double a, double b) { return ::remainder(a, b); }
-SLANG_FORCE_INLINE double F64_step(double a, double b) { return double(a >= b); }
+SLANG_FORCE_INLINE double F64_step(double a, double b) { return double(b >= a); }
 SLANG_FORCE_INLINE double F64_atan2(double a, double b) { return atan2(a, b); }
 
 // Ternary 
-SLANG_FORCE_INLINE double F64_smoothstep(double min, double max, double x) { return x < min ? min : ((x > max) ? max : x / (max - min)); }
+SLANG_FORCE_INLINE double F64_smoothstep(double min, double max, double x) 
+{ 
+    const double t = x < min ? 0.0 : ((x > max) ? 1.0 : (x - min) / (max - min)); 
+    return t * t * (3.0 - 2.0 * t);
+}
 SLANG_FORCE_INLINE double F64_lerp(double x, double y, double s) { return x + s * (y - x); }
 SLANG_FORCE_INLINE double F64_clamp(double x, double min, double max) { return (x < min) ? min : ((x > max) ? max : x); }
 SLANG_FORCE_INLINE void F64_sincos(double f, double& outSin, double& outCos) { outSin = F64_sin(f); outCos = F64_cos(f); }
+
+SLANG_FORCE_INLINE void F64_asuint(double d, uint32_t& low, uint32_t& hi)
+{
+    Union64 u;
+    u.d = d;
+    low = uint32_t(u.u);
+    hi = uint32_t(u.u >> 32);
+}
+
+SLANG_FORCE_INLINE void F64_asint(double d, int32_t& low, int32_t& hi)
+{
+    Union64 u;
+    u.d = d;
+    low = int32_t(u.u);
+    hi = int32_t(u.u >> 32);
+}
 
 // ----------------------------- I32 -----------------------------------------
 
@@ -164,22 +197,21 @@ SLANG_FORCE_INLINE double U32_asdouble(uint32_t low, uint32_t hi)
     return u.d;
 }
 
-// ----------------------------- F64 -----------------------------------------
-
-SLANG_FORCE_INLINE void F64_asuint(double d, uint32_t& low, uint32_t& hi)
+SLANG_FORCE_INLINE uint32_t U32_countbits(uint32_t v)
 {
-    Union64 u;
-    u.d = d;
-    low = uint32_t(u.u);
-    hi = uint32_t(u.u >> 32);
-}
-
-SLANG_FORCE_INLINE void F64_asint(double d, int32_t& low, int32_t& hi)
-{
-    Union64 u;
-    u.d = d;
-    low = int32_t(u.u);
-    hi = int32_t(u.u >> 32);
+#if SLANG_GCC_FAMILY    
+    return __builtin_popcount(v);
+#elif SLANG_PROCESSOR_X86_64 && SLANG_VC
+    return __popcnt(v);
+#else     
+    uint32_t c = 0;
+    while (v)
+    {
+        c++;
+        v &= v - 1;
+    }
+    return c;
+#endif
 }
 
 

@@ -199,6 +199,7 @@
     <ClInclude Include="slang-diagnostics.h" />
     <ClInclude Include="slang-emit-c-like.h" />
     <ClInclude Include="slang-emit-cpp.h" />
+    <ClInclude Include="slang-emit-cuda.h" />
     <ClInclude Include="slang-emit-glsl-extension-tracker.h" />
     <ClInclude Include="slang-emit-glsl.h" />
     <ClInclude Include="slang-emit-hlsl.h" />
@@ -207,6 +208,7 @@
     <ClInclude Include="slang-emit.h" />
     <ClInclude Include="slang-expr-defs.h" />
     <ClInclude Include="slang-file-system.h" />
+    <ClInclude Include="slang-hlsl-intrinsic-set.h" />
     <ClInclude Include="slang-image-format-defs.h" />
     <ClInclude Include="slang-ir-bind-existentials.h" />
     <ClInclude Include="slang-ir-clone.h" />
@@ -229,8 +231,10 @@
     <ClInclude Include="slang-ir-ssa.h" />
     <ClInclude Include="slang-ir-string-hash.h" />
     <ClInclude Include="slang-ir-strip.h" />
+    <ClInclude Include="slang-ir-type-set.h" />
     <ClInclude Include="slang-ir-union.h" />
     <ClInclude Include="slang-ir-validate.h" />
+    <ClInclude Include="slang-ir-wrap-structured-buffers.h" />
     <ClInclude Include="slang-ir.h" />
     <ClInclude Include="slang-legalize-types.h" />
     <ClInclude Include="slang-lexer.h" />
@@ -280,6 +284,7 @@
     <ClCompile Include="slang-dxc-support.cpp" />
     <ClCompile Include="slang-emit-c-like.cpp" />
     <ClCompile Include="slang-emit-cpp.cpp" />
+    <ClCompile Include="slang-emit-cuda.cpp" />
     <ClCompile Include="slang-emit-glsl-extension-tracker.cpp" />
     <ClCompile Include="slang-emit-glsl.cpp" />
     <ClCompile Include="slang-emit-hlsl.cpp" />
@@ -288,6 +293,7 @@
     <ClCompile Include="slang-emit-spirv.cpp" />
     <ClCompile Include="slang-emit.cpp" />
     <ClCompile Include="slang-file-system.cpp" />
+    <ClCompile Include="slang-hlsl-intrinsic-set.cpp" />
     <ClCompile Include="slang-ir-bind-existentials.cpp" />
     <ClCompile Include="slang-ir-clone.cpp" />
     <ClCompile Include="slang-ir-constexpr.cpp" />
@@ -308,8 +314,10 @@
     <ClCompile Include="slang-ir-ssa.cpp" />
     <ClCompile Include="slang-ir-string-hash.cpp" />
     <ClCompile Include="slang-ir-strip.cpp" />
+    <ClCompile Include="slang-ir-type-set.cpp" />
     <ClCompile Include="slang-ir-union.cpp" />
     <ClCompile Include="slang-ir-validate.cpp" />
+    <ClCompile Include="slang-ir-wrap-structured-buffers.cpp" />
     <ClCompile Include="slang-ir.cpp" />
     <ClCompile Include="slang-legalize-types.cpp" />
     <ClCompile Include="slang-lexer.cpp" />
@@ -373,4 +381,4 @@
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">
   </ImportGroup>
-</Project> 
+</Project>

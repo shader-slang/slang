@@ -757,11 +757,12 @@ static RefPtr<UsedRangeSet> findUsedRangeSetForSpace(
 // has been used in at least one binding, and so it should not
 // be used by auto-generated bindings that need to claim entire
 // spaces.
-static void markSpaceUsed(
+static VarLayout* markSpaceUsed(
     ParameterBindingContext*    context,
+    VarLayout*                  varLayout,
     UInt                        space)
 {
-    context->shared->usedSpaces.Add(nullptr, space, space+1);
+    return context->shared->usedSpaces.Add(varLayout, space, space+1);
 }
 
 static UInt allocateUnusedSpaces(
@@ -795,8 +796,7 @@ static void addExplicitParameterBinding(
     RefPtr<ParameterInfo>       parameterInfo,
     VarDeclBase*                varDecl,
     LayoutSemanticInfo const&   semanticInfo,
-    LayoutSize                  count,
-    RefPtr<UsedRangeSet>        usedRangeSet = nullptr)
+    LayoutSize                  count)
 {
     auto kind = semanticInfo.kind;
 
@@ -822,20 +822,31 @@ static void addExplicitParameterBinding(
         bindingInfo.index = semanticInfo.index;
         bindingInfo.space = semanticInfo.space;
 
-        if (!usedRangeSet)
+        VarLayout* overlappedVarLayout = nullptr;
+        if( kind == LayoutResourceKind::RegisterSpace )
         {
-            usedRangeSet = findUsedRangeSetForSpace(context, semanticInfo.space);
+            // Parameter is being bound to an entire space, so we
+            // need to mark the given space as used and report
+            // an error if another parameter was already allocated
+            // there.
+            //
+            overlappedVarLayout = markSpaceUsed(context, parameterInfo->varLayout, semanticInfo.index);
+        }
+        else
+        {
+            auto usedRangeSet = findUsedRangeSetForSpace(context, semanticInfo.space);
 
             // Record that the particular binding space was
             // used by an explicit binding, so that we don't
             // claim it for auto-generated bindings that
             // need to grab a full space
-            markSpaceUsed(context, semanticInfo.space);
+            markSpaceUsed(context, parameterInfo->varLayout, semanticInfo.space);
+
+            overlappedVarLayout = usedRangeSet->usedResourceRanges[(int)semanticInfo.kind].Add(
+                parameterInfo->varLayout,
+                semanticInfo.index,
+                semanticInfo.index + count);
         }
-        auto overlappedVarLayout = usedRangeSet->usedResourceRanges[(int)semanticInfo.kind].Add(
-            parameterInfo->varLayout,
-            semanticInfo.index,
-            semanticInfo.index + count);
 
         if (overlappedVarLayout)
         {
@@ -965,11 +976,6 @@ static void addExplicitParameterBindings_GLSL(
     // the index/offset/etc.
     //
 
-    // We also may need to store explicit binding info in a different place,
-    // in the case of varying input/output, since we don't want to collect
-    // things globally;
-    RefPtr<UsedRangeSet> usedRangeSet;
-
     TypeLayout::ResourceInfo* resInfo = nullptr;
     LayoutSemanticInfo semanticInfo;
     semanticInfo.index = 0;
@@ -1017,7 +1023,7 @@ static void addExplicitParameterBindings_GLSL(
     auto count = resInfo->count;
     semanticInfo.kind = kind;
 
-    addExplicitParameterBinding(context, parameterInfo, varDecl, semanticInfo, count, usedRangeSet);
+    addExplicitParameterBinding(context, parameterInfo, varDecl, semanticInfo, count);
 }
 
 // Given a single parameter, collect whatever information we have on
@@ -2585,6 +2591,19 @@ static bool _isCPUTarget(CodeGenTarget target)
     }
 }
 
+static bool _isPTXTarget(CodeGenTarget target)
+{
+    switch (target)
+    {
+        case CodeGenTarget::CUDASource:
+        case CodeGenTarget::PTX:
+        {
+            return true;
+        }
+        default: return false;
+    }
+}
+
     /// Keep track of the running global counter for entry points and global parameters visited.
     ///
     /// Because of explicit `register` and `[[vk::binding(...)]]` support, parameter binding
@@ -2970,7 +2989,8 @@ RefPtr<ProgramLayout> generateParameterBindings(
 
     // On a CPU target, it's okay to have global scope parameters that use Uniform resources (because on CPU
     // all resources are 'Uniform')
-    if (!_isCPUTarget(targetReq->target))
+    // TODO(JS): We'll just assume the same with CUDA target for now..
+    if (!_isCPUTarget(targetReq->target) && !_isPTXTarget(targetReq->target))
     {
         for( auto& parameterInfo : sharedContext.parameters )
         {

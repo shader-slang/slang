@@ -1,3 +1,4 @@
+//TEST(compute):COMPARE_COMPUTE:-cuda
 //TEST(compute):COMPARE_COMPUTE:-cpu
 //TEST(compute):COMPARE_COMPUTE:
 //TEST(compute,vulcan):COMPARE_COMPUTE:-vk

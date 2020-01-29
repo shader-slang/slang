@@ -814,8 +814,8 @@ struct SimpleLayoutRulesImpl
     virtual SimpleArrayLayoutInfo GetArrayLayout(SimpleLayoutInfo elementInfo, LayoutSize elementCount) = 0;
 
     // Get layout for a vector or matrix type
-    virtual SimpleLayoutInfo GetVectorLayout(SimpleLayoutInfo elementInfo, size_t elementCount) = 0;
-    virtual SimpleArrayLayoutInfo GetMatrixLayout(SimpleLayoutInfo elementInfo, size_t rowCount, size_t columnCount) = 0;
+    virtual SimpleLayoutInfo GetVectorLayout(BaseType elementType, SimpleLayoutInfo elementInfo, size_t elementCount) = 0;
+    virtual SimpleArrayLayoutInfo GetMatrixLayout(BaseType elementType, SimpleLayoutInfo elementInfo, size_t rowCount, size_t columnCount) = 0;
 
     // Begin doing layout on a `struct` type
     virtual UniformLayoutInfo BeginStructLayout() = 0;
@@ -851,14 +851,14 @@ struct LayoutRulesImpl
         return simpleRules->GetArrayLayout(elementInfo, elementCount);
     }
 
-    SimpleLayoutInfo GetVectorLayout(SimpleLayoutInfo elementInfo, size_t elementCount)
+    SimpleLayoutInfo GetVectorLayout(BaseType elementType, SimpleLayoutInfo elementInfo, size_t elementCount)
     {
-        return simpleRules->GetVectorLayout(elementInfo, elementCount);
+        return simpleRules->GetVectorLayout(elementType, elementInfo, elementCount);
     }
 
-    SimpleArrayLayoutInfo GetMatrixLayout(SimpleLayoutInfo elementInfo, size_t rowCount, size_t columnCount)
+    SimpleArrayLayoutInfo GetMatrixLayout(BaseType elementType, SimpleLayoutInfo elementInfo, size_t rowCount, size_t columnCount)
     {
-        return simpleRules->GetMatrixLayout(elementInfo, rowCount, columnCount);
+        return simpleRules->GetMatrixLayout(elementType, elementInfo, rowCount, columnCount);
     }
 
     UniformLayoutInfo BeginStructLayout()

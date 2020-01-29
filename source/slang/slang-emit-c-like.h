@@ -47,6 +47,7 @@ public:
         HLSL,
         C,
         CPP,
+        CUDA,
         CountOf,
     };
     
@@ -315,6 +316,7 @@ public:
     virtual void emitRateQualifiersImpl(IRRate* rate) { SLANG_UNUSED(rate); }
     virtual void emitSemanticsImpl(IRInst* inst) { SLANG_UNUSED(inst);  }
     virtual void emitSimpleFuncParamImpl(IRParam* param);
+    virtual void emitSimpleFuncParamsImpl(IRFunc* func);
     virtual void emitInterpolationModifiersImpl(IRInst* varInst, IRType* valueType, IRVarLayout* layout) { SLANG_UNUSED(varInst); SLANG_UNUSED(valueType); SLANG_UNUSED(layout); }
     virtual void emitSimpleTypeImpl(IRType* type) = 0;
     virtual void emitVarDecorationsImpl(IRInst* varDecl) { SLANG_UNUSED(varDecl);  }
@@ -325,6 +327,8 @@ public:
     virtual void emitSimpleFuncImpl(IRFunc* func);
     virtual void emitOperandImpl(IRInst* inst, EmitOpInfo const& outerPrec);
     virtual void emitParamTypeImpl(IRType* type, String const& name);
+    virtual void emitIntrinsicCallExprImpl(IRCall* inst, IRTargetIntrinsicDecoration* targetIntrinsic, EmitOpInfo const& inOuterPrec);
+    virtual void emitFunctionPreambleImpl(IRInst* inst) { SLANG_UNUSED(inst); }
 
         // Only needed for glsl output with $ prefix intrinsics - so perhaps removable in the future
     virtual void emitTextureOrTextureSamplerTypeImpl(IRTextureTypeBase*  type, char const* baseName) { SLANG_UNUSED(type); SLANG_UNUSED(baseName); }

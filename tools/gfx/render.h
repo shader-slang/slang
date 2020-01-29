@@ -68,13 +68,14 @@ enum class RendererType
     OpenGl,
     Vulkan,
     CPU,
+    CUDA,
     CountOf,
 };
 
 enum class ProjectionStyle
 {
     Unknown,
-    OpenGl,
+    OpenGl, 
     DirectX,
     Vulkan,
     CountOf,
@@ -88,6 +89,7 @@ enum class BindingStyle
     OpenGl,
     Vulkan,
     CPU,
+    CUDA,
     CountOf,
 };
 

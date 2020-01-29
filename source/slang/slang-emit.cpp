@@ -15,6 +15,7 @@
 #include "slang-ir-ssa.h"
 #include "slang-ir-union.h"
 #include "slang-ir-validate.h"
+#include "slang-ir-wrap-structured-buffers.h"
 #include "slang-legalize-types.h"
 #include "slang-lower-to-ir.h"
 #include "slang-mangle.h"
@@ -32,22 +33,11 @@
 #include "slang-emit-glsl.h"
 #include "slang-emit-hlsl.h"
 #include "slang-emit-cpp.h"
+#include "slang-emit-cuda.h"
 
 #include <assert.h>
 
 namespace Slang {
-
-enum class BuiltInCOp
-{
-    Splat,                  //< Splat a single value to all values of a vector or matrix type
-    Init,                   //< Initialize with parameters (must match the type)
-};
-
-
-//
-
-
-//
 
 EntryPointLayout* findEntryPointLayout(
     ProgramLayout*          programLayout,
@@ -395,6 +385,28 @@ Result linkAndOptimizeIR(
 #endif
     validateIRModuleIfEnabled(compileRequest, irModule);
 
+    // For HLSL (and fxc/dxc) only, we need to "wrap" any
+    // structured buffers defined over matrix types so
+    // that they instead use an intermediate `struct`.
+    // This is required to get those targets to respect
+    // the options for matrix layout set via `#pragma`
+    // or command-line options.
+    //
+    switch(target)
+    {
+    case CodeGenTarget::HLSL:
+        {
+            wrapStructuredBuffersOfMatrices(irModule);
+#if 0
+                dumpIRIfEnabled(compileRequest, irModule, "STRUCTURED BUFFERS WRAPPED");
+#endif
+                validateIRModuleIfEnabled(compileRequest, irModule);
+        }
+        break;
+
+    default:
+        break;
+    }
 
     // For GLSL only, we will need to perform "legalization" of
     // the entry point and any entry-point parameters.
@@ -444,7 +456,7 @@ Result linkAndOptimizeIR(
     return SLANG_OK;
 }
 
-String emitEntryPointSource(
+String emitEntryPointSourceFromIR(
     BackEndCompileRequest*  compileRequest,
     Int                     entryPointIndex,
     CodeGenTarget           target,
@@ -477,6 +489,10 @@ String emitEntryPointSource(
     desc.effectiveProfile = getEffectiveProfile(entryPoint, targetRequest);
     desc.sourceWriter = &sourceWriter;
 
+    // Define here, because must be in scope longer than the sourceEmitter, as sourceEmitter might reference
+    // items in the linkedIR module
+    LinkedIR linkedIR;
+
     RefPtr<CLikeSourceEmitter> sourceEmitter;
 
     typedef CLikeSourceEmitter::SourceStyle SourceStyle;
@@ -499,6 +515,11 @@ String emitEntryPointSource(
             sourceEmitter = new HLSLSourceEmitter(desc);
             break;
         }
+        case SourceStyle::CUDA:
+        {
+            sourceEmitter = new CUDASourceEmitter(desc);
+            break;
+        }
         default: break;
     }
 
@@ -508,8 +529,6 @@ String emitEntryPointSource(
         return String();
     }
 
-    // Outside because we want to keep IR in scope whilst we are processing emits
-    LinkedIR linkedIR;
     {
         LinkingAndOptimizationOptions linkingAndOptimizationOptions;
 
@@ -522,6 +541,7 @@ String emitEntryPointSource(
 
         case SourceStyle::CPP:
         case SourceStyle::C:
+        case SourceStyle::CUDA:
             linkingAndOptimizationOptions.shouldLegalizeExistentialAndResourceTypes = false;
             break;
         }

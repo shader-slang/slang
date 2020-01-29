@@ -25,6 +25,10 @@
 
 #include "cpu-compute-util.h"
 
+#if RENDER_TEST_CUDA
+#   include "cuda/cuda-compute-util.h"
+#endif
+
 namespace renderer_test {
 
 using Slang::Result;
@@ -78,7 +82,7 @@ class RenderTestApp : public WindowListener
 
 	BindingStateImpl* getBindingState() const { return m_bindingState; }
 
-    Result writeBindingOutput(const char* fileName);
+    Result writeBindingOutput(BindRoot* bindRoot, const char* fileName);
 
     Result writeScreen(const char* filename);
 
@@ -99,6 +103,8 @@ class RenderTestApp : public WindowListener
 	RefPtr<ShaderProgram>   m_shaderProgram;
     RefPtr<PipelineState>   m_pipelineState;
 	RefPtr<BindingStateImpl>    m_bindingState;
+
+    ShaderCompilerUtil::OutputAndLayout m_compilationOutput;
 
 	ShaderInputLayout m_shaderInputLayout;              ///< The binding layout
     int m_numAddedConstantBuffers;                      ///< Constant buffers can be added to the binding directly. Will be added at the end.
@@ -206,10 +212,9 @@ SlangResult RenderTestApp::initialize(SlangSession* session, Renderer* renderer,
 
 Result RenderTestApp::_initializeShaders(SlangSession* session, Renderer* renderer, Options::ShaderProgramType shaderType, const ShaderCompilerUtil::Input& input)
 {
-    ShaderCompilerUtil::OutputAndLayout output;
-    SLANG_RETURN_ON_FAIL(ShaderCompilerUtil::compileWithLayout(session, gOptions.sourcePath, gOptions.compileArgs, gOptions.shaderType, input,  output));
-    m_shaderInputLayout = output.layout;
-    m_shaderProgram = renderer->createProgram(output.output.desc);
+    SLANG_RETURN_ON_FAIL(ShaderCompilerUtil::compileWithLayout(session, gOptions.sourcePath, gOptions.compileArgs, gOptions.shaderType, input,  m_compilationOutput));
+    m_shaderInputLayout = m_compilationOutput.layout;
+    m_shaderProgram = renderer->createProgram(m_compilationOutput.output.desc);
     return m_shaderProgram ? SLANG_OK : SLANG_FAIL;
 }
 
@@ -251,7 +256,7 @@ void RenderTestApp::finalize()
 {
 }
 
-Result RenderTestApp::writeBindingOutput(const char* fileName)
+Result RenderTestApp::writeBindingOutput(BindRoot* bindRoot, const char* fileName)
 {
     // Submit the work
     m_renderer->submitGpuWork();
@@ -263,6 +268,7 @@ Result RenderTestApp::writeBindingOutput(const char* fileName)
     {
         return SLANG_FAIL;
     }
+    FileWriter writer(f, WriterFlags(0));
 
     for(auto binding : m_bindingState->outputBindings)
     {
@@ -270,34 +276,30 @@ Result RenderTestApp::writeBindingOutput(const char* fileName)
         const auto& layoutBinding = m_shaderInputLayout.entries[i];
 
         assert(layoutBinding.isOutput);
+        
+        if (binding.resource && binding.resource->isBuffer())
         {
-            if (binding.resource && binding.resource->isBuffer())
-            {
-                BufferResource* bufferResource = static_cast<BufferResource*>(binding.resource.Ptr());
-                const size_t bufferSize = bufferResource->getDesc().sizeInBytes;
+            BufferResource* bufferResource = static_cast<BufferResource*>(binding.resource.Ptr());
+            const size_t bufferSize = bufferResource->getDesc().sizeInBytes;
 
-                unsigned int* ptr = (unsigned int*)m_renderer->map(bufferResource, MapFlavor::HostRead);
-                if (!ptr)
-                {
-                    fclose(f);
-                    return SLANG_FAIL;
-                }
-
-                const int size = int(bufferSize / sizeof(unsigned int));
-                for (int i = 0; i < size; ++i)
-                {
-                    fprintf(f, "%X\n", ptr[i]);
-                }
-                m_renderer->unmap(bufferResource);
-            }
-            else
+            unsigned int* ptr = (unsigned int*)m_renderer->map(bufferResource, MapFlavor::HostRead);
+            if (!ptr)
             {
-                printf("invalid output type at %d.\n", int(i));
+                return SLANG_FAIL;
             }
+
+            const SlangResult res = ShaderInputLayout::writeBinding(bindRoot, m_shaderInputLayout.entries[i], ptr, bufferSize, &writer);
+
+            m_renderer->unmap(bufferResource);
+
+            SLANG_RETURN_ON_FAIL(res);
+        }
+        else
+        {
+            printf("invalid output type at %d.\n", int(i));
         }
     }
-    fclose(f);
-
+    
     return SLANG_OK;
 }
 
@@ -370,7 +372,16 @@ Result RenderTestApp::update(Window* window)
         {
             if (gOptions.shaderType == Options::ShaderProgramType::Compute || gOptions.shaderType == Options::ShaderProgramType::GraphicsCompute)
             {
-                SLANG_RETURN_ON_FAIL(writeBindingOutput(gOptions.outputPath));
+                auto request = m_compilationOutput.output.request;
+                auto slangReflection = (slang::ShaderReflection*) spGetReflection(request);
+
+                BindSet bindSet;
+                GPULikeBindRoot bindRoot;
+                bindRoot.init(&bindSet, slangReflection, 0);
+
+                BindRoot* outputBindRoot = gOptions.outputUsingType ? &bindRoot : nullptr;
+
+                SLANG_RETURN_ON_FAIL(writeBindingOutput(outputBindRoot, gOptions.outputPath));
             }
             else
             {
@@ -461,6 +472,13 @@ SLANG_TEST_TOOL_API SlangResult innerMain(Slang::StdWriters* stdWriters, SlangSe
             nativeLanguage = SLANG_SOURCE_LANGUAGE_CPP;
             slangPassThrough = SLANG_PASS_THROUGH_GENERIC_C_CPP;
             break;
+        case RendererType::CUDA:
+            input.target = SLANG_PTX;
+            input.profile = "";
+            nativeLanguage = SLANG_SOURCE_LANGUAGE_CUDA;
+            slangPassThrough = SLANG_PASS_THROUGH_NVRTC;
+            break;
+
 		default:
 			fprintf(stderr, "error: unexpected\n");
 			return SLANG_FAIL;
@@ -502,20 +520,30 @@ SLANG_TEST_TOOL_API SlangResult innerMain(Slang::StdWriters* stdWriters, SlangSe
         rendererName << "'" << gOptions.adapter << "'";
     }
 
+    if (gOptions.onlyStartup)
+    {
+        switch (gOptions.rendererType)
+        {
+            case RendererType::CUDA:
+            {
+#if RENDER_TEST_CUDA
+                return SLANG_SUCCEEDED(spSessionCheckPassThroughSupport(session, SLANG_PASS_THROUGH_NVRTC)) && CUDAComputeUtil::canCreateDevice() ? SLANG_OK : SLANG_FAIL;
+#else
+                return SLANG_FAIL;
+#endif
+            }
+            case RendererType::CPU:
+            {
+                // As long as we have CPU, then this should work
+                return spSessionCheckPassThroughSupport(session, SLANG_PASS_THROUGH_GENERIC_C_CPP);
+            }
+            default: break;
+        }
+    }
+
     // If it's CPU testing we don't need a window or a renderer
     if (gOptions.rendererType == RendererType::CPU)
     {
-        if (gOptions.onlyStartup)
-        {
-            // Need generic C/C++
-            if (SLANG_FAILED(spSessionCheckPassThroughSupport(session, SLANG_PASS_THROUGH_GENERIC_C_CPP)))
-            {
-                return SLANG_FAIL;
-            }
-            // Should work ... 
-            return SLANG_OK;
-        }
-
         ShaderCompilerUtil::OutputAndLayout compilationAndLayout;
         SLANG_RETURN_ON_FAIL(ShaderCompilerUtil::compileWithLayout(session, gOptions.sourcePath, gOptions.compileArgs, gOptions.shaderType, input, compilationAndLayout));
 
@@ -524,6 +552,11 @@ SLANG_TEST_TOOL_API SlangResult innerMain(Slang::StdWriters* stdWriters, SlangSe
             ComPtr<ISlangSharedLibrary> sharedLibrary;
             SLANG_RETURN_ON_FAIL(spGetEntryPointHostCallable(compilationAndLayout.output.request, 0, 0, sharedLibrary.writeRef()));
 
+            // This is a hack to work around, reflection when compiling straight C/C++ code. In that case the code is just passed
+            // straight through to the C++ compiler so no reflection. In these tests though we should have conditional code
+            // (performance-profile.slang for example), such that there is both a slang and C++ code, and it is the job
+            // of the test implementer to *ensure* that the straight C++ code has the same layout as the slang C++ backend.
+            //
             // If we are running c/c++ we still need binding information, so compile again as slang source
             if (gOptions.sourceLanguage == SLANG_SOURCE_LANGUAGE_C || input.sourceLanguage == SLANG_SOURCE_LANGUAGE_CPP)
             {
@@ -556,16 +589,50 @@ SLANG_TEST_TOOL_API SlangResult innerMain(Slang::StdWriters* stdWriters, SlangSe
 
             if (gOptions.outputPath)
             {
+                BindRoot* outputBindRoot = gOptions.outputUsingType ? &context.m_bindRoot : nullptr;
+
+
                 // Dump everything out that was written
-                SLANG_RETURN_ON_FAIL(CPUComputeUtil::writeBindings(compilationAndLayout.layout, context.buffers, gOptions.outputPath));
+                SLANG_RETURN_ON_FAIL(ShaderInputLayout::writeBindings(outputBindRoot, compilationAndLayout.layout, context.m_buffers, gOptions.outputPath));
 
                 // Check all execution styles produce the same result
                 SLANG_RETURN_ON_FAIL(CPUComputeUtil::checkStyleConsistency(sharedLibrary, gOptions.computeDispatchSize, compilationAndLayout));
             }
         }
 
-        
         return SLANG_OK;
+    }
+
+    if (gOptions.rendererType == RendererType::CUDA)
+    {
+        ShaderCompilerUtil::OutputAndLayout compilationAndLayout;
+        SLANG_RETURN_ON_FAIL(ShaderCompilerUtil::compileWithLayout(session, gOptions.sourcePath, gOptions.compileArgs, gOptions.shaderType, input, compilationAndLayout));
+
+#if RENDER_TEST_CUDA
+
+        const uint64_t startTicks = ProcessUtil::getClockTick();
+
+        CUDAComputeUtil::Context context;
+        SLANG_RETURN_ON_FAIL(CUDAComputeUtil::execute(compilationAndLayout, context));
+
+        if (gOptions.performanceProfile)
+        {
+            const uint64_t endTicks = ProcessUtil::getClockTick();
+            _outputProfileTime(startTicks, endTicks);
+        }
+
+        if (gOptions.outputPath)
+        {
+            BindRoot* outputBindRoot = gOptions.outputUsingType ? &context.m_bindRoot : nullptr;
+
+            // Dump everything out that was written
+            SLANG_RETURN_ON_FAIL(ShaderInputLayout::writeBindings(outputBindRoot, compilationAndLayout.layout, context.m_buffers, gOptions.outputPath));
+        }
+
+        return SLANG_OK;
+#else
+        return SLANG_FAIL;
+#endif
     }
 
     Slang::RefPtr<Renderer> renderer;

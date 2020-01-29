@@ -1,9 +1,10 @@
 #ifndef CPU_COMPUTE_UTIL_H
 #define CPU_COMPUTE_UTIL_H
 
-#include "cpu-memory-binding.h"
 #include "slang-support.h"
 #include "options.h"
+
+#include "bind-location.h"
 
 #include "../../source/core/slang-smart-pointer.h"
 
@@ -28,11 +29,11 @@ struct CPUComputeUtil
     struct Context
     {
             /// Holds the binding information
-        CPUMemoryBinding binding;
+        BindSet m_bindSet;
+        CPULikeBindRoot m_bindRoot;
+
             /// Buffers are held in same order as entries in layout (useful for dumping out bindings)
-        List<CPUMemoryBinding::Buffer> buffers;
-            /// Holds the resources created (in calcBindings)
-        List<RefPtr<Resource> > m_resources;
+        List<BindSet::Value*> m_buffers;
     };
 
     struct ExecuteInfo
@@ -53,15 +54,13 @@ struct CPUComputeUtil
     static SlangResult checkStyleConsistency(ISlangSharedLibrary* sharedLib, const uint32_t dispatchSize[3], const ShaderCompilerUtil::OutputAndLayout& compilationAndLayout);
 
     static SlangResult calcBindings(const ShaderCompilerUtil::OutputAndLayout& compilationAndLayout, Context& outContext);
-
+    
     static SlangResult calcExecuteInfo(ExecuteStyle style, ISlangSharedLibrary* sharedLib, const uint32_t dispatchSize[3], const ShaderCompilerUtil::OutputAndLayout& compilationAndLayout, Context& context, ExecuteInfo& out);
 
     static SlangResult execute(const ExecuteInfo& info);
-
-    static SlangResult writeBindings(const ShaderInputLayout& layout, const List<CPUMemoryBinding::Buffer>& buffers, const Slang::String& fileName);
 };
 
 
 } // renderer_test
 
-#endif //CPU_MEMORY_BINDING_H
+#endif //CPU_COMPUTE_UTIL_H

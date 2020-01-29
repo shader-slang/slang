@@ -34,7 +34,7 @@ namespace Slang
         /// generate different HLSL output if we know it
         /// will be used to generate SPIR-V).
         ///
-    String emitEntryPointSource(
+    String emitEntryPointSourceFromIR(
         BackEndCompileRequest*  compileRequest,
         Int                     entryPointIndex,
         CodeGenTarget           target,

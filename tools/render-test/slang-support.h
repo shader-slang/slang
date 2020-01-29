@@ -55,6 +55,19 @@ struct ShaderCompilerUtil
                  spDestroyCompileRequest(request);
             }
         }
+
+        Slang::Index findKernelDescIndex(gfx::StageType stage) const
+        {
+            for (Slang::Index i = 0; i < kernelDescs.getCount(); ++i)
+            {
+                if (kernelDescs[i].stage == stage)
+                {
+                    return i;
+                }
+            }
+            return -1;
+        }
+
         List<ShaderProgram::KernelDesc> kernelDescs;
         ShaderProgram::Desc desc;
         SlangCompileRequest* request = nullptr;

@@ -45,6 +45,49 @@ standard output = {
                         ]
                     }
                     ]
+                },
+                "containerVarLayout": {
+                    "binding": {"kind": "constantBuffer", "index": 0}
+                },
+                "elementVarLayout": {
+                    "type": {
+                        "kind": "struct",
+                        "name": "A",
+                        "fields": [
+                            {
+                                "name": "x",
+                                "type": {
+                                    "kind": "scalar",
+                                    "scalarType": "float32"
+                                },
+                                "binding": {"kind": "uniform", "offset": 0, "size": 4}
+                            },
+                            {
+                                "name": "y",
+                                "type": {
+                                    "kind": "scalar",
+                                    "scalarType": "float32"
+                                },
+                                "binding": {"kind": "uniform", "offset": 4, "size": 4},
+                                "userAttribs": [{
+                                    "name": "DefaultValue",
+                                    "arguments": [
+                                        1
+                                    ]
+                                }
+                                ]
+                            }
+                        ],
+                        "userAttribs": [{
+                            "name": "MyStruct",
+                            "arguments": [
+                                0,
+                                1.000000
+                            ]
+                        }
+                        ]
+                    },
+                    "binding": {"kind": "uniform", "offset": 0, "size": 8}
                 }
             }
         },
@@ -89,6 +132,49 @@ standard output = {
                         ]
                     }
                     ]
+                },
+                "containerVarLayout": {
+                    "binding": {"kind": "constantBuffer", "index": 0}
+                },
+                "elementVarLayout": {
+                    "type": {
+                        "kind": "struct",
+                        "name": "B",
+                        "fields": [
+                            {
+                                "name": "x",
+                                "type": {
+                                    "kind": "scalar",
+                                    "scalarType": "float32"
+                                },
+                                "binding": {"kind": "uniform", "offset": 0, "size": 4}
+                            },
+                            {
+                                "name": "z",
+                                "type": {
+                                    "kind": "scalar",
+                                    "scalarType": "float32"
+                                },
+                                "binding": {"kind": "uniform", "offset": 4, "size": 4},
+                                "userAttribs": [{
+                                    "name": "DefaultValue",
+                                    "arguments": [
+                                        2
+                                    ]
+                                }
+                                ]
+                            }
+                        ],
+                        "userAttribs": [{
+                            "name": "MyStruct",
+                            "arguments": [
+                                0,
+                                2.000000
+                            ]
+                        }
+                        ]
+                    },
+                    "binding": {"kind": "uniform", "offset": 0, "size": 8}
                 }
             }
         }

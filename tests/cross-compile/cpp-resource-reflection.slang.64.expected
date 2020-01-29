@@ -38,6 +38,42 @@ standard output = {
                             "binding": {"kind": "uniform", "offset": 8, "size": 4}
                         }
                     ]
+                },
+                "containerVarLayout": {
+                    "binding": {"kind": "uniform", "offset": 0, "size": 8}
+                },
+                "elementVarLayout": {
+                    "type": {
+                        "kind": "struct",
+                        "name": "Thing",
+                        "fields": [
+                            {
+                                "name": "a",
+                                "type": {
+                                    "kind": "scalar",
+                                    "scalarType": "int32"
+                                },
+                                "binding": {"kind": "uniform", "offset": 0, "size": 4}
+                            },
+                            {
+                                "name": "b",
+                                "type": {
+                                    "kind": "scalar",
+                                    "scalarType": "float32"
+                                },
+                                "binding": {"kind": "uniform", "offset": 4, "size": 4}
+                            },
+                            {
+                                "name": "c",
+                                "type": {
+                                    "kind": "scalar",
+                                    "scalarType": "float32"
+                                },
+                                "binding": {"kind": "uniform", "offset": 8, "size": 4}
+                            }
+                        ]
+                    },
+                    "binding": {"kind": "uniform", "offset": 0, "size": 12}
                 }
             }
         },

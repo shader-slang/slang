@@ -98,6 +98,7 @@ struct CLikeSourceEmitter::ComputeEmitActionsContext
         {
             return SourceStyle::HLSL;
         }
+        case CodeGenTarget::PTX:
         case CodeGenTarget::SPIRV:
         case CodeGenTarget::SPIRVAssembly:
         case CodeGenTarget::DXBytecode:
@@ -114,6 +115,10 @@ struct CLikeSourceEmitter::ComputeEmitActionsContext
         case CodeGenTarget::CPPSource:
         {
             return SourceStyle::CPP;
+        }
+        case CodeGenTarget::CUDASource:
+        {
+            return SourceStyle::CUDA;
         }
     }
 }
@@ -343,6 +348,7 @@ bool CLikeSourceEmitter::isTargetIntrinsicModifierApplicable(const String& targe
     case SourceStyle::CPP:  return targetName == "cpp";
     case SourceStyle::GLSL: return targetName == "glsl";
     case SourceStyle::HLSL: return targetName == "hlsl";
+    case SourceStyle::CUDA: return targetName == "cuda";
     }
 }
 
@@ -1021,6 +1027,7 @@ void CLikeSourceEmitter::emitInstResultDecl(IRInst* inst)
 
         switch (getSourceStyle())
         {
+        case SourceStyle::CUDA:
         case SourceStyle::HLSL:
         case SourceStyle::C:
         case SourceStyle::CPP:
@@ -1107,7 +1114,13 @@ IRTargetIntrinsicDecoration* CLikeSourceEmitter::findTargetIntrinsicDecoration(I
     return true;
 }
 
-void CLikeSourceEmitter::emitIntrinsicCallExpr(
+
+void CLikeSourceEmitter::emitIntrinsicCallExpr(IRCall* inst, IRTargetIntrinsicDecoration* targetIntrinsic, EmitOpInfo const& inOuterPrec)
+{
+    emitIntrinsicCallExprImpl(inst, targetIntrinsic, inOuterPrec);
+}
+
+void CLikeSourceEmitter::emitIntrinsicCallExprImpl(
     IRCall*                         inst,
     IRTargetIntrinsicDecoration*    targetIntrinsic,
     EmitOpInfo const&               inOuterPrec)
@@ -1229,6 +1242,38 @@ void CLikeSourceEmitter::emitIntrinsicCallExpr(
                 }
                 break;
 
+            case 'S':
+                // Get the scalar type of a generic at specified index
+                {
+                    SLANG_RELEASE_ASSERT(*cursor >= '0' && *cursor <= '9');
+                    Index argIndex = (*cursor++) - '0';
+                    SLANG_RELEASE_ASSERT(argCount > argIndex);
+
+                    IRType* type = args[argIndex].get()->getDataType();
+                    if (auto baseTextureType = as<IRTextureType>(type))
+                    {
+                        type = baseTextureType->getElementType();
+                    }
+
+                    IRBasicType* underlyingType = nullptr;
+                    if (auto basicType = as<IRBasicType>(type))
+                    {
+                        underlyingType = basicType;
+                    }
+                    else if (auto vectorType = as<IRVectorType>(type))
+                    {
+                        underlyingType = as<IRBasicType>(vectorType->getElementType());
+                    }
+                    else if (auto matrixType = as<IRMatrixType>(type))
+                    {
+                        underlyingType = as<IRBasicType>(matrixType->getElementType());
+                    }
+
+                    SLANG_ASSERT(underlyingType);
+
+                    emitSimpleType(underlyingType);
+                }
+                break;
             case 'p':
                 {
                     // If we are calling a D3D texturing operation in the form t.Foo(s, ...),
@@ -2507,6 +2552,22 @@ void CLikeSourceEmitter::emitSimpleFuncParamImpl(IRParam* param)
     emitSemantics(param);
 }
 
+void CLikeSourceEmitter::emitSimpleFuncParamsImpl(IRFunc* func)
+{
+    m_writer->emit("(");
+
+    auto firstParam = func->getFirstParam();
+    for (auto pp = firstParam; pp; pp = pp->getNextParam())
+    {
+        if (pp != firstParam)
+            m_writer->emit(", ");
+
+        emitSimpleFuncParamImpl(pp);
+    }
+
+    m_writer->emit(")");
+}
+
 void CLikeSourceEmitter::emitSimpleFuncImpl(IRFunc* func)
 {
     auto resultType = func->getResultType();
@@ -2518,21 +2579,12 @@ void CLikeSourceEmitter::emitSimpleFuncImpl(IRFunc* func)
         emitEntryPointAttributes(func, entryPointDecor);
     }
 
+    emitFunctionPreambleImpl(func);
+
     auto name = getName(func);
 
     emitType(resultType, name);
-
-    m_writer->emit("(");
-    auto firstParam = func->getFirstParam();
-    for( auto pp = firstParam; pp; pp = pp->getNextParam())
-    {
-        if(pp != firstParam)
-            m_writer->emit(", ");
-
-        emitSimpleFuncParamImpl(pp);
-    }
-    m_writer->emit(")");
-
+    emitSimpleFuncParamsImpl(func);
     emitSemantics(func);
 
     // TODO: encode declaration vs. definition
@@ -2913,6 +2965,8 @@ void CLikeSourceEmitter::emitGlobalVar(IRGlobalVar* varDecl)
     String initFuncName;
     if (varDecl->getFirstBlock())
     {
+        emitFunctionPreambleImpl(varDecl);
+
         // A global variable with code means it has an initializer
         // associated with it. Eventually we'd like to emit that
         // initializer directly as an expression here, but for

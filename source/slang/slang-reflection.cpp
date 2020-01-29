@@ -357,9 +357,9 @@ SLANG_API SlangReflectionType* spReflectionType_GetElementType(SlangReflectionTy
     {
         return (SlangReflectionType*) arrayType->baseType.Ptr();
     }
-    else if( auto constantBufferType = as<ConstantBufferType>(type))
+    else if( auto parameterGroupType = as<ParameterGroupType>(type))
     {
-        return convert(constantBufferType->elementType.Ptr());
+        return convert(parameterGroupType->elementType.Ptr());
     }
     else if( auto vectorType = as<VectorExpressionType>(type))
     {
@@ -598,8 +598,15 @@ SLANG_API SlangReflectionType * spReflection_FindTypeByName(SlangReflection * re
     Slang::DiagnosticSink sink(
         programLayout->getTargetReq()->getLinkage()->getSourceManager());
 
-    RefPtr<Type> result = program->getTypeFromString(name, &sink);
-    return (SlangReflectionType*)result.Ptr();
+    try
+    {
+        RefPtr<Type> result = program->getTypeFromString(name, &sink);
+        return (SlangReflectionType*)result.Ptr();
+    }
+    catch( ... )
+    {
+        return nullptr;
+    }
 }
 
 SLANG_API SlangReflectionTypeLayout* spReflection_GetTypeLayout(
@@ -680,6 +687,21 @@ SLANG_API size_t spReflectionTypeLayout_GetSize(SlangReflectionTypeLayout* inTyp
     return getReflectionSize(info->count);
 }
 
+SLANG_API int32_t spReflectionTypeLayout_getAlignment(SlangReflectionTypeLayout* inTypeLayout, SlangParameterCategory category)
+{
+    auto typeLayout = convert(inTypeLayout);
+    if(!typeLayout) return 0;
+
+    if( category == SLANG_PARAMETER_CATEGORY_UNIFORM )
+    {
+        return int32_t(typeLayout->uniformAlignment);
+    }
+    else
+    {
+        return 1;
+    }
+}
+
 SLANG_API SlangReflectionVariableLayout* spReflectionTypeLayout_GetFieldByIndex(SlangReflectionTypeLayout* inTypeLayout, unsigned index)
 {
     auto typeLayout = convert(inTypeLayout);
@@ -758,9 +780,22 @@ SLANG_API SlangReflectionVariableLayout* spReflectionTypeLayout_GetElementVarLay
     auto typeLayout = convert(inTypeLayout);
     if(!typeLayout) return nullptr;
 
-    if( auto constantBufferTypeLayout = as<ParameterGroupTypeLayout>(typeLayout))
+    if( auto parameterGroupTypeLayout = as<ParameterGroupTypeLayout>(typeLayout))
     {
-        return convert(constantBufferTypeLayout->elementVarLayout.Ptr());
+        return convert(parameterGroupTypeLayout->elementVarLayout.Ptr());
+    }
+
+    return nullptr;
+}
+
+SLANG_API SlangReflectionVariableLayout* spReflectionTypeLayout_getContainerVarLayout(SlangReflectionTypeLayout* inTypeLayout)
+{
+    auto typeLayout = convert(inTypeLayout);
+    if(!typeLayout) return nullptr;
+
+    if( auto parameterGroupTypeLayout = as<ParameterGroupTypeLayout>(typeLayout))
+    {
+        return convert(parameterGroupTypeLayout->containerVarLayout.Ptr());
     }
 
     return nullptr;
@@ -1299,6 +1334,17 @@ SLANG_API SlangReflectionVariableLayout* spReflectionEntryPoint_getVarLayout(
 
     return convert(entryPointLayout->parametersLayout);
 }
+
+SLANG_API SlangReflectionVariableLayout* spReflectionEntryPoint_getResultVarLayout(
+    SlangReflectionEntryPoint* inEntryPoint)
+{
+    auto entryPointLayout = convert(inEntryPoint);
+    if(!entryPointLayout)
+        return nullptr;
+
+    return convert(entryPointLayout->resultLayout);
+}
+
 
 static bool hasDefaultConstantBuffer(ScopeLayout* layout)
 {

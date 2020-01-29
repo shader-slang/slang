@@ -505,6 +505,7 @@ static PassThroughFlags _getPassThroughFlagsForTarget(SlangCompileTarget target)
         case SLANG_GLSL:
         case SLANG_C_SOURCE:
         case SLANG_CPP_SOURCE:
+        case SLANG_CUDA_SOURCE:
         {
             return 0;
         }
@@ -668,6 +669,11 @@ static SlangResult _extractRenderTestRequirements(const CommandLine& cmdLine, Te
             target = SLANG_HOST_CALLABLE;
             nativeLanguage = SLANG_SOURCE_LANGUAGE_CPP;
             passThru = SLANG_PASS_THROUGH_GENERIC_C_CPP;
+            break;
+        case RenderApiType::CUDA:
+            target = SLANG_PTX;
+            nativeLanguage = SLANG_SOURCE_LANGUAGE_CUDA;
+            passThru = SLANG_PASS_THROUGH_NVRTC;
             break;
     }
 
@@ -2508,22 +2514,61 @@ bool testPassesCategoryMask(
 static void _calcSynthesizedTests(TestContext* context, RenderApiType synthRenderApiType, const List<TestDetails>& srcTests, List<TestDetails>& ioSynthTests)
 {
     // Add the explicit parameter
-    for (const auto& testDetails: srcTests)
+    for (const auto& srcTest: srcTests)
     {
-        const auto& requirements = testDetails.requirements;
+        const auto& requirements = srcTest.requirements;
 
         // Render tests use renderApis...
         // If it's an explicit test, we don't synth from it now
 
-        // TODO(JS): Arguably we should synthesize from explicit tests. In principal we can remove the explicit api apply another
-        // although that may not always work.
-        if (requirements.usedRenderApiFlags == 0 ||
-            requirements.explicitRenderApi != RenderApiType::Unknown)
+        // In the case of CUDA, we can only synth from a CPU source
+        if (synthRenderApiType == RenderApiType::CUDA)
         {
-            continue;
+            if (requirements.explicitRenderApi != RenderApiType::CPU)
+            {
+                continue;
+            }
+
+            // If the source language is defined, and it's
+
+            const Index index = srcTest.options.args.indexOf("-source-language");
+            if (index >= 0)
+            {
+                //
+                const auto& language = srcTest.options.args[index + 1];
+                SlangSourceLanguage sourceLanguage = DownstreamCompiler::getSourceLanguageFromName(language.getUnownedSlice());
+
+                bool isCrossCompile = true;
+
+                switch (sourceLanguage)
+                {
+                    case SLANG_SOURCE_LANGUAGE_GLSL:
+                    case SLANG_SOURCE_LANGUAGE_C:
+                    case SLANG_SOURCE_LANGUAGE_CPP:
+                    {
+                        isCrossCompile = false;
+                    }
+                    default: break;
+                }
+
+                if (!isCrossCompile)
+                {
+                    continue;
+                }
+            }
+        }
+        else
+        {
+            // TODO(JS): Arguably we should synthesize from explicit tests. In principal we can remove the explicit api apply another
+            // although that may not always work.
+            if (requirements.usedRenderApiFlags == 0 ||
+                requirements.explicitRenderApi != RenderApiType::Unknown)
+            {
+                continue;
+            }
         }
 
-        TestDetails synthTestDetails(testDetails.options);
+        TestDetails synthTestDetails(srcTest.options);
         TestOptions& synthOptions = synthTestDetails.options;
 
         // Mark as synthesized
@@ -2538,8 +2583,16 @@ static void _calcSynthesizedTests(TestContext* context, RenderApiType synthRende
         // If the target is vulkan remove the -hlsl option
         if (synthRenderApiType == RenderApiType::Vulkan)
         {
-            Index index = synthOptions.args.indexOf("-hlsl");
-            if (index != Index(-1))
+            const Index index = synthOptions.args.indexOf("-hlsl");
+            if (index >= 0)
+            {
+                synthOptions.args.removeAt(index);
+            }
+        }
+        else if (synthRenderApiType == RenderApiType::CUDA)
+        {
+            const Index index = synthOptions.args.indexOf("-cpu");
+            if (index >= 0)
             {
                 synthOptions.args.removeAt(index);
             }
@@ -2835,8 +2888,10 @@ SlangResult innerMain(int argc, char** argv)
     /*auto computeTestCategory = */categorySet.add("compute", fullTestCategory);
     auto vulkanTestCategory = categorySet.add("vulkan", fullTestCategory);
     auto unitTestCatagory = categorySet.add("unit-test", fullTestCategory);
+    auto cudaTestCategory = categorySet.add("cuda", fullTestCategory);
+
     auto compatibilityIssueCategory = categorySet.add("compatibility-issue", fullTestCategory);
-    
+        
 #if SLANG_WINDOWS_FAMILY
     auto windowsCategory = categorySet.add("windows", fullTestCategory);
 #endif
@@ -2845,13 +2900,13 @@ SlangResult innerMain(int argc, char** argv)
     auto unixCatagory = categorySet.add("unix", fullTestCategory);
 #endif
 
-
     // An un-categorized test will always belong to the `full` category
     categorySet.defaultCategory = fullTestCategory;
 
     TestCategory* fxcCategory = nullptr;
     TestCategory* dxcCategory = nullptr;
     TestCategory* glslangCategory = nullptr;
+    TestCategory* nvrtcCategory = nullptr; 
 
     // Work out what backends/pass-thrus are available
     {
@@ -2878,6 +2933,10 @@ SlangResult innerMain(int argc, char** argv)
         if (context.availableBackendFlags & PassThroughFlag::Dxc)
         {
             dxcCategory = categorySet.add("dxc", fullTestCategory);
+        }
+        if (context.availableBackendFlags & PassThroughFlag::NVRTC)
+        {
+            nvrtcCategory = categorySet.add("nvrtc", fullTestCategory);
         }
     }
 

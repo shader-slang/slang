@@ -84,7 +84,9 @@ struct Options
     // By default we potentially synthesize test for all 
     // TODO: Vulkan is disabled by default for now as the majority as vulkan synthesized tests
     // OpenGL is disabled for now
-    Slang::RenderApiFlags synthesizedTestApis = Slang::RenderApiFlag::AllOf & ~(Slang::RenderApiFlag::Vulkan | Slang::RenderApiFlag::OpenGl | Slang::RenderApiFlag::CPU);
+    // CPU is disabled by default
+    // CUDA is disabled by default
+    Slang::RenderApiFlags synthesizedTestApis = Slang::RenderApiFlag::AllOf & ~(Slang::RenderApiFlag::Vulkan | Slang::RenderApiFlag::OpenGl | Slang::RenderApiFlag::CPU); 
 
     // The adapter to use. If empty will match first found adapter.
     Slang::String adapter;

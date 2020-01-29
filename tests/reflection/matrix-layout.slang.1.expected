@@ -52,6 +52,56 @@ standard output = {
                             "binding": {"kind": "uniform", "offset": 96, "size": 60}
                         }
                     ]
+                },
+                "containerVarLayout": {
+                    "binding": {"kind": "constantBuffer", "index": 0}
+                },
+                "elementVarLayout": {
+                    "type": {
+                        "kind": "struct",
+                        "fields": [
+                            {
+                                "name": "aa",
+                                "type": {
+                                    "kind": "matrix",
+                                    "rowCount": 3,
+                                    "columnCount": 4,
+                                    "elementType": {
+                                        "kind": "scalar",
+                                        "scalarType": "float32"
+                                    }
+                                },
+                                "binding": {"kind": "uniform", "offset": 0, "size": 48}
+                            },
+                            {
+                                "name": "ab",
+                                "type": {
+                                    "kind": "matrix",
+                                    "rowCount": 3,
+                                    "columnCount": 4,
+                                    "elementType": {
+                                        "kind": "scalar",
+                                        "scalarType": "float32"
+                                    }
+                                },
+                                "binding": {"kind": "uniform", "offset": 48, "size": 48}
+                            },
+                            {
+                                "name": "ac",
+                                "type": {
+                                    "kind": "matrix",
+                                    "rowCount": 3,
+                                    "columnCount": 4,
+                                    "elementType": {
+                                        "kind": "scalar",
+                                        "scalarType": "float32"
+                                    }
+                                },
+                                "binding": {"kind": "uniform", "offset": 96, "size": 60}
+                            }
+                        ]
+                    },
+                    "binding": {"kind": "uniform", "offset": 0, "size": 156}
                 }
             }
         },
@@ -113,6 +163,66 @@ standard output = {
                             "binding": {"kind": "uniform", "offset": 0, "size": 156}
                         }
                     ]
+                },
+                "containerVarLayout": {
+                    "binding": {"kind": "constantBuffer", "index": 0}
+                },
+                "elementVarLayout": {
+                    "type": {
+                        "kind": "struct",
+                        "fields": [
+                            {
+                                "name": "b",
+                                "type": {
+                                    "kind": "struct",
+                                    "name": "SB",
+                                    "fields": [
+                                        {
+                                            "name": "ba",
+                                            "type": {
+                                                "kind": "matrix",
+                                                "rowCount": 3,
+                                                "columnCount": 4,
+                                                "elementType": {
+                                                    "kind": "scalar",
+                                                    "scalarType": "float32"
+                                                }
+                                            },
+                                            "binding": {"kind": "uniform", "offset": 0, "size": 48}
+                                        },
+                                        {
+                                            "name": "bb",
+                                            "type": {
+                                                "kind": "matrix",
+                                                "rowCount": 3,
+                                                "columnCount": 4,
+                                                "elementType": {
+                                                    "kind": "scalar",
+                                                    "scalarType": "float32"
+                                                }
+                                            },
+                                            "binding": {"kind": "uniform", "offset": 48, "size": 48}
+                                        },
+                                        {
+                                            "name": "bc",
+                                            "type": {
+                                                "kind": "matrix",
+                                                "rowCount": 3,
+                                                "columnCount": 4,
+                                                "elementType": {
+                                                    "kind": "scalar",
+                                                    "scalarType": "float32"
+                                                }
+                                            },
+                                            "binding": {"kind": "uniform", "offset": 96, "size": 60}
+                                        }
+                                    ]
+                                },
+                                "binding": {"kind": "uniform", "offset": 0, "size": 156}
+                            }
+                        ]
+                    },
+                    "binding": {"kind": "uniform", "offset": 0, "size": 156}
                 }
             }
         }
@@ -120,7 +230,20 @@ standard output = {
     "entryPoints": [
         {
             "name": "main",
-            "stage:": "fragment"
+            "stage:": "fragment",
+            "result:": {
+                "stage": "fragment",
+                "binding": {"kind": "varyingOutput", "index": 0},
+                "semanticName": "SV_TARGET",
+                "type": {
+                    "kind": "vector",
+                    "elementCount": 4,
+                    "elementType": {
+                        "kind": "scalar",
+                        "scalarType": "float32"
+                    }
+                }
+            }
         }
     ]
 }

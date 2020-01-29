@@ -112,8 +112,9 @@ struct DefaultLayoutRulesImpl : SimpleLayoutRulesImpl
         return arrayInfo;
     }
 
-    SimpleLayoutInfo GetVectorLayout(SimpleLayoutInfo elementInfo, size_t elementCount) override
+    SimpleLayoutInfo GetVectorLayout(BaseType elementType, SimpleLayoutInfo elementInfo, size_t elementCount) override
     {
+        SLANG_UNUSED(elementType);
         SimpleLayoutInfo vectorInfo;
         vectorInfo.kind = elementInfo.kind;
         vectorInfo.size = elementInfo.size * elementCount;
@@ -121,7 +122,7 @@ struct DefaultLayoutRulesImpl : SimpleLayoutRulesImpl
         return vectorInfo;
     }
 
-    SimpleArrayLayoutInfo GetMatrixLayout(SimpleLayoutInfo elementInfo, size_t rowCount, size_t columnCount) override
+    SimpleArrayLayoutInfo GetMatrixLayout(BaseType elementType, SimpleLayoutInfo elementInfo, size_t rowCount, size_t columnCount) override
     {
         // The default behavior here is to lay out a matrix
         // as an array of row vectors (that is row-major).
@@ -131,7 +132,7 @@ struct DefaultLayoutRulesImpl : SimpleLayoutRulesImpl
         // to get layouts with a different convention.
         //
         return GetArrayLayout(
-            GetVectorLayout(elementInfo, columnCount),
+            GetVectorLayout(elementType, elementInfo, columnCount),
             rowCount);
     }
 
@@ -204,8 +205,9 @@ struct GLSLBaseLayoutRulesImpl : DefaultLayoutRulesImpl
 {
     typedef DefaultLayoutRulesImpl Super;
 
-    SimpleLayoutInfo GetVectorLayout(SimpleLayoutInfo elementInfo, size_t elementCount) override
+    SimpleLayoutInfo GetVectorLayout(BaseType elementType, SimpleLayoutInfo elementInfo, size_t elementCount) override
     {
+        SLANG_UNUSED(elementType);
         // The `std140` and `std430` rules require vectors to be aligned to the next power of
         // two up from their size (so a `float2` is 8-byte aligned, and a `float3` is
         // 16-byte aligned).
@@ -224,7 +226,7 @@ struct GLSLBaseLayoutRulesImpl : DefaultLayoutRulesImpl
         return vectorInfo;
     }
 
-    SimpleArrayLayoutInfo GetArrayLayout( SimpleLayoutInfo elementInfo, LayoutSize elementCount) override
+    SimpleArrayLayoutInfo GetArrayLayout(SimpleLayoutInfo elementInfo, LayoutSize elementCount) override
     {
         // The size of an array must be rounded up to be a multiple of its alignment.
         //
@@ -376,7 +378,7 @@ struct CPULayoutRulesImpl : DefaultLayoutRulesImpl
 
             // So it is actually a Array<T> on CPU which is a pointer and a size
             info.size = sizeof(void*) * 2;
-            info.alignment = sizeof(void*);
+            info.alignment = SLANG_ALIGN_OF(void*);
 
             return info;
         }
@@ -394,6 +396,116 @@ struct CPULayoutRulesImpl : DefaultLayoutRulesImpl
     void EndStructLayout(UniformLayoutInfo* ioStructInfo) override
     {
         // Conform to C/C++ size is adjusted to the largest alignment
+        ioStructInfo->size = RoundToAlignment(ioStructInfo->size, ioStructInfo->alignment);
+    }
+};
+
+struct CUDALayoutRulesImpl : DefaultLayoutRulesImpl
+{
+    typedef DefaultLayoutRulesImpl Super;
+
+    SimpleLayoutInfo GetScalarLayout(BaseType baseType) override
+    {
+        switch (baseType)
+        {
+            case BaseType::Bool:
+            {
+                // In memory a bool is a byte. BUT when in a vector or matrix it will actually be a int32_t
+                return SimpleLayoutInfo(LayoutResourceKind::Uniform, sizeof(uint8_t), SLANG_ALIGN_OF(uint8_t));
+            }
+
+            default: return Super::GetScalarLayout(baseType);
+        }
+    }
+
+    SimpleArrayLayoutInfo GetArrayLayout(SimpleLayoutInfo elementInfo, LayoutSize elementCount) override
+    {
+        SLANG_RELEASE_ASSERT(elementInfo.size.isFinite());
+        auto elementSize = elementInfo.size.getFiniteValue();
+        auto elementAlignment = elementInfo.alignment;
+        auto elementStride = RoundToAlignment(elementSize, elementAlignment);
+
+        if (elementCount.isInfinite())
+        {
+            // This is an unsized array, get information for element
+            auto info = Super::GetArrayLayout(elementInfo, LayoutSize(1));
+
+            // So it is actually a Array<T> on CUDA which is a pointer and a size
+            info.size = sizeof(void*) * 2;
+            info.alignment = SLANG_ALIGN_OF(void*);
+            return info;
+        }
+
+        // An array with no elements will have zero size.
+        //
+        LayoutSize arraySize = 0;
+        //
+        // Any array with a non-zero number of elements will need
+        // to have space for N elements of size `elementSize`, with
+        // the constraints that there must be `elementStride` bytes
+        // between consecutive elements.
+        //
+        if (elementCount > 0)
+        {
+            // We can think of this as either allocating (N-1)
+            // chunks of size `elementStride` (for most of the elements)
+            // and then one final chunk of size `elementSize`  for
+            // the last element, or equivalently as allocating
+            // N chunks of size `elementStride` and then "giving back"
+            // the final `elementStride - elementSize` bytes.
+            //
+            arraySize = (elementStride * (elementCount - 1)) + elementSize;
+        }
+
+        SimpleArrayLayoutInfo arrayInfo;
+        arrayInfo.kind = elementInfo.kind;
+        arrayInfo.size = arraySize;
+        arrayInfo.alignment = elementAlignment;
+        arrayInfo.elementStride = elementStride;
+        return arrayInfo;
+    }
+
+    SimpleLayoutInfo GetVectorLayout(BaseType elementType, SimpleLayoutInfo elementInfo, size_t elementCount) override
+    {
+        // Special case bool
+        if (elementType == BaseType::Bool)
+        {
+            SimpleLayoutInfo fixInfo(elementInfo);
+            fixInfo.size = sizeof(int32_t);
+            fixInfo.alignment = SLANG_ALIGN_OF(int32_t);
+            return GetVectorLayout(BaseType::Int, fixInfo, elementCount);
+        }
+
+        SimpleLayoutInfo vectorInfo;
+        vectorInfo.kind = elementInfo.kind;
+        vectorInfo.size = elementInfo.size * elementCount;
+        vectorInfo.alignment = elementInfo.alignment;
+    
+        return vectorInfo;
+    }
+
+    SimpleArrayLayoutInfo GetMatrixLayout(BaseType elementType, SimpleLayoutInfo elementInfo, size_t rowCount, size_t columnCount) override
+    {
+        // Special case bool
+        if (elementType == BaseType::Bool)
+        {
+            SimpleLayoutInfo fixInfo(elementInfo);
+            fixInfo.size = sizeof(int32_t);
+            fixInfo.alignment = SLANG_ALIGN_OF(int32_t);
+            return GetMatrixLayout(BaseType::Int, fixInfo, rowCount, columnCount);
+        }
+
+        return Super::GetMatrixLayout(elementType, elementInfo, rowCount, columnCount);
+    }
+
+    UniformLayoutInfo BeginStructLayout() override
+    {
+        return Super::BeginStructLayout();
+    }
+
+    void EndStructLayout(UniformLayoutInfo* ioStructInfo) override
+    {
+        // Conform to CUDA/C/C++ size is adjusted to the largest alignment
         ioStructInfo->size = RoundToAlignment(ioStructInfo->size, ioStructInfo->alignment);
     }
 };
@@ -429,8 +541,9 @@ struct DefaultVaryingLayoutRulesImpl : DefaultLayoutRulesImpl
             1);
     }
 
-    SimpleLayoutInfo GetVectorLayout(SimpleLayoutInfo, size_t) override
+    SimpleLayoutInfo GetVectorLayout(BaseType elementType, SimpleLayoutInfo, size_t) override
     {
+        SLANG_UNUSED(elementType);
         // Vectors take up one slot by default
         //
         // TODO: some platforms may decide that vectors of `double` need
@@ -472,8 +585,9 @@ struct GLSLSpecializationConstantLayoutRulesImpl : DefaultLayoutRulesImpl
             1);
     }
 
-    SimpleLayoutInfo GetVectorLayout(SimpleLayoutInfo, size_t elementCount) override
+    SimpleLayoutInfo GetVectorLayout(BaseType elementType, SimpleLayoutInfo, size_t elementCount) override
     {
+        SLANG_UNUSED(elementType);
         // GLSL doesn't support vectors of specialization constants,
         // but we will assume that, if supported, they would use one slot per element.
         return SimpleLayoutInfo(
@@ -653,9 +767,29 @@ struct CPULayoutRulesFamilyImpl : LayoutRulesFamilyImpl
     LayoutRulesImpl* getStructuredBufferRules() override;
 };
 
+struct CUDALayoutRulesFamilyImpl : LayoutRulesFamilyImpl
+{
+    virtual LayoutRulesImpl* getConstantBufferRules() override;
+    virtual LayoutRulesImpl* getPushConstantBufferRules() override;
+    virtual LayoutRulesImpl* getTextureBufferRules() override;
+    virtual LayoutRulesImpl* getVaryingInputRules() override;
+    virtual LayoutRulesImpl* getVaryingOutputRules() override;
+    virtual LayoutRulesImpl* getSpecializationConstantRules() override;
+    virtual LayoutRulesImpl* getShaderStorageBufferRules() override;
+    virtual LayoutRulesImpl* getParameterBlockRules() override;
+
+    LayoutRulesImpl* getRayPayloadParameterRules()      override;
+    LayoutRulesImpl* getCallablePayloadParameterRules() override;
+    LayoutRulesImpl* getHitAttributesParameterRules()   override;
+
+    LayoutRulesImpl* getShaderRecordConstantBufferRules() override;
+    LayoutRulesImpl* getStructuredBufferRules() override;
+};
+
 GLSLLayoutRulesFamilyImpl kGLSLLayoutRulesFamilyImpl;
 HLSLLayoutRulesFamilyImpl kHLSLLayoutRulesFamilyImpl;
 CPULayoutRulesFamilyImpl kCPULayoutRulesFamilyImpl;
+CUDALayoutRulesFamilyImpl kCUDALayoutRulesFamilyImpl;
 
 // CPU case
 
@@ -667,29 +801,29 @@ struct CPUObjectLayoutRulesImpl : ObjectLayoutRulesImpl
         {
             case ShaderParameterKind::ConstantBuffer:
                 // It's a pointer to the actual uniform data
-                return SimpleLayoutInfo(LayoutResourceKind::Uniform, sizeof(void*), sizeof(void*));
+                return SimpleLayoutInfo(LayoutResourceKind::Uniform, sizeof(void*), SLANG_ALIGN_OF(void*));
 
             case ShaderParameterKind::MutableTexture:
             case ShaderParameterKind::TextureUniformBuffer:
             case ShaderParameterKind::Texture:
                 // It's a pointer to a texture interface 
-                return SimpleLayoutInfo(LayoutResourceKind::Uniform, sizeof(void*), sizeof(void*));
+                return SimpleLayoutInfo(LayoutResourceKind::Uniform, sizeof(void*), SLANG_ALIGN_OF(void*));
                 
             case ShaderParameterKind::StructuredBuffer:            
             case ShaderParameterKind::MutableStructuredBuffer:
                 // It's a ptr and a size of the amount of elements
-                return SimpleLayoutInfo(LayoutResourceKind::Uniform, sizeof(void*) * 2, sizeof(void*));
+                return SimpleLayoutInfo(LayoutResourceKind::Uniform, sizeof(void*) * 2, SLANG_ALIGN_OF(void*));
 
             case ShaderParameterKind::RawBuffer:
             case ShaderParameterKind::Buffer:
             case ShaderParameterKind::MutableRawBuffer:
             case ShaderParameterKind::MutableBuffer:
                 // It's a pointer and a size in bytes
-                return SimpleLayoutInfo(LayoutResourceKind::Uniform, sizeof(void*) * 2, sizeof(void*));
+                return SimpleLayoutInfo(LayoutResourceKind::Uniform, sizeof(void*) * 2, SLANG_ALIGN_OF(void*));
 
             case ShaderParameterKind::SamplerState:
                 // It's a pointer
-                return SimpleLayoutInfo(LayoutResourceKind::Uniform, sizeof(void*), sizeof(void*));
+                return SimpleLayoutInfo(LayoutResourceKind::Uniform, sizeof(void*), SLANG_ALIGN_OF(void*));
  
             case ShaderParameterKind::TextureSampler:
             case ShaderParameterKind::MutableTextureSampler:
@@ -703,6 +837,62 @@ struct CPUObjectLayoutRulesImpl : ObjectLayoutRulesImpl
 };
 
 
+// TODO(JS): Most likely wrong! Assumes largely CPU layout which is probably not right
+struct CUDAObjectLayoutRulesImpl : CPUObjectLayoutRulesImpl
+{
+    typedef CPUObjectLayoutRulesImpl Super;
+
+    // cuda.h defines a variety of handle types. We don't want to have to include cuda.h though - as it may not be available
+    // on a build target. So for we define this handle type, that matches cuda.h and is used for types that use this kind
+    // of opaque handle (as opposed to a pointer) such as CUsurfObject, CUtexObject
+    typedef unsigned long long ObjectHandle;
+
+    virtual SimpleLayoutInfo GetObjectLayout(ShaderParameterKind kind) override
+    {
+        switch (kind)
+        {
+            case ShaderParameterKind::ConstantBuffer:
+                // It's a pointer to the actual uniform data
+                return SimpleLayoutInfo(LayoutResourceKind::Uniform, sizeof(void*), SLANG_ALIGN_OF(void*));
+
+            case ShaderParameterKind::MutableTexture:
+            case ShaderParameterKind::TextureUniformBuffer:
+            case ShaderParameterKind::Texture:
+                // It's a pointer to a texture interface 
+                return SimpleLayoutInfo(LayoutResourceKind::Uniform, sizeof(ObjectHandle), SLANG_ALIGN_OF(ObjectHandle));
+
+            case ShaderParameterKind::StructuredBuffer:
+            case ShaderParameterKind::MutableStructuredBuffer:
+                // It's a pointer and a size
+                return SimpleLayoutInfo(LayoutResourceKind::Uniform, sizeof(void*) * 2, SLANG_ALIGN_OF(void*));
+
+            case ShaderParameterKind::RawBuffer:
+            case ShaderParameterKind::Buffer:
+            case ShaderParameterKind::MutableRawBuffer:
+            case ShaderParameterKind::MutableBuffer:
+                // It's a pointer and a size in bytes
+                return SimpleLayoutInfo(LayoutResourceKind::Uniform, sizeof(void*) * 2, SLANG_ALIGN_OF(void*));
+
+            case ShaderParameterKind::SamplerState:
+                // In CUDA it seems that sampler states are combined into texture objects.
+                // So it's a binding issue to combine a sampler with a texture - and sampler are ignored
+                // For simplicity here though - we do create a variable and that variable takes up
+                // uniform binding space.
+                // TODO(JS): If we wanted to remove these variables we'd want to do it as a pass. The pass
+                // would presumably have to remove use of variables of this kind throughout IR. 
+                return SimpleLayoutInfo(LayoutResourceKind::Uniform, sizeof(void*), SLANG_ALIGN_OF(void*));
+
+            case ShaderParameterKind::TextureSampler:
+            case ShaderParameterKind::MutableTextureSampler:
+            case ShaderParameterKind::InputRenderTarget:
+                // TODO: how to handle these?
+            default:
+                SLANG_UNEXPECTED("unhandled shader parameter kind");
+                UNREACHABLE_RETURN(SimpleLayoutInfo());
+        }
+    }
+
+};
 
 static CPUObjectLayoutRulesImpl kCPUObjectLayoutRulesImpl;
 static CPULayoutRulesImpl kCPULayoutRulesImpl;
@@ -710,6 +900,16 @@ static CPULayoutRulesImpl kCPULayoutRulesImpl;
 LayoutRulesImpl kCPULayoutRulesImpl_ = {
     &kCPULayoutRulesFamilyImpl, &kCPULayoutRulesImpl, &kCPUObjectLayoutRulesImpl,
 };
+
+// CUDA
+
+static CUDAObjectLayoutRulesImpl kCUDAObjectLayoutRulesImpl;
+static CUDALayoutRulesImpl kCUDALayoutRulesImpl;
+
+LayoutRulesImpl kCUDALayoutRulesImpl_ = {
+    &kCUDALayoutRulesFamilyImpl, &kCUDALayoutRulesImpl, &kCUDAObjectLayoutRulesImpl,
+};
+
 
 // GLSL cases
 
@@ -986,6 +1186,69 @@ LayoutRulesImpl* CPULayoutRulesFamilyImpl::getStructuredBufferRules()
     return &kCPULayoutRulesImpl_;
 }
 
+// CUDA Family
+
+LayoutRulesImpl* CUDALayoutRulesFamilyImpl::getConstantBufferRules()
+{
+    return &kCUDALayoutRulesImpl_;
+}
+
+LayoutRulesImpl* CUDALayoutRulesFamilyImpl::getPushConstantBufferRules()
+{
+    return &kCUDALayoutRulesImpl_;
+}
+
+LayoutRulesImpl* CUDALayoutRulesFamilyImpl::getTextureBufferRules()
+{
+    return nullptr;
+}
+
+LayoutRulesImpl* CUDALayoutRulesFamilyImpl::getVaryingInputRules()
+{
+    return nullptr;
+}
+LayoutRulesImpl* CUDALayoutRulesFamilyImpl::getVaryingOutputRules()
+{
+    return nullptr;
+}
+LayoutRulesImpl* CUDALayoutRulesFamilyImpl::getSpecializationConstantRules()
+{
+    return nullptr;
+}
+LayoutRulesImpl* CUDALayoutRulesFamilyImpl::getShaderStorageBufferRules()
+{
+    return nullptr;
+}
+LayoutRulesImpl* CUDALayoutRulesFamilyImpl::getParameterBlockRules()
+{
+    // Not clear - just use similar to CPU 
+    return &kCUDALayoutRulesImpl_;
+}
+LayoutRulesImpl* CUDALayoutRulesFamilyImpl::getRayPayloadParameterRules()
+{
+    return nullptr;
+}
+LayoutRulesImpl* CUDALayoutRulesFamilyImpl::getCallablePayloadParameterRules()
+{
+    return nullptr;
+}
+LayoutRulesImpl* CUDALayoutRulesFamilyImpl::getHitAttributesParameterRules()
+{
+    return nullptr;
+}
+LayoutRulesImpl* CUDALayoutRulesFamilyImpl::getShaderRecordConstantBufferRules()
+{
+    // Just following HLSLs lead for the moment
+    return &kCUDALayoutRulesImpl_;
+}
+
+LayoutRulesImpl* CUDALayoutRulesFamilyImpl::getStructuredBufferRules()
+{
+    return &kCUDALayoutRulesImpl_;
+}
+
+
+
 LayoutRulesFamilyImpl* getDefaultLayoutRulesFamilyForTarget(TargetRequest* targetReq)
 {
     switch (targetReq->getTarget())
@@ -1018,6 +1281,13 @@ LayoutRulesFamilyImpl* getDefaultLayoutRulesFamilyForTarget(TargetRequest* targe
 
         return &kCPULayoutRulesFamilyImpl;
     }
+
+    case CodeGenTarget::PTX:
+    case CodeGenTarget::CUDASource:
+    {
+        return &kCUDALayoutRulesFamilyImpl;
+    }
+
 
     default:
         return nullptr;
@@ -2889,7 +3159,13 @@ static TypeLayoutResult _createTypeLayout(
             context,
             elementType);
 
-        auto info = rules->GetVectorLayout(element.info, elementCount);
+        BaseType elementBaseType = BaseType::Void;
+        if (auto elementBasicType = as<BasicExpressionType>(elementType))
+        {
+            elementBaseType = elementBasicType->baseType;
+        }
+
+        auto info = rules->GetVectorLayout(elementBaseType, element.info, elementCount);
 
         RefPtr<VectorTypeLayout> typeLayout = new VectorTypeLayout();
         typeLayout->type = type;
@@ -2915,6 +3191,12 @@ static TypeLayoutResult _createTypeLayout(
         auto elementTypeLayout = elementResult.layout;
         auto elementInfo = elementResult.info;
 
+        BaseType elementBaseType = BaseType::Void;
+        if (auto elementBasicType = as<BasicExpressionType>(elementType))
+        {
+            elementBaseType = elementBasicType->baseType;
+        }
+
         // The `GetMatrixLayout` implementation in the layout rules
         // currently defaults to assuming row-major layout,
         // so if we want column-major layout we achieve it here by
@@ -2929,6 +3211,7 @@ static TypeLayoutResult _createTypeLayout(
             layoutMinorCount = tmp;
         }
         auto info = rules->GetMatrixLayout(
+            elementBaseType,
             elementInfo,
             layoutMajorCount,
             layoutMinorCount);
@@ -2937,6 +3220,7 @@ static TypeLayoutResult _createTypeLayout(
         RefPtr<VectorTypeLayout> rowTypeLayout = new VectorTypeLayout();
 
         auto rowInfo = rules->GetVectorLayout(
+            elementBaseType,
             elementInfo,
             colCount);
 
@@ -3517,7 +3801,7 @@ RefPtr<TypeLayout> getSimpleVaryingParameterTypeLayout(
         {
             auto varyingRuleSet = varyingRules[rr];
             auto elementInfo = varyingRuleSet->GetScalarLayout(elementBaseType);
-            auto info = varyingRuleSet->GetVectorLayout(elementInfo, elementCount);
+            auto info = varyingRuleSet->GetVectorLayout(elementBaseType, elementInfo, elementCount);
             typeLayout->addResourceUsage(info.kind, info.size);
         }
 
@@ -3572,14 +3856,14 @@ RefPtr<TypeLayout> getSimpleVaryingParameterTypeLayout(
             auto varyingRuleSet = varyingRules[rr];
             auto elementInfo = varyingRuleSet->GetScalarLayout(elementBaseType);
 
-            auto info = varyingRuleSet->GetMatrixLayout(elementInfo, layoutMajorCount, layoutMinorCount);
+            auto info = varyingRuleSet->GetMatrixLayout(elementBaseType, elementInfo, layoutMajorCount, layoutMinorCount);
             typeLayout->addResourceUsage(info.kind, info.size);
 
             if(context.matrixLayoutMode == kMatrixLayoutMode_RowMajor)
             {
                 // For row-major matrices only, we can compute an effective
                 // resource usage for the row type.
-                auto rowInfo = varyingRuleSet->GetVectorLayout(elementInfo, colCount);
+                auto rowInfo = varyingRuleSet->GetVectorLayout(elementBaseType, elementInfo, colCount);
                 rowTypeLayout->addResourceUsage(rowInfo.kind, rowInfo.size);
             }
         }

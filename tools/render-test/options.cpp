@@ -25,11 +25,12 @@ static gfx::RendererType _toRenderType(Slang::RenderApiType apiType)
     using namespace Slang;
     switch (apiType)
     {
-    case RenderApiType::D3D11: return gfx::RendererType::DirectX11;
-    case RenderApiType::D3D12: return gfx::RendererType::DirectX12;
+    case RenderApiType::D3D11:  return gfx::RendererType::DirectX11;
+    case RenderApiType::D3D12:  return gfx::RendererType::DirectX12;
     case RenderApiType::OpenGl: return gfx::RendererType::OpenGl;
     case RenderApiType::Vulkan: return gfx::RendererType::Vulkan;
     case RenderApiType::CPU:    return gfx::RendererType::CPU;
+    case RenderApiType::CUDA:   return gfx::RendererType::CUDA;
     default: return gfx::RendererType::Unknown;
     }
 }
@@ -183,6 +184,10 @@ SlangResult parseOptions(int argc, const char*const* argv, Slang::WriterHelper s
             }
 
             gOptions.adapter = *argCursor++;
+        }
+        else if (strcmp(arg, "-output-using-type") == 0)
+        {
+            gOptions.outputUsingType = true;
         }
         else if (strcmp(arg, "-compute-dispatch") == 0)
         {

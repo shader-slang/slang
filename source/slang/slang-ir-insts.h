@@ -1063,6 +1063,7 @@ struct IRCall : IRInst
     IRInst* getCallee() { return getOperand(0); }
 
     UInt getArgCount() { return getOperandCount() - 1; }
+    IRUse* getArgs() { return getOperands() + 1; }
     IRInst* getArg(UInt index) { return getOperand(index + 1); }
 };
 
@@ -1769,6 +1770,9 @@ struct IRBuilder
         IRInst* const*  operands);
     IRType* getType(
         IROp            op);
+    IRType* getType(
+        IROp            op,
+        IRInst*         operand0);
 
         /// Create an empty basic block.
         ///

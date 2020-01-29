@@ -952,9 +952,17 @@ __generic<T : __BuiltinFloatingPointType, let N : int> vector<T,N> log(vector<T,
 __generic<T : __BuiltinFloatingPointType, let N : int, let M : int> matrix<T,N,M> log(matrix<T,N,M> x);
 
 // Base-10 logarithm
-__generic<T : __BuiltinFloatingPointType> T log10(T x);
-__generic<T : __BuiltinFloatingPointType, let N : int> vector<T,N> log10(vector<T,N> x);
-__generic<T : __BuiltinFloatingPointType, let N : int, let M : int> matrix<T,N,M> log10(matrix<T,N,M> x);
+__generic<T : __BuiltinFloatingPointType> 
+__target_intrinsic(glsl, "(log( $0 ) * $S0( 0.43429448190325182765112891891661) )" )
+T log10(T x);
+
+__generic<T : __BuiltinFloatingPointType, let N : int>
+__target_intrinsic(glsl, "(log( $0 ) * $S0(0.43429448190325182765112891891661) )" )
+vector<T,N> log10(vector<T,N> x);
+
+__generic<T : __BuiltinFloatingPointType, let N : int, let M : int> 
+__target_intrinsic(glsl, "(log( $0 ) * $S0(0.43429448190325182765112891891661) )" )
+matrix<T,N,M> log10(matrix<T,N,M> x);
 
 // Base-2 logarithm
 __generic<T : __BuiltinFloatingPointType> T log2(T x);
@@ -1240,7 +1248,9 @@ __generic<T : __BuiltinFloatingPointType, let N : int> vector<T,N> sin(vector<T,
 __generic<T : __BuiltinFloatingPointType, let N : int, let M : int> matrix<T,N,M> sin(matrix<T,N,M> x);
 
 // Sine and cosine
-__generic<T : __BuiltinFloatingPointType> void sincos(T x, out T s, out T c);
+__generic<T : __BuiltinFloatingPointType>
+__target_intrinsic(glsl, "$1 = sin($0); $2 = cos($0);")
+void sincos(T x, out T s, out T c);
 __generic<T : __BuiltinFloatingPointType, let N : int> void sincos(vector<T,N> x, out vector<T,N> s, out vector<T,N> c);
 __generic<T : __BuiltinFloatingPointType, let N : int, let M : int> void sincos(matrix<T,N,M> x, out matrix<T,N,M> s, out matrix<T,N,M> c);
 
