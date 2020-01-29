@@ -900,6 +900,8 @@ bool CLikeSourceEmitter::shouldFoldInstIntoUseSites(IRInst* inst)
         }
     }
 
+
+
     // If the instruction is at global scope, then it might represent
     // a constant (e.g., the value of an enum case).
     //
@@ -940,6 +942,56 @@ bool CLikeSourceEmitter::shouldFoldInstIntoUseSites(IRInst* inst)
 
     auto user = use->getUser();
 
+    // Check if the use is a call using a target intrinsic that uses the parameter more than once
+    // in the intrinsic definition.
+    if (auto callInst = as<IRCall>(user))
+    {
+        const auto funcValue = callInst->getCallee();
+
+        // Let's see if this instruction is a intrinsic call
+        // This is significant, because we can within a target intrinsics definition multiple accesses to the same
+        // parameter. This is not indicated into the call, and can lead to output code computes something multiple
+        // times as it is folding into the expression of the the target intrinsic, which we don't want.
+        if (auto targetIntrinsicDecoration = findTargetIntrinsicDecoration(funcValue))
+        {         
+            // Find the index of the original instruction, to see if it's multiply used.
+            IRUse* args = callInst->getArgs();
+            const Index paramIndex = Index(use - args);
+            SLANG_ASSERT(paramIndex >= 0 && paramIndex < Index(callInst->getArgCount()));
+
+            // Look through the slice to seeing how many times this parameters is used (signified via the $0...$9)
+            {
+                UnownedStringSlice slice = targetIntrinsicDecoration->getDefinition();
+                
+                const char* cur = slice.begin();
+                const char* end = slice.end();
+
+                // Count the amount of uses
+                Index useCount = 0;
+                while (cur < end)
+                {
+                    const char c = *cur;
+                    if (c == '$' && cur + 1 < end && cur[1] >= '0' && cur[1] <= '9')
+                    {
+                        const Index index = Index(cur[1] - '0');
+                        useCount += Index(index == paramIndex);
+                        cur += 2;
+                    }
+                    else
+                    {
+                        cur++;
+                    }
+                }
+
+                // If there is more than one use can't fold.
+                if (useCount > 1)
+                {
+                    return false;
+                }
+            }
+        }
+    }
+    
     // We'd like to figure out if it is safe to fold our instruction into `user`
 
     // First, let's make sure they are in the same block/parent:

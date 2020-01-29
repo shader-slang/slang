@@ -30,10 +30,12 @@ uniform image2D outputTexture_0;
 layout(local_size_x = 16, local_size_y = 16, local_size_z = 1) in;
 void main()
 {
+    ivec3 _S2 = ivec3(C_0._data.pos_0, 0);
+
     vec2 tmp_0 = texelFetch(
     	inputTexture_0,
-    	ivec3(C_0._data.pos_0, 0).xy,
-    	ivec3(C_0._data.pos_0, 0).z).xy;
+    	_S2.xy,
+    	_S2.z).xy;
 
     imageStore(
     	outputTexture_0,
