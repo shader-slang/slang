@@ -957,7 +957,7 @@ bool CLikeSourceEmitter::shouldFoldInstIntoUseSites(IRInst* inst)
             // Find the index of the original instruction, to see if it's multiply used.
             IRUse* args = callInst->getArgs();
             const Index paramIndex = Index(use - args);
-            SLANG_ASSERT(index >= 0 && index < Index(callInst->getArgCount()));
+            SLANG_ASSERT(paramIndex >= 0 && paramIndex < Index(callInst->getArgCount()));
 
             // Look through the slice to seeing how many times this parameters is used (signified via the $0...$9)
             {
