@@ -451,9 +451,8 @@ namespace Slang
         Decl* firstDeclWithName = nullptr;
         if( !translationUnitSyntax->memberDictionary.TryGetValue(entryPointName, firstDeclWithName) )
         {
-            // If there doesn't appear to be any such declaration, then
-            // we need to diagnose it as an error, and then bail out.
-            sink->diagnose(translationUnitSyntax, Diagnostics::entryPointFunctionNotFound, entryPointName);
+            // If there doesn't appear to be any such declaration, bail out but dont treat it as
+            // an error in case the entry point exists in our library modules.
             return nullptr;
         }
 
@@ -833,6 +832,31 @@ namespace Slang
                     outUnspecializedEntryPoints.add(entryPoint);
                     allComponentTypes.add(entryPoint);
                 }
+                else
+                {
+                    // Scan entry points that were introduced via adding
+                    // a library reference for explicit requests
+                    // TODO: We need to check for duplicate entry points that were
+                    // explicitly requested
+                    for (auto extraEntryPoint : compileRequest->m_extraEntryPoints)
+                    {
+                        if (getText(extraEntryPoint.name) == getText(entryPointReq->getName()) &&
+                            extraEntryPoint.profile == entryPointReq->getProfile())
+                        {
+                            auto entryPointExtra = EntryPoint::createDummyForDeserialize(
+                                linkage,
+                                extraEntryPoint.name,
+                                extraEntryPoint.profile,
+                                extraEntryPoint.mangledName);
+                            allComponentTypes.add(entryPointExtra);
+                        }
+                    }
+                    if (allComponentTypes.getFirst() == allComponentTypes.getLast())
+                    {
+                        // empty list: diagnose this as an error
+                        sink->diagnose(entryPointReq->getTranslationUnit()->getModuleDecl(), Diagnostics::entryPointFunctionNotFound, entryPointReq->getName());
+                    }
+                }
             }
 
             // TODO: We should consider always processing both categories,
@@ -913,19 +937,19 @@ namespace Slang
                     allComponentTypes.add(entryPoint);
                 }
             }
-        }
 
-        // Also consider entry points that were introduced via adding
-        // a library reference...
-        //
-        for( auto extraEntryPoint : compileRequest->m_extraEntryPoints )
-        {
-            auto entryPoint = EntryPoint::createDummyForDeserialize(
-                linkage,
-                extraEntryPoint.name,
-                extraEntryPoint.profile,
-                extraEntryPoint.mangledName);
-            allComponentTypes.add(entryPoint);
+            // Also consider entry points that were introduced via adding
+            // a library reference...
+            //
+            for (auto extraEntryPoint : compileRequest->m_extraEntryPoints)
+            {
+                auto entryPoint = EntryPoint::createDummyForDeserialize(
+                    linkage,
+                    extraEntryPoint.name,
+                    extraEntryPoint.profile,
+                    extraEntryPoint.mangledName);
+                allComponentTypes.add(entryPoint);
+            }
         }
 
         if(allComponentTypes.getCount() > 1)
