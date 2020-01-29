@@ -562,32 +562,10 @@ void BindSet::releaseValueTargets()
 // !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! BindLocation !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 
 BindLocation::BindLocation(slang::TypeLayoutReflection* typeLayout, const BindPoints& points, BindSet_Value* value) :
-    m_typeLayout(typeLayout)
+    m_typeLayout(typeLayout),
+    m_value(value)
 {
-    Slang::Index categoryIndex;
-    auto categoryCount = points.calcValidCount(&categoryIndex);
-
-    if (categoryCount == 0)
-    {
-        // If no categories - mark as invalid
-        m_typeLayout = nullptr;
-        m_category = slang::ParameterCategory::None;
-    }
-    else if (categoryCount == 1)
-    {
-        // If 1, we don't want m_bindPointSet
-        m_category = SlangParameterCategory(categoryIndex);
-        m_point = points.m_points[categoryIndex];
-    }
-    else
-    {
-        // We don't use these
-        m_category = SLANG_PARAMETER_CATEGORY_NONE;
-        m_point.setInvalid();
-
-        // Create a bindpoint set
-        m_bindPointSet = new BindPointSet(points);
-    }
+    setPoints(points);
 }
 
 BindLocation::BindLocation(slang::TypeLayoutReflection* typeLayout, SlangParameterCategory category, const BindPoint& point, BindSet_Value* value) :
@@ -596,6 +574,50 @@ BindLocation::BindLocation(slang::TypeLayoutReflection* typeLayout, SlangParamet
     m_typeLayout(typeLayout),
     m_value(value)
 {
+}
+
+BindLocation::BindLocation(slang::VariableLayoutReflection* varLayout, BindSet_Value* value)
+{    
+    m_value = value;
+    m_typeLayout = varLayout->getTypeLayout();
+
+    const Index categoryCount = Index(varLayout->getCategoryCount());
+
+    if (categoryCount <= 0)
+    {
+        *this = BindLocation::Invalid;
+        return;
+    }
+    else if (categoryCount == 1)
+    {
+        const auto category = varLayout->getCategoryByIndex(0);
+
+        const auto offset = varLayout->getOffset(category);
+        const auto space = varLayout->getBindingSpace(category);
+
+        m_category = category;
+        m_point = BindPoint(Index(space), size_t(offset));
+    }
+    else
+    {
+        BindPoints points;
+        points.setInvalid();
+
+        for (Index i = 0; i < categoryCount; ++i)
+        {
+            const auto category = varLayout->getCategoryByIndex((unsigned int)i);
+
+            const auto offset = varLayout->getOffset(category);
+            const auto space = varLayout->getBindingSpace(category);
+
+            BindPoint& point = points.m_points[category];
+
+            point.m_offset = size_t(offset);
+            point.m_space = Index(space);
+        }
+
+        setPoints(points);
+    }
 }
 
 BindPoint* BindLocation::getValidBindPointForCategory(SlangParameterCategory category)
@@ -828,15 +850,68 @@ SlangResult BindRoot::parse(const String& text, const String& sourcePath, Writer
     return SLANG_OK;
 }
 
+slang::VariableLayoutReflection* BindRoot::getParameterByName(const char* name)
+{
+    const int parameterCount = m_reflection->getParameterCount();
+    for (int i = 0; i < parameterCount; ++i)
+    {
+        auto parameter = m_reflection->getParameterByIndex(i);
+        const char* paramName = parameter->getName();
+        if (strcmp(name, paramName) == 0)
+        {
+            return parameter;
+        }
+    }
+
+    return nullptr;
+}
+
+slang::VariableLayoutReflection* BindRoot::getEntryPointParameterByName(const char* name)
+{
+    const int parameterCount = int(m_entryPoint->getParameterCount());
+    for (int i = 0; i < parameterCount; ++i)
+    {
+        auto parameter = m_entryPoint->getParameterByIndex(i);
+        // If has a semantic we will ignore
+        if (parameter->getSemanticName())
+        {
+            continue;
+        }
+        if (strcmp(parameter->getName(), name) == 0)
+        {
+            return parameter;
+        }
+    }
+    return nullptr;
+}
+
+SlangResult BindRoot::init(BindSet* bindSet, slang::ShaderReflection* reflection, int entryPointIndex)
+{
+    m_bindSet = bindSet;
+    m_reflection = reflection;
+    m_entryPoint = nullptr;
+    
+    {
+        auto entryPointCount = int(reflection->getEntryPointCount());
+        if (entryPointIndex < 0 || entryPointIndex >= entryPointCount)
+        {
+            SLANG_ASSERT(!"Entry point index out of range");
+            return SLANG_FAIL;
+        }
+        m_entryPoint = reflection->getEntryPointByIndex(entryPointIndex);
+    }
+
+    return SLANG_OK;
+}
+
 // !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! CPULikeBindRoot !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 
 SlangResult CPULikeBindRoot::init(BindSet* bindSet, slang::ShaderReflection* reflection, int entryPointIndex)
 {
-    m_bindSet = bindSet;
-        
-    m_reflection = reflection;
     m_rootValue = nullptr;
     m_entryPointValue = nullptr;
+
+    SLANG_RETURN_ON_FAIL(Super::init(bindSet, reflection, entryPointIndex));
 
     {
         size_t globalConstantBuffer = reflection->getGlobalConstantBufferSize();
@@ -866,14 +941,6 @@ SlangResult CPULikeBindRoot::init(BindSet* bindSet, slang::ShaderReflection* ref
     }
 
     {
-        auto entryPointCount = int(reflection->getEntryPointCount());
-        if (entryPointIndex < 0 || entryPointIndex >= entryPointCount)
-        {
-            SLANG_ASSERT(!"Entry point index out of range");
-            return SLANG_FAIL;
-        }
-
-        m_entryPoint = reflection->getEntryPointByIndex(entryPointIndex);
         size_t entryPointParamsSizeInBytes = 0;
 
         const int parameterCount = int(m_entryPoint->getParameterCount());
@@ -905,40 +972,7 @@ SlangResult CPULikeBindRoot::init(BindSet* bindSet, slang::ShaderReflection* ref
     return SLANG_OK;
 }
 
-slang::VariableLayoutReflection* CPULikeBindRoot::getParameterByName(const char* name)
-{
-    const int parameterCount = m_reflection->getParameterCount();
-    for (int i = 0; i < parameterCount; ++i)
-    {
-        auto parameter = m_reflection->getParameterByIndex(i);
-        const char* paramName = parameter->getName();
-        if (strcmp(name, paramName) == 0)
-        {
-            return parameter;
-        }
-    }
 
-    return nullptr;
-}
-
-slang::VariableLayoutReflection* CPULikeBindRoot::getEntryPointParameterByName(const char* name)
-{
-    const int parameterCount = int(m_entryPoint->getParameterCount());
-    for (int i = 0; i < parameterCount; ++i)
-    {
-        auto parameter = m_entryPoint->getParameterByIndex(i);
-        // If has a semantic we will ignore
-        if (parameter->getSemanticName())
-        {
-            continue;
-        }
-        if (strcmp(parameter->getName(), name) == 0)
-        {
-            return parameter;
-        }
-    }
-    return nullptr;
-}
 
 BindLocation CPULikeBindRoot::find(const char* name)
 {
@@ -1130,6 +1164,73 @@ void CPULikeBindRoot::addDefaultValues()
     for (auto& location : rootLocations)
     {
         _addDefaultBuffersRec(m_bindSet, location);
+    }
+}
+
+// !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! GPULikeBindRoot !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+
+BindLocation GPULikeBindRoot::find(const char* name)
+{
+    slang::VariableLayoutReflection* varLayout = nullptr;
+
+    varLayout = getParameterByName(name);
+    if (!varLayout)
+    {
+        varLayout = getEntryPointParameterByName(name);
+    }
+
+    if (!varLayout)
+    {
+        return BindLocation::Invalid;
+    }
+
+    return BindLocation(varLayout, nullptr);
+}
+
+SlangResult GPULikeBindRoot::setArrayCount(const BindLocation& location, int count)
+{
+    // TODO(JS):
+    // Not 100% clear how to handle this. If the mechanism uses 'spaces' there is nothing to do.
+    // If the size is an aspect of the binding, then we need to set up the binding information correctly. Depending on underlying
+    // API. This could perhaps be handled with a base class for m_target which meant we could just call that and it would
+    // do the right thing.
+    //
+    // For now, lets not worry.
+    return SLANG_OK;
+}
+
+void GPULikeBindRoot::getRoots(Slang::List<BindLocation>& outLocations)
+{
+    {
+        const int parameterCount = int(m_entryPoint->getParameterCount());
+        for (int i = 0; i < parameterCount; ++i)
+        {
+            auto parameter = m_entryPoint->getParameterByIndex(i);
+            // If has a semantic we will ignore
+            if (parameter->getSemanticName())
+            {
+                continue;
+            }
+
+            auto offset = parameter->getOffset(SLANG_PARAMETER_CATEGORY_UNIFORM);
+
+            BindLocation location(parameter, nullptr);
+            SLANG_ASSERT(location.isValid());
+
+            outLocations.add(location);
+        }
+    }
+    {
+        const int parameterCount = m_reflection->getParameterCount();
+        for (int i = 0; i < parameterCount; ++i)
+        {
+            auto parameter = m_reflection->getParameterByIndex(i);
+
+            BindLocation location(parameter, nullptr);
+            SLANG_ASSERT(location.isValid());
+
+            outLocations.add(location);
+        }
     }
 }
 

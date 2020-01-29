@@ -278,6 +278,7 @@ struct BindLocation
     BindLocation() {}
     BindLocation(slang::TypeLayoutReflection* typeLayout, const BindPoints& points, BindSet_Value* value = nullptr);
     BindLocation(slang::TypeLayoutReflection* typeLayout, SlangParameterCategory category, const BindPoint& point, BindSet_Value* value = nullptr);
+    BindLocation(slang::VariableLayoutReflection* varLayout, BindSet_Value* value = nullptr);
 
     BindLocation(const ThisType& rhs) = default;
 
@@ -386,9 +387,17 @@ public:
         /// Get the bindset
     BindSet* getBindSet() const { return m_bindSet; }
 
+    slang::VariableLayoutReflection* getParameterByName(const char* name);
+    slang::VariableLayoutReflection* getEntryPointParameterByName(const char* name);
+
+    SlangResult init(BindSet* bindSet, slang::ShaderReflection* reflection, int entryPointIndex);
+
+
 protected:
     
     BindSet* m_bindSet = nullptr;
+    slang::EntryPointReflection* m_entryPoint = nullptr;
+    slang::ShaderReflection* m_reflection = nullptr;
 };
 
 /* A CPULike implementation of the BindRoot. This can be used for any binding that holds
@@ -405,9 +414,6 @@ public:
     virtual SlangResult setArrayCount(const BindLocation& location, int count) SLANG_OVERRIDE;
     virtual void getRoots(Slang::List<BindLocation>& outLocations) SLANG_OVERRIDE;
 
-    slang::VariableLayoutReflection* getParameterByName(const char* name);
-    slang::VariableLayoutReflection* getEntryPointParameterByName(const char* name);
-
     void addDefaultValues();
 
     Value* getRootValue() const { return m_rootValue; }
@@ -420,11 +426,25 @@ public:
 
 protected:
     // Used when we have uniform buffers (as used on CPU/CUDA)
-    slang::ShaderReflection* m_reflection = nullptr;
+    
     Value* m_rootValue = nullptr;
     Value* m_entryPointValue = nullptr;
-    slang::EntryPointReflection* m_entryPoint;
 };
+
+class GPULikeBindRoot : public BindRoot
+{
+public:
+    typedef BindRoot Super;
+
+    // BindRoot
+    virtual BindLocation find(const char* name) SLANG_OVERRIDE;
+    virtual SlangResult setArrayCount(const BindLocation& location, int count) SLANG_OVERRIDE;
+    virtual void getRoots(Slang::List<BindLocation>& outLocations) SLANG_OVERRIDE;
+
+protected:
+};
+
+
 
 } // renderer_test
 
