@@ -84,9 +84,7 @@ protected:
     virtual SlangResult calcTypeName(IRType* type, CodeGenTarget target, StringBuilder& out);
     virtual SlangResult calcFuncName(const HLSLIntrinsic* specOp, StringBuilder& out);
     virtual SlangResult calcScalarFuncName(HLSLIntrinsic::Op op, IRBasicType* type, StringBuilder& outBuilder);
-    virtual void emitSpecializedOperationDefinitionPreamble(const HLSLIntrinsic* specOp) { SLANG_UNUSED(specOp); }
-
-
+    
     void _maybeEmitSpecializedOperationDefinition(const HLSLIntrinsic* specOp);
 
     void _emitForwardDeclarations(const List<EmitAction>& actions);
