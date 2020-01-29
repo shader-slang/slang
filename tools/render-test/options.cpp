@@ -185,6 +185,10 @@ SlangResult parseOptions(int argc, const char*const* argv, Slang::WriterHelper s
 
             gOptions.adapter = *argCursor++;
         }
+        else if (strcmp(arg, "-output-using-type") == 0)
+        {
+            gOptions.outputUsingType = true;
+        }
         else if (strcmp(arg, "-compute-dispatch") == 0)
         {
             if (argCursor == argEnd)

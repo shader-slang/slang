@@ -57,6 +57,8 @@ struct Options
     char const* slangArgs[kMaxSlangArgs];
     int slangArgCount = 0;
 
+    bool outputUsingType = false;
+
     bool useDXIL = false;
     bool onlyStartup = false;
 
