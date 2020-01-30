@@ -674,14 +674,14 @@ void GLSLSourceEmitter::emitSimpleValueImpl(IRInst* inst)
                     default: break;
                     case BaseType::Int64:
                     {
-                        m_writer->emit(litInst->value.intVal);
+                        m_writer->emitInt64(int64_t(litInst->value.intVal));
                         m_writer->emit("l");
                         return;
                     }
                     case BaseType::UInt64:
                     {
                         SLANG_COMPILE_TIME_ASSERT(sizeof(litInst->value.intVal) >= sizeof(uint64_t));
-                        m_writer->emit(uint64_t(litInst->value.intVal));
+                        m_writer->emitUInt64(uint64_t(litInst->value.intVal));
                         m_writer->emit("ul");
                         return;
                     }

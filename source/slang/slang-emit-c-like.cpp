@@ -768,14 +768,14 @@ void CLikeSourceEmitter::emitSimpleValueImpl(IRInst* inst)
                 }
                 case BaseType::Int64:
                 {
-                    m_writer->emit(litInst->value.intVal);
+                    m_writer->emitInt64(int64_t(litInst->value.intVal));
                     m_writer->emit("ll");
                     break;
                 }
                 case BaseType::UInt64:
                 {
                     SLANG_COMPILE_TIME_ASSERT(sizeof(litInst->value.intVal) >= sizeof(uint64_t));
-                    m_writer->emit(uint64_t(litInst->value.intVal));
+                    m_writer->emitUInt64(uint64_t(litInst->value.intVal));
                     m_writer->emit("ull");
                     break;
                 }
