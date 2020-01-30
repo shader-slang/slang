@@ -31,6 +31,10 @@ public:
     void emit(const NameLoc& nameAndLoc);
     void emit(const StringSliceLoc& nameAndLoc);
     void emit(IntegerLiteralValue value);
+
+    void emitUInt64(uint64_t value);
+    void emitInt64(int64_t value);
+
     void emit(UInt value);
     void emit(int value);
     void emit(double value);

@@ -15,7 +15,7 @@ public:
 
     void requireExtension(const String& name);
     void requireVersion(ProfileVersion version);
-    void requireHalfExtension();
+    void requireBaseTypeExtension(BaseType baseType);
 
     ProfileVersion getRequiredProfileVersion() const { return m_profileVersion; }
     const StringBuilder& getExtensionRequireLines() const { return m_extensionRequireLines; }
@@ -27,7 +27,9 @@ protected:
 
     ProfileVersion m_profileVersion = ProfileVersion::GLSL_110;
 
-    bool m_hasHalfExtension = false;
+    static uint32_t _getFlag(BaseType baseType) { return uint32_t(1) << int(baseType); }
+
+    uint32_t m_hasBaseTypeFlags = 0xffffffff & ~(_getFlag(BaseType::UInt64) + _getFlag(BaseType::Int64) + _getFlag(BaseType::Half)); 
 };
 
 }
