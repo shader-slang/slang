@@ -197,6 +197,20 @@ void SourceWriter::emit(UInt value)
     emit(buffer);
 }
 
+void SourceWriter::emitUInt64(uint64_t value)
+{
+    char buffer[32];
+    sprintf(buffer, "%llu", (unsigned long long)(value));
+    emit(buffer);
+}
+
+void SourceWriter::emitInt64(int64_t value)
+{
+    char buffer[32];
+    sprintf(buffer, "%lld", (long long int)value);
+    emit(buffer);
+}
+
 void SourceWriter::emit(int value)
 {
     char buffer[16];

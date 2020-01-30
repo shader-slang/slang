@@ -26,18 +26,35 @@ void GLSLExtensionTracker::requireVersion(ProfileVersion version)
     }
 }
 
-void GLSLExtensionTracker::requireHalfExtension()
+void GLSLExtensionTracker::requireBaseTypeExtension(BaseType baseType)
 {
-    if (!m_hasHalfExtension)
+    uint32_t bit = 1 << int(baseType);
+    if (m_hasBaseTypeFlags & bit)
     {
-        // https://github.com/KhronosGroup/GLSL/blob/master/extensions/ext/GL_EXT_shader_16bit_storage.txt
-        requireExtension("GL_EXT_shader_16bit_storage");
-
-        // https://github.com/KhronosGroup/GLSL/blob/master/extensions/ext/GL_EXT_shader_explicit_arithmetic_types.txt
-        requireExtension("GL_EXT_shader_explicit_arithmetic_types");
-
-        m_hasHalfExtension = true;
+        return;
     }
+
+    switch (baseType)
+    {
+        case BaseType::Half:
+        {
+            // https://github.com/KhronosGroup/GLSL/blob/master/extensions/ext/GL_EXT_shader_16bit_storage.txt
+            requireExtension("GL_EXT_shader_16bit_storage");
+
+            // https://github.com/KhronosGroup/GLSL/blob/master/extensions/ext/GL_EXT_shader_explicit_arithmetic_types.txt
+            requireExtension("GL_EXT_shader_explicit_arithmetic_types");
+            break;
+        }
+        case BaseType::UInt64:
+        case BaseType::Int64:
+        {
+            requireExtension("GL_EXT_shader_explicit_arithmetic_types_int64");
+            m_hasBaseTypeFlags |= _getFlag(BaseType::UInt64) | _getFlag(BaseType::Int64);
+            break;
+        }
+    }
+
+    m_hasBaseTypeFlags |= bit;
 }
 
 
