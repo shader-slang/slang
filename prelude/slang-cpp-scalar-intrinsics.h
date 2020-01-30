@@ -197,6 +197,7 @@ SLANG_FORCE_INLINE double U32_asdouble(uint32_t low, uint32_t hi)
     return u.d;
 }
 
+
 SLANG_FORCE_INLINE uint32_t U32_countbits(uint32_t v)
 {
 #if SLANG_GCC_FAMILY    
@@ -214,6 +215,40 @@ SLANG_FORCE_INLINE uint32_t U32_countbits(uint32_t v)
 #endif
 }
 
+// ----------------------------- U64 -----------------------------------------
+
+SLANG_FORCE_INLINE uint64_t U64_abs(uint64_t f) { return f; }
+
+SLANG_FORCE_INLINE uint64_t U64_min(uint64_t a, uint64_t b) { return a < b ? a : b; }
+SLANG_FORCE_INLINE uint64_t U64_max(uint64_t a, uint64_t b) { return a > b ? a : b; }
+
+SLANG_FORCE_INLINE uint64_t U64_clamp(uint64_t x, uint64_t min, uint64_t max) { return ( x < min) ? min : ((x > max) ? max : x); }
+
+SLANG_FORCE_INLINE uint32_t U64_countbits(uint64_t v)
+{
+#if SLANG_GCC_FAMILY    
+    return __builtin_popcountl(v);
+#elif SLANG_PROCESSOR_X86_64 && SLANG_VC
+    return __popcnt64(v);
+#else     
+    uint64_t c = 0;
+    while (v)
+    {
+        c++;
+        v &= v - 1;
+    }
+    return c;
+#endif
+}
+
+// ----------------------------- I64 -----------------------------------------
+
+SLANG_FORCE_INLINE int64_t I64_abs(int64_t f) { return (f < 0) ? -f : f; }
+
+SLANG_FORCE_INLINE int64_t I64_min(int64_t a, int64_t b) { return a < b ? a : b; }
+SLANG_FORCE_INLINE int64_t I64_max(int64_t a, int64_t b) { return a > b ? a : b; }
+
+SLANG_FORCE_INLINE int64_t I64_clamp(int64_t x, int64_t min, int64_t max) { return ( x < min) ? min : ((x > max) ? max : x); }
 
 #ifdef SLANG_PRELUDE_NAMESPACE
 } 

@@ -214,6 +214,32 @@ SLANG_CUDA_CALL uint32_t U32_countbits(uint32_t v)
     return __popc(v);
 }
 
+
+// ----------------------------- I64 -----------------------------------------
+
+SLANG_CUDA_CALL int64_t I64_abs(int64_t f) { return (f < 0) ? -f : f; }
+
+SLANG_CUDA_CALL int64_t I64_min(int64_t a, int64_t b) { return a < b ? a : b; }
+SLANG_CUDA_CALL int64_t I64_max(int64_t a, int64_t b) { return a > b ? a : b; }
+
+SLANG_CUDA_CALL int64_t I64_clamp(int64_t x, int64_t min, int64_t max) { return ( x < min) ? min : ((x > max) ? max : x); }
+
+// ----------------------------- U64 -----------------------------------------
+
+SLANG_CUDA_CALL int64_t U64_abs(uint64_t f) { return f; }
+
+SLANG_CUDA_CALL int64_t U64_min(uint64_t a, uint64_t b) { return a < b ? a : b; }
+SLANG_CUDA_CALL int64_t U64_max(uint64_t a, uint64_t b) { return a > b ? a : b; }
+
+SLANG_CUDA_CALL int64_t U64_clamp(uint64_t x, uint64_t min, uint64_t max) { return ( x < min) ? min : ((x > max) ? max : x); }
+
+SLANG_CUDA_CALL uint32_t U64_countbits(uint64_t v)
+{
+    // https://docs.nvidia.com/cuda/cuda-math-api/group__CUDA__MATH__INTRINSIC__INT.html#group__CUDA__MATH__INTRINSIC__INT_1g43c9c7d2b9ebf202ff1ef5769989be46
+    return __popcll(v);
+}
+
+
 // ----------------------------- ResourceType -----------------------------------------
 
 
