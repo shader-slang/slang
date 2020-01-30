@@ -49,23 +49,25 @@ Vulkan   | GlSlang/Spir-V   |      Yes       |          Yes       |
 D3D11    | FXC/DXBC         |      No        |          No        |   1
 D3D12    | FXC/DXBC         |      No        |          No        |   1
 
-The intrinsics available on uint64_t type are `abs`, `min`, `max`, `clamp` and `countbits`.
-
 1) uint64_t support requires https://docs.microsoft.com/en-us/windows/win32/direct3dhlsl/hlsl-shader-model-6-0-features-for-direct3d-12, so DXBC is not a target.
+
+The intrinsics available on uint64_t type are `abs`, `min`, `max`, `clamp` and `countbits`.
 
 int64_t Support
 ================
 
-Target   | Compiler/Binary  |  uint64_t Type |  Intrinsic support | Notes
+Target   | Compiler/Binary  |  int64_t Type |  Intrinsic support | Notes
 ---------|------------------|----------------|--------------------|--------
 CPU      |                  |      Yes       |          Yes       |   
 CUDA     | Nvrtx/PTX        |      Yes       |          Yes       |   
 Vulkan   | GlSlang/Spir-V   |      Yes       |          Yes       |   
-D3D12    | DXC/DXIL         |      No        |          No        | 1    
-D3D11    | FXC/DXBC         |      No        |          No        | 1 
-D3D12    | FXC/DXBC         |      No        |          No        | 1
+D3D12    | DXC/DXIL         |      Yes       |          Yes       | 1
+D3D11    | FXC/DXBC         |      No        |          No        | 2 
+D3D12    | FXC/DXBC         |      No        |          No        | 2
 
-1) SM6.0 only supports uint64_t - and DXBC doesn't support SM6.0, so no support on D3D targets.
+1) The sm6.0 docs (https://docs.microsoft.com/en-us/windows/win32/direct3dhlsl/hlsl-shader-model-6-0-features-for-direct3d-12) describe only supports uint64_t, but the dxc compiler page says int64_t is supported in HLSL 2016 (https://github.com/Microsoft/DirectXShaderCompiler/wiki/Language-Versions). Tests show that this is indeed the case.
+
+2) uint64_t support requires https://docs.microsoft.com/en-us/windows/win32/direct3dhlsl/hlsl-shader-model-6-0-features-for-direct3d-12, so DXBC is not a target.
 
 The intrinsics available on uint64_t type are `abs`, `min`, `max` and `clamp`.
 
