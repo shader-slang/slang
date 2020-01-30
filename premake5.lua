@@ -552,13 +552,14 @@ toolSharedLibrary "render-test"
         includedirs { cudaPath .. "/include" }
         includedirs { cudaPath .. "/include", cudaPath .. "/common/inc" }
         
+        links { "cuda", "cudart" }   
+        
         filter { "platforms:x86" }
             libdirs { cudaPath .. "/lib/Win32/" }
            
         filter { "platforms:x64" }
             libdirs { cudaPath .. "/lib/x64/" }   
            
-        links { "cuda", "cudart" }   
     end
   
 --
