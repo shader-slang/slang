@@ -743,8 +743,51 @@ void CLikeSourceEmitter::emitSimpleValueImpl(IRInst* inst)
     switch(inst->op)
     {
     case kIROp_IntLit:
-        m_writer->emit(((IRConstant*) inst)->value.intVal);
+    {
+        auto litInst = static_cast<IRConstant*>(inst);
+
+        IRBasicType* type = as<IRBasicType>(inst->getDataType());
+        if (type)
+        {
+            switch (type->getBaseType())
+            {
+                default:
+                case BaseType::Int8:
+                case BaseType::Int16:
+                case BaseType::Int:
+                {
+                    m_writer->emit(litInst->value.intVal);
+                    break;
+                }
+                case BaseType::UInt8:
+                case BaseType::UInt16:
+                case BaseType::UInt:
+                {
+                    m_writer->emit(UInt(litInst->value.intVal));
+                    break;
+                }
+                case BaseType::Int64:
+                {
+                    m_writer->emit(litInst->value.intVal);
+                    m_writer->emit("ll");
+                    break;
+                }
+                case BaseType::UInt64:
+                {
+                    SLANG_COMPILE_TIME_ASSERT(sizeof(litInst->value.intVal) >= sizeof(uint64_t));
+                    m_writer->emit(uint64_t(litInst->value.intVal));
+                    m_writer->emit("ull");
+                    break;
+                }
+            }
+        }
+        else
+        {
+            // If no type... just output what we have
+            m_writer->emit(litInst->value.intVal);
+        }
         break;
+    }
 
     case kIROp_FloatLit:
         m_writer->emit(((IRConstant*) inst)->value.floatVal);

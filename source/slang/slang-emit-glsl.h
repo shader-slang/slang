@@ -40,6 +40,9 @@ protected:
     virtual bool tryEmitGlobalParamImpl(IRGlobalParam* varDecl, IRType* varType) SLANG_OVERRIDE;
     virtual bool tryEmitInstExprImpl(IRInst* inst, const EmitOpInfo& inOuterPrec) SLANG_OVERRIDE;
 
+    virtual void emitSimpleValueImpl(IRInst* inst) SLANG_OVERRIDE;
+
+
     void _emitGLSLTextureOrTextureSamplerType(IRTextureTypeBase* type, char const* baseName);
     void _emitGLSLStructuredBuffer(IRGlobalParam* varDecl, IRHLSLStructuredBufferTypeBase* structuredBufferType);
 
@@ -62,7 +65,8 @@ protected:
         // of the variable is an integer type.
     void _maybeEmitGLSLFlatModifier(IRType* valueType);
 
-    void _requireHalf();
+    void _requireBaseType(BaseType baseType);
+
     void _maybeEmitGLSLCast(IRType* castType, IRInst* inst);
 };
 
