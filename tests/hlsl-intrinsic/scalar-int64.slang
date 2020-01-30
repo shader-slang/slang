@@ -13,9 +13,18 @@ RWStructuredBuffer<int> outputBuffer;
 [numthreads(4, 1, 1)]
 void computeMain(uint3 dispatchThreadID : SV_DispatchThreadID)
 {
-    uint idx = dispatchThreadID.x;
+    int64_t idx = int64_t(dispatchThreadID.x);
     
-    int64_t v = int64_t(idx) * 0x400010035435435ll; 
+    int64_t ti =0;
+    
+    ti += max(2, idx);
+    ti += min(idx, 1);
+    ti += abs(idx - 2);
+    ti += (idx * 3) % 5;
+    
+    ti += clamp(idx * 10, 11, 23);
+
+    int64_t v = (ti * 0x400010035435435ll) / 3ll + 7ll - 9ll; 
     
     outputBuffer[idx] = int(v) ^ int(((v >> 32) & 0xffffffff)); 
 }
