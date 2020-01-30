@@ -44,15 +44,28 @@ struct PreprocessorConditional
 
 struct PreprocessorMacro;
 
+    /// A node in a linked list of macros that are "busy" in an environment.
+    ///
+    /// A macro is "busy" if there is already an open expansion of it in
+    /// the same (or a parent) environment, such that expanding it again
+    /// in the environment would lead to infinite expansion.
+    ///
+struct BusyMacro
+{
+        /// The macro that is busy.
+    PreprocessorMacro*  macro = nullptr;
+
+        /// The rest of the list of busy macros.
+    BusyMacro*          next = nullptr;
+};
+
 struct PreprocessorEnvironment
 {
     // The "outer" environment, to be used if lookup in this env fails
     PreprocessorEnvironment*                parent = NULL;
 
-    // Macro that introduced this environment (if any),
-    // and should thus be considered "busy" when expanding.
-    //
-    PreprocessorMacro* busyMacro = nullptr;
+        /// Macros that should be considered busy in this environment
+    BusyMacro* busyMacros = nullptr;
 
     // Macros defined in this environment
     Dictionary<Name*, PreprocessorMacro*>  macros;
@@ -122,6 +135,9 @@ struct MacroExpansion : PretokenizedInputStream
 {
     // The macro we will expand
     PreprocessorMacro*  macro;
+
+        /// State for marking `macro` as busy in thsi expansion
+    BusyMacro busy;
 
     // Environment for macro expansion.
     //
@@ -555,12 +571,12 @@ static bool _isMacroBusy(PreprocessorMacro* macro, PreprocessorEnvironment* env)
     //
     // Given the design of putting busy macro state into environments,
     // we can easily check if a macro is busy in a given environment
-    // by walking up the chain of parent environments and seing if
-    // the macro has been registered to any of them:
+    // by walking through the list of busy macros that was registerd
+    // with that environment.
     //
-    for( auto e = env; e; e = e->parent )
+    for(auto busyMacro = env->busyMacros; busyMacro; busyMacro = busyMacro->next)
     {
-        if(e->busyMacro == macro)
+        if(busyMacro->macro == macro)
             return true;
     }
     return false;
@@ -579,13 +595,75 @@ static void InitializeMacroExpansion(
 
     expansion->parent = preprocessor->inputStream;
     expansion->primaryStream = preprocessor->inputStream->primaryStream;
-
-    expansion->expansionEnvironment.busyMacro = macro;
-    expansion->expansionEnvironment.parent = macro->environment;
-
-    expansion->environment = &expansion->expansionEnvironment;
     expansion->macro = macro;
+
+    // The macro expansion will read from the stored tokens
+    // that were recorded in the macro definition.
+    //
     expansion->tokenReader = TokenReader(macro->tokens);
+
+    // A macro expansion will always occur in its own
+    // environment.
+    //
+    // For a function-like macro this environment will
+    // map the names of macro parameters to their argument
+    // token lists.
+    //
+    // For all macros, this environment will be used
+    // to track the "busy" state of the macro itself.
+    //
+    expansion->environment = &expansion->expansionEnvironment;
+
+    // The environment used for expanding a macro is always
+    // a child of the environment where the macro was defined.
+    //
+    PreprocessorEnvironment* parentEnvironment = macro->environment;
+    expansion->expansionEnvironment.parent = parentEnvironment;
+    //
+    // For ordinary function-like and object-like macros, that
+    // environment will always be the global environment.
+    //
+    // For the macros that represent arguments to a function-like
+    // macro, that environment will be the environment where
+    // the function-like macro was *invoked*, which might be
+    // in the context of another macro expansion.
+
+    // A macro is always busy in its own expansion environment,
+    // to prevent recursive expansion. Here we construct a
+    // link for the linked list of busy macros and install it
+    // into the environment.
+    //
+    // Note: this extra link is unnecessary in the case where
+    // `macro` is an argument to a function-like macro, because
+    // there is no way for it to reference itself in its
+    // expansion. We could try to avoid the extra step at
+    // the cost of a bit more code complexity here.
+    //
+    expansion->busy.macro = macro;
+    expansion->expansionEnvironment.busyMacros = &expansion->busy;
+
+    // What goes into the rest of the list of busy macros
+    // depends on what kind of macro is being expanded.
+    //
+    if( macro->flavor == PreprocessorMacroFlavor::FunctionArg )
+    {
+        // For a macro representing an argument to a function-like
+        // macro, the busy macros should be those that were in
+        // place at the invocation site of the function-like macro.
+        // This happens to be what is stored in the parent
+        // environment.
+        //
+        expansion->busy.next = parentEnvironment->busyMacros;
+    }
+    else
+    {
+        // For the other cases (function-like and objet-like
+        // macros), the busy list should include anything
+        // that was already busy in the environment that
+        // is beginning to expand a macro.
+        //
+        expansion->busy.next = preprocessor->inputStream->environment->busyMacros;
+    }
 }
 
 static void PushMacroExpansion(
