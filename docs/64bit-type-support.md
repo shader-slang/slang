@@ -11,6 +11,42 @@ This also applies to vector and matrix versions of these types.
 
 Unfortunately if a specific target supports the type or the typical HLSL instrinsic functions (such as sin/cos/max/min etc) depends very much on the target. 
 
+Special attention has to be made with respect to literal 64 bit types. By default float and integer literals if they do not have an explicit postfix are assumed to be 32 bit. There is a variety of reasons for this design choice - the main one being around by default getting good performance. The postfixes required for 64 bit types are as follows
+
+```
+// double - 'l' or 'L'
+
+double a = 1.34e-200L;
+// WRONG!: This is the same as b = double(float(1.34e-200)) which will be 0
+double b = 1.34e-200;
+
+// int64_t - 'll' or 'LL' (or combination of upper/lower)
+
+int64_t c = -5436365345345234ll;
+// WRONG!: This is the same as d = int64_t(int32_t(-5436365345345234)) which means d ! = -5436365345345234LL
+int64_t d = -5436365345345234;
+
+int64_t e = ~0LL;       // Same as 0xffffffffffffffff
+// WRONG!: Probably, is the same as 0x00000000ffffffff, because equivalent of int64_t(~int32_t(0));
+int64_t f = ~0;         
+
+// uint64_t - 'ull' or 'ULL' (or combination of upper/lower)
+
+uint64_t g = 0x8000000000000000ull; 
+// WRONG!: This is the same as h = uint64_t(uint32_t(0x8000000000000000)) which means h = 0
+uint64_t h = 0x8000000000000000u; 
+
+uint64_t i = ~0ull;       // Same as 0xffffffffffffffff
+// WRONG!: Will be 0x00000000ffffffff, because equivalent of uint64_t(~uint32_t(0));
+int64_t j = ~0;         
+```
+
+Currently the compiler does not give a warning about the narrowing, to the 32 bit types. 
+
+NOTE! There is also arguably a bug around the behavior described above. In the 'wrong' scenarios above it is described as if the lack of the post fix means that the literal will *necessarily* be interpretted as a 32 bit type. This isn't actually the case - the truth is more nuanced, sometimes it will be interpretted as 32 bits but sometimes it will not. For this reason it is suggested, until something is done about this issue all 64 bit literals be written with the appropriate postfix.
+
+These issues are discussed more on issue [#1185](https://github.com/shader-slang/slang/issues/1185)
+
 Note this initial testing only tested scalar usage, and not vector or matrix intrinsics.
 
 Double support
@@ -20,55 +56,64 @@ Target   | Compiler/Binary  |  Double Type   |   Intrinsics          |  Notes
 ---------|------------------|----------------|-----------------------|-----------
 CPU      |                  |      Yes       |          Yes          |  1
 CUDA     | Nvrtx/PTX        |      Yes       |          Yes          |  1
-D3D12    | DXC/DXIL         |      Yes       |          No           |  2 
-Vulkan   | GlSlang/Spir-V   |      Yes       |          No           |  3
-D3D11    | FXC/DXBC         |      No        |          No           |
-D3D12    | FXC/DXBC         |      No        |          No           | 
+D3D12    | DXC/DXIL         |      Yes       |          Small Subset |  4 
+Vulkan   | GlSlang/Spir-V   |      Yes       |          Partial      |  2
+D3D11    | FXC/DXBC         |      Yes       |          No           |  4
+D3D12    | FXC/DXBC         |      Yes       |          No           |  3, 4
 
 1) CUDA and CPU support most intrinsics, with the notable exception currently of matrix invert
-2) Requires SM 6.0 and above  https://docs.microsoft.com/en-us/windows/win32/direct3dhlsl/hlsl-shader-model-6-0-features-for-direct3d-12
-3) Restriction is described in  https://www.khronos.org/registry/spir-v/specs/1.0/GLSL.std.450.html
-Note that GlSlang does produce spir-v that contains double intrinsic calls, the failure happens when validating the Spir-V 
+2) In terms of lack of general intrinsic support, the restriction is described in  https://www.khronos.org/registry/spir-v/specs/1.0/GLSL.std.450.html
+
+The following intrinsics are available for Vulkan 
+
+`fmod` (as %), `rcp`, `sign`, `saturate`, `sqrt`, `rsqrt`, `frac`, `ceil`, `floor`, `trunc`, `abs`, `min`, `max`, `smoothstep`, `lerp`, `clamp`, `step` and `asuint`. 
+
+These are tested in the test `tests/hlsl-intrinsic/scalar-double-vk-intrinsic.slang`.
+
+What is missing are transedentals, expX, logX. 
+
+Note that GlSlang does produce Spir-V that contains double intrinsic calls for the missing intrinsics, the failure happens when validating the Spir-V 
 
 ```
 Validation: error 0:  [ UNASSIGNED-CoreValidation-Shader-InconsistentSpirv ] Object: VK_NULL_HANDLE (Type = 0) | SPIR-V module not valid: GLSL.std.450 Sin: expected Result Type to be a 16 or 32-bit scalar or vector float type
   %57 = OpExtInst %double %1 Sin %56
 ```
 
-D3D12 and VK may have some very limited intrinsic support such as sqrt, rsqrt
+3) That if a RWStructuredBuffer<double> is used on D3D12 with DXBC, and a double is written, it can lead to incorrect behavior. Thus it is recommended not to use double with dxbc, but to use dxil to keep things simple. A test showing this problem is `tests/bugs/dxbc-double-problem.slang`. The test `tests/hlsl-intrinsic/scalar-double-simple.slang` shows not using a double resource, doubles do appear to work on D3D12 DXBC. 
 
-uint64_t Support
-=================
+4) If you compile code using double and intrinsics through Slang at first blush it will seem to work. Assuming there are no errors in your code, your code will even typically appear to work correctly. Unfortunately what is really happening is the backend compiler (fxc or dxc) compiler is narrowing double to float and then using float intrinsics. It typically generates a warning when this happens, but unless there is an error in your code you will not see these warnings because dxc doesn't appear to have a mechanism to return warnings if there isn't an error. This is why everything appears to work - but actually any intrinsic call is losing precision silently. 
 
-Target   | Compiler/Binary  |  uint64_t Type |  Intrinsic support | Notes
+Note on dxc by default Slang disables warnings - warnings need to be enabled to see the narrowing warnings. 
+
+There is another exception around the use of % - if you do this with double it will return an error saying on float is supported. 
+
+It appears that no intrinsics are available for double with fxc. 
+
+On dxc the following intrinsics are available with double::
+
+`rcp`, `sign`, `saturate`, `abs`, `min`, `max`, `clamp`, `asuint`. 
+
+These are tested in the test `tests/hlsl-intrinsic/scalar-double-d3d-intrinsic.slang`.
+
+There is no suport for transcendentals (`sin`, `cos` etc) or `log`/`exp`. More surprising is that`sqrt`, `rsqrt`, `frac`, `ceil`, `floor`, `trunc`, `step`, `lerp`, `smoothstep` are also not supported.
+
+uint64_t and int64_t Support
+============================
+
+Target   | Compiler/Binary  | u/int64_t Type |  Intrinsic support | Notes
 ---------|------------------|----------------|--------------------|--------
 CPU      |                  |      Yes       |          Yes       |   
 CUDA     | Nvrtx/PTX        |      Yes       |          Yes       |   
-D3D12    | DXC/DXIL         |      Yes       |          Yes       |   
 Vulkan   | GlSlang/Spir-V   |      Yes       |          Yes       |   
-D3D11    | FXC/DXBC         |      No        |          No        |   1
-D3D12    | FXC/DXBC         |      No        |          No        |   1
+D3D12    | DXC/DXIL         |      Yes       |          Yes       |   1
+D3D11    | FXC/DXBC         |      No        |          No        |   2
+D3D12    | FXC/DXBC         |      No        |          No        |   2
 
-1) uint64_t support requires https://docs.microsoft.com/en-us/windows/win32/direct3dhlsl/hlsl-shader-model-6-0-features-for-direct3d-12, so DXBC is not a target.
-
-The intrinsics available on uint64_t type are `abs`, `min`, `max`, `clamp` and `countbits`.
-
-int64_t Support
-================
-
-Target   | Compiler/Binary  |  int64_t Type |  Intrinsic support | Notes
----------|------------------|----------------|--------------------|--------
-CPU      |                  |      Yes       |          Yes       |   
-CUDA     | Nvrtx/PTX        |      Yes       |          Yes       |   
-Vulkan   | GlSlang/Spir-V   |      Yes       |          Yes       |   
-D3D12    | DXC/DXIL         |      Yes       |          Yes       | 1
-D3D11    | FXC/DXBC         |      No        |          No        | 2 
-D3D12    | FXC/DXBC         |      No        |          No        | 2
-
-1) The sm6.0 docs (https://docs.microsoft.com/en-us/windows/win32/direct3dhlsl/hlsl-shader-model-6-0-features-for-direct3d-12) describe only supports uint64_t, but the dxc compiler page says int64_t is supported in HLSL 2016 (https://github.com/Microsoft/DirectXShaderCompiler/wiki/Language-Versions). Tests show that this is indeed the case.
+1) The [sm6.0 docs](https://docs.microsoft.com/en-us/windows/win32/direct3dhlsl/hlsl-shader-model-6-0-features-for-direct3d-12) describe only supporting uint64_t, but dxc says int64_t is supported in [HLSL 2016](https://github.com/Microsoft/DirectXShaderCompiler/wiki/Language-Versions). Tests show that this is indeed the case.
 
 2) uint64_t support requires https://docs.microsoft.com/en-us/windows/win32/direct3dhlsl/hlsl-shader-model-6-0-features-for-direct3d-12, so DXBC is not a target.
 
+The intrinsics available on uint64_t type are `abs`, `min`, `max`, `clamp` and `countbits`.
 The intrinsics available on uint64_t type are `abs`, `min`, `max` and `clamp`.
 
 GLSL
