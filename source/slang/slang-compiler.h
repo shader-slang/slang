@@ -286,6 +286,9 @@ namespace Slang
             SlangInt                        specializationArgCount,
             slang::IComponentType**         outSpecializedComponentType,
             ISlangBlob**                    outDiagnostics) SLANG_OVERRIDE;
+        SLANG_NO_THROW SlangResult SLANG_MCALL link(
+            slang::IComponentType**         outLinkedComponentType,
+            ISlangBlob**                    outDiagnostics) SLANG_OVERRIDE;
 
             /// Get the linkage (aka "session" in the public API) for this component type.
         Linkage* getLinkage() { return m_linkage; }
@@ -637,9 +640,61 @@ namespace Slang
         /// `getName()` and `getProfile()` methods should be expected to
         /// return useful data on pass-through entry points.
         ///
-    class EntryPoint : public ComponentType
+    class EntryPoint : public ComponentType, public slang::IEntryPoint
     {
+        typedef ComponentType Super;
+
     public:
+        SLANG_REF_OBJECT_IUNKNOWN_ALL
+
+        ISlangUnknown* getInterface(const Guid& guid);
+
+
+        // Forward `IComponentType` methods
+
+        SLANG_NO_THROW slang::ISession* SLANG_MCALL getSession() SLANG_OVERRIDE
+        {
+            return Super::getSession();
+        }
+
+        SLANG_NO_THROW slang::ProgramLayout* SLANG_MCALL getLayout(
+            SlangInt        targetIndex,
+            slang::IBlob**  outDiagnostics) SLANG_OVERRIDE
+        {
+            return Super::getLayout(targetIndex, outDiagnostics);
+        }
+
+        SLANG_NO_THROW SlangResult SLANG_MCALL getEntryPointCode(
+            SlangInt        entryPointIndex,
+            SlangInt        targetIndex,
+            slang::IBlob**  outCode,
+            slang::IBlob**  outDiagnostics) SLANG_OVERRIDE
+        {
+            return Super::getEntryPointCode(entryPointIndex, targetIndex, outCode, outDiagnostics);
+        }
+
+        SLANG_NO_THROW SlangResult SLANG_MCALL specialize(
+            slang::SpecializationArg const* specializationArgs,
+            SlangInt                        specializationArgCount,
+            slang::IComponentType**         outSpecializedComponentType,
+            ISlangBlob**                    outDiagnostics) SLANG_OVERRIDE
+        {
+            return Super::specialize(
+                specializationArgs,
+                specializationArgCount,
+                outSpecializedComponentType,
+                outDiagnostics);
+        }
+
+        SLANG_NO_THROW SlangResult SLANG_MCALL link(
+            slang::IComponentType**         outLinkedComponentType,
+            ISlangBlob**                    outDiagnostics) SLANG_OVERRIDE
+        {
+            return Super::link(
+                outLinkedComponentType,
+                outDiagnostics);
+        }
+
             /// Create an entry point that refers to the given function.
         static RefPtr<EntryPoint> create(
             Linkage*            linkage,
@@ -837,6 +892,27 @@ namespace Slang
                 outDiagnostics);
         }
 
+        SLANG_NO_THROW SlangResult SLANG_MCALL link(
+            slang::IComponentType**         outLinkedComponentType,
+            ISlangBlob**                    outDiagnostics) SLANG_OVERRIDE
+        {
+            return Super::link(
+                outLinkedComponentType,
+                outDiagnostics);
+        }
+
+        SLANG_NO_THROW SlangResult SLANG_MCALL findEntryPointByName(
+            char const*             name,
+            slang::IEntryPoint**     outEntryPoint) SLANG_OVERRIDE
+        {
+            ComPtr<slang::IEntryPoint> entryPoint(findEntryPointByName(UnownedStringSlice(name)));
+            if((!entryPoint))
+                return SLANG_FAIL;
+
+            *outEntryPoint = entryPoint.detach();
+            return SLANG_OK;
+        }
+
         //
 
             /// Create a module (initially empty).
@@ -912,6 +988,11 @@ namespace Slang
             List<ExpandedSpecializationArg> existentialArgs;
         };
 
+        RefPtr<EntryPoint> findEntryPointByName(UnownedStringSlice const& name);
+
+        List<RefPtr<EntryPoint>> const& getEntryPoints() { return m_entryPoints; }
+        void _addEntryPoint(EntryPoint* entryPoint);
+
     protected:
         void acceptVisitor(ComponentTypeVisitor* visitor, SpecializationInfo* specializationInfo) SLANG_OVERRIDE;
 
@@ -937,6 +1018,26 @@ namespace Slang
 
         // List of filesystem paths this module depends on
         FilePathDependencyList m_filePathDependencyList;
+
+        // Entry points that were defined in thsi module
+        //
+        // Note: the entry point defined in the module are *not*
+        // part of the memory image/layout of the module when
+        // it is considered as an IComponentType. This can be
+        // a bit confusing, but if all the entry points in the
+        // module were automatically linked into the component
+        // type, we'd need a way to access just the global
+        // scope of the module without the entry points, in
+        // case we wanted to link a single entry point against
+        // the global scope. The `Module` type provides exactly
+        // that "module without its entry points" unit of
+        // granularity for linking.
+        //
+        // This list only exists for lookup purposes, so that
+        // the user can find an existing entry-point function
+        // that was defined as part of the module.
+        //
+        List<RefPtr<EntryPoint>> m_entryPoints;
     };
     typedef Module LoadedModule;
 
@@ -963,7 +1064,9 @@ namespace Slang
         void addSourceFile(SourceFile* sourceFile);
 
         // The entry points associated with this translation unit
-        List<RefPtr<EntryPoint>> entryPoints;
+        List<RefPtr<EntryPoint>> const& getEntryPoints() { return module->getEntryPoints(); }
+
+        void _addEntryPoint(EntryPoint* entryPoint) { module->_addEntryPoint(entryPoint); }
 
         // Preprocessor definitions to use for this translation unit only
         // (whereas the ones on `compileRequest` will be shared)
@@ -1259,7 +1362,8 @@ namespace Slang
         List<RefPtr<IRModule>> m_libModules;
 
     private:
-        Session* m_session = nullptr;
+            /// The global Slang library session that this linkage is a child of
+        RefPtr<Session> m_session;
 
             /// Tracks state of modules currently being loaded.
             ///
@@ -2058,10 +2162,7 @@ SLANG_FORCE_INLINE slang::IModule* asExternal(Module* module)
     return static_cast<slang::IModule*>(module);
 }
 
-SLANG_FORCE_INLINE ComponentType* asInternal(slang::IComponentType* componentType)
-{
-    return static_cast<ComponentType*>(componentType);
-}
+ComponentType* asInternal(slang::IComponentType* inComponentType);
 
 SLANG_FORCE_INLINE slang::IComponentType* asExternal(ComponentType* componentType)
 {

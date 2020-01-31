@@ -6800,7 +6800,7 @@ IRModule* generateIRForTranslationUnit(
 
     // First, ensure that all entry points have been emitted,
     // in case they require special handling.
-    for (auto entryPoint : translationUnit->entryPoints)
+    for (auto entryPoint : translationUnit->getEntryPoints())
     {
         lowerFrontEndEntryPointToIR(context, entryPoint);
     }
