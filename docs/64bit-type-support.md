@@ -56,14 +56,13 @@ Target   | Compiler/Binary  |  Double Type   |   Intrinsics          |  Notes
 ---------|------------------|----------------|-----------------------|-----------
 CPU      |                  |      Yes       |          Yes          |  1
 CUDA     | Nvrtx/PTX        |      Yes       |          Yes          |  1
-D3D12    | DXC/DXIL         |      Yes       |          No           |  2 
-Vulkan   | GlSlang/Spir-V   |      Yes       |          No           |  3
-D3D11    | FXC/DXBC         |      Yes       |          No           |
-D3D12    | FXC/DXBC         |      Yes       |          No           |  4
+D3D12    | DXC/DXIL         |      Yes       |          No           |  4 
+Vulkan   | GlSlang/Spir-V   |      Yes       |          No           |  2
+D3D11    | FXC/DXBC         |      Yes       |          No           |  4
+D3D12    | FXC/DXBC         |      Yes       |          No           |  3, 4
 
 1) CUDA and CPU support most intrinsics, with the notable exception currently of matrix invert
-2) Requires SM 6.0 and above  https://docs.microsoft.com/en-us/windows/win32/direct3dhlsl/hlsl-shader-model-6-0-features-for-direct3d-12
-3) Restriction is described in  https://www.khronos.org/registry/spir-v/specs/1.0/GLSL.std.450.html
+2) In terms of lack of intrinsic support, the restriction is described in  https://www.khronos.org/registry/spir-v/specs/1.0/GLSL.std.450.html
 Note that GlSlang does produce spir-v that contains double intrinsic calls, the failure happens when validating the Spir-V 
 
 ```
@@ -71,9 +70,16 @@ Validation: error 0:  [ UNASSIGNED-CoreValidation-Shader-InconsistentSpirv ] Obj
   %57 = OpExtInst %double %1 Sin %56
 ```
 
-4) That if a RWStructuredBuffer<double> is used on D3D12 with DXBC, and a double is written, it is easy to demonstrate incorrect behavior. This is not a problem with DXIL.
+3) That if a RWStructuredBuffer<double> is used on D3D12 with DXBC, and a double is written, it is easy to demonstrate incorrect behavior. This is not a problem with DXIL. Thus it is recommended not to use double with dxbc to keep things simple.
+
+A test showing this problem is `tests/bugs/dxbc-double-problem.slang`
+The test `tests/hlsl-intrinsic/scalar-double-simple.slang` shows not using a double resource, things work. 
 
 D3D12 and VK may have some very limited intrinsic support such as sqrt, rsqrt
+
+4) If you compile code using double and intrinsics through Slang at first blush it will seem to work. Assuming there are no errors in your code, your code will even typically appear to work correctly. Unfortunately what is really happening is the backend compiler (fxc or dxc) compiler is narrowing double to float and then using float intrinsics. It typically generates a warning when this happens, but unless there is an error in your code you will not see these warnings because dxc doesn't appear to have a mechanism to return warnings if there isn't an error. This is why everything appears to work - but actually any intrinsic call is losing precision silently. 
+
+There is another exception around the use of % - if you do this with double it will return an error saying on float is supported. 
 
 uint64_t and int64_t Support
 ============================

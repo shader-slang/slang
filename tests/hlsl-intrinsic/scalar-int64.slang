@@ -1,5 +1,5 @@
 //TEST(compute):COMPARE_COMPUTE_EX:-cpu -compute 
-// No support for int64_t on dx11 (no sm 6.0)
+// No support for int64_t on D3D11 (no sm 6.0)
 //DISABLE_TEST(compute):COMPARE_COMPUTE_EX:-slang -compute
 // No support with Dx12 with dxbc. Needs SM6.0 + dxil
 //DISABLE_TEST(compute):COMPARE_COMPUTE_EX:-slang -compute -dx12 
