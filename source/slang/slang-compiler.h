@@ -468,7 +468,7 @@ namespace Slang
         ComponentType(Linkage* linkage);
 
     private:
-        RefPtr<Linkage> m_linkage;
+        Linkage* m_linkage;
 
         // Cache of target-specific programs for each target.
         Dictionary<TargetRequest*, RefPtr<TargetProgram>> m_targetPrograms;
@@ -1361,9 +1361,18 @@ namespace Slang
         // Modules that have been read in with the -r option
         List<RefPtr<IRModule>> m_libModules;
 
+        void _stopRetainingParentSession()
+        {
+            m_retainedSession = nullptr;
+        }
+
     private:
             /// The global Slang library session that this linkage is a child of
-        RefPtr<Session> m_session;
+        Session* m_session = nullptr;
+
+        RefPtr<Session> m_retainedSession;
+
+
 
             /// Tracks state of modules currently being loaded.
             ///
@@ -2079,7 +2088,7 @@ namespace Slang
             /// Get the downstream compiler prelude
         const String& getDownstreamCompilerPrelude(PassThroughMode mode) { return m_downstreamCompilerPreludes[int(mode)]; }
 
-        Session();
+        void init();
 
         void addBuiltinSource(
             RefPtr<Scope> const&    scope,

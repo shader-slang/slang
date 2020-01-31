@@ -46,7 +46,7 @@ static const Guid IID_ISession          = SLANG_UUID_ISession;
 static const Guid IID_ISlangBlob        = SLANG_UUID_ISlangBlob;
 static const Guid IID_ISlangUnknown     = SLANG_UUID_ISlangUnknown;
 
-Session::Session()
+void Session::init()
 {
     ::memset(m_downstreamCompilerLocators, 0, sizeof(m_downstreamCompilerLocators));
     DownstreamCompilerUtil::setDefaultLocators(m_downstreamCompilerLocators);
@@ -78,6 +78,16 @@ Session::Session()
     builtinSourceManager.initialize(nullptr, nullptr);
 
     m_builtinLinkage = new Linkage(this);
+
+    // Because the `Session` retains the builtin `Linkage`,
+    // we need to make sure that the parent pointer inside
+    // `Linkage` doesn't create a retain cycle.
+    //
+    // This operation ensures that the parent pointer will
+    // just be a raw pointer, so that the builtin linkage
+    // doesn't keep the parent session alive.
+    //
+    m_builtinLinkage->_stopRetainingParentSession();
 
     // Initialize representations of some very basic types:
     initializeTypes();
@@ -439,6 +449,7 @@ Profile getEffectiveProfile(EntryPoint* entryPoint, TargetRequest* target)
 
 Linkage::Linkage(Session* session)
     : m_session(session)
+    , m_retainedSession(session)
     , m_sourceManager(&m_defaultSourceManager)
 {
     getNamePool()->setRootNamePool(session->getRootNamePool());
@@ -2549,6 +2560,7 @@ Session::~Session()
 SLANG_API SlangSession* spCreateSession(const char*)
 {
     Slang::RefPtr<Slang::Session> session(new Slang::Session());
+    session->init();
     // Will be returned with a refcount of 1
     return asExternal(session.detach());
 }
@@ -2561,6 +2573,7 @@ SLANG_API SlangResult slang_createGlobalSession(
         return SLANG_E_NOT_IMPLEMENTED;
 
     Slang::Session* globalSession = new Slang::Session();
+    globalSession->init();
     Slang::ComPtr<slang::IGlobalSession> result(Slang::asExternal(globalSession));
     *outGlobalSession = result.detach();
     return SLANG_OK;
