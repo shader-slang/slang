@@ -583,18 +583,29 @@ void GLSLSourceEmitter::_emitGLSLTypePrefix(IRType* type, bool promoteHalfToFloa
         case kIROp_Int8Type:    m_writer->emit("i8");     break;
         case kIROp_Int16Type:   m_writer->emit("i16");    break;
         case kIROp_IntType:     m_writer->emit("i");      break;
-        case kIROp_Int64Type:   m_writer->emit("i64");    break;
+        case kIROp_Int64Type:   
+        {
+            _requireBaseType(BaseType::Int64);
+            m_writer->emit("i64");
+            break;
+        }
 
         case kIROp_UInt8Type:   m_writer->emit("u8");     break;
         case kIROp_UInt16Type:  m_writer->emit("u16");    break;
         case kIROp_UIntType:    m_writer->emit("u");      break;
-        case kIROp_UInt64Type:  m_writer->emit("u64");    break;
+
+        case kIROp_UInt64Type:
+        {
+            _requireBaseType(BaseType::UInt64);
+            m_writer->emit("u64");
+            break;
+        }
 
         case kIROp_BoolType:    m_writer->emit("b");		break;
 
         case kIROp_HalfType:
         {
-            _requireHalf();
+            _requireBaseType(BaseType::Half);
             if (promoteHalfToFloat)
             {
                 // no prefix
@@ -621,9 +632,9 @@ void GLSLSourceEmitter::_emitGLSLTypePrefix(IRType* type, bool promoteHalfToFloa
     }
 }
 
-void GLSLSourceEmitter::_requireHalf()
+void GLSLSourceEmitter::_requireBaseType(BaseType baseType)
 {
-    m_glslExtensionTracker.requireHalfExtension();
+    m_glslExtensionTracker.requireBaseTypeExtension(baseType);
 }
 
 void GLSLSourceEmitter::_maybeEmitGLSLFlatModifier(IRType* valueType)
@@ -646,6 +657,44 @@ void GLSLSourceEmitter::_maybeEmitGLSLFlatModifier(IRType* valueType)
             break;
     }
 }
+
+void GLSLSourceEmitter::emitSimpleValueImpl(IRInst* inst) 
+{
+    switch (inst->op)
+    {
+        case kIROp_IntLit:
+        {
+            auto litInst = static_cast<IRConstant*>(inst);
+
+            IRBasicType* type = as<IRBasicType>(inst->getDataType());
+            if (type)
+            {
+                switch (type->getBaseType())
+                {
+                    default: break;
+                    case BaseType::Int64:
+                    {
+                        m_writer->emitInt64(int64_t(litInst->value.intVal));
+                        m_writer->emit("l");
+                        return;
+                    }
+                    case BaseType::UInt64:
+                    {
+                        SLANG_COMPILE_TIME_ASSERT(sizeof(litInst->value.intVal) >= sizeof(uint64_t));
+                        m_writer->emitUInt64(uint64_t(litInst->value.intVal));
+                        m_writer->emit("ul");
+                        return;
+                    }
+                }
+            }
+            break;   
+        }
+        default: break;
+    }
+
+    Super::emitSimpleValueImpl(inst);
+}
+
 
 void GLSLSourceEmitter::emitParameterGroupImpl(IRGlobalParam* varDecl, IRUniformParameterGroupType* type)
 {
@@ -1317,16 +1366,26 @@ void GLSLSourceEmitter::emitSimpleTypeImpl(IRType* type)
 {
     switch (type->op)
     {
-        case kIROp_VoidType:   
-        case kIROp_BoolType:   
-        case kIROp_Int8Type:   
-        case kIROp_Int16Type:  
-        case kIROp_IntType:    
-        case kIROp_Int64Type:  
-        case kIROp_UInt8Type:  
-        case kIROp_UInt16Type: 
-        case kIROp_UIntType:   
-        case kIROp_UInt64Type: 
+        case kIROp_Int64Type:
+        {
+            _requireBaseType(BaseType::Int64);
+            m_writer->emit(getDefaultBuiltinTypeName(type->op));
+            return;
+        }
+        case kIROp_UInt64Type:
+        {
+            _requireBaseType(BaseType::UInt64);
+            m_writer->emit(getDefaultBuiltinTypeName(type->op));
+            return;
+        }
+        case kIROp_VoidType:
+        case kIROp_BoolType:
+        case kIROp_Int8Type:
+        case kIROp_Int16Type:
+        case kIROp_IntType:
+        case kIROp_UInt8Type:
+        case kIROp_UInt16Type:
+        case kIROp_UIntType:
         case kIROp_FloatType:   
         case kIROp_DoubleType:
         {
@@ -1335,11 +1394,10 @@ void GLSLSourceEmitter::emitSimpleTypeImpl(IRType* type)
         }
         case kIROp_HalfType:
         {
-            _requireHalf();
+            _requireBaseType(BaseType::Half);
             m_writer->emit("float16_t");
             return;
         }
-
         case kIROp_StructType:
             m_writer->emit(getName(type));
             return;

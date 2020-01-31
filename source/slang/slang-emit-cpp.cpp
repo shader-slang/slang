@@ -72,6 +72,7 @@ static UnownedStringSlice _getTypePrefix(IROp op)
         case kIROp_UIntType:        return UnownedStringSlice::fromLiteral("U32");
         case kIROp_FloatType:       return UnownedStringSlice::fromLiteral("F32");
         case kIROp_Int64Type:       return UnownedStringSlice::fromLiteral("I64");
+        case kIROp_UInt64Type:      return UnownedStringSlice::fromLiteral("U64");
         case kIROp_DoubleType:      return UnownedStringSlice::fromLiteral("F64");
         default:                    return UnownedStringSlice::fromLiteral("?");
     }
