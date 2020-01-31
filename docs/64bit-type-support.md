@@ -56,14 +56,23 @@ Target   | Compiler/Binary  |  Double Type   |   Intrinsics          |  Notes
 ---------|------------------|----------------|-----------------------|-----------
 CPU      |                  |      Yes       |          Yes          |  1
 CUDA     | Nvrtx/PTX        |      Yes       |          Yes          |  1
-D3D12    | DXC/DXIL         |      Yes       |          No           |  4 
-Vulkan   | GlSlang/Spir-V   |      Yes       |          No           |  2
+D3D12    | DXC/DXIL         |      Yes       |          Small Subset |  4 
+Vulkan   | GlSlang/Spir-V   |      Yes       |          Partial      |  2
 D3D11    | FXC/DXBC         |      Yes       |          No           |  4
 D3D12    | FXC/DXBC         |      Yes       |          No           |  3, 4
 
 1) CUDA and CPU support most intrinsics, with the notable exception currently of matrix invert
 2) In terms of lack of intrinsic support, the restriction is described in  https://www.khronos.org/registry/spir-v/specs/1.0/GLSL.std.450.html
-Note that GlSlang does produce spir-v that contains double intrinsic calls, the failure happens when validating the Spir-V 
+
+The following intrinsics are available for Vulkan 
+
+`fmod` (as %), `rcp`, `sign`, `saturate`, `sqrt`, `rsqrt`, `frac`, `ceil`, `floor`, `trunc`, `abs`, `min`, `max`, `smoothstep`, `lerp`, `clamp`, `step` and `asuint`. 
+
+These are tested in the test `tests/hlsl-intrinsic/scalar-double-vk-intrinsic.slang`.
+
+What is missing are transedentals, exp, log. 
+
+Also note that GlSlang does produce spir-v that contains double intrinsic calls for the missing intrinsics, the failure happens when validating the Spir-V 
 
 ```
 Validation: error 0:  [ UNASSIGNED-CoreValidation-Shader-InconsistentSpirv ] Object: VK_NULL_HANDLE (Type = 0) | SPIR-V module not valid: GLSL.std.450 Sin: expected Result Type to be a 16 or 32-bit scalar or vector float type
@@ -85,9 +94,11 @@ There is another exception around the use of % - if you do this with double it w
 
 It appears that no intrinsics are available for double with fxc. 
 
-On dxc the following intrinsics are available with double
+On dxc the following intrinsics are available with double::
 
-`rcp`, `sign`, `saturate`, `abs`, `min`, `max`, `clamp`, `asuint`. These are tested in the test `tests/hlsl-intrinsic/scalar-double-simple-intrinsic.slang`.
+`rcp`, `sign`, `saturate`, `abs`, `min`, `max`, `clamp`, `asuint`. 
+
+These are tested in the test `tests/hlsl-intrinsic/scalar-double-d3d-intrinsic.slang`.
 
 There is no suport for transcendentals (`sin`, `cos` etc) or `log`/`exp`. 
 More surprising `sqrt`, `rsqrt`, `frac`, `ceil`, `floor`, `trunc`, `step`, `lerp`, `smoothstep` as also not supported.
