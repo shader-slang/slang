@@ -23,3 +23,23 @@ int NO_EXPAND(b)
 {
     return b + ARG_EXPAND(ARG_EXPAND(1));
 }
+
+// The same issue can arise for object-like macros and not
+// just function-like, so we will test that case here as well.
+
+int objectLikeMacroTest( int REC )
+{
+#define REC REC
+
+	return REC;	
+}
+
+// We also need to check the case where macros are
+// mutually, rather than directly, recursive
+
+int mutuallyRecursiveMacroTest( int XYZ )
+{
+	#define ABC XYZ
+	#define XYZ ABC
+	return XYZ;
+}

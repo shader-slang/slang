@@ -44,10 +44,28 @@ struct PreprocessorConditional
 
 struct PreprocessorMacro;
 
+    /// A node in a linked list of macros that are "busy" in an environment.
+    ///
+    /// A macro is "busy" if there is already an open expansion of it in
+    /// the same (or a parent) environment, such that expanding it again
+    /// in the environment would lead to infinite expansion.
+    ///
+struct BusyMacro
+{
+        /// The macro that is busy.
+    PreprocessorMacro*  macro = nullptr;
+
+        /// The rest of the list of busy macros.
+    BusyMacro*          next = nullptr;
+};
+
 struct PreprocessorEnvironment
 {
     // The "outer" environment, to be used if lookup in this env fails
     PreprocessorEnvironment*                parent = NULL;
+
+        /// Macros that should be considered busy in this environment
+    BusyMacro* busyMacros = nullptr;
 
     // Macros defined in this environment
     Dictionary<Name*, PreprocessorMacro*>  macros;
@@ -115,21 +133,24 @@ struct SimpleTokenInputStream : PretokenizedInputStream
 
 struct MacroExpansion : PretokenizedInputStream
 {
-        // In Dtor we want to mark the macro as no longer being busy
-    ~MacroExpansion();
-
     // The macro we will expand
     PreprocessorMacro*  macro;
-};
 
-struct ObjectLikeMacroExpansion : MacroExpansion
-{
-};
+        /// State for marking `macro` as busy in thsi expansion
+    BusyMacro busy;
 
-struct FunctionLikeMacroExpansion : MacroExpansion
-{
-    // Environment for macro arguments
-    PreprocessorEnvironment     argumentEnvironment;
+    // Environment for macro expansion.
+    //
+    // For a function-like macro, this will include
+    // the mapping from macro argument names to
+    // their values.
+    //
+    // For both function-like and object-like macros,
+    // this will include a marker that registers
+    // the macro as "busy" during its expansion, so
+    // that it won't be recursively expanded.
+    //
+    PreprocessorEnvironment     expansionEnvironment;
 };
 
 // An enumeration for the different types of macros
@@ -174,9 +195,6 @@ struct PreprocessorMacro
     {
         return nameAndLoc.loc;
     }
-
-    // Set to true during a macros expansion
-    bool isBusy = false;
 };
 
 // State of the preprocessor
@@ -215,16 +233,6 @@ struct Preprocessor
 
 
 static Token AdvanceToken(Preprocessor* preprocessor);
-
-MacroExpansion::~MacroExpansion()
-{
-    if (macro)
-    {
-        SLANG_ASSERT(macro->isBusy);
-        macro->isBusy = false;
-    }
-}
-
 
 // Convenience routine to access the diagnostic sink
 static DiagnosticSink* GetSink(Preprocessor* preprocessor)
@@ -522,9 +530,12 @@ static PreprocessorMacro* LookupMacro(Preprocessor* preprocessor, Name* name)
     return LookupMacro(GetCurrentEnvironment(preprocessor), name);
 }
 
-// A macro is "busy" if it is currently being used for expansion.
-// A macro cannot be expanded again while busy, to avoid infinite recursion.
-static bool _isMacroBusy(PreprocessorMacro* macro)
+    /// Check if `macro` is "busy" in the given `env`.
+    ///
+    /// A macro is "busy" if it is already being used for expansion, such
+    /// that an attempt to expand it again would lead to infinite expansion.
+    ///
+static bool _isMacroBusy(PreprocessorMacro* macro, PreprocessorEnvironment* env)
 {
     // The challenge here is that we are implementing expansion
     // for arguments to function-like macros in a "lazy" fashion.
@@ -535,6 +546,8 @@ static bool _isMacroBusy(PreprocessorMacro* macro)
     // can invoke a macro as part of an argument to an
     // invocation of the same macro:
     //
+    //     #define FOO(A,B,C) A + B + C
+    //
     //     FOO( 1, FOO(22, 2, 2), 333 );
     //
     // In our implementation, the "inner" invocation of `FOO`
@@ -543,12 +556,30 @@ static bool _isMacroBusy(PreprocessorMacro* macro)
     // Doing things this way leads to greatly simplified
     // code for handling expansion.
     //
-    // A proper implementation of `IsMacroBusy` needs to
-    // take context into account, so that it bans recursive
-    // use of a macro when it occurs (indirectly) through
-    // the *body* of the expansion, but not when it occcurs
-    // only through an *argument*.
-    return macro->isBusy;
+    // We solve this problem by having each `PreprocessorEnvironment`
+    // track an (optional) macro that should be busy in
+    // that environment.
+    //
+    // The environment that we create for the outer expansion
+    // of `FOO` (the one that will map `A => 1, B => FOO(22,2,2), ...`)
+    // will track the `FOO` macro because it should be busy
+    // in the body of `FOO`.
+    //
+    // In contrast, the environment used when expanding the parameter
+    // `B` will just be the environment in place at the macro *invocation*
+    // site, which in this case is the global environment.
+    //
+    // Given the design of putting busy macro state into environments,
+    // we can easily check if a macro is busy in a given environment
+    // by walking through the list of busy macros that was registerd
+    // with that environment.
+    //
+    for(auto busyMacro = env->busyMacros; busyMacro; busyMacro = busyMacro->next)
+    {
+        if(busyMacro->macro == macro)
+            return true;
+    }
+    return false;
 }
 
 //
@@ -564,35 +595,92 @@ static void InitializeMacroExpansion(
 
     expansion->parent = preprocessor->inputStream;
     expansion->primaryStream = preprocessor->inputStream->primaryStream;
-
-    expansion->environment = macro->environment;
     expansion->macro = macro;
+
+    // The macro expansion will read from the stored tokens
+    // that were recorded in the macro definition.
+    //
     expansion->tokenReader = TokenReader(macro->tokens);
+
+    // A macro expansion will always occur in its own
+    // environment.
+    //
+    // For a function-like macro this environment will
+    // map the names of macro parameters to their argument
+    // token lists.
+    //
+    // For all macros, this environment will be used
+    // to track the "busy" state of the macro itself.
+    //
+    expansion->environment = &expansion->expansionEnvironment;
+
+    // The environment used for expanding a macro is always
+    // a child of the environment where the macro was defined.
+    //
+    PreprocessorEnvironment* parentEnvironment = macro->environment;
+    expansion->expansionEnvironment.parent = parentEnvironment;
+    //
+    // For ordinary function-like and object-like macros, that
+    // environment will always be the global environment.
+    //
+    // For the macros that represent arguments to a function-like
+    // macro, that environment will be the environment where
+    // the function-like macro was *invoked*, which might be
+    // in the context of another macro expansion.
+
+    // A macro is always busy in its own expansion environment,
+    // to prevent recursive expansion. Here we construct a
+    // link for the linked list of busy macros and install it
+    // into the environment.
+    //
+    // Note: this extra link is unnecessary in the case where
+    // `macro` is an argument to a function-like macro, because
+    // there is no way for it to reference itself in its
+    // expansion. We could try to avoid the extra step at
+    // the cost of a bit more code complexity here.
+    //
+    expansion->busy.macro = macro;
+    expansion->expansionEnvironment.busyMacros = &expansion->busy;
+
+    // What goes into the rest of the list of busy macros
+    // depends on what kind of macro is being expanded.
+    //
+    if( macro->flavor == PreprocessorMacroFlavor::FunctionArg )
+    {
+        // For a macro representing an argument to a function-like
+        // macro, the busy macros should be those that were in
+        // place at the invocation site of the function-like macro.
+        // This happens to be what is stored in the parent
+        // environment.
+        //
+        expansion->busy.next = parentEnvironment->busyMacros;
+    }
+    else
+    {
+        // For the other cases (function-like and objet-like
+        // macros), the busy list should include anything
+        // that was already busy in the environment that
+        // is beginning to expand a macro.
+        //
+        expansion->busy.next = preprocessor->inputStream->environment->busyMacros;
+    }
 }
 
 static void PushMacroExpansion(
     Preprocessor*   preprocessor,
     MacroExpansion* expansion)
 {
-    SLANG_ASSERT(expansion->macro->isBusy == false);
-
-    // We are now expanding so mark the macro as busy.
-    // Will be when the MacroExpansion is release
-    expansion->macro->isBusy = true;
-
     PushInputStream(preprocessor, expansion);
 }
 
-#if 0
-static void AddEndOfStreamToken(
+static void _addEndOfStreamToken(
     Preprocessor*       preprocessor,
     PreprocessorMacro*  macro)
 {
     Token token = PeekRawToken(preprocessor);
     token.type = TokenType::EndOfFile;
-    macro->tokens.mTokens.add(token);
+    macro->tokens.add(token);
 }
-#endif
 
 static SimpleTokenInputStream* createSimpleInputStream(
     Preprocessor*   preprocessor,
@@ -614,74 +702,169 @@ static SimpleTokenInputStream* createSimpleInputStream(
     return inputStream;
 }
 
-static void _addEndOfStreamToken(Preprocessor* preprocessor, List<Token>& outTokens)
+    /// Parse one macro argument and return it in the form of a macro
+    ///
+    /// Assumes as a precondition that the caller has already checked
+    /// for a closing `)` or end-of-input token.
+    ///
+    /// Does not consume any closing `)` or `,` for the argument.
+    ///
+static PreprocessorMacro* _parseMacroArg(Preprocessor* preprocessor)
 {
-    Token token = PeekRawToken(preprocessor);
-    token.type = TokenType::EndOfFile;
-    outTokens.add(token);
-}
-
-static SlangResult _parseArgTokens(Preprocessor* preprocessor, List<Token>& outTokens)
-{
-    // Read tokens for the argument
-    // We track the nesting depth, since we don't break
-    // arguments on a `,` nested in balanced parentheses
+    // Create the argument, represented as a special flavor of macro
     //
-    // Note: Does not consume the closing ')' or ','
+    PreprocessorMacro* arg = CreateMacro(preprocessor);
+    arg->flavor = PreprocessorMacroFlavor::FunctionArg;
+    arg->environment = GetCurrentEnvironment(preprocessor);
 
-    int nesting = 0;
-    for (;;)
+    // We will now read the tokens that make up the argument.
+    //
+    // We need to keep track of the nesting depth of parentheses,
+    // because arguments should only break on a `,` that is
+    // not properly nested in balanced parentheses.
+    //
+    int nestingDepth = 0;
+    for(;;)
     {
-        switch (PeekRawTokenType(preprocessor))
+        switch(PeekRawTokenType(preprocessor))
         {
-            case TokenType::EndOfFile:
+        case TokenType::EndOfFile:
+            // End of input means end of the argument.
+            // It is up to the caller to diagnose the
+            // lack of a closing `)`.
+            return arg;
+
+        case TokenType::RParent:
+            // If we see a right paren when we aren't nested
+            // then we are at the end of an argument.
+            //
+            if(nestingDepth == 0)
             {
-                // if we reach the end of the file,
-                // then we have an error, and need to
-                // bail out
-                _addEndOfStreamToken(preprocessor, outTokens);
-                return SLANG_FAIL;
+                _addEndOfStreamToken(preprocessor, arg);
+                return arg;
             }
-            case TokenType::RParent:
+            // Otherwise we decrease our nesting depth, add
+            // the token, and keep going
+            nestingDepth--;
+            break;
+
+        case TokenType::Comma:
+            // If we see a comma when we aren't nested
+            // then we are at the end of an argument
+            if (nestingDepth == 0)
             {
-                // If we see a right paren when we aren't nested
-                // then we are at the end of an argument
-                if (nesting == 0)
-                {
-                    _addEndOfStreamToken(preprocessor, outTokens);
-                    return SLANG_OK;
-                }
-                // Otherwise we decrease our nesting depth, add
-                // the token, and keep going
-                nesting--;
-                break;
+                _addEndOfStreamToken(preprocessor, arg);
+                return arg;
             }
-            case TokenType::Comma:
-            {
-                // If we see a comma when we aren't nested
-                // then we are at the end of an argument
-                if (nesting == 0)
-                {
-                    _addEndOfStreamToken(preprocessor, outTokens);
-                    return SLANG_OK;
-                }
-                // Otherwise we add it as a normal token
-                break;
-            }
-            case TokenType::LParent:
-            {
-                // If we see a left paren then we need to
-                // increase our tracking of nesting
-                nesting++;
-                break;
-            }
-            default: break;
+            // Otherwise we add it as a normal token
+            break;
+
+        case TokenType::LParent:
+            // If we see a left paren then we need to
+            // increase our tracking of nesting
+            nestingDepth++;
+            break;
+
+        default:
+            break;
         }
 
         // Add the token and continue parsing.
-        outTokens.add(AdvanceRawToken(preprocessor));
+        arg->tokens.add(AdvanceRawToken(preprocessor));
     }            
 }
+
+    /// Parse the arguments to a function-like macro invocation.
+    ///
+    /// This function assumes the opening `(` has already been parsed,
+    /// and it leaves the closing `)`, if any, for the caller to consume.
+    ///
+    /// Returns the number of arguments parsed.
+    ///
+static Index _parseMacroArgs(
+    Preprocessor*       preprocessor,
+    PreprocessorMacro*  macro,
+    MacroExpansion*     expansion)
+{
+    // If there are no arguments present, then we
+    // will bail out immediately.
+    //
+    switch (PeekRawTokenType(preprocessor))
+    {
+    case TokenType::RParent:
+    case TokenType::EndOfFile:
+        return 0;
+    }
+
+    // Otherwise, we have one or more arguments.
+    Index paramCount = Index(macro->params.getCount());
+    Index argCount = 0;
+    for(;;)
+    {
+        // Parse an argument.
+        PreprocessorMacro* arg = _parseMacroArg(preprocessor);
+        SLANG_ASSERT(arg);
+
+        Index argIndex = argCount++;
+        if(argIndex < paramCount)
+        {
+            // The argument matches up with one of the declared
+            // parameters of the macro, so we will associate
+            // it with the parameter name.
+            //
+            NameLoc paramNameAndLoc = macro->params[argIndex];
+            Name* paramName = paramNameAndLoc.name;
+            arg->nameAndLoc = paramNameAndLoc;
+            expansion->expansionEnvironment.macros[paramName] = arg;
+        }
+        else
+        {
+            // TODO: If we supported variadic macros, we would
+            // want to check if `arg` should be appended to the
+            // tokens for the last/variadic parameter.
+            //
+            // For now, we assume that any "extra" arguments
+            // need to be disposed of, so that we don't
+            // leak.
+            //
+            delete arg;
+        }
+
+        // After consuming one macro argument, we look at
+        // the next token to decide what to do.
+        //
+        switch( PeekRawTokenType(preprocessor))
+        {
+        case TokenType::RParent:
+        case TokenType::EndOfFile:
+            // if we see a closing `)` or the end of
+            // input, we know we are done with arguments.
+            //
+            return argCount;
+
+        case TokenType::Comma:
+            // If we see a comma, then we will
+            // continue scanning for more macro
+            // arguments.
+            //
+            AdvanceRawToken(preprocessor);
+            break;
+
+        default:
+            // Another other token represents a syntax error.
+            //
+            // TODO: We could try to be clever here in deciding
+            // whether to break out of parsing macro arguments,
+            // or whether to "recover" and continue to scan
+            // ahead for a closing `)`. For now it is simplest
+            // to just bail.
+            //
+            GetSink(preprocessor)->diagnose(PeekLoc(preprocessor), Diagnostics::errorParsingToMacroInvocationArgument, paramCount, macro->getName());
+            return argCount;
+        }
+    }
+}
+
 
 // Check whether the current token on the given input stream should be
 // treated as a macro invocation, and if so set up state for expanding
@@ -710,7 +893,7 @@ static void MaybeBeginMacroExpansion(
 
         // If the macro is busy (already being expanded),
         // don't try to trigger recursive expansion
-        if (_isMacroBusy(macro))
+        if (_isMacroBusy(macro, GetCurrentEnvironment(preprocessor)))
             return;
 
         // We might already have looked at this token,
@@ -746,120 +929,40 @@ static void MaybeBeginMacroExpansion(
                 return;
             }
 
+            MacroExpansion* expansion = new MacroExpansion();
+            InitializeMacroExpansion(preprocessor, expansion, macro);
+
             // Consume the opening `(`
             Token leftParen = AdvanceRawToken(preprocessor);
 
-          
-            FunctionLikeMacroExpansion* expansion = new FunctionLikeMacroExpansion();
-            InitializeMacroExpansion(preprocessor, expansion, macro);
-            expansion->argumentEnvironment.parent = &preprocessor->globalEnv;
-            expansion->environment = &expansion->argumentEnvironment;
+            // Parse the arguments to the macro invocation
+            Index argCount = _parseMacroArgs(preprocessor, macro, expansion);
 
-            // Try to read any arguments present.
-            const Index paramCount = Index(macro->params.getCount());
-
-            // Set to invalid value initially
-            Index argCount = -1;
-            for (Index argIndex = 0; true; argIndex++)
+            // Expect a closing ')'
+            if(PeekRawTokenType(preprocessor) == TokenType::RParent)
             {
-                // Read an argument, as tokens
-                List<Token> argTokens;
-                if (SLANG_FAILED(_parseArgTokens(preprocessor, argTokens)))
-                {
-                    GetSink(preprocessor)->diagnose(PeekLoc(preprocessor), Diagnostics::errorParsingToMacroInvocationArgument, paramCount, macro->getName());
-                    return;
-                }
-
-                // We always have eof in argTokens, so if 1 or less there are no values. If we are at ')' means it had no parameters
-                // at all
-                if (argTokens.getCount() <= 1 && PeekRawTokenType(preprocessor) == TokenType::RParent)
-                {
-                    argCount = 0;
-                    break;
-                }
-
-                // Only bother adding the argument if the index is valid.
-                // Would need to do something different here if we supported var args
-                // Doing this way means we can report the amount of args passed correctly.
-                if (argIndex < paramCount)
-                {
-                    // Create the argument, represented as a special flavor of macro
-                    PreprocessorMacro* arg = CreateMacro(preprocessor);
-                    arg->flavor = PreprocessorMacroFlavor::FunctionArg;
-                    arg->environment = GetCurrentEnvironment(preprocessor);
-
-                    // Now we need to expand these tokens by applying macros (and in doing so we do
-                    // allow the expansion of args that invoke this macro)
-
-                    {
-                        SimpleTokenInputStream argExpandStream;
-                        argExpandStream.primaryStream = nullptr;
-                        argExpandStream.parent = nullptr;
-
-                        argExpandStream.lexedTokens.m_tokens.swapWith(argTokens);
-                        argExpandStream.tokenReader = TokenReader(argExpandStream.lexedTokens);
-
-                        // TODO(JS): What environment should be used for the expansion? For now we'll just use the environment set on the the macro
-                        argExpandStream.environment = macro->environment; // &preprocessor->globalEnv;
-
-                        auto prevInputStream = preprocessor->inputStream;
-
-                        preprocessor->inputStream = &argExpandStream;
-
-                        // Lets read some tokens until we hit the end of the file
-
-                        while (true)
-                        {
-                            Token expandToken = AdvanceToken(preprocessor);
-                            // Add the token to the expanded arg
-                            arg->tokens.add(expandToken);
-                            // If we hit the end then handle
-                            if (expandToken.type == TokenType::EndOfFile)
-                            {
-                                break;
-                            }
-                        }
-
-                        // Restore the previous input stream
-                        preprocessor->inputStream = prevInputStream;
-                    }
-
-                    // Associate the new macro with its parameter name
-                    NameLoc paramNameAndLoc = macro->params[argIndex];
-                    Name* paramName = paramNameAndLoc.name;
-                    arg->nameAndLoc = paramNameAndLoc;
-                    expansion->argumentEnvironment.macros[paramName] = arg;
-                }
-
-                // Do the peek to see what's next
-                auto tokenType = PeekRawTokenType(preprocessor);
-                if (tokenType == TokenType::RParent)
-                {
-                    // Expect closing right paren
-                    AdvanceRawToken(preprocessor);
-                    argCount = argIndex + 1;
-                    break;
-                }
-                else if (tokenType == TokenType::Comma)
-                {
-                    // Consume the comma
-                    AdvanceRawToken(preprocessor);
-                }
-                else
-                {
-                    // Anything else is an error
-                    GetSink(preprocessor)->diagnose(PeekLoc(preprocessor), Diagnostics::errorParsingToMacroInvocationArgument, paramCount, macro->getName());
-                    return;
-                }
+                AdvanceRawToken(preprocessor);
+            }
+            else
+            {
+                GetSink(preprocessor)->diagnose(PeekLoc(preprocessor), Diagnostics::expectedTokenInMacroArguments, TokenType::RParent, PeekRawTokenType(preprocessor));
             }
 
+            // If we didn't parse the expected number of arguments,
+            // then diagnose an error and do not attempt expansion.
+            //
+            // TODO: This check will need to be updated for variadic macros.
+            //
+            const Index paramCount = Index(macro->params.getCount());
             if (argCount != paramCount)
             {
                 GetSink(preprocessor)->diagnose(PeekLoc(preprocessor), Diagnostics::wrongNumberOfArgumentsToMacro, paramCount, argCount);
                 return;
             }
 
-            // We are ready to expand.
+            // Now that the arguments have been parsed and validated,
+            // we are ready to proceed with expansion of the macro body.
+            //
             PushMacroExpansion(preprocessor, expansion);
         }
         else
@@ -868,7 +971,7 @@ static void MaybeBeginMacroExpansion(
             AdvanceRawToken(preprocessor);
 
             // Object-like macros are the easy case.
-            ObjectLikeMacroExpansion* expansion = new ObjectLikeMacroExpansion();
+            MacroExpansion* expansion = new MacroExpansion();
             InitializeMacroExpansion(preprocessor, expansion, macro);
             PushMacroExpansion(preprocessor, expansion);
         }
