@@ -79,7 +79,18 @@ D3D12 and VK may have some very limited intrinsic support such as sqrt, rsqrt
 
 4) If you compile code using double and intrinsics through Slang at first blush it will seem to work. Assuming there are no errors in your code, your code will even typically appear to work correctly. Unfortunately what is really happening is the backend compiler (fxc or dxc) compiler is narrowing double to float and then using float intrinsics. It typically generates a warning when this happens, but unless there is an error in your code you will not see these warnings because dxc doesn't appear to have a mechanism to return warnings if there isn't an error. This is why everything appears to work - but actually any intrinsic call is losing precision silently. 
 
+Note on dxc by default Slang disables warnings - warnings need to be enabled to see the narrowing warnings. 
+
 There is another exception around the use of % - if you do this with double it will return an error saying on float is supported. 
+
+It appears that no intrinsics are available for double with fxc. 
+
+On dxc the following intrinsics are available with double
+
+`rcp`, `sign`, `saturate`, `abs`, `min`, `max`, `clamp`, `asuint`. These are tested in the test `tests/hlsl-intrinsic/scalar-double-simple-intrinsic.slang`.
+
+There is no suport for transcendentals (`sin`, `cos` etc) or `log`/`exp`. 
+More surprising `sqrt`, `rsqrt`, `frac`, `ceil`, `floor`, `trunc`, `step`, `lerp`, `smoothstep` as also not supported.
 
 uint64_t and int64_t Support
 ============================
