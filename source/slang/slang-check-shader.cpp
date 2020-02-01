@@ -828,7 +828,7 @@ namespace Slang
                     // but didn't specify any groups (since the current
                     // compilation API doesn't allow for grouping).
                     //
-                    entryPointReq->getTranslationUnit()->entryPoints.add(entryPoint);
+                    entryPointReq->getTranslationUnit()->module->_addEntryPoint(entryPoint);
 
                     outUnspecializedEntryPoints.add(entryPoint);
                     allComponentTypes.add(entryPoint);
@@ -907,7 +907,7 @@ namespace Slang
                     // group, so that its entry-point parameters lay out
                     // independent of the others.
                     //
-                    translationUnit->entryPoints.add(entryPoint);
+                    translationUnit->module->_addEntryPoint(entryPoint);
 
                     outUnspecializedEntryPoints.add(entryPoint);
                     allComponentTypes.add(entryPoint);
@@ -1264,7 +1264,7 @@ namespace Slang
         if(sink->GetErrorCount())
             return nullptr;
 
-        return unspecializedEntryPoint->specialize(
+        return ((ComponentType*) unspecializedEntryPoint)->specialize(
             args.getBuffer(),
             args.getCount(),
             sink);

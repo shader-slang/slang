@@ -3179,8 +3179,37 @@ namespace slang
             SlangInt                    specializationArgCount,
             IComponentType**            outSpecializedComponentType,
             ISlangBlob**                outDiagnostics = nullptr) = 0;
+
+            /** Link this component type against all of its unsatisifed dependencies.
+            
+            A component type may have unsatisfied dependencies. For example, a module
+            depends on any other modules it `import`s, and an entry point depends
+            on the module that defined it.
+
+            A user can manually satisfy dependencies by creating a composite
+            component type, and when doing so they retain full control over
+            the relative ordering of shader parameters in the resulting layout.
+
+            It is an error to try to generate/access compiled kernel code for
+            a component type with unresolved dependencies, so if dependencies
+            remain after whatever manual composition steps an application
+            cares to peform, the `link()` function can be used to automatically
+            compose in any remaining dependencies. The order of parameters
+            (and hence the global layout) that results will be deterministic,
+            but is not currently documented.
+            */
+            virtual SLANG_NO_THROW SlangResult SLANG_MCALL link(
+                IComponentType**            outLinkedComponentType,
+                ISlangBlob**                outDiagnostics = nullptr) = 0;
     };
     #define SLANG_UUID_IComponentType { 0x5bc42be8, 0x5c50, 0x4929, { 0x9e, 0x5e, 0xd1, 0x5e, 0x7c, 0x24, 0x1, 0x5f } };
+
+    struct IEntryPoint : public IComponentType
+    {
+    public:
+    };
+
+    #define SLANG_UUID_IEntryPoint { 0x8f241361, 0xf5bd, 0x4ca0, { 0xa3, 0xac, 0x2, 0xf7, 0xfa, 0x24, 0x2, 0xb8 } }
 
         /** A module is the granularity of shader code compilation and loading.
 
@@ -3198,9 +3227,9 @@ namespace slang
     struct IModule : public IComponentType
     {
     public:
-        /** Note: eventually operations for looking up types or entry
-        points by name should appear here.
-        */
+        virtual SLANG_NO_THROW SlangResult SLANG_MCALL findEntryPointByName(
+            char const*     name,
+            IEntryPoint**   outEntryPoint) = 0;
     };
     
     #define SLANG_UUID_IModule { 0xc720e64, 0x8722, 0x4d31, { 0x89, 0x90, 0x63, 0x8a, 0x98, 0xb1, 0xc2, 0x79 } }
@@ -3240,16 +3269,50 @@ namespace slang
     }
 }
 
-/**
+/** Get the (linked) program for a compile request.
+
+The linked program will include all of the global-scope modules for the
+translation units in the program, plus any modules that they `import`
+(transitively), specialized to any global specialization arguments that
+were provided via the API.
 */
 SLANG_API SlangResult spCompileRequest_getProgram(
     SlangCompileRequest*    request,
     slang::IComponentType** outProgram);
 
+/** Get the (partially linked) component type for an entry point.
+
+The returned component type will include the entry point at the
+given index, and will be specialized using any specialization arguments
+that were provided for it via the API.
+
+The returned component will *not* include the modules representing
+the global scope and its dependencies/specialization, so a client
+program will typically want to compose this component type with
+the one returned by `spCompileRequest_getProgram` to get a complete
+and usable component type from which kernel code can be requested.
+*/
 SLANG_API SlangResult spCompileRequest_getEntryPoint(
     SlangCompileRequest*    request,
     SlangInt                entryPointIndex,
-    slang::IComponentType**    outEntryPoint);
+    slang::IComponentType** outEntryPoint);
+
+/** Get the (un-linked) module for a translation unit.
+
+The returned module will not be linked against any dependencies,
+nor against any entry points (even entry points declared inside
+the module). Similarly, the module will not be specialized
+to the arguments that might have been provided via the API.
+
+This function provides an atomic unit of loaded code that
+is suitable for looking up types and entry points in the
+given module, and for linking together to produce a composite
+program that matches the needs of an application.
+*/
+SLANG_API SlangResult spCompileRequest_getModule(
+    SlangCompileRequest*    request,
+    SlangInt                translationUnitIndex,
+    slang::IModule**        outModule);
 
 #endif
 

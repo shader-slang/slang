@@ -196,6 +196,16 @@ namespace Slang
     // EntryPoint
     //
 
+    static const Guid IID_IEntryPoint = SLANG_UUID_IEntryPoint;
+
+    ISlangUnknown* EntryPoint::getInterface(const Guid& guid)
+    {
+        if(guid == IID_IEntryPoint)
+            return static_cast<slang::IEntryPoint*>(this);
+
+        return Super::getInterface(guid);
+    }
+
     RefPtr<EntryPoint> EntryPoint::create(
         Linkage*            linkage,
         DeclRef<FuncDecl>   funcDeclRef,
@@ -2058,6 +2068,15 @@ SlangResult dissassembleDXILUsingDXC(
         auto& result = m_entryPointResults[entryPointIndex];
         if( result.format != ResultFormat::None )
             return result;
+
+        // If we haven't yet computed a layout for this target
+        // program, we need to make sure that is done before
+        // code generation.
+        //
+        if( !getOrCreateIRModuleForLayout(sink) )
+        {
+            return result;
+        }
 
         RefPtr<BackEndCompileRequest> backEndRequest = new BackEndCompileRequest(
             m_program->getLinkage(),
