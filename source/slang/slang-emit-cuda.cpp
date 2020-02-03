@@ -393,9 +393,9 @@ void CUDASourceEmitter::emitCall(const HLSLIntrinsic* specOp, IRInst* inst, cons
 
             IRType* retType = specOp->returnType;
 
-            switch (retType->op)
+            if (IRVectorType* vecType = as<IRVectorType>(retType))
             {
-                case kIROp_VectorType:
+                if (numOperands == GetIntVal(vecType->getElementCount()))
                 {
                     // Get the type name
                     writer->emit("make_");
@@ -414,8 +414,8 @@ void CUDASourceEmitter::emitCall(const HLSLIntrinsic* specOp, IRInst* inst, cons
                     writer->emitChar(')');
                     return;
                 }
-                default: break; 
             }
+            // Just use the default
             break;
         }
         default: break;
@@ -542,10 +542,14 @@ void CUDASourceEmitter::emitPreprocessorDirectivesImpl()
         }
     }
 
-    // Emit all the intrinsics that were used
-    for (const auto& keyValue : m_intrinsicNameMap)
     {
-        _maybeEmitSpecializedOperationDefinition(keyValue.Key);
+        List<const HLSLIntrinsic*> intrinsics;
+        m_intrinsicSet.getIntrinsics(intrinsics);
+        // Emit all the intrinsics that were used
+        for (auto intrinsic : intrinsics)
+        {
+            _maybeEmitSpecializedOperationDefinition(intrinsic);
+        }
     }
 }
 

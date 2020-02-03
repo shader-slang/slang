@@ -1193,11 +1193,7 @@ void CPPSourceEmitter::_emitInitDefinition(const UnownedStringSlice& funcName, c
     emitFunctionPreambleImpl(nullptr);
 
     IRType* retType = specOp->returnType;
-    IRVectorType* vecType = as<IRVectorType>(retType);
-    SLANG_ASSERT(vecType);
-
-    Index elementCount = Index(GetIntVal(vecType->getElementCount()));
-
+    
     _emitSignature(funcName, specOp);
     writer->emit("\n{\n");
     writer->indent();
@@ -1209,45 +1205,61 @@ void CPPSourceEmitter::_emitInitDefinition(const UnownedStringSlice& funcName, c
 
     const Index paramCount = Index(funcType->getParamCount());
 
-    Index paramIndex = 0;
-    Index paramSubIndex = 0;
-
-    for (Index i = 0; i < elementCount; ++i)
+    if (IRVectorType* vecType = as<IRVectorType>(retType))
     {
-        if (i > 0)
-        {
-            writer->emit(", ");
-        }
+        Index elementCount = Index(GetIntVal(vecType->getElementCount()));
 
-        if (paramIndex >= paramCount)
-        {
-            writer->emit("0");
-        }
-        else
-        {
-            IRType* paramType = funcType->getParamType(paramIndex);
+        Index paramIndex = 0;
+        Index paramSubIndex = 0;
 
-            if (IRVectorType* paramVecType = as<IRVectorType>(paramType))
+        for (Index i = 0; i < elementCount; ++i)
+        {
+            if (i > 0)
             {
-                Index paramElementCount = Index(GetIntVal(paramVecType->getElementCount()));
+                writer->emit(", ");
+            }
 
-                writer->emitChar('a' + char(paramIndex));
-                writer->emit(".");
-                writer->emitChar(s_elemNames[paramSubIndex]);
-
-                paramSubIndex ++;
-
-                if (paramSubIndex >= paramElementCount)
-                {
-                    paramIndex++;
-                    paramSubIndex = 0;
-                }
+            if (paramIndex >= paramCount)
+            {
+                writer->emit("0");
             }
             else
             {
-                writer->emitChar('a' + char(paramIndex));
-                paramIndex++;
+                IRType* paramType = funcType->getParamType(paramIndex);
+
+                if (IRVectorType* paramVecType = as<IRVectorType>(paramType))
+                {
+                    Index paramElementCount = Index(GetIntVal(paramVecType->getElementCount()));
+
+                    writer->emitChar('a' + char(paramIndex));
+                    writer->emit(".");
+                    writer->emitChar(s_elemNames[paramSubIndex]);
+
+                    paramSubIndex ++;
+
+                    if (paramSubIndex >= paramElementCount)
+                    {
+                        paramIndex++;
+                        paramSubIndex = 0;
+                    }
+                }
+                else
+                {
+                    writer->emitChar('a' + char(paramIndex));
+                    paramIndex++;
+                }
             }
+        }
+    }
+    else
+    {
+        for (Index i = 0; i < paramCount; ++i)
+        {
+            if (i > 0)
+            {
+                writer->emit(", ");
+            }
+            writer->emitChar('a' + char(i));
         }
     }
 
@@ -1411,6 +1423,11 @@ void CPPSourceEmitter::emitSpecializedOperationDefinition(const HLSLIntrinsic* s
         case Op::GetAt:
         {
             return _emitGetAtDefinition(_getFuncName(specOp), specOp);
+        }
+        case Op::Swizzle:
+        {
+            // Don't have to output anything for swizzle for now
+            return; 
         }
         default:
         {
@@ -1650,26 +1667,8 @@ SlangResult CPPSourceEmitter::calcFuncName(const HLSLIntrinsic* specOp, StringBu
             case Op::Init:
             {
                 outBuilder << "make_";
-                IRType* retType = specOp->returnType;
-
-                if (auto vecType = as<IRVectorType>(retType))
-                {
-                    outBuilder << "v";
-                    outBuilder << GetIntVal(vecType->getElementCount());
-                    outBuilder << "_";
-                    return calcTypeName(vecType->getElementType(), CodeGenTarget::CSource, outBuilder);
-                }
-                else if (auto matType = as<IRMatrixType>(retType))
-                {
-                    outBuilder << "m";
-                    outBuilder << GetIntVal(matType->getRowCount());
-                    outBuilder << GetIntVal(matType->getColumnCount());
-                    outBuilder << "_";
-                    return calcTypeName(matType->getElementType(), CodeGenTarget::CSource, outBuilder);
-                }
-
-                SLANG_ASSERT(!"Unhandled case");
-                return SLANG_FAIL;
+                SLANG_RETURN_ON_FAIL(calcTypeName(specOp->returnType, CodeGenTarget::CSource, outBuilder));
+                return SLANG_OK;
             }
             default: break;
         }
