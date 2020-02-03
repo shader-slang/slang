@@ -5,12 +5,14 @@ Slang 64-bit Type Support
 
 * Not all targets support 64 bit types, or all 64 bit types 
   * 64 bit integers generally require later APIs/shader models
+* When specifying 64 bit literals *always* use the type suffixes (ie `l`, `ull`, `ll`) 
 * GPU target/s generally do not support all double intrinsics 
   * Typically missing are trascendentals (sin, cos etc), logarithm and exponental functions
   * CUDA is the exception supporting nearly all double intrinsics
-* D3D targets appear to support double intrinsics, but behind the scenes they are being converted to float
-* When using D3D12, it is best to use DXIL, there are some serious issues around double and dxbc
-* When specifying 64 bit literals *always* use the type suffixes (ie `l`, `ull`, `ll`) 
+* D3D 
+  * D3D targets *appear* to support double intrinsics (like sin, cos, log etc), but behind the scenes they are actually being converted to float
+  * When using D3D12, it is best to use DXIL if you use double because there are some serious issues around double and DXBC
+* VK will produce an error in validation if a double intrinsic is used it does support (which is most of them)
 
 Overview
 ========
