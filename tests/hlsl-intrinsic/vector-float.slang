@@ -51,7 +51,7 @@ void computeMain(uint3 dispatchThreadID : SV_DispatchThreadID)
     // Disabled because not supported on VK (glsl) in vector form
     ft += rcp(1.0 + f);
 #endif
-    
+
     ft += sign(f - 0.5);
     
     ft += saturate(f * 4 - 2.0);
@@ -61,22 +61,23 @@ void computeMain(uint3 dispatchThreadID : SV_DispatchThreadID)
     
     ft += exp2(f);
     ft += exp(f);
-        
-        
+     
     ft += frac(f * 3);
     ft += ceil(f * 5 - 3);
     
-    ft += floor(f * 10 - 7);
+    ft += floor(f * 10 - 7.01);
+
     ft += trunc(f * 7);
-     
    
     ft += log(f + 10.0);
     ft += log2(f * 3 + 2);
+
 
     {
         float v[] = { 1, 10, 100, 1000 };
         ft += int3(log10(float3(v[idx] + vf) + 0.5f));
     }
+
        
     ft += abs(f * 4 - 2.0f);
     
@@ -97,6 +98,7 @@ void computeMain(uint3 dispatchThreadID : SV_DispatchThreadID)
     ft += float3(vi);   
 
     float4 result = float4(ft + nv, 0) + float4(vf);
+
     
     // Quantize...
     result = int4(result * 256) * (1.0f / 256);
