@@ -24,7 +24,7 @@ Adding printing support to your own codebase
 The code in this example is meant to provide a starting point for applications/frameworks/engines that want to allow shader code to print messages, for debugging logging, etc.
 You can start by copying the `gpu-printing.{h,cpp}`, `gpu-printing-ops.h`, and `printing.slang` files into your codebase, and then modifying them to meet your needs.
 
-The implementation presented here is not feature-complete, so you may want to etend and customize it by:
+The implementation presented here is not feature-complete, so you may want to extend and customize it by:
 
 * Adapting it to use the graphics API or wrapper layer appropriate to your codebase
 
