@@ -1,7 +1,5 @@
-// It doesn't look like fxc, dxc, vk support double versions of many of the intrinsics, so they are disabled here.
-
 //TEST(compute):COMPARE_COMPUTE_EX:-cpu -compute -output-using-type
-//DISABLE_TEST(compute):COMPARE_COMPUTE_EX:-slang -compute -output-using-type
+//TEST(compute):COMPARE_COMPUTE_EX:-slang -compute -output-using-type
 // Fxc doesn't have double intrinsics available
 //DISABLE_TEST(compute):COMPARE_COMPUTE_EX:-slang -compute -dx12 -output-using-type
 //TEST(compute):COMPARE_COMPUTE_EX:-slang -compute -dx12 -profile sm_6_0 -use-dxil -output-using-type

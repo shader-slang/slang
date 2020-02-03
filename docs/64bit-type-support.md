@@ -1,6 +1,20 @@
 Slang 64-bit Type Support
 =========================
 
+## Summary
+
+* Not all targets support 64 bit types, or all 64 bit types 
+  * 64 bit integers generally require later APIs/shader models
+* GPU target/s generally do not support all double intrinsics 
+  * Typically missing are trascendentals (sin, cos etc), logarithm and exponental functions
+  * CUDA is the exception supporting nearly all double intrinsics
+* D3D targets appear to support double intrinsics, but behind the scenes they are being converted to float
+* When using D3D12, it is best to use DXIL, there are some serious issues around double and dxbc
+* When specifying 64 bit literals *always* use the type suffixes (ie `l`, `ull`, `ll`) 
+
+Overview
+========
+
 The Slang language supports 64 bit built in types. Such as
 
 * double
@@ -58,8 +72,8 @@ CPU      |                  |      Yes       |          Yes          |  1
 CUDA     | Nvrtx/PTX        |      Yes       |          Yes          |  1
 D3D12    | DXC/DXIL         |      Yes       |          Small Subset |  4 
 Vulkan   | GlSlang/Spir-V   |      Yes       |          Partial      |  2
-D3D11    | FXC/DXBC         |      Yes       |          No           |  4
-D3D12    | FXC/DXBC         |      Yes       |          No           |  3, 4
+D3D11    | FXC/DXBC         |      Yes       |          Small Subset |  4
+D3D12    | FXC/DXBC         |      Yes       |          Small Subset |  3, 4
 
 1) CUDA and CPU support most intrinsics, with the notable exception currently of matrix invert
 2) In terms of lack of general intrinsic support, the restriction is described in  https://www.khronos.org/registry/spir-v/specs/1.0/GLSL.std.450.html
