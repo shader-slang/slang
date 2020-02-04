@@ -4,6 +4,7 @@
 #include "../../source/core/slang-token-reader.h"
 #include "../../source/core/slang-std-writers.h"
 #include "../../source/core/slang-hex-dump-util.h"
+#include "../../source/core/slang-type-text-util.h"
 
 #include "../../slang-com-helper.h"
 
@@ -708,7 +709,7 @@ static SlangResult _extractSlangCTestRequirements(const CommandLine& cmdLine, Te
         String passThrough;
         if (SLANG_SUCCEEDED(_extractArg(cmdLine, "-pass-through", passThrough)))
         {
-            ioRequirements->addUsedBackEnd(DownstreamCompiler::getPassThroughFromName(passThrough.getUnownedSlice()));
+            ioRequirements->addUsedBackEnd(TypeTextUtil::asPassThrough(passThrough.getUnownedSlice()));
         }
     }
 
@@ -2536,7 +2537,7 @@ static void _calcSynthesizedTests(TestContext* context, RenderApiType synthRende
             {
                 //
                 const auto& language = srcTest.options.args[index + 1];
-                SlangSourceLanguage sourceLanguage = DownstreamCompiler::getSourceLanguageFromName(language.getUnownedSlice());
+                SlangSourceLanguage sourceLanguage = TypeTextUtil::asSourceLanguage(language.getUnownedSlice());
 
                 bool isCrossCompile = true;
 
