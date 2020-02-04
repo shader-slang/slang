@@ -99,9 +99,5 @@ void computeMain(uint3 dispatchThreadID : SV_DispatchThreadID)
 
     float4 result = float4(ft + nv, 0) + float4(vf);
 
-    
-    // Quantize...
-    result = int4(result * 256) * (1.0f / 256);
-
     outputBuffer[idx] = result;
 }
