@@ -698,6 +698,49 @@ namespace renderer_test
         }
     }
 
+
+#define SLANG_SCALAR_TYPES(x) \
+    x(None, none) \
+    x(Void, void) \
+    x(Bool, bool) \
+    x(Float16, half) \
+    x(UInt32, uint32_t) \
+    x(Int32, int32_t) \
+    x(Int64, int64_t) \
+    x(UInt64, uint64_t) \
+    x(Float32, float) \
+    x(Float64, double) 
+
+    /* static */UnownedStringSlice ShaderInputLayout::asText(slang::TypeReflection::ScalarType scalarType)
+    {
+        typedef slang::TypeReflection::ScalarType ScalarType;
+
+        switch (scalarType)
+        {
+
+#define SLANG_SCALAR_TYPE_TO_TEXT(value, text) \
+            case ScalarType::value:             return UnownedStringSlice::fromLiteral(#text);
+
+            SLANG_SCALAR_TYPES(SLANG_SCALAR_TYPE_TO_TEXT)
+            default: break;
+        }
+
+        return UnownedStringSlice();
+    }
+
+    /* static */slang::TypeReflection::ScalarType ShaderInputLayout::asScalarType(const UnownedStringSlice& inText)
+    {
+        typedef slang::TypeReflection::ScalarType ScalarType;
+
+#define SLANG_SCALAR_TYPE_TO_TYPE(value, text) \
+        if (inText == UnownedStringSlice::fromLiteral(#text)) { return ScalarType::value; } else 
+
+        SLANG_SCALAR_TYPES(SLANG_SCALAR_TYPE_TO_TYPE)
+        {
+            return ScalarType::None;
+        }
+    }
+
     /* static */SlangResult ShaderInputLayout::writeBinding(BindRoot* bindRoot, const ShaderInputLayoutEntry& entry, const void* data, size_t sizeInBytes, WriterHelper writer)
     {
         typedef slang::TypeReflection::ScalarType ScalarType;
@@ -755,6 +798,14 @@ namespace renderer_test
             scalarType = elementTypeLayout->getScalarType();
         }
 
+        if (scalarType != ScalarType::None && scalarType != ScalarType::Void)
+        {
+            UnownedStringSlice text = asText(scalarType);
+            // Write out the type
+            writer.put("type: ");
+            writer.put(text);
+            writer.put("\n");
+        }
 
         switch (scalarType)
         {
@@ -765,7 +816,6 @@ namespace renderer_test
             case ScalarType::None:
             case ScalarType::Void:
             case ScalarType::Bool:
-            case ScalarType::Float16:
             {
                 auto ptr = (const uint32_t*)data;
                 const size_t size = sizeInBytes / sizeof(ptr[0]);
@@ -773,6 +823,17 @@ namespace renderer_test
                 {
                     uint32_t v = ptr[i];
                     writer.print("%X\n", v);
+                }
+                break;
+            }
+            case ScalarType::Float16:
+            {
+                auto ptr = (const uint16_t*)data;
+                const size_t size = sizeInBytes / sizeof(ptr[0]);
+                for (size_t i = 0; i < size; ++i)
+                {
+                    const float v = HalfToFloat(ptr[i]);
+                    writer.print("%f\n", v);
                 }
                 break;
             }
