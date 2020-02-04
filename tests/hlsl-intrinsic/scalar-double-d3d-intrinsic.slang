@@ -1,6 +1,7 @@
 //TEST(compute):COMPARE_COMPUTE_EX:-cpu -compute -output-using-type
-//TEST(compute):COMPARE_COMPUTE_EX:-slang -compute -output-using-type
-// Fxc doesn't have double intrinsics available
+// On dx11 this causes a crash on CI (not currently not repeatable on test systems)
+//DISABLE_TEST(compute):COMPARE_COMPUTE_EX:-slang -compute -output-using-type
+// This is disabled because Dx12/DXBC doing double writes to a structured buffer can fail
 //DISABLE_TEST(compute):COMPARE_COMPUTE_EX:-slang -compute -dx12 -output-using-type
 //TEST(compute):COMPARE_COMPUTE_EX:-slang -compute -dx12 -profile sm_6_0 -use-dxil -output-using-type
 //TEST(compute, vulkan):COMPARE_COMPUTE_EX:-vk -compute -output-using-type
