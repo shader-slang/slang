@@ -207,6 +207,7 @@
     <ClInclude Include="slang-test-tool-util.h" />
     <ClInclude Include="slang-text-io.h" />
     <ClInclude Include="slang-token-reader.h" />
+    <ClInclude Include="slang-type-text-util.h" />
     <ClInclude Include="slang-type-traits.h" />
     <ClInclude Include="slang-uint-set.h" />
     <ClInclude Include="slang-visual-studio-compiler-util.h" />
@@ -238,6 +239,7 @@
     <ClCompile Include="slang-test-tool-util.cpp" />
     <ClCompile Include="slang-text-io.cpp" />
     <ClCompile Include="slang-token-reader.cpp" />
+    <ClCompile Include="slang-type-text-util.cpp" />
     <ClCompile Include="slang-uint-set.cpp" />
     <ClCompile Include="slang-visual-studio-compiler-util.cpp" />
     <ClCompile Include="slang-writer.cpp" />

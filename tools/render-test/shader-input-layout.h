@@ -115,12 +115,6 @@ public:
 
         /// Write bindings from values in memory from buffers
     static SlangResult writeBindings(BindRoot* bindRoot, const ShaderInputLayout& layout, const Slang::List<BindSet::Value*>& buffers, const Slang::String& fileName);
-
-        /// Get the scalar type as text.
-    static Slang::UnownedStringSlice asText(slang::TypeReflection::ScalarType scalarType);
-
-        // Converts text to scalar type. Returns 'none' if not determined
-    static slang::TypeReflection::ScalarType asScalarType(const Slang::UnownedStringSlice& text);
 };
 
 void generateTextureDataRGB8(TextureData& output, const InputTextureDesc& desc);
