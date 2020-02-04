@@ -280,21 +280,10 @@ public:
         /// Some downstream compilers are backed by a shared library. This allows access to the shared library to access internal functions. 
     virtual ISlangSharedLibrary* getSharedLibrary() { return nullptr; }
 
-        /// Return the compiler type as name
-    static UnownedStringSlice getCompilerTypeAsText(SlangPassThrough type);
-
         /// Get info for a compiler type
     static const Info& getInfo(SlangPassThrough compiler) { return s_infos.infos[int(compiler)]; }
         /// True if this compiler can compile the specified language
     static bool canCompile(SlangPassThrough compiler, SlangSourceLanguage sourceLanguage);
-
-        /// Given a source language name returns a source language. Name here is distinct from extension
-    static SlangSourceLanguage getSourceLanguageFromName(const UnownedStringSlice& text);
-        /// Given a name returns the pass through
-    static SlangPassThrough getPassThroughFromName(const UnownedStringSlice& slice);
-    static SlangResult getPassThroughFromName(const UnownedStringSlice& slice, SlangPassThrough& outPassThrough);
-        /// Get the compilers name
-    static UnownedStringSlice getPassThroughName(SlangPassThrough passThru);
 
         /// Given a source language return as the equivalent compile target
     static SlangCompileTarget getCompileTarget(SlangSourceLanguage sourceLanguage);

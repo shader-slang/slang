@@ -15,6 +15,8 @@
 #include "slang-state-serialize.h"
 #include "slang-ir-serialize.h"
 
+#include "../core/slang-type-text-util.h"
+
 #include <assert.h>
 
 namespace Slang {
@@ -708,7 +710,7 @@ struct OptionsParser
                     SLANG_RETURN_ON_FAIL(tryReadCommandLineArgument(sink, arg, &argCursor, argEnd, name));
 
                     SlangPassThrough passThrough = SLANG_PASS_THROUGH_NONE;
-                    if (SLANG_FAILED(DownstreamCompiler::getPassThroughFromName(name.getUnownedSlice(), passThrough)))
+                    if (SLANG_FAILED(TypeTextUtil::asPassThrough(name.getUnownedSlice(), passThrough)))
                     {
                         sink->diagnose(SourceLoc(), Diagnostics::unknownPassThroughTarget, name);
                         return SLANG_FAIL;
@@ -943,7 +945,7 @@ struct OptionsParser
                     String compilerText;
                     SLANG_RETURN_ON_FAIL(tryReadCommandLineArgument(sink, arg, &argCursor, argEnd, compilerText));
 
-                    SlangSourceLanguage sourceLanguage = DownstreamCompiler::getSourceLanguageFromName(sourceLanguageText.getUnownedSlice());
+                    SlangSourceLanguage sourceLanguage = TypeTextUtil::asSourceLanguage(sourceLanguageText.getUnownedSlice());
                     if (sourceLanguage == SLANG_SOURCE_LANGUAGE_UNKNOWN)
                     {
                         sink->diagnose(SourceLoc(), Diagnostics::unknownSourceLanguage, sourceLanguageText);
@@ -951,7 +953,7 @@ struct OptionsParser
                     }
 
                     SlangPassThrough compiler;
-                    if (SLANG_FAILED(DownstreamCompiler::getPassThroughFromName(compilerText.getUnownedSlice(), compiler)))
+                    if (SLANG_FAILED(TypeTextUtil::asPassThrough(compilerText.getUnownedSlice(), compiler)))
                     {
                         sink->diagnose(SourceLoc(), Diagnostics::unknownPassThroughTarget, compilerText);
                         return SLANG_FAIL;
@@ -985,7 +987,7 @@ struct OptionsParser
 
                             String slice = argStr.subString(1, index - 1);
                             SlangPassThrough passThrough = SLANG_PASS_THROUGH_NONE;
-                            if (SLANG_SUCCEEDED(DownstreamCompiler::getPassThroughFromName(slice.getUnownedSlice(), passThrough)))
+                            if (SLANG_SUCCEEDED(TypeTextUtil::asPassThrough(slice.getUnownedSlice(), passThrough)))
                             {
                                 session->setDownstreamCompilerPath(passThrough, name.getBuffer());
                                 continue;

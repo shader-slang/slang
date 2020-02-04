@@ -11,7 +11,9 @@
 
 #include "../../source/core/slang-list.h"
 #include "../../source/core/slang-string-util.h"
-#include "../../source/core/slang-downstream-compiler.h"
+//#include "../../source/core/slang-downstream-compiler.h"
+
+#include "../../source/core/slang-type-text-util.h"
 
 namespace renderer_test {
 using namespace Slang;
@@ -226,7 +228,7 @@ SlangResult parseOptions(int argc, const char*const* argv, Slang::WriterHelper s
             }
             UnownedStringSlice sourceLanguageText(*argCursor++);
 
-            SlangSourceLanguage sourceLanguage = DownstreamCompiler::getSourceLanguageFromName(sourceLanguageText);
+            SlangSourceLanguage sourceLanguage = TypeTextUtil::asSourceLanguage(sourceLanguageText);
             if (sourceLanguage == SLANG_SOURCE_LANGUAGE_UNKNOWN)
             {
                 stdError.print("error: expecting unknown source language name '%s' for '%s'\n", String(sourceLanguageText).getBuffer(), arg);

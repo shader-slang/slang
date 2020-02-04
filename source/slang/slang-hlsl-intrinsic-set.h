@@ -146,26 +146,28 @@ struct HLSLIntrinsic
     bool operator==(const ThisType& rhs) const { return op == rhs.op && returnType == rhs.returnType && signatureType == rhs.signatureType; }
     bool operator!=(const ThisType& rhs) const { return !(*this == rhs); }
 
+    static bool isTypeScalar(IRType* type)
+    {
+        // Strip off ptr if it's an operand type
+        if (type->op == kIROp_PtrType)
+        {
+            type = as<IRType>(type->getOperand(0));
+        }
+        // If any are vec or matrix, then we
+        return !(type->op == kIROp_MatrixType || type->op == kIROp_VectorType);
+    }
+
     bool isScalar() const
     {
         Index paramCount = Index(signatureType->getParamCount());
         for (Index i = 0; i < paramCount; ++i)
         {
-            IRType* paramType = signatureType->getParamType(i);
-
-            // Strip off ptr if it's an operand type
-            if (paramType->op == kIROp_PtrType)
-            {
-                paramType = as<IRType>(paramType->getOperand(0));
-            }
-
-            // If any are vec or matrix, then we
-            if (paramType->op == kIROp_MatrixType || paramType->op == kIROp_VectorType)
+            if (!isTypeScalar(signatureType->getParamType(i)))
             {
                 return false;
             }
         }
-        return true;
+        return isTypeScalar(returnType);
     }
 
     int GetHashCode() const { return combineHash(int(op), combineHash(Slang::GetHashCode(returnType), Slang::GetHashCode(signatureType))); }
@@ -254,6 +256,8 @@ public:
 
         /// Returns the intrinsic constructed if there is one from the inst. If not possible to construct returns nullptr.
     HLSLIntrinsic* add(IRInst* inst);
+
+    void getIntrinsics(List<const HLSLIntrinsic*>& out) const;
 
     HLSLIntrinsicSet(IRTypeSet* typeSet, HLSLIntrinsicOpLookup* lookup);
     
