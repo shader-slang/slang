@@ -443,6 +443,9 @@ if isTargetWindows then
 
     -- Let's go ahead and set up the projects for our other example now.
     example "model-viewer"
+
+    example "gpu-printing"
+        kind "ConsoleApp"
 end
 
 example "cpu-hello-world"
