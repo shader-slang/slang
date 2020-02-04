@@ -318,44 +318,45 @@ DIAGNOSTIC(30600, Error, varWithoutTypeMustHaveInitializer, "a variable declarat
 // 307xx: parameters
 DIAGNOSTIC(30700, Error, outputParameterCannotHaveDefaultValue, "an 'out' or 'inout' parameter cannot have a default-value expression");
 
-DIAGNOSTIC(39999, Error, expectedIntegerConstantWrongType, "expected integer constant (found: '$0')")
-DIAGNOSTIC(39999, Error, expectedIntegerConstantNotConstant, "expression does not evaluate to a compile-time constant")
-DIAGNOSTIC(39999, Error, expectedIntegerConstantNotLiteral, "could not extract value from integer constant")
+DIAGNOSTIC(30701, Error, expectedIntegerConstantWrongType, "expected integer constant (found: '$0')")
+DIAGNOSTIC(30702, Error, expectedIntegerConstantNotConstant, "expression does not evaluate to a compile-time constant")
+DIAGNOSTIC(30703, Error, expectedIntegerConstantNotLiteral, "could not extract value from integer constant")
 
-DIAGNOSTIC(39999, Error, noApplicableOverloadForNameWithArgs, "no overload for '$0' applicable to arguments of type $1")
-DIAGNOSTIC(39999, Error, noApplicableWithArgs, "no overload applicable to arguments of type $0")
+DIAGNOSTIC(30704, Error, noApplicableOverloadForNameWithArgs, "no overload for '$0' applicable to arguments of type $1")
+DIAGNOSTIC(30705, Error, noApplicableWithArgs, "no overload applicable to arguments of type $0")
 
-DIAGNOSTIC(39999, Error, ambiguousOverloadForNameWithArgs, "ambiguous call to '$0' operation with arguments of type $1")
-DIAGNOSTIC(39999, Error, ambiguousOverloadWithArgs, "ambiguous call to overloaded operation with arguments of type $0")
+DIAGNOSTIC(30706, Error, ambiguousOverloadForNameWithArgs, "ambiguous call to '$0' operation with arguments of type $1")
+DIAGNOSTIC(30707, Error, ambiguousOverloadWithArgs, "ambiguous call to overloaded operation with arguments of type $0")
 
-DIAGNOSTIC(39999, Note, overloadCandidate, "candidate: $0")
-DIAGNOSTIC(39999, Note, moreOverloadCandidates, "$0 more overload candidates")
+DIAGNOSTIC(30708, Note, overloadCandidate, "candidate: $0")
+DIAGNOSTIC(30709, Note, moreOverloadCandidates, "$0 more overload candidates")
 
-DIAGNOSTIC(39999, Error, caseOutsideSwitch, "'case' not allowed outside of a 'switch' statement")
-DIAGNOSTIC(39999, Error, defaultOutsideSwitch, "'default' not allowed outside of a 'switch' statement")
+DIAGNOSTIC(30710, Error, caseOutsideSwitch, "'case' not allowed outside of a 'switch' statement")
+DIAGNOSTIC(30711, Error, defaultOutsideSwitch, "'default' not allowed outside of a 'switch' statement")
 
-DIAGNOSTIC(39999, Error, expectedAGeneric, "expected a generic when using '<...>' (found: '$0')")
+DIAGNOSTIC(30712, Error, expectedAGeneric, "expected a generic when using '<...>' (found: '$0')")
 
-DIAGNOSTIC(39999, Error, genericArgumentInferenceFailed, "could not specialize generic for arguments of type $0")
-DIAGNOSTIC(39999, Note, genericSignatureTried, "see declaration of $0")
+DIAGNOSTIC(30713, Error, genericArgumentInferenceFailed, "could not specialize generic for arguments of type $0")
+DIAGNOSTIC(30714, Note, genericSignatureTried, "see declaration of $0")
 
-DIAGNOSTIC(39999, Error, expectedAnInterfaceGot, "expected an interface, got '$0'")
+DIAGNOSTIC(30715, Error, expectedAnInterfaceGot, "expected an interface, got '$0'")
 
-DIAGNOSTIC(39999, Error, ambiguousReference, "ambiguous reference to '$0'");
+DIAGNOSTIC(30716, Error, ambiguousReference, "ambiguous reference to '$0'");
 
-DIAGNOSTIC(39999, Error, declarationDidntDeclareAnything, "declaration does not declare anything");
-
-
-DIAGNOSTIC(39999, Error, expectedPrefixOperator, "function called as prefix operator was not declared `__prefix`")
-DIAGNOSTIC(39999, Error, expectedPostfixOperator, "function called as postfix operator was not declared `__postfix`")
-
-DIAGNOSTIC(39999, Error, notEnoughArguments, "not enough arguments to call (got $0, expected $1)")
-DIAGNOSTIC(39999, Error, tooManyArguments, "too many arguments to call (got $0, expected $1)")
-
-DIAGNOSTIC(39999, Error, invalidIntegerLiteralSuffix, "invalid suffix '$0' on integer literal")
-DIAGNOSTIC(39999, Error, invalidFloatingPointLiteralSuffix, "invalid suffix '$0' on floating-point literal")
+DIAGNOSTIC(30717, Error, declarationDidntDeclareAnything, "declaration does not declare anything");
 
 
+DIAGNOSTIC(30718, Error, expectedPrefixOperator, "function called as prefix operator was not declared `__prefix`")
+DIAGNOSTIC(30719, Error, expectedPostfixOperator, "function called as postfix operator was not declared `__postfix`")
+
+DIAGNOSTIC(30720, Error, notEnoughArguments, "not enough arguments to call (got $0, expected $1)")
+DIAGNOSTIC(30721, Error, tooManyArguments, "too many arguments to call (got $0, expected $1)")
+
+DIAGNOSTIC(30722, Error, invalidIntegerLiteralSuffix, "invalid suffix '$0' on integer literal")
+DIAGNOSTIC(30723, Error, invalidFloatingPointLiteralSuffix, "invalid suffix '$0' on floating-point literal")
+
+DIAGNOSTIC(30724, Warning, integerLiteralTruncated, "integer literal '$0' too large for type '$1' truncated to '$2'")
+DIAGNOSTIC(30725, Warning, floatLiteralUnrepresentable, "float literal '$0' unrepresentable, converted '$1' to '$2'")
 
 DIAGNOSTIC(38000, Error, entryPointFunctionNotFound, "no function found matching entry point name '$0'")
 DIAGNOSTIC(38001, Error, ambiguousEntryPoint, "more than one function matches entry point name '$0'")

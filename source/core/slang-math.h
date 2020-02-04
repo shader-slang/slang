@@ -130,6 +130,8 @@ namespace Slang
         return Math::FloatIntUnion::makeFromInt(val).fvalue; 
 	}
 
+#define SLANG_HALF_MAX 65504.0f
+
 	inline unsigned short FloatToHalf(float val)
 	{
         const auto x = FloatAsInt(val);

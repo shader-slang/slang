@@ -1662,21 +1662,7 @@ namespace Slang
 
     bool SemanticsVisitor::isIntegerBaseType(BaseType baseType)
     {
-        switch(baseType)
-        {
-        default:
-            return false;
-
-        case BaseType::Int8:
-        case BaseType::Int16:
-        case BaseType::Int:
-        case BaseType::Int64:
-        case BaseType::UInt8:
-        case BaseType::UInt16:
-        case BaseType::UInt:
-        case BaseType::UInt64:
-            return true;
-        }
+        return (BaseTypeInfo::getInfo(baseType).flags & BaseTypeInfo::Flag::Integer) != 0;
     }
 
     void SemanticsVisitor::validateEnumTagType(Type* type, SourceLoc const& loc)

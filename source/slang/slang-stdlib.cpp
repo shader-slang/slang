@@ -90,7 +90,7 @@ namespace Slang
 
     // Here we declare the table of all our builtin types, so that we can generate all the relevant declarations.
     //
-    struct BaseTypeInfo
+    struct BaseTypeConversionInfo
     {
         char const* name;
         BaseType	tag;
@@ -98,7 +98,7 @@ namespace Slang
         BaseTypeConversionKind conversionKind;
         BaseTypeConversionRank conversionRank;
     };
-    static const BaseTypeInfo kBaseTypes[] = {
+    static const BaseTypeConversionInfo kBaseTypes[] = {
         // TODO: `void` really shouldn't be in the `BaseType` enumeration, since it behaves so differently across the board
         { "void",	BaseType::Void,     0,          kBaseTypeConversionKind_Error,      kBaseTypeConversionRank_Error},
 
@@ -121,8 +121,8 @@ namespace Slang
 
     // Given two base types, we need to be able to compute the cost of converting between them.
     ConversionCost getBaseTypeConversionCost(
-        BaseTypeInfo const& toInfo,
-        BaseTypeInfo const& fromInfo)
+        BaseTypeConversionInfo const& toInfo,
+        BaseTypeConversionInfo const& fromInfo)
     {
         if(toInfo.conversionKind == fromInfo.conversionKind
             && toInfo.conversionRank == fromInfo.conversionRank)
