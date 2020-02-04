@@ -1996,6 +1996,147 @@ TestResult runPerformanceProfile(TestContext* context, TestInput& input)
     return TestResult::Pass;
 }
 
+
+static double _textToDouble(const UnownedStringSlice& slice)
+{
+    Index size = Index(slice.size());
+    // We have to zero terminate to be able to use atof
+    const Index maxSize = 80;
+    char buffer[maxSize + 1];
+
+    size = (size > maxSize) ? maxSize : size; 
+
+    memcpy(buffer, slice.begin(), size);
+    buffer[size] = 0;
+
+    return atof(buffer);
+}
+
+static bool _areNearlyEqual(double a, double b, double epsilon)
+{
+    // If they are equal then we are done
+    if (a == b)
+    { 
+        return true;
+    }
+
+    const double absA = abs(a);
+    const double absB = abs(b);
+    const double diff = abs(a - b);
+
+    // https://en.wikipedia.org/wiki/Double_precision_floating-point_format
+    // 
+    const double minNormal = 2.2250738585072014e10-308;
+
+    // Either a or b are very close to being zero, so doing relative comparison isn't really appropriate
+    if (a == 0.0 || b == 0.0 || (absA + absB < minNormal))
+    {
+        return diff < (epsilon * minNormal);
+    }
+    else
+    {
+        // Calculate a relative relative error
+        return diff < epsilon * (absA + absB);
+    }
+}
+
+static void _calcLines(const UnownedStringSlice& slice, List<UnownedStringSlice>& outLines)
+{
+    StringUtil::calcLines(slice, outLines);
+
+    // Remove any trailing empty lines
+    while (outLines.getCount())
+    {
+        if (outLines.getLast().trim() == UnownedStringSlice())
+        {
+            outLines.removeLast();
+        }
+        else
+        {
+            break;
+        }
+    }
+}
+
+static SlangResult _compareWithType(const UnownedStringSlice& actual, const UnownedStringSlice& ref, double differenceThreshold = 0.001)
+{
+    typedef slang::TypeReflection::ScalarType ScalarType;
+
+    ScalarType scalarType = ScalarType::None;
+
+    // We just do straight comparison if there is no type
+
+    List<UnownedStringSlice> linesActual, linesRef;
+
+    _calcLines(actual, linesActual);
+    _calcLines(ref, linesRef);
+
+    // If there are more lines in actual, we just ignore them, to keep same behavior as before
+    if (linesRef.getCount() < linesActual.getCount())
+    {
+        linesActual.setCount(linesRef.getCount());
+    }
+
+    if (linesActual.getCount() != linesRef.getCount())
+    {
+        return SLANG_FAIL;
+    }
+
+    for (Index i = 0; i < linesActual.getCount(); ++i)
+    {
+        const UnownedStringSlice lineActual = linesActual[i];
+        const UnownedStringSlice lineRef = linesRef[i];
+
+        if (lineActual.startsWith(UnownedStringSlice::fromLiteral("type:")))
+        {
+            if (lineActual != lineRef)
+            {
+                return SLANG_FAIL;
+            }
+            // Get the type
+            List<UnownedStringSlice> split;
+            StringUtil::split(lineActual, ':', split);
+
+            if (split.getCount() != 2)
+            {
+                return SLANG_FAIL;
+            }
+
+            scalarType = TypeTextUtil::asScalarType(split[1].trim());
+            continue;
+        }
+
+        switch (scalarType)
+        {
+            default:
+            {
+                if (lineActual.trim() != lineRef.trim())
+                {
+                    return SLANG_FAIL;
+                }
+                break;
+            }
+            case ScalarType::Float16:
+            case ScalarType::Float32:
+            case ScalarType::Float64:
+            {
+                
+                // Compare as double
+                double valueA = _textToDouble(lineActual);
+                double valueB = _textToDouble(lineRef);
+
+                if (!_areNearlyEqual(valueA, valueB, differenceThreshold))
+                {
+                    return SLANG_FAIL;
+                }
+                break;
+            }
+        }
+    }
+
+    return SLANG_OK;
+}
+
 TestResult runComputeComparisonImpl(TestContext* context, TestInput& input, const char *const* langOpts, size_t numLangOpts)
 {
 	// TODO: delete any existing files at the output path(s) to avoid stale outputs leading to a false pass
@@ -2036,8 +2177,8 @@ TestResult runComputeComparisonImpl(TestContext* context, TestInput& input, cons
         return TestResult::Pass;
     }
 
-    const String referenceOutput = findExpectedPath(input, ".expected.txt");
-    if (referenceOutput.getLength() <= 0)
+    const String referenceOutputFile = findExpectedPath(input, ".expected.txt");
+    if (referenceOutputFile.getLength() <= 0)
     {
         return TestResult::Fail;
     }
@@ -2061,33 +2202,20 @@ TestResult runComputeComparisonImpl(TestContext* context, TestInput& input, cons
         printf("render-test output:\n%s\n", actualOutput.getBuffer());
 		return TestResult::Fail;
     }
-    if (!File::exists(referenceOutput))
+    if (!File::exists(referenceOutputFile))
     {
-        printf("referenceOutput %s not found.\n", referenceOutput.getBuffer());
+        printf("referenceOutput %s not found.\n", referenceOutputFile.getBuffer());
 		return TestResult::Fail;
     }
     auto actualOutputContent = File::readAllText(actualOutputFile);
-	auto actualProgramOutput = Split(actualOutputContent, '\n');
-	auto referenceProgramOutput = Split(File::readAllText(referenceOutput), '\n');
-    auto printOutput = [&]()
+    auto referenceOutputContent = File::readAllText(referenceOutputFile);
+
+    if (SLANG_FAILED(_compareWithType(actualOutputContent.getUnownedSlice(), referenceOutputContent.getUnownedSlice())))
     {
-        context->reporter->messageFormat(TestMessageType::TestFailure, "output mismatch! actual output: {\n%s\n}, \n%s\n", actualOutputContent.getBuffer(), actualOutput.getBuffer());
-    };
-    if (actualProgramOutput.getCount() < referenceProgramOutput.getCount())
-    {
-        printOutput();
-		return TestResult::Fail;
+        context->reporter->messageFormat(TestMessageType::TestFailure, "output mismatch! actual output: {\n%s\n}, \n%s\n", actualOutputContent.getBuffer(), referenceOutputContent.getBuffer());
+        return TestResult::Fail;
     }
-	for (Index i = 0; i < referenceProgramOutput.getCount(); i++)
-	{
-		auto reference = String(referenceProgramOutput[i].trim());
-		auto actual = String(actualProgramOutput[i].trim());
-        if (actual != reference)
-        {
-            printOutput();
-            return TestResult::Fail;
-        }
-	}
+
 	return TestResult::Pass;
 }
 
