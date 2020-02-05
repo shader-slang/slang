@@ -13,6 +13,9 @@ int doSomething(int a)
     // Should sign extend 
     int c3 = 0x80000000;
     
+    // Should give a warning (including the preceeding -)
+    int c4 = -0xfffffffff;
+    
     // 
     a += c0 + c1 + c2;
     

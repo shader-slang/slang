@@ -599,6 +599,14 @@ namespace Slang
         char const* cursor = token.Content.begin();
         char const* end = token.Content.end();
 
+        bool isNegative = false;
+
+        if (cursor < end && *cursor == '-')
+        {
+            cursor++;
+            isNegative = true;
+        }
+
         int base = readOptionalBase(&cursor);
 
         for( ;;)
@@ -608,6 +616,11 @@ namespace Slang
                 break;
 
             value = value*base + digit;
+        }
+
+        if (isNegative)
+        {
+            value = -value;
         }
 
         if(outSuffix)
