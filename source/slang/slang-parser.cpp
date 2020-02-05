@@ -1,6 +1,7 @@
 #include "slang-parser.h"
 
 #include <assert.h>
+#include <float.h>
 
 #include "slang-compiler.h"
 #include "slang-lookup.h"
