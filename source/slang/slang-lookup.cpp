@@ -223,7 +223,8 @@ void DoMemberLookupImpl(
 {
     auto baseType = getTypeForDeclRef(
         session,
-        baseDeclRef);
+        baseDeclRef,
+        SourceLoc());
     return DoMemberLookupImpl(
         session,
         name, baseType, request, ioResult, breadcrumbs);
