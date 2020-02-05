@@ -1792,6 +1792,7 @@ void CPPSourceEmitter::emitSimpleValueImpl(IRInst* inst)
 {
     switch (inst->op)
     {
+
         case kIROp_IntLit:
         {
             auto litInst = static_cast<IRConstant*>(inst);
@@ -1835,13 +1836,39 @@ void CPPSourceEmitter::emitSimpleValueImpl(IRInst* inst)
         {
             IRConstant* constantInst = static_cast<IRConstant*>(inst);
 
-            m_writer->emit(constantInst->value.floatVal);
+            IRConstant::FloatKind kind = constantInst->getFloatKind();
 
-            // If the literal is a float, then we need to add 'f' at end
-            IRType* type = constantInst->getDataType();
-            if (type && type->op == kIROp_FloatType )
+            switch (kind)
             {
-                m_writer->emitChar('f');
+                case IRConstant::FloatKind::Nan:
+                {
+                    // It's not clear this will work on all targets.
+                    // On VS dividing by 0 is reported as an error.
+                    m_writer->emit("(0.0 / 0.0)");
+                    break;
+                }
+                case IRConstant::FloatKind::PositiveInfinity:
+                {
+                    m_writer->emit("SLANG_INFINITY");
+                    break;
+                }
+                case IRConstant::FloatKind::NegativeInfinity:
+                {
+                    m_writer->emit("-SLANG_INFINITY");
+                    break;
+                }
+                default:
+                {
+                    m_writer->emit(constantInst->value.floatVal);
+
+                    // If the literal is a float, then we need to add 'f' at end
+                    IRType* type = constantInst->getDataType();
+                    if (type && type->op == kIROp_FloatType)
+                    {
+                        m_writer->emitChar('f');
+                    }
+                    break;
+                }
             }
             return;
         }

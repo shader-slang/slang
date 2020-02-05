@@ -32,6 +32,7 @@ protected:
     virtual void emitMatrixLayoutModifiersImpl(IRVarLayout* layout) SLANG_OVERRIDE;
 
     virtual bool tryEmitInstExprImpl(IRInst* inst, const EmitOpInfo& inOuterPrec) SLANG_OVERRIDE;
+    virtual void emitSimpleValueImpl(IRInst* inst) SLANG_OVERRIDE;
 
         // Emit a single `register` semantic, as appropriate for a given resource-type-specific layout info
         // Keyword to use in the uniform case (`register` for globals, `packoffset` inside a `cbuffer`)

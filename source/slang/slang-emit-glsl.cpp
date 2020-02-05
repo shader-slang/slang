@@ -671,7 +671,23 @@ void GLSLSourceEmitter::emitSimpleValueImpl(IRInst* inst)
             {
                 switch (type->getBaseType())
                 {
-                    default: break;
+                    default: 
+                    
+                    case BaseType::Int8:
+                    case BaseType::Int16:
+                    case BaseType::Int:
+                    {
+                        m_writer->emit(litInst->value.intVal);
+                        return;
+                    }
+                    case BaseType::UInt8:
+                    case BaseType::UInt16:
+                    case BaseType::UInt:
+                    {
+                        m_writer->emit(UInt(litInst->value.intVal));
+                        m_writer->emit("u");
+                        return;
+                    }
                     case BaseType::Int64:
                     {
                         m_writer->emitInt64(int64_t(litInst->value.intVal));
@@ -685,10 +701,41 @@ void GLSLSourceEmitter::emitSimpleValueImpl(IRInst* inst)
                         m_writer->emit("ul");
                         return;
                     }
+
                 }
             }
             break;   
         }
+        case kIROp_FloatLit:
+        {
+            IRConstant* constantInst = static_cast<IRConstant*>(inst);
+
+            IRConstant::FloatKind kind = constantInst->getFloatKind();
+
+            switch (kind)
+            {
+                case IRConstant::FloatKind::Nan:
+                {
+                    // It's not clear this will work on all targets.
+                    // On VS dividing by 0 is reported as an error.
+                    m_writer->emit("(0.0 / 0.0)");
+                    return;
+                }
+                case IRConstant::FloatKind::PositiveInfinity:
+                {
+                    m_writer->emit("(1.0 / 0.0)");
+                    return;
+                }
+                case IRConstant::FloatKind::NegativeInfinity:
+                {
+                    m_writer->emit("(-1.0 / 0.0)");
+                    return;
+                }
+                default: break;
+            }
+            break;
+        }
+
         default: break;
     }
 

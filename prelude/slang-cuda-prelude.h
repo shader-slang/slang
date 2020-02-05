@@ -1,4 +1,9 @@
 
+// Must be large enough to cause overflow and therefore infinity
+#ifndef SLANG_INFINITY
+#   define SLANG_INFINITY   ((float)(1e+300 * 1e+300))
+#endif
+
 // For now we'll disable any asserts in this prelude
 #define SLANG_PRELUDE_ASSERT(x) 
 

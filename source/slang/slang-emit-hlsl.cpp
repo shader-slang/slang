@@ -488,6 +488,44 @@ void HLSLSourceEmitter::emitVectorTypeNameImpl(IRType* elementType, IRIntegerVal
     m_writer->emit(">");
 }
 
+void HLSLSourceEmitter::emitSimpleValueImpl(IRInst* inst)
+{
+    switch (inst->op)
+    {
+        case kIROp_FloatLit:
+        {
+            IRConstant* constantInst = static_cast<IRConstant*>(inst);
+            IRConstant::FloatKind kind = constantInst->getFloatKind();
+            switch (kind)
+            {
+                case IRConstant::FloatKind::Nan:
+                {
+                    // It's not clear this will work on all targets.
+                    // On VS dividing by 0 is reported as an error.
+                    m_writer->emit("(0.0 / 0.0)");
+                    return;
+                }
+                case IRConstant::FloatKind::PositiveInfinity:
+                {
+                    m_writer->emit("(1.0 / 0.0)");
+                    return;
+                }
+                case IRConstant::FloatKind::NegativeInfinity:
+                {
+                    m_writer->emit("(-1.0 / 0.0)");
+                    return;
+                }
+                default: break;
+            }
+            break;
+        }
+
+        default: break;
+    }
+
+    Super::emitSimpleValueImpl(inst);
+}
+
 void HLSLSourceEmitter::emitSimpleTypeImpl(IRType* type)
 {
     switch (type->op)

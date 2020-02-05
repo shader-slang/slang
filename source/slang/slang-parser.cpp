@@ -3873,7 +3873,7 @@ namespace Slang
 
     static bool _isFinite(double value)
     {
-        // Check for NAN and it's not infinte
+        // Check for NAN and it's not infinite
         return !(value != value ||
             value == -INFINITY ||
             value == INFINITY);
@@ -4165,8 +4165,8 @@ namespace Slang
                         case BaseType::Float:
                         {
                             // Clamp into the floating point range
-                            fixedValue = (fixedValue > FLT_MAX) ? FLT_MAX : fixedValue;
-                            fixedValue = (fixedValue < -FLT_MAX) ? -FLT_MAX : fixedValue;
+                            fixedValue = (fixedValue > FLT_MAX) ? float(INFINITY) : fixedValue;
+                            fixedValue = (fixedValue < -FLT_MAX) ? -float(INFINITY) : fixedValue;
 
                             if (fixedValue && float(fixedValue) == 0.0f)
                             {
