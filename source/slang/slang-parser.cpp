@@ -3873,10 +3873,16 @@ namespace Slang
 
     static bool _isFinite(double value)
     {
-        // Check for NAN and it's not infinite
-        return !(value != value ||
-            value == -INFINITY ||
-            value == INFINITY);
+        // Lets type pun double to uint64_t, so we can detect special double values
+        union
+        {
+            double d;
+            uint64_t i;
+        } u = { value };
+        // Detects nan and +-inf
+        const uint64_t i = u.i;
+        int e = int(i >> 52) & 0x7ff;
+        return (e != 0x7ff);
     }
 
     static RefPtr<Expr> parseAtomicExpr(Parser* parser)

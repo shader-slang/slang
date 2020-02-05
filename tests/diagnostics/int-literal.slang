@@ -13,7 +13,8 @@ int doSomething(int a)
     // Should sign extend 
     int c3 = 0x80000000;
     
-    // Should give a warning (including the preceeding -)
+    // Should give a warning (ideally including the preceeding -)
+    // Currently we don't have the -, because the lexer lexes - independently
     int c4 = -0xfffffffff;
     
     // 
