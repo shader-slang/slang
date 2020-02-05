@@ -227,7 +227,6 @@ DIAGNOSTIC(30012, Error, noApplicationUnaryOperator, "no overload found for oper
 DIAGNOSTIC(30012, Error, noOverloadFoundForBinOperatorOnTypes, "no overload found for operator $0  ($1, $2).")
 DIAGNOSTIC(30013, Error, subscriptNonArray, "no subscript operation found for  type '$0'")
 DIAGNOSTIC(30014, Error, subscriptIndexNonInteger, "index expression must evaluate to int.")
-DIAGNOSTIC(30015, Error, undefinedIdentifier, "'$0': undefined identifier.")
 DIAGNOSTIC(30015, Error, undefinedIdentifier2, "undefined identifier '$0'.")
 DIAGNOSTIC(30017, Error, componentNotAccessibleFromShader, "component '$0' is not accessible from shader '$1'.")
 DIAGNOSTIC(30019, Error, typeMismatch, "expected an expression of type '$0', got '$1'")

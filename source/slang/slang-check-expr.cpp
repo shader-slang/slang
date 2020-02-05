@@ -177,7 +177,7 @@ namespace Slang
     {
         // Compute the type that this declaration reference will have in context.
         //
-        auto type = GetTypeForDeclRef(declRef);
+        auto type = GetTypeForDeclRef(declRef, loc);
 
         // Construct an appropriate expression based on the structured of
         // the declaration reference.
