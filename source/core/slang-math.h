@@ -20,6 +20,13 @@ namespace Slang
 
         
 		static const float Pi;
+
+        template <typename T>
+        static T Abs(T a)
+        {
+            return (a < 0) ? -a : a;
+        }
+
 		template<typename T>
 		static T Min(const T& v1, const T&v2)
 		{

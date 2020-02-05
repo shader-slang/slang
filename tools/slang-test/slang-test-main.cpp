@@ -2020,9 +2020,9 @@ static bool _areNearlyEqual(double a, double b, double epsilon)
         return true;
     }
 
-    const double absA = abs(a);
-    const double absB = abs(b);
-    const double diff = abs(a - b);
+    const double absA = Math::Abs(a);
+    const double absB = Math::Abs(b);
+    const double diff = Math::Abs(a - b);
 
     // https://en.wikipedia.org/wiki/Double_precision_floating-point_format
     // 
