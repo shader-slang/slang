@@ -394,6 +394,23 @@ SlangResult CPPSourceEmitter::calcTypeName(IRType* type, CodeGenTarget target, S
 {
     switch (type->op)
     {
+        case kIROp_PtrType:
+        {
+            auto ptrType = static_cast<IRPtrType*>(type);
+            SLANG_RETURN_ON_FAIL(calcTypeName(ptrType->getValueType(), target, out));
+            // TODO(JS): It seems although it says it is a pointer, it can actually be output as a reference
+            // not clear where the ptr aspect is there, as in the definition it is just 'out', implying out
+            // is somewhere converted to a ptr?
+            out << "&";
+            return SLANG_OK;
+        }
+        case kIROp_RefType:
+        {
+            auto refType = static_cast<IRRefType*>(type);
+            SLANG_RETURN_ON_FAIL(calcTypeName(refType->getValueType(), target, out));
+            out << "&";
+            return SLANG_OK;
+        }
         case kIROp_HalfType:
         {
             // Special case half
@@ -571,6 +588,21 @@ static IRBasicType* _getElementType(IRType* type)
 {
     switch (type->op)
     {
+        case kIROp_PtrType:
+        {
+            type = static_cast<IRPtrType*>(type)->getValueType();
+            break;
+        }
+        case kIROp_RefType:
+        {
+            type = static_cast<IRRefType*>(type)->getValueType();
+            break;
+        }
+        default: break;
+    }
+
+    switch (type->op)
+    {
         case kIROp_VectorType:
         {
             auto vecType = static_cast<IRVectorType*>(type);
@@ -658,7 +690,6 @@ void CPPSourceEmitter::_emitAryDefinition(const HLSLIntrinsic* specOp)
     }
 
     IRType* retType = specOp->returnType;
-    TypeDimension retDim = _getTypeDimension(retType, false);
 
     UnownedStringSlice scalarFuncName(funcName);
     if (isOperator)
@@ -677,15 +708,31 @@ void CPPSourceEmitter::_emitAryDefinition(const HLSLIntrinsic* specOp)
     writer->emit("\n{\n");
     writer->indent();
 
-    emitType(retType);
-    writer->emit(" r;\n");
+    const bool hasReturnType = retType->op != kIROp_VoidType;
 
-    for (int i = 0; i < retDim.rowCount; ++i)
+    TypeDimension calcDim;
+    if (hasReturnType)
     {
-        for (int j = 0; j < retDim.colCount; ++j)
+        emitType(retType);
+        writer->emit(" r;\n");
+
+        calcDim = _getTypeDimension(retType, false);
+    }
+    else
+    {
+        calcDim = _getTypeDimension(funcType->getParamType(0), false);        
+    }
+
+    for (int i = 0; i < calcDim.rowCount; ++i)
+    {
+        for (int j = 0; j < calcDim.colCount; ++j)
         {
-            _emitAccess(UnownedStringSlice::fromLiteral("r"), retDim, i, j, writer);
-            writer->emit(" = ");
+            if (hasReturnType)
+            {
+                _emitAccess(UnownedStringSlice::fromLiteral("r"), calcDim, i, j, writer);
+                writer->emit(" = ");
+            }
+
             if (isOperator)
             {
                 switch (numParams)
@@ -727,7 +774,10 @@ void CPPSourceEmitter::_emitAryDefinition(const HLSLIntrinsic* specOp)
         }
     }
 
-    writer->emit("return r;\n");
+    if (hasReturnType)
+    {
+        writer->emit("return r;\n");
+    }
 
     writer->dedent();
     writer->emit("}\n\n");
@@ -1066,6 +1116,7 @@ void CPPSourceEmitter::_emitNormalizeDefinition(const UnownedStringSlice& funcNa
     writer->emit("}\n\n");
 }
 
+
 void CPPSourceEmitter::_emitConstructConvertDefinition(const UnownedStringSlice& funcName, const HLSLIntrinsic* specOp)
 {
     SourceWriter* writer = getSourceWriter();
@@ -1133,6 +1184,91 @@ void CPPSourceEmitter::_emitConstructConvertDefinition(const UnownedStringSlice&
     writer->dedent();
     writer->emit("}\n\n");
 }
+
+void CPPSourceEmitter::_emitInitDefinition(const UnownedStringSlice& funcName, const HLSLIntrinsic* specOp)
+{
+    SourceWriter* writer = getSourceWriter();
+    IRFuncType* funcType = specOp->signatureType;
+
+    emitFunctionPreambleImpl(nullptr);
+
+    IRType* retType = specOp->returnType;
+    
+    _emitSignature(funcName, specOp);
+    writer->emit("\n{\n");
+    writer->indent();
+
+    // Use C++ construction
+    writer->emit("return ");
+    emitType(retType);
+    writer->emit("{ ");
+
+    const Index paramCount = Index(funcType->getParamCount());
+
+    if (IRVectorType* vecType = as<IRVectorType>(retType))
+    {
+        Index elementCount = Index(GetIntVal(vecType->getElementCount()));
+
+        Index paramIndex = 0;
+        Index paramSubIndex = 0;
+
+        for (Index i = 0; i < elementCount; ++i)
+        {
+            if (i > 0)
+            {
+                writer->emit(", ");
+            }
+
+            if (paramIndex >= paramCount)
+            {
+                writer->emit("0");
+            }
+            else
+            {
+                IRType* paramType = funcType->getParamType(paramIndex);
+
+                if (IRVectorType* paramVecType = as<IRVectorType>(paramType))
+                {
+                    Index paramElementCount = Index(GetIntVal(paramVecType->getElementCount()));
+
+                    writer->emitChar('a' + char(paramIndex));
+                    writer->emit(".");
+                    writer->emitChar(s_elemNames[paramSubIndex]);
+
+                    paramSubIndex ++;
+
+                    if (paramSubIndex >= paramElementCount)
+                    {
+                        paramIndex++;
+                        paramSubIndex = 0;
+                    }
+                }
+                else
+                {
+                    writer->emitChar('a' + char(paramIndex));
+                    paramIndex++;
+                }
+            }
+        }
+    }
+    else
+    {
+        for (Index i = 0; i < paramCount; ++i)
+        {
+            if (i > 0)
+            {
+                writer->emit(", ");
+            }
+            writer->emitChar('a' + char(i));
+        }
+    }
+
+    writer->emit("};\n");
+
+    writer->dedent();
+    writer->emit("}\n\n");
+}
+
 
 void CPPSourceEmitter::_emitConstructFromScalarDefinition(const UnownedStringSlice& funcName, const HLSLIntrinsic* specOp)
 {
@@ -1246,6 +1382,10 @@ void CPPSourceEmitter::emitSpecializedOperationDefinition(const HLSLIntrinsic* s
 
     switch (specOp->op)
     {
+        case Op::Init:
+        {
+            return _emitInitDefinition(_getFuncName(specOp), specOp);
+        }
         case Op::VecMatMul:
         case Op::Dot:
         {
@@ -1284,6 +1424,11 @@ void CPPSourceEmitter::emitSpecializedOperationDefinition(const HLSLIntrinsic* s
         {
             return _emitGetAtDefinition(_getFuncName(specOp), specOp);
         }
+        case Op::Swizzle:
+        {
+            // Don't have to output anything for swizzle for now
+            return; 
+        }
         default:
         {
             const auto& info = HLSLIntrinsic::getInfo(specOp->op);
@@ -1306,80 +1451,23 @@ void CPPSourceEmitter::emitCall(const HLSLIntrinsic* specOp, IRInst* inst, const
 
     SLANG_UNUSED(inOuterPrec);
     SourceWriter* writer = getSourceWriter();
-
-    // Getting the name means that this op is registered as used
     
     switch (specOp->op)
     {
         case Op::Init:
         {
-            // For C++ we don't need an init function
-            // For C we'll need the construct function for the return type
-            //UnownedStringSlice name = _getFuncName(specOp);
-
             IRType* retType = specOp->returnType;
-
-            switch (retType->op)
+            if (IRBasicType::isaImpl(retType->op))
             {
-                case kIROp_VectorType:
-                {
-                    // Get the type name
-                    emitType(retType);
-                    writer->emitChar('{');
-
-                    for (int i = 0; i < numOperands; ++i)
-                    {
-                        if (i > 0)
-                        {
-                            writer->emit(", ");
-                        }
-                        emitOperand(operands[i].get(), getInfo(EmitOp::General));
-                    }
-
-                    writer->emitChar('}');
-                    break;
-                }
-                case kIROp_MatrixType:
-                {
-                    IRMatrixType* matType = static_cast<IRMatrixType*>(retType);
-
-                    //int colsCount = int(GetIntVal(matType->getColumnCount()));
-                    int rowsCount = int(GetIntVal(matType->getRowCount()));
-
-                    SLANG_ASSERT(rowsCount == numOperands);
-
-                    emitType(retType);
-                    writer->emitChar('{');
-
-                    for (int j = 0; j < rowsCount; ++j)
-                    {
-                        if (j > 0)
-                        {
-                            writer->emit(", ");
-                        }
-                        emitOperand(operands[j].get(), getInfo(EmitOp::General));
-                    }
-
-                    writer->emitChar('}');
-                    break;
-                }
-                default:
-                {
-                    if (IRBasicType::isaImpl(retType->op))
-                    {
-                        SLANG_ASSERT(numOperands == 1);
+                SLANG_ASSERT(numOperands == 1);
                         
-                        writer->emit(_getTypeName(retType));
-                        writer->emitChar('(');
+                writer->emit(_getTypeName(retType));
+                writer->emitChar('(');
 
-                        emitOperand(operands[0].get(), getInfo(EmitOp::General));
+                emitOperand(operands[0].get(), getInfo(EmitOp::General));
 
-                        writer->emitChar(')');
-                        break;
-                    }
-
-                    SLANG_ASSERT(!"Not handled");
-                }
+                writer->emitChar(')');
+                return;
             }
             break;
         }
@@ -1419,56 +1507,55 @@ void CPPSourceEmitter::emitCall(const HLSLIntrinsic* specOp, IRInst* inst, const
             }
 
             writer->emit("}");
-            break;
+            return;
         }
-        default:
+        default: break;
+    }
+    
+    {
+        const auto& info = HLSLIntrinsic::getInfo(specOp->op);
+        // Make sure that the return type is available
+        const bool isOperator = _isOperator(info.funcName);
+        const UnownedStringSlice funcName = _getFuncName(specOp);
+
+        switch (specOp->op)
         {
-            const auto& info = HLSLIntrinsic::getInfo(specOp->op);
-            // Make sure that the return type is available
-            bool isOperator = _isOperator(info.funcName);
-
-            UnownedStringSlice funcName = _getFuncName(specOp);
-
-            switch (specOp->op)
+            case Op::ConstructFromScalar:
             {
-                case Op::ConstructFromScalar:
-                {
-                    // We need to special case, because this may have come from a swizzle from a built in
-                    // type, in that case the only parameter we want is the first one 
-                    numOperands = 1;
-                    break;
-                }
-
-                default: break;
+                // We need to special case, because this may have come from a swizzle from a built in
+                // type, in that case the only parameter we want is the first one 
+                numOperands = 1;
+                break;
             }
 
-            // add that we want a function
-            SLANG_ASSERT(info.numOperands < 0 || numOperands == info.numOperands);
+            default: break;
+        }
 
-            useType(specOp->returnType);
+        // add that we want a function
+        SLANG_ASSERT(info.numOperands < 0 || numOperands == info.numOperands);
+
+        useType(specOp->returnType);
             
-            if (isOperator)
-            {
-                // Just do the default output
-                defaultEmitInstExpr(inst, inOuterPrec);
-            }
-            else
-            {
-                writer->emit(funcName);
-                writer->emitChar('(');
+        if (isOperator)
+        {
+            // Just do the default output
+            defaultEmitInstExpr(inst, inOuterPrec);
+        }
+        else
+        {
+            writer->emit(funcName);
+            writer->emitChar('(');
 
-                for (int i = 0; i < numOperands; ++i)
+            for (int i = 0; i < numOperands; ++i)
+            {
+                if (i > 0)
                 {
-                    if (i > 0)
-                    {
-                        writer->emit(", ");
-                    }
-                    emitOperand(operands[i].get(), getInfo(EmitOp::General));
+                    writer->emit(", ");
                 }
-
-                writer->emitChar(')');
+                emitOperand(operands[i].get(), getInfo(EmitOp::General));
             }
-            break;
+
+            writer->emitChar(')');
         }
     }
 }
@@ -1575,6 +1662,12 @@ SlangResult CPPSourceEmitter::calcFuncName(const HLSLIntrinsic* specOp, StringBu
             case Op::GetAt:
             {
                 outBuilder << "getAt";
+                return SLANG_OK;
+            }
+            case Op::Init:
+            {
+                outBuilder << "make_";
+                SLANG_RETURN_ON_FAIL(calcTypeName(specOp->returnType, CodeGenTarget::CSource, outBuilder));
                 return SLANG_OK;
             }
             default: break;
@@ -2129,10 +2222,16 @@ void CPPSourceEmitter::emitPreprocessorDirectivesImpl()
         }
     }
 
-    // Emit all the intrinsics that were used
-    for (const auto& keyValue : m_intrinsicNameMap)
     {
-        _maybeEmitSpecializedOperationDefinition(keyValue.Key);
+        List<const HLSLIntrinsic*> intrinsics;
+        m_intrinsicSet.getIntrinsics(intrinsics);
+
+        // Emit all the intrinsics that were used
+        for (auto intrinsic: intrinsics)
+        {
+            _maybeEmitSpecializedOperationDefinition(intrinsic);
+        }
+        
     }
 }
 

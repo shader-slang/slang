@@ -57,6 +57,11 @@ SlangResult WriterHelper::put(const char* text)
     return m_writer->write(text, ::strlen(text));
 }
 
+SlangResult WriterHelper::put(const UnownedStringSlice& text)
+{
+    return m_writer->write(text.begin(), text.size());
+}
+
 /* !!!!!!!!!!!!!!!!!!!!!!!!! BaseWriter !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!*/
 
 ISlangUnknown* BaseWriter::getInterface(const Guid& guid)

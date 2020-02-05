@@ -245,19 +245,37 @@ SlangResult HLSLIntrinsicSet::makeIntrinsic(IRInst* inst, HLSLIntrinsic& out)
                     // If it's constructed from a type conversion
                     calcIntrinsic(Op::ConstructConvert, inst, out);
                 }
+                return SLANG_OK;
             }
             else
             {
-                // We only emit as if it has one operand, but we can tell how many it actually has from the return type
-                calcIntrinsic(Op::Init, inst, 1, out);
+                // If we are constructing a basic type, we don't need an Op::Init
+                if (!IRBasicType::isaImpl(dstType->op))
+                {
+                    // Emit the 'init' intrinsic
+                    calcIntrinsic(Op::Init, inst, inst->getOperandCount(), out);
+                    return SLANG_OK;
+                }
+            }
+            return SLANG_FAIL;
+        }
+        case kIROp_makeVector:
+        {
+            if (inst->getOperandCount() == 1 && as<IRBasicType>(inst->getOperand(0)->getDataType()))
+            {
+                // This is make from scalar
+                calcIntrinsic(Op::ConstructFromScalar, inst, out);
+            }
+            else
+            {
+                calcIntrinsic(Op::Init, inst, inst->getOperandCount(), out);
             }
             return SLANG_OK;
         }
-        case kIROp_makeVector:
         case kIROp_MakeMatrix:
         {
             // We only emit as if it has one operand, but we can tell how many it actually has from the return type
-            calcIntrinsic(Op::Init, inst, 1, out);
+            calcIntrinsic(Op::Init, inst, inst->getOperandCount(), out);
             return SLANG_OK;
         }
         case kIROp_swizzle:
@@ -344,6 +362,14 @@ SlangResult HLSLIntrinsicSet::makeIntrinsic(IRInst* inst, HLSLIntrinsic& out)
     }
 
     return SLANG_FAIL;
+}
+
+void HLSLIntrinsicSet::getIntrinsics(List<const HLSLIntrinsic*>& out) const
+{
+    for (auto& pair : m_intrinsics)
+    {
+        out.add(pair.Value);
+    }
 }
 
 HLSLIntrinsic* HLSLIntrinsicSet::add(const HLSLIntrinsic& intrinsic)

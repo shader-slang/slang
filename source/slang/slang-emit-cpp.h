@@ -104,7 +104,8 @@ protected:
     void _emitConstructConvertDefinition(const UnownedStringSlice& funcName, const HLSLIntrinsic* specOp);
     void _emitConstructFromScalarDefinition(const UnownedStringSlice& funcName, const HLSLIntrinsic* specOp);
     void _emitGetAtDefinition(const UnownedStringSlice& funcName, const HLSLIntrinsic* specOp);
-    
+    void _emitInitDefinition(const UnownedStringSlice& funcName, const HLSLIntrinsic* specOp);
+
     void _emitSignature(const UnownedStringSlice& funcName, const HLSLIntrinsic* specOp);
 
     void _emitInOutParamType(IRType* type, String const& name, IRType* valueType);

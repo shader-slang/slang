@@ -3,6 +3,7 @@
 
 #include "shader-input-layout.h"
 #include "core/slang-token-reader.h"
+#include "core/slang-type-text-util.h"
 
 #include "render.h"
 
@@ -755,6 +756,14 @@ namespace renderer_test
             scalarType = elementTypeLayout->getScalarType();
         }
 
+        if (scalarType != ScalarType::None && scalarType != ScalarType::Void)
+        {
+            UnownedStringSlice text = TypeTextUtil::asText(scalarType);
+            // Write out the type
+            writer.put("type: ");
+            writer.put(text);
+            writer.put("\n");
+        }
 
         switch (scalarType)
         {
@@ -765,7 +774,6 @@ namespace renderer_test
             case ScalarType::None:
             case ScalarType::Void:
             case ScalarType::Bool:
-            case ScalarType::Float16:
             {
                 auto ptr = (const uint32_t*)data;
                 const size_t size = sizeInBytes / sizeof(ptr[0]);
@@ -773,6 +781,17 @@ namespace renderer_test
                 {
                     uint32_t v = ptr[i];
                     writer.print("%X\n", v);
+                }
+                break;
+            }
+            case ScalarType::Float16:
+            {
+                auto ptr = (const uint16_t*)data;
+                const size_t size = sizeInBytes / sizeof(ptr[0]);
+                for (size_t i = 0; i < size; ++i)
+                {
+                    const float v = HalfToFloat(ptr[i]);
+                    writer.print("%f\n", v);
                 }
                 break;
             }

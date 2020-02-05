@@ -6,6 +6,7 @@
 #include "../core/slang-stream.h"
 
 #include "../core/slang-math.h"
+#include "../core/slang-type-text-util.h"
 
 #include "slang-options.h"
 
@@ -1228,7 +1229,7 @@ static SlangResult _calcCommandLine(OffsetBase& base, StateSerializeUtil::Reques
             default:
             {
                 cmd.addArg("-pass-through");
-                cmd.addArg(DownstreamCompiler::getPassThroughName(SlangPassThrough(requestState->passThroughMode)));
+                cmd.addArg(TypeTextUtil::asText(SlangPassThrough(requestState->passThroughMode)));
                 break;
             }
         }

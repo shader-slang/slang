@@ -7,6 +7,8 @@
 
 #include "slang-check-impl.h"
 
+#include "../core/slang-type-text-util.h"
+
 namespace Slang
 {
     namespace { // anonymous
@@ -180,7 +182,7 @@ namespace Slang
         SlangFuncPtr func = sharedLibrary->findFuncByName(info.name);
         if (!func)
         {
-            UnownedStringSlice compilerName = DownstreamCompiler::getCompilerTypeAsText(SlangPassThrough(info.compilerType));
+            UnownedStringSlice compilerName = TypeTextUtil::asText(SlangPassThrough(info.compilerType));
             sink->diagnose(SourceLoc(), Diagnostics::failedToFindFunctionForCompiler, info.name, compilerName);
             return nullptr;
         }
