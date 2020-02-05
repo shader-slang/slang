@@ -1,0 +1,6 @@
+result code = 0
+standard error = {
+tests/diagnostics/int-literal.slang(6): warning 30724: integer literal '0x800000000' too large for type 'int' truncated to '0'
+}
+standard output = {
+}

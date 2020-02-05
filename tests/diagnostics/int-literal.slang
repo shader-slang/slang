@@ -4,7 +4,8 @@ int doSomething(int a)
 {
     // Warning can't fit
     int c0 = 0x800000000;
-    // No warning as top bits are just cleared
+    
+    // No warning as top bits are just ignored
     int c1 = -1ll;
     
     int c2 = int(-1u);
@@ -19,6 +20,8 @@ int doSomething(int a)
 
     // Ok
     b += 0x800000000ll;
+    
+    uint64_t c4 = -2ull;
     
     return a + int(b);
 }

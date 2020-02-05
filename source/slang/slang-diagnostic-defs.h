@@ -356,7 +356,7 @@ DIAGNOSTIC(30722, Error, invalidIntegerLiteralSuffix, "invalid suffix '$0' on in
 DIAGNOSTIC(30723, Error, invalidFloatingPointLiteralSuffix, "invalid suffix '$0' on floating-point literal")
 
 DIAGNOSTIC(30724, Warning, integerLiteralTruncated, "integer literal '$0' too large for type '$1' truncated to '$2'")
-DIAGNOSTIC(30725, Warning, floatLiteralUnrepresentable, "float literal '$0' unrepresentable, converted '$1' to '$2'")
+DIAGNOSTIC(30725, Warning, floatLiteralUnrepresentable, "$0 literal '$1' unrepresentable, converted to '$2'")
 
 DIAGNOSTIC(38000, Error, entryPointFunctionNotFound, "no function found matching entry point name '$0'")
 DIAGNOSTIC(38001, Error, ambiguousEntryPoint, "more than one function matches entry point name '$0'")

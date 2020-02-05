@@ -1,0 +1,9 @@
+result code = 0
+standard error = {
+tests/diagnostics/float-literal.slang(7): warning 30725: float literal '5e+40' unrepresentable, converted to '3.40282e+38'
+tests/diagnostics/float-literal.slang(9): warning 30725: float literal '9e-50' unrepresentable, converted to '0'
+tests/diagnostics/float-literal.slang(18): warning 30725: float literal '5e+40' unrepresentable, converted to '3.40282e+38'
+tests/diagnostics/float-literal.slang(19): warning 30725: float literal '9e-50' unrepresentable, converted to '0'
+}
+standard output = {
+}

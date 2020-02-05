@@ -14,5 +14,9 @@ float doSomething(float a)
     b += 5e+40l;
     b += 9e-50l;
     
+    // Cos these don't have l suffix they should also produce warnings
+    b += -5e+40;
+    b += -9e-50;
+    
     return a + float(b);
 }

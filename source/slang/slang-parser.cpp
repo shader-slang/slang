@@ -4190,7 +4190,7 @@ namespace Slang
 
                     if (fixedValue != value)
                     {
-                         parser->sink->diagnose(token, Diagnostics::floatLiteralUnrepresentable, token.Content, BaseTypeInfo::asText(suffixBaseType), fixedValue);
+                         parser->sink->diagnose(token, Diagnostics::floatLiteralUnrepresentable, BaseTypeInfo::asText(suffixBaseType), token.Content, fixedValue);
                     }
                 }
 
