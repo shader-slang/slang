@@ -252,7 +252,8 @@ namespace Slang
         SemanticsVisitor*       sema,
         DiagnosticSink*         sink,
         DeclRef<Decl>           declRef,
-        RefPtr<Type>* outTypeResult)
+        RefPtr<Type>*           outTypeResult,
+        SourceLoc               loc)
     {
         if( sema )
         {
@@ -386,17 +387,30 @@ namespace Slang
         }
         if( sink )
         {
-            sink->diagnose(declRef, Diagnostics::unimplemented, "cannot form reference to this kind of declaration");
+            // The compiler is trying to form a reference to a declaration
+            // that doesn't appear to be usable as an expression or type.
+            //
+            // In practice, this arises when user code has an undefined-identifier
+            // error, but the name that was undefined in context also matches
+            // a contextual keyword. Rather than confuse the user with the
+            // details of contextual keywords in the compiler, we will diagnose
+            // this as an undefined identifier.
+            //
+            // TODO: This code could break if we ever go down this path with
+            // an identifier that doesn't have a name.
+            //
+            sink->diagnose(loc, Diagnostics::undefinedIdentifier2, declRef.GetName());
         }
         return QualType(session->getErrorType());
     }
 
     QualType getTypeForDeclRef(
         Session*        session,
-        DeclRef<Decl>   declRef)
+        DeclRef<Decl>   declRef,
+        SourceLoc       loc)
     {
         RefPtr<Type> typeResult;
-        return getTypeForDeclRef(session, nullptr, nullptr, declRef, &typeResult);
+        return getTypeForDeclRef(session, nullptr, nullptr, declRef, &typeResult, loc);
     }
 
     DeclRef<ExtensionDecl> ApplyExtensionToType(
@@ -2832,7 +2846,7 @@ namespace Slang
         return extDeclRef;
     }
 
-    QualType SemanticsVisitor::GetTypeForDeclRef(DeclRef<Decl> declRef)
+    QualType SemanticsVisitor::GetTypeForDeclRef(DeclRef<Decl> declRef, SourceLoc loc)
     {
         RefPtr<Type> typeResult;
         return getTypeForDeclRef(
@@ -2840,7 +2854,8 @@ namespace Slang
             this,
             getSink(),
             declRef,
-            &typeResult);
+            &typeResult,
+            loc);
     }
 
     void SemanticsVisitor::importModuleIntoScope(Scope* scope, ModuleDecl* moduleDecl)

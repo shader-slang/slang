@@ -1,0 +1,7 @@
+result code = -1
+standard error = {
+tests/bugs/keyword-undefined-identifier.slang(29): error 30015: undefined identifier 'instance'.
+tests/bugs/keyword-undefined-identifier.slang(34): error 30015: undefined identifier 'triangle'.
+}
+standard output = {
+}

@@ -48,11 +48,13 @@ QualType getTypeForDeclRef(
     SemanticsVisitor*       sema,
     DiagnosticSink*         sink,
     DeclRef<Decl>           declRef,
-    RefPtr<Type>* outTypeResult);
+    RefPtr<Type>*           outTypeResult,
+    SourceLoc               loc);
 
 QualType getTypeForDeclRef(
     Session*        session,
-    DeclRef<Decl>   declRef);
+    DeclRef<Decl>   declRef,
+    SourceLoc       loc);
 
     /// Add a found item to a lookup result
 void AddToLookupResult(
