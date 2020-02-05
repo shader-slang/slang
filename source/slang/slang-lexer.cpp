@@ -436,7 +436,6 @@ namespace Slang
         return true;
     }
 
-    
     static TokenType lexNumberAfterDecimalPoint(Lexer* lexer, int base)
     {
         lexDigits(lexer, base);
@@ -445,7 +444,7 @@ namespace Slang
         return maybeLexNumberSuffix(lexer, TokenType::FloatingPointLiteral);
     }
 
-    static TokenType lexNumberWithBase(Lexer* lexer, int base)
+    static TokenType lexNumber(Lexer* lexer, int base)
     {
         // TODO(tfoley): Need to consider whehter to allow any kind of digit separator character.
 
@@ -469,56 +468,6 @@ namespace Slang
 
         maybeLexNumberSuffix(lexer, tokenType);
         return tokenType;
-    }
-
-    static TokenType lexNumber(SourceLoc startLoc, Lexer* lexer)
-    {
-        // NOTE! At this point any minus will have already been advanced over
-        const int peekChar = peek(lexer);
-        switch (peekChar)
-        {
-            case '1': case '2': case '3': case '4':
-            case '5': case '6': case '7': case '8': case '9':
-            {
-                return lexNumberWithBase(lexer, 10);
-            }
-            case '.':
-            {
-                advance(lexer);
-                return lexNumberAfterDecimalPoint(lexer, 10);
-            }
-            case '0':
-            {
-                advance(lexer);
-                switch (peek(lexer))
-                {
-                    default:
-                        return maybeLexNumberSuffix(lexer, TokenType::IntegerLiteral);
-
-                    case '.':
-                        advance(lexer);
-                        return lexNumberAfterDecimalPoint(lexer, 10);
-
-                    case 'x': case 'X':
-                        advance(lexer);
-                        return lexNumberWithBase(lexer, 16);
-
-                    case 'b': case 'B':
-                        advance(lexer);
-                        return lexNumberWithBase(lexer, 2);
-
-                    case '0': case '1': case '2': case '3': case '4':
-                    case '5': case '6': case '7': case '8': case '9':
-                        lexer->sink->diagnose(startLoc, Diagnostics::octalLiteral);
-                        return lexNumberWithBase(lexer, 8);
-                }
-            }
-            default:
-            {
-                SLANG_ASSERT(!"Should not be possible on entering this function must be one of the above cases.");
-                return TokenType::Invalid;
-            }
-        }
     }
 
     static int maybeReadDigit(char const** ioCursor, int base)
@@ -599,14 +548,6 @@ namespace Slang
         char const* cursor = token.Content.begin();
         char const* end = token.Content.end();
 
-        bool isNegative = false;
-
-        if (cursor < end && *cursor == '-')
-        {
-            cursor++;
-            isNegative = true;
-        }
-
         int base = readOptionalBase(&cursor);
 
         for( ;;)
@@ -616,11 +557,6 @@ namespace Slang
                 break;
 
             value = value*base + digit;
-        }
-
-        if (isNegative)
-        {
-            value = -value;
         }
 
         if(outSuffix)
@@ -637,14 +573,6 @@ namespace Slang
 
         char const* cursor = token.Content.begin();
         char const* end = token.Content.end();
-
-        bool isNegative = false;
-
-        if (cursor < end && *cursor == '-')
-        {
-            cursor++;
-            isNegative = true;
-        }
 
         int radix = readOptionalBase(&cursor);
 
@@ -723,11 +651,6 @@ namespace Slang
         }
 
         value /= divisor;
-
-        if (isNegative)
-        {
-            value = -value;
-        }
 
         if(outSuffix)
         {
@@ -1008,23 +931,50 @@ namespace Slang
             return TokenType::WhiteSpace;
 
         case '.':
-        {
             advance(lexer);
-            const int peekChar = peek(lexer);
-            if (peekChar >= '0' && peekChar <= '9')
+            switch(peek(lexer))
             {
+            case '0': case '1': case '2': case '3': case '4':
+            case '5': case '6': case '7': case '8': case '9':
                 return lexNumberAfterDecimalPoint(lexer, 10);
-            }
 
             // TODO(tfoley): handle ellipsis (`...`)
-            return TokenType::Dot;
-        }
-        case '0':
-        case '1': case '2': case '3': case '4':
+
+            default:
+                return TokenType::Dot;
+            }
+
+                    case '1': case '2': case '3': case '4':
         case '5': case '6': case '7': case '8': case '9':
-        {
-            return lexNumber(getSourceLoc(lexer), lexer);
-        }
+            return lexNumber(lexer, 10);
+
+        case '0':
+            {
+                auto loc = getSourceLoc(lexer);
+                advance(lexer);
+                switch(peek(lexer))
+                {
+                default:
+                    return maybeLexNumberSuffix(lexer, TokenType::IntegerLiteral);
+
+                case '.':
+                    advance(lexer);
+                    return lexNumberAfterDecimalPoint(lexer, 10);
+
+                case 'x': case 'X':
+                    advance(lexer);
+                    return lexNumber(lexer, 16);
+
+                case 'b': case 'B':
+                    advance(lexer);
+                    return lexNumber(lexer, 2);
+
+                case '0': case '1': case '2': case '3': case '4':
+                case '5': case '6': case '7': case '8': case '9':
+                    lexer->sink->diagnose(loc, Diagnostics::octalLiteral);
+                    return lexNumber(lexer, 8);
+                }
+            }
 
         case 'a': case 'b': case 'c': case 'd': case 'e':
         case 'f': case 'g': case 'h': case 'i': case 'j':
@@ -1063,26 +1013,16 @@ namespace Slang
             }
 
         case '-':
-        {
-            // Save the source location of the start
-            const SourceLoc loc = getSourceLoc(lexer);
-
             advance(lexer);
-            const int peekChar = peek(lexer);
-            switch(peekChar)
+            switch(peek(lexer))
             {
             case '-': advance(lexer); return TokenType::OpDec;
             case '=': advance(lexer); return TokenType::OpSubAssign;
             case '>': advance(lexer); return TokenType::RightArrow;
             default:
-                if ((peekChar >= '0' && peekChar <= '9') || peekChar == '.')
-                {
-                    return lexNumber(loc, lexer);
-                }
-                
                 return TokenType::OpSub;
             }
-        }
+
         case '*':
             advance(lexer);
             switch(peek(lexer))
