@@ -1676,7 +1676,7 @@ namespace Slang
 
     bool IRConstant::isFinite() const
     {
-        SLANG_ASSERT(op == kIROp_FloatType);
+        SLANG_ASSERT(op == kIROp_FloatLit);
         
         // Lets check we can analyze as double, at least in principal
         SLANG_COMPILE_TIME_ASSERT(sizeof(IRFloatingPointValue) == sizeof(double));
@@ -1690,7 +1690,7 @@ namespace Slang
 
     IRConstant::FloatKind IRConstant::getFloatKind() const
     {
-        SLANG_ASSERT(op == kIROp_FloatType);
+        SLANG_ASSERT(op == kIROp_FloatLit);
 
         const uint64_t i = uint64_t(value.intVal);
         int e = int(i >> 52) & 0x7ff;
