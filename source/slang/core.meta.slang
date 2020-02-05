@@ -359,7 +359,12 @@ for (int N = 2; N <= 4; ++N)
         sb << ", vector<T," << K << "> ";
         for (int ii = 0; ii < K; ++ii)
         {
-            sb << kComponentNames[ii];
+            // The component names for the second parameter
+            // must start at `M`, so that we get signatures like:
+            //
+            //      __init(float2 xy, float2 zw)
+            //
+            sb << kComponentNames[M + ii];
         }
         sb << ");\n";
     }
