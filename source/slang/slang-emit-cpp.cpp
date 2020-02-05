@@ -1792,6 +1792,45 @@ void CPPSourceEmitter::emitSimpleValueImpl(IRInst* inst)
 {
     switch (inst->op)
     {
+        case kIROp_IntLit:
+        {
+            auto litInst = static_cast<IRConstant*>(inst);
+            IRBasicType* type = as<IRBasicType>(inst->getDataType());
+            if (type)
+            {
+                switch (type->getBaseType())
+                {
+                    case BaseType::Int8:
+                    case BaseType::Int16:
+                    case BaseType::Int:
+                    {
+                        // NOTE! This hack is required, otherwise we get different results across targets.
+                        // That the CLikeSourceEmitter will put a l suffix, this should make the literal an int literal.
+                        //
+                        // uint64_t v = 0x80000000;
+                        // 
+                        // When output this becomes...
+                        // v_0 = uint64_t(-2147483648l);
+                        // 
+                        // On MSVC/Gcc/Clang this is equal to 0x80000000, elsewhere it's 0xffffffff80000000 elsewhere.
+                        // Note that it - isn't the issue because v0 = uint64_t(0x80000000l); produces the same issue
+                        // 
+                        // If we use a cast, we get the same result across targets (which is why the hack is here).
+                        //
+                        // Why? Perhaps l suffix is not the same as a cast, and it's just ignored.
+                        // If C++ had the same behavior with the int() and they were different then this would make more sense.
+                        
+                        m_writer->emit("int(");
+                        m_writer->emit(litInst->value.intVal);
+                        m_writer->emit(")");
+                        return;
+                    }
+                    default: break;
+                }
+            }
+            break;
+        }
+
         case kIROp_FloatLit:
         {
             IRConstant* constantInst = static_cast<IRConstant*>(inst);
@@ -1804,10 +1843,12 @@ void CPPSourceEmitter::emitSimpleValueImpl(IRInst* inst)
             {
                 m_writer->emitChar('f');
             }
-            break;
+            return;
         }
-        default: Super::emitSimpleValueImpl(inst);
+        default: break;
     }
+
+    Super::emitSimpleValueImpl(inst);
 }
 
 void CPPSourceEmitter::emitVectorTypeNameImpl(IRType* elementType, IRIntegerValue elementCount)

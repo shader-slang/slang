@@ -4036,36 +4036,35 @@ namespace Slang
                 SLANG_COMPILE_TIME_ASSERT(sizeof(value) == sizeof(uint64_t));
 
                 // If the type is 64 bits, do nothing, we'll assume all is good
-                if (info.sizeInBytes != sizeof(value))
+                if (suffixBaseType != BaseType::Void && info.sizeInBytes != sizeof(value))
                 {
-                    const IntegerLiteralValue mask = (~IntegerLiteralValue(0)) << (8 * info.sizeInBytes);
+                    const IntegerLiteralValue signBit = IntegerLiteralValue(1) << (8 * info.sizeInBytes - 1);
+                    // Same as (~IntegerLiteralValue(0)) << (8 * info.sizeInBytes);, without the need for variable shift
+                    const IntegerLiteralValue mask = -(signBit + signBit);
 
                     IntegerLiteralValue truncatedValue = value;
                     // If it's signed, and top bit is set, sign extend it negative
-                    if ((info.flags & BaseTypeInfo::Flag::Signed) && (value & (IntegerLiteralValue(1) << (8 * info.sizeInBytes - 1))))
+                    if (info.flags & BaseTypeInfo::Flag::Signed)
                     {
-                        // set all top bits
-                        truncatedValue |= mask;
+                        // Sign extend
+                        truncatedValue = (value & signBit) ? (value | mask) : (value & ~mask);
                     }
                     else
                     {
                         // 0 top bits
-                        truncatedValue &= ~mask;
+                        truncatedValue = value & ~mask;
                     }
 
-                    if (truncatedValue != value)
+                    const IntegerLiteralValue maskedValue = value & mask;
+
+                    // If the masked value is 0 or equal to the mask, we 'assume' no information is
+                    // lost
+                    // This allows for example -1u, to give 0xffffffff
+                    // It also means 0xfffffffffffffffffu will give 0xffffffff, without a warning.
+                    if (!(maskedValue == 0 || maskedValue == mask))
                     {
-                        // If the original value is negative
-                        // and the type used is unsigned
-                        // and all of the high bits of value are set... we allow this
-                        // So we can have uint32_t v = -1; 
-                        if (value < 0 && ((info.flags & BaseTypeInfo::Flag::Signed) == 0) && (value & mask) == mask)
-                        {
-                        }
-                        else
-                        {
-                            parser->sink->diagnose(token, Diagnostics::integerLiteralTruncated, token.Content, BaseTypeInfo::asText(suffixBaseType), truncatedValue);
-                        }
+                        // Output a warning that number has been altered
+                        parser->sink->diagnose(token, Diagnostics::integerLiteralTruncated, token.Content, BaseTypeInfo::asText(suffixBaseType), truncatedValue);
                     }
 
                     value = truncatedValue;

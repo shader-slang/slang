@@ -757,6 +757,7 @@ void CLikeSourceEmitter::emitSimpleValueImpl(IRInst* inst)
                 case BaseType::Int:
                 {
                     m_writer->emit(litInst->value.intVal);
+                    m_writer->emit("l");
                     break;
                 }
                 case BaseType::UInt8:
@@ -764,6 +765,7 @@ void CLikeSourceEmitter::emitSimpleValueImpl(IRInst* inst)
                 case BaseType::UInt:
                 {
                     m_writer->emit(UInt(litInst->value.intVal));
+                    m_writer->emit("u");
                     break;
                 }
                 case BaseType::Int64:
