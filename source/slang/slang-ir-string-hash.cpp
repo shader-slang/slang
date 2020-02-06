@@ -18,40 +18,6 @@ static void _findGetStringHashRec(IRInst* inst, List<IRGetStringHash*>& outInsts
     }
 }
 
-void replaceGetStringHash(IRModule* module, SharedIRBuilder& sharedBuilder, StringSlicePool& ioPool)
-{
-    IRBuilder builder;
-    builder.sharedBuilder = &sharedBuilder;
-
-    builder.setInsertInto(module->getModuleInst());
-
-    List<IRGetStringHash*> insts;
-    _findGetStringHashRec(module->getModuleInst(), insts);
-
-    // Then we want to add the GlobalHashedString instruction in the root
-    for (auto inst : insts)
-    {
-        IRStringLit* stringLit = inst->getStringLit();
-        ioPool.add(stringLit->getStringSlice());
-        
-        // Okay work out what the hash is
-        const int hash = GetHashCode(stringLit->getStringSlice());
-
-        IRInst* intLit = builder.getIntValue(builder.getIntType(), int32_t(hash));
-
-        // Okay we want to replace all uses with the literal
-        inst->replaceUsesWith(intLit);
-        inst->removeAndDeallocate();
-    }
-}
-
-void replaceGetStringHashWithGlobal(IRModule* module, SharedIRBuilder& sharedBuilder)
-{
-    StringSlicePool pool(StringSlicePool::Style::Empty);
-    replaceGetStringHash(module, sharedBuilder, pool);
-    addGlobalHashedStringLiterals(pool, sharedBuilder);
-}
-
 void findGlobalHashedStringLiterals(IRModule* module, StringSlicePool& pool)
 {
     IRModuleInst* moduleInst = module->getModuleInst();

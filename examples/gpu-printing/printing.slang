@@ -199,23 +199,14 @@ extension uint : IPrintable // <-- Note: we are adding a conformance to `IPrinta
     }
 }
 
-// HACK: Because we currently don't have a `String` type that we
-// can pass down into subroutines, we will be using the hash
-// code of a string to represent the string itself. These hash
-// codes currently have type `int`, so our printing library
-// will *always* assume that an `int` represents a hashed
-// string, and thus we can't print plain old `int`s right now.
-
-typedef int StringHash;
-
-extension StringHash : IPrintable
+extension String : IPrintable
 {
     uint getPrintWordCount() { return 2; }
 
     void writePrintWords(RWStructuredBuffer<uint> buffer, uint offset)
     {
         buffer[offset++] = (uint(PrintingOp.String) << 16) | 1;
-        buffer[offset++] = this;
+        buffer[offset++] = getStringHash(this);
     }
 }
 
@@ -294,7 +285,7 @@ void println<A : IPrintable, B : IPrintable, C : IPrintable>(
 // work.
 //
 
-uint _beginPrintf(int formatStrngHash, uint wordCount)
+uint _beginPrintf(String format, uint wordCount)
 {
     // A printf command will start with the usual command header word,
     // along with a word for the (hashed) format string. These
@@ -303,7 +294,7 @@ uint _beginPrintf(int formatStrngHash, uint wordCount)
     //
     uint wordOffset = _allocatePrintWords(wordCount + 2);
     gPrintBuffer[wordOffset++] = (uint(PrintingOp.PrintF) << 16) | (wordCount+1);
-    gPrintBuffer[wordOffset++] = formatStrngHash;
+    gPrintBuffer[wordOffset++] = getStringHash(format);
     return wordOffset;
 }
 
@@ -337,26 +328,26 @@ extension uint : IPrintf
     }
 }
 
-extension StringHash : IPrintf
+extension String : IPrintf
 {
     uint getPrintfWordCount() { return 1; }
 
     void writePrintfWords(RWStructuredBuffer<uint> buffer, uint offset)
     {
-        buffer[offset++] = this;
+        buffer[offset++] = getStringHash(this);
     }
 }
 
 
 // A `printf()` with no format arguments can just call back to `_beginPrintf()`
-void printf(StringHash format)
+void printf(String format)
 {
     _beginPrintf(format, 0);
 }
 
 // The `printf()` cases with one or more format arguments are all quite similar.
 
-void printf<A : IPrintf>(StringHash format, A a)
+void printf<A : IPrintf>(String format, A a)
 {
     // We need to compute the words required by each format argument
     // and sum them up.
@@ -375,7 +366,7 @@ void printf<A : IPrintf>(StringHash format, A a)
     a.writePrintfWords(gPrintBuffer, wordOffset); wordOffset += aCount;
 }
 
-void printf<A : IPrintf, B : IPrintf>(StringHash format, A a, B b)
+void printf<A : IPrintf, B : IPrintf>(String format, A a, B b)
 {
     uint wordCount = 0;
     uint aCount = a.getPrintfWordCount(); wordCount += aCount;

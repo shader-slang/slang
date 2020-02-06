@@ -343,6 +343,18 @@ struct SharedIRGenContext
     // to the appropriate basic block to jump to.
     Dictionary<Stmt*, IRBlock*> breakLabels;
     Dictionary<Stmt*, IRBlock*> continueLabels;
+
+    // List of all string literals used in user code, regardless
+    // of how they were used (i.e., whether or not they were hashed).
+    //
+    // This does *not* collect:
+    // * String literals that were only used for attributes/modifiers in
+    //   the user's code (e.g., `"compute"` in `[shader("compute")]`)
+    // * Any IR string literals constructed for the purpose of decorations,
+    //   reflection, or other meta-data that did not appear as a literal
+    //   in the source code.
+    //
+    List<IRInst*> m_stringLiterals;
 };
 
 
@@ -778,21 +790,6 @@ LoweredValInfo emitCallToDeclRef(
         }
         else
         {
-            switch (intrinsicOp)
-            {
-                case kIROp_GetStringHash:
-                {
-                    IRStringLit* stringLit = as<IRStringLit>(args[0]);
-                    if (stringLit == nullptr)
-                    {
-                        auto sink = context->getSink();
-                        sink->diagnose(funcDecl, Diagnostics::getStringHashRequiresStringLiteral);
-                        return LoweredValInfo();
-                    }
-
-                }
-            }
-
             // The intrinsic op maps to a single IR instruction,
             // so we will emit an instruction with the chosen
             // opcode, and the arguments to the call as its operands.
@@ -2515,7 +2512,9 @@ struct ExprLoweringVisitorBase : ExprVisitor<Derived, LoweredValInfo>
 
     LoweredValInfo visitStringLiteralExpr(StringLiteralExpr* expr)
     {
-        return LoweredValInfo::simple(context->irBuilder->getStringValue(expr->value.getUnownedSlice()));
+        auto irLit = context->irBuilder->getStringValue(expr->value.getUnownedSlice());
+        context->shared->m_stringLiterals.add(irLit);
+        return LoweredValInfo::simple(irLit);
     }
 
     LoweredValInfo visitAggTypeCtorExpr(AggTypeCtorExpr* /*expr*/)
@@ -6813,6 +6812,18 @@ IRModule* generateIRForTranslationUnit(
         ensureAllDeclsRec(context, decl);
     }
 
+    // Build a global instruction to hold all the string
+    // literals used in the module.
+    {
+        auto& stringLits = sharedContext->m_stringLiterals;
+        auto stringLitCount = stringLits.getCount();
+        if(stringLitCount != 0)
+        {
+            builder->setInsertInto(module->getModuleInst());
+            builder->emitIntrinsicInst(builder->getVoidType(), kIROp_GlobalHashedStringLiterals, stringLitCount, stringLits.getBuffer());
+        }
+    }
+
 #if 0
     fprintf(stderr, "### GENERATED\n");
     dumpIR(module);
@@ -6852,9 +6863,6 @@ IRModule* generateIRForTranslationUnit(
     // call graph) based on constraints imposed by different instructions.
     propagateConstExpr(module, compileRequest->getSink());
 
-    // Replace calls to getStringHash, and save all the unique string lits in a GlobalHashedStringLiterals inst
-    replaceGetStringHashWithGlobal(module, *sharedBuilder);
-    
     // TODO: give error messages if any `undefined` or
     // `unreachable` instructions remain.
 
