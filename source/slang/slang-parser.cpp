@@ -4214,7 +4214,7 @@ namespace Slang
                             {
                                 fixedValue = -float(INFINITY);
                             }
-                            else if (Math::Abs(fixedValue) < SLANG_HALF_SUB_NORMAL_MIN)
+                            else if (fixedValue && Math::Abs(fixedValue) < SLANG_HALF_SUB_NORMAL_MIN)
                             {
                                 fixedValue = 0.0f;
                             }
