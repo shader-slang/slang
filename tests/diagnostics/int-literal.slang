@@ -25,7 +25,7 @@ int doSomething(int a)
     // Ok
     b += 0x800000000ll;
     
-    uint64_t c4 = -2ull;
+    uint64_t c5 = -2ull;
     
     return a + int(b);
 }
