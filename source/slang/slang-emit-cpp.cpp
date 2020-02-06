@@ -1166,8 +1166,18 @@ void CPPSourceEmitter::_emitConstructConvertDefinition(const UnownedStringSlice&
             {
                 writer->emit(", \n");
             }
-            writer->emit(rowTypeName);
-            writer->emit("{ ");
+
+            if (m_target == CodeGenTarget::CUDASource)
+            {
+                m_writer->emit("make_");
+                writer->emit(rowTypeName);
+                m_writer->emit("(");
+            }
+            else
+            {
+                writer->emit(rowTypeName);
+                writer->emit("{ ");
+            }
         }
 
         for (int j = 0; j < dim.colCount; ++j)
@@ -1184,7 +1194,14 @@ void CPPSourceEmitter::_emitConstructConvertDefinition(const UnownedStringSlice&
         }
         if (dim.rowCount > 1)
         {
-            writer->emit("}");
+            if (m_target == CodeGenTarget::CUDASource)
+            {
+                writer->emit(")");
+            }
+            else
+            {
+                writer->emit("}");
+            }
         }
     }
 
