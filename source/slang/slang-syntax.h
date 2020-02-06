@@ -320,14 +320,22 @@ namespace Slang
             ///
         ModifiersChecked,
 
-            /// The declaration's basic signature has been checked to the point that
-            /// it is ready to be referenced in other places.
+            /// The type/signature of the declaration has been checked.
             ///
             /// For a value declaration like a variable or function, this means that
             /// the type of the declaration can be queried.
             ///
             /// For a type declaration like a `struct` or `typedef` this means
             /// that a `Type` referring to that declaration can be formed.
+            ///
+        SignatureChecked,
+
+            /// The declaration's basic signature has been checked to the point that
+            /// it is ready to be referenced in other places.
+            ///
+            /// For a function, this means that it has been organized into a
+            /// "redeclration group" if there are multiple functions with the
+            /// same name in a scope.
             ///
         ReadyForReference,
 

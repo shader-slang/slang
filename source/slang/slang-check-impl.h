@@ -382,6 +382,10 @@ namespace Slang
             /// Worker reoutine for `maybeResolveOverloadedExpr` and `resolveOverloadedExpr`.
         RefPtr<Expr> _resolveOverloadedExprImpl(RefPtr<OverloadedExpr> overloadedExpr, LookupMask mask, DiagnosticSink* diagSink);
 
+        void diagnoseAmbiguousReference(OverloadedExpr* overloadedExpr, LookupResult const& lookupResult);
+        void diagnoseAmbiguousReference(Expr* overloadedExpr);
+
+
         RefPtr<Expr> ExpectATypeRepr(RefPtr<Expr> expr);
 
         RefPtr<Type> ExpectAType(RefPtr<Expr> expr);
@@ -797,7 +801,9 @@ namespace Slang
         RefPtr<GenericSubstitution> createDummySubstitutions(
             GenericDecl* genericDecl);
 
-        void ValidateFunctionRedeclaration(FuncDecl* funcDecl);
+        Result checkRedeclaration(Decl* newDecl, Decl* oldDecl);
+        Result checkFuncRedeclaration(FuncDecl* newDecl, FuncDecl* oldDecl);
+        void checkForRedeclaration(Decl* decl);
 
         RefPtr<Expr> checkPredicateExpr(Expr* expr);
 
