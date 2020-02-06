@@ -1899,21 +1899,29 @@ void CPPSourceEmitter::emitSimpleValueImpl(IRInst* inst)
                     case BaseType::Int:
                     {
                         // NOTE! This hack is required, otherwise we get different results across targets.
-                        // That the CLikeSourceEmitter will put a l suffix, this should make the literal an int literal.
+                        // That the CLikeSourceEmitter will put a L suffix, this should make the literal an int literal.
                         //
                         // uint64_t v = 0x80000000;
                         // 
                         // When output this becomes...
-                        // v_0 = uint64_t(-2147483648l);
+                        // v_0 = uint64_t(-2147483648L);
                         // 
                         // On MSVC/Gcc/Clang this is equal to 0x80000000, elsewhere it's 0xffffffff80000000 elsewhere.
-                        // Note that it - isn't the issue because v0 = uint64_t(0x80000000l); produces the same issue
+                        // Note that '-' isn't the issue because v0 = uint64_t(0x80000000L); produces the same issue
                         // 
                         // If we use a cast, we get the same result across targets (which is why the hack is here).
                         //
-                        // Why? Perhaps l suffix is not the same as a cast, and it's just ignored.
-                        // If C++ had the same behavior with the int() and they were different then this would make more sense.
-                        
+                        // Why? It's not clear - it seems likely that it's related to the order of how the promotion takes place.
+                        // 
+                        // If we convert from int32_t -> uint64_t, there are two possible scenarios
+                        // 1) int32_t -> int64_t -> uint64_t  (ie widen first then do sign type change)
+                        // 2) int32_t -> uint32_t -> uint64_t (ie do sign type change then widen)
+                        //
+                        // 2 would produce what we see on C++, 1 what we see everywhere else.
+                        // 
+                        // Why having a cast or having a suffix would make a difference though is not clear. It is also possible that the
+                        // L suffix is just ignored, and the literal is really a 'non typed' int literal in C++.
+
                         m_writer->emit("int(");
                         m_writer->emit(litInst->value.intVal);
                         m_writer->emit(")");
@@ -1936,7 +1944,7 @@ void CPPSourceEmitter::emitSimpleValueImpl(IRInst* inst)
                 case IRConstant::FloatKind::Nan:
                 {
                     // It's not clear this will work on all targets.
-                    // On VS dividing by 0 is reported as an error.
+                    // In particular Visual Studio reports an error with this expression. 
                     m_writer->emit("(0.0 / 0.0)");
                     break;
                 }
@@ -1947,7 +1955,7 @@ void CPPSourceEmitter::emitSimpleValueImpl(IRInst* inst)
                 }
                 case IRConstant::FloatKind::NegativeInfinity:
                 {
-                    m_writer->emit("-SLANG_INFINITY");
+                    m_writer->emit("(-SLANG_INFINITY)");
                     break;
                 }
                 default:

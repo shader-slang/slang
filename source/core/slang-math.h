@@ -5,6 +5,13 @@
 
 namespace Slang
 {
+    // Some handy constants
+
+    // The largest positive (or negative) number 
+#   define SLANG_HALF_MAX 65504.0f
+    // Smallest (denormalized) value. 1 / 2^24
+#   define SLANG_HALF_SUB_NORMAL_MIN (1.0f / 16777216.0f)
+
 	class Math
 	{
 	public:
@@ -136,8 +143,6 @@ namespace Slang
 	{
         return Math::FloatIntUnion::makeFromInt(val).fvalue; 
 	}
-
-#define SLANG_HALF_MAX 65504.0f
 
 	inline unsigned short FloatToHalf(float val)
 	{

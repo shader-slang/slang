@@ -500,8 +500,6 @@ void HLSLSourceEmitter::emitSimpleValueImpl(IRInst* inst)
             {
                 case IRConstant::FloatKind::Nan:
                 {
-                    // It's not clear this will work on all targets.
-                    // On VS dividing by 0 is reported as an error.
                     m_writer->emit("(0.0 / 0.0)");
                     return;
                 }

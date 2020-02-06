@@ -685,20 +685,20 @@ void GLSLSourceEmitter::emitSimpleValueImpl(IRInst* inst)
                     case BaseType::UInt:
                     {
                         m_writer->emit(UInt(litInst->value.intVal));
-                        m_writer->emit("u");
+                        m_writer->emit("U");
                         return;
                     }
                     case BaseType::Int64:
                     {
                         m_writer->emitInt64(int64_t(litInst->value.intVal));
-                        m_writer->emit("l");
+                        m_writer->emit("L");
                         return;
                     }
                     case BaseType::UInt64:
                     {
                         SLANG_COMPILE_TIME_ASSERT(sizeof(litInst->value.intVal) >= sizeof(uint64_t));
                         m_writer->emitUInt64(uint64_t(litInst->value.intVal));
-                        m_writer->emit("ul");
+                        m_writer->emit("UL");
                         return;
                     }
 
@@ -716,8 +716,6 @@ void GLSLSourceEmitter::emitSimpleValueImpl(IRInst* inst)
             {
                 case IRConstant::FloatKind::Nan:
                 {
-                    // It's not clear this will work on all targets.
-                    // On VS dividing by 0 is reported as an error.
                     m_writer->emit("(0.0 / 0.0)");
                     return;
                 }

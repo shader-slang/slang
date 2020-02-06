@@ -4038,6 +4038,13 @@ namespace Slang
                     }
                 }
 
+                // TODO(JS):
+                // It is worth noting here that because of the way that the lexer works, that literals
+                // are always handled as if they are positive (a preceding - is taken as a negate on a
+                // positive value).
+                // The code here is designed to work with positive and negative values, as this behavior
+                // might change in the future, and is arguably more 'correct'.
+
                 const BaseTypeInfo& info = BaseTypeInfo::getInfo(suffixBaseType);
                 SLANG_ASSERT(info.flags & BaseTypeInfo::Flag::Integer);
                 SLANG_COMPILE_TIME_ASSERT(sizeof(value) == sizeof(uint64_t));
@@ -4161,7 +4168,13 @@ namespace Slang
                     }
                 }
 
-                
+                // TODO(JS):
+                // It is worth noting here that because of the way that the lexer works, that literals
+                // are always handled as if they are positive (a preceding - is taken as a negate on a
+                // positive value).
+                // The code here is designed to work with positive and negative values, as this behavior
+                // might change in the future, and is arguably more 'correct'.
+
                 FloatingPointLiteralValue fixedValue = value;
 
                 // Check the value is finite for checking narrowing to literal type losing information
@@ -4171,11 +4184,16 @@ namespace Slang
                     {
                         case BaseType::Float:
                         {
-                            // Clamp into the floating point range
-                            fixedValue = (fixedValue > FLT_MAX) ? float(INFINITY) : fixedValue;
-                            fixedValue = (fixedValue < -FLT_MAX) ? -float(INFINITY) : fixedValue;
-
-                            if (fixedValue && float(fixedValue) == 0.0f)
+                            // Fix out of range
+                            if (fixedValue > FLT_MAX)
+                            {
+                                fixedValue = float(INFINITY);
+                            }
+                            else if (fixedValue < -FLT_MAX)
+                            {
+                                fixedValue = -float(INFINITY);
+                            }
+                            else if (fixedValue && float(fixedValue) == 0.0f)
                             {
                                 fixedValue = 0.0f;
                             }
@@ -4187,17 +4205,35 @@ namespace Slang
                         }
                         case BaseType::Half:
                         {
-                            fixedValue = (fixedValue > SLANG_HALF_MAX) ? SLANG_HALF_MAX : fixedValue;
-                            fixedValue = (fixedValue < -SLANG_HALF_MAX) ? -SLANG_HALF_MAX : fixedValue;
-                            // Let's not worry about a very small value becoming 0 for half
+                            // Fix out of range
+                            if (fixedValue > SLANG_HALF_MAX)
+                            {
+                                fixedValue = float(INFINITY);
+                            }
+                            else if (fixedValue < -SLANG_HALF_MAX)
+                            {
+                                fixedValue = -float(INFINITY);
+                            }
+                            else if (Math::Abs(fixedValue) < SLANG_HALF_SUB_NORMAL_MIN)
+                            {
+                                fixedValue = 0.0f;
+                            }
                             break;
                         }
                         default: break;
                     }
 
+
                     if (fixedValue != value)
                     {
-                         parser->sink->diagnose(token, Diagnostics::floatLiteralUnrepresentable, BaseTypeInfo::asText(suffixBaseType), token.Content, fixedValue);
+                        if (fixedValue == 0.0)
+                        {
+                            parser->sink->diagnose(token, Diagnostics::floatLiteralTooSmall, BaseTypeInfo::asText(suffixBaseType), token.Content, fixedValue);
+                        }
+                        else
+                        {
+                            parser->sink->diagnose(token, Diagnostics::floatLiteralUnrepresentable, BaseTypeInfo::asText(suffixBaseType), token.Content, fixedValue);
+                        }
                     }
                 }
 
