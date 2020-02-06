@@ -461,7 +461,19 @@ namespace Slang
     {
         if(outToExpr)
         {
-            getSink()->diagnose(fromExpr->loc, Diagnostics::typeMismatch, toType, fromExpr->type);
+            // As a special case, if the expression we are trying to convert
+            // from is overloaded (implying an ambiguous reference), then we
+            // will try to produce a more appropriately tailored error message.
+            //
+            auto fromType = fromExpr->type.type;
+            if( as<OverloadGroupType>(fromType) )
+            {
+                diagnoseAmbiguousReference(fromExpr);
+            }
+            else
+            {
+                getSink()->diagnose(fromExpr->loc, Diagnostics::typeMismatch, toType, fromExpr->type);
+            }
         }
         return false;
     }

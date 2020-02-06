@@ -212,7 +212,6 @@ DIAGNOSTIC(20011, Error, unexpectedColon, "unexpected ':'.")
 // 3xxxx - Semantic analysis
 //
 
-DIAGNOSTIC(30002, Error, parameterAlreadyDefined, "parameter '$0' already defined.")
 DIAGNOSTIC(30003, Error, breakOutsideLoop, "'break' must appear inside loop constructs.")
 DIAGNOSTIC(30004, Error, continueOutsideLoop, "'continue' must appear inside loop constructs.")
 DIAGNOSTIC(30005, Error, whilePredicateTypeError, "'while': expression must evaluate to int.")
@@ -256,6 +255,7 @@ DIAGNOSTIC(30060, Error, expectedAType, "expected a type got a '$0'")
 
 DIAGNOSTIC(30100, Error, staticRefToNonStaticMember, "type '$0' cannot be used to refer to non-static member '$1'")
 
+DIAGNOSTIC(30200, Error, redeclaration, "declaration of '$0' conflicts with existing declaration")
 DIAGNOSTIC(30201, Error, functionRedefinition, "function '$0' already has a body")
 DIAGNOSTIC(30202, Error, functionRedeclarationWithDifferentReturnType, "function '$0' declared to return '$1' was previously declared to return '$2'")
 
@@ -341,6 +341,7 @@ DIAGNOSTIC(39999, Note, genericSignatureTried, "see declaration of $0")
 DIAGNOSTIC(39999, Error, expectedAnInterfaceGot, "expected an interface, got '$0'")
 
 DIAGNOSTIC(39999, Error, ambiguousReference, "ambiguous reference to '$0'");
+DIAGNOSTIC(39999, Error, ambiguousExpression, "ambiguous reference");
 
 DIAGNOSTIC(39999, Error, declarationDidntDeclareAnything, "declaration does not declare anything");
 

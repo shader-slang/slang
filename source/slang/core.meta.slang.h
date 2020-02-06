@@ -380,7 +380,12 @@ for (int N = 2; N <= 4; ++N)
         sb << ", vector<T," << K << "> ";
         for (int ii = 0; ii < K; ++ii)
         {
-            sb << kComponentNames[ii];
+            // The component names for the second parameter
+            // must start at `M`, so that we get signatures like:
+            //
+            //      __init(float2 xy, float2 zw)
+            //
+            sb << kComponentNames[M + ii];
         }
         sb << ");\n";
     }
@@ -1277,7 +1282,7 @@ for (auto op : binaryOps)
         sb << "__intrinsic_op(" << int(op.opCode) << ") matrix<" << resultType << ",N,M> operator" << op.opName << "(" << leftQual << "matrix<" << leftType << ",N,M> left, " << rightType << " right);\n";
     }
 }
-SLANG_RAW("#line 1259 \"core.meta.slang\"")
+SLANG_RAW("#line 1264 \"core.meta.slang\"")
 SLANG_RAW("\n")
 SLANG_RAW("\n")
 SLANG_RAW("// Specialized function\n")

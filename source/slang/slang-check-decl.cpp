@@ -81,6 +81,27 @@ namespace Slang
         void visitAccessorDecl(AccessorDecl* decl);
     };
 
+    struct SemanticsDeclRedeclarationVisitor
+        : public SemanticsDeclVisitorBase
+        , public DeclVisitor<SemanticsDeclRedeclarationVisitor>
+    {
+        SemanticsDeclRedeclarationVisitor(SharedSemanticsContext* shared)
+            : SemanticsDeclVisitorBase(shared)
+        {}
+
+        void visitDecl(Decl*) {}
+        void visitDeclGroup(DeclGroup*) {}
+
+#define CASE(TYPE) void visit##TYPE(TYPE* decl) { checkForRedeclaration(decl); }
+
+        CASE(FuncDecl)
+        CASE(VarDeclBase)
+        CASE(SimpleTypeDecl)
+        CASE(AggTypeDecl)
+
+#undef CASE
+    };
+
     struct SemanticsDeclBasesVisitor
         : public SemanticsDeclVisitorBase
         , public DeclVisitor<SemanticsDeclBasesVisitor>
@@ -2179,213 +2200,309 @@ namespace Slang
         return subst;
     }
 
-    void SemanticsVisitor::ValidateFunctionRedeclaration(FuncDecl* funcDecl)
+    Result SemanticsVisitor::checkFuncRedeclaration(
+        FuncDecl* newDecl,
+        FuncDecl* oldDecl)
     {
-        auto parentDecl = funcDecl->ParentDecl;
+        // There are a few different cases that this function needs
+        // to check for:
+        //
+        // * If `newDecl` and `oldDecl` have different signatures such
+        //   that they can always be distinguished at call sites, then
+        //   they don't conflict and don't count as redeclarations.
+        //
+        // * If `newDecl` and `oldDecl` have matching signatures, but
+        //   differ in return type (or other details that would affect
+        //   compatibility), then the declarations conflict and an
+        //   error needs to be diagnosed.
+        //
+        // * If `newDecl` and `oldDecl` have matching/compatible sigantures,
+        //   but differ when it comes to target-specific overloading,
+        //   then they can co-exist.
+        //
+        // * If `newDecl` and `oldDecl` have matching/compatible signatures
+        //   and are specialized for the same target(s), then only
+        //   one can have a body (in which case the other is a forward declaration),
+        //   or else we have a redefinition error.
+
+        auto newGenericDecl = as<GenericDecl>(newDecl->ParentDecl);
+        auto oldGenericDecl = as<GenericDecl>(oldDecl->ParentDecl);
+
+        // If one declaration is a prefix/postfix operator, and the
+        // other is not a matching operator, then don't consider these
+        // to be re-declarations.
+        //
+        // Note(tfoley): Any attempt to call such an operator using
+        // ordinary function-call syntax (if we decided to allow it)
+        // would be ambiguous in such a case, of course.
+        //
+        if (newDecl->HasModifier<PrefixModifier>() != oldDecl->HasModifier<PrefixModifier>())
+            return SLANG_OK;
+        if (newDecl->HasModifier<PostfixModifier>() != oldDecl->HasModifier<PostfixModifier>())
+            return SLANG_OK;
+
+        // If one is generic and the other isn't, then there is no match.
+        if ((newGenericDecl != nullptr) != (oldGenericDecl != nullptr))
+            return SLANG_OK;
+
+        // We are going to be comparing the signatures of the
+        // two functions, but if they are *generic* functions
+        // then we will need to compare them with consistent
+        // specializations in place.
+        //
+        // We'll go ahead and create some (unspecialized) declaration
+        // references here, just to be prepared.
+        //
+        DeclRef<FuncDecl> newDeclRef(newDecl, nullptr);
+        DeclRef<FuncDecl> oldDeclRef(oldDecl, nullptr);
+
+        // If we are working with generic functions, then we need to
+        // consider if their generic signatures match.
+        if(newGenericDecl)
+        {
+            SLANG_ASSERT(oldGenericDecl); // already checked above
+            if(!doGenericSignaturesMatch(newGenericDecl, oldGenericDecl))
+                return SLANG_OK;
+
+            // Now we need specialize the declaration references
+            // consistently, so that we can compare.
+            //
+            // First we create a "dummy" set of substitutions that
+            // just reference the parameters of the first generic.
+            //
+            auto subst = createDummySubstitutions(newGenericDecl);
+            //
+            // Then we use those parameters to specialize the *other*
+            // generic.
+            //
+            subst->genericDecl = oldGenericDecl;
+            oldDeclRef.substitutions.substitutions = subst;
+            //
+            // One way to think about it is that if we have these
+            // declarations (ignore the name differences...):
+            //
+            //     // oldDecl:
+            //     void foo1<T>(T x);
+            //
+            //     // newDecl:
+            //     void foo2<U>(U x);
+            //
+            // Then we will compare `foo2` against `foo1<U>`.
+        }
+
+        // If the parameter signatures don't match, then don't worry
+        if (!doFunctionSignaturesMatch(newDeclRef, oldDeclRef))
+            return SLANG_OK;
+
+        // If we get this far, then we've got two declarations in the same
+        // scope, with the same name and signature, so they appear
+        // to be redeclarations.
+        //
+        // We will track that redeclaration occured, so that we can
+        // take it into account for overload resolution.
+        //
+        // A huge complication that we'll need to deal with is that
+        // multiple declarations might introduce default values for
+        // (different) parameters, and we might need to merge across
+        // all of them (which could get complicated if defaults for
+        // parameters can reference earlier parameters).
+
+        // If the previous declaration wasn't already recorded
+        // as being part of a redeclaration family, then make
+        // it the primary declaration of a new family.
+        if (!oldDecl->primaryDecl)
+        {
+            oldDecl->primaryDecl = oldDecl;
+        }
+
+        // The new declaration will belong to the family of
+        // the previous one, and so it will share the same
+        // primary declaration.
+        newDecl->primaryDecl = oldDecl->primaryDecl;
+        newDecl->nextDecl = nullptr;
+
+        // Next we want to chain the new declaration onto
+        // the linked list of redeclarations.
+        auto link = &oldDecl->nextDecl;
+        while (*link)
+            link = &(*link)->nextDecl;
+        *link = newDecl;
+
+        // Now that we've added things to a group of redeclarations,
+        // we can do some additional validation.
+
+        // First, we will ensure that the return types match
+        // between the declarations, so that they are truly
+        // interchangeable.
+        //
+        // Note(tfoley): If we ever decide to add a beefier type
+        // system to Slang, we might allow overloads like this,
+        // so long as the desired result type can be disambiguated
+        // based on context at the call type. In that case we would
+        // consider result types earlier, as part of the signature
+        // matching step.
+        //
+        auto resultType = GetResultType(newDeclRef);
+        auto prevResultType = GetResultType(oldDeclRef);
+        if (!resultType->Equals(prevResultType))
+        {
+            // Bad redeclaration
+            getSink()->diagnose(newDecl, Diagnostics::functionRedeclarationWithDifferentReturnType, newDecl->getName(), resultType, prevResultType);
+            getSink()->diagnose(oldDecl, Diagnostics::seePreviousDeclarationOf, newDecl->getName());
+
+            // Don't bother emitting other errors at this point
+            return SLANG_FAIL;
+        }
+
+        // TODO: Enforce that the new declaration had better
+        // not specify a default value for any parameter that
+        // already had a default value in a prior declaration.
+
+        // We are going to want to enforce that we cannot have
+        // two declarations of a function both specify bodies.
+        // Before we make that check, however, we need to deal
+        // with the case where the two function declarations
+        // might represent different target-specific versions
+        // of a function.
+        //
+        // TODO: if the two declarations are specialized for
+        // different targets, then skip the body checks below.
+        //
+        // ???: Why isn't this problem showing up in practice?
+
+        // If both of the declarations have a body, then there
+        // is trouble, because we wouldn't know which one to
+        // use during code generation.
+        if (newDecl->Body && oldDecl->Body)
+        {
+            // Redefinition
+            getSink()->diagnose(newDecl, Diagnostics::functionRedefinition, newDecl->getName());
+            getSink()->diagnose(oldDecl, Diagnostics::seePreviousDefinitionOf, newDecl->getName());
+
+            // Don't bother emitting other errors
+            return SLANG_FAIL;
+        }
+
+        // At this point we've processed the redeclaration and
+        // put it into a group, so there is no reason to keep
+        // looping and looking at prior declarations.
+        //
+        // While no diagnostics have been emitted, we return
+        // a failure result from the operation to indicate
+        // to the caller that they should stop looping over
+        // declarations at this point.
+        //
+        return SLANG_FAIL;
+    }
+
+    Result SemanticsVisitor::checkRedeclaration(Decl* newDecl, Decl* oldDecl)
+    {
+        // If either of the declarations being looked at is generic, then
+        // we want to consider the "inner" declaration instead when
+        // making decisions about what to allow or not.
+        //
+        if(auto newGenericDecl = as<GenericDecl>(newDecl))
+            newDecl = newGenericDecl->inner;
+        if(auto oldGenericDecl = as<GenericDecl>(oldDecl))
+            oldDecl = oldGenericDecl->inner;
+
+        // Functions are special in that we can have many declarations
+        // with the same name in a given scope, and it is possible
+        // for them to co-exist as overloads, or even just be multiple
+        // declarations of the same function (thanks to the inherited
+        // legacy of C forward declarations).
+        //
+        // If both declarations are functions, we will check that
+        // they are allowed to co-exist using these more nuanced rules.
+        //
+        if( auto newFuncDecl = as<FuncDecl>(newDecl) )
+        {
+            if(auto oldFuncDecl = as<FuncDecl>(oldDecl) )
+            {
+                // Both new and old declarations are functions,
+                // so redeclaration may be valid.
+                return checkFuncRedeclaration(newFuncDecl, oldFuncDecl);
+            }
+        }
+
+        // For all other flavors of declaration, we do not
+        // allow duplicate declarations with the same name.
+        //
+        // TODO: We might consider allowing some other cases
+        // of overloading that can be safely disambiguated:
+        //
+        // * A type and a value (function/variable/etc.) of the same name can usually
+        //   co-exist because we can distinguish which is needed by context.
+        //
+        // * Multiple generic types with the same name can co-exist
+        //   if their generic parameter lists are sufficient to
+        //   tell them apart at a use site.
+
+        // We will diagnose a redeclaration error at the new declaration,
+        // and point to the old declaration for context.
+        //
+        getSink()->diagnose(newDecl, Diagnostics::redeclaration, newDecl->getName());
+        getSink()->diagnose(oldDecl, Diagnostics::seePreviousDeclarationOf, oldDecl->getName());
+        return SLANG_FAIL;
+    }
+
+
+    void SemanticsVisitor::checkForRedeclaration(Decl* decl)
+    {
+        // We want to consider a "new" declaration in the context
+        // of some parent/container declaration, and compare it
+        // to pre-existing "old" declarations of the same name
+        // in the same container.
+        //
+        auto newDecl = decl;
+        auto parentDecl = decl->ParentDecl;
+
+        // Sanity check: there should always be a parent declaration.
+        //
         SLANG_ASSERT(parentDecl);
         if (!parentDecl) return;
 
-        Decl* childDecl = funcDecl;
-
-        // If this is a generic function (that is, its parent
-        // declaration is a generic), then we need to look
-        // for sibling declarations of the parent.
-        auto genericDecl = as<GenericDecl>(parentDecl);
-        if (genericDecl)
+        // If the declaration is the "inner" declaration of a generic,
+        // then we actually want to look one level up, because the
+        // peers/siblings of the declaration will belong to the same
+        // parent as the generic, not to the generic.
+        //
+        if( auto genericParentDecl = as<GenericDecl>(parentDecl) )
         {
-            parentDecl = genericDecl->ParentDecl;
-            childDecl = genericDecl;
+            // Note: we need to check here to be sure `newDecl`
+            // is the "inner" declaration and not one of the
+            // generic parameters, or else we will end up
+            // checking them at the wrong scope.
+            //
+            if( newDecl == genericParentDecl->inner )
+            {
+                newDecl = parentDecl;
+                parentDecl = genericParentDecl->ParentDecl;
+            }
         }
 
-        // Look at previously-declared functions with the same name,
-        // in the same container
-        //
-        // Note: there is an assumption here that declarations that
-        // occur earlier in the program  text will be *later* in
-        // the linked list of declarations with the same name.
-        // We are also assuming/requiring that the check here is
-        // symmetric, in that it is okay to test (A,B) or (B,A),
-        // and there is no need to test both.
+        // We will now look for other declarations with
+        // the same name in the same parent/container.
         //
         buildMemberDictionary(parentDecl);
-        for (auto pp = childDecl->nextInContainerWithSameName; pp; pp = pp->nextInContainerWithSameName)
+        for (auto oldDecl = newDecl->nextInContainerWithSameName; oldDecl; oldDecl = oldDecl->nextInContainerWithSameName)
         {
-            auto prevDecl = pp;
-
-            // Look through generics to the declaration underneath
-            auto prevGenericDecl = as<GenericDecl>(prevDecl);
-            if (prevGenericDecl)
-                prevDecl = prevGenericDecl->inner.Ptr();
-
-            // We only care about previously-declared functions
-            // Note(tfoley): although we should really error out if the
-            // name is already in use for something else, like a variable...
-            auto prevFuncDecl = as<FuncDecl>(prevDecl);
-            if (!prevFuncDecl)
-                continue;
-
-            // If one declaration is a prefix/postfix operator, and the
-            // other is not a matching operator, then don't consider these
-            // to be re-declarations.
+            // For each matching declaration, we will check
+            // whether the redeclaration should be allowed,
+            // and emit an appropriate diagnostic if not.
             //
-            // Note(tfoley): Any attempt to call such an operator using
-            // ordinary function-call syntax (if we decided to allow it)
-            // would be ambiguous in such a case, of course.
+            Result checkResult = checkRedeclaration(newDecl, oldDecl);
+
+            // The `checkRedeclaration` function will return a failure
+            // status (whether or not it actually emitted a diagnostic)
+            // if we should stop checking further redeclarations, because
+            // the declaration in question has been dealt with fully.
             //
-            if (funcDecl->HasModifier<PrefixModifier>() != prevDecl->HasModifier<PrefixModifier>())
-                continue;
-            if (funcDecl->HasModifier<PostfixModifier>() != prevDecl->HasModifier<PostfixModifier>())
-                continue;
-
-            // If one is generic and the other isn't, then there is no match.
-            if ((genericDecl != nullptr) != (prevGenericDecl != nullptr))
-                continue;
-
-            // We are going to be comparing the signatures of the
-            // two functions, but if they are *generic* functions
-            // then we will need to compare them with consistent
-            // specializations in place.
-            //
-            // We'll go ahead and create some (unspecialized) declaration
-            // references here, just to be prepared.
-            DeclRef<FuncDecl> funcDeclRef(funcDecl, nullptr);
-            DeclRef<FuncDecl> prevFuncDeclRef(prevFuncDecl, nullptr);
-
-            // If we are working with generic functions, then we need to
-            // consider if their generic signatures match.
-            if (genericDecl)
-            {
-                SLANG_ASSERT(prevGenericDecl); // already checked above
-                if (!doGenericSignaturesMatch(genericDecl, prevGenericDecl))
-                    continue;
-
-                // Now we need specialize the declaration references
-                // consistently, so that we can compare.
-                //
-                // First we create a "dummy" set of substitutions that
-                // just reference the parameters of the first generic.
-                auto subst = createDummySubstitutions(genericDecl);
-                //
-                // Then we use those parameters to specialize the *other*
-                // generic.
-                //
-                subst->genericDecl = prevGenericDecl;
-                prevFuncDeclRef.substitutions.substitutions = subst;
-                //
-                // One way to think about it is that if we have these
-                // declarations (ignore the name differences...):
-                //
-                //     // prevFuncDecl:
-                //     void foo1<T>(T x);
-                //
-                //     // funcDecl:
-                //     void foo2<U>(U x);
-                //
-                // Then we will compare `foo2` against `foo1<U>`.
-            }
-
-            // If the parameter signatures don't match, then don't worry
-            if (!doFunctionSignaturesMatch(funcDeclRef, prevFuncDeclRef))
-                continue;
-
-            // If we get this far, then we've got two declarations in the same
-            // scope, with the same name and signature, so they appear
-            // to be redeclarations.
-            //
-            // We will track that redeclaration occured, so that we can
-            // take it into account for overload resolution.
-            //
-            // A huge complication that we'll need to deal with is that
-            // multiple declarations might introduce default values for
-            // (different) parameters, and we might need to merge across
-            // all of them (which could get complicated if defaults for
-            // parameters can reference earlier parameters).
-
-            // If the previous declaration wasn't already recorded
-            // as being part of a redeclaration family, then make
-            // it the primary declaration of a new family.
-            if (!prevFuncDecl->primaryDecl)
-            {
-                prevFuncDecl->primaryDecl = prevFuncDecl;
-            }
-
-            // The new declaration will belong to the family of
-            // the previous one, and so it will share the same
-            // primary declaration.
-            funcDecl->primaryDecl = prevFuncDecl->primaryDecl;
-            funcDecl->nextDecl = nullptr;
-
-            // Next we want to chain the new declaration onto
-            // the linked list of redeclarations.
-            auto link = &prevFuncDecl->nextDecl;
-            while (*link)
-                link = &(*link)->nextDecl;
-            *link = funcDecl;
-
-            // Now that we've added things to a group of redeclarations,
-            // we can do some additional validation.
-
-            // First, we will ensure that the return types match
-            // between the declarations, so that they are truly
-            // interchangeable.
-            //
-            // Note(tfoley): If we ever decide to add a beefier type
-            // system to Slang, we might allow overloads like this,
-            // so long as the desired result type can be disambiguated
-            // based on context at the call type. In that case we would
-            // consider result types earlier, as part of the signature
-            // matching step.
-            //
-            auto resultType = GetResultType(funcDeclRef);
-            auto prevResultType = GetResultType(prevFuncDeclRef);
-            if (!resultType->Equals(prevResultType))
-            {
-                // Bad redeclaration
-                getSink()->diagnose(funcDecl, Diagnostics::functionRedeclarationWithDifferentReturnType, funcDecl->getName(), resultType, prevResultType);
-                getSink()->diagnose(prevFuncDecl, Diagnostics::seePreviousDeclarationOf, funcDecl->getName());
-
-                // Don't bother emitting other errors at this point
+            if(SLANG_FAILED(checkResult))
                 break;
-            }
-
-            // Note(tfoley): several of the following checks should
-            // really be looping over all the previous declarations
-            // in the same group, and not just the one previous
-            // declaration we found just now.
-
-            // TODO: Enforce that the new declaration had better
-            // not specify a default value for any parameter that
-            // already had a default value in a prior declaration.
-
-            // We are going to want to enforce that we cannot have
-            // two declarations of a function both specify bodies.
-            // Before we make that check, however, we need to deal
-            // with the case where the two function declarations
-            // might represent different target-specific versions
-            // of a function.
-            //
-            // TODO: if the two declarations are specialized for
-            // different targets, then skip the body checks below.
-
-            // If both of the declarations have a body, then there
-            // is trouble, because we wouldn't know which one to
-            // use during code generation.
-            if (funcDecl->Body && prevFuncDecl->Body)
-            {
-                // Redefinition
-                getSink()->diagnose(funcDecl, Diagnostics::functionRedefinition, funcDecl->getName());
-                getSink()->diagnose(prevFuncDecl, Diagnostics::seePreviousDefinitionOf, funcDecl->getName());
-
-                // Don't bother emitting other errors
-                break;
-            }
-
-            // At this point we've processed the redeclaration and
-            // put it into a group, so there is no reason to keep
-            // looping and looking at prior declarations.
-            return;
         }
     }
+
 
     void SemanticsDeclHeaderVisitor::visitParamDecl(ParamDecl* paramDecl)
     {
@@ -2456,22 +2573,10 @@ namespace Slang
         }
         funcDecl->ReturnType = resultType;
 
-
-        HashSet<Name*> paraNames;
         for (auto & para : funcDecl->GetParameters())
         {
             ensureDecl(para, DeclCheckState::ReadyForReference);
-
-            if (paraNames.Contains(para->getName()))
-            {
-                getSink()->diagnose(para, Diagnostics::parameterAlreadyDefined, para->getName());
-            }
-            else
-                paraNames.Add(para->getName());
         }
-
-        // One last bit of validation: check if we are redeclaring an existing function
-        ValidateFunctionRedeclaration(funcDecl);
     }
 
     IntegerLiteralValue SemanticsVisitor::GetMinBound(RefPtr<IntVal> val)
@@ -2936,8 +3041,12 @@ namespace Slang
             SemanticsDeclModifiersVisitor(shared).dispatch(decl);
             break;
 
-        case DeclCheckState::ReadyForReference:
+        case DeclCheckState::SignatureChecked:
             SemanticsDeclHeaderVisitor(shared).dispatch(decl);
+            break;
+
+        case DeclCheckState::ReadyForReference:
+            SemanticsDeclRedeclarationVisitor(shared).dispatch(decl);
             break;
 
         case DeclCheckState::ReadyForLookup:

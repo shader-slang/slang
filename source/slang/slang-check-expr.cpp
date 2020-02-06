@@ -435,6 +435,29 @@ namespace Slang
         return result;
     }
 
+    void SemanticsVisitor::diagnoseAmbiguousReference(OverloadedExpr* overloadedExpr, LookupResult const& lookupResult)
+    {
+        getSink()->diagnose(overloadedExpr, Diagnostics::ambiguousReference, lookupResult.items[0].declRef.GetName());
+
+        for(auto item : lookupResult.items)
+        {
+            String declString = getDeclSignatureString(item);
+            getSink()->diagnose(item.declRef, Diagnostics::overloadCandidate, declString);
+        }
+    }
+
+    void SemanticsVisitor::diagnoseAmbiguousReference(Expr* expr)
+    {
+        if( auto overloadedExpr = as<OverloadedExpr>(expr) )
+        {
+            diagnoseAmbiguousReference(overloadedExpr, overloadedExpr->lookupResult2);
+        }
+        else
+        {
+            getSink()->diagnose(expr, Diagnostics::ambiguousExpression);
+        }
+    }
+
     RefPtr<Expr> SemanticsVisitor::_resolveOverloadedExprImpl(RefPtr<OverloadedExpr> overloadedExpr, LookupMask mask, DiagnosticSink* diagSink)
     {
         auto lookupResult = overloadedExpr->lookupResult2;
@@ -474,13 +497,7 @@ namespace Slang
         //
         if( diagSink )
         {
-            getSink()->diagnose(overloadedExpr, Diagnostics::ambiguousReference, lookupResult.items[0].declRef.GetName());
-
-            for(auto item : lookupResult.items)
-            {
-                String declString = getDeclSignatureString(item);
-                getSink()->diagnose(item.declRef, Diagnostics::overloadCandidate, declString);
-            }
+            diagnoseAmbiguousReference(overloadedExpr, lookupResult);
 
             // TODO(tfoley): should we construct a new ErrorExpr here?
             return CreateErrorExpr(overloadedExpr);

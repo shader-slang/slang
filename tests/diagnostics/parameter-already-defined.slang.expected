@@ -1,6 +1,7 @@
 result code = -1
 standard error = {
-tests/diagnostics/parameter-already-defined.slang(4): error 30002: parameter 'a' already defined.
+tests/diagnostics/parameter-already-defined.slang(4): error 30200: declaration of 'a' conflicts with existing declaration
+tests/diagnostics/parameter-already-defined.slang(4): note: see previous declaration of 'a'
 }
 standard output = {
 }
