@@ -2026,7 +2026,7 @@ static bool _areNearlyEqual(double a, double b, double epsilon)
 
     // https://en.wikipedia.org/wiki/Double_precision_floating-point_format
     // 
-    const double minNormal = 2.2250738585072014e10-308;
+    const double minNormal = 2.2250738585072014e-308;
 
     // Either a or b are very close to being zero, so doing relative comparison isn't really appropriate
     if (a == 0.0 || b == 0.0 || (absA + absB < minNormal))
@@ -2058,7 +2058,7 @@ static void _calcLines(const UnownedStringSlice& slice, List<UnownedStringSlice>
     }
 }
 
-static SlangResult _compareWithType(const UnownedStringSlice& actual, const UnownedStringSlice& ref, double differenceThreshold = 0.001)
+static SlangResult _compareWithType(const UnownedStringSlice& actual, const UnownedStringSlice& ref, double differenceThreshold = 0.0001)
 {
     typedef slang::TypeReflection::ScalarType ScalarType;
 
