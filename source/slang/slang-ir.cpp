@@ -1703,7 +1703,7 @@ namespace Slang
             // Sign bit (top bit) will indicate positive or negative nan
             return value.intVal < 0 ? FloatKind::NegativeInfinity : FloatKind::PositiveInfinity;
         }
-        return FloatKind::Normal;
+        return FloatKind::Finite;
     }
 
     bool IRConstant::isValueEqual(IRConstant* rhs)

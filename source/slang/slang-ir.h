@@ -640,7 +640,7 @@ struct IRConstant : IRInst
 {
     enum class FloatKind
     {
-        Normal,
+        Finite,
         PositiveInfinity,
         NegativeInfinity,
         Nan,
