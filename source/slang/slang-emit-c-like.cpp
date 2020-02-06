@@ -756,9 +756,37 @@ void CLikeSourceEmitter::emitSimpleValueImpl(IRInst* inst)
                 case BaseType::Int16:
                 case BaseType::Int:
                 {
+                    // NOTE! This hack is required, otherwise we get different results across targets.
+                    // You'd hope that outputting L suffix would be enough to make this work, and not require a cast, but testing shows L suffix
+                    // does not have the same meaning across targets.
+                    //
+                    // For example
+                    // 
+                    // uint64_t v = 0x80000000;
+                    // 
+                    // When output this becomes...
+                    // v_0 = uint64_t(-2147483648L);
+                    // 
+                    // On MSVC/Gcc/Clang this is equal to 0x80000000, elsewhere it's 0xffffffff80000000 elsewhere.
+                    // Note that '-' isn't the issue because v0 = uint64_t(0x80000000L); produces the same issue
+                    // 
+                    // If we use a cast, we get the same result across targets (which is why the hack is here).
+                    //
+                    // Why? It's not clear - it seems likely that it's related to the order of how the promotion takes place.
+                    // 
+                    // If we convert from int32_t -> uint64_t, there are two possible scenarios
+                    // 1) int32_t -> int64_t -> uint64_t  (ie widen first then do sign type change)
+                    // 2) int32_t -> uint32_t -> uint64_t (ie do sign type change then widen)
+                    //
+                    // 2 would produce what we see on C++, 1 what we see everywhere else.
+                    // 
+                    // Why having a cast or having a suffix would make a difference though is not clear. It is also possible that the
+                    // L suffix is just ignored, and the literal is really a 'non typed' int literal in C++.
+
+                    m_writer->emit("int(");
                     m_writer->emit(litInst->value.intVal);
-                    m_writer->emit("L");
-                    break;
+                    m_writer->emit(")");
+                    return;
                 }
                 case BaseType::UInt8:
                 case BaseType::UInt16:

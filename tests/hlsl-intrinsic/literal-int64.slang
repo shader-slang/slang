@@ -12,10 +12,10 @@
 // That when making a conversion to a uint64_t, we expect first it to be widened
 // to an int64_t, before becoming a uint64_t.
 
-//TEST_INPUT:ubuffer(data=[0 0 0 0 0 0 0 0 0 0], stride=4):out,name outputBuffer
+//TEST_INPUT:ubuffer(data=[0 0 0 0 0 0 0 0 0 0 0 0 0 0], stride=4):out,name outputBuffer
 RWStructuredBuffer<uint64_t> outputBuffer;
 
-[numthreads(5, 1, 1)]
+[numthreads(7, 1, 1)]
 void computeMain(uint3 dispatchThreadID : SV_DispatchThreadID)
 {
     int idx = int64_t(dispatchThreadID.x);
@@ -44,9 +44,17 @@ void computeMain(uint3 dispatchThreadID : SV_DispatchThreadID)
         int64_t v0 = 0x80000000;
         v = v0;
     }
-    else
+    else if (idx == 4)
     {   // Should be 0xffffffff80000000
         v = 0x80000000;
+    }
+    else if (idx == 5)
+    {   // Should be 0xffffffff
+        v = ~0; 
+    }
+    else 
+    {   // Should be 0xffffffffffffffff
+        v = ~0LL; 
     }
     
     outputBuffer[idx] = v;

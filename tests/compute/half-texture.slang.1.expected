@@ -24,7 +24,7 @@ void computeMain(vector<uint,3> dispatchThreadID_0 : SV_DISPATCHTHREADID)
 #line 20
     vector<int,2> pos_0 = (vector<int,2>) dispatchThreadID_0.xy;
     float _S1 = 1.00000000000000000000 / 3.00000000000000000000;
-    vector<int,2> pos2_0 = vector<int,2>(3L - pos_0.y, 3L - pos_0.x);
+    vector<int,2> pos2_0 = vector<int,2>(int(3) - pos_0.y, int(3) - pos_0.x);
 
 #line 29
     half h_0 = halfTexture_0[(vector<uint,2>) pos2_0];
@@ -37,7 +37,7 @@ void computeMain(vector<uint,3> dispatchThreadID_0 : SV_DISPATCHTHREADID)
     halfTexture2_0[(vector<uint,2>) pos_0] = h4_0.xy;
     halfTexture4_0[(vector<uint,2>) pos_0] = vector<half,4>(h2_0, h_0, h_0);
 
-    int index_0 = pos_0.x + pos_0.y * 4L;
+    int index_0 = pos_0.x + pos_0.y * int(4);
     outputBuffer_0[(uint) index_0] = index_0;
 
 #line 18

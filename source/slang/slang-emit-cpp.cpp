@@ -1883,100 +1883,48 @@ void CPPSourceEmitter::emitSimpleFuncImpl(IRFunc* func)
 
 void CPPSourceEmitter::emitSimpleValueImpl(IRInst* inst)
 {
-    switch (inst->op)
+    if (inst->op == kIROp_FloatLit)
     {
-
-        case kIROp_IntLit:
+        IRConstant* constantInst = static_cast<IRConstant*>(inst);
+        switch (constantInst->getFloatKind())
         {
-            auto litInst = static_cast<IRConstant*>(inst);
-            IRBasicType* type = as<IRBasicType>(inst->getDataType());
-            if (type)
+            case IRConstant::FloatKind::Nan:
             {
-                switch (type->getBaseType())
-                {
-                    case BaseType::Int8:
-                    case BaseType::Int16:
-                    case BaseType::Int:
-                    {
-                        // NOTE! This hack is required, otherwise we get different results across targets.
-                        // That the CLikeSourceEmitter will put a L suffix, this should make the literal an int literal.
-                        //
-                        // uint64_t v = 0x80000000;
-                        // 
-                        // When output this becomes...
-                        // v_0 = uint64_t(-2147483648L);
-                        // 
-                        // On MSVC/Gcc/Clang this is equal to 0x80000000, elsewhere it's 0xffffffff80000000 elsewhere.
-                        // Note that '-' isn't the issue because v0 = uint64_t(0x80000000L); produces the same issue
-                        // 
-                        // If we use a cast, we get the same result across targets (which is why the hack is here).
-                        //
-                        // Why? It's not clear - it seems likely that it's related to the order of how the promotion takes place.
-                        // 
-                        // If we convert from int32_t -> uint64_t, there are two possible scenarios
-                        // 1) int32_t -> int64_t -> uint64_t  (ie widen first then do sign type change)
-                        // 2) int32_t -> uint32_t -> uint64_t (ie do sign type change then widen)
-                        //
-                        // 2 would produce what we see on C++, 1 what we see everywhere else.
-                        // 
-                        // Why having a cast or having a suffix would make a difference though is not clear. It is also possible that the
-                        // L suffix is just ignored, and the literal is really a 'non typed' int literal in C++.
-
-                        m_writer->emit("int(");
-                        m_writer->emit(litInst->value.intVal);
-                        m_writer->emit(")");
-                        return;
-                    }
-                    default: break;
-                }
+                // TODO(JS): 
+                // It's not clear this will work on all targets.
+                // In particular Visual Studio reports an error with this expression. 
+                m_writer->emit("(0.0 / 0.0)");
+                break;
             }
-            break;
-        }
-
-        case kIROp_FloatLit:
-        {
-            IRConstant* constantInst = static_cast<IRConstant*>(inst);
-
-            IRConstant::FloatKind kind = constantInst->getFloatKind();
-
-            switch (kind)
+            case IRConstant::FloatKind::PositiveInfinity:
             {
-                case IRConstant::FloatKind::Nan:
-                {
-                    // It's not clear this will work on all targets.
-                    // In particular Visual Studio reports an error with this expression. 
-                    m_writer->emit("(0.0 / 0.0)");
-                    break;
-                }
-                case IRConstant::FloatKind::PositiveInfinity:
-                {
-                    m_writer->emit("SLANG_INFINITY");
-                    break;
-                }
-                case IRConstant::FloatKind::NegativeInfinity:
-                {
-                    m_writer->emit("(-SLANG_INFINITY)");
-                    break;
-                }
-                default:
-                {
-                    m_writer->emit(constantInst->value.floatVal);
-
-                    // If the literal is a float, then we need to add 'f' at end
-                    IRType* type = constantInst->getDataType();
-                    if (type && type->op == kIROp_FloatType)
-                    {
-                        m_writer->emitChar('f');
-                    }
-                    break;
-                }
+                m_writer->emit("SLANG_INFINITY");
+                break;
             }
-            return;
+            case IRConstant::FloatKind::NegativeInfinity:
+            {
+                m_writer->emit("(-SLANG_INFINITY)");
+                break;
+            }
+            default:
+            {
+                m_writer->emit(constantInst->value.floatVal);
+
+                // If the literal is a float, then we need to add 'f' at end, as
+                // without literal suffix the value defaults to double.
+                IRType* type = constantInst->getDataType();
+                if (type && type->op == kIROp_FloatType)
+                {
+                    m_writer->emitChar('f');
+                }
+                break;
+            }
         }
-        default: break;
     }
-
-    Super::emitSimpleValueImpl(inst);
+    else
+    {
+        Super::emitSimpleValueImpl(inst);
+    }
 }
 
 void CPPSourceEmitter::emitVectorTypeNameImpl(IRType* elementType, IRIntegerValue elementCount)

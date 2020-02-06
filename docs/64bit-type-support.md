@@ -34,27 +34,28 @@ Special attention has to be made with respect to literal 64 bit types. By defaul
 
 double a = 1.34e-200L;
 // WRONG!: This is the same as b = double(float(1.34e-200)) which will be 0. Will produce a warning.
-double b = 1.34e-200;
+double b = 1.34e-200; 
 
 // int64_t - 'll' or 'LL' (or combination of upper/lower)
 
 int64_t c = -5436365345345234ll;
-// WRONG!: This is the same as d = int64_t(int32_t(-5436365345345234)) which means d ! = -5436365345345234LL
-int64_t d = -5436365345345234;
+// WRONG!: This is the same as d = int64_t(int32_t(-5436365345345234)) which means d ! = -5436365345345234LL. 
+// Will produce a warning.
+int64_t d = -5436365345345234;      
 
 int64_t e = ~0LL;       // Same as 0xffffffffffffffff
-// WRONG!: Is the same as 0x00000000ffffffff, because equivalent of int64_t(~int32_t(0));
+// Does produce the same result as 'e' because equivalent int64_t(~int32_t(0))
 int64_t f = ~0;         
 
 // uint64_t - 'ull' or 'ULL' (or combination of upper/lower)
 
 uint64_t g = 0x8000000000000000ull; 
 // WRONG!: This is the same as h = uint64_t(uint32_t(0x8000000000000000)) which means h = 0
-uint64_t h = 0x8000000000000000u; 
+// Will produce a warning.
+uint64_t h = 0x8000000000000000u;   
 
 uint64_t i = ~0ull;       // Same as 0xffffffffffffffff
-// WRONG!: Will be 0x00000000ffffffff, because equivalent of uint64_t(~uint32_t(0));
-int64_t j = ~0;         
+uint64_t j = ~0;          // Equivalent to 'i' because uint64_t(int64_t(~int32_t(0)));
 ```
 
 These issues are discussed more on issue [#1185](https://github.com/shader-slang/slang/issues/1185)
