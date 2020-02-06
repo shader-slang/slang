@@ -5,6 +5,13 @@
 
 namespace Slang
 {
+    // Some handy constants
+
+    // The largest positive (or negative) number 
+#   define SLANG_HALF_MAX 65504.0f
+    // Smallest (denormalized) value. 1 / 2^24
+#   define SLANG_HALF_SUB_NORMAL_MIN (1.0f / 16777216.0f)
+
 	class Math
 	{
 	public:
@@ -20,6 +27,13 @@ namespace Slang
 
         
 		static const float Pi;
+
+        template <typename T>
+        static T Abs(T a)
+        {
+            return (a < 0) ? -a : a;
+        }
+
 		template<typename T>
 		static T Min(const T& v1, const T&v2)
 		{

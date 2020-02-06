@@ -1674,6 +1674,38 @@ namespace Slang
         }
     }
 
+    bool IRConstant::isFinite() const
+    {
+        SLANG_ASSERT(op == kIROp_FloatLit);
+        
+        // Lets check we can analyze as double, at least in principal
+        SLANG_COMPILE_TIME_ASSERT(sizeof(IRFloatingPointValue) == sizeof(double));
+        // We are in effect going to type pun (yay!), lets make sure they are the same size
+        SLANG_COMPILE_TIME_ASSERT(sizeof(IRIntegerValue) == sizeof(IRFloatingPointValue));
+
+        const uint64_t i = uint64_t(value.intVal);
+        int e = int(i >> 52) & 0x7ff;
+        return (e != 0x7ff);
+    }
+
+    IRConstant::FloatKind IRConstant::getFloatKind() const
+    {
+        SLANG_ASSERT(op == kIROp_FloatLit);
+
+        const uint64_t i = uint64_t(value.intVal);
+        int e = int(i >> 52) & 0x7ff;
+        if ( e == 0x7ff)
+        {
+            if (i << 12)
+            {
+                return FloatKind::Nan;
+            }
+            // Sign bit (top bit) will indicate positive or negative nan
+            return value.intVal < 0 ? FloatKind::NegativeInfinity : FloatKind::PositiveInfinity;
+        }
+        return FloatKind::Finite;
+    }
+
     bool IRConstant::isValueEqual(IRConstant* rhs)
     {
         // If they are literally the same thing.. 

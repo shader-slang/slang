@@ -22,6 +22,10 @@
 
 #define SLANG_PRELUDE_EXPORT SLANG_PRELUDE_EXTERN_C SLANG_PRELUDE_SHARED_LIB_EXPORT
 
+#ifndef SLANG_INFINITY
+#   define SLANG_INFINITY   INFINITY
+#endif
+
 #include "slang-cpp-types.h"
 #include "slang-cpp-scalar-intrinsics.h"
 

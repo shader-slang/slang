@@ -1,0 +1,9 @@
+result code = 0
+standard error = {
+tests/diagnostics/float-literal.slang(7): warning 39999: float literal '5e+40' unrepresentable, converted to 'inf'
+tests/diagnostics/float-literal.slang(9): warning 39999: '9e-50' is smaller than the smallest representable value for type float, converted to '0'
+tests/diagnostics/float-literal.slang(19): warning 39999: float literal '5e+40' unrepresentable, converted to 'inf'
+tests/diagnostics/float-literal.slang(20): warning 39999: '9e-50' is smaller than the smallest representable value for type float, converted to '0'
+}
+standard output = {
+}

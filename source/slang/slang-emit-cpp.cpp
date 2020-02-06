@@ -1883,23 +1883,47 @@ void CPPSourceEmitter::emitSimpleFuncImpl(IRFunc* func)
 
 void CPPSourceEmitter::emitSimpleValueImpl(IRInst* inst)
 {
-    switch (inst->op)
+    if (inst->op == kIROp_FloatLit)
     {
-        case kIROp_FloatLit:
+        IRConstant* constantInst = static_cast<IRConstant*>(inst);
+        switch (constantInst->getFloatKind())
         {
-            IRConstant* constantInst = static_cast<IRConstant*>(inst);
-
-            m_writer->emit(constantInst->value.floatVal);
-
-            // If the literal is a float, then we need to add 'f' at end
-            IRType* type = constantInst->getDataType();
-            if (type && type->op == kIROp_FloatType )
+            case IRConstant::FloatKind::Nan:
             {
-                m_writer->emitChar('f');
+                // TODO(JS): 
+                // It's not clear this will work on all targets.
+                // In particular Visual Studio reports an error with this expression. 
+                m_writer->emit("(0.0 / 0.0)");
+                break;
             }
-            break;
+            case IRConstant::FloatKind::PositiveInfinity:
+            {
+                m_writer->emit("SLANG_INFINITY");
+                break;
+            }
+            case IRConstant::FloatKind::NegativeInfinity:
+            {
+                m_writer->emit("(-SLANG_INFINITY)");
+                break;
+            }
+            default:
+            {
+                m_writer->emit(constantInst->value.floatVal);
+
+                // If the literal is a float, then we need to add 'f' at end, as
+                // without literal suffix the value defaults to double.
+                IRType* type = constantInst->getDataType();
+                if (type && type->op == kIROp_FloatType)
+                {
+                    m_writer->emitChar('f');
+                }
+                break;
+            }
         }
-        default: Super::emitSimpleValueImpl(inst);
+    }
+    else
+    {
+        Super::emitSimpleValueImpl(inst);
     }
 }
 

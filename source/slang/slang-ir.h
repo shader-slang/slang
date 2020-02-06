@@ -638,6 +638,14 @@ typedef double IRFloatingPointValue;
 
 struct IRConstant : IRInst
 {
+    enum class FloatKind
+    {
+        Finite,
+        PositiveInfinity,
+        NegativeInfinity,
+        Nan,
+    };
+
     struct StringValue
     {   
         uint32_t numChars;           ///< The number of chars
@@ -664,6 +672,13 @@ struct IRConstant : IRInst
 
         /// Returns a string slice (or empty string if not appropriate)
     UnownedStringSlice getStringSlice();
+
+         /// Returns the kind of floating point value we have
+    FloatKind getFloatKind() const;
+
+        /// Returns true if the value is finite.
+        /// NOTE! Only works on floating point types
+    bool isFinite() const;
 
         /// True if constants are equal
     bool equal(IRConstant* rhs);

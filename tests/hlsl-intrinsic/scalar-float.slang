@@ -14,7 +14,6 @@ void computeMain(uint3 dispatchThreadID : SV_DispatchThreadID)
     
     float f = idx * (1.0f / (4.0f));
 
-    int it = 0;
     float ft = 0.0f;
     
     // fmod

@@ -5,7 +5,7 @@ Slang 64-bit Type Support
 
 * Not all targets support 64 bit types, or all 64 bit types 
   * 64 bit integers generally require later APIs/shader models
-* When specifying 64 bit literals *always* use the type suffixes (ie `l`, `ull`, `ll`) 
+* When specifying 64 bit literals *always* use the type suffixes (ie `L`, `ULL`, `LL`) 
 * GPU target/s generally do not support all double intrinsics 
   * Typically missing are trascendentals (sin, cos etc), logarithm and exponental functions
   * CUDA is the exception supporting nearly all double intrinsics
@@ -27,39 +27,36 @@ This also applies to vector and matrix versions of these types.
 
 Unfortunately if a specific target supports the type or the typical HLSL instrinsic functions (such as sin/cos/max/min etc) depends very much on the target. 
 
-Special attention has to be made with respect to literal 64 bit types. By default float and integer literals if they do not have an explicit postfix are assumed to be 32 bit. There is a variety of reasons for this design choice - the main one being around by default getting good performance. The postfixes required for 64 bit types are as follows
+Special attention has to be made with respect to literal 64 bit types. By default float and integer literals if they do not have an explicit suffix are assumed to be 32 bit. There is a variety of reasons for this design choice - the main one being around by default behavior of getting good performance. The suffixes required for 64 bit types are as follows
 
 ```
 // double - 'l' or 'L'
 
 double a = 1.34e-200L;
-// WRONG!: This is the same as b = double(float(1.34e-200)) which will be 0
-double b = 1.34e-200;
+// WRONG!: This is the same as b = double(float(1.34e-200)) which will be 0. Will produce a warning.
+double b = 1.34e-200; 
 
 // int64_t - 'll' or 'LL' (or combination of upper/lower)
 
 int64_t c = -5436365345345234ll;
-// WRONG!: This is the same as d = int64_t(int32_t(-5436365345345234)) which means d ! = -5436365345345234LL
-int64_t d = -5436365345345234;
+// WRONG!: This is the same as d = int64_t(int32_t(-5436365345345234)) which means d ! = -5436365345345234LL. 
+// Will produce a warning.
+int64_t d = -5436365345345234;      
 
 int64_t e = ~0LL;       // Same as 0xffffffffffffffff
-// WRONG!: Probably, is the same as 0x00000000ffffffff, because equivalent of int64_t(~int32_t(0));
+// Does produce the same result as 'e' because equivalent int64_t(~int32_t(0))
 int64_t f = ~0;         
 
 // uint64_t - 'ull' or 'ULL' (or combination of upper/lower)
 
 uint64_t g = 0x8000000000000000ull; 
 // WRONG!: This is the same as h = uint64_t(uint32_t(0x8000000000000000)) which means h = 0
-uint64_t h = 0x8000000000000000u; 
+// Will produce a warning.
+uint64_t h = 0x8000000000000000u;   
 
 uint64_t i = ~0ull;       // Same as 0xffffffffffffffff
-// WRONG!: Will be 0x00000000ffffffff, because equivalent of uint64_t(~uint32_t(0));
-int64_t j = ~0;         
+uint64_t j = ~0;          // Equivalent to 'i' because uint64_t(int64_t(~int32_t(0)));
 ```
-
-Currently the compiler does not give a warning about the narrowing, to the 32 bit types. 
-
-NOTE! There is also arguably a bug around the behavior described above. In the 'wrong' scenarios above it is described as if the lack of the post fix means that the literal will *necessarily* be interpretted as a 32 bit type. This isn't actually the case - the truth is more nuanced, sometimes it will be interpretted as 32 bits but sometimes it will not. For this reason it is suggested, until something is done about this issue all 64 bit literals be written with the appropriate postfix.
 
 These issues are discussed more on issue [#1185](https://github.com/shader-slang/slang/issues/1185)
 

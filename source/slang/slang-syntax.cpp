@@ -236,7 +236,7 @@ void Type::accept(IValVisitor* visitor, void* extra)
 
     Type* Session::getBuiltinType(BaseType flavor)
     {
-        return RefPtr<Type>(builtinTypes[(int)flavor]);
+        return builtinTypes[int(flavor)];
     }
 
     Type* Session::getInitializerListType()

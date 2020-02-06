@@ -87,6 +87,8 @@ namespace Slang
     void printDiagnosticArg(StringBuilder& sb, int64_t val);
     void printDiagnosticArg(StringBuilder& sb, uint64_t val);
 
+    void printDiagnosticArg(StringBuilder& sb, double val);
+
     void printDiagnosticArg(StringBuilder& sb, Slang::String const& str);
     void printDiagnosticArg(StringBuilder& sb, Slang::UnownedStringSlice const& str);
     void printDiagnosticArg(StringBuilder& sb, Name* name);

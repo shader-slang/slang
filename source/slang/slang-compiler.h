@@ -1922,6 +1922,34 @@ namespace Slang
     struct TypeCheckingCache;
     //
 
+    // Information about BaseType that's useful for checking literals 
+    struct BaseTypeInfo
+    {
+        typedef uint8_t Flags;
+        struct Flag 
+        {
+            enum Enum : Flags
+            {
+                Signed = 0x1,
+                FloatingPoint = 0x2,
+                Integer = 0x4,
+            };
+        };
+
+        SLANG_FORCE_INLINE static const BaseTypeInfo& getInfo(BaseType baseType) { return s_info[Index(baseType)]; }
+
+        static UnownedStringSlice asText(BaseType baseType);
+
+        uint8_t sizeInBytes;               ///< Size of type in bytes
+        Flags flags;
+        uint8_t baseType;
+
+        static bool check();
+
+    private:
+        static const BaseTypeInfo s_info[Index(BaseType::CountOf)];
+    };
+
     class Session : public RefObject, public slang::IGlobalSession
     {
     public:
@@ -2014,7 +2042,7 @@ namespace Slang
         RefPtr<Type> enumTypeType;
 
         
-        Dictionary<int, RefPtr<Type>> builtinTypes;
+        RefPtr<Type> builtinTypes[Index(BaseType::CountOf)];
         Dictionary<String, Decl*> magicDecls;
 
         void initializeTypes();

@@ -43,6 +43,11 @@ void printDiagnosticArg(StringBuilder& sb, uint64_t val)
     sb << val;
 }
 
+void printDiagnosticArg(StringBuilder& sb, double val)
+{
+    sb << val;
+}
+
 void printDiagnosticArg(StringBuilder& sb, Slang::String const& str)
 {
     sb << str;

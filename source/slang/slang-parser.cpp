@@ -1,6 +1,7 @@
 #include "slang-parser.h"
 
 #include <assert.h>
+#include <float.h>
 
 #include "slang-compiler.h"
 #include "slang-lookup.h"
@@ -3871,6 +3872,20 @@ namespace Slang
         return parseBoolLitExpr(parser, false);
     }
 
+    static bool _isFinite(double value)
+    {
+        // Lets type pun double to uint64_t, so we can detect special double values
+        union
+        {
+            double d;
+            uint64_t i;
+        } u = { value };
+        // Detects nan and +-inf
+        const uint64_t i = u.i;
+        int e = int(i >> 52) & 0x7ff;
+        return (e != 0x7ff);
+    }
+
     static RefPtr<Expr> parseAtomicExpr(Parser* parser)
     {
         switch( peekTokenType(parser) )
@@ -3961,9 +3976,14 @@ namespace Slang
                 char const* suffixCursor = suffix.begin();
                 const char*const suffixEnd = suffix.end();
 
-                RefPtr<Type> suffixType = nullptr;
+                // If no suffix is defined go with the default
+                BaseType suffixBaseType = BaseType::Int;
+
                 if( suffixCursor < suffixEnd )
                 {
+                    // Mark as void, taken as an error
+                    suffixBaseType = BaseType::Void;
+
                     int lCount = 0;
                     int uCount = 0;
                     int unknownCount = 0;
@@ -3988,35 +4008,84 @@ namespace Slang
                     if(unknownCount)
                     {
                         parser->sink->diagnose(token, Diagnostics::invalidIntegerLiteralSuffix, suffix);
-                        suffixType = parser->getSession()->getErrorType();
+                        suffixBaseType = BaseType::Void;
                     }
                     // `u` or `ul` suffix -> `uint`
                     else if(uCount == 1 && (lCount <= 1))
                     {
-                        suffixType = parser->getSession()->getUIntType();
+                        suffixBaseType = BaseType::UInt;
                     }
                     // `l` suffix on integer -> `int` (== `long`)
                     else if(lCount == 1 && !uCount)
                     {
-                        suffixType = parser->getSession()->getIntType();
+                        suffixBaseType = BaseType::Int; 
                     }
                     // `ull` suffix -> `uint64_t`
                     else if(uCount == 1 && lCount == 2)
                     {
-                        suffixType = parser->getSession()->getUInt64Type();
+                        suffixBaseType = BaseType::UInt64;
                     }
                     // `ll` suffix -> `int64_t`
                     else if(uCount == 0 && lCount == 2)
                     {
-                        suffixType = parser->getSession()->getInt64Type();
+                        suffixBaseType = BaseType::Int64;
                     }
                     // TODO: do we need suffixes for smaller integer types?
                     else
                     {
                         parser->sink->diagnose(token, Diagnostics::invalidIntegerLiteralSuffix, suffix);
-                        suffixType = parser->getSession()->getErrorType();
+                        suffixBaseType = BaseType::Void;
                     }
                 }
+
+                // TODO(JS):
+                // It is worth noting here that because of the way that the lexer works, that literals
+                // are always handled as if they are positive (a preceding - is taken as a negate on a
+                // positive value).
+                // The code here is designed to work with positive and negative values, as this behavior
+                // might change in the future, and is arguably more 'correct'.
+
+                const BaseTypeInfo& info = BaseTypeInfo::getInfo(suffixBaseType);
+                SLANG_ASSERT(info.flags & BaseTypeInfo::Flag::Integer);
+                SLANG_COMPILE_TIME_ASSERT(sizeof(value) == sizeof(uint64_t));
+
+                // If the type is 64 bits, do nothing, we'll assume all is good
+                if (suffixBaseType != BaseType::Void && info.sizeInBytes != sizeof(value))
+                {
+                    const IntegerLiteralValue signBit = IntegerLiteralValue(1) << (8 * info.sizeInBytes - 1);
+                    // Same as (~IntegerLiteralValue(0)) << (8 * info.sizeInBytes);, without the need for variable shift
+                    const IntegerLiteralValue mask = -(signBit + signBit);
+
+                    IntegerLiteralValue truncatedValue = value;
+                    // If it's signed, and top bit is set, sign extend it negative
+                    if (info.flags & BaseTypeInfo::Flag::Signed)
+                    {
+                        // Sign extend
+                        truncatedValue = (value & signBit) ? (value | mask) : (value & ~mask);
+                    }
+                    else
+                    {
+                        // 0 top bits
+                        truncatedValue = value & ~mask;
+                    }
+
+                    const IntegerLiteralValue maskedValue = value & mask;
+
+                    // If the masked value is 0 or equal to the mask, we 'assume' no information is
+                    // lost
+                    // This allows for example -1u, to give 0xffffffff
+                    // It also means 0xfffffffffffffffffu will give 0xffffffff, without a warning.
+                    if (!(maskedValue == 0 || maskedValue == mask))
+                    {
+                        // Output a warning that number has been altered
+                        parser->sink->diagnose(token, Diagnostics::integerLiteralTruncated, token.Content, BaseTypeInfo::asText(suffixBaseType), truncatedValue);
+                    }
+
+                    value = truncatedValue;
+                }
+
+                auto session = parser->getSession();
+                Type* suffixType = (suffixBaseType == BaseType::Void) ? session->getErrorType() : session->getBuiltinType(suffixBaseType);
 
                 constExpr->value = value;
                 constExpr->type = QualType(suffixType);
@@ -4040,7 +4109,9 @@ namespace Slang
                 char const* suffixCursor = suffix.begin();
                 const char*const suffixEnd = suffix.end();
 
-                RefPtr<Type> suffixType = nullptr;
+ 
+                // Default is Float
+                BaseType suffixBaseType = BaseType::Float;
                 if( suffixCursor < suffixEnd )
                 {
                     int fCount = 0;
@@ -4072,32 +4143,105 @@ namespace Slang
                     if (unknownCount)
                     {
                         parser->sink->diagnose(token, Diagnostics::invalidFloatingPointLiteralSuffix, suffix);
-                        suffixType = parser->getSession()->getErrorType();
+                        suffixBaseType = BaseType::Void;
                     }
                     // `f` suffix -> `float`
                     if(fCount == 1 && !lCount && !hCount)
                     {
-                        suffixType = parser->getSession()->getFloatType();
+                        suffixBaseType = BaseType::Float;
                     }
                     // `l` or `lf` suffix on floating-point literal -> `double`
                     else if(lCount == 1 && (fCount <= 1))
                     {
-                        suffixType = parser->getSession()->getDoubleType();
+                        suffixBaseType = BaseType::Double;
                     }
                     // `h` or `hf` suffix on floating-point literal -> `half`
                     else if(hCount == 1 && (fCount <= 1))
                     {
-                        suffixType = parser->getSession()->getHalfType();
+                        suffixBaseType = BaseType::Half;
                     }
                     // TODO: are there other suffixes we need to handle?
                     else
                     {
                         parser->sink->diagnose(token, Diagnostics::invalidFloatingPointLiteralSuffix, suffix);
-                        suffixType = parser->getSession()->getErrorType();
+                        suffixBaseType = BaseType::Void;
                     }
                 }
 
-                constExpr->value = value;
+                // TODO(JS):
+                // It is worth noting here that because of the way that the lexer works, that literals
+                // are always handled as if they are positive (a preceding - is taken as a negate on a
+                // positive value).
+                // The code here is designed to work with positive and negative values, as this behavior
+                // might change in the future, and is arguably more 'correct'.
+
+                FloatingPointLiteralValue fixedValue = value;
+
+                // Check the value is finite for checking narrowing to literal type losing information
+                if (_isFinite(fixedValue))
+                {
+                    switch (suffixBaseType)
+                    {
+                        case BaseType::Float:
+                        {
+                            // Fix out of range
+                            if (fixedValue > FLT_MAX)
+                            {
+                                fixedValue = float(INFINITY);
+                            }
+                            else if (fixedValue < -FLT_MAX)
+                            {
+                                fixedValue = -float(INFINITY);
+                            }
+                            else if (fixedValue && float(fixedValue) == 0.0f)
+                            {
+                                fixedValue = 0.0f;
+                            }
+                            break;
+                        }
+                        case BaseType::Double:
+                        {
+                            break;
+                        }
+                        case BaseType::Half:
+                        {
+                            // Fix out of range
+                            if (fixedValue > SLANG_HALF_MAX)
+                            {
+                                fixedValue = float(INFINITY);
+                            }
+                            else if (fixedValue < -SLANG_HALF_MAX)
+                            {
+                                fixedValue = -float(INFINITY);
+                            }
+                            else if (fixedValue && Math::Abs(fixedValue) < SLANG_HALF_SUB_NORMAL_MIN)
+                            {
+                                fixedValue = 0.0f;
+                            }
+                            break;
+                        }
+                        default: break;
+                    }
+
+
+                    if (fixedValue != value)
+                    {
+                        if (fixedValue == 0.0)
+                        {
+                            parser->sink->diagnose(token, Diagnostics::floatLiteralTooSmall, BaseTypeInfo::asText(suffixBaseType), token.Content, fixedValue);
+                        }
+                        else
+                        {
+                            parser->sink->diagnose(token, Diagnostics::floatLiteralUnrepresentable, BaseTypeInfo::asText(suffixBaseType), token.Content, fixedValue);
+                        }
+                    }
+                }
+
+                Session* session = parser->getSession();
+
+                Type* suffixType = (suffixBaseType == BaseType::Void) ? session->getErrorType() : session->getBuiltinType(suffixBaseType);
+
+                constExpr->value = fixedValue;
                 constExpr->type = QualType(suffixType);
 
                 return constExpr;

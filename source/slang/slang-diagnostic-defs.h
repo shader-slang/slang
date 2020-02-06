@@ -317,6 +317,8 @@ DIAGNOSTIC(30600, Error, varWithoutTypeMustHaveInitializer, "a variable declarat
 // 307xx: parameters
 DIAGNOSTIC(30700, Error, outputParameterCannotHaveDefaultValue, "an 'out' or 'inout' parameter cannot have a default-value expression");
 
+// 39999 waiting to be placed in the right range
+
 DIAGNOSTIC(39999, Error, expectedIntegerConstantWrongType, "expected integer constant (found: '$0')")
 DIAGNOSTIC(39999, Error, expectedIntegerConstantNotConstant, "expression does not evaluate to a compile-time constant")
 DIAGNOSTIC(39999, Error, expectedIntegerConstantNotLiteral, "could not extract value from integer constant")
@@ -345,7 +347,6 @@ DIAGNOSTIC(39999, Error, ambiguousExpression, "ambiguous reference");
 
 DIAGNOSTIC(39999, Error, declarationDidntDeclareAnything, "declaration does not declare anything");
 
-
 DIAGNOSTIC(39999, Error, expectedPrefixOperator, "function called as prefix operator was not declared `__prefix`")
 DIAGNOSTIC(39999, Error, expectedPostfixOperator, "function called as postfix operator was not declared `__postfix`")
 
@@ -355,7 +356,11 @@ DIAGNOSTIC(39999, Error, tooManyArguments, "too many arguments to call (got $0, 
 DIAGNOSTIC(39999, Error, invalidIntegerLiteralSuffix, "invalid suffix '$0' on integer literal")
 DIAGNOSTIC(39999, Error, invalidFloatingPointLiteralSuffix, "invalid suffix '$0' on floating-point literal")
 
+DIAGNOSTIC(39999, Warning, integerLiteralTruncated, "integer literal '$0' too large for type '$1' truncated to '$2'")
+DIAGNOSTIC(39999, Warning, floatLiteralUnrepresentable, "$0 literal '$1' unrepresentable, converted to '$2'")
+DIAGNOSTIC(39999, Warning, floatLiteralTooSmall, "'$1' is smaller than the smallest representable value for type $0, converted to '$2'")
 
+// 38xxx 
 
 DIAGNOSTIC(38000, Error, entryPointFunctionNotFound, "no function found matching entry point name '$0'")
 DIAGNOSTIC(38001, Error, ambiguousEntryPoint, "more than one function matches entry point name '$0'")
