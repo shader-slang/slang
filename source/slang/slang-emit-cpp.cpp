@@ -1145,10 +1145,18 @@ void CPPSourceEmitter::_emitConstructConvertDefinition(const UnownedStringSlice&
     emitType(retType);
     writer->emit("{ ");
 
+  
     IRType* dstElemType = _getElementType(retType);
     //IRType* srcElemType = _getElementType(srcType);
 
     TypeDimension dim = _getTypeDimension(srcType, false);
+
+    UnownedStringSlice rowTypeName;
+    if (dim.rowCount > 1)
+    {
+        IRType* rowType = m_typeSet.addVectorType(dstElemType, int(dim.colCount));
+        rowTypeName = _getTypeName(rowType);
+    }
 
     for (int i = 0; i < dim.rowCount; ++i)
     {
@@ -1158,6 +1166,7 @@ void CPPSourceEmitter::_emitConstructConvertDefinition(const UnownedStringSlice&
             {
                 writer->emit(", \n");
             }
+            writer->emit(rowTypeName);
             writer->emit("{ ");
         }
 
