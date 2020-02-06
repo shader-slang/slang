@@ -9,29 +9,30 @@
 //TEST_INPUT:ubuffer(data=[0 0 0 0], stride=4):out,name outputBuffer
 RWStructuredBuffer<float> outputBuffer;
 
-typedef matrix<float, 2, 2> FloatType;
-typedef matrix<int, 2, 2> IntType;
-typedef matrix<uint, 2, 2> UIntType;
+typedef matrix<float, 2, 2> FloatMatrix;
+typedef matrix<int, 2, 2> IntMatrix;
+typedef matrix<uint, 2, 2> UIntMatrix;
+typedef vector<float, 2> FloatVector;
 
 float calcTotal(vector<float, 2> v)
 {
     return v.x + v.y;
 }
 
-float calcTotal(FloatType v) 
+float calcTotal(FloatMatrix v) 
 { 
     return calcTotal(v[0]) + calcTotal(v[1]);
 }
 
-FloatType makeFloatType(float f)
+FloatMatrix makeFloatMatrix(float f)
 {
-    FloatType m = { { f, f }, { f, f } };
+    FloatMatrix m = { { f, f }, { f, f } };
     return m;
 }
 
-IntType makeIntType(int v)
+IntMatrix makeIntMatrix(int v)
 {
-    IntType m = { { v, v }, { v, v } };
+    IntMatrix m = { { v, v }, { v, v } };
     return m;
 }
 
@@ -42,15 +43,27 @@ void computeMain(uint3 dispatchThreadID : SV_DispatchThreadID)
 
     float scalarF = idx * (1.0f / (4.0f));
 
-    FloatType ft = {}; 
+    FloatMatrix ft = {}; 
 
-    FloatType f = { { scalarF + 0.01, scalarF * 0.2f}, { scalarF * 0.3f, scalarF + 0.1f}};
+    FloatMatrix f = { { scalarF + 0.01, scalarF + 0.02f}, { scalarF + 0.011f, scalarF + 0.022f}};
     
     // fmod
-    ft += FloatType(IntType(((f % makeFloatType(0.11f)) * makeFloatType(100)) + makeFloatType(0.5)));
+    ft += FloatMatrix(IntMatrix(((f % makeFloatMatrix(0.11f)) * makeFloatMatrix(100)) + makeFloatMatrix(0.5)));
     
     ft += sin(f);
       
+    // Lets try some matrix/matrix
+    ft = f * ft;
+    
+    // Lets try some vector matrix
+    
+    {
+        FloatMatrix r = {mul(f[0], ft), mul(ft, f[1])};
+        ft += r;
+    }
+    
+    // Back to the transcendentals
+   
     ft += cos(f);
     ft += tan(f);
     
@@ -58,12 +71,12 @@ void computeMain(uint3 dispatchThreadID : SV_DispatchThreadID)
     ft += acos(f);
     ft += atan(f);
     
-    ft += atan2(f, makeFloatType(2)); 
+    ft += atan2(f, makeFloatMatrix(2)); 
 
 #if 0
     // This fails from DXC with a validation error(!)
     {
-        FloatType sf, cf;
+        FloatMatrix sf, cf;
         sincos(f, sf, cf);
         
         ft += sf;
@@ -71,51 +84,49 @@ void computeMain(uint3 dispatchThreadID : SV_DispatchThreadID)
     }
 #endif 
     
-    ft += rcp(makeFloatType(1.0) + f);
-    ft += FloatType(sign(f - makeFloatType(0.5)));
+    ft += rcp(makeFloatMatrix(1.0) + f);
+    ft += FloatMatrix(sign(f - makeFloatMatrix(0.5)));
    
-    ft += saturate(f * makeFloatType(4) - makeFloatType(2.0));
+    ft += saturate(f * makeFloatMatrix(4) - makeFloatMatrix(2.0));
     
     ft += sqrt(f);
-    ft += rsqrt(makeFloatType(1.0f) + f);
+    ft += rsqrt(makeFloatMatrix(1.0f) + f);
     
     ft += exp2(f);
     ft += exp(f);
                 
-    ft += frac(f * makeFloatType(3));
-    ft += ceil(f * makeFloatType(5) - makeFloatType(3));
+    ft += frac(f * makeFloatMatrix(3));
+    ft += ceil(f * makeFloatMatrix(5) - makeFloatMatrix(3));
     
-    ft += floor(f * makeFloatType(10) - makeFloatType(7));
-    ft += trunc(f * makeFloatType(7));
+    ft += floor(f * makeFloatMatrix(10) - makeFloatMatrix(7));
+    ft += trunc(f * makeFloatMatrix(7));
      
-   
-    ft += log(f + makeFloatType(10.0));
-    ft += log2(f * makeFloatType(3) + makeFloatType(2));
+    ft += log(f + makeFloatMatrix(10.0));
+    ft += log2(f * makeFloatMatrix(3) + makeFloatMatrix(2));
 
     {
         float scalarVs[] = { 1, 10, 100, 1000 };
-        ft += FloatType(IntType(log10(makeFloatType(scalarVs[idx])) + makeFloatType(0.5f)));
+        ft += FloatMatrix(IntMatrix(log10(makeFloatMatrix(scalarVs[idx])) + makeFloatMatrix(0.5f)));
     }
        
-    ft += abs(f * makeFloatType(4) - makeFloatType(2.0f));
+    ft += abs(f * makeFloatMatrix(4) - makeFloatMatrix(2.0f));
     
-    ft += min(makeFloatType(0.5), f);
-    ft += max(f, makeFloatType(0.75));
+    ft += min(makeFloatMatrix(0.5), f);
+    ft += max(f, makeFloatMatrix(0.75));
 
-    ft += pow(makeFloatType(0.5), f);
+    ft += pow(makeFloatMatrix(0.5), f);
 
-    ft += smoothstep(makeFloatType(0.2), makeFloatType(0.7), f);
-    ft += lerp(makeFloatType(-100), makeFloatType(100), f);
+    ft += smoothstep(makeFloatMatrix(0.2), makeFloatMatrix(0.7), f);
+    ft += lerp(makeFloatMatrix(-100), makeFloatMatrix(100), f);
 
-    ft += clamp(f, makeFloatType(0.1), makeFloatType(0.3));
+    ft += clamp(f, makeFloatMatrix(0.1), makeFloatMatrix(0.3));
 
-    ft += step(f, makeFloatType(0.5));
+    ft += step(f, makeFloatMatrix(0.5));
 
-    IntType vi = asint(f - f) + makeIntType(idx);
+    IntMatrix vi = asint(makeFloatMatrix(idx)); 
+    ft += asfloat(vi);
     
-    ft += FloatType(vi);
-    
-    UIntType vu = asuint(f);
+    UIntMatrix vu = asuint(f);
     ft += asfloat(vu);
    
     outputBuffer[idx] = calcTotal(ft);
