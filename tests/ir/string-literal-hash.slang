@@ -1,6 +1,12 @@
-//TEST(compute):COMPARE_COMPUTE: -cpu
 //TEST(compute):COMPARE_COMPUTE:
 //TEST(compute):COMPARE_COMPUTE: -vk
+
+// Note: disabled on CPU target until we can fill
+// in a more correct/complete `String` and `getStringHash`
+// for that target.
+//
+//TEST_DISABLED(compute):COMPARE_COMPUTE: -cpu
+
 
 import string_literal_module;
 
