@@ -345,7 +345,7 @@ static Token AdvanceRawToken(PreprocessorInputStream* inputStream, LexerFlags le
     {
         PretokenizedInputStream* pretokenized = dynamic_cast<PretokenizedInputStream*>(inputStream);
         SLANG_ASSERT(pretokenized);
-        return pretokenized->tokenReader.AdvanceToken();
+        return pretokenized->tokenReader.advanceToken();
     }
 }
 
@@ -360,7 +360,7 @@ static Token PeekRawToken(PreprocessorInputStream* inputStream)
     {
         PretokenizedInputStream* pretokenized = dynamic_cast<PretokenizedInputStream*>(inputStream);
         SLANG_ASSERT(pretokenized);
-        return pretokenized->tokenReader.PeekToken();
+        return pretokenized->tokenReader.peekToken();
     }
 }
 
@@ -375,7 +375,7 @@ static TokenType PeekRawTokenType(PreprocessorInputStream* inputStream)
     {
         PretokenizedInputStream* pretokenized = dynamic_cast<PretokenizedInputStream*>(inputStream);
         SLANG_ASSERT(pretokenized);
-        return pretokenized->tokenReader.PeekTokenType();
+        return pretokenized->tokenReader.peekTokenType();
     }
 }
 
@@ -1036,7 +1036,7 @@ top:
 
         // We expect the reuslt of lexing to be two tokens: one for the actual value,
         // and one for the end-of-input marker.
-        if (inputStream->tokenReader.GetCount() != 2)
+        if (inputStream->tokenReader.getCount() != 2)
         {
             // We expect a token paste to produce a single token
             // TODO(tfoley): emit a diagnostic here
@@ -2035,7 +2035,7 @@ static void HandleLineDirective(PreprocessorDirectiveContext* context)
         AdvanceToken(context);
 
         // Stop overriding source locations.
-        auto sourceView = inputStream->primaryStream->lexer.sourceView;
+        auto sourceView = inputStream->primaryStream->lexer.m_sourceView;
         sourceView->addDefaultLineDirective(directiveLoc);
         return;
     }
@@ -2072,7 +2072,7 @@ static void HandleLineDirective(PreprocessorDirectiveContext* context)
         return;
     }
 
-    auto sourceView = inputStream->primaryStream->lexer.sourceView;
+    auto sourceView = inputStream->primaryStream->lexer.m_sourceView;
     sourceView->addLineDirective(directiveLoc, file, line);
 }
 
