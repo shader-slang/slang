@@ -1,4 +1,6 @@
+// TODO(JS):
 // NOTE we can't test on VK/gl at the moment because we don't support intrinsics over matrices on that target currently
+// TODO(JS):
 // Also NOTE, we do not test matrix inverse as currently unsupported on C++/CUDA targets
 
 //TEST(compute):COMPARE_COMPUTE_EX:-cpu -compute -output-using-type
@@ -75,6 +77,7 @@ void computeMain(uint3 dispatchThreadID : SV_DispatchThreadID)
     ft += atan2(f, makeFloatMatrix(2)); 
 
 #if 0
+    // TODO(JS):
     // This fails from DXC with a validation error(!)
     {
         FloatMatrix sf, cf;

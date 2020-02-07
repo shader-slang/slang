@@ -7,21 +7,26 @@
 //TEST_INPUT:ubuffer(data=[0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0], stride=4):out,name outputBuffer
 RWStructuredBuffer<float4> outputBuffer;
 
+typedef float Float;
+
+typedef vector<Float, 3> FloatVector;
+typedef vector<int, 3> IntVector;
+typedef vector<uint, 3> UIntVector;
+
 [numthreads(4, 1, 1)]
 void computeMain(uint3 dispatchThreadID : SV_DispatchThreadID)
 {
     int idx = int(dispatchThreadID.x);
 
-    float vf = idx * (1.0f / (4.0f));
+    Float vf = idx * (1.0f / (4.0f));
      
-    float3 f = float3(0.1f, vf, vf + 0.2f);
-    
+    FloatVector f = FloatVector(0.1f, vf, vf + 0.2f);
     
     // Operate over all values
-    float3 ft = {};
+    FloatVector ft = {};
 
     // fmod
-    ft += float3(int3(((f % 0.11f) * 100) + 0.5));
+    ft += FloatVector(IntVector(((f % 0.11f) * 100) + 0.5));
     
     ft += sin(f);
     ft += cos(f);
@@ -29,10 +34,10 @@ void computeMain(uint3 dispatchThreadID : SV_DispatchThreadID)
     
     {
         // Vector specific
-        float3 nv = normalize(ft);
+        FloatVector nv = normalize(f);
         ft += nv;
         
-        float3 perp = cross(nv, f.zxy); 
+        FloatVector perp = cross(nv, f.zxy); 
         ft += perp;
   
         ft += dot(perp, f.zyx);
@@ -50,7 +55,7 @@ void computeMain(uint3 dispatchThreadID : SV_DispatchThreadID)
 #if 0
     {
         // Disabled because not supported on VK (glsl) in vector form
-        float3 sf, cf;
+        FloatVector sf, cf;
         sincos(f, sf, cf);
         
         ft += sf;
@@ -86,7 +91,7 @@ void computeMain(uint3 dispatchThreadID : SV_DispatchThreadID)
 
     {
         float v[] = { 1, 10, 100, 1000 };
-        ft += int3(log10(float3(v[idx] + vf) + 0.5f));
+        ft += IntVector(log10(FloatVector(v[idx] + vf) + 0.5f));
     }
 
        
@@ -105,9 +110,9 @@ void computeMain(uint3 dispatchThreadID : SV_DispatchThreadID)
     ft += step(f, 0.5);
 
     {
-        int3 vi = asint(f - f) + idx;
-        ft += float3(vi);   
+        IntVector vi = asint(f - f) + idx;
+        ft += FloatVector(vi);   
     }
     
-    outputBuffer[idx] = float4(ft, 0);
+    outputBuffer[idx] = vector<Float, 4>(ft, 0);
 }

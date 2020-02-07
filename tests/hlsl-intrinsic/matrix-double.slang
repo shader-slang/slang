@@ -1,4 +1,8 @@
+// TODO(JS):
 // It doesn't look like fxc, dxc, vk support double versions of many of the intrinsics, so they are disabled here.
+// Arguably we should implement simple intrinsics if missing in the stdlib
+// More complicated functions (like say sin) can also be written, if not available on a target, but requires significant
+// care.
 
 //TEST(compute):COMPARE_COMPUTE_EX:-cpu -compute -output-using-type
 //DISABLE_TEST(compute):COMPARE_COMPUTE_EX:-slang -compute -output-using-type
