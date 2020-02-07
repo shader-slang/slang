@@ -1367,6 +1367,22 @@ void CLikeSourceEmitter::emitIntrinsicCallExprImpl(
                 }
                 break;
 
+            case 'T':
+                // Get the the 'element' type for the type of the param at the index
+                {
+                    SLANG_RELEASE_ASSERT(*cursor >= '0' && *cursor <= '9');
+                    Index argIndex = (*cursor++) - '0';
+                    SLANG_RELEASE_ASSERT(argCount > argIndex);
+
+                    IRType* type = args[argIndex].get()->getDataType();
+                    if (auto baseTextureType = as<IRTextureType>(type))
+                    {
+                        type = baseTextureType->getElementType();
+                    }
+                    emitType(type);
+                }
+                break;
+            
             case 'S':
                 // Get the scalar type of a generic at specified index
                 {
