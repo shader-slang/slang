@@ -107,7 +107,7 @@ namespace Slang
 
         void FillPosition(SyntaxNode * node)
         {
-            node->loc = tokenReader.PeekLoc();
+            node->loc = tokenReader.peekLoc();
         }
         void PushScope(ContainerDecl* containerDecl)
         {
@@ -213,8 +213,8 @@ namespace Slang
         // Don't emit "unexpected token" errors if we are in recovering mode
         if (!parser->isRecovering)
         {
-            parser->sink->diagnose(parser->tokenReader.PeekLoc(), Diagnostics::unexpectedToken,
-                parser->tokenReader.PeekTokenType());
+            parser->sink->diagnose(parser->tokenReader.peekLoc(), Diagnostics::unexpectedToken,
+                parser->tokenReader.peekTokenType());
 
             // Switch into recovery mode, to suppress additional errors
             parser->isRecovering = true;
@@ -228,8 +228,8 @@ namespace Slang
         // Don't emit "unexpected token" errors if we are in recovering mode
         if (!parser->isRecovering)
         {
-            parser->sink->diagnose(parser->tokenReader.PeekLoc(), Diagnostics::unexpectedTokenExpectedTokenName,
-                parser->tokenReader.PeekTokenType(),
+            parser->sink->diagnose(parser->tokenReader.peekLoc(), Diagnostics::unexpectedTokenExpectedTokenName,
+                parser->tokenReader.peekTokenType(),
                 expected);
 
             // Switch into recovery mode, to suppress additional errors
@@ -244,8 +244,8 @@ namespace Slang
         // Don't emit "unexpected token" errors if we are in recovering mode
         if (!parser->isRecovering)
         {
-            parser->sink->diagnose(parser->tokenReader.PeekLoc(), Diagnostics::unexpectedTokenExpectedTokenType,
-                parser->tokenReader.PeekTokenType(),
+            parser->sink->diagnose(parser->tokenReader.peekLoc(), Diagnostics::unexpectedTokenExpectedTokenType,
+                parser->tokenReader.peekTokenType(),
                 expected);
 
             // Switch into recovery mode, to suppress additional errors
@@ -260,7 +260,7 @@ namespace Slang
     static TokenType SkipBalancedToken(
         TokenReader* reader)
     {
-        TokenType tokenType = reader->AdvanceToken().type;
+        TokenType tokenType = reader->advanceToken().type;
         switch (tokenType)
         {
         default:
@@ -280,10 +280,10 @@ namespace Slang
     {
         for (;;)
         {
-            if (reader->IsAtEnd()) return TokenType::EndOfFile;
-            if (reader->PeekTokenType() == tokenType)
+            if (reader->isAtEnd()) return TokenType::EndOfFile;
+            if (reader->peekTokenType() == tokenType)
             {
-                reader->AdvanceToken();
+                reader->advanceToken();
                 return tokenType;
             }
             SkipBalancedToken(reader);
@@ -311,17 +311,17 @@ namespace Slang
     // Expect an identifier token with the given content, and consume it.
     Token Parser::ReadToken(const char* expected)
     {
-        if (tokenReader.PeekTokenType() == TokenType::Identifier
-                && tokenReader.PeekToken().Content == expected)
+        if (tokenReader.peekTokenType() == TokenType::Identifier
+                && tokenReader.peekToken().Content == expected)
         {
             isRecovering = false;
-            return tokenReader.AdvanceToken();
+            return tokenReader.advanceToken();
         }
 
         if (!isRecovering)
         {
             Unexpected(this, expected);
-            return tokenReader.PeekToken();
+            return tokenReader.peekToken();
         }
         else
         {
@@ -330,18 +330,18 @@ namespace Slang
             {
                 // The token we expected?
                 // Then exit recovery mode and pretend like all is well.
-                if (tokenReader.PeekTokenType() == TokenType::Identifier
-                    && tokenReader.PeekToken().Content == expected)
+                if (tokenReader.peekTokenType() == TokenType::Identifier
+                    && tokenReader.peekToken().Content == expected)
                 {
                     isRecovering = false;
-                    return tokenReader.AdvanceToken();
+                    return tokenReader.advanceToken();
                 }
 
 
                 // Don't skip past any "closing" tokens.
-                if (IsClosingToken(tokenReader.PeekTokenType()))
+                if (IsClosingToken(tokenReader.peekTokenType()))
                 {
-                    return tokenReader.PeekToken();
+                    return tokenReader.peekToken();
                 }
 
                 // Skip balanced tokens and try again.
@@ -352,7 +352,7 @@ namespace Slang
 
     Token Parser::ReadToken()
     {
-        return tokenReader.AdvanceToken();
+        return tokenReader.advanceToken();
     }
 
     static bool TryRecover(
@@ -404,7 +404,7 @@ namespace Slang
         TokenReader* tokenReader = &parser->tokenReader;
         for (;;)
         {
-            TokenType peek = tokenReader->PeekTokenType();
+            TokenType peek = tokenReader->peekTokenType();
 
             // Is the next token in our recover-before set?
             // If so, then we have recovered successfully!
@@ -423,7 +423,7 @@ namespace Slang
             {
                 if (peek == recoverAfter[ii])
                 {
-                    tokenReader->AdvanceToken();
+                    tokenReader->advanceToken();
                     parser->isRecovering = false;
                     return true;
                 }
@@ -496,16 +496,16 @@ namespace Slang
 
     Token Parser::ReadToken(TokenType expected)
     {
-        if (tokenReader.PeekTokenType() == expected)
+        if (tokenReader.peekTokenType() == expected)
         {
             isRecovering = false;
-            return tokenReader.AdvanceToken();
+            return tokenReader.advanceToken();
         }
 
         if (!isRecovering)
         {
             Unexpected(this, expected);
-            return tokenReader.PeekToken();
+            return tokenReader.peekToken();
         }
         else
         {
@@ -513,10 +513,10 @@ namespace Slang
             if (TryRecoverBefore(this, expected))
             {
                 isRecovering = false;
-                return tokenReader.AdvanceToken();
+                return tokenReader.advanceToken();
             }
 
-            return tokenReader.PeekToken();
+            return tokenReader.peekToken();
         }
     }
 
@@ -524,19 +524,19 @@ namespace Slang
     {
         TokenReader r = tokenReader;
         for (int ii = 0; ii < offset; ++ii)
-            r.AdvanceToken();
+            r.advanceToken();
 
-        return r.PeekTokenType() == TokenType::Identifier
-            && r.PeekToken().Content == string;
+        return r.peekTokenType() == TokenType::Identifier
+            && r.peekToken().Content == string;
 }
 
     bool Parser::LookAheadToken(TokenType type, int offset)
     {
         TokenReader r = tokenReader;
         for (int ii = 0; ii < offset; ++ii)
-            r.AdvanceToken();
+            r.advanceToken();
 
-        return r.PeekTokenType() == type;
+        return r.peekTokenType() == type;
     }
 
     // Consume a token and return true it if matches, otherwise false
@@ -575,7 +575,7 @@ namespace Slang
         }
         if (AdvanceIf(parser, tokenType))
             return true;
-        if (parser->tokenReader.PeekTokenType() == TokenType::EndOfFile)
+        if (parser->tokenReader.peekTokenType() == TokenType::EndOfFile)
         {
             parser->ReadToken(tokenType);
             return true;
@@ -656,17 +656,17 @@ namespace Slang
     // '::'? identifier ('::' identifier)* 
     static Token parseAttributeName(Parser* parser)
     {
-        const SourceLoc scopedIdSourceLoc = parser->tokenReader.PeekLoc();
+        const SourceLoc scopedIdSourceLoc = parser->tokenReader.peekLoc();
 
         // Strip initial :: if there is one
-        const TokenType initialTokenType = parser->tokenReader.PeekTokenType();
+        const TokenType initialTokenType = parser->tokenReader.peekTokenType();
         if (initialTokenType == TokenType::Scope)
         {
             parser->ReadToken(TokenType::Scope); 
         }
 
         const Token firstIdentifier = parser->ReadToken(TokenType::Identifier);
-        if (initialTokenType != TokenType::Scope && parser->tokenReader.PeekTokenType() != TokenType::Scope)
+        if (initialTokenType != TokenType::Scope && parser->tokenReader.peekTokenType() != TokenType::Scope)
         {
             return firstIdentifier;
         }
@@ -679,7 +679,7 @@ namespace Slang
         }
         scopedIdentifierBuilder.Append(firstIdentifier.Content);
 
-        while (parser->tokenReader.PeekTokenType() == TokenType::Scope)
+        while (parser->tokenReader.peekTokenType() == TokenType::Scope)
         {
             parser->ReadToken(TokenType::Scope);
             scopedIdentifierBuilder.Append('_'); 
@@ -763,7 +763,7 @@ namespace Slang
 
     static TokenType peekTokenType(Parser* parser)
     {
-        return parser->tokenReader.PeekTokenType();
+        return parser->tokenReader.peekTokenType();
     }
 
     static Token advanceToken(Parser* parser)
@@ -773,7 +773,7 @@ namespace Slang
 
     static Token peekToken(Parser* parser)
     {
-        return parser->tokenReader.PeekToken();
+        return parser->tokenReader.peekToken();
     }
 
     static SyntaxDecl* tryLookUpSyntaxDecl(
@@ -868,7 +868,7 @@ namespace Slang
         RefPtr<Modifier>* modifierLink = &modifiers.first;
         for (;;)
         {
-            SourceLoc loc = parser->tokenReader.PeekLoc();
+            SourceLoc loc = parser->tokenReader.peekLoc();
 
             switch (peekTokenType(parser))
             {
@@ -1397,7 +1397,7 @@ namespace Slang
         Parser* parser)
     {
         RefPtr<Declarator> declarator;
-        switch( parser->tokenReader.PeekTokenType() )
+        switch( parser->tokenReader.peekTokenType() )
         {
         case TokenType::Identifier:
             {
@@ -1437,17 +1437,17 @@ namespace Slang
         // postifx additions
         for( ;;)
         {
-            switch( parser->tokenReader.PeekTokenType() )
+            switch( parser->tokenReader.peekTokenType() )
             {
             case TokenType::LBracket:
                 {
                     auto arrayDeclarator = new ArrayDeclarator();
-                    arrayDeclarator->openBracketLoc = parser->tokenReader.PeekLoc();
+                    arrayDeclarator->openBracketLoc = parser->tokenReader.peekLoc();
                     arrayDeclarator->flavor = Declarator::Flavor::Array;
                     arrayDeclarator->inner = declarator;
 
                     parser->ReadToken(TokenType::LBracket);
-                    if( parser->tokenReader.PeekTokenType() != TokenType::RBracket )
+                    if( parser->tokenReader.peekTokenType() != TokenType::RBracket )
                     {
                         arrayDeclarator->elementCountExpr = parser->ParseExpression();
                     }
@@ -1474,10 +1474,10 @@ namespace Slang
     static RefPtr<Declarator> ParseDeclarator(
         Parser* parser)
     {
-        if( parser->tokenReader.PeekTokenType() == TokenType::OpMul )
+        if( parser->tokenReader.peekTokenType() == TokenType::OpMul )
         {
             auto ptrDeclarator = new PointerDeclarator();
-            ptrDeclarator->starLoc = parser->tokenReader.PeekLoc();
+            ptrDeclarator->starLoc = parser->tokenReader.peekLoc();
             ptrDeclarator->flavor = Declarator::Flavor::Pointer;
 
             parser->ReadToken(TokenType::OpMul);
@@ -1670,15 +1670,15 @@ namespace Slang
         }
         parser->genericDepth--;
 
-        if (parser->tokenReader.PeekToken().type == TokenType::OpRsh)
+        if (parser->tokenReader.peekToken().type == TokenType::OpRsh)
         {
-            parser->tokenReader.PeekToken().type = TokenType::OpGreater;
-            parser->tokenReader.PeekToken().loc.setRaw(parser->tokenReader.PeekToken().loc.getRaw() + 1);
+            parser->tokenReader.peekToken().type = TokenType::OpGreater;
+            parser->tokenReader.peekToken().loc.setRaw(parser->tokenReader.peekToken().loc.getRaw() + 1);
         }
         else if (parser->LookAheadToken(TokenType::OpGreater))
             parser->ReadToken(TokenType::OpGreater);
         else
-            parser->sink->diagnose(parser->tokenReader.PeekToken(), Diagnostics::tokenTypeExpected, "'>'");
+            parser->sink->diagnose(parser->tokenReader.peekToken(), Diagnostics::tokenTypeExpected, "'>'");
         return genericApp;
     }
 
@@ -1708,8 +1708,8 @@ namespace Slang
 
         // otherwise, we speculate as generics, and fallback to comparison when parsing failed
         TokenSpan tokenSpan;
-        tokenSpan.mBegin = parser->tokenReader.mCursor;
-        tokenSpan.mEnd = parser->tokenReader.mEnd;
+        tokenSpan.m_begin = parser->tokenReader.m_cursor;
+        tokenSpan.m_end = parser->tokenReader.m_end;
         DiagnosticSink newSink(parser->sink->sourceManager);
         Parser newParser(*parser);
         newParser.sink = &newSink;
@@ -1887,7 +1887,7 @@ namespace Slang
         Parser*         parser,
         ContainerDecl*  containerDecl)
     {
-        SourceLoc startPosition = parser->tokenReader.PeekLoc();
+        SourceLoc startPosition = parser->tokenReader.peekLoc();
 
         auto typeSpec = parseTypeSpec(parser);
 
@@ -1972,8 +1972,8 @@ namespace Slang
         // matter unless we actually decide to support function-type parameters,
         // using C syntax.
         //
-        if ((parser->tokenReader.PeekTokenType() == TokenType::LParent ||
-            parser->tokenReader.PeekTokenType() == TokenType::OpLess)
+        if ((parser->tokenReader.peekTokenType() == TokenType::LParent ||
+            parser->tokenReader.peekTokenType() == TokenType::OpLess)
 
             // Only parse as a function if we didn't already see mutually-exclusive
             // constructs when parsing the declarator.
@@ -2232,7 +2232,7 @@ namespace Slang
         // declaration is made to be "transparent" so that lookup
         // will see through it to the members inside.
 
-        auto bufferWrapperTypeNamePos = parser->tokenReader.PeekLoc();
+        auto bufferWrapperTypeNamePos = parser->tokenReader.peekLoc();
 
         // We are going to represent each buffer as a pair of declarations.
         // The first is a type declaration that holds all the members, while
@@ -2490,7 +2490,7 @@ namespace Slang
 
         AddModifiers(decl, modifiers.first);
 
-        if( parser->tokenReader.PeekTokenType() == TokenType::LBrace )
+        if( parser->tokenReader.peekTokenType() == TokenType::LBrace )
         {
             decl->Body = parser->parseBlockStatement();
         }
@@ -2881,7 +2881,7 @@ namespace Slang
     {
         RefPtr<DeclBase> decl;
 
-        auto loc = parser->tokenReader.PeekLoc();
+        auto loc = parser->tokenReader.peekLoc();
 
         switch (peekTokenType(parser))
         {
@@ -3027,7 +3027,7 @@ namespace Slang
         }
 
         PushScope(program);
-        program->loc = tokenReader.PeekLoc();
+        program->loc = tokenReader.peekLoc();
         program->scope = currentScope;
         ParseDeclBody(this, program, TokenType::EndOfFile);
         PopScope();
@@ -3179,7 +3179,7 @@ namespace Slang
         if(!parser->LookAheadToken(TokenType::Identifier))
             return false;
 
-        auto name = parser->tokenReader.PeekToken().getName();
+        auto name = parser->tokenReader.peekToken().getName();
         return isTypeName(parser, name);
     }
 
@@ -3357,7 +3357,7 @@ namespace Slang
 
         RefPtr<Stmt> body;
 
-        if(!tokenReader.IsAtEnd())
+        if(!tokenReader.isAtEnd())
         {
             FillPosition(blockStatement.Ptr());
         }
@@ -3670,7 +3670,7 @@ namespace Slang
     static RefPtr<Expr> parseOperator(Parser* parser)
     {
         Token opToken;
-        switch(parser->tokenReader.PeekTokenType())
+        switch(parser->tokenReader.peekTokenType())
         {
         case TokenType::QuestionMark:
             opToken = parser->ReadToken();
@@ -3713,7 +3713,7 @@ namespace Slang
         auto expr = inExpr;
         for(;;)
         {
-            auto opTokenType = parser->tokenReader.PeekTokenType();
+            auto opTokenType = parser->tokenReader.peekTokenType();
             auto opPrec = GetOpLevel(parser, opTokenType);
             if(opPrec < prec)
                 break;
@@ -3742,7 +3742,7 @@ namespace Slang
 
             for(;;)
             {
-                auto nextOpPrec = GetOpLevel(parser, parser->tokenReader.PeekTokenType());
+                auto nextOpPrec = GetOpLevel(parser, parser->tokenReader.peekTokenType());
 
                 if((GetAssociativityFromLevel(nextOpPrec) == Associativity::Right) ? (nextOpPrec < opPrec) : (nextOpPrec <= opPrec))
                     break;
@@ -3892,7 +3892,7 @@ namespace Slang
         {
         default:
             // TODO: should this return an error expression instead of NULL?
-            parser->sink->diagnose(parser->tokenReader.PeekLoc(), Diagnostics::syntaxError);
+            parser->sink->diagnose(parser->tokenReader.peekLoc(), Diagnostics::syntaxError);
             return nullptr;
 
         // Either:
@@ -3966,7 +3966,7 @@ namespace Slang
                 RefPtr<IntegerLiteralExpr> constExpr = new IntegerLiteralExpr();
                 parser->FillPosition(constExpr.Ptr());
 
-                auto token = parser->tokenReader.AdvanceToken();
+                auto token = parser->tokenReader.advanceToken();
                 constExpr->token = token;
 
                 UnownedStringSlice suffix;
@@ -4099,7 +4099,7 @@ namespace Slang
                 RefPtr<FloatingPointLiteralExpr> constExpr = new FloatingPointLiteralExpr();
                 parser->FillPosition(constExpr.Ptr());
 
-                auto token = parser->tokenReader.AdvanceToken();
+                auto token = parser->tokenReader.advanceToken();
                 constExpr->token = token;
 
                 UnownedStringSlice suffix;
@@ -4250,7 +4250,7 @@ namespace Slang
         case TokenType::StringLiteral:
             {
                 RefPtr<StringLiteralExpr> constExpr = new StringLiteralExpr();
-                auto token = parser->tokenReader.AdvanceToken();
+                auto token = parser->tokenReader.advanceToken();
                 constExpr->token = token;
                 parser->FillPosition(constExpr.Ptr());
 
@@ -4265,7 +4265,7 @@ namespace Slang
                     sb << getStringLiteralTokenValue(token);
                     while (parser->LookAheadToken(TokenType::StringLiteral))
                     {
-                        token = parser->tokenReader.AdvanceToken();
+                        token = parser->tokenReader.advanceToken();
                         sb << getStringLiteralTokenValue(token);
                     }
                     constExpr->value = sb.ProduceString();
@@ -4356,7 +4356,7 @@ namespace Slang
                     invokeExpr->FunctionExpr = expr;
                     parser->FillPosition(invokeExpr.Ptr());
                     parser->ReadToken(TokenType::LParent);
-                    while (!parser->tokenReader.IsAtEnd())
+                    while (!parser->tokenReader.isAtEnd())
                     {
                         if (!parser->LookAheadToken(TokenType::RParent))
                             invokeExpr->Arguments.add(parser->ParseArgExpr());

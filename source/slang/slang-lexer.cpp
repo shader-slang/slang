@@ -31,44 +31,44 @@ namespace Slang
     }
 
     TokenSpan::TokenSpan()
-        : mBegin(NULL)
-        , mEnd  (NULL)
+        : m_begin(nullptr)
+        , m_end  (nullptr)
     {}
 
     TokenReader::TokenReader()
-        : mCursor(NULL)
-        , mEnd   (NULL)
+        : m_cursor(nullptr)
+        , m_end   (nullptr)
     {}
 
 
-    Token& TokenReader::PeekToken()
+    Token& TokenReader::peekToken()
     {
-        return nextToken;
+        return m_nextToken;
     }
 
-    TokenType TokenReader::PeekTokenType() const
+    TokenType TokenReader::peekTokenType() const
     {
-        return nextToken.type;
+        return m_nextToken.type;
     }
 
-    SourceLoc TokenReader::PeekLoc() const
+    SourceLoc TokenReader::peekLoc() const
     {
-        return nextToken.loc;
+        return m_nextToken.loc;
     }
 
-    Token TokenReader::AdvanceToken()
+    Token TokenReader::advanceToken()
     {
-        if (!mCursor)
+        if (!m_cursor)
             return GetEndOfFileToken();
 
-        Token token = nextToken;
-        if (mCursor < mEnd)
+        Token token = m_nextToken;
+        if (m_cursor < m_end)
         {
-            mCursor++;
-            nextToken = *mCursor;
+            m_cursor++;
+            m_nextToken = *m_cursor;
         }
         else
-            nextToken.type = TokenType::EndOfFile;
+            m_nextToken.type = TokenType::EndOfFile;
         return token;
     }
 
@@ -106,7 +106,7 @@ namespace Slang
 
     // Get the next input byte, without any handling of
     // escaped newlines, non-ASCII code points, source locations, etc.
-    static int peekRaw(Lexer* lexer)
+    static int _peekRaw(Lexer* lexer)
     {
         // If we are at the end of the input, return a designated end-of-file value
         if(lexer->cursor == lexer->end)
@@ -117,7 +117,7 @@ namespace Slang
     }
 
     // Read one input byte without any special handling (similar to `peekRaw`)
-    static int advanceRaw(Lexer* lexer)
+    static int _advanceRaw(Lexer* lexer)
     {
         // The logic here is basically the same as for `peekRaw()`,
         // escape we advance `cursor` if we aren't at the end.
@@ -140,23 +140,23 @@ namespace Slang
     //
     // We always look for the longest match possible.
     //
-    static void handleNewLineInner(Lexer* lexer, int c)
+    static void _handleNewLineInner(Lexer* lexer, int c)
     {
         SLANG_ASSERT(c == '\n' || c == '\r');
 
-        int d = peekRaw(lexer);
+        int d = _peekRaw(lexer);
         if( (c ^ d) == ('\n' ^ '\r') )
         {
-            advanceRaw(lexer);
+            _advanceRaw(lexer);
         }
     }
 
     // Look ahead one code point, dealing with complications like
     // escaped newlines.
-    static int peek(Lexer* lexer)
+    static int _peek(Lexer* lexer)
     {
         // Look at the next raw byte, and decide what to do
-        int c = peekRaw(lexer);
+        int c = _peekRaw(lexer);
 
         if(c == '\\')
         {
@@ -189,7 +189,7 @@ namespace Slang
     }
 
     // Get the next code point from the input, and advance the cursor.
-    static int advance(Lexer* lexer)
+    static int _advance(Lexer* lexer)
     {
         // We are going to loop, but only as a way of handling
         // escaped line endings.
@@ -215,7 +215,7 @@ namespace Slang
                 case '\r': case '\n':
                     // handle the end-of-line for our source location tracking
                     lexer->cursor++;
-                    handleNewLineInner(lexer, d);
+                    _handleNewLineInner(lexer, d);
 
                     lexer->tokenFlags |= TokenFlag::ScrubbingNeeded;
 
@@ -235,48 +235,48 @@ namespace Slang
         }
     }
 
-    static void handleNewLine(Lexer* lexer)
+    static void _handleNewLine(Lexer* lexer)
     {
-        int c = advance(lexer);
-        handleNewLineInner(lexer, c);
+        int c = _advance(lexer);
+        _handleNewLineInner(lexer, c);
     }
 
-    static void lexLineComment(Lexer* lexer)
+    static void _lexLineComment(Lexer* lexer)
     {
         for(;;)
         {
-            switch(peek(lexer))
+            switch(_peek(lexer))
             {
             case '\n': case '\r': case kEOF:
                 return;
 
             default:
-                advance(lexer);
+                _advance(lexer);
                 continue;
             }
         }
     }
 
-    static void lexBlockComment(Lexer* lexer)
+    static void _lexBlockComment(Lexer* lexer)
     {
         for(;;)
         {
-            switch(peek(lexer))
+            switch(_peek(lexer))
             {
             case kEOF:
                 // TODO(tfoley) diagnostic!
                 return;
 
             case '\n': case '\r':
-                handleNewLine(lexer);
+                _handleNewLine(lexer);
                 continue;
 
             case '*':
-                advance(lexer);
-                switch( peek(lexer) )
+                _advance(lexer);
+                switch( _peek(lexer) )
                 {
                 case '/':
-                    advance(lexer);
+                    _advance(lexer);
                     return;
 
                 default:
@@ -284,20 +284,20 @@ namespace Slang
                 }
 
             default:
-                advance(lexer);
+                _advance(lexer);
                 continue;
             }
         }
     }
 
-    static void lexHorizontalSpace(Lexer* lexer)
+    static void _lexHorizontalSpace(Lexer* lexer)
     {
         for(;;)
         {
-            switch(peek(lexer))
+            switch(_peek(lexer))
             {
             case ' ': case '\t':
-                advance(lexer);
+                _advance(lexer);
                 continue;
 
             default:
@@ -306,17 +306,17 @@ namespace Slang
         }
     }
 
-    static void lexIdentifier(Lexer* lexer)
+    static void _lexIdentifier(Lexer* lexer)
     {
         for(;;)
         {
-            int c = peek(lexer);
+            int c = _peek(lexer);
             if(('a' <= c ) && (c <= 'z')
                 || ('A' <= c) && (c <= 'Z')
                 || ('0' <= c) && (c <= '9')
                 || (c == '_'))
             {
-                advance(lexer);
+                _advance(lexer);
                 continue;
             }
 
@@ -324,16 +324,16 @@ namespace Slang
         }
     }
 
-    static SourceLoc getSourceLoc(Lexer* lexer)
+    static SourceLoc _getSourceLoc(Lexer* lexer)
     {
         return lexer->startLoc + (lexer->cursor - lexer->begin);
     }
 
-    static void lexDigits(Lexer* lexer, int base)
+    static void _lexDigits(Lexer* lexer, int base)
     {
         for(;;)
         {
-            int c = peek(lexer);
+            int c = _peek(lexer);
 
             int digitVal = 0;
             switch(c)
@@ -361,14 +361,14 @@ namespace Slang
             if(digitVal >= base)
             {
                 char buffer[] = { (char) c, 0 };
-                lexer->sink->diagnose(getSourceLoc(lexer), Diagnostics::invalidDigitForBase, buffer, base);
+                lexer->sink->diagnose(_getSourceLoc(lexer), Diagnostics::invalidDigitForBase, buffer, base);
             }
 
-            advance(lexer);
+            _advance(lexer);
         }
     }
 
-    static TokenType maybeLexNumberSuffix(Lexer* lexer, TokenType tokenType)
+    static TokenType _maybeLexNumberSuffix(Lexer* lexer, TokenType tokenType)
     {
         // Be liberal in what we accept here, so that figuring out
         // the semantics of a numeric suffix is left up to the parser
@@ -376,7 +376,7 @@ namespace Slang
         //
         for( ;;)
         {
-            int c = peek(lexer);
+            int c = _peek(lexer);
 
             // Accept any alphanumeric character, plus underscores.
             if(('a' <= c ) && (c <= 'z')
@@ -384,7 +384,7 @@ namespace Slang
                 || ('0' <= c) && (c <= '9')
                 || (c == '_'))
             {
-                advance(lexer);
+                _advance(lexer);
                 continue;
             }
 
@@ -394,7 +394,7 @@ namespace Slang
         }
     }
 
-    static bool isNumberExponent(int c, int base)
+    static bool _isNumberExponent(int c, int base)
     {
         switch( c )
         {
@@ -413,64 +413,64 @@ namespace Slang
         return true;
     }
 
-    static bool maybeLexNumberExponent(Lexer* lexer, int base)
+    static bool _maybeLexNumberExponent(Lexer* lexer, int base)
     {
-        if(!isNumberExponent(peek(lexer), base))
+        if(!_isNumberExponent(_peek(lexer), base))
             return false;
 
         // we saw an exponent marker
-        advance(lexer);
+        _advance(lexer);
 
         // Now start to read the exponent
-        switch( peek(lexer) )
+        switch( _peek(lexer) )
         {
         case '+': case '-':
-            advance(lexer);
+            _advance(lexer);
             break;
         }
 
         // TODO(tfoley): it would be an error to not see digits here...
 
-        lexDigits(lexer, 10);
+        _lexDigits(lexer, 10);
 
         return true;
     }
 
-    static TokenType lexNumberAfterDecimalPoint(Lexer* lexer, int base)
+    static TokenType _lexNumberAfterDecimalPoint(Lexer* lexer, int base)
     {
-        lexDigits(lexer, base);
-        maybeLexNumberExponent(lexer, base);
+        _lexDigits(lexer, base);
+        _maybeLexNumberExponent(lexer, base);
 
-        return maybeLexNumberSuffix(lexer, TokenType::FloatingPointLiteral);
+        return _maybeLexNumberSuffix(lexer, TokenType::FloatingPointLiteral);
     }
 
-    static TokenType lexNumber(Lexer* lexer, int base)
+    static TokenType _lexNumber(Lexer* lexer, int base)
     {
         // TODO(tfoley): Need to consider whehter to allow any kind of digit separator character.
 
         TokenType tokenType = TokenType::IntegerLiteral;
 
         // At the start of things, we just concern ourselves with digits
-        lexDigits(lexer, base);
+        _lexDigits(lexer, base);
 
-        if( peek(lexer) == '.' )
+        if( _peek(lexer) == '.' )
         {
             tokenType = TokenType::FloatingPointLiteral;
 
-            advance(lexer);
-            lexDigits(lexer, base);
+            _advance(lexer);
+            _lexDigits(lexer, base);
         }
 
-        if( maybeLexNumberExponent(lexer, base))
+        if( _maybeLexNumberExponent(lexer, base))
         {
             tokenType = TokenType::FloatingPointLiteral;
         }
 
-        maybeLexNumberSuffix(lexer, tokenType);
+        _maybeLexNumberSuffix(lexer, tokenType);
         return tokenType;
     }
 
-    static int maybeReadDigit(char const** ioCursor, int base)
+    static int _maybeReadDigit(char const** ioCursor, int base)
     {
         auto& cursor = *ioCursor;
 
@@ -511,7 +511,7 @@ namespace Slang
         }
     }
 
-    static int readOptionalBase(char const** ioCursor)
+    static int _readOptionalBase(char const** ioCursor)
     {
         auto& cursor = *ioCursor;
         if( *cursor == '0' )
@@ -548,11 +548,11 @@ namespace Slang
         char const* cursor = token.Content.begin();
         char const* end = token.Content.end();
 
-        int base = readOptionalBase(&cursor);
+        int base = _readOptionalBase(&cursor);
 
         for( ;;)
         {
-            int digit = maybeReadDigit(&cursor, base);
+            int digit = _maybeReadDigit(&cursor, base);
             if(digit < 0)
                 break;
 
@@ -574,7 +574,7 @@ namespace Slang
         char const* cursor = token.Content.begin();
         char const* end = token.Content.end();
 
-        int radix = readOptionalBase(&cursor);
+        int radix = _readOptionalBase(&cursor);
 
         bool seenDot = false;
         FloatingPointLiteralValue divisor = 1;
@@ -587,7 +587,7 @@ namespace Slang
                 continue;
             }
 
-            int digit = maybeReadDigit(&cursor, radix);
+            int digit = _maybeReadDigit(&cursor, radix);
             if(digit < 0)
                 break;
 
@@ -600,7 +600,7 @@ namespace Slang
         }
 
         // Now read optional exponent
-        if(isNumberExponent(*cursor, radix))
+        if(_isNumberExponent(*cursor, radix))
         {
             cursor++;
 
@@ -625,7 +625,7 @@ namespace Slang
 
             for(;;)
             {
-                int digit = maybeReadDigit(&cursor, exponentRadix);
+                int digit = _maybeReadDigit(&cursor, exponentRadix);
                 if(digit < 0)
                     break;
 
@@ -660,31 +660,31 @@ namespace Slang
         return value;
     }
 
-    static void lexStringLiteralBody(Lexer* lexer, char quote)
+    static void _lexStringLiteralBody(Lexer* lexer, char quote)
     {
         for(;;)
         {
-            int c = peek(lexer);
+            int c = _peek(lexer);
             if(c == quote)
             {
-                advance(lexer);
+                _advance(lexer);
                 return;
             }
 
             switch(c)
             {
             case kEOF:
-                lexer->sink->diagnose(getSourceLoc(lexer), Diagnostics::endOfFileInLiteral);
+                lexer->sink->diagnose(_getSourceLoc(lexer), Diagnostics::endOfFileInLiteral);
                 return;
 
             case '\n': case '\r':
-                lexer->sink->diagnose(getSourceLoc(lexer), Diagnostics::newlineInLiteral);
+                lexer->sink->diagnose(_getSourceLoc(lexer), Diagnostics::newlineInLiteral);
                 return;
 
             case '\\':
                 // Need to handle various escape sequence cases
-                advance(lexer);
-                switch(peek(lexer))
+                _advance(lexer);
+                switch(_peek(lexer))
                 {
                 case '\'':
                 case '\"':
@@ -697,19 +697,19 @@ namespace Slang
                 case 'r':
                 case 't':
                 case 'v':
-                    advance(lexer);
+                    _advance(lexer);
                     break;
 
                 case '0': case '1': case '2': case '3': case '4':
                 case '5': case '6': case '7':
                     // octal escape: up to 3 characters
-                    advance(lexer);
+                    _advance(lexer);
                     for(int ii = 0; ii < 3; ++ii)
                     {
-                        int d = peek(lexer);
+                        int d = _peek(lexer);
                         if(('0' <= d) && (d <= '7'))
                         {
-                            advance(lexer);
+                            _advance(lexer);
                             continue;
                         }
                         else
@@ -721,15 +721,15 @@ namespace Slang
 
                 case 'x':
                     // hexadecimal escape: any number of characters
-                    advance(lexer);
+                    _advance(lexer);
                     for(;;)
                     {
-                        int d = peek(lexer);
+                        int d = _peek(lexer);
                         if(('0' <= d) && (d <= '9')
                             || ('a' <= d) && (d <= 'f')
                             || ('A' <= d) && (d <= 'F'))
                         {
-                            advance(lexer);
+                            _advance(lexer);
                             continue;
                         }
                         else
@@ -745,7 +745,7 @@ namespace Slang
                 break;
 
             default:
-                advance(lexer);
+                _advance(lexer);
                 continue;
             }
         }
@@ -890,16 +890,16 @@ namespace Slang
 
 
 
-    static TokenType lexTokenImpl(Lexer* lexer, LexerFlags effectiveFlags)
+    static TokenType _lexTokenImpl(Lexer* lexer, LexerFlags effectiveFlags)
     {
         if(effectiveFlags & kLexerFlag_ExpectDirectiveMessage)
         {
             for(;;)
             {
-                switch(peek(lexer))
+                switch(_peek(lexer))
                 {
                 default:
-                    advance(lexer);
+                    _advance(lexer);
                     continue;
 
                 case kEOF: case '\r': case '\n':
@@ -910,7 +910,7 @@ namespace Slang
             return TokenType::DirectiveMessage;
         }
 
-        switch(peek(lexer))
+        switch(_peek(lexer))
         {
         default:
             break;
@@ -923,20 +923,20 @@ namespace Slang
         case '\r': case '\n':
             if((effectiveFlags & kLexerFlag_InDirective) != 0)
                 return TokenType::EndOfDirective;
-            handleNewLine(lexer);
+            _handleNewLine(lexer);
             return TokenType::NewLine;
 
         case ' ': case '\t':
-            lexHorizontalSpace(lexer);
+            _lexHorizontalSpace(lexer);
             return TokenType::WhiteSpace;
 
         case '.':
-            advance(lexer);
-            switch(peek(lexer))
+            _advance(lexer);
+            switch(_peek(lexer))
             {
             case '0': case '1': case '2': case '3': case '4':
             case '5': case '6': case '7': case '8': case '9':
-                return lexNumberAfterDecimalPoint(lexer, 10);
+                return _lexNumberAfterDecimalPoint(lexer, 10);
 
             // TODO(tfoley): handle ellipsis (`...`)
 
@@ -946,33 +946,33 @@ namespace Slang
 
                     case '1': case '2': case '3': case '4':
         case '5': case '6': case '7': case '8': case '9':
-            return lexNumber(lexer, 10);
+            return _lexNumber(lexer, 10);
 
         case '0':
             {
-                auto loc = getSourceLoc(lexer);
-                advance(lexer);
-                switch(peek(lexer))
+                auto loc = _getSourceLoc(lexer);
+                _advance(lexer);
+                switch(_peek(lexer))
                 {
                 default:
-                    return maybeLexNumberSuffix(lexer, TokenType::IntegerLiteral);
+                    return _maybeLexNumberSuffix(lexer, TokenType::IntegerLiteral);
 
                 case '.':
-                    advance(lexer);
-                    return lexNumberAfterDecimalPoint(lexer, 10);
+                    _advance(lexer);
+                    return _lexNumberAfterDecimalPoint(lexer, 10);
 
                 case 'x': case 'X':
-                    advance(lexer);
-                    return lexNumber(lexer, 16);
+                    _advance(lexer);
+                    return _lexNumber(lexer, 16);
 
                 case 'b': case 'B':
-                    advance(lexer);
-                    return lexNumber(lexer, 2);
+                    _advance(lexer);
+                    return _lexNumber(lexer, 2);
 
                 case '0': case '1': case '2': case '3': case '4':
                 case '5': case '6': case '7': case '8': case '9':
                     lexer->sink->diagnose(loc, Diagnostics::octalLiteral);
-                    return lexNumber(lexer, 8);
+                    return _lexNumber(lexer, 8);
                 }
             }
 
@@ -989,182 +989,182 @@ namespace Slang
         case 'U': case 'V': case 'W': case 'X': case 'Y':
         case 'Z':
         case '_':
-            lexIdentifier(lexer);
+            _lexIdentifier(lexer);
             return TokenType::Identifier;
 
         case '\"':
-            advance(lexer);
-            lexStringLiteralBody(lexer, '\"');
+            _advance(lexer);
+            _lexStringLiteralBody(lexer, '\"');
             return TokenType::StringLiteral;
 
         case '\'':
-            advance(lexer);
-            lexStringLiteralBody(lexer, '\'');
+            _advance(lexer);
+            _lexStringLiteralBody(lexer, '\'');
             return TokenType::CharLiteral;
 
         case '+':
-            advance(lexer);
-            switch(peek(lexer))
+            _advance(lexer);
+            switch(_peek(lexer))
             {
-            case '+': advance(lexer); return TokenType::OpInc;
-            case '=': advance(lexer); return TokenType::OpAddAssign;
+            case '+': _advance(lexer); return TokenType::OpInc;
+            case '=': _advance(lexer); return TokenType::OpAddAssign;
             default:
                 return TokenType::OpAdd;
             }
 
         case '-':
-            advance(lexer);
-            switch(peek(lexer))
+            _advance(lexer);
+            switch(_peek(lexer))
             {
-            case '-': advance(lexer); return TokenType::OpDec;
-            case '=': advance(lexer); return TokenType::OpSubAssign;
-            case '>': advance(lexer); return TokenType::RightArrow;
+            case '-': _advance(lexer); return TokenType::OpDec;
+            case '=': _advance(lexer); return TokenType::OpSubAssign;
+            case '>': _advance(lexer); return TokenType::RightArrow;
             default:
                 return TokenType::OpSub;
             }
 
         case '*':
-            advance(lexer);
-            switch(peek(lexer))
+            _advance(lexer);
+            switch(_peek(lexer))
             {
-            case '=': advance(lexer); return TokenType::OpMulAssign;
+            case '=': _advance(lexer); return TokenType::OpMulAssign;
             default:
                 return TokenType::OpMul;
             }
 
         case '/':
-            advance(lexer);
-            switch(peek(lexer))
+            _advance(lexer);
+            switch(_peek(lexer))
             {
-            case '=': advance(lexer); return TokenType::OpDivAssign;
-            case '/': advance(lexer); lexLineComment(lexer); return TokenType::LineComment;
-            case '*': advance(lexer); lexBlockComment(lexer); return TokenType::BlockComment;
+            case '=': _advance(lexer); return TokenType::OpDivAssign;
+            case '/': _advance(lexer); _lexLineComment(lexer); return TokenType::LineComment;
+            case '*': _advance(lexer); _lexBlockComment(lexer); return TokenType::BlockComment;
             default:
                 return TokenType::OpDiv;
             }
 
         case '%':
-            advance(lexer);
-            switch(peek(lexer))
+            _advance(lexer);
+            switch(_peek(lexer))
             {
-            case '=': advance(lexer); return TokenType::OpModAssign;
+            case '=': _advance(lexer); return TokenType::OpModAssign;
             default:
                 return TokenType::OpMod;
             }
 
         case '|':
-            advance(lexer);
-            switch(peek(lexer))
+            _advance(lexer);
+            switch(_peek(lexer))
             {
-            case '|': advance(lexer); return TokenType::OpOr;
-            case '=': advance(lexer); return TokenType::OpOrAssign;
+            case '|': _advance(lexer); return TokenType::OpOr;
+            case '=': _advance(lexer); return TokenType::OpOrAssign;
             default:
                 return TokenType::OpBitOr;
             }
 
         case '&':
-            advance(lexer);
-            switch(peek(lexer))
+            _advance(lexer);
+            switch(_peek(lexer))
             {
-            case '&': advance(lexer); return TokenType::OpAnd;
-            case '=': advance(lexer); return TokenType::OpAndAssign;
+            case '&': _advance(lexer); return TokenType::OpAnd;
+            case '=': _advance(lexer); return TokenType::OpAndAssign;
             default:
                 return TokenType::OpBitAnd;
             }
 
         case '^':
-            advance(lexer);
-            switch(peek(lexer))
+            _advance(lexer);
+            switch(_peek(lexer))
             {
-            case '=': advance(lexer); return TokenType::OpXorAssign;
+            case '=': _advance(lexer); return TokenType::OpXorAssign;
             default:
                 return TokenType::OpBitXor;
             }
 
         case '>':
-            advance(lexer);
-            switch(peek(lexer))
+            _advance(lexer);
+            switch(_peek(lexer))
             {
             case '>':
-                advance(lexer);
-                switch(peek(lexer))
+                _advance(lexer);
+                switch(_peek(lexer))
                 {
-                case '=': advance(lexer); return TokenType::OpShrAssign;
+                case '=': _advance(lexer); return TokenType::OpShrAssign;
                 default: return TokenType::OpRsh;
                 }
-            case '=': advance(lexer); return TokenType::OpGeq;
+            case '=': _advance(lexer); return TokenType::OpGeq;
             default:
                 return TokenType::OpGreater;
             }
 
         case '<':
-            advance(lexer);
-            switch(peek(lexer))
+            _advance(lexer);
+            switch(_peek(lexer))
             {
             case '<':
-                advance(lexer);
-                switch(peek(lexer))
+                _advance(lexer);
+                switch(_peek(lexer))
                 {
-                case '=': advance(lexer); return TokenType::OpShlAssign;
+                case '=': _advance(lexer); return TokenType::OpShlAssign;
                 default: return TokenType::OpLsh;
                 }
-            case '=': advance(lexer); return TokenType::OpLeq;
+            case '=': _advance(lexer); return TokenType::OpLeq;
             default:
                 return TokenType::OpLess;
             }
 
         case '=':
-            advance(lexer);
-            switch(peek(lexer))
+            _advance(lexer);
+            switch(_peek(lexer))
             {
-            case '=': advance(lexer); return TokenType::OpEql;
+            case '=': _advance(lexer); return TokenType::OpEql;
             default:
                 return TokenType::OpAssign;
             }
 
         case '!':
-            advance(lexer);
-            switch(peek(lexer))
+            _advance(lexer);
+            switch(_peek(lexer))
             {
-            case '=': advance(lexer); return TokenType::OpNeq;
+            case '=': _advance(lexer); return TokenType::OpNeq;
             default:
                 return TokenType::OpNot;
             }
 
         case '#':
-            advance(lexer);
-            switch(peek(lexer))
+            _advance(lexer);
+            switch(_peek(lexer))
             {
-            case '#': advance(lexer); return TokenType::PoundPound;
+            case '#': _advance(lexer); return TokenType::PoundPound;
             default:
                 return TokenType::Pound;
             }
 
-        case '~': advance(lexer); return TokenType::OpBitNot;
+        case '~': _advance(lexer); return TokenType::OpBitNot;
 
         case ':': 
         {
-            advance(lexer);
-            if (peek(lexer) == ':')
+            _advance(lexer);
+            if (_peek(lexer) == ':')
             {
-                advance(lexer);
+                _advance(lexer);
                 return TokenType::Scope;
             }
             return TokenType::Colon;
         }
-        case ';': advance(lexer); return TokenType::Semicolon;
-        case ',': advance(lexer); return TokenType::Comma;
+        case ';': _advance(lexer); return TokenType::Semicolon;
+        case ',': _advance(lexer); return TokenType::Comma;
 
-        case '{': advance(lexer); return TokenType::LBrace;
-        case '}': advance(lexer); return TokenType::RBrace;
-        case '[': advance(lexer); return TokenType::LBracket;
-        case ']': advance(lexer); return TokenType::RBracket;
-        case '(': advance(lexer); return TokenType::LParent;
-        case ')': advance(lexer); return TokenType::RParent;
+        case '{': _advance(lexer); return TokenType::LBrace;
+        case '}': _advance(lexer); return TokenType::RBrace;
+        case '[': _advance(lexer); return TokenType::LBracket;
+        case ']': _advance(lexer); return TokenType::RBracket;
+        case '(': _advance(lexer); return TokenType::LParent;
+        case ')': _advance(lexer); return TokenType::RParent;
 
-        case '?': advance(lexer); return TokenType::QuestionMark;
-        case '@': advance(lexer); return TokenType::At;
-        case '$': advance(lexer); return TokenType::Dollar;
+        case '?': _advance(lexer); return TokenType::QuestionMark;
+        case '@': _advance(lexer); return TokenType::At;
+        case '$': _advance(lexer); return TokenType::Dollar;
 
         }
 
@@ -1177,8 +1177,8 @@ namespace Slang
             // If none of the above cases matched, then we have an
             // unexpected/invalid character.
 
-            auto loc = getSourceLoc(lexer);
-            int c = advance(lexer);
+            auto loc = _getSourceLoc(lexer);
+            int c = _advance(lexer);
             if(!(effectiveFlags & kLexerFlag_IgnoreInvalid))
             {
                 auto sink = lexer->sink;
@@ -1204,11 +1204,11 @@ namespace Slang
         for(;;)
         {
             Token token;
-            token.loc = getSourceLoc(this);
+            token.loc = _getSourceLoc(this);
 
             char const* textBegin = cursor;
 
-            auto tokenType = lexTokenImpl(this, this->lexerFlags | extraFlags);
+            auto tokenType = _lexTokenImpl(this, this->lexerFlags | extraFlags);
 
             // The low-level lexer produces tokens for things we want
             // to ignore, such as white space, so we skip them here.
