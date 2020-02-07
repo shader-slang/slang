@@ -37,12 +37,12 @@ static bool _isSingleNameBasicType(IROp op)
         case kIROp_Int8Type:    return UnownedStringSlice("char");
         case kIROp_Int16Type:   return UnownedStringSlice("short");
         case kIROp_IntType:     return UnownedStringSlice("int");
-        case kIROp_Int64Type:   return UnownedStringSlice("long long");
+        case kIROp_Int64Type:   return UnownedStringSlice("longlong");
 
-        case kIROp_UInt8Type:   return UnownedStringSlice("unsigned char");
-        case kIROp_UInt16Type:  return UnownedStringSlice("unsigned short");
-        case kIROp_UIntType:    return UnownedStringSlice("unsigned int");
-        case kIROp_UInt64Type:  return UnownedStringSlice("unsigned long long");
+        case kIROp_UInt8Type:   return UnownedStringSlice("uchar");
+        case kIROp_UInt16Type:  return UnownedStringSlice("ushort");
+        case kIROp_UIntType:    return UnownedStringSlice("uint");
+        case kIROp_UInt64Type:  return UnownedStringSlice("ulonglong");
 
             // Not clear just yet how we should handle half... we want all processing as float probly, but when reading/writing to memory converting
         case kIROp_HalfType:    return UnownedStringSlice("half");

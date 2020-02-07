@@ -13,6 +13,7 @@ Slang 64-bit Type Support
   * D3D targets *appear* to support double intrinsics (like sin, cos, log etc), but behind the scenes they are actually being converted to float
   * When using D3D12, it is best to use DXIL if you use double because there are some serious issues around double and DXBC
 * VK will produce an error in validation if a double intrinsic is used it does support (which is most of them)
+* Vector and Matrix types have even spottier than scalar intrinsic support across targets
 
 Overview
 ========
@@ -59,8 +60,6 @@ uint64_t j = ~0;          // Equivalent to 'i' because uint64_t(int64_t(~int32_t
 ```
 
 These issues are discussed more on issue [#1185](https://github.com/shader-slang/slang/issues/1185)
-
-Note this initial testing only tested scalar usage, and not vector or matrix intrinsics.
 
 Double support
 ==============

@@ -1,33 +1,36 @@
 // TODO(JS):
-// NOTE we can't test on VK/gl at the moment because we don't support intrinsics over matrices on that target currently
-// TODO(JS):
-// Also NOTE, we do not test matrix inverse as currently unsupported on C++/CUDA targets
+// It doesn't look like fxc, dxc, vk support double versions of many of the intrinsics, so they are disabled here.
+// Arguably we should implement simple intrinsics if missing in the stdlib
+// More complicated functions (like say sin) can also be written, if not available on a target, but requires significant
+// care.
 
 //TEST(compute):COMPARE_COMPUTE_EX:-cpu -compute -output-using-type
-//TEST(compute):COMPARE_COMPUTE_EX:-slang -compute -output-using-type
-//TEST(compute):COMPARE_COMPUTE_EX:-slang -compute -dx12 -use-dxil -output-using-type
+//DISABLE_TEST(compute):COMPARE_COMPUTE_EX:-slang -compute -output-using-type
+//DISABLE_TEST(compute):COMPARE_COMPUTE_EX:-slang -compute -dx12 -output-using-type
 //DISABLE_TEST(compute, vulkan):COMPARE_COMPUTE_EX:-vk -compute -output-using-type
-//TEST(compute, vulkan):COMPARE_COMPUTE_EX:-cuda -compute -output-using-type
+//TEST(compute):COMPARE_COMPUTE_EX:-cuda -compute -output-using-type
 
-//TEST_INPUT:ubuffer(data=[0 0 0 0], stride=4):out,name outputBuffer
-RWStructuredBuffer<float> outputBuffer;
+//TEST_INPUT:ubuffer(data=[0 0 0 0 0 0 0 0], stride=4):out,name outputBuffer
+RWStructuredBuffer<double> outputBuffer;
 
-typedef matrix<float, 2, 2> FloatMatrix;
-typedef matrix<int, 2, 2> IntMatrix;
-typedef matrix<uint, 2, 2> UIntMatrix;
-typedef vector<float, 2> FloatVector;
+typedef double Float;
 
-float calcTotal(vector<float, 2> v)
+typedef matrix<Float, 2, 2> FloatMatrix;
+typedef matrix<int64_t, 2, 2> IntMatrix;
+typedef matrix<uint64_t, 2, 2> UIntMatrix;
+typedef vector<Float, 2> FloatVector;
+
+Float calcTotal(FloatVector v)
 {
     return v.x + v.y;
 }
 
-float calcTotal(FloatMatrix v) 
+Float calcTotal(FloatMatrix v) 
 { 
     return calcTotal(v[0]) + calcTotal(v[1]);
 }
 
-FloatMatrix makeFloatMatrix(float f)
+FloatMatrix makeFloatMatrix(Float f)
 {
     FloatMatrix m = { { f, f }, { f, f } };
     return m;
@@ -44,11 +47,11 @@ void computeMain(uint3 dispatchThreadID : SV_DispatchThreadID)
 {
     int idx = int(dispatchThreadID.x);
 
-    float scalarF = idx * (1.0f / (4.0f));
+    Float scalarF = idx * (1.0f / (4.0f));
 
     FloatMatrix ft = {}; 
 
-    FloatMatrix f = { { scalarF + 0.01, scalarF + 0.02f}, { scalarF + 0.011f, scalarF + 0.022f}};
+    FloatMatrix f = { { scalarF + 0.01, scalarF + 0.02}, { scalarF + 0.011, scalarF + 0.022}};
     
     // fmod
     ft += FloatMatrix(IntMatrix(((f % makeFloatMatrix(0.11f)) * makeFloatMatrix(100)) + makeFloatMatrix(0.5)));
@@ -76,9 +79,6 @@ void computeMain(uint3 dispatchThreadID : SV_DispatchThreadID)
     
     ft += atan2(f, makeFloatMatrix(2)); 
 
-#if 0
-    // TODO(JS):
-    // This fails from DXC with a validation error(!)
     {
         FloatMatrix sf, cf;
         sincos(f, sf, cf);
@@ -86,7 +86,6 @@ void computeMain(uint3 dispatchThreadID : SV_DispatchThreadID)
         ft += sf;
         ft += cf;
     }
-#endif 
     
     ft += rcp(makeFloatMatrix(1.0) + f);
     ft += FloatMatrix(sign(f - makeFloatMatrix(0.5)));
@@ -127,11 +126,13 @@ void computeMain(uint3 dispatchThreadID : SV_DispatchThreadID)
 
     ft += step(f, makeFloatMatrix(0.5));
 
+#if 0
     IntMatrix vi = asint(makeFloatMatrix(idx)); 
     ft += asfloat(vi);
     
     UIntMatrix vu = asuint(f);
     ft += asfloat(vu);
+#endif   
    
     outputBuffer[idx] = calcTotal(ft);
 }
