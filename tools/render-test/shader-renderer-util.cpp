@@ -176,7 +176,7 @@ static RefPtr<SamplerState> _createSamplerState(
     for (Index i = 0; i < numEntries; i++)
     {
         const ShaderInputLayoutEntry& srcEntry = srcEntries[i];
-        SLANG_ASSERT(srcEntry.isCPUOnly == false);
+        SLANG_ASSERT(srcEntry.isUniformBindingOnly == false);
 
         DescriptorSetLayout::SlotRangeDesc slotRangeDesc;
 
