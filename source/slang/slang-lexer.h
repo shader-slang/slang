@@ -106,22 +106,22 @@ namespace Slang
 
         TokenList lexAllTokens();
 
-        SourceView*     sourceView;
-        DiagnosticSink* sink;
-        NamePool*       namePool;
+        SourceView*     m_sourceView;
+        DiagnosticSink* m_sink;
+        NamePool*       m_namePool;
 
-        char const*     cursor;
+        char const*     m_cursor;
 
-        char const*     begin;
-        char const*     end;
+        char const*     m_begin;
+        char const*     m_end;
 
         /// The starting sourceLoc (same as first location of SourceView)
-        SourceLoc       startLoc;           
+        SourceLoc       m_startLoc;           
 
-        TokenFlags      tokenFlags;
-        LexerFlags      lexerFlags;
+        TokenFlags      m_tokenFlags;
+        LexerFlags      m_lexerFlags;
 
-        MemoryArena*    memoryArena;
+        MemoryArena*    m_memoryArena;
     };
 
     // Helper routines for extracting values from tokens

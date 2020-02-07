@@ -80,22 +80,22 @@ namespace Slang
         NamePool*       inNamePool,
         MemoryArena*    inMemoryArena)
     {
-        sourceView  = inSourceView;
-        sink        = inSink;
-        namePool    = inNamePool;
-        memoryArena = inMemoryArena;
+        m_sourceView  = inSourceView;
+        m_sink        = inSink;
+        m_namePool    = inNamePool;
+        m_memoryArena = inMemoryArena;
 
         auto content = inSourceView->getContent();
         
-        begin   = content.begin();
-        cursor  = content.begin();
-        end     = content.end();
+        m_begin   = content.begin();
+        m_cursor  = content.begin();
+        m_end     = content.end();
 
         // Set the start location
-        startLoc = inSourceView->getRange().begin;
+        m_startLoc = inSourceView->getRange().begin;
 
-        tokenFlags = TokenFlag::AtStartOfLine | TokenFlag::AfterWhitespace;
-        lexerFlags = 0;
+        m_tokenFlags = TokenFlag::AtStartOfLine | TokenFlag::AfterWhitespace;
+        m_lexerFlags = 0;
     }
 
     Lexer::~Lexer()
@@ -109,11 +109,11 @@ namespace Slang
     static int _peekRaw(Lexer* lexer)
     {
         // If we are at the end of the input, return a designated end-of-file value
-        if(lexer->cursor == lexer->end)
+        if(lexer->m_cursor == lexer->m_end)
             return kEOF;
 
         // Otherwise, just look at the next byte
-        return *lexer->cursor;
+        return *lexer->m_cursor;
     }
 
     // Read one input byte without any special handling (similar to `peekRaw`)
@@ -122,10 +122,10 @@ namespace Slang
         // The logic here is basically the same as for `peekRaw()`,
         // escape we advance `cursor` if we aren't at the end.
 
-        if (lexer->cursor == lexer->end)
+        if (lexer->m_cursor == lexer->m_end)
             return kEOF;
 
-        return *lexer->cursor++;
+        return *lexer->m_cursor++;
     }
 
     // When the cursor is already at the first byte of an end-of-line sequence,
@@ -165,16 +165,16 @@ namespace Slang
             //
             // Note(tfoley): We are assuming a null-terminated input here,
             // so that we can safely look at the next byte without issue.
-            int d = lexer->cursor[1];
+            int d = lexer->m_cursor[1];
             switch (d)
             {
             case '\r': case '\n':
                 {
                     // The newline was escaped, so return the code point after *that*
 
-                    int e = lexer->cursor[2];
+                    int e = lexer->m_cursor[2];
                     if ((d ^ e) == ('\r' ^ '\n'))
-                        return lexer->cursor[3];
+                        return lexer->m_cursor[3];
                     return e;
                 }
 
@@ -196,11 +196,11 @@ namespace Slang
         for (;;)
         {
             // If we are at the end of the input, then the task is easy.
-            if (lexer->cursor == lexer->end)
+            if (lexer->m_cursor == lexer->m_end)
                 return kEOF;
 
             // Look at the next raw byte, and decide what to do
-            int c = *lexer->cursor++;
+            int c = *lexer->m_cursor++;
 
             if (c == '\\')
             {
@@ -209,15 +209,15 @@ namespace Slang
                 //
                 // Note(tfoley): We are assuming a null-terminated input here,
                 // so that we can safely look at the next byte without issue.
-                int d = *lexer->cursor;
+                int d = *lexer->m_cursor;
                 switch (d)
                 {
                 case '\r': case '\n':
                     // handle the end-of-line for our source location tracking
-                    lexer->cursor++;
+                    lexer->m_cursor++;
                     _handleNewLineInner(lexer, d);
 
-                    lexer->tokenFlags |= TokenFlag::ScrubbingNeeded;
+                    lexer->m_tokenFlags |= TokenFlag::ScrubbingNeeded;
 
                     // Now try again, looking at the character after the
                     // escaped newline.
@@ -326,7 +326,7 @@ namespace Slang
 
     static SourceLoc _getSourceLoc(Lexer* lexer)
     {
-        return lexer->startLoc + (lexer->cursor - lexer->begin);
+        return lexer->m_startLoc + (lexer->m_cursor - lexer->m_begin);
     }
 
     static void _lexDigits(Lexer* lexer, int base)
@@ -361,7 +361,7 @@ namespace Slang
             if(digitVal >= base)
             {
                 char buffer[] = { (char) c, 0 };
-                lexer->sink->diagnose(_getSourceLoc(lexer), Diagnostics::invalidDigitForBase, buffer, base);
+                lexer->m_sink->diagnose(_getSourceLoc(lexer), Diagnostics::invalidDigitForBase, buffer, base);
             }
 
             _advance(lexer);
@@ -674,11 +674,11 @@ namespace Slang
             switch(c)
             {
             case kEOF:
-                lexer->sink->diagnose(_getSourceLoc(lexer), Diagnostics::endOfFileInLiteral);
+                lexer->m_sink->diagnose(_getSourceLoc(lexer), Diagnostics::endOfFileInLiteral);
                 return;
 
             case '\n': case '\r':
-                lexer->sink->diagnose(_getSourceLoc(lexer), Diagnostics::newlineInLiteral);
+                lexer->m_sink->diagnose(_getSourceLoc(lexer), Diagnostics::newlineInLiteral);
                 return;
 
             case '\\':
@@ -971,7 +971,7 @@ namespace Slang
 
                 case '0': case '1': case '2': case '3': case '4':
                 case '5': case '6': case '7': case '8': case '9':
-                    lexer->sink->diagnose(loc, Diagnostics::octalLiteral);
+                    lexer->m_sink->diagnose(loc, Diagnostics::octalLiteral);
                     return _lexNumber(lexer, 8);
                 }
             }
@@ -1181,7 +1181,7 @@ namespace Slang
             int c = _advance(lexer);
             if(!(effectiveFlags & kLexerFlag_IgnoreInvalid))
             {
-                auto sink = lexer->sink;
+                auto sink = lexer->m_sink;
                 if(c >= 0x20 && c <=  0x7E)
                 {
                     char buffer[] = { (char) c, 0 };
@@ -1200,15 +1200,15 @@ namespace Slang
 
     Token Lexer::lexToken(LexerFlags extraFlags)
     {
-        auto& flags = this->tokenFlags;
+        auto& flags = m_tokenFlags;
         for(;;)
         {
             Token token;
             token.loc = _getSourceLoc(this);
 
-            char const* textBegin = cursor;
+            char const* textBegin = m_cursor;
 
-            auto tokenType = _lexTokenImpl(this, this->lexerFlags | extraFlags);
+            auto tokenType = _lexTokenImpl(this, m_lexerFlags | extraFlags);
 
             // The low-level lexer produces tokens for things we want
             // to ignore, such as white space, so we skip them here.
@@ -1240,14 +1240,14 @@ namespace Slang
             // preprocessor directive.
             case TokenType::Pound:
                 if((flags & TokenFlag::AtStartOfLine) != 0)
-                    lexerFlags |= kLexerFlag_InDirective;
+                    m_lexerFlags |= kLexerFlag_InDirective;
                 break;
             //
             // And if we saw an end-of-line during a directive, then we are
             // now leaving that directive.
             //
             case TokenType::EndOfDirective:
-                lexerFlags &= ~kLexerFlag_InDirective;
+                m_lexerFlags &= ~kLexerFlag_InDirective;
                 break;
 
             default:
@@ -1256,7 +1256,7 @@ namespace Slang
 
             token.type =  tokenType;
 
-            char const* textEnd = cursor;
+            char const* textEnd = m_cursor;
 
             // Note(tfoley): `StringBuilder::Append()` seems to crash when appending zero bytes
             if(textEnd != textBegin)
@@ -1266,10 +1266,10 @@ namespace Slang
                 // Only perform this work if we encountered an escaped newline
                 // while lexing this token (e.g., keep a flag on the lexer), or
                 // do it on-demand when the actual value of the token is needed.
-                if (tokenFlags & TokenFlag::ScrubbingNeeded)
+                if (m_tokenFlags & TokenFlag::ScrubbingNeeded)
                 {
                     // Allocate space that will always be more than enough for stripped contents
-                    char* startDst = (char*)memoryArena->allocateUnaligned(textEnd - textBegin);
+                    char* startDst = (char*)m_memoryArena->allocateUnaligned(textEnd - textBegin);
                     char* dst = startDst;
 
                     auto tt = textBegin;
@@ -1308,11 +1308,11 @@ namespace Slang
 
             token.flags = flags;
 
-            this->tokenFlags = 0;
+            m_tokenFlags = 0;
 
             if (tokenType == TokenType::Identifier)
             {
-                token.ptrValue = this->namePool->getName(token.Content);
+                token.ptrValue = m_namePool->getName(token.Content);
             }
 
             return token;

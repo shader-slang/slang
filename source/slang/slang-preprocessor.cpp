@@ -2035,7 +2035,7 @@ static void HandleLineDirective(PreprocessorDirectiveContext* context)
         AdvanceToken(context);
 
         // Stop overriding source locations.
-        auto sourceView = inputStream->primaryStream->lexer.sourceView;
+        auto sourceView = inputStream->primaryStream->lexer.m_sourceView;
         sourceView->addDefaultLineDirective(directiveLoc);
         return;
     }
@@ -2072,7 +2072,7 @@ static void HandleLineDirective(PreprocessorDirectiveContext* context)
         return;
     }
 
-    auto sourceView = inputStream->primaryStream->lexer.sourceView;
+    auto sourceView = inputStream->primaryStream->lexer.m_sourceView;
     sourceView->addLineDirective(directiveLoc, file, line);
 }
 
