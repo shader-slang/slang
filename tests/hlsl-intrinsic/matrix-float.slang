@@ -1,4 +1,5 @@
 // NOTE we can't test on VK/gl at the moment because we don't support intrinsics over matrices on that target currently
+// Also NOTE, we do not test matrix inverse as currently unsupported on C++/CUDA targets
 
 //TEST(compute):COMPARE_COMPUTE_EX:-cpu -compute -output-using-type
 //TEST(compute):COMPARE_COMPUTE_EX:-slang -compute -output-using-type

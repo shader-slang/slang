@@ -16,9 +16,6 @@ void computeMain(uint3 dispatchThreadID : SV_DispatchThreadID)
      
     float3 f = float3(0.1f, vf, vf + 0.2f);
     
-    // Vector specific
-    float3 nv = normalize(f);
-    
     
     // Operate over all values
     float3 ft = {};
@@ -29,6 +26,20 @@ void computeMain(uint3 dispatchThreadID : SV_DispatchThreadID)
     ft += sin(f);
     ft += cos(f);
     ft += tan(f);
+    
+    {
+        // Vector specific
+        float3 nv = normalize(ft);
+        ft += nv;
+        
+        float3 perp = cross(nv, f.zxy); 
+        ft += perp;
+  
+        ft += dot(perp, f.zyx);
+        ft += length(perp);
+  
+        ft += reflect(f, perp.yzx);
+    }
     
     ft += asin(f);
     ft += acos(f);
@@ -93,11 +104,10 @@ void computeMain(uint3 dispatchThreadID : SV_DispatchThreadID)
 
     ft += step(f, 0.5);
 
-    int3 vi = asint(f - f) + idx;
+    {
+        int3 vi = asint(f - f) + idx;
+        ft += float3(vi);   
+    }
     
-    ft += float3(vi);   
-
-    float4 result = float4(ft + nv, 0) + float4(vf);
-
-    outputBuffer[idx] = result;
+    outputBuffer[idx] = float4(ft, 0);
 }

@@ -57,6 +57,16 @@ void computeMain(uint3 dispatchThreadID : SV_DispatchThreadID)
     ft += rcp(makeFloatMatrix(1.0l) + f);
     ft += FloatMatrix(sign(f - makeFloatMatrix(0.5l)));
     
+    // Lets try some matrix/matrix
+    ft = f * ft;
+    
+    // Lets try some vector matrix
+    
+    {
+        FloatMatrix r = {mul(f[0], ft), mul(ft, f[1])};
+        ft += r;
+    }
+    
     ft += saturate(f * makeFloatMatrix(4) - makeFloatMatrix(2.0l));
        
     ft += abs(f * makeFloatMatrix(4) - makeFloatMatrix(2.0l));
