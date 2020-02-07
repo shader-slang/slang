@@ -219,7 +219,7 @@ void GPUPrinting::processGPUPrintCommands(const void* data, size_t dataSize)
                     // likely that the application code needs to be configured
                     // to pass in the right strings.
                     //
-                    fprintf(stderr, "error: string with unknown hash %d\n", hash);
+                    fprintf(stderr, "error: string with unknown hash 0x%x\n", hash);
                     continue;
                 }
 
@@ -253,7 +253,7 @@ void GPUPrinting::processGPUPrintCommands(const void* data, size_t dataSize)
                     // likely that the application code needs to be configured
                     // to pass in the right strings.
                     //
-                    fprintf(stderr, "error: string with unknown hash %d\n", formatHash);
+                    fprintf(stderr, "error: string with unknown hash 0x%x\n", formatHash);
                     continue;
                 }
                 std::string format = iter->second;
@@ -373,7 +373,7 @@ void GPUPrinting::processGPUPrintCommands(const void* data, size_t dataSize)
                             auto iter = m_hashedStrings.find(hash);
                             if(iter == m_hashedStrings.end())
                             {
-                                fprintf(stderr, "error: string with unknown hash %d\n", hash);
+                                fprintf(stderr, "error: string with unknown hash 0x%x\n", hash);
                                 continue;
                             }
                             printf("%s", iter->second.c_str());

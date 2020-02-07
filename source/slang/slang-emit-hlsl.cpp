@@ -458,6 +458,22 @@ bool HLSLSourceEmitter::tryEmitInstExprImpl(IRInst* inst, const EmitOpInfo& inOu
             m_writer->emit(")");
             return true;
         }
+        case kIROp_StringLit:
+        {
+            IRStringLit* lit = cast<IRStringLit>(inst);
+            m_writer->emit(GetHashCode(lit->getStringSlice()));
+            return true;
+        }
+        case kIROp_GetStringHash:
+        {
+            // On GLSL target, the `String` type is just an `int`
+            // that is the hash of the string, so we can emit
+            // the first operand to `getStringHash` directly.
+            //
+            EmitOpInfo outerPrec = inOuterPrec;
+            emitOperand(inst->getOperand(0), outerPrec);
+            return true;
+        }
         default: break;
     }
     // Not handled
@@ -584,6 +600,7 @@ void HLSLSourceEmitter::emitSimpleTypeImpl(IRType* type)
             }
             return;
         }
+        case kIROp_StringType: m_writer->emit("int"); return;
         default: break;
     }
 

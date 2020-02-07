@@ -29,10 +29,10 @@ void computeMain(uint3 tid : SV_DispatchThreadID)
     // in terms of their hash code, and the current Slang implementation
     // of `getStringHash` only applies to string literals.
     //
-    println(getStringHash("hello from thread number "), tid.x);
+    println("hello from thread number ", tid.x);
 
     // The second facility supported by `printing.slang` is a C-style
     // `printf()` function.
     //
-    printf(getStringHash("printf from thread 0x%x\n"), tid.x);
+    printf("printf from thread 0x%x\n", tid.x);
 }
