@@ -71,10 +71,23 @@ namespace renderer_test
             default: return false;
         }
     }
+    static bool _isPTXTarget(SlangCompileTarget target)
+    {
+        switch (target)
+        {
+            case SLANG_CUDA_SOURCE:
+            case SLANG_PTX:
+            {
+                return true;
+            }
+            default: return false;
+        }
+    }
+
 
     void ShaderInputLayout::updateForTarget(SlangCompileTarget target)
     {
-        if (!_isCPUTarget(target))
+        if (!_isCPUTarget(target) && !_isPTXTarget(target))
         {
             int count = int(entries.getCount());
             for (int i = 0; i < count; ++i)
