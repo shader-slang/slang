@@ -3899,6 +3899,19 @@ void TypeLayout::removeResourceUsage(LayoutResourceKind kind)
     }
 }
 
+void VarLayout::removeResourceUsage(LayoutResourceKind kind)
+{
+    Int infoCount = resourceInfos.getCount();
+    for( Int ii = 0; ii < infoCount; ++ii )
+    {
+        if( resourceInfos[ii].kind == kind )
+        {
+            resourceInfos.removeAt(ii);
+            return;
+        }
+    }
+}
+
 
 void TypeLayout::addResourceUsageFrom(TypeLayout* otherTypeLayout)
 {

@@ -557,6 +557,7 @@ ScalarizedVal createSimpleGLSLGlobalVarying(
     LayoutResourceKind          kind,
     Stage                       stage,
     UInt                        bindingIndex,
+    UInt                        bindingSpace,
     GlobalVaryingDeclarator*    declarator)
 {
     // Check if we have a system value on our hands.
@@ -613,7 +614,9 @@ ScalarizedVal createSimpleGLSLGlobalVarying(
     //
     IRVarLayout::Builder varLayoutBuilder(builder, typeLayout);
     varLayoutBuilder.cloneEverythingButOffsetsFrom(inVarLayout);
-    varLayoutBuilder.findOrAddResourceInfo(kind)->offset = bindingIndex;
+    auto varOffsetInfo = varLayoutBuilder.findOrAddResourceInfo(kind);
+    varOffsetInfo->offset = bindingIndex;
+    varOffsetInfo->space = bindingSpace;
     IRVarLayout* varLayout = varLayoutBuilder.build();
 
     // We are going to be creating a global parameter to replace
@@ -674,6 +677,7 @@ ScalarizedVal createGLSLGlobalVaryingsImpl(
     LayoutResourceKind          kind,
     Stage                       stage,
     UInt                        bindingIndex,
+    UInt                        bindingSpace,
     GlobalVaryingDeclarator*    declarator)
 {
     if (as<IRVoidType>(type))
@@ -684,20 +688,20 @@ ScalarizedVal createGLSLGlobalVaryingsImpl(
     {
         return createSimpleGLSLGlobalVarying(
             context,
-            builder, type, varLayout, typeLayout, kind, stage, bindingIndex, declarator);
+            builder, type, varLayout, typeLayout, kind, stage, bindingIndex, bindingSpace, declarator);
     }
     else if( as<IRVectorType>(type) )
     {
         return createSimpleGLSLGlobalVarying(
             context,
-            builder, type, varLayout, typeLayout, kind, stage, bindingIndex, declarator);
+            builder, type, varLayout, typeLayout, kind, stage, bindingIndex, bindingSpace, declarator);
     }
     else if( as<IRMatrixType>(type) )
     {
         // TODO: a matrix-type varying should probably be handled like an array of rows
         return createSimpleGLSLGlobalVarying(
             context,
-            builder, type, varLayout, typeLayout, kind, stage, bindingIndex, declarator);
+            builder, type, varLayout, typeLayout, kind, stage, bindingIndex, bindingSpace, declarator);
     }
     else if( auto arrayType = as<IRArrayType>(type) )
     {
@@ -723,6 +727,7 @@ ScalarizedVal createGLSLGlobalVaryingsImpl(
             kind,
             stage,
             bindingIndex,
+            bindingSpace,
             &arrayDeclarator);
     }
     else if( auto streamType = as<IRHLSLStreamOutputType>(type))
@@ -741,6 +746,7 @@ ScalarizedVal createGLSLGlobalVaryingsImpl(
             kind,
             stage,
             bindingIndex,
+            bindingSpace,
             declarator);
     }
     else if(auto structType = as<IRStructType>(type))
@@ -775,8 +781,12 @@ ScalarizedVal createGLSLGlobalVaryingsImpl(
             auto fieldLayout = structTypeLayout->getFieldLayout(fieldIndex);
 
             UInt fieldBindingIndex = bindingIndex;
-            if(auto fieldResInfo = fieldLayout->findOffsetAttr(kind))
+            UInt fieldBindingSpace = bindingSpace;
+            if( auto fieldResInfo = fieldLayout->findOffsetAttr(kind) )
+            {
                 fieldBindingIndex += fieldResInfo->getOffset();
+                fieldBindingSpace += fieldResInfo->getSpace();
+            }
 
             auto fieldVal = createGLSLGlobalVaryingsImpl(
                 context,
@@ -787,6 +797,7 @@ ScalarizedVal createGLSLGlobalVaryingsImpl(
                 kind,
                 stage,
                 fieldBindingIndex,
+                fieldBindingSpace,
                 declarator);
             if (fieldVal.flavor != ScalarizedVal::Flavor::none)
             {
@@ -804,7 +815,7 @@ ScalarizedVal createGLSLGlobalVaryingsImpl(
     // Default case is to fall back on the simple behavior
     return createSimpleGLSLGlobalVarying(
         context,
-        builder, type, varLayout, typeLayout, kind, stage, bindingIndex, declarator);
+        builder, type, varLayout, typeLayout, kind, stage, bindingIndex, bindingSpace, declarator);
 }
 
 ScalarizedVal createGLSLGlobalVaryings(
@@ -816,11 +827,15 @@ ScalarizedVal createGLSLGlobalVaryings(
     Stage                       stage)
 {
     UInt bindingIndex = 0;
-    if(auto rr = layout->findOffsetAttr(kind))
+    UInt bindingSpace = 0;
+    if( auto rr = layout->findOffsetAttr(kind) )
+    {
         bindingIndex = rr->getOffset();
+        bindingSpace = rr->getSpace();
+    }
     return createGLSLGlobalVaryingsImpl(
         context,
-        builder, type, layout, layout->getTypeLayout(), kind, stage, bindingIndex, nullptr);
+        builder, type, layout, layout->getTypeLayout(), kind, stage, bindingIndex, bindingSpace, nullptr);
 }
 
 ScalarizedVal extractField(

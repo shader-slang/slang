@@ -1293,6 +1293,12 @@ attribute_syntax [vk_push_constant]									: PushConstantAttribute;
 __attributeTarget(DeclBase)
 attribute_syntax [push_constant]									: PushConstantAttribute;
 
+__attributeTarget(VarDeclBase)
+attribute_syntax [vk_location(locaiton : int)] : GLSLLocationAttribute;
+
+__attributeTarget(VarDeclBase)
+attribute_syntax [vk_index(index : int)] : GLSLIndexAttribute;
+
 // Statement Attributes
 
 __attributeTarget(LoopStmt)

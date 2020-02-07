@@ -1393,68 +1393,112 @@ static RefPtr<TypeLayout> processSimpleEntryPointParameter(
     String sn = semanticName.toLower();
 
     RefPtr<TypeLayout> typeLayout;
+
+    // First we check for a system-value semantic, operating
+    // under the assumption that *any* semantic with an `SV_`
+    // or `NV_` prefix is a system value.
+    //
     if (sn.startsWith("sv_")
         || sn.startsWith("nv_"))
     {
-        // System-value semantic.
-
-        if (state.directionMask & kEntryPointParameterDirection_Output)
+        // Fragment shader color/render target outputs need to be handled
+        // specially, because they are declared with an `SV`-prefixed
+        // "system value" semantic, but in practice they are ordinary
+        // user-defined outputs.
+        //
+        // TODO: We should consider allowing fragment-shader outputs
+        // with arbitrary semantics, and simply treat them as if
+        // they were declared with `SV_Target`.
+        //
+        if( (state.directionMask & kEntryPointParameterDirection_Output)
+            && (state.stage == Stage::Fragment)
+            && (sn == "sv_target") )
         {
-            // Note: I'm just doing something expedient here and detecting `SV_Target`
-            // outputs and claiming the appropriate register range right away.
+            // Note: For D3D shader models 5.0 and below, each `SV_Target<N>`
+            // output conflicts with UAV register `u<N>`.
             //
-            // TODO: we should really be building up some representation of all of this,
-            // once we've gone to the trouble of looking it all up...
-            if( sn == "sv_target" )
+            if( isD3DTarget(context->getTargetRequest()) )
             {
-                // TODO: construct a `ParameterInfo` we can use here so that
-                // overlapped layout errors get reported nicely.
-
-                auto usedResourceSet = findUsedRangeSetForSpace(context, 0);
-                usedResourceSet->usedResourceRanges[int(LayoutResourceKind::UnorderedAccess)].Add(nullptr, semanticIndex, semanticIndex + semanticSlotCount);
-
-
-                // We also need to track this as an ordinary varying output from the stage,
-                // since that is how GLSL will want to see it.
-                //
-                typeLayout = getSimpleVaryingParameterTypeLayout(
-                    context->layoutContext,
-                    type,
-                    kEntryPointParameterDirection_Output);
+                auto version = context->getTargetRequest()->targetProfile.GetVersion();
+                if( version <= ProfileVersion::DX_5_0 )
+                {
+                    // We will address the conflict here by claiming the corresponding
+                    // `u` register.
+                    //
+                    // Note: because entry point parameters get processed *before*
+                    // registers get assigned to global-scope parameters, this
+                    // allocation will prevent register `u<N>` from being auto-assigned
+                    // to any global parameter.
+                    //
+                    // TODO: construct a `ParameterInfo` we can use here so that
+                    // overlapped layout errors get reported nicely.
+                    //
+                    auto usedResourceSet = findUsedRangeSetForSpace(context, 0);
+                    usedResourceSet->usedResourceRanges[int(LayoutResourceKind::UnorderedAccess)].Add(nullptr, semanticIndex, semanticIndex + semanticSlotCount);
+                }
             }
-        }
 
-        if (state.directionMask & kEntryPointParameterDirection_Input)
-        {
-            if (sn == "sv_sampleindex")
-            {
-                state.isSampleRate = true;
-            }
+            // A fragment shader output is effectively a user-defined output,
+            // even if it was declared with `SV_Target`.
+            //
+            typeLayout = getSimpleVaryingParameterTypeLayout(
+                context->layoutContext,
+                type,
+                kEntryPointParameterDirection_Output);
         }
-
-        if( !typeLayout )
+        else
         {
-            // If we didn't compute a special-case layout for the
-            // system-value parameter (e.g., because it was an
-            // `SV_Target` output), then create a default layout
-            // that consumes no input/output varying slots.
-            // (since system parameters are distinct from
-            // user-defined parameters for layout purposes)
+            // For a system-value parameter (that didn't match the
+            // `SV_Target` special case above) we create a default
+            // layout that consumes no input/output varying slots.
+            //
+            // The rationale here is that system parameters are distinct
+            // form user-defined parameters for layout purposes, and
+            // in particular should not be assigned `location`s on
+            // GLSL-based targets.
             //
             typeLayout = getSimpleVaryingParameterTypeLayout(
                 context->layoutContext,
                 type,
                 0);
+
+            // We need to compute whether an entry point consumes
+            // any sample-rate inputs, and along with explicitly
+            // `sample`-qualified parameters, we also need to
+            // detect use of `SV_SampleIndex` as an input.
+            //
+            if (state.directionMask & kEntryPointParameterDirection_Input)
+            {
+                if (sn == "sv_sampleindex")
+                {
+                    state.isSampleRate = true;
+                }
+            }
         }
 
-        // Remember the system-value semantic so that we can query it later
+        // For any case of a system-value semantic (including `SV_Target`)
+        // we record the system-value semantic so it can be queried
+        // via reflection.
+        //
+        // TODO: We might want to consider skipping this step for
+        // `SV_Target` outputs and treating them consistently as
+        // just user-defined outputs.
+        //
         if (varLayout)
         {
             varLayout->systemValueSemantic = semanticName;
             varLayout->systemValueSemanticIndex = semanticIndex;
         }
 
-        // TODO: add some kind of usage information for system input/output
+        // TODO: We might want to consider tracking some kind of usage
+        // information for system inputs/outputs. In particular, it
+        // would be good to check for and diagnose overlapping system
+        // value declarations.
+
+        // TODO: We should eventually be checking that system values
+        // are appropriate to the stage that they appear on, and also
+        // map the system value semantic string over to an `enum`
+        // type of known/supported system value semantics.
     }
     else
     {
@@ -1483,6 +1527,18 @@ static RefPtr<TypeLayout> processSimpleEntryPointParameter(
     return typeLayout;
 }
 
+    /// Compute layout information for an entry-point parameter `decl`.
+    ///
+    /// This function should be used for a top-level entry point varying
+    /// parameter or a field of a structure used for varying parameters,
+    /// but *not* for any recursive case that operates on a type without
+    /// an associated declaration (e.g., recursing on `X` when dealing
+    /// with a parameer of type `X[]`).
+    ///
+    /// This function is responsible for processing any atributes or
+    /// other modifiers on the declaration that should impact out layout
+    /// is computed.
+    ///
 static RefPtr<TypeLayout> processEntryPointVaryingParameterDecl(
     ParameterBindingContext*        context,
     Decl*                           decl,
@@ -1490,13 +1546,46 @@ static RefPtr<TypeLayout> processEntryPointVaryingParameterDecl(
     EntryPointParameterState const& inState,
     RefPtr<VarLayout>               varLayout)
 {
-    SimpleSemanticInfo semanticInfo;
-    int semanticIndex = 0;
+    // One of our responsibilities when recursing through varying
+    // parameters is to compute the semantic name/index for each
+    // parameter.
+    //
+    // Semantics can either be declared per field/parameter:
+    //
+    //      struct Output
+    //      {
+    //          float4 a : A;
+    //          float4 b : B;
+    //      }
+    //
+    // or they can be applied to an entire aggregate type:
+    //
+    //      void entryPoint(out Output o : OUTPUT) { ... }
+    //
+    // When these both of the above cases apply to a
+    // leaf parameter/field, then the policy is that the
+    // "outer-most" semantic wins. Thus in the case above,
+    // `o.a` gets semantic `OUTPUT0` and `o.b` gets semantic
+    // `OUTPUT1`.
 
+    // By default the state we use for processing the
+    // parameter/field `decl` will be the state that was
+    // inherited from the outer context (if any).
+    //
     EntryPointParameterState state = inState;
 
-    // If there is no explicit semantic already in effect, *and* we find an explicit
-    // semantic on the associated declaration, then we'll use it.
+    // If there is already a semantic name coming from the
+    // outer context, we will use it, but if there is no
+    // outer semantic *and* the current field/parameter `decl`
+    // has an explicit semantic, we will use that.
+    //
+    // Note: we allocate the storage for the variables that
+    // will track the semantic state outside the conditional,
+    // so that they are in scope for the recusrivse call
+    // coming up.
+    //
+    SimpleSemanticInfo semanticInfo;
+    int semanticIndex = 0;
     if( !state.optSemanticName )
     {
         if( auto semantic = decl->FindModifier<HLSLSimpleSemantic>() )
@@ -1509,6 +1598,12 @@ static RefPtr<TypeLayout> processEntryPointVaryingParameterDecl(
         }
     }
 
+    // One of our tasks is to track whether a fragment shader
+    // has any sample-rate varying inputs. To that end, we
+    // will pass down a marker if this parameter was declared
+    // with the `sample` modifier, so that we can detect
+    // sample-rate inputs at the leaves.
+    //
     if (decl)
     {
         if (decl->FindModifier<HLSLSampleModifier>())
@@ -1517,11 +1612,89 @@ static RefPtr<TypeLayout> processEntryPointVaryingParameterDecl(
         }
     }
 
-    // Default case: either there was an explicit semantic in effect already,
-    // *or* we couldn't find an explicit semantic to apply on the given
-    // declaration, so we will just recursive with whatever we have at
-    // the moment.
-    return processEntryPointVaryingParameter(context, type, state, varLayout);
+    // With the state to use for assigning semantics computed,
+    // we now do processing that depends on the type of
+    // the parameter, which may involve recursing into its
+    // fields.
+    //
+    // The result of this step is the type layout to use for
+    // our field/parameter `decl` in this context.
+    //
+    auto typeLayout = processEntryPointVaryingParameter(context, type, state, varLayout);
+
+    // For Khronos targets (OpenGL and Vulkan), we need to process
+    // the `[[vk::location(...)]]` and `[[vk::index(...)]]` attributes,
+    // if present.
+    //
+    // TODO: In principle we should *also* be using the data from
+    // `SV_Target<N>` semantics as an equivalent to `location = <N>`
+    // when targetting Vulkan. Right now we are kind of skating by
+    // on the fact that people almost always declare `SV_Target`s
+    // in numerical order, so that our automatic assignment of
+    // `location`s in declaration order coincidentally matches
+    // the `SV_Target` order.
+    //
+    if( isKhronosTarget(context->getTargetRequest()) )
+    {
+        if( auto locationAttr = decl->FindModifier<GLSLLocationAttribute>() )
+        {
+            int location = locationAttr->value;
+
+            int index = 0;
+            if( auto indexAttr = decl->FindModifier<GLSLIndexAttribute>() )
+            {
+                index = indexAttr->value;
+            }
+
+            // TODO: We should eventually include validation that a non-zero
+            // `vk::index` is only valid for fragment shader color outputs.
+
+            // Once we've extracted the data from the attribute(s), we
+            // need to apply it to the `varLayout` for the parameter/field `decl`.
+            //
+            LayoutResourceKind kinds[] = { LayoutResourceKind::VaryingInput, LayoutResourceKind::VaryingOutput };
+            for( auto kind : kinds )
+            {
+                auto typeResInfo = typeLayout->FindResourceInfo(kind);
+                if(!typeResInfo)
+                    continue;
+
+                auto varResInfo = varLayout->findOrAddResourceInfo(kind);
+                varResInfo->index = location;
+
+                // Note: OpenGL and Vulkan represent dual-source color blending
+                // differently from multiple render targets (MRT) at the source
+                // level.
+                //
+                // When using MRT, GLSL (and thus SPIR-V) looks like this:
+                //
+                //      layout(location = 0) vec4 a;
+                //      layout(location = 1) vec4 b;
+                //
+                // When using dual-source blending the GLSL/SPIR-V looks like:
+                //
+                //      layout(location = 0)            vec4 a;
+                //      layout(location = 0, index = 1) vec4 b;
+                //
+                // Thus for a parameter of kind `VaryingOutput` when targetting
+                // GLSL/SPIR-V, we need a way to encode the value that was pased
+                // for `index` on the secondary color output.
+                //
+                // We are already using the `index` field in the `VarLayout::ResourceInfo`
+                // to store what GLSL/SPIR-V calls the "location," so we will
+                // hijack the `space` field (which is usually unused for varying
+                // parameters) to store the GLSL/SPIR-V "index" value.
+                //
+                varResInfo->space = index;
+            }
+        }
+        else if( auto indexAttr = decl->FindModifier<GLSLIndexAttribute>() )
+        {
+            getSink(context)->diagnose(indexAttr, Diagnostics::vkIndexWithoutVkLocation, decl->getName());
+        }
+    }
+
+    return typeLayout;
 }
 
 static RefPtr<TypeLayout> processEntryPointVaryingParameter(
@@ -1721,11 +1894,30 @@ static RefPtr<TypeLayout> processEntryPointVaryingParameter(
             RefPtr<StructTypeLayout> structLayout = new StructTypeLayout();
             structLayout->type = type;
 
-            // Need to recursively walk the fields of the structure now...
+            // We will recursively walk the fields of a `struct` type
+            // to compute layouts for those fields.
+            //
+            // Along the way, we may find fields with explicit layout
+            // annotations, along with fields that have no explicit
+            // layout. We will consider it an error to have a mix of
+            // the two.
+            //
+            // TODO: We could support a mix of implicit and explicit
+            // layout by performing layout on fields in two passes,
+            // much like is done for the global scope. This would
+            // complicate layout significantly for little practical
+            // benefit, so it is very much a "nice to have" rather
+            // than a "must have" feature.
+            //
+            Decl* firstExplicit = nullptr;
+            Decl* firstImplicit = nullptr;
             for( auto field : GetFields(structDeclRef) )
             {
                 RefPtr<VarLayout> fieldVarLayout = new VarLayout();
                 fieldVarLayout->varDecl = field;
+
+                structLayout->fields.add(fieldVarLayout);
+                structLayout->mapVarToLayout.Add(field.getDecl(), fieldVarLayout);
 
                 auto fieldTypeLayout = processEntryPointVaryingParameterDecl(
                     context,
@@ -1734,22 +1926,52 @@ static RefPtr<TypeLayout> processEntryPointVaryingParameter(
                     state,
                     fieldVarLayout);
 
-                if(fieldTypeLayout)
+                SLANG_ASSERT(fieldTypeLayout);
+                if(!fieldTypeLayout)
+                    continue;
+                fieldVarLayout->typeLayout = fieldTypeLayout;
+
+                // The field needs to have offset information stored
+                // in `fieldVarLayout` for every kind of resource
+                // consumed by `fieldTypeLayout`.
+                //
+                for(auto fieldTypeResInfo : fieldTypeLayout->resourceInfos)
                 {
-                    fieldVarLayout->typeLayout = fieldTypeLayout;
+                    SLANG_RELEASE_ASSERT(fieldTypeResInfo.count != 0);
+                    auto kind = fieldTypeResInfo.kind;
 
-                    for (auto rr : fieldTypeLayout->resourceInfos)
+                    auto structTypeResInfo = structLayout->findOrAddResourceInfo(kind);
+
+                    auto fieldResInfo = fieldVarLayout->FindResourceInfo(kind);
+                    if( !fieldResInfo )
                     {
-                        SLANG_RELEASE_ASSERT(rr.count != 0);
+                        if(!firstImplicit) firstImplicit = field;
 
-                        auto structRes = structLayout->findOrAddResourceInfo(rr.kind);
-                        fieldVarLayout->findOrAddResourceInfo(rr.kind)->index = structRes->count.getFiniteValue();
-                        structRes->count += rr.count;
+                        // In the implicit-layout case, we assign the field
+                        // the next available offset after the fields that
+                        // have preceded it.
+                        //
+                        fieldResInfo = fieldVarLayout->findOrAddResourceInfo(kind);
+                        fieldResInfo->index = structTypeResInfo->count.getFiniteValue();
+                        structTypeResInfo->count += fieldTypeResInfo.count;
                     }
-                }
+                    else
+                    {
+                        if(!firstExplicit) firstExplicit = field;
 
-                structLayout->fields.add(fieldVarLayout);
-                structLayout->mapVarToLayout.Add(field.getDecl(), fieldVarLayout);
+                        // In the explicit case, the field already has offset
+                        // information, and we just need to update the computed
+                        // size of the `struct` type to account for the field.
+                        //
+                        auto fieldEndOffset = fieldResInfo->index + fieldTypeResInfo.count;
+                        structTypeResInfo->count = maximum(structTypeResInfo->count, fieldEndOffset);
+                    }
+
+                }
+            }
+            if( firstImplicit && firstExplicit )
+            {
+                getSink(context)->diagnose(firstImplicit, Diagnostics::mixingImplicitAndExplicitBindingForVaryingParams, firstImplicit->getName(), firstExplicit->getName());
             }
 
             return structLayout;
@@ -1992,44 +2214,6 @@ struct ScopeLayoutBuilder
 
     }
 
-        // Add a "simple" parameter that cannot have any user-defined
-        // register or binding modifiers, so that its layout computation
-        // can be simplified greatly.
-        //
-    void addSimpleParameter(
-        RefPtr<VarLayout> varLayout)
-    {
-        // The main `addParameter` logic will deal with any ordinary/uniform data,
-        // and with the "pending" part of the layout.
-        //
-        addParameter(varLayout);
-
-        // That leaves us to deal with the resource usage that isn't
-        // handled by `addParameter`.
-        //
-        auto paramTypeLayout = varLayout->getTypeLayout();
-        for (auto paramTypeResInfo : paramTypeLayout->resourceInfos)
-        {
-            // We need to skip ordinary/uniform data because it was
-            // handled by `addParameter`.
-            //
-            if(paramTypeResInfo.kind == LayoutResourceKind::Uniform)
-                continue;
-
-            // Whatever resources the parameter uses, we need to
-            // assign the parameter's location/register/binding offset to
-            // be the sum of everything added so far.
-            //
-            auto scopeResInfo = m_structLayout->findOrAddResourceInfo(paramTypeResInfo.kind);
-            varLayout->findOrAddResourceInfo(paramTypeResInfo.kind)->index = scopeResInfo->count.getFiniteValue();
-
-            // We then need to add the resources consumed by the parameter
-            // to those consumed by the scope.
-            //
-            scopeResInfo->count += paramTypeResInfo.count;
-        }
-    }
-
     RefPtr<VarLayout> endLayout()
     {
         // Finish computing the layout for the ordindary data (if any).
@@ -2066,6 +2250,121 @@ struct ScopeLayoutBuilder
         }
 
         return scopeVarLayout;
+    }
+};
+
+// Scope layout builder specialized to the case of "simple"
+// scopes (more or less everything but the global scope)
+//
+struct SimpleScopeLayoutBuilder : ScopeLayoutBuilder
+{
+    typedef ScopeLayoutBuilder Super;
+
+        // Add a "simple" parameter that cannot have any user-defined
+        // register or binding modifiers, so that its layout computation
+        // can be simplified greatly.
+        //
+    void addSimpleParameter(
+        RefPtr<VarLayout> varLayout)
+    {
+        // The main `addParameter` logic will deal with any ordinary/uniform data,
+        // and with the "pending" part of the layout.
+        //
+        addParameter(varLayout);
+
+        // That leaves us to deal with the resource usage that isn't
+        // handled by `addParameter`, which we will defer until
+        // `endLayout()` is called.
+    }
+
+    RefPtr<VarLayout> endLayout()
+    {
+        // In order to support a mix of parameters with explicit
+        // and implicit layout, we will process the parameters in
+        // two phases.
+        //
+        // In the first phase we will collect information about
+        // resource ranges already claimed by parameters in the
+        // scope.
+        //
+        UsedRanges usedRangeSet[kLayoutResourceKindCount];
+        for( auto paramVarLayout : m_structLayout->fields )
+        {
+            auto paramTypeLayout = paramVarLayout->getTypeLayout();
+            for (auto paramTypeResInfo : paramTypeLayout->resourceInfos)
+            {
+                auto kind = paramTypeResInfo.kind;
+
+                // We will look for an explicit/existing binding in
+                // the parameter var layout, which would represent
+                // an explicit binding, and skip the parameter if
+                // we don't find one.
+                //
+                auto paramResInfo = paramVarLayout->FindResourceInfo(kind);
+                if(!paramResInfo)
+                    continue;
+
+                // If we found an explicit binding, then we need
+                // to add it to our set for tracking.
+                //
+                auto startOffset = paramResInfo->index;
+                auto endOffset = startOffset + paramTypeResInfo.count;
+                usedRangeSet[int(kind)].Add(paramVarLayout, startOffset, endOffset);
+            }
+        }
+        //
+        // Next we iterate over the parameters again, and assign
+        // unused ranges to all of those that didn't have ranges
+        // explicitly bound.
+        //
+        for( auto paramVarLayout : m_structLayout->fields )
+        {
+            auto paramTypeLayout = paramVarLayout->getTypeLayout();
+            for (auto paramTypeResInfo : paramTypeLayout->resourceInfos)
+            {
+                auto kind = paramTypeResInfo.kind;
+
+                // We only care about parameters that are not already
+                // explicitly bound, so we will skip those that already
+                // have offset information for `kind`.
+                //
+                auto paramResInfo = paramVarLayout->FindResourceInfo(kind);
+                if(paramResInfo)
+                    continue;
+                paramResInfo = paramVarLayout->findOrAddResourceInfo(kind);
+
+                paramResInfo->index = usedRangeSet[int(kind)].Allocate(paramVarLayout, paramTypeResInfo.count.getFiniteValue());
+            }
+        }
+        //
+        // Finally, we need to compute the overall resource usage of
+        // the scope/aggregate, so that it includes the ranges consumed
+        // by all of the parameters/fields.
+        //
+        for( auto paramVarLayout : m_structLayout->fields )
+        {
+            auto paramTypeLayout = paramVarLayout->getTypeLayout();
+            for (auto paramTypeResInfo : paramTypeLayout->resourceInfos)
+            {
+                auto kind = paramTypeResInfo.kind;
+
+                auto paramResInfo = paramVarLayout->FindResourceInfo(kind);
+                SLANG_ASSERT(paramResInfo);
+                if(!paramResInfo) continue;
+
+                auto startOffset = paramResInfo->index;
+                auto endOffset = startOffset + paramTypeResInfo.count;
+
+                auto scopeResInfo = m_structLayout->findOrAddResourceInfo(paramTypeResInfo.kind);
+                scopeResInfo->count = maximum(scopeResInfo->count, endOffset);
+            }
+        }
+
+        // Once we are done providing explicit offsets for all the parameters,
+        // we can defer to the base `ScopeLayoutBuilder` logic to decide
+        // whether to allocate a default constant buffer or anything like that.
+        //
+        return Super::endLayout();
     }
 };
 
@@ -2110,6 +2409,19 @@ static void removePerEntryPointParameterKinds(
     typeLayout->removeResourceUsage(LayoutResourceKind::HitAttributes);
     typeLayout->removeResourceUsage(LayoutResourceKind::ExistentialObjectParam);
     typeLayout->removeResourceUsage(LayoutResourceKind::ExistentialTypeParam);
+}
+
+static void removePerEntryPointParameterKinds(
+    VarLayout* varLayout)
+{
+    removePerEntryPointParameterKinds(varLayout->typeLayout);
+
+    varLayout->removeResourceUsage(LayoutResourceKind::VaryingInput);
+    varLayout->removeResourceUsage(LayoutResourceKind::VaryingOutput);
+    varLayout->removeResourceUsage(LayoutResourceKind::ShaderRecord);
+    varLayout->removeResourceUsage(LayoutResourceKind::HitAttributes);
+    varLayout->removeResourceUsage(LayoutResourceKind::ExistentialObjectParam);
+    varLayout->removeResourceUsage(LayoutResourceKind::ExistentialTypeParam);
 }
 
     /// Iterate over the parameters of an entry point to compute its requirements.
@@ -2187,7 +2499,7 @@ static RefPtr<EntryPointLayout> collectEntryPointParameters(
     // in the parameter list (e.g., a `uniform float4x4 mvp` parameter),
     // which is what the `ScopeLayoutBuilder` is designed to help with.
     //
-    ScopeLayoutBuilder scopeBuilder;
+    SimpleScopeLayoutBuilder scopeBuilder;
     scopeBuilder.beginLayout(context);
     auto paramsStructLayout = scopeBuilder.m_structLayout;
     paramsStructLayout->type = entryPointType;
@@ -2255,26 +2567,6 @@ static RefPtr<EntryPointLayout> collectEntryPointParameters(
         //
         scopeBuilder.addSimpleParameter(paramVarLayout);
     }
-
-    // We don't want certain kinds of resource usage within an entry
-    // point to "leak" into the overall resource usage of the entry
-    // point and thus lead to offsetting of successive entry points.
-    //
-    // For example if we have a vertex and a fragment entry point
-    // in the some program, and each has one varying input, then
-    // the both the vertex and fragment varying outputs should have
-    // a location/index of zero. It would be bad if the fragment
-    // input (or whichever entry point comes second in the global
-    // ordering) started at location one, because then it wouldn't
-    // line up correctly with any vertex stage outputs.
-    //
-    // We handle this with a bit of a kludge, by removing the
-    // particular `LayoutResourceKind`s that are susceptible to
-    // this problem from the overall resource usage of the entry
-    // point.
-    //
-    removePerEntryPointParameterKinds(scopeBuilder.m_structLayout);
-
     entryPointLayout->parametersLayout = scopeBuilder.endLayout();
 
     // For an entry point with a non-`void` return type, we need to process the
@@ -2315,6 +2607,26 @@ static RefPtr<EntryPointLayout> collectEntryPointParameters(
 
         entryPointLayout->resultLayout = resultLayout;
     }
+
+    // We don't want certain kinds of resource usage within an entry
+    // point to "leak" into the overall resource usage of the entry
+    // point and thus lead to offsetting of successive entry points.
+    //
+    // For example if we have a vertex and a fragment entry point
+    // in the some program, and each has one varying input, then
+    // the both the vertex and fragment varying outputs should have
+    // a location/index of zero. It would be bad if the fragment
+    // input (or whichever entry point comes second in the global
+    // ordering) started at location one, because then it wouldn't
+    // line up correctly with any vertex stage outputs.
+    //
+    // We handle this with a bit of a kludge, by removing the
+    // particular `LayoutResourceKind`s that are susceptible to
+    // this problem from the overall resource usage of the entry
+    // point.
+    //
+    removePerEntryPointParameterKinds(paramsStructLayout);
+    removePerEntryPointParameterKinds(entryPointLayout->parametersLayout);
 
     return entryPointLayout;
 }

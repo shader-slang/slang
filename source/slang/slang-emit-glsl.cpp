@@ -470,10 +470,15 @@ bool GLSLSourceEmitter::_emitGLSLLayoutQualifier(LayoutResourceKind kind, EmitVa
         }
         break;
 
-        case LayoutResourceKind::VertexInput:
-        case LayoutResourceKind::FragmentOutput:
+        case LayoutResourceKind::VaryingInput:
+        case LayoutResourceKind::VaryingOutput:
             m_writer->emit("layout(location = ");
             m_writer->emit(index);
+            if( space )
+            {
+                m_writer->emit(", index = ");
+                m_writer->emit(space);
+            }
             m_writer->emit(")\n");
             break;
 

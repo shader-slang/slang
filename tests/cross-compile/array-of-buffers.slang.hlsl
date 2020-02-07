@@ -17,7 +17,7 @@ struct S_0
 
 ConstantBuffer<S_0>        cb_0 [3] : register(b1);
 StructuredBuffer<S_0>      sb1_0[4] : register(t0);
-RWStructuredBuffer<float4> sb2_0[5] : register(u1);
+RWStructuredBuffer<float4> sb2_0[5] : register(u0);
 ByteAddressBuffer          bb_0[6]  : register(t4);
 
 float4 main() : SV_TARGET
