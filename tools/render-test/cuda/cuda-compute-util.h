@@ -36,7 +36,7 @@ struct CUDAComputeUtil
         List<BindSet::Value*> m_buffers;
     };
 
-    static SlangResult execute(const ShaderCompilerUtil::OutputAndLayout& outputAndLayout, Context& outContext);
+    static SlangResult execute(const ShaderCompilerUtil::OutputAndLayout& outputAndLayout, const uint32_t dispatchSize[3], Context& outContext);
 
     static bool canCreateDevice();
 };

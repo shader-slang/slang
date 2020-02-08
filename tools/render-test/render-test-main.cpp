@@ -613,7 +613,7 @@ SLANG_TEST_TOOL_API SlangResult innerMain(Slang::StdWriters* stdWriters, SlangSe
         const uint64_t startTicks = ProcessUtil::getClockTick();
 
         CUDAComputeUtil::Context context;
-        SLANG_RETURN_ON_FAIL(CUDAComputeUtil::execute(compilationAndLayout, context));
+        SLANG_RETURN_ON_FAIL(CUDAComputeUtil::execute(compilationAndLayout, gOptions.computeDispatchSize, context));
 
         if (gOptions.performanceProfile)
         {

@@ -896,7 +896,7 @@ for (int tt = 0; tt < kBaseTextureTypeCount; ++tt)
 
                 if( baseShape != TextureFlavor::Shape::ShapeCube )
                 {
-                    sb << "__target_intrinsic(cuda, \"tex" << kBaseTextureTypes[tt].coordCount << "D<$S0>($0";
+                    sb << "__target_intrinsic(cuda, \"tex" << kBaseTextureTypes[tt].coordCount << "D<$T0>($0";
                     if (kBaseTextureTypes[tt].coordCount == 1)
                     {
                         sb << ", $2";
@@ -1049,10 +1049,27 @@ for (int tt = 0; tt < kBaseTextureTypeCount; ++tt)
                 // `SampleLevel`
 
                 sb << "__target_intrinsic(glsl, \"$ctextureLod($p, $2, $3)$z\")\n";
+
+                // CUDA
+                if (!isArray)
+                {
+                    sb << "__target_intrinsic(cuda, \"tex" << kBaseTextureTypes[tt].coordCount << "DLod<$T0>($0";
+                    for (int i = 0; i < kBaseTextureTypes[tt].coordCount; ++i)
+                    {
+                        sb << ", $2";
+                        if (kBaseTextureTypes[tt].coordCount > 1)
+                        {
+                            sb << '.' << char(i + 'x');
+                        }
+                    }
+                    sb << ", $3)\")\n";
+                }
+
                 sb << "T SampleLevel(SamplerState s, ";
                 sb << "float" << kBaseTextureTypes[tt].coordCount + isArray << " location, ";
                 sb << "float level);\n";
 
+                
                 if( baseShape != TextureFlavor::Shape::ShapeCube )
                 {
                     sb << "__target_intrinsic(glsl, \"$ctextureLodOffset($p, $2, $3, $4)$z\")\n";

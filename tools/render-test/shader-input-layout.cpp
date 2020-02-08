@@ -56,8 +56,9 @@ namespace renderer_test
         return -1;
     }
 
-    static bool _isCPUTarget(SlangCompileTarget target)
+    static bool _isCPULikeBindingTarget(SlangCompileTarget target)
     {
+        // CUDA and C++ are 'CPULike' in terms of their binding mechanism
         switch (target)
         {
             case SLANG_C_SOURCE:
@@ -65,6 +66,8 @@ namespace renderer_test
             case SLANG_EXECUTABLE:
             case SLANG_SHARED_LIBRARY:
             case SLANG_HOST_CALLABLE:
+            case SLANG_CUDA_SOURCE:
+            case SLANG_PTX:
             {
                 return true;
             }
@@ -74,13 +77,13 @@ namespace renderer_test
 
     void ShaderInputLayout::updateForTarget(SlangCompileTarget target)
     {
-        if (!_isCPUTarget(target))
+        if (!_isCPULikeBindingTarget(target))
         {
             int count = int(entries.getCount());
             for (int i = 0; i < count; ++i)
             {
                 auto& entry = entries[i];
-                if (entry.isCPUOnly)
+                if (entry.onlyCPULikeBinding)
                 {
                     entries.removeAt(i);
                     i--;
@@ -462,9 +465,9 @@ namespace renderer_test
                             parser.Read(":");
                             while (!parser.IsEnd())
                             {
-                                if (parser.LookAhead("isCPUOnly"))
+                                if (parser.LookAhead("onlyCPULikeBinding"))
                                 {
-                                    entry.isCPUOnly = true;
+                                    entry.onlyCPULikeBinding = true;
                                     parser.ReadToken();
                                 }
                                 else if (parser.LookAhead("out"))
