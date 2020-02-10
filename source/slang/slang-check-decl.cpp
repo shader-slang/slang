@@ -2121,8 +2121,8 @@ namespace Slang
     {
 
         // TODO(tfoley): This copies the parameter array, which is bad for performance.
-        auto fstParams = GetParameters(fst).ToArray();
-        auto sndParams = GetParameters(snd).ToArray();
+        auto fstParams = GetParameters(fst).toArray();
+        auto sndParams = GetParameters(snd).toArray();
 
         // If the functions have different numbers of parameters, then
         // their signatures trivially don't match.
@@ -2754,7 +2754,7 @@ namespace Slang
             ensureDecl(paramDecl, DeclCheckState::CanUseTypeOfValueDecl);
         }
 
-        // We need to compute the result tyep for this declaration,
+        // We need to compute the result type for this declaration,
         // since it wasn't filled in for us.
         decl->ReturnType.type = findResultTypeForConstructorDecl(decl);
     }

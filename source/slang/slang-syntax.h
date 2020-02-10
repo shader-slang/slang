@@ -842,7 +842,7 @@ namespace Slang
             , substitutions(substitutions)
         {}
 
-        int Count() const
+        int getCount() const
         {
             int count = 0;
             for (auto d : *this)
@@ -850,7 +850,7 @@ namespace Slang
             return count;
         }
 
-        List<DeclRef<T>> ToArray() const
+        List<DeclRef<T>> toArray() const
         {
             List<DeclRef<T>> result;
             for (auto d : *this)
@@ -881,7 +881,7 @@ namespace Slang
 
             void operator++()
             {
-                ptr = list->Adjust(ptr + 1, end);
+                ptr = list->adjust(ptr + 1, end);
             }
 
             DeclRef<T> operator*()
@@ -890,10 +890,10 @@ namespace Slang
             }
         };
 
-        Iterator begin() const { return Iterator(this, Adjust(decls.begin(), decls.end()), decls.end()); }
+        Iterator begin() const { return Iterator(this, adjust(decls.begin(), decls.end()), decls.end()); }
         Iterator end() const { return Iterator(this, decls.end(), decls.end()); }
 
-        const RefPtr<Decl>* Adjust(const RefPtr<Decl>* ptr, const RefPtr<Decl>* end) const
+        const RefPtr<Decl>* adjust(const RefPtr<Decl>* ptr, const RefPtr<Decl>* end) const
         {
             for (; ptr != end; ptr++)
             {

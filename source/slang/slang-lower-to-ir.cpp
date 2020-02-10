@@ -928,7 +928,7 @@ top:
             // a target, while the general `ref` case does not...)
 
             auto getters = getMembersOfType<GetterDecl>(boundSubscriptInfo->declRef);
-            if (getters.Count())
+            if (getters.getCount())
             {
                 lowered = emitCallToDeclRef(
                     context,
@@ -940,7 +940,7 @@ top:
             }
 
             auto refAccessors = getMembersOfType<RefAccessorDecl>(boundSubscriptInfo->declRef);
-            if(refAccessors.Count())
+            if(refAccessors.getCount())
             {
                 // The `ref` accessor will return a pointer to the value, so
                 // we need to reflect that in the type of our `call` instruction.
@@ -3998,7 +3998,7 @@ LoweredValInfo tryGetAddress(
             // where we really want/need a pointer to be able to make progress.
             //
             if(mode != TryGetAddressMode::Aggressive
-                && getMembersOfType<SetterDecl>(subscriptInfo->declRef).Count())
+                && getMembersOfType<SetterDecl>(subscriptInfo->declRef).getCount())
             {
                 // There is a setter that we should consider using,
                 // so don't go and aggressively collapse things just yet.
@@ -4006,7 +4006,7 @@ LoweredValInfo tryGetAddress(
             }
 
             auto refAccessors = getMembersOfType<RefAccessorDecl>(subscriptInfo->declRef);
-            if(refAccessors.Count())
+            if(refAccessors.getCount())
             {
                 // The `ref` accessor will return a pointer to the value, so
                 // we need to reflect that in the type of our `call` instruction.
@@ -4231,7 +4231,7 @@ top:
 
             // Search for an appropriate "setter" declaration
             auto setters = getMembersOfType<SetterDecl>(subscriptInfo->declRef);
-            if (setters.Count())
+            if (setters.getCount())
             {
                 auto allArgs = subscriptInfo->args;
                 addArgs(context, &allArgs, right);
@@ -4246,7 +4246,7 @@ top:
             }
 
             auto refAccessors = getMembersOfType<RefAccessorDecl>(subscriptInfo->declRef);
-            if(refAccessors.Count())
+            if(refAccessors.getCount())
             {
                 // The `ref` accessor will return a pointer to the value, so
                 // we need to reflect that in the type of our `call` instruction.
