@@ -19,7 +19,8 @@ struct RasterVertex
 [maxvertexcount(3)]
 void main(
     triangle CoarseVertex coarseVertices[3],
-    inout TriangleStream<RasterVertex> outputStream)
+    inout TriangleStream<RasterVertex> outputStream,
+    uint primitiveID : SV_PrimitiveID)
 {
     for(int ii = 0; ii < 3; ++ii)
     {
@@ -27,7 +28,7 @@ void main(
         RasterVertex rasterVertex;
         rasterVertex.position   = coarseVertex.position;
         rasterVertex.color      = coarseVertex.color;
-        rasterVertex.id         = coarseVertex.id;
+        rasterVertex.id         = coarseVertex.id + primitiveID;
         outputStream.Append(rasterVertex);
     }
 }

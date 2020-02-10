@@ -414,9 +414,36 @@ GLSLSystemValueInfo* getGLSLSystemValueInfo(
     {
         // uint in hlsl, int in glsl
         // https://www.khronos.org/registry/OpenGL-Refpages/gl4/html/gl_PrimitiveID.xhtml
-        name = "gl_PrimitiveID";
-
         requiredType = builder->getBasicType(BaseType::Int);
+
+        switch( context->getStage() )
+        {
+        default:
+            name = "gl_PrimitiveID";
+            break;
+
+        case Stage::Geometry:
+            // GLSL makes a confusing design choice here.
+            //
+            // All the non-GS stages use `gl_PrimitiveID` to access
+            // the *input* primitive ID, but a GS uses `gl_PrimitiveID`
+            // to acces an *output* primitive ID (that will be passed
+            // along to the fragment shader).
+            //
+            // For a GS to get an input primitive ID (the thing that
+            // other stages access with `gl_PrimitiveID`), the
+            // programmer must write `gl_PrimitiveIDIn`.
+            //
+            if( kind == LayoutResourceKind::VaryingInput )
+            {
+                name = "gl_PrimitiveIDIn";
+            }
+            else
+            {
+                name = "gl_PrimitiveID";
+            }
+            break;
+        }
     }
     else if (semanticName == "sv_rendertargetarrayindex")
     {
