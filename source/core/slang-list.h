@@ -80,7 +80,9 @@ namespace Slang
 		}
 	};
 
-
+    // List is container of values of a type held consecutively in memory (much like std::vector)
+    // Note that in this implementation, the underlying memory is backed via an allocation of T[capacity]
+    // This means that all values have to be in a valid state *even if they are not used* (ie indices < m_count)
 	template<typename T, typename TAllocator = StandardAllocator>
 	class List
 	{
@@ -210,31 +212,28 @@ namespace Slang
 			return ArrayView<T>(m_buffer + start, count);
 		}
 
+        void _maybeReserveForAdd()
+        {
+            if (m_capacity <= m_count)
+            {
+                Index newBufferSize = kInitialCount;
+                if (m_capacity)
+                    newBufferSize = (m_capacity << 1);
+
+                reserve(newBufferSize);
+            }
+        }
+
 		void add(T&& obj)
 		{
-			if (m_capacity < m_count + 1)
-			{
-				Index newBufferSize = kInitialCount;
-				if (m_capacity)
-					newBufferSize = (m_capacity << 1);
-
-				reserve(newBufferSize);
-			}
+            _maybeReserveForAdd();
 			m_buffer[m_count++] = static_cast<T&&>(obj);
 		}
 
 		void add(const T& obj)
 		{
-			if (m_capacity < m_count + 1)
-			{
-				Index newBufferSize = kInitialCount;
-				if (m_capacity)
-					newBufferSize = (m_capacity << 1);
-
-				reserve(newBufferSize);
-			}
+            _maybeReserveForAdd();
 			m_buffer[m_count++] = obj;
-
 		}
 
         Index getCount() const { return m_count; }
@@ -292,12 +291,6 @@ namespace Slang
 			m_count += n;
 		}
 
-		//slower than original edition
-		//void Add(const T & val)
-		//{
-		//	InsertRange(_count, &val, 1);
-		//}
-
 		void insertRange(Index id, const List<T>& list) {	insertRange(id, list.m_buffer, list.m_count); }
 
 		void addRange(ArrayView<T> list) { insertRange(m_count, list.getBuffer(), list.Count()); }
@@ -336,15 +329,18 @@ namespace Slang
 		void fastRemove(const T& val)
 		{
             Index idx = indexOf(val);
-			fastRemoveAt(idx);
+            if (idx >= 0)
+            {
+			    fastRemoveAt(idx);
+            }
 		}
 
 		void fastRemoveAt(Index idx)
 		{
-			if (idx != -1 && m_count - 1 != idx)
-			{
-				m_buffer[idx] = _Move(m_buffer[m_count - 1]);
-			}
+            SLANG_ASSERT(idx >= 0);
+            // We do not test for idx == m_count - 1 (ie the move is to current index). With the assumption that any reasonable move implementation
+            // tests and ignores this case  
+			m_buffer[idx] = _Move(m_buffer[m_count - 1]);
 			m_count--;
 		}
 
@@ -415,9 +411,15 @@ namespace Slang
 			}
 		}
 
-		SLANG_FORCE_INLINE T& operator [](Index idx) const
+        SLANG_FORCE_INLINE const T& operator [](Index idx) const
+        {
+            SLANG_ASSERT(idx >= 0 && idx < m_count);
+            return m_buffer[idx];
+        }
+
+		SLANG_FORCE_INLINE T& operator [](Index idx)
 		{
-            SLANG_ASSERT(idx >= 0 && idx <= m_count);
+            SLANG_ASSERT(idx >= 0 && idx < m_count);
 			return m_buffer[idx];
 		}
 
@@ -429,7 +431,7 @@ namespace Slang
 				if (predicate(m_buffer[i]))
 					return i;
 			}
-			return (Index)-1;
+			return -1;
 		}
 
 		template<typename Func>
@@ -440,7 +442,7 @@ namespace Slang
 				if (predicate(m_buffer[i-1]))
 					return i-1;
 			}
-			return (Index)-1;
+			return -1;
 		}
 
 		template<typename T2>
@@ -451,7 +453,7 @@ namespace Slang
 				if (m_buffer[i] == val)
 					return i;
 			}
-			return (Index)-1;
+			return -1;
 		}
 
 		template<typename T2>
@@ -459,10 +461,10 @@ namespace Slang
 		{
 			for (Index i = m_count; i > 0; i--)
 			{
-				if(m_buffer[i-1] == val)
-					return i-1;
+				if(m_buffer[i - 1] == val)
+					return i - 1;
 			}
-			return (Index)-1;
+			return -1;
 		}
 
 		void sort()
@@ -582,7 +584,7 @@ namespace Slang
 				});
 		}
     private:
-        T*      m_buffer;           ///< A new T[N] allocated buffer. NOTE! All elements up to capacity are in some valid form for T.
+        T*       m_buffer;           ///< A new T[N] allocated buffer. NOTE! All elements up to capacity are in some valid form for T.
         Index    m_capacity;         ///< The total capacity of elements
         Index    m_count;            ///< The amount of elements
 
