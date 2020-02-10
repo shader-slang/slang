@@ -347,7 +347,7 @@ public:
     return SLANG_SUCCEEDED(context.init(0));
 }
 
-static SlangResult _compute(CUcontext context, CUmodule module, const ShaderCompilerUtil::OutputAndLayout& outputAndLayout, CUDAComputeUtil::Context& outContext)
+static SlangResult _compute(CUcontext context, CUmodule module, const ShaderCompilerUtil::OutputAndLayout& outputAndLayout, const uint32_t dispatchSize[3], CUDAComputeUtil::Context& outContext)
 {
     auto& bindSet = outContext.m_bindSet;
     auto& bindRoot = outContext.m_bindRoot;
@@ -680,11 +680,8 @@ static SlangResult _compute(CUcontext context, CUmodule module, const ShaderComp
             entryPoint->getComputeThreadGroupSize(3, numThreadsPerAxis);
 
             // Launch
-            // TODO(JS): We probably want to do something a little more clever here using the maxThreadsPerBlock,
-            // but for now just launch a single block, and hope it all fits.
-
             auto cudaLaunchResult = cuLaunchKernel(kernel,
-                1, 1, 1,                                                                                // Blocks
+                dispatchSize[0], dispatchSize[1], dispatchSize[2], 
                 int(numThreadsPerAxis[0]), int(numThreadsPerAxis[1]), int(numThreadsPerAxis[2]),        // Threads per block
                 0,                                                                                      // Shared memory size
                 cudaStream,                                                                                 // Stream. 0 is no stream.
@@ -727,7 +724,7 @@ static SlangResult _compute(CUcontext context, CUmodule module, const ShaderComp
     return SLANG_OK;
 }
 
-/* static */SlangResult CUDAComputeUtil::execute(const ShaderCompilerUtil::OutputAndLayout& outputAndLayout, Context& outContext)
+/* static */SlangResult CUDAComputeUtil::execute(const ShaderCompilerUtil::OutputAndLayout& outputAndLayout, const uint32_t dispatchSize[3], Context& outContext)
 {
     ScopeCUDAContext cudaContext;
     SLANG_RETURN_ON_FAIL(cudaContext.init(0));
@@ -742,7 +739,7 @@ static SlangResult _compute(CUcontext context, CUmodule module, const ShaderComp
 
     ScopeCUDAModule cudaModule;
     SLANG_RETURN_ON_FAIL(cudaModule.load(kernel.codeBegin));
-    SLANG_RETURN_ON_FAIL(_compute(cudaContext, cudaModule, outputAndLayout, outContext));
+    SLANG_RETURN_ON_FAIL(_compute(cudaContext, cudaModule, outputAndLayout, dispatchSize, outContext));
 
     return SLANG_OK;
 }

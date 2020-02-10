@@ -71,7 +71,7 @@ public:
     InputSamplerDesc samplerDesc;
     ArrayDesc arrayDesc;
     bool isOutput = false;
-    bool isCPUOnly = false;
+    bool onlyCPULikeBinding = false;        ///< If true, only use on targets that have 'uniform' or 'CPU like' binding, like CPU and CUDA
 
     Slang::String name;                     ///< Optional name. Useful for binding through reflection.
 };

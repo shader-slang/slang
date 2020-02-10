@@ -917,7 +917,7 @@ for (int tt = 0; tt < kBaseTextureTypeCount; ++tt)
 
                 if( baseShape != TextureFlavor::Shape::ShapeCube )
                 {
-                    sb << "__target_intrinsic(cuda, \"tex" << kBaseTextureTypes[tt].coordCount << "D<$S0>($0";
+                    sb << "__target_intrinsic(cuda, \"tex" << kBaseTextureTypes[tt].coordCount << "D<$T0>($0";
                     if (kBaseTextureTypes[tt].coordCount == 1)
                     {
                         sb << ", $2";
@@ -1070,10 +1070,27 @@ for (int tt = 0; tt < kBaseTextureTypeCount; ++tt)
                 // `SampleLevel`
 
                 sb << "__target_intrinsic(glsl, \"$ctextureLod($p, $2, $3)$z\")\n";
+
+                // CUDA
+                if (!isArray)
+                {
+                    sb << "__target_intrinsic(cuda, \"tex" << kBaseTextureTypes[tt].coordCount << "DLod<$T0>($0";
+                    for (int i = 0; i < kBaseTextureTypes[tt].coordCount; ++i)
+                    {
+                        sb << ", $2";
+                        if (kBaseTextureTypes[tt].coordCount > 1)
+                        {
+                            sb << '.' << char(i + 'x');
+                        }
+                    }
+                    sb << ", $3)\")\n";
+                }
+
                 sb << "T SampleLevel(SamplerState s, ";
                 sb << "float" << kBaseTextureTypes[tt].coordCount + isArray << " location, ";
                 sb << "float level);\n";
 
+                
                 if( baseShape != TextureFlavor::Shape::ShapeCube )
                 {
                     sb << "__target_intrinsic(glsl, \"$ctextureLodOffset($p, $2, $3, $4)$z\")\n";
@@ -1282,7 +1299,7 @@ for (auto op : binaryOps)
         sb << "__intrinsic_op(" << int(op.opCode) << ") matrix<" << resultType << ",N,M> operator" << op.opName << "(" << leftQual << "matrix<" << leftType << ",N,M> left, " << rightType << " right);\n";
     }
 }
-SLANG_RAW("#line 1264 \"core.meta.slang\"")
+SLANG_RAW("#line 1281 \"core.meta.slang\"")
 SLANG_RAW("\n")
 SLANG_RAW("\n")
 SLANG_RAW("// Specialized function\n")
