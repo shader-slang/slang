@@ -2779,13 +2779,7 @@ namespace Slang
         //      subscript(uint index) -> T { get; }
         //
 
-        bool anyAccessors = false;
-        for(auto accessorDecl : decl->getMembersOfType<AccessorDecl>())
-        {
-            SLANG_UNUSED(accessorDecl);
-            anyAccessors = true;
-            break;
-        }
+        const bool anyAccessors = decl->getMembersOfType<AccessorDecl>().hasContent();
 
         if(!anyAccessors)
         {

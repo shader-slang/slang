@@ -304,7 +304,7 @@ SLANG_API unsigned int spReflectionType_GetFieldCount(SlangReflectionType* inTyp
         auto declRef = declRefType->declRef;
         if( auto structDeclRef = declRef.as<StructDecl>())
         {
-            return GetFields(structDeclRef).Count();
+            return GetFields(structDeclRef).getCount();
         }
     }
 
@@ -323,7 +323,7 @@ SLANG_API SlangReflectionVariable* spReflectionType_GetFieldByIndex(SlangReflect
         auto declRef = declRefType->declRef;
         if( auto structDeclRef = declRef.as<StructDecl>())
         {
-            auto fieldDeclRef = GetFields(structDeclRef).ToArray()[index];
+            auto fieldDeclRef = GetFields(structDeclRef).toArray()[index];
             return (SlangReflectionVariable*) fieldDeclRef.getDecl();
         }
     }

@@ -819,6 +819,20 @@ namespace Slang
             return result;
         }
 
+        bool hasContent() const
+        {
+            for (const Element* cur = m_begin; cur != m_end; ++cur)
+            {
+                if (as<T>(*cur))
+                {
+                    return true;
+                }
+            }
+            return false;
+        }
+
+        bool isEmpty() const { return !hasContent(); }
+
         const Element* m_begin;
         const Element* m_end;
     };
@@ -849,6 +863,20 @@ namespace Slang
                 count++;
             return count;
         }
+
+        bool hasContent() const
+        {
+            for (Decl* decl : decls)
+            {
+                if (decl->is<T>())
+                {
+                    return true;
+                }
+            }
+            return false;
+        }
+
+        bool isEmpty() const { return !hasContent(); }
 
         List<DeclRef<T>> toArray() const
         {

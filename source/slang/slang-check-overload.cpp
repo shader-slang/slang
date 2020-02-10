@@ -440,18 +440,9 @@ namespace Slang
                     // A call may yield an l-value, and we should take a look at the candidate to be sure
                     if(auto subscriptDeclRef = candidate.item.declRef.as<SubscriptDecl>())
                     {
-                        for(auto setter : subscriptDeclRef.getDecl()->getMembersOfType<SetterDecl>())
-                        {
-                            SLANG_UNUSED(setter);
-                            callExpr->type.IsLeftValue = true;
-                            break;
-                        }
-                        for(auto refAccessor : subscriptDeclRef.getDecl()->getMembersOfType<RefAccessorDecl>())
-                        {
-                            SLANG_UNUSED(refAccessor);
-                            callExpr->type.IsLeftValue = true;
-                            break;
-                        }
+                        auto decl = subscriptDeclRef.getDecl();
+
+                        callExpr->type.IsLeftValue = decl->getMembersOfType<SetterDecl>().hasContent() || decl->getMembersOfType<RefAccessorDecl>().hasContent();
                     }
 
                     // TODO: there may be other cases that confer l-value-ness
