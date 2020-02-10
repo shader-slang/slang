@@ -269,6 +269,24 @@ namespace Slang
             bindingAttr->binding = int32_t(binding->value);
             bindingAttr->set = int32_t(set->value);
         }
+        else if (auto simpleLayoutAttr = as<GLSLSimpleIntegerLayoutAttribute>(attr))
+        {
+            // This case handles GLSL-oriented layout attributes
+            // that take a single integer argument.
+
+            if (attr->args.getCount() != 1)
+            {
+                return false;
+            }
+
+            auto value = checkConstantIntVal(attr->args[0]);
+            if (value == nullptr)
+            {
+                return false;
+            }
+
+            simpleLayoutAttr->value = int32_t(value->value);
+        }
         else if (auto maxVertexCountAttr = as<MaxVertexCountAttribute>(attr))
         {
             SLANG_ASSERT(attr->args.getCount() == 1);

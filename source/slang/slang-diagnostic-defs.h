@@ -435,6 +435,9 @@ DIAGNOSTIC(39017, Error, tooManyShaderRecordConstantBuffers, "can have at most o
 
 DIAGNOSTIC(39018, Error, typeParametersNotAllowedOnEntryPointGlobal, "local-root-signature shader parameter '$0' at global scope must not include existential/interface types");
 
+DIAGNOSTIC(39019, Warning, vkIndexWithoutVkLocation, "ignoring '[[vk::index(...)]]` attribute without a corresponding '[[vk::location(...)]]' attribute")
+DIAGNOSTIC(39020, Error, mixingImplicitAndExplicitBindingForVaryingParams, "mixing explicit and implicit bindings for varying parameters is not supported (see '$0' and '$1')");
+
 //
 // 4xxxx - IL code generation.
 //

@@ -353,6 +353,16 @@ SYNTAX_CLASS(GLSLBindingAttribute, Attribute)
     FIELD(int32_t, set = 0)
 END_SYNTAX_CLASS()
 
+SYNTAX_CLASS(GLSLSimpleIntegerLayoutAttribute, Attribute)
+    FIELD(int32_t, value = 0)
+END_SYNTAX_CLASS()
+
+// [[vk_location]]
+SIMPLE_SYNTAX_CLASS(GLSLLocationAttribute, GLSLSimpleIntegerLayoutAttribute)
+
+// [[vk_index]]
+SIMPLE_SYNTAX_CLASS(GLSLIndexAttribute, GLSLSimpleIntegerLayoutAttribute)
+
 // TODO: for attributes that take arguments, the syntax node
 // classes should provide accessors for the values of those arguments.
 
