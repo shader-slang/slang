@@ -1011,7 +1011,7 @@ namespace Slang
         // TODO: This could be factored into another visitor pass
         // that fits more with the standard checking below.
         //
-        for(auto importDecl : moduleDecl->getMembersOfType<ImportDecl>())
+        for(auto& importDecl : moduleDecl->getMembersOfType<ImportDecl>())
         {
             ensureDecl(importDecl, DeclCheckState::Checked);
         }
@@ -2559,7 +2559,7 @@ namespace Slang
         }
         funcDecl->ReturnType = resultType;
 
-        for (auto para : funcDecl->GetParameters())
+        for (auto& para : funcDecl->GetParameters())
         {
             ensureDecl(para, DeclCheckState::ReadyForReference);
         }
@@ -2749,7 +2749,7 @@ namespace Slang
 
     void SemanticsDeclHeaderVisitor::visitConstructorDecl(ConstructorDecl* decl)
     {
-        for (auto paramDecl : decl->GetParameters())
+        for (auto& paramDecl : decl->GetParameters())
         {
             ensureDecl(paramDecl, DeclCheckState::CanUseTypeOfValueDecl);
         }
@@ -2779,13 +2779,7 @@ namespace Slang
         //      subscript(uint index) -> T { get; }
         //
 
-        bool anyAccessors = false;
-        for(auto accessorDecl : decl->getMembersOfType<AccessorDecl>())
-        {
-            SLANG_UNUSED(accessorDecl);
-            anyAccessors = true;
-            break;
-        }
+        bool anyAccessors = decl->getMembersOfType<AccessorDecl>().hasContent();
 
         if(!anyAccessors)
         {

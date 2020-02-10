@@ -154,17 +154,17 @@ namespace Slang
             SLANG_ASSERT(m_count > 0);
 			return m_buffer[0];
 		}
-
-		const T& getLast() const
-		{
-            SLANG_ASSERT(m_count > 0);
-			return m_buffer[m_count-1];
-		}
-
+		
         T& getFirst()
         {
             SLANG_ASSERT(m_count > 0);
             return m_buffer[0];
+        }
+
+        const T& getLast() const
+        {
+            SLANG_ASSERT(m_count > 0);
+            return m_buffer[m_count - 1];
         }
 
         T& getLast() 
@@ -341,8 +341,11 @@ namespace Slang
 		{
             SLANG_ASSERT(idx >= 0);
             // We do not test for idx == m_count - 1 (ie the move is to current index). With the assumption that any reasonable move implementation
-            // tests and ignores this case  
-			m_buffer[idx] = _Move(m_buffer[m_count - 1]);
+             // tests and ignores this case  
+            if (idx != m_count - 1)
+            {
+                m_buffer[idx] = _Move(m_buffer[m_count - 1]);
+            }
 			m_count--;
 		}
 

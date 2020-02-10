@@ -766,9 +766,9 @@ namespace Slang
                 m_cursor = adjust(m_cursor + 1, m_end);
             }
 
-            T* operator*()
+            const RefPtr<T>& operator*()
             {
-                return static_cast<T*>(m_cursor->Ptr());
+                return  *(RefPtr<T>*)(m_cursor->Ptr());
             }
         };
 
@@ -797,7 +797,7 @@ namespace Slang
 
         // TODO(tfoley): It is ugly to have these.
         // We should probably fix the call sites instead.
-        T* getFirst() { return *begin(); }
+        const RefPtr<T>& getFirst() { return *begin(); }
         Index getCount()
         {
             Index count = 0;
@@ -818,6 +818,8 @@ namespace Slang
             }
             return result;
         }
+
+        bool hasContent() const { return m_end != m_begin; }
 
         const Element* m_begin;
         const Element* m_end;
