@@ -143,9 +143,11 @@ namespace Slang
 			return *this;
 		}
 
-        // TODO(JS): These should be made const safe but some other code depends on this behavior for now.
-        T* begin() const { return m_buffer; }
-        T* end() const { return m_buffer + m_count; }
+        const T* begin() const { return m_buffer; }
+        const T* end() const { return m_buffer + m_count; }
+
+        T* begin() { return m_buffer; }
+        T* end() { return m_buffer + m_count; }
 
 		const T& getFirst() const
 		{

@@ -753,8 +753,8 @@ namespace Slang
 
         struct Iterator
         {
-            Element* m_cursor;
-            Element* m_end;
+            const Element* m_cursor;
+            const Element* m_end;
 
             bool operator!=(Iterator const& other)
             {
@@ -766,9 +766,9 @@ namespace Slang
                 m_cursor = adjust(m_cursor + 1, m_end);
             }
 
-            RefPtr<T>& operator*()
+            T* operator*()
             {
-                return *(RefPtr<T>*)m_cursor;
+                return static_cast<T*>(m_cursor->Ptr());
             }
         };
 
@@ -784,7 +784,7 @@ namespace Slang
             return iter;
         }
 
-        static Element* adjust(Element* cursor, Element* end)
+        static const Element* adjust(const Element* cursor, const Element* end)
         {
             while (cursor != end)
             {
@@ -797,7 +797,7 @@ namespace Slang
 
         // TODO(tfoley): It is ugly to have these.
         // We should probably fix the call sites instead.
-        RefPtr<T>& getFirst() { return *begin(); }
+        T* getFirst() { return *begin(); }
         Index getCount()
         {
             Index count = 0;
@@ -819,8 +819,8 @@ namespace Slang
             return result;
         }
 
-        Element* m_begin;
-        Element* m_end;
+        const Element* m_begin;
+        const Element* m_end;
     };
 
     struct TransparentMemberInfo
@@ -861,17 +861,17 @@ namespace Slang
         struct Iterator
         {
             FilteredMemberRefList const* list;
-            RefPtr<Decl>* ptr;
-            RefPtr<Decl>* end;
+            const RefPtr<Decl>* ptr;
+            const RefPtr<Decl>* end;
 
             Iterator() : list(nullptr), ptr(nullptr) {}
             Iterator(
-                FilteredMemberRefList const* list,
-                RefPtr<Decl>* ptr,
-                RefPtr<Decl>* end)
-                : list(list)
-                , ptr(ptr)
-                , end(end)
+                FilteredMemberRefList const* inList,
+                const RefPtr<Decl>* inPtr,
+                const RefPtr<Decl>* inEnd)
+                : list(inList)
+                , ptr(inPtr)
+                , end(inEnd)
             {}
 
             bool operator!=(Iterator other)
@@ -893,7 +893,7 @@ namespace Slang
         Iterator begin() const { return Iterator(this, Adjust(decls.begin(), decls.end()), decls.end()); }
         Iterator end() const { return Iterator(this, decls.end(), decls.end()); }
 
-        RefPtr<Decl>* Adjust(RefPtr<Decl>* ptr, RefPtr<Decl>* end) const
+        const RefPtr<Decl>* Adjust(const RefPtr<Decl>* ptr, const RefPtr<Decl>* end) const
         {
             for (; ptr != end; ptr++)
             {

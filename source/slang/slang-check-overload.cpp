@@ -442,11 +442,15 @@ namespace Slang
                     {
                         for(auto setter : subscriptDeclRef.getDecl()->getMembersOfType<SetterDecl>())
                         {
+                            SLANG_UNUSED(setter);
                             callExpr->type.IsLeftValue = true;
+                            break;
                         }
                         for(auto refAccessor : subscriptDeclRef.getDecl()->getMembersOfType<RefAccessorDecl>())
                         {
+                            SLANG_UNUSED(refAccessor);
                             callExpr->type.IsLeftValue = true;
+                            break;
                         }
                     }
 
