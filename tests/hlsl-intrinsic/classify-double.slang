@@ -5,8 +5,8 @@
 //TEST(compute, vulkan):COMPARE_COMPUTE_EX:-cuda -compute
 
 // inf, -inf, nan, finite
-//TEST_INPUT:ubuffer(data=[ 0x7f800000 0xff800000 0x7fffffff 1 ], stride=4):name inputBuffer
-RWStructuredBuffer<float> inputBuffer;
+//TEST_INPUT:ubuffer(data=[ 0 0x7ff00000 0 0xfff00000 0xffffffff 0x7fffffff 1 0], stride=4):name inputBuffer
+RWStructuredBuffer<uint> inputBuffer;
 
 //TEST_INPUT:ubuffer(data=[0 0 0 0], stride=4):out,name outputBuffer
 RWStructuredBuffer<int> outputBuffer;
@@ -16,7 +16,10 @@ void computeMain(uint3 dispatchThreadID : SV_DispatchThreadID)
 {
     int idx = int(dispatchThreadID.x);
 
-    float v = inputBuffer[idx];
+    uint low = inputBuffer[idx * 2 + 0];
+    uint high = inputBuffer[idx * 2 + 1];
+
+    double v = asdouble(low, high);
     
     int flags = 0;
     
