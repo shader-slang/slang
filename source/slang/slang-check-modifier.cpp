@@ -80,84 +80,125 @@ namespace Slang
 
     AttributeDecl* SemanticsVisitor::lookUpAttributeDecl(Name* attributeName, Scope* scope)
     {
-        // Look up the name and see what we find.
+        auto session = getSession();
+
+        // We start by looking for an existing attribute matching
+        // the name `attributeName`.
         //
-        // TODO: This needs to have some special filtering or naming
-        // rules to keep us from seeing shadowing variable declarations.
-        auto lookupResult = lookUp(getSession(), this, attributeName, scope, LookupMask::Attribute);
-
-        // If the result was overloaded,
-        // then we aren't going to be able to extract a single decl.
-        if(lookupResult.isOverloaded())
-            return nullptr;
-
-        if (lookupResult.isValid())
         {
-            auto decl = lookupResult.item.declRef.getDecl();
-            if (auto attributeDecl = as<AttributeDecl>(decl))
-            {
-                return attributeDecl;
-            }
-            else
-            {
+            // Look up the name and see what attributes we find.
+            //
+            auto lookupResult = lookUp(session, this, attributeName, scope, LookupMask::Attribute);
+
+            // If the result was overloaded, then that means there
+            // are multiple attributes matching the name, and we
+            // aren't going to be able to narrow it down.
+            //
+            if(lookupResult.isOverloaded())
                 return nullptr;
+
+            // If there is a single valid result, and it names
+            // an existing attribute declaration, then we can
+            // use it as the result.
+            //
+            if (lookupResult.isValid())
+            {
+                auto decl = lookupResult.item.declRef.getDecl();
+                if (auto attributeDecl = as<AttributeDecl>(decl))
+                {
+                    return attributeDecl;
+                }
             }
         }
 
-        // If we couldn't find a system attribute, try looking up as a user defined attribute
-        // A user defined attribute class is defined as a struct type with a "UserDefinedAttributeAttribute" modifier
-        lookupResult = lookUp(getSession(), this, getSession()->getNameObj(attributeName->text + "Attribute"), scope, LookupMask::type);
-        if (lookupResult.isOverloaded())
-        {
-            // see if we have already created an AttributeDecl for this attribute struct
-            for (auto alt : lookupResult.items)
-            {
-                if (auto adecl = alt.declRef.as<AttributeDecl>())
-                    return adecl.getDecl();
-            }
-        }
-        // If we still cannot find any thing, quit
+        // If there wasn't already an attribute matching the
+        // given name, then we will look for a `struct` type
+        // matching the name scheme for user-defined attributes.
+        //
+        // If the attribute was `[Something(...)]` then we will
+        // look for a `struct` named `SomethingAttribute`.
+        //
+        LookupResult lookupResult = lookUp(session, this, session->getNameObj(attributeName->text + "Attribute"), scope, LookupMask::type);
+        //
+        // If we didn't find a matching type name, then we give up.
+        //
         if (!lookupResult.isValid() || lookupResult.isOverloaded())
             return nullptr;
-        // Now construct an AttributeDecl for this user defined attribute class for future lookup
-        auto userDefAttribAttrib = lookupResult.item.declRef.decl->FindModifier<AttributeUsageAttribute>();
-        if (!userDefAttribAttrib)
+
+
+        // We only allow a `struct` type to be used as an attribute
+        // if the type itself has an `[AttributeUsage(...)]` attribute
+        // attached to it.
+        //
+        auto structDecl = lookupResult.item.declRef.as<StructDecl>().getDecl();
+        if(!structDecl)
             return nullptr;
-        // create an AttributeDecl for the user defined attribute
-        auto structAttribDef = lookupResult.item.declRef.as<StructDecl>().getDecl();
-        RefPtr<AttributeDecl> attribDecl = new AttributeDecl();
-        attribDecl->nameAndLoc = structAttribDef->nameAndLoc;
-        attribDecl->loc = structAttribDef->loc;
-        attribDecl->nextInContainerWithSameName = structAttribDef->nextInContainerWithSameName;
-        // create a __attributeTarget modifier for the attribute class definition
+        auto attrUsageAttr = structDecl->FindModifier<AttributeUsageAttribute>();
+        if (!attrUsageAttr)
+            return nullptr;
+
+        // We will now synthesize a new `AttributeDecl` to mirror
+        // what was declared on the `struct` type.
+        //
+        RefPtr<AttributeDecl> attrDecl = new AttributeDecl();
+        attrDecl->nameAndLoc.name = attributeName;
+        attrDecl->nameAndLoc.loc = structDecl->nameAndLoc.loc;
+        attrDecl->loc = structDecl->loc;
+
         RefPtr<AttributeTargetModifier> targetModifier = new AttributeTargetModifier();
-        targetModifier->syntaxClass = userDefAttribAttrib->targetSyntaxClass;
-        targetModifier->loc = structAttribDef->loc;
-        targetModifier->next = attribDecl->modifiers.first;
-        attribDecl->modifiers.first = targetModifier;
-        structAttribDef->nextInContainerWithSameName = attribDecl.Ptr();
-        // we should create UserDefinedAttribute nodes for all user defined attribute instances
-        attribDecl->syntaxClass = getSession()->findSyntaxClass(getSession()->getNameObj("UserDefinedAttribute"));
-        for (auto member : structAttribDef->Members)
+        targetModifier->syntaxClass = attrUsageAttr->targetSyntaxClass;
+        targetModifier->loc = attrUsageAttr->loc;
+        addModifier(attrDecl, targetModifier);
+
+        // Every attribute declaration is associated with the type
+        // of syntax nodes it constructs (via reflection/RTTI).
+        //
+        // User-defined attributes create instances of
+        // `UserDefinedAttribute`.
+        //
+        attrDecl->syntaxClass = session->findSyntaxClass(session->getNameObj("UserDefinedAttribute"));
+
+        // The fields of the user-defined `struct` type become
+        // the parameters of the new attribute.
+        //
+        // TODO: This step should skip `static` fields.
+        //
+        for(auto member : structDecl->Members)
         {
-            if (auto varMember = as<VarDecl>(member))
+            if(auto varMember = as<VarDecl>(member))
             {
-                RefPtr<ParamDecl> param = new ParamDecl();
-                param->nameAndLoc = member->nameAndLoc;
-                param->type = varMember->type;
-                param->loc = member->loc;
-                attribDecl->Members.add(param);
+                ensureDecl(varMember, DeclCheckState::CanUseTypeOfValueDecl);
+
+                RefPtr<ParamDecl> paramDecl = new ParamDecl();
+                paramDecl->nameAndLoc = member->nameAndLoc;
+                paramDecl->type = varMember->type;
+                paramDecl->loc = member->loc;
+                paramDecl->SetCheckState(DeclCheckState::Checked);
+
+                paramDecl->ParentDecl = attrDecl;
+                attrDecl->Members.add(paramDecl);
             }
         }
-        // add the attribute class definition to the syntax tree, so it can be found
-        structAttribDef->ParentDecl->Members.add(attribDecl.Ptr());
-        structAttribDef->ParentDecl->memberDictionaryIsValid = false;
-        // do necessary checks on this newly constructed node
 
+        // We need to end by putting the new attribute declaration
+        // into the AST, so that it can be found via lookup.
+        //
+        auto parentDecl = structDecl->ParentDecl;
+        //
+        // TODO: handle the case where `parentDecl` is generic?
+        //
+        attrDecl->ParentDecl = parentDecl;
+        parentDecl->Members.add(attrDecl);
+        parentDecl->memberDictionaryIsValid = false;
+
+        // Finally, we perform any required semantic checks on
+        // the newly constructed attribute decl.
+        //
         // TODO: what check state is relevant here?
-        ensureDecl(attribDecl, DeclCheckState::Checked);
+        //
+        ensureDecl(attrDecl, DeclCheckState::Checked);
 
-        return attribDecl.Ptr();
+        return attrDecl;
     }
 
     bool SemanticsVisitor::hasIntArgs(Attribute* attr, int numArgs)
@@ -268,6 +309,24 @@ namespace Slang
                     
             bindingAttr->binding = int32_t(binding->value);
             bindingAttr->set = int32_t(set->value);
+        }
+        else if (auto simpleLayoutAttr = as<GLSLSimpleIntegerLayoutAttribute>(attr))
+        {
+            // This case handles GLSL-oriented layout attributes
+            // that take a single integer argument.
+
+            if (attr->args.getCount() != 1)
+            {
+                return false;
+            }
+
+            auto value = checkConstantIntVal(attr->args[0]);
+            if (value == nullptr)
+            {
+                return false;
+            }
+
+            simpleLayoutAttr->value = int32_t(value->value);
         }
         else if (auto maxVertexCountAttr = as<MaxVertexCountAttribute>(attr))
         {

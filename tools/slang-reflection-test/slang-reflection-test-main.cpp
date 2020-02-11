@@ -1253,6 +1253,20 @@ static SlangResult maybeDumpDiagnostic(SlangResult res, SlangCompileRequest* req
     return res;
 }
 
+SlangResult performCompilationAndReflection(SlangCompileRequest* request, int argc, const char*const* argv)
+{
+    SLANG_RETURN_ON_FAIL(maybeDumpDiagnostic(spProcessCommandLineArguments(request, &argv[1], argc - 1), request));
+    SLANG_RETURN_ON_FAIL(maybeDumpDiagnostic(spCompile(request), request));
+
+    // Okay, let's go through and emit reflection info on whatever
+    // we have.
+
+    SlangReflection* reflection = spGetReflection(request);
+    emitReflectionJSON(reflection);
+
+    return SLANG_OK;
+}
+
 SLANG_TEST_TOOL_API SlangResult innerMain(Slang::StdWriters* stdWriters, SlangSession* session, int argc, const char*const* argv)
 {
     Slang::StdWriters::setSingleton(stdWriters);
@@ -1264,18 +1278,11 @@ SLANG_TEST_TOOL_API SlangResult innerMain(Slang::StdWriters* stdWriters, SlangSe
     char const* appName = "slang-reflection-test";
     if (argc > 0) appName = argv[0];
 
-    SLANG_RETURN_ON_FAIL(maybeDumpDiagnostic(spProcessCommandLineArguments(request, &argv[1], argc - 1), request));
-    SLANG_RETURN_ON_FAIL(maybeDumpDiagnostic(spCompile(request), request));
-
-    // Okay, let's go through and emit reflection info on whatever
-    // we have.
-
-    SlangReflection* reflection = spGetReflection(request);
-    emitReflectionJSON(reflection);
+    SlangResult res = performCompilationAndReflection(request, argc, argv);
 
     spDestroyCompileRequest(request);
-    
-    return SLANG_OK;
+
+    return res;
 }
 
 int main(

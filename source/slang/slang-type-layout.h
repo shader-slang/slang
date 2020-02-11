@@ -475,6 +475,8 @@ public:
         return AddResourceInfo(kind);
     }
 
+    void removeResourceUsage(LayoutResourceKind kind);
+
     RefPtr<VarLayout> pendingVarLayout;
 };
 
