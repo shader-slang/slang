@@ -14,15 +14,8 @@ static void _diagnosticCallback(char const* message, void* /*userData*/)
     stdError.flush();
 }
 
-SlangResult SlangCTool::innerMain(StdWriters* stdWriters, SlangSession* session, int argc, const char*const* argv)
+static SlangResult _compile(SlangCompileRequest* compileRequest, int argc, const char*const* argv)
 {
-    SlangCompileRequest* compileRequest = spCreateCompileRequest(session);
-    spSetDiagnosticCallback(compileRequest, &_diagnosticCallback, nullptr);
-
-    spSetCommandLineCompilerMode(compileRequest);
-    // Do any app specific configuration
-    stdWriters->setRequestWriters(compileRequest);
-
     {
         const SlangResult res = spProcessCommandLineArguments(compileRequest, &argv[1], argc - 1);
         if (SLANG_FAILED(res))
@@ -51,6 +44,20 @@ SlangResult SlangCTool::innerMain(StdWriters* stdWriters, SlangSession* session,
         res = SLANG_FAIL;
     }
 #endif
+
+    return res;
+}
+
+SlangResult SlangCTool::innerMain(StdWriters* stdWriters, SlangSession* session, int argc, const char*const* argv)
+{
+    SlangCompileRequest* compileRequest = spCreateCompileRequest(session);
+    spSetDiagnosticCallback(compileRequest, &_diagnosticCallback, nullptr);
+
+    spSetCommandLineCompilerMode(compileRequest);
+    // Do any app specific configuration
+    stdWriters->setRequestWriters(compileRequest);
+
+    SlangResult res = _compile(compileRequest, argc, argv);
 
     // Now that we are done, clean up after ourselves
     spDestroyCompileRequest(compileRequest);
