@@ -12,8 +12,8 @@ namespace Slang
 
     struct TokenList
     {
-        Token* begin() const;
-        Token* end() const;
+        const Token* begin() const;
+        const Token* end() const;
 
         SLANG_FORCE_INLINE void add(const Token& token) { m_tokens.add(token); }
 
@@ -29,13 +29,13 @@ namespace Slang
             , m_end  (tokenList.end  ())
         {}
 
-        Token* begin() const { return m_begin; }
-        Token* end  () const { return m_end  ; }
+        const Token* begin() const { return m_begin; }
+        const Token* end  () const { return m_end  ; }
 
         int getCount() { return (int)(m_end - m_begin); }
 
-        Token* m_begin;
-        Token* m_end;
+        const Token* m_begin;
+        const Token* m_end;
     };
 
     struct TokenReader
@@ -45,17 +45,17 @@ namespace Slang
         explicit TokenReader(TokenSpan const& tokens)
             : m_cursor(tokens.begin())
             , m_end   (tokens.end  ())
-            , m_nextToken(tokens.begin() ? *tokens.begin() : GetEndOfFileToken())
+            , m_nextToken(tokens.begin() ? *tokens.begin() : getEndOfFileToken())
         {}
         explicit TokenReader(TokenList const& tokens)
             : m_cursor(tokens.begin())
             , m_end   (tokens.end  ())
-            , m_nextToken(tokens.begin() ? *tokens.begin() : GetEndOfFileToken())
+            , m_nextToken(tokens.begin() ? *tokens.begin() : getEndOfFileToken())
         {}
         struct ParsingCursor
         {
             Token nextToken;
-            Token* tokenReaderCursor = nullptr;
+            const Token* tokenReaderCursor = nullptr;
         };
         ParsingCursor getCursor()
         {
@@ -78,9 +78,9 @@ namespace Slang
 
         int getCount() { return (int)(m_end - m_cursor); }
 
-        Token* m_cursor;
-        Token* m_end;
-        static Token GetEndOfFileToken();
+        const Token* m_cursor;
+        const Token* m_end;
+        static Token getEndOfFileToken();
     };
 
     typedef unsigned int LexerFlags;

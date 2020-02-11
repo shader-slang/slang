@@ -440,11 +440,8 @@ namespace Slang
                     // A call may yield an l-value, and we should take a look at the candidate to be sure
                     if(auto subscriptDeclRef = candidate.item.declRef.as<SubscriptDecl>())
                     {
-                        for(auto setter : subscriptDeclRef.getDecl()->getMembersOfType<SetterDecl>())
-                        {
-                            callExpr->type.IsLeftValue = true;
-                        }
-                        for(auto refAccessor : subscriptDeclRef.getDecl()->getMembersOfType<RefAccessorDecl>())
+                        const auto& decl = subscriptDeclRef.getDecl();
+                        if (decl->getMembersOfType<SetterDecl>().isNonEmpty() || decl->getMembersOfType<RefAccessorDecl>().isNonEmpty())
                         {
                             callExpr->type.IsLeftValue = true;
                         }

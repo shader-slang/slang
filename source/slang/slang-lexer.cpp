@@ -12,18 +12,18 @@
 
 namespace Slang
 {
-    Token TokenReader::GetEndOfFileToken()
+    Token TokenReader::getEndOfFileToken()
     {
         return Token(TokenType::EndOfFile, UnownedStringSlice::fromLiteral(""), SourceLoc());
     }
 
-    Token* TokenList::begin() const
+    const Token* TokenList::begin() const
     {
         SLANG_ASSERT(m_tokens.getCount());
         return &m_tokens[0];
     }
 
-    Token* TokenList::end() const
+    const Token* TokenList::end() const
     {
         SLANG_ASSERT(m_tokens.getCount());
         SLANG_ASSERT(m_tokens[m_tokens.getCount() - 1].type == TokenType::EndOfFile);
@@ -59,7 +59,7 @@ namespace Slang
     Token TokenReader::advanceToken()
     {
         if (!m_cursor)
-            return GetEndOfFileToken();
+            return getEndOfFileToken();
 
         Token token = m_nextToken;
         if (m_cursor < m_end)
