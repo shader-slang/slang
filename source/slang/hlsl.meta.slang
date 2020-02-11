@@ -908,9 +908,17 @@ __target_intrinsic(glsl, "($2 = $atomicXor($A, $1))")
 void InterlockedXor(__ref uint dest, uint value, out uint original_value);
 
 // Is floating-point value finite?
-__generic<T : __BuiltinFloatingPointType> bool isfinite(T x);
-__generic<T : __BuiltinFloatingPointType, let N : int> vector<bool,N> isfinite(vector<T,N> x);
-__generic<T : __BuiltinFloatingPointType, let N : int, let M : int> matrix<bool,N,M> isfinite(matrix<T,N,M> x);
+
+__generic<T : __BuiltinFloatingPointType>
+__target_intrinsic(glsl, "(!(isinf($0) || isnan($0)))")
+bool isfinite(T x);
+
+__generic<T : __BuiltinFloatingPointType, let N : int>
+__target_intrinsic(glsl, "(!(isinf($0) || isnan($0)))")
+vector<bool,N> isfinite(vector<T,N> x);
+
+__generic<T : __BuiltinFloatingPointType, let N : int, let M : int>
+matrix<bool,N,M> isfinite(matrix<T,N,M> x);
 
 // Is floating-point value infinite?
 __generic<T : __BuiltinFloatingPointType> bool isinf(T x);
