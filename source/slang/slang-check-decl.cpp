@@ -2761,7 +2761,7 @@ namespace Slang
 
     void SemanticsDeclHeaderVisitor::visitSubscriptDecl(SubscriptDecl* decl)
     {
-        for (auto paramDecl : decl->GetParameters())
+        for (auto& paramDecl : decl->GetParameters())
         {
             ensureDecl(paramDecl, DeclCheckState::CanUseTypeOfValueDecl);
         }

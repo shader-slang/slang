@@ -768,7 +768,7 @@ namespace Slang
 
             const RefPtr<T>& operator*()
             {
-                return  *(RefPtr<T>*)(m_cursor->Ptr());
+                return  *(RefPtr<T>*)(m_cursor);
             }
         };
 
