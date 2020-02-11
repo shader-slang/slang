@@ -470,7 +470,7 @@ void CUDASourceEmitter::emitRateQualifiersImpl(IRRate* rate)
 {
     if (as<IRGroupSharedRate>(rate))
     {
-        m_writer->emit("groupshared ");
+        m_writer->emit("__shared__ ");
     }
 }
 
@@ -599,6 +599,18 @@ void CUDASourceEmitter::emitModuleImpl(IRModule* module)
         m_writer->emit("\n};\n\n");
     }
 
+    // Output group shared variables
+
+    {
+        for (auto action : actions)
+        {
+            if (action.level == EmitAction::Level::Definition && action.inst->op == kIROp_GlobalVar && as<IRGroupSharedRate>(action.inst->getRate()))
+            {
+                emitGlobalInst(action.inst);   
+            }
+        }
+    }
+
     // Output the 'Context' which will be used for execution
     {
         m_writer->emit("struct Context\n{\n");
@@ -614,7 +626,7 @@ void CUDASourceEmitter::emitModuleImpl(IRModule* module)
         // Output all the thread locals 
         for (auto action : actions)
         {
-            if (action.level == EmitAction::Level::Definition && action.inst->op == kIROp_GlobalVar)
+            if (action.level == EmitAction::Level::Definition && action.inst->op == kIROp_GlobalVar && !as<IRGroupSharedRate>(action.inst->getRate()))
             {
                 emitGlobalInst(action.inst);
             }
