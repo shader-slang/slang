@@ -67,9 +67,9 @@ SLANG_FORCE_INLINE float F32_saturate(float f) { return (f < 0.0f) ? 0.0f : (f >
 SLANG_FORCE_INLINE float F32_frac(float f) { return f - F32_floor(f); }
 SLANG_FORCE_INLINE float F32_radians(float f) { return f * 0.01745329222f; }
 
-SLANG_FORCE_INLINE bool F32_isnan(float f) { return ::isnan(f); }
-SLANG_FORCE_INLINE bool F32_isfinite(float f) { return ::isfinite(f); }
-SLANG_FORCE_INLINE bool F32_isinf(float f) { return ::isinf(f); }
+SLANG_FORCE_INLINE bool F32_isnan(float f) { return isnan(f); }
+SLANG_FORCE_INLINE bool F32_isfinite(float f) { return isfinite(f); }
+SLANG_FORCE_INLINE bool F32_isinf(float f) { return isinf(f); }
 
 // Binary
 SLANG_FORCE_INLINE float F32_min(float a, float b) { return a < b ? a : b; }
@@ -133,9 +133,9 @@ SLANG_FORCE_INLINE double F64_saturate(double f) { return (f < 0.0) ? 0.0 : (f >
 SLANG_FORCE_INLINE double F64_frac(double f) { return f - F64_floor(f); }
 SLANG_FORCE_INLINE double F64_radians(double f) { return f * 0.01745329222; }
 
-SLANG_FORCE_INLINE bool F64_isnan(double f) { return ::isnan(f); }
-SLANG_FORCE_INLINE bool F64_isfinite(double f) { return ::isfinite(f); }
-SLANG_FORCE_INLINE bool F64_isinf(double f) { return ::isinf(f); }
+SLANG_FORCE_INLINE bool F64_isnan(double f) { return isnan(f); }
+SLANG_FORCE_INLINE bool F64_isfinite(double f) { return isfinite(f); }
+SLANG_FORCE_INLINE bool F64_isinf(double f) { return isinf(f); }
 
 // Binary
 SLANG_FORCE_INLINE double F64_min(double a, double b) { return a < b ? a : b; }
