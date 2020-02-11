@@ -818,7 +818,6 @@ void GroupMemoryBarrier();
 
 
 __target_intrinsic(glsl, "groupMemoryBarrier(), barrier()")
-// TODO(JS): I don't think __syncwarp can be used because a 'group' could be multiple warps
 __target_intrinsic(cuda, "__syncthreads()")
 void GroupMemoryBarrierWithGroupSync();
 

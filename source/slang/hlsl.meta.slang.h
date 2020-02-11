@@ -894,7 +894,6 @@ SLANG_RAW("void GroupMemoryBarrier();\n")
 SLANG_RAW("\n")
 SLANG_RAW("\n")
 SLANG_RAW("__target_intrinsic(glsl, \"groupMemoryBarrier(), barrier()\")\n")
-SLANG_RAW("// TODO(JS): I don't think __syncwarp can be used because a 'group' could be multiple warps\n")
 SLANG_RAW("__target_intrinsic(cuda, \"__syncthreads()\")\n")
 SLANG_RAW("void GroupMemoryBarrierWithGroupSync();\n")
 SLANG_RAW("\n")
@@ -1626,7 +1625,7 @@ for (int aa = 0; aa < kBaseBufferAccessLevelCount; ++aa)
 
     sb << "};\n";
 }
-SLANG_RAW("#line 1553 \"hlsl.meta.slang\"")
+SLANG_RAW("#line 1552 \"hlsl.meta.slang\"")
 SLANG_RAW("\n")
 SLANG_RAW("\n")
 SLANG_RAW("\n")
