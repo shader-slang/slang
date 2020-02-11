@@ -81,8 +81,14 @@ namespace Slang
     };
 
     // List is container of values of a type held consecutively in memory (much like std::vector)
+    // 
     // Note that in this implementation, the underlying memory is backed via an allocation of T[capacity]
-    // This means that all values have to be in a valid state *even if they are not used* (ie indices < m_count)
+    // This means that all values have to be in a valid state *even if they are not used* (ie indices >= m_count must be valid)
+    //
+    // Also note this implementation does not necessarily 'initialize' an element which is no longer used, 
+    // and this may lead to surprising behavior. Say the list contains a single smart pointer, and the last element is removed (say with removeLast).
+    // The smart pointer will *not* be released. The smart pointer will be released if the that index is used (via say an add) or
+    // the List goes out of scope.
     template<typename T, typename TAllocator = StandardAllocator>
     class List
     {
