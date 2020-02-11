@@ -819,7 +819,8 @@ namespace Slang
             return result;
         }
 
-        bool hasContent() const { return m_end != m_begin; }
+        bool isEmpty() const { return m_end == m_begin; }
+        bool isNonEmpty() const { return m_end != m_begin; }
 
         const Element* m_begin;
         const Element* m_end;

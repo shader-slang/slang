@@ -2779,7 +2779,7 @@ namespace Slang
         //      subscript(uint index) -> T { get; }
         //
 
-        bool anyAccessors = decl->getMembersOfType<AccessorDecl>().hasContent();
+        bool anyAccessors = decl->getMembersOfType<AccessorDecl>().isNonEmpty();
 
         if(!anyAccessors)
         {

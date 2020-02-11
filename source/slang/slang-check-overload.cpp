@@ -441,7 +441,7 @@ namespace Slang
                     if(auto subscriptDeclRef = candidate.item.declRef.as<SubscriptDecl>())
                     {
                         const auto& decl = subscriptDeclRef.getDecl();
-                        if (decl->getMembersOfType<SetterDecl>().hasContent() || decl->getMembersOfType<RefAccessorDecl>().hasContent())
+                        if (decl->getMembersOfType<SetterDecl>().isNonEmpty() || decl->getMembersOfType<RefAccessorDecl>().isNonEmpty())
                         {
                             callExpr->type.IsLeftValue = true;
                         }
