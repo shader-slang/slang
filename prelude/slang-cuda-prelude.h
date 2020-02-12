@@ -120,10 +120,18 @@ SLANG_CUDA_CALL float F32_sign(float f) { return ( f == 0.0f) ? f : (( f < 0.0f)
 SLANG_CUDA_CALL float F32_saturate(float f) { return (f < 0.0f) ? 0.0f : (f > 1.0f) ? 1.0f : f; }
 SLANG_CUDA_CALL float F32_frac(float f) { return f - floorf(f); }
 
+SLANG_CUDA_CALL bool F32_isnan(float f) { return isnan(f); }
+SLANG_CUDA_CALL bool F32_isfinite(float f) { return isfinite(f); }
+SLANG_CUDA_CALL bool F32_isinf(float f) { return isinf(f); }
+
 // Binary
 SLANG_CUDA_CALL float F32_min(float a, float b) { return a < b ? a : b; }
 SLANG_CUDA_CALL float F32_max(float a, float b) { return a > b ? a : b; }
 SLANG_CUDA_CALL float F32_step(float a, float b) { return float(b >= a); }
+
+// TODO(JS): 
+// Note CUDA has ldexp, but it takes an integer for the exponent, it seems HLSL takes both as float
+SLANG_CUDA_CALL float F32_ldexp(float m, float e) { return m * powf(2.0f, e); }
 
 // Ternary 
 SLANG_CUDA_CALL float F32_lerp(float x, float y, float s) { return x + s * (y - x); }
@@ -146,10 +154,18 @@ SLANG_CUDA_CALL double F64_sign(double f) { return (f == 0.0) ? f : ((f < 0.0) ?
 SLANG_CUDA_CALL double F64_saturate(double f) { return (f < 0.0) ? 0.0 : (f > 1.0) ? 1.0 : f; }
 SLANG_CUDA_CALL double F64_frac(double f) { return f - floor(f); }
 
+SLANG_CUDA_CALL bool F64_isnan(double f) { return isnan(f); }
+SLANG_CUDA_CALL bool F64_isfinite(double f) { return isfinite(f); }
+SLANG_CUDA_CALL bool F64_isinf(double f) { return isinf(f); }
+
 // Binary
 SLANG_CUDA_CALL double F64_min(double a, double b) { return a < b ? a : b; }
 SLANG_CUDA_CALL double F64_max(double a, double b) { return a > b ? a : b; }
 SLANG_CUDA_CALL double F64_step(double a, double b) { return double(b >= a); }
+
+// TODO(JS): 
+// Note CUDA has ldexp, but it takes an integer for the exponent, it seems HLSL takes both as float
+SLANG_CUDA_CALL double F64_ldexp(double m, double e) { return m * pow(2.0, e); }
 
 // Ternary 
 SLANG_CUDA_CALL double F64_lerp(double x, double y, double s) { return x + s * (y - x); }

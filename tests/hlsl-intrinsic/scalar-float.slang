@@ -82,7 +82,9 @@ void computeMain(uint3 dispatchThreadID : SV_DispatchThreadID)
     int vi = asint(f - f) + idx;
     
     ft += float(vi);
-    
+
+    ft += ldexp(23.2, f);
+
     uint vu = asuint(f);
     ft += asfloat(vu);
     

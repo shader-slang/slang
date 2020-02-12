@@ -124,7 +124,12 @@ just constructXXXFromScalar. Would be good if there was a suitable name to encom
         \
         x(GetAt, "", 2) \
         \
-        x(CountBits, "countbits", 1)
+        x(CountBits, "countbits", 1) \
+        \
+        x(IsInfinite, "isinf", 1) \
+        x(IsFinite, "isfinite", 1) \
+        x(IsNan, "isnan", 1) \
+        x(LdExp, "ldexp", 2)
 
 struct HLSLIntrinsic
 {

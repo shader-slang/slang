@@ -86,5 +86,7 @@ void computeMain(uint3 dispatchThreadID : SV_DispatchThreadID)
         ft += asdouble(low, high);
     }
     
+    ft += ldexp(23.2, f);
+    
     outputBuffer[idx] = int(ft * 16);
 }

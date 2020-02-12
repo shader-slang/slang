@@ -944,9 +944,17 @@ __target_intrinsic(cuda, "($2 = (uint)atomicXor((int*)&$0, $1))")
 void InterlockedXor(__ref uint dest, uint value, out uint original_value);
 
 // Is floating-point value finite?
-__generic<T : __BuiltinFloatingPointType> bool isfinite(T x);
-__generic<T : __BuiltinFloatingPointType, let N : int> vector<bool,N> isfinite(vector<T,N> x);
-__generic<T : __BuiltinFloatingPointType, let N : int, let M : int> matrix<bool,N,M> isfinite(matrix<T,N,M> x);
+
+__generic<T : __BuiltinFloatingPointType>
+__target_intrinsic(glsl, "(!(isinf($0) || isnan($0)))")
+bool isfinite(T x);
+
+__generic<T : __BuiltinFloatingPointType, let N : int>
+__target_intrinsic(glsl, "(!(isinf($0) || isnan($0)))")
+vector<bool,N> isfinite(vector<T,N> x);
+
+__generic<T : __BuiltinFloatingPointType, let N : int, let M : int>
+matrix<bool,N,M> isfinite(matrix<T,N,M> x);
 
 // Is floating-point value infinite?
 __generic<T : __BuiltinFloatingPointType> bool isinf(T x);
@@ -959,9 +967,17 @@ __generic<T : __BuiltinFloatingPointType, let N : int> vector<bool,N> isnan(vect
 __generic<T : __BuiltinFloatingPointType, let N : int, let M : int> matrix<bool,N,M> isnan(matrix<T,N,M> x);
 
 // Construct float from mantissa and exponent
-__generic<T : __BuiltinFloatingPointType> T ldexp(T x, T exp);
-__generic<T : __BuiltinFloatingPointType, let N : int> vector<T,N> ldexp(vector<T,N> x, vector<T,N> exp);
-__generic<T : __BuiltinFloatingPointType, let N : int, let M : int> matrix<T,N,M> ldexp(matrix<T,N,M> x, matrix<T,N,M> exp);
+
+__generic<T : __BuiltinFloatingPointType>
+__target_intrinsic(glsl, "($0 * pow(2.0f, $1))")
+T ldexp(T x, T exp);
+
+__generic<T : __BuiltinFloatingPointType, let N : int>
+__target_intrinsic(glsl, "($0 * pow(2.0f, $1))")
+vector<T,N> ldexp(vector<T,N> x, vector<T,N> exp);
+
+__generic<T : __BuiltinFloatingPointType, let N : int, let M : int>
+matrix<T,N,M> ldexp(matrix<T,N,M> x, matrix<T,N,M> exp);
 
 // Vector length
 __generic<T : __BuiltinFloatingPointType, let N : int> T length(vector<T,N> x);
