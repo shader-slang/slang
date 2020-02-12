@@ -2559,7 +2559,7 @@ namespace Slang
         }
         funcDecl->ReturnType = resultType;
 
-        for (auto & para : funcDecl->GetParameters())
+        for (auto& para : funcDecl->GetParameters())
         {
             ensureDecl(para, DeclCheckState::ReadyForReference);
         }
@@ -2779,11 +2779,7 @@ namespace Slang
         //      subscript(uint index) -> T { get; }
         //
 
-        bool anyAccessors = false;
-        for(auto accessorDecl : decl->getMembersOfType<AccessorDecl>())
-        {
-            anyAccessors = true;
-        }
+        bool anyAccessors = decl->getMembersOfType<AccessorDecl>().isNonEmpty();
 
         if(!anyAccessors)
         {

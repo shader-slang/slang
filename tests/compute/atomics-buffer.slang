@@ -1,13 +1,9 @@
 // atomics-buffer.slang
 
 //TEST(compute):COMPARE_COMPUTE_EX:-slang -compute
+//TEST(compute):COMPARE_COMPUTE_EX:-slang -compute -dx12
 
-// Note: not enabling D3D12 test yet because change
-// was developed on a machine that can run D3D12
-//
-//TEST_DISABLED(compute):COMPARE_COMPUTE_EX:-slang -compute -dx12
-
-//TEST_INPUT:ubuffer(format=R_UInt32, data=[0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0]):out
+//TEST_INPUT:ubuffer(format=R_UInt32, data=[0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0]):out,name outputBuffer
 
 RWBuffer<uint> outputBuffer;
 
