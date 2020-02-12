@@ -1847,3 +1847,214 @@ float3x4 WorldToObject() { return WorldToObject3x4(); }
 // 10.4.4 - Hit Specific System values
 __target_intrinsic(glsl, "(gl_HitKindNV)")
 uint HitKind();
+
+// Pre-defined hit kinds (not documented explicitly)
+static const uint HIT_KIND_TRIANGLE_FRONT_FACE  = 254;
+static const uint HIT_KIND_TRIANGLE_BACK_FACE   = 255;
+
+//
+// Shader Model 6.4
+//
+
+// Treats `left` and `right` as 4-component vectors of `UInt8` and computes `dot(left, right) + acc`
+uint dot4add_u8packed(uint left, uint right, uint acc);
+
+// Treats `left` and `right` as 4-component vectors of `Int8` and computes `dot(left, right) + acc`
+int dot4add_i8packed(uint left, uint right, int acc);
+
+// Computes `dot(left, right) + acc`.
+//
+// May not produce infinities or NaNs for intermediate results that overflow the range of `half`
+float dot2add(float2 left, float2 right, float acc);
+
+//
+// Mesh Shaders
+//
+
+// Set the number of output vertices and primitives for a mesh shader invocation.
+void SetMeshOutputCounts(uint vertexCount, uint primitiveCount);
+
+// Specify the number of downstream mesh shader thread groups to invoke from an amplification shader,
+// and provide the values for per-mesh payload parameters.
+//
+void DispatchMesh<P>(uint threadGroupCountX, uint threadGroupCountY, uint threadGroupCountZ, P meshPayload);
+
+//
+// TODO: "Sampler feedback" types `FeedbackTexture2D` and `FeedbackTexture2DArray`.
+//
+
+//
+// DXR 1.1 and `TraceRayInline` support
+//
+
+// Status of whether a (closest) hit has been committed in a `RayQuery`.
+typedef uint COMMITTED_STATUS;
+
+// No hit committed.
+static const COMMITTED_STATUS COMMITTED_NOTHING = 0;
+
+// Closest hit is a triangle.
+//
+// This could be an opaque triangle hit found by the fixed-function
+// traversal and intersection implementation, or a non-opaque
+// triangle hit committed by user code with `RayQuery.CommitNonOpaqueTriangleHit`
+//
+static const COMMITTED_STATUS COMMITTED_TRIANGLE_HIT = 1;
+
+// Closest hit is a procedural primitive.
+//
+// A procedural hit primitive is committed using `RayQuery.CommitProceduralPrimitiveHit`.
+static const COMMITTED_STATUS COMMITTED_PROCEDURAL_PRIMITIVE_HIT = 2;
+
+// Type of candidate hit that a `RayQuery` is pausing at.
+//
+// A `RayQuery` can automatically commit hits with opaque triangles,
+// but yields to user code for other hits to allow them to be
+// dismissed or committed.
+//
+typedef uint CANDIDATE_TYPE;
+
+// Candidate hit is a non-opaque triangle.
+static const CANDIDATE_TYPE CANDIDATE_NON_OPAQUE_TRIANGLE = 0;
+
+// Candidate hit is a procedural primitive.
+static const CANDIDATE_TYPE CANDIDATE_PROCEDURAL_PRIMITIVE = 1;
+
+// Handle to state of an in-progress ray-tracing query.
+//
+// The ray query is effectively a coroutine that user shader
+// code can resume to continue tracing the ray, and which yields
+// back to the user code at interesting events along the ray.
+//
+struct RayQuery<let rayFlags : RAY_FLAG = RAY_FLAG_NONE>
+{
+    // Initialize a ray-tracing query.
+    //
+    // This method may be called on a "fresh" ray query, or
+    // on one that is already tracing a ray. In the latter
+    // case any state related to the ray previously being
+    // traced is overwritten.
+    //
+    // The `rayFlags` here will be bitwise ORed with
+    // the `rayFlags` passed as a generic argument to
+    // `RayQuery` to get the effective ray flags, which
+    // must obey any API-imposed restrictions.
+    //
+    void TraceRayInline(RaytracingAccelerationStructure accelerationStructure, RAY_FLAG rayFlags, uint instanceInclusionMask, RayDesc ray);
+
+    // Resume the ray query coroutine.
+    //
+    // If the coroutine suspends because of encountering
+    // a candidate hit that cannot be resolved with fixed-funciton
+    // logic, this function returns `true`, and the `Candidate*()`
+    // functions should be used by application code to resolve
+    // the candidate hit (by either committing or ignoring it).
+    //
+    // If the coroutine terminates because traversal is
+    // complete (or has been aborted), this function returns
+    // `false`, and application code should use the `Committed*()`
+    // functions to appropriately handle the closest hit (it any)
+    // that was found.
+    //
+    bool Proceed();
+
+    // Causes the ray query to terminate.
+    //
+    // This function cases the ray query to act as if
+    // traversal has terminated, so that subsequent
+    // `Proceed()` calls will return `false`.
+    //
+    void Abort();
+
+    // Get the type of candidate hit being considered.
+    //
+    // The ray query coroutine will suspend when it encounters
+    // a hit that cannot be resolved with fixed-function logic
+    // (either a non-opaque triangle or a procedural primitive).
+    // In either of those cases, `CandidateType()` will return
+    // the kind of candidate hit that must be resolved by
+    // user code.
+    //
+    CANDIDATE_TYPE CandidateType();
+
+    // Access properties of a candidate hit.
+    //
+    float3x4 CandidateObjectToWorld3x4();
+    float4x3 CandidateObjectToWorld4x3();
+    float3x4 CandidateWorldToObject3x4();
+    float4x3 CandidateWorldToObject4x3();
+    uint CandidateInstanceIndex();
+    uint CandidateInstanceID();
+    uint CandidateGeometryIndex();
+    uint CandidatePrimitiveIndex();
+    uint CandidateInstanceContributionToHitGroupIndex();
+
+    // Access properties of the ray being traced
+    // in the object space of a candidate hit.
+    //
+    float3 CandidateObjectRayOrigin();
+    float3 CandidateObjectRayDirection();
+
+    // Access properties of a candidate procedural primitive hit.
+    //
+    bool CandidateProceduralPrimitiveNonOpaque();
+
+    // Access properties of a candidate no-opaque triangle hit.
+    //
+    bool CandidateTriangleFrontFace();
+    float2 CandidateTriangleBarycentrics();
+    float CandidateTriangleRayT();
+
+    // Commit the current non-opaque triangle hit.
+    void CommitNonOpaqueTriangleHit();
+
+    // Commit the current procedural primitive hit, with hit time `t`.
+    void CommitProceduralPrimitiveHit(float t);
+
+    // Get the status of the committed (closest) hit, if any.
+    COMMITTED_STATUS CommittedStatus();
+
+    // Access properties of the committed hit.
+    //
+    float3x4 CommittedObjectToWorld3x4();
+    float4x3 CommittedObjectToWorld4x3();
+    float3x4 CommittedWorldToObject3x4();
+    float4x3 CommittedWorldToObject4x3();
+    float CommittedRayT();
+    uint CommittedInstanceIndex();
+    uint CommittedInstanceID();
+    uint CommittedGeometryIndex();
+    uint CommittedPrimitiveIndex();
+    uint CommittedInstanceContributionToHitGroupIndex();
+
+    // Access properties of the ray being traced
+    // in the object space of a committed hit.
+    //
+    float3 CommittedObjectRayOrigin();
+    float3 CommittedObjectRayDirection();
+
+    // Access properties of a committed triangle hit.
+    //
+    bool CommittedTriangleFrontFace();
+    float2 CommittedTriangleBarycentrics();
+
+    // Access properties of the ray being traced.
+    uint RayFlags();
+    float3 WorldRayOrigin();
+    float3 WorldRayDirection();
+    float RayTMin();
+}
+
+//
+// Vulkan/SPIR-V specific features
+//
+
+struct VkSubpassInput<T>
+{
+    T SubpassLoad();
+}
+
+struct VkSubpassInputMS<T>
+{
+    T SubpassLoad(int sampleIndex);
+}
