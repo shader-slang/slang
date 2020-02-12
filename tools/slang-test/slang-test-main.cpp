@@ -2012,34 +2012,6 @@ static double _textToDouble(const UnownedStringSlice& slice)
     return atof(buffer);
 }
 
-static bool _areNearlyEqual(double a, double b, double epsilon)
-{
-    // If they are equal then we are done
-    if (a == b)
-    { 
-        return true;
-    }
-
-    const double absA = Math::Abs(a);
-    const double absB = Math::Abs(b);
-    const double diff = Math::Abs(a - b);
-
-    // https://en.wikipedia.org/wiki/Double_precision_floating-point_format
-    // 
-    const double minNormal = 2.2250738585072014e-308;
-
-    // Either a or b are very close to being zero, so doing relative comparison isn't really appropriate
-    if (a == 0.0 || b == 0.0 || (absA + absB < minNormal))
-    {
-        return diff < (epsilon * minNormal);
-    }
-    else
-    {
-        // Calculate a relative relative error
-        return diff < epsilon * (absA + absB);
-    }
-}
-
 static void _calcLines(const UnownedStringSlice& slice, List<UnownedStringSlice>& outLines)
 {
     StringUtil::calcLines(slice, outLines);
@@ -2125,7 +2097,7 @@ static SlangResult _compareWithType(const UnownedStringSlice& actual, const Unow
                 double valueA = _textToDouble(lineActual);
                 double valueB = _textToDouble(lineRef);
 
-                if (!_areNearlyEqual(valueA, valueB, differenceThreshold))
+                if (!Math::AreNearlyEqual(valueA, valueB, differenceThreshold))
                 {
                     return SLANG_FAIL;
                 }
