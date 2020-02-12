@@ -134,6 +134,33 @@ namespace Slang
 			return log2;
 		}
 		*/
+
+        static bool AreNearlyEqual(double a, double b, double epsilon)
+        {
+            // If they are equal then we are done
+            if (a == b)
+            {
+                return true;
+            }
+
+            const double absA = Abs(a);
+            const double absB = Abs(b);
+            const double diff = Abs(a - b);
+
+            // https://en.wikipedia.org/wiki/Double_precision_floating-point_format
+            const double minNormal = 2.2250738585072014e-308;
+            // Either a or b are very close to being zero, so doing relative comparison isn't really appropriate
+            if (a == 0.0 || b == 0.0 || (absA + absB < minNormal))
+            {
+                return diff < (epsilon * minNormal);
+            }
+            else
+            {
+                // Calculate a relative relative error
+                return diff < epsilon * (absA + absB);
+            }
+        }
+
 	};
     inline int FloatAsInt(float val)
 	{
