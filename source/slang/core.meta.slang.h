@@ -1175,6 +1175,12 @@ for (int tt = 0; tt < kBaseTextureTypeCount; ++tt)
                     EMIT_LINE_DIRECTIVE();
 
                     sb << "__target_intrinsic(glsl, \"textureGather($p, $2, " << componentIndex << ")\")\n";
+                    if (kBaseTextureTypes[tt].coordCount == 2)
+                    {
+                        // Gather only works on 2D in CUDA
+                        // "It is based on the base type of DataType except when readMode is equal to cudaReadModeNormalizedFloat (see Texture Reference API), in which case it is always float4."
+                        sb << "__target_intrinsic(cuda, \"tex2Dgather<$T0>($0, ($2).x, ($2).y, " << componentIndex << ")\")\n";
+                    }
                     sb << outputType << " Gather" << componentName << "(SamplerState s, ";
                     sb << "float" << kBaseTextureTypes[tt].coordCount << " location);\n";
 
@@ -1308,7 +1314,7 @@ for (auto op : binaryOps)
         sb << "__intrinsic_op(" << int(op.opCode) << ") matrix<" << resultType << ",N,M> operator" << op.opName << "(" << leftQual << "matrix<" << leftType << ",N,M> left, " << rightType << " right);\n";
     }
 }
-SLANG_RAW("#line 1290 \"core.meta.slang\"")
+SLANG_RAW("#line 1296 \"core.meta.slang\"")
 SLANG_RAW("\n")
 SLANG_RAW("\n")
 SLANG_RAW("// Specialized function\n")
