@@ -12,7 +12,7 @@ Texture2D<float> t2D;
 //TEST_INPUT: Sampler:name samplerState
 SamplerState samplerState;
 
-//TEST_INPUT: ubuffer(data=[0], stride=4):out,name outputBuffer
+//TEST_INPUT: ubuffer(data=[0 0 0 0], stride=4):out,name outputBuffer
 RWStructuredBuffer<float> outputBuffer;
 
 [numthreads(4, 4, 1)]
