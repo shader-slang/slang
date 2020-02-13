@@ -16,47 +16,105 @@ namespace renderer_test {
 using namespace Slang;
 
 template <int COUNT>
-struct OneTexture2D : public CPUComputeUtil::Resource, public CPPPrelude::ITexture2D
+struct ValueTexture2D : public CPUComputeUtil::Resource, public CPPPrelude::ITexture2D
 {
-    void setOne(void* out)
+    void set(void* out)
     {
         float* dst = (float*)out;
         for (int i = 0; i < COUNT; ++i)
         {
-            dst[i] = 1.0f;
+            dst[i] = m_value;
         }
     }
 
     virtual void Load(const CPPPrelude::int3& v, void* out) SLANG_OVERRIDE
     {
-        setOne(out);
+        set(out);
     }
     virtual void Sample(CPPPrelude::SamplerState samplerState, const CPPPrelude::float2& loc, void* out) SLANG_OVERRIDE
     {
-        setOne(out);
+        set(out);
     }
     virtual void SampleLevel(CPPPrelude::SamplerState samplerState, const CPPPrelude::float2& loc, float level, void* out) SLANG_OVERRIDE
     {
-        setOne(out);
+        set(out);
     }
 
-    OneTexture2D()
+    ValueTexture2D(float value):
+        m_value(value)
     {
         m_interface = static_cast<CPPPrelude::ITexture2D*>(this);
     }
+
+    float m_value;
 };
 
-static CPUComputeUtil::Resource* _newOneTexture2D(int elemCount)
+template <int COUNT>
+struct ValueTexture1D : public CPUComputeUtil::Resource, public CPPPrelude::ITexture1D
 {
-    switch (elemCount)
+    void set(void* out)
     {
-        case 1: return new OneTexture2D<1>();
-        case 2: return new OneTexture2D<2>();
-        case 3: return new OneTexture2D<3>();
-        case 4: return new OneTexture2D<4>();
-        default: return nullptr;
+        float* dst = (float*)out;
+        for (int i = 0; i < COUNT; ++i)
+        {
+            dst[i] = m_value;
+        }
     }
+
+    virtual void Load(const CPPPrelude::int2& v, void* out) SLANG_OVERRIDE
+    {
+        set(out);
+    }
+    virtual void Sample(CPPPrelude::SamplerState samplerState, float loc, void* out) SLANG_OVERRIDE
+    {
+        set(out);
+    }
+    virtual void SampleLevel(CPPPrelude::SamplerState samplerState, float loc, float level, void* out) SLANG_OVERRIDE
+    {
+        set(out);
+    }
+
+    ValueTexture1D(float value) :
+        m_value(value)
+    {
+        m_interface = static_cast<CPPPrelude::ITexture1D*>(this);
+    }
+
+    float m_value;
+};
+
+static CPUComputeUtil::Resource* _newValueTexture(SlangResourceShape baseShape, int elemCount, float value)
+{
+    switch (baseShape)
+    {
+        case SLANG_TEXTURE_1D:
+        {
+            switch (elemCount)
+            {
+                case 1: return new ValueTexture1D<1>(value);
+                case 2: return new ValueTexture1D<2>(value);
+                case 3: return new ValueTexture1D<3>(value);
+                case 4: return new ValueTexture1D<4>(value);
+                default: break;
+            }
+            break;
+        }
+        case SLANG_TEXTURE_2D:
+        {
+            switch (elemCount)
+            {
+                case 1: return new ValueTexture2D<1>(value);
+                case 2: return new ValueTexture2D<2>(value);
+                case 3: return new ValueTexture2D<3>(value);
+                case 4: return new ValueTexture2D<4>(value);
+                default: break;
+            }
+        }
+        default: break;
+    }
+    return nullptr;
 }
+
 
 /* static */SlangResult CPUComputeUtil::calcBindings(const ShaderCompilerUtil::OutputAndLayout& compilationAndLayout, Context& outContext)
 {
@@ -109,13 +167,16 @@ static CPUComputeUtil::Resource* _newOneTexture2D(int elemCount)
 
                         //auto access = type->getResourceAccess();
 
-                        switch (shape & SLANG_RESOURCE_BASE_SHAPE_MASK)
+                        auto baseShape = shape & SLANG_RESOURCE_BASE_SHAPE_MASK;
+                        switch (baseShape)
                         {
+                            case SLANG_TEXTURE_1D:
                             case SLANG_TEXTURE_2D:
                             {
                                 SLANG_ASSERT(value->m_userIndex >= 0);
                                 auto& srcEntry = layout.entries[value->m_userIndex];
 
+                 
                                 // TODO(JS):
                                 // We should use the srcEntry to determine what data to store in the texture,
                                 // it's dimensions etc. For now we just support it being 1.
@@ -128,12 +189,23 @@ static CPUComputeUtil::Resource* _newOneTexture2D(int elemCount)
                                     count = int(typeReflection->getElementCount());
                                 }
 
-                                // TODO(JS): Should use the input setup to work how to create this texture
-                                // Store the target specific value
-                                value->m_target = _newOneTexture2D(count);
+                                switch (srcEntry.textureDesc.content)
+                                {
+                                    case InputTextureContent::One:
+                                    {
+                                        value->m_target = _newValueTexture(baseShape, count, 1.0f);
+                                        break;                                        
+                                    }
+                                    case InputTextureContent::Zero:
+                                    {
+                                        value->m_target = _newValueTexture(baseShape, count, 0.0f);
+                                        break;
+                                    }
+                                    default: break;
+                                }
                                 break;
                             }
-                            case SLANG_TEXTURE_1D:
+                            
                             case SLANG_TEXTURE_3D:
                             case SLANG_TEXTURE_CUBE:
                             case SLANG_TEXTURE_BUFFER:

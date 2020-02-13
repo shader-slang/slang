@@ -34,9 +34,6 @@ public:
     typedef RefObject Super;
 
         /// Dtor
-    CUDAResource() {}
-    CUDAResource(CUdeviceptr cudaMemory): m_cudaMemory(cudaMemory) {}
-
     ~CUDAResource()
     {
         if (m_cudaMemory)
@@ -64,22 +61,11 @@ class CUDATextureResource : public RefObject
 public:
     typedef RefObject Super;
 
-    CUDATextureResource() {}
-    CUDATextureResource(CUtexObject cudaTexObj, CUdeviceptr cudaMemory, CUarray cudaArray):
-        m_cudaTexObj(cudaTexObj),
-        m_cudaMemory(cudaMemory),
-        m_cudaArray(cudaArray)
-    {
-    }
     ~CUDATextureResource()
     {
         if (m_cudaTexObj)
         {
             SLANG_CUDA_ASSERT_ON_FAIL(cuTexObjectDestroy(m_cudaTexObj));
-        }
-        if (m_cudaMemory)
-        {
-            SLANG_CUDA_ASSERT_ON_FAIL(cuMemFree(m_cudaMemory));
         }
         if (m_cudaArray)
         {
@@ -99,10 +85,8 @@ public:
         return resource ? resource->m_cudaTexObj : CUtexObject(0);
     }
 
-protected:
     // This is an opaque type, that's backed by a long long
     CUtexObject m_cudaTexObj = CUtexObject();
-    CUdeviceptr m_cudaMemory = CUdeviceptr();
     CUarray m_cudaArray = CUarray();
 };
 
@@ -409,10 +393,9 @@ static SlangResult _compute(CUcontext context, CUmodule module, const ShaderComp
                     case slang::TypeReflection::Kind::ParameterBlock:
                     {
                         // We can construct the buffers. We can't copy into yet, as we need to set all of the bindings first
-
-                        CUdeviceptr cudaMem = CUdeviceptr();
-                        SLANG_CUDA_RETURN_ON_FAIL(cuMemAlloc(&cudaMem, value->m_sizeInBytes));
-                        value->m_target = new CUDAResource(cudaMem);
+                        RefPtr<CUDAResource> resource = new CUDAResource;
+                        SLANG_CUDA_RETURN_ON_FAIL(cuMemAlloc(&resource->m_cudaMemory, value->m_sizeInBytes));
+                        value->m_target = resource;
                         break;
                     }
                     case slang::TypeReflection::Kind::Resource:
@@ -420,11 +403,15 @@ static SlangResult _compute(CUcontext context, CUmodule module, const ShaderComp
                         auto type = typeLayout->getType();
                         auto shape = type->getResourceShape();
 
-                        //auto access = type->getResourceAccess();
+                        auto access = type->getResourceAccess();
 
-                        switch (shape & SLANG_RESOURCE_BASE_SHAPE_MASK)
+                        auto baseShape = shape & SLANG_RESOURCE_BASE_SHAPE_MASK;
+
+                        switch (baseShape)
                         {
+                            case SLANG_TEXTURE_1D:
                             case SLANG_TEXTURE_2D:
+                            case SLANG_TEXTURE_3D:
                             {
                                 SLANG_ASSERT(value->m_userIndex >= 0);
                                 auto& srcEntry = entries[value->m_userIndex];
@@ -440,18 +427,38 @@ static SlangResult _compute(CUcontext context, CUmodule module, const ShaderComp
                                 const auto& textureDesc = srcEntry.textureDesc;
 
                                 int width = textureDesc.size;
-                                int height = textureDesc.size;
+                                int height = 1;
+                                int depth = 1;
 
+                                switch (baseShape)
+                                {
+                                    case SLANG_TEXTURE_1D: break;
+                                    case SLANG_TEXTURE_2D:
+                                    {
+                                        height = textureDesc.size;
+                                        break;
+                                    }
+                                    case SLANG_TEXTURE_3D:
+                                    {
+                                        height = textureDesc.size;
+                                        depth = textureDesc.size;
+                                        break;
+                                    }
+                                }
+                                
                                 TextureData texData;
                                 generateTextureData(texData, textureDesc);
 
+                                RefPtr<CUDATextureResource> tex = new CUDATextureResource;
+
                                 size_t elementSize = 0;
 
-                                CUarray cudaArray;
                                 {
                                     CUDA_ARRAY_DESCRIPTOR arrayDesc;
                                     arrayDesc.Width = width;
-                                    arrayDesc.Height = height;
+
+                                    // Width, and Height are the width, and height of the CUDA array (in elements); the CUDA array is one-dimensional if height is 0, two-dimensional otherwise;
+                                    arrayDesc.Height = (baseShape == SLANG_TEXTURE_1D) ? 0 : height;
 
                                     switch (textureDesc.format)
                                     {
@@ -477,37 +484,44 @@ static SlangResult _compute(CUcontext context, CUmodule module, const ShaderComp
                                     }
 
                                     // Allocate the array
-                                    SLANG_CUDA_RETURN_ON_FAIL(cuArrayCreate(&cudaArray, &arrayDesc));
+                                    SLANG_CUDA_RETURN_ON_FAIL(cuArrayCreate(&tex->m_cudaArray, &arrayDesc));
                                 }
 
-                                CUdeviceptr cudaMemory = (CUdeviceptr)nullptr;
+                                switch (baseShape)
                                 {
-                                    const size_t size = width  * height * elementSize;
-                                     // allocate device memory for result
-                                    SLANG_CUDA_RETURN_ON_FAIL(cuMemAlloc(&cudaMemory, size));
-                                }
-
-                                {
-                                    CUDA_MEMCPY2D copyParam;
-                                    memset(&copyParam, 0, sizeof(copyParam));
-                                    copyParam.dstMemoryType = CU_MEMORYTYPE_ARRAY;
-                                    copyParam.dstArray = cudaArray;
-                                    copyParam.srcMemoryType = CU_MEMORYTYPE_HOST;
-                                    copyParam.srcHost = texData.dataBuffer[0].getBuffer();
-                                    copyParam.srcPitch = width * elementSize;
-                                    copyParam.WidthInBytes = copyParam.srcPitch;
-                                    copyParam.Height = height;
-                                    SLANG_CUDA_RETURN_ON_FAIL(cuMemcpy2D(&copyParam));
+                                    case SLANG_TEXTURE_1D:
+                                    case SLANG_TEXTURE_2D:
+                                    {
+                                        // TODO(JS):
+                                        // Not clear how the copy should be done for 1D, but seeing as it is copying to an 'array'
+                                        // doing it with cuMemcpy2D is appropriate.
+                                        // Not clear if the height should be 0 or 1. The array required it to be 0.
+                                        CUDA_MEMCPY2D copyParam;
+                                        memset(&copyParam, 0, sizeof(copyParam));
+                                        copyParam.dstMemoryType = CU_MEMORYTYPE_ARRAY;
+                                        copyParam.dstArray = tex->m_cudaArray;
+                                        copyParam.srcMemoryType = CU_MEMORYTYPE_HOST;
+                                        copyParam.srcHost = texData.dataBuffer[0].getBuffer();
+                                        copyParam.srcPitch = width * elementSize;
+                                        copyParam.WidthInBytes = copyParam.srcPitch; 
+                                        copyParam.Height = height;
+                                        SLANG_CUDA_RETURN_ON_FAIL(cuMemcpy2D(&copyParam));
+                                        break;
+                                    }
+                                    case SLANG_TEXTURE_3D:
+                                    {
+                                        SLANG_ASSERT(!"Not implemented");
+                                        break;
+                                    }
                                 }
 
                                 // set texture parameters
 
-                                CUtexObject cudaTexObj;
                                 {
                                     CUDA_RESOURCE_DESC resDesc;
                                     memset(&resDesc, 0, sizeof(CUDA_RESOURCE_DESC));
                                     resDesc.resType = CU_RESOURCE_TYPE_ARRAY;
-                                    resDesc.res.array.hArray = cudaArray;
+                                    resDesc.res.array.hArray = tex->m_cudaArray;
 
                                     CUDA_TEXTURE_DESC texDesc;
                                     memset(&texDesc, 0, sizeof(CUDA_TEXTURE_DESC));
@@ -517,14 +531,13 @@ static SlangResult _compute(CUcontext context, CUmodule module, const ShaderComp
                                     texDesc.filterMode = CU_TR_FILTER_MODE_LINEAR;
                                     texDesc.flags = CU_TRSF_NORMALIZED_COORDINATES;
 
-                                    SLANG_CUDA_RETURN_ON_FAIL(cuTexObjectCreate(&cudaTexObj, &resDesc, &texDesc, nullptr));
+                                    SLANG_CUDA_RETURN_ON_FAIL(cuTexObjectCreate(&tex->m_cudaTexObj, &resDesc, &texDesc, nullptr));
                                 }
 
-                                value->m_target = new CUDATextureResource(cudaTexObj, cudaMemory, cudaArray);
+                                value->m_target = tex;
                                 break;
                             }
-                            case SLANG_TEXTURE_1D:
-                            case SLANG_TEXTURE_3D:
+
                             case SLANG_TEXTURE_CUBE:
                             case SLANG_TEXTURE_BUFFER:
                             {
@@ -537,9 +550,9 @@ static SlangResult _compute(CUcontext context, CUmodule module, const ShaderComp
                             case SLANG_STRUCTURED_BUFFER:
                             {
                                 // On CPU we just use the memory in the BindSet buffer, so don't need to create anything
-                                CUdeviceptr cudaMem = CUdeviceptr();
-                                SLANG_CUDA_RETURN_ON_FAIL(cuMemAlloc(&cudaMem, value->m_sizeInBytes));
-                                value->m_target = new CUDAResource(cudaMem);
+                                RefPtr<CUDAResource> resource = new CUDAResource;
+                                SLANG_CUDA_RETURN_ON_FAIL(cuMemAlloc(&resource->m_cudaMemory, value->m_sizeInBytes));
+                                value->m_target = resource;
                                 break;
                             }
                         }
