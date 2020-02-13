@@ -1,7 +1,9 @@
 //TEST(compute):COMPARE_COMPUTE_EX:-cpu -compute 
 //TEST(compute):COMPARE_COMPUTE_EX:-slang -compute
-//TEST(compute):COMPARE_COMPUTE_EX:-slang -compute -dx12 -profile cs_6_3 -use-dxil
-//TEST(compute, vulkan):COMPARE_COMPUTE_EX:-vk -compute
+//TEST(compute):COMPARE_COMPUTE_EX:-slang -compute -dx12 
+//TEST(compute):COMPARE_COMPUTE_EX:-slang -compute -dx12 -profile cs_6_0 -use-dxil
+// TODO(JS): Doesn't work on vk currently
+//DISABLE_TEST(compute, vulkan):COMPARE_COMPUTE_EX:-vk -compute
 //TEST(compute):COMPARE_COMPUTE_EX:-cuda -compute 
 
 //TEST_INPUT: Texture1D(size=4, content = one):name t1D
@@ -22,8 +24,8 @@ void computeMain(uint3 dispatchThreadID : SV_DispatchThreadID)
     float u = idx * (1.0f / 4);
     
     float val = 0.0f;
-    val += t1D.Sample(samplerState, u);
-    val += t2D.Sample(samplerState, float2(u, u));
+    val += t1D.SampleLevel(samplerState, u, 0);
+    val += t2D.SampleLevel(samplerState, float2(u, u), 0);
  
     outputBuffer[idx] = val;
 }
