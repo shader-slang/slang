@@ -9,6 +9,7 @@
 #include "../bind-location.h"
 
 #include <cuda.h>
+
 #include <cuda_runtime_api.h>
 
 namespace renderer_test {
@@ -33,14 +34,14 @@ public:
     typedef RefObject Super;
 
         /// Dtor
-    CUDAResource(): m_cudaMemory(nullptr) {}
-    CUDAResource(void* cudaMemory): m_cudaMemory(cudaMemory) {}
+    CUDAResource() {}
+    CUDAResource(CUdeviceptr cudaMemory): m_cudaMemory(cudaMemory) {}
 
     ~CUDAResource()
     {
         if (m_cudaMemory)
         {
-            SLANG_CUDA_ASSERT_ON_FAIL(cudaFree(m_cudaMemory));
+            SLANG_CUDA_ASSERT_ON_FAIL(cuMemFree(m_cudaMemory));
         }
     }
 
@@ -49,13 +50,13 @@ public:
         return value ? dynamic_cast<CUDAResource*>(value->m_target.Ptr()) : nullptr;
     }
         /// Helper function to get the cuda memory pointer when given a value
-    static void* getCUDAData(BindSet::Value* value)
+    static CUdeviceptr getCUDAData(BindSet::Value* value)
     {
         auto resource = getCUDAResource(value);
-        return resource ? resource->m_cudaMemory : nullptr;
+        return resource ? resource->m_cudaMemory : CUdeviceptr();
     }
 
-    void* m_cudaMemory;
+    CUdeviceptr m_cudaMemory = CUdeviceptr();
 };
 
 class CUDATextureResource : public RefObject
@@ -140,7 +141,7 @@ public:
     {
         release();
         SLANG_ASSERT(m_stream == nullptr);
-        SLANG_CUDA_RETURN_ON_FAIL(cudaStreamCreateWithFlags(&m_stream, flags));
+        SLANG_CUDA_RETURN_ON_FAIL(cuStreamCreate(&m_stream, flags));
         return SLANG_OK;
     }
 
@@ -148,7 +149,7 @@ public:
     {
         if (m_stream)
         {
-            SLANG_CUDA_RETURN_ON_FAIL(cudaStreamSynchronize(m_stream));
+            SLANG_CUDA_RETURN_ON_FAIL(cuStreamSynchronize(m_stream));
         }
         else
         {
@@ -162,7 +163,7 @@ public:
         if (m_stream)
         {
             sync();
-            SLANG_CUDA_ASSERT_ON_FAIL(cudaStreamDestroy(m_stream));
+            SLANG_CUDA_ASSERT_ON_FAIL(cuStreamDestroy(m_stream));
             m_stream = nullptr;
         }
     }
@@ -171,9 +172,9 @@ public:
 
     ~ScopeCUDAStream() { release(); }
 
-    operator cudaStream_t () const { return m_stream; }
+    operator CUstream () const { return m_stream; }
 
-    cudaStream_t m_stream;
+    CUstream m_stream;
 };
 
 
@@ -409,8 +410,8 @@ static SlangResult _compute(CUcontext context, CUmodule module, const ShaderComp
                     {
                         // We can construct the buffers. We can't copy into yet, as we need to set all of the bindings first
 
-                        void* cudaMem = nullptr;
-                        SLANG_CUDA_RETURN_ON_FAIL(cudaMalloc(&cudaMem, value->m_sizeInBytes));
+                        CUdeviceptr cudaMem = CUdeviceptr();
+                        SLANG_CUDA_RETURN_ON_FAIL(cuMemAlloc(&cudaMem, value->m_sizeInBytes));
                         value->m_target = new CUDAResource(cudaMem);
                         break;
                     }
@@ -536,10 +537,9 @@ static SlangResult _compute(CUcontext context, CUmodule module, const ShaderComp
                             case SLANG_STRUCTURED_BUFFER:
                             {
                                 // On CPU we just use the memory in the BindSet buffer, so don't need to create anything
-                                void* cudaMem = nullptr;
-                                SLANG_CUDA_RETURN_ON_FAIL(cudaMalloc(&cudaMem, value->m_sizeInBytes));
+                                CUdeviceptr cudaMem = CUdeviceptr();
+                                SLANG_CUDA_RETURN_ON_FAIL(cuMemAlloc(&cudaMem, value->m_sizeInBytes));
                                 value->m_target = new CUDAResource(cudaMem);
-
                                 break;
                             }
                         }
@@ -572,7 +572,7 @@ static SlangResult _compute(CUcontext context, CUmodule module, const ShaderComp
                         auto elementCount = int(typeLayout->getElementCount());
                         if (elementCount == 0)
                         {
-                            CUDAComputeUtil::Array array = { nullptr, 0 };
+                            CUDAComputeUtil::Array array = { CUdeviceptr(), 0 };
                             auto resource = CUDAResource::getCUDAResource(value);
                             if (resource)
                             {
@@ -588,7 +588,7 @@ static SlangResult _compute(CUcontext context, CUmodule module, const ShaderComp
                     case slang::TypeReflection::Kind::ParameterBlock:
                     {
                         // These map down to just pointers
-                        *location.getUniform<void*>() = CUDAResource::getCUDAData(value);
+                        *location.getUniform<CUdeviceptr>() = CUDAResource::getCUDAData(value);
                         break;
                     }
                     case slang::TypeReflection::Kind::Resource:
@@ -602,7 +602,7 @@ static SlangResult _compute(CUcontext context, CUmodule module, const ShaderComp
                         {
                             case SLANG_STRUCTURED_BUFFER:
                             {
-                                CUDAComputeUtil::StructuredBuffer buffer = { nullptr, 0 };
+                                CUDAComputeUtil::StructuredBuffer buffer = { CUdeviceptr(), 0 };
                                 auto resource = CUDAResource::getCUDAResource(value);
                                 if (resource)
                                 {
@@ -615,7 +615,7 @@ static SlangResult _compute(CUcontext context, CUmodule module, const ShaderComp
                             }
                             case SLANG_BYTE_ADDRESS_BUFFER:
                             {
-                                CUDAComputeUtil::ByteAddressBuffer buffer = { nullptr, 0 };
+                                CUDAComputeUtil::ByteAddressBuffer buffer = { CUdeviceptr(), 0 };
 
                                 auto resource = CUDAResource::getCUDAResource(value);
                                 if (resource)
@@ -649,11 +649,11 @@ static SlangResult _compute(CUcontext context, CUmodule module, const ShaderComp
             const auto& values = bindSet.getValues();
             for (BindSet::Value* value : values)
             {
-                void* cudaMem = CUDAResource::getCUDAData(value);
+                CUdeviceptr cudaMem = CUDAResource::getCUDAData(value);
                 if (value && value->m_data && cudaMem)
                 {
                     // Okay copy the data over...
-                    SLANG_CUDA_RETURN_ON_FAIL(cudaMemcpy(cudaMem, value->m_data, value->m_sizeInBytes, cudaMemcpyHostToDevice));
+                    SLANG_CUDA_RETURN_ON_FAIL(cuMemcpyHtoD(cudaMem, value->m_data, value->m_sizeInBytes));
                 }
             }
         }
@@ -670,8 +670,8 @@ static SlangResult _compute(CUcontext context, CUmodule module, const ShaderComp
             SLANG_CUDA_RETURN_ON_FAIL(cuFuncGetAttribute(&sharedSizeInBytes, CU_FUNC_ATTRIBUTE_SHARED_SIZE_BYTES, kernel));
 
             // Work out the args
-            void* uniformCUDAData = CUDAResource::getCUDAData(bindRoot.getRootValue());
-            void* entryPointCUDAData = CUDAResource::getCUDAData(bindRoot.getEntryPointValue());
+            CUdeviceptr uniformCUDAData = CUDAResource::getCUDAData(bindRoot.getRootValue());
+            CUdeviceptr entryPointCUDAData = CUDAResource::getCUDAData(bindRoot.getEntryPointValue());
 
             // NOTE! These are pointers to the cuda memory pointers
             void* args[] = { &entryPointCUDAData , &uniformCUDAData };
@@ -683,10 +683,10 @@ static SlangResult _compute(CUcontext context, CUmodule module, const ShaderComp
             auto cudaLaunchResult = cuLaunchKernel(kernel,
                 dispatchSize[0], dispatchSize[1], dispatchSize[2], 
                 int(numThreadsPerAxis[0]), int(numThreadsPerAxis[1]), int(numThreadsPerAxis[2]),        // Threads per block
-                0,                                                                                      // Shared memory size
-                cudaStream,                                                                                 // Stream. 0 is no stream.
-                args,                                                                                   // Args
-                nullptr);                                                                               // extra
+                0,              // Shared memory size
+                cudaStream,     // Stream. 0 is no stream.
+                args,           // Args
+                nullptr);       // extra
 
             SLANG_CUDA_RETURN_ON_FAIL(cudaLaunchResult);
 
@@ -707,11 +707,11 @@ static SlangResult _compute(CUcontext context, CUmodule module, const ShaderComp
                 if (entry.isOutput)
                 {
                     // Copy back to CPU memory
-                    void* cudaMem = CUDAResource::getCUDAData(value);
+                   CUdeviceptr cudaMem = CUDAResource::getCUDAData(value);
                     if (value && value->m_data && cudaMem)
                     {
                         // Okay copy the data back...
-                        SLANG_CUDA_RETURN_ON_FAIL(cudaMemcpy(value->m_data, cudaMem, value->m_sizeInBytes, cudaMemcpyDeviceToHost));
+                        SLANG_CUDA_RETURN_ON_FAIL(cuMemcpyDtoH(value->m_data, cudaMem, value->m_sizeInBytes));
                     }
                 }
             }
