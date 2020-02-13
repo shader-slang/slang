@@ -1967,19 +1967,31 @@ void CLikeSourceEmitter::defaultEmitInstExpr(IRInst* inst, const EmitOpInfo& inO
 
         needClose = maybeEmitParens(outerPrec, prec);
 
-        // If it's a BitNot, but the data type is bool special case to !
-        if (emitOp == EmitOp::BitNot && as<IRBoolType>(inst->getDataType()))
+        switch (inst->op)
         {
-            m_writer->emit("!");
+            case kIROp_BitNot:
+            {
+                // If it's a BitNot, but the data type is bool special case to !
+                m_writer->emit(as<IRBoolType>(inst->getDataType()) ? "!" : prec.op);
+                break;
+            }
+            case kIROp_Not:
+            {
+                m_writer->emit(prec.op);
+                break;
+            }
+            case kIROp_Neg:
+            {
+                // Emit a space after the unary -, so if we are followed by a negative literal we don't end up with --
+                // which some downstream compilers determine to be decrement.
+                m_writer->emit("- ");
+                break;
+            }
         }
-        else
-        {
-            m_writer->emit(prec.op);
-        }
-        
+
         emitOperand(operand, rightSide(prec, outerPrec));
         break;
-    }
+    }    
     case kIROp_Load:
         {
             auto base = inst->getOperand(0);
