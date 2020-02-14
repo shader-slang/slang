@@ -915,22 +915,47 @@ for (int tt = 0; tt < kBaseTextureTypeCount; ++tt)
 
                 sb << "__target_intrinsic(glsl, \"$ctexture($p, $2)$z\")\n";
 
-                if( baseShape != TextureFlavor::Shape::ShapeCube )
+                // CUDA
                 {
-                    sb << "__target_intrinsic(cuda, \"tex" << kBaseTextureTypes[tt].coordCount << "D<$T0>($0";
-                    for (int i = 0; i < kBaseTextureTypes[tt].coordCount; ++i)
+                    const int coordCount = kBaseTextureTypes[tt].coordCount;
+                    const int vecCount = coordCount + int(isArray);
+
+                    if( baseShape != TextureFlavor::Shape::ShapeCube )
                     {
-                        sb << ", ($2)";
-                        if (kBaseTextureTypes[tt].coordCount > 1)
+                        sb << "__target_intrinsic(cuda, \"tex" << coordCount << "D";
+                        if (isArray)
                         {
-                            sb << '.' << char(i + 'x');
+                            sb << "Layered";
                         }
+                        sb << "<$T0>($0";
+                        for (int i = 0; i < coordCount; ++i)
+                        {
+                            sb << ", ($2)";
+                            if (vecCount > 1)
+                            {
+                                sb << '.' << char(i + 'x');
+                            }
+                        }
+                        if (isArray)
+                        {
+                            sb << ", int(($2)." << char(coordCount + 'x') << ")";
+                        }
+                        sb << ")\")\n";
                     }
-                    sb << ")\")\n";
-                }
-                else
-                {
-                    sb << "__target_intrinsic(cuda, \"texCubemap<$T0>($0, ($2).x, ($2).y, ($2).z)\")\n";
+                    else
+                    {
+                        sb << "__target_intrinsic(cuda, \"texCubemap";
+                        if (isArray)
+                        {
+                            sb << "Layered";
+                        }
+                        sb << "<$T0>($0, ($2).x, ($2).y, ($2).z"; 
+                        if (isArray)
+                        {
+                            sb << ", int(($2).w)";
+                        }
+                        sb << ")\")\n";
+                    }
                 }
 
                 sb << "T Sample(SamplerState s, ";
@@ -959,7 +984,6 @@ for (int tt = 0; tt < kBaseTextureTypeCount; ++tt)
                     sb << "constexpr int" << kBaseTextureTypes[tt].coordCount << " offset, ";
                 }
                 sb << "float clamp, out uint status);\n";
-
 
                 // `SampleBias()`
                 sb << "__target_intrinsic(glsl, \"$ctexture($p, $2, $3)$z\")\n";
@@ -1075,24 +1099,45 @@ for (int tt = 0; tt < kBaseTextureTypeCount; ++tt)
                 sb << "__target_intrinsic(glsl, \"$ctextureLod($p, $2, $3)$z\")\n";
 
                 // CUDA
-                if (!isArray)
                 {
+                    const int coordCount = kBaseTextureTypes[tt].coordCount;
+                    const int vecCount = coordCount + int(isArray);
+
                     if( baseShape != TextureFlavor::Shape::ShapeCube )
                     {
-                        sb << "__target_intrinsic(cuda, \"tex" << kBaseTextureTypes[tt].coordCount << "DLod<$T0>($0";
-                        for (int i = 0; i < kBaseTextureTypes[tt].coordCount; ++i)
+                        sb << "__target_intrinsic(cuda, \"tex" << coordCount << "D";
+                        if (isArray)
+                        {
+                            sb << "Layered";
+                        }
+                        sb << "Lod<$T0>($0";
+                        for (int i = 0; i < coordCount; ++i)
                         {
                             sb << ", ($2)";
-                            if (kBaseTextureTypes[tt].coordCount > 1)
+                            if (vecCount > 1)
                             {
                                 sb << '.' << char(i + 'x');
                             }
+                        }
+                        if (isArray)
+                        {
+                            sb << ", int(($2)." << char(coordCount + 'x') << ")";
                         }
                         sb << ", $3)\")\n";
                     }
                     else
                     {
-                        sb << "__target_intrinsic(cuda, \"texCubemap<$T0>($0, ($2).x, ($2).y, ($2).z)\")\n";
+                        sb << "__target_intrinsic(cuda, \"texCubemap";
+                        if (isArray)
+                        {
+                            sb << "Layered";
+                        }
+                        sb << "Lod<$T0>($0, ($2).x, ($2).y, ($2).z";
+                        if (isArray)
+                        {
+                            sb << ", int(($2).w)"; 
+                        }
+                        sb << ", $3)\")\n";
                     }
                 }
 
@@ -1314,7 +1359,7 @@ for (auto op : binaryOps)
         sb << "__intrinsic_op(" << int(op.opCode) << ") matrix<" << resultType << ",N,M> operator" << op.opName << "(" << leftQual << "matrix<" << leftType << ",N,M> left, " << rightType << " right);\n";
     }
 }
-SLANG_RAW("#line 1296 \"core.meta.slang\"")
+SLANG_RAW("#line 1341 \"core.meta.slang\"")
 SLANG_RAW("\n")
 SLANG_RAW("\n")
 SLANG_RAW("// Specialized function\n")

@@ -81,56 +81,28 @@ static bool _isSingleNameBasicType(IROp op)
 
 SlangResult CUDASourceEmitter::_calcCUDATextureTypeName(IRTextureTypeBase* texType, StringBuilder& outName)
 {
-    // texture<float, cudaTextureType2D, cudaReadModeElementType> texRef;
-
     // Not clear how to do this yet
-    if (texType->isMultisample() || texType->isArray())
+    if (texType->isMultisample())
     {
         return SLANG_FAIL;
     }
-
-    outName << "CUtexObject";
-
-#if 0
-    outName << "texture<";
-    outName << _getTypeName(texType->getElementType());
-    outName << ", ";
-
-    switch (texType->GetBaseShape())
-    {
-        case TextureFlavor::Shape::Shape1D:		outName << "cudaTextureType1D";		break;
-        case TextureFlavor::Shape::Shape2D:		outName << "cudaTextureType2D";		break;
-        case TextureFlavor::Shape::Shape3D:		outName << "cudaTextureType3D";		break;
-        case TextureFlavor::Shape::ShapeCube:	outName << "cudaTextureTypeCubemap";	break;
-        case TextureFlavor::Shape::ShapeBuffer: outName << "Buffer";         break;
-        default:
-            SLANG_DIAGNOSE_UNEXPECTED(getSink(), SourceLoc(), "unhandled resource shape");
-            return SLANG_FAIL;
-    }
-
-    outName << ", ";
 
     switch (texType->getAccess())
     {
         case SLANG_RESOURCE_ACCESS_READ:
         {
-            // Other value is cudaReadModeNormalizedFloat 
-
-            outName << "cudaReadModeElementType";
-            break;
+            outName << "CUtexObject";
+            return SLANG_OK;
         }
-        default:
+        case SLANG_RESOURCE_ACCESS_READ_WRITE:
         {
-            SLANG_DIAGNOSE_UNEXPECTED(getSink(), SourceLoc(), "unhandled resource access mode");
-            return SLANG_FAIL;
+            outName << "CUsurfObject";
+            return SLANG_OK;
         }
+        default: break;
     }
-
-    outName << ">";
-#endif
-    return SLANG_OK;
+    return SLANG_FAIL;
 }
-
 
 SlangResult CUDASourceEmitter::calcScalarFuncName(HLSLIntrinsic::Op op, IRBasicType* type, StringBuilder& outBuilder)
 {

@@ -17,6 +17,7 @@ These limitations apply to Slang transpiling to CUDA.
 * Only supports the 'texture object' style binding (The texture object API is only supported on devices of compute capability 3.0 or higher. )
 * Samplers are not separate objects in CUDA - they are combined into a single 'TextureObject'. So samplers are effectively ignored on CUDA targets. 
 * Whilst there is tex1Dfetch there are no equivalents for higher dimensions - so such accesses are not currently supported
+* When using a TextureArray (layered texture in CUDA) - the index will be treated as an int, as this is all CUDA allows
 
 The following are a work in progress or not implmented but are planned to be so in the future
 
