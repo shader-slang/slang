@@ -148,10 +148,43 @@ struct ValueTexture1D : public CPUComputeUtil::Resource, public CPPPrelude::ITex
 };
 
 
-
-static CPUComputeUtil::Resource* _newValueTexture(SlangResourceShape baseShape, int elemCount, float value)
+template <int COUNT>
+struct ValueTexture1DArray : public CPUComputeUtil::Resource, public CPPPrelude::ITexture1DArray
 {
-    switch (baseShape)
+    void set(void* out)
+    {
+        float* dst = (float*)out;
+        for (int i = 0; i < COUNT; ++i)
+        {
+            dst[i] = m_value;
+        }
+    }
+
+    virtual void Load(const CPPPrelude::int3& v, void* out) SLANG_OVERRIDE
+    {
+        set(out);
+    }
+    virtual void Sample(CPPPrelude::SamplerState samplerState, const CPPPrelude::float2& loc, void* out) SLANG_OVERRIDE
+    {
+        set(out);
+    }
+    virtual void SampleLevel(CPPPrelude::SamplerState samplerState, const CPPPrelude::float2& loc, float level, void* out) SLANG_OVERRIDE
+    {
+        set(out);
+    }
+
+    ValueTexture1DArray(float value) :
+        m_value(value)
+    {
+        m_interface = static_cast<CPPPrelude::ITexture1DArray*>(this);
+    }
+
+    float m_value;
+};
+
+static CPUComputeUtil::Resource* _newValueTexture(SlangResourceShape shape, int elemCount, float value)
+{
+    switch (shape)
     {
         case SLANG_TEXTURE_1D:
         {
@@ -198,6 +231,19 @@ static CPUComputeUtil::Resource* _newValueTexture(SlangResourceShape baseShape, 
                 default: break;
             }
         }
+        case SLANG_TEXTURE_1D_ARRAY:
+        {
+            switch (elemCount)
+            {
+                case 1: return new ValueTexture1DArray<1>(value);
+                case 2: return new ValueTexture1DArray<2>(value);
+                case 3: return new ValueTexture1DArray<3>(value);
+                case 4: return new ValueTexture1DArray<4>(value);
+                default: break;
+            }
+            break;
+        }
+
         default: break;
     }
     return nullptr;
@@ -281,12 +327,12 @@ static CPUComputeUtil::Resource* _newValueTexture(SlangResourceShape baseShape, 
                                 {
                                     case InputTextureContent::One:
                                     {
-                                        value->m_target = _newValueTexture(baseShape, count, 1.0f);
+                                        value->m_target = _newValueTexture(shape, count, 1.0f);
                                         break;                                        
                                     }
                                     case InputTextureContent::Zero:
                                     {
-                                        value->m_target = _newValueTexture(baseShape, count, 0.0f);
+                                        value->m_target = _newValueTexture(shape, count, 0.0f);
                                         break;
                                     }
                                     default: break;
