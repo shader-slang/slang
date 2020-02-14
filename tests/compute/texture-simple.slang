@@ -1,7 +1,7 @@
-//DISABLE_TEST(compute):COMPARE_COMPUTE_EX:-cpu -compute 
-//DISABLE_TEST(compute):COMPARE_COMPUTE_EX:-slang -compute
-//DISABLE_TEST(compute):COMPARE_COMPUTE_EX:-slang -compute -dx12 
-//DISABLE_TEST(compute):COMPARE_COMPUTE_EX:-slang -compute -dx12 -profile cs_6_0 -use-dxil
+//TEST(compute):COMPARE_COMPUTE_EX:-cpu -compute 
+//TEST(compute):COMPARE_COMPUTE_EX:-slang -compute
+//TEST(compute):COMPARE_COMPUTE_EX:-slang -compute -dx12 
+//TEST(compute):COMPARE_COMPUTE_EX:-slang -compute -dx12 -profile cs_6_0 -use-dxil
 // TODO(JS): Doesn't work on vk currently, because createTextureView not implemented on vk renderer
 //DISABLE_TEST(compute, vulkan):COMPARE_COMPUTE_EX:-vk -compute
 //TEST(compute):COMPARE_COMPUTE_EX:-cuda -compute 

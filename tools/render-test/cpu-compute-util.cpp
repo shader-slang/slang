@@ -218,6 +218,8 @@ static CPUComputeUtil::Resource* _newValueTexture(SlangResourceShape baseShape, 
                         {
                             case SLANG_TEXTURE_1D:
                             case SLANG_TEXTURE_2D:
+                            case SLANG_TEXTURE_3D:
+                            case SLANG_TEXTURE_CUBE:
                             {
                                 SLANG_ASSERT(value->m_userIndex >= 0);
                                 auto& srcEntry = layout.entries[value->m_userIndex];
@@ -249,11 +251,15 @@ static CPUComputeUtil::Resource* _newValueTexture(SlangResourceShape baseShape, 
                                     }
                                     default: break;
                                 }
+
+                                if (value->m_target == nullptr)
+                                {
+                                    SLANG_ASSERT(!"Couldn't construct resource type");
+                                    return SLANG_FAIL;
+                                }
+
                                 break;
                             }
-                            
-                            case SLANG_TEXTURE_3D:
-                            case SLANG_TEXTURE_CUBE:
                             case SLANG_TEXTURE_BUFFER:
                             {
                                 // Need a CPU impl for these...

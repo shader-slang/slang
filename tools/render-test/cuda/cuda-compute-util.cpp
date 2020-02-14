@@ -556,34 +556,40 @@ static SlangResult _compute(CUcontext context, CUmodule module, const ShaderComp
 
                                 for (int mipLevel = 0; mipLevel < mipLevels; ++mipLevel)
                                 {
+                                    int mipWidth = width >> mipLevel;
+                                    int mipHeight = height >> mipLevel;
+                                    int mipDepth = depth >> mipLevel;
+
+                                    mipWidth = (mipWidth == 0) ? 1 : mipWidth;
+                                    mipHeight = (mipHeight == 0) ? 1 : mipHeight;
+                                    mipDepth = (mipDepth == 0) ? 1 : mipDepth;
+
+                                    auto dstArray = tex->m_cudaArray;
+                                    if (tex->m_cudaMipMappedArray)
+                                    {
+                                        // Get the array for the mip level
+                                        SLANG_CUDA_RETURN_ON_FAIL(cuMipmappedArrayGetLevel(&dstArray, tex->m_cudaMipMappedArray, mipLevel));
+                                    }
+                                    SLANG_ASSERT(dstArray);
+
+                                    const auto& srcData = texData.dataBuffer[mipLevel];
+
+                                    SLANG_ASSERT(mipWidth * mipHeight * mipDepth == srcData.getCount());
+
+                                    // Check using the desc to see if it's plausible
+                                    {
+                                        CUDA_ARRAY_DESCRIPTOR arrayDesc;
+                                        SLANG_CUDA_RETURN_ON_FAIL(cuArrayGetDescriptor(&arrayDesc, dstArray));
+
+                                        SLANG_ASSERT(mipWidth == arrayDesc.Width);
+                                        SLANG_ASSERT(mipHeight == arrayDesc.Height);
+                                    }
+
                                     switch (baseShape)
                                     {
                                         case SLANG_TEXTURE_1D:
                                         case SLANG_TEXTURE_2D:
-                                        case SLANG_TEXTURE_3D:
-                                        case SLANG_TEXTURE_CUBE:
-                                        {
-                                            int mipWidth = width >> mipLevel;
-                                            int mipHeight = height >> mipLevel;
-                                            mipWidth = (mipWidth == 0) ? 1 : mipWidth;
-                                            mipHeight = (mipHeight == 0) ? 1 : mipHeight;
-
-                                            auto dstArray = tex->m_cudaArray;
-                                            if (tex->m_cudaMipMappedArray)
-                                            {
-                                                // Get the array for the mip level
-                                                SLANG_CUDA_RETURN_ON_FAIL(cuMipmappedArrayGetLevel(&dstArray, tex->m_cudaMipMappedArray, mipLevel));
-                                            }
-
-                                            SLANG_ASSERT(dstArray);
-
-                                            CUDA_ARRAY_DESCRIPTOR arrayDesc;
-                                            SLANG_CUDA_RETURN_ON_FAIL(cuArrayGetDescriptor(&arrayDesc, dstArray));
-
-                                            const auto& srcData = texData.dataBuffer[mipLevel];
-
-                                            SLANG_ASSERT(mipWidth * mipHeight == srcData.getCount());
-
+                                        {                                                                                                                                 
                                             CUDA_MEMCPY2D copyParam;
                                             memset(&copyParam, 0, sizeof(copyParam));
                                             copyParam.dstMemoryType = CU_MEMORYTYPE_ARRAY;
@@ -596,6 +602,26 @@ static SlangResult _compute(CUcontext context, CUmodule module, const ShaderComp
                                             SLANG_CUDA_RETURN_ON_FAIL(cuMemcpy2D(&copyParam));
                                             break;
                                         }
+                                        case SLANG_TEXTURE_3D:
+                                        case SLANG_TEXTURE_CUBE:
+                                        {                                           
+                                            CUDA_MEMCPY3D copyParam;
+                                            memset(&copyParam, 0, sizeof(copyParam));
+
+                                            copyParam.dstMemoryType = CU_MEMORYTYPE_ARRAY;
+                                            copyParam.dstArray = dstArray;
+
+                                            copyParam.srcMemoryType = CU_MEMORYTYPE_HOST;
+                                            copyParam.srcHost = srcData.getBuffer();
+                                            copyParam.srcPitch = mipWidth * elementSize;
+                                            copyParam.WidthInBytes = copyParam.srcPitch;
+                                            copyParam.Height = mipHeight;
+                                            copyParam.Depth = mipDepth;
+
+                                            SLANG_CUDA_RETURN_ON_FAIL(cuMemcpy3D(&copyParam));
+                                            break;
+                                        }
+
                                         default:
                                         {
                                             SLANG_ASSERT(!"Not implemented");
