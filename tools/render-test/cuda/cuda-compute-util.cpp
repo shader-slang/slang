@@ -71,6 +71,10 @@ public:
         {
             SLANG_CUDA_ASSERT_ON_FAIL(cuArrayDestroy(m_cudaArray));
         }
+        if (m_cudaMipMappedArray)
+        {
+            SLANG_CUDA_ASSERT_ON_FAIL(cuMipmappedArrayDestroy(m_cudaMipMappedArray));
+        }
     }
 
     static CUDATextureResource* getCUDATextureResource(BindSet::Value* value)
@@ -88,6 +92,7 @@ public:
     // This is an opaque type, that's backed by a long long
     CUtexObject m_cudaTexObj = CUtexObject();
     CUarray m_cudaArray = CUarray();
+    CUmipmappedArray m_cudaMipMappedArray = CUmipmappedArray();
 };
 
 class ScopeCUDAModule
@@ -405,6 +410,8 @@ static SlangResult _compute(CUcontext context, CUmodule module, const ShaderComp
 
                         auto access = type->getResourceAccess();
 
+                        CUresourcetype resourceType = CU_RESOURCE_TYPE_ARRAY;
+
                         auto baseShape = shape & SLANG_RESOURCE_BASE_SHAPE_MASK;
 
                         switch (baseShape)
@@ -426,9 +433,11 @@ static SlangResult _compute(CUcontext context, CUmodule module, const ShaderComp
 
                                 const auto& textureDesc = srcEntry.textureDesc;
 
+                                // CUDA wants the unused dimensions to be 0.
+                                // Might need to specially handle elsewhere
                                 int width = textureDesc.size;
-                                int height = 1;
-                                int depth = 1;
+                                int height = 0;
+                                int depth = 0;
 
                                 switch (baseShape)
                                 {
@@ -444,10 +453,18 @@ static SlangResult _compute(CUcontext context, CUmodule module, const ShaderComp
                                         depth = textureDesc.size;
                                         break;
                                     }
+                                    case SLANG_TEXTURE_CUBE:
+                                    {
+                                        height = width;
+                                        depth = 6;
+                                        break;
+                                    }
                                 }
                                 
                                 TextureData texData;
                                 generateTextureData(texData, textureDesc);
+
+                                auto mipLevels = texData.mipLevels;
 
                                 RefPtr<CUDATextureResource> tex = new CUDATextureResource;
 
@@ -457,8 +474,7 @@ static SlangResult _compute(CUcontext context, CUmodule module, const ShaderComp
                                     CUDA_ARRAY_DESCRIPTOR arrayDesc;
                                     arrayDesc.Width = width;
 
-                                    // Width, and Height are the width, and height of the CUDA array (in elements); the CUDA array is one-dimensional if height is 0, two-dimensional otherwise;
-                                    arrayDesc.Height = (baseShape == SLANG_TEXTURE_1D) ? 0 : height;
+                                    arrayDesc.Height = height;
 
                                     switch (textureDesc.format)
                                     {
@@ -483,35 +499,76 @@ static SlangResult _compute(CUcontext context, CUmodule module, const ShaderComp
                                         }
                                     }
 
-                                    // Allocate the array
-                                    SLANG_CUDA_RETURN_ON_FAIL(cuArrayCreate(&tex->m_cudaArray, &arrayDesc));
+                                    if (mipLevels > 1)
+                                    {
+                                        resourceType = CU_RESOURCE_TYPE_MIPMAPPED_ARRAY;
+
+                                        CUDA_ARRAY3D_DESCRIPTOR mipMappedArrayDesc;
+
+                                        mipMappedArrayDesc.Width = width;
+                                        mipMappedArrayDesc.Height = height;
+                                        mipMappedArrayDesc.Depth = depth;
+                                        mipMappedArrayDesc.Format = arrayDesc.Format;
+                                        mipMappedArrayDesc.NumChannels = arrayDesc.NumChannels;
+                                        mipMappedArrayDesc.Flags = 0;
+
+                                        if (baseShape == SLANG_TEXTURE_CUBE)
+                                        {
+                                            mipMappedArrayDesc.Flags |= CUDA_ARRAY3D_CUBEMAP;
+                                        }
+
+                                        SLANG_CUDA_RETURN_ON_FAIL(cuMipmappedArrayCreate(&tex->m_cudaMipMappedArray,  &mipMappedArrayDesc, mipLevels));
+                                    }
+                                    else
+                                    {
+                                        resourceType = CU_RESOURCE_TYPE_ARRAY;
+                                        // Allocate the array
+                                        SLANG_CUDA_RETURN_ON_FAIL(cuArrayCreate(&tex->m_cudaArray, &arrayDesc));
+                                    }
                                 }
 
-                                switch (baseShape)
+                                for (int mipLevel = 0; mipLevel < mipLevels; ++mipLevel)
                                 {
-                                    case SLANG_TEXTURE_1D:
-                                    case SLANG_TEXTURE_2D:
+                                    switch (baseShape)
                                     {
-                                        // TODO(JS):
-                                        // Not clear how the copy should be done for 1D, but seeing as it is copying to an 'array'
-                                        // doing it with cuMemcpy2D is appropriate.
-                                        // Not clear if the height should be 0 or 1. The array required it to be 0.
-                                        CUDA_MEMCPY2D copyParam;
-                                        memset(&copyParam, 0, sizeof(copyParam));
-                                        copyParam.dstMemoryType = CU_MEMORYTYPE_ARRAY;
-                                        copyParam.dstArray = tex->m_cudaArray;
-                                        copyParam.srcMemoryType = CU_MEMORYTYPE_HOST;
-                                        copyParam.srcHost = texData.dataBuffer[0].getBuffer();
-                                        copyParam.srcPitch = width * elementSize;
-                                        copyParam.WidthInBytes = copyParam.srcPitch; 
-                                        copyParam.Height = height;
-                                        SLANG_CUDA_RETURN_ON_FAIL(cuMemcpy2D(&copyParam));
-                                        break;
-                                    }
-                                    case SLANG_TEXTURE_3D:
-                                    {
-                                        SLANG_ASSERT(!"Not implemented");
-                                        break;
+                                        case SLANG_TEXTURE_1D:
+                                        case SLANG_TEXTURE_2D:
+                                        {
+                                            int mipWidth = width >> mipLevel;
+                                            int mipHeight = height >> mipLevel;
+                                            mipWidth = (mipWidth == 0) ? 1 : mipWidth;
+                                            mipHeight = (mipHeight == 0) ? 1 : mipHeight;
+
+                                            auto dstArray = tex->m_cudaArray;
+                                            if (tex->m_cudaMipMappedArray)
+                                            {
+                                                // Get the array for the mip level
+                                                SLANG_CUDA_RETURN_ON_FAIL(cuMipmappedArrayGetLevel(&dstArray, tex->m_cudaMipMappedArray, mipLevel));
+                                            }
+
+                                            SLANG_ASSERT(dstArray);
+
+                                            const auto& srcData = texData.dataBuffer[mipLevel];
+
+                                            SLANG_ASSERT(mipWidth * mipHeight == srcData.getCount());
+
+                                            CUDA_MEMCPY2D copyParam;
+                                            memset(&copyParam, 0, sizeof(copyParam));
+                                            copyParam.dstMemoryType = CU_MEMORYTYPE_ARRAY;
+                                            copyParam.dstArray = dstArray;
+                                            copyParam.srcMemoryType = CU_MEMORYTYPE_HOST;
+                                            copyParam.srcHost = srcData.getBuffer();
+                                            copyParam.srcPitch = mipWidth * elementSize;
+                                            copyParam.WidthInBytes = copyParam.srcPitch; 
+                                            copyParam.Height = mipHeight; 
+                                            SLANG_CUDA_RETURN_ON_FAIL(cuMemcpy2D(&copyParam));
+                                            break;
+                                        }
+                                        case SLANG_TEXTURE_3D:
+                                        {
+                                            SLANG_ASSERT(!"Not implemented");
+                                            break;
+                                        }
                                     }
                                 }
 
@@ -520,8 +577,16 @@ static SlangResult _compute(CUcontext context, CUmodule module, const ShaderComp
                                 {
                                     CUDA_RESOURCE_DESC resDesc;
                                     memset(&resDesc, 0, sizeof(CUDA_RESOURCE_DESC));
-                                    resDesc.resType = CU_RESOURCE_TYPE_ARRAY;
-                                    resDesc.res.array.hArray = tex->m_cudaArray;
+                                    resDesc.resType = resourceType;
+
+                                    if (tex->m_cudaArray)
+                                    {
+                                        resDesc.res.array.hArray = tex->m_cudaArray;
+                                    }
+                                    if (tex->m_cudaMipMappedArray)
+                                    {
+                                        resDesc.res.mipmap.hMipmappedArray = tex->m_cudaMipMappedArray;
+                                    }
 
                                     CUDA_TEXTURE_DESC texDesc;
                                     memset(&texDesc, 0, sizeof(CUDA_TEXTURE_DESC));

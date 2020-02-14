@@ -262,6 +262,23 @@ struct Texture2D
     ITexture2D* texture;              
 };
 
+struct ITexture3D
+{
+    virtual void Load(const int4& v, void* out) = 0;
+    virtual void Sample(SamplerState samplerState, const float3& loc, void* out) = 0;
+    virtual void SampleLevel(SamplerState samplerState, const float3& loc, float level, void* out) = 0;
+};
+
+template <typename T>
+struct Texture3D
+{
+    T Load(const int4& v) const { T out; texture->Load(v, &out); return out; }
+    T Sample(SamplerState samplerState, const float3& v) const { T out; texture->Sample(samplerState, v, &out); return out; }
+    T SampleLevel(SamplerState samplerState, const float3& v, float level) { T out; texture->SampleLevel(samplerState, v, level, &out); return out; }
+    
+    ITexture3D* texture;              
+};
+
 /* Varying input for Compute */
 
 /* Used when running a single thread */
