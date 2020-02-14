@@ -419,6 +419,7 @@ static SlangResult _compute(CUcontext context, CUmodule module, const ShaderComp
                             case SLANG_TEXTURE_1D:
                             case SLANG_TEXTURE_2D:
                             case SLANG_TEXTURE_3D:
+                            case SLANG_TEXTURE_CUBE:
                             {
                                 SLANG_ASSERT(value->m_userIndex >= 0);
                                 auto& srcEntry = entries[value->m_userIndex];
@@ -471,24 +472,22 @@ static SlangResult _compute(CUcontext context, CUmodule module, const ShaderComp
                                 size_t elementSize = 0;
 
                                 {
-                                    CUDA_ARRAY_DESCRIPTOR arrayDesc;
-                                    arrayDesc.Width = width;
-
-                                    arrayDesc.Height = height;
+                                    CUarray_format format = CU_AD_FORMAT_FLOAT;
+                                    int numChannels = 0;
 
                                     switch (textureDesc.format)
                                     {
                                         case Format::R_Float32:
                                         {
-                                            arrayDesc.Format = CU_AD_FORMAT_FLOAT;
-                                            arrayDesc.NumChannels = 1;
+                                            format = CU_AD_FORMAT_FLOAT;
+                                            numChannels = 1;
                                             elementSize = sizeof(float);
                                             break;
                                         }
                                         case Format::RGBA_Unorm_UInt8:
                                         {
-                                            arrayDesc.Format = CU_AD_FORMAT_UNSIGNED_INT8;
-                                            arrayDesc.NumChannels = 4;
+                                            format = CU_AD_FORMAT_UNSIGNED_INT8;
+                                            numChannels = 4;
                                             elementSize = sizeof(uint32_t);
                                             break;
                                         }
@@ -503,27 +502,55 @@ static SlangResult _compute(CUcontext context, CUmodule module, const ShaderComp
                                     {
                                         resourceType = CU_RESOURCE_TYPE_MIPMAPPED_ARRAY;
 
-                                        CUDA_ARRAY3D_DESCRIPTOR mipMappedArrayDesc;
+                                        CUDA_ARRAY3D_DESCRIPTOR arrayDesc;
+                                        memset(&arrayDesc, 0, sizeof(arrayDesc));
 
-                                        mipMappedArrayDesc.Width = width;
-                                        mipMappedArrayDesc.Height = height;
-                                        mipMappedArrayDesc.Depth = depth;
-                                        mipMappedArrayDesc.Format = arrayDesc.Format;
-                                        mipMappedArrayDesc.NumChannels = arrayDesc.NumChannels;
-                                        mipMappedArrayDesc.Flags = 0;
+                                        arrayDesc.Width = width;
+                                        arrayDesc.Height = height;
+                                        arrayDesc.Depth = depth;
+                                        arrayDesc.Format = format;
+                                        arrayDesc.NumChannels = numChannels;
+                                        arrayDesc.Flags = 0;
 
                                         if (baseShape == SLANG_TEXTURE_CUBE)
                                         {
-                                            mipMappedArrayDesc.Flags |= CUDA_ARRAY3D_CUBEMAP;
+                                            arrayDesc.Flags |= CUDA_ARRAY3D_CUBEMAP;
                                         }
 
-                                        SLANG_CUDA_RETURN_ON_FAIL(cuMipmappedArrayCreate(&tex->m_cudaMipMappedArray,  &mipMappedArrayDesc, mipLevels));
+                                        SLANG_CUDA_RETURN_ON_FAIL(cuMipmappedArrayCreate(&tex->m_cudaMipMappedArray,  &arrayDesc, mipLevels));
                                     }
                                     else
                                     {
                                         resourceType = CU_RESOURCE_TYPE_ARRAY;
-                                        // Allocate the array
-                                        SLANG_CUDA_RETURN_ON_FAIL(cuArrayCreate(&tex->m_cudaArray, &arrayDesc));
+
+                                        if (baseShape == SLANG_TEXTURE_3D || baseShape == SLANG_TEXTURE_CUBE)
+                                        {
+                                            CUDA_ARRAY3D_DESCRIPTOR arrayDesc;
+                                            memset(&arrayDesc, 0, sizeof(arrayDesc));
+
+                                            arrayDesc.Depth = depth;
+                                            arrayDesc.Height = height;
+                                            arrayDesc.Width = width;
+                                            arrayDesc.Format = format;
+                                            arrayDesc.NumChannels = numChannels;
+                    
+                                            arrayDesc.Flags = 0;
+
+                                            SLANG_CUDA_RETURN_ON_FAIL(cuArray3DCreate(&tex->m_cudaArray, &arrayDesc));
+                                        }
+                                        else
+                                        {
+                                            CUDA_ARRAY_DESCRIPTOR arrayDesc;
+                                            memset(&arrayDesc, 0, sizeof(arrayDesc));
+
+                                            arrayDesc.Width = width;
+                                            arrayDesc.Height = height;
+                                            arrayDesc.Format = format;
+                                            arrayDesc.NumChannels = numChannels;
+
+                                            // Allocate the array, will work for 1D or 2D case
+                                            SLANG_CUDA_RETURN_ON_FAIL(cuArrayCreate(&tex->m_cudaArray, &arrayDesc));
+                                        }
                                     }
                                 }
 
@@ -533,6 +560,8 @@ static SlangResult _compute(CUcontext context, CUmodule module, const ShaderComp
                                     {
                                         case SLANG_TEXTURE_1D:
                                         case SLANG_TEXTURE_2D:
+                                        case SLANG_TEXTURE_3D:
+                                        case SLANG_TEXTURE_CUBE:
                                         {
                                             int mipWidth = width >> mipLevel;
                                             int mipHeight = height >> mipLevel;
@@ -547,6 +576,9 @@ static SlangResult _compute(CUcontext context, CUmodule module, const ShaderComp
                                             }
 
                                             SLANG_ASSERT(dstArray);
+
+                                            CUDA_ARRAY_DESCRIPTOR arrayDesc;
+                                            SLANG_CUDA_RETURN_ON_FAIL(cuArrayGetDescriptor(&arrayDesc, dstArray));
 
                                             const auto& srcData = texData.dataBuffer[mipLevel];
 
@@ -564,7 +596,7 @@ static SlangResult _compute(CUcontext context, CUmodule module, const ShaderComp
                                             SLANG_CUDA_RETURN_ON_FAIL(cuMemcpy2D(&copyParam));
                                             break;
                                         }
-                                        case SLANG_TEXTURE_3D:
+                                        default:
                                         {
                                             SLANG_ASSERT(!"Not implemented");
                                             break;
@@ -603,7 +635,6 @@ static SlangResult _compute(CUcontext context, CUmodule module, const ShaderComp
                                 break;
                             }
 
-                            case SLANG_TEXTURE_CUBE:
                             case SLANG_TEXTURE_BUFFER:
                             {
                                 // Need a CUDA impl for these...
