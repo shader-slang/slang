@@ -3886,6 +3886,108 @@ namespace Slang
         return (e != 0x7ff);
     }
 
+    enum class FloatFixKind
+    {
+        None,               ///< No modification was made
+        Unrepresentable,    ///< Unrepresentable
+        Zeroed,             ///< Too close to 0
+        Truncated,          ///< Truncated to a non zero value
+    };
+
+    static FloatFixKind _fixFloatLiteralValue(BaseType type, IRFloatingPointValue value, IRFloatingPointValue& outValue)
+    {
+        IRFloatingPointValue epsilon = 1e-10f;
+
+        // Check the value is finite for checking narrowing to literal type losing information
+        if (_isFinite(value))
+        {
+            switch (type)
+            {
+                case BaseType::Float:
+                {
+                    // Fix out of range
+                    if (value > FLT_MAX)
+                    {
+                        if (Math::AreNearlyEqual(value, FLT_MAX, epsilon))
+                        {
+                            outValue = FLT_MAX;
+                            return FloatFixKind::Truncated;
+                        }
+                        else
+                        {
+                            outValue = float(INFINITY);
+                            return FloatFixKind::Unrepresentable;
+                        }
+                    }
+                    else if (value < -FLT_MAX)
+                    {
+                        if (Math::AreNearlyEqual(-value, FLT_MAX, epsilon))
+                        {
+                            outValue = -FLT_MAX;
+                            return FloatFixKind::Truncated;
+                        }
+                        else
+                        {
+                            outValue = -float(INFINITY);
+                            return FloatFixKind::Unrepresentable;
+                        }
+                    }
+                    else if (value && float(value) == 0.0f)
+                    {
+                        outValue = 0.0f;
+                        return FloatFixKind::Zeroed;
+                    }
+                    break;
+                }
+                case BaseType::Double:
+                {
+                    // All representable
+                    break;
+                }
+                case BaseType::Half:
+                {
+                    // Fix out of range
+                    if (value > SLANG_HALF_MAX)
+                    {
+                        if (Math::AreNearlyEqual(value, FLT_MAX, epsilon))
+                        {
+                            outValue = SLANG_HALF_MAX;
+                            return FloatFixKind::Truncated;
+                        }
+                        else
+                        {
+                            outValue = float(INFINITY);
+                            return FloatFixKind::Unrepresentable;
+                        }
+                    }
+                    else if (value < -SLANG_HALF_MAX)
+                    {
+                        if (Math::AreNearlyEqual(-value, FLT_MAX, epsilon))
+                        {
+                            outValue = -SLANG_HALF_MAX;
+                            return FloatFixKind::Truncated;
+                        }
+                        else
+                        {
+                            outValue = -float(INFINITY);
+                            return FloatFixKind::Unrepresentable;
+                        }
+                    }
+                    else if (value && Math::Abs(value) < SLANG_HALF_SUB_NORMAL_MIN)
+                    {
+                        outValue = 0.0f;
+                        return FloatFixKind::Zeroed;
+                    }
+                    break;
+                }
+                default: break;
+            }
+        }
+
+        outValue = value;
+        return FloatFixKind::None;
+    }
+
     static RefPtr<Expr> parseAtomicExpr(Parser* parser)
     {
         switch( peekTokenType(parser) )
@@ -4109,7 +4211,6 @@ namespace Slang
                 char const* suffixCursor = suffix.begin();
                 const char*const suffixEnd = suffix.end();
 
- 
                 // Default is Float
                 BaseType suffixBaseType = BaseType::Float;
                 if( suffixCursor < suffixEnd )
@@ -4176,64 +4277,26 @@ namespace Slang
                 // might change in the future, and is arguably more 'correct'.
 
                 FloatingPointLiteralValue fixedValue = value;
+                auto fixType = _fixFloatLiteralValue(suffixBaseType, value, fixedValue);
 
-                // Check the value is finite for checking narrowing to literal type losing information
-                if (_isFinite(fixedValue))
+                switch (fixType)
                 {
-                    switch (suffixBaseType)
+                    case FloatFixKind::Truncated: 
+                    case FloatFixKind::None:
                     {
-                        case BaseType::Float:
-                        {
-                            // Fix out of range
-                            if (fixedValue > FLT_MAX)
-                            {
-                                fixedValue = float(INFINITY);
-                            }
-                            else if (fixedValue < -FLT_MAX)
-                            {
-                                fixedValue = -float(INFINITY);
-                            }
-                            else if (fixedValue && float(fixedValue) == 0.0f)
-                            {
-                                fixedValue = 0.0f;
-                            }
-                            break;
-                        }
-                        case BaseType::Double:
-                        {
-                            break;
-                        }
-                        case BaseType::Half:
-                        {
-                            // Fix out of range
-                            if (fixedValue > SLANG_HALF_MAX)
-                            {
-                                fixedValue = float(INFINITY);
-                            }
-                            else if (fixedValue < -SLANG_HALF_MAX)
-                            {
-                                fixedValue = -float(INFINITY);
-                            }
-                            else if (fixedValue && Math::Abs(fixedValue) < SLANG_HALF_SUB_NORMAL_MIN)
-                            {
-                                fixedValue = 0.0f;
-                            }
-                            break;
-                        }
-                        default: break;
+                        // No warning.
+                        // The truncation allowed must be very small. When Truncated the value *is* changed though.
+                        break;
                     }
-
-
-                    if (fixedValue != value)
+                    case FloatFixKind::Zeroed:
                     {
-                        if (fixedValue == 0.0)
-                        {
-                            parser->sink->diagnose(token, Diagnostics::floatLiteralTooSmall, BaseTypeInfo::asText(suffixBaseType), token.Content, fixedValue);
-                        }
-                        else
-                        {
-                            parser->sink->diagnose(token, Diagnostics::floatLiteralUnrepresentable, BaseTypeInfo::asText(suffixBaseType), token.Content, fixedValue);
-                        }
+                        parser->sink->diagnose(token, Diagnostics::floatLiteralTooSmall, BaseTypeInfo::asText(suffixBaseType), token.Content, fixedValue);
+                        break;
+                    }
+                    case FloatFixKind::Unrepresentable:
+                    {
+                        parser->sink->diagnose(token, Diagnostics::floatLiteralUnrepresentable, BaseTypeInfo::asText(suffixBaseType), token.Content, fixedValue);
+                        break;
                     }
                 }
 
