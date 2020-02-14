@@ -12,6 +12,8 @@ Texture1D<float> t1D;
 Texture2D<float> t2D;
 //TEST_INPUT: Texture3D(size=4, content = one):name t3D
 Texture3D<float> t3D;
+//TEST_INPUT: TextureCube(size=4, content = one):name tCube
+TextureCube<float> tCube;
 
 //TEST_INPUT: Sampler:name samplerState
 SamplerState samplerState;
@@ -29,6 +31,7 @@ void computeMain(uint3 dispatchThreadID : SV_DispatchThreadID)
     val += t1D.SampleLevel(samplerState, u, 0);
     val += t2D.SampleLevel(samplerState, float2(u, u), 0);
     val += t3D.SampleLevel(samplerState, float3(u, u, u), 0);
+    val += tCube.SampleLevel(samplerState, normalize(float3(u, 1 - u, u)), 0);
  
     outputBuffer[idx] = val;
 }

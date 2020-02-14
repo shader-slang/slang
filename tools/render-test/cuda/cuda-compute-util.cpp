@@ -528,6 +528,7 @@ static SlangResult _compute(CUcontext context, CUmodule module, const ShaderComp
                                             CUDA_ARRAY3D_DESCRIPTOR arrayDesc;
                                             memset(&arrayDesc, 0, sizeof(arrayDesc));
 
+                                            // If we have a cubemap the depth is 6
                                             arrayDesc.Depth = depth;
                                             arrayDesc.Height = height;
                                             arrayDesc.Width = width;
@@ -535,6 +536,12 @@ static SlangResult _compute(CUcontext context, CUmodule module, const ShaderComp
                                             arrayDesc.NumChannels = numChannels;
                     
                                             arrayDesc.Flags = 0;
+
+                                            if (baseShape == SLANG_TEXTURE_CUBE)
+                                            {
+                                                arrayDesc.Depth = 6;
+                                                arrayDesc.Flags |= CUDA_ARRAY3D_CUBEMAP;
+                                            }
 
                                             SLANG_CUDA_RETURN_ON_FAIL(cuArray3DCreate(&tex->m_cudaArray, &arrayDesc));
                                         }
@@ -554,6 +561,9 @@ static SlangResult _compute(CUcontext context, CUmodule module, const ShaderComp
                                     }
                                 }
 
+                                // Work space for holding data for uploading if it needs to be rearranged
+                                List<uint8_t> workspace;
+
                                 for (int mipLevel = 0; mipLevel < mipLevels; ++mipLevel)
                                 {
                                     int mipWidth = width >> mipLevel;
@@ -564,6 +574,12 @@ static SlangResult _compute(CUcontext context, CUmodule module, const ShaderComp
                                     mipHeight = (mipHeight == 0) ? 1 : mipHeight;
                                     mipDepth = (mipDepth == 0) ? 1 : mipDepth;
 
+                                    // If it's a cubemap then the depth is always 6
+                                    if (baseShape == SLANG_TEXTURE_CUBE)
+                                    {
+                                        mipDepth = 6;
+                                    }
+                                     
                                     auto dstArray = tex->m_cudaArray;
                                     if (tex->m_cudaMipMappedArray)
                                     {
@@ -572,9 +588,6 @@ static SlangResult _compute(CUcontext context, CUmodule module, const ShaderComp
                                     }
                                     SLANG_ASSERT(dstArray);
 
-                                    const auto& srcData = texData.dataBuffer[mipLevel];
-
-                                    SLANG_ASSERT(mipWidth * mipHeight * mipDepth == srcData.getCount());
 
                                     // Check using the desc to see if it's plausible
                                     {
@@ -582,7 +595,34 @@ static SlangResult _compute(CUcontext context, CUmodule module, const ShaderComp
                                         SLANG_CUDA_RETURN_ON_FAIL(cuArrayGetDescriptor(&arrayDesc, dstArray));
 
                                         SLANG_ASSERT(mipWidth == arrayDesc.Width);
-                                        SLANG_ASSERT(mipHeight == arrayDesc.Height);
+                                        SLANG_ASSERT(mipHeight == arrayDesc.Height || (mipHeight == 1 && arrayDesc.Height == 0));
+                                    }
+
+                                    const void* srcDataPtr = nullptr; 
+
+                                    if (baseShape == SLANG_TEXTURE_CUBE)
+                                    {
+                                        size_t faceSizeInBytes = elementSize * mipWidth * mipHeight;
+
+                                        workspace.setCount(faceSizeInBytes * 6);
+                                        
+                                        // Copy the data over to make contiguous
+                                        for (Index j = 0; j < 6; j++)
+                                        {
+                                            const auto& srcData = texData.dataBuffer[mipLevels * j + mipLevel];
+                                            SLANG_ASSERT(mipWidth * mipHeight == srcData.getCount());
+
+                                            ::memcpy(workspace.getBuffer() + faceSizeInBytes * j, srcData.getBuffer(), faceSizeInBytes);
+                                        }
+
+                                        srcDataPtr = workspace.getBuffer();
+                                    }
+                                    else
+                                    {
+                                        const auto& srcData = texData.dataBuffer[mipLevel];
+                                        SLANG_ASSERT(mipWidth * mipHeight * mipDepth == srcData.getCount());
+
+                                        srcDataPtr = srcData.getBuffer();
                                     }
 
                                     switch (baseShape)
@@ -595,7 +635,7 @@ static SlangResult _compute(CUcontext context, CUmodule module, const ShaderComp
                                             copyParam.dstMemoryType = CU_MEMORYTYPE_ARRAY;
                                             copyParam.dstArray = dstArray;
                                             copyParam.srcMemoryType = CU_MEMORYTYPE_HOST;
-                                            copyParam.srcHost = srcData.getBuffer();
+                                            copyParam.srcHost = srcDataPtr;
                                             copyParam.srcPitch = mipWidth * elementSize;
                                             copyParam.WidthInBytes = copyParam.srcPitch; 
                                             copyParam.Height = mipHeight; 
@@ -612,7 +652,7 @@ static SlangResult _compute(CUcontext context, CUmodule module, const ShaderComp
                                             copyParam.dstArray = dstArray;
 
                                             copyParam.srcMemoryType = CU_MEMORYTYPE_HOST;
-                                            copyParam.srcHost = srcData.getBuffer();
+                                            copyParam.srcHost = srcDataPtr;
                                             copyParam.srcPitch = mipWidth * elementSize;
                                             copyParam.WidthInBytes = copyParam.srcPitch;
                                             copyParam.Height = mipHeight;

@@ -279,6 +279,21 @@ struct Texture3D
     ITexture3D* texture;              
 };
 
+struct ITextureCube
+{
+    virtual void Sample(SamplerState samplerState, const float3& loc, void* out) = 0;
+    virtual void SampleLevel(SamplerState samplerState, const float3& loc, float level, void* out) = 0;
+};
+
+template <typename T>
+struct TextureCube
+{
+    T Sample(SamplerState samplerState, const float3& v) const { T out; texture->Sample(samplerState, v, &out); return out; }
+    T SampleLevel(SamplerState samplerState, const float3& v, float level) { T out; texture->SampleLevel(samplerState, v, level, &out); return out; }
+    
+    ITextureCube* texture;              
+};
+
 /* Varying input for Compute */
 
 /* Used when running a single thread */
