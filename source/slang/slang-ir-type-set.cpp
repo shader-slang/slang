@@ -115,50 +115,74 @@ IRInst* IRTypeSet::cloneInst(IRInst* inst)
             clone = m_builder.getStringValue(stringLit->getStringSlice());
             break;
         }
-        default:
+        case kIROp_VectorType:
         {
-            if (IRBasicType::isaImpl(inst->op))
+            auto vecType = static_cast<IRVectorType*>(inst);
+            const Index elementCount = Index(GetIntVal(vecType->getElementCount()));
+
+            if (elementCount <= 1)
             {
-                clone = m_builder.getType(inst->op);
+                clone = cloneType(vecType->getElementType());
+            }
+            break;
+        }
+        case kIROp_MatrixType:
+        {
+            auto matType = static_cast<IRMatrixType*>(inst);
+            const Index columnCount = Index(GetIntVal(matType->getColumnCount()));
+            const Index rowCount = Index(GetIntVal(matType->getRowCount()));
+
+            if (columnCount <= 1 && rowCount <= 1)
+            {
+                clone = cloneType(matType->getElementType());
+            }
+            break;
+        }
+        default: break;
+    }
+
+    if (!clone)
+    {
+        if (IRBasicType::isaImpl(inst->op))
+        {
+            clone = m_builder.getType(inst->op);
+        }
+        else
+        {
+            IRType* irType = dynamicCast<IRType>(inst);
+            if (irType)
+            {
+                auto clonedType = cloneType(inst->getFullType());
+                Index operandCount = Index(inst->getOperandCount());
+
+                List<IRInst*> cloneOperands;
+                cloneOperands.setCount(operandCount);
+
+                for (Index i = 0; i < operandCount; ++i)
+                {
+                    cloneOperands[i] = cloneInst(inst->getOperand(i));
+                }
+
+                //clone = m_irBuilder.findOrEmitHoistableInst(cloneType, inst->op, operandCount, cloneOperands.getBuffer());
+
+                UInt operandCounts[1] = { UInt(operandCount) };
+                IRInst*const* listOperands[1] = { cloneOperands.getBuffer() };
+
+                clone = m_builder.findOrAddInst(clonedType, inst->op, 1, operandCounts, listOperands);
             }
             else
             {
-                IRType* irType = dynamicCast<IRType>(inst);
-                if (irType)
+                // This cloning style only works on insts that are not unique
+                auto clonedType = cloneType(inst->getFullType());
+
+                Index operandCount = Index(inst->getOperandCount());
+                clone = m_builder.emitIntrinsicInst(clonedType, inst->op, operandCount, nullptr);
+                for (Index i = 0; i < operandCount; ++i)
                 {
-                    auto clonedType = cloneType(inst->getFullType());
-                    Index operandCount = Index(inst->getOperandCount());
-
-                    List<IRInst*> cloneOperands;
-                    cloneOperands.setCount(operandCount);
-
-                    for (Index i = 0; i < operandCount; ++i)
-                    {
-                        cloneOperands[i] = cloneInst(inst->getOperand(i));
-                    }
-
-                    //clone = m_irBuilder.findOrEmitHoistableInst(cloneType, inst->op, operandCount, cloneOperands.getBuffer());
-
-                    UInt operandCounts[1] = { UInt(operandCount) };
-                    IRInst*const* listOperands[1] = { cloneOperands.getBuffer() };
-
-                    clone = m_builder.findOrAddInst(clonedType, inst->op, 1, operandCounts, listOperands);
-                }
-                else
-                {
-                    // This cloning style only works on insts that are not unique
-                    auto clonedType = cloneType(inst->getFullType());
-
-                    Index operandCount = Index(inst->getOperandCount());
-                    clone = m_builder.emitIntrinsicInst(clonedType, inst->op, operandCount, nullptr);
-                    for (Index i = 0; i < operandCount; ++i)
-                    {
-                        auto cloneOperand = cloneInst(inst->getOperand(i));
-                        clone->getOperands()[i].init(clone, cloneOperand);
-                    }
+                    auto cloneOperand = cloneInst(inst->getOperand(i));
+                    clone->getOperands()[i].init(clone, cloneOperand);
                 }
             }
-            break;
         }
     }
 
@@ -226,6 +250,10 @@ void IRTypeSet::getTypes(Kind kind, List<IRType*>& outTypes) const
 IRType* IRTypeSet::addVectorType(IRType* inElementType, int colsCount)
 {
     IRType* elementType = cloneType(inElementType);
+    if (colsCount == 1)
+    {
+        return elementType;
+    }
     return m_builder.getVectorType(elementType, m_builder.getIntValue(m_builder.getIntType(), colsCount));
 }
 

@@ -228,6 +228,23 @@ struct SamplerComparisonState
 
 // Texture
 
+struct ITexture1D
+{
+    virtual void Load(const int2& v, void* out) = 0;
+    virtual void Sample(SamplerState samplerState, float loc, void* out) = 0;
+    virtual void SampleLevel(SamplerState samplerState, float loc, float level, void* out) = 0;
+};
+
+template <typename T>
+struct Texture1D
+{
+    T Load(const int2& v) const { T out; texture->Load(v, &out); return out; }
+    T Sample(SamplerState samplerState, float v) const { T out; texture->Sample(samplerState, v, &out); return out; }
+    T SampleLevel(SamplerState samplerState, float v, float level) { T out; texture->SampleLevel(samplerState, v, level, &out); return out; }
+    
+    ITexture1D* texture;              
+};
+
 struct ITexture2D
 {
     virtual void Load(const int3& v, void* out) = 0;

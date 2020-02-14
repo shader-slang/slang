@@ -34,7 +34,10 @@ works, but probably needs to be handled in a better way. The better way may invo
 enabled in other code generation and making de-duping possible in emit code.
 
 Note that one pro for this approach is that it does not alter the source module. That as it stands it's not necessary
-for the source module to be immutable, because it is created for emitting and then discarded. 
+for the source module to be immutable, because it is created for emitting and then discarded.
+
+NOTE! That Vector<X, 1> or Matrix<X, 1, 1> will be turned into the type X.
+
  */
 class IRTypeSet
 {

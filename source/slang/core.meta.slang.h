@@ -918,18 +918,19 @@ for (int tt = 0; tt < kBaseTextureTypeCount; ++tt)
                 if( baseShape != TextureFlavor::Shape::ShapeCube )
                 {
                     sb << "__target_intrinsic(cuda, \"tex" << kBaseTextureTypes[tt].coordCount << "D<$T0>($0";
-                    if (kBaseTextureTypes[tt].coordCount == 1)
+                    for (int i = 0; i < kBaseTextureTypes[tt].coordCount; ++i)
                     {
-                        sb << ", $2";
-                    }
-                    else
-                    {
-                        for (int i = 0; i < kBaseTextureTypes[tt].coordCount; ++i)
+                        sb << ", ($2)";
+                        if (kBaseTextureTypes[tt].coordCount > 1)
                         {
-                            sb << ", ($2)." << char(i + 'x');
+                            sb << '.' << char(i + 'x');
                         }
                     }
                     sb << ")\")\n";
+                }
+                else
+                {
+                    sb << "__target_intrinsic(cuda, \"texCubemap<$T0>($0, ($2).x, ($2).y, ($2).z)\")\n";
                 }
 
                 sb << "T Sample(SamplerState s, ";
@@ -1049,7 +1050,9 @@ for (int tt = 0; tt < kBaseTextureTypeCount; ++tt)
                     sb << "constexpr int" << kBaseTextureTypes[tt].coordCount << " offset);\n";
                 }
 
-
+                // TODO(JS): Not clear how to map this to CUDA, because in HLSL, the gradient is a vector based on
+                // the dimension. On CUDA there is texNDGrad, but it always just takes ddx, ddy.
+                // I could just assume 0 for elements not supplied, and ignore z. For now will just leave                  
                 sb << "__target_intrinsic(glsl, \"$ctextureGrad($p, $2, $3, $4)$z\")\n";
                 sb << "T SampleGrad(SamplerState s, ";
                 sb << "float" << kBaseTextureTypes[tt].coordCount + isArray << " location, ";
@@ -1074,23 +1077,29 @@ for (int tt = 0; tt < kBaseTextureTypeCount; ++tt)
                 // CUDA
                 if (!isArray)
                 {
-                    sb << "__target_intrinsic(cuda, \"tex" << kBaseTextureTypes[tt].coordCount << "DLod<$T0>($0";
-                    for (int i = 0; i < kBaseTextureTypes[tt].coordCount; ++i)
+                    if( baseShape != TextureFlavor::Shape::ShapeCube )
                     {
-                        sb << ", $2";
-                        if (kBaseTextureTypes[tt].coordCount > 1)
+                        sb << "__target_intrinsic(cuda, \"tex" << kBaseTextureTypes[tt].coordCount << "DLod<$T0>($0";
+                        for (int i = 0; i < kBaseTextureTypes[tt].coordCount; ++i)
                         {
-                            sb << '.' << char(i + 'x');
+                            sb << ", ($2)";
+                            if (kBaseTextureTypes[tt].coordCount > 1)
+                            {
+                                sb << '.' << char(i + 'x');
+                            }
                         }
+                        sb << ", $3)\")\n";
                     }
-                    sb << ", $3)\")\n";
+                    else
+                    {
+                        sb << "__target_intrinsic(cuda, \"texCubemap<$T0>($0, ($2).x, ($2).y, ($2).z)\")\n";
+                    }
                 }
 
                 sb << "T SampleLevel(SamplerState s, ";
                 sb << "float" << kBaseTextureTypes[tt].coordCount + isArray << " location, ";
                 sb << "float level);\n";
 
-                
                 if( baseShape != TextureFlavor::Shape::ShapeCube )
                 {
                     sb << "__target_intrinsic(glsl, \"$ctextureLodOffset($p, $2, $3, $4)$z\")\n";
@@ -1166,6 +1175,12 @@ for (int tt = 0; tt < kBaseTextureTypeCount; ++tt)
                     EMIT_LINE_DIRECTIVE();
 
                     sb << "__target_intrinsic(glsl, \"textureGather($p, $2, " << componentIndex << ")\")\n";
+                    if (kBaseTextureTypes[tt].coordCount == 2)
+                    {
+                        // Gather only works on 2D in CUDA
+                        // "It is based on the base type of DataType except when readMode is equal to cudaReadModeNormalizedFloat (see Texture Reference API), in which case it is always float4."
+                        sb << "__target_intrinsic(cuda, \"tex2Dgather<$T0>($0, ($2).x, ($2).y, " << componentIndex << ")\")\n";
+                    }
                     sb << outputType << " Gather" << componentName << "(SamplerState s, ";
                     sb << "float" << kBaseTextureTypes[tt].coordCount << " location);\n";
 
@@ -1299,7 +1314,7 @@ for (auto op : binaryOps)
         sb << "__intrinsic_op(" << int(op.opCode) << ") matrix<" << resultType << ",N,M> operator" << op.opName << "(" << leftQual << "matrix<" << leftType << ",N,M> left, " << rightType << " right);\n";
     }
 }
-SLANG_RAW("#line 1281 \"core.meta.slang\"")
+SLANG_RAW("#line 1296 \"core.meta.slang\"")
 SLANG_RAW("\n")
 SLANG_RAW("\n")
 SLANG_RAW("// Specialized function\n")

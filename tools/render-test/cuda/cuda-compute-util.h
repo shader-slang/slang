@@ -8,22 +8,26 @@
 
 namespace renderer_test {
 
+
 struct CUDAComputeUtil
 {
+    // Define here, so we don't need to include the cude header
+    typedef size_t CUdeviceptr;
+
         /// NOTE! MUST match up to definitions in the CUDA prelude
     struct ByteAddressBuffer
     {
-        void* data;
+        CUdeviceptr data;
         size_t sizeInBytes;
     };
     struct StructuredBuffer
     {
-        void* data;
+        CUdeviceptr data;
         size_t count;
     };
     struct Array
     {
-        void* data;
+        CUdeviceptr data;
         size_t count;
     };
 

@@ -347,8 +347,7 @@ __generic<T : __BuiltinType, let N : int, let M : int> bool all(matrix<T,N,M> x)
 
 // Barrier for writes to all memory spaces (HLSL SM 5.0)
 __target_intrinsic(glsl, "memoryBarrier(), groupMemoryBarrier(), memoryBarrierImage(), memoryBarrierBuffer()")
-// TODO(JS): Doesn't seem to be weaker form of sync, so use this?
-__target_intrinsic(cuda, "__syncthreads()")
+__target_intrinsic(cuda, "__threadfence()")
 void AllMemoryBarrier();
 
 // Thread-group sync and barrier for writes to all memory spaces (HLSL SM 5.0)
@@ -648,6 +647,7 @@ __generic<T : __BuiltinFloatingPointType, let N : int> T determinant(matrix<T,N,
 
 // Barrier for device memory
 __target_intrinsic(glsl, "memoryBarrier(), memoryBarrierImage(), memoryBarrierBuffer()")
+__target_intrinsic(cuda, "__threadfence()")
 void DeviceMemoryBarrier();
 
 __target_intrinsic(glsl, "memoryBarrier(), memoryBarrierImage(), memoryBarrierBuffer(), barrier()")
@@ -814,6 +814,7 @@ float2 GetRenderTargetSamplePosition(int Index);
 
 // Group memory barrier
 __target_intrinsic(glsl, "groupMemoryBarrier")
+__target_intrinsic(cuda, "__threadfence_block")
 void GroupMemoryBarrier();
 
 
