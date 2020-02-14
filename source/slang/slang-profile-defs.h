@@ -69,6 +69,9 @@ PROFILE_STAGE(ClosestHit,       closesthit,     SLANG_STAGE_CLOSEST_HIT)
 PROFILE_STAGE(Miss,             miss,           SLANG_STAGE_MISS)
 PROFILE_STAGE(Callable,         callable,       SLANG_STAGE_CALLABLE)
 
+PROFILE_STAGE(Mesh,             mesh,           SLANG_STAGE_MESH)
+PROFILE_STAGE(Amplification,    amplification,  SLANG_STAGE_AMPLIFICATION)
+
 
 // Note: HLSL and Direct3D convention erroneously uses the term "Pixel Shader"
 // for the thing that shades *fragments*. Slang strives to treat the more correct
@@ -98,6 +101,8 @@ PROFILE_VERSION(DX_6_0,             DX)
 PROFILE_VERSION(DX_6_1,             DX)
 PROFILE_VERSION(DX_6_2,             DX)
 PROFILE_VERSION(DX_6_3,             DX)
+PROFILE_VERSION(DX_6_4,             DX)
+PROFILE_VERSION(DX_6_5,             DX)
 
 PROFILE_VERSION(GLSL_110,           GLSL)
 PROFILE_VERSION(GLSL_120,           GLSL)
@@ -199,10 +204,14 @@ PROFILE(DX_None_6_0,              sm_6_0,             Unknown, DX_6_0)
 PROFILE(DX_Lib_6_1,              lib_6_1,             Unknown, DX_6_1)
 PROFILE(DX_Lib_6_2,              lib_6_2,             Unknown, DX_6_2)
 PROFILE(DX_Lib_6_3,              lib_6_3,             Unknown, DX_6_3)
+PROFILE(DX_Lib_6_4,              lib_6_4,             Unknown, DX_6_4)
+PROFILE(DX_Lib_6_5,              lib_6_5,             Unknown, DX_6_5)
 
 PROFILE_ALIAS(DX_None_6_1,  DX_Lib_6_1,     sm_6_1)
 PROFILE_ALIAS(DX_None_6_2,  DX_Lib_6_2,     sm_6_2)
 PROFILE_ALIAS(DX_None_6_3,  DX_Lib_6_3,     sm_6_3)
+PROFILE_ALIAS(DX_None_6_4,  DX_Lib_6_4,     sm_6_4)
+PROFILE_ALIAS(DX_None_6_5,  DX_Lib_6_5,     sm_6_5)
 
 
 // Define all the GLSL profiles
