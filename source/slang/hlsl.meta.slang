@@ -1431,13 +1431,23 @@ __generic<T : __BuiltinType> uint4 WaveMatch(T value);
 __generic<T : __BuiltinType, let N : int> uint4 WaveMatch(vector<T,N> value);
 __generic<T : __BuiltinType, let N : int, let M : int> uint4 WaveMatch(matrix<T,N,M> value);
 
+// TODO(JS): This doesn't look quite right as the article
+// https://devblogs.nvidia.com/using-cuda-warp-level-primitives/
+// Claims mask needs to be carefully chosen.
+
+__target_intrinsic(cuda, "(__all_sync(0xffffffff, $0) != 0)") 
 bool WaveActiveAllTrue(bool condition);
+__target_intrinsic(cuda, "(_any_sync(0xffffffff, $0) != 0)")
 bool WaveActiveAnyTrue(bool condition);
 
+__target_intrinsic(cuda, "make_uint4(__ballot_sync(0xffffffff, $0), 0, 0, 0)")
 uint4 WaveActiveBallot(bool condition);
+
 uint WaveActiveCountBits(bool value);
 
+__target_intrinsic(cuda, "(warpSize)")
 uint WaveGetLaneCount();
+
 uint WaveGetLaneIndex();
 bool WaveIsFirstLane();
 
