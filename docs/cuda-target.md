@@ -17,11 +17,11 @@ These limitations apply to Slang transpiling to CUDA.
 * Only supports the 'texture object' style binding (The texture object API is only supported on devices of compute capability 3.0 or higher. )
 * Samplers are not separate objects in CUDA - they are combined into a single 'TextureObject'. So samplers are effectively ignored on CUDA targets. 
 * Whilst there is tex1Dfetch there are no equivalents for higher dimensions - so such accesses are not currently supported
+* When using a TextureArray (layered texture in CUDA) - the index will be treated as an int, as this is all CUDA allows
 
 The following are a work in progress or not implmented but are planned to be so in the future
 
-* Barriers/Atomics/Complex resource types
-* Preliminary version does maps StructuredBuffers to a pointer - and without boudn checking
+* Resource types including surfaces
 
 # How it works
 
@@ -137,9 +137,8 @@ For a client application - as long as the requirements of the generated code are
 
 That for pass-through usage, prelude is not pre-pended, preludes are for code generation only. 
 */
-virtual SLANG_NO_THROW void SLANG_MCALL setDownstreamCompilerPrelude(
-SlangPassThrough passThrough,
-const char* preludeText) = 0;
+
+void setDownstreamCompilerPrelude(SlangPassThrough passThrough, const char* preludeText);
 ```
 
 The code that sets up the prelude for the test infrastucture and command line usage can be found in ```TestToolUtil::setSessionDefaultPrelude```. Essentially this determines what the absolute path is to `slang-cpp-prelude.h` is and then just makes the prelude `#include "the absolute path"`.
@@ -152,5 +151,3 @@ Language aspects
 Slang follows the HLSL convention that arrays are passed by value. This is in contrast with CUDA where arrays follow C++ conventions and are passed by reference. To make generated CUDA follow this convention an array is turned into a 'FixedArray' struct type. 
 
 To get something more similar to CUDA/C++ operation the array can be marked in out or inout to make it passed by reference. 
-
-
