@@ -283,6 +283,18 @@ struct SpecializationContext
                 continue;
             }
 
+            // We should never specialize intrinsic types.
+            //
+            // TODO: This logic assumes that having *any* target
+            // intrinsic decoration makes a type skip specialization,
+            // even if the decoration isn't applicable to the
+            // current target. This should be made true in practice
+            // by having the linking step strip/skip decorations
+            // that aren't applicable to the chosen target at link time.
+            //
+            if(as<IRStructType>(val) && val->findDecoration<IRTargetIntrinsicDecoration>())
+                return false;
+
             // Once we've found the leaf value that will be produced
             // after all specialization is complete, we can check
             // whether it looks like a definition or not.

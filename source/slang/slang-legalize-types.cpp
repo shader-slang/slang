@@ -1095,6 +1095,14 @@ LegalType legalizeTypeImpl(
     if(!type)
         return LegalType::simple(nullptr);
 
+    // It might be that the type we are looking at is
+    // an intrinsic type on our chosen target, in which
+    // case we should never legalize it, figuring that
+    // the target defines its semantics fully.
+    //
+    if(type->findDecoration<IRTargetIntrinsicDecoration>())
+        return LegalType::simple(type);
+
     context->builder->setInsertBefore(type);
 
     if (auto uniformBufferType = as<IRUniformParameterGroupType>(type))
