@@ -1,6 +1,7 @@
 
 #include "slang-type-text-util.h"
 
+#include "slang-string-util.h"
 
 namespace Slang
 {
@@ -36,11 +37,41 @@ struct ScalarTypeInfo
     UnownedStringSlice text;
 };
 
-static const ScalarTypeInfo s_scalarTypeInfo[] =
+static const ScalarTypeInfo s_scalarTypeInfos[] =
 {
     #define SLANG_SCALAR_TYPE_INFO(value, text) \
             { slang::TypeReflection::ScalarType::value, UnownedStringSlice::fromLiteral(#text) },
     SLANG_SCALAR_TYPES(SLANG_SCALAR_TYPE_INFO)
+};
+
+struct CompileTargetInfo
+{
+    SlangCompileTarget target;          ///< The target
+    const char* extensions;             ///< Comma delimited list of extensions associated with the target
+    const char* names;                  ///< Comma delimited list of names associated with the target. NOTE! First name is taken as the normal display name.
+};
+
+static const CompileTargetInfo s_compileTargetInfos[] = 
+{
+    { SLANG_TARGET_UNKNOWN, "",                                                 "unknown"},
+    { SLANG_TARGET_NONE,    "",                                                 "none"},
+    { SLANG_HLSL,           "hlsl,fx",                                          "hlsl"},
+    { SLANG_DXBC,           "dxbc",                                             "dxbc"},
+    { SLANG_DXBC_ASM,       "dxbc.asm",                                         "dxbc-asm,dxbc-assembly" },
+    { SLANG_DXIL,           "dxil",                                             "dxil" },
+    { SLANG_DXIL_ASM,       "dxil.asm",                                         "dxil-asm,dxil-assembly" },
+    { SLANG_GLSL,           "glsl,vert,frag,geom,tesc,tese,comp",               "glsl" },
+    { SLANG_GLSL_VULKAN,    "",                                                 "glsl-vulkan" },
+    { SLANG_GLSL_VULKAN_ONE_DESC, "",                                           "glsl-vulkan-one-desc" },
+    { SLANG_SPIRV,          "spv",                                              "spirv" },
+    { SLANG_SPIRV_ASM,      "spv.asm",                                          "spirv-asm,spirv-assembly" },
+    { SLANG_C_SOURCE,       "c",                                                "c" },
+    { SLANG_CPP_SOURCE,     "cpp,c++,cxx",                                      "cpp,c++,cxx" },
+    { SLANG_EXECUTABLE,     "exe",                                              "exe,executable" },
+    { SLANG_SHARED_LIBRARY, "dll,so",                                           "sharedlib,sharedlibrary,dll" },
+    { SLANG_CUDA_SOURCE,    "cu",                                               "cuda,cu"  },
+    { SLANG_PTX,            "ptx",                                              "ptx" },
+    { SLANG_HOST_CALLABLE,  "",                                                 "host-callable,callable" }
 };
 
 } // anonymous
@@ -60,9 +91,9 @@ static const ScalarTypeInfo s_scalarTypeInfo[] =
 
 /* static */slang::TypeReflection::ScalarType TypeTextUtil::asScalarType(const UnownedStringSlice& inText)
 {
-    for (Index i = 0; i < SLANG_COUNT_OF(s_scalarTypeInfo); ++i)
+    for (Index i = 0; i < SLANG_COUNT_OF(s_scalarTypeInfos); ++i)
     {
-        const auto& info = s_scalarTypeInfo[i];
+        const auto& info = s_scalarTypeInfos[i];
         if (info.text == inText)
         {
             return info.type;
@@ -160,6 +191,54 @@ static const ScalarTypeInfo s_scalarTypeInfo[] =
     return UnownedStringSlice::fromLiteral("unknown");
 }
 
+/* static */SlangCompileTarget TypeTextUtil::asCompileTargetFromExtension(const UnownedStringSlice& slice)
+{
+    if (slice.size())
+    {
+        for (const auto& info : s_compileTargetInfos)
+        {
+            if (StringUtil::indexOfInSplit(UnownedStringSlice(info.extensions), ',', slice) >= 0)
+            {
+                return info.target;
+            }
+        }
+    }
+    return SLANG_TARGET_UNKNOWN;
+}
+
+/* static */ SlangCompileTarget TypeTextUtil::asCompileTargetFromName(const UnownedStringSlice& slice)
+{
+    if (slice.size())
+    {
+        for (const auto& info : s_compileTargetInfos)
+        {
+            if (StringUtil::indexOfInSplit(UnownedStringSlice(info.names), ',', slice) >= 0)
+            {
+                return info.target;
+            }
+        }
+    }
+    return SLANG_TARGET_UNKNOWN;
+}
+
+static Index _getTargetInfoIndex(SlangCompileTarget target)
+{
+    for (Index i = 0; i < SLANG_COUNT_OF(s_compileTargetInfos); ++i)
+    {
+        if (s_compileTargetInfos[i].target == target)
+        {
+            return i;
+        }
+    }
+    return -1;
+}
+
+UnownedStringSlice TypeTextUtil::asNameFromCodeGenTarget(SlangCompileTarget target)
+{
+    const Index index = _getTargetInfoIndex(target);
+    // Return the first name
+    return index >= 0 ? StringUtil::getAtInSplit(UnownedStringSlice(s_compileTargetInfos[int(target)].names), ',', 0) : UnownedStringSlice();
+}
 
 }
 

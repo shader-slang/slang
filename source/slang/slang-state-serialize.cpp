@@ -1253,7 +1253,7 @@ static SlangResult _calcCommandLine(OffsetBase& base, StateSerializeUtil::Reques
             TargetRequestState& src = base.asRaw(requestState->targetRequests[i]);
 
             cmd.addArg("-target");
-            cmd.addArg(getCodeGenTargetName(CodeGenTarget(src.target)));
+            cmd.addArg(TypeTextUtil::asNameFromCodeGenTarget(SlangCompileTarget(src.target)));
 
             cmd.addArg("-profile");
             cmd.addArg(Profile(src.profile).getName());

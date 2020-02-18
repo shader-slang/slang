@@ -75,65 +75,6 @@
 
 namespace Slang
 {
-
-// NOTE! These must be in the same order as the SlangCompileTarget enum 
-#define SLANG_CODE_GEN_TARGETS(x) \
-    x("unknown", Unknown) \
-    x("none", None) \
-    x("glsl", GLSL) \
-    x("glsl-vulkan", GLSL_Vulkan) \
-    x("glsl-vulkan-one-desc", GLSL_Vulkan_OneDesc) \
-    x("hlsl", HLSL) \
-    x("spirv", SPIRV) \
-    x("spirv-asm,spirv-assembly", SPIRVAssembly) \
-    x("dxbc", DXBytecode) \
-    x("dxbc-asm,dxbc-assembly", DXBytecodeAssembly) \
-    x("dxil", DXIL) \
-    x("dxil-asm,dxil-assembly", DXILAssembly) \
-    x("c", CSource) \
-    x("cpp", CPPSource) \
-    x("exe,executable", Executable) \
-    x("sharedlib,sharedlibrary,dll", SharedLibrary) \
-    x("callable,host-callable", HostCallable) \
-    x("cu,cuda", CUDASource) \
-    x("ptx", PTX) 
-
-#define SLANG_CODE_GEN_INFO(names, e) \
-    { CodeGenTarget::e, UnownedStringSlice::fromLiteral(names) },
-
-    struct CodeGenTargetInfo
-    {
-        CodeGenTarget target;
-        UnownedStringSlice names;
-    };
-
-    static const CodeGenTargetInfo s_codeGenTargetInfos[] = 
-    {
-        SLANG_CODE_GEN_TARGETS(SLANG_CODE_GEN_INFO)
-    };
-
-    CodeGenTarget calcCodeGenTargetFromName(const UnownedStringSlice& name)
-    {
-        for (int i = 0; i < SLANG_COUNT_OF(s_codeGenTargetInfos); ++i)
-        {
-            const auto& info = s_codeGenTargetInfos[i];
-
-            // If this assert fails, then the SLANG_CODE_GEN_TARGETS macro has the wrong order
-            SLANG_ASSERT(i == int(info.target));
-
-            if (StringUtil::indexOfInSplit(info.names, ',', name) >= 0)
-            {
-                return info.target;
-            }
-        }
-        return CodeGenTarget::Unknown;
-    }
-    UnownedStringSlice getCodeGenTargetName(CodeGenTarget target)
-    {
-        // Return the first name
-        return StringUtil::getAtInSplit(s_codeGenTargetInfos[int(target)].names, ',', 0);
-    }
-
     SlangResult CompileResult::getSharedLibrary(ComPtr<ISlangSharedLibrary>& outSharedLibrary)
     {
         if (downstreamResult)

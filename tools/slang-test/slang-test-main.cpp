@@ -545,35 +545,6 @@ static PassThroughFlags _getPassThroughFlagsForTarget(SlangCompileTarget target)
     }
 }
 
-static SlangCompileTarget _getCompileTarget(const UnownedStringSlice& name)
-{
-#define CASE(NAME, TARGET)  if(name == NAME) return SLANG_##TARGET;
-
-    CASE("hlsl", HLSL)
-        CASE("glsl", GLSL)
-        CASE("dxbc", DXBC)
-        CASE("dxbc-assembly", DXBC_ASM)
-        CASE("dxbc-asm", DXBC_ASM)
-        CASE("spirv", SPIRV)
-        CASE("spirv-assembly", SPIRV_ASM)
-        CASE("spirv-asm", SPIRV_ASM)
-        CASE("dxil", DXIL)
-        CASE("dxil-assembly", DXIL_ASM)
-        CASE("dxil-asm", DXIL_ASM)
-        CASE("c", C_SOURCE)
-        CASE("cpp", CPP_SOURCE)
-        CASE("exe", EXECUTABLE)
-        CASE("sharedlib", SHARED_LIBRARY)
-        CASE("dll", SHARED_LIBRARY)
-        CASE("callable", HOST_CALLABLE)
-        CASE("host-callable", HOST_CALLABLE)
-        CASE("ptx", PTX)
-        CASE("cuda", CUDA_SOURCE)
-#undef CASE
-
-        return SLANG_TARGET_UNKNOWN;
-}
-
 static SlangResult _extractRenderTestRequirements(const CommandLine& cmdLine, TestRequirements* ioRequirements)
 {
     const auto& args = cmdLine.m_args;
@@ -718,7 +689,7 @@ static SlangResult _extractSlangCTestRequirements(const CommandLine& cmdLine, Te
         String targetName;
         if (SLANG_SUCCEEDED(_extractArg(cmdLine, "-target", targetName)))
         {
-            const SlangCompileTarget target = _getCompileTarget(targetName.getUnownedSlice());
+            const SlangCompileTarget target = TypeTextUtil::asCompileTargetFromName(targetName.getUnownedSlice());
             ioRequirements->addUsedBackends(_getPassThroughFlagsForTarget(target));
         }
     }
@@ -1010,7 +981,7 @@ TestResult runSimpleTest(TestContext* context, TestInput& input)
         const Index targetIndex = args.indexOf("-target");
         if (targetIndex != Index(-1) && targetIndex + 1 < args.getCount())
         {
-            target = _getCompileTarget(args[targetIndex + 1].getUnownedSlice());
+            target = TypeTextUtil::asCompileTargetFromName(args[targetIndex + 1].getUnownedSlice());
         }
     }
 
@@ -1548,7 +1519,7 @@ TestResult runCrossCompilerTest(TestContext* context, TestInput& input)
     const Index targetIndex = args.indexOf("-target");
     if (targetIndex != Index(-1) && targetIndex + 1 < args.getCount())
     {
-        SlangCompileTarget target = _getCompileTarget(args[targetIndex + 1].getUnownedSlice());
+        const SlangCompileTarget target = TypeTextUtil::asCompileTargetFromName(args[targetIndex + 1].getUnownedSlice());
 
         // Check the session supports it. If not we ignore it
         if (SLANG_FAILED(spSessionCheckCompileTargetSupport(context->getSession(), target)))

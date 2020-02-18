@@ -31,6 +31,17 @@ struct TypeTextUtil
 
         /// Get the compilers name
     static UnownedStringSlice asText(SlangPassThrough passThru);
+
+        /// Given a file extension determines suitable target
+        /// If doesn't match any target will return SLANG_TARGET_UNKNOWN
+    static SlangCompileTarget asCompileTargetFromExtension(const UnownedStringSlice& slice);
+
+        /// Given a name suitable target
+        /// If doesn't match any target will return SLANG_TARGET_UNKNOWN
+    static SlangCompileTarget asCompileTargetFromName(const UnownedStringSlice& slice);
+
+        /// Given a target returns the associated name.
+    static UnownedStringSlice asNameFromCodeGenTarget(SlangCompileTarget target);
 };
 
 }
