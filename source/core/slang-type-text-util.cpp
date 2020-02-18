@@ -76,7 +76,7 @@ static const CompileTargetInfo s_compileTargetInfos[] =
 
 } // anonymous
 
-/* static */UnownedStringSlice TypeTextUtil::asText(slang::TypeReflection::ScalarType scalarType)
+/* static */UnownedStringSlice TypeTextUtil::getScalarTypeName(slang::TypeReflection::ScalarType scalarType)
 {    
     typedef slang::TypeReflection::ScalarType ScalarType;
     switch (scalarType)
@@ -89,7 +89,7 @@ static const CompileTargetInfo s_compileTargetInfos[] =
     return UnownedStringSlice();
 }
 
-/* static */slang::TypeReflection::ScalarType TypeTextUtil::asScalarType(const UnownedStringSlice& inText)
+/* static */slang::TypeReflection::ScalarType TypeTextUtil::findScalarType(const UnownedStringSlice& inText)
 {
     for (Index i = 0; i < SLANG_COUNT_OF(s_scalarTypeInfos); ++i)
     {
@@ -102,7 +102,7 @@ static const CompileTargetInfo s_compileTargetInfos[] =
     return slang::TypeReflection::ScalarType::None;
 }
 
-/* static */UnownedStringSlice TypeTextUtil::asHumanText(SlangPassThrough type)
+/* static */UnownedStringSlice TypeTextUtil::getPassThroughAsHumanText(SlangPassThrough type)
 {
     switch (type)
     {
@@ -118,7 +118,7 @@ static const CompileTargetInfo s_compileTargetInfos[] =
     }
 }
 
-/* static */SlangSourceLanguage TypeTextUtil::asSourceLanguage(const UnownedStringSlice& text)
+/* static */SlangSourceLanguage TypeTextUtil::findSourceLanguage(const UnownedStringSlice& text)
 {
     if (text == "c" || text == "C")
     {
@@ -147,7 +147,7 @@ static const CompileTargetInfo s_compileTargetInfos[] =
     return SLANG_SOURCE_LANGUAGE_UNKNOWN;
 }
 
-/* static */SlangPassThrough TypeTextUtil::asPassThrough(const UnownedStringSlice& slice)
+/* static */SlangPassThrough TypeTextUtil::findPassThrough(const UnownedStringSlice& slice)
 {
 #define SLANG_PASS_THROUGH_NAME_TO_TYPE(x, y) \
     if (slice == UnownedStringSlice::fromLiteral(#x)) return SLANG_PASS_THROUGH_##y;
@@ -167,9 +167,9 @@ static const CompileTargetInfo s_compileTargetInfos[] =
     return SLANG_PASS_THROUGH_NONE;
 }
 
-/* static */SlangResult TypeTextUtil::asPassThrough(const UnownedStringSlice& slice, SlangPassThrough& outPassThrough)
+/* static */SlangResult TypeTextUtil::findPassThrough(const UnownedStringSlice& slice, SlangPassThrough& outPassThrough)
 {
-    outPassThrough = asPassThrough(slice);
+    outPassThrough = findPassThrough(slice);
     // It could be none on error - if it's not equal to "none" then it must be an error
     if (outPassThrough == SLANG_PASS_THROUGH_NONE && slice != UnownedStringSlice::fromLiteral("none"))
     {
@@ -178,7 +178,7 @@ static const CompileTargetInfo s_compileTargetInfos[] =
     return SLANG_OK;
 }
 
-/* static */UnownedStringSlice TypeTextUtil::asText(SlangPassThrough passThru)
+/* static */UnownedStringSlice TypeTextUtil::getPassThroughName(SlangPassThrough passThru)
 {
 #define SLANG_PASS_THROUGH_TYPE_TO_NAME(x, y) \
     case SLANG_PASS_THROUGH_##y: return UnownedStringSlice::fromLiteral(#x);
@@ -191,7 +191,7 @@ static const CompileTargetInfo s_compileTargetInfos[] =
     return UnownedStringSlice::fromLiteral("unknown");
 }
 
-/* static */SlangCompileTarget TypeTextUtil::asCompileTargetFromExtension(const UnownedStringSlice& slice)
+/* static */SlangCompileTarget TypeTextUtil::findCompileTargetFromExtension(const UnownedStringSlice& slice)
 {
     if (slice.size())
     {
@@ -206,7 +206,7 @@ static const CompileTargetInfo s_compileTargetInfos[] =
     return SLANG_TARGET_UNKNOWN;
 }
 
-/* static */ SlangCompileTarget TypeTextUtil::asCompileTargetFromName(const UnownedStringSlice& slice)
+/* static */ SlangCompileTarget TypeTextUtil::findCompileTargetFromName(const UnownedStringSlice& slice)
 {
     if (slice.size())
     {
@@ -233,7 +233,7 @@ static Index _getTargetInfoIndex(SlangCompileTarget target)
     return -1;
 }
 
-UnownedStringSlice TypeTextUtil::asNameFromCodeGenTarget(SlangCompileTarget target)
+UnownedStringSlice TypeTextUtil::getCompileTargetName(SlangCompileTarget target)
 {
     const Index index = _getTargetInfoIndex(target);
     // Return the first name

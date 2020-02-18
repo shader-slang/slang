@@ -680,7 +680,7 @@ static SlangResult _extractSlangCTestRequirements(const CommandLine& cmdLine, Te
         String passThrough;
         if (SLANG_SUCCEEDED(_extractArg(cmdLine, "-pass-through", passThrough)))
         {
-            ioRequirements->addUsedBackEnd(TypeTextUtil::asPassThrough(passThrough.getUnownedSlice()));
+            ioRequirements->addUsedBackEnd(TypeTextUtil::findPassThrough(passThrough.getUnownedSlice()));
         }
     }
 
@@ -689,7 +689,7 @@ static SlangResult _extractSlangCTestRequirements(const CommandLine& cmdLine, Te
         String targetName;
         if (SLANG_SUCCEEDED(_extractArg(cmdLine, "-target", targetName)))
         {
-            const SlangCompileTarget target = TypeTextUtil::asCompileTargetFromName(targetName.getUnownedSlice());
+            const SlangCompileTarget target = TypeTextUtil::findCompileTargetFromName(targetName.getUnownedSlice());
             ioRequirements->addUsedBackends(_getPassThroughFlagsForTarget(target));
         }
     }
@@ -981,7 +981,7 @@ TestResult runSimpleTest(TestContext* context, TestInput& input)
         const Index targetIndex = args.indexOf("-target");
         if (targetIndex != Index(-1) && targetIndex + 1 < args.getCount())
         {
-            target = TypeTextUtil::asCompileTargetFromName(args[targetIndex + 1].getUnownedSlice());
+            target = TypeTextUtil::findCompileTargetFromName(args[targetIndex + 1].getUnownedSlice());
         }
     }
 
@@ -1519,7 +1519,7 @@ TestResult runCrossCompilerTest(TestContext* context, TestInput& input)
     const Index targetIndex = args.indexOf("-target");
     if (targetIndex != Index(-1) && targetIndex + 1 < args.getCount())
     {
-        const SlangCompileTarget target = TypeTextUtil::asCompileTargetFromName(args[targetIndex + 1].getUnownedSlice());
+        const SlangCompileTarget target = TypeTextUtil::findCompileTargetFromName(args[targetIndex + 1].getUnownedSlice());
 
         // Check the session supports it. If not we ignore it
         if (SLANG_FAILED(spSessionCheckCompileTargetSupport(context->getSession(), target)))
@@ -2045,7 +2045,7 @@ static SlangResult _compareWithType(const UnownedStringSlice& actual, const Unow
                 return SLANG_FAIL;
             }
 
-            scalarType = TypeTextUtil::asScalarType(split[1].trim());
+            scalarType = TypeTextUtil::findScalarType(split[1].trim());
             continue;
         }
 
@@ -2608,7 +2608,7 @@ static void _calcSynthesizedTests(TestContext* context, RenderApiType synthRende
             {
                 //
                 const auto& language = srcTest.options.args[index + 1];
-                SlangSourceLanguage sourceLanguage = TypeTextUtil::asSourceLanguage(language.getUnownedSlice());
+                SlangSourceLanguage sourceLanguage = TypeTextUtil::findSourceLanguage(language.getUnownedSlice());
 
                 bool isCrossCompile = true;
 

@@ -1229,7 +1229,7 @@ static SlangResult _calcCommandLine(OffsetBase& base, StateSerializeUtil::Reques
             default:
             {
                 cmd.addArg("-pass-through");
-                cmd.addArg(TypeTextUtil::asText(SlangPassThrough(requestState->passThroughMode)));
+                cmd.addArg(TypeTextUtil::getPassThroughName(SlangPassThrough(requestState->passThroughMode)));
                 break;
             }
         }
@@ -1253,7 +1253,7 @@ static SlangResult _calcCommandLine(OffsetBase& base, StateSerializeUtil::Reques
             TargetRequestState& src = base.asRaw(requestState->targetRequests[i]);
 
             cmd.addArg("-target");
-            cmd.addArg(TypeTextUtil::asNameFromCodeGenTarget(SlangCompileTarget(src.target)));
+            cmd.addArg(TypeTextUtil::getCompileTargetName(SlangCompileTarget(src.target)));
 
             cmd.addArg("-profile");
             cmd.addArg(Profile(src.profile).getName());

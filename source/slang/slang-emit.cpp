@@ -527,7 +527,7 @@ String emitEntryPointSourceFromIR(
 
     if (!sourceEmitter)
     {
-        sink->diagnose(SourceLoc(), Diagnostics::unableToGenerateCodeForTarget, TypeTextUtil::asNameFromCodeGenTarget(SlangCompileTarget(target)));
+        sink->diagnose(SourceLoc(), Diagnostics::unableToGenerateCodeForTarget, TypeTextUtil::getCompileTargetName(SlangCompileTarget(target)));
         return String();
     }
 

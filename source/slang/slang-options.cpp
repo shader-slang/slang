@@ -350,7 +350,7 @@ struct OptionsParser
         }
         else
         {
-            const SlangCompileTarget target = TypeTextUtil::asCompileTargetFromExtension(ext.getUnownedSlice());
+            const SlangCompileTarget target = TypeTextUtil::findCompileTargetFromExtension(ext.getUnownedSlice());
             // If the target is not found the value returned is Unknown. This is okay because
             // we allow an unknown-format `-o`, assuming we get a target format
             // from another argument.
@@ -585,7 +585,7 @@ struct OptionsParser
                     String name;
                     SLANG_RETURN_ON_FAIL(tryReadCommandLineArgument(sink, arg, &argCursor, argEnd, name));
 
-                    const CodeGenTarget format = (CodeGenTarget)TypeTextUtil::asCompileTargetFromName(name.getUnownedSlice());
+                    const CodeGenTarget format = (CodeGenTarget)TypeTextUtil::findCompileTargetFromName(name.getUnownedSlice());
 
                     if (format == CodeGenTarget::Unknown)
                     {
@@ -680,7 +680,7 @@ struct OptionsParser
                     SLANG_RETURN_ON_FAIL(tryReadCommandLineArgument(sink, arg, &argCursor, argEnd, name));
 
                     SlangPassThrough passThrough = SLANG_PASS_THROUGH_NONE;
-                    if (SLANG_FAILED(TypeTextUtil::asPassThrough(name.getUnownedSlice(), passThrough)))
+                    if (SLANG_FAILED(TypeTextUtil::findPassThrough(name.getUnownedSlice(), passThrough)))
                     {
                         sink->diagnose(SourceLoc(), Diagnostics::unknownPassThroughTarget, name);
                         return SLANG_FAIL;
@@ -915,7 +915,7 @@ struct OptionsParser
                     String compilerText;
                     SLANG_RETURN_ON_FAIL(tryReadCommandLineArgument(sink, arg, &argCursor, argEnd, compilerText));
 
-                    SlangSourceLanguage sourceLanguage = TypeTextUtil::asSourceLanguage(sourceLanguageText.getUnownedSlice());
+                    SlangSourceLanguage sourceLanguage = TypeTextUtil::findSourceLanguage(sourceLanguageText.getUnownedSlice());
                     if (sourceLanguage == SLANG_SOURCE_LANGUAGE_UNKNOWN)
                     {
                         sink->diagnose(SourceLoc(), Diagnostics::unknownSourceLanguage, sourceLanguageText);
@@ -923,7 +923,7 @@ struct OptionsParser
                     }
 
                     SlangPassThrough compiler;
-                    if (SLANG_FAILED(TypeTextUtil::asPassThrough(compilerText.getUnownedSlice(), compiler)))
+                    if (SLANG_FAILED(TypeTextUtil::findPassThrough(compilerText.getUnownedSlice(), compiler)))
                     {
                         sink->diagnose(SourceLoc(), Diagnostics::unknownPassThroughTarget, compilerText);
                         return SLANG_FAIL;
@@ -957,7 +957,7 @@ struct OptionsParser
 
                             String slice = argStr.subString(1, index - 1);
                             SlangPassThrough passThrough = SLANG_PASS_THROUGH_NONE;
-                            if (SLANG_SUCCEEDED(TypeTextUtil::asPassThrough(slice.getUnownedSlice(), passThrough)))
+                            if (SLANG_SUCCEEDED(TypeTextUtil::findPassThrough(slice.getUnownedSlice(), passThrough)))
                             {
                                 session->setDownstreamCompilerPath(passThrough, name.getBuffer());
                                 continue;
