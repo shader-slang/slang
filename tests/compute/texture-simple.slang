@@ -2,7 +2,7 @@
 //TEST(compute):COMPARE_COMPUTE_EX:-slang -compute
 //TEST(compute):COMPARE_COMPUTE_EX:-slang -compute -dx12 
 //TEST(compute):COMPARE_COMPUTE_EX:-slang -compute -dx12 -profile cs_6_0 -use-dxil
-// TODO(JS): Doesn't work on vk currently
+// TODO(JS): Doesn't work on vk currently, because createTextureView not implemented on vk renderer
 //DISABLE_TEST(compute, vulkan):COMPARE_COMPUTE_EX:-vk -compute
 //TEST(compute):COMPARE_COMPUTE_EX:-cuda -compute 
 
@@ -10,6 +10,8 @@
 Texture1D<float> t1D;
 //TEST_INPUT: Texture2D(size=4, content = one):name t2D
 Texture2D<float> t2D;
+//TEST_INPUT: Texture3D(size=4, content = one):name t3D
+Texture3D<float> t3D;
 
 //TEST_INPUT: Sampler:name samplerState
 SamplerState samplerState;
@@ -26,6 +28,7 @@ void computeMain(uint3 dispatchThreadID : SV_DispatchThreadID)
     float val = 0.0f;
     val += t1D.SampleLevel(samplerState, u, 0);
     val += t2D.SampleLevel(samplerState, float2(u, u), 0);
+    val += t3D.SampleLevel(samplerState, float3(u, u, u), 0);
  
     outputBuffer[idx] = val;
 }

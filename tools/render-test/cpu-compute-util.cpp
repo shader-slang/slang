@@ -16,6 +16,40 @@ namespace renderer_test {
 using namespace Slang;
 
 template <int COUNT>
+struct ValueTexture3D : public CPUComputeUtil::Resource, public CPPPrelude::ITexture3D
+{
+    void set(void* out)
+    {
+        float* dst = (float*)out;
+        for (int i = 0; i < COUNT; ++i)
+        {
+            dst[i] = m_value;
+        }
+    }
+
+    virtual void Load(const CPPPrelude::int4& v, void* out) SLANG_OVERRIDE
+    {
+        set(out);
+    }
+    virtual void Sample(CPPPrelude::SamplerState samplerState, const CPPPrelude::float3& loc, void* out) SLANG_OVERRIDE
+    {
+        set(out);
+    }
+    virtual void SampleLevel(CPPPrelude::SamplerState samplerState, const CPPPrelude::float3& loc, float level, void* out) SLANG_OVERRIDE
+    {
+        set(out);
+    }
+
+    ValueTexture3D(float value) :
+        m_value(value)
+    {
+        m_interface = static_cast<CPPPrelude::ITexture3D*>(this);
+    }
+
+    float m_value;
+};
+
+template <int COUNT>
 struct ValueTexture2D : public CPUComputeUtil::Resource, public CPPPrelude::ITexture2D
 {
     void set(void* out)
@@ -83,6 +117,8 @@ struct ValueTexture1D : public CPUComputeUtil::Resource, public CPPPrelude::ITex
     float m_value;
 };
 
+
+
 static CPUComputeUtil::Resource* _newValueTexture(SlangResourceShape baseShape, int elemCount, float value)
 {
     switch (baseShape)
@@ -110,11 +146,21 @@ static CPUComputeUtil::Resource* _newValueTexture(SlangResourceShape baseShape, 
                 default: break;
             }
         }
+        case SLANG_TEXTURE_3D:
+        {
+            switch (elemCount)
+            {
+                case 1: return new ValueTexture3D<1>(value);
+                case 2: return new ValueTexture3D<2>(value);
+                case 3: return new ValueTexture3D<3>(value);
+                case 4: return new ValueTexture3D<4>(value);
+                default: break;
+            }
+        }
         default: break;
     }
     return nullptr;
 }
-
 
 /* static */SlangResult CPUComputeUtil::calcBindings(const ShaderCompilerUtil::OutputAndLayout& compilationAndLayout, Context& outContext)
 {
@@ -172,6 +218,8 @@ static CPUComputeUtil::Resource* _newValueTexture(SlangResourceShape baseShape, 
                         {
                             case SLANG_TEXTURE_1D:
                             case SLANG_TEXTURE_2D:
+                            case SLANG_TEXTURE_3D:
+                            case SLANG_TEXTURE_CUBE:
                             {
                                 SLANG_ASSERT(value->m_userIndex >= 0);
                                 auto& srcEntry = layout.entries[value->m_userIndex];
@@ -203,11 +251,15 @@ static CPUComputeUtil::Resource* _newValueTexture(SlangResourceShape baseShape, 
                                     }
                                     default: break;
                                 }
+
+                                if (value->m_target == nullptr)
+                                {
+                                    SLANG_ASSERT(!"Couldn't construct resource type");
+                                    return SLANG_FAIL;
+                                }
+
                                 break;
                             }
-                            
-                            case SLANG_TEXTURE_3D:
-                            case SLANG_TEXTURE_CUBE:
                             case SLANG_TEXTURE_BUFFER:
                             {
                                 // Need a CPU impl for these...

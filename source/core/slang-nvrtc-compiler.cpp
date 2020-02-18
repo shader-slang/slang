@@ -297,8 +297,16 @@ SlangResult NVRTCDownstreamCompiler::compile(const CompileOptions& options, RefP
         cmdLine.addArg(include);
     }
 
+    // Neither of these options are strictly required, for general use of nvrtc,
+    // but are enabled to make use withing Slang work more smoothly
     {
+        // Require c++14, as makes initialization construction with {} available and so simplifies code generation
         cmdLine.addArg("-std=c++14");
+
+        // Disable all warnings
+        // This is arguably too much - but nvrtc does not appear to have a mechanism to switch off individual warnings.
+        // I tried the -Xcudafe mechanism but that does not appear to work for nvrtc
+        cmdLine.addArg("-w");
     }
 
     nvrtcProgram program = nullptr;
