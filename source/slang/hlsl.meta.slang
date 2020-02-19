@@ -1431,24 +1431,30 @@ __generic<T : __BuiltinType> uint4 WaveMatch(T value);
 __generic<T : __BuiltinType, let N : int> uint4 WaveMatch(vector<T,N> value);
 __generic<T : __BuiltinType, let N : int, let M : int> uint4 WaveMatch(matrix<T,N,M> value);
 
-// TODO(JS): This doesn't look quite right as the article
+// TODO(JS): For CUDA the article claims mask has to be used carefully
 // https://devblogs.nvidia.com/using-cuda-warp-level-primitives/
-// Claims mask needs to be carefully chosen.
+// With the Warp intrinsics there is though mask, and it's just the 'active lanes'. So __activemask()
+// seems to be appropriate.
 
-__target_intrinsic(cuda, "(__all_sync(0xffffffff, $0) != 0)") 
+__target_intrinsic(cuda, "(__all_sync(__activemask(), $0) != 0)") 
 bool WaveActiveAllTrue(bool condition);
-__target_intrinsic(cuda, "(_any_sync(0xffffffff, $0) != 0)")
+__target_intrinsic(cuda, "(_any_sync(__activemask(), $0) != 0)")
 bool WaveActiveAnyTrue(bool condition);
 
-__target_intrinsic(cuda, "make_uint4(__ballot_sync(0xffffffff, $0), 0, 0, 0)")
+__target_intrinsic(cuda, "make_uint4(__ballot_sync(__activemask(), $0), 0, 0, 0)")
 uint4 WaveActiveBallot(bool condition);
 
+__target_intrinsic(cuda, "__popc(__ballot_sync(__activemask(), $0))")
 uint WaveActiveCountBits(bool value);
 
 __target_intrinsic(cuda, "(warpSize)")
 uint WaveGetLaneCount();
 
+__target_intrinsic(cuda, "_getLaneId()")
 uint WaveGetLaneIndex();
+
+// If there are no *active* lanes less than this one, we must be the lowest lane
+__target_intrinsic(cuda, "((__activemask() & __lanemask_lt()) == 0)")
 bool WaveIsFirstLane();
 
 __generic<T : __BuiltinArithmeticType> T WavePrefixProduct(T expr);
