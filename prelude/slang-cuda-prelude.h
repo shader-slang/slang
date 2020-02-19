@@ -7,6 +7,12 @@
 // For now we'll disable any asserts in this prelude
 #define SLANG_PRELUDE_ASSERT(x) 
 
+#ifndef SLANG_CUDA_WARP_SIZE 
+#   define SLANG_CUDA_WARP_SIZE 32
+#endif
+
+#define SLANG_CUDA_WARP_MASK (SLANG_CUDA_WARP_SIZE - 1)
+
 //
 #define SLANG_FORCE_INLINE inline
 
@@ -111,6 +117,36 @@ union Union64
     int64_t i;
     double d;
 };
+
+// ---------------------- Miscellaneous --------------------------------------
+
+// TODO(JS): It appears that cuda does not have a simple way to get a lane index. 
+// 
+// Another approach could be... 
+// laneId = ((threadIdx.z * blockDim.y + threadIdx.y) * blockDim.x + threadIdx.x) & SLANG_CUDA_WARP_MASK
+// If that is really true another way to do this, would be for code generator to add this function 
+// with the [numthreads] baked in. 
+// 
+// For now I'll just assume you have a launch that makes the following correct if the kernel uses WaveGetLaneIndex()
+#ifndef SLANG_USE_ASM_LANE_ID
+ __forceinline__ __device__ uint32_t _getLaneId()
+{
+    // If the launch is (or I guess some multiple of the warp size) 
+    // we try this mechanism, which is apparently faster. 
+    return threadIdx.x & SLANG_CUDA_WARP_MASK;
+}
+#else
+__forceinline__ __device__ uint32_t _getLaneId()
+{
+    // https://stackoverflow.com/questions/44337309/whats-the-most-efficient-way-to-calculate-the-warp-id-lane-id-in-a-1-d-grid#
+    // This mechanism is not the fastest way to do it, and that is why the other mechanism 
+    // is the default. But the other mechanism relies on a launch that makes the assumption 
+    // true.
+    unsigned ret; 
+    asm volatile ("mov.u32 %0, %laneid;" : "=r"(ret));
+    return ret;
+}
+#endif
 
 // ----------------------------- F32 -----------------------------------------
 
