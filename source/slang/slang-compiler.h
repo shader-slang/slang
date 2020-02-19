@@ -72,9 +72,6 @@ namespace Slang
         CountOf             = SLANG_TARGET_COUNT_OF,
     };
 
-    CodeGenTarget calcCodeGenTargetFromName(const UnownedStringSlice& name);
-    UnownedStringSlice getCodeGenTargetName(CodeGenTarget target);
-
     enum class ContainerFormat : SlangContainerFormat
     {
         None            = SLANG_CONTAINER_FORMAT_NONE,

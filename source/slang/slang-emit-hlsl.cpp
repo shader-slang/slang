@@ -659,6 +659,22 @@ void HLSLSourceEmitter::emitSimpleTypeImpl(IRType* type)
 
         return;
     }
+    else if(auto specializedType = as<IRSpecialize>(type))
+    {
+        // If a `specialize` instruction made it this far, then
+        // it represents an intrinsic generic type.
+        //
+        emitSimpleType((IRType*) getSpecializedValue(specializedType));
+        m_writer->emit("<");
+        UInt argCount = specializedType->getArgCount();
+        for (UInt ii = 0; ii < argCount; ++ii)
+        {
+            if (ii != 0) m_writer->emit(", ");
+            emitVal(specializedType->getArg(ii), getInfo(EmitOp::General));
+        }
+        m_writer->emit(" >");
+        return;
+    }
 
     // HACK: As a fallback for HLSL targets, assume that the name of the
     // instruction being used is the same as the name of the HLSL type.
