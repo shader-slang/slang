@@ -216,6 +216,37 @@ struct ValueTexture2DArray : public CPUComputeUtil::Resource, public CPPPrelude:
     float m_value;
 };
 
+
+template <int COUNT>
+struct ValueTextureCubeArray : public CPUComputeUtil::Resource, public CPPPrelude::ITextureCubeArray
+{
+    void set(void* out)
+    {
+        float* dst = (float*)out;
+        for (int i = 0; i < COUNT; ++i)
+        {
+            dst[i] = m_value;
+        }
+    }
+
+    virtual void Sample(CPPPrelude::SamplerState samplerState, const CPPPrelude::float4& loc, void* out) SLANG_OVERRIDE
+    {
+        set(out);
+    }
+    virtual void SampleLevel(CPPPrelude::SamplerState samplerState, const CPPPrelude::float4& loc, float level, void* out) SLANG_OVERRIDE
+    {
+        set(out);
+    }
+
+    ValueTextureCubeArray(float value) :
+        m_value(value)
+    {
+        m_interface = static_cast<CPPPrelude::ITextureCubeArray*>(this);
+    }
+
+    float m_value;
+};
+
 static CPUComputeUtil::Resource* _newValueTexture(SlangResourceShape shape, int elemCount, float value)
 {
     switch (shape)
@@ -289,6 +320,19 @@ static CPUComputeUtil::Resource* _newValueTexture(SlangResourceShape shape, int 
             }
             break;
         }
+        case SLANG_TEXTURE_CUBE_ARRAY:
+        {
+            switch (elemCount)
+            {
+                case 1: return new ValueTextureCubeArray<1>(value);
+                case 2: return new ValueTextureCubeArray<2>(value);
+                case 3: return new ValueTextureCubeArray<3>(value);
+                case 4: return new ValueTextureCubeArray<4>(value);
+                default: break;
+            }
+            break;
+        }
+
 
         default: break;
     }

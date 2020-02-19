@@ -343,32 +343,9 @@ public:
     auto access = type->getResourceAccess();
 
     CUresourcetype resourceType = CU_RESOURCE_TYPE_ARRAY;
-
     auto baseShape = shape & SLANG_RESOURCE_BASE_SHAPE_MASK;
 
-    switch (baseShape)
-    {
-        case SLANG_TEXTURE_1D:
-        case SLANG_TEXTURE_2D:
-        case SLANG_TEXTURE_3D:
-        case SLANG_TEXTURE_CUBE:
-        {
-            break;
-        }
-        default:
-        {
-            SLANG_ASSERT(!"Type not supported");
-            return SLANG_FAIL;
-        }
-    }
-
     slang::TypeReflection* typeReflection = typeLayout->getResourceResultType();
-
-    int count = 1;
-    if (typeReflection->getKind() == slang::TypeReflection::Kind::Vector)
-    {
-        count = int(typeReflection->getElementCount());
-    }
 
     const auto& textureDesc = srcEntry.textureDesc;
 
@@ -380,7 +357,10 @@ public:
 
     switch (baseShape)
     {
-        case SLANG_TEXTURE_1D: break;
+        case SLANG_TEXTURE_1D:
+        {
+            break;
+        }
         case SLANG_TEXTURE_2D:
         {
             height = textureDesc.size;
@@ -395,8 +375,13 @@ public:
         case SLANG_TEXTURE_CUBE:
         {
             height = width;
-            depth = 6;
+            depth = 1;
             break;
+        }
+        default:
+        {
+            SLANG_ASSERT(!"Type not supported");
+            return SLANG_FAIL;
         }
     }
 
@@ -453,7 +438,8 @@ public:
             if (textureDesc.arrayLength > 1)
             {
                 if (baseShape == SLANG_TEXTURE_1D ||
-                    baseShape == SLANG_TEXTURE_2D)
+                    baseShape == SLANG_TEXTURE_2D ||
+                    baseShape == SLANG_TEXTURE_CUBE)
                 {
                     arrayDesc.Flags |= CUDA_ARRAY3D_LAYERED;
                     arrayDesc.Depth = textureDesc.arrayLength;
@@ -464,9 +450,11 @@ public:
                     return SLANG_FAIL;
                 }
             }
-            else if (baseShape == SLANG_TEXTURE_CUBE)
+            
+            if (baseShape == SLANG_TEXTURE_CUBE)
             {
                 arrayDesc.Flags |= CUDA_ARRAY3D_CUBEMAP;
+                arrayDesc.Depth *= 6;
             }
 
             SLANG_CUDA_RETURN_ON_FAIL(cuMipmappedArrayCreate(&tex->m_cudaMipMappedArray, &arrayDesc, mipLevels));
@@ -477,9 +465,9 @@ public:
 
             if (textureDesc.arrayLength > 1)
             {
-                if (baseShape == SLANG_TEXTURE_1D || baseShape == SLANG_TEXTURE_2D)
+                if (baseShape == SLANG_TEXTURE_1D || baseShape == SLANG_TEXTURE_2D || baseShape == SLANG_TEXTURE_CUBE)
                 {
-                    SLANG_ASSERT(!"Arrays of 3d or cubemaps not supported");
+                    SLANG_ASSERT(!"Only 1D, 2D and Cube arrays supported");
                     return SLANG_FAIL;
                 }
 
@@ -488,6 +476,11 @@ public:
 
                 // Set the depth as the array length
                 arrayDesc.Depth = textureDesc.arrayLength;
+                if (baseShape == SLANG_TEXTURE_CUBE)
+                {
+                    arrayDesc.Depth *= 6;
+                }
+                
                 arrayDesc.Height = height;
                 arrayDesc.Width = width;
                 arrayDesc.Format = format;
@@ -500,7 +493,6 @@ public:
                 CUDA_ARRAY3D_DESCRIPTOR arrayDesc;
                 memset(&arrayDesc, 0, sizeof(arrayDesc));
 
-                // If we have a cubemap the depth is 6
                 arrayDesc.Depth = depth;
                 arrayDesc.Height = height;
                 arrayDesc.Width = width;
@@ -509,6 +501,7 @@ public:
 
                 arrayDesc.Flags = 0;
 
+                // Handle cube texture
                 if (baseShape == SLANG_TEXTURE_CUBE)
                 {
                     arrayDesc.Depth = 6;
@@ -574,20 +567,26 @@ public:
 
         if (textureDesc.arrayLength > 1)
         {
-            SLANG_ASSERT(baseShape == SLANG_TEXTURE_1D || baseShape == SLANG_TEXTURE_2D);
+            SLANG_ASSERT(baseShape == SLANG_TEXTURE_1D || baseShape == SLANG_TEXTURE_2D || baseShape == SLANG_TEXTURE_CUBE);
 
             // TODO(JS): Here I assume that arrays are just held contiguously within a 'face'
             // This seems reasonable and works with the Copy3D.
             const size_t faceSizeInBytes = elementSize * mipWidth * mipHeight;
-            const size_t mipSizeInBytes = faceSizeInBytes * textureDesc.arrayLength;
+
+            Index faceCount = textureDesc.arrayLength;
+            if (baseShape == SLANG_TEXTURE_CUBE)
+            {
+                faceCount *= 6;
+            }
+
+            const size_t mipSizeInBytes = faceSizeInBytes * faceCount;
             workspace.setCount(mipSizeInBytes);
 
             // We need to add the face data from each mip
-
-            for (Index j = 0; j < textureDesc.arrayLength; j++)
+            // We iterate over face count so we copy all of the cubemap faces
+            for (Index j = 0; j < faceCount; j++)
             {
                 const auto& srcData = texData.dataBuffer[mipLevel + j * mipLevels];
-
                 // Copy over to the workspace to make contiguous
                 ::memcpy(workspace.begin() + faceSizeInBytes * j, srcData.getBuffer(), faceSizeInBytes);
             }
@@ -624,7 +623,7 @@ public:
 
         if (textureDesc.arrayLength > 1)
         {
-            SLANG_ASSERT(baseShape == SLANG_TEXTURE_1D || baseShape == SLANG_TEXTURE_2D);
+            SLANG_ASSERT(baseShape == SLANG_TEXTURE_1D || baseShape == SLANG_TEXTURE_2D || baseShape == SLANG_TEXTURE_CUBE);
 
             CUDA_MEMCPY3D copyParam;
             memset(&copyParam, 0, sizeof(copyParam));
@@ -639,6 +638,11 @@ public:
             copyParam.Height = mipHeight;
             // Set the depth to the array length
             copyParam.Depth = textureDesc.arrayLength;
+
+            if (baseShape == SLANG_TEXTURE_CUBE)
+            {
+                copyParam.Depth *= 6;
+            }
 
             SLANG_CUDA_RETURN_ON_FAIL(cuMemcpy3D(&copyParam));
         }

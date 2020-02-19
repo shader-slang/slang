@@ -328,6 +328,21 @@ struct Texture2DArray
     ITexture2DArray* texture;              
 };
 
+struct ITextureCubeArray
+{
+    virtual void Sample(SamplerState samplerState, const float4& loc, void* out) = 0;
+    virtual void SampleLevel(SamplerState samplerState, const float4& loc, float level, void* out) = 0;
+};
+
+template <typename T>
+struct TextureCubeArray
+{
+    T Sample(SamplerState samplerState, const float4& v) const { T out; texture->Sample(samplerState, v, &out); return out; }
+    T SampleLevel(SamplerState samplerState, const float4& v, float level) { T out; texture->SampleLevel(samplerState, v, level, &out); return out; }
+    
+    ITextureCubeArray* texture;              
+};
+
 /* Varying input for Compute */
 
 /* Used when running a single thread */
