@@ -18,6 +18,7 @@ These limitations apply to Slang transpiling to CUDA.
 * Samplers are not separate objects in CUDA - they are combined into a single 'TextureObject'. So samplers are effectively ignored on CUDA targets. 
 * Whilst there is tex1Dfetch there are no equivalents for higher dimensions - so such accesses are not currently supported
 * When using a TextureArray (layered texture in CUDA) - the index will be treated as an int, as this is all CUDA allows
+* Care must be used in using `WaveGetLaneIndex` wave intrinsic - it will only give the right results for appopriate launches
 
 The following are a work in progress or not implmented but are planned to be so in the future
 
@@ -142,6 +143,17 @@ void setDownstreamCompilerPrelude(SlangPassThrough passThrough, const char* prel
 ```
 
 The code that sets up the prelude for the test infrastucture and command line usage can be found in ```TestToolUtil::setSessionDefaultPrelude```. Essentially this determines what the absolute path is to `slang-cpp-prelude.h` is and then just makes the prelude `#include "the absolute path"`.
+
+Limitations
+===========
+
+## WaveGetLaneIndex
+
+This defaults to `threadIdx.x & SLANG_CUDA_WARP_MASK`. Depending on how the kernel is launched this could be incorrect. 
+
+There other ways to get lane index, for example using inline assembly. This mechanism though is apparently slower than the simple method used here. 
+
+There is potential to calculate the lane id using the [numthreads] markup in Slang/HLSL, but that also requires some assumptions of how that maps to a lane index. 
 
 Language aspects
 ================
