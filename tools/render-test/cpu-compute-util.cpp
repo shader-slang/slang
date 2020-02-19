@@ -182,6 +182,40 @@ struct ValueTexture1DArray : public CPUComputeUtil::Resource, public CPPPrelude:
     float m_value;
 };
 
+template <int COUNT>
+struct ValueTexture2DArray : public CPUComputeUtil::Resource, public CPPPrelude::ITexture2DArray
+{
+    void set(void* out)
+    {
+        float* dst = (float*)out;
+        for (int i = 0; i < COUNT; ++i)
+        {
+            dst[i] = m_value;
+        }
+    }
+
+    virtual void Load(const CPPPrelude::int4& v, void* out) SLANG_OVERRIDE
+    {
+        set(out);
+    }
+    virtual void Sample(CPPPrelude::SamplerState samplerState, const CPPPrelude::float3& loc, void* out) SLANG_OVERRIDE
+    {
+        set(out);
+    }
+    virtual void SampleLevel(CPPPrelude::SamplerState samplerState, const CPPPrelude::float3& loc, float level, void* out) SLANG_OVERRIDE
+    {
+        set(out);
+    }
+
+    ValueTexture2DArray(float value) :
+        m_value(value)
+    {
+        m_interface = static_cast<CPPPrelude::ITexture2DArray*>(this);
+    }
+
+    float m_value;
+};
+
 static CPUComputeUtil::Resource* _newValueTexture(SlangResourceShape shape, int elemCount, float value)
 {
     switch (shape)
@@ -239,6 +273,18 @@ static CPUComputeUtil::Resource* _newValueTexture(SlangResourceShape shape, int 
                 case 2: return new ValueTexture1DArray<2>(value);
                 case 3: return new ValueTexture1DArray<3>(value);
                 case 4: return new ValueTexture1DArray<4>(value);
+                default: break;
+            }
+            break;
+        }
+        case SLANG_TEXTURE_2D_ARRAY:
+        {
+            switch (elemCount)
+            {
+                case 1: return new ValueTexture2DArray<1>(value);
+                case 2: return new ValueTexture2DArray<2>(value);
+                case 3: return new ValueTexture2DArray<3>(value);
+                case 4: return new ValueTexture2DArray<4>(value);
                 default: break;
             }
             break;
