@@ -388,10 +388,6 @@ static SlangResult _compute(CUcontext context, CUmodule module, const ShaderComp
                 // Get the type kind, if typeLayout is not set we'll assume a 'constant buffer' will do
                 slang::TypeReflection::Kind kind = typeLayout ? typeLayout->getKind() : slang::TypeReflection::Kind::ConstantBuffer;
                
-                // TODO(JS):
-                // Here we should be using information about what textures hold to create appropriate
-                // textures. For now we only support 2d textures that always return 1.
-                
                 switch (kind)
                 {
                     case slang::TypeReflection::Kind::ConstantBuffer:
@@ -512,18 +508,52 @@ static SlangResult _compute(CUcontext context, CUmodule module, const ShaderComp
                                         arrayDesc.NumChannels = numChannels;
                                         arrayDesc.Flags = 0;
 
-                                        if (baseShape == SLANG_TEXTURE_CUBE)
+                                        if (textureDesc.arrayLength > 1)
+                                        {
+                                            if (baseShape == SLANG_TEXTURE_1D ||
+                                                baseShape == SLANG_TEXTURE_2D)
+                                            {
+                                                arrayDesc.Flags |= CUDA_ARRAY3D_LAYERED;
+                                                arrayDesc.Depth = textureDesc.arrayLength;
+                                            }
+                                            else
+                                            {
+                                                SLANG_ASSERT(!"Arrays only supported for 1D and 2D");
+                                                return SLANG_FAIL;
+                                            }
+                                        }
+                                        else if (baseShape == SLANG_TEXTURE_CUBE)
                                         {
                                             arrayDesc.Flags |= CUDA_ARRAY3D_CUBEMAP;
                                         }
-
+                                    
                                         SLANG_CUDA_RETURN_ON_FAIL(cuMipmappedArrayCreate(&tex->m_cudaMipMappedArray,  &arrayDesc, mipLevels));
                                     }
                                     else
                                     {
                                         resourceType = CU_RESOURCE_TYPE_ARRAY;
 
-                                        if (baseShape == SLANG_TEXTURE_3D || baseShape == SLANG_TEXTURE_CUBE)
+                                        if (textureDesc.arrayLength > 1)
+                                        {
+                                            if (baseShape == SLANG_TEXTURE_1D || baseShape == SLANG_TEXTURE_2D)
+                                            {
+                                                SLANG_ASSERT(!"Arrays of 3d or cubemaps not supported");
+                                                return SLANG_FAIL;
+                                            }
+
+                                            CUDA_ARRAY3D_DESCRIPTOR arrayDesc;
+                                            memset(&arrayDesc, 0, sizeof(arrayDesc));
+
+                                            // Set the depth as the array length
+                                            arrayDesc.Depth = textureDesc.arrayLength;
+                                            arrayDesc.Height = height;
+                                            arrayDesc.Width = width;
+                                            arrayDesc.Format = format;
+                                            arrayDesc.NumChannels = numChannels;
+
+                                            SLANG_CUDA_RETURN_ON_FAIL(cuArray3DCreate(&tex->m_cudaArray, &arrayDesc));
+                                        }
+                                        else if (baseShape == SLANG_TEXTURE_3D || baseShape == SLANG_TEXTURE_CUBE)
                                         {
                                             CUDA_ARRAY3D_DESCRIPTOR arrayDesc;
                                             memset(&arrayDesc, 0, sizeof(arrayDesc));
@@ -600,72 +630,120 @@ static SlangResult _compute(CUcontext context, CUmodule module, const ShaderComp
 
                                     const void* srcDataPtr = nullptr; 
 
-                                    if (baseShape == SLANG_TEXTURE_CUBE)
+                                    if (textureDesc.arrayLength > 1)
                                     {
-                                        size_t faceSizeInBytes = elementSize * mipWidth * mipHeight;
+                                        SLANG_ASSERT(baseShape == SLANG_TEXTURE_1D || baseShape == SLANG_TEXTURE_2D);
 
-                                        workspace.setCount(faceSizeInBytes * 6);
-                                        
-                                        // Copy the data over to make contiguous
-                                        for (Index j = 0; j < 6; j++)
+                                        // TODO(JS): Here I assume that arrays are just held contiguously within a 'face'
+                                        // This seems reasonable and works with the Copy3D.
+                                        const size_t faceSizeInBytes = elementSize * mipWidth * mipHeight;
+                                        const size_t mipSizeInBytes = faceSizeInBytes * textureDesc.arrayLength;
+                                        workspace.setCount(mipSizeInBytes);
+
+                                        // We need to add the face data from each mip
+
+                                        for (Index j = 0; j < textureDesc.arrayLength; j++)
                                         {
-                                            const auto& srcData = texData.dataBuffer[mipLevels * j + mipLevel];
-                                            SLANG_ASSERT(mipWidth * mipHeight == srcData.getCount());
+                                            const auto& srcData = texData.dataBuffer[mipLevel + j * mipLevels];
 
-                                            ::memcpy(workspace.getBuffer() + faceSizeInBytes * j, srcData.getBuffer(), faceSizeInBytes);
+                                            // Copy over to the workspace to make contiguous
+                                            ::memcpy(workspace.begin() + faceSizeInBytes * j, srcData.getBuffer(), faceSizeInBytes);
                                         }
 
                                         srcDataPtr = workspace.getBuffer();
                                     }
                                     else
                                     {
-                                        const auto& srcData = texData.dataBuffer[mipLevel];
-                                        SLANG_ASSERT(mipWidth * mipHeight * mipDepth == srcData.getCount());
+                                        if (baseShape == SLANG_TEXTURE_CUBE)
+                                        {
+                                            size_t faceSizeInBytes = elementSize * mipWidth * mipHeight;
 
-                                        srcDataPtr = srcData.getBuffer();
+                                            workspace.setCount(faceSizeInBytes * 6);
+
+                                            // Copy the data over to make contiguous
+                                            for (Index j = 0; j < 6; j++)
+                                            {
+                                                const auto& srcData = texData.dataBuffer[mipLevels * j + mipLevel];
+                                                SLANG_ASSERT(mipWidth * mipHeight == srcData.getCount());
+
+                                                ::memcpy(workspace.getBuffer() + faceSizeInBytes * j, srcData.getBuffer(), faceSizeInBytes);
+                                            }
+
+                                            srcDataPtr = workspace.getBuffer();
+                                        }
+                                        else
+                                        {
+                                            const auto& srcData = texData.dataBuffer[mipLevel];
+                                            SLANG_ASSERT(mipWidth * mipHeight * mipDepth == srcData.getCount());
+
+                                            srcDataPtr = srcData.getBuffer();
+                                        }
                                     }
 
-                                    switch (baseShape)
+                                    if (textureDesc.arrayLength > 1)
                                     {
-                                        case SLANG_TEXTURE_1D:
-                                        case SLANG_TEXTURE_2D:
-                                        {                                                                                                                                 
-                                            CUDA_MEMCPY2D copyParam;
-                                            memset(&copyParam, 0, sizeof(copyParam));
-                                            copyParam.dstMemoryType = CU_MEMORYTYPE_ARRAY;
-                                            copyParam.dstArray = dstArray;
-                                            copyParam.srcMemoryType = CU_MEMORYTYPE_HOST;
-                                            copyParam.srcHost = srcDataPtr;
-                                            copyParam.srcPitch = mipWidth * elementSize;
-                                            copyParam.WidthInBytes = copyParam.srcPitch; 
-                                            copyParam.Height = mipHeight; 
-                                            SLANG_CUDA_RETURN_ON_FAIL(cuMemcpy2D(&copyParam));
-                                            break;
-                                        }
-                                        case SLANG_TEXTURE_3D:
-                                        case SLANG_TEXTURE_CUBE:
-                                        {                                           
-                                            CUDA_MEMCPY3D copyParam;
-                                            memset(&copyParam, 0, sizeof(copyParam));
+                                        SLANG_ASSERT(baseShape == SLANG_TEXTURE_1D || baseShape == SLANG_TEXTURE_2D);
 
-                                            copyParam.dstMemoryType = CU_MEMORYTYPE_ARRAY;
-                                            copyParam.dstArray = dstArray;
+                                        CUDA_MEMCPY3D copyParam;
+                                        memset(&copyParam, 0, sizeof(copyParam));
 
-                                            copyParam.srcMemoryType = CU_MEMORYTYPE_HOST;
-                                            copyParam.srcHost = srcDataPtr;
-                                            copyParam.srcPitch = mipWidth * elementSize;
-                                            copyParam.WidthInBytes = copyParam.srcPitch;
-                                            copyParam.Height = mipHeight;
-                                            copyParam.Depth = mipDepth;
+                                        copyParam.dstMemoryType = CU_MEMORYTYPE_ARRAY;
+                                        copyParam.dstArray = dstArray;
 
-                                            SLANG_CUDA_RETURN_ON_FAIL(cuMemcpy3D(&copyParam));
-                                            break;
-                                        }
+                                        copyParam.srcMemoryType = CU_MEMORYTYPE_HOST;
+                                        copyParam.srcHost = srcDataPtr;
+                                        copyParam.srcPitch = mipWidth * elementSize;
+                                        copyParam.WidthInBytes = copyParam.srcPitch;
+                                        copyParam.Height = mipHeight;
+                                        // Set the depth to the array length
+                                        copyParam.Depth = textureDesc.arrayLength;
 
-                                        default:
+                                        SLANG_CUDA_RETURN_ON_FAIL(cuMemcpy3D(&copyParam));
+                                    }
+                                    else
+                                    {
+                                        switch (baseShape)
                                         {
-                                            SLANG_ASSERT(!"Not implemented");
-                                            break;
+                                            case SLANG_TEXTURE_1D:
+                                            case SLANG_TEXTURE_2D:
+                                            {                                                                                                                                 
+                                                CUDA_MEMCPY2D copyParam;
+                                                memset(&copyParam, 0, sizeof(copyParam));
+                                                copyParam.dstMemoryType = CU_MEMORYTYPE_ARRAY;
+                                                copyParam.dstArray = dstArray;
+                                                copyParam.srcMemoryType = CU_MEMORYTYPE_HOST;
+                                                copyParam.srcHost = srcDataPtr;
+                                                copyParam.srcPitch = mipWidth * elementSize;
+                                                copyParam.WidthInBytes = copyParam.srcPitch; 
+                                                copyParam.Height = mipHeight; 
+                                                SLANG_CUDA_RETURN_ON_FAIL(cuMemcpy2D(&copyParam));
+                                                break;
+                                            }
+                                            case SLANG_TEXTURE_3D:
+                                            case SLANG_TEXTURE_CUBE:
+                                            {                                           
+                                                CUDA_MEMCPY3D copyParam;
+                                                memset(&copyParam, 0, sizeof(copyParam));
+
+                                                copyParam.dstMemoryType = CU_MEMORYTYPE_ARRAY;
+                                                copyParam.dstArray = dstArray;
+
+                                                copyParam.srcMemoryType = CU_MEMORYTYPE_HOST;
+                                                copyParam.srcHost = srcDataPtr;
+                                                copyParam.srcPitch = mipWidth * elementSize;
+                                                copyParam.WidthInBytes = copyParam.srcPitch;
+                                                copyParam.Height = mipHeight;
+                                                copyParam.Depth = mipDepth;
+
+                                                SLANG_CUDA_RETURN_ON_FAIL(cuMemcpy3D(&copyParam));
+                                                break;
+                                            }
+
+                                            default:
+                                            {
+                                                SLANG_ASSERT(!"Not implemented");
+                                                break;
+                                            }
                                         }
                                     }
                                 }
