@@ -761,7 +761,7 @@ namespace renderer_test
 
         if (scalarType != ScalarType::None && scalarType != ScalarType::Void)
         {
-            UnownedStringSlice text = TypeTextUtil::asText(scalarType);
+            UnownedStringSlice text = TypeTextUtil::getScalarTypeName(scalarType);
             // Write out the type
             writer.put("type: ");
             writer.put(text);

@@ -49,7 +49,7 @@ static DownstreamCompiler::Infos _calcInfos()
 
 void DownstreamCompiler::Desc::appendAsText(StringBuilder& out) const
 {
-    out << TypeTextUtil::asHumanText(type);
+    out << TypeTextUtil::getPassThroughAsHumanText(type);
 
     // Append the version if there is a version
     if (majorVersion || minorVersion)
