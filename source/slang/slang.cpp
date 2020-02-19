@@ -2632,7 +2632,7 @@ SLANG_API SlangResult slang_createGlobalSession(
     if(apiVersion != 0)
         return SLANG_E_NOT_IMPLEMENTED;
 
-    Slang::Session* globalSession = new Slang::Session();
+    Slang::RefPtr<Slang::Session> globalSession(new Slang::Session());
     globalSession->init();
     Slang::ComPtr<slang::IGlobalSession> result(Slang::asExternal(globalSession));
     *outGlobalSession = result.detach();
