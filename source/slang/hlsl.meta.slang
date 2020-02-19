@@ -1869,6 +1869,10 @@ int dot4add_i8packed(uint left, uint right, int acc);
 float dot2add(float2 left, float2 right, float acc);
 
 //
+// Shader Model 6.5
+//
+
+//
 // Mesh Shaders
 //
 
@@ -1887,6 +1891,9 @@ void DispatchMesh<P>(uint threadGroupCountX, uint threadGroupCountY, uint thread
 //
 // DXR 1.1 and `TraceRayInline` support
 //
+
+// Get the index of the geometry that was hit in an intersection, any-hit, or closest-hit shader
+uint GeometryIndex();
 
 // Status of whether a (closest) hit has been committed in a `RayQuery`.
 typedef uint COMMITTED_STATUS;
@@ -1927,7 +1934,8 @@ static const CANDIDATE_TYPE CANDIDATE_PROCEDURAL_PRIMITIVE = 1;
 // code can resume to continue tracing the ray, and which yields
 // back to the user code at interesting events along the ray.
 //
-struct RayQuery<let rayFlags : RAY_FLAG = RAY_FLAG_NONE>
+__target_intrinsic(hlsl, RayQuery)
+struct RayQuery <let rayFlags : RAY_FLAG = RAY_FLAG_NONE>
 {
     // Initialize a ray-tracing query.
     //
