@@ -3343,20 +3343,28 @@ RefPtr<ProgramLayout> generateParameterBindings(
             //
             for (auto resInfo : varLayout->typeLayout->resourceInfos)
             {
-                // We don't care about whole register spaces/sets, since
-                // we don't need to allocate a default space/set for a parameter
-                // that itself consumes a whole space/set.
-                //
-                if( resInfo.kind == LayoutResourceKind::RegisterSpace )
-                    continue;
-
-                // We also don't want to consider resource kinds for which
+                // We don't want to consider resource kinds for which
                 // the variable already has an (explicit) binding, since
                 // the space from the explicit binding will be used, so
                 // that a default space isn't needed.
                 //
                 if( parameterInfo->bindingInfo[resInfo.kind].count != 0 )
                     continue;
+
+                // We also want to exclude certain resource kinds from
+                // consideration, since parameters using those resource
+                // kinds wouldn't be allocated into the default space
+                // anyway.
+                //
+                switch( resInfo.kind )
+                {
+                case LayoutResourceKind::RegisterSpace:
+                case LayoutResourceKind::PushConstantBuffer:
+                    continue;
+
+                default:
+                    break;
+                }
 
                 // Otherwise, we have a shader parameter that will need
                 // a default space or set to live in.
