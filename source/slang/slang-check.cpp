@@ -182,7 +182,7 @@ namespace Slang
         SlangFuncPtr func = sharedLibrary->findFuncByName(info.name);
         if (!func)
         {
-            UnownedStringSlice compilerName = TypeTextUtil::asText(SlangPassThrough(info.compilerType));
+            UnownedStringSlice compilerName = TypeTextUtil::getPassThroughName(SlangPassThrough(info.compilerType));
             sink->diagnose(SourceLoc(), Diagnostics::failedToFindFunctionForCompiler, info.name, compilerName);
             return nullptr;
         }

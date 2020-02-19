@@ -2,6 +2,8 @@
 #include "slang-emit.h"
 
 #include "../core/slang-writer.h"
+#include "../core/slang-type-text-util.h"
+
 #include "slang-ir-bind-existentials.h"
 #include "slang-ir-dce.h"
 #include "slang-ir-entry-point-uniforms.h"
@@ -525,7 +527,7 @@ String emitEntryPointSourceFromIR(
 
     if (!sourceEmitter)
     {
-        sink->diagnose(SourceLoc(), Diagnostics::unableToGenerateCodeForTarget, getCodeGenTargetName(target));
+        sink->diagnose(SourceLoc(), Diagnostics::unableToGenerateCodeForTarget, TypeTextUtil::getCompileTargetName(SlangCompileTarget(target)));
         return String();
     }
 

@@ -341,50 +341,20 @@ struct OptionsParser
     void addOutputPath(char const* inPath)
     {
         String path = String(inPath);
+        String ext = Path::getFileExt(path);
 
-        if (!inPath) {}
-#define CASE(EXT, TARGET)   \
-        else if(path.endsWith(EXT)) do { addOutputPath(path, CodeGenTarget(SLANG_##TARGET)); } while(0)
-
-        CASE(".hlsl", HLSL);
-        CASE(".fx",   HLSL);
-
-        CASE(".dxbc", DXBC);
-        CASE(".dxbc.asm", DXBC_ASM);
-
-        CASE(".dxil", DXIL);
-        CASE(".dxil.asm", DXIL_ASM);
-
-        CASE(".glsl", GLSL);
-        CASE(".vert", GLSL);
-        CASE(".frag", GLSL);
-        CASE(".geom", GLSL);
-        CASE(".tesc", GLSL);
-        CASE(".tese", GLSL);
-        CASE(".comp", GLSL);
-
-        CASE(".spv",        SPIRV);
-        CASE(".spv.asm",    SPIRV_ASM);
-
-        CASE(".c",      C_SOURCE);
-        CASE(".cpp",    CPP_SOURCE);
-
-        CASE(".exe",    EXECUTABLE);
-        CASE(".dll",    SHARED_LIBRARY);
-        CASE(".so",     SHARED_LIBRARY);
-
-#undef CASE
-
-        else if (path.endsWith(".slang-module") || path.endsWith(".slang-lib"))
+        if (ext == "slang-module" || ext == "slang-lib")
         {
             spSetOutputContainerFormat(compileRequest, SLANG_CONTAINER_FORMAT_SLANG_MODULE);
             requestImpl->m_containerOutputPath = path;
         }
         else
         {
-            // Allow an unknown-format `-o`, assuming we get a target format
+            const SlangCompileTarget target = TypeTextUtil::findCompileTargetFromExtension(ext.getUnownedSlice());
+            // If the target is not found the value returned is Unknown. This is okay because
+            // we allow an unknown-format `-o`, assuming we get a target format
             // from another argument.
-            addOutputPath(path, CodeGenTarget::Unknown);
+            addOutputPath(path, CodeGenTarget(target));
         }
     }
 
@@ -615,7 +585,7 @@ struct OptionsParser
                     String name;
                     SLANG_RETURN_ON_FAIL(tryReadCommandLineArgument(sink, arg, &argCursor, argEnd, name));
 
-                    const CodeGenTarget format = calcCodeGenTargetFromName(name.getUnownedSlice());
+                    const CodeGenTarget format = (CodeGenTarget)TypeTextUtil::findCompileTargetFromName(name.getUnownedSlice());
 
                     if (format == CodeGenTarget::Unknown)
                     {
@@ -710,7 +680,7 @@ struct OptionsParser
                     SLANG_RETURN_ON_FAIL(tryReadCommandLineArgument(sink, arg, &argCursor, argEnd, name));
 
                     SlangPassThrough passThrough = SLANG_PASS_THROUGH_NONE;
-                    if (SLANG_FAILED(TypeTextUtil::asPassThrough(name.getUnownedSlice(), passThrough)))
+                    if (SLANG_FAILED(TypeTextUtil::findPassThrough(name.getUnownedSlice(), passThrough)))
                     {
                         sink->diagnose(SourceLoc(), Diagnostics::unknownPassThroughTarget, name);
                         return SLANG_FAIL;
@@ -945,7 +915,7 @@ struct OptionsParser
                     String compilerText;
                     SLANG_RETURN_ON_FAIL(tryReadCommandLineArgument(sink, arg, &argCursor, argEnd, compilerText));
 
-                    SlangSourceLanguage sourceLanguage = TypeTextUtil::asSourceLanguage(sourceLanguageText.getUnownedSlice());
+                    SlangSourceLanguage sourceLanguage = TypeTextUtil::findSourceLanguage(sourceLanguageText.getUnownedSlice());
                     if (sourceLanguage == SLANG_SOURCE_LANGUAGE_UNKNOWN)
                     {
                         sink->diagnose(SourceLoc(), Diagnostics::unknownSourceLanguage, sourceLanguageText);
@@ -953,7 +923,7 @@ struct OptionsParser
                     }
 
                     SlangPassThrough compiler;
-                    if (SLANG_FAILED(TypeTextUtil::asPassThrough(compilerText.getUnownedSlice(), compiler)))
+                    if (SLANG_FAILED(TypeTextUtil::findPassThrough(compilerText.getUnownedSlice(), compiler)))
                     {
                         sink->diagnose(SourceLoc(), Diagnostics::unknownPassThroughTarget, compilerText);
                         return SLANG_FAIL;
@@ -987,7 +957,7 @@ struct OptionsParser
 
                             String slice = argStr.subString(1, index - 1);
                             SlangPassThrough passThrough = SLANG_PASS_THROUGH_NONE;
-                            if (SLANG_SUCCEEDED(TypeTextUtil::asPassThrough(slice.getUnownedSlice(), passThrough)))
+                            if (SLANG_SUCCEEDED(TypeTextUtil::findPassThrough(slice.getUnownedSlice(), passThrough)))
                             {
                                 session->setDownstreamCompilerPath(passThrough, name.getBuffer());
                                 continue;

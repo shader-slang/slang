@@ -228,7 +228,7 @@ SlangResult parseOptions(int argc, const char*const* argv, Slang::WriterHelper s
             }
             UnownedStringSlice sourceLanguageText(*argCursor++);
 
-            SlangSourceLanguage sourceLanguage = TypeTextUtil::asSourceLanguage(sourceLanguageText);
+            SlangSourceLanguage sourceLanguage = TypeTextUtil::findSourceLanguage(sourceLanguageText);
             if (sourceLanguage == SLANG_SOURCE_LANGUAGE_UNKNOWN)
             {
                 stdError.print("error: expecting unknown source language name '%s' for '%s'\n", String(sourceLanguageText).getBuffer(), arg);
