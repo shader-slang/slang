@@ -28,13 +28,13 @@ SLANG_FORCE_INLINE static bool _isError(cudaError_t result) { return result != 0
 
 #define SLANG_CUDA_ASSERT_ON_FAIL(x) { auto _res = x; if (_isError(_res)) { SLANG_ASSERT(!"Failed CUDA call"); }; }
 
-class CUDAResource : public CUDAComputeUtil::ResourceBase
+class MemoryCUDAResource : public CUDAResource
 {
 public:
-    typedef CUDAComputeUtil::ResourceBase Super;
+    typedef CUDAResource Super;
 
         /// Dtor
-    ~CUDAResource()
+    ~MemoryCUDAResource()
     {
         if (m_cudaMemory)
         {
@@ -42,26 +42,26 @@ public:
         }
     }
 
-    static CUDAResource* getCUDAResource(BindSet::Value* value)
+    static MemoryCUDAResource* asResource(BindSet::Value* value)
     {
-        return value ? dynamic_cast<CUDAResource*>(value->m_target.Ptr()) : nullptr;
+        return value ? dynamic_cast<MemoryCUDAResource*>(value->m_target.Ptr()) : nullptr;
     }
-        /// Helper function to get the cuda memory pointer when given a value
+        /// Helper function to get the CUDA memory pointer when given a value
     static CUdeviceptr getCUDAData(BindSet::Value* value)
     {
-        auto resource = getCUDAResource(value);
+        auto resource = asResource(value);
         return resource ? resource->m_cudaMemory : CUdeviceptr();
     }
 
     CUdeviceptr m_cudaMemory = CUdeviceptr();
 };
 
-class CUDATextureResource : public CUDAComputeUtil::ResourceBase
+class TextureCUDAResource : public CUDAResource
 {
 public:
-    typedef CUDAComputeUtil::ResourceBase Super;
+    typedef CUDAResource Super;
 
-    ~CUDATextureResource()
+    ~TextureCUDAResource()
     {
         if (m_cudaTexObj)
         {
@@ -77,14 +77,14 @@ public:
         }
     }
 
-    static CUDATextureResource* getCUDATextureResource(BindSet::Value* value)
+    static TextureCUDAResource* asResource(BindSet::Value* value)
     {
-        return value ? dynamic_cast<CUDATextureResource*>(value->m_target.Ptr()) : nullptr;
+        return value ? dynamic_cast<TextureCUDAResource*>(value->m_target.Ptr()) : nullptr;
     }
 
-    static CUtexObject getCUDATexObject(BindSet::Value* value)
+    static CUtexObject getTexObject(BindSet::Value* value)
     {
-        auto resource = getCUDATextureResource(value);
+        auto resource = asResource(value);
         // It's an assumption here that 0 is okay for null. Seems to work...
         return resource ? resource->m_cudaTexObj : CUtexObject(0);
     }
@@ -335,7 +335,7 @@ public:
     return SLANG_SUCCEEDED(context.init(0));
 }
 
-/* static */SlangResult CUDAComputeUtil::createTextureResource(const ShaderInputLayoutEntry& srcEntry, slang::TypeLayoutReflection* typeLayout, RefPtr<ResourceBase>& outResource)
+/* static */SlangResult CUDAComputeUtil::createTextureResource(const ShaderInputLayoutEntry& srcEntry, slang::TypeLayoutReflection* typeLayout, RefPtr<CUDAResource>& outResource)
 {
     auto type = typeLayout->getType();
     auto shape = type->getResourceShape();
@@ -390,7 +390,7 @@ public:
 
     auto mipLevels = texData.mipLevels;
 
-    RefPtr<CUDATextureResource> tex = new CUDATextureResource;
+    RefPtr<TextureCUDAResource> tex = new TextureCUDAResource;
 
     size_t elementSize = 0;
 
@@ -782,7 +782,7 @@ static SlangResult _compute(CUcontext context, CUmodule module, const ShaderComp
                     case slang::TypeReflection::Kind::ParameterBlock:
                     {
                         // We can construct the buffers. We can't copy into yet, as we need to set all of the bindings first
-                        RefPtr<CUDAResource> resource = new CUDAResource;
+                        RefPtr<MemoryCUDAResource> resource = new MemoryCUDAResource;
                         SLANG_CUDA_RETURN_ON_FAIL(cuMemAlloc(&resource->m_cudaMemory, value->m_sizeInBytes));
                         value->m_target = resource;
                         break;
@@ -801,7 +801,7 @@ static SlangResult _compute(CUcontext context, CUmodule module, const ShaderComp
                             case SLANG_TEXTURE_3D:
                             case SLANG_TEXTURE_CUBE:
                             {
-                                RefPtr<CUDAComputeUtil::ResourceBase> resource;
+                                RefPtr<CUDAResource> resource;
                                 SLANG_RETURN_ON_FAIL(CUDAComputeUtil::createTextureResource(entries[value->m_userIndex], typeLayout, resource));
                                 value->m_target = resource;
                                 break;
@@ -817,7 +817,7 @@ static SlangResult _compute(CUcontext context, CUmodule module, const ShaderComp
                             case SLANG_STRUCTURED_BUFFER:
                             {
                                 // On CPU we just use the memory in the BindSet buffer, so don't need to create anything
-                                RefPtr<CUDAResource> resource = new CUDAResource;
+                                RefPtr<MemoryCUDAResource> resource = new MemoryCUDAResource;
                                 SLANG_CUDA_RETURN_ON_FAIL(cuMemAlloc(&resource->m_cudaMemory, value->m_sizeInBytes));
                                 value->m_target = resource;
                                 break;
@@ -853,7 +853,7 @@ static SlangResult _compute(CUcontext context, CUmodule module, const ShaderComp
                         if (elementCount == 0)
                         {
                             CUDAComputeUtil::Array array = { CUdeviceptr(), 0 };
-                            auto resource = CUDAResource::getCUDAResource(value);
+                            auto resource = MemoryCUDAResource::asResource(value);
                             if (resource)
                             {
                                 array.data = resource->m_cudaMemory;
@@ -868,7 +868,7 @@ static SlangResult _compute(CUcontext context, CUmodule module, const ShaderComp
                     case slang::TypeReflection::Kind::ParameterBlock:
                     {
                         // These map down to just pointers
-                        *location.getUniform<CUdeviceptr>() = CUDAResource::getCUDAData(value);
+                        *location.getUniform<CUdeviceptr>() = MemoryCUDAResource::getCUDAData(value);
                         break;
                     }
                     case slang::TypeReflection::Kind::Resource:
@@ -883,7 +883,7 @@ static SlangResult _compute(CUcontext context, CUmodule module, const ShaderComp
                             case SLANG_STRUCTURED_BUFFER:
                             {
                                 CUDAComputeUtil::StructuredBuffer buffer = { CUdeviceptr(), 0 };
-                                auto resource = CUDAResource::getCUDAResource(value);
+                                auto resource = MemoryCUDAResource::asResource(value);
                                 if (resource)
                                 {
                                     buffer.data = resource->m_cudaMemory;
@@ -897,7 +897,7 @@ static SlangResult _compute(CUcontext context, CUmodule module, const ShaderComp
                             {
                                 CUDAComputeUtil::ByteAddressBuffer buffer = { CUdeviceptr(), 0 };
 
-                                auto resource = CUDAResource::getCUDAResource(value);
+                                auto resource = MemoryCUDAResource::asResource(value);
                                 if (resource)
                                 {
                                     buffer.data = resource->m_cudaMemory;
@@ -912,7 +912,7 @@ static SlangResult _compute(CUcontext context, CUmodule module, const ShaderComp
                             case SLANG_TEXTURE_3D:
                             case SLANG_TEXTURE_CUBE:
                             {
-                                *location.getUniform<CUtexObject>() = CUDATextureResource::getCUDATexObject(value);
+                                *location.getUniform<CUtexObject>() = TextureCUDAResource::getTexObject(value);
                                 break;
                             }
 
@@ -929,7 +929,7 @@ static SlangResult _compute(CUcontext context, CUmodule module, const ShaderComp
             const auto& values = bindSet.getValues();
             for (BindSet::Value* value : values)
             {
-                CUdeviceptr cudaMem = CUDAResource::getCUDAData(value);
+                CUdeviceptr cudaMem = MemoryCUDAResource::getCUDAData(value);
                 if (value && value->m_data && cudaMem)
                 {
                     // Okay copy the data over...
@@ -950,8 +950,8 @@ static SlangResult _compute(CUcontext context, CUmodule module, const ShaderComp
             SLANG_CUDA_RETURN_ON_FAIL(cuFuncGetAttribute(&sharedSizeInBytes, CU_FUNC_ATTRIBUTE_SHARED_SIZE_BYTES, kernel));
 
             // Work out the args
-            CUdeviceptr uniformCUDAData = CUDAResource::getCUDAData(bindRoot.getRootValue());
-            CUdeviceptr entryPointCUDAData = CUDAResource::getCUDAData(bindRoot.getEntryPointValue());
+            CUdeviceptr uniformCUDAData = MemoryCUDAResource::getCUDAData(bindRoot.getRootValue());
+            CUdeviceptr entryPointCUDAData = MemoryCUDAResource::getCUDAData(bindRoot.getEntryPointValue());
 
             // NOTE! These are pointers to the cuda memory pointers
             void* args[] = { &entryPointCUDAData , &uniformCUDAData };
@@ -987,7 +987,7 @@ static SlangResult _compute(CUcontext context, CUmodule module, const ShaderComp
                 if (entry.isOutput)
                 {
                     // Copy back to CPU memory
-                   CUdeviceptr cudaMem = CUDAResource::getCUDAData(value);
+                   CUdeviceptr cudaMem = MemoryCUDAResource::getCUDAData(value);
                     if (value && value->m_data && cudaMem)
                     {
                         // Okay copy the data back...
