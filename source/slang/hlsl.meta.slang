@@ -1433,7 +1433,7 @@ __generic<T : __BuiltinType, let N : int, let M : int> uint4 WaveMatch(matrix<T,
 
 // TODO(JS): For CUDA the article claims mask has to be used carefully
 // https://devblogs.nvidia.com/using-cuda-warp-level-primitives/
-// With the Warp intrinsics there is np mask, and it's just the 'active lanes'. So __activemask()
+// With the Warp intrinsics there is no mask, and it's just the 'active lanes'. So __activemask()
 // seems to be appropriate.
 
 __target_intrinsic(cuda, "(__all_sync(__activemask(), $0) != 0)") 

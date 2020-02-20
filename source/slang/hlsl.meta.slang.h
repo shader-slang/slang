@@ -1509,7 +1509,7 @@ SLANG_RAW("__generic<T : __BuiltinType, let N : int, let M : int> uint4 WaveMatc
 SLANG_RAW("\n")
 SLANG_RAW("// TODO(JS): For CUDA the article claims mask has to be used carefully\n")
 SLANG_RAW("// https://devblogs.nvidia.com/using-cuda-warp-level-primitives/\n")
-SLANG_RAW("// With the Warp intrinsics there is np mask, and it's just the 'active lanes'. So __activemask()\n")
+SLANG_RAW("// With the Warp intrinsics there is no mask, and it's just the 'active lanes'. So __activemask()\n")
 SLANG_RAW("// seems to be appropriate.\n")
 SLANG_RAW("\n")
 SLANG_RAW("__target_intrinsic(cuda, \"(__all_sync(__activemask(), $0) != 0)\") \n")
