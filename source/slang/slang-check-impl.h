@@ -408,7 +408,7 @@ namespace Slang
         // so that we can add some quality-of-life features for users
         // in cases where the compiler crashes
         //
-        void dispatchStmt(Stmt* stmt, FuncDecl* parentFunc, OuterStmtInfo* outerStmts);
+        void dispatchStmt(Stmt* stmt, FunctionDeclBase* parentFunc, OuterStmtInfo* outerStmts);
         void dispatchExpr(Expr* expr);
 
             /// Ensure that a declaration has been checked up to some state
@@ -781,7 +781,7 @@ namespace Slang
         // as the tag type for an `enum`
         void validateEnumTagType(Type* type, SourceLoc const& loc);
 
-        void checkStmt(Stmt* stmt, FuncDecl* outerFunction, OuterStmtInfo* outerStmts);
+        void checkStmt(Stmt* stmt, FunctionDeclBase* outerFunction, OuterStmtInfo* outerStmts);
 
         void getGenericParams(
             GenericDecl*                        decl,
@@ -1369,20 +1369,19 @@ namespace Slang
         : public SemanticsVisitor
         , StmtVisitor<SemanticsStmtVisitor>
     {
-        SemanticsStmtVisitor(SharedSemanticsContext* shared, FuncDecl* parentFunc, OuterStmtInfo* outerStmts)
+        SemanticsStmtVisitor(SharedSemanticsContext* shared, FunctionDeclBase* parentFunc, OuterStmtInfo* outerStmts)
             : SemanticsVisitor(shared)
             , m_parentFunc(parentFunc)
             , m_outerStmts(outerStmts)
         {}
 
             /// The parent function (if any) that surrounds the statement being checked.
-            // TODO: This should probably be a more general case like `CallableDecl`
-        FuncDecl* m_parentFunc = nullptr;
+        FunctionDeclBase* m_parentFunc = nullptr;
 
             /// The linked list of lexically surrounding statements.
         OuterStmtInfo* m_outerStmts = nullptr;
 
-        FuncDecl* getParentFunc() { return m_parentFunc; }
+        FunctionDeclBase* getParentFunc() { return m_parentFunc; }
 
         void checkStmt(Stmt* stmt);
 
@@ -1433,7 +1432,7 @@ namespace Slang
             : SemanticsVisitor(shared)
         {}
 
-        void checkBodyStmt(Stmt* stmt, FuncDecl* parentDecl)
+        void checkBodyStmt(Stmt* stmt, FunctionDeclBase* parentDecl)
         {
             checkStmt(stmt, parentDecl, nullptr);
         }

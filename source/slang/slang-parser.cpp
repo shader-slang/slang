@@ -2447,6 +2447,7 @@ namespace Slang
     {
         RefPtr<ConstructorDecl> decl = new ConstructorDecl();
         parser->FillPosition(decl.Ptr());
+        parser->PushScope(decl);
 
         // TODO: we need to make sure that all initializers have
         // the same name, but that this name doesn't conflict
@@ -2462,6 +2463,7 @@ namespace Slang
 
         decl->Body = parseOptBody(parser);
 
+        parser->PopScope();
         return decl;
     }
 
@@ -2506,6 +2508,7 @@ namespace Slang
     {
         RefPtr<SubscriptDecl> decl = new SubscriptDecl();
         parser->FillPosition(decl.Ptr());
+        parser->PushScope(decl);
 
         // TODO: the use of this name here is a bit magical...
         decl->nameAndLoc.name = getName(parser, "operator[]");
@@ -2533,6 +2536,7 @@ namespace Slang
             // empty body should be treated like `{ get; }`
         }
 
+        parser->PopScope();
         return decl;
     }
 
