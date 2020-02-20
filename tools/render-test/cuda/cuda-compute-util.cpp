@@ -63,6 +63,10 @@ public:
 
     ~TextureCUDAResource()
     {
+        if (m_cudaSurfObj)
+        {
+            SLANG_CUDA_ASSERT_ON_FAIL(cuSurfObjectDestroy(m_cudaSurfObj));
+        }
         if (m_cudaTexObj)
         {
             SLANG_CUDA_ASSERT_ON_FAIL(cuTexObjectDestroy(m_cudaTexObj));
@@ -89,8 +93,12 @@ public:
         return resource ? resource->m_cudaTexObj : CUtexObject(0);
     }
 
-    // This is an opaque type, that's backed by a long long
+    // The texObject is for reading 'texture' like things. This is an opaque type, that's backed by a long long
     CUtexObject m_cudaTexObj = CUtexObject();
+
+    // The surfObj is for reading/writing 'texture like' things, but not for sampling.
+    CUsurfObject m_cudaSurfObj = CUsurfObject();
+
     CUarray m_cudaArray = CUarray();
     CUmipmappedArray m_cudaMipMappedArray = CUmipmappedArray();
 };
@@ -341,6 +349,13 @@ public:
     auto shape = type->getResourceShape();
 
     auto access = type->getResourceAccess();
+
+    if (!(access == SLANG_RESOURCE_ACCESS_READ ||
+        access == SLANG_RESOURCE_ACCESS_READ_WRITE))
+    {
+        SLANG_ASSERT(!"Only read or read write currently supported");
+        return SLANG_FAIL;
+    }
 
     CUresourcetype resourceType = CU_RESOURCE_TYPE_ARRAY;
     auto baseShape = shape & SLANG_RESOURCE_BASE_SHAPE_MASK;
@@ -709,16 +724,26 @@ public:
         {
             resDesc.res.mipmap.hMipmappedArray = tex->m_cudaMipMappedArray;
         }
+        
+        // If we can read, then we *probably* need to have a texture resource
+        if (access == SLANG_RESOURCE_ACCESS_READ ||
+            access == SLANG_RESOURCE_ACCESS_READ_WRITE)
+        {
+            CUDA_TEXTURE_DESC texDesc;
+            memset(&texDesc, 0, sizeof(CUDA_TEXTURE_DESC));
+            texDesc.addressMode[0] = CU_TR_ADDRESS_MODE_WRAP;
+            texDesc.addressMode[1] = CU_TR_ADDRESS_MODE_WRAP;
+            texDesc.addressMode[2] = CU_TR_ADDRESS_MODE_WRAP;
+            texDesc.filterMode = CU_TR_FILTER_MODE_LINEAR;
+            texDesc.flags = CU_TRSF_NORMALIZED_COORDINATES;
 
-        CUDA_TEXTURE_DESC texDesc;
-        memset(&texDesc, 0, sizeof(CUDA_TEXTURE_DESC));
-        texDesc.addressMode[0] = CU_TR_ADDRESS_MODE_WRAP;
-        texDesc.addressMode[1] = CU_TR_ADDRESS_MODE_WRAP;
-        texDesc.addressMode[2] = CU_TR_ADDRESS_MODE_WRAP;
-        texDesc.filterMode = CU_TR_FILTER_MODE_LINEAR;
-        texDesc.flags = CU_TRSF_NORMALIZED_COORDINATES;
+            SLANG_CUDA_RETURN_ON_FAIL(cuTexObjectCreate(&tex->m_cudaTexObj, &resDesc, &texDesc, nullptr));
+        }
 
-        SLANG_CUDA_RETURN_ON_FAIL(cuTexObjectCreate(&tex->m_cudaTexObj, &resDesc, &texDesc, nullptr));
+        if (access == SLANG_RESOURCE_ACCESS_READ_WRITE)
+        {
+            SLANG_CUDA_RETURN_ON_FAIL(cuSurfObjectCreate(&tex->m_cudaSurfObj, &resDesc));
+        }
     }
 
     outResource = tex;
