@@ -40,6 +40,13 @@ struct CUDAComputeUtil
         List<BindSet::Value*> m_buffers;
     };
 
+    class ResourceBase : public RefObject
+    {
+    public:
+    };
+
+    static SlangResult createTextureResource(const ShaderInputLayoutEntry& srcEntry, slang::TypeLayoutReflection* typeLayout, RefPtr<ResourceBase>& outResource);
+
     static SlangResult execute(const ShaderCompilerUtil::OutputAndLayout& outputAndLayout, const uint32_t dispatchSize[3], Context& outContext);
 
     static bool canCreateDevice();
