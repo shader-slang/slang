@@ -343,6 +343,16 @@ public:
     return SLANG_SUCCEEDED(context.init(0));
 }
 
+static bool _hasReadAccess(SlangResourceAccess access)
+{
+    return access = SLANG_RESOURCE_ACCESS_READ || access == SLANG_RESOURCE_ACCESS_READ_WRITE;
+}
+
+static bool _hasWriteAccess(SlangResourceAccess access)
+{
+    return access == SLANG_RESOURCE_ACCESS_READ_WRITE;
+}
+
 /* static */SlangResult CUDAComputeUtil::createTextureResource(const ShaderInputLayoutEntry& srcEntry, slang::TypeLayoutReflection* typeLayout, RefPtr<CUDAResource>& outResource)
 {
     auto type = typeLayout->getType();
@@ -501,6 +511,11 @@ public:
                 arrayDesc.Format = format;
                 arrayDesc.NumChannels = numChannels;
 
+                if (baseShape == SLANG_TEXTURE_CUBE)
+                {
+                    arrayDesc.Flags |= CUDA_ARRAY3D_CUBEMAP;
+                }
+
                 SLANG_CUDA_RETURN_ON_FAIL(cuArray3DCreate(&tex->m_cudaArray, &arrayDesc));
             }
             else if (baseShape == SLANG_TEXTURE_3D || baseShape == SLANG_TEXTURE_CUBE)
@@ -567,7 +582,6 @@ public:
             SLANG_CUDA_RETURN_ON_FAIL(cuMipmappedArrayGetLevel(&dstArray, tex->m_cudaMipMappedArray, mipLevel));
         }
         SLANG_ASSERT(dstArray);
-
 
         // Check using the desc to see if it's plausible
         {
@@ -726,8 +740,7 @@ public:
         }
         
         // If we can read, then we *probably* need to have a texture resource
-        if (access == SLANG_RESOURCE_ACCESS_READ ||
-            access == SLANG_RESOURCE_ACCESS_READ_WRITE)
+        if (_hasReadAccess(access))
         {
             CUDA_TEXTURE_DESC texDesc;
             memset(&texDesc, 0, sizeof(CUDA_TEXTURE_DESC));
@@ -740,7 +753,7 @@ public:
             SLANG_CUDA_RETURN_ON_FAIL(cuTexObjectCreate(&tex->m_cudaTexObj, &resDesc, &texDesc, nullptr));
         }
 
-        if (access == SLANG_RESOURCE_ACCESS_READ_WRITE)
+        if (_hasWriteAccess(access))
         {
             SLANG_CUDA_RETURN_ON_FAIL(cuSurfObjectCreate(&tex->m_cudaSurfObj, &resDesc));
         }
