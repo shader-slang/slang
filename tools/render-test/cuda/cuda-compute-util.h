@@ -8,10 +8,16 @@
 
 namespace renderer_test {
 
+// Base class for CUDA resources. This includes textures but also
+// memory allocations
+class CUDAResource : public RefObject
+{
+public:
+};
 
 struct CUDAComputeUtil
 {
-    // Define here, so we don't need to include the cude header
+    // Define here, so we don't need to include the CUDA header
     typedef size_t CUdeviceptr;
 
         /// NOTE! MUST match up to definitions in the CUDA prelude
@@ -40,12 +46,7 @@ struct CUDAComputeUtil
         List<BindSet::Value*> m_buffers;
     };
 
-    class ResourceBase : public RefObject
-    {
-    public:
-    };
-
-    static SlangResult createTextureResource(const ShaderInputLayoutEntry& srcEntry, slang::TypeLayoutReflection* typeLayout, RefPtr<ResourceBase>& outResource);
+    static SlangResult createTextureResource(const ShaderInputLayoutEntry& srcEntry, slang::TypeLayoutReflection* typeLayout, RefPtr<CUDAResource>& outResource);
 
     static SlangResult execute(const ShaderCompilerUtil::OutputAndLayout& outputAndLayout, const uint32_t dispatchSize[3], Context& outContext);
 
