@@ -40,6 +40,16 @@
 #   define SLANG_CUDA_FIXED_ARRAY_BOUND_CHECK(index, count) SLANG_PRELUDE_ASSERT(index < count); 
 #endif
 
+ // This macro handles how out-of-range surface coordinates are handled; 
+ // I can equal
+ // cudaBoundaryModeClamp, in which case out-of-range coordinates are clamped to the valid range
+ // cudaBoundaryModeZero, in which case out-of-range reads return zero and out-of-range writes are ignored
+ // cudaBoundaryModeTrap, in which case out-of-range accesses cause the kernel execution to fail. 
+ 
+#ifndef SLANG_CUDA_BOUNDARY_MODE
+#   define SLANG_CUDA_BOUNDARY_MODE cudaBoundaryModeZero
+#endif
+
 template <typename T, size_t SIZE>
 struct FixedArray
 {

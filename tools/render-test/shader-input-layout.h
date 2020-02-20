@@ -33,6 +33,7 @@ struct InputTextureDesc
     bool isDepthTexture = false;
     bool isRWTexture = false;
     int size = 4;
+    int mipMapCount = 0;            ///< 0 means the maximum number of mips will be bound
 
     Format format = Format::RGBA_Unorm_UInt8;            
 
@@ -117,8 +118,8 @@ public:
     static SlangResult writeBindings(BindRoot* bindRoot, const ShaderInputLayout& layout, const Slang::List<BindSet::Value*>& buffers, const Slang::String& fileName);
 };
 
-void generateTextureDataRGB8(TextureData& output, bool generateMips, const InputTextureDesc& desc);
-void generateTextureData(TextureData& output, bool generateMips, const InputTextureDesc& desc);
+void generateTextureDataRGB8(TextureData& output, const InputTextureDesc& desc);
+void generateTextureData(TextureData& output, const InputTextureDesc& desc);
 
 
 } // namespace render_test

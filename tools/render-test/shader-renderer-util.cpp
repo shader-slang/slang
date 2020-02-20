@@ -19,7 +19,7 @@ void BindingStateImpl::apply(Renderer* renderer, PipelineType pipelineType)
 /* static */Result ShaderRendererUtil::generateTextureResource(const InputTextureDesc& inputDesc, int bindFlags, Renderer* renderer, RefPtr<TextureResource>& textureOut)
 {
     TextureData texData;
-    generateTextureData(texData, true, inputDesc);
+    generateTextureData(texData, inputDesc);
     return createTextureResource(inputDesc, texData, bindFlags, renderer, textureOut);
 }
 

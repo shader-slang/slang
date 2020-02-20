@@ -378,8 +378,12 @@ static bool _hasWriteAccess(SlangResourceAccess access)
 
     slang::TypeReflection* typeReflection = typeLayout->getResourceResultType();
 
-    const InputTextureDesc& textureDesc = srcEntry.textureDesc;
+    InputTextureDesc textureDesc = srcEntry.textureDesc;
 
+    if (_hasWriteAccess(access))
+    {
+        textureDesc.mipMapCount = 1;
+    }
     
     // CUDA wants the unused dimensions to be 0.
     // Might need to specially handle elsewhere
@@ -416,11 +420,9 @@ static bool _hasWriteAccess(SlangResourceAccess access)
             return SLANG_FAIL;
         }
     }
-
-    const bool generateMips = !_hasWriteAccess(access);
     
     TextureData texData;
-    generateTextureData(texData, generateMips, textureDesc);
+    generateTextureData(texData, textureDesc);
 
     auto mipLevels = texData.mipLevels;
 

@@ -16,13 +16,14 @@ These limitations apply to Slang transpiling to CUDA.
 
 * Only supports the 'texture object' style binding (The texture object API is only supported on devices of compute capability 3.0 or higher. )
 * Samplers are not separate objects in CUDA - they are combined into a single 'TextureObject'. So samplers are effectively ignored on CUDA targets. 
-* Whilst there is tex1Dfetch there are no equivalents for higher dimensions - so such accesses are not currently supported
 * When using a TextureArray (layered texture in CUDA) - the index will be treated as an int, as this is all CUDA allows
 * Care must be used in using `WaveGetLaneIndex` wave intrinsic - it will only give the right results for appopriate launches
+* Surfaces are used for textures which are read/write. CUDA does NOT do format conversion with surfaces.
 
-The following are a work in progress or not implmented but are planned to be so in the future
+The following are a work in progress or not implemented but are planned to be so in the future
 
-* Resource types including surfaces
+* Some resource types remain unsupported, and not all methods on types are supported
+* Some support for Wave intrinsics
 
 # How it works
 
@@ -95,6 +96,30 @@ The UniformState and UniformEntryPointParams struct typically vary by shader. Un
     uint32_t* data;
     size_t sizeInBytes;
 ```  
+
+## Texture
+
+Read only textures will be bound as the opaque CUDA type CUtexObject. This type is the combination of both a texture AND a sampler. This is somewhat different from HLSL, where there can be separate `SamplerState` variables. This allows access of a single texture binding with different types of sampling. 
+
+If code relys on this behavior it will be necessary to bind multiple CtexObjects with different sampler settings, accessing the same texture data. 
+
+Slang has some preliminary support for TextureSampler type - a combined Texture and SamplerState. To write Slang code that can target CUDA and other platforms using this mechanism will expose the semantics appropriately within the source.  
+ 
+Load is only supported for Texture1D, and the mip map selection argument is ignored. This is because there is tex1Dfetch and no higher dimensional equivalents. CUDA also only allows such access if the backing array is linear memory - meaning the bound texture cannot have mip maps - thus making the mip map parameter superflous anyway. RWTexture does allow Load on other texture types.  
+ 
+## RWTexture 
+ 
+RWTexture types are converted into CUsurfObject type. 
+
+In CUDA it is not possible to do a format conversion on an access to a CUsurfObject, so it must be backed by the same data format as is used within the Slang source code. 
+
+It is also worth noting that CUsurfObjects in CUDA are NOT allowed to have mip maps. 
+
+By default surface access uses cudaBoundaryModeZero, this can be replaced using the macro SLANG_CUDA_BOUNDARY_MODE in the CUDA prelude.
+
+## Sampler
+
+Samplers are in effect ignored in CUDA output. Currently we do output a variable `SamplerState`, but this value is never accessed within the kernel and so can be ignored. More discussion on this behavior is in `Texture` section.
 
 ## Unsized arrays
 

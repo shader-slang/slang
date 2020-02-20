@@ -452,6 +452,12 @@ namespace renderer_test
                                     entry.textureDesc.format = format;
                                     entry.bufferDesc.format = format;
                                 }
+                                else if(word == "mipMaps")
+                                {
+                                    parser.Read("=");
+                                    entry.textureDesc.mipMapCount = int(parser.ReadInt());
+                                }
+
                                 if (parser.LookAhead(","))
                                     parser.Read(",");
                                 else
@@ -896,19 +902,19 @@ namespace renderer_test
         return writeBindings(bindRoot, layout, buffers, &fileWriter);
     }
 
-    void generateTextureData(TextureData& output, bool generateMips, const InputTextureDesc& desc)
+    void generateTextureData(TextureData& output, const InputTextureDesc& desc)
     {
         switch (desc.format)
         {
             case Format::RGBA_Unorm_UInt8:
             {
-                generateTextureDataRGB8(output, generateMips, desc);
+                generateTextureDataRGB8(output, desc);
                 break;
             }
             case Format::R_Float32:
             {
                 TextureData work;
-                generateTextureDataRGB8(work, generateMips, desc);
+                generateTextureDataRGB8(work, desc);
 
                 output.textureSize = work.textureSize;
                 output.mipLevels = work.mipLevels;
@@ -963,7 +969,7 @@ namespace renderer_test
                         buffer[i*size*size + j * size + k] = f(k, j, i);
     };
 
-    void generateTextureDataRGB8(TextureData& output, bool generateMips, const InputTextureDesc& inputDesc)
+    void generateTextureDataRGB8(TextureData& output, const InputTextureDesc& inputDesc)
     {
         int arrLen = inputDesc.arrayLength;
         if (arrLen == 0)
@@ -974,7 +980,12 @@ namespace renderer_test
             arraySize *= 6;
         output.arraySize = arraySize;
         output.textureSize = inputDesc.size;
-        output.mipLevels = generateMips ? (Math::Log2Floor(output.textureSize) + 1) : 1;
+
+        const Index maxMipLevels = Math::Log2Floor(output.textureSize) + 1;
+        Index mipLevels = (inputDesc.mipMapCount <= 0) ? maxMipLevels : inputDesc.mipMapCount;
+        mipLevels = (mipLevels > maxMipLevels) ? maxMipLevels : mipLevels;
+
+        output.mipLevels = int(mipLevels); 
         output.dataBuffer.setCount(output.mipLevels * output.arraySize);
 
         int slice = 0;

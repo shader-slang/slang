@@ -810,7 +810,7 @@ for (int tt = 0; tt < kBaseTextureTypeCount; ++tt)
                             {
                                 sb << ", int(($1)." << char(coordCount + 'x') << ")";
                             }
-                            sb << ")\")\n";
+                            sb << ", SLANG_CUDA_BOUNDARY_MODE)\")\n";
                         }
                         else
                         {
@@ -825,7 +825,15 @@ for (int tt = 0; tt < kBaseTextureTypeCount; ++tt)
                             {
                                 sb << ", int(($1).w)";
                             }
-                            sb << ")\")\n";
+                            sb << ", SLANG_CUDA_BOUNDARY_MODE)\")\n";
+                        }
+                    }
+                    else if (access == SLANG_RESOURCE_ACCESS_READ)
+                    {
+                        // We can allow this on Texture1D
+                        if( baseShape == TextureFlavor::Shape::Shape1D && isArray == false)
+                        {
+                            sb << "__target_intrinsic(cuda, \"tex1Dfetch<$T0>($0, ($1).x)\")\n";
                         }
                     }
                 }
