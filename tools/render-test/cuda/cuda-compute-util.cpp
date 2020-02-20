@@ -378,8 +378,9 @@ static bool _hasWriteAccess(SlangResourceAccess access)
 
     slang::TypeReflection* typeReflection = typeLayout->getResourceResultType();
 
-    const auto& textureDesc = srcEntry.textureDesc;
+    const InputTextureDesc& textureDesc = srcEntry.textureDesc;
 
+    
     // CUDA wants the unused dimensions to be 0.
     // Might need to specially handle elsewhere
     int width = textureDesc.size;
@@ -416,8 +417,10 @@ static bool _hasWriteAccess(SlangResourceAccess access)
         }
     }
 
+    const bool generateMips = !_hasWriteAccess(access);
+    
     TextureData texData;
-    generateTextureData(texData, textureDesc);
+    generateTextureData(texData, generateMips, textureDesc);
 
     auto mipLevels = texData.mipLevels;
 
@@ -921,7 +924,7 @@ static SlangResult _compute(CUcontext context, CUmodule module, const ShaderComp
                         auto type = typeLayout->getType();
                         auto shape = type->getResourceShape();
 
-                        //auto access = type->getResourceAccess();
+                        auto access = type->getResourceAccess();
 
                         switch (shape & SLANG_RESOURCE_BASE_SHAPE_MASK)
                         {
@@ -957,7 +960,14 @@ static SlangResult _compute(CUcontext context, CUmodule module, const ShaderComp
                             case SLANG_TEXTURE_3D:
                             case SLANG_TEXTURE_CUBE:
                             {
-                                *location.getUniform<CUtexObject>() = TextureCUDAResource::getTexObject(value);
+                                if (_hasWriteAccess(access))
+                                {
+                                    *location.getUniform<CUsurfObject>() = TextureCUDAResource::getSurfObject(value);
+                                }
+                                else
+                                {
+                                    *location.getUniform<CUtexObject>() = TextureCUDAResource::getTexObject(value);
+                                }
                                 break;
                             }
 

@@ -896,19 +896,19 @@ namespace renderer_test
         return writeBindings(bindRoot, layout, buffers, &fileWriter);
     }
 
-    void generateTextureData(TextureData& output, const InputTextureDesc& desc)
+    void generateTextureData(TextureData& output, bool generateMips, const InputTextureDesc& desc)
     {
         switch (desc.format)
         {
             case Format::RGBA_Unorm_UInt8:
             {
-                generateTextureDataRGB8(output, desc);
+                generateTextureDataRGB8(output, generateMips, desc);
                 break;
             }
             case Format::R_Float32:
             {
                 TextureData work;
-                generateTextureDataRGB8(work, desc);
+                generateTextureDataRGB8(work, generateMips, desc);
 
                 output.textureSize = work.textureSize;
                 output.mipLevels = work.mipLevels;
@@ -963,7 +963,7 @@ namespace renderer_test
                         buffer[i*size*size + j * size + k] = f(k, j, i);
     };
 
-    void generateTextureDataRGB8(TextureData& output, const InputTextureDesc& inputDesc)
+    void generateTextureDataRGB8(TextureData& output, bool generateMips, const InputTextureDesc& inputDesc)
     {
         int arrLen = inputDesc.arrayLength;
         if (arrLen == 0)
@@ -974,7 +974,7 @@ namespace renderer_test
             arraySize *= 6;
         output.arraySize = arraySize;
         output.textureSize = inputDesc.size;
-        output.mipLevels = Math::Log2Floor(output.textureSize) + 1;
+        output.mipLevels = generateMips ? (Math::Log2Floor(output.textureSize) + 1) : 1;
         output.dataBuffer.setCount(output.mipLevels * output.arraySize);
 
         int slice = 0;

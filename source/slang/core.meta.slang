@@ -777,6 +777,59 @@ for (int tt = 0; tt < kBaseTextureTypeCount; ++tt)
                     sb << ")$z\")\n";
 
                 }
+
+                // CUDA
+                if (isMultisample)
+                {
+                }
+                else
+                {
+                    if (access == SLANG_RESOURCE_ACCESS_READ_WRITE)
+                    {
+                        const int coordCount = kBaseTextureTypes[tt].coordCount;
+                        const int vecCount = coordCount + int(isArray);
+
+                        if( baseShape != TextureFlavor::Shape::ShapeCube )
+                        {
+                            sb << "__target_intrinsic(cuda, \"surf" << coordCount << "D";
+                            if (isArray)
+                            {
+                                sb << "Layered";
+                            }
+                            sb << "read";
+                            sb << "<$T0>($0";
+                            for (int i = 0; i < coordCount; ++i)
+                            {
+                                sb << ", ($1)";
+                                if (vecCount > 1)
+                                {
+                                    sb << '.' << char(i + 'x');
+                                }
+                            }
+                            if (isArray)
+                            {
+                                sb << ", int(($1)." << char(coordCount + 'x') << ")";
+                            }
+                            sb << ")\")\n";
+                        }
+                        else
+                        {
+                            sb << "__target_intrinsic(cuda, \"surfCubemap";
+                            if (isArray)
+                            {
+                                sb << "Layered";
+                            }
+                            sb << "read";
+                            sb << "<$T0>($0, ($1).x, ($1).y, ($1).z"; 
+                            if (isArray)
+                            {
+                                sb << ", int(($1).w)";
+                            }
+                            sb << ")\")\n";
+                        }
+                    }
+                }
+
                 sb << "T Load(";
                 sb << "int" << loadCoordCount << " location";
                 if(isMultisample)
@@ -785,6 +838,7 @@ for (int tt = 0; tt < kBaseTextureTypeCount; ++tt)
                 }
                 sb << ");\n";
 
+                // GLSL
                 if (isMultisample)
                 {
                     sb << "__glsl_extension(GL_EXT_samplerless_texture_functions)";
@@ -804,6 +858,9 @@ for (int tt = 0; tt < kBaseTextureTypeCount; ++tt)
                     }
                     sb << ", $2)$z\")\n";
                 }
+
+
+
                 sb << "T Load(";
                 sb << "int" << loadCoordCount << " location";
                 if(isMultisample)
