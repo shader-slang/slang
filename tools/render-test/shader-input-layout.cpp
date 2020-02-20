@@ -452,6 +452,12 @@ namespace renderer_test
                                     entry.textureDesc.format = format;
                                     entry.bufferDesc.format = format;
                                 }
+                                else if(word == "mipMaps")
+                                {
+                                    parser.Read("=");
+                                    entry.textureDesc.mipMapCount = int(parser.ReadInt());
+                                }
+
                                 if (parser.LookAhead(","))
                                     parser.Read(",");
                                 else
@@ -974,7 +980,12 @@ namespace renderer_test
             arraySize *= 6;
         output.arraySize = arraySize;
         output.textureSize = inputDesc.size;
-        output.mipLevels = Math::Log2Floor(output.textureSize) + 1;
+
+        const Index maxMipLevels = Math::Log2Floor(output.textureSize) + 1;
+        Index mipLevels = (inputDesc.mipMapCount <= 0) ? maxMipLevels : inputDesc.mipMapCount;
+        mipLevels = (mipLevels > maxMipLevels) ? maxMipLevels : mipLevels;
+
+        output.mipLevels = int(mipLevels); 
         output.dataBuffer.setCount(output.mipLevels * output.arraySize);
 
         int slice = 0;
