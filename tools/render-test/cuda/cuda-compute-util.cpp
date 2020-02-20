@@ -93,6 +93,12 @@ public:
         return resource ? resource->m_cudaTexObj : CUtexObject(0);
     }
 
+    static CUsurfObject getSurfObject(BindSet::Value* value)
+    {
+        auto resource = asResource(value);
+        return resource ? resource->m_cudaSurfObj : CUsurfObject(0);
+    }
+
     // The texObject is for reading 'texture' like things. This is an opaque type, that's backed by a long long
     CUtexObject m_cudaTexObj = CUtexObject();
 
@@ -738,10 +744,15 @@ static bool _hasWriteAccess(SlangResourceAccess access)
         {
             resDesc.res.mipmap.hMipmappedArray = tex->m_cudaMipMappedArray;
         }
-        
-        // If we can read, then we *probably* need to have a texture resource
-        if (_hasReadAccess(access))
+
+        if (_hasWriteAccess(access))
         {
+            // If has write access it's effectively UAV, and so doesn't have sampling available
+            SLANG_CUDA_RETURN_ON_FAIL(cuSurfObjectCreate(&tex->m_cudaSurfObj, &resDesc));
+        }
+        else
+        {
+            // If read only it's a SRV and can sample, but cannot write
             CUDA_TEXTURE_DESC texDesc;
             memset(&texDesc, 0, sizeof(CUDA_TEXTURE_DESC));
             texDesc.addressMode[0] = CU_TR_ADDRESS_MODE_WRAP;
@@ -753,10 +764,6 @@ static bool _hasWriteAccess(SlangResourceAccess access)
             SLANG_CUDA_RETURN_ON_FAIL(cuTexObjectCreate(&tex->m_cudaTexObj, &resDesc, &texDesc, nullptr));
         }
 
-        if (_hasWriteAccess(access))
-        {
-            SLANG_CUDA_RETURN_ON_FAIL(cuSurfObjectCreate(&tex->m_cudaSurfObj, &resDesc));
-        }
     }
 
     outResource = tex;
