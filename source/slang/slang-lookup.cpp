@@ -518,7 +518,11 @@ void DoLookupImpl(
                 session,
                 name, containerDeclRef, request, result, breadcrumbs);
 
-            if( auto funcDeclRef = containerDeclRef.as<FunctionDeclBase>() )
+            if( containerDeclRef.is<ConstructorDecl>() )
+            {
+                thisParameterMode = LookupResultItem::Breadcrumb::ThisParameterMode::Mutating;
+            }
+            else if( auto funcDeclRef = containerDeclRef.as<FunctionDeclBase>() )
             {
                 if( funcDeclRef.getDecl()->HasModifier<MutatingAttribute>() )
                 {

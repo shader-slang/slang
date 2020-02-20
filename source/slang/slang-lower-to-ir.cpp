@@ -804,17 +804,34 @@ LoweredValInfo emitCallToDeclRef(
 
     if( auto ctorDeclRef = funcDeclRef.as<ConstructorDecl>() )
     {
-        // HACK: we know all constructors are builtins for now,
-        // so we need to emit them as a call to the corresponding
-        // builtin operation.
-        //
-        // TODO: these should all either be intrinsic operations,
-        // or calls to library functions.
-
-        return LoweredValInfo::simple(builder->emitConstructorInst(type, argCount, args));
+        if(!ctorDeclRef.getDecl()->Body)
+        {
+            // HACK: For legacy reasons, all of the built-in initializers
+            // in the standard library are declared without proper
+            // intrinsic-op modifiers, so we will assume that an
+            // initializer without a body should map to `kIROp_Construct`.
+            //
+            // TODO: We should make all the initializers in the
+            // standard library have either a body or a proper
+            // intrinsic-op modifier.
+            //
+            // TODO: We should eliminate `kIROp_Construct` from the
+            // IR completely, in favor of more detailed/specific ops
+            // that cover the cases we actually care about.
+            //
+            return LoweredValInfo::simple(builder->emitConstructorInst(type, argCount, args));
+        }
     }
 
     // Fallback case is to emit an actual call.
+    //
+    // TODO: We are constructing a type that we expect the function
+    // being called to have here, but that type doesn't account
+    // for `in` vs. `out`/`inout` parameters, so it could easily
+    // be wrong. We should sort out why this path in the code
+    // even needs to be computing a type (rather than taking
+    // it directly from the declaration).
+    //
     if(!funcType)
     {
         List<IRType*> argTypes;
@@ -6175,15 +6192,46 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
                 }
             }
 
-            // Lower body
 
+            // We will now set about emitting the code for the body of
+            // the function/callable.
+            //
+            // In the case of an initializer ("constructor") declaration,
+            // the `this` value is not a parameter, but rather a placeholder
+            // for the value that will be returned. We thus need to set up
+            // a local variable to represent this value.
+            //
+            auto constructorDecl = as<ConstructorDecl>(decl);
+            if(constructorDecl)
+            {
+                auto thisVar = subContext->irBuilder->emitVar(irResultType);
+                subContext->thisVal = LoweredValInfo::ptr(thisVar);
+            }
+
+            // We lower whatever statement was stored on the declaration
+            // as the body of the new IR function.
+            //
             lowerStmt(subContext, decl->Body);
 
             // We need to carefully add a terminator instruction to the end
             // of the body, in case the user didn't do so.
+            //
             if (!subContext->irBuilder->getBlock()->getTerminator())
             {
-                if(as<IRVoidType>(irResultType))
+                if(constructorDecl)
+                {
+                    // A constructor declaration should return the
+                    // value of the `this` variable that was set
+                    // up at the start.
+                    //
+                    // TODO: This should also apply if any code
+                    // path in an initializer/constructor attempts
+                    // to do an early `return;`.
+                    //
+                    subContext->irBuilder->emitReturn(
+                        getSimpleVal(subContext, subContext->thisVal));
+                }
+                else if(as<IRVoidType>(irResultType))
                 {
                     // `void`-returning function can get an implicit
                     // return on exit of the body statement.

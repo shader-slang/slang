@@ -223,7 +223,7 @@ namespace Slang
         translationUnit->getModule()->_collectShaderParams();
     }
 
-    void SemanticsVisitor::dispatchStmt(Stmt* stmt, FuncDecl* parentFunc, OuterStmtInfo* outerStmts)
+    void SemanticsVisitor::dispatchStmt(Stmt* stmt, FunctionDeclBase* parentFunc, OuterStmtInfo* outerStmts)
     {
         SemanticsStmtVisitor visitor(getShared(), parentFunc, outerStmts);
         try

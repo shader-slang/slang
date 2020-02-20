@@ -35,7 +35,7 @@ namespace Slang
         };
     }
 
-    void SemanticsVisitor::checkStmt(Stmt* stmt, FuncDecl* parentDecl, OuterStmtInfo* outerStmts)
+    void SemanticsVisitor::checkStmt(Stmt* stmt, FunctionDeclBase* parentDecl, OuterStmtInfo* outerStmts)
     {
         if (!stmt) return;
         dispatchStmt(stmt, parentDecl, outerStmts);

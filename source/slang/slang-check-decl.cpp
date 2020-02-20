@@ -70,6 +70,8 @@ namespace Slang
 
         void visitAssocTypeDecl(AssocTypeDecl* decl);
 
+        void checkCallableDeclCommon(CallableDecl* decl);
+
         void visitFuncDecl(FuncDecl* funcDecl);
 
         void visitParamDecl(ParamDecl* paramDecl);
@@ -149,7 +151,7 @@ namespace Slang
 
         void visitEnumDecl(EnumDecl* decl);
 
-        void visitFuncDecl(FuncDecl* funcDecl);
+        void visitFunctionDeclBase(FunctionDeclBase* funcDecl);
 
         void visitParamDecl(ParamDecl* paramDecl);
     };
@@ -1990,11 +1992,11 @@ namespace Slang
             getSink()->diagnose(decl, Slang::Diagnostics::assocTypeInInterfaceOnly);
     }
 
-    void SemanticsDeclBodyVisitor::visitFuncDecl(FuncDecl* funcDecl)
+    void SemanticsDeclBodyVisitor::visitFunctionDeclBase(FunctionDeclBase* decl)
     {
-        if (auto body = funcDecl->Body)
+        if (auto body = decl->Body)
         {
-            checkBodyStmt(body, funcDecl);
+            checkBodyStmt(body, decl);
         }
     }
 
@@ -2546,6 +2548,14 @@ namespace Slang
         }
     }
 
+    void SemanticsDeclHeaderVisitor::checkCallableDeclCommon(CallableDecl* decl)
+    {
+        for(auto& paramDecl : decl->GetParameters())
+        {
+            ensureDecl(paramDecl, DeclCheckState::ReadyForReference);
+        }
+    }
+
     void SemanticsDeclHeaderVisitor::visitFuncDecl(FuncDecl* funcDecl)
     {
         auto resultType = funcDecl->ReturnType;
@@ -2559,10 +2569,7 @@ namespace Slang
         }
         funcDecl->ReturnType = resultType;
 
-        for (auto& para : funcDecl->GetParameters())
-        {
-            ensureDecl(para, DeclCheckState::ReadyForReference);
-        }
+        checkCallableDeclCommon(funcDecl);
     }
 
     IntegerLiteralValue SemanticsVisitor::GetMinBound(RefPtr<IntVal> val)
@@ -2700,6 +2707,7 @@ namespace Slang
             // significant, and we need to make a choice
             // sooner or later.
             //
+            ensureDecl(extDeclRef, DeclCheckState::CanUseExtensionTargetType);
             auto targetType = GetTargetType(extDeclRef);
             return calcThisType(targetType);
         }
@@ -2749,23 +2757,15 @@ namespace Slang
 
     void SemanticsDeclHeaderVisitor::visitConstructorDecl(ConstructorDecl* decl)
     {
-        for (auto& paramDecl : decl->GetParameters())
-        {
-            ensureDecl(paramDecl, DeclCheckState::CanUseTypeOfValueDecl);
-        }
-
         // We need to compute the result tyep for this declaration,
         // since it wasn't filled in for us.
         decl->ReturnType.type = findResultTypeForConstructorDecl(decl);
+
+        checkCallableDeclCommon(decl);
     }
 
     void SemanticsDeclHeaderVisitor::visitSubscriptDecl(SubscriptDecl* decl)
     {
-        for (auto& paramDecl : decl->GetParameters())
-        {
-            ensureDecl(paramDecl, DeclCheckState::CanUseTypeOfValueDecl);
-        }
-
         decl->ReturnType = CheckUsableType(decl->ReturnType);
 
         // If we have a subscript declaration with no accessor declarations,
@@ -2789,6 +2789,8 @@ namespace Slang
             getterDecl->ParentDecl = decl;
             decl->Members.add(getterDecl);
         }
+
+        checkCallableDeclCommon(decl);
     }
 
     void SemanticsDeclHeaderVisitor::visitAccessorDecl(AccessorDecl* decl)
@@ -2808,6 +2810,8 @@ namespace Slang
         {
             getSink()->diagnose(decl, Diagnostics::accessorMustBeInsideSubscriptOrProperty);
         }
+
+        checkCallableDeclCommon(decl);
     }
 
     GenericDecl* SemanticsVisitor::GetOuterGeneric(Decl* decl)
