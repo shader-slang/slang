@@ -204,3 +204,11 @@ RAW(
     List<TypeExp> caseTypes;
 )
 END_SYNTAX_CLASS()
+
+    /// A type expression of the form `This`
+    ///
+    /// Refers to the type of `this` in the current context.
+    ///
+SYNTAX_CLASS(ThisTypeExpr, Expr)
+    FIELD(RefPtr<Scope>, scope);
+END_SYNTAX_CLASS()

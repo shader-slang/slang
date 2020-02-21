@@ -1794,6 +1794,19 @@ namespace Slang
         return parseTaggedUnionType(parser);
     }
 
+        /// Parse a `This` type expression
+    static RefPtr<Expr> parseThisTypeExpr(Parser* parser)
+    {
+        RefPtr<ThisTypeExpr> expr = new ThisTypeExpr();
+        expr->scope = parser->currentScope;
+        return expr;
+    }
+
+    static RefPtr<RefObject> parseThisTypeExpr(Parser* parser, void* /*userData*/)
+    {
+        return parseThisTypeExpr(parser);
+    }
+
     static TypeSpec parseTypeSpec(Parser* parser)
     {
         TypeSpec typeSpec;
@@ -1846,6 +1859,11 @@ namespace Slang
         else if(AdvanceIf(parser, "__TaggedUnion"))
         {
             typeSpec.expr = parseTaggedUnionType(parser);
+            return typeSpec;
+        }
+        else if(AdvanceIf(parser, "This"))
+        {
+            typeSpec.expr = parseThisTypeExpr(parser);
             return typeSpec;
         }
 
@@ -4995,6 +5013,7 @@ namespace Slang
         addBuiltinSyntax<Expr>(session, scope, #KEYWORD, &CALLBACK)
 
         EXPR(this,  parseThisExpr);
+        EXPR(This,  parseThisTypeExpr);
         EXPR(true,  parseTrueExpr);
         EXPR(false, parseFalseExpr);
         EXPR(__TaggedUnion, parseTaggedUnionType);

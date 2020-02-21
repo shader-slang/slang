@@ -1677,6 +1677,12 @@ namespace Slang
                     expr->type.IsLeftValue = true;
                 }
             }
+            else if( auto typeOrExtensionDecl = as<AggTypeDeclBase>(containerDecl) )
+            {
+                expr->type.type = calcThisType(makeDeclRef(typeOrExtensionDecl));
+                return expr;
+            }
+#if 0
             else if (auto aggTypeDecl = as<AggTypeDecl>(containerDecl))
             {
                 ensureDecl(aggTypeDecl, DeclCheckState::CanUseAsType);
@@ -1706,6 +1712,7 @@ namespace Slang
                 expr->type.type = extensionDecl->targetType.type;
                 return expr;
             }
+#endif
 
             scope = scope->parent;
         }
@@ -1713,4 +1720,27 @@ namespace Slang
         getSink()->diagnose(expr, Diagnostics::thisExpressionOutsideOfTypeDecl);
         return CreateErrorExpr(expr);
     }
+
+    RefPtr<Expr> SemanticsExprVisitor::visitThisTypeExpr(ThisTypeExpr* expr)
+    {
+        auto scope = expr->scope;
+        while (scope)
+        {
+            auto containerDecl = scope->containerDecl;
+            if( auto typeOrExtensionDecl = as<AggTypeDeclBase>(containerDecl) )
+            {
+                auto thisType = calcThisType(makeDeclRef(typeOrExtensionDecl));
+                auto thisTypeType = getTypeType(thisType);
+
+                expr->type.type = thisTypeType;
+                return expr;
+            }
+
+            scope = scope->parent;
+        }
+
+        getSink()->diagnose(expr, Diagnostics::thisTypeOutsideOfTypeDecl);
+        return CreateErrorExpr(expr);
+    }
+
 }
