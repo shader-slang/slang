@@ -348,12 +348,17 @@ struct TextureCubeArray
 struct IRWTexture1D
 {
     virtual void Load(int32_t loc, void* out) = 0;
+    
+        /// Get the element at the specified location
+    virtual void* getAt(int32_t loc) = 0;
 };
 
 template <typename T>
 struct RWTexture1D
 {
     T Load(int32_t loc) const { T out; texture->Load(loc, &out); return out; }
+    
+    T& operator[](int32_t loc) { return *(T*)texture->getAt(loc); }
     
     IRWTexture1D* texture;              
 };

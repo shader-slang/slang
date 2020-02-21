@@ -301,6 +301,12 @@ public:
         }
     }
 
+    float* getAt(const int32_t* location)
+    {
+        const Index index = _getIndex(location);
+        return &m_values[index];
+    }
+
     void getAt(const int32_t* location, float* dst)
     {
         const Index index = _getIndex(location);
@@ -354,6 +360,7 @@ public:
 struct FloatRWTexture1D : public CPUComputeUtil::Resource, public CPPPrelude::IRWTexture1D
 {
     virtual void Load(int32_t loc, void* out) SLANG_OVERRIDE { m_data.getAt(&loc, (float*)out); }
+    virtual void* getAt(int32_t loc) { return m_data.getAt(&loc); }
 
     FloatRWTexture1D(int elementCount, int dimsCount, const int32_t* dims, float initialValue)
     {
