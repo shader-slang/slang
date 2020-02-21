@@ -1363,6 +1363,7 @@ namespace Slang
         RefPtr<Expr> visitInitializerListExpr(InitializerListExpr* expr);
 
         RefPtr<Expr> visitThisExpr(ThisExpr* expr);
+        RefPtr<Expr> visitThisTypeExpr(ThisTypeExpr* expr);
     };
 
     struct SemanticsStmtVisitor
