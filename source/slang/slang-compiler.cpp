@@ -1671,9 +1671,7 @@ SlangResult dissassembleDXILUsingDXC(
                         assembly);
 
                     maybeDumpIntermediate(compileRequest, assembly.getBuffer(), target);
-
-                    // Write as text, even if stored in uint8_t array
-                    result = CompileResult(UnownedStringSlice((const char*)code.getBuffer(), code.getCount()));
+                    result = CompileResult(assembly);
                 }
             }
             break;
