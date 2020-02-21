@@ -33,6 +33,7 @@ struct InputTextureDesc
     bool isDepthTexture = false;
     bool isRWTexture = false;
     int size = 4;
+    int mipMapCount = 0;            ///< 0 means the maximum number of mips will be bound
 
     Format format = Format::RGBA_Unorm_UInt8;            
 

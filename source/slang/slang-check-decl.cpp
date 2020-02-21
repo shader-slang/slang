@@ -829,9 +829,76 @@ namespace Slang
     {
         if (auto initExpr = varDecl->initExpr)
         {
+            // If the variable has an explicit initial-value expression,
+            // then we simply need to check that expression and coerce
+            // it to the tyep of the variable.
+            //
             initExpr = CheckTerm(initExpr);
             initExpr = coerce(varDecl->type.Ptr(), initExpr);
             varDecl->initExpr = initExpr;
+        }
+        else
+        {
+            // If a variable doesn't have an explicit initial-value
+            // expression, it is still possible that it should
+            // be initialized implicitly, because the type of the
+            // variable has a default (zero parameter) initializer.
+            // That is, for types where it is possible, we will
+            // treat a variable declared like this:
+            //
+            //      MyType myVar;
+            //
+            // as if it were declared as:
+            //
+            //      MyType myVar = MyType();
+            //
+            // Rather than try to code up an ad hoc search for an
+            // appropriate initializer here, we will instead fall
+            // back on the general-purpose overload-resolution
+            // machinery, which can handle looking up initializers
+            // and filtering them to ones that are applicable
+            // to our "call site" with zero arguments.
+            //
+            auto type = varDecl->getType();
+
+            OverloadResolveContext overloadContext;
+            overloadContext.loc = varDecl->nameAndLoc.loc;
+            overloadContext.mode = OverloadResolveContext::Mode::JustTrying;
+            AddTypeOverloadCandidates(type, overloadContext);
+
+            if(overloadContext.bestCandidates.getCount() != 0)
+            {
+                // If there were multiple equally-good candidates to call,
+                // then might have an ambiguity.
+                //
+                // Before issuing any kind of diagnostic we need to check
+                // if any of those candidates are actually applicable,
+                // because if they aren't then we actually just have
+                // an uninitialized varaible.
+                //
+                if(overloadContext.bestCandidates[0].status != OverloadCandidate::Status::Applicable)
+                    return;
+
+                getSink()->diagnose(varDecl, Diagnostics::ambiguousDefaultInitializerForType, type);
+            }
+            else if(overloadContext.bestCandidate)
+            {
+                // If we are in the single-candidate case, then we again
+                // want to ignore the case where that candidate wasn't
+                // actually applicable, because declaring a variable
+                // of a type that *doesn't* have a default initializer
+                // isn't actually an error.
+                //
+                if(overloadContext.bestCandidate->status != OverloadCandidate::Status::Applicable)
+                    return;
+
+                // If we had a single best candidate *and* it was applicable,
+                // then we use it to construct a new initial-value expression
+                // for the variable, that will be used for all downstream
+                // code generation.
+                //
+                varDecl->initExpr = CompleteOverloadCandidate(overloadContext, *overloadContext.bestCandidate);
+            }
         }
     }
 

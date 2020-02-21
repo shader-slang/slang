@@ -6,6 +6,10 @@
 //DISABLE_TEST(compute, vulkan):COMPARE_COMPUTE_EX:-vk -compute
 //TEST(compute):COMPARE_COMPUTE_EX:-cuda -compute 
 
+// Doesn't work on CUDA, not clear why yet
+//DISABLE_TEST_INPUT: Texture1D(format=R_Float32, size=4, content = one, mipMaps=1):name tLoad1D
+//Texture1D<float> tLoad1D;
+
 //TEST_INPUT: Texture1D(size=4, content = one):name t1D
 Texture1D<float> t1D;
 //TEST_INPUT: Texture2D(size=4, content = one):name t2D
@@ -35,6 +39,7 @@ void computeMain(uint3 dispatchThreadID : SV_DispatchThreadID)
     float u = idx * (1.0f / 4);
     
     float val = 0.0f;
+   
     val += t1D.SampleLevel(samplerState, u, 0);
     val += t2D.SampleLevel(samplerState, float2(u, u), 0);
     val += t3D.SampleLevel(samplerState, float3(u, u, u), 0);
@@ -43,6 +48,8 @@ void computeMain(uint3 dispatchThreadID : SV_DispatchThreadID)
     val += t1DArray.SampleLevel(samplerState, float2(u, 0), 0);
     val += t2DArray.SampleLevel(samplerState, float3(u, u, 0), 0);
     val += tCubeArray.SampleLevel(samplerState, float4(u, u, u, 0), 0);
+ 
+    //val += tLoad1D.Load(int2(idx, 0));
  
     outputBuffer[idx] = val;
 }

@@ -343,6 +343,21 @@ struct TextureCubeArray
     ITextureCubeArray* texture;              
 };
 
+/* !!!!!!!!!!!!!!!!!!!!!!!!!!! RWTexture !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! */
+
+struct IRWTexture1D
+{
+    virtual void Load(int32_t loc, void* out) = 0;
+};
+
+template <typename T>
+struct RWTexture1D
+{
+    T Load(int32_t loc) const { T out; texture->Load(loc, &out); return out; }
+    
+    IRWTexture1D* texture;              
+};
+
 /* Varying input for Compute */
 
 /* Used when running a single thread */
