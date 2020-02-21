@@ -247,19 +247,61 @@ struct ValueTextureCubeArray : public CPUComputeUtil::Resource, public CPPPrelud
     float m_value;
 };
 
-static CPUComputeUtil::Resource* _newValueTexture(SlangResourceShape shape, int elemCount, float value)
+
+template <int COUNT>
+struct ValueRWTexture1D : public CPUComputeUtil::Resource, public CPPPrelude::IRWTexture1D
+{
+    void set(void* out)
+    {
+        float* dst = (float*)out;
+        for (int i = 0; i < COUNT; ++i)
+        {
+            dst[i] = m_value;
+        }
+    }
+
+    virtual void Load(int32_t loc, void* out) SLANG_OVERRIDE
+    {
+        set(out);
+    }
+
+    ValueRWTexture1D(float value) :
+        m_value(value)
+    {
+        m_interface = static_cast<CPPPrelude::IRWTexture1D*>(this);
+    }
+
+    float m_value;
+};
+
+
+static CPUComputeUtil::Resource* _newValueTexture(SlangResourceShape shape, SlangResourceAccess access, Index elemCount, float value)
 {
     switch (shape)
     {
         case SLANG_TEXTURE_1D:
         {
-            switch (elemCount)
+            if (access == SLANG_RESOURCE_ACCESS_READ_WRITE)
             {
-                case 1: return new ValueTexture1D<1>(value);
-                case 2: return new ValueTexture1D<2>(value);
-                case 3: return new ValueTexture1D<3>(value);
-                case 4: return new ValueTexture1D<4>(value);
-                default: break;
+                switch (elemCount)
+                {
+                    case 1: return new ValueRWTexture1D<1>(value);
+                    case 2: return new ValueRWTexture1D<2>(value);
+                    case 3: return new ValueRWTexture1D<3>(value);
+                    case 4: return new ValueRWTexture1D<4>(value);
+                    default: break;
+                }
+            }
+            else
+            {
+                switch (elemCount)
+                {
+                    case 1: return new ValueTexture1D<1>(value);
+                    case 2: return new ValueTexture1D<2>(value);
+                    case 3: return new ValueTexture1D<3>(value);
+                    case 4: return new ValueTexture1D<4>(value);
+                    default: break;
+                }
             }
             break;
         }
@@ -388,7 +430,7 @@ static CPUComputeUtil::Resource* _newValueTexture(SlangResourceShape shape, int 
                         auto type = typeLayout->getType();
                         auto shape = type->getResourceShape();
 
-                        //auto access = type->getResourceAccess();
+                        auto access = type->getResourceAccess();
 
                         auto baseShape = shape & SLANG_RESOURCE_BASE_SHAPE_MASK;
                         switch (baseShape)
@@ -407,22 +449,22 @@ static CPUComputeUtil::Resource* _newValueTexture(SlangResourceShape shape, int 
 
                                 slang::TypeReflection* typeReflection = typeLayout->getResourceResultType();
 
-                                int count = 1;
+                                Index count = 1;
                                 if (typeReflection->getKind() == slang::TypeReflection::Kind::Vector)
                                 {
-                                    count = int(typeReflection->getElementCount());
+                                    count = Index(typeReflection->getElementCount());
                                 }
 
                                 switch (srcEntry.textureDesc.content)
                                 {
                                     case InputTextureContent::One:
                                     {
-                                        value->m_target = _newValueTexture(shape, count, 1.0f);
+                                        value->m_target = _newValueTexture(shape, access, count, 1.0f);
                                         break;                                        
                                     }
                                     case InputTextureContent::Zero:
                                     {
-                                        value->m_target = _newValueTexture(shape, count, 0.0f);
+                                        value->m_target = _newValueTexture(shape, access, count, 0.0f);
                                         break;
                                     }
                                     default: break;
