@@ -300,16 +300,24 @@ GLSLSystemValueInfo* getGLSLSystemValueInfo(
     }
     else if(semanticName == "sv_coverage")
     {
-        // TODO: deal with `gl_SampleMaskIn` when used as an input.
-
-        // TODO: type conversion is required here.
-
         // uint in hlsl, int in glsl
         // https://www.opengl.org/sdk/docs/manglsl/docbook4/xhtml/gl_SampleMask.xml
 
         requiredType = builder->getBasicType(BaseType::Int);
 
-        name = "gl_SampleMask";
+        // Note: `gl_SampleMask` is actually an *array* of `int`,
+        // rather than a single scalar. Because HLSL `SV_Coverage`
+        // on allows for a 32 bits worth of coverage, we will
+        // only use the first array element in the generated GLSL.
+
+        if( kind == LayoutResourceKind::VaryingInput )
+        {
+            name = "gl_SampleMaskIn[0]";
+        }
+        else
+        {
+            name = "gl_SampleMask[0]";
+        }
     }
     else if(semanticName == "sv_depth")
     {
