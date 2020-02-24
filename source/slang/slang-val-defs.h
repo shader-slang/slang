@@ -41,6 +41,24 @@ SYNTAX_CLASS(GenericParamIntVal, IntVal)
 )
 END_SYNTAX_CLASS()
 
+    /// An unknown integer value indicating an erroneous sub-expression
+SYNTAX_CLASS(ErrorIntVal, IntVal)
+
+    // TODO: We should probably eventually just have an `ErrorVal` here
+    // and have all `Val`s that represent ordinary values hold their
+    // `Type` so that we can have an `ErrorVal` of any type.
+
+    RAW(
+    ErrorIntVal()
+    {}
+
+    virtual bool EqualsVal(Val* val) override;
+    virtual String ToString() override;
+    virtual int GetHashCode() override;
+    virtual RefPtr<Val> SubstituteImpl(SubstitutionSet subst, int* ioDiff) override;
+)
+END_SYNTAX_CLASS()
+
 // A witness to the fact that some proposition is true, encoded
 // at the level of the type system.
 //

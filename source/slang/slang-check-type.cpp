@@ -105,9 +105,22 @@ namespace Slang
         return ExpectAType(exp);
     }
 
+    RefPtr<IntVal> SemanticsVisitor::ExtractGenericArgInteger(RefPtr<Expr> exp, DiagnosticSink* sink)
+    {
+        RefPtr<IntVal> val = CheckIntegerConstantExpression(exp.Ptr(), sink);
+        if(val) return val;
+
+        // If the argument expression could not be coerced to an integer
+        // constant expression in context, then we will instead construct
+        // a dummy "error" value to represent the result.
+        //
+        val = new ErrorIntVal();
+        return val;
+    }
+
     RefPtr<IntVal> SemanticsVisitor::ExtractGenericArgInteger(RefPtr<Expr> exp)
     {
-        return CheckIntegerConstantExpression(exp.Ptr());
+        return ExtractGenericArgInteger(exp, getSink());
     }
 
     RefPtr<Val> SemanticsVisitor::ExtractGenericArgVal(RefPtr<Expr> exp)

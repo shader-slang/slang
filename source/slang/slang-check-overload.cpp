@@ -196,7 +196,7 @@ namespace Slang
                 }
 
                 arg = coerce(GetType(valParamRef), arg);
-                auto val = ExtractGenericArgInteger(arg);
+                auto val = ExtractGenericArgInteger(arg, context.mode == OverloadResolveContext::Mode::JustTrying ? nullptr : getSink());
                 checkedArgs.add(val);
             }
             else

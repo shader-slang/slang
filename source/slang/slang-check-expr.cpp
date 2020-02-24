@@ -828,7 +828,7 @@ namespace Slang
         return TryConstantFoldExpr(exp);
     }
 
-    RefPtr<IntVal> SemanticsVisitor::CheckIntegerConstantExpression(Expr* inExpr)
+    RefPtr<IntVal> SemanticsVisitor::CheckIntegerConstantExpression(Expr* inExpr, DiagnosticSink* sink)
     {
         // No need to issue further errors if the expression didn't even type-check.
         if(IsErrorExpr(inExpr)) return nullptr;
@@ -840,11 +840,16 @@ namespace Slang
         if(IsErrorExpr(expr)) return nullptr;
 
         auto result = TryCheckIntegerConstantExpression(expr.Ptr());
-        if (!result)
+        if (!result && sink)
         {
-            getSink()->diagnose(expr, Diagnostics::expectedIntegerConstantNotConstant);
+            sink->diagnose(expr, Diagnostics::expectedIntegerConstantNotConstant);
         }
         return result;
+    }
+
+    RefPtr<IntVal> SemanticsVisitor::CheckIntegerConstantExpression(Expr* inExpr)
+    {
+        return CheckIntegerConstantExpression(inExpr, getSink());
     }
 
     RefPtr<IntVal> SemanticsVisitor::CheckEnumConstantExpression(Expr* expr)
