@@ -903,6 +903,68 @@ for (int tt = 0; tt < kBaseTextureTypeCount; ++tt)
                 // subscript operator
                 sb << "__subscript(" << uintN << " location) -> T {\n";
 
+                // CUDA
+                if (isMultisample)
+                {
+                }
+                else 
+                {
+                    if (access == SLANG_RESOURCE_ACCESS_READ_WRITE)
+                    {
+                        for (int readWrite = 0; readWrite < 2; ++readWrite)
+                        {
+                            const bool isRead = (readWrite == 0);
+
+                            const int coordCount = kBaseTextureTypes[tt].coordCount;
+                            const int vecCount = coordCount + int(isArray);
+
+                            sb << "__target_intrinsic(cuda, \"";
+
+                            sb << "surf";
+                            if( baseShape != TextureFlavor::Shape::ShapeCube )
+                            {
+                                sb << coordCount << "D";
+                            }
+                            else
+                            {
+                                sb << "Cubemap";
+                            }
+
+                            sb << (isArray ? "Layered" : "");
+
+                            if (isRead)
+                            {
+                                sb << "read<$T0>($0";
+                            }
+                            else
+                            {
+                                sb << "write<$T0>($2, $0";
+                            }
+
+                            for (int i = 0; i < vecCount; ++i)
+                            {
+                                sb << ", ($1)";
+                                if (vecCount > 1)
+                                {
+                                    sb << '.' << char(i + 'x');
+                                }
+                            }
+
+                            sb << ", SLANG_CUDA_BOUNDARY_MODE)\") ";
+                            sb << (isRead ? " get;\n" : " set;\n");
+                        }
+                    }
+                    else if (access == SLANG_RESOURCE_ACCESS_READ)
+                    {
+                        // We can allow this on Texture1D
+                        if( baseShape == TextureFlavor::Shape::Shape1D && isArray == false)
+                        {
+                            sb << "__target_intrinsic(cuda, \"tex1Dfetch<$T0>($0, $1)\") get;\n";
+                        }
+                    }
+                }
+
+
                 // GLSL/SPIR-V distinguished sampled vs. non-sampled images
                 switch( access )
                 {
