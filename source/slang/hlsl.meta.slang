@@ -1605,6 +1605,8 @@ static const RAY_FLAG RAY_FLAG_CULL_BACK_FACING_TRIANGLES       = 0x10;
 static const RAY_FLAG RAY_FLAG_CULL_FRONT_FACING_TRIANGLES      = 0x20;
 static const RAY_FLAG RAY_FLAG_CULL_OPAQUE                      = 0x40;
 static const RAY_FLAG RAY_FLAG_CULL_NON_OPAQUE                  = 0x80;
+static const RAY_FLAG RAY_FLAG_SKIP_TRIANGLES                   = 0x100;
+static const RAY_FLAG RAY_FLAG_SKIP_PROCEDURAL_PRIMITIVES       = 0x200;
 
 // 10.1.2 - Ray Description Structure
 
