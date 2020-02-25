@@ -325,20 +325,66 @@ struct TriangleStream
     void RestartStrip();
 };
 
-// Note(tfoley): Trying to systematically add all the HLSL builtins
+#define VECTOR_MAP_UNARY(TYPE, COUNT, FUNC, VALUE) \
+    vector<TYPE,COUNT> result; for(int i = 0; i < COUNT; ++i) { result[i] = FUNC(VALUE[i]); } return result
+    
+#define MATRIX_MAP_UNARY(TYPE, ROWS, COLS, FUNC, VALUE) \
+    matrix<TYPE,ROWS,COLS> result; for(int i = 0; i < ROWS; ++i) { result[i] = FUNC(VALUE[i]); } return result
+
+#define VECTOR_MAP_BINARY(TYPE, COUNT, FUNC, LEFT, RIGHT) \
+    vector<TYPE,COUNT> result; for(int i = 0; i < COUNT; ++i) { result[i] = FUNC(LEFT[i], RIGHT[i]); } return result
+    
+#define MATRIX_MAP_BINARY(TYPE, ROWS, COLS, FUNC, LEFT, RIGHT) \
+    matrix<TYPE,ROWS,COLS> result; for(int i = 0; i < ROWS; ++i) { result[i] = FUNC(LEFT[i], RIGHT[i]); } return result
+
+#define VECTOR_MAP_TRINARY(TYPE, COUNT, FUNC, A, B, C) \
+    vector<TYPE,COUNT> result; for(int i = 0; i < COUNT; ++i) { result[i] = FUNC(A[i], B[i], C[i]); } return result
+    
+#define MATRIX_MAP_TRINARY(TYPE, ROWS, COLS, FUNC, A, B, C) \
+    matrix<TYPE,ROWS,COLS> result; for(int i = 0; i < ROWS; ++i) { result[i] = FUNC(A[i], B[i], C[i]); } return result
 
 // Try to terminate the current draw or dispatch call (HLSL SM 4.0)
 void abort();
 
 // Absolute value (HLSL SM 1.0)
-__generic<T : __BuiltinSignedArithmeticType> T abs(T x);
-__generic<T : __BuiltinSignedArithmeticType, let N : int> vector<T,N> abs(vector<T,N> x);
-__generic<T : __BuiltinSignedArithmeticType, let N : int, let M : int> matrix<T,N,M> abs(matrix<T,N,M> x);
+
+__generic<T : __BuiltinSignedArithmeticType>
+T abs(T x);
+
+__generic<T : __BuiltinSignedArithmeticType, let N : int>
+__target_intrinsic(hlsl)
+__target_intrinsic(glsl)
+vector<T, N> abs(vector<T, N> x)
+{
+    VECTOR_MAP_UNARY(T, N, abs, x);
+}
+
+__generic<T : __BuiltinSignedArithmeticType, let N : int, let M : int>
+__target_intrinsic(hlsl)
+matrix<T,N,M> abs(matrix<T,N,M> x)
+{
+    MATRIX_MAP_UNARY(T, N, M, abs, x);
+}
 
 // Inverse cosine (HLSL SM 1.0)
-__generic<T : __BuiltinFloatingPointType> T acos(T x);
-__generic<T : __BuiltinFloatingPointType, let N : int> vector<T,N> acos(vector<T,N> x);
-__generic<T : __BuiltinFloatingPointType, let N : int, let M : int> matrix<T,N,M> acos(matrix<T,N,M> x);
+
+__generic<T : __BuiltinFloatingPointType>
+T acos(T x);
+
+__generic<T : __BuiltinFloatingPointType, let N : int>
+__target_intrinsic(hlsl)
+__target_intrinsic(glsl)
+vector<T, N> acos(vector<T, N> x)
+{
+    VECTOR_MAP_UNARY(T, N, acos, x);
+}
+
+__generic<T : __BuiltinFloatingPointType, let N : int, let M : int>
+__target_intrinsic(hlsl)
+matrix<T, N, M> acos(matrix<T, N, M> x)
+{
+    MATRIX_MAP_UNARY(T, N, M, acos, x);
+}
 
 // Test if all components are non-zero (HLSL SM 1.0)
 __generic<T : __BuiltinType> bool all(T x);
@@ -362,193 +408,398 @@ __target_intrinsic(glsl, "bool($0)")
 bool any(T x);
 
 __generic<T : __BuiltinType, let N : int>
+__target_intrinsic(hlsl)
 __target_intrinsic(glsl, "any(bvec$N0($0))")
-bool any(vector<T,N> x);
+bool any(vector<T, N> x);
+// TODO: implementation of `any()` in the stdlib is
+// blocked on fixing implementation of `bool` vector
+// `getAt` on the CUDA codegen path.
+/*
+{
+    bool result = false;
+    for(int i = 0; i < N; ++i)
+        result = result || any(x[i]);
+    return result;
+}
+*/
 
 __generic<T : __BuiltinType, let N : int, let M : int>
-// TODO: need to define GLSL mapping
-bool any(matrix<T,N,M> x);
+__target_intrinsic(hlsl)
+bool any(matrix<T, N, M> x);
+/*
+{
+    bool result = false;
+    for(int i = 0; i < N; ++i)
+        result = result || any(x[i]);
+    return result;
+}
+*/
 
 
 // Reinterpret bits as a double (HLSL SM 5.0)
 
+__target_intrinsic(hlsl)
 __target_intrinsic(glsl, "packDouble2x32(uvec2($0, $1))")
 __glsl_extension(GL_ARB_gpu_shader5)
 double asdouble(uint lowbits, uint highbits);
 
-double asdouble(uint lowbits, uint highbits);
-
 // Reinterpret bits as a float (HLSL SM 4.0)
 
-// GLSL Scalar
+__target_intrinsic(hlsl)
 __target_intrinsic(glsl, "intBitsToFloat")
 float asfloat(int x);
+
+__target_intrinsic(hlsl)
 __target_intrinsic(glsl, "uintBitsToFloat")
 float asfloat(uint x);
 
-// GLSL Vector
 __generic<let N : int>
+__target_intrinsic(hlsl)
 __target_intrinsic(glsl, "intBitsToFloat")
-vector<float,N> asfloat(vector< int,N> x);
+vector<float, N> asfloat(vector< int, N> x)
+{
+    VECTOR_MAP_UNARY(float, N, asfloat, x);
+}
+
 __generic<let N : int>
+__target_intrinsic(hlsl)
 __target_intrinsic(glsl, "uintBitsToFloat")
-vector<float,N> asfloat(vector<uint,N> x);
+vector<float,N> asfloat(vector<uint,N> x)
+{
+    VECTOR_MAP_UNARY(float, N, asfloat, x);
+}
+
+__generic<let N : int, let M : int>
+__target_intrinsic(hlsl)
+matrix<float,N,M> asfloat(matrix< int,N,M> x)
+{
+    MATRIX_MAP_UNARY(float, N, M, asfloat, x);
+}
+
+__generic<let N : int, let M : int>
+__target_intrinsic(hlsl)
+matrix<float,N,M> asfloat(matrix<uint,N,M> x)
+{
+    MATRIX_MAP_UNARY(float, N, M, asfloat, x);
+}
 
 // No op
 __intrinsic_op($(kCompoundIntrinsicOp_Pos))
 float asfloat(float x);
+
 __generic<let N : int>
 __intrinsic_op($(kCompoundIntrinsicOp_Pos))
 vector<float,N> asfloat(vector<float,N> x);
+
 __generic<let N : int, let M : int>
 __intrinsic_op($(kCompoundIntrinsicOp_Pos))
 matrix<float,N,M> asfloat(matrix<float,N,M> x);
 
-// Pass thru to HLSL
-float asfloat(uint x);
-float asfloat(int x);
-__generic<let N : int, let M : int> matrix<float,N,M> asfloat(matrix< int,N,M> x);
-__generic<let N : int, let M : int> matrix<float,N,M> asfloat(matrix<uint,N,M> x);
-
 // Inverse sine (HLSL SM 1.0)
-__generic<T : __BuiltinFloatingPointType> T asin(T x);
-__generic<T : __BuiltinFloatingPointType, let N : int> vector<T,N> asin(vector<T,N> x);
-__generic<T : __BuiltinFloatingPointType, let N : int, let M : int> matrix<T,N,M> asin(matrix<T,N,M> x);
+__generic<T : __BuiltinFloatingPointType>
+__target_intrinsic(hlsl)
+__target_intrinsic(glsl)
+T asin(T x);
+
+__generic<T : __BuiltinFloatingPointType, let N : int>
+__target_intrinsic(hlsl)
+__target_intrinsic(glsl)
+vector<T, N> asin(vector<T, N> x)
+{
+    VECTOR_MAP_UNARY(T,N,asin,x);
+}
+
+__generic<T : __BuiltinFloatingPointType, let N : int, let M : int>
+__target_intrinsic(hlsl)
+matrix<T, N, M> asin(matrix<T, N, M> x)
+{
+    MATRIX_MAP_UNARY(T,N,M,asin,x);
+}
 
 // Reinterpret bits as an int (HLSL SM 4.0)
 
-// GLSL scalar
+__target_intrinsic(hlsl)
 __target_intrinsic(glsl, "floatBitsToInt")
 int asint(float x);
+
+__target_intrinsic(hlsl)
 __target_intrinsic(glsl, "int($0)")
 int asint(uint x);
 
-// GLSL Vector
 __generic<let N : int>
+__target_intrinsic(hlsl)
 __target_intrinsic(glsl, "floatBitsToInt")
-vector<int,N> asint(vector<float,N> x);
+vector<int, N> asint(vector<float, N> x)
+{
+    VECTOR_MAP_UNARY(int, N, asint, x);
+}
+
 __generic<let N : int>
+__target_intrinsic(hlsl)
 __target_intrinsic(glsl, "ivec$N0($0)")
-vector<int,N> asint(vector<uint,N> x);
+vector<int, N> asint(vector<uint, N> x)
+{
+    VECTOR_MAP_UNARY(int, N, asint, x);
+}
+
+__generic<let N : int, let M : int>
+__target_intrinsic(hlsl)
+matrix<int, N, M> asint(matrix<float, N, M> x)
+{
+    MATRIX_MAP_UNARY(int, N, M, asint, x);
+}
+
+__generic<let N : int, let M : int>
+__target_intrinsic(hlsl)
+matrix<int, N, M> asint(matrix<uint, N, M> x)
+{
+    MATRIX_MAP_UNARY(int, N, M, asint, x);
+}
 
 // No op
 __intrinsic_op($(kCompoundIntrinsicOp_Pos))
 int asint(int x);
+
 __generic<let N : int>
 __intrinsic_op($(kCompoundIntrinsicOp_Pos))
 vector<int,N> asint(vector<int,N> x);
+
 __generic<let N : int, let M : int>
 __intrinsic_op($(kCompoundIntrinsicOp_Pos))
 matrix<int,N,M> asint(matrix<int,N,M> x);
 
-// Pass thru HLSL
-
-int asint(float x);
-int asint(uint x);
-
-__generic<let N : int> vector<int,N> asint(vector<uint,N> x);
-__generic<let N : int, let M : int> matrix<int,N,M> asint(matrix<float,N,M> x);
-__generic<let N : int, let M : int> matrix<int,N,M> asint(matrix<uint,N,M> x);
-
 // Reinterpret bits of double as a uint (HLSL SM 5.0)
 
+__target_intrinsic(hlsl)
 __target_intrinsic(glsl, "{ uvec2 v = unpackDouble2x32($0); $1 = v.x; $2 = v.y; }")
 __glsl_extension(GL_ARB_gpu_shader5)
 void asuint(double value, out uint lowbits, out uint highbits);
 
-void asuint(double value, out uint lowbits, out uint highbits);
-
 // Reinterpret bits as a uint (HLSL SM 4.0)
 
-// GLSL Scalar
+__target_intrinsic(hlsl)
 __target_intrinsic(glsl, "floatBitsToUint")
 uint asuint(float x);
+
+__target_intrinsic(hlsl)
 __target_intrinsic(glsl, "uint($0)")
 uint asuint(int x);
 
-// GLSL Vector
 __generic<let N : int>
+__target_intrinsic(hlsl)
 __target_intrinsic(glsl, "floatBitsToUint")
-vector<uint,N> asuint(vector<float,N> x);
-__generic<let N : int>
-__target_intrinsic(glsl, "uvec$N0($0)")
-vector<uint,N> asuint(vector<int,N> x);
+vector<uint,N> asuint(vector<float,N> x)
+{
+    VECTOR_MAP_UNARY(uint, N, asuint, x);
+}
 
-// No op
+__generic<let N : int>
+__target_intrinsic(hlsl)
+__target_intrinsic(glsl, "uvec$N0($0)")
+vector<uint, N> asuint(vector<int, N> x)
+{
+    VECTOR_MAP_UNARY(uint, N, asuint, x);
+}
+
+__generic<let N : int, let M : int>
+__target_intrinsic(hlsl)
+matrix<uint,N,M> asuint(matrix<float,N,M> x)
+{
+    MATRIX_MAP_UNARY(uint, N, M, asuint, x);
+}
+
+__generic<let N : int, let M : int>
+__target_intrinsic(hlsl)
+matrix<uint, N, M> asuint(matrix<int, N, M> x)
+{
+    MATRIX_MAP_UNARY(uint, N, M, asuint, x);
+}
+
 __intrinsic_op($(kCompoundIntrinsicOp_Pos))
 uint asuint(uint x);
+
 __generic<let N : int>
 __intrinsic_op($(kCompoundIntrinsicOp_Pos))
 vector<uint,N> asuint(vector<uint,N> x);
+
 __generic<let N : int, let M : int>
 __intrinsic_op($(kCompoundIntrinsicOp_Pos))
 matrix<uint,N,M> asuint(matrix<uint,N,M> x);
 
-// Pass thru HLSL
-uint asuint(float x);
-uint asuint(int x);
-
-__generic<let N : int> vector<uint,N> asuint(vector<float,N> x);
-__generic<let N : int> vector<uint,N> asuint(vector<int,N> x);
-
-__generic<let N : int, let M : int> matrix<uint,N,M> asuint(matrix<float,N,M> x);
-__generic<let N : int, let M : int> matrix<uint,N,M> asuint(matrix<int,N,M> x);
-
 // Inverse tangent (HLSL SM 1.0)
-__generic<T : __BuiltinFloatingPointType> T atan(T x);
-__generic<T : __BuiltinFloatingPointType, let N : int> vector<T,N> atan(vector<T,N> x);
-__generic<T : __BuiltinFloatingPointType, let N : int, let M : int> matrix<T,N,M> atan(matrix<T,N,M> x);
+__generic<T : __BuiltinFloatingPointType>
+T atan(T x);
+
+__generic<T : __BuiltinFloatingPointType, let N : int>
+__target_intrinsic(hlsl)
+__target_intrinsic(glsl)
+vector<T, N> atan(vector<T, N> x)
+{
+    VECTOR_MAP_UNARY(T, N, atan, x);
+}
+
+__generic<T : __BuiltinFloatingPointType, let N : int, let M : int>
+__target_intrinsic(hlsl)
+matrix<T, N, M> atan(matrix<T, N, M> x)
+{
+    MATRIX_MAP_UNARY(T, N, M, atan, x);
+}
 
 __generic<T : __BuiltinFloatingPointType>
+__target_intrinsic(hlsl)
 __target_intrinsic(glsl,"atan($0,$1)")
 T atan2(T y, T x);
 
 __generic<T : __BuiltinFloatingPointType, let N : int>
+__target_intrinsic(hlsl)
 __target_intrinsic(glsl,"atan($0,$1)")
-vector<T,N> atan2(vector<T,N> y, vector<T,N> x);
+vector<T, N> atan2(vector<T, N> y, vector<T, N> x)
+{
+    VECTOR_MAP_BINARY(T, N, atan2, y, x);
+}
 
 __generic<T : __BuiltinFloatingPointType, let N : int, let M : int>
-__target_intrinsic(glsl,"atan($0,$1)")
-matrix<T,N,M> atan2(matrix<T,N,M> y, matrix<T,N,M> x);
+__target_intrinsic(hlsl)
+matrix<T,N,M> atan2(matrix<T,N,M> y, matrix<T,N,M> x)
+{
+    MATRIX_MAP_BINARY(T, N, M, atan2, y, x);
+}
 
 // Ceiling (HLSL SM 1.0)
-__generic<T : __BuiltinFloatingPointType> T ceil(T x);
-__generic<T : __BuiltinFloatingPointType, let N : int> vector<T,N> ceil(vector<T,N> x);
-__generic<T : __BuiltinFloatingPointType, let N : int, let M : int> matrix<T,N,M> ceil(matrix<T,N,M> x);
+__generic<T : __BuiltinFloatingPointType>
+T ceil(T x);
+
+__generic<T : __BuiltinFloatingPointType, let N : int>
+__target_intrinsic(hlsl)
+__target_intrinsic(glsl)
+vector<T, N> ceil(vector<T, N> x)
+{
+    VECTOR_MAP_UNARY(T, N, ceil, x);
+}
+
+__generic<T : __BuiltinFloatingPointType, let N : int, let M : int>
+__target_intrinsic(hlsl)
+matrix<T, N, M> ceil(matrix<T, N, M> x)
+{
+    MATRIX_MAP_UNARY(T, N, M, ceil, x);
+}
 
 
 // Check access status to tiled resource
 bool CheckAccessFullyMapped(uint status);
 
 // Clamp (HLSL SM 1.0)
-__generic<T : __BuiltinArithmeticType> T clamp(T x, T min, T max);
-__generic<T : __BuiltinArithmeticType, let N : int> vector<T,N> clamp(vector<T,N> x, vector<T,N> min, vector<T,N> max);
-__generic<T : __BuiltinArithmeticType, let N : int, let M : int> matrix<T,N,M> clamp(matrix<T,N,M> x, matrix<T,N,M> min, matrix<T,N,M> max);
+__generic<T : __BuiltinArithmeticType>
+__target_intrinsic(hlsl)
+__target_intrinsic(glsl)
+T clamp(T x, T minBound, T maxBound)
+{
+    return min(max(x, minBound), maxBound);
+}
+
+__generic<T : __BuiltinArithmeticType, let N : int>
+__target_intrinsic(hlsl)
+__target_intrinsic(glsl)
+vector<T, N> clamp(vector<T, N> x, vector<T, N> minBound, vector<T, N> maxBound)
+{
+    return min(max(x, minBound), maxBound);
+}
+
+__generic<T : __BuiltinArithmeticType, let N : int, let M : int>
+__target_intrinsic(hlsl)
+matrix<T,N,M> clamp(matrix<T,N,M> x, matrix<T,N,M> minBound, matrix<T,N,M> maxBound)
+{
+    return min(max(x, minBound), maxBound);
+}
 
 // Clip (discard) fragment conditionally
-__generic<T : __BuiltinFloatingPointType> void clip(T x);
-__generic<T : __BuiltinFloatingPointType, let N : int> void clip(vector<T,N> x);
-__generic<T : __BuiltinFloatingPointType, let N : int, let M : int> void clip(matrix<T,N,M> x);
+__generic<T : __BuiltinFloatingPointType>
+__target_intrinsic(hlsl)
+void clip(T x);
+// TODO: filling this in here requires ability to invoke `operator<(T,T)`
+/*{
+    if(x < T(0)) discard;
+}*/
+
+__generic<T : __BuiltinFloatingPointType, let N : int>
+__target_intrinsic(hlsl)
+void clip(vector<T,N> x);
+// TODO: filling this in here requires ability to invoke `operator<(T,T)`
+/*{
+    if(any(x < T(0))) discard;
+}*/
+
+__generic<T : __BuiltinFloatingPointType, let N : int, let M : int>
+__target_intrinsic(hlsl)
+void clip(matrix<T,N,M> x);
+// TODO: filling this in here requires ability to invoke `operator<(T,T)`
+/*{
+    if(any(x < T(0))) discard;
+}*/
 
 // Cosine
-__generic<T : __BuiltinFloatingPointType> T cos(T x);
-__generic<T : __BuiltinFloatingPointType, let N : int> vector<T,N> cos(vector<T,N> x);
-__generic<T : __BuiltinFloatingPointType, let N : int, let M : int> matrix<T,N,M> cos(matrix<T,N,M> x);
+__generic<T : __BuiltinFloatingPointType>
+T cos(T x);
+
+__generic<T : __BuiltinFloatingPointType, let N : int>
+__target_intrinsic(hlsl)
+__target_intrinsic(glsl)
+vector<T, N> cos(vector<T, N> x)
+{
+    VECTOR_MAP_UNARY(T,N, cos, x);
+}
+
+__generic<T : __BuiltinFloatingPointType, let N : int, let M : int>
+__target_intrinsic(hlsl)
+matrix<T, N, M> cos(matrix<T, N, M> x)
+{
+    MATRIX_MAP_UNARY(T, N, M, cos, x);
+}
 
 // Hyperbolic cosine
-__generic<T : __BuiltinFloatingPointType> T cosh(T x);
-__generic<T : __BuiltinFloatingPointType, let N : int> vector<T,N> cosh(vector<T,N> x);
-__generic<T : __BuiltinFloatingPointType, let N : int, let M : int> matrix<T,N,M> cosh(matrix<T,N,M> x);
+__generic<T : __BuiltinFloatingPointType>
+T cosh(T x);
+
+__generic<T : __BuiltinFloatingPointType, let N : int>
+__target_intrinsic(hlsl)
+__target_intrinsic(glsl)
+vector<T,N> cosh(vector<T,N> x)
+{
+    VECTOR_MAP_UNARY(T,N, cosh, x);
+}
+
+__generic<T : __BuiltinFloatingPointType, let N : int, let M : int>
+__target_intrinsic(hlsl)
+matrix<T, N, M> cosh(matrix<T, N, M> x)
+{
+    MATRIX_MAP_UNARY(T, N, M, cosh, x);
+}
 
 // Population count
 __target_intrinsic(glsl, "bitCount")
 uint countbits(uint value);
 
 // Cross product
-__generic<T : __BuiltinArithmeticType> vector<T,3> cross(vector<T,3> x, vector<T,3> y);
+__generic<T : __BuiltinArithmeticType>
+__target_intrinsic(hlsl)
+__target_intrinsic(glsl)
+vector<T,3> cross(vector<T,3> left, vector<T,3> right);
+// TODO: filling this in here requires ability to invoke `operator*(T,T)`, etc.
+/*{
+    return vector<T,3>(
+        left.y * right.z - left.z * right.y,
+        left.z * right.x - left.x * right.z,
+        left.x * right.y - left.y * right.x);
+}*/
+
 
 // Convert encoded color
-int4 D3DCOLORtoUBYTE4(float4 x);
+__target_intrinsic(hlsl)
+int4 D3DCOLORtoUBYTE4(float4 color)
+{
+    let scaled = color.zyxw * 255.001999f;
+    return int4(scaled);
+}
 
 // Partial-difference derivatives
 __generic<T : __BuiltinFloatingPointType>
@@ -637,9 +888,25 @@ matrix<T,N,M> ddy_fine(matrix<T,N,M> x);
 
 
 // Radians to degrees
-__generic<T : __BuiltinFloatingPointType> T degrees(T x);
-__generic<T : __BuiltinFloatingPointType, let N : int> vector<T,N> degrees(vector<T,N> x);
-__generic<T : __BuiltinFloatingPointType, let N : int, let M : int> matrix<T,N,M> degrees(matrix<T,N,M> x);
+
+__generic<T : __BuiltinFloatingPointType>
+__target_intrinsic(hlsl)
+__target_intrinsic(hlsl)
+T degrees(T x);
+// TODO: filling this in here requires ability to invoke `operator*` on T,
+// and convert a constant to `T` for the conversion factor
+
+__generic<T : __BuiltinFloatingPointType, let N : int>
+__target_intrinsic(hlsl)
+__target_intrinsic(hlsl)
+vector<T,N> degrees(vector<T,N> x);
+
+__generic<T : __BuiltinFloatingPointType, let N : int, let M : int>
+__target_intrinsic(hlsl)
+matrix<T, N, M> degrees(matrix<T, N, M> x)
+{
+    MATRIX_MAP_UNARY(T, N, M, degrees, x);
+}
 
 // Matrix determinant
 
@@ -714,14 +981,44 @@ __target_intrinsic(glsl, "interpolateAtOffset($0, vec2($1) / 16.0f)")
 matrix<T,N,M> EvaluateAttributeSnapped(matrix<T,N,M> x, int2 offset);
 
 // Base-e exponent
-__generic<T : __BuiltinFloatingPointType> T exp(T x);
-__generic<T : __BuiltinFloatingPointType, let N : int> vector<T,N> exp(vector<T,N> x);
-__generic<T : __BuiltinFloatingPointType, let N : int, let M : int> matrix<T,N,M> exp(matrix<T,N,M> x);
+
+__generic<T : __BuiltinFloatingPointType>
+T exp(T x);
+
+__generic<T : __BuiltinFloatingPointType, let N : int>
+__target_intrinsic(hlsl)
+__target_intrinsic(glsl)
+vector<T, N> exp(vector<T, N> x)
+{
+    VECTOR_MAP_UNARY(T, N, exp, x);
+}
+
+__generic<T : __BuiltinFloatingPointType, let N : int, let M : int>
+__target_intrinsic(hlsl)
+matrix<T, N, M> exp(matrix<T, N, M> x)
+{
+    MATRIX_MAP_UNARY(T, N, M, exp, x);
+}
 
 // Base-2 exponent
-__generic<T : __BuiltinFloatingPointType> T exp2(T x);
-__generic<T : __BuiltinFloatingPointType, let N : int> vector<T,N> exp2(vector<T,N> x);
-__generic<T : __BuiltinFloatingPointType, let N : int, let M : int> matrix<T,N,M> exp2(matrix<T,N,M> x);
+
+__generic<T : __BuiltinFloatingPointType>
+T exp2(T x);
+
+__generic<T : __BuiltinFloatingPointType, let N : int>
+__target_intrinsic(hlsl)
+__target_intrinsic(glsl)
+vector<T,N> exp2(vector<T,N> x)
+{
+    VECTOR_MAP_UNARY(T, N, exp2, x);
+}
+
+__generic<T : __BuiltinFloatingPointType, let N : int, let M : int>
+__target_intrinsic(hlsl)
+matrix<T,N,M> exp2(matrix<T,N,M> x)
+{
+    MATRIX_MAP_UNARY(T, N, M, exp2, x);
+}
 
 // Convert 16-bit float stored in low bits of integer
 __target_intrinsic(glsl, "unpackHalf2x16($0).x")
@@ -740,38 +1037,79 @@ __target_intrinsic(glsl, "packHalf2x16(vec2($0,0.0))")
 vector<uint,N> f32tof16(vector<float,N> value);
 
 // Flip surface normal to face forward, if needed
-__generic<T : __BuiltinFloatingPointType, let N : int> vector<T,N> faceforward(vector<T,N> n, vector<T,N> i, vector<T,N> ng);
+__generic<T : __BuiltinFloatingPointType, let N : int>
+__target_intrinsic(hlsl)
+__target_intrinsic(glsl)
+vector<T,N> faceforward(vector<T,N> n, vector<T,N> i, vector<T,N> ng);
+/*{
+    return dot(ng, i) < T(0.0f) ? n : -n;
+}*/
 
 // Find first set bit starting at high bit and working down
 __target_intrinsic(glsl,"findMSB")
 int firstbithigh(int value);
 
+__target_intrinsic(hlsl)
 __target_intrinsic(glsl,"findMSB")
-__generic<let N : int> vector<int,N> firstbithigh(vector<int,N> value);
+__generic<let N : int>
+vector<int, N> firstbithigh(vector<int, N> value)
+{
+    VECTOR_MAP_UNARY(int, N, firstbithigh, value);
+}
 
 __target_intrinsic(glsl,"findMSB")
 uint firstbithigh(uint value);
 
+__target_intrinsic(hlsl)
 __target_intrinsic(glsl,"findMSB")
-__generic<let N : int> vector<uint,N> firstbithigh(vector<uint,N> value);
+__generic<let N : int>
+vector<uint,N> firstbithigh(vector<uint,N> value)
+{
+    VECTOR_MAP_UNARY(uint, N, firstbithigh, value);
+}
 
 // Find first set bit starting at low bit and working up
 __target_intrinsic(glsl,"findLSB")
 int firstbitlow(int value);
 
+__target_intrinsic(hlsl)
 __target_intrinsic(glsl,"findLSB")
-__generic<let N : int> vector<int,N> firstbitlow(vector<int,N> value);
+__generic<let N : int>
+vector<int,N> firstbitlow(vector<int,N> value)
+{
+    VECTOR_MAP_UNARY(int, N, firstbitlow, value);
+}
 
 __target_intrinsic(glsl,"findLSB")
 uint firstbitlow(uint value);
 
+__target_intrinsic(hlsl)
 __target_intrinsic(glsl,"findLSB")
-__generic<let N : int> vector<uint,N> firstbitlow(vector<uint,N> value);
+__generic<let N : int>
+vector<uint,N> firstbitlow(vector<uint,N> value)
+{
+    VECTOR_MAP_UNARY(uint, N, firstbitlow, value);
+}
 
 // Floor (HLSL SM 1.0)
-__generic<T : __BuiltinFloatingPointType> T floor(T x);
-__generic<T : __BuiltinFloatingPointType, let N : int> vector<T,N> floor(vector<T,N> x);
-__generic<T : __BuiltinFloatingPointType, let N : int, let M : int> matrix<T,N,M> floor(matrix<T,N,M> x);
+
+__generic<T : __BuiltinFloatingPointType>
+T floor(T x);
+
+__generic<T : __BuiltinFloatingPointType, let N : int>
+__target_intrinsic(hlsl)
+__target_intrinsic(glsl)
+vector<T, N> floor(vector<T, N> x)
+{
+    VECTOR_MAP_UNARY(T, N, floor, x);
+}
+
+__generic<T : __BuiltinFloatingPointType, let N : int, let M : int>
+__target_intrinsic(hlsl)
+matrix<T, N, M> floor(matrix<T, N, M> x)
+{
+    MATRIX_MAP_UNARY(T, N, M, floor, x);
+}
 
 // Fused multiply-add for doubles
 double fma(double a, double b, double c);
@@ -779,9 +1117,23 @@ __generic<let N : int> vector<double, N> fma(vector<double, N> a, vector<double,
 __generic<let N : int, let M : int> matrix<double,N,M> fma(matrix<double,N,M> a, matrix<double,N,M> b, matrix<double,N,M> c);
 
 // Floating point remainder of x/y
-__generic<T : __BuiltinFloatingPointType> T fmod(T x, T y);
-__generic<T : __BuiltinFloatingPointType, let N : int> vector<T,N> fmod(vector<T,N> x, vector<T,N> y);
-__generic<T : __BuiltinFloatingPointType, let N : int, let M : int> matrix<T,N,M> fmod(matrix<T,N,M> x, matrix<T,N,M> y);
+__generic<T : __BuiltinFloatingPointType>
+T fmod(T x, T y);
+
+__generic<T : __BuiltinFloatingPointType, let N : int>
+__target_intrinsic(hlsl)
+__target_intrinsic(glsl)
+vector<T, N> fmod(vector<T, N> x, vector<T, N> y)
+{
+    VECTOR_MAP_BINARY(T, N, fmod, x, y);
+}
+
+__generic<T : __BuiltinFloatingPointType, let N : int, let M : int>
+__target_intrinsic(hlsl)
+matrix<T, N, M> fmod(matrix<T, N, M> x, matrix<T, N, M> y)
+{
+    MATRIX_MAP_BINARY(T, N, M, fmod, x, y);
+}
 
 // Fractional part
 __generic<T : __BuiltinFloatingPointType>
@@ -789,22 +1141,58 @@ __target_intrinsic(glsl, fract)
 T frac(T x);
 
 __generic<T : __BuiltinFloatingPointType, let N : int>
+__target_intrinsic(hlsl)
 __target_intrinsic(glsl, fract)
-vector<T,N> frac(vector<T,N> x);
+vector<T, N> frac(vector<T, N> x)
+{
+    VECTOR_MAP_UNARY(T, N, frac, x);
+}
 
 __generic<T : __BuiltinFloatingPointType, let N : int, let M : int>
-__target_intrinsic(glsl, fract)
-matrix<T,N,M> frac(matrix<T,N,M> x);
+matrix<T, N, M> frac(matrix<T, N, M> x)
+{
+    MATRIX_MAP_UNARY(T, N, M, frac, x);
+}
 
 // Split float into mantissa and exponent
-__generic<T : __BuiltinFloatingPointType> T frexp(T x, out T exp);
-__generic<T : __BuiltinFloatingPointType, let N : int> vector<T,N> frexp(vector<T,N> x, out vector<T,N> exp);
-__generic<T : __BuiltinFloatingPointType, let N : int, let M : int> matrix<T,N,M> frexp(matrix<T,N,M> x, out matrix<T,N,M> exp);
+__generic<T : __BuiltinFloatingPointType>
+__target_intrinsic(hlsl)
+__target_intrinsic(glsl)
+T frexp(T x, out T exp);
+
+__generic<T : __BuiltinFloatingPointType, let N : int>
+__target_intrinsic(hlsl)
+__target_intrinsic(glsl)
+vector<T, N> frexp(vector<T, N> x, out vector<T, N> exp)
+{
+    VECTOR_MAP_BINARY(T, N, frexp, x, exp);
+}
+
+__generic<T : __BuiltinFloatingPointType, let N : int, let M : int>
+__target_intrinsic(hlsl)
+matrix<T, N, M> frexp(matrix<T, N, M> x, out matrix<T, N, M> exp)
+{
+    MATRIX_MAP_BINARY(T, N, M, frexp, x, exp);
+}
 
 // Texture filter width
-__generic<T : __BuiltinFloatingPointType> T fwidth(T x);
-__generic<T : __BuiltinFloatingPointType, let N : int> vector<T,N> fwidth(vector<T,N> x);
-__generic<T : __BuiltinFloatingPointType, let N : int, let M : int> matrix<T,N,M> fwidth(matrix<T,N,M> x);
+__generic<T : __BuiltinFloatingPointType>
+T fwidth(T x);
+
+__generic<T : __BuiltinFloatingPointType, let N : int>
+__target_intrinsic(hlsl)
+__target_intrinsic(glsl)
+vector<T, N> fwidth(vector<T, N> x)
+{
+    VECTOR_MAP_UNARY(T, N, fwidth, x);
+}
+
+__generic<T : __BuiltinFloatingPointType, let N : int, let M : int>
+__target_intrinsic(hlsl)
+matrix<T, N, M> fwidth(matrix<T, N, M> x)
+{
+    MATRIX_MAP_UNARY(T, N, M, fwidth, x);
+}
 
 // Get number of samples in render target
 uint GetRenderTargetSampleCount();
@@ -947,80 +1335,187 @@ void InterlockedXor(__ref uint dest, uint value, out uint original_value);
 // Is floating-point value finite?
 
 __generic<T : __BuiltinFloatingPointType>
-__target_intrinsic(glsl, "(!(isinf($0) || isnan($0)))")
-bool isfinite(T x);
+__target_intrinsic(hlsl)
+__target_intrinsic(cpu)
+__target_intrinsic(cuda)
+//__target_intrinsic(glsl, "(!(isinf($0) || isnan($0)))")
+bool isfinite(T x)
+{
+    return !(isinf(x) || isnan(x));
+}
 
 __generic<T : __BuiltinFloatingPointType, let N : int>
-__target_intrinsic(glsl, "(!(isinf($0) || isnan($0)))")
-vector<bool,N> isfinite(vector<T,N> x);
+__target_intrinsic(hlsl)
+//__target_intrinsic(glsl, "(!(isinf($0) || isnan($0)))")
+vector<bool, N> isfinite(vector<T, N> x)
+{
+    VECTOR_MAP_UNARY(bool, N, isfinite, x);
+}
 
 __generic<T : __BuiltinFloatingPointType, let N : int, let M : int>
-matrix<bool,N,M> isfinite(matrix<T,N,M> x);
+__target_intrinsic(hlsl)
+matrix<bool, N, M> isfinite(matrix<T, N, M> x)
+{
+    MATRIX_MAP_UNARY(bool, N, M, isfinite, x);
+}
 
 // Is floating-point value infinite?
-__generic<T : __BuiltinFloatingPointType> bool isinf(T x);
-__generic<T : __BuiltinFloatingPointType, let N : int> vector<bool,N> isinf(vector<T,N> x);
-__generic<T : __BuiltinFloatingPointType, let N : int, let M : int> matrix<bool,N,M> isinf(matrix<T,N,M> x);
+__generic<T : __BuiltinFloatingPointType>
+bool isinf(T x);
+
+__generic<T : __BuiltinFloatingPointType, let N : int>
+__target_intrinsic(hlsl)
+__target_intrinsic(glsl)
+vector<bool, N> isinf(vector<T, N> x)
+{
+    VECTOR_MAP_UNARY(bool, N, isinf, x);
+}
+
+__generic<T : __BuiltinFloatingPointType, let N : int, let M : int>
+__target_intrinsic(hlsl)
+matrix<bool, N, M> isinf(matrix<T, N, M> x)
+{
+    MATRIX_MAP_UNARY(bool, N, M, isinf, x);
+}
 
 // Is floating-point value not-a-number?
-__generic<T : __BuiltinFloatingPointType> bool isnan(T x);
-__generic<T : __BuiltinFloatingPointType, let N : int> vector<bool,N> isnan(vector<T,N> x);
-__generic<T : __BuiltinFloatingPointType, let N : int, let M : int> matrix<bool,N,M> isnan(matrix<T,N,M> x);
+__generic<T : __BuiltinFloatingPointType>
+bool isnan(T x);
+
+__generic<T : __BuiltinFloatingPointType, let N : int>
+__target_intrinsic(hlsl)
+__target_intrinsic(glsl)
+vector<bool, N> isnan(vector<T, N> x)
+{
+    VECTOR_MAP_UNARY(bool, N, isnan, x);
+}
+
+__generic<T : __BuiltinFloatingPointType, let N : int, let M : int>
+__target_intrinsic(hlsl)
+matrix<bool, N, M> isnan(matrix<T, N, M> x)
+{
+    MATRIX_MAP_UNARY(bool, N, M, isnan, x);
+}
 
 // Construct float from mantissa and exponent
 
 __generic<T : __BuiltinFloatingPointType>
+__target_intrinsic(hlsl)
 __target_intrinsic(glsl, "($0 * pow(2.0f, $1))")
 T ldexp(T x, T exp);
+/*{
+    return x * exp2(exp);
+}*/
 
 __generic<T : __BuiltinFloatingPointType, let N : int>
+__target_intrinsic(hlsl)
 __target_intrinsic(glsl, "($0 * pow(2.0f, $1))")
-vector<T,N> ldexp(vector<T,N> x, vector<T,N> exp);
+vector<T, N> ldexp(vector<T, N> x, vector<T, N> exp)
+{
+    VECTOR_MAP_BINARY(T, N, ldexp, x, exp);
+}
 
 __generic<T : __BuiltinFloatingPointType, let N : int, let M : int>
-matrix<T,N,M> ldexp(matrix<T,N,M> x, matrix<T,N,M> exp);
+__target_intrinsic(hlsl)
+matrix<T, N, M> ldexp(matrix<T, N, M> x, matrix<T, N, M> exp)
+{
+    MATRIX_MAP_BINARY(T, N, M, ldexp, x, exp);
+}
 
 // Vector length
-__generic<T : __BuiltinFloatingPointType, let N : int> T length(vector<T,N> x);
+__generic<T : __BuiltinFloatingPointType, let N : int>
+__target_intrinsic(hlsl)
+__target_intrinsic(glsl)
+T length(vector<T, N> x)
+{
+    return sqrt(dot(x, x));
+}
 
 // Linear interpolation
 __generic<T : __BuiltinFloatingPointType>
+__target_intrinsic(hlsl)
 __target_intrinsic(glsl, mix)
 T lerp(T x, T y, T s);
+/*{
+    return x * (1 - s) + y * s;
+}*/
 
 __generic<T : __BuiltinFloatingPointType, let N : int>
+__target_intrinsic(hlsl)
 __target_intrinsic(glsl, mix)
-vector<T,N> lerp(vector<T,N> x, vector<T,N> y, vector<T,N> s);
+vector<T, N> lerp(vector<T, N> x, vector<T, N> y, vector<T, N> s)
+{
+    VECTOR_MAP_TRINARY(T, N, lerp, x, y, s);
+}
 
 __generic<T : __BuiltinFloatingPointType, let N : int, let M : int>
-__target_intrinsic(glsl, mix)
-matrix<T,N,M> lerp(matrix<T,N,M> x, matrix<T,N,M> y, matrix<T,N,M> s);
+__target_intrinsic(hlsl)
+matrix<T,N,M> lerp(matrix<T,N,M> x, matrix<T,N,M> y, matrix<T,N,M> s)
+{
+    MATRIX_MAP_TRINARY(T, N, M, lerp, x, y, s);
+}
 
 // Legacy lighting function (obsolete)
 float4 lit(float n_dot_l, float n_dot_h, float m);
 
 // Base-e logarithm
-__generic<T : __BuiltinFloatingPointType> T log(T x);
-__generic<T : __BuiltinFloatingPointType, let N : int> vector<T,N> log(vector<T,N> x);
-__generic<T : __BuiltinFloatingPointType, let N : int, let M : int> matrix<T,N,M> log(matrix<T,N,M> x);
+__generic<T : __BuiltinFloatingPointType>
+T log(T x);
+
+__generic<T : __BuiltinFloatingPointType, let N : int>
+__target_intrinsic(hlsl)
+__target_intrinsic(glsl)
+vector<T, N> log(vector<T, N> x)
+{
+    VECTOR_MAP_UNARY(T, N, log, x);
+}
+
+__generic<T : __BuiltinFloatingPointType, let N : int, let M : int>
+__target_intrinsic(hlsl)
+matrix<T, N, M> log(matrix<T, N, M> x)
+{
+    MATRIX_MAP_UNARY(T, N, M, log, x);
+}
 
 // Base-10 logarithm
 __generic<T : __BuiltinFloatingPointType> 
+__target_intrinsic(hlsl)
 __target_intrinsic(glsl, "(log( $0 ) * $S0( 0.43429448190325182765112891891661) )" )
 T log10(T x);
 
 __generic<T : __BuiltinFloatingPointType, let N : int>
+__target_intrinsic(hlsl)
 __target_intrinsic(glsl, "(log( $0 ) * $S0(0.43429448190325182765112891891661) )" )
-vector<T,N> log10(vector<T,N> x);
+vector<T,N> log10(vector<T,N> x)
+{
+    VECTOR_MAP_UNARY(T, N, log10, x);
+}
 
 __generic<T : __BuiltinFloatingPointType, let N : int, let M : int> 
-__target_intrinsic(glsl, "(log( $0 ) * $S0(0.43429448190325182765112891891661) )" )
-matrix<T,N,M> log10(matrix<T,N,M> x);
+__target_intrinsic(hlsl)
+matrix<T,N,M> log10(matrix<T,N,M> x)
+{
+    MATRIX_MAP_UNARY(T, N, M, log10, x);
+}
 
 // Base-2 logarithm
-__generic<T : __BuiltinFloatingPointType> T log2(T x);
-__generic<T : __BuiltinFloatingPointType, let N : int> vector<T,N> log2(vector<T,N> x);
-__generic<T : __BuiltinFloatingPointType, let N : int, let M : int> matrix<T,N,M> log2(matrix<T,N,M> x);
+__generic<T : __BuiltinFloatingPointType>
+T log2(T x);
+
+__generic<T : __BuiltinFloatingPointType, let N : int>
+__target_intrinsic(hlsl)
+__target_intrinsic(glsl)
+vector<T,N> log2(vector<T,N> x)
+{
+    VECTOR_MAP_UNARY(T, N, log2, x);
+}
+
+__generic<T : __BuiltinFloatingPointType, let N : int, let M : int>
+__target_intrinsic(hlsl)
+matrix<T,N,M> log2(matrix<T,N,M> x)
+{
+    MATRIX_MAP_UNARY(T, N, M, log2, x);
+}
 
 // multiply-add
 
@@ -1034,19 +1529,65 @@ __target_intrinsic(glsl, fma)
 __generic<T : __BuiltinArithmeticType, let N : int, let M : int> matrix<T,N,M> mad(matrix<T,N,M> mvalue, matrix<T,N,M> avalue, matrix<T,N,M> bvalue);
 
 // maximum
-__generic<T : __BuiltinArithmeticType> T max(T x, T y);
-__generic<T : __BuiltinArithmeticType, let N : int> vector<T,N> max(vector<T,N> x, vector<T,N> y);
-__generic<T : __BuiltinArithmeticType, let N : int, let M : int> matrix<T,N,M> max(matrix<T,N,M> x, matrix<T,N,M> y);
+__generic<T : __BuiltinArithmeticType>
+T max(T x, T y);
+// Note: a stdlib implementation of `max` (or `min`) will require splitting
+// floating-point and integer cases apart, because the floating-point
+// version needs to correctly handle the case where one of the inputs
+// is not-a-number.
+
+__generic<T : __BuiltinArithmeticType, let N : int>
+__target_intrinsic(hlsl)
+__target_intrinsic(glsl)
+vector<T, N> max(vector<T, N> x, vector<T, N> y)
+{
+    VECTOR_MAP_BINARY(T, N, max, x, y);
+}
+
+__generic<T : __BuiltinArithmeticType, let N : int, let M : int>
+__target_intrinsic(hlsl)
+matrix<T, N, M> max(matrix<T, N, M> x, matrix<T, N, M> y)
+{
+    MATRIX_MAP_BINARY(T, N, M, max, x, y);
+}
 
 // minimum
-__generic<T : __BuiltinArithmeticType> T min(T x, T y);
-__generic<T : __BuiltinArithmeticType, let N : int> vector<T,N> min(vector<T,N> x, vector<T,N> y);
-__generic<T : __BuiltinArithmeticType, let N : int, let M : int> matrix<T,N,M> min(matrix<T,N,M> x, matrix<T,N,M> y);
+__generic<T : __BuiltinArithmeticType>
+T min(T x, T y);
+
+__generic<T : __BuiltinArithmeticType, let N : int>
+__target_intrinsic(hlsl)
+__target_intrinsic(glsl)
+vector<T,N> min(vector<T,N> x, vector<T,N> y)
+{
+    VECTOR_MAP_BINARY(T, N, min, x, y);
+}
+
+__generic<T : __BuiltinArithmeticType, let N : int, let M : int>
+__target_intrinsic(hlsl)
+matrix<T,N,M> min(matrix<T,N,M> x, matrix<T,N,M> y)
+{
+    MATRIX_MAP_BINARY(T, N, M, min, x, y);
+}
 
 // split into integer and fractional parts (both with same sign)
-__generic<T : __BuiltinFloatingPointType> T modf(T x, out T ip);
-__generic<T : __BuiltinFloatingPointType, let N : int> vector<T,N> modf(vector<T,N> x, out vector<T,N> ip);
-__generic<T : __BuiltinFloatingPointType, let N : int, let M : int> matrix<T,N,M> modf(matrix<T,N,M> x, out matrix<T,N,M> ip);
+__generic<T : __BuiltinFloatingPointType>
+T modf(T x, out T ip);
+
+__generic<T : __BuiltinFloatingPointType, let N : int>
+__target_intrinsic(hlsl)
+__target_intrinsic(glsl)
+vector<T,N> modf(vector<T,N> x, out vector<T,N> ip)
+{
+    VECTOR_MAP_BINARY(T, N, modf, x, ip);
+}
+
+__generic<T : __BuiltinFloatingPointType, let N : int, let M : int>
+__target_intrinsic(hlsl)
+matrix<T,N,M> modf(matrix<T,N,M> x, out matrix<T,N,M> ip)
+{
+    MATRIX_MAP_BINARY(T, N, M, modf, x, ip);
+}
 
 // msad4 (whatever that is)
 uint4 msad4(uint reference, uint2 source, uint4 accum);
@@ -1077,8 +1618,16 @@ __generic<T : __BuiltinArithmeticType, let N : int, let M : int> __intrinsic_op(
 __generic<T : __BuiltinArithmeticType, let R : int, let N : int, let C : int> __intrinsic_op(mulMatrixMatrix) matrix<T,R,C> mul(matrix<T,R,N> x, matrix<T,N,C> y);
 
 // noise (deprecated)
-float noise(float x);
-__generic<let N : int> float noise(vector<float, N> x);
+
+float noise(float x)
+{
+    return 0;
+}
+
+__generic<let N : int> float noise(vector<float, N> x)
+{
+    return 0;
+}
 
 /// Indicate that an index may be non-uniform at execution time.
 ///
@@ -1098,23 +1647,48 @@ __generic<let N : int> float noise(vector<float, N> x);
 /// to this function as necessary in output code, rather than make this
 /// the user's responsibility, so that the default behavior of the language
 /// is more semantically "correct."
+__target_intrinsic(hlsl)
 __target_intrinsic(glsl, nonuniformEXT)
 __glsl_extension(GL_EXT_nonuniform_qualifier)
 [__readNone]
-uint NonUniformResourceIndex(uint index);
+uint NonUniformResourceIndex(uint index)
+{
+    return index;
+}
 
+__target_intrinsic(hlsl)
 __target_intrinsic(glsl, nonuniformEXT)
 __glsl_extension(GL_EXT_nonuniform_qualifier)
 [__readNone]
-int NonUniformResourceIndex(int index);
+int NonUniformResourceIndex(int index)
+{
+    return index;
+}
 
 // Normalize a vector
 __generic<T : __BuiltinFloatingPointType, let N : int> vector<T,N> normalize(vector<T,N> x);
+/*{
+    return x / length(x);
+}*/
 
 // Raise to a power
-__generic<T : __BuiltinFloatingPointType> T pow(T x, T y);
-__generic<T : __BuiltinFloatingPointType, let N : int> vector<T,N> pow(vector<T,N> x, vector<T,N> y);
-__generic<T : __BuiltinFloatingPointType, let N : int, let M : int> matrix<T,N,M> pow(matrix<T,N,M> x, matrix<T,N,M> y);
+__generic<T : __BuiltinFloatingPointType>
+T pow(T x, T y);
+
+__generic<T : __BuiltinFloatingPointType, let N : int>
+__target_intrinsic(hlsl)
+__target_intrinsic(glsl)
+vector<T, N> pow(vector<T, N> x, vector<T, N> y)
+{
+    VECTOR_MAP_BINARY(T, N, pow, x, y);
+}
+
+__generic<T : __BuiltinFloatingPointType, let N : int, let M : int>
+__target_intrinsic(hlsl)
+matrix<T,N,M> pow(matrix<T,N,M> x, matrix<T,N,M> y)
+{
+    MATRIX_MAP_BINARY(T, N, M, pow, x, y);
+}
 
 // Output message
 
@@ -1192,26 +1766,66 @@ void ProcessTriTessFactorsMin(
     out float UnroundedInsideTessFactors);
 
 // Degrees to radians
-__generic<T : __BuiltinFloatingPointType> T radians(T x);
-__generic<T : __BuiltinFloatingPointType, let N : int> vector<T,N> radians(vector<T,N> x);
-__generic<T : __BuiltinFloatingPointType, let N : int, let M : int> matrix<T,N,M> radians(matrix<T,N,M> x);
+__generic<T : __BuiltinFloatingPointType>
+__target_intrinsic(hlsl)
+__target_intrinsic(glsl)
+T radians(T x);
+
+__generic<T : __BuiltinFloatingPointType, let N : int>
+__target_intrinsic(hlsl)
+__target_intrinsic(glsl)
+vector<T, N> radians(vector<T, N> x)
+{
+    VECTOR_MAP_UNARY(T, N, radians, x);
+}
+
+__generic<T : __BuiltinFloatingPointType, let N : int, let M : int>
+__target_intrinsic(hlsl)
+matrix<T, N, M> radians(matrix<T, N, M> x)
+{
+    MATRIX_MAP_UNARY(T, N, M, radians, x);
+}
 
 // Approximate reciprocal
 __generic<T : __BuiltinFloatingPointType>
+__target_intrinsic(hlsl)
 __target_intrinsic(glsl, "1.0/($0)")
 T rcp(T x);
+/*{
+    return T(1) / x;
+}*/
 
-// TODO: vector and matrix approx. reciprocals needto be deconstructed for GLSL
-__generic<T : __BuiltinFloatingPointType, let N : int> vector<T,N> rcp(vector<T,N> x);
-__generic<T : __BuiltinFloatingPointType, let N : int, let M : int> matrix<T,N,M> rcp(matrix<T,N,M> x);
+__generic<T : __BuiltinFloatingPointType, let N : int>
+__target_intrinsic(hlsl)
+vector<T, N> rcp(vector<T, N> x)
+{
+    VECTOR_MAP_UNARY(T, N, rcp, x);
+}
+
+__generic<T : __BuiltinFloatingPointType, let N : int, let M : int>
+__target_intrinsic(hlsl)
+// Note: GLSL doesn't define a vector `rcp`, so not intrinsic there
+matrix<T, N, M> rcp(matrix<T, N, M> x)
+{
+    MATRIX_MAP_UNARY(T, N, M, rcp, x);
+}
 
 // Reflect incident vector across plane with given normal
 __generic<T : __BuiltinFloatingPointType, let N : int>
 vector<T,N> reflect(vector<T,N> i, vector<T,N> n);
+/*{
+    return i - T(2) * dot(n,i) * n;
+}*/
 
 // Refract incident vector given surface normal and index of refraction
 __generic<T : __BuiltinFloatingPointType, let N : int>
 vector<T,N> refract(vector<T,N> i, vector<T,N> n, float eta);
+/*{
+    let dotNI = dot(n,i);
+    let k = T(1) - eta*eta*(T(1) - dotNI * dotNI);
+    if(k < 0) return vector<T,N>(T(0));
+    return eta * i - (eta * dotNI + sqrt(k)) * n;
+}*/
 
 // Reverse order of bits
 __target_intrinsic(glsl, "bitfieldReverse")
@@ -1221,45 +1835,56 @@ __target_intrinsic(glsl, "bitfieldReverse")
 __generic<let N : int> vector<uint,N> reversebits(vector<uint,N> value);
 
 // Round-to-nearest
-__generic<T : __BuiltinFloatingPointType> T round(T x);
-__generic<T : __BuiltinFloatingPointType, let N : int> vector<T,N> round(vector<T,N> x);
-__generic<T : __BuiltinFloatingPointType, let N : int, let M : int> matrix<T,N,M> round(matrix<T,N,M> x);
+__generic<T : __BuiltinFloatingPointType>
+T round(T x);
+
+__generic<T : __BuiltinFloatingPointType, let N : int>
+__target_intrinsic(hlsl)
+__target_intrinsic(glsl)
+vector<T, N> round(vector<T, N> x)
+{
+    VECTOR_MAP_UNARY(T, N, round, x);
+}
+
+__generic<T : __BuiltinFloatingPointType, let N : int, let M : int>
+__target_intrinsic(hlsl)
+matrix<T,N,M> round(matrix<T,N,M> x)
+{
+    MATRIX_MAP_UNARY(T, N, M, round, x);
+}
 
 // Reciprocal of square root
 __generic<T : __BuiltinFloatingPointType>
+__target_intrinsic(hlsl)
 __target_intrinsic(glsl, "inversesqrt($0)")
 T rsqrt(T x);
 
 __generic<T : __BuiltinFloatingPointType, let N : int>
+__target_intrinsic(hlsl)
 __target_intrinsic(glsl, "inversesqrt($0)")
-vector<T,N> rsqrt(vector<T,N> x);
+vector<T, N> rsqrt(vector<T, N> x)
+{
+    VECTOR_MAP_UNARY(T, N, rsqrt, x);
+}
 
 __generic<T : __BuiltinFloatingPointType, let N : int, let M : int>
-__target_intrinsic(glsl, "inversesqrt($0)")
-matrix<T,N,M> rsqrt(matrix<T,N,M> x);
+__target_intrinsic(hlsl)
+matrix<T, N, M> rsqrt(matrix<T, N, M> x)
+{
+    MATRIX_MAP_UNARY(T, N, M, rsqrt, x);
+}
 
 // Clamp value to [0,1] range
-__generic<T : __BuiltinFloatingPointType>
-__target_intrinsic(glsl, "clamp($0, 0, 1)")
-T saturate(T x);
-
-__generic<T : __BuiltinFloatingPointType, let N : int>
-__target_intrinsic(glsl, "clamp($0, 0, 1)")
-vector<T,N> saturate(vector<T,N> x);
-
-__generic<T : __BuiltinFloatingPointType, let N : int, let M : int>
-__target_intrinsic(glsl, "clamp($0, 0, 1)")
-matrix<T,N,M> saturate(matrix<T,N,M> x);
 
 __generic<T : __BuiltinFloatingPointType>
-__specialized_for_target(glsl)
+__target_intrinsic(hlsl)
 T saturate(T x)
 {
     return clamp<T>(x, T(0), T(1));
 }
 
 __generic<T : __BuiltinFloatingPointType, let N : int>
-__specialized_for_target(glsl)
+__target_intrinsic(hlsl)
 vector<T,N> saturate(vector<T,N> x)
 {
     return clamp<T,N>(x,
@@ -1267,21 +1892,12 @@ vector<T,N> saturate(vector<T,N> x)
         vector<T,N>(T(1)));
 }
 
-// HACK: need a helper to turn a scalar into a matrix,
-// because GLSL and HLSL disagree on the semantics of
-// constructing a matrix from a single scalar.
-__generic<T, let N : int, let M : int>
-matrix<T,N,M> __scalarToMatrix(T value);
-
 __generic<T : __BuiltinFloatingPointType, let N : int, let M : int>
-__specialized_for_target(glsl)
+__target_intrinsic(hlsl)
 matrix<T,N,M> saturate(matrix<T,N,M> x)
 {
-    return clamp<T,N,M>(x,
-        __scalarToMatrix<T,N,M>(T(0)),
-        __scalarToMatrix<T,N,M>(T(1)));
+    MATRIX_MAP_UNARY(T, N, M, saturate, x);
 }
-
 
 // Extract sign of value
 __generic<T : __BuiltinSignedArithmeticType>
@@ -1289,93 +1905,216 @@ __target_intrinsic(glsl, "int(sign($0))")
 int sign(T x);
 
 __generic<T : __BuiltinSignedArithmeticType, let N : int>
+__target_intrinsic(hlsl)
 __target_intrinsic(glsl, "ivec$N0(sign($0))")
-vector<int,N> sign(vector<T,N> x);
+vector<int, N> sign(vector<T, N> x)
+{
+    VECTOR_MAP_UNARY(int, N, sign, x);
+}
 
-__generic<T : __BuiltinSignedArithmeticType, let N : int, let M : int> matrix<int,N,M> sign(matrix<T,N,M> x);
+__generic<T : __BuiltinSignedArithmeticType, let N : int, let M : int>
+__target_intrinsic(hlsl)
+matrix<int, N, M> sign(matrix<T, N, M> x)
+{
+    MATRIX_MAP_UNARY(int, N, M, sign, x);
+}
 
 
 // Sine
-__generic<T : __BuiltinFloatingPointType> T sin(T x);
-__generic<T : __BuiltinFloatingPointType, let N : int> vector<T,N> sin(vector<T,N> x);
-__generic<T : __BuiltinFloatingPointType, let N : int, let M : int> matrix<T,N,M> sin(matrix<T,N,M> x);
+
+__generic<T : __BuiltinFloatingPointType>
+T sin(T x);
+
+__generic<T : __BuiltinFloatingPointType, let N : int>
+__target_intrinsic(hlsl)
+__target_intrinsic(glsl)
+vector<T, N> sin(vector<T, N> x)
+{
+    VECTOR_MAP_UNARY(T, N, sin, x);
+}
+
+__generic<T : __BuiltinFloatingPointType, let N : int, let M : int>
+__target_intrinsic(hlsl)
+matrix<T, N, M> sin(matrix<T, N, M> x)
+{
+    MATRIX_MAP_UNARY(T, N, M, sin, x);
+}
 
 // Sine and cosine
 __generic<T : __BuiltinFloatingPointType>
-__target_intrinsic(glsl, "$1 = sin($0); $2 = cos($0);")
-void sincos(T x, out T s, out T c);
-__generic<T : __BuiltinFloatingPointType, let N : int> void sincos(vector<T,N> x, out vector<T,N> s, out vector<T,N> c);
-__generic<T : __BuiltinFloatingPointType, let N : int, let M : int> void sincos(matrix<T,N,M> x, out matrix<T,N,M> s, out matrix<T,N,M> c);
+__target_intrinsic(hlsl)
+void sincos(T x, out T s, out T c)
+{
+    s = sin(x);
+    c = cos(x);
+}
+
+__generic<T : __BuiltinFloatingPointType, let N : int>
+__target_intrinsic(hlsl)
+void sincos(vector<T,N> x, out vector<T,N> s, out vector<T,N> c)
+{
+    s = sin(x);
+    c = cos(x);
+}
+
+__generic<T : __BuiltinFloatingPointType, let N : int, let M : int>
+__target_intrinsic(hlsl)
+void sincos(matrix<T,N,M> x, out matrix<T,N,M> s, out matrix<T,N,M> c)
+{
+    s = sin(x);
+    c = cos(x);
+}
 
 // Hyperbolic Sine
-__generic<T : __BuiltinFloatingPointType> T sinh(T x);
-__generic<T : __BuiltinFloatingPointType, let N : int> vector<T,N> sinh(vector<T,N> x);
-__generic<T : __BuiltinFloatingPointType, let N : int, let M : int> matrix<T,N,M> sinh(matrix<T,N,M> x);
+__generic<T : __BuiltinFloatingPointType>
+T sinh(T x);
+
+__generic<T : __BuiltinFloatingPointType, let N : int>
+__target_intrinsic(hlsl)
+__target_intrinsic(glsl)
+vector<T, N> sinh(vector<T, N> x)
+{
+    VECTOR_MAP_UNARY(T, N, sinh, x);
+}
+
+__generic<T : __BuiltinFloatingPointType, let N : int, let M : int>
+__target_intrinsic(hlsl)
+matrix<T, N, M> sinh(matrix<T, N, M> x)
+{
+    MATRIX_MAP_UNARY(T, N, M, sinh, x);
+}
 
 // Smooth step (Hermite interpolation)
-__generic<T : __BuiltinFloatingPointType> T smoothstep(T min, T max, T x);
-__generic<T : __BuiltinFloatingPointType, let N : int> vector<T,N> smoothstep(vector<T,N> min, vector<T,N> max, vector<T,N> x);
-__generic<T : __BuiltinFloatingPointType, let N : int, let M : int> matrix<T,N,M> smoothstep(matrix<T,N,M> min, matrix<T,N,M> max, matrix<T,N,M> x);
+__generic<T : __BuiltinFloatingPointType>
+T smoothstep(T min, T max, T x);
+
+__generic<T : __BuiltinFloatingPointType, let N : int>
+__target_intrinsic(hlsl)
+__target_intrinsic(glsl)
+vector<T, N> smoothstep(vector<T, N> min, vector<T, N> max, vector<T, N> x)
+{
+    VECTOR_MAP_TRINARY(T, N, smoothstep, min, max, x);
+}
+
+__generic<T : __BuiltinFloatingPointType, let N : int, let M : int>
+__target_intrinsic(hlsl)
+matrix<T, N, M> smoothstep(matrix<T, N, M> min, matrix<T, N, M> max, matrix<T, N, M> x)
+{
+    MATRIX_MAP_TRINARY(T, N, M, smoothstep, min, max, x);
+}
 
 // Square root
-__generic<T : __BuiltinFloatingPointType> T sqrt(T x);
-__generic<T : __BuiltinFloatingPointType, let N : int> vector<T,N> sqrt(vector<T,N> x);
-__generic<T : __BuiltinFloatingPointType, let N : int, let M : int> matrix<T,N,M> sqrt(matrix<T,N,M> x);
+__generic<T : __BuiltinFloatingPointType>
+T sqrt(T x);
+
+__generic<T : __BuiltinFloatingPointType, let N : int>
+__target_intrinsic(hlsl)
+__target_intrinsic(glsl)
+vector<T, N> sqrt(vector<T, N> x)
+{
+    VECTOR_MAP_UNARY(T, N, sqrt, x);
+}
+
+__generic<T : __BuiltinFloatingPointType, let N : int, let M : int>
+__target_intrinsic(hlsl)
+matrix<T, N, M> sqrt(matrix<T, N, M> x)
+{
+    MATRIX_MAP_UNARY(T, N, M, sqrt, x);
+}
 
 // Step function
-__generic<T : __BuiltinFloatingPointType> T step(T y, T x);
-__generic<T : __BuiltinFloatingPointType, let N : int> vector<T,N> step(vector<T,N> y, vector<T,N> x);
-__generic<T : __BuiltinFloatingPointType, let N : int, let M : int> matrix<T,N,M> step(matrix<T,N,M> y, matrix<T,N,M> x);
+__generic<T : __BuiltinFloatingPointType>
+__target_intrinsic(hlsl)
+__target_intrinsic(glsl)
+T step(T y, T x);
+/*{
+    return x < y ? T(0.0f) : T(1.0f);
+}*/
+
+__generic<T : __BuiltinFloatingPointType, let N : int>
+__target_intrinsic(hlsl)
+__target_intrinsic(glsl)
+vector<T,N> step(vector<T,N> y, vector<T,N> x)
+{
+    VECTOR_MAP_BINARY(T, N, step, y, x);
+}
+
+__generic<T : __BuiltinFloatingPointType, let N : int, let M : int>
+__target_intrinsic(hlsl)
+matrix<T, N, M> step(matrix<T, N, M> y, matrix<T, N, M> x)
+{
+    MATRIX_MAP_BINARY(T, N, M, step, y, x);
+}
 
 // Tangent
-__generic<T : __BuiltinFloatingPointType> T tan(T x);
-__generic<T : __BuiltinFloatingPointType, let N : int> vector<T,N> tan(vector<T,N> x);
-__generic<T : __BuiltinFloatingPointType, let N : int, let M : int> matrix<T,N,M> tan(matrix<T,N,M> x);
+__generic<T : __BuiltinFloatingPointType>
+T tan(T x);
+
+__generic<T : __BuiltinFloatingPointType, let N : int>
+__target_intrinsic(hlsl)
+__target_intrinsic(glsl)
+vector<T, N> tan(vector<T, N> x)
+{
+    VECTOR_MAP_UNARY(T, N, tan, x);
+}
+
+__generic<T : __BuiltinFloatingPointType, let N : int, let M : int>
+__target_intrinsic(hlsl)
+matrix<T, N, M> tan(matrix<T, N, M> x)
+{
+    MATRIX_MAP_UNARY(T, N, M, tan, x);
+}
 
 // Hyperbolic tangent
-__generic<T : __BuiltinFloatingPointType> T tanh(T x);
-__generic<T : __BuiltinFloatingPointType, let N : int> vector<T,N> tanh(vector<T,N> x);
-__generic<T : __BuiltinFloatingPointType, let N : int, let M : int> matrix<T,N,M> tanh(matrix<T,N,M> x);
+__generic<T : __BuiltinFloatingPointType>
+T tanh(T x);
 
-// Legacy texture-fetch operations
+__generic<T : __BuiltinFloatingPointType, let N : int>
+__target_intrinsic(hlsl)
+__target_intrinsic(glsl)
+vector<T,N> tanh(vector<T,N> x)
+{
+    VECTOR_MAP_UNARY(T, N, tanh, x);
+}
 
-/*
-float4 tex1D(sampler1D s, float t);
-float4 tex1D(sampler1D s, float t, float ddx, float ddy);
-float4 tex1Dbias(sampler1D s, float4 t);
-float4 tex1Dgrad(sampler1D s, float t, float ddx, float ddy);
-float4 tex1Dlod(sampler1D s, float4 t);
-float4 tex1Dproj(sampler1D s, float4 t);
-
-float4 tex2D(sampler2D s, float2 t);
-float4 tex2D(sampler2D s, float2 t, float2 ddx, float2 ddy);
-float4 tex2Dbias(sampler2D s, float4 t);
-float4 tex2Dgrad(sampler2D s, float2 t, float2 ddx, float2 ddy);
-float4 tex2Dlod(sampler2D s, float4 t);
-float4 tex2Dproj(sampler2D s, float4 t);
-
-float4 tex3D(sampler3D s, float3 t);
-float4 tex3D(sampler3D s, float3 t, float3 ddx, float3 ddy);
-float4 tex3Dbias(sampler3D s, float4 t);
-float4 tex3Dgrad(sampler3D s, float3 t, float3 ddx, float3 ddy);
-float4 tex3Dlod(sampler3D s, float4 t);
-float4 tex3Dproj(sampler3D s, float4 t);
-
-float4 texCUBE(samplerCUBE s, float3 t);
-float4 texCUBE(samplerCUBE s, float3 t, float3 ddx, float3 ddy);
-float4 texCUBEbias(samplerCUBE s, float4 t);
-float4 texCUBEgrad(samplerCUBE s, float3 t, float3 ddx, float3 ddy);
-float4 texCUBElod(samplerCUBE s, float4 t);
-float4 texCUBEproj(samplerCUBE s, float4 t);
-*/
+__generic<T : __BuiltinFloatingPointType, let N : int, let M : int>
+__target_intrinsic(hlsl)
+matrix<T,N,M> tanh(matrix<T,N,M> x)
+{
+    MATRIX_MAP_UNARY(T, N, M, tanh, x);
+}
 
 // Matrix transpose
-__generic<T : __BuiltinType, let N : int, let M : int> matrix<T,M,N> transpose(matrix<T,N,M> x);
+__generic<T : __BuiltinType, let N : int, let M : int>
+__target_intrinsic(hlsl)
+__target_intrinsic(glsl)
+matrix<T, M, N> transpose(matrix<T, N, M> x)
+{
+    matrix<T,M,N> result;
+    for(int r = 0; r < M; ++r)
+        for(int c = 0; c < N; ++c)
+            result[r][c] = x[c][r];
+    return result;
+}
 
 // Truncate to integer
-__generic<T : __BuiltinFloatingPointType> T trunc(T x);
-__generic<T : __BuiltinFloatingPointType, let N : int> vector<T,N> trunc(vector<T,N> x);
-__generic<T : __BuiltinFloatingPointType, let N : int, let M : int> matrix<T,N,M> trunc(matrix<T,N,M> x);
+__generic<T : __BuiltinFloatingPointType>
+T trunc(T x);
+
+__generic<T : __BuiltinFloatingPointType, let N : int>
+__target_intrinsic(hlsl)
+__target_intrinsic(glsl)
+vector<T, N> trunc(vector<T, N> x)
+{
+    VECTOR_MAP_UNARY(T, N, trunc, x);
+}
+
+__generic<T : __BuiltinFloatingPointType, let N : int, let M : int>
+__target_intrinsic(hlsl)
+matrix<T, N, M> trunc(matrix<T, N, M> x)
+{
+    MATRIX_MAP_UNARY(T, N, M, trunc, x);
+}
 
 // Shader model 6.0 stuff
 
@@ -1501,37 +2240,6 @@ __generic<T : __BuiltinType, let N : int, let M : int> matrix<T,N,M> WaveReadLan
 typedef Texture2D texture2D;
 
 ${{{{
-// Component-wise multiplication ops
-for(auto op : binaryOps)
-{
-    switch (op.opCode)
-    {
-    default:
-        continue;
-
-    case kIROp_Mul:
-    case kCompoundIntrinsicOp_MulAssign:
-        break;
-    }
-
-    for (auto type : kBaseTypes)
-    {
-        if ((type.flags & op.flags) == 0)
-            continue;
-
-        char const* leftType = type.name;
-        char const* rightType = leftType;
-        char const* resultType = leftType;
-
-        char const* leftQual = "";
-        if(op.flags & ASSIGNMENT) leftQual = "in out ";
-
-        sb << "__generic<let N : int, let M : int> ";
-        sb << "__intrinsic_op(" << int(op.opCode) << ") matrix<" << resultType << ",N,M> operator" << op.opName << "(" << leftQual << "matrix<" << leftType << ",N,M> left, matrix<" << rightType << ",N,M> right);\n";
-    }
-}
-
-//
 
 // Buffer types
 
