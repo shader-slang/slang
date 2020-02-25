@@ -347,7 +347,7 @@ struct TextureCubeArray
 
 struct IRWTexture
 {
-       
+        /// Load at specified location. 
     virtual void Load(const int32_t* loc, void* out) = 0;
         /// Get the reference to the element at loc. 
     virtual void* refAt(const uint32_t* loc) = 0;
@@ -368,6 +368,39 @@ struct RWTexture2D
     T& operator[](const uint2& loc) { return *(T*)texture->refAt(&loc.x); }
     IRWTexture* texture;
 };
+
+template <typename T>
+struct RWTexture3D
+{
+    T Load(const int3& loc) const { T out; texture->Load(&loc.x, &out); return out; }
+    T& operator[](const uint3& loc) { return *(T*)texture->refAt(&loc.x); }
+    IRWTexture* texture;
+};
+
+template <typename T>
+struct RWTextureCube
+{
+    T Load(const int3& loc) const { T out; texture->Load(&loc.x, &out); return out; }
+    T& operator[](const uint3& loc) { return *(T*)texture->refAt(&loc.x); }
+    IRWTexture* texture;
+};
+
+template <typename T>
+struct RWTexture1DArray
+{
+    T Load(int2 loc) const { T out; texture->Load(&loc.x, &out); return out; }
+    T& operator[](uint2 loc) { return *(T*)texture->refAt(&loc.x); }
+    IRWTexture* texture;
+};
+
+template <typename T>
+struct RWTexture2DArray
+{
+    T Load(const int3& loc) const { T out; texture->Load(&loc.x, &out); return out; }
+    T& operator[](const uint3& loc) { return *(T*)texture->refAt(&loc.x); }
+    IRWTexture* texture;
+};
+
 
 /* Varying input for Compute */
 

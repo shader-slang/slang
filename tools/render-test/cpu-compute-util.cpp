@@ -260,7 +260,7 @@ public:
     void init(int elementCount, int dimCount, const uint32_t* dims)
     {
         SLANG_ASSERT(elementCount >= 1 && elementCount <= 4);
-        SLANG_ASSERT(dims >= 1 && dims < 4);
+        SLANG_ASSERT(dimCount >= 1 && dimCount < 4);
 
         Index totalSize = 1;
 
@@ -557,6 +557,8 @@ static SlangResult _newTexture(const InputTextureDesc& desc, slang::TypeLayoutRe
             case SLANG_TEXTURE_2D:
             case SLANG_TEXTURE_3D:
             case SLANG_TEXTURE_CUBE:
+            case SLANG_TEXTURE_1D_ARRAY:
+            case SLANG_TEXTURE_2D_ARRAY:
             {
                 outResource = new FloatRWTexture(elemCount, dimsCount, dims, initialValue);
                 return SLANG_OK;

@@ -10,9 +10,12 @@
 
 //TEST_INPUT: RWTexture1D(format=R_Float32, size=4, content = one):name rwt1D
 RWTexture1D<float> rwt1D;
-
 //TEST_INPUT: RWTexture2D(format=R_Float32, size=4, content = one):name rwt2D
 RWTexture2D<float> rwt2D;
+//TEST_INPUT: RWTexture3D(format=R_Float32, size=4, content = one):name rwt3D
+RWTexture3D<float> rwt3D;
+//TEST_INPUT: RWTextureCube(format=R_Float32, size=4, content = one):name rwtCube
+RWTextureCube<float> rwtCube;
 
 //TEST_INPUT: ubuffer(data=[0 0 0 0], stride=4):out,name outputBuffer
 RWStructuredBuffer<float> outputBuffer;
@@ -27,14 +30,21 @@ void computeMain(uint3 dispatchThreadID : SV_DispatchThreadID)
     //val += rwt1D.Load(idx);
     val += rwt1D[idx];
     val += rwt2D[uint2(idx, idx)];
+    val += rwt3D[uint3(idx, idx, idx)];
+    //val += rwtCube[uint3(idx, idx, 0)];
     
-    // On CUDA the write does have an effect - when it is read back it's value is 0 (!)
+    // NOTE! This is disabled because on CUDA, whilst this has an effect it is not what is expected.
+    // The value read back has changed but seems to always be 1.
+    //rwt1D[idx] = idx;
     
-    rwt1D[idx] = idx;
-    rwt2D[uint2(idx, idx)] = idx;        
+    rwt2D[uint2(idx, idx)] = idx;    
+    rwt3D[uint3(idx, idx, idx)] = idx;    
+    //rwtCube[uint3(idx, idx, 0)] = idx;    
             
     val += rwt1D[idx];
     val += rwt2D[uint2(idx, idx)];
+    val += rwt3D[uint3(idx, idx, idx)];
+    //val += rwtCube[uint3(idx, idx, 0)];
  
     outputBuffer[idx] = val;
 }

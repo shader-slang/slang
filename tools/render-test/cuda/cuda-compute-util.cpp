@@ -928,7 +928,9 @@ static SlangResult _compute(CUcontext context, CUmodule module, const ShaderComp
 
                         auto access = type->getResourceAccess();
 
-                        switch (shape & SLANG_RESOURCE_BASE_SHAPE_MASK)
+                        const auto baseShape = shape & SLANG_RESOURCE_BASE_SHAPE_MASK;
+
+                        switch (baseShape)
                         {
                             case SLANG_STRUCTURED_BUFFER:
                             {
