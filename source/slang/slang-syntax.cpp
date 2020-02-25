@@ -1346,6 +1346,34 @@ void Type::accept(IValVisitor* visitor, void* extra)
         return this;
     }
 
+    // ErrorIntVal
+
+    bool ErrorIntVal::EqualsVal(Val* val)
+    {
+        if( auto errorIntVal = as<ErrorIntVal>(val) )
+        {
+            return true;
+        }
+        return false;
+    }
+
+    String ErrorIntVal::ToString()
+    {
+        return "<error>";
+    }
+
+    int ErrorIntVal::GetHashCode()
+    {
+        return int(typeid(this).hash_code());
+    }
+
+    RefPtr<Val> ErrorIntVal::SubstituteImpl(SubstitutionSet subst, int* ioDiff)
+    {
+        SLANG_UNUSED(subst);
+        SLANG_UNUSED(ioDiff);
+        return this;
+    }
+
     // Substitutions
 
     RefPtr<Substitutions> GenericSubstitution::applySubstitutionsShallow(SubstitutionSet substSet, RefPtr<Substitutions> substOuter, int* ioDiff)

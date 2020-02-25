@@ -1,0 +1,6 @@
+result code = -1
+standard error = {
+tests/bugs/ray-flags-non-constant.slang(11): error 39999: expression does not evaluate to a compile-time constant
+}
+standard output = {
+}
