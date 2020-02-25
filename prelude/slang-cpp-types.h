@@ -345,22 +345,28 @@ struct TextureCubeArray
 
 /* !!!!!!!!!!!!!!!!!!!!!!!!!!! RWTexture !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! */
 
-struct IRWTexture1D
+struct IRWTexture
 {
-    virtual void Load(int32_t loc, void* out) = 0;
-    
-        /// Get the element at the specified location
-    virtual void* getAt(int32_t loc) = 0;
+       
+    virtual void Load(const int32_t* loc, void* out) = 0;
+        /// Get the reference to the element at loc. 
+    virtual void* refAt(const uint32_t* loc) = 0;
 };
 
 template <typename T>
 struct RWTexture1D
 {
-    T Load(int32_t loc) const { T out; texture->Load(loc, &out); return out; }
-    
-    T& operator[](int32_t loc) { return *(T*)texture->getAt(loc); }
-    
-    IRWTexture1D* texture;              
+    T Load(int32_t loc) const { T out; texture->Load(&loc, &out); return out; }
+    T& operator[](uint32_t loc) { return *(T*)texture->refAt(&loc); }
+    IRWTexture* texture;              
+};
+
+template <typename T>
+struct RWTexture2D
+{
+    T Load(const int2& loc) const { T out; texture->Load(&loc.x, &out); return out; }
+    T& operator[](const uint2& loc) { return *(T*)texture->refAt(&loc.x); }
+    IRWTexture* texture;
 };
 
 /* Varying input for Compute */

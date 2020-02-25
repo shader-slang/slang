@@ -11,6 +11,9 @@
 //TEST_INPUT: RWTexture1D(format=R_Float32, size=4, content = one):name rwt1D
 RWTexture1D<float> rwt1D;
 
+//TEST_INPUT: RWTexture2D(format=R_Float32, size=4, content = one):name rwt2D
+RWTexture2D<float> rwt2D;
+
 //TEST_INPUT: ubuffer(data=[0 0 0 0], stride=4):out,name outputBuffer
 RWStructuredBuffer<float> outputBuffer;
 
@@ -18,17 +21,20 @@ RWStructuredBuffer<float> outputBuffer;
 void computeMain(uint3 dispatchThreadID : SV_DispatchThreadID)
 {
     int idx = dispatchThreadID.x;
-    float u = idx * (1.0f / 4);
     
     float val = 0.0f;
  
-    val += rwt1D.Load(idx);
- 
+    //val += rwt1D.Load(idx);
     val += rwt1D[idx];
+    val += rwt2D[uint2(idx, idx)];
+    
+    // On CUDA the write does have an effect - when it is read back it's value is 0 (!)
     
     rwt1D[idx] = idx;
-        
+    rwt2D[uint2(idx, idx)] = idx;        
+            
     val += rwt1D[idx];
+    val += rwt2D[uint2(idx, idx)];
  
     outputBuffer[idx] = val;
 }

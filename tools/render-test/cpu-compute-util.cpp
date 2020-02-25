@@ -252,12 +252,12 @@ class FloatTextureData
 {
 public:
     FloatTextureData() {}
-    FloatTextureData(int elementCount, int dimCount, const int32_t* dims)
+    FloatTextureData(int elementCount, int dimCount, const uint32_t* dims)
     {
         init(elementCount, dimCount, dims);
     }
 
-    void init(int elementCount, int dimCount, const int32_t* dims)
+    void init(int elementCount, int dimCount, const uint32_t* dims)
     {
         SLANG_ASSERT(elementCount >= 1 && elementCount <= 4);
         SLANG_ASSERT(dims >= 1 && dims < 4);
@@ -288,7 +288,7 @@ public:
         }
     }
 
-    void setAt(const int32_t* location, const float* value)
+    void setAt(const uint32_t* location, const float* value)
     {
         const Index index = _getIndex(location);
         float* dst = &m_values[index];
@@ -301,13 +301,13 @@ public:
         }
     }
 
-    float* getAt(const int32_t* location)
+    float* getAt(const uint32_t* location)
     {
         const Index index = _getIndex(location);
         return &m_values[index];
     }
 
-    void getAt(const int32_t* location, float* dst)
+    void getAt(const uint32_t* location, float* dst)
     {
         const Index index = _getIndex(location);
         float* value = &m_values[index];
@@ -320,12 +320,12 @@ public:
         }
     }
 
-    bool isLocationValid(const int32_t* location) const
+    bool isLocationValid(const uint32_t* location) const
     {
         for (Index i = 0; i < m_dimCount; ++i)
         {
             const auto v = location[i];
-            if (v < 0 || v >= m_dims[i])
+            if (v >= m_dims[i])
             {
                 return false;
             }
@@ -333,7 +333,7 @@ public:
         return true;
     }
 
-    Index _getIndex(const int32_t* location)
+    Index _getIndex(const uint32_t* location)
     {
         const auto style = (m_dimCount << 2) | m_elementCount;
         SLANG_ASSERT(isLocationValid(location));
@@ -351,29 +351,29 @@ public:
     uint8_t m_elementCount;             ///< Number of elements in each value
 
     uint8_t m_dimCount;
-    int32_t m_dims[4];                  ///< Sizes in each dimension
+    uint32_t m_dims[4];                  ///< Sizes in each dimension
     
     List<float> m_values;               ///< Holds the contained data
 };
 
 // For a RWTexture we will define it to have memory, and that it can only be accessed via 
-struct FloatRWTexture1D : public CPUComputeUtil::Resource, public CPPPrelude::IRWTexture1D
+struct FloatRWTexture : public CPUComputeUtil::Resource, public CPPPrelude::IRWTexture
 {
-    virtual void Load(int32_t loc, void* out) SLANG_OVERRIDE { m_data.getAt(&loc, (float*)out); }
-    virtual void* getAt(int32_t loc) { return m_data.getAt(&loc); }
+    // IRWTexture
+    virtual void Load(const int32_t* loc, void* out) SLANG_OVERRIDE { m_data.getAt((const uint32_t*)loc, (float*)out); }
+    virtual void* refAt(const uint32_t* loc) SLANG_OVERRIDE { return m_data.getAt(loc); }
 
-    FloatRWTexture1D(int elementCount, int dimsCount, const int32_t* dims, float initialValue)
+    FloatRWTexture(int elementCount, int dimsCount, const uint32_t* dims, float initialValue)
     {
-        SLANG_ASSERT(dimsCount == 1);
         m_data.init(elementCount, dimsCount, dims);
         m_data.setValue(initialValue);
-        m_interface = static_cast<CPPPrelude::IRWTexture1D*>(this);
+        m_interface = static_cast<CPPPrelude::IRWTexture*>(this);
     }
 
     FloatTextureData m_data;
 };
 
-static int _calcDims(const InputTextureDesc& desc, slang::TypeLayoutReflection* typeLayout, int32_t outDims[4])
+static int _calcDims(const InputTextureDesc& desc, slang::TypeLayoutReflection* typeLayout, uint32_t outDims[4])
 {
     const auto kind = typeLayout->getKind();
     SLANG_ASSERT(kind == slang::TypeReflection::Kind::Resource);
@@ -381,13 +381,11 @@ static int _calcDims(const InputTextureDesc& desc, slang::TypeLayoutReflection* 
     auto type = typeLayout->getType();
     auto shape = type->getResourceShape();
 
-    //auto access = type->getResourceAccess();
-
-    const int32_t size = int32_t(desc.size);
+    const uint32_t size = uint32_t(desc.size);
+    const auto baseShape = (shape & SLANG_RESOURCE_BASE_SHAPE_MASK);
 
     int dimsCount = 0;
 
-    auto baseShape = shape & SLANG_RESOURCE_BASE_SHAPE_MASK;
     switch (baseShape)
     {
         case SLANG_TEXTURE_1D:
@@ -419,7 +417,7 @@ static int _calcDims(const InputTextureDesc& desc, slang::TypeLayoutReflection* 
 
     if (shape & SLANG_TEXTURE_ARRAY_FLAG)
     {
-        int32_t arrayLength = int32_t(desc.arrayLength);
+        uint32_t arrayLength = uint32_t(desc.arrayLength);
         outDims[dimsCount++] = arrayLength;
     }
 
@@ -550,14 +548,17 @@ static SlangResult _newTexture(const InputTextureDesc& desc, slang::TypeLayoutRe
     // These need a different style of texture if can be written to
     if (access == SLANG_RESOURCE_ACCESS_READ_WRITE)
     {
-        int32_t dims[4];
+        uint32_t dims[4];
         const int dimsCount = _calcDims(desc, typeLayout, dims);
 
         switch (shape)
         {
             case SLANG_TEXTURE_1D:
+            case SLANG_TEXTURE_2D:
+            case SLANG_TEXTURE_3D:
+            case SLANG_TEXTURE_CUBE:
             {
-                outResource = new FloatRWTexture1D(elemCount, dimsCount, dims, initialValue);
+                outResource = new FloatRWTexture(elemCount, dimsCount, dims, initialValue);
                 return SLANG_OK;
             }
         }
