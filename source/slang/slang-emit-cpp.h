@@ -97,7 +97,6 @@ protected:
 
     // Really we don't want any of these defined like they are here, they should be defined in slang stdlib 
     void _emitAnyAllDefinition(const UnownedStringSlice& funcName, const HLSLIntrinsic* specOp);
-    void _emitCrossDefinition(const UnownedStringSlice& funcName, const HLSLIntrinsic* specOp);
     void _emitLengthDefinition(const UnownedStringSlice& funcName, const HLSLIntrinsic* specOp);
     void _emitNormalizeDefinition(const UnownedStringSlice& funcName, const HLSLIntrinsic* specOp);
     void _emitReflectDefinition(const UnownedStringSlice& funcName, const HLSLIntrinsic* specOp);

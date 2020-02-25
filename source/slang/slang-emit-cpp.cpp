@@ -951,33 +951,6 @@ void CPPSourceEmitter::_emitVecMatMulDefinition(const UnownedStringSlice& funcNa
     writer->emit("}\n\n");
 }
 
-void CPPSourceEmitter::_emitCrossDefinition(const UnownedStringSlice& funcName, const HLSLIntrinsic* specOp)
-{
-    _emitSignature(funcName, specOp);
-
-    SourceWriter* writer = getSourceWriter();
-
-    writer->emit("\n{\n");
-    writer->indent();
-
-    writer->emit("return ");
-    if (m_target == CodeGenTarget::CUDASource)
-    {
-        m_writer->emit("make_");
-        emitType(specOp->returnType);
-        writer->emit("( a.y * b.z - a.z * b.y, a.z * b.x - a.x * b.z, a.x * b.y - a.y * b.x ); \n");
-    }
-    else
-    {
-        emitType(specOp->returnType);
-        writer->emit("{ a.y * b.z - a.z * b.y, a.z * b.x - a.x * b.z, a.x * b.y - a.y * b.x }; \n");
-    }
-
-    
-    writer->dedent();
-    writer->emit("}\n\n");
-}
-
 UnownedStringSlice CPPSourceEmitter::_getAndEmitSpecializedOperationDefinition(HLSLIntrinsic::Op op, IRType*const* argTypes, Int argCount, IRType* retType)
 {
     HLSLIntrinsic intrinsic;
@@ -1421,10 +1394,6 @@ void CPPSourceEmitter::emitSpecializedOperationDefinition(const HLSLIntrinsic* s
         case Op::All:
         {
             return _emitAnyAllDefinition(_getFuncName(specOp), specOp);
-        }
-        case Op::Cross:
-        {
-            return _emitCrossDefinition(_getFuncName(specOp), specOp);
         }
         case Op::Normalize:
         {

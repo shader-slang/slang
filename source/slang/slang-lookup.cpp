@@ -25,14 +25,6 @@ struct BreadcrumbInfo
     BreadcrumbInfo* prev = nullptr;
 };
 
-void DoLocalLookupImpl(
-    Session*                session,
-    Name*                   name,
-    DeclRef<ContainerDecl>  containerDeclRef,
-    LookupRequest const&    request,
-    LookupResult&		    result,
-    BreadcrumbInfo*		    inBreadcrumbs);
-
 //
 
 void buildMemberDictionary(ContainerDecl* decl)
@@ -169,146 +161,28 @@ LookupResultItem CreateLookupResultItem(
     return item;
 }
 
-void DoMemberLookupImpl(
+static void _lookUpMembersInValue(
     Session*                session,
     Name*                   name,
-    RefPtr<Type>            baseType,
-    LookupRequest const&    request,
-    LookupResult&           ioResult,
-    BreadcrumbInfo*         breadcrumbs)
-{
-    if (!baseType)
-    {
-        return;
-    }
-
-    // If the type was pointer-like, then dereference it
-    // automatically here.
-    if (auto pointerLikeType = as<PointerLikeType>(baseType))
-    {
-        // Need to leave a breadcrumb to indicate that we
-        // did an implicit dereference here
-        BreadcrumbInfo derefBreacrumb;
-        derefBreacrumb.kind = LookupResultItem::Breadcrumb::Kind::Deref;
-        derefBreacrumb.prev = breadcrumbs;
-
-        // Recursively perform lookup on the result of deref
-        return DoMemberLookupImpl(
-            session,
-            name, pointerLikeType->elementType, request, ioResult, &derefBreacrumb);
-    }
-
-    // Default case: no dereference needed
-
-    if (auto baseDeclRefType = as<DeclRefType>(baseType))
-    {
-        if (auto baseAggTypeDeclRef = baseDeclRefType->declRef.as<AggTypeDecl>())
-        {
-            DoLocalLookupImpl(
-                session,
-                name, baseAggTypeDeclRef, request, ioResult, breadcrumbs);
-        }
-    }
-
-    // TODO(tfoley): any other cases to handle here?
-}
-
-void DoMemberLookupImpl(
-    Session*                session,
-    Name*                   name,
-    DeclRef<Decl>           baseDeclRef,
+    DeclRef<Decl>           valueDeclRef,
     LookupRequest const&    request,
     LookupResult&	        ioResult,
-    BreadcrumbInfo*	        breadcrumbs)
-{
-    auto baseType = getTypeForDeclRef(
-        session,
-        baseDeclRef,
-        SourceLoc());
-    return DoMemberLookupImpl(
-        session,
-        name, baseType, request, ioResult, breadcrumbs);
-}
+    BreadcrumbInfo*	        breadcrumbs);
 
-// If we are about to perform lookup through an interface, then
-// we need to specialize the decl-ref to that interface to include
-// a "this type" subtitution. This function applies that substition
-// when it is required, and returns the existing `declRef` otherwise.
-DeclRef<Decl> maybeSpecializeInterfaceDeclRef(
-    RefPtr<Type>                subType,
-    RefPtr<Type>                superType,
-    DeclRef<Decl>               superTypeDeclRef,   // The decl-ref we are going to perform lookup in
-    DeclRef<TypeConstraintDecl> constraintDeclRef)  // The type constraint that told us our type is a subtype
-{
-    if (auto superInterfaceDeclRef = superTypeDeclRef.as<InterfaceDecl>())
-    {
-        // TODO: This case should probably loop back into the semantic
-        // checking logic (when available) in order to ensure that
-        // appropriate witness values have been registered for (at least)
-        // the associated type requirements of the super-type.
-
-        // Create a subtype witness value to note the subtype relationship
-        // that makes this specialization valid.
-        //
-        // Note: this is to ensure that we can specialize the subtype witness
-        // later (e.g., by replacing a subtype witness that represents a generic
-        // constraint parameter with the concrete generic arguments that
-        // are used at a particular call site to the generic).
-        RefPtr<DeclaredSubtypeWitness> subtypeWitness = new DeclaredSubtypeWitness();
-        subtypeWitness->declRef = constraintDeclRef;
-        subtypeWitness->sub = subType;
-        subtypeWitness->sup = superType;
-
-        RefPtr<ThisTypeSubstitution> thisTypeSubst = new ThisTypeSubstitution();
-        thisTypeSubst->interfaceDecl = superInterfaceDeclRef.getDecl();
-        thisTypeSubst->witness = subtypeWitness;
-        thisTypeSubst->outer = superInterfaceDeclRef.substitutions.substitutions;
-
-        auto specializedInterfaceDeclRef = DeclRef<Decl>(superInterfaceDeclRef.getDecl(), thisTypeSubst);
-        return specializedInterfaceDeclRef;
-    }
-
-    return superTypeDeclRef;
-}
-
-// Same as the above, but we are specializing a type instead of a decl-ref
-RefPtr<Type> maybeSpecializeInterfaceDeclRef(
-    Session*                    session,
-    RefPtr<Type>                subType,
-    RefPtr<Type>                superType,          // The type we are going to perform lookup in
-    DeclRef<TypeConstraintDecl> constraintDeclRef)  // The type constraint that told us our type is a subtype
-{
-    if (auto superDeclRefType = as<DeclRefType>(superType))
-    {
-        if (auto superInterfaceDeclRef = superDeclRefType->declRef.as<InterfaceDecl>())
-        {
-            auto specializedInterfaceDeclRef = maybeSpecializeInterfaceDeclRef(
-                subType,
-                superType,
-                superInterfaceDeclRef,
-                constraintDeclRef);
-            auto specializedInterfaceType = DeclRefType::Create(session, specializedInterfaceDeclRef);
-            return specializedInterfaceType;
-        }
-    }
-
-    return superType;
-}
-
-
-// Look for members of the given name in the given container for declarations
-void DoLocalLookupImpl(
+    /// Look up direct members (those declared in `containerDeclRef` itself, as well
+    /// as transitively through any direct members that are marked "transparent."
+    ///
+    /// This function does *not* deal with looking up through `extension`s,
+    /// inheritance clauses, etc.
+    ///
+static void _lookUpDirectAndTransparentMembers(
     Session*                session,
     Name*                   name,
-    DeclRef<ContainerDecl>	containerDeclRef,
+    DeclRef<ContainerDecl>  containerDeclRef,
     LookupRequest const&    request,
-    LookupResult&		    result,
-    BreadcrumbInfo*		    inBreadcrumbs)
+    LookupResult&           result,
+    BreadcrumbInfo*         inBreadcrumbs)
 {
-    if (result.lookedupDecls.Contains(containerDeclRef))
-        return;
-    result.lookedupDecls.Add(containerDeclRef);
-
     ContainerDecl* containerDecl = containerDeclRef.getDecl();
 
     // Ensure that the lookup dictionary in the container is up to date
@@ -334,10 +208,8 @@ void DoLocalLookupImpl(
         AddToLookupResult(result, CreateLookupResultItem(DeclRef<Decl>(m, containerDeclRef.substitutions), inBreadcrumbs));
     }
 
-
     // TODO(tfoley): should we look up in the transparent decls
     // if we already has a hit in the current container?
-
     for(auto transparentInfo : containerDecl->transparentMembers)
     {
         // The reference to the transparent member should use whatever
@@ -352,7 +224,7 @@ void DoLocalLookupImpl(
         memberRefBreadcrumb.declRef = transparentMemberDeclRef;
         memberRefBreadcrumb.prev = inBreadcrumbs;
 
-        DoMemberLookupImpl(
+        _lookUpMembersInValue(
             session,
             name,
             transparentMemberDeclRef,
@@ -360,97 +232,363 @@ void DoLocalLookupImpl(
             result,
             &memberRefBreadcrumb);
     }
+}
 
-    // Consider lookup via extension
-    if( auto aggTypeDeclRef = containerDeclRef.as<AggTypeDecl>() )
+static RefPtr<SubtypeWitness> _makeSubtypeWitness(
+    Type*                       subType,
+    SubtypeWitness*             subToMidWitness,
+    Type*                       superType,
+    DeclRef<TypeConstraintDecl> midToSuperConstraint)
+{
+    if(subToMidWitness)
     {
-        if (request.semantics)
-        {
-            ensureDecl(request.semantics, containerDeclRef.getDecl(), DeclCheckState::ReadyForLookup);
-        }
-
-        RefPtr<Type> type = DeclRefType::Create(
-            session,
-            aggTypeDeclRef);
-
-        for (auto ext = GetCandidateExtensions(aggTypeDeclRef); ext; ext = ext->nextCandidateExtension)
-        {
-            auto extDeclRef = ApplyExtensionToType(request.semantics, ext, type);
-            if (!extDeclRef)
-                continue;
-
-            // TODO: eventually we need to insert a breadcrumb here so that
-            // the constructed result can somehow indicate that a member
-            // was found through an extension.
-
-            DoLocalLookupImpl(
-                session,
-                name, extDeclRef, request, result, inBreadcrumbs);
-        }
-
+        RefPtr<TransitiveSubtypeWitness> transitiveWitness = new TransitiveSubtypeWitness();
+        transitiveWitness->subToMid = subToMidWitness;
+        transitiveWitness->midToSup = midToSuperConstraint;
+        transitiveWitness->sub = subType;
+        transitiveWitness->sup = superType;
+        return transitiveWitness;
     }
-    // for interface decls, also lookup in the base interfaces
-    if (request.semantics)
+    else
     {
-        // TODO:
-        // The logic here is a bit gross, because it tries to work in terms of
-        // decl-refs instead of types (e.g., it asserts that the target type
-        // for an `extension` declaration must be a decl-ref type).
-        //
-        // This code should be converted to do a type-based lookup
-        // through declared bases for *any* aggregate type declaration.
-        // I think that logic is present in the type-based lookup path, but
-        // it would be needed here for when doing lookup from inside an
-        // aggregate declaration.
+        RefPtr<DeclaredSubtypeWitness> declaredWitness = new DeclaredSubtypeWitness();
+        declaredWitness->declRef = midToSuperConstraint;
+        declaredWitness->sub = subType;
+        declaredWitness->sup = superType;
+        return declaredWitness;
+    }
+}
 
-        // if we are looking at an extension, find the target decl that we are extending
-        DeclRef<Decl> targetDeclRef = containerDeclRef;
-        RefPtr<DeclRefType> targetDeclRefType;
-        if (auto extDeclRef = containerDeclRef.as<ExtensionDecl>())
+// Same as the above, but we are specializing a type instead of a decl-ref
+static RefPtr<Type> _maybeSpecializeSuperType(
+    Session*                    session,
+    Type*                       superType,
+    SubtypeWitness*             subIsSuperWitness)
+{
+    if (auto superDeclRefType = as<DeclRefType>(superType))
+    {
+        if (auto superInterfaceDeclRef = superDeclRefType->declRef.as<InterfaceDecl>())
         {
-            ensureDecl(request.semantics, extDeclRef.getDecl(), DeclCheckState::CanUseExtensionTargetType);
+            RefPtr<ThisTypeSubstitution> thisTypeSubst = new ThisTypeSubstitution();
+            thisTypeSubst->interfaceDecl = superInterfaceDeclRef.getDecl();
+            thisTypeSubst->witness = subIsSuperWitness;
+            thisTypeSubst->outer = superInterfaceDeclRef.substitutions.substitutions;
 
-            targetDeclRefType = as<DeclRefType>(extDeclRef.getDecl()->targetType);
-            SLANG_ASSERT(targetDeclRefType);
-            int diff = 0;
-            targetDeclRef = targetDeclRefType->declRef.as<ContainerDecl>().SubstituteImpl(containerDeclRef.substitutions, &diff);
+            auto specializedInterfaceDeclRef = DeclRef<Decl>(superInterfaceDeclRef.getDecl(), thisTypeSubst);
+
+            auto specializedInterfaceType = DeclRefType::Create(session, specializedInterfaceDeclRef);
+            return specializedInterfaceType;
         }
+    }
 
-        // When looking up inside a type, we want to also perform lookup via
-        // the types it inherits from, in case of them defines the member we are looking for.
-        //
-        // TODO: Need to be careful that this doesn't allow a type to satisfy an interface
-        // requirement using the original declaration of that requirement...
+    return superType;
+}
 
+static void _lookUpMembersInType(
+    Session*                session,
+    Name*                   name,
+    RefPtr<Type>            type,
+    LookupRequest const&    request,
+    LookupResult&           ioResult,
+    BreadcrumbInfo*         breadcrumbs);
+
+static void _lookUpMembersInSuperTypeImpl(
+    Session*                session,
+    Name*                   name,
+    Type*                   leafType,
+    Type*                   superType,
+    SubtypeWitness*         leafIsSuperWitness,
+    LookupRequest const&    request,
+    LookupResult&           ioResult,
+    BreadcrumbInfo*         inBreadcrumbs);
+
+
+static void _lookUpMembersInSuperType(
+    Session*                    session,
+    Name*                       name,
+    Type*                       leafType,
+    SubtypeWitness*             leafIsIntermediateWitness,
+    DeclRef<TypeConstraintDecl> intermediateIsSuperConstraint,
+    LookupRequest const&        request,
+    LookupResult&               ioResult,
+    BreadcrumbInfo*             inBreadcrumbs)
+{
+    if( request.semantics )
+    {
+        ensureDecl(request.semantics, intermediateIsSuperConstraint, DeclCheckState::CanUseBaseOfInheritanceDecl);
+    }
+
+    // The super-type in the constraint (e.g., `Foo` in `T : Foo`)
+    // will tell us a type we should use for lookup.
+    //
+    auto superType = GetSup(intermediateIsSuperConstraint);
+    //
+    // We will go ahead and perform lookup using `superType`,
+    // after dealing with some details.
+
+    auto leafIsSuperWitness = _makeSubtypeWitness(
+        leafType,
+        leafIsIntermediateWitness,
+        superType,
+        intermediateIsSuperConstraint);
+
+    // If we are looking up through an interface type, then
+    // we need to be sure that we add an appropriate
+    // "this type" substitution here, since that needs to
+    // be applied to any members we look up.
+    //
+    superType = _maybeSpecializeSuperType(
+        session,
+        superType,
+        leafIsSuperWitness);
+
+    // We need to track the indirection we took in lookup,
+    // so that we can construct an appropriate AST on the other
+    // side that includes the "upcast" from sub-type to super-type.
+    //
+    BreadcrumbInfo breadcrumb;
+    breadcrumb.prev = inBreadcrumbs;
+    breadcrumb.kind = LookupResultItem::Breadcrumb::Kind::Constraint;
+    breadcrumb.declRef = intermediateIsSuperConstraint;
+    breadcrumb.prev = inBreadcrumbs;
+
+    // TODO: Need to consider case where this might recurse infinitely (e.g.,
+    // if an inheritance clause does something like `Bad<T> : Bad<Bad<T>>`.
+    //
+    // TODO: The even simpler thing we need to worry about here is that if
+    // there is ever a "diamond" relationship in the inheritance hierarchy,
+    // we might end up seeing the same interface via different "paths" and
+    // we wouldn't want that to lead to overload-resolution failure.
+    //
+    _lookUpMembersInSuperTypeImpl(session, name, leafType, superType, leafIsSuperWitness, request, ioResult, &breadcrumb);
+}
+
+static void _lookUpMembersInSuperTypeDeclImpl(
+    Session*                session,
+    Name*                   name,
+    Type*                   leafType,
+    Type*                   superType,
+    SubtypeWitness*         leafIsSuperWitness,
+    DeclRef<Decl>           declRef,
+    LookupRequest const&    request,
+    LookupResult&           ioResult,
+    BreadcrumbInfo*         inBreadcrumbs)
+{
+    auto semantics = request.semantics;
+    if( semantics )
+    {
+        ensureDecl(semantics, declRef.getDecl(), DeclCheckState::ReadyForLookup);
+    }
+
+    if (auto genericTypeParamDeclRef = declRef.as<GenericTypeParamDecl>())
+    {
+        // If the type we are doing lookup in is a generic type parameter,
+        // then the members it provides can only be discovered by looking
+        // at the constraints that are placed on that type.
+
+        auto genericDeclRef = genericTypeParamDeclRef.GetParent().as<GenericDecl>();
+        assert(genericDeclRef);
+
+        for(auto constraintDeclRef : getMembersOfType<GenericTypeConstraintDecl>(genericDeclRef))
         {
-            if(!targetDeclRefType)
+            if( semantics )
             {
-                targetDeclRefType = DeclRefType::Create(session, targetDeclRef);
+                ensureDecl(semantics, constraintDeclRef, DeclCheckState::CanUseBaseOfInheritanceDecl);
             }
 
-            auto baseInterfaces = getMembersOfType<InheritanceDecl>(containerDeclRef);
-            for (auto inheritanceDeclRef : baseInterfaces)
+            // Does this constraint pertain to the type we are working on?
+            //
+            // We want constraints of the form `T : Foo` where `T` is the
+            // generic parameter in question, and `Foo` is whatever we are
+            // constraining it to.
+            auto subType = GetSub(constraintDeclRef);
+            auto subDeclRefType = as<DeclRefType>(subType);
+            if(!subDeclRefType)
+                continue;
+            if(!subDeclRefType->declRef.Equals(genericTypeParamDeclRef))
+                continue;
+
+            _lookUpMembersInSuperType(
+                session,
+                name,
+                leafType,
+                leafIsSuperWitness,
+                constraintDeclRef,
+                request,
+                ioResult,
+                inBreadcrumbs);
+        }
+    }
+    else if (declRef.as<AssocTypeDecl>() || declRef.as<GlobalGenericParamDecl>())
+    {
+        for (auto constraintDeclRef : getMembersOfType<TypeConstraintDecl>(declRef.as<ContainerDecl>()))
+        {
+            _lookUpMembersInSuperType(
+                session,
+                name,
+                leafType,
+                leafIsSuperWitness,
+                constraintDeclRef,
+                request,
+                ioResult,
+                inBreadcrumbs);
+        }
+    }
+    else if(auto aggTypeDeclBaseRef = declRef.as<AggTypeDeclBase>())
+    {
+        // In this case we are peforming lookup in the context of an aggregate
+        // type or an `extension`, so the first thing to do is to look for
+        // matching members declared directly in the body of the type/`extension`.
+        //
+        _lookUpDirectAndTransparentMembers(session, name, aggTypeDeclBaseRef, request, ioResult, inBreadcrumbs);
+
+        // There are further lookup steps that we can only perform when a
+        // semantic checking context is available to us. That means that
+        // during parsing, lookup will fail to find members under `name`
+        // if they required following these paths.
+        //
+        if(semantics)
+        {
+            if(auto aggTypeDeclRef = aggTypeDeclBaseRef.as<AggTypeDecl>())
             {
-                ensureDecl(request.semantics, inheritanceDeclRef.getDecl(), DeclCheckState::CanUseBaseOfInheritanceDecl);
+                // If the declaration we are looking at is a nominal type declaration,
+                // then we want to consider any `extension`s that have been associated
+                // directly with that type.
+                //
+                ensureDecl(request.semantics, aggTypeDeclRef.getDecl(), DeclCheckState::ReadyForLookup);
+                for(auto extDecl = GetCandidateExtensions(aggTypeDeclRef); extDecl; extDecl = extDecl->nextCandidateExtension)
+                {
+                    // Note: In this case `extDecl` is an extension that was declared to apply
+                    // (conditionally) to `aggTypeDeclRef`, which is the decl-ref part of
+                    // `superType`. Thus when looking for a substitution to apply to the
+                    // extension, we need to apply it to `superType` and not to `leafType`.
+                    //
+                    auto extDeclRef = ApplyExtensionToType(request.semantics, extDecl, superType);
+                    if (!extDeclRef)
+                        continue;
 
-                auto baseType = inheritanceDeclRef.getDecl()->base.type.dynamicCast<DeclRefType>();
-                SLANG_ASSERT(baseType);
-                int diff = 0;
-                auto baseInterfaceDeclRef = baseType->declRef.SubstituteImpl(containerDeclRef.substitutions, &diff);
+                    // TODO: eventually we need to insert a breadcrumb here so that
+                    // the constructed result can somehow indicate that a member
+                    // was found through an extension.
+                    //
+                    _lookUpMembersInSuperTypeDeclImpl(
+                        session,
+                        name,
+                        leafType,
+                        superType,
+                        leafIsSuperWitness,
+                        extDeclRef,
+                        request,
+                        ioResult,
+                        inBreadcrumbs);
+                }
+            }
 
-                baseInterfaceDeclRef = maybeSpecializeInterfaceDeclRef(
-                    targetDeclRefType,
-                    baseType,
-                    baseInterfaceDeclRef,
-                    inheritanceDeclRef);
-
-                DoLocalLookupImpl(session, name, baseInterfaceDeclRef.as<ContainerDecl>(), request, result, inBreadcrumbs);
+            // For both aggregate types and their `extension`s, we want lookup to follow
+            // through the declared inheritance relationships on each declaration.
+            //
+            ensureDecl(semantics, aggTypeDeclBaseRef.getDecl(), DeclCheckState::CanEnumerateBases);
+            for (auto inheritanceDeclRef : getMembersOfType<InheritanceDecl>(aggTypeDeclBaseRef))
+            {
+                ensureDecl(semantics, inheritanceDeclRef.getDecl(), DeclCheckState::CanUseBaseOfInheritanceDecl);
+                _lookUpMembersInSuperType(session, name, leafType, leafIsSuperWitness, inheritanceDeclRef, request, ioResult, inBreadcrumbs);
             }
         }
     }
 }
 
-void DoLookupImpl(
+static void _lookUpMembersInSuperTypeImpl(
+    Session*                session,
+    Name*                   name,
+    Type*                   leafType,
+    Type*                   superType,
+    SubtypeWitness*         leafIsSuperWitness,
+    LookupRequest const&    request,
+    LookupResult&           ioResult,
+    BreadcrumbInfo*         inBreadcrumbs)
+{
+    // If the type was pointer-like, then dereference it
+    // automatically here.
+    if (auto pointerLikeType = as<PointerLikeType>(superType))
+    {
+        // Need to leave a breadcrumb to indicate that we
+        // did an implicit dereference here
+        BreadcrumbInfo derefBreacrumb;
+        derefBreacrumb.kind = LookupResultItem::Breadcrumb::Kind::Deref;
+        derefBreacrumb.prev = inBreadcrumbs;
+
+        // Recursively perform lookup on the result of deref
+        _lookUpMembersInType(
+            session,
+            name, pointerLikeType->elementType, request, ioResult, &derefBreacrumb);
+        return;
+    }
+
+    // Default case: no dereference needed
+
+    if(auto declRefType = as<DeclRefType>(superType))
+    {
+        auto declRef = declRefType->declRef;
+
+        _lookUpMembersInSuperTypeDeclImpl(session, name, leafType, superType, leafIsSuperWitness, declRef, request, ioResult, inBreadcrumbs);
+    }
+}
+
+    /// Perform lookup for `name` in the context of `type`.
+    ///
+    /// This operation does the kind of lookup we'd expect if `name`
+    /// was used inside of a member function on `type`, or if the
+    /// user wrote `obj.<name>` for a variable `obj` of the given
+    /// `type`.
+    ///
+    /// Looking up members in `type` includes lookup through any
+    /// constraints or inheritance relationships that expand the
+    /// set of members visible on `type`.
+    ///
+static void _lookUpMembersInType(
+    Session*                session,
+    Name*                   name,
+    RefPtr<Type>            type,
+    LookupRequest const&    request,
+    LookupResult&           ioResult,
+    BreadcrumbInfo*         breadcrumbs)
+{
+    if (!type)
+    {
+        return;
+    }
+
+    _lookUpMembersInSuperTypeImpl(session, name, type, type, nullptr, request, ioResult, breadcrumbs);
+}
+
+    /// Look up members by `name` in the given `valueDeclRef`.
+    ///
+    /// If `valueDeclRef` represents a reference to a variable
+    /// or other named and typed value, then this performs the
+    /// kind of lookup we'd expect for `valueDeclRef.<name>`.
+    ///
+static void _lookUpMembersInValue(
+    Session*                session,
+    Name*                   name,
+    DeclRef<Decl>           valueDeclRef,
+    LookupRequest const&    request,
+    LookupResult&	        ioResult,
+    BreadcrumbInfo*	        breadcrumbs)
+{
+    // Looking up `name` in the context of a value can
+    // be reduced to the problem of looking up `name`
+    // in the *type* of that value.
+    //
+    auto valueType = getTypeForDeclRef(
+        session,
+        valueDeclRef,
+        SourceLoc());
+    return _lookUpMembersInType(
+        session,
+        name, valueType, request, ioResult, breadcrumbs);
+}
+
+static void _lookUpInScopes(
     Session*                session,
     Name*                   name,
     LookupRequest const&    request,
@@ -472,52 +610,74 @@ void DoLookupImpl(
             if(!containerDecl)
                 continue;
 
+            // TODO: If we need default substitutions to be applied to
+            // the `containerDecl`, then it might make sense to have
+            // each `link` in the scope store a decl-ref instead of
+            // just a decl.
+            //
             DeclRef<ContainerDecl> containerDeclRef =
                 DeclRef<Decl>(containerDecl, createDefaultSubstitutions(session, containerDecl)).as<ContainerDecl>();
             
-            BreadcrumbInfo breadcrumb;
-            BreadcrumbInfo* breadcrumbs = nullptr;
-
-            // Depending on the kind of container we are looking into,
-            // we may need to insert something like a `this` expression
-            // to resolve the lookup result.
+            // If the container we are looking into represents a type
+            // or an `extension` of a type, then we need to treat
+            // this step as lookup into the `this` variable (or the
+            // `This` type), which means including any `extension`s
+            // or inheritance clauses in the lookup process.
             //
-            // Note: We are checking for `AggTypeDeclBase` here, and not
-            // just `AggTypeDecl`, because we want to catch `extension`
-            // declarations as well.
+            // Note: The `AggTypeDeclBase` class is the common superclass
+            // between `AggTypeDecl` and `ExtensionDecl`.
             //
-            if (auto aggTypeDeclRef = containerDeclRef.as<AggTypeDeclBase>())
+            if (auto aggTypeDeclBaseRef = containerDeclRef.as<AggTypeDeclBase>())
             {
+                // When reconstructing the final expression for a result
+                // looked up through the tyep or extension, we will need
+                // a `this` expression (or a `This` type expression) to
+                // mark the base of the member reference, so we create
+                // a "breadcrumb" here to trakc that fact.
+                //
+                BreadcrumbInfo breadcrumb;
                 breadcrumb.kind = LookupResultItem::Breadcrumb::Kind::This;
                 breadcrumb.thisParameterMode = thisParameterMode;
-                breadcrumb.declRef = aggTypeDeclRef;
+                breadcrumb.declRef = aggTypeDeclBaseRef;
                 breadcrumb.prev = nullptr;
 
-                breadcrumbs = &breadcrumb;
-            }
-
-            // Now perform "local" lookup in the context of the container,
-            // as if we were looking up a member directly.
-            
-            // if we are currently in an extension decl, perform local lookup
-            // in the target decl we are extending
-            if (auto extDeclRef = containerDeclRef.as<ExtensionDecl>())
-            {
-                if (extDeclRef.getDecl()->targetType)
+                RefPtr<Type> type;
+                if(auto extDeclRef = aggTypeDeclBaseRef.as<ExtensionDecl>())
                 {
-                    if (auto targetDeclRef = as<DeclRefType>(extDeclRef.getDecl()->targetType))
+                    if( request.semantics )
                     {
-                        if (auto aggDeclRef = targetDeclRef->declRef.as<AggTypeDecl>())
-                        {
-                            containerDeclRef = extDeclRef.Substitute(aggDeclRef);
-                        }
+                        ensureDecl(request.semantics, extDeclRef.getDecl(), DeclCheckState::CanUseExtensionTargetType);
                     }
-                }
-            }
-            DoLocalLookupImpl(
-                session,
-                name, containerDeclRef, request, result, breadcrumbs);
 
+                    // If we are doing lookup from inside an `extension`
+                    // declaration, then the `this` expression will have
+                    // a type that uses the "target type" of the `extension`.
+                    //
+                    type = GetTargetType(extDeclRef);
+                }
+                else
+                {
+                    assert(aggTypeDeclBaseRef.as<AggTypeDecl>());
+                    type = DeclRefType::Create(session, aggTypeDeclBaseRef);
+                }
+
+                _lookUpMembersInType(session, name, type, request, result, &breadcrumb);
+            }
+            else
+            {
+                // The default case is when the scope doesn't represent a
+                // type or `extension` declaration, so we can look up members
+                // in that scope much more simply.
+                //
+                _lookUpDirectAndTransparentMembers(session, name, containerDeclRef, request, result, nullptr);
+            }
+
+            // Before we proceed up to the next outer scope to perform lookup
+            // again, we need to consider what the current scope tells us
+            // about how to interpret uses of `this`. For example, if
+            // we are inside a `[mutating]` method, then the implicit `this`
+            // that we use for lookup should be an l-value.
+            //
             if( containerDeclRef.is<ConstructorDecl>() )
             {
                 thisParameterMode = LookupResultItem::Breadcrumb::ThisParameterMode::Mutating;
@@ -546,16 +706,6 @@ void DoLookupImpl(
     // If we run out of scopes, then we are done.
 }
 
-LookupResult DoLookup(
-    Session*                session,
-    Name*                   name,
-    LookupRequest const&    request)
-{
-    LookupResult result;
-    DoLookupImpl(session, name, request, result);
-    return result;
-}
-
 LookupResult lookUp(
     Session*            session,
     SemanticsVisitor*   semantics,
@@ -567,24 +717,9 @@ LookupResult lookUp(
     request.semantics = semantics;
     request.scope = scope;
     request.mask = mask;
-    return DoLookup(session, name, request);
-}
-
-// perform lookup within the context of a particular container declaration,
-// and do *not* look further up the chain
-LookupResult lookUpLocal(
-    Session*                session,
-    SemanticsVisitor*       semantics,
-    Name*                   name,
-    DeclRef<ContainerDecl>  containerDeclRef,
-    LookupMask          mask)
-{
-    LookupRequest request;
-    request.semantics = semantics;
-    request.mask = mask;
 
     LookupResult result;
-    DoLocalLookupImpl(session, name, containerDeclRef, request, result, nullptr);
+    _lookUpInScopes(session, name, request, result);
     return result;
 }
 
@@ -597,128 +732,6 @@ void lookUpMemberImpl(
     BreadcrumbInfo*     inBreadcrumbs,
     LookupMask          mask);
 
-// Perform lookup "through" the given constraint decl-ref,
-// which should show that `subType` is a sub-type of some
-// super-type (e.g., an interface).
-//
-void lookUpThroughConstraint(
-    Session*                    session,
-    SemanticsVisitor*           semantics,
-    Name*                       name,
-    Type*                       subType,
-    DeclRef<TypeConstraintDecl> constraintDeclRef,
-    LookupResult&               ioResult,
-    BreadcrumbInfo*             inBreadcrumbs,
-    LookupMask                  mask)
-{
-    // The super-type in the constraint (e.g., `Foo` in `T : Foo`)
-    // will tell us a type we should use for lookup.
-    //
-    auto superType = GetSup(constraintDeclRef);
-    //
-    // We will go ahead and perform lookup using `superType`,
-    // after dealing with some details.
-
-    // If we are looking up through an interface type, then
-    // we need to be sure that we add an appropriate
-    // "this type" substitution here, since that needs to
-    // be applied to any members we look up.
-    //
-    superType = maybeSpecializeInterfaceDeclRef(
-        session,
-        subType,
-        superType,
-        constraintDeclRef);
-
-    // We need to track the indirection we took in lookup,
-    // so that we can construct an appropriate AST on the other
-    // side that includes the "upcase" from sub-type to super-type.
-    //
-    BreadcrumbInfo breadcrumb;
-    breadcrumb.prev = inBreadcrumbs;
-    breadcrumb.kind = LookupResultItem::Breadcrumb::Kind::Constraint;
-    breadcrumb.declRef = constraintDeclRef;
-
-    // TODO: Need to consider case where this might recurse infinitely (e.g.,
-    // if an inheritance clause does something like `Bad<T> : Bad<Bad<T>>`.
-    //
-    // TODO: The even simpler thing we need to worry about here is that if
-    // there is ever a "diamond" relationship in the inheritance hierarchy,
-    // we might end up seeing the same interface via different "paths" and
-    // we wouldn't want that to lead to overload-resolution failure.
-    //
-    lookUpMemberImpl(session, semantics, name, superType, ioResult, &breadcrumb, mask);
-}
-
-void lookUpMemberImpl(
-    Session*            session,
-    SemanticsVisitor*   semantics,
-    Name*               name,
-    Type*               type,
-    LookupResult&       ioResult,
-    BreadcrumbInfo*     inBreadcrumbs,
-    LookupMask          mask)
-{
-    if (auto declRefType = as<DeclRefType>(type))
-    {
-        auto declRef = declRefType->declRef;
-        if (declRef.as<AssocTypeDecl>() || declRef.as<GlobalGenericParamDecl>())
-        {
-            for (auto constraintDeclRef : getMembersOfType<TypeConstraintDecl>(declRef.as<ContainerDecl>()))
-            {
-                lookUpThroughConstraint(
-                    session,
-                    semantics,
-                    name,
-                    type,
-                    constraintDeclRef,
-                    ioResult,
-                    inBreadcrumbs,
-                    mask);
-            }
-        }
-        else if (auto aggTypeDeclRef = declRef.as<AggTypeDecl>())
-        {
-            LookupRequest request;
-            request.semantics = semantics;
-
-            DoLocalLookupImpl(session, name, aggTypeDeclRef, request, ioResult, inBreadcrumbs);
-        }
-        else if (auto genericTypeParamDeclRef = declRef.as<GenericTypeParamDecl>())
-        {
-            auto genericDeclRef = genericTypeParamDeclRef.GetParent().as<GenericDecl>();
-            assert(genericDeclRef);
-
-            for(auto constraintDeclRef : getMembersOfType<GenericTypeConstraintDecl>(genericDeclRef))
-            {
-                // Does this constraint pertain to the type we are working on?
-                //
-                // We want constraints of the form `T : Foo` where `T` is the
-                // generic parameter in question, and `Foo` is whatever we are
-                // constraining it to.
-                auto subType = GetSub(constraintDeclRef);
-                auto subDeclRefType = as<DeclRefType>(subType);
-                if(!subDeclRefType)
-                    continue;
-                if(!subDeclRefType->declRef.Equals(genericTypeParamDeclRef))
-                    continue;
-
-                lookUpThroughConstraint(
-                    session,
-                    semantics,
-                    name,
-                    type,
-                    constraintDeclRef,
-                    ioResult,
-                    inBreadcrumbs,
-                    mask);
-            }
-        }
-        
-    }
-    
-}
-
 LookupResult lookUpMember(
     Session*            session,
     SemanticsVisitor*   semantics,
@@ -726,8 +739,12 @@ LookupResult lookUpMember(
     Type*               type,
     LookupMask          mask)
 {
+    LookupRequest request;
+    request.semantics = semantics;
+    request.mask = mask;
+
     LookupResult result;
-    lookUpMemberImpl(session, semantics, name, type, result, nullptr, mask);
+    _lookUpMembersInType(session, name, type, request, result, nullptr);
     return result;
 }
 

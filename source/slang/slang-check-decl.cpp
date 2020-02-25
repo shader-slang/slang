@@ -1407,7 +1407,7 @@ namespace Slang
 
     bool SemanticsVisitor::findWitnessForInterfaceRequirement(
         ConformanceCheckingContext* context,
-        DeclRef<AggTypeDeclBase>    typeDeclRef,
+        Type*                       type,
         InheritanceDecl*            inheritanceDecl,
         DeclRef<InterfaceDecl>      interfaceDeclRef,
         DeclRef<Decl>               requiredMemberDeclRef,
@@ -1447,7 +1447,7 @@ namespace Slang
 
             RefPtr<WitnessTable> satisfyingWitnessTable = checkConformanceToType(
                 context,
-                typeDeclRef,
+                type,
                 requiredInheritanceDeclRef.getDecl(),
                 getBaseType(requiredInheritanceDeclRef));
 
@@ -1464,42 +1464,34 @@ namespace Slang
         // since only same-name members will be able to
         // satisfy the requirement.
         //
-        // TODO: this won't work right now for members that
-        // don't have names, which right now includes
-        // initializers/constructors.
         Name* name = requiredMemberDeclRef.GetName();
 
-        // We are basically looking up members of the
-        // given type, but we need to be a bit careful.
-        // We *cannot* perfom lookup "through" inheritance
-        // declarations for this or other interfaces,
-        // since that would let us satisfy a requirement
-        // with itself.
+        // We start by looking up members of the same
+        // name, on the type that is claiming to conform.
         //
-        // There's also an interesting question of whether
-        // we can/should support innterface requirements
-        // being satisfied via `__transparent` members.
-        // This seems like a "clever" idea rather than
-        // a useful one, and IR generation would
-        // need to construct real IR to trampoline over
-        // to the implementation.
+        // This lookup step could include members that
+        // we might not actually want to consider:
         //
-        // The final case that can't be reduced to just
-        // "a directly declared member with the same name"
-        // is the case where the type inherits a member
-        // that can satisfy the requirement from a base type.
-        // We are ignoring implementation inheritance for
-        // now, so we won't worry about this.
-
-        // Make sure that by-name lookup is possible.
-        buildMemberDictionary(typeDeclRef.getDecl());
-        auto lookupResult = lookUpLocal(getSession(), this, name, typeDeclRef);
-
-        if (!lookupResult.isValid())
-        {
-            getSink()->diagnose(inheritanceDecl, Diagnostics::typeDoesntImplementInterfaceRequirement, typeDeclRef, requiredMemberDeclRef);
-            return false;
-        }
+        // * Lookup through a type `Foo` where `Foo : IBar`
+        //   will be able to find members of `IBar`, which
+        //   somewhat obviously shouldn't apply when
+        //   determining if `Foo` satisfies the requirements
+        //   of `IBar`.
+        //
+        // * Lookup in the presence of `__transparent` members
+        //   may produce references to declarations on a *field*
+        //   of the type rather than the type. Conformance through
+        //   transparent members could be supported in theory,
+        //   but would require synthesizing proxy/forwarding
+        //   implementations in the type itself.
+        //
+        // We will punt on the second issue for now (since
+        // transparent members aren't currently exposed as
+        // a general-purpose feature for users), and rely
+        // on subsequent checking in this function to
+        // rule out inherited abstract members.
+        //
+        auto lookupResult = lookUpMember(getSession(), this, name, type);
 
         // Iterate over the members and look for one that matches
         // the expected signature for the requirement.
@@ -1516,13 +1508,13 @@ namespace Slang
         // of "candidates" for satisfaction of the requirement,
         // and if nothing is found we print the candidates
 
-        getSink()->diagnose(inheritanceDecl, Diagnostics::typeDoesntImplementInterfaceRequirement, typeDeclRef, requiredMemberDeclRef);
+        getSink()->diagnose(inheritanceDecl, Diagnostics::typeDoesntImplementInterfaceRequirement, type, requiredMemberDeclRef);
         return false;
     }
 
     RefPtr<WitnessTable> SemanticsVisitor::checkInterfaceConformance(
         ConformanceCheckingContext* context,
-        DeclRef<AggTypeDeclBase>    typeDeclRef,
+        Type*                       type,
         InheritanceDecl*            inheritanceDecl,
         DeclRef<InterfaceDecl>      interfaceDeclRef)
     {
@@ -1564,7 +1556,7 @@ namespace Slang
         {
             auto requirementSatisfied = findWitnessForInterfaceRequirement(
                 context,
-                typeDeclRef,
+                type,
                 inheritanceDecl,
                 interfaceDeclRef,
                 requiredMemberDeclRef,
@@ -1615,7 +1607,7 @@ namespace Slang
             {
                 auto requirementSatisfied = findWitnessForInterfaceRequirement(
                     context,
-                    typeDeclRef,
+                    type,
                     inheritanceDecl,
                     interfaceDeclRef,
                     requiredInheritanceDeclRef,
@@ -1638,7 +1630,7 @@ namespace Slang
 
     RefPtr<WitnessTable> SemanticsVisitor::checkConformanceToType(
         ConformanceCheckingContext* context,
-        DeclRef<AggTypeDeclBase>    typeDeclRef,
+        Type*                       type,
         InheritanceDecl*            inheritanceDecl,
         Type*                       baseType)
     {
@@ -1652,7 +1644,7 @@ namespace Slang
                 // required by that interface.
                 return checkInterfaceConformance(
                     context,
-                    typeDeclRef,
+                    type,
                     inheritanceDecl,
                     baseInterfaceDeclRef);
             }
@@ -1663,41 +1655,43 @@ namespace Slang
     }
 
     bool SemanticsVisitor::checkConformance(
-        DeclRef<AggTypeDeclBase>    declRef,
+        Type*                       type,
         InheritanceDecl*            inheritanceDecl)
     {
-        declRef = createDefaultSubstitutionsIfNeeded(getSession(), declRef).as<AggTypeDeclBase>();
-
-        // Don't check conformances for abstract types that
-        // are being used to express *required* conformances.
-        if (auto assocTypeDeclRef = declRef.as<AssocTypeDecl>())
+        if( auto declRefType = as<DeclRefType>(type) )
         {
-            // An associated type declaration represents a requirement
-            // in an outer interface declaration, and its members
-            // (type constraints) represent additional requirements.
-            return true;
-        }
-        else if (auto interfaceDeclRef = declRef.as<InterfaceDecl>())
-        {
-            // HACK: Our semantics as they stand today are that an
-            // `extension` of an interface that adds a new inheritance
-            // clause acts *as if* that inheritnace clause had been
-            // attached to the original `interface` decl: that is,
-            // it adds additional requirements.
-            //
-            // This is *not* a reasonable semantic to keep long-term,
-            // but it is required for some of our current example
-            // code to work.
-            return true;
-        }
+            auto declRef = declRefType->declRef;
 
+            // Don't check conformances for abstract types that
+            // are being used to express *required* conformances.
+            if (auto assocTypeDeclRef = declRef.as<AssocTypeDecl>())
+            {
+                // An associated type declaration represents a requirement
+                // in an outer interface declaration, and its members
+                // (type constraints) represent additional requirements.
+                return true;
+            }
+            else if (auto interfaceDeclRef = declRef.as<InterfaceDecl>())
+            {
+                // HACK: Our semantics as they stand today are that an
+                // `extension` of an interface that adds a new inheritance
+                // clause acts *as if* that inheritnace clause had been
+                // attached to the original `interface` decl: that is,
+                // it adds additional requirements.
+                //
+                // This is *not* a reasonable semantic to keep long-term,
+                // but it is required for some of our current example
+                // code to work.
+                return true;
+            }
+        }
 
         // Look at the type being inherited from, and validate
         // appropriately.
         auto baseType = inheritanceDecl->base.type;
 
         ConformanceCheckingContext context;
-        RefPtr<WitnessTable> witnessTable = checkConformanceToType(&context, declRef, inheritanceDecl, baseType);
+        RefPtr<WitnessTable> witnessTable = checkConformanceToType(&context, type, inheritanceDecl, baseType);
         if(!witnessTable)
             return false;
 
@@ -1707,15 +1701,12 @@ namespace Slang
 
     void SemanticsVisitor::checkExtensionConformance(ExtensionDecl* decl)
     {
-        if (auto targetDeclRefType = as<DeclRefType>(decl->targetType))
+        auto declRef = createDefaultSubstitutionsIfNeeded(getSession(), makeDeclRef(decl)).as<ExtensionDecl>();
+        auto targetType = GetTargetType(declRef);
+
+        for (auto inheritanceDecl : decl->getMembersOfType<InheritanceDecl>())
         {
-            if (auto aggTypeDeclRef = targetDeclRefType->declRef.as<AggTypeDecl>())
-            {
-                for (auto inheritanceDecl : decl->getMembersOfType<InheritanceDecl>())
-                {
-                    checkConformance(aggTypeDeclRef, inheritanceDecl);
-                }
-            }
+            checkConformance(targetType, inheritanceDecl);
         }
     }
 
@@ -1740,6 +1731,10 @@ namespace Slang
         {
             // For non-interface types we need to check conformance.
             //
+
+            auto declRef = createDefaultSubstitutionsIfNeeded(getSession(), makeDeclRef(decl)).as<AggTypeDeclBase>();
+            auto type = DeclRefType::Create(getSession(), declRef);
+
             // TODO: Need to figure out what this should do for
             // `abstract` types if we ever add them. Should they
             // be required to implement all interface requirements,
@@ -1747,7 +1742,7 @@ namespace Slang
             // (That's what C# does).
             for (auto inheritanceDecl : decl->getMembersOfType<InheritanceDecl>())
             {
-                checkConformance(makeDeclRef(decl), inheritanceDecl);
+                checkConformance(type, inheritanceDecl);
             }
         }
     }
@@ -2070,7 +2065,7 @@ namespace Slang
     void SemanticsVisitor::getGenericParams(
         GenericDecl*                        decl,
         List<Decl*>&                        outParams,
-        List<GenericTypeConstraintDecl*>    outConstraints)
+        List<GenericTypeConstraintDecl*>&   outConstraints)
     {
         for (auto dd : decl->Members)
         {
@@ -2087,100 +2082,223 @@ namespace Slang
     }
 
     bool SemanticsVisitor::doGenericSignaturesMatch(
-        GenericDecl*    fst,
-        GenericDecl*    snd)
+        GenericDecl*                    left,
+        GenericDecl*                    right,
+        RefPtr<GenericSubstitution>*    outSubstRightToLeft)
     {
-        // First we'll extract the parameters and constraints
-        // in each generic signature. We will consider parameters
-        // and constraints separately so that we are independent
-        // of the order in which constraints are given (that is,
-        // a constraint like `<T : IFoo>` would be considered
-        // the same as `<T>` with a later `where T : IFoo`.
+        // Our first goal here is to determine if `left` and
+        // `right` have equivalent lists of explicit
+        // generic parameters.
+        //
+        // Once we have determined that the explicit generic
+        // parameters match, we will look at the constraints
+        // placed on those parameters to see if they are
+        // equivalent.
+        //
+        // We thus start by extracting the explicit parameters
+        // and the constraints from each declaration.
+        //
+        List<Decl*> leftParams;
+        List<GenericTypeConstraintDecl*> leftConstraints;
+        getGenericParams(left, leftParams, leftConstraints);
 
-        List<Decl*> fstParams;
-        List<GenericTypeConstraintDecl*> fstConstraints;
-        getGenericParams(fst, fstParams, fstConstraints);
+        List<Decl*> rightParams;
+        List<GenericTypeConstraintDecl*> rightConstraints;
+        getGenericParams(right, rightParams, rightConstraints);
 
-        List<Decl*> sndParams;
-        List<GenericTypeConstraintDecl*> sndConstraints;
-        getGenericParams(snd, sndParams, sndConstraints);
-
-        // For there to be any hope of a match, the
-        // two need to have the same number of parameters.
-        Index paramCount = fstParams.getCount();
-        if (paramCount != sndParams.getCount())
+        // For there to be any hope of a match, the two decls
+        // need to have the same number of explicit parameters.
+        //
+        Index paramCount = leftParams.getCount();
+        if(paramCount != rightParams.getCount())
             return false;
 
-        // Now we'll walk through the parameters.
-        for (Index pp = 0; pp < paramCount; ++pp)
+        // Next we will walk through the parameters and look
+        // for a pair-wise match.
+        //
+        for(Index pp = 0; pp < paramCount; ++pp)
         {
-            Decl* fstParam = fstParams[pp];
-            Decl* sndParam = sndParams[pp];
+            Decl* leftParam = leftParams[pp];
+            Decl* rightParam = rightParams[pp];
 
-            if (auto fstTypeParam = as<GenericTypeParamDecl>(fstParam))
+            if (auto leftTypeParam = as<GenericTypeParamDecl>(leftParam))
             {
-                if (auto sndTypeParam = as<GenericTypeParamDecl>(sndParam))
+                if (auto rightTypeParam = as<GenericTypeParamDecl>(rightParam))
                 {
-                    // TODO: is there any validation that needs to be performed here?
-                }
-                else
-                {
-                    // Type and non-type parameters can't match.
-                    return false;
+                    // Right now any two type parameters are a match.
+                    // Names are irrelevant to matching, and any constraints
+                    // on the type parameters are represented as implicit
+                    // extra parameters of the generic.
+                    //
+                    // TODO: If we ever supported type parameters with
+                    // higher kinds we might need to make a check here
+                    // that the kind of each parameter matches (which
+                    // would in a sense be a kind of recursive check
+                    // of the generic signature of the parameter).
+                    //
+                    continue;
                 }
             }
-            else if (auto fstValueParam = as<GenericValueParamDecl>(fstParam))
+            else if (auto leftValueParam = as<GenericValueParamDecl>(leftParam))
             {
-                if (auto sndValueParam = as<GenericValueParamDecl>(sndParam))
+                if (auto rightValueParam = as<GenericValueParamDecl>(rightParam))
                 {
-                    // Need to check that the parameters have the same type.
+                    // In this case we have two generic value parameters,
+                    // and they should only be considered to match if
+                    // they have the same type.
                     //
                     // Note: We are assuming here that the type of a value
                     // parameter cannot be dependent on any of the type
                     // parameters in the same signature. This is a reasonable
                     // assumption for now, but could get thorny down the road.
-                    if (!fstValueParam->getType()->Equals(sndValueParam->getType()))
+                    //
+                    if (!leftValueParam->getType()->Equals(rightValueParam->getType()))
                     {
-                        // Type mismatch.
+                        // If the value parameters have non-matching types,
+                        // then the full generic signatures do not match.
+                        //
                         return false;
                     }
 
-                    // TODO: This is not the right place to check on default
-                    // values for the parameter, because they won't affect
-                    // the signature, but we should make sure to do validation
-                    // later on (e.g., that only one declaration can/should
-                    // be allowed to provide a default).
-                }
-                else
-                {
-                    // Value and non-value parameters can't match.
-                    return false;
+                    // Generic value parameters with the same type are
+                    // always considered to match.
+                    //
+                    continue;
                 }
             }
+
+            // If we get to this point, then we have two parameters that
+            // were of different syntatic categories (e.g., one type parameter
+            // and one value parameter), so the signatures clearly don't match.
+            //
+            return false;
         }
 
-        // If we got this far, then it means the parameter signatures *seem*
-        // to match up all right, but now we need to check that the constraints
-        // placed on those parameters are also consistent.
+        // At this point we know that the explicit generic parameters
+        // of `left` and `right` are aligned, but we need to check
+        // that the constraints that each declaration places on
+        // its parameters match.
         //
-        // For now I'm going to assume/require that all declarations must
-        // declare the signature in a way that matches exactly.
-        Index constraintCount = fstConstraints.getCount();
-        if(constraintCount != sndConstraints.getCount())
+        // A first challenge that arises is that `left` and `right`
+        // will each express the constraints in terms of their
+        // own parameters. For example, consider the following
+        // declarations:
+        //
+        //      void foo1<T : IFoo>(T value);
+        //      void foo2<U : IFoo>(U value);
+        //
+        // It is "obvious" to a human that the signatures here
+        // match, but `foo1` has a constraint `T : IFoo` while
+        // `foo2` has a constraint `U : IFoo`, and since `T`
+        // and `U` are distinct `Decl`s, those constraints
+        // are not obviously equivalent.
+        //
+        // We will work around this first issue by creating
+        // a substitution taht lists all the parameters of
+        // `left`, which we can use to specialize `right`
+        // so that it aligns.
+        //
+        // In terms of the example above, this is like constructing
+        // `foo2<T>` so that its constraint, after specialization,
+        // looks like `T : IFoo`.
+        //
+        auto& substRightToLeft = *outSubstRightToLeft;
+        substRightToLeft = createDummySubstitutions(left);
+        substRightToLeft->genericDecl = right;
+
+        // We should now be able to enumerate the constraints
+        // on `right` in a way that uses the same type parameters
+        // as `left`, using `rightDeclRef`.
+        //
+        // At this point a second problem arises: if/when we support
+        // more flexibility in how generic parameter constraints are
+        // specified, it will be possible for two declarations to
+        // list the "same" constraints in very different ways.
+        //
+        // For example, if we support a `where` clause for separating
+        // the constraints from the parameters, then the following
+        // two declarations should have equivalent signatures:
+        //
+        //      void foo1<T>(T value)
+        //          where T : IFoo
+        //      { ... }
+        //
+        //      void foo2<T : IFoo>(T value)
+        //      { ... }
+        //
+        // Similarly, if we allow for general compositions of interfaces
+        // to be used as constraints, then there can be more than one
+        // way to specify the same constraints:
+        //
+        //      void foo1<T : IFoo&IBar>(T value);
+        //      void foo2<T : IBar&IFoo>(T value);
+        //
+        // Adding support for equality constraints in `where` clauses
+        // also creates opportunities for multiple equivalent expressions:
+        //
+        //      void foo1<T,U>(...) where T.A == U.A;
+        //      void foo2<T,U>(...) where U.A == T.A;
+        //
+        // A robsut version of the checking logic here should attempt
+        // to *canonicalize* all of the constraints. Canonicalization
+        // should involve putting constraints into a deterministic
+        // order (e.g., for a generic with `<T,U>` all the constraints
+        // on `T` should come before those on `U`), rewriting individual
+        // constraints into a canonical form (e.g., `T : IFoo & IBar`
+        // should turn into two constraints: `T : IFoo` and `T : IBar`),
+        // etc.
+        //
+        // Once the constraints are in a canonical form we should be able
+        // to test them for pairwise equivalent. As a safety measure we
+        // could also try to test whether one set of constraints implies
+        // the other (since implication in both directions should imply
+        // equivalence, in which case our canonicalization had better
+        // have produced the same result).
+        //
+        // For now we are taking a simpler short-cut by assuming
+        // that constraints are already in a canonical form, which
+        // is reasonable for now as the syntax only allows a single
+        // constraint per parameter, specified on the parameter itself.
+        //
+        // Under the assumption of canonical constraints, we can
+        // assume that different numbers of constraints must indicate
+        // a signature mismatch.
+        //
+        Index constraintCount = leftConstraints.getCount();
+        if(constraintCount != rightConstraints.getCount())
             return false;
 
         for (Index cc = 0; cc < constraintCount; ++cc)
         {
-            //auto fstConstraint = fstConstraints[cc];
-            //auto sndConstraint = sndConstraints[cc];
+            // Note that we use a plain `Decl` pointer for the left
+            // constraint, but need to use a `DeclRef` for the right
+            // constraint so that we can take the substitution
+            // arguments into account.
+            //
+            GenericTypeConstraintDecl* leftConstraint = leftConstraints[cc];
+            DeclRef<GenericTypeConstraintDecl> rightConstraint(rightConstraints[cc], substRightToLeft);
 
-            // TODO: the challenge here is that the
-            // constraints are going to be expressed
-            // in terms of the parameters, which means
-            // we need to be doing substitution here.
+            // For now, every constraint has the form `sub : sup`
+            // to indicate that `sub` must be a subtype of `sup`.
+            //
+            // Two such constraints are equivalent if their `sub`
+            // and `sup` types are pairwise equivalent.
+            //
+            auto leftSub = leftConstraint->sub;
+            auto rightSub = GetSub(rightConstraint);
+            if(!leftSub->Equals(rightSub))
+                return false;
+
+            auto leftSup = leftConstraint->sup;
+            auto rightSup = GetSup(rightConstraint);
+            if(!leftSup->Equals(rightSup))
+                return false;
         }
 
-        // HACK: okay, we'll just assume things match for now.
+        // If we have checked all of the (canonicalized) constraints
+        // and found them to be pairwise equivalent then the two
+        // generic signatures seem to match.
+        //
         return true;
     }
 
@@ -2313,25 +2431,18 @@ namespace Slang
 
         // If we are working with generic functions, then we need to
         // consider if their generic signatures match.
+        //
         if(newGenericDecl)
         {
-            SLANG_ASSERT(oldGenericDecl); // already checked above
-            if(!doGenericSignaturesMatch(newGenericDecl, oldGenericDecl))
-                return SLANG_OK;
+            // If one declaration is generic, the other must be.
+            // (This condition was already checked above)
+            //
+            SLANG_ASSERT(oldGenericDecl);
 
-            // Now we need specialize the declaration references
-            // consistently, so that we can compare.
-            //
-            // First we create a "dummy" set of substitutions that
-            // just reference the parameters of the first generic.
-            //
-            auto subst = createDummySubstitutions(newGenericDecl);
-            //
-            // Then we use those parameters to specialize the *other*
-            // generic.
-            //
-            subst->genericDecl = oldGenericDecl;
-            oldDeclRef.substitutions.substitutions = subst;
+            // As part of checking if the generic signatures match,
+            // we will produce a substitution that can be used to
+            // reference `oldGenericDecl` with the generic parameters
+            // substituted for those of `newDecl`.
             //
             // One way to think about it is that if we have these
             // declarations (ignore the name differences...):
@@ -2342,7 +2453,14 @@ namespace Slang
             //     // newDecl:
             //     void foo2<U>(U x);
             //
-            // Then we will compare `foo2` against `foo1<U>`.
+            // Then we will compare the parameter types of `foo2`
+            // against the specialization `foo1<U>`.
+            //
+            RefPtr<GenericSubstitution> subst;
+            if(!doGenericSignaturesMatch(newGenericDecl, oldGenericDecl, &subst))
+                return SLANG_OK;
+
+            oldDeclRef.substitutions.substitutions = subst;
         }
 
         // If the parameter signatures don't match, then don't worry
