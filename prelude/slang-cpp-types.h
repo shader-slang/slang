@@ -228,119 +228,79 @@ struct SamplerComparisonState
 
 // Texture
 
-struct ITexture1D
+struct ITexture
 {
-    virtual void Load(const int2& v, void* out) = 0;
-    virtual void Sample(SamplerState samplerState, float loc, void* out) = 0;
-    virtual void SampleLevel(SamplerState samplerState, float loc, float level, void* out) = 0;
+    virtual void Load(const int* v, void* out) = 0;
+    virtual void Sample(SamplerState samplerState, const float* loc, void* out) = 0;
+    virtual void SampleLevel(SamplerState samplerState, const float* loc, float level, void* out) = 0;
 };
 
 template <typename T>
 struct Texture1D
 {
-    T Load(const int2& v) const { T out; texture->Load(v, &out); return out; }
-    T Sample(SamplerState samplerState, float v) const { T out; texture->Sample(samplerState, v, &out); return out; }
-    T SampleLevel(SamplerState samplerState, float v, float level) { T out; texture->SampleLevel(samplerState, v, level, &out); return out; }
+    T Load(const int2& loc) const { T out; texture->Load(&loc.x, &out); return out; }
+    T Sample(SamplerState samplerState, float loc) const { T out; texture->Sample(samplerState, &loc, &out); return out; }
+    T SampleLevel(SamplerState samplerState, float loc, float level) { T out; texture->SampleLevel(samplerState, &loc, level, &out); return out; }
     
-    ITexture1D* texture;              
-};
-
-struct ITexture2D
-{
-    virtual void Load(const int3& v, void* out) = 0;
-    virtual void Sample(SamplerState samplerState, const float2& loc, void* out) = 0;
-    virtual void SampleLevel(SamplerState samplerState, const float2& loc, float level, void* out) = 0;
+    ITexture* texture;              
 };
 
 template <typename T>
 struct Texture2D
 {
-    T Load(const int3& v) const { T out; texture->Load(v, &out); return out; }
-    T Sample(SamplerState samplerState, const float2& v) const { T out; texture->Sample(samplerState, v, &out); return out; }
-    T SampleLevel(SamplerState samplerState, const float2& v, float level) { T out; texture->SampleLevel(samplerState, v, level, &out); return out; }
+    T Load(const int3& loc) const { T out; texture->Load(&loc.x, &out); return out; }
+    T Sample(SamplerState samplerState, const float2& loc) const { T out; texture->Sample(samplerState, &loc.x, &out); return out; }
+    T SampleLevel(SamplerState samplerState, const float2& loc, float level) { T out; texture->SampleLevel(samplerState, &loc.x, level, &out); return out; }
     
-    ITexture2D* texture;              
-};
-
-struct ITexture3D
-{
-    virtual void Load(const int4& v, void* out) = 0;
-    virtual void Sample(SamplerState samplerState, const float3& loc, void* out) = 0;
-    virtual void SampleLevel(SamplerState samplerState, const float3& loc, float level, void* out) = 0;
+    ITexture* texture;              
 };
 
 template <typename T>
 struct Texture3D
 {
-    T Load(const int4& v) const { T out; texture->Load(v, &out); return out; }
-    T Sample(SamplerState samplerState, const float3& v) const { T out; texture->Sample(samplerState, v, &out); return out; }
-    T SampleLevel(SamplerState samplerState, const float3& v, float level) { T out; texture->SampleLevel(samplerState, v, level, &out); return out; }
+    T Load(const int4& loc) const { T out; texture->Load(&loc.x, &out); return out; }
+    T Sample(SamplerState samplerState, const float3& loc) const { T out; texture->Sample(samplerState, &loc.x, &out); return out; }
+    T SampleLevel(SamplerState samplerState, const float3& loc, float level) { T out; texture->SampleLevel(samplerState, &loc.x, level, &out); return out; }
     
-    ITexture3D* texture;              
-};
-
-struct ITextureCube
-{
-    virtual void Sample(SamplerState samplerState, const float3& loc, void* out) = 0;
-    virtual void SampleLevel(SamplerState samplerState, const float3& loc, float level, void* out) = 0;
+    ITexture* texture;              
 };
 
 template <typename T>
 struct TextureCube
 {
-    T Sample(SamplerState samplerState, const float3& v) const { T out; texture->Sample(samplerState, v, &out); return out; }
-    T SampleLevel(SamplerState samplerState, const float3& v, float level) { T out; texture->SampleLevel(samplerState, v, level, &out); return out; }
+    T Sample(SamplerState samplerState, const float3& loc) const { T out; texture->Sample(samplerState, &loc.x, &out); return out; }
+    T SampleLevel(SamplerState samplerState, const float3& loc, float level) { T out; texture->SampleLevel(samplerState, &loc.x, level, &out); return out; }
     
-    ITextureCube* texture;              
-};
-
-struct ITexture1DArray
-{
-    virtual void Load(const int3& v, void* out) = 0;
-    virtual void Sample(SamplerState samplerState, const float2& loc, void* out) = 0;
-    virtual void SampleLevel(SamplerState samplerState, const float2& loc, float level, void* out) = 0;
+    ITexture* texture;              
 };
 
 template <typename T>
 struct Texture1DArray
 {
-    T Load(const int3& v) const { T out; texture->Load(v, &out); return out; }
-    T Sample(SamplerState samplerState, const float2& v) const { T out; texture->Sample(samplerState, v, &out); return out; }
-    T SampleLevel(SamplerState samplerState, const float2& v, float level) { T out; texture->SampleLevel(samplerState, v, level, &out); return out; }
+    T Load(const int3& loc) const { T out; texture->Load(&loc.x, &out); return out; }
+    T Sample(SamplerState samplerState, const float2& loc) const { T out; texture->Sample(samplerState, &loc.x, &out); return out; }
+    T SampleLevel(SamplerState samplerState, const float2& loc, float level) { T out; texture->SampleLevel(samplerState, &loc.x, level, &out); return out; }
     
-    ITexture1DArray* texture;              
-};
-
-struct ITexture2DArray
-{
-    virtual void Load(const int4& v, void* out) = 0;
-    virtual void Sample(SamplerState samplerState, const float3& loc, void* out) = 0;
-    virtual void SampleLevel(SamplerState samplerState, const float3& loc, float level, void* out) = 0;
+    ITexture* texture;              
 };
 
 template <typename T>
 struct Texture2DArray
 {
-    T Load(const int4& v) const { T out; texture->Load(v, &out); return out; }
-    T Sample(SamplerState samplerState, const float3& v) const { T out; texture->Sample(samplerState, v, &out); return out; }
-    T SampleLevel(SamplerState samplerState, const float3& v, float level) { T out; texture->SampleLevel(samplerState, v, level, &out); return out; }
+    T Load(const int4& loc) const { T out; texture->Load(&loc.x, &out); return out; }
+    T Sample(SamplerState samplerState, const float3& loc) const { T out; texture->Sample(samplerState, &loc.x, &out); return out; }
+    T SampleLevel(SamplerState samplerState, const float3& loc, float level) { T out; texture->SampleLevel(samplerState, &loc.x, level, &out); return out; }
     
-    ITexture2DArray* texture;              
-};
-
-struct ITextureCubeArray
-{
-    virtual void Sample(SamplerState samplerState, const float4& loc, void* out) = 0;
-    virtual void SampleLevel(SamplerState samplerState, const float4& loc, float level, void* out) = 0;
+    ITexture* texture;              
 };
 
 template <typename T>
 struct TextureCubeArray
 {
-    T Sample(SamplerState samplerState, const float4& v) const { T out; texture->Sample(samplerState, v, &out); return out; }
-    T SampleLevel(SamplerState samplerState, const float4& v, float level) { T out; texture->SampleLevel(samplerState, v, level, &out); return out; }
+    T Sample(SamplerState samplerState, const float4& loc) const { T out; texture->Sample(samplerState, &loc.x, &out); return out; }
+    T SampleLevel(SamplerState samplerState, const float4& loc, float level) { T out; texture->SampleLevel(samplerState, &loc.x, level, &out); return out; }
     
-    ITextureCubeArray* texture;              
+    ITexture* texture;              
 };
 
 /* !!!!!!!!!!!!!!!!!!!!!!!!!!! RWTexture !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! */
@@ -371,14 +331,6 @@ struct RWTexture2D
 
 template <typename T>
 struct RWTexture3D
-{
-    T Load(const int3& loc) const { T out; texture->Load(&loc.x, &out); return out; }
-    T& operator[](const uint3& loc) { return *(T*)texture->refAt(&loc.x); }
-    IRWTexture* texture;
-};
-
-template <typename T>
-struct RWTextureCube
 {
     T Load(const int3& loc) const { T out; texture->Load(&loc.x, &out); return out; }
     T& operator[](const uint3& loc) { return *(T*)texture->refAt(&loc.x); }
