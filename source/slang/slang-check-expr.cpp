@@ -828,7 +828,7 @@ namespace Slang
         return TryConstantFoldExpr(exp);
     }
 
-    RefPtr<IntVal> SemanticsVisitor::CheckIntegerConstantExpression(Expr* inExpr)
+    RefPtr<IntVal> SemanticsVisitor::CheckIntegerConstantExpression(Expr* inExpr, DiagnosticSink* sink)
     {
         // No need to issue further errors if the expression didn't even type-check.
         if(IsErrorExpr(inExpr)) return nullptr;
@@ -840,11 +840,16 @@ namespace Slang
         if(IsErrorExpr(expr)) return nullptr;
 
         auto result = TryCheckIntegerConstantExpression(expr.Ptr());
-        if (!result)
+        if (!result && sink)
         {
-            getSink()->diagnose(expr, Diagnostics::expectedIntegerConstantNotConstant);
+            sink->diagnose(expr, Diagnostics::expectedIntegerConstantNotConstant);
         }
         return result;
+    }
+
+    RefPtr<IntVal> SemanticsVisitor::CheckIntegerConstantExpression(Expr* inExpr)
+    {
+        return CheckIntegerConstantExpression(inExpr, getSink());
     }
 
     RefPtr<IntVal> SemanticsVisitor::CheckEnumConstantExpression(Expr* expr)
@@ -1677,6 +1682,12 @@ namespace Slang
                     expr->type.IsLeftValue = true;
                 }
             }
+            else if( auto typeOrExtensionDecl = as<AggTypeDeclBase>(containerDecl) )
+            {
+                expr->type.type = calcThisType(makeDeclRef(typeOrExtensionDecl));
+                return expr;
+            }
+#if 0
             else if (auto aggTypeDecl = as<AggTypeDecl>(containerDecl))
             {
                 ensureDecl(aggTypeDecl, DeclCheckState::CanUseAsType);
@@ -1706,6 +1717,7 @@ namespace Slang
                 expr->type.type = extensionDecl->targetType.type;
                 return expr;
             }
+#endif
 
             scope = scope->parent;
         }
@@ -1713,4 +1725,27 @@ namespace Slang
         getSink()->diagnose(expr, Diagnostics::thisExpressionOutsideOfTypeDecl);
         return CreateErrorExpr(expr);
     }
+
+    RefPtr<Expr> SemanticsExprVisitor::visitThisTypeExpr(ThisTypeExpr* expr)
+    {
+        auto scope = expr->scope;
+        while (scope)
+        {
+            auto containerDecl = scope->containerDecl;
+            if( auto typeOrExtensionDecl = as<AggTypeDeclBase>(containerDecl) )
+            {
+                auto thisType = calcThisType(makeDeclRef(typeOrExtensionDecl));
+                auto thisTypeType = getTypeType(thisType);
+
+                expr->type.type = thisTypeType;
+                return expr;
+            }
+
+            scope = scope->parent;
+        }
+
+        getSink()->diagnose(expr, Diagnostics::thisTypeOutsideOfTypeDecl);
+        return CreateErrorExpr(expr);
+    }
+
 }

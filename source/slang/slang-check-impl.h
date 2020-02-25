@@ -392,6 +392,7 @@ namespace Slang
 
         RefPtr<Type> ExtractGenericArgType(RefPtr<Expr> exp);
 
+        RefPtr<IntVal> ExtractGenericArgInteger(RefPtr<Expr> exp, DiagnosticSink* sink);
         RefPtr<IntVal> ExtractGenericArgInteger(RefPtr<Expr> exp);
 
         RefPtr<Val> ExtractGenericArgVal(RefPtr<Expr> exp);
@@ -834,6 +835,7 @@ namespace Slang
 
         // Enforce that an expression resolves to an integer constant, and get its value
         RefPtr<IntVal> CheckIntegerConstantExpression(Expr* inExpr);
+        RefPtr<IntVal> CheckIntegerConstantExpression(Expr* inExpr, DiagnosticSink* sink);
 
         RefPtr<IntVal> CheckEnumConstantExpression(Expr* expr);
 
@@ -1363,6 +1365,7 @@ namespace Slang
         RefPtr<Expr> visitInitializerListExpr(InitializerListExpr* expr);
 
         RefPtr<Expr> visitThisExpr(ThisExpr* expr);
+        RefPtr<Expr> visitThisTypeExpr(ThisTypeExpr* expr);
     };
 
     struct SemanticsStmtVisitor

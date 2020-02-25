@@ -3004,6 +3004,12 @@ struct ExprLoweringVisitorBase : ExprVisitor<Derived, LoweredValInfo>
         UNREACHABLE_RETURN(LoweredValInfo());
     }
 
+    LoweredValInfo visitThisTypeExpr(ThisTypeExpr* /*expr*/)
+    {
+        SLANG_UNIMPLEMENTED_X("this-type expression during code generation");
+        UNREACHABLE_RETURN(LoweredValInfo());
+    }
+
     LoweredValInfo visitAssignExpr(AssignExpr* expr)
     {
         // Because our representation of lowered "values"

@@ -642,6 +642,8 @@ namespace Slang
         CASE(Geometry,  gs);
         CASE(Fragment,  ps);
         CASE(Compute,   cs);
+        CASE(Amplification, as);
+        CASE(Mesh,          ms);
     #undef CASE
         }
 
@@ -660,6 +662,8 @@ namespace Slang
         CASE(DX_6_1,             _6_1);
         CASE(DX_6_2,             _6_2);
         CASE(DX_6_3,             _6_3);
+        CASE(DX_6_4,             _6_4);
+        CASE(DX_6_5,             _6_5);
     #undef CASE
 
         default:
@@ -1667,9 +1671,7 @@ SlangResult dissassembleDXILUsingDXC(
                         assembly);
 
                     maybeDumpIntermediate(compileRequest, assembly.getBuffer(), target);
-
-                    // Write as text, even if stored in uint8_t array
-                    result = CompileResult(UnownedStringSlice((const char*)code.getBuffer(), code.getCount()));
+                    result = CompileResult(assembly);
                 }
             }
             break;
