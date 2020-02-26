@@ -4514,12 +4514,37 @@ namespace Slang
         case TokenType::OpNot:
         case TokenType::OpBitNot:
         case TokenType::OpAdd:
-        case TokenType::OpSub:
             {
                 RefPtr<PrefixExpr> prefixExpr = new PrefixExpr();
                 parser->FillPosition(prefixExpr.Ptr());
                 prefixExpr->FunctionExpr = parseOperator(parser);
                 prefixExpr->Arguments.add(parsePrefixExpr(parser));
+                return prefixExpr;
+            }
+        case TokenType::OpSub:
+            {
+                // Special case prefix sub (aka neg), so if it's on a literal, it produces a new literal
+
+                RefPtr<PrefixExpr> prefixExpr = new PrefixExpr();
+                parser->FillPosition(prefixExpr.Ptr());
+                prefixExpr->FunctionExpr = parseOperator(parser);
+
+                auto arg = parsePrefixExpr(parser);
+
+                if (auto intLit = as<IntegerLiteralExpr>(arg))
+                {
+                    RefPtr<IntegerLiteralExpr> newLiteral = new IntegerLiteralExpr(*intLit);    
+                    newLiteral->value = -newLiteral->value;
+                    return newLiteral;
+                }
+                else if (auto floatLit = as<FloatingPointLiteralExpr>(arg))
+                {
+                    RefPtr<FloatingPointLiteralExpr> newLiteral = new FloatingPointLiteralExpr(*floatLit);
+                    newLiteral->value = -newLiteral->value;
+                    return newLiteral;
+                }
+                
+                prefixExpr->Arguments.add(arg);
                 return prefixExpr;
             }
             break;
