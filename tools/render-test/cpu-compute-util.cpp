@@ -16,9 +16,29 @@ namespace renderer_test {
 using namespace Slang;
 
 template <int COUNT>
-struct ValueTextureCube : public CPUComputeUtil::Resource, public CPPPrelude::ITextureCube
+struct ValueTexture : public CPUComputeUtil::Resource, public CPPPrelude::ITexture
 {
-    void set(void* out)
+    // ITexture interface
+    virtual void Load(const int32_t* loc, void* out) SLANG_OVERRIDE
+    {
+        _set(out);
+    }
+    virtual void Sample(CPPPrelude::SamplerState samplerState, const float* loc, void* out) SLANG_OVERRIDE
+    {
+        _set(out);
+    }
+    virtual void SampleLevel(CPPPrelude::SamplerState samplerState, const float* loc, float level, void* out) SLANG_OVERRIDE
+    {
+        _set(out);
+    }
+
+    ValueTexture(float value) :
+        m_value(value)
+    {
+        m_interface = static_cast<CPPPrelude::ITexture*>(this);
+    }
+
+    void _set(void* out)
     {
         float* dst = (float*)out;
         for (int i = 0; i < COUNT; ++i)
@@ -27,358 +47,256 @@ struct ValueTextureCube : public CPUComputeUtil::Resource, public CPPPrelude::IT
         }
     }
 
-    virtual void Sample(CPPPrelude::SamplerState samplerState, const CPPPrelude::float3& loc, void* out) SLANG_OVERRIDE
-    {
-        set(out);
-    }
-    virtual void SampleLevel(CPPPrelude::SamplerState samplerState, const CPPPrelude::float3& loc, float level, void* out) SLANG_OVERRIDE
-    {
-        set(out);
-    }
-
-    ValueTextureCube(float value) :
-        m_value(value)
-    {
-        m_interface = static_cast<CPPPrelude::ITextureCube*>(this);
-    }
-
     float m_value;
 };
 
-template <int COUNT>
-struct ValueTexture3D : public CPUComputeUtil::Resource, public CPPPrelude::ITexture3D
+class FloatTextureData
 {
-    void set(void* out)
+public:
+    FloatTextureData() {}
+    FloatTextureData(int elementCount, int dimCount, const uint32_t* dims)
     {
-        float* dst = (float*)out;
-        for (int i = 0; i < COUNT; ++i)
+        init(elementCount, dimCount, dims);
+    }
+
+    void init(int elementCount, int dimCount, const uint32_t* dims)
+    {
+        SLANG_ASSERT(elementCount >= 1 && elementCount <= 4);
+        SLANG_ASSERT(dimCount >= 1 && dimCount < 4);
+
+        Index totalSize = 1;
+
+        for (Index i = 0; i < Index(dimCount); ++i)
         {
-            dst[i] = m_value;
+            m_dims[i] = (dims[i] <= 0) ? 1 : dims[i];
+            totalSize *= m_dims[i];
+        }
+
+        m_dimCount = uint8_t(dimCount);
+        m_elementCount = uint8_t(elementCount);
+
+        // Set the array to hold the total capacity needed
+        m_values.setCount(totalSize);
+    }
+
+    void setValue(float value)
+    {
+        const Index count = m_values.getCount();
+        float* dst = m_values.getBuffer();
+
+        for (Index i = 0; i < count; ++i)
+        {
+            dst[i] = value;
         }
     }
 
-    virtual void Load(const CPPPrelude::int4& v, void* out) SLANG_OVERRIDE
+    void setAt(const uint32_t* location, const float* value)
     {
-        set(out);
-    }
-    virtual void Sample(CPPPrelude::SamplerState samplerState, const CPPPrelude::float3& loc, void* out) SLANG_OVERRIDE
-    {
-        set(out);
-    }
-    virtual void SampleLevel(CPPPrelude::SamplerState samplerState, const CPPPrelude::float3& loc, float level, void* out) SLANG_OVERRIDE
-    {
-        set(out);
-    }
-
-    ValueTexture3D(float value) :
-        m_value(value)
-    {
-        m_interface = static_cast<CPPPrelude::ITexture3D*>(this);
-    }
-
-    float m_value;
-};
-
-template <int COUNT>
-struct ValueTexture2D : public CPUComputeUtil::Resource, public CPPPrelude::ITexture2D
-{
-    void set(void* out)
-    {
-        float* dst = (float*)out;
-        for (int i = 0; i < COUNT; ++i)
+        const Index index = _getIndex(location);
+        float* dst = &m_values[index];
+        switch (m_elementCount)
         {
-            dst[i] = m_value;
+            case 1: dst[0] = value[0]; break;
+            case 2: dst[0] = value[0]; dst[1] = value[1]; break; 
+            case 3: dst[0] = value[0]; dst[1] = value[1]; dst[2] = value[2]; break;
+            case 4: dst[0] = value[0]; dst[1] = value[1]; dst[2] = value[2]; dst[3] = value[3]; break;
         }
     }
 
-    virtual void Load(const CPPPrelude::int3& v, void* out) SLANG_OVERRIDE
+    float* getAt(const uint32_t* location)
     {
-        set(out);
-    }
-    virtual void Sample(CPPPrelude::SamplerState samplerState, const CPPPrelude::float2& loc, void* out) SLANG_OVERRIDE
-    {
-        set(out);
-    }
-    virtual void SampleLevel(CPPPrelude::SamplerState samplerState, const CPPPrelude::float2& loc, float level, void* out) SLANG_OVERRIDE
-    {
-        set(out);
+        const Index index = _getIndex(location);
+        return &m_values[index];
     }
 
-    ValueTexture2D(float value):
-        m_value(value)
+    void getAt(const uint32_t* location, float* dst)
     {
-        m_interface = static_cast<CPPPrelude::ITexture2D*>(this);
-    }
-
-    float m_value;
-};
-
-template <int COUNT>
-struct ValueTexture1D : public CPUComputeUtil::Resource, public CPPPrelude::ITexture1D
-{
-    void set(void* out)
-    {
-        float* dst = (float*)out;
-        for (int i = 0; i < COUNT; ++i)
+        const Index index = _getIndex(location);
+        float* value = &m_values[index];
+        switch (m_elementCount)
         {
-            dst[i] = m_value;
+            case 1: dst[0] = value[0]; break;
+            case 2: dst[0] = value[0]; dst[1] = value[1]; break;
+            case 3: dst[0] = value[0]; dst[1] = value[1]; dst[2] = value[2]; break;
+            case 4: dst[0] = value[0]; dst[1] = value[1]; dst[2] = value[2]; dst[3] = value[3]; break;
         }
     }
 
-    virtual void Load(const CPPPrelude::int2& v, void* out) SLANG_OVERRIDE
+    bool isLocationValid(const uint32_t* location) const
     {
-        set(out);
-    }
-    virtual void Sample(CPPPrelude::SamplerState samplerState, float loc, void* out) SLANG_OVERRIDE
-    {
-        set(out);
-    }
-    virtual void SampleLevel(CPPPrelude::SamplerState samplerState, float loc, float level, void* out) SLANG_OVERRIDE
-    {
-        set(out);
-    }
-
-    ValueTexture1D(float value) :
-        m_value(value)
-    {
-        m_interface = static_cast<CPPPrelude::ITexture1D*>(this);
-    }
-
-    float m_value;
-};
-
-
-template <int COUNT>
-struct ValueTexture1DArray : public CPUComputeUtil::Resource, public CPPPrelude::ITexture1DArray
-{
-    void set(void* out)
-    {
-        float* dst = (float*)out;
-        for (int i = 0; i < COUNT; ++i)
+        for (Index i = 0; i < m_dimCount; ++i)
         {
-            dst[i] = m_value;
+            const auto v = location[i];
+            if (v >= m_dims[i])
+            {
+                return false;
+            }
+        }
+        return true;
+    }
+
+    Index _getIndex(const uint32_t* location)
+    {
+        const auto style = (m_dimCount << 2) | m_elementCount;
+        SLANG_ASSERT(isLocationValid(location));
+        switch (m_dimCount)
+        {
+            default:    return 0;
+            case 1:     return (location[0] )* m_elementCount;
+            case 2:     return (location[0] + location[1] * m_dims[0]) * m_elementCount;
+            case 3:     return (location[0] + (location[1] + location[2] * m_dims[1]) * m_dims[0]) * m_elementCount;
+            case 4:     return (location[0] + (location[1] + (location[2] + location[3] * m_dims[2]) * m_dims[1]) * m_dims[0]) * m_elementCount;
         }
     }
 
-    virtual void Load(const CPPPrelude::int3& v, void* out) SLANG_OVERRIDE
-    {
-        set(out);
-    }
-    virtual void Sample(CPPPrelude::SamplerState samplerState, const CPPPrelude::float2& loc, void* out) SLANG_OVERRIDE
-    {
-        set(out);
-    }
-    virtual void SampleLevel(CPPPrelude::SamplerState samplerState, const CPPPrelude::float2& loc, float level, void* out) SLANG_OVERRIDE
-    {
-        set(out);
-    }
+    uint8_t m_style;
+    uint8_t m_elementCount;             ///< Number of elements in each value
 
-    ValueTexture1DArray(float value) :
-        m_value(value)
-    {
-        m_interface = static_cast<CPPPrelude::ITexture1DArray*>(this);
-    }
-
-    float m_value;
+    uint8_t m_dimCount;
+    uint32_t m_dims[4];                  ///< Sizes in each dimension
+    
+    List<float> m_values;               ///< Holds the contained data
 };
 
-template <int COUNT>
-struct ValueTexture2DArray : public CPUComputeUtil::Resource, public CPPPrelude::ITexture2DArray
+// For a RWTexture we will define it to have memory, and that it can only be accessed via 
+struct FloatRWTexture : public CPUComputeUtil::Resource, public CPPPrelude::IRWTexture
 {
-    void set(void* out)
+    // IRWTexture
+    virtual void Load(const int32_t* loc, void* out) SLANG_OVERRIDE { m_data.getAt((const uint32_t*)loc, (float*)out); }
+    virtual void* refAt(const uint32_t* loc) SLANG_OVERRIDE { return m_data.getAt(loc); }
+
+    FloatRWTexture(int elementCount, int dimsCount, const uint32_t* dims, float initialValue)
     {
-        float* dst = (float*)out;
-        for (int i = 0; i < COUNT; ++i)
-        {
-            dst[i] = m_value;
-        }
+        m_data.init(elementCount, dimsCount, dims);
+        m_data.setValue(initialValue);
+        m_interface = static_cast<CPPPrelude::IRWTexture*>(this);
     }
 
-    virtual void Load(const CPPPrelude::int4& v, void* out) SLANG_OVERRIDE
-    {
-        set(out);
-    }
-    virtual void Sample(CPPPrelude::SamplerState samplerState, const CPPPrelude::float3& loc, void* out) SLANG_OVERRIDE
-    {
-        set(out);
-    }
-    virtual void SampleLevel(CPPPrelude::SamplerState samplerState, const CPPPrelude::float3& loc, float level, void* out) SLANG_OVERRIDE
-    {
-        set(out);
-    }
-
-    ValueTexture2DArray(float value) :
-        m_value(value)
-    {
-        m_interface = static_cast<CPPPrelude::ITexture2DArray*>(this);
-    }
-
-    float m_value;
+    FloatTextureData m_data;
 };
 
-
-template <int COUNT>
-struct ValueTextureCubeArray : public CPUComputeUtil::Resource, public CPPPrelude::ITextureCubeArray
+static int _calcDims(const InputTextureDesc& desc, slang::TypeLayoutReflection* typeLayout, uint32_t outDims[4])
 {
-    void set(void* out)
-    {
-        float* dst = (float*)out;
-        for (int i = 0; i < COUNT; ++i)
-        {
-            dst[i] = m_value;
-        }
-    }
+    const auto kind = typeLayout->getKind();
+    SLANG_ASSERT(kind == slang::TypeReflection::Kind::Resource);
 
-    virtual void Sample(CPPPrelude::SamplerState samplerState, const CPPPrelude::float4& loc, void* out) SLANG_OVERRIDE
-    {
-        set(out);
-    }
-    virtual void SampleLevel(CPPPrelude::SamplerState samplerState, const CPPPrelude::float4& loc, float level, void* out) SLANG_OVERRIDE
-    {
-        set(out);
-    }
+    auto type = typeLayout->getType();
+    auto shape = type->getResourceShape();
 
-    ValueTextureCubeArray(float value) :
-        m_value(value)
-    {
-        m_interface = static_cast<CPPPrelude::ITextureCubeArray*>(this);
-    }
+    const uint32_t size = uint32_t(desc.size);
+    const auto baseShape = (shape & SLANG_RESOURCE_BASE_SHAPE_MASK);
 
-    float m_value;
-};
+    int dimsCount = 0;
 
-
-template <int COUNT>
-struct ValueRWTexture1D : public CPUComputeUtil::Resource, public CPPPrelude::IRWTexture1D
-{
-    void set(void* out)
-    {
-        float* dst = (float*)out;
-        for (int i = 0; i < COUNT; ++i)
-        {
-            dst[i] = m_value;
-        }
-    }
-
-    virtual void Load(int32_t loc, void* out) SLANG_OVERRIDE
-    {
-        set(out);
-    }
-
-    ValueRWTexture1D(float value) :
-        m_value(value)
-    {
-        m_interface = static_cast<CPPPrelude::IRWTexture1D*>(this);
-    }
-
-    float m_value;
-};
-
-
-static CPUComputeUtil::Resource* _newValueTexture(SlangResourceShape shape, SlangResourceAccess access, Index elemCount, float value)
-{
-    switch (shape)
+    switch (baseShape)
     {
         case SLANG_TEXTURE_1D:
         {
-            if (access == SLANG_RESOURCE_ACCESS_READ_WRITE)
-            {
-                switch (elemCount)
-                {
-                    case 1: return new ValueRWTexture1D<1>(value);
-                    case 2: return new ValueRWTexture1D<2>(value);
-                    case 3: return new ValueRWTexture1D<3>(value);
-                    case 4: return new ValueRWTexture1D<4>(value);
-                    default: break;
-                }
-            }
-            else
-            {
-                switch (elemCount)
-                {
-                    case 1: return new ValueTexture1D<1>(value);
-                    case 2: return new ValueTexture1D<2>(value);
-                    case 3: return new ValueTexture1D<3>(value);
-                    case 4: return new ValueTexture1D<4>(value);
-                    default: break;
-                }
-            }
+            outDims[dimsCount++] = size;
             break;
         }
         case SLANG_TEXTURE_2D:
         {
-            switch (elemCount)
-            {
-                case 1: return new ValueTexture2D<1>(value);
-                case 2: return new ValueTexture2D<2>(value);
-                case 3: return new ValueTexture2D<3>(value);
-                case 4: return new ValueTexture2D<4>(value);
-                default: break;
-            }
+            outDims[dimsCount++] = size;
+            outDims[dimsCount++] = size;
+            break;
         }
         case SLANG_TEXTURE_3D:
         {
-            switch (elemCount)
-            {
-                case 1: return new ValueTexture3D<1>(value);
-                case 2: return new ValueTexture3D<2>(value);
-                case 3: return new ValueTexture3D<3>(value);
-                case 4: return new ValueTexture3D<4>(value);
-                default: break;
-            }
+            outDims[dimsCount++] = size;
+            outDims[dimsCount++] = size;
+            outDims[dimsCount++] = size;
+            break;
         }
         case SLANG_TEXTURE_CUBE:
         {
-            switch (elemCount)
-            {
-                case 1: return new ValueTextureCube<1>(value);
-                case 2: return new ValueTextureCube<2>(value);
-                case 3: return new ValueTextureCube<3>(value);
-                case 4: return new ValueTextureCube<4>(value);
-                default: break;
-            }
-        }
-        case SLANG_TEXTURE_1D_ARRAY:
-        {
-            switch (elemCount)
-            {
-                case 1: return new ValueTexture1DArray<1>(value);
-                case 2: return new ValueTexture1DArray<2>(value);
-                case 3: return new ValueTexture1DArray<3>(value);
-                case 4: return new ValueTexture1DArray<4>(value);
-                default: break;
-            }
+            outDims[dimsCount++] = size;
+            outDims[dimsCount++] = size;
+            outDims[dimsCount++] = 6;
             break;
         }
-        case SLANG_TEXTURE_2D_ARRAY:
-        {
-            switch (elemCount)
-            {
-                case 1: return new ValueTexture2DArray<1>(value);
-                case 2: return new ValueTexture2DArray<2>(value);
-                case 3: return new ValueTexture2DArray<3>(value);
-                case 4: return new ValueTexture2DArray<4>(value);
-                default: break;
-            }
-            break;
-        }
-        case SLANG_TEXTURE_CUBE_ARRAY:
-        {
-            switch (elemCount)
-            {
-                case 1: return new ValueTextureCubeArray<1>(value);
-                case 2: return new ValueTextureCubeArray<2>(value);
-                case 3: return new ValueTextureCubeArray<3>(value);
-                case 4: return new ValueTextureCubeArray<4>(value);
-                default: break;
-            }
-            break;
-        }
+    }
 
+    if (shape & SLANG_TEXTURE_ARRAY_FLAG)
+    {
+        uint32_t arrayLength = uint32_t(desc.arrayLength);
+        outDims[dimsCount++] = arrayLength;
+    }
 
+    return dimsCount;
+}
+
+static CPUComputeUtil::Resource* _newReadTexture(int elemCount, SlangResourceShape shape, float initialValue)
+{
+    switch (elemCount)
+    {
+        case 1: return new ValueTexture<1>(initialValue);
+        case 2: return new ValueTexture<2>(initialValue);
+        case 3: return new ValueTexture<3>(initialValue);
+        case 4: return new ValueTexture<4>(initialValue);
         default: break;
     }
     return nullptr;
+}
+
+static SlangResult _newTexture(const InputTextureDesc& desc, slang::TypeLayoutReflection* typeLayout, RefPtr<CPUComputeUtil::Resource>& outResource)
+{
+    const auto kind = typeLayout->getKind();
+    SLANG_ASSERT(kind == slang::TypeReflection::Kind::Resource);
+
+    auto type = typeLayout->getType();
+    auto shape = type->getResourceShape();
+
+    auto access = type->getResourceAccess();
+
+    // TODO(JS): Currently we support only textures who's content is either
+    // 0 or 1. This is because this is easy to implement.
+    // Will need to do something better in the future..
+
+    slang::TypeReflection* typeReflection = typeLayout->getResourceResultType();
+
+    int elemCount = 1;
+    if (typeReflection->getKind() == slang::TypeReflection::Kind::Vector)
+    {
+        elemCount = int(typeReflection->getElementCount());
+    }
+
+    float initialValue = 0.0f;
+
+    switch (desc.content)
+    {
+        case InputTextureContent::One:  initialValue = 1.0f; break;
+        case InputTextureContent::Zero: initialValue = 0.0f; break;
+        default: break;
+    }
+
+    // These need a different style of texture if can be written to
+    if (access == SLANG_RESOURCE_ACCESS_READ_WRITE)
+    {
+        uint32_t dims[4];
+        const int dimsCount = _calcDims(desc, typeLayout, dims);
+
+        switch (shape)
+        {
+            case SLANG_TEXTURE_1D:
+            case SLANG_TEXTURE_2D:
+            case SLANG_TEXTURE_3D:
+            case SLANG_TEXTURE_CUBE:
+            case SLANG_TEXTURE_1D_ARRAY:
+            case SLANG_TEXTURE_2D_ARRAY:
+            {
+                outResource = new FloatRWTexture(elemCount, dimsCount, dims, initialValue);
+                return SLANG_OK;
+            }
+        }
+    }
+    else
+    {
+        outResource = _newReadTexture(elemCount, shape, initialValue);
+        return outResource ? SLANG_OK : SLANG_FAIL;
+    }
+
+    return SLANG_FAIL;
 }
 
 /* static */SlangResult CPUComputeUtil::calcBindings(const ShaderCompilerUtil::OutputAndLayout& compilationAndLayout, Context& outContext)
@@ -443,39 +361,9 @@ static CPUComputeUtil::Resource* _newValueTexture(SlangResourceShape shape, Slan
                                 SLANG_ASSERT(value->m_userIndex >= 0);
                                 auto& srcEntry = layout.entries[value->m_userIndex];
 
-                                // TODO(JS): Currently we support only textures who's content is either
-                                // 0 or 1. This is because this is easy to implement.
-                                // Will need to do something better in the future..
-
-                                slang::TypeReflection* typeReflection = typeLayout->getResourceResultType();
-
-                                Index count = 1;
-                                if (typeReflection->getKind() == slang::TypeReflection::Kind::Vector)
-                                {
-                                    count = Index(typeReflection->getElementCount());
-                                }
-
-                                switch (srcEntry.textureDesc.content)
-                                {
-                                    case InputTextureContent::One:
-                                    {
-                                        value->m_target = _newValueTexture(shape, access, count, 1.0f);
-                                        break;                                        
-                                    }
-                                    case InputTextureContent::Zero:
-                                    {
-                                        value->m_target = _newValueTexture(shape, access, count, 0.0f);
-                                        break;
-                                    }
-                                    default: break;
-                                }
-
-                                if (value->m_target == nullptr)
-                                {
-                                    SLANG_ASSERT(!"Couldn't construct resource type");
-                                    return SLANG_FAIL;
-                                }
-
+                                RefPtr<CPUComputeUtil::Resource> resource;
+                                SLANG_RETURN_ON_FAIL(_newTexture(srcEntry.textureDesc, typeLayout, resource));
+                                value->m_target = resource;
                                 break;
                             }
                             case SLANG_TEXTURE_BUFFER:
