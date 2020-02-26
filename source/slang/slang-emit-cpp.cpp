@@ -2615,6 +2615,7 @@ void CPPSourceEmitter::_emitUniformStateMembers(const List<EmitAction>& actions,
             // We want to output some padding
             StringBuilder builder;
             builder << "uint8_t _pad" << (padIndex++) << "[" << (paramInfo.offset - offset) << "];\n";
+            m_writer->emit(builder);
         }
 
         emitGlobalInst(paramInfo.inst);

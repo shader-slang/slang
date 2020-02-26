@@ -855,6 +855,10 @@ struct CUDAObjectLayoutRulesImpl : CPUObjectLayoutRulesImpl
                 // It's a pointer to the actual uniform data
                 return SimpleLayoutInfo(LayoutResourceKind::Uniform, sizeof(void*), SLANG_ALIGN_OF(void*));
 
+            case ShaderParameterKind::TextureSampler:
+            case ShaderParameterKind::MutableTextureSampler:
+                // That there is no distinct Sampler on CUDA, so TextureSampler is the same as a Texture
+                // which is an ObjectHandle.
             case ShaderParameterKind::MutableTexture:
             case ShaderParameterKind::TextureUniformBuffer:
             case ShaderParameterKind::Texture:
@@ -882,8 +886,6 @@ struct CUDAObjectLayoutRulesImpl : CPUObjectLayoutRulesImpl
                 // would presumably have to remove use of variables of this kind throughout IR. 
                 return SimpleLayoutInfo(LayoutResourceKind::Uniform, sizeof(void*), SLANG_ALIGN_OF(void*));
 
-            case ShaderParameterKind::TextureSampler:
-            case ShaderParameterKind::MutableTextureSampler:
             case ShaderParameterKind::InputRenderTarget:
                 // TODO: how to handle these?
             default:
