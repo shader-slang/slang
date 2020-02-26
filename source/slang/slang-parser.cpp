@@ -4010,6 +4010,57 @@ namespace Slang
         return FloatFixKind::None;
     }
 
+    static IntegerLiteralValue _fixIntegerLiteral(BaseType baseType, IntegerLiteralValue value, Token* token, DiagnosticSink* sink)
+    {
+        // TODO(JS):
+        // It is worth noting here that because of the way that the lexer works, that literals
+        // are always handled as if they are positive (a preceding - is taken as a negate on a
+        // positive value).
+        // The code here is designed to work with positive and negative values, as this behavior
+        // might change in the future, and is arguably more 'correct'.
+
+        const BaseTypeInfo& info = BaseTypeInfo::getInfo(baseType);
+        SLANG_ASSERT(info.flags & BaseTypeInfo::Flag::Integer);
+        SLANG_COMPILE_TIME_ASSERT(sizeof(value) == sizeof(uint64_t));
+
+        // If the type is 64 bits, do nothing, we'll assume all is good
+        if (baseType != BaseType::Void && info.sizeInBytes != sizeof(value))
+        {
+            const IntegerLiteralValue signBit = IntegerLiteralValue(1) << (8 * info.sizeInBytes - 1);
+            // Same as (~IntegerLiteralValue(0)) << (8 * info.sizeInBytes);, without the need for variable shift
+            const IntegerLiteralValue mask = -(signBit + signBit);
+
+            IntegerLiteralValue truncatedValue = value;
+            // If it's signed, and top bit is set, sign extend it negative
+            if (info.flags & BaseTypeInfo::Flag::Signed)
+            {
+                // Sign extend
+                truncatedValue = (value & signBit) ? (value | mask) : (value & ~mask);
+            }
+            else
+            {
+                // 0 top bits
+                truncatedValue = value & ~mask;
+            }
+
+            const IntegerLiteralValue maskedValue = value & mask;
+
+            // If the masked value is 0 or equal to the mask, we 'assume' no information is
+            // lost
+            // This allows for example -1u, to give 0xffffffff
+            // It also means 0xfffffffffffffffffu will give 0xffffffff, without a warning.
+            if ((!(maskedValue == 0 || maskedValue == mask)) && sink && token)
+            {
+                // Output a warning that number has been altered
+                sink->diagnose(*token, Diagnostics::integerLiteralTruncated, token->Content, BaseTypeInfo::asText(baseType), truncatedValue);
+            }
+
+            value = truncatedValue;
+        }
+
+        return value;
+    }
+
     static RefPtr<Expr> parseAtomicExpr(Parser* parser)
     {
         switch( peekTokenType(parser) )
@@ -4162,52 +4213,8 @@ namespace Slang
                     }
                 }
 
-                // TODO(JS):
-                // It is worth noting here that because of the way that the lexer works, that literals
-                // are always handled as if they are positive (a preceding - is taken as a negate on a
-                // positive value).
-                // The code here is designed to work with positive and negative values, as this behavior
-                // might change in the future, and is arguably more 'correct'.
-
-                const BaseTypeInfo& info = BaseTypeInfo::getInfo(suffixBaseType);
-                SLANG_ASSERT(info.flags & BaseTypeInfo::Flag::Integer);
-                SLANG_COMPILE_TIME_ASSERT(sizeof(value) == sizeof(uint64_t));
-
-                // If the type is 64 bits, do nothing, we'll assume all is good
-                if (suffixBaseType != BaseType::Void && info.sizeInBytes != sizeof(value))
-                {
-                    const IntegerLiteralValue signBit = IntegerLiteralValue(1) << (8 * info.sizeInBytes - 1);
-                    // Same as (~IntegerLiteralValue(0)) << (8 * info.sizeInBytes);, without the need for variable shift
-                    const IntegerLiteralValue mask = -(signBit + signBit);
-
-                    IntegerLiteralValue truncatedValue = value;
-                    // If it's signed, and top bit is set, sign extend it negative
-                    if (info.flags & BaseTypeInfo::Flag::Signed)
-                    {
-                        // Sign extend
-                        truncatedValue = (value & signBit) ? (value | mask) : (value & ~mask);
-                    }
-                    else
-                    {
-                        // 0 top bits
-                        truncatedValue = value & ~mask;
-                    }
-
-                    const IntegerLiteralValue maskedValue = value & mask;
-
-                    // If the masked value is 0 or equal to the mask, we 'assume' no information is
-                    // lost
-                    // This allows for example -1u, to give 0xffffffff
-                    // It also means 0xfffffffffffffffffu will give 0xffffffff, without a warning.
-                    if (!(maskedValue == 0 || maskedValue == mask))
-                    {
-                        // Output a warning that number has been altered
-                        parser->sink->diagnose(token, Diagnostics::integerLiteralTruncated, token.Content, BaseTypeInfo::asText(suffixBaseType), truncatedValue);
-                    }
-
-                    value = truncatedValue;
-                }
-
+                value = _fixIntegerLiteral(suffixBaseType, value, &token, parser->sink);
+            
                 auto session = parser->getSession();
                 Type* suffixType = (suffixBaseType == BaseType::Void) ? session->getErrorType() : session->getBuiltinType(suffixBaseType);
 
@@ -4514,12 +4521,46 @@ namespace Slang
         case TokenType::OpNot:
         case TokenType::OpBitNot:
         case TokenType::OpAdd:
-        case TokenType::OpSub:
             {
                 RefPtr<PrefixExpr> prefixExpr = new PrefixExpr();
                 parser->FillPosition(prefixExpr.Ptr());
                 prefixExpr->FunctionExpr = parseOperator(parser);
                 prefixExpr->Arguments.add(parsePrefixExpr(parser));
+                return prefixExpr;
+            }
+        case TokenType::OpSub:
+            {
+                // Special case prefix sub (aka neg), so if it's on a literal, it produces a new literal
+
+                RefPtr<PrefixExpr> prefixExpr = new PrefixExpr();
+                parser->FillPosition(prefixExpr.Ptr());
+                prefixExpr->FunctionExpr = parseOperator(parser);
+
+                auto arg = parsePrefixExpr(parser);
+
+                if (auto intLit = as<IntegerLiteralExpr>(arg))
+                {
+                    RefPtr<IntegerLiteralExpr> newLiteral = new IntegerLiteralExpr(*intLit);
+
+                    IRIntegerValue value = -newLiteral->value;
+
+                    // Need to get the basic type, so we can fit to underlying type
+                    if (auto basicExprType = as<BasicExpressionType>(intLit->type.type))
+                    {
+                        value = _fixIntegerLiteral(basicExprType->baseType, value, nullptr, nullptr);
+                    }
+
+                    newLiteral->value = value;
+                    return newLiteral;
+                }
+                else if (auto floatLit = as<FloatingPointLiteralExpr>(arg))
+                {
+                    RefPtr<FloatingPointLiteralExpr> newLiteral = new FloatingPointLiteralExpr(*floatLit);
+                    newLiteral->value = -newLiteral->value;
+                    return newLiteral;
+                }
+                
+                prefixExpr->Arguments.add(arg);
                 return prefixExpr;
             }
             break;

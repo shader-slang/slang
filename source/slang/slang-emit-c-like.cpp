@@ -783,8 +783,14 @@ void CLikeSourceEmitter::emitSimpleValueImpl(IRInst* inst)
                     // Why having a cast or having a suffix would make a difference though is not clear. It is also possible that the
                     // L suffix is just ignored, and the literal is really a 'non typed' int literal in C++.
 
+                    // This little hack is needed for gcc that if we have the expression
+                    // int(-0x80000000) we get the warning: warning :  integer overflow in expression [-Woverflow]
+                    // 0x80000000 and -0x80000000 mean the same thing when casted to 32 bit int, so we just flip the value here.
+                    IRIntegerValue value = litInst->value.intVal;
+                    value = (value == -0x80000000ll) ? -value : value;
+
                     m_writer->emit("int(");
-                    m_writer->emit(litInst->value.intVal);
+                    m_writer->emit(value);
                     m_writer->emit(")");
                     return;
                 }
