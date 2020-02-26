@@ -783,8 +783,12 @@ void CLikeSourceEmitter::emitSimpleValueImpl(IRInst* inst)
                     // Why having a cast or having a suffix would make a difference though is not clear. It is also possible that the
                     // L suffix is just ignored, and the literal is really a 'non typed' int literal in C++.
 
+                    auto value = litInst->value.intVal;
+                    value = (value == -0x80000000) ? -value : value;
+
                     m_writer->emit("int(");
-                    m_writer->emit(litInst->value.intVal);
+
+                    m_writer->emit(value);
                     m_writer->emit(")");
                     return;
                 }
