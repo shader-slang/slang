@@ -924,99 +924,125 @@ for (int tt = 0; tt < kBaseTextureTypeCount; ++tt)
                 // subscript operator
                 sb << "__subscript(" << uintN << " location) -> T {\n";
 
-                // CUDA
-                if (isMultisample)
+                // !!!!!!!!!!!!!!!!!!!! get !!!!!!!!!!!!!!!!!!!!!!!
+
+                // GLSL/SPIR-V distinguished sampled vs. non-sampled images
                 {
+                    switch( access )
+                    {
+                    case SLANG_RESOURCE_ACCESS_NONE:
+                    case SLANG_RESOURCE_ACCESS_READ:
+                        sb << "__glsl_extension(GL_EXT_samplerless_texture_functions)";
+                        sb << "__target_intrinsic(glsl, \"$ctexelFetch($0, " << ivecN << "($1)";
+                        if( !isMultisample )
+                        {
+                            sb << ", 0";
+                        }
+                        else
+                        {
+                            // TODO: how to handle passing through sample index?
+                            sb << ", 0";
+                        }
+                        break;
+
+                    default:
+                        sb << "__target_intrinsic(glsl, \"$cimageLoad($0, " << ivecN << "($1)";
+                        if( isMultisample )
+                        {
+                            // TODO: how to handle passing through sample index?
+                            sb << ", 0";
+                        }
+                        break;
+                    }
+                    sb << ")$z\")\n";
                 }
-                else 
+
+                // CUDA
                 {
                     if (access == SLANG_RESOURCE_ACCESS_READ_WRITE)
                     {
-                        for (int readWrite = 0; readWrite < 2; ++readWrite)
+                        const int coordCount = kBaseTextureTypes[tt].coordCount;
+                        const int vecCount = coordCount + int(isArray);
+
+                        sb << "__target_intrinsic(cuda, \"surf";
+                        if( baseShape != TextureFlavor::Shape::ShapeCube )
                         {
-                            const bool isRead = (readWrite == 0);
-
-                            const int coordCount = kBaseTextureTypes[tt].coordCount;
-                            const int vecCount = coordCount + int(isArray);
-
-                            sb << "__target_intrinsic(cuda, \"";
-
-                            sb << "surf";
-                            if( baseShape != TextureFlavor::Shape::ShapeCube )
-                            {
-                                sb << coordCount << "D";
-                            }
-                            else
-                            {
-                                sb << "Cubemap";
-                            }
-
-                            sb << (isArray ? "Layered" : "");
-
-                            if (isRead)
-                            {
-                                sb << "read<$T0>($0";
-                            }
-                            else
-                            {
-                                sb << "write<$T0>($2, $0";
-                            }
-
-                            for (int i = 0; i < vecCount; ++i)
-                            {
-                                sb << ", ($1)";
-                                if (vecCount > 1)
-                                {
-                                    sb << '.' << char(i + 'x');
-                                }
-                            }
-
-                            sb << ", SLANG_CUDA_BOUNDARY_MODE)\") ";
-                            sb << (isRead ? " get;\n" : " set;\n");
+                            sb << coordCount << "D";
                         }
+                        else
+                        {
+                            sb << "Cubemap";
+                        }
+
+                        sb << (isArray ? "Layered" : "");
+                        sb << "read<$T0>($0";
+                            
+                        for (int i = 0; i < vecCount; ++i)
+                        {
+                            sb << ", ($1)";
+                            if (vecCount > 1)
+                            {
+                                sb << '.' << char(i + 'x');
+                            }
+                        }
+
+                        sb << ", SLANG_CUDA_BOUNDARY_MODE)\")\n";
                     }
                     else if (access == SLANG_RESOURCE_ACCESS_READ)
                     {
                         // We can allow this on Texture1D
                         if( baseShape == TextureFlavor::Shape::Shape1D && isArray == false)
                         {
-                            sb << "__target_intrinsic(cuda, \"tex1Dfetch<$T0>($0, $1)\") get;\n";
+                            sb << "__target_intrinsic(cuda, \"tex1Dfetch<$T0>($0, $1)\")\n";
                         }
                     }
                 }
 
+                // Output that has get
+                sb << " get;\n";
 
-                // GLSL/SPIR-V distinguished sampled vs. non-sampled images
-                switch( access )
+                // !!!!!!!!!!!!!!!!!!!! set !!!!!!!!!!!!!!!!!!!!!!!
+
+                if (!(access == SLANG_RESOURCE_ACCESS_NONE || access == SLANG_RESOURCE_ACCESS_READ))
                 {
-                case SLANG_RESOURCE_ACCESS_NONE:
-                case SLANG_RESOURCE_ACCESS_READ:
-                    sb << "__glsl_extension(GL_EXT_samplerless_texture_functions)";
-                    sb << "__target_intrinsic(glsl, \"$ctexelFetch($0, " << ivecN << "($1)";
-                    if( !isMultisample )
-                    {
-                        sb << ", 0";
-                    }
-                    else
-                    {
-                        // TODO: how to handle passing through sample index?
-                        sb << ", 0";
-                    }
-                    break;
+                    // GLSL
+                    sb << "__target_intrinsic(glsl, \"imageStore($0, " << ivecN << "($1), $V2)\")\n";
 
-                default:
-                    sb << "__target_intrinsic(glsl, \"$cimageLoad($0, " << ivecN << "($1)";
-                    if( isMultisample )
+                    // CUDA
                     {
-                        // TODO: how to handle passing through sample index?
-                        sb << ", 0";
+                        const int coordCount = kBaseTextureTypes[tt].coordCount;
+                        const int vecCount = coordCount + int(isArray);
+
+                        sb << "__target_intrinsic(cuda, \"surf";
+                        if( baseShape != TextureFlavor::Shape::ShapeCube )
+                        {
+                            sb << coordCount << "D";
+                        }
+                        else
+                        {
+                            sb << "Cubemap";
+                        }
+
+                        sb << (isArray ? "Layered" : "");
+                        sb << "write<$T0>($2, $0";
+                        for (int i = 0; i < vecCount; ++i)
+                        {
+                            sb << ", ($1)";
+                            if (vecCount > 1)
+                            {
+                                sb << '.' << char(i + 'x');
+                            }
+                        }
+
+                        sb << ", SLANG_CUDA_BOUNDARY_MODE)\")\n";
                     }
-                    break;
+
+                    // Set
+                    sb << " set;\n";
                 }
 
-
-                sb << ")$z\") get;\n";
-
+                // !!!!!!!!!!!!!!!!!! ref !!!!!!!!!!!!!!!!!!!!!!!!!
+                
                 // Depending on the access level of the texture type,
                 // we either have just a getter (the default), or both
                 // a getter and setter.
@@ -1025,10 +1051,7 @@ for (int tt = 0; tt < kBaseTextureTypeCount; ++tt)
                 case SLANG_RESOURCE_ACCESS_NONE:
                 case SLANG_RESOURCE_ACCESS_READ:
                     break;
-
                 default:
-                    sb << "__target_intrinsic(glsl, \"imageStore($0, " << ivecN << "($1), $V2)\") set;\n";
-
                     sb << "__intrinsic_op(" << int(kIROp_ImageSubscript) << ") ref;\n";
                     break;
                 }
@@ -1486,7 +1509,7 @@ for (auto op : binaryOps)
         sb << "__intrinsic_op(" << int(op.opCode) << ") matrix<" << resultType << ",N,M> operator" << op.opName << "(" << leftQual << "matrix<" << leftType << ",N,M> left, " << rightType << " right);\n";
     }
 }
-SLANG_RAW("#line 1468 \"core.meta.slang\"")
+SLANG_RAW("#line 1491 \"core.meta.slang\"")
 SLANG_RAW("\n")
 SLANG_RAW("\n")
 SLANG_RAW("// Specialized function\n")
