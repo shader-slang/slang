@@ -35,15 +35,14 @@ namespace Slang
     SyntaxClassBase::ClassInfo const SyntaxClassBase::Impl<NAME>::kClassInfo(#NAME, nullptr, &SyntaxClassBase::Impl<BASE>::kClassInfo);
 
 #define SYNTAX_CLASS(NAME, BASE)                                                \
-    void NAME::accept(NAME::Visitor* visitor, void* extra)                      \
-    { visitor->dispatch_##NAME(this, extra); }                                  \
     template<>                                                                  \
     void* SyntaxClassBase::Impl<NAME>::createFunc() { return new NAME(); }      \
-    SyntaxClass<NodeBase> NAME::getClass() { return Slang::getClass<NAME>(); }  \
-    const SyntaxClassBase::ClassInfo& NAME::getClassInfo() const { return SyntaxClassBase::Impl<NAME>::kClassInfo; } \
     template<>                                                                  \
-    SyntaxClassBase::ClassInfo const SyntaxClassBase::Impl<NAME>::kClassInfo( #NAME, &SyntaxClassBase::Impl<NAME>::createFunc, &SyntaxClassBase::Impl<BASE>::kClassInfo);
-
+    SyntaxClassBase::ClassInfo const SyntaxClassBase::Impl<NAME>::kClassInfo( #NAME, &SyntaxClassBase::Impl<NAME>::createFunc, &SyntaxClassBase::Impl<BASE>::kClassInfo); \
+    void NAME::accept(NAME::Visitor* visitor, void* extra)                      \
+    { visitor->dispatch_##NAME(this, extra); }                                  \
+    const SyntaxClassBase::ClassInfo& NAME::getClassInfo() const { return SyntaxClassBase::Impl<NAME>::kClassInfo; }  
+    
 template<>
 SyntaxClassBase::ClassInfo const SyntaxClassBase::Impl<RefObject>::kClassInfo("RefObject", nullptr, nullptr);
 
