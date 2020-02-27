@@ -32,7 +32,7 @@ namespace Slang
 
 #define ABSTRACT_SYNTAX_CLASS(NAME, BASE)   \
     template<>                              \
-    SyntaxClassBase::ClassInfo const SyntaxClassBase::Impl<NAME>::kClassInfo = { #NAME, &SyntaxClassBase::Impl<BASE>::kClassInfo, nullptr };
+    SyntaxClassBase::ClassInfo const SyntaxClassBase::Impl<NAME>::kClassInfo(#NAME, nullptr, &SyntaxClassBase::Impl<BASE>::kClassInfo);
 
 #define SYNTAX_CLASS(NAME, BASE)                                                \
     void NAME::accept(NAME::Visitor* visitor, void* extra)                      \
@@ -40,11 +40,12 @@ namespace Slang
     template<>                                                                  \
     void* SyntaxClassBase::Impl<NAME>::createFunc() { return new NAME(); }      \
     SyntaxClass<NodeBase> NAME::getClass() { return Slang::getClass<NAME>(); }  \
+    const SyntaxClassBase::ClassInfo& NAME::getClassInfo() const { return SyntaxClassBase::Impl<NAME>::kClassInfo; } \
     template<>                                                                  \
-    SyntaxClassBase::ClassInfo const SyntaxClassBase::Impl<NAME>::kClassInfo = { #NAME, &SyntaxClassBase::Impl<BASE>::kClassInfo, &SyntaxClassBase::Impl<NAME>::createFunc };
+    SyntaxClassBase::ClassInfo const SyntaxClassBase::Impl<NAME>::kClassInfo( #NAME, &SyntaxClassBase::Impl<NAME>::createFunc, &SyntaxClassBase::Impl<BASE>::kClassInfo);
 
 template<>
-SyntaxClassBase::ClassInfo const SyntaxClassBase::Impl<RefObject>::kClassInfo = { "RefObject", nullptr, nullptr };
+SyntaxClassBase::ClassInfo const SyntaxClassBase::Impl<RefObject>::kClassInfo("RefObject", nullptr, nullptr);
 
 ABSTRACT_SYNTAX_CLASS(NodeBase, RefObject);
 ABSTRACT_SYNTAX_CLASS(SyntaxNodeBase, NodeBase);
@@ -71,26 +72,117 @@ ABSTRACT_SYNTAX_CLASS(GlobalGenericParamSubstitution, Substitutions);
 #include "slang-val-defs.h"
 #include "slang-object-meta-end.h"
 
-bool SyntaxClassBase::isSubClassOfImpl(SyntaxClassBase const& super) const
-{
-    SyntaxClassBase::ClassInfo const* info = classInfo;
-    while (info)
-    {
-        if (info == super.classInfo)
-            return true;
 
-        info = info->baseClass;
+/* static*/ SyntaxClassBase::ClassInfo* SyntaxClassBase::ClassInfo::s_first = nullptr;
+
+SyntaxClassBase::ClassInfo::ClassInfo(const char* name, CreateFunc createFunc, const ClassInfo* superClass):
+    m_name(name),
+    m_createFunc(createFunc),
+    m_superClass(superClass),
+    m_next(s_first)
+{
+    m_rangeStart = 0;
+    m_rangeEnd = 0;
+
+    s_first = this;
+}
+
+
+
+static uint32_t _calcRangeRec(const SyntaxClassBase::ClassInfo* classInfo, const Dictionary<const SyntaxClassBase::ClassInfo*, List<const SyntaxClassBase::ClassInfo*> >& childMap, uint32_t index)
+{
+    classInfo->m_rangeStart = index++;
+    // Do the calc range for all the children
+    auto list = childMap.TryGetValue(classInfo);
+
+    if (list)
+    {
+        for (auto child : *list)
+        {
+            index = _calcRangeRec(child, childMap, index);
+        }
     }
 
+    classInfo->m_rangeEnd = index;
+    return index;
+}
+
+bool SyntaxClassBase::ClassInfo::isSubClassOfSlow(const ThisType& super) const
+{
+    SyntaxClassBase::ClassInfo const* info = this;
+    while (info)
+    {
+        if (info == &super)
+            return true;
+        info = info->m_superClass;
+    }
     return false;
 }
 
-NodeBase* _dynamicCastImpl(NodeBase* node, SyntaxClassBase const& toClass)
+static bool _checkSubClassRange()
 {
-    if(!node) return nullptr;
-    if(node->getClass().isSubClassOfImpl(toClass))
-        return node;
-    return nullptr;
+    typedef SyntaxClassBase::ClassInfo ClassInfo;
+
+    List<const ClassInfo*> list;
+    for (const ClassInfo* type = ClassInfo::s_first; type; type = type->m_next)
+    {
+        list.add(type);
+    }
+
+    for (Index i = 0; i < list.getCount(); ++i)
+    {
+        for (Index j = 0; j < list.getCount(); ++j)
+        {
+            auto a = list[i];
+            auto b = list[j];
+            if (a->isSubClassOf(*b) != a->isSubClassOfSlow(*b))
+            {
+                return false;
+            }
+        }
+    }
+
+    return true;
+}
+
+
+/* static */SlangResult SyntaxClassBase::ClassInfo::initRanges()
+{
+    // Remove the warning about not referenced
+    SLANG_UNUSED(&_checkSubClassRange);
+
+    // TODO(JS):
+    // Note that the calculating of the ranges could be done more efficiently by adding to an array of struct { super, class }, sorting, by super classs
+    // and using a dictionary to map from class it's first in list of super class use. This works for now though.
+  
+    // We want to produce a map from a node that holds all of it's children
+    Dictionary<const ThisType*, List<const ThisType*> > childMap;
+
+    const List<const ThisType*> emptyList;
+
+    {
+         for (const ThisType* type = s_first; type; type = type->m_next)
+         {
+             if (type->m_superClass)
+             {
+                 // Add to that item
+                 List<const ThisType*>* list = childMap.TryGetValueOrAdd(type->m_superClass, emptyList);
+                 if (!list)
+                 {
+                     list = childMap.TryGetValue(type->m_superClass);
+                 }
+                 SLANG_ASSERT(list);
+                 list->add(type);
+             }
+         }
+    }
+
+    // We want to recursively work out a range
+    _calcRangeRec(&SyntaxClassBase::Impl<RefObject>::kClassInfo, childMap, 1);
+
+    SLANG_ASSERT(_checkSubClassRange());
+
+    return SLANG_OK;
 }
 
 

@@ -6,9 +6,8 @@
 
 ABSTRACT_SYNTAX_CLASS(NodeBase, RefObject)
     // A helper to access the corresponding class on a concrete instance
-    RAW(
-    virtual SyntaxClass<NodeBase> getClass() = 0;
-    )
+    RAW(virtual SyntaxClass<NodeBase> getClass() = 0;)
+    RAW(virtual const SyntaxClassBase::ClassInfo& getClassInfo() const = 0;)
 END_SYNTAX_CLASS()
 
 // Base class for all nodes representing actual syntax
