@@ -8,6 +8,9 @@
 
 namespace Slang
 {
+    // We want this first, before the kClassInfo variables so it is constructed before anything else. 
+    /* static*/ SyntaxClassBase::ClassInfo* SyntaxClassBase::ClassInfo::s_first = nullptr;
+
     // BasicExpressionType
 
     bool BasicExpressionType::EqualsImpl(Type * type)
@@ -70,9 +73,6 @@ ABSTRACT_SYNTAX_CLASS(GlobalGenericParamSubstitution, Substitutions);
 #include "slang-type-defs.h"
 #include "slang-val-defs.h"
 #include "slang-object-meta-end.h"
-
-
-/* static*/ SyntaxClassBase::ClassInfo* SyntaxClassBase::ClassInfo::s_first = nullptr;
 
 SyntaxClassBase::ClassInfo::ClassInfo(const char* name, CreateFunc createFunc, const ClassInfo* superClass):
     m_name(name),
