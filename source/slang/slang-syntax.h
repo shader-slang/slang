@@ -1320,7 +1320,6 @@ namespace Slang
 #define SYNTAX_CLASS(NAME, BASE, ...)                                   \
     class NAME : public BASE {                                          \
     virtual void accept(NAME::Visitor* visitor, void* extra) override;  \
-    public: virtual SyntaxClass<NodeBase> getClass() override;          \
     public: virtual const SyntaxClassBase::ClassInfo& getClassInfo() const override; \
     public: /* ... */
 #include "slang-expr-defs.h"

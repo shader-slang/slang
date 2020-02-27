@@ -618,7 +618,7 @@ namespace Slang
         bool validTarget = false;
         for(auto attrTargetMod : attrDecl->GetModifiersOfType<AttributeTargetModifier>())
         {
-            if(attrTarget->getClass().isSubClassOf(attrTargetMod->syntaxClass))
+            if(attrTarget->getClassInfo().isSubClassOf(*attrTargetMod->syntaxClass.classInfo))
             {
                 validTarget = true;
                 break;

@@ -39,7 +39,6 @@ namespace Slang
     { visitor->dispatch_##NAME(this, extra); }                                  \
     template<>                                                                  \
     void* SyntaxClassBase::Impl<NAME>::createFunc() { return new NAME(); }      \
-    SyntaxClass<NodeBase> NAME::getClass() { return Slang::getClass<NAME>(); }  \
     const SyntaxClassBase::ClassInfo& NAME::getClassInfo() const { return SyntaxClassBase::Impl<NAME>::kClassInfo; } \
     template<>                                                                  \
     SyntaxClassBase::ClassInfo const SyntaxClassBase::Impl<NAME>::kClassInfo( #NAME, &SyntaxClassBase::Impl<NAME>::createFunc, &SyntaxClassBase::Impl<BASE>::kClassInfo);
