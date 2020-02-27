@@ -244,7 +244,7 @@ namespace Slang
     {
         if( auto rateQualType = as<IRRateQualifiedType>(type) )
         {
-            type = rateQualType->getDataType();
+            type = rateQualType->getValueType();
         }
 
         // The "true" pointers and the pointer-like stdlib types are the easy cases.
