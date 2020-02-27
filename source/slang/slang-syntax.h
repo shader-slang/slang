@@ -488,7 +488,7 @@ namespace Slang
                 /// Non inclusive end of range of children.
             mutable uint32_t m_childrenEndClassId;        
 
-            const ClassInfo* m_superClass;          ///< Base class for runtime queries
+            const ClassInfo* m_superClass;          ///< The super class of this class, or nullptr if has no super class. 
             const char* m_name;                     ///< Textual class name, for debugging 
             CreateFunc m_createFunc;                ///< Callback to use when creating instances
             
