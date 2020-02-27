@@ -468,13 +468,14 @@ namespace Slang
                 /// A constant time implementation of isSubClassOf
             SLANG_FORCE_INLINE bool isSubClassOf(const ThisType& super) const
             {
-                return m_rangeStart >= super.m_rangeStart && m_rangeStart < super.m_rangeEnd;
+                // We include super.m_classId, because it's a subclass of itself.
+                return m_classId >= super.m_classId && m_classId < super.m_childrenEndClassId;
             }
                 /// Will produce the same result as isSubClassOf, but more slowly by traversing the m_superClass
                 /// Works without initRange being called. 
             bool isSubClassOfSlow(const ThisType& super) const;
 
-                /// This function must have been called before any dynamic casting will work
+                /// This function must have been called before any dynamic casting will work (via the m_classId/m_childrenEndClassId.
                 /// It sets up the m_rangeStart/m_rangeEnd values to make.
                 /// Is called within the creation of Session
             static SlangResult initRanges();
@@ -482,8 +483,10 @@ namespace Slang
                 /// Ctor
             ClassInfo(const char* name, CreateFunc createFunc, const ClassInfo* superClass);
 
-            mutable uint32_t m_rangeStart;          ///< The first element is for this class
-            mutable uint32_t m_rangeEnd;            ///< Non inclusive end of range
+                /// The id for this class. The children of this class are in the range of m_classId + 1 to (but not including) m_childrenEndId.
+            mutable uint32_t m_classId;
+                /// Non inclusive end of range of children.
+            mutable uint32_t m_childrenEndClassId;        
 
             const ClassInfo* m_superClass;          ///< Base class for runtime queries
             const char* m_name;                     ///< Textual class name, for debugging 

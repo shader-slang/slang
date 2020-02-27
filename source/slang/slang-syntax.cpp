@@ -80,8 +80,8 @@ SyntaxClassBase::ClassInfo::ClassInfo(const char* name, CreateFunc createFunc, c
     m_superClass(superClass),
     m_next(s_first)
 {
-    m_rangeStart = 0;
-    m_rangeEnd = 0;
+    m_classId = 0;
+    m_childrenEndClassId = 0;
 
     s_first = this;
 }
@@ -90,7 +90,7 @@ SyntaxClassBase::ClassInfo::ClassInfo(const char* name, CreateFunc createFunc, c
 
 static uint32_t _calcRangeRec(const SyntaxClassBase::ClassInfo* classInfo, const Dictionary<const SyntaxClassBase::ClassInfo*, List<const SyntaxClassBase::ClassInfo*> >& childMap, uint32_t index)
 {
-    classInfo->m_rangeStart = index++;
+    classInfo->m_classId = index++;
     // Do the calc range for all the children
     auto list = childMap.TryGetValue(classInfo);
 
@@ -102,7 +102,7 @@ static uint32_t _calcRangeRec(const SyntaxClassBase::ClassInfo* classInfo, const
         }
     }
 
-    classInfo->m_rangeEnd = index;
+    classInfo->m_childrenEndClassId = index;
     return index;
 }
 
