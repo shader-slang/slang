@@ -1485,15 +1485,11 @@ T WavePrefixSum(T expr);
 __generic<T : __BuiltinArithmeticType, let N : int> vector<T,N> WavePrefixSum(vector<T,N> expr);
 __generic<T : __BuiltinArithmeticType, let N : int, let M : int> matrix<T,N,M> WavePrefixSum(matrix<T,N,M> expr);
 
-__generic<T : __BuiltinArithmeticType>
-__target_intrinsic(cuda, "_waveAnd(__activemask() & __lanemask_lt(), $0)")
-T WaveMultiPrefixBitAnd(T expr);
+__generic<T : __BuiltinArithmeticType> T WaveMultiPrefixBitAnd(T expr);
 __generic<T : __BuiltinArithmeticType, let N : int> vector<T,N> WaveMultiPrefixBitAnd(vector<T,N> expr);
 __generic<T : __BuiltinArithmeticType, let N : int, let M : int> matrix<T,N,M> WaveMultiPrefixBitAnd(matrix<T,N,M> expr);
 
-__generic<T : __BuiltinArithmeticType>
-__target_intrinsic(cuda, "_waveOr(__activemask() & __lanemask_lt(), $0)")
-T WaveMultiPrefixBitOr(T expr);
+__generic<T : __BuiltinArithmeticType> T WaveMultiPrefixBitOr(T expr);
 __generic<T : __BuiltinArithmeticType, let N : int> vector<T,N> WaveMultiPrefixBitOr(vector<T,N> expr);
 __generic<T : __BuiltinArithmeticType, let N : int, let M : int> matrix<T,N,M> WaveMultiPrefixBitOr(matrix<T,N,M> expr);
 

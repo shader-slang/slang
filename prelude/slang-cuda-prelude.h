@@ -216,7 +216,6 @@ __inline__ __device__ int _waveProduct(int mask, int val)
 
 __inline__ __device__ int _waveSum(int mask, int val) 
 {
-    const int laneId = _getLaneId();
     for (int offset = SLANG_CUDA_WARP_SIZE / 2; offset > 0; offset /= 2) 
     {
         val += __shfl_xor_sync( mask, val, offset);
@@ -224,14 +223,20 @@ __inline__ __device__ int _waveSum(int mask, int val)
     return val;
 }
 
-__inline__ __device__ bool _waveAllEqual(int mask, int val) 
+// TODO(JS):
+// This is a hack that relies on that I can pass down 64 bits. That I will use ~uint64_t(0) 
+// to mark not equalness, otherwise the value I pass down is the value. 
+// This only works because we have 32 bit input. I could use a 32 bit sentinel. Perhaps there is 
+// a better way. 
+__inline__ __device__ bool _waveAllEqual(int mask, int inVal) 
 {
-    bool isEqual = true;
+    uint64_t val = uint32_t(inVal);
     for (int offset = SLANG_CUDA_WARP_SIZE / 2; offset > 0; offset /= 2) 
     {
-        isEqual = isEqual && (val != __shfl_xor_sync( mask , val, offset));
+        uint64_t readVal = __shfl_xor_sync( mask, val, offset);
+        val = (readVal == val) ? val : ~uint64_t(0); 
     }
-    return isEqual;
+    return val != ~uint64_t(0);
 }
 
 // ----------------------------- F32 -----------------------------------------
