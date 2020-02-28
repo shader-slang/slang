@@ -30,13 +30,5 @@ namespace Slang
     return defaults;
 }
 
-void StdWriters::setRequestWriters(SlangCompileRequest* request)
-{
-    for (int i = 0; i < SLANG_WRITER_CHANNEL_COUNT_OF; ++i)
-    {
-        spSetWriter(request, SlangWriterChannel(i), m_writers[i]);
-    }
-}
-
 }
 

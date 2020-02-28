@@ -55,8 +55,11 @@ SlangResult SlangCTool::innerMain(StdWriters* stdWriters, SlangSession* session,
 
     spSetCommandLineCompilerMode(compileRequest);
     // Do any app specific configuration
-    stdWriters->setRequestWriters(compileRequest);
-
+    for (int i = 0; i < SLANG_WRITER_CHANNEL_COUNT_OF; ++i)
+    {
+        spSetWriter(compileRequest, SlangWriterChannel(i), stdWriters->getWriter(i));
+    }
+    
     SlangResult res = _compile(compileRequest, argc, argv);
 
     // Now that we are done, clean up after ourselves

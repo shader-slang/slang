@@ -749,11 +749,7 @@ if enableProfile then
         
         -- gprof needs symbols
         symbols "On"
-
-        filter { "system:linux" }
-            linkoptions{  "-pg" }
-            buildoptions{ "-pg" }
-
+        
         dependson { "slang" }
 
         includedirs { "external/spirv-headers/include" }
@@ -772,6 +768,11 @@ if enableProfile then
 
         includedirs { "." }
         links { "core"}
+        
+        filter { "system:linux" }
+            linkoptions{  "-pg" }
+            buildoptions{ "-pg" }
+
 end
 
 if buildGlslang then
