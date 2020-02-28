@@ -19,5 +19,11 @@ void computeMain(uint3 dispatchThreadID : SV_DispatchThreadID)
     value |= WaveActiveAnyTrue(idx == -1) ? 4 : 0;
     value |= WaveActiveAllTrue(idx == 3) ? 8 : 0;
         
+    int sum = WaveActiveSum(idx);
+    value |= (sum << 4);
+    
+    int product = WaveActiveProduct((idx & 1) + 1);
+    value |= (product << 8);    
+        
     outputBuffer[idx] = value;
 }
