@@ -1,0 +1,23 @@
+//DISABLE_TEST(compute):COMPARE_COMPUTE_EX:-cpu -compute 
+//DISABLE_TEST(compute):COMPARE_COMPUTE_EX:-slang -compute
+//TEST(compute):COMPARE_COMPUTE_EX:-slang -compute -dx12 -use-dxil -profile cs_6_0
+//DISABLE_TEST(compute, vulkan):COMPARE_COMPUTE_EX:-vk -compute
+//TEST(compute, vulkan):COMPARE_COMPUTE_EX:-cuda -compute
+
+//TEST_INPUT:ubuffer(data=[0 0 0 0], stride=4):out,name outputBuffer
+RWStructuredBuffer<int> outputBuffer;
+
+[numthreads(4, 1, 1)]
+void computeMain(uint3 dispatchThreadID : SV_DispatchThreadID)
+{
+    int idx = int(dispatchThreadID.x);
+    
+    int value = 0;
+    
+    value |= WaveActiveAllTrue(idx < 4 ) ? 1 : 0;
+    value |= WaveActiveAnyTrue(idx == 2) ? 2 : 0;
+    value |= WaveActiveAnyTrue(idx == -1) ? 4 : 0;
+    value |= WaveActiveAllTrue(idx == 3) ? 8 : 0;
+        
+    outputBuffer[idx] = value;
+}

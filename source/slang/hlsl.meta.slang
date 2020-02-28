@@ -1395,35 +1395,51 @@ __generic<T : __BuiltinType> T QuadReadAcrossDiagonal(T localValue);
 __generic<T : __BuiltinType, let N : int> vector<T,N> QuadReadAcrossDiagonal(vector<T,N> localValue);
 __generic<T : __BuiltinType, let N : int, let M : int> matrix<T,N,M> QuadReadAcrossDiagonal(matrix<T,N,M> localValue);
 
-__generic<T : __BuiltinIntegerType> T WaveActiveBitAnd(T expr);
+__generic<T : __BuiltinIntegerType>
+__target_intrinsic(cuda, "_waveAnd(__activemask(), $0)")
+T WaveActiveBitAnd(T expr);
 __generic<T : __BuiltinIntegerType, let N : int> vector<T,N> WaveActiveBitAnd(vector<T,N> expr);
 __generic<T : __BuiltinIntegerType, let N : int, let M : int> matrix<T,N,M> WaveActiveBitAnd(matrix<T,N,M> expr);
 
-__generic<T : __BuiltinIntegerType> T WaveActiveBitOr(T expr);
+__generic<T : __BuiltinIntegerType>
+__target_intrinsic(cuda, "_waveOr(__activemask(), $0)")
+T WaveActiveBitOr(T expr);
 __generic<T : __BuiltinIntegerType, let N : int> vector<T,N> WaveActiveBitOr(vector<T,N> expr);
 __generic<T : __BuiltinIntegerType, let N : int, let M : int> matrix<T,N,M> WaveActiveBitOr(matrix<T,N,M> expr);
 
-__generic<T : __BuiltinIntegerType> T WaveActiveBitXor(T expr);
+__generic<T : __BuiltinIntegerType>
+__target_intrinsic(cuda, "_waveXor(__activemask(), $0)")
+T WaveActiveBitXor(T expr);
 __generic<T : __BuiltinIntegerType, let N : int> vector<T,N> WaveActiveBitXor(vector<T,N> expr);
 __generic<T : __BuiltinIntegerType, let N : int, let M : int> matrix<T,N,M> WaveActiveBitXor(matrix<T,N,M> expr);
 
-__generic<T : __BuiltinArithmeticType> T WaveActiveMax(T expr);
+__generic<T : __BuiltinArithmeticType>
+__target_intrinsic(cuda, "_waveMax(__activemask(), $0)")
+T WaveActiveMax(T expr);
 __generic<T : __BuiltinArithmeticType, let N : int> vector<T,N> WaveActiveMax(vector<T,N> expr);
 __generic<T : __BuiltinArithmeticType, let N : int, let M : int> matrix<T,N,M> WaveActiveMax(matrix<T,N,M> expr);
 
-__generic<T : __BuiltinArithmeticType> T WaveActiveMin(T expr);
+__generic<T : __BuiltinArithmeticType>
+__target_intrinsic(cuda, "_waveMin(__activemask(), $0)")
+T WaveActiveMin(T expr);
 __generic<T : __BuiltinArithmeticType, let N : int> vector<T,N> WaveActiveMin(vector<T,N> expr);
 __generic<T : __BuiltinArithmeticType, let N : int, let M : int> matrix<T,N,M> WaveActiveMin(matrix<T,N,M> expr);
 
-__generic<T : __BuiltinArithmeticType> T WaveActiveProduct(T expr);
+__generic<T : __BuiltinArithmeticType>
+__target_intrinsic(cuda, "_waveProduct(__activemask(), $0)")
+T WaveActiveProduct(T expr);
 __generic<T : __BuiltinArithmeticType, let N : int> vector<T,N> WaveActiveProduct(vector<T,N> expr);
 __generic<T : __BuiltinArithmeticType, let N : int, let M : int> matrix<T,N,M> WaveActiveProduct(matrix<T,N,M> expr);
 
-__generic<T : __BuiltinArithmeticType> T WaveActiveSum(T expr);
+__generic<T : __BuiltinArithmeticType>
+__target_intrinsic(cuda, "_waveSum(__activemask(), $0)")
+T WaveActiveSum(T expr);
 __generic<T : __BuiltinArithmeticType, let N : int> vector<T,N> WaveActiveSum(vector<T,N> expr);
 __generic<T : __BuiltinArithmeticType, let N : int, let M : int> matrix<T,N,M> WaveActiveSum(matrix<T,N,M> expr);
 
-__generic<T : __BuiltinType> bool WaveActiveAllEqual(T value);
+__generic<T : __BuiltinType>
+__target_intrinsic(cuda, "_waveAllEqual(__activemask(), $0)")
+bool WaveActiveAllEqual(T value);
 __generic<T : __BuiltinType, let N : int> vector<bool,N> WaveActiveAllEqual(vector<T,N> value);
 __generic<T : __BuiltinType, let N : int, let M : int> matrix<bool,N,M> WaveActiveAllEqual(matrix<T,N,M> value);
 
@@ -1438,7 +1454,7 @@ __generic<T : __BuiltinType, let N : int, let M : int> uint4 WaveMatch(matrix<T,
 
 __target_intrinsic(cuda, "(__all_sync(__activemask(), $0) != 0)") 
 bool WaveActiveAllTrue(bool condition);
-__target_intrinsic(cuda, "(_any_sync(__activemask(), $0) != 0)")
+__target_intrinsic(cuda, "(__any_sync(__activemask(), $0) != 0)")
 bool WaveActiveAnyTrue(bool condition);
 
 __target_intrinsic(cuda, "make_uint4(__ballot_sync(__activemask(), $0), 0, 0, 0)")
@@ -1457,27 +1473,39 @@ uint WaveGetLaneIndex();
 __target_intrinsic(cuda, "((__activemask() & __lanemask_lt()) == 0)")
 bool WaveIsFirstLane();
 
-__generic<T : __BuiltinArithmeticType> T WavePrefixProduct(T expr);
+__generic<T : __BuiltinArithmeticType>
+__target_intrinsic(cuda, "_waveProduct(__activemask() & __lanemask_lt(), $0)")
+T WavePrefixProduct(T expr);
 __generic<T : __BuiltinArithmeticType, let N : int> vector<T,N> WavePrefixProduct(vector<T,N> expr);
 __generic<T : __BuiltinArithmeticType, let N : int, let M : int> matrix<T,N,M> WavePrefixProduct(matrix<T,N,M> expr);
 
-__generic<T : __BuiltinArithmeticType> T WavePrefixSum(T expr);
+__generic<T : __BuiltinArithmeticType>
+__target_intrinsic(cuda, "_waveSum(__activemask() & __lanemask_lt(), $0)")
+T WavePrefixSum(T expr);
 __generic<T : __BuiltinArithmeticType, let N : int> vector<T,N> WavePrefixSum(vector<T,N> expr);
 __generic<T : __BuiltinArithmeticType, let N : int, let M : int> matrix<T,N,M> WavePrefixSum(matrix<T,N,M> expr);
 
-__generic<T : __BuiltinArithmeticType> T WaveMultiPrefixBitAnd(T expr);
+__generic<T : __BuiltinArithmeticType>
+__target_intrinsic(cuda, "_waveAnd(__activemask() & __lanemask_lt(), $0)")
+T WaveMultiPrefixBitAnd(T expr);
 __generic<T : __BuiltinArithmeticType, let N : int> vector<T,N> WaveMultiPrefixBitAnd(vector<T,N> expr);
 __generic<T : __BuiltinArithmeticType, let N : int, let M : int> matrix<T,N,M> WaveMultiPrefixBitAnd(matrix<T,N,M> expr);
 
-__generic<T : __BuiltinArithmeticType> T WaveMultiPrefixBitOr(T expr);
+__generic<T : __BuiltinArithmeticType>
+__target_intrinsic(cuda, "_waveOr(__activemask() & __lanemask_lt(), $0)")
+T WaveMultiPrefixBitOr(T expr);
 __generic<T : __BuiltinArithmeticType, let N : int> vector<T,N> WaveMultiPrefixBitOr(vector<T,N> expr);
 __generic<T : __BuiltinArithmeticType, let N : int, let M : int> matrix<T,N,M> WaveMultiPrefixBitOr(matrix<T,N,M> expr);
 
-__generic<T : __BuiltinArithmeticType> T WaveMultiPrefixBitXor(T expr);
+__generic<T : __BuiltinArithmeticType>
+__target_intrinsic(cuda, "_waveXor(__activemask() & __lanemask_lt(), $0)")
+T WaveMultiPrefixBitXor(T expr);
 __generic<T : __BuiltinArithmeticType, let N : int> vector<T,N> WaveMultiPrefixBitXor(vector<T,N> expr);
 __generic<T : __BuiltinArithmeticType, let N : int, let M : int> matrix<T,N,M> WaveMultiPrefixBitXor(matrix<T,N,M> expr);
 
+__target_intrinsic(cuda, "__popc(__ballot_sync((__activemask() & __lanemask_lt()), $0))")
 uint WavePrefixCountBits(bool value);
+
 uint WaveMultiPrefixCountBits(bool value, uint4 mask);
 
 __generic<T : __BuiltinArithmeticType> T WaveMultiPrefixProduct(T value, uint4 mask);

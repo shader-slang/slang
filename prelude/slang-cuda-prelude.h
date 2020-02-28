@@ -128,7 +128,7 @@ union Union64
     double d;
 };
 
-// ---------------------- Miscellaneous --------------------------------------
+// ---------------------- Wave --------------------------------------
 
 // TODO(JS): It appears that cuda does not have a simple way to get a lane index. 
 // 
@@ -157,6 +157,83 @@ __forceinline__ __device__ uint32_t _getLaneId()
     return ret;
 }
 #endif
+
+__inline__ __device__ int _waveOr(int mask, int val) 
+{
+    for (int offset = SLANG_CUDA_WARP_SIZE / 2; offset > 0; offset /= 2) 
+    {
+        val = val | __shfl_down_sync( mask, val, offset);
+    }
+    return val;
+}
+
+__inline__ __device__ int _waveAnd(int mask, int val) 
+{
+    for (int offset = SLANG_CUDA_WARP_SIZE / 2; offset > 0; offset /= 2) 
+    {
+        val = val & __shfl_down_sync( mask, val, offset);
+    }
+    return val;
+}
+
+__inline__ __device__ int _waveXor(int mask, int val) 
+{
+    for (int offset = SLANG_CUDA_WARP_SIZE / 2; offset > 0; offset /= 2) 
+    {
+        val = val ^ __shfl_down_sync( mask, val, offset);
+    }
+    return val;
+}
+
+__inline__ __device__ int _waveMin(int mask, int val) 
+{
+    for (int offset = SLANG_CUDA_WARP_SIZE / 2; offset > 0; offset /= 2) 
+    {
+        int newVal = __shfl_down_sync( mask, val, offset);
+        val = (newVal < val) ? newVal : val;
+    }
+    return val;
+}
+
+__inline__ __device__ int _waveMax(int mask, int val) 
+{
+    for (int offset = SLANG_CUDA_WARP_SIZE / 2; offset > 0; offset /= 2) 
+    {
+        int newVal = __shfl_down_sync( mask, val, offset);
+        val = (newVal > val) ? newVal : val;
+    }
+    return val;
+}
+
+__inline__ __device__ int _waveProduct(int mask, int val) 
+{
+    for (int offset = SLANG_CUDA_WARP_SIZE / 2; offset > 0; offset /= 2) 
+    {
+        val *= __shfl_down_sync( mask, val, offset);
+    }
+    return val;
+}
+
+__inline__ __device__ int _waveSum(int mask, int val) 
+{
+    for (int offset = SLANG_CUDA_WARP_SIZE / 2; offset > 0; offset /= 2) 
+    {
+        val += __shfl_down_sync( mask , val, offset);
+    }
+    return val;
+}
+
+__inline__ __device__ bool _waveAllEqual(int mask, int val) 
+{
+    for (int offset = SLANG_CUDA_WARP_SIZE / 2; offset > 0; offset /= 2) 
+    {
+        if (val != __shfl_down_sync( mask , val, offset))
+        {
+            return false;
+        }
+    }
+    return true;
+}
 
 // ----------------------------- F32 -----------------------------------------
 
