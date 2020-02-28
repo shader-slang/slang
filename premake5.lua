@@ -92,11 +92,20 @@ newoption {
    allowed     = { { "true", "True"}, { "false", "False" } }
 }
 
+newoption {
+   trigger     = "enable-profile",
+   description = "(Optional) If true will enable slang-profile tool - suitable for gprof usage on linux",
+   value       = "bool",
+   default     = "false",
+   allowed     = { { "true", "True"}, { "false", "False" } }
+}
+
 buildLocation = _OPTIONS["build-location"]
 executeBinary = (_OPTIONS["execute-binary"] == "true")
 targetDetail = _OPTIONS["target-detail"]
 buildGlslang = (_OPTIONS["build-glslang"] == "true")
 enableCuda = (_OPTIONS["enable-cuda"] == "true")
+enableProfile = (_OPTIONS["enable-profile"] == "true")
 
 -- cudaPath is only set if cuda is enabled, and CUDA_PATH enviromental variable is set
 cudaPath = nil
@@ -733,6 +742,34 @@ standardProject "slang"
             --
             buildinputs { "%{cfg.targetdir}/slang-generate" .. executableSuffix }
     end
+
+if enableProfile then
+    tool "slang-profile"
+        uuid "375CC87D-F34A-4DF1-9607-C5C990FD6227"
+
+        filter { "system:linux" }
+            linkoptions{  "-pg" }
+            buildoptions{ "-pg" }
+
+        dependson { "slang" }
+
+        includedirs { "external/spirv-headers/include" }
+
+        defines { "SLANG_STATIC" }
+
+        -- The `standardProject` operation already added all the code in
+        -- `source/slang/*`, but we also want to incldue the umbrella
+        -- `slang.h` header in this prject, so we do that manually here.
+        files { "slang.h" }
+
+        files { "source/core/core.natvis" }
+
+        -- Add the slang source
+        addSourceDir "source/slang"
+
+        includedirs { "." }
+        links { "core"}
+end
 
 if buildGlslang then
 
