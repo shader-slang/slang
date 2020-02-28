@@ -746,6 +746,9 @@ standardProject "slang"
 if enableProfile then
     tool "slang-profile"
         uuid "375CC87D-F34A-4DF1-9607-C5C990FD6227"
+        
+        -- gprof needs symbols
+        symbols "On"
 
         filter { "system:linux" }
             linkoptions{  "-pg" }
