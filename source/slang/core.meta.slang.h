@@ -28,8 +28,7 @@ SLANG_RAW("interface __BuiltinSignedArithmeticType : __BuiltinArithmeticType {}\
 SLANG_RAW("\n")
 SLANG_RAW("// A type that can represent integers\n")
 SLANG_RAW("interface __BuiltinIntegerType : __BuiltinArithmeticType\n")
-SLANG_RAW("{\n")
-SLANG_RAW("}\n")
+SLANG_RAW("{}\n")
 SLANG_RAW("\n")
 SLANG_RAW("// A type that can represent non-integers\n")
 SLANG_RAW("interface __BuiltinRealType : __BuiltinArithmeticType {}\n")
@@ -200,7 +199,7 @@ for (int tt = 0; tt < kBaseTypeCount; ++tt)
         // TODO: should this cover the full gamut of integer types?
     case BaseType::Int:
     case BaseType::UInt:
-SLANG_RAW("#line 200 \"core.meta.slang\"")
+SLANG_RAW("#line 199 \"core.meta.slang\"")
 SLANG_RAW("\n")
 SLANG_RAW("        __generic<T:__EnumType>\n")
 SLANG_RAW("        __init(T value);\n")
@@ -216,7 +215,7 @@ SLANG_RAW("        __init(T value);\n")
 
 // Declare built-in pointer type
 // (eventually we can have the traditional syntax sugar for this)
-SLANG_RAW("#line 215 \"core.meta.slang\"")
+SLANG_RAW("#line 214 \"core.meta.slang\"")
 SLANG_RAW("\n")
 SLANG_RAW("\n")
 SLANG_RAW("__generic<T>\n")
@@ -278,7 +277,7 @@ sb << "    __init(T value);\n";
 sb << "    __init(vector<T,N> value);\n";
 
 sb << "};\n";
-SLANG_RAW("#line 261 \"core.meta.slang\"")
+SLANG_RAW("#line 260 \"core.meta.slang\"")
 SLANG_RAW("\n")
 SLANG_RAW("\n")
 SLANG_RAW("__generic<T = float, let R : int = 4, let C : int = 4>\n")
@@ -1514,7 +1513,7 @@ for (auto op : binaryOps)
         sb << "__intrinsic_op(" << int(op.opCode) << ") matrix<" << resultType << ",N,M> operator" << op.opName << "(" << leftQual << "matrix<" << leftType << ",N,M> left, " << rightType << " right);\n";
     }
 }
-SLANG_RAW("#line 1496 \"core.meta.slang\"")
+SLANG_RAW("#line 1495 \"core.meta.slang\"")
 SLANG_RAW("\n")
 SLANG_RAW("\n")
 SLANG_RAW("// Specialized function\n")

@@ -158,6 +158,9 @@ __forceinline__ __device__ uint32_t _getLaneId()
 }
 #endif
 
+// TODO(JS): NOTE! These functions only work across all lanes. 
+// Special handling will be needed if only some lanes are active.
+
 __inline__ __device__ int _waveOr(int mask, int val) 
 {
     for (int offset = SLANG_CUDA_WARP_SIZE / 2; offset > 0; offset /= 2) 
@@ -186,13 +189,12 @@ __inline__ __device__ int _waveXor(int mask, int val)
 }
 
 __inline__ __device__ int _waveMin(int mask, int val) 
-{
+{    
     for (int offset = SLANG_CUDA_WARP_SIZE / 2; offset > 0; offset /= 2) 
     {
         int newVal = __shfl_xor_sync( mask, val, offset);
         val = (newVal < val) ? newVal : val;
     }
-    return val;
 }
 
 __inline__ __device__ int _waveMax(int mask, int val) 
@@ -223,20 +225,18 @@ __inline__ __device__ int _waveSum(int mask, int val)
     return val;
 }
 
-// TODO(JS):
-// This is a hack that relies on that I can pass down 64 bits. That I will use ~uint64_t(0) 
-// to mark not equalness, otherwise the value I pass down is the value. 
-// This only works because we have 32 bit input. I could use a 32 bit sentinel. Perhaps there is 
-// a better way. 
-__inline__ __device__ bool _waveAllEqual(int mask, int inVal) 
+__inline__ __device__ bool _waveAllEqual(int mask, int val) 
 {
-    uint64_t val = uint32_t(inVal);
-    for (int offset = SLANG_CUDA_WARP_SIZE / 2; offset > 0; offset /= 2) 
-    {
-        uint64_t readVal = __shfl_xor_sync( mask, val, offset);
-        val = (readVal == val) ? val : ~uint64_t(0); 
-    }
-    return val != ~uint64_t(0);
+    int pred;
+    __match_all_sync(mask, val, &pred);
+    return pred != 0;
+}
+
+__inline__ __device__ int _waveReadFirst(int val) 
+{
+    const int mask = __activemask();
+    const int lowestLaneId = __ffs(mask) - 1;
+    return __shfl_sync(mask, val, lowestLaneId);   
 }
 
 // ----------------------------- F32 -----------------------------------------

@@ -1473,14 +1473,15 @@ uint WaveGetLaneIndex();
 __target_intrinsic(cuda, "((__activemask() & __lanemask_lt()) == 0)")
 bool WaveIsFirstLane();
 
+// TODO(JS): We cannot calculate prefix sums using a mask of __activemask() & __lanemask_lt(), because (amongst other reasons)
+// that would mean different lanes having a different mask, and they all have to have the same mask.
+
 __generic<T : __BuiltinArithmeticType>
-__target_intrinsic(cuda, "_waveProduct(__activemask() & __lanemask_lt(), $0)")
 T WavePrefixProduct(T expr);
 __generic<T : __BuiltinArithmeticType, let N : int> vector<T,N> WavePrefixProduct(vector<T,N> expr);
 __generic<T : __BuiltinArithmeticType, let N : int, let M : int> matrix<T,N,M> WavePrefixProduct(matrix<T,N,M> expr);
 
 __generic<T : __BuiltinArithmeticType>
-__target_intrinsic(cuda, "_waveSum(__activemask() & __lanemask_lt(), $0)")
 T WavePrefixSum(T expr);
 __generic<T : __BuiltinArithmeticType, let N : int> vector<T,N> WavePrefixSum(vector<T,N> expr);
 __generic<T : __BuiltinArithmeticType, let N : int, let M : int> matrix<T,N,M> WavePrefixSum(matrix<T,N,M> expr);
@@ -1494,12 +1495,11 @@ __generic<T : __BuiltinArithmeticType, let N : int> vector<T,N> WaveMultiPrefixB
 __generic<T : __BuiltinArithmeticType, let N : int, let M : int> matrix<T,N,M> WaveMultiPrefixBitOr(matrix<T,N,M> expr);
 
 __generic<T : __BuiltinArithmeticType>
-__target_intrinsic(cuda, "_waveXor(__activemask() & __lanemask_lt(), $0)")
 T WaveMultiPrefixBitXor(T expr);
 __generic<T : __BuiltinArithmeticType, let N : int> vector<T,N> WaveMultiPrefixBitXor(vector<T,N> expr);
 __generic<T : __BuiltinArithmeticType, let N : int, let M : int> matrix<T,N,M> WaveMultiPrefixBitXor(matrix<T,N,M> expr);
 
-__target_intrinsic(cuda, "__popc(__ballot_sync((__activemask() & __lanemask_lt()), $0))")
+__target_intrinsic(cuda, "__popc(__ballot_sync(__activemask(), $0)  & __lanemask_lt())")
 uint WavePrefixCountBits(bool value);
 
 uint WaveMultiPrefixCountBits(bool value, uint4 mask);
@@ -1512,11 +1512,15 @@ __generic<T : __BuiltinArithmeticType> T WaveMultiPrefixSum(T value, uint4 mask)
 __generic<T : __BuiltinArithmeticType, let N : int> vector<T,N> WaveMultiPrefixSum(vector<T,N> value, uint4 mask);
 __generic<T : __BuiltinArithmeticType, let N : int, let M : int> matrix<T,N,M> WaveMultiPrefixSum(matrix<T,N,M> value, uint4 mask);
 
-__generic<T : __BuiltinType> T WaveReadLaneFirst(T expr);
+__generic<T : __BuiltinType>
+__target_intrinsic(cuda, "_waveReadFirst($0)")
+T WaveReadLaneFirst(T expr);
 __generic<T : __BuiltinType, let N : int> vector<T,N> WaveReadLaneFirst(vector<T,N> expr);
 __generic<T : __BuiltinType, let N : int, let M : int> matrix<T,N,M> WaveReadLaneFirst(matrix<T,N,M> expr);
 
-__generic<T : __BuiltinType> T WaveReadLaneAt(T value, int lane);
+__generic<T : __BuiltinType>
+__target_intrinsic(cuda, "__shfl_sync(SLANG_CUDA_WARP_MASK, $0, $1)")
+T WaveReadLaneAt(T value, int lane);
 __generic<T : __BuiltinType, let N : int> vector<T,N> WaveReadLaneAt(vector<T,N> value, int lane);
 __generic<T : __BuiltinType, let N : int, let M : int> matrix<T,N,M> WaveReadLaneAt(matrix<T,N,M> value, int lane);
 
