@@ -695,7 +695,7 @@ namespace Slang
             PlatformUtil::appendResult(res, builder);
         }
 
-        if (diagnostic.size() > 0)
+        if (diagnostic.getLength() > 0)
         {
             builder.Append(diagnostic);
             if (!diagnostic.endsWith("\n"))

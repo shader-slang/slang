@@ -773,7 +773,7 @@ void HLSLSourceEmitter::emitInterpolationModifiersImpl(IRInst* varInst, IRType* 
         auto decoration = (IRInterpolationModeDecoration*)dd;
   
         UnownedStringSlice modeText = _getInterpolationModifierText(decoration->getMode());
-        if (modeText.size() > 0)
+        if (modeText.getLength() > 0)
         {
             m_writer->emit(modeText);
             m_writer->emitChar(' ');

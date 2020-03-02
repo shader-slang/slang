@@ -193,7 +193,7 @@ static const CompileTargetInfo s_compileTargetInfos[] =
 
 /* static */SlangCompileTarget TypeTextUtil::findCompileTargetFromExtension(const UnownedStringSlice& slice)
 {
-    if (slice.size())
+    if (slice.getLength())
     {
         for (const auto& info : s_compileTargetInfos)
         {
@@ -208,7 +208,7 @@ static const CompileTargetInfo s_compileTargetInfos[] =
 
 /* static */ SlangCompileTarget TypeTextUtil::findCompileTargetFromName(const UnownedStringSlice& slice)
 {
-    if (slice.size())
+    if (slice.getLength())
     {
         for (const auto& info : s_compileTargetInfos)
         {

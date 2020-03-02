@@ -122,7 +122,7 @@ enum class Token
 static Token nextToken(Slang::UnownedStringSlice& textInOut, Slang::UnownedStringSlice& lexemeOut)
 {
     using namespace Slang;
-    if (textInOut.size() <= 0)
+    if (textInOut.getLength() <= 0)
     {
         return Token::eEnd;
     }

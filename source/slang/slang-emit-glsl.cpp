@@ -1609,7 +1609,7 @@ void GLSLSourceEmitter::emitInterpolationModifiersImpl(IRInst* varInst, IRType* 
         auto decoration = (IRInterpolationModeDecoration*)dd;
         const UnownedStringSlice slice = _getInterpolationModifierText(decoration->getMode());
 
-        if (slice.size())
+        if (slice.getLength())
         {
             m_writer->emit(slice);
             m_writer->emitChar(' ');

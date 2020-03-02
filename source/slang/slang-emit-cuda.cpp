@@ -161,7 +161,7 @@ SlangResult CUDASourceEmitter::calcScalarFuncName(HLSLIntrinsic::Op op, IRBasicT
         default: break;
     }
 
-    if (funcName.size())
+    if (funcName.getLength())
     {
         outBuilder << funcName;
         if (type->op == kIROp_FloatType)
@@ -219,7 +219,7 @@ SlangResult CUDASourceEmitter::calcTypeName(IRType* type, CodeGenTarget target, 
             const IROp elemType = vecType->getElementType()->op;
 
             UnownedStringSlice prefix = getVectorPrefix(elemType);
-            if (prefix.size() <= 0)
+            if (prefix.getLength() <= 0)
             {
                 return SLANG_FAIL;
             }

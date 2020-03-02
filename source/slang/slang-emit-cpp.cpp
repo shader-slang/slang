@@ -433,7 +433,7 @@ SlangResult CPPSourceEmitter::calcTypeName(IRType* type, CodeGenTarget target, S
                 UnownedStringSlice postFix = _getCTypeVecPostFix(elemType->op);
 
                 out << postFix;
-                if (postFix.size() > 1)
+                if (postFix.getLength() > 1)
                 {
                     out << "_";
                 }
@@ -458,7 +458,7 @@ SlangResult CPPSourceEmitter::calcTypeName(IRType* type, CodeGenTarget target, S
                 out << "Mat";
                 const UnownedStringSlice postFix = _getCTypeVecPostFix(_getCType(elementType->op));
                 out  << postFix;
-                if (postFix.size() > 1)
+                if (postFix.getLength() > 1)
                 {
                     out << "_";
                 }
@@ -514,7 +514,7 @@ SlangResult CPPSourceEmitter::calcTypeName(IRType* type, CodeGenTarget target, S
             // If _getResourceTypePrefix returns something, we assume can output any specialization after it in order.
             {
                 UnownedStringSlice prefix = _getResourceTypePrefix(type->op);
-                if (prefix.size() > 0)
+                if (prefix.getLength() > 0)
                 {
                     auto oldWriter = m_writer;
                     SourceManager* sourceManager = oldWriter->getSourceManager();
@@ -653,7 +653,7 @@ static IRBasicType* _getElementType(IRType* type)
 
 static bool _isOperator(const UnownedStringSlice& funcName)
 {
-    if (funcName.size() > 0)
+    if (funcName.getLength() > 0)
     {
         const char c = funcName[0];
         return !((c >= 'a' && c <='z') || (c >= 'A' && c <= 'Z') || c == '_');
@@ -665,7 +665,7 @@ void CPPSourceEmitter::_emitAryDefinition(const HLSLIntrinsic* specOp)
 {
     auto info = HLSLIntrinsic::getInfo(specOp->op);
     auto funcName = info.funcName;
-    SLANG_ASSERT(funcName.size() > 0);
+    SLANG_ASSERT(funcName.getLength() > 0);
 
     const bool isOperator = _isOperator(funcName);
 
@@ -1700,7 +1700,7 @@ SlangResult CPPSourceEmitter::calcFuncName(const HLSLIntrinsic* specOp, StringBu
         }
 
         const auto& info = HLSLIntrinsic::getInfo(specOp->op);
-        if (info.funcName.size())
+        if (info.funcName.getLength())
         {
             if (!_isOperator(info.funcName))
             {
@@ -2518,7 +2518,7 @@ void CPPSourceEmitter::_emitInitAxisValues(const Int sizeAlongAxis[kThreadGroupA
         builder.Clear();
         const char elem[2] = { s_elemNames[i], 0 };
         builder << mulName << "." << elem << " * " << sizeAlongAxis[i];
-        if (addName.size() > 0)
+        if (addName.getLength() > 0)
         {
             builder << " + " << addName << "." << elem;
         }

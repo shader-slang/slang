@@ -1400,7 +1400,7 @@ static SlangResult _calcCommandLine(OffsetBase& base, StateSerializeUtil::Reques
         {
             UnownedStringSlice contents = base.asRaw(file->contents)->getSlice();
 
-            SLANG_RETURN_ON_FAIL(fileSystem->saveFile(base.asRaw(file->uniqueName)->getCstr(), contents.begin(), contents.size()));
+            SLANG_RETURN_ON_FAIL(fileSystem->saveFile(base.asRaw(file->uniqueName)->getCstr(), contents.begin(), contents.getLength()));
 
             OffsetString* originalName = nullptr;
             if (file->canonicalPath)

@@ -176,7 +176,7 @@ StringRepresentation* StringRepresentationCache::getStringRepresentation(Handle 
     }
 
     const UnownedStringSlice slice = getStringSlice(handle);
-    const UInt size = slice.size();
+    const UInt size = slice.getLength();
 
     StringRepresentation* stringRep = StringRepresentation::createWithCapacityAndLength(size, size);
     memcpy(stringRep->getData(), slice.begin(), size);
@@ -208,7 +208,7 @@ char* StringRepresentationCache::getCStr(Handle handle)
     stringTable.clear();
     for (const auto& slice : slices)
     {
-        const int len = int(slice.size());
+        const int len = int(slice.getLength());
         
         // We need to write into the the string array
         char prefixBytes[6];
