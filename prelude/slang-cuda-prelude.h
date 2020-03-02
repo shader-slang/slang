@@ -263,9 +263,21 @@ __inline__ __device__ int _waveProduct(int mask, int val)
     {
         return val;
     }
-
-    // Special case across arbitrary set bits
-    return -1;
+    else
+    {
+        int result = 1;
+        int remaining = mask;
+        while (remaining)
+        {
+            const int laneBit = remaining & -remaining;
+            // Get the sourceLane 
+            const int srcLane = __ffs(laneBit) - 1;
+            // Broadcast (can also broadcast to self)
+            result *= __shfl_sync(mask, val, srcLane);
+            remaining &= ~laneBit;
+        }
+        return result;
+    }
 }
 
 __inline__ __device__ int _waveSum(int mask, int val) 
