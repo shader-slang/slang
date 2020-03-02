@@ -158,6 +158,13 @@ __forceinline__ __device__ uint32_t _getLaneId()
 }
 #endif
 
+// Note! Note will return true if mask is 0, but thats okay, because there must be one
+// lane active to execute anything
+__inline__ __device__ bool _waveIsSingleLane(int mask)
+{
+    return (mask & (mask - 1)) == 0;
+}
+
 // Returns the power of 2 size of run of set bits. Returns 0 if not a suitable run.
 __inline__ __device__ int _waveCalcPow2Offset(int mask)
 {
@@ -246,13 +253,13 @@ __inline__ __device__ int _waveProduct(int mask, int val)
     const int offsetSize = _waveCalcPow2Offset(mask);
     if (offsetSize > 0)
     {
-        for (int offset = offsetSize >> 1; offset > 0; offset >>= 2) 
+        for (int offset = offsetSize >> 1; offset > 0; offset >>= 1) 
         {
             val *= __shfl_xor_sync( mask, val, offset);
         }
         return val;        
     }
-    else if ((mask & (mask - 1)) == 0)
+    else if (_waveIsSingleLane(mask))
     {
         return val;
     }
