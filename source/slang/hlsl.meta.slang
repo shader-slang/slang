@@ -1470,7 +1470,7 @@ __target_intrinsic(cuda, "_getLaneId()")
 uint WaveGetLaneIndex();
 
 // If there are no *active* lanes less than this one, we must be the lowest lane
-__target_intrinsic(cuda, "((__activemask() & __lanemask_lt()) == 0)")
+__target_intrinsic(cuda, "_waveIsFirstLane()")
 bool WaveIsFirstLane();
 
 // TODO(JS): We cannot calculate prefix sums using a mask of __activemask() & __lanemask_lt(), because (amongst other reasons)

@@ -158,6 +158,40 @@ __forceinline__ __device__ uint32_t _getLaneId()
 }
 #endif
 
+// Returns the power of 2 size of run of set bits. Returns 0 if not a suitable run.
+__inline__ __device__ int _waveCalcPow2Offset(int mask)
+{
+    // This should be the most common case, so fast path it
+    if (mask == SLANG_CUDA_WARP_MASK)
+    {
+        return SLANG_CUDA_WARP_SIZE;
+    }
+    // Is it a contiguous run of bits?
+    if ((mask & (mask + 1)) == 0)
+    {
+        // const int offsetSize = __ffs(mask + 1) - 1;
+        const int offset = 32 - __clz(mask);
+        // Is it a power of 2 size
+        if ((offset & (offset - 1)) == 0)
+        {
+            return offset;
+        }
+    }
+    return 0;
+}
+
+__inline__ __device__ bool _waveIsFirstLane()
+{
+    const int mask = __activemask();
+    // We special case bit 0, as that most warps are expected to be fully active. 
+    
+    // mask & -mask, isolates the lowest set bit.
+    //return (mask & 1 ) || ((mask & -mask) == (1 << _getLaneId()));
+    
+    // This mechanism is most similar to what was in an nVidia post, so assume it is prefered. 
+    return (mask & 1 ) || ((__ffs(mask) - 1) == _getLaneId());
+}
+
 // TODO(JS): NOTE! These functions only work across all lanes. 
 // Special handling will be needed if only some lanes are active.
 
@@ -209,11 +243,22 @@ __inline__ __device__ int _waveMax(int mask, int val)
 
 __inline__ __device__ int _waveProduct(int mask, int val) 
 {
-    for (int offset = SLANG_CUDA_WARP_SIZE / 2; offset > 0; offset /= 2) 
+    const int offsetSize = _waveCalcPow2Offset(mask);
+    if (offsetSize > 0)
     {
-        val *= __shfl_xor_sync( mask, val, offset);
+        for (int offset = offsetSize >> 1; offset > 0; offset >>= 2) 
+        {
+            val *= __shfl_xor_sync( mask, val, offset);
+        }
+        return val;        
     }
-    return val;
+    else if ((mask & (mask - 1)) == 0)
+    {
+        return val;
+    }
+
+    // Special case across arbitrary set bits
+    return -1;
 }
 
 __inline__ __device__ int _waveSum(int mask, int val) 
