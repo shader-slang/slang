@@ -1272,8 +1272,10 @@ SLANG_TEST_TOOL_API SlangResult innerMain(Slang::StdWriters* stdWriters, SlangSe
     Slang::StdWriters::setSingleton(stdWriters);
     
     SlangCompileRequest* request = spCreateCompileRequest(session);
-
-    stdWriters->setRequestWriters(request);
+    for (int i = 0; i < SLANG_WRITER_CHANNEL_COUNT_OF; ++i)
+    {
+        spSetWriter(request, SlangWriterChannel(i), stdWriters->getWriter(i));
+    }
 
     char const* appName = "slang-reflection-test";
     if (argc > 0) appName = argv[0];
