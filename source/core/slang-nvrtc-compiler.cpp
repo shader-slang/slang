@@ -307,6 +307,9 @@ SlangResult NVRTCDownstreamCompiler::compile(const CompileOptions& options, RefP
         // This is arguably too much - but nvrtc does not appear to have a mechanism to switch off individual warnings.
         // I tried the -Xcudafe mechanism but that does not appear to work for nvrtc
         cmdLine.addArg("-w");
+
+        //
+        cmdLine.addArg("-arch=compute_70");
     }
 
     nvrtcProgram program = nullptr;

@@ -128,36 +128,6 @@ union Union64
     double d;
 };
 
-// ---------------------- Miscellaneous --------------------------------------
-
-// TODO(JS): It appears that cuda does not have a simple way to get a lane index. 
-// 
-// Another approach could be... 
-// laneId = ((threadIdx.z * blockDim.y + threadIdx.y) * blockDim.x + threadIdx.x) & SLANG_CUDA_WARP_MASK
-// If that is really true another way to do this, would be for code generator to add this function 
-// with the [numthreads] baked in. 
-// 
-// For now I'll just assume you have a launch that makes the following correct if the kernel uses WaveGetLaneIndex()
-#ifndef SLANG_USE_ASM_LANE_ID
- __forceinline__ __device__ uint32_t _getLaneId()
-{
-    // If the launch is (or I guess some multiple of the warp size) 
-    // we try this mechanism, which is apparently faster. 
-    return threadIdx.x & SLANG_CUDA_WARP_MASK;
-}
-#else
-__forceinline__ __device__ uint32_t _getLaneId()
-{
-    // https://stackoverflow.com/questions/44337309/whats-the-most-efficient-way-to-calculate-the-warp-id-lane-id-in-a-1-d-grid#
-    // This mechanism is not the fastest way to do it, and that is why the other mechanism 
-    // is the default. But the other mechanism relies on a launch that makes the assumption 
-    // true.
-    unsigned ret; 
-    asm volatile ("mov.u32 %0, %laneid;" : "=r"(ret));
-    return ret;
-}
-#endif
-
 // ----------------------------- F32 -----------------------------------------
 
 // Unary 
@@ -439,6 +409,192 @@ struct RWByteAddressBuffer
     uint32_t* data;
     size_t sizeInBytes; //< Must be multiple of 4 
 };
+
+
+// ---------------------- Wave --------------------------------------
+
+// TODO(JS): It appears that cuda does not have a simple way to get a lane index. 
+// 
+// Another approach could be... 
+// laneId = ((threadIdx.z * blockDim.y + threadIdx.y) * blockDim.x + threadIdx.x) & SLANG_CUDA_WARP_MASK
+// If that is really true another way to do this, would be for code generator to add this function 
+// with the [numthreads] baked in. 
+// 
+// For now I'll just assume you have a launch that makes the following correct if the kernel uses WaveGetLaneIndex()
+#ifndef SLANG_USE_ASM_LANE_ID
+ __forceinline__ __device__ uint32_t _getLaneId()
+{
+    // If the launch is (or I guess some multiple of the warp size) 
+    // we try this mechanism, which is apparently faster. 
+    return threadIdx.x & SLANG_CUDA_WARP_MASK;
+}
+#else
+__forceinline__ __device__ uint32_t _getLaneId()
+{
+    // https://stackoverflow.com/questions/44337309/whats-the-most-efficient-way-to-calculate-the-warp-id-lane-id-in-a-1-d-grid#
+    // This mechanism is not the fastest way to do it, and that is why the other mechanism 
+    // is the default. But the other mechanism relies on a launch that makes the assumption 
+    // true.
+    unsigned ret; 
+    asm volatile ("mov.u32 %0, %laneid;" : "=r"(ret));
+    return ret;
+}
+#endif
+
+// Note! Note will return true if mask is 0, but thats okay, because there must be one
+// lane active to execute anything
+__inline__ __device__ bool _waveIsSingleLane(int mask)
+{
+    return (mask & (mask - 1)) == 0;
+}
+
+// Returns the power of 2 size of run of set bits. Returns 0 if not a suitable run.
+__inline__ __device__ int _waveCalcPow2Offset(int mask)
+{
+    // This should be the most common case, so fast path it
+    if (mask == SLANG_CUDA_WARP_MASK)
+    {
+        return SLANG_CUDA_WARP_SIZE;
+    }
+    // Is it a contiguous run of bits?
+    if ((mask & (mask + 1)) == 0)
+    {
+        // const int offsetSize = __ffs(mask + 1) - 1;
+        const int offset = 32 - __clz(mask);
+        // Is it a power of 2 size
+        if ((offset & (offset - 1)) == 0)
+        {
+            return offset;
+        }
+    }
+    return 0;
+}
+
+__inline__ __device__ bool _waveIsFirstLane()
+{
+    const int mask = __activemask();
+    // We special case bit 0, as that most warps are expected to be fully active. 
+    
+    // mask & -mask, isolates the lowest set bit.
+    //return (mask & 1 ) || ((mask & -mask) == (1 << _getLaneId()));
+    
+    // This mechanism is most similar to what was in an nVidia post, so assume it is prefered. 
+    return (mask & 1 ) || ((__ffs(mask) - 1) == _getLaneId());
+}
+
+// TODO(JS): NOTE! These functions only work across all lanes. 
+// Special handling will be needed if only some lanes are active.
+
+#define SLANG_CUDA_REDUCE_OP(INIT_VALUE, OP) \
+    const int offsetSize = _waveCalcPow2Offset(mask); \
+    if (offsetSize > 0) \
+    { \
+        for (int offset = offsetSize >> 1; offset > 0; offset >>= 1) \
+        { \
+            val = val OP __shfl_xor_sync( mask, val, offset); \
+        } \
+        return val;  \
+    } \
+    else if (_waveIsSingleLane(mask)) \
+    { \
+        return val; \
+    } \
+    else \
+    { \
+        int result = INIT_VALUE; \
+        int remaining = mask; \
+        while (remaining) \
+        { \
+            const int laneBit = remaining & -remaining; \
+            /* Get the sourceLane */ \
+            const int srcLane = __ffs(laneBit) - 1; \
+            /* Broadcast (can also broadcast to self) */ \
+            result = result OP __shfl_sync(mask, val, srcLane); \
+            remaining &= ~laneBit; \
+        } \
+        return result; \
+    }
+
+#define SLANG_CUDA_REDUCE_FUNC(INIT_VALUE, FUNC) \
+    const int offsetSize = _waveCalcPow2Offset(mask); \
+    if (offsetSize > 0) \
+    { \
+        for (int offset = offsetSize >> 1; offset > 0; offset >>= 1) \
+        { \
+            val = FUNC(val, __shfl_xor_sync( mask, val, offset)); \
+        } \
+        return val;  \
+    } \
+    else if (_waveIsSingleLane(mask)) \
+    { \
+        return val; \
+    } \
+    else \
+    { \
+        int result = INIT_VALUE; \
+        int remaining = mask; \
+        while (remaining) \
+        { \
+            const int laneBit = remaining & -remaining; \
+            /* Get the sourceLane */ \
+            const int srcLane = __ffs(laneBit) - 1; \
+            /* Broadcast (can also broadcast to self) */ \
+            result = FUNC(result, __shfl_sync(mask, val, srcLane)); \
+            remaining &= ~laneBit; \
+        } \
+        return result; \
+    }    
+    
+
+__inline__ __device__ int _waveOr(int mask, int val) 
+{
+    SLANG_CUDA_REDUCE_OP(0, |)
+}
+
+__inline__ __device__ int _waveAnd(int mask, int val) 
+{
+    SLANG_CUDA_REDUCE_OP(~int(0), &)
+}
+
+__inline__ __device__ int _waveXor(int mask, int val) 
+{
+    SLANG_CUDA_REDUCE_OP(0, ^)
+}
+
+__inline__ __device__ int _waveProduct(int mask, int val) 
+{
+    SLANG_CUDA_REDUCE_OP(1, *)
+}
+
+__inline__ __device__ int _waveSum(int mask, int val) 
+{
+    SLANG_CUDA_REDUCE_OP(0, +)
+}
+
+__inline__ __device__ int _waveMin(int mask, int val) 
+{    
+    SLANG_CUDA_REDUCE_FUNC(val, I32_min)
+}
+
+__inline__ __device__ int _waveMax(int mask, int val) 
+{
+    SLANG_CUDA_REDUCE_FUNC(val, I32_max)
+}
+
+__inline__ __device__ bool _waveAllEqual(int mask, int val) 
+{
+    int pred;
+    __match_all_sync(mask, val, &pred);
+    return pred != 0;
+}
+
+__inline__ __device__ int _waveReadFirst(int val) 
+{
+    const int mask = __activemask();
+    const int lowestLaneId = __ffs(mask) - 1;
+    return __shfl_sync(mask, val, lowestLaneId);   
+}
+
 
 /* !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! */
 
