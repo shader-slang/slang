@@ -23,9 +23,9 @@ void computeMain(uint3 dispatchThreadID : SV_DispatchThreadID)
     value |= (sum << 4);
     
     // TODO(JS): 
-    // This result is unexpected. I expect 1 * 2 * 1 * 2 = 4. But we get 0 on CUDA and DX.
-    int product = WaveActiveProduct((idx & 1) + 1);
-    value |= (product << 8);    
+    // This result is unexpected. I expect 1 * 2 * 1 * 2 = 4. But we get 0 on DX (so disable for now). On CUDA I get 4.
+    // int product = WaveActiveProduct((idx & 1) + 1);
+    /// value |= (product << 8);    
         
     // TODO(JS): NOTE! This only works with uint, *NOT* int on HLSL/DXC. 
     // We need to update the stdlib to reflect this.
