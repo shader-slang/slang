@@ -441,6 +441,12 @@ __forceinline__ __device__ uint32_t _getLaneId()
 }
 #endif
 
+// Return mask of all the lanes less than the current lane
+__forceinline__ __device__ int _getLaneLtMask()
+{
+    return (int(1) << _getLaneId()) - 1;
+}    
+
 // Note! Note will return true if mask is 0, but thats okay, because there must be one
 // lane active to execute anything
 __inline__ __device__ bool _waveIsSingleLane(int mask)
