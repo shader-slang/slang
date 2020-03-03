@@ -1456,19 +1456,8 @@ for (auto op : binaryOps)
         sb << "__intrinsic_op(" << int(op.opCode) << ") vector<" << resultType << ",N> operator" << op.opName << "(" << leftQual << "vector<" << leftType << ",N> left, vector<" << rightType << ",N> right);\n";
 
         // matrix version
-
-        // skip matrix-matrix multiply operations here, so that GLSL doesn't see them
-        switch (op.opCode)
-        {
-        case kIROp_Mul:
-        case kCompoundIntrinsicOp_MulAssign:
-            break;
-
-        default:
-            sb << "__generic<let N : int, let M : int> ";
-            sb << "__intrinsic_op(" << int(op.opCode) << ") matrix<" << resultType << ",N,M> operator" << op.opName << "(" << leftQual << "matrix<" << leftType << ",N,M> left, matrix<" << rightType << ",N,M> right);\n";
-            break;
-        }
+        sb << "__generic<let N : int, let M : int> ";
+        sb << "__intrinsic_op(" << int(op.opCode) << ") matrix<" << resultType << ",N,M> operator" << op.opName << "(" << leftQual << "matrix<" << leftType << ",N,M> left, matrix<" << rightType << ",N,M> right);\n";
 
         // We are going to go ahead and explicitly define combined
         // operations for the scalar-op-vector, etc. cases, rather
