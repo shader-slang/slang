@@ -5751,9 +5751,13 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
             {
                 definition = getStringLiteralTokenValue(definitionToken);
             }
-            else
+            else if(definitionToken.type == TokenType::Identifier)
             {
                 definition = definitionToken.Content;
+            }
+            else
+            {
+                definition = decl->getName()->text;
             }
 
             UnownedStringSlice targetName;
