@@ -91,11 +91,9 @@ static void dumpDiagnostics(
 
 // Apply the SPIRV-Tools optimizer to generated SPIR-V based on the desired optimization level
 // TODO: add flag for optimizing SPIR-V size as well
-static void glslang_optimizeSPIRV(std::vector<unsigned int>& spirv, unsigned optimizationLevel, unsigned debugInfoType)
+static void glslang_optimizeSPIRV(std::vector<unsigned int>& spirv, spv_target_env targetEnv, unsigned optimizationLevel, unsigned debugInfoType)
 {
-    spv_target_env target_env = SPV_ENV_UNIVERSAL_1_2;
-
-    spvtools::Optimizer optimizer(target_env);
+    spvtools::Optimizer optimizer(targetEnv);
     optimizer.SetMessageConsumer(
         [](spv_message_level_t level, const char *source, const spv_position_t &position, const char *message) {
         auto &out = std::cerr;
@@ -229,10 +227,76 @@ static int glslang_compileGLSLToSPIRV(glslang_CompileRequest* request)
         return 1;
     }
 
+    spv_target_env targetEnv = SPV_ENV_UNIVERSAL_1_2;
+    auto const& spirvVersion = request->spirvVersion;
+
+    // Set to something invalid
+    glslang::EShTargetLanguageVersion targetLanguage = glslang::EShTargetLanguageVersion(0);
+
+    // Assert the mechanism for working out versions works. If this fails
+    // It's going to be necessary to look at how EShTargetLanguageVersion is defined
+    assert(glslang::EShTargetSpv_1_2 == (uint32_t(1) << 16) | (uint32_t(2) << 8));
+
+    switch (spirvVersion.style)
+    {
+        case GLSLANG_SPIRV_STYLE_UNKNOWN:
+        {
+            // We'll just go with the default
+            break;
+        }
+        case GLSLANG_SPIRV_STYLE_UNIVERSAL:
+        {
+            if (request->spirvVersion.majorVersion && request->spirvVersion.minorVersion)
+            {
+                int32_t version = request->spirvVersion.majorVersion * 100 + request->spirvVersion.minorVersion;
+                switch (version)
+                {
+                    case 102:
+                    {
+                        targetLanguage = glslang::EShTargetSpv_1_2;
+                        targetEnv = SPV_ENV_UNIVERSAL_1_2;
+                        break;
+                    }
+                    case 103:
+                    {
+                        targetLanguage = glslang::EShTargetSpv_1_3;
+                        targetEnv = SPV_ENV_UNIVERSAL_1_3;
+                        break;
+                    }
+                    case 104:
+                    {
+                        targetLanguage = glslang::EShTargetSpv_1_4;
+                        targetEnv = SPV_ENV_UNIVERSAL_1_4;
+                        break;
+                    }
+                    case 105:
+                    {
+                        // The highest value available is 1.4, but assuming this encoding remains, we can generate
+                        // what it should be
+                        targetLanguage = glslang::EShTargetLanguageVersion((uint32_t(spirvVersion.majorVersion) << 16) | (uint32_t(spirvVersion.minorVersion) << 8));
+                        targetEnv = SPV_ENV_UNIVERSAL_1_5;
+                        break;
+                    }
+                    default:
+                    {
+                        dumpDiagnostics(request, "unknown universal SPIR-V version\n");
+                        return 1;
+                    }
+                }
+            }
+            break;
+        }
+        default:
+            dumpDiagnostics(request, "unsupported SPIR-V style\n");
+            return 1;
+    }
+
     // TODO: compute glslang stage to use
 
     glslang::TShader* shader = new glslang::TShader(glslangStage);
     auto shaderPtr = std::unique_ptr<glslang::TShader>(shader);
+
+    shader->setEnvTarget(glslang::EShTargetSpv, targetLanguage);
 
     glslang::TProgram* program = new glslang::TProgram();
     auto programPtr = std::unique_ptr<glslang::TProgram>(program);
@@ -285,7 +349,7 @@ static int glslang_compileGLSLToSPIRV(glslang_CompileRequest* request)
 
         if (request->optimizationLevel != SLANG_OPTIMIZATION_LEVEL_NONE)
         {
-            glslang_optimizeSPIRV(spirv, request->optimizationLevel, request->debugInfoType);
+            glslang_optimizeSPIRV(spirv, targetEnv, request->optimizationLevel, request->debugInfoType);
         }
 
         dumpDiagnostics(request, logger.getAllMessages());

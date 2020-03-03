@@ -421,12 +421,14 @@ Result linkAndOptimizeIR(
     {
     case CodeGenTarget::GLSL:
     {
+        auto glslExtensionTracker = as<GLSLExtensionTracker>(options.sourceEmitter->getExtensionTracker());
+
         legalizeEntryPointForGLSL(
             session,
             irModule,
             irEntryPoint,
             compileRequest->getSink(),
-            options.sourceEmitter->getGLSLExtensionTracker());
+            glslExtensionTracker);
 
 #if 0
             dumpIRIfEnabled(compileRequest, irModule, "GLSL LEGALIZED");
@@ -458,12 +460,15 @@ Result linkAndOptimizeIR(
     return SLANG_OK;
 }
 
-String emitEntryPointSourceFromIR(
+SlangResult emitEntryPointSourceFromIR(
     BackEndCompileRequest*  compileRequest,
     Int                     entryPointIndex,
     CodeGenTarget           target,
-    TargetRequest*          targetRequest)
+    TargetRequest*          targetRequest,
+    SourceResult&       outSource)
 {
+    outSource.reset();
+
     auto sink = compileRequest->getSink();
     auto program = compileRequest->getProgram();
 
@@ -496,7 +501,7 @@ String emitEntryPointSourceFromIR(
     LinkedIR linkedIR;
 
     RefPtr<CLikeSourceEmitter> sourceEmitter;
-
+    
     typedef CLikeSourceEmitter::SourceStyle SourceStyle;
 
     SourceStyle sourceStyle = CLikeSourceEmitter::getSourceStyle(target);
@@ -528,7 +533,7 @@ String emitEntryPointSourceFromIR(
     if (!sourceEmitter)
     {
         sink->diagnose(SourceLoc(), Diagnostics::unableToGenerateCodeForTarget, TypeTextUtil::getCompileTargetName(SlangCompileTarget(target)));
-        return String();
+        return SLANG_FAIL;
     }
 
     {
@@ -582,8 +587,10 @@ String emitEntryPointSourceFromIR(
     case Stage::RayGeneration:
         if( target == CodeGenTarget::GLSL )
         {
-            sourceEmitter->getGLSLExtensionTracker()->requireExtension("GL_NV_ray_tracing");
-            sourceEmitter->getGLSLExtensionTracker()->requireVersion(ProfileVersion::GLSL_460);
+            auto glslExtensionTracker = as<GLSLExtensionTracker>(sourceEmitter->getExtensionTracker());
+
+            glslExtensionTracker->requireExtension("GL_NV_ray_tracing");
+            glslExtensionTracker->requireVersion(ProfileVersion::GLSL_460);
         }
         break;
     }
@@ -630,13 +637,20 @@ String emitEntryPointSourceFromIR(
     StringBuilder finalResultBuilder;
     finalResultBuilder << prefix;
 
-    finalResultBuilder << sourceEmitter->getGLSLExtensionTracker()->getExtensionRequireLines();
+    RefObject* extensionTracker = sourceEmitter->getExtensionTracker();
+
+    if (auto glslExtensionTracker = as<GLSLExtensionTracker>(extensionTracker))
+    {
+        finalResultBuilder << glslExtensionTracker->getExtensionRequireLines();
+    }
 
     finalResultBuilder << code;
 
-    String finalResult = finalResultBuilder.ProduceString();
+    // Write out the result
+    outSource.source = finalResultBuilder.ProduceString();
+    outSource.extensionTracker = extensionTracker;
 
-    return finalResult;
+    return SLANG_OK;
 }
 
 SlangResult emitSPIRVFromIR(

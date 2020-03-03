@@ -12,6 +12,19 @@ enum
     GLSLANG_ACTION_DISSASSEMBLE_SPIRV,
 };
 
+enum glslang_SPIRVStyle 
+{
+    GLSLANG_SPIRV_STYLE_UNKNOWN,
+    GLSLANG_SPIRV_STYLE_UNIVERSAL,
+};
+
+struct glslang_SPIRVVersion
+{
+    unsigned char style;                    /// One of glslang_SPIRVStyle
+    unsigned char majorVersion;
+    unsigned char minorVersion;
+};
+
 struct glslang_CompileRequest
 {
     char const*         sourcePath;
@@ -31,6 +44,8 @@ struct glslang_CompileRequest
 
     unsigned            optimizationLevel;
     unsigned            debugInfoType;
+
+    glslang_SPIRVVersion spirvVersion;       
 };
 
 typedef int (*glslang_CompileFunc)(glslang_CompileRequest* request);

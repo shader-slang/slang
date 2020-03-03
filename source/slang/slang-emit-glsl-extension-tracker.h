@@ -9,7 +9,7 @@
 namespace Slang
 {
 
-class GLSLExtensionTracker
+class GLSLExtensionTracker : public RefObject
 {
 public:
 
@@ -20,6 +20,8 @@ public:
 
     ProfileVersion getRequiredProfileVersion() const { return m_profileVersion; }
     const StringBuilder& getExtensionRequireLines() const { return m_extensionRequireLines; }
+
+    SPIRVVersion getSPIRVVersion() const { return m_spirvVersion; }
 
 protected:
     // Record the GLSL extensions we have already emitted a `#extension` for

@@ -14,7 +14,7 @@ namespace Slang {
 
 void GLSLSourceEmitter::_requireGLSLExtension(String const& name)
 {
-    m_glslExtensionTracker.requireExtension(name);
+    m_glslExtensionTracker->requireExtension(name);
 }
 
 void GLSLSourceEmitter::_requireGLSLVersion(ProfileVersion version)
@@ -22,12 +22,12 @@ void GLSLSourceEmitter::_requireGLSLVersion(ProfileVersion version)
     if (getSourceStyle() != SourceStyle::GLSL)
         return;
 
-    m_glslExtensionTracker.requireVersion(version);
+    m_glslExtensionTracker->requireVersion(version);
 }
 
 void GLSLSourceEmitter::_requireSPIRVVersion(SPIRVVersion version)
 {
-    m_glslExtensionTracker.requireSPIRVVersion(version);
+    m_glslExtensionTracker->requireSPIRVVersion(version);
 }
 
 void GLSLSourceEmitter::_requireGLSLVersion(int version)
@@ -644,7 +644,7 @@ void GLSLSourceEmitter::_emitGLSLTypePrefix(IRType* type, bool promoteHalfToFloa
 
 void GLSLSourceEmitter::_requireBaseType(BaseType baseType)
 {
-    m_glslExtensionTracker.requireBaseTypeExtension(baseType);
+    m_glslExtensionTracker->requireBaseTypeExtension(baseType);
 }
 
 void GLSLSourceEmitter::_maybeEmitGLSLFlatModifier(IRType* valueType)
@@ -1368,9 +1368,9 @@ void GLSLSourceEmitter::emitPreprocessorDirectivesImpl()
     //
     // TODO: Either correctly compute a minimum required version, or require
     // the user to specify a version as part of the target.
-    m_glslExtensionTracker.requireVersion(ProfileVersion::GLSL_450);
+    m_glslExtensionTracker->requireVersion(ProfileVersion::GLSL_450);
 
-    auto requiredProfileVersion = m_glslExtensionTracker.getRequiredProfileVersion();
+    auto requiredProfileVersion = m_glslExtensionTracker->getRequiredProfileVersion();
     switch (requiredProfileVersion)
     {
 #define CASE(TAG, VALUE)    \

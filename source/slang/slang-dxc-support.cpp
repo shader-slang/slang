@@ -81,12 +81,11 @@ namespace Slang
 
         // Now let's go ahead and generate HLSL for the entry
         // point, since we'll need that to feed into dxc.
-        auto hlslCode = emitEntryPointSource(
-            compileRequest,
-            entryPointIndex,
-            targetReq,
-            CodeGenTarget::HLSL,
-            endToEndReq);
+        SourceResult source;
+        SLANG_RETURN_ON_FAIL(emitEntryPointSource(compileRequest, entryPointIndex, targetReq, CodeGenTarget::HLSL, endToEndReq, source));
+
+        const auto& hlslCode = source.source;
+
         maybeDumpIntermediate(compileRequest, hlslCode.getBuffer(), CodeGenTarget::HLSL);
 
         // Wrap the 

@@ -8,6 +8,7 @@
 #include "../core/slang-riff.h"
 #include "../core/slang-type-text-util.h"
 
+
 #include "slang-check.h"
 #include "slang-compiler.h"
 #include "slang-lexer.h"
@@ -19,6 +20,8 @@
 #include "slang-type-layout.h"
 #include "slang-reflection.h"
 #include "slang-emit.h"
+
+#include "slang-emit-glsl-extension-tracker.h"
 
 #include "slang-ir-serialize.h"
 
@@ -498,13 +501,16 @@ namespace Slang
         outCodeBuilder << fileContent << "\n";
     }
 
-    String emitEntryPointSource(
+    SlangResult emitEntryPointSource(
         BackEndCompileRequest*  compileRequest,
         Int                     entryPointIndex,
         TargetRequest*          targetReq,
         CodeGenTarget           target,
-        EndToEndCompileRequest* endToEndReq)
+        EndToEndCompileRequest* endToEndReq,
+        SourceResult&       outSource)
     {
+        outSource.reset();
+
         if(auto translationUnit = findPassThroughTranslationUnit(endToEndReq, entryPointIndex))
         {
             // Generate a string that includes the content of
@@ -541,7 +547,9 @@ namespace Slang
                     _appendCodeWithPath(sourceFile->getPathInfo().foundPath.getUnownedSlice(), sourceFile->getContent(), codeBuilder);
                 }
             }
-            return codeBuilder.ProduceString();
+
+            outSource.source = codeBuilder.ProduceString();
+            return SLANG_OK;
         }
         else
         {
@@ -549,7 +557,8 @@ namespace Slang
                 compileRequest,
                 entryPointIndex,
                 target,
-                targetReq);
+                targetReq,
+                outSource);
         }
     }
 
@@ -836,7 +845,10 @@ namespace Slang
             return SLANG_FAIL;
         }
 
-        auto hlslCode = emitEntryPointSource(compileRequest, entryPointIndex, targetReq, CodeGenTarget::HLSL, endToEndReq);
+        SourceResult source;
+        SLANG_RETURN_ON_FAIL(emitEntryPointSource(compileRequest, entryPointIndex, targetReq, CodeGenTarget::HLSL, endToEndReq, source));
+
+        const auto& hlslCode = source.source;
         maybeDumpIntermediate(compileRequest, hlslCode.getBuffer(), CodeGenTarget::HLSL);
 
         auto profile = getEffectiveProfile(entryPoint, targetReq);
@@ -1100,6 +1112,8 @@ SlangResult dissassembleDXILUsingDXC(
         };
 
         glslang_CompileRequest request;
+        memset(&request, 0, sizeof(request));
+
         request.action = GLSLANG_ACTION_DISSASSEMBLE_SPIRV;
 
         request.sourcePath = nullptr;
@@ -1107,6 +1121,7 @@ SlangResult dissassembleDXILUsingDXC(
         request.inputBegin  = data;
         request.inputEnd    = (char*)data + size;
 
+       
         request.outputFunc = outputFunc;
         request.outputUserData = &output;
 
@@ -1250,13 +1265,19 @@ SlangResult dissassembleDXILUsingDXC(
             }
             else
             {
-                options.sourceContents = emitEntryPointSource(slangRequest, entryPointIndex, targetReq, sourceTarget, endToEndReq);
+                SourceResult source;
+                SLANG_RETURN_ON_FAIL(emitEntryPointSource(slangRequest, entryPointIndex, targetReq, sourceTarget, endToEndReq, source));
+
+                options.sourceContents = source.source;
             }
         }
         else
         {
-            options.sourceContents = emitEntryPointSource(slangRequest, entryPointIndex, targetReq, sourceTarget, endToEndReq);
+            SourceResult source;
+            SLANG_RETURN_ON_FAIL(emitEntryPointSource(slangRequest, entryPointIndex, targetReq, sourceTarget, endToEndReq, source));
 
+            options.sourceContents = source.source;
+            
             maybeDumpIntermediate(slangRequest, options.sourceContents.getBuffer(), sourceTarget);
         }
 
@@ -1422,12 +1443,12 @@ SlangResult dissassembleDXILUsingDXC(
     {
         spirvOut.clear();
 
-        String rawGLSL = emitEntryPointSource(
-            slangRequest,
-            entryPointIndex,
-            targetReq,
-            CodeGenTarget::GLSL,
-            endToEndReq);
+        SourceResult source;
+
+        SLANG_RETURN_ON_FAIL(emitEntryPointSource(slangRequest, entryPointIndex, targetReq, CodeGenTarget::GLSL, endToEndReq, source));
+
+        const auto& rawGLSL = source.source;
+
         maybeDumpIntermediate(slangRequest, rawGLSL.getBuffer(), CodeGenTarget::GLSL);
 
         auto outputFunc = [](void const* data, size_t size, void* userData)
@@ -1438,12 +1459,27 @@ SlangResult dissassembleDXILUsingDXC(
         const String sourcePath = calcSourcePathForEntryPoint(endToEndReq, entryPointIndex);
 
         glslang_CompileRequest request;
+        memset(&request, 0, sizeof(request));
+
         request.action = GLSLANG_ACTION_COMPILE_GLSL_TO_SPIRV;
         request.sourcePath = sourcePath.getBuffer();
         request.slangStage = (SlangStage)entryPoint->getStage();
 
         request.inputBegin  = rawGLSL.begin();
         request.inputEnd    = rawGLSL.end();
+
+        auto& spirvVersion = request.spirvVersion;
+
+        spirvVersion.style = GLSLANG_SPIRV_STYLE_UNKNOWN;
+
+        if (GLSLExtensionTracker* tracker = as<GLSLExtensionTracker>(source.extensionTracker.Ptr()))
+        {
+            auto srcVersion = tracker->getSPIRVVersion();
+
+            spirvVersion.style = GLSLANG_SPIRV_STYLE_UNIVERSAL;
+            spirvVersion.majorVersion = uint8_t(getMajorVersion(srcVersion));
+            spirvVersion.minorVersion = uint8_t(getMinorVersion(srcVersion));
+        }
 
         request.outputFunc = outputFunc;
         request.outputUserData = &spirvOut;
@@ -1544,12 +1580,13 @@ SlangResult dissassembleDXILUsingDXC(
         case CodeGenTarget::CPPSource:
         case CodeGenTarget::CSource:
             {
-                String code = emitEntryPointSource(
-                    compileRequest,
-                    entryPointIndex,
-                    targetReq,
-                    target,
-                    endToEndReq);
+                SourceResult source;
+                if (SLANG_FAILED(emitEntryPointSource(compileRequest, entryPointIndex, targetReq, target, endToEndReq, source)))
+                {
+                    return result;
+                }
+
+                const auto& code = source.source;
                 maybeDumpIntermediate(compileRequest, code.getBuffer(), target);
                 result = CompileResult(code);
             }

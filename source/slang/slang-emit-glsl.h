@@ -15,7 +15,10 @@ public:
     GLSLSourceEmitter(const Desc& desc) :
         Super(desc)
     {
+        m_glslExtensionTracker = new GLSLExtensionTracker;
     }
+
+    virtual RefObject* getExtensionTracker() { return m_glslExtensionTracker; }
 
 protected:
 
@@ -69,6 +72,9 @@ protected:
     void _requireBaseType(BaseType baseType);
 
     void _maybeEmitGLSLCast(IRType* castType, IRInst* inst);
+
+
+    RefPtr<GLSLExtensionTracker> m_glslExtensionTracker;
 };
 
 }

@@ -1902,19 +1902,33 @@ namespace Slang
     If the end-to-end compile is a pass-through case, will attempt to find the (unique) source file
     pathname for the translation unit containing the entry point at `entryPointIndex.
     If the compilation is not in a pass-through case, then always returns `"slang-generated"`.
-    @param endToEndReq The end-to-end compile request which might be using pass-through copmilation
+    @param endToEndReq The end-to-end compile request which might be using pass-through compilation
     @param entryPointIndex The index of the entry point to compute a filename for.
     @return the appropriate source filename */
     String calcSourcePathForEntryPoint(EndToEndCompileRequest* endToEndReq, UInt entryPointIndex);
 
+    struct SourceResult
+    {
+        void reset()
+        {
+            source = String();
+            extensionTracker.setNull();
+        }
+
+        String source;
+        // Must be cast to a specific extension tracker such as GLSLExtensionTracker
+        RefPtr<RefObject> extensionTracker;
+    };
+
     /* Emits entry point source taking into account if a pass-through or not. Uses 'target' to determine
     the target (not targetReq) */
-    String emitEntryPointSource(
+    SlangResult emitEntryPointSource(
         BackEndCompileRequest*  compileRequest,
         Int                     entryPointIndex,
         TargetRequest*          targetReq,
         CodeGenTarget           target,
-        EndToEndCompileRequest* endToEndReq);
+        EndToEndCompileRequest* endToEndReq,
+        SourceResult&           outSource);
 
     struct TypeCheckingCache;
     //
