@@ -6,6 +6,7 @@
 #include "../core/slang-string-util.h"
 #include "../core/slang-hex-dump-util.h"
 #include "../core/slang-riff.h"
+#include "../core/slang-type-text-util.h"
 
 #include "slang-check.h"
 #include "slang-compiler.h"
@@ -350,49 +351,6 @@ namespace Slang
         }
         return UnownedStringSlice();
     }
-
-    static UnownedStringSlice _getPassThroughAsText(PassThroughMode mode)
-    {
-        switch (mode)
-        {
-            case PassThroughMode::None:     return UnownedStringSlice::fromLiteral("None");
-            case PassThroughMode::Dxc:      return UnownedStringSlice::fromLiteral("Dxc");
-            case PassThroughMode::Fxc:      return UnownedStringSlice::fromLiteral("Fxc");
-            case PassThroughMode::Glslang:  return UnownedStringSlice::fromLiteral("Glslang");
-            case PassThroughMode::Clang:    return UnownedStringSlice::fromLiteral("Clang");
-            case PassThroughMode::VisualStudio: return UnownedStringSlice::fromLiteral("VisualStudio");
-            case PassThroughMode::Gcc:      return UnownedStringSlice::fromLiteral("GCC");
-            case PassThroughMode::GenericCCpp:  return UnownedStringSlice::fromLiteral("Generic C/C++ Compiler");
-            default:                        return UnownedStringSlice::fromLiteral("Unknown");
-        }
-    }
-
-    static const struct
-    {
-        char const*     name;
-        SourceLanguage  sourceLanguage;
-    } kSourceLanguages[] =
-    {
-        { "slang", SourceLanguage::Slang },
-        { "hlsl", SourceLanguage::HLSL },
-        { "glsl", SourceLanguage::GLSL },
-        { "c", SourceLanguage::C },
-        { "cxx", SourceLanguage::CPP },
-        { "cuda", SourceLanguage::CUDA },
-    };
-
-    SourceLanguage findSourceLanguageByName(String const& name)
-    {
-        for (auto entry : kSourceLanguages)
-        {
-            if (name == entry.name)
-            {
-                return entry.sourceLanguage;
-            }
-        }
-
-        return SourceLanguage::Unknown;
-    };
 
     SlangResult checkExternalCompilerSupport(Session* session, PassThroughMode passThrough)
     {
@@ -1209,7 +1167,7 @@ SlangResult dissassembleDXILUsingDXC(
 
         if (!compiler)
         {
-            auto compilerName = _getPassThroughAsText(downstreamCompiler);
+            auto compilerName = TypeTextUtil::getPassThroughAsHumanText((SlangPassThrough)downstreamCompiler);
             if (downstreamCompiler != PassThroughMode::None)
             {
                 sink->diagnose(SourceLoc(), Diagnostics::passThroughCompilerNotFound, compilerName);

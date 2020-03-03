@@ -659,7 +659,7 @@ struct OptionsParser
                     String name;
                     SLANG_RETURN_ON_FAIL(tryReadCommandLineArgument(sink, arg, &argCursor, argEnd, name));
 
-                    SourceLanguage sourceLanguage = findSourceLanguageByName(name);
+                    const SourceLanguage sourceLanguage = (SourceLanguage)TypeTextUtil::findSourceLanguage(name.getUnownedSlice());
 
                     if (sourceLanguage == SourceLanguage::Unknown)
                     {

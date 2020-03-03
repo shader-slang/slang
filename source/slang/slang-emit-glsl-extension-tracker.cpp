@@ -26,6 +26,14 @@ void GLSLExtensionTracker::requireVersion(ProfileVersion version)
     }
 }
 
+void GLSLExtensionTracker::requireSPIRVVersion(SPIRVVersion version)
+{
+    if (asInteger(version) > asInteger(m_spirvVersion))
+    {
+        m_spirvVersion = version;
+    }
+}
+
 void GLSLExtensionTracker::requireBaseTypeExtension(BaseType baseType)
 {
     uint32_t bit = 1 << int(baseType);

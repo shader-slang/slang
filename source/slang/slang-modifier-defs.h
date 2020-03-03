@@ -82,6 +82,13 @@ FIELD(Token, versionNumberToken)
 END_SYNTAX_CLASS()
 
 
+// A modifier to tag something as an intrinsic that requires
+// a certain SPIRV version to be enabled when used. Specified as "major.minor"
+SYNTAX_CLASS(RequiredSPIRVVersionModifier, Modifier)
+FIELD(Token, token)
+FIELD(SPIRVVersion, spirvVersion)
+END_SYNTAX_CLASS()
+
 SIMPLE_SYNTAX_CLASS(InOutModifier, OutModifier)
 
 // `__ref` modifier for by-reference parameter passing

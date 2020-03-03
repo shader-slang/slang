@@ -25,6 +25,11 @@ void GLSLSourceEmitter::_requireGLSLVersion(ProfileVersion version)
     m_glslExtensionTracker.requireVersion(version);
 }
 
+void GLSLSourceEmitter::_requireSPIRVVersion(SPIRVVersion version)
+{
+    m_glslExtensionTracker.requireSPIRVVersion(version);
+}
+
 void GLSLSourceEmitter::_requireGLSLVersion(int version)
 {
     switch (version)
@@ -1327,12 +1332,21 @@ void GLSLSourceEmitter::handleCallExprDecorationsImpl(IRInst* funcValue)
                 break;
 
             case kIROp_RequireGLSLExtensionDecoration:
+            {
                 _requireGLSLExtension(String(((IRRequireGLSLExtensionDecoration*)decoration)->getExtensionName()));
                 break;
-
+            }
             case kIROp_RequireGLSLVersionDecoration:
+            {
                 _requireGLSLVersion(int(((IRRequireGLSLVersionDecoration*)decoration)->getLanguageVersion()));
                 break;
+            }
+            case kIROp_RequireSPIRVVersionDecoration:
+            {
+                _requireSPIRVVersion(static_cast<IRRequireSPIRVVersionDecoration*>(decoration)->getSPIRVVersion());
+                break;
+            }
+
         }
     }
 }
