@@ -18,7 +18,7 @@ public:
         m_glslExtensionTracker = new GLSLExtensionTracker;
     }
 
-    virtual RefObject* getExtensionTracker() { return m_glslExtensionTracker; }
+    virtual RefObject* getExtensionTracker() SLANG_OVERRIDE { return m_glslExtensionTracker; }
 
 protected:
 
