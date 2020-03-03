@@ -2110,6 +2110,11 @@ struct IRBuilder
         addDecoration(value, kIROp_RequireGLSLVersionDecoration, getIntValue(getIntType(), IRIntegerValue(version)));
     }
 
+    void addRequireSPIRVVersionDecoration(IRInst* value, SPIRVVersion version)
+    {
+        addDecoration(value, kIROp_RequireSPIRVVersionDecoration, getIntValue(getIntType(), IRIntegerValue(version)));
+    }
+
     void addPatchConstantFuncDecoration(IRInst* value, IRInst* patchConstantFunc)
     {
         addDecoration(value, kIROp_PatchConstantFuncDecoration, patchConstantFunc);

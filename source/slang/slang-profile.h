@@ -104,11 +104,24 @@ namespace Slang
         RawVal raw = Unknown;
     };
 
+
+
     Stage findStageByName(String const& name);
 
     UnownedStringSlice getStageText(Stage stage);
 
-    SourceLanguage findSourceLanguageByName(String const& name);
+
+    // An enum to specify SPIR-V versions.
+    // For the moment they are only differentiated by version number, but it may be necessary to
+    // differentiate specific versions in other ways (such as the VK1.1 / SPIR-V combination in
+    // glslang). The enum is used to encode the representation, and vary as is needed in
+    // an implementation. 
+    enum class SPIRVVersion : uint32_t;
+
+    SLANG_INLINE SPIRVVersion makeSPIRVVersion(int major, int minor) { return SPIRVVersion((uint32_t(major) << 8) | uint32_t(minor)); }
+    SLANG_FORCE_INLINE Index getMajorVersion(SPIRVVersion version) { return Index((uint32_t(version) >> 8) & 0xff); }
+    SLANG_FORCE_INLINE Index getMinorVersion(SPIRVVersion version) { return Index(uint32_t(version) & 0xff); }
+    SLANG_FORCE_INLINE int32_t asInteger(SPIRVVersion version) { return int32_t(version); }
 }
 
 #endif

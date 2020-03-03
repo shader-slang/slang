@@ -4747,6 +4747,88 @@ namespace Slang
 
         return modifier;
     }
+    static RefPtr<RefObject> parseSPIRVVersionModifier(Parser* parser, void* /*userData*/)
+    {
+        auto modifier = new RequiredSPIRVVersionModifier();
+
+        parser->ReadToken(TokenType::LParent);
+
+        UnownedStringSlice typeName;
+        UnownedStringSlice majorVersionText;
+        UnownedStringSlice minorVersionText;
+
+        // There is a legitimate question about how the version should be handled here.
+        switch (parser->tokenReader.peekTokenType())
+        {
+            case TokenType::FloatingPointLiteral:
+            {
+                modifier->token = parser->ReadToken(TokenType::FloatingPointLiteral);
+
+                List<UnownedStringSlice> split;
+                StringUtil::split(modifier->token.Content, '.', split);
+
+                if (split.getCount() != 2)
+                {
+                    parser->sink->diagnose(modifier->token, Diagnostics::invalidSPIRVVersion);
+                    return RefPtr<RefObject>();
+                }
+
+                majorVersionText = split[0];
+                minorVersionText = split[1];
+                break;
+            }
+            case TokenType::Identifier:
+            {
+                modifier->token = parser->ReadToken(TokenType::Identifier);
+
+                List<UnownedStringSlice> split;
+                StringUtil::split(modifier->token.Content, '_', split);
+
+                if (split.getCount() != 3)
+                {
+                    parser->sink->diagnose(modifier->token, Diagnostics::invalidSPIRVVersion);
+                    return RefPtr<RefObject>();
+                }
+
+                typeName = split[0];
+                majorVersionText = split[1];
+                minorVersionText = split[2];
+                break;
+
+            }
+            default:
+            {
+                parser->sink->diagnose(modifier->token, Diagnostics::invalidSPIRVVersion);
+                return RefPtr<RefObject>();
+            }
+        }
+
+        parser->ReadToken(TokenType::RParent);
+
+        // Currently we only support 'spirv' or no typename
+        if (!(typeName == UnownedStringSlice::fromLiteral("spirv") || typeName.getLength() == 0))
+        {
+            parser->sink->diagnose(modifier->token, Diagnostics::invalidSPIRVVersion);
+            return RefPtr<RefObject>();
+        }
+
+        Token intToken = modifier->token;
+        intToken.type = TokenType::IntegerLiteral;
+        intToken.Content = majorVersionText;
+
+        auto majorValue = getIntegerLiteralValue(intToken);
+        intToken.Content = minorVersionText;
+        auto minorValue = getIntegerLiteralValue(intToken);
+
+        if (minorValue < 0 || minorValue > 0xff || majorValue < 0)
+        {
+            parser->sink->diagnose(modifier->token, Diagnostics::invalidSPIRVVersion);
+            return RefPtr<RefObject>();
+        }
+
+        modifier->spirvVersion = makeSPIRVVersion(int(majorValue), int(minorValue));
+        return modifier;
+    }
 
     static RefPtr<RefObject> parseLayoutModifier(Parser* parser, void* /*userData*/)
     {
@@ -5038,6 +5120,7 @@ namespace Slang
         MODIFIER(__specialized_for_target,    parseSpecializedForTargetModifier);
         MODIFIER(__glsl_extension,  parseGLSLExtensionModifier);
         MODIFIER(__glsl_version,    parseGLSLVersionModifier);
+        MODIFIER(__spirv_version,   parseSPIRVVersionModifier);
 
         MODIFIER(__builtin_type,    parseBuiltinTypeModifier);
         MODIFIER(__magic_type,      parseMagicTypeModifier);

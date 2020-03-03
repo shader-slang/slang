@@ -16,6 +16,7 @@ public:
     void requireExtension(const String& name);
     void requireVersion(ProfileVersion version);
     void requireBaseTypeExtension(BaseType baseType);
+    void requireSPIRVVersion(SPIRVVersion version);
 
     ProfileVersion getRequiredProfileVersion() const { return m_profileVersion; }
     const StringBuilder& getExtensionRequireLines() const { return m_extensionRequireLines; }
@@ -24,6 +25,8 @@ protected:
     // Record the GLSL extensions we have already emitted a `#extension` for
     HashSet<String> m_extensionsRequired;
     StringBuilder m_extensionRequireLines;
+
+    SPIRVVersion m_spirvVersion = makeSPIRVVersion(1, 2);
 
     ProfileVersion m_profileVersion = ProfileVersion::GLSL_110;
 

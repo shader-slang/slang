@@ -188,6 +188,11 @@ struct GLSLLegalizationContext
         glslExtensionTracker->requireExtension(name);
     }
 
+    void requireSPIRVVersion(SPIRVVersion version)
+    {
+        glslExtensionTracker->requireSPIRVVersion(version);
+    }
+
     void requireGLSLVersion(ProfileVersion version)
     {
         glslExtensionTracker->requireVersion(version);

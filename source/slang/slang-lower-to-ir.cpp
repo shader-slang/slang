@@ -6288,6 +6288,11 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
         {
             getBuilder()->addRequireGLSLVersionDecoration(irFunc, Int(getIntegerLiteralValue(versionMod->versionNumberToken)));
         }
+        for (auto versionMod : decl->GetModifiersOfType<RequiredSPIRVVersionModifier>())
+        {
+            getBuilder()->addRequireSPIRVVersionDecoration(irFunc, versionMod->spirvVersion);
+        }
+
 
         if (auto attr = decl->FindModifier<InstanceAttribute>())
         {
