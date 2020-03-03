@@ -453,7 +453,7 @@ static void splitNameAndIndex(
 
 LayoutResourceKind findRegisterClassFromName(UnownedStringSlice const& registerClassName)
 {
-    switch( registerClassName.size() )
+    switch( registerClassName.getLength() )
     {
     case 1:
         switch (*registerClassName.begin())
@@ -491,7 +491,7 @@ LayoutSemanticInfo ExtractLayoutSemanticInfo(
     info.kind = LayoutResourceKind::None;
 
     UnownedStringSlice registerName = semantic->registerName.Content;
-    if (registerName.size() == 0)
+    if (registerName.getLength() == 0)
         return info;
 
     // The register name is expected to be in the form:
@@ -517,7 +517,7 @@ LayoutSemanticInfo ExtractLayoutSemanticInfo(
 
     // For a `register` semantic, the register index is not optional (unlike
     // how it works for varying input/output semantics).
-    if( registerIndexDigits.size() == 0 )
+    if( registerIndexDigits.getLength() == 0 )
     {
         getSink(context)->diagnose(semantic->registerName, Diagnostics::expectedARegisterIndex, registerClassName);
     }
@@ -534,7 +534,7 @@ LayoutSemanticInfo ExtractLayoutSemanticInfo(
     if( auto registerSemantic = as<HLSLRegisterSemantic>(semantic) )
     {
         auto const& spaceName = registerSemantic->spaceName.Content;
-        if(spaceName.size() != 0)
+        if(spaceName.getLength() != 0)
         {
             UnownedStringSlice spaceSpelling;
             UnownedStringSlice spaceDigits;
@@ -548,7 +548,7 @@ LayoutSemanticInfo ExtractLayoutSemanticInfo(
             {
                 getSink(context)->diagnose(registerSemantic->spaceName, Diagnostics::expectedSpace, spaceSpelling);
             }
-            else if( spaceDigits.size() == 0 )
+            else if( spaceDigits.getLength() == 0 )
             {
                 getSink(context)->diagnose(registerSemantic->spaceName, Diagnostics::expectedSpaceIndex);
             }
@@ -564,7 +564,7 @@ LayoutSemanticInfo ExtractLayoutSemanticInfo(
     }
 
     // TODO: handle component mask part of things...
-    if( semantic->componentMask.Content.size() != 0 )
+    if( semantic->componentMask.Content.getLength() != 0 )
     {
         getSink(context)->diagnose(semantic->componentMask, Diagnostics::componentMaskNotSupported);
     }
@@ -1340,7 +1340,7 @@ SimpleSemanticInfo decomposeSimpleSemantic(
 
     // look for a trailing sequence of decimal digits
     // at the end of the composed name
-    UInt length = composedName.size();
+    UInt length = composedName.getLength();
     UInt indexLoc = length;
     while( indexLoc > 0 )
     {

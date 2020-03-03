@@ -183,7 +183,7 @@ SLANG_API const char* spReflectionUserAttribute_GetArgumentValueString(SlangRefl
     if (auto cexpr = as<StringLiteralExpr>(userAttr->args[index]))
     {
         if (bufLen)
-            *bufLen = cexpr->token.Content.size();
+            *bufLen = cexpr->token.Content.getLength();
         return cexpr->token.Content.begin();
     }
     return nullptr;
@@ -1564,7 +1564,7 @@ SLANG_API const char* spReflection_getHashedString(
     auto slices = programLayout->hashedStringLiteralPool.getAdded();
     auto slice = slices[Index(index)];
 
-    *outCount = slice.size();
+    *outCount = slice.getLength();
     return slice.begin();
 }
 

@@ -291,7 +291,7 @@ static SlangResult _parseVisualStudioLine(const UnownedStringSlice& line, Downst
         outDiagnostic.stage = Diagnostic::Stage::Link;
         outDiagnostic.type = Diagnostic::Type::Info;
 
-        outDiagnostic.text = UnownedStringSlice(line.begin() + linkPrefix.size(), line.end());
+        outDiagnostic.text = UnownedStringSlice(line.begin() + linkPrefix.getLength(), line.end());
 
         return SLANG_OK;
     }

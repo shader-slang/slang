@@ -1652,7 +1652,7 @@ static LegalVal declareSimpleVar(
             builder->addLayoutDecoration(irVar, varLayout);
         }
 
-        if( nameHint.size() )
+        if( nameHint.getLength() )
         {
             context->builder->addNameHintDecoration(irVar, nameHint);
         }
@@ -2308,7 +2308,7 @@ static LegalVal declareVars(
 
                 UnownedStringSlice fieldNameHint;
                 String joinedNameHintStorage;
-                if( nameHint.size() )
+                if( nameHint.getLength() )
                 {
                     if( auto fieldNameHintDecoration = ee.key->findDecoration<IRNameHintDecoration>() )
                     {

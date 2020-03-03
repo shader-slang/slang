@@ -181,7 +181,7 @@ static bool _isDriveLetter(char c)
 
 static bool _hasDriveLetter(const UnownedStringSlice& line)
 {
-    return line.size() > 2 && line[1] == ':' && _isDriveLetter(line[0]);
+    return line.getLength() > 2 && line[1] == ':' && _isDriveLetter(line[0]);
 }
 
 static SlangResult _parseNVRTCLine(const UnownedStringSlice& line, DownstreamDiagnostic& outDiagnostic)
@@ -307,6 +307,9 @@ SlangResult NVRTCDownstreamCompiler::compile(const CompileOptions& options, RefP
         // This is arguably too much - but nvrtc does not appear to have a mechanism to switch off individual warnings.
         // I tried the -Xcudafe mechanism but that does not appear to work for nvrtc
         cmdLine.addArg("-w");
+
+        //
+        cmdLine.addArg("-arch=compute_70");
     }
 
     nvrtcProgram program = nullptr;

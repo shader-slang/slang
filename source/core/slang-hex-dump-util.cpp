@@ -23,7 +23,7 @@ static const char s_hex[] = "0123456789abcdef";
 /* static */SlangResult HexDumpUtil::dumpWithMarkers(const uint8_t* data, size_t dataCount, int maxBytesPerLine, ISlangWriter* writer)
 {
     WriterHelper helper(writer);
-    SLANG_RETURN_ON_FAIL(helper.write(s_start.begin(), s_start.size()));
+    SLANG_RETURN_ON_FAIL(helper.write(s_start.begin(), s_start.getLength()));
     SLANG_RETURN_ON_FAIL(helper.print(" %zu", dataCount));
 
     const int hash = GetHashCode((const char*)data, dataCount);
@@ -31,7 +31,7 @@ static const char s_hex[] = "0123456789abcdef";
 
     SLANG_RETURN_ON_FAIL(dump(data, dataCount, maxBytesPerLine, writer));
 
-    SLANG_RETURN_ON_FAIL(helper.write(s_end.begin(), s_end.size()));
+    SLANG_RETURN_ON_FAIL(helper.write(s_end.begin(), s_end.getLength()));
     SLANG_RETURN_ON_FAIL(helper.put("\n"));
     return SLANG_OK;
 }

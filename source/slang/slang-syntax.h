@@ -463,14 +463,37 @@ namespace Slang
         // Run-time type representation for syntax nodes
         struct ClassInfo
         {
-            // Textual class name, for debugging
-            char const* name;
+            typedef ClassInfo ThisType;
 
-            // Base class for runtime queries
-            ClassInfo const*  baseClass;
+                /// A constant time implementation of isSubClassOf
+            SLANG_FORCE_INLINE bool isSubClassOf(const ThisType& super) const
+            {
+                // We include super.m_classId, because it's a subclass of itself.
+                return m_classId >= super.m_classId && m_classId < super.m_childrenEndClassId;
+            }
+                /// Will produce the same result as isSubClassOf, but more slowly by traversing the m_superClass
+                /// Works without initRange being called. 
+            bool isSubClassOfSlow(const ThisType& super) const;
 
-            // Callback to use when creating instances
-            CreateFunc createFunc;
+                /// This function must have been called before any dynamic casting will work (via the m_classId/m_childrenEndClassId.
+                /// It sets up the m_rangeStart/m_rangeEnd values to make.
+                /// Is called within the creation of Session
+            static SlangResult initRanges();
+
+                /// Ctor
+            ClassInfo(const char* name, CreateFunc createFunc, const ClassInfo* superClass);
+
+                /// The id for this class. The children of this class are in the range of m_classId + 1 to (but not including) m_childrenEndId.
+            mutable uint32_t m_classId;
+                /// Non inclusive end of range of children.
+            mutable uint32_t m_childrenEndClassId;        
+
+            const ClassInfo* m_superClass;          ///< The super class of this class, or nullptr if has no super class. 
+            const char* m_name;                     ///< Textual class name, for debugging 
+            CreateFunc m_createFunc;                ///< Callback to use when creating instances
+            
+            ClassInfo* m_next;                      ///< Next in list starting from s_first
+            static ClassInfo* s_first;
         };
 
         SyntaxClassBase()
@@ -485,13 +508,13 @@ namespace Slang
             auto ci = classInfo;
             if (!ci) return nullptr;
 
-            auto cf = ci->createFunc;
+            auto cf = ci->m_createFunc;
             if (!cf) return nullptr;
 
             return cf();
         }
 
-        bool isSubClassOfImpl(SyntaxClassBase const& super) const;
+        SLANG_FORCE_INLINE bool isSubClassOfImpl(SyntaxClassBase const& super) const { return classInfo->isSubClassOf(*super.classInfo); }
 
         ClassInfo const* classInfo = nullptr;
 
@@ -549,23 +572,18 @@ namespace Slang
         return SyntaxClass<T>::getClass();
     }
 
-    NodeBase* _dynamicCastImpl(NodeBase* node, SyntaxClassBase const& toClass);
+    template<typename T>
+    SLANG_FORCE_INLINE T* dynamicCast(NodeBase* node);
 
     template<typename T>
-    T* dynamicCast(NodeBase* node)
-    {
-        return (T*) _dynamicCastImpl(node, getClass<T>());
-    }
+    SLANG_FORCE_INLINE const T* dynamicCast(const NodeBase* node);
 
     template<typename T>
-    const T* dynamicCast(const NodeBase* node) { return dynamicCast<T>(const_cast<NodeBase*>(node)); }
+    SLANG_FORCE_INLINE T* as(NodeBase* node);
 
     template<typename T>
-    T* as(NodeBase* node) { return dynamicCast<T>(node); }
-
-    template<typename T>
-    const T* as(const NodeBase* node) { return dynamicCast<T>(const_cast<NodeBase*>(node)); }
-
+    SLANG_FORCE_INLINE const T* as(const NodeBase* node);
+    
     struct SubstitutionSet
     {
         RefPtr<Substitutions> substitutions;
@@ -1305,7 +1323,7 @@ namespace Slang
 #define SYNTAX_CLASS(NAME, BASE, ...)                                   \
     class NAME : public BASE {                                          \
     virtual void accept(NAME::Visitor* visitor, void* extra) override;  \
-    public: virtual SyntaxClass<NodeBase> getClass() override;          \
+    public: virtual const SyntaxClassBase::ClassInfo& getClassInfo() const override;          \
     public: /* ... */
 #include "slang-expr-defs.h"
 #include "slang-decl-defs.h"
@@ -1569,6 +1587,30 @@ namespace Slang
 
         /// Get the module that a declaration is associated with, if any.
     Module* getModule(Decl* decl);
+
+    template<typename T>
+    SLANG_FORCE_INLINE T* dynamicCast(NodeBase* node)
+    {
+        return (node && node->getClassInfo().isSubClassOf(SyntaxClassBase::Impl<T>::kClassInfo)) ? static_cast<T*>(node) : nullptr; 
+    }
+
+    template<typename T>
+    SLANG_FORCE_INLINE const T* dynamicCast(const NodeBase* node)
+    {
+        return (node && node->getClassInfo().isSubClassOf(SyntaxClassBase::Impl<T>::kClassInfo)) ? static_cast<const T*>(node) : nullptr;
+    }
+
+    template<typename T>
+    SLANG_FORCE_INLINE T* as(NodeBase* node)
+    {
+        return (node && node->getClassInfo().isSubClassOf(SyntaxClassBase::Impl<T>::kClassInfo)) ? static_cast<T*>(node) : nullptr;
+    }
+
+    template<typename T>
+    SLANG_FORCE_INLINE const T* as(const NodeBase* node)
+    {
+        return (node && node->getClassInfo().isSubClassOf(SyntaxClassBase::Impl<T>::kClassInfo)) ? static_cast<const T*>(node) : nullptr;
+    }
 
 } // namespace Slang
 

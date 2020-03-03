@@ -132,9 +132,12 @@ for (int tt = 0; tt < kBaseTypeCount; ++tt)
     case BaseType::Half:
     case BaseType::Float:
     case BaseType::Double:
-        sb << "\n    , __BuiltinFloatingPointType\n";
+        sb << "\n    ,  __BuiltinFloatingPointType\n";
         sb << "\n    ,  __BuiltinRealType\n";
-        ; // fall through to:
+        sb << "\n    ,  __BuiltinSignedArithmeticType\n";
+        sb << "\n    ,  __BuiltinArithmeticType\n";
+        sb << "\n    ,  __BuiltinType\n";
+        break;
     case BaseType::Int8:
     case BaseType::Int16:
     case BaseType::Int:
@@ -146,6 +149,7 @@ for (int tt = 0; tt < kBaseTypeCount; ++tt)
     case BaseType::UInt:
     case BaseType::UInt64:
         sb << "\n    ,  __BuiltinArithmeticType\n";
+        sb << "\n    ,  __BuiltinIntegerType\n";
         ; // fall through to:
     case BaseType::Bool:
         sb << "\n    ,  __BuiltinType\n";

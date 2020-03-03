@@ -244,7 +244,7 @@ namespace Slang
     {
         if( auto rateQualType = as<IRRateQualifiedType>(type) )
         {
-            type = rateQualType->getDataType();
+            type = rateQualType->getValueType();
         }
 
         // The "true" pointers and the pointer-like stdlib types are the easy cases.
@@ -1773,7 +1773,7 @@ namespace Slang
             case kIROp_StringLit:
             {
                 const UnownedStringSlice slice = getStringSlice();
-                return combineHash(code, Slang::GetHashCode(slice.begin(), slice.size()));
+                return combineHash(code, Slang::GetHashCode(slice.begin(), slice.getLength()));
             }
             default:
             {
@@ -1837,7 +1837,7 @@ namespace Slang
             {
                 const UnownedStringSlice slice = keyInst.getStringSlice();
 
-                const size_t sliceSize = slice.size();
+                const size_t sliceSize = slice.getLength();
                 const size_t instSize = prefixSize + offsetof(IRConstant::StringValue, chars) + sliceSize; 
 
                 irValue = static_cast<IRConstant*>(createInstWithSizeImpl(builder, keyInst.op, keyInst.getFullType(), instSize));
@@ -1910,7 +1910,7 @@ namespace Slang
         
         IRConstant::StringSliceValue& dstSlice = keyInst.value.transitoryStringVal;
         dstSlice.chars = const_cast<char*>(inSlice.begin());
-        dstSlice.numChars = uint32_t(inSlice.size());
+        dstSlice.numChars = uint32_t(inSlice.getLength());
 
         return static_cast<IRStringLit*>(findOrEmitConstant(this, keyInst));
     }

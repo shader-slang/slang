@@ -368,7 +368,7 @@ bool D3DUtil::isTypeless(DXGI_FORMAT format)
 
 static bool _isMatch(IDXGIAdapter* adapter, const Slang::UnownedStringSlice& lowerAdapaterName)
 {
-    if (lowerAdapaterName.size() == 0)
+    if (lowerAdapaterName.getLength() == 0)
     {
         return true;
     }

@@ -79,7 +79,7 @@ size_t OffsetString::calcEncodedSize(size_t size, uint8_t encode[kMaxSizeEncodeS
 
 /* static */size_t OffsetString::calcAllocationSize(const UnownedStringSlice& slice)
 {
-    return calcAllocationSize(slice.size());
+    return calcAllocationSize(slice.getLength());
 }
 
 UnownedStringSlice OffsetString::getSlice() const
@@ -166,7 +166,7 @@ void* OffsetContainer::allocateAndZero(size_t size, size_t alignment)
 
 Offset32Ptr<OffsetString> OffsetContainer::newString(const UnownedStringSlice& slice)
 {
-    size_t stringSize = slice.size();
+    size_t stringSize = slice.getLength();
 
     uint8_t head[OffsetString::kMaxSizeEncodeSize];
     size_t headSize = OffsetString::calcEncodedSize(stringSize, head);

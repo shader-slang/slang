@@ -235,7 +235,7 @@ namespace Slang
             ioBuilder.append(path);
             return;
         }
-        if (path.size() > 0)
+        if (path.getLength() > 0)
         {
             // If ioBuilder doesn't end in a delimiter, add one
             if (!isDelimiter(ioBuilder[ioBuilder.getLength() - 1]))
@@ -278,7 +278,7 @@ namespace Slang
 
     /* static */ bool Path::isDriveSpecification(const UnownedStringSlice& element)
     {
-        switch (element.size())
+        switch (element.getLength())
         {
             case 0:     
             {
@@ -306,14 +306,14 @@ namespace Slang
 
     /* static */bool Path::isAbsolute(const UnownedStringSlice& path)
     {
-        if (path.size() > 0 && isDelimiter(path[0]))
+        if (path.getLength() > 0 && isDelimiter(path[0]))
         {
             return true;
         }
 
 #if SLANG_WINDOWS_FAMILY
         // Check for the \\ network drive style
-        if (path.size() >= 2 && path[0] == '\\' && path[1] == '\\')
+        if (path.getLength() >= 2 && path[0] == '\\' && path[1] == '\\')
         {
             return true;
         }
@@ -348,7 +348,7 @@ namespace Slang
         }
 
         // Okay if the end is empty. And we aren't with a spec like // or c:/ , then drop the final slash 
-        if (splitOut.getCount() > 1 && splitOut.getLast().size() == 0)
+        if (splitOut.getCount() > 1 && splitOut.getLast().getLength() == 0)
         {
             if (splitOut.getCount() == 2 && isDriveSpecification(splitOut[0]))
             {

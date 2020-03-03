@@ -59,7 +59,7 @@ SlangResult WriterHelper::put(const char* text)
 
 SlangResult WriterHelper::put(const UnownedStringSlice& text)
 {
-    return m_writer->write(text.begin(), text.size());
+    return m_writer->write(text.begin(), text.getLength());
 }
 
 /* !!!!!!!!!!!!!!!!!!!!!!!!! BaseWriter !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!*/

@@ -468,7 +468,7 @@ HLSLIntrinsicOpLookup::HLSLIntrinsicOpLookup():
         const auto& info = HLSLIntrinsic::getInfo(Op(i));
         UnownedStringSlice slice = info.funcName;
 
-        if (slice.size() > 0 && slice[0] >= 'a' && slice[0] <= 'z')
+        if (slice.getLength() > 0 && slice[0] >= 'a' && slice[0] <= 'z')
         {
             auto handle = m_slicePool.add(slice);
             Index index = Index(handle);
@@ -545,7 +545,7 @@ HLSLIntrinsic::Op HLSLIntrinsicOpLookup::getOpFromTargetDecoration(IRInst* inIns
             // original HLSL name, which has a target of ""
             // 
             // It's not 100% clear this covers all the cases, but for now lets go with that
-            if (decor->getTargetName().size() == 0)
+            if (decor->getTargetName().getLength() == 0)
             {
                 Op op = getOpByName(decor->getDefinition());
                 if (op != Op::Invalid)
