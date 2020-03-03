@@ -208,7 +208,7 @@ ComPtr<ISlangBlob> StringUtil::createStringBlob(const String& string)
         return slice;
     }
 
-    const Index numChars = slice.size();
+    const Index numChars = slice.getLength();
     const char* srcChars = slice.begin();
 
     StringBuilder builder;

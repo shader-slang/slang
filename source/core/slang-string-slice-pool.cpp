@@ -50,7 +50,7 @@ StringSlicePool::Handle StringSlicePool::add(const Slice& slice)
     }
 
     // Create a scoped copy
-    UnownedStringSlice scopePath(m_arena.allocateString(slice.begin(), slice.size()), slice.size());
+    UnownedStringSlice scopePath(m_arena.allocateString(slice.begin(), slice.getLength()), slice.getLength());
 
     const auto index = m_slices.getCount();
 

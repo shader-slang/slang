@@ -91,7 +91,7 @@ void IRSerialWriter::_addDebugSourceLocRun(SourceLoc sourceLoc, uint32_t startIn
             if (!pool.isDefaultHandle(entry.m_pathHandle))
             {
                 UnownedStringSlice slice = pool.getSlice(entry.m_pathHandle);
-                SLANG_ASSERT(slice.size() > 0);
+                SLANG_ASSERT(slice.getLength() > 0);
                 adjustedLineInfo.m_pathStringIndex = Ser::StringIndex(m_debugStringSlicePool.add(slice));
             }
 
@@ -1161,7 +1161,7 @@ static int _calcFixSourceLoc(const IRSerialData::DebugSourceInfo& info, SourceVi
 
                     const UnownedStringSlice slice = m_stringRepresentationCache.getStringSlice(StringHandle(srcInst.m_payload.m_stringIndices[0]));
                         
-                    const size_t sliceSize = slice.size();
+                    const size_t sliceSize = slice.getLength();
                     const size_t instSize = prefixSize + SLANG_OFFSET_OF(IRConstant::StringValue, chars) + sliceSize;
 
                     irConst = static_cast<IRConstant*>(createEmptyInstWithSize(module, op, instSize));

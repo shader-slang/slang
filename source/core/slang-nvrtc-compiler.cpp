@@ -181,7 +181,7 @@ static bool _isDriveLetter(char c)
 
 static bool _hasDriveLetter(const UnownedStringSlice& line)
 {
-    return line.size() > 2 && line[1] == ':' && _isDriveLetter(line[0]);
+    return line.getLength() > 2 && line[1] == ':' && _isDriveLetter(line[0]);
 }
 
 static SlangResult _parseNVRTCLine(const UnownedStringSlice& line, DownstreamDiagnostic& outDiagnostic)

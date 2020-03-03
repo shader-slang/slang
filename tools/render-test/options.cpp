@@ -245,7 +245,7 @@ SlangResult parseOptions(int argc, const char*const* argv, Slang::WriterHelper s
         {
             // Lookup
             Slang::UnownedStringSlice argSlice(arg);
-            if (argSlice.size() && argSlice[0] == '-')
+            if (argSlice.getLength() && argSlice[0] == '-')
             {
                 // Look up the rendering API if set
                 UnownedStringSlice argName = UnownedStringSlice(argSlice.begin() + 1, argSlice.end());

@@ -568,7 +568,7 @@ static SlangResult _extractRenderTestRequirements(const CommandLine& cmdLine, Te
         for (const auto& arg: args)
         {
             Slang::UnownedStringSlice argSlice = arg.value.getUnownedSlice();
-            if (argSlice.size() && argSlice[0] == '-')
+            if (argSlice.getLength() && argSlice[0] == '-')
             {
                 // Look up the rendering API if set
                 UnownedStringSlice argName = UnownedStringSlice(argSlice.begin() + 1, argSlice.end());
@@ -1918,7 +1918,7 @@ static SlangResult _extractProfileTime(const UnownedStringSlice& text, double& t
     {
         if (line.startsWith(lineStart))
         {
-            UnownedStringSlice remaining(line.begin() + lineStart.size(), line.end());
+            UnownedStringSlice remaining(line.begin() + lineStart.getLength(), line.end());
             remaining.trim();
 
             timeOut = StringToDouble(String(remaining));
@@ -1970,7 +1970,7 @@ TestResult runPerformanceProfile(TestContext* context, TestInput& input)
 
 static double _textToDouble(const UnownedStringSlice& slice)
 {
-    Index size = Index(slice.size());
+    Index size = Index(slice.getLength());
     // We have to zero terminate to be able to use atof
     const Index maxSize = 80;
     char buffer[maxSize + 1];

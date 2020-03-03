@@ -373,7 +373,7 @@ bool CLikeSourceEmitter::isTargetIntrinsicModifierBetter(IRTargetIntrinsicDecora
     // good) as `existing`.
     //
     SLANG_UNUSED(existing);
-    return candidate->getTargetName().size() != 0;
+    return candidate->getTargetName().getLength() != 0;
 }
 
 void CLikeSourceEmitter::emitStringLiteral(String const& value)

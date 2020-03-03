@@ -20,7 +20,7 @@ namespace Slang
     {
         if (line.startsWith(prefix))
         {
-            const UnownedStringSlice remainingSlice = UnownedStringSlice(line.begin() + prefix.size(), line.end()).trim();
+            const UnownedStringSlice remainingSlice = UnownedStringSlice(line.begin() + prefix.getLength(), line.end()).trim();
             const Index versionEndIndex = remainingSlice.indexOf(' ');
             if (versionEndIndex < 0)
             {

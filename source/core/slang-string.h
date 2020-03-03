@@ -93,7 +93,7 @@ namespace Slang
             return m_end;
         }
 
-        Index size() const
+        Index getLength() const
         {
             return Index(m_end - m_begin);
         }
@@ -134,8 +134,8 @@ namespace Slang
             // Note that memcmp is undefined when passed in null ptrs, so if we want to handle
             // we need to cover that case.
             // Can only be nullptr if size is 0.
-            auto thisSize = size();
-            auto otherSize = other.size();
+            auto thisSize = getLength();
+            auto otherSize = other.getLength();
 
             if (thisSize != otherSize)
             {

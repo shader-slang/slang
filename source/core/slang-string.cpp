@@ -74,8 +74,8 @@ namespace Slang
 
     bool UnownedStringSlice::startsWith(UnownedStringSlice const& other) const
     {
-        UInt thisSize = size();
-        UInt otherSize = other.size();
+        UInt thisSize = getLength();
+        UInt otherSize = other.getLength();
 
         if (otherSize > thisSize)
             return false;
@@ -91,8 +91,8 @@ namespace Slang
 
     bool UnownedStringSlice::endsWith(UnownedStringSlice const& other) const
     {
-        UInt thisSize = size();
-        UInt otherSize = other.size();
+        UInt thisSize = getLength();
+        UInt otherSize = other.getLength();
 
         if (otherSize > thisSize)
             return false;

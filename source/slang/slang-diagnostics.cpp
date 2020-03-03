@@ -328,7 +328,7 @@ void DiagnosticSink::diagnoseRaw(
     if(writer)
     {
         // If so, pass the error string along to them
-        writer->write(message.begin(), message.size());
+        writer->write(message.begin(), message.getLength());
     }
     else
     {

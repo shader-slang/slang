@@ -558,7 +558,7 @@ void emitSimpleText(
     while (StringUtil::extractLine(content, line))
     {
         // Write the line
-        fwrite(line.begin(), 1, line.size(), stream);
+        fwrite(line.begin(), 1, line.getLength(), stream);
 
         // Specially handle the 'final line', excluding an empty line after \n.
         // We can detect, as if input ends with 'cr/lf' combination, content.begin == span.end(), else if content.begin() == nullptr.

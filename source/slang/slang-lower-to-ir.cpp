@@ -5847,7 +5847,7 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
                 //
                 if(targetMod->targetToken.type == TokenType::Unknown)
                     return;
-                else if(targetMod->targetToken.Content.size() == 0)
+                else if(targetMod->targetToken.Content.getLength() == 0)
                     return;
             }
         }
