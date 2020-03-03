@@ -178,6 +178,19 @@ struct IRRequireGLSLVersionDecoration : IRDecoration
     }
 };
 
+struct IRRequireSPIRVVersionDecoration : IRDecoration
+{
+    enum { kOp = kIROp_RequireSPIRVVersionDecoration };
+    IR_LEAF_ISA(RequireGLSLVersionDecoration)
+
+    IRConstant* getSPIRVVersionOperand() { return cast<IRConstant>(getOperand(0)); }
+
+    SPIRVVersion getSPIRVVersion()
+    {
+        return SPIRVVersion(getSPIRVVersionOperand()->value.intVal);
+    }
+};
+
 struct IRRequireGLSLExtensionDecoration : IRDecoration
 {
     enum { kOp = kIROp_RequireGLSLExtensionDecoration };

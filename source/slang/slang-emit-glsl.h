@@ -60,6 +60,7 @@ protected:
 
     void _requireGLSLVersion(ProfileVersion version);
     void _requireGLSLVersion(int version);
+    void _requireSPIRVVersion(SPIRVVersion version);
 
         // Emit the `flat` qualifier if the underlying type
         // of the variable is an integer type.
