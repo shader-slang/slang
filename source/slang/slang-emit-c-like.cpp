@@ -2891,18 +2891,18 @@ bool CLikeSourceEmitter::isTargetIntrinsic(IRFunc* func)
 
 void CLikeSourceEmitter::emitFunc(IRFunc* func)
 {
+    // Target-intrinsic functions should never be emitted
+    // even if they happen to have a body.
+    //
+    if (isTargetIntrinsic(func))
+        return;
+
+
     if(!isDefinition(func))
     {
         // This is just a function declaration,
         // and so we want to emit it as such.
-        // (Or maybe not emit it at all).
-
-        // We do not emit the declaration for
-        // functions that appear to be intrinsics/builtins
-        // in the target language.
-        if (isTargetIntrinsic(func))
-            return;
-
+        //
         emitFuncDecl(func);
     }
     else
@@ -2910,6 +2910,7 @@ void CLikeSourceEmitter::emitFunc(IRFunc* func)
         // The common case is that what we
         // have is just an ordinary function,
         // and we can emit it as such.
+        //
         emitSimpleFunc(func);
     }
 }

@@ -79,11 +79,9 @@ just constructXXXFromScalar. Would be good if there was a suitable name to encom
         x(ArcTan, "atan", 1) \
         \
         x(ArcTan2, "atan2", 2) \
-        x(SinCos, "sincos", 3) \
         \
         x(Rcp, "rcp", 1) \
         x(Sign, "sign", 1) \
-        x(Saturate, "saturate", 1) \
         x(Frac, "frac", 1) \
         \
         x(Ceil, "ceil", 1) \

@@ -211,6 +211,73 @@ SlangResult HLSLIntrinsicSet::makeIntrinsic(IRInst* inst, HLSLIntrinsic& out)
     {
         // See if we can just directly convert
         Op op = HLSLIntrinsicOpLookup::getOpForIROp(inst->op);
+
+
+        // HACK: some cases we want to stop handling via the synthesis
+        // path, but only for vector and matrix types (not scalars).
+        //
+        switch( op )
+        {
+        default: break;
+
+        case Op::Sin:
+        case Op::Cos:
+        case Op::Tan:
+        case Op::ArcSin:
+        case Op::ArcCos:
+        case Op::ArcTan:
+        case Op::ArcTan2:
+        case Op::Rcp:
+        case Op::Sign:
+        case Op::Frac:
+        case Op::Ceil:
+        case Op::Floor:
+        case Op::Trunc:
+        case Op::Sqrt:
+        case Op::RecipSqrt:
+        case Op::Exp2:
+        case Op::Exp:
+        case Op::Log:
+        case Op::Log2:
+        case Op::Log10:
+        case Op::Abs:
+        case Op::Min:
+        case Op::Max:
+        case Op::Pow:
+        case Op::FMod:
+        case Op::SmoothStep:
+        case Op::Lerp:
+        case Op::Clamp:
+        case Op::Step:
+        case Op::AsFloat:
+        case Op::AsInt:
+        case Op::AsUInt:
+        case Op::IsInfinite:
+        case Op::IsFinite:
+        case Op::IsNan:
+        case Op::LdExp:
+            // Note: the `any()`/`all()` case can't be handled via a stdlib definition
+            // right now because `bool` vectors map to `int` vectors on the CUDA
+            // path, so that the generated `geAt` operation is incorrect.
+            //
+//        case Op::Any:
+//        case Op::All:
+            {
+                IRType* srcType = inst->getOperand(0)->getDataType();
+                switch( srcType->op )
+                {
+                default:
+                    break;
+
+                case kIROp_VectorType:
+                case kIROp_MatrixType:
+                    return SLANG_FAIL;
+                }
+            }
+            break;
+        }
+
+
         if (op != Op::Invalid)
         {
             calcIntrinsic(op, inst, inst->getOperandCount(), out);
