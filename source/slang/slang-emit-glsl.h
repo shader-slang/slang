@@ -59,11 +59,11 @@ protected:
 
     void _emitGLSLTypePrefix(IRType* type, bool promoteHalfToFloat = false);
 
-    void _requireGLSLExtension(const String& name);
+    void _requireGLSLExtension(const UnownedStringSlice& name);
 
     void _requireGLSLVersion(ProfileVersion version);
     void _requireGLSLVersion(int version);
-    void _requireSPIRVVersion(SPIRVVersion version);
+    void _requireSPIRVVersion(const UnownedStringSlice& versionName);
 
         // Emit the `flat` qualifier if the underlying type
         // of the variable is an integer type.

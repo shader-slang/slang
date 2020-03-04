@@ -6294,7 +6294,7 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
         }
         for (auto versionMod : decl->GetModifiersOfType<RequiredSPIRVVersionModifier>())
         {
-            getBuilder()->addRequireSPIRVVersionDecoration(irFunc, versionMod->spirvVersion);
+            getBuilder()->addRequireSPIRVVersionDecoration(irFunc, versionMod->versionName);
         }
 
 

@@ -1113,6 +1113,7 @@ SlangResult dissassembleDXILUsingDXC(
 
         glslang_CompileRequest request;
         memset(&request, 0, sizeof(request));
+        request.sizeInBytes = sizeof(request);
 
         request.action = GLSLANG_ACTION_DISSASSEMBLE_SPIRV;
 
@@ -1460,6 +1461,7 @@ SlangResult dissassembleDXILUsingDXC(
 
         glslang_CompileRequest request;
         memset(&request, 0, sizeof(request));
+        request.sizeInBytes = sizeof(request);
 
         request.action = GLSLANG_ACTION_COMPILE_GLSL_TO_SPIRV;
         request.sourcePath = sourcePath.getBuffer();
@@ -1468,18 +1470,17 @@ SlangResult dissassembleDXILUsingDXC(
         request.inputBegin  = rawGLSL.begin();
         request.inputEnd    = rawGLSL.end();
 
-        auto& spirvVersion = request.spirvVersion;
-
-        spirvVersion.style = GLSLANG_SPIRV_STYLE_UNKNOWN;
-
+        List<const char*> spirvVersions;
         if (GLSLExtensionTracker* tracker = as<GLSLExtensionTracker>(source.extensionTracker.Ptr()))
         {
-            auto srcVersion = tracker->getSPIRVVersion();
-
-            spirvVersion.style = GLSLANG_SPIRV_STYLE_UNIVERSAL;
-            spirvVersion.majorVersion = uint8_t(getMajorVersion(srcVersion));
-            spirvVersion.minorVersion = uint8_t(getMinorVersion(srcVersion));
+            for (const auto& spirvVersion : tracker->getSPIRVVersions())
+            {
+                spirvVersions.add(spirvVersion.begin());
+            }
         }
+
+        request.spirvVersions = spirvVersions.getBuffer();
+        request.spirvVersionsCount = int(spirvVersions.getCount());
 
         request.outputFunc = outputFunc;
         request.outputUserData = &spirvOut;

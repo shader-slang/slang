@@ -589,7 +589,7 @@ SlangResult emitEntryPointSourceFromIR(
         {
             auto glslExtensionTracker = as<GLSLExtensionTracker>(sourceEmitter->getExtensionTracker());
 
-            glslExtensionTracker->requireExtension("GL_NV_ray_tracing");
+            glslExtensionTracker->requireExtension(UnownedStringSlice::fromLiteral("GL_NV_ray_tracing"));
             glslExtensionTracker->requireVersion(ProfileVersion::GLSL_460);
         }
         break;
@@ -641,7 +641,7 @@ SlangResult emitEntryPointSourceFromIR(
 
     if (auto glslExtensionTracker = as<GLSLExtensionTracker>(extensionTracker))
     {
-        finalResultBuilder << glslExtensionTracker->getExtensionRequireLines();
+        glslExtensionTracker->appendExtensionRequireLines(finalResultBuilder);
     }
 
     finalResultBuilder << code;

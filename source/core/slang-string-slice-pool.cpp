@@ -59,6 +59,24 @@ StringSlicePool::Handle StringSlicePool::add(const Slice& slice)
     return Handle(index);
 }
 
+bool StringSlicePool::findOrAdd(const Slice& slice, Handle& outHandle)
+{
+    Handle newHandle = Handle(m_slices.getCount());
+    const Handle* handlePtr = m_map.TryGetValueOrAdd(slice, newHandle);
+    if (handlePtr)
+    {
+        outHandle = *handlePtr;
+        return true;
+    }
+
+    // Need to add
+    UnownedStringSlice scopeSlice(m_arena.allocateString(slice.begin(), slice.getLength()), slice.getLength());
+    m_slices.add(scopeSlice);
+    m_map.Add(scopeSlice, newHandle);
+    outHandle = newHandle;
+    return false;
+}
+
 StringSlicePool::Handle StringSlicePool::add(StringRepresentation* stringRep)
 {
     if (stringRep == nullptr && m_style == Style::Default)

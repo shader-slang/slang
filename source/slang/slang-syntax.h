@@ -32,8 +32,6 @@ namespace Slang
     class Parser;
     class SyntaxNode;
 
-    enum class SPIRVVersion : uint32_t;
-
     typedef RefPtr<RefObject> (*SyntaxParseCallback)(Parser* parser, void* userData);
 
     typedef unsigned int ConversionCost;
