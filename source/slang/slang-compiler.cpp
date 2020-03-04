@@ -1495,9 +1495,9 @@ SlangResult dissassembleDXILUsingDXC(
             request.spirvTargetName = tracker->getSPIRVTargetName();
             auto spirvLanguageVersion = tracker->getSPIRVVersion();
 
-            request.spirvVersion.major = spirvLanguageVersion.major;
-            request.spirvVersion.minor = spirvLanguageVersion.minor;
-            request.spirvVersion.patch = spirvLanguageVersion.patch;
+            request.spirvVersion.major = spirvLanguageVersion.m_major;
+            request.spirvVersion.minor = spirvLanguageVersion.m_minor;
+            request.spirvVersion.patch = spirvLanguageVersion.m_patch;
         }
 
         request_1_0.outputFunc = outputFunc;

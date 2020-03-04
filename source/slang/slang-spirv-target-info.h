@@ -9,22 +9,22 @@ namespace Slang
 
 struct SPIRVVersion
 {
-    SPIRVVersion():major(0), minor(0), patch(0) {}
+    SPIRVVersion():m_major(0), m_minor(0), m_patch(0) {}
     SPIRVVersion(int inMajor, int inMinor = 0, int inPatch = 0):
-        major(uint8_t(inMajor)),
-        minor(uint8_t(inMinor)),
-        patch(uint8_t(inPatch))
+        m_major(uint8_t(inMajor)),
+        m_minor(uint8_t(inMinor)),
+        m_patch(uint8_t(inPatch))
     {}
 
-    Index toInteger() const { return (Index(major) << 16) | (Index(minor) << 8) | patch; }
+    Index toInteger() const { return (Index(m_major) << 16) | (Index(m_minor) << 8) | m_patch; }
     SPIRVVersion setFromInteger(Index i)
     {
-        major = uint8_t((i >> 16) & 0xff);
-        minor = uint8_t((i >> 8) & 0xff);
-        patch = uint8_t((i >> 0) & 0xff);
+        m_major = uint8_t((i >> 16) & 0xff);
+        m_minor = uint8_t((i >> 8) & 0xff);
+        m_patch = uint8_t((i >> 0) & 0xff);
     }
 
-    uint8_t major, minor, patch;
+    uint8_t m_major, m_minor, m_patch;
 };
 
 struct SPIRVTargetFlag

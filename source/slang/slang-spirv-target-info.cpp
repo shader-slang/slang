@@ -90,9 +90,9 @@ static const SPIRVNameAndVersion kSPIRVNameAndVersions[] =
                 }
 
                 outInfo.targetName = name;
-                outInfo.version.major = uint8_t(ints[0]);
-                outInfo.version.minor = uint8_t(ints[1]);
-                outInfo.version.patch = uint8_t(ints[2]);
+                outInfo.version.m_major = uint8_t(ints[0]);
+                outInfo.version.m_minor = uint8_t(ints[1]);
+                outInfo.version.m_patch = uint8_t(ints[2]);
                 outInfo.flags = SPIRVTargetFlag::Universal;
                 return SLANG_OK;
             }
