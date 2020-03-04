@@ -18,10 +18,8 @@ struct glsl_SPIRVVersion
     unsigned char misc;                     ///< Set to 0 if not used
 };
 
-struct glslang_CompileRequest
+struct glslang_CompileRequest_1_0
 {
-    size_t              sizeInBytes;            ///< Size in bytes of this structure
-
     char const*         sourcePath;
 
     void const*         inputBegin;
@@ -39,11 +37,20 @@ struct glslang_CompileRequest
 
     unsigned            optimizationLevel;
     unsigned            debugInfoType;
+};
+
+
+struct glslang_CompileRequest_1_1
+{
+    size_t              sizeInBytes;            ///< Size in bytes of this structure
+
+    glslang_CompileRequest_1_0 request_1_0;
 
     const char*         spirvTargetName;            /// A valid TargetName. If null will use universal based on the spirVersion.
     glsl_SPIRVVersion   spirvVersion;               ///< The SPIR-V version. If all are 0 will use the default which is 1.2 currently
 };
 
-typedef int (*glslang_CompileFunc)(glslang_CompileRequest* request);
+typedef int (*glslang_CompileFunc_1_0)(glslang_CompileRequest_1_0* request);
+typedef int (*glslang_CompileFunc_1_1)(glslang_CompileRequest_1_1* request);
 
 #endif

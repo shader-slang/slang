@@ -2000,7 +2000,8 @@ namespace Slang
 
         enum class SharedLibraryFuncType
         {
-            Glslang_Compile,
+            Glslang_Compile_1_0,
+            Glslang_Compile_1_1,
             Fxc_D3DCompile,
             Fxc_D3DDisassemble,
             Dxc_DxcCreateInstance,

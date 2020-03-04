@@ -1061,15 +1061,22 @@ SlangResult dissassembleDXILUsingDXC(
 #if SLANG_ENABLE_GLSLANG_SUPPORT
     SlangResult invokeGLSLCompiler(
         BackEndCompileRequest*      slangCompileRequest,
-        glslang_CompileRequest&     request)
+        glslang_CompileRequest_1_1&     request)
     {
+        auto& request_1_0 = request.request_1_0;
+
         Session* session = slangCompileRequest->getSession();
         auto sink = slangCompileRequest->getSink();
         auto linkage = slangCompileRequest->getLinkage();
 
-        auto glslang_compile = (glslang_CompileFunc)session->getSharedLibraryFunc(Session::SharedLibraryFuncType::Glslang_Compile, sink);
-        if (!glslang_compile)
+        auto glslang_compile_1_0 = (glslang_CompileFunc_1_0)session->getSharedLibraryFunc(Session::SharedLibraryFuncType::Glslang_Compile_1_0, nullptr);
+        auto glslang_compile_1_1 = (glslang_CompileFunc_1_1)session->getSharedLibraryFunc(Session::SharedLibraryFuncType::Glslang_Compile_1_1, nullptr);
+
+        if(glslang_compile_1_0 == nullptr && glslang_compile_1_1 == nullptr)
         {
+            // Try again and put diagnostic to the sink
+            session->getSharedLibraryFunc(Session::SharedLibraryFuncType::Glslang_Compile_1_0, sink);
+            session->getSharedLibraryFunc(Session::SharedLibraryFuncType::Glslang_Compile_1_1, sink);
             return SLANG_FAIL;
         }
 
@@ -1080,13 +1087,21 @@ SlangResult dissassembleDXILUsingDXC(
             (*(StringBuilder*)userData).append((char const*)data, (char const*)data + size);
         };
 
-        request.diagnosticFunc = diagnosticOutputFunc;
-        request.diagnosticUserData = &diagnosticOutput;
+        request_1_0.diagnosticFunc = diagnosticOutputFunc;
+        request_1_0.diagnosticUserData = &diagnosticOutput;
 
-        request.optimizationLevel = (unsigned)linkage->optimizationLevel;
-        request.debugInfoType = (unsigned)linkage->debugInfoLevel;
+        request_1_0.optimizationLevel = (unsigned)linkage->optimizationLevel;
+        request_1_0.debugInfoType = (unsigned)linkage->debugInfoLevel;
 
-        int err = glslang_compile(&request);
+        int err = 1;
+        if (glslang_compile_1_1)
+        {
+            err = glslang_compile_1_1(&request);   
+        }
+        else if (glslang_compile_1_0)
+        {
+            err = glslang_compile_1_0(&request.request_1_0);   
+        }
 
         if (err)
         {
@@ -1111,20 +1126,23 @@ SlangResult dissassembleDXILUsingDXC(
             (*(String*)userData).append((char const*)data, (char const*)data + size);
         };
 
-        glslang_CompileRequest request;
+        glslang_CompileRequest_1_1 request;
         memset(&request, 0, sizeof(request));
         request.sizeInBytes = sizeof(request);
 
-        request.action = GLSLANG_ACTION_DISSASSEMBLE_SPIRV;
+        {
+            auto& request_1_0 = request.request_1_0;
 
-        request.sourcePath = nullptr;
+            request_1_0.action = GLSLANG_ACTION_DISSASSEMBLE_SPIRV;
 
-        request.inputBegin  = data;
-        request.inputEnd    = (char*)data + size;
+            request_1_0.sourcePath = nullptr;
 
-       
-        request.outputFunc = outputFunc;
-        request.outputUserData = &output;
+            request_1_0.inputBegin  = data;
+            request_1_0.inputEnd    = (char*)data + size;
+
+            request_1_0.outputFunc = outputFunc;
+            request_1_0.outputUserData = &output;
+        }
 
         SLANG_RETURN_ON_FAIL(invokeGLSLCompiler(slangRequest, request));
 
@@ -1459,16 +1477,18 @@ SlangResult dissassembleDXILUsingDXC(
 
         const String sourcePath = calcSourcePathForEntryPoint(endToEndReq, entryPointIndex);
 
-        glslang_CompileRequest request;
+        glslang_CompileRequest_1_1 request;
         memset(&request, 0, sizeof(request));
         request.sizeInBytes = sizeof(request);
 
-        request.action = GLSLANG_ACTION_COMPILE_GLSL_TO_SPIRV;
-        request.sourcePath = sourcePath.getBuffer();
-        request.slangStage = (SlangStage)entryPoint->getStage();
+        auto& request_1_0 = request.request_1_0;
 
-        request.inputBegin  = rawGLSL.begin();
-        request.inputEnd    = rawGLSL.end();
+        request_1_0.action = GLSLANG_ACTION_COMPILE_GLSL_TO_SPIRV;
+        request_1_0.sourcePath = sourcePath.getBuffer();
+        request_1_0.slangStage = (SlangStage)entryPoint->getStage();
+
+        request_1_0.inputBegin  = rawGLSL.begin();
+        request_1_0.inputEnd    = rawGLSL.end();
 
         if (GLSLExtensionTracker* tracker = as<GLSLExtensionTracker>(source.extensionTracker.Ptr()))
         {
@@ -1480,8 +1500,8 @@ SlangResult dissassembleDXILUsingDXC(
             request.spirvVersion.patch = spirvLanguageVersion.patch;
         }
 
-        request.outputFunc = outputFunc;
-        request.outputUserData = &spirvOut;
+        request_1_0.outputFunc = outputFunc;
+        request_1_0.outputUserData = &spirvOut;
 
         SLANG_RETURN_ON_FAIL(invokeGLSLCompiler(slangRequest, request));
         return SLANG_OK;
