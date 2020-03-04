@@ -207,7 +207,8 @@ DIAGNOSTIC(20002, Error, syntaxError, "syntax error.");
 DIAGNOSTIC(20004, Error, unexpectedTokenExpectedComponentDefinition, "unexpected token '$0', only component definitions are allowed in a shader scope.")
 DIAGNOSTIC(20008, Error, invalidOperator, "invalid operator '$0'.");
 DIAGNOSTIC(20011, Error, unexpectedColon, "unexpected ':'.")
-DIAGNOSTIC(20012, Error, invalidSPIRVVersion, "Expecting SPIR-V version number as either 'major.minor' or 'spirv_major_minor' (eg for SPIR-V 1.2, '1.2' or 'spirv_1_2')")
+DIAGNOSTIC(20012, Error, invalidSPIRVVersion, "Expecting SPIR-V version as either 'major.minor' or \"target-name\" (eg for SPIR-V 1.2, '1.2' or \"spv1.2\"')")
+DIAGNOSTIC(20013, Warning, unrecognizedSPIRVVersion, "Unrecognized SPIR-V target version"); 
 
 //
 // 3xxxx - Semantic analysis

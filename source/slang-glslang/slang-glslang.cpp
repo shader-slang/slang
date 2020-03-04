@@ -206,83 +206,61 @@ static glslang::EShTargetLanguageVersion _makeTargetLanguageVersion(int majorVer
     return glslang::EShTargetLanguageVersion((uint32_t(majorVersion) << 16) | (uint32_t(minorVersion) << 8));
 }
 
-namespace { // anonymous
-
-
-struct SPIRVTargetFlag
+static glsl_SPIRVVersion _toSPIRVVersion(glslang::EShTargetLanguageVersion version)
 {
-    typedef uint32_t IntegerType;
-    enum Enum : IntegerType
-    {
-        Universal = 0x1
-    };
-};
-typedef SPIRVTargetFlag::IntegerType SPIRVTargetFlags;
+    glsl_SPIRVVersion ver;
+
+    ver.misc = 0;
+    ver.patch = 0;
+
+    ver.major = uint8_t(uint32_t(version) >> 16);
+    ver.minor = uint8_t(uint32_t(version) >> 8);
+
+    return ver;
+}
+
+// For working out the targets based on SPIR-V target strings
+
+namespace { // anonymous
 
 struct SPRIVTargetInfo
 {
     const char* name;
     spv_target_env targetEnv;
-    glslang::EShTargetLanguageVersion targetLanguage;
-    SPIRVTargetFlags flags;
-};
-
-struct SPIRVTargetPair
-{
-    bool isValid = false;
-    spv_target_env targetEnv = SPV_ENV_UNIVERSAL_1_0;
-    glslang::EShTargetLanguageVersion targetLanguage = glslang::EShTargetLanguageVersion(0);
 };
 
 } // anonymous
 
 static const SPRIVTargetInfo kSpirvTargetInfos[] =
 {
-    {"1.0",         SPV_ENV_UNIVERSAL_1_0,              glslang::EShTargetSpv_1_0               , SPIRVTargetFlag::Universal},
-    {"vk1.0",       SPV_ENV_VULKAN_1_0,                 glslang::EShTargetLanguageVersion(0)    , 0 },
-    {"1.1",         SPV_ENV_UNIVERSAL_1_1,              glslang::EShTargetSpv_1_1               , SPIRVTargetFlag::Universal},
-    {"cl2.1",       SPV_ENV_OPENCL_2_1,                 glslang::EShTargetLanguageVersion(0)    , 0 },
-    {"cl2.2",       SPV_ENV_OPENCL_2_2,                 glslang::EShTargetLanguageVersion(0)    , 0},
-    {"gl4.0",       SPV_ENV_OPENGL_4_0,                 glslang::EShTargetLanguageVersion(0)    , 0},
-    {"gl4.1",       SPV_ENV_OPENGL_4_1,                 glslang::EShTargetLanguageVersion(0)    , 0},
-    {"gl4.2",       SPV_ENV_OPENGL_4_2,                 glslang::EShTargetLanguageVersion(0)    , 0},
-    {"gl4.3",       SPV_ENV_OPENGL_4_3,                 glslang::EShTargetLanguageVersion(0)    , 0},
-    {"gl4.5",       SPV_ENV_OPENGL_4_5,                 glslang::EShTargetLanguageVersion(0)    , 0},
-    {"1.2",         SPV_ENV_UNIVERSAL_1_2,              glslang::EShTargetSpv_1_2               , SPIRVTargetFlag::Universal },
-    {"cl1.2",       SPV_ENV_OPENCL_1_2,                 glslang::EShTargetLanguageVersion(0)    , 0 },
-    {"cl_emb1.2",   SPV_ENV_OPENCL_EMBEDDED_1_2,        glslang::EShTargetLanguageVersion(0)    , 0 },
-    {"cl2.0",       SPV_ENV_OPENCL_2_0,                 glslang::EShTargetLanguageVersion(0)    , 0 },
-    {"cl_emb2.0",   SPV_ENV_OPENCL_EMBEDDED_2_0,        glslang::EShTargetLanguageVersion(0)    , 0 },
-    {"cl_emb2.1",   SPV_ENV_OPENCL_EMBEDDED_2_1,        glslang::EShTargetLanguageVersion(0)    , 0 },
-    {"cl_emb2.2",   SPV_ENV_OPENCL_EMBEDDED_2_2,        glslang::EShTargetLanguageVersion(0)    , 0},
-    {"1.3",         SPV_ENV_UNIVERSAL_1_3,              glslang::EShTargetSpv_1_3               , SPIRVTargetFlag::Universal},
-    {"vk1.1",       SPV_ENV_VULKAN_1_1,                 glslang::EShTargetLanguageVersion(0)    , 0},
-    {"web_gpu1.0",  SPV_ENV_WEBGPU_0,                   glslang::EShTargetLanguageVersion(0)    , 0 },
-    {"1.4",         SPV_ENV_UNIVERSAL_1_4,              glslang::EShTargetSpv_1_4               , SPIRVTargetFlag::Universal},
-    {"vk1.1_spirv1.4", SPV_ENV_VULKAN_1_1_SPIRV_1_4,    glslang::EShTargetSpv_1_4               , 0 },
-    {"1.5",         SPV_ENV_UNIVERSAL_1_5,              _makeTargetLanguageVersion(1, 5)        , SPIRVTargetFlag::Universal },
+    {"1.0",         SPV_ENV_UNIVERSAL_1_0},
+    {"vk1.0",       SPV_ENV_VULKAN_1_0},
+    {"1.1",         SPV_ENV_UNIVERSAL_1_1}, 
+    {"cl2.1",       SPV_ENV_OPENCL_2_1},
+    {"cl2.2",       SPV_ENV_OPENCL_2_2}, 
+    {"gl4.0",       SPV_ENV_OPENGL_4_0},
+    {"gl4.1",       SPV_ENV_OPENGL_4_1},
+    {"gl4.2",       SPV_ENV_OPENGL_4_2},
+    {"gl4.3",       SPV_ENV_OPENGL_4_3},
+    {"gl4.5",       SPV_ENV_OPENGL_4_5},
+    {"1.2",         SPV_ENV_UNIVERSAL_1_2}, 
+    {"cl1.2",       SPV_ENV_OPENCL_1_2}, 
+    {"cl_emb1.2",   SPV_ENV_OPENCL_EMBEDDED_1_2},
+    {"cl2.0",       SPV_ENV_OPENCL_2_0},
+    {"cl_emb2.0",   SPV_ENV_OPENCL_EMBEDDED_2_0},
+    {"cl_emb2.1",   SPV_ENV_OPENCL_EMBEDDED_2_1},
+    {"cl_emb2.2",   SPV_ENV_OPENCL_EMBEDDED_2_2},
+    {"1.3",         SPV_ENV_UNIVERSAL_1_3},
+    {"vk1.1",       SPV_ENV_VULKAN_1_1},
+    {"web_gpu1.0",  SPV_ENV_WEBGPU_0},
+    {"1.4",         SPV_ENV_UNIVERSAL_1_4},
+    {"vk1.1_spirv1.4", SPV_ENV_VULKAN_1_1_SPIRV_1_4},
+    {"1.5",         SPV_ENV_UNIVERSAL_1_5},             
 };
-
-static bool _isPrefix(const char* text, const char* prefix)
-{
-    while (*text == *prefix && *text && *prefix )
-    {
-        text++;
-        prefix++;
-    }
-    return *prefix == 0;
-}
 
 static int _findTargetIndex(const char* name)
 {
-    // Remove spirv prefix 
-    if (_isPrefix(name, "spirv"))
-    {
-        name += 5;
-    }
-
     const int count = int(sizeof(kSpirvTargetInfos) / sizeof(kSpirvTargetInfos[0]));
-
     for (int i = 0; i < count; ++i)
     {
         const SPRIVTargetInfo& info = kSpirvTargetInfos[i];
@@ -295,38 +273,31 @@ static int _findTargetIndex(const char* name)
     return -1;
 }
 
-static int _combine(const char* name, SPIRVTargetPair& ioPair)
+static spv_target_env _getUniversalTargetEnv(glslang::EShTargetLanguageVersion inVersion)
 {
-    int index = _findTargetIndex(name);
-    if (index < 0)
-    {
-        return index;
-    }
-    const SPRIVTargetInfo& info = kSpirvTargetInfos[index];
+    glsl_SPIRVVersion spirvVersion = _toSPIRVVersion(inVersion);
+    uint32_t ver = (uint32_t(spirvVersion.major) << 8) | spirvVersion.minor;
 
-    if (ioPair.isValid == false)
+    switch (ver)
     {
-        ioPair.isValid = true;
-        ioPair.targetEnv = info.targetEnv;
-        ioPair.targetLanguage = info.targetLanguage;
-        
-    }
-    else
-    {
-        if (info.targetLanguage > ioPair.targetLanguage)
-        {
-            // If it's more advanced SPIR-V features, just go with that
-            ioPair.targetLanguage = info.targetLanguage;
-            ioPair.targetEnv = info.targetEnv;
-        }
-        else
-        {
-            // Okay just set the target env... 
-            ioPair.targetEnv = info.targetEnv;
+        case 0x100:     return SPV_ENV_UNIVERSAL_1_0;
+        case 0x101:     return SPV_ENV_UNIVERSAL_1_1;
+        case 0x102:     return SPV_ENV_UNIVERSAL_1_2;
+        case 0x103:     return SPV_ENV_UNIVERSAL_1_3;
+        case 0x104:     return SPV_ENV_UNIVERSAL_1_4;
+        case 0x105:     return SPV_ENV_UNIVERSAL_1_5;
+        default:
+        {            
+            if (ver > 0x105)
+            {
+                // This is the highest we known for now..., so try that
+                return SPV_ENV_UNIVERSAL_1_5;
+            }
+            break;
         }
     }
-
-    return index;
+    // Just use the default...
+    return SPV_ENV_UNIVERSAL_1_2;
 }
 
 static int glslang_compileGLSLToSPIRV(glslang_CompileRequest* request)
@@ -359,22 +330,35 @@ static int glslang_compileGLSLToSPIRV(glslang_CompileRequest* request)
         return 1;
     }
 
-    SPIRVTargetPair pair;
-    for (int i = 0; i < request->spirvVersionsCount; ++i)
+
+    spv_target_env targetEnv = SPV_ENV_UNIVERSAL_1_2;
+    glslang::EShTargetLanguageVersion targetLanguage = glslang::EShTargetLanguageVersion(0);
+
+    int spirvTargetIndex = -1;
+    if (request->spirvTargetName)
     {
-        if (_combine(request->spirvVersions[i], pair) < 0)
+        spirvTargetIndex = _findTargetIndex(request->spirvTargetName);
+        if (spirvTargetIndex < 0)
         {
-            dumpDiagnostics(request, "unknown universal SPIR-V version\n");
-            return 1;
+            dumpDiagnostics(request, "warning: unknown SPIR-V version\n");
+        }
+        else
+        {
+            targetEnv = kSpirvTargetInfos[spirvTargetIndex].targetEnv;
         }
     }
 
-    // If not set, use the defaults, compatible with previous version
-    if (!pair.isValid)
+    // If a version is specified, and no target language is specified, set to universal version of that SPIR-V version
+    if (request->spirvVersion.major != 0 && targetLanguage == glslang::EShTargetLanguageVersion(0))
     {
-        pair.isValid = true;
-        pair.targetEnv = SPV_ENV_UNIVERSAL_1_2;
-        pair.targetLanguage = glslang::EShTargetLanguageVersion(0);
+        targetLanguage = _makeTargetLanguageVersion(request->spirvVersion.major, request->spirvVersion.minor);
+    }
+
+    // If we don't have a target, but do have a language, use that to determine a universal target
+    if (spirvTargetIndex < 0 && targetLanguage != glslang::EShTargetLanguageVersion(0))
+    {
+        // We can just use the appropriate universal based on the target language
+        targetEnv = _getUniversalTargetEnv(targetLanguage);
     }
     
     // TODO: compute glslang stage to use
@@ -383,9 +367,9 @@ static int glslang_compileGLSLToSPIRV(glslang_CompileRequest* request)
     auto shaderPtr = std::unique_ptr<glslang::TShader>(shader);
 
     // Only set the target language if one is determined
-    if (pair.targetLanguage != glslang::EShTargetLanguageVersion(0))
+    if (targetLanguage != glslang::EShTargetLanguageVersion(0))
     {
-        shader->setEnvTarget(glslang::EShTargetSpv, pair.targetLanguage);
+        shader->setEnvTarget(glslang::EShTargetSpv, targetLanguage);
     }
 
     glslang::TProgram* program = new glslang::TProgram();
@@ -439,7 +423,7 @@ static int glslang_compileGLSLToSPIRV(glslang_CompileRequest* request)
 
         if (request->optimizationLevel != SLANG_OPTIMIZATION_LEVEL_NONE)
         {
-            glslang_optimizeSPIRV(spirv, pair.targetEnv, request->optimizationLevel, request->debugInfoType);
+            glslang_optimizeSPIRV(spirv, targetEnv, request->optimizationLevel, request->debugInfoType);
         }
 
         dumpDiagnostics(request, logger.getAllMessages());

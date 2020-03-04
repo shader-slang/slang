@@ -1470,17 +1470,15 @@ SlangResult dissassembleDXILUsingDXC(
         request.inputBegin  = rawGLSL.begin();
         request.inputEnd    = rawGLSL.end();
 
-        List<const char*> spirvVersions;
         if (GLSLExtensionTracker* tracker = as<GLSLExtensionTracker>(source.extensionTracker.Ptr()))
         {
-            for (const auto& spirvVersion : tracker->getSPIRVVersions())
-            {
-                spirvVersions.add(spirvVersion.begin());
-            }
-        }
+            request.spirvTargetName = tracker->getSPIRVTargetName();
+            auto spirvLanguageVersion = tracker->getSPIRVVersion();
 
-        request.spirvVersions = spirvVersions.getBuffer();
-        request.spirvVersionsCount = int(spirvVersions.getCount());
+            request.spirvVersion.major = spirvLanguageVersion.major;
+            request.spirvVersion.minor = spirvLanguageVersion.minor;
+            request.spirvVersion.patch = spirvLanguageVersion.patch;
+        }
 
         request.outputFunc = outputFunc;
         request.outputUserData = &spirvOut;

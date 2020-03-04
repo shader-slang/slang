@@ -72,7 +72,6 @@ bool StringSlicePool::findOrAdd(const Slice& slice, Handle& outHandle)
     // Need to add
     UnownedStringSlice scopeSlice(m_arena.allocateString(slice.begin(), slice.getLength()), slice.getLength());
     m_slices.add(scopeSlice);
-    m_map.Add(scopeSlice, newHandle);
     outHandle = newHandle;
     return false;
 }

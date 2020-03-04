@@ -13,6 +13,69 @@ void GLSLExtensionTracker::appendExtensionRequireLines(StringBuilder& ioBuilder)
     }
 }
 
+void GLSLExtensionTracker::requireSPIRVVersion(const UnownedStringSlice& inVersion)
+{
+    StringSlicePool::Handle handle;
+    if (m_spirvVersionPool.findOrAdd(inVersion, handle))
+    {
+        // If we already have it, then we are done
+        return;
+    }
+    // We want the version that will stay in scope
+    const UnownedStringSlice version = m_spirvVersionPool.getSlice(handle);
+    SPIRVTargetInfo info;
+    if (SLANG_FAILED(SPIRVTargetInfo::find(version, info)))
+    {
+        // Couldn't determine how to use
+        SLANG_ASSERT(!"Unknown SPIR-V target name");
+        return;
+    }
+    
+    const Index intLanguageVersion = info.version.toInteger();
+    const Index currentIntLanguageVersion = m_spirvVersion.toInteger();
+
+    if (intLanguageVersion > currentIntLanguageVersion)
+    {
+        // Set the language version
+        m_spirvVersion = info.version;
+
+        // The universal target is higher, assume it subsumes the lower versioned more specific target.
+        // If there is no target just use this one
+        if ((info.flags & SPIRVTargetFlag::Universal) || m_spirvTarget == nullptr)
+        {
+            // NOTE! We know this is null terminated and won't go out of scope because is in the pool
+            m_spirvTarget = version.begin();
+        }
+    }
+    else if (intLanguageVersion == currentIntLanguageVersion)
+    {
+        if (m_spirvTarget)
+        {
+            // If target is set, see if we should replace it. If it's the same, we are done
+            if (version != UnownedStringSlice(m_spirvTarget))
+            {
+                // If the new target is *not* universal (ie is a more specific target) 
+                if ((info.flags & SPIRVTargetFlag::Universal) == 0)
+                {
+                    // And the current target is universal.. 
+                    SPIRVTargetInfo currentInfo;
+                    if (SLANG_SUCCEEDED(SPIRVTargetInfo::find(UnownedStringSlice(m_spirvTarget), currentInfo)) &&
+                        (currentInfo.flags & SPIRVTargetFlag::Universal))
+                    {
+                        // Then we can use the new one, as it's the same version, but more specific.
+                        m_spirvTarget = version.begin();
+                    }
+                }
+            }
+        }
+        else
+        {
+            // If no target is set, we can just set it
+            m_spirvTarget = version.begin();
+        }
+    }
+}
+
 void GLSLExtensionTracker::requireVersion(ProfileVersion version)
 {
     // Check if this profile is newer
@@ -52,6 +115,5 @@ void GLSLExtensionTracker::requireBaseTypeExtension(BaseType baseType)
 
     m_hasBaseTypeFlags |= bit;
 }
-
 
 } // namespace Slang

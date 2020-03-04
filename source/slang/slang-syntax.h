@@ -8,6 +8,9 @@
 #include "slang-type-system-shared.h"
 #include "../../slang.h"
 
+// Needed for RequiredSPIRVVersionModifier
+#include "slang-spirv-target-info.h"
+
 #include "slang-name.h"
 
 #include <assert.h>

@@ -12,6 +12,12 @@ enum
     GLSLANG_ACTION_DISSASSEMBLE_SPIRV,
 };
 
+struct glsl_SPIRVVersion
+{
+    unsigned char major, minor, patch;
+    unsigned char misc;                     ///< Set to 0 if not used
+};
+
 struct glslang_CompileRequest
 {
     size_t              sizeInBytes;            ///< Size in bytes of this structure
@@ -34,14 +40,8 @@ struct glslang_CompileRequest
     unsigned            optimizationLevel;
     unsigned            debugInfoType;
 
-        /// Can be nullptr if not defined, else a string that identifies the spirvVersion 
-        /// Values can be of the form major.minor as in "1.3" for SPIR-V
-        /// Passed this way to allow for future availability of SPIR-V target types without
-        /// breaking binary compatibility. 
-    const char*const*   spirvVersions;
-        /// Count of amount of spirv versions specified
-    int spirvVersionsCount; 
-
+    const char*         spirvTargetName;            /// A valid TargetName. If null will use universal based on the spirVersion.
+    glsl_SPIRVVersion   spirvVersion;               ///< The SPIR-V version. If all are 0 will use the default which is 1.2 currently
 };
 
 typedef int (*glslang_CompileFunc)(glslang_CompileRequest* request);

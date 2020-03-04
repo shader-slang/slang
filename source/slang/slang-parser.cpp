@@ -7,6 +7,8 @@
 #include "slang-lookup.h"
 #include "slang-visitor.h"
 
+#include "slang-spirv-target-info.h"
+
 namespace Slang
 {
     // pre-declare
@@ -4755,28 +4757,17 @@ namespace Slang
         Token token = parser->ReadToken();
         parser->ReadToken(TokenType::RParent);
 
+        UnownedStringSlice content = token.Content;
+
         // We allow specified as major.minor or as a string (in quotes)
         switch (token.type)
         {
-            case TokenType::FloatingPointLiteral:
-            {
-                List<UnownedStringSlice> split;
-                StringUtil::split(token.Content, '.', split);
-                if (split.getCount() != 2)
-                {
-                    parser->sink->diagnose(token, Diagnostics::invalidSPIRVVersion);
-                    return RefPtr<RefObject>();
-                }
-                modifier->versionName = token.Content;
-                break;
-            }
+            case TokenType::FloatingPointLiteral:  break;
             case TokenType::StringLiteral:
             {
                 // We need to trim quotes if needed
-                UnownedStringSlice slice = token.Content;
-                SLANG_ASSERT(slice.getLength() >= 2 && slice[0] == '"' && slice[slice.getLength() -1] == '"');
-                // Trim the quotes
-                modifier->versionName = UnownedStringSlice(slice.begin() + 1, slice.end() - 1);
+                SLANG_ASSERT(content.getLength() >= 2 && content[0] == '"' && slice[content.getLength() -1] == '"');
+                content = UnownedStringSlice(content.begin() + 1, content.end() - 1);
                 break;
             }
             default:
@@ -4785,7 +4776,18 @@ namespace Slang
                 return RefPtr<RefObject>();
             }
         }
-        
+
+        // This is a little convoluted - content is always in global scope, or is just part of the input
+        // source. That is why it can be stored without any additional allocation.
+        SPIRVTargetInfo info;
+        if (SLANG_FAILED(SPIRVTargetInfo::find(content, info)))
+        {
+            // Output a warning... but allow, glslang might know what to do with it
+            parser->sink->diagnose(token, Diagnostics::unrecognizedSPIRVVersion);
+        }
+
+        // Save the versionName. 
+        modifier->versionName = content;
         return modifier;
     }
 
