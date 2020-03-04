@@ -4766,7 +4766,7 @@ namespace Slang
             case TokenType::StringLiteral:
             {
                 // We need to trim quotes if needed
-                SLANG_ASSERT(content.getLength() >= 2 && content[0] == '"' && slice[content.getLength() -1] == '"');
+                SLANG_ASSERT(content.getLength() >= 2 && content[0] == '"' && content[content.getLength() -1] == '"');
                 content = UnownedStringSlice(content.begin() + 1, content.end() - 1);
                 break;
             }

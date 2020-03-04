@@ -22,7 +22,7 @@ void GLSLExtensionTracker::requireSPIRVVersion(const UnownedStringSlice& inVersi
         return;
     }
     // We want the version that will stay in scope
-    const UnownedStringSlice version = m_spirvVersionPool.getSlice(handle);
+    UnownedStringSlice version = m_spirvVersionPool.getSlice(handle);
     SPIRVTargetInfo info;
     if (SLANG_FAILED(SPIRVTargetInfo::find(version, info)))
     {
@@ -30,7 +30,13 @@ void GLSLExtensionTracker::requireSPIRVVersion(const UnownedStringSlice& inVersi
         SLANG_ASSERT(!"Unknown SPIR-V target name");
         return;
     }
-    
+
+    // We want to test that it's contained, and that it ends at the end of version (so we have 0 termination)
+    SLANG_ASSERT(version.isMemoryContained(info.targetName) && version.end() == info.targetName.end());
+
+    // Looked up version. We know it's a substring, that's 0
+    version = info.targetName;
+
     const Index intLanguageVersion = info.version.toInteger();
     const Index currentIntLanguageVersion = m_spirvVersion.toInteger();
 
