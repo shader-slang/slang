@@ -533,13 +533,15 @@ int glslang_compile_1_1(glslang_CompileRequest_1_1* inRequest)
         return 1;
     }
 
-    // If the size is right, just use it
+    // If it's the right size just use it
     if (inRequest->sizeInBytes == sizeof(glslang_CompileRequest_1_1))
     {
         return _compile(*inRequest);
     }
     else
     {
+        // NOTE! It could be larger, but here we'll assume thats ok, and copy and use.
+
         // Try to ensure some binary compatibility, by using sizeInBytes member, and copying
 
         glslang_CompileRequest_1_1 request;
