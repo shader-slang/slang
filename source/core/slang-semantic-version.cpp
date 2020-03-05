@@ -12,8 +12,9 @@ SlangResult SemanticVersion::parse(const UnownedStringSlice& value, SemanticVers
     outVersion.reset();
 
     UnownedStringSlice slices[3];
-    const Index splitCount = StringUtil::split(value, '.', 3, slices);
-    if (!(splitCount > 0 && splitCount <= 3 && slices[splitCount - 1].end() == value.end()))
+    Index splitCount;
+    SLANG_RETURN_ON_FAIL(StringUtil::split(value, '.', 3, slices, splitCount));
+    if (!(splitCount > 0 && splitCount <= 3))
     {
         return SLANG_FAIL;
     }

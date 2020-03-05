@@ -56,6 +56,21 @@ namespace Slang {
     return index;
 }
 
+/* static */SlangResult StringUtil::split(const UnownedStringSlice& in, char splitChar, Index maxSlices, UnownedStringSlice* outSlices, Index& outSlicesCount)
+{
+    const Index sliceCount = split(in, splitChar, maxSlices, outSlices);
+    if (sliceCount == maxSlices && sliceCount > 0)
+    {
+        // To succeed must have parsed all of the input
+        if (in.end() != outSlices[sliceCount - 1].end())
+        {
+            return SLANG_FAIL;
+        }
+    }
+    outSlicesCount = sliceCount;
+    return SLANG_OK;
+}
+
 /* static */void StringUtil::join(const List<String>& values, char separator, StringBuilder& out)
 {
     join(values, UnownedStringSlice(&separator, 1), out);

@@ -17,8 +17,10 @@ struct StringUtil
         /// Slices contents will directly address into in, so contents will only stay valid as long as in does.
     static void split(const UnownedStringSlice& in, char splitChar, List<UnownedStringSlice>& slicesOut);
 
-        /// Splits in into outSlices, up to maxSlices
+        /// Splits in into outSlices, up to maxSlices. May not consume all of in (for example if it runs out of space).
     static Index split(const UnownedStringSlice& in, char splitChar, Index maxSlices, UnownedStringSlice* outSlices);
+        /// Splits into outSlices up to maxSlices. Returns SLANG_OK if of 'in' consumed.
+    static SlangResult split(const UnownedStringSlice& in, char splitChar, Index maxSlices, UnownedStringSlice* outSlices, Index& outSlicesCount);
 
         /// Append the joining of in items, separated by 'separator' onto out
     static void join(const List<String>& in, char separator, StringBuilder& out);
