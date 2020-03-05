@@ -183,10 +183,10 @@ struct IRRequireSPIRVVersionDecoration : IRDecoration
     enum { kOp = kIROp_RequireSPIRVVersionDecoration };
     IR_LEAF_ISA(RequireGLSLVersionDecoration)
 
-    IRStringLit* getSPIRVVersionOperand() { return cast<IRStringLit>(getOperand(0)); }
-    UnownedStringSlice getSPIRVVersion()
+    IRConstant* getSPIRVVersionOperand() { return cast<IRConstant>(getOperand(0)); }
+    IntegerLiteralValue getSPIRVVersion()
     {
-        return getSPIRVVersionOperand()->getStringSlice();
+        return getSPIRVVersionOperand()->value.intVal;
     }
 };
 
@@ -2122,9 +2122,10 @@ struct IRBuilder
         addDecoration(value, kIROp_RequireGLSLVersionDecoration, getIntValue(getIntType(), IRIntegerValue(version)));
     }
 
-    void addRequireSPIRVVersionDecoration(IRInst* value, const UnownedStringSlice& versionName)
+    void addRequireSPIRVVersionDecoration(IRInst* value, const SemanticVersion& version)
     {
-        addDecoration(value, kIROp_RequireSPIRVVersionDecoration, getStringValue(versionName));
+        SemanticVersion::IntegerType intValue = version.toInteger();
+        addDecoration(value, kIROp_RequireSPIRVVersionDecoration, getIntValue(getBasicType(BaseType::UInt64), intValue));
     }
 
     void addPatchConstantFuncDecoration(IRInst* value, IRInst* patchConstantFunc)

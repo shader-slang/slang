@@ -14,8 +14,7 @@ enum
 
 struct glsl_SPIRVVersion
 {
-    unsigned char major, minor, patch;
-    unsigned char misc;                     ///< Set to 0 if not used
+    int major, minor, patch;
 };
 
 struct glslang_CompileRequest_1_0

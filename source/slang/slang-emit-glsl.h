@@ -63,7 +63,7 @@ protected:
 
     void _requireGLSLVersion(ProfileVersion version);
     void _requireGLSLVersion(int version);
-    void _requireSPIRVVersion(const UnownedStringSlice& versionName);
+    void _requireSPIRVVersion(const SemanticVersion& version);
 
         // Emit the `flat` qualifier if the underlying type
         // of the variable is an integer type.

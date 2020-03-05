@@ -7,7 +7,7 @@
 #include "slang-lookup.h"
 #include "slang-visitor.h"
 
-#include "slang-spirv-target-info.h"
+#include "../core/slang-semantic-version.h"
 
 namespace Slang
 {
@@ -4776,18 +4776,14 @@ namespace Slang
                 return RefPtr<RefObject>();
             }
         }
-
-        // This is a little convoluted - content is always in global scope, or is just part of the input
-        // source. That is why it can be stored without any additional allocation.
-        SPIRVTargetInfo info;
-        if (SLANG_FAILED(SPIRVTargetInfo::find(content, info)))
+        
+        SemanticVersion version;
+        if (SLANG_FAILED(SemanticVersion::parse(content, modifier->version)))
         {
             // Output a warning... but allow, glslang might know what to do with it
-            parser->sink->diagnose(token, Diagnostics::unrecognizedSPIRVVersion);
+            parser->sink->diagnose(token, Diagnostics::invalidSPIRVVersion);
         }
 
-        // Save the versionName. 
-        modifier->versionName = content;
         return modifier;
     }
 

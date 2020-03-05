@@ -25,9 +25,9 @@ void GLSLSourceEmitter::_requireGLSLVersion(ProfileVersion version)
     m_glslExtensionTracker->requireVersion(version);
 }
 
-void GLSLSourceEmitter::_requireSPIRVVersion(const UnownedStringSlice& versionName)
+void GLSLSourceEmitter::_requireSPIRVVersion(const SemanticVersion& version)
 {
-    m_glslExtensionTracker->requireSPIRVVersion(versionName);
+    m_glslExtensionTracker->requireSPIRVVersion(version);
 }
 
 void GLSLSourceEmitter::_requireGLSLVersion(int version)
@@ -1343,7 +1343,10 @@ void GLSLSourceEmitter::handleCallExprDecorationsImpl(IRInst* funcValue)
             }
             case kIROp_RequireSPIRVVersionDecoration:
             {
-                _requireSPIRVVersion(static_cast<IRRequireSPIRVVersionDecoration*>(decoration)->getSPIRVVersion());
+                auto intValue = static_cast<IRRequireSPIRVVersionDecoration*>(decoration)->getSPIRVVersion();
+                SemanticVersion version;
+                version.setFromInteger(SemanticVersion::IntegerType(intValue));
+                _requireSPIRVVersion(version);
                 break;
             }
 

@@ -210,13 +210,9 @@ static glslang::EShTargetLanguageVersion _makeTargetLanguageVersion(int majorVer
 static glsl_SPIRVVersion _toSPIRVVersion(glslang::EShTargetLanguageVersion version)
 {
     glsl_SPIRVVersion ver;
-
-    ver.misc = 0;
     ver.patch = 0;
-
     ver.major = uint8_t(uint32_t(version) >> 16);
     ver.minor = uint8_t(uint32_t(version) >> 8);
-
     return ver;
 }
 

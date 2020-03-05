@@ -8,8 +8,7 @@
 #include "slang-type-system-shared.h"
 #include "../../slang.h"
 
-// Needed for RequiredSPIRVVersionModifier
-#include "slang-spirv-target-info.h"
+#include "../core/slang-semantic-version.h"
 
 #include "slang-name.h"
 

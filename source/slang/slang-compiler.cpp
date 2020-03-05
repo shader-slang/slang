@@ -1492,7 +1492,7 @@ SlangResult dissassembleDXILUsingDXC(
 
         if (GLSLExtensionTracker* tracker = as<GLSLExtensionTracker>(source.extensionTracker.Ptr()))
         {
-            request.spirvTargetName = tracker->getSPIRVTargetName();
+            request.spirvTargetName = nullptr;
             auto spirvLanguageVersion = tracker->getSPIRVVersion();
 
             request.spirvVersion.major = spirvLanguageVersion.m_major;

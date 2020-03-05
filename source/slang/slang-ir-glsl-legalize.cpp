@@ -188,9 +188,9 @@ struct GLSLLegalizationContext
         glslExtensionTracker->requireExtension(name);
     }
 
-    void requireSPIRVVersion(const UnownedStringSlice& versionName)
+    void requireSPIRVVersion(const SemanticVersion& version)
     {
-        glslExtensionTracker->requireSPIRVVersion(versionName);
+        glslExtensionTracker->requireSPIRVVersion(version);
     }
 
     void requireGLSLVersion(ProfileVersion version)
