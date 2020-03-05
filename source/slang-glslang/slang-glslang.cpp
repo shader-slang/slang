@@ -86,8 +86,7 @@ static void dumpDiagnostics(
     const glslang_CompileRequest_1_1& request,
     std::string const&      log)
 {
-    const auto& request_1_0 = request.request_1_0;
-    dump(log.c_str(), log.length(), request_1_0.diagnosticFunc, request_1_0.diagnosticUserData, stderr);
+    dump(log.c_str(), log.length(), request.diagnosticFunc, request.diagnosticUserData, stderr);
 }
 
 // Apply the SPIRV-Tools optimizer to generated SPIR-V based on the desired optimization level
@@ -302,10 +301,8 @@ static int glslang_compileGLSLToSPIRV(const glslang_CompileRequest_1_1& request)
     // Check that the encoding matches
     assert(glslang::EShTargetSpv_1_4 == _makeTargetLanguageVersion(1, 4));
 
-    const auto& request_1_0 = request.request_1_0;
-
     EShLanguage glslangStage;
-    switch( request_1_0.slangStage )
+    switch( request.slangStage )
     {
 #define CASE(SP, GL) case SLANG_STAGE_##SP: glslangStage = EShLang##GL; break
     CASE(VERTEX,    Vertex);
@@ -374,8 +371,8 @@ static int glslang_compileGLSLToSPIRV(const glslang_CompileRequest_1_1& request)
     glslang::TProgram* program = new glslang::TProgram();
     auto programPtr = std::unique_ptr<glslang::TProgram>(program);
 
-    char const* sourceText = (char const*)request_1_0.inputBegin;
-    char const* sourceTextEnd = (char const*)request_1_0.inputEnd;
+    char const* sourceText = (char const*)request.inputBegin;
+    char const* sourceTextEnd = (char const*)request.inputEnd;
 
     int sourceTextLength = (int)(sourceTextEnd - sourceText);
 
@@ -384,7 +381,7 @@ static int glslang_compileGLSLToSPIRV(const glslang_CompileRequest_1_1& request)
     shader->setStringsWithLengthsAndNames(
         &sourceText,
         &sourceTextLength,
-        &request_1_0.sourcePath,
+        &request.sourcePath,
         1);
 
     EShMessages messages = EShMessages(EShMsgSpvRules | EShMsgVulkanRules);
@@ -420,14 +417,14 @@ static int glslang_compileGLSLToSPIRV(const glslang_CompileRequest_1_1& request)
         spv::SpvBuildLogger logger;
         glslang::GlslangToSpv(*stageIntermediate, spirv, &logger);
 
-        if (request_1_0.optimizationLevel != SLANG_OPTIMIZATION_LEVEL_NONE)
+        if (request.optimizationLevel != SLANG_OPTIMIZATION_LEVEL_NONE)
         {
-            glslang_optimizeSPIRV(spirv, targetEnv, request_1_0.optimizationLevel, request_1_0.debugInfoType);
+            glslang_optimizeSPIRV(spirv, targetEnv, request.optimizationLevel, request.debugInfoType);
         }
 
         dumpDiagnostics(request, logger.getAllMessages());
 
-        dump(spirv.data(), spirv.size() * sizeof(unsigned int), request_1_0.outputFunc, request_1_0.outputUserData, stdout);
+        dump(spirv.data(), spirv.size() * sizeof(unsigned int), request.outputFunc, request.outputUserData, stdout);
     }
 
     return 0;
@@ -437,17 +434,15 @@ static int glslang_dissassembleSPIRV(const glslang_CompileRequest_1_1& request)
 {
     typedef unsigned int SPIRVWord;
 
-    auto& request_1_0 = request.request_1_0;
-
-    SPIRVWord const* spirvBegin = (SPIRVWord const*)request_1_0.inputBegin;
-    SPIRVWord const* spirvEnd   = (SPIRVWord const*)request_1_0.inputEnd;
+    SPIRVWord const* spirvBegin = (SPIRVWord const*)request.inputBegin;
+    SPIRVWord const* spirvEnd   = (SPIRVWord const*)request.inputEnd;
 
     std::vector<SPIRVWord> spirv(spirvBegin, spirvEnd);
 
     std::stringstream spirvAsmStream;
     spv::Disassemble(spirvAsmStream, spirv);
     std::string result = spirvAsmStream.str();
-    dump(result.c_str(), result.length(), request_1_0.outputFunc, request_1_0.outputUserData, stdout);
+    dump(result.c_str(), result.length(), request.outputFunc, request.outputUserData, stdout);
 
     return 0;
 }
@@ -491,7 +486,7 @@ public:
 static int _compile(const glslang_CompileRequest_1_1& request)
 {
     int result = 0;
-    switch (request.request_1_0.action)
+    switch (request.action)
     {
         default:
             result = 1;
@@ -563,6 +558,6 @@ int glslang_compile(glslang_CompileRequest_1_0* inRequest)
     glslang_CompileRequest_1_1 request;
     memset(&request, 0, sizeof(request));
     request.sizeInBytes = sizeof(request);
-    request.request_1_0 = *inRequest;
+    request.set(*inRequest);
     return glslang_compile_1_1(&request);
 }

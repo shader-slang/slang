@@ -17,8 +17,57 @@ struct glsl_SPIRVVersion
     int major, minor, patch;
 };
 
+#define SLANG_GLSLANG_COMPILE_REQUEST_1_0(x)  \
+    x(sourcePath) \
+    x(inputBegin) \
+    x(inputEnd) \
+    x(diagnosticFunc) \
+    x(diagnosticUserData) \
+    x(outputFunc) \
+    x(outputUserData) \
+    x(slangStage) \
+    x(action) \
+    x(optimizationLevel) \
+    x(debugInfoType)
+
+#define SLANG_GLSLANG_FIELD_COPY(name) name = in.name;
+
+// Pre-declare
+struct glslang_CompileRequest_1_1;
+
+// 1.0 version
 struct glslang_CompileRequest_1_0
 {
+    void set(const glslang_CompileRequest_1_1& in);
+
+    char const*         sourcePath;
+
+    void const*         inputBegin;
+    void const*         inputEnd;
+
+    glslang_OutputFunc  diagnosticFunc;
+    void*               diagnosticUserData;
+
+    glslang_OutputFunc  outputFunc;
+    void*               outputUserData;
+
+    int                 slangStage;
+
+    unsigned            action;
+
+    unsigned            optimizationLevel;
+    unsigned            debugInfoType;   
+};
+
+// 1.1 version
+struct glslang_CompileRequest_1_1
+{
+        /// Set from 1.0 
+    void set(const glslang_CompileRequest_1_0& in);
+
+    size_t              sizeInBytes;            ///< Size in bytes of this structure
+
+    // START! Embed the glslang_CompileRequest_1_0 fields
     char const*         sourcePath;
 
     void const*         inputBegin;
@@ -36,18 +85,21 @@ struct glslang_CompileRequest_1_0
 
     unsigned            optimizationLevel;
     unsigned            debugInfoType;
-};
-
-
-struct glslang_CompileRequest_1_1
-{
-    size_t              sizeInBytes;            ///< Size in bytes of this structure
-
-    glslang_CompileRequest_1_0 request_1_0;
+    // END! Embed the glslang_CompileRequest_1_0 fields
 
     const char*         spirvTargetName;            /// A valid TargetName. If null will use universal based on the spirVersion.
     glsl_SPIRVVersion   spirvVersion;               ///< The SPIR-V version. If all are 0 will use the default which is 1.2 currently
 };
+
+void glslang_CompileRequest_1_0::set(const glslang_CompileRequest_1_1& in)
+{
+    SLANG_GLSLANG_COMPILE_REQUEST_1_0(SLANG_GLSLANG_FIELD_COPY)
+}
+
+void glslang_CompileRequest_1_1::set(const glslang_CompileRequest_1_0& in)
+{
+    SLANG_GLSLANG_COMPILE_REQUEST_1_0(SLANG_GLSLANG_FIELD_COPY)
+}
 
 typedef int (*glslang_CompileFunc_1_0)(glslang_CompileRequest_1_0* request);
 typedef int (*glslang_CompileFunc_1_1)(glslang_CompileRequest_1_1* request);
