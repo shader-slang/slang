@@ -14,7 +14,7 @@ SlangResult SemanticVersion::parse(const UnownedStringSlice& value, SemanticVers
     UnownedStringSlice slices[3];
     Index splitCount;
     SLANG_RETURN_ON_FAIL(StringUtil::split(value, '.', 3, slices, splitCount));
-    if (!(splitCount > 0 && splitCount <= 3))
+    if (splitCount <= 0)
     {
         return SLANG_FAIL;
     }
@@ -24,7 +24,7 @@ SlangResult SemanticVersion::parse(const UnownedStringSlice& value, SemanticVers
     {
         SLANG_RETURN_ON_FAIL(StringUtil::parseInt(slices[i], ints[i]));
 
-        const Int max = (i == 0) ? 0xffffffff : 0xffff;
+        const Int max = (i == 0) ? 0x7fffffff : 0xffff;
         if (ints[i] < 0 || ints[i] > max)
         {
             return SLANG_FAIL;

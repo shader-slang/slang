@@ -4758,11 +4758,13 @@ namespace Slang
         parser->ReadToken(TokenType::RParent);
 
         UnownedStringSlice content = token.Content;
-
         // We allow specified as major.minor or as a string (in quotes)
         switch (token.type)
         {
-            case TokenType::FloatingPointLiteral:  break;
+            case TokenType::FloatingPointLiteral:
+            {
+                break;
+            }
             case TokenType::StringLiteral:
             {
                 // We need to trim quotes if needed
