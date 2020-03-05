@@ -4780,8 +4780,9 @@ namespace Slang
         SemanticVersion version;
         if (SLANG_FAILED(SemanticVersion::parse(content, modifier->version)))
         {
-            // Output a warning... but allow, glslang might know what to do with it
+            // Unable to parse the error so fail
             parser->sink->diagnose(token, Diagnostics::invalidSPIRVVersion);
+            return RefPtr<RefObject>();
         }
 
         return modifier;
