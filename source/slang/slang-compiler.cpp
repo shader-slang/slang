@@ -21,7 +21,7 @@
 #include "slang-reflection.h"
 #include "slang-emit.h"
 
-#include "slang-emit-glsl-extension-tracker.h"
+#include "slang-glsl-extension-tracker.h"
 
 #include "slang-ir-serialize.h"
 

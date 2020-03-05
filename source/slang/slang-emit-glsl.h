@@ -4,6 +4,8 @@
 
 #include "slang-emit-c-like.h"
 
+#include "slang-glsl-extension-tracker.h"
+
 namespace Slang
 {
 

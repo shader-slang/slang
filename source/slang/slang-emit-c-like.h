@@ -6,7 +6,6 @@
 
 #include "slang-compiler.h"
 
-#include "slang-emit-glsl-extension-tracker.h"
 #include "slang-emit-precedence.h"
 #include "slang-emit-source-writer.h"
 

@@ -4,7 +4,7 @@
 #include "slang-ir.h"
 #include "slang-ir-insts.h"
 
-#include "slang-emit-glsl-extension-tracker.h"
+#include "slang-glsl-extension-tracker.h"
 
 namespace Slang
 {

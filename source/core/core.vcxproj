@@ -197,6 +197,7 @@
     <ClInclude Include="slang-render-api-util.h" />
     <ClInclude Include="slang-riff.h" />
     <ClInclude Include="slang-secure-crt.h" />
+    <ClInclude Include="slang-semantic-version.h" />
     <ClInclude Include="slang-shared-library.h" />
     <ClInclude Include="slang-smart-pointer.h" />
     <ClInclude Include="slang-std-writers.h" />
@@ -230,6 +231,7 @@
     <ClCompile Include="slang-random-generator.cpp" />
     <ClCompile Include="slang-render-api-util.cpp" />
     <ClCompile Include="slang-riff.cpp" />
+    <ClCompile Include="slang-semantic-version.cpp" />
     <ClCompile Include="slang-shared-library.cpp" />
     <ClCompile Include="slang-std-writers.cpp" />
     <ClCompile Include="slang-stream.cpp" />
