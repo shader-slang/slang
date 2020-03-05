@@ -59,7 +59,7 @@ struct glslang_CompileRequest_1_0
     unsigned            debugInfoType;   
 };
 
-// 1.1 version
+// 1.1 version  
 struct glslang_CompileRequest_1_1
 {
         /// Set from 1.0 
