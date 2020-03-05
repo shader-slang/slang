@@ -64,6 +64,9 @@ public:
         /// Add a string
     Handle add(const String& string) { return add(string.getUnownedSlice()); }
 
+        /// Returns true if found
+    bool findOrAdd(const Slice& slice, Handle& outHandle);
+
         /// Empty contents
     void clear();
 

@@ -12,6 +12,8 @@ namespace Slang
     class ProgramLayout;
     class TranslationUnitRequest;
 
+
+
         /// Emit source code for a single entry point.
         ///
         /// This function generates source code for the
@@ -34,10 +36,11 @@ namespace Slang
         /// generate different HLSL output if we know it
         /// will be used to generate SPIR-V).
         ///
-    String emitEntryPointSourceFromIR(
+    SlangResult emitEntryPointSourceFromIR(
         BackEndCompileRequest*  compileRequest,
         Int                     entryPointIndex,
         CodeGenTarget           target,
-        TargetRequest*          targetRequest);
+        TargetRequest*          targetRequest,
+        SourceResult&       outSource);
 }
 #endif

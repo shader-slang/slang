@@ -4,7 +4,7 @@
 #include "slang-ir.h"
 #include "slang-ir-insts.h"
 
-#include "slang-emit-glsl-extension-tracker.h"
+#include "slang-glsl-extension-tracker.h"
 
 namespace Slang
 {
@@ -183,12 +183,12 @@ struct GLSLLegalizationContext
     DiagnosticSink*         sink;
     Stage                   stage;
 
-    void requireGLSLExtension(String const& name)
+    void requireGLSLExtension(const UnownedStringSlice& name)
     {
         glslExtensionTracker->requireExtension(name);
     }
 
-    void requireSPIRVVersion(SPIRVVersion version)
+    void requireSPIRVVersion(const SemanticVersion& version)
     {
         glslExtensionTracker->requireSPIRVVersion(version);
     }
@@ -297,7 +297,7 @@ GLSLSystemValueInfo* getGLSLSystemValueInfo(
         // float in hlsl & glsl.
         // https://www.khronos.org/registry/OpenGL-Refpages/gl4/html/gl_CullDistance.xhtml
 
-        context->requireGLSLExtension("ARB_cull_distance");
+        context->requireGLSLExtension(UnownedStringSlice::fromLiteral("ARB_cull_distance"));
 
         // TODO: type conversion is required here.
         name = "gl_CullDistance";
@@ -475,7 +475,7 @@ GLSLSystemValueInfo* getGLSLSystemValueInfo(
 
         default:
             context->requireGLSLVersion(ProfileVersion::GLSL_450);
-            context->requireGLSLExtension("GL_ARB_shader_viewport_layer_array");
+            context->requireGLSLExtension(UnownedStringSlice::fromLiteral("GL_ARB_shader_viewport_layer_array"));
             break;
         }
 
@@ -497,7 +497,7 @@ GLSLSystemValueInfo* getGLSLSystemValueInfo(
 
         requiredType = builder->getBasicType(BaseType::Int);
 
-        context->requireGLSLExtension("ARB_shader_stencil_export");
+        context->requireGLSLExtension(UnownedStringSlice::fromLiteral("ARB_shader_stencil_export"));
         name = "gl_FragStencilRef";
     }
     else if (semanticName == "sv_tessfactor")
@@ -535,7 +535,7 @@ GLSLSystemValueInfo* getGLSLSystemValueInfo(
     else if (semanticName == "nv_x_right")
     {
         context->requireGLSLVersion(ProfileVersion::GLSL_450);
-        context->requireGLSLExtension("GL_NVX_multiview_per_view_attributes");
+        context->requireGLSLExtension(UnownedStringSlice::fromLiteral("GL_NVX_multiview_per_view_attributes"));
 
         // The actual output in GLSL is:
         //
@@ -569,7 +569,7 @@ GLSLSystemValueInfo* getGLSLSystemValueInfo(
         // On glsl its highp int gl_ViewportMaskPerViewNV[];
 
         context->requireGLSLVersion(ProfileVersion::GLSL_450);
-        context->requireGLSLExtension("GL_NVX_multiview_per_view_attributes");
+        context->requireGLSLExtension(UnownedStringSlice::fromLiteral("GL_NVX_multiview_per_view_attributes"));
 
         name = "gl_ViewportMaskPerViewNV";
 //            globalVarExpr = createGLSLBuiltinRef("gl_ViewportMaskPerViewNV",

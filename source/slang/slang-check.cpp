@@ -71,7 +71,8 @@ namespace Slang
         
         switch (funcType)
         {
-            case FuncType::Glslang_Compile:   return { "glslang_compile", PassThroughMode::Glslang} ;
+            case FuncType::Glslang_Compile_1_0:   return { "glslang_compile", PassThroughMode::Glslang} ;
+            case FuncType::Glslang_Compile_1_1:   return { "glslang_compile_1_1", PassThroughMode::Glslang} ;
             case FuncType::Fxc_D3DCompile:     return { "D3DCompile", PassThroughMode::Fxc};
             case FuncType::Fxc_D3DDisassemble: return { "D3DDisassemble", PassThroughMode::Fxc };
             case FuncType::Dxc_DxcCreateInstance:  return { "DxcCreateInstance", PassThroughMode::Dxc };
@@ -182,8 +183,11 @@ namespace Slang
         SlangFuncPtr func = sharedLibrary->findFuncByName(info.name);
         if (!func)
         {
-            UnownedStringSlice compilerName = TypeTextUtil::getPassThroughName(SlangPassThrough(info.compilerType));
-            sink->diagnose(SourceLoc(), Diagnostics::failedToFindFunctionForCompiler, info.name, compilerName);
+            if (sink)
+            {
+                UnownedStringSlice compilerName = TypeTextUtil::getPassThroughName(SlangPassThrough(info.compilerType));
+                sink->diagnose(SourceLoc(), Diagnostics::failedToFindFunctionForCompiler, info.name, compilerName);
+            }
             return nullptr;
         }
 

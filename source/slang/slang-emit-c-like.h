@@ -6,7 +6,6 @@
 
 #include "slang-compiler.h"
 
-#include "slang-emit-glsl-extension-tracker.h"
 #include "slang-emit-precedence.h"
 #include "slang-emit-source-writer.h"
 
@@ -113,8 +112,6 @@ public:
     SLANG_FORCE_INLINE SourceStyle getSourceStyle() const { return m_sourceStyle;  }
 
     void noteInternalErrorLoc(SourceLoc loc) { return getSink()->noteInternalErrorLoc(loc); }
-
-    GLSLExtensionTracker* getGLSLExtensionTracker() { return &m_glslExtensionTracker;  }
 
     //
     // Types
@@ -294,6 +291,8 @@ public:
 
     void emitVectorTypeName(IRType* elementType, IRIntegerValue elementCount) { emitVectorTypeNameImpl(elementType, elementCount); }
 
+    virtual RefObject* getExtensionTracker() { return nullptr; }
+
         /// Gets a source style for a target. Returns Unknown if not a known target
     static SourceStyle getSourceStyle(CodeGenTarget target);
         /// Gets the default type name for built in scalar types. Different impls may require something different.
@@ -369,8 +368,6 @@ public:
     HashSet<ModuleDecl*> m_modulesAlreadyEmitted;
 
     ModuleDecl* m_program;
-
-    GLSLExtensionTracker m_glslExtensionTracker;
 
     UInt m_uniqueIDCounter = 1;
     Dictionary<IRInst*, UInt> m_mapIRValueToID;

@@ -4,6 +4,8 @@
 
 #include "slang-emit-c-like.h"
 
+#include "slang-glsl-extension-tracker.h"
+
 namespace Slang
 {
 
@@ -15,7 +17,10 @@ public:
     GLSLSourceEmitter(const Desc& desc) :
         Super(desc)
     {
+        m_glslExtensionTracker = new GLSLExtensionTracker;
     }
+
+    virtual RefObject* getExtensionTracker() SLANG_OVERRIDE { return m_glslExtensionTracker; }
 
 protected:
 
@@ -56,11 +61,11 @@ protected:
 
     void _emitGLSLTypePrefix(IRType* type, bool promoteHalfToFloat = false);
 
-    void _requireGLSLExtension(const String& name);
+    void _requireGLSLExtension(const UnownedStringSlice& name);
 
     void _requireGLSLVersion(ProfileVersion version);
     void _requireGLSLVersion(int version);
-    void _requireSPIRVVersion(SPIRVVersion version);
+    void _requireSPIRVVersion(const SemanticVersion& version);
 
         // Emit the `flat` qualifier if the underlying type
         // of the variable is an integer type.
@@ -69,6 +74,9 @@ protected:
     void _requireBaseType(BaseType baseType);
 
     void _maybeEmitGLSLCast(IRType* castType, IRInst* inst);
+
+
+    RefPtr<GLSLExtensionTracker> m_glslExtensionTracker;
 };
 
 }

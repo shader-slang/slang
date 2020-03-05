@@ -30,6 +30,47 @@ namespace Slang {
     }
 }
 
+/* static */Index StringUtil::split(const UnownedStringSlice& in, char splitChar, Index maxSlices, UnownedStringSlice* outSlices)
+{
+    Index index = 0;
+
+    const char* start = in.begin();
+    const char* end = in.end();
+
+    while (start < end && index < maxSlices)
+    {
+        // Move cur so it's either at the end or at next split character
+        const char* cur = start;
+        while (cur < end && *cur != splitChar)
+        {
+            cur++;
+        }
+
+        // Add to output
+        outSlices[index++] = UnownedStringSlice(start, cur);
+
+        // Skip the split character, if at end we are okay anyway
+        start = cur + 1;
+    }
+
+    return index;
+}
+
+/* static */SlangResult StringUtil::split(const UnownedStringSlice& in, char splitChar, Index maxSlices, UnownedStringSlice* outSlices, Index& outSlicesCount)
+{
+    const Index sliceCount = split(in, splitChar, maxSlices, outSlices);
+    if (sliceCount == maxSlices && sliceCount > 0)
+    {
+        // To succeed must have parsed all of the input
+        if (in.end() != outSlices[sliceCount - 1].end())
+        {
+            return SLANG_FAIL;
+        }
+    }
+    outSlicesCount = sliceCount;
+    return SLANG_OK;
+}
+
 /* static */void StringUtil::join(const List<String>& values, char separator, StringBuilder& out)
 {
     join(values, UnownedStringSlice(&separator, 1), out);

@@ -93,6 +93,12 @@ namespace Slang
             return m_end;
         }
 
+            /// True if slice is strictly contained in memory.
+        bool isMemoryContained(const UnownedStringSlice& slice) const
+        {
+            return slice.m_begin >= m_begin && slice.m_end <= m_end; 
+        }
+
         Index getLength() const
         {
             return Index(m_end - m_begin);

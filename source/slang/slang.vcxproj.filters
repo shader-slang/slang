@@ -1,4 +1,4 @@
-﻿<?xml version="1.0" encoding="utf-8"?>
+<?xml version="1.0" encoding="utf-8"?>
 <Project ToolsVersion="4.0" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
   <ItemGroup>
     <Filter Include="Header Files">
@@ -51,9 +51,6 @@
     <ClInclude Include="slang-emit-cuda.h">
       <Filter>Header Files</Filter>
     </ClInclude>
-    <ClInclude Include="slang-emit-glsl-extension-tracker.h">
-      <Filter>Header Files</Filter>
-    </ClInclude>
     <ClInclude Include="slang-emit-glsl.h">
       <Filter>Header Files</Filter>
     </ClInclude>
@@ -73,6 +70,9 @@
       <Filter>Header Files</Filter>
     </ClInclude>
     <ClInclude Include="slang-file-system.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="slang-glsl-extension-tracker.h">
       <Filter>Header Files</Filter>
     </ClInclude>
     <ClInclude Include="slang-hlsl-intrinsic-set.h">
@@ -151,6 +151,9 @@
       <Filter>Header Files</Filter>
     </ClInclude>
     <ClInclude Include="slang-ir-validate.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="slang-ir-wrap-structured-buffers.h">
       <Filter>Header Files</Filter>
     </ClInclude>
     <ClInclude Include="slang-ir.h">
@@ -246,9 +249,6 @@
     <ClInclude Include="slang-visitor.h">
       <Filter>Header Files</Filter>
     </ClInclude>
-    <ClInclude Include="slang-ir-wrap-structured-buffers.h">
-      <Filter>Header Files</Filter>
-    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="slang-check-conformance.cpp">
@@ -302,9 +302,6 @@
     <ClCompile Include="slang-emit-cuda.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
-    <ClCompile Include="slang-emit-glsl-extension-tracker.cpp">
-      <Filter>Source Files</Filter>
-    </ClCompile>
     <ClCompile Include="slang-emit-glsl.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
@@ -324,6 +321,9 @@
       <Filter>Source Files</Filter>
     </ClCompile>
     <ClCompile Include="slang-file-system.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="slang-glsl-extension-tracker.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
     <ClCompile Include="slang-hlsl-intrinsic-set.cpp">
@@ -398,6 +398,9 @@
     <ClCompile Include="slang-ir-validate.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
+    <ClCompile Include="slang-ir-wrap-structured-buffers.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
     <ClCompile Include="slang-ir.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
@@ -462,9 +465,6 @@
       <Filter>Source Files</Filter>
     </ClCompile>
     <ClCompile Include="slang.cpp">
-      <Filter>Source Files</Filter>
-    </ClCompile>
-    <ClCompile Include="slang-ir-wrap-structured-buffers.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
   </ItemGroup>

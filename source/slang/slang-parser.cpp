@@ -7,6 +7,8 @@
 #include "slang-lookup.h"
 #include "slang-visitor.h"
 
+#include "../core/slang-semantic-version.h"
+
 namespace Slang
 {
     // pre-declare
@@ -4752,81 +4754,39 @@ namespace Slang
         auto modifier = new RequiredSPIRVVersionModifier();
 
         parser->ReadToken(TokenType::LParent);
+        Token token = parser->ReadToken();
+        parser->ReadToken(TokenType::RParent);
 
-        UnownedStringSlice typeName;
-        UnownedStringSlice majorVersionText;
-        UnownedStringSlice minorVersionText;
-
-        // There is a legitimate question about how the version should be handled here.
-        switch (parser->tokenReader.peekTokenType())
+        UnownedStringSlice content = token.Content;
+        // We allow specified as major.minor or as a string (in quotes)
+        switch (token.type)
         {
             case TokenType::FloatingPointLiteral:
             {
-                modifier->token = parser->ReadToken(TokenType::FloatingPointLiteral);
-
-                List<UnownedStringSlice> split;
-                StringUtil::split(modifier->token.Content, '.', split);
-
-                if (split.getCount() != 2)
-                {
-                    parser->sink->diagnose(modifier->token, Diagnostics::invalidSPIRVVersion);
-                    return RefPtr<RefObject>();
-                }
-
-                majorVersionText = split[0];
-                minorVersionText = split[1];
                 break;
             }
-            case TokenType::Identifier:
+            case TokenType::StringLiteral:
             {
-                modifier->token = parser->ReadToken(TokenType::Identifier);
-
-                List<UnownedStringSlice> split;
-                StringUtil::split(modifier->token.Content, '_', split);
-
-                if (split.getCount() != 3)
-                {
-                    parser->sink->diagnose(modifier->token, Diagnostics::invalidSPIRVVersion);
-                    return RefPtr<RefObject>();
-                }
-
-                typeName = split[0];
-                majorVersionText = split[1];
-                minorVersionText = split[2];
+                // We need to trim quotes if needed
+                SLANG_ASSERT(content.getLength() >= 2 && content[0] == '"' && content[content.getLength() -1] == '"');
+                content = UnownedStringSlice(content.begin() + 1, content.end() - 1);
                 break;
-
             }
             default:
             {
-                parser->sink->diagnose(modifier->token, Diagnostics::invalidSPIRVVersion);
+                parser->sink->diagnose(token, Diagnostics::invalidSPIRVVersion);
                 return RefPtr<RefObject>();
             }
         }
-
-        parser->ReadToken(TokenType::RParent);
-
-        // Currently we only support 'spirv' or no typename
-        if (!(typeName == UnownedStringSlice::fromLiteral("spirv") || typeName.getLength() == 0))
+        
+        SemanticVersion version;
+        if (SLANG_FAILED(SemanticVersion::parse(content, modifier->version)))
         {
-            parser->sink->diagnose(modifier->token, Diagnostics::invalidSPIRVVersion);
+            // Unable to parse the error so fail
+            parser->sink->diagnose(token, Diagnostics::invalidSPIRVVersion);
             return RefPtr<RefObject>();
         }
 
-        Token intToken = modifier->token;
-        intToken.type = TokenType::IntegerLiteral;
-        intToken.Content = majorVersionText;
-
-        auto majorValue = getIntegerLiteralValue(intToken);
-        intToken.Content = minorVersionText;
-        auto minorValue = getIntegerLiteralValue(intToken);
-
-        if (minorValue < 0 || minorValue > 0xff || majorValue < 0)
-        {
-            parser->sink->diagnose(modifier->token, Diagnostics::invalidSPIRVVersion);
-            return RefPtr<RefObject>();
-        }
-
-        modifier->spirvVersion = makeSPIRVVersion(int(majorValue), int(minorValue));
         return modifier;
     }
 

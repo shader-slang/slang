@@ -12,7 +12,12 @@ enum
     GLSLANG_ACTION_DISSASSEMBLE_SPIRV,
 };
 
-struct glslang_CompileRequest
+struct glsl_SPIRVVersion
+{
+    int major, minor, patch;
+};
+
+struct glslang_CompileRequest_1_0
 {
     char const*         sourcePath;
 
@@ -33,6 +38,18 @@ struct glslang_CompileRequest
     unsigned            debugInfoType;
 };
 
-typedef int (*glslang_CompileFunc)(glslang_CompileRequest* request);
+
+struct glslang_CompileRequest_1_1
+{
+    size_t              sizeInBytes;            ///< Size in bytes of this structure
+
+    glslang_CompileRequest_1_0 request_1_0;
+
+    const char*         spirvTargetName;            /// A valid TargetName. If null will use universal based on the spirVersion.
+    glsl_SPIRVVersion   spirvVersion;               ///< The SPIR-V version. If all are 0 will use the default which is 1.2 currently
+};
+
+typedef int (*glslang_CompileFunc_1_0)(glslang_CompileRequest_1_0* request);
+typedef int (*glslang_CompileFunc_1_1)(glslang_CompileRequest_1_1* request);
 
 #endif

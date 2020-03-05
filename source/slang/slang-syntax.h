@@ -8,6 +8,8 @@
 #include "slang-type-system-shared.h"
 #include "../../slang.h"
 
+#include "../core/slang-semantic-version.h"
+
 #include "slang-name.h"
 
 #include <assert.h>
@@ -31,8 +33,6 @@ namespace Slang
 
     class Parser;
     class SyntaxNode;
-
-    enum class SPIRVVersion : uint32_t;
 
     typedef RefPtr<RefObject> (*SyntaxParseCallback)(Parser* parser, void* userData);
 

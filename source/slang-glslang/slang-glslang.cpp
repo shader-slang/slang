@@ -83,19 +83,18 @@ static void dump(
 }
 
 static void dumpDiagnostics(
-    glslang_CompileRequest* request,
+    const glslang_CompileRequest_1_1& request,
     std::string const&      log)
 {
-    dump(log.c_str(), log.length(), request->diagnosticFunc, request->diagnosticUserData, stderr);
+    const auto& request_1_0 = request.request_1_0;
+    dump(log.c_str(), log.length(), request_1_0.diagnosticFunc, request_1_0.diagnosticUserData, stderr);
 }
 
 // Apply the SPIRV-Tools optimizer to generated SPIR-V based on the desired optimization level
 // TODO: add flag for optimizing SPIR-V size as well
-static void glslang_optimizeSPIRV(std::vector<unsigned int>& spirv, unsigned optimizationLevel, unsigned debugInfoType)
+static void glslang_optimizeSPIRV(std::vector<unsigned int>& spirv, spv_target_env targetEnv, unsigned optimizationLevel, unsigned debugInfoType)
 {
-    spv_target_env target_env = SPV_ENV_UNIVERSAL_1_2;
-
-    spvtools::Optimizer optimizer(target_env);
+    spvtools::Optimizer optimizer(targetEnv);
     optimizer.SetMessageConsumer(
         [](spv_message_level_t level, const char *source, const spv_position_t &position, const char *message) {
         auto &out = std::cerr;
@@ -202,10 +201,111 @@ static void glslang_optimizeSPIRV(std::vector<unsigned int>& spirv, unsigned opt
     optimizer.Run(spirv.data(), spirv.size(), &spirv, spvOptOptions);
 }
 
-static int glslang_compileGLSLToSPIRV(glslang_CompileRequest* request)
+
+static glslang::EShTargetLanguageVersion _makeTargetLanguageVersion(int majorVersion, int minorVersion)
 {
+    return glslang::EShTargetLanguageVersion((uint32_t(majorVersion) << 16) | (uint32_t(minorVersion) << 8));
+}
+
+static glsl_SPIRVVersion _toSPIRVVersion(glslang::EShTargetLanguageVersion version)
+{
+    glsl_SPIRVVersion ver;
+    ver.patch = 0;
+    ver.major = uint8_t(uint32_t(version) >> 16);
+    ver.minor = uint8_t(uint32_t(version) >> 8);
+    return ver;
+}
+
+// For working out the targets based on SPIR-V target strings
+
+namespace { // anonymous
+
+struct SPRIVTargetInfo
+{
+    const char* name;
+    spv_target_env targetEnv;
+};
+
+} // anonymous
+
+static const SPRIVTargetInfo kSpirvTargetInfos[] =
+{
+    {"1.0",         SPV_ENV_UNIVERSAL_1_0},
+    {"vk1.0",       SPV_ENV_VULKAN_1_0},
+    {"1.1",         SPV_ENV_UNIVERSAL_1_1}, 
+    {"cl2.1",       SPV_ENV_OPENCL_2_1},
+    {"cl2.2",       SPV_ENV_OPENCL_2_2}, 
+    {"gl4.0",       SPV_ENV_OPENGL_4_0},
+    {"gl4.1",       SPV_ENV_OPENGL_4_1},
+    {"gl4.2",       SPV_ENV_OPENGL_4_2},
+    {"gl4.3",       SPV_ENV_OPENGL_4_3},
+    {"gl4.5",       SPV_ENV_OPENGL_4_5},
+    {"1.2",         SPV_ENV_UNIVERSAL_1_2}, 
+    {"cl1.2",       SPV_ENV_OPENCL_1_2}, 
+    {"cl_emb1.2",   SPV_ENV_OPENCL_EMBEDDED_1_2},
+    {"cl2.0",       SPV_ENV_OPENCL_2_0},
+    {"cl_emb2.0",   SPV_ENV_OPENCL_EMBEDDED_2_0},
+    {"cl_emb2.1",   SPV_ENV_OPENCL_EMBEDDED_2_1},
+    {"cl_emb2.2",   SPV_ENV_OPENCL_EMBEDDED_2_2},
+    {"1.3",         SPV_ENV_UNIVERSAL_1_3},
+    {"vk1.1",       SPV_ENV_VULKAN_1_1},
+    {"web_gpu1.0",  SPV_ENV_WEBGPU_0},
+    {"1.4",         SPV_ENV_UNIVERSAL_1_4},
+    {"vk1.1_spirv1.4", SPV_ENV_VULKAN_1_1_SPIRV_1_4},
+    {"1.5",         SPV_ENV_UNIVERSAL_1_5},             
+};
+
+static int _findTargetIndex(const char* name)
+{
+    const int count = int(sizeof(kSpirvTargetInfos) / sizeof(kSpirvTargetInfos[0]));
+    for (int i = 0; i < count; ++i)
+    {
+        const SPRIVTargetInfo& info = kSpirvTargetInfos[i];
+
+        if (::strcmp(info.name, name) == 0)
+        {
+            return i;
+        }
+    }
+    return -1;
+}
+
+static spv_target_env _getUniversalTargetEnv(glslang::EShTargetLanguageVersion inVersion)
+{
+    glsl_SPIRVVersion spirvVersion = _toSPIRVVersion(inVersion);
+    uint32_t ver = (uint32_t(spirvVersion.major) << 8) | spirvVersion.minor;
+
+    switch (ver)
+    {
+        case 0x100:     return SPV_ENV_UNIVERSAL_1_0;
+        case 0x101:     return SPV_ENV_UNIVERSAL_1_1;
+        case 0x102:     return SPV_ENV_UNIVERSAL_1_2;
+        case 0x103:     return SPV_ENV_UNIVERSAL_1_3;
+        case 0x104:     return SPV_ENV_UNIVERSAL_1_4;
+        case 0x105:     return SPV_ENV_UNIVERSAL_1_5;
+        default:
+        {            
+            if (ver > 0x105)
+            {
+                // This is the highest we known for now..., so try that
+                return SPV_ENV_UNIVERSAL_1_5;
+            }
+            break;
+        }
+    }
+    // Just use the default...
+    return SPV_ENV_UNIVERSAL_1_2;
+}
+
+static int glslang_compileGLSLToSPIRV(const glslang_CompileRequest_1_1& request)
+{
+    // Check that the encoding matches
+    assert(glslang::EShTargetSpv_1_4 == _makeTargetLanguageVersion(1, 4));
+
+    const auto& request_1_0 = request.request_1_0;
+
     EShLanguage glslangStage;
-    switch( request->slangStage )
+    switch( request_1_0.slangStage )
     {
 #define CASE(SP, GL) case SLANG_STAGE_##SP: glslangStage = EShLang##GL; break
     CASE(VERTEX,    Vertex);
@@ -229,16 +329,53 @@ static int glslang_compileGLSLToSPIRV(glslang_CompileRequest* request)
         return 1;
     }
 
+
+    spv_target_env targetEnv = SPV_ENV_UNIVERSAL_1_2;
+    glslang::EShTargetLanguageVersion targetLanguage = glslang::EShTargetLanguageVersion(0);
+
+    int spirvTargetIndex = -1;
+    if (request.spirvTargetName)
+    {
+        spirvTargetIndex = _findTargetIndex(request.spirvTargetName);
+        if (spirvTargetIndex < 0)
+        {
+            dumpDiagnostics(request, "warning: unknown SPIR-V version\n");
+        }
+        else
+        {
+            targetEnv = kSpirvTargetInfos[spirvTargetIndex].targetEnv;
+        }
+    }
+
+    // If a version is specified, and no target language is specified, set to universal version of that SPIR-V version
+    if (request.spirvVersion.major != 0 && targetLanguage == glslang::EShTargetLanguageVersion(0))
+    {
+        targetLanguage = _makeTargetLanguageVersion(request.spirvVersion.major, request.spirvVersion.minor);
+    }
+
+    // If we don't have a target, but do have a language, use that to determine a universal target
+    if (spirvTargetIndex < 0 && targetLanguage != glslang::EShTargetLanguageVersion(0))
+    {
+        // We can just use the appropriate universal based on the target language
+        targetEnv = _getUniversalTargetEnv(targetLanguage);
+    }
+    
     // TODO: compute glslang stage to use
 
     glslang::TShader* shader = new glslang::TShader(glslangStage);
     auto shaderPtr = std::unique_ptr<glslang::TShader>(shader);
 
+    // Only set the target language if one is determined
+    if (targetLanguage != glslang::EShTargetLanguageVersion(0))
+    {
+        shader->setEnvTarget(glslang::EShTargetSpv, targetLanguage);
+    }
+
     glslang::TProgram* program = new glslang::TProgram();
     auto programPtr = std::unique_ptr<glslang::TProgram>(program);
 
-    char const* sourceText = (char const*)request->inputBegin;
-    char const* sourceTextEnd = (char const*)request->inputEnd;
+    char const* sourceText = (char const*)request_1_0.inputBegin;
+    char const* sourceTextEnd = (char const*)request_1_0.inputEnd;
 
     int sourceTextLength = (int)(sourceTextEnd - sourceText);
 
@@ -247,11 +384,11 @@ static int glslang_compileGLSLToSPIRV(glslang_CompileRequest* request)
     shader->setStringsWithLengthsAndNames(
         &sourceText,
         &sourceTextLength,
-        &request->sourcePath,
+        &request_1_0.sourcePath,
         1);
 
     EShMessages messages = EShMessages(EShMsgSpvRules | EShMsgVulkanRules);
-
+     
     if( !shader->parse(&gResources, 110, false, messages) )
     {
         dumpDiagnostics(request, shader->getInfoLog());
@@ -283,32 +420,34 @@ static int glslang_compileGLSLToSPIRV(glslang_CompileRequest* request)
         spv::SpvBuildLogger logger;
         glslang::GlslangToSpv(*stageIntermediate, spirv, &logger);
 
-        if (request->optimizationLevel != SLANG_OPTIMIZATION_LEVEL_NONE)
+        if (request_1_0.optimizationLevel != SLANG_OPTIMIZATION_LEVEL_NONE)
         {
-            glslang_optimizeSPIRV(spirv, request->optimizationLevel, request->debugInfoType);
+            glslang_optimizeSPIRV(spirv, targetEnv, request_1_0.optimizationLevel, request_1_0.debugInfoType);
         }
 
         dumpDiagnostics(request, logger.getAllMessages());
 
-        dump(spirv.data(), spirv.size() * sizeof(unsigned int), request->outputFunc, request->outputUserData, stdout);
+        dump(spirv.data(), spirv.size() * sizeof(unsigned int), request_1_0.outputFunc, request_1_0.outputUserData, stdout);
     }
 
     return 0;
 }
 
-static int glslang_dissassembleSPIRV(glslang_CompileRequest* request)
+static int glslang_dissassembleSPIRV(const glslang_CompileRequest_1_1& request)
 {
     typedef unsigned int SPIRVWord;
 
-    SPIRVWord const* spirvBegin = (SPIRVWord const*)request->inputBegin;
-    SPIRVWord const* spirvEnd   = (SPIRVWord const*)request->inputEnd;
+    auto& request_1_0 = request.request_1_0;
+
+    SPIRVWord const* spirvBegin = (SPIRVWord const*)request_1_0.inputBegin;
+    SPIRVWord const* spirvEnd   = (SPIRVWord const*)request_1_0.inputEnd;
 
     std::vector<SPIRVWord> spirv(spirvBegin, spirvEnd);
 
     std::stringstream spirvAsmStream;
     spv::Disassemble(spirvAsmStream, spirv);
     std::string result = spirvAsmStream.str();
-    dump(result.c_str(), result.length(), request->outputFunc, request->outputUserData, stdout);
+    dump(result.c_str(), result.length(), request_1_0.outputFunc, request_1_0.outputUserData, stdout);
 
     return 0;
 }
@@ -349,13 +488,34 @@ public:
     bool m_isInitialized = false;
 };
 
+static int _compile(const glslang_CompileRequest_1_1& request)
+{
+    int result = 0;
+    switch (request.request_1_0.action)
+    {
+        default:
+            result = 1;
+            break;
+
+        case GLSLANG_ACTION_COMPILE_GLSL_TO_SPIRV:
+            result = glslang_compileGLSLToSPIRV(request);
+            break;
+
+        case GLSLANG_ACTION_DISSASSEMBLE_SPIRV:
+            result = glslang_dissassembleSPIRV(request);
+            break;
+    }
+
+    return result;
+}
+
 extern "C"
 #ifdef _MSC_VER
 _declspec(dllexport)
 #else
 __attribute__((__visibility__("default")))
 #endif
-int glslang_compile(glslang_CompileRequest* request)
+int glslang_compile_1_1(glslang_CompileRequest_1_1* inRequest)
 {
     static ProcessInitializer g_processInitializer;
     if (!g_processInitializer.init())
@@ -369,21 +529,40 @@ int glslang_compile(glslang_CompileRequest* request)
         return 1;
     }
 
-    int result = 0;
-    switch(request->action)
+    // If it's the right size just use it
+    if (inRequest->sizeInBytes == sizeof(glslang_CompileRequest_1_1))
     {
-    default:
-        result = 1;
-        break;
-
-    case GLSLANG_ACTION_COMPILE_GLSL_TO_SPIRV:
-        result = glslang_compileGLSLToSPIRV(request);
-        break;
-
-    case GLSLANG_ACTION_DISSASSEMBLE_SPIRV:
-        result = glslang_dissassembleSPIRV(request);
-        break;
+        return _compile(*inRequest);
     }
+    else
+    {
+        // NOTE! It could be larger, but here we'll assume thats ok, and copy and use.
 
-    return result;
+        // Try to ensure some binary compatibility, by using sizeInBytes member, and copying
+
+        glslang_CompileRequest_1_1 request;
+        
+        // Copy into request
+        const size_t copySize = (inRequest->sizeInBytes > sizeof(request)) ? sizeof(request) : inRequest->sizeInBytes;
+        ::memcpy(&request, inRequest, copySize);
+        // Zero any remaining members
+        memset(((uint8_t*)&request) + copySize, 0, sizeof(request) - copySize);
+
+        return _compile(request);
+    }
+}
+
+extern "C"
+#ifdef _MSC_VER
+_declspec(dllexport)
+#else
+__attribute__((__visibility__("default")))
+#endif
+int glslang_compile(glslang_CompileRequest_1_0* inRequest)
+{
+    glslang_CompileRequest_1_1 request;
+    memset(&request, 0, sizeof(request));
+    request.sizeInBytes = sizeof(request);
+    request.request_1_0 = *inRequest;
+    return glslang_compile_1_1(&request);
 }

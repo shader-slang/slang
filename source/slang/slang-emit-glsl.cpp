@@ -12,9 +12,9 @@
 
 namespace Slang {
 
-void GLSLSourceEmitter::_requireGLSLExtension(String const& name)
+void GLSLSourceEmitter::_requireGLSLExtension(const UnownedStringSlice& name)
 {
-    m_glslExtensionTracker.requireExtension(name);
+    m_glslExtensionTracker->requireExtension(name);
 }
 
 void GLSLSourceEmitter::_requireGLSLVersion(ProfileVersion version)
@@ -22,12 +22,12 @@ void GLSLSourceEmitter::_requireGLSLVersion(ProfileVersion version)
     if (getSourceStyle() != SourceStyle::GLSL)
         return;
 
-    m_glslExtensionTracker.requireVersion(version);
+    m_glslExtensionTracker->requireVersion(version);
 }
 
-void GLSLSourceEmitter::_requireSPIRVVersion(SPIRVVersion version)
+void GLSLSourceEmitter::_requireSPIRVVersion(const SemanticVersion& version)
 {
-    m_glslExtensionTracker.requireSPIRVVersion(version);
+    m_glslExtensionTracker->requireSPIRVVersion(version);
 }
 
 void GLSLSourceEmitter::_requireGLSLVersion(int version)
@@ -284,7 +284,7 @@ void GLSLSourceEmitter::_emitGLSLImageFormatModifier(IRInst* var, IRTextureType*
             // the image *type* (with a "base type" for images with
             // unknown format).
             //
-            _requireGLSLExtension("GL_EXT_shader_image_load_formatted");
+            _requireGLSLExtension(UnownedStringSlice::fromLiteral("GL_EXT_shader_image_load_formatted"));
         }
         else
         {
@@ -316,7 +316,7 @@ void GLSLSourceEmitter::_emitGLSLImageFormatModifier(IRInst* var, IRTextureType*
     //
     if (m_compileRequest->useUnknownImageFormatAsDefault)
     {
-        _requireGLSLExtension("GL_EXT_shader_image_load_formatted");
+        _requireGLSLExtension(UnownedStringSlice::fromLiteral("GL_EXT_shader_image_load_formatted"));
         return;
     }
 
@@ -466,7 +466,7 @@ bool GLSLSourceEmitter::_emitGLSLLayoutQualifier(LayoutResourceKind kind, EmitVa
             bool useExplicitOffsets = false;
             if (useExplicitOffsets)
             {
-                _requireGLSLExtension("GL_ARB_enhanced_layouts");
+                _requireGLSLExtension(UnownedStringSlice::fromLiteral("GL_ARB_enhanced_layouts"));
 
                 m_writer->emit("layout(offset = ");
                 m_writer->emit(index);
@@ -644,7 +644,7 @@ void GLSLSourceEmitter::_emitGLSLTypePrefix(IRType* type, bool promoteHalfToFloa
 
 void GLSLSourceEmitter::_requireBaseType(BaseType baseType)
 {
-    m_glslExtensionTracker.requireBaseTypeExtension(baseType);
+    m_glslExtensionTracker->requireBaseTypeExtension(baseType);
 }
 
 void GLSLSourceEmitter::_maybeEmitGLSLFlatModifier(IRType* valueType)
@@ -923,7 +923,7 @@ bool GLSLSourceEmitter::tryEmitGlobalParamImpl(IRGlobalParam* varDecl, IRType* v
     {
         if (isResourceType(unwrapArray(varType)))
         {
-            _requireGLSLExtension("GL_EXT_nonuniform_qualifier");
+            _requireGLSLExtension(UnownedStringSlice::fromLiteral("GL_EXT_nonuniform_qualifier"));
         }
     }
 
@@ -1333,7 +1333,7 @@ void GLSLSourceEmitter::handleCallExprDecorationsImpl(IRInst* funcValue)
 
             case kIROp_RequireGLSLExtensionDecoration:
             {
-                _requireGLSLExtension(String(((IRRequireGLSLExtensionDecoration*)decoration)->getExtensionName()));
+                _requireGLSLExtension(((IRRequireGLSLExtensionDecoration*)decoration)->getExtensionName());
                 break;
             }
             case kIROp_RequireGLSLVersionDecoration:
@@ -1343,7 +1343,10 @@ void GLSLSourceEmitter::handleCallExprDecorationsImpl(IRInst* funcValue)
             }
             case kIROp_RequireSPIRVVersionDecoration:
             {
-                _requireSPIRVVersion(static_cast<IRRequireSPIRVVersionDecoration*>(decoration)->getSPIRVVersion());
+                auto intValue = static_cast<IRRequireSPIRVVersionDecoration*>(decoration)->getSPIRVVersion();
+                SemanticVersion version;
+                version.setFromInteger(SemanticVersion::IntegerType(intValue));
+                _requireSPIRVVersion(version);
                 break;
             }
 
@@ -1368,9 +1371,9 @@ void GLSLSourceEmitter::emitPreprocessorDirectivesImpl()
     //
     // TODO: Either correctly compute a minimum required version, or require
     // the user to specify a version as part of the target.
-    m_glslExtensionTracker.requireVersion(ProfileVersion::GLSL_450);
+    m_glslExtensionTracker->requireVersion(ProfileVersion::GLSL_450);
 
-    auto requiredProfileVersion = m_glslExtensionTracker.getRequiredProfileVersion();
+    auto requiredProfileVersion = m_glslExtensionTracker->getRequiredProfileVersion();
     switch (requiredProfileVersion)
     {
 #define CASE(TAG, VALUE)    \
@@ -1565,7 +1568,7 @@ void GLSLSourceEmitter::emitSimpleTypeImpl(IRType* type)
         switch (untypedBufferType->op)
         {
             case kIROp_RaytracingAccelerationStructureType:
-                _requireGLSLExtension("GL_NV_ray_tracing");
+                _requireGLSLExtension(UnownedStringSlice::fromLiteral("GL_NV_ray_tracing"));
                 m_writer->emit("accelerationStructureNV");
                 break;
 
