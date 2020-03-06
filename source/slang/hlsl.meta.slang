@@ -350,6 +350,9 @@ void abort();
 
 __generic<T : __BuiltinSignedArithmeticType>
 T abs(T x);
+/*{
+    return x < 0 ? -x : x;
+}*/
 
 __generic<T : __BuiltinSignedArithmeticType, let N : int>
 __target_intrinsic(hlsl)
@@ -387,9 +390,37 @@ matrix<T, N, M> acos(matrix<T, N, M> x)
 }
 
 // Test if all components are non-zero (HLSL SM 1.0)
-__generic<T : __BuiltinType> bool all(T x);
-__generic<T : __BuiltinType, let N : int> bool all(vector<T,N> x);
-__generic<T : __BuiltinType, let N : int, let M : int> bool all(matrix<T,N,M> x);
+__generic<T : __BuiltinType>
+__target_intrinsic(glsl, "bool($0)")
+bool all(T x);
+
+__generic<T : __BuiltinType, let N : int>
+__target_intrinsic(hlsl)
+__target_intrinsic(glsl, "all(bvec$N0($0))")
+bool all(vector<T,N> x);
+// TODO: implementation of `all()` in the stdlib is
+// blocked on fixing implementation of `bool` vector
+// `getAt` on the CUDA codegen path.
+/*
+{
+    bool result = true;
+    for(int i = 0; i < N; ++i)
+        result = result && all(x[i]);
+    return result;
+}
+*/
+
+__generic<T : __BuiltinType, let N : int, let M : int>
+__target_intrinsic(hlsl)
+bool all(matrix<T,N,M> x);
+/*
+{
+    bool result = true;
+    for(int i = 0; i < N; ++i)
+        result = result && all(x[i]);
+    return result;
+}
+*/
 
 // Barrier for writes to all memory spaces (HLSL SM 5.0)
 __target_intrinsic(glsl, "memoryBarrier(), groupMemoryBarrier(), memoryBarrierImage(), memoryBarrierBuffer()")
@@ -715,27 +746,24 @@ matrix<T,N,M> clamp(matrix<T,N,M> x, matrix<T,N,M> minBound, matrix<T,N,M> maxBo
 // Clip (discard) fragment conditionally
 __generic<T : __BuiltinFloatingPointType>
 __target_intrinsic(hlsl)
-void clip(T x);
-// TODO: filling this in here requires ability to invoke `operator<(T,T)`
-/*{
+void clip(T x)
+{
     if(x < T(0)) discard;
-}*/
+}
 
 __generic<T : __BuiltinFloatingPointType, let N : int>
 __target_intrinsic(hlsl)
-void clip(vector<T,N> x);
-// TODO: filling this in here requires ability to invoke `operator<(T,T)`
-/*{
+void clip(vector<T,N> x)
+{
     if(any(x < T(0))) discard;
-}*/
+}
 
 __generic<T : __BuiltinFloatingPointType, let N : int, let M : int>
 __target_intrinsic(hlsl)
-void clip(matrix<T,N,M> x);
-// TODO: filling this in here requires ability to invoke `operator<(T,T)`
-/*{
+void clip(matrix<T,N,M> x)
+{
     if(any(x < T(0))) discard;
-}*/
+}
 
 // Cosine
 __generic<T : __BuiltinFloatingPointType>
@@ -783,15 +811,13 @@ uint countbits(uint value);
 __generic<T : __BuiltinArithmeticType>
 __target_intrinsic(hlsl)
 __target_intrinsic(glsl)
-vector<T,3> cross(vector<T,3> left, vector<T,3> right);
-// TODO: filling this in here requires ability to invoke `operator*(T,T)`, etc.
-/*{
+vector<T,3> cross(vector<T,3> left, vector<T,3> right)
+{
     return vector<T,3>(
         left.y * right.z - left.z * right.y,
         left.z * right.x - left.x * right.z,
         left.x * right.y - left.y * right.x);
-}*/
-
+}
 
 // Convert encoded color
 __target_intrinsic(hlsl)
@@ -807,54 +833,83 @@ __target_intrinsic(glsl, dFdx)
 T ddx(T x);
 
 __generic<T : __BuiltinFloatingPointType, let N : int>
+__target_intrinsic(hlsl)
 __target_intrinsic(glsl, dFdx)
-vector<T,N> ddx(vector<T,N> x);
+vector<T, N> ddx(vector<T, N> x)
+{
+    VECTOR_MAP_UNARY(T, N, ddx, x);
+}
 
 __generic<T : __BuiltinFloatingPointType, let N : int, let M : int>
-__target_intrinsic(glsl, dFdx)
-matrix<T,N,M> ddx(matrix<T,N,M> x);
+__target_intrinsic(hlsl)
+matrix<T, N, M> ddx(matrix<T, N, M> x)
+{
+    MATRIX_MAP_UNARY(T, N, M, ddx, x);
+}
 
 __generic<T : __BuiltinFloatingPointType>
+__target_intrinsic(hlsl)
 __glsl_extension(GL_ARB_derivative_control)
 __target_intrinsic(glsl, dFdxCoarse)
 T ddx_coarse(T x);
 
 __generic<T : __BuiltinFloatingPointType, let N : int>
+__target_intrinsic(hlsl)
 __glsl_extension(GL_ARB_derivative_control)
 __target_intrinsic(glsl, dFdxCoarse)
-vector<T,N> ddx_coarse(vector<T,N> x);
+vector<T, N> ddx_coarse(vector<T, N> x)
+{
+    VECTOR_MAP_UNARY(T, N, ddx_coarse, x);
+}
 
 __generic<T : __BuiltinFloatingPointType, let N : int, let M : int>
-__glsl_extension(GL_ARB_derivative_control)
-__target_intrinsic(glsl, dFdxCoarse)
-matrix<T,N,M> ddx_coarse(matrix<T,N,M> x);
+__target_intrinsic(hlsl)
+matrix<T, N, M> ddx_coarse(matrix<T, N, M> x)
+{
+    MATRIX_MAP_UNARY(T, N, M, ddx_coarse, x);
+}
 
 __generic<T : __BuiltinFloatingPointType>
+__target_intrinsic(hlsl)
 __glsl_extension(GL_ARB_derivative_control)
 __target_intrinsic(glsl, dFdxFine)
 T ddx_fine(T x);
 
 __generic<T : __BuiltinFloatingPointType, let N : int>
+__target_intrinsic(hlsl)
 __glsl_extension(GL_ARB_derivative_control)
 __target_intrinsic(glsl, dFdxFine)
-vector<T,N> ddx_fine(vector<T,N> x);
+vector<T, N> ddx_fine(vector<T, N> x)
+{
+    VECTOR_MAP_UNARY(T, N, ddx_fine, x);
+}
 
 __generic<T : __BuiltinFloatingPointType, let N : int, let M : int>
-__glsl_extension(GL_ARB_derivative_control)
-__target_intrinsic(glsl, dFdxFine)
-matrix<T,N,M> ddx_fine(matrix<T,N,M> x);
+__target_intrinsic(hlsl)
+matrix<T, N, M> ddx_fine(matrix<T, N, M> x)
+{
+    MATRIX_MAP_UNARY(T, N, M, ddx_fine, x);
+}
 
 __generic<T : __BuiltinFloatingPointType>
+__target_intrinsic(hlsl)
 __target_intrinsic(glsl, dFdy)
 T ddy(T x);
 
 __generic<T : __BuiltinFloatingPointType, let N : int>
+__target_intrinsic(hlsl)
 __target_intrinsic(glsl, dFdy)
-vector<T,N> ddy(vector<T,N> x);
+vector<T, N> ddy(vector<T, N> x)
+{
+    VECTOR_MAP_UNARY(T, N, ddy, x);
+}
 
 __generic<T : __BuiltinFloatingPointType, let N : int, let M : int>
-__target_intrinsic(glsl, dFdy)
- matrix<T,N,M> ddy(matrix<T,N,M> x);
+__target_intrinsic(hlsl)
+matrix<T, N, M> ddy(matrix<T, N, M> x)
+{
+    MATRIX_MAP_UNARY(T, N, M, ddy, x);
+}
 
 __generic<T : __BuiltinFloatingPointType>
 __glsl_extension(GL_ARB_derivative_control)
@@ -862,44 +917,61 @@ __target_intrinsic(glsl, dFdyCoarse)
 T ddy_coarse(T x);
 
 __generic<T : __BuiltinFloatingPointType, let N : int>
+__target_intrinsic(hlsl)
 __glsl_extension(GL_ARB_derivative_control)
 __target_intrinsic(glsl, dFdyCoarse)
-vector<T,N> ddy_coarse(vector<T,N> x);
+vector<T, N> ddy_coarse(vector<T, N> x)
+{
+    VECTOR_MAP_UNARY(T, N, ddy_coarse, x);
+}
 
 __generic<T : __BuiltinFloatingPointType, let N : int, let M : int>
-__glsl_extension(GL_ARB_derivative_control)
-__target_intrinsic(glsl, dFdyCoarse)
-matrix<T,N,M> ddy_coarse(matrix<T,N,M> x);
+__target_intrinsic(hlsl)
+matrix<T, N, M> ddy_coarse(matrix<T, N, M> x)
+{
+    MATRIX_MAP_UNARY(T, N, M, ddy_coarse, x);
+}
 
 __generic<T : __BuiltinFloatingPointType>
+__target_intrinsic(hlsl)
 __glsl_extension(GL_ARB_derivative_control)
 __target_intrinsic(glsl, dFdyFine)
 T ddy_fine(T x);
 
 __generic<T : __BuiltinFloatingPointType, let N : int>
+__target_intrinsic(hlsl)
 __glsl_extension(GL_ARB_derivative_control)
 __target_intrinsic(glsl, dFdyFine)
-vector<T,N> ddy_fine(vector<T,N> x);
+vector<T, N> ddy_fine(vector<T, N> x)
+{
+    VECTOR_MAP_UNARY(T, N, ddy_fine, x);
+}
 
 __generic<T : __BuiltinFloatingPointType, let N : int, let M : int>
-__glsl_extension(GL_ARB_derivative_control)
-__target_intrinsic(glsl, dFdyFine)
-matrix<T,N,M> ddy_fine(matrix<T,N,M> x);
+__target_intrinsic(hlsl)
+matrix<T, N, M> ddy_fine(matrix<T, N, M> x)
+{
+    MATRIX_MAP_UNARY(T, N, M, ddy_fine, x);
+}
 
 
 // Radians to degrees
 
 __generic<T : __BuiltinFloatingPointType>
 __target_intrinsic(hlsl)
-__target_intrinsic(hlsl)
-T degrees(T x);
-// TODO: filling this in here requires ability to invoke `operator*` on T,
-// and convert a constant to `T` for the conversion factor
+__target_intrinsic(glsl)
+T degrees(T x)
+{
+    return x * (T(180) / T.getPi());
+}
 
 __generic<T : __BuiltinFloatingPointType, let N : int>
 __target_intrinsic(hlsl)
-__target_intrinsic(hlsl)
-vector<T,N> degrees(vector<T,N> x);
+__target_intrinsic(glsl)
+vector<T, N> degrees(vector<T, N> x)
+{
+    VECTOR_MAP_UNARY(T, N, degrees, x);
+}
 
 __generic<T : __BuiltinFloatingPointType, let N : int, let M : int>
 __target_intrinsic(hlsl)
@@ -923,11 +995,26 @@ void DeviceMemoryBarrierWithGroupSync();
 
 // Vector distance
 
-__generic<T : __BuiltinFloatingPointType, let N : int> T distance(vector<T,N> x, vector<T,N> y);
+__generic<T : __BuiltinFloatingPointType, let N : int>
+__target_intrinsic(hlsl)
+__target_intrinsic(glsl)
+T distance(vector<T, N> x, vector<T, N> y)
+{
+    return length(x - y);
+}
 
 // Vector dot product
 
-__generic<T : __BuiltinArithmeticType, let N : int> T dot(vector<T,N> x, vector<T,N> y);
+__generic<T : __BuiltinArithmeticType, let N : int>
+__target_intrinsic(hlsl)
+__target_intrinsic(glsl)
+T dot(vector<T, N> x, vector<T, N> y)
+{
+    T result = T(0);
+    for(int i = 0; i < N; ++i)
+        result += x[i] * y[i];
+    return result;
+}
 
 // Helper for computing distance terms for lighting (obsolete)
 
@@ -1040,10 +1127,10 @@ vector<uint,N> f32tof16(vector<float,N> value);
 __generic<T : __BuiltinFloatingPointType, let N : int>
 __target_intrinsic(hlsl)
 __target_intrinsic(glsl)
-vector<T,N> faceforward(vector<T,N> n, vector<T,N> i, vector<T,N> ng);
-/*{
+vector<T,N> faceforward(vector<T,N> n, vector<T,N> i, vector<T,N> ng)
+{
     return dot(ng, i) < T(0.0f) ? n : -n;
-}*/
+}
 
 // Find first set bit starting at high bit and working down
 __target_intrinsic(glsl,"findMSB")

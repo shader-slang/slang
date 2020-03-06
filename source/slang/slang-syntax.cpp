@@ -1548,7 +1548,18 @@ void Type::accept(IValVisitor* visitor, void* extra)
 
         if (auto thisTypeSubst = as<ThisTypeSubstitution>(subst))
         {
-            return witness->EqualsVal(thisTypeSubst->witness);
+            // For our purposes, two this-type substitutions are
+            // equivalent if they have the same type as `This`,
+            // even if the specific witness values they use
+            // might differ.
+            //
+            if(this->interfaceDecl != thisTypeSubst->interfaceDecl)
+                return false;
+
+            if(!this->witness->sub->Equals(thisTypeSubst->witness->sub))
+                return false;
+
+            return true;
         }
         return false;
     }

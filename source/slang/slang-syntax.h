@@ -1168,8 +1168,6 @@ namespace Slang
         // used at all, to avoid allocation.
         List<LookupResultItem> items;
 
-        HashSet<DeclRef<ContainerDecl>>      lookedupDecls;
-
         // Was at least one result found?
         bool isValid() const { return item.declRef.getDecl() != nullptr; }
 

@@ -21,7 +21,14 @@ syntax globallycoherent : GloballyCoherentModifier;
 interface __BuiltinType {}
 
 // A type that can be used for arithmetic operations
-interface __BuiltinArithmeticType : __BuiltinType {}
+interface __BuiltinArithmeticType : __BuiltinType
+{
+        /// Initialize from a 32-bit signed integer value.
+    __init(int value);
+}
+
+    /// A type that can be used for logical/bitwsie operations
+interface __BuiltinLogicalType : __BuiltinType {}
 
 // A type that logically has a sign (positive/negative/zero)
 interface __BuiltinSignedArithmeticType : __BuiltinArithmeticType {}
@@ -31,14 +38,16 @@ interface __BuiltinIntegerType : __BuiltinArithmeticType
 {}
 
 // A type that can represent non-integers
-interface __BuiltinRealType : __BuiltinArithmeticType {}
+interface __BuiltinRealType : __BuiltinSignedArithmeticType {}
 
 // A type that uses a floating-point representation
-interface __BuiltinFloatingPointType : __BuiltinRealType, __BuiltinSignedArithmeticType
+interface __BuiltinFloatingPointType : __BuiltinRealType
 {
-    // A builtin floating-point type must have an initializer that takes
-    // a floating-point value...
+        /// Initialize from a 32-bit floating-point value.
     __init(float value);
+
+        /// Get the value of the mathematical constant pi in this type.
+    static This getPi();
 }
 
 // A type resulting from an `enum` declaration.
@@ -116,52 +125,58 @@ __generic<T, let N : int> __intrinsic_op(select) vector<T,N> operator?:(vector<b
 ${{{{
 // We are going to use code generation to produce the
 // declarations for all of our base types.
-
 static const int kBaseTypeCount = sizeof(kBaseTypes) / sizeof(kBaseTypes[0]);
 for (int tt = 0; tt < kBaseTypeCount; ++tt)
 {
-    EMIT_LINE_DIRECTIVE();
-    sb << "__builtin_type(" << int(kBaseTypes[tt].tag) << ") struct " << kBaseTypes[tt].name;
+}}}}
 
-    // Declare interface conformances for this type
+__builtin_type($(int(kBaseTypes[tt].tag)))
+struct $(kBaseTypes[tt].name)
+    : __BuiltinType
 
-    sb << "\n    : __BuiltinType\n";
-
+${{{{
     switch (kBaseTypes[tt].tag)
     {
     case BaseType::Half:
     case BaseType::Float:
     case BaseType::Double:
-        sb << "\n    ,  __BuiltinFloatingPointType\n";
-        sb << "\n    ,  __BuiltinRealType\n";
-        sb << "\n    ,  __BuiltinSignedArithmeticType\n";
-        sb << "\n    ,  __BuiltinArithmeticType\n";
-        sb << "\n    ,  __BuiltinType\n";
+}}}}
+    ,  __BuiltinFloatingPointType
+    ,  __BuiltinRealType
+    ,  __BuiltinSignedArithmeticType
+    ,  __BuiltinArithmeticType
+${{{{
         break;
     case BaseType::Int8:
     case BaseType::Int16:
     case BaseType::Int:
     case BaseType::Int64:
-        sb << "\n    ,  __BuiltinSignedArithmeticType\n";
+}}}}
+    ,  __BuiltinSignedArithmeticType
+${{{{
         ; // fall through to:
     case BaseType::UInt8:
     case BaseType::UInt16:
     case BaseType::UInt:
     case BaseType::UInt64:
-        sb << "\n    ,  __BuiltinArithmeticType\n";
-        sb << "\n    ,  __BuiltinIntegerType\n";
+}}}}
+    ,  __BuiltinArithmeticType
+    ,  __BuiltinIntegerType
+${{{{
         ; // fall through to:
     case BaseType::Bool:
-        sb << "\n    ,  __BuiltinType\n";
+}}}}
+    ,  __BuiltinLogicalType
+${{{{
         break;
 
     default:
         break;
     }
+}}}}
+{
 
-    sb << "\n{\n";
-
-
+${{{{
     // Declare initializers to convert from various other types
     for (int ss = 0; ss < kBaseTypeCount; ++ss)
     {
@@ -175,12 +190,12 @@ for (int tt = 0; tt < kBaseTypeCount; ++tt)
         ConversionCost conversionCost = getBaseTypeConversionCost(
             kBaseTypes[tt],
             kBaseTypes[ss]);
+}}}}
 
-        EMIT_LINE_DIRECTIVE();
-        sb << "__implicit_conversion(" << conversionCost << ")\n";
+    __implicit_conversion($(conversionCost))
+    __init($(kBaseTypes[ss].name) value);
 
-        EMIT_LINE_DIRECTIVE();
-        sb << "__init(" << kBaseTypes[ss].name << " value);\n";
+${{{{
     }
 
     // If this is a basic integer type, then define explicit
@@ -206,13 +221,33 @@ ${{{{
         break;
     }
 
-    sb << "};\n";
+    // If this is a floating-point type, then we need to
+    // define the basic `getPi()` function that is used
+    // to implement generic versions of `degrees()` and
+    // `radians()`.
+    //
+    switch (kBaseTypes[tt].tag)
+    {
+    default:
+        break;
+    case BaseType::Half:
+    case BaseType::Float:
+    case BaseType::Double:
+}}}}
+        static $(kBaseTypes[tt].name) getPi() { return $(kBaseTypes[tt].name)(3.14159265358979323846264338328); }
+${{{{
+        break;
+    }
+}}}}
+
+}
+
+${{{{
 }
 
 // Declare built-in pointer type
 // (eventually we can have the traditional syntax sugar for this)
 }}}}
-
 __generic<T>
 __magic_type(PtrType)
 __intrinsic_type($(kIROp_PtrType))
@@ -242,26 +277,31 @@ __intrinsic_type($(kIROp_StringType))
 struct String
 {};
 
-${{{{
-// Declare vector and matrix types
+    /// An `N` component vector with elements of type `T`.
+__generic<T = float, let N : int = 4>
+__magic_type(Vector)
+struct vector
+{
+        /// The element type of the vector
+    typedef T Element;
 
-sb << "__generic<T = float, let N : int = 4> __magic_type(Vector) struct vector\n{\n";
-sb << "    typedef T Element;\n";
 
-// Declare initializer taking a single scalar of the elemnt type
-sb << "    __implicit_conversion(" << kConversionCost_ScalarToVector << ")\n";
-sb << "    __intrinsic_op(" << kIROp_constructVectorFromScalar << ")\n";
-sb << "    __init(T value);\n";
+        /// Initialize a vector where all elements have the same scalar `value`.
+    __implicit_conversion($(kConversionCost_ScalarToVector))
+    __intrinsic_op($(kIROp_constructVectorFromScalar))
+    __init(T value);
 
-// Allow initialization from same type
-sb << "    __init(vector<T,N> value);\n";
+        /// Initialize a vector from a value of the same type
+    // TODO: we should revise semantic checking so this kind of "identity" conversion is not required
+    __init(vector<T,N> value);
+}
 
-sb << "};\n";
-}}}}
-
+    /// A matrix with `R` rows and `C` columns, with elements of type `T`.
 __generic<T = float, let R : int = 4, let C : int = 4>
 __magic_type(Matrix)
-struct matrix {};
+struct matrix
+{
+}
 
 ${{{{
 static const struct {
@@ -310,20 +350,24 @@ for (int tt = 0; tt < kTypeCount; ++tt)
 }
 
 // Declare additional built-in generic types
-//        EMIT_LINE_DIRECTIVE();
+}}}}
 
+__generic<T>
+__intrinsic_type($(kIROp_ConstantBufferType))
+__magic_type(ConstantBuffer)
+struct ConstantBuffer {}
 
-sb << "__generic<T>\n";
-sb << "__intrinsic_type(" << kIROp_ConstantBufferType << ")\n";
-sb << "__magic_type(ConstantBuffer) struct ConstantBuffer {};\n";
+__generic<T>
+__intrinsic_type($(kIROp_TextureBufferType))
+__magic_type(TextureBuffer)
+struct TextureBuffer {}
 
-sb << "__generic<T>\n";
-sb << "__intrinsic_type(" << kIROp_TextureBufferType << ")\n";
-sb << "__magic_type(TextureBuffer) struct TextureBuffer {};\n";
+__generic<T>
+__intrinsic_type($(kIROp_ParameterBlockType))
+__magic_type(ParameterBlockType)
+struct ParameterBlock {}
 
-sb << "__generic<T>\n";
-sb << "__intrinsic_type(" << kIROp_ParameterBlockType << ")\n";
-sb << "__magic_type(ParameterBlockType) struct ParameterBlock {};\n";
+${{{{
 
 static const char* kComponentNames[]{ "x", "y", "z", "w" };
 static const char* kVectorNames[]{ "", "x", "xy", "xyz", "xyzw" };
@@ -454,20 +498,25 @@ for( int C = 2; C <= 4; ++C )
 
     sb << "}\n";
 }
-
-// Declare built-in texture and sampler types
-
+}}}}
 
 
-sb << "__magic_type(SamplerState," << int(SamplerStateFlavor::SamplerState) << ")\n";
-sb << "__intrinsic_type(" << kIROp_SamplerStateType << ")\n";
-sb << "struct SamplerState {};";
+    /// Sampling state for filtered texture fetches.
+__magic_type(SamplerState, $(int(SamplerStateFlavor::SamplerState)))
+__intrinsic_type($(kIROp_SamplerStateType))
+struct SamplerState
+{
+}
 
-sb << "__magic_type(SamplerState," << int(SamplerStateFlavor::SamplerComparisonState) << ")\n";
-sb << "__intrinsic_type(" << kIROp_SamplerComparisonStateType << ")\n";
-sb << "struct SamplerComparisonState {};";
+    /// Sampling state for filtered texture fetches that include a comparison operation before filtering.
+__magic_type(SamplerState, $(int(SamplerStateFlavor::SamplerComparisonState)))
+__intrinsic_type($(kIROp_SamplerComparisonStateType))
+struct SamplerComparisonState
+{
+}
 
-// TODO(tfoley): Need to handle `RW*` variants of texture types as well...
+${{{{
+
 static const struct {
     char const*			    name;
     TextureFlavor::Shape	baseShape;
@@ -1403,6 +1452,9 @@ for (int tt = 0; tt < kBaseTextureTypeCount; ++tt)
 
 for (auto op : unaryOps)
 {
+    char const* fixity = (op.flags & POSTFIX) != 0 ? "__postfix " : "__prefix ";
+    char const* qual = (op.flags & ASSIGNMENT) != 0 ? "in out " : "";
+
     for (auto type : kBaseTypes)
     {
         if ((type.flags & op.flags) == 0)
@@ -1410,9 +1462,6 @@ for (auto op : unaryOps)
 
         char const* resultType = type.name;
         if (op.flags & BOOL_RESULT) resultType = "bool";
-
-        char const* fixity = (op.flags & POSTFIX) != 0 ? "__postfix " : "__prefix ";
-        char const* qual = (op.flags & ASSIGNMENT) != 0 ? "in out " : "";
 
         // scalar version
         sb << fixity;
@@ -1428,10 +1477,35 @@ for (auto op : unaryOps)
         sb << fixity;
         sb << "__intrinsic_op(" << int(op.opCode) << ") matrix<" << resultType << ",N,M> operator" << op.opName << "(" << qual << "matrix<" << type.name << ",N,M> value);\n";
     }
+
+    // Synthesize generic versions
+    if(op.interface)
+    {
+        char const* resultType = "T";
+        if (op.flags & BOOL_RESULT) resultType = "bool";
+
+        // scalar version
+        sb << fixity;
+        sb << "__generic<T : " << op.interface << ">\n";
+        sb << "__intrinsic_op(" << int(op.opCode) << ") " << resultType << " operator" << op.opName << "(" << qual << "T value);\n";
+
+        // vector version
+        sb << "__generic<T : " << op.interface << ", let N : int> ";
+        sb << fixity;
+        sb << "__intrinsic_op(" << int(op.opCode) << ") vector<" << resultType << ",N> operator" << op.opName << "(" << qual << "vector<T,N> value);\n";
+
+        // matrix version
+        sb << "__generic<T : " << op.interface << ", let N : int, let M : int> ";
+        sb << fixity;
+        sb << "__intrinsic_op(" << int(op.opCode) << ") matrix<" << resultType << ",N,M> operator" << op.opName << "(" << qual << "matrix<T,N,M> value);\n";
+    }
 }
 
 for (auto op : binaryOps)
 {
+    char const* leftQual = "";
+    if(op.flags & ASSIGNMENT) leftQual = "in out ";
+
     for (auto type : kBaseTypes)
     {
         if ((type.flags & op.flags) == 0)
@@ -1443,10 +1517,15 @@ for (auto op : binaryOps)
 
         if (op.flags & BOOL_RESULT) resultType = "bool";
 
-        char const* leftQual = "";
-        if(op.flags & ASSIGNMENT) leftQual = "in out ";
-
-        // TODO: handle `SHIFT`
+        // TODO: We should handle a `SHIFT` flag on the op
+        // by changing `rightType` to `int` in order to
+        // account for the fact that the shift amount should
+        // always have a fixed type independent of the LHS.
+        //
+        // (It is unclear why this change hadn't been made
+        // already, so it is possible that such a change
+        // breaks overload resolution or other parts of
+        // the compiler)
 
         // scalar version
         sb << "__intrinsic_op(" << int(op.opCode) << ") " << resultType << " operator" << op.opName << "(" << leftQual << leftType << " left, " << rightType << " right);\n";
@@ -1459,9 +1538,38 @@ for (auto op : binaryOps)
         sb << "__generic<let N : int, let M : int> ";
         sb << "__intrinsic_op(" << int(op.opCode) << ") matrix<" << resultType << ",N,M> operator" << op.opName << "(" << leftQual << "matrix<" << leftType << ",N,M> left, matrix<" << rightType << ",N,M> right);\n";
 
-        // We are going to go ahead and explicitly define combined
-        // operations for the scalar-op-vector, etc. cases, rather
-        // than rely on promotion rules.
+        // We currently synthesize addiitonal overloads
+        // for the case where one or the other operand
+        // is a scalar. This choice serves a few purposes:
+        //
+        // 1. It avoids introducing scalar-to-vector or
+        // scalar-to-matrix promotions before the operator,
+        // which might allow some back ends to produce
+        // more optimal code.
+        //
+        // 2. It avoids concerns about making overload resolution
+        // and the inference rules for `N` and `M` able to
+        // handle the mixed vector/scalar or matrix/scalar case.
+        //
+        // 3. Having explicit overloads for the matrix/scalar cases
+        // here means that we do *not* need to support a general
+        // implicit conversion from scalars to matrices, unless
+        // we decide we want to.
+        //
+        // Note: Case (2) of the motivation shouldn't really apply
+        // any more, because we end up having to support similar
+        // inteference for built-in binary math functions where
+        // vectors and scalars might be combined (and where defining
+        // additional overloads to cover all the combinations doesn't
+        // seem practical or desirable).
+        //
+        // TODO: We should consider whether dropping these extra
+        // overloads is possible and worth it. The optimization
+        // concern (1) could possibly be addressed in specific
+        // back-ends. The issue (3) about not wanting to support
+        // implicit scalar-to-matrix conversion may be moot if
+        // we end up needing to support mixed scalar/matrix input
+        // for builtin in non-operator functions anyway.
 
         // scalar-vector and scalar-matrix
         if (!(op.flags & ASSIGNMENT))
@@ -1478,6 +1586,46 @@ for (auto op : binaryOps)
         sb << "__intrinsic_op(" << int(op.opCode) << ") vector<" << resultType << ",N> operator" << op.opName << "(" << leftQual << "vector<" << leftType << ",N> left, " << rightType << " right);\n";
 
         sb << "__generic<let N : int, let M : int> ";
+        sb << "__intrinsic_op(" << int(op.opCode) << ") matrix<" << resultType << ",N,M> operator" << op.opName << "(" << leftQual << "matrix<" << leftType << ",N,M> left, " << rightType << " right);\n";
+    }
+
+    // Synthesize generic versions
+    if(op.interface)
+    {
+        char const* leftType = "T";
+        char const* rightType = leftType;
+        char const* resultType = leftType;
+
+        if (op.flags & BOOL_RESULT) resultType = "bool";
+        // TODO: handle `SHIFT`
+
+        // scalar version
+        sb << "__generic<T : " << op.interface << ">\n";
+        sb << "__intrinsic_op(" << int(op.opCode) << ") " << resultType << " operator" << op.opName << "(" << leftQual << leftType << " left, " << rightType << " right);\n";
+
+        // vector version
+        sb << "__generic<T : " << op.interface << ", let N : int> ";
+        sb << "__intrinsic_op(" << int(op.opCode) << ") vector<" << resultType << ",N> operator" << op.opName << "(" << leftQual << "vector<" << leftType << ",N> left, vector<" << rightType << ",N> right);\n";
+
+        // matrix version
+        sb << "__generic<T : " << op.interface << ", let N : int, let M : int> ";
+        sb << "__intrinsic_op(" << int(op.opCode) << ") matrix<" << resultType << ",N,M> operator" << op.opName << "(" << leftQual << "matrix<" << leftType << ",N,M> left, matrix<" << rightType << ",N,M> right);\n";
+
+        // scalar-vector and scalar-matrix
+        if (!(op.flags & ASSIGNMENT))
+        {
+            sb << "__generic<T : " << op.interface << ", let N : int> ";
+            sb << "__intrinsic_op(" << int(op.opCode) << ") vector<" << resultType << ",N> operator" << op.opName << "(" << leftQual << leftType << " left, vector<" << rightType << ",N> right);\n";
+
+            sb << "__generic<T : " << op.interface << ", let N : int, let M : int> ";
+            sb << "__intrinsic_op(" << int(op.opCode) << ") matrix<" << resultType << ",N,M> operator" << op.opName << "(" << leftQual << leftType << " left, matrix<" << rightType << ",N,M> right);\n";
+        }
+
+        // vector-scalar and matrix-scalar
+        sb << "__generic<T : " << op.interface << ", let N : int> ";
+        sb << "__intrinsic_op(" << int(op.opCode) << ") vector<" << resultType << ",N> operator" << op.opName << "(" << leftQual << "vector<" << leftType << ",N> left, " << rightType << " right);\n";
+
+        sb << "__generic<T : " << op.interface << ", let N : int, let M : int> ";
         sb << "__intrinsic_op(" << int(op.opCode) << ") matrix<" << resultType << ",N,M> operator" << op.opName << "(" << leftQual << "matrix<" << leftType << ",N,M> left, " << rightType << " right);\n";
     }
 }

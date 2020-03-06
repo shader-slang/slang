@@ -104,7 +104,6 @@ just constructXXXFromScalar. Would be good if there was a suitable name to encom
         x(Max, "max", 2) \
         x(Pow, "pow", 2) \
         x(FMod, "fmod", 2) \
-        x(Cross, "cross", 2) \
         x(Reflect, "reflect", 2) \
         \
         x(SmoothStep, "smoothstep", 3) \
