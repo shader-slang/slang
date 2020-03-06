@@ -497,6 +497,33 @@ namespace Slang
         return false;
     }
 
+        /// If `declRef` representations a specialization of a generic, returns the number of specialized generic arguments.
+        /// Otherwise, returns zero.
+        ///
+    Int SemanticsVisitor::getSpecializedParamCount(DeclRef<Decl> const& declRef)
+    {
+        if(!declRef)
+            return 0;
+
+        // A specialization of a generic must point at the
+        // "inner" declaration of a generic. That means that
+        // the parent of the decl ref must be a generic.
+        //
+        auto parentGeneric = declRef.GetParent().as<GenericDecl>();
+        if(!parentGeneric)
+            return 0;
+        //
+        // Furthermore, the declaration we are considering
+        // must be the single "inner" declaration of the
+        // parent generic (and not somthing like a generic
+        // parameter).
+        //
+        if( parentGeneric.getDecl()->inner.Ptr() != declRef.getDecl())
+            return 0;
+
+        return CountParameters(parentGeneric).required;
+    }
+
     int SemanticsVisitor::CompareLookupResultItems(
         LookupResultItem const& left,
         LookupResultItem const& right)
@@ -534,6 +561,87 @@ namespace Slang
         return 0;
     }
 
+    int SemanticsVisitor::compareOverloadCandidateSpecificity(
+        LookupResultItem const& left,
+        LookupResultItem const& right)
+    {
+        // HACK: if both items refer to the same declaration,
+        // then arbitrarily pick one.
+        if(left.declRef.Equals(right.declRef))
+            return -1;
+
+        // There is a very general rule that we would like to enforce
+        // in principle:
+        //
+        // Given candidates A and B, if A being applicable to some
+        // arguments implies that B is also applicable, but not vice versa,
+        // then A is a more specific/specialized candidate than B.
+        //
+        // A number of conclusions follow from this general rule.
+        // For example, a non-generic declaration will always be
+        // more specific than a generic declaration that was specialized
+        // to matching types:
+        //
+        //      int doThing(int a);
+        //      T doThing<T>(T a);
+        //
+        // It is clear that if the non-generic `doThing` is applicable
+        // to an argument `x`, then `doThing<int>` is also applicable to
+        // `x`. However, knowing that the generic `doThing` was applicable
+        // to some `y` doesn't tell us that the non-generic `doThing` can
+        // be called on `y`, because `y` could have some type that can't
+        // convert to `int`.
+        //
+        // Similarly, a generic declaration with a subset of the parameters
+        // of another generic is always more specialized:
+        //
+        //      int doThing<T>(vector<T,3> value);
+        //      int doThing<T, let N : int>(vector<T,N> value);
+        //
+        // Here we know that both overloads can apply to `float3`, but only
+        // one can apply to `float4`, so the first overload is more
+        // specialized/specific.
+        //
+        // As a final example, a generic which places more constraints
+        // on its generic parameters is more specific, all other things
+        // being equal:
+        //
+        //      int doThing<T : IFoo>( T value );
+        //      int doThing<T>(T value);
+        //
+        // In this case we know that the first overload is applicable
+        // to a strict subset of the types that the second overload can
+        // apply to.
+        //
+        // The above rules represent the idealized principles we want
+        // to implement, but actually implementing that full check here
+        // could make overload resolution far more expensive.
+        //
+        // For now we are going to do something far simpler and hackier,
+        // which is to say that a candidate with more generic parameters
+        // is always preferred over one with fewer.
+        //
+        // TODO: We could extend this definition to account for constraints
+        // on generic parameters in the count, which would handle the
+        // need to prefer a more-constrained generic when possible.
+        //
+        // TODO: In the long run we should clearly replace this with
+        // the more general "does A being applicable imply B being applicable"
+        // test.
+        //
+        // TODO: The principle stated here doesn't take the actual
+        // arguments or their types into account, and it might be that
+        // in some cases disambiguation of which declaration should be
+        // preferred will depend on knowing the actual arguments.
+        //
+        auto leftSpecCount = getSpecializedParamCount(left.declRef);
+        auto rightSpecCount = getSpecializedParamCount(right.declRef);
+        if(leftSpecCount != rightSpecCount)
+            return int(leftSpecCount - rightSpecCount);
+
+        return 0;
+    }
+
     int SemanticsVisitor::CompareOverloadCandidates(
         OverloadCandidate*	left,
         OverloadCandidate*	right)
@@ -546,17 +654,66 @@ namespace Slang
         // the costs of their type conversion sequences
         if(left->status == OverloadCandidate::Status::Applicable)
         {
+            // If one candidate incurred less cost related to
+            // implicit conversion of arguments to matching
+            // parameter types, then we should prefer that
+            // candidate.
+            //
+            // TODO: This eventually should be refined into
+            // a test that checks conversion cost per-argument,
+            // and only considers a candidate "better" if it
+            // has lower cost for at least one argument, and
+            // does not have higher cost for any.
+            //
             if (left->conversionCostSum != right->conversionCostSum)
                 return left->conversionCostSum - right->conversionCostSum;
 
-            // If all conversion costs match, then we should consider
-            // whether one of the two items/declarations should be
-            // preferred based on grounds that have nothing to do
-            // with applicability or conversion costs.
+            // If both candidates appear to be equally good when it
+            // comes to the per-argument conversions required,
+            // then we have two other categories of criteria we
+            // can look at to disambiguate things:
+            //
+            // 1. We can look at how the lookup process found `left` and `right`
+            //    do decide which is a better match based purely on how "far away"
+            //    they are for lookup purposes. A canonincal example here would
+            //    be if one declaration shadows or overrides the other.
+            //
+            // 2. We can look at parameter lists of `left` and `right`, their types, etc.
+            //    do decide which is a better match based purely on structure.
+            //    Canonical examples in this case would be preferring a non-generic
+            //    candidate over a generic one, preferring a non-variadic candidate
+            //    over a variadic one, and preferring a candidate with fewer
+            //    default parameters over one with more.
+            //
+            // Deciding how to order/interleave these two categories of criteria
+            // is an important design decision.
+            //
+            // For example, consider:
+            //
+            //      float f(float x);
+            //
+            //      struct S
+            //      {
+            //          int f<T>(T x);
+            //
+            //          float g(float y) { return f(y); }
+            //      }
+            //
+            // In terms of structural/type matching, the global `f` is a more specialized
+            // candidate at the call site, while in terms of lookup/lexical crieteria
+            // the `S.f` declaration is better.
+            //
+            // For now we are considering lookup/overriding concerns first (so
+            // we would bias in favor of selecting `S.f` in the above example), and then
+            // structural/type concerns, but a more nuanced approach may be
+            // required in the future to better match programmer intuition.
             //
             auto itemDiff = CompareLookupResultItems(left->item, right->item);
             if(itemDiff)
                 return itemDiff;
+            auto specificityDiff = compareOverloadCandidateSpecificity(left->item, right->item);
+            if(specificityDiff)
+                return specificityDiff;
         }
 
         return 0;
@@ -988,6 +1145,22 @@ namespace Slang
         sb << val->ToString();
     }
 
+    static void formatDeclName(StringBuilder& sb, Decl* decl)
+    {
+        if(as<ConstructorDecl>(decl))
+        {
+            sb << "init";
+        }
+        else if(as<SubscriptDecl>(decl))
+        {
+            sb << "subscript";
+        }
+        else
+        {
+            sb << getText(decl->getName());
+        }
+    }
+
     void SemanticsVisitor::formatDeclPath(StringBuilder& sb, DeclRef<Decl> declRef)
     {
         // Find the parent declaration
@@ -1008,7 +1181,7 @@ namespace Slang
             sb << ".";
         }
 
-        sb << getText(declRef.GetName());
+        formatDeclName(sb, declRef.getDecl());
 
         // If the parent declaration is a generic, then we need to print out its
         // signature
@@ -1018,10 +1191,29 @@ namespace Slang
             SLANG_RELEASE_ASSERT(genSubst);
             SLANG_RELEASE_ASSERT(genSubst->genericDecl == parentGenericDeclRef.getDecl());
 
+            // If the name we printed previously was an operator
+            // that ends with `<`, then immediately printing the
+            // generic arguments inside `<...>` may cause it to
+            // be hard to parse the operator name visually.
+            //
+            // We thus include a space between the declaration name
+            // and its generic arguments in this case.
+            //
+            if(sb.endsWith("<")) sb << " ";
+
             sb << "<";
             bool first = true;
             for(auto arg : genSubst->args)
             {
+                // When printing the representation of a sepcialized
+                // generic declaration we don't want to include the
+                // argument values for subtype witnesses since these
+                // do not correspond to parameters of the generic
+                // as the user sees it.
+                //
+                if(as<Witness>(arg))
+                    continue;
+
                 if(!first) sb << ", ";
                 formatVal(sb, arg);
                 first = false;
@@ -1085,10 +1277,31 @@ namespace Slang
         }
     }
 
+    static void formatDeclKindPrefix(StringBuilder& sb, Decl* decl)
+    {
+        if(as<FuncDecl>(decl))
+        {
+            sb << "func ";
+        }
+    }
+
+    void SemanticsVisitor::formatDeclResultType(StringBuilder& sb, DeclRef<Decl> const& declRef)
+    {
+        if(as<ConstructorDecl>(declRef))
+        {}
+        else if(auto callableDeclRef = declRef.as<CallableDecl>())
+        {
+            sb << " -> ";
+            formatType(sb, GetResultType(callableDeclRef));
+        }
+    }
+
     void SemanticsVisitor::formatDeclSignature(StringBuilder& sb, DeclRef<Decl> declRef)
     {
+        formatDeclKindPrefix(sb, declRef.getDecl());
         formatDeclPath(sb, declRef);
         formatDeclParams(sb, declRef);
+        formatDeclResultType(sb, declRef);
     }
 
     String SemanticsVisitor::getDeclSignatureString(DeclRef<Decl> declRef)

@@ -742,7 +742,7 @@ namespace Slang
         //
         bool findWitnessForInterfaceRequirement(
             ConformanceCheckingContext* context,
-            DeclRef<AggTypeDeclBase>    typeDeclRef,
+            Type*                       type,
             InheritanceDecl*            inheritanceDecl,
             DeclRef<InterfaceDecl>      interfaceDeclRef,
             DeclRef<Decl>               requiredMemberDeclRef,
@@ -754,22 +754,21 @@ namespace Slang
         // members to satisfy all the requirements in the interface.
         RefPtr<WitnessTable> checkInterfaceConformance(
             ConformanceCheckingContext* context,
-            DeclRef<AggTypeDeclBase>    typeDeclRef,
+            Type*                       type,
             InheritanceDecl*            inheritanceDecl,
             DeclRef<InterfaceDecl>      interfaceDeclRef);
 
         RefPtr<WitnessTable> checkConformanceToType(
             ConformanceCheckingContext* context,
-            DeclRef<AggTypeDeclBase>    typeDeclRef,
+            Type*                       type,
             InheritanceDecl*            inheritanceDecl,
             Type*                       baseType);
 
-        // Check that the type (or extension) declaration `declRef`,
-        // which declares that it inherits from another type via
-        // `inheritanceDecl` actually does what it needs to
-        // for that inheritance to be valid.
+            /// Check that `type` which has declared that it inherits from (and/or implements)
+            /// another type via `inheritanceDecl` actually does what it needs to for that
+            /// inheritance to be valid.
         bool checkConformance(
-            DeclRef<AggTypeDeclBase>    declRef,
+            Type*                       type,
             InheritanceDecl*            inheritanceDecl);
 
         void checkExtensionConformance(ExtensionDecl* decl);
@@ -787,11 +786,15 @@ namespace Slang
         void getGenericParams(
             GenericDecl*                        decl,
             List<Decl*>&                        outParams,
-            List<GenericTypeConstraintDecl*>    outConstraints);
+            List<GenericTypeConstraintDecl*>&   outConstraints);
 
+            /// Determine if `left` and `right` have matching generic signatures.
+            /// If they do, then outputs a substitution to `ioSubstRightToLeft` that
+            /// can be used to specialize `right` to the parameters of `left`.
         bool doGenericSignaturesMatch(
-            GenericDecl*    fst,
-            GenericDecl*    snd);
+            GenericDecl*                    left,
+            GenericDecl*                    right,
+            RefPtr<GenericSubstitution>*    outSubstRightToLeft);
 
         // Check if two functions have the same signature for the purposes
         // of overload resolution.
@@ -1124,8 +1127,18 @@ namespace Slang
             OverloadCandidate*	left,
             OverloadCandidate*	right);
 
+            /// If `declRef` representations a specialization of a generic, returns the number of specialized generic arguments.
+            /// Otherwise, returns zero.
+            ///
+        Int getSpecializedParamCount(DeclRef<Decl> const& declRef);
+
             /// Compare items `left` and `right` produced by lookup, to see if one should be favored for overloading.
         int CompareLookupResultItems(
+            LookupResultItem const& left,
+            LookupResultItem const& right);
+
+            /// Compare items `left` and `right` being considered as overload candidates, and determine if one should be favored for structural reasons.
+        int compareOverloadCandidateSpecificity(
             LookupResultItem const& left,
             LookupResultItem const& right);
 
@@ -1236,6 +1249,8 @@ namespace Slang
         void formatDeclPath(StringBuilder& sb, DeclRef<Decl> declRef);
 
         void formatDeclParams(StringBuilder& sb, DeclRef<Decl> declRef);
+
+        void formatDeclResultType(StringBuilder& sb, DeclRef<Decl> const& declRef);
 
         void formatDeclSignature(StringBuilder& sb, DeclRef<Decl> declRef);
 
