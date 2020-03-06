@@ -488,113 +488,122 @@ __inline__ __device__ bool _waveIsFirstLane()
     return (mask & 1 ) || ((__ffs(mask) - 1) == _getLaneId());
 }
 
-// TODO(JS): NOTE! These functions only work across all lanes. 
-// Special handling will be needed if only some lanes are active.
 
-#define SLANG_CUDA_REDUCE_OP(INIT_VALUE, OP) \
-    const int offsetSize = _waveCalcPow2Offset(mask); \
-    if (offsetSize > 0) \
-    { \
-        for (int offset = offsetSize >> 1; offset > 0; offset >>= 1) \
-        { \
-            val = val OP __shfl_xor_sync( mask, val, offset); \
-        } \
-        return val;  \
-    } \
-    else if (_waveIsSingleLane(mask)) \
-    { \
-        return val; \
-    } \
-    else \
-    { \
-        int result = INIT_VALUE; \
-        int remaining = mask; \
-        while (remaining) \
-        { \
-            const int laneBit = remaining & -remaining; \
-            /* Get the sourceLane */ \
-            const int srcLane = __ffs(laneBit) - 1; \
-            /* Broadcast (can also broadcast to self) */ \
-            result = result OP __shfl_sync(mask, val, srcLane); \
-            remaining &= ~laneBit; \
-        } \
-        return result; \
+template <typename T>
+struct WaveOpOr
+{
+    __inline__ __device__ static T getInitial(T a) { return 0; }
+    __inline__ __device__ static T doOp(T a, T b) { return a | b; }
+};
+
+template <typename T>
+struct WaveOpAnd
+{
+    __inline__ __device__ static T getInitial(T a) { return ~T(0); }
+    __inline__ __device__ static T doOp(T a, T b) { return a & b; }
+};
+
+template <typename T>
+struct WaveOpXor
+{
+    __inline__ __device__ static T getInitial(T a) { return 0; }
+    __inline__ __device__ static T doOp(T a, T b) { return a ^ b; }
+};
+
+template <typename T>
+struct WaveOpAdd
+{
+    __inline__ __device__ static T getInitial(T a) { return 0; }
+    __inline__ __device__ static T doOp(T a, T b) { return a + b; }
+};
+
+template <typename T>
+struct WaveOpMul
+{
+    __inline__ __device__ static T getInitial(T a) { return T(1); }
+    __inline__ __device__ static T doOp(T a, T b) { return a * b; }
+};
+
+template <typename T>
+struct WaveOpMax
+{
+    __inline__ __device__ static T getInitial(T a) { return a; }
+    __inline__ __device__ static T doOp(T a, T b) { return a > b ? a : b; }
+};
+
+template <typename T>
+struct WaveOpMin
+{
+    __inline__  __device__ static T getInitial(T a) { return a; }
+    __inline__ __device__ static T doOp(T a, T b) { return a < b ? a : b; }
+};
+
+// Scalar 
+template <typename INTF, typename T>
+__device__ T _waveReduce(int mask, T val)
+{
+    const int offsetSize = _waveCalcPow2Offset(mask);
+    if (offsetSize > 0)
+    {
+        for (int offset = offsetSize >> 1; offset > 0; offset >>= 1)
+        {
+            val = INTF::doOp(val, __shfl_xor_sync(mask, val, offset));
+        }
+        return val;
     }
-
-#define SLANG_CUDA_REDUCE_FUNC(INIT_VALUE, FUNC) \
-    const int offsetSize = _waveCalcPow2Offset(mask); \
-    if (offsetSize > 0) \
-    { \
-        for (int offset = offsetSize >> 1; offset > 0; offset >>= 1) \
-        { \
-            val = FUNC(val, __shfl_xor_sync( mask, val, offset)); \
-        } \
-        return val;  \
-    } \
-    else if (_waveIsSingleLane(mask)) \
-    { \
-        return val; \
-    } \
-    else \
-    { \
-        int result = INIT_VALUE; \
-        int remaining = mask; \
-        while (remaining) \
-        { \
-            const int laneBit = remaining & -remaining; \
-            /* Get the sourceLane */ \
-            const int srcLane = __ffs(laneBit) - 1; \
-            /* Broadcast (can also broadcast to self) */ \
-            result = FUNC(result, __shfl_sync(mask, val, srcLane)); \
-            remaining &= ~laneBit; \
-        } \
-        return result; \
-    }    
-    
-
-__inline__ __device__ int _waveOr(int mask, int val) 
-{
-    SLANG_CUDA_REDUCE_OP(0, |)
+    else if (_waveIsSingleLane(mask))
+    {
+        return val;
+    }
+    else
+    {
+        T result = INTF::getInitial(val);
+        int remaining = mask;
+        while (remaining)
+        {
+            const int laneBit = remaining & -remaining;
+            /* Get the sourceLane */
+            const int srcLane = __ffs(laneBit) - 1;
+            /* Broadcast (can also broadcast to self) */
+            result = INTF::doOp(result, __shfl_sync(mask, val, srcLane));
+            remaining &= ~laneBit;
+        }
+        return result;
+    }
 }
 
-__inline__ __device__ int _waveAnd(int mask, int val) 
-{
-    SLANG_CUDA_REDUCE_OP(~int(0), &)
-}
+template <typename T>
+__inline__ __device__  T _waveOr(int mask, T val) { return _waveReduce<WaveOpOr<T>, T>(mask, val); }
 
-__inline__ __device__ int _waveXor(int mask, int val) 
-{
-    SLANG_CUDA_REDUCE_OP(0, ^)
-}
+template <typename T>
+__inline__ __device__ T _waveAnd(int mask, T val) { return _waveReduce<WaveOpAnd<T>, T>(mask, val); }
 
-__inline__ __device__ int _waveProduct(int mask, int val) 
-{
-    SLANG_CUDA_REDUCE_OP(1, *)
-}
+template <typename T>
+__inline__ __device__ T _waveXor(int mask, T val) { return _waveReduce<WaveOpXor<T>, T>(mask, val); }
 
-__inline__ __device__ int _waveSum(int mask, int val) 
-{
-    SLANG_CUDA_REDUCE_OP(0, +)
-}
+template <typename T>
+__inline__ __device__ T _waveProduct(int mask, T val) { return _waveReduce<WaveOpMul<T>, T>(mask, val); }
 
-__inline__ __device__ int _waveMin(int mask, int val) 
-{    
-    SLANG_CUDA_REDUCE_FUNC(val, I32_min)
-}
+template <typename T>
+__inline__ __device__ T _waveSum(int mask, T val) { return _waveReduce<WaveOpAdd<T>, T>(mask, val); }
 
-__inline__ __device__ int _waveMax(int mask, int val) 
-{
-    SLANG_CUDA_REDUCE_FUNC(val, I32_max)
-}
+template <typename T>
+__inline__ __device__ T _waveMin(int mask, T val) { return _waveReduce<WaveOpMin<T>, T>(mask, val); }
 
-__inline__ __device__ bool _waveAllEqual(int mask, int val) 
+template <typename T>
+__inline__ __device__ T _waveMax(int mask, T val) { return _waveReduce<WaveOpMax<T>, T>(mask, val); }
+
+
+template <typename T>
+__inline__ __device__ bool _waveAllEqual(int mask, T val) 
 {
     int pred;
     __match_all_sync(mask, val, &pred);
     return pred != 0;
 }
 
-__inline__ __device__ int _waveReadFirst(int val) 
+template <typename T>
+__inline__ __device__ T _waveReadFirst(T val) 
 {
     const int mask = __activemask();
     const int lowestLaneId = __ffs(mask) - 1;
