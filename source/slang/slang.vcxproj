@@ -230,6 +230,7 @@
     <ClInclude Include="slang-ir-specialize.h" />
     <ClInclude Include="slang-ir-ssa.h" />
     <ClInclude Include="slang-ir-string-hash.h" />
+    <ClInclude Include="slang-ir-strip-witness-tables.h" />
     <ClInclude Include="slang-ir-strip.h" />
     <ClInclude Include="slang-ir-type-set.h" />
     <ClInclude Include="slang-ir-union.h" />
@@ -313,6 +314,7 @@
     <ClCompile Include="slang-ir-specialize.cpp" />
     <ClCompile Include="slang-ir-ssa.cpp" />
     <ClCompile Include="slang-ir-string-hash.cpp" />
+    <ClCompile Include="slang-ir-strip-witness-tables.cpp" />
     <ClCompile Include="slang-ir-strip.cpp" />
     <ClCompile Include="slang-ir-type-set.cpp" />
     <ClCompile Include="slang-ir-union.cpp" />
