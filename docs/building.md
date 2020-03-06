@@ -23,6 +23,17 @@ For Linux and other targets the section below on `premake` describes the process
 
 Some targets below are described as 'unofficial'. In practice this means that they are not tested as part of contiguous integration. Thus unfortunately it is quite possible from time to time for them to break on a merge of a PR. That said, if broken it is likely only very minor changes are needed to make them work again. 
 
+### Generated Files
+
+Slang as part of it's build process generates header files, which are then used to compile the main Slang project. If you use `premake` to create your project, it will automatically generate these files before compiling the rest of the Slang. These are the current header generations which are created via the `slang-generate` tool... 
+
+* core.meta.slang -> core.meta.slang.h
+* hlsl.meta.slang -> hlsl.meta.slang.h 
+
+It may be necessary or desirable to create a build of Slang without using `premake`. 
+
+One way to do this would be to first compile slang-generate and then invoke it directly or as a dependency in your build. Another perhaps simpler way would be to first compile the same Slang source on another system that does support `premake`, or using a preexisting build mechanism (such as Visual Studio projects on Windows). Then copy the generated header files to your target system. This is appropriate because the generated files are indentical across platforms. It does of course mean that if `core.meta.slang` or `hlsl.meta.slang` files change the headers will need to be regenerated. 
+
 ## Premake
 
 Slang uses the tool [`premake5`](https://premake.github.io/) in order to generate projects that can be built on different targets. On Linux premake will generate Makefile/s and on windows it will generate a Visual Studio solution. Information on invoking premake for different kinds of targets can be found [here](https://github.com/premake/premake-core/wiki/Using-Premake). You can also run with `--help` to see available command line options
