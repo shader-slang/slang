@@ -703,7 +703,7 @@ template <typename T>
 __inline__ __device__ T _waveXor(T val) { return _waveReduceScalar<WaveOpXor<T>, T>(val); }
 
 template <typename T>
-__inline__ __device__ T _waveProduct(T val) { return _waveReduceScalar<WaveOpMul<T::Type>, T>(val); }
+__inline__ __device__ T _waveProduct(T val) { return _waveReduceScalar<WaveOpMul<T>, T>(val); }
 
 template <typename T>
 __inline__ __device__ T _waveSum(T val) { return _waveReduceScalar<WaveOpAdd<T>, T>(val); }
