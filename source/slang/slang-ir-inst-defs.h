@@ -373,10 +373,6 @@ INST(Dot, dot, 2, 0)
 
 INST(GetStringHash, getStringHash, 1, 0)
 
-INST(Mul_Vector_Matrix, mulVectorMatrix, 2, 0)
-INST(Mul_Matrix_Vector, mulMatrixVector, 2, 0)
-INST(Mul_Matrix_Matrix, mulMatrixMatrix, 2, 0)
-
 // Texture sampling operation of the form `t.Sample(s,u)`
 INST(Sample, sample, 3, 0)
 

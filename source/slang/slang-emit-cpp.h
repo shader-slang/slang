@@ -91,15 +91,10 @@ protected:
     void _calcGlobalParams(const List<EmitAction>& actions, List<GlobalParamInfo>& outParams, IRGlobalParam** outEntryPointGlobalParams);
     void _emitUniformStateMembers(const List<EmitAction>& actions, IRGlobalParam** outEntryPointGlobalParams);
 
-    void _emitVecMatMulDefinition(const UnownedStringSlice& funcName, const HLSLIntrinsic* specOp);
-
     void _emitAryDefinition(const HLSLIntrinsic* specOp);
 
     // Really we don't want any of these defined like they are here, they should be defined in slang stdlib 
     void _emitAnyAllDefinition(const UnownedStringSlice& funcName, const HLSLIntrinsic* specOp);
-    void _emitLengthDefinition(const UnownedStringSlice& funcName, const HLSLIntrinsic* specOp);
-    void _emitNormalizeDefinition(const UnownedStringSlice& funcName, const HLSLIntrinsic* specOp);
-    void _emitReflectDefinition(const UnownedStringSlice& funcName, const HLSLIntrinsic* specOp);
     void _emitConstructConvertDefinition(const UnownedStringSlice& funcName, const HLSLIntrinsic* specOp);
     void _emitConstructFromScalarDefinition(const UnownedStringSlice& funcName, const HLSLIntrinsic* specOp);
     void _emitGetAtDefinition(const UnownedStringSlice& funcName, const HLSLIntrinsic* specOp);

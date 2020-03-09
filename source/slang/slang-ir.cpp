@@ -4951,9 +4951,6 @@ namespace Slang
         case kIROp_BitNot:
         case kIROp_Select:
         case kIROp_Dot:
-        case kIROp_Mul_Vector_Matrix:
-        case kIROp_Mul_Matrix_Vector:
-        case kIROp_Mul_Matrix_Matrix:
         case kIROp_MakeExistential:
         case kIROp_ExtractExistentialType:
         case kIROp_ExtractExistentialValue:

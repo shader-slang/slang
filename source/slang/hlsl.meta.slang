@@ -349,8 +349,13 @@ void abort();
 // Absolute value (HLSL SM 1.0)
 
 __generic<T : __BuiltinSignedArithmeticType>
+__target_intrinsic(hlsl)
+__target_intrinsic(glsl)
+__target_intrinsic(cuda, "$P_abs($0)")
+__target_intrinsic(cpp, "$P_abs($0)")
 T abs(T x);
 /*{
+    // Note: this simple definition may not be appropriate for floating-point inputs
     return x < 0 ? -x : x;
 }*/
 
@@ -372,6 +377,10 @@ matrix<T,N,M> abs(matrix<T,N,M> x)
 // Inverse cosine (HLSL SM 1.0)
 
 __generic<T : __BuiltinFloatingPointType>
+__target_intrinsic(hlsl)
+__target_intrinsic(glsl)
+__target_intrinsic(cuda, "$P_acos($0)")
+__target_intrinsic(cpp, "$P_acos($0)")
 T acos(T x);
 
 __generic<T : __BuiltinFloatingPointType, let N : int>
@@ -530,6 +539,8 @@ matrix<float,N,M> asfloat(matrix<float,N,M> x);
 __generic<T : __BuiltinFloatingPointType>
 __target_intrinsic(hlsl)
 __target_intrinsic(glsl)
+__target_intrinsic(cuda, "$P_asin($0)")
+__target_intrinsic(cpp, "$P_asin($0)")
 T asin(T x);
 
 __generic<T : __BuiltinFloatingPointType, let N : int>
@@ -659,6 +670,10 @@ matrix<uint,N,M> asuint(matrix<uint,N,M> x);
 
 // Inverse tangent (HLSL SM 1.0)
 __generic<T : __BuiltinFloatingPointType>
+__target_intrinsic(hlsl)
+__target_intrinsic(glsl)
+__target_intrinsic(cuda, "$P_atan($0)")
+__target_intrinsic(cpp, "$P_atan($0)")
 T atan(T x);
 
 __generic<T : __BuiltinFloatingPointType, let N : int>
@@ -679,6 +694,8 @@ matrix<T, N, M> atan(matrix<T, N, M> x)
 __generic<T : __BuiltinFloatingPointType>
 __target_intrinsic(hlsl)
 __target_intrinsic(glsl,"atan($0,$1)")
+__target_intrinsic(cuda, "$P_atan2($0, $1)")
+__target_intrinsic(cpp, "$P_atan2($0, $1)")
 T atan2(T y, T x);
 
 __generic<T : __BuiltinFloatingPointType, let N : int>
@@ -698,6 +715,10 @@ matrix<T,N,M> atan2(matrix<T,N,M> y, matrix<T,N,M> x)
 
 // Ceiling (HLSL SM 1.0)
 __generic<T : __BuiltinFloatingPointType>
+__target_intrinsic(hlsl)
+__target_intrinsic(glsl)
+__target_intrinsic(cuda, "$P_ceil($0)")
+__target_intrinsic(cpp, "$P_ceil($0)")
 T ceil(T x);
 
 __generic<T : __BuiltinFloatingPointType, let N : int>
@@ -767,6 +788,10 @@ void clip(matrix<T,N,M> x)
 
 // Cosine
 __generic<T : __BuiltinFloatingPointType>
+__target_intrinsic(hlsl)
+__target_intrinsic(glsl)
+__target_intrinsic(cuda, "$P_cos($0)")
+__target_intrinsic(cpp, "$P_cos($0)")
 T cos(T x);
 
 __generic<T : __BuiltinFloatingPointType, let N : int>
@@ -786,6 +811,10 @@ matrix<T, N, M> cos(matrix<T, N, M> x)
 
 // Hyperbolic cosine
 __generic<T : __BuiltinFloatingPointType>
+__target_intrinsic(hlsl)
+__target_intrinsic(glsl)
+__target_intrinsic(cuda, "$P_cosh($0)")
+__target_intrinsic(cpp, "$P_cosh($0)")
 T cosh(T x);
 
 __generic<T : __BuiltinFloatingPointType, let N : int>
@@ -804,7 +833,10 @@ matrix<T, N, M> cosh(matrix<T, N, M> x)
 }
 
 // Population count
+__target_intrinsic(hlsl)
 __target_intrinsic(glsl, "bitCount")
+__target_intrinsic(cuda, "$P_countbits($0)")
+__target_intrinsic(cpp, "$P_countbits($0)")
 uint countbits(uint value);
 
 // Cross product
@@ -1070,6 +1102,10 @@ matrix<T,N,M> EvaluateAttributeSnapped(matrix<T,N,M> x, int2 offset);
 // Base-e exponent
 
 __generic<T : __BuiltinFloatingPointType>
+__target_intrinsic(hlsl)
+__target_intrinsic(glsl)
+__target_intrinsic(cuda, "$P_exp($0)")
+__target_intrinsic(cpp, "$P_exp($0)")
 T exp(T x);
 
 __generic<T : __BuiltinFloatingPointType, let N : int>
@@ -1090,6 +1126,10 @@ matrix<T, N, M> exp(matrix<T, N, M> x)
 // Base-2 exponent
 
 __generic<T : __BuiltinFloatingPointType>
+__target_intrinsic(hlsl)
+__target_intrinsic(glsl)
+__target_intrinsic(cuda, "$P_exp2($0)")
+__target_intrinsic(cpp, "$P_exp2($0)")
 T exp2(T x);
 
 __generic<T : __BuiltinFloatingPointType, let N : int>
@@ -1133,7 +1173,10 @@ vector<T,N> faceforward(vector<T,N> n, vector<T,N> i, vector<T,N> ng)
 }
 
 // Find first set bit starting at high bit and working down
+__target_intrinsic(hlsl)
 __target_intrinsic(glsl,"findMSB")
+__target_intrinsic(cuda, "$P_firstbithigh($0)")
+__target_intrinsic(cpp, "$P_firstbithigh($0)")
 int firstbithigh(int value);
 
 __target_intrinsic(hlsl)
@@ -1144,7 +1187,10 @@ vector<int, N> firstbithigh(vector<int, N> value)
     VECTOR_MAP_UNARY(int, N, firstbithigh, value);
 }
 
+__target_intrinsic(hlsl)
 __target_intrinsic(glsl,"findMSB")
+__target_intrinsic(cuda, "$P_firstbithigh($0)")
+__target_intrinsic(cpp, "$P_firstbithigh($0)")
 uint firstbithigh(uint value);
 
 __target_intrinsic(hlsl)
@@ -1156,7 +1202,10 @@ vector<uint,N> firstbithigh(vector<uint,N> value)
 }
 
 // Find first set bit starting at low bit and working up
+__target_intrinsic(hlsl)
 __target_intrinsic(glsl,"findLSB")
+__target_intrinsic(cuda, "$P_firstbitlow($0)")
+__target_intrinsic(cpp, "$P_firstbitlow($0)")
 int firstbitlow(int value);
 
 __target_intrinsic(hlsl)
@@ -1167,7 +1216,10 @@ vector<int,N> firstbitlow(vector<int,N> value)
     VECTOR_MAP_UNARY(int, N, firstbitlow, value);
 }
 
+__target_intrinsic(hlsl)
 __target_intrinsic(glsl,"findLSB")
+__target_intrinsic(cuda, "$P_firstbitlow($0)")
+__target_intrinsic(cpp, "$P_firstbitlow($0)")
 uint firstbitlow(uint value);
 
 __target_intrinsic(hlsl)
@@ -1181,6 +1233,10 @@ vector<uint,N> firstbitlow(vector<uint,N> value)
 // Floor (HLSL SM 1.0)
 
 __generic<T : __BuiltinFloatingPointType>
+__target_intrinsic(hlsl)
+__target_intrinsic(glsl)
+__target_intrinsic(cuda, "$P_floor($0)")
+__target_intrinsic(cpp, "$P_floor($0)")
 T floor(T x);
 
 __generic<T : __BuiltinFloatingPointType, let N : int>
@@ -1201,6 +1257,8 @@ matrix<T, N, M> floor(matrix<T, N, M> x)
 // Fused multiply-add for doubles
 __target_intrinsic(hlsl)
 __target_intrinsic(glsl)
+__target_intrinsic(cuda, "$P_fma($0, $1, $2)")
+__target_intrinsic(cpp, "$P_fma($0, $1, $2)")
 double fma(double a, double b, double c);
 
 __generic<let N : int>
@@ -1220,6 +1278,10 @@ matrix<double, N, M> fma(matrix<double, N, M> a, matrix<double, N, M> b, matrix<
 
 // Floating point remainder of x/y
 __generic<T : __BuiltinFloatingPointType>
+__target_intrinsic(hlsl)
+__target_intrinsic(glsl)
+__target_intrinsic(cuda, "$P_fmod($0, $1)")
+__target_intrinsic(cpp, "$P_fmod($0, $1)")
 T fmod(T x, T y);
 
 __generic<T : __BuiltinFloatingPointType, let N : int>
@@ -1239,7 +1301,10 @@ matrix<T, N, M> fmod(matrix<T, N, M> x, matrix<T, N, M> y)
 
 // Fractional part
 __generic<T : __BuiltinFloatingPointType>
+__target_intrinsic(hlsl)
 __target_intrinsic(glsl, fract)
+__target_intrinsic(cuda, "$P_frac($0)")
+__target_intrinsic(cpp, "$P_frac($0)")
 T frac(T x);
 
 __generic<T : __BuiltinFloatingPointType, let N : int>
@@ -1438,8 +1503,8 @@ void InterlockedXor(__ref uint dest, uint value, out uint original_value);
 
 __generic<T : __BuiltinFloatingPointType>
 __target_intrinsic(hlsl)
-__target_intrinsic(cpu)
-__target_intrinsic(cuda)
+__target_intrinsic(cuda, "$P_isfinite($0)")
+__target_intrinsic(cpp, "$P_isfinite($0)")
 bool isfinite(T x)
 {
     return !(isinf(x) || isnan(x));
@@ -1461,6 +1526,10 @@ matrix<bool, N, M> isfinite(matrix<T, N, M> x)
 
 // Is floating-point value infinite?
 __generic<T : __BuiltinFloatingPointType>
+__target_intrinsic(hlsl)
+__target_intrinsic(glsl)
+__target_intrinsic(cuda, "$P_isinf($0)")
+__target_intrinsic(cpp, "$P_isinf($0)")
 bool isinf(T x);
 
 __generic<T : __BuiltinFloatingPointType, let N : int>
@@ -1480,6 +1549,10 @@ matrix<bool, N, M> isinf(matrix<T, N, M> x)
 
 // Is floating-point value not-a-number?
 __generic<T : __BuiltinFloatingPointType>
+__target_intrinsic(hlsl)
+__target_intrinsic(glsl)
+__target_intrinsic(cuda, "$P_isnan($0)")
+__target_intrinsic(cpp, "$P_isnan($0)")
 bool isnan(T x);
 
 __generic<T : __BuiltinFloatingPointType, let N : int>
@@ -1565,6 +1638,10 @@ float4 lit(float n_dot_l, float n_dot_h, float m)
 
 // Base-e logarithm
 __generic<T : __BuiltinFloatingPointType>
+__target_intrinsic(hlsl)
+__target_intrinsic(glsl)
+__target_intrinsic(cuda, "$P_log($0)")
+__target_intrinsic(cpp, "$P_log($0)")
 T log(T x);
 
 __generic<T : __BuiltinFloatingPointType, let N : int>
@@ -1586,6 +1663,8 @@ matrix<T, N, M> log(matrix<T, N, M> x)
 __generic<T : __BuiltinFloatingPointType> 
 __target_intrinsic(hlsl)
 __target_intrinsic(glsl, "(log( $0 ) * $S0( 0.43429448190325182765112891891661) )" )
+__target_intrinsic(cuda, "$P_log10($0)")
+__target_intrinsic(cpp, "$P_log10($0)")
 T log10(T x);
 
 __generic<T : __BuiltinFloatingPointType, let N : int>
@@ -1605,6 +1684,10 @@ matrix<T,N,M> log10(matrix<T,N,M> x)
 
 // Base-2 logarithm
 __generic<T : __BuiltinFloatingPointType>
+__target_intrinsic(hlsl)
+__target_intrinsic(glsl)
+__target_intrinsic(cuda, "$P_log2($0)")
+__target_intrinsic(cpp, "$P_log2($0)")
 T log2(T x);
 
 __generic<T : __BuiltinFloatingPointType, let N : int>
@@ -1627,6 +1710,8 @@ matrix<T,N,M> log2(matrix<T,N,M> x)
 __generic<T : __BuiltinArithmeticType>
 __target_intrinsic(hlsl)
 __target_intrinsic(glsl, fma)
+__target_intrinsic(cuda, "$P_fma($0, $1, $2)")
+__target_intrinsic(cpp, "$P_fma($0, $1, $2)")
 T mad(T mvalue, T avalue, T bvalue);
 
 __generic<T : __BuiltinArithmeticType, let N : int>
@@ -1646,6 +1731,10 @@ matrix<T, N, M> mad(matrix<T, N, M> mvalue, matrix<T, N, M> avalue, matrix<T, N,
 
 // maximum
 __generic<T : __BuiltinArithmeticType>
+__target_intrinsic(hlsl)
+__target_intrinsic(glsl)
+__target_intrinsic(cuda, "$P_max($0, $1)")
+__target_intrinsic(cpp, "$P_max($0, $1)")
 T max(T x, T y);
 // Note: a stdlib implementation of `max` (or `min`) will require splitting
 // floating-point and integer cases apart, because the floating-point
@@ -1669,6 +1758,10 @@ matrix<T, N, M> max(matrix<T, N, M> x, matrix<T, N, M> y)
 
 // minimum
 __generic<T : __BuiltinArithmeticType>
+__target_intrinsic(hlsl)
+__target_intrinsic(glsl)
+__target_intrinsic(cuda, "$P_min($0, $1)")
+__target_intrinsic(cpp, "$P_min($0, $1)")
 T min(T x, T y);
 
 __generic<T : __BuiltinArithmeticType, let N : int>
@@ -1757,28 +1850,64 @@ T mul(vector<T, N> x, vector<T, N> y)
     return dot(x, y);
 }
 
-${{{{
-// TODO: The following functions could conceivably be defined
-// in the stdlib for the benefit of targets without direct
-// support for matrices, but the use of `__intrinsic_op` to
-// map them to a dedicated IR instruction interferes with
-// that choice.
-}}}}
-
 // vector-matrix
 __generic<T : __BuiltinArithmeticType, let N : int, let M : int>
-__intrinsic_op(mulVectorMatrix)
-vector<T,M> mul(vector<T,N> x, matrix<T,N,M> y);
+__target_intrinsic(hlsl)
+__target_intrinsic(glsl, "($1 * $0)")
+vector<T, M> mul(vector<T, N> left, matrix<T, N, M> right)
+{
+    vector<T,M> result;
+    for( int j = 0; j < M; ++j )
+    {
+        T sum = T(0);
+        for( int i = 0; i < N; ++i )
+        {
+            sum += left[i] * right[i][j];
+        }
+        result[j] = sum;
+    }
+    return result;
+}
 
 // matrix-vector
 __generic<T : __BuiltinArithmeticType, let N : int, let M : int>
-__intrinsic_op(mulMatrixVector)
-vector<T,N> mul(matrix<T,N,M> x, vector<T,M> y);
+__target_intrinsic(hlsl)
+__target_intrinsic(glsl, "($1 * $0)")
+vector<T,N> mul(matrix<T,N,M> left, vector<T,M> right)
+{
+    vector<T,N> result;
+    for( int i = 0; i < N; ++i )
+    {
+        T sum = T(0);
+        for( int j = 0; j < M; ++j )
+        {
+            sum += left[i][j] * right[j];
+        }
+        result[i] = sum;
+    }
+    return result;
+}
+
 
 // matrix-matrix
 __generic<T : __BuiltinArithmeticType, let R : int, let N : int, let C : int>
-__intrinsic_op(mulMatrixMatrix)
-matrix<T,R,C> mul(matrix<T,R,N> x, matrix<T,N,C> y);
+__target_intrinsic(hlsl)
+__target_intrinsic(glsl, "($1 * $0)")
+matrix<T,R,C> mul(matrix<T,R,N> right, matrix<T,N,C> left)
+{
+    matrix<T,R,C> result;
+    for( int r = 0; r < R; ++r)
+    for( int c = 0; c < C; ++c)
+    {
+        T sum = T(0);
+        for( int i = 0; i < N; ++i )
+        {
+            sum += left[r][i] * right[i][c];
+        }
+        result[r][c] = sum;
+    }
+    return result;
+}
 
 // noise (deprecated)
 
@@ -1839,6 +1968,10 @@ vector<T,N> normalize(vector<T,N> x)
 
 // Raise to a power
 __generic<T : __BuiltinFloatingPointType>
+__target_intrinsic(hlsl)
+__target_intrinsic(glsl)
+__target_intrinsic(cuda, "$P_pow($0, $1)")
+__target_intrinsic(cpp, "$P_pow($0, $1)")
 T pow(T x, T y);
 
 __generic<T : __BuiltinFloatingPointType, let N : int>
@@ -1999,7 +2132,10 @@ vector<T,N> refract(vector<T,N> i, vector<T,N> n, T eta)
 }
 
 // Reverse order of bits
+__target_intrinsic(hlsl)
 __target_intrinsic(glsl, "bitfieldReverse")
+__target_intrinsic(cuda, "$P_reversebits($0)")
+__target_intrinsic(cpp, "$P_reversebits($0)")
 uint reversebits(uint value);
 
 __target_intrinsic(glsl, "bitfieldReverse")
@@ -2011,6 +2147,10 @@ vector<uint, N> reversebits(vector<uint, N> value)
 
 // Round-to-nearest
 __generic<T : __BuiltinFloatingPointType>
+__target_intrinsic(hlsl)
+__target_intrinsic(glsl)
+__target_intrinsic(cuda, "$P_round($0)")
+__target_intrinsic(cpp, "$P_round($0)")
 T round(T x);
 
 __generic<T : __BuiltinFloatingPointType, let N : int>
@@ -2032,7 +2172,12 @@ matrix<T,N,M> round(matrix<T,N,M> x)
 __generic<T : __BuiltinFloatingPointType>
 __target_intrinsic(hlsl)
 __target_intrinsic(glsl, "inversesqrt($0)")
-T rsqrt(T x);
+__target_intrinsic(cuda, "$P_rsqrt($0)")
+__target_intrinsic(cpp, "$P_rsqrt($0)")
+T rsqrt(T x)
+{
+    return T(1.0) / sqrt(x);
+}
 
 __generic<T : __BuiltinFloatingPointType, let N : int>
 __target_intrinsic(hlsl)
@@ -2076,7 +2221,10 @@ matrix<T,N,M> saturate(matrix<T,N,M> x)
 
 // Extract sign of value
 __generic<T : __BuiltinSignedArithmeticType>
+__target_intrinsic(hlsl)
 __target_intrinsic(glsl, "int(sign($0))")
+__target_intrinsic(cuda, "$P_sign($0)")
+__target_intrinsic(cpp, "$P_sign($0)")
 int sign(T x);
 
 __generic<T : __BuiltinSignedArithmeticType, let N : int>
@@ -2098,6 +2246,10 @@ matrix<int, N, M> sign(matrix<T, N, M> x)
 // Sine
 
 __generic<T : __BuiltinFloatingPointType>
+__target_intrinsic(hlsl)
+__target_intrinsic(glsl)
+__target_intrinsic(cuda, "$P_sin($0)")
+__target_intrinsic(cpp, "$P_sin($0)")
 T sin(T x);
 
 __generic<T : __BuiltinFloatingPointType, let N : int>
@@ -2118,6 +2270,7 @@ matrix<T, N, M> sin(matrix<T, N, M> x)
 // Sine and cosine
 __generic<T : __BuiltinFloatingPointType>
 __target_intrinsic(hlsl)
+__target_intrinsic(cuda, "$P_sincos($0, $1, $2)")
 void sincos(T x, out T s, out T c)
 {
     s = sin(x);
@@ -2142,6 +2295,10 @@ void sincos(matrix<T,N,M> x, out matrix<T,N,M> s, out matrix<T,N,M> c)
 
 // Hyperbolic Sine
 __generic<T : __BuiltinFloatingPointType>
+__target_intrinsic(hlsl)
+__target_intrinsic(glsl)
+__target_intrinsic(cuda, "$P_sinh($0)")
+__target_intrinsic(cpp, "$P_sinh($0)")
 T sinh(T x);
 
 __generic<T : __BuiltinFloatingPointType, let N : int>
@@ -2186,6 +2343,10 @@ matrix<T, N, M> smoothstep(matrix<T, N, M> min, matrix<T, N, M> max, matrix<T, N
 
 // Square root
 __generic<T : __BuiltinFloatingPointType>
+__target_intrinsic(hlsl)
+__target_intrinsic(glsl)
+__target_intrinsic(cuda, "$P_sqrt($0)")
+__target_intrinsic(cpp, "$P_sqrt($0)")
 T sqrt(T x);
 
 __generic<T : __BuiltinFloatingPointType, let N : int>
@@ -2229,6 +2390,10 @@ matrix<T, N, M> step(matrix<T, N, M> y, matrix<T, N, M> x)
 
 // Tangent
 __generic<T : __BuiltinFloatingPointType>
+__target_intrinsic(hlsl)
+__target_intrinsic(glsl)
+__target_intrinsic(cuda, "$P_tan($0)")
+__target_intrinsic(cpp, "$P_tan($0)")
 T tan(T x);
 
 __generic<T : __BuiltinFloatingPointType, let N : int>
@@ -2248,6 +2413,10 @@ matrix<T, N, M> tan(matrix<T, N, M> x)
 
 // Hyperbolic tangent
 __generic<T : __BuiltinFloatingPointType>
+__target_intrinsic(hlsl)
+__target_intrinsic(glsl)
+__target_intrinsic(cuda, "$P_tanh($0)")
+__target_intrinsic(cpp, "$P_tanh($0)")
 T tanh(T x);
 
 __generic<T : __BuiltinFloatingPointType, let N : int>
@@ -2280,6 +2449,10 @@ matrix<T, M, N> transpose(matrix<T, N, M> x)
 
 // Truncate to integer
 __generic<T : __BuiltinFloatingPointType>
+__target_intrinsic(hlsl)
+__target_intrinsic(glsl)
+__target_intrinsic(cuda, "$P_trunc($0)")
+__target_intrinsic(cpp, "$P_trunc($0)")
 T trunc(T x);
 
 __generic<T : __BuiltinFloatingPointType, let N : int>
