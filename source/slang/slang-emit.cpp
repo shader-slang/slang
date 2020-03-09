@@ -15,6 +15,7 @@
 #include "slang-ir-specialize.h"
 #include "slang-ir-specialize-resources.h"
 #include "slang-ir-ssa.h"
+#include "slang-ir-strip-witness-tables.h"
 #include "slang-ir-union.h"
 #include "slang-ir-validate.h"
 #include "slang-ir-wrap-structured-buffers.h"
@@ -440,6 +441,16 @@ Result linkAndOptimizeIR(
     default:
         break;
     }
+
+    // For all targets that don't support true dynamic dispatch through
+    // witness tables (that is all targets at present), we need
+    // to eliminate witness tables from the IR so that they
+    // don't keep symbols live that we don't actually need.
+    stripWitnessTables(irModule);
+#if 0
+    dumpIRIfEnabled(compileRequest, irModule, "AFTER STRIP WITNESS TABLES");
+#endif
+    validateIRModuleIfEnabled(compileRequest, irModule);
 
     // The resource-based specialization pass above
     // may create specialized versions of functions, but
