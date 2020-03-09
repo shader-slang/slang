@@ -441,6 +441,33 @@ __forceinline__ __device__ uint32_t _getLaneId()
 }
 #endif
 
+__forceinline__ __device__ int _getConvergedMask()
+{
+    // It appears that the active mask is not good enough because on later hardware threads can diverge.
+    // 
+    // For CUDA the article claims mask has to be used carefully
+    // https://devblogs.nvidia.com/using-cuda-warp-level-primitives/
+    // With the Warp intrinsics there is no mask, and it's just the 'active lanes'. 
+    // __activemask() though does not require there is convergence, so that doesn't work.
+    // 
+    // '__ballot_sync' produces a convergance. 
+    // 
+    // From the CUDA docs:
+    // For __all_sync, __any_sync, and __ballot_sync, a mask must be passed that specifies the threads 
+    // participating in the call. A bit, representing the thread's lane ID, must be set for each participating thread 
+    // to ensure they are properly converged before the intrinsic is executed by the hardware. All active threads named 
+    // in mask must execute the same intrinsic with the same mask, or the result is undefined.
+    
+    // To get the right results we need to use the __activemask() within _ballot_sync it seems.
+    
+    // Also note that __all_sync and __any_sync are listed with __ballot_sync. That if they have a similar synchronizing behavior
+    // we can use __activemask() there (instead of _getConvergedMask), because they will converge too. 
+    
+    //return __activemask(); 
+    //return __ballot_sync(SLANG_CUDA_WARP_MASK, true);
+    return __ballot_sync(__activemask(), true);
+}
+
 // Return mask of all the lanes less than the current lane
 __forceinline__ __device__ int _getLaneLtMask()
 {
@@ -487,7 +514,6 @@ __inline__ __device__ bool _waveIsFirstLane()
     // This mechanism is most similar to what was in an nVidia post, so assume it is prefered. 
     return (mask & 1 ) || ((__ffs(mask) - 1) == _getLaneId());
 }
-
 
 template <typename T>
 struct WaveOpOr
@@ -540,22 +566,22 @@ struct WaveOpMin
 
 // Scalar 
 template <typename INTF, typename T>
-__device__ T _waveReduce(int mask, T val)
+__device__ T _waveReduce(T val)
 {
+    // The shuffles appear to converge on set bits, so it appears ok to use __activemask()
+    //const int mask = _getConvergedMask();
+    const int mask = __activemask();
+    
     const int offsetSize = _waveCalcPow2Offset(mask);
     if (offsetSize > 0)
     {
+        // Fast path O(log2(activeLanes)) 
         for (int offset = offsetSize >> 1; offset > 0; offset >>= 1)
         {
             val = INTF::doOp(val, __shfl_xor_sync(mask, val, offset));
         }
-        return val;
     }
-    else if (_waveIsSingleLane(mask))
-    {
-        return val;
-    }
-    else
+    else if (!_waveIsSingleLane(mask))
     {
         T result = INTF::getInitial(val);
         int remaining = mask;
@@ -570,33 +596,36 @@ __device__ T _waveReduce(int mask, T val)
         }
         return result;
     }
+    return val;
 }
 
 template <typename T>
-__inline__ __device__  T _waveOr(int mask, T val) { return _waveReduce<WaveOpOr<T>, T>(mask, val); }
+__inline__ __device__  T _waveOr(T val) { return _waveReduce<WaveOpOr<T>, T>(val); }
 
 template <typename T>
-__inline__ __device__ T _waveAnd(int mask, T val) { return _waveReduce<WaveOpAnd<T>, T>(mask, val); }
+__inline__ __device__ T _waveAnd(T val) { return _waveReduce<WaveOpAnd<T>, T>(val); }
 
 template <typename T>
-__inline__ __device__ T _waveXor(int mask, T val) { return _waveReduce<WaveOpXor<T>, T>(mask, val); }
+__inline__ __device__ T _waveXor(T val) { return _waveReduce<WaveOpXor<T>, T>(val); }
 
 template <typename T>
-__inline__ __device__ T _waveProduct(int mask, T val) { return _waveReduce<WaveOpMul<T>, T>(mask, val); }
+__inline__ __device__ T _waveProduct(T val) { return _waveReduce<WaveOpMul<T>, T>(val); }
 
 template <typename T>
-__inline__ __device__ T _waveSum(int mask, T val) { return _waveReduce<WaveOpAdd<T>, T>(mask, val); }
+__inline__ __device__ T _waveSum(T val) { return _waveReduce<WaveOpAdd<T>, T>(val); }
 
 template <typename T>
-__inline__ __device__ T _waveMin(int mask, T val) { return _waveReduce<WaveOpMin<T>, T>(mask, val); }
+__inline__ __device__ T _waveMin(T val) { return _waveReduce<WaveOpMin<T>, T>(val); }
 
 template <typename T>
-__inline__ __device__ T _waveMax(int mask, T val) { return _waveReduce<WaveOpMax<T>, T>(mask, val); }
+__inline__ __device__ T _waveMax(T val) { return _waveReduce<WaveOpMax<T>, T>(val); }
 
 
 template <typename T>
-__inline__ __device__ bool _waveAllEqual(int mask, T val) 
+__inline__ __device__ bool _waveAllEqual(T val) 
 {
+    // __match_all_sync is a synchronises so can use __activemask()
+    const int mask = __activemask();
     int pred;
     __match_all_sync(mask, val, &pred);
     return pred != 0;
