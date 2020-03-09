@@ -6,28 +6,42 @@ layout(row_major) uniform;
 layout(row_major) buffer;
 #extension GL_NV_ray_tracing : require
 
+#define rcp_tmp _S2
+#define RayData _S3
+#define Attributes _S4
+
+#define tmpA _S5
+#define tmpB _S6
+#define tmpC _S7
+
 layout(std430, binding = 1) readonly buffer _S1 {
     float _data[];
 } gParamBlock_sbuf_0;
+
+float rcp_0(float x_0)
+{
+    float rcp_tmp = float(1.00000000000000000000) / x_0;
+    return rcp_tmp;
+}
 
 struct RayHitInfoPacked_0
 {
     vec4 PackedHitInfoA_0;
 };
 
-rayPayloadInNV RayHitInfoPacked_0 _S2;
+rayPayloadInNV RayHitInfoPacked_0 RayData;
 
 struct BuiltInTriangleIntersectionAttributes_0
 {
     vec2 barycentrics_0;
 };
 
-hitAttributeNV BuiltInTriangleIntersectionAttributes_0 _S3;
+hitAttributeNV BuiltInTriangleIntersectionAttributes_0 Attributes;
 
 void main()
 {
     float HitT_0 = (gl_HitTNV);
-    _S2.PackedHitInfoA_0.x = HitT_0;
+    RayData.PackedHitInfoA_0.x = HitT_0;
 
     const uint use_rcp_0 = uint(0);
 
@@ -38,9 +52,9 @@ void main()
     if(bool(use_rcp_1))
     {
 
-        float _S4 = (1.0/((offsfloat_0)));
+        float tmpA = rcp_0(offsfloat_0);
 
-        _S2.PackedHitInfoA_0.y = _S4;
+        RayData.PackedHitInfoA_0.y = tmpA;
 
     }
     else
@@ -49,16 +63,16 @@ void main()
         if(use_rcp_1 > uint(0)&&offsfloat_0 == 0.00000000000000000000)
         {
 
-            float _S5 = (inversesqrt((offsfloat_0 + 1.00000000000000000000)));
+            float tmpB = (inversesqrt((offsfloat_0 + 1.00000000000000000000)));
 
-            _S2.PackedHitInfoA_0.y = _S5;
+            RayData.PackedHitInfoA_0.y = tmpB;
 
         }
         else
         {
-            float _S6 = (inversesqrt((offsfloat_0)));
+            float tmpC = (inversesqrt((offsfloat_0)));
 
-            _S2.PackedHitInfoA_0.y = _S6;
+            RayData.PackedHitInfoA_0.y = tmpC;
 
         }
 
