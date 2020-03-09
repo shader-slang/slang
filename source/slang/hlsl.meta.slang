@@ -2441,10 +2441,10 @@ __glsl_extension(GL_KHR_shader_subgroup_vote)
 __spirv_version(1.3)
 __target_intrinsic(glsl, "subgroupAllEqual($0)")
 __target_intrinsic(cuda, "_waveAllEqualMultiple($0)")
-vector<bool,N> WaveActiveAllEqual(vector<T,N> value);
+bool WaveActiveAllEqual(vector<T,N> value);
 __generic<T : __BuiltinType, let N : int, let M : int>
 __target_intrinsic(cuda, "_waveAllEqualMultiple($0)")
-matrix<bool,N,M> WaveActiveAllEqual(matrix<T,N,M> value);
+bool WaveActiveAllEqual(matrix<T,N,M> value);
 
 __generic<T : __BuiltinType> uint4 WaveMatch(T value);
 __generic<T : __BuiltinType, let N : int> uint4 WaveMatch(vector<T,N> value);

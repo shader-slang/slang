@@ -759,11 +759,11 @@ __inline__ __device__ bool _waveAllEqualMultiple(T inVal)
     const int mask = __activemask();
     int pred;
     
-    const ElemType* src = (const ElemeType*)&inVal;
+    const ElemType* src = (const ElemType*)&inVal;
     
     for (size_t i = 0; i < count; ++i)
     {
-        __match_all_sync(mask, val, &pred);
+        __match_all_sync(mask, src[i], &pred);
         if (pred == 0)
         {
             return false;
