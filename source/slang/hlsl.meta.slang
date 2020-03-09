@@ -2234,8 +2234,10 @@ __generic<T : __BuiltinIntegerType, let N : int>
 __glsl_extension(GL_KHR_shader_subgroup_arithmetic)
 __spirv_version(1.3)
 __target_intrinsic(glsl, "subgroupAnd($0)")
+__target_intrinsic(cuda, "_waveAndMultiple($0)")
 vector<T,N> WaveActiveBitAnd(vector<T,N> expr);
 __generic<T : __BuiltinIntegerType, let N : int, let M : int>
+__target_intrinsic(cuda, "_waveAndMultiple($0)")
 matrix<T,N,M> WaveActiveBitAnd(matrix<T,N,M> expr);
 
 __generic<T : __BuiltinIntegerType>
@@ -2248,8 +2250,10 @@ __generic<T : __BuiltinIntegerType, let N : int>
 __glsl_extension(GL_KHR_shader_subgroup_arithmetic)
 __spirv_version(1.3)
 __target_intrinsic(glsl, "subgroupOr($0)")
+__target_intrinsic(cuda, "_waveOrMultiple($0)")
 vector<T,N> WaveActiveBitOr(vector<T,N> expr);
 __generic<T : __BuiltinIntegerType, let N : int, let M : int>
+__target_intrinsic(cuda, "_waveOrMultiple($0)")
 matrix<T,N,M> WaveActiveBitOr(matrix<T,N,M> expr);
 
 __generic<T : __BuiltinIntegerType>
@@ -2262,8 +2266,10 @@ __generic<T : __BuiltinIntegerType, let N : int>
 __glsl_extension(GL_KHR_shader_subgroup_arithmetic)
 __spirv_version(1.3)
 __target_intrinsic(glsl, "subgroupXor($0)")
+__target_intrinsic(cuda, "_waveXorMultiple($0)")
 vector<T,N> WaveActiveBitXor(vector<T,N> expr);
 __generic<T : __BuiltinIntegerType, let N : int, let M : int>
+__target_intrinsic(cuda, "_waveXorMultiple($0)")
 matrix<T,N,M> WaveActiveBitXor(matrix<T,N,M> expr);
 
 __generic<T : __BuiltinArithmeticType>
@@ -2276,8 +2282,10 @@ __generic<T : __BuiltinArithmeticType, let N : int>
 __glsl_extension(GL_KHR_shader_subgroup_arithmetic)
 __spirv_version(1.3)
 __target_intrinsic(glsl, "subgroupMax($0)")
+__target_intrinsic(cuda, "_waveMaxMultiple($0)")
 vector<T,N> WaveActiveMax(vector<T,N> expr);
 __generic<T : __BuiltinArithmeticType, let N : int, let M : int>
+__target_intrinsic(cuda, "_waveMaxMultiple($0)")
 matrix<T,N,M> WaveActiveMax(matrix<T,N,M> expr);
 
 __generic<T : __BuiltinArithmeticType>
@@ -2290,8 +2298,10 @@ __generic<T : __BuiltinArithmeticType, let N : int>
 __glsl_extension(GL_KHR_shader_subgroup_arithmetic)
 __spirv_version(1.3)
 __target_intrinsic(glsl, "subgroupMin($0)")
+__target_intrinsic(cuda, "_waveMinMultiple($0)")
 vector<T,N> WaveActiveMin(vector<T,N> expr);
 __generic<T : __BuiltinArithmeticType, let N : int, let M : int>
+__target_intrinsic(cuda, "_waveMinMultiple($0)")
 matrix<T,N,M> WaveActiveMin(matrix<T,N,M> expr);
 
 __generic<T : __BuiltinArithmeticType>
@@ -2304,8 +2314,10 @@ __generic<T : __BuiltinArithmeticType, let N : int>
 __glsl_extension(GL_KHR_shader_subgroup_arithmetic)
 __spirv_version(1.3)
 __target_intrinsic(glsl, "subgroupMul($0)")
+__target_intrinsic(cuda, "_waveProductMultiple($0)")
 vector<T,N> WaveActiveProduct(vector<T,N> expr);
 __generic<T : __BuiltinArithmeticType, let N : int, let M : int>
+__target_intrinsic(cuda, "_waveProductMultiple($0)")
 matrix<T,N,M> WaveActiveProduct(matrix<T,N,M> expr);
 
 __generic<T : __BuiltinArithmeticType>
@@ -2318,8 +2330,10 @@ __generic<T : __BuiltinArithmeticType, let N : int>
 __glsl_extension(GL_KHR_shader_subgroup_arithmetic)
 __spirv_version(1.3)
 __target_intrinsic(glsl, "subgroupAdd($0)")
+__target_intrinsic(cuda, "_waveSumMultiple($0)")
 vector<T,N> WaveActiveSum(vector<T,N> expr);
 __generic<T : __BuiltinArithmeticType, let N : int, let M : int>
+__target_intrinsic(cuda, "_waveSumMultiple($0)")
 matrix<T,N,M> WaveActiveSum(matrix<T,N,M> expr);
 
 __generic<T : __BuiltinType>
@@ -2332,8 +2346,10 @@ __generic<T : __BuiltinType, let N : int>
 __glsl_extension(GL_KHR_shader_subgroup_vote)
 __spirv_version(1.3)
 __target_intrinsic(glsl, "subgroupAllEqual($0)")
+__target_intrinsic(cuda, "_waveAllEqualMultiple($0)")
 vector<bool,N> WaveActiveAllEqual(vector<T,N> value);
 __generic<T : __BuiltinType, let N : int, let M : int>
+__target_intrinsic(cuda, "_waveAllEqualMultiple($0)")
 matrix<bool,N,M> WaveActiveAllEqual(matrix<T,N,M> value);
 
 __generic<T : __BuiltinType> uint4 WaveMatch(T value);
