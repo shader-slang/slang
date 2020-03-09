@@ -788,7 +788,7 @@ __inline__ __device__ T _waveReadFirstMultiple(T inVal)
     
     T outVal;
     
-    const ElemType* src = (const ElemeType*)&inVal;
+    const ElemType* src = (const ElemType*)&inVal;
     ElemType* dst = (ElemType*)&outVal;
     
     const int mask = __activemask();
@@ -803,14 +803,14 @@ __inline__ __device__ T _waveReadFirstMultiple(T inVal)
 }
 
 template <typename T>
-__inline__ __device__ T _waveReadLaneAtMultiple(T value, int lane)
+__inline__ __device__ T _waveReadLaneAtMultiple(T inVal, int lane)
 {
     typedef typename ElementTypeTrait<T>::Type ElemType;
     const size_t count = sizeof(T) / sizeof(ElemType);
     
     T outVal;
     
-    const ElemType* src = (const ElemeType*)&inVal;
+    const ElemType* src = (const ElemType*)&inVal;
     ElemType* dst = (ElemType*)&outVal;
     
     const int mask = __activemask();
