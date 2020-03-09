@@ -1199,9 +1199,24 @@ matrix<T, N, M> floor(matrix<T, N, M> x)
 }
 
 // Fused multiply-add for doubles
+__target_intrinsic(hlsl)
+__target_intrinsic(glsl)
 double fma(double a, double b, double c);
-__generic<let N : int> vector<double, N> fma(vector<double, N> a, vector<double, N> b, vector<double, N> c);
-__generic<let N : int, let M : int> matrix<double,N,M> fma(matrix<double,N,M> a, matrix<double,N,M> b, matrix<double,N,M> c);
+
+__generic<let N : int>
+__target_intrinsic(hlsl)
+__target_intrinsic(glsl)
+vector<double, N> fma(vector<double, N> a, vector<double, N> b, vector<double, N> c)
+{
+    VECTOR_MAP_TRINARY(double, N, fma, a, b, c);
+}
+
+__generic<let N : int, let M : int>
+__target_intrinsic(hlsl)
+matrix<double, N, M> fma(matrix<double, N, M> a, matrix<double, N, M> b, matrix<double, N, M> c)
+{
+    MATRIX_MAP_TRINARY(double, N, M, fma, a, b, c);
+}
 
 // Floating point remainder of x/y
 __generic<T : __BuiltinFloatingPointType>
@@ -1425,7 +1440,6 @@ __generic<T : __BuiltinFloatingPointType>
 __target_intrinsic(hlsl)
 __target_intrinsic(cpu)
 __target_intrinsic(cuda)
-//__target_intrinsic(glsl, "(!(isinf($0) || isnan($0)))")
 bool isfinite(T x)
 {
     return !(isinf(x) || isnan(x));
@@ -1433,7 +1447,6 @@ bool isfinite(T x)
 
 __generic<T : __BuiltinFloatingPointType, let N : int>
 __target_intrinsic(hlsl)
-//__target_intrinsic(glsl, "(!(isinf($0) || isnan($0)))")
 vector<bool, N> isfinite(vector<T, N> x)
 {
     VECTOR_MAP_UNARY(bool, N, isfinite, x);
@@ -1488,18 +1501,16 @@ matrix<bool, N, M> isnan(matrix<T, N, M> x)
 
 __generic<T : __BuiltinFloatingPointType>
 __target_intrinsic(hlsl)
-__target_intrinsic(glsl, "($0 * pow(2.0f, $1))")
-T ldexp(T x, T exp);
-/*{
+T ldexp(T x, T exp)
+{
     return x * exp2(exp);
-}*/
+}
 
 __generic<T : __BuiltinFloatingPointType, let N : int>
 __target_intrinsic(hlsl)
-__target_intrinsic(glsl, "($0 * pow(2.0f, $1))")
 vector<T, N> ldexp(vector<T, N> x, vector<T, N> exp)
 {
-    VECTOR_MAP_BINARY(T, N, ldexp, x, exp);
+    return x * exp2(exp);
 }
 
 __generic<T : __BuiltinFloatingPointType, let N : int, let M : int>
@@ -1522,17 +1533,17 @@ T length(vector<T, N> x)
 __generic<T : __BuiltinFloatingPointType>
 __target_intrinsic(hlsl)
 __target_intrinsic(glsl, mix)
-T lerp(T x, T y, T s);
-/*{
-    return x * (1 - s) + y * s;
-}*/
+T lerp(T x, T y, T s)
+{
+    return x * (T(1.0f) - s) + y * s;
+}
 
 __generic<T : __BuiltinFloatingPointType, let N : int>
 __target_intrinsic(hlsl)
 __target_intrinsic(glsl, mix)
 vector<T, N> lerp(vector<T, N> x, vector<T, N> y, vector<T, N> s)
 {
-    VECTOR_MAP_TRINARY(T, N, lerp, x, y, s);
+    return x * (T(1.0f) - s) + y * s;
 }
 
 __generic<T : __BuiltinFloatingPointType, let N : int, let M : int>
@@ -1543,7 +1554,14 @@ matrix<T,N,M> lerp(matrix<T,N,M> x, matrix<T,N,M> y, matrix<T,N,M> s)
 }
 
 // Legacy lighting function (obsolete)
-float4 lit(float n_dot_l, float n_dot_h, float m);
+__target_intrinsic(hlsl)
+float4 lit(float n_dot_l, float n_dot_h, float m)
+{
+    let ambient = 1.0f;
+    let diffuse = max(n_dot_l, 0.0f);
+    let specular = step(0.0f, n_dot_l) * max(n_dot_h * m, 0.0f);
+    return float4(ambient, diffuse, specular, 1.0f);
+}
 
 // Base-e logarithm
 __generic<T : __BuiltinFloatingPointType>
@@ -1606,14 +1624,25 @@ matrix<T,N,M> log2(matrix<T,N,M> x)
 
 // multiply-add
 
+__generic<T : __BuiltinArithmeticType>
+__target_intrinsic(hlsl)
 __target_intrinsic(glsl, fma)
-__generic<T : __BuiltinArithmeticType> T mad(T mvalue, T avalue, T bvalue);
+T mad(T mvalue, T avalue, T bvalue);
 
+__generic<T : __BuiltinArithmeticType, let N : int>
+__target_intrinsic(hlsl)
 __target_intrinsic(glsl, fma)
-__generic<T : __BuiltinArithmeticType, let N : int> vector<T,N> mad(vector<T,N> mvalue, vector<T,N> avalue, vector<T,N> bvalue);
+vector<T, N> mad(vector<T, N> mvalue, vector<T, N> avalue, vector<T, N> bvalue)
+{
+    VECTOR_MAP_TRINARY(T, N, mad, mvalue, avalue, bvalue);
+}
 
-__target_intrinsic(glsl, fma)
-__generic<T : __BuiltinArithmeticType, let N : int, let M : int> matrix<T,N,M> mad(matrix<T,N,M> mvalue, matrix<T,N,M> avalue, matrix<T,N,M> bvalue);
+__generic<T : __BuiltinArithmeticType, let N : int, let M : int>
+__target_intrinsic(hlsl)
+matrix<T, N, M> mad(matrix<T, N, M> mvalue, matrix<T, N, M> avalue, matrix<T, N, M> bvalue)
+{
+    MATRIX_MAP_TRINARY(T, N, M, mad, mvalue, avalue, bvalue);
+}
 
 // maximum
 __generic<T : __BuiltinArithmeticType>
@@ -1677,32 +1706,79 @@ matrix<T,N,M> modf(matrix<T,N,M> x, out matrix<T,N,M> ip)
 }
 
 // msad4 (whatever that is)
-uint4 msad4(uint reference, uint2 source, uint4 accum);
+__target_intrinsic(hlsl)
+uint4 msad4(uint reference, uint2 source, uint4 accum)
+{
+    int4 bytesRef = (reference >> uint4(24, 16, 8, 0)) & 0xFF;
+    int4 bytesX   = (source.x  >> uint4(24, 16, 8, 0)) & 0xFF;
+    int4 bytesY   = (source.y  >> uint4(24, 16, 8, 0)) & 0xFF;
+
+    uint4 mask = bytesRef == 0 ? 0 : 0xFFFFFFFFu;
+
+    uint4 result = accum;
+    result += mask.x & abs(bytesRef - int4(bytesX.x,           bytesY.y, bytesY.z, bytesY.w));
+    result += mask.y & abs(bytesRef - int4(bytesX.x, bytesX.y,           bytesY.z, bytesY.w));
+    result += mask.z & abs(bytesRef - int4(bytesX.x, bytesX.y, bytesX.z,           bytesY.w));
+    result += mask.w & abs(bytesRef - int4(bytesX.x, bytesX.y, bytesX.z, bytesX.w));
+    return result;
+}
 
 // General inner products
 
 // scalar-scalar
-__generic<T : __BuiltinArithmeticType> T mul(T x, T y);
+__generic<T : __BuiltinArithmeticType>
+__intrinsic_op($(kIROp_Mul))
+T mul(T x, T y);
 
 // scalar-vector and vector-scalar
-__generic<T : __BuiltinArithmeticType, let N : int> vector<T,N> mul(vector<T,N> x, T y);
-__generic<T : __BuiltinArithmeticType, let N : int> vector<T,N> mul(T x, vector<T,N> y);
+__generic<T : __BuiltinArithmeticType, let N : int>
+__intrinsic_op($(kIROp_Mul))
+vector<T, N> mul(vector<T, N> x, T y);
+
+__generic<T : __BuiltinArithmeticType, let N : int>
+__intrinsic_op($(kIROp_Mul))
+vector<T, N> mul(T x, vector<T, N> y);
 
 // scalar-matrix and matrix-scalar
-__generic<T : __BuiltinArithmeticType, let N : int, let M :int> matrix<T,N,M> mul(matrix<T,N,M> x, T y);
-__generic<T : __BuiltinArithmeticType, let N : int, let M :int> matrix<T,N,M> mul(T x, matrix<T,N,M> y);
+__generic<T : __BuiltinArithmeticType, let N : int, let M :int>
+__intrinsic_op($(kIROp_Mul))
+matrix<T, N, M> mul(matrix<T, N, M> x, T y);
+
+__generic<T : __BuiltinArithmeticType, let N : int, let M :int>
+__intrinsic_op($(kIROp_Mul))
+matrix<T, N, M> mul(T x, matrix<T, N, M> y);
 
 // vector-vector (dot product)
-__generic<T : __BuiltinArithmeticType, let N : int> __intrinsic_op(dot) T mul(vector<T,N> x, vector<T,N> y);
+__generic<T : __BuiltinArithmeticType, let N : int>
+__target_intrinsic(hlsl)
+__target_intrinsic(glsl, "dot")
+T mul(vector<T, N> x, vector<T, N> y)
+{
+    return dot(x, y);
+}
+
+${{{{
+// TODO: The following functions could conceivably be defined
+// in the stdlib for the benefit of targets without direct
+// support for matrices, but the use of `__intrinsic_op` to
+// map them to a dedicated IR instruction interferes with
+// that choice.
+}}}}
 
 // vector-matrix
-__generic<T : __BuiltinArithmeticType, let N : int, let M : int> __intrinsic_op(mulVectorMatrix) vector<T,M> mul(vector<T,N> x, matrix<T,N,M> y);
+__generic<T : __BuiltinArithmeticType, let N : int, let M : int>
+__intrinsic_op(mulVectorMatrix)
+vector<T,M> mul(vector<T,N> x, matrix<T,N,M> y);
 
 // matrix-vector
-__generic<T : __BuiltinArithmeticType, let N : int, let M : int> __intrinsic_op(mulMatrixVector) vector<T,N> mul(matrix<T,N,M> x, vector<T,M> y);
+__generic<T : __BuiltinArithmeticType, let N : int, let M : int>
+__intrinsic_op(mulMatrixVector)
+vector<T,N> mul(matrix<T,N,M> x, vector<T,M> y);
 
 // matrix-matrix
-__generic<T : __BuiltinArithmeticType, let R : int, let N : int, let C : int> __intrinsic_op(mulMatrixMatrix) matrix<T,R,C> mul(matrix<T,R,N> x, matrix<T,N,C> y);
+__generic<T : __BuiltinArithmeticType, let R : int, let N : int, let C : int>
+__intrinsic_op(mulMatrixMatrix)
+matrix<T,R,C> mul(matrix<T,R,N> x, matrix<T,N,C> y);
 
 // noise (deprecated)
 
@@ -1753,10 +1829,13 @@ int NonUniformResourceIndex(int index)
 }
 
 // Normalize a vector
-__generic<T : __BuiltinFloatingPointType, let N : int> vector<T,N> normalize(vector<T,N> x);
-/*{
+__generic<T : __BuiltinFloatingPointType, let N : int>
+__target_intrinsic(hlsl)
+__target_intrinsic(glsl)
+vector<T,N> normalize(vector<T,N> x)
+{
     return x / length(x);
-}*/
+}
 
 // Raise to a power
 __generic<T : __BuiltinFloatingPointType>
@@ -1856,31 +1935,33 @@ void ProcessTriTessFactorsMin(
 __generic<T : __BuiltinFloatingPointType>
 __target_intrinsic(hlsl)
 __target_intrinsic(glsl)
-T radians(T x);
+T radians(T x)
+{
+    return x * (T.getPi() / T(180.0f));
+}
 
 __generic<T : __BuiltinFloatingPointType, let N : int>
 __target_intrinsic(hlsl)
 __target_intrinsic(glsl)
 vector<T, N> radians(vector<T, N> x)
 {
-    VECTOR_MAP_UNARY(T, N, radians, x);
+    return x * (T.getPi() / T(180.0f));
 }
 
 __generic<T : __BuiltinFloatingPointType, let N : int, let M : int>
 __target_intrinsic(hlsl)
 matrix<T, N, M> radians(matrix<T, N, M> x)
 {
-    MATRIX_MAP_UNARY(T, N, M, radians, x);
+    return x * (T.getPi() / T(180.0f));
 }
 
 // Approximate reciprocal
 __generic<T : __BuiltinFloatingPointType>
 __target_intrinsic(hlsl)
-__target_intrinsic(glsl, "1.0/($0)")
-T rcp(T x);
-/*{
-    return T(1) / x;
-}*/
+T rcp(T x)
+{
+    return T(1.0) / x;
+}
 
 __generic<T : __BuiltinFloatingPointType, let N : int>
 __target_intrinsic(hlsl)
@@ -1891,7 +1972,6 @@ vector<T, N> rcp(vector<T, N> x)
 
 __generic<T : __BuiltinFloatingPointType, let N : int, let M : int>
 __target_intrinsic(hlsl)
-// Note: GLSL doesn't define a vector `rcp`, so not intrinsic there
 matrix<T, N, M> rcp(matrix<T, N, M> x)
 {
     MATRIX_MAP_UNARY(T, N, M, rcp, x);
@@ -1899,27 +1979,35 @@ matrix<T, N, M> rcp(matrix<T, N, M> x)
 
 // Reflect incident vector across plane with given normal
 __generic<T : __BuiltinFloatingPointType, let N : int>
-vector<T,N> reflect(vector<T,N> i, vector<T,N> n);
-/*{
+__target_intrinsic(hlsl)
+__target_intrinsic(glsl)
+vector<T,N> reflect(vector<T,N> i, vector<T,N> n)
+{
     return i - T(2) * dot(n,i) * n;
-}*/
+}
 
 // Refract incident vector given surface normal and index of refraction
 __generic<T : __BuiltinFloatingPointType, let N : int>
-vector<T,N> refract(vector<T,N> i, vector<T,N> n, float eta);
-/*{
+__target_intrinsic(hlsl)
+__target_intrinsic(glsl)
+vector<T,N> refract(vector<T,N> i, vector<T,N> n, T eta)
+{
     let dotNI = dot(n,i);
     let k = T(1) - eta*eta*(T(1) - dotNI * dotNI);
-    if(k < 0) return vector<T,N>(T(0));
+    if(k < T(0)) return vector<T,N>(T(0));
     return eta * i - (eta * dotNI + sqrt(k)) * n;
-}*/
+}
 
 // Reverse order of bits
 __target_intrinsic(glsl, "bitfieldReverse")
 uint reversebits(uint value);
 
 __target_intrinsic(glsl, "bitfieldReverse")
-__generic<let N : int> vector<uint,N> reversebits(vector<uint,N> value);
+__generic<let N : int>
+vector<uint, N> reversebits(vector<uint, N> value)
+{
+    VECTOR_MAP_UNARY(uint, N, reversebits, value);
+}
 
 // Round-to-nearest
 __generic<T : __BuiltinFloatingPointType>
@@ -2073,7 +2161,13 @@ matrix<T, N, M> sinh(matrix<T, N, M> x)
 
 // Smooth step (Hermite interpolation)
 __generic<T : __BuiltinFloatingPointType>
-T smoothstep(T min, T max, T x);
+__target_intrinsic(hlsl)
+__target_intrinsic(glsl)
+T smoothstep(T min, T max, T x)
+{
+    let t = saturate((x - min) / (max - min));
+    return t * t * (T(3.0f) - (t + t));
+}
 
 __generic<T : __BuiltinFloatingPointType, let N : int>
 __target_intrinsic(hlsl)
@@ -2113,10 +2207,10 @@ matrix<T, N, M> sqrt(matrix<T, N, M> x)
 __generic<T : __BuiltinFloatingPointType>
 __target_intrinsic(hlsl)
 __target_intrinsic(glsl)
-T step(T y, T x);
-/*{
+T step(T y, T x)
+{
     return x < y ? T(0.0f) : T(1.0f);
-}*/
+}
 
 __generic<T : __BuiltinFloatingPointType, let N : int>
 __target_intrinsic(hlsl)
