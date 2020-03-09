@@ -758,6 +758,52 @@ __inline__ __device__ T _waveReadFirst(T val)
 }
 
 
+__device__ int _wavePrefixSum(int val)
+{
+    const int mask = __activemask();
+    const int offsetSize = _waveCalcPow2Offset(mask);
+    
+    const int laneId = _getLaneId();
+    
+    if (offsetSize > 0)
+    {
+        int sum = val;
+        for (int i = 1; i < offsetSize; i += i) 
+        {
+            // We do the __shfl_sync unconditionally so that we
+            // can read even from threads which won't do a
+            // sum, and then conditionally assign the result.
+            const int readVal = __shfl_up_sync(mask, sum, i, offsetSize);
+            if ((laneId & (offsetSize - 1)) >= i)
+            {
+                sum += readVal;
+            }
+        }
+        return sum - val;
+    }
+    else 
+    {
+        const int laneId = _getLaneId();
+        int result = 0;
+        int remaining = mask;
+        while (remaining)
+        {
+            const int laneBit = remaining & -remaining;
+            // Get the sourceLane 
+            const int srcLane = __ffs(laneBit) - 1;
+            // Broadcast (can also broadcast to self) 
+            int readValue = __shfl_sync(mask, val, srcLane);
+            // Only accumulate if srcLane is less than this lane
+            if (srcLane < laneId)
+            {
+                result += readValue;
+            }
+            remaining &= ~laneBit;
+        }
+        return result;
+    }
+}
+
 /* !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! */
 
 
