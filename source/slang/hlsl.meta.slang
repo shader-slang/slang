@@ -2322,122 +2322,133 @@ __generic<T : __BuiltinIntegerType>
 __glsl_extension(GL_KHR_shader_subgroup_arithmetic)
 __spirv_version(1.3)
 __target_intrinsic(glsl, "subgroupAnd($0)")
-__target_intrinsic(cuda, "_waveAnd(__activemask(), $0)")
+__target_intrinsic(cuda, "_waveAnd($0)")
 T WaveActiveBitAnd(T expr);
 __generic<T : __BuiltinIntegerType, let N : int>
 __glsl_extension(GL_KHR_shader_subgroup_arithmetic)
 __spirv_version(1.3)
 __target_intrinsic(glsl, "subgroupAnd($0)")
+__target_intrinsic(cuda, "_waveAndMultiple($0)")
 vector<T,N> WaveActiveBitAnd(vector<T,N> expr);
 __generic<T : __BuiltinIntegerType, let N : int, let M : int>
+__target_intrinsic(cuda, "_waveAndMultiple($0)")
 matrix<T,N,M> WaveActiveBitAnd(matrix<T,N,M> expr);
 
 __generic<T : __BuiltinIntegerType>
 __glsl_extension(GL_KHR_shader_subgroup_arithmetic)
 __spirv_version(1.3)
 __target_intrinsic(glsl, "subgroupOr($0)")
-__target_intrinsic(cuda, "_waveOr(__activemask(), $0)")
+__target_intrinsic(cuda, "_waveOr($0)")
 T WaveActiveBitOr(T expr);
 __generic<T : __BuiltinIntegerType, let N : int>
 __glsl_extension(GL_KHR_shader_subgroup_arithmetic)
 __spirv_version(1.3)
 __target_intrinsic(glsl, "subgroupOr($0)")
+__target_intrinsic(cuda, "_waveOrMultiple($0)")
 vector<T,N> WaveActiveBitOr(vector<T,N> expr);
 __generic<T : __BuiltinIntegerType, let N : int, let M : int>
+__target_intrinsic(cuda, "_waveOrMultiple($0)")
 matrix<T,N,M> WaveActiveBitOr(matrix<T,N,M> expr);
 
 __generic<T : __BuiltinIntegerType>
 __glsl_extension(GL_KHR_shader_subgroup_arithmetic)
 __spirv_version(1.3)
 __target_intrinsic(glsl, "subgroupXor($0)")
-__target_intrinsic(cuda, "_waveXor(__activemask(), $0)")
+__target_intrinsic(cuda, "_waveXor($0)")
 T WaveActiveBitXor(T expr);
 __generic<T : __BuiltinIntegerType, let N : int> 
 __glsl_extension(GL_KHR_shader_subgroup_arithmetic)
 __spirv_version(1.3)
 __target_intrinsic(glsl, "subgroupXor($0)")
+__target_intrinsic(cuda, "_waveXorMultiple($0)")
 vector<T,N> WaveActiveBitXor(vector<T,N> expr);
 __generic<T : __BuiltinIntegerType, let N : int, let M : int>
+__target_intrinsic(cuda, "_waveXorMultiple($0)")
 matrix<T,N,M> WaveActiveBitXor(matrix<T,N,M> expr);
 
 __generic<T : __BuiltinArithmeticType>
 __glsl_extension(GL_KHR_shader_subgroup_arithmetic)
 __spirv_version(1.3)
 __target_intrinsic(glsl, "subgroupMax($0)")
-__target_intrinsic(cuda, "_waveMax(__activemask(), $0)")
+__target_intrinsic(cuda, "_waveMax($0)")
 T WaveActiveMax(T expr);
 __generic<T : __BuiltinArithmeticType, let N : int>
 __glsl_extension(GL_KHR_shader_subgroup_arithmetic)
 __spirv_version(1.3)
 __target_intrinsic(glsl, "subgroupMax($0)")
+__target_intrinsic(cuda, "_waveMaxMultiple($0)")
 vector<T,N> WaveActiveMax(vector<T,N> expr);
 __generic<T : __BuiltinArithmeticType, let N : int, let M : int>
+__target_intrinsic(cuda, "_waveMaxMultiple($0)")
 matrix<T,N,M> WaveActiveMax(matrix<T,N,M> expr);
 
 __generic<T : __BuiltinArithmeticType>
 __glsl_extension(GL_KHR_shader_subgroup_arithmetic)
 __spirv_version(1.3)
 __target_intrinsic(glsl, "subgroupMin($0)")
-__target_intrinsic(cuda, "_waveMin(__activemask(), $0)")
+__target_intrinsic(cuda, "_waveMin($0)")
 T WaveActiveMin(T expr);
 __generic<T : __BuiltinArithmeticType, let N : int>
 __glsl_extension(GL_KHR_shader_subgroup_arithmetic)
 __spirv_version(1.3)
 __target_intrinsic(glsl, "subgroupMin($0)")
+__target_intrinsic(cuda, "_waveMinMultiple($0)")
 vector<T,N> WaveActiveMin(vector<T,N> expr);
 __generic<T : __BuiltinArithmeticType, let N : int, let M : int>
+__target_intrinsic(cuda, "_waveMinMultiple($0)")
 matrix<T,N,M> WaveActiveMin(matrix<T,N,M> expr);
 
 __generic<T : __BuiltinArithmeticType>
 __glsl_extension(GL_KHR_shader_subgroup_arithmetic)
 __spirv_version(1.3)
 __target_intrinsic(glsl, "subgroupMul($0)")
-__target_intrinsic(cuda, "_waveProduct(__activemask(), $0)")
+__target_intrinsic(cuda, "_waveProduct($0)")
 T WaveActiveProduct(T expr);
 __generic<T : __BuiltinArithmeticType, let N : int>
 __glsl_extension(GL_KHR_shader_subgroup_arithmetic)
 __spirv_version(1.3)
 __target_intrinsic(glsl, "subgroupMul($0)")
+__target_intrinsic(cuda, "_waveProductMultiple($0)")
 vector<T,N> WaveActiveProduct(vector<T,N> expr);
 __generic<T : __BuiltinArithmeticType, let N : int, let M : int>
+__target_intrinsic(cuda, "_waveProductMultiple($0)")
 matrix<T,N,M> WaveActiveProduct(matrix<T,N,M> expr);
 
 __generic<T : __BuiltinArithmeticType>
 __glsl_extension(GL_KHR_shader_subgroup_arithmetic)
 __spirv_version(1.3)
 __target_intrinsic(glsl, "subgroupAdd($0)")
-__target_intrinsic(cuda, "_waveSum(__activemask(), $0)")
+__target_intrinsic(cuda, "_waveSum($0)")
 T WaveActiveSum(T expr);
 __generic<T : __BuiltinArithmeticType, let N : int>
 __glsl_extension(GL_KHR_shader_subgroup_arithmetic)
 __spirv_version(1.3)
 __target_intrinsic(glsl, "subgroupAdd($0)")
+__target_intrinsic(cuda, "_waveSumMultiple($0)")
 vector<T,N> WaveActiveSum(vector<T,N> expr);
 __generic<T : __BuiltinArithmeticType, let N : int, let M : int>
+__target_intrinsic(cuda, "_waveSumMultiple($0)")
 matrix<T,N,M> WaveActiveSum(matrix<T,N,M> expr);
 
 __generic<T : __BuiltinType>
 __glsl_extension(GL_KHR_shader_subgroup_vote)
 __spirv_version(1.3)
 __target_intrinsic(glsl, "subgroupAllEqual($0)")
-__target_intrinsic(cuda, "_waveAllEqual(__activemask(), $0)")
+__target_intrinsic(cuda, "_waveAllEqual($0)")
 bool WaveActiveAllEqual(T value);
 __generic<T : __BuiltinType, let N : int> 
 __glsl_extension(GL_KHR_shader_subgroup_vote)
 __spirv_version(1.3)
 __target_intrinsic(glsl, "subgroupAllEqual($0)")
+__target_intrinsic(cuda, "_waveAllEqualMultiple($0)")
 vector<bool,N> WaveActiveAllEqual(vector<T,N> value);
 __generic<T : __BuiltinType, let N : int, let M : int>
+__target_intrinsic(cuda, "_waveAllEqualMultiple($0)")
 matrix<bool,N,M> WaveActiveAllEqual(matrix<T,N,M> value);
 
 __generic<T : __BuiltinType> uint4 WaveMatch(T value);
 __generic<T : __BuiltinType, let N : int> uint4 WaveMatch(vector<T,N> value);
 __generic<T : __BuiltinType, let N : int, let M : int> uint4 WaveMatch(matrix<T,N,M> value);
-
-// TODO(JS): For CUDA the article claims mask has to be used carefully
-// https://devblogs.nvidia.com/using-cuda-warp-level-primitives/
-// With the Warp intrinsics there is no mask, and it's just the 'active lanes'. So __activemask()
-// seems to be appropriate.
 
 __glsl_extension(GL_KHR_shader_subgroup_vote)
 __spirv_version(1.3)
@@ -2482,9 +2493,6 @@ __spirv_version(1.3)
 __target_intrinsic(glsl, "subgroupElect()")
 __target_intrinsic(cuda, "_waveIsFirstLane()")
 bool WaveIsFirstLane();
-
-// TODO(JS): We cannot calculate prefix sums using a mask of __activemask() & __lanemask_lt(), because (amongst other reasons)
-// that would mean different lanes having a different mask, and they all have to have the same mask.
 
 __generic<T : __BuiltinArithmeticType>
 __glsl_extension(GL_KHR_shader_subgroup_arithmetic)
@@ -2585,7 +2593,7 @@ __generic<T : __BuiltinType>
 __glsl_extension(GL_KHR_shader_subgroup_ballot)
 __spirv_version(1.3)
 __target_intrinsic(glsl, "subgroupBroadcast($0, $1)")
-__target_intrinsic(cuda, "__shfl_sync(SLANG_CUDA_WARP_MASK, $0, $1)")
+__target_intrinsic(cuda, "__shfl_sync(_activemask(), $0, $1)")
 T WaveReadLaneAt(T value, int lane);
 __generic<T : __BuiltinType, let N : int>
 __spirv_version(1.3)

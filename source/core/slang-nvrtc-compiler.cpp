@@ -204,7 +204,7 @@ static SlangResult _parseNVRTCLine(const UnownedStringSlice& line, DownstreamDia
         StringUtil::split(line, ':', split);
     }
 
-    if (split.getCount() == 3)
+    if (split.getCount() >= 3)
     {
         // tests/cuda/cuda-compile.cu(7): warning: variable "c" is used before its value is set
 
