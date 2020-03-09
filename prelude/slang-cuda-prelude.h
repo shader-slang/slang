@@ -764,17 +764,14 @@ __device__ int _wavePrefixSum(int val)
     const int offsetSize = _waveCalcPow2Offset(mask);
     
     const int laneId = _getLaneId();
-    
     if (offsetSize > 0)
-    {
+    {    
+        const int maskedLaneId = laneId & (offsetSize - 1);
         int sum = val;
         for (int i = 1; i < offsetSize; i += i) 
         {
-            // We do the __shfl_sync unconditionally so that we
-            // can read even from threads which won't do a
-            // sum, and then conditionally assign the result.
             const int readVal = __shfl_up_sync(mask, sum, i, offsetSize);
-            if ((laneId & (offsetSize - 1)) >= i)
+            if (maskedLaneId >= i)
             {
                 sum += readVal;
             }
@@ -783,7 +780,6 @@ __device__ int _wavePrefixSum(int val)
     }
     else 
     {
-        const int laneId = _getLaneId();
         int result = 0;
         int remaining = mask;
         while (remaining)
