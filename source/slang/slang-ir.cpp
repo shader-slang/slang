@@ -5030,6 +5030,21 @@ namespace Slang
         return val;
     }
 
+    IRGeneric* findSpecializedGeneric(IRSpecialize* specialize)
+    {
+        return as<IRGeneric>(specialize->getBase());
+    }
+
+
+    IRInst* findSpecializeReturnVal(IRSpecialize* specialize)
+    {
+        auto generic = findSpecializedGeneric(specialize);
+        if(!generic)
+            return nullptr;
+
+        return findGenericReturnVal(generic);
+    }
+
     IRInst* getResolvedInstForDecorations(IRInst* inst)
     {
         IRInst* candidate = inst;

@@ -1249,6 +1249,10 @@ struct IRGeneric : IRGlobalValueWithParams
 // a pass can glean information from it.
 IRInst* findGenericReturnVal(IRGeneric* generic);
 
+struct IRSpecialize;
+IRGeneric* findSpecializedGeneric(IRSpecialize* specialize);
+IRInst* findSpecializeReturnVal(IRSpecialize* specialize);
+
 // Resolve an instruction that might reference a static definition
 // to the most specific IR node possible, so that we can read
 // decorations from it (e.g., if this is a `specialize` instruction,

@@ -452,6 +452,9 @@ INST(HighLevelDeclDecoration,               highLevelDecl,          1, 0)
         /// A `[format(f)]` decoration specifies that the format of an image should be `f`
     INST(FormatDecoration, format, 1, 0)
 
+        /// An `[unsafeForceInlineEarly]` decoration specifies that calls to this function should be inline after initial codegen
+    INST(UnsafeForceInlineEarlyDecoration, unsafeForceInlineEarly, 0, 0)
+
     /* LinkageDecoration */
         INST(ImportDecoration, import, 1, 0)
         INST(ExportDecoration, export, 1, 0)
