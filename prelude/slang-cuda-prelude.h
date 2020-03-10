@@ -831,6 +831,7 @@ __device__ int _wavePrefixSum(int val)
     const int laneId = _getLaneId();
     if (offsetSize > 0)
     {    
+        // Sum is calculated inclusive of this lanes value
         int sum = val;
         for (int i = 1; i < offsetSize; i += i) 
         {
@@ -840,6 +841,7 @@ __device__ int _wavePrefixSum(int val)
                 sum += readVal;
             }
         }
+        // We want the result exclusive of this lanes value, so subtract it out
         return sum - val;
     }
     else 
@@ -862,6 +864,49 @@ __device__ int _wavePrefixSum(int val)
         }
         return result;
     }
+}
+
+__device__ int _wavePrefixProduct(int val)
+{
+    const int mask = __activemask();
+    const int offsetSize = _waveCalcPow2Offset(mask);
+    
+    const int laneId = _getLaneId();
+    int result = 1;           
+    if (offsetSize > 0)
+    {    
+        // For transmitted value we will do it inclusively with this lanes value
+        // For the result we do not include the lanes value. This means an extra multiply for each iteration
+        // but means we don't need to have a divide at the end and also removes overflow issues in that scenario.
+        for (int i = 1; i < offsetSize; i += i) 
+        {
+            const int readVal = __shfl_up_sync(mask, val, i, offsetSize);
+            if (laneId >= i)
+            {
+                result *= readVal;
+                val *= readVal;
+            }
+        }
+    }
+    else 
+    {
+        int remaining = mask;
+        while (remaining)
+        {
+            const int laneBit = remaining & -remaining;
+            // Get the sourceLane 
+            const int srcLane = __ffs(laneBit) - 1;
+            // Broadcast (can also broadcast to self) 
+            int readValue = __shfl_sync(mask, val, srcLane);
+            // Only accumulate if srcLane is less than this lane
+            if (srcLane < laneId)
+            {
+                result *= readValue;
+            }
+            remaining &= ~laneBit;
+        }
+    }
+    return result;
 }
 
 /* !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! */

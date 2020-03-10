@@ -2498,6 +2498,7 @@ __generic<T : __BuiltinArithmeticType>
 __glsl_extension(GL_KHR_shader_subgroup_arithmetic)
 __spirv_version(1.3)
 __target_intrinsic(glsl, "subgroupExclusiveMul($0)")
+__target_intrinsic(cuda, "_wavePrefixProduct($0)")
 T WavePrefixProduct(T expr);
 __generic<T : __BuiltinArithmeticType, let N : int>
 __glsl_extension(GL_KHR_shader_subgroup_arithmetic)
