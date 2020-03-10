@@ -766,12 +766,11 @@ __device__ int _wavePrefixSum(int val)
     const int laneId = _getLaneId();
     if (offsetSize > 0)
     {    
-        const int maskedLaneId = laneId & (offsetSize - 1);
         int sum = val;
         for (int i = 1; i < offsetSize; i += i) 
         {
             const int readVal = __shfl_up_sync(mask, sum, i, offsetSize);
-            if (maskedLaneId >= i)
+            if (laneId >= i)
             {
                 sum += readVal;
             }
