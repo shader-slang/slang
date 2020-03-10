@@ -534,6 +534,7 @@ struct WaveOpXor
 {
     __inline__ __device__ static T getInitial(T a) { return 0; }
     __inline__ __device__ static T doOp(T a, T b) { return a ^ b; }
+    __inline__ __device__ static T doInverse(T a, T b) { return a ^ b; }
 };
 
 template <typename T>
@@ -541,6 +542,7 @@ struct WaveOpAdd
 {
     __inline__ __device__ static T getInitial(T a) { return 0; }
     __inline__ __device__ static T doOp(T a, T b) { return a + b; }
+    __inline__ __device__ static T doInverse(T a, T b) { return a - b; }
 };
 
 template <typename T>
@@ -548,6 +550,9 @@ struct WaveOpMul
 {
     __inline__ __device__ static T getInitial(T a) { return T(1); }
     __inline__ __device__ static T doOp(T a, T b) { return a * b; }
+    // Using this inverse for int is probably undesirable - because in general it requires T to have more precision
+    // There is also a performance aspect to it, where divides are generally significantly slower
+    __inline__ __device__ static T doInverse(T a, T b) { return a / b; }
 };
 
 template <typename T>
@@ -823,46 +828,121 @@ __inline__ __device__ T _waveReadLaneAtMultiple(T inVal, int lane)
     return outVal;
 }
 
-__device__ int _wavePrefixSum(int val)
+// Scalar 
+
+// Invertable means that when we get to the end of the reduce, we can remove val (to make exclusive), using 
+// the inverse of the op.
+template <typename INTF, typename T>
+__device__ T _wavePrefixInvertableScalar(T val)
 {
     const int mask = __activemask();
     const int offsetSize = _waveCalcPow2Offset(mask);
     
     const int laneId = _getLaneId();
+    T result;
     if (offsetSize > 0)
     {    
-        int sum = val;
+        // Sum is calculated inclusive of this lanes value
+        result = val;
         for (int i = 1; i < offsetSize; i += i) 
         {
-            const int readVal = __shfl_up_sync(mask, sum, i, offsetSize);
+            const T readVal = __shfl_up_sync(mask, result, i, offsetSize);
             if (laneId >= i)
             {
-                sum += readVal;
+                result = INTF::doOp(result, readVal);
             }
         }
-        return sum - val;
+        // Remove val from the result, by applyin inverse
+        result = INTF::doInverse(result, val);
     }
     else 
     {
-        int result = 0;
-        int remaining = mask;
-        while (remaining)
+        result = INTF::getInitial(val);
+        if (!_waveIsSingleLane(mask))
         {
-            const int laneBit = remaining & -remaining;
-            // Get the sourceLane 
-            const int srcLane = __ffs(laneBit) - 1;
-            // Broadcast (can also broadcast to self) 
-            int readValue = __shfl_sync(mask, val, srcLane);
-            // Only accumulate if srcLane is less than this lane
-            if (srcLane < laneId)
+            int remaining = mask;
+            while (remaining)
             {
-                result += readValue;
+                const int laneBit = remaining & -remaining;
+                // Get the sourceLane 
+                const int srcLane = __ffs(laneBit) - 1;
+                // Broadcast (can also broadcast to self) 
+                const T readValue = __shfl_sync(mask, val, srcLane);
+                // Only accumulate if srcLane is less than this lane
+                if (srcLane < laneId)
+                {
+                    result = INTF::doOp(result, readValue);
+                }
+                remaining &= ~laneBit;
             }
-            remaining &= ~laneBit;
-        }
-        return result;
+        }   
     }
+    return result;
 }
+ 
+// This implementation separately tracks the value to be propogated, and the value
+// that is the final result 
+template <typename INTF, typename T>
+__device__ T _wavePrefixScalar(T val)
+{
+    const int mask = __activemask();
+    const int offsetSize = _waveCalcPow2Offset(mask);
+    
+    const int laneId = _getLaneId();
+    T result = INTF::getInitial(val);           
+    if (offsetSize > 0)
+    {    
+        // For transmitted value we will do it inclusively with this lanes value
+        // For the result we do not include the lanes value. This means an extra multiply for each iteration
+        // but means we don't need to have a divide at the end and also removes overflow issues in that scenario.
+        for (int i = 1; i < offsetSize; i += i) 
+        {
+            const T readVal = __shfl_up_sync(mask, val, i, offsetSize);
+            if (laneId >= i)
+            {
+                result = INTF::doOp(result, readVal);
+                val = INTF::doOp(val, readVal);
+            }
+        }
+    }
+    else 
+    {
+        if (!_waveIsSingleLane(mask))
+        {
+            int remaining = mask;
+            while (remaining)
+            {
+                const int laneBit = remaining & -remaining;
+                // Get the sourceLane 
+                const int srcLane = __ffs(laneBit) - 1;
+                // Broadcast (can also broadcast to self) 
+                const T readValue = __shfl_sync(mask, val, srcLane);
+                // Only accumulate if srcLane is less than this lane
+                if (srcLane < laneId)
+                {
+                    result = INTF::doOp(result, readValue);
+                }
+                remaining &= ~laneBit;
+            }
+        }
+    }
+    return result;
+}
+    
+template <typename T>
+__inline__ __device__ T _wavePrefixProduct(T val) { return _wavePrefixScalar<WaveOpMul<T>, T>(val); }
+
+template <typename T>
+__inline__ __device__ T _wavePrefixSum(T val) { return _wavePrefixInvertableScalar<WaveOpAdd<T>, T>(val); }    
+    
+template <typename T>
+__inline__ __device__ T _wavePrefixAnd(T val) { return _wavePrefixScalar<WaveOpAnd<T>, T>(val); }
+    
+template <typename T>
+__inline__ __device__ T _wavePrefixOr(T val) { return _wavePrefixScalar<WaveOpOr<T>, T>(val); }
+
+template <typename T>
+__inline__ __device__ T _wavePrefixXor(T val) { return _wavePrefixInvertableScalar<WaveOpXor<T>, T>(val); }
 
 /* !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! */
 
