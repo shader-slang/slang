@@ -750,6 +750,29 @@ __inline__ __device__ bool _waveAllEqual(T val)
 }
 
 template <typename T>
+__inline__ __device__ bool _waveAllEqualMultiple(T inVal) 
+{
+    typedef typename ElementTypeTrait<T>::Type ElemType;
+    const size_t count = sizeof(T) / sizeof(ElemType);
+    
+    // __match_all_sync is a synchronises so can use __activemask()
+    const int mask = __activemask();
+    int pred;
+    
+    const ElemType* src = (const ElemType*)&inVal;
+    
+    for (size_t i = 0; i < count; ++i)
+    {
+        __match_all_sync(mask, src[i], &pred);
+        if (pred == 0)
+        {
+            return false;
+        }
+    }
+    return true;
+}
+
+template <typename T>
 __inline__ __device__ T _waveReadFirst(T val) 
 {
     const int mask = __activemask();
@@ -757,6 +780,48 @@ __inline__ __device__ T _waveReadFirst(T val)
     return __shfl_sync(mask, val, lowestLaneId);   
 }
 
+template <typename T>
+__inline__ __device__ T _waveReadFirstMultiple(T inVal) 
+{
+    typedef typename ElementTypeTrait<T>::Type ElemType;
+    const size_t count = sizeof(T) / sizeof(ElemType);
+    
+    T outVal;
+    
+    const ElemType* src = (const ElemType*)&inVal;
+    ElemType* dst = (ElemType*)&outVal;
+    
+    const int mask = __activemask();
+    const int lowestLaneId = __ffs(mask) - 1;
+    
+    for (size_t i = 0; i < count; ++i)
+    {
+        dst[i] = __shfl_sync(mask, src[i], lowestLaneId);   
+    }
+    
+    return outVal;
+}
+
+template <typename T>
+__inline__ __device__ T _waveReadLaneAtMultiple(T inVal, int lane)
+{
+    typedef typename ElementTypeTrait<T>::Type ElemType;
+    const size_t count = sizeof(T) / sizeof(ElemType);
+    
+    T outVal;
+    
+    const ElemType* src = (const ElemType*)&inVal;
+    ElemType* dst = (ElemType*)&outVal;
+    
+    const int mask = __activemask();
+    
+    for (size_t i = 0; i < count; ++i)
+    {
+        dst[i] = __shfl_sync(mask, src[i], lane);   
+    }
+    
+    return outVal;
+}
 
 __device__ int _wavePrefixSum(int val)
 {

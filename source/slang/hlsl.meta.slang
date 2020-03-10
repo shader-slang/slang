@@ -2441,10 +2441,10 @@ __glsl_extension(GL_KHR_shader_subgroup_vote)
 __spirv_version(1.3)
 __target_intrinsic(glsl, "subgroupAllEqual($0)")
 __target_intrinsic(cuda, "_waveAllEqualMultiple($0)")
-vector<bool,N> WaveActiveAllEqual(vector<T,N> value);
+bool WaveActiveAllEqual(vector<T,N> value);
 __generic<T : __BuiltinType, let N : int, let M : int>
 __target_intrinsic(cuda, "_waveAllEqualMultiple($0)")
-matrix<bool,N,M> WaveActiveAllEqual(matrix<T,N,M> value);
+bool WaveActiveAllEqual(matrix<T,N,M> value);
 
 __generic<T : __BuiltinType> uint4 WaveMatch(T value);
 __generic<T : __BuiltinType, let N : int> uint4 WaveMatch(vector<T,N> value);
@@ -2586,21 +2586,27 @@ __generic<T : __BuiltinType, let N : int>
 __glsl_extension(GL_KHR_shader_subgroup_ballot)
 __spirv_version(1.3)
 __target_intrinsic(glsl, "subgroupBroadcastFirst($0)")
+__target_intrinsic(cuda, "_waveReadFirstMultiple($0)")
 vector<T,N> WaveReadLaneFirst(vector<T,N> expr);
 __generic<T : __BuiltinType, let N : int, let M : int>
+__target_intrinsic(cuda, "_waveReadFirstMultiple($0)")
 matrix<T,N,M> WaveReadLaneFirst(matrix<T,N,M> expr);
 
+// NOTE! On GLSL based targets the lane index *must* be a compile time expression!
+// See https://github.com/KhronosGroup/GLSL/blob/master/extensions/khr/GL_KHR_shader_subgroup.txt
 __generic<T : __BuiltinType>
 __glsl_extension(GL_KHR_shader_subgroup_ballot)
 __spirv_version(1.3)
 __target_intrinsic(glsl, "subgroupBroadcast($0, $1)")
-__target_intrinsic(cuda, "__shfl_sync(_activemask(), $0, $1)")
+__target_intrinsic(cuda, "__shfl_sync(__activemask(), $0, $1)")
 T WaveReadLaneAt(T value, int lane);
 __generic<T : __BuiltinType, let N : int>
 __spirv_version(1.3)
 __target_intrinsic(glsl, "subgroupBroadcast($0, $1)")
+__target_intrinsic(cuda, "_waveReadLaneAtMultiple($0, $1)")
 vector<T,N> WaveReadLaneAt(vector<T,N> value, int lane);
 __generic<T : __BuiltinType, let N : int, let M : int>
+__target_intrinsic(cuda, "_waveReadLaneAtMultiple($0, $1)")
 matrix<T,N,M> WaveReadLaneAt(matrix<T,N,M> value, int lane);
 
 
