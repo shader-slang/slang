@@ -273,6 +273,14 @@ namespace Slang
             if (declRef.is<RefAccessorDecl>())   emitRaw(context, "Ar");
         }
 
+        // Special case: need a way to tell prefix and postfix unary
+        // operators apart.
+        {
+            if(declRef.getDecl()->HasModifier<PostfixModifier>()) emitRaw(context, "P");
+            if(declRef.getDecl()->HasModifier<PrefixModifier>()) emitRaw(context, "p");
+        }
+
+
         // Are we the "inner" declaration beneath a generic decl?
         if(parentGenericDeclRef && (parentGenericDeclRef.getDecl()->inner.Ptr() == declRef.getDecl()))
         {

@@ -356,6 +356,7 @@ namespace Slang
             SourceLoc               loc);
 
         RefPtr<Expr> createLookupResultExpr(
+            Name*                   name,
             LookupResult const&     lookupResult,
             RefPtr<Expr>            baseExpr,
             SourceLoc               loc);

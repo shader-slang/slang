@@ -36,17 +36,9 @@ SYNTAX_CLASS(IntrinsicOpModifier, Modifier)
     // Token that names the intrinsic op.
     FIELD(Token, opToken)
 
-    // The opcode for the intrinsic operation.
+    // The IR opcode for the intrinsic operation.
     //
-    // If greather than or equal to zero, then `op`
-    // is an `IROp` and directly identifies an IR
-    // instruction that the intrinsic should translate to.
-    //
-    // If less than zero, then `op` is a `CompoundIntrinsicOp`
-    // which maps to zero or more IR instructions using
-    // special-case logic in the IR lowering phase.
-    //
-    FIELD_INIT(IntrinsicOp, op, 0)
+    FIELD_INIT(uint32_t, op, 0)
 END_SYNTAX_CLASS()
 
 // A modifier that marks something as an intrinsic function,
