@@ -901,56 +901,6 @@ void CPPSourceEmitter::_emitSignature(const UnownedStringSlice& funcName, const 
     writer->emit(")");
 }
 
-void CPPSourceEmitter::_emitVecMatMulDefinition(const UnownedStringSlice& funcName, const HLSLIntrinsic* specOp)
-{
-    IRFuncType* funcType = specOp->signatureType;
-    SLANG_ASSERT(funcType->getParamCount() == 2);
-    IRType* paramType0 = funcType->getParamType(0);
-    IRType* paramType1 = funcType->getParamType(1);
-    IRType* retType = specOp->returnType;
-
-    SourceWriter* writer = getSourceWriter();
-
-    _emitSignature(funcName, specOp);
-
-    writer->emit("\n{\n");
-    writer->indent();
-
-    emitType(retType);
-    writer->emit(" r;\n");
-
-    TypeDimension dimA = _getTypeDimension(paramType0, false);
-    TypeDimension dimB = _getTypeDimension(paramType1, true);
-    TypeDimension resultDim = _getTypeDimension(retType, paramType1->op == kIROp_VectorType);
-
-    for (int i = 0; i < resultDim.rowCount; ++i)
-    {
-        for (int j = 0; j < resultDim.colCount; ++j)
-        {
-            _emitAccess(UnownedStringSlice::fromLiteral("r"), resultDim, i, j, writer);
-            writer->emit(" = ");
-
-            for (int k = 0; k < dimA.colCount; k++)
-            {
-                if (k > 0)
-                {
-                    writer->emit(" + ");
-                }
-                _emitAccess(UnownedStringSlice::fromLiteral("a"), dimA, i, k, writer);
-                writer->emit(" * ");
-                _emitAccess(UnownedStringSlice::fromLiteral("b"), dimB, k, j, writer);
-            }
-
-            writer->emit(";\n");
-        }
-    }
-
-    writer->emit("return r;\n");
-
-    writer->dedent();
-    writer->emit("}\n\n");
-}
-
 UnownedStringSlice CPPSourceEmitter::_getAndEmitSpecializedOperationDefinition(HLSLIntrinsic::Op op, IRType*const* argTypes, Int argCount, IRType* retType)
 {
     HLSLIntrinsic intrinsic;
@@ -958,38 +908,6 @@ UnownedStringSlice CPPSourceEmitter::_getAndEmitSpecializedOperationDefinition(H
     auto specOp = m_intrinsicSet.add(intrinsic);
     _maybeEmitSpecializedOperationDefinition(specOp);
     return  _getFuncName(specOp);
-}
-
-void CPPSourceEmitter::_emitLengthDefinition(const UnownedStringSlice& funcName, const HLSLIntrinsic* specOp)
-{
-    SourceWriter* writer = getSourceWriter();
-
-    IRFuncType* funcType = specOp->signatureType;
-    SLANG_ASSERT(funcType->getParamCount() == 1);
-    IRType* paramType0 = funcType->getParamType(0);
-
-    SLANG_ASSERT(paramType0->op == kIROp_VectorType);
-
-    IRBasicType* elementType = as<IRBasicType>(static_cast<IRVectorType*>(paramType0)->getElementType());
-
-    IRType* dotArgs[] = { paramType0, paramType0 };
-    UnownedStringSlice dotFuncName = _getAndEmitSpecializedOperationDefinition(HLSLIntrinsic::Op::Dot, dotArgs, SLANG_COUNT_OF(dotArgs), elementType);
-
-    UnownedStringSlice sqrtName = _getScalarFuncName(HLSLIntrinsic::Op::Sqrt, elementType);
-
-    _emitSignature(funcName, specOp);
-
-    writer->emit("\n{\n");
-    writer->indent();
-
-    writer->emit("return ");
-    writer->emit(sqrtName);
-    writer->emit("(");
-    writer->emit(dotFuncName);
-    writer->emit("(a, a));\n");
-   
-    writer->dedent();
-    writer->emit("}\n\n");
 }
 
 void CPPSourceEmitter::_emitGetAtDefinition(const UnownedStringSlice& funcName, const HLSLIntrinsic* specOp)
@@ -1048,47 +966,6 @@ void CPPSourceEmitter::_emitGetAtDefinition(const UnownedStringSlice& funcName, 
         writer->emit("}\n\n");
     }
 }
-
-void CPPSourceEmitter::_emitNormalizeDefinition(const UnownedStringSlice& funcName, const HLSLIntrinsic* specOp)
-{    
-    SourceWriter* writer = getSourceWriter();
-
-    IRFuncType* funcType = specOp->signatureType;
-    SLANG_ASSERT(funcType->getParamCount() == 1);
-    IRType* paramType0 = funcType->getParamType(0);
-
-    SLANG_ASSERT(paramType0->op == kIROp_VectorType);
-
-    IRBasicType* elementType = as<IRBasicType>(static_cast<IRVectorType*>(paramType0)->getElementType());
-
-    IRType* dotArgs[] = { paramType0, paramType0 };
-    UnownedStringSlice dotFuncName = _getAndEmitSpecializedOperationDefinition(HLSLIntrinsic::Op::Dot, dotArgs, SLANG_COUNT_OF(dotArgs), elementType);
-    UnownedStringSlice rsqrtName = _getScalarFuncName(HLSLIntrinsic::Op::RecipSqrt, elementType);
-    IRType* vecMulScalarArgs[] = { paramType0, elementType };
-    UnownedStringSlice vecMulScalarName = _getAndEmitSpecializedOperationDefinition(HLSLIntrinsic::Op::Mul, vecMulScalarArgs, SLANG_COUNT_OF(vecMulScalarArgs), paramType0);
-
-    TypeDimension dimA = _getTypeDimension(paramType0, false);
-
-    // Assumes C++
-
-    _emitSignature(funcName, specOp);
-
-    writer->emit("\n{\n");
-    writer->indent();
-
-    writer->emit("return ");
-
-    // Assumes C++ here
-    writer->emit("a * ");
-    writer->emit(rsqrtName);
-    writer->emit("(");
-    writer->emit(dotFuncName);
-    writer->emit("(a, a));\n");
-
-    writer->dedent();
-    writer->emit("}\n\n");
-}
-
 
 void CPPSourceEmitter::_emitConstructConvertDefinition(const UnownedStringSlice& funcName, const HLSLIntrinsic* specOp)
 {
@@ -1329,42 +1206,6 @@ void CPPSourceEmitter::_emitConstructFromScalarDefinition(const UnownedStringSli
     writer->emit("}\n\n");
 }
 
-void CPPSourceEmitter::_emitReflectDefinition(const UnownedStringSlice& funcName, const HLSLIntrinsic* specOp)
-{
-    SourceWriter* writer = getSourceWriter();
-
-    IRFuncType* funcType = specOp->signatureType;
-    SLANG_ASSERT(funcType->getParamCount() == 2);
-    IRType* paramType0 = funcType->getParamType(0);
-
-    SLANG_ASSERT(paramType0->op == kIROp_VectorType);
-
-    IRBasicType* elementType = as<IRBasicType>(static_cast<IRVectorType*>(paramType0)->getElementType());
-
-    // Make sure we have all these functions defined before emitting 
-    IRType* dotArgs[] = { paramType0, paramType0 };
-    UnownedStringSlice dotFuncName = _getAndEmitSpecializedOperationDefinition(HLSLIntrinsic::Op::Dot, dotArgs, SLANG_COUNT_OF(dotArgs), elementType);
-
-    IRType* subArgs[] = { paramType0, paramType0};
-    UnownedStringSlice subFuncName = _getAndEmitSpecializedOperationDefinition(HLSLIntrinsic::Op::Sub, subArgs, SLANG_COUNT_OF(subArgs), paramType0);
-
-    IRType* vecMulScalarArgs[] = { paramType0, elementType };
-    UnownedStringSlice vecMulScalarFuncName = _getAndEmitSpecializedOperationDefinition(HLSLIntrinsic::Op::Mul, vecMulScalarArgs, SLANG_COUNT_OF(vecMulScalarArgs), paramType0);
-
-    // Assumes C++
-
-    _emitSignature(funcName, specOp);
-    writer->emit("\n{\n");
-    writer->indent();
-
-    writer->emit("return a - b * 2.0 * ");
-    writer->emit(dotFuncName);
-    writer->emit("(a, b);\n");
-
-    writer->dedent();
-    writer->emit("}\n\n");
-}
-
 void CPPSourceEmitter::_maybeEmitSpecializedOperationDefinition(const HLSLIntrinsic* specOp)
 {
     // Check if it's been emitted already, if not add it.
@@ -1385,27 +1226,10 @@ void CPPSourceEmitter::emitSpecializedOperationDefinition(const HLSLIntrinsic* s
         {
             return _emitInitDefinition(_getFuncName(specOp), specOp);
         }
-        case Op::VecMatMul:
-        case Op::Dot:
-        {
-            return _emitVecMatMulDefinition(_getFuncName(specOp), specOp);
-        }
         case Op::Any:
         case Op::All:
         {
             return _emitAnyAllDefinition(_getFuncName(specOp), specOp);
-        }
-        case Op::Normalize:
-        {
-            return _emitNormalizeDefinition(_getFuncName(specOp), specOp);
-        }
-        case Op::Length:
-        {
-            return _emitLengthDefinition(_getFuncName(specOp), specOp);
-        }
-        case Op::Reflect:
-        {
-            return _emitReflectDefinition(_getFuncName(specOp), specOp);
         }
         case Op::ConstructConvert:
         {
