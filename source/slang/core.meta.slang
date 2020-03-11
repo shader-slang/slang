@@ -113,7 +113,12 @@ interface __FlagsEnumType : __EnumType
 // argument. The left-to-right evaluation order guaranteed by Slang then ensures that
 // `left` is evaluated before `right`.
 //
-__generic<T,U> __intrinsic_op($(kCompoundIntrinsicOp_Sequence)) U operator,(T left, U right);
+__generic<T,U>
+[__unsafeForceInlineEarly]
+U operator,(T left, U right)
+{
+    return right;
+}
 
 // The ternary `?:` operator does not short-circuit in HLSL, and Slang continues to
 // follow that definition, so that this operator is effectively just an ordinary
@@ -1773,3 +1778,5 @@ attribute_syntax [allow(diagnostic: String)] : AllowAttribute;
 __attributeTarget(Decl)
 attribute_syntax [__extern] : ExternAttribute;
 
+__attributeTarget(FunctionDeclBase)
+attribute_syntax [__unsafeForceInlineEarly] : UnsafeForceInlineEarlyAttribute;

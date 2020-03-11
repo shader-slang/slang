@@ -29,7 +29,6 @@
     M(PreDec)                \
     M(PostInc)               \
     M(PostDec)               \
-    M(Sequence)              \
     M(AddAssign)             \
     M(SubAssign)             \
     M(MulAssign)             \

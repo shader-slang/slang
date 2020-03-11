@@ -345,6 +345,9 @@ struct IRFormatDecoration : IRDecoration
     }
 };
 
+IR_SIMPLE_DECORATION(UnsafeForceInlineEarlyDecoration)
+
+
 // An instruction that specializes another IR value
 // (representing a generic) to a particular set of generic arguments 
 // (instructions representing types, witness tables, etc.)

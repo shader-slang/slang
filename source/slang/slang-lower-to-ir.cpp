@@ -8,6 +8,7 @@
 #include "slang-compound-intrinsics.h"
 #include "slang-ir-constexpr.h"
 #include "slang-ir-dce.h"
+#include "slang-ir-inline.h"
 #include "slang-ir-insts.h"
 #include "slang-ir-missing-return.h"
 #include "slang-ir-sccp.h"
@@ -474,6 +475,14 @@ bool isImportedDecl(IRGenContext* context, Decl* decl)
     return false;
 }
 
+static bool isInline(Decl* decl)
+{
+    if(decl->HasModifier<UnsafeForceInlineEarlyAttribute>())
+        return true;
+
+    return false;
+}
+
     /// Should the given `decl` nested in `parentDecl` be treated as a static rather than instance declaration?
 bool isEffectivelyStatic(
     Decl*           decl,
@@ -745,15 +754,6 @@ LoweredValInfo emitCallToDeclRef(
             {
             case kCompoundIntrinsicOp_Pos:
                 return LoweredValInfo::simple(args[0]);
-
-            case kCompoundIntrinsicOp_Sequence:
-                // The main effect of "operator comma" is to enforce
-                // sequencing of its operands, but Slang already
-                // implements a strictly left-to-right evaluation
-                // order for function arguments, so in practice we
-                // just need to compile `a, b` to the value of `b`
-                // (because argument evaluation already happened).
-                return LoweredValInfo::simple(args[1]);
 
 #define CASE(COMPOUND, OP)  \
             case COMPOUND: return emitCompoundAssignOp(context, type, OP, argCount, args)
@@ -6042,7 +6042,7 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
 
         subBuilder->setInsertInto(irFunc);
 
-        if (isImportedDecl(decl))
+        if (isImportedDecl(decl) && !isInline(decl))
         {
             // Always emit imported declarations as declarations,
             // and not definitions.
@@ -6356,6 +6356,11 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
         {
             IRIntLit* intLit = _getIntLitFromAttribute(getBuilder(), attr);
             getBuilder()->addDecoration(irFunc, kIROp_OutputControlPointsDecoration, intLit);
+        }
+
+        if(decl->FindModifier<UnsafeForceInlineEarlyAttribute>())
+        {
+            getBuilder()->addDecoration(irFunc, kIROp_UnsafeForceInlineEarlyDecoration);
         }
 
         // For convenience, ensure that any additional global
@@ -6913,7 +6918,12 @@ IRModule* generateIRForTranslationUnit(
 
     //      dumpIR(module);
 
-    // First, attempt to promote local variables to SSA
+    // First, inline calls to any functions that have been
+    // marked for mandatory "early" inlining.
+    //
+    performMandatoryEarlyInlining(module);
+
+    // Next, attempt to promote local variables to SSA
     // temporaries whenever possible.
     constructSSA(module);
 
