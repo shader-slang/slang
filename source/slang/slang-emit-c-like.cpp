@@ -1777,6 +1777,42 @@ void CLikeSourceEmitter::emitIntrinsicCallExprImpl(
                 }
                 break;
 
+            case 'P':
+                // Type-based prefix as used for CUDA and C++ targets
+                {
+                    Index argIndex = 0;
+                    SLANG_RELEASE_ASSERT(argCount > argIndex);
+                    auto arg = args[argIndex].get();
+                    auto argType = arg->getDataType();
+
+                    const char* str = "";
+                    switch(argType->op)
+                    {
+                    #define CASE(OP, STR) \
+                    case kIROp_##OP: str = #STR; break
+
+                    CASE(Int8Type,      I8);
+                    CASE(Int16Type,     I16);
+                    CASE(IntType,       I32);
+                    CASE(Int64Type,     I64);
+                    CASE(UInt8Type,     U8);
+                    CASE(UInt16Type,    U16);
+                    CASE(UIntType,      U32);
+                    CASE(UInt64Type,    U64);
+                    CASE(HalfType,      F16);
+                    CASE(FloatType,     F32);
+                    CASE(DoubleType,    F64);
+
+                    #undef CASE
+
+                    default:
+                        SLANG_UNEXPECTED("unexpected type in intrinsic definition");
+                        break;
+                    }
+                    m_writer->emit(str);
+                }
+                break;
+
             default:
                 SLANG_UNEXPECTED("bad format in intrinsic definition");
                 break;
@@ -2057,17 +2093,6 @@ void CLikeSourceEmitter::defaultEmitInstExpr(IRInst* inst, const EmitOpInfo& inO
             emitOperand(inst->getOperand(1), getInfo(EmitOp::General));
             m_writer->emit("]");
         }
-        break;
-
-    case kIROp_Mul_Vector_Matrix:
-    case kIROp_Mul_Matrix_Vector:
-    case kIROp_Mul_Matrix_Matrix:
-        // Default impl
-        m_writer->emit("mul(");
-        emitOperand(inst->getOperand(0), getInfo(EmitOp::General));
-        m_writer->emit(", ");
-        emitOperand(inst->getOperand(1), getInfo(EmitOp::General));
-        m_writer->emit(")");
         break;
 
     case kIROp_swizzle:

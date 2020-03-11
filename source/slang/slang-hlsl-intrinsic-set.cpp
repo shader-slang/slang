@@ -220,42 +220,9 @@ SlangResult HLSLIntrinsicSet::makeIntrinsic(IRInst* inst, HLSLIntrinsic& out)
         {
         default: break;
 
-        case Op::Sin:
-        case Op::Cos:
-        case Op::Tan:
-        case Op::ArcSin:
-        case Op::ArcCos:
-        case Op::ArcTan:
-        case Op::ArcTan2:
-        case Op::Rcp:
-        case Op::Sign:
-        case Op::Frac:
-        case Op::Ceil:
-        case Op::Floor:
-        case Op::Trunc:
-        case Op::Sqrt:
-        case Op::RecipSqrt:
-        case Op::Exp2:
-        case Op::Exp:
-        case Op::Log:
-        case Op::Log2:
-        case Op::Log10:
-        case Op::Abs:
-        case Op::Min:
-        case Op::Max:
-        case Op::Pow:
-        case Op::FMod:
-        case Op::SmoothStep:
-        case Op::Lerp:
-        case Op::Clamp:
-        case Op::Step:
         case Op::AsFloat:
         case Op::AsInt:
         case Op::AsUInt:
-        case Op::IsInfinite:
-        case Op::IsFinite:
-        case Op::IsNan:
-        case Op::LdExp:
             // Note: the `any()`/`all()` case can't be handled via a stdlib definition
             // right now because `bool` vectors map to `int` vectors on the CUDA
             // path, so that the generated `geAt` operation is incorrect.
@@ -604,14 +571,6 @@ HLSLIntrinsic::Op HLSLIntrinsicOpLookup::getOpForIROp(IRInst* inst)
         case kIROp_BitNot:  return Op::BitNot;
 
         case kIROp_constructVectorFromScalar: return Op::ConstructFromScalar;
-
-        case kIROp_Mul_Matrix_Matrix:
-        case kIROp_Mul_Matrix_Vector:
-        case kIROp_Mul_Vector_Matrix:
-        {
-            return Op::VecMatMul;
-        }
-        case kIROp_Dot:     return Op::Dot;
 
         default:            return Op::Invalid;
     }
