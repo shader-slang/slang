@@ -490,3 +490,8 @@ END_SYNTAX_CLASS()
 // A `[__extern]` attribute, which indicates that a function/type is defined externally
 //
 SIMPLE_SYNTAX_CLASS(ExternAttribute, Attribute)
+
+// An `[__unsafeForceInlineExternal]` attribute indicates that the callee should be inlined
+// into call sites after initial IR generation (that is, as early as possible).
+//
+SIMPLE_SYNTAX_CLASS(UnsafeForceInlineEarlyAttribute, Attribute)

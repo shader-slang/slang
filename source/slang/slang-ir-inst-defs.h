@@ -373,10 +373,6 @@ INST(Dot, dot, 2, 0)
 
 INST(GetStringHash, getStringHash, 1, 0)
 
-INST(Mul_Vector_Matrix, mulVectorMatrix, 2, 0)
-INST(Mul_Matrix_Vector, mulMatrixVector, 2, 0)
-INST(Mul_Matrix_Matrix, mulMatrixMatrix, 2, 0)
-
 // Texture sampling operation of the form `t.Sample(s,u)`
 INST(Sample, sample, 3, 0)
 
@@ -451,6 +447,9 @@ INST(HighLevelDeclDecoration,               highLevelDecl,          1, 0)
 
         /// A `[format(f)]` decoration specifies that the format of an image should be `f`
     INST(FormatDecoration, format, 1, 0)
+
+        /// An `[unsafeForceInlineEarly]` decoration specifies that calls to this function should be inline after initial codegen
+    INST(UnsafeForceInlineEarlyDecoration, unsafeForceInlineEarly, 0, 0)
 
     /* LinkageDecoration */
         INST(ImportDecoration, import, 1, 0)

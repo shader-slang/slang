@@ -4951,9 +4951,6 @@ namespace Slang
         case kIROp_BitNot:
         case kIROp_Select:
         case kIROp_Dot:
-        case kIROp_Mul_Vector_Matrix:
-        case kIROp_Mul_Matrix_Vector:
-        case kIROp_Mul_Matrix_Matrix:
         case kIROp_MakeExistential:
         case kIROp_ExtractExistentialType:
         case kIROp_ExtractExistentialValue:
@@ -5028,6 +5025,21 @@ namespace Slang
 
         auto val = returnInst->getVal();
         return val;
+    }
+
+    IRGeneric* findSpecializedGeneric(IRSpecialize* specialize)
+    {
+        return as<IRGeneric>(specialize->getBase());
+    }
+
+
+    IRInst* findSpecializeReturnVal(IRSpecialize* specialize)
+    {
+        auto generic = findSpecializedGeneric(specialize);
+        if(!generic)
+            return nullptr;
+
+        return findGenericReturnVal(generic);
     }
 
     IRInst* getResolvedInstForDecorations(IRInst* inst)

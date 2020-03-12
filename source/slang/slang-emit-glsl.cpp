@@ -1096,31 +1096,6 @@ bool GLSLSourceEmitter::tryEmitInstExprImpl(IRInst* inst, const EmitOpInfo& inOu
             }
             break;
         }
-        case kIROp_Mul_Vector_Matrix:
-        case kIROp_Mul_Matrix_Vector:
-        case kIROp_Mul_Matrix_Matrix:
-        {
-            EmitOpInfo outerPrec = inOuterPrec;
-            bool needClose = false;
-
-            // GLSL expresses inner-product multiplications
-            // with the ordinary infix `*` operator.
-            //
-            // Note that the order of the operands is reversed
-            // compared to HLSL (and Slang's internal representation)
-            // because the notion of what is a "row" vs. a "column"
-            // is reversed between HLSL/Slang and GLSL.
-            //
-            auto prec = getInfo(EmitOp::Mul);
-            needClose = maybeEmitParens(outerPrec, prec);
-
-            emitOperand(inst->getOperand(1), leftSide(outerPrec, prec));
-            m_writer->emit(" * ");
-            emitOperand(inst->getOperand(0), rightSide(prec, outerPrec));
-
-            maybeCloseParens(needClose);
-            return true;
-        }
         case kIROp_Select:
         {
             if (inst->getOperand(0)->getDataType()->op != kIROp_BoolType)

@@ -217,6 +217,7 @@
     <ClInclude Include="slang-ir-dominators.h" />
     <ClInclude Include="slang-ir-entry-point-uniforms.h" />
     <ClInclude Include="slang-ir-glsl-legalize.h" />
+    <ClInclude Include="slang-ir-inline.h" />
     <ClInclude Include="slang-ir-inst-defs.h" />
     <ClInclude Include="slang-ir-insts.h" />
     <ClInclude Include="slang-ir-link.h" />
@@ -302,6 +303,7 @@
     <ClCompile Include="slang-ir-dominators.cpp" />
     <ClCompile Include="slang-ir-entry-point-uniforms.cpp" />
     <ClCompile Include="slang-ir-glsl-legalize.cpp" />
+    <ClCompile Include="slang-ir-inline.cpp" />
     <ClCompile Include="slang-ir-legalize-types.cpp" />
     <ClCompile Include="slang-ir-link.cpp" />
     <ClCompile Include="slang-ir-missing-return.cpp" />

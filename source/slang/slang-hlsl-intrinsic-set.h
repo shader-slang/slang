@@ -64,53 +64,6 @@ just constructXXXFromScalar. Would be good if there was a suitable name to encom
         \
         x(Swizzle, "", -1) \
         \
-        x(Dot, "dot", 2) \
-        x(VecMatMul, "mul", 2) \
-        \
-        x(Normalize, "normalize", 1) \
-        x(Length, "length", 1) \
-        \
-        x(Sin, "sin", 1) \
-        x(Cos, "cos", 1) \
-        x(Tan, "tan", 1) \
-        \
-        x(ArcSin, "asin", 1) \
-        x(ArcCos, "acos", 1) \
-        x(ArcTan, "atan", 1) \
-        \
-        x(ArcTan2, "atan2", 2) \
-        \
-        x(Rcp, "rcp", 1) \
-        x(Sign, "sign", 1) \
-        x(Frac, "frac", 1) \
-        \
-        x(Ceil, "ceil", 1) \
-        x(Floor, "floor", 1) \
-        x(Trunc, "trunc", 1) \
-        \
-        x(Sqrt, "sqrt", 1) \
-        x(RecipSqrt, "rsqrt", 1) \
-        \
-        x(Exp2, "exp2", 1) \
-        x(Exp, "exp", 1) \
-        \
-        x(Log, "log", 1) \
-        x(Log2, "log2", 1) \
-        x(Log10, "log10", 1) \
-        \
-        x(Abs, "abs", 1) \
-        \
-        x(Min, "min", 2) \
-        x(Max, "max", 2) \
-        x(Pow, "pow", 2) \
-        x(FMod, "fmod", 2) \
-        x(Reflect, "reflect", 2) \
-        \
-        x(SmoothStep, "smoothstep", 3) \
-        x(Lerp, "lerp", 3) \
-        x(Clamp, "clamp", 3) \
-        x(Step, "step", 2) \
-        \
         x(AsFloat, "asfloat", 1) \
         x(AsInt, "asint", -1) \
         x(AsUInt, "asuint", -1) \
@@ -120,13 +73,7 @@ just constructXXXFromScalar. Would be good if there was a suitable name to encom
         x(ConstructFromScalar, "", 1) \
         \
         x(GetAt, "", 2) \
-        \
-        x(CountBits, "countbits", 1) \
-        \
-        x(IsInfinite, "isinf", 1) \
-        x(IsFinite, "isfinite", 1) \
-        x(IsNan, "isnan", 1) \
-        x(LdExp, "ldexp", 2)
+        /* end */
 
 struct HLSLIntrinsic
 {

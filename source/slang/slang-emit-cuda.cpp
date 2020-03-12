@@ -112,26 +112,7 @@ SlangResult CUDASourceEmitter::calcScalarFuncName(HLSLIntrinsic::Op op, IRBasicT
     
     switch (op)
     {
-        case Op::Sin:
-        case Op::Cos:
-        case Op::Tan:
-        case Op::ArcSin:
-        case Op::ArcCos:
-        case Op::ArcTan:
-        case Op::ArcTan2:
-        case Op::Floor:
-        case Op::Ceil:
-        case Op::FMod:
-        case Op::Exp2:
-        case Op::Exp:
-        case Op::Log:
-        case Op::Log2:
-        case Op::Log10:
         case Op::FRem:
-        case Op::Sqrt:
-        case Op::RecipSqrt:
-        case Op::Pow:
-        case Op::Trunc:
         {
             if (type->op == kIROp_FloatType || type->op == kIROp_DoubleType)
             {
@@ -139,25 +120,6 @@ SlangResult CUDASourceEmitter::calcScalarFuncName(HLSLIntrinsic::Op op, IRBasicT
             }
             break;
         }
-        case Op::Max:
-        case Op::Min:
-        case Op::Abs:
-        {
-            // There are only floating point built in versions of these, prefixed with f
-            if (type->op == kIROp_FloatType || type->op == kIROp_DoubleType)
-            {
-                outBuilder << "f";
-                outBuilder << HLSLIntrinsic::getInfo(op).funcName;
-
-                if (type->op == kIROp_FloatType)
-                {
-                    outBuilder << "f";
-                }
-                return SLANG_OK;
-            }
-            break;
-        }
-
         default: break;
     }
 
@@ -170,23 +132,6 @@ SlangResult CUDASourceEmitter::calcScalarFuncName(HLSLIntrinsic::Op op, IRBasicT
         }
         return SLANG_OK;
     }
-
-    // Missing ones:
-    // 
-    // sincos - the built in uses pointer, so we'll just define in prelude
-    // rcp
-    // sign
-    // saturate
-    // frac
-    // smoothstep
-    // lerp
-    // clamp
-    // step
-    // 
-    // For integer types
-    // abs
-    // min
-    // max
 
     // Defer to the supers impl
     return Super::calcScalarFuncName(op, type, outBuilder);
