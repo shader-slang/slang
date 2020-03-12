@@ -919,6 +919,7 @@ __device__ T _wavePrefixInvertableScalar(T val)
     return result;
 }
  
+
 // This implementation separately tracks the value to be propogated, and the value
 // that is the final result 
 template <typename INTF, typename T>
@@ -967,6 +968,151 @@ __device__ T _wavePrefixScalar(T val)
     }
     return result;
 }
+
+
+template <typename INTF, typename T, size_t COUNT>
+__device__ T _copy(T* dst, const T* src)
+{
+    for (size_t j = 0; j < COUNT; ++j)
+    {
+        dst[j] = src[j];
+    }
+}    
+
+
+template <typename INTF, typename T, size_t COUNT>
+__device__ T _doInverse(T* inOut, const T* val)
+{
+    for (size_t j = 0; j < COUNT; ++j)
+    {
+        inOut[j] = INTF::doInverse(inOut[j], val[j]);
+    }
+}    
+
+template <typename INTF, typename T, size_t COUNT>
+__device__ T _setInitial(T* out, const T* val)
+{
+    for (size_t j = 0; j < COUNT; ++j)
+    {
+        out[j] = INTF::getInitial(val[j]);
+    }
+} 
+
+template <typename INTF, typename T, size_t COUNT>
+__device__ T _wavePrefixInvertableMultiple(T* val)
+{
+    const int mask = __activemask();
+    const int offsetSize = _waveCalcPow2Offset(mask);
+    
+    const int laneId = _getLaneId();
+    T originalVal[COUNT];
+    _copy<INTF, T, COUNT>(originalVal, val);
+    
+    if (offsetSize > 0)
+    {    
+        // Sum is calculated inclusive of this lanes value
+        for (int i = 1; i < offsetSize; i += i) 
+        {
+            // TODO(JS): Note that here I don't split the laneId outside so it's only tested once.
+            // This may be better but it would also mean that there would be shfl between lanes 
+            // that are on different (albeit identical) instructions. So this seems more likely to 
+            // work as expected with everything in lock step.
+            for (size_t j = 0; j < COUNT; ++j)
+            {
+                const T readVal = __shfl_up_sync(mask, val[j], i, offsetSize);
+                if (laneId >= i)
+                {
+                    val[j] = INTF::doOp(val[j], readVal);
+                }
+            }
+        }
+        // Remove originalVal from the result, by applyin inverse
+        _doInverse<INTF, T, COUNT>(val, originalVal);
+    }
+    else 
+    {
+        _setInitial<INTF, T, COUNT>(val, val);
+        if (!_waveIsSingleLane(mask))
+        {
+            int remaining = mask;
+            while (remaining)
+            {
+                const int laneBit = remaining & -remaining;
+                // Get the sourceLane 
+                const int srcLane = __ffs(laneBit) - 1;
+                
+                for (size_t j = 0; j < COUNT; ++j)
+                {
+                    // Broadcast (can also broadcast to self) 
+                    const T readValue = __shfl_sync(mask, originalVal[j], srcLane);
+                    // Only accumulate if srcLane is less than this lane
+                    if (srcLane < laneId)
+                    {
+                        val[j] = INTF::doOp(val[j], readValue);
+                    }
+                    remaining &= ~laneBit;
+                }
+            }
+        }   
+    }
+}
+ 
+template <typename INTF, typename T, size_t COUNT>
+__device__ T _wavePrefixMultiple(T* val)
+{
+    const int mask = __activemask();
+    const int offsetSize = _waveCalcPow2Offset(mask);
+    
+    const int laneId = _getLaneId();
+    
+    T work[COUNT];
+    _copy<INTF, T, COUNT>(work, val);
+    _setInitial<INTF, T, COUNT>(val, val);
+    
+    if (offsetSize > 0)
+    {    
+        // For transmitted value we will do it inclusively with this lanes value
+        // For the result we do not include the lanes value. This means an extra op for each iteration
+        // but means we don't need to have a divide at the end and also removes overflow issues in that scenario.
+        for (int i = 1; i < offsetSize; i += i) 
+        {
+            for (size_t j = 0; j < COUNT; ++j)
+            {
+                const T readVal = __shfl_up_sync(mask, work[j], i, offsetSize);
+                if (laneId >= i)
+                {
+                    work[j] = INTF::doOp(work[j], readVal);
+                    val[j] = INTF::doOp(val[j], readVal);     
+                }
+            }
+        }
+    }
+    else 
+    {
+        if (!_waveIsSingleLane(mask))
+        {
+            int remaining = mask;
+            while (remaining)
+            {
+                const int laneBit = remaining & -remaining;
+                // Get the sourceLane 
+                const int srcLane = __ffs(laneBit) - 1;
+                
+                for (size_t j = 0; j < COUNT; ++j)
+                {
+                    // Broadcast (can also broadcast to self) 
+                    const T readValue = __shfl_sync(mask, work[j], srcLane);
+                    // Only accumulate if srcLane is less than this lane
+                    if (srcLane < laneId)
+                    {
+                        val[j] = INTF::doOp(val[j], readValue);
+                    }
+                }
+                remaining &= ~laneBit;
+            }
+        }
+    }
+}
     
 template <typename T>
 __inline__ __device__ T _wavePrefixProduct(T val) { return _wavePrefixScalar<WaveOpMul<T>, T>(val); }
@@ -975,13 +1121,20 @@ template <typename T>
 __inline__ __device__ T _wavePrefixSum(T val) { return _wavePrefixInvertableScalar<WaveOpAdd<T>, T>(val); }    
     
 template <typename T>
-__inline__ __device__ T _wavePrefixAnd(T val) { return _wavePrefixScalar<WaveOpAnd<T>, T>(val); }
-    
-template <typename T>
-__inline__ __device__ T _wavePrefixOr(T val) { return _wavePrefixScalar<WaveOpOr<T>, T>(val); }
+__inline__ __device__ T _wavePrefixProductMultiple(T val) 
+{ 
+    typedef typename ElementTypeTrait<T>::Type ElemType;    
+    _wavePrefixInvertableMultiple<WaveOpMul<ElemType>, ElemType, sizeof(T) / sizeof(ElemType)>((ElemType*)&val);    
+    return val;
+}
 
 template <typename T>
-__inline__ __device__ T _wavePrefixXor(T val) { return _wavePrefixInvertableScalar<WaveOpXor<T>, T>(val); }
+__inline__ __device__ T _wavePrefixSumMultiple(T val) 
+{ 
+    typedef typename ElementTypeTrait<T>::Type ElemType;    
+    _wavePrefixMultiple<WaveOpAdd<ElemType>, ElemType, sizeof(T) / sizeof(ElemType)>((ElemType*)&val);    
+    return val;
+}
 
 /* !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! */
 
