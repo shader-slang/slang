@@ -2686,8 +2686,10 @@ __generic<T : __BuiltinArithmeticType, let N : int>
 __glsl_extension(GL_KHR_shader_subgroup_arithmetic)
 __spirv_version(1.3)
 __target_intrinsic(glsl, "subgroupExclusiveMul($0)")
+__target_intrinsic(cuda, "_wavePrefixProductMultiple($0)")
 vector<T,N> WavePrefixProduct(vector<T,N> expr);
 __generic<T : __BuiltinArithmeticType, let N : int, let M : int>
+__target_intrinsic(cuda, "_wavePrefixProductMultiple($0)")
 matrix<T,N,M> WavePrefixProduct(matrix<T,N,M> expr);
 
 __generic<T : __BuiltinArithmeticType>
@@ -2700,8 +2702,10 @@ __generic<T : __BuiltinArithmeticType, let N : int>
 __glsl_extension(GL_KHR_shader_subgroup_arithmetic)
 __spirv_version(1.3)
 __target_intrinsic(glsl, "subgroupExclusiveAdd($0)")
+__target_intrinsic(cuda, "_wavePrefixSumMultiple($0)")
 vector<T,N> WavePrefixSum(vector<T,N> expr);
 __generic<T : __BuiltinArithmeticType, let N : int, let M : int>
+__target_intrinsic(cuda, "_wavePrefixSumMultiple($0)")
 matrix<T,N,M> WavePrefixSum(matrix<T,N,M> expr);
 
 __generic<T : __BuiltinType>

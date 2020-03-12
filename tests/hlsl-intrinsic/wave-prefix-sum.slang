@@ -11,6 +11,13 @@ RWStructuredBuffer<int> outputBuffer;
 void computeMain(uint3 dispatchThreadID : SV_DispatchThreadID)
 {
     int idx = int(dispatchThreadID.x);
-    int val = WavePrefixSum(1 << idx);
-    outputBuffer[idx] = val;
+    
+    float2 v1 = float2(1, 1 << idx);
+    
+    int r0 = WavePrefixSum(1 << idx);
+    float2 r1 = WavePrefixSum(v1);
+    
+    int r2 = int(r1.x) + int(r1.y) - idx;
+    
+    outputBuffer[idx] = r0 + (r2 << 16);
 }
