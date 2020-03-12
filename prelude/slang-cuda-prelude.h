@@ -974,6 +974,10 @@ __device__ T _wavePrefixInvertableMultiple(T* val)
         // Sum is calculated inclusive of this lanes value
         for (int i = 1; i < offsetSize; i += i) 
         {
+            // TODO(JS): Note that here I don't split the laneId outside so it's only tested once.
+            // This may be better but it would also mean that there would be shfl between lanes 
+            // that are on different (albeit identical) instructions. So this seems more likely to 
+            // work as expected with everything in lock step.
             for (size_t j = 0; j < COUNT; ++j)
             {
                 const T readVal = __shfl_up_sync(mask, val[j], i, offsetSize);
