@@ -513,6 +513,18 @@ __forceinline__ __device__ int _getLaneLtMask()
     return (int(1) << _getLaneId()) - 1;
 }    
 
+// Return a mask suitable for the straight 'Prefix' style ops
+__forceinline__ __device__ int _getPrefixMask()
+{
+    return __activemask();
+}
+
+// Return a mask suitable for the 'MultiPrefix' style functions
+__forceinline__ __device__ int _getMultiPrefixMask(int mask)
+{
+    return mask;
+}
+
 // Note! Note will return true if mask is 0, but thats okay, because there must be one
 // lane active to execute anything
 __inline__ __device__ bool _waveIsSingleLane(int mask)
@@ -671,9 +683,9 @@ __device__ T _waveReduceScalar(T val)
         while (remaining)
         {
             const int laneBit = remaining & -remaining;
-            /* Get the sourceLane */
+            // Get the sourceLane 
             const int srcLane = __ffs(laneBit) - 1;
-            /* Broadcast (can also broadcast to self) */
+            // Broadcast (can also broadcast to self) 
             result = INTF::doOp(result, __shfl_sync(mask, val, srcLane));
             remaining &= ~laneBit;
         }
@@ -718,9 +730,9 @@ __device__ void _waveReduceMultiple(T* val)
         while (remaining)
         {
             const int laneBit = remaining & -remaining;
-            /* Get the sourceLane */
+            // Get the sourceLane 
             const int srcLane = __ffs(laneBit) - 1;
-            /* Broadcast (can also broadcast to self) */
+            // Broadcast (can also broadcast to self) 
             for (size_t i = 0; i < COUNT; ++i)
             {
                 val[i] = INTF::doOp(val[i], __shfl_sync(mask, originalVal[i], srcLane));
@@ -786,7 +798,7 @@ __inline__ __device__  T _waveMaxMultiple(T val) { typedef typename ElementTypeT
 template <typename T>
 __inline__ __device__ bool _waveAllEqual(T val) 
 {
-    // __match_all_sync is a synchronises so can use __activemask()
+    // __match_all_sync synchronizes so can use __activemask()
     const int mask = __activemask();
     int pred;
     __match_all_sync(mask, val, &pred);
@@ -798,13 +810,10 @@ __inline__ __device__ bool _waveAllEqualMultiple(T inVal)
 {
     typedef typename ElementTypeTrait<T>::Type ElemType;
     const size_t count = sizeof(T) / sizeof(ElemType);
-    
-    // __match_all_sync is a synchronises so can use __activemask()
+    // __match_all_sync synchronizes so can use __activemask()
     const int mask = __activemask();
     int pred;
-    
     const ElemType* src = (const ElemType*)&inVal;
-    
     for (size_t i = 0; i < count; ++i)
     {
         __match_all_sync(mask, src[i], &pred);
@@ -829,20 +838,15 @@ __inline__ __device__ T _waveReadFirstMultiple(T inVal)
 {
     typedef typename ElementTypeTrait<T>::Type ElemType;
     const size_t count = sizeof(T) / sizeof(ElemType);
-    
     T outVal;
-    
     const ElemType* src = (const ElemType*)&inVal;
     ElemType* dst = (ElemType*)&outVal;
-    
     const int mask = __activemask();
     const int lowestLaneId = __ffs(mask) - 1;
-    
     for (size_t i = 0; i < count; ++i)
     {
         dst[i] = __shfl_sync(mask, src[i], lowestLaneId);   
     }
-    
     return outVal;
 }
 
@@ -851,19 +855,14 @@ __inline__ __device__ T _waveReadLaneAtMultiple(T inVal, int lane)
 {
     typedef typename ElementTypeTrait<T>::Type ElemType;
     const size_t count = sizeof(T) / sizeof(ElemType);
-    
     T outVal;
-    
     const ElemType* src = (const ElemType*)&inVal;
     ElemType* dst = (ElemType*)&outVal;
-    
     const int mask = __activemask();
-    
     for (size_t i = 0; i < count; ++i)
     {
         dst[i] = __shfl_sync(mask, src[i], lane);   
     }
-    
     return outVal;
 }
 
@@ -872,9 +871,8 @@ __inline__ __device__ T _waveReadLaneAtMultiple(T inVal, int lane)
 // Invertable means that when we get to the end of the reduce, we can remove val (to make exclusive), using 
 // the inverse of the op.
 template <typename INTF, typename T>
-__device__ T _wavePrefixInvertableScalar(T val)
+__device__ T _wavePrefixInvertableScalar(T val, const int mask)
 {
-    const int mask = __activemask();
     const int offsetSize = _waveCalcPow2Offset(mask);
     
     const int laneId = _getLaneId();
@@ -923,9 +921,8 @@ __device__ T _wavePrefixInvertableScalar(T val)
 // This implementation separately tracks the value to be propogated, and the value
 // that is the final result 
 template <typename INTF, typename T>
-__device__ T _wavePrefixScalar(T val)
+__device__ T _wavePrefixScalar(T val, const int mask)
 {
-    const int mask = __activemask();
     const int offsetSize = _waveCalcPow2Offset(mask);
     
     const int laneId = _getLaneId();
@@ -971,7 +968,7 @@ __device__ T _wavePrefixScalar(T val)
 
 
 template <typename INTF, typename T, size_t COUNT>
-__device__ T _copy(T* dst, const T* src)
+__device__ T _waveOpCopy(T* dst, const T* src)
 {
     for (size_t j = 0; j < COUNT; ++j)
     {
@@ -981,7 +978,7 @@ __device__ T _copy(T* dst, const T* src)
 
 
 template <typename INTF, typename T, size_t COUNT>
-__device__ T _doInverse(T* inOut, const T* val)
+__device__ T _waveOpDoInverse(T* inOut, const T* val)
 {
     for (size_t j = 0; j < COUNT; ++j)
     {
@@ -990,7 +987,7 @@ __device__ T _doInverse(T* inOut, const T* val)
 }    
 
 template <typename INTF, typename T, size_t COUNT>
-__device__ T _setInitial(T* out, const T* val)
+__device__ T _waveOpSetInitial(T* out, const T* val)
 {
     for (size_t j = 0; j < COUNT; ++j)
     {
@@ -999,14 +996,13 @@ __device__ T _setInitial(T* out, const T* val)
 } 
 
 template <typename INTF, typename T, size_t COUNT>
-__device__ T _wavePrefixInvertableMultiple(T* val)
+__device__ T _wavePrefixInvertableMultiple(T* val, const int mask)
 {
-    const int mask = __activemask();
     const int offsetSize = _waveCalcPow2Offset(mask);
     
     const int laneId = _getLaneId();
     T originalVal[COUNT];
-    _copy<INTF, T, COUNT>(originalVal, val);
+    _waveOpCopy<INTF, T, COUNT>(originalVal, val);
     
     if (offsetSize > 0)
     {    
@@ -1027,11 +1023,11 @@ __device__ T _wavePrefixInvertableMultiple(T* val)
             }
         }
         // Remove originalVal from the result, by applyin inverse
-        _doInverse<INTF, T, COUNT>(val, originalVal);
+        _waveOpDoInverse<INTF, T, COUNT>(val, originalVal);
     }
     else 
     {
-        _setInitial<INTF, T, COUNT>(val, val);
+        _waveOpSetInitial<INTF, T, COUNT>(val, val);
         if (!_waveIsSingleLane(mask))
         {
             int remaining = mask;
@@ -1058,16 +1054,15 @@ __device__ T _wavePrefixInvertableMultiple(T* val)
 }
  
 template <typename INTF, typename T, size_t COUNT>
-__device__ T _wavePrefixMultiple(T* val)
+__device__ T _wavePrefixMultiple(T* val, const int mask)
 {
-    const int mask = __activemask();
     const int offsetSize = _waveCalcPow2Offset(mask);
     
     const int laneId = _getLaneId();
     
     T work[COUNT];
-    _copy<INTF, T, COUNT>(work, val);
-    _setInitial<INTF, T, COUNT>(val, val);
+    _waveOpCopy<INTF, T, COUNT>(work, val);
+    _waveOpSetInitial<INTF, T, COUNT>(val, val);
     
     if (offsetSize > 0)
     {    
@@ -1113,26 +1108,60 @@ __device__ T _wavePrefixMultiple(T* val)
         }
     }
 }
-    
-template <typename T>
-__inline__ __device__ T _wavePrefixProduct(T val) { return _wavePrefixScalar<WaveOpMul<T>, T>(val); }
 
 template <typename T>
-__inline__ __device__ T _wavePrefixSum(T val) { return _wavePrefixInvertableScalar<WaveOpAdd<T>, T>(val); }    
+__inline__ __device__ T _wavePrefixProduct(T val, const int mask = _getPrefixMask()) { return _wavePrefixScalar<WaveOpMul<T>, T>(val, mask); }
+
+template <typename T>
+__inline__ __device__ T _wavePrefixSum(T val, const int mask = _getPrefixMask()) { return _wavePrefixInvertableScalar<WaveOpAdd<T>, T>(val, mask); }    
+
+template <typename T>
+__inline__ __device__ T _wavePrefixXor(T val, const int mask = _getPrefixMask()) { return _wavePrefixInvertableScalar<WaveOpXor<T>, T>(val, mask); }    
     
 template <typename T>
-__inline__ __device__ T _wavePrefixProductMultiple(T val) 
+__inline__ __device__ T _wavePrefixOr(T val, const int mask = _getPrefixMask()) { return _wavePrefixScalar<WaveOpOr<T>, T>(val, mask); }      
+    
+template <typename T>
+__inline__ __device__ T _wavePrefixAnd(T val, const int mask = _getPrefixMask()) { return _wavePrefixScalar<WaveOpAnd<T>, T>(val, mask); }      
+    
+    
+template <typename T>
+__inline__ __device__ T _wavePrefixProductMultiple(T val, const int mask = _getPrefixMask())  
 { 
     typedef typename ElementTypeTrait<T>::Type ElemType;    
-    _wavePrefixInvertableMultiple<WaveOpMul<ElemType>, ElemType, sizeof(T) / sizeof(ElemType)>((ElemType*)&val);    
+    _wavePrefixInvertableMultiple<WaveOpMul<ElemType>, ElemType, sizeof(T) / sizeof(ElemType)>((ElemType*)&val, mask);    
     return val;
 }
 
 template <typename T>
-__inline__ __device__ T _wavePrefixSumMultiple(T val) 
+__inline__ __device__ T _wavePrefixSumMultiple(T val, const int mask = _getPrefixMask()) 
 { 
     typedef typename ElementTypeTrait<T>::Type ElemType;    
-    _wavePrefixMultiple<WaveOpAdd<ElemType>, ElemType, sizeof(T) / sizeof(ElemType)>((ElemType*)&val);    
+    _wavePrefixInvertableMultiple<WaveOpAdd<ElemType>, ElemType, sizeof(T) / sizeof(ElemType)>((ElemType*)&val, mask);    
+    return val;
+}
+
+template <typename T>
+__inline__ __device__ T _wavePrefixXorMultiple(T val, const int mask = _getPrefixMask())  
+{ 
+    typedef typename ElementTypeTrait<T>::Type ElemType;    
+    _wavePrefixInvertableMultiple<WaveOpXor<ElemType>, ElemType, sizeof(T) / sizeof(ElemType)>((ElemType*)&val, mask);    
+    return val;
+}
+
+template <typename T>
+__inline__ __device__ T _wavePrefixOrMultiple(T val, const int mask = _getPrefixMask()) 
+{ 
+    typedef typename ElementTypeTrait<T>::Type ElemType;    
+    _wavePrefixMultiple<WaveOpOr<ElemType>, ElemType, sizeof(T) / sizeof(ElemType)>((ElemType*)&val, mask);    
+    return val;
+}
+
+template <typename T>
+__inline__ __device__ T _wavePrefixAndMultiple(T val, const int mask = _getPrefixMask())  
+{ 
+    typedef typename ElementTypeTrait<T>::Type ElemType;    
+    _wavePrefixMultiple<WaveOpAnd<ElemType>, ElemType, sizeof(T) / sizeof(ElemType)>((ElemType*)&val, mask);    
     return val;
 }
 

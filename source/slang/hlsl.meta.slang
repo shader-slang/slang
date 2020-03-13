@@ -2619,9 +2619,7 @@ __generic<T : __BuiltinType, let N : int, let M : int>
 __target_intrinsic(cuda, "_waveAllEqualMultiple($0)")
 bool WaveActiveAllEqual(matrix<T,N,M> value);
 
-__generic<T : __BuiltinType> uint4 WaveMatch(T value);
-__generic<T : __BuiltinType, let N : int> uint4 WaveMatch(vector<T,N> value);
-__generic<T : __BuiltinType, let N : int, let M : int> uint4 WaveMatch(matrix<T,N,M> value);
+
 
 __glsl_extension(GL_KHR_shader_subgroup_vote)
 __spirv_version(1.3)
@@ -2641,11 +2639,9 @@ __target_intrinsic(glsl, "subgroupBallot($0)")
 __target_intrinsic(cuda, "make_uint4(__ballot_sync(__activemask(), $0), 0, 0, 0)")
 uint4 WaveActiveBallot(bool condition);
 
-// TODO(JS): 
-// subgroupBallotBitCount seems to take a uint4 parameter. 
 __glsl_extension(GL_KHR_shader_subgroup_ballot)
 __spirv_version(1.3)
-__target_intrinsic(glsl, "subgroupBallotBitCount($0)")
+__target_intrinsic(glsl, "bitCount(subgroupBallot($0))")
 __target_intrinsic(cuda, "__popc(__ballot_sync(__activemask(), $0))")
 uint WaveActiveCountBits(bool value);
 
@@ -2742,58 +2738,102 @@ uint WavePrefixCountBits(bool value);
 // https://github.com/microsoft/DirectX-Specs/blob/master/d3d/HLSL_ShaderModel6_5.md
 // TODO(JS): Looks like they need a mask parameter
 
-__generic<T : __BuiltinArithmeticType>
-__glsl_extension(GL_KHR_shader_subgroup_arithmetic)
-__spirv_version(1.3)
-__target_intrinsic(glsl, "subgroupExclusiveAnd($0)")
-__target_intrinsic(cuda, "_wavePrefixAnd($0)")
-T WaveMultiPrefixBitAnd(T expr);
-__glsl_extension(GL_KHR_shader_subgroup_arithmetic)
-__spirv_version(1.3)
-__target_intrinsic(glsl, "subgroupExclusiveAnd($0)")
-__generic<T : __BuiltinArithmeticType, let N : int>
-vector<T,N> WaveMultiPrefixBitAnd(vector<T,N> expr);
-__generic<T : __BuiltinArithmeticType, let N : int, let M : int>
-matrix<T,N,M> WaveMultiPrefixBitAnd(matrix<T,N,M> expr);
+__generic<T : __BuiltinType>
+__target_intrinsic(hlsl)
+uint4 WaveMatch(T value);
+__generic<T : __BuiltinType, let N : int>
+__target_intrinsic(hlsl)
+uint4 WaveMatch(vector<T,N> value);
+__generic<T : __BuiltinType, let N : int, let M : int>
+__target_intrinsic(hlsl)
+uint4 WaveMatch(matrix<T,N,M> value);
 
-__generic<T : __BuiltinArithmeticType>
-__glsl_extension(GL_KHR_shader_subgroup_arithmetic)
-__spirv_version(1.3)
-__target_intrinsic(glsl, "subgroupExclusiveOr($0)")
-__target_intrinsic(cuda, "_wavePrefixOr($0)")
-T WaveMultiPrefixBitOr(T expr);
-__generic<T : __BuiltinArithmeticType, let N : int>
-__glsl_extension(GL_KHR_shader_subgroup_arithmetic)
-__spirv_version(1.3)
-__target_intrinsic(glsl, "subgroupExclusiveOr($0)")
-vector<T,N> WaveMultiPrefixBitOr(vector<T,N> expr);
-__generic<T : __BuiltinArithmeticType, let N : int, let M : int>
-matrix<T,N,M> WaveMultiPrefixBitOr(matrix<T,N,M> expr);
-
-__generic<T : __BuiltinArithmeticType>
-__glsl_extension(GL_KHR_shader_subgroup_arithmetic)
-__spirv_version(1.3)
-__target_intrinsic(glsl, "subgroupExclusiveXor($0)")
-__target_intrinsic(cuda, "_wavePrefixXor($0)")
-T WaveMultiPrefixBitXor(T expr);
-__generic<T : __BuiltinArithmeticType, let N : int>
-__glsl_extension(GL_KHR_shader_subgroup_arithmetic)
-__spirv_version(1.3)
-__target_intrinsic(glsl, "subgroupExclusiveXor($0)")
-vector<T,N> WaveMultiPrefixBitXor(vector<T,N> expr);
-__generic<T : __BuiltinArithmeticType, let N : int, let M : int>
-matrix<T,N,M> WaveMultiPrefixBitXor(matrix<T,N,M> expr);
-
-
+__target_intrinsic(hlsl)
+__target_intrinsic(cuda, "_popc(__ballot_sync(($1).x, $0) & _getLaneLtMask())")
 uint WaveMultiPrefixCountBits(bool value, uint4 mask);
 
-__generic<T : __BuiltinArithmeticType> T WaveMultiPrefixProduct(T value, uint4 mask);
-__generic<T : __BuiltinArithmeticType, let N : int> vector<T,N> WaveMultiPrefixProduct(vector<T,N> value, uint4 mask);
-__generic<T : __BuiltinArithmeticType, let N : int, let M : int> matrix<T,N,M> WaveMultiPrefixProduct(matrix<T,N,M> value, uint4 mask);
+__generic<T : __BuiltinArithmeticType>
+__target_intrinsic(hlsl)
+__glsl_extension(GL_KHR_shader_subgroup_arithmetic)
+__spirv_version(1.3)
+//__target_intrinsic(glsl, "subgroupExclusiveAnd($0)")
+__target_intrinsic(cuda, "_wavePrefixAnd($0, _getMultiPrefixMask(($1).x))")
+T WaveMultiPrefixBitAnd(T expr, uint4 mask);
+__target_intrinsic(hlsl)
+__glsl_extension(GL_KHR_shader_subgroup_arithmetic)
+__spirv_version(1.3)
+__target_intrinsic(glsl, "subgroupExclusiveAnd($0)")
+__target_intrinsic(cuda, "_wavePrefixAndMultiple($0, _getMultiPrefixMask(($1).x))")
+__generic<T : __BuiltinArithmeticType, let N : int>
+vector<T,N> WaveMultiPrefixBitAnd(vector<T,N> expr, uint4 mask);
+__generic<T : __BuiltinArithmeticType, let N : int, let M : int>
+__target_intrinsic(hlsl)
+__target_intrinsic(cuda, "_wavePrefixAndMultiple($0, _getMultiPrefixMask(($1).x))")
+matrix<T,N,M> WaveMultiPrefixBitAnd(matrix<T,N,M> expr, uint4 mask);
 
-__generic<T : __BuiltinArithmeticType> T WaveMultiPrefixSum(T value, uint4 mask);
-__generic<T : __BuiltinArithmeticType, let N : int> vector<T,N> WaveMultiPrefixSum(vector<T,N> value, uint4 mask);
-__generic<T : __BuiltinArithmeticType, let N : int, let M : int> matrix<T,N,M> WaveMultiPrefixSum(matrix<T,N,M> value, uint4 mask);
+__generic<T : __BuiltinArithmeticType>
+__target_intrinsic(hlsl)
+__glsl_extension(GL_KHR_shader_subgroup_arithmetic)
+__spirv_version(1.3)
+//__target_intrinsic(glsl, "subgroupExclusiveOr($0)")
+__target_intrinsic(cuda, "_wavePrefixOr($0, _getMultiPrefixMask(($1).x))")
+T WaveMultiPrefixBitOr(T expr, uint4 mask);
+__generic<T : __BuiltinArithmeticType, let N : int>
+__target_intrinsic(hlsl)
+__glsl_extension(GL_KHR_shader_subgroup_arithmetic)
+__spirv_version(1.3)
+//__target_intrinsic(glsl, "subgroupExclusiveOr($0)")
+__target_intrinsic(cuda, "_wavePrefixOrMultiple($0, _getMultiPrefixMask(($1).x))")
+vector<T,N> WaveMultiPrefixBitOr(vector<T,N> expr, uint4 mask);
+__generic<T : __BuiltinArithmeticType, let N : int, let M : int>
+__target_intrinsic(hlsl)
+__target_intrinsic(cuda, "_wavePrefixOrMultiple($0, _getMultiPrefixMask(($1).x))")
+matrix<T,N,M> WaveMultiPrefixBitOr(matrix<T,N,M> expr, uint4 mask);
+
+__generic<T : __BuiltinArithmeticType>
+__target_intrinsic(hlsl)
+__glsl_extension(GL_KHR_shader_subgroup_arithmetic)
+__spirv_version(1.3)
+__target_intrinsic(glsl, "subgroupExclusiveXor($0)")
+__target_intrinsic(cuda, "_wavePrefixXor($0, _getMultiPrefixMask(($1).x))")
+T WaveMultiPrefixBitXor(T expr, uint4 mask);
+__generic<T : __BuiltinArithmeticType, let N : int>
+__target_intrinsic(hlsl)
+__glsl_extension(GL_KHR_shader_subgroup_arithmetic)
+__spirv_version(1.3)
+__target_intrinsic(glsl, "subgroupExclusiveXor($0)")
+__target_intrinsic(cuda, "_wavePrefixXorMultiple($0, _getMultiPrefixMask(($1).x))")
+vector<T,N> WaveMultiPrefixBitXor(vector<T,N> expr, uint4 mask);
+__generic<T : __BuiltinArithmeticType, let N : int, let M : int>
+__target_intrinsic(hlsl)
+__target_intrinsic(cuda, "_wavePrefixXorMultiple($0, _getMultiPrefixMask(($1).x))")
+matrix<T,N,M> WaveMultiPrefixBitXor(matrix<T,N,M> expr, uint4 mask);
+
+__generic<T : __BuiltinArithmeticType>
+__target_intrinsic(hlsl)
+__target_intrinsic(cuda, "_wavePrefixProduct($0, _getMultiPrefixMask(($1).x))")
+T WaveMultiPrefixProduct(T value, uint4 mask);
+__generic<T : __BuiltinArithmeticType, let N : int> 
+__target_intrinsic(hlsl)
+__target_intrinsic(cuda, "_wavePrefixProductMultiple($0, _getMultiPrefixMask(($1).x))")
+vector<T,N> WaveMultiPrefixProduct(vector<T,N> value, uint4 mask);
+__generic<T : __BuiltinArithmeticType, let N : int, let M : int>
+__target_intrinsic(hlsl)
+__target_intrinsic(cuda, "_wavePrefixProductMultiple($0, _getMultiPrefixMask(($1).x))")
+matrix<T,N,M> WaveMultiPrefixProduct(matrix<T,N,M> value, uint4 mask);
+
+__generic<T : __BuiltinArithmeticType>
+__target_intrinsic(hlsl)
+__target_intrinsic(cuda, "_wavePrefixSum($0, _getMultiPrefixMask(($1).x))")
+T WaveMultiPrefixSum(T value, uint4 mask);
+__generic<T : __BuiltinArithmeticType, let N : int>
+__target_intrinsic(hlsl)
+__target_intrinsic(cuda, "_wavePrefixSumMultiple($0, _getMultiPrefixMask(($1).x))")
+vector<T,N> WaveMultiPrefixSum(vector<T,N> value, uint4 mask);
+__generic<T : __BuiltinArithmeticType, let N : int, let M : int>
+__target_intrinsic(hlsl)
+__target_intrinsic(cuda, "_wavePrefixSumMultiple($0, _getMultiPrefixMask(($1).x))")
+matrix<T,N,M> WaveMultiPrefixSum(matrix<T,N,M> value, uint4 mask);
 
 // `typedef`s to help with the fact that HLSL has been sorta-kinda case insensitive at various points
 typedef Texture2D texture2D;
