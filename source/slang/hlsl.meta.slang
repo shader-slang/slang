@@ -2740,12 +2740,15 @@ uint WavePrefixCountBits(bool value);
 
 __generic<T : __BuiltinType>
 __target_intrinsic(hlsl)
+__target_intrinsic(cuda, "_waveMatchScalar($0)")
 uint4 WaveMatch(T value);
 __generic<T : __BuiltinType, let N : int>
 __target_intrinsic(hlsl)
+__target_intrinsic(cuda, "_waveMatchMultiple($0)")
 uint4 WaveMatch(vector<T,N> value);
 __generic<T : __BuiltinType, let N : int, let M : int>
 __target_intrinsic(hlsl)
+__target_intrinsic(cuda, "_waveMatchMultiple($0)")
 uint4 WaveMatch(matrix<T,N,M> value);
 
 __target_intrinsic(hlsl)

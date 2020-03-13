@@ -1165,6 +1165,32 @@ __inline__ __device__ T _wavePrefixAndMultiple(T val, const int mask = _getPrefi
     return val;
 }
 
+template <typename T>
+__inline__ __device__ uint4 _waveMatchScalar(T val) 
+{
+    // __match_all_sync synchronizes so can use __activemask()
+    const int mask = __activemask();
+    int pred;
+    return make_uint4(__match_all_sync(mask, val, &pred), 0, 0, 0);
+}
+
+template <typename T>
+__inline__ __device__ uint4 _waveMatchMultiple(const T& inVal) 
+{
+    typedef typename ElementTypeTrait<T>::Type ElemType;
+    const size_t count = sizeof(T) / sizeof(ElemType);
+    // __match_all_sync synchronizes so can use __activemask()
+    const int mask = __activemask();
+    int pred;
+    const ElemType* src = (const ElemType*)&inVal;
+    uint matchBits = 0xffffffff;
+    for (size_t i = 0; i < count && matchBits; ++i)
+    {
+        matchBits = matchBits & __match_all_sync(mask, src[i], &pred);
+    }
+    return make_uint4(matchBits, 0, 0, 0);
+}
+
 /* !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! */
 
 
