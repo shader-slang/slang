@@ -48,7 +48,6 @@
 -- From in the build directory you can use
 -- % premake5 --file=../premake5.lua --os=linux gmake 
 
-
 newoption {
    trigger     = "override-module",
    description = "(Optional) Specify a lua file that can override functions",
@@ -93,6 +92,12 @@ newoption {
 }
 
 newoption {
+   trigger     = "cuda-sdk-path",
+   description = "(Optional) Path to the root of CUDA SDK. If set will enable CUDA in build (ie in effect sets enable-cuda=true too)",
+   value       = "path"
+}
+
+newoption {
    trigger     = "enable-profile",
    description = "(Optional) If true will enable slang-profile tool - suitable for gprof usage on linux",
    value       = "bool",
@@ -104,14 +109,14 @@ buildLocation = _OPTIONS["build-location"]
 executeBinary = (_OPTIONS["execute-binary"] == "true")
 targetDetail = _OPTIONS["target-detail"]
 buildGlslang = (_OPTIONS["build-glslang"] == "true")
-enableCuda = (_OPTIONS["enable-cuda"] == "true")
+enableCuda = not not (_OPTIONS["enable-cuda"] == "true" or _OPTIONS["cuda-sdk-path"])
 enableProfile = (_OPTIONS["enable-profile"] == "true")
 
 -- cudaPath is only set if cuda is enabled, and CUDA_PATH enviromental variable is set
 cudaPath = nil
 if enableCuda then
-    -- Get the CUDA path from the environment variable. If set, CUDA will be assumed installed
-    cudaPath = os.getenv("CUDA_PATH")
+    -- Get the CUDA path. Use the value set on cuda-sdk-path by default, if not set use the environment variable. 
+    cudaPath = (_OPTIONS["cuda-sdk-path"] or os.getenv("CUDA_PATH"))
 end    
 
 -- Is true when the target is really windows (ie not something on top of windows like cygwin)
