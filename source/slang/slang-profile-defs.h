@@ -129,6 +129,8 @@ PROFILE(DX_Compute_6_0,				cs_6_0,				Compute,	DX_6_0)
 PROFILE(DX_Compute_6_1,				cs_6_1,				Compute,	DX_6_1)
 PROFILE(DX_Compute_6_2,				cs_6_2,				Compute,	DX_6_2)
 PROFILE(DX_Compute_6_3,				cs_6_3,				Compute,	DX_6_3)
+PROFILE(DX_Compute_6_4,				cs_6_4,				Compute,	DX_6_4)
+PROFILE(DX_Compute_6_5,				cs_6_5,				Compute,	DX_6_5)
 
 PROFILE(DX_Domain_5_0,				ds_5_0,				Domain,		DX_5_0)
 PROFILE(DX_Domain_5_1,				ds_5_1,				Domain,		DX_5_1)
