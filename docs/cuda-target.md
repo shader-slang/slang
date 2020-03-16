@@ -208,7 +208,7 @@ There is potential to calculate the lane id using the [numthreads] markup in Sla
 
 ## Unsupported Intrinsics
 
-* Intrinsics which only work in a pixel shader
+* Intrinsics which only work in pixel shaders
   + QuadXXXX intrinsics
   
 Limitations
@@ -218,7 +218,7 @@ Some features are not available because they cannot be mapped with appropriate b
 
 * Not all Wave intrinsics are supported
 * There is not complete support for all methods on 'objects' like textures etc. 
-* Does not currently support combined 'TextureSampler', that a Texture behaves equivalently as TextureSampler
+* Does not currently support combined 'TextureSampler'. A Texture behaves equivalently to a TextureSampler and Samplers are ignored.
 
 Language aspects
 ================
