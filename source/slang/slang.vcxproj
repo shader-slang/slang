@@ -193,7 +193,6 @@
     <ClInclude Include="slang-check-impl.h" />
     <ClInclude Include="slang-check.h" />
     <ClInclude Include="slang-compiler.h" />
-    <ClInclude Include="slang-compound-intrinsics.h" />
     <ClInclude Include="slang-decl-defs.h" />
     <ClInclude Include="slang-diagnostic-defs.h" />
     <ClInclude Include="slang-diagnostics.h" />

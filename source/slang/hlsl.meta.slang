@@ -524,16 +524,19 @@ matrix<float,N,M> asfloat(matrix<uint,N,M> x)
 }
 
 // No op
-__intrinsic_op($(kCompoundIntrinsicOp_Pos))
-float asfloat(float x);
+[__unsafeForceInlineEarly]
+float asfloat(float x)
+{ return x; }
 
 __generic<let N : int>
-__intrinsic_op($(kCompoundIntrinsicOp_Pos))
-vector<float,N> asfloat(vector<float,N> x);
+[__unsafeForceInlineEarly]
+vector<float,N> asfloat(vector<float,N> x)
+{ return x; }
 
 __generic<let N : int, let M : int>
-__intrinsic_op($(kCompoundIntrinsicOp_Pos))
-matrix<float,N,M> asfloat(matrix<float,N,M> x);
+[__unsafeForceInlineEarly]
+matrix<float,N,M> asfloat(matrix<float,N,M> x)
+{ return x; }
 
 // Inverse sine (HLSL SM 1.0)
 __generic<T : __BuiltinFloatingPointType>
@@ -599,16 +602,19 @@ matrix<int, N, M> asint(matrix<uint, N, M> x)
 }
 
 // No op
-__intrinsic_op($(kCompoundIntrinsicOp_Pos))
-int asint(int x);
+[__unsafeForceInlineEarly]
+int asint(int x)
+{ return x; }
 
 __generic<let N : int>
-__intrinsic_op($(kCompoundIntrinsicOp_Pos))
-vector<int,N> asint(vector<int,N> x);
+[__unsafeForceInlineEarly]
+vector<int,N> asint(vector<int,N> x)
+{ return x; }
 
 __generic<let N : int, let M : int>
-__intrinsic_op($(kCompoundIntrinsicOp_Pos))
-matrix<int,N,M> asint(matrix<int,N,M> x);
+[__unsafeForceInlineEarly]
+matrix<int,N,M> asint(matrix<int,N,M> x)
+{ return x; }
 
 // Reinterpret bits of double as a uint (HLSL SM 5.0)
 
@@ -657,16 +663,19 @@ matrix<uint, N, M> asuint(matrix<int, N, M> x)
     MATRIX_MAP_UNARY(uint, N, M, asuint, x);
 }
 
-__intrinsic_op($(kCompoundIntrinsicOp_Pos))
-uint asuint(uint x);
+[__unsafeForceInlineEarly]
+uint asuint(uint x)
+{ return x; }
 
 __generic<let N : int>
-__intrinsic_op($(kCompoundIntrinsicOp_Pos))
-vector<uint,N> asuint(vector<uint,N> x);
+[__unsafeForceInlineEarly]
+vector<uint,N> asuint(vector<uint,N> x)
+{ return x; }
 
 __generic<let N : int, let M : int>
-__intrinsic_op($(kCompoundIntrinsicOp_Pos))
-matrix<uint,N,M> asuint(matrix<uint,N,M> x);
+[__unsafeForceInlineEarly]
+matrix<uint,N,M> asuint(matrix<uint,N,M> x)
+{ return x; }
 
 // Inverse tangent (HLSL SM 1.0)
 __generic<T : __BuiltinFloatingPointType>

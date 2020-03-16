@@ -329,7 +329,7 @@ DIAGNOSTIC(39999, Error, expectedIntegerConstantNotLiteral, "could not extract v
 DIAGNOSTIC(39999, Error, noApplicableOverloadForNameWithArgs, "no overload for '$0' applicable to arguments of type $1")
 DIAGNOSTIC(39999, Error, noApplicableWithArgs, "no overload applicable to arguments of type $0")
 
-DIAGNOSTIC(39999, Error, ambiguousOverloadForNameWithArgs, "ambiguous call to '$0' operation with arguments of type $1")
+DIAGNOSTIC(39999, Error, ambiguousOverloadForNameWithArgs, "ambiguous call to '$0' with arguments of type $1")
 DIAGNOSTIC(39999, Error, ambiguousOverloadWithArgs, "ambiguous call to overloaded operation with arguments of type $0")
 
 DIAGNOSTIC(39999, Note, overloadCandidate, "candidate: $0")

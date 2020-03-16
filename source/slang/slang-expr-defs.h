@@ -21,6 +21,8 @@ SIMPLE_SYNTAX_CLASS(VarExpr, DeclRefExpr)
 // An expression that references an overloaded set of declarations
 // having the same name.
 SYNTAX_CLASS(OverloadedExpr, Expr)
+    // The name that was looked up and found to be overloaded
+    FIELD(Name*, name)
 
     // Optional: the base expression is this overloaded result
     // arose from a member-reference expression.
