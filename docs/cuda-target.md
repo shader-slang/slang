@@ -17,13 +17,12 @@ These limitations apply to Slang transpiling to CUDA.
 * Only supports the 'texture object' style binding (The texture object API is only supported on devices of compute capability 3.0 or higher. )
 * Samplers are not separate objects in CUDA - they are combined into a single 'TextureObject'. So samplers are effectively ignored on CUDA targets. 
 * When using a TextureArray (layered texture in CUDA) - the index will be treated as an int, as this is all CUDA allows
-* Care must be used in using `WaveGetLaneIndex` wave intrinsic - it will only give the right results for appopriate launches
-* Surfaces are used for textures which are read/write. CUDA does NOT do format conversion with surfaces.
+* Care must be used in using `WaveGetLaneIndex` wave intrinsic - it will only give the right results for appropriate launches
+* CUDA 'surfaces' are used for textures which are read/write. CUDA does NOT do format conversion with surfaces.
 
 The following are a work in progress or not implemented but are planned to be so in the future
 
 * Some resource types remain unsupported, and not all methods on types are supported
-* Some support for Wave intrinsics
 
 # How it works
 
@@ -97,6 +96,8 @@ The UniformState and UniformEntryPointParams struct typically vary by shader. Un
     size_t sizeInBytes;
 ```  
 
+
+
 ## Texture
 
 Read only textures will be bound as the opaque CUDA type CUtexObject. This type is the combination of both a texture AND a sampler. This is somewhat different from HLSL, where there can be separate `SamplerState` variables. This allows access of a single texture binding with different types of sampling. 
@@ -169,16 +170,55 @@ void setDownstreamCompilerPrelude(SlangPassThrough passThrough, const char* prel
 
 The code that sets up the prelude for the test infrastucture and command line usage can be found in ```TestToolUtil::setSessionDefaultPrelude```. Essentially this determines what the absolute path is to `slang-cpp-prelude.h` is and then just makes the prelude `#include "the absolute path"`.
 
-Limitations
-===========
+Wave Intrinsics
+===============
+
+There is broad support for [HLSL Wave intrinsics](https://docs.microsoft.com/en-us/windows/win32/direct3dhlsl/hlsl-shader-model-6-0-features-for-direct3d-12), including support for [SM 6.5 intrinsics](https://microsoft.github.io/DirectX-Specs/d3d/HLSL_ShaderModel6_5.html). 
+
+Most Wave intrinsics will work with vector, matrix or scalar types of typical built in types - uint, int, float, double, uint64_t, int64_t.  
+
+The support is provided via both the Slang stdlib as well as the Slang CUDA prelude found in 'prelude/slang-cuda-prelude.h'. Many Wave intrinsics are not directly applicable within CUDA which supplies a more low level mechanisms. The implementation of most Wave functions work most optimally if a 'Wave' where all lanes are used. If all lanes from index 0 to pow2(n) -1  are used (which is also true if all lanes are used) a binary reduction is typically applied. If this is not the case the implementation fallsback on a slow path which is linear in the number of active lanes, and so is typically significantly less performant. 
+
+For more a more concrete example take 
+
+```
+int sum = WaveActiveSum(...);
+```
+
+When computing the sum, if all lanes (32 on CUDA), the computation will require 5 steps to complete (2^5 = 32). If say just one lane is not being used it will take 31 steps to complete (because it is now linear in amount of lanes). So just having one lane disabled required 6 times as many steps. If lanes with 0 - 15 are active, it will take 4 steps to complete (2^4 = 16). 
+
+In the future it may be possible to improve on the performance of the 'slow' path, however it will always remain the most efficient generally for all of 0 to pow2(n) - 1 lanes to be active. 
+
+It is also worth noting that lane communicating intrinsics performance will be impacted by the 'size' of the data communicated. The size here is at a minimum the amount of built in scalar types used in the processing. The CUDA language only allows direct communication with built in scalar types. 
+
+Thus 
+
+```
+int3 v = ...;
+int3 sum = WaveActiveSum(v);
+```
+
+Will require 3 times as many steps as the earlier scalar example just using a single int. 
 
 ## WaveGetLaneIndex
 
-This defaults to `threadIdx.x & SLANG_CUDA_WARP_MASK`. Depending on how the kernel is launched this could be incorrect. 
-
-There other ways to get lane index, for example using inline assembly. This mechanism though is apparently slower than the simple method used here. 
+'WaveGetLaneIndex' defaults to `(threadIdx.x & SLANG_CUDA_WARP_MASK)`. Depending on how the kernel is launched this could be incorrect. There other ways to get lane index, for example using inline assembly. This mechanism though is apparently slower than the simple method used here. There is support for using the asm mechnism in the CUDA prelude using the `SLANG_USE_ASM_LANE_ID` preprocessor define to enable the feature. 
 
 There is potential to calculate the lane id using the [numthreads] markup in Slang/HLSL, but that also requires some assumptions of how that maps to a lane index. 
+
+## Unsupported Intrinsics
+
+* Intrinsics which only work in a pixel shader
+  + QuadXXXX intrinsics
+  
+Limitations
+===========
+
+Some features are not available because they cannot be mapped with appropriate behavior to a target. Other features are unavailable because of resources to devote to more unusual features. 
+
+* Not all Wave intrinsics are supported
+* There is not complete support for all methods on 'objects' like textures etc. 
+* Does not currently support combined 'TextureSampler', that a Texture behaves equivalently as TextureSampler
 
 Language aspects
 ================
