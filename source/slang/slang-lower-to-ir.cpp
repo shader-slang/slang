@@ -5,7 +5,6 @@
 
 #include "slang-check.h"
 #include "slang-ir.h"
-#include "slang-compound-intrinsics.h"
 #include "slang-ir-constexpr.h"
 #include "slang-ir-dce.h"
 #include "slang-ir-inline.h"
@@ -475,7 +474,8 @@ bool isImportedDecl(IRGenContext* context, Decl* decl)
     return false;
 }
 
-static bool isInline(Decl* decl)
+    /// Is `decl` a function that should be force-inlined early in compilation (before linking)?
+static bool isForceInlineEarly(Decl* decl)
 {
     if(decl->HasModifier<UnsafeForceInlineEarlyAttribute>())
         return true;
@@ -540,113 +540,6 @@ LoweredValInfo emitCallToVal(
         return LoweredValInfo::simple(
             builder->emitCallInst(type, getSimpleVal(context, funcVal), argCount, args));
     }
-}
-
-LoweredValInfo emitCompoundAssignOp(
-    IRGenContext*   context,
-    IRType*         type,
-    IROp            op,
-    UInt            argCount,
-    IRInst* const* args)
-{
-    auto builder = context->irBuilder;
-    SLANG_UNREFERENCED_PARAMETER(argCount);
-    SLANG_ASSERT(argCount == 2);
-    auto leftPtr = args[0];
-    auto rightVal = args[1];
-
-    auto leftVal = builder->emitLoad(leftPtr);
-
-    IRInst* innerArgs[] = { leftVal, rightVal };
-    auto innerOp = builder->emitIntrinsicInst(type, op, 2, innerArgs);
-
-    builder->emitStore(leftPtr, innerOp);
-
-    return LoweredValInfo::ptr(leftPtr);
-}
-
-IRInst* getOneValOfType(
-    IRGenContext*   context,
-    IRType*         type)
-{
-    switch(type->op)
-    {
-    case kIROp_IntType:
-    case kIROp_UIntType:
-    case kIROp_UInt64Type:
-        return context->irBuilder->getIntValue(type, 1);
-
-    case kIROp_HalfType:
-    case kIROp_FloatType:
-    case kIROp_DoubleType:
-        return context->irBuilder->getFloatValue(type, 1.0);
-
-    default:
-        break;
-    }
-
-    // TODO: should make sure to handle vector and matrix types here
-
-    SLANG_UNEXPECTED("inc/dec type");
-    UNREACHABLE_RETURN(nullptr);
-}
-
-LoweredValInfo emitPrefixIncDecOp(
-    IRGenContext*   context,
-    IRType*         type,
-    IROp            op,
-    UInt            argCount,
-    IRInst* const* args)
-{
-    auto builder = context->irBuilder;
-    SLANG_UNREFERENCED_PARAMETER(argCount);
-    SLANG_ASSERT(argCount == 1);
-    auto argPtr = args[0];
-
-    auto preVal = builder->emitLoad(argPtr);
-
-    IRInst* oneVal = getOneValOfType(context, type);
-
-    IRInst* innerArgs[] = { preVal, oneVal };
-    auto innerOp = builder->emitIntrinsicInst(type, op, 2, innerArgs);
-
-    builder->emitStore(argPtr, innerOp);
-
-    // For a prefix operator like `++i` we return
-    // the value after the increment/decrement has
-    // been applied. In casual terms we "increment
-    // the varaible, then return its value."
-    //
-    return LoweredValInfo::simple(innerOp);
-}
-
-LoweredValInfo emitPostfixIncDecOp(
-    IRGenContext*   context,
-    IRType*         type,
-    IROp            op,
-    UInt            argCount,
-    IRInst* const* args)
-{
-    auto builder = context->irBuilder;
-    SLANG_UNREFERENCED_PARAMETER(argCount);
-    SLANG_ASSERT(argCount == 1);
-    auto argPtr = args[0];
-
-    auto preVal = builder->emitLoad(argPtr);
-
-    IRInst* oneVal = getOneValOfType(context, type);
-
-    IRInst* innerArgs[] = { preVal, oneVal };
-    auto innerOp = builder->emitIntrinsicInst(type, op, 2, innerArgs);
-
-    builder->emitStore(argPtr, innerOp);
-
-    // For a postfix operator like `i++` we return
-    // the value that we read before the increment/decrement
-    // gets applied. In casual terms we "read
-    // the variable, then increment it."
-    //
-    return LoweredValInfo::simple(preVal);
 }
 
 LoweredValInfo lowerRValueExpr(
@@ -739,67 +632,16 @@ LoweredValInfo emitCallToDeclRef(
     auto funcDecl = funcDeclRef.getDecl();
     if(auto intrinsicOpModifier = funcDecl->FindModifier<IntrinsicOpModifier>())
     {
-        // An intrinsic op either maps to a single IR instruction
-        // (in the case where the opcode value is >= 0), or to
-        // a `CompountIntrinsicOp` (in the case where it is < 0).
+        // The intrinsic op maps to a single IR instruction,
+        // so we will emit an instruction with the chosen
+        // opcode, and the arguments to the call as its operands.
         //
         auto intrinsicOp = getIntrinsicOp(funcDecl, intrinsicOpModifier);
-        if(intrinsicOp < 0)
-        {
-            // We have a compound op, which requires special-case
-            // handling to generate zero or more IR instructions.
-            //
-            auto compoundOp = CompoundIntrinsicOp(intrinsicOp);
-            switch (compoundOp)
-            {
-            case kCompoundIntrinsicOp_Pos:
-                return LoweredValInfo::simple(args[0]);
-
-#define CASE(COMPOUND, OP)  \
-            case COMPOUND: return emitCompoundAssignOp(context, type, OP, argCount, args)
-
-            CASE(kCompoundIntrinsicOp_AddAssign, kIROp_Add);
-            CASE(kCompoundIntrinsicOp_SubAssign, kIROp_Sub);
-            CASE(kCompoundIntrinsicOp_MulAssign, kIROp_Mul);
-            CASE(kCompoundIntrinsicOp_DivAssign, kIROp_Div);
-            CASE(kCompoundIntrinsicOp_IRemAssign,kIROp_IRem);
-            CASE(kCompoundIntrinsicOp_FRemAssign,kIROp_FRem);
-            CASE(kCompoundIntrinsicOp_AndAssign, kIROp_BitAnd);
-            CASE(kCompoundIntrinsicOp_OrAssign, kIROp_BitOr);
-            CASE(kCompoundIntrinsicOp_XorAssign, kIROp_BitXor);
-            CASE(kCompoundIntrinsicOp_LshAssign, kIROp_Lsh);
-            CASE(kCompoundIntrinsicOp_RshAssign, kIROp_Rsh);
-
-#undef CASE
-
-#define CASE(COMPOUND, OP)  \
-            case COMPOUND: return emitPrefixIncDecOp(context, type, OP, argCount, args)
-            CASE(kCompoundIntrinsicOp_PreInc, kIROp_Add);
-            CASE(kCompoundIntrinsicOp_PreDec, kIROp_Sub);
-#undef CASE
-
-#define CASE(COMPOUND, OP)  \
-            case COMPOUND: return emitPostfixIncDecOp(context, type, OP, argCount, args)
-            CASE(kCompoundIntrinsicOp_PostInc, kIROp_Add);
-            CASE(kCompoundIntrinsicOp_PostDec, kIROp_Sub);
-#undef CASE
-            default:
-                SLANG_UNIMPLEMENTED_X("IR pseudo-op");
-                UNREACHABLE_RETURN(LoweredValInfo());
-            }
-        }
-        else
-        {
-            // The intrinsic op maps to a single IR instruction,
-            // so we will emit an instruction with the chosen
-            // opcode, and the arguments to the call as its operands.
-            //
-            return LoweredValInfo::simple(builder->emitIntrinsicInst(
-                type,
-                IROp(intrinsicOp),
-                argCount,
-                args));
-        }
+        return LoweredValInfo::simple(builder->emitIntrinsicInst(
+            type,
+            IROp(intrinsicOp),
+            argCount,
+            args));
     }
 
     if( auto ctorDeclRef = funcDeclRef.as<ConstructorDecl>() )
@@ -5184,7 +5026,7 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
             if(auto initExpr = decl->initExpr)
             {
                 auto initVal = lowerRValueExpr(context, initExpr);
-                initVal = materialize(context, initVal);
+                initVal = LoweredValInfo::simple(getSimpleVal(context, initVal));
                 setGlobalValue(context, decl, initVal);
                 return initVal;
             }
@@ -6042,7 +5884,22 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
 
         subBuilder->setInsertInto(irFunc);
 
-        if (isImportedDecl(decl) && !isInline(decl))
+        // If a function is imported from another module then
+        // we usually don't want to emit it as a definition, and
+        // will instead only emit a declaration for it with an
+        // appropriate `[import(...)]` linkage decoration.
+        //
+        // However, if the function is marked with `[__unsafeForceInlineEarly]`
+        // then we need to make sure the IR for its definition is available
+        // to the mandatory optimization passes.
+        //
+        // TODO: The design here means that we will re-emit the inline
+        // function from its AST in every module that uses it. We should
+        // instead have logic to clone the target function in from the
+        // pre-generated IR for the module that defines it (or do some kind
+        // of minimal linking to bring in the inline functions).
+        //
+        if (isImportedDecl(decl) && !isForceInlineEarly(decl))
         {
             // Always emit imported declarations as declarations,
             // and not definitions.

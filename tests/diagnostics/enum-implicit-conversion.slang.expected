@@ -6,7 +6,7 @@ tests/diagnostics/enum-implicit-conversion.slang(34): error 30019: expected an e
 tests/diagnostics/enum-implicit-conversion.slang(34): note: explicit conversion from 'Color' to 'int' is possible
 tests/diagnostics/enum-implicit-conversion.slang(35): error 30019: expected an expression of type 'uint', got 'Color'
 tests/diagnostics/enum-implicit-conversion.slang(35): note: explicit conversion from 'Color' to 'uint' is possible
-tests/diagnostics/enum-implicit-conversion.slang(42): error 39999: ambiguous call to overloaded operation with arguments of type (Color)
+tests/diagnostics/enum-implicit-conversion.slang(42): error 39999: ambiguous call to 'foo' with arguments of type (Color)
 tests/diagnostics/enum-implicit-conversion.slang(18): note 39999: candidate: func foo(uint) -> int
 tests/diagnostics/enum-implicit-conversion.slang(17): note 39999: candidate: func foo(int) -> int
 }

@@ -1455,11 +1455,8 @@ for (int tt = 0; tt < kBaseTextureTypeCount; ++tt)
 }
 
 
-for (auto op : unaryOps)
+for (auto op : intrinsicUnaryOps)
 {
-    char const* fixity = (op.flags & POSTFIX) != 0 ? "__postfix " : "__prefix ";
-    char const* qual = (op.flags & ASSIGNMENT) != 0 ? "in out " : "";
-
     for (auto type : kBaseTypes)
     {
         if ((type.flags & op.flags) == 0)
@@ -1469,18 +1466,15 @@ for (auto op : unaryOps)
         if (op.flags & BOOL_RESULT) resultType = "bool";
 
         // scalar version
-        sb << fixity;
-        sb << "__intrinsic_op(" << int(op.opCode) << ") " << resultType << " operator" << op.opName << "(" << qual << type.name << " value);\n";
+        sb << "__prefix __intrinsic_op(" << int(op.opCode) << ") " << resultType << " operator" << op.opName << "(" << type.name << " value);\n";
 
         // vector version
         sb << "__generic<let N : int> ";
-        sb << fixity;
-        sb << "__intrinsic_op(" << int(op.opCode) << ") vector<" << resultType << ",N> operator" << op.opName << "(" << qual << "vector<" << type.name << ",N> value);\n";
+        sb << "__prefix __intrinsic_op(" << int(op.opCode) << ") vector<" << resultType << ",N> operator" << op.opName << "(" << "vector<" << type.name << ",N> value);\n";
 
         // matrix version
         sb << "__generic<let N : int, let M : int> ";
-        sb << fixity;
-        sb << "__intrinsic_op(" << int(op.opCode) << ") matrix<" << resultType << ",N,M> operator" << op.opName << "(" << qual << "matrix<" << type.name << ",N,M> value);\n";
+        sb << "__prefix __intrinsic_op(" << int(op.opCode) << ") matrix<" << resultType << ",N,M> operator" << op.opName << "(" <<  "matrix<" << type.name << ",N,M> value);\n";
     }
 
     // Synthesize generic versions
@@ -1490,27 +1484,85 @@ for (auto op : unaryOps)
         if (op.flags & BOOL_RESULT) resultType = "bool";
 
         // scalar version
-        sb << fixity;
         sb << "__generic<T : " << op.interface << ">\n";
-        sb << "__intrinsic_op(" << int(op.opCode) << ") " << resultType << " operator" << op.opName << "(" << qual << "T value);\n";
+        sb << "__prefix __intrinsic_op(" << int(op.opCode) << ") " << resultType << " operator" << op.opName << "(" << "T value);\n";
 
         // vector version
         sb << "__generic<T : " << op.interface << ", let N : int> ";
-        sb << fixity;
-        sb << "__intrinsic_op(" << int(op.opCode) << ") vector<" << resultType << ",N> operator" << op.opName << "(" << qual << "vector<T,N> value);\n";
+        sb << "__prefix __intrinsic_op(" << int(op.opCode) << ") vector<" << resultType << ",N> operator" << op.opName << "(vector<T,N> value);\n";
 
         // matrix version
         sb << "__generic<T : " << op.interface << ", let N : int, let M : int> ";
-        sb << fixity;
-        sb << "__intrinsic_op(" << int(op.opCode) << ") matrix<" << resultType << ",N,M> operator" << op.opName << "(" << qual << "matrix<T,N,M> value);\n";
+        sb << "__prefix __intrinsic_op(" << int(op.opCode) << ") matrix<" << resultType << ",N,M> operator" << op.opName << "(matrix<T,N,M> value);\n";
     }
 }
 
-for (auto op : binaryOps)
-{
-    char const* leftQual = "";
-    if(op.flags & ASSIGNMENT) leftQual = "in out ";
+}}}}
 
+__generic<T : __BuiltinArithmeticType>
+[__unsafeForceInlineEarly]
+__prefix T operator+(T value)
+{ return value; }
+
+__generic<T : __BuiltinArithmeticType, let N : int>
+[__unsafeForceInlineEarly]
+__prefix vector<T,N> operator+(vector<T,N> value)
+{ return value; }
+
+__generic<T : __BuiltinArithmeticType, let R : int, let C : int>
+[__unsafeForceInlineEarly]
+__prefix matrix<T,R,C> operator+(matrix<T,R,C> value)
+{ return value; }
+
+${{{{
+
+static const struct IncDecOpInfo
+{
+    char const* name;
+    char const* binOp;
+} kIncDecOps[] =
+{
+    { "++", "+" },
+    { "--", "-" },
+};
+static const struct IncDecOpFixity
+{
+    char const* qual;
+    char const* bodyPrefix;
+    char const* returnVal;
+} kIncDecFixities[] =
+{
+    { "__prefix", "", "value" },
+    { "__postfix", " let result = value;", "result" },
+};
+for(auto op : kIncDecOps)
+for(auto fixity : kIncDecFixities)
+{
+}}}}
+
+$(fixity.qual)
+__generic<T : __BuiltinArithmeticType>
+[__unsafeForceInlineEarly]
+T operator$(op.name)(in out T value)
+{$(fixity.bodyPrefix) value = value $(op.binOp) T(1); return $(fixity.returnVal); }
+
+$(fixity.qual)
+__generic<T : __BuiltinArithmeticType, let N : int>
+[__unsafeForceInlineEarly]
+vector<T,N> operator$(op.name)(in out vector<T,N> value)
+{$(fixity.bodyPrefix) value = value $(op.binOp) T(1); return $(fixity.returnVal); }
+
+$(fixity.qual)
+__generic<T : __BuiltinArithmeticType, let R : int, let C : int>
+[__unsafeForceInlineEarly]
+matrix<T,R,C> operator$(op.name)(in out matrix<T,R,C> value)
+{$(fixity.bodyPrefix) value = value $(op.binOp) T(1); return $(fixity.returnVal); }
+
+${{{{
+}
+
+for (auto op : intrinsicBinaryOps)
+{
     for (auto type : kBaseTypes)
     {
         if ((type.flags & op.flags) == 0)
@@ -1533,15 +1585,15 @@ for (auto op : binaryOps)
         // the compiler)
 
         // scalar version
-        sb << "__intrinsic_op(" << int(op.opCode) << ") " << resultType << " operator" << op.opName << "(" << leftQual << leftType << " left, " << rightType << " right);\n";
+        sb << "__intrinsic_op(" << int(op.opCode) << ") " << resultType << " operator" << op.opName << "(" << leftType << " left, " << rightType << " right);\n";
 
         // vector version
         sb << "__generic<let N : int> ";
-        sb << "__intrinsic_op(" << int(op.opCode) << ") vector<" << resultType << ",N> operator" << op.opName << "(" << leftQual << "vector<" << leftType << ",N> left, vector<" << rightType << ",N> right);\n";
+        sb << "__intrinsic_op(" << int(op.opCode) << ") vector<" << resultType << ",N> operator" << op.opName << "(vector<" << leftType << ",N> left, vector<" << rightType << ",N> right);\n";
 
         // matrix version
         sb << "__generic<let N : int, let M : int> ";
-        sb << "__intrinsic_op(" << int(op.opCode) << ") matrix<" << resultType << ",N,M> operator" << op.opName << "(" << leftQual << "matrix<" << leftType << ",N,M> left, matrix<" << rightType << ",N,M> right);\n";
+        sb << "__intrinsic_op(" << int(op.opCode) << ") matrix<" << resultType << ",N,M> operator" << op.opName << "(matrix<" << leftType << ",N,M> left, matrix<" << rightType << ",N,M> right);\n";
 
         // We currently synthesize addiitonal overloads
         // for the case where one or the other operand
@@ -1577,21 +1629,18 @@ for (auto op : binaryOps)
         // for builtin in non-operator functions anyway.
 
         // scalar-vector and scalar-matrix
-        if (!(op.flags & ASSIGNMENT))
-        {
-            sb << "__generic<let N : int> ";
-            sb << "__intrinsic_op(" << int(op.opCode) << ") vector<" << resultType << ",N> operator" << op.opName << "(" << leftQual << leftType << " left, vector<" << rightType << ",N> right);\n";
+        sb << "__generic<let N : int> ";
+        sb << "__intrinsic_op(" << int(op.opCode) << ") vector<" << resultType << ",N> operator" << op.opName << "(" << leftType << " left, vector<" << rightType << ",N> right);\n";
 
-            sb << "__generic<let N : int, let M : int> ";
-            sb << "__intrinsic_op(" << int(op.opCode) << ") matrix<" << resultType << ",N,M> operator" << op.opName << "(" << leftQual << leftType << " left, matrix<" << rightType << ",N,M> right);\n";
-        }
+        sb << "__generic<let N : int, let M : int> ";
+        sb << "__intrinsic_op(" << int(op.opCode) << ") matrix<" << resultType << ",N,M> operator" << op.opName << "(" << leftType << " left, matrix<" << rightType << ",N,M> right);\n";
 
         // vector-scalar and matrix-scalar
         sb << "__generic<let N : int> ";
-        sb << "__intrinsic_op(" << int(op.opCode) << ") vector<" << resultType << ",N> operator" << op.opName << "(" << leftQual << "vector<" << leftType << ",N> left, " << rightType << " right);\n";
+        sb << "__intrinsic_op(" << int(op.opCode) << ") vector<" << resultType << ",N> operator" << op.opName << "(vector<" << leftType << ",N> left, " << rightType << " right);\n";
 
         sb << "__generic<let N : int, let M : int> ";
-        sb << "__intrinsic_op(" << int(op.opCode) << ") matrix<" << resultType << ",N,M> operator" << op.opName << "(" << leftQual << "matrix<" << leftType << ",N,M> left, " << rightType << " right);\n";
+        sb << "__intrinsic_op(" << int(op.opCode) << ") matrix<" << resultType << ",N,M> operator" << op.opName << "(matrix<" << leftType << ",N,M> left, " << rightType << " right);\n";
     }
 
     // Synthesize generic versions
@@ -1606,35 +1655,101 @@ for (auto op : binaryOps)
 
         // scalar version
         sb << "__generic<T : " << op.interface << ">\n";
-        sb << "__intrinsic_op(" << int(op.opCode) << ") " << resultType << " operator" << op.opName << "(" << leftQual << leftType << " left, " << rightType << " right);\n";
+        sb << "__intrinsic_op(" << int(op.opCode) << ") " << resultType << " operator" << op.opName << "(" << leftType << " left, " << rightType << " right);\n";
 
         // vector version
         sb << "__generic<T : " << op.interface << ", let N : int> ";
-        sb << "__intrinsic_op(" << int(op.opCode) << ") vector<" << resultType << ",N> operator" << op.opName << "(" << leftQual << "vector<" << leftType << ",N> left, vector<" << rightType << ",N> right);\n";
+        sb << "__intrinsic_op(" << int(op.opCode) << ") vector<" << resultType << ",N> operator" << op.opName << "(vector<" << leftType << ",N> left, vector<" << rightType << ",N> right);\n";
 
         // matrix version
         sb << "__generic<T : " << op.interface << ", let N : int, let M : int> ";
-        sb << "__intrinsic_op(" << int(op.opCode) << ") matrix<" << resultType << ",N,M> operator" << op.opName << "(" << leftQual << "matrix<" << leftType << ",N,M> left, matrix<" << rightType << ",N,M> right);\n";
+        sb << "__intrinsic_op(" << int(op.opCode) << ") matrix<" << resultType << ",N,M> operator" << op.opName << "(matrix<" << leftType << ",N,M> left, matrix<" << rightType << ",N,M> right);\n";
 
         // scalar-vector and scalar-matrix
-        if (!(op.flags & ASSIGNMENT))
-        {
-            sb << "__generic<T : " << op.interface << ", let N : int> ";
-            sb << "__intrinsic_op(" << int(op.opCode) << ") vector<" << resultType << ",N> operator" << op.opName << "(" << leftQual << leftType << " left, vector<" << rightType << ",N> right);\n";
+        sb << "__generic<T : " << op.interface << ", let N : int> ";
+        sb << "__intrinsic_op(" << int(op.opCode) << ") vector<" << resultType << ",N> operator" << op.opName << "(" << leftType << " left, vector<" << rightType << ",N> right);\n";
 
-            sb << "__generic<T : " << op.interface << ", let N : int, let M : int> ";
-            sb << "__intrinsic_op(" << int(op.opCode) << ") matrix<" << resultType << ",N,M> operator" << op.opName << "(" << leftQual << leftType << " left, matrix<" << rightType << ",N,M> right);\n";
-        }
+        sb << "__generic<T : " << op.interface << ", let N : int, let M : int> ";
+        sb << "__intrinsic_op(" << int(op.opCode) << ") matrix<" << resultType << ",N,M> operator" << op.opName << "(" <<  leftType << " left, matrix<" << rightType << ",N,M> right);\n";
 
         // vector-scalar and matrix-scalar
         sb << "__generic<T : " << op.interface << ", let N : int> ";
-        sb << "__intrinsic_op(" << int(op.opCode) << ") vector<" << resultType << ",N> operator" << op.opName << "(" << leftQual << "vector<" << leftType << ",N> left, " << rightType << " right);\n";
+        sb << "__intrinsic_op(" << int(op.opCode) << ") vector<" << resultType << ",N> operator" << op.opName << "(vector<" << leftType << ",N> left, " << rightType << " right);\n";
 
         sb << "__generic<T : " << op.interface << ", let N : int, let M : int> ";
-        sb << "__intrinsic_op(" << int(op.opCode) << ") matrix<" << resultType << ",N,M> operator" << op.opName << "(" << leftQual << "matrix<" << leftType << ",N,M> left, " << rightType << " right);\n";
+        sb << "__intrinsic_op(" << int(op.opCode) << ") matrix<" << resultType << ",N,M> operator" << op.opName << "(matrix<" << leftType << ",N,M> left, " << rightType << " right);\n";
     }
 }
+
+
+    static const struct CompoundBinaryOpInfo
+    {
+        char const* name;
+        char const* interface;
+    } kCompoundBinaryOps[] =
+    {
+        { "+",  "__BuiltinArithmeticType" },
+        { "-",  "__BuiltinArithmeticType" },
+        { "*",  "__BuiltinArithmeticType" },
+        { "/",  "__BuiltinArithmeticType" },
+        { "%",  "__BuiltinIntegerType" },
+        { "%",  "__BuiltinFloatingPointType" },
+        { "&",  "__BuiltinLogicalType" },
+        { "|",  "__BuiltinLogicalType" },
+        { "^",  "__BuiltinLogicalType" },
+        { "<<", "__BuiltinIntegerType" },
+        { ">>", "__BuiltinIntegerType" },
+    };
+    for( auto op : kCompoundBinaryOps )
+    {
+    }}}}
+
+    __generic<T : $(op.interface)>
+    [__unsafeForceInlineEarly]
+    T operator$(op.name)=(in out T left, T right)
+    {
+        left = left $(op.name) right;
+        return left;
+    }
+
+    __generic<T : $(op.interface), let N : int>
+    [__unsafeForceInlineEarly]
+    vector<T,N> operator$(op.name)=(in out vector<T,N> left, vector<T,N> right)
+    {
+        left = left $(op.name) right;
+        return left;
+    }
+
+    __generic<T : $(op.interface), let N : int>
+    [__unsafeForceInlineEarly]
+    vector<T,N> operator$(op.name)=(in out vector<T,N> left, T right)
+    {
+        left = left $(op.name) right;
+        return left;
+    }
+
+    __generic<T : $(op.interface), let R : int, let C : int>
+    [__unsafeForceInlineEarly]
+    matrix<T,R,C> operator$(op.name)=(in out matrix<T,R,C> left, matrix<T,R,C> right)
+    {
+        left = left $(op.name) right;
+        return left;
+    }
+
+    __generic<T : $(op.interface), let R : int, let C : int>
+    [__unsafeForceInlineEarly]
+    matrix<T,R,C> operator$(op.name)=(in out matrix<T,R,C> left, T right)
+    {
+        left = left $(op.name) right;
+        return left;
+    }
+
+    ${{{{
+    }
+
 }}}}
+
+
 
 // Specialized function
 

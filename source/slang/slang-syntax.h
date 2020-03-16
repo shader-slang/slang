@@ -2,7 +2,6 @@
 #define SLANG_SYNTAX_H
 
 #include "../core/slang-basic.h"
-#include "slang-compound-intrinsics.h"
 #include "slang-lexer.h"
 #include "slang-profile.h"
 #include "slang-type-system-shared.h"
