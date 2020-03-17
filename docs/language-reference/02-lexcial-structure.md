@@ -29,12 +29,17 @@ An _escaped line break_ comprises a backslack (`\`, U+005C) follow immediately b
 Comments
 --------
 
-A _comment_ is either a line comment or a block comment.
+A _comment_ is either a line comment or a block comment:
+
+```hlsl
+// a line comment
+/* a block comment */
+```
 
 A _line comment_ comprises two forward slashes (`/`, U+002F) followed by zero or more characters that do not contain a line break.
 A line comment extends up to, but does not include, a subsequent line break or the end of the source unit.
 
-A _block comment_ begins with a forward slahs (`/`, U+002F) followed by an asterisk (`*`, U+0052). 
+A _block comment_ begins with a forward slash (`/`, U+002F) followed by an asterisk (`*`, U+0052). 
 A block comment is terminated by the next instance of an asterisk followed by a forward slash (`*/`).
 A block comment contains all characters between where it begins and where it terminates, including any line breaks.
 Block comments do not nest.
@@ -60,7 +65,7 @@ Compilation of a source unit proceeds _as if_ the following steps are executed i
 Identifiers
 -----------
 
-An _identifier_ betgins with an upercase or lowercase ASCII leter (`A` through `Z`, `a` through `z`), or an underscore (`_`).
+An _identifier_ begins with an uppercase or lowercase ASCII letter (`A` through `Z`, `a` through `z`), or an underscore (`_`).
 After the first character, ASCII digits (`0` through `9`) may also be used in an identifier.
 
 The identifier consistent of a single underscore (`_`) is reserved by the language and must not be used by programs.

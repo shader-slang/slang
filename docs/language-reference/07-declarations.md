@@ -211,7 +211,7 @@ The available directions are:
 
 * `out` indicates copy-out semantics. The callee writes to the parameter and then a copy of that value is assigned to the argument of the caller after the call returns.
 
-* `in out` or `inout` indicates pass-by-value-result (copy-in and copy-out) semantics. The callee receives a copy of the argument passed by the caller, it may manipulate the copy, and then when the call returns the final value is copied back to teh argument of the caller.
+* `in out` or `inout` indicates pass-by-value-result (copy-in and copy-out) semantics. The callee receives a copy of the argument passed by the caller, it may manipulate the copy, and then when the call returns the final value is copied back to the argument of the caller.
 
 An implementation may assume that at every call site the arguments for `out` or `in out` parameters never alias.
 Under those assumptions, the `out` and `inout` cases may be optimized to use pass-by-refernece instead of copy-in and copy-out.
@@ -633,7 +633,7 @@ The body of an extension declaration may include type declarations, functions, i
 > Note: The body of an extension may *not* include variable declarations.
 > An extension cannot introduce members that would change teh in-memory layout of the type being extended.
 
-The members of an extension are access through the type that is being extended.
+The members of an extension are accessed through the type that is being extended.
 For example, for the above extension of `MyVector`, the introduced methods are accessed as follows:
 
 ```hlsl
@@ -661,7 +661,7 @@ When an extension declaration lists an interface in its inheritance clause, it a
 The extension must ensure that the type being extended satisfies all the requirements of the interface.
 Interface requirements may be satisfied by the members of the extension, members of the original type, or members introduced through other extensions visible at the point where the conformance was declared.
 
-I is an error for overlapping conformances (that is, of the same type to the same interface) to be visible at the same point.
+It is an error for overlapping conformances (that is, of the same type to the same interface) to be visible at the same point.
 This includes cases where two extensions declare the same conformance, as well as those where the original type and an extension both declare the same conformance.
 The conflicting conformances may come from the same module or difference modules.
 
@@ -708,7 +708,7 @@ Generic parameters may declare a default value with `=`:
 T anotherFunction<T = float, let N : int = 4>(vector<T,N> v);
 ```
 
-For generic type parametters, the default value is a type to use if no argument is specified.
+For generic type parameters, the default value is a type to use if no argument is specified.
 For generic value parameters, the default value is a value of the same type to use if no argument is specified.
 
 ### Explicit Specialization

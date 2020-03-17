@@ -72,7 +72,18 @@ A vector type is written as `vector<T, N>` and represents an `N`-element vector 
 The _element type_ `T` must be one of the built-in scalar types, and the _element count_ `N` must be a specialization-time constant integer.
 The element count must be between 2 and 4, inclusive.
 
-A vector type allows subscripting of its elements like an array, but also supports component-wise arithmetic on its elements.
+A vector type allows subscripting of its elements like an array, but also supports element-wise arithmetic on its elements.
+_Element-wise arithmetic_ means mapping unary and binary operators over the elements of a vector to produce a vector of results:
+
+```hlsl
+vector<int,4> a = { 1, 2, 30, 40 };
+vector<int,4> b = { 10, 20, 3, 4 };
+
+-a; // yields { -1, -2, -30, -40 }
+a + b; // yields { 11, 22, 33, 44 }
+b / a; // yields { 10, 10, 0, 0 }
+a > b; // yields { false, false, true, true }
+```
 
 A vector type is laid out in memory as `N` contiguous values of type `T` with no padding.
 The alignment of a vector type may vary by target platforms.
@@ -111,7 +122,7 @@ The element type `T` must be one of the built-in scalar types.
 The _row count_ `R` and _column count_ `C` must be specialization-time constant integers.
 The row count and column count must each be between 2 and 4, respectively.
 
-A matrix type allwos subscripting of its rows, similar to an `R`-element array of `vector<T,C>` elements.
+A matrix type allows subscripting of its rows, similar to an `R`-element array of `vector<T,C>` elements.
 A matrix type also supports element-wise arithmetic.
 
 Matrix types support both _row-major_ and _column-major_ memory layout.
@@ -125,7 +136,7 @@ Under column-major layout, a matrix is laid out in memory equivalent to the row-
 This means it will be laid out equivalently to a `C`-element array of `vector<T,R>` elements.
 
 As a convenience, Slang defines built-in type aliases for matrices of the built-in scalar types.
-E.e.g, declarations equivalent to the following are provied by the Slang standard library:
+E.g., declarations equivalent to the following are provided by the Slang standard library:
 
 ```hlsl
 typealias float3x4 = matrix<float, 3, 4>;
@@ -211,6 +222,8 @@ This type represents an array of exactly `N` values of type `T`.
 
 An unknown-size array type is written `T[]` where `T` is a type.
 This type represents an array of some fixed, but statically unknown, size.
+
+> Note: Unlike in C and C++, arrays in Slang are always value types, meaning that assignment and parameter passing of arrays copies their elements.
 
 ### Declaration Syntax
 
@@ -314,10 +327,10 @@ Types with unknown size arise in a few ways:
 
 * A structure type has unknown size if any field type has unknown size
 
-The use of tyeps with unknown size is restricted as follows:
+The use of types with unknown size is restricted as follows:
 
 * A type with unknown size cannot be used as the element type of an array
 
 * A type with unknown size can only be used as the last field of a structure type
 
-* A type with unknown size cannot be used as a generic argument to specialize a type, function, etc.
+* A type with unknown size cannot be used as a generic argument to specialize a user-defined type, function, etc. Specific built-in generic types/functions may support unknown-size types, and this will be documented on the specific type/function.

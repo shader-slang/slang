@@ -130,10 +130,10 @@ A _this expression_ consists of the keyword `this` and refers to the implicit in
 
 The type of `this` is `This`.
 
-Parenthized Expression
+Parenthesized Expression
 ----------------------
 
-An expression wrapped in parentheses `()` is a _parenthized expression_ and evaluates to the same value as the wrapped expression.
+An expression wrapped in parentheses `()` is a _parenthesized expression_ and evaluates to the same value as the wrapped expression.
 
 Call Expression
 ---------------
