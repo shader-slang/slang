@@ -359,6 +359,7 @@ namespace Slang
     }
 
     RefPtr<Expr> SemanticsVisitor::createLookupResultExpr(
+        Name*                   name,
         LookupResult const&     lookupResult,
         RefPtr<Expr>            baseExpr,
         SourceLoc               loc)
@@ -366,6 +367,7 @@ namespace Slang
         if (lookupResult.isOverloaded())
         {
             auto overloadedExpr = new OverloadedExpr();
+            overloadedExpr->name = name;
             overloadedExpr->loc = loc;
             overloadedExpr->type = QualType(
                 getSession()->getOverloadedType());
@@ -960,10 +962,11 @@ namespace Slang
         // declarations on the type and try to call one of them.
 
         {
+            Name* name = getName("operator[]");
             LookupResult lookupResult = lookUpMember(
                 getSession(),
                 this,
-                getName("operator[]"),
+                name,
                 baseType);
             if (!lookupResult.isValid())
             {
@@ -977,7 +980,7 @@ namespace Slang
             // case the attempt to call it will trigger overload
             // resolution.
             RefPtr<Expr> subscriptFuncExpr = createLookupResultExpr(
-                lookupResult, subscriptExpr->BaseExpression, subscriptExpr->loc);
+                name, lookupResult, subscriptExpr->BaseExpression, subscriptExpr->loc);
 
             RefPtr<InvokeExpr> subscriptCallExpr = new InvokeExpr();
             subscriptCallExpr->loc = subscriptExpr->loc;
@@ -1181,6 +1184,7 @@ namespace Slang
         if (lookupResult.isValid())
         {
             return createLookupResultExpr(
+                expr->name,
                 lookupResult,
                 nullptr,
                 expr->loc);
@@ -1531,6 +1535,7 @@ namespace Slang
             }
 
             return createLookupResultExpr(
+                expr->name,
                 lookupResult,
                 baseExpression,
                 expr->loc);
@@ -1638,6 +1643,7 @@ namespace Slang
             // to in this context...
 
             return createLookupResultExpr(
+                expr->name,
                 lookupResult,
                 expr->BaseExpression,
                 expr->loc);

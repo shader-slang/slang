@@ -1,7 +1,6 @@
 // slang-stdlib.cpp
 
 #include "slang-compiler.h"
-#include "slang-compound-intrinsics.h"
 #include "slang-ir.h"
 #include "slang-syntax.h"
 
@@ -50,8 +49,6 @@ namespace Slang
         BOOL_RESULT = 1 << 2,
         BOOL_MASK   = 1 << 3,
         UINT_MASK   = 1 << 4,
-        ASSIGNMENT  = 1 << 5,
-        POSTFIX     = 1 << 6,
 
         INT_MASK = SINT_MASK | UINT_MASK,
         ARITHMETIC_MASK = INT_MASK | FLOAT_MASK,
@@ -199,20 +196,15 @@ namespace Slang
         }
     }
 
-    struct OpInfo { IntrinsicOp opCode; char const* opName; char const* interface; unsigned flags; };
+    struct IntrinsicOpInfo { IROp opCode; char const* opName; char const* interface; unsigned flags; };
 
-    static const OpInfo unaryOps[] = {
-        { kCompoundIntrinsicOp_Pos,     "+",    "__BuiltinArithmeticType",  ARITHMETIC_MASK },
+    static const IntrinsicOpInfo intrinsicUnaryOps[] = {
         { kIROp_Neg,                    "-",    "__BuiltinArithmeticType",  ARITHMETIC_MASK },
         { kIROp_Not,                    "!",    nullptr,                    BOOL_MASK | BOOL_RESULT },
         { kIROp_BitNot,                 "~",    "__BuiltinIntegerType",     INT_MASK        },
-        { kCompoundIntrinsicOp_PreInc,  "++",   "__BuiltinArithmeticType",  ARITHMETIC_MASK | ASSIGNMENT },
-        { kCompoundIntrinsicOp_PreDec,  "--",   "__BuiltinArithmeticType",  ARITHMETIC_MASK | ASSIGNMENT },
-        { kCompoundIntrinsicOp_PostInc, "++",   "__BuiltinArithmeticType",  ARITHMETIC_MASK | ASSIGNMENT | POSTFIX },
-        { kCompoundIntrinsicOp_PostDec, "--",   "__BuiltinArithmeticType",  ARITHMETIC_MASK | ASSIGNMENT | POSTFIX },
     };
 
-    static const OpInfo binaryOps[] = {
+    static const IntrinsicOpInfo intrinsicBinaryOps[] = {
         { kIROp_Add,                        "+",    "__BuiltinArithmeticType",      ARITHMETIC_MASK },
         { kIROp_Sub,                        "-",    "__BuiltinArithmeticType",      ARITHMETIC_MASK },
         { kIROp_Mul,                        "*",    "__BuiltinArithmeticType",      ARITHMETIC_MASK },
@@ -232,17 +224,6 @@ namespace Slang
         { kIROp_Less,                       "<",    "__BuiltinArithmeticType",      ARITHMETIC_MASK | BOOL_RESULT },
         { kIROp_Geq,                        ">=",   "__BuiltinArithmeticType",      ARITHMETIC_MASK | BOOL_RESULT },
         { kIROp_Leq,                        "<=",   "__BuiltinArithmeticType",      ARITHMETIC_MASK | BOOL_RESULT },
-        { kCompoundIntrinsicOp_AddAssign,   "+=",   "__BuiltinArithmeticType",      ASSIGNMENT | ARITHMETIC_MASK },
-        { kCompoundIntrinsicOp_SubAssign,   "-=",   "__BuiltinArithmeticType",      ASSIGNMENT | ARITHMETIC_MASK },
-        { kCompoundIntrinsicOp_MulAssign,   "*=",   "__BuiltinArithmeticType",      ASSIGNMENT | ARITHMETIC_MASK },
-        { kCompoundIntrinsicOp_DivAssign,   "/=",   "__BuiltinArithmeticType",      ASSIGNMENT | ARITHMETIC_MASK },
-        { kCompoundIntrinsicOp_IRemAssign,  "%=",   "__BuiltinIntegerType",         ASSIGNMENT | INT_MASK },
-        { kCompoundIntrinsicOp_FRemAssign,  "%=",   "__BuiltinFloatingPointType",   ASSIGNMENT | FLOAT_MASK },
-        { kCompoundIntrinsicOp_AndAssign,   "&=",    "__BuiltinLogicalType",         ASSIGNMENT | LOGICAL_MASK },
-        { kCompoundIntrinsicOp_OrAssign,    "|=",    "__BuiltinLogicalType",         ASSIGNMENT | LOGICAL_MASK },
-        { kCompoundIntrinsicOp_XorAssign,   "^=",    "__BuiltinLogicalType",         ASSIGNMENT | LOGICAL_MASK },
-        { kCompoundIntrinsicOp_LshAssign,   "<<=",  "__BuiltinIntegerType",         ASSIGNMENT | INT_MASK },
-        { kCompoundIntrinsicOp_RshAssign,   ">>=",  "__BuiltinIntegerType",         ASSIGNMENT | INT_MASK },
     };
 
     String Session::getCoreLibraryCode()

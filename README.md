@@ -45,6 +45,8 @@ The [API user's guide](docs/api-users-guide.md) gives information on how to driv
 
 The [CPU target guide](docs/cpu-target.md) gives information on compiling Slang or C++ source into shared libraries/executables or functions that can be directly executed. It also covers how to generate C++ code from Slang source.  
 
+The [CUDA target guide](docs/cuda-target.md) provides information on compiling Slang/HLSL or CUDA source. Slang can compile to equivalent CUDA source, as well as to PTX via the nvrtc CUDA complier.
+
 If you want to try out the `slangc` command-line tool, then you will want to read its [documentation](docs/command-line-slangc.md).
 Be warned, however, that the command-line tool is primarily intended for experimenting, testing, and debugging; serious applications will likely want to use the API interface.
 

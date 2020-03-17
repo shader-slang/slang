@@ -1261,9 +1261,9 @@ namespace Slang
                     if (!first) sb << ", ";
                     first = false;
 
-                    formatType(sb, GetType(genericValParam));
-                    sb << " ";
                     sb << getText(genericValParam.GetName());
+                    sb << ":";
+                    formatType(sb, GetType(genericValParam));
                 }
                 else
                 {}
@@ -1279,14 +1279,24 @@ namespace Slang
 
     static void formatDeclKindPrefix(StringBuilder& sb, Decl* decl)
     {
+        if(auto genericDecl = as<GenericDecl>(decl))
+        {
+            decl = genericDecl->inner;
+        }
         if(as<FuncDecl>(decl))
         {
             sb << "func ";
         }
     }
 
-    void SemanticsVisitor::formatDeclResultType(StringBuilder& sb, DeclRef<Decl> const& declRef)
+    void SemanticsVisitor::formatDeclResultType(StringBuilder& sb, DeclRef<Decl> const& inDeclRef)
     {
+        DeclRef<Decl> declRef = inDeclRef;
+        if(auto genericDeclRef = declRef.as<GenericDecl>())
+        {
+            declRef = DeclRef<Decl>(GetInner(genericDeclRef), genericDeclRef.substitutions);
+        }
+
         if(as<ConstructorDecl>(declRef))
         {}
         else if(auto callableDeclRef = declRef.as<CallableDecl>())
@@ -1434,10 +1444,19 @@ namespace Slang
             }
 
             Name* funcName = nullptr;
-            if (auto baseVar = as<VarExpr>(funcExpr))
-                funcName = baseVar->name;
-            else if(auto baseMemberRef = as<MemberExpr>(funcExpr))
-                funcName = baseMemberRef->name;
+            {
+                Expr* baseExpr = funcExpr;
+
+                if(auto baseGenericApp = as<GenericAppExpr>(baseExpr))
+                    baseExpr = baseGenericApp->FunctionExpr;
+
+                if (auto baseVar = as<VarExpr>(baseExpr))
+                    funcName = baseVar->name;
+                else if(auto baseMemberRef = as<MemberExpr>(baseExpr))
+                    funcName = baseMemberRef->name;
+                else if(auto baseOverloaded = as<OverloadedExpr>(baseExpr))
+                    funcName = baseOverloaded->name;
+            }
 
             String argsList = getCallSignatureString(context);
 
