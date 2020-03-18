@@ -2745,7 +2745,6 @@ uint WavePrefixCountBits(bool value);
 
 // Shader model 6.5 stuff
 // https://github.com/microsoft/DirectX-Specs/blob/master/d3d/HLSL_ShaderModel6_5.md
-// TODO(JS): Looks like they need a mask parameter
 
 __generic<T : __BuiltinType>
 __target_intrinsic(hlsl)
