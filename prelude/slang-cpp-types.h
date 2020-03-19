@@ -92,7 +92,7 @@ typedef size_t NonUniformResourceIndex;
 // ----------------------------- ResourceType -----------------------------------------
 
 // https://docs.microsoft.com/en-us/windows/win32/direct3dhlsl/sm5-object-structuredbuffer-getdimensions
-// Missing  Load(_In_  int  Location, _Out_ uint32_t Status);
+// Missing  Load(_In_  int  Location, _Out_ uint Status);
 
 template <typename T>
 struct RWStructuredBuffer
@@ -116,7 +116,7 @@ struct StructuredBuffer
     size_t count;
 };
 
-// Missing  Load(_In_  int  Location, _Out_ uint32_t Status);
+// Missing  Load(_In_  int  Location, _Out_ uint Status);
 struct ByteAddressBuffer
 {
     void GetDimensions(uint32_t& outDim) const { outDim = uint32_t(sizeInBytes); }
