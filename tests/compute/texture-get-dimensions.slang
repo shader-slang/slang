@@ -4,11 +4,8 @@
 //TEST(compute):COMPARE_COMPUTE_EX:-slang -compute -dx12 -profile cs_6_0 -use-dxil
 // TODO(JS): Doesn't work on vk currently, because createTextureView not implemented on vk renderer
 //DISABLE_TEST(compute, vulkan):COMPARE_COMPUTE_EX:-vk -compute
-//TEST(compute):COMPARE_COMPUTE_EX:-cuda -compute 
-
-// Doesn't work on CUDA, not clear why yet
-//DISABLE_TEST_INPUT: Texture1D(format=R_Float32, size=4, content = one, mipMaps=1):name tLoad1D
-//Texture1D<float> tLoad1D;
+// TODO(JS): Doesn't work on CUDA as there aren't any CUDA functions to get dimensions.
+//DISABLE_TEST(compute):COMPARE_COMPUTE_EX:-cuda -compute 
 
 //TEST_INPUT: Texture1D(size=4, content = one):name t1D
 Texture1D<float> t1D;

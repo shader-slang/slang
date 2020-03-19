@@ -691,7 +691,12 @@ for (int tt = 0; tt < kBaseTextureTypeCount; ++tt)
                     switch(baseShape)
                     {
                     case TextureFlavor::Shape::Shape1D:
-                        sb << "($" << aa++ << opStr << "))";
+                        sb << "($" << aa++ << opStr << ")"; 
+                        if (isArray)
+                        {
+                            sb << ".x";
+                        }
+                        sb << ")";
                         cc = 1;
                         break;
 
