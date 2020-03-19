@@ -268,7 +268,7 @@ static int _calcDims(const InputTextureDesc& desc, slang::TypeLayoutReflection* 
     }
 
     int maxMipCount = outDims.calcMaxMIPLevels();
-    SLANG_ASSERT(descMipCount <= maxMipCount);
+    SLANG_ASSERT(desc.mipMapCount <= maxMipCount);
 
     outDims.numberOfLevels = (desc.mipMapCount == 0) ? uint32_t(maxMipCount) : uint32_t(desc.mipMapCount);
    
