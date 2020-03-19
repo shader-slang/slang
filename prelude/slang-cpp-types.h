@@ -92,7 +92,7 @@ typedef size_t NonUniformResourceIndex;
 // ----------------------------- ResourceType -----------------------------------------
 
 // https://docs.microsoft.com/en-us/windows/win32/direct3dhlsl/sm5-object-structuredbuffer-getdimensions
-// Missing  Load(_In_  int  Location, _Out_ uint Status);
+// Missing  Load(_In_  int  Location, _Out_ uint32_t Status);
 
 template <typename T>
 struct RWStructuredBuffer
@@ -116,7 +116,7 @@ struct StructuredBuffer
     size_t count;
 };
 
-// Missing  Load(_In_  int  Location, _Out_ uint Status);
+// Missing  Load(_In_  int  Location, _Out_ uint32_t Status);
 struct ByteAddressBuffer
 {
     void GetDimensions(uint32_t& outDim) const { outDim = uint32_t(sizeInBytes); }
@@ -226,10 +226,116 @@ struct SamplerComparisonState
     ISamplerComparisonState* state;
 };
 
+// 
+struct TextureDimensions
+{
+    void reset()
+    {
+        shape = 0;
+        width = height = depth = 0;
+        numberOfLevels = 0;
+        arrayElementCount = 0;
+    }
+    int getDimSizes(uint32_t outDims[4]) const
+    {
+        const auto baseShape = (shape & SLANG_RESOURCE_BASE_SHAPE_MASK);
+        int count = 0;
+        switch (baseShape)
+        {
+            case SLANG_TEXTURE_1D:
+            {
+                outDims[count++] = width;
+                break;
+            }
+            case SLANG_TEXTURE_2D:
+            {
+                outDims[count++] = width;
+                outDims[count++] = height;
+                break;
+            }
+            case SLANG_TEXTURE_3D:
+            {
+                outDims[count++] = width;
+                outDims[count++] = height;
+                outDims[count++] = depth;
+                break;
+            }
+            case SLANG_TEXTURE_CUBE:
+            {
+                outDims[count++] = width;
+                outDims[count++] = height;
+                outDims[count++] = 6;
+                break;
+            }
+        }
+
+        if (shape & SLANG_TEXTURE_ARRAY_FLAG)
+        {
+            outDims[count++] = arrayElementCount;
+        }
+        return count;
+    }
+    int getMIPDims(int outDims[3]) const
+    {
+        const auto baseShape = (shape & SLANG_RESOURCE_BASE_SHAPE_MASK);
+        int count = 0;
+        switch (baseShape)
+        {
+            case SLANG_TEXTURE_1D:
+            {
+                outDims[count++] = width;
+                break;
+            }
+            case SLANG_TEXTURE_CUBE:
+            case SLANG_TEXTURE_2D:
+            {
+                outDims[count++] = width;
+                outDims[count++] = height;
+                break;
+            }
+            case SLANG_TEXTURE_3D:
+            {
+                outDims[count++] = width;
+                outDims[count++] = height;
+                outDims[count++] = depth;
+                break;
+            }
+        }
+        return count;
+    }
+    int calcMaxMIPLevels() const
+    {
+        int dims[3];
+        const int dimCount = getMIPDims(dims);
+        for (int count = 1; true; count++)
+        {
+            bool allOne = true;
+            for (int i = 0; i < dimCount; ++i)
+            {
+                if (dims[i] > 1)
+                {
+                    allOne = false;
+                    dims[i] >>= 1;
+                }
+            }
+            if (allOne)
+            {
+                return count;
+            }
+        }
+    }
+
+    SlangResourceShape shape;
+    uint32_t width, height, depth;
+    uint32_t numberOfLevels;
+    uint32_t arrayElementCount;                  ///< For array types, 0 otherwise
+};
+
 // Texture
 
 struct ITexture
 {
+    virtual TextureDimensions GetDimensions(int mipLevel = -1) = 0;
     virtual void Load(const int* v, void* out) = 0;
     virtual void Sample(SamplerState samplerState, const float* loc, void* out) = 0;
     virtual void SampleLevel(SamplerState samplerState, const float* loc, float level, void* out) = 0;
@@ -238,6 +344,22 @@ struct ITexture
 template <typename T>
 struct Texture1D
 {
+    void GetDimensions(uint32_t& outWidth) { outWidth = texture->GetDimensions().width; }
+    void GetDimensions(uint32_t mipLevel, uint32_t& outWidth, uint32_t& outNumberOfLevels) 
+    { 
+        auto dims = texture->GetDimensions(mipLevel); 
+        outWidth = dims.width; 
+        outNumberOfLevels = dims.numberOfLevels; 
+    }
+    
+    void GetDimensions(float& outWidth) { outWidth = texture->GetDimensions().width; }
+    void GetDimensions(uint32_t mipLevel, float& outWidth, float& outNumberOfLevels) 
+    { 
+        auto dims = texture->GetDimensions(mipLevel); 
+        outWidth = dims.width; 
+        outNumberOfLevels = dims.numberOfLevels; 
+    }
+    
     T Load(const int2& loc) const { T out; texture->Load(&loc.x, &out); return out; }
     T Sample(SamplerState samplerState, float loc) const { T out; texture->Sample(samplerState, &loc, &out); return out; }
     T SampleLevel(SamplerState samplerState, float loc, float level) { T out; texture->SampleLevel(samplerState, &loc, level, &out); return out; }
@@ -248,6 +370,33 @@ struct Texture1D
 template <typename T>
 struct Texture2D
 {
+    void GetDimensions(uint32_t& outWidth, uint32_t& outHeight) 
+    { 
+        const auto dims = texture->GetDimensions(); 
+        outWidth = dims.width; 
+        outHeight = dims.height; 
+    }
+    void GetDimensions(uint32_t mipLevel, uint32_t& outWidth, uint32_t& outHeight, uint32_t& outNumberOfLevels)
+    {
+        const auto dims = texture->GetDimensions(mipLevel);
+        outWidth = dims.width;
+        outHeight = dims.height;
+        outNumberOfLevels = dims.numberOfLevels;
+    }
+    void GetDimensions(float& outWidth, float& outHeight) 
+    { 
+        const auto dims = texture->GetDimensions(); 
+        outWidth = dims.width; 
+        outHeight = dims.height; 
+    }
+    void GetDimensions(uint32_t mipLevel, float& outWidth, float& outHeight, float& outNumberOfLevels)
+    {
+        const auto dims = texture->GetDimensions(mipLevel);
+        outWidth = dims.width;
+        outHeight = dims.outHeight;
+        outNumberOfLevels = dims.numberOfLevels;
+    }
+    
     T Load(const int3& loc) const { T out; texture->Load(&loc.x, &out); return out; }
     T Sample(SamplerState samplerState, const float2& loc) const { T out; texture->Sample(samplerState, &loc.x, &out); return out; }
     T SampleLevel(SamplerState samplerState, const float2& loc, float level) { T out; texture->SampleLevel(samplerState, &loc.x, level, &out); return out; }
@@ -258,6 +407,37 @@ struct Texture2D
 template <typename T>
 struct Texture3D
 {
+    void GetDimensions(uint32_t& outWidth, uint32_t& outHeight, uint32_t& outDepth)
+    {
+        const auto dims = texture->GetDimensions(); 
+        outWidth = dims.width; 
+        outHeight = dims.height; 
+        outDepth = dims.depth;
+    }
+    void GetDimensions(uint32_t mipLevel, uint32_t& outWidth, uint32_t& outHeight, uint32_t& outDepth, uint32_t& outNumberOfLevels)
+    {
+        const auto dims = texture->GetDimensions(mipLevel);
+        outWidth = dims.width;
+        outHeight = dims.height;
+        outDepth = dims.depth;
+        outNumberOfLevels = dims.numberOfLevels;
+    }
+    void GetDimensions(float& outWidth, float& outHeight, float& outDepth)
+    {
+        const auto dims = texture->GetDimensions(); 
+        outWidth = dims.width; 
+        outHeight = dims.height; 
+        outDepth = dims.depth;
+    }
+    void GetDimensions(uint32_t mipLevel, float& outWidth, float& outHeight, float& outDepth, float& outNumberOfLevels)
+    {
+        const auto dims = texture->GetDimensions(mipLevel);
+        outWidth = dims.width;
+        outHeight = dims.height;
+        outDepth = dims.depth;
+        outNumberOfLevels = dims.numberOfLevels;
+    }
+    
     T Load(const int4& loc) const { T out; texture->Load(&loc.x, &out); return out; }
     T Sample(SamplerState samplerState, const float3& loc) const { T out; texture->Sample(samplerState, &loc.x, &out); return out; }
     T SampleLevel(SamplerState samplerState, const float3& loc, float level) { T out; texture->SampleLevel(samplerState, &loc.x, level, &out); return out; }
@@ -268,6 +448,33 @@ struct Texture3D
 template <typename T>
 struct TextureCube
 {
+    void GetDimensions(uint32_t& outWidth, uint32_t& outHeight) 
+    { 
+        const auto dims = texture->GetDimensions(); 
+        outWidth = dims.width; 
+        outHeight = dims.height; 
+    }
+    void GetDimensions(uint32_t mipLevel, uint32_t& outWidth, uint32_t& outHeight, uint32_t& outNumberOfLevels)
+    {
+        const auto dims = texture->GetDimensions(mipLevel);
+        outWidth = dims.width;
+        outHeight = dims.height;
+        outNumberOfLevels = dims.numberOfLevels;
+    }
+    void GetDimensions(float& outWidth, float& outHeight) 
+    { 
+        const auto dims = texture->GetDimensions(); 
+        outWidth = dims.width; 
+        outHeight = dims.height; 
+    }
+    void GetDimensions(uint32_t mipLevel, float& outWidth, float& outHeight, float& outNumberOfLevels)
+    {
+        const auto dims = texture->GetDimensions(mipLevel);
+        outWidth = dims.width;
+        outHeight = dims.height;
+        outNumberOfLevels = dims.numberOfLevels;
+    }
+    
     T Sample(SamplerState samplerState, const float3& loc) const { T out; texture->Sample(samplerState, &loc.x, &out); return out; }
     T SampleLevel(SamplerState samplerState, const float3& loc, float level) { T out; texture->SampleLevel(samplerState, &loc.x, level, &out); return out; }
     
@@ -277,6 +484,23 @@ struct TextureCube
 template <typename T>
 struct Texture1DArray
 {
+    void GetDimensions(uint32_t& outWidth, uint32_t& outElements) { auto dims = texture->GetDimensions(); outWidth = dims.width; outElements = dims.arrayElementCount; }
+    void GetDimensions(uint32_t mipLevel, uint32_t& outWidth, uint32_t& outElements, uint32_t& outNumberOfLevels) 
+    {
+        auto dims = texture->GetDimensions(mipLevel); 
+        outWidth = dims.width; 
+        outNumberOfLevels = dims.numberOfLevels;
+        outElements = dims.arrayElementCount; 
+    }        
+     void GetDimensions(float& outWidth, float& outElements) { auto dims = texture->GetDimensions(); outWidth = dims.width; outElements = dims.arrayElementCount; }
+    void GetDimensions(uint32_t mipLevel, float& outWidth, float& outElements, float& outNumberOfLevels) 
+    {
+        auto dims = texture->GetDimensions(mipLevel); 
+        outWidth = dims.width; 
+        outNumberOfLevels = dims.numberOfLevels;
+        outElements = dims.arrayElementCount; 
+    }
+    
     T Load(const int3& loc) const { T out; texture->Load(&loc.x, &out); return out; }
     T Sample(SamplerState samplerState, const float2& loc) const { T out; texture->Sample(samplerState, &loc.x, &out); return out; }
     T SampleLevel(SamplerState samplerState, const float2& loc, float level) { T out; texture->SampleLevel(samplerState, &loc.x, level, &out); return out; }
@@ -287,6 +511,38 @@ struct Texture1DArray
 template <typename T>
 struct Texture2DArray
 {
+    void GetDimensions(uint32_t& outWidth, uint32_t& outHeight, uint32_t& outElements)
+    {
+        auto dims = texture->GetDimensions();
+        outWidth = dims.width;
+        outHeight = dims.height;
+        outElements = dims.arrayElementCount;
+    }
+    void GetDimensions(uint32_t mipLevel, uint32_t& outWidth, uint32_t& outHeight, uint32_t& outElements, uint32_t& outNumberOfLevels)
+    {
+        auto dims = texture->GetDimensions(mipLevel);
+        outWidth = dims.width;
+        outHeight = dims.height;
+        outElements = dims.arrayElementCount;
+        outNumberOfLevels = dims.numberOfLevels;
+    }
+    
+    void GetDimensions(uint32_t& outWidth, float& outHeight, float& outElements)
+    {
+        auto dims = texture->GetDimensions();
+        outWidth = dims.width;
+        outHeight = dims.height;
+        outElements = dims.arrayElementCount;
+    }
+    void GetDimensions(uint32_t mipLevel, float& outWidth, float& outHeight, float& outElements, float& outNumberOfLevels)
+    {
+        auto dims = texture->GetDimensions(mipLevel);
+        outWidth = dims.width;
+        outHeight = dims.height;
+        outElements = dims.arrayElementCount;
+        outNumberOfLevels = dims.numberOfLevels;
+    }
+    
     T Load(const int4& loc) const { T out; texture->Load(&loc.x, &out); return out; }
     T Sample(SamplerState samplerState, const float3& loc) const { T out; texture->Sample(samplerState, &loc.x, &out); return out; }
     T SampleLevel(SamplerState samplerState, const float3& loc, float level) { T out; texture->SampleLevel(samplerState, &loc.x, level, &out); return out; }
@@ -297,6 +553,38 @@ struct Texture2DArray
 template <typename T>
 struct TextureCubeArray
 {
+    void GetDimensions(uint32_t& outWidth, uint32_t& outHeight, uint32_t& outElements)
+    {
+        auto dims = texture->GetDimensions();
+        outWidth = dims.width;
+        outHeight = dims.height;
+        outElements = dims.arrayElementCount;
+    }
+    void GetDimensions(uint32_t mipLevel, uint32_t& outWidth, uint32_t& outHeight, uint32_t& outElements, uint32_t& outNumberOfLevels)
+    {
+        auto dims = texture->GetDimensions(mipLevel);
+        outWidth = dims.width;
+        outHeight = dims.height;
+        outElements = dims.arrayElementCount;
+        outNumberOfLevels = dims.numberOfLevels;
+    }
+    
+    void GetDimensions(uint32_t& outWidth, float& outHeight, float& outElements)
+    {
+        auto dims = texture->GetDimensions();
+        outWidth = dims.width;
+        outHeight = dims.height;
+        outElements = dims.arrayElementCount;
+    }
+    void GetDimensions(uint32_t mipLevel, float& outWidth, float& outHeight, float& outElements, float& outNumberOfLevels)
+    {
+        auto dims = texture->GetDimensions(mipLevel);
+        outWidth = dims.width;
+        outHeight = dims.height;
+        outElements = dims.arrayElementCount;
+        outNumberOfLevels = dims.numberOfLevels;
+    }
+    
     T Sample(SamplerState samplerState, const float4& loc) const { T out; texture->Sample(samplerState, &loc.x, &out); return out; }
     T SampleLevel(SamplerState samplerState, const float4& loc, float level) { T out; texture->SampleLevel(samplerState, &loc.x, level, &out); return out; }
     
@@ -307,6 +595,8 @@ struct TextureCubeArray
 
 struct IRWTexture
 {
+    virtual TextureDimensions GetDimensions(int mipLevel = -1) = 0;
+    
         /// Load at specified location. 
     virtual void Load(const int32_t* loc, void* out) = 0;
         /// Get the reference to the element at loc. 
@@ -316,6 +606,12 @@ struct IRWTexture
 template <typename T>
 struct RWTexture1D
 {
+    void GetDimensions(uint32_t& outWidth) { outWidth = texture->GetDimensions().width; }
+    void GetDimensions(uint32_t mipLevel, uint32_t& outwidth, uint32_t& outNumberOfLevels) { auto dims = texture->GetDimensions(mipLevel); outWidth = dims.width; outNumberOfLevels = dims.numberOfLevels; }
+    
+    void GetDimensions(float& outWidth) { outWidth = texture->GetDimensions().width; }
+    void GetDimensions(uint32_t mipLevel, float& outwidth, float& outNumberOfLevels) { auto dims = texture->GetDimensions(mipLevel); outWidth = dims.width; outNumberOfLevels = dims.numberOfLevels; }
+    
     T Load(int32_t loc) const { T out; texture->Load(&loc, &out); return out; }
     T& operator[](uint32_t loc) { return *(T*)texture->refAt(&loc); }
     IRWTexture* texture;              
@@ -324,6 +620,33 @@ struct RWTexture1D
 template <typename T>
 struct RWTexture2D
 {
+    void GetDimensions(uint32_t& outWidth, uint32_t& outHeight) 
+    { 
+        const auto dims = texture->GetDimensions(); 
+        outWidth = dims.width; 
+        outHeight = dims.height; 
+    }
+    void GetDimensions(uint32_t mipLevel, uint32_t& outWidth, uint32_t& outHeight, uint32_t& outNumberOfLevels)
+    {
+        const auto dims = texture->GetDimensions(mipLevel);
+        outWidth = dims.width;
+        outHeight = dims.height;
+        outNumberOfLevels = dims.numberOfLevels;
+    }
+    void GetDimensions(float& outWidth, float& outHeight) 
+    { 
+        const auto dims = texture->GetDimensions(); 
+        outWidth = dims.width; 
+        outHeight = dims.height; 
+    }
+    void GetDimensions(uint32_t mipLevel, float& outWidth, float& outHeight, float& outNumberOfLevels)
+    {
+        const auto dims = texture->GetDimensions(mipLevel);
+        outWidth = dims.width;
+        outHeight = dims.height;
+        outNumberOfLevels = dims.numberOfLevels;
+    }
+    
     T Load(const int2& loc) const { T out; texture->Load(&loc.x, &out); return out; }
     T& operator[](const uint2& loc) { return *(T*)texture->refAt(&loc.x); }
     IRWTexture* texture;
@@ -332,14 +655,73 @@ struct RWTexture2D
 template <typename T>
 struct RWTexture3D
 {
+    void GetDimensions(uint32_t& outWidth, uint32_t& outHeight, uint32_t& outDepth)
+    {
+        const auto dims = texture->GetDimensions(); 
+        outWidth = dims.width; 
+        outHeight = dims.height; 
+        outDepth = dims.depth;
+    }
+    void GetDimensions(uint32_t mipLevel, uint32_t& outWidth, uint32_t& outHeight, uint32_t& outDepth, uint32_t& outNumberOfLevels)
+    {
+        const auto dims = texture->GetDimensions(mipLevel);
+        outWidth = dims.width;
+        outHeight = dims.height;
+        outDepth = dims.depth;
+        outNumberOfLevels = dims.numberOfLevels;
+    }
+    void GetDimensions(float& outWidth, float& outHeight, float& outDepth)
+    {
+        const auto dims = texture->GetDimensions(); 
+        outWidth = dims.width; 
+        outHeight = dims.height; 
+        outDepth = dims.depth;
+    }
+    void GetDimensions(uint32_t mipLevel, float& outWidth, float& outHeight, float& outDepth, float& outNumberOfLevels)
+    {
+        const auto dims = texture->GetDimensions(mipLevel);
+        outWidth = dims.width;
+        outHeight = dims.height;
+        outDepth = dims.depth;
+        outNumberOfLevels = dims.numberOfLevels;
+    }
+    
     T Load(const int3& loc) const { T out; texture->Load(&loc.x, &out); return out; }
     T& operator[](const uint3& loc) { return *(T*)texture->refAt(&loc.x); }
     IRWTexture* texture;
 };
 
+
 template <typename T>
 struct RWTexture1DArray
 {
+    void GetDimensions(uint32_t& outWidth, uint32_t& outElements) 
+    { 
+        auto dims = texture->GetDimenions(); 
+        outWidth = dims.width; 
+        outElements = dims.arrayElementCount; 
+    }
+    void GetDimensions(uint32_t mipLevel, uint32_t& outWidth, uint32_t& outElements, uint32_t& outNumberOfLevels)
+    {
+        const auto dims = texture->GetDimensions(mipLevel);
+        outWidth = dims.width;
+        outElements = dims.arrayElementCount;
+        outNumberOfLevels = dims.numberOfLevels;
+    }
+    void GetDimensions(float& outWidth, float& outElements) 
+    { 
+        auto dims = texture->GetDimenions(); 
+        outWidth = dims.width; 
+        outElements = dims.arrayElementCount; 
+    }
+    void GetDimensions(uint32_t mipLevel, float& outWidth, float& outElements, float& outNumberOfLevels)
+    {
+        const auto dims = texture->GetDimensions(mipLevel);
+        outWidth = dims.width;
+        outElements = dims.arrayElementCount;
+        outNumberOfLevels = dims.numberOfLevels;
+    }
+    
     T Load(int2 loc) const { T out; texture->Load(&loc.x, &out); return out; }
     T& operator[](uint2 loc) { return *(T*)texture->refAt(&loc.x); }
     IRWTexture* texture;
@@ -348,11 +730,41 @@ struct RWTexture1DArray
 template <typename T>
 struct RWTexture2DArray
 {
+    void GetDimensions(uint32_t& outWidth, uint32_t& outHeight, uint32_t& outElements)
+    {
+        auto dims = texture->GetDimenions(); 
+        outWidth = dims.width; 
+        outHeight = dims.height;
+        outElements = dims.arrayElementCount; 
+    }
+    void GetDimensions(uint32_t mipLevel, uint32_t& outWidth, uint32_t& outHeight, uint32_t& outElements, uint32_t& outNumberOfLevels)
+    {
+        const auto dims = texture->GetDimensions(mipLevel);
+        outWidth = dims.width;
+        outHeight = dims.height;
+        outElements = dims.arrayElementCount;
+        outNumberOfLevels = dims.numberOfLevels;
+    }
+    void GetDimensions(float& outWidth, float& outHeight, float& outElements)
+    {
+        auto dims = texture->GetDimenions(); 
+        outWidth = dims.width; 
+        outHeight = dims.height;
+        outElements = dims.arrayElementCount; 
+    }
+    void GetDimensions(uint32_t mipLevel, float& outWidth, float& outHeight, float& outElements, float& outNumberOfLevels)
+    {
+        const auto dims = texture->GetDimensions(mipLevel);
+        outWidth = dims.width;
+        outHeight = dims.height;
+        outElements = dims.arrayElementCount;
+        outNumberOfLevels = dims.numberOfLevels;
+    }
+    
     T Load(const int3& loc) const { T out; texture->Load(&loc.x, &out); return out; }
     T& operator[](const uint3& loc) { return *(T*)texture->refAt(&loc.x); }
     IRWTexture* texture;
 };
-
 
 /* Varying input for Compute */
 
