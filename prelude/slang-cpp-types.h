@@ -393,7 +393,7 @@ struct Texture2D
     {
         const auto dims = texture->GetDimensions(mipLevel);
         outWidth = dims.width;
-        outHeight = dims.outHeight;
+        outHeight = dims.height;
         outNumberOfLevels = dims.numberOfLevels;
     }
     
@@ -607,10 +607,10 @@ template <typename T>
 struct RWTexture1D
 {
     void GetDimensions(uint32_t& outWidth) { outWidth = texture->GetDimensions().width; }
-    void GetDimensions(uint32_t mipLevel, uint32_t& outwidth, uint32_t& outNumberOfLevels) { auto dims = texture->GetDimensions(mipLevel); outWidth = dims.width; outNumberOfLevels = dims.numberOfLevels; }
+    void GetDimensions(uint32_t mipLevel, uint32_t& outWidth, uint32_t& outNumberOfLevels) { auto dims = texture->GetDimensions(mipLevel); outWidth = dims.width; outNumberOfLevels = dims.numberOfLevels; }
     
     void GetDimensions(float& outWidth) { outWidth = texture->GetDimensions().width; }
-    void GetDimensions(uint32_t mipLevel, float& outwidth, float& outNumberOfLevels) { auto dims = texture->GetDimensions(mipLevel); outWidth = dims.width; outNumberOfLevels = dims.numberOfLevels; }
+    void GetDimensions(uint32_t mipLevel, float& outWidth, float& outNumberOfLevels) { auto dims = texture->GetDimensions(mipLevel); outWidth = dims.width; outNumberOfLevels = dims.numberOfLevels; }
     
     T Load(int32_t loc) const { T out; texture->Load(&loc, &out); return out; }
     T& operator[](uint32_t loc) { return *(T*)texture->refAt(&loc); }
@@ -697,7 +697,7 @@ struct RWTexture1DArray
 {
     void GetDimensions(uint32_t& outWidth, uint32_t& outElements) 
     { 
-        auto dims = texture->GetDimenions(); 
+        auto dims = texture->GetDimensions(); 
         outWidth = dims.width; 
         outElements = dims.arrayElementCount; 
     }
@@ -710,7 +710,7 @@ struct RWTexture1DArray
     }
     void GetDimensions(float& outWidth, float& outElements) 
     { 
-        auto dims = texture->GetDimenions(); 
+        auto dims = texture->GetDimensions(); 
         outWidth = dims.width; 
         outElements = dims.arrayElementCount; 
     }
@@ -732,7 +732,7 @@ struct RWTexture2DArray
 {
     void GetDimensions(uint32_t& outWidth, uint32_t& outHeight, uint32_t& outElements)
     {
-        auto dims = texture->GetDimenions(); 
+        auto dims = texture->GetDimensions(); 
         outWidth = dims.width; 
         outHeight = dims.height;
         outElements = dims.arrayElementCount; 
@@ -747,7 +747,7 @@ struct RWTexture2DArray
     }
     void GetDimensions(float& outWidth, float& outHeight, float& outElements)
     {
-        auto dims = texture->GetDimenions(); 
+        auto dims = texture->GetDimensions(); 
         outWidth = dims.width; 
         outHeight = dims.height;
         outElements = dims.arrayElementCount; 
