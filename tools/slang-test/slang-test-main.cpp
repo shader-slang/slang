@@ -947,6 +947,103 @@ static SlangResult _executeBinary(const UnownedStringSlice& hexDump, ExecuteResu
     return ProcessUtil::execute(cmdLine, outExeRes);
 }
 
+static UnownedStringSlice _removeDiagnosticPrefix(const UnownedStringSlice& prefix, const UnownedStringSlice& in)
+{
+    SLANG_ASSERT(in.startsWith(prefix));
+
+    UnownedStringSlice remaining(in.begin() + prefix.getLength(), in.end());
+    const Index index = remaining.indexOf(':');
+
+    if (index >= 0)
+    {
+        // Ok strip everything before the colon
+        return UnownedStringSlice(remaining.begin() + index, remaining.end());
+    }
+    else
+    {
+        // Couldn't strip, just return the whole string as is
+        return in;
+    }
+}
+
+static bool _isLineEqual(const UnownedStringSlice& a, const UnownedStringSlice& b)
+{
+    if (a == b)
+    {
+        return true;
+    }
+
+    static const UnownedStringSlice stdLibNames[] =
+    {
+        UnownedStringSlice::fromLiteral("core.meta.slang"),
+        UnownedStringSlice::fromLiteral("hlsl.meta.slang"),
+        UnownedStringSlice::fromLiteral("slang-stdlib.cpp"),
+    };
+
+    // Look for if a line starts with a stdlib name
+    for (const auto& stdLibName : stdLibNames)
+    {
+        if (a.startsWith(stdLibName) && b.startsWith(stdLibName))
+        {
+            // If the text after the diagnostic prefix is equal then the line is equal
+            if (_removeDiagnosticPrefix(stdLibName, a) == _removeDiagnosticPrefix(stdLibName, b))
+            {
+                return true;
+            }
+        }
+    }
+
+    return false;
+}
+
+static bool _areResultsEqual(TestOptions::Type type, const String& a, const String& b)
+{
+    switch (type)
+    {
+        case TestOptions::Type::Diagnostic:
+        {
+            // If they are identical we are done
+            if (a == b)
+            {
+                return true;
+            }
+
+            // Okay we are going to go line by line
+            // If the lines are equal thats ok.
+            // If they are not.. we will check if the only difference is line numbers from the stdlib
+
+            List<UnownedStringSlice> linesA;
+            List<UnownedStringSlice> linesB;
+
+            StringUtil::calcLines(a.getUnownedSlice(), linesA);
+            StringUtil::calcLines(b.getUnownedSlice(), linesB);
+
+            if (linesA.getCount() != linesB.getCount())
+            {
+                return false;
+            }
+
+            for (Index i = 0; i < linesA.getCount(); ++i)
+            {
+                if (!_isLineEqual(linesA[i], linesB[i]))
+                {
+                    return false;
+                }
+            }
+
+            return true;
+        }
+        case TestOptions::Type::Normal:
+        {
+            return a == b;
+        }
+        default:
+        {
+            SLANG_ASSERT(!"Unknown test type");
+            return false;
+        }
+    }
+}
 
 TestResult runSimpleTest(TestContext* context, TestInput& input)
 {
@@ -1018,7 +1115,7 @@ TestResult runSimpleTest(TestContext* context, TestInput& input)
     TestResult result = TestResult::Pass;
 
     // Otherwise we compare to the expected output
-    if (actualOutput != expectedOutput)
+    if (!_areResultsEqual(input.testOptions->type, expectedOutput, actualOutput))
     {
         context->reporter->dumpOutputDifference(expectedOutput, actualOutput);
         result = TestResult::Fail;

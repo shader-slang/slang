@@ -336,6 +336,7 @@ static const struct {
 
     {"bool",        "b"},
 };
+
 static const int kTypeCount = sizeof(kTypes) / sizeof(kTypes[0]);
 
 for (int tt = 0; tt < kTypeCount; ++tt)
