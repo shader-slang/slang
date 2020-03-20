@@ -3592,6 +3592,38 @@ struct StmtLoweringVisitor : StmtVisitor<StmtLoweringVisitor>
         return newCaseLabel;
     }
 
+    bool hasSwitchCases(Stmt* inStmt)
+    {
+        Stmt* stmt = inStmt;
+        // Unwrap any surrounding `{ ... }` so we can look
+        // at the statement inside.
+        while (auto blockStmt = as<BlockStmt>(stmt))
+        {
+            stmt = blockStmt->body;
+            continue;
+        }
+
+        if (auto seqStmt = as<SeqStmt>(stmt))
+        {
+            // Walk through the children looking for cases
+            for (auto childStmt : seqStmt->stmts)
+            {
+                return hasSwitchCases(childStmt);
+            }
+        }
+        else if (auto caseStmt = as<CaseStmt>(stmt))
+        {
+            return true;
+        }
+        else if (auto defaultStmt = as<DefaultStmt>(stmt))
+        {
+            // A 'default:' is a kind of case. 
+            return true;
+        }
+
+        return false;
+    }
+
     // Given a statement that appears as (or in) the body
     // of a `switch` statement
     void lowerSwitchCases(Stmt* inStmt, SwitchStmtInfo* info)
@@ -3733,6 +3765,14 @@ struct StmtLoweringVisitor : StmtVisitor<StmtLoweringVisitor>
 
         // First emit code to compute the condition:
         auto conditionVal = getSimpleVal(context, lowerRValueExpr(context, stmt->condition));
+
+        // Check for any cases or default. 
+        if (!hasSwitchCases(stmt->body))
+        {
+            // If we don't have any case/default then nothing inside switch can be executed (other than condition)
+            // so we are done.
+            return;
+        }
 
         // Remember the initial block so that we can add to it
         // after we've collected all the `case`s
