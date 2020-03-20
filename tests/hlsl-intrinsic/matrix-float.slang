@@ -1,7 +1,5 @@
 // TODO(JS):
 // NOTE we can't test on VK/gl at the moment because we don't support intrinsics over matrices on that target currently
-// TODO(JS):
-// Also NOTE, we do not test matrix inverse as currently unsupported on C++/CUDA targets
 
 //TEST(compute):COMPARE_COMPUTE_EX:-cpu -compute -output-using-type
 //TEST(compute):COMPARE_COMPUTE_EX:-slang -compute -output-using-type
@@ -17,14 +15,10 @@ typedef matrix<int, 2, 2> IntMatrix;
 typedef matrix<uint, 2, 2> UIntMatrix;
 typedef vector<float, 2> FloatVector;
 
-float calcTotal(vector<float, 2> v)
-{
-    return v.x + v.y;
-}
-
-float calcTotal(FloatMatrix v) 
+float calcResult(FloatMatrix v) 
 { 
-    return calcTotal(v[0]) + calcTotal(v[1]);
+    // Multiply diffent parts by different amounts to make order important
+    return v[0][0] + v[0][1] * 2 + v[1][0] * 3 + v[1][1] * 4;
 }
 
 FloatMatrix makeFloatMatrix(float f)
@@ -49,6 +43,8 @@ void computeMain(uint3 dispatchThreadID : SV_DispatchThreadID)
     FloatMatrix ft = {}; 
 
     FloatMatrix f = { { scalarF + 0.01, scalarF + 0.02f}, { scalarF + 0.011f, scalarF + 0.022f}};
+    
+    ft += transpose(f);
     
     // fmod
     ft += FloatMatrix(IntMatrix(((f % makeFloatMatrix(0.11f)) * makeFloatMatrix(100)) + makeFloatMatrix(0.5)));
@@ -133,5 +129,5 @@ void computeMain(uint3 dispatchThreadID : SV_DispatchThreadID)
     UIntMatrix vu = asuint(f);
     ft += asfloat(vu);
    
-    outputBuffer[idx] = calcTotal(ft);
+    outputBuffer[idx] = calcResult(ft);
 }
