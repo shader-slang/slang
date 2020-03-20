@@ -6,33 +6,32 @@ Items with ^ means there is some discussion about support later in the document 
 
 | Feature                     |    D3D11     |    D3D12     |     VK     |      CUDA     |    CPU
 |-----------------------------|--------------|--------------|------------|---------------|---------------
-| Half Type                   |     No       |     Yes      |   Yes      |     No+       |    No+
+| Half Type                   |     No       |     Yes      |   Yes      |     No +      |    No +
 | Double Type                 |     Yes      |     Yes      |   Yes      |     Yes       |    Yes
-| Double Intrinsics           |     No       |   Limited+   |  Limited   |     Most      |    Yes
-| u/int64_t Type              |     No       |  Yes (SM6.0) |   Yes      |     Yes       |    Yes
+| Double Intrinsics           |     No       |   Limited +  |  Limited   |     Most      |    Yes
+| u/int64_t Type              |     No       |   Yes ^      |   Yes      |     Yes       |    Yes
 | u/int64_t Intrinsics        |     No       |   No         |   Yes      |     Yes       |    Yes
-| int matrix                  |     Yes      |   Yes        |   No+      |     Yes       |    Yes
+| int matrix                  |     Yes      |   Yes        |   No +     |     Yes       |    Yes
 | tex.GetDimension            |     Yes      |   Yes        |   Yes      |     No        |    Yes
 | SM6.0 Wave Intrinsics       |     No       |   Yes        |  Partial   |     Yes       |    No
-| SM6.0 Quad Intrinsics       |     No       |   Yes        |   No+      |     No        |    No
-| SM6.5 Wave Intrinsics       |     No       |   Yes (1)    |   No+      |     Yes       |    No
-| Tesselation                 |     Yes      |   Yes        | Limited+   |     No        |    No
+| SM6.0 Quad Intrinsics       |     No       |   Yes        |   No +     |     No        |    No
+| SM6.5 Wave Intrinsics       |     No       |   Yes ^      |   No +     |     Yes       |    No
+| Tesselation                 |     Yes      |   Yes        | Limited +  |     No        |    No
 | Graphics Pipeline           |     Yes      |   Yes        |   Yes      |     No        |    No
 | Ray Tracing                 |     No       |   Yes        |   Yes      |     No        |    No
 | Native Bindless             |     No       |    No        |   No       |     Yes       |    Yes
-| Buffer bounds               |     Yes      |   Yes        |   Yes      |   Limited^    |    Limited^
+| Buffer bounds               |     Yes      |   Yes        |   Yes      |   Limited ^   |    Limited ^
 | Resource bounds             |     Yes      |   Yes        |   Yes      | Yes (optional)|    Yes
 | Atomics                     |     Yes      |   Yes        |   Yes      |     Yes       |    Yes
-| Group shared mem/Barriers   |     Yes      |   Yes        |   Yes      |     Yes       |    No+ 
+| Group shared mem/Barriers   |     Yes      |   Yes        |   Yes      |     Yes       |    No + 
 | TextureArray.Sample float   |     Yes      |   Yes        |   Yes      |     No        |    Yes
-| Separate Sampler            |     Yes      |   Yes        |   Yes?     |     No        |    Yes
+| Separate Sampler            |     Yes      |   Yes        |   Yes ?    |     No        |    Yes
 | tex.Load                    |     Yes      |   Yes        |   Yes      |  Limited      |    Yes
-| Full bool                   |     Yes      |   Yes        |   Yes      |     No        |    Yes^ 
+| Full bool                   |     Yes      |   Yes        |   Yes      |     No        |    Yes ^ 
 
 ## Half Type
 
 There appears to be a problem writing to a StructuredBuffer containing half on D3D12. D3D12 also appears to have problems doing calculations with half.
-
 
 ## u/int64_t Type
 
@@ -45,6 +44,10 @@ Means can use matrix types containing integer types.
 ## tex.GetDimensions
 
 tex.GetDimensions is the GetDimensions method on 'texture' objects. This is not supported on CUDA as CUDA has no equivalent functionality to get these values. GetDimensions work on Buffer resource types on CUDA.
+
+## SM6.5 Wave Intrinsics
+
+SM6.5 Wave Intrinsics are supported, but requires a downstream DXC compiler that supports SM6.5. As it stands the DXC shipping with windows does not. 
 
 ## Tesselation
 
