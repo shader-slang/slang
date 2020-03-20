@@ -612,7 +612,7 @@ for (int tt = 0; tt < kBaseTextureTypeCount; ++tt)
                 sb << "<T> t, float" << kBaseTextureTypes[tt].coordCount + isArray << " location);\n";
             }
         }
-	}
+    }
 }
 
 for (int tt = 0; tt < kBaseTextureTypeCount; ++tt)
