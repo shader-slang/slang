@@ -3608,7 +3608,10 @@ struct StmtLoweringVisitor : StmtVisitor<StmtLoweringVisitor>
             // Walk through the children looking for cases
             for (auto childStmt : seqStmt->stmts)
             {
-                return hasSwitchCases(childStmt);
+                if (hasSwitchCases(childStmt))
+                {
+                    return true;
+                }
             }
         }
         else if (auto caseStmt = as<CaseStmt>(stmt))
