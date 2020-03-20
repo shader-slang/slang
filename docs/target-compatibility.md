@@ -16,11 +16,11 @@ Items with ^ means there is some discussion about support later in the document 
 | SM6.0 Wave Intrinsics       |     No       |   Yes        |  Partial   |     Yes       |    No
 | SM6.0 Quad Intrinsics       |     No       |   Yes        |   No+      |     No        |    No
 | SM6.5 Wave Intrinsics       |     No       |   Yes (1)    |   No+      |     Yes       |    No
-| Tesselation                 |     Partial+ |   Partial+   | Limited+   |     No        |    No
+| Tesselation                 |     Yes      |   Yes        | Limited+   |     No        |    No
 | Graphics Pipeline           |     Yes      |   Yes        |   Yes      |     No        |    No
 | Ray Tracing                 |     No       |   Yes        |   Yes      |     No        |    No
 | Native Bindless             |     No       |    No        |   No       |     Yes       |    Yes
-| Buffer bounds               |     Yes      |   Yes        |   Yes      |   Limited     |    Limited
+| Buffer bounds               |     Yes      |   Yes        |   Yes      |   Limited^    |    Limited^
 | Resource bounds             |     Yes      |   Yes        |   Yes      | Yes (optional)|    Yes
 | Atomics                     |     Yes      |   Yes        |   Yes      |     Yes       |    Yes
 | Group shared mem/Barriers   |     Yes      |   Yes        |   Yes      |     Yes       |    No+ 
@@ -33,9 +33,6 @@ Items with ^ means there is some discussion about support later in the document 
 
 There appears to be a problem writing to a StructuredBuffer containing half on D3D12. D3D12 also appears to have problems doing calculations with half.
 
-## tex.GetDimensions
-
-tex.GetDimensions is the GetDimensions method on 'texture' objects. This is not supported on CUDA as CUDA has no equivalent functionality to get these values. GetDimensions work on Buffer resource types on CUDA.
 
 ## u/int64_t Type
 
@@ -44,6 +41,16 @@ Requires SM6.0 which requires DXIL for D3D12. Therefore not available with DXBC 
 ## int matrix
 
 Means can use matrix types containing integer types. 
+
+## tex.GetDimensions
+
+tex.GetDimensions is the GetDimensions method on 'texture' objects. This is not supported on CUDA as CUDA has no equivalent functionality to get these values. GetDimensions work on Buffer resource types on CUDA.
+
+## Tesselation
+
+Although tesselation stages should work on D3D11 and D3D12 they are not tested within our test framework, and may have problems. 
+
+There is some limited support for tessellation stages in GLSL/VK.
 
 ## Native Bindless  
 
