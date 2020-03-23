@@ -1,7 +1,11 @@
 Slang Target Compatibility 
 ==========================
 
-Items with a + means that the feature is aniticipated to be added in the future.
+
+Shader Model (SM) numbers are D3D Shader Model versions, unless explicitly stated otherwise.
+OpenGL compatibility is not listed here, because OpenGL isn't an officially supported target. 
+
+Items with a + means that the feature is anticipated to be added in the future.
 Items with ^ means there is some discussion about support later in the document for this target.
 
 | Feature                     |    D3D11     |    D3D12     |     VK     |      CUDA     |    CPU
@@ -16,18 +20,20 @@ Items with ^ means there is some discussion about support later in the document 
 | SM6.0 Wave Intrinsics       |     No       |   Yes        |  Partial   |     Yes       |    No
 | SM6.0 Quad Intrinsics       |     No       |   Yes        |   No +     |     No        |    No
 | SM6.5 Wave Intrinsics       |     No       |   Yes ^      |   No +     |     Yes       |    No
-| Tesselation                 |     Yes      |   Yes        | Limited +  |     No        |    No
+| Tesselation                 |     Yes ^    |   Yes ^      |   No +     |     No        |    No
 | Graphics Pipeline           |     Yes      |   Yes        |   Yes      |     No        |    No
-| Ray Tracing                 |     No       |   Yes        |   Yes      |     No        |    No
+| Ray Tracing DXR 1.0         |     No       |   Yes ^      |   Yes ^    |     No        |    No
+| Ray Tracing DXR 1.1         |     No       |   Yes        |   No +     |     No        |    No
 | Native Bindless             |     No       |    No        |   No       |     Yes       |    Yes
 | Buffer bounds               |     Yes      |   Yes        |   Yes      |   Limited ^   |    Limited ^
 | Resource bounds             |     Yes      |   Yes        |   Yes      | Yes (optional)|    Yes
 | Atomics                     |     Yes      |   Yes        |   Yes      |     Yes       |    Yes
 | Group shared mem/Barriers   |     Yes      |   Yes        |   Yes      |     Yes       |    No + 
 | TextureArray.Sample float   |     Yes      |   Yes        |   Yes      |     No        |    Yes
-| Separate Sampler            |     Yes      |   Yes        |   Yes ?    |     No        |    Yes
-| tex.Load                    |     Yes      |   Yes        |   Yes      |  Limited      |    Yes
+| Separate Sampler            |     Yes      |   Yes        |   Yes      |     No        |    Yes
+| tex.Load                    |     Yes      |   Yes        |   Yes      |  Limited ^    |    Yes
 | Full bool                   |     Yes      |   Yes        |   Yes      |     No        |    Yes ^ 
+| Mesh Shader                 |     No       |   No +       |   No +     |     No        |    No
 
 ## Half Type
 
@@ -52,8 +58,6 @@ SM6.5 Wave Intrinsics are supported, but requires a downstream DXC compiler that
 ## Tesselation
 
 Although tesselation stages should work on D3D11 and D3D12 they are not tested within our test framework, and may have problems. 
-
-There is some limited support for tessellation stages in GLSL/VK.
 
 ## Native Bindless  
 
@@ -87,12 +91,26 @@ On CUDA the SamplerState is ignored, because on this target a 'texture object' i
 
 CPU and CUDA only currently support compute shaders. 
 
+## Ray Tracing DXR 1.0
+
+Vulkan does not support a local root signature, but there is the concept of a 'shader record'. In Slang a single constant buffer can be marked as a shader record with the `[[vk::shader_record]]` attribute, for example:
+
+```
+[[vk::shader_record]]
+cbuffer ShaderRecord
+{
+	uint shaderRecordID;
+} 
+```
+
+In practice to write shader code that works across D3D12 and VK you should have a single constant buffer marked as 'shader record' for VK and then on D3D that constant buffer should be bound in the local root signature on D3D. 
+
 ## tex.Load
 
-tex.Load is only supported on CUDA for Texture1D. Additionally CUDA only allows such access for linear memory, meaning the bound texture can also not have mip maps. Load is allowed on RWTexture types on CUDA.
+tex.Load is only supported on CUDA for Texture1D. Additionally CUDA only allows such access for linear memory, meaning the bound texture can also not have mip maps. Load *is* allowed on RWTexture types of other dimensions including 1D on CUDA.
 
 ## Full bool
 
 Means fully featured bool support. CUDA has issues around bool because there isn't a vector bool type built in. Currently bool aliases to an int vector type. 
 
-On CPU there are some issues in so far as bool's size is not well defined in size an alignment. Most C++ compliers now use a byte to represent a bool. In the past it has been backed by an int on some compilers. 
+On CPU there are some issues in so far as bool's size is not well defined in size an alignment. Most C++ compilers now use a byte to represent a bool. In the past it has been backed by an int on some compilers. 
