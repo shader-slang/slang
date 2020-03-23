@@ -43,6 +43,8 @@ The Slang [language guide](docs/language-guide.md) provides information on exten
 
 The [API user's guide](docs/api-users-guide.md) gives information on how to drive Slang programmatically from an application.
 
+The [target compatibility guide](docs/target-compatibility.md) gives an overview of feature compatibility for targets. 
+
 The [CPU target guide](docs/cpu-target.md) gives information on compiling Slang or C++ source into shared libraries/executables or functions that can be directly executed. It also covers how to generate C++ code from Slang source.  
 
 The [CUDA target guide](docs/cuda-target.md) provides information on compiling Slang/HLSL or CUDA source. Slang can compile to equivalent CUDA source, as well as to PTX via the nvrtc CUDA complier.

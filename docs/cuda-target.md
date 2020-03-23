@@ -16,7 +16,7 @@ These limitations apply to Slang transpiling to CUDA.
 
 * Only supports the 'texture object' style binding (The texture object API is only supported on devices of compute capability 3.0 or higher. )
 * Samplers are not separate objects in CUDA - they are combined into a single 'TextureObject'. So samplers are effectively ignored on CUDA targets. 
-* When using a TextureArray (layered texture in CUDA) - the index will be treated as an int, as this is all CUDA allows
+* When using a TextureArray.Sample (layered texture in CUDA) - the index will be treated as an int, as this is all CUDA allows
 * Care must be used in using `WaveGetLaneIndex` wave intrinsic - it will only give the right results for appropriate launches
 * CUDA 'surfaces' are used for textures which are read/write. CUDA does NOT do format conversion with surfaces.
 
