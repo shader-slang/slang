@@ -219,6 +219,8 @@ Some features are not available because they cannot be mapped with appropriate b
 * Not all Wave intrinsics are supported
 * There is not complete support for all methods on 'objects' like textures etc. 
 * Does not currently support combined 'TextureSampler'. A Texture behaves equivalently to a TextureSampler and Samplers are ignored.
+* Half type is not currently supported
+* GetDimensions is not available on any Texture type currently - as there doesn't appear to be a CUDA equivalent 
 
 Language aspects
 ================
