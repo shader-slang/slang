@@ -309,7 +309,9 @@ SlangResult NVRTCDownstreamCompiler::compile(const CompileOptions& options, RefP
         cmdLine.addArg("-w");
 
         //
+#if 0
         cmdLine.addArg("-arch=compute_70");
+#endif
     }
 
     nvrtcProgram program = nullptr;
