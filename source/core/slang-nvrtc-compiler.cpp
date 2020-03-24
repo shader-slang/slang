@@ -311,6 +311,9 @@ SlangResult NVRTCDownstreamCompiler::compile(const CompileOptions& options, RefP
         //
 #if 0
         cmdLine.addArg("-arch=compute_70");
+#else
+        // Needed for Warp intrinsics
+        cmdLine.addArg("-arch=compute_30");
 #endif
     }
 
