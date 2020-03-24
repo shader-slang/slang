@@ -4,10 +4,10 @@
 
 struct S
 {
-	static void doThing(in out int x, int y)
-	{
-		x += y;
-	}
+    static void doThing(in out int x, int y)
+    {
+        x += y;
+    }
 }
 
 //TEST_INPUT:ubuffer(data=[0 0 0 0], stride=4):out
@@ -15,20 +15,19 @@ RWStructuredBuffer<int> outputBuffer : register(u0);
 
 int test(int t)
 {
-	// TODO: This case is currently being mis-handled by the parser
-//	S::doThing(t, 0x10);
+    S::doThing(t, 0x10);
 
-	(S::doThing(t, 0x200));
+    (S::doThing(t, 0x200));
 
-	(S::doThing)(t, 0x4000);
+    (S::doThing)(t, 0x4000);
 
-	return t;
+    return t;
 }
 
 [numthreads(4)]
 void computeMain(uint3 tid : SV_DispatchThreadID)
 {
-	int val = tid.x;
-	val = test(val);
-	outputBuffer[tid.x] = val;
+    int val = tid.x;
+    val = test(val);
+    outputBuffer[tid.x] = val;
 }
