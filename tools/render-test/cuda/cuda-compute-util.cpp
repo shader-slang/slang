@@ -18,79 +18,95 @@ using namespace Slang;
 SLANG_FORCE_INLINE static bool _isError(CUresult result) { return result != 0; }
 SLANG_FORCE_INLINE static bool _isError(cudaError_t result) { return result != 0; }
 
-struct CUDAResult
+// A enum used to control if errors are reported on failure of CUDA call.
+enum class CUDAReportStyle
 {
-    enum class Type
-    {
-        CUResult,
-        CUDAError,
-    };
-
-    CUDAResult(CUresult result):
-        m_type(Type::CUResult),
-        m_value(int(result))
-    {}
-    CUDAResult(cudaError_t result):
-        m_type(Type::CUDAError),
-        m_value(int(result))
-    {
-    }
-
-    Type m_type;
-    int m_value;
+    Normal,
+    Silent,
 };
 
-static SlangResult _handleCUDAError(const CUDAResult& result, const char* file, int line)
+struct CUDAErrorInfo
 {
-    StringBuilder builder;
-
-    builder << "Error: " << file << " (" << line << ") :"; 
-
-    if (result.m_type == CUDAResult::Type::CUResult)
+    CUDAErrorInfo(const char* filePath, int lineNo, const char* errorName = nullptr, const char* errorString = nullptr):
+        m_filePath(filePath),
+        m_lineNo(lineNo),
+        m_errorName(errorName),
+        m_errorString(errorString)
     {
-        CUresult cuResult = CUresult(result.m_value);
-        const char* errorString = nullptr;
-        const char* errorName = nullptr;
-
-        cuGetErrorString(cuResult, &errorString);
-        cuGetErrorName(cuResult, &errorName);
-
-        if (errorName)
-        {
-            builder << errorName << " : ";
-        }
-        if (errorString)
-        {
-            builder << errorString;
-        }
     }
-    else if (result.m_type == CUDAResult::Type::CUDAError)
+    SlangResult handle() const
     {
-        cudaError_t error = cudaError_t(result.m_value);
+        StringBuilder builder;
+        builder << "Error: " << m_filePath << " (" << m_lineNo << ") :";
 
-        const char* errorString = cudaGetErrorString(error);
-        const char* errorName = cudaGetErrorName(error);
+        if (m_errorName)
+        {
+            builder << m_errorName << " : ";
+        }
+        if (m_errorString)
+        {
+            builder << m_errorString;
+        }
 
-        if (errorName)
-        {
-            builder << errorName << " : ";
-        }
-        if (errorString)
-        {
-            builder << errorString;
-        }
+        StdWriters::getError().put(builder.getUnownedSlice());
+
+        //Slang::signalUnexpectedError(builder.getBuffer());
+        return SLANG_FAIL;
     }
 
-    Slang::signalUnexpectedError(builder.getBuffer());
+    const char* m_filePath;
+    int m_lineNo;
+    const char* m_errorName;
+    const char* m_errorString;
+};
+
+#if 1
+// If this code path is enabled, CUDA errors will be reported directly to StdWriter::out stream.
+
+static SlangResult _handleCUDAError(CUresult cuResult, const char* file, int line)
+{
+    CUDAErrorInfo info(file, line);
+    cuGetErrorString(cuResult, &info.m_errorString);
+    cuGetErrorName(cuResult, &info.m_errorName);
+    return info.handle();
+}
+
+static SlangResult _handleCUDAError(cudaError_t error, const char* file, int line)
+{
+    return CUDAErrorInfo(file, line, cudaGetErrorName(error), cudaGetErrorString(error)).handle();
+}
+
+#define SLANG_CUDA_HANDLE_ERROR(x) _handleCUDAError(_res, __FILE__, __LINE__)
+
+#else
+// If this code path is enabled, errors are not reported, but can have an assert enabled
+
+static SlangResult _handleCUDAError(CUresult cuResult)
+{
+    SLANG_UNUSED(cuResult);
+    //SLANG_ASSERT(!"Failed CUDA call");
     return SLANG_FAIL;
 }
 
-#define SLANG_CUDA_HANDLE_ERROR(x) if (_isError(_res)) return _handleCUDAError(_res, __FILE__, __LINE__);
+static SlangResult _handleCUDAError(cudaError_t error)
+{
+    SLANG_UNUSED(error);
+    //SLANG_ASSERT(!"Failed CUDA call");
+    return SLANG_FAIL;
+}
 
-//#define SLANG_CUDA_HANDLE_ERROR(x) if (_isError(_res)) { SLANG_ASSERT(!"Failed CUDA call"); return SLANG_FAIL; }
-//#define SLANG_CUDA_HANDLE_ERROR(x) if (_isError(_res)) { return SLANG_FAIL; }
+#define SLANG_CUDA_HANDLE_ERROR(x) _handleCUDAError(_res)
+#endif
 
-#define SLANG_CUDA_RETURN_ON_FAIL(x) { auto _res = x; SLANG_CUDA_HANDLE_ERROR(_res); }
+#define SLANG_CUDA_RETURN_ON_FAIL(x) { auto _res = x; if (_isError(_res)) return SLANG_CUDA_HANDLE_ERROR(_res); }
+#define SLANG_CUDA_RETURN_WITH_REPORT_ON_FAIL(x, r) \
+    { \
+        auto _res = x; \
+        if (_isError(_res)) \
+        { \
+            return (r == CUDAReportStyle::Normal) ? SLANG_CUDA_HANDLE_ERROR(_res) : SLANG_FAIL; \
+        } \
+    } \
 
 #define SLANG_CUDA_ASSERT_ON_FAIL(x) { auto _res = x; if (_isError(_res)) { SLANG_ASSERT(!"Failed CUDA call"); }; }
 
@@ -348,11 +364,10 @@ static SlangResult _findMaxFlopsDeviceId(int* outDevice)
     return SLANG_OK;
 }
 
-static SlangResult _initCuda()
+static SlangResult _initCuda(CUDAReportStyle reportType = CUDAReportStyle::Normal)
 {
     static CUresult res = cuInit(0);
-    SLANG_CUDA_RETURN_ON_FAIL(res);
-
+    SLANG_CUDA_RETURN_WITH_REPORT_ON_FAIL(res, reportType);
     return SLANG_OK;
 }
 
@@ -361,9 +376,9 @@ class ScopeCUDAContext
 public:
     ScopeCUDAContext() : m_context(nullptr) {}
 
-    SlangResult init(unsigned int flags, CUdevice device)
+    SlangResult init(unsigned int flags, CUdevice device, CUDAReportStyle reportType = CUDAReportStyle::Normal)
     {
-        SLANG_RETURN_ON_FAIL(_initCuda());
+        SLANG_RETURN_ON_FAIL(_initCuda(reportType));
 
         if (m_context)
         {
@@ -371,18 +386,17 @@ public:
             m_context = nullptr;
         }
 
-        SLANG_CUDA_RETURN_ON_FAIL(cuCtxCreate(&m_context, flags, device));
-
+        SLANG_CUDA_RETURN_WITH_REPORT_ON_FAIL(cuCtxCreate(&m_context, flags, device), reportType);
         return SLANG_OK;
     }
 
-    SlangResult init(unsigned int flags)
+    SlangResult init(unsigned int flags, CUDAReportStyle reportType = CUDAReportStyle::Normal)
     {
-        SLANG_RETURN_ON_FAIL(_initCuda());
+        SLANG_RETURN_ON_FAIL(_initCuda(reportType));
 
         int deviceId;
         SLANG_RETURN_ON_FAIL(_findMaxFlopsDeviceId(&deviceId));
-        SLANG_CUDA_RETURN_ON_FAIL(cudaSetDevice(deviceId));
+        SLANG_CUDA_RETURN_WITH_REPORT_ON_FAIL(cudaSetDevice(deviceId), reportType);
 
         if (m_context)
         {
@@ -390,7 +404,7 @@ public:
             m_context = nullptr;
         }
 
-        SLANG_CUDA_RETURN_ON_FAIL(cuCtxCreate(&m_context, flags, deviceId));
+        SLANG_CUDA_RETURN_WITH_REPORT_ON_FAIL(cuCtxCreate(&m_context, flags, deviceId), reportType);
         return SLANG_OK;
     }
 
@@ -409,7 +423,7 @@ public:
 /* static */bool CUDAComputeUtil::canCreateDevice()
 {
     ScopeCUDAContext context;
-    return SLANG_SUCCEEDED(context.init(0));
+    return SLANG_SUCCEEDED(context.init(0, CUDAReportStyle::Silent));
 }
 
 static bool _hasReadAccess(SlangResourceAccess access)
