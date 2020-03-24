@@ -18,13 +18,79 @@ using namespace Slang;
 SLANG_FORCE_INLINE static bool _isError(CUresult result) { return result != 0; }
 SLANG_FORCE_INLINE static bool _isError(cudaError_t result) { return result != 0; }
 
-#if 0
-#define SLANG_CUDA_RETURN_ON_FAIL(x) { auto _res = x; if (_isError(_res)) return SLANG_FAIL; }
-#else
+struct CUDAResult
+{
+    enum class Type
+    {
+        CUResult,
+        CUDAError,
+    };
 
-#define SLANG_CUDA_RETURN_ON_FAIL(x) { auto _res = x; if (_isError(_res)) { SLANG_ASSERT(!"Failed CUDA call"); return SLANG_FAIL; } }
+    CUDAResult(CUresult result):
+        m_type(Type::CUResult),
+        m_value(int(result))
+    {}
+    CUDAResult(cudaError_t result):
+        m_type(Type::CUDAError),
+        m_value(int(result))
+    {
+    }
 
-#endif
+    Type m_type;
+    int m_value;
+};
+
+static SlangResult _handleCUDAError(const CUDAResult& result, const char* file, int line)
+{
+    StringBuilder builder;
+
+    builder << "Error: " << file << " (" << line << ") :"; 
+
+    if (result.m_type == CUDAResult::Type::CUResult)
+    {
+        CUresult cuResult = CUresult(result.m_value);
+        const char* errorString = nullptr;
+        const char* errorName = nullptr;
+
+        cuGetErrorString(cuResult, &errorString);
+        cuGetErrorName(cuResult, &errorName);
+
+        if (errorName)
+        {
+            builder << errorName << " : ";
+        }
+        if (errorString)
+        {
+            builder << errorString;
+        }
+    }
+    else if (result.m_type == CUDAResult::Type::CUDAError)
+    {
+        cudaError_t error = cudaError_t(result.m_value);
+
+        const char* errorString = cudaGetErrorString(error);
+        const char* errorName = cudaGetErrorName(error);
+
+        if (errorName)
+        {
+            builder << errorName << " : ";
+        }
+        if (errorString)
+        {
+            builder << errorString;
+        }
+    }
+
+    Slang::signalUnexpectedError(builder.getBuffer());
+    return SLANG_FAIL;
+}
+
+#define SLANG_CUDA_HANDLE_ERROR(x) if (_isError(_res)) return _handleCUDAError(_res, __FILE__, __LINE__);
+
+//#define SLANG_CUDA_HANDLE_ERROR(x) if (_isError(_res)) { SLANG_ASSERT(!"Failed CUDA call"); return SLANG_FAIL; }
+//#define SLANG_CUDA_HANDLE_ERROR(x) if (_isError(_res)) { return SLANG_FAIL; }
+
+#define SLANG_CUDA_RETURN_ON_FAIL(x) { auto _res = x; SLANG_CUDA_HANDLE_ERROR(_res); }
 
 #define SLANG_CUDA_ASSERT_ON_FAIL(x) { auto _res = x; if (_isError(_res)) { SLANG_ASSERT(!"Failed CUDA call"); }; }
 
@@ -304,10 +370,9 @@ public:
             cuCtxDestroy(m_context);
             m_context = nullptr;
         }
-        if (_isError(cuCtxCreate(&m_context, flags, device)))
-        {
-            return SLANG_FAIL;
-        }
+
+        SLANG_CUDA_RETURN_ON_FAIL(cuCtxCreate(&m_context, flags, device));
+
         return SLANG_OK;
     }
 
@@ -324,10 +389,8 @@ public:
             cuCtxDestroy(m_context);
             m_context = nullptr;
         }
-        if (_isError(cuCtxCreate(&m_context, flags, deviceId)))
-        {
-            return SLANG_FAIL;
-        }
+
+        SLANG_CUDA_RETURN_ON_FAIL(cuCtxCreate(&m_context, flags, deviceId));
         return SLANG_OK;
     }
 
