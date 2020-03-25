@@ -2592,17 +2592,38 @@ void CLikeSourceEmitter::emitRegion(Region* inRegion)
                 //
                 if (auto loopControlDecoration = loopInst->findDecoration<IRLoopControlDecoration>())
                 {
-                    switch (loopControlDecoration->getMode())
+                    const auto loopMode = loopControlDecoration->getMode();
+                    if (loopMode == kIRLoopControl_Unroll)
                     {
-                    case kIRLoopControl_Unroll:
-                        // Note: loop unrolling control is only available in HLSL, not GLSL
-                        if(getSourceStyle() == SourceStyle::HLSL)
+                        switch (getSourceStyle())
                         {
-                            m_writer->emit("[unroll]\n");
+                            case SourceStyle::HLSL:
+                            {
+                                m_writer->emit("[unroll]\n");
+                                break;
+                            }
+                            case SourceStyle::GLSL:
+                            {
+                                // Note: loop unrolling control not available in GLSL
+                                break;
+                            }
+                            case SourceStyle::CUDA:
+                            {
+                                m_writer->emit("#pragma unroll\n");
+                                break;
+                            }
+                            case SourceStyle::C:
+                            case SourceStyle::CPP:
+                            {
+                                // This relies on a suitable definition in slang-cpp-prelude.h or defined in C++ compiler invocation.
+                                m_writer->emit("SLANG_UNROLL\n");
+                                break;
+                            }
+                            default:
+                            {
+                                break;
+                            }
                         }
-                        break;
-
-                    default:
                         break;
                     }
                 }
