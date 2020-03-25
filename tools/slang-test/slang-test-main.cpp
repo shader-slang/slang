@@ -373,7 +373,7 @@ TestResult gatherTestsForFile(
         }
 
         TestDetails testDetails;
-        if (match(&cursor, "IGNORE_"))
+        if (match(&cursor, "DISABLE_"))
         {
             testDetails.options.isEnabled = false;
         }
