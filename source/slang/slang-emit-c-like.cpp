@@ -1094,6 +1094,17 @@ bool CLikeSourceEmitter::shouldFoldInstIntoUseSites(IRInst* inst)
             return false;
     }
 
+    // As a safeguard, we should not allow an instruction that references
+    // a block parameter to be folded into a unconcditonal branch
+    // (which includes arguments for the parameters of the target block).
+    //
+    // For simplicity, we will just disallow folding of intructions
+    // into an unconditonal branch completely, and leave a more refined
+    // version of this check for later.
+    //
+    if(as<IRUnconditionalBranch>(user))
+        return false;
+
     // Okay, if we reach this point then the user comes later in
     // the same block, and there are no instructions with side
     // effects in between, so it seems safe to fold things in.
@@ -2406,25 +2417,206 @@ void CLikeSourceEmitter::emitLayoutSemantics(IRInst* inst, char const* uniformSe
 
 void CLikeSourceEmitter::emitPhiVarAssignments(UInt argCount, IRUse* args, IRBlock* targetBlock)
 {
-    UInt argCounter = 0;
-    for (auto pp = targetBlock->getFirstParam(); pp; pp = pp->getNextParam())
+    // The basic setup here is that we are at the end of a block
+    // and are about to branch to `targetBlock`. The target block
+    // has parameters (representing the phi variables/nodes in SSA
+    // form), and the block we are branching from provided arguments
+    // (given as `args` and `argCount` here) to be passed to those
+    // parameters.
+    //
+    // An earlier step will have already emitted a local variable
+    // declaration for each phi node (block parameter), so we should
+    // be able to "pass" an argument to a parameter by assigning
+    // to the variable that represents the parameter.
+    //
+    // A naive approach would simply loop over the parameters/arguments
+    // in tandem and emit assignments like:
+    //
+    //      <param_i> = <arg_i>;
+    //
+    // This approach has an important and known failure case, which
+    // can occur when one of the arguments is also one of the parameters.
+    //
+    // If we have a block like:
+    //
+    //      block b(
+    //          param x: Int,
+    //          y: Int)
+    //          ...
+    //
+    // and then a branch to it like:
+    //
+    //      br(b, y, x);
+    //
+    // Then the naive approach for emitting the assignments for
+    // that branch would output:
+    //
+    //      x = y;
+    //      y = x;
+    //
+    // But that is not the semantics that the "parameter passing"
+    // model is meant to capture.
+    //
+    // The simplest way to restore the correct semantics would
+    // be to assign each of the arguments to a temporary, and
+    // then to assign those temporaries to the parameters:
+    //
+    //      let tmp0 = y;
+    //      let tmp1 = x;
+    //      x = tmp0;
+    //      y = tmp1;
+    //
+    // Adding temporaries like that unconditionally would clutter
+    // up the generated code, so it would be nicer to only
+    // introduce them when strictly necessary.
+    //
+    // A temporary should only be necessary when we have:
+    //
+    // * A parameter `destParam` of the `targetBlock`
+    // * Where the argument value for `destParam` is another parameter, `srcParam`, of `targetBlock`
+    // * And `srcParam` appears before `destParam` in the parameter list
+    //
+    // We start by looking for such cases, and collecting the
+    // set of block parameters that will require a defensive
+    // temporary.
+    //
+    // Note: an alternative approach would first look for a total
+    // order on the arguments/parameters such that we avoid
+    // the problem, and then only resort to introducing temporaries
+    // as a means of breaking cycles.
+    //
+    // We will track the parameters that need temporaries by
+    // building a dictionary mapping parameters to the name
+    // of the temporary they will use, if any.
+    //
+    Dictionary<IRParam*, String> mapParamToTempName;
     {
-        UInt argIndex = argCounter++;
+        // To know whether a  parameter occurs earlier in
+        // the list than another, we will rely on a set
+        // of parameters we have already "seen" during
+        // our iteration.
+        //
+        // TODO: This is a strong candidate for using a
+        // hash set optimized for a small number of entries
+        // (and thus using a stack allocation in the common case),
+        // given that most blocks will only have a handful
+        // of parameters.
+        //
+        HashSet<IRParam*> seenParams;
 
-        if (argIndex >= argCount)
+        UInt argCounter = 0;
+        for (auto destParam = targetBlock->getFirstParam(); destParam; destParam = destParam->getNextParam())
         {
-            SLANG_UNEXPECTED("not enough arguments for branch");
-            break;
-        }
+            seenParams.Add(destParam);
 
-        IRInst* arg = args[argIndex].get();
+            UInt argIndex = argCounter++;
+            if (argIndex >= argCount)
+            {
+                SLANG_UNEXPECTED("not enough arguments for branch");
+                break;
+            }
+            IRInst* arg = args[argIndex].get();
+
+            // Is the argument also a parameter of the same block?
+            //
+            // If not, then we don't have to worry about this assignment.
+            //
+            IRParam* srcParam = as<IRParam>(arg);
+            if(!srcParam)
+                continue;
+            if(srcParam->getParent() != targetBlock)
+                continue;
+
+            // Is the argument an *earlier* parameter of the same block?
+            // We test this by checking if we've already seen it during
+            // our iteration.
+            //
+            // If the parameter isn't an earlier one, then we don't have
+            // to worry about the order of assignment creating problems.
+            //
+            if(!seenParams.Contains(srcParam))
+                continue;
+
+            // At this point we've detected a problem case: the `dstParam`
+            // would naively be assigned the value of `srcParam` *after*
+            // we've already assigned to `srcParam`.
+            //
+            // We will need to avoid the problem by introducing a temporary
+            // for `srcParam`.
+            //
+            if( !mapParamToTempName.ContainsKey(srcParam) )
+            {
+                String tempName = "tmp_" + getName(srcParam);
+                mapParamToTempName.Add(srcParam, tempName);
+            }
+        }
+    }
+
+    // Now that we've determined which of the parameters could cause problems,
+    // we can do an initial round of assignments, where we move form the
+    // argument values into either a parameter (if there were no problems)
+    // or a temporary (if we needed to avoid a problem).
+    //
+    {
+        UInt argCounter = 0;
+        for (auto param = targetBlock->getFirstParam(); param; param = param->getNextParam())
+        {
+            UInt argIndex = argCounter++;
+            if (argIndex >= argCount)
+            {
+                SLANG_UNEXPECTED("not enough arguments for branch");
+                break;
+            }
+            IRInst* arg = args[argIndex].get();
+
+            auto outerPrec = getInfo(EmitOp::General);
+            auto prec = getInfo(EmitOp::Assign);
+
+            String tempName;
+            if( mapParamToTempName.TryGetValue(param, tempName) )
+            {
+                // This parameter was involved in a confounding assignment,
+                // where it was used as the argument value for a later
+                // parameter on this same branch/edge.
+                //
+                // We need to assign to a temporary instead of
+                // to the parameter itself. We will declare
+                // the temporary here so that the assignment
+                // of the argument serves as the initializer.
+                //
+                emitType(param->getFullType(), tempName);
+            }
+            else
+            {
+                // This parameter was not involved in any confounding assignments,
+                // so we can simply us the parameter itself as the left-hand side
+                // of an assignment.
+                //
+                emitOperand(param, leftSide(outerPrec, prec));
+            }
+
+            m_writer->emit(" = ");
+            emitOperand(arg, rightSide(prec, outerPrec));
+            m_writer->emit(";\n");
+        }
+    }
+
+    // Finally, after all the assignments from argument values have been completed,
+    // we will make a cleanup pass that copies from any of the temporary variables
+    // we introduced over to the parameter that needed a temporary.
+    //
+    for (auto param = targetBlock->getFirstParam(); param; param = param->getNextParam())
+    {
+        String tempName;
+        if( !mapParamToTempName.TryGetValue(param, tempName) )
+            continue;
 
         auto outerPrec = getInfo(EmitOp::General);
         auto prec = getInfo(EmitOp::Assign);
 
-        emitOperand(pp, leftSide(outerPrec, prec));
+        emitOperand(param, leftSide(outerPrec, prec));
         m_writer->emit(" = ");
-        emitOperand(arg, rightSide(prec, outerPrec));
+        m_writer->emit(tempName);
         m_writer->emit(";\n");
     }
 }

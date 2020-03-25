@@ -28,13 +28,14 @@ void main()
 
     if(uint(innerIndex_1) >= bufferCount_0)
     {
-        innerIndex_0 = int(bufferCount_0 - uint(1));
+        int _S5 = int(bufferCount_0 - uint(1));
+        innerIndex_0 = _S5;
     }
     else
     {
         innerIndex_0 = innerIndex_1;
     }
-    uint _S5 = uint(innerIndex_0);
-    ((outputBuffer_0)._data[(uint(index_0))]) = ((g_aoa_0[nonuniformEXT(index_0 >> 2)])._data[(_S5)]);
+    uint _S6 = uint(innerIndex_0);
+    ((outputBuffer_0)._data[(uint(index_0))]) = ((g_aoa_0[nonuniformEXT(index_0 >> 2)])._data[(_S6)]);
     return;
 }
