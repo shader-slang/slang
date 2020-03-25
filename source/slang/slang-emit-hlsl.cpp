@@ -504,6 +504,14 @@ void HLSLSourceEmitter::emitVectorTypeNameImpl(IRType* elementType, IRIntegerVal
     m_writer->emit(">");
 }
 
+void HLSLSourceEmitter::emitLoopControlDecorationImpl(IRLoopControlDecoration* decl)
+{
+    if (decl->getMode() == kIRLoopControl_Unroll)
+    {
+        m_writer->emit("[unroll]\n");
+    }
+}
+
 void HLSLSourceEmitter::emitSimpleValueImpl(IRInst* inst)
 {
     switch (inst->op)

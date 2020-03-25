@@ -341,6 +341,14 @@ void CUDASourceEmitter::emitCall(const HLSLIntrinsic* specOp, IRInst* inst, cons
     return Super::emitCall(specOp, inst, operands, numOperands, inOuterPrec);
 }
 
+void CUDASourceEmitter::emitLoopControlDecorationImpl(IRLoopControlDecoration* decl)
+{
+    if (decl->getMode() == kIRLoopControl_Unroll)
+    {
+        m_writer->emit("#pragma unroll\n");
+    }
+}
+
 bool CUDASourceEmitter::tryEmitInstExprImpl(IRInst* inst, const EmitOpInfo& inOuterPrec)
 {
     switch(inst->op)
