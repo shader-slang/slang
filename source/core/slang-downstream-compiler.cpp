@@ -209,9 +209,37 @@ SlangResult CommandLineDownstreamCompileResult::getHostCallableSharedLibrary(Com
     // Okay we want to load
     // Try loading the shared library
     SharedLibrary::Handle handle;
-    if (SLANG_FAILED(SharedLibrary::loadWithPlatformPath(m_moduleFilePath.getBuffer(), handle)))
+    //if (SLANG_FAILED(SharedLibrary::loadWithPlatformPath(m_moduleFilePath.getBuffer(), handle)))
     {
-        return SLANG_FAIL;
+        // The problem here *could* be that the file was written to /tmp folder, and that has been
+        // protected against execution/loading.
+
+        // Okay.. lets copy the file elsewhere, and see if we can load that.
+        StringBuilder baseName;
+        // TODO(JS): There is probly a better way to come up with a unique name... for example with a guid
+        // but we don't have full guid support, and for unix getting a good guid is not trivial either.
+        baseName << "slang-shared-library-" << ProcessUtil::getClockTick();
+
+        StringBuilder fileName;
+        SharedLibrary::appendPlatformFileName(baseName.getUnownedSlice(), fileName);
+
+        // Okay we need to copy the output file to the destination location (which won't be a temporary file location)
+
+        if (SLANG_FAILED(File::copy(fileName, m_moduleFilePath)))
+        {
+            return SLANG_FAIL;
+        }   
+
+        // Try loading from the copied to file
+        if (SLANG_FAILED(SharedLibrary::loadWithPlatformPath(fileName.getBuffer(), handle)))
+        {
+            // Delete the file
+            File::remove(fileName);
+            return SLANG_FAIL;
+        }
+
+        // Okay if this worked we add to list of temporary files
+        m_temporaryFiles->add(fileName);
     }
     // The shared library needs to keep temp files in scope
     RefPtr<TemporarySharedLibrary> sharedLib(new TemporarySharedLibrary(handle, m_moduleFilePath));

@@ -11,15 +11,17 @@ namespace Slang
 	class File
 	{
 	public:
-		static bool exists(const Slang::String& fileName);
-		static Slang::String readAllText(const Slang::String& fileName);
-		static Slang::List<unsigned char> readAllBytes(const Slang::String& fileName);
-		static void writeAllText(const Slang::String& fileName, const Slang::String& text);
+		static bool exists(const String& fileName);
+		static Slang::String readAllText(const String& fileName);
+		static Slang::List<unsigned char> readAllBytes(const String& fileName);
+		static void writeAllText(const String& fileName, const String& text);
         static SlangResult remove(const String& fileName);
+
+        static SlangResult copy(const String& dstPath, const String& srcPath);
 
         static SlangResult makeExecutable(const String& fileName);
 
-        static SlangResult generateTemporary(const UnownedStringSlice& prefix, Slang::String& outFileName);
+        static SlangResult generateTemporary(const UnownedStringSlice& prefix, String& outFileName);
 	};
 
 	class Path

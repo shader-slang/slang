@@ -32,6 +32,55 @@
 namespace Slang
 {
 
+    /* static */SlangResult File::copy(const String& dstPath, const String& srcPath)
+    {
+#if defined(_WIN32) 
+        return CopyFileA(srcPath.getBuffer(), dstPath.getBuffer(), true) ? SLANG_OK : SLANG_FAIL;
+#else
+        FILE* srcFile = fopen(srcPath.getBuffer(), "rb");
+        if (!srcFile)
+        {
+            return SLANG_E_NOT_FOUND;
+        }
+        FILE* dstFile = fopen(dstPath.getBuffer(), "wb");
+        if (!dstFile)
+        {
+            fclose(srcFile);
+            return SLANG_FAIL;
+        }
+
+        char buffer[8192];
+
+        while (true)
+        {
+            size_t readSize = fread(buffer, 1, SLANG_COUNT_OF(buffer), srcFile);
+            if (readSize == 0)
+            {
+                break;
+            }
+
+            // Write
+            size_t writeSize = fwrite(buffer, 1, readSize, dstFile);
+            if (writeSize != readSize)
+            {
+                fclose(dstFile);
+                fclose(srcFile);
+
+                // Delete the dst file
+                remove(dstPath.getBuffer());
+                return SLANG_FAIL;
+            }
+        }
+
+        fclose(dstFile);
+        fclose(srcFile);
+
+        return SLANG_OK;
+#endif
+    }
+
+
+
     /* static */SlangResult File::remove(const String& fileName)
     {
 #ifdef _WIN32
