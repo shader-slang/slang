@@ -2619,12 +2619,8 @@ void CLikeSourceEmitter::emitRegion(Region* inRegion)
                                 m_writer->emit("SLANG_UNROLL\n");
                                 break;
                             }
-                            default:
-                            {
-                                break;
-                            }
+                            default: break;
                         }
-                        break;
                     }
                 }
 
