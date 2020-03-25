@@ -1393,10 +1393,20 @@ namespace Slang
         decl->initExpr = declaratorInfo.initializer;
     }
 
-    static RefPtr<Declarator> ParseDeclarator(Parser* parser);
+    typedef unsigned int DeclaratorParseOptions;
+    enum
+    {
+        kDeclaratorParseOptions_None = 0,
+        kDeclaratorParseOption_AllowEmpty = 1 << 0,
+    };
 
-    static RefPtr<Declarator> ParseDirectAbstractDeclarator(
-        Parser* parser)
+    static RefPtr<Declarator> parseDeclarator(
+        Parser*                 parser,
+        DeclaratorParseOptions  options);
+
+    static RefPtr<Declarator> parseDirectAbstractDeclarator(
+        Parser*                 parser,
+        DeclaratorParseOptions  options)
     {
         RefPtr<Declarator> declarator;
         switch( parser->tokenReader.peekTokenType() )
@@ -1425,14 +1435,31 @@ namespace Slang
                 //
                 // The difference really doesn't matter right now, but we err in
                 // the direction of assuming the second case.
+                //
+                // TODO: We should consider just not supporting this case at all,
+                // since it can't come up in current Slang (no pointer or function-type
+                // support), and we might be able to introduce alternative syntax
+                // to get around these issues when those features come online.
+                //
                 parser->ReadToken(TokenType::LParent);
-                declarator = ParseDeclarator(parser);
+                declarator = parseDeclarator(parser, options);
                 parser->ReadToken(TokenType::RParent);
             }
             break;
 
         default:
-            // an empty declarator is allowed
+            if(options & kDeclaratorParseOption_AllowEmpty)
+            {
+                // an empty declarator is allowed
+            }
+            else
+            {
+                // If an empty declarator is now allowed, then we
+                // will give the user an error message saying that
+                // an identifier was expected.
+                //
+                expectIdentifier(parser);
+            }
             return nullptr;
         }
 
@@ -1473,8 +1500,9 @@ namespace Slang
     }
 
     // Parse a declarator (or at least as much of one as we support)
-    static RefPtr<Declarator> ParseDeclarator(
-        Parser* parser)
+    static RefPtr<Declarator> parseDeclarator(
+        Parser*                 parser,
+        DeclaratorParseOptions  options)
     {
         if( parser->tokenReader.peekTokenType() == TokenType::OpMul )
         {
@@ -1486,38 +1514,40 @@ namespace Slang
 
             // TODO(tfoley): allow qualifiers like `const` here?
 
-            ptrDeclarator->inner = ParseDeclarator(parser);
+            ptrDeclarator->inner = parseDeclarator(parser, options);
             return ptrDeclarator;
         }
         else
         {
-            return ParseDirectAbstractDeclarator(parser);
+            return parseDirectAbstractDeclarator(parser, options);
         }
     }
 
     // A declarator plus optional semantics and initializer
     struct InitDeclarator
     {
-        RefPtr<Declarator>				declarator;
-        RefPtr<Modifier>				semantics;
-        RefPtr<Expr>	initializer;
+        RefPtr<Declarator>  declarator;
+        RefPtr<Modifier>    semantics;
+        RefPtr<Expr>        initializer;
     };
 
     // Parse a declarator plus optional semantics
-    static InitDeclarator ParseSemanticDeclarator(
-        Parser* parser)
+    static InitDeclarator parseSemanticDeclarator(
+        Parser*                 parser,
+        DeclaratorParseOptions  options)
     {
         InitDeclarator result;
-        result.declarator = ParseDeclarator(parser);
+        result.declarator = parseDeclarator(parser, options);
         result.semantics = ParseOptSemantics(parser);
         return result;
     }
 
     // Parse a declarator plus optional semantics and initializer
-    static InitDeclarator ParseInitDeclarator(
-        Parser* parser)
+    static InitDeclarator parseInitDeclarator(
+        Parser*                 parser,
+        DeclaratorParseOptions  options)
     {
-        InitDeclarator result = ParseSemanticDeclarator(parser);
+        InitDeclarator result = parseSemanticDeclarator(parser, options);
         if (AdvanceIf(parser, TokenType::OpAssign))
         {
             result.initializer = parser->ParseInitExpr();
@@ -1981,7 +2011,7 @@ namespace Slang
         }
 
 
-        InitDeclarator initDeclarator = ParseInitDeclarator(parser);
+        InitDeclarator initDeclarator = parseInitDeclarator(parser, kDeclaratorParseOptions_None);
 
         DeclaratorInfo declaratorInfo;
         declaratorInfo.typeSpec = typeSpec.expr;
@@ -2069,7 +2099,7 @@ namespace Slang
             }
 
             // expect another variable declaration...
-            initDeclarator = ParseInitDeclarator(parser);
+            initDeclarator = parseInitDeclarator(parser, kDeclaratorParseOptions_None);
         }
     }
 
@@ -3275,8 +3305,6 @@ namespace Slang
         RefPtr<Stmt> statement;
         if (LookAheadToken(TokenType::LBrace))
             statement = parseBlockStatement();
-        else if (peekTypeName(this))
-            statement = parseVarDeclrStatement(modifiers);
         else if (LookAheadToken("if"))
             statement = parseIfStatement();
         else if (LookAheadToken("for"))
@@ -3314,16 +3342,49 @@ namespace Slang
             // expression statement, and we need to figure out which.
             //
             // We'll solve this with backtracking for now.
+            //
+            // TODO: This should not require backtracking at all.
 
             TokenReader::ParsingCursor startPos = tokenReader.getCursor();
 
             // Try to parse a type (knowing that the type grammar is
             // a subset of the expression grammar, and so this should
             // always succeed).
+            //
+            // HACK: The type grammar that `ParseType` supports is *not*
+            // a subset of the expression grammar because it includes
+            // type specififers like `struct` and `enum` declarations
+            // which should always be the start of a declaration.
+            //
+            // TODO: Before launching into this attempt to parse a type,
+            // this logic should really be looking up the `SyntaxDecl`,
+            // if any, assocaited with the identifier. If a piece of
+            // syntax is discovered, then it should dictate the next
+            // steps of parsing, and only in the case where the lookahead
+            // isn't a keyword should we fall back to the approach
+            // here.
+            //
             RefPtr<Expr> type = ParseType();
+
             // We don't actually care about the type, though, so
             // don't retain it
+            //
+            // TODO: There is no reason to throw away the work we
+            // did parsing the `type` expression. Once we disambiguate
+            // what to do, we should be able to use the expression
+            // we already parsed as a starting point for whatever we
+            // parse next. E.g., if we have `A.b` and the lookahead is `+`
+            // then we can use `A.b` as the left-hand-side expression
+            // when starting to parse an infix expression.
+            //
             type = nullptr;
+
+            // TODO: If we decide to intermix parsing of statement bodies
+            // with semantic checking (by delaying the parsing of bodies
+            // until semantic context is available), then we could look
+            // at the *type* of `type` to disambiguate what to do next,
+            // which might result in a nice simplification (at the cost
+            // of definitely making the grammar context-dependent).
 
             // If the next token after we parsed a type looks like
             // we are going to declare a variable, then lets guess
@@ -3332,6 +3393,15 @@ namespace Slang
             // TODO(tfoley): this wouldn't be robust for more
             // general kinds of declarators (notably pointer declarators),
             // so we'll need to be careful about this.
+            //
+            // If the lookahead token is `*`, then we have to decide
+            // whether to parse a pointer declarator or a multiply
+            // expression. In this context it makes sense to disambiguate
+            // in favor of a pointer over a multiply, since a multiply
+            // expression can't appear at the start of a statement
+            // with any side effects.
+            //
+            //
             if (LookAheadToken(TokenType::Identifier))
             {
                 // Reset the cursor and try to parse a declaration now.
@@ -3585,7 +3655,7 @@ namespace Slang
         DeclaratorInfo declaratorInfo;
         declaratorInfo.typeSpec = ParseType();
 
-        InitDeclarator initDeclarator = ParseInitDeclarator(this);
+        InitDeclarator initDeclarator = parseInitDeclarator(this, kDeclaratorParseOption_AllowEmpty);
         UnwrapDeclarator(initDeclarator, &declaratorInfo);
 
         // Assume it is a variable-like declarator
@@ -4853,21 +4923,19 @@ namespace Slang
                 // If the token asked for is not returned found will put in recovering state, and return token found
                 Token valToken = parser->ReadToken(TokenType::IntegerLiteral);
                 // If wasn't the desired IntegerLiteral return that couldn't parse
-                if (valToken.type != TokenType::IntegerLiteral)
+                if (valToken.type == TokenType::IntegerLiteral)
                 {
-                    return nullptr;
-                }
+                    // Work out the value
+                    auto value = getIntegerLiteralValue(valToken);
 
-                // Work out the value
-                auto value = getIntegerLiteralValue(valToken);
-
-                if (nameText == "binding")
-                {
-                    attr->binding = int32_t(value);
-                }
-                else
-                {
-                    attr->set = int32_t(value);
+                    if (nameText == "binding")
+                    {
+                        attr->binding = int32_t(value);
+                    }
+                    else
+                    {
+                        attr->set = int32_t(value);
+                    }
                 }
             }
             else

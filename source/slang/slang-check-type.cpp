@@ -86,7 +86,7 @@ namespace Slang
             return expr;
         }
 
-        getSink()->diagnose(expr, Diagnostics::unimplemented, "expected a type");
+        getSink()->diagnose(expr, Diagnostics::expectedAType, expr->type);
         return CreateErrorExpr(expr);
     }
 

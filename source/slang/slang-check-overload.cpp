@@ -849,25 +849,11 @@ namespace Slang
     }
 
     void SemanticsVisitor::AddFuncOverloadCandidate(
-        RefPtr<FuncType>		/*funcType*/,
-        OverloadResolveContext&	/*context*/)
+        RefPtr<FuncType>        funcType,
+        OverloadResolveContext& context)
     {
-#if 0
-        if (funcType->decl)
-        {
-            AddFuncOverloadCandidate(funcType->decl, context);
-        }
-        else if (funcType->Func)
-        {
-            AddFuncOverloadCandidate(funcType->Func->SyntaxNode, context);
-        }
-        else if (funcType->Component)
-        {
-            AddComponentFuncOverloadCandidate(funcType->Component, context);
-        }
-#else
-        throw "unimplemented";
-#endif
+        SLANG_UNUSED(funcType);
+        getSink()->diagnose(context.loc, Diagnostics::unimplemented, "call on expression of function type");
     }
 
     void SemanticsVisitor::AddCtorOverloadCandidate(
@@ -1093,9 +1079,19 @@ namespace Slang
     }
 
     void SemanticsVisitor::AddOverloadCandidates(
-        RefPtr<Expr>	funcExpr,
-        OverloadResolveContext&			context)
+        RefPtr<Expr>            funcExpr,
+        OverloadResolveContext& context)
     {
+        // A call of the form `(<something>)(<args>)` should be
+        // resolved as if the user wrote `<something>(<args>)`,
+        // so that we avoid introducing intermediate expressions
+        // of function type in cases where they are not needed.
+        //
+        while(auto parenExpr = as<ParenExpr>(funcExpr))
+        {
+            funcExpr = parenExpr->base;
+        }
+
         auto funcExprType = funcExpr->type;
 
         if (auto declRefExpr = as<DeclRefExpr>(funcExpr))
