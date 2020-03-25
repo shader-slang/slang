@@ -34,7 +34,7 @@ Items with ^ means there is some discussion about support later in the document 
 | tex.Load                    |     Yes      |   Yes        |   Yes      |  Limited ^    |    Yes
 | Full bool                   |     Yes      |   Yes        |   Yes      |     No        |    Yes ^ 
 | Mesh Shader                 |     No       |   No +       |   No +     |     No        |    No
-| `[unroll]`                  |     Yes      |   Yes        |   No +     |     Yes       |    Limited + 
+| `[unroll]`                  |     Yes      |   Yes        |   Yes ^    |     Yes       |    Limited + 
 
 ## Half Type
 
@@ -120,7 +120,9 @@ On CPU there are some issues in so far as bool's size is not well defined in siz
 
 The unroll attribute allows for unrolling `for` loops. At the moment the feature is dependent on downstream compiler support which is mixed. In the longer term the intention is for Slang to contain it's own loop unroller - and therefore not be dependent on the feature on downstream compilers. 
 
-On C++ this attribute becomes SLANG_UNROLL which is defined in the prelude. This can be predefined if there is a suitable mechanism.  
+On C++ this attribute becomes SLANG_UNROLL which is defined in the prelude. This can be predefined if there is a suitable mechanism, if there isn't a definition SLANG_UNROLL will be an empty definition. 
 
-Slang does have a mechanism to [unroll loops directly within Slang code](languge-reference/06-statements.md), in the section `Compile-Time For Statement`.
+On GLSL and VK targets loop unrolling uses the [GL_EXT_control_flow_attributes](https://github.com/KhronosGroup/GLSL/blob/master/extensions/ext/GL_EXT_control_flow_attributes.txt) extension.
+
+Slang does have a cross target mechanism to [unroll loops](language-reference/06-statements.md), in the section `Compile-Time For Statement`.
 

@@ -668,6 +668,16 @@ void GLSLSourceEmitter::_maybeEmitGLSLFlatModifier(IRType* valueType)
     }
 }
 
+void GLSLSourceEmitter::emitLoopControlDecorationImpl(IRLoopControlDecoration* decl)
+{
+    if (decl->getMode() == kIRLoopControl_Unroll)
+    {
+        // https://github.com/KhronosGroup/GLSL/blob/master/extensions/ext/GL_EXT_control_flow_attributes.txt
+        m_glslExtensionTracker->requireExtension(UnownedStringSlice::fromLiteral("GL_EXT_control_flow_attributes"));
+        m_writer->emit("[[unroll]]\n");
+    }
+}
+
 void GLSLSourceEmitter::emitSimpleValueImpl(IRInst* inst) 
 {
     switch (inst->op)

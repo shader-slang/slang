@@ -79,6 +79,7 @@ protected:
     virtual bool tryEmitGlobalParamImpl(IRGlobalParam* varDecl, IRType* varType) SLANG_OVERRIDE;
     virtual void emitIntrinsicCallExprImpl(IRCall* inst, IRTargetIntrinsicDecoration* targetIntrinsic, EmitOpInfo const& inOuterPrec) SLANG_OVERRIDE;
 
+    virtual void emitLoopControlDecorationImpl(IRLoopControlDecoration* decl) SLANG_OVERRIDE;
 
     // Replaceable for classes derived from CPPSourceEmitter
     virtual SlangResult calcTypeName(IRType* type, CodeGenTarget target, StringBuilder& out);
