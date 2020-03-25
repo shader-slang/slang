@@ -309,7 +309,12 @@ SlangResult NVRTCDownstreamCompiler::compile(const CompileOptions& options, RefP
         cmdLine.addArg("-w");
 
         //
+#if 0
         cmdLine.addArg("-arch=compute_70");
+#else
+        // Needed for Warp intrinsics
+        cmdLine.addArg("-arch=compute_30");
+#endif
     }
 
     nvrtcProgram program = nullptr;
