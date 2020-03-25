@@ -1868,6 +1868,15 @@ void CPPSourceEmitter::emitIntrinsicCallExprImpl(
     return Super::emitIntrinsicCallExprImpl(inst, targetIntrinsic, inOuterPrec);
 }
 
+void CPPSourceEmitter::emitLoopControlDecorationImpl(IRLoopControlDecoration* decl)
+{
+    if (decl->getMode() == kIRLoopControl_Unroll)
+    {
+        // This relies on a suitable definition in slang-cpp-prelude.h or defined in C++ compiler invocation.
+        m_writer->emit("SLANG_UNROLL\n");
+    }
+}
+
 bool CPPSourceEmitter::_tryEmitInstExprAsIntrinsic(IRInst* inst, const EmitOpInfo& inOuterPrec)
 {
     HLSLIntrinsic* specOp = m_intrinsicSet.add(inst);

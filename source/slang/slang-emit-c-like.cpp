@@ -2784,20 +2784,8 @@ void CLikeSourceEmitter::emitRegion(Region* inRegion)
                 //
                 if (auto loopControlDecoration = loopInst->findDecoration<IRLoopControlDecoration>())
                 {
-                    switch (loopControlDecoration->getMode())
-                    {
-                    case kIRLoopControl_Unroll:
-                        // Note: loop unrolling control is only available in HLSL, not GLSL
-                        if(getSourceStyle() == SourceStyle::HLSL)
-                        {
-                            m_writer->emit("[unroll]\n");
-                        }
-                        break;
-
-                    default:
-                        break;
-                    }
-                }
+                    emitLoopControlDecorationImpl(loopControlDecoration);
+               }
 
                 m_writer->emit("for(;;)\n{\n");
                 m_writer->indent();

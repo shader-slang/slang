@@ -54,6 +54,7 @@ struct TestOptions
     // The categories that this test was assigned to
     List<TestCategory*> categories;
 
+    bool isEnabled = true;
     bool isSynthesized = false;
 };
 
@@ -303,6 +304,8 @@ static TestResult _gatherTestOptions(
         {
         case 0: case '\r': case '\n':
             skipToEndOfLine(&cursor);
+
+            *ioCursor = cursor;
             return TestResult::Pass;
 
         default:
@@ -348,7 +351,6 @@ TestResult gatherTestsForFile(
         return TestResult::Fail;
     }
 
-
     // Walk through the lines of the file, looking for test commands
     char const* cursor = fileContents.begin();
 
@@ -358,24 +360,33 @@ TestResult gatherTestsForFile(
 
         skipHorizontalSpace(&cursor);
 
+        if(!match(&cursor, "//"))
+        {
+            skipToEndOfLine(&cursor);
+            continue;
+        }
+
         // Look for a pattern that matches what we want
-        if(match(&cursor, "//TEST_IGNORE_FILE"))
+        if (match(&cursor, "TEST_IGNORE_FILE"))
         {
             return TestResult::Ignored;
         }
-        else if(match(&cursor, "//TEST"))
-        {
-            TestDetails testDetails;
 
+        TestDetails testDetails;
+        if (match(&cursor, "DISABLE_"))
+        {
+            testDetails.options.isEnabled = false;
+        }
+
+        if(match(&cursor, "TEST"))
+        { 
             if(_gatherTestOptions(categorySet, &cursor, testDetails.options) != TestResult::Pass)
                 return TestResult::Fail;
 
             testList->tests.add(testDetails);
         }
-        else if (match(&cursor, "//DIAGNOSTIC_TEST"))
+        else if (match(&cursor, "DIAGNOSTIC_TEST"))
         {
-            TestDetails testDetails;
-            
             if (_gatherTestOptions(categorySet, &cursor, testDetails.options) != TestResult::Pass)
                 return TestResult::Fail;
 
@@ -2779,9 +2790,15 @@ static void _calcSynthesizedTests(TestContext* context, RenderApiType synthRende
     }
 }
 
-static bool _canIgnore(TestContext* context,
-    const TestRequirements& requirements)
+static bool _canIgnore(TestContext* context, const TestDetails& details)
 {
+    if (details.options.isEnabled == false)
+    {
+        return true;
+    }
+
+    const auto& requirements = details.requirements;
+
     // Work out what render api flags are available
     const RenderApiFlags availableRenderApiFlags = requirements.usedRenderApiFlags ? _getAvailableRenderApiFlags(context) : 0;
 
@@ -2933,7 +2950,7 @@ void runTestsOnFile(
             TestResult testResult = TestResult::Fail;
 
             // If this test can be ignored
-            if (_canIgnore(context, testDetails.requirements))
+            if (_canIgnore(context, testDetails))
             {
                 testResult = TestResult::Ignored;
             }

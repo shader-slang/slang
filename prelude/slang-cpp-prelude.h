@@ -34,4 +34,8 @@
 #   pragma warning(disable : 4700)
 #endif
 
+#ifndef SLANG_UNROLL
+#   define SLANG_UNROLL
+#endif
+
 #endif

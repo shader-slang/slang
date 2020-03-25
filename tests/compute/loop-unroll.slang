@@ -1,7 +1,15 @@
 //TEST(compute):COMPARE_COMPUTE:
+//TEST(compute):COMPARE_COMPUTE:-dx12 
+//TODO(JS): This test fails with a crash in CreateComputePipelineState, so disabled for now
+//DISABLE_TEST(compute):COMPARE_COMPUTE:-dx12 -use-dxil
+//TEST(compute):COMPARE_COMPUTE:-cpu
+//TEST(compute):COMPARE_COMPUTE:-cuda
+// Note VK output is not loop unrolled
+//TEST(compute):COMPARE_COMPUTE:-vk
 
-//TEST_INPUT:ubuffer(data=[0 1 2 3], stride=4):out
-//TEST_INPUT:ubuffer(data=[1 2 3 0], stride=4):
+//TEST_INPUT:ubuffer(data=[0 0 0 0], stride=4):out, name buffers[0]
+//TEST_INPUT:ubuffer(data=[0 1 2 3], stride=4):name buffers[1]
+//TEST_INPUT:ubuffer(data=[1 2 3 0], stride=4):name buffers[2]
 
 // Check that we propagate the `[unroll]` attribute
 // through to HLSL output correctly.
@@ -10,7 +18,7 @@
 // it will generate a warning output from fxc, and the
 // test will fail to match the expected output.
 
-RWStructuredBuffer<int> buffers[2];
+RWStructuredBuffer<int> buffers[3];
 
 [numthreads(4, 1, 1)]
 void computeMain(uint3 dispatchThreadID : SV_DispatchThreadID)
@@ -20,12 +28,12 @@ void computeMain(uint3 dispatchThreadID : SV_DispatchThreadID)
 	// Note: using `unroll` as a variable name to validate that
 	// the lookup process for attribute names doesn't run into
 	// problems because of local declarations with the same name.
-	int unroll = buffers[1][tid];
+	int unroll = buffers[2][tid];
 
 	[unroll]
 	for(int ii = 0; ii < 2; ii++)
 	{
-		unroll = buffers[ii][unroll];
+		unroll = buffers[ii + 1][unroll];
 	}
 
 	buffers[0][tid] = unroll;
