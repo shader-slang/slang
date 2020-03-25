@@ -6,7 +6,8 @@
 //TEST(compute):COMPARE_COMPUTE_EX:-slang -compute -dx12 -profile cs_6_0 -use-dxil -output-using-type
 // TODO(JS): Doesn't work on vk currently, because createTextureView not implemented on vk renderer
 //DISABLE_TEST(compute, vulkan):COMPARE_COMPUTE_EX:-vk -compute -output-using-type
-//TEST(compute):COMPARE_COMPUTE_EX:-cuda -compute -output-using-type
+// TODO(JS): Doesn't work on certain CI systems. 
+//DISABLE_TEST(compute):COMPARE_COMPUTE_EX:-cuda -compute -output-using-type
 
 //TEST_INPUT: RWTexture1D(format=R_Float32, size=4, content = one):name rwt1D
 RWTexture1D<float> rwt1D;

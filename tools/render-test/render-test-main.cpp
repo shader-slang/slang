@@ -406,7 +406,7 @@ Result RenderTestApp::update(Window* window)
 
 } //  namespace renderer_test
 
-SLANG_TEST_TOOL_API SlangResult innerMain(Slang::StdWriters* stdWriters, SlangSession* session, int argcIn, const char*const* argvIn)
+static SlangResult _innerMain(Slang::StdWriters* stdWriters, SlangSession* session, int argcIn, const char*const* argvIn)
 {
     using namespace renderer_test;
     using namespace Slang;
@@ -692,6 +692,29 @@ SLANG_TEST_TOOL_API SlangResult innerMain(Slang::StdWriters* stdWriters, SlangSe
         window->show();
         return window->runLoop(app);
 	}
+}
+
+SLANG_TEST_TOOL_API SlangResult innerMain(Slang::StdWriters* stdWriters, SlangSession* session, int argcIn, const char*const* argvIn)
+{
+    using namespace Slang;
+
+    SlangResult res = SLANG_FAIL;
+    try
+    {
+        res = _innerMain(stdWriters, session, argcIn, argvIn);
+    }
+    catch (const Slang::Exception& exception)
+    {
+        stdWriters->getOut().put(exception.Message.getUnownedSlice());
+        return SLANG_FAIL;
+    }
+    catch (...)
+    {
+        stdWriters->getOut().put(UnownedStringSlice::fromLiteral("Unhandled exception"));
+        return SLANG_FAIL;
+    }
+
+    return res;
 }
 
 int main(int argc, char**  argv)
