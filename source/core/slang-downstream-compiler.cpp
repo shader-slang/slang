@@ -209,7 +209,7 @@ SlangResult CommandLineDownstreamCompileResult::getHostCallableSharedLibrary(Com
     // Okay we want to load
     // Try loading the shared library
     SharedLibrary::Handle handle;
-    //if (SLANG_FAILED(SharedLibrary::loadWithPlatformPath(m_moduleFilePath.getBuffer(), handle)))
+    if (SLANG_FAILED(SharedLibrary::loadWithPlatformPath(m_moduleFilePath.getBuffer(), handle)))
     {
         // The problem here *could* be that the file was written to /tmp folder, and that has been
         // protected against execution/loading.
