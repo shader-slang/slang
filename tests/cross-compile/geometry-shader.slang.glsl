@@ -91,7 +91,8 @@ void main()
 
         EmitVertex();
 
-        ii_0 = ii_0 + 1;
+        int _S9 = ii_0 + 1;
+        ii_0 = _S9;
     }
 
     return;
