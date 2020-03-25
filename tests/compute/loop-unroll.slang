@@ -1,6 +1,6 @@
 //TEST(compute):COMPARE_COMPUTE:
 //TEST(compute):COMPARE_COMPUTE:-dx12 
-//TODO(JS): This test fails on binding with a crash(!)
+//TODO(JS): This test fails with a crash in CreateComputePipelineState, so disabled for now
 //DISABLE_TEST(compute):COMPARE_COMPUTE:-dx12 -use-dxil
 //TEST(compute):COMPARE_COMPUTE:-cpu
 //TEST(compute):COMPARE_COMPUTE:-cuda
