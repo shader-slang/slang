@@ -30,5 +30,24 @@ namespace Slang
     return defaults;
 }
 
+void handleResultFail(SlangResult res, const char* file, int line)
+{
+    StringBuilder builder;
+
+    builder << "Error: " << file << " (" << line << ") : ";
+    builder << res;
+
+    // Where to write to?
+    auto writers = StdWriters::getSingleton();
+    if (writers && writers->getWriter(SLANG_WRITER_CHANNEL_STD_ERROR))
+    {
+        writers->getOut().put(builder.getUnownedSlice());
+    }
+    else
+    {
+        fprintf(stderr, "%s\n", builder.getBuffer());
+    }
+}
+
 }
 

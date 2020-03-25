@@ -12,6 +12,13 @@
 #define SLANG_PRELUDE_NAMESPACE CPPPrelude
 #include "../../prelude/slang-cpp-types.h"
 
+namespace Slang {
+void handleResultFail(SlangResult res, const char* file, int line);
+}
+
+#undef SLANG_HANDLE_RESULT_FAIL
+#define SLANG_HANDLE_RESULT_FAIL(x) ::Slang::handleResultFail(x, __FILE__, __LINE__)
+
 namespace renderer_test {
 using namespace Slang;
 
