@@ -851,7 +851,7 @@ __inline__ __device__ T _waveReadFirstMultiple(T inVal)
 }
 
 template <typename T>
-__inline__ __device__ T _waveReadLaneAtMultiple(T inVal, int lane)
+__inline__ __device__ T _waveShuffleMultiple(T inVal, int lane)
 {
     typedef typename ElementTypeTrait<T>::Type ElemType;
     const size_t count = sizeof(T) / sizeof(ElemType);

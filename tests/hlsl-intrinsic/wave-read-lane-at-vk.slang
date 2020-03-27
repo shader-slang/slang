@@ -2,8 +2,7 @@
 // We have this 'simple' test, because we can't do matrix (or imat) operations on GLSL/Vk target
 
 //TEST(compute):COMPARE_COMPUTE_EX:-slang -compute -dx12 -use-dxil -profile cs_6_0
-// TODO(JS): Disabled for now, as requires upgraded glslang
-//DISABLE_TEST(compute, vulkan):COMPARE_COMPUTE_EX:-vk -compute
+//TEST(compute, vulkan):COMPARE_COMPUTE_EX:-vk -compute
 
 //TEST_INPUT:ubuffer(data=[0 0 0 0], stride=4):out,name outputBuffer
 RWStructuredBuffer<int> outputBuffer;

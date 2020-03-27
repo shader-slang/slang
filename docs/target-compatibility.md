@@ -20,7 +20,7 @@ Items with ^ means there is some discussion about support later in the document 
 | SM6.0 Wave Intrinsics       |     No       |   Yes        |  Partial   |     Yes       |    No
 | SM6.0 Quad Intrinsics       |     No       |   Yes        |   No +     |     No        |    No
 | SM6.5 Wave Intrinsics       |     No       |   Yes ^      |   No +     |     Yes       |    No
-| WaveShuffle                 |     No       |   Limited ^  |   Yes +    |     Yes       |    No
+| WaveShuffle                 |     No       |   Limited ^  |   Yes      |     Yes       |    No
 | Tesselation                 |     Yes ^    |   Yes ^      |   No +     |     No        |    No
 | Graphics Pipeline           |     Yes      |   Yes        |   Yes      |     No        |    No
 | Ray Tracing DXR 1.0         |     No       |   Yes ^      |   Yes ^    |     No        |    No
@@ -59,13 +59,23 @@ SM6.5 Wave Intrinsics are supported, but requires a downstream DXC compiler that
 
 ## WaveShuffle
 
-WaveShuffle is an intrinsic added to the Slang stdlibrary to expose the glsl `subgroupShuffle` intrinsics and allow loosened requirements on laneId. 
+`WaveShuffle` and `WaveBroadcastLaneAt` are Slang specific intrinsic additions to expand the options available around `WaveReadLaneAt`. 
 
-`HLSL` uses `WaveReadLaneAt` and this requires the `laneId` must be 'dynamically uniform' across the wave. WaveShuffle has the same functionality but relaxes this restriction. 
+To be clear this means they will not compile directly on 'standard' HLSL compilers such as `dxc`, but Slang HLSL *output* (which will not contain these intrinsics) can (and typically is) compiled via dxc.
 
-`WaveReadLaneAt` most obviously maps to `subgroupBroadcast` in GLSL. This has the extra restriction the index must be compile time consts. With SPIR-V 1.5 it is allowed to be 'dynamically uniform', but doesn't work on current glslang.
+The difference between them can be summarized as follows
 
-NOTE! That using WaveShuffle to target `HLSL` will produce `WaveReadLaneAt` - that means strictly speaking the restriction *still applies*, and the correct behavior will only be seen on hardware that allows the loosed requirements of laneId, on hardware that does not result of `WaveShuffle` is the same as `WaveReadLaneId` which is undefined. 
+* WaveBroadcastLaneAt - laneId must be a compile time constant 
+* WaveReadLaneAt - laneId can be dynamic but *MUST* be the same value across the Wave ie 'dynamically uniform' across the Wave
+* WaveShuffle - laneId can be truly dynamic (NOTE! That it is not strictly truly available currently on all targets, specifically HLSL)
+
+Other than the different restrictions on laneId they act identically to WaveReadLaneAt.
+
+`WaveBroadcastLaneAt` and `WaveReadLaneAt` will work on all targets that support wave intrinsics, with the only current restriction being that on GLSL targets, only scalars and vectors are supported.
+
+`WaveShuffle` will always work on CUDA/Vulkan. 
+
+On HLSL based targets currently `WaveShuffle` will be converted into `WaveReadLaneAt`. Strictly speaking this means it *requires* the `laneId` to be `dynamically uniform` across the Wave. In practice some hardware supports the loosened usage, and others does not. In the future this may be fixed in Slang and/or HLSL to work across all hardware. For now if you use `WaveShuffle` on HLSL based targets it will be necessary to confirm that `WaveReadLaneAt` has the loosened behavior for all the hardware intended. If target hardware does not support the loosened restrictions it's behavior is undefined. 
 
 ## Tesselation
 
