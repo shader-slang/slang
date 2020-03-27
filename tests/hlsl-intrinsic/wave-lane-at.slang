@@ -9,7 +9,7 @@
 RWStructuredBuffer<int> outputBuffer;
 
 // Note from HLSL: `The input lane index must be uniform across the wave.`. 
-// The same restriction applies to glsl/SPIR-V 1.4
+// The same restriction applies to glsl/SPIR-V 1.5
 // So we are going to use the input buffer to achieve this.
 
 //TEST_INPUT:ubuffer(data=[1 2 3 0], stride=4):name inputBuffer
