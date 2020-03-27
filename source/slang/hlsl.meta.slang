@@ -2733,12 +2733,35 @@ __target_intrinsic(cuda, "__shfl_sync(__activemask(), $0, $1)")
 T WaveReadLaneAt(T value, int lane);
 __generic<T : __BuiltinType, let N : int>
 __spirv_version(1.4)
+__glsl_extension(GL_KHR_shader_subgroup_ballot)
 __target_intrinsic(glsl, "subgroupBroadcast($0, $1)")
 __target_intrinsic(cuda, "_waveReadLaneAtMultiple($0, $1)")
 vector<T,N> WaveReadLaneAt(vector<T,N> value, int lane);
 __generic<T : __BuiltinType, let N : int, let M : int>
 __target_intrinsic(cuda, "_waveReadLaneAtMultiple($0, $1)")
 matrix<T,N,M> WaveReadLaneAt(matrix<T,N,M> value, int lane);
+
+// NOTE! WaveShuffle is a NON STANDARD HLSL intrinsic! It will map to WaveReadLaneAt on HLSL
+// which means it will only work on hardware which allows arbitrary laneIds which is not true
+// in general because it breaks the HLSL standard, which requires it's 'dynamically uniform' across the Wave.
+__generic<T : __BuiltinType>
+__glsl_extension(GL_KHR_shader_subgroup_shuffle)
+__spirv_version(1.3)
+__target_intrinsic(glsl, "subgroupShuffle($0, $1)")
+__target_intrinsic(cuda, "__shfl_sync(__activemask(), $0, $1)")
+__target_intrinsic(hlsl, "WaveReadLaneAt")
+T WaveShuffle(T value, int lane);
+__generic<T : __BuiltinType, let N : int>
+__glsl_extension(GL_KHR_shader_subgroup_shuffle)
+__spirv_version(1.3)
+__target_intrinsic(glsl, "subgroupShuffle($0, $1)")
+__target_intrinsic(cuda, "_waveReadLaneAtMultiple($0, $1)")
+__target_intrinsic(hlsl, "WaveReadLaneAt")
+vector<T,N> WaveShuffle(vector<T,N> value, int lane);
+__generic<T : __BuiltinType, let N : int, let M : int>
+__target_intrinsic(cuda, "_waveReadLaneAtMultiple($0, $1)")
+__target_intrinsic(hlsl, "WaveReadLaneAt")
+matrix<T,N,M> WaveShuffle(matrix<T,N,M> value, int lane);
 
 __glsl_extension(GL_KHR_shader_subgroup_ballot)
 __spirv_version(1.3)
