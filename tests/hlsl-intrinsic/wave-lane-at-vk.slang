@@ -1,14 +1,14 @@
-//DISABLE_TEST(compute):COMPARE_COMPUTE_EX:-cpu -compute 
-//DISABLE_TEST(compute):COMPARE_COMPUTE_EX:-slang -compute
+// This is similar to wave-lane-at.slang but tests more limited supported types for vk.
+// We have this 'simple' test, because we can't do matrix (or imat) operations on GLSL/Vk target
+
 //TEST(compute):COMPARE_COMPUTE_EX:-slang -compute -dx12 -use-dxil -profile cs_6_0
-// Disabled on VK because glsl can't do WaveReadLaneAt on matrix. 
+// TODO(JS): Disabled for now, as requires upgraded glslang
 //DISABLE_TEST(compute, vulkan):COMPARE_COMPUTE_EX:-vk -compute
-//TEST(compute):COMPARE_COMPUTE_EX:-cuda -compute
 
 //TEST_INPUT:ubuffer(data=[0 0 0 0], stride=4):out,name outputBuffer
 RWStructuredBuffer<int> outputBuffer;
 
-// Note from HLSL: `The input lane index must be uniform across the wave.`. 
+// `The input lane index must be uniform across the wave.`. 
 // The same restriction applies to glsl/SPIR-V 1.4
 // So we are going to use the input buffer to achieve this.
 
@@ -38,17 +38,8 @@ void computeMain(uint3 dispatchThreadID : SV_DispatchThreadID)
             float2 readValue = WaveReadLaneAt(v, (laneId + 1) & 3);
             
             value += int(readValue[0] + readValue[1]);
-        }
-            
-        // matrix
-        {
-            matrix<int, 2, 2> v = matrix<int, 2, 2>(idx, idx - 1, idx * 3, idx - 2);
-            
-            matrix<int, 2, 2> readValue = WaveReadLaneAt(v, (laneId - 1) & 3);
-            
-            value += int(readValue[0][0] + readValue[0][1] + readValue[1][0] + readValue[1][1]);
-        }
+        }            
     }
-    
+   
     outputBuffer[idx] = value;
 }
