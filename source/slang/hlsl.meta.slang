@@ -2728,18 +2728,20 @@ matrix<T,N,M> WaveReadLaneFirst(matrix<T,N,M> expr);
 // If that's the behavior required then client code should use WaveReadLaneAt which works this way.
 __generic<T : __BuiltinType>
 __glsl_extension(GL_KHR_shader_subgroup_ballot)
+__spirv_version(1.3)
 __target_intrinsic(glsl, "subgroupBroadcast($0, $1)")
 __target_intrinsic(cuda, "__shfl_sync(__activemask(), $0, $1)")
 __target_intrinsic(hlsl, "WaveReadLaneAt")
 T WaveBroadcastLaneAt(T value, constexpr int lane);
 __generic<T : __BuiltinType, let N : int>
 __glsl_extension(GL_KHR_shader_subgroup_ballot)
+__spirv_version(1.3)
 __target_intrinsic(glsl, "subgroupBroadcast($0, $1)")
-__target_intrinsic(cuda, "_waveReadLaneAtMultiple($0, $1)")
+__target_intrinsic(cuda, "_waveShuffleMultiple($0, $1)")
 __target_intrinsic(hlsl, "WaveReadLaneAt")
 vector<T,N> WaveBroadcastLaneAt(vector<T,N> value, constexpr int lane);
 __generic<T : __BuiltinType, let N : int, let M : int>
-__target_intrinsic(cuda, "_waveReadLaneAtMultiple($0, $1)")
+__target_intrinsic(cuda, "_waveShuffleMultiple($0, $1)")
 __target_intrinsic(hlsl, "WaveReadLaneAt")
 matrix<T,N,M> WaveBroadcastLaneAt(matrix<T,N,M> value, constexpr int lane);
 
@@ -2755,10 +2757,10 @@ __generic<T : __BuiltinType, let N : int>
 __spirv_version(1.3)
 __glsl_extension(GL_KHR_shader_subgroup_shuffle)
 __target_intrinsic(glsl, "subgroupShuffle($0, $1)")
-__target_intrinsic(cuda, "_waveReadLaneAtMultiple($0, $1)")
+__target_intrinsic(cuda, "_waveShuffleMultiple($0, $1)")
 vector<T,N> WaveReadLaneAt(vector<T,N> value, int lane);
 __generic<T : __BuiltinType, let N : int, let M : int>
-__target_intrinsic(cuda, "_waveReadLaneAtMultiple($0, $1)")
+__target_intrinsic(cuda, "_waveShuffleMultiple($0, $1)")
 matrix<T,N,M> WaveReadLaneAt(matrix<T,N,M> value, int lane);
 
 // NOTE! WaveShuffle is a NON STANDARD HLSL intrinsic! It will map to WaveReadLaneAt on HLSL
@@ -2775,11 +2777,11 @@ __generic<T : __BuiltinType, let N : int>
 __glsl_extension(GL_KHR_shader_subgroup_shuffle)
 __spirv_version(1.3)
 __target_intrinsic(glsl, "subgroupShuffle($0, $1)")
-__target_intrinsic(cuda, "_waveReadLaneAtMultiple($0, $1)")
+__target_intrinsic(cuda, "_waveShuffleMultiple($0, $1)")
 __target_intrinsic(hlsl, "WaveReadLaneAt")
 vector<T,N> WaveShuffle(vector<T,N> value, int lane);
 __generic<T : __BuiltinType, let N : int, let M : int>
-__target_intrinsic(cuda, "_waveReadLaneAtMultiple($0, $1)")
+__target_intrinsic(cuda, "_waveShuffleMultiple($0, $1)")
 __target_intrinsic(hlsl, "WaveReadLaneAt")
 matrix<T,N,M> WaveShuffle(matrix<T,N,M> value, int lane);
 
