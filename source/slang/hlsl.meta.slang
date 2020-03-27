@@ -2722,17 +2722,17 @@ matrix<T,N,M> WaveReadLaneFirst(matrix<T,N,M> expr);
 
 // NOTE! On GLSL based targets the lane index *must* be a compile time expression!
 // See https://github.com/KhronosGroup/GLSL/blob/master/extensions/khr/GL_KHR_shader_subgroup.txt
-// It is allowed to be 'dynamically uniform within the subgroup' if it's SPIR-V 1.4.
-// TODO(JS): For now we'll use 1.4, but aim for the future for the compiler to determine
+// It is allowed to be 'dynamically uniform within the subgroup' if it's SPIR-V 1.5.
+// TODO(JS): For now we'll use 1.5, but aim for the future for the compiler to determine
 // if the line the is compile constant, and reduce requirement to 1.3
 __generic<T : __BuiltinType>
 __glsl_extension(GL_KHR_shader_subgroup_ballot)
-__spirv_version(1.4)
+__spirv_version(1.5)
 __target_intrinsic(glsl, "subgroupBroadcast($0, $1)")
 __target_intrinsic(cuda, "__shfl_sync(__activemask(), $0, $1)")
 T WaveReadLaneAt(T value, int lane);
 __generic<T : __BuiltinType, let N : int>
-__spirv_version(1.4)
+__spirv_version(1.5)
 __glsl_extension(GL_KHR_shader_subgroup_ballot)
 __target_intrinsic(glsl, "subgroupBroadcast($0, $1)")
 __target_intrinsic(cuda, "_waveReadLaneAtMultiple($0, $1)")

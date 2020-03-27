@@ -61,9 +61,11 @@ SM6.5 Wave Intrinsics are supported, but requires a downstream DXC compiler that
 
 WaveShuffle is an intrinsic added to the Slang stdlibrary to expose the glsl `subgroupShuffle` intrinsics and allow loosened requirements on laneId. 
 
-In `HLSL` requires the `laneId` must be 'dynamically uniform' across the wave. WaveShuffle has the same functionality but relaxes this restriction. 
+`HLSL` uses `WaveReadLaneAt` and this requires the `laneId` must be 'dynamically uniform' across the wave. WaveShuffle has the same functionality but relaxes this restriction. 
 
-`WaveReadLaneAt` most obviously maps to `subgroupBroadcast` in GLSL. This has the extra restriction the index must be compile time consts. With SPIR-V 1.4 it is allowed to be 'dynamically uniform', but doesn't work on current glslang.
+`WaveReadLaneAt` most obviously maps to `subgroupBroadcast` in GLSL. This has the extra restriction the index must be compile time consts. With SPIR-V 1.5 it is allowed to be 'dynamically uniform', but doesn't work on current glslang.
+
+NOTE! That using WaveShuffle to target `HLSL` will produce `WaveReadLaneAt` - that means strictly speaking the restriction *still applies*, and the correct behavior will only be seen on hardware that allows the loosed requirements of laneId, on hardware that does not result of `WaveShuffle` is the same as `WaveReadLaneId` which is undefined. 
 
 ## Tesselation
 
