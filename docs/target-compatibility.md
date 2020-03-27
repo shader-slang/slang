@@ -20,6 +20,7 @@ Items with ^ means there is some discussion about support later in the document 
 | SM6.0 Wave Intrinsics       |     No       |   Yes        |  Partial   |     Yes       |    No
 | SM6.0 Quad Intrinsics       |     No       |   Yes        |   No +     |     No        |    No
 | SM6.5 Wave Intrinsics       |     No       |   Yes ^      |   No +     |     Yes       |    No
+| WaveShuffle                 |     No       |   Limited ^  |   Yes +    |     Yes       |    No
 | Tesselation                 |     Yes ^    |   Yes ^      |   No +     |     No        |    No
 | Graphics Pipeline           |     Yes      |   Yes        |   Yes      |     No        |    No
 | Ray Tracing DXR 1.0         |     No       |   Yes ^      |   Yes ^    |     No        |    No
@@ -55,6 +56,14 @@ tex.GetDimensions is the GetDimensions method on 'texture' objects. This is not 
 ## SM6.5 Wave Intrinsics
 
 SM6.5 Wave Intrinsics are supported, but requires a downstream DXC compiler that supports SM6.5. As it stands the DXC shipping with windows does not. 
+
+## WaveShuffle
+
+WaveShuffle is an intrinsic added to the Slang stdlibrary to expose the glsl `subgroupShuffle` intrinsics and allow loosened requirements on laneId. 
+
+In `HLSL` requires the `laneId` must be 'dynamically uniform' across the wave. WaveShuffle has the same functionality but relaxes this restriction. 
+
+`WaveReadLaneAt` most obviously maps to `subgroupBroadcast` in GLSL. This has the extra restriction the index must be compile time consts. With SPIR-V 1.4 it is allowed to be 'dynamically uniform', but doesn't work on current glslang.
 
 ## Tesselation
 
