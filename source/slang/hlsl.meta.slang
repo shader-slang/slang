@@ -2720,21 +2720,41 @@ __generic<T : __BuiltinType, let N : int, let M : int>
 __target_intrinsic(cuda, "_waveReadFirstMultiple($0)")
 matrix<T,N,M> WaveReadLaneFirst(matrix<T,N,M> expr);
 
-// NOTE! On GLSL based targets the lane index *must* be a compile time expression!
-// See https://github.com/KhronosGroup/GLSL/blob/master/extensions/khr/GL_KHR_shader_subgroup.txt
-// It is allowed to be 'dynamically uniform within the subgroup' if it's SPIR-V 1.5.
-// TODO(JS): For now we'll use 1.5, but aim for the future for the compiler to determine
-// if the line the is compile constant, and reduce requirement to 1.3
+// NOTE! WaveBroadcastLaneAt is *NOT* standard HLSL
+// It is provided as access to subgroupBroadcast which can only take a
+// constexpr laneId.
+// https://github.com/KhronosGroup/GLSL/blob/master/extensions/khr/GL_KHR_shader_subgroup.txt
+// Versions SPIR-V greater than 1.4 loosen this restriction, and allow 'dynamic uniform' index
+// If that's the behavior required then client code should use WaveReadLaneAt which works this way.
 __generic<T : __BuiltinType>
 __glsl_extension(GL_KHR_shader_subgroup_ballot)
-__spirv_version(1.5)
 __target_intrinsic(glsl, "subgroupBroadcast($0, $1)")
+__target_intrinsic(cuda, "__shfl_sync(__activemask(), $0, $1)")
+__target_intrinsic(hlsl, "WaveReadLaneAt")
+T WaveBroadcastLaneAt(T value, constexpr int lane);
+__generic<T : __BuiltinType, let N : int>
+__glsl_extension(GL_KHR_shader_subgroup_ballot)
+__target_intrinsic(glsl, "subgroupBroadcast($0, $1)")
+__target_intrinsic(cuda, "_waveReadLaneAtMultiple($0, $1)")
+__target_intrinsic(hlsl, "WaveReadLaneAt")
+vector<T,N> WaveBroadcastLaneAt(vector<T,N> value, constexpr int lane);
+__generic<T : __BuiltinType, let N : int, let M : int>
+__target_intrinsic(cuda, "_waveReadLaneAtMultiple($0, $1)")
+__target_intrinsic(hlsl, "WaveReadLaneAt")
+matrix<T,N,M> WaveBroadcastLaneAt(matrix<T,N,M> value, constexpr int lane);
+
+// TODO(JS): If it can be determines that the `laneId` is constExpr, then subgroupBroadcast
+// could be used on GLSL. For now we just use subgroupShuffle
+__generic<T : __BuiltinType>
+__glsl_extension(GL_KHR_shader_subgroup_shuffle)
+__spirv_version(1.3)
+__target_intrinsic(glsl, "subgroupShuffle($0, $1)")
 __target_intrinsic(cuda, "__shfl_sync(__activemask(), $0, $1)")
 T WaveReadLaneAt(T value, int lane);
 __generic<T : __BuiltinType, let N : int>
-__spirv_version(1.5)
-__glsl_extension(GL_KHR_shader_subgroup_ballot)
-__target_intrinsic(glsl, "subgroupBroadcast($0, $1)")
+__spirv_version(1.3)
+__glsl_extension(GL_KHR_shader_subgroup_shuffle)
+__target_intrinsic(glsl, "subgroupShuffle($0, $1)")
 __target_intrinsic(cuda, "_waveReadLaneAtMultiple($0, $1)")
 vector<T,N> WaveReadLaneAt(vector<T,N> value, int lane);
 __generic<T : __BuiltinType, let N : int, let M : int>

@@ -20,7 +20,7 @@ Items with ^ means there is some discussion about support later in the document 
 | SM6.0 Wave Intrinsics       |     No       |   Yes        |  Partial   |     Yes       |    No
 | SM6.0 Quad Intrinsics       |     No       |   Yes        |   No +     |     No        |    No
 | SM6.5 Wave Intrinsics       |     No       |   Yes ^      |   No +     |     Yes       |    No
-| WaveShuffle                 |     No       |   Limited ^  |   Yes +    |     Yes       |    No
+| WaveShuffle/BroadcastLaneAt |     No       |   Limited ^  |   Yes      |     Yes       |    No
 | Tesselation                 |     Yes ^    |   Yes ^      |   No +     |     No        |    No
 | Graphics Pipeline           |     Yes      |   Yes        |   Yes      |     No        |    No
 | Ray Tracing DXR 1.0         |     No       |   Yes ^      |   Yes ^    |     No        |    No
@@ -57,15 +57,17 @@ tex.GetDimensions is the GetDimensions method on 'texture' objects. This is not 
 
 SM6.5 Wave Intrinsics are supported, but requires a downstream DXC compiler that supports SM6.5. As it stands the DXC shipping with windows does not. 
 
-## WaveShuffle
+## WaveShuffle/BroadcastLaneAt
 
-WaveShuffle is an intrinsic added to the Slang stdlibrary to expose the glsl `subgroupShuffle` intrinsics and allow loosened requirements on laneId. 
+`WaveShuffle` and `WaveReadLaneAt` are Slang specific intrinsic additions to expand the options available around `WaveReadLaneAt`. The difference between them can be summarized as follows
 
-`HLSL` uses `WaveReadLaneAt` and this requires the `laneId` must be 'dynamically uniform' across the wave. WaveShuffle has the same functionality but relaxes this restriction. 
+* WaveBroadcastLaneAt - laneId must be a compile time constant 
+* WaveReadLaneAt - laneId can be dynamic but *MUST* be the same value across the Wave ie 'dynamically uniform' across the Wave
+* WaveShuffle - laneId can be truly dynamic
 
-`WaveReadLaneAt` most obviously maps to `subgroupBroadcast` in GLSL. This has the extra restriction the index must be compile time consts. With SPIR-V 1.5 it is allowed to be 'dynamically uniform', but doesn't work on current glslang.
+Other than the different restrictions on laneId they act identically to WaveReadLaneAt.
 
-NOTE! That using WaveShuffle to target `HLSL` will produce `WaveReadLaneAt` - that means strictly speaking the restriction *still applies*, and the correct behavior will only be seen on hardware that allows the loosed requirements of laneId, on hardware that does not result of `WaveShuffle` is the same as `WaveReadLaneId` which is undefined. 
+NOTE! That using WaveShuffle to target `HLSL` will produce `WaveReadLaneAt` in the output `HLSL`. This means strictly speaking the `dynamically uniform` *still applies*, and the correct behavior will only be seen on hardware that allows the loosened requirements of laneId, otherwise the result will be undefined.
 
 ## Tesselation
 

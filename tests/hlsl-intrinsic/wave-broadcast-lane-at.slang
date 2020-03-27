@@ -1,8 +1,8 @@
-// Disabled because main tests is wave-shuffle.slang, this just tests VK 
 //DISABLE_TEST(compute):COMPARE_COMPUTE_EX:-cpu -compute 
 //DISABLE_TEST(compute):COMPARE_COMPUTE_EX:-slang -compute
-//DISABLE_TEST(compute):COMPARE_COMPUTE_EX:-slang -compute -dx12 -use-dxil -profile cs_6_0
-//TEST(compute, vulkan):COMPARE_COMPUTE_EX:-vk -compute
+//TEST(compute):COMPARE_COMPUTE_EX:-slang -compute -dx12 -use-dxil -profile cs_6_0
+// Disabled on VK because glsl can't do WaveReadLaneAt on matrix. 
+//DISABLE_TEST(compute, vulkan):COMPARE_COMPUTE_EX:-vk -compute
 //TEST(compute):COMPARE_COMPUTE_EX:-cuda -compute
 
 //TEST_INPUT:ubuffer(data=[0 0 0 0], stride=4):out,name outputBuffer
@@ -17,15 +17,24 @@ void computeMain(uint3 dispatchThreadID : SV_DispatchThreadID)
     
     // Scalar
     
-    value += WaveShuffle(idx, (idx + 1) & 3);
+    value += WaveBroadcastLaneAt(idx, 1);
     
     // vector
     
     {
         float2 v = float2(idx + 1, idx + 2);
-        float2 readValue = WaveShuffle(v, (idx - 1) & 3);
+        float2 readValue = WaveBroadcastLaneAt(v, 2);
         
         value += int(readValue[0] + readValue[1]);
+    }
+        
+    // matrix
+    {
+        matrix<int, 2, 2> v = matrix<int, 2, 2>(idx, idx - 1, idx * 3, idx - 2);
+        
+        matrix<int, 2, 2> readValue = WaveBroadcastLaneAt(v, 3);
+        
+        value += int(readValue[0][0] + readValue[0][1] + readValue[1][0] + readValue[1][1]);
     }
     
     outputBuffer[idx] = value;
