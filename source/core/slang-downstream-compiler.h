@@ -208,7 +208,7 @@ public:
         String value;
     };
 
-    struct Version
+    struct CapabilityVersion
     {
         enum class Kind
         {
@@ -259,7 +259,7 @@ public:
         List<String> includePaths;
         List<String> libraryPaths;
 
-        List<Version> requiredVersions;
+        List<CapabilityVersion> requiredCapabilityVersions;
     };
 
     typedef uint32_t ProductFlags;

@@ -1298,11 +1298,11 @@ SlangResult dissassembleDXILUsingDXC(
             {
                 if (cudaTracker->m_smVersion.isSet())
                 {
-                    DownstreamCompiler::Version version;
-                    version.kind = DownstreamCompiler::Version::Kind::CUDASM;
+                    DownstreamCompiler::CapabilityVersion version;
+                    version.kind = DownstreamCompiler::CapabilityVersion::Kind::CUDASM;
                     version.version = cudaTracker->m_smVersion;
 
-                    options.requiredVersions.add(version);
+                    options.requiredCapabilityVersions.add(version);
                 }
             }
 

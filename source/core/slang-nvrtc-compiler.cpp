@@ -313,13 +313,13 @@ SlangResult NVRTCDownstreamCompiler::compile(const CompileOptions& options, RefP
     {
         // Lowest supported is 3.0
         SemanticVersion version(3);
-        for (const auto& requiredVersion : options.requiredVersions)
+        for (const auto& capabilityVersion : options.requiredCapabilityVersions)
         {
-            if (requiredVersion.kind == DownstreamCompiler::Version::Kind::CUDASM)
+            if (capabilityVersion.kind == DownstreamCompiler::CapabilityVersion::Kind::CUDASM)
             {
-                if (requiredVersion.version > version)
+                if (capabilityVersion.version > version)
                 {
-                    version = requiredVersion.version;
+                    version = capabilityVersion.version;
                 }
             }
         }
