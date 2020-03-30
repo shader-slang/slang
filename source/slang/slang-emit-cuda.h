@@ -7,6 +7,13 @@
 namespace Slang
 {
 
+class CUDAExtensionTracker : public RefObject
+{
+public:
+
+    SemanticVersion m_smVersion;
+};
+
 class CUDASourceEmitter : public CPPSourceEmitter
 {
 public:
@@ -26,8 +33,11 @@ public:
     static UnownedStringSlice getBuiltinTypeName(IROp op);
     static UnownedStringSlice getVectorPrefix(IROp op);
 
+    virtual RefObject* getExtensionTracker() SLANG_OVERRIDE { return m_extensionTracker; }
+
     CUDASourceEmitter(const Desc& desc) :
-        Super(desc)
+        Super(desc),
+        m_extensionTracker(new CUDAExtensionTracker)
     {}
 
 protected:
@@ -51,6 +61,7 @@ protected:
 
     virtual void emitLoopControlDecorationImpl(IRLoopControlDecoration* decl) SLANG_OVERRIDE;
 
+    virtual void handleCallExprDecorationsImpl(IRInst* funcValue) SLANG_OVERRIDE;
 
     //virtual bool tryEmitGlobalParamImpl(IRGlobalParam* varDecl, IRType* varType) SLANG_OVERRIDE;
     virtual bool tryEmitInstExprImpl(IRInst* inst, const EmitOpInfo& inOuterPrec) SLANG_OVERRIDE;
@@ -64,6 +75,8 @@ protected:
     virtual SlangResult calcScalarFuncName(HLSLIntrinsic::Op op, IRBasicType* type, StringBuilder& outBuilder) SLANG_OVERRIDE;
     
     SlangResult _calcCUDATextureTypeName(IRTextureTypeBase* texType, StringBuilder& outName);
+
+    RefPtr<CUDAExtensionTracker> m_extensionTracker;
 };
 
 }

@@ -27,6 +27,9 @@ struct SemanticVersion
         m_patch = 0;
     }
 
+        /// All zeros means nothing is set
+    bool isSet() const { return m_major || m_minor || m_patch; }
+
     IntegerType toInteger() const { return (IntegerType(m_major) << 32) | (uint32_t(m_minor) << 16) | m_patch; }
     void setFromInteger(IntegerType v)
     {

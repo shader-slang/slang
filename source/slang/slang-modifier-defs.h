@@ -80,6 +80,12 @@ SYNTAX_CLASS(RequiredSPIRVVersionModifier, Modifier)
 FIELD(SemanticVersion, version)
 END_SYNTAX_CLASS()
 
+// A modifier to tag something as an intrinsic that requires
+// a certain CUDA SM version to be enabled when used. Specified as "major.minor"
+SYNTAX_CLASS(RequiredCUDASMVersionModifier, Modifier)
+FIELD(SemanticVersion, version)
+END_SYNTAX_CLASS()
+
 SIMPLE_SYNTAX_CLASS(InOutModifier, OutModifier)
 
 // `__ref` modifier for by-reference parameter passing

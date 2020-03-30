@@ -2,8 +2,7 @@
 //DISABLE_TEST(compute):COMPARE_COMPUTE_EX:-slang -compute
 //TEST(compute):COMPARE_COMPUTE_EX:-slang -compute -dx12 -use-dxil -profile cs_6_0
 //TEST(compute, vulkan):COMPARE_COMPUTE_EX:-vk -compute
-// TODO(JS): Requires compute_7_0 which isn't available on all CI systems with CUDA
-//DISABLE_TEST(compute):COMPARE_COMPUTE_EX:-cuda -compute
+//TEST(compute):COMPARE_COMPUTE_EX:-cuda -compute cuda_sm_7_0
 
 //TEST_INPUT:ubuffer(data=[0 0 0 0], stride=4):out,name outputBuffer
 RWStructuredBuffer<int> outputBuffer;

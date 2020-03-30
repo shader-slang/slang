@@ -6196,7 +6196,10 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
         {
             getBuilder()->addRequireSPIRVVersionDecoration(irFunc, versionMod->version);
         }
-
+        for (auto versionMod : decl->GetModifiersOfType<RequiredCUDASMVersionModifier>())
+        {
+            getBuilder()->addRequireCUDASMVersionDecoration(irFunc, versionMod->version);
+        }
 
         if (auto attr = decl->FindModifier<InstanceAttribute>())
         {

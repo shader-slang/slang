@@ -375,6 +375,32 @@ bool CUDASourceEmitter::tryEmitInstExprImpl(IRInst* inst, const EmitOpInfo& inOu
     return Super::tryEmitInstExprImpl(inst, inOuterPrec);
 }
 
+void CUDASourceEmitter::handleCallExprDecorationsImpl(IRInst* funcValue)
+{
+    // Does this function declare any requirements on GLSL version or
+    // extensions, which should affect our output?
+
+    auto decoratedValue = funcValue;
+    while (auto specInst = as<IRSpecialize>(decoratedValue))
+    {
+        decoratedValue = getSpecializedValue(specInst);
+    }
+
+    for (auto decoration : decoratedValue->getDecorations())
+    {
+        if( auto smDecoration = as<IRRequireCUDASMVersionDecoration>(decoration))
+        {
+            SemanticVersion version;
+            version.setFromInteger(SemanticVersion::IntegerType(smDecoration->getCUDASMVersion()));
+
+            if (version > m_extensionTracker->m_smVersion)
+            {
+                m_extensionTracker->m_smVersion = version;
+            }
+        }
+    }
+}
+
 void CUDASourceEmitter::emitLayoutDirectivesImpl(TargetRequest* targetReq)
 {
     SLANG_UNUSED(targetReq);

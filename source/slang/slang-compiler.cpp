@@ -22,6 +22,7 @@
 #include "slang-emit.h"
 
 #include "slang-glsl-extension-tracker.h"
+#include "slang-emit-cuda.h"
 
 #include "slang-ir-serialize.h"
 
@@ -1291,6 +1292,19 @@ SlangResult dissassembleDXILUsingDXC(
         {
             SourceResult source;
             SLANG_RETURN_ON_FAIL(emitEntryPointSource(slangRequest, entryPointIndex, targetReq, sourceTarget, endToEndReq, source));
+
+            // Look for the version
+            if (auto cudaTracker = as<CUDAExtensionTracker>(source.extensionTracker))
+            {
+                if (cudaTracker->m_smVersion.isSet())
+                {
+                    DownstreamCompiler::Version version;
+                    version.kind = DownstreamCompiler::Version::Kind::CUDASM;
+                    version.version = cudaTracker->m_smVersion;
+
+                    options.requiredVersions.add(version);
+                }
+            }
 
             options.sourceContents = source.source;
             
