@@ -49,7 +49,9 @@ struct CPUComputeUtil
         void* m_uniformEntryPointParams;
     };
 
-    
+        /// True if this feature is available on CPU
+    static bool hasFeature(const Slang::UnownedStringSlice& feature);
+
         /// Runs code across run styles and makes sure output buffers match
     static SlangResult checkStyleConsistency(ISlangSharedLibrary* sharedLib, const uint32_t dispatchSize[3], const ShaderCompilerUtil::OutputAndLayout& compilationAndLayout);
 

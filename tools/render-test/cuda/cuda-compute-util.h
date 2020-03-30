@@ -46,6 +46,10 @@ struct CUDAComputeUtil
         List<BindSet::Value*> m_buffers;
     };
 
+    static SlangResult parseFeature(const Slang::UnownedStringSlice& feature, bool& outResult);
+
+    static bool hasFeature(const Slang::UnownedStringSlice& feature);
+
     static SlangResult createTextureResource(const ShaderInputLayoutEntry& srcEntry, slang::TypeLayoutReflection* typeLayout, RefPtr<CUDAResource>& outResource);
 
     static SlangResult execute(const ShaderCompilerUtil::OutputAndLayout& outputAndLayout, const uint32_t dispatchSize[3], Context& outContext);
