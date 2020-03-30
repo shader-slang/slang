@@ -5,6 +5,7 @@
 
 #include "../../source/core/slang-std-writers.h"
 #include "../../source/core/slang-token-reader.h"
+#include "../../source/core/slang-semantic-version.h"
 
 #include "../bind-location.h"
 
@@ -307,7 +308,7 @@ static int _calcSMCountPerMultiProcessor(int major, int minor)
     return last.coreCount;
 }
 
-static SlangResult _findMaxFlopsDeviceId(int* outDevice)
+static SlangResult _findMaxFlopsDeviceIndex(int* outDeviceIndex)
 {
     int smPerMultiproc = 0;
     int maxPerfDevice = -1;
@@ -360,7 +361,7 @@ static SlangResult _findMaxFlopsDeviceId(int* outDevice)
         return SLANG_FAIL;
     }
 
-    *outDevice = maxPerfDevice;
+    *outDeviceIndex = maxPerfDevice;
     return SLANG_OK;
 }
 
@@ -374,9 +375,13 @@ static SlangResult _initCuda(CUDAReportStyle reportType = CUDAReportStyle::Norma
 class ScopeCUDAContext
 {
 public:
-    ScopeCUDAContext() : m_context(nullptr) {}
+    ScopeCUDAContext() :
+        m_context(nullptr),
+        m_device(-1),
+        m_deviceIndex(-1)
+    {}
 
-    SlangResult init(unsigned int flags, CUdevice device, CUDAReportStyle reportType = CUDAReportStyle::Normal)
+    SlangResult init(unsigned int flags, int deviceIndex, CUDAReportStyle reportType = CUDAReportStyle::Normal)
     {
         SLANG_RETURN_ON_FAIL(_initCuda(reportType));
 
@@ -386,7 +391,10 @@ public:
             m_context = nullptr;
         }
 
-        SLANG_CUDA_RETURN_WITH_REPORT_ON_FAIL(cuCtxCreate(&m_context, flags, device), reportType);
+        m_deviceIndex = deviceIndex;
+        SLANG_CUDA_RETURN_ON_FAIL(cuDeviceGet(&m_device, deviceIndex));
+
+        SLANG_CUDA_RETURN_WITH_REPORT_ON_FAIL(cuCtxCreate(&m_context, flags, m_device), reportType);
         return SLANG_OK;
     }
 
@@ -394,9 +402,8 @@ public:
     {
         SLANG_RETURN_ON_FAIL(_initCuda(reportType));
 
-        int deviceId;
-        SLANG_RETURN_ON_FAIL(_findMaxFlopsDeviceId(&deviceId));
-        SLANG_CUDA_RETURN_WITH_REPORT_ON_FAIL(cudaSetDevice(deviceId), reportType);
+        SLANG_RETURN_ON_FAIL(_findMaxFlopsDeviceIndex(&m_deviceIndex));
+        SLANG_CUDA_RETURN_WITH_REPORT_ON_FAIL(cudaSetDevice(m_deviceIndex), reportType);
 
         if (m_context)
         {
@@ -404,7 +411,9 @@ public:
             m_context = nullptr;
         }
 
-        SLANG_CUDA_RETURN_WITH_REPORT_ON_FAIL(cuCtxCreate(&m_context, flags, deviceId), reportType);
+        SLANG_CUDA_RETURN_ON_FAIL(cuDeviceGet(&m_device, m_deviceIndex));
+
+        SLANG_CUDA_RETURN_WITH_REPORT_ON_FAIL(cuCtxCreate(&m_context, flags, m_device), reportType);
         return SLANG_OK;
     }
 
@@ -417,8 +426,56 @@ public:
     }
     SLANG_FORCE_INLINE operator CUcontext () const { return m_context; }
 
+    int m_deviceIndex;
+    CUdevice m_device;
     CUcontext m_context;
 };
+
+/* static */SlangResult CUDAComputeUtil::parseFeature(const Slang::UnownedStringSlice& feature, bool& outResult)
+{
+    outResult = false;
+
+    if (feature.startsWith("cuda_sm_"))
+    {
+        const UnownedStringSlice versionSlice = UnownedStringSlice(feature.begin() + 8, feature.end());
+        SemanticVersion requiredVersion;
+        SLANG_RETURN_ON_FAIL(SemanticVersion::parse(versionSlice, '_', requiredVersion));
+
+        // Need to get the version from the cuda device
+        ScopeCUDAContext context;
+        SLANG_RETURN_ON_FAIL(context.init(0, CUDAReportStyle::Silent));
+
+        const int deviceIndex = context.m_deviceIndex;
+
+        int computeMode = -1;
+        SLANG_CUDA_RETURN_ON_FAIL(cudaDeviceGetAttribute(&computeMode, cudaDevAttrComputeMode, deviceIndex));
+
+        // If we don't have compute mode availability, we can't execute
+        if (computeMode == cudaComputeModeProhibited)
+        {
+            return SLANG_FAIL;
+        }
+
+        int major, minor;
+        SLANG_CUDA_RETURN_ON_FAIL(cudaDeviceGetAttribute(&major,  cudaDevAttrComputeCapabilityMajor, deviceIndex));
+        SLANG_CUDA_RETURN_ON_FAIL(cudaDeviceGetAttribute(&minor, cudaDevAttrComputeCapabilityMinor, deviceIndex));
+
+        SemanticVersion actualVersion;
+        actualVersion.set(major, minor);
+
+        outResult = actualVersion >= requiredVersion;
+
+        return SLANG_OK;
+    }
+
+    return SLANG_FAIL;
+}
+
+/* static */bool CUDAComputeUtil::hasFeature(const Slang::UnownedStringSlice& feature)
+{
+    bool res;
+    return SLANG_SUCCEEDED(parseFeature(feature, res)) ? res : false;
+}
 
 /* static */bool CUDAComputeUtil::canCreateDevice()
 {

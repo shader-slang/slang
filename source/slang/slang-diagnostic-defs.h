@@ -208,7 +208,7 @@ DIAGNOSTIC(20004, Error, unexpectedTokenExpectedComponentDefinition, "unexpected
 DIAGNOSTIC(20008, Error, invalidOperator, "invalid operator '$0'.");
 DIAGNOSTIC(20011, Error, unexpectedColon, "unexpected ':'.")
 DIAGNOSTIC(20012, Error, invalidSPIRVVersion, "Expecting SPIR-V version as either 'major.minor', or quoted if has patch (eg for SPIR-V 1.2, '1.2' or \"1.2\"')")
-
+DIAGNOSTIC(20013, Error, invalidCUDASMVersion, "Expecting CUDA SM version as either 'major.minor', or quoted if has patch (eg for '7.0' or \"7.0\"')")
 //
 // 3xxxx - Semantic analysis
 //

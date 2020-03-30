@@ -190,6 +190,18 @@ struct IRRequireSPIRVVersionDecoration : IRDecoration
     }
 };
 
+struct IRRequireCUDASMVersionDecoration : IRDecoration
+{
+    enum { kOp = kIROp_RequireCUDASMVersionDecoration };
+    IR_LEAF_ISA(RequireCUDASMVersionDecoration)
+
+    IRConstant* getCUDASMVersionOperand() { return cast<IRConstant>(getOperand(0)); }
+    IntegerLiteralValue getCUDASMVersion()
+    {
+        return getCUDASMVersionOperand()->value.intVal;
+    }
+};
+
 struct IRRequireGLSLExtensionDecoration : IRDecoration
 {
     enum { kOp = kIROp_RequireGLSLExtensionDecoration };
@@ -2129,6 +2141,12 @@ struct IRBuilder
     {
         SemanticVersion::IntegerType intValue = version.toInteger();
         addDecoration(value, kIROp_RequireSPIRVVersionDecoration, getIntValue(getBasicType(BaseType::UInt64), intValue));
+    }
+
+    void addRequireCUDASMVersionDecoration(IRInst* value, const SemanticVersion& version)
+    {
+        SemanticVersion::IntegerType intValue = version.toInteger();
+        addDecoration(value, kIROp_RequireCUDASMVersionDecoration, getIntValue(getBasicType(BaseType::UInt64), intValue));
     }
 
     void addPatchConstantFuncDecoration(IRInst* value, IRInst* patchConstantFunc)

@@ -2616,15 +2616,18 @@ __generic<T : __BuiltinType>
 __glsl_extension(GL_KHR_shader_subgroup_vote)
 __spirv_version(1.3)
 __target_intrinsic(glsl, "subgroupAllEqual($0)")
+__cuda_sm_version(7.0)
 __target_intrinsic(cuda, "_waveAllEqual($0)")
 bool WaveActiveAllEqual(T value);
 __generic<T : __BuiltinType, let N : int> 
 __glsl_extension(GL_KHR_shader_subgroup_vote)
 __spirv_version(1.3)
 __target_intrinsic(glsl, "subgroupAllEqual($0)")
+__cuda_sm_version(7.0)
 __target_intrinsic(cuda, "_waveAllEqualMultiple($0)")
 bool WaveActiveAllEqual(vector<T,N> value);
 __generic<T : __BuiltinType, let N : int, let M : int>
+__cuda_sm_version(7.0)
 __target_intrinsic(cuda, "_waveAllEqualMultiple($0)")
 bool WaveActiveAllEqual(matrix<T,N,M> value);
 
@@ -2796,14 +2799,17 @@ uint WavePrefixCountBits(bool value);
 
 __generic<T : __BuiltinType>
 __target_intrinsic(hlsl)
+__cuda_sm_version(7.0)
 __target_intrinsic(cuda, "_waveMatchScalar($0)")
 uint4 WaveMatch(T value);
 __generic<T : __BuiltinType, let N : int>
 __target_intrinsic(hlsl)
+__cuda_sm_version(7.0)
 __target_intrinsic(cuda, "_waveMatchMultiple($0)")
 uint4 WaveMatch(vector<T,N> value);
 __generic<T : __BuiltinType, let N : int, let M : int>
 __target_intrinsic(hlsl)
+__cuda_sm_version(7.0)
 __target_intrinsic(cuda, "_waveMatchMultiple($0)")
 uint4 WaveMatch(matrix<T,N,M> value);
 

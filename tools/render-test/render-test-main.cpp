@@ -544,6 +544,15 @@ static SlangResult _innerMain(Slang::StdWriters* stdWriters, SlangSession* sessi
     // If it's CPU testing we don't need a window or a renderer
     if (gOptions.rendererType == RendererType::CPU)
     {
+        // Check we have all the required features
+        for (const auto& renderFeature : gOptions.renderFeatures)
+        {
+            if (!CPUComputeUtil::hasFeature(renderFeature.getUnownedSlice()))
+            {
+                return SLANG_E_NOT_AVAILABLE;
+            }
+        }
+
         ShaderCompilerUtil::OutputAndLayout compilationAndLayout;
         SLANG_RETURN_ON_FAIL(ShaderCompilerUtil::compileWithLayout(session, gOptions.sourcePath, gOptions.compileArgs, gOptions.shaderType, input, compilationAndLayout));
 
@@ -604,11 +613,19 @@ static SlangResult _innerMain(Slang::StdWriters* stdWriters, SlangSession* sessi
     }
 
     if (gOptions.rendererType == RendererType::CUDA)
-    {
+    {        
+#if RENDER_TEST_CUDA
+        // Check we have all the required features
+        for (const auto& renderFeature : gOptions.renderFeatures)
+        {
+            if (!CUDAComputeUtil::hasFeature(renderFeature.getUnownedSlice()))
+            {
+                return SLANG_E_NOT_AVAILABLE;
+            }
+        }
+
         ShaderCompilerUtil::OutputAndLayout compilationAndLayout;
         SLANG_RETURN_ON_FAIL(ShaderCompilerUtil::compileWithLayout(session, gOptions.sourcePath, gOptions.compileArgs, gOptions.shaderType, input, compilationAndLayout));
-
-#if RENDER_TEST_CUDA
 
         const uint64_t startTicks = ProcessUtil::getClockTick();
 

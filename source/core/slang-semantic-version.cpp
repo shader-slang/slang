@@ -7,13 +7,13 @@
 
 namespace Slang {
 
-SlangResult SemanticVersion::parse(const UnownedStringSlice& value, SemanticVersion& outVersion)
+SlangResult SemanticVersion::parse(const UnownedStringSlice& value, char separatorChar, SemanticVersion& outVersion)
 {
     outVersion.reset();
 
     UnownedStringSlice slices[3];
     Index splitCount;
-    SLANG_RETURN_ON_FAIL(StringUtil::split(value, '.', 3, slices, splitCount));
+    SLANG_RETURN_ON_FAIL(StringUtil::split(value, separatorChar, 3, slices, splitCount));
     if (splitCount <= 0)
     {
         return SLANG_FAIL;
@@ -36,6 +36,11 @@ SlangResult SemanticVersion::parse(const UnownedStringSlice& value, SemanticVers
     outVersion.m_patch = uint16_t(ints[2]);
 
     return SLANG_OK;
+}
+
+SlangResult SemanticVersion::parse(const UnownedStringSlice& value,  SemanticVersion& outVersion)
+{
+    return parse(value, '.', outVersion);
 }
 
 void SemanticVersion::append(StringBuilder& buf) const

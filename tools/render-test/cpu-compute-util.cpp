@@ -350,6 +350,13 @@ static SlangResult _newTexture(const InputTextureDesc& desc, slang::TypeLayoutRe
     return SLANG_FAIL;
 }
 
+/* static */bool CPUComputeUtil::hasFeature(const UnownedStringSlice& feature)
+{
+    SLANG_UNUSED(feature);
+    // CPU has no specific support requirements
+    return false;
+}
+
 /* static */SlangResult CPUComputeUtil::calcBindings(const ShaderCompilerUtil::OutputAndLayout& compilationAndLayout, Context& outContext)
 {
     auto request = compilationAndLayout.output.request;

@@ -10,6 +10,7 @@
 
 #include "slang-io.h"
 #include "slang-shared-library.h"
+#include "slang-semantic-version.h"
 
 namespace nvrtc
 {
@@ -307,14 +308,30 @@ SlangResult NVRTCDownstreamCompiler::compile(const CompileOptions& options, RefP
         // This is arguably too much - but nvrtc does not appear to have a mechanism to switch off individual warnings.
         // I tried the -Xcudafe mechanism but that does not appear to work for nvrtc
         cmdLine.addArg("-w");
+    }
 
-        //
-#if 0
-        cmdLine.addArg("-arch=compute_70");
-#else
-        // Needed for Warp intrinsics
-        cmdLine.addArg("-arch=compute_30");
-#endif
+    {
+        // Lowest supported is 3.0
+        SemanticVersion version(3);
+        for (const auto& capabilityVersion : options.requiredCapabilityVersions)
+        {
+            if (capabilityVersion.kind == DownstreamCompiler::CapabilityVersion::Kind::CUDASM)
+            {
+                if (capabilityVersion.version > version)
+                {
+                    version = capabilityVersion.version;
+                }
+            }
+        }
+
+        StringBuilder builder;
+        builder << "-arch=compute_";
+        builder << version.m_major;
+
+        SLANG_ASSERT(version.m_minor >= 0 && version.m_minor <= 9);
+        builder << char('0' + version.m_minor);
+
+        cmdLine.addArg(builder);
     }
 
     nvrtcProgram program = nullptr;

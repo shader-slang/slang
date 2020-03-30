@@ -7,6 +7,7 @@
 #include "slang-process-util.h"
 
 #include "slang-platform.h"
+#include "slang-semantic-version.h"
 
 #include "slang-io.h"
 
@@ -207,6 +208,16 @@ public:
         String value;
     };
 
+    struct CapabilityVersion
+    {
+        enum class Kind
+        {
+            CUDASM,                     ///< What the version is for
+        };
+        Kind kind;
+        SemanticVersion version;
+    };
+
     struct CompileOptions
     {
         typedef uint32_t Flags;
@@ -247,6 +258,8 @@ public:
 
         List<String> includePaths;
         List<String> libraryPaths;
+
+        List<CapabilityVersion> requiredCapabilityVersions;
     };
 
     typedef uint32_t ProductFlags;

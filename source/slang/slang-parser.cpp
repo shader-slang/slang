@@ -4819,17 +4819,17 @@ namespace Slang
 
         return modifier;
     }
-    static RefPtr<RefObject> parseSPIRVVersionModifier(Parser* parser, void* /*userData*/)
-    {
-        auto modifier = new RequiredSPIRVVersionModifier();
 
+
+    static SlangResult parseSemanticVersion(Parser* parser, Token& outToken, SemanticVersion& outVersion)
+    {
         parser->ReadToken(TokenType::LParent);
-        Token token = parser->ReadToken();
+        outToken = parser->ReadToken();
         parser->ReadToken(TokenType::RParent);
 
-        UnownedStringSlice content = token.Content;
+        UnownedStringSlice content = outToken.Content;
         // We allow specified as major.minor or as a string (in quotes)
-        switch (token.type)
+        switch (outToken.type)
         {
             case TokenType::FloatingPointLiteral:
             {
@@ -4838,26 +4838,44 @@ namespace Slang
             case TokenType::StringLiteral:
             {
                 // We need to trim quotes if needed
-                SLANG_ASSERT(content.getLength() >= 2 && content[0] == '"' && content[content.getLength() -1] == '"');
+                SLANG_ASSERT(content.getLength() >= 2 && content[0] == '"' && content[content.getLength() - 1] == '"');
                 content = UnownedStringSlice(content.begin() + 1, content.end() - 1);
                 break;
             }
             default:
             {
-                parser->sink->diagnose(token, Diagnostics::invalidSPIRVVersion);
-                return RefPtr<RefObject>();
+                return SLANG_FAIL;
             }
         }
-        
-        SemanticVersion version;
-        if (SLANG_FAILED(SemanticVersion::parse(content, modifier->version)))
-        {
-            // Unable to parse the error so fail
-            parser->sink->diagnose(token, Diagnostics::invalidSPIRVVersion);
-            return RefPtr<RefObject>();
-        }
+        return SemanticVersion::parse(content, outVersion);
+    }
 
-        return modifier;
+    static RefPtr<RefObject> parseSPIRVVersionModifier(Parser* parser, void* /*userData*/)
+    {
+        Token token;
+        SemanticVersion version;
+        if (SLANG_SUCCEEDED(parseSemanticVersion(parser, token, version)))
+        {
+            auto modifier = new RequiredSPIRVVersionModifier();
+            modifier->version = version;
+            return modifier;
+        }
+        parser->sink->diagnose(token, Diagnostics::invalidSPIRVVersion);
+        return RefPtr<RefObject>();
+    }
+
+    static RefPtr<RefObject> parseCUDASMVersionModifier(Parser* parser, void* /*userData*/)
+    {
+        Token token;
+        SemanticVersion version;
+        if (SLANG_SUCCEEDED(parseSemanticVersion(parser, token, version)))
+        {
+            auto modifier = new RequiredCUDASMVersionModifier();
+            modifier->version = version;
+            return modifier;
+        }
+        parser->sink->diagnose(token, Diagnostics::invalidCUDASMVersion);
+        return RefPtr<RefObject>();
     }
 
     static RefPtr<RefObject> parseLayoutModifier(Parser* parser, void* /*userData*/)
@@ -5149,6 +5167,7 @@ namespace Slang
         MODIFIER(__glsl_extension,  parseGLSLExtensionModifier);
         MODIFIER(__glsl_version,    parseGLSLVersionModifier);
         MODIFIER(__spirv_version,   parseSPIRVVersionModifier);
+        MODIFIER(__cuda_sm_version, parseCUDASMVersionModifier);
 
         MODIFIER(__builtin_type,    parseBuiltinTypeModifier);
         MODIFIER(__magic_type,      parseMagicTypeModifier);
