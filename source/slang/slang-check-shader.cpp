@@ -1270,6 +1270,36 @@ namespace Slang
             sink);
     }
 
+    RefPtr<Scope> ComponentType::_createScopeForLegacyLookup()
+    {
+        // The shape of this logic is dictated by the legacy
+        // behavior for name-based lookup/parsing of types
+        // specified via the API or command line.
+        //
+        // We begin with a dummy scope that has as its parent
+        // the scope that provides the "base" langauge
+        // definitions (that scope is necessary because
+        // it defines keywords like `true` and `false`).
+        //
+        RefPtr<Scope> scope = new Scope();
+        scope->parent = getLinkage()->getSessionImpl()->baseLanguageScope;
+        //
+        // Next, the scope needs to include all of the
+        // modules in the program as peers, as if they
+        // were `import`ed into the scope.
+        //
+        for( auto module : getModuleDependencies() )
+        {
+            RefPtr<Scope> moduleScope = new Scope();
+            moduleScope->containerDecl = module->getModuleDecl();
+
+            moduleScope->nextSibling = scope->nextSibling;
+            scope->nextSibling = moduleScope;
+        }
+
+        return scope;
+    }
+
         /// Parse an array of strings as specialization arguments.
         ///
         /// Names in the strings will be parsed in the context of
@@ -1282,14 +1312,8 @@ namespace Slang
     {
         auto unspecialiedProgram = endToEndReq->getUnspecializedGlobalComponentType();
 
-        // TODO: Building a list of `scopesToTry` here shouldn't
-        // be required, since the `Scope` type itself has the ability
-        // for form chains for lookup purposes (e.g., the way that
-        // `import` is handled by modifying a scope).
-        //
-        List<RefPtr<Scope>> scopesToTry;
-        for( auto module : unspecialiedProgram->getModuleDependencies() )
-            scopesToTry.add(module->getModuleDecl()->scope);
+
+        RefPtr<Scope> scope = unspecialiedProgram->_createScopeForLegacyLookup();
 
         // We are going to do some semantic checking, so we need to
         // set up a `SemanticsVistitor` that we can use.
@@ -1311,16 +1335,8 @@ namespace Slang
         //
         for(auto name : genericArgStrings)
         {
-            RefPtr<Expr> argExpr;
-            for (auto & s : scopesToTry)
-            {
-                argExpr = linkage->parseTermString(name, s);
-                argExpr = semantics.CheckTerm(argExpr);
-                if( argExpr )
-                {
-                    break;
-                }
-            }
+            RefPtr<Expr> argExpr = linkage->parseTermString(name, scope);
+            argExpr = semantics.CheckTerm(argExpr);
 
             if(!argExpr)
             {
@@ -1605,6 +1621,14 @@ namespace Slang
 
             outSpecializedEntryPoints.add(specializedEntryPoint);
         }
+
+        // There might have been errors during the specialization above,
+        // so we will bail out early if anything went wrong, rather
+        // then try to create a composite where some of the constituent
+        // component types might be null.
+        //
+        if(endToEndReq->getSink()->GetErrorCount() != 0)
+            return nullptr;
 
         // Any entry points beyond those that were specified up front will be
         // assumed to not need/want specialization.

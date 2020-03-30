@@ -461,6 +461,13 @@ namespace Slang
             ///
         virtual void acceptVisitor(ComponentTypeVisitor* visitor, SpecializationInfo* specializationInfo) = 0;
 
+            /// Create a scope suitable for looking up names or parsing specialization arguments.
+            ///
+            /// This facility is only needed to support legacy APIs for string-based lookup
+            /// and parsing via Slang reflection, and is not recommended for future APIs to use.
+            ///
+        RefPtr<Scope> _createScopeForLegacyLookup();
+
     protected:
         ComponentType(Linkage* linkage);
 

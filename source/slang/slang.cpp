@@ -890,33 +890,19 @@ Type* ComponentType::getTypeFromString(
     // the modules that were directly or
     // indirectly referenced.
     //
-    // TODO: This `scopesToTry` idiom appears
-    // all over the code, and isn't really
-    // how we should be handling this kind of
-    // lookup at all.
-    //
-    List<RefPtr<Scope>> scopesToTry;
-    for(auto module : getModuleDependencies())
-        scopesToTry.add(module->getModuleDecl()->scope);
+    RefPtr<Scope> scope = _createScopeForLegacyLookup();
 
     auto linkage = getLinkage();
-    for(auto& s : scopesToTry)
-    {
-        RefPtr<Expr> typeExpr = linkage->parseTermString(
-            typeStr, s);
-        type = checkProperType(linkage, TypeExp(typeExpr), sink);
-        if (type && !type.as<ErrorType>())
-            break;
-    }
+    RefPtr<Expr> typeExpr = linkage->parseTermString(
+        typeStr, scope);
+    type = checkProperType(linkage, TypeExp(typeExpr), sink);
+
     if( type )
     {
         m_types[typeStr] = type;
     }
     return type;
 }
-
-
-
 
 CompileRequestBase::CompileRequestBase(
     Linkage*        linkage,
