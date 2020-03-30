@@ -326,7 +326,9 @@ SlangResult NVRTCDownstreamCompiler::compile(const CompileOptions& options, RefP
 
         StringBuilder builder;
         builder << "-arch=compute_";
-        builder << char('0' + version.m_major);
+        builder << version.m_major;
+
+        SLANG_ASSERT(version.minor >= 0 && version.minor <= 9);
         builder << char('0' + version.m_minor);
 
         cmdLine.addArg(builder);
