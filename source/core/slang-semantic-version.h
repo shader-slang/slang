@@ -15,9 +15,9 @@ struct SemanticVersion
 
     SemanticVersion():m_major(0), m_minor(0), m_patch(0) {}
     SemanticVersion(int inMajor, int inMinor = 0, int inPatch = 0):
-        m_major(uint8_t(inMajor)),
-        m_minor(uint8_t(inMinor)),
-        m_patch(uint8_t(inPatch))
+        m_major(uint32_t(inMajor)),
+        m_minor(uint16_t(inMinor)),
+        m_patch(uint16_t(inPatch))
     {}
 
     void reset()
@@ -30,12 +30,20 @@ struct SemanticVersion
     IntegerType toInteger() const { return (IntegerType(m_major) << 32) | (uint32_t(m_minor) << 16) | m_patch; }
     void setFromInteger(IntegerType v)
     {
-        m_major = (v >> 32);
-        m_minor = uint16_t(v >> 16);
-        m_patch = uint16_t(v);
+        set(int(v >> 32), int((v >> 16) & 0xffff), int(v & 0xffff));
+    }
+    void set(int major, int minor, int patch = 0)
+    {
+        SLANG_ASSERT(major >= 0 && minor >=0 && patch >= 0);
+
+        m_major = uint32_t(major);
+        m_minor = uint16_t(minor);
+        m_patch = uint16_t(patch);
     }
 
     static SlangResult parse(const UnownedStringSlice& value, SemanticVersion& outVersion);
+    static SlangResult parse(const UnownedStringSlice& value, char separatorChar, SemanticVersion& outVersion);
+
     void append(StringBuilder& buf) const;
 
     bool operator>(const ThisType& rhs) const { return toInteger() > rhs.toInteger(); }

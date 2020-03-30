@@ -5,7 +5,7 @@
 
 #include "../../source/core/slang-std-writers.h"
 #include "../../source/core/slang-token-reader.h"
-#include "../../source/core/slang-string-util.h"
+#include "../../source/core/slang-semantic-version.h"
 
 #include "../bind-location.h"
 
@@ -431,11 +431,6 @@ public:
     CUcontext m_context;
 };
 
-static int _getPackedSemanticVersion(const int version[3])
-{
-    return (version[0] << 16) | (version[1] << 8) << (version[0]);
-}
-
 /* static */SlangResult CUDAComputeUtil::parseFeature(const Slang::UnownedStringSlice& feature, bool& outResult)
 {
     outResult = false;
@@ -443,39 +438,16 @@ static int _getPackedSemanticVersion(const int version[3])
     if (feature.startsWith("cuda_sm_"))
     {
         const UnownedStringSlice versionSlice = UnownedStringSlice(feature.begin() + 8, feature.end());
-
-        UnownedStringSlice versionSlices[3];
-        // Extract the version number required
-        Index count = StringUtil::split(versionSlice, '_', 3, versionSlices);
-
-        if (count < 1)
-        {
-            SLANG_ASSERT(!"Badly formed cuda_sm version");
-            return SLANG_FAIL;
-        }
-        int requiredVersion[3] = { 0, 0, 0 };
-
-        for (Index i = 0; i < count; ++i)
-        {
-            Slang::Int value;
-            SLANG_RETURN_ON_FAIL(StringUtil::parseInt(versionSlices[i], value));
-            if (value < 0)
-            {
-                SLANG_ASSERT(!"All values must be +ve");
-                return SLANG_FAIL;
-            }
-            requiredVersion[i] = int(value);
-        }
+        SemanticVersion requiredVersion;
+        SLANG_RETURN_ON_FAIL(SemanticVersion::parse(versionSlice, '_', requiredVersion));
 
         // Need to get the version from the cuda device
-
         ScopeCUDAContext context;
         SLANG_RETURN_ON_FAIL(context.init(0, CUDAReportStyle::Silent));
 
-        int computeMode = -1, major = 0, minor = 0;
-
         const int deviceIndex = context.m_deviceIndex;
 
+        int computeMode = -1;
         SLANG_CUDA_RETURN_ON_FAIL(cudaDeviceGetAttribute(&computeMode, cudaDevAttrComputeMode, deviceIndex));
 
         // If we don't have compute mode availability, we can't execute
@@ -484,11 +456,14 @@ static int _getPackedSemanticVersion(const int version[3])
             return SLANG_FAIL;
         }
 
-        int actualVersion[3] = { 0, 0, 0 };
-        SLANG_CUDA_RETURN_ON_FAIL(cudaDeviceGetAttribute(&actualVersion[0], cudaDevAttrComputeCapabilityMajor, deviceIndex));
-        SLANG_CUDA_RETURN_ON_FAIL(cudaDeviceGetAttribute(&actualVersion[1], cudaDevAttrComputeCapabilityMinor, deviceIndex));
+        int major, minor;
+        SLANG_CUDA_RETURN_ON_FAIL(cudaDeviceGetAttribute(&major,  cudaDevAttrComputeCapabilityMajor, deviceIndex));
+        SLANG_CUDA_RETURN_ON_FAIL(cudaDeviceGetAttribute(&minor, cudaDevAttrComputeCapabilityMinor, deviceIndex));
 
-        outResult = (_getPackedSemanticVersion(actualVersion) >= _getPackedSemanticVersion(requiredVersion));
+        SemanticVersion actualVersion;
+        actualVersion.set(major, minor);
+
+        outResult = actualVersion >= requiredVersion;
 
         return SLANG_OK;
     }
