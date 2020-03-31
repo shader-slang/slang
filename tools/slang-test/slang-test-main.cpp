@@ -3146,7 +3146,7 @@ SlangResult innerMain(int argc, char** argv)
         // Additionally it may be the case that on test systems, they can compile shared libraries but loading and using them does not
         // appear to work. Initially it was thought it might be protected against files in /tmp but copying shared libraries elsewhere
         // also doesn't work
-#if SLANG_UNIX_FAMILY /* && SLANG_PROCESSOR_X86 */
+#if SLANG_UNIX_FAMILY && SLANG_PROCESSOR_X86 
         _disableCPPBackends(&context);
 #endif
     }

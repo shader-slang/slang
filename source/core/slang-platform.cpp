@@ -154,7 +154,7 @@ SLANG_COMPILE_TIME_ASSERT(E_OUTOFMEMORY == SLANG_E_OUT_OF_MEMORY);
 	void* h = dlopen(platformFileName, RTLD_NOW | RTLD_LOCAL);
 	if(!h)
 	{
-#if 0
+#if 1
         // We can't output the error message here, because it will cause output when testing what code gen is available
 		if(auto msg = dlerror())
 		{
