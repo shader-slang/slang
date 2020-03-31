@@ -152,6 +152,10 @@ SlangResult parseOptions(int argc, const char*const* argv, Slang::WriterHelper s
         {
             gOptions.shaderType = ShaderProgramType::GraphicsCompute;
         }
+        else if (strcmp(arg, "-rt") == 0)
+        {
+            gOptions.shaderType = ShaderProgramType::RayTracing;
+        }
         else if( strcmp(arg, "-use-dxil") == 0 )
         {
             gOptions.useDXIL = true;

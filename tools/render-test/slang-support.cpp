@@ -18,6 +18,37 @@ using namespace Slang;
 static const char vertexEntryPointName[] = "vertexMain";
 static const char fragmentEntryPointName[] = "fragmentMain";
 static const char computeEntryPointName[] = "computeMain";
+static const char rtEntryPointName[] = "raygenMain";
+
+static gfx::StageType _translateStage(SlangStage slangStage)
+{
+    switch(slangStage)
+    {
+    default:
+        SLANG_ASSERT(!"unhandled case");
+        return gfx::StageType::Unknown;
+
+#define CASE(FROM, TO) \
+    case SLANG_STAGE_##FROM: return gfx::StageType::TO
+
+    CASE(VERTEX,    Vertex);
+    CASE(HULL,      Hull);
+    CASE(DOMAIN,    Domain);
+    CASE(GEOMETRY,  Geometry);
+    CASE(FRAGMENT,  Fragment);
+
+    CASE(COMPUTE,   Compute);
+
+    CASE(RAY_GENERATION,    RayGeneration);
+    CASE(INTERSECTION,      Intersection);
+    CASE(ANY_HIT,           AnyHit);
+    CASE(CLOSEST_HIT,       ClosestHit);
+    CASE(MISS,              Miss);
+    CASE(CALLABLE,          Callable);
+
+#undef CASE
+    }
+}
 
 /* static */ SlangResult ShaderCompilerUtil::compileProgram(SlangSession* session, const Input& input, const ShaderCompileRequest& request, Output& out)
 {
@@ -80,46 +111,12 @@ static const char computeEntryPointName[] = "computeMain";
     // the `-xslang <arg>` option to `render-test`.
     SLANG_RETURN_ON_FAIL(spProcessCommandLineArguments(slangRequest, input.args, input.argCount)); 
 
-    int computeTranslationUnit = 0;
-    int vertexTranslationUnit = 0;
-    int fragmentTranslationUnit = 0;
-    char const* vertexEntryPointName = request.vertexShader.name;
-    char const* fragmentEntryPointName = request.fragmentShader.name;
-    char const* computeEntryPointName = request.computeShader.name;
-
     const auto sourceLanguage = input.sourceLanguage;
 
-    if (sourceLanguage == SLANG_SOURCE_LANGUAGE_GLSL)
+    int translationUnitIndex = 0;
     {
-        // GLSL presents unique challenges because, frankly, it got the whole
-        // compilation model wrong. One aspect of working around this is that
-        // we will compile the same source file multiple times: once per
-        // entry point, and we will have different preprocessor definitions
-        // active in each case.
-
-        vertexTranslationUnit = spAddTranslationUnit(slangRequest, sourceLanguage, nullptr);
-        spAddTranslationUnitSourceString(slangRequest, vertexTranslationUnit, request.source.path, request.source.dataBegin);
-        spTranslationUnit_addPreprocessorDefine(slangRequest, vertexTranslationUnit, "__GLSL_VERTEX__", "1");
-        vertexEntryPointName = "main";
-
-        fragmentTranslationUnit = spAddTranslationUnit(slangRequest, sourceLanguage, nullptr);
-        spAddTranslationUnitSourceString(slangRequest, fragmentTranslationUnit, request.source.path, request.source.dataBegin);
-        spTranslationUnit_addPreprocessorDefine(slangRequest, fragmentTranslationUnit, "__GLSL_FRAGMENT__", "1");
-        fragmentEntryPointName = "main";
-
-        computeTranslationUnit = spAddTranslationUnit(slangRequest, sourceLanguage, nullptr);
-        spAddTranslationUnitSourceString(slangRequest, computeTranslationUnit, request.source.path, request.source.dataBegin);
-        spTranslationUnit_addPreprocessorDefine(slangRequest, computeTranslationUnit, "__GLSL_COMPUTE__", "1");
-        computeEntryPointName = "main";
-    }
-    else
-    {
-        int translationUnit = spAddTranslationUnit(slangRequest, sourceLanguage, nullptr);
-        spAddTranslationUnitSourceString(slangRequest, translationUnit, request.source.path, request.source.dataBegin);
-
-        vertexTranslationUnit = translationUnit;
-        fragmentTranslationUnit = translationUnit;
-        computeTranslationUnit = translationUnit;
+        translationUnitIndex = spAddTranslationUnit(slangRequest, sourceLanguage, nullptr);
+        spAddTranslationUnitSourceString(slangRequest, translationUnitIndex, request.source.path, request.source.dataBegin);
     }
 
     const int globalSpecializationArgCount = int(request.globalSpecializationArgs.getCount());
@@ -137,104 +134,99 @@ static const char computeEntryPointName[] = "computeMain";
         }
     };
 
-    if (request.computeShader.name)
+   Index explicitEntryPointCount = request.entryPoints.getCount();
+   for(Index ee = 0; ee < explicitEntryPointCount; ++ee)
+   {
+        if(gOptions.dontAddDefaultEntryPoints)
+        {
+            // If default entry points are not to be added, then
+            // the `request.entryPoints` array should have been
+            // left empty.
+            //
+            SLANG_ASSERT(false);
+        }
+
+       auto& entryPointInfo = request.entryPoints[ee];
+       int entryPointIndex = spAddEntryPoint(
+           slangRequest,
+           translationUnitIndex,
+           entryPointInfo.name,
+           entryPointInfo.slangStage);
+       SLANG_ASSERT(entryPointIndex == ee);
+
+       setEntryPointSpecializationArgs(entryPointIndex);
+   }
+
+    spSetLineDirectiveMode(slangRequest, SLANG_LINE_DIRECTIVE_MODE_NONE);
+
+    const SlangResult res = spCompile(slangRequest);
+
+    if (auto diagnostics = spGetDiagnosticOutput(slangRequest))
     {
-        int computeEntryPointIndex = 0;
-        if(!gOptions.dontAddDefaultEntryPoints)
+        fprintf(stderr, "%s", diagnostics);
+    }
+
+    SLANG_RETURN_ON_FAIL(res);
+
+    
+    List<ShaderCompileRequest::EntryPoint> actualEntryPoints;
+    if(input.passThrough == SLANG_PASS_THROUGH_NONE)
+    {
+        // In the case where pass-through compilation is not being used,
+        // we can use the Slang reflection information to discover what
+        // the entry points were, and then use those to drive the
+        // loading of code.
+        //
+        auto reflection = slang::ProgramLayout::get(slangRequest);
+
+        // Get the amount of entry points in reflection
+        Index entryPointCount = Index(reflection->getEntryPointCount());
+
+        // We must have at least one entry point (whether explicit or implicit)
+        SLANG_ASSERT(entryPointCount);
+
+        for(Index ee = 0; ee < entryPointCount; ++ee)
         {
-            computeEntryPointIndex = spAddEntryPoint(slangRequest, computeTranslationUnit,
-                computeEntryPointName,
-                SLANG_STAGE_COMPUTE);
-
-            setEntryPointSpecializationArgs(computeEntryPointIndex);
-        }
-
-        spSetLineDirectiveMode(slangRequest, SLANG_LINE_DIRECTIVE_MODE_NONE);
-
-        const SlangResult res = spCompile(slangRequest);
-
-        if (auto diagnostics = spGetDiagnosticOutput(slangRequest))
-        {
-            fprintf(stderr, "%s", diagnostics);
-        }
-
-        SLANG_RETURN_ON_FAIL(res);
-
-        // We are going to get the entry point count... lets check what we have
-        if (input.passThrough == SLANG_PASS_THROUGH_NONE)
-        {
-            auto reflection = spGetReflection(slangRequest);
-            // Get the amount of entry points in reflection
-            const int entryPointCount = int(spReflection_getEntryPointCount(reflection));
-
-            // Above code assumes there is an entry point
-            SLANG_ASSERT(entryPointCount && computeEntryPointIndex < entryPointCount);
-
-            auto entryPoint = spReflection_getEntryPointByIndex(reflection, computeEntryPointIndex);
-
-            // Get the entry point name
-            const char* entryPointName = spReflectionEntryPoint_getName(entryPoint);
-
+            auto entryPoint = reflection->getEntryPointByIndex(ee);
+            const char* entryPointName = entryPoint->getName();
             SLANG_ASSERT(entryPointName);
-        }
 
-        {
-            size_t codeSize = 0;
-            char const* code = (char const*) spGetEntryPointCode(slangRequest, computeEntryPointIndex, &codeSize);
+            auto slangStage = entryPoint->getStage();
 
-            ShaderProgram::KernelDesc kernelDesc;
-            kernelDesc.stage = StageType::Compute;
-            kernelDesc.codeBegin = code;
-            kernelDesc.codeEnd = code + codeSize;
+            ShaderCompileRequest::EntryPoint entryPointInfo;
+            entryPointInfo.name = entryPointName;
+            entryPointInfo.slangStage = slangStage;
 
-            out.set(PipelineType::Compute, &kernelDesc, 1);
+            actualEntryPoints.add(entryPointInfo);
         }
     }
     else
     {
-        int vertexEntryPoint = 0;
-        int fragmentEntryPoint = 1;
-        if( !gOptions.dontAddDefaultEntryPoints )
-        {
-            vertexEntryPoint = spAddEntryPoint(slangRequest, vertexTranslationUnit, vertexEntryPointName, SLANG_STAGE_VERTEX);
-            fragmentEntryPoint = spAddEntryPoint(slangRequest, fragmentTranslationUnit, fragmentEntryPointName, SLANG_STAGE_FRAGMENT);
-
-            setEntryPointSpecializationArgs(vertexEntryPoint);
-            setEntryPointSpecializationArgs(fragmentEntryPoint);
-        }
-
-        const SlangResult res = spCompile(slangRequest);
-        if (auto diagnostics = spGetDiagnosticOutput(slangRequest))
-        {
-            // TODO(tfoley): re-enable when I get a logging solution in place
-//            OutputDebugStringA(diagnostics);
-            fprintf(stderr, "%s", diagnostics);
-        }
-
-        SLANG_RETURN_ON_FAIL(res);
-
-        {
-            size_t vertexCodeSize = 0;
-            char const* vertexCode = (char const*) spGetEntryPointCode(slangRequest, vertexEntryPoint, &vertexCodeSize);
-
-            size_t fragmentCodeSize = 0;
-            char const* fragmentCode = (char const*) spGetEntryPointCode(slangRequest, fragmentEntryPoint, &fragmentCodeSize);
-
-            static const int kDescCount = 2;
-
-            ShaderProgram::KernelDesc kernelDescs[kDescCount];
-
-            kernelDescs[0].stage = StageType::Vertex;
-            kernelDescs[0].codeBegin = vertexCode;
-            kernelDescs[0].codeEnd = vertexCode + vertexCodeSize;
-
-            kernelDescs[1].stage = StageType::Fragment;
-            kernelDescs[1].codeBegin = fragmentCode;
-            kernelDescs[1].codeEnd = fragmentCode + fragmentCodeSize;
-
-            out.set(PipelineType::Graphics, kernelDescs, kDescCount);
-        }
+        actualEntryPoints = request.entryPoints;
     }
+
+    List<ShaderProgram::KernelDesc> kernelDescs;
+
+    Index actualEntryPointCount = actualEntryPoints.getCount();
+    for(Index ee = 0; ee < actualEntryPointCount; ++ee)
+    {
+        auto& actualEntryPoint = actualEntryPoints[ee];
+
+        size_t codeSize = 0;
+        char const* code = (char const*) spGetEntryPointCode(slangRequest, int(ee), &codeSize);
+
+        auto gfxStage = _translateStage(actualEntryPoint.slangStage);
+
+        ShaderProgram::KernelDesc kernelDesc;
+        kernelDesc.stage = gfxStage;
+        kernelDesc.codeBegin = code;
+        kernelDesc.codeEnd = code + codeSize;
+        kernelDesc.entryPointName = actualEntryPoint.name;
+
+        kernelDescs.add(kernelDesc);
+    }
+
+    out.set(input.pipelineType, kernelDescs.getBuffer(), kernelDescs.getCount());
 
     return SLANG_OK;
 }
@@ -294,6 +286,7 @@ static const char computeEntryPointName[] = "computeMain";
             break;
 
         case Options::ShaderProgramType::Compute:
+        case Options::ShaderProgramType::RayTracing:
             layout.numRenderTargets = 0;
             break;
     }
@@ -319,15 +312,33 @@ static const char computeEntryPointName[] = "computeMain";
     compileRequest.source = sourceInfo;
     if (shaderType == Options::ShaderProgramType::Graphics || shaderType == Options::ShaderProgramType::GraphicsCompute)
     {
-        compileRequest.vertexShader.source = sourceInfo;
-        compileRequest.vertexShader.name = vertexEntryPointName;
-        compileRequest.fragmentShader.source = sourceInfo;
-        compileRequest.fragmentShader.name = fragmentEntryPointName;
+        ShaderCompileRequest::EntryPoint vertexEntryPoint;
+        vertexEntryPoint.name = vertexEntryPointName;
+        vertexEntryPoint.slangStage = SLANG_STAGE_VERTEX;
+        compileRequest.entryPoints.add(vertexEntryPoint);
+
+        ShaderCompileRequest::EntryPoint fragmentEntryPoint;
+        fragmentEntryPoint.name = fragmentEntryPointName;
+        fragmentEntryPoint.slangStage = SLANG_STAGE_FRAGMENT;
+        compileRequest.entryPoints.add(fragmentEntryPoint);
+    }
+    else if( shaderType == Options::ShaderProgramType::RayTracing )
+    {
+        // Note: Current GPU ray tracing pipelines allow for an
+        // almost arbitrary mix of entry points for different stages
+        // to be used together (e.g., a single "program" might
+        // have multiple any-hit shaders, multiple miss shaders, etc.)
+        //
+        // Rather than try to define a fixed set of entry point
+        // names and stages that the testing will support, we will
+        // instead rely on `[shader(...)]` annotations to tell us
+        // what entry points are present in the input code.
     }
     else
     {
-        compileRequest.computeShader.source = sourceInfo;
-        compileRequest.computeShader.name = computeEntryPointName;
+        ShaderCompileRequest::EntryPoint computeEntryPoint;
+        computeEntryPoint.name = computeEntryPointName;
+        computeEntryPoint.slangStage = SLANG_STAGE_COMPUTE;
     }
     compileRequest.globalSpecializationArgs = layout.globalSpecializationArgs;
     compileRequest.entryPointSpecializationArgs = layout.entryPointSpecializationArgs;

@@ -500,6 +500,25 @@ static SlangResult _innerMain(Slang::StdWriters* stdWriters, SlangSession* sessi
             break;
     }
 
+    switch( gOptions.shaderType )
+    {
+    case Options::ShaderProgramType::Graphics:
+    case Options::ShaderProgramType::GraphicsCompute:
+        input.pipelineType = PipelineType::Graphics;
+        break;
+
+    case Options::ShaderProgramType::Compute:
+        input.pipelineType = PipelineType::Compute;
+        break;
+
+    case Options::ShaderProgramType::RayTracing:
+        input.pipelineType = PipelineType::RayTracing;
+        break;
+
+    default:
+        break;
+    }
+
     if (gOptions.sourceLanguage != SLANG_SOURCE_LANGUAGE_UNKNOWN)
     {
         input.sourceLanguage = gOptions.sourceLanguage;

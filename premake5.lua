@@ -98,6 +98,21 @@ newoption {
 }
 
 newoption {
+   trigger     = "enable-optix",
+   description = "(Optional) If true will enable OptiX build/ tests (also implicitly enables CUDA)",
+   value       = "bool",
+   default     = "false",
+   allowed     = { { "true", "True"}, { "false", "False" } }
+}
+
+newoption {
+   trigger     = "optix-sdk-path",
+   description = "(Optional) Path to the root of OptiX SDK. (Implicitly enabled OptiX and CUDA)",
+   value       = "path"
+}
+
+
+newoption {
    trigger     = "enable-profile",
    description = "(Optional) If true will enable slang-profile tool - suitable for gprof usage on linux",
    value       = "bool",
@@ -111,13 +126,21 @@ targetDetail = _OPTIONS["target-detail"]
 buildGlslang = (_OPTIONS["build-glslang"] == "true")
 enableCuda = not not (_OPTIONS["enable-cuda"] == "true" or _OPTIONS["cuda-sdk-path"])
 enableProfile = (_OPTIONS["enable-profile"] == "true")
+optixPath = _OPTIONS["optix-sdk-path"]
+enableOptix = not not (_OPTIONS["enable-optix"] == "true" or optixPath)
+enableProfile = (_OPTIONS["enable-profile"] == "true")
+
+if enableOptix then
+    optixPath = optixPath or "C:/ProgramData/NVIDIA Corporation/OptiX SDK 7.0.0/"
+    enableCuda = true;
+end
 
 -- cudaPath is only set if cuda is enabled, and CUDA_PATH enviromental variable is set
 cudaPath = nil
 if enableCuda then
     -- Get the CUDA path. Use the value set on cuda-sdk-path by default, if not set use the environment variable. 
     cudaPath = (_OPTIONS["cuda-sdk-path"] or os.getenv("CUDA_PATH"))
-end    
+end
 
 -- Is true when the target is really windows (ie not something on top of windows like cygwin)
 local isTargetWindows = (os.target() == "windows") and not (targetDetail == "mingw" or targetDetail == "cygwin")
@@ -568,6 +591,11 @@ toolSharedLibrary "render-test"
         defines { "RENDER_TEST_CUDA" }
         includedirs { cudaPath .. "/include" }
         includedirs { cudaPath .. "/include", cudaPath .. "/common/inc" }
+
+        if optixPath then
+            defines { "RENDER_TEST_OPTIX" }
+            includedirs { optixPath .. "include/" }
+        end
         
         links { "cuda", "cudart" }   
         
@@ -575,8 +603,7 @@ toolSharedLibrary "render-test"
             libdirs { cudaPath .. "/lib/Win32/" }
            
         filter { "platforms:x64" }
-            libdirs { cudaPath .. "/lib/x64/" }   
-           
+            libdirs { cudaPath .. "/lib/x64/" }       
     end
   
 --

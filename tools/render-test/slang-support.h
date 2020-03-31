@@ -17,6 +17,7 @@ struct ShaderCompilerUtil
         SlangCompileTarget      target;
         SlangSourceLanguage     sourceLanguage;
         SlangPassThrough        passThrough;
+        PipelineType            pipelineType = PipelineType::Unknown;
         char const*             profile;
         const char**            args;
         int                     argCount;
@@ -24,7 +25,7 @@ struct ShaderCompilerUtil
 
     struct Output
     {
-        void set(PipelineType pipelineType, const ShaderProgram::KernelDesc* inKernelDescs, int kernelDescCount)
+        void set(PipelineType pipelineType, const ShaderProgram::KernelDesc* inKernelDescs, Slang::Index kernelDescCount)
         {
             kernelDescs.clear();
             kernelDescs.addRange(inKernelDescs, kernelDescCount);

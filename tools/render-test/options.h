@@ -36,7 +36,8 @@ struct Options
     {
         Graphics,
         Compute,
-        GraphicsCompute
+        GraphicsCompute,
+        RayTracing,
     };
 
     char const* appName = "render-test";
