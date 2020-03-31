@@ -3142,11 +3142,9 @@ SlangResult innerMain(int argc, char** argv)
     {
         // On TeamCity CI there is an issue with unix/linux targets where test system may be different from the build system
         // That we rely on having compilation tools present such that on x64 systems we can build x86 binaries, and that appears to
-        // not be the case.
-        // Additionally it may be the case that on test systems, they can compile shared libraries but loading and using them does not
-        // appear to work. Initially it was thought it might be protected against files in /tmp but copying shared libraries elsewhere
-        // also doesn't work
-#if SLANG_UNIX_FAMILY /* && SLANG_PROCESSOR_X86 */
+        // not always be the case.
+        // For now we only allow CPP backends to run on x86_64 targets
+#if SLANG_UNIX_FAMILY && !SLANG_PROCESSOR_X86_64 
         _disableCPPBackends(&context);
 #endif
     }
