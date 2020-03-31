@@ -134,7 +134,7 @@ static SlangResult _parseGCCFamilyLine(const UnownedStringSlice& line, LineParse
     
     // Set to default case
     outLineParseResult = LineParseResult::Ignore;
-    
+
     /* example error output from different scenarios */
     
     /*
@@ -167,10 +167,28 @@ static SlangResult _parseGCCFamilyLine(const UnownedStringSlice& line, LineParse
         /home/travis/build/shader-slang/slang/tests/cpp-compiler/c-compile-link-error.c:10: undefined reference to `thing'
         clang-7: error: linker command failed with exit code 1 (use -v to see invocation)*/
 
+    /*  /path/slang-cpp-prelude.h:4:10: fatal error: ../slang.h: No such file or directory
+        #include "../slang.h"
+        ^~~~~~~~~~~~
+        compilation terminated.*/
+    
     outDiagnostic.stage = Diagnostic::Stage::Compile;
 
     List<UnownedStringSlice> split;
     StringUtil::split(line, ':', split);
+
+    // On windows we can have paths that are a: etc... if we detect this we can combine 0 - 1 to be 1.
+    if (split.getCount() > 1 && split[0].getLength() == 1)
+    {
+        const char c = split[0][0];
+        if ((c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z'))
+        {
+            // We'll assume it's a path
+            UnownedStringSlice path(split[0].begin(), split[1].end());
+            split.removeAt(0);
+            split[0] = path;
+        }
+    }
 
     if (split.getCount() == 2)
     {
@@ -267,19 +285,21 @@ static SlangResult _parseGCCFamilyLine(const UnownedStringSlice& line, LineParse
             return SLANG_OK;
         }
     }
-    else if (split.getCount() == 5)
+    else if (split.getCount() >= 5)
     {
         // Probably a regular error line
         SLANG_RETURN_ON_FAIL(_parseErrorType(split[3].trim(), outDiagnostic.type));
 
         outDiagnostic.filePath = split[0];
         SLANG_RETURN_ON_FAIL(StringUtil::parseInt(split[1], outDiagnostic.fileLine));
-        outDiagnostic.text = split[4];
+
+        // Everything from 4 to the end is the error
+        outDiagnostic.text = UnownedStringSlice(split[4].begin(), split.getLast().end());
 
         outLineParseResult = LineParseResult::Start;
         return SLANG_OK;
     }
-    
+
     // Assume it's a continuation
     outLineParseResult = LineParseResult::Continuation;
     return SLANG_OK;

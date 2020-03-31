@@ -1394,17 +1394,11 @@ SlangResult dissassembleDXILUsingDXC(
         SLANG_RETURN_ON_FAIL(compiler->compile(options, downstreamCompileResult));
         
         const auto& diagnostics = downstreamCompileResult->getDiagnostics();
-
-        StringBuilder compilerText;
-        compiler->getDesc().appendAsText(compilerText);
-
-        if (diagnostics.rawDiagnostics.getLength())
+        
         {
-            reportExternalCompileError(compilerText.getBuffer(), Severity::Note, SLANG_FAIL, diagnostics.rawDiagnostics.getUnownedSlice(), sink);
-        }
+            StringBuilder compilerText;
+            compiler->getDesc().appendAsText(compilerText);
 
-        {
-            
             StringBuilder builder;
 
             typedef DownstreamDiagnostic Diagnostic;
