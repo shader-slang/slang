@@ -1079,8 +1079,6 @@ namespace Slang
         {
             member->ParentDecl = container.Ptr();
             container->Members.add(member);
-
-            container->memberDictionaryIsValid = false;
         }
     }
 

@@ -18,14 +18,17 @@ ABSTRACT_SYNTAX_CLASS(ContainerDecl, Decl)
         return FilteredMemberList<T>(Members);
     }
 
+    bool isMemberDictionaryValid() const { return dictionaryLastMemberIndex == Members.getCount(); }
 
     // Dictionary for looking up members by name.
     // This is built on demand before performing lookup.
     Dictionary<Name*, Decl*> memberDictionary;
 
-    // Whether the `memberDictionary` is valid.
-    // Should be set to `false` if any members get added/remoed.
-    bool memberDictionaryIsValid = false;
+    // Denotes how much of Members has been placed into the dictionary/transparentMembers.
+    // If this value equals the Members.getCount(), the dictionary is completely full and valid.
+    // If it's >= 0, then the Members after dictionaryLastMemberIndex are all that need to be added.
+    // If it < 0 it means that the dictionary/transparentMembers is invalid and needs to be recreated.
+    Index dictionaryLastMemberIndex = -1;
 
     // A list of transparent members, to be used in lookup
     // Note: this is only valid if `memberDictionaryIsValid` is true

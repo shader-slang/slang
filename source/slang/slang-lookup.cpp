@@ -30,24 +30,35 @@ struct BreadcrumbInfo
 void buildMemberDictionary(ContainerDecl* decl)
 {
     // Don't rebuild if already built
-    if (decl->memberDictionaryIsValid)
+    if (decl->isMemberDictionaryValid())
         return;
 
-    decl->memberDictionary.Clear();
-    decl->transparentMembers.clear();
+    // If it's < 0 it means that the dictionaries are entirely invalid
+    if (decl->dictionaryLastMemberIndex < 0)
+    {
+        decl->dictionaryLastMemberIndex = 0;
+        decl->memberDictionary.Clear();
+        decl->transparentMembers.clear();
+    }
 
     // are we a generic?
     GenericDecl* genericDecl = as<GenericDecl>(decl);
 
-    for (auto m : decl->Members)
+    const Index membersCount = decl->Members.getCount();
+
+    SLANG_ASSERT(decl->dictionaryLastMemberIndex >= 0 && decl->dictionaryLastMemberIndex <= membersCount);
+
+    for (Index i = decl->dictionaryLastMemberIndex; i < membersCount; ++i)
     {
+        Decl* m = decl->Members[i];
+
         auto name = m->getName();
 
         // Add any transparent members to a separate list for lookup
         if (m->HasModifier<TransparentModifier>())
         {
             TransparentMemberInfo info;
-            info.decl = m.Ptr();
+            info.decl = m;
             decl->transparentMembers.add(info);
         }
 
@@ -59,17 +70,16 @@ void buildMemberDictionary(ContainerDecl* decl)
         if (genericDecl && m == genericDecl->inner)
             continue;
 
-
         m->nextInContainerWithSameName = nullptr;
 
         Decl* next = nullptr;
         if (decl->memberDictionary.TryGetValue(name, next))
             m->nextInContainerWithSameName = next;
 
-        decl->memberDictionary[name] = m.Ptr();
-
+        decl->memberDictionary[name] = m;
     }
-    decl->memberDictionaryIsValid = true;
+    decl->dictionaryLastMemberIndex = membersCount;
+    SLANG_ASSERT(decl->isMemberDictionaryValid());
 }
 
 
@@ -186,7 +196,7 @@ static void _lookUpDirectAndTransparentMembers(
     ContainerDecl* containerDecl = containerDeclRef.getDecl();
 
     // Ensure that the lookup dictionary in the container is up to date
-    if (!containerDecl->memberDictionaryIsValid)
+    if (!containerDecl->isMemberDictionaryValid())
     {
         buildMemberDictionary(containerDecl);
     }
