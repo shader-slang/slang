@@ -1526,6 +1526,10 @@ namespace Slang
         Session*                    session,
         DeclRef<GenericDecl> const& declRef);
 
+    RefPtr<NamespaceType> getNamespaceType(
+        Session*                            session,
+        DeclRef<NamespaceDeclBase> const&   declRef);
+
     RefPtr<SamplerStateType> getSamplerStateType(
         Session*        session);
 

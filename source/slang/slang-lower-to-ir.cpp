@@ -1575,6 +1575,8 @@ struct ValLoweringVisitor : ValVisitor<ValLoweringVisitor, LoweredValInfo, Lower
     UNEXPECTED_CASE(ErrorType)
     UNEXPECTED_CASE(InitializerListType)
     UNEXPECTED_CASE(OverloadGroupType)
+    UNEXPECTED_CASE(NamespaceType)
+#undef UNEXPECTED_CASE
 };
 
 LoweredValInfo lowerVal(
@@ -4256,25 +4258,16 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
         return LoweredValInfo();
     }
 
-    LoweredValInfo visitImportDecl(ImportDecl* /*decl*/)
-    {
-        return LoweredValInfo();
-    }
+#define IGNORED_CASE(NAME) \
+    LoweredValInfo visit##NAME(NAME*) { return LoweredValInfo(); }
 
-    LoweredValInfo visitEmptyDecl(EmptyDecl* /*decl*/)
-    {
-        return LoweredValInfo();
-    }
+    IGNORED_CASE(ImportDecl)
+    IGNORED_CASE(EmptyDecl)
+    IGNORED_CASE(SyntaxDecl)
+    IGNORED_CASE(AttributeDecl)
+    IGNORED_CASE(NamespaceDecl)
 
-    LoweredValInfo visitSyntaxDecl(SyntaxDecl* /*decl*/)
-    {
-        return LoweredValInfo();
-    }
-
-    LoweredValInfo visitAttributeDecl(AttributeDecl* /*decl*/)
-    {
-        return LoweredValInfo();
-    }
+#undef IGNORED_CASE
 
     LoweredValInfo visitTypeDefDecl(TypeDefDecl* decl)
     {
@@ -4575,9 +4568,9 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
     bool isGlobalVarDecl(VarDecl* decl)
     {
         auto parent = decl->ParentDecl;
-        if (as<ModuleDecl>(parent))
+        if (as<NamespaceDeclBase>(parent))
         {
-            // Variable declared at global scope? -> Global.
+            // Variable declared at global/namespace scope? -> Global.
             return true;
         }
         else if(as<AggTypeDeclBase>(parent))

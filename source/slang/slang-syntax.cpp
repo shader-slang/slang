@@ -1280,6 +1280,35 @@ void Type::accept(IValVisitor* visitor, void* extra)
         return this;
     }
 
+    // NamespaceType
+
+    String NamespaceType::ToString()
+    {
+        String result;
+        result.append("namespace ");
+        result.append(m_declRef.toString());
+        return result;
+    }
+
+    bool NamespaceType::EqualsImpl(Type * type)
+    {
+        if (auto namespaceType = as<NamespaceType>(type))
+        {
+            return m_declRef.Equals(namespaceType->m_declRef);
+        }
+        return false;
+    }
+
+    int NamespaceType::GetHashCode()
+    {
+        return m_declRef.GetHashCode();
+    }
+
+    RefPtr<Type> NamespaceType::CreateCanonicalType()
+    {
+        return this;
+    }
+
     // ArithmeticExpressionType
 
     // VectorExpressionType
@@ -2299,6 +2328,16 @@ void Type::accept(IValVisitor* visitor, void* extra)
         auto genericDeclRefType = new GenericDeclRefType(declRef);
         genericDeclRefType->setSession(session);
         return genericDeclRefType;
+    }
+
+    RefPtr<NamespaceType> getNamespaceType(
+        Session*                            session,
+        DeclRef<NamespaceDeclBase> const&   declRef)
+    {
+        auto type = new NamespaceType;
+        type->setSession(session);
+        type->m_declRef = declRef;
+        return type;
     }
 
     RefPtr<SamplerStateType> getSamplerStateType(
