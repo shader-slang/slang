@@ -641,19 +641,21 @@ SlangResult emitEntryPointSourceFromIR(
     // There may be global-scope modifiers that we should emit now
     sourceEmitter->emitPreprocessorDirectives();
 
+    RefObject* extensionTracker = sourceEmitter->getExtensionTracker();
+
+    if (auto glslExtensionTracker = as<GLSLExtensionTracker>(extensionTracker))
+    {
+        StringBuilder builder;
+        glslExtensionTracker->appendExtensionRequireLines(builder);
+        sourceWriter.emit(builder.getUnownedSlice());
+    }
+
     sourceEmitter->emitLayoutDirectives(targetRequest);
 
     String prefix = sourceWriter.getContent();
     
     StringBuilder finalResultBuilder;
     finalResultBuilder << prefix;
-
-    RefObject* extensionTracker = sourceEmitter->getExtensionTracker();
-
-    if (auto glslExtensionTracker = as<GLSLExtensionTracker>(extensionTracker))
-    {
-        glslExtensionTracker->appendExtensionRequireLines(finalResultBuilder);
-    }
 
     finalResultBuilder << code;
 
