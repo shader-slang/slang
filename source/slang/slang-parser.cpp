@@ -180,17 +180,18 @@ namespace Slang
 
     // Forward Declarations
 
-    static void ParseDeclBody(
-        Parser*						parser,
-        ContainerDecl*				containerDecl,
-        TokenType	                closingToken);
+        /// Parse declarations making up the body of `parent`, up to the matching `closingToken`
+    static void parseDecls(
+        Parser*         parser,
+        ContainerDecl*  parent,
+        TokenType	    closingToken);
+
+        /// Parse a body consisting of declarations enclosed in `{}`, as the children of `parent`.
+    static void parseDeclBody(
+        Parser*         parser,
+        ContainerDecl*  parent);
 
     static RefPtr<Decl> parseEnumDecl(Parser* parser);
-
-    // Parse the `{}`-delimeted body of an aggregate type declaration
-    static void parseAggTypeDeclBody(
-        Parser*             parser,
-        AggTypeDeclBase*    decl);
 
     static RefPtr<Modifier> ParseOptSemantics(
         Parser* parser);
@@ -2342,7 +2343,7 @@ namespace Slang
         ParseOptSemantics(parser, bufferVarDecl.Ptr());
 
         // The declarations in the body belong to the data type.
-        parseAggTypeDeclBody(parser, bufferDataTypeDecl.Ptr());
+        parseDeclBody(parser, bufferDataTypeDecl.Ptr());
 
         // All HLSL buffer declarations are "transparent" in that their
         // members are implicitly made visible in the parent scope.
@@ -2403,7 +2404,7 @@ namespace Slang
         parser->FillPosition(decl.Ptr());
         decl->targetType = parser->ParseTypeExp();
         parseOptionalInheritanceClause(parser, decl);
-        parseAggTypeDeclBody(parser, decl.Ptr());
+        parseDeclBody(parser, decl.Ptr());
 
         return decl;
     }
@@ -2488,9 +2489,128 @@ namespace Slang
 
         parseOptionalInheritanceClause(parser, decl.Ptr());
 
-        parseAggTypeDeclBody(parser, decl.Ptr());
+        parseDeclBody(parser, decl.Ptr());
 
         return decl;
+    }
+
+    static RefPtr<RefObject> parseNamespaceDecl(Parser* parser, void* /*userData*/)
+    {
+        // We start by parsing the name of the namespace that is being opened.
+        //
+        // TODO: We should eventually support a qualified name for
+        // a namespace declaration:
+        //
+        //      namespace A.B { ... }
+        //
+        // which should expand as if the user had written nested
+        // namespace declarations:
+        //
+        //      namespace A { namespace B { ... } }
+        //
+        // TODO: Support we also support the degenerate case of
+        // a namesapce without a name? Should that be treated as
+        // an anonymous (and implicitly imported) namespace, or
+        // something else?
+        //
+        // TODO: Should we support a shorthand syntax for putting
+        // the rest of the current scope/file into a namespace:
+        //
+        //      namespace A.B;
+        //
+        //      ...
+        //
+        NameLoc nameAndLoc = NameLoc(parser->ReadToken(TokenType::Identifier));
+
+        // Once we have the name for the namespace, we face a challenge:
+        // either the namespace hasn't been seen before (in which case
+        // we need to create it and start filling it in), or we've seen
+        // the same namespace before inside the same module, such that
+        // we should be adding the declarations we parse to the existing
+        // declarations (so that they share a common scope/parent).
+        //
+        // In each case we will find a namespace that we want to fill in,
+        // but depending on the case we may or may not want to return
+        // a declaration to the caller (since they will try to add
+        // any non-null pointer we return to the AST).
+        //
+        RefPtr<NamespaceDecl> namespaceDecl;
+        RefPtr<RefObject> result;
+        //
+        // In order to find out what case we are in, we start by looking
+        // for a namespace declaration of the same name in the parent
+        // declaration.
+        //
+        {
+            auto parentDecl = parser->currentScope->containerDecl;
+            SLANG_ASSERT(parentDecl);
+
+            // We meed to make sure that the member dictionary of
+            // the parent declaration has been built/rebuilt so that
+            // lookup by name will work.
+            //
+            // TODO: The current way we rebuild the member dictionary
+            // would make for O(N^2) parsing time in a file that
+            // consisted of N back-to-back `namespace`s, since each
+            // would trigger a rebuild of the member dictionary that
+            // would take O(N) time.
+            //
+            // Eventually we should make `builtMemberDictionary()`
+            // incremental, so that it only has to process members
+            // added since the last time it was invoked.
+            //
+            buildMemberDictionary(parentDecl);
+
+            // There might be multiple members of the same name
+            // (if we define a namespace `foo` after an overloaded
+            // function `foo` has been defined), and direct member
+            // lookup will only give us the first.
+            //
+            Decl* firstDecl = nullptr;
+            parentDecl->memberDictionary.TryGetValue(nameAndLoc.name, firstDecl);
+            //
+            // We will search through the declarations of the name
+            // and find the first that is a namespace (if any).
+            //
+            // Note: we do not issue diagnostics here based on
+            // the potential conflicts between these declarations,
+            // because we want to do as little semantic analysis
+            // as possible in the parser, and we'd rather be
+            // as permissive as possible right now.
+            //
+            for(Decl* d = firstDecl; d; d = d->nextInContainerWithSameName)
+            {
+                namespaceDecl = as<NamespaceDecl>(d);
+                if(namespaceDecl)
+                    break;
+            }
+
+            // If we didn't find a pre-existing namespace, then
+            // we will go ahead and create one now.
+            //
+            if( !namespaceDecl )
+            {
+                namespaceDecl = new NamespaceDecl();
+                namespaceDecl->nameAndLoc = nameAndLoc;
+
+                // In the case where we are creating the first
+                // declaration of the given namesapce, we need
+                // to use it as the return value of the parsing
+                // callback, so that it is appropriately added
+                // to the parent declaration.
+                //
+                result = namespaceDecl;
+            }
+        }
+
+        // Now that we have a namespace declaration to fill in
+        // (whether a new or existing one), we can parse the
+        // `{}`-enclosed body to add declarations as children
+        // of the namespace.
+        //
+        parseDeclBody(parser, namespaceDecl.Ptr());
+
+        return result;
     }
 
     static RefPtr<RefObject> parseConstructorDecl(Parser* parser, void* /*userData*/)
@@ -3040,8 +3160,7 @@ namespace Slang
     }
 
 
-    // Parse a body consisting of declarations
-    static void ParseDeclBody(
+    static void parseDecls(
         Parser*         parser,
         ContainerDecl*  containerDecl,
         TokenType       closingToken)
@@ -3052,22 +3171,14 @@ namespace Slang
         }
     }
 
-    // Parse the `{}`-delimeted body of an aggregate type declaration
-    static void parseAggTypeDeclBody(
-        Parser*             parser,
-        AggTypeDeclBase*    decl)
+    static void parseDeclBody(
+        Parser*         parser,
+        ContainerDecl*  parent)
     {
-        // TODO: the scope used for the body might need to be
-        // slightly specialized to deal with the complexity
-        // of how `this` works.
-        //
-        // Alternatively, that complexity can be pushed down
-        // to semantic analysis so that it doesn't clutter
-        // things here.
-        parser->PushScope(decl);
+        parser->PushScope(parent);
 
         parser->ReadToken(TokenType::LBrace);
-        ParseDeclBody(parser, decl, TokenType::RBrace);
+        parseDecls(parser, parent, TokenType::RBrace);
 
         parser->PopScope();
     }
@@ -3081,9 +3192,25 @@ namespace Slang
         }
 
         PushScope(program);
-        program->loc = tokenReader.peekLoc();
-        program->scope = currentScope;
-        ParseDeclBody(this, program, TokenType::EndOfFile);
+
+        // A single `ModuleDecl` might span multiple source files, so it
+        // is possible that we are parsing a new source file into a module
+        // that has already been created and filled in for a previous
+        // source file.
+        //
+        // If this is the first source file for the module then we expect
+        // its location information to be invalid, and we will set it to
+        // refer to the start of the first source file.
+        //
+        // This convention is reasonable for any single-source-file module,
+        // and about as good as possible for multiple-file modules.
+        //
+        if(!program->loc.isValid())
+        {
+            program->loc = tokenReader.peekLoc();
+        }
+
+        parseDecls(this, program, TokenType::EndOfFile);
         PopScope();
 
         SLANG_RELEASE_ASSERT(currentScope == outerScope);
@@ -3104,7 +3231,7 @@ namespace Slang
             // We allow for an inheritance clause on a `struct`
             // so that it can conform to interfaces.
             parseOptionalInheritanceClause(this, rs.Ptr());
-            parseAggTypeDeclBody(this, rs.Ptr());
+            parseDeclBody(this, rs.Ptr());
             return rs;
         });
     }
@@ -3118,7 +3245,7 @@ namespace Slang
 
         parseOptionalInheritanceClause(this, rs.Ptr());
 
-        parseAggTypeDeclBody(this, rs.Ptr());
+        parseDeclBody(this, rs.Ptr());
         return rs;
     }
 
@@ -5097,6 +5224,7 @@ namespace Slang
         DECL(func,            parseFuncDecl);
         DECL(typealias,       parseTypeAliasDecl);
         DECL(__generic_value_param, parseGlobalGenericValueParamDecl);
+        DECL(namespace,       parseNamespaceDecl);
 
     #undef DECL
 

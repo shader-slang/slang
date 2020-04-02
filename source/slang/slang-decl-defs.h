@@ -241,11 +241,21 @@ SIMPLE_SYNTAX_CLASS(RefAccessorDecl, AccessorDecl)
 
 SIMPLE_SYNTAX_CLASS(FuncDecl, FunctionDeclBase)
 
-// A "module" of code (essentiately, a single translation unit)
-// that provides a scope for some number of declarations.
-SYNTAX_CLASS(ModuleDecl, ContainerDecl)
-    FIELD(RefPtr<Scope>, scope)
+SIMPLE_SYNTAX_CLASS(NamespaceDeclBase, ContainerDecl)
 
+    // A `namespace` declaration inside some module, that provides
+    // a named scope for declarations inside it.
+    //
+    // Note: Multiple `namespace` declarations with the same name
+    // in a given module/file will be collapsed into a single
+    // `NamespaceDecl` during parsing, so this declaration does
+    // not directly represent what is present in the input syntax.
+    //
+SIMPLE_SYNTAX_CLASS(NamespaceDecl, NamespaceDeclBase)
+
+    // A "module" of code (essentiately, a single translation unit)
+    // that provides a scope for some number of declarations.
+SYNTAX_CLASS(ModuleDecl, NamespaceDeclBase)
     // The API-level module that this declaration belong to.
     //
     // This field allows lookup of the `Module` based on a

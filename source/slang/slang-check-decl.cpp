@@ -234,9 +234,10 @@ namespace Slang
         /// Is `decl` a global shader parameter declaration?
     bool isGlobalShaderParameter(VarDeclBase* decl)
     {
-        // A global shader parameter must be declared at global (module) scope.
+        // A global shader parameter must be declared at global or namespace
+        // scope, so that it has a single definition across the module.
         //
-        if(!as<ModuleDecl>(decl->ParentDecl)) return false;
+        if(!as<NamespaceDeclBase>(decl->ParentDecl)) return false;
 
         // A global variable marked `static` indicates a traditional
         // global variable (albeit one that is implicitly local to
@@ -406,6 +407,11 @@ namespace Slang
             // we are conceptually performing a "cast" to the given super-type,
             // with the declaration showing that such a cast is legal.
             auto type = GetSup(constraintDeclRef);
+            return QualType(type);
+        }
+        else if( auto namespaceDeclRef = declRef.as<NamespaceDeclBase>())
+        {
+            auto type = getNamespaceType(session, namespaceDeclRef);
             return QualType(type);
         }
         if( sink )

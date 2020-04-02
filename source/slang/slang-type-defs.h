@@ -444,6 +444,25 @@ protected:
 )
 END_SYNTAX_CLASS()
 
+// The "type" of a reference to a module or namespace
+SYNTAX_CLASS(NamespaceType, Type)
+    DECL_FIELD(DeclRef<NamespaceDeclBase>, m_declRef)
+
+RAW(
+    NamespaceType()
+    {}
+
+    DeclRef<NamespaceDeclBase> const& getDeclRef() const { return m_declRef; }
+
+    virtual String ToString() override;
+
+protected:
+    virtual bool EqualsImpl(Type * type) override;
+    virtual int GetHashCode() override;
+    virtual RefPtr<Type> CreateCanonicalType() override;    
+)
+END_SYNTAX_CLASS()
+
 // The concrete type for a value wrapped in an existential, accessible
 // when the existential is "opened" in some context.
 SYNTAX_CLASS(ExtractExistentialType, Type)
@@ -501,4 +520,3 @@ RAW(
     virtual RefPtr<Val> SubstituteImpl(SubstitutionSet subst, int* ioDiff) override;
 )
 END_SYNTAX_CLASS()
-
