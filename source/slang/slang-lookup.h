@@ -32,6 +32,14 @@ LookupResult lookUpMember(
     Type*               type,
     LookupMask          mask = LookupMask::Default);
 
+    /// Perform "direct" lookup in a container declaration
+LookupResult lookUpDirectAndTransparentMembers(
+    Session*                session,
+    SemanticsVisitor*       semantics,
+    Name*                   name,
+    DeclRef<ContainerDecl>  containerDeclRef,
+    LookupMask              mask = LookupMask::Default);
+
 // TODO: this belongs somewhere else
 
 QualType getTypeForDeclRef(

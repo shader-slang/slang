@@ -1423,7 +1423,37 @@ namespace Slang
     {
         auto& baseType = baseExpression->type;
 
-        if (auto typeType = as<TypeType>(baseType))
+        // TODO: Need to handle overloaded case (in case we
+        // have multiple visible types and/or namespaces
+        // with the same name).
+
+        if (auto namespaceType = as<NamespaceType>(baseType))
+        {
+            // We are looking up a namespace member.
+            //
+            auto namespaceDeclRef = namespaceType->getDeclRef();
+
+            // This ought to be the easy case, because
+            // there are no restrictions on whether
+            // we can reference the declaration here.
+            //
+            LookupResult lookupResult = lookUpDirectAndTransparentMembers(
+                getSession(),
+                this,
+                expr->name,
+                namespaceDeclRef);
+            if (!lookupResult.isValid())
+            {
+                return lookupMemberResultFailure(expr, baseType);
+            }
+
+            return createLookupResultExpr(
+                expr->name,
+                lookupResult,
+                nullptr,
+                expr->loc);
+        }
+        else if (auto typeType = as<TypeType>(baseType))
         {
             // We are looking up a member inside a type.
             // We want to be careful here because we should only find members
@@ -1594,6 +1624,11 @@ namespace Slang
         //
         expr->BaseExpression = maybeOpenExistential(expr->BaseExpression);
 
+        // TODO: Handle the case of an overloaded base expression
+        // here, in case we can use the name of the member to
+        // disambiguate which of the candidates is meant, or if
+        // we can return an overloaded result.
+
         auto & baseType = expr->BaseExpression->type;
 
         // Note: Checking for vector types before declaration-reference types,
@@ -1618,6 +1653,10 @@ namespace Slang
                 expr,
                 baseScalarType,
                 1);
+        }
+        else if( as<NamespaceType>(baseType) )
+        {
+            return _lookupStaticMember(expr, expr->BaseExpression);
         }
         else if(auto typeType = as<TypeType>(baseType))
         {

@@ -245,6 +245,29 @@ static void _lookUpDirectAndTransparentMembers(
     }
 }
 
+    /// Perform "direct" lookup in a container declaration
+LookupResult lookUpDirectAndTransparentMembers(
+    Session*                session,
+    SemanticsVisitor*       semantics,
+    Name*                   name,
+    DeclRef<ContainerDecl>  containerDeclRef,
+    LookupMask              mask)
+{
+    LookupRequest request;
+    request.semantics = semantics;
+    request.mask = mask;
+    LookupResult result;
+    _lookUpDirectAndTransparentMembers(
+        session,
+        name,
+        containerDeclRef,
+        request,
+        result,
+        nullptr);
+    return result;
+}
+
+
 static RefPtr<SubtypeWitness> _makeSubtypeWitness(
     Type*                       subType,
     SubtypeWitness*             subToMidWitness,
@@ -618,6 +641,12 @@ static void _lookUpInScopes(
         {
             auto containerDecl = link->containerDecl;
 
+            // It is possible for the first scope in a list of
+            // siblings to be a "dummy" scope that only exists
+            // to combine the siblings; in that case it will
+            // have a null `containerDecl` and needs to be
+            // skipped over.
+            //
             if(!containerDecl)
                 continue;
 
