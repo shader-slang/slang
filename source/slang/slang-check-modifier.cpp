@@ -189,8 +189,7 @@ namespace Slang
         //
         attrDecl->ParentDecl = parentDecl;
         parentDecl->Members.add(attrDecl);
-        parentDecl->memberDictionaryIsValid = false;
-
+        
         // Finally, we perform any required semantic checks on
         // the newly constructed attribute decl.
         //
