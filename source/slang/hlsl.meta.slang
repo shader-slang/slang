@@ -2659,13 +2659,13 @@ uint WaveActiveCountBits(bool value);
 
 __glsl_extension(GL_KHR_shader_subgroup_basic)
 __spirv_version(1.3)
-__target_intrinsic(glsl, "gl_SubgroupSize")
+__target_intrinsic(glsl, "(gl_SubgroupSize)")
 __target_intrinsic(cuda, "(warpSize)")
 uint WaveGetLaneCount();
 
 __glsl_extension(GL_KHR_shader_subgroup_basic)
 __spirv_version(1.3)
-__target_intrinsic(glsl, "gl_SubgroupInvocationID")
+__target_intrinsic(glsl, "(gl_SubgroupInvocationID)")
 __target_intrinsic(cuda, "_getLaneId()")
 uint WaveGetLaneIndex();
 
