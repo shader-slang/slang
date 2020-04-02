@@ -34,9 +34,9 @@ void buildMemberDictionary(ContainerDecl* decl)
         return;
 
     // If it's < 0 it means that the dictionaries are entirely invalid
-    if (decl->dictionaryLastMemberIndex < 0)
+    if (decl->dictionaryLastCount < 0)
     {
-        decl->dictionaryLastMemberIndex = 0;
+        decl->dictionaryLastCount = 0;
         decl->memberDictionary.Clear();
         decl->transparentMembers.clear();
     }
@@ -46,9 +46,9 @@ void buildMemberDictionary(ContainerDecl* decl)
 
     const Index membersCount = decl->Members.getCount();
 
-    SLANG_ASSERT(decl->dictionaryLastMemberIndex >= 0 && decl->dictionaryLastMemberIndex <= membersCount);
+    SLANG_ASSERT(decl->dictionaryLastCount >= 0 && decl->dictionaryLastCount <= membersCount);
 
-    for (Index i = decl->dictionaryLastMemberIndex; i < membersCount; ++i)
+    for (Index i = decl->dictionaryLastCount; i < membersCount; ++i)
     {
         Decl* m = decl->Members[i];
 
@@ -78,7 +78,8 @@ void buildMemberDictionary(ContainerDecl* decl)
 
         decl->memberDictionary[name] = m;
     }
-    decl->dictionaryLastMemberIndex = membersCount;
+
+    decl->dictionaryLastCount = membersCount;
     SLANG_ASSERT(decl->isMemberDictionaryValid());
 }
 
