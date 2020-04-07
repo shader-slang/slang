@@ -754,6 +754,43 @@ namespace Slang
         return DeclRef<T>(decl, nullptr);
     }
 
+    enum class MemberFilterStyle
+    {
+        All,                        ///< All members               
+        Instance,                   ///< Only instance members
+        Static,                     ///< Only static (ie non instance) members
+    };
+
+    const RefPtr<Decl>* adjustFilterCursorImpl(const SyntaxClassBase::ClassInfo& clsInfo, MemberFilterStyle filterStyle, const RefPtr<Decl>* ptr, const RefPtr<Decl>* end);
+    const RefPtr<Decl>* getFilterCursorByIndexImpl(const SyntaxClassBase::ClassInfo& clsInfo, MemberFilterStyle filterStyle, const RefPtr<Decl>* ptr, const RefPtr<Decl>* end, Index index);
+    Index getFilterCountImpl(const SyntaxClassBase::ClassInfo& clsInfo, MemberFilterStyle filterStyle, const RefPtr<Decl>* ptr, const RefPtr<Decl>* end);
+
+
+    template <typename T>
+    const RefPtr<Decl>* adjustFilterCursor(MemberFilterStyle filterStyle, const RefPtr<Decl>* ptr, const RefPtr<Decl>* end)
+    {
+        return adjustFilterCursorImpl(SyntaxClassBase::Impl<T>::kClassInfo, filterStyle, ptr, end);
+    }
+
+        /// Finds the element at index. If there is no element at the index (for example has too few elements), returns nullptr.
+    template <typename T>
+    const RefPtr<Decl>* getFilterCursorByIndex(MemberFilterStyle filterStyle, const RefPtr<Decl>* ptr, const RefPtr<Decl>* end, Index index)
+    {
+        return getFilterCursorByIndexImpl(SyntaxClassBase::Impl<T>::kClassInfo, filterStyle, ptr, end, index);
+    }
+     
+    template <typename T>
+    Index getFilterCount(MemberFilterStyle filterStyle, const RefPtr<Decl>* ptr, const RefPtr<Decl>* end)
+    {
+        return getFilterCountImpl(SyntaxClassBase::Impl<T>::kClassInfo, filterStyle, ptr, end);
+    }
+     
+    template <typename T>
+    bool isFilterNonEmpty(MemberFilterStyle filterStyle, const RefPtr<Decl>* ptr, const RefPtr<Decl>* end)
+    {
+        return adjustFilterCursorImpl(SyntaxClassBase::Impl<T>::kClassInfo, filterStyle, ptr, end) != end;
+    }
+
     template<typename T>
     struct FilteredMemberList
     {
@@ -765,68 +802,58 @@ namespace Slang
         {}
 
         explicit FilteredMemberList(
-            List<Element> const& list)
-            : m_begin(adjust(list.begin(), list.end()))
+            List<Element> const& list,
+            MemberFilterStyle filterStyle = MemberFilterStyle::All)
+            : m_begin(adjustFilterCursor<T>(filterStyle, list.begin(), list.end()))
             , m_end(list.end())
+            , m_filterStyle(filterStyle)
         {}
 
         struct Iterator
         {
             const Element* m_cursor;
             const Element* m_end;
+            MemberFilterStyle m_filterStyle;
 
-            bool operator!=(Iterator const& other)
-            {
-                return m_cursor != other.m_cursor;
-            }
+            bool operator!=(Iterator const& other) const { return m_cursor != other.m_cursor; }
 
-            void operator++()
-            {
-                m_cursor = adjust(m_cursor + 1, m_end);
-            }
+            void operator++() { m_cursor = adjustFilterCursor<T>(m_filterStyle, m_cursor + 1, m_end); }
 
-            const RefPtr<T>& operator*()
-            {
-                return  *(RefPtr<T>*)(m_cursor);
-            }
+            const RefPtr<T>& operator*() { return  *(RefPtr<T>*)(m_cursor); }
         };
 
         Iterator begin()
         {
-            Iterator iter = { m_begin, m_end };
+            Iterator iter = { m_begin, m_end, m_filterStyle };
             return iter;
         }
 
         Iterator end()
         {
-            Iterator iter = { m_end, m_end };
+            Iterator iter = { m_end, m_end, m_filterStyle };
             return iter;
-        }
-
-        static const Element* adjust(const Element* cursor, const Element* end)
-        {
-            while (cursor != end)
-            {
-                if (as<T>(*cursor))
-                    return cursor;
-                cursor++;
-            }
-            return cursor;
         }
 
         // TODO(tfoley): It is ugly to have these.
         // We should probably fix the call sites instead.
         const RefPtr<T>& getFirst() { return *begin(); }
-        Index getCount()
+        Index getCount() { return getFilterCount<T>(m_filterStyle, m_begin, m_end); }
+
+        RefPtr<T> operator[](Index index) const
         {
-            Index count = 0;
-            for (auto iter : (*this))
-            {
-                (void)iter;
-                count++;
-            }
-            return count;
+            const RefPtr<Decl>* ptr = getFilterCursorByIndex<T>(m_filterStyle, m_begin, m_end, index);
+            SLANG_ASSERT(ptr);
+            return  *(RefPtr<T>*)(ptr);
         }
+
+            /// Returns true if empty (equivalent to getCount() == 0)
+        bool isEmpty() const
+        {
+            /// Note we don't have to scan, because m_begin has already been adjusted, when the FilteredMemberList is constructed
+            return m_begin == m_end;
+        }
+            /// Returns true if non empty (equivalent to getCount() != 0 but faster)
+        bool isNonEmpty() const { return !isEmpty(); }
 
         List<RefPtr<T>> toArray()
         {
@@ -837,12 +864,10 @@ namespace Slang
             }
             return result;
         }
-
-        bool isEmpty() const { return m_end == m_begin; }
-        bool isNonEmpty() const { return m_end != m_begin; }
-
-        const Element* m_begin;
+        
+        const Element* m_begin;             ///< Is either equal to m_end, or points to first *valid* filtered member
         const Element* m_end;
+        MemberFilterStyle m_filterStyle;
     };
 
     struct TransparentMemberInfo
@@ -854,25 +879,34 @@ namespace Slang
     template<typename T>
     struct FilteredMemberRefList
     {
-        List<RefPtr<Decl>> const&	decls;
-        SubstitutionSet		substitutions;
+        List<RefPtr<Decl>> const&	m_decls;
+        SubstitutionSet		m_substitutions;
+        MemberFilterStyle   m_filterStyle;
 
         FilteredMemberRefList(
             List<RefPtr<Decl>> const&	decls,
-            SubstitutionSet		substitutions)
-            : decls(decls)
-            , substitutions(substitutions)
+            SubstitutionSet		substitutions,
+            MemberFilterStyle   filterStyle = MemberFilterStyle::All)
+            : m_decls(decls)
+            , m_substitutions(substitutions)
+            , m_filterStyle(filterStyle)
         {}
 
-        int Count() const
+        Index getCount() const { return getFilterCount<T>(m_filterStyle, m_decls.begin(), m_decls.end()); }
+    
+            /// True if empty (equivalent to getCount == 0, but faster)
+        bool isEmpty() const { return !isNonEmpty(); }
+            /// True if non empty (equivalent to getCount() != 0 but faster)
+        bool isNonEmpty() const { return isFilterNonEmpty<T>(m_filterStyle, m_decls.begin(), m_decls.end()); }
+
+        DeclRef<T> operator[](Index index) const
         {
-            int count = 0;
-            for (auto d : *this)
-                count++;
-            return count;
+             const RefPtr<Decl>* decl = getFilterCursorByIndex<T>(m_filterStyle, m_decls.begin(), m_decls.end(), index);
+             SLANG_ASSERT(decl);
+             return DeclRef<T>((T*) decl->Ptr(), m_substitutions);
         }
 
-        List<DeclRef<T>> ToArray() const
+        List<DeclRef<T>> toArray() const
         {
             List<DeclRef<T>> result;
             for (auto d : *this)
@@ -882,50 +916,33 @@ namespace Slang
 
         struct Iterator
         {
-            FilteredMemberRefList const* list;
-            const RefPtr<Decl>* ptr;
-            const RefPtr<Decl>* end;
+            FilteredMemberRefList const* m_list;
+            const RefPtr<Decl>* m_ptr;
+            const RefPtr<Decl>* m_end;
+            MemberFilterStyle m_filterStyle;
 
-            Iterator() : list(nullptr), ptr(nullptr) {}
+            Iterator() : m_list(nullptr), m_ptr(nullptr), m_filterStyle(MemberFilterStyle::All) {}
             Iterator(
-                FilteredMemberRefList const* inList,
-                const RefPtr<Decl>* inPtr,
-                const RefPtr<Decl>* inEnd)
-                : list(inList)
-                , ptr(inPtr)
-                , end(inEnd)
+                FilteredMemberRefList const* list,
+                const RefPtr<Decl>* ptr,
+                const RefPtr<Decl>* end,
+                MemberFilterStyle filterStyle
+                )
+                : m_list(list)
+                , m_ptr(ptr)
+                , m_end(end)
+                , m_filterStyle(filterStyle)
             {}
 
-            bool operator!=(Iterator other)
-            {
-                return ptr != other.ptr;
-            }
+            bool operator!=(const Iterator& other) const  { return m_ptr != other.m_ptr; }
 
-            void operator++()
-            {
-                ptr = list->Adjust(ptr + 1, end);
-            }
+            void operator++() { m_ptr = adjustFilterCursor<T>(m_filterStyle, m_ptr + 1, m_end); }
 
-            DeclRef<T> operator*()
-            {
-                return DeclRef<T>((T*) ptr->Ptr(), list->substitutions);
-            }
+            DeclRef<T> operator*() { return DeclRef<T>((T*) m_ptr->Ptr(), m_list->m_substitutions); }
         };
 
-        Iterator begin() const { return Iterator(this, Adjust(decls.begin(), decls.end()), decls.end()); }
-        Iterator end() const { return Iterator(this, decls.end(), decls.end()); }
-
-        const RefPtr<Decl>* Adjust(const RefPtr<Decl>* ptr, const RefPtr<Decl>* end) const
-        {
-            for (; ptr != end; ptr++)
-            {
-                if (ptr->is<T>())
-                {
-                    return ptr;
-                }
-            }
-            return end;
-        }
+        Iterator begin() const { return Iterator(this, adjustFilterCursor<T>(m_filterStyle, m_decls.begin(), m_decls.end()), m_decls.end(), m_filterStyle); }
+        Iterator end() const { return Iterator(this, m_decls.end(), m_decls.end(), m_filterStyle); }
     };
 
     //
@@ -1400,28 +1417,28 @@ namespace Slang
         return declRef.getDecl()->candidateExtensions;
     }
 
-    inline FilteredMemberRefList<Decl> getMembers(DeclRef<ContainerDecl> const& declRef)
+    inline FilteredMemberRefList<Decl> getMembers(DeclRef<ContainerDecl> const& declRef, MemberFilterStyle filterStyle)
     {
-        return FilteredMemberRefList<Decl>(declRef.getDecl()->Members, declRef.substitutions);
+        return FilteredMemberRefList<Decl>(declRef.getDecl()->Members, declRef.substitutions, filterStyle);
     }
 
     template<typename T>
-    inline FilteredMemberRefList<T> getMembersOfType(DeclRef<ContainerDecl> const& declRef)
+    inline FilteredMemberRefList<T> getMembersOfType( DeclRef<ContainerDecl> const& declRef, MemberFilterStyle filterStyle)
     {
-        return FilteredMemberRefList<T>(declRef.getDecl()->Members, declRef.substitutions);
+        return FilteredMemberRefList<T>(declRef.getDecl()->Members, declRef.substitutions, filterStyle);
     }
 
     template<typename T>
-    inline List<DeclRef<T>> getMembersOfTypeWithExt(DeclRef<ContainerDecl> const& declRef)
+    inline List<DeclRef<T>> getMembersOfTypeWithExt(DeclRef<ContainerDecl> const& declRef, MemberFilterStyle filterStyle)
     {
         List<DeclRef<T>> rs;
-        for (auto d : getMembersOfType<T>(declRef))
+        for (auto d : getMembersOfType<T>(declRef, filterStyle))
             rs.add(d);
         if (auto aggDeclRef = declRef.as<AggTypeDecl>())
         {
             for (auto ext = GetCandidateExtensions(aggDeclRef); ext; ext = ext->nextCandidateExtension)
             {
-                auto extMembers = getMembersOfType<T>(DeclRef<ContainerDecl>(ext, declRef.substitutions));
+                auto extMembers = getMembersOfType<T>(DeclRef<ContainerDecl>(ext, declRef.substitutions), filterStyle);
                 for (auto mbr : extMembers)
                     rs.add(mbr);
             }
@@ -1469,10 +1486,12 @@ namespace Slang
         return declRef.Substitute(declRef.getDecl()->targetType.Ptr());
     }
     
-    inline FilteredMemberRefList<VarDecl> GetFields(DeclRef<StructDecl> const& declRef)
+    inline FilteredMemberRefList<VarDecl> GetFields(DeclRef<StructDecl> const& declRef, MemberFilterStyle filterStyle)
     {
-        return getMembersOfType<VarDecl>(declRef);
+        return getMembersOfType<VarDecl>(declRef, filterStyle);
     }
+
+    
 
     inline RefPtr<Type> getBaseType(DeclRef<InheritanceDecl> const& declRef)
     {
@@ -1491,7 +1510,7 @@ namespace Slang
 
     inline FilteredMemberRefList<ParamDecl> GetParameters(DeclRef<CallableDecl> const& declRef)
     {
-        return getMembersOfType<ParamDecl>(declRef);
+        return getMembersOfType<ParamDecl>(declRef, MemberFilterStyle::All);
     }
 
     inline Decl* GetInner(DeclRef<GenericDecl> const& declRef)

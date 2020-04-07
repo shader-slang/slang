@@ -423,7 +423,7 @@ static void _lookUpMembersInSuperTypeDeclImpl(
         auto genericDeclRef = genericTypeParamDeclRef.GetParent().as<GenericDecl>();
         assert(genericDeclRef);
 
-        for(auto constraintDeclRef : getMembersOfType<GenericTypeConstraintDecl>(genericDeclRef))
+        for(auto constraintDeclRef : getMembersOfType<GenericTypeConstraintDecl>(genericDeclRef, MemberFilterStyle::All))
         {
             if( semantics )
             {
@@ -455,7 +455,7 @@ static void _lookUpMembersInSuperTypeDeclImpl(
     }
     else if (declRef.as<AssocTypeDecl>() || declRef.as<GlobalGenericParamDecl>())
     {
-        for (auto constraintDeclRef : getMembersOfType<TypeConstraintDecl>(declRef.as<ContainerDecl>()))
+        for (auto constraintDeclRef : getMembersOfType<TypeConstraintDecl>(declRef.as<ContainerDecl>(), MemberFilterStyle::All))
         {
             _lookUpMembersInSuperType(
                 session,
@@ -522,7 +522,7 @@ static void _lookUpMembersInSuperTypeDeclImpl(
             // through the declared inheritance relationships on each declaration.
             //
             ensureDecl(semantics, aggTypeDeclBaseRef.getDecl(), DeclCheckState::CanEnumerateBases);
-            for (auto inheritanceDeclRef : getMembersOfType<InheritanceDecl>(aggTypeDeclBaseRef))
+            for (auto inheritanceDeclRef : getMembersOfType<InheritanceDecl>(aggTypeDeclBaseRef, MemberFilterStyle::All))
             {
                 ensureDecl(semantics, inheritanceDeclRef.getDecl(), DeclCheckState::CanUseBaseOfInheritanceDecl);
                 _lookUpMembersInSuperType(session, name, leafType, leafIsSuperWitness, inheritanceDeclRef, request, ioResult, inBreadcrumbs);

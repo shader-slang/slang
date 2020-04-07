@@ -156,7 +156,7 @@ namespace Slang
         auto& checkedArgs = genSubst->args;
 
         Index aa = 0;
-        for (auto memberRef : getMembers(genericDeclRef))
+        for (auto memberRef : getMembers(genericDeclRef, MemberFilterStyle::All))
         {
             if (auto typeParamRef = memberRef.as<GenericTypeParamDecl>())
             {
@@ -219,7 +219,7 @@ namespace Slang
         switch (candidate.flavor)
         {
         case OverloadCandidate::Flavor::Func:
-            params = GetParameters(candidate.item.declRef.as<CallableDecl>()).ToArray();
+            params = GetParameters(candidate.item.declRef.as<CallableDecl>()).toArray();
             break;
 
         case OverloadCandidate::Flavor::Generic:
@@ -904,7 +904,7 @@ namespace Slang
         // to match it up with the arguments accordingly...
         if (auto funcDeclRef = unspecializedInnerRef.as<CallableDecl>())
         {
-            auto params = GetParameters(funcDeclRef).ToArray();
+            auto params = GetParameters(funcDeclRef).toArray();
 
             Index argCount = context.getArgCount();
             Index paramCount = params.getCount();
@@ -1243,7 +1243,7 @@ namespace Slang
         {
             sb << "<";
             bool first = true;
-            for (auto paramDeclRef : getMembers(genericDeclRef))
+            for (auto paramDeclRef : getMembers(genericDeclRef, MemberFilterStyle::All))
             {
                 if(auto genericTypeParam = paramDeclRef.as<GenericTypeParamDecl>())
                 {

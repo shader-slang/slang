@@ -305,7 +305,7 @@ namespace Slang
                 // information about the parameters of the generic here.
                 emitRaw(context, "g");
                 UInt genericParameterCount = 0;
-                for( auto mm : getMembers(parentGenericDeclRef) )
+                for( auto mm : getMembers(parentGenericDeclRef, MemberFilterStyle::All) )
                 {
                     if(mm.is<GenericTypeParamDecl>())
                     {
@@ -325,7 +325,7 @@ namespace Slang
                 }
 
                 emit(context, genericParameterCount);
-                for( auto mm : getMembers(parentGenericDeclRef) )
+                for( auto mm : getMembers(parentGenericDeclRef, MemberFilterStyle::All) )
                 {
                     if(auto genericTypeParamDecl = mm.as<GenericTypeParamDecl>())
                     {
@@ -358,7 +358,7 @@ namespace Slang
         if( auto callableDeclRef = declRef.as<CallableDecl>())
         {
             auto parameters = GetParameters(callableDeclRef);
-            UInt parameterCount = parameters.Count();
+            UInt parameterCount = parameters.getCount();
 
             emitRaw(context, "p");
             emit(context, parameterCount);

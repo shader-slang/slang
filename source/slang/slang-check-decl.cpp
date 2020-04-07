@@ -1274,7 +1274,7 @@ namespace Slang
         // associated type and see if they can be satisfied.
         //
         bool conformance = true;
-        for (auto requiredConstraintDeclRef : getMembersOfType<TypeConstraintDecl>(requiredAssociatedTypeDeclRef))
+        for (auto requiredConstraintDeclRef : getMembersOfType<TypeConstraintDecl>(requiredAssociatedTypeDeclRef, MemberFilterStyle::All))
         {
             // Grab the type we expect to conform to from the constraint.
             auto requiredSuperType = GetSup(requiredConstraintDeclRef);
@@ -1558,7 +1558,7 @@ namespace Slang
         // its (non-interface) base types already conforms to
         // that interface, so that all of the requirements are
         // already satisfied with inherited implementations...
-        for(auto requiredMemberDeclRef : getMembers(interfaceDeclRef))
+        for(auto requiredMemberDeclRef : getMembers(interfaceDeclRef, MemberFilterStyle::All))
         {
             auto requirementSatisfied = findWitnessForInterfaceRequirement(
                 context,
@@ -1609,7 +1609,7 @@ namespace Slang
                 continue;
 
             // Only inheritance clauses from the extension matter right now.
-            for(auto requiredInheritanceDeclRef : getMembersOfType<InheritanceDecl>(extDeclRef))
+            for(auto requiredInheritanceDeclRef : getMembersOfType<InheritanceDecl>(extDeclRef, MemberFilterStyle::All))
             {
                 auto requirementSatisfied = findWitnessForInterfaceRequirement(
                     context,
@@ -2314,8 +2314,8 @@ namespace Slang
     {
 
         // TODO(tfoley): This copies the parameter array, which is bad for performance.
-        auto fstParams = GetParameters(fst).ToArray();
-        auto sndParams = GetParameters(snd).ToArray();
+        auto fstParams = GetParameters(fst).toArray();
+        auto sndParams = GetParameters(snd).toArray();
 
         // If the functions have different numbers of parameters, then
         // their signatures trivially don't match.

@@ -3424,12 +3424,8 @@ static TypeLayoutResult _createTypeLayout(
 
             typeLayoutBuilder.beginLayout(type, rules);
             auto typeLayout = typeLayoutBuilder.getTypeLayout();
-            for (auto field : GetFields(structDeclRef))
+            for (auto field : GetFields(structDeclRef, MemberFilterStyle::Instance))
             {
-                // Static fields shouldn't take part in layout.
-                if(field.getDecl()->HasModifier<HLSLStaticModifier>())
-                    continue;
-
                 // The fields of a `struct` type may include existential (interface)
                 // types (including as nested sub-fields), and any types present
                 // in those fields will need to be specialized based on the

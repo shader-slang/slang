@@ -304,7 +304,7 @@ SLANG_API unsigned int spReflectionType_GetFieldCount(SlangReflectionType* inTyp
         auto declRef = declRefType->declRef;
         if( auto structDeclRef = declRef.as<StructDecl>())
         {
-            return GetFields(structDeclRef).Count();
+            return (unsigned int)GetFields(structDeclRef, MemberFilterStyle::Instance).getCount();
         }
     }
 
@@ -323,7 +323,8 @@ SLANG_API SlangReflectionVariable* spReflectionType_GetFieldByIndex(SlangReflect
         auto declRef = declRefType->declRef;
         if( auto structDeclRef = declRef.as<StructDecl>())
         {
-            auto fieldDeclRef = GetFields(structDeclRef).ToArray()[index];
+            auto fields = GetFields(structDeclRef, MemberFilterStyle::Instance);
+            auto fieldDeclRef = fields[index];
             return (SlangReflectionVariable*) fieldDeclRef.getDecl();
         }
     }
@@ -1405,7 +1406,7 @@ SLANG_API SlangReflectionType* spReflectionTypeParameter_GetConstraintByIndex(Sl
         if( auto globalGenericParamDecl = as<GlobalGenericParamDecl>(genericParamLayout->decl) )
         {
             auto constraints = globalGenericParamDecl->getMembersOfType<GenericTypeConstraintDecl>();
-            return (SlangReflectionType*)constraints.toArray()[index]->sup.Ptr();
+            return (SlangReflectionType*)constraints[index]->sup.Ptr();
         }
         // TODO: Add case for entry-point generic parameters.
     }
