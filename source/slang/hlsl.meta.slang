@@ -2479,6 +2479,42 @@ matrix<T, N, M> trunc(matrix<T, N, M> x)
     MATRIX_MAP_UNARY(T, N, M, trunc, x);
 }
 
+// Slang Specific Mask functions
+
+typedef uint WaveMask;
+
+__target_intrinsic(cuda, "__activemask()")
+WaveMask WaveGetActiveMask() { return 0xffffffff; }
+
+__glsl_extension(GL_KHR_shader_subgroup_vote)
+__spirv_version(1.3)
+__target_intrinsic(glsl, "subgroupAll($1)") 
+__target_intrinsic(cuda, "(__all_sync($0, $1) != 0)")
+__target_intrinsic(hlsl, "WaveActiveAllTrue($1)")
+bool WaveMaskAllTrue(WaveMask mask, bool condition);
+
+__glsl_extension(GL_KHR_shader_subgroup_vote)
+__spirv_version(1.3)
+__target_intrinsic(glsl, "subgroupAny($1)") 
+__target_intrinsic(cuda, "(__any_sync($0, $1) != 0)")
+__target_intrinsic(hlsl, "WaveActiveAnyTrue($1)")
+bool WaveMaskAnyTrue(WaveMask mask, bool condition);
+
+__glsl_extension(GL_KHR_shader_subgroup_ballot)
+__spirv_version(1.3)
+__target_intrinsic(glsl, "subgroupBallot($1).x")
+__target_intrinsic(cuda, "__ballot_sync($0, $1)")
+__target_intrinsic(hlsl, "WaveActiveBallot($1)")
+WaveMask WaveMaskBallot(WaveMask mask, bool condition);
+
+__glsl_extension(GL_KHR_shader_subgroup_ballot)
+__spirv_version(1.3)
+__target_intrinsic(glsl, "bitCount(subgroupBallot($1))")
+__target_intrinsic(cuda, "__popc(__ballot_sync($0, $1))")
+__target_intrinsic(hlsl, "WaveActiveCountBits($1)")
+WaveMask WaveMaskCountBits(WaveMask mask, bool value);
+
+
 // Shader model 6.0 stuff
 
 // Information for GLSL wave/subgroup support
