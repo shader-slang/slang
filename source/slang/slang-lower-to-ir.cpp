@@ -6717,12 +6717,16 @@ static void ensureAllDeclsRec(
     // Aggregate types are the main case where we can emit an outer declaration
     // and not the stuff nested inside of it.
     //
-    if(auto containerDecl = as<AggTypeDecl>(decl))
+    if(auto containerDecl = as<AggTypeDeclBase>(decl))
     {
         for (auto memberDecl : containerDecl->Members)
         {
             ensureAllDeclsRec(context, memberDecl);
         }
+    }
+    else if (auto genericDecl = as<GenericDecl>(decl))
+    {
+        ensureAllDeclsRec(context, genericDecl->inner);
     }
 }
 
