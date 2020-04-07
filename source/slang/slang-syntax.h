@@ -1417,19 +1417,19 @@ namespace Slang
         return declRef.getDecl()->candidateExtensions;
     }
 
-    inline FilteredMemberRefList<Decl> getMembers(DeclRef<ContainerDecl> const& declRef, MemberFilterStyle filterStyle)
+    inline FilteredMemberRefList<Decl> getMembers(DeclRef<ContainerDecl> const& declRef, MemberFilterStyle filterStyle = MemberFilterStyle::All)
     {
         return FilteredMemberRefList<Decl>(declRef.getDecl()->Members, declRef.substitutions, filterStyle);
     }
 
     template<typename T>
-    inline FilteredMemberRefList<T> getMembersOfType( DeclRef<ContainerDecl> const& declRef, MemberFilterStyle filterStyle)
+    inline FilteredMemberRefList<T> getMembersOfType( DeclRef<ContainerDecl> const& declRef, MemberFilterStyle filterStyle = MemberFilterStyle::All)
     {
         return FilteredMemberRefList<T>(declRef.getDecl()->Members, declRef.substitutions, filterStyle);
     }
 
     template<typename T>
-    inline List<DeclRef<T>> getMembersOfTypeWithExt(DeclRef<ContainerDecl> const& declRef, MemberFilterStyle filterStyle)
+    inline List<DeclRef<T>> getMembersOfTypeWithExt(DeclRef<ContainerDecl> const& declRef, MemberFilterStyle filterStyle = MemberFilterStyle::All)
     {
         List<DeclRef<T>> rs;
         for (auto d : getMembersOfType<T>(declRef, filterStyle))
@@ -1510,7 +1510,7 @@ namespace Slang
 
     inline FilteredMemberRefList<ParamDecl> GetParameters(DeclRef<CallableDecl> const& declRef)
     {
-        return getMembersOfType<ParamDecl>(declRef, MemberFilterStyle::All);
+        return getMembersOfType<ParamDecl>(declRef);
     }
 
     inline Decl* GetInner(DeclRef<GenericDecl> const& declRef)

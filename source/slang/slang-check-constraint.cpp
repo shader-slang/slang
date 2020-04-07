@@ -294,7 +294,7 @@ namespace Slang
         // each we will try to find a way to satisfy all
         // the constraints for that parameter
         List<RefPtr<Val>> args;
-        for (auto m : getMembers(genericDeclRef, MemberFilterStyle::All))
+        for (auto m : getMembers(genericDeclRef))
         {
             if (auto typeParam = m.as<GenericTypeParamDecl>())
             {

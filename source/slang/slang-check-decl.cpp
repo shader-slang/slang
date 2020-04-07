@@ -1274,7 +1274,7 @@ namespace Slang
         // associated type and see if they can be satisfied.
         //
         bool conformance = true;
-        for (auto requiredConstraintDeclRef : getMembersOfType<TypeConstraintDecl>(requiredAssociatedTypeDeclRef, MemberFilterStyle::All))
+        for (auto requiredConstraintDeclRef : getMembersOfType<TypeConstraintDecl>(requiredAssociatedTypeDeclRef))
         {
             // Grab the type we expect to conform to from the constraint.
             auto requiredSuperType = GetSup(requiredConstraintDeclRef);
@@ -1558,7 +1558,7 @@ namespace Slang
         // its (non-interface) base types already conforms to
         // that interface, so that all of the requirements are
         // already satisfied with inherited implementations...
-        for(auto requiredMemberDeclRef : getMembers(interfaceDeclRef, MemberFilterStyle::All))
+        for(auto requiredMemberDeclRef : getMembers(interfaceDeclRef))
         {
             auto requirementSatisfied = findWitnessForInterfaceRequirement(
                 context,
@@ -1609,7 +1609,7 @@ namespace Slang
                 continue;
 
             // Only inheritance clauses from the extension matter right now.
-            for(auto requiredInheritanceDeclRef : getMembersOfType<InheritanceDecl>(extDeclRef, MemberFilterStyle::All))
+            for(auto requiredInheritanceDeclRef : getMembersOfType<InheritanceDecl>(extDeclRef))
             {
                 auto requirementSatisfied = findWitnessForInterfaceRequirement(
                     context,

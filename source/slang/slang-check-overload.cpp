@@ -156,7 +156,7 @@ namespace Slang
         auto& checkedArgs = genSubst->args;
 
         Index aa = 0;
-        for (auto memberRef : getMembers(genericDeclRef, MemberFilterStyle::All))
+        for (auto memberRef : getMembers(genericDeclRef))
         {
             if (auto typeParamRef = memberRef.as<GenericTypeParamDecl>())
             {
@@ -1243,7 +1243,7 @@ namespace Slang
         {
             sb << "<";
             bool first = true;
-            for (auto paramDeclRef : getMembers(genericDeclRef, MemberFilterStyle::All))
+            for (auto paramDeclRef : getMembers(genericDeclRef))
             {
                 if(auto genericTypeParam = paramDeclRef.as<GenericTypeParamDecl>())
                 {

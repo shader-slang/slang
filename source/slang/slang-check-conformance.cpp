@@ -108,7 +108,7 @@ namespace Slang
     bool SemanticsVisitor::isInterfaceSafeForTaggedUnion(
         DeclRef<InterfaceDecl> interfaceDeclRef)
     {
-        for( auto memberDeclRef : getMembers(interfaceDeclRef, MemberFilterStyle::All) )
+        for( auto memberDeclRef : getMembers(interfaceDeclRef) )
         {
             if(!isInterfaceRequirementSafeForTaggedUnion(interfaceDeclRef, memberDeclRef))
                 return false;
@@ -175,7 +175,7 @@ namespace Slang
             {
                 ensureDecl(aggTypeDeclRef, DeclCheckState::CanEnumerateBases);
 
-                for( auto inheritanceDeclRef : getMembersOfTypeWithExt<InheritanceDecl>(aggTypeDeclRef, MemberFilterStyle::All))
+                for( auto inheritanceDeclRef : getMembersOfTypeWithExt<InheritanceDecl>(aggTypeDeclRef))
                 {
                     ensureDecl(inheritanceDeclRef, DeclCheckState::CanUseBaseOfInheritanceDecl);
 
@@ -208,7 +208,7 @@ namespace Slang
                     }
                 }
                 // if an inheritance decl is not found, try to find a GenericTypeConstraintDecl
-                for (auto genConstraintDeclRef : getMembersOfType<GenericTypeConstraintDecl>(aggTypeDeclRef, MemberFilterStyle::All))
+                for (auto genConstraintDeclRef : getMembersOfType<GenericTypeConstraintDecl>(aggTypeDeclRef))
                 {
                     ensureDecl(genConstraintDeclRef, DeclCheckState::CanUseBaseOfInheritanceDecl);
                     auto inheritedType = GetSup(genConstraintDeclRef);
@@ -231,7 +231,7 @@ namespace Slang
                 auto genericDeclRef = genericTypeParamDeclRef.GetParent().as<GenericDecl>();
                 SLANG_ASSERT(genericDeclRef);
 
-                for( auto constraintDeclRef : getMembersOfType<GenericTypeConstraintDecl>(genericDeclRef, MemberFilterStyle::All) )
+                for( auto constraintDeclRef : getMembersOfType<GenericTypeConstraintDecl>(genericDeclRef) )
                 {
                     auto sub = GetSub(constraintDeclRef);
                     auto sup = GetSup(constraintDeclRef);

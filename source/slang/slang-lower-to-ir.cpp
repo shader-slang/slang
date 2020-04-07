@@ -1107,7 +1107,7 @@ struct ValLoweringVisitor : ValVisitor<ValLoweringVisitor, LoweredValInfo, Lower
         // Now we will iterate over the requirements (members) of the
         // interface and try to synthesize an appropriate value for each.
         //
-        for( auto reqDeclRef : getMembers(supInterfaceDeclRef, MemberFilterStyle::All) )
+        for( auto reqDeclRef : getMembers(supInterfaceDeclRef) )
         {
             // TODO: if there are any members we shouldn't process as a requirement,
             // then we should detect and skip them here.
@@ -1169,7 +1169,7 @@ struct ValLoweringVisitor : ValVisitor<ValLoweringVisitor, LoweredValInfo, Lower
                 // mapped to the correct witness value).
                 //
                 List<IRParam*> irParams;
-                for( auto paramDeclRef : getMembersOfType<ParamDecl>(callableDeclRef, MemberFilterStyle::All) )
+                for( auto paramDeclRef : getMembersOfType<ParamDecl>(callableDeclRef) )
                 {
                     // TODO: need to handle `out` and `in out` here. Over all
                     // there is a lot of duplication here with the existing logic
@@ -2511,7 +2511,7 @@ struct ExprLoweringVisitorBase : ExprVisitor<Derived, LoweredValInfo>
     {
         UInt argCount = expr->Arguments.getCount();
         UInt argCounter = 0;
-        for (auto paramDeclRef : getMembersOfType<ParamDecl>(funcDeclRef, MemberFilterStyle::All))
+        for (auto paramDeclRef : getMembersOfType<ParamDecl>(funcDeclRef))
         {
             auto paramDecl = paramDeclRef.getDecl();
             IRType* paramType = lowerType(context, GetType(paramDeclRef));
