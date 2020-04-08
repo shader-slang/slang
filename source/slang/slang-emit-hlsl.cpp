@@ -439,7 +439,7 @@ bool HLSLSourceEmitter::tryEmitInstExprImpl(IRInst* inst, const EmitOpInfo& inOu
             switch (toType)
             {
                 default:
-                    m_writer->emit("/* unhandled */");
+                    diagnoseUnhandledInst(inst);
                     break;
                 case BaseType::UInt:
                     break;
