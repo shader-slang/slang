@@ -219,7 +219,7 @@ namespace Slang
         switch (candidate.flavor)
         {
         case OverloadCandidate::Flavor::Func:
-            params = GetParameters(candidate.item.declRef.as<CallableDecl>()).ToArray();
+            params = GetParameters(candidate.item.declRef.as<CallableDecl>()).toArray();
             break;
 
         case OverloadCandidate::Flavor::Generic:
@@ -904,7 +904,7 @@ namespace Slang
         // to match it up with the arguments accordingly...
         if (auto funcDeclRef = unspecializedInnerRef.as<CallableDecl>())
         {
-            auto params = GetParameters(funcDeclRef).ToArray();
+            auto params = GetParameters(funcDeclRef).toArray();
 
             Index argCount = context.getArgCount();
             Index paramCount = params.getCount();
