@@ -12,8 +12,8 @@ struct Data<let kCount : int> : IData
 {
     int state;
 
-	[mutating] void doStuff()
-	{
-		state++;
-	}
+    [mutating] void doStuff()
+    {
+        state++;
+    }
 }

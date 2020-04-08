@@ -22,32 +22,32 @@ import struct_generic_value_param_import;
 
 Data<N> makeData<let N : int>( int val )
 {
-	Data<N> result = { val };
-	return result;
+    Data<N> result = { val };
+    return result;
 }
 
 void doThings<D : IData>(D data, inout int v)
 {
-	v++;
+    v++;
 }
 
 int test(int val)
 {
-	var data = makeData<4>(val);
+    var data = makeData<4>(val);
 
-	// Note: with the original bug, this call emitted
-	// as `/* unhandled */(data)` which meant the call
-	// acted as a no-op.
-	//
-	data.doStuff();
+    // Note: with the original bug, this call emitted
+    // as `/* unhandled */(data)` which meant the call
+    // acted as a no-op.
+    //
+    data.doStuff();
 
-	// Note: with the original bug, this call emitted
-	// as `/* uhandled */(data, val)` which is also
-	// a no-op (that happens to use `operator,`).
-	//
-	doThings(data, val);
+    // Note: with the original bug, this call emitted
+    // as `/* uhandled */(data, val)` which is also
+    // a no-op (that happens to use `operator,`).
+    //
+    doThings(data, val);
 
-	return data.state + val*16;
+    return data.state + val*16;
 }
 
 //TEST_INPUT:ubuffer(data=[0 0 0 0], stride=4):out,name=outputBuffer
