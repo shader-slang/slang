@@ -379,7 +379,7 @@ namespace Slang
                 // We will go through the fields in order and try to match them
                 // up with initializer arguments.
                 //
-                for(auto fieldDeclRef : getMembersOfType<VarDecl>(toStructDeclRef))
+                for(auto fieldDeclRef : getMembersOfType<VarDecl>(toStructDeclRef, MemberFilterStyle::Instance))
                 {
                     RefPtr<Expr> coercedArg;
                     bool argResult = _readValueFromInitializerList(

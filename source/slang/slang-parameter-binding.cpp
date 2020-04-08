@@ -1911,7 +1911,7 @@ static RefPtr<TypeLayout> processEntryPointVaryingParameter(
             //
             Decl* firstExplicit = nullptr;
             Decl* firstImplicit = nullptr;
-            for( auto field : GetFields(structDeclRef) )
+            for( auto field : GetFields(structDeclRef, MemberFilterStyle::Instance) )
             {
                 RefPtr<VarLayout> fieldVarLayout = new VarLayout();
                 fieldVarLayout->varDecl = field;

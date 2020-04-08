@@ -267,6 +267,13 @@ struct SpecializationContext
         IRGeneric* g = generic;
         for(;;)
         {
+            // We can't specialize a generic if it is marked as
+            // being imported from an external module (in which
+            // case its definition is not available to us).
+            //
+            if(!isDefinition(g))
+                return false;
+
             // Given the generic `g`, we will find the value
             // it appears to return in its body.
             //
@@ -366,6 +373,23 @@ struct SpecializationContext
     void maybeMarkAsFullySpecialized(
         IRInst* inst)
     {
+        // TODO: The logic here is completely bogus and
+        // we need to revisit the notion of fully-specialized-ness
+        // to only involve things that are semantically *values*
+        // rather than computations/expressions.
+        //
+        // The rules should be something like:
+        //
+        // * Literals are values
+        // * Composite type constructors where all the operands are value are values
+        // * References to nominal types are values
+        // * Built-in types where all the operands are values are values
+        //
+        // The system for defining value-ness probably needs
+        // to combine with the system for deduplicating instructions,
+        // since values are an important class of instruction we want
+        // to deduplicate.
+
         switch(inst->op)
         {
         default:
@@ -387,10 +411,49 @@ struct SpecializationContext
             // Certain instructions cannot ever be considered
             // fully specialized because they should never
             // be substituted into a generic as its arguments.
-        case kIROp_Specialize:
         case kIROp_lookup_interface_method:
         case kIROp_ExtractExistentialType:
         case kIROp_BindExistentialsType:
+            break;
+
+        case kIROp_Specialize:
+            // The `specialize` instruction is a bit sepcial,
+            // because it is possible to have a `specialize`
+            // of a built-in type so that it never gets
+            // substituted for another type. (e.g., the specific
+            // case where this code path first showed up
+            // as necessary was `RayQuery<>`)
+            //
+            {
+                auto specialize = cast<IRSpecialize>(inst);
+                auto base = specialize->getBase();
+                if( auto generic = as<IRGeneric>(base) )
+                {
+                    // If the thing being specialized can be resolved,
+                    // *and* it is a target intrinsic, ...
+                    //
+                    if( auto result = findGenericReturnVal(generic) )
+                    {
+                        if( result->findDecoration<IRTargetIntrinsicDecoration>() )
+                        {
+                            // ... then we should consider the instruction as
+                            // "fully specialized" in the same cases as for
+                            // any ordinary instruciton.
+                            //
+
+                            if( areAllOperandsFullySpecialized(inst) )
+                            {
+                                markInstAsFullySpecialized(inst);
+                            }
+                            return;
+                        }
+                    }
+                }
+
+                // Otherwise, a `specialize` instruction falls into
+                // the case of instructions that should never be
+                // considered to be fully specialized.
+            }
             break;
         }
     }

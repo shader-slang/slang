@@ -582,7 +582,7 @@ LoweredValInfo emitCallToDeclRef(
 
         DeclRef<GetterDecl> getterDeclRef;
         bool justAGetter = true;
-        for (auto accessorDeclRef : getMembersOfType<AccessorDecl>(subscriptDeclRef))
+        for (auto accessorDeclRef : getMembersOfType<AccessorDecl>(subscriptDeclRef, MemberFilterStyle::Instance))
         {
             // We want to track whether this subscript has any accessors other than
             // `get` (assuming that everything except `get` can be used for setting...).
@@ -786,8 +786,8 @@ top:
             // in case the `get` operation has a natural translation for
             // a target, while the general `ref` case does not...)
 
-            auto getters = getMembersOfType<GetterDecl>(boundSubscriptInfo->declRef);
-            if (getters.Count())
+            auto getters = getMembersOfType<GetterDecl>(boundSubscriptInfo->declRef, MemberFilterStyle::Instance);
+            if (getters.getCount())
             {
                 lowered = emitCallToDeclRef(
                     context,
@@ -798,8 +798,8 @@ top:
                 goto top;
             }
 
-            auto refAccessors = getMembersOfType<RefAccessorDecl>(boundSubscriptInfo->declRef);
-            if(refAccessors.Count())
+            auto refAccessors = getMembersOfType<RefAccessorDecl>(boundSubscriptInfo->declRef, MemberFilterStyle::Instance);
+            if(refAccessors.getCount())
             {
                 // The `ref` accessor will return a pointer to the value, so
                 // we need to reflect that in the type of our `call` instruction.
@@ -2198,11 +2198,8 @@ struct ExprLoweringVisitorBase : ExprVisitor<Derived, LoweredValInfo>
             if (auto aggTypeDeclRef = declRef.as<AggTypeDecl>())
             {
                 List<IRInst*> args;
-                for (auto ff : getMembersOfType<VarDecl>(aggTypeDeclRef))
+                for (auto ff : getMembersOfType<VarDecl>(aggTypeDeclRef, MemberFilterStyle::Instance))
                 {
-                    if (ff.getDecl()->HasModifier<HLSLStaticModifier>())
-                        continue;
-
                     auto irFieldVal = getSimpleVal(context, getDefaultVal(ff));
                     args.add(irFieldVal);
                 }
@@ -2322,11 +2319,8 @@ struct ExprLoweringVisitorBase : ExprVisitor<Derived, LoweredValInfo>
             if (auto aggTypeDeclRef = declRef.as<AggTypeDecl>())
             {
                 UInt argCounter = 0;
-                for (auto ff : getMembersOfType<VarDecl>(aggTypeDeclRef))
+                for (auto ff : getMembersOfType<VarDecl>(aggTypeDeclRef, MemberFilterStyle::Instance))
                 {
-                    if (ff.getDecl()->HasModifier<HLSLStaticModifier>())
-                        continue;
-
                     UInt argIndex = argCounter++;
                     if (argIndex < argCount)
                     {
@@ -3908,15 +3902,15 @@ LoweredValInfo tryGetAddress(
             // where we really want/need a pointer to be able to make progress.
             //
             if(mode != TryGetAddressMode::Aggressive
-                && getMembersOfType<SetterDecl>(subscriptInfo->declRef).Count())
+                && getMembersOfType<SetterDecl>(subscriptInfo->declRef, MemberFilterStyle::Instance).isNonEmpty())
             {
                 // There is a setter that we should consider using,
                 // so don't go and aggressively collapse things just yet.
                 return val;
             }
 
-            auto refAccessors = getMembersOfType<RefAccessorDecl>(subscriptInfo->declRef);
-            if(refAccessors.Count())
+            auto refAccessors = getMembersOfType<RefAccessorDecl>(subscriptInfo->declRef, MemberFilterStyle::Instance);
+            if(refAccessors.isNonEmpty())
             {
                 // The `ref` accessor will return a pointer to the value, so
                 // we need to reflect that in the type of our `call` instruction.
@@ -4140,8 +4134,8 @@ top:
             auto subscriptInfo = left.getBoundSubscriptInfo();
 
             // Search for an appropriate "setter" declaration
-            auto setters = getMembersOfType<SetterDecl>(subscriptInfo->declRef);
-            if (setters.Count())
+            auto setters = getMembersOfType<SetterDecl>(subscriptInfo->declRef, MemberFilterStyle::Instance);
+            if (setters.isNonEmpty())
             {
                 auto allArgs = subscriptInfo->args;
                 addArgs(context, &allArgs, right);
@@ -4155,8 +4149,8 @@ top:
                 return;
             }
 
-            auto refAccessors = getMembersOfType<RefAccessorDecl>(subscriptInfo->declRef);
-            if(refAccessors.Count())
+            auto refAccessors = getMembersOfType<RefAccessorDecl>(subscriptInfo->declRef, MemberFilterStyle::Instance);
+            if(refAccessors.isNonEmpty())
             {
                 // The `ref` accessor will return a pointer to the value, so
                 // we need to reflect that in the type of our `call` instruction.
@@ -6717,12 +6711,16 @@ static void ensureAllDeclsRec(
     // Aggregate types are the main case where we can emit an outer declaration
     // and not the stuff nested inside of it.
     //
-    if(auto containerDecl = as<AggTypeDecl>(decl))
+    if(auto containerDecl = as<AggTypeDeclBase>(decl))
     {
         for (auto memberDecl : containerDecl->Members)
         {
             ensureAllDeclsRec(context, memberDecl);
         }
+    }
+    else if (auto genericDecl = as<GenericDecl>(decl))
+    {
+        ensureAllDeclsRec(context, genericDecl->inner);
     }
 }
 

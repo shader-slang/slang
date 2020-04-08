@@ -92,11 +92,8 @@ namespace Slang
                 // A structure type should recursively introduce
                 // existential slots for its fields.
                 //
-                for( auto fieldDeclRef : GetFields(structDeclRef) )
+                for( auto fieldDeclRef : GetFields(structDeclRef, MemberFilterStyle::Instance) )
                 {
-                    if(fieldDeclRef.getDecl()->HasModifier<HLSLStaticModifier>())
-                        continue;
-
                     _collectExistentialSpecializationParamsRec(
                         ioSpecializationParams,
                         fieldDeclRef);

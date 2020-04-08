@@ -358,7 +358,7 @@ namespace Slang
         if( auto callableDeclRef = declRef.as<CallableDecl>())
         {
             auto parameters = GetParameters(callableDeclRef);
-            UInt parameterCount = parameters.Count();
+            UInt parameterCount = parameters.getCount();
 
             emitRaw(context, "p");
             emit(context, parameterCount);

@@ -1544,6 +1544,7 @@ RefPtr<Module> Linkage::loadModule(
     RefPtr<TranslationUnitRequest> translationUnit = new TranslationUnitRequest(frontEndReq);
     translationUnit->compileRequest = frontEndReq;
     translationUnit->moduleName = name;
+    translationUnit->sourceLanguage = SourceLanguage::Slang;
 
     auto module = translationUnit->getModule();
 
