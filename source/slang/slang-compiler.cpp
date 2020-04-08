@@ -1373,6 +1373,56 @@ SlangResult dissassembleDXILUsingDXC(
                 default: SLANG_ASSERT(!"Unhandled floating point mode");
             }
 
+            {
+                // We need to look at the stage of the entry point(s) we are
+                // being asked to compile, since this will determine the
+                // "pipeline" that the result should be compiled for (e.g.,
+                // compute vs. ray tracing).
+                //
+                // TODO: This logic is kind of messy in that it assumes
+                // a program to be compiled will only contain kernels for
+                // a single pipeline type, but that invariant isn't expressed
+                // at all in the front-end today. It also has no error
+                // checking for the case where there are conflicts.
+                //
+                // HACK: Right now none of the above concerns matter
+                // because we always perform code generation on a single
+                // entry point at a time.
+                //
+                Index entryPointCount = slangRequest->getProgram()->getEntryPointCount();
+                for(Index ee = 0; ee < entryPointCount; ++ee)
+                {
+                    auto stage = slangRequest->getProgram()->getEntryPoint(ee)->getStage();
+                    switch(stage)
+                    {
+                    default:
+                        break;
+
+                    case Stage::Compute:
+                        options.pipelineType = DownstreamCompiler::PipelineType::Compute;
+                        break;
+
+                    case Stage::Vertex:
+                    case Stage::Hull:
+                    case Stage::Domain:
+                    case Stage::Geometry:
+                    case Stage::Fragment:
+                        options.pipelineType = DownstreamCompiler::PipelineType::Rasterization;
+                        break;
+
+                    case Stage::RayGeneration:
+                    case Stage::Intersection:
+                    case Stage::AnyHit:
+                    case Stage::ClosestHit:
+                    case Stage::Miss:
+                    case Stage::Callable:
+                        options.pipelineType = DownstreamCompiler::PipelineType::RayTracing;
+                        break;
+                    }
+                }
+                
+            }
+
             // Add all the search paths (as calculated earlier - they will only be set if this is a pass through else will be empty)
             options.includePaths = includePaths;
 

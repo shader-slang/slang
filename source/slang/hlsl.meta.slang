@@ -3162,6 +3162,7 @@ void AcceptHitAndEndSearch();
 // 10.4.1 - Ray Dispatch System Values
 
 __target_intrinsic(glsl, "(gl_LaunchIDNV)")
+__target_intrinsic(cuda, "optixGetLaunchIndex")
 uint3 DispatchRaysIndex();
 
 __target_intrinsic(glsl, "(gl_LaunchSizeNV)")

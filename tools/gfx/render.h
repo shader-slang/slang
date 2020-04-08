@@ -45,6 +45,7 @@ enum class PipelineType
     Unknown,
     Graphics,
     Compute,
+    RayTracing,
     CountOf,
 };
 
@@ -57,6 +58,12 @@ enum class StageType
     Geometry,
     Fragment,
     Compute,
+    RayGeneration,
+    Intersection,
+    AnyHit,
+    ClosestHit,
+    Miss,
+    Callable,
     CountOf,
 };
 
@@ -102,6 +109,7 @@ public:
         StageType   stage;
         void const* codeBegin;
         void const* codeEnd;
+        char const* entryPointName;
 
         UInt getCodeSize() const { return (char const*)codeEnd - (char const*)codeBegin; }
     };
@@ -141,13 +149,12 @@ struct ShaderCompileRequest
     struct EntryPoint
     {
         char const* name = nullptr;
-        SourceInfo  source;
+        SlangStage  slangStage;
     };
 
     SourceInfo source;
-    EntryPoint vertexShader;
-    EntryPoint fragmentShader;
-    EntryPoint computeShader;
+    Slang::List<EntryPoint> entryPoints;
+
     Slang::List<Slang::String> globalSpecializationArgs;
     Slang::List<Slang::String> entryPointSpecializationArgs;
 

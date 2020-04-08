@@ -202,6 +202,14 @@ public:
         Object,             ///< Produce an object file
     };
 
+    enum PipelineType
+    {
+        Unknown,
+        Compute,
+        Rasterization,
+        RayTracing,
+    };
+
     struct Define
     {
         String nameWithSig;             ///< If macro takes parameters include in brackets
@@ -236,6 +244,7 @@ public:
         TargetType targetType = TargetType::Executable;
         SlangSourceLanguage sourceLanguage = SLANG_SOURCE_LANGUAGE_CPP;
         FloatingPointMode floatingPointMode = FloatingPointMode::Default;
+        PipelineType pipelineType = PipelineType::Unknown;
 
         Flags flags = Flag::EnableExceptionHandling;
 

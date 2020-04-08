@@ -162,6 +162,10 @@
     </Link>
   </ItemDefinitionGroup>
   <ItemGroup>
+    <ClInclude Include="gpu-printing-ops.h" />
+    <ClInclude Include="gpu-printing.h" />
+  </ItemGroup>
+  <ItemGroup>
     <ClCompile Include="gpu-printing.cpp" />
     <ClCompile Include="main.cpp" />
   </ItemGroup>
@@ -179,10 +183,6 @@
     <ProjectReference Include="..\..\tools\gfx\gfx.vcxproj">
       <Project>{222F7498-B40C-4F3F-A704-DDEB91A4484A}</Project>
     </ProjectReference>
-  </ItemGroup>
-  <ItemGroup>
-    <ClInclude Include="gpu-printing-ops.h" />
-    <ClInclude Include="gpu-printing.h" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">
