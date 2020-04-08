@@ -267,6 +267,13 @@ struct SpecializationContext
         IRGeneric* g = generic;
         for(;;)
         {
+            // We can't specialize a generic if it is marked as
+            // being imported from an external module (in which
+            // case its definition is not available to us).
+            //
+            if(!isDefinition(g))
+                return false;
+
             // Given the generic `g`, we will find the value
             // it appears to return in its body.
             //

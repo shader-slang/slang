@@ -5068,6 +5068,13 @@ namespace Slang
         // the value they return.
         for(;;)
         {
+            // An instruciton marked `[import(...)]` cannot
+            // be a definition, since it is claiming that
+            // the actual body comes from another module.
+            //
+            if(val->findDecoration<IRImportDecoration>())
+                return false;
+
             auto genericInst = as<IRGeneric>(val);
             if(!genericInst)
                 break;
@@ -5079,13 +5086,12 @@ namespace Slang
             val = returnVal;
         }
 
-        // TODO: the logic here should probably
-        // be that anything with an `IRImportDecoration`
-        // is considered to be a declaration rather than definition.
-
+        // Some cases of instructions have structural
+        // rules about when they are considered to have
+        // a definition (e.g., a function must have a body).
+        //
         switch (val->op)
         {
-        case kIROp_WitnessTable:
         case kIROp_Func:
         case kIROp_Generic:
             return val->getFirstChild() != nullptr;
@@ -5093,14 +5099,15 @@ namespace Slang
         case kIROp_GlobalConstant:
             return cast<IRGlobalConstant>(val)->getValue() != nullptr;
 
-        case kIROp_StructType:
-        case kIROp_GlobalVar:
-        case kIROp_GlobalParam:
-            return true;
-
         default:
-            return false;
+            break;
         }
+
+        // In all other cases, if we have an instruciton
+        // that has *not* been marked for import, then
+        // we consider it to be a definition.
+
+        return true;
     }
 
     void markConstExpr(
