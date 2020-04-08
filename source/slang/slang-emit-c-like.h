@@ -196,6 +196,7 @@ public:
 
     void emitInstExpr(IRInst* inst, EmitOpInfo const& inOuterPrec);
     void defaultEmitInstExpr(IRInst* inst, EmitOpInfo const& inOuterPrec);
+    void diagnoseUnhandledInst(IRInst* inst);
 
     BaseType extractBaseType(IRType* inType);
 

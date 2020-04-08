@@ -1883,6 +1883,11 @@ void CLikeSourceEmitter::emitInstExpr(IRInst* inst, const EmitOpInfo& inOuterPre
     defaultEmitInstExpr(inst, inOuterPrec);
 }
 
+void CLikeSourceEmitter::diagnoseUnhandledInst(IRInst* inst)
+{
+    getSink()->diagnose(inst, Diagnostics::unimplemented, "unexpected IR opcode during code emit");
+}
+
 void CLikeSourceEmitter::defaultEmitInstExpr(IRInst* inst, const EmitOpInfo& inOuterPrec)
 {
     EmitOpInfo outerPrec = inOuterPrec;
@@ -2195,7 +2200,7 @@ void CLikeSourceEmitter::defaultEmitInstExpr(IRInst* inst, const EmitOpInfo& inO
         break;
 
     default:
-        m_writer->emit("/* unhandled */");
+        diagnoseUnhandledInst(inst);
         break;
     }
     maybeCloseParens(needClose);
