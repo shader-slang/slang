@@ -252,8 +252,12 @@ static gfx::StageType _translateStage(SlangStage slangStage)
     return SLANG_OK;
 }
 
-/* static */SlangResult ShaderCompilerUtil::compileWithLayout(SlangSession* session, const String& sourcePath, const Slang::List<Slang::CommandLine::Arg>& compileArgs, Options::ShaderProgramType shaderType, const ShaderCompilerUtil::Input& input, OutputAndLayout& output)
+/* static */SlangResult ShaderCompilerUtil::compileWithLayout(SlangSession* session, const Options& options, const ShaderCompilerUtil::Input& input, OutputAndLayout& output)
 {
+    String sourcePath = options.sourcePath;
+    auto& compileArgs = options.compileArgs;
+    auto shaderType = options.shaderType;
+
     List<char> sourceText;
     SLANG_RETURN_ON_FAIL(readSource(sourcePath, sourceText));
 
@@ -310,35 +314,47 @@ static gfx::StageType _translateStage(SlangStage slangStage)
     compileRequest.compileArgs = compileArgs;
 
     compileRequest.source = sourceInfo;
-    if (shaderType == Options::ShaderProgramType::Graphics || shaderType == Options::ShaderProgramType::GraphicsCompute)
-    {
-        ShaderCompileRequest::EntryPoint vertexEntryPoint;
-        vertexEntryPoint.name = vertexEntryPointName;
-        vertexEntryPoint.slangStage = SLANG_STAGE_VERTEX;
-        compileRequest.entryPoints.add(vertexEntryPoint);
 
-        ShaderCompileRequest::EntryPoint fragmentEntryPoint;
-        fragmentEntryPoint.name = fragmentEntryPointName;
-        fragmentEntryPoint.slangStage = SLANG_STAGE_FRAGMENT;
-        compileRequest.entryPoints.add(fragmentEntryPoint);
-    }
-    else if( shaderType == Options::ShaderProgramType::RayTracing )
+    // Now we will add the "default" entry point names/stages that
+    // are appropriate to the pipeline type being targetted, *unless*
+    // the options specify that we should leave out the default
+    // entry points and instead rely on the Slang compiler's built-in
+    // mechanisms for discovering entry points (e.g., `[shader(...)]`
+    // attributes).
+    //
+    if( !options.dontAddDefaultEntryPoints )
     {
-        // Note: Current GPU ray tracing pipelines allow for an
-        // almost arbitrary mix of entry points for different stages
-        // to be used together (e.g., a single "program" might
-        // have multiple any-hit shaders, multiple miss shaders, etc.)
-        //
-        // Rather than try to define a fixed set of entry point
-        // names and stages that the testing will support, we will
-        // instead rely on `[shader(...)]` annotations to tell us
-        // what entry points are present in the input code.
-    }
-    else
-    {
-        ShaderCompileRequest::EntryPoint computeEntryPoint;
-        computeEntryPoint.name = computeEntryPointName;
-        computeEntryPoint.slangStage = SLANG_STAGE_COMPUTE;
+        if (shaderType == Options::ShaderProgramType::Graphics || shaderType == Options::ShaderProgramType::GraphicsCompute)
+        {
+            ShaderCompileRequest::EntryPoint vertexEntryPoint;
+            vertexEntryPoint.name = vertexEntryPointName;
+            vertexEntryPoint.slangStage = SLANG_STAGE_VERTEX;
+            compileRequest.entryPoints.add(vertexEntryPoint);
+
+            ShaderCompileRequest::EntryPoint fragmentEntryPoint;
+            fragmentEntryPoint.name = fragmentEntryPointName;
+            fragmentEntryPoint.slangStage = SLANG_STAGE_FRAGMENT;
+            compileRequest.entryPoints.add(fragmentEntryPoint);
+        }
+        else if( shaderType == Options::ShaderProgramType::RayTracing )
+        {
+            // Note: Current GPU ray tracing pipelines allow for an
+            // almost arbitrary mix of entry points for different stages
+            // to be used together (e.g., a single "program" might
+            // have multiple any-hit shaders, multiple miss shaders, etc.)
+            //
+            // Rather than try to define a fixed set of entry point
+            // names and stages that the testing will support, we will
+            // instead rely on `[shader(...)]` annotations to tell us
+            // what entry points are present in the input code.
+        }
+        else
+        {
+            ShaderCompileRequest::EntryPoint computeEntryPoint;
+            computeEntryPoint.name = computeEntryPointName;
+            computeEntryPoint.slangStage = SLANG_STAGE_COMPUTE;
+            compileRequest.entryPoints.add(computeEntryPoint);
+        }
     }
     compileRequest.globalSpecializationArgs = layout.globalSpecializationArgs;
     compileRequest.entryPointSpecializationArgs = layout.entryPointSpecializationArgs;

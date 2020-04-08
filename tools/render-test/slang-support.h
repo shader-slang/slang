@@ -83,7 +83,7 @@ struct ShaderCompilerUtil
         Slang::String sourcePath;
     };
 
-    static SlangResult compileWithLayout(SlangSession* session, const Slang::String& sourcePath, const Slang::List<Slang::CommandLine::Arg>& compileArgs, Options::ShaderProgramType shaderType, const ShaderCompilerUtil::Input& input, OutputAndLayout& output);
+    static SlangResult compileWithLayout(SlangSession* session, const Options& options, const ShaderCompilerUtil::Input& input, OutputAndLayout& output);
 
     static SlangResult readSource(const Slang::String& inSourcePath, List<char>& outSourceText);
 

@@ -631,7 +631,7 @@ void CUDASourceEmitter::emitModuleImpl(IRModule* module)
                     break;
 
             #define CASE(STAGE, PREFIX) \
-                case Stage::STAGE: globalSymbolName = #PREFIX + funcName
+                case Stage::STAGE: globalSymbolName = #PREFIX + funcName; break
 
                 CASE(RayGeneration, __raygen__);
                 // TODO: Add the other ray tracing shader stages here.
