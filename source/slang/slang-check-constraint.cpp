@@ -284,7 +284,7 @@ namespace Slang
         // These seem more reasonable to have influence constraint solving, since it could
         // conceivably let us specialize a `X<T> : IContainer` to `X<Int>` if we find
         // that `X<T>.IndexType == T`.
-        for( auto constraintDeclRef : getMembersOfType<GenericTypeConstraintDecl>(genericDeclRef, MemberFilterStyle::All) )
+        for( auto constraintDeclRef : getMembersOfType<GenericTypeConstraintDecl>(genericDeclRef) )
         {
             if(!TryUnifyTypes(*system, GetSub(constraintDeclRef), GetSup(constraintDeclRef)))
                 return SubstitutionSet();
