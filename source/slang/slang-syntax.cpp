@@ -184,11 +184,153 @@ static bool _checkSubClassRange()
     return SLANG_OK;
 }
 
+    // Free functions
 
-void Type::accept(IValVisitor* visitor, void* extra)
+const RefPtr<Decl>* adjustFilterCursorImpl(const SyntaxClassBase::ClassInfo& clsInfo, MemberFilterStyle filterStyle, const RefPtr<Decl>* ptr, const RefPtr<Decl>* end)
 {
-    accept((ITypeVisitor*)visitor, extra);
+    switch (filterStyle)
+    {
+        default:
+        case MemberFilterStyle::All:
+        {
+            for (; ptr != end; ptr++)
+            {
+                Decl* decl = *ptr;
+                if (decl->getClassInfo().isSubClassOf(clsInfo))
+                {
+                    return ptr;
+                }
+            }
+            break;
+        }
+        case MemberFilterStyle::Instance:
+        {
+            for (; ptr != end; ptr++)
+            {
+                Decl* decl = *ptr;
+                if (decl->getClassInfo().isSubClassOf(clsInfo) && !decl->HasModifier<HLSLStaticModifier>())
+                {
+                    return ptr;
+                }
+            }
+            break;
+        }
+        case MemberFilterStyle::Static:
+        {
+            for (; ptr != end; ptr++)
+            {
+                Decl* decl = *ptr;
+                if (decl->getClassInfo().isSubClassOf(clsInfo) && decl->HasModifier<HLSLStaticModifier>())
+                {
+                    return ptr;
+                }
+            }
+            break;
+        }
+    }
+    return end;
 }
+
+const RefPtr<Decl>* getFilterCursorByIndexImpl(const SyntaxClassBase::ClassInfo& clsInfo, MemberFilterStyle filterStyle, const RefPtr<Decl>* ptr, const RefPtr<Decl>* end, Index index)
+{
+    switch (filterStyle)
+    {
+        default:
+        case MemberFilterStyle::All:
+        {
+            for (; ptr != end; ptr++)
+            {
+                Decl* decl = *ptr;
+                if (decl->getClassInfo().isSubClassOf(clsInfo))
+                {
+                    if (index <= 0)
+                    {
+                        return ptr;
+                    }
+                    index--;
+                }
+            }
+            break;
+        }
+        case MemberFilterStyle::Instance:
+        {
+            for (; ptr != end; ptr++)
+            {
+                Decl* decl = *ptr;
+                if (decl->getClassInfo().isSubClassOf(clsInfo) && !decl->HasModifier<HLSLStaticModifier>())
+                {
+                    if (index <= 0)
+                    {
+                        return ptr;
+                    }
+                    index--;
+                }
+            }
+            break;
+        }
+        case MemberFilterStyle::Static:
+        {
+            for (; ptr != end; ptr++)
+            {
+                Decl* decl = *ptr;
+                if (decl->getClassInfo().isSubClassOf(clsInfo) && decl->HasModifier<HLSLStaticModifier>())
+                {
+                    if (index <= 0)
+                    {
+                        return ptr;
+                    }
+                    index--;
+                }
+            }
+            break;
+        }
+    }
+    return nullptr;
+}
+
+Index getFilterCountImpl(const SyntaxClassBase::ClassInfo& clsInfo, MemberFilterStyle filterStyle, const RefPtr<Decl>* ptr, const RefPtr<Decl>* end)
+{
+    Index count = 0;
+    switch (filterStyle)
+    {
+        default:
+        case MemberFilterStyle::All:
+        {
+            for (; ptr != end; ptr++)
+            {
+                Decl* decl = *ptr;
+                count += Index(decl->getClassInfo().isSubClassOf(clsInfo));
+            }
+            break;
+        }
+        case MemberFilterStyle::Instance:
+        {
+            for (; ptr != end; ptr++)
+            {
+                Decl* decl = *ptr;
+                count += Index(decl->getClassInfo().isSubClassOf(clsInfo)&& !decl->HasModifier<HLSLStaticModifier>());
+            }
+            break;
+        }
+        case MemberFilterStyle::Static:
+        {
+            for (; ptr != end; ptr++)
+            {
+                Decl* decl = *ptr;
+                count += Index(decl->getClassInfo().isSubClassOf(clsInfo) && decl->HasModifier<HLSLStaticModifier>());
+            }
+            break;
+        }
+    }
+    return count;
+}
+
+    // Type
+
+    void Type::accept(IValVisitor* visitor, void* extra)
+    {
+        accept((ITypeVisitor*)visitor, extra);
+    }
 
     // TypeExp
 

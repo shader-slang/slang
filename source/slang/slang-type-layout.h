@@ -572,7 +572,7 @@ public:
 class StructTypeLayout : public TypeLayout
 {
 public:
-    // An ordered list of layouts for the known fields
+    // An ordered list of layouts for the known per *instance* fields
     List<RefPtr<VarLayout>> fields;
 
     // Map a variable to its layout directly.
