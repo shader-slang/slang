@@ -644,7 +644,7 @@ static SlangResult _innerMain(Slang::StdWriters* stdWriters, SlangSession* sessi
         }
 
         ShaderCompilerUtil::OutputAndLayout compilationAndLayout;
-        SLANG_RETURN_ON_FAIL(ShaderCompilerUtil::compileWithLayout(session, gOptions.sourcePath, gOptions.compileArgs, gOptions.shaderType, input, compilationAndLayout));
+        SLANG_RETURN_ON_FAIL(ShaderCompilerUtil::compileWithLayout(session, gOptions, input, compilationAndLayout));
 
         const uint64_t startTicks = ProcessUtil::getClockTick();
 
