@@ -1,10 +1,10 @@
 // static-const-array.slang
 
 //TEST(compute):COMPARE_COMPUTE_EX:-slang -compute
-//TEST_DISABLED(compute, vulkan):COMPARE_COMPUTE_EX:-vk -compute
+//TEST(compute, vulkan):COMPARE_COMPUTE_EX:-vk -compute
+//TEST(compute):COMPARE_COMPUTE_EX:-cpu -slang -compute
 
-
-//TEST_INPUT:ubuffer(data=[0 0 0 0], stride=4):out
+//TEST_INPUT:ubuffer(data=[0 0 0 0], stride=4):out, name outputBuffer
 RWStructuredBuffer<int> outputBuffer;
 
 static const int kArray[] = { 16, 1, 32, 2 };
