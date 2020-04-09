@@ -4706,29 +4706,63 @@ namespace Slang
         }
     }
 
+    static IRIntegerValue _foldIntegerPrefixOp(TokenType tokenType, IRIntegerValue value)
+    {
+        switch (tokenType)
+        {
+            case TokenType::OpNot:      return !value;
+            case TokenType::OpBitNot:   return ~value;
+            case TokenType::OpAdd:      return value;
+            case TokenType::OpSub:      return -value;
+            default:
+            {
+                SLANG_ASSERT(!"Unexpected op");
+                return value;
+            }
+        }
+    }
+
+    static IRFloatingPointValue _foldFloatPrefixOp(TokenType tokenType, IRFloatingPointValue value)
+    {
+        switch (tokenType)
+        {
+            case TokenType::OpNot:      return !value;
+            case TokenType::OpAdd:      return value;
+            case TokenType::OpSub:      return -value;
+            default:
+            {
+                SLANG_ASSERT(!"Unexpected op");
+                return value;
+            }
+        }
+    }
+
     static RefPtr<Expr> parsePrefixExpr(Parser* parser)
     {
-        switch( peekTokenType(parser) )
+        auto tokenType = peekTokenType(parser);
+        switch( tokenType )
         {
         default:
             return parsePostfixExpr(parser);
 
+
         case TokenType::OpInc:
         case TokenType::OpDec:
+        {
+            RefPtr<PrefixExpr> prefixExpr = new PrefixExpr();
+            parser->FillPosition(prefixExpr.Ptr());
+            prefixExpr->FunctionExpr = parseOperator(parser);
+
+            auto arg = parsePrefixExpr(parser);
+
+            prefixExpr->Arguments.add(arg);
+            return prefixExpr;
+        }
         case TokenType::OpNot:
         case TokenType::OpBitNot:
         case TokenType::OpAdd:
-            {
-                RefPtr<PrefixExpr> prefixExpr = new PrefixExpr();
-                parser->FillPosition(prefixExpr.Ptr());
-                prefixExpr->FunctionExpr = parseOperator(parser);
-                prefixExpr->Arguments.add(parsePrefixExpr(parser));
-                return prefixExpr;
-            }
         case TokenType::OpSub:
             {
-                // Special case prefix sub (aka neg), so if it's on a literal, it produces a new literal
-
                 RefPtr<PrefixExpr> prefixExpr = new PrefixExpr();
                 parser->FillPosition(prefixExpr.Ptr());
                 prefixExpr->FunctionExpr = parseOperator(parser);
@@ -4739,7 +4773,7 @@ namespace Slang
                 {
                     RefPtr<IntegerLiteralExpr> newLiteral = new IntegerLiteralExpr(*intLit);
 
-                    IRIntegerValue value = -newLiteral->value;
+                    IRIntegerValue value = _foldIntegerPrefixOp(tokenType, newLiteral->value);
 
                     // Need to get the basic type, so we can fit to underlying type
                     if (auto basicExprType = as<BasicExpressionType>(intLit->type.type))
@@ -4753,13 +4787,14 @@ namespace Slang
                 else if (auto floatLit = as<FloatingPointLiteralExpr>(arg))
                 {
                     RefPtr<FloatingPointLiteralExpr> newLiteral = new FloatingPointLiteralExpr(*floatLit);
-                    newLiteral->value = -newLiteral->value;
+                    newLiteral->value = _foldFloatPrefixOp(tokenType, floatLit->value);
                     return newLiteral;
                 }
-                
+
                 prefixExpr->Arguments.add(arg);
                 return prefixExpr;
             }
+        
             break;
         }
     }
