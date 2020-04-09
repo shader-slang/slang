@@ -4710,8 +4710,6 @@ namespace Slang
     {
         switch (tokenType)
         {
-            case TokenType::OpInc:      return ++value;
-            case TokenType::OpDec:      return --value;
             case TokenType::OpNot:      return !value;
             case TokenType::OpBitNot:   return ~value;
             case TokenType::OpAdd:      return value;
@@ -4728,8 +4726,6 @@ namespace Slang
     {
         switch (tokenType)
         {
-            case TokenType::OpInc:      return ++value;
-            case TokenType::OpDec:      return --value;
             case TokenType::OpNot:      return !value;
             case TokenType::OpAdd:      return value;
             case TokenType::OpSub:      return -value;
@@ -4749,8 +4745,19 @@ namespace Slang
         default:
             return parsePostfixExpr(parser);
 
+
         case TokenType::OpInc:
         case TokenType::OpDec:
+        {
+            RefPtr<PrefixExpr> prefixExpr = new PrefixExpr();
+            parser->FillPosition(prefixExpr.Ptr());
+            prefixExpr->FunctionExpr = parseOperator(parser);
+
+            auto arg = parsePrefixExpr(parser);
+
+            prefixExpr->Arguments.add(arg);
+            return prefixExpr;
+        }
         case TokenType::OpNot:
         case TokenType::OpBitNot:
         case TokenType::OpAdd:
