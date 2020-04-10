@@ -4710,7 +4710,6 @@ namespace Slang
     {
         switch (tokenType)
         {
-            case TokenType::OpNot:      return !value;
             case TokenType::OpBitNot:   return ~value;
             case TokenType::OpAdd:      return value;
             case TokenType::OpSub:      return -value;
@@ -4726,7 +4725,6 @@ namespace Slang
     {
         switch (tokenType)
         {
-            case TokenType::OpNot:      return !value;
             case TokenType::OpAdd:      return value;
             case TokenType::OpSub:      return -value;
             default:
@@ -4745,7 +4743,7 @@ namespace Slang
         default:
             return parsePostfixExpr(parser);
 
-
+        case TokenType::OpNot:
         case TokenType::OpInc:
         case TokenType::OpDec:
         {
@@ -4758,7 +4756,6 @@ namespace Slang
             prefixExpr->Arguments.add(arg);
             return prefixExpr;
         }
-        case TokenType::OpNot:
         case TokenType::OpBitNot:
         case TokenType::OpAdd:
         case TokenType::OpSub:
