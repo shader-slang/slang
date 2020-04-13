@@ -349,6 +349,104 @@ void CUDASourceEmitter::emitLoopControlDecorationImpl(IRLoopControlDecoration* d
     }
 }
 
+void CUDASourceEmitter::_emitInitArrayValue(IRInst* value)
+{
+    switch (value->op)
+    {
+        case kIROp_Construct:
+        case kIROp_MakeMatrix:
+        case kIROp_makeVector:
+        {
+            IRType* type = value->getDataType();
+
+            if (auto vecType = as<IRVectorType>(type))
+            {
+                SLANG_ASSERT(UInt(GetIntVal(vecType->getElementCount())) == value->getOperandCount());
+
+                _emitInitArray(vecType->getElementType(), value->getOperands(), value->getOperandCount());
+                return;
+            }
+            else if (auto matType = as<IRMatrixType>(type))
+            {
+                // Emit the braces for the Matrix struct, contains an row array.
+                m_writer->emit("{ ");
+
+                const Index colCount = Index(GetIntVal(matType->getColumnCount()));
+                const Index rowCount = Index(GetIntVal(matType->getRowCount()));
+
+                // TODO(JS): If num cols = 1, then it *doesn't* actually return a vector.
+                    // That could be argued is an error because we want swizzling or [] to work.
+                IRType* rowType = m_typeSet.addVectorType(matType->getElementType(), int(colCount));
+
+                IRVectorType* rowVectorType = as<IRVectorType>(rowType);
+
+                // Can init, with vectors.
+                // For now special case if the rowVectorType is not actually a vector (when elementSize == 1)
+                if (Index(value->getOperandCount()) == rowCount || rowVectorType == nullptr)
+                {
+                    // We have to output vectors
+                    _emitInitArray(rowType, value->getOperands(), rowCount);
+                }
+                else
+                {
+                    // TODO(JS): The amount of elements may not be enough.
+                    // That is seems if I have matrix<2,2> = { 1, 2} is equivalent to matrix<2,2> = { float2(1), float2(2) };
+                    // If I have matrix<2, 2> m = { 1 } ?
+                    // If I have matrix<2, 2> m = { float2(1, 2) } ?
+
+                    IRType* elementType = matType->getElementType();                                        
+                    IRUse* operands = value->getOperands();
+                    const Index operandCount = Index(value->getOperandCount());
+
+                    SLANG_ASSERT(operandCount <= rowCount * colCount);
+                    
+                    m_writer->emit("{ ");
+                    Int rowIndex = 0;
+
+                    for (Index i = 0; i < rowCount; ++i)
+                    {
+                        if (rowIndex + i >= operandCount)
+                        {
+                            // TODO(JS): I could do something more appropriate here...                            
+                            break;
+                        }
+
+                        if (i != 0) m_writer->emit(", ");
+                        _emitInitArray(elementType, operands, colCount);
+                        operands += colCount;
+
+                        rowIndex += colCount;
+                    }
+                    m_writer->emit("} ");
+                }
+
+                // Close the braces for the array struct
+                m_writer->emit("} ");
+
+                return;
+            }
+
+            break;
+        }
+    }
+
+    emitOperand(value, getInfo(EmitOp::General));
+}
+
+void CUDASourceEmitter::_emitInitArray(IRType* elementType, IRUse* operands, Index operandCount)
+{
+    SLANG_UNUSED(elementType);
+    m_writer->emit("{ ");
+
+    for (Index i = 0; i < operandCount; ++i)
+    {
+        if (i != 0) m_writer->emit(", ");
+        _emitInitArrayValue(operands[i].get());
+    }
+
+    m_writer->emit("} ");
+}
+
 bool CUDASourceEmitter::tryEmitInstExprImpl(IRInst* inst, const EmitOpInfo& inOuterPrec)
 {
     switch(inst->op)
@@ -368,6 +466,22 @@ bool CUDASourceEmitter::tryEmitInstExprImpl(IRInst* inst, const EmitOpInfo& inOu
                 return true;
             }
             break;
+        }
+        case kIROp_makeArray:
+        {
+            IRType* dataType = inst->getDataType();
+            IRArrayType* arrayType = as<IRArrayType>(dataType);
+
+            IRType* elementType = arrayType->getElementType();
+
+            // Emit braces for the FixedArray struct. 
+            m_writer->emit("{ ");
+
+            _emitInitArray(elementType, inst->getOperands(), Index(inst->getOperandCount()));
+
+            m_writer->emit("} ");
+
+            return true;
         }
         default: break;
     }

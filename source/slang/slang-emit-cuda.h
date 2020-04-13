@@ -76,6 +76,10 @@ protected:
     
     SlangResult _calcCUDATextureTypeName(IRTextureTypeBase* texType, StringBuilder& outName);
 
+    void _emitInitArray(IRType* elementType, IRUse* operands, Index operandCount);
+    void _emitInitArrayValue(IRInst* value);
+
+
     RefPtr<CUDAExtensionTracker> m_extensionTracker;
 };
 
