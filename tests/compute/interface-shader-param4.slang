@@ -46,6 +46,14 @@ int test(
 //TEST_INPUT:ubuffer(data=[0 0 0 0], stride=4):out
 RWStructuredBuffer<int> gOutputBuffer;
 
+// Note: a constant buffer register/binding is always claimed
+// for `gStrategy` during initial compilation (before specialization)
+// because the layout logic has no way of knowing if the type
+// that gets plugged in will involve uniform/ordinary data
+// or not.
+//
+//TEST_INPUT:cbuffer(data=[0]):
+//
 ConstantBuffer<IRandomNumberGenerationStrategy> gStrategy;
 
 // The concrete types we plug in for `gStrategy` and `modifier`
