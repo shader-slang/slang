@@ -366,32 +366,20 @@ static bool _areEquivalent(IRType* a, IRType* b)
         {
             IRVectorType* vecA = static_cast<IRVectorType*>(a);
             IRVectorType* vecB = static_cast<IRVectorType*>(b);
-
-            if (GetIntVal(vecA->getElementCount()) != GetIntVal(vecB->getElementCount()))
-            {
-                return false;
-            }
-            return _areEquivalent(vecA->getElementType(), vecB->getElementType());
+            return GetIntVal(vecA->getElementCount()) == GetIntVal(vecB->getElementCount()) &&
+                _areEquivalent(vecA->getElementType(), vecB->getElementType());
         }
         case kIROp_MatrixType:
         {
             IRMatrixType* matA = static_cast<IRMatrixType*>(a);
             IRMatrixType* matB = static_cast<IRMatrixType*>(b);
-
-            if (GetIntVal(matA->getColumnCount()) != GetIntVal(matB->getColumnCount()) ||
-                GetIntVal(matA->getRowCount()) != GetIntVal(matB->getRowCount()))
-            {
-                return false;
-            }
-
-            return _areEquivalent(matA->getElementType(), matB->getElementType());
+            return GetIntVal(matA->getColumnCount()) == GetIntVal(matB->getColumnCount()) &&
+                GetIntVal(matA->getRowCount()) == GetIntVal(matB->getRowCount()) && 
+                _areEquivalent(matA->getElementType(), matB->getElementType());
         }
         default:
         {
-            IRBasicType* basicA = as<IRBasicType>(a);
-            IRBasicType* basicB = as<IRBasicType>(b);
-
-            return basicA && basicB;
+            return as<IRBasicType>(a) != nullptr;
         }
     }
 }
