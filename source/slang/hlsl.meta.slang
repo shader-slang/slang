@@ -2514,12 +2514,15 @@ __target_intrinsic(cuda, "__popc(__ballot_sync($0, $1))")
 __target_intrinsic(hlsl, "WaveActiveCountBits($1)")
 WaveMask WaveMaskCountBits(WaveMask mask, bool value);
 
+// Waits until all warp lanes named in mask have executed a WaveMaskSync (with the same mask)
+// before resuming execution. Guarantees memory ordering in shared memory among threads participating
+// in the barrier.
+//
+// TODO(JS): The cuda intrinsic says it orders *all* memory accesses, which is stronger than memoryBarrierShared. 
 __target_intrinsic(cuda, "__syncwarp($0)")
-void WaveMaskSync(WaveMask mask)
-{
-    // TODO(JS): Need to confirm what is appropriate sync for non CUDA targets within a
-    // mask with access to shared memory.
-}
+__target_intrinsic(glsl, "memoryBarrierShared()")
+__target_intrinsic(hlsl, "GroupMemoryBarrier()")
+void WaveMaskSharedSync(WaveMask mask);
 
 // NOTE! WaveMaskBroadcastLaneAt is *NOT* standard HLSL
 // It is provided as access to subgroupBroadcast which can only take a

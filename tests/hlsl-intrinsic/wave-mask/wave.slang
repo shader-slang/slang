@@ -12,9 +12,11 @@ RWStructuredBuffer<int> inputBuffer;
 
 groupshared int sharedMem[32];
 
-int prefixSum(WaveMask mask, int index, int waveLaneId, int originalValue, int elementCount)
+int exclusivePrefixSum(WaveMask mask, int index, int waveLaneId, int originalValue, int elementCount)
 {
     WaveMask localMask = WaveMaskBallot(mask, waveLaneId < elementCount);
+    
+    sharedMem[index] = 0;
     
     if(waveLaneId < elementCount)
 	{
@@ -25,7 +27,9 @@ int prefixSum(WaveMask mask, int index, int waveLaneId, int originalValue, int e
 		{
 			int temp = WaveMaskShuffle(localMask, val, waveLaneId - i);			
             if(waveLaneId >= i)
+            {
 				val += temp;
+            }
 		}		
         
         // Make it an exclusive prefix sum
@@ -35,7 +39,7 @@ int prefixSum(WaveMask mask, int index, int waveLaneId, int originalValue, int e
 		sharedMem[index] = val;
         
         // Syncronizes on the mask, and ensures memory fence for shared data write
-		WaveMaskSync(localMask); 
+		WaveMaskSharedSync(localMask); 
 		return val;
 	}	
     
@@ -51,11 +55,10 @@ void computeMain(uint3 dispatchThreadID : SV_DispatchThreadID)
     const int value = inputBuffer[index];
     const int elementCount = 9;
     
-    prefixSum(WaveGetActiveMask(), index, waveLaneId, value, elementCount);
+    exclusivePrefixSum(WaveGetActiveMask(), index, waveLaneId, value, elementCount);
     
-    // It returns the result, but we are going to read from shared memory
-    
+    // It returns the result, but we are going to read from shared memory, to check that aspect worked
     int prefixValue = sharedMem[index];
     
-    outputBuffer[index] = value;
+    outputBuffer[index] = prefixValue;
 }
