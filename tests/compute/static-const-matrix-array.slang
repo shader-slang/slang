@@ -7,11 +7,11 @@
 //TEST_INPUT:ubuffer(data=[0 0 0 0  0 0 0 0], stride=4):out, name outputBuffer
 RWStructuredBuffer<float> outputBuffer;
 
-static const matrix<float, 2, 3> kArray[3] =
+
+static const matrix<float, 2, 3> kArray[2] =
 {
     matrix<float, 2, 3>(0, 1, 2, 3, 4, 5),
     matrix<float, 2, 3>(float3(6, 7, 8), float3(9, 10, 11)),
-    matrix<float, 2, 3>(0, 1),
 };
 
 float test(int inVal, int index)
