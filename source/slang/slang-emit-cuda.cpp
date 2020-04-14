@@ -378,8 +378,8 @@ static bool _areEquivalent(IRType* a, IRType* b)
             IRMatrixType* matA = static_cast<IRMatrixType*>(a);
             IRMatrixType* matB = static_cast<IRMatrixType*>(b);
 
-            if (GetIntVal(matA->getColumnCount()) != GetIntVal(matA->getColumnCount()) ||
-                GetIntVal(matA->getRowCount()) != GetIntVal(matA->getRowCount()))
+            if (GetIntVal(matA->getColumnCount()) != GetIntVal(matB->getColumnCount()) ||
+                GetIntVal(matA->getRowCount()) != GetIntVal(matB->getRowCount()))
             {
                 return false;
             }
