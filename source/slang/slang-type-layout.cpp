@@ -1797,6 +1797,11 @@ static bool _usesOrdinaryData(RefPtr<TypeLayout> typeLayout)
     return _usesResourceKind(typeLayout, LayoutResourceKind::Uniform);
 }
 
+static bool _usesExistentialData(RefPtr<TypeLayout> typeLayout)
+{
+    return _usesResourceKind(typeLayout, LayoutResourceKind::ExistentialObjectParam);
+}
+
     /// Add resource usage from `srcTypeLayout` to `dstTypeLayout` unless it would be "masked."
     ///
     /// This function is appropriate for applying resource usage from an element type
@@ -1918,9 +1923,32 @@ static RefPtr<TypeLayout> _createParameterGroupTypeLayout(
     //
     // To determine if we actually need a constant-buffer binding,
     // we will inspect the element type and see if it contains
-    // any ordinary/uniform data.
+    // any ordinary/uniform data *or* any interface/existential-type
+    // slots.
     //
-    bool wantConstantBuffer = _usesOrdinaryData(rawElementTypeLayout);
+    // The latter detail might sound surprising, because it means
+    // that for a declaration like:
+    //
+    //      cbuffer U { IThing gThing; }
+    //
+    // we will allocate a constant-buffer binding for `U` whether
+    // or not it turns out that the concrete type plugged in for
+    // `IThing gThing` has any ordinary/uniform data at all (that is,
+    // if the user plugs in a type that only holds a `Texture2D`,
+    // we will still have allocated the constant buffer binding/register,
+    // and waste it on an empty buffer).
+    //
+    // The reason for this choice is that it greatly simplifies
+    // logic for clients of Slang: a given `ConstantBuffer<>` or
+    // `cbuffer` variable can be statically determined to either
+    // need a constant buffer binding or not, based on its declared
+    // element type, and *nothing* that happens later can change
+    // that (e.g., plugging in a new value/object for `gThing`
+    // can't retroactively change whether or not `U` needed
+    // a constant buffer).
+    //
+    bool wantConstantBuffer = _usesOrdinaryData(rawElementTypeLayout)
+        || _usesExistentialData(rawElementTypeLayout);
     if( wantConstantBuffer )
     {
         // If there is any ordinary data, then we'll need to
@@ -1932,10 +1960,8 @@ static RefPtr<TypeLayout> _createParameterGroupTypeLayout(
     }
 
     // Similarly to how we only need a constant buffer to be allocated
-    // if the contents of the group actually had ordinary/uniform data,
-    // we also only want to allocate a `space` or `set` if that is really
-    // required.
-    //
+    // if the contents of the group actually call for it, we also only
+    // want to allocate a `space` or `set` if that is really required.
     //
     bool canUseSpaceOrSet = false;
     //
@@ -1970,9 +1996,11 @@ static RefPtr<TypeLayout> _createParameterGroupTypeLayout(
     if( canUseSpaceOrSet )
     {
         // Note that if we are allocating a constant buffer to hold
-        // some ordinary/uniform data then we definitely want a space/set,
-        // but we don't need to special-case that because the loop
-        // here will also detect the `LayoutResourceKind::Uniform` usage.
+        // some ordinary/uniform (or existential) data then we
+        // definitely want a space/set (because we will need it for
+        // the constant buffer we allocated above)  but we don't need
+        // to special-case that because the loop here will also detect
+        // the `LayoutResourceKind::Uniform` usage.
 
         for( auto elementResourceInfo : rawElementTypeLayout->resourceInfos )
         {
@@ -2080,89 +2108,27 @@ static RefPtr<TypeLayout> _createParameterGroupTypeLayout(
     {
         auto rules = rawElementTypeLayout->rules;
 
-        // One really annoying complication we need to deal with here
-        // its that it is possible that the original parameter group
-        // declaration didn't need a constant buffer or `space`/`set`
-        // to be allocated, but once we consider the "pending" data
-        // we need to have a constant buffer and/or space.
+        // Note that because we conservatively allocated both
+        // a constant buffer `register`/`binding` and a `space`/`set`
+        // for the container in cases where the element type
+        // might need it (which included interface/existential types),
+        // there is no need to worry about a case where `pendingElementType`
+        // could require a constant buffer `register`/`binding` or
+        // as `space`/`set` to be allocated but we didn't already
+        // allocate one in the non-pending layout.
         //
-        // We will compute whether the pending data create a demand
-        // for a constant buffer and/or a space/set, so that we know
-        // if we are in the tricky case.
+        // Out focus here is then on setting up the representation
+        // of the "pending" data for the element type, and in
+        // particular on dealing with any data that needs to
+        // "bleed through" to the resource usage of the overall
+        // parameter group.
         //
-        bool pendingDataWantsConstantBuffer = _usesOrdinaryData(pendingElementTypeLayout);
-        bool pendingDataWantsSpaceOrSet = false;
-        if( canUseSpaceOrSet )
-        {
-            for( auto resInfo : pendingElementTypeLayout->resourceInfos )
-            {
-                if( resInfo.kind != LayoutResourceKind::RegisterSpace )
-                {
-                    pendingDataWantsSpaceOrSet = true;
-                    break;
-                }
-            }
-        }
-
-        // We will use a few different variables to track resource
-        // usage for the pending data, with roles similar to the
-        // umbrella type layout, container layout, and element layout
-        // that already came up for the main part of the parameter group type.
-
-
-        RefPtr<TypeLayout> pendingContainerTypeLayout = new TypeLayout();
-        pendingContainerTypeLayout->type = parameterGroupType;
-        pendingContainerTypeLayout->rules = parameterGroupRules;
-
-        containerTypeLayout->pendingDataTypeLayout = pendingContainerTypeLayout;
-
-        RefPtr<VarLayout> pendingContainerVarLayout = new VarLayout();
-        pendingContainerVarLayout->typeLayout = pendingContainerTypeLayout;
-
-        containerVarLayout->pendingVarLayout = pendingContainerVarLayout;
-
-
         RefPtr<VarLayout> pendingElementVarLayout = new VarLayout();
         pendingElementVarLayout->typeLayout = pendingElementTypeLayout;
 
         elementVarLayout->pendingVarLayout = pendingElementVarLayout;
 
-        // If we need a space/set for the pending data, and don't already
-        // have one, then we will allocate it now, as part of the
-        // "full" data type.
-        //
-        if( pendingDataWantsSpaceOrSet && !wantSpaceOrSet )
-        {
-            pendingContainerTypeLayout->addResourceUsage(LayoutResourceKind::RegisterSpace, 1);
-
-            // From here on, we know we have access to a register space,
-            // and we can mask any registers/bindings appropriately.
-            //
-            wantSpaceOrSet = true;
-        }
-
-        // If we need a constant buffer for laying out ordinary
-        // data, and didn't have one allocated before, we will create
-        // one.
-        //
-        if( pendingDataWantsConstantBuffer && !wantConstantBuffer )
-        {
-            auto cbUsage = rules->GetObjectLayout(ShaderParameterKind::ConstantBuffer);
-            pendingContainerTypeLayout->addResourceUsage(cbUsage.kind, cbUsage.size);
-
-            wantConstantBuffer = true;
-        }
-
-        for( auto resInfo : pendingContainerTypeLayout->resourceInfos )
-        {
-            pendingContainerVarLayout->findOrAddResourceInfo(resInfo.kind);
-        }
-
-        // Now that we've added in the resource usage for any CB or set/space
-        // we needed to allocate just for the pending data, we can safely
-        // lay out the pending data itself.
-        //
-        // The ordinary/uniform part of things wil always be "masked" and
+        // Any ordinary/uniform part of the pending data wil always be "masked" and
         // needs to come after any uniform data from the original element type.
         //
         // To kick things off we will initialize state for `struct` type layout,
@@ -2183,8 +2149,8 @@ static RefPtr<TypeLayout> _createParameterGroupTypeLayout(
             if( resInfo.kind == LayoutResourceKind::Uniform )
             {
                 // For the ordinary/uniform resource kind, we will add the resource
-                // usage as a structure field, and then write the resulting offset
-                // into the variable layout for the pending data.
+                // usage as if it was a structure field, and then write the resulting
+                // offset into the variable layout for the pending data.
                 //
                 auto offset = rules->AddStructField(
                     &uniformLayout,
@@ -2195,16 +2161,11 @@ static RefPtr<TypeLayout> _createParameterGroupTypeLayout(
             }
             else
             {
-                // For all other resource kinds, we will set the offset in
-                // the variable layout based on the total resources of that
-                // kind seen so far (including the "container" if any),
-                // and then bump the count for total resource usage.
+                // For all other resource kinds, we simply need to add an
+                // entry to the pending layout to represent the resource
+                // usage of the pending data.
                 //
-                auto elementVarResInfo = pendingElementVarLayout->findOrAddResourceInfo(resInfo.kind);
-                if( auto containerTypeInfo = pendingContainerTypeLayout->FindResourceInfo(resInfo.kind) )
-                {
-                    elementVarResInfo->index = containerTypeInfo->count.getFiniteValue();
-                }
+                pendingElementVarLayout->findOrAddResourceInfo(resInfo.kind);
             }
         }
         rules->EndStructLayout(&uniformLayout);
@@ -2218,7 +2179,6 @@ static RefPtr<TypeLayout> _createParameterGroupTypeLayout(
         // up the hierarchy.
         //
         RefPtr<TypeLayout> unmaskedPendingDataTypeLayout = new TypeLayout();
-        _addUnmaskedResourceUsage(true, unmaskedPendingDataTypeLayout, pendingContainerTypeLayout, wantSpaceOrSet);
         _addUnmaskedResourceUsage(false, unmaskedPendingDataTypeLayout, pendingElementTypeLayout, wantSpaceOrSet);
 
         // TODO: we should probably optimize for the case where there is no unmasked
@@ -2227,6 +2187,58 @@ static RefPtr<TypeLayout> _createParameterGroupTypeLayout(
         // Now we need to update the type layout to  what we've done.
         //
         typeLayout->pendingDataTypeLayout = unmaskedPendingDataTypeLayout;
+
+        // We will now attempt to compute reasonable offset information for
+        // (non-uniform) pending data in the element type. There are basically
+        // two cases here:
+        //
+        // 1. If the resource kind is one that is "masked" by the container,
+        // then the pending data can be statically placed at an offset fater
+        // the diret (non-pending) element data.
+        //
+        // 2. If the resource kind is one that "bleeds through" to the container,
+        // then its offset will always be relative to the location that
+        // gets allocated for pending data in the container, which means it
+        // is always zero.
+        //
+        // Because the offsets are currently all set to zero, we only
+        // need to check for case (1).
+        //
+        for( auto pendingVarResInfo : pendingElementVarLayout->resourceInfos )
+        {
+            auto kind = pendingVarResInfo.kind;
+
+            // If we are looking at uniform resource usage, we already
+            // handled it easlier.
+            //
+            if(kind == LayoutResourceKind::Uniform)
+                continue;
+
+            // If the usage is unmasked, the nwe are in case (2) and should
+            // skip out.
+            //
+            if(unmaskedPendingDataTypeLayout->FindResourceInfo(kind))
+                continue;
+
+            // Okay, we have resource info for somethign that is going
+            // to be "masked" by the container, in which case we
+            // can compute a fixed offset, after any existing data
+            // of the same kind.
+            //
+            auto existingVarResInfo = elementVarLayout->FindResourceInfo(kind);
+            if(!existingVarResInfo)
+                continue;
+
+            auto existingTypeResInfo = elementVarLayout->typeLayout->FindResourceInfo(kind);
+            if(!existingTypeResInfo)
+                continue;
+
+            // TODO: We need a more robust solution than just calling
+            // `getFiniteValue` here.
+            //
+            pendingVarResInfo.index = existingVarResInfo->index
+                + existingTypeResInfo->count.getFiniteValue();
+        }
 
         // TODO: we should probably adjust the size reported by the element type
         // to include any "pending" data that was allocated into the group, so
@@ -3025,7 +3037,7 @@ static TypeLayoutResult _createTypeLayout(
         //    buffer, including offsets, etc.
         //
         // 2. Compute information about any object types inside
-        //    the constant buffer, which need to be surfaces out
+        //    the constant buffer, which need to be surfaced out
         //    to the top level.
         //
         auto typeLayout = createParameterGroupTypeLayout(
