@@ -384,9 +384,9 @@ static bool _areEquivalent(IRType* a, IRType* b)
     }
 }
 
-void CUDASourceEmitter::_emitInitArrayValue(IRType* dstType, IRInst* value)
+void CUDASourceEmitter::_emitInitializerListValue(IRType* dstType, IRInst* value)
 {
-    // When constructing a matrix or vector from a single value this is already handled by the default path
+    // When constructing a matrix or vector from a single value this is handled by the default path
 
     switch (value->op)
     {
@@ -403,7 +403,7 @@ void CUDASourceEmitter::_emitInitArrayValue(IRType* dstType, IRInst* value)
                 {
                     if (UInt(GetIntVal(vecType->getElementCount())) == value->getOperandCount())
                     {
-                        _emitInitArray(vecType->getElementType(), value->getOperands(), value->getOperandCount());
+                        _emitInitializerList(vecType->getElementType(), value->getOperands(), value->getOperandCount());
                         return;
                     }
                 }
@@ -427,7 +427,7 @@ void CUDASourceEmitter::_emitInitArrayValue(IRType* dstType, IRInst* value)
                         // Emit the braces for the Matrix struct, contains an row array.
                         m_writer->emit("{\n");
                         m_writer->indent();
-                        _emitInitArray(rowType, value->getOperands(), rowCount);
+                        _emitInitializerList(rowType, value->getOperands(), rowCount);
                         m_writer->dedent();
                         m_writer->emit("\n}");
                         return;
@@ -446,7 +446,7 @@ void CUDASourceEmitter::_emitInitArrayValue(IRType* dstType, IRInst* value)
                         for (Index i = 0; i < rowCount; ++i)
                         {
                             if (i != 0) m_writer->emit(", ");
-                            _emitInitArray(elementType, operands, colCount);
+                            _emitInitializerList(elementType, operands, colCount);
                             operands += colCount;
                         }
                         m_writer->dedent();
@@ -462,11 +462,11 @@ void CUDASourceEmitter::_emitInitArrayValue(IRType* dstType, IRInst* value)
         }
     }
 
-    // All other cases we just use the default emitting - might now work on arrays defined in global scope on CUDA though
+    // All other cases we just use the default emitting - might not work on arrays defined in global scope on CUDA though
     emitOperand(value, getInfo(EmitOp::General));
 }
 
-void CUDASourceEmitter::_emitInitArray(IRType* elementType, IRUse* operands, Index operandCount)
+void CUDASourceEmitter::_emitInitializerList(IRType* elementType, IRUse* operands, Index operandCount)
 {
     m_writer->emit("{\n");
     m_writer->indent();
@@ -474,7 +474,7 @@ void CUDASourceEmitter::_emitInitArray(IRType* elementType, IRUse* operands, Ind
     for (Index i = 0; i < operandCount; ++i)
     {
         if (i != 0) m_writer->emit(", ");
-        _emitInitArrayValue(elementType, operands[i].get());
+        _emitInitializerListValue(elementType, operands[i].get());
     }
 
     m_writer->dedent();
@@ -512,7 +512,7 @@ bool CUDASourceEmitter::tryEmitInstExprImpl(IRInst* inst, const EmitOpInfo& inOu
             m_writer->emit("{\n");
             m_writer->indent();
 
-            _emitInitArray(elementType, inst->getOperands(), Index(inst->getOperandCount()));
+            _emitInitializerList(elementType, inst->getOperands(), Index(inst->getOperandCount()));
 
             m_writer->dedent();
             m_writer->emit("\n}");
