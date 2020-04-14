@@ -8,6 +8,9 @@
 RWStructuredBuffer<float> outputBuffer;
 
 
+static const matrix<float, 2, 3> kMatrix = { 1, 2, 4, -1, -2, -3 };
+static const float3 kVector = { -1, -2, -3 };
+
 static const matrix<float, 2, 3> kArray[2] =
 {
     matrix<float, 2, 3>(0, 1, 2, 3, 4, 5),
@@ -16,7 +19,9 @@ static const matrix<float, 2, 3> kArray[2] =
 
 float test(int inVal, int index)
 {
-    matrix<float, 2, 3> mat = kArray[index];
+    matrix<float, 2, 3> mat = kArray[index] + kMatrix;
+    mat[0] =+ kVector;
+    
     float2 a = { inVal, inVal + 1};
     float3 v = mul(a, mat);
     return v.x + v.y + v.z;
