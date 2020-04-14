@@ -16,7 +16,7 @@ static const matrix<float, 2, 3> kArray[2] =
 
 float test(int inVal, int index)
 {
-	matrix<float, 2, 3> mat = kArray[index];
+    matrix<float, 2, 3> mat = kArray[index];
     float2 a = { inVal, inVal + 1};
     float3 v = mul(a, mat);
     return v.x + v.y + v.z;
@@ -25,7 +25,7 @@ float test(int inVal, int index)
 [numthreads(8, 1, 1)]
 void computeMain(uint3 tid : SV_DispatchThreadID)
 {
-	int inVal = tid.x;
-	float outVal = test(inVal, inVal & 1);
-	outputBuffer[inVal] = outVal;
+    int inVal = tid.x;
+    float outVal = test(inVal, inVal & 1);
+    outputBuffer[inVal] = outVal;
 }
