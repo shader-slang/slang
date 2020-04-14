@@ -4,33 +4,58 @@
 //TEST(compute, vulkan):COMPARE_COMPUTE_EX:-vk -compute
 //TEST(compute):COMPARE_COMPUTE_EX:-cuda -compute
 
-//TEST_INPUT:ubuffer(data=[0 0 0 0], stride=4):out,name outputBuffer
+//TEST_INPUT:ubuffer(data=[0 0 0 0  0 0 0 0  0 0 0 0  0 0 0 0], stride=4):out,name outputBuffer
 RWStructuredBuffer<int> outputBuffer;
 
-[numthreads(4, 1, 1)]
+//TEST_INPUT:ubuffer(data=[3 10 2 -1  4 53 4 6  1 2 3 4  7 5 3 1], stride=4):name inputBuffer
+RWStructuredBuffer<int> inputBuffer;
+
+groupshared int sharedMem[32];
+
+int prefixSum(WaveMask mask, int index, int waveLaneId, int originalValue, int elementCount)
+{
+    WaveMask localMask = WaveMaskBallot(mask, waveLaneId < elementCount);
+    
+    if(waveLaneId < elementCount)
+	{
+		int temp = 0;
+		int val = originalValue;		
+        
+		for(int  i = 1; i < elementCount; i += i)
+		{
+			int temp = WaveMaskShuffle(localMask, val, waveLaneId - i);			
+            if(waveLaneId >= i)
+				val += temp;
+		}		
+        
+        // Make it an exclusive prefix sum
+        val -= originalValue;
+        
+        // Write to shared memory
+		sharedMem[index] = val;
+        
+        // Syncronizes on the mask, and ensures memory fence for shared data write
+		WaveMaskSync(localMask); 
+		return val;
+	}	
+    
+    return 0;	
+}
+
+[numthreads(32, 1, 1)]
 void computeMain(uint3 dispatchThreadID : SV_DispatchThreadID)
 {
-    int idx = int(dispatchThreadID.x);
+    int index = int(dispatchThreadID.x);
+    const int waveLaneId = WaveGetLaneIndex();
     
-    int value = 0;
+    const int value = inputBuffer[index];
+    const int elementCount = 9;
     
-    value |= WaveActiveAllTrue(idx < 4 ) ? 1 : 0;
-    value |= WaveActiveAnyTrue(idx == 2) ? 2 : 0;
-    value |= WaveActiveAnyTrue(idx == -1) ? 4 : 0;
-    value |= WaveActiveAllTrue(idx == 3) ? 8 : 0;
-        
-    int sum = WaveActiveSum(idx);
-    value |= (sum << 4);
+    prefixSum(WaveGetActiveMask(), index, waveLaneId, value, elementCount);
     
-    // TODO(JS): 
-    // This result is unexpected. I expect 1 * 2 * 1 * 2 = 4. But we get 0 on DX (so disable for now). On CUDA I get 4.
-    // int product = WaveActiveProduct((idx & 1) + 1);
-    /// value |= (product << 8);    
-        
-    // TODO(JS): NOTE! This only works with uint, *NOT* int on HLSL/DXC. 
-    // We need to update the stdlib to reflect this.
-    uint xor = WaveActiveBitXor(uint(idx + 1));
-    value |= int(xor << 12);
+    // It returns the result, but we are going to read from shared memory
     
-    outputBuffer[idx] = value;
+    int prefixValue = sharedMem[index];
+    
+    outputBuffer[index] = value;
 }
