@@ -539,6 +539,9 @@ namespace Slang
     bool SemanticsVisitor::isDeclUsableAsStaticMember(
         Decl*   decl)
     {
+        if(auto genericDecl = as<GenericDecl>(decl))
+            decl = genericDecl->inner;
+
         if(decl->HasModifier<HLSLStaticModifier>())
             return true;
 
