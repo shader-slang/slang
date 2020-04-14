@@ -148,55 +148,148 @@ namespace Slang
     {
         auto genericDeclRef = candidate.item.declRef.as<GenericDecl>();
 
-        // We will go ahead and hang onto the arguments that we've
-        // already checked, since downstream validation might need
-        // them.
+        // The basic idea here is that we need to check that the
+        // arguments to a generic application (e.g., `F<A1, A2, ...>`)
+        // have the right "type," which in this context means
+        // checking that:
+        //
+        // * The argument for any generic type parameter is a (proper) type.
+        //
+        // * The argument for any generic value parameter is a
+        //   specialization-time constant value of the appropriate type.
+        //
+        // Some additional checks are *not* handled at this point:
+        //
+        // * We don't check that a type argument actually conforms to
+        //   the constraints on the parameter.
+        //
+        // Along the way we will build up a `GenericSubstitution`
+        // to represent the arguments that have been coerced to
+        // appropriateforms.
+        //
         auto genSubst = new GenericSubstitution();
         candidate.subst = genSubst;
         auto& checkedArgs = genSubst->args;
+
+        // Rather than bail out as soon as we hit a problem,
+        // we are going to process *all* of the parameters of the
+        // generic and place suitable arguments into the `checkedArgs`
+        // array. This is important so that we don't cause crashes
+        // in cases where the arguments fail this step of checking,
+        // but we decide to proceed with subsequent steps (e.g.,
+        // because the candidate we are trying here is the *only*
+        // candidate).
+        //
+        bool success = true;
 
         Index aa = 0;
         for (auto memberRef : getMembers(genericDeclRef))
         {
             if (auto typeParamRef = memberRef.as<GenericTypeParamDecl>())
             {
-                if (aa >= context.argCount)
+                // We have a type parameter, and we expect to find
+                // a type argument.
+                //
+                TypeExp typeArg;
+                if( aa >= context.argCount )
                 {
-                    return false;
-                }
-                auto arg = context.getArg(aa++);
-
-                TypeExp typeExp;
-                if (context.mode == OverloadResolveContext::Mode::JustTrying)
-                {
-                    typeExp = tryCoerceToProperType(TypeExp(arg));
-                    if(!typeExp.type)
-                    {
-                        return false;
-                    }
+                    // If we have run out of arguments, then we definitely
+                    // fail checking (in principle this should have been
+                    // checked already by an earlier step).
+                    //
+                    success = false;
                 }
                 else
                 {
-                    typeExp = CoerceToProperType(TypeExp(arg));
+                    // If we have at least one argument left, we grab
+                    // it and try to coerce it to a proper type. The
+                    // manner in which we handle the coercion depends
+                    // on whether we are "just trying" the candidate
+                    // (so a failure would rule out the candidate, but
+                    // shouldn't be reported to the user), or are doing
+                    // the checking "for real" in which case any errors
+                    // we run into need to be reported.
+                    //
+                    auto arg = context.getArg(aa++);
+                    if (context.mode == OverloadResolveContext::Mode::JustTrying)
+                    {
+                        typeArg = tryCoerceToProperType(TypeExp(arg));
+                    }
+                    else
+                    {
+                        typeArg = CoerceToProperType(TypeExp(arg));
+                    }
                 }
-                checkedArgs.add(typeExp.type);
+
+                // If we failed to get a valid type (either because
+                // there was no matching argument, or because the
+                // "just trying" coercion failed), then we create
+                // an error type to stand in for the argument
+                //
+                if( !typeArg.type )
+                {
+                    typeArg.type = getSession()->getErrorType();
+                    success = false;
+                }
+
+                checkedArgs.add(typeArg.type);
             }
             else if (auto valParamRef = memberRef.as<GenericValueParamDecl>())
             {
-                auto arg = context.getArg(aa++);
-
-                if (context.mode == OverloadResolveContext::Mode::JustTrying)
+                // The case for a generic value parameter is similar to that
+                // for a generic type parameter.
+                //
+                RefPtr<Expr> arg;
+                if( aa >= context.argCount )
                 {
-                    ConversionCost cost = kConversionCost_None;
-                    if (!canCoerce(GetType(valParamRef), arg->type, &cost))
+                    // If there are no arguments left to consume, then
+                    // we have a definite failure.
+                    //
+                    success = false;
+                }
+                else
+                {
+                    // If we have an argument then we need to coerce it
+                    // to the type of the parameter (and fail if the
+                    // coercion is not possible)
+                    //
+                    arg = context.getArg(aa++);
+                    if (context.mode == OverloadResolveContext::Mode::JustTrying)
                     {
-                        return false;
+                        ConversionCost cost = kConversionCost_None;
+                        if (!canCoerce(GetType(valParamRef), arg->type, &cost))
+                        {
+                            success = false;
+                        }
+                        candidate.conversionCostSum += cost;
                     }
-                    candidate.conversionCostSum += cost;
+                    else
+                    {
+                        arg = coerce(GetType(valParamRef), arg);
+                    }
                 }
 
-                arg = coerce(GetType(valParamRef), arg);
-                auto val = ExtractGenericArgInteger(arg, context.mode == OverloadResolveContext::Mode::JustTrying ? nullptr : getSink());
+                // If we have an argument to work with, then we will
+                // try to extract its speicalization-time constant value.
+                //
+                // TODO: This is one of the places where we will need to
+                // generalize in order to support generic value parameters
+                // with types other than `int`.
+                //
+                RefPtr<Val> val;
+                if( arg )
+                {
+                    val = ExtractGenericArgInteger(arg, context.mode == OverloadResolveContext::Mode::JustTrying ? nullptr : getSink());
+                }
+
+                // If any of the above checking steps fail and we don't
+                // have a value to work with here, we will instead
+                // use an "error" value to stand in for the argument.
+                //
+                if( !val )
+                {
+                    val = new ErrorIntVal();
+                }
                 checkedArgs.add(val);
             }
             else
@@ -205,8 +298,12 @@ namespace Slang
             }
         }
 
-        // Okay, we've made it!
-        return true;
+        // Once we are done processing the parameters of the generic,
+        // we will have build up a usable `checkedArgs` array and
+        // can return to the caller a report of whether we
+        // were successful or not.
+        //
+        return success;
     }
 
     bool SemanticsVisitor::TryCheckOverloadCandidateTypes(
@@ -219,7 +316,7 @@ namespace Slang
         switch (candidate.flavor)
         {
         case OverloadCandidate::Flavor::Func:
-            params = GetParameters(candidate.item.declRef.as<CallableDecl>()).ToArray();
+            params = GetParameters(candidate.item.declRef.as<CallableDecl>()).toArray();
             break;
 
         case OverloadCandidate::Flavor::Generic:
@@ -904,7 +1001,7 @@ namespace Slang
         // to match it up with the arguments accordingly...
         if (auto funcDeclRef = unspecializedInnerRef.as<CallableDecl>())
         {
-            auto params = GetParameters(funcDeclRef).ToArray();
+            auto params = GetParameters(funcDeclRef).toArray();
 
             Index argCount = context.getArgCount();
             Index paramCount = params.getCount();
@@ -1672,7 +1769,7 @@ namespace Slang
         else
         {
             // Nothing at all was found that we could even consider invoking
-            getSink()->diagnose(genericAppExpr, Diagnostics::unimplemented, "expected a generic");
+            getSink()->diagnose(genericAppExpr, Diagnostics::expectedAGeneric, baseExpr->type);
             return CreateErrorExpr(genericAppExpr);
         }
     }

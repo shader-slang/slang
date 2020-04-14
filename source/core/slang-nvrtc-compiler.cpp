@@ -334,8 +334,63 @@ SlangResult NVRTCDownstreamCompiler::compile(const CompileOptions& options, RefP
         cmdLine.addArg(builder);
     }
 
+    List<const char*> headers;
+    List<const char*> headerIncludeNames;
+
+    // If compiling for OptiX, we need to add the appropriate search paths to the command line.
+    //
+    if(options.pipelineType == PipelineType::RayTracing)
+    {
+        // The device-side OptiX API is accessed through a constellation
+        // of headers provided by the OptiX SDK, so we need to set an
+        // include path for the compile that makes those visible.
+        //
+        // TODO: The OptiX SDK installer doesn't set any kind of environment
+        // variable to indicate where the SDK was installed, so we seemingly
+        // need to probe paths instead. The form of the path will differ
+        // betwene Windows and Unix-y platforms, and we will need some kind
+        // of approach to probe multiple versiosn and use the latest.
+        //
+        // HACK: For now I'm using the fixed path for the most recent SDK
+        // release on Windows. This means that OptiX cross-compilation will
+        // only "work" on a subset of platforms, but that doesn't matter
+        // for now since it doesn't really "work" at all.
+        //
+        cmdLine.addArg("-I");
+        cmdLine.addArg("C:/ProgramData/NVIDIA Corporation/OptiX SDK 7.0.0/include/");
+
+        // The OptiX headers in turn `#include <stddef.h>` and expect that
+        // to work. We could try to also add in an include path from the CUDA
+        // SDK (which seems to provide a `stddef.h` in the most recent version),
+        // but using that version doesn't seem to work (and also bakes in a
+        // requirement that the user have the CUDA SDK installed in addition
+        // to the OptiX SDK).
+        //
+        // Instead, we will rely on the NVRTC feature that lets us set up
+        // memory buffers to be used as include files by the we compile.
+        // We will define a dummy `stddef.h` that includes the bare minimum
+        // lines required to get the OptiX headers to compile without complaint.
+        //
+        // TODO: Confirm that the `LP64` definition herei s actually needed.
+        //
+        headerIncludeNames.add("stddef.h");
+        headers.add("#pragma once\n" "#define LP64\n");
+
+        // Finally, we want the CUDA prelude to be able to react to whether
+        // or not OptiX is required (most notably by `#include`ing the appropriate
+        // header(s)), so we will insert a preprocessor define to indicate
+        // the requirement.
+        //
+        cmdLine.addArg("-DSLANG_CUDA_ENABLE_OPTIX");
+    }
+
+    SLANG_ASSERT(headers.getCount() == headerIncludeNames.getCount());
+
     nvrtcProgram program = nullptr;
-    nvrtcResult res = m_nvrtcCreateProgram(&program, options.sourceContents.getBuffer(), options.sourceContentsPath.getBuffer(), 0, nullptr, nullptr);
+    nvrtcResult res = m_nvrtcCreateProgram(&program, options.sourceContents.getBuffer(), options.sourceContentsPath.getBuffer(),
+        (int) headers.getCount(),
+        headers.getBuffer(),
+        headerIncludeNames.getBuffer());
     if (res != NVRTC_SUCCESS)
     {
         return _asResult(res);

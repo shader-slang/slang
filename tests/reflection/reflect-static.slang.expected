@@ -1,0 +1,125 @@
+result code = 0
+standard error = {
+}
+standard output = {
+{
+    "parameters": [
+        {
+            "name": "cbThing",
+            "type": {
+                "kind": "constantBuffer",
+                "elementType": {
+                    "kind": "struct",
+                    "name": "Thing",
+                    "fields": [
+
+                    ]
+                },
+                "containerVarLayout": {
+
+                },
+                "elementVarLayout": {
+                    "type": {
+                        "kind": "struct",
+                        "name": "Thing",
+                        "fields": [
+
+                        ]
+                    }
+                }
+            }
+        },
+        {
+            "name": "cbAnotherThing",
+            "binding": {"kind": "constantBuffer", "index": 0},
+            "type": {
+                "kind": "constantBuffer",
+                "elementType": {
+                    "kind": "struct",
+                    "name": "AnotherThing",
+                    "fields": [
+                        {
+                            "name": "a",
+                            "type": {
+                                "kind": "scalar",
+                                "scalarType": "int32"
+                            },
+                            "binding": {"kind": "uniform", "offset": 0, "size": 4}
+                        },
+                        {
+                            "name": "b",
+                            "type": {
+                                "kind": "scalar",
+                                "scalarType": "int32"
+                            },
+                            "binding": {"kind": "uniform", "offset": 4, "size": 4}
+                        }
+                    ]
+                },
+                "containerVarLayout": {
+                    "binding": {"kind": "constantBuffer", "index": 0}
+                },
+                "elementVarLayout": {
+                    "type": {
+                        "kind": "struct",
+                        "name": "AnotherThing",
+                        "fields": [
+                            {
+                                "name": "a",
+                                "type": {
+                                    "kind": "scalar",
+                                    "scalarType": "int32"
+                                },
+                                "binding": {"kind": "uniform", "offset": 0, "size": 4}
+                            },
+                            {
+                                "name": "b",
+                                "type": {
+                                    "kind": "scalar",
+                                    "scalarType": "int32"
+                                },
+                                "binding": {"kind": "uniform", "offset": 4, "size": 4}
+                            }
+                        ]
+                    },
+                    "binding": {"kind": "uniform", "offset": 0, "size": 8}
+                }
+            }
+        },
+        {
+            "name": "outputBuffer",
+            "binding": {"kind": "unorderedAccess", "index": 0},
+            "type": {
+                "kind": "resource",
+                "baseShape": "structuredBuffer",
+                "access": "readWrite",
+                "resultType": {
+                    "kind": "scalar",
+                    "scalarType": "int32"
+                }
+            }
+        }
+    ],
+    "entryPoints": [
+        {
+            "name": "computeMain",
+            "stage:": "compute",
+            "parameters": [
+                {
+                    "name": "dispatchThreadID",
+                    "semanticName": "SV_DISPATCHTHREADID",
+                    "type": {
+                        "kind": "vector",
+                        "elementCount": 3,
+                        "elementType": {
+                            "kind": "scalar",
+                            "scalarType": "uint32"
+                        }
+                    }
+                }
+            ],
+            "threadGroupSize": [4, 1, 1]
+        }
+    ]
+}
+}

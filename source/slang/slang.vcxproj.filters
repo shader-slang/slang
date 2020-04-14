@@ -1,4 +1,4 @@
-﻿<?xml version="1.0" encoding="utf-8"?>
+<?xml version="1.0" encoding="utf-8"?>
 <Project ToolsVersion="4.0" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
   <ItemGroup>
     <Filter Include="Header Files">
@@ -13,9 +13,6 @@
       <Filter>Header Files</Filter>
     </ClInclude>
     <ClInclude Include="core.meta.slang.h">
-      <Filter>Header Files</Filter>
-    </ClInclude>
-    <ClInclude Include="glsl.meta.slang.h">
       <Filter>Header Files</Filter>
     </ClInclude>
     <ClInclude Include="hlsl.meta.slang.h">
@@ -99,6 +96,9 @@
     <ClInclude Include="slang-ir-glsl-legalize.h">
       <Filter>Header Files</Filter>
     </ClInclude>
+    <ClInclude Include="slang-ir-inline.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
     <ClInclude Include="slang-ir-inst-defs.h">
       <Filter>Header Files</Filter>
     </ClInclude>
@@ -136,6 +136,9 @@
       <Filter>Header Files</Filter>
     </ClInclude>
     <ClInclude Include="slang-ir-string-hash.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="slang-ir-strip-witness-tables.h">
       <Filter>Header Files</Filter>
     </ClInclude>
     <ClInclude Include="slang-ir-strip.h">
@@ -246,12 +249,6 @@
     <ClInclude Include="slang-visitor.h">
       <Filter>Header Files</Filter>
     </ClInclude>
-    <ClInclude Include="slang-ir-strip-witness-tables.h">
-      <Filter>Header Files</Filter>
-    </ClInclude>
-    <ClInclude Include="slang-ir-inline.h">
-      <Filter>Header Files</Filter>
-    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="slang-check-conformance.cpp">
@@ -353,6 +350,9 @@
     <ClCompile Include="slang-ir-glsl-legalize.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
+    <ClCompile Include="slang-ir-inline.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
     <ClCompile Include="slang-ir-legalize-types.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
@@ -387,6 +387,9 @@
       <Filter>Source Files</Filter>
     </ClCompile>
     <ClCompile Include="slang-ir-string-hash.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="slang-ir-strip-witness-tables.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
     <ClCompile Include="slang-ir-strip.cpp">
@@ -470,20 +473,6 @@
     <ClCompile Include="slang.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
-    <ClCompile Include="slang-ir-strip-witness-tables.cpp">
-      <Filter>Source Files</Filter>
-    </ClCompile>
-    <ClCompile Include="slang-ir-inline.cpp">
-      <Filter>Source Files</Filter>
-    </ClCompile>
-  </ItemGroup>
-  <ItemGroup>
-    <None Include="..\core\core.natvis">
-      <Filter>Source Files</Filter>
-    </None>
-    <None Include="slang.natvis">
-      <Filter>Source Files</Filter>
-    </None>
   </ItemGroup>
   <ItemGroup>
     <CustomBuild Include="core.meta.slang">
@@ -492,5 +481,13 @@
     <CustomBuild Include="hlsl.meta.slang">
       <Filter>Source Files</Filter>
     </CustomBuild>
+  </ItemGroup>
+  <ItemGroup>
+    <Natvis Include="..\core\core.natvis">
+      <Filter>Source Files</Filter>
+    </Natvis>
+    <Natvis Include="slang.natvis">
+      <Filter>Source Files</Filter>
+    </Natvis>
   </ItemGroup>
 </Project>

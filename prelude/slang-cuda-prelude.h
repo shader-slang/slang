@@ -1,3 +1,7 @@
+#ifdef SLANG_CUDA_ENABLE_OPTIX
+#include <optix.h>
+#endif
+
 
 // Must be large enough to cause overflow and therefore infinity
 #ifndef SLANG_INFINITY

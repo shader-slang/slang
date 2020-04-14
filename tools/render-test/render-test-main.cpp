@@ -212,7 +212,7 @@ SlangResult RenderTestApp::initialize(SlangSession* session, Renderer* renderer,
 
 Result RenderTestApp::_initializeShaders(SlangSession* session, Renderer* renderer, Options::ShaderProgramType shaderType, const ShaderCompilerUtil::Input& input)
 {
-    SLANG_RETURN_ON_FAIL(ShaderCompilerUtil::compileWithLayout(session, gOptions.sourcePath, gOptions.compileArgs, gOptions.shaderType, input,  m_compilationOutput));
+    SLANG_RETURN_ON_FAIL(ShaderCompilerUtil::compileWithLayout(session, gOptions, input,  m_compilationOutput));
     m_shaderInputLayout = m_compilationOutput.layout;
     m_shaderProgram = renderer->createProgram(m_compilationOutput.output.desc);
     return m_shaderProgram ? SLANG_OK : SLANG_FAIL;
@@ -500,6 +500,25 @@ static SlangResult _innerMain(Slang::StdWriters* stdWriters, SlangSession* sessi
             break;
     }
 
+    switch( gOptions.shaderType )
+    {
+    case Options::ShaderProgramType::Graphics:
+    case Options::ShaderProgramType::GraphicsCompute:
+        input.pipelineType = PipelineType::Graphics;
+        break;
+
+    case Options::ShaderProgramType::Compute:
+        input.pipelineType = PipelineType::Compute;
+        break;
+
+    case Options::ShaderProgramType::RayTracing:
+        input.pipelineType = PipelineType::RayTracing;
+        break;
+
+    default:
+        break;
+    }
+
     if (gOptions.sourceLanguage != SLANG_SOURCE_LANGUAGE_UNKNOWN)
     {
         input.sourceLanguage = gOptions.sourceLanguage;
@@ -554,7 +573,7 @@ static SlangResult _innerMain(Slang::StdWriters* stdWriters, SlangSession* sessi
         }
 
         ShaderCompilerUtil::OutputAndLayout compilationAndLayout;
-        SLANG_RETURN_ON_FAIL(ShaderCompilerUtil::compileWithLayout(session, gOptions.sourcePath, gOptions.compileArgs, gOptions.shaderType, input, compilationAndLayout));
+        SLANG_RETURN_ON_FAIL(ShaderCompilerUtil::compileWithLayout(session, gOptions, input, compilationAndLayout));
 
         {
             // Get the shared library -> it contains the executable code, we need to keep around if we recompile
@@ -575,7 +594,7 @@ static SlangResult _innerMain(Slang::StdWriters* stdWriters, SlangSession* sessi
                 // We just want CPP, so we get suitable reflection
                 slangInput.target = SLANG_CPP_SOURCE;
 
-                SLANG_RETURN_ON_FAIL(ShaderCompilerUtil::compileWithLayout(session, gOptions.sourcePath, gOptions.compileArgs, gOptions.shaderType, slangInput, compilationAndLayout));
+                SLANG_RETURN_ON_FAIL(ShaderCompilerUtil::compileWithLayout(session, gOptions, slangInput, compilationAndLayout));
             }
 
             // calculate binding
@@ -625,7 +644,7 @@ static SlangResult _innerMain(Slang::StdWriters* stdWriters, SlangSession* sessi
         }
 
         ShaderCompilerUtil::OutputAndLayout compilationAndLayout;
-        SLANG_RETURN_ON_FAIL(ShaderCompilerUtil::compileWithLayout(session, gOptions.sourcePath, gOptions.compileArgs, gOptions.shaderType, input, compilationAndLayout));
+        SLANG_RETURN_ON_FAIL(ShaderCompilerUtil::compileWithLayout(session, gOptions, input, compilationAndLayout));
 
         const uint64_t startTicks = ProcessUtil::getClockTick();
 
