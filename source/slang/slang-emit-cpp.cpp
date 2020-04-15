@@ -999,7 +999,7 @@ void CPPSourceEmitter::_emitConstructConvertDefinition(const UnownedStringSlice&
     IRType* dstElemType = _getElementType(retType);
     //IRType* srcElemType = _getElementType(srcType);
 
-    TypeDimension dim = _getTypeDimension(srcType, false);
+    TypeDimension dim = _getTypeDimension(retType, false);
 
     UnownedStringSlice rowTypeName;
     if (dim.rowCount > 1)
