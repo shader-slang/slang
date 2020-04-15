@@ -2479,7 +2479,7 @@ matrix<T, N, M> trunc(matrix<T, N, M> x)
     MATRIX_MAP_UNARY(T, N, M, trunc, x);
 }
 
-// Slang Specific Mask functions
+// Slang Specific Mask Wave Intrinsics 
 
 typedef uint WaveMask;
 
@@ -2514,13 +2514,37 @@ __target_intrinsic(cuda, "__popc(__ballot_sync($0, $1))")
 __target_intrinsic(hlsl, "WaveActiveCountBits($1)")
 WaveMask WaveMaskCountBits(WaveMask mask, bool value);
 
-// Waits until all warp lanes named in mask have executed a WaveMaskSync (with the same mask)
+// Waits until all warp lanes named in mask have executed a WaveMaskSharedSync (with the same mask)
 // before resuming execution. Guarantees memory ordering in shared memory among threads participating
 // in the barrier.
 //
-// TODO(JS): The cuda intrinsic says it orders *all* memory accesses, which is stronger than memoryBarrierShared. 
+// The CUDA intrinsic says it orders *all* memory accesses, which appears to match most closely subgroupBarrier.
+//
+// TODO(JS):
+// For HLSL it's not clear what to do. There is no explicit mechanism to 'reconverge' threads. In the docs it describes
+// behavior as
+// "These intrinsics are dependent on active lanes and therefore flow control. In the model of this document, implementations
+// must enforce that the number of active lanes exactly corresponds to the programmer’s view of flow control."
+// 
+// It seems this can only mean the active threads are the "threads the program flow would lead to". This implies a lockstep
+// "straight SIMD" style interpretation. That being the case this op on HLSL is just a memory barrier without any Sync.
+
 __target_intrinsic(cuda, "__syncwarp($0)")
-__target_intrinsic(glsl, "memoryBarrierShared()")
+__glsl_extension(GL_KHR_shader_subgroup_basic)
+__spirv_version(1.3)
+__target_intrinsic(glsl, "subgroupBarrier()")
+__target_intrinsic(hlsl, "AllMemoryBarrier()")
+void WaveMaskSync(WaveMask mask);
+
+// On GLSL, it appears we can't use subgroupMemoryBarrierShared, because it only implies a memory ordering, it does not
+// imply convergence. For subgroupBarrier we have from the docs..
+// "The function subgroupBarrier() enforces that all active invocations within a subgroup must execute this function before any
+// are allowed to continue their execution"
+
+__target_intrinsic(cuda, "__syncwarp($0)")
+__glsl_extension(GL_KHR_shader_subgroup_basic)
+__spirv_version(1.3)
+__target_intrinsic(glsl, "subgroupBarrier()")
 __target_intrinsic(hlsl, "GroupMemoryBarrier()")
 void WaveMaskSharedSync(WaveMask mask);
 
