@@ -19,31 +19,31 @@ int exclusivePrefixSum(WaveMask mask, int index, int waveLaneId, int originalVal
     sharedMem[index] = 0;
     
     if(waveLaneId < elementCount)
-	{
-		int temp = 0;
-		int val = originalValue;		
+    {
+        int temp = 0;
+        int val = originalValue;        
         
-		for(int  i = 1; i < elementCount; i += i)
-		{
-			int temp = WaveMaskShuffle(localMask, val, waveLaneId - i);			
+        for(int  i = 1; i < elementCount; i += i)
+        {
+            int temp = WaveMaskShuffle(localMask, val, waveLaneId - i);            
             if(waveLaneId >= i)
             {
-				val += temp;
+                val += temp;
             }
-		}		
+        }        
         
         // Make it an exclusive prefix sum
         val -= originalValue;
         
         // Write to shared memory
-		sharedMem[index] = val;
+        sharedMem[index] = val;
         
         // Syncronizes on the mask, and ensures memory fence for shared data write
-		WaveMaskSharedSync(localMask); 
-		return val;
-	}	
+        WaveMaskSharedSync(localMask); 
+        return val;
+    }    
     
-    return 0;	
+    return 0;    
 }
 
 [numthreads(32, 1, 1)]
