@@ -1,4 +1,4 @@
-//TEST(dxc):SIMPLE:-pass-through dxc -target dxil -entry computeMain -stage compute -profile sm_6_1 
+//DIAGNOSTIC_TEST(dxc):SIMPLE:-pass-through dxc -target dxil -entry computeMain -stage compute -profile sm_6_1 
 
 [numthreads(4, 1, 1)]
 void computeMain(uint3 dispatchThreadID : SV_DispatchThreadID)
