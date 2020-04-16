@@ -13,6 +13,14 @@ namespace Slang {
 
 struct StringUtil
 {
+    typedef bool (*EqualFn)(const UnownedStringSlice& a, const UnownedStringSlice& b);
+
+        /// True if the splits of a and b (via splitChar) are all equal as compared with the equalFn function
+    static bool areAllEqualWithSplit(const UnownedStringSlice& a, const UnownedStringSlice& b, char splitChar, EqualFn equalFn);
+
+        /// True if all slices in match are all equal as compared with the equalFn function
+    static bool areAllEqual(const List<UnownedStringSlice>& a, const List<UnownedStringSlice>& b, EqualFn equalFn);
+
         /// Split in, by specified splitChar into slices out
         /// Slices contents will directly address into in, so contents will only stay valid as long as in does.
     static void split(const UnownedStringSlice& in, char splitChar, List<UnownedStringSlice>& slicesOut);

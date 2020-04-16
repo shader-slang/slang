@@ -6,6 +6,40 @@ namespace Slang {
 
 // !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! StringUtil !!!!!!!!!!!!!!!!!!!!!!!!!!!
 
+/* static */bool StringUtil::areAllEqual(const List<UnownedStringSlice>& a, const List<UnownedStringSlice>& b, EqualFn equalFn)
+{
+    if (a.getCount() != b.getCount())
+    {
+        return false;
+    }
+
+    const Index count = a.getCount();
+    for (Index i = 0; i < count; ++i)
+    {
+        if (!equalFn(a[i], b[i]))
+        {
+            return false;
+        }
+    }
+    return true;
+}
+
+/* static */bool StringUtil::areAllEqualWithSplit(const UnownedStringSlice& a, const UnownedStringSlice& b, char splitChar, EqualFn equalFn)
+{
+    List<UnownedStringSlice> slicesA;
+    List<UnownedStringSlice> slicesB;
+
+    StringUtil::split(a, splitChar, slicesA);
+    StringUtil::split(b, splitChar, slicesB);
+
+    if (slicesA.getCount() != slicesB.getCount())
+    {
+        return false;
+    }
+
+    return areAllEqual(slicesA, slicesB, equalFn);
+}
+
 /* static */void StringUtil::split(const UnownedStringSlice& in, char splitChar, List<UnownedStringSlice>& slicesOut)
 {
     slicesOut.clear();

@@ -977,6 +977,37 @@ static UnownedStringSlice _removeDiagnosticPrefix(const UnownedStringSlice& pref
     }
 }
 
+static bool _isUnsignedInteger(const UnownedStringSlice& a)
+{
+    const char* end = a.end();
+    for (const char* cur = a.begin(); cur < end; ++cur)
+    {
+        if (!(*cur >= '0' && *cur <= '9'))
+        {
+            return false;
+        }
+    }
+    return true;
+}
+
+static bool _isDXCLineSplitEqual(const UnownedStringSlice& a, const UnownedStringSlice& b)
+{
+    return a == b || (_isUnsignedInteger(a.trim()) && _isUnsignedInteger(b.trim()));
+}
+
+// Returns true if a and b are output from dxc (prefixed with dxc:.
+// Ignores line number/column number differences from the dxc specific line format. 
+static bool _isDXCLineEqual(const UnownedStringSlice& a, const UnownedStringSlice& b)
+{
+    // We are going to ignore the line number/column number.
+    // To do this if we find any sub strings inbetween : that are just all digits we'll assume it's a line number/column number
+    // and ignore
+
+    // dxc: tests/cross-compile/dxc-error.hlsl:9:2: error: use of undeclared identifier 'gOutputBuffer'
+    const UnownedStringSlice dxcPrefix = UnownedStringSlice::fromLiteral("dxc:");
+    return a.startsWith(dxcPrefix) && b.startsWith(dxcPrefix) && StringUtil::areAllEqualWithSplit(a, b, ':', _isDXCLineSplitEqual);
+}
+
 static bool _isLineEqual(const UnownedStringSlice& a, const UnownedStringSlice& b)
 {
     if (a == b)
@@ -1004,50 +1035,49 @@ static bool _isLineEqual(const UnownedStringSlice& a, const UnownedStringSlice& 
         }
     }
 
-    return false;
+    return _isDXCLineEqual(a, b);
+}
+
+static bool _areDiagnosticsEqual(const UnownedStringSlice& a, const UnownedStringSlice& b)
+{
+    // If they are identical we are done
+    if (a == b)
+    {
+        return true;
+    }
+
+    // Okay we are going to go line by line
+    // If the lines are equal thats ok.
+    // If they are not.. we will check if the only difference is line numbers from the stdlib
+
+    List<UnownedStringSlice> linesA;
+    List<UnownedStringSlice> linesB;
+
+    StringUtil::calcLines(a, linesA);
+    StringUtil::calcLines(b, linesB);
+
+    if (linesA.getCount() != linesB.getCount())
+    {
+        return false;
+    }
+
+    for (Index i = 0; i < linesA.getCount(); ++i)
+    {
+        if (!_isLineEqual(linesA[i], linesB[i]))
+        {
+            return false;
+        }
+    }
+
+    return true;
 }
 
 static bool _areResultsEqual(TestOptions::Type type, const String& a, const String& b)
 {
     switch (type)
     {
-        case TestOptions::Type::Diagnostic:
-        {
-            // If they are identical we are done
-            if (a == b)
-            {
-                return true;
-            }
-
-            // Okay we are going to go line by line
-            // If the lines are equal thats ok.
-            // If they are not.. we will check if the only difference is line numbers from the stdlib
-
-            List<UnownedStringSlice> linesA;
-            List<UnownedStringSlice> linesB;
-
-            StringUtil::calcLines(a.getUnownedSlice(), linesA);
-            StringUtil::calcLines(b.getUnownedSlice(), linesB);
-
-            if (linesA.getCount() != linesB.getCount())
-            {
-                return false;
-            }
-
-            for (Index i = 0; i < linesA.getCount(); ++i)
-            {
-                if (!_isLineEqual(linesA[i], linesB[i]))
-                {
-                    return false;
-                }
-            }
-
-            return true;
-        }
-        case TestOptions::Type::Normal:
-        {
-            return a == b;
-        }
+        case TestOptions::Type::Diagnostic:     return _areDiagnosticsEqual(a.getUnownedSlice(), b.getUnownedSlice());
+        case TestOptions::Type::Normal:         return a == b;
         default:
         {
             SLANG_ASSERT(!"Unknown test type");
