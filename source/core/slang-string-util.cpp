@@ -26,17 +26,9 @@ namespace Slang {
 
 /* static */bool StringUtil::areAllEqualWithSplit(const UnownedStringSlice& a, const UnownedStringSlice& b, char splitChar, EqualFn equalFn)
 {
-    List<UnownedStringSlice> slicesA;
-    List<UnownedStringSlice> slicesB;
-
+    List<UnownedStringSlice> slicesA, slicesB;
     StringUtil::split(a, splitChar, slicesA);
     StringUtil::split(b, splitChar, slicesB);
-
-    if (slicesA.getCount() != slicesB.getCount())
-    {
-        return false;
-    }
-
     return areAllEqual(slicesA, slicesB, equalFn);
 }
 
