@@ -17,9 +17,10 @@ Items with ^ means there is some discussion about support later in the document 
 | u/int64_t Intrinsics        |     No       |   No         |   Yes      |     Yes       |    Yes
 | int matrix                  |     Yes      |   Yes        |   No +     |     Yes       |    Yes
 | tex.GetDimension            |     Yes      |   Yes        |   Yes      |     No        |    Yes
-| SM6.0 Wave Intrinsics       |     No       |   Yes        |  Partial   |     Yes       |    No
+| SM6.0 Wave Intrinsics       |     No       |   Yes        |  Partial   |     No +      |    No
 | SM6.0 Quad Intrinsics       |     No       |   Yes        |   No +     |     No        |    No
-| SM6.5 Wave Intrinsics       |     No       |   Yes ^      |   No +     |     Yes       |    No
+| SM6.5 Wave Intrinsics       |     No       |   Yes ^      |   No +     |     No +      |    No
+| WaveMask Intrinsics         |     Yes ^    |   Yes ^      |   Yes +    |     Yes       |    No
 | WaveShuffle                 |     No       |   Limited ^  |   Yes      |     Yes       |    No
 | Tesselation                 |     Yes ^    |   Yes ^      |   No +     |     No        |    No
 | Graphics Pipeline           |     Yes      |   Yes        |   Yes      |     No        |    No
@@ -37,6 +38,7 @@ Items with ^ means there is some discussion about support later in the document 
 | Mesh Shader                 |     No       |   No +       |   No +     |     No        |    No
 | `[unroll]`                  |     Yes      |   Yes        |   Yes ^    |     Yes       |    Limited + 
 
+
 ## Half Type
 
 There appears to be a problem writing to a StructuredBuffer containing half on D3D12. D3D12 also appears to have problems doing calculations with half.
@@ -53,9 +55,21 @@ Means can use matrix types containing integer types.
 
 tex.GetDimensions is the GetDimensions method on 'texture' objects. This is not supported on CUDA as CUDA has no equivalent functionality to get these values. GetDimensions work on Buffer resource types on CUDA.
 
+## SM6.0 Wave Intrinsics
+
+CUDA does not currently support the HLSL Wave intrinsics. It does support 'WaveMask' intrinsics that follow the CUDA sync mechanism, where the programmer has to explicilty specify the lanes involved when calling the intrisnic.
+
+Currently there is the intention to look into making Slang generate suitable masks automatically such that that regular Wave intrinsics work. 
+
 ## SM6.5 Wave Intrinsics
 
 SM6.5 Wave Intrinsics are supported, but requires a downstream DXC compiler that supports SM6.5. As it stands the DXC shipping with windows does not. 
+
+## WaveMask Intrinsics
+
+In order to map better to the CUDA sync/mask model Slang supports 'WaveMask' intrinsics. They operate in broadly the same way as the Wave intrinsics, but require the programmer to specify the lanes that are involved. To write code that uses wave intrinsics acrosss targets including CUDA, currently the WaveMask intrinsics must be used. For this to work, the masks passed to the WaveMask functions should exactly match the 'Active lanes' concept that HLSL uses, otherwise the result is undefined. 
+
+The WaveMask intrinsics are not part of HLSL and are only available on Slang.
 
 ## WaveShuffle
 
