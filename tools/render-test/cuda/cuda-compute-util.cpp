@@ -15,9 +15,13 @@
 
 // TODO: should conditionalize this on OptiX being present
 #ifdef RENDER_TEST_OPTIX
+
+// The `optix_stubs.h` header produces warnings when compiled with MSVC
+#ifdef _MSC_VER
+#pragma warning(disable: 4996)
+#endif
 #include <optix.h>
 #include <optix_function_table_definition.h>
-#define _CRT_SECURE_NO_WARNINGS 1
 #include <optix_stubs.h>
 #endif
 
@@ -947,13 +951,33 @@ static bool _hasWriteAccess(SlangResourceAccess access)
     return SLANG_OK;
 }
 
-static SlangResult _compute(CUcontext context, CUmodule module, const ShaderCompilerUtil::OutputAndLayout& outputAndLayout, const uint32_t dispatchSize[3], CUDAComputeUtil::Context& outContext)
+    /// Load kernel code and invoke a compute program
+    ///
+    /// Assumes that data for binding the kernel parameters is already
+    /// set up in `outContext.`
+    ///
+static SlangResult _loadAndInvokeComputeProgram(
+    CUcontext cudaContext,
+    ScopeCUDAStream& cudaStream,
+    const ShaderCompilerUtil::OutputAndLayout& outputAndLayout,
+    const uint32_t dispatchSize[3],
+    CUDAComputeUtil::Context& outContext)
 {
+    auto reflection = slang::ProgramLayout::get(outputAndLayout.output.request);
+
     auto& bindSet = outContext.m_bindSet;
     auto& bindRoot = outContext.m_bindRoot;
 
-    auto request = outputAndLayout.output.request;
-    auto reflection = (slang::ShaderReflection*) spGetReflection(request);
+    const Index index = outputAndLayout.output.findKernelDescIndex(StageType::Compute);
+    if (index < 0)
+    {
+        return SLANG_FAIL;
+    }
+
+    const auto& kernelDesc = outputAndLayout.output.kernelDescs[index];
+
+    ScopeCUDAModule cudaModule;
+    SLANG_RETURN_ON_FAIL(cudaModule.load(kernelDesc.codeBegin));
 
     slang::EntryPointReflection* entryPoint = nullptr;
     auto entryPointCount = reflection->getEntryPointCount();
@@ -964,514 +988,611 @@ static SlangResult _compute(CUcontext context, CUmodule module, const ShaderComp
     const char* entryPointName = entryPoint->getName();
 
     // Get the entry point
-    CUfunction kernel;
-    SLANG_CUDA_RETURN_ON_FAIL(cuModuleGetFunction(&kernel, module, entryPointName));
+    CUfunction cudaEntryPoint;
+    SLANG_CUDA_RETURN_ON_FAIL(cuModuleGetFunction(&cudaEntryPoint, cudaModule, entryPointName));
 
-    // A default stream, will act as a global stream. Calling sync will globally sync
-    ScopeCUDAStream cudaStream;
-    //SLANG_CUDA_RETURN_ON_FAIL(cudaStream.init(cudaStreamNonBlocking));
+    // Get the max threads per block for this function
 
-    {
-        // Okay now we need to set up binding
-        bindRoot.init(&bindSet, reflection, 0);
+    int maxTheadsPerBlock;
+    SLANG_CUDA_RETURN_ON_FAIL(cuFuncGetAttribute(&maxTheadsPerBlock, CU_FUNC_ATTRIBUTE_MAX_THREADS_PER_BLOCK, cudaEntryPoint));
 
-        // Will set up any root buffers
-        bindRoot.addDefaultValues();
+    int sharedSizeInBytes;
+    SLANG_CUDA_RETURN_ON_FAIL(cuFuncGetAttribute(&sharedSizeInBytes, CU_FUNC_ATTRIBUTE_SHARED_SIZE_BYTES, cudaEntryPoint));
 
-        // Now set up the Values from the test
+    // Work out the args
+    CUdeviceptr uniformCUDAData = MemoryCUDAResource::getCUDAData(bindRoot.getRootValue());
+    CUdeviceptr entryPointCUDAData = MemoryCUDAResource::getCUDAData(bindRoot.getEntryPointValue());
 
-        auto outStream = StdWriters::getOut();
-        SLANG_RETURN_ON_FAIL(ShaderInputLayout::addBindSetValues(outputAndLayout.layout.entries, outputAndLayout.sourcePath, outStream, bindRoot));
+    // NOTE! These are pointers to the cuda memory pointers
+    void* args[] = { &entryPointCUDAData , &uniformCUDAData };
 
-        ShaderInputLayout::getValueBuffers(outputAndLayout.layout.entries, bindSet, outContext.m_buffers);
+    SlangUInt numThreadsPerAxis[3];
+    entryPoint->getComputeThreadGroupSize(3, numThreadsPerAxis);
 
-        // First create all of the resources for the values
+    // Launch
+    auto cudaLaunchResult = cuLaunchKernel(cudaEntryPoint,
+        dispatchSize[0], dispatchSize[1], dispatchSize[2], 
+        int(numThreadsPerAxis[0]), int(numThreadsPerAxis[1]), int(numThreadsPerAxis[2]),        // Threads per block
+        0,              // Shared memory size
+        cudaStream,     // Stream. 0 is no stream.
+        args,           // Args
+        nullptr);       // extra
 
-        {
-            const auto& values = bindSet.getValues();
-            const auto& entries = outputAndLayout.layout.entries;
+    SLANG_CUDA_RETURN_ON_FAIL(cudaLaunchResult);
 
-            for (BindSet::Value* value : values)
-            {
-                auto typeLayout = value->m_type;
-               
-                // Get the type kind, if typeLayout is not set we'll assume a 'constant buffer' will do
-                slang::TypeReflection::Kind kind = typeLayout ? typeLayout->getKind() : slang::TypeReflection::Kind::ConstantBuffer;
-               
-                switch (kind)
-                {
-                    case slang::TypeReflection::Kind::ConstantBuffer:
-                    case slang::TypeReflection::Kind::ParameterBlock:
-                    {
-                        // We can construct the buffers. We can't copy into yet, as we need to set all of the bindings first
-                        RefPtr<MemoryCUDAResource> resource = new MemoryCUDAResource;
-                        SLANG_CUDA_RETURN_ON_FAIL(cuMemAlloc(&resource->m_cudaMemory, value->m_sizeInBytes));
-                        value->m_target = resource;
-                        break;
-                    }
-                    case slang::TypeReflection::Kind::Resource:
-                    {
-                        auto type = typeLayout->getType();
-                        auto shape = type->getResourceShape();
-
-                        auto baseShape = shape & SLANG_RESOURCE_BASE_SHAPE_MASK;
-
-                        switch (baseShape)
-                        {
-                            case SLANG_TEXTURE_1D: 
-                            case SLANG_TEXTURE_2D:
-                            case SLANG_TEXTURE_3D:
-                            case SLANG_TEXTURE_CUBE:
-                            {
-                                RefPtr<CUDAResource> resource;
-                                SLANG_RETURN_ON_FAIL(CUDAComputeUtil::createTextureResource(entries[value->m_userIndex], typeLayout, resource));
-                                value->m_target = resource;
-                                break;
-                            }
-                            case SLANG_TEXTURE_BUFFER:
-                            {
-                                // Need a CUDA impl for these...
-                                // For now we can just leave as target will just be nullptr
-                                break;
-                            }
-
-                            case SLANG_BYTE_ADDRESS_BUFFER:
-                            case SLANG_STRUCTURED_BUFFER:
-                            {
-                                // On CPU we just use the memory in the BindSet buffer, so don't need to create anything
-                                RefPtr<MemoryCUDAResource> resource = new MemoryCUDAResource;
-                                SLANG_CUDA_RETURN_ON_FAIL(cuMemAlloc(&resource->m_cudaMemory, value->m_sizeInBytes));
-                                value->m_target = resource;
-                                break;
-                            }
-                        }
-                    }
-                    default: break;
-                }
-            }
-        }
-    
-        // Now we need to go through all of the bindings and set the appropriate data
-
-        {
-            List<BindLocation> locations;
-            List<BindSet::Value*> values;
-            bindSet.getBindings(locations, values);
-
-            for (Index i = 0; i < locations.getCount(); ++i)
-            {
-                const auto& location = locations[i];
-                BindSet::Value* value = values[i];
-
-                // Okay now we need to set up the actual handles that CPU will follow.
-                auto typeLayout = location.getTypeLayout();
-
-                const auto kind = typeLayout->getKind();
-                switch (kind)
-                {
-                    case slang::TypeReflection::Kind::Array:
-                    {
-                        auto elementCount = int(typeLayout->getElementCount());
-                        if (elementCount == 0)
-                        {
-                            CUDAComputeUtil::Array array = { CUdeviceptr(), 0 };
-                            auto resource = MemoryCUDAResource::asResource(value);
-                            if (resource)
-                            {
-                                array.data = resource->m_cudaMemory;
-                                array.count = value->m_elementCount;
-                            }
-
-                            location.setUniform(&array, sizeof(array));
-                        }
-                        break;
-                    }
-                    case slang::TypeReflection::Kind::ConstantBuffer:
-                    case slang::TypeReflection::Kind::ParameterBlock:
-                    {
-                        // These map down to just pointers
-                        *location.getUniform<CUdeviceptr>() = MemoryCUDAResource::getCUDAData(value);
-                        break;
-                    }
-                    case slang::TypeReflection::Kind::Resource:
-                    {
-                        auto type = typeLayout->getType();
-                        auto shape = type->getResourceShape();
-
-                        auto access = type->getResourceAccess();
-
-                        const auto baseShape = shape & SLANG_RESOURCE_BASE_SHAPE_MASK;
-
-                        switch (baseShape)
-                        {
-                            case SLANG_STRUCTURED_BUFFER:
-                            {
-                                CUDAComputeUtil::StructuredBuffer buffer = { CUdeviceptr(), 0 };
-                                auto resource = MemoryCUDAResource::asResource(value);
-                                if (resource)
-                                {
-                                    buffer.data = resource->m_cudaMemory;
-                                    buffer.count = value->m_elementCount;
-                                }
-
-                                location.setUniform(&buffer, sizeof(buffer));
-                                break;
-                            }
-                            case SLANG_BYTE_ADDRESS_BUFFER:
-                            {
-                                CUDAComputeUtil::ByteAddressBuffer buffer = { CUdeviceptr(), 0 };
-
-                                auto resource = MemoryCUDAResource::asResource(value);
-                                if (resource)
-                                {
-                                    buffer.data = resource->m_cudaMemory;
-                                    buffer.sizeInBytes = value->m_sizeInBytes;
-                                }
-
-                                location.setUniform(&buffer, sizeof(buffer));
-                                break;
-                            }
-                            case SLANG_TEXTURE_1D:
-                            case SLANG_TEXTURE_2D:
-                            case SLANG_TEXTURE_3D:
-                            case SLANG_TEXTURE_CUBE:
-                            {
-                                if (_hasWriteAccess(access))
-                                {
-                                    *location.getUniform<CUsurfObject>() = TextureCUDAResource::getSurfObject(value);
-                                }
-                                else
-                                {
-                                    *location.getUniform<CUtexObject>() = TextureCUDAResource::getTexObject(value);
-                                }
-                                break;
-                            }
-
-                        }
-                        break;
-                    }
-                    default: break;
-                }
-            }
-        }
-
-        // Okay now the memory is all set up, we can copy everything over
-        {
-            const auto& values = bindSet.getValues();
-            for (BindSet::Value* value : values)
-            {
-                CUdeviceptr cudaMem = MemoryCUDAResource::getCUDAData(value);
-                if (value && value->m_data && cudaMem)
-                {
-                    // Okay copy the data over...
-                    SLANG_CUDA_RETURN_ON_FAIL(cuMemcpyHtoD(cudaMem, value->m_data, value->m_sizeInBytes));
-                }
-            }
-        }
-
-        // Now we can execute the kernel
-
-        {
-            // Get the max threads per block for this function
-
-            int maxTheadsPerBlock;
-            SLANG_CUDA_RETURN_ON_FAIL(cuFuncGetAttribute(&maxTheadsPerBlock, CU_FUNC_ATTRIBUTE_MAX_THREADS_PER_BLOCK, kernel));
-
-            int sharedSizeInBytes;
-            SLANG_CUDA_RETURN_ON_FAIL(cuFuncGetAttribute(&sharedSizeInBytes, CU_FUNC_ATTRIBUTE_SHARED_SIZE_BYTES, kernel));
-
-            // Work out the args
-            CUdeviceptr uniformCUDAData = MemoryCUDAResource::getCUDAData(bindRoot.getRootValue());
-            CUdeviceptr entryPointCUDAData = MemoryCUDAResource::getCUDAData(bindRoot.getEntryPointValue());
-
-            // NOTE! These are pointers to the cuda memory pointers
-            void* args[] = { &entryPointCUDAData , &uniformCUDAData };
-
-            SlangUInt numThreadsPerAxis[3];
-            entryPoint->getComputeThreadGroupSize(3, numThreadsPerAxis);
-
-            // Launch
-            auto cudaLaunchResult = cuLaunchKernel(kernel,
-                dispatchSize[0], dispatchSize[1], dispatchSize[2], 
-                int(numThreadsPerAxis[0]), int(numThreadsPerAxis[1]), int(numThreadsPerAxis[2]),        // Threads per block
-                0,              // Shared memory size
-                cudaStream,     // Stream. 0 is no stream.
-                args,           // Args
-                nullptr);       // extra
-
-            SLANG_CUDA_RETURN_ON_FAIL(cudaLaunchResult);
-
-            // Do a sync here. Makes sure any issues are detected early and not on some implicit sync
-            SLANG_RETURN_ON_FAIL(cudaStream.sync());
-        }
-
-        // Finally we need to copy the data back
-
-        {
-            const auto& entries = outputAndLayout.layout.entries;
-
-            for (Index i = 0; i < entries.getCount(); ++i)
-            {
-                const auto& entry = entries[i];
-                BindSet::Value* value = outContext.m_buffers[i];
-
-                if (entry.isOutput)
-                {
-                    // Copy back to CPU memory
-                   CUdeviceptr cudaMem = MemoryCUDAResource::getCUDAData(value);
-                    if (value && value->m_data && cudaMem)
-                    {
-                        // Okay copy the data back...
-                        SLANG_CUDA_RETURN_ON_FAIL(cuMemcpyDtoH(value->m_data, cudaMem, value->m_sizeInBytes));
-                    }
-                }
-            }
-        }
-    }
-
-    // Release all othe CUDA resource/allocations
-    bindSet.releaseValueTargets();
+    // Do a sync here. Makes sure any issues are detected early and not on some implicit sync
+    SLANG_RETURN_ON_FAIL(cudaStream.sync());
 
     return SLANG_OK;
 }
 
-/* static */SlangResult CUDAComputeUtil::execute(const ShaderCompilerUtil::OutputAndLayout& outputAndLayout, const uint32_t dispatchSize[3], Context& outContext)
+#ifdef RENDER_TEST_OPTIX
+    /// Load kernel code and invoke a ray-tracing program
+    ///
+    /// Assumes that data for binding the kernel parameters is already
+    /// set up in `outContext.`
+    ///
+    /// Currently only works for programs that have a single
+    /// ray generation shader and no other entry points.
+    ///
+static SlangResult _loadAndInvokeRayTracingProgram(
+    CUcontext cudaContext,
+    ScopeCUDAStream& cudaStream,
+    const ShaderCompilerUtil::OutputAndLayout& outputAndLayout,
+    const uint32_t dispatchSize[3],
+    CUDAComputeUtil::Context& outContext)
 {
-    ScopeCUDAContext cudaContext;
-    SLANG_RETURN_ON_FAIL(cudaContext.init(0));
+    SLANG_OPTIX_RETURN_ON_FAIL(optixInit());
+
+    OptixDeviceContextOptions optixOptions = {};
+
+#if _DEBUG
+    optixOptions.logCallbackFunction = &_optixLogCallback;
+    optixOptions.logCallbackLevel = 4;
+#endif
+
+    OptixDeviceContext optixContext = nullptr;
+    SLANG_OPTIX_RETURN_ON_FAIL(optixDeviceContextCreate(cudaContext, &optixOptions, &optixContext));
+
+    enum { kOptixLogSize = 2*1024 };
+    char log[kOptixLogSize];
+    size_t logSize = sizeof(log);
+
+    OptixPipelineCompileOptions optixPipelineCompileOptions = {};
+    optixPipelineCompileOptions.pipelineLaunchParamsVariableName = "SLANG_globalParams";
+
+    // We need to load modules from the PTX code available to us,
+    // and then also create program groups from the kernels
+    // in those modules.
+    //
+    // For now we will only support program groups with a single
+    // kernel in them, and will create one per entry point.
+    //
+    Index entryPointCount = outputAndLayout.output.kernelDescs.getCount();
+    List<OptixProgramGroup> optixProgramGroups;
+    List<String> names;
+
+    OptixShaderBindingTable optixSBT = {};
+
+    for( Index ee = 0; ee < entryPointCount; ++ee )
+    {
+        auto& kernel = outputAndLayout.output.kernelDescs[ee];
+
+        // TODO: The logic here assumes that each kernel will
+        // come from its own independent module, and has no
+        // provisiion for loading modules that might contain
+        // multiple entry points.
+        //
+        OptixModuleCompileOptions optixModuleCompileOptions = {};
+        OptixModule optixModule;
+        SLANG_OPTIX_RETURN_ON_FAIL(optixModuleCreateFromPTX(
+            optixContext,
+            &optixModuleCompileOptions,
+            &optixPipelineCompileOptions,
+            (char const*) kernel.codeBegin,
+            kernel.getCodeSize(),
+            log,
+            &logSize,
+            &optixModule));
+
+        // TODO: The logic here only handles ray-generation entry points.
+        //
+        // It would seem simple to extend this to handle other entry
+        // point types, by inspecting the stage of the entry points
+        // being loaded, and this is indeed true for the subset of
+        // stages that map one-to-one with OptiX "program groups."
+        //
+        // The sticking point is "hit groups" which require a collection
+        // of entry points to be specified together (insersection,
+        // any hit, and closest hit). A hit group can comprise between
+        // zero and three entry points.
+        //
+        // The catch for us is how to determine which entry points
+        // should be grouped to form hit groups. Should this be
+        // implied in the input code (either by naming convention
+        // or by new Slang language features)? Should this be set
+        // up via command-line arguments or something akin to
+        // `//TEST_INPUT` lines?
+
+        OptixProgramGroupOptions optixProgramGroupOptions = {};
+
+        OptixProgramGroupDesc optixProgramGroupDesc = {};
+        optixProgramGroupDesc.kind = OPTIX_PROGRAM_GROUP_KIND_RAYGEN;
+        optixProgramGroupDesc.raygen.module = optixModule;
+
+        String name = String("__raygen__") + kernel.entryPointName;
+        names.add(name);
+        optixProgramGroupDesc.raygen.entryFunctionName = name.begin();
+
+        OptixProgramGroup optixProgramGroup = nullptr;
+        SLANG_OPTIX_RETURN_ON_FAIL(optixProgramGroupCreate(
+            optixContext,
+            &optixProgramGroupDesc,
+            1,
+            &optixProgramGroupOptions,
+            log,
+            &logSize,
+            &optixProgramGroup));
+
+        optixProgramGroups.add(optixProgramGroup);
+
+        {
+            CUdeviceptr rayGenRecordPtr;
+            size_t rayGenRecordSize = OPTIX_SBT_RECORD_HEADER_SIZE;
+
+            SLANG_CUDA_RETURN_ON_FAIL(cudaMalloc((void**) &rayGenRecordPtr, rayGenRecordSize));
+
+            struct { char data[OPTIX_SBT_RECORD_HEADER_SIZE]; } rayGenRecordData;
+            SLANG_OPTIX_RETURN_ON_FAIL(optixSbtRecordPackHeader(optixProgramGroup, &rayGenRecordData));
+
+            SLANG_CUDA_RETURN_ON_FAIL(cudaMemcpy(
+                (void*) rayGenRecordPtr,
+                &rayGenRecordData,
+                rayGenRecordSize,
+                cudaMemcpyHostToDevice));
+
+            optixSBT.raygenRecord = rayGenRecordPtr;
+        }
+    }
+
+    OptixPipeline optixPipeline = nullptr;
+
+    OptixPipelineLinkOptions optixPipelineLinkOptions = {};
+    optixPipelineLinkOptions.maxTraceDepth = 5;
+    optixPipelineLinkOptions.debugLevel = OPTIX_COMPILE_DEBUG_LEVEL_FULL;
+    optixPipelineLinkOptions.overrideUsesMotionBlur = false;
+    SLANG_OPTIX_RETURN_ON_FAIL(optixPipelineCreate(
+        optixContext,
+        &optixPipelineCompileOptions,
+        &optixPipelineLinkOptions,
+        optixProgramGroups.getBuffer(),
+        (unsigned int)optixProgramGroups.getCount(),
+        log,
+        &logSize,
+        &optixPipeline));
 
 
+    {
+        // The OptiX API complains if we don't fill in a miss record
+        // in the SBT, so we will create a dummy one here to represent
+        // the lack of any miss shaders.
+        //
+        OptixProgramGroupOptions optixProgramGroupOptions = {};
+        OptixProgramGroupDesc missGroupDesc = {};
+        missGroupDesc.kind = OPTIX_PROGRAM_GROUP_KIND_MISS;
+        OptixProgramGroup missProgramGroup;
+        SLANG_OPTIX_RETURN_ON_FAIL(optixProgramGroupCreate(
+            optixContext,
+            &missGroupDesc,
+            1,
+            &optixProgramGroupOptions,
+            log,
+            &logSize,
+            &missProgramGroup));
+
+
+        CUdeviceptr missRecordPtr;
+        size_t missRecordSize = OPTIX_SBT_RECORD_HEADER_SIZE;
+
+        SLANG_CUDA_RETURN_ON_FAIL(cudaMalloc((void**) &missRecordPtr, missRecordSize));
+
+        struct { char data[OPTIX_SBT_RECORD_HEADER_SIZE]; } missRecordData;
+        SLANG_OPTIX_RETURN_ON_FAIL(optixSbtRecordPackHeader(missProgramGroup, &missRecordData));
+
+        SLANG_CUDA_RETURN_ON_FAIL(cudaMemcpy(
+            (void*) missRecordPtr,
+            &missRecordData,
+            missRecordSize,
+            cudaMemcpyHostToDevice));
+
+        optixSBT.missRecordBase = missRecordPtr;
+        optixSBT.missRecordCount = 1;
+        optixSBT.missRecordStrideInBytes = (unsigned int)missRecordSize;
+    }
+    {
+        // Okay, we also need a dummy hit group.
+
+        OptixProgramGroupOptions optixProgramGroupOptions = {};
+        OptixProgramGroupDesc hitGroupDesc = {};
+        hitGroupDesc.kind = OPTIX_PROGRAM_GROUP_KIND_HITGROUP;
+        OptixProgramGroup programGroup;
+        SLANG_OPTIX_RETURN_ON_FAIL(optixProgramGroupCreate(
+            optixContext,
+            &hitGroupDesc,
+            1,
+            &optixProgramGroupOptions,
+            log,
+            &logSize,
+            &programGroup));
+
+
+        CUdeviceptr recordPtr;
+        size_t recordSize = OPTIX_SBT_RECORD_HEADER_SIZE;
+
+        SLANG_CUDA_RETURN_ON_FAIL(cudaMalloc((void**) &recordPtr, recordSize));
+
+        struct { char data[OPTIX_SBT_RECORD_HEADER_SIZE]; } recordData;
+        SLANG_OPTIX_RETURN_ON_FAIL(optixSbtRecordPackHeader(programGroup, &recordData));
+
+        SLANG_CUDA_RETURN_ON_FAIL(cudaMemcpy(
+            (void*) recordPtr,
+            &recordData,
+            recordSize,
+            cudaMemcpyHostToDevice));
+
+        optixSBT.hitgroupRecordBase = recordPtr;
+        optixSBT.hitgroupRecordCount = 1;
+        optixSBT.hitgroupRecordStrideInBytes = (unsigned int)recordSize;
+    }
+
+    // Work out the args
+
+    auto& bindRoot = outContext.m_bindRoot;
+
+    CUdeviceptr globalParams = 0;
+    size_t globalParamsSize;
+
+    if( auto globalArg = bindRoot.getRootValue() )
+    {
+        globalParams = MemoryCUDAResource::getCUDAData(globalArg);
+        globalParamsSize = globalArg->m_sizeInBytes;
+    }
+
+    // TODO: The data for entry point parameters needs to be stored
+    // into the SBT.
+    //
+    // The simplest solution here would be to copy data from the `bindRoot`
+    // into the SBT at the point where we are setting up the SBT, but
+    // a more optimized approach (more similar to what a real applicaiton
+    // would do) would be to allocate the SBT first and then have the
+    // binding logic write directly into its entries.
+    //
+    // One big complication here is that there need not necessarily be
+    // a one-to-one relationship between the entry points (or entry-point
+    // groups) in a compiled ray-tracing pipeline and the entries in
+    // the SBT. Each SBT entry is conceptually an "instance" of one
+    // of the entry-point groups in the program, and there can be
+    // zero, one, or many instances of a given group.
+    //
+    // Modelling this more completely in `render-test` requires that
+    // we start having a model for the "scene" that is being rendered,
+    // and how entry point groups are associated with the objects in
+    // that scene.
+    //
+    CUdeviceptr entryPointParams = MemoryCUDAResource::getCUDAData(bindRoot.getEntryPointValue());
+
+    SLANG_OPTIX_RETURN_ON_FAIL(optixLaunch(
+        optixPipeline,
+        cudaStream,
+        globalParams,
+        globalParamsSize,
+        &optixSBT,
+        dispatchSize[0],
+        dispatchSize[1],
+        dispatchSize[2]));
+
+    SLANG_RETURN_ON_FAIL(cudaStream.sync());
+
+    return SLANG_OK;
+}
+#endif
+
+    /// Fill in the binding information for arguments of a CUDA program.
+static SlangResult _setUpArguments(
+    CUcontext cudaContext,
+    ScopeCUDAStream& cudaStream,
+    const ShaderCompilerUtil::OutputAndLayout& outputAndLayout,
+    const uint32_t dispatchSize[3],
+    CUDAComputeUtil::Context& outContext)
+{
+    auto reflection = slang::ProgramLayout::get(outputAndLayout.output.request);
+
+    auto& bindSet = outContext.m_bindSet;
+    auto& bindRoot = outContext.m_bindRoot;
+
+    // Okay now we need to set up binding
+    bindRoot.init(&bindSet, reflection, 0);
+
+    // Will set up any root buffers
+    bindRoot.addDefaultValues();
+
+    // Now set up the Values from the test
+
+    auto outStream = StdWriters::getOut();
+    SLANG_RETURN_ON_FAIL(ShaderInputLayout::addBindSetValues(outputAndLayout.layout.entries, outputAndLayout.sourcePath, outStream, bindRoot));
+
+    ShaderInputLayout::getValueBuffers(outputAndLayout.layout.entries, bindSet, outContext.m_buffers);
+
+    // First create all of the resources for the values
+
+    {
+        const auto& values = bindSet.getValues();
+        const auto& entries = outputAndLayout.layout.entries;
+
+        for (BindSet::Value* value : values)
+        {
+            auto typeLayout = value->m_type;
+               
+            // Get the type kind, if typeLayout is not set we'll assume a 'constant buffer' will do
+            slang::TypeReflection::Kind kind = typeLayout ? typeLayout->getKind() : slang::TypeReflection::Kind::ConstantBuffer;
+               
+            switch (kind)
+            {
+                case slang::TypeReflection::Kind::ConstantBuffer:
+                case slang::TypeReflection::Kind::ParameterBlock:
+                {
+                    // We can construct the buffers. We can't copy into yet, as we need to set all of the bindings first
+                    RefPtr<MemoryCUDAResource> resource = new MemoryCUDAResource;
+                    SLANG_CUDA_RETURN_ON_FAIL(cuMemAlloc(&resource->m_cudaMemory, value->m_sizeInBytes));
+                    value->m_target = resource;
+                    break;
+                }
+                case slang::TypeReflection::Kind::Resource:
+                {
+                    auto type = typeLayout->getType();
+                    auto shape = type->getResourceShape();
+
+                    auto baseShape = shape & SLANG_RESOURCE_BASE_SHAPE_MASK;
+
+                    switch (baseShape)
+                    {
+                        case SLANG_TEXTURE_1D: 
+                        case SLANG_TEXTURE_2D:
+                        case SLANG_TEXTURE_3D:
+                        case SLANG_TEXTURE_CUBE:
+                        {
+                            RefPtr<CUDAResource> resource;
+                            SLANG_RETURN_ON_FAIL(CUDAComputeUtil::createTextureResource(entries[value->m_userIndex], typeLayout, resource));
+                            value->m_target = resource;
+                            break;
+                        }
+                        case SLANG_TEXTURE_BUFFER:
+                        {
+                            // Need a CUDA impl for these...
+                            // For now we can just leave as target will just be nullptr
+                            break;
+                        }
+
+                        case SLANG_BYTE_ADDRESS_BUFFER:
+                        case SLANG_STRUCTURED_BUFFER:
+                        {
+                            // On CPU we just use the memory in the BindSet buffer, so don't need to create anything
+                            RefPtr<MemoryCUDAResource> resource = new MemoryCUDAResource;
+                            SLANG_CUDA_RETURN_ON_FAIL(cuMemAlloc(&resource->m_cudaMemory, value->m_sizeInBytes));
+                            value->m_target = resource;
+                            break;
+                        }
+                    }
+                }
+                default: break;
+            }
+        }
+    }
+    
+    // Now we need to go through all of the bindings and set the appropriate data
+
+    {
+        List<BindLocation> locations;
+        List<BindSet::Value*> values;
+        bindSet.getBindings(locations, values);
+
+        for (Index i = 0; i < locations.getCount(); ++i)
+        {
+            const auto& location = locations[i];
+            BindSet::Value* value = values[i];
+
+            // Okay now we need to set up the actual handles that CPU will follow.
+            auto typeLayout = location.getTypeLayout();
+
+            const auto kind = typeLayout->getKind();
+            switch (kind)
+            {
+                case slang::TypeReflection::Kind::Array:
+                {
+                    auto elementCount = int(typeLayout->getElementCount());
+                    if (elementCount == 0)
+                    {
+                        CUDAComputeUtil::Array array = { CUdeviceptr(), 0 };
+                        auto resource = MemoryCUDAResource::asResource(value);
+                        if (resource)
+                        {
+                            array.data = resource->m_cudaMemory;
+                            array.count = value->m_elementCount;
+                        }
+
+                        location.setUniform(&array, sizeof(array));
+                    }
+                    break;
+                }
+                case slang::TypeReflection::Kind::ConstantBuffer:
+                case slang::TypeReflection::Kind::ParameterBlock:
+                {
+                    // These map down to just pointers
+                    *location.getUniform<CUdeviceptr>() = MemoryCUDAResource::getCUDAData(value);
+                    break;
+                }
+                case slang::TypeReflection::Kind::Resource:
+                {
+                    auto type = typeLayout->getType();
+                    auto shape = type->getResourceShape();
+
+                    auto access = type->getResourceAccess();
+
+                    const auto baseShape = shape & SLANG_RESOURCE_BASE_SHAPE_MASK;
+
+                    switch (baseShape)
+                    {
+                        case SLANG_STRUCTURED_BUFFER:
+                        {
+                            CUDAComputeUtil::StructuredBuffer buffer = { CUdeviceptr(), 0 };
+                            auto resource = MemoryCUDAResource::asResource(value);
+                            if (resource)
+                            {
+                                buffer.data = resource->m_cudaMemory;
+                                buffer.count = value->m_elementCount;
+                            }
+
+                            location.setUniform(&buffer, sizeof(buffer));
+                            break;
+                        }
+                        case SLANG_BYTE_ADDRESS_BUFFER:
+                        {
+                            CUDAComputeUtil::ByteAddressBuffer buffer = { CUdeviceptr(), 0 };
+
+                            auto resource = MemoryCUDAResource::asResource(value);
+                            if (resource)
+                            {
+                                buffer.data = resource->m_cudaMemory;
+                                buffer.sizeInBytes = value->m_sizeInBytes;
+                            }
+
+                            location.setUniform(&buffer, sizeof(buffer));
+                            break;
+                        }
+                        case SLANG_TEXTURE_1D:
+                        case SLANG_TEXTURE_2D:
+                        case SLANG_TEXTURE_3D:
+                        case SLANG_TEXTURE_CUBE:
+                        {
+                            if (_hasWriteAccess(access))
+                            {
+                                *location.getUniform<CUsurfObject>() = TextureCUDAResource::getSurfObject(value);
+                            }
+                            else
+                            {
+                                *location.getUniform<CUtexObject>() = TextureCUDAResource::getTexObject(value);
+                            }
+                            break;
+                        }
+
+                    }
+                    break;
+                }
+                default: break;
+            }
+        }
+    }
+
+    // Okay now the memory is all set up, we can copy everything over
+    {
+        const auto& values = bindSet.getValues();
+        for (BindSet::Value* value : values)
+        {
+            CUdeviceptr cudaMem = MemoryCUDAResource::getCUDAData(value);
+            if (value && value->m_data && cudaMem)
+            {
+                // Okay copy the data over...
+                SLANG_CUDA_RETURN_ON_FAIL(cuMemcpyHtoD(cudaMem, value->m_data, value->m_sizeInBytes));
+            }
+        }
+    }
+
+    return SLANG_OK;
+}
+
+    /// Read back any output arguments from a CUDA program.
+static SlangResult _readBackOutputs(
+    CUcontext cudaContext,
+    ScopeCUDAStream& cudaStream,
+    const ShaderCompilerUtil::OutputAndLayout& outputAndLayout,
+    const uint32_t dispatchSize[3],
+    CUDAComputeUtil::Context& outContext)
+{
+    const auto& entries = outputAndLayout.layout.entries;
+
+    for (Index i = 0; i < entries.getCount(); ++i)
+    {
+        const auto& entry = entries[i];
+        BindSet::Value* value = outContext.m_buffers[i];
+
+        if (entry.isOutput)
+        {
+            // Copy back to CPU memory
+            CUdeviceptr cudaMem = MemoryCUDAResource::getCUDAData(value);
+            if (value && value->m_data && cudaMem)
+            {
+                // Okay copy the data back...
+                SLANG_CUDA_RETURN_ON_FAIL(cuMemcpyDtoH(value->m_data, cudaMem, value->m_sizeInBytes));
+            }
+        }
+    }
+
+    return SLANG_OK;
+}
+
+    /// Load and invoke a CUDA program (either compute or ray-tracing)
+SlangResult _loadAndInvokeKernel(
+    CUcontext cudaContext,
+    ScopeCUDAStream& cudaStream,
+    const ShaderCompilerUtil::OutputAndLayout& outputAndLayout,
+    const uint32_t dispatchSize[3],
+    CUDAComputeUtil::Context& outContext)
+{
     switch( outputAndLayout.output.desc.pipelineType )
     {
     default:
         return SLANG_FAIL;
 
     case PipelineType::Compute:
-        {
-            const Index index = outputAndLayout.output.findKernelDescIndex(StageType::Compute);
-            if (index < 0)
-            {
-                return SLANG_FAIL;
-            }
-
-            const auto& kernel = outputAndLayout.output.kernelDescs[index];
-
-            ScopeCUDAModule cudaModule;
-            SLANG_RETURN_ON_FAIL(cudaModule.load(kernel.codeBegin));
-            SLANG_RETURN_ON_FAIL(_compute(cudaContext, cudaModule, outputAndLayout, dispatchSize, outContext));
-        }
-        break;
+        return _loadAndInvokeComputeProgram(cudaContext, cudaStream, outputAndLayout, dispatchSize, outContext);
 
     case PipelineType::RayTracing:
-        {
-#ifdef RENDER_TEST_OPTIX
-            SLANG_OPTIX_RETURN_ON_FAIL(optixInit());
-
-            OptixDeviceContextOptions optixOptions = {};
-
-            // TODO: set log callback
-            optixOptions.logCallbackFunction = &_optixLogCallback;
-            optixOptions.logCallbackLevel = 4;
-
-            OptixDeviceContext optixContext = nullptr;
-            SLANG_OPTIX_RETURN_ON_FAIL(optixDeviceContextCreate(cudaContext, &optixOptions, &optixContext));
-
-            enum { kOptixLogSize = 2*1024 };
-            char log[kOptixLogSize];
-            size_t logSize = sizeof(log);
-
-            OptixPipelineCompileOptions optixPipelineCompileOptions = {};
-
-            // We need to load modules from the PTX code available to us,
-            // and then also create program groups from the kernels
-            // in those modules.
-            //
-            // For now we will only support program groups with a single
-            // kernel in them, and will create one per entry point.
-            //
-            Index entryPointCount = outputAndLayout.output.kernelDescs.getCount();
-            List<OptixProgramGroup> optixProgramGroups;
-            List<String> names;
-
-            OptixShaderBindingTable optixSBT = {};
-
-            for( Index ee = 0; ee < entryPointCount; ++ee )
-            {
-                auto& kernel = outputAndLayout.output.kernelDescs[ee];
-
-                OptixModuleCompileOptions optixModuleCompileOptions = {};
-
-                OptixModule optixModule;
-                SLANG_OPTIX_RETURN_ON_FAIL(optixModuleCreateFromPTX(
-                    optixContext,
-                    &optixModuleCompileOptions,
-                    &optixPipelineCompileOptions,
-                    (char const*) kernel.codeBegin,
-                    kernel.getCodeSize(),
-                    log,
-                    &logSize,
-                    &optixModule));
-
-
-                OptixProgramGroupOptions optixProgramGroupOptions = {};
-
-                OptixProgramGroupDesc optixProgramGroupDesc = {};
-                optixProgramGroupDesc.kind = OPTIX_PROGRAM_GROUP_KIND_RAYGEN;
-                optixProgramGroupDesc.raygen.module = optixModule;
-
-                String name = String("__raygen__") + kernel.entryPointName;
-                names.add(name);
-                optixProgramGroupDesc.raygen.entryFunctionName = name.begin();
-
-                OptixProgramGroup optixProgramGroup = nullptr;
-                SLANG_OPTIX_RETURN_ON_FAIL(optixProgramGroupCreate(
-                    optixContext,
-                    &optixProgramGroupDesc,
-                    1,
-                    &optixProgramGroupOptions,
-                    log,
-                    &logSize,
-                    &optixProgramGroup));
-
-                optixProgramGroups.add(optixProgramGroup);
-
-                {
-                    CUdeviceptr rayGenRecordPtr;
-                    size_t rayGenRecordSize = OPTIX_SBT_RECORD_HEADER_SIZE;
-
-                    SLANG_CUDA_RETURN_ON_FAIL(cudaMalloc((void**) &rayGenRecordPtr, rayGenRecordSize));
-
-                    struct { char data[OPTIX_SBT_RECORD_HEADER_SIZE]; } rayGenRecordData;
-                    SLANG_OPTIX_RETURN_ON_FAIL(optixSbtRecordPackHeader(optixProgramGroup, &rayGenRecordData));
-
-                    SLANG_CUDA_RETURN_ON_FAIL(cudaMemcpy(
-                        (void*) rayGenRecordPtr,
-                        &rayGenRecordData,
-                        rayGenRecordSize,
-                        cudaMemcpyHostToDevice));
-
-                    optixSBT.raygenRecord = rayGenRecordPtr;
-                }
-            }
-
-
-
-            OptixPipeline optixPipeline = nullptr;
-
-            OptixPipelineLinkOptions optixPipelineLinkOptions = {};
-            optixPipelineLinkOptions.maxTraceDepth = 5;
-            optixPipelineLinkOptions.debugLevel = OPTIX_COMPILE_DEBUG_LEVEL_FULL;
-            optixPipelineLinkOptions.overrideUsesMotionBlur = false;
-            SLANG_OPTIX_RETURN_ON_FAIL(optixPipelineCreate(
-                optixContext,
-                &optixPipelineCompileOptions,
-                &optixPipelineLinkOptions,
-                optixProgramGroups.getBuffer(),
-                (unsigned int)optixProgramGroups.getCount(),
-                log,
-                &logSize,
-                &optixPipeline));
-
-
-            {
-                // The OptiX API complains if we don't fill in a miss record
-                // in the SBT, so we will create a dummy one here to represent
-                // the lack of any miss shaders.
-                //
-                OptixProgramGroupOptions optixProgramGroupOptions = {};
-                OptixProgramGroupDesc missGroupDesc = {};
-                missGroupDesc.kind = OPTIX_PROGRAM_GROUP_KIND_MISS;
-                OptixProgramGroup missProgramGroup;
-                SLANG_OPTIX_RETURN_ON_FAIL(optixProgramGroupCreate(
-                    optixContext,
-                    &missGroupDesc,
-                    1,
-                    &optixProgramGroupOptions,
-                    log,
-                    &logSize,
-                    &missProgramGroup));
-
-
-                CUdeviceptr missRecordPtr;
-                size_t missRecordSize = OPTIX_SBT_RECORD_HEADER_SIZE;
-
-                SLANG_CUDA_RETURN_ON_FAIL(cudaMalloc((void**) &missRecordPtr, missRecordSize));
-
-                struct { char data[OPTIX_SBT_RECORD_HEADER_SIZE]; } missRecordData;
-                SLANG_OPTIX_RETURN_ON_FAIL(optixSbtRecordPackHeader(missProgramGroup, &missRecordData));
-
-                SLANG_CUDA_RETURN_ON_FAIL(cudaMemcpy(
-                    (void*) missRecordPtr,
-                    &missRecordData,
-                    missRecordSize,
-                    cudaMemcpyHostToDevice));
-
-                optixSBT.missRecordBase = missRecordPtr;
-                optixSBT.missRecordCount = 1;
-                optixSBT.missRecordStrideInBytes = missRecordSize;
-            }
-            {
-                // Okay, we also need a dummy hit group.
-
-                OptixProgramGroupOptions optixProgramGroupOptions = {};
-                OptixProgramGroupDesc hitGroupDesc = {};
-                hitGroupDesc.kind = OPTIX_PROGRAM_GROUP_KIND_HITGROUP;
-                OptixProgramGroup programGroup;
-                SLANG_OPTIX_RETURN_ON_FAIL(optixProgramGroupCreate(
-                    optixContext,
-                    &hitGroupDesc,
-                    1,
-                    &optixProgramGroupOptions,
-                    log,
-                    &logSize,
-                    &programGroup));
-
-
-                CUdeviceptr recordPtr;
-                size_t recordSize = OPTIX_SBT_RECORD_HEADER_SIZE;
-
-                SLANG_CUDA_RETURN_ON_FAIL(cudaMalloc((void**) &recordPtr, recordSize));
-
-                struct { char data[OPTIX_SBT_RECORD_HEADER_SIZE]; } recordData;
-                SLANG_OPTIX_RETURN_ON_FAIL(optixSbtRecordPackHeader(programGroup, &recordData));
-
-                SLANG_CUDA_RETURN_ON_FAIL(cudaMemcpy(
-                    (void*) recordPtr,
-                    &recordData,
-                    recordSize,
-                    cudaMemcpyHostToDevice));
-
-                optixSBT.hitgroupRecordBase = recordPtr;
-                optixSBT.hitgroupRecordCount = 1;
-                optixSBT.hitgroupRecordStrideInBytes = recordSize;
-            }
-
-            ScopeCUDAStream cudaStream;
-
-            CUdeviceptr globalParams = 0;
-            size_t globalParamsSize = 0;
-
-            unsigned int gridSizeX = 1;
-            unsigned int gridSizeY = 1;
-            unsigned int gridSizeZ = 1;
-
-
-            SLANG_OPTIX_RETURN_ON_FAIL(optixLaunch(
-                optixPipeline,
-                cudaStream,
-                globalParams,
-                globalParamsSize,
-                &optixSBT,
-                gridSizeX,
-                gridSizeY,
-                gridSizeZ));
-
-
-            SLANG_RETURN_ON_FAIL(cudaStream.sync());
-#endif
-        }
-        break;
+        return _loadAndInvokeRayTracingProgram(cudaContext, cudaStream, outputAndLayout, dispatchSize, outContext);
     }
+}
+
+    /// Execute a CUDA program (either compute or ray-tracing)
+    ///
+    /// This function handles loading code and argument data,
+    /// invoking the kernel(s), and reading back results.
+    ///
+/* static */SlangResult CUDAComputeUtil::execute(const ShaderCompilerUtil::OutputAndLayout& outputAndLayout, const uint32_t dispatchSize[3], Context& outContext)
+{
+    ScopeCUDAContext cudaContext;
+    SLANG_RETURN_ON_FAIL(cudaContext.init(0));
+
+    // A default stream, will act as a global stream. Calling sync will globally sync
+    ScopeCUDAStream cudaStream;
+    //SLANG_CUDA_RETURN_ON_FAIL(cudaStream.init(cudaStreamNonBlocking));
+
+    auto& bindSet = outContext.m_bindSet;
+    auto& bindRoot = outContext.m_bindRoot;
+
+    auto request = outputAndLayout.output.request;
+    auto reflection = (slang::ShaderReflection*) spGetReflection(request);
+
+    SLANG_RETURN_ON_FAIL(_setUpArguments(
+        cudaContext, cudaStream, outputAndLayout, dispatchSize, outContext));
+
+    SLANG_RETURN_ON_FAIL(_loadAndInvokeKernel(
+        cudaContext, cudaStream, outputAndLayout, dispatchSize, outContext));
+
+        // Finally we need to copy the data back
+    SLANG_RETURN_ON_FAIL(_readBackOutputs(
+        cudaContext, cudaStream, outputAndLayout, dispatchSize, outContext));
+
+    // Release all othe CUDA resource/allocations
+    bindSet.releaseValueTargets();
 
     return SLANG_OK;
 }
