@@ -2540,7 +2540,17 @@ void WaveMaskSync(WaveMask mask);
 // imply convergence. For subgroupBarrier we have from the docs..
 // "The function subgroupBarrier() enforces that all active invocations within a subgroup must execute this function before any
 // are allowed to continue their execution"
-
+// TODO(JS):
+// It's not entirely clear what to do here on HLSL. 
+// Reading the dxc wiki (https://github.com/Microsoft/DirectXShaderCompiler/wiki/Wave-Intrinsics), we have statements like:
+//    ... these intrinsics enable the elimination of barrier constructs when the scope of synchronization is within the width of the SIMD processor.
+//    Wave: A set of lanes executed simultaneously in the processor. No explicit barriers are required to guarantee that they execute in parallel.
+// Which seems to imply at least some memory barriers like Shared might not be needed.
+//
+// The barrier is left here though, because not only is the barrier make writes before the barrier across the wave appear to others afterwards, it's
+// also there to inform the compiler on what order reads and writes can take place. This might seem to be silly because of the 'Active' lanes
+// aspect of HLSL seems to make everything in lock step - but that's not quite so, it only has to apparently be that way as far as the programmers
+// model appears - divergence could perhaps potentially still happen. 
 __target_intrinsic(cuda, "__syncwarp($0)")
 __glsl_extension(GL_KHR_shader_subgroup_basic)
 __spirv_version(1.3)
