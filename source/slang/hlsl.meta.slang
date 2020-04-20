@@ -1158,19 +1158,25 @@ matrix<T,N,M> exp2(matrix<T,N,M> x)
 
 // Convert 16-bit float stored in low bits of integer
 __target_intrinsic(glsl, "unpackHalf2x16($0).x")
+__glsl_version(420)
 float f16tof32(uint value);
 
 __generic<let N : int>
-__target_intrinsic(glsl, "unpackHalf2x16($0).x")
-vector<float,N> f16tof32(vector<uint,N> value);
+vector<float, N> f16tof32(vector<uint, N> value)
+{
+    VECTOR_MAP_UNARY(float, N, f16tof32, value);
+}
 
 // Convert to 16-bit float stored in low bits of integer
 __target_intrinsic(glsl, "packHalf2x16(vec2($0,0.0))")
+__glsl_version(420)
 uint f32tof16(float value);
 
 __generic<let N : int>
-__target_intrinsic(glsl, "packHalf2x16(vec2($0,0.0))")
-vector<uint,N> f32tof16(vector<float,N> value);
+vector<uint, N> f32tof16(vector<float, N> value)
+{
+    VECTOR_MAP_UNARY(uint, N, f32tof16, value);
+}
 
 // Flip surface normal to face forward, if needed
 __generic<T : __BuiltinFloatingPointType, let N : int>
