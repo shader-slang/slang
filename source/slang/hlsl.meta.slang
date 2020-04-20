@@ -2486,6 +2486,13 @@ typedef uint WaveMask;
 __target_intrinsic(cuda, "__activemask()")
 WaveMask WaveGetConvergedMask() { return 0xffffffff; }
 
+__glsl_extension(GL_KHR_shader_subgroup_basic)
+__spirv_version(1.3)
+__target_intrinsic(glsl, "subgroupElect()")
+__target_intrinsic(cuda, "(($0 & -$0) == (WarpMask(1) << _getLaneId()))")
+__target_intrinsic(hlsl, "WaveIsFirstLane()")
+bool WaveMaskIsFirstLane(WaveMask mask);
+
 __glsl_extension(GL_KHR_shader_subgroup_vote)
 __spirv_version(1.3)
 __target_intrinsic(glsl, "subgroupAll($1)") 
@@ -2558,7 +2565,6 @@ __target_intrinsic(glsl, "subgroupBarrier()")
 __target_intrinsic(hlsl, "GroupMemoryBarrier()")
 void GroupMemoryBarrierWithWaveMaskSync(WaveMask mask);
 
-
 __glsl_extension(GL_KHR_shader_subgroup_basic)
 __spirv_version(1.3)
 __target_intrinsic(glsl, "subgroupBarrier()")
@@ -2614,7 +2620,7 @@ __target_intrinsic(cuda, "_waveShuffleMultiple($0, $1, $2)")
 __target_intrinsic(hlsl, "WaveReadLaneAt($1, $2)")
 vector<T,N> WaveMaskReadLaneAt(WaveMask mask, vector<T,N> value, int lane);
 __generic<T : __BuiltinType, let N : int, let M : int>
-__target_intrinsic(cuda, "_waveShuffleMultiple($0, $1)")
+__target_intrinsic(cuda, "_waveShuffleMultiple($0, $1, $2)")
 __target_intrinsic(hlsl, "WaveReadLaneAt($1, $2)")
 matrix<T,N,M> WaveMaskReadLaneAt(WaveMask mask, matrix<T,N,M> value, int lane);
 
@@ -2683,7 +2689,7 @@ __target_intrinsic(cuda, "_waveOrMultiple($0, $1)")
 __target_intrinsic(hlsl, "WaveActiveBitOr($1)")
 vector<T,N> WaveMaskBitOr(WaveMask mask, vector<T,N> expr);
 __generic<T : __BuiltinIntegerType, let N : int, let M : int>
-__target_intrinsic(cuda, "_waveOrMultiple(_$0, $1)")
+__target_intrinsic(cuda, "_waveOrMultiple($0, $1)")
 __target_intrinsic(hlsl, "WaveActiveBitOr($1)")
 matrix<T,N,M> WaveMaskBitOr(WaveMask mask, matrix<T,N,M> expr);
 

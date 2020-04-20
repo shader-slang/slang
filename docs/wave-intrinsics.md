@@ -184,6 +184,8 @@ The intrinsics that make up the Slang `WaveMask` extension.
 
 WaveMask WaveGetConvergedMask();
 
+bool WaveMaskIsFirstLane(WaveMask mask);
+
 // Ballot
 
 bool WaveMaskAllTrue(WaveMask mask, bool condition);
