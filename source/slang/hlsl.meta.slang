@@ -3312,7 +3312,7 @@ __generic<T : __BuiltinArithmeticType>
 __target_intrinsic(hlsl)
 __glsl_extension(GL_KHR_shader_subgroup_arithmetic)
 __spirv_version(1.3)
-//__target_intrinsic(glsl, "subgroupExclusiveAnd($0)")
+__target_intrinsic(glsl, "subgroupExclusiveAnd($0)")
 __target_intrinsic(cuda, "_wavePrefixAnd(_getMultiPrefixMask(($1).x), $0)")
 T WaveMultiPrefixBitAnd(T expr, uint4 mask);
 __target_intrinsic(hlsl)
