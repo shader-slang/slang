@@ -2483,7 +2483,11 @@ matrix<T, N, M> trunc(matrix<T, N, M> x)
 
 typedef uint WaveMask;
 
+__glsl_extension(GL_KHR_shader_subgroup_ballot)
+__spirv_version(1.3)
+__target_intrinsic(glsl, "subgroupBallot(true).x")
 __target_intrinsic(cuda, "__activemask()")
+__target_intrinsic(hlsl, "WaveActiveBallot(true).x")
 WaveMask WaveGetConvergedMask() { return 0xffffffff; }
 
 __glsl_extension(GL_KHR_shader_subgroup_basic)
