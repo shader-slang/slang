@@ -1,9 +1,114 @@
 Wave Intrinsics
 ===============
 
-Slang has support for Wave intrinsics introduced to HLSL in SM6.0 and SM6.5. All intrinsics are available on D3D12, and a subset on Vulkan. On CUDA 'WaveMask' intrinsics are introduced which map more directly to the CUDA model of requiring a `mask` of participating lanes. On D3D12 and Vulkan the WaveMask instrinsics can be used, but the mask is effectively ignored. For this to work across targets including CUDA, the mask must be calculated such that it exactly matches that of HLSL defined 'active' lanes, else the behavior is undefined. 
+Slang has support for Wave intrinsics introduced to HLSL in [SM6.0](https://docs.microsoft.com/en-us/windows/win32/direct3dhlsl/hlsl-shader-model-6-0-features-for-direct3d-12) and [SM6.5](https://github.com/microsoft/DirectX-Specs/blob/master/d3d/HLSL_ShaderModel6_5.md). All intrinsics are available on D3D12, and a subset on Vulkan. 
 
-Another wrinkle in compatibility is that on GLSL targets such as Vulkan, the is not built in language support for Matrix versions of Wave intrinsics. Currently this means that Matrix is not a supported type for Wave intrinsics on Vulkan, but may be in the future.
+On GLSL targets such as Vulkan wave intrinsics map to ['subgroup' extension] (https://github.com/KhronosGroup/GLSL/blob/master/extensions/khr/GL_KHR_shader_subgroup.txt).  There is no subgroup support for Matrix types, and currently this means that Matrix is not a supported type for Wave intrinsics on Vulkan, but may be in the future.
+
+Also introduced are some 'non standard' Wave intrinsics which are only available on Slang. All WaveMask intrinsics are non standard. Other non standard intrinsics expose more accurately different behaviours which are either not distinguished on HLSL, or perhaps currently unavailable. Two examples would be `WaveShuffle` and `WaveBroadcastLaneAt`. 
+
+There are three styles of wave intrinsics...
+
+## WaveActive
+
+The majority of 'regular' HLSL Wave intrinsics which operate on implicit 'active' lanes. 
+
+In the [DXC Wiki](https://github.com/Microsoft/DirectXShaderCompiler/wiki/Wave-Intrinsics) active lanes are described as
+
+"These intrinsics are dependent on active lanes and therefore flow control. In the model of this document, implementations
+ must enforce that the number of active lanes exactly corresponds to the programmer’s view of flow control."
+ 
+In practice this appears to imply that the programming model is that all lanes operate in 'lock step'. That the 'active lanes' are the lanes doing processing at a particular point in the control flow. On some hardware this may match how processing actually works. There is also a large amount of hardware in the field that doesn't follow this model, and allows lanes to diverge and not necessarily on flow control. On this style of hardware Active intrinsics may act to also converge lanes to give the appearance of 'in step' ness. 
+ 
+## WaveMask
+
+The WaveMask intrinsics take an explicit mask of lanes to operate on, in the same vein as CUDA. Requesting data from a from an inactive lane, can lead to undefined behavior, that includes locking up the shader. The WaveMask is an integer type that can hold the maximum amount of active lanes for this model - currently 32. In the future the WaveMask type may be made an opaque type, but can largely be operated on as if it is an integer.
+
+Using WaveMask intrinsics is generally more verbose and prone to error than the 'Active' style, but it does have a few advantages
+
+* It works across all supported targets - including CUDA (currently WaveActive intrinics do not)
+* Gives more fine control
+* Might allow for higher performance (for example it gives more control of divergence)
+* Maps most closely to CUDA
+
+On D3D12 and Vulkan the WaveMask instrinsics can be used, but the mask is effectively ignored. For this to work across targets including CUDA, the mask must be calculated such that it exactly matches that of HLSL defined 'active' lanes, else the behavior is undefined. 
+
+The WaveMask intrinsics are an non standard Slang feature, and may change in the future. 
+
+```
+RWStructuredBuffer<int> outputBuffer;
+
+[numthreads(4, 1, 1)]
+void computeMain(uint3 dispatchThreadID : SV_DispatchThreadID)
+{
+    // It is the programmers responsibility to determine the inital mask, and that is dependent on the launch
+    // It's common to launch such that all lanes are active - with CUDA this would mean 32 lanes. 
+    // Here the launch only has 4 lanes active, and so the initial mask is 0xf.
+    const WaveMask mask0 = 0xf;
+    
+    int idx = int(dispatchThreadID.x);
+    
+    int value = 0;
+    
+    // When there is a conditional/flow control we typically need to work out a new mask.
+    // This can be achieved by calling WaveMaskBallot with the current mask, and the condition the 
+    // condition will typically be the same as in the condition
+    const WaveMask mask1 = WaveMaskBallot(mask0, idx == 2);
+    
+    if (idx == 2)
+    {
+        // In here the mask is `mask1`, although no WaveMask intrinsics are used along this path
+    
+        // diverge
+        return;
+    }
+    
+    // If we get here, the active lanes must be the opposite of mask1 (because we took the other side of the condition), but cannot include
+    // any lanes which were not active before. We can calculate this as mask0 & ~mask1.
+    
+    const WaveMask mask2 = mask0 & ~mask1;
+    
+    // mask2 holds the correct active mask to use with WaveMaskMin
+    value = WaveMaskMin(mask2, idx + 1);
+    
+    // Write out the result
+    outputBuffer[idx] = value;
+}
+```
+
+Many of the nuances of writing code in this way are discussed in the [CUDA documentation](https://docs.nvidia.com/cuda/cuda-c-programming-guide/index.html#warp-vote-functions).
+
+The above example written via the regular intrinsics is significantly simpler, as we do not need to track 'active lanes' in the masks. 
+
+```
+RWStructuredBuffer<int> outputBuffer;
+
+[numthreads(4, 1, 1)]
+void computeMain(uint3 dispatchThreadID : SV_DispatchThreadID)
+{
+    int idx = int(dispatchThreadID.x);
+    
+    int value = 0;
+    
+    if (idx == 2)
+    {    
+        // diverge
+        return;
+    }
+    
+    value = WaveActiveMin(idx + 1);
+    
+    // Write out the result
+    outputBuffer[idx] = value;
+}
+```
+
+## WaveMulti
+
+The standard 'Multi' intrinsics were added to HLSL is SM6.5, they can specify a mask of lanes via uint4. They introduce some intrinsics that work in a similar fashion to the `WaveMask` intrinsics. The available intrisnics is currently significantly restricted compared to WaveMask. 
+
+Standard Wave intrinsics
+=========================
 
 The Wave Intrinsics supported on Slang are listed below. Note that typically T generic types also include vector and matrix forms. 
 
@@ -26,12 +131,6 @@ bool WaveActiveAnyTrue(bool condition);
 uint4 WaveActiveBallot(bool condition);
 
 uint WaveActiveCountBits(bool value);
-
-// Barriers 
-
-void AllMemoryBarrierWithWaveSync();
-
-void GroupMemoryBarrierWithWaveSync();
 
 // Across Lanes
 
@@ -73,13 +172,7 @@ __generic<T : __BuiltinType>
 T WaveReadLaneFirst(T expr);
 
 __generic<T : __BuiltinType>
-T WaveBroadcastLaneAt(T value, constexpr int lane);
-
-__generic<T : __BuiltinType>
 T WaveReadLaneAt(T value, int lane);
-
-__generic<T : __BuiltinType>
-T WaveShuffle(T value, int lane);
 
 // Prefix
 
@@ -109,10 +202,30 @@ __generic<T : __BuiltinArithmeticType>
 T WaveMultiPrefixSum(T value, uint4 mask);
 ```
 
-Additional Wave Intrinsics
-==========================
+Non Standard Wave Intrinsics
+============================
 
-T can be scalar, vector or matrix, except on Vulkan which doesn't support Matrix.
+The following intrinsics are not part of the HLSL Wave intrinsics standard, but were added to Slang for a variety of reasons. Within the following signatures T can be scalar, vector or matrix, except on Vulkan which doesn't (currently) support Matrix.
+
+```
+__generic<T : __BuiltinType>
+T WaveBroadcastLaneAt(T value, constexpr int lane);
+
+__generic<T : __BuiltinType>
+T WaveShuffle(T value, int lane);
+
+uint4 WaveGetActiveMulti();
+
+uint4 WaveGetConvergedMulti();
+
+// Barriers 
+
+void AllMemoryBarrierWithWaveSync();
+
+void GroupMemoryBarrierWithWaveSync();
+```
+
+## Description
 
 ```
 T WaveBroadcastLaneAt(T value, constexpr int lane);
@@ -143,9 +256,6 @@ void GroupMemoryBarrierWithWaveSync();
 
 Synchronizes all lanes to the same GroupMemoryBarrierWithWaveSync in program flow. Orders group shared memory accesses such that accesses after the barrier can be seen by writes before.  
 
-
-
-
 Wave Mask Intrinsics
 ====================
 
@@ -158,7 +268,7 @@ The WaveMask intrinsics will work across targets, but *only* if on CUDA targets 
 Most of the `WaveMask` functions are identical to the regular Wave intrinsics, but they take a WaveMask as the first parameter, and the intrinsic name starts with `WaveMask`. 
 
 ```
-WaveMask GetConvergedMask();
+WaveMask WaveGetConvergedMask();
 ```
 
 Gets the mask of lanes which are converged within the Wave. Note that this is *not* the same as Active threads, and may be some subset of that. It is equivalent to the `__activemask()` in CUDA.
@@ -183,6 +293,8 @@ The intrinsics that make up the Slang `WaveMask` extension.
 // Lane info
 
 WaveMask WaveGetConvergedMask();
+
+WaveMask WaveGetActiveMask();
 
 bool WaveMaskIsFirstLane(WaveMask mask);
 

@@ -2488,7 +2488,13 @@ __spirv_version(1.3)
 __target_intrinsic(glsl, "subgroupBallot(true).x")
 __target_intrinsic(cuda, "__activemask()")
 __target_intrinsic(hlsl, "WaveActiveBallot(true).x")
-WaveMask WaveGetConvergedMask() { return 0xffffffff; }
+WaveMask WaveGetConvergedMask();
+
+__glsl_extension(GL_KHR_shader_subgroup_ballot)
+__spirv_version(1.3)
+__target_intrinsic(glsl, "subgroupBallot(true).x")
+__target_intrinsic(hlsl, "WaveActiveBallot(true).x")
+WaveMask WaveGetActiveMask();
 
 __glsl_extension(GL_KHR_shader_subgroup_basic)
 __spirv_version(1.3)
@@ -3264,6 +3270,20 @@ __spirv_version(1.3)
 __target_intrinsic(glsl, "subgroupBallotExclusiveBitCount(subgroupBallot($0))")
 __target_intrinsic(cuda, "__popc(__ballot_sync(__activemask(), $0)  & _getLaneLtMask())")
 uint WavePrefixCountBits(bool value);
+
+
+__glsl_extension(GL_KHR_shader_subgroup_ballot)
+__spirv_version(1.3)
+__target_intrinsic(glsl, "subgroupBallot(true)")
+__target_intrinsic(cuda, "make_uint4(__activemask(), 0, 0, 0)")
+__target_intrinsic(hlsl, "WaveActiveBallot(true)")
+uint4 WaveGetConvergedMulti();
+
+__glsl_extension(GL_KHR_shader_subgroup_ballot)
+__spirv_version(1.3)
+__target_intrinsic(glsl, "subgroupBallot(true)")
+__target_intrinsic(hlsl, "WaveActiveBallot(true)")
+uint4 WaveGetActiveMulti();
 
 // Shader model 6.5 stuff
 // https://github.com/microsoft/DirectX-Specs/blob/master/d3d/HLSL_ShaderModel6_5.md
