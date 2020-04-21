@@ -2485,12 +2485,19 @@ matrix<T, N, M> trunc(matrix<T, N, M> x)
     MATRIX_MAP_UNARY(T, N, M, trunc, x);
 }
 
-// Slang Specific Mask Wave Intrinsics 
+// Slang Specific 'Mask' Wave Intrinsics 
 
 typedef uint WaveMask;
 
 __target_intrinsic(cuda, "__activemask()")
 WaveMask WaveGetConvergedMask() { return 0xffffffff; }
+
+__glsl_extension(GL_KHR_shader_subgroup_basic)
+__spirv_version(1.3)
+__target_intrinsic(glsl, "subgroupElect()")
+__target_intrinsic(cuda, "(($0 & -$0) == (WarpMask(1) << _getLaneId()))")
+__target_intrinsic(hlsl, "WaveIsFirstLane()")
+bool WaveMaskIsFirstLane(WaveMask mask);
 
 __glsl_extension(GL_KHR_shader_subgroup_vote)
 __spirv_version(1.3)
@@ -2564,7 +2571,6 @@ __target_intrinsic(glsl, "subgroupBarrier()")
 __target_intrinsic(hlsl, "GroupMemoryBarrier()")
 void GroupMemoryBarrierWithWaveMaskSync(WaveMask mask);
 
-
 __glsl_extension(GL_KHR_shader_subgroup_basic)
 __spirv_version(1.3)
 __target_intrinsic(glsl, "subgroupBarrier()")
@@ -2620,7 +2626,7 @@ __target_intrinsic(cuda, "_waveShuffleMultiple($0, $1, $2)")
 __target_intrinsic(hlsl, "WaveReadLaneAt($1, $2)")
 vector<T,N> WaveMaskReadLaneAt(WaveMask mask, vector<T,N> value, int lane);
 __generic<T : __BuiltinType, let N : int, let M : int>
-__target_intrinsic(cuda, "_waveShuffleMultiple($0, $1)")
+__target_intrinsic(cuda, "_waveShuffleMultiple($0, $1, $2)")
 __target_intrinsic(hlsl, "WaveReadLaneAt($1, $2)")
 matrix<T,N,M> WaveMaskReadLaneAt(WaveMask mask, matrix<T,N,M> value, int lane);
 
@@ -2689,7 +2695,7 @@ __target_intrinsic(cuda, "_waveOrMultiple($0, $1)")
 __target_intrinsic(hlsl, "WaveActiveBitOr($1)")
 vector<T,N> WaveMaskBitOr(WaveMask mask, vector<T,N> expr);
 __generic<T : __BuiltinIntegerType, let N : int, let M : int>
-__target_intrinsic(cuda, "_waveOrMultiple(_$0, $1)")
+__target_intrinsic(cuda, "_waveOrMultiple($0, $1)")
 __target_intrinsic(hlsl, "WaveActiveBitOr($1)")
 matrix<T,N,M> WaveMaskBitOr(WaveMask mask, matrix<T,N,M> expr);
 
@@ -2866,8 +2872,82 @@ __generic<T : __BuiltinType, let N : int, let M : int>
 __target_intrinsic(cuda, "_waveReadFirstMultiple($0, $1)")
 matrix<T,N,M> WaveMaskReadLaneFirst(WaveMask mask, matrix<T,N,M> expr);
 
+// WaveMask SM6.5 like intrinsics
 
+// TODO(JS): On HLSL it only works for 32 bits or less
 
+__generic<T : __BuiltinType>
+__target_intrinsic(hlsl, "WaveMatch($1).x")
+__cuda_sm_version(7.0)
+__target_intrinsic(cuda, "_waveMatchScalar($0, $1)")
+WaveMask WaveMaskMatch(WaveMask mask, T value);
+__generic<T : __BuiltinType, let N : int>
+__target_intrinsic(hlsl, "WaveMatch($1).x")
+__cuda_sm_version(7.0)
+__target_intrinsic(cuda, "_waveMatchMultiple($0, $1)")
+WaveMask WaveMaskMatch(WaveMask mask, vector<T,N> value);
+__generic<T : __BuiltinType, let N : int, let M : int>
+__target_intrinsic(hlsl, "WaveMatch($1).x")
+__cuda_sm_version(7.0)
+__target_intrinsic(cuda, "_waveMatchMultiple($0, $1)")
+WaveMask WaveMaskMatch(WaveMask mask, matrix<T,N,M> value);
+
+__generic<T : __BuiltinArithmeticType>
+__target_intrinsic(hlsl, "WaveMultiPrefixBitAnd($1, uint4($0, 0, 0, 0))")
+__glsl_extension(GL_KHR_shader_subgroup_arithmetic)
+__spirv_version(1.3)
+//__target_intrinsic(glsl, "subgroupExclusiveAnd($1)")
+__target_intrinsic(cuda, "_wavePrefixAnd($0, $1)")
+T WaveMaskPrefixBitAnd(WaveMask mask, T expr);
+__target_intrinsic(hlsl, "WaveMultiPrefixBitAnd($1, uint4($0, 0, 0, 0))")
+__glsl_extension(GL_KHR_shader_subgroup_arithmetic)
+__spirv_version(1.3)
+__target_intrinsic(glsl, "subgroupExclusiveAnd($1)")
+__target_intrinsic(cuda, "_wavePrefixAndMultiple($0, $1)")
+__generic<T : __BuiltinArithmeticType, let N : int>
+vector<T,N> WaveMaskPrefixBitAnd(WaveMask mask, vector<T,N> expr);
+__generic<T : __BuiltinArithmeticType, let N : int, let M : int>
+__target_intrinsic(hlsl, "WaveMultiPrefixBitAnd($1, uint4($0, 0, 0, 0))")
+__target_intrinsic(cuda, "_wavePrefixAndMultiple(_getMultiPrefixMask($0, $1)")
+matrix<T,N,M> WaveMaskPrefixBitAnd(WaveMask mask, matrix<T,N,M> expr);
+
+__generic<T : __BuiltinArithmeticType>
+__target_intrinsic(hlsl, "WaveMultiPrefixBitOr($1, uint4($0, 0, 0, 0))")
+__glsl_extension(GL_KHR_shader_subgroup_arithmetic)
+__spirv_version(1.3)
+//__target_intrinsic(glsl, "subgroupExclusiveOr($1)")
+__target_intrinsic(cuda, "_wavePrefixOr($0, $1)")
+T WaveMaskPrefixBitOr(WaveMask mask, T expr);
+__generic<T : __BuiltinArithmeticType, let N : int>
+__target_intrinsic(hlsl, "WaveMultiPrefixBitOr($1, uint4($0, 0, 0, 0))")
+__glsl_extension(GL_KHR_shader_subgroup_arithmetic)
+__spirv_version(1.3)
+//__target_intrinsic(glsl, "subgroupExclusiveOr($1)")
+__target_intrinsic(cuda, "_wavePrefixOrMultiple($0, $1)")
+vector<T,N> WaveMaskPrefixBitOr(WaveMask mask, vector<T,N> expr);
+__generic<T : __BuiltinArithmeticType, let N : int, let M : int>
+__target_intrinsic(hlsl, "WaveMultiPrefixBitOr($1, uint4($0, 0, 0, 0))")
+__target_intrinsic(cuda, "_wavePrefixOrMultiple($0, $1)")
+matrix<T,N,M> WaveMaskPrefixBitOr(WaveMask mask, matrix<T,N,M> expr);
+
+__generic<T : __BuiltinArithmeticType>
+__target_intrinsic(hlsl, "WaveMultiPrefixBitXor($1, uint4($0, 0, 0, 0))")
+__glsl_extension(GL_KHR_shader_subgroup_arithmetic)
+__spirv_version(1.3)
+__target_intrinsic(glsl, "subgroupExclusiveXor($1)")
+__target_intrinsic(cuda, "_wavePrefixXor($0, $1)")
+T WaveMaskPrefixBitXor(WaveMask mask, T expr);
+__generic<T : __BuiltinArithmeticType, let N : int>
+__target_intrinsic(hlsl, "WaveMultiPrefixBitXor($1, uint4($0, 0, 0, 0))")
+__glsl_extension(GL_KHR_shader_subgroup_arithmetic)
+__spirv_version(1.3)
+__target_intrinsic(glsl, "subgroupExclusiveXor($1)")
+__target_intrinsic(cuda, "_wavePrefixXorMultiple($0, $1)")
+vector<T,N> WaveMaskPrefixBitXor(WaveMask mask, vector<T,N> expr);
+__generic<T : __BuiltinArithmeticType, let N : int, let M : int>
+__target_intrinsic(hlsl, "WaveMultiPrefixBitXor($1, uint4($0, 0, 0, 0))")
+__target_intrinsic(cuda, "_wavePrefixXorMultiple($0, $1)")
+matrix<T,N,M> WaveMaskPrefixBitXor(WaveMask mask, matrix<T,N,M> expr);
 
 // Shader model 6.0 stuff
 
