@@ -78,6 +78,9 @@
     <ClInclude Include="slang-ir-bind-existentials.h">
       <Filter>Header Files</Filter>
     </ClInclude>
+    <ClInclude Include="slang-ir-byte-address-legalize.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
     <ClInclude Include="slang-ir-clone.h">
       <Filter>Header Files</Filter>
     </ClInclude>
@@ -103,6 +106,9 @@
       <Filter>Header Files</Filter>
     </ClInclude>
     <ClInclude Include="slang-ir-insts.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="slang-ir-layout.h">
       <Filter>Header Files</Filter>
     </ClInclude>
     <ClInclude Include="slang-ir-link.h">
@@ -332,6 +338,9 @@
     <ClCompile Include="slang-ir-bind-existentials.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
+    <ClCompile Include="slang-ir-byte-address-legalize.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
     <ClCompile Include="slang-ir-clone.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
@@ -351,6 +360,9 @@
       <Filter>Source Files</Filter>
     </ClCompile>
     <ClCompile Include="slang-ir-inline.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="slang-ir-layout.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
     <ClCompile Include="slang-ir-legalize-types.cpp">

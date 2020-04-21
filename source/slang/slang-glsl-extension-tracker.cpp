@@ -41,6 +41,8 @@ void GLSLExtensionTracker::requireBaseTypeExtension(BaseType baseType)
     switch (baseType)
     {
         case BaseType::Half:
+        case BaseType::UInt16:
+        case BaseType::Int16:
         {
             // https://github.com/KhronosGroup/GLSL/blob/master/extensions/ext/GL_EXT_shader_16bit_storage.txt
             requireExtension(UnownedStringSlice::fromLiteral("GL_EXT_shader_16bit_storage"));

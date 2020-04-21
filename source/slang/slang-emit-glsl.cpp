@@ -1290,7 +1290,44 @@ bool GLSLSourceEmitter::tryEmitInstExprImpl(IRInst* inst, const EmitOpInfo& inOu
             emitOperand(inst->getOperand(0), outerPrec);
             return true;
         }
+        case kIROp_StructuredBufferLoad:
+        {
+            auto outerPrec = inOuterPrec;
+            auto prec = getInfo(EmitOp::Postfix);
+            bool needClose = maybeEmitParens(outerPrec, prec);
 
+            emitOperand(inst->getOperand(0), leftSide(outerPrec, prec));
+            m_writer->emit("._data[");
+            emitOperand(inst->getOperand(1), getInfo(EmitOp::General));
+            m_writer->emit("]");
+
+            maybeCloseParens(needClose);
+            return true;
+        }
+        case kIROp_StructuredBufferStore:
+        {
+            auto outerPrec = inOuterPrec;
+
+            auto assignPrec = getInfo(EmitOp::Assign);
+            bool assignNeedsClose = maybeEmitParens(outerPrec, assignPrec);
+
+            {
+                auto subscriptPrec = getInfo(EmitOp::Postfix);
+                bool subscriptNeedsClose = maybeEmitParens(assignPrec, subscriptPrec);
+
+                emitOperand(inst->getOperand(0), leftSide(assignPrec, subscriptPrec));
+                m_writer->emit("._data[");
+                emitOperand(inst->getOperand(1), getInfo(EmitOp::General));
+                m_writer->emit("]");
+
+                maybeCloseParens(subscriptNeedsClose);
+            }
+
+            m_writer->emit(" = ");
+            emitOperand(inst->getOperand(2), rightSide(assignPrec, outerPrec));
+            maybeCloseParens(assignNeedsClose);
+            return true;
+        }
         default: break;
     }
 
@@ -1458,6 +1495,7 @@ void GLSLSourceEmitter::emitSimpleTypeImpl(IRType* type)
         case kIROp_FloatType:   
         case kIROp_DoubleType:
         {
+            _requireBaseType(cast<IRBasicType>(type)->getBaseType());
             m_writer->emit(getDefaultBuiltinTypeName(type->op));
             return;
         }

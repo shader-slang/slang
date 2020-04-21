@@ -37,7 +37,7 @@ public:
 protected:
     static uint32_t _getFlag(BaseType baseType) { return uint32_t(1) << int(baseType); }
 
-    uint32_t m_hasBaseTypeFlags = 0xffffffff & ~(_getFlag(BaseType::UInt64) + _getFlag(BaseType::Int64) + _getFlag(BaseType::Half));
+    uint32_t m_hasBaseTypeFlags = _getFlag(BaseType::Float) | _getFlag(BaseType::Int) | _getFlag(BaseType::UInt) | _getFlag(BaseType::Void) | _getFlag(BaseType::Bool);
 
     ProfileVersion m_profileVersion = ProfileVersion::GLSL_110;
 

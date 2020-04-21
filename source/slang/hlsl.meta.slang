@@ -41,7 +41,27 @@ struct ByteAddressBuffer
     uint4 Load4(int location);
 
     uint4 Load4(int location, out uint status);
+
+    T Load<T>(int location)
+    {
+        return __byteAddressBufferLoad<T>(this, location);
+    }
 };
+
+__intrinsic_op($(kIROp_ByteAddressBufferLoad))
+T __byteAddressBufferLoad<T>(ByteAddressBuffer buffer, int offset);
+
+__intrinsic_op($(kIROp_ByteAddressBufferLoad))
+T __byteAddressBufferLoad<T>(RWByteAddressBuffer buffer, int offset);
+
+__intrinsic_op($(kIROp_ByteAddressBufferLoad))
+T __byteAddressBufferLoad<T>(RasterizerOrderedByteAddressBuffer buffer, int offset);
+
+__intrinsic_op($(kIROp_ByteAddressBufferStore))
+void __byteAddressBufferStore<T>(RWByteAddressBuffer buffer, int offset, T value);
+
+__intrinsic_op($(kIROp_ByteAddressBufferStore))
+void __byteAddressBufferStore<T>(RasterizerOrderedByteAddressBuffer buffer, int offset, T value);
 
 __generic<T>
 __magic_type(HLSLStructuredBufferType)
@@ -134,6 +154,11 @@ struct $(item.name)
     uint4 Load4(int location);
 
     uint4 Load4(int location, out uint status);
+
+    T Load<T>(int location)
+    {
+        return __byteAddressBufferLoad<T>(this, location);
+    }
 
     // Added operations:
 
@@ -241,6 +266,11 @@ struct $(item.name)
     void Store4(
         uint address,
         uint4 value);
+
+    void Store<T>(int offset, T value)
+    {
+        __byteAddressBufferStore(this, offset, value);
+    }
 };
 
 ${{{{
