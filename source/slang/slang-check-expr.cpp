@@ -191,13 +191,33 @@ namespace Slang
             // actually names a type, because in that case we are doing
             // a static member reference.
             //
-            // TODO: Should we be checking if the member is static here?
-            // If it isn't, should we be automatically producing a "curried"
-            // form (e.g., for a member function, return a value usable
-            // for referencing it as a free function).
-            //
-            if (as<TypeType>(baseExpr->type))
+            if (auto typeType = as<TypeType>(baseExpr->type))
             {
+                // Before forming the reference, we will check if the
+                // member being referenced can even be used as a static
+                // member, and if not we will diagnose an error.
+                //
+                // TODO: It is conceptually possible to allow static
+                // references to many instance members, provided we
+                // change the exposed type/signature.
+                //
+                // E.g., if we have:
+                //
+                //      struct Test { float getVal() { ... } }
+                //
+                // Then a reference to `Test.getVal` could be allowed,
+                // and given a type of `(Test) -> float` to indicate
+                // that it is an "unbound" instance method.
+                //
+                if( !isDeclUsableAsStaticMember(declRef.getDecl()) )
+                {
+                    getSink()->diagnose(
+                        loc,
+                        Diagnostics::staticRefToNonStaticMember,
+                        typeType->type,
+                        declRef.GetName());
+                }
+
                 auto expr = new StaticMemberExpr();
                 expr->loc = loc;
                 expr->type = type;
@@ -280,18 +300,6 @@ namespace Slang
         return derefExpr;
     }
 
-    RefPtr<Expr> SemanticsVisitor::createImplicitThisMemberExpr(
-        Type*                                           type,
-        SourceLoc                                       loc,
-        LookupResultItem::Breadcrumb::ThisParameterMode thisParameterMode)
-    {
-        RefPtr<ThisExpr> expr = new ThisExpr();
-        expr->type = type;
-        expr->type.IsLeftValue = thisParameterMode == LookupResultItem::Breadcrumb::ThisParameterMode::Mutating;
-        expr->loc = loc;
-        return expr;
-    }
-
     RefPtr<Expr> SemanticsVisitor::ConstructLookupResultExpr(
         LookupResultItem const& item,
         RefPtr<Expr>            baseExpr,
@@ -330,22 +338,60 @@ namespace Slang
                     // at the start of a chain.
                     SLANG_ASSERT(bb == nullptr);
 
-                    // The member was looked up via a `this` expression,
-                    // so we need to create one here.
-                    if (auto extensionDeclRef = breadcrumb->declRef.as<ExtensionDecl>())
+                    // We will compute the type to use for `This` using
+                    // the same logic that a direct reference to `This`
+                    // uses.
+                    //
+                    auto thisType = calcThisType(breadcrumb->declRef);
+
+                    // Next we construct an appropriate expression to
+                    // stand in for the implicit `this` or `This` reference.
+                    //
+                    // The lookup process will have computed the appropriate
+                    // "mode" to use for the implicit `this` or `This`.
+                    //
+                    auto thisParameterMode = breadcrumb->thisParameterMode;
+                    if(thisParameterMode == LookupResultItem::Breadcrumb::ThisParameterMode::Type)
                     {
-                        bb = createImplicitThisMemberExpr(
-                            GetTargetType(extensionDeclRef),
-                            loc,
-                            breadcrumb->thisParameterMode);
+                        // If we are in a static context, then we do not
+                        // have implicit `this` expression, and the expression
+                        // we construct will need to start with the `This`
+                        // type.
+                        //
+                        // Because we are constrained to yield an expression
+                        // here, we must construct an expression that
+                        // references `This`, and the *type* of that expression
+                        // will be `typeof(This)`, which conceptually
+                        // `typeof(typeof(this))`
+                        //
+                        auto thisTypeType = getTypeType(thisType);
+
+                        auto typeExpr = new SharedTypeExpr();
+                        typeExpr->type.type = thisTypeType;
+                        typeExpr->base.type = thisType;
+
+                        bb = typeExpr;
                     }
                     else
                     {
-                        auto type = DeclRefType::Create(getSession(), breadcrumb->declRef);
-                        bb = createImplicitThisMemberExpr(
-                            type,
-                            loc,
-                            breadcrumb->thisParameterMode);
+                        // In a context where both static and instance members can
+                        // be referenced, we will construct a reference to `this`,
+                        // and then rely on downstream logic to ensure that a
+                        // refernece to `this.someStaticMember` will be translated
+                        // over to `This.someStaticMember`.
+                        //
+                        RefPtr<ThisExpr> expr = new ThisExpr();
+                        expr->type.type = thisType;
+                        expr->loc = loc;
+
+                        // Whether or not the implicit `this` is mutable depends
+                        // on the context in which it is used, and the lookup
+                        // logic will have computed an appropriate "mode" based
+                        // on the context during lookup.
+                        //
+                        expr->type.IsLeftValue = thisParameterMode == LookupResultItem::Breadcrumb::ThisParameterMode::MutableValue;
+
+                        bb = expr;
                     }
                 }
                 break;
@@ -1501,29 +1547,16 @@ namespace Slang
             // For now let's just be expedient and disallow all of that, because
             // we can always add it back in later.
 
-            if (!lookupResult.isOverloaded())
+            // If the lookup result is overloaded, then we want to filter
+            // it to just those candidates that can be referenced statically,
+            // and ignore any that would only be allowed as instance members.
+            //
+            if(lookupResult.isOverloaded())
             {
-                // The non-overloaded case is relatively easy. We just want
-                // to look at the member being referenced, and check if
-                // it is allowed in a `static` context:
+                // We track both the usable items, and whether or
+                // not there were any non-static items that need
+                // to be ignored.
                 //
-                if (!isUsableAsStaticMember(lookupResult.item))
-                {
-                    getSink()->diagnose(
-                        expr->loc,
-                        Diagnostics::staticRefToNonStaticMember,
-                        type,
-                        expr->name);
-                }
-            }
-            else
-            {
-                // The overloaded case is trickier, because we should first
-                // filter the list of candidates, because if there is anything
-                // that *is* usable in a static context, then we should assume
-                // the user just wants to reference that. We should only
-                // issue an error if *all* of the items that were discovered
-                // are non-static.
                 bool anyNonStatic = false;
                 List<LookupResultItem> staticItems;
                 for (auto item : lookupResult.items)
@@ -1558,6 +1591,7 @@ namespace Slang
                             Diagnostics::staticRefToNonStaticMember,
                             type,
                             expr->name);
+                        return CreateErrorExpr(expr);
                     }
                 }
                 // If there were no non-static items, then the `items`

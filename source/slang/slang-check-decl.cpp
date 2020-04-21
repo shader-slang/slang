@@ -557,6 +557,9 @@ namespace Slang
         if(as<SimpleTypeDecl>(decl))
             return true;
 
+        if(as<TypeConstraintDecl>(decl))
+            return true;
+
         return false;
     }
 

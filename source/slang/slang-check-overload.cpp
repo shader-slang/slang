@@ -445,9 +445,9 @@ namespace Slang
     }
 
     RefPtr<Expr> SemanticsVisitor::createGenericDeclRef(
-        RefPtr<Expr>            baseExpr,
-        RefPtr<Expr>            originalExpr,
-        RefPtr<GenericSubstitution>   subst)
+        RefPtr<Expr>                baseExpr,
+        RefPtr<Expr>                originalExpr,
+        RefPtr<GenericSubstitution> subst)
     {
         auto baseDeclRefExpr = as<DeclRefExpr>(baseExpr);
         if (!baseDeclRefExpr)

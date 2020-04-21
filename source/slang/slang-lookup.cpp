@@ -670,10 +670,10 @@ static void _lookUpInScopes(
             if (auto aggTypeDeclBaseRef = containerDeclRef.as<AggTypeDeclBase>())
             {
                 // When reconstructing the final expression for a result
-                // looked up through the tyep or extension, we will need
+                // looked up through the type or extension, we will need
                 // a `this` expression (or a `This` type expression) to
                 // mark the base of the member reference, so we create
-                // a "breadcrumb" here to trakc that fact.
+                // a "breadcrumb" here to track that fact.
                 //
                 BreadcrumbInfo breadcrumb;
                 breadcrumb.kind = LookupResultItem::Breadcrumb::Kind::This;
@@ -714,25 +714,57 @@ static void _lookUpInScopes(
 
             // Before we proceed up to the next outer scope to perform lookup
             // again, we need to consider what the current scope tells us
-            // about how to interpret uses of `this`. For example, if
-            // we are inside a `[mutating]` method, then the implicit `this`
-            // that we use for lookup should be an l-value.
+            // about how to interpret uses of implicit `this` or `This`. For
+            // example, if we are inside a `[mutating]` method, then the implicit
+            // `this` that we use for lookup should be an l-value.
+            //
+            // Similarly, if we look up a member in a type from the scope
+            // of some nested type, then there shouldn't be an implicit `this`
+            // expression for the outer type, but instead an implicit `This`.
             //
             if( containerDeclRef.is<ConstructorDecl>() )
             {
-                thisParameterMode = LookupResultItem::Breadcrumb::ThisParameterMode::Mutating;
+                // In the context of an `__init` declaration, the members of
+                // the surrounding type are accessible through a mutable `this`.
+                //
+                thisParameterMode = LookupResultItem::Breadcrumb::ThisParameterMode::MutableValue;
             }
             else if( auto funcDeclRef = containerDeclRef.as<FunctionDeclBase>() )
             {
-                if( funcDeclRef.getDecl()->HasModifier<MutatingAttribute>() )
+                // The implicit `this`/`This` for a function-like declaration
+                // depends on modifiers attached to the declaration.
+                //
+                if( funcDeclRef.getDecl()->HasModifier<HLSLStaticModifier>() )
                 {
-                    thisParameterMode = LookupResultItem::Breadcrumb::ThisParameterMode::Mutating;
+                    // A `static` method only has access to an implicit `This`,
+                    // and does not have a `this` expression available.
+                    //
+                    thisParameterMode = LookupResultItem::Breadcrumb::ThisParameterMode::Type;
+                }
+                else if( funcDeclRef.getDecl()->HasModifier<MutatingAttribute>() )
+                {
+                    // In a non-`static` method marked `[mutating]` there is
+                    // an implicit `this` parameter that is mutable.
+                    //
+                    thisParameterMode = LookupResultItem::Breadcrumb::ThisParameterMode::MutableValue;
                 }
                 else
                 {
-                    thisParameterMode = LookupResultItem::Breadcrumb::ThisParameterMode::Default;
+                    // In all other cases, there is an implicit `this` parameter
+                    // that is immutable.
+                    //
+                    thisParameterMode = LookupResultItem::Breadcrumb::ThisParameterMode::ImmutableValue;
                 }
             }
+            else if( containerDeclRef.as<AggTypeDeclBase>() )
+            {
+                // When lookup moves from a nested typed declaration to an
+                // outer scope, there is no ability to use an implicit `this`
+                // expression, and we have only the `This` type available.
+                //
+                thisParameterMode = LookupResultItem::Breadcrumb::ThisParameterMode::Type;
+            }
+            // TODO: What other cases need to be enumerated here?
         }
 
         if (result.isValid())
