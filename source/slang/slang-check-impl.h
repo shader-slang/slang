@@ -345,11 +345,6 @@ namespace Slang
             RefPtr<Expr>    base,
             SourceLoc       loc);
 
-        RefPtr<Expr> createImplicitThisMemberExpr(
-            Type*                                           type,
-            SourceLoc                                       loc,
-            LookupResultItem::Breadcrumb::ThisParameterMode thisParameterMode);
-
         RefPtr<Expr> ConstructLookupResultExpr(
             LookupResultItem const& item,
             RefPtr<Expr>            baseExpr,

@@ -1112,15 +1112,18 @@ namespace Slang
             // The kind of lookup step that was performed
             Kind kind;
 
-            // For the `Kind::This` case, is the `this` parameter
-            // mutable or not?
+            // For the `Kind::This` case, what does the implicit
+            // `this` or `This` parameter refer to?
+            //
             enum class ThisParameterMode : uint8_t
             {
-                Default,
-                Mutating,
+                ImmutableValue, // An immutable `this` value
+                MutableValue,   // A mutable `this` value
+                Type,           // A `This` type
+
+                Default = ImmutableValue,
             };
             ThisParameterMode thisParameterMode = ThisParameterMode::Default;
-
 
             // As needed, a reference to the declaration that faciliated
             // the lookup step.
