@@ -33,7 +33,7 @@ Using WaveMask intrinsics is generally more verbose and prone to error than the 
 
 On D3D12 and Vulkan the WaveMask instrinsics can be used, but the mask is effectively ignored. For this to work across targets including CUDA, the mask must be calculated such that it exactly matches that of HLSL defined 'active' lanes, else the behavior is undefined. 
 
-The WaveMask intrinsics are an non standard Slang feature, and may change in the future. 
+The WaveMask intrinsics are a non standard Slang feature, and may change in the future. 
 
 ```
 RWStructuredBuffer<int> outputBuffer;
