@@ -1156,6 +1156,7 @@ matrix<T,N,M> exp2(matrix<T,N,M> x)
     MATRIX_MAP_UNARY(T, N, M, exp2, x);
 }
 
+
 // Convert 16-bit float stored in low bits of integer
 __target_intrinsic(glsl, "unpackHalf2x16($0).x")
 __glsl_version(420)
@@ -2489,8 +2490,18 @@ matrix<T, N, M> trunc(matrix<T, N, M> x)
 
 typedef uint WaveMask;
 
+__glsl_extension(GL_KHR_shader_subgroup_ballot)
+__spirv_version(1.3)
+__target_intrinsic(glsl, "subgroupBallot(true).x")
 __target_intrinsic(cuda, "__activemask()")
-WaveMask WaveGetConvergedMask() { return 0xffffffff; }
+__target_intrinsic(hlsl, "WaveActiveBallot(true).x")
+WaveMask WaveGetConvergedMask();
+
+__glsl_extension(GL_KHR_shader_subgroup_ballot)
+__spirv_version(1.3)
+__target_intrinsic(glsl, "subgroupBallot(true).x")
+__target_intrinsic(hlsl, "WaveActiveBallot(true).x")
+WaveMask WaveGetActiveMask();
 
 __glsl_extension(GL_KHR_shader_subgroup_basic)
 __spirv_version(1.3)
@@ -3267,6 +3278,20 @@ __target_intrinsic(glsl, "subgroupBallotExclusiveBitCount(subgroupBallot($0))")
 __target_intrinsic(cuda, "__popc(__ballot_sync(__activemask(), $0)  & _getLaneLtMask())")
 uint WavePrefixCountBits(bool value);
 
+
+__glsl_extension(GL_KHR_shader_subgroup_ballot)
+__spirv_version(1.3)
+__target_intrinsic(glsl, "subgroupBallot(true)")
+__target_intrinsic(cuda, "make_uint4(__activemask(), 0, 0, 0)")
+__target_intrinsic(hlsl, "WaveActiveBallot(true)")
+uint4 WaveGetConvergedMulti();
+
+__glsl_extension(GL_KHR_shader_subgroup_ballot)
+__spirv_version(1.3)
+__target_intrinsic(glsl, "subgroupBallot(true)")
+__target_intrinsic(hlsl, "WaveActiveBallot(true)")
+uint4 WaveGetActiveMulti();
+
 // Shader model 6.5 stuff
 // https://github.com/microsoft/DirectX-Specs/blob/master/d3d/HLSL_ShaderModel6_5.md
 
@@ -3294,7 +3319,7 @@ __generic<T : __BuiltinArithmeticType>
 __target_intrinsic(hlsl)
 __glsl_extension(GL_KHR_shader_subgroup_arithmetic)
 __spirv_version(1.3)
-//__target_intrinsic(glsl, "subgroupExclusiveAnd($0)")
+__target_intrinsic(glsl, "subgroupExclusiveAnd($0)")
 __target_intrinsic(cuda, "_wavePrefixAnd(_getMultiPrefixMask(($1).x), $0)")
 T WaveMultiPrefixBitAnd(T expr, uint4 mask);
 __target_intrinsic(hlsl)

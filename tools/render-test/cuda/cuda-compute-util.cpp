@@ -1550,15 +1550,19 @@ SlangResult _loadAndInvokeKernel(
 {
     switch( outputAndLayout.output.desc.pipelineType )
     {
-    default:
-        return SLANG_FAIL;
-
     case PipelineType::Compute:
         return _loadAndInvokeComputeProgram(cudaContext, cudaStream, outputAndLayout, dispatchSize, outContext);
 
     case PipelineType::RayTracing:
+#ifdef RENDER_TEST_OPTIX
         return _loadAndInvokeRayTracingProgram(cudaContext, cudaStream, outputAndLayout, dispatchSize, outContext);
+#endif
+        break;
+    
+    default: break;
     }
+
+    return SLANG_FAIL;
 }
 
     /// Execute a CUDA program (either compute or ray-tracing)
