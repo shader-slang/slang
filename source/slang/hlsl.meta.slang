@@ -1179,10 +1179,6 @@ vector<uint, N> f32tof16(vector<float, N> value)
     VECTOR_MAP_UNARY(uint, N, f32tof16, value);
 }
 
-__generic<let N : int>
-__target_intrinsic(glsl, "packHalf2x16(vec2($0,0.0))")
-vector<uint,N> f32tof16(vector<float,N> value);
-
 // Flip surface normal to face forward, if needed
 __generic<T : __BuiltinFloatingPointType, let N : int>
 __target_intrinsic(hlsl)
