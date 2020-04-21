@@ -11,6 +11,6 @@ T doThing<T>(T in);
 
 void test()
 {
-	int a = 5;
+    int a = 5;
     int b = doThing(a);
 }
