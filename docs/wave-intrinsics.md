@@ -15,8 +15,8 @@ The majority of 'regular' HLSL Wave intrinsics which operate on implicit 'active
 
 In the [DXC Wiki](https://github.com/Microsoft/DirectXShaderCompiler/wiki/Wave-Intrinsics) active lanes are described as
 
-"These intrinsics are dependent on active lanes and therefore flow control. In the model of this document, implementations
- must enforce that the number of active lanes exactly corresponds to the programmer’s view of flow control."
+> These intrinsics are dependent on active lanes and therefore flow control. In the model of this document, implementations
+> must enforce that the number of active lanes exactly corresponds to the programmer’s view of flow control.
  
 In practice this appears to imply that the programming model is that all lanes operate in 'lock step'. That the 'active lanes' are the lanes doing processing at a particular point in the control flow. On some hardware this may match how processing actually works. There is also a large amount of hardware in the field that doesn't follow this model, and allows lanes to diverge and not necessarily on flow control. On this style of hardware Active intrinsics may act to also converge lanes to give the appearance of 'in step' ness. 
  
@@ -51,13 +51,14 @@ void computeMain(uint3 dispatchThreadID : SV_DispatchThreadID)
     int value = 0;
     
     // When there is a conditional/flow control we typically need to work out a new mask.
-    // This can be achieved by calling WaveMaskBallot with the current mask, and the condition the 
-    // condition will typically be the same as in the condition
+    // This can be achieved by calling WaveMaskBallot with the current mask, and the condition
+    // used in the flow control - here the subsequent 'if'.
     const WaveMask mask1 = WaveMaskBallot(mask0, idx == 2);
     
     if (idx == 2)
     {
-        // In here the mask is `mask1`, although no WaveMask intrinsics are used along this path
+        // At this point the mask is `mask1`, although no WaveMask intrinsics are used along this path, 
+        // so it's not used.
     
         // diverge
         return;
@@ -113,7 +114,6 @@ Standard Wave intrinsics
 The Wave Intrinsics supported on Slang are listed below. Note that typically T generic types also include vector and matrix forms. 
 
 ```
-
 // Lane info
 
 uint WaveGetLaneCount();
@@ -134,45 +134,33 @@ uint WaveActiveCountBits(bool value);
 
 // Across Lanes
 
-__generic<T : __BuiltinIntegerType>
-T WaveActiveBitAnd(T expr);
+T WaveActiveBitAnd<T>(T expr);
 
-__generic<T : __BuiltinIntegerType>
-T WaveActiveBitOr(T expr);
+T WaveActiveBitOr<T>(T expr);
 
-__generic<T : __BuiltinIntegerType>
-T WaveActiveBitXor(T expr);
+T WaveActiveBitXor<T>(T expr);
 
-__generic<T : __BuiltinArithmeticType>
-T WaveActiveMax(T expr);
+T WaveActiveMax<T>(T expr);
 
-__generic<T : __BuiltinArithmeticType>
-T WaveActiveMin(T expr);
+T WaveActiveMin<T>(T expr);
 
-__generic<T : __BuiltinArithmeticType>
-T WaveActiveProduct(T expr);
+T WaveActiveProduct<T>(T expr);
 
-__generic<T : __BuiltinArithmeticType>
-T WaveActiveSum(T expr);
+T WaveActiveSum<T>(T expr);
 
-__generic<T : __BuiltinType>
-bool WaveActiveAllEqual(T value);
+bool WaveActiveAllEqual<T>(T value);
 
 // Prefix
 
-__generic<T : __BuiltinArithmeticType>
-T WavePrefixProduct(T expr);
+T WavePrefixProduct<T>(T expr);
 
-__generic<T : __BuiltinArithmeticType>
-T WavePrefixSum(T expr);
+T WavePrefixSum<T>(T expr);
 
 // Communication
 
-__generic<T : __BuiltinType>
-T WaveReadLaneFirst(T expr);
+T WaveReadLaneFirst<T>(T expr);
 
-__generic<T : __BuiltinType>
-T WaveReadLaneAt(T value, int lane);
+T WaveReadLaneAt<T>(T value, int lane);
 
 // Prefix
 
@@ -181,25 +169,19 @@ uint WavePrefixCountBits(bool value);
 // Shader model 6.5 stuff
 // https://github.com/microsoft/DirectX-Specs/blob/master/d3d/HLSL_ShaderModel6_5.md
 
-__generic<T : __BuiltinType>
-uint4 WaveMatch(T value);
+uint4 WaveMatch<T>(T value);
 
 uint WaveMultiPrefixCountBits(bool value, uint4 mask);
 
-__generic<T : __BuiltinArithmeticType>
-T WaveMultiPrefixBitAnd(T expr, uint4 mask);
+T WaveMultiPrefixBitAnd<T>(T expr, uint4 mask);
 
-__generic<T : __BuiltinArithmeticType>
-T WaveMultiPrefixBitOr(T expr, uint4 mask);
+T WaveMultiPrefixBitOr<T>(T expr, uint4 mask);
 
-__generic<T : __BuiltinArithmeticType>
-T WaveMultiPrefixBitXor(T expr, uint4 mask);
+T WaveMultiPrefixBitXor<T>(T expr, uint4 mask);
 
-__generic<T : __BuiltinArithmeticType>
-T WaveMultiPrefixProduct(T value, uint4 mask);
+T WaveMultiPrefixProduct<T>(T value, uint4 mask);
 
-__generic<T : __BuiltinArithmeticType>
-T WaveMultiPrefixSum(T value, uint4 mask);
+T WaveMultiPrefixSum<T>(T value, uint4 mask);
 ```
 
 Non Standard Wave Intrinsics
@@ -208,11 +190,9 @@ Non Standard Wave Intrinsics
 The following intrinsics are not part of the HLSL Wave intrinsics standard, but were added to Slang for a variety of reasons. Within the following signatures T can be scalar, vector or matrix, except on Vulkan which doesn't (currently) support Matrix.
 
 ```
-__generic<T : __BuiltinType>
-T WaveBroadcastLaneAt(T value, constexpr int lane);
+T WaveBroadcastLaneAt<T>(T value, constexpr int lane);
 
-__generic<T : __BuiltinType>
-T WaveShuffle(T value, int lane);
+T WaveShuffle<T>(T value, int lane);
 
 uint4 WaveGetActiveMulti();
 
@@ -228,14 +208,14 @@ void GroupMemoryBarrierWithWaveSync();
 ## Description
 
 ```
-T WaveBroadcastLaneAt(T value, constexpr int lane);
+T WaveBroadcastLaneAt<T>(T value, constexpr int lane);
 ```
 
 All lanes receive the value specified in lane. Lane must be an active lane, otherwise the result is undefined. 
 This is a more restricive version of `WaveReadLaneAt` - which can take a non constexpr lane, *but* must be the same value for all lanes in the warp. Or 'dynamically uniform' as described in the HLSL documentation. 
 
 ```
-T WaveShuffle(T value, int lane);
+T WaveShuffle<T>(T value, int lane);
 ```
 
 Shuffle is a less restrictive version of `WaveReadLaneAt` in that it has no restriction on the lane value - it does *not* require the value to be same on all lanes. 
@@ -308,8 +288,7 @@ WaveMask WaveMaskBallot(WaveMask mask, bool condition);
 
 WaveMask WaveMaskCountBits(WaveMask mask, bool value);
 
-__generic<T : __BuiltinType>
-WaveMask WaveMaskMatch(WaveMask mask, T value);
+WaveMask WaveMaskMatch<T>(WaveMask mask, T value);
 
 // Barriers
 
@@ -319,63 +298,45 @@ void GroupMemoryBarrierWithWaveMaskSync(WaveMask mask);
 
 // Across lane ops
 
-__generic<T : __BuiltinIntegerType>
-T WaveMaskBitAnd(WaveMask mask, T expr);
+T WaveMaskBitAnd<T>(WaveMask mask, T expr);
 
-__generic<T : __BuiltinIntegerType>
-T WaveMaskBitOr(WaveMask mask, T expr);
+T WaveMaskBitOr<T>(WaveMask mask, T expr);
 
-__generic<T : __BuiltinIntegerType>
-T WaveMaskBitXor(WaveMask mask, T expr);
+T WaveMaskBitXor<T>(WaveMask mask, T expr);
 
-__generic<T : __BuiltinArithmeticType>
-T WaveMaskMax(WaveMask mask, T expr);
+T WaveMaskMax<T>(WaveMask mask, T expr);
 
-__generic<T : __BuiltinArithmeticType>
-T WaveMaskMin(WaveMask mask, T expr);
+T WaveMaskMin<T>(WaveMask mask, T expr);
 
-__generic<T : __BuiltinArithmeticType>
-T WaveMaskProduct(WaveMask mask, T expr);
+T WaveMaskProduct<T>(WaveMask mask, T expr);
 
-__generic<T : __BuiltinArithmeticType>
-T WaveMaskSum(WaveMask mask, T expr);
+T WaveMaskSum<T>(WaveMask mask, T expr);
 
-__generic<T : __BuiltinType>
-bool WaveMaskAllEqual(WaveMask mask, T value);
+bool WaveMaskAllEqual<T>(WaveMask mask, T value);
 
 // Prefix
 
-__generic<T : __BuiltinArithmeticType>
-T WaveMaskPrefixProduct(WaveMask mask, T expr);
+T WaveMaskPrefixProduct<T>(WaveMask mask, T expr);
 
-__generic<T : __BuiltinArithmeticType>
-T WaveMaskPrefixSum(WaveMask mask, T expr);
+T WaveMaskPrefixSum<T>(WaveMask mask, T expr);
 
-__generic<T : __BuiltinArithmeticType>
-T WaveMaskPrefixBitAnd(WaveMask mask, T expr);
+T WaveMaskPrefixBitAnd<T>(WaveMask mask, T expr);
 
-__generic<T : __BuiltinArithmeticType>
-T WaveMaskPrefixBitOr(WaveMask mask, T expr);
+T WaveMaskPrefixBitOr<T>(WaveMask mask, T expr);
 
-__generic<T : __BuiltinArithmeticType>
-T WaveMaskPrefixBitXor(WaveMask mask, T expr);
+T WaveMaskPrefixBitXor<T>(WaveMask mask, T expr);
 
 uint WaveMaskPrefixCountBits(WaveMask mask, bool value);
 
 // Communication
 
-__generic<T : __BuiltinType>
-T WaveMaskReadLaneFirst(WaveMask mask, T expr);
+T WaveMaskReadLaneFirst<T>(WaveMask mask, T expr);
 
-__generic<T : __BuiltinType>
-T WaveMaskBroadcastLaneAt(WaveMask mask, T value, constexpr int lane);
+T WaveMaskBroadcastLaneAt<T>(WaveMask mask, T value, constexpr int lane);
 
-__generic<T : __BuiltinType>
-_ WaveMaskReadLaneAt(WaveMask mask, T value, int lane);
-_
-__generic<T : __BuiltinType>
-T WaveMaskShuffle(WaveMask mask, T value, int lane);
+T WaveMaskReadLaneAt<T>(WaveMask mask, T value, int lane);
 
+T WaveMaskShuffle<T>(WaveMask mask, T value, int lane);
 ```
 
  
