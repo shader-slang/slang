@@ -3105,6 +3105,7 @@ SlangResult innerMain(int argc, char** argv)
     auto vulkanTestCategory = categorySet.add("vulkan", fullTestCategory);
     auto unitTestCatagory = categorySet.add("unit-test", fullTestCategory);
     auto cudaTestCategory = categorySet.add("cuda", fullTestCategory);
+    auto optixTestCategory = categorySet.add("optix", cudaTestCategory);
 
     auto compatibilityIssueCategory = categorySet.add("compatibility-issue", fullTestCategory);
         
@@ -3204,6 +3205,12 @@ SlangResult innerMain(int argc, char** argv)
     if( options.includeCategories.Count() == 0 )
     {
         options.includeCategories.Add(fullTestCategory, fullTestCategory);
+    }
+
+    // Don't include OptiX tests unless the client has explicit opted into them.
+    if( !options.includeCategories.ContainsKey(optixTestCategory) )
+    {
+        options.excludeCategories.Add(optixTestCategory, optixTestCategory);
     }
 
     // Exclude rendering tests when building under AppVeyor.
