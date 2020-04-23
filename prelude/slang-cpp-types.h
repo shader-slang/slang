@@ -116,6 +116,29 @@ struct StructuredBuffer
     size_t count;
 };
 
+
+template <typename T>
+struct RWBuffer
+{
+    SLANG_FORCE_INLINE T& operator[](size_t index) const { SLANG_PRELUDE_ASSERT(index < count); return data[index]; }
+    const T& Load(size_t index) const { SLANG_PRELUDE_ASSERT(index < count); return data[index]; }
+    void GetDimensions(uint32_t& outCount) { outCount = uint32_t(count); }
+    
+    T* data;
+    size_t count;
+};
+
+template <typename T>
+struct Buffer
+{
+    SLANG_FORCE_INLINE const T& operator[](size_t index) const { SLANG_PRELUDE_ASSERT(index < count); return data[index]; }
+    const T& Load(size_t index) const { SLANG_PRELUDE_ASSERT(index < count); return data[index]; }
+    void GetDimensions(uint32_t& outCount) { outCount = uint32_t(count); }
+    
+    T* data;
+    size_t count;
+};
+
 // Missing  Load(_In_  int  Location, _Out_ uint Status);
 struct ByteAddressBuffer
 {
