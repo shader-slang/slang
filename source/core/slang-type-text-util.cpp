@@ -237,7 +237,7 @@ UnownedStringSlice TypeTextUtil::getCompileTargetName(SlangCompileTarget target)
 {
     const Index index = _getTargetInfoIndex(target);
     // Return the first name
-    return index >= 0 ? StringUtil::getAtInSplit(UnownedStringSlice(s_compileTargetInfos[int(target)].names), ',', 0) : UnownedStringSlice();
+    return index >= 0 ? StringUtil::getAtInSplit(UnownedStringSlice(s_compileTargetInfos[index].names), ',', 0) : UnownedStringSlice();
 }
 
 }
