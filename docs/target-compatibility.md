@@ -37,7 +37,8 @@ Items with ^ means there is some discussion about support later in the document 
 | Full bool                   |     Yes      |   Yes        |   Yes      |     No        |    Yes ^ 
 | Mesh Shader                 |     No       |   No +       |   No +     |     No        |    No
 | `[unroll]`                  |     Yes      |   Yes        |   Yes ^    |     Yes       |    Limited + 
-
+| Atomics                     |     Yes      |   Yes        |   Yes      |     Yes       |    No + 
+| Atomics on RWBuffer         |     Yes      |   Yes        |   Yes      |     No        |    No + 
 
 ## Half Type
 
@@ -161,3 +162,10 @@ On GLSL and VK targets loop unrolling uses the [GL_EXT_control_flow_attributes](
 
 Slang does have a cross target mechanism to [unroll loops](language-reference/06-statements.md), in the section `Compile-Time For Statement`.
 
+## Atomics on RWBuffer
+
+For VK the GLSL output from Slang seems plausible, but VK binding fails in tests harness.
+
+On CUDA RWBuffer becomes CUsurfObject, which is a 'texture' type and does not support atomics. 
+
+On the CPU atomics are not supported, but will be in the future.
