@@ -21,15 +21,15 @@ uint test(uint val)
 
     uint originalSum = 0;
 
-	InterlockedAdd(shared[val], 		val, 		originalValue);
+    InterlockedAdd(shared[val],         val,         originalValue);
     originalSum += originalValue;
     
-	InterlockedAdd(shared[val ^ 1], 	val*16, 	originalValue);
+    InterlockedAdd(shared[val ^ 1],     val*16,     originalValue);
     originalSum += originalValue;
     
-	InterlockedAdd(shared[val ^ 2], 	val*16*16, 	originalValue);
+    InterlockedAdd(shared[val ^ 2],     val*16*16,     originalValue);
     originalSum += originalValue;
-	
+    
     GroupMemoryBarrierWithGroupSync();
 
     return shared[val] ^ originalSum;
