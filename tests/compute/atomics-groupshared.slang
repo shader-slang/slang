@@ -2,6 +2,7 @@
 
 //TEST(compute):COMPARE_COMPUTE_EX:-slang -compute
 //TEST(compute):COMPARE_COMPUTE_EX:-slang -compute -dx12
+//TEST(compute):COMPARE_COMPUTE_EX:-slang -compute -vk
 //TEST(compute):COMPARE_COMPUTE_EX:-slang -compute -cuda
 
 //TEST_INPUT:ubuffer(data=[0 0 0 0], stride=4):out,name outputBuffer
@@ -18,13 +19,20 @@ uint test(uint val)
 
     GroupMemoryBarrierWithGroupSync();
 
+    uint originalSum = 0;
+
 	InterlockedAdd(shared[val], 		val, 		originalValue);
+    originalSum += originalValue;
+    
 	InterlockedAdd(shared[val ^ 1], 	val*16, 	originalValue);
+    originalSum += originalValue;
+    
 	InterlockedAdd(shared[val ^ 2], 	val*16*16, 	originalValue);
+    originalSum += originalValue;
 	
     GroupMemoryBarrierWithGroupSync();
 
-    return shared[val];
+    return shared[val] ^ originalSum;
 }
 
 [numthreads(4, 1, 1)]
