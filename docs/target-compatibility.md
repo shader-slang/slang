@@ -166,4 +166,6 @@ Slang does have a cross target mechanism to [unroll loops](language-reference/06
 
 For VK the GLSL output from Slang seems plausible, but VK binding fails in tests harness.
 
-On CUDA RWBuffer becomes CUsurfObject, which is a 'texture' type, and does not support atomics. 
+On CUDA RWBuffer becomes CUsurfObject, which is a 'texture' type and does not support atomics. 
+
+On the CPU atomics are not supported, but will be in the future.
