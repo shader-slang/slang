@@ -435,27 +435,86 @@ bool HLSLSourceEmitter::tryEmitInstExprImpl(IRInst* inst, const EmitOpInfo& inOu
         }
         case kIROp_BitCast:
         {
+            // For simplicity, we will handle all bit-cast operations
+            // by first casting the "from" type to an intermediate
+            // integer type to hold the bits, and then convert *the*
+            // type over to the desired "to" type.
+            //
+            // A fundamental invariant that must be guaranteed
+            // by earlier steps is that a bit-cast instruction
+            // is only generated when the "from" and "to" types
+            // have the same size, and (in the case where they
+            // are vectors) number of elements.
+            //
+            // In textual order, the conversion to the "to" type
+            // comes first.
+            //
             auto toType = extractBaseType(inst->getDataType());
             switch (toType)
             {
                 default:
                     diagnoseUnhandledInst(inst);
                     break;
-                case BaseType::UInt:
-                    break;
+
+                case BaseType::Int8:
+                case BaseType::Int16:
                 case BaseType::Int:
+                case BaseType::Int64:
+                case BaseType::UInt8:
+                case BaseType::UInt16:
+                case BaseType::UInt:
+                case BaseType::UInt64:
+                    // Because the intermediate type will always
+                    // be an integer type, we can convert to
+                    // another integer type of the same size
+                    // via a cast.
                     m_writer->emit("(");
                     emitType(inst->getDataType());
                     m_writer->emit(")");
                     break;
+
                 case BaseType::Float:
+                    // Note: at present HLSL only supports
+                    // reinterpreting integer bits as a `float`.
+                    //
+                    // There is no current function (it seems)
+                    // for bit-casting an `int16_t` to a `half`.
+                    //
+                    // TODO: There is an `asdouble` function
+                    // for converting two 32-bit integer values into
+                    // one `double`. We could use that for
+                    // bit casts of 64-bit values with a bit of
+                    // extra work, but doing so might be best
+                    // handled in an IR pass that legalizes
+                    // bit-casts.
+                    //
                     m_writer->emit("asfloat");
                     break;
             }
-
             m_writer->emit("(");
+            int closeCount = 1;
+
+            auto fromType = extractBaseType(inst->getOperand(0)->getDataType());
+            switch( fromType )
+            {
+                default:
+                    diagnoseUnhandledInst(inst);
+                    break;
+
+                case BaseType::UInt:
+                case BaseType::Int:
+                    break;
+
+                case BaseType::Float:
+                    m_writer->emit("asuint(");
+                    closeCount++;
+                    break;
+            }
+
             emitOperand(inst->getOperand(0), getInfo(EmitOp::General));
-            m_writer->emit(")");
+
+            while(closeCount--)
+                m_writer->emit(")");
             return true;
         }
         case kIROp_StringLit:
@@ -474,6 +533,113 @@ bool HLSLSourceEmitter::tryEmitInstExprImpl(IRInst* inst, const EmitOpInfo& inOu
             emitOperand(inst->getOperand(0), outerPrec);
             return true;
         }
+        case kIROp_ByteAddressBufferLoad:
+        {
+            // HLSL byte-address buffers have two kinds of `Load` operations.
+            //
+            // First we have the `Load`, `Load2`, `Load3`, and `Load4` operations,
+            // which are *not* generic/templated, and always return a scalar
+            // or vector of `uint`. These are available on all profiles that
+            // support byte-address buffers.
+            //
+            // Second we have the `Load<T>` generic, which itself comes in
+            // two flavors. The basic version can only handle the case where `T`
+            // is a scalar or vector, but can handle more types than the
+            // non-generic operations. The more complex version can handle
+            // aggregate tyeps as well, but we don't need to worry about
+            // that because we will have legalized such operations out
+            // already.
+            //
+            // Our task here is thus to pick between `Load`/`Load2`/`Load3`/`Load4`
+            // or `Load<T>`, always preferring the functions that are more
+            // universally available.
+            //
+            // We will thus inspect the type that is being loaded,
+            // and determine if it is a scalar or vector, and then
+            // if the elemnet type of that scalar/vector is `uint`.
+            //
+            auto elementType = inst->getDataType();
+            IRIntegerValue elementCount = 1;
+            if( auto vecType = as<IRVectorType>(elementType) )
+            {
+                if( auto elementCountInst = as<IRIntLit>(vecType->getElementCount()) )
+                {
+                    elementType = vecType->getElementType();
+                    elementCount = elementCountInst->getValue();
+                }
+            }
+
+            if( elementType->op == kIROp_UIntType )
+            {
+                // If we are in the case that can use `Load`/`Load2`/`Load3`/`Load4`,
+                // then we will always prefer to use it.
+                //
+                auto outerPrec = inOuterPrec;
+                auto prec = getInfo(EmitOp::Postfix);
+                bool needClose = maybeEmitParens(outerPrec, prec);
+
+                emitOperand(inst->getOperand(0), leftSide(outerPrec, prec));
+                m_writer->emit(".Load");
+                if( elementCount != 1 )
+                {
+                    m_writer->emit(elementCount);
+                }
+                m_writer->emit("(");
+                emitOperand(inst->getOperand(1), getInfo(EmitOp::General));
+                m_writer->emit(")");
+
+                maybeCloseParens(needClose);
+                return true;
+            }
+
+            // Otherwise we fall back to the base case, which
+            // is already handled by the base `CLikeSourceEmitter`
+            return false;
+        }
+        case kIROp_ByteAddressBufferStore:
+        {
+            // Similar to the case for a load, we want to specialize
+            // the generated code for the case where we store a `uint`
+            // or a vector of `uint`.
+            //
+            auto elementType = inst->getDataType();
+            IRIntegerValue elementCount = 1;
+            if( auto vecType = as<IRVectorType>(elementType) )
+            {
+                if( auto elementCountInst = as<IRIntLit>(vecType->getElementCount()) )
+                {
+                    elementType = vecType->getElementType();
+                    elementCount = elementCountInst->getValue();
+                }
+            }
+            if( elementType->op == kIROp_UIntType )
+            {
+                auto outerPrec = inOuterPrec;
+                auto prec = getInfo(EmitOp::Postfix);
+                bool needClose = maybeEmitParens(outerPrec, prec);
+
+                emitOperand(inst->getOperand(0), leftSide(outerPrec, prec));
+                m_writer->emit(".Store");
+                if( elementCount != 1 )
+                {
+                    m_writer->emit(elementCount);
+                }
+                m_writer->emit("(");
+                emitOperand(inst->getOperand(1), getInfo(EmitOp::General));
+                m_writer->emit(", ");
+                emitOperand(inst->getOperand(2), getInfo(EmitOp::General));
+                m_writer->emit(")");
+
+                maybeCloseParens(needClose);
+                return true;
+            }
+
+            // Otherwise we fall back to the base case, which
+            // is already handled by the base `CLikeSourceEmitter`
+            return false;
+        }
+        break;
+
         default: break;
     }
     // Not handled

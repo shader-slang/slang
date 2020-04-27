@@ -166,6 +166,12 @@ struct ByteAddressBuffer
         const size_t dataIdx = index >> 2; 
         return uint4{data[dataIdx], data[dataIdx + 1], data[dataIdx + 2], data[dataIdx + 3]}; 
     }
+    template<typename T>
+    T Load(size_t offset) const
+    {
+        SLANG_PRELUDE_ASSERT(offset + sizeof(T) <= sizeInBytes && (offset & (alignof(T)-1)) == 0); 
+        return *(T const*)((char*)data + offset);
+    }
     
     const uint32_t* data;
     size_t sizeInBytes;  //< Must be multiple of 4
@@ -201,7 +207,13 @@ struct RWByteAddressBuffer
         const size_t dataIdx = index >> 2; 
         return uint4{data[dataIdx], data[dataIdx + 1], data[dataIdx + 2], data[dataIdx + 3]}; 
     }
-    
+    template<typename T>
+    T Load(size_t offset) const
+    {
+        SLANG_PRELUDE_ASSERT(offset + sizeof(T) <= sizeInBytes && (offset & (alignof(T)-1)) == 0); 
+        return *(T const*)((char*)data + offset);
+    }
+
     void Store(size_t index, uint32_t v) const 
     { 
         SLANG_PRELUDE_ASSERT(index + 4 <= sizeInBytes && (index & 3) == 0); 
@@ -231,7 +243,13 @@ struct RWByteAddressBuffer
         data[dataIdx + 2] = v.z;
         data[dataIdx + 3] = v.w;
     }
-    
+    template<typename T>
+    void Store(size_t offset, T const& value) const
+    {
+        SLANG_PRELUDE_ASSERT(offset + sizeof(T) <= sizeInBytes && (offset & (alignof(T)-1)) == 0); 
+        *(T*)((char*)data + offset) = value;
+    }
+
     uint32_t* data;
     size_t sizeInBytes; //< Must be multiple of 4 
 };

@@ -5,6 +5,7 @@
 #include "../core/slang-type-text-util.h"
 
 #include "slang-ir-bind-existentials.h"
+#include "slang-ir-byte-address-legalize.h"
 #include "slang-ir-dce.h"
 #include "slang-ir-entry-point-uniforms.h"
 #include "slang-ir-glsl-legalize.h"
@@ -409,6 +410,94 @@ Result linkAndOptimizeIR(
 
     default:
         break;
+    }
+
+    // For all targets, we translate load/store operations
+    // of aggregate types from/to byte-address buffers into
+    // stores of individual scalar or vector values.
+    //
+    {
+        ByteAddressBufferLegalizationOptions byteAddressBufferOptions;
+
+        // Depending on the target, we may decide to do
+        // more aggressive translation that reduces the
+        // load/store operations down to invididual scalars
+        // (splitting up vector ops).
+        //
+        switch( target )
+        {
+        default:
+            break;
+
+        case CodeGenTarget::GLSL:
+            // For GLSL targets, we want to translate the vector load/store
+            // operations into scalar ops. This is in part as a simplification,
+            // but it also ensures that our generated code respects the lax
+            // alignment rules for D3D byte-address buffers (the base address
+            // of a buffer need not be more than 4-byte aligned, and loads
+            // of vectors need only be aligned based on their element type).
+            //
+            // TODO: We should consider having an extended variant of `Load<T>`
+            // on byte-address buffers which expresses a programmer's knowledge
+            // that the load will have greater alignment than required by D3D.
+            // That could either come as an explicit guaranteed-alignment
+            // operand, or instead as something like a `Load4Aligned<T>` operation
+            // that returns a `vector<4,T>` and assumes `4*sizeof(T)` alignemtn.
+            //
+            byteAddressBufferOptions.scalarizeVectorLoadStore = true;
+
+            // For GLSL targets, there really isn't a low-level concept
+            // of a byte-address buffer at all, and the standard "shader storage
+            // buffer" (SSBO) feature is a lot closer to an HLSL structured
+            // buffer for our purposes.
+            //
+            // In particular, each SSBO can only have a single element type,
+            // so that even with bitcasts we can't have a single buffer declaration
+            // (e.g., one with `uint` elements) service all load/store operations
+            // (e.g., a `half` value can't be stored atomically if there are
+            // `uint` elements, unless we use explicit atomics).
+            //
+            // In order to simplify things, we will translate byte-address buffer
+            // ops to equivalent structured-buffer ops for GLSL targets, where
+            // each unique type being loaded/stored yields a different global
+            // parameter declaration of the buffer.
+            //
+            byteAddressBufferOptions.translateToStructuredBufferOps = true;
+            break;
+        }
+
+        // We also need to decide whether to translate
+        // any "leaf" load/store operations over to
+        // use only unsigned-integer types and then
+        // bit-cast, or if we prefer to leave them
+        // as load/store of the original type.
+        //
+        switch( target )
+        {
+        case CodeGenTarget::HLSL:
+            {
+                auto profile = targetRequest->targetProfile;
+                if( profile.getFamily() == ProfileFamily::DX )
+                {
+                    if(profile.GetVersion() <= ProfileVersion::DX_5_0)
+                    {
+                        // Fxc and earlier dxc versions do not support
+                        // a templates `.Load<T>` operation on byte-address
+                        // buffers, and instead need us to emit separate
+                        // `uint` loads and then bit-cast over to
+                        // the correct type.
+                        //
+                        byteAddressBufferOptions.useBitCastFromUInt = true;
+                    }
+                }
+            }
+            break;
+
+        default:
+            break;
+        }
+
+        legalizeByteAddressBufferOps(session, irModule, byteAddressBufferOptions);
     }
 
     // For GLSL only, we will need to perform "legalization" of

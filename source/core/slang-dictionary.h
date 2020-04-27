@@ -56,8 +56,14 @@ namespace Slang
 		}
 		int GetHashCode()
 		{
-			return GetHashCode(Key);
+            return combineHash(
+                Slang::GetHashCode(Key),
+                Slang::GetHashCode(Value));
 		}
+        bool operator==(const KeyValuePair<TKey, TValue>& that) const
+        {
+            return (Key == that.Key) && (Value == that.Value);
+        }
 	};
 
 	template<typename TKey, typename TValue>

@@ -209,6 +209,7 @@
     <ClInclude Include="slang-hlsl-intrinsic-set.h" />
     <ClInclude Include="slang-image-format-defs.h" />
     <ClInclude Include="slang-ir-bind-existentials.h" />
+    <ClInclude Include="slang-ir-byte-address-legalize.h" />
     <ClInclude Include="slang-ir-clone.h" />
     <ClInclude Include="slang-ir-constexpr.h" />
     <ClInclude Include="slang-ir-dce.h" />
@@ -218,6 +219,7 @@
     <ClInclude Include="slang-ir-inline.h" />
     <ClInclude Include="slang-ir-inst-defs.h" />
     <ClInclude Include="slang-ir-insts.h" />
+    <ClInclude Include="slang-ir-layout.h" />
     <ClInclude Include="slang-ir-link.h" />
     <ClInclude Include="slang-ir-missing-return.h" />
     <ClInclude Include="slang-ir-restructure-scoping.h" />
@@ -295,6 +297,7 @@
     <ClCompile Include="slang-glsl-extension-tracker.cpp" />
     <ClCompile Include="slang-hlsl-intrinsic-set.cpp" />
     <ClCompile Include="slang-ir-bind-existentials.cpp" />
+    <ClCompile Include="slang-ir-byte-address-legalize.cpp" />
     <ClCompile Include="slang-ir-clone.cpp" />
     <ClCompile Include="slang-ir-constexpr.cpp" />
     <ClCompile Include="slang-ir-dce.cpp" />
@@ -302,6 +305,7 @@
     <ClCompile Include="slang-ir-entry-point-uniforms.cpp" />
     <ClCompile Include="slang-ir-glsl-legalize.cpp" />
     <ClCompile Include="slang-ir-inline.cpp" />
+    <ClCompile Include="slang-ir-layout.cpp" />
     <ClCompile Include="slang-ir-legalize-types.cpp" />
     <ClCompile Include="slang-ir-link.cpp" />
     <ClCompile Include="slang-ir-missing-return.cpp" />

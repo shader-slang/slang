@@ -359,6 +359,27 @@ struct IRFormatDecoration : IRDecoration
 
 IR_SIMPLE_DECORATION(UnsafeForceInlineEarlyDecoration)
 
+struct IRNaturalSizeAndAlignmentDecoration : IRDecoration
+{
+    enum { kOp = kIROp_NaturalSizeAndAlignmentDecoration };
+    IR_LEAF_ISA(NaturalSizeAndAlignmentDecoration)
+
+    IRIntLit* getSizeOperand() { return cast<IRIntLit>(getOperand(0)); }
+    IRIntLit* getAlignmentOperand() { return cast<IRIntLit>(getOperand(1)); }
+
+    IRIntegerValue getSize() { return getSizeOperand()->getValue(); }
+    IRIntegerValue getAlignment() { return getAlignmentOperand()->getValue(); }
+};
+
+struct IRNaturalOffsetDecoration : IRDecoration
+{
+    enum { kOp = kIROp_NaturalOffsetDecoration };
+    IR_LEAF_ISA(NaturalOffsetDecoration)
+
+    IRIntLit* getOffsetOperand() { return cast<IRIntLit>(getOperand(0)); }
+
+    IRIntegerValue getOffset() { return getOffsetOperand()->getValue(); }
+};
 
 // An instruction that specializes another IR value
 // (representing a generic) to a particular set of generic arguments 

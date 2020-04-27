@@ -233,6 +233,50 @@ INST(getElementPtr, getElementPtr, 2, 0)
 // "Subscript" an image at a pixel coordinate to get pointer
 INST(ImageSubscript, imageSubscript, 2, 0)
 
+// Load (almost) arbitrary-type data from a byte-address buffer
+//
+// %dst = byteAddressBufferLoad(%buffer, %offset)
+//
+// where
+// - `buffer` is a value of some `ByteAddressBufferTypeBase` type
+// - `offset` is an `int`
+// - `dst` is a value of some type containing only ordinary data
+//
+INST(ByteAddressBufferLoad, byteAddressBufferLoad, 2, 0)
+
+// Store (almost) arbitrary-type data to a byte-address buffer
+//
+// byteAddressBufferLoad(%buffer, %offset, %src)
+//
+// where
+// - `buffer` is a value of some `ByteAddressBufferTypeBase` type
+// - `offset` is an `int`
+// - `src` is a value of some type containing only ordinary data
+//
+INST(ByteAddressBufferStore, byteAddressBufferStore, 3, 0)
+
+// Load data from a structured buffer
+//
+// %dst = structuredBufferLoad(%buffer, %index)
+//
+// where
+// - `buffer` is a value of some `StructuredBufferTypeBase` type with element type T
+// - `offset` is an `int`
+// - `dst` is a value of type T
+//
+INST(StructuredBufferLoad, structuredBufferLoad, 2, 0)
+
+// Store data to a structured buffer
+//
+// structuredBufferLoad(%buffer, %offset, %src)
+//
+// where
+// - `buffer` is a value of some `StructuredBufferTypeBase` type with element type T
+// - `offset` is an `int`
+// - `src` is a value of type T
+//
+INST(StructuredBufferStore, structuredBufferStore, 3, 0)
+
 // Construct a vector from a scalar
 //
 // %dst = constructVectorFromScalar %T %N %val
@@ -452,6 +496,12 @@ INST(HighLevelDeclDecoration,               highLevelDecl,          1, 0)
 
         /// An `[unsafeForceInlineEarly]` decoration specifies that calls to this function should be inline after initial codegen
     INST(UnsafeForceInlineEarlyDecoration, unsafeForceInlineEarly, 0, 0)
+
+        /// A `[naturalSizeAndAlignment(s,a)]` decoration is attached to a type to indicate that is has natural size `s` and alignment `a`
+    INST(NaturalSizeAndAlignmentDecoration, naturalSizeAndAlignment, 2, 0)
+
+        /// A `[naturalOffset(o)]` decoration is attached to a field to indicate that it has natural offset `o` in the parent type
+    INST(NaturalOffsetDecoration, naturalOffset, 1, 0)
 
     /* LinkageDecoration */
         INST(ImportDecoration, import, 1, 0)

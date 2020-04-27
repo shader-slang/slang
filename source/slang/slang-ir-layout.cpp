@@ -1,0 +1,239 @@
+// slang-ir-layout.cpp
+#include "slang-ir-layout.h"
+
+#include "slang-ir-insts.h"
+
+// This file implements facilities for computing and caching layout
+// information on IR types.
+//
+// Unlike the AST-level layout system, this code currently only
+// handles the notion of "natural" layout for IR types, which is
+// the layout they use when stored in general-purpose memory
+// without additional constraints.
+//
+// In general, "natural" layout for all targets is assumed to follow
+// the same basic rules:
+//
+// * Scalars are all naturally aligned and have the "obvious" size
+//
+// * Arrays are laid out by separating elements by their "stride" (size rounded up to alignment)
+//
+// * Vectors are laid out as arrays of elements
+//
+// * Matrices are laid out as arrays of rows
+//
+// * Structures are laid out by packing fields in order, placing each field on the "next"
+//   suitably aligned offset. The alignment of a structure is the maximum alignment of
+//   its fields.
+//
+// Right now this file implements a one-size-fits-all version of natural
+// layout that might not be a perfect fit for all targets. In particular
+// this code currently assumes:
+//
+// * The `bool` type is laid out as 4 bytes (equivalent to an `int`)
+//
+// * The size of a structure or array type is *not* rounded up to a multiple
+//   of its alignment. This means that fields may be laid out in
+//   the "tail padding" of previous fields in the same structure. This is
+//   correct behavior for VK/D3D, but does not match the behavior of typical
+//   C/C++ compilers.
+//
+// * All matrices are laid out in row-major order, regardless of any
+//   settings in user code.
+//
+// TODO: Addressing the above issues would require extending this file to somehow
+// get target-specific layout information as an input. One option would be
+// to attach information about "natural" layout on the target to the `IRModuleInst`
+// as a decoration, similar to how an LLVM IR module stores a "layout string."
+
+namespace Slang
+{
+
+static Result _calcNaturalSizeAndAlignment(IRType* type, IRSizeAndAlignment* outSizeAndAlignment)
+{
+    switch( type->op )
+    {
+
+#define CASE(TYPE, SIZE, ALIGNMENT)                                 \
+    case kIROp_##TYPE##Type:                                        \
+        *outSizeAndAlignment = IRSizeAndAlignment(SIZE, ALIGNMENT); \
+        return SLANG_OK                                             \
+        /* end */
+
+    // Most base types are "naturally aligned" (meaning alignment and size are the same)
+#define BASE(TYPE, SIZE) CASE(TYPE, SIZE, SIZE)
+
+    BASE(Int8,      1);
+    BASE(UInt8,     1);
+
+    BASE(Int16,     2);
+    BASE(UInt16,    2);
+    BASE(Half,      2);
+
+    BASE(Int,       4);
+    BASE(UInt,      4);
+    BASE(Float,     4);
+
+    BASE(Int64,     8);
+    BASE(UInt64,    8);
+    BASE(Double,    8);
+
+    // We are currently handling `bool` following the HLSL
+    // precednet of storing it in 4 bytes.
+    //
+    // TODO: It would be good to try to make this follow
+    // per-platform conventions, or at least to be able
+    // to use a 1-byte encoding where available.
+    //
+    BASE(Bool,      4);
+
+    // The Slang `void` type is treated as a zero-byte
+    // type, so that it does not influence layout at all.
+    //
+    CASE(Void,      0,  1);
+
+#undef CASE
+
+#undef CASE
+
+    case kIROp_StructType:
+        {
+            auto structType = cast<IRStructType>(type);
+            IRSizeAndAlignment structLayout;
+            for( auto field : structType->getFields() )
+            {
+                IRSizeAndAlignment fieldTypeLayout;
+                SLANG_RETURN_ON_FAIL(getNaturalSizeAndAlignment(field->getFieldType(), &fieldTypeLayout));
+
+                structLayout.size = align(structLayout.size, fieldTypeLayout.alignment);
+                structLayout.alignment = std::max(structLayout.alignment, fieldTypeLayout.alignment);
+
+                IRIntegerValue fieldOffset = structLayout.size;
+                if( auto module = type->getModule() )
+                {
+                    // If we are in a situation where attaching new
+                    // decorations is possible, then we want to
+                    // cache the field offset on the IR field
+                    // instruction.
+                    //
+                    SharedIRBuilder sharedBuilder;
+                    sharedBuilder.module = module;
+                    sharedBuilder.session = module->getSession();
+
+                    IRBuilder builder;
+                    builder.sharedBuilder = &sharedBuilder;
+
+                    auto intType = builder.getIntType();
+                    builder.addDecoration(
+                        field,
+                        kIROp_NaturalOffsetDecoration,
+                        builder.getIntValue(intType, fieldOffset));
+                }
+
+                structLayout.size += fieldTypeLayout.size;
+            }
+            *outSizeAndAlignment = structLayout;
+            return SLANG_OK;
+        }
+        break;
+
+    case kIROp_ArrayType:
+        {
+            auto arrayType = cast<IRArrayType>(type);
+
+            auto elementCountLit = as<IRIntLit>(arrayType->getElementCount());
+            if(!elementCountLit)
+                return SLANG_FAIL;
+            auto elementCount = elementCountLit->getValue();
+
+            if( elementCount == 0 )
+            {
+                *outSizeAndAlignment = IRSizeAndAlignment(0, 1);
+                return SLANG_OK;
+            }
+
+            auto elementType = arrayType->getElementType();
+            IRSizeAndAlignment elementTypeLayout;
+            SLANG_RETURN_ON_FAIL(getNaturalSizeAndAlignment(elementType, &elementTypeLayout));
+
+            auto elementStride = elementTypeLayout.getStride();
+
+            *outSizeAndAlignment = IRSizeAndAlignment(
+                elementStride * (elementCount - 1) + elementTypeLayout.size,
+                elementTypeLayout.alignment);
+            return SLANG_OK;
+        }
+        break;
+
+    default:
+        return SLANG_FAIL;
+    }
+}
+
+Result getNaturalSizeAndAlignment(IRType* type, IRSizeAndAlignment* outSizeAndAlignment)
+{
+    if( auto decor = type->findDecoration<IRNaturalSizeAndAlignmentDecoration>() )
+    {
+        *outSizeAndAlignment = IRSizeAndAlignment(decor->getSize(), (int)decor->getAlignment());
+        return SLANG_OK;
+    }
+
+    IRSizeAndAlignment sizeAndAlignment;
+    SLANG_RETURN_ON_FAIL(_calcNaturalSizeAndAlignment(type, &sizeAndAlignment));
+
+    if( auto module = type->getModule() )
+    {
+        SharedIRBuilder sharedBuilder;
+        sharedBuilder.module = module;
+        sharedBuilder.session = module->getSession();
+
+        IRBuilder builder;
+        builder.sharedBuilder = &sharedBuilder;
+
+        auto intType = builder.getIntType();
+        builder.addDecoration(
+            type,
+            kIROp_NaturalSizeAndAlignmentDecoration,
+            builder.getIntValue(intType, sizeAndAlignment.size),
+            builder.getIntValue(intType, sizeAndAlignment.alignment));
+    }
+
+    *outSizeAndAlignment = sizeAndAlignment;
+    return SLANG_OK;
+}
+
+
+Result getNaturalOffset(IRStructField* field, IRIntegerValue* outOffset)
+{
+    if( auto decor = field->findDecoration<IRNaturalOffsetDecoration>() )
+    {
+        *outOffset = decor->getOffset();
+        return SLANG_OK;
+    }
+
+    // Offsets are computed as part of layout out types,
+    // so we expect that layout of the "parent" type
+    // of the field should add an offset to it if
+    // possible.
+
+    auto structType = as<IRStructType>(field->getParent());
+    if(!structType)
+        return SLANG_FAIL;
+
+    IRSizeAndAlignment structTypeLayout;
+    SLANG_RETURN_ON_FAIL(getNaturalSizeAndAlignment(structType, &structTypeLayout));
+
+    if( auto decor = field->findDecoration<IRNaturalOffsetDecoration>() )
+    {
+        *outOffset = decor->getOffset();
+        return SLANG_OK;
+    }
+
+    // If attempting to lay out the parent type didn't
+    // cause the field to get an offset, then we are
+    // in an unexpected case with no easy answer.
+    //
+    return SLANG_FAIL;
+}
+
+}
