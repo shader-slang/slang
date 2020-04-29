@@ -37,6 +37,12 @@ public:
         AnonymousNamespace,
     };
 
+    struct Field
+    {
+        UnownedStringSlice type;
+        Token name;
+    };
+
     void addChild(Node* child)
     {
         SLANG_ASSERT(child->m_parent == nullptr);
@@ -60,6 +66,11 @@ public:
         return (nodePtr) ? *nodePtr : nullptr;
     }
 
+    bool acceptsFields() const
+    {
+        return m_braceStack.getCount() == 0 && (m_type == Type::StructType || m_type == Type::ClassType);
+    }
+
     void dump(int indent, StringBuilder& out);
     
     Node(Type type, Node* parent = nullptr):
@@ -77,6 +88,8 @@ public:
     List<RefPtr<Node>> m_children;
 
     Dictionary<UnownedStringSlice, Node*> m_childMap;
+
+    List<Field> m_fields;
 
     Node* m_anonymousNamespace;
 
@@ -152,6 +165,12 @@ void Node::dump(int indentCount, StringBuilder& out)
         child->dump(indentCount + 1, out);
     }
 
+    for (const Field& field : m_fields)
+    {
+        _indent(indentCount + 1, out);
+        out << field.type << " " << field.name.Content << "\n";
+    }
+
     _indent(indentCount, out);
     out << "}\n";
 }
@@ -177,10 +196,17 @@ public:
 
     static Node::Type _textToNodeType(const UnownedStringSlice& in);
     SlangResult _maybeParseNode(Node::Type type);
+    SlangResult _maybeParseField();
+
+    SlangResult _maybeParseType(UnownedStringSlice& outType);
+    SlangResult _maybeParseTemplateArgs();
+    SlangResult _maybeParseTemplateArg();
+
     static bool _isVisibilityKeyword(const UnownedStringSlice& slice)
     {
         return slice == UnownedStringSlice::fromLiteral("public") || slice == UnownedStringSlice::fromLiteral("protected") || slice == UnownedStringSlice::fromLiteral("private");
     }
+    SlangResult _consumeToSync();
 
     TokenList m_tokenList;
     TokenReader m_reader;
@@ -480,6 +506,222 @@ SlangResult CPPExtractor::_maybeParseNode(Node::Type type)
     return pushNode(node);
 }
 
+static const UnownedStringSlice kConst = UnownedStringSlice::fromLiteral("const");
+
+SlangResult CPPExtractor::_consumeToSync()
+{
+    while (true)
+    {
+        TokenType type = m_reader.peekTokenType();
+
+        switch (type)
+        {
+            case TokenType::Semicolon:
+            {
+                m_reader.advanceToken();
+                return SLANG_OK;
+            }
+            case TokenType::Pound:
+            case TokenType::EndOfFile:
+            case TokenType::LBrace:
+            case TokenType::RBrace:
+            {
+                return SLANG_OK;
+            }
+        }
+
+        m_reader.advanceToken();
+    }
+}
+
+SlangResult CPPExtractor::_maybeParseTemplateArg()
+{
+    switch (m_reader.peekTokenType())
+    {
+        case TokenType::Identifier:
+        {
+            UnownedStringSlice name;
+            SLANG_RETURN_ON_FAIL(_maybeParseType(name));
+            return SLANG_OK;
+        }
+        case TokenType::IntegerLiteral:
+        {
+            m_reader.advanceToken();
+            return SLANG_OK;
+        }
+        default: break;
+    }
+    return SLANG_FAIL;
+}
+
+SlangResult CPPExtractor::_maybeParseTemplateArgs()
+{
+    if (!advanceIfToken(TokenType::OpLess))
+    {
+        return SLANG_FAIL;
+    }
+
+    while (true)
+    {
+        switch (m_reader.peekTokenType())
+        {
+            case TokenType::OpGreater:
+            {
+                m_reader.advanceToken();
+                return SLANG_OK;
+            }
+            default:
+            {
+                while (true)
+                {
+                    UnownedStringSlice typeName;
+                    SLANG_RETURN_ON_FAIL(_maybeParseTemplateArg());
+
+                    if (m_reader.peekTokenType() == TokenType::Comma)
+                    {
+                        m_reader.advanceToken();
+                        // If there is a comma parse another arg
+                        continue;
+                    }
+                }
+                break;
+            }
+        }
+    }
+}
+
+static bool _isNotTypeKeyword(const UnownedStringSlice& name)
+{
+    if (name == "virtual")
+    {
+        return true;
+    }
+    return false;
+}
+
+
+SlangResult CPPExtractor::_maybeParseType(UnownedStringSlice& outType)
+{
+    Token startToken = m_reader.peekToken();
+
+    if (m_reader.peekTokenType() == TokenType::Identifier)
+    {
+        if (_isNotTypeKeyword(m_reader.peekToken().Content))
+        {
+            return SLANG_FAIL;
+        }
+        if (m_reader.peekToken().Content == kConst)
+        {
+            m_reader.advanceToken();
+        }
+    }
+
+    if (m_reader.peekTokenType() == TokenType::Scope)
+    {
+        m_reader.advanceToken();
+    }
+
+    while (true)
+    {
+        // Strip all the consts
+        while (m_reader.peekTokenType() == TokenType::Identifier && m_reader.peekToken().Content == kConst)
+        {
+            m_reader.advanceToken();
+        }
+
+        if (m_reader.peekTokenType() != TokenType::Identifier)
+        {
+            return SLANG_FAIL;
+        }
+
+        m_reader.advanceToken();
+        if (m_reader.peekTokenType() == TokenType::Scope)
+        {
+            m_reader.advanceToken();
+            continue;
+        }
+        break;
+    }
+
+    if (m_reader.peekTokenType() == TokenType::OpLess)
+    {
+        SLANG_RETURN_ON_FAIL(_maybeParseTemplateArgs());
+    }
+
+    // Strip all the consts
+    while (m_reader.peekTokenType() == TokenType::Identifier && m_reader.peekToken().Content == kConst)
+    {
+        m_reader.advanceToken();
+    }
+
+    // It's a reference and we are done
+    if (m_reader.peekTokenType() == TokenType::OpBitAnd)
+    {
+        m_reader.advanceToken();
+        return SLANG_OK;
+    }
+
+    while (true)
+    {
+        if (m_reader.peekTokenType() == TokenType::OpMul)
+        {
+            m_reader.advanceToken();
+            // Strip all the consts
+            while (m_reader.peekTokenType() == TokenType::Identifier && m_reader.peekToken().Content == kConst)
+            {
+                m_reader.advanceToken();
+            }
+            continue;
+        }
+        break;
+    }
+
+    // This is a bit of a hack -> I don't store the previous token, and Lexer doesn't have an easy interface
+    // So I just pull out the content to the begining of the peek token (which might have trailing whitespace (or even comments)
+    outType = UnownedStringSlice(startToken.Content.begin(), m_reader.peekToken().Content.begin());
+
+    return SLANG_OK;
+}
+
+SlangResult CPPExtractor::_maybeParseField()
+{
+    Node::Field field;
+
+    UnownedStringSlice typeName;
+    if (SLANG_FAILED(_maybeParseType(typeName)))
+    {
+        _consumeToSync();
+        return SLANG_OK;
+    }
+
+    if (m_reader.peekTokenType() != TokenType::Identifier)
+    {
+        _consumeToSync();
+        return SLANG_OK;
+    }
+
+    Token fieldName = m_reader.advanceToken();
+
+    switch (m_reader.peekTokenType())
+    {
+        case TokenType::OpAssign:
+        case TokenType::Semicolon:
+        {
+            Node::Field field;
+            field.type = typeName;
+            field.name = fieldName;
+
+            m_currentNode->m_fields.add(field);
+
+            break;
+        }
+        default: break;
+    }
+
+    _consumeToSync();
+    return SLANG_OK;
+}
+
 Node::Type CPPExtractor::_textToNodeType(const UnownedStringSlice& in)
 {
     if (in == UnownedStringSlice::fromLiteral("struct"))
@@ -534,7 +776,15 @@ SlangResult CPPExtractor::parse(SourceFile* sourceFile, NamePool* namePool, Diag
                 }
                 else
                 {
-                    m_reader.advanceToken();
+                    // This could be a field
+                    if (m_currentNode->acceptsFields())
+                    {
+                        SLANG_RETURN_ON_FAIL(_maybeParseField());
+                    }
+                    else
+                    {
+                        m_reader.advanceToken();
+                    }
                 }
                 break;
             }
