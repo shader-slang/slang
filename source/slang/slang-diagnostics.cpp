@@ -124,15 +124,6 @@ void printDiagnosticArg(StringBuilder& sb, CodeGenTarget val)
     }
 }
 
-void printDiagnosticArg(StringBuilder& sb, Stage val)
-{
-    sb << getStageName(val);
-}
-
-void printDiagnosticArg(StringBuilder& sb, ProfileVersion val)
-{
-    sb << Profile(val).getName();
-}
 
 
 SourceLoc const& getDiagnosticPos(SyntaxNode const* syntax)

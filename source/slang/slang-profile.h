@@ -41,6 +41,9 @@ namespace Slang
 #include "slang-profile-defs.h"
     };
 
+
+    void printDiagnosticArg(StringBuilder& sb, ProfileVersion val);
+    
     enum class Stage : SlangStage
     {
         Unknown = SLANG_STAGE_NONE,
@@ -50,6 +53,8 @@ namespace Slang
     };
 
     const char* getStageName(Stage stage);
+
+    void printDiagnosticArg(StringBuilder& sb, Stage val);
 
     ProfileFamily getProfileFamily(ProfileVersion version);
 
