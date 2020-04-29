@@ -60,18 +60,19 @@ public:
         return (nodePtr) ? *nodePtr : nullptr;
     }
 
+    void dump(int indent, StringBuilder& out);
+    
     Node(Type type, Node* parent = nullptr):
         m_type(type),
         m_parent(parent),
         m_isReflected(false)
     {
-        m_openBraceCount = 0;
         m_anonymousNamespace = nullptr;
     }
 
     Type m_type;
 
-    int m_openBraceCount;
+    List<Token> m_braceStack;
 
     List<RefPtr<Node>> m_children;
 
@@ -88,6 +89,73 @@ public:
     Node* m_parent;
 };
 
+static void _indent(int indentCount, StringBuilder& out)
+{
+    for (int i = 0; i < indentCount; ++i)
+    {
+        out << "  ";
+    }
+}
+
+
+void Node::dump(int indentCount, StringBuilder& out)
+{
+    _indent(indentCount, out);
+
+    switch (m_type)
+    {
+        case Type::AnonymousNamespace:
+        {
+            out << "namespace {\n";
+        }
+        case Type::Namespace:
+        {
+            if (m_name.Content.getLength())
+            {
+                out << "namespace " << m_name.Content << " {\n";
+            }
+            else
+            {
+                out << "{\n";
+            }
+            break;
+        }
+        case Type::StructType:
+        case Type::ClassType:
+        {
+            const char* typeName = (m_type == Type::StructType) ? "struct" : "class";
+            
+            out << typeName << " ";
+
+            if (!m_isReflected)
+            {
+                out << " (";
+            }
+            out << m_name.Content;
+            if (!m_isReflected)
+            {
+                out << ") ";
+            }
+
+            if (m_super.Content.getLength())
+            {
+                out << " : " << m_super.Content; 
+            }
+
+            out << " {\n";
+            break;
+        }
+    }
+
+    for (Node* child : m_children)
+    {
+        child->dump(indentCount + 1, out);
+    }
+
+    _indent(indentCount, out);
+    out << "}\n";
+}
+
 // !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! CPPExtractor !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 
 class CPPExtractor
@@ -100,7 +168,7 @@ public:
 
     SlangResult pushAnonymousNamespace();
     SlangResult pushNode(Node* node);
-    void pushBrace();
+    void pushBrace(const Token& token);
     SlangResult popBrace();
 
     SlangResult parse(SourceFile* sourceFile, NamePool* namePool, DiagnosticSink* sink, Node* rootNode);
@@ -218,19 +286,21 @@ SlangResult CPPExtractor::pushNode(Node* node)
     return SLANG_OK;
 }
 
-void CPPExtractor::pushBrace()
+void CPPExtractor::pushBrace(const Token& brace)
 {
-    m_currentNode->m_openBraceCount++;
+    SLANG_ASSERT(brace.type == TokenType::LBrace);
+    m_currentNode->m_braceStack.add(brace);
 }
 
 SlangResult CPPExtractor::popBrace()
 {
-    if (m_currentNode->m_openBraceCount > 0)
+    if (m_currentNode->m_braceStack.getCount() > 0)
     {
-        m_currentNode->m_openBraceCount--;
+        m_currentNode->m_braceStack.removeLast();
+        return SLANG_OK;
     }
 
-    if (m_currentNode->m_parent)
+    if (m_currentNode->m_parent == nullptr)
     {
         m_sink->diagnoseRaw(Severity::Error, "Leaving root scope");
         return SLANG_FAIL;
@@ -247,6 +317,9 @@ SlangResult CPPExtractor::_maybeParseNode(Node::Type type)
 
     if (type == Node::Type::Namespace)
     {
+        // consume namespace
+        SLANG_RETURN_ON_FAIL(expect(TokenType::Identifier));
+
         if (m_reader.peekTokenType() == TokenType::LBrace)
         {
             m_reader.advanceToken();
@@ -310,43 +383,31 @@ SlangResult CPPExtractor::_maybeParseNode(Node::Type type)
         }
     }
 
-    if (!advanceIfToken(TokenType::LBrace))
+    if (m_reader.peekTokenType() != TokenType::LBrace)
     {
         // Consume up until we see a brace else it's an error
-
         while (true)
         {
-            TokenType peekTokenType = m_reader.peekTokenType();
-        
+            const TokenType peekTokenType = m_reader.peekTokenType();
             if (peekTokenType == TokenType::EndOfFile)
             {
                 // Expecting brace
                 m_sink->diagnoseRaw(Severity::Error, UnownedStringSlice::fromLiteral("Expecting { "));
-            
                 return SLANG_FAIL;
             }
             else if (peekTokenType == TokenType::LBrace)
             {
-                // Node does define a class, but we don't need to do anything with it
-                node->m_isReflected = false;
-
-                if (Node* foundNode = m_currentNode->findChild(name.Content))
-                {
-                    StringBuilder buf;
-                    buf << "Type " << foundNode->m_name.Content << " already found";
-
-                    m_sink->diagnoseRaw(Severity::Error, buf.getUnownedSlice());
-                    return SLANG_FAIL;
-                }
-
-                m_currentNode->addChild(node);
-                m_currentNode = node;
-                return SLANG_OK;
+                break;        
            }
-
             m_reader.advanceToken();
         }
+
+        // Node does define a class, but it's not reflected
+        node->m_isReflected = false;
+        return pushNode(node);
     }
+
+    Token braceToken = m_reader.advanceToken();
 
     while (true)
     {
@@ -357,6 +418,7 @@ SlangResult CPPExtractor::_maybeParseNode(Node::Type type)
             // Consume it and a colon
             if (!expect(TokenType::Colon))
             {
+                pushBrace(braceToken);
                 return SLANG_OK;
             }
             continue;
@@ -413,6 +475,8 @@ SlangResult CPPExtractor::_maybeParseNode(Node::Type type)
 
     SLANG_RETURN_ON_FAIL(expect(TokenType::RParent));
 
+    node->m_isReflected = true;
+
     return pushNode(node);
 }
 
@@ -439,7 +503,7 @@ SlangResult CPPExtractor::parse(SourceFile* sourceFile, NamePool* namePool, Diag
     m_rootNode = rootNode;
     m_currentNode = rootNode;
 
-    SLANG_ASSERT(rootNode && rootNode->m_openBraceCount == 0);
+    SLANG_ASSERT(rootNode && rootNode->m_braceStack.getCount() == 0);
    
     SourceManager* manager = sourceFile->getSourceManager();
 
@@ -468,36 +532,67 @@ SlangResult CPPExtractor::parse(SourceFile* sourceFile, NamePool* namePool, Diag
                 {
                     SLANG_RETURN_ON_FAIL(_maybeParseNode(type));
                 }
+                else
+                {
+                    m_reader.advanceToken();
+                }
                 break;
             }
             case TokenType::LBrace:
             {
-                pushBrace();
+                pushBrace(m_reader.advanceToken());
                 break;
             }
             case TokenType::RBrace:
             {
                 SLANG_RETURN_ON_FAIL(popBrace());
+                m_reader.advanceToken();
                 break;
             }
             case TokenType::EndOfFile:
             {
                 // Okay we need to confirm that we are in the root node, and with no open braces
-
-                if (m_currentNode != m_rootNode || m_rootNode->m_openBraceCount)
+                if (m_currentNode != m_rootNode || m_rootNode->m_braceStack.getCount() > 0)
                 {
-                    m_sink->diagnoseRaw(Severity::Error, UnownedStringSlice::fromLiteral("Didn't find matching braces at end of file"));
-
+                    if (m_currentNode->m_braceStack.getCount() > 0)
+                    {
+                        m_sink->diagnoseRaw(Severity::Error, UnownedStringSlice::fromLiteral("Didn't find matching brace"));
+                    }
+                    else
+                    {
+                        m_sink->diagnoseRaw(Severity::Error, UnownedStringSlice::fromLiteral("Didn't find matching braces at end of file"));
+                    }
                     return SLANG_FAIL;
                 }
 
                 return SLANG_OK;
             }
-            default: break;
+            case TokenType::Pound:
+            {
+                Token token = m_reader.peekToken();
+                if (token.flags & TokenFlag::AtStartOfLine)
+                {
+                    // We are just going to ignore all of these for now....
+                    m_reader.advanceToken();
+                    while (m_reader.peekTokenType() != TokenType::EndOfDirective && m_reader.peekTokenType() != TokenType::EndOfFile)
+                    {
+                        m_reader.advanceToken();
+                    }
+                    break;
+                }
+                // Skip it then
+                m_reader.advanceToken();
+                break;
+            }
+            default:
+            {
+                // Skip it then
+                m_reader.advanceToken();
+                break;
+            }
         }
 
-        // Skip it then
-        m_reader.advanceToken();
+        
     }
 }
 
@@ -598,6 +693,15 @@ SlangResult CPPExtractorApp::execute(const Options& options)
         // Okay we now need to parse contents. We know this is 0 terminated (as all strings are).
         SLANG_RETURN_ON_FAIL(parseContents(sourceFile, &m_namePool, rootNode));
     }
+
+    // Dump out the tree
+    {
+        StringBuilder buf;
+        rootNode->dump(0, buf);
+
+        m_sink->writer->write(buf.getBuffer(), buf.getLength());
+    }
+
     return SLANG_OK;
 }
 
