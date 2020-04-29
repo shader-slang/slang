@@ -442,7 +442,7 @@ SlangResult CPPExtractor::_maybeParseNode(Node::Type type)
         {
             m_reader.advanceToken();
             // Consume it and a colon
-            if (!expect(TokenType::Colon))
+            if (SLANG_FAILED(expect(TokenType::Colon)))
             {
                 pushBrace(braceToken);
                 return SLANG_OK;
@@ -574,7 +574,6 @@ SlangResult CPPExtractor::_maybeParseTemplateArgs()
             {
                 while (true)
                 {
-                    UnownedStringSlice typeName;
                     SLANG_RETURN_ON_FAIL(_maybeParseTemplateArg());
 
                     if (m_reader.peekTokenType() == TokenType::Comma)
@@ -583,6 +582,7 @@ SlangResult CPPExtractor::_maybeParseTemplateArgs()
                         // If there is a comma parse another arg
                         continue;
                     }
+                    break;
                 }
                 break;
             }
@@ -592,7 +592,7 @@ SlangResult CPPExtractor::_maybeParseTemplateArgs()
 
 static bool _isNotTypeKeyword(const UnownedStringSlice& name)
 {
-    if (name == "virtual")
+    if (name == "virtual" || name == "typedef")
     {
         return true;
     }
