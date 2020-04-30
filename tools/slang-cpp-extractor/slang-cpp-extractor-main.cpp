@@ -33,6 +33,8 @@ enum class IdentifierStyle
 
     Identifier,         ///< Just an identifier
     Marker,             ///< Marker
+    Root,
+    BaseClass,          ///< Has the name of a base class defined elsewhere
 
     TypeModifier,       ///< const, volatile etc
     Keyword,            ///< A keyword C/C++ keyword that is not another type
@@ -57,9 +59,11 @@ struct IdentifierFlag
 
 static const IdentifierFlags kIdentifierFlags[Index(IdentifierStyle::CountOf)] =
 {
-    0,              // None
+    0,              /// None
     0,              /// Identifier 
     0,              /// Marker
+    0,              /// Root
+    0,              /// BaseClass
     IdentifierFlag::Keyword,              /// TypeModifier
     IdentifierFlag::Keyword,              /// Keyword
     IdentifierFlag::Keyword | IdentifierFlag::StartScope | IdentifierFlag::Class, /// Class
@@ -144,10 +148,12 @@ public:
         Token name;
     };
 
+    bool isClassLike() const { return m_type == Type::StructType || m_type == Type::ClassType; }
+
     void addChild(Node* child)
     {
-        SLANG_ASSERT(child->m_parent == nullptr);
-        child->m_parent = this;
+        SLANG_ASSERT(child->m_parentScope == nullptr);
+        child->m_parentScope = this;
         m_children.add(child);
 
         if (child->m_type == Type::AnonymousNamespace)
@@ -167,17 +173,27 @@ public:
         return (nodePtr) ? *nodePtr : nullptr;
     }
 
-    bool acceptsFields() const
+    void addDerived(Node* derived)
     {
-        return m_type == Type::StructType || m_type == Type::ClassType;
+        SLANG_ASSERT(derived->m_derivedFrom == nullptr);
+        derived->m_derivedFrom = this;
+        m_derivedTypes.add(derived);
     }
 
+    bool acceptsFields() const { return isClassLike(); }
+
     void dump(int indent, StringBuilder& out);
-    
+    void dumpDerived(int indentCount, StringBuilder& out);
+
+    void calcName(StringBuilder& outName) const;
+
+
     Node(Type type, Node* parent = nullptr):
         m_type(type),
-        m_parent(parent),
-        m_isReflected(false)
+        m_parentScope(parent),
+        m_isReflected(false),
+        m_derivedFrom(nullptr),
+        m_isBaseType(false)
     {
         m_anonymousNamespace = nullptr;
     }
@@ -186,6 +202,8 @@ public:
 
     List<RefPtr<Node>> m_children;
 
+    List<RefPtr<Node>> m_derivedTypes;
+
     Dictionary<UnownedStringSlice, Node*> m_childMap;
 
     List<Field> m_fields;
@@ -193,12 +211,14 @@ public:
     Node* m_anonymousNamespace;
 
     bool m_isReflected;
+    bool m_isBaseType;          ///< The Super type is bothered to be looked up
 
     Token m_name;
     Token m_super;
     Token m_marker;        
 
-    Node* m_parent;
+    Node* m_parentScope;
+    Node* m_derivedFrom;
 };
 
 static void _indent(int indentCount, StringBuilder& out)
@@ -209,6 +229,19 @@ static void _indent(int indentCount, StringBuilder& out)
     }
 }
 
+void Node::dumpDerived(int indentCount, StringBuilder& out)
+{
+    if (isClassLike() && m_isReflected && m_name.Content.getLength() > 0)
+    {
+        _indent(indentCount, out);
+        out << m_name.Content << "\n";
+    }
+
+    for (Node* derivedType : m_derivedTypes)
+    {
+        derivedType->dumpDerived(indentCount + 1, out);
+    }
+}
 
 void Node::dump(int indentCount, StringBuilder& out)
 {
@@ -274,6 +307,30 @@ void Node::dump(int indentCount, StringBuilder& out)
     out << "}\n";
 }
 
+void Node::calcName(StringBuilder& outName) const
+{
+    if (m_parentScope == nullptr)
+    {
+        if (m_name.Content.getLength() == 0)
+        {
+            return;
+        }
+        outName << m_name.Content;
+    }
+    else
+    {
+        outName << "::";
+        if (m_type == Type::AnonymousNamespace)
+        {
+            outName << "::{Anonymous}";
+        }
+        else
+        {
+            outName << m_name.Content;
+        }
+    }
+}
+
 // !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! CPPExtractor !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 
 class CPPExtractor
@@ -283,16 +340,26 @@ public:
     SlangResult expect(TokenType type, Token* outToken = nullptr);
 
     bool advanceIfToken(TokenType type, Token* outToken = nullptr);
+    bool advanceIfStyle(IdentifierStyle style, Token* outToken = nullptr);
 
     SlangResult pushAnonymousNamespace();
     SlangResult pushNode(Node* node);
     SlangResult consumeToClosingBrace(const Token* openBraceToken = nullptr);
     SlangResult popBrace();
 
-    SlangResult parse(SourceFile* sourceFile, NamePool* namePool, DiagnosticSink* sink, Node* rootNode, IdentifierLookup* identifierLookup);
+    SlangResult parse(SourceFile* sourceFile);
 
-    CPPExtractor(StringSlicePool* typePool);
+    SlangResult calcDerivedTypes();
 
+        /// Only valid after calcDerivedTypes has been executed
+    const List<Node*>& getBaseTypes() const { return m_baseTypes; }
+
+        /// Get the root node
+    Node* getRootNode() const { return m_rootNode; }
+
+    CPPExtractor(StringSlicePool* typePool, NamePool* namePool, DiagnosticSink* sink, IdentifierLookup* identifierLookup);
+
+protected:
     static Node::Type _toNodeType(IdentifierStyle style);
 
     SlangResult _maybeParseNode(Node::Type type);
@@ -304,12 +371,10 @@ public:
     SlangResult _maybeParseTemplateArgs(Index& ioTemplateDepth);
     SlangResult _maybeParseTemplateArg(Index& ioTemplateDepth);
 
+    SlangResult _calcDerivedTypesRec(Node* node);
+
     void _consumeTypeModifiers();
 
-    static bool _isVisibilityKeyword(const UnownedStringSlice& slice)
-    {
-        return slice == UnownedStringSlice::fromLiteral("public") || slice == UnownedStringSlice::fromLiteral("protected") || slice == UnownedStringSlice::fromLiteral("private");
-    }
     SlangResult _consumeToSync();
 
     TokenList m_tokenList;
@@ -318,17 +383,25 @@ public:
     List<Node*> m_nodeStack;
     Node* m_currentNode;
 
-    Node* m_rootNode;
+    RefPtr<Node> m_rootNode;
+
+    List<Node*> m_baseTypes;
 
     DiagnosticSink* m_sink;
+
+    NamePool* m_namePool;
 
     IdentifierLookup* m_identifierLookup;
     StringSlicePool* m_typePool;
 };
 
-CPPExtractor::CPPExtractor(StringSlicePool* typePool):
-    m_typePool(typePool)
+CPPExtractor::CPPExtractor(StringSlicePool* typePool, NamePool* namePool, DiagnosticSink* sink, IdentifierLookup* identifierLookup):
+    m_typePool(typePool),
+    m_sink(sink),
+    m_namePool(namePool),
+    m_identifierLookup(identifierLookup)
 {
+    m_rootNode = new Node(Node::Type::Namespace);
 }
 
 SlangResult CPPExtractor::expect(TokenType type, Token* outToken)
@@ -364,6 +437,25 @@ bool CPPExtractor::advanceIfToken(TokenType type, Token* outToken)
     return false;
 }
 
+bool CPPExtractor::advanceIfStyle(IdentifierStyle style, Token* outToken)
+{
+    if (m_reader.peekTokenType() == TokenType::Identifier)
+    {
+        IdentifierStyle readStyle = m_identifierLookup->get(m_reader.peekToken().Content);
+        if (readStyle == style)
+        {
+            Token token = m_reader.advanceToken();
+            if (outToken)
+            {
+                *outToken = token;
+            }
+            return true;
+        }
+    }
+    return false;
+}
+
+
 SlangResult CPPExtractor::pushAnonymousNamespace()
 {
     // See if we find a anonymous namespace node
@@ -386,8 +478,7 @@ SlangResult CPPExtractor::pushNode(Node* node)
 
         if (Node* foundNode = m_currentNode->findChild(node->m_name.Content))
         {
-            if (node->m_type == Node::Type::StructType ||
-                node->m_type == Node::Type::ClassType)
+            if (node->isClassLike())
             {
                 m_sink->diagnose(m_reader.peekToken(), CPPDiagnostics::typeAlreadyDeclared, node->m_name.Content);
                 m_sink->diagnose(foundNode->m_name, CPPDiagnostics::seeDeclarationOf, node->m_name.Content);
@@ -451,13 +542,13 @@ SlangResult CPPExtractor::consumeToClosingBrace(const Token* inOpenBraceToken)
 
 SlangResult CPPExtractor::popBrace()
 {
-    if (m_currentNode->m_parent == nullptr)
+    if (m_currentNode->m_parentScope == nullptr)
     {
         m_sink->diagnose(m_reader.peekLoc(), CPPDiagnostics::scopeNotClosed);
         return SLANG_FAIL;
     }
 
-    m_currentNode = m_currentNode->m_parent;
+    m_currentNode = m_currentNode->m_parentScope;
     return SLANG_OK;
 }
 
@@ -522,11 +613,7 @@ SlangResult CPPExtractor::_maybeParseNode(Node::Type type)
     if (advanceIfToken(TokenType::Colon))
     {
         // Could have public
-        Token accessToken = m_reader.peekToken();
-        if (accessToken.type == TokenType::Identifier && _isVisibilityKeyword(accessToken.Content))
-        {
-            m_reader.advanceToken();
-        }
+        advanceIfStyle(IdentifierStyle::Access);
 
         if (!advanceIfToken(TokenType::Identifier, &node->m_super))
         {
@@ -563,9 +650,8 @@ SlangResult CPPExtractor::_maybeParseNode(Node::Type type)
     while (true)
     {
         // Okay now we are looking for the markers, or visibility qualifiers
-        if (m_reader.peekTokenType() == TokenType::Identifier && _isVisibilityKeyword(m_reader.peekToken().Content))
+        if (advanceIfStyle(IdentifierStyle::Access))
         {
-            m_reader.advanceToken();
             // Consume it and a colon
             if (SLANG_FAILED(expect(TokenType::Colon)))
             {
@@ -897,22 +983,17 @@ SlangResult CPPExtractor::_maybeParseField()
     }
 }
 
-SlangResult CPPExtractor::parse(SourceFile* sourceFile, NamePool* namePool, DiagnosticSink* sink, Node* rootNode, IdentifierLookup* identifierLookup)
-{
-    m_sink = sink;
-    m_rootNode = rootNode;
-    m_currentNode = rootNode;
-    m_identifierLookup = identifierLookup;
-
-    SLANG_ASSERT(rootNode);
-   
+SlangResult CPPExtractor::parse(SourceFile* sourceFile)
+{  
     SourceManager* manager = sourceFile->getSourceManager();
 
     SourceView* sourceView = manager->createSourceView(sourceFile, nullptr);
 
     Lexer lexer;
 
-    lexer.initialize(sourceView, m_sink, namePool, manager->getMemoryArena());
+    m_currentNode = m_rootNode;
+
+    lexer.initialize(sourceView, m_sink, m_namePool, manager->getMemoryArena());
     m_tokenList = lexer.lexAllTokens();
     // See if there were any errors
     if (m_sink->errorCount)
@@ -929,23 +1010,58 @@ SlangResult CPPExtractor::parse(SourceFile* sourceFile, NamePool* namePool, Diag
             case TokenType::Identifier:
             {
                 IdentifierStyle style = m_identifierLookup->get(m_reader.peekToken().Content);
-                IdentifierFlags flags = getFlags(style);
 
-                if (flags & IdentifierFlag::StartScope)
+                switch (style)
                 {
-                    Node::Type type = _toNodeType(style);
-                    SLANG_RETURN_ON_FAIL(_maybeParseNode(type));
-                }
-                else
-                {
-                    // This could be a field
-                    if (m_currentNode->acceptsFields())
-                    {
-                        SLANG_RETURN_ON_FAIL(_maybeParseField());
-                    }
-                    else
+                    case IdentifierStyle::BaseClass:
                     {
                         m_reader.advanceToken();
+
+                        Token nameToken;
+                        SLANG_RETURN_ON_FAIL(expect(TokenType::LParent));
+                        SLANG_RETURN_ON_FAIL(expect(TokenType::Identifier, &nameToken));
+                        SLANG_RETURN_ON_FAIL(expect(TokenType::RParent));
+
+                        RefPtr<Node> node(new Node(Node::Type::ClassType));
+                        node->m_name = nameToken;
+                        node->m_isBaseType = true;
+
+                        SLANG_RETURN_ON_FAIL(pushNode(node));
+                        popBrace();
+                        break;
+                    }
+                    case IdentifierStyle::Root:
+                    {
+                        if (m_currentNode && m_currentNode->isClassLike())
+                        {
+                            m_currentNode->m_isBaseType = true;
+                        }
+                        m_reader.advanceToken();
+                        break;
+                    }
+                    default:
+                    {
+                        IdentifierFlags flags = getFlags(style);
+
+                        if (flags & IdentifierFlag::StartScope)
+                        {
+                            Node::Type type = _toNodeType(style);
+                            SLANG_RETURN_ON_FAIL(_maybeParseNode(type));
+                        }
+                        else
+                        {
+                            // Special case the node that's the root of the hierarchy (as far as reflection is concerned)
+                            // This could be a field
+                            if (m_currentNode->acceptsFields())
+                            {
+                                SLANG_RETURN_ON_FAIL(_maybeParseField());
+                            }
+                            else
+                            {
+                                m_reader.advanceToken();
+                            }
+                        }
+                        break;
                     }
                 }
                 break;
@@ -999,6 +1115,66 @@ SlangResult CPPExtractor::parse(SourceFile* sourceFile, NamePool* namePool, Diag
     }
 }
 
+SlangResult CPPExtractor::_calcDerivedTypesRec(Node* node)
+{
+    if (node->isClassLike() && !node->m_isBaseType)
+    {
+        if (node->m_super.Content.getLength())
+        {
+            Node* parentScope = node->m_parentScope;
+            if (parentScope == nullptr)
+            {
+                m_sink->diagnoseRaw(Severity::Error, UnownedStringSlice::fromLiteral("Can't lookup in scope if there is none!"));
+                return SLANG_FAIL;
+            }
+
+            Node* superType = parentScope->findChild(node->m_super.Content);
+            if (!superType)
+            {
+                if (node->m_isReflected)
+                {
+                    m_sink->diagnose(node->m_name, CPPDiagnostics::superTypeNotFound, node->m_name.Content);
+                    return SLANG_FAIL;
+                }
+            }
+            else
+            {
+                if (!superType->isClassLike())
+                {
+                    m_sink->diagnose(node->m_name, CPPDiagnostics::superTypeNotAType, node->m_name.Content);
+                    return SLANG_FAIL;
+                }
+
+                // The base class must be defined in same scope (as we didn't allow different scopes for base classes)
+
+                superType->addDerived(node);
+            }
+        }
+        else
+        {
+            // If it has no super class defined, then we can just make it a root without being set
+            node->m_isBaseType = true;
+        }
+    }
+
+    if (node->m_isBaseType)
+    {
+        m_baseTypes.add(node);
+    }
+
+    for (Node* child : node->m_children)
+    {
+        SLANG_RETURN_ON_FAIL(_calcDerivedTypesRec(child));
+    }
+
+    return SLANG_OK;
+}
+
+SlangResult CPPExtractor::calcDerivedTypes()
+{
+    return _calcDerivedTypesRec(m_rootNode);
+}
+
 // !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! CPPExtractorApp !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 
 struct Options
@@ -1007,8 +1183,10 @@ struct Options
     {
         m_inputPaths.clear();
         m_outputPath = String();
+        m_dump = false;
     }
 
+    bool m_dump = false;
     List<String> m_inputPaths;
     String m_outputPath;
     String m_inputDirectory;
@@ -1079,6 +1257,12 @@ SlangResult OptionsParser::parse(int argc, const char*const* argv, DiagnosticSin
                 SLANG_RETURN_ON_FAIL(_parseArgWithValue("-o", outOptions.m_outputPath));
                 continue;
             }
+            else if (arg == "-dump")
+            {
+                outOptions.m_dump = true;
+                m_index++;
+                continue;
+            }
 
             m_sink->diagnose(SourceLoc(), CPPDiagnostics::unknownOption, arg);
             return SLANG_FAIL;
@@ -1106,6 +1290,7 @@ SlangResult OptionsParser::parse(int argc, const char*const* argv, DiagnosticSin
 }
 
 
+
 // !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! CPPExtractorApp !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 
 class CPPExtractorApp
@@ -1113,8 +1298,6 @@ class CPPExtractorApp
 public:
     
     SlangResult readAllText(const Slang::String& fileName, String& outRead);
-
-    SlangResult parseContents(SourceFile* sourceFile, NamePool* namePool, Node* rootNode);
 
     SlangResult execute(const Options& options);
 
@@ -1145,7 +1328,12 @@ public:
             const char* names[] = {"SLANG_ABSTRACT_CLASS", "SLANG_CLASS"};
             m_identifierLookup.set(names, SLANG_COUNT_OF(names), IdentifierStyle::Marker);
         }
-        
+
+        {
+            m_identifierLookup.set("SLANG_CLASS_ROOT", IdentifierStyle::Root);
+            m_identifierLookup.set("SLANG_REFLECT_BASE_CLASS", IdentifierStyle::BaseClass);
+        }
+
         // Scope
         {
             m_identifierLookup.set("struct", IdentifierStyle::Struct);
@@ -1194,19 +1382,11 @@ SlangResult CPPExtractorApp::readAllText(const Slang::String& fileName, String& 
     return SLANG_OK;
 }
 
-SlangResult CPPExtractorApp::parseContents(SourceFile* sourceFile, NamePool* namePool, Node* rootNode)
-{
-    CPPExtractor parser(&m_slicePool);
-    SLANG_RETURN_ON_FAIL(parser.parse(sourceFile, namePool, m_sink, rootNode, &m_identifierLookup));
-    return SLANG_OK;
-}
-
 SlangResult CPPExtractorApp::execute(const Options& options)
 {
     m_options = options;
 
-    // Create the root node
-    RefPtr<Node> rootNode(new Node(Node::Type::Namespace));
+    CPPExtractor extractor(&m_slicePool, &m_namePool, m_sink, &m_identifierLookup);
 
     // Read in each of the input files
     for (Index i = 0; i < m_options.m_inputPaths.getCount(); ++i)
@@ -1230,16 +1410,33 @@ SlangResult CPPExtractorApp::execute(const Options& options)
 
         SourceFile* sourceFile = m_sourceManager->createSourceFileWithString(pathInfo, contents);
 
-        // Okay we now need to parse contents. We know this is 0 terminated (as all strings are).
-        SLANG_RETURN_ON_FAIL(parseContents(sourceFile, &m_namePool, rootNode));
+        SLANG_RETURN_ON_FAIL(extractor.parse(sourceFile));
     }
 
-    // Dump out the tree
-    {
-        StringBuilder buf;
-        rootNode->dump(0, buf);
+    SLANG_RETURN_ON_FAIL(extractor.calcDerivedTypes());
 
-        m_sink->writer->write(buf.getBuffer(), buf.getLength());
+    // Dump out the tree
+    if (options.m_dump)
+    {
+        {
+            StringBuilder buf;
+            extractor.getRootNode()->dump(0, buf);
+            m_sink->writer->write(buf.getBuffer(), buf.getLength());
+        }
+
+        {
+            const List<Node*>& baseTypes = extractor.getBaseTypes();
+
+            for (Node* baseType : baseTypes)
+            {
+                StringBuilder buf;
+
+                baseType->dumpDerived(0, buf);
+
+                m_sink->writer->write(buf.getBuffer(), buf.getLength());
+
+            }
+        }
     }
 
     return SLANG_OK;

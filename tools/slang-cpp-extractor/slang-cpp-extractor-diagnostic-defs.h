@@ -31,6 +31,8 @@ DIAGNOSTIC(100003, Error, typeNameDoesntMatch, "Type name doesn't match $0")
 DIAGNOSTIC(100004, Error, didntFindMatchingBrace, "Didn't find brace matching $0")
 DIAGNOSTIC(100005, Error, braceOpenAtEndOfFile, "Brace open at file end")
 DIAGNOSTIC(100006, Error, unexpectedTemplateClose, "Unexpected template close")
+DIAGNOSTIC(100007, Error, superTypeNotFound, "Super type not found for $0")
+DIAGNOSTIC(100008, Error, superTypeNotAType, "Named super type is not a type $0")
 
 // Command line errors 100100
 
