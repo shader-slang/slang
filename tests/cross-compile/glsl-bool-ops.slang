@@ -15,7 +15,7 @@ uint test(uint val)
 	bool2 d = a && b;
 	bool2 e = a || c;
 
-	bool2 f = a & b;
+	bool2 f = !(a & b);
 	bool2 g = a | c;
 	bool2 h = a ^ c;
 
@@ -27,8 +27,8 @@ uint test(uint val)
 	t = t*2 + h;
 
 	uint result = 0;
-	result = result*32 + t.x;
-	result = result*32 + t.y;
+	result = result*256 + t.x;
+	result = result*256 + t.y;
 	return result;
 }
 

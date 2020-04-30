@@ -1260,11 +1260,23 @@ bool GLSLSourceEmitter::tryEmitInstExprImpl(IRInst* inst, const EmitOpInfo& inOu
             }
             return false;
         }
+
+        // When emitting a bitwise operation in GLSL, we need to special-case the handling
+        // of `bool` and vectors of `bool` so that they produce valid results by operating
+        // on the single-bit truth value.
+        //
+        // In the case of a vector we will convert to `uint` vectors and perform the
+        // bitwise op on them before converting back to `bool` vectors.
+        //
+        // In the scalar case we will apply the corresponding logical operation to
+        // the `bool` operands.
+        //
         case kIROp_BitAnd:
             return _tryEmitBitBinOp(inst, getInfo(EmitOp::BitAnd), getInfo(EmitOp::And), inOuterPrec);
         case kIROp_BitOr:
             return _tryEmitBitBinOp(inst, getInfo(EmitOp::BitOr), getInfo(EmitOp::Or), inOuterPrec);
         case kIROp_BitXor:
+            // Note: on scalar `bool` operands, a bitwise XOR (`^`) is equivalent to a not-equal (`!=`) comparison.
             return _tryEmitBitBinOp(inst, getInfo(EmitOp::BitXor), getInfo(EmitOp::Neq), inOuterPrec);
 
         // Comparisons

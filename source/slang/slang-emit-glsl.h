@@ -75,8 +75,29 @@ protected:
 
     void _maybeEmitGLSLCast(IRType* castType, IRInst* inst);
 
+        /// Emit the legalized form of a bitwise or logical operation on a vector of `bool`.
+        ///
+        /// This emits GLSL code that converts the operands of `inst` into vectors of
+        /// `uint`, then applies `op` bitwise to the result, and finally converts back
+        /// into the desired vector-of-bool `type`.
+        ///
     void _emitLegalizedBoolVectorBinOp(IRInst* inst, IRVectorType* type, const EmitOpInfo& op, const EmitOpInfo& inOuterPrec);
+
+        /// Try to emit specialized code for a logic binary op.
+        ///
+        /// Returns true if specialized code was emitted, false if the default behavior should be used.
+        ///
+        /// The `bitOp` parameter should be the bitwise equivalent of the logical op being emitted.
+        ///
     bool _tryEmitLogicalBinOp(IRInst* inst, const EmitOpInfo& bitOp, const EmitOpInfo& inOuterPrec);
+
+        /// Try to emit specialized code for a logic binary op.
+        ///
+        /// Returns true if specialized code was emitted, false if the default behavior should be used.
+        ///
+        /// The `bitOp` parameter should be the bitwise op being emitted.
+        /// The `bitOp` parameter should be the logical equivalent of `bitOp`
+        ///
     bool _tryEmitBitBinOp(IRInst* inst, const EmitOpInfo& bitOp, const EmitOpInfo& boolOp, const EmitOpInfo& inOuterPrec);
 
     RefPtr<GLSLExtensionTracker> m_glslExtensionTracker;
