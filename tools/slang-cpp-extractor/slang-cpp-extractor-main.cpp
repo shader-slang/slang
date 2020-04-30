@@ -27,55 +27,102 @@ namespace SlangExperimental
 
 using namespace Slang;
 
+enum class IdentifierStyle
+{
+    None,               ///< It's not an identifier
+
+    Identifier,         ///< Just an identifier
+    Marker,             ///< Marker
+
+    TypeModifier,       ///< const, volatile etc
+    Keyword,            ///< A keyword C/C++ keyword that is not another type
+    Class,              ///< class
+    Struct,             ///< struct
+    Namespace,          ///< namespace
+    Access,             ///< public, protected, private
+
+    CountOf,
+};
+
+typedef uint32_t IdentifierFlags;
+struct IdentifierFlag
+{
+    enum Enum : IdentifierFlags
+    {
+        StartScope  = 0x1,          ///< namespace, struct or class
+        Class       = 0x2,          ///< Struct or class
+        Keyword     = 0x4,
+    };
+};
+
+static const IdentifierFlags kIdentifierFlags[Index(IdentifierStyle::CountOf)] =
+{
+    0,              // None
+    0,              /// Identifier 
+    0,              /// Marker
+    IdentifierFlag::Keyword,              /// TypeModifier
+    IdentifierFlag::Keyword,              /// Keyword
+    IdentifierFlag::Keyword | IdentifierFlag::StartScope | IdentifierFlag::Class, /// Class
+    IdentifierFlag::Keyword | IdentifierFlag::StartScope | IdentifierFlag::Class, /// Struct
+    IdentifierFlag::Keyword | IdentifierFlag::StartScope, /// Namespace
+    IdentifierFlag::Keyword,
+};
+
+SLANG_FORCE_INLINE IdentifierFlags getFlags(IdentifierStyle style)
+{
+    return kIdentifierFlags[Index(style)];
+}
+
+SLANG_FORCE_INLINE bool hasFlag(IdentifierStyle style, IdentifierFlag::Enum flag)
+{
+    return (getFlags(style) & flag) != 0;
+}
+
 class IdentifierLookup
 {
 public:
-    typedef uint32_t Flags;
-    struct Flag
-    {
-        enum Enum : Flags
-        {
-            Marker          = 0x1,
-            TypeModifier    = 0x2,          ///< 
-            Keyword         = 0x4,
-            ScopeStart      = 0x8,
-        };
-    };
 
-    Flags get(const UnownedStringSlice& slice) const
+    IdentifierStyle get(const UnownedStringSlice& slice) const
     {
         Index index = m_pool.findIndex(slice);
-        return (index >= 0) ? m_flags[index] : 0;
+        return (index >= 0) ? m_styles[index] : IdentifierStyle::None;
     }
 
-    void set(const char* name, Flags flags)
+    void set(const char* name, IdentifierStyle style)
     {
-        set(UnownedStringSlice(name), flags);
+        set(UnownedStringSlice(name), style);
     }
 
-    void set(const UnownedStringSlice& name, Flags flags)
+    void set(const UnownedStringSlice& name, IdentifierStyle style)
     {
         StringSlicePool::Handle handle;
         if (m_pool.findOrAdd(name, handle))
         {
             // Add the extra flags
-            m_flags[Index(handle)] |= flags;
+            m_styles[Index(handle)] = style;
         }
         else
         {
             Index index = Index(handle);
-            SLANG_ASSERT(index == m_flags.getCount());
-            m_flags.add(flags);
+            SLANG_ASSERT(index == m_styles.getCount());
+            m_styles.add(style);
         }
     }
 
+    void set(const char*const* names, size_t namesCount, IdentifierStyle style)
+    {
+        for (size_t i = 0; i < namesCount; ++i)
+        {
+            set(UnownedStringSlice(names[i]), style);
+        }
+    }
     IdentifierLookup():
         m_pool(StringSlicePool::Style::Empty)
     {
         SLANG_ASSERT(m_pool.getSlicesCount() == 0);
     }
 protected:
-    List<Flags> m_flags;
+    List<IdentifierStyle> m_styles;
     StringSlicePool m_pool;
 };
 
@@ -244,9 +291,10 @@ public:
 
     SlangResult parse(SourceFile* sourceFile, NamePool* namePool, DiagnosticSink* sink, Node* rootNode, IdentifierLookup* identifierLookup);
 
-    CPPExtractor();
+    CPPExtractor(StringSlicePool* typePool);
 
-    static Node::Type _textToNodeType(const UnownedStringSlice& in);
+    static Node::Type _toNodeType(IdentifierStyle style);
+
     SlangResult _maybeParseNode(Node::Type type);
     SlangResult _maybeParseField();
 
@@ -275,9 +323,11 @@ public:
     DiagnosticSink* m_sink;
 
     IdentifierLookup* m_identifierLookup;
+    StringSlicePool* m_typePool;
 };
 
-CPPExtractor::CPPExtractor() 
+CPPExtractor::CPPExtractor(StringSlicePool* typePool):
+    m_typePool(typePool)
 {
 }
 
@@ -547,8 +597,8 @@ SlangResult CPPExtractor::_maybeParseNode(Node::Type type)
         // If it's one of the markers, then we add it
         UnownedStringSlice lexeme = m_reader.peekToken().Content;
 
-        const IdentifierLookup::Flags flags = m_identifierLookup->get(lexeme);
-        if ((flags & IdentifierLookup::Flag::Marker) == 0)
+        const IdentifierStyle style = m_identifierLookup->get(lexeme);
+        if (style != IdentifierStyle::Marker)
         {
             // Looks like a class, but looks like non-reflected
             node->m_isReflected = false;
@@ -692,9 +742,8 @@ void CPPExtractor::_consumeTypeModifiers()
     {
         if (m_reader.peekTokenType() == TokenType::Identifier)
         {
-            IdentifierLookup::Flags flags = m_identifierLookup->get(m_reader.peekToken().Content);
-
-            if (flags & IdentifierLookup::Flag::TypeModifier)
+            IdentifierStyle style = m_identifierLookup->get(m_reader.peekToken().Content);
+            if (style == IdentifierStyle::TypeModifier)
             {
                 m_reader.advanceToken();
                 continue;
@@ -706,27 +755,25 @@ void CPPExtractor::_consumeTypeModifiers()
 
 SlangResult CPPExtractor::_maybeParseType(UnownedStringSlice& outType, Index& ioTemplateDepth)
 {
-    Token startToken = m_reader.peekToken();
+    auto startCursor = m_reader.getCursor();
 
-    if (m_reader.peekTokenType() == TokenType::Identifier)
-    {
-        IdentifierLookup::Flags flags = m_identifierLookup->get(m_reader.peekToken().Content);
-        if ((flags & IdentifierLookup::Flag::Keyword) && (flags & IdentifierLookup::Flag::TypeModifier) == 0)
-        {
-            // It's a keyword, but not type modifier, so can't be a type
-            return SLANG_FAIL;
-        }
-
-        _consumeTypeModifiers();
-    }
+    _consumeTypeModifiers();
 
     advanceIfToken(TokenType::Scope);
     while (true)
     {
-        if (!advanceIfToken(TokenType::Identifier))
+        Token identifierToken;
+        if (!advanceIfToken(TokenType::Identifier, &identifierToken))
         {
             return SLANG_FAIL;
         }
+
+        const IdentifierStyle style = m_identifierLookup->get(identifierToken.Content);
+        if (hasFlag(style, IdentifierFlag::Keyword))
+        {
+            return SLANG_FAIL;
+        }
+
         if (advanceIfToken(TokenType::Scope))
         {
             continue;
@@ -759,10 +806,22 @@ SlangResult CPPExtractor::_maybeParseType(UnownedStringSlice& outType, Index& io
         break;
     }
 
-    // This is a bit of a hack -> I don't store the previous token, and Lexer doesn't have an easy interface
-    // So I just pull out the content to the begining of the peek token (which might have trailing whitespace (or even comments)
-    outType = UnownedStringSlice(startToken.Content.begin(), m_reader.peekToken().Content.begin());
+    // We can build up the out type, from the tokens we found
+    auto endCursor = m_reader.getCursor();
 
+    m_reader.setCursor(startCursor);
+
+    StringBuilder buf;
+    while (!m_reader.isAtCursor(endCursor))
+    {
+        Token token = m_reader.advanceToken();
+        // Concat the type. 
+        buf << token.Content;
+    }
+
+    auto handle = m_typePool->add(buf);
+
+    outType = m_typePool->getSlice(handle);
     return SLANG_OK;
 }
 
@@ -827,21 +886,15 @@ SlangResult CPPExtractor::_maybeParseField()
     return SLANG_OK;
 }
 
-Node::Type CPPExtractor::_textToNodeType(const UnownedStringSlice& in)
+/* static */Node::Type CPPExtractor::_toNodeType(IdentifierStyle style)
 {
-    if (in == UnownedStringSlice::fromLiteral("struct"))
+    switch (style)
     {
-        return Node::Type::StructType;
+        case IdentifierStyle::Class: return Node::Type::ClassType;
+        case IdentifierStyle::Struct: return Node::Type::StructType;
+        case IdentifierStyle::Namespace: return Node::Type::Namespace;
+        default: return Node::Type::Invalid;
     }
-    else if (in == UnownedStringSlice::fromLiteral("class"))
-    {
-        return Node::Type::ClassType;
-    }
-    else if (in == UnownedStringSlice::fromLiteral("namespace"))
-    {
-        return Node::Type::Namespace;
-    }
-    return Node::Type::Invalid;
 }
 
 SlangResult CPPExtractor::parse(SourceFile* sourceFile, NamePool* namePool, DiagnosticSink* sink, Node* rootNode, IdentifierLookup* identifierLookup)
@@ -875,11 +928,12 @@ SlangResult CPPExtractor::parse(SourceFile* sourceFile, NamePool* namePool, Diag
         {
             case TokenType::Identifier:
             {
-                IdentifierLookup::Flags flags = m_identifierLookup->get(m_reader.peekToken().Content);
+                IdentifierStyle style = m_identifierLookup->get(m_reader.peekToken().Content);
+                IdentifierFlags flags = getFlags(style);
 
-                if (flags & IdentifierLookup::Flag::ScopeStart)
+                if (flags & IdentifierFlag::StartScope)
                 {
-                    Node::Type type = _textToNodeType(m_reader.peekToken().Content);
+                    Node::Type type = _toNodeType(style);
                     SLANG_RETURN_ON_FAIL(_maybeParseNode(type));
                 }
                 else
@@ -1064,46 +1118,58 @@ public:
 
     SlangResult execute(const Options& options);
 
-    /// Parse the parameters. NOTE! Must have the program path removed
-    SlangResult parseArgs(int argc, const char*const* argv, Options& outOptions);
-
         /// Execute
     SlangResult executeWithArgs(int argc, const char*const* argv);
 
     CPPExtractorApp(DiagnosticSink* sink, SourceManager* sourceManager, RootNamePool* rootNamePool):
         m_sink(sink),
-        m_sourceManager(sourceManager)
+        m_sourceManager(sourceManager),
+        m_slicePool(StringSlicePool::Style::Default)
     {
         m_namePool.setRootNamePool(rootNamePool);
 
         // Some keywords
-        m_identifierLookup.set("virtual", IdentifierLookup::Flag::Keyword);
-        m_identifierLookup.set("typedef", IdentifierLookup::Flag::Keyword);
-
+        {
+            const char* names[] = { "virtual", "typedef" };
+            m_identifierLookup.set(names, SLANG_COUNT_OF(names), IdentifierStyle::Keyword);
+        }
+        
         // Modifiers
-
-        m_identifierLookup.set("const", IdentifierLookup::Flag::Keyword | IdentifierLookup::Flag::TypeModifier);
-        m_identifierLookup.set("volatile", IdentifierLookup::Flag::Keyword | IdentifierLookup::Flag::TypeModifier);
+        {
+            const char* names[] = { "const", "volatile" };
+            m_identifierLookup.set(names, SLANG_COUNT_OF(names), IdentifierStyle::TypeModifier);
+        }
 
         // Strings to look for...
-        m_identifierLookup.set("SLANG_ABSTRACT_CLASS", IdentifierLookup::Flag::Marker);
-        m_identifierLookup.set("SLANG_CLASS", IdentifierLookup::Flag::Marker);
-
+        {
+            const char* names[] = {"SLANG_ABSTRACT_CLASS", "SLANG_CLASS"};
+            m_identifierLookup.set(names, SLANG_COUNT_OF(names), IdentifierStyle::Marker);
+        }
+        
         // Scope
-        m_identifierLookup.set("struct", IdentifierLookup::Flag::Keyword | IdentifierLookup::Flag::ScopeStart);
-        m_identifierLookup.set("class", IdentifierLookup::Flag::Keyword | IdentifierLookup::Flag::ScopeStart);
-        m_identifierLookup.set("namespace", IdentifierLookup::Flag::Keyword | IdentifierLookup::Flag::ScopeStart);
+        {
+            m_identifierLookup.set("struct", IdentifierStyle::Struct);
+            m_identifierLookup.set("class", IdentifierStyle::Class);
+            m_identifierLookup.set("namespace", IdentifierStyle::Namespace);
+        }
+
+        // Access
+        {
+            const char* names[] = { "private", "protected", "public" };
+            m_identifierLookup.set(names, SLANG_COUNT_OF(names), IdentifierStyle::Access);
+        }
     }
 
     
 protected:
     NamePool m_namePool;
 
-    
     Options m_options;
     DiagnosticSink* m_sink;
     SourceManager* m_sourceManager;
     IdentifierLookup m_identifierLookup;
+
+    StringSlicePool m_slicePool;
 };
 
 SlangResult CPPExtractorApp::readAllText(const Slang::String& fileName, String& outRead)
@@ -1130,7 +1196,7 @@ SlangResult CPPExtractorApp::readAllText(const Slang::String& fileName, String& 
 
 SlangResult CPPExtractorApp::parseContents(SourceFile* sourceFile, NamePool* namePool, Node* rootNode)
 {
-    CPPExtractor parser;
+    CPPExtractor parser(&m_slicePool);
     SLANG_RETURN_ON_FAIL(parser.parse(sourceFile, namePool, m_sink, rootNode, &m_identifierLookup));
     return SLANG_OK;
 }
