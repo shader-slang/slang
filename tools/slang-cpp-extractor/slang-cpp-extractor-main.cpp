@@ -70,7 +70,7 @@ public:
 
     bool acceptsFields() const
     {
-        return m_braceStack.getCount() == 0 && (m_type == Type::StructType || m_type == Type::ClassType);
+        return m_type == Type::StructType || m_type == Type::ClassType;
     }
 
     void dump(int indent, StringBuilder& out);
@@ -84,8 +84,6 @@ public:
     }
 
     Type m_type;
-
-    List<Token> m_braceStack;
 
     List<RefPtr<Node>> m_children;
 
@@ -189,7 +187,7 @@ public:
 
     SlangResult pushAnonymousNamespace();
     SlangResult pushNode(Node* node);
-    void pushBrace(const Token& token);
+    SlangResult consumeToClosingBrace(const Token* openBraceToken = nullptr);
     SlangResult popBrace();
 
     SlangResult parse(SourceFile* sourceFile, NamePool* namePool, DiagnosticSink* sink, Node* rootNode);
@@ -308,20 +306,49 @@ SlangResult CPPExtractor::pushNode(Node* node)
     return SLANG_OK;
 }
 
-void CPPExtractor::pushBrace(const Token& brace)
+SlangResult CPPExtractor::consumeToClosingBrace(const Token* inOpenBraceToken)
 {
-    SLANG_ASSERT(brace.type == TokenType::LBrace);
-    m_currentNode->m_braceStack.add(brace);
+    Token openToken;
+    if (inOpenBraceToken)
+    {
+        openToken = *inOpenBraceToken;
+    }
+    else
+    {
+        openToken = m_reader.advanceToken();
+    }
+
+    while (true)
+    {
+        switch (m_reader.peekTokenType())
+        {
+            case TokenType::EndOfFile:
+            {
+                m_sink->diagnose(m_reader.peekLoc(), CPPDiagnostics::didntFindMatchingBrace);
+                m_sink->diagnose(openToken, CPPDiagnostics::seeOpenBrace);
+                return SLANG_FAIL;
+            }
+            case TokenType::LBrace:
+            {
+                SLANG_RETURN_ON_FAIL(consumeToClosingBrace());
+                break;
+            }
+            case TokenType::RBrace:
+            {
+                m_reader.advanceToken();
+                return SLANG_OK;
+            }
+            default:
+            {
+                m_reader.advanceToken();
+                break;
+            }
+        }
+    }
 }
 
 SlangResult CPPExtractor::popBrace()
 {
-    if (m_currentNode->m_braceStack.getCount() > 0)
-    {
-        m_currentNode->m_braceStack.removeLast();
-        return SLANG_OK;
-    }
-
     if (m_currentNode->m_parent == nullptr)
     {
         m_sink->diagnose(m_reader.peekLoc(), CPPDiagnostics::scopeNotClosed);
@@ -440,7 +467,7 @@ SlangResult CPPExtractor::_maybeParseNode(Node::Type type)
             // Consume it and a colon
             if (SLANG_FAILED(expect(TokenType::Colon)))
             {
-                pushBrace(braceToken);
+                consumeToClosingBrace(&braceToken);
                 return SLANG_OK;
             }
             continue;
@@ -739,7 +766,7 @@ SlangResult CPPExtractor::parse(SourceFile* sourceFile, NamePool* namePool, Diag
     m_rootNode = rootNode;
     m_currentNode = rootNode;
 
-    SLANG_ASSERT(rootNode && rootNode->m_braceStack.getCount() == 0);
+    SLANG_ASSERT(rootNode);
    
     SourceManager* manager = sourceFile->getSourceManager();
 
@@ -784,7 +811,7 @@ SlangResult CPPExtractor::parse(SourceFile* sourceFile, NamePool* namePool, Diag
             }
             case TokenType::LBrace:
             {
-                pushBrace(m_reader.advanceToken());
+                SLANG_RETURN_ON_FAIL(consumeToClosingBrace());
                 break;
             }
             case TokenType::RBrace:
@@ -796,17 +823,9 @@ SlangResult CPPExtractor::parse(SourceFile* sourceFile, NamePool* namePool, Diag
             case TokenType::EndOfFile:
             {
                 // Okay we need to confirm that we are in the root node, and with no open braces
-                if (m_currentNode != m_rootNode || m_rootNode->m_braceStack.getCount() > 0)
+                if (m_currentNode != m_rootNode)
                 {
-                    if (m_currentNode->m_braceStack.getCount() > 0)
-                    {
-                        m_sink->diagnose(m_reader.peekLoc(), CPPDiagnostics::didntFindMatchingBrace);
-                        m_sink->diagnose(m_currentNode->m_braceStack.getLast(), CPPDiagnostics::seeOpenBrace);
-                    }
-                    else
-                    {
-                        m_sink->diagnose(m_reader.peekToken(), CPPDiagnostics::braceOpenAtEndOfFile);
-                    }
+                    m_sink->diagnose(m_reader.peekToken(), CPPDiagnostics::braceOpenAtEndOfFile);
                     return SLANG_FAIL;
                 }
 
