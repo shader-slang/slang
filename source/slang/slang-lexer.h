@@ -69,6 +69,10 @@ namespace Slang
             m_cursor = cursor.tokenReaderCursor;
             m_nextToken = cursor.nextToken;
         }
+        bool isAtCursor(const ParsingCursor& cursor) const
+        {
+            return cursor.tokenReaderCursor == m_cursor;
+        }
         bool isAtEnd() const { return m_cursor == m_end; }
         Token& peekToken();
         TokenType peekTokenType() const;
