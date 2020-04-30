@@ -75,6 +75,9 @@ protected:
 
     void _maybeEmitGLSLCast(IRType* castType, IRInst* inst);
 
+    void _emitLegalizedBoolVectorBinOp(IRInst* inst, IRVectorType* type, const EmitOpInfo& op, const EmitOpInfo& inOuterPrec);
+    bool _tryEmitLogicalBinOp(IRInst* inst, const EmitOpInfo& bitOp, const EmitOpInfo& inOuterPrec);
+    bool _tryEmitBitBinOp(IRInst* inst, const EmitOpInfo& bitOp, const EmitOpInfo& boolOp, const EmitOpInfo& inOuterPrec);
 
     RefPtr<GLSLExtensionTracker> m_glslExtensionTracker;
 };
