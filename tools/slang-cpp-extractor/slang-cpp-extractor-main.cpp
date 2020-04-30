@@ -20,6 +20,8 @@
 #include "../../source/slang/slang-file-system.h"
 #include "../../source/slang/slang-name.h"
 
+#include "slang-cpp-extractor-diagnostics.h"
+
 namespace SlangExperimental
 {
 
@@ -233,11 +235,7 @@ SlangResult CPPExtractor::expect(TokenType type, Token* outToken)
 {
     if (m_reader.peekTokenType() != type)
     {
-        StringBuilder buf;
-
-        buf << "Expecting " << TokenTypeToString(type) << " found '" << TokenTypeToString(m_reader.peekTokenType());
-        m_sink->diagnoseRaw(Severity::Error, buf.getUnownedSlice());
-
+        m_sink->diagnose(m_reader.peekToken(), CPPDiagnostics::expectingToken, type);
         return SLANG_FAIL;
     }
 
@@ -291,10 +289,8 @@ SlangResult CPPExtractor::pushNode(Node* node)
             if (node->m_type == Node::Type::StructType ||
                 node->m_type == Node::Type::ClassType)
             {
-                StringBuilder buf;
-                buf << "Type " << foundNode->m_name.Content << " already found";
-
-                m_sink->diagnoseRaw(Severity::Error, buf.getUnownedSlice());
+                m_sink->diagnose(m_reader.peekToken(), CPPDiagnostics::typeAlreadyDeclared, node->m_name.Content);
+                m_sink->diagnose(foundNode->m_name, CPPDiagnostics::seeDeclarationOf, node->m_name.Content);
                 return SLANG_FAIL;
             }
 
@@ -328,7 +324,7 @@ SlangResult CPPExtractor::popBrace()
 
     if (m_currentNode->m_parent == nullptr)
     {
-        m_sink->diagnoseRaw(Severity::Error, "Leaving root scope");
+        m_sink->diagnose(m_reader.peekLoc(), CPPDiagnostics::scopeNotClosed);
         return SLANG_FAIL;
     }
 
@@ -418,7 +414,7 @@ SlangResult CPPExtractor::_maybeParseNode(Node::Type type)
             if (peekTokenType == TokenType::EndOfFile)
             {
                 // Expecting brace
-                m_sink->diagnoseRaw(Severity::Error, UnownedStringSlice::fromLiteral("Expecting { "));
+                m_sink->diagnose(m_reader.peekToken(), CPPDiagnostics::expectingToken, TokenType::LBrace);
                 return SLANG_FAIL;
             }
             else if (peekTokenType == TokenType::LBrace)
@@ -493,9 +489,7 @@ SlangResult CPPExtractor::_maybeParseNode(Node::Type type)
 
     if (typeNameToken.Content != node->m_name.Content)
     {
-        StringBuilder msg;
-        msg << "Class name '" << node->m_name.Content << "' doesn't match '" << typeNameToken.Content << "'";
-        m_sink->diagnoseRaw(Severity::Error, msg.getUnownedSlice());
+        m_sink->diagnose(typeNameToken, CPPDiagnostics::typeNameDoesntMatch, node->m_name.Content);
         return SLANG_FAIL;
     }
 
@@ -806,11 +800,12 @@ SlangResult CPPExtractor::parse(SourceFile* sourceFile, NamePool* namePool, Diag
                 {
                     if (m_currentNode->m_braceStack.getCount() > 0)
                     {
-                        m_sink->diagnoseRaw(Severity::Error, UnownedStringSlice::fromLiteral("Didn't find matching brace"));
+                        m_sink->diagnose(m_reader.peekLoc(), CPPDiagnostics::didntFindMatchingBrace);
+                        m_sink->diagnose(m_currentNode->m_braceStack.getLast(), CPPDiagnostics::seeOpenBrace);
                     }
                     else
                     {
-                        m_sink->diagnoseRaw(Severity::Error, UnownedStringSlice::fromLiteral("Didn't find matching braces at end of file"));
+                        m_sink->diagnose(m_reader.peekToken(), CPPDiagnostics::braceOpenAtEndOfFile);
                     }
                     return SLANG_FAIL;
                 }
@@ -897,16 +892,14 @@ SlangResult CPPExtractorApp::readAllText(const Slang::String& fileName, String& 
         outRead = reader.ReadToEnd();
 
     }
-    catch (const IOException& except)
+    catch (const IOException&)
     {
-        m_sink->diagnoseRaw(Severity::Error, except.Message.getUnownedSlice());
+        m_sink->diagnose(SourceLoc(), CPPDiagnostics::cannotOpenFile, fileName);
         return SLANG_FAIL;
     }
     catch (...)
     {
-        StringBuilder msg;
-        msg << "Unable to read '" << fileName << "'";
-        m_sink->diagnoseRaw(Severity::Error, msg.getUnownedSlice());
+        m_sink->diagnose(SourceLoc(), CPPDiagnostics::cannotOpenFile, fileName);
         return SLANG_FAIL;
     }
 
@@ -976,17 +969,13 @@ SlangResult CPPExtractorApp::parseArgs(int argc, const char*const* argv, Options
                     if (outOptions.m_outputPath.getLength())
                     {
                         // There already is output
-                        StringBuilder msg;
-                        msg << "Output has already been defined '" << outOptions.m_outputPath << "'";
-                        m_sink->diagnoseRaw(Severity::Error, msg.getUnownedSlice());
+                        m_sink->diagnose(SourceLoc(), CPPDiagnostics::outputAlreadyDefined, outOptions.m_outputPath);
                         return SLANG_FAIL;
                     }
                 }
                 else
                 {
-                    StringBuilder msg;
-                    msg << "Require a value after -o option";
-                    m_sink->diagnoseRaw(Severity::Error, msg.getUnownedSlice());
+                    m_sink->diagnose(SourceLoc(), CPPDiagnostics::requireValueAfterOption, "-o");
                     return SLANG_FAIL;
                 }
 
@@ -997,9 +986,7 @@ SlangResult CPPExtractorApp::parseArgs(int argc, const char*const* argv, Options
 
 
             {
-                StringBuilder msg;
-                msg << "Unknown option '" << arg << "'";
-                m_sink->diagnoseRaw(Severity::Error, msg.getUnownedSlice());
+                m_sink->diagnose(SourceLoc(), CPPDiagnostics::unknownOption, arg);
                 return SLANG_FAIL;
             }
         }
@@ -1011,12 +998,12 @@ SlangResult CPPExtractorApp::parseArgs(int argc, const char*const* argv, Options
 
     if (outOptions.m_inputPaths.getCount() < 0)
     {
-        m_sink->diagnoseRaw(Severity::Error, UnownedStringSlice::fromLiteral("No input paths specified"));
+        m_sink->diagnose(SourceLoc(), CPPDiagnostics::noInputPathsSpecified);
         return SLANG_FAIL;
     }
     if (outOptions.m_outputPath.getLength() == 0)
     {
-        m_sink->diagnoseRaw(Severity::Error, UnownedStringSlice::fromLiteral("No -o output path specified"));
+        m_sink->diagnose(SourceLoc(), CPPDiagnostics::noOutputPathSpecified);
         return SLANG_FAIL;
     }
 
