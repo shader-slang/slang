@@ -30,10 +30,11 @@ DIAGNOSTIC(100002, Error, scopeNotClosed, "Scope not closed")
 DIAGNOSTIC(100003, Error, typeNameDoesntMatch, "Type name doesn't match $0")
 DIAGNOSTIC(100004, Error, didntFindMatchingBrace, "Didn't find brace matching $0")
 DIAGNOSTIC(100005, Error, braceOpenAtEndOfFile, "Brace open at file end")
+DIAGNOSTIC(100006, Error, unexpectedTemplateClose, "Unexpected template close")
 
 // Command line errors 100100
 
-DIAGNOSTIC(100101, Error, outputAlreadyDefined, "Output is already defined '$0'")
+DIAGNOSTIC(100101, Error, optionAlreadyDefined, "Option '$0' is already defined '$1'")
 DIAGNOSTIC(100102, Error, requireValueAfterOption, "Require a value after $0 option")
 DIAGNOSTIC(100103, Error, unknownOption, "Unknown option '$0'")
 DIAGNOSTIC(100104, Error, noInputPathsSpecified, "No input paths specified")

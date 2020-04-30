@@ -251,8 +251,10 @@ public:
     SlangResult _maybeParseField();
 
     SlangResult _maybeParseType(UnownedStringSlice& outType);
-    SlangResult _maybeParseTemplateArgs();
-    SlangResult _maybeParseTemplateArg();
+
+    SlangResult _maybeParseType(UnownedStringSlice& outType, Index& ioTemplateDepth);
+    SlangResult _maybeParseTemplateArgs(Index& ioTemplateDepth);
+    SlangResult _maybeParseTemplateArg(Index& ioTemplateDepth);
 
     void _consumeTypeModifiers();
 
@@ -604,14 +606,14 @@ SlangResult CPPExtractor::_consumeToSync()
     }
 }
 
-SlangResult CPPExtractor::_maybeParseTemplateArg()
+SlangResult CPPExtractor::_maybeParseTemplateArg(Index& ioTemplateDepth)
 {
     switch (m_reader.peekTokenType())
     {
         case TokenType::Identifier:
         {
             UnownedStringSlice name;
-            SLANG_RETURN_ON_FAIL(_maybeParseType(name));
+            SLANG_RETURN_ON_FAIL(_maybeParseType(name, ioTemplateDepth));
             return SLANG_OK;
         }
         case TokenType::IntegerLiteral:
@@ -624,19 +626,43 @@ SlangResult CPPExtractor::_maybeParseTemplateArg()
     return SLANG_FAIL;
 }
 
-SlangResult CPPExtractor::_maybeParseTemplateArgs()
+SlangResult CPPExtractor::_maybeParseTemplateArgs(Index& ioTemplateDepth)
 {
     if (!advanceIfToken(TokenType::OpLess))
     {
         return SLANG_FAIL;
     }
 
+    ioTemplateDepth++;
+
     while (true)
     {
+        if (ioTemplateDepth == 0)
+        {
+            return SLANG_OK;
+        }
+
         switch (m_reader.peekTokenType())
         {
             case TokenType::OpGreater:
             {
+                if (ioTemplateDepth <= 0)
+                {
+                    m_sink->diagnose(m_reader.peekToken(), CPPDiagnostics::unexpectedTemplateClose);
+                    return SLANG_FAIL;
+                }
+                ioTemplateDepth--;
+                m_reader.advanceToken();
+                return SLANG_OK;
+            }
+            case TokenType::OpRsh:
+            {
+                if (ioTemplateDepth <= 1)
+                {
+                    m_sink->diagnose(m_reader.peekToken(), CPPDiagnostics::unexpectedTemplateClose);
+                    return SLANG_FAIL;
+                }
+                ioTemplateDepth -= 2;
                 m_reader.advanceToken();
                 return SLANG_OK;
             }
@@ -644,7 +670,7 @@ SlangResult CPPExtractor::_maybeParseTemplateArgs()
             {
                 while (true)
                 {
-                    SLANG_RETURN_ON_FAIL(_maybeParseTemplateArg());
+                    SLANG_RETURN_ON_FAIL(_maybeParseTemplateArg(ioTemplateDepth));
 
                     if (m_reader.peekTokenType() == TokenType::Comma)
                     {
@@ -678,7 +704,7 @@ void CPPExtractor::_consumeTypeModifiers()
     }
 }
 
-SlangResult CPPExtractor::_maybeParseType(UnownedStringSlice& outType)
+SlangResult CPPExtractor::_maybeParseType(UnownedStringSlice& outType, Index& ioTemplateDepth)
 {
     Token startToken = m_reader.peekToken();
 
@@ -710,7 +736,7 @@ SlangResult CPPExtractor::_maybeParseType(UnownedStringSlice& outType)
 
     if (m_reader.peekTokenType() == TokenType::OpLess)
     {
-        SLANG_RETURN_ON_FAIL(_maybeParseTemplateArgs());
+        SLANG_RETURN_ON_FAIL(_maybeParseTemplateArgs(ioTemplateDepth));
     }
 
     // Strip all the consts etc modifiers
@@ -740,6 +766,23 @@ SlangResult CPPExtractor::_maybeParseType(UnownedStringSlice& outType)
     return SLANG_OK;
 }
 
+SlangResult CPPExtractor::_maybeParseType(UnownedStringSlice& outType)
+{
+    Index templateDepth = 0;
+    SlangResult res = _maybeParseType(outType, templateDepth);
+    if (SLANG_FAILED(res) && m_sink->errorCount)
+    {
+        return res;
+    }
+
+    if (templateDepth != 0)
+    {
+        m_sink->diagnose(m_reader.peekToken(), CPPDiagnostics::unexpectedTemplateClose);
+        return SLANG_FAIL;
+    }
+    return SLANG_OK;
+}
+
 SlangResult CPPExtractor::_maybeParseField()
 {
     Node::Field field;
@@ -747,6 +790,11 @@ SlangResult CPPExtractor::_maybeParseField()
     UnownedStringSlice typeName;
     if (SLANG_FAILED(_maybeParseType(typeName)))
     {
+        if (m_sink->errorCount)
+        {
+            return SLANG_FAIL;
+        }
+
         _consumeToSync();
         return SLANG_OK;
     }
@@ -894,28 +942,122 @@ SlangResult CPPExtractor::parse(SourceFile* sourceFile, NamePool* namePool, Diag
                 break;
             }
         }
-
-        
     }
 }
+
+// !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! CPPExtractorApp !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+
+struct Options
+{
+    void reset()
+    {
+        m_inputPaths.clear();
+        m_outputPath = String();
+    }
+
+    List<String> m_inputPaths;
+    String m_outputPath;
+    String m_inputDirectory;
+};
+
+struct OptionsParser
+{
+
+    /// Parse the parameters. NOTE! Must have the program path removed
+    SlangResult parse(int argc, const char*const* argv, DiagnosticSink* sink, Options& outOptions);
+
+    SlangResult _parseArgWithValue(const char* option, String& outValue);
+    
+    Index m_index;
+    Int m_argCount;
+    const char*const* m_args;
+    DiagnosticSink* m_sink;
+};
+
+SlangResult OptionsParser::_parseArgWithValue(const char* option, String& ioValue)
+{
+    SLANG_ASSERT(UnownedStringSlice(m_args[m_index]) == option);
+    if (m_index + 1 < m_argCount)
+    {
+        // Next parameter is the output path, there can only be one
+        if (ioValue.getLength())
+        {
+            // There already is output
+            m_sink->diagnose(SourceLoc(), CPPDiagnostics::optionAlreadyDefined, option, ioValue);
+            return SLANG_FAIL;
+        }
+    }
+    else
+    {
+        m_sink->diagnose(SourceLoc(), CPPDiagnostics::requireValueAfterOption, option);
+        return SLANG_FAIL;
+    }
+
+    ioValue = m_args[m_index + 1];
+    m_index += 2;
+    return SLANG_OK;
+}
+
+SlangResult OptionsParser::parse(int argc, const char*const* argv, DiagnosticSink* sink, Options& outOptions)
+{
+    outOptions.reset();
+
+    m_index = 0;
+    m_argCount = argc;
+    m_args = argv;
+    m_sink = sink;
+
+    outOptions.reset();
+
+    while (m_index < m_argCount)
+    {
+        const UnownedStringSlice arg = UnownedStringSlice(argv[m_index]);
+
+        if (arg.getLength() > 0 && arg[0] == '-')
+        {
+            if (arg == "-d")
+            {
+                SLANG_RETURN_ON_FAIL(_parseArgWithValue("-d", outOptions.m_inputDirectory));
+                continue;
+            }
+            else if (arg == "-o")
+            {
+                SLANG_RETURN_ON_FAIL(_parseArgWithValue("-o", outOptions.m_outputPath));
+                continue;
+            }
+
+            m_sink->diagnose(SourceLoc(), CPPDiagnostics::unknownOption, arg);
+            return SLANG_FAIL;
+        }
+        else
+        {
+            // If it starts with - then it an unknown option
+            outOptions.m_inputPaths.add(arg);
+            m_index++;
+        }
+    }
+
+    if (outOptions.m_inputPaths.getCount() < 0)
+    {
+        m_sink->diagnose(SourceLoc(), CPPDiagnostics::noInputPathsSpecified);
+        return SLANG_FAIL;
+    }
+    if (outOptions.m_outputPath.getLength() == 0)
+    {
+        m_sink->diagnose(SourceLoc(), CPPDiagnostics::noOutputPathSpecified);
+        return SLANG_FAIL;
+    }
+
+    return SLANG_OK;
+}
+
 
 // !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! CPPExtractorApp !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 
 class CPPExtractorApp
 {
 public:
-    struct Options
-    {
-        void reset()
-        {
-            m_inputPaths.clear();
-            m_outputPath = String();
-        }
-
-        List<String> m_inputPaths;
-        String m_outputPath;
-    };
-
+    
     SlangResult readAllText(const Slang::String& fileName, String& outRead);
 
     SlangResult parseContents(SourceFile* sourceFile, NamePool* namePool, Node* rootNode);
@@ -953,8 +1095,11 @@ public:
         m_identifierLookup.set("namespace", IdentifierLookup::Flag::Keyword | IdentifierLookup::Flag::ScopeStart);
     }
 
+    
+protected:
     NamePool m_namePool;
 
+    
     Options m_options;
     DiagnosticSink* m_sink;
     SourceManager* m_sourceManager;
@@ -1000,7 +1145,16 @@ SlangResult CPPExtractorApp::execute(const Options& options)
     // Read in each of the input files
     for (Index i = 0; i < m_options.m_inputPaths.getCount(); ++i)
     {
-        const String& inputPath = m_options.m_inputPaths[i];
+        String inputPath;
+
+        if (m_options.m_inputDirectory.getLength())
+        {
+            inputPath = Path::combine(m_options.m_inputDirectory, m_options.m_inputPaths[i]);
+        }
+        else
+        {
+            inputPath = m_options.m_inputPaths[i];
+        }
 
         // Read the input file
         String contents;
@@ -1025,73 +1179,12 @@ SlangResult CPPExtractorApp::execute(const Options& options)
     return SLANG_OK;
 }
 
-/// Parse the parameters. NOTE! Must have the program path removed
-SlangResult CPPExtractorApp::parseArgs(int argc, const char*const* argv, Options& outOptions)
-{
-    outOptions.reset();
-
-    Index i = 0;
-    while (i < argc)
-    {
-        const UnownedStringSlice arg = UnownedStringSlice(argv[i]);
-
-        if (arg.getLength() > 0 && arg[0] == '-')
-        {
-            if (arg == "-o")
-            {
-                if (i + 1 < argc)
-                {
-                    // Next parameter is the output path, there can only be one
-
-                    if (outOptions.m_outputPath.getLength())
-                    {
-                        // There already is output
-                        m_sink->diagnose(SourceLoc(), CPPDiagnostics::outputAlreadyDefined, outOptions.m_outputPath);
-                        return SLANG_FAIL;
-                    }
-                }
-                else
-                {
-                    m_sink->diagnose(SourceLoc(), CPPDiagnostics::requireValueAfterOption, "-o");
-                    return SLANG_FAIL;
-                }
-
-                outOptions.m_outputPath = argv[i + 1];
-                i += 2;
-                continue;
-            }
-
-
-            {
-                m_sink->diagnose(SourceLoc(), CPPDiagnostics::unknownOption, arg);
-                return SLANG_FAIL;
-            }
-        }
-
-        // If it starts with - then it an unknown option
-        outOptions.m_inputPaths.add(arg);
-        i++;
-    }
-
-    if (outOptions.m_inputPaths.getCount() < 0)
-    {
-        m_sink->diagnose(SourceLoc(), CPPDiagnostics::noInputPathsSpecified);
-        return SLANG_FAIL;
-    }
-    if (outOptions.m_outputPath.getLength() == 0)
-    {
-        m_sink->diagnose(SourceLoc(), CPPDiagnostics::noOutputPathSpecified);
-        return SLANG_FAIL;
-    }
-
-    return SLANG_OK;
-}
-
 /// Execute
 SlangResult CPPExtractorApp::executeWithArgs(int argc, const char*const* argv)
 {
     Options options;
-    SLANG_RETURN_ON_FAIL(parseArgs(argc, argv, options));
+    OptionsParser optionsParser;
+    SLANG_RETURN_ON_FAIL(optionsParser.parse(argc, argv, m_sink, options));
     SLANG_RETURN_ON_FAIL(execute(options));
     return SLANG_OK;
 }
