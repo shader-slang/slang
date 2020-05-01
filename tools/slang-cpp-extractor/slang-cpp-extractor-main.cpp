@@ -51,7 +51,7 @@ struct IdentifierFlag
     enum Enum : IdentifierFlags
     {
         StartScope  = 0x1,          ///< namespace, struct or class
-        Class       = 0x2,          ///< Struct or class
+        ClassLike   = 0x2,          ///< Struct or class
         Keyword     = 0x4,
     };
 };
@@ -64,8 +64,8 @@ static const IdentifierFlags kIdentifierFlags[Index(IdentifierStyle::CountOf)] =
     0,              /// BaseClass
     IdentifierFlag::Keyword,              /// TypeModifier
     IdentifierFlag::Keyword,              /// Keyword
-    IdentifierFlag::Keyword | IdentifierFlag::StartScope | IdentifierFlag::Class, /// Class
-    IdentifierFlag::Keyword | IdentifierFlag::StartScope | IdentifierFlag::Class, /// Struct
+    IdentifierFlag::Keyword | IdentifierFlag::StartScope | IdentifierFlag::ClassLike, /// Class
+    IdentifierFlag::Keyword | IdentifierFlag::StartScope | IdentifierFlag::ClassLike, /// Struct
     IdentifierFlag::Keyword | IdentifierFlag::StartScope, /// Namespace
     IdentifierFlag::Keyword,
 };
