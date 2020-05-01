@@ -1469,7 +1469,7 @@ class CPPExtractorApp
 public:
     
     SlangResult readAllText(const Slang::String& fileName, String& outRead);
-    SlangResult writeAllText(const Slang::String& fileName, UnownedStringSlice& text);
+    SlangResult writeAllText(const Slang::String& fileName, const UnownedStringSlice& text);
 
     SlangResult execute(const Options& options);
 
@@ -1555,7 +1555,7 @@ SlangResult CPPExtractorApp::readAllText(const Slang::String& fileName, String& 
     return SLANG_OK;
 }
 
-SlangResult CPPExtractorApp::writeAllText(const Slang::String& fileName, UnownedStringSlice& text)
+SlangResult CPPExtractorApp::writeAllText(const Slang::String& fileName, const UnownedStringSlice& text)
 {
     try
     {
