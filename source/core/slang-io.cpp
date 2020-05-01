@@ -144,29 +144,29 @@ namespace Slang
     }
 
 
-	bool File::exists(const String& fileName)
-	{
+    bool File::exists(const String& fileName)
+    {
 #ifdef _WIN32
-		struct _stat32 statVar;
-		return ::_wstat32(((String)fileName).toWString(), &statVar) != -1;
+        struct _stat32 statVar;
+        return ::_wstat32(((String)fileName).toWString(), &statVar) != -1;
 #else
-		struct stat statVar;
-		return ::stat(fileName.getBuffer(), &statVar) == 0;
+        struct stat statVar;
+        return ::stat(fileName.getBuffer(), &statVar) == 0;
 #endif
-	}
+    }
 
-	String Path::replaceExt(const String& path, const char* newExt)
-	{
-		StringBuilder sb(path.getLength() + 10);
+    String Path::replaceExt(const String& path, const char* newExt)
+    {
+        StringBuilder sb(path.getLength() + 10);
         Index dotPos = findExtIndex(path);
 
-		if (dotPos < 0)
-			dotPos = path.getLength();
-		sb.Append(path.getBuffer(), dotPos);
-		sb.Append('.');
-		sb.Append(newExt);
-		return sb.ProduceString();
-	}
+        if (dotPos < 0)
+            dotPos = path.getLength();
+        sb.Append(path.getBuffer(), dotPos);
+        sb.Append('.');
+        sb.Append(newExt);
+        return sb.ProduceString();
+    }
 
     /* static */ Index Path::findLastSeparatorIndex(String const& path)
     {
@@ -198,8 +198,8 @@ namespace Slang
         }
     }
 
-	String Path::getFileName(const String& path)
-	{
+    String Path::getFileName(const String& path)
+    {
         Index pos = findLastSeparatorIndex(path);
         if (pos >= 0)
         {
@@ -210,7 +210,7 @@ namespace Slang
         {
             return path;
         }
-	}
+    }
 
     /* static */String Path::getFileNameWithoutExt(const String& path)
     {
@@ -231,24 +231,24 @@ namespace Slang
             return path;
     }
 
-	String Path::getPathExt(const String& path)
-	{
+    String Path::getPathExt(const String& path)
+    {
         const Index dotPos = findExtIndex(path);
-		if (dotPos >= 0)
-			return path.subString(dotPos + 1, path.getLength() - dotPos - 1);
-		else
-			return "";
-	}
+        if (dotPos >= 0)
+            return path.subString(dotPos + 1, path.getLength() - dotPos - 1);
+        else
+            return "";
+    }
 
-	String Path::getParentDirectory(const String& path)
-	{
+    String Path::getParentDirectory(const String& path)
+    {
         Index pos = findLastSeparatorIndex(path);
-		if (pos >= 0)
-			return path.subString(0, pos);
-		else
-			return "";
-	}
-	
+        if (pos >= 0)
+            return path.subString(0, pos);
+        else
+            return "";
+    }
+    
     /* static */void Path::append(StringBuilder& ioBuilder, const UnownedStringSlice& path)
     {
         if (ioBuilder.getLength() == 0)
@@ -288,14 +288,14 @@ namespace Slang
         combineIntoBuilder(path1.getUnownedSlice(), path2.getUnownedSlice(), sb);
         return sb.ProduceString();
     }
-	String Path::combine(const String& path1, const String& path2, const String& path3)
-	{
-		StringBuilder sb;
+    String Path::combine(const String& path1, const String& path2, const String& path3)
+    {
+        StringBuilder sb;
         sb.append(path1);
         append(sb, path2.getUnownedSlice());
         append(sb, path3.getUnownedSlice());
-		return sb.ProduceString();
-	}
+        return sb.ProduceString();
+    }
 
     /* static */ bool Path::isDriveSpecification(const UnownedStringSlice& element)
     {
@@ -444,14 +444,14 @@ namespace Slang
         return builder.ToString();
     }
 
-	bool Path::createDirectory(const String& path)
-	{
+    bool Path::createDirectory(const String& path)
+    {
 #if defined(_WIN32)
-		return _wmkdir(path.toWString()) == 0;
+        return _wmkdir(path.toWString()) == 0;
 #else 
-		return mkdir(path.getBuffer(), 0777) == 0;
+        return mkdir(path.getBuffer(), 0777) == 0;
 #endif
-	}
+    }
 
     /* static */SlangResult Path::getPathType(const String& path, SlangPathType* pathTypeOut)
     {
@@ -671,33 +671,33 @@ namespace Slang
         return _getExecutablePath();
     }
 
-	Slang::String File::readAllText(const Slang::String& fileName)
-	{
-		StreamReader reader(new FileStream(fileName, FileMode::Open, FileAccess::Read, FileShare::ReadWrite));
-		return reader.ReadToEnd();
-	}
+    Slang::String File::readAllText(const Slang::String& fileName)
+    {
+        StreamReader reader(new FileStream(fileName, FileMode::Open, FileAccess::Read, FileShare::ReadWrite));
+        return reader.ReadToEnd();
+    }
 
-	Slang::List<unsigned char> File::readAllBytes(const Slang::String& fileName)
-	{
-		RefPtr<FileStream> fs = new FileStream(fileName, FileMode::Open, FileAccess::Read, FileShare::ReadWrite);
-		List<unsigned char> buffer;
-		while (!fs->isEnd())
-		{
-			unsigned char ch;
-			int read = (int)fs->read(&ch, 1);
-			if (read)
-				buffer.add(ch);
-			else
-				break;
-		}
-		return _Move(buffer);
-	}
+    Slang::List<unsigned char> File::readAllBytes(const Slang::String& fileName)
+    {
+        RefPtr<FileStream> fs = new FileStream(fileName, FileMode::Open, FileAccess::Read, FileShare::ReadWrite);
+        List<unsigned char> buffer;
+        while (!fs->isEnd())
+        {
+            unsigned char ch;
+            int read = (int)fs->read(&ch, 1);
+            if (read)
+                buffer.add(ch);
+            else
+                break;
+        }
+        return _Move(buffer);
+    }
 
-	void File::writeAllText(const Slang::String& fileName, const Slang::String& text)
-	{
-		StreamWriter writer(new FileStream(fileName, FileMode::Create));
-		writer.Write(text);
-	}
+    void File::writeAllText(const Slang::String& fileName, const Slang::String& text)
+    {
+        StreamWriter writer(new FileStream(fileName, FileMode::Create));
+        writer.Write(text);
+    }
 
 
 }
