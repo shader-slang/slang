@@ -1018,16 +1018,6 @@ void GLSLSourceEmitter::emitLayoutQualifiersImpl(IRVarLayout* layout)
     }
 }
 
-static EmitOp _getBoolOp(IROp op)
-{
-    switch (op)
-    {
-        case kIROp_BitAnd:          return EmitOp::And;
-        case kIROp_BitOr:           return EmitOp::Or;
-        default:                    return EmitOp::None;
-    }
-}
-
 static const char* _getGLSLVectorCompareFunctionName(IROp op)
 {
     // Glsl vector comparisons use functions...
@@ -1063,6 +1053,102 @@ void GLSLSourceEmitter::_maybeEmitGLSLCast(IRType* castType, IRInst* inst)
         // Emit the operand
         emitOperand(inst, getInfo(EmitOp::General));
     }
+}
+
+void GLSLSourceEmitter::_emitLegalizedBoolVectorBinOp(IRInst* inst, IRVectorType* type, const EmitOpInfo& op, const EmitOpInfo& inOuterPrec)
+{
+    auto elementCount = type->getElementCount();
+
+    EmitOpInfo outerPrec = inOuterPrec;
+    auto prec = getInfo(EmitOp::Postfix);
+    bool needClose = maybeEmitParens(outerPrec, prec);
+
+    emitType(type);
+    m_writer->emit("(uvec");
+    emitSimpleValue(elementCount);
+    m_writer->emit("(");
+    emitOperand(inst->getOperand(0), getInfo(EmitOp::General));
+    m_writer->emit(")");
+    m_writer->emit(op.op);
+    m_writer->emit("uvec");
+    emitSimpleValue(elementCount);
+    m_writer->emit("(");
+    emitOperand(inst->getOperand(1), getInfo(EmitOp::General));
+    m_writer->emit("))");
+
+    maybeCloseParens(needClose);
+}
+
+bool GLSLSourceEmitter::_tryEmitLogicalBinOp(IRInst* inst, const EmitOpInfo& bitOp, const EmitOpInfo& inOuterPrec)
+{
+    // Logical operation on scalar `bool` values are directly
+    // supported by GLSL. They have short-circuiting behavior,
+    // but we need not worry about that because our logic
+    // for folding sub-expressions into their use sites will
+    // never fold a sub-expression that would have side effects.
+    //
+    // Thus we fall back to the default handling for scalar
+    // cases (which should only arise for `bool` operands).
+    //
+    IRType* type = inst->getDataType();
+    auto vectorType = as<IRVectorType>(type);
+    if(!vectorType)
+        return false;
+
+    // For vector cases, we need to convert the operands to
+    // a type that supports vector operations, and then use
+    // bit operations there.
+    //
+    _emitLegalizedBoolVectorBinOp(inst, vectorType, bitOp, inOuterPrec);
+    return true;
+}
+
+bool GLSLSourceEmitter::_tryEmitBitBinOp(IRInst* inst, const EmitOpInfo& bitOp, const EmitOpInfo& boolOp, const EmitOpInfo& inOuterPrec)
+{
+    // The bitwise binary operations are supported in GLSL,
+    // but do not support `bool` or vector-of-`bool` operands.
+    //
+    // We start by checking if we have a `bool`-based case,
+    // and fall back to the default emit logic if not.
+    //
+    IRType* type = inst->getDataType();
+    IRType* elementType = type;
+    auto vectorType = as<IRVectorType>(type);
+    if(vectorType)
+        elementType = vectorType->getElementType();
+    if(!as<IRBoolType>(elementType))
+        return false;
+
+    // If we have a vector case, then it will be handled
+    // by casting the `bool` vectors to vectors of
+    // integers and doing the bitwise op there, where
+    // it should yield an equivalent result.
+    //
+    if(vectorType)
+    {
+        _emitLegalizedBoolVectorBinOp(inst, vectorType, bitOp, inOuterPrec);
+    }
+    else
+    {
+        // In the scalar case, we will translate
+        // bitwise operations on `bool` values to
+        // the equivalent logical operation, knowing
+        // that our appraoch to folding of sub-expressions
+        // into use sites will avoid any potential issues
+        // around short-circuiting behavior.
+        //
+        auto prec = boolOp;
+        EmitOpInfo outerPrec = inOuterPrec;
+        bool needClose = maybeEmitParens(outerPrec, prec);
+
+        emitOperand(inst->getOperand(0), leftSide(outerPrec, prec));
+        m_writer->emit(prec.op);
+        emitOperand(inst->getOperand(1), rightSide(outerPrec, prec));
+
+        maybeCloseParens(needClose);
+    }
+    return true;
+
 }
 
 bool GLSLSourceEmitter::tryEmitInstExprImpl(IRInst* inst, const EmitOpInfo& inOuterPrec)
@@ -1149,6 +1235,10 @@ bool GLSLSourceEmitter::tryEmitInstExprImpl(IRInst* inst, const EmitOpInfo& inOu
 
             return true;
         }
+        case kIROp_And:
+            return _tryEmitLogicalBinOp(inst, getInfo(EmitOp::BitAnd), inOuterPrec);
+        case kIROp_Or:
+            return _tryEmitLogicalBinOp(inst, getInfo(EmitOp::BitOr), inOuterPrec);
         case kIROp_Not:
         {
             IRInst* operand = inst->getOperand(0);
@@ -1170,33 +1260,24 @@ bool GLSLSourceEmitter::tryEmitInstExprImpl(IRInst* inst, const EmitOpInfo& inOu
             }
             return false;
         }
+
+        // When emitting a bitwise operation in GLSL, we need to special-case the handling
+        // of `bool` and vectors of `bool` so that they produce valid results by operating
+        // on the single-bit truth value.
+        //
+        // In the case of a vector we will convert to `uint` vectors and perform the
+        // bitwise op on them before converting back to `bool` vectors.
+        //
+        // In the scalar case we will apply the corresponding logical operation to
+        // the `bool` operands.
+        //
         case kIROp_BitAnd:
+            return _tryEmitBitBinOp(inst, getInfo(EmitOp::BitAnd), getInfo(EmitOp::And), inOuterPrec);
         case kIROp_BitOr:
-        {
-            // Are we targetting GLSL, and are both operands scalar bools?
-            // In that case convert the operation to a logical And
-            if (as<IRBoolType>(inst->getOperand(0)->getDataType())
-                && as<IRBoolType>(inst->getOperand(1)->getDataType()))
-            {
-                EmitOpInfo outerPrec = inOuterPrec;
-                bool needClose = maybeEmitParens(outerPrec, outerPrec);
-
-                // Get the boolean version of the op
-                const auto op = _getBoolOp(inst->op);
-                auto prec = getInfo(op);
-
-                // TODO: handle a bitwise Or of a vector of bools by casting to
-                // a uvec and performing the bitwise operation
-
-                emitOperand(inst->getOperand(0), leftSide(outerPrec, prec));
-                m_writer->emit(prec.op);
-                emitOperand(inst->getOperand(1), rightSide(outerPrec, prec));
-
-                maybeCloseParens(needClose);
-                return true;
-            }
-            break;
-        }
+            return _tryEmitBitBinOp(inst, getInfo(EmitOp::BitOr), getInfo(EmitOp::Or), inOuterPrec);
+        case kIROp_BitXor:
+            // Note: on scalar `bool` operands, a bitwise XOR (`^`) is equivalent to a not-equal (`!=`) comparison.
+            return _tryEmitBitBinOp(inst, getInfo(EmitOp::BitXor), getInfo(EmitOp::Neq), inOuterPrec);
 
         // Comparisons
         case kIROp_Eql:
