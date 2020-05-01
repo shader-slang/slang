@@ -155,19 +155,12 @@ namespace Slang
 #endif
 	}
 
-	String Path::truncateExt(const String& path)
-	{
-		UInt dotPos = path.lastIndexOf('.');
-		if (dotPos != -1)
-			return path.subString(0, dotPos);
-		else
-			return path;
-	}
 	String Path::replaceExt(const String& path, const char* newExt)
 	{
-		StringBuilder sb(path.getLength()+10);
-		UInt dotPos = path.lastIndexOf('.');
-		if (dotPos == -1)
+		StringBuilder sb(path.getLength() + 10);
+        Index dotPos = findExtIndex(path);
+
+		if (dotPos < 0)
 			dotPos = path.getLength();
 		sb.Append(path.getBuffer(), dotPos);
 		sb.Append('.');
@@ -175,25 +168,40 @@ namespace Slang
 		return sb.ProduceString();
 	}
 
-    static UInt findLastSeparator(String const& path)
+    /* static */ Index Path::findLastSeparatorIndex(String const& path)
     {
-		UInt slashPos = path.lastIndexOf('/');
-        UInt backslashPos = path.lastIndexOf('\\');
+        const char* chars = path.getBuffer();
+        for (Index i = path.getLength() - 1; i >= 0; --i)
+        {
+            const char c = chars[i];
+            if (c == '/' || c == '\\')
+            {
+                return i;
+            }
+        }
+        return -1;
+    }
 
-        if (slashPos == -1) return backslashPos;
-        if (backslashPos == -1) return slashPos;
+    /* static */Index Path::findExtIndex(String const& path)
+    {
+        const Index sepIndex = findLastSeparatorIndex(path);
 
-        UInt pos = slashPos;
-        if (backslashPos > slashPos)
-            pos = backslashPos;
-
-        return pos;
+        const Index dotIndex = path.lastIndexOf('.');
+        if (sepIndex >= 0)
+        {
+            // Index has to be in the last part of the path
+            return (dotIndex > sepIndex) ? dotIndex : -1;
+        }
+        else
+        {
+            return dotIndex;
+        }
     }
 
 	String Path::getFileName(const String& path)
 	{
-        UInt pos = findLastSeparator(path);
-        if (pos != -1)
+        Index pos = findLastSeparatorIndex(path);
+        if (pos >= 0)
         {
             pos = pos + 1;
             return path.subString(pos, path.getLength() - pos);
@@ -203,26 +211,39 @@ namespace Slang
             return path;
         }
 	}
-	String Path::getFileNameWithoutExt(const String& path)
+
+    /* static */String Path::getFileNameWithoutExt(const String& path)
+    {
+        Index sepIndex = findLastSeparatorIndex(path);
+        sepIndex = (sepIndex < 0) ? 0 : sepIndex;
+        Index dotIndex = findExtIndex(path);
+        dotIndex = (dotIndex < 0) ? path.getLength() : dotIndex;
+
+        return path.subString(sepIndex, dotIndex);
+    }
+
+    /* static*/ String Path::getPathWithoutExt(const String& path)
+    {
+        Index dotPos = findExtIndex(path);
+        if (dotPos >= 0)
+            return path.subString(0, dotPos);
+        else
+            return path;
+    }
+
+	String Path::getPathExt(const String& path)
 	{
-        String fileName = getFileName(path);
-		UInt dotPos = fileName.lastIndexOf('.');
-		if (dotPos == -1)
-            return fileName;
-		return fileName.subString(0, dotPos);
-	}
-	String Path::getFileExt(const String& path)
-	{
-		UInt dotPos = path.lastIndexOf('.');
-		if (dotPos != -1)
-			return path.subString(dotPos+1, path.getLength()-dotPos-1);
+        const Index dotPos = findExtIndex(path);
+		if (dotPos >= 0)
+			return path.subString(dotPos + 1, path.getLength() - dotPos - 1);
 		else
 			return "";
 	}
+
 	String Path::getParentDirectory(const String& path)
 	{
-        UInt pos = findLastSeparator(path);
-		if (pos != -1)
+        Index pos = findLastSeparatorIndex(path);
+		if (pos >= 0)
 			return path.subString(0, pos);
 		else
 			return "";
