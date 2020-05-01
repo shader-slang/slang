@@ -150,47 +150,30 @@ public:
 
     bool isClassLike() const { return m_type == Type::StructType || m_type == Type::ClassType; }
 
-    void addChild(Node* child)
-    {
-        SLANG_ASSERT(child->m_parentScope == nullptr);
-        child->m_parentScope = this;
-        m_children.add(child);
+        /// Add a child node to this nodes scope
+    void addChild(Node* child);
 
-        if (child->m_type == Type::AnonymousNamespace)
-        {
-            SLANG_ASSERT(m_anonymousNamespace == nullptr);
-            m_anonymousNamespace = child;
-        
-        }
-        else if (child->m_name.Content.getLength())
-        {
-            m_childMap.Add(child->m_name.Content, child);
-        }
-    }
-    Node* findChild(const UnownedStringSlice& name) const
-    {
-        Node** nodePtr = m_childMap.TryGetValue(name);
-        return (nodePtr) ? *nodePtr : nullptr;
-    }
+        /// Find a child node in this scope with the specified name. Return nullptr if not found
+    Node* findChild(const UnownedStringSlice& name) const;
 
-    void addDerived(Node* derived)
-    {
-        SLANG_ASSERT(derived->m_derivedFrom == nullptr);
-        derived->m_derivedFrom = this;
-        m_derivedTypes.add(derived);
-    }
+        /// Add a node that is derived from this
+    void addDerived(Node* derived);
 
+        /// True if can accept fields (class like types can)
     bool acceptsFields() const { return isClassLike(); }
 
     void dump(int indent, StringBuilder& out);
     void dumpDerived(int indentCount, StringBuilder& out);
 
-    void calcName(StringBuilder& outName) const;
+        /// Calculate the absolute name for this namespace/type
+    void calcAbsoluteName(StringBuilder& outName) const;
 
+        /// Gets the anonymous namespace associated with this scope
+    Node* getAnonymousNamespace();
 
-    Node(Type type, Node* parent = nullptr):
+    Node(Type type):
         m_type(type),
-        m_parentScope(parent),
+        m_parentScope(nullptr),
         m_isReflected(false),
         m_derivedFrom(nullptr),
         m_isBaseType(false)
@@ -198,28 +181,78 @@ public:
         m_anonymousNamespace = nullptr;
     }
 
+        /// The type of node this is
     Type m_type;
 
+        /// All of the types and namespaces in this *scope*
     List<RefPtr<Node>> m_children;
 
+        /// All of the types derived from this type
     List<RefPtr<Node>> m_derivedTypes;
 
+        /// Map from a name (in this scope) to the Node
     Dictionary<UnownedStringSlice, Node*> m_childMap;
 
+        /// All of the fields within a *type*
     List<Field> m_fields;
 
+        /// There can only be one anonymousNamespace for a scope. If there is one it's held here
     Node* m_anonymousNamespace;
 
+        /// Classes can be traversed, but not reflected. To be reflected they have to contain the marker
     bool m_isReflected;
-    bool m_isBaseType;          ///< The Super type is bothered to be looked up
+        /// If set, will not lookup super class even if one is defined (can be useful for setting an arbitray 'base')
+    bool m_isBaseType;          
 
-    Token m_name;
-    Token m_super;
-    Token m_marker;        
+    Token m_name;           ///< The name of this scope/type
+    Token m_super;          ///< Super class name
+    Token m_marker;         ///< The marker associated with this scope (typically the marker is SLANG_CLASS etc, that is used to identify reflectedType)
 
-    Node* m_parentScope;
-    Node* m_derivedFrom;
+    Node* m_parentScope;    ///< The scope this type/scope is defined in
+    Node* m_derivedFrom;    ///< If this is a class/struct, the type it is derived from (or nullptr if base)
 };
+
+Node* Node::getAnonymousNamespace()
+{
+    
+    if (!m_anonymousNamespace)
+    {
+        m_anonymousNamespace = new Node(Type::AnonymousNamespace);
+        m_anonymousNamespace->m_parentScope = this;
+        m_children.add(m_anonymousNamespace);
+    }
+
+    return m_anonymousNamespace;
+}
+
+void Node::addChild(Node* child)
+{
+    SLANG_ASSERT(child->m_parentScope == nullptr);
+    // Can't add anonymous namespace this way - should be added via getAnonymousNamespace
+    SLANG_ASSERT(child->m_type != Type::AnonymousNamespace);
+
+    child->m_parentScope = this;
+    m_children.add(child);
+
+    if (child->m_name.Content.getLength())
+    {
+        m_childMap.Add(child->m_name.Content, child);
+    }
+}
+
+Node* Node::findChild(const UnownedStringSlice& name) const
+{
+    Node** nodePtr = m_childMap.TryGetValue(name);
+    return (nodePtr) ? *nodePtr : nullptr;
+}
+
+/// Add a node that is derived from this
+void Node::addDerived(Node* derived)
+{
+    SLANG_ASSERT(derived->m_derivedFrom == nullptr);
+    derived->m_derivedFrom = this;
+    m_derivedTypes.add(derived);
+}
 
 static void _indent(int indentCount, StringBuilder& out)
 {
@@ -307,7 +340,7 @@ void Node::dump(int indentCount, StringBuilder& out)
     out << "}\n";
 }
 
-void Node::calcName(StringBuilder& outName) const
+void Node::calcAbsoluteName(StringBuilder& outName) const
 {
     if (m_parentScope == nullptr)
     {
@@ -322,7 +355,7 @@ void Node::calcName(StringBuilder& outName) const
         outName << "::";
         if (m_type == Type::AnonymousNamespace)
         {
-            outName << "::{Anonymous}";
+            outName << "{Anonymous}";
         }
         else
         {
@@ -458,14 +491,7 @@ bool CPPExtractor::advanceIfStyle(IdentifierStyle style, Token* outToken)
 
 SlangResult CPPExtractor::pushAnonymousNamespace()
 {
-    // See if we find a anonymous namespace node
-    if (!m_currentNode->m_anonymousNamespace)
-    {
-        Node* node = new Node(Node::Type::AnonymousNamespace);
-        m_currentNode->addChild(node);
-    }
-    m_currentNode = m_currentNode->m_anonymousNamespace;
-
+    m_currentNode = m_currentNode->getAnonymousNamespace();
     return SLANG_OK;
 }
 
@@ -562,25 +588,18 @@ SlangResult CPPExtractor::_maybeParseNode(Node::Type type)
         // consume namespace
         SLANG_RETURN_ON_FAIL(expect(TokenType::Identifier));
 
-        if (m_reader.peekTokenType() == TokenType::LBrace)
+        Token name;
+        if (advanceIfToken(TokenType::LBrace))
         {
-            m_reader.advanceToken();
             return pushAnonymousNamespace();
         }
-        else if (m_reader.peekTokenType() == TokenType::Identifier)
+        else if (advanceIfToken(TokenType::Identifier, &name))
         {
-            Token token = m_reader.advanceToken();
-
-            if (m_reader.peekTokenType() == TokenType::LBrace)
+            if (advanceIfToken(TokenType::LBrace))
             {
                 // Okay looks like we are opening a namespace
-
                 RefPtr<Node> node(new Node(Node::Type::Namespace));
-                node->m_name = token;
-
-                // Skip the brace
-                m_reader.advanceToken();
-
+                node->m_name = name;
                 // Push the node
                 return pushNode(node);
             }
@@ -607,7 +626,7 @@ SlangResult CPPExtractor::_maybeParseNode(Node::Type type)
         return SLANG_OK;
     }
 
-    RefPtr<Node> node(new Node(type, nullptr));
+    RefPtr<Node> node(new Node(type));
     node->m_name = name;
 
     if (advanceIfToken(TokenType::Colon))
@@ -680,39 +699,33 @@ SlangResult CPPExtractor::_maybeParseNode(Node::Type type)
             }
         }
         
-        // If it's one of the markers, then we add it
-        UnownedStringSlice lexeme = m_reader.peekToken().Content;
-
-        const IdentifierStyle style = m_identifierLookup->get(lexeme);
-        if (style != IdentifierStyle::Marker)
+        // If it's one of the markers, then we continue to extract parameter
+        if (advanceIfStyle(IdentifierStyle::Marker, &node->m_marker))
         {
-            // Looks like a class, but looks like non-reflected
-            node->m_isReflected = false;
-
-            // We still need to add the node,
-            SLANG_RETURN_ON_FAIL(pushNode(node));
-            return SLANG_OK;
+            break;
         }
-        node->m_marker = m_reader.advanceToken();
-        break;
+
+        // Looks like a class, but looks like non-reflected
+        node->m_isReflected = false;
+        // We still need to add the node,
+        SLANG_RETURN_ON_FAIL(pushNode(node));
+        return SLANG_OK;
     }
 
     // Okay now looking for ( identifier)
-    SLANG_RETURN_ON_FAIL(expect(TokenType::LParent));
-
     Token typeNameToken;
+
+    SLANG_RETURN_ON_FAIL(expect(TokenType::LParent));
     SLANG_RETURN_ON_FAIL(expect(TokenType::Identifier, &typeNameToken));
+    SLANG_RETURN_ON_FAIL(expect(TokenType::RParent));
 
     if (typeNameToken.Content != node->m_name.Content)
     {
         m_sink->diagnose(typeNameToken, CPPDiagnostics::typeNameDoesntMatch, node->m_name.Content);
         return SLANG_FAIL;
     }
-
-    SLANG_RETURN_ON_FAIL(expect(TokenType::RParent));
-
+    
     node->m_isReflected = true;
-
     return pushNode(node);
 }
 
@@ -824,19 +837,7 @@ SlangResult CPPExtractor::_maybeParseTemplateArgs(Index& ioTemplateDepth)
 
 void CPPExtractor::_consumeTypeModifiers()
 {
-    while (true)
-    {
-        if (m_reader.peekTokenType() == TokenType::Identifier)
-        {
-            IdentifierStyle style = m_identifierLookup->get(m_reader.peekToken().Content);
-            if (style == IdentifierStyle::TypeModifier)
-            {
-                m_reader.advanceToken();
-                continue;
-            }
-        }
-        break;
-    }
+    while (advanceIfStyle(IdentifierStyle::TypeModifier));
 }
 
 SlangResult CPPExtractor::_maybeParseType(UnownedStringSlice& outType, Index& ioTemplateDepth)
