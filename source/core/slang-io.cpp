@@ -215,11 +215,11 @@ namespace Slang
     /* static */String Path::getFileNameWithoutExt(const String& path)
     {
         Index sepIndex = findLastSeparatorIndex(path);
-        sepIndex = (sepIndex < 0) ? 0 : sepIndex;
+        sepIndex = (sepIndex < 0) ? 0 : (sepIndex + 1);
         Index dotIndex = findExtIndex(path);
         dotIndex = (dotIndex < 0) ? path.getLength() : dotIndex;
 
-        return path.subString(sepIndex, dotIndex);
+        return path.subString(sepIndex, dotIndex - sepIndex);
     }
 
     /* static*/ String Path::getPathWithoutExt(const String& path)
