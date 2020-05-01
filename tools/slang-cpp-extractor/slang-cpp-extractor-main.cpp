@@ -1600,12 +1600,25 @@ SlangResult CPPExtractorApp::calcMacroHeader(CPPExtractor& extractor, StringBuil
                 continue;
             }
 
+            // Define the derived types
+            out << "#define " << m_options.m_prefixMark << "DERIVED_" << reflectTypeName << "_"  << node->m_name.Content << "(x, param) \\\n";
+            for (Node* derivedType : node->m_derivedTypes)
+            {
+                if (!derivedType->m_isReflected)
+                {
+                    continue;
+                }
+                _indent(1, out);
+                out << "SLANG_" << reflectTypeName << "_" << derivedType->m_name.Content << "(x, param) \\\n";
+            }
+            out << "/* */\n";
+
+
             out << "#define SLANG_" << reflectTypeName << "_" << node->m_name.Content << "(x, param) \\\n";
             
             // Output the X macro part
             _indent(1, out);
             out << "x(" << node->m_name.Content << ", ";
-
 
             UnownedStringSlice marker = node->m_marker.Content;
             // Need to extract the name
@@ -1634,19 +1647,10 @@ SlangResult CPPExtractorApp::calcMacroHeader(CPPExtractor& extractor, StringBuil
 
             out << "param) \\\n";
 
-            // Output all of the derived types
-
-            for (Node* childType : node->m_derivedTypes)
-            {
-                if (!childType->m_isReflected)
-                {
-                    continue;
-                }
-
-                _indent(1, out);
-                out << "SLANG_" << reflectTypeName << "_" << childType->m_name.Content << "(x, param) \\\n";
-            }
-
+            // Reference the derived types
+            _indent(1, out);
+            out << m_options.m_prefixMark << "DERIVED_" <<  reflectTypeName << "_" << node->m_name.Content << "(x, param) \n";
+            
             out << "\n";
         }
     }
