@@ -571,7 +571,7 @@ static bool _isStorable(const PathInfo::Type type)
             }
 
             String filename = Path::getFileNameWithoutExt(path);
-            String ext = Path::getFileExt(path);
+            String ext = Path::getPathExt(path);
 
             StringBuilder uniqueName;
             for (Index j = 0; j < 0x10000; j++)
@@ -1121,7 +1121,7 @@ struct LoadContext
     String parentDir = Path::getParentDirectory(absPath);
 
     String baseName = Path::getFileNameWithoutExt(filename);
-    String ext = Path::getFileExt(filename);
+    String ext = Path::getPathExt(filename);
 
     if (ext.getLength() == 0)
     {

@@ -341,7 +341,7 @@ struct OptionsParser
     void addOutputPath(char const* inPath)
     {
         String path = String(inPath);
-        String ext = Path::getFileExt(path);
+        String ext = Path::getPathExt(path);
 
         if (ext == "slang-module" || ext == "slang-lib")
         {
