@@ -32,7 +32,6 @@ enum class IdentifierStyle
     None,               ///< It's not an identifier
 
     Identifier,         ///< Just an identifier
-    Marker,             ///< Marker
     Root,
     BaseClass,          ///< Has the name of a base class defined elsewhere
 
@@ -61,7 +60,6 @@ static const IdentifierFlags kIdentifierFlags[Index(IdentifierStyle::CountOf)] =
 {
     0,              /// None
     0,              /// Identifier 
-    0,              /// Marker
     0,              /// Root
     0,              /// BaseClass
     IdentifierFlag::Keyword,              /// TypeModifier
@@ -192,6 +190,9 @@ public:
 
         /// Find the last (reflected) derived type
     Node* findLastDerived();
+
+        /// True if has a derived type that is reflected
+    bool hasReflectedDerivedType() const;
 
     static void calcScopePath(Node* node, List<Node*>& outPath);
 
@@ -453,6 +454,171 @@ Node* Node::findLastDerived()
     outPath.reverse();
 }
 
+bool Node::hasReflectedDerivedType() const
+{
+    for (Node* type : m_derivedTypes)
+    {
+        if (type->m_isReflected)
+        {
+            return true;
+        }
+    }
+    return false;
+}
+
+
+// !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! Options !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+
+struct Options
+{
+    void reset()
+    {
+        m_inputPaths.clear();
+        m_outputPath = String();
+        m_dump = false;
+
+        m_prefixMark = "SLANG_";
+        m_postfixMark = "_CLASS";
+    }
+
+    bool m_dump = false;
+    List<String> m_inputPaths;
+    String m_outputPath;
+    String m_inputDirectory;
+    String m_reflectType;           ///< The typename used for output
+    String m_prefixMark;
+    String m_postfixMark;
+};
+
+struct OptionsParser
+{
+    /// Parse the parameters. NOTE! Must have the program path removed
+    SlangResult parse(int argc, const char*const* argv, DiagnosticSink* sink, Options& outOptions);
+
+    SlangResult _parseArgWithValue(const char* option, String& outValue);
+    SlangResult _parseArgReplaceValue(const char* option, String& outValue);
+
+    String m_reflectType;
+
+    Index m_index;
+    Int m_argCount;
+    const char*const* m_args;
+    DiagnosticSink* m_sink;
+};
+
+SlangResult OptionsParser::_parseArgWithValue(const char* option, String& ioValue)
+{
+    SLANG_ASSERT(UnownedStringSlice(m_args[m_index]) == option);
+    if (m_index + 1 < m_argCount)
+    {
+        // Next parameter is the output path, there can only be one
+        if (ioValue.getLength())
+        {
+            // There already is output
+            m_sink->diagnose(SourceLoc(), CPPDiagnostics::optionAlreadyDefined, option, ioValue);
+            return SLANG_FAIL;
+        }
+    }
+    else
+    {
+        m_sink->diagnose(SourceLoc(), CPPDiagnostics::requireValueAfterOption, option);
+        return SLANG_FAIL;
+    }
+
+    ioValue = m_args[m_index + 1];
+    m_index += 2;
+    return SLANG_OK;
+}
+
+SlangResult OptionsParser::_parseArgReplaceValue(const char* option, String& ioValue)
+{
+    SLANG_ASSERT(UnownedStringSlice(m_args[m_index]) == option);
+    if (m_index + 1 >= m_argCount)
+    {
+        m_sink->diagnose(SourceLoc(), CPPDiagnostics::requireValueAfterOption, option);
+        return SLANG_FAIL;
+    }
+
+    ioValue = m_args[m_index + 1];
+    m_index += 2;
+    return SLANG_OK;
+}
+
+SlangResult OptionsParser::parse(int argc, const char*const* argv, DiagnosticSink* sink, Options& outOptions)
+{
+    outOptions.reset();
+
+    m_index = 0;
+    m_argCount = argc;
+    m_args = argv;
+    m_sink = sink;
+
+    outOptions.reset();
+
+    while (m_index < m_argCount)
+    {
+        const UnownedStringSlice arg = UnownedStringSlice(argv[m_index]);
+
+        if (arg.getLength() > 0 && arg[0] == '-')
+        {
+            if (arg == "-d")
+            {
+                SLANG_RETURN_ON_FAIL(_parseArgWithValue("-d", outOptions.m_inputDirectory));
+                continue;
+            }
+            else if (arg == "-o")
+            {
+                SLANG_RETURN_ON_FAIL(_parseArgWithValue("-o", outOptions.m_outputPath));
+                continue;
+            }
+            else if (arg == "-dump")
+            {
+                outOptions.m_dump = true;
+                m_index++;
+                continue;
+            }
+            else if (arg == "-reflect-type")
+            {
+                SLANG_RETURN_ON_FAIL(_parseArgWithValue("-reflect-type", outOptions.m_reflectType));
+                continue;
+            }
+            else if (arg == "-prefix-mark")
+            {
+                SLANG_RETURN_ON_FAIL(_parseArgReplaceValue("-prefix-mark", outOptions.m_prefixMark));
+                continue;
+            }
+            else if (arg == "-postfix-mark")
+            {
+                SLANG_RETURN_ON_FAIL(_parseArgReplaceValue("-postfix-mark", outOptions.m_postfixMark));
+                continue;
+            }
+
+            m_sink->diagnose(SourceLoc(), CPPDiagnostics::unknownOption, arg);
+            return SLANG_FAIL;
+        }
+        else
+        {
+            // If it starts with - then it an unknown option
+            outOptions.m_inputPaths.add(arg);
+            m_index++;
+        }
+    }
+
+    if (outOptions.m_inputPaths.getCount() < 0)
+    {
+        m_sink->diagnose(SourceLoc(), CPPDiagnostics::noInputPathsSpecified);
+        return SLANG_FAIL;
+    }
+
+    // Set default name
+    if (outOptions.m_reflectType.getLength() == 0)
+    {
+        outOptions.m_reflectType = "ASTNode";
+    }
+
+    return SLANG_OK;
+}
+
 // !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! CPPExtractor !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 
 class CPPExtractor
@@ -461,6 +627,7 @@ public:
     
     SlangResult expect(TokenType type, Token* outToken = nullptr);
 
+    bool advanceIfMarker(Token* outToken = nullptr);
     bool advanceIfToken(TokenType type, Token* outToken = nullptr);
     bool advanceIfStyle(IdentifierStyle style, Token* outToken = nullptr);
 
@@ -470,7 +637,7 @@ public:
     SlangResult popBrace();
 
         /// Parse the contents of the source file
-    SlangResult parse(SourceFile* sourceFile);
+    SlangResult parse(SourceFile* sourceFile, const Options* options);
 
         /// When parsing we don't lookup all up super types/add derived types. This is because
         /// we allow files to be processed in any order, so we have to do the type lookup as a separate operation
@@ -486,6 +653,11 @@ public:
 
 protected:
     static Node::Type _toNodeType(IdentifierStyle style);
+
+    bool _isMarker(const UnownedStringSlice& name)
+    {
+        return name.startsWith(m_options->m_prefixMark.getUnownedSlice()) && name.endsWith(m_options->m_postfixMark.getUnownedSlice());
+    }
 
     SlangResult _maybeParseNode(Node::Type type);
     SlangResult _maybeParseField();
@@ -514,6 +686,8 @@ protected:
     DiagnosticSink* m_sink;
 
     NamePool* m_namePool;
+
+    const Options* m_options;
 
     IdentifierLookup* m_identifierLookup;
     StringSlicePool* m_typePool;
@@ -555,6 +729,21 @@ bool CPPExtractor::advanceIfToken(TokenType type, Token* outToken)
         if (outToken)
         {
             *outToken = token;
+        }
+        return true;
+    }
+    return false;
+}
+
+bool CPPExtractor::advanceIfMarker(Token* outToken)
+{
+    const Token peekToken = m_reader.peekToken();
+    if (peekToken.type == TokenType::Identifier && _isMarker(peekToken.Content))
+    {
+        m_reader.advanceToken();
+        if (outToken)
+        {
+            *outToken = peekToken;
         }
         return true;
     }
@@ -793,9 +982,9 @@ SlangResult CPPExtractor::_maybeParseNode(Node::Type type)
                 return SLANG_OK;
             }
         }
-        
+
         // If it's one of the markers, then we continue to extract parameter
-        if (advanceIfStyle(IdentifierStyle::Marker, &node->m_marker))
+        if (advanceIfMarker(&node->m_marker))
         {
             break;
         }
@@ -1079,8 +1268,10 @@ SlangResult CPPExtractor::_maybeParseField()
     }
 }
 
-SlangResult CPPExtractor::parse(SourceFile* sourceFile)
-{  
+SlangResult CPPExtractor::parse(SourceFile* sourceFile, const Options* options)
+{
+    m_options = options;
+
     SourceManager* manager = sourceFile->getSourceManager();
 
     SourceView* sourceView = manager->createSourceView(sourceFile, nullptr);
@@ -1273,129 +1464,6 @@ SlangResult CPPExtractor::calcDerivedTypes()
 
 // !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! CPPExtractorApp !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 
-struct Options
-{
-    void reset()
-    {
-        m_inputPaths.clear();
-        m_outputPath = String();
-        m_dump = false;
-    }
-
-    bool m_dump = false;
-    List<String> m_inputPaths;
-    String m_outputPath;
-    String m_inputDirectory;
-    String m_reflectType;           ///< The typename used for output
-};
-
-struct OptionsParser
-{
-
-    /// Parse the parameters. NOTE! Must have the program path removed
-    SlangResult parse(int argc, const char*const* argv, DiagnosticSink* sink, Options& outOptions);
-
-    SlangResult _parseArgWithValue(const char* option, String& outValue);
-
-    String m_reflectType;
-
-    Index m_index;
-    Int m_argCount;
-    const char*const* m_args;
-    DiagnosticSink* m_sink;
-};
-
-SlangResult OptionsParser::_parseArgWithValue(const char* option, String& ioValue)
-{
-    SLANG_ASSERT(UnownedStringSlice(m_args[m_index]) == option);
-    if (m_index + 1 < m_argCount)
-    {
-        // Next parameter is the output path, there can only be one
-        if (ioValue.getLength())
-        {
-            // There already is output
-            m_sink->diagnose(SourceLoc(), CPPDiagnostics::optionAlreadyDefined, option, ioValue);
-            return SLANG_FAIL;
-        }
-    }
-    else
-    {
-        m_sink->diagnose(SourceLoc(), CPPDiagnostics::requireValueAfterOption, option);
-        return SLANG_FAIL;
-    }
-
-    ioValue = m_args[m_index + 1];
-    m_index += 2;
-    return SLANG_OK;
-}
-
-SlangResult OptionsParser::parse(int argc, const char*const* argv, DiagnosticSink* sink, Options& outOptions)
-{
-    outOptions.reset();
-
-    m_index = 0;
-    m_argCount = argc;
-    m_args = argv;
-    m_sink = sink;
-
-    outOptions.reset();
-
-    while (m_index < m_argCount)
-    {
-        const UnownedStringSlice arg = UnownedStringSlice(argv[m_index]);
-
-        if (arg.getLength() > 0 && arg[0] == '-')
-        {
-            if (arg == "-d")
-            {
-                SLANG_RETURN_ON_FAIL(_parseArgWithValue("-d", outOptions.m_inputDirectory));
-                continue;
-            }
-            else if (arg == "-o")
-            {
-                SLANG_RETURN_ON_FAIL(_parseArgWithValue("-o", outOptions.m_outputPath));
-                continue;
-            }
-            else if (arg == "-dump")
-            {
-                outOptions.m_dump = true;
-                m_index++;
-                continue;
-            }
-            else if (arg == "-reflect-type")
-            {
-                SLANG_RETURN_ON_FAIL(_parseArgWithValue("-reflect-type", outOptions.m_reflectType));
-                continue;
-            }
-
-            m_sink->diagnose(SourceLoc(), CPPDiagnostics::unknownOption, arg);
-            return SLANG_FAIL;
-        }
-        else
-        {
-            // If it starts with - then it an unknown option
-            outOptions.m_inputPaths.add(arg);
-            m_index++;
-        }
-    }
-
-    if (outOptions.m_inputPaths.getCount() < 0)
-    {
-        m_sink->diagnose(SourceLoc(), CPPDiagnostics::noInputPathsSpecified);
-        return SLANG_FAIL;
-    }
-
-    // Set default name
-    if (outOptions.m_reflectType.getLength() == 0)
-    {
-        outOptions.m_reflectType = "ASTNode";
-    }
-
-    return SLANG_OK;
-}
-
-// !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! CPPExtractorApp !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-
 class CPPExtractorApp
 {
 public:
@@ -1413,6 +1481,7 @@ public:
 
         /// Calculate the header 
     SlangResult calcHeader(CPPExtractor& extractor, StringBuilder& out);
+    SlangResult calcMacroHeader(CPPExtractor& exctractor, StringBuilder& out);
 
     CPPExtractorApp(DiagnosticSink* sink, SourceManager* sourceManager, RootNamePool* rootNamePool):
         m_sink(sink),
@@ -1431,12 +1500,6 @@ public:
         {
             const char* names[] = { "const", "volatile" };
             m_identifierLookup.set(names, SLANG_COUNT_OF(names), IdentifierStyle::TypeModifier);
-        }
-
-        // Strings to look for...
-        {
-            const char* names[] = {"SLANG_ABSTRACT_CLASS", "SLANG_CLASS"};
-            m_identifierLookup.set(names, SLANG_COUNT_OF(names), IdentifierStyle::Marker);
         }
 
         // Special markers
@@ -1508,6 +1571,89 @@ SlangResult CPPExtractorApp::writeAllText(const Slang::String& fileName, Unowned
     return SLANG_OK;
 }
 
+SlangResult CPPExtractorApp::calcMacroHeader(CPPExtractor& extractor, StringBuilder& out)
+{
+    const List<Node*>& baseTypes = extractor.getBaseTypes();
+
+    const String& reflectTypeName = m_options.m_reflectType;
+
+    out << "#pragma once\n\n";
+    out << "// Do not edit this file is generated from slang-cpp-extractor tool\n\n";
+
+    for (Index i = 0; i < baseTypes.getCount(); ++i)
+    {
+        Node* baseType = baseTypes[i];
+        if (baseType->m_baseType != Node::BaseType::Marked)
+        {
+            continue;
+        }
+
+        List<Node*> nodes;
+        baseType->calcDerivedDepthFirst(nodes);
+
+        for (Index j = 0; j < nodes.getCount(); j++)
+        {
+            Node* node = nodes[j];
+
+            if (!node->isClassLike() || !node->m_isReflected)
+            {
+                continue;
+            }
+
+            out << "#define SLANG_" << reflectTypeName << "_" << node->m_name.Content << "(x, param) \\\n";
+            
+            // Output the X macro part
+            _indent(1, out);
+            out << "x(" << node->m_name.Content << ", ";
+
+
+            UnownedStringSlice marker = node->m_marker.Content;
+            // Need to extract the name
+            if (marker.getLength() > m_options.m_prefixMark.getLength() + m_options.m_postfixMark.getLength())
+            {
+                marker = UnownedStringSlice(marker.begin() + m_options.m_prefixMark.getLength(), marker.end() - m_options.m_postfixMark.getLength());
+            }
+            else
+            {
+                marker = UnownedStringSlice::fromLiteral("NORMAL");
+            }
+            out << marker << ", ";
+
+            if (node->m_baseType != Node::BaseType::None || node->m_superNode && node->m_superNode->m_isReflected == false)
+            {
+                out << "BASE, ";
+            }
+            else if (node->hasReflectedDerivedType())
+            {
+                out << "INNER, ";
+            }
+            else
+            {
+                out << "LEAF, ";
+            }
+
+            out << "param) \\\n";
+
+            // Output all of the derived types
+
+            for (Node* childType : node->m_derivedTypes)
+            {
+                if (!childType->m_isReflected)
+                {
+                    continue;
+                }
+
+                _indent(1, out);
+                out << "SLANG_" << reflectTypeName << "_" << childType->m_name.Content << "(x, param) \\\n";
+            }
+
+            out << "\n";
+        }
+    }
+
+    return SLANG_OK;
+}
+
 SlangResult CPPExtractorApp::calcHeader(CPPExtractor& extractor, StringBuilder& out)
 {
     const List<Node*>& baseTypes = extractor.getBaseTypes();
@@ -1539,13 +1685,14 @@ SlangResult CPPExtractorApp::calcHeader(CPPExtractor& extractor, StringBuilder& 
             out << "namespace " << scopeNode->m_name.Content << " {\n";
         }
 
+        List<Node*> nodes;
+        baseType->calcDerivedDepthFirst(nodes);
+
         out << "\n";
         out << "enum class " << reflectTypeName << "Type\n";
         out << "{\n";
 
-        List<Node*> nodes;
-        baseType->calcDerivedDepthFirst(nodes);
-
+       
         Index typeIndex = 0;
 
         for (Node* node : nodes)
@@ -1616,7 +1763,8 @@ SlangResult CPPExtractorApp::calcHeader(CPPExtractor& extractor, StringBuilder& 
             if (node->m_isReflected && node->m_superNode)
             {
                 _indent(1, out);
-                out << "typedef " << node->m_superNode->m_name.Content << " " << node->m_name.Content << ";\n";
+                // We concat _Super so the typedef are distinct from the ones being referenced
+                out << "typedef " << node->m_superNode->m_name.Content << " " << node->m_name.Content << "_Super;\n";
             }
         }
 
@@ -1665,8 +1813,18 @@ SlangResult CPPExtractorApp::writeOutput(CPPExtractor& extractor)
         // Write it out
 
         StringBuilder headerPath;
-        headerPath << path + "." + ext;
+        headerPath << path << "." << ext;
         SLANG_RETURN_ON_FAIL(writeAllText(headerPath, header.getUnownedSlice()));
+    }
+
+    {
+        StringBuilder macroHeader;
+
+        SLANG_RETURN_ON_FAIL(calcMacroHeader(extractor, macroHeader));
+
+        StringBuilder headerPath;
+        headerPath << path << "-macro." + ext;
+        SLANG_RETURN_ON_FAIL(writeAllText(headerPath, macroHeader.getUnownedSlice()));
     }
 
     // Write to output
@@ -1704,7 +1862,7 @@ SlangResult CPPExtractorApp::execute(const Options& options)
 
         SourceFile* sourceFile = m_sourceManager->createSourceFileWithString(pathInfo, contents);
 
-        SLANG_RETURN_ON_FAIL(extractor.parse(sourceFile));
+        SLANG_RETURN_ON_FAIL(extractor.parse(sourceFile, &m_options));
     }
 
     SLANG_RETURN_ON_FAIL(extractor.calcDerivedTypes());
