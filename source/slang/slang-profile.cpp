@@ -29,6 +29,15 @@ const char* getStageName(Stage stage)
 
 }
 
+void printDiagnosticArg(StringBuilder& sb, Stage val)
+{
+    sb << getStageName(val);
+}
+
+void printDiagnosticArg(StringBuilder& sb, ProfileVersion val)
+{
+    sb << Profile(val).getName();
+}
 
 
 }

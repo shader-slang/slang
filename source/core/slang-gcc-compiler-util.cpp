@@ -265,7 +265,7 @@ static SlangResult _parseGCCFamilyLine(const UnownedStringSlice& line, LineParse
     else if (split.getCount() == 4)
     {
         // Probably a link error, give the source line
-        String ext = Path::getFileExt(split[0]);
+        String ext = Path::getPathExt(split[0]);
 
         // Maybe a bit fragile -> but probably okay for now
         if (ext != "o" && ext != "obj")

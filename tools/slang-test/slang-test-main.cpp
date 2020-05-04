@@ -1434,7 +1434,7 @@ static TestResult runCPPCompilerSharedLibrary(TestContext* context, TestInput& i
 
     // Make the module name the same as the source file
     String modulePath = _calcModulePath(input);
-    String ext = Path::getFileExt(filePath);
+    String ext = Path::getPathExt(filePath);
 
     // Remove the binary..
     String sharedLibraryPath = SharedLibrary::calcPlatformPath(modulePath.getUnownedSlice());
@@ -1551,7 +1551,7 @@ static TestResult runCPPCompilerExecute(TestContext* context, TestInput& input)
     File::remove(actualOutputPath);
 
     // Make the module name the same as the source file
-    String ext = Path::getFileExt(filePath);
+    String ext = Path::getPathExt(filePath);
     String modulePath = _calcModulePath(input);
     
     // Remove the binary..

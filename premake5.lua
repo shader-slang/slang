@@ -274,6 +274,7 @@ function addSourceDir(path)
         path .. "/*.natvis",    -- Visual Studio debugger visualization files
     }
 end
+
 --
 -- Next we will define a helper routine that all of our
 -- projects will bottleneck through. Here `name` is
@@ -541,6 +542,33 @@ tool "slang-test"
     links { "core", "slang" }
 
 --
+-- The cpp extractor is a tool that scans C++ header files to extract
+-- reflection like information, and generate files to handle 
+-- RTTI fast/simply
+---
+
+tool "slang-cpp-extractor"
+    uuid "CA8A30D1-8FA9-4330-B7F7-84709246D8DC"
+    includedirs { "." }
+    
+    files { 
+        "source/slang/slang-lexer.cpp",
+        "source/slang/slang-lexer.h",
+        "source/slang/slang-source-loc.cpp",
+        "source/slang/slang-source-loc.h",
+        "source/slang/slang-file-system.cpp",
+        "source/slang/slang-file-system.h",
+        "source/slang/slang-diagnostics.cpp",
+        "source/slang/slang-diagnostics.h",
+        "source/slang/slang-name.cpp",
+        "source/slang/slang-name.h",
+        "source/slang/slang-token.cpp",
+        "source/slang/slang-token.h",
+    }
+    
+    links { "core" }
+
+--
 -- The reflection test harness `slang-reflection-test` is pretty
 -- simple, in that it only needs to link against the slang library
 -- to do its job:
@@ -550,6 +578,7 @@ toolSharedLibrary "slang-reflection-test"
     uuid "C5ACCA6E-C04D-4B36-8516-3752B3C13C2F"
     
     includedirs { "." }
+    
     kind "SharedLib"
     links { "core", "slang" }      
     

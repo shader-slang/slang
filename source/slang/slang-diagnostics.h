@@ -99,8 +99,6 @@ namespace Slang
     void printDiagnosticArg(StringBuilder& sb, TokenType tokenType);
     void printDiagnosticArg(StringBuilder& sb, Token const& token);
     void printDiagnosticArg(StringBuilder& sb, CodeGenTarget val);
-    void printDiagnosticArg(StringBuilder& sb, Stage val);
-    void printDiagnosticArg(StringBuilder& sb, ProfileVersion val);
     void printDiagnosticArg(StringBuilder& sb, Val* val);
 
     template<typename T>
