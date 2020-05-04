@@ -33,6 +33,22 @@ namespace Slang
     class Parser;
     class SyntaxNode;
 
+    class Decl;
+    struct QualType;
+    class Type;
+    struct TypeExp;
+    class Val;
+
+    void printDiagnosticArg(StringBuilder& sb, Decl* decl);
+    void printDiagnosticArg(StringBuilder& sb, Type* type);
+    void printDiagnosticArg(StringBuilder& sb, TypeExp const& type);
+    void printDiagnosticArg(StringBuilder& sb, QualType const& type);
+    void printDiagnosticArg(StringBuilder& sb, Val* val);
+
+    class SyntaxNode;
+    SourceLoc const& getDiagnosticPos(SyntaxNode const* syntax);
+    SourceLoc const& getDiagnosticPos(TypeExp const& typeExp);
+
     typedef RefPtr<RefObject> (*SyntaxParseCallback)(Parser* parser, void* userData);
 
     typedef unsigned int ConversionCost;

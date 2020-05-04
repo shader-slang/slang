@@ -72,6 +72,8 @@ namespace Slang
         CountOf             = SLANG_TARGET_COUNT_OF,
     };
 
+    void printDiagnosticArg(StringBuilder& sb, CodeGenTarget val);
+
     enum class ContainerFormat : SlangContainerFormat
     {
         None            = SLANG_CONTAINER_FORMAT_NONE,

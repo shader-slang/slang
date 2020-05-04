@@ -5,7 +5,7 @@
 // input bytes and turning it into semantically useful tokens.
 //
 
-#include "slang-compiler.h"
+#include "slang-name.h"
 #include "slang-source-loc.h"
 
 #include <assert.h>

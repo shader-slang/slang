@@ -1,8 +1,6 @@
 // slang-source-loc.cpp
 #include "slang-source-loc.h"
 
-#include "slang-compiler.h"
-
 #include "../core/slang-string-util.h"
 
 namespace Slang {

@@ -80,6 +80,32 @@
 
 namespace Slang
 {
+
+    // !!!!!!!!!!!!!!!!!!!!!! free functions for DiagnosicSink !!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+
+    void printDiagnosticArg(StringBuilder& sb, CodeGenTarget val)
+    {
+        switch (val)
+        {
+            default:
+                sb << "<unknown>";
+                break;
+
+    #define CASE(TAG, STR) case CodeGenTarget::TAG: sb << STR; break
+                CASE(GLSL, "glsl");
+                CASE(HLSL, "hlsl");
+                CASE(SPIRV, "spirv");
+                CASE(SPIRVAssembly, "spriv-assembly");
+                CASE(DXBytecode, "dxbc");
+                CASE(DXBytecodeAssembly, "dxbc-assembly");
+                CASE(DXIL, "dxil");
+                CASE(DXILAssembly, "dxil-assembly");
+    #undef CASE
+        }
+    }
+
+    // !!!!!!!!!!!!!!!!!!!!!!!!!!!! CompileResult !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+
     SlangResult CompileResult::getSharedLibrary(ComPtr<ISlangSharedLibrary>& outSharedLibrary)
     {
         if (downstreamResult)
