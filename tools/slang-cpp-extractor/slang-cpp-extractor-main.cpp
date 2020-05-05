@@ -299,7 +299,7 @@ public:
     SlangResult popBrace();
 
         /// Parse the contents of the source file
-    SlangResult parse(SourceOrigin* origin, const Options* options);
+    SlangResult parse(SourceFile* sourceFile, const Options* options);
 
     /// When parsing we don't lookup all up super types/add derived types. This is because
     /// we allow files to be processed in any order, so we have to do the type lookup as a separate operation
@@ -307,6 +307,9 @@ public:
 
     /// Only valid after calcDerivedTypes has been executed
     const List<Node*>& getBaseTypes() const { return m_baseTypes; }
+
+        /// Get all of the parsed source origins
+    const List<RefPtr<SourceOrigin> >& getSourceOrigins() const { return m_origins; }
 
     /// Get the root node
     Node* getRootNode() const { return m_rootNode; }
@@ -328,6 +331,7 @@ protected:
     SlangResult _maybeParseTemplateArg(Index& ioTemplateDepth);
 
     SlangResult _calcDerivedTypesRec(Node* node);
+    String _calcMacroOriginText(const String& filePath);
 
     void _consumeTypeModifiers();
 
@@ -347,6 +351,8 @@ protected:
     DiagnosticSink* m_sink;
 
     NamePool* m_namePool;
+
+    List<RefPtr<SourceOrigin>> m_origins;
 
     const Options* m_options;
 
@@ -1376,13 +1382,16 @@ SlangResult CPPExtractor::_maybeParseField()
     }
 }
 
-SlangResult CPPExtractor::parse(SourceOrigin* origin, const Options* options)
+SlangResult CPPExtractor::parse(SourceFile* sourceFile, const Options* options)
 {
     m_options = options;
 
-    m_origin = origin;
+    RefPtr<SourceOrigin> origin = new SourceOrigin(sourceFile);
+    origin->m_macroOriginText = _calcMacroOriginText(sourceFile->getPathInfo().foundPath);
+    m_origins.add(origin);
 
-    SourceFile* sourceFile = origin->m_sourceFile;
+    // Set the current origin
+    m_origin = origin;
 
     SourceManager* manager = sourceFile->getSourceManager();
 
@@ -1574,6 +1583,45 @@ SlangResult CPPExtractor::calcDerivedTypes()
     return _calcDerivedTypesRec(m_rootNode);
 }
 
+
+String CPPExtractor::_calcMacroOriginText(const String& filePath)
+{
+    String fileName = Path::getFileNameWithoutExt(filePath);
+
+    if (m_options->m_stripFilePrefix.getLength() && fileName.startsWith(m_options->m_stripFilePrefix))
+    {
+        const Index len = m_options->m_stripFilePrefix.getLength();
+        fileName = UnownedStringSlice(fileName.begin() + len, fileName.end());
+    }
+
+    const char* start = fileName.begin();
+    const char* end = fileName.end();
+
+    // Trim any - 
+    while (start < end && *start == '-') ++start;
+    while (end - 1 > start && end[-1] == '-') --end;
+
+    StringBuilder out;
+
+    // Make into macro like name
+    for (; start < end; ++start)
+    {
+        char c = *start;
+
+        if (c == '-')
+        {
+            c = '_';
+        }
+        else if (c >= 'a' && c <= 'z')
+        {
+            c = c - 'a' + 'A';
+        }
+        out.append(c);
+    }
+
+    return out;
+}
+
 // !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! CPPExtractorApp !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 
 class CPPExtractorApp
@@ -1592,7 +1640,7 @@ public:
     SlangResult writeOutput(CPPExtractor& extractor);
 
         /// Write def files
-    SlangResult writeDefs(CPPExtractor& extractor, List<RefPtr<SourceOrigin>>& origins);
+    SlangResult writeDefs(CPPExtractor& extractor);
 
         /// Calculate the header 
     SlangResult calcHeader(CPPExtractor& extractor, StringBuilder& out);
@@ -1639,10 +1687,8 @@ public:
         }
     }
 
-    
 protected:
-    String _calcMacroOriginText(const String& filePath);
-
+    
     NamePool m_namePool;
 
     Options m_options;
@@ -1986,8 +2032,10 @@ SlangResult CPPExtractorApp::calcHeader(CPPExtractor& extractor, StringBuilder& 
     return SLANG_OK;
 }
 
-SlangResult CPPExtractorApp::writeDefs(CPPExtractor& extractor, List<RefPtr<SourceOrigin>>& origins)
+SlangResult CPPExtractorApp::writeDefs(CPPExtractor& extractor)
 {
+    const auto& origins = extractor.getSourceOrigins();
+
     for (SourceOrigin* origin : origins)
     {
         const String path = origin->m_sourceFile->getPathInfo().foundPath;
@@ -2063,50 +2111,12 @@ SlangResult CPPExtractorApp::writeOutput(CPPExtractor& extractor)
     return SLANG_OK;
 }
 
-String CPPExtractorApp::_calcMacroOriginText(const String& filePath)
-{
-    String fileName = Path::getFileNameWithoutExt(filePath);
-
-    if (m_options.m_stripFilePrefix.getLength() && fileName.startsWith(m_options.m_stripFilePrefix))
-    {
-        const Index len = m_options.m_stripFilePrefix.getLength();
-        fileName = UnownedStringSlice(fileName.begin() + len, fileName.end());
-    }
-
-    const char* start = fileName.begin();
-    const char* end = fileName.end();
-
-    // Trim any - 
-    while (start < end && *start == '-') ++start;
-    while (end - 1 > start && end[-1] == '-') --end;
-
-    StringBuilder out; 
-
-    // Make into macro like name
-    for (; start < end; ++start)
-    {
-        char c = *start;
-
-        if (c == '-')
-        {
-            c = '_';
-        }
-        else if (c >= 'a' && c <= 'z')
-        {
-            c = c - 'a' + 'A';
-        }
-        out.append(c);
-    }
-
-    return out;
-}
 
 SlangResult CPPExtractorApp::execute(const Options& options)
 {
     m_options = options;
 
-    List<RefPtr<SourceOrigin>> origins;
-
+    
     CPPExtractor extractor(&m_slicePool, &m_namePool, m_sink, &m_identifierLookup);
 
     // Read in each of the input files
@@ -2131,13 +2141,7 @@ SlangResult CPPExtractorApp::execute(const Options& options)
 
         SourceFile* sourceFile = m_sourceManager->createSourceFileWithString(pathInfo, contents);
 
-        RefPtr<SourceOrigin> origin = new SourceOrigin(sourceFile);
-
-        origin->m_macroOriginText = _calcMacroOriginText(pathInfo.foundPath);
-
-        origins.add(origin);
-
-        SLANG_RETURN_ON_FAIL(extractor.parse(origin, &m_options));
+        SLANG_RETURN_ON_FAIL(extractor.parse(sourceFile, &m_options));
     }
 
     SLANG_RETURN_ON_FAIL(extractor.calcDerivedTypes());
@@ -2165,7 +2169,7 @@ SlangResult CPPExtractorApp::execute(const Options& options)
 
     if (options.m_defs)
     {
-        SLANG_RETURN_ON_FAIL(writeDefs(extractor, origins));
+        SLANG_RETURN_ON_FAIL(writeDefs(extractor));
     }
 
     if (options.m_outputPath.getLength())
