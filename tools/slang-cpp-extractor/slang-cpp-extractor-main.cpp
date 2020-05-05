@@ -1620,6 +1620,15 @@ SlangResult CPPExtractorApp::calcMacroHeader(CPPExtractor& extractor, StringBuil
             _indent(1, out);
             out << "x(" << node->m_name.Content << ", ";
 
+            if (node->m_superNode)
+            {
+                out << node->m_superNode->m_name.Content << ", ";
+            }
+            else
+            {
+                out << m_options.m_prefixMark << "NO_SUPER, ";
+            }
+
             UnownedStringSlice marker = node->m_marker.Content;
             // Need to extract the name
             if (marker.getLength() > m_options.m_prefixMark.getLength() + m_options.m_postfixMark.getLength())
