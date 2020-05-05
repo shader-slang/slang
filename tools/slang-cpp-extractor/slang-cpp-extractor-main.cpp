@@ -207,7 +207,8 @@ public:
         m_parentScope(nullptr),
         m_isReflected(false),
         m_superNode(nullptr),
-        m_baseType(BaseType::None)
+        m_baseType(BaseType::None),
+        m_origin(nullptr)
     {
         m_anonymousNamespace = nullptr;
     }
@@ -271,13 +272,13 @@ public:
         m_sourceFile(sourceFile)
     {}
 
-    String m_macroOriginText;                 ///< The macro text is inserted into the macro to identify the origin. It is based on the filename
-
-    String m_filePath;
+         ///< The macro text is inserted into the macro to identify the origin. It is based on the filename
+    String m_macroOriginText;
+        /// The source file - also holds the path information
     SourceFile* m_sourceFile;
     
-    // All of the nodes defined in this file in the order they were defined
-    // Note that the same namespace may be listed multiple times.
+        /// All of the nodes defined in this file in the order they were defined
+        /// Note that the same namespace may be listed multiple times.
     List<RefPtr<Node> > m_nodes;
 };
 
@@ -607,13 +608,14 @@ void Node::getReflectedDerivedTypes(List<Node*>& out) const
 /* static */void Node::filterReflectedClassLike(List<Node*>& ioNodes)
 {
     // Filter out all the unreflected nodes
-    const Index count = ioNodes.getCount();
+    Index count = ioNodes.getCount();
     for (Index j = 0; j < count; )
     {
         Node* node = ioNodes[j];
         if (!node->isClassLike() || !node->m_isReflected)
         {
             ioNodes.removeAt(j);
+            count--;
         }
         else
         {
