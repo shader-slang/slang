@@ -126,7 +126,7 @@ deploy:
   artifact: 'binary_archive,source_archive'
   draft: false
   prerelease: false
-  force_update: true # TODO: consider if we can avoid this
+  force_update: false
   on:
     configuration: Release
     appveyor_repo_tag: true        # deploy on tag push only
