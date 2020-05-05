@@ -631,15 +631,17 @@ struct Options
         m_postfixMark = "_CLASS";
     }
 
-    bool m_defs = false;
-    bool m_dump = false;
-    List<String> m_inputPaths;
-    String m_outputPath;
-    String m_inputDirectory;
+    bool m_defs = false;            ///< If set will output a '-defs.h' file for each of the input files, that corresponds to previous defs files (although doesn't have fields/RAW)
+    bool m_dump = false;            ///< If true will dump to stderr the types/fields and hierarchy it extracted
+
+    List<String> m_inputPaths;      ///< The input paths to the files to be processed
+        
+    String m_outputPath;            ///< The ouput path. Note that the extractor can generate multiple output files, and this will actually be the 'stem' of several files
+    String m_inputDirectory;        ///< The input directory that is by default used for reading m_inputPaths from. 
     String m_reflectType;           ///< The typename used for output
-    String m_prefixMark;
-    String m_postfixMark;
-    String m_stripFilePrefix;
+    String m_prefixMark;            ///< The prefix of the 'marker' used to identify a reflected type
+    String m_postfixMark;           ///< The postfix of the 'marker' used to identify a reflected type
+    String m_stripFilePrefix;       ///< Used for the 'origin' information, this is stripped from the source filename, and the remainder of the filename (without extension) is 'macroized'
 };
 
 struct OptionsParser
