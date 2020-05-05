@@ -268,12 +268,13 @@ public:
         m_nodes.add(node);
     }
 
-    SourceOrigin(SourceFile* sourceFile) :
-        m_sourceFile(sourceFile)
+    SourceOrigin(SourceFile* sourceFile, const String& macroOrigin) :
+        m_sourceFile(sourceFile),
+        m_macroOrigin(macroOrigin)
     {}
 
          ///< The macro text is inserted into the macro to identify the origin. It is based on the filename
-    String m_macroOriginText;
+    String m_macroOrigin;
         /// The source file - also holds the path information
     SourceFile* m_sourceFile;
     
@@ -332,7 +333,7 @@ protected:
     SlangResult _maybeParseTemplateArg(Index& ioTemplateDepth);
 
     SlangResult _calcDerivedTypesRec(Node* node);
-    String _calcMacroOriginText(const String& filePath);
+    static String _calcMacroOrigin(const String& filePath, const Options& options);
 
     void _consumeTypeModifiers();
 
@@ -1386,10 +1387,13 @@ SlangResult CPPExtractor::_maybeParseField()
 
 SlangResult CPPExtractor::parse(SourceFile* sourceFile, const Options* options)
 {
+    SLANG_ASSERT(options);
     m_options = options;
 
-    RefPtr<SourceOrigin> origin = new SourceOrigin(sourceFile);
-    origin->m_macroOriginText = _calcMacroOriginText(sourceFile->getPathInfo().foundPath);
+    // Calculate from the path, a 'macro origin' name. 
+    const String macroOrigin = _calcMacroOrigin(sourceFile->getPathInfo().foundPath, *options);
+
+    RefPtr<SourceOrigin> origin = new SourceOrigin(sourceFile, macroOrigin);
     m_origins.add(origin);
 
     // Set the current origin
@@ -1586,13 +1590,13 @@ SlangResult CPPExtractor::calcDerivedTypes()
 }
 
 
-String CPPExtractor::_calcMacroOriginText(const String& filePath)
+/* static */String CPPExtractor::_calcMacroOrigin(const String& filePath, const Options& options)
 {
     String fileName = Path::getFileNameWithoutExt(filePath);
 
-    if (m_options->m_stripFilePrefix.getLength() && fileName.startsWith(m_options->m_stripFilePrefix))
+    if (options.m_stripFilePrefix.getLength() && fileName.startsWith(options.m_stripFilePrefix))
     {
-        const Index len = m_options->m_stripFilePrefix.getLength();
+        const Index len = options.m_stripFilePrefix.getLength();
         fileName = UnownedStringSlice(fileName.begin() + len, fileName.end());
     }
 
@@ -1980,7 +1984,7 @@ SlangResult CPPExtractorApp::calcHeader(CPPExtractor& extractor, StringBuilder& 
                 }
 
                 // Output the (file origin)
-                out << node->m_origin->m_macroOriginText;
+                out << node->m_origin->m_macroOrigin;
                 out << ", ";
 
                 // The last type
