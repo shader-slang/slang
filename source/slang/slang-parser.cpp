@@ -2833,7 +2833,7 @@ namespace Slang
     // the class of AST node to construct.
     static RefPtr<RefObject> parseSimpleSyntax(Parser* /*parser*/, void* userData)
     {
-        SyntaxClassBase syntaxClass((SyntaxClassBase::ClassInfo*) userData);
+        SyntaxClassBase syntaxClass((ReflectClassInfo*) userData);
         return (RefObject*) syntaxClass.createInstanceImpl();
     }
 

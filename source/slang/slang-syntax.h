@@ -9,6 +9,12 @@
 
 #include "../core/slang-semantic-version.h"
 
+#include "slang-ast-generated.h"
+
+#include "slang-ast-reflect.h"
+
+//#include "slang-ast-base.h"
+
 #include "slang-name.h"
 
 #include <assert.h>
@@ -123,11 +129,13 @@ namespace Slang
     class Decl;
     class Val;
 
+#if 0
     // Forward-declare all syntax classes
 #define SYNTAX_CLASS(NAME, BASE, ...) class NAME;
 #include "slang-object-meta-begin.h"
 #include "slang-syntax-defs.h"
 #include "slang-object-meta-end.h"
+#endif
 
     // Helper type for pairing up a name and the location where it appeared
     struct NameLoc
@@ -471,12 +479,37 @@ namespace Slang
         RefPtr<Type> operator->() { return type; }
     };
 
+    struct ReflectClassInfo
+    {
+        typedef ReflectClassInfo ThisType;
+
+        typedef void* (*CreateFunc)();
+
+        /// A constant time implementation of isSubClassOf
+        SLANG_FORCE_INLINE bool isSubClassOf(const ThisType& super) const
+        {
+            // We include super.m_classId, because it's a subclass of itself.
+            return m_classId >= super.m_classId && m_classId <= super.m_lastClassId;
+        }
+        /// Will produce the same result as isSubClassOf, but more slowly by traversing the m_superClass
+        /// Works without initRange being called. 
+        bool isSubClassOfSlow(const ThisType& super) const;
+
+        uint32_t m_classId;
+        uint32_t m_lastClassId;
+
+        const ReflectClassInfo* m_superClass;       ///< The super class of this class, or nullptr if has no super class. 
+        const char* m_name;                         ///< Textual class name, for debugging 
+        CreateFunc m_createFunc;                    ///< Callback to use when creating instances
+    };
+
     // A reference to a class of syntax node, that can be
     // used to create instances on the fly
     struct SyntaxClassBase
     {
         typedef void* (*CreateFunc)();
 
+#if 0
         // Run-time type representation for syntax nodes
         struct ClassInfo
         {
@@ -512,12 +545,13 @@ namespace Slang
             ClassInfo* m_next;                      ///< Next in list starting from s_first
             static ClassInfo* s_first;
         };
+#endif
 
         SyntaxClassBase()
         {}
 
-        SyntaxClassBase(ClassInfo const* classInfoIn)
-            : classInfo(classInfoIn)
+        SyntaxClassBase(ReflectClassInfo const* inClassInfo)
+            : classInfo(inClassInfo)
         {}
 
         void* createInstanceImpl() const
@@ -533,14 +567,7 @@ namespace Slang
 
         SLANG_FORCE_INLINE bool isSubClassOfImpl(SyntaxClassBase const& super) const { return classInfo->isSubClassOf(*super.classInfo); }
 
-        ClassInfo const* classInfo = nullptr;
-
-        template<typename T>
-        struct Impl
-        {
-            static void* createFunc();
-            static const ClassInfo kClassInfo;
-        };
+        ReflectClassInfo const* classInfo = nullptr;
     };
 
     template<typename T>
@@ -561,8 +588,8 @@ namespace Slang
             return (T*)createInstanceImpl();
         }
 
-        SyntaxClass(const ClassInfo* classInfoIn):
-            SyntaxClassBase(classInfoIn) 
+        SyntaxClass(const ReflectClassInfo* inClassInfo):
+            SyntaxClassBase(inClassInfo) 
         {}
 
         static SyntaxClass<T> getClass()
@@ -777,34 +804,34 @@ namespace Slang
         Static,                     ///< Only static (ie non instance) members
     };
 
-    const RefPtr<Decl>* adjustFilterCursorImpl(const SyntaxClassBase::ClassInfo& clsInfo, MemberFilterStyle filterStyle, const RefPtr<Decl>* ptr, const RefPtr<Decl>* end);
-    const RefPtr<Decl>* getFilterCursorByIndexImpl(const SyntaxClassBase::ClassInfo& clsInfo, MemberFilterStyle filterStyle, const RefPtr<Decl>* ptr, const RefPtr<Decl>* end, Index index);
-    Index getFilterCountImpl(const SyntaxClassBase::ClassInfo& clsInfo, MemberFilterStyle filterStyle, const RefPtr<Decl>* ptr, const RefPtr<Decl>* end);
+    const RefPtr<Decl>* adjustFilterCursorImpl(const ReflectClassInfo& clsInfo, MemberFilterStyle filterStyle, const RefPtr<Decl>* ptr, const RefPtr<Decl>* end);
+    const RefPtr<Decl>* getFilterCursorByIndexImpl(const ReflectClassInfo& clsInfo, MemberFilterStyle filterStyle, const RefPtr<Decl>* ptr, const RefPtr<Decl>* end, Index index);
+    Index getFilterCountImpl(const ReflectClassInfo& clsInfo, MemberFilterStyle filterStyle, const RefPtr<Decl>* ptr, const RefPtr<Decl>* end);
 
 
     template <typename T>
     const RefPtr<Decl>* adjustFilterCursor(MemberFilterStyle filterStyle, const RefPtr<Decl>* ptr, const RefPtr<Decl>* end)
     {
-        return adjustFilterCursorImpl(SyntaxClassBase::Impl<T>::kClassInfo, filterStyle, ptr, end);
+        return adjustFilterCursorImpl(T::kReflectClassInfo, filterStyle, ptr, end);
     }
 
         /// Finds the element at index. If there is no element at the index (for example has too few elements), returns nullptr.
     template <typename T>
     const RefPtr<Decl>* getFilterCursorByIndex(MemberFilterStyle filterStyle, const RefPtr<Decl>* ptr, const RefPtr<Decl>* end, Index index)
     {
-        return getFilterCursorByIndexImpl(SyntaxClassBase::Impl<T>::kClassInfo, filterStyle, ptr, end, index);
+        return getFilterCursorByIndexImpl(T::kReflectClassInfo, filterStyle, ptr, end, index);
     }
      
     template <typename T>
     Index getFilterCount(MemberFilterStyle filterStyle, const RefPtr<Decl>* ptr, const RefPtr<Decl>* end)
     {
-        return getFilterCountImpl(SyntaxClassBase::Impl<T>::kClassInfo, filterStyle, ptr, end);
+        return getFilterCountImpl(T::kReflectClassInfo, filterStyle, ptr, end);
     }
      
     template <typename T>
     bool isFilterNonEmpty(MemberFilterStyle filterStyle, const RefPtr<Decl>* ptr, const RefPtr<Decl>* end)
     {
-        return adjustFilterCursorImpl(SyntaxClassBase::Impl<T>::kClassInfo, filterStyle, ptr, end) != end;
+        return adjustFilterCursorImpl(T::kReflectClassInfo, filterStyle, ptr, end) != end;
     }
 
     template<typename T>
@@ -1339,35 +1366,12 @@ namespace Slang
     };
     typedef List<ExpandedSpecializationArg> ExpandedSpecializationArgs;
 
-    // Generate class definition for all syntax classes
-#define SYNTAX_FIELD(TYPE, NAME) TYPE NAME;
-#define FIELD(TYPE, NAME) TYPE NAME;
-#define FIELD_INIT(TYPE, NAME, INIT) TYPE NAME = INIT;
-#define RAW(...) __VA_ARGS__
-#define END_SYNTAX_CLASS() };
-#define SYNTAX_CLASS(NAME, BASE, ...) class NAME : public BASE {public:
-#include "slang-object-meta-begin.h"
+} // namespace Slang
 
-#include "slang-syntax-base-defs.h"
-#undef SYNTAX_CLASS
+#include "slang-ast-all.h"
 
-#undef ABSTRACT_SYNTAX_CLASS
-#define ABSTRACT_SYNTAX_CLASS(NAME, BASE, ...)                          \
-    class NAME : public BASE {                                          \
-    public: /* ... */
-#define SYNTAX_CLASS(NAME, BASE, ...)                                   \
-    class NAME : public BASE {                                          \
-    virtual void accept(NAME::Visitor* visitor, void* extra) override;  \
-    public: virtual const SyntaxClassBase::ClassInfo& getClassInfo() const override;          \
-    public: /* ... */
-#include "slang-expr-defs.h"
-#include "slang-decl-defs.h"
-#include "slang-modifier-defs.h"
-#include "slang-stmt-defs.h"
-#include "slang-type-defs.h"
-#include "slang-val-defs.h"
-
-#include "slang-object-meta-end.h"
+namespace Slang
+{
 
     inline RefPtr<Type> GetSub(DeclRef<GenericTypeConstraintDecl> const& declRef)
     {
@@ -1632,25 +1636,25 @@ namespace Slang
     template<typename T>
     SLANG_FORCE_INLINE T* dynamicCast(NodeBase* node)
     {
-        return (node && node->getClassInfo().isSubClassOf(SyntaxClassBase::Impl<T>::kClassInfo)) ? static_cast<T*>(node) : nullptr; 
+        return (node && node->getClassInfo().isSubClassOf(T::kReflectClassInfo)) ? static_cast<T*>(node) : nullptr; 
     }
 
     template<typename T>
     SLANG_FORCE_INLINE const T* dynamicCast(const NodeBase* node)
     {
-        return (node && node->getClassInfo().isSubClassOf(SyntaxClassBase::Impl<T>::kClassInfo)) ? static_cast<const T*>(node) : nullptr;
+        return (node && node->getClassInfo().isSubClassOf(T::kReflectClassInfo)) ? static_cast<const T*>(node) : nullptr;
     }
 
     template<typename T>
     SLANG_FORCE_INLINE T* as(NodeBase* node)
     {
-        return (node && node->getClassInfo().isSubClassOf(SyntaxClassBase::Impl<T>::kClassInfo)) ? static_cast<T*>(node) : nullptr;
+        return (node && node->getClassInfo().isSubClassOf(T::kReflectClassInfo)) ? static_cast<T*>(node) : nullptr;
     }
 
     template<typename T>
     SLANG_FORCE_INLINE const T* as(const NodeBase* node)
     {
-        return (node && node->getClassInfo().isSubClassOf(SyntaxClassBase::Impl<T>::kClassInfo)) ? static_cast<const T*>(node) : nullptr;
+        return (node && node->getClassInfo().isSubClassOf(T::kReflectClassInfo)) ? static_cast<const T*>(node) : nullptr;
     }
 
 } // namespace Slang
