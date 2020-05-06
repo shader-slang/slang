@@ -116,16 +116,12 @@ void Session::init()
     // Set all the shared library function pointers to nullptr
     ::memset(m_sharedLibraryFunctions, 0, sizeof(m_sharedLibraryFunctions));
 
-    {
-        static auto res = SyntaxClassBase::ClassInfo::initRanges();
-    }
-
+    
     // Initialize the lookup table of syntax classes:
 
     // We can just iterate over the class pointers.
     // NOTE! That this adds the names of the abstract classes too(!)
     {
-        const SyntaxClassBase::ClassInfo* info = SyntaxClassBase::ClassInfo::s_first;
         for (; info; info = info->m_next)
         {
             mapNameToSyntaxClass.Add(getNamePool()->getName(info->m_name), SyntaxClass<Slang::RefObject>(info));

@@ -2,7 +2,7 @@
 
 #pragma once
 
-#include "slang-syntax.h"
+#include "slang-ast-support-types.h"
 
 #include "slang-ast-generated.h"
 #include "slang-ast-reflect.h"
@@ -14,9 +14,14 @@
 namespace Slang
 {
 
-struct ReflectClassInfo;
+#define SLANG_ABSTRACT_CLASS(x) SLANG_ABSTRACT_CLASS_REFLECT(x)
+#define SLANG_CLASS(x) SLANG_CLASS_REFLECT(x)
+
 
 SLANG_REFLECT_BASE_CLASS(RefObject)
+
+struct ReflectClassInfo;
+
 
 class NodeBase : public RefObject
 {
@@ -127,7 +132,7 @@ SLANG_FORCE_INLINE const T* as(const Type* obj) { return obj ? dynamicCast<T>(co
 // type-level variables to concrete argument values
 class Substitutions: public RefObject
 {
-    SLANG_NON_VISITOR_ABSTRACT_CLASS(Substitutions)
+    SLANG_ABSTRACT_CLASS(Substitutions)
 
     // The next outer that this one refines.
     RefPtr<Substitutions> outer;
@@ -142,7 +147,7 @@ class Substitutions: public RefObject
 
 class GenericSubstitution : public Substitutions
 {
-    SLANG_NON_VISITOR_CLASS(GenericSubstitution)
+    SLANG_CLASS(GenericSubstitution)
 
     // The generic declaration that defines the
     // parameters we are binding to arguments
@@ -171,7 +176,7 @@ class GenericSubstitution : public Substitutions
 
 class ThisTypeSubstitution : public Substitutions
 {
-    SLANG_NON_VISITOR_CLASS(ThisTypeSubstitution)
+    SLANG_CLASS(ThisTypeSubstitution)
 
     // The declaration of the interface that we are specializing
     InterfaceDecl* interfaceDecl = nullptr;
@@ -192,7 +197,7 @@ class ThisTypeSubstitution : public Substitutions
 
 class GlobalGenericParamSubstitution : public Substitutions
 {
-    SLANG_NON_VISITOR_CLASS(GlobalGenericParamSubstitution)
+    SLANG_CLASS(GlobalGenericParamSubstitution)
     // the type_param decl to be substituted
     GlobalGenericParamDecl* paramDecl;
 
@@ -331,5 +336,8 @@ class Stmt : public ModifiableSyntaxNode
     virtual void accept(IStmtVisitor* visitor, void* extra) = 0;
 
 };
+
+#undef SLANG_ABSTRACT_CLASS
+#undef SLANG_CLASS
 
 } // namespace Slang

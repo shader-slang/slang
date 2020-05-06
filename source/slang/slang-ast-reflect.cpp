@@ -50,8 +50,8 @@ struct CreateImpl
 #define SLANG_REFLECT_CLASS_INFO(NAME, SUPER, STYLE, NODE_STYLE, PARAM) \
     /* static */const ReflectClassInfo NAME::kReflectClassInfo = { uint32_t(ASTNodeType::NAME), uint32_t(ASTNodeLast::NAME), SLANG_GET_SUPER_##NODE_STYLE(NAME), #NAME, SLANG_GET_CREATE_FUNC_##STYLE(NAME)  };
 
-SLANG_ASTNode_NodeBase(SLANG_REFLECT_CLASS_INFO, _)
-SLANG_ASTNode_Substitutions(SLANG_REFLECT_CLASS_INFO, _)
+//SLANG_ASTNode_NodeBase(SLANG_REFLECT_CLASS_INFO, _)
+//SLANG_ASTNode_Substitutions(SLANG_REFLECT_CLASS_INFO, _)
 
 #if 0
 #define SLANG_DISPATCH(name, abstractStyle, nodeStyle, param) \

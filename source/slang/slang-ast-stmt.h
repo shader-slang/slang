@@ -6,6 +6,9 @@
 
 namespace Slang {
 
+#define SLANG_ABSTRACT_CLASS(x) SLANG_ABSTRACT_CLASS_REFLECT(x)
+#define SLANG_CLASS(x) SLANG_CLASS_REFLECT_WITH_ACCEPT(x)
+
 // Syntax class definitions for statements.
 
 class ScopeStmt : public Stmt 
@@ -203,5 +206,8 @@ class ExpressionStmt : public Stmt
 
     RefPtr<Expr> Expression;
 };
+
+#undef SLANG_ABSTRACT_CLASS
+#undef SLANG_CLASS
 
 } // namespace Slang

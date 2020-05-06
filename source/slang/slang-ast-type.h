@@ -6,6 +6,9 @@
 
 namespace Slang {
 
+#define SLANG_ABSTRACT_CLASS(x) SLANG_ABSTRACT_CLASS_REFLECT(x)
+#define SLANG_CLASS(x) SLANG_CLASS_REFLECT_WITH_ACCEPT(x)
+
 // Syntax class definitions for types.
 
 // The type of a reference to an overloaded name
@@ -696,5 +699,7 @@ class ThisType : public Type
 
 };
 
+#undef SLANG_ABSTRACT_CLASS
+#undef SLANG_CLASS
 
 } // namespace Slang
