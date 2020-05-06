@@ -587,44 +587,6 @@ namespace Slang
         return SyntaxClass<T>::getClass();
     }
 
-#if 0
-    template<typename T>
-    SLANG_FORCE_INLINE T* dynamicCast(NodeBase* node);
-
-    template<typename T>
-    SLANG_FORCE_INLINE const T* dynamicCast(const NodeBase* node);
-
-    template<typename T>
-    SLANG_FORCE_INLINE T* as(NodeBase* node);
-
-    template<typename T>
-    SLANG_FORCE_INLINE const T* as(const NodeBase* node);
-#endif
-
-    template<typename T>
-    SLANG_FORCE_INLINE T* dynamicCast(NodeBase* node)
-    {
-        return (node && node->getClassInfo().isSubClassOf(T::kReflectClassInfo)) ? static_cast<T*>(node) : nullptr;
-    }
-
-    template<typename T>
-    SLANG_FORCE_INLINE const T* dynamicCast(const NodeBase* node)
-    {
-        return (node && node->getClassInfo().isSubClassOf(T::kReflectClassInfo)) ? static_cast<const T*>(node) : nullptr;
-    }
-
-    template<typename T>
-    SLANG_FORCE_INLINE T* as(NodeBase* node)
-    {
-        return (node && node->getClassInfo().isSubClassOf(T::kReflectClassInfo)) ? static_cast<T*>(node) : nullptr;
-    }
-
-    template<typename T>
-    SLANG_FORCE_INLINE const T* as(const NodeBase* node)
-    {
-        return (node && node->getClassInfo().isSubClassOf(T::kReflectClassInfo)) ? static_cast<const T*>(node) : nullptr;
-    }
-
     struct SubstitutionSet
     {
         RefPtr<Substitutions> substitutions;

@@ -19,7 +19,7 @@ namespace Slang
 static ReflectClassInfo::Infos _calcInfos()
 {
     ReflectClassInfo::Infos infos;
-    memset(&infos, sizeof(infos), 0);
+    memset(&infos, 0, sizeof(infos));
     SLANG_ALL_ASTNode_NodeBase(SLANG_REFLECT_GET_REFLECT_CLASS_INFO, _)
     SLANG_ALL_ASTNode_Substitutions(SLANG_REFLECT_GET_REFLECT_CLASS_INFO, _)
     return infos;

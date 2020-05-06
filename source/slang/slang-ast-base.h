@@ -29,7 +29,9 @@ class NodeBase : public RefObject
    
     SyntaxClass<NodeBase> getClass() { return SyntaxClass<NodeBase>(&getClassInfo()); }
 };
-    
+
+
+
 // Base class for all nodes representing actual syntax
 // (thus having a location in the source code)
 class SyntaxNodeBase : public NodeBase
@@ -339,5 +341,30 @@ class Stmt : public ModifiableSyntaxNode
 
 #undef SLANG_ABSTRACT_CLASS
 #undef SLANG_CLASS
+
+
+template<typename T>
+SLANG_FORCE_INLINE T* dynamicCast(NodeBase* node)
+{
+    return (node && node->getClassInfo().isSubClassOf(T::kReflectClassInfo)) ? static_cast<T*>(node) : nullptr;
+}
+
+template<typename T>
+SLANG_FORCE_INLINE const T* dynamicCast(const NodeBase* node)
+{
+    return (node && node->getClassInfo().isSubClassOf(T::kReflectClassInfo)) ? static_cast<const T*>(node) : nullptr;
+}
+
+template<typename T>
+SLANG_FORCE_INLINE T* as(NodeBase* node)
+{
+    return (node && node->getClassInfo().isSubClassOf(T::kReflectClassInfo)) ? static_cast<T*>(node) : nullptr;
+}
+
+template<typename T>
+SLANG_FORCE_INLINE const T* as(const NodeBase* node)
+{
+    return (node && node->getClassInfo().isSubClassOf(T::kReflectClassInfo)) ? static_cast<const T*>(node) : nullptr;
+}
 
 } // namespace Slang
