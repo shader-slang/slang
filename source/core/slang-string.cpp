@@ -439,4 +439,51 @@ namespace Slang
         sprintf_s(data, kCount, format, val);
         m_buffer->length += strnlen_s(data, kCount);
     }
+
+    // !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! UnownedStringSlice !!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+
+    Index UnownedStringSlice::indexOf(char c) const
+    {
+        const Index size = Index(m_end - m_begin);
+        for (Index i = 0; i < size; ++i)
+        {
+            if (m_begin[i] == c)
+            {
+                return i;
+            }
+        }
+        return -1;
+    }
+
+    Index UnownedStringSlice::indexOf(const UnownedStringSlice& in) const
+    {
+        const Index len = getLength();
+        const Index inLen = in.getLength();
+        if (inLen > len)
+        {
+            return -1;
+        }
+
+        const char* inChars = in.m_begin;
+        switch (inLen)
+        {
+            case 0:         return 0;
+            case 1:         return indexOf(inChars[0]);
+            default: break;
+        }
+
+        const char* chars = m_begin;
+        const char firstChar = inChars[0];
+
+        for (Int i = 0; i < len - inLen; ++i)
+        {
+            if (chars[i] == firstChar && in == UnownedStringSlice(chars + i, inLen))
+            {
+                return i;
+            }
+        }
+
+        return -1;
+    }
+
 }
