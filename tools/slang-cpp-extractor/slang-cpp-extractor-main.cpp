@@ -1889,6 +1889,9 @@ SlangResult CPPExtractorApp::calcHeader(CPPExtractor& extractor, StringBuilder& 
                 typeIndex++;
             }
 
+            _indent(1, out);
+            out << "CountOf\n";
+
             out << "};\n\n";
         }
 

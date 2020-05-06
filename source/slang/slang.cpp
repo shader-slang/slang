@@ -122,9 +122,13 @@ void Session::init()
     // We can just iterate over the class pointers.
     // NOTE! That this adds the names of the abstract classes too(!)
     {
-        for (; info; info = info->m_next)
+        for (Index i = 0; i < Index(ASTNodeType::CountOf); ++i)
         {
-            mapNameToSyntaxClass.Add(getNamePool()->getName(info->m_name), SyntaxClass<Slang::RefObject>(info));
+            const ReflectClassInfo* info = ReflectClassInfo::getInfo(ASTNodeType(i));
+            if (info)
+            {
+                mapNameToSyntaxClass.Add(getNamePool()->getName(info->m_name), SyntaxClass<Slang::RefObject>(info));
+            }
         }
     }
 

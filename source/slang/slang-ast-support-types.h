@@ -501,6 +501,15 @@ namespace Slang
         const ReflectClassInfo* m_superClass;       ///< The super class of this class, or nullptr if has no super class. 
         const char* m_name;                         ///< Textual class name, for debugging 
         CreateFunc m_createFunc;                    ///< Callback to use when creating instances
+
+        struct Infos
+        {
+            const ReflectClassInfo* infos[int(ASTNodeType::CountOf)];
+        };
+
+        SLANG_FORCE_INLINE static const ReflectClassInfo* getInfo(ASTNodeType type) { return kInfos.infos[int(type)]; }
+
+        static const Infos kInfos;
     };
 
     // A reference to a class of syntax node, that can be

@@ -14,6 +14,19 @@
 namespace Slang
 {
 
+#define SLANG_REFLECT_GET_REFLECT_CLASS_INFO(NAME, SUPER, ORIGIN, LAST, MARKER, TYPE, param) infos.infos[int(ASTNodeType::NAME)] = &NAME::kReflectClassInfo;
+
+static ReflectClassInfo::Infos _calcInfos()
+{
+    ReflectClassInfo::Infos infos;
+    memset(&infos, sizeof(infos), 0);
+    SLANG_ALL_ASTNode_NodeBase(SLANG_REFLECT_GET_REFLECT_CLASS_INFO, _)
+    SLANG_ALL_ASTNode_Substitutions(SLANG_REFLECT_GET_REFLECT_CLASS_INFO, _)
+    return infos;
+}
+
+/* static */const ReflectClassInfo::Infos ReflectClassInfo::kInfos = _calcInfos();
+
 bool ReflectClassInfo::isSubClassOfSlow(const ThisType& super) const
 {
     ReflectClassInfo const* info = this;
@@ -36,33 +49,22 @@ struct CreateImpl
     static void* create() { return new T; }
 };
 
-#define SLANG_GET_SUPER_BASE(NAME) nullptr
-#define SLANG_GET_SUPER_INNER(NAME) &ASTNodeSuper::NAME##_Super::kReflectClassInfo
-#define SLANG_GET_SUPER_LEAF(NAME) &ASTNodeSuper::NAME##_Super::kReflectClassInfo
+#define SLANG_GET_SUPER_BASE(SUPER) nullptr
+#define SLANG_GET_SUPER_INNER(SUPER) &SUPER::kReflectClassInfo
+#define SLANG_GET_SUPER_LEAF(SUPER) &SUPER::kReflectClassInfo
 
 #define SLANG_GET_CREATE_FUNC_ABSTRACT(NAME) nullptr
-#define SLANG_GET_CREATE_FUNC_NORMAL(NAME) &CreateImpl<NAME>::create
+#define SLANG_GET_CREATE_FUNC_NONE(NAME) &CreateImpl<NAME>::create
 
 #define SLANG_GET_CREATE_FUNC_NON_VISITOR_ABSTRACT(NAME) nullptr
 #define SLANG_GET_CREATE_FUNC_NON_VISITOR(NAME) &CreateImpl<NAME>::create
 
 
-#define SLANG_REFLECT_CLASS_INFO(NAME, SUPER, STYLE, NODE_STYLE, PARAM) \
-    /* static */const ReflectClassInfo NAME::kReflectClassInfo = { uint32_t(ASTNodeType::NAME), uint32_t(ASTNodeLast::NAME), SLANG_GET_SUPER_##NODE_STYLE(NAME), #NAME, SLANG_GET_CREATE_FUNC_##STYLE(NAME)  };
+#define SLANG_REFLECT_CLASS_INFO(NAME, SUPER, ORIGIN, LAST, MARKER, TYPE, param) \
+    /* static */const ReflectClassInfo NAME::kReflectClassInfo = { uint32_t(ASTNodeType::NAME), uint32_t(ASTNodeType::LAST), SLANG_GET_SUPER_##TYPE(SUPER), #NAME, SLANG_GET_CREATE_FUNC_##MARKER(NAME)  };
 
-//SLANG_ASTNode_NodeBase(SLANG_REFLECT_CLASS_INFO, _)
-//SLANG_ASTNode_Substitutions(SLANG_REFLECT_CLASS_INFO, _)
+SLANG_ALL_ASTNode_NodeBase(SLANG_REFLECT_CLASS_INFO, _)
+SLANG_ALL_ASTNode_Substitutions(SLANG_REFLECT_CLASS_INFO, _)
 
-#if 0
-#define SLANG_DISPATCH(name, abstractStyle, nodeStyle, param) \
-    virtual void dispatch_##name(name* obj, void* extra) = 0;
-
-struct ITypeVisitor
-{
-    // All of the types that are derived from Type
-    SLANG_DERIVED_ASTNode_Type(SLANG_DISPATCH, _)
-};
-
-#endif
 
 } // namespace Slang

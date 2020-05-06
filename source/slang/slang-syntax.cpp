@@ -9,17 +9,10 @@
 namespace Slang
 {
 
-// Different implementations based on the STYLE
-#define SLANG_ACCEPT_IMPL_ABSTRACT(NAME) 
-#define SLANG_ACCEPT_IMPL_NORMAL(NAME)                     void NAME::accept(NAME::Visitor* visitor, void* extra) { visitor->dispatch_##NAME(this, extra); }
-#define SLANG_ACCEPT_IMPL_NON_VISITOR_ABSTRACT(NAME) 
-#define SLANG_ACCEPT_IMPL_NON_VISITOR(NAME)
+#define SLANG_CLASS_ACCEPT_IMPL(NAME, SUPER, ORIGIN, LAST, MARKER, TYPE, param) \
+    void NAME::accept(NAME::Visitor* visitor, void* extra) { visitor->dispatch_##NAME(this, extra); }
 
-// Macro to apply over the AST tree
-#define SLANG_AST_ACCEPT_IMPL(NAME, SUPER, STYLE, NODE_STYLE, PARAM) SLANG_ACCEPT_IMPL_##STYLE(NAME)
-
-// Generate all the accept implementations
-SLANG_DERIVED_ASTNode_NodeBase(SLANG_AST_ACCEPT_IMPL, _)
+SLANG_ALL_ASTNode_NodeBase(SLANG_CLASS_ONLY, SLANG_CLASS_ACCEPT_IMPL)
 
 // !!!!!!!!!!!!!!!!!!!!!!!!!!!!! DiagnosticSink impls !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 

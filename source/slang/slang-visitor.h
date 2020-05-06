@@ -193,7 +193,7 @@ struct StmtVisitor<Derived,void> : IStmtVisitor
 
 struct IDeclVisitor
 {
-    SLANG_CHILDREN_ASTNode_Decl(SLANG_CLASS_ONLY, SLANG_VISITOR_DISPATCH_DECL)
+    SLANG_CHILDREN_ASTNode_DeclBase(SLANG_CLASS_ONLY, SLANG_VISITOR_DISPATCH_DECL)
 };
 
 template<typename Derived, typename Result = void>
@@ -206,8 +206,8 @@ struct DeclVisitor : IDeclVisitor
         return result;
     }
 
-    SLANG_CHILDREN_ASTNode_Decl(SLANG_CLASS_ONLY, SLANG_VISITOR_DISPATCH_RESULT_IMPL)
-    SLANG_CHILDREN_ASTNode_Decl(SLANG_VISITOR_RESULT_VISIT_IMPL, _)
+    SLANG_CHILDREN_ASTNode_DeclBase(SLANG_CLASS_ONLY, SLANG_VISITOR_DISPATCH_RESULT_IMPL)
+    SLANG_CHILDREN_ASTNode_DeclBase(SLANG_VISITOR_RESULT_VISIT_IMPL, _)
 };
 
 template<typename Derived>
@@ -218,8 +218,8 @@ struct DeclVisitor<Derived,void> : IDeclVisitor
         decl->accept(this, 0);
     }
 
-    SLANG_CHILDREN_ASTNode_Decl(SLANG_CLASS_ONLY, SLANG_VISITOR_DISPATCH_VOID_IMPL)
-    SLANG_CHILDREN_ASTNode_Decl(SLANG_VISITOR_VOID_VISIT_IMPL, _)
+    SLANG_CHILDREN_ASTNode_DeclBase(SLANG_CLASS_ONLY, SLANG_VISITOR_DISPATCH_VOID_IMPL)
+    SLANG_CHILDREN_ASTNode_DeclBase(SLANG_VISITOR_VOID_VISIT_IMPL, _)
 };
 
 template<typename Derived, typename Arg>
@@ -230,8 +230,8 @@ struct DeclVisitorWithArg : IDeclVisitor
         obj->accept(this, (void*)&arg);
     }
 
-    SLANG_CHILDREN_ASTNode_Decl(SLANG_CLASS_ONLY, SLANG_VISITOR_DISPATCH_ARG_IMPL)
-    SLANG_CHILDREN_ASTNode_Decl(SLANG_VISITOR_VOID_VISIT_ARG_IMPL, _)
+    SLANG_CHILDREN_ASTNode_DeclBase(SLANG_CLASS_ONLY, SLANG_VISITOR_DISPATCH_ARG_IMPL)
+    SLANG_CHILDREN_ASTNode_DeclBase(SLANG_VISITOR_VOID_VISIT_ARG_IMPL, _)
 };
 
 

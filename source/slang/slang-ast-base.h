@@ -15,8 +15,8 @@ namespace Slang
 {
 
 #define SLANG_ABSTRACT_CLASS(x) SLANG_ABSTRACT_CLASS_REFLECT(x)
-#define SLANG_CLASS(x) SLANG_CLASS_REFLECT(x)
-
+// We don't use SLANG_CLASS_REFLECT_DEFAULT(x), as we don't want accept method on these classes 
+#define SLANG_CLASS(x) SLANG_CLASS_REFLECT_DEFAULT(x)
 
 SLANG_REFLECT_BASE_CLASS(RefObject)
 

@@ -14,7 +14,7 @@ namespace Slang {
 // A group of declarations that should be treated as a unit
 class DeclGroup: public DeclBase
 {
-    SLANG_ABSTRACT_CLASS(DeclGroup)
+    SLANG_CLASS(DeclGroup)
 
     List<RefPtr<Decl>> decls;
 };
