@@ -10,6 +10,15 @@ namespace Slang
 {
     struct IRSpecContext;
 
+    // !!!!!!!!!!!!!!!!!!!!!!!!!!!! DiagnosticSink Impls !!!!!!!!!!!!!!!!!!!!!
+
+    SourceLoc const& getDiagnosticPos(IRInst* inst)
+    {
+        return inst->sourceLoc;
+    }
+
+    // !!!!!!!!!!!!!!!!!!!!!!!!!!!! DiagnosticSink Impls !!!!!!!!!!!!!!!!!!!!!
+
     IRInst* cloneGlobalValueWithLinkage(
         IRSpecContext*          context,
         IRInst*                 originalVal,

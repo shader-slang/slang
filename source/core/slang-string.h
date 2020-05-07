@@ -104,18 +104,11 @@ namespace Slang
             return Index(m_end - m_begin);
         }
 
-        Index indexOf(char c) const
-        {
-            const Index size = int(m_end - m_begin);
-            for (Index i = 0; i < size; ++i)
-            {
-                if (m_begin[i] == c)
-                {
-                    return i;
-                }
-            }
-            return -1;
-        }
+            /// Finds first index of char 'c'. If not found returns -1.
+        Index indexOf(char c) const;
+            /// Find first index of slice. If not found returns -1
+        Index indexOf(const UnownedStringSlice& slice) const;
+
         Index lastIndexOf(char c) const
         {
             const Index size = Index(m_end - m_begin);

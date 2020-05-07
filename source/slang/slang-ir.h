@@ -565,6 +565,8 @@ T* cast(IRInst* inst, T* /* */ = nullptr)
     return (T*)inst;
 }
 
+SourceLoc const& getDiagnosticPos(IRInst* inst);
+
 // Now that `IRInst` is defined we can back-fill the definitions that need to access it.
 
 template<typename T>

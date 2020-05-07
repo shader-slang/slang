@@ -74,6 +74,7 @@ ABSTRACT_SYNTAX_CLASS(GlobalGenericParamSubstitution, Substitutions);
 #include "slang-val-defs.h"
 #include "slang-object-meta-end.h"
 
+
 SyntaxClassBase::ClassInfo::ClassInfo(const char* name, CreateFunc createFunc, const ClassInfo* superClass):
     m_name(name),
     m_createFunc(createFunc),
@@ -184,7 +185,48 @@ static bool _checkSubClassRange()
     return SLANG_OK;
 }
 
-    // Free functions
+// !!!!!!!!!!!!!!!!!!!!!!!!!!!!! DiagnosticSink impls !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+
+void printDiagnosticArg(StringBuilder& sb, Decl* decl)
+{
+    sb << getText(decl->getName());
+}
+
+void printDiagnosticArg(StringBuilder& sb, Type* type)
+{
+    sb << type->ToString();
+}
+
+void printDiagnosticArg(StringBuilder& sb, Val* val)
+{
+    sb << val->ToString();
+}
+
+void printDiagnosticArg(StringBuilder& sb, TypeExp const& type)
+{
+    sb << type.type->ToString();
+}
+
+void printDiagnosticArg(StringBuilder& sb, QualType const& type)
+{
+    if (type.type)
+        sb << type.type->ToString();
+    else
+        sb << "<null>";
+}
+
+SourceLoc const& getDiagnosticPos(SyntaxNode const* syntax)
+{
+    return syntax->loc;
+}
+
+SourceLoc const& getDiagnosticPos(TypeExp const& typeExp)
+{
+    return typeExp.exp->loc;
+}
+
+
+// !!!!!!!!!!!!!!!!!!!!!!!!!!!!!  Free functions !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 
 const RefPtr<Decl>* adjustFilterCursorImpl(const SyntaxClassBase::ClassInfo& clsInfo, MemberFilterStyle filterStyle, const RefPtr<Decl>* ptr, const RefPtr<Decl>* end)
 {

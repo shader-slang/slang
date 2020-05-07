@@ -69,15 +69,11 @@ namespace Slang
     };
 
     class Name;
-    class Decl;
-    struct QualType;
-    class Type;
-    struct TypeExp;
-    class Val;
 
-    enum class CodeGenTarget;
-    enum class Stage : SlangStage;
-    enum class ProfileVersion;
+    //enum class CodeGenTarget;
+
+    //enum class Stage : SlangStage;
+    //enum class ProfileVersion;
 
     void printDiagnosticArg(StringBuilder& sb, char const* str);
 
@@ -92,15 +88,11 @@ namespace Slang
     void printDiagnosticArg(StringBuilder& sb, Slang::String const& str);
     void printDiagnosticArg(StringBuilder& sb, Slang::UnownedStringSlice const& str);
     void printDiagnosticArg(StringBuilder& sb, Name* name);
-    void printDiagnosticArg(StringBuilder& sb, Decl* decl);
-    void printDiagnosticArg(StringBuilder& sb, Type* type);
-    void printDiagnosticArg(StringBuilder& sb, TypeExp const& type);
-    void printDiagnosticArg(StringBuilder& sb, QualType const& type);
+
     void printDiagnosticArg(StringBuilder& sb, TokenType tokenType);
     void printDiagnosticArg(StringBuilder& sb, Token const& token);
-    void printDiagnosticArg(StringBuilder& sb, CodeGenTarget val);
-    void printDiagnosticArg(StringBuilder& sb, Val* val);
-
+    
+    
     template<typename T>
     void printDiagnosticArg(StringBuilder& sb, RefPtr<T> ptr)
     {
@@ -109,13 +101,8 @@ namespace Slang
 
     inline SourceLoc const& getDiagnosticPos(SourceLoc const& pos) { return pos;  }
 
-    class SyntaxNode;
-    SourceLoc const& getDiagnosticPos(SyntaxNode const* syntax);
     SourceLoc const& getDiagnosticPos(Token const& token);
-    SourceLoc const& getDiagnosticPos(TypeExp const& typeExp);
-
-    struct IRInst;
-    SourceLoc const& getDiagnosticPos(IRInst* inst);
+    
 
     template<typename T>
     SourceLoc getDiagnosticPos(RefPtr<T> const& ptr)
