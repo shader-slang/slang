@@ -812,7 +812,7 @@ standardProject "slang"
             buildmessage "slang-cpp-extractor AST %{file.relpath}"
 
             -- Where the input files are located
-            local sourcePath = "source/slang/"
+            local sourcePath = "%{file.directory}"
             
             -- Specify the files that will be used for the generation
             local inputFiles = { "slang-ast-base.h", "slang-ast-decl.h", "slang-ast-expr.h", "slang-ast-modifier.h", "slang-ast-stmt.h", "slang-ast-type.h", "slang-ast-val.h" }
