@@ -742,6 +742,7 @@ standardProject "slang"
     -- the projects here:
     --
     dependson { "slang-generate" }
+    dependson { "slang-cpp-extractor" }
 
     -- If we are not building glslang from source, then be
     -- sure to copy a binary copy over to the output directory
@@ -802,6 +803,49 @@ standardProject "slang"
             end
             --
             buildinputs { "%{cfg.targetdir}/slang-generate" .. executableSuffix }
+    end
+
+    -- We need to run the C++ extractor to generate some include files
+    
+    if executeBinary then
+        filter "files:source/slang/slang-ast-reflect.h"
+            buildmessage "slang-cpp-extractor AST %{file.relpath}"
+
+            -- Where the input files are located
+            local sourcePath = "source/slang/"
+            
+            -- Specify the files that will be used for the generation
+            local inputFiles = { "slang-ast-base.h", "slang-ast-decl.h", "slang-ast-expr.h", "slang-ast-modifier.h", "slang-ast-stmt.h", "slang-ast-type.h", "slang-ast-val.h" }
+
+            -- Specify the actual command to run for this action.
+            --
+            -- Note that we use a single-quoted Lua string and wrap the path
+            -- to the `slang-cpp-extractor` command in double quotes to avoid
+            -- confusing the Windows shell. It seems that Premake outputs that
+            -- path with forward slashes, which confused the shell if we don't
+            -- quote the executable path.
+
+            local buildcmd = '"%{cfg.targetdir}/slang-cpp-extractor" ' .. table.concat(inputFiles, " ") .. " -strip-prefix slang-ast- -o slang-ast-generated"
+            
+            buildcommands { buildcmd }
+            
+            -- Specify the files output by the extactor - so custom action will run when these files are needed.
+            --
+            buildoutputs { sourcePath .. "/slang-ast-generated.h", sourcePath .. "slang-ast-generated-macro.h"}
+            
+            local executableSuffix = "";
+            if(os.target() == "windows") then
+                executableSuffix = ".exe";
+            end
+            
+            -- Make it depend on the extractor tool itself
+            local buildInputTable = { "%{cfg.targetdir}/slang-cpp-extractor" .. executableSuffix }
+            for key, inputFile in ipairs(inputFiles) do
+                table.insert(buildInputTable, sourcePath .. inputFile)
+            end
+            
+            --
+            buildinputs(buildInputTable)
     end
 
 if enableProfile then
