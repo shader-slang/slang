@@ -87,7 +87,6 @@ class ArithmeticExpressionType : public DeclRefType
 
 public:
     virtual BasicExpressionType* GetScalarType() = 0;
-
 };
 
 class BasicExpressionType : public ArithmeticExpressionType 
@@ -288,7 +287,7 @@ class HLSLPatchType : public BuiltinType
     SLANG_CLASS(HLSLPatchType)
 
     Type* getElementType();
-    IntVal*         getElementCount();
+    IntVal* getElementCount();
 };
 
 class HLSLInputPatchType : public HLSLPatchType 
@@ -338,7 +337,6 @@ class ParameterGroupType : public PointerLikeType
 {
     SLANG_CLASS(ParameterGroupType)
 };
-
 
 class UniformParameterGroupType : public ParameterGroupType 
 {
@@ -391,7 +389,6 @@ class ParameterBlockType : public UniformParameterGroupType
     SLANG_CLASS(ParameterBlockType)
 };
 
-
 class ArrayExpressionType : public Type 
 {
     SLANG_CLASS(ArrayExpressionType)
@@ -438,7 +435,6 @@ class VectorExpressionType : public ArithmeticExpressionType
 {
     SLANG_CLASS(VectorExpressionType)
 
-
     // The type of vector elements.
     // As an invariant, this should be a basic type or an alias.
     RefPtr<Type> elementType;
@@ -483,10 +479,7 @@ class StringType : public BuiltinType
 class EnumTypeType : public BuiltinType 
 {
     SLANG_CLASS(EnumTypeType)
-
-
-// TODO: provide accessors for the declaration, the "tag" type, etc.
-
+    // TODO: provide accessors for the declaration, the "tag" type, etc.
 };
 
 // Base class for types that map down to
@@ -503,7 +496,6 @@ class PtrTypeBase : public BuiltinType
 class PtrType : public PtrTypeBase 
 {
     SLANG_CLASS(PtrType)
-
 };
 
 // A type that represents the behind-the-scenes
@@ -512,28 +504,24 @@ class PtrType : public PtrTypeBase
 class OutTypeBase : public PtrTypeBase 
 {
     SLANG_CLASS(OutTypeBase)
-
 };
 
 // The type for an `out` parameter, e.g., `out T`
 class OutType : public OutTypeBase 
 {
     SLANG_CLASS(OutType)
-
 };
 
 // The type for an `in out` parameter, e.g., `in out T`
 class InOutType : public OutTypeBase 
 {
     SLANG_CLASS(InOutType)
-
 };
 
 // The type for an `ref` parameter, e.g., `ref T`
 class RefType : public PtrTypeBase 
 {
     SLANG_CLASS(RefType)
-
 };
 
 // A type alias of some kind (e.g., via `typedef`)
@@ -551,7 +539,6 @@ class NamedExpressionType : public Type
         : declRef(declRef)
     {}
 
-
     virtual String ToString() override;
 
 protected:
@@ -565,7 +552,6 @@ protected:
 class FuncType : public Type 
 {
     SLANG_CLASS(FuncType)
-
 
     // TODO: We may want to preserve parameter names
     // in the list here, just so that we can print
@@ -604,7 +590,6 @@ class GenericDeclRefType : public Type
         DeclRef<GenericDecl> declRef)
         : declRef(declRef)
     {}
-
 
     DeclRef<GenericDecl> const& GetDeclRef() const { return declRef; }
 

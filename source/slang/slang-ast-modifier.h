@@ -40,7 +40,6 @@ class IntrinsicOpModifier : public Modifier
 {
     SLANG_CLASS(IntrinsicOpModifier)
  
-
     // Token that names the intrinsic op.
     Token opToken;
 

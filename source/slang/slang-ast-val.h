@@ -15,7 +15,6 @@ namespace Slang {
 class IntVal : public Val 
 {
     SLANG_ABSTRACT_CLASS(IntVal)
-
 };
 
 // Trivial case of a value that is just a constant integer
@@ -59,7 +58,6 @@ class GenericParamIntVal : public IntVal
 class ErrorIntVal : public IntVal 
 {
     SLANG_CLASS(ErrorIntVal)
-
 
     // TODO: We should probably eventually just have an `ErrorVal` here
     // and have all `Val`s that represent ordinary values hold their
@@ -110,7 +108,6 @@ class ErrorIntVal : public IntVal
 class Witness : public Val 
 {
     SLANG_ABSTRACT_CLASS(Witness)
-
 };
 
 // A witness that one type is a subtype of another
@@ -135,8 +132,8 @@ class TypeEqualityWitness : public SubtypeWitness
     virtual String ToString() override;
     virtual int GetHashCode() override;
     virtual RefPtr<Val> SubstituteImpl(SubstitutionSet subst, int * ioDiff) override;
-
 };
+
 // A witness that one type is a subtype of another
 // because some in-scope declaration says so
 class DeclaredSubtypeWitness : public SubtypeWitness 
@@ -149,7 +146,6 @@ class DeclaredSubtypeWitness : public SubtypeWitness
     virtual String ToString() override;
     virtual int GetHashCode() override;
     virtual RefPtr<Val> SubstituteImpl(SubstitutionSet subst, int * ioDiff) override;
-
 };
 
 // A witness that `sub : sup` because `sub : mid` and `mid : sup`
@@ -167,7 +163,6 @@ class TransitiveSubtypeWitness : public SubtypeWitness
     virtual String ToString() override;
     virtual int GetHashCode() override;
     virtual RefPtr<Val> SubstituteImpl(SubstitutionSet subst, int * ioDiff) override;
-
 };
 
 // A witness taht `sub : sup` because `sub` was wrapped into

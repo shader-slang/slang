@@ -273,7 +273,7 @@ class CallableDecl : public ContainerDecl
     TypeExp ReturnType;
 
     // Fields related to redeclaration, so that we
-    // can support multiple specialized varaitions
+    // can support multiple specialized variations
     // of the "same" logical function.
     //
     // This should also help us to support redeclaration
@@ -350,7 +350,7 @@ class NamespaceDecl : public NamespaceDeclBase
     SLANG_CLASS(NamespaceDecl)
 };
 
-    // A "module" of code (essentiately, a single translation unit)
+    // A "module" of code (essentially, a single translation unit)
     // that provides a scope for some number of declarations.
 class ModuleDecl : public NamespaceDeclBase
 {
@@ -405,7 +405,7 @@ class GenericTypeConstraintDecl : public TypeConstraintDecl
     // A type constraint like `T : U` is constraining `T` to be "below" `U`
     // on a lattice of types. This may not be a subtyping relationship
     // per se, but it makes sense to use that terminology here, so we
-    // think of these fields as the sub-type and sup-ertype, respectively.
+    // think of these fields as the sub-type and super-type, respectively.
     TypeExp sub;
     TypeExp sup;
     

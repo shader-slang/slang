@@ -15,13 +15,13 @@ namespace Slang
 {
 
 #define SLANG_ABSTRACT_CLASS(x) SLANG_ABSTRACT_CLASS_REFLECT(x)
-// We don't use SLANG_CLASS_REFLECT_DEFAULT(x), as we don't want accept method on these classes 
+// We don't use SLANG_CLASS_REFLECT_WITH_ACCEPT(x), as we don't want accept method on these classes 
 #define SLANG_CLASS(x) SLANG_CLASS_REFLECT_DEFAULT(x)
 
+// Signals to C++ extractor that RefObject is a base class, that isn't reflected to C++ extractor
 SLANG_REFLECT_BASE_CLASS(RefObject)
 
 struct ReflectClassInfo;
-
 
 class NodeBase : public RefObject
 {
@@ -30,6 +30,31 @@ class NodeBase : public RefObject
     SyntaxClass<NodeBase> getClass() { return SyntaxClass<NodeBase>(&getClassInfo()); }
 };
 
+// Casting of NodeBase
+
+template<typename T>
+SLANG_FORCE_INLINE T* dynamicCast(NodeBase* node)
+{
+    return (node && node->getClassInfo().isSubClassOf(T::kReflectClassInfo)) ? static_cast<T*>(node) : nullptr;
+}
+
+template<typename T>
+SLANG_FORCE_INLINE const T* dynamicCast(const NodeBase* node)
+{
+    return (node && node->getClassInfo().isSubClassOf(T::kReflectClassInfo)) ? static_cast<const T*>(node) : nullptr;
+}
+
+template<typename T>
+SLANG_FORCE_INLINE T* as(NodeBase* node)
+{
+    return (node && node->getClassInfo().isSubClassOf(T::kReflectClassInfo)) ? static_cast<T*>(node) : nullptr;
+}
+
+template<typename T>
+SLANG_FORCE_INLINE const T* as(const NodeBase* node)
+{
+    return (node && node->getClassInfo().isSubClassOf(T::kReflectClassInfo)) ? static_cast<const T*>(node) : nullptr;
+}
 
 
 // Base class for all nodes representing actual syntax
@@ -142,7 +167,7 @@ class Substitutions: public RefObject
     // Apply a set of substitutions to the bindings in this substitution
     virtual RefPtr<Substitutions> applySubstitutionsShallow(SubstitutionSet substSet, RefPtr<Substitutions> substOuter, int* ioDiff) = 0;
 
-    // Check if these are equivalent substitutiosn to another set
+    // Check if these are equivalent substitutions to another set
     virtual bool Equals(Substitutions* subst) = 0;
     virtual int GetHashCode() const = 0;
 };
@@ -161,7 +186,7 @@ class GenericSubstitution : public Substitutions
     // Apply a set of substitutions to the bindings in this substitution
     virtual RefPtr<Substitutions> applySubstitutionsShallow(SubstitutionSet substSet, RefPtr<Substitutions> substOuter, int* ioDiff)  override;
 
-    // Check if these are equivalent substitutiosn to another set
+    // Check if these are equivalent substitutions to another set
     virtual bool Equals(Substitutions* subst) override;
 
     virtual int GetHashCode() const override
@@ -191,7 +216,7 @@ class ThisTypeSubstitution : public Substitutions
     // Apply a set of substitutions to the bindings in this substitution
     virtual RefPtr<Substitutions> applySubstitutionsShallow(SubstitutionSet substSet, RefPtr<Substitutions> substOuter, int* ioDiff)  override;
 
-    // Check if these are equivalent substitutiosn to another set
+    // Check if these are equivalent substitutions to another set
     virtual bool Equals(Substitutions* subst) override;
 
     virtual int GetHashCode() const override;
@@ -218,7 +243,7 @@ class GlobalGenericParamSubstitution : public Substitutions
     // Apply a set of substitutions to the bindings in this substitution
     virtual RefPtr<Substitutions> applySubstitutionsShallow(SubstitutionSet substSet, RefPtr<Substitutions> substOuter, int* ioDiff)  override;
 
-    // Check if these are equivalent substitutiosn to another set
+    // Check if these are equivalent substitutions to another set
     virtual bool Equals(Substitutions* subst) override;
 
     virtual int GetHashCode() const override
@@ -336,35 +361,10 @@ class Stmt : public ModifiableSyntaxNode
     typedef IStmtVisitor Visitor;
 
     virtual void accept(IStmtVisitor* visitor, void* extra) = 0;
-
 };
 
 #undef SLANG_ABSTRACT_CLASS
 #undef SLANG_CLASS
 
-
-template<typename T>
-SLANG_FORCE_INLINE T* dynamicCast(NodeBase* node)
-{
-    return (node && node->getClassInfo().isSubClassOf(T::kReflectClassInfo)) ? static_cast<T*>(node) : nullptr;
-}
-
-template<typename T>
-SLANG_FORCE_INLINE const T* dynamicCast(const NodeBase* node)
-{
-    return (node && node->getClassInfo().isSubClassOf(T::kReflectClassInfo)) ? static_cast<const T*>(node) : nullptr;
-}
-
-template<typename T>
-SLANG_FORCE_INLINE T* as(NodeBase* node)
-{
-    return (node && node->getClassInfo().isSubClassOf(T::kReflectClassInfo)) ? static_cast<T*>(node) : nullptr;
-}
-
-template<typename T>
-SLANG_FORCE_INLINE const T* as(const NodeBase* node)
-{
-    return (node && node->getClassInfo().isSubClassOf(T::kReflectClassInfo)) ? static_cast<const T*>(node) : nullptr;
-}
 
 } // namespace Slang
