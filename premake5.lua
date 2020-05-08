@@ -556,6 +556,7 @@ tool "slang-generate"
     uuid "66174227-8541-41FC-A6DF-4764FC66F78E"
     links { "core" }
 
+    dependson{ "slang-cpp-extractor" }
 
 --
 -- The `slang-test` test driver also uses the `core` library, and it
