@@ -7,21 +7,52 @@
 
 #include "slang-syntax.h"
 
+#include "slang-ast-generated-macro.h"
+
 namespace Slang {
 
+// Macros to generate from ast-generated-macro file the vistors
+
+// Only runs 'param' macro if the marker is NONE (ie not ABSTRACT here)
+#define SLANG_CLASS_ONLY_ABSTRACT(NAME, SUPER, ORIGIN, LAST, MARKER, TYPE, param)
+#define SLANG_CLASS_ONLY_NONE(NAME, SUPER, ORIGIN, LAST, MARKER, TYPE, param) param(NAME, SUPER, ORIGIN, LAST, MARKER, TYPE, param)
+
+#define SLANG_CLASS_ONLY(NAME, SUPER, ORIGIN, LAST, MARKER, TYPE, param) SLANG_CLASS_ONLY_##MARKER(NAME, SUPER, ORIGIN, LAST, MARKER, TYPE, param)
+
+// Dispatch decl
+#define SLANG_VISITOR_DISPATCH_DECL(NAME, SUPER, ORIGIN, LAST, MARKER, TYPE, param) \
+    virtual void dispatch_##NAME(NAME* obj, void* extra) = 0;
+
+// Dispatch
+
+#define SLANG_VISITOR_DISPATCH_RESULT_IMPL(NAME, SUPER, ORIGIN, LAST, MARKER, TYPE, param) \
+    virtual void dispatch_##NAME(NAME* obj, void* extra) override  { *(Result*)extra = ((Derived*) this)->visit##NAME(obj); }
+
+#define SLANG_VISITOR_DISPATCH_VOID_IMPL(NAME, SUPER, ORIGIN, LAST, MARKER, TYPE, param) \
+    virtual void dispatch_##NAME(NAME* obj, void*) override { ((Derived*) this)->visit##NAME(obj); }
+
+// Visitor with and without result
+
+#define SLANG_VISITOR_RESULT_VISIT_IMPL(NAME, SUPER, ORIGIN, LAST, MARKER, TYPE, param) \
+    Result visit##NAME(NAME* obj) { return ((Derived*) this)->visit##SUPER(obj); } \
+
+#define SLANG_VISITOR_VOID_VISIT_IMPL(NAME, SUPER, ORIGIN, LAST, MARKER, TYPE, param) \
+    void visit##NAME(NAME* obj) { ((Derived*) this)->visit##SUPER(obj); }
+
+// Args
+
+#define SLANG_VISITOR_DISPATCH_ARG_IMPL(NAME, SUPER, ORIGIN, LAST, MARKER, TYPE, param) \
+    virtual void dispatch_##NAME(NAME* obj, void* arg) override { ((Derived*) this)->visit##NAME(obj, *(Arg*)arg); }
+
+#define SLANG_VISITOR_VOID_VISIT_ARG_IMPL(NAME, SUPER, ORIGIN, LAST, MARKER, TYPE, param) \
+    void visit##NAME(NAME* obj, Arg const& arg) { ((Derived*) this)->visit##SUPER(obj, arg); }
 //
 // type Visitors
 //
 
 struct ITypeVisitor
 {
-#define ABSTRACT_SYNTAX_CLASS(NAME,BASE) /* empty */
-#define SYNTAX_CLASS(NAME, BASE) \
-    virtual void dispatch_##NAME(NAME* obj, void* extra) = 0;
-
-#include "slang-object-meta-begin.h"
-#include "slang-type-defs.h"
-#include "slang-object-meta-end.h"
+    SLANG_CHILDREN_ASTNode_Type(SLANG_CLASS_ONLY, SLANG_VISITOR_DISPATCH_DECL)
 };
 
 template<typename Derived, typename Result = void, typename Base = ITypeVisitor>
@@ -41,23 +72,8 @@ struct TypeVisitor : Base
         return result;
     }
 
-#define ABSTRACT_SYNTAX_CLASS(NAME,BASE) /* empty */
-#define SYNTAX_CLASS(NAME, BASE) \
-    virtual void dispatch_##NAME(NAME* obj, void* extra) override \
-    { *(Result*)extra = ((Derived*) this)->visit##NAME(obj); }
-
-#include "slang-object-meta-begin.h"
-#include "slang-type-defs.h"
-#include "slang-object-meta-end.h"
-
-#define ABSTRACT_SYNTAX_CLASS(NAME,BASE) SYNTAX_CLASS(NAME, BASE)
-#define SYNTAX_CLASS(NAME, BASE) \
-    Result visit##NAME(NAME* obj) \
-    { return ((Derived*) this)->visit##BASE(obj); }
-
-#include "slang-object-meta-begin.h"
-#include "slang-type-defs.h"
-#include "slang-object-meta-end.h"
+    SLANG_CHILDREN_ASTNode_Type(SLANG_CLASS_ONLY, SLANG_VISITOR_DISPATCH_RESULT_IMPL)
+    SLANG_CHILDREN_ASTNode_Type(SLANG_VISITOR_RESULT_VISIT_IMPL, _)
 };
 
 template<typename Derived, typename Base>
@@ -73,23 +89,8 @@ struct TypeVisitor<Derived,void,Base> : Base
         type->accept(this, 0);
     }
 
-#define ABSTRACT_SYNTAX_CLASS(NAME,BASE) /* empty */
-#define SYNTAX_CLASS(NAME, BASE) \
-    virtual void dispatch_##NAME(NAME* obj, void*) override \
-    { ((Derived*) this)->visit##NAME(obj); }
-
-#include "slang-object-meta-begin.h"
-#include "slang-type-defs.h"
-#include "slang-object-meta-end.h"
-
-#define ABSTRACT_SYNTAX_CLASS(NAME,BASE) SYNTAX_CLASS(NAME, BASE)
-#define SYNTAX_CLASS(NAME, BASE) \
-    void visit##NAME(NAME* obj) \
-    { ((Derived*) this)->visit##BASE(obj); }
-
-#include "slang-object-meta-begin.h"
-#include "slang-type-defs.h"
-#include "slang-object-meta-end.h"
+    SLANG_CHILDREN_ASTNode_Type(SLANG_CLASS_ONLY, SLANG_VISITOR_DISPATCH_VOID_IMPL)
+    SLANG_CHILDREN_ASTNode_Type(SLANG_VISITOR_VOID_VISIT_IMPL, _)
 };
 
 template<typename Derived, typename Arg, typename Base = ITypeVisitor>
@@ -100,23 +101,8 @@ struct TypeVisitorWithArg : Base
         type->accept(this, (void*)&arg);
     }
 
-#define ABSTRACT_SYNTAX_CLASS(NAME,BASE) /* empty */
-#define SYNTAX_CLASS(NAME, BASE) \
-    virtual void dispatch_##NAME(NAME* obj, void* arg) override \
-    { ((Derived*) this)->visit##NAME(obj, *(Arg*)arg); }
-
-#include "slang-object-meta-begin.h"
-#include "slang-type-defs.h"
-#include "slang-object-meta-end.h"
-
-#define ABSTRACT_SYNTAX_CLASS(NAME,BASE) SYNTAX_CLASS(NAME, BASE)
-#define SYNTAX_CLASS(NAME, BASE) \
-    void visit##NAME(NAME* obj, Arg const& arg) \
-    { ((Derived*) this)->visit##BASE(obj, arg); }
-
-#include "slang-object-meta-begin.h"
-#include "slang-type-defs.h"
-#include "slang-object-meta-end.h"
+    SLANG_CHILDREN_ASTNode_Type(SLANG_CLASS_ONLY, SLANG_VISITOR_DISPATCH_ARG_IMPL)
+    SLANG_CHILDREN_ASTNode_Type(SLANG_VISITOR_VOID_VISIT_ARG_IMPL, _)
 };
 
 //
@@ -125,13 +111,7 @@ struct TypeVisitorWithArg : Base
 
 struct IExprVisitor
 {
-#define ABSTRACT_SYNTAX_CLASS(NAME,BASE) /* empty */
-#define SYNTAX_CLASS(NAME, BASE) \
-    virtual void dispatch_##NAME(NAME* obj, void* extra) = 0;
-
-#include "slang-object-meta-begin.h"
-#include "slang-expr-defs.h"
-#include "slang-object-meta-end.h"
+    SLANG_CHILDREN_ASTNode_Expr(SLANG_CLASS_ONLY, SLANG_VISITOR_DISPATCH_DECL)
 };
 
 template<typename Derived, typename Result = void>
@@ -144,23 +124,8 @@ struct ExprVisitor : IExprVisitor
         return result;
     }
 
-#define ABSTRACT_SYNTAX_CLASS(NAME,BASE) /* empty */
-#define SYNTAX_CLASS(NAME, BASE) \
-    virtual void dispatch_##NAME(NAME* obj, void* extra) override \
-    { *(Result*)extra = ((Derived*) this)->visit##NAME(obj); }
-
-#include "slang-object-meta-begin.h"
-#include "slang-expr-defs.h"
-#include "slang-object-meta-end.h"
-
-#define ABSTRACT_SYNTAX_CLASS(NAME,BASE) SYNTAX_CLASS(NAME, BASE)
-#define SYNTAX_CLASS(NAME, BASE) \
-    Result visit##NAME(NAME* obj) \
-    { return ((Derived*) this)->visit##BASE(obj); }
-
-#include "slang-object-meta-begin.h"
-#include "slang-expr-defs.h"
-#include "slang-object-meta-end.h"
+    SLANG_CHILDREN_ASTNode_Expr(SLANG_CLASS_ONLY, SLANG_VISITOR_DISPATCH_RESULT_IMPL)
+    SLANG_CHILDREN_ASTNode_Expr(SLANG_VISITOR_RESULT_VISIT_IMPL, _)
 };
 
 template<typename Derived>
@@ -171,23 +136,8 @@ struct ExprVisitor<Derived,void> : IExprVisitor
         expr->accept(this, 0);
     }
 
-#define ABSTRACT_SYNTAX_CLASS(NAME,BASE) /* empty */
-#define SYNTAX_CLASS(NAME, BASE) \
-    virtual void dispatch_##NAME(NAME* obj, void*) override \
-    { ((Derived*) this)->visit##NAME(obj); }
-
-#include "slang-object-meta-begin.h"
-#include "slang-expr-defs.h"
-#include "slang-object-meta-end.h"
-
-#define ABSTRACT_SYNTAX_CLASS(NAME,BASE) SYNTAX_CLASS(NAME, BASE)
-#define SYNTAX_CLASS(NAME, BASE) \
-    void visit##NAME(NAME* obj) \
-    { ((Derived*) this)->visit##BASE(obj); }
-
-#include "slang-object-meta-begin.h"
-#include "slang-expr-defs.h"
-#include "slang-object-meta-end.h"
+    SLANG_CHILDREN_ASTNode_Expr(SLANG_CLASS_ONLY, SLANG_VISITOR_DISPATCH_VOID_IMPL)
+    SLANG_CHILDREN_ASTNode_Expr(SLANG_VISITOR_VOID_VISIT_IMPL, _)
 };
 
 template<typename Derived, typename Arg>
@@ -198,23 +148,8 @@ struct ExprVisitorWithArg : IExprVisitor
         obj->accept(this, (void*)&arg);
     }
 
-#define ABSTRACT_SYNTAX_CLASS(NAME,BASE) /* empty */
-#define SYNTAX_CLASS(NAME, BASE) \
-    virtual void dispatch_##NAME(NAME* obj, void* arg) override \
-    { ((Derived*) this)->visit##NAME(obj, *(Arg*)arg); }
-
-#include "slang-object-meta-begin.h"
-#include "slang-expr-defs.h"
-#include "slang-object-meta-end.h"
-
-#define ABSTRACT_SYNTAX_CLASS(NAME,BASE) SYNTAX_CLASS(NAME, BASE)
-#define SYNTAX_CLASS(NAME, BASE) \
-    void visit##NAME(NAME* obj, Arg const& arg) \
-    { ((Derived*) this)->visit##BASE(obj, arg); }
-
-#include "slang-object-meta-begin.h"
-#include "slang-expr-defs.h"
-#include "slang-object-meta-end.h"
+    SLANG_CHILDREN_ASTNode_Expr(SLANG_CLASS_ONLY, SLANG_VISITOR_DISPATCH_ARG_IMPL)
+    SLANG_CHILDREN_ASTNode_Expr(SLANG_VISITOR_VOID_VISIT_ARG_IMPL, _)
 };
 
 //
@@ -223,13 +158,7 @@ struct ExprVisitorWithArg : IExprVisitor
 
 struct IStmtVisitor
 {
-#define ABSTRACT_SYNTAX_CLASS(NAME,BASE) /* empty */
-#define SYNTAX_CLASS(NAME, BASE) \
-    virtual void dispatch_##NAME(NAME* obj, void* extra) = 0;
-
-#include "slang-object-meta-begin.h"
-#include "slang-stmt-defs.h"
-#include "slang-object-meta-end.h"
+    SLANG_CHILDREN_ASTNode_Stmt(SLANG_CLASS_ONLY, SLANG_VISITOR_DISPATCH_DECL)
 };
 
 template<typename Derived, typename Result = void>
@@ -242,23 +171,8 @@ struct StmtVisitor : IStmtVisitor
         return result;
     }
 
-#define ABSTRACT_SYNTAX_CLASS(NAME,BASE) /* empty */
-#define SYNTAX_CLASS(NAME, BASE) \
-    virtual void dispatch_##NAME(NAME* obj, void* extra) override \
-    { *(Result*)extra = ((Derived*) this)->visit##NAME(obj); }
-
-#include "slang-object-meta-begin.h"
-#include "slang-stmt-defs.h"
-#include "slang-object-meta-end.h"
-
-#define ABSTRACT_SYNTAX_CLASS(NAME,BASE) SYNTAX_CLASS(NAME, BASE)
-#define SYNTAX_CLASS(NAME, BASE) \
-    Result visit##NAME(NAME* obj) \
-    { return ((Derived*) this)->visit##BASE(obj); }
-
-#include "slang-object-meta-begin.h"
-#include "slang-stmt-defs.h"
-#include "slang-object-meta-end.h"
+    SLANG_CHILDREN_ASTNode_Stmt(SLANG_CLASS_ONLY, SLANG_VISITOR_DISPATCH_RESULT_IMPL)
+    SLANG_CHILDREN_ASTNode_Stmt(SLANG_VISITOR_RESULT_VISIT_IMPL, _)
 };
 
 template<typename Derived>
@@ -269,23 +183,8 @@ struct StmtVisitor<Derived,void> : IStmtVisitor
         stmt->accept(this, 0);
     }
 
-#define ABSTRACT_SYNTAX_CLASS(NAME,BASE) /* empty */
-#define SYNTAX_CLASS(NAME, BASE) \
-    virtual void dispatch_##NAME(NAME* obj, void*) override \
-    { ((Derived*) this)->visit##NAME(obj); }
-
-#include "slang-object-meta-begin.h"
-#include "slang-stmt-defs.h"
-#include "slang-object-meta-end.h"
-
-#define ABSTRACT_SYNTAX_CLASS(NAME,BASE) SYNTAX_CLASS(NAME, BASE)
-#define SYNTAX_CLASS(NAME, BASE) \
-    void visit##NAME(NAME* obj) \
-    { ((Derived*) this)->visit##BASE(obj); }
-
-#include "slang-object-meta-begin.h"
-#include "slang-stmt-defs.h"
-#include "slang-object-meta-end.h"
+    SLANG_CHILDREN_ASTNode_Stmt(SLANG_CLASS_ONLY, SLANG_VISITOR_DISPATCH_VOID_IMPL)
+    SLANG_CHILDREN_ASTNode_Stmt(SLANG_VISITOR_VOID_VISIT_IMPL, _)
 };
 
 //
@@ -294,13 +193,7 @@ struct StmtVisitor<Derived,void> : IStmtVisitor
 
 struct IDeclVisitor
 {
-#define ABSTRACT_SYNTAX_CLASS(NAME,BASE) /* empty */
-#define SYNTAX_CLASS(NAME, BASE) \
-    virtual void dispatch_##NAME(NAME* obj, void* extra) = 0;
-
-#include "slang-object-meta-begin.h"
-#include "slang-decl-defs.h"
-#include "slang-object-meta-end.h"
+    SLANG_CHILDREN_ASTNode_DeclBase(SLANG_CLASS_ONLY, SLANG_VISITOR_DISPATCH_DECL)
 };
 
 template<typename Derived, typename Result = void>
@@ -313,23 +206,8 @@ struct DeclVisitor : IDeclVisitor
         return result;
     }
 
-#define ABSTRACT_SYNTAX_CLASS(NAME,BASE) /* empty */
-#define SYNTAX_CLASS(NAME, BASE) \
-    virtual void dispatch_##NAME(NAME* obj, void* extra) override \
-    { *(Result*)extra = ((Derived*) this)->visit##NAME(obj); }
-
-#include "slang-object-meta-begin.h"
-#include "slang-decl-defs.h"
-#include "slang-object-meta-end.h"
-
-#define ABSTRACT_SYNTAX_CLASS(NAME,BASE) SYNTAX_CLASS(NAME, BASE)
-#define SYNTAX_CLASS(NAME, BASE) \
-    Result visit##NAME(NAME* obj) \
-    { return ((Derived*) this)->visit##BASE(obj); }
-
-#include "slang-object-meta-begin.h"
-#include "slang-decl-defs.h"
-#include "slang-object-meta-end.h"
+    SLANG_CHILDREN_ASTNode_DeclBase(SLANG_CLASS_ONLY, SLANG_VISITOR_DISPATCH_RESULT_IMPL)
+    SLANG_CHILDREN_ASTNode_DeclBase(SLANG_VISITOR_RESULT_VISIT_IMPL, _)
 };
 
 template<typename Derived>
@@ -340,23 +218,8 @@ struct DeclVisitor<Derived,void> : IDeclVisitor
         decl->accept(this, 0);
     }
 
-#define ABSTRACT_SYNTAX_CLASS(NAME,BASE) /* empty */
-#define SYNTAX_CLASS(NAME, BASE) \
-    virtual void dispatch_##NAME(NAME* obj, void*) override \
-    { ((Derived*) this)->visit##NAME(obj); }
-
-#include "slang-object-meta-begin.h"
-#include "slang-decl-defs.h"
-#include "slang-object-meta-end.h"
-
-#define ABSTRACT_SYNTAX_CLASS(NAME,BASE) SYNTAX_CLASS(NAME, BASE)
-#define SYNTAX_CLASS(NAME, BASE) \
-    void visit##NAME(NAME* obj) \
-    { ((Derived*) this)->visit##BASE(obj); }
-
-#include "slang-object-meta-begin.h"
-#include "slang-decl-defs.h"
-#include "slang-object-meta-end.h"
+    SLANG_CHILDREN_ASTNode_DeclBase(SLANG_CLASS_ONLY, SLANG_VISITOR_DISPATCH_VOID_IMPL)
+    SLANG_CHILDREN_ASTNode_DeclBase(SLANG_VISITOR_VOID_VISIT_IMPL, _)
 };
 
 template<typename Derived, typename Arg>
@@ -367,23 +230,8 @@ struct DeclVisitorWithArg : IDeclVisitor
         obj->accept(this, (void*)&arg);
     }
 
-#define ABSTRACT_SYNTAX_CLASS(NAME,BASE) /* empty */
-#define SYNTAX_CLASS(NAME, BASE) \
-    virtual void dispatch_##NAME(NAME* obj, void* arg) override \
-    { ((Derived*) this)->visit##NAME(obj, *(Arg*)arg); }
-
-#include "slang-object-meta-begin.h"
-#include "slang-decl-defs.h"
-#include "slang-object-meta-end.h"
-
-#define ABSTRACT_SYNTAX_CLASS(NAME,BASE) SYNTAX_CLASS(NAME, BASE)
-#define SYNTAX_CLASS(NAME, BASE) \
-    void visit##NAME(NAME* obj, Arg const& arg) \
-    { ((Derived*) this)->visit##BASE(obj, arg); }
-
-#include "slang-object-meta-begin.h"
-#include "slang-decl-defs.h"
-#include "slang-object-meta-end.h"
+    SLANG_CHILDREN_ASTNode_DeclBase(SLANG_CLASS_ONLY, SLANG_VISITOR_DISPATCH_ARG_IMPL)
+    SLANG_CHILDREN_ASTNode_DeclBase(SLANG_VISITOR_VOID_VISIT_ARG_IMPL, _)
 };
 
 
@@ -393,13 +241,7 @@ struct DeclVisitorWithArg : IDeclVisitor
 
 struct IModifierVisitor
 {
-#define ABSTRACT_SYNTAX_CLASS(NAME,BASE) /* empty */
-#define SYNTAX_CLASS(NAME, BASE) \
-    virtual void dispatch_##NAME(NAME* obj, void* extra) = 0;
-
-#include "slang-object-meta-begin.h"
-#include "slang-modifier-defs.h"
-#include "slang-object-meta-end.h"
+    SLANG_CHILDREN_ASTNode_Modifier(SLANG_CLASS_ONLY, SLANG_VISITOR_DISPATCH_DECL)
 };
 
 template<typename Derived, typename Result = void>
@@ -412,23 +254,8 @@ struct ModifierVisitor : IModifierVisitor
         return result;
     }
 
-#define ABSTRACT_SYNTAX_CLASS(NAME,BASE) /* empty */
-#define SYNTAX_CLASS(NAME, BASE) \
-    virtual void dispatch_##NAME(NAME* obj, void* extra) override \
-    { *(Result*)extra = ((Derived*) this)->visit##NAME(obj); }
-
-#include "slang-object-meta-begin.h"
-#include "slang-modifier-defs.h"
-#include "slang-object-meta-end.h"
-
-#define ABSTRACT_SYNTAX_CLASS(NAME,BASE) SYNTAX_CLASS(NAME, BASE)
-#define SYNTAX_CLASS(NAME, BASE) \
-    Result visit##NAME(NAME* obj) \
-    { return ((Derived*) this)->visit##BASE(obj); }
-
-#include "slang-object-meta-begin.h"
-#include "slang-modifier-defs.h"
-#include "slang-object-meta-end.h"
+    SLANG_CHILDREN_ASTNode_Modifier(SLANG_CLASS_ONLY, SLANG_VISITOR_DISPATCH_RESULT_IMPL)
+    SLANG_CHILDREN_ASTNode_Modifier(SLANG_VISITOR_RESULT_VISIT_IMPL, _)
 };
 
 template<typename Derived>
@@ -439,23 +266,8 @@ struct ModifierVisitor<Derived, void> : IModifierVisitor
         modifier->accept(this, 0);
     }
 
-#define ABSTRACT_SYNTAX_CLASS(NAME,BASE) /* empty */
-#define SYNTAX_CLASS(NAME, BASE) \
-    virtual void dispatch_##NAME(NAME* obj, void*) override \
-    { ((Derived*) this)->visit##NAME(obj); }
-
-#include "slang-object-meta-begin.h"
-#include "slang-modifier-defs.h"
-#include "slang-object-meta-end.h"
-
-#define ABSTRACT_SYNTAX_CLASS(NAME,BASE) SYNTAX_CLASS(NAME, BASE)
-#define SYNTAX_CLASS(NAME, BASE) \
-    void visit##NAME(NAME* obj) \
-    { ((Derived*) this)->visit##BASE(obj); }
-
-#include "slang-object-meta-begin.h"
-#include "slang-modifier-defs.h"
-#include "slang-object-meta-end.h"
+    SLANG_CHILDREN_ASTNode_Modifier(SLANG_CLASS_ONLY, SLANG_VISITOR_DISPATCH_VOID_IMPL)
+    SLANG_CHILDREN_ASTNode_Modifier(SLANG_VISITOR_VOID_VISIT_IMPL, _)
 };
 
 //
@@ -464,13 +276,7 @@ struct ModifierVisitor<Derived, void> : IModifierVisitor
 
 struct IValVisitor : ITypeVisitor
 {
-#define ABSTRACT_SYNTAX_CLASS(NAME,BASE) /* empty */
-#define SYNTAX_CLASS(NAME, BASE) \
-    virtual void dispatch_##NAME(NAME* obj, void* extra) = 0;
-
-#include "slang-object-meta-begin.h"
-#include "slang-val-defs.h"
-#include "slang-object-meta-end.h"
+    SLANG_CHILDREN_ASTNode_Val(SLANG_CLASS_ONLY, SLANG_VISITOR_DISPATCH_DECL)
 };
 
 template<typename Derived, typename Result = void, typename TypeResult = void>
@@ -483,23 +289,8 @@ struct ValVisitor : TypeVisitor<Derived, TypeResult, IValVisitor>
         return result;
     }
 
-#define ABSTRACT_SYNTAX_CLASS(NAME,BASE) /* empty */
-#define SYNTAX_CLASS(NAME, BASE) \
-    virtual void dispatch_##NAME(NAME* obj, void* extra) override \
-    { *(Result*)extra = ((Derived*) this)->visit##NAME(obj); }
-
-#include "slang-object-meta-begin.h"
-#include "slang-val-defs.h"
-#include "slang-object-meta-end.h"
-
-#define ABSTRACT_SYNTAX_CLASS(NAME,BASE) SYNTAX_CLASS(NAME, BASE)
-#define SYNTAX_CLASS(NAME, BASE) \
-    Result visit##NAME(NAME* obj) \
-    { return ((Derived*) this)->visit##BASE(obj); }
-
-#include "slang-object-meta-begin.h"
-#include "slang-val-defs.h"
-#include "slang-object-meta-end.h"
+    SLANG_CHILDREN_ASTNode_Val(SLANG_CLASS_ONLY, SLANG_VISITOR_DISPATCH_RESULT_IMPL)
+    SLANG_CHILDREN_ASTNode_Val(SLANG_VISITOR_RESULT_VISIT_IMPL, _)
 };
 
 template<typename Derived>
@@ -510,24 +301,8 @@ struct ValVisitor<Derived, void, void> : TypeVisitor<Derived, void, IValVisitor>
         val->accept(this, 0);
     }
 
-#define ABSTRACT_SYNTAX_CLASS(NAME,BASE) /* empty */
-#define SYNTAX_CLASS(NAME, BASE) \
-    virtual void dispatch_##NAME(NAME* obj, void*) override \
-    { ((Derived*) this)->visit##NAME(obj); }
-
-#include "slang-object-meta-begin.h"
-#include "slang-val-defs.h"
-#include "slang-object-meta-end.h"
-
-#define ABSTRACT_SYNTAX_CLASS(NAME,BASE) SYNTAX_CLASS(NAME, BASE)
-#define SYNTAX_CLASS(NAME, BASE) \
-    void visit##NAME(NAME* obj) \
-    { ((Derived*) this)->visit##BASE(obj); }
-
-#include "slang-object-meta-begin.h"
-#include "slang-val-defs.h"
-#include "slang-object-meta-end.h"
-
+    SLANG_CHILDREN_ASTNode_Val(SLANG_CLASS_ONLY, SLANG_VISITOR_DISPATCH_VOID_IMPL)
+    SLANG_CHILDREN_ASTNode_Val(SLANG_VISITOR_VOID_VISIT_IMPL, _)
 };
 
 }

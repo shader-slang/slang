@@ -1,17 +1,32 @@
 // slang-decl-defs.h
 
+#pragma once
+
+#include "slang-ast-base.h"
+
+namespace Slang {
+
+#define SLANG_ABSTRACT_CLASS(x) SLANG_ABSTRACT_CLASS_REFLECT(x)
+#define SLANG_CLASS(x) SLANG_CLASS_REFLECT_WITH_ACCEPT(x)
+
 // Syntax class definitions for declarations.
 
 // A group of declarations that should be treated as a unit
-SYNTAX_CLASS(DeclGroup, DeclBase)
-    SYNTAX_FIELD(List<RefPtr<Decl>>, decls)
-END_SYNTAX_CLASS()
+class DeclGroup: public DeclBase
+{
+    SLANG_CLASS(DeclGroup)
+
+    List<RefPtr<Decl>> decls;
+};
+
 
 // A "container" decl is a parent to other declarations
-ABSTRACT_SYNTAX_CLASS(ContainerDecl, Decl)
-    SYNTAX_FIELD(List<RefPtr<Decl>>, Members)
+class ContainerDecl: public Decl
+{
+    SLANG_ABSTRACT_CLASS(ContainerDecl)
 
-    RAW(
+    List<RefPtr<Decl>> Members;
+
     template<typename T>
     FilteredMemberList<T> getMembersOfType()
     {
@@ -35,30 +50,33 @@ ABSTRACT_SYNTAX_CLASS(ContainerDecl, Decl)
     // A list of transparent members, to be used in lookup
     // Note: this is only valid if `memberDictionaryIsValid` is true
     List<TransparentMemberInfo> transparentMembers;
-    )
-END_SYNTAX_CLASS()
+};
 
 // Base class for all variable declarations
-ABSTRACT_SYNTAX_CLASS(VarDeclBase, Decl)
+class VarDeclBase : public Decl
+{
+    SLANG_ABSTRACT_CLASS(VarDeclBase)
 
     // type of the variable
-    SYNTAX_FIELD(TypeExp, type)
+    TypeExp type;
 
-    RAW(
-    Type* getType() { return type.type.Ptr(); }
-    )
+    Type* getType() { return (Type*)type.type.Ptr(); }
 
     // Initializer expression (optional)
-    SYNTAX_FIELD(RefPtr<Expr>, initExpr)
-END_SYNTAX_CLASS()
+    RefPtr<Expr> initExpr;
+};
 
 // Ordinary potentially-mutable variables (locals, globals, and member variables)
-SYNTAX_CLASS(VarDecl, VarDeclBase)
-END_SYNTAX_CLASS()
+class VarDecl : public VarDeclBase
+{
+    SLANG_CLASS(VarDecl)
+};
 
 // A variable declaration that is always immutable (whether local, global, or member variable)
-SYNTAX_CLASS(LetDecl, VarDecl)
-END_SYNTAX_CLASS()
+class LetDecl : public VarDecl
+{
+    SLANG_CLASS(LetDecl)
+};
 
 // An `AggTypeDeclBase` captures the shared functionality
 // between true aggregate type declarations and extension
@@ -68,44 +86,58 @@ END_SYNTAX_CLASS()
 // - Both can have declared bases
 // - Both expose a `this` variable in their body
 //
-ABSTRACT_SYNTAX_CLASS(AggTypeDeclBase, ContainerDecl)
-END_SYNTAX_CLASS()
+class AggTypeDeclBase : public ContainerDecl
+{
+    SLANG_ABSTRACT_CLASS(AggTypeDeclBase);
+};
 
 // An extension to apply to an existing type
-SYNTAX_CLASS(ExtensionDecl, AggTypeDeclBase)
-    SYNTAX_FIELD(TypeExp, targetType)
+class ExtensionDecl : public AggTypeDeclBase
+{
+    SLANG_CLASS(ExtensionDecl)
+
+    TypeExp targetType;
 
     // next extension attached to the same nominal type
-    DECL_FIELD(ExtensionDecl*, nextCandidateExtension RAW(= nullptr))
-END_SYNTAX_CLASS()
+    ExtensionDecl* nextCandidateExtension = nullptr;
+};
 
 // Declaration of a type that represents some sort of aggregate
-ABSTRACT_SYNTAX_CLASS(AggTypeDecl, AggTypeDeclBase)
+class AggTypeDecl : public  AggTypeDeclBase
+{
+    SLANG_ABSTRACT_CLASS(AggTypeDecl)
 
-RAW(
     // extensions that might apply to this declaration
     ExtensionDecl* candidateExtensions = nullptr;
+
     FilteredMemberList<VarDecl> GetFields()
     {
         return getMembersOfType<VarDecl>();
     }
-    )
-END_SYNTAX_CLASS()
+};
 
-SIMPLE_SYNTAX_CLASS(StructDecl, AggTypeDecl)
+class StructDecl: public AggTypeDecl
+{
+    SLANG_CLASS(StructDecl);
+};
 
-SIMPLE_SYNTAX_CLASS(ClassDecl, AggTypeDecl)
+class ClassDecl : public AggTypeDecl
+{
+    SLANG_CLASS(ClassDecl)
+};
+
 
 // TODO: Is it appropriate to treat an `enum` as an aggregate type?
 // Most code that looks for, e.g., conformances assumes user-defined
 // types are all `AggTypeDecl`, so this is the right choice for now
 // if we want `enum` types to be able to implement interfaces, etc.
 //
-SYNTAX_CLASS(EnumDecl, AggTypeDecl)
-RAW(
+class EnumDecl : public AggTypeDecl
+{
+    SLANG_CLASS(EnumDecl)
+
     RefPtr<Type> tagType;
-)
-END_SYNTAX_CLASS()
+};
 
 // A single case in an enum.
 //
@@ -117,36 +149,43 @@ END_SYNTAX_CLASS()
 // case, with `0` as an explicit expression for its
 // _tag value_.
 //
-SYNTAX_CLASS(EnumCaseDecl, Decl)
+class EnumCaseDecl : public Decl
+{
+    SLANG_CLASS(EnumCaseDecl)
 
     // type of the parent `enum`
-    SYNTAX_FIELD(TypeExp, type)
+    TypeExp type;
 
-    RAW(
-    Type* getType() { return type.type.Ptr(); }
-    )
+    Type* getType() { return (Type*)type.type.Ptr(); }
 
     // Tag value
-    SYNTAX_FIELD(RefPtr<Expr>, tagExpr)
-END_SYNTAX_CLASS()
+    RefPtr<Expr> tagExpr;
+};
 
 // An interface which other types can conform to
-SIMPLE_SYNTAX_CLASS(InterfaceDecl, AggTypeDecl)
+class InterfaceDecl : public  AggTypeDecl
+{
+    SLANG_CLASS(InterfaceDecl)
+};
 
-ABSTRACT_SYNTAX_CLASS(TypeConstraintDecl, Decl)
-    RAW(
+
+class TypeConstraintDecl : public  Decl
+{
+    SLANG_ABSTRACT_CLASS(TypeConstraintDecl)
+    
     virtual TypeExp& getSup() = 0;
-    )
-END_SYNTAX_CLASS()
+};
 
 // A kind of pseudo-member that represents an explicit
 // or implicit inheritance relationship.
 //
-SYNTAX_CLASS(InheritanceDecl, TypeConstraintDecl)
-// The type expression as written
-    SYNTAX_FIELD(TypeExp, base)
+class InheritanceDecl : public TypeConstraintDecl
+{
+    SLANG_CLASS(InheritanceDecl)
 
-    RAW(
+// The type expression as written
+    TypeExp base;
+
     // After checking, this dictionary will map members
     // required by the base type to their concrete
     // implementations in the type that contains
@@ -156,8 +195,7 @@ SYNTAX_CLASS(InheritanceDecl, TypeConstraintDecl)
     {
         return base;
     }
-    )
-END_SYNTAX_CLASS()
+};
 
 // TODO: may eventually need sub-classes for explicit/direct vs. implicit/indirect inheritance
 
@@ -166,51 +204,76 @@ END_SYNTAX_CLASS()
 //
 // TODO: probably all types will be aggregate decls eventually,
 // so that we can easily store conformances/constraints on type variables
-ABSTRACT_SYNTAX_CLASS(SimpleTypeDecl, Decl)
-END_SYNTAX_CLASS()
+class SimpleTypeDecl : public Decl
+{
+    SLANG_ABSTRACT_CLASS(SimpleTypeDecl)
+};
 
 // A `typedef` declaration
-SYNTAX_CLASS(TypeDefDecl, SimpleTypeDecl)
-    SYNTAX_FIELD(TypeExp, type)
-END_SYNTAX_CLASS()
+class TypeDefDecl : public SimpleTypeDecl
+{
+    SLANG_CLASS(TypeDefDecl)
+   
+    TypeExp type;
+};
 
-SIMPLE_SYNTAX_CLASS(TypeAliasDecl, TypeDefDecl)
+class TypeAliasDecl : public TypeDefDecl
+{
+    SLANG_CLASS(TypeAliasDecl)
+};
 
 // An 'assoctype' declaration, it is a container of inheritance clauses
-SYNTAX_CLASS(AssocTypeDecl, AggTypeDecl)
-END_SYNTAX_CLASS()
+class AssocTypeDecl : public AggTypeDecl
+{
+    SLANG_CLASS(AssocTypeDecl)
+};
 
 // A 'type_param' declaration, which defines a generic
 // entry-point parameter. Is a container of GenericTypeConstraintDecl
-SYNTAX_CLASS(GlobalGenericParamDecl, AggTypeDecl)
-END_SYNTAX_CLASS()
+class GlobalGenericParamDecl : public AggTypeDecl
+{
+    SLANG_CLASS(GlobalGenericParamDecl)
+};
 
 // A `__generic_value_param` declaration, which defines an existential
 // value parameter (not a type parameter.
-SYNTAX_CLASS(GlobalGenericValueParamDecl, VarDeclBase)
-END_SYNTAX_CLASS()
+class GlobalGenericValueParamDecl : public VarDeclBase
+{
+    SLANG_CLASS(GlobalGenericValueParamDecl)
+};
 
 // A scope for local declarations (e.g., as part of a statement)
-SIMPLE_SYNTAX_CLASS(ScopeDecl, ContainerDecl)
+class ScopeDecl : public  ContainerDecl
+{
+    SLANG_CLASS(ScopeDecl)
+};
 
 // A function/initializer/subscript parameter (potentially mutable)
-SIMPLE_SYNTAX_CLASS(ParamDecl, VarDeclBase)
+class ParamDecl : public VarDeclBase
+{
+    SLANG_CLASS(ParamDecl)
+};
 
 // A parameter of a function declared in "modern" types (immutable unless explicitly `out` or `inout`)
-SIMPLE_SYNTAX_CLASS(ModernParamDecl, ParamDecl)
+class ModernParamDecl : public ParamDecl
+{
+    SLANG_CLASS(ModernParamDecl)
+};
 
 // Base class for things that have parameter lists and can thus be applied to arguments ("called")
-ABSTRACT_SYNTAX_CLASS(CallableDecl, ContainerDecl)
-    RAW(
+class CallableDecl : public ContainerDecl
+{
+    SLANG_ABSTRACT_CLASS(CallableDecl)
+
     FilteredMemberList<ParamDecl> GetParameters()
     {
         return getMembersOfType<ParamDecl>();
-    })
+    }
 
-    SYNTAX_FIELD(TypeExp, ReturnType)
+    TypeExp ReturnType;
 
     // Fields related to redeclaration, so that we
-    // can support multiple specialized varaitions
+    // can support multiple specialized variations
     // of the "same" logical function.
     //
     // This should also help us to support redeclaration
@@ -218,35 +281,61 @@ ABSTRACT_SYNTAX_CLASS(CallableDecl, ContainerDecl)
 
     // The "primary" declaration of the function, which will
     // be used whenever we need to unique things.
-    FIELD_INIT(CallableDecl*, primaryDecl, nullptr)
+    CallableDecl* primaryDecl = nullptr;
 
     // The next declaration of the "same" function (that is,
     // with the same `primaryDecl`).
-    FIELD_INIT(CallableDecl*, nextDecl, nullptr);
-
-END_SYNTAX_CLASS()
+    CallableDecl* nextDecl = nullptr;
+};
 
 // Base class for callable things that may also have a body that is evaluated to produce their result
-ABSTRACT_SYNTAX_CLASS(FunctionDeclBase, CallableDecl)
-    SYNTAX_FIELD(RefPtr<Stmt>, Body)
-END_SYNTAX_CLASS()
+class FunctionDeclBase : public CallableDecl
+{
+    SLANG_ABSTRACT_CLASS(FunctionDeclBase)
+
+    RefPtr<Stmt> Body;
+};
 
 // A constructor/initializer to create instances of a type
-SIMPLE_SYNTAX_CLASS(ConstructorDecl, FunctionDeclBase)
+class ConstructorDecl : public FunctionDeclBase
+{
+    SLANG_CLASS(ConstructorDecl)
+};
 
 // A subscript operation used to index instances of a type
-SIMPLE_SYNTAX_CLASS(SubscriptDecl, CallableDecl)
+class SubscriptDecl : public CallableDecl
+{
+    SLANG_CLASS(SubscriptDecl)
+};
 
 // An "accessor" for a subscript or property
-SIMPLE_SYNTAX_CLASS(AccessorDecl, FunctionDeclBase)
+class AccessorDecl : public FunctionDeclBase
+{
+    SLANG_CLASS(AccessorDecl)
+};
 
-SIMPLE_SYNTAX_CLASS(GetterDecl, AccessorDecl)
-SIMPLE_SYNTAX_CLASS(SetterDecl, AccessorDecl)
-SIMPLE_SYNTAX_CLASS(RefAccessorDecl, AccessorDecl)
+class GetterDecl : public AccessorDecl
+{
+    SLANG_CLASS(GetterDecl)
+};
+class SetterDecl : public AccessorDecl
+{
+    SLANG_CLASS(SetterDecl)
+};
+class RefAccessorDecl : public AccessorDecl
+{
+    SLANG_CLASS(RefAccessorDecl)
+};
 
-SIMPLE_SYNTAX_CLASS(FuncDecl, FunctionDeclBase)
+class FuncDecl : public FunctionDeclBase
+{
+    SLANG_CLASS(FuncDecl)
+};
 
-SIMPLE_SYNTAX_CLASS(NamespaceDeclBase, ContainerDecl)
+class NamespaceDeclBase : public ContainerDecl
+{
+    SLANG_CLASS(NamespaceDeclBase)
+};
 
     // A `namespace` declaration inside some module, that provides
     // a named scope for declarations inside it.
@@ -256,63 +345,80 @@ SIMPLE_SYNTAX_CLASS(NamespaceDeclBase, ContainerDecl)
     // `NamespaceDecl` during parsing, so this declaration does
     // not directly represent what is present in the input syntax.
     //
-SIMPLE_SYNTAX_CLASS(NamespaceDecl, NamespaceDeclBase)
+class NamespaceDecl : public NamespaceDeclBase
+{
+    SLANG_CLASS(NamespaceDecl)
+};
 
-    // A "module" of code (essentiately, a single translation unit)
+    // A "module" of code (essentially, a single translation unit)
     // that provides a scope for some number of declarations.
-SYNTAX_CLASS(ModuleDecl, NamespaceDeclBase)
+class ModuleDecl : public NamespaceDeclBase
+{
+    SLANG_CLASS(ModuleDecl)
     // The API-level module that this declaration belong to.
     //
     // This field allows lookup of the `Module` based on a
     // declaration nested under a `ModuleDecl` by following
     // its chain of parents.
     //
-    RAW(Module* module = nullptr;)
-END_SYNTAX_CLASS()
+    Module* module = nullptr;
+};
 
-SYNTAX_CLASS(ImportDecl, Decl)
+class ImportDecl : public Decl
+{
+    SLANG_CLASS(ImportDecl)
+
     // The name of the module we are trying to import
-    FIELD(NameLoc, moduleNameAndLoc)
+    NameLoc moduleNameAndLoc;
 
     // The scope that we want to import into
-    FIELD(RefPtr<Scope>, scope)
+    RefPtr<Scope> scope;
 
     // The module that actually got imported
-    DECL_FIELD(RefPtr<ModuleDecl>, importedModuleDecl)
-END_SYNTAX_CLASS()
+    RefPtr<ModuleDecl> importedModuleDecl;
+};
 
 // A generic declaration, parameterized on types/values
-SYNTAX_CLASS(GenericDecl, ContainerDecl)
+class GenericDecl : public ContainerDecl
+{
+    SLANG_CLASS(GenericDecl)
     // The decl that is genericized...
-    SYNTAX_FIELD(RefPtr<Decl>, inner)
-END_SYNTAX_CLASS()
+    RefPtr<Decl> inner;
+};
 
-SYNTAX_CLASS(GenericTypeParamDecl, SimpleTypeDecl)
+class GenericTypeParamDecl : public SimpleTypeDecl
+{
+    SLANG_CLASS(GenericTypeParamDecl)
     // The bound for the type parameter represents a trait that any
     // type used as this parameter must conform to
 //            TypeExp bound;
 
     // The "initializer" for the parameter represents a default value
-    SYNTAX_FIELD(TypeExp, initType)
-END_SYNTAX_CLASS()
+    TypeExp initType;
+};
 
 // A constraint placed as part of a generic declaration
-SYNTAX_CLASS(GenericTypeConstraintDecl, TypeConstraintDecl)
+class GenericTypeConstraintDecl : public TypeConstraintDecl
+{
+    SLANG_CLASS(GenericTypeConstraintDecl)
+
     // A type constraint like `T : U` is constraining `T` to be "below" `U`
     // on a lattice of types. This may not be a subtyping relationship
     // per se, but it makes sense to use that terminology here, so we
-    // think of these fields as the sub-type and sup-ertype, respectively.
-    SYNTAX_FIELD(TypeExp, sub)
-    SYNTAX_FIELD(TypeExp, sup)
-    RAW(
+    // think of these fields as the sub-type and super-type, respectively.
+    TypeExp sub;
+    TypeExp sup;
+    
     virtual TypeExp& getSup() override
     {
         return sup;
     }
-    )
-END_SYNTAX_CLASS()
+};
 
-SIMPLE_SYNTAX_CLASS(GenericValueParamDecl, VarDeclBase)
+class GenericValueParamDecl : public VarDeclBase
+{
+    SLANG_CLASS(GenericValueParamDecl)
+};
 
 // An empty declaration (which might still have modifiers attached).
 //
@@ -323,23 +429,36 @@ SIMPLE_SYNTAX_CLASS(GenericValueParamDecl, VarDeclBase)
 //
 //     layout(local_size_x = 16) in;
 //
-SIMPLE_SYNTAX_CLASS(EmptyDecl, Decl)
+class EmptyDecl : public Decl
+{
+    SLANG_CLASS(EmptyDecl)
+};
 
 // A declaration used by the implementation to put syntax keywords
 // into the current scope.
 //
-SYNTAX_CLASS(SyntaxDecl, Decl)
+class SyntaxDecl : public Decl
+{
+    SLANG_CLASS(SyntaxDecl)
+
     // What type of syntax node will be produced when parsing with this keyword?
-    FIELD(SyntaxClass<RefObject>, syntaxClass)
+    SyntaxClass<RefObject> syntaxClass;
 
     // Callback to invoke in order to parse syntax with this keyword.
-    FIELD(SyntaxParseCallback,  parseCallback)
-    FIELD(void*,                parseUserData)
-END_SYNTAX_CLASS()
+    SyntaxParseCallback  parseCallback;
+    void*                parseUserData;
+};
 
 // A declaration of an attribute to be used with `[name(...)]` syntax.
 //
-SYNTAX_CLASS(AttributeDecl, ContainerDecl)
+class AttributeDecl : public ContainerDecl
+{
+    SLANG_CLASS(AttributeDecl)
     // What type of syntax node will be produced to represent this attribute.
-    FIELD(SyntaxClass<RefObject>, syntaxClass)
-END_SYNTAX_CLASS()
+    SyntaxClass<RefObject> syntaxClass;
+};
+
+#undef SLANG_ABSTRACT_CLASS
+#undef SLANG_CLASS
+
+} // namespace Slang

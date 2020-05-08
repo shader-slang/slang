@@ -1889,6 +1889,9 @@ SlangResult CPPExtractorApp::calcHeader(CPPExtractor& extractor, StringBuilder& 
                 typeIndex++;
             }
 
+            _indent(1, out);
+            out << "CountOf\n";
+
             out << "};\n\n";
         }
 
@@ -1968,7 +1971,7 @@ SlangResult CPPExtractorApp::calcHeader(CPPExtractor& extractor, StringBuilder& 
             // Output all of the definitions for each type
             for (Node* node : nodes)
             {
-                out << "#define SLANG_" << reflectTypeName << "_" << node->m_name.Content << "(x, param) ";
+                out << "#define " << m_options.m_prefixMark <<  reflectTypeName << "_" << node->m_name.Content << "(x, param) ";
 
                 // Output the X macro part
                 _indent(1, out);
@@ -2027,12 +2030,34 @@ SlangResult CPPExtractorApp::calcHeader(CPPExtractor& extractor, StringBuilder& 
             }
         }
 
+    
         // Now pop the scope in revers
         for (Index j = baseScopePath.getCount() - 1; j >= 0; j--)
         {
             Node* scopeNode = baseScopePath[j];
             out << "} // namespace " << scopeNode->m_name.Content << "\n";
         }
+    }
+
+    // Do macros by origin
+
+    out << "// Origin macros\n\n";
+
+    for (SourceOrigin* origin : extractor.getSourceOrigins())
+    {
+        out << "#define " << m_options.m_prefixMark <<  "ORIGIN_" << origin->m_macroOrigin << "_" << reflectTypeName << "(x, param) \\\n";
+
+        for (Node* node : origin->m_nodes)
+        {
+            if (!(node->m_isReflected && node->isClassLike()))
+            {
+                continue;
+            }
+
+            _indent(1, out);
+            out << "x(" << node->m_name.Content << ", param) \\\n";
+        }
+        out << "/* */\n\n";
     }
 
     return SLANG_OK;

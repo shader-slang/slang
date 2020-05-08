@@ -1,10 +1,21 @@
-// slang-type-defs.h
+// slang-ast-type.h
+
+#pragma once
+
+#include "slang-ast-base.h"
+
+namespace Slang {
+
+#define SLANG_ABSTRACT_CLASS(x) SLANG_ABSTRACT_CLASS_REFLECT(x)
+#define SLANG_CLASS(x) SLANG_CLASS_REFLECT_WITH_ACCEPT(x)
 
 // Syntax class definitions for types.
 
 // The type of a reference to an overloaded name
-SYNTAX_CLASS(OverloadGroupType, Type)
-RAW(
+class OverloadGroupType : public Type 
+{
+    SLANG_CLASS(OverloadGroupType)
+
 public:
     virtual String ToString() override;
 
@@ -12,25 +23,27 @@ protected:
     virtual bool EqualsImpl(Type * type) override;
     virtual RefPtr<Type> CreateCanonicalType() override;
     virtual int GetHashCode() override;
-)
-END_SYNTAX_CLASS()
+};
 
 // The type of an initializer-list expression (before it has
 // been coerced to some other type)
-SYNTAX_CLASS(InitializerListType, Type)
-RAW(
+class InitializerListType : public Type 
+{
+    SLANG_CLASS(InitializerListType)
+
     virtual String ToString() override;
 
 protected:
     virtual bool EqualsImpl(Type * type) override;
     virtual RefPtr<Type> CreateCanonicalType() override;
     virtual int GetHashCode() override;
-)
-END_SYNTAX_CLASS()
+};
 
 // The type of an expression that was erroneous
-SYNTAX_CLASS(ErrorType, Type)
-RAW(
+class ErrorType : public Type 
+{
+    SLANG_CLASS(ErrorType)
+
 public:
     virtual String ToString() override;
 
@@ -39,14 +52,15 @@ protected:
     virtual RefPtr<Val> SubstituteImpl(SubstitutionSet subst, int* ioDiff) override;
     virtual RefPtr<Type> CreateCanonicalType() override;
     virtual int GetHashCode() override;
-)
-END_SYNTAX_CLASS()
+};
 
 // A type that takes the form of a reference to some declaration
-SYNTAX_CLASS(DeclRefType, Type)
-    DECL_FIELD(DeclRef<Decl>, declRef)
+class DeclRefType : public Type 
+{
+    SLANG_CLASS(DeclRefType)
 
-RAW(
+    DeclRef<Decl> declRef;
+
     virtual String ToString() override;
     virtual RefPtr<Val> SubstituteImpl(SubstitutionSet subst, int* ioDiff) override;
 
@@ -64,22 +78,24 @@ protected:
     virtual int GetHashCode() override;
     virtual bool EqualsImpl(Type * type) override;
     virtual RefPtr<Type> CreateCanonicalType() override;
-)
-END_SYNTAX_CLASS()
+};
 
 // Base class for types that can be used in arithmetic expressions
-ABSTRACT_SYNTAX_CLASS(ArithmeticExpressionType, DeclRefType)
-RAW(
+class ArithmeticExpressionType : public DeclRefType 
+{
+    SLANG_ABSTRACT_CLASS(ArithmeticExpressionType)
+
 public:
     virtual BasicExpressionType* GetScalarType() = 0;
-)
-END_SYNTAX_CLASS()
+};
 
-SYNTAX_CLASS(BasicExpressionType, ArithmeticExpressionType)
+class BasicExpressionType : public ArithmeticExpressionType 
+{
+    SLANG_CLASS(BasicExpressionType)
 
-    FIELD(BaseType, baseType)
 
-RAW(
+    BaseType baseType;
+
     BasicExpressionType() {}
     BasicExpressionType(
         Slang::BaseType baseType)
@@ -89,38 +105,43 @@ protected:
     virtual BasicExpressionType* GetScalarType() override;
     virtual bool EqualsImpl(Type * type) override;
     virtual RefPtr<Type> CreateCanonicalType() override;
-)
-END_SYNTAX_CLASS()
+
+};
 
 // Base type for things that are built in to the compiler,
 // and will usually have special behavior or a custom
 // mapping to the IR level.
-ABSTRACT_SYNTAX_CLASS(BuiltinType, DeclRefType)
-END_SYNTAX_CLASS()
+class BuiltinType : public DeclRefType 
+{
+    SLANG_ABSTRACT_CLASS(BuiltinType)
+
+};
 
 // Resources that contain "elements" that can be fetched
-ABSTRACT_SYNTAX_CLASS(ResourceType, BuiltinType)
+class ResourceType : public BuiltinType 
+{
+    SLANG_ABSTRACT_CLASS(ResourceType)
+
     // The type that results from fetching an element from this resource
-    SYNTAX_FIELD(RefPtr<Type>, elementType)
+    RefPtr<Type> elementType;
 
     // Shape and access level information for this resource type
-    FIELD(TextureFlavor, flavor)
+    TextureFlavor flavor;
 
-    RAW(
-        TextureFlavor::Shape GetBaseShape()
-        {
-            return flavor.GetBaseShape();
-        }
-        bool isMultisample() { return flavor.isMultisample(); }
-        bool isArray() { return flavor.isArray(); }
-        SlangResourceShape getShape() const { return flavor.getShape(); }
-        SlangResourceAccess getAccess() { return flavor.getAccess(); }
+    TextureFlavor::Shape GetBaseShape()
+    {
+        return flavor.GetBaseShape();
+    }
+    bool isMultisample() { return flavor.isMultisample(); }
+    bool isArray() { return flavor.isArray(); }
+    SlangResourceShape getShape() const { return flavor.getShape(); }
+    SlangResourceAccess getAccess() { return flavor.getAccess(); }
+};
 
-    )
-END_SYNTAX_CLASS()
+class TextureTypeBase : public ResourceType 
+{
+    SLANG_ABSTRACT_CLASS(TextureTypeBase)
 
-ABSTRACT_SYNTAX_CLASS(TextureTypeBase, ResourceType)
-RAW(
     TextureTypeBase()
     {}
     TextureTypeBase(
@@ -130,11 +151,12 @@ RAW(
         this->elementType = elementType;
         this->flavor = flavor;
     }
-)
-END_SYNTAX_CLASS()
+};
 
-SYNTAX_CLASS(TextureType, TextureTypeBase)
-RAW(
+class TextureType : public TextureTypeBase 
+{
+    SLANG_CLASS(TextureType)
+
     TextureType()
     {}
     TextureType(
@@ -142,13 +164,14 @@ RAW(
         RefPtr<Type> elementType)
         : TextureTypeBase(flavor, elementType)
     {}
-)
-END_SYNTAX_CLASS()
+};
 
 // This is a base type for texture/sampler pairs,
 // as they exist in, e.g., GLSL
-SYNTAX_CLASS(TextureSamplerType, TextureTypeBase)
-RAW(
+class TextureSamplerType : public TextureTypeBase 
+{
+    SLANG_CLASS(TextureSamplerType)
+
     TextureSamplerType()
     {}
     TextureSamplerType(
@@ -156,12 +179,13 @@ RAW(
         RefPtr<Type> elementType)
         : TextureTypeBase(flavor, elementType)
     {}
-)
-END_SYNTAX_CLASS()
+};
 
 // This is a base type for `image*` types, as they exist in GLSL
-SYNTAX_CLASS(GLSLImageType, TextureTypeBase)
-RAW(
+class GLSLImageType : public TextureTypeBase 
+{
+    SLANG_CLASS(GLSLImageType)
+
     GLSLImageType()
     {}
     GLSLImageType(
@@ -169,91 +193,209 @@ RAW(
         RefPtr<Type> elementType)
         : TextureTypeBase(flavor, elementType)
     {}
-)
-END_SYNTAX_CLASS()
+};
 
-SYNTAX_CLASS(SamplerStateType, BuiltinType)
+class SamplerStateType : public BuiltinType 
+{
+    SLANG_CLASS(SamplerStateType)
+
     // What flavor of sampler state is this
-    FIELD(SamplerStateFlavor, flavor)
-END_SYNTAX_CLASS()
+    SamplerStateFlavor flavor;
+};
 
 // Other cases of generic types known to the compiler
-SYNTAX_CLASS(BuiltinGenericType, BuiltinType)
-    SYNTAX_FIELD(RefPtr<Type>, elementType)
+class BuiltinGenericType : public BuiltinType 
+{
+    SLANG_CLASS(BuiltinGenericType)
 
-    RAW(Type* getElementType() { return elementType; })
-END_SYNTAX_CLASS()
+    RefPtr<Type> elementType;
+
+    Type* getElementType() { return elementType; }
+};
 
 // Types that behave like pointers, in that they can be
 // dereferenced (implicitly) to access members defined
 // in the element type.
-SIMPLE_SYNTAX_CLASS(PointerLikeType, BuiltinGenericType)
+class PointerLikeType : public BuiltinGenericType 
+{
+    SLANG_CLASS(PointerLikeType)
+};
+
 
 // HLSL buffer-type resources
 
-SIMPLE_SYNTAX_CLASS(HLSLStructuredBufferTypeBase, BuiltinGenericType)
-SIMPLE_SYNTAX_CLASS(HLSLStructuredBufferType, HLSLStructuredBufferTypeBase)
-SIMPLE_SYNTAX_CLASS(HLSLRWStructuredBufferType, HLSLStructuredBufferTypeBase)
-SIMPLE_SYNTAX_CLASS(HLSLRasterizerOrderedStructuredBufferType, HLSLStructuredBufferTypeBase)
+class HLSLStructuredBufferTypeBase : public BuiltinGenericType 
+{
+    SLANG_CLASS(HLSLStructuredBufferTypeBase)
+};
 
-SIMPLE_SYNTAX_CLASS(UntypedBufferResourceType, BuiltinType)
-SIMPLE_SYNTAX_CLASS(HLSLByteAddressBufferType, UntypedBufferResourceType)
-SIMPLE_SYNTAX_CLASS(HLSLRWByteAddressBufferType, UntypedBufferResourceType)
-SIMPLE_SYNTAX_CLASS(HLSLRasterizerOrderedByteAddressBufferType, UntypedBufferResourceType)
-SIMPLE_SYNTAX_CLASS(RaytracingAccelerationStructureType, UntypedBufferResourceType)
+class HLSLStructuredBufferType : public HLSLStructuredBufferTypeBase 
+{
+    SLANG_CLASS(HLSLStructuredBufferType)
+};
 
-SIMPLE_SYNTAX_CLASS(HLSLAppendStructuredBufferType, HLSLStructuredBufferTypeBase)
-SIMPLE_SYNTAX_CLASS(HLSLConsumeStructuredBufferType, HLSLStructuredBufferTypeBase)
+class HLSLRWStructuredBufferType : public HLSLStructuredBufferTypeBase 
+{
+    SLANG_CLASS(HLSLRWStructuredBufferType)
+};
 
-SYNTAX_CLASS(HLSLPatchType, BuiltinType)
-RAW(
+class HLSLRasterizerOrderedStructuredBufferType : public HLSLStructuredBufferTypeBase 
+{
+    SLANG_CLASS(HLSLRasterizerOrderedStructuredBufferType)
+};
+
+
+class UntypedBufferResourceType : public BuiltinType 
+{
+    SLANG_CLASS(UntypedBufferResourceType)
+};
+
+class HLSLByteAddressBufferType : public UntypedBufferResourceType 
+{
+    SLANG_CLASS(HLSLByteAddressBufferType)
+};
+
+class HLSLRWByteAddressBufferType : public UntypedBufferResourceType 
+{
+    SLANG_CLASS(HLSLRWByteAddressBufferType)
+};
+
+class HLSLRasterizerOrderedByteAddressBufferType : public UntypedBufferResourceType 
+{
+    SLANG_CLASS(HLSLRasterizerOrderedByteAddressBufferType)
+};
+
+class RaytracingAccelerationStructureType : public UntypedBufferResourceType 
+{
+    SLANG_CLASS(RaytracingAccelerationStructureType)
+};
+
+
+class HLSLAppendStructuredBufferType : public HLSLStructuredBufferTypeBase 
+{
+    SLANG_CLASS(HLSLAppendStructuredBufferType)
+};
+
+class HLSLConsumeStructuredBufferType : public HLSLStructuredBufferTypeBase 
+{
+    SLANG_CLASS(HLSLConsumeStructuredBufferType)
+};
+
+
+class HLSLPatchType : public BuiltinType 
+{
+    SLANG_CLASS(HLSLPatchType)
+
     Type* getElementType();
-    IntVal*         getElementCount();
-)
-END_SYNTAX_CLASS()
+    IntVal* getElementCount();
+};
 
-SIMPLE_SYNTAX_CLASS(HLSLInputPatchType, HLSLPatchType)
-SIMPLE_SYNTAX_CLASS(HLSLOutputPatchType, HLSLPatchType)
+class HLSLInputPatchType : public HLSLPatchType 
+{
+    SLANG_CLASS(HLSLInputPatchType)
+};
+
+class HLSLOutputPatchType : public HLSLPatchType 
+{
+    SLANG_CLASS(HLSLOutputPatchType)
+};
+
 
 // HLSL geometry shader output stream types
 
-SIMPLE_SYNTAX_CLASS(HLSLStreamOutputType, BuiltinGenericType)
-SIMPLE_SYNTAX_CLASS(HLSLPointStreamType, HLSLStreamOutputType)
-SIMPLE_SYNTAX_CLASS(HLSLLineStreamType, HLSLStreamOutputType)
-SIMPLE_SYNTAX_CLASS(HLSLTriangleStreamType, HLSLStreamOutputType)
+class HLSLStreamOutputType : public BuiltinGenericType 
+{
+    SLANG_CLASS(HLSLStreamOutputType)
+};
+
+class HLSLPointStreamType : public HLSLStreamOutputType 
+{
+    SLANG_CLASS(HLSLPointStreamType)
+};
+
+class HLSLLineStreamType : public HLSLStreamOutputType 
+{
+    SLANG_CLASS(HLSLLineStreamType)
+};
+
+class HLSLTriangleStreamType : public HLSLStreamOutputType 
+{
+    SLANG_CLASS(HLSLTriangleStreamType)
+};
+
 
 //
-SIMPLE_SYNTAX_CLASS(GLSLInputAttachmentType, BuiltinType)
+class GLSLInputAttachmentType : public BuiltinType 
+{
+    SLANG_CLASS(GLSLInputAttachmentType)
+};
+
 
 // Base class for types used when desugaring parameter block
 // declarations, includeing HLSL `cbuffer` or GLSL `uniform` blocks.
-SIMPLE_SYNTAX_CLASS(ParameterGroupType, PointerLikeType)
+class ParameterGroupType : public PointerLikeType 
+{
+    SLANG_CLASS(ParameterGroupType)
+};
 
-SIMPLE_SYNTAX_CLASS(UniformParameterGroupType, ParameterGroupType)
-SIMPLE_SYNTAX_CLASS(VaryingParameterGroupType, ParameterGroupType)
+class UniformParameterGroupType : public ParameterGroupType 
+{
+    SLANG_CLASS(UniformParameterGroupType)
+};
+
+class VaryingParameterGroupType : public ParameterGroupType 
+{
+    SLANG_CLASS(VaryingParameterGroupType)
+};
+
 
 // type for HLSL `cbuffer` declarations, and `ConstantBuffer<T>`
 // ALso used for GLSL `uniform` blocks.
-SIMPLE_SYNTAX_CLASS(ConstantBufferType, UniformParameterGroupType)
+class ConstantBufferType : public UniformParameterGroupType 
+{
+    SLANG_CLASS(ConstantBufferType)
+};
+
 
 // type for HLSL `tbuffer` declarations, and `TextureBuffer<T>`
-SIMPLE_SYNTAX_CLASS(TextureBufferType, UniformParameterGroupType)
+class TextureBufferType : public UniformParameterGroupType 
+{
+    SLANG_CLASS(TextureBufferType)
+};
+
 
 // type for GLSL `in` and `out` blocks
-SIMPLE_SYNTAX_CLASS(GLSLInputParameterGroupType, VaryingParameterGroupType)
-SIMPLE_SYNTAX_CLASS(GLSLOutputParameterGroupType, VaryingParameterGroupType)
+class GLSLInputParameterGroupType : public VaryingParameterGroupType 
+{
+    SLANG_CLASS(GLSLInputParameterGroupType)
+};
+
+class GLSLOutputParameterGroupType : public VaryingParameterGroupType 
+{
+    SLANG_CLASS(GLSLOutputParameterGroupType)
+};
+
 
 // type for GLLSL `buffer` blocks
-SIMPLE_SYNTAX_CLASS(GLSLShaderStorageBufferType, UniformParameterGroupType)
+class GLSLShaderStorageBufferType : public UniformParameterGroupType 
+{
+    SLANG_CLASS(GLSLShaderStorageBufferType)
+};
+
 
 // type for Slang `ParameterBlock<T>` type
-SIMPLE_SYNTAX_CLASS(ParameterBlockType, UniformParameterGroupType)
+class ParameterBlockType : public UniformParameterGroupType 
+{
+    SLANG_CLASS(ParameterBlockType)
+};
 
-SYNTAX_CLASS(ArrayExpressionType, Type)
-    SYNTAX_FIELD(RefPtr<Type>, baseType)
-    SYNTAX_FIELD(RefPtr<IntVal>, ArrayLength)
+class ArrayExpressionType : public Type 
+{
+    SLANG_CLASS(ArrayExpressionType)
 
-RAW(
+    RefPtr<Type> baseType;
+    RefPtr<IntVal> ArrayLength;
+
     virtual Slang::String ToString() override;
 
 protected:
@@ -261,17 +403,18 @@ protected:
     virtual RefPtr<Type> CreateCanonicalType() override;
     virtual RefPtr<Val> SubstituteImpl(SubstitutionSet subst, int* ioDiff) override;
     virtual int GetHashCode() override;
-    )
-END_SYNTAX_CLASS()
+};
 
 // The "type" of an expression that resolves to a type.
 // For example, in the expression `float(2)` the sub-expression,
 // `float` would have the type `TypeType(float)`.
-SYNTAX_CLASS(TypeType, Type)
-    // The type that this is the type of...
-    SYNTAX_FIELD(RefPtr<Type>, type)
+class TypeType : public Type 
+{
+    SLANG_CLASS(TypeType)
 
-RAW(
+    // The type that this is the type of...
+    RefPtr<Type> type;
+
 public:
     TypeType()
     {}
@@ -285,30 +428,30 @@ protected:
     virtual bool EqualsImpl(Type * type) override;
     virtual RefPtr<Type> CreateCanonicalType() override;
     virtual int GetHashCode() override;
-)
-END_SYNTAX_CLASS()
+};
 
 // A vector type, e.g., `vector<T,N>`
-SYNTAX_CLASS(VectorExpressionType, ArithmeticExpressionType)
+class VectorExpressionType : public ArithmeticExpressionType 
+{
+    SLANG_CLASS(VectorExpressionType)
 
     // The type of vector elements.
     // As an invariant, this should be a basic type or an alias.
-    SYNTAX_FIELD(RefPtr<Type>, elementType)
+    RefPtr<Type> elementType;
 
     // The number of elements
-    SYNTAX_FIELD(RefPtr<IntVal>, elementCount)
+    RefPtr<IntVal> elementCount;
 
-RAW(
     virtual String ToString() override;
 
 protected:
     virtual BasicExpressionType* GetScalarType() override;
-)
-END_SYNTAX_CLASS()
+};
 
 // A matrix type, e.g., `matrix<T,R,C>`
-SYNTAX_CLASS(MatrixExpressionType, ArithmeticExpressionType)
-RAW(
+class MatrixExpressionType : public ArithmeticExpressionType 
+{
+    SLANG_CLASS(MatrixExpressionType)
 
     Type* getElementType();
     IntVal*         getRowCount();
@@ -323,55 +466,71 @@ protected:
 
 private:
     RefPtr<Type> mRowType;
-)
-END_SYNTAX_CLASS()
+};
 
 // The built-in `String` type
-SIMPLE_SYNTAX_CLASS(StringType, BuiltinType)
+class StringType : public BuiltinType 
+{
+    SLANG_CLASS(StringType)
+};
+
 
 // Type built-in `__EnumType` type
-SYNTAX_CLASS(EnumTypeType, BuiltinType)
-
-// TODO: provide accessors for the declaration, the "tag" type, etc.
-
-END_SYNTAX_CLASS()
+class EnumTypeType : public BuiltinType 
+{
+    SLANG_CLASS(EnumTypeType)
+    // TODO: provide accessors for the declaration, the "tag" type, etc.
+};
 
 // Base class for types that map down to
 // simple pointers as part of code generation.
-SYNTAX_CLASS(PtrTypeBase, BuiltinType)
-RAW(
+class PtrTypeBase : public BuiltinType 
+{
+    SLANG_CLASS(PtrTypeBase)
+
     // Get the type of the pointed-to value.
     Type*   getValueType();
-)
-END_SYNTAX_CLASS()
+};
 
 // A true (user-visible) pointer type, e.g., `T*`
-SYNTAX_CLASS(PtrType, PtrTypeBase)
-END_SYNTAX_CLASS()
+class PtrType : public PtrTypeBase 
+{
+    SLANG_CLASS(PtrType)
+};
 
 // A type that represents the behind-the-scenes
 // logical pointer that is passed for an `out`
 // or `in out` parameter
-SYNTAX_CLASS(OutTypeBase, PtrTypeBase)
-END_SYNTAX_CLASS()
+class OutTypeBase : public PtrTypeBase 
+{
+    SLANG_CLASS(OutTypeBase)
+};
 
 // The type for an `out` parameter, e.g., `out T`
-SYNTAX_CLASS(OutType, OutTypeBase)
-END_SYNTAX_CLASS()
+class OutType : public OutTypeBase 
+{
+    SLANG_CLASS(OutType)
+};
 
 // The type for an `in out` parameter, e.g., `in out T`
-SYNTAX_CLASS(InOutType, OutTypeBase)
-END_SYNTAX_CLASS()
+class InOutType : public OutTypeBase 
+{
+    SLANG_CLASS(InOutType)
+};
 
 // The type for an `ref` parameter, e.g., `ref T`
-SYNTAX_CLASS(RefType, PtrTypeBase)
-END_SYNTAX_CLASS()
+class RefType : public PtrTypeBase 
+{
+    SLANG_CLASS(RefType)
+};
 
 // A type alias of some kind (e.g., via `typedef`)
-SYNTAX_CLASS(NamedExpressionType, Type)
-DECL_FIELD(DeclRef<TypeDefDecl>, declRef)
+class NamedExpressionType : public Type 
+{
+    SLANG_CLASS(NamedExpressionType)
 
-RAW(
+    DeclRef<TypeDefDecl> declRef;
+
     RefPtr<Type> innerType;
     NamedExpressionType()
     {}
@@ -380,19 +539,19 @@ RAW(
         : declRef(declRef)
     {}
 
-
     virtual String ToString() override;
 
 protected:
     virtual bool EqualsImpl(Type * type) override;
     virtual RefPtr<Type> CreateCanonicalType() override;
     virtual int GetHashCode() override;
-)
-END_SYNTAX_CLASS()
+};
 
 // A function type is defined by its parameter types
 // and its result type.
-SYNTAX_CLASS(FuncType, Type)
+class FuncType : public Type 
+{
+    SLANG_CLASS(FuncType)
 
     // TODO: We may want to preserve parameter names
     // in the list here, just so that we can print
@@ -400,9 +559,9 @@ SYNTAX_CLASS(FuncType, Type)
     // type, even if they don't affect the actual
     // semantic type underneath.
 
-    FIELD(List<RefPtr<Type>>, paramTypes)
-    FIELD(RefPtr<Type>, resultType)
-RAW(
+    List<RefPtr<Type>> paramTypes;
+    RefPtr<Type> resultType;
+
     FuncType()
     {}
 
@@ -416,22 +575,21 @@ protected:
     virtual bool EqualsImpl(Type * type) override;
     virtual RefPtr<Type> CreateCanonicalType() override;
     virtual int GetHashCode() override;
-)
-END_SYNTAX_CLASS()
+};
 
 // The "type" of an expression that names a generic declaration.
-SYNTAX_CLASS(GenericDeclRefType, Type)
+class GenericDeclRefType : public Type 
+{
+    SLANG_CLASS(GenericDeclRefType)
 
-    DECL_FIELD(DeclRef<GenericDecl>, declRef)
+    DeclRef<GenericDecl> declRef;
 
-    RAW(
     GenericDeclRefType()
     {}
     GenericDeclRefType(
         DeclRef<GenericDecl> declRef)
         : declRef(declRef)
     {}
-
 
     DeclRef<GenericDecl> const& GetDeclRef() const { return declRef; }
 
@@ -441,14 +599,15 @@ protected:
     virtual bool EqualsImpl(Type * type) override;
     virtual int GetHashCode() override;
     virtual RefPtr<Type> CreateCanonicalType() override;
-)
-END_SYNTAX_CLASS()
+};
 
 // The "type" of a reference to a module or namespace
-SYNTAX_CLASS(NamespaceType, Type)
-    DECL_FIELD(DeclRef<NamespaceDeclBase>, m_declRef)
+class NamespaceType : public Type 
+{
+    SLANG_CLASS(NamespaceType)
 
-RAW(
+    DeclRef<NamespaceDeclBase> m_declRef;
+
     NamespaceType()
     {}
 
@@ -460,13 +619,14 @@ protected:
     virtual bool EqualsImpl(Type * type) override;
     virtual int GetHashCode() override;
     virtual RefPtr<Type> CreateCanonicalType() override;    
-)
-END_SYNTAX_CLASS()
+};
 
 // The concrete type for a value wrapped in an existential, accessible
 // when the existential is "opened" in some context.
-SYNTAX_CLASS(ExtractExistentialType, Type)
-RAW(
+class ExtractExistentialType : public Type 
+{
+    SLANG_CLASS(ExtractExistentialType)
+
     DeclRef<VarDeclBase> declRef;
 
     virtual String ToString() override;
@@ -474,12 +634,13 @@ RAW(
     virtual int GetHashCode() override;
     virtual RefPtr<Type> CreateCanonicalType() override;
     virtual RefPtr<Val> SubstituteImpl(SubstitutionSet subst, int* ioDiff) override;
-)
-END_SYNTAX_CLASS()
+};
 
     /// A tagged union of zero or more other types.
-SYNTAX_CLASS(TaggedUnionType, Type)
-RAW(
+class TaggedUnionType : public Type 
+{
+    SLANG_CLASS(TaggedUnionType)
+
         /// The distinct "cases" the tagged union can store.
         ///
         /// For each type in this array, the array index is the
@@ -492,11 +653,12 @@ RAW(
     virtual int GetHashCode() override;
     virtual RefPtr<Type> CreateCanonicalType() override;
     virtual RefPtr<Val> SubstituteImpl(SubstitutionSet subst, int* ioDiff) override;
-)
-END_SYNTAX_CLASS()
+};
 
-SYNTAX_CLASS(ExistentialSpecializedType, Type)
-RAW(
+class ExistentialSpecializedType : public Type 
+{
+    SLANG_CLASS(ExistentialSpecializedType)
+
     RefPtr<Type> baseType;
     ExpandedSpecializationArgs args;
 
@@ -505,12 +667,13 @@ RAW(
     virtual int GetHashCode() override;
     virtual RefPtr<Type> CreateCanonicalType() override;
     virtual RefPtr<Val> SubstituteImpl(SubstitutionSet subst, int* ioDiff) override;
-)
-END_SYNTAX_CLASS()
+};
 
     /// The type of `this` within a polymorphic declaration
-SYNTAX_CLASS(ThisType, Type)
-RAW(
+class ThisType : public Type 
+{
+    SLANG_CLASS(ThisType)
+
     DeclRef<InterfaceDecl> interfaceDeclRef;
 
     virtual String ToString() override;
@@ -518,5 +681,10 @@ RAW(
     virtual int GetHashCode() override;
     virtual RefPtr<Type> CreateCanonicalType() override;
     virtual RefPtr<Val> SubstituteImpl(SubstitutionSet subst, int* ioDiff) override;
-)
-END_SYNTAX_CLASS()
+
+};
+
+#undef SLANG_ABSTRACT_CLASS
+#undef SLANG_CLASS
+
+} // namespace Slang

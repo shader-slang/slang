@@ -202,13 +202,13 @@ workspace "slang"
 
     filter { "toolset:clang or gcc*" }
         buildoptions { "-Wno-unused-parameter", "-Wno-type-limits", "-Wno-sign-compare", "-Wno-unused-variable", "-Wno-reorder", "-Wno-switch", "-Wno-return-type", "-Wno-unused-local-typedefs", "-Wno-parentheses",  "-std=c++11", "-fvisibility=hidden" , "-Wno-ignored-optimization-argument", "-Wno-unknown-warning-option"} 
-    	
-	filter { "toolset:gcc*"}
-		buildoptions { "-Wno-unused-but-set-variable", "-Wno-implicit-fallthrough"  }
-		
+        
+    filter { "toolset:gcc*"}
+        buildoptions { "-Wno-unused-but-set-variable", "-Wno-implicit-fallthrough"  }
+        
     filter { "toolset:clang" }
          buildoptions { "-Wno-deprecated-register", "-Wno-tautological-compare", "-Wno-missing-braces", "-Wno-undefined-var-template", "-Wno-unused-function", "-Wno-return-std-move"}
-		
+        
     -- When compiling the debug configuration, we want to turn
     -- optimization off, make sure debug symbols are output,
     -- and add the same preprocessor definition that VS
@@ -224,7 +224,7 @@ workspace "slang"
     filter { "configurations:release" }
         optimize "On"
         defines { "NDEBUG" }
-    		
+            
     filter { "system:linux" }
         linkoptions{  "-Wl,-rpath,'$$ORIGIN',--no-as-needed", "-ldl"}
             
@@ -240,14 +240,14 @@ function dump(o)
         return tostring(o)
      end
 end
-	
+    
 function dumpTable(o)
-	local s = '{ '
-	for k,v in pairs(o) do
-		if type(k) ~= 'number' then k = '"'..k..'"' end
-		s = s .. '['..k..'] = ' .. tostring(v) .. ',\n'
-	end
-	return s .. '} '
+    local s = '{ '
+    for k,v in pairs(o) do
+        if type(k) ~= 'number' then k = '"'..k..'"' end
+        s = s .. '['..k..'] = ' .. tostring(v) .. ',\n'
+    end
+    return s .. '} '
 end
 
 
@@ -520,28 +520,6 @@ standardProject "core"
         buildoptions{"-fPIC"}
     
 --
--- `slang-generate` is a tool we use for source code generation on
--- the compiler. It depends on the `core` library, so we need to
--- declare that:
---
-
-tool "slang-generate"
-    uuid "66174227-8541-41FC-A6DF-4764FC66F78E"
-    links { "core" }
-
-
---
--- The `slang-test` test driver also uses the `core` library, and it
--- currently relies on include paths being set up so that it can find
--- the core headers:
---
-
-tool "slang-test"
-    uuid "0C768A18-1D25-4000-9F37-DA5FE99E3B64"
-    includedirs { "." }
-    links { "core", "slang" }
-
---
 -- The cpp extractor is a tool that scans C++ header files to extract
 -- reflection like information, and generate files to handle 
 -- RTTI fast/simply
@@ -567,6 +545,27 @@ tool "slang-cpp-extractor"
     }
     
     links { "core" }
+    
+--
+-- `slang-generate` is a tool we use for source code generation on
+-- the compiler. It depends on the `core` library, so we need to
+-- declare that:
+--
+
+tool "slang-generate"
+    uuid "66174227-8541-41FC-A6DF-4764FC66F78E"
+    links { "core" }
+
+--
+-- The `slang-test` test driver also uses the `core` library, and it
+-- currently relies on include paths being set up so that it can find
+-- the core headers:
+--
+
+tool "slang-test"
+    uuid "0C768A18-1D25-4000-9F37-DA5FE99E3B64"
+    includedirs { "." }
+    links { "core", "slang" }
 
 --
 -- The reflection test harness `slang-reflection-test` is pretty
@@ -726,23 +725,28 @@ standardProject "slang"
 
     includedirs { "external/spirv-headers/include" }
 
+    -- On some tests with MSBuild disabling these made build work.
+    -- flags { "NoIncrementalLink", "NoPCH", "NoMinimalRebuild" }
+
     -- The `standardProject` operation already added all the code in
     -- `source/slang/*`, but we also want to incldue the umbrella
     -- `slang.h` header in this prject, so we do that manually here.
     files { "slang.h" }
 
     files { "source/core/core.natvis" }
-
+ 
+    -- 
     -- The most challenging part of building `slang` is that we need
-    -- to invoke the `slang-generate` tool to generate the version
+    -- to invoke the `slang-generate`tools to generate the version
     -- of the Slang standard library that we embed into the compiler.
+    -- We need to build the `slang-cpp-extractor` for similar reasons.
     --
-    -- First, we need to ensure that `slang-generate` gets built
-    -- before `slang`, so we declare a non-linking dependency between
+    -- First, we need to ensure that `slang-generate`/`slang-cpp-extactor` 
+    -- gets built before `slang`, so we declare a non-linking dependency between
     -- the projects here:
     --
-    dependson { "slang-generate" }
-
+    dependson { "slang-cpp-extractor", "slang-generate"  }
+    
     -- If we are not building glslang from source, then be
     -- sure to copy a binary copy over to the output directory
     if not buildGlslang then
@@ -758,8 +762,50 @@ standardProject "slang"
     end
 
     filter { "system:linux" }
-	-- might be able to do pic(true)
+        -- might be able to do pic(true)
         buildoptions{"-fPIC"}
+       
+    -- We need to run the C++ extractor to generate some include files
+    if executeBinary then
+        filter "files:**/slang-ast-reflect.h"
+            buildmessage "slang-cpp-extractor AST %{file.relpath}"
+
+            -- Where the input files are located
+            local sourcePath = "%{file.directory}/"
+            
+            -- Specify the files that will be used for the generation
+            local inputFiles = { "slang-ast-base.h", "slang-ast-decl.h", "slang-ast-expr.h", "slang-ast-modifier.h", "slang-ast-stmt.h", "slang-ast-type.h", "slang-ast-val.h" }
+
+            -- Specify the actual command to run for this action.
+            --
+            -- Note that we use a single-quoted Lua string and wrap the path
+            -- to the `slang-cpp-extractor` command in double quotes to avoid
+            -- confusing the Windows shell. It seems that Premake outputs that
+            -- path with forward slashes, which confused the shell if we don't
+            -- quote the executable path.
+
+            local buildcmd = '"%{cfg.targetdir}/slang-cpp-extractor" -d ' .. sourcePath .. " " .. table.concat(inputFiles, " ") .. " -strip-prefix slang-ast- -o slang-ast-generated"
+            
+            buildcommands { buildcmd }
+            
+            -- Specify the files output by the extactor - so custom action will run when these files are needed.
+            --
+            buildoutputs { sourcePath .. "slang-ast-generated.h", sourcePath .. "slang-ast-generated-macro.h"}
+            
+            local executableSuffix = "";
+            if(os.target() == "windows") then
+                executableSuffix = ".exe";
+            end
+            
+            -- Make it depend on the extractor tool itself
+            local buildInputTable = { "%{cfg.targetdir}/slang-cpp-extractor" .. executableSuffix }
+            for key, inputFile in ipairs(inputFiles) do
+                table.insert(buildInputTable, sourcePath .. inputFile)
+            end
+            
+            --
+            buildinputs(buildInputTable)
+    end       
        
     -- Next, we want to add a custom build rule for each of the
     -- files that makes up the standard library. Those are
@@ -803,6 +849,8 @@ standardProject "slang"
             --
             buildinputs { "%{cfg.targetdir}/slang-generate" .. executableSuffix }
     end
+
+
 
 if enableProfile then
     tool "slang-profile"

@@ -8,182 +8,11 @@
 
 namespace Slang
 {
-    // We want this first, before the kClassInfo variables so it is constructed before anything else. 
-    /* static*/ SyntaxClassBase::ClassInfo* SyntaxClassBase::ClassInfo::s_first = nullptr;
 
-    // BasicExpressionType
+#define SLANG_CLASS_ACCEPT_IMPL(NAME, SUPER, ORIGIN, LAST, MARKER, TYPE, param) \
+    void NAME::accept(NAME::Visitor* visitor, void* extra) { visitor->dispatch_##NAME(this, extra); }
 
-    bool BasicExpressionType::EqualsImpl(Type * type)
-    {
-        auto basicType = as<BasicExpressionType>(type);
-        return basicType && basicType->baseType == this->baseType;
-    }
-
-    RefPtr<Type> BasicExpressionType::CreateCanonicalType()
-    {
-        // A basic type is already canonical, in our setup
-        return this;
-    }
-
-    // Generate dispatch logic and other definitions for all syntax classes
-#define SYNTAX_CLASS(NAME, BASE) /* empty */
-#include "slang-object-meta-begin.h"
-
-#include "slang-syntax-base-defs.h"
-#undef SYNTAX_CLASS
-#undef ABSTRACT_SYNTAX_CLASS
-
-#define ABSTRACT_SYNTAX_CLASS(NAME, BASE)   \
-    template<>                              \
-    SyntaxClassBase::ClassInfo const SyntaxClassBase::Impl<NAME>::kClassInfo(#NAME, nullptr, &SyntaxClassBase::Impl<BASE>::kClassInfo);
-
-#define SYNTAX_CLASS(NAME, BASE)                                                \
-    template<>                                                                  \
-    void* SyntaxClassBase::Impl<NAME>::createFunc() { return new NAME(); }      \
-    template<>                                                                  \
-    SyntaxClassBase::ClassInfo const SyntaxClassBase::Impl<NAME>::kClassInfo( #NAME, &SyntaxClassBase::Impl<NAME>::createFunc, &SyntaxClassBase::Impl<BASE>::kClassInfo); \
-    void NAME::accept(NAME::Visitor* visitor, void* extra)                      \
-    { visitor->dispatch_##NAME(this, extra); }                                  \
-    const SyntaxClassBase::ClassInfo& NAME::getClassInfo() const { return SyntaxClassBase::Impl<NAME>::kClassInfo; }  
-    
-template<>
-SyntaxClassBase::ClassInfo const SyntaxClassBase::Impl<RefObject>::kClassInfo("RefObject", nullptr, nullptr);
-
-ABSTRACT_SYNTAX_CLASS(NodeBase, RefObject);
-ABSTRACT_SYNTAX_CLASS(SyntaxNodeBase, NodeBase);
-ABSTRACT_SYNTAX_CLASS(SyntaxNode, SyntaxNodeBase);
-ABSTRACT_SYNTAX_CLASS(ModifiableSyntaxNode, SyntaxNode);
-ABSTRACT_SYNTAX_CLASS(DeclBase, ModifiableSyntaxNode);
-ABSTRACT_SYNTAX_CLASS(Decl, DeclBase);
-ABSTRACT_SYNTAX_CLASS(Stmt, ModifiableSyntaxNode);
-ABSTRACT_SYNTAX_CLASS(Val, NodeBase);
-ABSTRACT_SYNTAX_CLASS(Type, Val);
-ABSTRACT_SYNTAX_CLASS(Modifier, SyntaxNodeBase);
-ABSTRACT_SYNTAX_CLASS(Expr, SyntaxNode);
-
-ABSTRACT_SYNTAX_CLASS(Substitutions, SyntaxNode);
-ABSTRACT_SYNTAX_CLASS(GenericSubstitution, Substitutions);
-ABSTRACT_SYNTAX_CLASS(ThisTypeSubstitution, Substitutions);
-ABSTRACT_SYNTAX_CLASS(GlobalGenericParamSubstitution, Substitutions);
-
-#include "slang-expr-defs.h"
-#include "slang-decl-defs.h"
-#include "slang-modifier-defs.h"
-#include "slang-stmt-defs.h"
-#include "slang-type-defs.h"
-#include "slang-val-defs.h"
-#include "slang-object-meta-end.h"
-
-
-SyntaxClassBase::ClassInfo::ClassInfo(const char* name, CreateFunc createFunc, const ClassInfo* superClass):
-    m_name(name),
-    m_createFunc(createFunc),
-    m_superClass(superClass),
-    m_next(s_first)
-{
-    m_classId = 0;
-    m_childrenEndClassId = 0;
-
-    s_first = this;
-}
-
-
-
-static uint32_t _calcRangeRec(const SyntaxClassBase::ClassInfo* classInfo, const Dictionary<const SyntaxClassBase::ClassInfo*, List<const SyntaxClassBase::ClassInfo*> >& childMap, uint32_t index)
-{
-    classInfo->m_classId = index++;
-    // Do the calc range for all the children
-    auto list = childMap.TryGetValue(classInfo);
-
-    if (list)
-    {
-        for (auto child : *list)
-        {
-            index = _calcRangeRec(child, childMap, index);
-        }
-    }
-
-    classInfo->m_childrenEndClassId = index;
-    return index;
-}
-
-bool SyntaxClassBase::ClassInfo::isSubClassOfSlow(const ThisType& super) const
-{
-    SyntaxClassBase::ClassInfo const* info = this;
-    while (info)
-    {
-        if (info == &super)
-            return true;
-        info = info->m_superClass;
-    }
-    return false;
-}
-
-static bool _checkSubClassRange()
-{
-    typedef SyntaxClassBase::ClassInfo ClassInfo;
-
-    List<const ClassInfo*> list;
-    for (const ClassInfo* type = ClassInfo::s_first; type; type = type->m_next)
-    {
-        list.add(type);
-    }
-
-    for (Index i = 0; i < list.getCount(); ++i)
-    {
-        for (Index j = 0; j < list.getCount(); ++j)
-        {
-            auto a = list[i];
-            auto b = list[j];
-            if (a->isSubClassOf(*b) != a->isSubClassOfSlow(*b))
-            {
-                return false;
-            }
-        }
-    }
-
-    return true;
-}
-
-
-/* static */SlangResult SyntaxClassBase::ClassInfo::initRanges()
-{
-    // Remove the warning about not referenced
-    SLANG_UNUSED(&_checkSubClassRange);
-
-    // TODO(JS):
-    // Note that the calculating of the ranges could be done more efficiently by adding to an array of struct { super, class }, sorting, by super classs
-    // and using a dictionary to map from class it's first in list of super class use. This works for now though.
-  
-    // We want to produce a map from a node that holds all of it's children
-    Dictionary<const ThisType*, List<const ThisType*> > childMap;
-
-    const List<const ThisType*> emptyList;
-
-    {
-         for (const ThisType* type = s_first; type; type = type->m_next)
-         {
-             if (type->m_superClass)
-             {
-                 // Add to that item
-                 List<const ThisType*>* list = childMap.TryGetValueOrAdd(type->m_superClass, emptyList);
-                 if (!list)
-                 {
-                     list = childMap.TryGetValue(type->m_superClass);
-                 }
-                 SLANG_ASSERT(list);
-                 list->add(type);
-             }
-         }
-    }
-
-    // We want to recursively work out a range
-    _calcRangeRec(&SyntaxClassBase::Impl<RefObject>::kClassInfo, childMap, 1);
-
-    SLANG_ASSERT(_checkSubClassRange());
-
-    return SLANG_OK;
-}
+SLANG_ALL_ASTNode_NodeBase(SLANG_CLASS_ONLY, SLANG_CLASS_ACCEPT_IMPL)
 
 // !!!!!!!!!!!!!!!!!!!!!!!!!!!!! DiagnosticSink impls !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 
@@ -225,10 +54,23 @@ SourceLoc const& getDiagnosticPos(TypeExp const& typeExp)
     return typeExp.exp->loc;
 }
 
+// !!!!!!!!!!!!!!!!!!!!!!!!!!!!! BasicExpressionType !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+
+bool BasicExpressionType::EqualsImpl(Type * type)
+{
+    auto basicType = as<BasicExpressionType>(type);
+    return basicType && basicType->baseType == this->baseType;
+}
+
+RefPtr<Type> BasicExpressionType::CreateCanonicalType()
+{
+    // A basic type is already canonical, in our setup
+    return this;
+}
 
 // !!!!!!!!!!!!!!!!!!!!!!!!!!!!!  Free functions !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 
-const RefPtr<Decl>* adjustFilterCursorImpl(const SyntaxClassBase::ClassInfo& clsInfo, MemberFilterStyle filterStyle, const RefPtr<Decl>* ptr, const RefPtr<Decl>* end)
+const RefPtr<Decl>* adjustFilterCursorImpl(const ReflectClassInfo& clsInfo, MemberFilterStyle filterStyle, const RefPtr<Decl>* ptr, const RefPtr<Decl>* end)
 {
     switch (filterStyle)
     {
@@ -273,7 +115,7 @@ const RefPtr<Decl>* adjustFilterCursorImpl(const SyntaxClassBase::ClassInfo& cls
     return end;
 }
 
-const RefPtr<Decl>* getFilterCursorByIndexImpl(const SyntaxClassBase::ClassInfo& clsInfo, MemberFilterStyle filterStyle, const RefPtr<Decl>* ptr, const RefPtr<Decl>* end, Index index)
+const RefPtr<Decl>* getFilterCursorByIndexImpl(const ReflectClassInfo& clsInfo, MemberFilterStyle filterStyle, const RefPtr<Decl>* ptr, const RefPtr<Decl>* end, Index index)
 {
     switch (filterStyle)
     {
@@ -330,7 +172,7 @@ const RefPtr<Decl>* getFilterCursorByIndexImpl(const SyntaxClassBase::ClassInfo&
     return nullptr;
 }
 
-Index getFilterCountImpl(const SyntaxClassBase::ClassInfo& clsInfo, MemberFilterStyle filterStyle, const RefPtr<Decl>* ptr, const RefPtr<Decl>* end)
+Index getFilterCountImpl(const ReflectClassInfo& clsInfo, MemberFilterStyle filterStyle, const RefPtr<Decl>* ptr, const RefPtr<Decl>* end)
 {
     Index count = 0;
     switch (filterStyle)
