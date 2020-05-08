@@ -520,28 +520,6 @@ standardProject "core"
         buildoptions{"-fPIC"}
     
 --
--- `slang-generate` is a tool we use for source code generation on
--- the compiler. It depends on the `core` library, so we need to
--- declare that:
---
-
-tool "slang-generate"
-    uuid "66174227-8541-41FC-A6DF-4764FC66F78E"
-    links { "core" }
-
-
---
--- The `slang-test` test driver also uses the `core` library, and it
--- currently relies on include paths being set up so that it can find
--- the core headers:
---
-
-tool "slang-test"
-    uuid "0C768A18-1D25-4000-9F37-DA5FE99E3B64"
-    includedirs { "." }
-    links { "core", "slang" }
-
---
 -- The cpp extractor is a tool that scans C++ header files to extract
 -- reflection like information, and generate files to handle 
 -- RTTI fast/simply
@@ -567,6 +545,30 @@ tool "slang-cpp-extractor"
     }
     
     links { "core" }
+    
+--
+-- `slang-generate` is a tool we use for source code generation on
+-- the compiler. It depends on the `core` library, so we need to
+-- declare that:
+--
+
+tool "slang-generate"
+    uuid "66174227-8541-41FC-A6DF-4764FC66F78E"
+    links { "core" }
+
+
+--
+-- The `slang-test` test driver also uses the `core` library, and it
+-- currently relies on include paths being set up so that it can find
+-- the core headers:
+--
+
+tool "slang-test"
+    uuid "0C768A18-1D25-4000-9F37-DA5FE99E3B64"
+    includedirs { "." }
+    links { "core", "slang" }
+
+
 
 --
 -- The reflection test harness `slang-reflection-test` is pretty
@@ -790,7 +792,7 @@ standardProject "slang"
             
             -- Specify the files output by the extactor - so custom action will run when these files are needed.
             --
-            buildoutputs { sourcePath .. "/slang-ast-generated.h", sourcePath .. "slang-ast-generated-macro.h"}
+            buildoutputs { sourcePath .. "slang-ast-generated.h", sourcePath .. "slang-ast-generated-macro.h"}
             
             local executableSuffix = "";
             if(os.target() == "windows") then
