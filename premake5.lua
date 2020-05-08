@@ -725,7 +725,8 @@ standardProject "slang"
 
     includedirs { "external/spirv-headers/include" }
 
-    flags { "NoIncrementalLink", "NoPCH", "NoMinimalRebuild" }
+    -- On some tests with MSBuild disabling these made build work.
+    -- flags { "NoIncrementalLink", "NoPCH", "NoMinimalRebuild" }
 
     -- The `standardProject` operation already added all the code in
     -- `source/slang/*`, but we also want to incldue the umbrella
