@@ -742,6 +742,9 @@ standardProject "slang"
     -- the projects here:
     --
     dependson { "slang-generate" }
+    
+    -- We also need to build the C++ extractor for similar reasons to slang-generate
+    -- 
     dependson { "slang-cpp-extractor" }
 
     -- If we are not building glslang from source, then be
@@ -759,7 +762,7 @@ standardProject "slang"
     end
 
     filter { "system:linux" }
-	-- might be able to do pic(true)
+        -- might be able to do pic(true)
         buildoptions{"-fPIC"}
        
     -- Next, we want to add a custom build rule for each of the
@@ -808,7 +811,7 @@ standardProject "slang"
     -- We need to run the C++ extractor to generate some include files
     
     if executeBinary then
-        filter "files:source/slang/slang-ast-reflect.h"
+        filter "files:**/slang-ast-reflect.h"
             buildmessage "slang-cpp-extractor AST %{file.relpath}"
 
             -- Where the input files are located
