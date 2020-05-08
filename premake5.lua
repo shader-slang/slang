@@ -202,13 +202,13 @@ workspace "slang"
 
     filter { "toolset:clang or gcc*" }
         buildoptions { "-Wno-unused-parameter", "-Wno-type-limits", "-Wno-sign-compare", "-Wno-unused-variable", "-Wno-reorder", "-Wno-switch", "-Wno-return-type", "-Wno-unused-local-typedefs", "-Wno-parentheses",  "-std=c++11", "-fvisibility=hidden" , "-Wno-ignored-optimization-argument", "-Wno-unknown-warning-option"} 
-    	
-	filter { "toolset:gcc*"}
-		buildoptions { "-Wno-unused-but-set-variable", "-Wno-implicit-fallthrough"  }
-		
+        
+    filter { "toolset:gcc*"}
+        buildoptions { "-Wno-unused-but-set-variable", "-Wno-implicit-fallthrough"  }
+        
     filter { "toolset:clang" }
          buildoptions { "-Wno-deprecated-register", "-Wno-tautological-compare", "-Wno-missing-braces", "-Wno-undefined-var-template", "-Wno-unused-function", "-Wno-return-std-move"}
-		
+        
     -- When compiling the debug configuration, we want to turn
     -- optimization off, make sure debug symbols are output,
     -- and add the same preprocessor definition that VS
@@ -224,7 +224,7 @@ workspace "slang"
     filter { "configurations:release" }
         optimize "On"
         defines { "NDEBUG" }
-    		
+            
     filter { "system:linux" }
         linkoptions{  "-Wl,-rpath,'$$ORIGIN',--no-as-needed", "-ldl"}
             
@@ -240,14 +240,14 @@ function dump(o)
         return tostring(o)
      end
 end
-	
+    
 function dumpTable(o)
-	local s = '{ '
-	for k,v in pairs(o) do
-		if type(k) ~= 'number' then k = '"'..k..'"' end
-		s = s .. '['..k..'] = ' .. tostring(v) .. ',\n'
-	end
-	return s .. '} '
+    local s = '{ '
+    for k,v in pairs(o) do
+        if type(k) ~= 'number' then k = '"'..k..'"' end
+        s = s .. '['..k..'] = ' .. tostring(v) .. ',\n'
+    end
+    return s .. '} '
 end
 
 
@@ -732,21 +732,20 @@ standardProject "slang"
     files { "slang.h" }
 
     files { "source/core/core.natvis" }
-
+ 
+    -- 
     -- The most challenging part of building `slang` is that we need
-    -- to invoke the `slang-generate` tool to generate the version
+    -- to invoke the `slang-generate`tools to generate the version
     -- of the Slang standard library that we embed into the compiler.
+    -- We need to build the `slang-cpp-extractor` for similar reasons.
     --
-    -- First, we need to ensure that `slang-generate` gets built
-    -- before `slang`, so we declare a non-linking dependency between
+    -- First, we need to ensure that `slang-generate`/`slang-cpp-extactor` 
+    -- gets built before `slang`, so we declare a non-linking dependency between
     -- the projects here:
     --
-    dependson { "slang-generate" }
+    dependson { "slang-generate", "slang-cpp-extractor" }
     
-    -- We also need to build the C++ extractor for similar reasons to slang-generate
-    -- 
-    dependson { "slang-cpp-extractor" }
-
+    
     -- If we are not building glslang from source, then be
     -- sure to copy a binary copy over to the output directory
     if not buildGlslang then
