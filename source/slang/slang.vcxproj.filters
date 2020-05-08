@@ -18,6 +18,39 @@
     <ClInclude Include="hlsl.meta.slang.h">
       <Filter>Header Files</Filter>
     </ClInclude>
+    <ClInclude Include="slang-ast-all.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="slang-ast-base.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="slang-ast-decl.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="slang-ast-expr.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="slang-ast-generated-macro.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="slang-ast-generated.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="slang-ast-modifier.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="slang-ast-stmt.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="slang-ast-support-types.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="slang-ast-type.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="slang-ast-val.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
     <ClInclude Include="slang-check-impl.h">
       <Filter>Header Files</Filter>
     </ClInclude>
@@ -25,9 +58,6 @@
       <Filter>Header Files</Filter>
     </ClInclude>
     <ClInclude Include="slang-compiler.h">
-      <Filter>Header Files</Filter>
-    </ClInclude>
-    <ClInclude Include="slang-decl-defs.h">
       <Filter>Header Files</Filter>
     </ClInclude>
     <ClInclude Include="slang-diagnostic-defs.h">
@@ -58,9 +88,6 @@
       <Filter>Header Files</Filter>
     </ClInclude>
     <ClInclude Include="slang-emit.h">
-      <Filter>Header Files</Filter>
-    </ClInclude>
-    <ClInclude Include="slang-expr-defs.h">
       <Filter>Header Files</Filter>
     </ClInclude>
     <ClInclude Include="slang-file-system.h">
@@ -183,16 +210,7 @@
     <ClInclude Include="slang-mangled-lexer.h">
       <Filter>Header Files</Filter>
     </ClInclude>
-    <ClInclude Include="slang-modifier-defs.h">
-      <Filter>Header Files</Filter>
-    </ClInclude>
     <ClInclude Include="slang-name.h">
-      <Filter>Header Files</Filter>
-    </ClInclude>
-    <ClInclude Include="slang-object-meta-begin.h">
-      <Filter>Header Files</Filter>
-    </ClInclude>
-    <ClInclude Include="slang-object-meta-end.h">
       <Filter>Header Files</Filter>
     </ClInclude>
     <ClInclude Include="slang-options.h">
@@ -222,15 +240,6 @@
     <ClInclude Include="slang-state-serialize.h">
       <Filter>Header Files</Filter>
     </ClInclude>
-    <ClInclude Include="slang-stmt-defs.h">
-      <Filter>Header Files</Filter>
-    </ClInclude>
-    <ClInclude Include="slang-syntax-base-defs.h">
-      <Filter>Header Files</Filter>
-    </ClInclude>
-    <ClInclude Include="slang-syntax-defs.h">
-      <Filter>Header Files</Filter>
-    </ClInclude>
     <ClInclude Include="slang-syntax.h">
       <Filter>Header Files</Filter>
     </ClInclude>
@@ -240,16 +249,10 @@
     <ClInclude Include="slang-token.h">
       <Filter>Header Files</Filter>
     </ClInclude>
-    <ClInclude Include="slang-type-defs.h">
-      <Filter>Header Files</Filter>
-    </ClInclude>
     <ClInclude Include="slang-type-layout.h">
       <Filter>Header Files</Filter>
     </ClInclude>
     <ClInclude Include="slang-type-system-shared.h">
-      <Filter>Header Files</Filter>
-    </ClInclude>
-    <ClInclude Include="slang-val-defs.h">
       <Filter>Header Files</Filter>
     </ClInclude>
     <ClInclude Include="slang-visitor.h">
@@ -257,6 +260,9 @@
     </ClInclude>
   </ItemGroup>
   <ItemGroup>
+    <ClCompile Include="slang-ast-reflect.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
     <ClCompile Include="slang-check-conformance.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
@@ -501,5 +507,11 @@
     <Natvis Include="slang.natvis">
       <Filter>Source Files</Filter>
     </Natvis>
+    <CustomBuild Include="hlsl.meta.slang">
+      <Filter>Source Files</Filter>
+    </CustomBuild>
+    <CustomBuild Include="slang-ast-reflect.h">
+      <Filter>Header Files</Filter>
+    </CustomBuild>
   </ItemGroup>
 </Project>
