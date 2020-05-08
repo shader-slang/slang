@@ -726,6 +726,8 @@ standardProject "slang"
 
     includedirs { "external/spirv-headers/include" }
 
+    flags { "NoIncrementalLink", "NoPCH", "NoMinimalRebuild" }
+
     -- The `standardProject` operation already added all the code in
     -- `source/slang/*`, but we also want to incldue the umbrella
     -- `slang.h` header in this prject, so we do that manually here.
