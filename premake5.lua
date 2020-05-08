@@ -556,8 +556,6 @@ tool "slang-generate"
     uuid "66174227-8541-41FC-A6DF-4764FC66F78E"
     links { "core" }
 
-    dependson{ "slang-cpp-extractor" }
-
 --
 -- The `slang-test` test driver also uses the `core` library, and it
 -- currently relies on include paths being set up so that it can find
@@ -568,8 +566,6 @@ tool "slang-test"
     uuid "0C768A18-1D25-4000-9F37-DA5FE99E3B64"
     includedirs { "." }
     links { "core", "slang" }
-
-
 
 --
 -- The reflection test harness `slang-reflection-test` is pretty
