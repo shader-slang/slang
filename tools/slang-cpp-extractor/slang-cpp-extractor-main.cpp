@@ -332,8 +332,13 @@ protected:
     SlangResult _maybeParseTemplateArgs(Index& ioTemplateDepth);
     SlangResult _maybeParseTemplateArg(Index& ioTemplateDepth);
 
+    SlangResult _maybeParseArrayTypeSuffix(UnownedStringSlice& outSuffix);
+
     SlangResult _calcDerivedTypesRec(Node* node);
     static String _calcMacroOrigin(const String& filePath, const Options& options);
+
+        /// Concatenate all tokens from start to the current position
+    UnownedStringSlice _concatTokens(TokenReader::ParsingCursor start);
 
     void _consumeTypeModifiers();
 
@@ -1241,6 +1246,21 @@ void CPPExtractor::_consumeTypeModifiers()
     while (advanceIfStyle(IdentifierStyle::TypeModifier));
 }
 
+UnownedStringSlice CPPExtractor::_concatTokens(TokenReader::ParsingCursor start)
+{
+    auto endCursor = m_reader.getCursor();
+    m_reader.setCursor(start);
+
+    StringBuilder buf;
+    while (!m_reader.isAtCursor(endCursor))
+    {
+        const Token token = m_reader.advanceToken();
+        buf << token.Content;
+    }
+
+    return m_typePool->getSlice(m_typePool->add(buf));
+}
+
 SlangResult CPPExtractor::_maybeParseType(UnownedStringSlice& outType, Index& ioTemplateDepth)
 {
     auto startCursor = m_reader.getCursor();
@@ -1295,21 +1315,7 @@ SlangResult CPPExtractor::_maybeParseType(UnownedStringSlice& outType, Index& io
     }
 
     // We can build up the out type, from the tokens we found
-    auto endCursor = m_reader.getCursor();
-
-    m_reader.setCursor(startCursor);
-
-    StringBuilder buf;
-    while (!m_reader.isAtCursor(endCursor))
-    {
-        Token token = m_reader.advanceToken();
-        // Concat the type. 
-        buf << token.Content;
-    }
-
-    auto handle = m_typePool->add(buf);
-
-    outType = m_typePool->getSlice(handle);
+    outType = _concatTokens(startCursor);
     return SLANG_OK;
 }
 
@@ -1327,6 +1333,48 @@ SlangResult CPPExtractor::_maybeParseType(UnownedStringSlice& outType)
         m_sink->diagnose(m_reader.peekToken(), CPPDiagnostics::unexpectedTemplateClose);
         return SLANG_FAIL;
     }
+    return SLANG_OK;
+}
+
+SlangResult CPPExtractor::_maybeParseArrayTypeSuffix(UnownedStringSlice& outSuffix)
+{
+    auto startCursor = m_reader.getCursor();
+
+    while (true)
+    {
+        SLANG_RETURN_ON_FAIL(expect(TokenType::LBracket));
+
+        while (true)
+        {
+            TokenType tokenType = m_reader.peekTokenType();
+            if (tokenType == TokenType::RBracket)
+            {
+                break;
+            }
+
+            if (tokenType == TokenType::EndOfFile ||
+                tokenType == TokenType::LBrace ||
+                tokenType == TokenType::RBrace ||
+                tokenType == TokenType::LBracket)
+            {
+                return SLANG_FAIL;
+            }
+
+            // Okay onto next
+            m_reader.advanceToken();
+        }
+
+        SLANG_RETURN_ON_FAIL(expect(TokenType::RBracket));
+
+        if (m_reader.peekTokenType() == TokenType::RBracket)
+        {
+            continue;
+        }
+
+        break;
+    }
+
+    outSuffix = _concatTokens(startCursor);
     return SLANG_OK;
 }
 
@@ -1354,6 +1402,22 @@ SlangResult CPPExtractor::_maybeParseField()
 
     Token fieldName = m_reader.advanceToken();
 
+    if (m_reader.peekTokenType() == TokenType::LBracket)
+    {
+        UnownedStringSlice arraySuffix;
+
+        if (SLANG_FAILED(_maybeParseArrayTypeSuffix(arraySuffix)))
+        {
+            _consumeToSync();
+            return m_sink->errorCount ? SLANG_FAIL : SLANG_OK;
+        }
+        // The overall type is the typename concatted with the arraySuffix
+        StringBuilder buf;
+        buf << typeName << arraySuffix;
+
+        typeName = m_typePool->getSlice( m_typePool->add(buf));
+    }
+
     switch (m_reader.peekTokenType())
     {
         case TokenType::OpAssign:
@@ -1364,7 +1428,6 @@ SlangResult CPPExtractor::_maybeParseField()
             field.name = fieldName;
 
             m_currentNode->m_fields.add(field);
-
             break;
         }
         default: break;
