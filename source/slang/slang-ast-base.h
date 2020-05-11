@@ -26,8 +26,9 @@ struct ReflectClassInfo;
 class NodeBase : public RefObject
 {
     SLANG_ABSTRACT_CLASS(NodeBase)
-   
+
     SyntaxClass<NodeBase> getClass() { return SyntaxClass<NodeBase>(&getClassInfo()); }
+    ASTNodeType m_astType;
 };
 
 // Casting of NodeBase
@@ -35,25 +36,25 @@ class NodeBase : public RefObject
 template<typename T>
 SLANG_FORCE_INLINE T* dynamicCast(NodeBase* node)
 {
-    return (node && node->getClassInfo().isSubClassOf(T::kReflectClassInfo)) ? static_cast<T*>(node) : nullptr;
+    return (node && ReflectClassInfo::isSubClassOf(node->m_astType, T::kReflectClassInfo)) ? static_cast<T*>(node) : nullptr;
 }
 
 template<typename T>
 SLANG_FORCE_INLINE const T* dynamicCast(const NodeBase* node)
 {
-    return (node && node->getClassInfo().isSubClassOf(T::kReflectClassInfo)) ? static_cast<const T*>(node) : nullptr;
+    return (node && ReflectClassInfo::isSubClassOf(node->m_astType, T::kReflectClassInfo)) ? static_cast<const T*>(node) : nullptr;
 }
 
 template<typename T>
 SLANG_FORCE_INLINE T* as(NodeBase* node)
 {
-    return (node && node->getClassInfo().isSubClassOf(T::kReflectClassInfo)) ? static_cast<T*>(node) : nullptr;
+    return (node && ReflectClassInfo::isSubClassOf(node->m_astType, T::kReflectClassInfo)) ? static_cast<T*>(node) : nullptr;
 }
 
 template<typename T>
 SLANG_FORCE_INLINE const T* as(const NodeBase* node)
 {
-    return (node && node->getClassInfo().isSubClassOf(T::kReflectClassInfo)) ? static_cast<const T*>(node) : nullptr;
+    return (node && ReflectClassInfo::isSubClassOf(node->m_astType, T::kReflectClassInfo)) ? static_cast<const T*>(node) : nullptr;
 }
 
 
@@ -170,7 +171,34 @@ class Substitutions: public RefObject
     // Check if these are equivalent substitutions to another set
     virtual bool Equals(Substitutions* subst) = 0;
     virtual int GetHashCode() const = 0;
+
+    ASTNodeType m_astType;
 };
+
+
+template<typename T>
+SLANG_FORCE_INLINE T* dynamicCast(Substitutions* node)
+{
+    return (node && ReflectClassInfo::isSubClassOf(node->m_astType, T::kReflectClassInfo)) ? static_cast<T*>(node) : nullptr;
+}
+
+template<typename T>
+SLANG_FORCE_INLINE const T* dynamicCast(const Substitutions* node)
+{
+    return (node && ReflectClassInfo::isSubClassOf(node->m_astType, T::kReflectClassInfo)) ? static_cast<const T*>(node) : nullptr;
+}
+
+template<typename T>
+SLANG_FORCE_INLINE T* as(Substitutions* node)
+{
+    return (node && ReflectClassInfo::isSubClassOf(node->m_astType, T::kReflectClassInfo)) ? static_cast<T*>(node) : nullptr;
+}
+
+template<typename T>
+SLANG_FORCE_INLINE const T* as(const Substitutions* node)
+{
+    return (node && ReflectClassInfo::isSubClassOf(node->m_astType, T::kReflectClassInfo)) ? static_cast<const T*>(node) : nullptr;
+}
 
 class GenericSubstitution : public Substitutions
 {

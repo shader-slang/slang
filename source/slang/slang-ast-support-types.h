@@ -491,6 +491,13 @@ namespace Slang
             // We include super.m_classId, because it's a subclass of itself.
             return m_classId >= super.m_classId && m_classId <= super.m_lastClassId;
         }
+
+        SLANG_FORCE_INLINE static bool isSubClassOf(ASTNodeType type, const ThisType& super)
+        {
+            // We include super.m_classId, because it's a subclass of itself.
+            return uint32_t(type) >= super.m_classId && uint32_t(type) <= super.m_lastClassId;
+        }
+
         /// Will produce the same result as isSubClassOf, but more slowly by traversing the m_superClass
         /// Works without initRange being called. 
         bool isSubClassOfSlow(const ThisType& super) const;

@@ -14,7 +14,7 @@
     typedef SUPER Super; \
     SLANG_FORCE_INLINE static bool isDerivedFrom(ASTNodeType type) { return int(type) >= int(kType) && int(type) <= int(ASTNodeType::LAST); } \
     virtual const ReflectClassInfo& getClassInfo() const SLANG_AST_OVERRIDE_##TYPE { return kReflectClassInfo; } \
-
+    SLANG_FORCE_INLINE NAME() { m_astType = ASTNodeType::NAME; }
 
 #define SLANG_CLASS_REFLECT_DEFAULT(NAME) \
     public:     \

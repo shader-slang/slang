@@ -68,12 +68,12 @@ class DeclRefType : public Type
         Session*        session,
         DeclRef<Decl>   declRef);
 
-    DeclRefType()
-    {}
     DeclRefType(
         DeclRef<Decl> declRef)
         : declRef(declRef)
-    {}
+    {
+        m_astType = kType;
+    }
 protected:
     virtual int GetHashCode() override;
     virtual bool EqualsImpl(Type * type) override;
@@ -93,14 +93,14 @@ class BasicExpressionType : public ArithmeticExpressionType
 {
     SLANG_CLASS(BasicExpressionType)
 
-
     BaseType baseType;
 
-    BasicExpressionType() {}
     BasicExpressionType(
         Slang::BaseType baseType)
         : baseType(baseType)
-    {}
+    {
+        m_astType = kType;
+    }
 protected:
     virtual BasicExpressionType* GetScalarType() override;
     virtual bool EqualsImpl(Type * type) override;
@@ -142,14 +142,13 @@ class TextureTypeBase : public ResourceType
 {
     SLANG_ABSTRACT_CLASS(TextureTypeBase)
 
-    TextureTypeBase()
-    {}
     TextureTypeBase(
         TextureFlavor flavor,
         RefPtr<Type> elementType)
     {
         this->elementType = elementType;
         this->flavor = flavor;
+        m_astType = kType;
     }
 };
 
@@ -157,13 +156,13 @@ class TextureType : public TextureTypeBase
 {
     SLANG_CLASS(TextureType)
 
-    TextureType()
-    {}
     TextureType(
         TextureFlavor flavor,
         RefPtr<Type> elementType)
         : TextureTypeBase(flavor, elementType)
-    {}
+    {
+        m_astType = kType;
+    }
 };
 
 // This is a base type for texture/sampler pairs,
@@ -172,13 +171,13 @@ class TextureSamplerType : public TextureTypeBase
 {
     SLANG_CLASS(TextureSamplerType)
 
-    TextureSamplerType()
-    {}
     TextureSamplerType(
         TextureFlavor flavor,
         RefPtr<Type> elementType)
         : TextureTypeBase(flavor, elementType)
-    {}
+    {
+        m_astType = kType;
+    }
 };
 
 // This is a base type for `image*` types, as they exist in GLSL
@@ -186,13 +185,13 @@ class GLSLImageType : public TextureTypeBase
 {
     SLANG_CLASS(GLSLImageType)
 
-    GLSLImageType()
-    {}
     GLSLImageType(
         TextureFlavor flavor,
         RefPtr<Type> elementType)
         : TextureTypeBase(flavor, elementType)
-    {}
+    {
+        m_astType = kType;
+    }
 };
 
 class SamplerStateType : public BuiltinType 
@@ -416,11 +415,11 @@ class TypeType : public Type
     RefPtr<Type> type;
 
 public:
-    TypeType()
-    {}
     TypeType(RefPtr<Type> type)
         : type(type)
-    {}
+    {
+        m_astType = kType;
+    }
 
     virtual String ToString() override;
 
@@ -532,12 +531,13 @@ class NamedExpressionType : public Type
     DeclRef<TypeDefDecl> declRef;
 
     RefPtr<Type> innerType;
-    NamedExpressionType()
-    {}
+    
     NamedExpressionType(
         DeclRef<TypeDefDecl> declRef)
         : declRef(declRef)
-    {}
+    {
+        m_astType = kType;
+    }
 
     virtual String ToString() override;
 
@@ -562,9 +562,6 @@ class FuncType : public Type
     List<RefPtr<Type>> paramTypes;
     RefPtr<Type> resultType;
 
-    FuncType()
-    {}
-
     UInt getParamCount() { return paramTypes.getCount(); }
     Type* getParamType(UInt index) { return paramTypes[index]; }
     Type* getResultType() { return resultType; }
@@ -584,12 +581,12 @@ class GenericDeclRefType : public Type
 
     DeclRef<GenericDecl> declRef;
 
-    GenericDeclRefType()
-    {}
     GenericDeclRefType(
         DeclRef<GenericDecl> declRef)
         : declRef(declRef)
-    {}
+    {
+        m_astType = kType;
+    }
 
     DeclRef<GenericDecl> const& GetDeclRef() const { return declRef; }
 
@@ -607,9 +604,6 @@ class NamespaceType : public Type
     SLANG_CLASS(NamespaceType)
 
     DeclRef<NamespaceDeclBase> m_declRef;
-
-    NamespaceType()
-    {}
 
     DeclRef<NamespaceDeclBase> const& getDeclRef() const { return m_declRef; }
 

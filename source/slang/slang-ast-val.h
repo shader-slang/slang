@@ -24,11 +24,11 @@ class ConstantIntVal : public IntVal
 
     IntegerLiteralValue value;
 
-    ConstantIntVal()
-    {}
     ConstantIntVal(IntegerLiteralValue value)
         : value(value)
-    {}
+    {
+        m_astType = kType;
+    }
 
     virtual bool EqualsVal(Val* val) override;
     virtual String ToString() override;
@@ -42,11 +42,11 @@ class GenericParamIntVal : public IntVal
 
     DeclRef<VarDeclBase> declRef;
 
-    GenericParamIntVal()
-    {}
     GenericParamIntVal(DeclRef<VarDeclBase> declRef)
         : declRef(declRef)
-    {}
+    {
+        m_astType = kType;
+    }
 
     virtual bool EqualsVal(Val* val) override;
     virtual String ToString() override;
@@ -62,9 +62,6 @@ class ErrorIntVal : public IntVal
     // TODO: We should probably eventually just have an `ErrorVal` here
     // and have all `Val`s that represent ordinary values hold their
     // `Type` so that we can have an `ErrorVal` of any type.
-
-    ErrorIntVal()
-    {}
 
     virtual bool EqualsVal(Val* val) override;
     virtual String ToString() override;
@@ -126,7 +123,6 @@ class SubtypeWitness : public Witness
 class TypeEqualityWitness : public SubtypeWitness 
 {
     SLANG_CLASS(TypeEqualityWitness)
-
 
     virtual bool EqualsVal(Val* val) override;
     virtual String ToString() override;
