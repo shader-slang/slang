@@ -1325,14 +1325,15 @@ matrix<double, N, M> fma(matrix<double, N, M> a, matrix<double, N, M> b, matrix<
 // Floating point remainder of x/y
 __generic<T : __BuiltinFloatingPointType>
 __target_intrinsic(hlsl)
-__target_intrinsic(glsl)
 __target_intrinsic(cuda, "$P_fmod($0, $1)")
 __target_intrinsic(cpp, "$P_fmod($0, $1)")
-T fmod(T x, T y);
+T fmod(T x, T y)
+{
+    return x - y * trunc(x/y);
+}
 
 __generic<T : __BuiltinFloatingPointType, let N : int>
 __target_intrinsic(hlsl)
-__target_intrinsic(glsl)
 vector<T, N> fmod(vector<T, N> x, vector<T, N> y)
 {
     VECTOR_MAP_BINARY(T, N, fmod, x, y);
