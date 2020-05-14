@@ -6,9 +6,6 @@
 
 namespace Slang { 
 
-#define SLANG_ABSTRACT_CLASS(x) SLANG_ABSTRACT_CLASS_REFLECT(x)
-#define SLANG_CLASS(x) SLANG_CLASS_REFLECT_WITH_ACCEPT(x)
-
 // Syntax class definitions for modifiers.
 
 // Simple modifiers have no state beyond their identity
@@ -875,9 +872,5 @@ class UnsafeForceInlineEarlyAttribute : public Attribute
 {
     SLANG_CLASS(UnsafeForceInlineEarlyAttribute)
 };
-
-
-#undef SLANG_ABSTRACT_CLASS
-#undef SLANG_CLASS
 
 } // namespace Slang
