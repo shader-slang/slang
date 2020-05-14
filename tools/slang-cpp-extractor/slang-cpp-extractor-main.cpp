@@ -1959,7 +1959,7 @@ SlangResult CPPExtractorApp::calcChildrenHeader(CPPExtractor& extractor, StringB
             for (Node* node : nodes)
             {
                 // Define the derived types
-                out << "#define " << m_options.m_prefixMark << "FIELDS_" << reflectTypeName << "_" << node->m_name.Content << "(x, param)";
+                out << "#define " << m_options.m_prefixMark << "FIELDS_" << reflectTypeName << "_" << node->m_name.Content << "(_x_, _param_)";
 
                 if (node->m_fields.getCount() > 0)
                 {
@@ -1970,7 +1970,7 @@ SlangResult CPPExtractorApp::calcChildrenHeader(CPPExtractor& extractor, StringB
                     {
                         const auto& field = node->m_fields[j];
                         _indent(1, out);
-                        out << "x(" << field.name.Content << ", " << field.type << ", param)";
+                        out << "_x_(" << field.name.Content << ", " << field.type << ", _param_)";
 
                         if (j < fieldsCount - 1)
                         {
