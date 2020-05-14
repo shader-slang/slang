@@ -19,7 +19,7 @@
 #endif
 
 DIAGNOSTIC(-1, Note, seeDeclarationOf, "see declaration of '$0'")
-DIAGNOSTIC(-1, Note, seeOpenBrace, "see open brace")
+DIAGNOSTIC(-1, Note, seeOpen, "see open $0")
 
 DIAGNOSTIC(1, Error, cannotOpenFile, "cannot open file '$0'.")
 
@@ -33,6 +33,8 @@ DIAGNOSTIC(100005, Error, braceOpenAtEndOfFile, "Brace open at file end")
 DIAGNOSTIC(100006, Error, unexpectedTemplateClose, "Unexpected template close")
 DIAGNOSTIC(100007, Error, superTypeNotFound, "Super type not found for $0")
 DIAGNOSTIC(100008, Error, superTypeNotAType, "Named super type is not a type $0")
+DIAGNOSTIC(100009, Error, unexpectedUnbalancedToken, "Unexpected unbalanced token")
+DIAGNOSTIC(100010, Error, unexpectedEndOfFile, "Unexpected end of file")
 
 // Command line errors 100100
 

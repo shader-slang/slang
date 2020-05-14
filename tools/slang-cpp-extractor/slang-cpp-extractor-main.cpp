@@ -332,7 +332,8 @@ protected:
     SlangResult _maybeParseTemplateArgs(Index& ioTemplateDepth);
     SlangResult _maybeParseTemplateArg(Index& ioTemplateDepth);
 
-    SlangResult _maybeParseArrayTypeSuffix(UnownedStringSlice& outSuffix);
+        /// Parse balanced - if a sink is set will report to that sink
+    SlangResult _parseBalanced(DiagnosticSink* sink);
 
     SlangResult _calcDerivedTypesRec(Node* node);
     static String _calcMacroOrigin(const String& filePath, const Options& options);
@@ -950,7 +951,7 @@ SlangResult CPPExtractor::consumeToClosingBrace(const Token* inOpenBraceToken)
             case TokenType::EndOfFile:
             {
                 m_sink->diagnose(m_reader.peekLoc(), CPPDiagnostics::didntFindMatchingBrace);
-                m_sink->diagnose(openToken, CPPDiagnostics::seeOpenBrace);
+                m_sink->diagnose(openToken, CPPDiagnostics::seeOpen);
                 return SLANG_FAIL;
             }
             case TokenType::LBrace:
@@ -1336,46 +1337,91 @@ SlangResult CPPExtractor::_maybeParseType(UnownedStringSlice& outType)
     return SLANG_OK;
 }
 
-SlangResult CPPExtractor::_maybeParseArrayTypeSuffix(UnownedStringSlice& outSuffix)
+static bool _isBalancedOpen(TokenType tokenType)
 {
-    auto startCursor = m_reader.getCursor();
+    return tokenType == TokenType::LBrace ||
+        tokenType == TokenType::LParent ||
+        tokenType == TokenType::LBracket;
+}
+
+static bool _isBalancedClose(TokenType tokenType)
+{
+    return tokenType == TokenType::RBrace ||
+        tokenType == TokenType::RParent ||
+        tokenType == TokenType::RBracket;
+}
+
+static TokenType _getBalancedClose(TokenType tokenType)
+{
+    SLANG_ASSERT(_isBalancedOpen(tokenType));
+    switch (tokenType)
+    {
+        case TokenType::LBrace:         return TokenType::RBrace;
+        case TokenType::LParent:        return TokenType::RParent;
+        case TokenType::LBracket:       return TokenType::RBracket;
+        default:                        return TokenType::Unknown;
+    }
+}
+
+SlangResult CPPExtractor::_parseBalanced(DiagnosticSink* sink)
+{
+    const TokenType openTokenType = m_reader.peekTokenType();
+    if (!_isBalancedOpen(openTokenType))
+    {
+        return SLANG_FAIL;
+    }
+
+    // Save the start token
+    const Token startToken = m_reader.advanceToken();
+    // Get the token type that would close the open
+    const TokenType closeTokenType = _getBalancedClose(openTokenType);
 
     while (true)
     {
-        SLANG_RETURN_ON_FAIL(expect(TokenType::LBracket));
+        const TokenType tokenType = m_reader.peekTokenType();
 
-        while (true)
+        // If we hit the closing token, we are done
+        if (tokenType == closeTokenType)
         {
-            TokenType tokenType = m_reader.peekTokenType();
-            if (tokenType == TokenType::RBracket)
-            {
-                break;
-            }
-
-            if (tokenType == TokenType::EndOfFile ||
-                tokenType == TokenType::LBrace ||
-                tokenType == TokenType::RBrace ||
-                tokenType == TokenType::LBracket)
-            {
-                return SLANG_FAIL;
-            }
-
-            // Okay onto next
             m_reader.advanceToken();
+            return SLANG_OK;
         }
 
-        SLANG_RETURN_ON_FAIL(expect(TokenType::RBracket));
-
-        if (m_reader.peekTokenType() == TokenType::RBracket)
+        // If we hit a balanced open, recurse 
+        if (_isBalancedOpen(tokenType))
         {
+            SLANG_RETURN_ON_FAIL(_parseBalanced(sink));
             continue;
         }
 
-        break;
-    }
+        // If we hit a close token that doesn't match, then the balancing has gone wrong
+        if (_isBalancedClose(tokenType))
+        {
+            // Only diagnose if required
+            if (sink)
+            {
+                sink->diagnose(m_reader.peekLoc(), CPPDiagnostics::unexpectedUnbalancedToken);
+                sink->diagnose(startToken, CPPDiagnostics::seeOpen);
+            }
+            return SLANG_FAIL;
+        }
 
-    outSuffix = _concatTokens(startCursor);
-    return SLANG_OK;
+        // If we hit the end of the file and have not hit the closing token, then
+        // somethings gone wrong
+        if (tokenType == TokenType::EndOfFile)
+        {
+            if (sink)
+            {
+                sink->diagnose(m_reader.peekLoc(), CPPDiagnostics::unexpectedEndOfFile);
+                sink->diagnose(startToken, CPPDiagnostics::seeOpen);
+            }
+
+            return SLANG_FAIL;
+        }
+
+        // Skip the token
+        m_reader.advanceToken();
+    }
 }
 
 SlangResult CPPExtractor::_maybeParseField()
@@ -1404,14 +1450,18 @@ SlangResult CPPExtractor::_maybeParseField()
 
     if (m_reader.peekTokenType() == TokenType::LBracket)
     {
-        UnownedStringSlice arraySuffix;
+        auto startCursor = m_reader.getCursor();
 
-        if (SLANG_FAILED(_maybeParseArrayTypeSuffix(arraySuffix)))
+        // If it's not balanced we just assume it's not correct - and ignore
+        if (SLANG_FAILED(_parseBalanced(nullptr)))
         {
             _consumeToSync();
-            return m_sink->errorCount ? SLANG_FAIL : SLANG_OK;
+            return SLANG_OK;
         }
-        // The overall type is the typename concatted with the arraySuffix
+
+        UnownedStringSlice arraySuffix = _concatTokens(startCursor);
+
+        // The overall type is the typename concated with the arraySuffix
         StringBuilder buf;
         buf << typeName << arraySuffix;
 
