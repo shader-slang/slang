@@ -7,8 +7,13 @@
 namespace Slang
 {
 
+struct ASTDumpAccess;
+
 struct ASTDumpUtil
 {
+    template <typename T>
+    SLANG_FORCE_INLINE static T& getMember(T& in) { return in; }
+
     static void dump(NodeBase* node, StringBuilder& out);
     static void dump(Substitutions* subs, StringBuilder& out);
 };

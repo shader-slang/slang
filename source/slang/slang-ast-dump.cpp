@@ -24,7 +24,7 @@ struct Context
     };
 
 
-    void dumpContents(const ReflectClassInfo& type, RefObject* obj);
+    void dumpObject(const ReflectClassInfo& type, RefObject* obj);
 
     void dump(NodeBase* node)
     {
@@ -76,7 +76,7 @@ struct Context
         else
         {
             // Recurse to it's fields
-            dumpContents(type, obj);
+            dumpObject(type, obj);
         }
     }
 
@@ -98,7 +98,7 @@ struct Context
             }
         }
         dedent();
-        m_builder << "}"
+        m_builder << "}";
     }
 
     void dump(SourceLoc sourceLoc)
@@ -157,6 +157,22 @@ struct Context
     {
         m_builder << v;
     }
+
+    void dump(Index v)
+    {
+        m_builder << v;
+    }
+
+    void dump(int32_t v)
+    {
+        m_builder << v;
+    }
+    void dump(FloatingPointLiteralValue v)
+    {
+        m_builder << v;
+    }
+
+
     void dump(const SemanticVersion& version)
     {
         m_builder << UInt(version.m_major) << "." << UInt(version.m_minor) << "." << UInt(version.m_patch);
@@ -246,14 +262,28 @@ struct Context
         }
 
         dedent();
-        m_builder << "}"
-
+        m_builder << "}";
     }
 
     void dump(const DeclCheckStateExt& extState)
     {
         auto state = extState.getState();
         m_builder << "DeclCheckStateExt{" << extState.isBeingChecked() << ", " << Index(state) << "}";
+    }
+
+    void dump(TextureFlavor texFlavor)
+    {
+        m_builder << "TextureFlavor{" << Index(texFlavor.flavor) << "}";
+    }
+
+    void dump(SamplerStateFlavor flavor)
+    {
+        switch (flavor)
+        {
+            case SamplerStateFlavor::SamplerState: m_builder << "sampler"; break;
+            case SamplerStateFlavor::SamplerComparisonState: m_builder << "samplerComparison"; break;
+            default: m_builder << "unknown"; break;
+        }
     }
 
     void dumpPtr(const void* ptr)
@@ -286,7 +316,42 @@ struct Context
         }
 
         dedent();
-        m_builder << "}"
+        m_builder << "}";
+    }
+    void dump(const GlobalGenericParamSubstitution::ConstraintArg& arg)
+    {
+        m_builder << " { \n";
+        indent();
+
+        dump(arg.decl);
+        m_builder << ",\n";
+        dump(arg.val);
+        m_builder << "\n";
+
+        dedent();
+        m_builder << "}";
+    }
+    void dump(const TypeExp& exp)
+    {
+        m_builder << " { \n";
+        indent();
+
+        dump(exp.exp);
+        m_builder << ",\n";
+        dump(exp.type);
+        m_builder << "\n";
+
+        dedent();
+        m_builder << "}";
+    }
+    void dump(const ExpandedSpecializationArg& arg)
+    {
+        dump(arg.witness);
+    }
+
+    void dump(const TransparentMemberInfo& memInfo)
+    {
+        dump(memInfo.decl);
     }
 
     void dumpFieldName(const char* name)
@@ -319,10 +384,12 @@ struct Context
 // Lets generate functions one for each that attempts to write out *it's* fields.
 // We can write out the Super types fields by looking that up
 
-#define SLANG_AST_DUMP_FIELD(FIELD_NAME, TYPE, param) context.dumpFieldName(#FIELD_NAME); context.dump(node->FIELD_NAME);
+struct ASTDumpAccess
+{
+#define SLANG_AST_DUMP_FIELD(FIELD_NAME, TYPE, param) context.dumpFieldName(#FIELD_NAME); context.dump(ASTDumpUtil::getMember(node->FIELD_NAME));
 
 #define SLANG_AST_DUMP_FIELDS_IMPL(NAME, SUPER, ORIGIN, LAST, MARKER, TYPE, param) \
-static void _dumpFields(NAME* node, Context& context) \
+static void dumpFields_##NAME(NAME* node, Context& context) \
 { \
     SLANG_UNUSED(node); \
     SLANG_UNUSED(context); \
@@ -332,6 +399,10 @@ static void _dumpFields(NAME* node, Context& context) \
 SLANG_ALL_ASTNode_Substitutions(SLANG_AST_DUMP_FIELDS_IMPL, _)
 SLANG_ALL_ASTNode_NodeBase(SLANG_AST_DUMP_FIELDS_IMPL, _)
 
+};
+
+#define SLANG_AST_GET_DUMP_FUNC(NAME, SUPER, ORIGIN, LAST, MARKER, TYPE, param) m_funcs[Index(ASTNodeType::NAME)] = (DumpFieldsFunc)&ASTDumpAccess::dumpFields_##NAME;
+
 typedef void (*DumpFieldsFunc)(RefObject* obj, Context& context);
 
 struct DumpFieldFuncs
@@ -339,9 +410,8 @@ struct DumpFieldFuncs
     DumpFieldFuncs()
     {
         memset(m_funcs, 0, sizeof(m_funcs));
-
-
-
+        SLANG_ALL_ASTNode_Substitutions(SLANG_AST_GET_DUMP_FUNC, _)
+        SLANG_ALL_ASTNode_NodeBase(SLANG_AST_GET_DUMP_FUNC, _)
     }
 
     DumpFieldsFunc m_funcs[Index(ASTNodeType::CountOf)];
@@ -350,12 +420,47 @@ struct DumpFieldFuncs
 static DumpFieldFuncs s_funcs;
 
 
-void Context::dump(NodeBase* node)
+void Context::dumpObject(const ReflectClassInfo& type, RefObject* obj)
 {
-}
+    Index index = getObjectIndex(obj);
 
-void Context::dump(Substitutions* subs)
-{
+    ObjectInfo& info = m_objects[index];
+    if (info.m_isDumped == true)
+    {
+        return;
+    }
+
+    // To stop cycles
+    info.m_isDumped = true;
+
+    // We need to dump the fields.
+
+    m_builder << type.m_name << "@" << index < " {\n";
+    indent();
+
+    List<const ReflectClassInfo*> allTypes;
+    {
+        const ReflectClassInfo* curType = &type;
+        do
+        {
+            allTypes.add(curType);
+            curType = curType->m_superClass;
+        }while (curType);
+    }
+
+    // Okay we go backwards so we output in the 'normal' order
+    for (Index i = allTypes.getCount() - 1; i >= 0; --i)
+    {
+        const ReflectClassInfo* curType = allTypes[i];
+        DumpFieldsFunc func = s_funcs.m_funcs[Index(curType->m_classId)];
+        if (func)
+        {
+            func(obj, *this);
+        }
+    }
+
+    dedent();
+    m_builder << "}\n";
 }
 
 /* static */void ASTDumpUtil::dump(NodeBase* node, StringBuilder& out)

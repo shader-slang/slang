@@ -122,6 +122,8 @@ class Type: public Val
 {
     SLANG_ABSTRACT_CLASS(Type)
 
+    friend struct ASTDumpAccess;
+
     typedef ITypeVisitor Visitor;
 
     virtual void accept(IValVisitor* visitor, void* extra) override;
