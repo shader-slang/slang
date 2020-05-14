@@ -649,6 +649,8 @@ struct Options
     bool m_defs = false;            ///< If set will output a '-defs.h' file for each of the input files, that corresponds to previous defs files (although doesn't have fields/RAW)
     bool m_dump = false;            ///< If true will dump to stderr the types/fields and hierarchy it extracted
 
+    bool m_outputFields = false;     ///< When dumping macros also dump field definitions
+
     List<String> m_inputPaths;      ///< The input paths to the files to be processed
         
     String m_outputPath;            ///< The ouput path. Note that the extractor can generate multiple output files, and this will actually be the 'stem' of several files
@@ -764,7 +766,12 @@ SlangResult OptionsParser::parse(int argc, const char*const* argv, DiagnosticSin
             else if (arg == "-defs")
             {
                 outOptions.m_defs = true;
-                continue;
+                continue; 
+            }
+            else if (arg == "-output-fields")
+            {
+                outOptions.m_outputFields = true;
+                break;
             }
             else if (arg == "-strip-prefix")
             {
@@ -1876,8 +1883,6 @@ SlangResult CPPExtractorApp::calcDef(CPPExtractor& extractor, SourceOrigin* orig
     return SLANG_OK;
 }
 
-
-
 SlangResult CPPExtractorApp::calcChildrenHeader(CPPExtractor& extractor, StringBuilder& out)
 {
     const List<Node*>& baseTypes = extractor.getBaseTypes();
@@ -1946,6 +1951,37 @@ SlangResult CPPExtractorApp::calcChildrenHeader(CPPExtractor& extractor, StringB
             }
             out << "\n\n";
         }
+
+        if (m_options.m_outputFields)
+        {
+            out << "\n\n /* !!!!!!!!!!!!!!!!!!!!!!!!!!!!! FIELDS !!!!!!!!!!!!!!!!!!!!!!!!!!!! */\n\n";
+
+            for (Node* node : nodes)
+            {
+                // Define the derived types
+                out << "#define " << m_options.m_prefixMark << "FIELDS_" << reflectTypeName << "_" << node->m_name.Content << "(x, param)";
+
+                if (node->m_fields.getCount() > 0)
+                {
+                    out << "\\\n";
+
+                    const Index fieldsCount = node->m_fields.getCount();
+                    for (Index j = 0; j < fieldsCount; ++j)
+                    {
+                        const auto& field = node->m_fields[j];
+                        _indent(1, out);
+                        out << "x(" << field.name.Content << ", " << field.type << ", param)";
+
+                        if (j < fieldsCount - 1)
+                        {
+                            out << "\\\n";
+                        }
+                    }
+                }
+                
+                out << "\n\n";
+            }
+        }
     }
 
     return SLANG_OK;
@@ -2008,33 +2044,6 @@ SlangResult CPPExtractorApp::calcHeader(CPPExtractor& extractor, StringBuilder& 
             out << "};\n\n";
         }
 
-#if 0
-        out << "\n";
-        out << "enum class " << reflectTypeName << "Last\n";
-        out << "{\n";
-
-        for (Node* node : nodes)
-        {
-            SLANG_ASSERT(node->isClassLike());
-            // If it's not reflected we don't output, in the enum list
-            if (!node->m_isReflected)
-            {
-                continue;
-            }
-
-            Node* lastDerived = node->findLastDerived();
-            if (lastDerived)
-            {
-                // Okay first we are going to output the enum values
-                const Index depth = node->calcDerivedDepth() - 1;
-                _indent(depth, out);
-                out << node->m_name.Content << " = int(" << reflectTypeName << "Type::" << lastDerived->m_name.Content << "),\n";
-            }
-        }
-
-        out << "};\n\n";
-#endif
-
         // Predeclare the classes
         {
             out << "// Predeclare\n\n";
@@ -2049,24 +2058,6 @@ SlangResult CPPExtractorApp::calcHeader(CPPExtractor& extractor, StringBuilder& 
                 }
             }
         }
-
-#if 0
-        out << "struct " << reflectTypeName << "Super\n";
-        out << "{\n";
-
-        for (Node* node : nodes)
-        {
-            // If it's not reflected we don't output, in the enum list
-            if (node->m_isReflected && node->m_superNode)
-            {
-                _indent(1, out);
-                // We concat _Super so the typedef are distinct from the ones being referenced
-                out << "typedef " << node->m_superNode->m_name.Content << " " << node->m_name.Content << "_Super;\n";
-            }
-        }
-
-        out << "};\n";
-#endif
 
         // Do the macros for each of the types
 
@@ -2260,7 +2251,6 @@ SlangResult CPPExtractorApp::execute(const Options& options)
 {
     m_options = options;
 
-    
     CPPExtractor extractor(&m_slicePool, &m_namePool, m_sink, &m_identifierLookup);
 
     // Read in each of the input files
