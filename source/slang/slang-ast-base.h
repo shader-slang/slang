@@ -14,10 +14,6 @@
 namespace Slang
 {
 
-#define SLANG_ABSTRACT_CLASS(x) SLANG_ABSTRACT_CLASS_REFLECT(x)
-// We don't use SLANG_CLASS_REFLECT_WITH_ACCEPT(x), as we don't want accept method on these classes 
-#define SLANG_CLASS(x) SLANG_CLASS_REFLECT_DEFAULT(x)
-
 // Signals to C++ extractor that RefObject is a base class, that isn't reflected to C++ extractor
 SLANG_REFLECT_BASE_CLASS(RefObject)
 
@@ -364,9 +360,5 @@ class Stmt : public ModifiableSyntaxNode
 
     virtual void accept(IStmtVisitor* visitor, void* extra) = 0;
 };
-
-#undef SLANG_ABSTRACT_CLASS
-#undef SLANG_CLASS
-
 
 } // namespace Slang

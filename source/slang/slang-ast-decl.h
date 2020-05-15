@@ -6,9 +6,6 @@
 
 namespace Slang {
 
-#define SLANG_ABSTRACT_CLASS(x) SLANG_ABSTRACT_CLASS_REFLECT(x)
-#define SLANG_CLASS(x) SLANG_CLASS_REFLECT_WITH_ACCEPT(x)
-
 // Syntax class definitions for declarations.
 
 // A group of declarations that should be treated as a unit
@@ -459,8 +456,5 @@ class AttributeDecl : public ContainerDecl
     // What type of syntax node will be produced to represent this attribute.
     SyntaxClass<RefObject> syntaxClass;
 };
-
-#undef SLANG_ABSTRACT_CLASS
-#undef SLANG_CLASS
 
 } // namespace Slang

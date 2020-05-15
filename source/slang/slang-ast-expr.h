@@ -6,9 +6,6 @@
 
 namespace Slang {
 
-#define SLANG_ABSTRACT_CLASS(x) SLANG_ABSTRACT_CLASS_REFLECT(x)
-#define SLANG_CLASS(x) SLANG_CLASS_REFLECT_WITH_ACCEPT(x)
-
 // Syntax class definitions for expressions.
 
 // Base class for expressions that will reference declarations
@@ -304,8 +301,5 @@ class ThisTypeExpr: public Expr
     SLANG_CLASS(ThisTypeExpr)
     RefPtr<Scope> scope;
 };
-
-#undef SLANG_ABSTRACT_CLASS
-#undef SLANG_CLASS
 
 } // namespace Slang
