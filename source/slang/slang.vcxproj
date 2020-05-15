@@ -192,6 +192,7 @@
     <ClInclude Include="slang-ast-all.h" />
     <ClInclude Include="slang-ast-base.h" />
     <ClInclude Include="slang-ast-decl.h" />
+    <ClInclude Include="slang-ast-dump.h" />
     <ClInclude Include="slang-ast-expr.h" />
     <ClInclude Include="slang-ast-generated-macro.h" />
     <ClInclude Include="slang-ast-generated.h" />
@@ -271,6 +272,7 @@
     <ClInclude Include="slang-visitor.h" />
   </ItemGroup>
   <ItemGroup>
+    <ClCompile Include="slang-ast-dump.cpp" />
     <ClCompile Include="slang-ast-reflect.cpp" />
     <ClCompile Include="slang-check-conformance.cpp" />
     <ClCompile Include="slang-check-constraint.cpp" />
