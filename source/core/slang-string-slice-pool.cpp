@@ -61,16 +61,23 @@ StringSlicePool::Handle StringSlicePool::add(const Slice& slice)
 
 bool StringSlicePool::findOrAdd(const Slice& slice, Handle& outHandle)
 {
-    Handle newHandle = Handle(m_slices.getCount());
-    const Handle* handlePtr = m_map.TryGetValueOrAdd(slice, newHandle);
+    const Handle* handlePtr = m_map.TryGetValue(slice);
     if (handlePtr)
     {
         outHandle = *handlePtr;
         return true;
     }
 
-    // Need to add
+    // Need to add.
+
+    // Make a copy stored in the arena
     UnownedStringSlice scopeSlice(m_arena.allocateString(slice.begin(), slice.getLength()), slice.getLength());
+
+    // Add using the arenas copy
+    Handle newHandle = Handle(m_slices.getCount());
+    m_map.Add(scopeSlice, newHandle);
+
+    // Add to slices list
     m_slices.add(scopeSlice);
     outHandle = newHandle;
     return false;
