@@ -4,6 +4,8 @@
 
 #include "slang-syntax.h"
 
+#include "slang-emit-source-writer.h"
+
 namespace Slang
 {
 
@@ -11,11 +13,14 @@ struct ASTDumpAccess;
 
 struct ASTDumpUtil
 {
-    template <typename T>
-    SLANG_FORCE_INLINE static T& getMember(T& in) { return in; }
+    enum class Style
+    {
+        Hierachical,
+        Flat,
+    };
 
-    static void dump(NodeBase* node, StringBuilder& out);
-    static void dump(Substitutions* subs, StringBuilder& out);
+    static void dump(NodeBase* node, Style style, SourceWriter* writer);
+    static void dump(Substitutions* subs, Style style, SourceWriter* writer);
 };
 
 } // namespace Slang

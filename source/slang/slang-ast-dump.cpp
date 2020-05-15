@@ -19,22 +19,52 @@ struct Context
 {
     struct ObjectInfo
     {
+        const ReflectClassInfo* m_typeInfo;
         RefObject* m_object;
         bool m_isDumped;
     };
 
+    struct ScopeWrite
+    {
+        ScopeWrite(Context* context):
+            m_context(context)
+        {
+            if (m_context->m_scopeWriteCount == 0)
+            {
+                m_context->m_buf.Clear();
+            }
+            m_context->m_scopeWriteCount++;
+        }
+
+        ~ScopeWrite()
+        {
+            if (--m_context->m_scopeWriteCount == 0)
+            {
+                m_context->m_writer->emit(m_context->m_buf);
+            }
+        }
+
+        StringBuilder& getBuf() { return m_context->m_buf; }
+
+        operator StringBuilder&() { return m_context->m_buf; }
+
+        Context* m_context;
+    };
 
     void dumpObject(const ReflectClassInfo& type, RefObject* obj);
+
+    void dumpObjectFull(const ReflectClassInfo& type, RefObject* obj, Index objIndex);
+    void dumpObjectReference(const ReflectClassInfo& type, RefObject* obj, Index objIndex);
 
     void dump(NodeBase* node)
     {
         if (node == nullptr)
         {
-            m_builder << "null";
+            dumpPtr(nullptr);
         }
         else
         {
-            dump(node->getClassInfo(), node);
+            dumpObject(node->getClassInfo(), node);
         }
     }
 
@@ -42,11 +72,23 @@ struct Context
     {
         if (subs == nullptr)
         {
-            m_builder << "null";
+            dumpPtr(nullptr);
         }
         else
         {
-            dump(subs->getClassInfo(), subs);
+            dumpObject(subs->getClassInfo(), subs);
+        }
+    }
+
+    void dump(const Name* name)
+    {
+        if (name == nullptr)
+        {
+            dumpPtr(nullptr);
+        }
+        else
+        {
+            dump(name->text);
         }
     }
 
@@ -54,56 +96,49 @@ struct Context
     {
         if (obj == nullptr)
         {
-            m_builder << "null";
+            dumpPtr(nullptr);
         }
         else
         {
             // We don't know what this is!
-            m_builder << "Unknown@";
-            m_builder << size_t(obj);
-        }
-    }
-
-    void dump(const ReflectClassInfo& type, RefObject* obj)
-    {
-        const Index index = getObjectIndex(obj);
-        const auto& info = m_objects[index];
-        if (info.m_isDumped)
-        {
-            // Dump the type
-            m_builder << type.m_name << "@" << index;
-        }
-        else
-        {
-            // Recurse to it's fields
-            dumpObject(type, obj);
+            ScopeWrite(this).getBuf() << "Unknown@" << size_t(obj);
         }
     }
 
     template <typename T>
     void dump(const List<T>& list)
     {
-        m_builder << " { \n";
-        indent();
+        m_writer->emit(" { \n");
+        m_writer->indent();
         for (Index i = 0; i < list.getCount(); ++i)
         {
             dump(list[i]);
             if (i < list.getCount() - 1)
             {
-                m_builder << ",\n";
+                m_writer->emit(",\n");
             }
             else
             {
-                m_builder << "\n";
+                m_writer->emit("\n");
             }
         }
-        dedent();
-        m_builder << "}";
+        m_writer->dedent();
+        m_writer->emit("}");
     }
 
     void dump(SourceLoc sourceLoc)
     {
-        m_builder << "SourceLoc(" << sourceLoc.getRaw() << ")";
+        SourceManager* manager = m_writer->getSourceManager();
+
+        {
+            ScopeWrite(this).getBuf() << "SourceLoc(" << sourceLoc.getRaw() << ")";
+        }
+
+        if (manager && sourceLoc.isValid())
+        {
+            HumaneSourceLoc humaneLoc = manager->getHumaneLoc(sourceLoc);
+            ScopeWrite(this).getBuf() << " " << humaneLoc.pathInfo.foundPath << ":" << humaneLoc.line;   
+        }
     }
 
     static const char _getHexDigit(UInt v)
@@ -113,31 +148,35 @@ struct Context
 
     void dump(const UnownedStringSlice& slice)
     {
-        m_builder << "\"";
+        m_writer->emitChar('\"');
 
-        for (const char c : slice)
         {
-            if (c < 0x20 || c >= 0x80)
+            ScopeWrite scope(this);
+            auto& buf = scope.getBuf();
+            for (const char c : slice)
             {
-                m_builder << "\\0x" <<  _getHexDigit(UInt32(c) >> 4) << _getHexDigit(c & 0xf);
-            }
-            else
-            {
-                m_builder << c;
+                if (c < 0x20 || c >= 0x80)
+                {
+                    buf << "\\0x" <<  _getHexDigit(UInt32(c) >> 4) << _getHexDigit(c & 0xf);
+                }
+                else
+                {
+                    buf << c;
+                }
             }
         }
-        m_builder << "\"";
+        m_writer->emitChar('\"');
     }
     
     void dump(const Token& token)
     {
-        m_builder << " { " << TokenTypeToString(token.type) << ", ";
+        ScopeWrite(this).getBuf() << " { " << TokenTypeToString(token.type) << ", ";
         dump(token.loc);
         dump(token.Content);
-        m_builder << " }";
+        m_writer->emit(" }");
     }
 
-    Index getObjectIndex(RefObject* obj)
+    Index getObjectIndex(const ReflectClassInfo& typeInfo, RefObject* obj)
     {
         Index* indexPtr = m_objectMap.TryGetValueOrAdd(obj, m_objects.getCount());
         if (indexPtr)
@@ -148,6 +187,7 @@ struct Context
         ObjectInfo info;
         info.m_isDumped = false;
         info.m_object = obj;
+        info.m_typeInfo = &typeInfo;
 
         m_objects.add(info);
         return m_objects.getCount() - 1;
@@ -155,54 +195,54 @@ struct Context
 
     void dump(uint32_t v)
     {
-        m_builder << v;
+        m_writer->emit(UInt(v));
     }
 
     void dump(Index v)
     {
-        m_builder << v;
+        m_writer->emit(v);
     }
 
     void dump(int32_t v)
     {
-        m_builder << v;
+        m_writer->emit(v);
     }
     void dump(FloatingPointLiteralValue v)
     {
-        m_builder << v;
+        m_writer->emit(v);
     }
 
 
     void dump(const SemanticVersion& version)
     {
-        m_builder << UInt(version.m_major) << "." << UInt(version.m_minor) << "." << UInt(version.m_patch);
+        ScopeWrite(this).getBuf() << UInt(version.m_major) << "." << UInt(version.m_minor) << "." << UInt(version.m_patch);
     }
     void dump(const NameLoc& nameLoc)
     {
-        m_builder << "NameLoc{";
+        m_writer->emit("NameLoc{");
         if (nameLoc.name)
         {
             dump(nameLoc.name->text.getUnownedSlice());
         }
         else
         {
-            m_builder << "null";
+            dumpPtr(nullptr);
         }
-        m_builder << ", ";
+        m_writer->emit(", ");
         dump(nameLoc.loc);
-        m_builder << " }";
+        m_writer->emit(" }");
     }
     void dump(BaseType baseType)
     {
-        m_builder << BaseTypeInfo::asText(baseType);
+        m_writer->emit(BaseTypeInfo::asText(baseType));
     }
     void dump(Stage stage)
     {
-        m_builder << getStageName(stage);
+        m_writer->emit(getStageName(stage));
     }
     void dump(ImageFormat imageFormat)
     {
-        m_builder << getGLSLNameForImageFormat(imageFormat);
+        m_writer->emit(getGLSLNameForImageFormat(imageFormat));
     }
 
     void dump(const String& string)
@@ -212,42 +252,41 @@ struct Context
 
     void dump(const DiagnosticInfo* info)
     {
-        m_builder << "DiagnosticInfo {" << info->id << "}";
+        ScopeWrite(this).getBuf() << "DiagnosticInfo {" << info->id << "}";
     }
     void dump(const Layout* layout)
     {
-        m_builder << "Layout@" << size_t(layout); 
+        ScopeWrite(this).getBuf() << "Layout@" << size_t(layout); 
     }
 
     void dump(const Modifiers& modifiers)
     {
         auto& nonConstModifiers = const_cast<Modifiers&>(modifiers);
 
-
-        m_builder << " { \n";
-        indent();
+        m_writer->emit(" { \n");
+        m_writer->indent();
 
         for (const auto& mod : nonConstModifiers)
         {
             dump(mod);
-            m_builder << " ,\n";
+            m_writer->emit("\n");
         }
 
-        dedent();
-        m_builder << "}";
+        m_writer->dedent();
+        m_writer->emit("}");
     }
 
     template <typename T>
     void dump(const SyntaxClass<T>& cls)
     {
-        m_builder << cls.classInfo->m_name;
+        m_writer->emit(cls.classInfo->m_name);
     }
 
     template <typename KEY, typename VALUE>
     void dump(const Dictionary<KEY, VALUE>& dict)
     {
-        m_builder << " { \n";
-        indent();
+        m_writer->emit(" { \n");
+        m_writer->indent();
 
         for (auto iter : dict)
         {
@@ -255,46 +294,62 @@ struct Context
             const auto& value = iter.Value;
 
             dump(key);
-            m_builder << " : ";
+            m_writer->emit(" : ");
             dump(value);
 
-            m_builder << "\n";
+            m_writer->emit("\n");
         }
 
-        dedent();
-        m_builder << "}";
+        m_writer->dedent();
+        m_writer->emit("}");
     }
 
     void dump(const DeclCheckStateExt& extState)
     {
         auto state = extState.getState();
-        m_builder << "DeclCheckStateExt{" << extState.isBeingChecked() << ", " << Index(state) << "}";
+      
+        ScopeWrite(this).getBuf() << "DeclCheckStateExt{" << extState.isBeingChecked() << ", " << Index(state) << "}";
     }
 
     void dump(TextureFlavor texFlavor)
     {
-        m_builder << "TextureFlavor{" << Index(texFlavor.flavor) << "}";
+        m_buf.Clear();
+        m_buf << "TextureFlavor{" << Index(texFlavor.flavor) << "}";
+        m_writer->emit(m_buf);
     }
 
     void dump(SamplerStateFlavor flavor)
     {
         switch (flavor)
         {
-            case SamplerStateFlavor::SamplerState: m_builder << "sampler"; break;
-            case SamplerStateFlavor::SamplerComparisonState: m_builder << "samplerComparison"; break;
-            default: m_builder << "unknown"; break;
+            case SamplerStateFlavor::SamplerState: m_writer->emit("sampler"); break;
+            case SamplerStateFlavor::SamplerComparisonState: m_writer->emit("samplerComparison"); break;
+            default: m_writer->emit("unknown"); break;
         }
+    }
+
+    void dump(const QualType& qualType)
+    {
+        if (qualType.IsLeftValue)
+        {
+            m_writer->emit("left ");
+        }
+        else
+        {
+            m_writer->emit("right ");
+        }
+        dump(qualType.type);
     }
 
     void dumpPtr(const void* ptr)
     {
         if (ptr)
         {
-            m_builder << size_t(ptr);
+            ScopeWrite(this).getBuf() << "Unknown@" << size_t(ptr);
         }
         else
         {
-            m_builder << "null";
+            m_writer->emit("null");
         }
     }
 
@@ -303,21 +358,21 @@ struct Context
     template <typename T, int SIZE>
     void dump(const T (&in)[SIZE])
     {
-        m_builder << " { \n";
-        indent();
+        m_writer->emit(" { \n");
+        m_writer->indent();
 
         for (Index i = 0; i < Index(SIZE); ++i)
         {
             dump(in[i]);
             if (i < Index(SIZE) - 1)
             {
-                m_builder << ",";
+                m_writer->emit(", ");
             }
-            m_builder << "\n";
+            m_writer->emit("\n");
         }
 
-        dedent();
-        m_builder << "}";
+        m_writer->dedent();
+        m_writer->emit("}");
     }
 
     //void dump(const void* ptr) { dumpPtr(ptr); }
@@ -326,43 +381,43 @@ struct Context
     {
         auto& nonConstResult = const_cast<LookupResult&>(result);
 
-        m_builder << " { \n";
-        indent();
+        m_writer->emit(" { \n");
+        m_writer->indent();
 
         for (auto item : nonConstResult)
         {
             // TODO(JS):
-            m_builder << "...\n";
+            m_writer->emit("...\n");
         }
 
-        dedent();
-        m_builder << "}";
+        m_writer->dedent();
+        m_writer->emit("}");
     }
     void dump(const GlobalGenericParamSubstitution::ConstraintArg& arg)
     {
-        m_builder << " { \n";
-        indent();
+        m_writer->emit(" { \n");
+        m_writer->indent();
 
         dump(arg.decl);
-        m_builder << ",\n";
+        m_writer->emit(",\n");
         dump(arg.val);
-        m_builder << "\n";
+        m_writer->emit("\n");
 
-        dedent();
-        m_builder << "}";
+        m_writer->dedent();
+        m_writer->emit("}");
     }
     void dump(const TypeExp& exp)
     {
-        m_builder << " { \n";
-        indent();
+        m_writer->emit(" { \n");
+        m_writer->indent();
 
         dump(exp.exp);
-        m_builder << ",\n";
+        m_writer->emit(",\n");
         dump(exp.type);
-        m_builder << "\n";
+        m_writer->emit("\n");
 
-        dedent();
-        m_builder << "}";
+        m_writer->dedent();
+        m_writer->emit("}");
     }
     void dump(const ExpandedSpecializationArg& arg)
     {
@@ -374,29 +429,48 @@ struct Context
         dump(memInfo.decl);
     }
 
-    void dumpFieldName(const char* name)
+    void dumpRemaining()
     {
-        _indent();
-        m_builder << name << " : ";
-    }
-
-    void indent() { m_indent++; }
-    void dedent() { m_indent--; }
-
-    void _indent()
-    {
-        for (Int i = 0; i < m_indent * m_indentCount; ++i)
+        // Have to keep checking count, as dumping objects can add objects
+        for (Index i = 0; i < m_objects.getCount(); ++i)
         {
-            m_builder << " ";
+            ObjectInfo& info = m_objects[i];
+            if (!info.m_isDumped)
+            {
+                dumpObjectFull(*info.m_typeInfo, info.m_object, i);
+            }
         }
     }
+
+    template <typename T>
+    void dumpField(const char* name, const T& value)
+    {
+        m_writer->emit(name);
+        m_writer->emit(" : ");
+        dump(value);
+        m_writer->emit("\n");
+    }
+
+    void dumpObjectFull(NodeBase* node);
+    void dumpObjectFull(Substitutions* subs);
+
+    Context(SourceWriter* writer, ASTDumpUtil::Style dumpStyle):
+        m_writer(writer),
+        m_scopeWriteCount(0),
+        m_dumpStyle(dumpStyle)
+    {
+    }
+
+    ASTDumpUtil::Style m_dumpStyle;
+
+    Index m_scopeWriteCount;
+
+    SourceWriter* m_writer;
 
     Dictionary<RefObject*, Index> m_objectMap;  ///< Object index
     List<ObjectInfo> m_objects;
 
-    StringBuilder m_builder;
-    Index m_indent = 0;                 ///< Current indent
-    Index m_indentCount = 4;            ///< Amount of spaces in indent
+    StringBuilder m_buf;
 };
 
 } // anonymous
@@ -406,7 +480,7 @@ struct Context
 
 struct ASTDumpAccess
 {
-#define SLANG_AST_DUMP_FIELD(FIELD_NAME, TYPE, param) context.dumpFieldName(#FIELD_NAME); context.dump(ASTDumpUtil::getMember(node->FIELD_NAME));
+#define SLANG_AST_DUMP_FIELD(FIELD_NAME, TYPE, param) context.dumpField(#FIELD_NAME, node->FIELD_NAME); 
 
 #define SLANG_AST_DUMP_FIELDS_IMPL(NAME, SUPER, ORIGIN, LAST, MARKER, TYPE, param) \
 static void dumpFields_##NAME(NAME* node, Context& context) \
@@ -437,26 +511,24 @@ struct DumpFieldFuncs
     DumpFieldsFunc m_funcs[Index(ASTNodeType::CountOf)];
 };
 
-static DumpFieldFuncs s_funcs;
+static const DumpFieldFuncs s_funcs;
 
-
-void Context::dumpObject(const ReflectClassInfo& type, RefObject* obj)
+void Context::dumpObjectReference(const ReflectClassInfo& type, RefObject* obj, Index objIndex)
 {
-    Index index = getObjectIndex(obj);
+    SLANG_UNUSED(obj);
+    ScopeWrite(this).getBuf() << type.m_name << "@" << objIndex;
+}
 
-    ObjectInfo& info = m_objects[index];
-    if (info.m_isDumped == true)
-    {
-        return;
-    }
-
-    // To stop cycles
+void Context::dumpObjectFull(const ReflectClassInfo& type, RefObject* obj, Index objIndex)
+{
+    ObjectInfo& info = m_objects[objIndex];
+    SLANG_ASSERT(info.m_isDumped == false);
     info.m_isDumped = true;
 
     // We need to dump the fields.
 
-    m_builder << type.m_name << "@" << index < " {\n";
-    indent();
+    ScopeWrite(this).getBuf() << type.m_name << "(" << objIndex << ") {\n";
+    m_writer->indent();
 
     List<const ReflectClassInfo*> allTypes;
     {
@@ -465,7 +537,7 @@ void Context::dumpObject(const ReflectClassInfo& type, RefObject* obj)
         {
             allTypes.add(curType);
             curType = curType->m_superClass;
-        }while (curType);
+        } while (curType);
     }
 
     // Okay we go backwards so we output in the 'normal' order
@@ -479,22 +551,66 @@ void Context::dumpObject(const ReflectClassInfo& type, RefObject* obj)
         }
     }
 
-    dedent();
-    m_builder << "}\n";
+    m_writer->dedent();
+    m_writer->emit("}\n");
 }
 
-/* static */void ASTDumpUtil::dump(NodeBase* node, StringBuilder& out)
+void Context::dumpObject(const ReflectClassInfo& typeInfo, RefObject* obj)
 {
-    Context context;
-    context.dump(node);
-    out = context.m_builder;
+    Index index = getObjectIndex(typeInfo, obj);
+
+    ObjectInfo& info = m_objects[index];
+    if (info.m_isDumped || m_dumpStyle == ASTDumpUtil::Style::Flat)
+    {
+        dumpObjectReference(typeInfo, obj, index);
+    }
+    else
+    {
+        dumpObjectFull(typeInfo, obj, index);
+    }
 }
 
-/* static */void ASTDumpUtil::dump(Substitutions* subs, StringBuilder& out)
+void Context::dumpObjectFull(NodeBase* node)
 {
-    Context context;
-    context.dump(subs);
-    out = context.m_builder;
+    if (!node)
+    {
+        dumpPtr(nullptr);
+    }
+    else
+    {
+        const ReflectClassInfo& typeInfo = node->getClassInfo();
+        Index index = getObjectIndex(typeInfo, node);
+        dumpObjectFull(typeInfo, node, index);
+    }
+}
+
+void Context::dumpObjectFull(Substitutions* subs)
+{
+    if (!subs)
+    {
+        dumpPtr(nullptr);
+    }
+    else
+    {
+        const ReflectClassInfo& typeInfo = subs->getClassInfo();
+        Index index = getObjectIndex(typeInfo, subs);
+        dumpObjectFull(typeInfo, subs, index);
+    }
+}
+
+/* static */void ASTDumpUtil::dump(NodeBase* node, Style style, SourceWriter* writer)
+{
+    Context context(writer, style);
+    context.dumpObjectFull(node);
+    context.dumpRemaining();
+}
+
+/* static */void ASTDumpUtil::dump(Substitutions* subs, Style style, SourceWriter* writer)
+{
+    Context context(writer, style);
+    context.dumpObjectFull(subs);
+    context.dumpRemaining();
+
 }
 
 } // namespace Slang
