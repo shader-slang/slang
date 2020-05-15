@@ -141,7 +141,7 @@ struct Context
         }
     }
 
-    static const char _getHexDigit(UInt v)
+    static char _getHexDigit(UInt v)
     {
         return (v < 10) ? char(v + '0') : char('a' + v - 10);
     }
