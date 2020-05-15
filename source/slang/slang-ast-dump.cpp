@@ -300,7 +300,27 @@ struct Context
 
     void dump(SyntaxParseCallback callback) { dumpPtr((const void*)callback); }
 
-    void dump(const void* ptr) { dumpPtr(ptr); }
+    template <typename T, int SIZE>
+    void dump(const T (&in)[SIZE])
+    {
+        m_builder << " { \n";
+        indent();
+
+        for (Index i = 0; i < Index(SIZE); ++i)
+        {
+            dump(in[i]);
+            if (i < Index(SIZE) - 1)
+            {
+                m_builder << ",";
+            }
+            m_builder << "\n";
+        }
+
+        dedent();
+        m_builder << "}";
+    }
+
+    //void dump(const void* ptr) { dumpPtr(ptr); }
 
     void dump(const LookupResult& result)
     {

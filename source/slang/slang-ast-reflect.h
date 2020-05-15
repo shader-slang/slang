@@ -31,7 +31,7 @@
 
 // Used for C++ extractor, does nothing here
 #define SLANG_REFLECT_BASE_CLASS(x) /* ... */
-
-
+#define SLANG_REFLECTED
+#define SLANG_UNREFLECTED
 
 #endif // SLANG_AST_REFLECT_H

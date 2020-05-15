@@ -42,6 +42,9 @@ enum class IdentifierStyle
     Namespace,          ///< namespace
     Access,             ///< public, protected, private
 
+    Reflected,
+    Unreflected,
+
     CountOf,
 };
 
@@ -53,6 +56,7 @@ struct IdentifierFlag
         StartScope  = 0x1,          ///< namespace, struct or class
         ClassLike   = 0x2,          ///< Struct or class
         Keyword     = 0x4,
+        Reflection  = 0x8,
     };
 };
 
@@ -67,7 +71,10 @@ static const IdentifierFlags kIdentifierFlags[Index(IdentifierStyle::CountOf)] =
     IdentifierFlag::Keyword | IdentifierFlag::StartScope | IdentifierFlag::ClassLike, /// Class
     IdentifierFlag::Keyword | IdentifierFlag::StartScope | IdentifierFlag::ClassLike, /// Struct
     IdentifierFlag::Keyword | IdentifierFlag::StartScope, /// Namespace
-    IdentifierFlag::Keyword,
+    IdentifierFlag::Keyword,                              /// Access
+    IdentifierFlag::Reflection,                           /// Reflected
+    IdentifierFlag::Reflection,                           /// Unreflected
+
 };
 
 SLANG_FORCE_INLINE IdentifierFlags getFlags(IdentifierStyle style)
@@ -118,6 +125,12 @@ public:
             set(UnownedStringSlice(names[i]), style);
         }
     }
+    void reset()
+    {
+        m_styles.clear();
+        m_pool.clear();
+    }
+
     IdentifierLookup():
         m_pool(StringSlicePool::Style::Empty)
     {
@@ -126,6 +139,12 @@ public:
 protected:
     List<IdentifierStyle> m_styles;
     StringSlicePool m_pool;
+};
+
+enum class ReflectionType
+{
+    NotReflected,
+    Reflected,
 };
 
 class SourceOrigin;
@@ -144,8 +163,11 @@ public:
 
     struct Field
     {
+        bool isReflected() const { return reflectionType == ReflectionType::Reflected; }
+
         UnownedStringSlice type;
         Token name;
+        ReflectionType reflectionType;
     };
 
     enum class BaseType
@@ -193,6 +215,12 @@ public:
         /// Find the last (reflected) derived type
     Node* findLastDerived();
 
+        /// True if reflected
+    bool isReflected() const { return m_reflectionType == ReflectionType::Reflected; }
+
+        /// Gets the reflection for any contained types
+    ReflectionType getContainedReflectionType() const { return m_reflectionType == ReflectionType::NotReflected ? ReflectionType::NotReflected : m_reflectionOverride; }
+
         /// True if has a derived type that is reflected
     bool hasReflectedDerivedType() const;
         /// Stores in out any reflected derived types
@@ -205,7 +233,8 @@ public:
     Node(Type type):
         m_type(type),
         m_parentScope(nullptr),
-        m_isReflected(false),
+        m_reflectionType(ReflectionType::NotReflected),
+        m_reflectionOverride(ReflectionType::Reflected),
         m_superNode(nullptr),
         m_baseType(BaseType::None),
         m_origin(nullptr)
@@ -235,7 +264,11 @@ public:
     SourceOrigin* m_origin;
 
         /// Classes can be traversed, but not reflected. To be reflected they have to contain the marker
-    bool m_isReflected;
+    ReflectionType m_reflectionType;
+
+        /// For child types, fields, how reflection is handled. If this type is not reflected
+    ReflectionType m_reflectionOverride;    
+
         /// The base type of this
     BaseType m_baseType;
 
@@ -441,7 +474,7 @@ static void _indent(Index indentCount, StringBuilder& out)
 
 void Node::dumpDerived(int indentCount, StringBuilder& out)
 {
-    if (isClassLike() && m_isReflected && m_name.Content.getLength() > 0)
+    if (isClassLike() && isReflected() && m_name.Content.getLength() > 0)
     {
         _indent(indentCount, out);
         out << m_name.Content << "\n";
@@ -482,12 +515,12 @@ void Node::dump(int indentCount, StringBuilder& out)
             
             out << typeName << " ";
 
-            if (!m_isReflected)
+            if (!isReflected())
             {
                 out << " (";
             }
             out << m_name.Content;
-            if (!m_isReflected)
+            if (!isReflected())
             {
                 out << ") ";
             }
@@ -509,8 +542,11 @@ void Node::dump(int indentCount, StringBuilder& out)
 
     for (const Field& field : m_fields)
     {
-        _indent(indentCount + 1, out);
-        out << field.type << " " << field.name.Content << "\n";
+        if (field.isReflected())
+        {
+            _indent(indentCount + 1, out);
+            out << field.type << " " << field.name.Content << "\n";
+        }
     }
 
     _indent(indentCount, out);
@@ -557,7 +593,7 @@ Index Node::calcDerivedDepth() const
 
 Node* Node::findLastDerived()
 {
-    if (!m_isReflected)
+    if (!isReflected())
     {
         return nullptr;
     }
@@ -592,7 +628,7 @@ bool Node::hasReflectedDerivedType() const
 {
     for (Node* type : m_derivedTypes)
     {
-        if (type->m_isReflected)
+        if (type->isReflected())
         {
             return true;
         }
@@ -605,7 +641,7 @@ void Node::getReflectedDerivedTypes(List<Node*>& out) const
     out.clear();
     for (Node* type : m_derivedTypes)
     {
-        if (type->m_isReflected)
+        if (type->isReflected())
         {
             out.add(type);
         }
@@ -619,7 +655,7 @@ void Node::getReflectedDerivedTypes(List<Node*>& out) const
     for (Index j = 0; j < count; )
     {
         Node* node = ioNodes[j];
-        if (!node->isClassLike() || !node->m_isReflected)
+        if (!node->isClassLike() || !node->isReflected())
         {
             ioNodes.removeAt(j);
             count--;
@@ -814,6 +850,7 @@ CPPExtractor::CPPExtractor(StringSlicePool* typePool, NamePool* namePool, Diagno
     m_identifierLookup(identifierLookup)
 {
     m_rootNode = new Node(Node::Type::Namespace);
+    m_rootNode->m_reflectionType = ReflectionType::Reflected;
 }
 
 bool CPPExtractor::_isMarker(const UnownedStringSlice& name)
@@ -1043,6 +1080,9 @@ SlangResult CPPExtractor::_maybeParseNode(Node::Type type)
     RefPtr<Node> node(new Node(type));
     node->m_name = name;
 
+    // Defaults to not reflected
+    SLANG_ASSERT(!node->isReflected());
+
     if (advanceIfToken(TokenType::Colon))
     {
         // Could have public
@@ -1073,8 +1113,6 @@ SlangResult CPPExtractor::_maybeParseNode(Node::Type type)
             m_reader.advanceToken();
         }
 
-        // Node does define a class, but it's not reflected
-        node->m_isReflected = false;
         return pushNode(node);
     }
 
@@ -1099,7 +1137,6 @@ SlangResult CPPExtractor::_maybeParseNode(Node::Type type)
             case TokenType::Identifier:  break;
             case TokenType::RBrace:
             {
-                node->m_isReflected = false;
                 SLANG_RETURN_ON_FAIL(pushNode(node));
                 SLANG_RETURN_ON_FAIL(popBrace());
                 m_reader.advanceToken();
@@ -1107,7 +1144,6 @@ SlangResult CPPExtractor::_maybeParseNode(Node::Type type)
             }
             default:
             {
-                node->m_isReflected = false;
                 SLANG_RETURN_ON_FAIL(pushNode(node));
                 return SLANG_OK;
             }
@@ -1119,8 +1155,6 @@ SlangResult CPPExtractor::_maybeParseNode(Node::Type type)
             break;
         }
 
-        // Looks like a class, but looks like non-reflected
-        node->m_isReflected = false;
         // We still need to add the node,
         SLANG_RETURN_ON_FAIL(pushNode(node));
         return SLANG_OK;
@@ -1139,7 +1173,7 @@ SlangResult CPPExtractor::_maybeParseNode(Node::Type type)
         return SLANG_FAIL;
     }
     
-    node->m_isReflected = true;
+    node->m_reflectionType = ReflectionType::Reflected;
     return pushNode(node);
 }
 
@@ -1483,6 +1517,7 @@ SlangResult CPPExtractor::_maybeParseField()
             Node::Field field;
             field.type = typeName;
             field.name = fieldName;
+            field.reflectionType = m_currentNode->getContainedReflectionType();
 
             m_currentNode->m_fields.add(field);
             break;
@@ -1543,8 +1578,8 @@ SlangResult CPPExtractor::parse(SourceFile* sourceFile, const Options* options)
         {
             case TokenType::Identifier:
             {
-                IdentifierStyle style = m_identifierLookup->get(m_reader.peekToken().Content);
-
+                const IdentifierStyle style = m_identifierLookup->get(m_reader.peekToken().Content);
+                
                 switch (style)
                 {
                     case IdentifierStyle::BaseClass:
@@ -1560,8 +1595,29 @@ SlangResult CPPExtractor::parse(SourceFile* sourceFile, const Options* options)
                         node->m_name = nameToken;
                         node->m_baseType = Node::BaseType::Marked;
 
+                        // Classes defined this way are not reflected, as the mark means the type exists, but isn't visible
+                        node->m_reflectionType = ReflectionType::NotReflected;
+
                         SLANG_RETURN_ON_FAIL(pushNode(node));
                         popBrace();
+                        break;
+                    }
+                    case IdentifierStyle::Reflected:
+                    {
+                        m_reader.advanceToken();
+                        if (m_currentNode)
+                        {
+                            m_currentNode->m_reflectionOverride = ReflectionType::Reflected;
+                        }
+                        break;
+                    }
+                    case IdentifierStyle::Unreflected:
+                    {
+                        m_reader.advanceToken();
+                        if (m_currentNode)
+                        {
+                            m_currentNode->m_reflectionOverride = ReflectionType::NotReflected;
+                        }
                         break;
                     }
                     case IdentifierStyle::Root:
@@ -1665,7 +1721,7 @@ SlangResult CPPExtractor::_calcDerivedTypesRec(Node* node)
             Node* superType = parentScope->findChild(node->m_super.Content);
             if (!superType)
             {
-                if (node->m_isReflected)
+                if (node->isReflected())
                 {
                     m_sink->diagnose(node->m_name, CPPDiagnostics::superTypeNotFound, node->m_name.Content);
                     return SLANG_FAIL;
@@ -1780,48 +1836,18 @@ public:
         m_slicePool(StringSlicePool::Style::Default)
     {
         m_namePool.setRootNamePool(rootNamePool);
-
-        // Some keywords
-        {
-            const char* names[] = { "virtual", "typedef", "continue", "if", "case", "break", "catch", "default", "delete", "do", "else", "for", "new", "goto", "return", "switch", "throw", "using", "while" };
-            m_identifierLookup.set(names, SLANG_COUNT_OF(names), IdentifierStyle::Keyword);
-        }
-
-        // Type modifier keywords
-        {
-            const char* names[] = { "const", "volatile" };
-            m_identifierLookup.set(names, SLANG_COUNT_OF(names), IdentifierStyle::TypeModifier);
-        }
-
-        // Special markers
-        {
-            m_identifierLookup.set("SLANG_CLASS_ROOT", IdentifierStyle::Root);
-            m_identifierLookup.set("SLANG_REFLECT_BASE_CLASS", IdentifierStyle::BaseClass);
-        }
-
-        // Keywords which introduce types/scopes
-        {
-            m_identifierLookup.set("struct", IdentifierStyle::Struct);
-            m_identifierLookup.set("class", IdentifierStyle::Class);
-            m_identifierLookup.set("namespace", IdentifierStyle::Namespace);
-        }
-
-        // Keywords that control access
-        {
-            const char* names[] = { "private", "protected", "public" };
-            m_identifierLookup.set(names, SLANG_COUNT_OF(names), IdentifierStyle::Access);
-        }
     }
 
 protected:
-    
+
+        /// Called to set up identifer lookup. Must be performed after options are initials
+    static void _initIdentifierLookup(const Options& options, IdentifierLookup& outLookup);
+
     NamePool m_namePool;
 
     Options m_options;
     DiagnosticSink* m_sink;
     SourceManager* m_sourceManager;
-    IdentifierLookup m_identifierLookup;
-
     
     StringSlicePool m_slicePool;
 };
@@ -1869,7 +1895,7 @@ SlangResult CPPExtractorApp::calcDef(CPPExtractor& extractor, SourceOrigin* orig
 
     for (Node* node : origin->m_nodes)
     {
-        if (node->isClassLike() && node->m_isReflected)
+        if (node->isClassLike() && node->isReflected())
         {
             if (node->m_marker.Content.indexOf(UnownedStringSlice::fromLiteral("ABSTRACT")) >= 0)
             {
@@ -1966,15 +1992,24 @@ SlangResult CPPExtractorApp::calcChildrenHeader(CPPExtractor& extractor, StringB
                     out << "\\\n";
 
                     const Index fieldsCount = node->m_fields.getCount();
-                    for (Index j = 0; j < fieldsCount; ++j)
+                    bool previousField = false;
+                    for (Index j = 0; j < fieldsCount; ++j) 
                     {
                         const auto& field = node->m_fields[j];
-                        _indent(1, out);
-                        out << "_x_(" << field.name.Content << ", " << field.type << ", _param_)";
-
-                        if (j < fieldsCount - 1)
+                        
+                        if (field.isReflected())
                         {
-                            out << "\\\n";
+                            if (previousField)
+                            {
+                                out << "\\\n";
+                            }
+
+                            _indent(1, out);
+
+                            // NOTE! We put the type field in brackets, such that there is no issue with templates containing a comma.
+                            // If stringified
+                            out << "_x_(" << field.name.Content << ", (" << field.type << "), _param_)";
+                            previousField = true;
                         }
                     }
                 }
@@ -2051,7 +2086,7 @@ SlangResult CPPExtractorApp::calcHeader(CPPExtractor& extractor, StringBuilder& 
             {
                 SLANG_ASSERT(node->isClassLike());
                 // If it's not reflected we don't output, in the enum list
-                if (node->m_isReflected)
+                if (node->isReflected())
                 {
                     const char* type = (node->m_type == Node::Type::ClassType) ? "class" : "struct";
                     out << type << " " << node->m_name.Content << ";\n";
@@ -2118,7 +2153,7 @@ SlangResult CPPExtractorApp::calcHeader(CPPExtractor& extractor, StringBuilder& 
                 }
                 out << marker << ", ";
 
-                if (node->m_baseType != Node::BaseType::None || node->m_superNode && node->m_superNode->m_isReflected == false)
+                if (node->m_baseType != Node::BaseType::None || node->m_superNode && node->m_superNode->isReflected() == false)
                 {
                     out << "BASE, ";
                 }
@@ -2153,7 +2188,7 @@ SlangResult CPPExtractorApp::calcHeader(CPPExtractor& extractor, StringBuilder& 
 
         for (Node* node : origin->m_nodes)
         {
-            if (!(node->m_isReflected && node->isClassLike()))
+            if (!(node->isReflected() && node->isClassLike()))
             {
                 continue;
             }
@@ -2197,7 +2232,6 @@ SlangResult CPPExtractorApp::writeDefs(CPPExtractor& extractor)
 
 SlangResult CPPExtractorApp::writeOutput(CPPExtractor& extractor)
 {
-    
     String path;
     if (m_options.m_inputDirectory.getLength())
     {
@@ -2246,12 +2280,77 @@ SlangResult CPPExtractorApp::writeOutput(CPPExtractor& extractor)
     return SLANG_OK;
 }
 
+/* static */void CPPExtractorApp::_initIdentifierLookup(const Options& options, IdentifierLookup& outLookup)
+{
+    outLookup.reset();
+
+    // Some keywords
+    {
+        const char* names[] = { "virtual", "typedef", "continue", "if", "case", "break", "catch", "default", "delete", "do", "else", "for", "new", "goto", "return", "switch", "throw", "using", "while" };
+        outLookup.set(names, SLANG_COUNT_OF(names), IdentifierStyle::Keyword);
+    }
+
+    // Type modifier keywords
+    {
+        const char* names[] = { "const", "volatile" };
+        outLookup.set(names, SLANG_COUNT_OF(names), IdentifierStyle::TypeModifier);
+    }
+
+    // Special markers
+    {
+        {
+            StringBuilder buf;
+            buf << options.m_prefixMark;
+            buf << "CLASS_ROOT";
+
+            outLookup.set(buf.getUnownedSlice(), IdentifierStyle::Root);
+        }
+        {
+            StringBuilder buf;
+            buf << options.m_prefixMark;
+            buf << "REFLECT_BASE_CLASS";
+
+            outLookup.set(buf.getUnownedSlice(), IdentifierStyle::BaseClass);
+        }
+        {
+            StringBuilder buf;
+            buf << options.m_prefixMark;
+            buf << "REFLECTED";
+
+            outLookup.set(buf.getUnownedSlice(), IdentifierStyle::Reflected);
+        }
+        {
+            StringBuilder buf;
+            buf << options.m_prefixMark;
+            buf << "UNREFLECTED";
+
+            outLookup.set(buf.getUnownedSlice(), IdentifierStyle::Unreflected);
+        }
+    }
+
+
+    // Keywords which introduce types/scopes
+    {
+        outLookup.set("struct", IdentifierStyle::Struct);
+        outLookup.set("class", IdentifierStyle::Class);
+        outLookup.set("namespace", IdentifierStyle::Namespace);
+    }
+
+    // Keywords that control access
+    {
+        const char* names[] = { "private", "protected", "public" };
+        outLookup.set(names, SLANG_COUNT_OF(names), IdentifierStyle::Access);
+    }
+}
 
 SlangResult CPPExtractorApp::execute(const Options& options)
 {
     m_options = options;
 
-    CPPExtractor extractor(&m_slicePool, &m_namePool, m_sink, &m_identifierLookup);
+    IdentifierLookup identifierLookup;
+    _initIdentifierLookup(options, identifierLookup);
+
+    CPPExtractor extractor(&m_slicePool, &m_namePool, m_sink, &identifierLookup);
 
     // Read in each of the input files
     for (Index i = 0; i < m_options.m_inputPaths.getCount(); ++i)
