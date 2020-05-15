@@ -1449,6 +1449,8 @@ namespace Slang
         bool shouldDumpIR = false;
         bool shouldValidateIR = false;
 
+        bool shouldDumpAST = false;
+
     protected:
         CompileRequestBase(
             Linkage*        linkage,

@@ -465,6 +465,10 @@ struct OptionsParser
                     requestImpl->getFrontEndReq()->shouldDumpIR = true;
                     requestImpl->getBackEndReq()->shouldDumpIR = true;
                 }
+                else if (argStr == "-dump-ast")
+                {
+                    requestImpl->getFrontEndReq()->shouldDumpAST = true;
+                }
                 else if (argStr == "-dump-repro")
                 {
                     SLANG_RETURN_ON_FAIL(tryReadCommandLineArgument(sink, arg, &argCursor, argEnd, requestImpl->dumpRepro));
