@@ -2187,6 +2187,7 @@ namespace slang
             ParameterBlock = SLANG_TYPE_KIND_PARAMETER_BLOCK,
             GenericTypeParameter = SLANG_TYPE_KIND_GENERIC_TYPE_PARAMETER,
             Interface = SLANG_TYPE_KIND_INTERFACE,
+            OutputStream = SLANG_TYPE_KIND_OUTPUT_STREAM,
             Specialized = SLANG_TYPE_KIND_SPECIALIZED,
         };
 
@@ -2202,6 +2203,10 @@ namespace slang
             Float16 = SLANG_SCALAR_TYPE_FLOAT16,
             Float32 = SLANG_SCALAR_TYPE_FLOAT32,
             Float64 = SLANG_SCALAR_TYPE_FLOAT64,
+            Int8    = SLANG_SCALAR_TYPE_INT8,
+            UInt8   = SLANG_SCALAR_TYPE_UINT8,
+            Int16   = SLANG_SCALAR_TYPE_INT16,
+            UInt16  = SLANG_SCALAR_TYPE_UINT16,
         };
 
         Kind getKind()
