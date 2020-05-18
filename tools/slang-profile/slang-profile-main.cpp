@@ -19,8 +19,11 @@ SlangResult innerMain(int argc, char** argv)
     {
         const auto startTick = ProcessUtil::getClockTick();
 
-        ComPtr<slang::IGlobalSession> slangSession;
-        slangSession.attach(spCreateSession(nullptr));
+        for (Int i = 0; i < 32; ++i)
+        {
+            ComPtr<slang::IGlobalSession> slangSession;
+            slangSession.attach(spCreateSession(nullptr));
+        }
 
         const auto endTick = ProcessUtil::getClockTick();
 

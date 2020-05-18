@@ -5625,7 +5625,7 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
             }
             else if(definitionToken.type == TokenType::Identifier)
             {
-                definition = definitionToken.Content;
+                definition = definitionToken.getContent();
             }
             else
             {
@@ -5636,7 +5636,7 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
             auto& targetToken = targetMod->targetToken;
             if( targetToken.type != TokenType::Unknown )
             {
-                targetName = targetToken.Content;
+                targetName = targetToken.getContent();
             }
 
             builder->addTargetIntrinsicDecoration(irInst, targetName, definition.getUnownedSlice());
@@ -5723,7 +5723,7 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
                 //
                 if(targetMod->targetToken.type == TokenType::Unknown)
                     return;
-                else if(targetMod->targetToken.Content.getLength() == 0)
+                else if(targetMod->targetToken.getContent().getLength() == 0)
                     return;
             }
         }
@@ -6156,7 +6156,7 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
             // a specialized definition of the particular function for the given
             // target, and we need to reflect that at the IR level.
 
-            getBuilder()->addTargetDecoration(irFunc, targetMod->targetToken.Content);
+            getBuilder()->addTargetDecoration(irFunc, targetMod->targetToken.getContent());
         }
 
         // If this declaration was marked as having a target-specific lowering
@@ -6173,7 +6173,7 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
         //
         for(auto extensionMod : decl->GetModifiersOfType<RequiredGLSLExtensionModifier>())
         {
-            getBuilder()->addRequireGLSLExtensionDecoration(irFunc, extensionMod->extensionNameToken.Content);
+            getBuilder()->addRequireGLSLExtensionDecoration(irFunc, extensionMod->extensionNameToken.getContent());
         }
         for(auto versionMod : decl->GetModifiersOfType<RequiredGLSLVersionModifier>())
         {

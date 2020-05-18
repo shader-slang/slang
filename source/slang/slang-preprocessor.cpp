@@ -999,7 +999,7 @@ top:
         // We are pasting tokens, which could get messy
 
         StringBuilder sb;
-        sb << token.Content;
+        sb << token.getContent();
 
         while (PeekRawTokenType(preprocessor) == TokenType::PoundPound)
         {
@@ -1012,7 +1012,7 @@ top:
             // Read the next raw token (now that expansion has been triggered)
             Token nextToken = AdvanceRawToken(preprocessor);
 
-            sb << nextToken.Content;
+            sb << nextToken.getContent();
         }
 
         // Now re-lex the input
@@ -1106,9 +1106,9 @@ inline Token const& GetDirective(PreprocessorDirectiveContext* context)
 }
 
 // Get the name of the directive being parsed.
-inline UnownedStringSlice const& GetDirectiveName(PreprocessorDirectiveContext* context)
+inline UnownedStringSlice GetDirectiveName(PreprocessorDirectiveContext* context)
 {
-    return context->directiveToken.Content;
+    return context->directiveToken.getContent();
 }
 
 // Get the location of the directive being parsed.
@@ -1360,12 +1360,12 @@ static PreprocessorExpressionValue ParseAndEvaluateUnaryExpression(PreprocessorD
         }
 
     case TokenType::IntegerLiteral:
-        return StringToInt(AdvanceToken(context).Content);
+        return StringToInt(AdvanceToken(context).getContent());
 
     case TokenType::Identifier:
         {
             Token token = AdvanceToken(context);
-            if (token.Content == "defined")
+            if (token.getContent() == "defined")
             {
                 // handle `defined(someName)`
 
@@ -1994,7 +1994,7 @@ static void HandleWarningDirective(PreprocessorDirectiveContext* context)
     Expect(context, TokenType::DirectiveMessage, Diagnostics::expectedTokenInPreprocessorDirective, &messageToken);
 
     // Report the custom error.
-    GetSink(context)->diagnose(GetDirectiveLoc(context), Diagnostics::userDefinedWarning, messageToken.Content);
+    GetSink(context)->diagnose(GetDirectiveLoc(context), Diagnostics::userDefinedWarning, messageToken.getContent());
 }
 
 // Handle a `#error` directive
@@ -2008,7 +2008,7 @@ static void HandleErrorDirective(PreprocessorDirectiveContext* context)
     Expect(context, TokenType::DirectiveMessage, Diagnostics::expectedTokenInPreprocessorDirective, &messageToken);
 
     // Report the custom error.
-    GetSink(context)->diagnose(GetDirectiveLoc(context), Diagnostics::userDefinedError, messageToken.Content);
+    GetSink(context)->diagnose(GetDirectiveLoc(context), Diagnostics::userDefinedError, messageToken.getContent());
 }
 
 // Handle a `#line` directive
@@ -2023,14 +2023,14 @@ static void HandleLineDirective(PreprocessorDirectiveContext* context)
     // `#line <integer-literal> ...`
     if (PeekTokenType(context) == TokenType::IntegerLiteral)
     {
-        line = StringToInt(AdvanceToken(context).Content);
+        line = StringToInt(AdvanceToken(context).getContent());
     }
     // `#line`
     // `#line default`
     else if (
         PeekTokenType(context) == TokenType::EndOfDirective
         || (PeekTokenType(context) == TokenType::Identifier
-            && PeekToken(context).Content == "default"))
+            && PeekToken(context).getContent() == "default"))
     {
         AdvanceToken(context);
 
@@ -2064,7 +2064,7 @@ static void HandleLineDirective(PreprocessorDirectiveContext* context)
     {
         // Note(tfoley): GLSL allows the "source string" to be indicated by an integer
         // TODO(tfoley): Figure out a better way to handle this, if it matters
-        file = AdvanceToken(context).Content;
+        file = AdvanceToken(context).getContent();
     }
     else
     {
