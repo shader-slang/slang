@@ -197,12 +197,6 @@ struct Context
     {
         m_writer->emit(UInt(v));
     }
-
-    void dump(Index v)
-    {
-        m_writer->emit(v);
-    }
-
     void dump(int32_t v)
     {
         m_writer->emit(v);
@@ -212,6 +206,11 @@ struct Context
         m_writer->emit(v);
     }
 
+    void dump(IntegerLiteralValue v)
+    {
+        m_writer->emit(v);
+    }
+    
 
     void dump(const SemanticVersion& version)
     {
