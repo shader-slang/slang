@@ -564,7 +564,7 @@ LayoutSemanticInfo ExtractLayoutSemanticInfo(
     }
 
     // TODO: handle component mask part of things...
-    if( semantic->componentMask.getContent().getLength() != 0 )
+    if( semantic->componentMask.hasContent())
     {
         getSink(context)->diagnose(semantic->componentMask, Diagnostics::componentMaskNotSupported);
     }

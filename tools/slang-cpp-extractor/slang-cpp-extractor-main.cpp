@@ -443,7 +443,7 @@ static void _indent(Index indentCount, StringBuilder& out)
 
 void Node::dumpDerived(int indentCount, StringBuilder& out)
 {
-    if (isClassLike() && m_isReflected && m_name.getContent().getLength() > 0)
+    if (isClassLike() && m_isReflected && m_name.hasContent())
     {
         _indent(indentCount, out);
         out << m_name.getContent() << "\n";
@@ -467,7 +467,7 @@ void Node::dump(int indentCount, StringBuilder& out)
         }
         case Type::Namespace:
         {
-            if (m_name.getContent().getLength())
+            if (m_name.hasContent())
             {
                 out << "namespace " << m_name.getContent() << " {\n";
             }
@@ -494,7 +494,7 @@ void Node::dump(int indentCount, StringBuilder& out)
                 out << ") ";
             }
 
-            if (m_super.getContent().getLength())
+            if (m_super.hasContent())
             {
                 out << " : " << m_super.getContent(); 
             }
@@ -523,7 +523,7 @@ void Node::calcAbsoluteName(StringBuilder& outName) const
 {
     if (m_parentScope == nullptr)
     {
-        if (m_name.getContent().getLength() == 0)
+        if (!m_name.hasContent())
         {
             return;
         }
@@ -902,7 +902,7 @@ SlangResult CPPExtractor::pushNode(Node* node)
         m_origin->addNode(node);
     }
 
-    if (node->m_name.getContent().getLength())
+    if (node->m_name.hasContent())
     {
         // For anonymous namespace, we should look if we already have one and just reopen that. Doing so will mean will
         // find anonymous namespace clashes
@@ -1648,7 +1648,7 @@ SlangResult CPPExtractor::_calcDerivedTypesRec(Node* node)
 {
     if (node->isClassLike() && node->m_baseType == Node::BaseType::None)
     {
-        if (node->m_super.getContent().getLength())
+        if (node->m_super.hasContent())
         {
             Node* parentScope = node->m_parentScope;
             if (parentScope == nullptr)

@@ -5723,7 +5723,7 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
                 //
                 if(targetMod->targetToken.type == TokenType::Unknown)
                     return;
-                else if(targetMod->targetToken.getContent().getLength() == 0)
+                else if(!targetMod->targetToken.hasContent())
                     return;
             }
         }
