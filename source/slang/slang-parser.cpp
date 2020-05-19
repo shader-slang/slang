@@ -315,7 +315,7 @@ namespace Slang
     Token Parser::ReadToken(const char* expected)
     {
         if (tokenReader.peekTokenType() == TokenType::Identifier
-                && tokenReader.peekToken().Content == expected)
+                && tokenReader.peekToken().getContent() == expected)
         {
             isRecovering = false;
             return tokenReader.advanceToken();
@@ -334,7 +334,7 @@ namespace Slang
                 // The token we expected?
                 // Then exit recovery mode and pretend like all is well.
                 if (tokenReader.peekTokenType() == TokenType::Identifier
-                    && tokenReader.peekToken().Content == expected)
+                    && tokenReader.peekToken().getContent() == expected)
                 {
                     isRecovering = false;
                     return tokenReader.advanceToken();
@@ -530,7 +530,7 @@ namespace Slang
             r.advanceToken();
 
         return r.peekTokenType() == TokenType::Identifier
-            && r.peekToken().Content == string;
+            && r.peekToken().getContent() == string;
 }
 
     bool Parser::LookAheadToken(TokenType type, int offset)
@@ -680,7 +680,7 @@ namespace Slang
         {
             scopedIdentifierBuilder.Append('_'); 
         }
-        scopedIdentifierBuilder.Append(firstIdentifier.Content);
+        scopedIdentifierBuilder.Append(firstIdentifier.getContent());
 
         while (parser->tokenReader.peekTokenType() == TokenType::Scope)
         {
@@ -688,7 +688,7 @@ namespace Slang
             scopedIdentifierBuilder.Append('_'); 
             
             const Token nextIdentifier(parser->ReadToken(TokenType::Identifier));
-            scopedIdentifierBuilder.Append(nextIdentifier.Content);
+            scopedIdentifierBuilder.Append(nextIdentifier.getContent());
         }
 
         // Make a 'token'
@@ -700,7 +700,7 @@ namespace Slang
         auto namePool = parser->getNamePool();
 
         // Since it's an Identifier have to set the name.
-        token.ptrValue = namePool->getName(token.Content);
+        token.setName(namePool->getName(token.getContent()));
 
         return token;
     }
@@ -954,7 +954,7 @@ namespace Slang
                 while (AdvanceIf(parser, TokenType::Dot))
                 {
                     sb << "/";
-                    sb << parser->ReadToken(TokenType::Identifier).Content;
+                    sb << parser->ReadToken(TokenType::Identifier).getContent();
                 }
 
                 moduleNameAndLoc.name = getName(parser, sb.ProduceString());
@@ -1003,7 +1003,7 @@ namespace Slang
                 if (AdvanceIf(parser, TokenType::Colon))
                 {
                     // Concat : onto ?
-                    nameToken.Content = UnownedStringSlice::fromLiteral("?:"); 
+                    nameToken.setContent(UnownedStringSlice::fromLiteral("?:")); 
                     break;
                 }
                 ;       // fall-thru
@@ -1013,7 +1013,7 @@ namespace Slang
             }
 
             return NameLoc(
-                getName(parser, nameToken.Content),
+                getName(parser, nameToken.getContent()),
                 nameToken.loc);
         }
         else
@@ -2301,8 +2301,8 @@ namespace Slang
         addModifier(bufferVarDecl, reflectionNameModifier);
 
         // Both the buffer variable and its type need to have names generated
-        bufferVarDecl->nameAndLoc.name = generateName(parser, "parameterGroup_" + String(reflectionNameToken.Content));
-        bufferDataTypeDecl->nameAndLoc.name = generateName(parser, "ParameterGroup_" + String(reflectionNameToken.Content));
+        bufferVarDecl->nameAndLoc.name = generateName(parser, "parameterGroup_" + String(reflectionNameToken.getContent()));
+        bufferDataTypeDecl->nameAndLoc.name = generateName(parser, "ParameterGroup_" + String(reflectionNameToken.getContent()));
 
         addModifier(bufferDataTypeDecl, new ImplicitParameterGroupElementTypeModifier());
         addModifier(bufferVarDecl, new ImplicitParameterGroupVariableModifier());
@@ -3893,7 +3893,7 @@ namespace Slang
         {
         case TokenType::QuestionMark:
             opToken = parser->ReadToken();
-            opToken.Content = UnownedStringSlice::fromLiteral("?:");
+            opToken.setContent(UnownedStringSlice::fromLiteral("?:"));
             break;
 
         default:
@@ -3902,7 +3902,7 @@ namespace Slang
         }
 
         auto opExpr = new VarExpr();
-        opExpr->name = getName(parser, opToken.Content);
+        opExpr->name = getName(parser, opToken.getContent());
         opExpr->scope = parser->currentScope;
         opExpr->loc = opToken.loc;
 
@@ -4249,7 +4249,7 @@ namespace Slang
             if ((!(maskedValue == 0 || maskedValue == mask)) && sink && token)
             {
                 // Output a warning that number has been altered
-                sink->diagnose(*token, Diagnostics::integerLiteralTruncated, token->Content, BaseTypeInfo::asText(baseType), truncatedValue);
+                sink->diagnose(*token, Diagnostics::integerLiteralTruncated, token->getContent(), BaseTypeInfo::asText(baseType), truncatedValue);
             }
 
             value = truncatedValue;
@@ -4516,12 +4516,12 @@ namespace Slang
                     }
                     case FloatFixKind::Zeroed:
                     {
-                        parser->sink->diagnose(token, Diagnostics::floatLiteralTooSmall, BaseTypeInfo::asText(suffixBaseType), token.Content, fixedValue);
+                        parser->sink->diagnose(token, Diagnostics::floatLiteralTooSmall, BaseTypeInfo::asText(suffixBaseType), token.getContent(), fixedValue);
                         break;
                     }
                     case FloatFixKind::Unrepresentable:
                     {
-                        parser->sink->diagnose(token, Diagnostics::floatLiteralUnrepresentable, BaseTypeInfo::asText(suffixBaseType), token.Content, fixedValue);
+                        parser->sink->diagnose(token, Diagnostics::floatLiteralUnrepresentable, BaseTypeInfo::asText(suffixBaseType), token.getContent(), fixedValue);
                         break;
                     }
                 }
@@ -4893,17 +4893,17 @@ namespace Slang
         {
             if (AdvanceIf(parser, TokenType::OpSub))
             {
-                modifier->op = IROp(-StringToInt(parser->ReadToken().Content));
+                modifier->op = IROp(-StringToInt(parser->ReadToken().getContent()));
             }
             else if (parser->LookAheadToken(TokenType::IntegerLiteral))
             {
-                modifier->op = IROp(StringToInt(parser->ReadToken().Content));
+                modifier->op = IROp(StringToInt(parser->ReadToken().getContent()));
             }
             else
             {
                 modifier->opToken = parser->ReadToken(TokenType::Identifier);
 
-                modifier->op = findIROp(modifier->opToken.Content);
+                modifier->op = findIROp(modifier->opToken.getContent());
 
                 if (modifier->op == kIROp_Invalid)
                 {
@@ -4984,7 +4984,7 @@ namespace Slang
         outToken = parser->ReadToken();
         parser->ReadToken(TokenType::RParent);
 
-        UnownedStringSlice content = outToken.Content;
+        UnownedStringSlice content = outToken.getContent();
         // We allow specified as major.minor or as a string (in quotes)
         switch (outToken.type)
         {
@@ -5162,7 +5162,7 @@ namespace Slang
     {
         RefPtr<BuiltinTypeModifier> modifier = new BuiltinTypeModifier();
         parser->ReadToken(TokenType::LParent);
-        modifier->tag = BaseType(StringToInt(parser->ReadToken(TokenType::IntegerLiteral).Content));
+        modifier->tag = BaseType(StringToInt(parser->ReadToken(TokenType::IntegerLiteral).getContent()));
         parser->ReadToken(TokenType::RParent);
 
         return modifier;
@@ -5172,10 +5172,10 @@ namespace Slang
     {
         RefPtr<MagicTypeModifier> modifier = new MagicTypeModifier();
         parser->ReadToken(TokenType::LParent);
-        modifier->name = parser->ReadToken(TokenType::Identifier).Content;
+        modifier->name = parser->ReadToken(TokenType::Identifier).getContent();
         if (AdvanceIf(parser, TokenType::Comma))
         {
-            modifier->tag = uint32_t(StringToInt(parser->ReadToken(TokenType::IntegerLiteral).Content));
+            modifier->tag = uint32_t(StringToInt(parser->ReadToken(TokenType::IntegerLiteral).getContent()));
         }
         parser->ReadToken(TokenType::RParent);
 
@@ -5186,10 +5186,10 @@ namespace Slang
     {
         RefPtr<IntrinsicTypeModifier> modifier = new IntrinsicTypeModifier();
         parser->ReadToken(TokenType::LParent);
-        modifier->irOp = uint32_t(StringToInt(parser->ReadToken(TokenType::IntegerLiteral).Content));
+        modifier->irOp = uint32_t(StringToInt(parser->ReadToken(TokenType::IntegerLiteral).getContent()));
         while( AdvanceIf(parser, TokenType::Comma) )
         {
-            auto operand = uint32_t(StringToInt(parser->ReadToken(TokenType::IntegerLiteral).Content));
+            auto operand = uint32_t(StringToInt(parser->ReadToken(TokenType::IntegerLiteral).getContent()));
             modifier->irOperands.add(operand);
         }
         parser->ReadToken(TokenType::RParent);
@@ -5203,7 +5203,7 @@ namespace Slang
         ConversionCost cost = kConversionCost_Default;
         if( AdvanceIf(parser, TokenType::LParent) )
         {
-            cost = ConversionCost(StringToInt(parser->ReadToken(TokenType::IntegerLiteral).Content));
+            cost = ConversionCost(StringToInt(parser->ReadToken(TokenType::IntegerLiteral).getContent()));
             parser->ReadToken(TokenType::RParent);
         }
         modifier->cost = cost;

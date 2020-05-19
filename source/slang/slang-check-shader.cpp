@@ -396,7 +396,7 @@ namespace Slang
                 {
                     const auto& semanticToken = semantic->name;
 
-                    String lowerName = String(semanticToken.Content).toLower();
+                    String lowerName = String(semanticToken.getContent()).toLower();
 
                     if(lowerName == "sv_dispatchthreadid")
                     {

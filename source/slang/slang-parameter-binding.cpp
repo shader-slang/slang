@@ -490,7 +490,7 @@ LayoutSemanticInfo ExtractLayoutSemanticInfo(
     info.index = 0;
     info.kind = LayoutResourceKind::None;
 
-    UnownedStringSlice registerName = semantic->registerName.Content;
+    UnownedStringSlice registerName = semantic->registerName.getContent();
     if (registerName.getLength() == 0)
         return info;
 
@@ -533,7 +533,7 @@ LayoutSemanticInfo ExtractLayoutSemanticInfo(
     UInt space = 0;
     if( auto registerSemantic = as<HLSLRegisterSemantic>(semantic) )
     {
-        auto const& spaceName = registerSemantic->spaceName.Content;
+        auto const& spaceName = registerSemantic->spaceName.getContent();
         if(spaceName.getLength() != 0)
         {
             UnownedStringSlice spaceSpelling;
@@ -564,7 +564,7 @@ LayoutSemanticInfo ExtractLayoutSemanticInfo(
     }
 
     // TODO: handle component mask part of things...
-    if( semantic->componentMask.Content.getLength() != 0 )
+    if( semantic->componentMask.hasContent())
     {
         getSink(context)->diagnose(semantic->componentMask, Diagnostics::componentMaskNotSupported);
     }
@@ -589,7 +589,7 @@ static bool findLayoutArg(
     {
         if( modifier )
         {
-            *outVal = (UInt) strtoull(String(modifier->valToken.Content).getBuffer(), nullptr, 10);
+            *outVal = (UInt) strtoull(String(modifier->valToken.getContent()).getBuffer(), nullptr, 10);
             return true;
         }
     }
@@ -1336,7 +1336,7 @@ struct SimpleSemanticInfo
 SimpleSemanticInfo decomposeSimpleSemantic(
     HLSLSimpleSemantic* semantic)
 {
-    auto composedName = semantic->name.Content;
+    auto composedName = semantic->name.getContent();
 
     // look for a trailing sequence of decimal digits
     // at the end of the composed name
