@@ -8,9 +8,6 @@
 
 #include "slang-ast-generated-macro.h"
 
-// There could be an argument for using the SourceWriter, but whilst that has some useful stuff
-// like the automatic indentation, it is a little clumsy in some other ways, like how to build up
-// a result via << operators is not available.
 namespace Slang {
 
 namespace { // anonymous
@@ -464,6 +461,7 @@ struct Context
 
     Index m_scopeWriteCount;
 
+    // Using the SourceWriter, for automatic indentation.
     SourceWriter* m_writer;
 
     Dictionary<RefObject*, Index> m_objectMap;  ///< Object index
