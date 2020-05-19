@@ -230,32 +230,36 @@ struct Context
         return (v < 10) ? char(v + '0') : char('a' + v - 10);
     }
 
+    static bool _isPrintableChar(char c)
+    {
+        return c >= 0x20 && c < 0x80;
+    }
+
     void dump(const UnownedStringSlice& slice)
     {
-        m_writer->emitChar('\"');
-
+        
+        ScopeWrite scope(this);
+        auto& buf = scope.getBuf();
+        buf.appendChar('\"');
+        for (const char c : slice)
         {
-            ScopeWrite scope(this);
-            auto& buf = scope.getBuf();
-            for (const char c : slice)
+            if (_isPrintableChar(c))
             {
-                if (c < 0x20 || c >= 0x80)
-                {
-                    buf << "\\0x" <<  _getHexDigit(UInt32(c) >> 4) << _getHexDigit(c & 0xf);
-                }
-                else
-                {
-                    buf << c;
-                }
+                buf << c;
+            }
+            else
+            {
+                buf << "\\0x" <<  _getHexDigit(UInt32(c) >> 4) << _getHexDigit(c & 0xf);
             }
         }
-        m_writer->emitChar('\"');
+        buf.appendChar('\"');
     }
     
     void dump(const Token& token)
     {
         ScopeWrite(this).getBuf() << " { " << TokenTypeToString(token.type) << ", ";
         dump(token.loc);
+        m_writer->emit(" ");
         dump(token.getContent());
         m_writer->emit(" }");
     }
@@ -508,6 +512,27 @@ struct Context
             {
                 dumpObjectFull(*info.m_typeInfo, info.m_object, i);
             }
+        }
+    }
+
+    void dump(ContainerDecl* decl)
+    {
+        if (auto moduleDecl = dynamicCast<ModuleDecl>(decl))
+        {
+            // Lets special case handling of module decls -> we only want to output as references
+            // otherwise we end up dumping everything in every module.
+
+            const ReflectClassInfo& typeInfo = moduleDecl->getClassInfo();
+            Index index = getObjectIndex(typeInfo, moduleDecl);
+
+            // We don't want to fully dump, referenced modules as doing so dumps everything
+            m_objects[index].m_isDumped = true;
+
+            dumpObjectReference(typeInfo, moduleDecl, index);
+        }
+        else
+        {
+            dump(static_cast<NodeBase*>(decl));
         }
     }
 
