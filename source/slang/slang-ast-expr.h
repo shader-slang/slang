@@ -176,6 +176,14 @@ class StaticMemberExpr: public DeclRefExpr
     RefPtr<Expr> BaseExpression;
 };
 
+class MatrixSwizzleExpr : public Expr
+{
+    SLANG_CLASS(MatrixSwizzleExpr)
+    RefPtr<Expr> base;
+    int elementCount;
+    int elementIndices[4][2];
+};
+
 class SwizzleExpr: public Expr
 {
     SLANG_CLASS(SwizzleExpr)

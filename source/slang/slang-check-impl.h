@@ -1283,6 +1283,18 @@ namespace Slang
 
         RefPtr<Expr> MaybeDereference(RefPtr<Expr> inExpr);
 
+        RefPtr<Expr> CheckMatrixSwizzleExpr(
+            MemberExpr* memberRefExpr,
+            RefPtr<Type>      baseElementType,
+            IntegerLiteralValue        baseElementRowCount,
+            IntegerLiteralValue        baseElementColCount);
+
+        RefPtr<Expr> CheckMatrixSwizzleExpr(
+            MemberExpr* memberRefExpr,
+            RefPtr<Type>      baseElementType,
+            RefPtr<IntVal>        baseElementRowCount,
+            RefPtr<IntVal>        baseElementColCount);
+
         RefPtr<Expr> CheckSwizzleExpr(
             MemberExpr* memberRefExpr,
             RefPtr<Type>      baseElementType,
@@ -1359,6 +1371,7 @@ namespace Slang
         }
 
         CASE(DerefExpr)
+        CASE(MatrixSwizzleExpr)
         CASE(SwizzleExpr)
         CASE(OverloadedExpr)
         CASE(OverloadedExpr2)
