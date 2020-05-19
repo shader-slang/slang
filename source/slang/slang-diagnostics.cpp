@@ -70,7 +70,7 @@ void printDiagnosticArg(StringBuilder& sb, TokenType tokenType)
 
 void printDiagnosticArg(StringBuilder& sb, Token const& token)
 {
-    sb << token.Content;
+    sb << token.getContent();
 }
 
 SourceLoc const& getDiagnosticPos(Token const& token)

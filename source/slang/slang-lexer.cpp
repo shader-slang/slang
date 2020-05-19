@@ -545,8 +545,10 @@ namespace Slang
     {
         IntegerLiteralValue value = 0;
 
-        char const* cursor = token.Content.begin();
-        char const* end = token.Content.end();
+        const UnownedStringSlice content = token.getContent();
+
+        char const* cursor = content.begin();
+        char const* end = content.end();
 
         int base = _readOptionalBase(&cursor);
 
@@ -571,8 +573,10 @@ namespace Slang
     {
         FloatingPointLiteralValue value = 0;
 
-        char const* cursor = token.Content.begin();
-        char const* end = token.Content.end();
+        const UnownedStringSlice content = token.getContent();
+
+        char const* cursor = content.begin();
+        char const* end = content.end();
 
         int radix = _readOptionalBase(&cursor);
 
@@ -756,8 +760,10 @@ namespace Slang
         SLANG_ASSERT(token.type == TokenType::StringLiteral
             || token.type == TokenType::CharLiteral);
 
-        char const* cursor = token.Content.begin();
-        char const* end = token.Content.end();
+        const UnownedStringSlice content = token.getContent();
+
+        char const* cursor = content.begin();
+        char const* end = content.end();
         SLANG_UNREFERENCED_VARIABLE(end);
 
         auto quote = *cursor++;
@@ -879,13 +885,15 @@ namespace Slang
 
     String getFileNameTokenValue(Token const& token)
     {
+        const UnownedStringSlice content = token.getContent();
+
         // A file name usually doesn't process escape sequences
         // (this is import on Windows, where `\\` is a valid
         // path separator character).
 
         // Just trim off the first and last characters to remove the quotes
         // (whether they were `""` or `<>`.
-        return String(token.Content.begin() + 1, token.Content.end() - 1); 
+        return String(content.begin() + 1, content.end() - 1); 
     }
 
 
@@ -1298,11 +1306,11 @@ namespace Slang
                         }
                         *dst++ = c;
                     }
-                    token.Content = UnownedStringSlice(startDst, dst);
+                    token.setContent(UnownedStringSlice(startDst, dst));
                 }
                 else
                 {
-                    token.Content = UnownedStringSlice(textBegin, textEnd);
+                    token.setContent(UnownedStringSlice(textBegin, textEnd));
                 }
             }
 
@@ -1312,7 +1320,7 @@ namespace Slang
 
             if (tokenType == TokenType::Identifier)
             {
-                token.ptrValue = m_namePool->getName(token.Content);
+                token.setName(m_namePool->getName(token.getContent()));
             }
 
             return token;
