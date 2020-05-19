@@ -426,9 +426,9 @@ void Node::addChild(Node* child)
     child->m_parentScope = this;
     m_children.add(child);
 
-    if (child->m_name.Content.getLength())
+    if (child->m_name.hasContent())
     {
-        m_childMap.Add(child->m_name.Content, child);
+        m_childMap.Add(child->m_name.getContent(), child);
     }
 }
 
@@ -474,10 +474,10 @@ static void _indent(Index indentCount, StringBuilder& out)
 
 void Node::dumpDerived(int indentCount, StringBuilder& out)
 {
-    if (isClassLike() && isReflected() && m_name.Content.getLength() > 0)
+    if (isClassLike() && isReflected() && m_name.hasContent())
     {
         _indent(indentCount, out);
-        out << m_name.Content << "\n";
+        out << m_name.getContent() << "\n";
     }
 
     for (Node* derivedType : m_derivedTypes)
@@ -498,9 +498,9 @@ void Node::dump(int indentCount, StringBuilder& out)
         }
         case Type::Namespace:
         {
-            if (m_name.Content.getLength())
+            if (m_name.hasContent())
             {
-                out << "namespace " << m_name.Content << " {\n";
+                out << "namespace " << m_name.getContent() << " {\n";
             }
             else
             {
@@ -519,15 +519,15 @@ void Node::dump(int indentCount, StringBuilder& out)
             {
                 out << " (";
             }
-            out << m_name.Content;
+            out << m_name.getContent();
             if (!isReflected())
             {
                 out << ") ";
             }
 
-            if (m_super.Content.getLength())
+            if (m_super.hasContent())
             {
-                out << " : " << m_super.Content; 
+                out << " : " << m_super.getContent(); 
             }
 
             out << " {\n";
@@ -545,7 +545,7 @@ void Node::dump(int indentCount, StringBuilder& out)
         if (field.isReflected())
         {
             _indent(indentCount + 1, out);
-            out << field.type << " " << field.name.Content << "\n";
+            out << field.type << " " << field.name.getContent() << "\n";
         }
     }
 
@@ -557,11 +557,11 @@ void Node::calcAbsoluteName(StringBuilder& outName) const
 {
     if (m_parentScope == nullptr)
     {
-        if (m_name.Content.getLength() == 0)
+        if (!m_name.hasContent())
         {
             return;
         }
-        outName << m_name.Content;
+        outName << m_name.getContent();
     }
     else
     {
@@ -572,7 +572,7 @@ void Node::calcAbsoluteName(StringBuilder& outName) const
         }
         else
         {
-            outName << m_name.Content;
+            outName << m_name.getContent();
         }
     }
 }
@@ -894,7 +894,7 @@ bool CPPExtractor::advanceIfToken(TokenType type, Token* outToken)
 bool CPPExtractor::advanceIfMarker(Token* outToken)
 {
     const Token peekToken = m_reader.peekToken();
-    if (peekToken.type == TokenType::Identifier && _isMarker(peekToken.Content))
+    if (peekToken.type == TokenType::Identifier && _isMarker(peekToken.getContent()))
     {
         m_reader.advanceToken();
         if (outToken)
@@ -910,7 +910,7 @@ bool CPPExtractor::advanceIfStyle(IdentifierStyle style, Token* outToken)
 {
     if (m_reader.peekTokenType() == TokenType::Identifier)
     {
-        IdentifierStyle readStyle = m_identifierLookup->get(m_reader.peekToken().Content);
+        IdentifierStyle readStyle = m_identifierLookup->get(m_reader.peekToken().getContent());
         if (readStyle == style)
         {
             Token token = m_reader.advanceToken();
@@ -944,17 +944,17 @@ SlangResult CPPExtractor::pushNode(Node* node)
         m_origin->addNode(node);
     }
 
-    if (node->m_name.Content.getLength())
+    if (node->m_name.hasContent())
     {
         // For anonymous namespace, we should look if we already have one and just reopen that. Doing so will mean will
         // find anonymous namespace clashes
 
-        if (Node* foundNode = m_currentNode->findChild(node->m_name.Content))
+        if (Node* foundNode = m_currentNode->findChild(node->m_name.getContent()))
         {
             if (node->isClassLike())
             {
-                m_sink->diagnose(m_reader.peekToken(), CPPDiagnostics::typeAlreadyDeclared, node->m_name.Content);
-                m_sink->diagnose(foundNode->m_name, CPPDiagnostics::seeDeclarationOf, node->m_name.Content);
+                m_sink->diagnose(m_reader.peekToken(), CPPDiagnostics::typeAlreadyDeclared, node->m_name.getContent());
+                m_sink->diagnose(foundNode->m_name, CPPDiagnostics::seeDeclarationOf, node->m_name.getContent());
                 return SLANG_FAIL;
             }
 
@@ -1167,9 +1167,9 @@ SlangResult CPPExtractor::_maybeParseNode(Node::Type type)
     SLANG_RETURN_ON_FAIL(expect(TokenType::Identifier, &typeNameToken));
     SLANG_RETURN_ON_FAIL(expect(TokenType::RParent));
 
-    if (typeNameToken.Content != node->m_name.Content)
+    if (typeNameToken.getContent() != node->m_name.getContent())
     {
-        m_sink->diagnose(typeNameToken, CPPDiagnostics::typeNameDoesntMatch, node->m_name.Content);
+        m_sink->diagnose(typeNameToken, CPPDiagnostics::typeNameDoesntMatch, node->m_name.getContent());
         return SLANG_FAIL;
     }
     
@@ -1297,7 +1297,7 @@ UnownedStringSlice CPPExtractor::_concatTokens(TokenReader::ParsingCursor start)
     while (!m_reader.isAtCursor(endCursor))
     {
         const Token token = m_reader.advanceToken();
-        buf << token.Content;
+        buf << token.getContent();
     }
 
     return m_typePool->getSlice(m_typePool->add(buf));
@@ -1318,7 +1318,7 @@ SlangResult CPPExtractor::_maybeParseType(UnownedStringSlice& outType, Index& io
             return SLANG_FAIL;
         }
 
-        const IdentifierStyle style = m_identifierLookup->get(identifierToken.Content);
+        const IdentifierStyle style = m_identifierLookup->get(identifierToken.getContent());
         if (hasFlag(style, IdentifierFlag::Keyword))
         {
             return SLANG_FAIL;
@@ -1578,7 +1578,7 @@ SlangResult CPPExtractor::parse(SourceFile* sourceFile, const Options* options)
         {
             case TokenType::Identifier:
             {
-                const IdentifierStyle style = m_identifierLookup->get(m_reader.peekToken().Content);
+                const IdentifierStyle style = m_identifierLookup->get(m_reader.peekToken().getContent());
                 
                 switch (style)
                 {
@@ -1709,7 +1709,7 @@ SlangResult CPPExtractor::_calcDerivedTypesRec(Node* node)
 {
     if (node->isClassLike() && node->m_baseType == Node::BaseType::None)
     {
-        if (node->m_super.Content.getLength())
+        if (node->m_super.hasContent())
         {
             Node* parentScope = node->m_parentScope;
             if (parentScope == nullptr)
@@ -1718,12 +1718,12 @@ SlangResult CPPExtractor::_calcDerivedTypesRec(Node* node)
                 return SLANG_FAIL;
             }
 
-            Node* superType = parentScope->findChild(node->m_super.Content);
+            Node* superType = parentScope->findChild(node->m_super.getContent());
             if (!superType)
             {
                 if (node->isReflected())
                 {
-                    m_sink->diagnose(node->m_name, CPPDiagnostics::superTypeNotFound, node->m_name.Content);
+                    m_sink->diagnose(node->m_name, CPPDiagnostics::superTypeNotFound, node->m_name.getContent());
                     return SLANG_FAIL;
                 }
             }
@@ -1731,7 +1731,7 @@ SlangResult CPPExtractor::_calcDerivedTypesRec(Node* node)
             {
                 if (!superType->isClassLike())
                 {
-                    m_sink->diagnose(node->m_name, CPPDiagnostics::superTypeNotAType, node->m_name.Content);
+                    m_sink->diagnose(node->m_name, CPPDiagnostics::superTypeNotAType, node->m_name.getContent());
                     return SLANG_FAIL;
                 }
 
@@ -1840,7 +1840,7 @@ public:
 
 protected:
 
-        /// Called to set up identifer lookup. Must be performed after options are initials
+        /// Called to set up identifier lookup. Must be performed after options are initials
     static void _initIdentifierLookup(const Options& options, IdentifierLookup& outLookup);
 
     NamePool m_namePool;
@@ -1897,12 +1897,12 @@ SlangResult CPPExtractorApp::calcDef(CPPExtractor& extractor, SourceOrigin* orig
     {
         if (node->isClassLike() && node->isReflected())
         {
-            if (node->m_marker.Content.indexOf(UnownedStringSlice::fromLiteral("ABSTRACT")) >= 0)
+            if (node->m_marker.getContent().indexOf(UnownedStringSlice::fromLiteral("ABSTRACT")) >= 0)
             {
                 out << "ABSTRACT_";
             }
 
-            out << "SYNTAX_CLASS(" << node->m_name.Content << ", " << node->m_super.Content << ")\n";
+            out << "SYNTAX_CLASS(" << node->m_name.getContent() << ", " << node->m_super.getContent() << ")\n";
             out << "END_SYNTAX_CLASS()\n\n";
         }
     }
@@ -1940,7 +1940,7 @@ SlangResult CPPExtractorApp::calcChildrenHeader(CPPExtractor& extractor, StringB
             node->getReflectedDerivedTypes(derivedTypes);
 
             // Define the derived types
-            out << "#define " << m_options.m_prefixMark << "CHILDREN_" << reflectTypeName << "_"  << node->m_name.Content << "(x, param)";
+            out << "#define " << m_options.m_prefixMark << "CHILDREN_" << reflectTypeName << "_"  << node->m_name.getContent() << "(x, param)";
 
             if (derivedTypes.getCount())
             {
@@ -1949,7 +1949,7 @@ SlangResult CPPExtractorApp::calcChildrenHeader(CPPExtractor& extractor, StringB
                 {
                     Node* derivedType = derivedTypes[j];
                     _indent(1, out);
-                    out << m_options.m_prefixMark << "ALL_" << reflectTypeName << "_" << derivedType->m_name.Content << "(x, param)";
+                    out << m_options.m_prefixMark << "ALL_" << reflectTypeName << "_" << derivedType->m_name.getContent() << "(x, param)";
                     if (j < derivedTypes.getCount() - 1)
                     {
                         out << "\\\n";
@@ -1964,16 +1964,16 @@ SlangResult CPPExtractorApp::calcChildrenHeader(CPPExtractor& extractor, StringB
         for (Node* node : nodes)
         {
             // Define the derived types
-            out << "#define " << m_options.m_prefixMark << "ALL_" << reflectTypeName << "_" << node->m_name.Content << "(x, param) \\\n";
+            out << "#define " << m_options.m_prefixMark << "ALL_" << reflectTypeName << "_" << node->m_name.getContent() << "(x, param) \\\n";
             _indent(1, out);
-            out << m_options.m_prefixMark << reflectTypeName << "_"  << node->m_name.Content << "(x, param)";
+            out << m_options.m_prefixMark << reflectTypeName << "_"  << node->m_name.getContent() << "(x, param)";
 
             // If has derived types output them
             if (node->hasReflectedDerivedType())
             {
                 out << " \\\n";
                 _indent(1, out);
-                out << m_options.m_prefixMark << "CHILDREN_" << reflectTypeName << "_" << node->m_name.Content << "(x, param)";
+                out << m_options.m_prefixMark << "CHILDREN_" << reflectTypeName << "_" << node->m_name.getContent() << "(x, param)";
             }
             out << "\n\n";
         }
@@ -1985,7 +1985,7 @@ SlangResult CPPExtractorApp::calcChildrenHeader(CPPExtractor& extractor, StringB
             for (Node* node : nodes)
             {
                 // Define the derived types
-                out << "#define " << m_options.m_prefixMark << "FIELDS_" << reflectTypeName << "_" << node->m_name.Content << "(_x_, _param_)";
+                out << "#define " << m_options.m_prefixMark << "FIELDS_" << reflectTypeName << "_" << node->m_name.getContent() << "(_x_, _param_)";
 
                 if (node->m_fields.getCount() > 0)
                 {
@@ -2008,7 +2008,7 @@ SlangResult CPPExtractorApp::calcChildrenHeader(CPPExtractor& extractor, StringB
 
                             // NOTE! We put the type field in brackets, such that there is no issue with templates containing a comma.
                             // If stringified
-                            out << "_x_(" << field.name.Content << ", (" << field.type << "), _param_)";
+                            out << "_x_(" << field.name.getContent() << ", (" << field.type << "), _param_)";
                             previousField = true;
                         }
                     }
@@ -2050,7 +2050,7 @@ SlangResult CPPExtractorApp::calcHeader(CPPExtractor& extractor, StringBuilder& 
         for (Node* scopeNode : baseScopePath)
         {
             SLANG_ASSERT(scopeNode->m_type == Node::Type::Namespace);
-            out << "namespace " << scopeNode->m_name.Content << " {\n";
+            out << "namespace " << scopeNode->m_name.getContent() << " {\n";
         }
 
         List<Node*> nodes;
@@ -2069,7 +2069,7 @@ SlangResult CPPExtractorApp::calcHeader(CPPExtractor& extractor, StringBuilder& 
                 // Okay first we are going to output the enum values
                 const Index depth = node->calcDerivedDepth() - 1;
                 _indent(depth, out);
-                out << node->m_name.Content << " = " << typeIndex << ",\n";
+                out << node->m_name.getContent() << " = " << typeIndex << ",\n";
                 typeIndex++;
             }
 
@@ -2089,7 +2089,7 @@ SlangResult CPPExtractorApp::calcHeader(CPPExtractor& extractor, StringBuilder& 
                 if (node->isReflected())
                 {
                     const char* type = (node->m_type == Node::Type::ClassType) ? "class" : "struct";
-                    out << type << " " << node->m_name.Content << ";\n";
+                    out << type << " " << node->m_name.getContent() << ";\n";
                 }
             }
         }
@@ -2110,15 +2110,15 @@ SlangResult CPPExtractorApp::calcHeader(CPPExtractor& extractor, StringBuilder& 
             // Output all of the definitions for each type
             for (Node* node : nodes)
             {
-                out << "#define " << m_options.m_prefixMark <<  reflectTypeName << "_" << node->m_name.Content << "(x, param) ";
+                out << "#define " << m_options.m_prefixMark <<  reflectTypeName << "_" << node->m_name.getContent() << "(x, param) ";
 
                 // Output the X macro part
                 _indent(1, out);
-                out << "x(" << node->m_name.Content << ", ";
+                out << "x(" << node->m_name.getContent() << ", ";
 
                 if (node->m_superNode)
                 {
-                    out << node->m_superNode->m_name.Content << ", ";
+                    out << node->m_superNode->m_name.getContent() << ", ";
                 }
                 else
                 {
@@ -2133,7 +2133,7 @@ SlangResult CPPExtractorApp::calcHeader(CPPExtractor& extractor, StringBuilder& 
                 Node* lastDerived = node->findLastDerived();
                 if (lastDerived)
                 {
-                    out << lastDerived->m_name.Content << ", ";
+                    out << lastDerived->m_name.getContent() << ", ";
                 }
                 else
                 {
@@ -2141,7 +2141,7 @@ SlangResult CPPExtractorApp::calcHeader(CPPExtractor& extractor, StringBuilder& 
                 }
 
                 // Output any specifics of the markup
-                UnownedStringSlice marker = node->m_marker.Content;
+                UnownedStringSlice marker = node->m_marker.getContent();
                 // Need to extract the name
                 if (marker.getLength() > m_options.m_prefixMark.getLength() + m_options.m_postfixMark.getLength())
                 {
@@ -2174,7 +2174,7 @@ SlangResult CPPExtractorApp::calcHeader(CPPExtractor& extractor, StringBuilder& 
         for (Index j = baseScopePath.getCount() - 1; j >= 0; j--)
         {
             Node* scopeNode = baseScopePath[j];
-            out << "} // namespace " << scopeNode->m_name.Content << "\n";
+            out << "} // namespace " << scopeNode->m_name.getContent() << "\n";
         }
     }
 
@@ -2194,7 +2194,7 @@ SlangResult CPPExtractorApp::calcHeader(CPPExtractor& extractor, StringBuilder& 
             }
 
             _indent(1, out);
-            out << "x(" << node->m_name.Content << ", param) \\\n";
+            out << "x(" << node->m_name.getContent() << ", param) \\\n";
         }
         out << "/* */\n\n";
     }

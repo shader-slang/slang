@@ -172,7 +172,7 @@ struct Context
     {
         ScopeWrite(this).getBuf() << " { " << TokenTypeToString(token.type) << ", ";
         dump(token.loc);
-        dump(token.Content);
+        dump(token.getContent());
         m_writer->emit(" }");
     }
 
