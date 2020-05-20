@@ -14,6 +14,8 @@
 #include "slang-reflection.h"
 #include "slang-type-layout.h"
 
+#include "slang-ast-dump.h"
+
 #include "slang-state-serialize.h"
 
 #include "slang-file-system.h"
@@ -996,6 +998,25 @@ void FrontEndCompileRequest::parseTranslationUnit(
             tokens,
             getSink(),
             languageScope);
+
+        // Let's try dumping
+
+        if (shouldDumpAST)
+        {
+            StringBuilder buf;
+            SourceWriter writer(linkage->getSourceManager(), LineDirectiveMode::None);
+
+            ASTDumpUtil::dump(translationUnit->getModuleDecl(), ASTDumpUtil::Style::Flat, &writer);
+
+            const String& path = sourceFile->getPathInfo().foundPath;
+            if (path.getLength())
+            {
+                String fileName = Path::getFileNameWithoutExt(path);
+                fileName.append(".slang-ast");
+
+                File::writeAllText(fileName, writer.getContent());
+            }
+        }
     }
 }
 

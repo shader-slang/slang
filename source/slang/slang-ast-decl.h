@@ -441,6 +441,8 @@ class SyntaxDecl : public Decl
     // What type of syntax node will be produced when parsing with this keyword?
     SyntaxClass<RefObject> syntaxClass;
 
+    SLANG_UNREFLECTED
+
     // Callback to invoke in order to parse syntax with this keyword.
     SyntaxParseCallback  parseCallback;
     void*                parseUserData;

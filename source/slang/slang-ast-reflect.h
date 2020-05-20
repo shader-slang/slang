@@ -53,5 +53,7 @@
 
 // Does nothing - just a mark to the C++ extractor
 #define SLANG_REFLECT_BASE_CLASS(NAME)
+#define SLANG_REFLECTED
+#define SLANG_UNREFLECTED
 
 #endif // SLANG_AST_REFLECT_H

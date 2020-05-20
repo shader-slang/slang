@@ -27,6 +27,9 @@
     <ClInclude Include="slang-ast-decl.h">
       <Filter>Header Files</Filter>
     </ClInclude>
+    <ClInclude Include="slang-ast-dump.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
     <ClInclude Include="slang-ast-expr.h">
       <Filter>Header Files</Filter>
     </ClInclude>
@@ -260,6 +263,9 @@
     </ClInclude>
   </ItemGroup>
   <ItemGroup>
+    <ClCompile Include="slang-ast-dump.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
     <ClCompile Include="slang-ast-reflect.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
