@@ -74,7 +74,7 @@ class Val : public NodeBase
 
     typedef IValVisitor Visitor;
 
-    virtual void accept(IValVisitor* visitor, void* extra) = 0;
+    void accept(IValVisitor* visitor, void* extra);
 
     // construct a new value by applying a set of parameter
     // substitutions to this one
@@ -122,8 +122,7 @@ class Type: public Val
 
     typedef ITypeVisitor Visitor;
 
-    virtual void accept(IValVisitor* visitor, void* extra) override;
-    virtual void accept(ITypeVisitor* visitor, void* extra) = 0;
+    void accept(ITypeVisitor* visitor, void* extra);
 
 public:
     Session* getSession() { return this->session; }
@@ -270,7 +269,7 @@ class Modifier : public SyntaxNode
     SLANG_ABSTRACT_CLASS(Modifier)
     typedef IModifierVisitor Visitor;
 
-    virtual void accept(IModifierVisitor* visitor, void* extra) = 0;
+    void accept(IModifierVisitor* visitor, void* extra);
 
     // Next modifier in linked list of modifiers on same piece of syntax
     RefPtr<Modifier> next;
@@ -311,7 +310,7 @@ class DeclBase : public ModifiableSyntaxNode
 
     typedef IDeclVisitor Visitor;
 
-    virtual void accept(IDeclVisitor* visitor, void* extra) = 0;
+    void accept(IDeclVisitor* visitor, void* extra);
 };
 
 class Decl : public DeclBase
@@ -349,7 +348,7 @@ class Expr : public SyntaxNode
 
     QualType type;
 
-    virtual void accept(IExprVisitor* visitor, void* extra) = 0;
+    void accept(IExprVisitor* visitor, void* extra);
 };
 
 class Stmt : public ModifiableSyntaxNode
@@ -358,7 +357,7 @@ class Stmt : public ModifiableSyntaxNode
 
     typedef IStmtVisitor Visitor;
 
-    virtual void accept(IStmtVisitor* visitor, void* extra) = 0;
+    void accept(IStmtVisitor* visitor, void* extra);
 };
 
 } // namespace Slang

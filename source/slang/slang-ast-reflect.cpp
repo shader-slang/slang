@@ -9,6 +9,8 @@
 #include <typeinfo>
 #include <assert.h>
 
+#include "slang-visitor.h"
+
 #include "slang-ast-generated-macro.h"
 
 namespace Slang
@@ -66,5 +68,91 @@ struct CreateImpl
 SLANG_ALL_ASTNode_NodeBase(SLANG_REFLECT_CLASS_INFO, _)
 SLANG_ALL_ASTNode_Substitutions(SLANG_REFLECT_CLASS_INFO, _)
 
+// We dispatch to non 'abstract' types
+#define SLANG_CASE_NONE(NAME)           case ASTNodeType::NAME: return visitor->dispatch_##NAME(static_cast<NAME*>(this), extra);
+#define SLANG_CASE_ABSTRACT(NAME)
+
+#define SLANG_CASE_DISPATCH(NAME, SUPER, ORIGIN, LAST, MARKER, TYPE, param)  SLANG_CASE_##MARKER(NAME)
+
+void Val::accept(IValVisitor* visitor, void* extra)
+{
+    const ReflectClassInfo& classInfo = getClassInfo();
+    const ASTNodeType astType = ASTNodeType(classInfo.m_classId);
+
+    // If the Val is *really* a type, we convert into a type visitor.
+    if (Type::kReflectClassInfo.isDerivedFrom(uint32_t(astType)))
+    {
+        Type* type = static_cast<Type*>(this);
+        type->accept((ITypeVisitor*)visitor, extra);
+    }
+    else
+    {
+        switch (astType)
+        {
+            SLANG_CHILDREN_ASTNode_Val(SLANG_CASE_DISPATCH, _)
+            default: SLANG_ASSERT(!"Unknown type");
+        }
+    }
+}
+
+void Type::accept(ITypeVisitor* visitor, void* extra)
+{
+    const ReflectClassInfo& classInfo = getClassInfo();
+    const ASTNodeType astType = ASTNodeType(classInfo.m_classId);
+
+    switch (astType)
+    {
+        SLANG_CHILDREN_ASTNode_Type(SLANG_CASE_DISPATCH, _)
+        default: SLANG_ASSERT(!"Unknown type");
+    }
+}
+
+void Modifier::accept(IModifierVisitor* visitor, void* extra)
+{
+    const ReflectClassInfo& classInfo = getClassInfo();
+    const ASTNodeType astType = ASTNodeType(classInfo.m_classId);
+
+    switch (astType)
+    {
+        SLANG_CHILDREN_ASTNode_Modifier(SLANG_CASE_DISPATCH, _)
+        default: SLANG_ASSERT(!"Unknown type");
+    }
+}
+
+void DeclBase::accept(IDeclVisitor* visitor, void* extra)
+{
+    const ReflectClassInfo& classInfo = getClassInfo();
+    const ASTNodeType astType = ASTNodeType(classInfo.m_classId);
+
+    switch (astType)
+    {
+        SLANG_CHILDREN_ASTNode_DeclBase(SLANG_CASE_DISPATCH, _)
+        default: SLANG_ASSERT(!"Unknown type");
+    }
+}
+
+void Expr::accept(IExprVisitor* visitor, void* extra)
+{
+    const ReflectClassInfo& classInfo = getClassInfo();
+    const ASTNodeType astType = ASTNodeType(classInfo.m_classId);
+
+    switch (astType)
+    {
+        SLANG_CHILDREN_ASTNode_Expr(SLANG_CASE_DISPATCH, _)
+        default: SLANG_ASSERT(!"Unknown type");
+    }
+}
+
+void Stmt::accept(IStmtVisitor* visitor, void* extra)
+{
+    const ReflectClassInfo& classInfo = getClassInfo();
+    const ASTNodeType astType = ASTNodeType(classInfo.m_classId);
+
+    switch (astType)
+    {
+        SLANG_CHILDREN_ASTNode_Stmt(SLANG_CASE_DISPATCH, _)
+        default: SLANG_ASSERT(!"Unknown type");
+    }
+}
 
 } // namespace Slang
