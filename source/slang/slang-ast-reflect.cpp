@@ -74,24 +74,38 @@ SLANG_ALL_ASTNode_Substitutions(SLANG_REFLECT_CLASS_INFO, _)
 
 #define SLANG_CASE_DISPATCH(NAME, SUPER, ORIGIN, LAST, MARKER, TYPE, param)  SLANG_CASE_##MARKER(NAME)
 
+// A special case used in Val::accept, because can be Type derived too
+#define SLANG_CASE_TYPE_NONE(NAME)           case ASTNodeType::NAME: return ((ITypeVisitor*)visitor)->dispatch_##NAME(static_cast<NAME*>(this), extra);
+#define SLANG_CASE_TYPE_ABSTRACT(NAME)
+
+#define SLANG_CASE_TYPE_DISPATCH(NAME, SUPER, ORIGIN, LAST, MARKER, TYPE, param)  SLANG_CASE_TYPE_##MARKER(NAME)
+
+// Use origin lists, to generate regular and type dispatch
+
+#define SLANG_ORIGIN_CASE_DISPATCH(NAME, param) SLANG_ASTNode_##NAME(SLANG_CASE_DISPATCH, param)
+#define SLANG_ORIGIN_CASE_TYPE_DISPATCH(NAME, param) SLANG_ASTNode_##NAME(SLANG_CASE_TYPE_DISPATCH, param)
+
 void Val::accept(IValVisitor* visitor, void* extra)
 {
     const ReflectClassInfo& classInfo = getClassInfo();
     const ASTNodeType astType = ASTNodeType(classInfo.m_classId);
 
-    // If the Val is *really* a type, we convert into a type visitor.
-    if (Type::kReflectClassInfo.isDerivedFrom(uint32_t(astType)))
+    switch (astType)
     {
-        Type* type = static_cast<Type*>(this);
-        type->accept((ITypeVisitor*)visitor, extra);
-    }
-    else
-    {
-        switch (astType)
-        {
-            SLANG_CHILDREN_ASTNode_Val(SLANG_CASE_DISPATCH, _)
-            default: SLANG_ASSERT(!"Unknown type");
-        }
+        // Here some trickery is used. When virtual methods were used, the override of the IValVistor
+        // function on Type, would cast to a ITypeVisitor and then 'accept' that.
+        //
+        // Here I want to dispatch to the correct visitor depending on the underlying type.
+        // A problem is that the 'Val' hierachy contains both Type and other things, so if I want a single
+        // switch I have to partition.
+        //
+        // A simpler (but less efficient) method would be to cast this to a type, and if that works use the ITypeVistor.
+        // Here I use the 'ORIGIN' which uses the file 'ORIGIN' of the class. It turns out that Type and Val are partitioned
+        // such that there is no cross over, and contain the appropriate split of types
+        SLANG_ORIGIN_TYPE_ASTNode(SLANG_ORIGIN_CASE_TYPE_DISPATCH, _)
+        SLANG_ORIGIN_VAL_ASTNode(SLANG_ORIGIN_CASE_DISPATCH, _)
+
+        default: SLANG_ASSERT(!"Unknown type");
     }
 }
 
