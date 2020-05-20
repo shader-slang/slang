@@ -74,16 +74,6 @@ SLANG_ALL_ASTNode_Substitutions(SLANG_REFLECT_CLASS_INFO, _)
 
 #define SLANG_CASE_DISPATCH(NAME, SUPER, ORIGIN, LAST, MARKER, TYPE, param)  SLANG_CASE_##MARKER(NAME)
 
-// A special case used in Val::accept, because can be Type derived too
-
-#define SLANG_CASE_ORIGIN_VAL(NAME)        case ASTNodeType::NAME: return visitor->dispatch_##NAME(static_cast<NAME*>(this), extra);
-#define SLANG_CASE_ORIGIN_TYPE(NAME)       case ASTNodeType::NAME: return ((ITypeVisitor*)visitor)->dispatch_##NAME(static_cast<NAME*>(this), extra);
-
-#define SLANG_CASE_TYPE_NONE(NAME, ORIGIN)              SLANG_CASE_ORIGIN_##ORIGIN(NAME)
-#define SLANG_CASE_TYPE_ABSTRACT(NAME, ORIGIN)
-
-#define SLANG_CASE_TYPE_DISPATCH(NAME, SUPER, ORIGIN, LAST, MARKER, TYPE, param)  SLANG_CASE_TYPE_##MARKER(NAME, ORIGIN)
-
 void Val::accept(IValVisitor* visitor, void* extra)
 {
     const ReflectClassInfo& classInfo = getClassInfo();
@@ -91,19 +81,7 @@ void Val::accept(IValVisitor* visitor, void* extra)
 
     switch (astType)
     {
-        // Here some trickery is used. When virtual methods were used, the override of the IValVistor
-        // function on Type, would cast to a ITypeVisitor and then 'accept' that.
-        //
-        // I want to dispatch to the correct visitor depending on the underlying type.
-        // A problem is that the 'Val' hierarchy contains both Type and other things, so if I want a single
-        // switch I have to partition.
-        //
-        // A simpler (but less efficient) method would be to cast this to a type, and if that works use the ITypeVistor.
-        // Here I use the 'ORIGIN' which uses the file 'ORIGIN' of the class. It turns out that Type and Val are partitioned
-        // such that there is no cross over, and contain the appropriate split of types.
-
-        SLANG_CHILDREN_ASTNode_Val(SLANG_CASE_TYPE_DISPATCH, _)
-
+        SLANG_CHILDREN_ASTNode_Val(SLANG_CASE_DISPATCH, _)
         default: SLANG_ASSERT(!"Unknown type");
     }
 }
