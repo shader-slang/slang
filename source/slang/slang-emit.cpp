@@ -17,6 +17,7 @@
 #include "slang-ir-specialize-resources.h"
 #include "slang-ir-ssa.h"
 #include "slang-ir-strip-witness-tables.h"
+#include "slang-ir-synthesize-active-mask.h"
 #include "slang-ir-union.h"
 #include "slang-ir-validate.h"
 #include "slang-ir-wrap-structured-buffers.h"
@@ -498,6 +499,31 @@ Result linkAndOptimizeIR(
         }
 
         legalizeByteAddressBufferOps(session, irModule, byteAddressBufferOptions);
+    }
+
+    // For CUDA targets only, we will need to turn operations
+    // the implicitly reference the "active mask" into ones
+    // that use (and pass around) an explicit mask instead.
+    //
+    switch(target)
+    {
+    case CodeGenTarget::CUDASource:
+    case CodeGenTarget::PTX:
+        {
+            synthesizeActiveMask(
+                irModule,
+                compileRequest->getSink());
+
+#if 0
+            dumpIRIfEnabled(compileRequest, irModule, "AFTER synthesizeActiveMask");
+#endif
+            validateIRModuleIfEnabled(compileRequest, irModule);
+
+        }
+        break;
+
+    default:
+        break;
     }
 
     // For GLSL only, we will need to perform "legalization" of

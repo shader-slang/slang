@@ -180,6 +180,9 @@
     <ClInclude Include="slang-ir-strip.h">
       <Filter>Header Files</Filter>
     </ClInclude>
+    <ClInclude Include="slang-ir-synthesize-active-mask.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
     <ClInclude Include="slang-ir-type-set.h">
       <Filter>Header Files</Filter>
     </ClInclude>
@@ -419,6 +422,9 @@
     <ClCompile Include="slang-ir-strip.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
+    <ClCompile Include="slang-ir-synthesize-active-mask.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
     <ClCompile Include="slang-ir-type-set.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
@@ -505,6 +511,9 @@
     <CustomBuild Include="hlsl.meta.slang">
       <Filter>Source Files</Filter>
     </CustomBuild>
+    <CustomBuild Include="slang-ast-reflect.h">
+      <Filter>Header Files</Filter>
+    </CustomBuild>
   </ItemGroup>
   <ItemGroup>
     <Natvis Include="..\core\core.natvis">
@@ -513,11 +522,5 @@
     <Natvis Include="slang.natvis">
       <Filter>Source Files</Filter>
     </Natvis>
-    <CustomBuild Include="hlsl.meta.slang">
-      <Filter>Source Files</Filter>
-    </CustomBuild>
-    <CustomBuild Include="slang-ast-reflect.h">
-      <Filter>Header Files</Filter>
-    </CustomBuild>
   </ItemGroup>
 </Project>
