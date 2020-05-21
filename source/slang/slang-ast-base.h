@@ -143,7 +143,8 @@ protected:
 
     virtual RefPtr<Type> CreateCanonicalType() = 0;
     Type* canonicalType = nullptr;
-    
+
+    SLANG_UNREFLECTED
     Session* session = nullptr;
 };
 
