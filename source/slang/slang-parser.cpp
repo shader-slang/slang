@@ -1310,13 +1310,13 @@ namespace Slang
             replaceScopeVisitor.scope = parser->currentScope;
             declaratorInfo.typeSpec->accept(&replaceScopeVisitor, nullptr);
 
-            decl->ReturnType = TypeExp(declaratorInfo.typeSpec);
+            decl->returnType = TypeExp(declaratorInfo.typeSpec);
 
             parser->PushScope(decl);
 
             parseParameterList(parser, decl);
             ParseOptSemantics(parser, decl.Ptr());
-            decl->Body = parseOptBody(parser);
+            decl->body = parseOptBody(parser);
 
             parser->PopScope();
 
@@ -2629,7 +2629,7 @@ namespace Slang
 
         parseParameterList(parser, decl);
 
-        decl->Body = parseOptBody(parser);
+        decl->body = parseOptBody(parser);
 
         parser->PopScope();
         return decl;
@@ -2662,7 +2662,7 @@ namespace Slang
 
         if( parser->tokenReader.peekTokenType() == TokenType::LBrace )
         {
-            decl->Body = parser->parseBlockStatement();
+            decl->body = parser->parseBlockStatement();
         }
         else
         {
@@ -2685,7 +2685,7 @@ namespace Slang
 
         if( AdvanceIf(parser, TokenType::RightArrow) )
         {
-            decl->ReturnType = parser->ParseTypeExp();
+            decl->returnType = parser->ParseTypeExp();
         }
 
         if( AdvanceIf(parser, TokenType::LBrace) )
@@ -2801,9 +2801,9 @@ namespace Slang
             parseModernParamList(parser, decl);
             if(AdvanceIf(parser, TokenType::RightArrow))
             {
-                decl->ReturnType = parser->ParseTypeExp();
+                decl->returnType = parser->ParseTypeExp();
             }
-            decl->Body = parseOptBody(parser);
+            decl->body = parseOptBody(parser);
             parser->PopScope();
             return decl;
         });

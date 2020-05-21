@@ -646,7 +646,7 @@ LoweredValInfo emitCallToDeclRef(
 
     if( auto ctorDeclRef = funcDeclRef.as<ConstructorDecl>() )
     {
-        if(!ctorDeclRef.getDecl()->Body)
+        if(!ctorDeclRef.getDecl()->body)
         {
             // HACK: For legacy reasons, all of the built-in initializers
             // in the standard library are declared without proper
@@ -5461,7 +5461,7 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
             // we are in a `static` context.
             if( mode == kParameterListCollectMode_Default )
             {
-                for( auto paramDecl : callableDecl->GetParameters() )
+                for( auto paramDecl : callableDecl->getParameters() )
                 {
                     ioParameterLists->params.add(getParameterInfo(paramDecl));
                 }
@@ -5694,7 +5694,7 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
         // We don't need an intrinsic decoration on a function that has a body,
         // since the body can be used as the "catch-all" case.
         //
-        if(decl->Body)
+        if(decl->body)
             return;
 
         // Only standard library declarations should get any kind of catch-all
@@ -5882,7 +5882,7 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
             paramTypes.add(irParamType);
         }
 
-        auto irResultType = lowerType(subContext, declForReturnType->ReturnType);
+        auto irResultType = lowerType(subContext, declForReturnType->returnType);
 
         if (auto setterDecl = as<SetterDecl>(decl))
         {
@@ -5934,7 +5934,7 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
             // Always emit imported declarations as declarations,
             // and not definitions.
         }
-        else if (!decl->Body)
+        else if (!decl->body)
         {
             // This is a function declaration without a body.
             // In Slang we currently try not to support forward declarations
@@ -6108,7 +6108,7 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
             // We lower whatever statement was stored on the declaration
             // as the body of the new IR function.
             //
-            lowerStmt(subContext, decl->Body);
+            lowerStmt(subContext, decl->body);
 
             // We need to carefully add a terminator instruction to the end
             // of the body, in case the user didn't do so.
@@ -6606,7 +6606,7 @@ static void lowerFrontEndEntryPointToIR(
     // But only if this is a definition not a declaration
     if (isDefinition(instToDecorate))
     {
-        FilteredMemberList<ParamDecl> params = entryPointFuncDecl->GetParameters();
+        FilteredMemberList<ParamDecl> params = entryPointFuncDecl->getParameters();
 
         IRGlobalValueWithParams* valueWithParams = as<IRGlobalValueWithParams>(instToDecorate);
         if (valueWithParams)

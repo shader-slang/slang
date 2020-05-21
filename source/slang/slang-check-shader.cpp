@@ -390,7 +390,7 @@ namespace Slang
         }
         else if(stage == Stage::Compute)
         {
-            for(const auto& param : entryPointFuncDecl->GetParameters())
+            for(const auto& param : entryPointFuncDecl->getParameters())
             {
                 if(auto semantic = param->FindModifier<HLSLSimpleSemantic>())
                 {

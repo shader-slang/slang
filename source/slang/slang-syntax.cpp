@@ -14,6 +14,8 @@ namespace Slang
 
 SLANG_ALL_ASTNode_NodeBase(SLANG_CLASS_ONLY, SLANG_CLASS_ACCEPT_IMPL)
 
+/* static */const TypeExp TypeExp::empty;
+
 // !!!!!!!!!!!!!!!!!!!!!!!!!!!!! DiagnosticSink impls !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 
 void printDiagnosticArg(StringBuilder& sb, Decl* decl)

@@ -163,7 +163,7 @@ namespace Slang
 
     inline RefPtr<Type> GetResultType(DeclRef<CallableDecl> const& declRef)
     {
-        return declRef.Substitute(declRef.getDecl()->ReturnType.type.Ptr());
+        return declRef.Substitute(declRef.getDecl()->returnType.type.Ptr());
     }
 
     inline FilteredMemberRefList<ParamDecl> GetParameters(DeclRef<CallableDecl> const& declRef)

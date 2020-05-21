@@ -994,6 +994,9 @@ namespace Slang
         Type* operator->() { return Ptr(); }
 
         TypeExp Accept(SyntaxVisitor* visitor);
+
+            /// A global immutable TypeExp, that has no type or exp set.
+        static const TypeExp empty;
     };
 
 

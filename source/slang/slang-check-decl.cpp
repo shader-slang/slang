@@ -2068,7 +2068,7 @@ namespace Slang
 
     void SemanticsDeclBodyVisitor::visitFunctionDeclBase(FunctionDeclBase* decl)
     {
-        if (auto body = decl->Body)
+        if (auto body = decl->body)
         {
             checkBodyStmt(body, decl);
         }
@@ -2399,7 +2399,7 @@ namespace Slang
     // having a target intrinsic isn't a 'body'.
     bool _isDefinition(FuncDecl* decl)
     {
-        return decl->Body || decl->HasModifier<TargetIntrinsicModifier>();
+        return decl->body || decl->HasModifier<TargetIntrinsicModifier>();
     }
 
     Result SemanticsVisitor::checkFuncRedeclaration(
@@ -2764,7 +2764,7 @@ namespace Slang
 
     void SemanticsDeclHeaderVisitor::checkCallableDeclCommon(CallableDecl* decl)
     {
-        for(auto& paramDecl : decl->GetParameters())
+        for(auto& paramDecl : decl->getParameters())
         {
             ensureDecl(paramDecl, DeclCheckState::ReadyForReference);
         }
@@ -2772,7 +2772,7 @@ namespace Slang
 
     void SemanticsDeclHeaderVisitor::visitFuncDecl(FuncDecl* funcDecl)
     {
-        auto resultType = funcDecl->ReturnType;
+        auto resultType = funcDecl->returnType;
         if(resultType.exp)
         {
             resultType = CheckProperType(resultType);
@@ -2781,7 +2781,7 @@ namespace Slang
         {
             resultType = TypeExp(getSession()->getVoidType());
         }
-        funcDecl->ReturnType = resultType;
+        funcDecl->returnType = resultType;
 
         checkCallableDeclCommon(funcDecl);
     }
@@ -2973,14 +2973,14 @@ namespace Slang
     {
         // We need to compute the result tyep for this declaration,
         // since it wasn't filled in for us.
-        decl->ReturnType.type = findResultTypeForConstructorDecl(decl);
+        decl->returnType.type = findResultTypeForConstructorDecl(decl);
 
         checkCallableDeclCommon(decl);
     }
 
     void SemanticsDeclHeaderVisitor::visitSubscriptDecl(SubscriptDecl* decl)
     {
-        decl->ReturnType = CheckUsableType(decl->ReturnType);
+        decl->returnType = CheckUsableType(decl->returnType);
 
         // If we have a subscript declaration with no accessor declarations,
         // then we should create a single `GetterDecl` to represent
@@ -3017,7 +3017,7 @@ namespace Slang
         if (auto parentSubscript = as<SubscriptDecl>(parent))
         {
             ensureDecl(parentSubscript, DeclCheckState::CanUseTypeOfValueDecl);
-            decl->ReturnType = parentSubscript->ReturnType;
+            decl->returnType = parentSubscript->returnType;
         }
         // TODO: when we add "property" declarations, check for them here
         else

@@ -107,7 +107,7 @@ class AggTypeDecl : public  AggTypeDeclBase
     // extensions that might apply to this declaration
     ExtensionDecl* candidateExtensions = nullptr;
 
-    FilteredMemberList<VarDecl> GetFields()
+    FilteredMemberList<VarDecl> getFields()
     {
         return getMembersOfType<VarDecl>();
     }
@@ -170,7 +170,7 @@ class TypeConstraintDecl : public  Decl
 {
     SLANG_ABSTRACT_CLASS(TypeConstraintDecl)
     
-    virtual TypeExp& getSup() = 0;
+    SLANG_INLINE const TypeExp& getSup() const;
 };
 
 // A kind of pseudo-member that represents an explicit
@@ -180,7 +180,7 @@ class InheritanceDecl : public TypeConstraintDecl
 {
     SLANG_CLASS(InheritanceDecl)
 
-// The type expression as written
+    // The type expression as written
     TypeExp base;
 
     // After checking, this dictionary will map members
@@ -188,10 +188,6 @@ class InheritanceDecl : public TypeConstraintDecl
     // implementations in the type that contains
     // this inheritance declaration.
     RefPtr<WitnessTable> witnessTable;
-    virtual TypeExp& getSup() override
-    {
-        return base;
-    }
 };
 
 // TODO: may eventually need sub-classes for explicit/direct vs. implicit/indirect inheritance
@@ -262,12 +258,12 @@ class CallableDecl : public ContainerDecl
 {
     SLANG_ABSTRACT_CLASS(CallableDecl)
 
-    FilteredMemberList<ParamDecl> GetParameters()
+    FilteredMemberList<ParamDecl> getParameters()
     {
         return getMembersOfType<ParamDecl>();
     }
 
-    TypeExp ReturnType;
+    TypeExp returnType;
 
     // Fields related to redeclaration, so that we
     // can support multiple specialized variations
@@ -290,7 +286,7 @@ class FunctionDeclBase : public CallableDecl
 {
     SLANG_ABSTRACT_CLASS(FunctionDeclBase)
 
-    RefPtr<Stmt> Body;
+    RefPtr<Stmt> body;
 };
 
 // A constructor/initializer to create instances of a type
@@ -405,11 +401,6 @@ class GenericTypeConstraintDecl : public TypeConstraintDecl
     // think of these fields as the sub-type and super-type, respectively.
     TypeExp sub;
     TypeExp sup;
-    
-    virtual TypeExp& getSup() override
-    {
-        return sup;
-    }
 };
 
 class GenericValueParamDecl : public VarDeclBase
@@ -456,5 +447,19 @@ class AttributeDecl : public ContainerDecl
     // What type of syntax node will be produced to represent this attribute.
     SyntaxClass<RefObject> syntaxClass;
 };
+
+// ------------------------------------------------------------------------
+
+const TypeExp& TypeConstraintDecl::getSup() const
+{
+    ASTNodeType type = ASTNodeType(getClassInfo().m_classId);
+    switch (type)
+    {
+        case ASTNodeType::InheritanceDecl:              return static_cast<const InheritanceDecl*>(this)->base;
+        case ASTNodeType::GenericTypeConstraintDecl:    return static_cast<const GenericTypeConstraintDecl*>(this)->sup;
+        default:                                        SLANG_ASSERT(!"getSup not implemented for this type!"); return TypeExp::empty;
+    }
+}
+
 
 } // namespace Slang

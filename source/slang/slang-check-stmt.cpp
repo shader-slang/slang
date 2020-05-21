@@ -250,7 +250,7 @@ namespace Slang
         auto function = getParentFunc();
         if (!stmt->Expression)
         {
-            if (function && !function->ReturnType.Equals(getSession()->getVoidType()))
+            if (function && !function->returnType.Equals(getSession()->getVoidType()))
             {
                 getSink()->diagnose(stmt, Diagnostics::returnNeedsExpression);
             }
@@ -262,7 +262,7 @@ namespace Slang
             {
                 if (function)
                 {
-                    stmt->Expression = coerce(function->ReturnType.Ptr(), stmt->Expression);
+                    stmt->Expression = coerce(function->returnType.Ptr(), stmt->Expression);
                 }
                 else
                 {
