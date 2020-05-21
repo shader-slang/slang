@@ -469,7 +469,7 @@ namespace Slang
 
         RefPtr<Expr> base;
         if (auto mbrExpr = as<MemberExpr>(baseExpr))
-            base = mbrExpr->BaseExpression;
+            base = mbrExpr->baseExpression;
 
         return ConstructDeclRefExpr(
             innerDeclRef,
@@ -527,11 +527,11 @@ namespace Slang
                         callExpr->loc = context.loc;
 
                         for(Index aa = 0; aa < context.argCount; ++aa)
-                            callExpr->Arguments.add(context.getArg(aa));
+                            callExpr->arguments.add(context.getArg(aa));
                     }
 
 
-                    callExpr->FunctionExpr = baseExpr;
+                    callExpr->functionExpr = baseExpr;
                     callExpr->type = QualType(candidate.resultType);
 
                     // A call may yield an l-value, and we should take a look at the candidate to be sure
@@ -1461,7 +1461,7 @@ namespace Slang
         }
 
         // Look at the base expression for the call, and figure out how to invoke it.
-        auto funcExpr = expr->FunctionExpr;
+        auto funcExpr = expr->functionExpr;
         auto funcExprType = funcExpr->type;
 
         // If we are trying to apply an erroneous expression, then just bail out now.
@@ -1472,7 +1472,7 @@ namespace Slang
         // If any of the arguments is an error, then we should bail out, to avoid
         // cascading errors where we successfully pick an overload, but not the one
         // the user meant.
-        for (auto arg : expr->Arguments)
+        for (auto arg : expr->arguments)
         {
             if (IsErrorExpr(arg))
                 return CreateErrorExpr(expr);
@@ -1481,13 +1481,13 @@ namespace Slang
         context.originalExpr = expr;
         context.funcLoc = funcExpr->loc;
 
-        context.argCount = expr->Arguments.getCount();
-        context.args = expr->Arguments.getBuffer();
+        context.argCount = expr->arguments.getCount();
+        context.args = expr->arguments.getBuffer();
         context.loc = expr->loc;
 
         if (auto funcMemberExpr = as<MemberExpr>(funcExpr))
         {
-            context.baseExpr = funcMemberExpr->BaseExpression;
+            context.baseExpr = funcMemberExpr->baseExpression;
         }
         else if (auto funcOverloadExpr = as<OverloadedExpr>(funcExpr))
         {
@@ -1528,7 +1528,7 @@ namespace Slang
             //
             // If any argument was an error, we skip out on printing
             // another message, to avoid cascading errors.
-            for (auto arg : expr->Arguments)
+            for (auto arg : expr->arguments)
             {
                 if (IsErrorExpr(arg))
                 {
@@ -1541,7 +1541,7 @@ namespace Slang
                 Expr* baseExpr = funcExpr;
 
                 if(auto baseGenericApp = as<GenericAppExpr>(baseExpr))
-                    baseExpr = baseGenericApp->FunctionExpr;
+                    baseExpr = baseGenericApp->functionExpr;
 
                 if (auto baseVar = as<VarExpr>(baseExpr))
                     funcName = baseVar->name;
@@ -1631,7 +1631,7 @@ namespace Slang
         else
         {
             // Nothing at all was found that we could even consider invoking
-            getSink()->diagnose(expr->FunctionExpr, Diagnostics::expectedFunction, funcExprType);
+            getSink()->diagnose(expr->functionExpr, Diagnostics::expectedFunction, funcExprType);
             expr->type = QualType(getSession()->getErrorType());
             return expr;
         }
@@ -1681,9 +1681,9 @@ namespace Slang
     RefPtr<Expr> SemanticsExprVisitor::visitGenericAppExpr(GenericAppExpr* genericAppExpr)
     {
         // Start by checking the base expression and arguments.
-        auto& baseExpr = genericAppExpr->FunctionExpr;
+        auto& baseExpr = genericAppExpr->functionExpr;
         baseExpr = CheckTerm(baseExpr);
-        auto& args = genericAppExpr->Arguments;
+        auto& args = genericAppExpr->arguments;
         for (auto& arg : args)
         {
             arg = CheckTerm(arg);
@@ -1699,8 +1699,8 @@ namespace Slang
         // declarations with the same name, so this becomes a specialized case of
         // overload resolution.
 
-        auto& baseExpr = genericAppExpr->FunctionExpr;
-        auto& args = genericAppExpr->Arguments;
+        auto& baseExpr = genericAppExpr->functionExpr;
+        auto& args = genericAppExpr->arguments;
 
         // If there was an error in the base expression,  or in any of
         // the arguments, then just bail.

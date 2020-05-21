@@ -2018,8 +2018,8 @@ struct ExprLoweringVisitorBase : ExprVisitor<Derived, LoweredValInfo>
     LoweredValInfo visitIndexExpr(IndexExpr* expr)
     {
         auto type = lowerType(context, expr->type);
-        auto baseVal = lowerSubExpr(expr->BaseExpression);
-        auto indexVal = getSimpleVal(context, lowerRValueExpr(context, expr->IndexExpression));
+        auto baseVal = lowerSubExpr(expr->baseExpression);
+        auto indexVal = getSimpleVal(context, lowerRValueExpr(context, expr->indexExpression));
 
         return subscriptValue(type, baseVal, indexVal);
     }
@@ -2032,7 +2032,7 @@ struct ExprLoweringVisitorBase : ExprVisitor<Derived, LoweredValInfo>
     LoweredValInfo visitMemberExpr(MemberExpr* expr)
     {
         auto loweredType = lowerType(context, expr->type);
-        auto loweredBase = lowerRValueExpr(context, expr->BaseExpression);
+        auto loweredBase = lowerRValueExpr(context, expr->baseExpression);
 
         auto declRef = expr->declRef;
         if (auto fieldDeclRef = declRef.as<VarDecl>())
@@ -2509,7 +2509,7 @@ struct ExprLoweringVisitorBase : ExprVisitor<Derived, LoweredValInfo>
         List<IRInst*>*         ioArgs,
         List<OutArgumentFixup>* ioFixups)
     {
-        UInt argCount = expr->Arguments.getCount();
+        UInt argCount = expr->arguments.getCount();
         UInt argCounter = 0;
         for (auto paramDeclRef : getMembersOfType<ParamDecl>(funcDeclRef))
         {
@@ -2521,7 +2521,7 @@ struct ExprLoweringVisitorBase : ExprVisitor<Derived, LoweredValInfo>
             RefPtr<Expr> argExpr;
             if(argIndex < argCount)
             {
-                argExpr = expr->Arguments[argIndex];
+                argExpr = expr->arguments[argIndex];
             }
             else
             {
@@ -2637,7 +2637,7 @@ struct ExprLoweringVisitorBase : ExprVisitor<Derived, LoweredValInfo>
         if (auto memberFuncExpr = as<MemberExpr>(funcExpr))
         {
             outInfo->funcDeclRef = memberFuncExpr->declRef;
-            outInfo->baseExpr = memberFuncExpr->BaseExpression;
+            outInfo->baseExpr = memberFuncExpr->baseExpression;
             return true;
         }
         else if (auto staticMemberFuncExpr = as<StaticMemberExpr>(funcExpr))
@@ -2687,7 +2687,7 @@ struct ExprLoweringVisitorBase : ExprVisitor<Derived, LoweredValInfo>
         // back to their arguments.
         List<OutArgumentFixup> argFixups;
 
-        auto funcExpr = expr->FunctionExpr;
+        auto funcExpr = expr->functionExpr;
         ResolvedCallInfo resolvedInfo;
         if( tryResolveDeclRefForCall(funcExpr, &resolvedInfo) )
         {

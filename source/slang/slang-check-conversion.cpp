@@ -722,7 +722,7 @@ namespace Slang
                 //
                 auto castExpr = createImplicitCastExpr();
                 castExpr->loc = fromExpr->loc;
-                castExpr->Arguments.add(fromExpr);
+                castExpr->arguments.add(fromExpr);
                 //
                 // Next we need to set our cast expression as the "original"
                 // expression and then complete the overload process.
@@ -744,8 +744,8 @@ namespace Slang
                 // because we don't allow nested implicit conversions,
                 // but I'd rather play it safe.
                 //
-                castExpr->Arguments.clear();
-                castExpr->Arguments.add(fromExpr);
+                castExpr->arguments.clear();
+                castExpr->arguments.add(fromExpr);
             }
 
             return true;
@@ -830,9 +830,9 @@ namespace Slang
         typeExpr->base.type = toType;
 
         castExpr->loc = fromExpr->loc;
-        castExpr->FunctionExpr = typeExpr;
+        castExpr->functionExpr = typeExpr;
         castExpr->type = QualType(toType);
-        castExpr->Arguments.add(fromExpr);
+        castExpr->arguments.add(fromExpr);
         return castExpr;
     }
 
