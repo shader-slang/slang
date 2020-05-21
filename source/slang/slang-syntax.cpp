@@ -9,11 +9,6 @@
 namespace Slang
 {
 
-#define SLANG_CLASS_ACCEPT_IMPL(NAME, SUPER, ORIGIN, LAST, MARKER, TYPE, param) \
-    void NAME::accept(NAME::Visitor* visitor, void* extra) { visitor->dispatch_##NAME(this, extra); }
-
-SLANG_ALL_ASTNode_NodeBase(SLANG_CLASS_ONLY, SLANG_CLASS_ACCEPT_IMPL)
-
 // !!!!!!!!!!!!!!!!!!!!!!!!!!!!! DiagnosticSink impls !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 
 void printDiagnosticArg(StringBuilder& sb, Decl* decl)
@@ -208,13 +203,6 @@ Index getFilterCountImpl(const ReflectClassInfo& clsInfo, MemberFilterStyle filt
     }
     return count;
 }
-
-    // Type
-
-    void Type::accept(IValVisitor* visitor, void* extra)
-    {
-        accept((ITypeVisitor*)visitor, extra);
-    }
 
     // TypeExp
 
