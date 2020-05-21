@@ -57,7 +57,7 @@ struct Context
     {
         if (node == nullptr)
         {
-            dumpPtr(nullptr);
+            _dumpPtr(nullptr);
         }
         else
         {
@@ -69,7 +69,7 @@ struct Context
     {
         if (subs == nullptr)
         {
-            dumpPtr(nullptr);
+            _dumpPtr(nullptr);
         }
         else
         {
@@ -81,7 +81,7 @@ struct Context
     {
         if (name == nullptr)
         {
-            dumpPtr(nullptr);
+            _dumpPtr(nullptr);
         }
         else
         {
@@ -89,16 +89,103 @@ struct Context
         }
     }
 
+    void _appendPtr(const void* ptr, StringBuilder& out)
+    {
+        if (ptr == nullptr)
+        {
+            out << "null";
+            return;
+        }
+
+        char* start = out.prepareForAppend(sizeof(ptr) * 2 + 2);
+        char* dst = start;
+
+        *dst++ = '0';
+        *dst++ = 'x';
+
+        size_t v = size_t(ptr);
+
+        for (Index i = (sizeof(ptr) * 2) - 1; i >= 0; --i)
+        {
+            dst[i] = _getHexDigit(UInt32(v) & 0xf);
+            v >>= 4;
+        }
+        dst += sizeof(ptr) * 2;
+        out.appendInPlace(start, Index(dst - start));
+    }
+
+    void _dumpPtr(const UnownedStringSlice& prefix, const void* ptr)
+    {
+        ScopeWrite scope(this);
+        StringBuilder& buf = scope.getBuf();
+        buf << prefix;
+        _appendPtr(ptr, buf);
+    }
+
+    void _dumpPtr(const void* ptr)
+    {
+        ScopeWrite scope(this);
+        StringBuilder& buf = scope.getBuf();
+        if (ptr)
+        {
+            _appendPtr(ptr, buf);
+        }
+        else
+        {
+            buf << "null";
+        }
+    }
+
+    void dump(const Scope* scope)
+    {
+        if (scope == nullptr)
+        {
+            _dumpPtr(nullptr);
+        }
+        else
+        {
+            ScopeWrite writeScope(this);
+            StringBuilder& buf = writeScope.getBuf();
+
+            List<const Scope*> scopes;
+            const Scope* cur = scope;
+            while (cur)
+            {
+                scopes.add(cur);
+                cur = cur->parent;
+            }
+
+            for (Index i = scopes.getCount() - 1; i >= 0 ; --i)
+            {
+                buf << "::";
+                const Scope* curScope = scopes[i];
+
+                auto containerDecl = curScope->containerDecl;
+
+                Name* name = containerDecl ? containerDecl->getName() : nullptr;
+
+                if (name)
+                {
+                    buf << name->text;
+                }
+                else
+                {
+                    buf << "?";
+                }
+            }
+        }
+    }
+
     void dump(const RefObject* obj)
     {
         if (obj == nullptr)
         {
-            dumpPtr(nullptr);
+            _dumpPtr(nullptr);
         }
         else
         {
             // We don't know what this is!
-            ScopeWrite(this).getBuf() << "Unknown@" << size_t(obj);
+            _dumpPtr(UnownedStringSlice::fromLiteral("Unknown@"), obj);
         }
     }
 
@@ -138,37 +225,41 @@ struct Context
         }
     }
 
-    static char _getHexDigit(UInt v)
+    static char _getHexDigit(UInt32 v)
     {
         return (v < 10) ? char(v + '0') : char('a' + v - 10);
     }
 
+    static bool _isPrintableChar(char c)
+    {
+        return c >= 0x20 && c < 0x80;
+    }
+
     void dump(const UnownedStringSlice& slice)
     {
-        m_writer->emitChar('\"');
-
+        
+        ScopeWrite scope(this);
+        auto& buf = scope.getBuf();
+        buf.appendChar('\"');
+        for (const char c : slice)
         {
-            ScopeWrite scope(this);
-            auto& buf = scope.getBuf();
-            for (const char c : slice)
+            if (_isPrintableChar(c))
             {
-                if (c < 0x20 || c >= 0x80)
-                {
-                    buf << "\\0x" <<  _getHexDigit(UInt32(c) >> 4) << _getHexDigit(c & 0xf);
-                }
-                else
-                {
-                    buf << c;
-                }
+                buf << c;
+            }
+            else
+            {
+                buf << "\\0x" <<  _getHexDigit(UInt32(c) >> 4) << _getHexDigit(c & 0xf);
             }
         }
-        m_writer->emitChar('\"');
+        buf.appendChar('\"');
     }
     
     void dump(const Token& token)
     {
         ScopeWrite(this).getBuf() << " { " << TokenTypeToString(token.type) << ", ";
         dump(token.loc);
+        m_writer->emit(" ");
         dump(token.getContent());
         m_writer->emit(" }");
     }
@@ -222,7 +313,7 @@ struct Context
         }
         else
         {
-            dumpPtr(nullptr);
+            _dumpPtr(nullptr);
         }
         m_writer->emit(", ");
         dump(nameLoc.loc);
@@ -252,7 +343,7 @@ struct Context
     }
     void dump(const Layout* layout)
     {
-        ScopeWrite(this).getBuf() << "Layout@" << size_t(layout); 
+        _dumpPtr(UnownedStringSlice::fromLiteral("Layout@"), layout);
     }
 
     void dump(const Modifiers& modifiers)
@@ -337,19 +428,7 @@ struct Context
         dump(qualType.type);
     }
 
-    void dumpPtr(const void* ptr)
-    {
-        if (ptr)
-        {
-            ScopeWrite(this).getBuf() << "Unknown@" << size_t(ptr);
-        }
-        else
-        {
-            m_writer->emit("null");
-        }
-    }
-
-    void dump(SyntaxParseCallback callback) { dumpPtr((const void*)callback); }
+    void dump(SyntaxParseCallback callback) { _dumpPtr(UnownedStringSlice::fromLiteral("SyntaxParseCallback"), (const void*)callback); }
 
     template <typename T, int SIZE>
     void dump(const T (&in)[SIZE])
@@ -370,8 +449,6 @@ struct Context
         m_writer->dedent();
         m_writer->emit("}");
     }
-
-    //void dump(const void* ptr) { dumpPtr(ptr); }
 
     void dump(const LookupResult& result)
     {
@@ -435,6 +512,27 @@ struct Context
             {
                 dumpObjectFull(*info.m_typeInfo, info.m_object, i);
             }
+        }
+    }
+
+    void dump(ContainerDecl* decl)
+    {
+        if (auto moduleDecl = dynamicCast<ModuleDecl>(decl))
+        {
+            // Lets special case handling of module decls -> we only want to output as references
+            // otherwise we end up dumping everything in every module.
+
+            const ReflectClassInfo& typeInfo = moduleDecl->getClassInfo();
+            Index index = getObjectIndex(typeInfo, moduleDecl);
+
+            // We don't want to fully dump, referenced modules as doing so dumps everything
+            m_objects[index].m_isDumped = true;
+
+            dumpObjectReference(typeInfo, moduleDecl, index);
+        }
+        else
+        {
+            dump(static_cast<NodeBase*>(decl));
         }
     }
 
@@ -513,7 +611,7 @@ static const DumpFieldFuncs s_funcs;
 void Context::dumpObjectReference(const ReflectClassInfo& type, RefObject* obj, Index objIndex)
 {
     SLANG_UNUSED(obj);
-    ScopeWrite(this).getBuf() << type.m_name << "@" << objIndex;
+    ScopeWrite(this).getBuf() << type.m_name << ":" << objIndex;
 }
 
 void Context::dumpObjectFull(const ReflectClassInfo& type, RefObject* obj, Index objIndex)
@@ -524,7 +622,7 @@ void Context::dumpObjectFull(const ReflectClassInfo& type, RefObject* obj, Index
 
     // We need to dump the fields.
 
-    ScopeWrite(this).getBuf() << type.m_name << "(" << objIndex << ") {\n";
+    ScopeWrite(this).getBuf() << type.m_name << ":" << objIndex << " {\n";
     m_writer->indent();
 
     List<const ReflectClassInfo*> allTypes;
@@ -571,7 +669,7 @@ void Context::dumpObjectFull(NodeBase* node)
 {
     if (!node)
     {
-        dumpPtr(nullptr);
+        _dumpPtr(nullptr);
     }
     else
     {
@@ -585,7 +683,7 @@ void Context::dumpObjectFull(Substitutions* subs)
 {
     if (!subs)
     {
-        dumpPtr(nullptr);
+        _dumpPtr(nullptr);
     }
     else
     {
