@@ -27,8 +27,8 @@ class ConstantIntVal : public IntVal
         : value(value)
     {}
 
-    virtual bool EqualsVal(Val* val) override;
-    virtual String ToString() override;
+    virtual bool equalsVal(Val* val) override;
+    virtual String toString() override;
     virtual int GetHashCode() override;
 };
 
@@ -45,8 +45,8 @@ class GenericParamIntVal : public IntVal
         : declRef(declRef)
     {}
 
-    virtual bool EqualsVal(Val* val) override;
-    virtual String ToString() override;
+    virtual bool equalsVal(Val* val) override;
+    virtual String toString() override;
     virtual int GetHashCode() override;
     virtual RefPtr<Val> substituteImpl(SubstitutionSet subst, int* ioDiff) override;
 };
@@ -63,8 +63,8 @@ class ErrorIntVal : public IntVal
     ErrorIntVal()
     {}
 
-    virtual bool EqualsVal(Val* val) override;
-    virtual String ToString() override;
+    virtual bool equalsVal(Val* val) override;
+    virtual String toString() override;
     virtual int GetHashCode() override;
     virtual RefPtr<Val> substituteImpl(SubstitutionSet subst, int* ioDiff) override;
 };
@@ -125,8 +125,8 @@ class TypeEqualityWitness : public SubtypeWitness
     SLANG_CLASS(TypeEqualityWitness)
 
 
-    virtual bool EqualsVal(Val* val) override;
-    virtual String ToString() override;
+    virtual bool equalsVal(Val* val) override;
+    virtual String toString() override;
     virtual int GetHashCode() override;
     virtual RefPtr<Val> substituteImpl(SubstitutionSet subst, int * ioDiff) override;
 };
@@ -139,8 +139,8 @@ class DeclaredSubtypeWitness : public SubtypeWitness
 
     DeclRef<Decl> declRef;
 
-    virtual bool EqualsVal(Val* val) override;
-    virtual String ToString() override;
+    virtual bool equalsVal(Val* val) override;
+    virtual String toString() override;
     virtual int GetHashCode() override;
     virtual RefPtr<Val> substituteImpl(SubstitutionSet subst, int * ioDiff) override;
 };
@@ -156,8 +156,8 @@ class TransitiveSubtypeWitness : public SubtypeWitness
     // Witness that `mid : sup`
     DeclRef<Decl> midToSup;
 
-    virtual bool EqualsVal(Val* val) override;
-    virtual String ToString() override;
+    virtual bool equalsVal(Val* val) override;
+    virtual String toString() override;
     virtual int GetHashCode() override;
     virtual RefPtr<Val> substituteImpl(SubstitutionSet subst, int * ioDiff) override;
 };
@@ -171,8 +171,8 @@ class ExtractExistentialSubtypeWitness : public SubtypeWitness
     // The declaration of the existential value that has been opened
     DeclRef<VarDeclBase> declRef;
 
-    virtual bool EqualsVal(Val* val) override;
-    virtual String ToString() override;
+    virtual bool equalsVal(Val* val) override;
+    virtual String toString() override;
     virtual int GetHashCode() override;
     virtual RefPtr<Val> substituteImpl(SubstitutionSet subst, int * ioDiff) override;
 };
@@ -190,8 +190,8 @@ class TaggedUnionSubtypeWitness : public SubtypeWitness
     //
     List<RefPtr<Val>> caseWitnesses;
 
-    virtual bool EqualsVal(Val* val) override;
-    virtual String ToString() override;
+    virtual bool equalsVal(Val* val) override;
+    virtual String toString() override;
     virtual int GetHashCode() override;
     virtual RefPtr<Val> substituteImpl(SubstitutionSet subst, int * ioDiff) override;
 };

@@ -923,8 +923,8 @@ namespace Slang
         auto baseExpr = subscriptExpr->baseExpression;
         auto indexExpr = subscriptExpr->indexExpression;
 
-        if (!indexExpr->type->Equals(getSession()->getIntType()) &&
-            !indexExpr->type->Equals(getSession()->getUIntType()))
+        if (!indexExpr->type->equals(getSession()->getIntType()) &&
+            !indexExpr->type->equals(getSession()->getUIntType()))
         {
             getSink()->diagnose(indexExpr, Diagnostics::subscriptIndexNonInteger);
             return CreateErrorExpr(subscriptExpr.Ptr());
@@ -1387,7 +1387,7 @@ namespace Slang
             case 'w': case 'a': elementIndex = 3; break;
             default:
                 // An invalid character in the swizzle is an error
-                getSink()->diagnose(swizExpr, Diagnostics::invalidSwizzleExpr, swizzleText, baseElementType->ToString());
+                getSink()->diagnose(swizExpr, Diagnostics::invalidSwizzleExpr, swizzleText, baseElementType->toString());
                 anyError = true;
                 continue;
             }
@@ -1398,7 +1398,7 @@ namespace Slang
             // Make sure the index is in range for the source type
             if (elementIndex >= limitElement)
             {
-                getSink()->diagnose(swizExpr, Diagnostics::invalidSwizzleExpr, swizzleText, baseElementType->ToString());
+                getSink()->diagnose(swizExpr, Diagnostics::invalidSwizzleExpr, swizzleText, baseElementType->toString());
                 anyError = true;
                 continue;
             }

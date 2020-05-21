@@ -178,7 +178,7 @@ namespace Slang
         RefPtr<Type>  right)
     {
         // Easy case: they are the same type!
-        if (left->Equals(right))
+        if (left->equals(right))
             return left;
 
         // We can join two basic types by picking the "better" of the two
@@ -217,7 +217,7 @@ namespace Slang
             if(auto rightVector = as<VectorExpressionType>(right))
             {
                 // Check if the vector sizes match
-                if(!leftVector->elementCount->EqualsVal(rightVector->elementCount.Ptr()))
+                if(!leftVector->elementCount->equalsVal(rightVector->elementCount.Ptr()))
                     return nullptr;
 
                 // Try to join the element types
@@ -352,7 +352,7 @@ namespace Slang
                     }
                     else
                     {
-                        if(!val->EqualsVal(cVal))
+                        if(!val->equalsVal(cVal))
                         {
                             // failure!
                             return SubstitutionSet();
@@ -664,7 +664,7 @@ namespace Slang
         RefPtr<Type>  fst,
         RefPtr<Type>  snd)
     {
-        if (fst->Equals(snd)) return true;
+        if (fst->equals(snd)) return true;
 
         // An error type can unify with anything, just so we avoid cascading errors.
 

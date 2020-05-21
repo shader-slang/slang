@@ -343,7 +343,7 @@ namespace Slang
                 if( context.disallowNestedConversions )
                 {
                     // We need an exact match in this case.
-                    if(!GetType(param)->Equals(argType))
+                    if(!GetType(param)->equals(argType))
                         return false;
                 }
                 else if (!canCoerce(GetType(param), argType, &cost))
@@ -1230,12 +1230,12 @@ namespace Slang
 
     void SemanticsVisitor::formatType(StringBuilder& sb, RefPtr<Type> type)
     {
-        sb << type->ToString();
+        sb << type->toString();
     }
 
     void SemanticsVisitor::formatVal(StringBuilder& sb, RefPtr<Val> val)
     {
-        sb << val->ToString();
+        sb << val->toString();
     }
 
     static void formatDeclName(StringBuilder& sb, Decl* decl)
@@ -1429,7 +1429,7 @@ namespace Slang
         for( UInt aa = 0; aa < argCount; ++aa )
         {
             if(aa != 0) argsListBuilder << ", ";
-            argsListBuilder << context.getArgType(aa)->ToString();
+            argsListBuilder << context.getArgType(aa)->toString();
         }
         argsListBuilder << ")";
         return argsListBuilder.ProduceString();

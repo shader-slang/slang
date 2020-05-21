@@ -258,7 +258,7 @@ namespace Slang
         else
         {
             stmt->expression = CheckTerm(stmt->expression);
-            if (!stmt->expression->type->Equals(getSession()->getErrorType()))
+            if (!stmt->expression->type->equals(getSession()->getErrorType()))
             {
                 if (function)
                 {

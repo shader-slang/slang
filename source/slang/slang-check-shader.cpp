@@ -404,7 +404,7 @@ namespace Slang
 
                         if(!isValidThreadDispatchIDType(paramType))
                         {
-                            String typeString = paramType->ToString();
+                            String typeString = paramType->toString();
                             sink->diagnose(param->loc, Diagnostics::invalidDispatchThreadIDType, typeString);
                             return;
                         }

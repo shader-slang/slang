@@ -25,23 +25,23 @@ void printDiagnosticArg(StringBuilder& sb, Decl* decl)
 
 void printDiagnosticArg(StringBuilder& sb, Type* type)
 {
-    sb << type->ToString();
+    sb << type->toString();
 }
 
 void printDiagnosticArg(StringBuilder& sb, Val* val)
 {
-    sb << val->ToString();
+    sb << val->toString();
 }
 
 void printDiagnosticArg(StringBuilder& sb, TypeExp const& type)
 {
-    sb << type.type->ToString();
+    sb << type.type->toString();
 }
 
 void printDiagnosticArg(StringBuilder& sb, QualType const& type)
 {
     if (type.type)
-        sb << type.type->ToString();
+        sb << type.type->toString();
     else
         sb << "<null>";
 }
@@ -58,7 +58,7 @@ SourceLoc const& getDiagnosticPos(TypeExp const& typeExp)
 
 // !!!!!!!!!!!!!!!!!!!!!!!!!!!!! BasicExpressionType !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 
-bool BasicExpressionType::EqualsImpl(Type * type)
+bool BasicExpressionType::equalsImpl(Type * type)
 {
     auto basicType = as<BasicExpressionType>(type);
     return basicType && basicType->baseType == this->baseType;
@@ -222,12 +222,12 @@ Index getFilterCountImpl(const ReflectClassInfo& clsInfo, MemberFilterStyle filt
 
     bool TypeExp::Equals(Type* other)
     {
-        return type->Equals(other);
+        return type->equals(other);
     }
 
     bool TypeExp::Equals(RefPtr<Type> other)
     {
-        return type->Equals(other.Ptr());
+        return type->equals(other.Ptr());
     }
 
     // BasicExpressionType
@@ -249,15 +249,15 @@ Index getFilterCountImpl(const ReflectClassInfo& clsInfo, MemberFilterStyle filt
         }
     }
 
-    bool Type::Equals(Type * type)
+    bool Type::equals(Type* type)
     {
-        return getCanonicalType()->EqualsImpl(type->getCanonicalType());
+        return getCanonicalType()->equalsImpl(type->getCanonicalType());
     }
 
-    bool Type::EqualsVal(Val* val)
+    bool Type::equalsVal(Val* val)
     {
         if (auto type = dynamicCast<Type>(val))
-            return const_cast<Type*>(this)->Equals(type);
+            return const_cast<Type*>(this)->equals(type);
         return false;
     }
 
@@ -458,12 +458,12 @@ Index getFilterCountImpl(const ReflectClassInfo& clsInfo, MemberFilterStyle filt
 
 
 
-    bool ArrayExpressionType::EqualsImpl(Type* type)
+    bool ArrayExpressionType::equalsImpl(Type* type)
     {
         auto arrType = as<ArrayExpressionType>(type);
         if (!arrType)
             return false;
-        return (areValsEqual(arrayLength, arrType->arrayLength) && baseType->Equals(arrType->baseType.Ptr()));
+        return (areValsEqual(arrayLength, arrType->arrayLength) && baseType->equals(arrType->baseType.Ptr()));
     }
 
     RefPtr<Val> ArrayExpressionType::substituteImpl(SubstitutionSet subst, int* ioDiff)
@@ -498,17 +498,17 @@ Index getFilterCountImpl(const ReflectClassInfo& clsInfo, MemberFilterStyle filt
         else
             return baseType->GetHashCode();
     }
-    Slang::String ArrayExpressionType::ToString()
+    Slang::String ArrayExpressionType::toString()
     {
         if (arrayLength)
-            return baseType->ToString() + "[" + arrayLength->ToString() + "]";
+            return baseType->toString() + "[" + arrayLength->toString() + "]";
         else
-            return baseType->ToString() + "[]";
+            return baseType->toString() + "[]";
     }
 
     // DeclRefType
 
-    String DeclRefType::ToString()
+    String DeclRefType::toString()
     {
         return declRef.toString();
     }
@@ -518,7 +518,7 @@ Index getFilterCountImpl(const ReflectClassInfo& clsInfo, MemberFilterStyle filt
         return (declRef.GetHashCode() * 16777619) ^ (int)(typeid(this).hash_code());
     }
 
-    bool DeclRefType::EqualsImpl(Type * type)
+    bool DeclRefType::equalsImpl(Type * type)
     {
         if (auto declRefType = as<DeclRefType>(type))
         {
@@ -1040,12 +1040,12 @@ Index getFilterCountImpl(const ReflectClassInfo& clsInfo, MemberFilterStyle filt
 
     // OverloadGroupType
 
-    String OverloadGroupType::ToString()
+    String OverloadGroupType::toString()
     {
         return "overload group";
     }
 
-    bool OverloadGroupType::EqualsImpl(Type * /*type*/)
+    bool OverloadGroupType::equalsImpl(Type * /*type*/)
     {
         return false;
     }
@@ -1062,12 +1062,12 @@ Index getFilterCountImpl(const ReflectClassInfo& clsInfo, MemberFilterStyle filt
 
     // InitializerListType
 
-    String InitializerListType::ToString()
+    String InitializerListType::toString()
     {
         return "initializer list";
     }
 
-    bool InitializerListType::EqualsImpl(Type * /*type*/)
+    bool InitializerListType::equalsImpl(Type * /*type*/)
     {
         return false;
     }
@@ -1084,12 +1084,12 @@ Index getFilterCountImpl(const ReflectClassInfo& clsInfo, MemberFilterStyle filt
 
     // ErrorType
 
-    String ErrorType::ToString()
+    String ErrorType::toString()
     {
         return "error";
     }
 
-    bool ErrorType::EqualsImpl(Type* type)
+    bool ErrorType::equalsImpl(Type* type)
     {
         if (auto errorType = as<ErrorType>(type))
             return true;
@@ -1114,12 +1114,12 @@ Index getFilterCountImpl(const ReflectClassInfo& clsInfo, MemberFilterStyle filt
 
     // NamedExpressionType
 
-    String NamedExpressionType::ToString()
+    String NamedExpressionType::toString()
     {
         return getText(declRef.GetName());
     }
 
-    bool NamedExpressionType::EqualsImpl(Type * /*type*/)
+    bool NamedExpressionType::equalsImpl(Type * /*type*/)
     {
         SLANG_UNEXPECTED("unreachable");
         UNREACHABLE_RETURN(false);
@@ -1148,7 +1148,7 @@ Index getFilterCountImpl(const ReflectClassInfo& clsInfo, MemberFilterStyle filt
 
     // FuncType
 
-    String FuncType::ToString()
+    String FuncType::toString()
     {
         StringBuilder sb;
         sb << "(";
@@ -1156,14 +1156,14 @@ Index getFilterCountImpl(const ReflectClassInfo& clsInfo, MemberFilterStyle filt
         for (UInt pp = 0; pp < paramCount; ++pp)
         {
             if (pp != 0) sb << ", ";
-            sb << getParamType(pp)->ToString();
+            sb << getParamType(pp)->toString();
         }
         sb << ") -> ";
-        sb << getResultType()->ToString();
+        sb << getResultType()->toString();
         return sb.ProduceString();
     }
 
-    bool FuncType::EqualsImpl(Type * type)
+    bool FuncType::equalsImpl(Type * type)
     {
         if (auto funcType = as<FuncType>(type))
         {
@@ -1176,11 +1176,11 @@ Index getFilterCountImpl(const ReflectClassInfo& clsInfo, MemberFilterStyle filt
             {
                 auto paramType = getParamType(pp);
                 auto otherParamType = funcType->getParamType(pp);
-                if (!paramType->Equals(otherParamType))
+                if (!paramType->equals(otherParamType))
                     return false;
             }
 
-            if(!resultType->Equals(funcType->resultType))
+            if(!resultType->equals(funcType->resultType))
                 return false;
 
             // TODO: if we ever introduce other kinds
@@ -1253,18 +1253,18 @@ Index getFilterCountImpl(const ReflectClassInfo& clsInfo, MemberFilterStyle filt
 
     // TypeType
 
-    String TypeType::ToString()
+    String TypeType::toString()
     {
         StringBuilder sb;
-        sb << "typeof(" << type->ToString() << ")";
+        sb << "typeof(" << type->toString() << ")";
         return sb.ProduceString();
     }
 
-    bool TypeType::EqualsImpl(Type * t)
+    bool TypeType::equalsImpl(Type * t)
     {
         if (auto typeType = as<TypeType>(t))
         {
-            return t->Equals(typeType->type);
+            return t->equals(typeType->type);
         }
         return false;
     }
@@ -1283,13 +1283,13 @@ Index getFilterCountImpl(const ReflectClassInfo& clsInfo, MemberFilterStyle filt
 
     // GenericDeclRefType
 
-    String GenericDeclRefType::ToString()
+    String GenericDeclRefType::toString()
     {
         // TODO: what is appropriate here?
         return "<DeclRef<GenericDecl>>";
     }
 
-    bool GenericDeclRefType::EqualsImpl(Type * type)
+    bool GenericDeclRefType::equalsImpl(Type * type)
     {
         if (auto genericDeclRefType = as<GenericDeclRefType>(type))
         {
@@ -1310,7 +1310,7 @@ Index getFilterCountImpl(const ReflectClassInfo& clsInfo, MemberFilterStyle filt
 
     // NamespaceType
 
-    String NamespaceType::ToString()
+    String NamespaceType::toString()
     {
         String result;
         result.append("namespace ");
@@ -1318,7 +1318,7 @@ Index getFilterCountImpl(const ReflectClassInfo& clsInfo, MemberFilterStyle filt
         return result;
     }
 
-    bool NamespaceType::EqualsImpl(Type * type)
+    bool NamespaceType::equalsImpl(Type * type)
     {
         if (auto namespaceType = as<NamespaceType>(type))
         {
@@ -1341,10 +1341,10 @@ Index getFilterCountImpl(const ReflectClassInfo& clsInfo, MemberFilterStyle filt
 
     // VectorExpressionType
 
-    String VectorExpressionType::ToString()
+    String VectorExpressionType::toString()
     {
         StringBuilder sb;
-        sb << "vector<" << elementType->ToString() << "," << elementCount->ToString() << ">";
+        sb << "vector<" << elementType->toString() << "," << elementCount->toString() << ">";
         return sb.ProduceString();
     }
 
@@ -1367,10 +1367,10 @@ Index getFilterCountImpl(const ReflectClassInfo& clsInfo, MemberFilterStyle filt
 
     // MatrixExpressionType
 
-    String MatrixExpressionType::ToString()
+    String MatrixExpressionType::toString()
     {
         StringBuilder sb;
-        sb << "matrix<" << getElementType()->ToString() << "," << getRowCount()->ToString() << "," << getColumnCount()->ToString() << ">";
+        sb << "matrix<" << getElementType()->toString() << "," << getRowCount()->toString() << "," << getColumnCount()->toString() << ">";
         return sb.ProduceString();
     }
 
@@ -1433,7 +1433,7 @@ Index getFilterCountImpl(const ReflectClassInfo& clsInfo, MemberFilterStyle filt
 
     // GenericParamIntVal
 
-    bool GenericParamIntVal::EqualsVal(Val* val)
+    bool GenericParamIntVal::equalsVal(Val* val)
     {
         if (auto genericParamVal = as<GenericParamIntVal>(val))
         {
@@ -1442,7 +1442,7 @@ Index getFilterCountImpl(const ReflectClassInfo& clsInfo, MemberFilterStyle filt
         return false;
     }
 
-    String GenericParamIntVal::ToString()
+    String GenericParamIntVal::toString()
     {
         return getText(declRef.GetName());
     }
@@ -1496,7 +1496,7 @@ Index getFilterCountImpl(const ReflectClassInfo& clsInfo, MemberFilterStyle filt
 
     // ErrorIntVal
 
-    bool ErrorIntVal::EqualsVal(Val* val)
+    bool ErrorIntVal::equalsVal(Val* val)
     {
         if( auto errorIntVal = as<ErrorIntVal>(val) )
         {
@@ -1505,7 +1505,7 @@ Index getFilterCountImpl(const ReflectClassInfo& clsInfo, MemberFilterStyle filt
         return false;
     }
 
-    String ErrorIntVal::ToString()
+    String ErrorIntVal::toString()
     {
         return "<error>";
     }
@@ -1546,7 +1546,7 @@ Index getFilterCountImpl(const ReflectClassInfo& clsInfo, MemberFilterStyle filt
         return substSubst;
     }
 
-    bool GenericSubstitution::Equals(Substitutions* subst)
+    bool GenericSubstitution::equals(Substitutions* subst)
     {
         // both must be NULL, or non-NULL
         if (subst == nullptr)
@@ -1564,14 +1564,14 @@ Index getFilterCountImpl(const ReflectClassInfo& clsInfo, MemberFilterStyle filt
         SLANG_RELEASE_ASSERT(args.getCount() == genericSubst->args.getCount());
         for (Index aa = 0; aa < argCount; ++aa)
         {
-            if (!args[aa]->EqualsVal(genericSubst->args[aa].Ptr()))
+            if (!args[aa]->equalsVal(genericSubst->args[aa].Ptr()))
                 return false;
         }
 
         if (!outer)
             return !genericSubst->outer;
 
-        if (!outer->Equals(genericSubst->outer.Ptr()))
+        if (!outer->equals(genericSubst->outer.Ptr()))
             return false;
 
         return true;
@@ -1596,7 +1596,7 @@ Index getFilterCountImpl(const ReflectClassInfo& clsInfo, MemberFilterStyle filt
         return substSubst;
     }
 
-    bool ThisTypeSubstitution::Equals(Substitutions* subst)
+    bool ThisTypeSubstitution::equals(Substitutions* subst)
     {
         if (!subst)
             return false;
@@ -1613,7 +1613,7 @@ Index getFilterCountImpl(const ReflectClassInfo& clsInfo, MemberFilterStyle filt
             if(this->interfaceDecl != thisTypeSubst->interfaceDecl)
                 return false;
 
-            if(!this->witness->sub->Equals(thisTypeSubst->witness->sub))
+            if(!this->witness->sub->equals(thisTypeSubst->witness->sub))
                 return false;
 
             return true;
@@ -1659,7 +1659,7 @@ Index getFilterCountImpl(const ReflectClassInfo& clsInfo, MemberFilterStyle filt
         return substSubst;
     }
 
-    bool GlobalGenericParamSubstitution::Equals(Substitutions* subst)
+    bool GlobalGenericParamSubstitution::equals(Substitutions* subst)
     {
         if (!subst)
             return false;
@@ -1670,13 +1670,13 @@ Index getFilterCountImpl(const ReflectClassInfo& clsInfo, MemberFilterStyle filt
         {
             if (paramDecl != genSubst->paramDecl)
                 return false;
-            if (!actualType->EqualsVal(genSubst->actualType))
+            if (!actualType->equalsVal(genSubst->actualType))
                 return false;
             if (constraintArgs.getCount() != genSubst->constraintArgs.getCount())
                 return false;
             for (Index i = 0; i < constraintArgs.getCount(); i++)
             {
-                if (!constraintArgs[i].val->EqualsVal(genSubst->constraintArgs[i].val))
+                if (!constraintArgs[i].val->equalsVal(genSubst->constraintArgs[i].val))
                     return false;
             }
             return true;
@@ -2182,14 +2182,14 @@ Index getFilterCountImpl(const ReflectClassInfo& clsInfo, MemberFilterStyle filt
 
     // ConstantIntVal
 
-    bool ConstantIntVal::EqualsVal(Val* val)
+    bool ConstantIntVal::equalsVal(Val* val)
     {
         if (auto intVal = as<ConstantIntVal>(val))
             return value == intVal->value;
         return false;
     }
 
-    String ConstantIntVal::ToString()
+    String ConstantIntVal::toString()
     {
         return String(value);
     }
@@ -2378,12 +2378,12 @@ Index getFilterCountImpl(const ReflectClassInfo& clsInfo, MemberFilterStyle filt
 
     // TODO: should really have a `type.cpp` and a `witness.cpp`
 
-    bool TypeEqualityWitness::EqualsVal(Val* val)
+    bool TypeEqualityWitness::equalsVal(Val* val)
     {
         auto otherWitness = as<TypeEqualityWitness>(val);
         if (!otherWitness)
             return false;
-        return sub->Equals(otherWitness->sub);
+        return sub->equals(otherWitness->sub);
     }
 
     RefPtr<Val> TypeEqualityWitness::substituteImpl(SubstitutionSet subst, int * ioDiff)
@@ -2394,9 +2394,9 @@ Index getFilterCountImpl(const ReflectClassInfo& clsInfo, MemberFilterStyle filt
         return rs;
     }
 
-    String TypeEqualityWitness::ToString()
+    String TypeEqualityWitness::toString()
     {
-        return "TypeEqualityWitness(" + sub->ToString() + ")";
+        return "TypeEqualityWitness(" + sub->toString() + ")";
     }
 
     int TypeEqualityWitness::GetHashCode()
@@ -2404,14 +2404,14 @@ Index getFilterCountImpl(const ReflectClassInfo& clsInfo, MemberFilterStyle filt
         return sub->GetHashCode();
     }
 
-    bool DeclaredSubtypeWitness::EqualsVal(Val* val)
+    bool DeclaredSubtypeWitness::equalsVal(Val* val)
     {
         auto otherWitness = as<DeclaredSubtypeWitness>(val);
         if(!otherWitness)
             return false;
 
-        return sub->Equals(otherWitness->sub)
-            && sup->Equals(otherWitness->sup)
+        return sub->equals(otherWitness->sub)
+            && sup->equals(otherWitness->sup)
             && declRef.Equals(otherWitness->declRef);
     }
 
@@ -2553,13 +2553,13 @@ Index getFilterCountImpl(const ReflectClassInfo& clsInfo, MemberFilterStyle filt
         return rs;
     }
 
-    String DeclaredSubtypeWitness::ToString()
+    String DeclaredSubtypeWitness::toString()
     {
         StringBuilder sb;
         sb << "DeclaredSubtypeWitness(";
-        sb << this->sub->ToString();
+        sb << this->sub->toString();
         sb << ", ";
-        sb << this->sup->ToString();
+        sb << this->sup->toString();
         sb << ", ";
         sb << this->declRef.toString();
         sb << ")";
@@ -2573,15 +2573,15 @@ Index getFilterCountImpl(const ReflectClassInfo& clsInfo, MemberFilterStyle filt
 
     // TransitiveSubtypeWitness
 
-    bool TransitiveSubtypeWitness::EqualsVal(Val* val)
+    bool TransitiveSubtypeWitness::equalsVal(Val* val)
     {
         auto otherWitness = as<TransitiveSubtypeWitness>(val);
         if(!otherWitness)
             return false;
 
-        return sub->Equals(otherWitness->sub)
-            && sup->Equals(otherWitness->sup)
-            && subToMid->EqualsVal(otherWitness->subToMid)
+        return sub->equals(otherWitness->sub)
+            && sup->equals(otherWitness->sup)
+            && subToMid->equalsVal(otherWitness->subToMid)
             && midToSup.Equals(otherWitness->midToSup);
     }
 
@@ -2626,14 +2626,14 @@ Index getFilterCountImpl(const ReflectClassInfo& clsInfo, MemberFilterStyle filt
         return result;
     }
 
-    String TransitiveSubtypeWitness::ToString()
+    String TransitiveSubtypeWitness::toString()
     {
         // Note: we only print the constituent
         // witnesses, and rely on them to print
         // the starting and ending types.
         StringBuilder sb;
         sb << "TransitiveSubtypeWitness(";
-        sb << this->subToMid->ToString();
+        sb << this->subToMid->toString();
         sb << ", ";
         sb << this->midToSup.toString();
         sb << ")";
@@ -2672,7 +2672,7 @@ Index getFilterCountImpl(const ReflectClassInfo& clsInfo, MemberFilterStyle filt
         {
             return false;
         }
-        return substitutions->Equals(substSet.substitutions);
+        return substitutions->equals(substSet.substitutions);
     }
 
     int SubstitutionSet::GetHashCode() const
@@ -2685,7 +2685,7 @@ Index getFilterCountImpl(const ReflectClassInfo& clsInfo, MemberFilterStyle filt
 
     // ExtractExistentialType
 
-    String ExtractExistentialType::ToString()
+    String ExtractExistentialType::toString()
     {
         String result;
         result.append(declRef.toString());
@@ -2693,7 +2693,7 @@ Index getFilterCountImpl(const ReflectClassInfo& clsInfo, MemberFilterStyle filt
         return result;
     }
 
-    bool ExtractExistentialType::EqualsImpl(Type* type)
+    bool ExtractExistentialType::equalsImpl(Type* type)
     {
         if( auto extractExistential = as<ExtractExistentialType>(type) )
         {
@@ -2728,7 +2728,7 @@ Index getFilterCountImpl(const ReflectClassInfo& clsInfo, MemberFilterStyle filt
 
     // ExtractExistentialSubtypeWitness
 
-    bool ExtractExistentialSubtypeWitness::EqualsVal(Val* val)
+    bool ExtractExistentialSubtypeWitness::equalsVal(Val* val)
     {
         if( auto extractWitness = as<ExtractExistentialSubtypeWitness>(val) )
         {
@@ -2737,7 +2737,7 @@ Index getFilterCountImpl(const ReflectClassInfo& clsInfo, MemberFilterStyle filt
         return false;
     }
 
-    String ExtractExistentialSubtypeWitness::ToString()
+    String ExtractExistentialSubtypeWitness::toString()
     {
         String result;
         result.append("extractExistentialValue(");
@@ -2775,7 +2775,7 @@ Index getFilterCountImpl(const ReflectClassInfo& clsInfo, MemberFilterStyle filt
     // TaggedUnionType
     //
 
-    String TaggedUnionType::ToString()
+    String TaggedUnionType::toString()
     {
         String result;
         result.append("__TaggedUnion(");
@@ -2785,13 +2785,13 @@ Index getFilterCountImpl(const ReflectClassInfo& clsInfo, MemberFilterStyle filt
             if(!first) result.append(", ");
             first = false;
 
-            result.append(caseType->ToString());
+            result.append(caseType->toString());
         }
         result.append(")");
         return result;
     }
 
-    bool TaggedUnionType::EqualsImpl(Type* type)
+    bool TaggedUnionType::equalsImpl(Type* type)
     {
         auto taggedUnion = as<TaggedUnionType>(type);
         if(!taggedUnion)
@@ -2803,7 +2803,7 @@ Index getFilterCountImpl(const ReflectClassInfo& clsInfo, MemberFilterStyle filt
 
         for( Index ii = 0; ii < caseCount; ++ii )
         {
-            if(!caseTypes[ii]->Equals(taggedUnion->caseTypes[ii]))
+            if(!caseTypes[ii]->equals(taggedUnion->caseTypes[ii]))
                 return false;
         }
         return true;
@@ -2858,7 +2858,7 @@ Index getFilterCountImpl(const ReflectClassInfo& clsInfo, MemberFilterStyle filt
 //
 
 
-bool TaggedUnionSubtypeWitness::EqualsVal(Val* val)
+bool TaggedUnionSubtypeWitness::equalsVal(Val* val)
 {
     auto taggedUnionWitness = as<TaggedUnionSubtypeWitness>(val);
     if(!taggedUnionWitness)
@@ -2870,14 +2870,14 @@ bool TaggedUnionSubtypeWitness::EqualsVal(Val* val)
 
     for(Index ii = 0; ii < caseCount; ++ii)
     {
-        if(!caseWitnesses[ii]->EqualsVal(taggedUnionWitness->caseWitnesses[ii]))
+        if(!caseWitnesses[ii]->equalsVal(taggedUnionWitness->caseWitnesses[ii]))
             return false;
     }
 
     return true;
 }
 
-String TaggedUnionSubtypeWitness::ToString()
+String TaggedUnionSubtypeWitness::toString()
 {
     String result;
     result.append("TaggedUnionSubtypeWitness(");
@@ -2887,7 +2887,7 @@ String TaggedUnionSubtypeWitness::ToString()
         if(!first) result.append(", ");
         first = false;
 
-        result.append(caseWitness->ToString());
+        result.append(caseWitness->toString());
     }
     return result;
 }
@@ -2975,27 +2975,27 @@ char const* getGLSLNameForImageFormat(ImageFormat format)
 // ExistentialSpecializedType
 //
 
-String ExistentialSpecializedType::ToString()
+String ExistentialSpecializedType::toString()
 {
     String result;
     result.append("__ExistentialSpecializedType(");
-    result.append(baseType->ToString());
+    result.append(baseType->toString());
     for( auto arg : args )
     {
         result.append(", ");
-        result.append(arg.val->ToString());
+        result.append(arg.val->toString());
     }
     result.append(")");
     return result;
 }
 
-bool ExistentialSpecializedType::EqualsImpl(Type * type)
+bool ExistentialSpecializedType::equalsImpl(Type * type)
 {
     auto other = as<ExistentialSpecializedType>(type);
     if(!other)
         return false;
 
-    if(!baseType->Equals(other->baseType))
+    if(!baseType->equals(other->baseType))
         return false;
 
     auto argCount = args.getCount();
@@ -3007,7 +3007,7 @@ bool ExistentialSpecializedType::EqualsImpl(Type * type)
         auto arg = args[ii];
         auto otherArg = other->args[ii];
 
-        if(!arg.val->EqualsVal(otherArg.val))
+        if(!arg.val->equalsVal(otherArg.val))
             return false;
 
         if(!areValsEqual(arg.witness, otherArg.witness))
@@ -3095,7 +3095,7 @@ RefPtr<Val> ExistentialSpecializedType::substituteImpl(SubstitutionSet subst, in
 // ThisType
 //
 
-String ThisType::ToString()
+String ThisType::toString()
 {
     String result;
     result.append(interfaceDeclRef.toString());
@@ -3103,7 +3103,7 @@ String ThisType::ToString()
     return result;
 }
 
-bool ThisType::EqualsImpl(Type * type)
+bool ThisType::equalsImpl(Type * type)
 {
     auto other = as<ThisType>(type);
     if(!other)

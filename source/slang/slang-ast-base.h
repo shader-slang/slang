@@ -87,12 +87,12 @@ class Val : public NodeBase
     // decide whether they need to do anything).
     virtual RefPtr<Val> substituteImpl(SubstitutionSet subst, int* ioDiff);
 
-    virtual bool EqualsVal(Val* val) = 0;
-    virtual String ToString() = 0;
+    virtual bool equalsVal(Val* val) = 0;
+    virtual String toString() = 0;
     virtual int GetHashCode() = 0;
     bool operator == (const Val & v)
     {
-        return EqualsVal(const_cast<Val*>(&v));
+        return equalsVal(const_cast<Val*>(&v));
     }
 };
 
@@ -129,18 +129,18 @@ public:
     Session* getSession() { return this->session; }
     void setSession(Session* s) { this->session = s; }
 
-    bool Equals(Type* type);
+    bool equals(Type* type);
     
     Type* getCanonicalType();
 
     virtual RefPtr<Val> substituteImpl(SubstitutionSet subst, int* ioDiff) override;
 
-    virtual bool EqualsVal(Val* val) override;
+    virtual bool equalsVal(Val* val) override;
 
     ~Type();
 
 protected:
-    virtual bool EqualsImpl(Type* type) = 0;
+    virtual bool equalsImpl(Type* type) = 0;
 
     virtual RefPtr<Type> CreateCanonicalType() = 0;
     Type* canonicalType = nullptr;
@@ -166,7 +166,7 @@ class Substitutions: public RefObject
     virtual RefPtr<Substitutions> applySubstitutionsShallow(SubstitutionSet substSet, RefPtr<Substitutions> substOuter, int* ioDiff) = 0;
 
     // Check if these are equivalent substitutions to another set
-    virtual bool Equals(Substitutions* subst) = 0;
+    virtual bool equals(Substitutions* subst) = 0;
     virtual int GetHashCode() const = 0;
 };
 
@@ -185,7 +185,7 @@ class GenericSubstitution : public Substitutions
     virtual RefPtr<Substitutions> applySubstitutionsShallow(SubstitutionSet substSet, RefPtr<Substitutions> substOuter, int* ioDiff)  override;
 
     // Check if these are equivalent substitutions to another set
-    virtual bool Equals(Substitutions* subst) override;
+    virtual bool equals(Substitutions* subst) override;
 
     virtual int GetHashCode() const override
     {
@@ -215,7 +215,7 @@ class ThisTypeSubstitution : public Substitutions
     virtual RefPtr<Substitutions> applySubstitutionsShallow(SubstitutionSet substSet, RefPtr<Substitutions> substOuter, int* ioDiff)  override;
 
     // Check if these are equivalent substitutions to another set
-    virtual bool Equals(Substitutions* subst) override;
+    virtual bool equals(Substitutions* subst) override;
 
     virtual int GetHashCode() const override;
 };
@@ -242,7 +242,7 @@ class GlobalGenericParamSubstitution : public Substitutions
     virtual RefPtr<Substitutions> applySubstitutionsShallow(SubstitutionSet substSet, RefPtr<Substitutions> substOuter, int* ioDiff)  override;
 
     // Check if these are equivalent substitutions to another set
-    virtual bool Equals(Substitutions* subst) override;
+    virtual bool equals(Substitutions* subst) override;
 
     virtual int GetHashCode() const override
     {

@@ -356,7 +356,7 @@ namespace Slang
         RefPtr<Type>    sub,
         RefPtr<Type>    sup)
     {
-        if(sub->Equals(sup))
+        if(sub->equals(sup))
         {
             // They are the same type, so we just need a witness
             // for type equality.

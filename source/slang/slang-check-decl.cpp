@@ -1234,7 +1234,7 @@ namespace Slang
             {
                 if (auto requiredGenValMbr = as<GenericValueParamDecl>(requiredGenMbr))
                 {
-                    if (!genValMbr->type->Equals(requiredGenValMbr->type))
+                    if (!genValMbr->type->equals(requiredGenValMbr->type))
                         return false;
                 }
                 else
@@ -1244,7 +1244,7 @@ namespace Slang
             {
                 if (auto requiredTypeConstraintMbr = as<GenericTypeConstraintDecl>(requiredGenMbr))
                 {
-                    if (!genTypeConstraintMbr->sup->Equals(requiredTypeConstraintMbr->sup))
+                    if (!genTypeConstraintMbr->sup->equals(requiredTypeConstraintMbr->sup))
                     {
                         return false;
                     }
@@ -2164,7 +2164,7 @@ namespace Slang
                     // parameters in the same signature. This is a reasonable
                     // assumption for now, but could get thorny down the road.
                     //
-                    if (!leftValueParam->getType()->Equals(rightValueParam->getType()))
+                    if (!leftValueParam->getType()->equals(rightValueParam->getType()))
                     {
                         // If the value parameters have non-matching types,
                         // then the full generic signatures do not match.
@@ -2298,12 +2298,12 @@ namespace Slang
             //
             auto leftSub = leftConstraint->sub;
             auto rightSub = GetSub(rightConstraint);
-            if(!leftSub->Equals(rightSub))
+            if(!leftSub->equals(rightSub))
                 return false;
 
             auto leftSup = leftConstraint->sup;
             auto rightSup = GetSup(rightConstraint);
-            if(!leftSup->Equals(rightSup))
+            if(!leftSup->equals(rightSup))
                 return false;
         }
 
@@ -2336,7 +2336,7 @@ namespace Slang
             auto sndParam = sndParams[ii];
 
             // If a given parameter type doesn't match, then signatures don't match
-            if (!GetType(fstParam)->Equals(GetType(sndParam)))
+            if (!GetType(fstParam)->equals(GetType(sndParam)))
                 return false;
 
             // If one parameter is `out` and the other isn't, then they don't match
@@ -2546,7 +2546,7 @@ namespace Slang
         //
         auto resultType = GetResultType(newDeclRef);
         auto prevResultType = GetResultType(oldDeclRef);
-        if (!resultType->Equals(prevResultType))
+        if (!resultType->equals(prevResultType))
         {
             // Bad redeclaration
             getSink()->diagnose(newDecl, Diagnostics::functionRedeclarationWithDifferentReturnType, newDecl->getName(), resultType, prevResultType);
@@ -3144,7 +3144,7 @@ namespace Slang
 
         // In order for this extension to apply to the given type, we
         // need to have a match on the target types.
-        if (!type->Equals(targetType))
+        if (!type->equals(targetType))
             return DeclRef<ExtensionDecl>();
 
 

@@ -2578,7 +2578,7 @@ static RefPtr<EntryPointLayout> collectEntryPointParameters(
     auto resultType = GetResultType(entryPointFuncDeclRef);
     SLANG_ASSERT(resultType);
 
-    if( !resultType->Equals(resultType->getSession()->getVoidType()) )
+    if( !resultType->equals(resultType->getSession()->getVoidType()) )
     {
         state.loc = entryPointFuncDeclRef.getLoc();
         state.directionMask = kEntryPointParameterDirection_Output;

@@ -487,7 +487,7 @@ namespace Slang
     {
         // An important and easy case is when the "to" and "from" types are equal.
         //
-        if( toType->Equals(fromType) )
+        if( toType->equals(fromType) )
         {
             if(outToExpr)
                 *outToExpr = fromExpr;
