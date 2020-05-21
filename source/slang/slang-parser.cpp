@@ -122,7 +122,7 @@ namespace Slang
 
         void pushScopeAndSetParent(ContainerDecl* containerDecl)
         {
-            containerDecl->ParentDecl = currentScope->containerDecl;
+            containerDecl->parentDecl = currentScope->containerDecl;
             PushScope(containerDecl);
         }
 
@@ -1078,8 +1078,8 @@ namespace Slang
     {
         if (container)
         {
-            member->ParentDecl = container.Ptr();
-            container->Members.add(member);
+            member->parentDecl = container.Ptr();
+            container->members.add(member);
         }
     }
 
@@ -1166,7 +1166,7 @@ namespace Slang
         parser->genericDepth--;
         parser->ReadToken(TokenType::OpGreater);
         decl->inner = parseInnerFunc(decl);
-        decl->inner->ParentDecl = decl;
+        decl->inner->parentDecl = decl;
 
         // A generic decl hijacks the name of the declaration
         // it wraps, so that lookup can find it.

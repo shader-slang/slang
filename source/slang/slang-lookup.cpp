@@ -44,13 +44,13 @@ void buildMemberDictionary(ContainerDecl* decl)
     // are we a generic?
     GenericDecl* genericDecl = as<GenericDecl>(decl);
 
-    const Index membersCount = decl->Members.getCount();
+    const Index membersCount = decl->members.getCount();
 
     SLANG_ASSERT(decl->dictionaryLastCount >= 0 && decl->dictionaryLastCount <= membersCount);
 
     for (Index i = decl->dictionaryLastCount; i < membersCount; ++i)
     {
-        Decl* m = decl->Members[i];
+        Decl* m = decl->members[i];
 
         auto name = m->getName();
 

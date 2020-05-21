@@ -592,7 +592,7 @@ namespace Slang
         // specialized (don't accidentially constrain
         // parameters of a generic function based on
         // calls in its body).
-        if(paramDecl->ParentDecl != constraints.genericDecl)
+        if(paramDecl->parentDecl != constraints.genericDecl)
             return false;
 
         // We want to constrain the given parameter to equal the given value.
@@ -684,7 +684,7 @@ namespace Slang
 
             if (auto typeParamDecl = as<GenericTypeParamDecl>(fstDeclRef.getDecl()))
             {
-                if(typeParamDecl->ParentDecl == constraints.genericDecl )
+                if(typeParamDecl->parentDecl == constraints.genericDecl )
                     return TryUnifyTypeParam(constraints, typeParamDecl, snd);
             }
         }
@@ -695,7 +695,7 @@ namespace Slang
 
             if (auto typeParamDecl = as<GenericTypeParamDecl>(sndDeclRef.getDecl()))
             {
-                if(typeParamDecl->ParentDecl == constraints.genericDecl )
+                if(typeParamDecl->parentDecl == constraints.genericDecl )
                     return TryUnifyTypeParam(constraints, typeParamDecl, fst);
             }
         }

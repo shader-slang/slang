@@ -320,7 +320,7 @@ class Decl : public DeclBase
 public:
     SLANG_ABSTRACT_CLASS(Decl)
 
-    ContainerDecl* ParentDecl = nullptr;
+    ContainerDecl* parentDecl = nullptr;
 
     NameLoc nameAndLoc;
 

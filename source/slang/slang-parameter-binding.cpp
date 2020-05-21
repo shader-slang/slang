@@ -776,7 +776,7 @@ static bool shouldDisableDiagnostic(
     Decl*                   decl,
     DiagnosticInfo const&   diagnosticInfo)
 {
-    for( auto dd = decl; dd; dd = dd->ParentDecl )
+    for( auto dd = decl; dd; dd = dd->parentDecl )
     {
         for( auto modifier : dd->modifiers )
         {

@@ -37,7 +37,7 @@ namespace Slang
     SemanticsVisitor::ParamCounts SemanticsVisitor::CountParameters(DeclRef<GenericDecl> genericRef)
     {
         ParamCounts counts = { 0, 0 };
-        for (auto m : genericRef.getDecl()->Members)
+        for (auto m : genericRef.getDecl()->members)
         {
             if (auto typeParam = as<GenericTypeParamDecl>(m))
             {

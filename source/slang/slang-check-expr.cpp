@@ -32,7 +32,7 @@ namespace Slang
     RefPtr<Expr> SemanticsVisitor::moveTemp(RefPtr<Expr> const& expr, F const& func)
     {
         RefPtr<VarDecl> varDecl = new VarDecl();
-        varDecl->ParentDecl = nullptr; // TODO: need to fill this in somehow!
+        varDecl->parentDecl = nullptr; // TODO: need to fill this in somehow!
         varDecl->checkState = DeclCheckState::Checked;
         varDecl->nameAndLoc.loc = expr->loc;
         varDecl->initExpr = expr;

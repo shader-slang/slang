@@ -224,9 +224,9 @@ namespace Slang
         // comes up just enough that we should probably have a convenience
         // function for it.
 
-        auto parentDecl = decl->ParentDecl;
+        auto parentDecl = decl->parentDecl;
         if(auto genericDecl = as<GenericDecl>(parentDecl))
-            parentDecl = genericDecl->ParentDecl;
+            parentDecl = genericDecl->parentDecl;
 
         return isEffectivelyStatic(decl, parentDecl);
     }
@@ -237,7 +237,7 @@ namespace Slang
         // A global shader parameter must be declared at global or namespace
         // scope, so that it has a single definition across the module.
         //
-        if(!as<NamespaceDeclBase>(decl->ParentDecl)) return false;
+        if(!as<NamespaceDeclBase>(decl->parentDecl)) return false;
 
         // A global variable marked `static` indicates a traditional
         // global variable (albeit one that is implicitly local to
@@ -256,7 +256,7 @@ namespace Slang
 
     static bool _isLocalVar(VarDeclBase* varDecl)
     {
-        auto pp = varDecl->ParentDecl;
+        auto pp = varDecl->parentDecl;
 
         if(as<ScopeDecl>(pp))
             return true;
@@ -462,7 +462,7 @@ namespace Slang
         genericSubst->genericDecl = genericDecl;
         genericSubst->outer = outerSubst;
 
-        for( auto mm : genericDecl->Members )
+        for( auto mm : genericDecl->members )
         {
             if( auto genericTypeParamDecl = as<GenericTypeParamDecl>(mm) )
             {
@@ -475,7 +475,7 @@ namespace Slang
         }
 
         // create default substitution arguments for constraints
-        for (auto mm : genericDecl->Members)
+        for (auto mm : genericDecl->members)
         {
             if (auto genericTypeConstraintDecl = as<GenericTypeConstraintDecl>(mm))
             {
@@ -499,7 +499,7 @@ namespace Slang
         Decl*           decl,
         SubstitutionSet outerSubstSet)
     {
-        auto dd = decl->ParentDecl;
+        auto dd = decl->parentDecl;
         if( auto genericDecl = as<GenericDecl>(dd) )
         {
             // We don't want to specialize references to anything
@@ -523,7 +523,7 @@ namespace Slang
         Decl*   decl)
     {
         SubstitutionSet subst;
-        if( auto parentDecl = decl->ParentDecl )
+        if( auto parentDecl = decl->parentDecl )
         {
             subst = createDefaultSubstitutions(session, parentDecl);
         }
@@ -728,7 +728,7 @@ namespace Slang
             // declarations under a statement (e.g., in a function body),
             // and we don't want to check such local declarations here.
             //
-            for(auto childDecl : containerDecl->Members)
+            for(auto childDecl : containerDecl->members)
             {
                 if(as<ScopeDecl>(childDecl))
                     continue;
@@ -959,7 +959,7 @@ namespace Slang
     {
         genericDecl->setCheckState(DeclCheckState::ReadyForLookup);
 
-        for (auto m : genericDecl->Members)
+        for (auto m : genericDecl->members)
         {
             if (auto typeParam = as<GenericTypeParamDecl>(m))
             {
@@ -1052,7 +1052,7 @@ namespace Slang
 
         if(auto containerDecl = as<ContainerDecl>(decl))
         {
-            for(auto childDecl : containerDecl->Members)
+            for(auto childDecl : containerDecl->members)
             {
                 if(as<ScopeDecl>(childDecl))
                     continue;
@@ -1216,12 +1216,12 @@ namespace Slang
         DeclRef<GenericDecl>        requirementGenDecl,
         RefPtr<WitnessTable>        witnessTable)
     {
-        if (genDecl.getDecl()->Members.getCount() != requirementGenDecl.getDecl()->Members.getCount())
+        if (genDecl.getDecl()->members.getCount() != requirementGenDecl.getDecl()->members.getCount())
             return false;
-        for (Index i = 0; i < genDecl.getDecl()->Members.getCount(); i++)
+        for (Index i = 0; i < genDecl.getDecl()->members.getCount(); i++)
         {
-            auto genMbr = genDecl.getDecl()->Members[i];
-            auto requiredGenMbr = genDecl.getDecl()->Members[i];
+            auto genMbr = genDecl.getDecl()->members[i];
+            auto requiredGenMbr = genDecl.getDecl()->members[i];
             if (auto genTypeMbr = as<GenericTypeParamDecl>(genMbr))
             {
                 if (auto requiredGenTypeMbr = as<GenericTypeParamDecl>(requiredGenMbr))
@@ -1870,10 +1870,10 @@ namespace Slang
             RefPtr<Type> enumTypeType = getSession()->getEnumTypeType();
 
             RefPtr<InheritanceDecl> enumConformanceDecl = new InheritanceDecl();
-            enumConformanceDecl->ParentDecl = decl;
+            enumConformanceDecl->parentDecl = decl;
             enumConformanceDecl->loc = decl->loc;
             enumConformanceDecl->base.type = getSession()->getEnumTypeType();
-            decl->Members.add(enumConformanceDecl);
+            decl->members.add(enumConformanceDecl);
 
             // The `__EnumType` interface has one required member, the `__Tag` type.
             // We need to satisfy this requirement automatically, rather than require
@@ -1889,7 +1889,7 @@ namespace Slang
             {
                 if(auto enumTypeTypeInterfaceDecl = as<InterfaceDecl>(enumTypeTypeDeclRefType->declRef.getDecl()))
                 {
-                    for(auto memberDecl : enumTypeTypeInterfaceDecl->Members)
+                    for(auto memberDecl : enumTypeTypeInterfaceDecl->members)
                     {
                         if(memberDecl->getName() == tagAssociatedTypeName)
                         {
@@ -2002,7 +2002,7 @@ namespace Slang
         // An enum case had better appear inside an enum!
         //
         // TODO: Do we need/want to support generic cases some day?
-        auto parentEnumDecl = as<EnumDecl>(decl->ParentDecl);
+        auto parentEnumDecl = as<EnumDecl>(decl->parentDecl);
         SLANG_ASSERT(parentEnumDecl);
 
         // The tag type should have already been set by
@@ -2053,7 +2053,7 @@ namespace Slang
     void SemanticsDeclHeaderVisitor::visitGlobalGenericParamDecl(GlobalGenericParamDecl* decl)
     {
         // global generic param only allowed in global scope
-        auto program = as<ModuleDecl>(decl->ParentDecl);
+        auto program = as<ModuleDecl>(decl->parentDecl);
         if (!program)
             getSink()->diagnose(decl, Slang::Diagnostics::globalGenParamInGlobalScopeOnly);
     }
@@ -2061,7 +2061,7 @@ namespace Slang
     void SemanticsDeclHeaderVisitor::visitAssocTypeDecl(AssocTypeDecl* decl)
     {
         // assoctype only allowed in an interface
-        auto interfaceDecl = as<InterfaceDecl>(decl->ParentDecl);
+        auto interfaceDecl = as<InterfaceDecl>(decl->parentDecl);
         if (!interfaceDecl)
             getSink()->diagnose(decl, Slang::Diagnostics::assocTypeInInterfaceOnly);
     }
@@ -2079,7 +2079,7 @@ namespace Slang
         List<Decl*>&                        outParams,
         List<GenericTypeConstraintDecl*>&   outConstraints)
     {
-        for (auto dd : decl->Members)
+        for (auto dd : decl->members)
         {
             if (dd == decl->inner)
                 continue;
@@ -2363,7 +2363,7 @@ namespace Slang
     {
         RefPtr<GenericSubstitution> subst = new GenericSubstitution();
         subst->genericDecl = genericDecl;
-        for (auto dd : genericDecl->Members)
+        for (auto dd : genericDecl->members)
         {
             if (dd == genericDecl->inner)
                 continue;
@@ -2427,8 +2427,8 @@ namespace Slang
         //   one can have a body (in which case the other is a forward declaration),
         //   or else we have a redefinition error.
 
-        auto newGenericDecl = as<GenericDecl>(newDecl->ParentDecl);
-        auto oldGenericDecl = as<GenericDecl>(oldDecl->ParentDecl);
+        auto newGenericDecl = as<GenericDecl>(newDecl->parentDecl);
+        auto oldGenericDecl = as<GenericDecl>(oldDecl->parentDecl);
 
         // If one declaration is a prefix/postfix operator, and the
         // other is not a matching operator, then don't consider these
@@ -2657,7 +2657,7 @@ namespace Slang
         // in the same container.
         //
         auto newDecl = decl;
-        auto parentDecl = decl->ParentDecl;
+        auto parentDecl = decl->parentDecl;
 
         // Sanity check: there should always be a parent declaration.
         //
@@ -2679,7 +2679,7 @@ namespace Slang
             if( newDecl == genericParentDecl->inner )
             {
                 newDecl = parentDecl;
-                parentDecl = genericParentDecl->ParentDecl;
+                parentDecl = genericParentDecl->parentDecl;
             }
         }
 
@@ -2950,11 +2950,11 @@ namespace Slang
         // the `GenericDecl` and we need to skip past that to
         // the grandparent.
         //
-        auto parent = decl->ParentDecl;
+        auto parent = decl->parentDecl;
         auto genericParent = as<GenericDecl>(parent);
         if (genericParent)
         {
-            parent = genericParent->ParentDecl;
+            parent = genericParent->parentDecl;
         }
 
         // The result type for a constructor is whatever `This` would
@@ -3000,8 +3000,8 @@ namespace Slang
             RefPtr<GetterDecl> getterDecl = new GetterDecl();
             getterDecl->loc = decl->loc;
 
-            getterDecl->ParentDecl = decl;
-            decl->Members.add(getterDecl);
+            getterDecl->parentDecl = decl;
+            decl->members.add(getterDecl);
         }
 
         checkCallableDeclCommon(decl);
@@ -3013,7 +3013,7 @@ namespace Slang
         // or a property declaration (when we add them). It will derive
         // its return type from the outer declaration, so we handle both
         // of these checks at the same place.
-        auto parent = decl->ParentDecl;
+        auto parent = decl->parentDecl;
         if (auto parentSubscript = as<SubscriptDecl>(parent))
         {
             ensureDecl(parentSubscript, DeclCheckState::CanUseTypeOfValueDecl);
@@ -3030,7 +3030,7 @@ namespace Slang
 
     GenericDecl* SemanticsVisitor::GetOuterGeneric(Decl* decl)
     {
-        auto parentDecl = decl->ParentDecl;
+        auto parentDecl = decl->parentDecl;
         if (!parentDecl) return nullptr;
         auto parentGeneric = as<GenericDecl>(parentDecl);
         return parentGeneric;

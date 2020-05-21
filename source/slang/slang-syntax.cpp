@@ -672,11 +672,11 @@ Index getFilterCountImpl(const ReflectClassInfo& clsInfo, MemberFilterStyle filt
                 // the generic decl associated with the substitution list must be
                 // the generic decl that declared this parameter
                 auto genericDecl = genericSubst->genericDecl;
-                if (genericDecl != genericTypeParamDecl->ParentDecl)
+                if (genericDecl != genericTypeParamDecl->parentDecl)
                     continue;
 
                 int index = 0;
-                for (auto m : genericDecl->Members)
+                for (auto m : genericDecl->members)
                 {
                     if (m.Ptr() == genericTypeParamDecl)
                     {
@@ -736,7 +736,7 @@ Index getFilterCountImpl(const ReflectClassInfo& clsInfo, MemberFilterStyle filt
                 if(!thisSubst)
                     continue;
 
-                if(auto interfaceDecl = as<InterfaceDecl>(substAssocTypeDecl->ParentDecl))
+                if(auto interfaceDecl = as<InterfaceDecl>(substAssocTypeDecl->parentDecl))
                 {
                     if(thisSubst->interfaceDecl == interfaceDecl)
                     {
@@ -808,7 +808,7 @@ Index getFilterCountImpl(const ReflectClassInfo& clsInfo, MemberFilterStyle filt
         for(;;)
         {
             RefPtr<Decl> childDecl = dd;
-            RefPtr<Decl> parentDecl = dd->ParentDecl;
+            RefPtr<Decl> parentDecl = dd->parentDecl;
             if(!parentDecl)
                 break;
 
@@ -1464,11 +1464,11 @@ Index getFilterCountImpl(const ReflectClassInfo& clsInfo, MemberFilterStyle filt
             // the generic decl associated with the substitution list must be
             // the generic decl that declared this parameter
             auto genericDecl = genSubst->genericDecl;
-            if (genericDecl != declRef.getDecl()->ParentDecl)
+            if (genericDecl != declRef.getDecl()->parentDecl)
                 continue;
 
             int index = 0;
-            for (auto m : genericDecl->Members)
+            for (auto m : genericDecl->members)
             {
                 if (m.Ptr() == declRef.getDecl())
                 {
@@ -1732,7 +1732,7 @@ Index getFilterCountImpl(const ReflectClassInfo& clsInfo, MemberFilterStyle filt
             if(auto interfaceDecl = as<InterfaceDecl>(dd))
                 return interfaceDecl;
 
-            dd = dd->ParentDecl;
+            dd = dd->parentDecl;
         }
         return nullptr;
     }
@@ -1883,7 +1883,7 @@ Index getFilterCountImpl(const ReflectClassInfo& clsInfo, MemberFilterStyle filt
         // nested directly in a generic, then `substToSpecialize` will either start with
         // the corresponding `GenericSubstitution` or there will be *no* generic substitutions
         // corresponding to that decl.
-        for(Decl* ancestorDecl = declToSpecialize; ancestorDecl; ancestorDecl = ancestorDecl->ParentDecl)
+        for(Decl* ancestorDecl = declToSpecialize; ancestorDecl; ancestorDecl = ancestorDecl->parentDecl)
         {
             if(auto ancestorGenericDecl = as<GenericDecl>(ancestorDecl))
             {
@@ -1897,7 +1897,7 @@ Index getFilterCountImpl(const ReflectClassInfo& clsInfo, MemberFilterStyle filt
                         // keep one matching it in place.
                         int diff = 0;
                         auto restSubst = specializeSubstitutions(
-                            ancestorGenericDecl->ParentDecl,
+                            ancestorGenericDecl->parentDecl,
                             specGenericSubst->outer,
                             substsToApply,
                             &diff);
@@ -1937,7 +1937,7 @@ Index getFilterCountImpl(const ReflectClassInfo& clsInfo, MemberFilterStyle filt
 
                     int diff = 0;
                     auto restSubst = specializeSubstitutions(
-                        ancestorGenericDecl->ParentDecl,
+                        ancestorGenericDecl->parentDecl,
                         substsToSpecialize,
                         substsToApply,
                         &diff);
@@ -1967,7 +1967,7 @@ Index getFilterCountImpl(const ReflectClassInfo& clsInfo, MemberFilterStyle filt
                         // keep one matching it in place.
                         int diff = 0;
                         auto restSubst = specializeSubstitutions(
-                            ancestorInterfaceDecl->ParentDecl,
+                            ancestorInterfaceDecl->parentDecl,
                             specThisTypeSubst->outer,
                             substsToApply,
                             &diff);
@@ -1997,7 +1997,7 @@ Index getFilterCountImpl(const ReflectClassInfo& clsInfo, MemberFilterStyle filt
 
                     int diff = 0;
                     auto restSubst = specializeSubstitutions(
-                        ancestorInterfaceDecl->ParentDecl,
+                        ancestorInterfaceDecl->parentDecl,
                         substsToSpecialize,
                         substsToApply,
                         &diff);
@@ -2103,7 +2103,7 @@ Index getFilterCountImpl(const ReflectClassInfo& clsInfo, MemberFilterStyle filt
         // Can access as method with this->as because it removes any ambiguity.
         using Slang::as;
 
-        auto parentDecl = decl->ParentDecl;
+        auto parentDecl = decl->parentDecl;
         if (!parentDecl)
             return DeclRefBase();
 
@@ -2222,7 +2222,7 @@ Index getFilterCountImpl(const ReflectClassInfo& clsInfo, MemberFilterStyle filt
         // actually want to register is the generic itself.
         //
         auto declToRegister = decl;
-        if(auto genericDecl = as<GenericDecl>(decl->ParentDecl))
+        if(auto genericDecl = as<GenericDecl>(decl->parentDecl))
             declToRegister = genericDecl;
 
         session->magicDecls[modifier->name] = declToRegister.Ptr();
@@ -2448,12 +2448,12 @@ Index getFilterCountImpl(const ReflectClassInfo& clsInfo, MemberFilterStyle filt
                     // the generic decl associated with the substitution list must be
                     // the generic decl that declared this parameter
                     auto genericDecl = genericSubst->genericDecl;
-                    if (genericDecl != genConstraintDecl->ParentDecl)
+                    if (genericDecl != genConstraintDecl->parentDecl)
                         continue;
 
                     bool found = false;
                     Index index = 0;
-                    for (auto m : genericDecl->Members)
+                    for (auto m : genericDecl->members)
                     {
                         if (auto constraintParam = as<GenericTypeConstraintDecl>(m))
                         {
@@ -2477,7 +2477,7 @@ Index getFilterCountImpl(const ReflectClassInfo& clsInfo, MemberFilterStyle filt
                 else if(auto globalGenericSubst = s.as<GlobalGenericParamSubstitution>())
                 {
                     // check if the substitution is really about this global generic type parameter
-                    if (globalGenericSubst->paramDecl != genConstraintDecl->ParentDecl)
+                    if (globalGenericSubst->paramDecl != genConstraintDecl->parentDecl)
                         continue;
 
                     for(auto constraintArg : globalGenericSubst->constraintArgs)
@@ -2514,9 +2514,9 @@ Index getFilterCountImpl(const ReflectClassInfo& clsInfo, MemberFilterStyle filt
         //
         if (auto substTypeConstraintDecl = as<GenericTypeConstraintDecl>(substDeclRef.decl))
         {
-            if (auto substAssocTypeDecl = as<AssocTypeDecl>(substTypeConstraintDecl->ParentDecl))
+            if (auto substAssocTypeDecl = as<AssocTypeDecl>(substTypeConstraintDecl->parentDecl))
             {
-                if (auto interfaceDecl = as<InterfaceDecl>(substAssocTypeDecl->ParentDecl))
+                if (auto interfaceDecl = as<InterfaceDecl>(substAssocTypeDecl->parentDecl))
                 {
                     // At this point we have a constraint decl for an associated type,
                     // and we nee to see if we are dealing with a concrete substitution
@@ -2929,7 +2929,7 @@ RefPtr<Val> TaggedUnionSubtypeWitness::substituteImpl(SubstitutionSet subst, int
 
 Module* getModule(Decl* decl)
 {
-    for( auto dd = decl; dd; dd = dd->ParentDecl )
+    for( auto dd = decl; dd; dd = dd->parentDecl )
     {
         if(auto moduleDecl = as<ModuleDecl>(dd))
             return moduleDecl->module;

@@ -77,13 +77,13 @@ namespace Slang
 
     inline FilteredMemberRefList<Decl> getMembers(DeclRef<ContainerDecl> const& declRef, MemberFilterStyle filterStyle = MemberFilterStyle::All)
     {
-        return FilteredMemberRefList<Decl>(declRef.getDecl()->Members, declRef.substitutions, filterStyle);
+        return FilteredMemberRefList<Decl>(declRef.getDecl()->members, declRef.substitutions, filterStyle);
     }
 
     template<typename T>
     inline FilteredMemberRefList<T> getMembersOfType( DeclRef<ContainerDecl> const& declRef, MemberFilterStyle filterStyle = MemberFilterStyle::All)
     {
-        return FilteredMemberRefList<T>(declRef.getDecl()->Members, declRef.substitutions, filterStyle);
+        return FilteredMemberRefList<T>(declRef.getDecl()->members, declRef.substitutions, filterStyle);
     }
 
     template<typename T>

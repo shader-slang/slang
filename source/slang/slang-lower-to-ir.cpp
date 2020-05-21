@@ -417,7 +417,7 @@ void setValue(IRGenContext* context, Decl* decl, LoweredValInfo value)
 
 ModuleDecl* findModuleDecl(Decl* decl)
 {
-    for (auto dd = decl; dd; dd = dd->ParentDecl)
+    for (auto dd = decl; dd; dd = dd->parentDecl)
     {
         if (auto moduleDecl = as<ModuleDecl>(dd))
             return moduleDecl;
@@ -427,7 +427,7 @@ ModuleDecl* findModuleDecl(Decl* decl)
 
 bool isFromStdLib(Decl* decl)
 {
-    for (auto dd = decl; dd; dd = dd->ParentDecl)
+    for (auto dd = decl; dd; dd = dd->parentDecl)
     {
         if (dd->hasModifier<FromStdLibModifier>())
             return true;
@@ -1708,11 +1708,11 @@ static String getNameForNameHint(
 
     // For other cases of declaration, we want to consider
     // merging its name with the name of its parent declaration.
-    auto parentDecl = decl->ParentDecl;
+    auto parentDecl = decl->parentDecl;
 
     // Skip past a generic parent, if we are a declaration nested in a generic.
     if(auto genericParentDecl = as<GenericDecl>(parentDecl))
-        parentDecl = genericParentDecl->ParentDecl;
+        parentDecl = genericParentDecl->parentDecl;
 
     // A `ModuleDecl` can have a name too, but in the common case
     // we don't want to generate name hints that include the module
@@ -1726,7 +1726,7 @@ static String getNameForNameHint(
     // For now we skip past a `ModuleDecl` parent.
     //
     if(auto moduleParentDecl = as<ModuleDecl>(parentDecl))
-        parentDecl = moduleParentDecl->ParentDecl;
+        parentDecl = moduleParentDecl->parentDecl;
 
     if(!parentDecl)
     {
@@ -4247,7 +4247,7 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
 
     LoweredValInfo visitExtensionDecl(ExtensionDecl* decl)
     {
-        for (auto & member : decl->Members)
+        for (auto & member : decl->members)
             ensureDecl(context, member);
         return LoweredValInfo();
     }
@@ -4299,13 +4299,13 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
         // This might be a type constraint on an associated type,
         // in which case it should lower as the key for that
         // interface requirement.
-        if(auto assocTypeDecl = as<AssocTypeDecl>(decl->ParentDecl))
+        if(auto assocTypeDecl = as<AssocTypeDecl>(decl->parentDecl))
         {
             // TODO: might need extra steps if we ever allow
             // generic associated types.
 
 
-            if(auto interfaceDecl = as<InterfaceDecl>(assocTypeDecl->ParentDecl))
+            if(auto interfaceDecl = as<InterfaceDecl>(assocTypeDecl->parentDecl))
             {
                 // Okay, this seems to be an interface rquirement, and
                 // we should lower it as such.
@@ -4313,7 +4313,7 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
             }
         }
 
-        if(auto globalGenericParamDecl = as<GlobalGenericParamDecl>(decl->ParentDecl))
+        if(auto globalGenericParamDecl = as<GlobalGenericParamDecl>(decl->parentDecl))
         {
             // This is a constraint on a global generic type parameters,
             // and so it should lower as a parameter of its own.
@@ -4426,7 +4426,7 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
         // table, because it represents something the
         // interface requires, and not what it provides.
         //
-        auto parentDecl = inheritanceDecl->ParentDecl;
+        auto parentDecl = inheritanceDecl->parentDecl;
         if (auto parentInterfaceDecl = as<InterfaceDecl>(parentDecl))
         {
             return LoweredValInfo::simple(getInterfaceRequirementKey(inheritanceDecl));
@@ -4561,7 +4561,7 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
 
     bool isGlobalVarDecl(VarDecl* decl)
     {
-        auto parent = decl->ParentDecl;
+        auto parent = decl->parentDecl;
         if (as<NamespaceDeclBase>(parent))
         {
             // Variable declared at global/namespace scope? -> Global.
@@ -4581,7 +4581,7 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
 
     bool isMemberVarDecl(VarDecl* decl)
     {
-        auto parent = decl->ParentDecl;
+        auto parent = decl->parentDecl;
         if (as<AggTypeDecl>(parent))
         {
             // A variable declared inside of an aggregate type declaration is a member.
@@ -4778,7 +4778,7 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
         // TODO: right now the parent links for scopes are *not*
         // set correctly, so we can't just scan up and look
         // for a function in the parent chain...
-        auto parent = decl->ParentDecl;
+        auto parent = decl->parentDecl;
         if( as<ScopeDecl>(parent) )
         {
             return true;
@@ -4808,7 +4808,7 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
         //
         // First we start with type and value parameters,
         // in the order they were declared.
-        for (auto member : genericDecl->Members)
+        for (auto member : genericDecl->members)
         {
             if (auto typeParamDecl = as<GenericTypeParamDecl>(member))
             {
@@ -4821,7 +4821,7 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
         }
         // Then we emit constraint parameters, again in
         // declaration order.
-        for (auto member : genericDecl->Members)
+        for (auto member : genericDecl->members)
         {
             if (auto constraintDecl = as<GenericTypeConstraintDecl>(member))
             {
@@ -4849,7 +4849,7 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
         if(!parentVal)
             return val;
 
-        for(auto pp = decl->ParentDecl; pp; pp = pp->ParentDecl)
+        for(auto pp = decl->parentDecl; pp; pp = pp->parentDecl)
         {
             if(auto genericAncestor = as<GenericDecl>(pp))
             {
@@ -5097,7 +5097,7 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
         // a witness table for the interface type's conformance
         // to its own interface.
         //
-        for (auto requirementDecl : decl->Members)
+        for (auto requirementDecl : decl->members)
         {
             getInterfaceRequirementKey(requirementDecl);
 
@@ -5424,7 +5424,7 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
         // The parameters introduced by any "parent" declarations
         // will need to come first, so we'll deal with that
         // logic here.
-        if( auto parentDecl = decl->ParentDecl )
+        if( auto parentDecl = decl->parentDecl )
         {
             // Compute the mode to use when collecting parameters from
             // the outer declaration. The most important question here
@@ -5522,7 +5522,7 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
         //
         // First we start with type and value parameters,
         // in the order they were declared.
-        for (auto member : genericDecl->Members)
+        for (auto member : genericDecl->members)
         {
             if (auto typeParamDecl = as<GenericTypeParamDecl>(member))
             {
@@ -5542,7 +5542,7 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
         }
         // Then we emit constraint parameters, again in
         // declaration order.
-        for (auto member : genericDecl->Members)
+        for (auto member : genericDecl->members)
         {
             if (auto constraintDecl = as<GenericTypeConstraintDecl>(member))
             {
@@ -5564,7 +5564,7 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
     //
     IRGeneric* emitOuterGenerics(IRGenContext* subContext, Decl* decl, Decl* leafDecl)
     {
-        for(auto pp = decl->ParentDecl; pp; pp = pp->ParentDecl)
+        for(auto pp = decl->parentDecl; pp; pp = pp->parentDecl)
         {
             if(auto genericAncestor = as<GenericDecl>(pp))
             {
@@ -5658,18 +5658,18 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
         if(as<ConstructorDecl>(decl))
             return false;
 
-        auto dd = decl->ParentDecl;
+        auto dd = decl->parentDecl;
         for(;;)
         {
             if(auto genericDecl = as<GenericDecl>(dd))
             {
-                dd = genericDecl->ParentDecl;
+                dd = genericDecl->parentDecl;
                 continue;
             }
 
             if( auto subscriptDecl = as<SubscriptDecl>(dd) )
             {
-                dd = subscriptDecl->ParentDecl;
+                dd = subscriptDecl->parentDecl;
             }
 
             break;
@@ -5753,7 +5753,7 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
         //
         Decl* declForName = decl;
         if(auto accessorDecl = as<AccessorDecl>(decl))
-            declForName = decl->ParentDecl;
+            declForName = decl->parentDecl;
 
         definition.append(getText(declForName->getName()));
 
@@ -5827,7 +5827,7 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
             // We are some kind of accessor, so the parent declaration should
             // know the correct return type to expose.
             //
-            auto parentDecl = accessorDecl->ParentDecl;
+            auto parentDecl = accessorDecl->parentDecl;
             if (auto subscriptDecl = as<SubscriptDecl>(parentDecl))
             {
                 declForReturnType = subscriptDecl;
@@ -6713,7 +6713,7 @@ static void ensureAllDeclsRec(
     //
     if(auto containerDecl = as<AggTypeDeclBase>(decl))
     {
-        for (auto memberDecl : containerDecl->Members)
+        for (auto memberDecl : containerDecl->members)
         {
             ensureAllDeclsRec(context, memberDecl);
         }
@@ -6769,7 +6769,7 @@ IRModule* generateIRForTranslationUnit(
     //
     // Next, ensure that all other global declarations have
     // been emitted.
-    for (auto decl : translationUnit->getModuleDecl()->Members)
+    for (auto decl : translationUnit->getModuleDecl()->members)
     {
         ensureAllDeclsRec(context, decl);
     }

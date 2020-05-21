@@ -22,15 +22,15 @@ class ContainerDecl: public Decl
 {
     SLANG_ABSTRACT_CLASS(ContainerDecl)
 
-    List<RefPtr<Decl>> Members;
+    List<RefPtr<Decl>> members;
 
     template<typename T>
     FilteredMemberList<T> getMembersOfType()
     {
-        return FilteredMemberList<T>(Members);
+        return FilteredMemberList<T>(members);
     }
 
-    bool isMemberDictionaryValid() const { return dictionaryLastCount == Members.getCount(); }
+    bool isMemberDictionaryValid() const { return dictionaryLastCount == members.getCount(); }
 
     void invalidateMemberDictionary() { dictionaryLastCount = -1; }
 
