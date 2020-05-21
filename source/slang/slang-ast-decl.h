@@ -34,6 +34,8 @@ class ContainerDecl: public Decl
 
     void invalidateMemberDictionary() { dictionaryLastCount = -1; }
 
+    SLANG_UNREFLECTED   // We don't want to reflect the following fields
+
     // Denotes how much of Members has been placed into the dictionary/transparentMembers.
     // If this value equals the Members.getCount(), the dictionary is completely full and valid.
     // If it's >= 0, then the Members after dictionaryLastCount are all that need to be added.
