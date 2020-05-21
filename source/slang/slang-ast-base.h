@@ -131,7 +131,7 @@ public:
 
     bool Equals(Type* type);
     
-    Type* GetCanonicalType();
+    Type* getCanonicalType();
 
     virtual RefPtr<Val> SubstituteImpl(SubstitutionSet subst, int* ioDiff) override;
 
@@ -149,9 +149,9 @@ protected:
 };
 
 template <typename T>
-SLANG_FORCE_INLINE T* as(Type* obj) { return obj ? dynamicCast<T>(obj->GetCanonicalType()) : nullptr; }
+SLANG_FORCE_INLINE T* as(Type* obj) { return obj ? dynamicCast<T>(obj->getCanonicalType()) : nullptr; }
 template <typename T>
-SLANG_FORCE_INLINE const T* as(const Type* obj) { return obj ? dynamicCast<T>(const_cast<Type*>(obj)->GetCanonicalType()) : nullptr; }
+SLANG_FORCE_INLINE const T* as(const Type* obj) { return obj ? dynamicCast<T>(const_cast<Type*>(obj)->getCanonicalType()) : nullptr; }
 
 // A substitution represents a binding of certain
 // type-level variables to concrete argument values

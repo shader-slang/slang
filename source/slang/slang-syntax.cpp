@@ -251,7 +251,7 @@ Index getFilterCountImpl(const ReflectClassInfo& clsInfo, MemberFilterStyle filt
 
     bool Type::Equals(Type * type)
     {
-        return GetCanonicalType()->EqualsImpl(type->GetCanonicalType());
+        return getCanonicalType()->EqualsImpl(type->getCanonicalType());
     }
 
     bool Type::EqualsVal(Val* val)
@@ -264,7 +264,7 @@ Index getFilterCountImpl(const ReflectClassInfo& clsInfo, MemberFilterStyle filt
     RefPtr<Val> Type::SubstituteImpl(SubstitutionSet subst, int* ioDiff)
     {
         int diff = 0;
-        auto canSubst = GetCanonicalType()->SubstituteImpl(subst, &diff);
+        auto canSubst = getCanonicalType()->SubstituteImpl(subst, &diff);
 
         // If nothing changed, then don't drop any sugar that is applied
         if (!diff)
@@ -276,7 +276,7 @@ Index getFilterCountImpl(const ReflectClassInfo& clsInfo, MemberFilterStyle filt
         return canSubst;
     }
 
-    Type* Type::GetCanonicalType()
+    Type* Type::getCanonicalType()
     {
         Type* et = const_cast<Type*>(this);
         if (!et->canonicalType)
@@ -485,7 +485,7 @@ Index getFilterCountImpl(const ReflectClassInfo& clsInfo, MemberFilterStyle filt
 
     RefPtr<Type> ArrayExpressionType::CreateCanonicalType()
     {
-        auto canonicalElementType = baseType->GetCanonicalType();
+        auto canonicalElementType = baseType->getCanonicalType();
         auto canonicalArrayType = getArrayType(
             canonicalElementType,
             arrayLength);
@@ -1129,7 +1129,7 @@ Index getFilterCountImpl(const ReflectClassInfo& clsInfo, MemberFilterStyle filt
     {
         if (!innerType)
             innerType = GetType(declRef);
-        return innerType->GetCanonicalType();
+        return innerType->getCanonicalType();
     }
 
     int NamedExpressionType::GetHashCode()
@@ -1143,7 +1143,7 @@ Index getFilterCountImpl(const ReflectClassInfo& clsInfo, MemberFilterStyle filt
         // for now (and hopefully equivalent) to just have any
         // named types automaticlaly route hash-code requests
         // to their canonical type.
-        return GetCanonicalType()->GetHashCode();
+        return getCanonicalType()->GetHashCode();
     }
 
     // FuncType
@@ -1220,13 +1220,13 @@ Index getFilterCountImpl(const ReflectClassInfo& clsInfo, MemberFilterStyle filt
     RefPtr<Type> FuncType::CreateCanonicalType()
     {
         // result type
-        RefPtr<Type> canResultType = resultType->GetCanonicalType();
+        RefPtr<Type> canResultType = resultType->getCanonicalType();
 
         // parameter types
         List<RefPtr<Type>> canParamTypes;
         for( auto pp : paramTypes )
         {
-            canParamTypes.add(pp->GetCanonicalType());
+            canParamTypes.add(pp->getCanonicalType());
         }
 
         RefPtr<FuncType> canType = new FuncType();
@@ -1271,7 +1271,7 @@ Index getFilterCountImpl(const ReflectClassInfo& clsInfo, MemberFilterStyle filt
 
     RefPtr<Type> TypeType::CreateCanonicalType()
     {
-        auto canType = getTypeType(type->GetCanonicalType());
+        auto canType = getTypeType(type->getCanonicalType());
         return canType;
     }
 
@@ -2826,7 +2826,7 @@ Index getFilterCountImpl(const ReflectClassInfo& clsInfo, MemberFilterStyle filt
 
         for( auto caseType : caseTypes )
         {
-            auto canCaseType = caseType->GetCanonicalType();
+            auto canCaseType = caseType->getCanonicalType();
             canType->caseTypes.add(canCaseType);
         }
 
@@ -3035,7 +3035,7 @@ RefPtr<Val> getCanonicalValue(Val* val)
         return nullptr;
     if(auto type = as<Type>(val))
     {
-        return type->GetCanonicalType();
+        return type->getCanonicalType();
     }
     // TODO: We may eventually need/want some sort of canonicalization
     // for non-type values, but for now there is nothing to do.
@@ -3047,7 +3047,7 @@ RefPtr<Type> ExistentialSpecializedType::CreateCanonicalType()
     RefPtr<ExistentialSpecializedType> canType = new ExistentialSpecializedType();
     canType->setSession(getSession());
 
-    canType->baseType = baseType->GetCanonicalType();
+    canType->baseType = baseType->getCanonicalType();
     for( auto arg : args )
     {
         ExpandedSpecializationArg canArg;
