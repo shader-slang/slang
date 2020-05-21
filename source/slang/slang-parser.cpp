@@ -3634,13 +3634,13 @@ namespace Slang
         FillPosition(ifStatement.Ptr());
         ReadToken("if");
         ReadToken(TokenType::LParent);
-        ifStatement->Predicate = ParseExpression();
+        ifStatement->predicate = ParseExpression();
         ReadToken(TokenType::RParent);
-        ifStatement->PositiveStatement = ParseStatement();
+        ifStatement->positiveStatement = ParseStatement();
         if (LookAheadToken("else"))
         {
             ReadToken("else");
-            ifStatement->NegativeStatement = ParseStatement();
+            ifStatement->negativeStatement = ParseStatement();
         }
         return ifStatement;
     }
@@ -3679,13 +3679,13 @@ namespace Slang
         ReadToken(TokenType::LParent);
         if (peekTypeName(this))
         {
-            stmt->InitialStatement = parseVarDeclrStatement(Modifiers());
+            stmt->initialStatement = parseVarDeclrStatement(Modifiers());
         }
         else
         {
             if (!LookAheadToken(TokenType::Semicolon))
             {
-                stmt->InitialStatement = ParseExpressionStatement();
+                stmt->initialStatement = ParseExpressionStatement();
             }
             else
             {
@@ -3693,12 +3693,12 @@ namespace Slang
             }
         }
         if (!LookAheadToken(TokenType::Semicolon))
-            stmt->PredicateExpression = ParseExpression();
+            stmt->predicateExpression = ParseExpression();
         ReadToken(TokenType::Semicolon);
         if (!LookAheadToken(TokenType::RParent))
-            stmt->SideEffectExpression = ParseExpression();
+            stmt->sideEffectExpression = ParseExpression();
         ReadToken(TokenType::RParent);
-        stmt->Statement = ParseStatement();
+        stmt->statement = ParseStatement();
 
         if (!brokenScoping)
             PopScope();
@@ -3712,9 +3712,9 @@ namespace Slang
         FillPosition(whileStatement.Ptr());
         ReadToken("while");
         ReadToken(TokenType::LParent);
-        whileStatement->Predicate = ParseExpression();
+        whileStatement->predicate = ParseExpression();
         ReadToken(TokenType::RParent);
-        whileStatement->Statement = ParseStatement();
+        whileStatement->statement = ParseStatement();
         return whileStatement;
     }
 
@@ -3723,10 +3723,10 @@ namespace Slang
         RefPtr<DoWhileStmt> doWhileStatement = new DoWhileStmt();
         FillPosition(doWhileStatement.Ptr());
         ReadToken("do");
-        doWhileStatement->Statement = ParseStatement();
+        doWhileStatement->statement = ParseStatement();
         ReadToken("while");
         ReadToken(TokenType::LParent);
-        doWhileStatement->Predicate = ParseExpression();
+        doWhileStatement->predicate = ParseExpression();
         ReadToken(TokenType::RParent);
         ReadToken(TokenType::Semicolon);
         return doWhileStatement;
@@ -3756,7 +3756,7 @@ namespace Slang
         FillPosition(returnStatement.Ptr());
         ReadToken("return");
         if (!LookAheadToken(TokenType::Semicolon))
-            returnStatement->Expression = ParseExpression();
+            returnStatement->expression = ParseExpression();
         ReadToken(TokenType::Semicolon);
         return returnStatement;
     }
@@ -3766,7 +3766,7 @@ namespace Slang
         RefPtr<ExpressionStmt> statement = new ExpressionStmt();
 
         FillPosition(statement.Ptr());
-        statement->Expression = ParseExpression();
+        statement->expression = ParseExpression();
 
         ReadToken(TokenType::Semicolon);
         return statement;

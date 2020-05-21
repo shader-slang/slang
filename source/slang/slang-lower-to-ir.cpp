@@ -3178,9 +3178,9 @@ struct StmtLoweringVisitor : StmtVisitor<StmtLoweringVisitor>
         auto builder = getBuilder();
         startBlockIfNeeded(stmt);
 
-        auto condExpr = stmt->Predicate;
-        auto thenStmt = stmt->PositiveStatement;
-        auto elseStmt = stmt->NegativeStatement;
+        auto condExpr = stmt->predicate;
+        auto thenStmt = stmt->positiveStatement;
+        auto elseStmt = stmt->negativeStatement;
 
         auto irCond = getSimpleVal(context,
             lowerRValueExpr(context, condExpr));
@@ -3234,7 +3234,7 @@ struct StmtLoweringVisitor : StmtVisitor<StmtLoweringVisitor>
 
         // The initializer clause for the statement
         // can always safetly be emitted to the current block.
-        if (auto initStmt = stmt->InitialStatement)
+        if (auto initStmt = stmt->initialStatement)
         {
             lowerStmt(context, initStmt);
         }
@@ -3267,10 +3267,10 @@ struct StmtLoweringVisitor : StmtVisitor<StmtLoweringVisitor>
 
         // Now that we are within the header block, we
         // want to emit the expression for the loop condition:
-        if (auto condExpr = stmt->PredicateExpression)
+        if (auto condExpr = stmt->predicateExpression)
         {
             auto irCondition = getSimpleVal(context,
-                lowerRValueExpr(context, stmt->PredicateExpression));
+                lowerRValueExpr(context, stmt->predicateExpression));
 
             // Now we want to `break` if the loop condition is false.
             builder->emitLoopTest(
@@ -3281,11 +3281,11 @@ struct StmtLoweringVisitor : StmtVisitor<StmtLoweringVisitor>
 
         // Emit the body of the loop
         insertBlock(bodyLabel);
-        lowerStmt(context, stmt->Statement);
+        lowerStmt(context, stmt->statement);
 
         // Insert the `continue` block
         insertBlock(continueLabel);
-        if (auto incrExpr = stmt->SideEffectExpression)
+        if (auto incrExpr = stmt->sideEffectExpression)
         {
             lowerRValueExpr(context, incrExpr);
         }
@@ -3336,7 +3336,7 @@ struct StmtLoweringVisitor : StmtVisitor<StmtLoweringVisitor>
 
         // Now that we are within the header block, we
         // want to emit the expression for the loop condition:
-        if (auto condExpr = stmt->Predicate)
+        if (auto condExpr = stmt->predicate)
         {
             auto irCondition = getSimpleVal(context,
                 lowerRValueExpr(context, condExpr));
@@ -3350,7 +3350,7 @@ struct StmtLoweringVisitor : StmtVisitor<StmtLoweringVisitor>
 
         // Emit the body of the loop
         insertBlock(bodyLabel);
-        lowerStmt(context, stmt->Statement);
+        lowerStmt(context, stmt->statement);
 
         // At the end of the body we need to jump back to the top.
         emitBranchIfNeeded(loopHead);
@@ -3397,13 +3397,13 @@ struct StmtLoweringVisitor : StmtVisitor<StmtLoweringVisitor>
         insertBlock(loopHead);
 
         // Emit the body of the loop
-        lowerStmt(context, stmt->Statement);
+        lowerStmt(context, stmt->statement);
 
         insertBlock(testLabel);
 
         // Now that we are within the header block, we
         // want to emit the expression for the loop condition:
-        if (auto condExpr = stmt->Predicate)
+        if (auto condExpr = stmt->predicate)
         {
             auto irCondition = getSimpleVal(context,
                 lowerRValueExpr(context, condExpr));
@@ -3434,7 +3434,7 @@ struct StmtLoweringVisitor : StmtVisitor<StmtLoweringVisitor>
         // so that an expression statement that names
         // a location (but doesn't load from it)
         // will not actually emit a load.
-        lowerLValueExpr(context, stmt->Expression);
+        lowerLValueExpr(context, stmt->expression);
     }
 
     void visitDeclStmt(DeclStmt* stmt)
@@ -3480,7 +3480,7 @@ struct StmtLoweringVisitor : StmtVisitor<StmtLoweringVisitor>
         // instruction. If the statement had an argument
         // expression, then we need to lower that to
         // a value first, and then emit the resulting value.
-        if( auto expr = stmt->Expression )
+        if( auto expr = stmt->expression )
         {
             auto loweredExpr = lowerRValueExpr(context, expr);
 
