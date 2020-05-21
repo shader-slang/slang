@@ -703,7 +703,7 @@ static void collectGlobalScopeParameter(
     auto varDeclRef = shaderParamInfo.paramDeclRef;
 
     // We apply any substitutions for global generic parameters here.
-    auto type = GetType(varDeclRef)->Substitute(globalGenericSubst).as<Type>();
+    auto type = GetType(varDeclRef)->substitute(globalGenericSubst).as<Type>();
 
     // We use a single operation to both check whether the
     // variable represents a shader parameter, and to compute

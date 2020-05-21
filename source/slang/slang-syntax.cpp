@@ -261,10 +261,10 @@ Index getFilterCountImpl(const ReflectClassInfo& clsInfo, MemberFilterStyle filt
         return false;
     }
 
-    RefPtr<Val> Type::SubstituteImpl(SubstitutionSet subst, int* ioDiff)
+    RefPtr<Val> Type::substituteImpl(SubstitutionSet subst, int* ioDiff)
     {
         int diff = 0;
-        auto canSubst = getCanonicalType()->SubstituteImpl(subst, &diff);
+        auto canSubst = getCanonicalType()->substituteImpl(subst, &diff);
 
         // If nothing changed, then don't drop any sugar that is applied
         if (!diff)
@@ -466,11 +466,11 @@ Index getFilterCountImpl(const ReflectClassInfo& clsInfo, MemberFilterStyle filt
         return (areValsEqual(arrayLength, arrType->arrayLength) && baseType->Equals(arrType->baseType.Ptr()));
     }
 
-    RefPtr<Val> ArrayExpressionType::SubstituteImpl(SubstitutionSet subst, int* ioDiff)
+    RefPtr<Val> ArrayExpressionType::substituteImpl(SubstitutionSet subst, int* ioDiff)
     {
         int diff = 0;
-        auto elementType = baseType->SubstituteImpl(subst, &diff).as<Type>();
-        auto arrlen = arrayLength->SubstituteImpl(subst, &diff).as<IntVal>();
+        auto elementType = baseType->substituteImpl(subst, &diff).as<Type>();
+        auto arrlen = arrayLength->substituteImpl(subst, &diff).as<IntVal>();
         SLANG_ASSERT(arrlen);
         if (diff)
         {
@@ -577,7 +577,7 @@ Index getFilterCountImpl(const ReflectClassInfo& clsInfo, MemberFilterStyle filt
                 SLANG_ASSERT(val);
 
                 return RequirementWitness(
-                    val->Substitute(subst));
+                    val->substitute(subst));
             }
         }
     }
@@ -654,7 +654,7 @@ Index getFilterCountImpl(const ReflectClassInfo& clsInfo, MemberFilterStyle filt
         return RequirementWitness();
     }
 
-    RefPtr<Val> DeclRefType::SubstituteImpl(SubstitutionSet subst, int* ioDiff)
+    RefPtr<Val> DeclRefType::substituteImpl(SubstitutionSet subst, int* ioDiff)
     {
         if (!subst) return this;
 
@@ -1101,7 +1101,7 @@ Index getFilterCountImpl(const ReflectClassInfo& clsInfo, MemberFilterStyle filt
         return this;
     }
 
-    RefPtr<Val> ErrorType::SubstituteImpl(SubstitutionSet /*subst*/, int* /*ioDiff*/)
+    RefPtr<Val> ErrorType::substituteImpl(SubstitutionSet /*subst*/, int* /*ioDiff*/)
     {
         return this;
     }
@@ -1191,18 +1191,18 @@ Index getFilterCountImpl(const ReflectClassInfo& clsInfo, MemberFilterStyle filt
         return false;
     }
 
-    RefPtr<Val> FuncType::SubstituteImpl(SubstitutionSet subst, int* ioDiff)
+    RefPtr<Val> FuncType::substituteImpl(SubstitutionSet subst, int* ioDiff)
     {
         int diff = 0;
 
         // result type
-        RefPtr<Type> substResultType = resultType->SubstituteImpl(subst, &diff).as<Type>();
+        RefPtr<Type> substResultType = resultType->substituteImpl(subst, &diff).as<Type>();
 
         // parameter types
         List<RefPtr<Type>> substParamTypes;
         for( auto pp : paramTypes )
         {
-            substParamTypes.add(pp->SubstituteImpl(subst, &diff).as<Type>());
+            substParamTypes.add(pp->substituteImpl(subst, &diff).as<Type>());
         }
 
         // early exit for no change...
@@ -1452,7 +1452,7 @@ Index getFilterCountImpl(const ReflectClassInfo& clsInfo, MemberFilterStyle filt
         return declRef.GetHashCode() ^ 0xFFFF;
     }
 
-    RefPtr<Val> GenericParamIntVal::SubstituteImpl(SubstitutionSet subst, int* ioDiff)
+    RefPtr<Val> GenericParamIntVal::substituteImpl(SubstitutionSet subst, int* ioDiff)
     {
         // search for a substitution that might apply to us
         for(auto s = subst.substitutions; s; s = s->outer)
@@ -1515,7 +1515,7 @@ Index getFilterCountImpl(const ReflectClassInfo& clsInfo, MemberFilterStyle filt
         return int(typeid(this).hash_code());
     }
 
-    RefPtr<Val> ErrorIntVal::SubstituteImpl(SubstitutionSet subst, int* ioDiff)
+    RefPtr<Val> ErrorIntVal::substituteImpl(SubstitutionSet subst, int* ioDiff)
     {
         SLANG_UNUSED(subst);
         SLANG_UNUSED(ioDiff);
@@ -1533,7 +1533,7 @@ Index getFilterCountImpl(const ReflectClassInfo& clsInfo, MemberFilterStyle filt
         List<RefPtr<Val>> substArgs;
         for (auto a : args)
         {
-            substArgs.add(a->SubstituteImpl(substSet, &diff));
+            substArgs.add(a->substituteImpl(substSet, &diff));
         }
 
         if (!diff) return this;
@@ -1584,7 +1584,7 @@ Index getFilterCountImpl(const ReflectClassInfo& clsInfo, MemberFilterStyle filt
         if(substOuter != outer) diff++;
 
         // NOTE: Must use .as because we must have a smart pointer here to keep in scope.
-        auto substWitness = witness->SubstituteImpl(substSet, &diff).as<SubtypeWitness>();
+        auto substWitness = witness->substituteImpl(substSet, &diff).as<SubtypeWitness>();
         
         if (!diff) return this;
 
@@ -1634,14 +1634,14 @@ Index getFilterCountImpl(const ReflectClassInfo& clsInfo, MemberFilterStyle filt
 
         if(substOuter != outer) diff++;
 
-        auto substActualType = actualType->SubstituteImpl(substSet, &diff).as<Type>();
+        auto substActualType = actualType->substituteImpl(substSet, &diff).as<Type>();
 
         List<ConstraintArg> substConstraintArgs;
         for(auto constraintArg : constraintArgs)
         {
             ConstraintArg substConstraintArg;
             substConstraintArg.decl = constraintArg.decl;
-            substConstraintArg.val = constraintArg.val->SubstituteImpl(substSet, &diff);
+            substConstraintArg.val = constraintArg.val->substituteImpl(substSet, &diff);
 
             substConstraintArgs.add(substConstraintArg);
         }
@@ -1699,7 +1699,7 @@ Index getFilterCountImpl(const ReflectClassInfo& clsInfo, MemberFilterStyle filt
 
         // Otherwise we need to recurse on the type structure
         // and apply substitutions where it makes sense
-        return type->Substitute(substitutions).as<Type>();
+        return type->substitute(substitutions).as<Type>();
     }
 
     DeclRefBase DeclRefBase::Substitute(DeclRefBase declRef) const
@@ -2155,14 +2155,14 @@ Index getFilterCountImpl(const ReflectClassInfo& clsInfo, MemberFilterStyle filt
 
     // Val
 
-    RefPtr<Val> Val::Substitute(SubstitutionSet subst)
+    RefPtr<Val> Val::substitute(SubstitutionSet subst)
     {
         if (!subst) return this;
         int diff = 0;
-        return SubstituteImpl(subst, &diff);
+        return substituteImpl(subst, &diff);
     }
 
-    RefPtr<Val> Val::SubstituteImpl(SubstitutionSet /*subst*/, int* /*ioDiff*/)
+    RefPtr<Val> Val::substituteImpl(SubstitutionSet /*subst*/, int* /*ioDiff*/)
     {
         // Default behavior is to not substitute at all
         return this;
@@ -2386,11 +2386,11 @@ Index getFilterCountImpl(const ReflectClassInfo& clsInfo, MemberFilterStyle filt
         return sub->Equals(otherWitness->sub);
     }
 
-    RefPtr<Val> TypeEqualityWitness::SubstituteImpl(SubstitutionSet subst, int * ioDiff)
+    RefPtr<Val> TypeEqualityWitness::substituteImpl(SubstitutionSet subst, int * ioDiff)
     {
         RefPtr<TypeEqualityWitness> rs = new TypeEqualityWitness();
-        rs->sub = sub->SubstituteImpl(subst, ioDiff).as<Type>();
-        rs->sup = sup->SubstituteImpl(subst, ioDiff).as<Type>();
+        rs->sub = sub->substituteImpl(subst, ioDiff).as<Type>();
+        rs->sup = sup->substituteImpl(subst, ioDiff).as<Type>();
         return rs;
     }
 
@@ -2434,7 +2434,7 @@ Index getFilterCountImpl(const ReflectClassInfo& clsInfo, MemberFilterStyle filt
         return nullptr;
     }
 
-    RefPtr<Val> DeclaredSubtypeWitness::SubstituteImpl(SubstitutionSet subst, int * ioDiff)
+    RefPtr<Val> DeclaredSubtypeWitness::substituteImpl(SubstitutionSet subst, int * ioDiff)
     {
         if (auto genConstraintDeclRef = declRef.as<GenericTypeConstraintDecl>())
         {
@@ -2494,8 +2494,8 @@ Index getFilterCountImpl(const ReflectClassInfo& clsInfo, MemberFilterStyle filt
 
         // Perform substitution on the constituent elements.
         int diff = 0;
-        auto substSub = sub->SubstituteImpl(subst, &diff).as<Type>();
-        auto substSup = sup->SubstituteImpl(subst, &diff).as<Type>();
+        auto substSub = sub->substituteImpl(subst, &diff).as<Type>();
+        auto substSup = sup->substituteImpl(subst, &diff).as<Type>();
         auto substDeclRef = declRef.SubstituteImpl(subst, &diff);
         if (!diff)
             return this;
@@ -2585,13 +2585,13 @@ Index getFilterCountImpl(const ReflectClassInfo& clsInfo, MemberFilterStyle filt
             && midToSup.Equals(otherWitness->midToSup);
     }
 
-    RefPtr<Val> TransitiveSubtypeWitness::SubstituteImpl(SubstitutionSet subst, int * ioDiff)
+    RefPtr<Val> TransitiveSubtypeWitness::substituteImpl(SubstitutionSet subst, int * ioDiff)
     {
         int diff = 0;
 
-        RefPtr<Type> substSub = sub->SubstituteImpl(subst, &diff).as<Type>();
-        RefPtr<Type> substSup = sup->SubstituteImpl(subst, &diff).as<Type>();
-        RefPtr<SubtypeWitness> substSubToMid = subToMid->SubstituteImpl(subst, &diff).as<SubtypeWitness>();
+        RefPtr<Type> substSub = sub->substituteImpl(subst, &diff).as<Type>();
+        RefPtr<Type> substSup = sup->substituteImpl(subst, &diff).as<Type>();
+        RefPtr<SubtypeWitness> substSubToMid = subToMid->substituteImpl(subst, &diff).as<SubtypeWitness>();
         DeclRef<Decl> substMidToSup = midToSup.SubstituteImpl(subst, &diff);
 
         // If nothing changed, then we can bail out early.
@@ -2712,7 +2712,7 @@ Index getFilterCountImpl(const ReflectClassInfo& clsInfo, MemberFilterStyle filt
         return this;
     }
 
-    RefPtr<Val> ExtractExistentialType::SubstituteImpl(SubstitutionSet subst, int* ioDiff)
+    RefPtr<Val> ExtractExistentialType::substituteImpl(SubstitutionSet subst, int* ioDiff)
     {
         int diff = 0;
         auto substDeclRef = declRef.SubstituteImpl(subst, &diff);
@@ -2751,13 +2751,13 @@ Index getFilterCountImpl(const ReflectClassInfo& clsInfo, MemberFilterStyle filt
         return declRef.GetHashCode();
     }
 
-    RefPtr<Val> ExtractExistentialSubtypeWitness::SubstituteImpl(SubstitutionSet subst, int* ioDiff)
+    RefPtr<Val> ExtractExistentialSubtypeWitness::substituteImpl(SubstitutionSet subst, int* ioDiff)
     {
         int diff = 0;
 
         auto substDeclRef = declRef.SubstituteImpl(subst, &diff);
-        auto substSub = sub->SubstituteImpl(subst, &diff).as<Type>();
-        auto substSup = sup->SubstituteImpl(subst, &diff).as<Type>();
+        auto substSub = sub->substituteImpl(subst, &diff).as<Type>();
+        auto substSup = sup->substituteImpl(subst, &diff).as<Type>();
 
         if(!diff)
             return this;
@@ -2833,14 +2833,14 @@ Index getFilterCountImpl(const ReflectClassInfo& clsInfo, MemberFilterStyle filt
         return canType;
     }
 
-    RefPtr<Val> TaggedUnionType::SubstituteImpl(SubstitutionSet subst, int* ioDiff)
+    RefPtr<Val> TaggedUnionType::substituteImpl(SubstitutionSet subst, int* ioDiff)
     {
         int diff = 0;
 
         List<RefPtr<Type>> substCaseTypes;
         for( auto caseType : caseTypes )
         {
-            substCaseTypes.add(caseType->SubstituteImpl(subst, &diff).as<Type>());
+            substCaseTypes.add(caseType->substituteImpl(subst, &diff).as<Type>());
         }
         if(!diff)
             return this;
@@ -2902,17 +2902,17 @@ int TaggedUnionSubtypeWitness::GetHashCode()
     return hash;
 }
 
-RefPtr<Val> TaggedUnionSubtypeWitness::SubstituteImpl(SubstitutionSet subst, int* ioDiff)
+RefPtr<Val> TaggedUnionSubtypeWitness::substituteImpl(SubstitutionSet subst, int* ioDiff)
 {
     int diff = 0;
 
-    auto substSub = sub->SubstituteImpl(subst, &diff).as<Type>();
-    auto substSup = sup->SubstituteImpl(subst, &diff).as<Type>();
+    auto substSub = sub->substituteImpl(subst, &diff).as<Type>();
+    auto substSup = sup->substituteImpl(subst, &diff).as<Type>();
 
     List<RefPtr<Val>> substCaseWitnesses;
     for( auto caseWitness : caseWitnesses )
     {
-        substCaseWitnesses.add(caseWitness->SubstituteImpl(subst, &diff));
+        substCaseWitnesses.add(caseWitness->substituteImpl(subst, &diff));
     }
 
     if(!diff)
@@ -3061,14 +3061,14 @@ RefPtr<Type> ExistentialSpecializedType::CreateCanonicalType()
 RefPtr<Val> substituteImpl(Val* val, SubstitutionSet subst, int* ioDiff)
 {
     if(!val) return nullptr;
-    return val->SubstituteImpl(subst, ioDiff);
+    return val->substituteImpl(subst, ioDiff);
 }
 
-RefPtr<Val> ExistentialSpecializedType::SubstituteImpl(SubstitutionSet subst, int* ioDiff)
+RefPtr<Val> ExistentialSpecializedType::substituteImpl(SubstitutionSet subst, int* ioDiff)
 {
     int diff = 0;
 
-    auto substBaseType = baseType->SubstituteImpl(subst, &diff).as<Type>();
+    auto substBaseType = baseType->substituteImpl(subst, &diff).as<Type>();
 
     ExpandedSpecializationArgs substArgs;
     for( auto arg : args )
@@ -3132,7 +3132,7 @@ RefPtr<Type> ThisType::CreateCanonicalType()
     return canType;
 }
 
-RefPtr<Val> ThisType::SubstituteImpl(SubstitutionSet subst, int* ioDiff)
+RefPtr<Val> ThisType::substituteImpl(SubstitutionSet subst, int* ioDiff)
 {
     int diff = 0;
 

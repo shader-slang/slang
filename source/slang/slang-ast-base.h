@@ -78,14 +78,14 @@ class Val : public NodeBase
 
     // construct a new value by applying a set of parameter
     // substitutions to this one
-    RefPtr<Val> Substitute(SubstitutionSet subst);
+    RefPtr<Val> substitute(SubstitutionSet subst);
 
     // Lower-level interface for substitution. Like the basic
     // `Substitute` above, but also takes a by-reference
     // integer parameter that should be incremented when
     // returning a modified value (this can help the caller
     // decide whether they need to do anything).
-    virtual RefPtr<Val> SubstituteImpl(SubstitutionSet subst, int* ioDiff);
+    virtual RefPtr<Val> substituteImpl(SubstitutionSet subst, int* ioDiff);
 
     virtual bool EqualsVal(Val* val) = 0;
     virtual String ToString() = 0;
@@ -133,7 +133,7 @@ public:
     
     Type* getCanonicalType();
 
-    virtual RefPtr<Val> SubstituteImpl(SubstitutionSet subst, int* ioDiff) override;
+    virtual RefPtr<Val> substituteImpl(SubstitutionSet subst, int* ioDiff) override;
 
     virtual bool EqualsVal(Val* val) override;
 
