@@ -45,7 +45,7 @@ namespace Slang
 //
 // Turning these rules into something formal mostly comes down to codifying:
 //
-// 1. when threads exit a structured control flow statement, and\
+// 1. when threads exit a structured control flow statement, and
 // 2. which of those exits are "normal" vs. "abnormal."
 //
 // The Slang IR maintains structure information in its IR (similar to the
@@ -1023,7 +1023,7 @@ struct SynthesizeActiveMaskForFunctionContext
         // the way.
         //
         IRInst* nextInst = nullptr;
-        for( IRInst* inst = regionEntry->getFirstInst(); inst; inst = nextInst )\
+        for( IRInst* inst = regionEntry->getFirstInst(); inst; inst = nextInst )
         {
             nextInst = inst->getNextInst();
 
@@ -1169,17 +1169,17 @@ struct SynthesizeActiveMaskForFunctionContext
                 //
                 // We can picture the situation as something like:
                 //
-                //          I       // block with if/else
-                //         / \
-                //        T   F     // true and false blocks
-                //       /|\ /|\
-                //                
-                //         ...
-                //
-                //         \|/
-                //          A       // "after" block
-                //
-                //         ...
+                //          I       // block with if/else           |
+                //         / \                                      |
+                //        T   F     // true and false blocks        |
+                //       /|\ /|\                                    |
+                //                                                  |
+                //         ...                                      |
+                //                                                  |
+                //         \|/                                      |
+                //          A       // "after" block                |
+                //                                                  |
+                //         ...                                      |
                 //
                 // Note that very few assumptions can or should be
                 // made about the code under T and F. In particular:
@@ -1292,21 +1292,21 @@ struct SynthesizeActiveMaskForFunctionContext
                 //
                 // We can visualize it as something like this:
                 //
-                //          L           // block with `loop` instruction
-                //          |
-                //          |  ___      // back edge(s) that start a new iteration
-                //          |/    \
-                //          H     |     // loop header, where control flow starts on each iteration
-                //         /|\    |
-                //         ...
-                //
-                //               \|/
-                //                C     // continue label, which leads to any/all back edges
-                //               ...
-                //
-                //         \|/
-                //          B           // break label, which is the start of code after the loop
-                //         ...
+                //          L           // block with `loop` instruction    |
+                //          |                                               |
+                //          |  ___      // back edge(s) that start a        |
+                //          |/    \     //     new iteration                |
+                //          H     |     // loop header, where control flow  |
+                //         /|\    |     //     starts on each iteration     |
+                //         ...                                              |
+                //                                                          |
+                //               \|/                                        |
+                //                C     // continue label, which leads      |
+                //               ...    //     to any/all back edges        |
+                //                                                          |
+                //         \|/                                              |
+                //          B           // break label, which is the start  |
+                //         ...          //     of code after the loop       |
                 //
                 // Much like the case for `ifElse`, we can't make a lot
                 // of definition statements about the structure of the control
