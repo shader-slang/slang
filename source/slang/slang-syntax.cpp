@@ -94,7 +94,7 @@ const RefPtr<Decl>* adjustFilterCursorImpl(const ReflectClassInfo& clsInfo, Memb
             for (; ptr != end; ptr++)
             {
                 Decl* decl = *ptr;
-                if (decl->getClassInfo().isSubClassOf(clsInfo) && !decl->HasModifier<HLSLStaticModifier>())
+                if (decl->getClassInfo().isSubClassOf(clsInfo) && !decl->hasModifier<HLSLStaticModifier>())
                 {
                     return ptr;
                 }
@@ -106,7 +106,7 @@ const RefPtr<Decl>* adjustFilterCursorImpl(const ReflectClassInfo& clsInfo, Memb
             for (; ptr != end; ptr++)
             {
                 Decl* decl = *ptr;
-                if (decl->getClassInfo().isSubClassOf(clsInfo) && decl->HasModifier<HLSLStaticModifier>())
+                if (decl->getClassInfo().isSubClassOf(clsInfo) && decl->hasModifier<HLSLStaticModifier>())
                 {
                     return ptr;
                 }
@@ -143,7 +143,7 @@ const RefPtr<Decl>* getFilterCursorByIndexImpl(const ReflectClassInfo& clsInfo, 
             for (; ptr != end; ptr++)
             {
                 Decl* decl = *ptr;
-                if (decl->getClassInfo().isSubClassOf(clsInfo) && !decl->HasModifier<HLSLStaticModifier>())
+                if (decl->getClassInfo().isSubClassOf(clsInfo) && !decl->hasModifier<HLSLStaticModifier>())
                 {
                     if (index <= 0)
                     {
@@ -159,7 +159,7 @@ const RefPtr<Decl>* getFilterCursorByIndexImpl(const ReflectClassInfo& clsInfo, 
             for (; ptr != end; ptr++)
             {
                 Decl* decl = *ptr;
-                if (decl->getClassInfo().isSubClassOf(clsInfo) && decl->HasModifier<HLSLStaticModifier>())
+                if (decl->getClassInfo().isSubClassOf(clsInfo) && decl->hasModifier<HLSLStaticModifier>())
                 {
                     if (index <= 0)
                     {
@@ -194,7 +194,7 @@ Index getFilterCountImpl(const ReflectClassInfo& clsInfo, MemberFilterStyle filt
             for (; ptr != end; ptr++)
             {
                 Decl* decl = *ptr;
-                count += Index(decl->getClassInfo().isSubClassOf(clsInfo)&& !decl->HasModifier<HLSLStaticModifier>());
+                count += Index(decl->getClassInfo().isSubClassOf(clsInfo)&& !decl->hasModifier<HLSLStaticModifier>());
             }
             break;
         }
@@ -203,7 +203,7 @@ Index getFilterCountImpl(const ReflectClassInfo& clsInfo, MemberFilterStyle filt
             for (; ptr != end; ptr++)
             {
                 Decl* decl = *ptr;
-                count += Index(decl->getClassInfo().isSubClassOf(clsInfo) && decl->HasModifier<HLSLStaticModifier>());
+                count += Index(decl->getClassInfo().isSubClassOf(clsInfo) && decl->hasModifier<HLSLStaticModifier>());
             }
             break;
         }
@@ -865,14 +865,14 @@ Index getFilterCountImpl(const ReflectClassInfo& clsInfo, MemberFilterStyle filt
     {
         declRef = createDefaultSubstitutionsIfNeeded(session, declRef);
 
-        if (auto builtinMod = declRef.getDecl()->FindModifier<BuiltinTypeModifier>())
+        if (auto builtinMod = declRef.getDecl()->findModifier<BuiltinTypeModifier>())
         {
             auto type = new BasicExpressionType(builtinMod->tag);
             type->setSession(session);
             type->declRef = declRef;
             return type;
         }
-        else if (auto magicMod = declRef.getDecl()->FindModifier<MagicTypeModifier>())
+        else if (auto magicMod = declRef.getDecl()->findModifier<MagicTypeModifier>())
         {
             GenericSubstitution* subst = nullptr;
             for(auto s = declRef.substitutions.substitutions; s; s = s->outer)
@@ -2328,13 +2328,13 @@ Index getFilterCountImpl(const ReflectClassInfo& clsInfo, MemberFilterStyle filt
         {
             auto paramDecl = paramDeclRef.getDecl();
             auto paramType = GetType(paramDeclRef);
-            if( paramDecl->FindModifier<RefModifier>() )
+            if( paramDecl->findModifier<RefModifier>() )
             {
                 paramType = session->getRefType(paramType);
             }
-            else if( paramDecl->FindModifier<OutModifier>() )
+            else if( paramDecl->findModifier<OutModifier>() )
             {
-                if(paramDecl->FindModifier<InOutModifier>() || paramDecl->FindModifier<InModifier>())
+                if(paramDecl->findModifier<InOutModifier>() || paramDecl->findModifier<InModifier>())
                 {
                     paramType = session->getInOutType(paramType);
                 }

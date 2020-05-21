@@ -133,7 +133,7 @@ namespace Slang
         auto structDecl = lookupResult.item.declRef.as<StructDecl>().getDecl();
         if(!structDecl)
             return nullptr;
-        auto attrUsageAttr = structDecl->FindModifier<AttributeUsageAttribute>();
+        auto attrUsageAttr = structDecl->findModifier<AttributeUsageAttribute>();
         if (!attrUsageAttr)
             return nullptr;
 
@@ -173,7 +173,7 @@ namespace Slang
                 paramDecl->nameAndLoc = member->nameAndLoc;
                 paramDecl->type = varMember->type;
                 paramDecl->loc = member->loc;
-                paramDecl->SetCheckState(DeclCheckState::Checked);
+                paramDecl->setCheckState(DeclCheckState::Checked);
 
                 paramDecl->ParentDecl = attrDecl;
                 attrDecl->Members.add(paramDecl);
@@ -615,7 +615,7 @@ namespace Slang
         // If any of these match `attrTarget`, then we are good.
         //
         bool validTarget = false;
-        for(auto attrTargetMod : attrDecl->GetModifiersOfType<AttributeTargetModifier>())
+        for(auto attrTargetMod : attrDecl->getModifiersOfType<AttributeTargetModifier>())
         {
             if(attrTarget->getClass().isSubClassOf(attrTargetMod->syntaxClass))
             {

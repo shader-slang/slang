@@ -675,7 +675,7 @@ namespace Slang
         if (!funcDeclRefExpr) return nullptr;
 
         auto funcDeclRef = funcDeclRefExpr->declRef;
-        auto intrinsicMod = funcDeclRef.getDecl()->FindModifier<IntrinsicOpModifier>();
+        auto intrinsicMod = funcDeclRef.getDecl()->findModifier<IntrinsicOpModifier>();
         if (!intrinsicMod)
         {
             // We can't constant fold anything that doesn't map to a builtin
@@ -821,9 +821,9 @@ namespace Slang
                 auto varDecl = varRef.getDecl();
 
                 // In HLSL, `static const` is used to mark compile-time constant expressions
-                if(auto staticAttr = varDecl->FindModifier<HLSLStaticModifier>())
+                if(auto staticAttr = varDecl->findModifier<HLSLStaticModifier>())
                 {
-                    if(auto constAttr = varDecl->FindModifier<ConstModifier>())
+                    if(auto constAttr = varDecl->findModifier<ConstModifier>())
                     {
                         // HLSL `static const` can be used as a constant expression
                         if(auto initExpr = getInitExpr(varRef))
@@ -1756,7 +1756,7 @@ namespace Slang
 
             if( auto funcDeclBase = as<FunctionDeclBase>(containerDecl) )
             {
-                if( funcDeclBase->HasModifier<MutatingAttribute>() )
+                if( funcDeclBase->hasModifier<MutatingAttribute>() )
                 {
                     expr->type.IsLeftValue = true;
                 }

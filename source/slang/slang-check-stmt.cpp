@@ -155,7 +155,7 @@ namespace Slang
 
         stmt->varDecl->type.type = getSession()->getIntType();
         addModifier(stmt->varDecl, new ConstModifier());
-        stmt->varDecl->SetCheckState(DeclCheckState::Checked);
+        stmt->varDecl->setCheckState(DeclCheckState::Checked);
 
         RefPtr<IntVal> rangeBeginVal;
         RefPtr<IntVal> rangeEndVal;

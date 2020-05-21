@@ -15,7 +15,7 @@ namespace Slang
     ConversionCost SemanticsVisitor::getImplicitConversionCost(
         Decl* decl)
     {
-        if(auto modifier = decl->FindModifier<ImplicitConversionModifier>())
+        if(auto modifier = decl->findModifier<ImplicitConversionModifier>())
         {
             return modifier->cost;
         }

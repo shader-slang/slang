@@ -135,12 +135,12 @@ namespace Slang
 
                     // Reject definitions that have the wrong fixity.
                     //
-                    if(prefixExpr && !funcDecl->FindModifier<PrefixModifier>())
+                    if(prefixExpr && !funcDecl->findModifier<PrefixModifier>())
                         continue;
-                    if(postfixExpr && !funcDecl->FindModifier<PostfixModifier>())
+                    if(postfixExpr && !funcDecl->findModifier<PostfixModifier>())
                         continue;
 
-                    if (auto intrinsicOp = funcDecl->FindModifier<IntrinsicOpModifier>())
+                    if (auto intrinsicOp = funcDecl->findModifier<IntrinsicOpModifier>())
                     {
                         operatorName = intrinsicOp->op;
                         return true;

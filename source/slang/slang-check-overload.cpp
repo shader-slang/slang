@@ -110,7 +110,7 @@ namespace Slang
 
         if(auto prefixExpr = as<PrefixExpr>(expr))
         {
-            if(decl->HasModifier<PrefixModifier>())
+            if(decl->hasModifier<PrefixModifier>())
                 return true;
 
             if (context.mode != OverloadResolveContext::Mode::JustTrying)
@@ -123,7 +123,7 @@ namespace Slang
         }
         else if(auto postfixExpr = as<PostfixExpr>(expr))
         {
-            if(decl->HasModifier<PostfixModifier>())
+            if(decl->hasModifier<PostfixModifier>())
                 return true;
 
             if (context.mode != OverloadResolveContext::Mode::JustTrying)

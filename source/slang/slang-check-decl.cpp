@@ -169,7 +169,7 @@ namespace Slang
         // Anything explicitly marked `static` and not at module scope
         // counts as a static rather than instance declaration.
         //
-        if(decl->HasModifier<HLSLStaticModifier>())
+        if(decl->hasModifier<HLSLStaticModifier>())
             return true;
 
         // Next we need to deal with cases where a declaration is
@@ -243,13 +243,13 @@ namespace Slang
         // global variable (albeit one that is implicitly local to
         // the translation unit)
         //
-        if(decl->HasModifier<HLSLStaticModifier>()) return false;
+        if(decl->hasModifier<HLSLStaticModifier>()) return false;
 
         // The `groupshared` modifier indicates that a variable cannot
         // be a shader parameters, but is instead transient storage
         // allocated for the duration of a thread-group's execution.
         //
-        if(decl->HasModifier<HLSLGroupSharedModifier>()) return false;
+        if(decl->hasModifier<HLSLGroupSharedModifier>()) return false;
 
         return true;
     }
@@ -325,7 +325,7 @@ namespace Slang
             qualType.type = GetType(varDeclRef);
 
             bool isLValue = true;
-            if(varDeclRef.getDecl()->FindModifier<ConstModifier>())
+            if(varDeclRef.getDecl()->findModifier<ConstModifier>())
                 isLValue = false;
 
             // Global-scope shader parameters should not be writable,
@@ -356,7 +356,7 @@ namespace Slang
                 // the class for the `out` modifier so that we can
                 // make simple checks like this.
                 //
-                if( !varDeclRef.getDecl()->HasModifier<OutModifier>() )
+                if( !varDeclRef.getDecl()->hasModifier<OutModifier>() )
                 {
                     isLValue = false;
                 }
@@ -542,7 +542,7 @@ namespace Slang
         if(auto genericDecl = as<GenericDecl>(decl))
             decl = genericDecl->inner;
 
-        if(decl->HasModifier<HLSLStaticModifier>())
+        if(decl->hasModifier<HLSLStaticModifier>())
             return true;
 
         if(as<ConstructorDecl>(decl))
@@ -621,7 +621,7 @@ namespace Slang
         // If the `decl` has already been checked up to or beyond `state`
         // then there is nothing for us to do.
         //
-        if (decl->IsChecked(state)) return;
+        if (decl->isChecked(state)) return;
 
         // Is the declaration already being checked, somewhere up the
         // call stack from us?
@@ -690,14 +690,14 @@ namespace Slang
             //
             if(nextState > decl->checkState.getState())
             {
-                decl->SetCheckState(nextState);
+                decl->setCheckState(nextState);
             }
         }
 
         // Once we are done here, the state of `decl` should have
         // been upgraded to (at least) `state`.
         //
-        SLANG_ASSERT(decl->IsChecked(state));
+        SLANG_ASSERT(decl->isChecked(state));
 
         // Now that we are done checking `decl` we need to restore
         // its "is being checked" flag so that we don't generate
@@ -794,7 +794,7 @@ namespace Slang
 
             // If we've gone down this path, then the variable
             // declaration is actually pretty far along in checking
-            varDecl->SetCheckState(DeclCheckState::Checked);
+            varDecl->setCheckState(DeclCheckState::Checked);
         }
         else
         {
@@ -824,7 +824,7 @@ namespace Slang
 
                     maybeInferArraySizeForVariable(varDecl);
 
-                    varDecl->SetCheckState(DeclCheckState::Checked);
+                    varDecl->setCheckState(DeclCheckState::Checked);
                 }
             }
             //
@@ -957,7 +957,7 @@ namespace Slang
 
     void SemanticsDeclHeaderVisitor::visitGenericDecl(GenericDecl* genericDecl)
     {
-        genericDecl->SetCheckState(DeclCheckState::ReadyForLookup);
+        genericDecl->setCheckState(DeclCheckState::ReadyForLookup);
 
         for (auto m : genericDecl->Members)
         {
@@ -1041,11 +1041,11 @@ namespace Slang
         ///
     static void _registerBuiltinDeclsRec(Session* session, Decl* decl)
     {
-        if (auto builtinMod = decl->FindModifier<BuiltinTypeModifier>())
+        if (auto builtinMod = decl->findModifier<BuiltinTypeModifier>())
         {
             registerBuiltinDecl(session, decl, builtinMod);
         }
-        if (auto magicMod = decl->FindModifier<MagicTypeModifier>())
+        if (auto magicMod = decl->findModifier<MagicTypeModifier>())
         {
             registerMagicDecl(session, decl, magicMod);
         }
@@ -1188,16 +1188,16 @@ namespace Slang
         DeclRef<CallableDecl>   requiredMemberDeclRef,
         RefPtr<WitnessTable>    witnessTable)
     {
-        if(satisfyingMemberDeclRef.getDecl()->HasModifier<MutatingAttribute>()
-            && !requiredMemberDeclRef.getDecl()->HasModifier<MutatingAttribute>())
+        if(satisfyingMemberDeclRef.getDecl()->hasModifier<MutatingAttribute>()
+            && !requiredMemberDeclRef.getDecl()->hasModifier<MutatingAttribute>())
         {
             // A `[mutating]` method can't satisfy a non-`[mutating]` requirement,
             // but vice-versa is okay.
             return false;
         }
 
-        if(satisfyingMemberDeclRef.getDecl()->HasModifier<HLSLStaticModifier>()
-            != requiredMemberDeclRef.getDecl()->HasModifier<HLSLStaticModifier>())
+        if(satisfyingMemberDeclRef.getDecl()->hasModifier<HLSLStaticModifier>()
+            != requiredMemberDeclRef.getDecl()->hasModifier<HLSLStaticModifier>())
         {
             // A `static` method can't satisfy a non-`static` requirement and vice versa.
             return false;
@@ -1915,7 +1915,7 @@ namespace Slang
             // the min/max tag values, or the total number of tags, so that people don't
             // have to declare these as additional cases.
 
-            enumConformanceDecl->SetCheckState(DeclCheckState::Checked);
+            enumConformanceDecl->setCheckState(DeclCheckState::Checked);
         }
     }
 
@@ -2343,12 +2343,12 @@ namespace Slang
             //
             // Note(tfoley): we don't consider `out` and `inout` as distinct here,
             // because there is no way for overload resolution to pick between them.
-            if (fstParam.getDecl()->HasModifier<OutModifier>() != sndParam.getDecl()->HasModifier<OutModifier>())
+            if (fstParam.getDecl()->hasModifier<OutModifier>() != sndParam.getDecl()->hasModifier<OutModifier>())
                 return false;
 
             // If one parameter is `ref` and the other isn't, then they don't match.
             //
-            if(fstParam.getDecl()->HasModifier<RefModifier>() != sndParam.getDecl()->HasModifier<RefModifier>())
+            if(fstParam.getDecl()->hasModifier<RefModifier>() != sndParam.getDecl()->hasModifier<RefModifier>())
                 return false;
         }
 
@@ -2399,7 +2399,7 @@ namespace Slang
     // having a target intrinsic isn't a 'body'.
     bool _isDefinition(FuncDecl* decl)
     {
-        return decl->body || decl->HasModifier<TargetIntrinsicModifier>();
+        return decl->body || decl->hasModifier<TargetIntrinsicModifier>();
     }
 
     Result SemanticsVisitor::checkFuncRedeclaration(
@@ -2438,9 +2438,9 @@ namespace Slang
         // ordinary function-call syntax (if we decided to allow it)
         // would be ambiguous in such a case, of course.
         //
-        if (newDecl->HasModifier<PrefixModifier>() != oldDecl->HasModifier<PrefixModifier>())
+        if (newDecl->hasModifier<PrefixModifier>() != oldDecl->hasModifier<PrefixModifier>())
             return SLANG_OK;
-        if (newDecl->HasModifier<PostfixModifier>() != oldDecl->HasModifier<PostfixModifier>())
+        if (newDecl->hasModifier<PostfixModifier>() != oldDecl->hasModifier<PostfixModifier>())
             return SLANG_OK;
 
         // If one is generic and the other isn't, then there is no match.
@@ -2755,7 +2755,7 @@ namespace Slang
             // Note: the `InOutModifier` class inherits from `OutModifier`,
             // so we only need to check for the base case.
             //
-            if(paramDecl->FindModifier<OutModifier>())
+            if(paramDecl->findModifier<OutModifier>())
             {
                 getSink()->diagnose(initExpr, Diagnostics::outputParameterCannotHaveDefaultValue);
             }
@@ -3187,7 +3187,7 @@ namespace Slang
         // with the `__exported` modifier
         for (auto importDecl : moduleDecl->getMembersOfType<ImportDecl>())
         {
-            if (!importDecl->HasModifier<ExportedModifier>())
+            if (!importDecl->hasModifier<ExportedModifier>())
                 continue;
 
             importModuleIntoScope(scope, importDecl->importedModuleDecl.Ptr());

@@ -276,8 +276,8 @@ namespace Slang
         // Special case: need a way to tell prefix and postfix unary
         // operators apart.
         {
-            if(declRef.getDecl()->HasModifier<PostfixModifier>()) emitRaw(context, "P");
-            if(declRef.getDecl()->HasModifier<PrefixModifier>()) emitRaw(context, "p");
+            if(declRef.getDecl()->hasModifier<PostfixModifier>()) emitRaw(context, "P");
+            if(declRef.getDecl()->hasModifier<PrefixModifier>()) emitRaw(context, "p");
         }
 
 

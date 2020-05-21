@@ -429,7 +429,7 @@ bool isFromStdLib(Decl* decl)
 {
     for (auto dd = decl; dd; dd = dd->ParentDecl)
     {
-        if (dd->HasModifier<FromStdLibModifier>())
+        if (dd->hasModifier<FromStdLibModifier>())
             return true;
     }
     return false;
@@ -448,7 +448,7 @@ bool isImportedDecl(IRGenContext* context, Decl* decl)
     // Note that in practice for matching during linking uses the fully qualified name - including module name.
     // Thus using extern __attribute isn't useful for symbols that are imported via `import`, only symbols
     // that notionally come from the same module but are split into separate compilations (as can be done with -module-name)
-    if (decl->FindModifier<ExternAttribute>())
+    if (decl->findModifier<ExternAttribute>())
     {
         return true;
     }
@@ -477,7 +477,7 @@ bool isImportedDecl(IRGenContext* context, Decl* decl)
     /// Is `decl` a function that should be force-inlined early in compilation (before linking)?
 static bool isForceInlineEarly(Decl* decl)
 {
-    if(decl->HasModifier<UnsafeForceInlineEarlyAttribute>())
+    if(decl->hasModifier<UnsafeForceInlineEarlyAttribute>())
         return true;
 
     return false;
@@ -630,7 +630,7 @@ LoweredValInfo emitCallToDeclRef(
     }
 
     auto funcDecl = funcDeclRef.getDecl();
-    if(auto intrinsicOpModifier = funcDecl->FindModifier<IntrinsicOpModifier>())
+    if(auto intrinsicOpModifier = funcDecl->findModifier<IntrinsicOpModifier>())
     {
         // The intrinsic op maps to a single IR instruction,
         // so we will emit an instruction with the chosen
@@ -1341,7 +1341,7 @@ struct ValLoweringVisitor : ValVisitor<ValLoweringVisitor, LoweredValInfo, Lower
         auto decl = declRef.getDecl();
 
         // Check for types with teh `__intrinsic_type` modifier.
-        if(decl->FindModifier<IntrinsicTypeModifier>())
+        if(decl->findModifier<IntrinsicTypeModifier>())
         {
             return lowerSimpleIntrinsicType(type);
         }
@@ -1408,7 +1408,7 @@ struct ValLoweringVisitor : ValVisitor<ValLoweringVisitor, LoweredValInfo, Lower
     // type with the appropriate opcode.
     IRType* lowerSimpleIntrinsicType(DeclRefType* type)
     {
-        auto intrinsicTypeModifier = type->declRef.getDecl()->FindModifier<IntrinsicTypeModifier>();
+        auto intrinsicTypeModifier = type->declRef.getDecl()->findModifier<IntrinsicTypeModifier>();
         SLANG_ASSERT(intrinsicTypeModifier);
         IROp op = IROp(intrinsicTypeModifier->irOp);
         return getBuilder()->getType(op);
@@ -1419,7 +1419,7 @@ struct ValLoweringVisitor : ValVisitor<ValLoweringVisitor, LoweredValInfo, Lower
     // which can thus be lowered to a simple IR type with the appropriate opcode.
     IRType* lowerGenericIntrinsicType(DeclRefType* type, Type* elementType)
     {
-        auto intrinsicTypeModifier = type->declRef.getDecl()->FindModifier<IntrinsicTypeModifier>();
+        auto intrinsicTypeModifier = type->declRef.getDecl()->findModifier<IntrinsicTypeModifier>();
         SLANG_ASSERT(intrinsicTypeModifier);
         IROp op = IROp(intrinsicTypeModifier->irOp);
         IRInst* irElementType = lowerType(context, elementType);
@@ -1431,7 +1431,7 @@ struct ValLoweringVisitor : ValVisitor<ValLoweringVisitor, LoweredValInfo, Lower
 
     IRType* lowerGenericIntrinsicType(DeclRefType* type, Type* elementType, IntVal* count)
     {
-        auto intrinsicTypeModifier = type->declRef.getDecl()->FindModifier<IntrinsicTypeModifier>();
+        auto intrinsicTypeModifier = type->declRef.getDecl()->findModifier<IntrinsicTypeModifier>();
         SLANG_ASSERT(intrinsicTypeModifier);
         IROp op = IROp(intrinsicTypeModifier->irOp);
         IRInst* irElementType = lowerType(context, elementType);
@@ -1663,7 +1663,7 @@ void maybeSetRate(
 {
     auto builder = context->irBuilder;
 
-    if (decl->HasModifier<HLSLGroupSharedModifier>())
+    if (decl->hasModifier<HLSLGroupSharedModifier>())
     {
         inst->setFullType(builder->getRateQualifiedType(
             builder->getGroupSharedRate(),
@@ -1680,7 +1680,7 @@ static String getNameForNameHint(
     Name* leafName = decl->getName();
 
     // Handle custom name for a global parameter group (e.g., a `cbuffer`)
-    if(auto reflectionNameModifier = decl->FindModifier<ParameterGroupReflectionName>())
+    if(auto reflectionNameModifier = decl->findModifier<ParameterGroupReflectionName>())
     {
         leafName = reflectionNameModifier->nameAndLoc.name;
     }
@@ -1869,21 +1869,21 @@ enum ParameterDirection
     /// Compute the direction for a parameter based on its declaration
 ParameterDirection getParameterDirection(VarDeclBase* paramDecl)
 {
-    if( paramDecl->HasModifier<RefModifier>() )
+    if( paramDecl->hasModifier<RefModifier>() )
     {
         // The AST specified `ref`:
         return kParameterDirection_Ref;
     }
-    if( paramDecl->HasModifier<InOutModifier>() )
+    if( paramDecl->hasModifier<InOutModifier>() )
     {
         // The AST specified `inout`:
         return kParameterDirection_InOut;
     }
-    if (paramDecl->HasModifier<OutModifier>())
+    if (paramDecl->hasModifier<OutModifier>())
     {
         // We saw an `out` modifier, so now we need
         // to check if there was a paired `in`.
-        if(paramDecl->HasModifier<InModifier>())
+        if(paramDecl->hasModifier<InModifier>())
             return kParameterDirection_InOut;
         else
             return kParameterDirection_Out;
@@ -1902,7 +1902,7 @@ ParameterDirection getThisParamDirection(Decl* parentDecl)
     // by applying the `[mutating]` attribute to their
     // declaration.
     //
-    if( parentDecl->HasModifier<MutatingAttribute>() )
+    if( parentDecl->hasModifier<MutatingAttribute>() )
     {
         return kParameterDirection_InOut;
     }
@@ -3220,7 +3220,7 @@ struct StmtLoweringVisitor : StmtVisitor<StmtLoweringVisitor>
         IRInst* inst,
         Stmt*   stmt)
     {
-        if( stmt->FindModifier<UnrollAttribute>() )
+        if( stmt->findModifier<UnrollAttribute>() )
         {
             getBuilder()->addLoopControlDecoration(inst, kIRLoopControl_Unroll);
         }
@@ -4543,7 +4543,7 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
 
         for (auto accessor : decl->getMembersOfType<AccessorDecl>())
         {
-            if (accessor->HasModifier<IntrinsicOpModifier>())
+            if (accessor->hasModifier<IntrinsicOpModifier>())
                 continue;
 
             ensureDecl(context, accessor);
@@ -4569,7 +4569,7 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
         }
         else if(as<AggTypeDeclBase>(parent))
         {
-            if(decl->HasModifier<HLSLStaticModifier>())
+            if(decl->hasModifier<HLSLStaticModifier>())
             {
                 // A `static` member variable is effectively global.
                 return true;
@@ -4707,7 +4707,7 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
 
         // A `static const` global is actually a compile-time constant.
         //
-        if (decl->HasModifier<HLSLStaticModifier>() && decl->HasModifier<ConstModifier>())
+        if (decl->hasModifier<HLSLStaticModifier>() && decl->hasModifier<ConstModifier>())
         {
             return lowerGlobalConstantDecl(decl);
         }
@@ -4769,7 +4769,7 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
     bool isFunctionStaticVarDecl(VarDeclBase* decl)
     {
         // Only a variable marked `static` can be static.
-        if(!decl->FindModifier<HLSLStaticModifier>())
+        if(!decl->findModifier<HLSLStaticModifier>())
             return false;
 
         // The immediate parent of a function-scope variable
@@ -4903,7 +4903,7 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
         VarDeclBase*    decl)
     {
         // We know the variable is `static`, but it might also be `const.
-        if(decl->HasModifier<ConstModifier>())
+        if(decl->hasModifier<ConstModifier>())
             return lowerFunctionStaticConstVarDecl(decl);
 
         // A global variable may need to be generic, if one
@@ -5186,7 +5186,7 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
     LoweredValInfo visitAggTypeDecl(AggTypeDecl* decl)
     {
         // Don't generate an IR `struct` for intrinsic types
-        if(decl->FindModifier<IntrinsicTypeModifier>() || decl->FindModifier<BuiltinTypeModifier>())
+        if(decl->findModifier<IntrinsicTypeModifier>() || decl->findModifier<BuiltinTypeModifier>())
         {
             return LoweredValInfo();
         }
@@ -5217,7 +5217,7 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
 
         for (auto fieldDecl : decl->getMembersOfType<VarDeclBase>())
         {
-            if (fieldDecl->HasModifier<HLSLStaticModifier>())
+            if (fieldDecl->hasModifier<HLSLStaticModifier>())
             {
                 // A `static` field is actually a global variable,
                 // and we should emit it as such.
@@ -5279,7 +5279,7 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
 
         addLinkageDecoration(context, irFieldKey, fieldDecl);
 
-        if (auto semanticModifier = fieldDecl->FindModifier<HLSLSimpleSemantic>())
+        if (auto semanticModifier = fieldDecl->findModifier<HLSLSimpleSemantic>())
         {
             builder->addSemanticDecoration(irFieldKey, semanticModifier->name.getName()->text.getUnownedSlice());
         }
@@ -5476,11 +5476,11 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
 
     bool isConstExprVar(Decl* decl)
     {
-        if( decl->HasModifier<ConstExprModifier>() )
+        if( decl->hasModifier<ConstExprModifier>() )
         {
             return true;
         }
-        else if(decl->HasModifier<HLSLStaticModifier>() && decl->HasModifier<ConstModifier>())
+        else if(decl->hasModifier<HLSLStaticModifier>() && decl->hasModifier<ConstModifier>())
         {
             return true;
         }
@@ -5615,7 +5615,7 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
     {
         auto builder = getBuilder();
 
-        for (auto targetMod : decl->GetModifiersOfType<TargetIntrinsicModifier>())
+        for (auto targetMod : decl->getModifiersOfType<TargetIntrinsicModifier>())
         {
             String definition;
             auto definitionToken = targetMod->definitionToken;
@@ -5708,7 +5708,7 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
         // No need to worry about functions that lower to intrinsic IR opcodes
         // (or pseudo-ops).
         //
-        if(decl->FindModifier<IntrinsicOpModifier>())
+        if(decl->findModifier<IntrinsicOpModifier>())
             return;
 
         // We also don't need an intrinsic decoration if the function already
@@ -5716,7 +5716,7 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
         //
         for( auto f = decl->primaryDecl; f; f = f->nextDecl )
         {
-            for(auto targetMod : f->GetModifiersOfType<TargetIntrinsicModifier>())
+            for(auto targetMod : f->getModifiersOfType<TargetIntrinsicModifier>())
             {
                 // If we find a catch-all case (marked as either *no* target
                 // token or an empty target name), then we should bail out.
@@ -6011,7 +6011,7 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
                         // TODO: we should consider having all parameter be implicitly
                         // immutable except in a specific "compatibility mode."
                         //
-                        if(paramDecl && paramDecl->FindModifier<ConstModifier>())
+                        if(paramDecl && paramDecl->findModifier<ConstModifier>())
                         {
                             // This parameter was declared to be immutable,
                             // so there should be no assignment to it in the
@@ -6064,7 +6064,7 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
 
             {
 
-                auto attr = decl->FindModifier<PatchConstantFuncAttribute>();
+                auto attr = decl->findModifier<PatchConstantFuncAttribute>();
 
                 // I needed to test for patchConstantFuncDecl here
                 // because it is only set if validateEntryPoint is called with Hull as the required stage
@@ -6150,7 +6150,7 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
 
         // If this declaration was marked as being an intrinsic for a particular
         // target, then we should reflect that here.
-        for( auto targetMod : decl->GetModifiersOfType<SpecializedForTargetModifier>() )
+        for( auto targetMod : decl->getModifiersOfType<SpecializedForTargetModifier>() )
         {
             // `targetMod` indicates that this particular declaration represents
             // a specialized definition of the particular function for the given
@@ -6171,36 +6171,36 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
         // TODO: We should wrap this an `SpecializedForTargetModifier` together into a single
         // case for enumerating the "capabilities" that a declaration requires.
         //
-        for(auto extensionMod : decl->GetModifiersOfType<RequiredGLSLExtensionModifier>())
+        for(auto extensionMod : decl->getModifiersOfType<RequiredGLSLExtensionModifier>())
         {
             getBuilder()->addRequireGLSLExtensionDecoration(irFunc, extensionMod->extensionNameToken.getContent());
         }
-        for(auto versionMod : decl->GetModifiersOfType<RequiredGLSLVersionModifier>())
+        for(auto versionMod : decl->getModifiersOfType<RequiredGLSLVersionModifier>())
         {
             getBuilder()->addRequireGLSLVersionDecoration(irFunc, Int(getIntegerLiteralValue(versionMod->versionNumberToken)));
         }
-        for (auto versionMod : decl->GetModifiersOfType<RequiredSPIRVVersionModifier>())
+        for (auto versionMod : decl->getModifiersOfType<RequiredSPIRVVersionModifier>())
         {
             getBuilder()->addRequireSPIRVVersionDecoration(irFunc, versionMod->version);
         }
-        for (auto versionMod : decl->GetModifiersOfType<RequiredCUDASMVersionModifier>())
+        for (auto versionMod : decl->getModifiersOfType<RequiredCUDASMVersionModifier>())
         {
             getBuilder()->addRequireCUDASMVersionDecoration(irFunc, versionMod->version);
         }
 
-        if (auto attr = decl->FindModifier<InstanceAttribute>())
+        if (auto attr = decl->findModifier<InstanceAttribute>())
         {
             IRIntLit* intLit = _getIntLitFromAttribute(getBuilder(), attr);
             getBuilder()->addDecoration(irFunc, kIROp_InstanceDecoration, intLit);
         }
 
-        if(auto attr = decl->FindModifier<MaxVertexCountAttribute>())
+        if(auto attr = decl->findModifier<MaxVertexCountAttribute>())
         {
             IRIntLit* intLit = _getIntLitFromAttribute(getBuilder(), attr);
             getBuilder()->addDecoration(irFunc, kIROp_MaxVertexCountDecoration, intLit);
         }
 
-        if(auto attr = decl->FindModifier<NumThreadsAttribute>())
+        if(auto attr = decl->findModifier<NumThreadsAttribute>())
         {
             auto builder = getBuilder();
             IRType* intType = builder->getIntType();
@@ -6214,41 +6214,41 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
            builder->addDecoration(irFunc, kIROp_NumThreadsDecoration, operands, 3);
         }
 
-        if(decl->FindModifier<ReadNoneAttribute>())
+        if(decl->findModifier<ReadNoneAttribute>())
         {
             getBuilder()->addSimpleDecoration<IRReadNoneDecoration>(irFunc);
         }
 
-        if (decl->FindModifier<EarlyDepthStencilAttribute>())
+        if (decl->findModifier<EarlyDepthStencilAttribute>())
         {
             getBuilder()->addSimpleDecoration<IREarlyDepthStencilDecoration>(irFunc);
         }
 
-        if (auto attr = decl->FindModifier<DomainAttribute>())
+        if (auto attr = decl->findModifier<DomainAttribute>())
         {
             IRStringLit* stringLit = _getStringLitFromAttribute(getBuilder(), attr);
             getBuilder()->addDecoration(irFunc, kIROp_DomainDecoration, stringLit);
         }
 
-        if (auto attr = decl->FindModifier<PartitioningAttribute>())
+        if (auto attr = decl->findModifier<PartitioningAttribute>())
         {
             IRStringLit* stringLit = _getStringLitFromAttribute(getBuilder(), attr);
             getBuilder()->addDecoration(irFunc, kIROp_PartitioningDecoration, stringLit);
         }
 
-        if (auto attr = decl->FindModifier<OutputTopologyAttribute>())
+        if (auto attr = decl->findModifier<OutputTopologyAttribute>())
         {
             IRStringLit* stringLit = _getStringLitFromAttribute(getBuilder(), attr);
             getBuilder()->addDecoration(irFunc, kIROp_OutputTopologyDecoration, stringLit);
         }
 
-        if (auto attr = decl->FindModifier<OutputControlPointsAttribute>())
+        if (auto attr = decl->findModifier<OutputControlPointsAttribute>())
         {
             IRIntLit* intLit = _getIntLitFromAttribute(getBuilder(), attr);
             getBuilder()->addDecoration(irFunc, kIROp_OutputControlPointsDecoration, intLit);
         }
 
-        if(decl->FindModifier<UnsafeForceInlineEarlyAttribute>())
+        if(decl->findModifier<UnsafeForceInlineEarlyAttribute>())
         {
             getBuilder()->addDecoration(irFunc, kIROp_UnsafeForceInlineEarlyDecoration);
         }
@@ -6615,7 +6615,7 @@ static void lowerFrontEndEntryPointToIR(
 
             for (auto param : params)
             {
-                if (auto modifier = param->FindModifier<HLSLGeometryShaderInputPrimitiveTypeModifier>())
+                if (auto modifier = param->findModifier<HLSLGeometryShaderInputPrimitiveTypeModifier>())
                 {
                     IROp op = kIROp_Invalid;
 

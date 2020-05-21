@@ -290,17 +290,17 @@ class ModifiableSyntaxNode : public SyntaxNode
     Modifiers modifiers;
 
     template<typename T>
-    FilteredModifierList<T> GetModifiersOfType() { return FilteredModifierList<T>(modifiers.first.Ptr()); }
+    FilteredModifierList<T> getModifiersOfType() { return FilteredModifierList<T>(modifiers.first.Ptr()); }
 
     // Find the first modifier of a given type, or return `nullptr` if none is found.
     template<typename T>
-    T* FindModifier()
+    T* findModifier()
     {
-        return *GetModifiersOfType<T>().begin();
+        return *getModifiersOfType<T>().begin();
     }
 
     template<typename T>
-    bool HasModifier() { return FindModifier<T>() != nullptr; }
+    bool hasModifier() { return findModifier<T>() != nullptr; }
 };
 
 
@@ -333,8 +333,8 @@ public:
     // The next declaration defined in the same container with the same name
     Decl* nextInContainerWithSameName = nullptr;
 
-    bool IsChecked(DeclCheckState state) { return checkState >= state; }
-    void SetCheckState(DeclCheckState state)
+    bool isChecked(DeclCheckState state) { return checkState >= state; }
+    void setCheckState(DeclCheckState state)
     {
         SLANG_RELEASE_ASSERT(state >= checkState.getState());
         checkState.setState(state);

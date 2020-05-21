@@ -126,7 +126,7 @@ namespace Slang
             // A `static` method requirement can't be satisfied by a
             // tagged union, because there is no tag to dispatch on.
             //
-            if(requirementDeclRef.getDecl()->HasModifier<HLSLStaticModifier>())
+            if(requirementDeclRef.getDecl()->hasModifier<HLSLStaticModifier>())
                 return false;
 
             // TODO: We will eventually want to check that any callable

@@ -342,7 +342,7 @@ namespace Slang
             // TODO: We could consider *always* checking any `[patchconsantfunc("...")]`
             // attributes, so that they need to resolve to a function.
 
-            auto attr = entryPointFuncDecl->FindModifier<PatchConstantFuncAttribute>();
+            auto attr = entryPointFuncDecl->findModifier<PatchConstantFuncAttribute>();
 
             if (attr)
             {
@@ -392,7 +392,7 @@ namespace Slang
         {
             for(const auto& param : entryPointFuncDecl->getParameters())
             {
-                if(auto semantic = param->FindModifier<HLSLSimpleSemantic>())
+                if(auto semantic = param->findModifier<HLSLSimpleSemantic>())
                 {
                     const auto& semanticToken = semantic->name;
 
@@ -534,7 +534,7 @@ namespace Slang
         // it didn't have one, *or* issue a diagnostic if there is a mismatch.
         //
         auto entryPointProfile = entryPointReq->getProfile();
-        if( auto entryPointAttribute = entryPointFuncDecl->FindModifier<EntryPointAttribute>() )
+        if( auto entryPointAttribute = entryPointFuncDecl->findModifier<EntryPointAttribute>() )
         {
             auto entryPointStage = entryPointProfile.GetStage();
             if( entryPointStage == Stage::Unknown )
@@ -569,7 +569,7 @@ namespace Slang
         /// Get the name a variable will use for reflection purposes
     Name* getReflectionName(VarDeclBase* varDecl)
     {
-        if (auto reflectionNameModifier = varDecl->FindModifier<ParameterGroupReflectionName>())
+        if (auto reflectionNameModifier = varDecl->findModifier<ParameterGroupReflectionName>())
             return reflectionNameModifier->nameAndLoc.name;
 
         return varDecl->getName();
@@ -869,7 +869,7 @@ namespace Slang
                     if(!funcDecl)
                         continue;
 
-                    auto entryPointAttr = funcDecl->FindModifier<EntryPointAttribute>();
+                    auto entryPointAttr = funcDecl->findModifier<EntryPointAttribute>();
                     if(!entryPointAttr)
                         continue;
 
