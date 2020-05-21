@@ -1389,9 +1389,9 @@ struct ValLoweringVisitor : ValVisitor<ValLoweringVisitor, LoweredValInfo, Lower
     IRType* visitArrayExpressionType(ArrayExpressionType* type)
     {
         auto elementType = lowerType(context, type->baseType);
-        if (type->ArrayLength)
+        if (type->arrayLength)
         {
-            auto elementCount = lowerSimpleVal(context, type->ArrayLength);
+            auto elementCount = lowerSimpleVal(context, type->arrayLength);
             return getBuilder()->getArrayType(
                 elementType,
                 elementCount);
@@ -2179,7 +2179,7 @@ struct ExprLoweringVisitorBase : ExprVisitor<Derived, LoweredValInfo>
         }
         else if (auto arrayType = as<ArrayExpressionType>(type))
         {
-            UInt elementCount = (UInt) GetIntVal(arrayType->ArrayLength);
+            UInt elementCount = (UInt) GetIntVal(arrayType->arrayLength);
 
             auto irDefaultElement = getSimpleVal(context, getDefaultVal(arrayType->baseType));
 
@@ -2247,7 +2247,7 @@ struct ExprLoweringVisitorBase : ExprVisitor<Derived, LoweredValInfo>
         // fill in the appropriate field of the result
         if (auto arrayType = as<ArrayExpressionType>(type))
         {
-            UInt elementCount = (UInt) GetIntVal(arrayType->ArrayLength);
+            UInt elementCount = (UInt) GetIntVal(arrayType->arrayLength);
 
             for (UInt ee = 0; ee < argCount; ++ee)
             {

@@ -339,7 +339,7 @@ SLANG_API size_t spReflectionType_GetElementCount(SlangReflectionType* inType)
 
     if(auto arrayType = as<ArrayExpressionType>(type))
     {
-        return arrayType->ArrayLength ? (size_t) GetIntVal(arrayType->ArrayLength) : 0;
+        return arrayType->arrayLength ? (size_t) GetIntVal(arrayType->arrayLength) : 0;
     }
     else if( auto vectorType = as<VectorExpressionType>(type))
     {

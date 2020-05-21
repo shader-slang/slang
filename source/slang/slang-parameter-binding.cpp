@@ -1856,7 +1856,7 @@ static RefPtr<TypeLayout> processEntryPointVaryingParameter(
         // Note: Bad Things will happen if we have an array input
         // without a semantic already being enforced.
         
-        auto elementCount = (UInt) GetIntVal(arrayType->ArrayLength);
+        auto elementCount = (UInt) GetIntVal(arrayType->arrayLength);
 
         // We use the first element to derive the layout for the element type
         auto elementTypeLayout = processEntryPointVaryingParameter(context, arrayType->baseType, state, varLayout);

@@ -3294,7 +3294,7 @@ static TypeLayoutResult _createTypeLayout(
         // The layout rules for these vary heavily by resource kind and API.
         //
 
-        auto elementCount = GetElementCount(arrayType->ArrayLength);
+        auto elementCount = GetElementCount(arrayType->arrayLength);
 
         //
         // We can compute the uniform storage layout of an array using

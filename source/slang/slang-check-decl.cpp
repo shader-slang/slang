@@ -755,7 +755,7 @@ namespace Slang
         if (!arrayType) return false;
 
         // Explicit element count given?
-        auto elementCount = arrayType->ArrayLength;
+        auto elementCount = arrayType->arrayLength;
         if (elementCount) return true;
 
         return true;
@@ -2802,7 +2802,7 @@ namespace Slang
         if (!arrayType) return;
 
         // Explicit element count given?
-        auto elementCount = arrayType->ArrayLength;
+        auto elementCount = arrayType->arrayLength;
         if (elementCount) return;
 
         // No initializer?
@@ -2812,7 +2812,7 @@ namespace Slang
         // Is the type of the initializer an array type?
         if(auto arrayInitType = as<ArrayExpressionType>(initExpr->type))
         {
-            elementCount = arrayInitType->ArrayLength;
+            elementCount = arrayInitType->arrayLength;
         }
         else
         {
@@ -2832,7 +2832,7 @@ namespace Slang
         auto arrayType = as<ArrayExpressionType>(varDecl->type);
         if (!arrayType) return;
 
-        auto elementCount = arrayType->ArrayLength;
+        auto elementCount = arrayType->arrayLength;
         if (!elementCount)
         {
             // Note(tfoley): For now we allow arrays of unspecified size

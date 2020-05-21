@@ -239,7 +239,7 @@ namespace Slang
 
             auto toElementType = toArrayType->baseType;
 
-            if(auto toElementCount = toArrayType->ArrayLength)
+            if(auto toElementCount = toArrayType->arrayLength)
             {
                 // In the case of a sized array, we need to check that the number
                 // of elements being initialized matches what was declared.

@@ -139,7 +139,7 @@ namespace Slang
         else if (auto arrType = dynamicCast<ArrayExpressionType>(type))
         {
             emitRaw(context, "a");
-            emitSimpleIntVal(context, arrType->ArrayLength);
+            emitSimpleIntVal(context, arrType->arrayLength);
             emitType(context, arrType->baseType);
         }
         else if( auto taggedUnionType = dynamicCast<TaggedUnionType>(type) )

@@ -443,7 +443,7 @@ Index getFilterCountImpl(const ReflectClassInfo& clsInfo, MemberFilterStyle filt
         RefPtr<ArrayExpressionType> arrayType = new ArrayExpressionType();
         arrayType->setSession(this);
         arrayType->baseType = elementType;
-        arrayType->ArrayLength = elementCount;
+        arrayType->arrayLength = elementCount;
         return arrayType;
     }
 
@@ -463,14 +463,14 @@ Index getFilterCountImpl(const ReflectClassInfo& clsInfo, MemberFilterStyle filt
         auto arrType = as<ArrayExpressionType>(type);
         if (!arrType)
             return false;
-        return (areValsEqual(ArrayLength, arrType->ArrayLength) && baseType->Equals(arrType->baseType.Ptr()));
+        return (areValsEqual(arrayLength, arrType->arrayLength) && baseType->Equals(arrType->baseType.Ptr()));
     }
 
     RefPtr<Val> ArrayExpressionType::SubstituteImpl(SubstitutionSet subst, int* ioDiff)
     {
         int diff = 0;
         auto elementType = baseType->SubstituteImpl(subst, &diff).as<Type>();
-        auto arrlen = ArrayLength->SubstituteImpl(subst, &diff).as<IntVal>();
+        auto arrlen = arrayLength->SubstituteImpl(subst, &diff).as<IntVal>();
         SLANG_ASSERT(arrlen);
         if (diff)
         {
@@ -488,20 +488,20 @@ Index getFilterCountImpl(const ReflectClassInfo& clsInfo, MemberFilterStyle filt
         auto canonicalElementType = baseType->GetCanonicalType();
         auto canonicalArrayType = getArrayType(
             canonicalElementType,
-            ArrayLength);
+            arrayLength);
         return canonicalArrayType;
     }
     int ArrayExpressionType::GetHashCode()
     {
-        if (ArrayLength)
-            return (baseType->GetHashCode() * 16777619) ^ ArrayLength->GetHashCode();
+        if (arrayLength)
+            return (baseType->GetHashCode() * 16777619) ^ arrayLength->GetHashCode();
         else
             return baseType->GetHashCode();
     }
     Slang::String ArrayExpressionType::ToString()
     {
-        if (ArrayLength)
-            return baseType->ToString() + "[" + ArrayLength->ToString() + "]";
+        if (arrayLength)
+            return baseType->ToString() + "[" + arrayLength->ToString() + "]";
         else
             return baseType->ToString() + "[]";
     }
@@ -2282,7 +2282,7 @@ Index getFilterCountImpl(const ReflectClassInfo& clsInfo, MemberFilterStyle filt
         auto arrayType = new ArrayExpressionType();
         arrayType->setSession(session);
         arrayType->baseType = elementType;
-        arrayType->ArrayLength = elementCount;
+        arrayType->arrayLength = elementCount;
         return arrayType;
     }
 

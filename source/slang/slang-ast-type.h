@@ -391,7 +391,7 @@ class ArrayExpressionType : public Type
     SLANG_CLASS(ArrayExpressionType)
 
     RefPtr<Type> baseType;
-    RefPtr<IntVal> ArrayLength;
+    RefPtr<IntVal> arrayLength;
 
     virtual Slang::String ToString() override;
 
