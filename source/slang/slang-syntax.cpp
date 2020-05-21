@@ -1314,7 +1314,7 @@ Index getFilterCountImpl(const ReflectClassInfo& clsInfo, MemberFilterStyle filt
     {
         String result;
         result.append("namespace ");
-        result.append(m_declRef.toString());
+        result.append(declRef.toString());
         return result;
     }
 
@@ -1322,14 +1322,14 @@ Index getFilterCountImpl(const ReflectClassInfo& clsInfo, MemberFilterStyle filt
     {
         if (auto namespaceType = as<NamespaceType>(type))
         {
-            return m_declRef.Equals(namespaceType->m_declRef);
+            return declRef.Equals(namespaceType->declRef);
         }
         return false;
     }
 
     int NamespaceType::GetHashCode()
     {
-        return m_declRef.GetHashCode();
+        return declRef.GetHashCode();
     }
 
     RefPtr<Type> NamespaceType::CreateCanonicalType()
@@ -1396,11 +1396,11 @@ Index getFilterCountImpl(const ReflectClassInfo& clsInfo, MemberFilterStyle filt
 
     RefPtr<Type> MatrixExpressionType::getRowType()
     {
-        if( !mRowType )
+        if( !rowType )
         {
-            mRowType = getSession()->getVectorType(getElementType(), getColumnCount());
+            rowType = getSession()->getVectorType(getElementType(), getColumnCount());
         }
-        return mRowType;
+        return rowType;
     }
 
     RefPtr<VectorExpressionType> Session::getVectorType(
@@ -2364,7 +2364,7 @@ Index getFilterCountImpl(const ReflectClassInfo& clsInfo, MemberFilterStyle filt
     {
         auto type = new NamespaceType;
         type->setSession(session);
-        type->m_declRef = declRef;
+        type->declRef = declRef;
         return type;
     }
 

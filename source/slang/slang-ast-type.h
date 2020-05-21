@@ -125,9 +125,9 @@ class ResourceType : public BuiltinType
     // Shape and access level information for this resource type
     TextureFlavor flavor;
 
-    TextureFlavor::Shape GetBaseShape()
+    TextureFlavor::Shape getBaseShape()
     {
-        return flavor.GetBaseShape();
+        return flavor.getBaseShape();
     }
     bool isMultisample() { return flavor.isMultisample(); }
     bool isArray() { return flavor.isArray(); }
@@ -393,7 +393,7 @@ class ArrayExpressionType : public Type
     RefPtr<Type> baseType;
     RefPtr<IntVal> arrayLength;
 
-    virtual Slang::String ToString() override;
+    virtual String ToString() override;
 
 protected:
     virtual bool EqualsImpl(Type * type) override;
@@ -450,7 +450,7 @@ class MatrixExpressionType : public ArithmeticExpressionType
 {
     SLANG_CLASS(MatrixExpressionType)
 
-    Type* getElementType();
+    Type*           getElementType();
     IntVal*         getRowCount();
     IntVal*         getColumnCount();
 
@@ -462,7 +462,7 @@ protected:
     virtual BasicExpressionType* GetScalarType() override;
 
 private:
-    RefPtr<Type> mRowType;
+    RefPtr<Type> rowType;
 };
 
 // The built-in `String` type
@@ -588,7 +588,7 @@ class GenericDeclRefType : public Type
         : declRef(declRef)
     {}
 
-    DeclRef<GenericDecl> const& GetDeclRef() const { return declRef; }
+    DeclRef<GenericDecl> const& getDeclRef() const { return declRef; }
 
     virtual String ToString() override;
 
@@ -603,12 +603,12 @@ class NamespaceType : public Type
 {
     SLANG_CLASS(NamespaceType)
 
-    DeclRef<NamespaceDeclBase> m_declRef;
+    DeclRef<NamespaceDeclBase> declRef;
 
     NamespaceType()
     {}
 
-    DeclRef<NamespaceDeclBase> const& getDeclRef() const { return m_declRef; }
+    DeclRef<NamespaceDeclBase> const& getDeclRef() const { return declRef; }
 
     virtual String ToString() override;
 
