@@ -1363,7 +1363,7 @@ return coerce(typeExp.type, initListExpr);
     {
         RefPtr<MatrixSwizzleExpr> swizExpr = new MatrixSwizzleExpr();
         swizExpr->loc = memberRefExpr->loc;
-        swizExpr->base = memberRefExpr->BaseExpression;
+        swizExpr->base = memberRefExpr->baseExpression
 
         int elementIndices[4][2];
         int elementCount = 0;
@@ -1378,13 +1378,13 @@ return coerce(typeExp.type, initListExpr);
         {
             // Throw out swizzling with more than 4 output elements
             if (elementCount >= 4) {
-                getSink()->diagnose(swizExpr, Diagnostics::invalidSwizzleExpr, swizzleText, baseElementType->ToString());
+                getSink()->diagnose(swizExpr, Diagnostics::invalidSwizzleExpr, swizzleText, baseElementType->toString());
                 return CreateErrorExpr(memberRefExpr);
             }
             int elementIndex[2];
             // Check for the preceding underscore
             if (*coursor++ != '_') {
-                getSink()->diagnose(swizExpr, Diagnostics::invalidSwizzleExpr, swizzleText, baseElementType->ToString());
+                getSink()->diagnose(swizExpr, Diagnostics::invalidSwizzleExpr, swizzleText, baseElementType->toString());
                 return CreateErrorExpr(memberRefExpr);
             }
 
@@ -1392,7 +1392,7 @@ return coerce(typeExp.type, initListExpr);
             if (*coursor == 'm') {
                 // Can't mix one and zero indexing
                 if (oneIndexed == 1) {
-                    getSink()->diagnose(swizExpr, Diagnostics::invalidSwizzleExpr, swizzleText, baseElementType->ToString());
+                    getSink()->diagnose(swizExpr, Diagnostics::invalidSwizzleExpr, swizzleText, baseElementType->toString());
                     return CreateErrorExpr(memberRefExpr);
                 }
                 oneIndexed = 0;
@@ -1402,7 +1402,7 @@ return coerce(typeExp.type, initListExpr);
             else {
                 // Can't mix one and zero indexing
                 if (oneIndexed == 0) {
-                    getSink()->diagnose(swizExpr, Diagnostics::invalidSwizzleExpr, swizzleText, baseElementType->ToString());
+                    getSink()->diagnose(swizExpr, Diagnostics::invalidSwizzleExpr, swizzleText, baseElementType->toString());
                     return CreateErrorExpr(memberRefExpr);
                 }
                 oneIndexed = 1;
@@ -1423,7 +1423,7 @@ return coerce(typeExp.type, initListExpr);
                 case '4': subIndex = 4; break;
                 default:
                     // An invalid character in the swizzle is an error
-                    getSink()->diagnose(swizExpr, Diagnostics::invalidSwizzleExpr, swizzleText, baseElementType->ToString());
+                    getSink()->diagnose(swizExpr, Diagnostics::invalidSwizzleExpr, swizzleText, baseElementType->toString());
                     return CreateErrorExpr(memberRefExpr);
                 }
 
@@ -1441,7 +1441,7 @@ return coerce(typeExp.type, initListExpr);
                 // Account for off-by-one and reject 0 if oneIndexed
                 if (subIndex >= elementLimit + oneIndexed || subIndex < oneIndexed)
                 {
-                    getSink()->diagnose(swizExpr, Diagnostics::invalidSwizzleExpr, swizzleText, baseElementType->ToString());
+                    getSink()->diagnose(swizExpr, Diagnostics::invalidSwizzleExpr, swizzleText, baseElementType->toString());
                     return CreateErrorExpr(memberRefExpr);
                 }
             }
