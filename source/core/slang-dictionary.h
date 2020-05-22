@@ -135,11 +135,10 @@ namespace Slang
 
 		};
 		inline int GetHashPos(TKey& key) const
-		{
-            // TODO(JS): We probably want a function to convert a Hash to types of integrals
-            // because it's size could vary - say on pointer width.
-            // Note here, the multiply is performed, on unsigned int size 
-			return int((((unsigned int)getHashCode(key)) * 2654435761) % bucketSizeMinusOne);
+        {
+            // The hash could be negative, but we only want a positive result. Shift down by 1 to make it only +ve
+            const unsigned int hash = (unsigned int)getHashCode(key);
+            return (hash * 2654435761) % (unsigned int)(bucketSizeMinusOne);
 		}
 		FindPositionResult FindPosition(const TKey& key) const
 		{

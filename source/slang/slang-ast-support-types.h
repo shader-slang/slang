@@ -961,6 +961,8 @@ namespace Slang
     // We store both the original syntax and the resolved type here.
     struct TypeExp
     {
+        typedef TypeExp ThisType;
+
         TypeExp() {}
         TypeExp(TypeExp const& other)
             : exp(other.exp)
@@ -988,6 +990,8 @@ namespace Slang
             return type;
         }
         Type* operator->() { return Ptr(); }
+
+        ThisType& operator=(const ThisType& rhs) = default;
 
         //TypeExp accept(SyntaxVisitor* visitor);
 
