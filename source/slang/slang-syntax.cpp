@@ -208,12 +208,12 @@ Index getFilterCountImpl(const ReflectClassInfo& clsInfo, MemberFilterStyle filt
 
     // TypeExp
 
-    bool TypeExp::Equals(Type* other)
+    bool TypeExp::equals(Type* other)
     {
         return type->equals(other);
     }
 
-    bool TypeExp::Equals(RefPtr<Type> other)
+    bool TypeExp::equals(RefPtr<Type> other)
     {
         return type->equals(other.Ptr());
     }
@@ -510,7 +510,7 @@ Index getFilterCountImpl(const ReflectClassInfo& clsInfo, MemberFilterStyle filt
     {
         if (auto declRefType = as<DeclRefType>(type))
         {
-            return declRef.Equals(declRefType->declRef);
+            return declRef.equals(declRefType->declRef);
         }
         return false;
     }
@@ -1281,7 +1281,7 @@ Index getFilterCountImpl(const ReflectClassInfo& clsInfo, MemberFilterStyle filt
     {
         if (auto genericDeclRefType = as<GenericDeclRefType>(type))
         {
-            return declRef.Equals(genericDeclRefType->declRef);
+            return declRef.equals(genericDeclRefType->declRef);
         }
         return false;
     }
@@ -1310,7 +1310,7 @@ Index getFilterCountImpl(const ReflectClassInfo& clsInfo, MemberFilterStyle filt
     {
         if (auto namespaceType = as<NamespaceType>(type))
         {
-            return declRef.Equals(namespaceType->declRef);
+            return declRef.equals(namespaceType->declRef);
         }
         return false;
     }
@@ -1425,7 +1425,7 @@ Index getFilterCountImpl(const ReflectClassInfo& clsInfo, MemberFilterStyle filt
     {
         if (auto genericParamVal = as<GenericParamIntVal>(val))
         {
-            return declRef.Equals(genericParamVal->declRef);
+            return declRef.equals(genericParamVal->declRef);
         }
         return false;
     }
@@ -2064,11 +2064,11 @@ Index getFilterCountImpl(const ReflectClassInfo& clsInfo, MemberFilterStyle filt
 
 
     // Check if this is an equivalent declaration reference to another
-    bool DeclRefBase::Equals(DeclRefBase const& declRef) const
+    bool DeclRefBase::equals(DeclRefBase const& declRef) const
     {
         if (decl != declRef.decl)
             return false;
-        if (!substitutions.Equals(declRef.substitutions))
+        if (!substitutions.equals(declRef.substitutions))
             return false;
 
         return true;
@@ -2400,7 +2400,7 @@ Index getFilterCountImpl(const ReflectClassInfo& clsInfo, MemberFilterStyle filt
 
         return sub->equals(otherWitness->sub)
             && sup->equals(otherWitness->sup)
-            && declRef.Equals(otherWitness->declRef);
+            && declRef.equals(otherWitness->declRef);
     }
 
     RefPtr<ThisTypeSubstitution> findThisTypeSubstitution(
@@ -2570,7 +2570,7 @@ Index getFilterCountImpl(const ReflectClassInfo& clsInfo, MemberFilterStyle filt
         return sub->equals(otherWitness->sub)
             && sup->equals(otherWitness->sup)
             && subToMid->equalsVal(otherWitness->subToMid)
-            && midToSup.Equals(otherWitness->midToSup);
+            && midToSup.equals(otherWitness->midToSup);
     }
 
     RefPtr<Val> TransitiveSubtypeWitness::substituteImpl(SubstitutionSet subst, int * ioDiff)
@@ -2650,7 +2650,7 @@ Index getFilterCountImpl(const ReflectClassInfo& clsInfo, MemberFilterStyle filt
         return name->text;
     }
 
-    bool SubstitutionSet::Equals(const SubstitutionSet& substSet) const
+    bool SubstitutionSet::equals(const SubstitutionSet& substSet) const
     {
         if (substitutions == substSet.substitutions)
         {
@@ -2685,7 +2685,7 @@ Index getFilterCountImpl(const ReflectClassInfo& clsInfo, MemberFilterStyle filt
     {
         if( auto extractExistential = as<ExtractExistentialType>(type) )
         {
-            return declRef.Equals(extractExistential->declRef);
+            return declRef.equals(extractExistential->declRef);
         }
         return false;
     }
@@ -2720,7 +2720,7 @@ Index getFilterCountImpl(const ReflectClassInfo& clsInfo, MemberFilterStyle filt
     {
         if( auto extractWitness = as<ExtractExistentialSubtypeWitness>(val) )
         {
-            return declRef.Equals(extractWitness->declRef);
+            return declRef.equals(extractWitness->declRef);
         }
         return false;
     }
@@ -3097,7 +3097,7 @@ bool ThisType::equalsImpl(Type * type)
     if(!other)
         return false;
 
-    if(!interfaceDeclRef.Equals(other->interfaceDeclRef))
+    if(!interfaceDeclRef.equals(other->interfaceDeclRef))
         return false;
 
     return true;

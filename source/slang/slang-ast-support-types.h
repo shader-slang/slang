@@ -606,7 +606,7 @@ namespace Slang
             : substitutions(subst)
         {
         }
-        bool Equals(const SubstitutionSet& substSet) const;
+        bool equals(const SubstitutionSet& substSet) const;
         HashCode getHashCode() const;
     };
 
@@ -663,10 +663,10 @@ namespace Slang
         DeclRef<T> as() const;
 
         // Check if this is an equivalent declaration reference to another
-        bool Equals(DeclRefBase const& declRef) const;
+        bool equals(DeclRefBase const& declRef) const;
         bool operator == (const DeclRefBase& other) const
         {
-            return Equals(other);
+            return equals(other);
         }
 
         // Convenience accessors for common properties of declarations
@@ -980,13 +980,13 @@ namespace Slang
         RefPtr<Expr> exp;
         RefPtr<Type> type;
 
-        bool Equals(Type* other);
+        bool equals(Type* other);
 #if 0
         {
             return type->Equals(other);
         }
 #endif
-        bool Equals(RefPtr<Type> other);
+        bool equals(RefPtr<Type> other);
 #if 0
         {
             return type->Equals(other.Ptr());
