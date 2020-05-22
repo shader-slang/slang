@@ -111,7 +111,7 @@ class ExprWithArgsBase : public Expr
 {
     SLANG_ABSTRACT_CLASS(ExprWithArgsBase)
 
-    List<RefPtr<Expr>> Arguments;
+    List<RefPtr<Expr>> arguments;
 };
 
 // An aggregate type constructor
@@ -119,7 +119,7 @@ class AggTypeCtorExpr : public ExprWithArgsBase
 {
     SLANG_CLASS(AggTypeCtorExpr)
 
-    TypeExp base;;
+    TypeExp base;
 };
 
 
@@ -129,7 +129,7 @@ class AppExprBase : public ExprWithArgsBase
 {
     SLANG_ABSTRACT_CLASS(AppExprBase)
 
-    RefPtr<Expr> FunctionExpr;
+    RefPtr<Expr> functionExpr;
 };
 
 class InvokeExpr: public AppExprBase
@@ -159,21 +159,21 @@ class IndexExpr: public Expr
 {
     SLANG_CLASS(IndexExpr)
 
-    RefPtr<Expr> BaseExpression;
-    RefPtr<Expr> IndexExpression;
+    RefPtr<Expr> baseExpression;
+    RefPtr<Expr> indexExpression;
 };
 
 class MemberExpr: public DeclRefExpr
 {
     SLANG_CLASS(MemberExpr)
-    RefPtr<Expr> BaseExpression;
+    RefPtr<Expr> baseExpression;
 };
 
 // Member looked up on a type, rather than a value
 class StaticMemberExpr: public DeclRefExpr
 {
     SLANG_CLASS(StaticMemberExpr)
-    RefPtr<Expr> BaseExpression;
+    RefPtr<Expr> baseExpression;
 };
 
 class SwizzleExpr: public Expr
@@ -245,8 +245,8 @@ class SharedTypeExpr: public Expr
 class AssignExpr: public Expr
 {
     SLANG_CLASS(AssignExpr)
-    RefPtr<Expr> left;;
-    RefPtr<Expr> right;;
+    RefPtr<Expr> left;
+    RefPtr<Expr> right;
 };
 
 // Just an expression inside parentheses `(exp)`
@@ -256,7 +256,7 @@ class AssignExpr: public Expr
 class ParenExpr: public Expr
 {
     SLANG_CLASS(ParenExpr)
-    RefPtr<Expr> base;;
+    RefPtr<Expr> base;
 };
 
 // An object-oriented `this` expression, used to
@@ -264,7 +264,7 @@ class ParenExpr: public Expr
 class ThisExpr: public Expr
 {
     SLANG_CLASS(ThisExpr)
-    RefPtr<Scope> scope;;
+    RefPtr<Scope> scope;
 };
 
 // An expression that binds a temporary variable in a local expression context

@@ -585,7 +585,7 @@ static bool findLayoutArg(
     RefPtr<ModifiableSyntaxNode>    syntax,
     UInt*                           outVal)
 {
-    for( auto modifier : syntax->GetModifiersOfType<T>() )
+    for( auto modifier : syntax->getModifiersOfType<T>() )
     {
         if( modifier )
         {
@@ -615,7 +615,7 @@ RefPtr<TypeLayout> getTypeLayoutForGlobalShaderParameter(
     auto layoutContext = context->layoutContext;
     auto rules = layoutContext.getRulesFamily();
 
-    if(varDecl->HasModifier<ShaderRecordAttribute>() && as<ConstantBufferType>(type))
+    if(varDecl->hasModifier<ShaderRecordAttribute>() && as<ConstantBufferType>(type))
     {
         return createTypeLayout(
             layoutContext.with(rules->getShaderRecordConstantBufferRules()),
@@ -625,7 +625,7 @@ RefPtr<TypeLayout> getTypeLayoutForGlobalShaderParameter(
 
     // We want to check for a constant-buffer type with a `push_constant` layout
     // qualifier before we move on to anything else.
-    if( varDecl->HasModifier<PushConstantAttribute>() && as<ConstantBufferType>(type) )
+    if( varDecl->hasModifier<PushConstantAttribute>() && as<ConstantBufferType>(type) )
     {
         return createTypeLayout(
             layoutContext.with(rules->getPushConstantBufferRules()),
@@ -640,11 +640,11 @@ RefPtr<TypeLayout> getTypeLayoutForGlobalShaderParameter(
     // pointer checks in the code that calls this.
 
     // HLSL `static` modifier indicates "thread local"
-    if(varDecl->HasModifier<HLSLStaticModifier>())
+    if(varDecl->hasModifier<HLSLStaticModifier>())
         return nullptr;
 
     // HLSL `groupshared` modifier indicates "thread-group local"
-    if(varDecl->HasModifier<HLSLGroupSharedModifier>())
+    if(varDecl->hasModifier<HLSLGroupSharedModifier>())
         return nullptr;
 
     // TODO(tfoley): there may be other cases that we need to handle here
@@ -703,7 +703,7 @@ static void collectGlobalScopeParameter(
     auto varDeclRef = shaderParamInfo.paramDeclRef;
 
     // We apply any substitutions for global generic parameters here.
-    auto type = GetType(varDeclRef)->Substitute(globalGenericSubst).as<Type>();
+    auto type = GetType(varDeclRef)->substitute(globalGenericSubst).as<Type>();
 
     // We use a single operation to both check whether the
     // variable represents a shader parameter, and to compute
@@ -776,7 +776,7 @@ static bool shouldDisableDiagnostic(
     Decl*                   decl,
     DiagnosticInfo const&   diagnosticInfo)
 {
-    for( auto dd = decl; dd; dd = dd->ParentDecl )
+    for( auto dd = decl; dd; dd = dd->parentDecl )
     {
         for( auto modifier : dd->modifiers )
         {
@@ -909,7 +909,7 @@ static void addExplicitParameterBindings_HLSL(
     // here is where we want to extract and apply them...
 
     // Look for HLSL `register` or `packoffset` semantics.
-    for (auto semantic : varDecl.getDecl()->GetModifiersOfType<HLSLLayoutSemantic>())
+    for (auto semantic : varDecl.getDecl()->getModifiersOfType<HLSLLayoutSemantic>())
     {
         // Need to extract the information encoded in the semantic
         LayoutSemanticInfo semanticInfo = ExtractLayoutSemanticInfo(context, semantic);
@@ -945,7 +945,7 @@ static void maybeDiagnoseMissingVulkanLayoutModifier(
     // If the user didn't specify a `binding` (and optional `set`) for Vulkan,
     // but they *did* specify a `register` for D3D, then that is probably an
     // oversight on their part.
-    if( auto registerModifier = varDecl.getDecl()->FindModifier<HLSLRegisterSemantic>() )
+    if( auto registerModifier = varDecl.getDecl()->findModifier<HLSLRegisterSemantic>() )
     {
         getSink(context)->diagnose(registerModifier, Diagnostics::registerModifierButNoVulkanLayout, varDecl.GetName());
     }
@@ -983,7 +983,7 @@ static void addExplicitParameterBindings_GLSL(
     if( (resInfo = typeLayout->FindResourceInfo(LayoutResourceKind::DescriptorTableSlot)) != nullptr )
     {
         // Try to find `binding` and `set`
-        auto attr = varDecl.getDecl()->FindModifier<GLSLBindingAttribute>();
+        auto attr = varDecl.getDecl()->findModifier<GLSLBindingAttribute>();
         if (!attr)
         {
             maybeDiagnoseMissingVulkanLayoutModifier(context, varDecl);
@@ -995,7 +995,7 @@ static void addExplicitParameterBindings_GLSL(
     else if( (resInfo = typeLayout->FindResourceInfo(LayoutResourceKind::RegisterSpace)) != nullptr )
     {
         // Try to find `set`
-        auto attr = varDecl.getDecl()->FindModifier<GLSLBindingAttribute>();
+        auto attr = varDecl.getDecl()->findModifier<GLSLBindingAttribute>();
         if (!attr)
         {
             maybeDiagnoseMissingVulkanLayoutModifier(context, varDecl);
@@ -1588,7 +1588,7 @@ static RefPtr<TypeLayout> processEntryPointVaryingParameterDecl(
     int semanticIndex = 0;
     if( !state.optSemanticName )
     {
-        if( auto semantic = decl->FindModifier<HLSLSimpleSemantic>() )
+        if( auto semantic = decl->findModifier<HLSLSimpleSemantic>() )
         {
             semanticInfo = decomposeSimpleSemantic(semantic);
             semanticIndex = semanticInfo.index;
@@ -1606,7 +1606,7 @@ static RefPtr<TypeLayout> processEntryPointVaryingParameterDecl(
     //
     if (decl)
     {
-        if (decl->FindModifier<HLSLSampleModifier>())
+        if (decl->findModifier<HLSLSampleModifier>())
         {
             state.isSampleRate = true;
         }
@@ -1636,12 +1636,12 @@ static RefPtr<TypeLayout> processEntryPointVaryingParameterDecl(
     //
     if( isKhronosTarget(context->getTargetRequest()) )
     {
-        if( auto locationAttr = decl->FindModifier<GLSLLocationAttribute>() )
+        if( auto locationAttr = decl->findModifier<GLSLLocationAttribute>() )
         {
             int location = locationAttr->value;
 
             int index = 0;
-            if( auto indexAttr = decl->FindModifier<GLSLIndexAttribute>() )
+            if( auto indexAttr = decl->findModifier<GLSLIndexAttribute>() )
             {
                 index = indexAttr->value;
             }
@@ -1688,7 +1688,7 @@ static RefPtr<TypeLayout> processEntryPointVaryingParameterDecl(
                 varResInfo->space = index;
             }
         }
-        else if( auto indexAttr = decl->FindModifier<GLSLIndexAttribute>() )
+        else if( auto indexAttr = decl->findModifier<GLSLIndexAttribute>() )
         {
             getSink(context)->diagnose(indexAttr, Diagnostics::vkIndexWithoutVkLocation, decl->getName());
         }
@@ -1856,7 +1856,7 @@ static RefPtr<TypeLayout> processEntryPointVaryingParameter(
         // Note: Bad Things will happen if we have an array input
         // without a semantic already being enforced.
         
-        auto elementCount = (UInt) GetIntVal(arrayType->ArrayLength);
+        auto elementCount = (UInt) GetIntVal(arrayType->arrayLength);
 
         // We use the first element to derive the layout for the element type
         auto elementTypeLayout = processEntryPointVaryingParameter(context, arrayType->baseType, state, varLayout);
@@ -2042,7 +2042,7 @@ static RefPtr<TypeLayout> computeEntryPointParameterTypeLayout(
     auto paramType = GetType(paramDeclRef);
     SLANG_ASSERT(paramType);
 
-    if( paramDeclRef.getDecl()->HasModifier<HLSLUniformModifier>() )
+    if( paramDeclRef.getDecl()->hasModifier<HLSLUniformModifier>() )
     {
         // An entry-point parameter that is explicitly marked `uniform` represents
         // a uniform shader parameter passed via the implicitly-defined
@@ -2064,16 +2064,16 @@ static RefPtr<TypeLayout> computeEntryPointParameterTypeLayout(
         state.directionMask = 0;
 
         // If it appears to be an input, process it as such.
-        if( paramDeclRef.getDecl()->HasModifier<InModifier>()
-            || paramDeclRef.getDecl()->HasModifier<InOutModifier>()
-            || !paramDeclRef.getDecl()->HasModifier<OutModifier>() )
+        if( paramDeclRef.getDecl()->hasModifier<InModifier>()
+            || paramDeclRef.getDecl()->hasModifier<InOutModifier>()
+            || !paramDeclRef.getDecl()->hasModifier<OutModifier>() )
         {
             state.directionMask |= kEntryPointParameterDirection_Input;
         }
 
         // If it appears to be an output, process it as such.
-        if(paramDeclRef.getDecl()->HasModifier<OutModifier>()
-            || paramDeclRef.getDecl()->HasModifier<InOutModifier>())
+        if(paramDeclRef.getDecl()->hasModifier<OutModifier>()
+            || paramDeclRef.getDecl()->hasModifier<InOutModifier>())
         {
             state.directionMask |= kEntryPointParameterDirection_Output;
         }
@@ -2578,7 +2578,7 @@ static RefPtr<EntryPointLayout> collectEntryPointParameters(
     auto resultType = GetResultType(entryPointFuncDeclRef);
     SLANG_ASSERT(resultType);
 
-    if( !resultType->Equals(resultType->getSession()->getVoidType()) )
+    if( !resultType->equals(resultType->getSession()->getVoidType()) )
     {
         state.loc = entryPointFuncDeclRef.getLoc();
         state.directionMask = kEntryPointParameterDirection_Output;

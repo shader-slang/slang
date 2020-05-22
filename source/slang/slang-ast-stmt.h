@@ -28,7 +28,7 @@ class BlockStmt : public ScopeStmt
 {
     SLANG_CLASS(BlockStmt)
 
-    RefPtr<Stmt> body;;
+    RefPtr<Stmt> body;
 };
 
 // A statement that we aren't going to parse or check, because
@@ -62,9 +62,9 @@ class IfStmt : public Stmt
 {
     SLANG_CLASS(IfStmt)
 
-    RefPtr<Expr> Predicate;
-    RefPtr<Stmt> PositiveStatement;
-    RefPtr<Stmt> NegativeStatement;
+    RefPtr<Expr> predicate;
+    RefPtr<Stmt> positiveStatement;
+    RefPtr<Stmt> negativeStatement;
 };
 
 // A statement that can be escaped with a `break`
@@ -129,10 +129,10 @@ class ForStmt : public LoopStmt
 {
     SLANG_CLASS(ForStmt)
 
-    RefPtr<Stmt> InitialStatement;
-    RefPtr<Expr> SideEffectExpression;
-    RefPtr<Expr> PredicateExpression;
-    RefPtr<Stmt> Statement;
+    RefPtr<Stmt> initialStatement;
+    RefPtr<Expr> sideEffectExpression;
+    RefPtr<Expr> predicateExpression;
+    RefPtr<Stmt> statement;
 };
 
 // A `for` statement in a language that doesn't restrict the scope
@@ -147,16 +147,16 @@ class WhileStmt : public LoopStmt
 {
     SLANG_CLASS(WhileStmt)
 
-    RefPtr<Expr> Predicate;
-    RefPtr<Stmt> Statement;
+    RefPtr<Expr> predicate;
+    RefPtr<Stmt> statement;
 };
 
 class DoWhileStmt : public LoopStmt 
 {
     SLANG_CLASS(DoWhileStmt)
 
-    RefPtr<Stmt> Statement;
-    RefPtr<Expr> Predicate;
+    RefPtr<Stmt> statement;
+    RefPtr<Expr> predicate;
 };
 
 // A compile-time, range-based `for` loop, which will not appear in the output code
@@ -194,14 +194,14 @@ class ReturnStmt : public Stmt
 {
     SLANG_CLASS(ReturnStmt)
 
-    RefPtr<Expr> Expression;
+    RefPtr<Expr> expression;
 };
 
 class ExpressionStmt : public Stmt 
 {
     SLANG_CLASS(ExpressionStmt)
 
-    RefPtr<Expr> Expression;
+    RefPtr<Expr> expression;
 };
 
 } // namespace Slang

@@ -32,7 +32,7 @@ namespace Slang
     RefPtr<Expr> SemanticsVisitor::moveTemp(RefPtr<Expr> const& expr, F const& func)
     {
         RefPtr<VarDecl> varDecl = new VarDecl();
-        varDecl->ParentDecl = nullptr; // TODO: need to fill this in somehow!
+        varDecl->parentDecl = nullptr; // TODO: need to fill this in somehow!
         varDecl->checkState = DeclCheckState::Checked;
         varDecl->nameAndLoc.loc = expr->loc;
         varDecl->initExpr = expr;
@@ -221,7 +221,7 @@ namespace Slang
                 auto expr = new StaticMemberExpr();
                 expr->loc = loc;
                 expr->type = type;
-                expr->BaseExpression = baseExpr;
+                expr->baseExpression = baseExpr;
                 expr->name = declRef.GetName();
                 expr->declRef = declRef;
                 return expr;
@@ -237,7 +237,7 @@ namespace Slang
                 auto expr = new StaticMemberExpr();
                 expr->loc = loc;
                 expr->type = type;
-                expr->BaseExpression = baseTypeExpr;
+                expr->baseExpression = baseTypeExpr;
                 expr->name = declRef.GetName();
                 expr->declRef = declRef;
                 return expr;
@@ -250,7 +250,7 @@ namespace Slang
                 auto expr = new MemberExpr();
                 expr->loc = loc;
                 expr->type = type;
-                expr->BaseExpression = baseExpr;
+                expr->baseExpression = baseExpr;
                 expr->name = declRef.GetName();
                 expr->declRef = declRef;
 
@@ -606,7 +606,7 @@ namespace Slang
     {
         if (auto memberExpr = as<MemberExpr>(expr))
         {
-            return memberExpr->BaseExpression;
+            return memberExpr->baseExpression;
         }
         else if(auto overloadedExpr = as<OverloadedExpr>(expr))
         {
@@ -671,11 +671,11 @@ namespace Slang
         //
         // For right now we will look for calls to intrinsic functions, and then inspect
         // their names (this is bad and slow).
-        auto funcDeclRefExpr = invokeExpr->FunctionExpr.as<DeclRefExpr>();
+        auto funcDeclRefExpr = invokeExpr->functionExpr.as<DeclRefExpr>();
         if (!funcDeclRefExpr) return nullptr;
 
         auto funcDeclRef = funcDeclRefExpr->declRef;
-        auto intrinsicMod = funcDeclRef.getDecl()->FindModifier<IntrinsicOpModifier>();
+        auto intrinsicMod = funcDeclRef.getDecl()->findModifier<IntrinsicOpModifier>();
         if (!intrinsicMod)
         {
             // We can't constant fold anything that doesn't map to a builtin
@@ -690,7 +690,7 @@ namespace Slang
 
         // Let's not constant-fold operations with more than a certain number of arguments, for simplicity
         static const int kMaxArgs = 8;
-        if (invokeExpr->Arguments.getCount() > kMaxArgs)
+        if (invokeExpr->arguments.getCount() > kMaxArgs)
             return nullptr;
 
         // Before checking the operation name, let's look at the arguments
@@ -698,7 +698,7 @@ namespace Slang
         IntegerLiteralValue constArgVals[kMaxArgs];
         int argCount = 0;
         bool allConst = true;
-        for (auto argExpr : invokeExpr->Arguments)
+        for (auto argExpr : invokeExpr->arguments)
         {
             auto argVal = TryCheckIntegerConstantExpression(argExpr.Ptr());
             if (!argVal)
@@ -821,9 +821,9 @@ namespace Slang
                 auto varDecl = varRef.getDecl();
 
                 // In HLSL, `static const` is used to mark compile-time constant expressions
-                if(auto staticAttr = varDecl->FindModifier<HLSLStaticModifier>())
+                if(auto staticAttr = varDecl->findModifier<HLSLStaticModifier>())
                 {
-                    if(auto constAttr = varDecl->FindModifier<ConstModifier>())
+                    if(auto constAttr = varDecl->findModifier<ConstModifier>())
                     {
                         // HLSL `static const` can be used as a constant expression
                         if(auto initExpr = getInitExpr(varRef))
@@ -845,7 +845,7 @@ namespace Slang
 
         if(auto castExpr = as<TypeCastExpr>(expr))
         {
-            auto val = TryConstantFoldExpr(castExpr->Arguments[0].Ptr());
+            auto val = TryConstantFoldExpr(castExpr->arguments[0].Ptr());
             if(val)
                 return val;
         }
@@ -920,11 +920,11 @@ namespace Slang
         RefPtr<IndexExpr>   subscriptExpr,
         RefPtr<Type>              elementType)
     {
-        auto baseExpr = subscriptExpr->BaseExpression;
-        auto indexExpr = subscriptExpr->IndexExpression;
+        auto baseExpr = subscriptExpr->baseExpression;
+        auto indexExpr = subscriptExpr->indexExpression;
 
-        if (!indexExpr->type->Equals(getSession()->getIntType()) &&
-            !indexExpr->type->Equals(getSession()->getUIntType()))
+        if (!indexExpr->type->equals(getSession()->getIntType()) &&
+            !indexExpr->type->equals(getSession()->getUIntType()))
         {
             getSink()->diagnose(indexExpr, Diagnostics::subscriptIndexNonInteger);
             return CreateErrorExpr(subscriptExpr.Ptr());
@@ -940,17 +940,17 @@ namespace Slang
 
     RefPtr<Expr> SemanticsExprVisitor::visitIndexExpr(IndexExpr* subscriptExpr)
     {
-        auto baseExpr = subscriptExpr->BaseExpression;
+        auto baseExpr = subscriptExpr->baseExpression;
         baseExpr = CheckExpr(baseExpr);
 
-        RefPtr<Expr> indexExpr = subscriptExpr->IndexExpression;
+        RefPtr<Expr> indexExpr = subscriptExpr->indexExpression;
         if (indexExpr)
         {
             indexExpr = CheckExpr(indexExpr);
         }
 
-        subscriptExpr->BaseExpression = baseExpr;
-        subscriptExpr->IndexExpression = indexExpr;
+        subscriptExpr->baseExpression = baseExpr;
+        subscriptExpr->indexExpression = indexExpr;
 
         // If anything went wrong in the base expression,
         // then just move along...
@@ -1026,14 +1026,14 @@ namespace Slang
             // case the attempt to call it will trigger overload
             // resolution.
             RefPtr<Expr> subscriptFuncExpr = createLookupResultExpr(
-                name, lookupResult, subscriptExpr->BaseExpression, subscriptExpr->loc);
+                name, lookupResult, subscriptExpr->baseExpression, subscriptExpr->loc);
 
             RefPtr<InvokeExpr> subscriptCallExpr = new InvokeExpr();
             subscriptCallExpr->loc = subscriptExpr->loc;
-            subscriptCallExpr->FunctionExpr = subscriptFuncExpr;
+            subscriptCallExpr->functionExpr = subscriptFuncExpr;
 
             // TODO(tfoley): This path can support multiple arguments easily
-            subscriptCallExpr->Arguments.add(subscriptExpr->IndexExpression);
+            subscriptCallExpr->arguments.add(subscriptExpr->indexExpression);
 
             return CheckInvokeExprWithCheckedOperands(subscriptCallExpr.Ptr());
         }
@@ -1069,11 +1069,11 @@ namespace Slang
         {
             if(auto memberExpr = as<MemberExpr>(e))
             {
-                e = memberExpr->BaseExpression;
+                e = memberExpr->baseExpression;
             }
             else if(auto subscriptExpr = as<IndexExpr>(e))
             {
-                e = subscriptExpr->BaseExpression;
+                e = subscriptExpr->baseExpression;
             }
             else
             {
@@ -1138,7 +1138,7 @@ namespace Slang
         if (auto invoke = as<InvokeExpr>(rs.Ptr()))
         {
             // if this is still an invoke expression, test arguments passed to inout/out parameter are LValues
-            if(auto funcType = as<FuncType>(invoke->FunctionExpr->type))
+            if(auto funcType = as<FuncType>(invoke->functionExpr->type))
             {
                 Index paramCount = funcType->getParamCount();
                 for (Index pp = 0; pp < paramCount; ++pp)
@@ -1153,9 +1153,9 @@ namespace Slang
                         // for an `inout` parameter to be converted in both
                         // directions.
                         //
-                        if( pp < expr->Arguments.getCount() )
+                        if( pp < expr->arguments.getCount() )
                         {
-                            auto argExpr = expr->Arguments[pp];
+                            auto argExpr = expr->arguments[pp];
                             if( !argExpr->type.IsLeftValue )
                             {
                                 getSink()->diagnose(
@@ -1168,7 +1168,7 @@ namespace Slang
                                     getSink()->diagnose(
                                         argExpr,
                                         Diagnostics::implicitCastUsedAsLValue,
-                                        implicitCastExpr->Arguments[0]->type,
+                                        implicitCastExpr->arguments[0]->type,
                                         implicitCastExpr->type);
                                 }
 
@@ -1207,9 +1207,9 @@ namespace Slang
     RefPtr<Expr> SemanticsExprVisitor::visitInvokeExpr(InvokeExpr *expr)
     {
         // check the base expression first
-        expr->FunctionExpr = CheckExpr(expr->FunctionExpr);
+        expr->functionExpr = CheckExpr(expr->functionExpr);
         // Next check the argument expressions
-        for (auto & arg : expr->Arguments)
+        for (auto & arg : expr->arguments)
         {
             arg = CheckExpr(arg);
         }
@@ -1244,7 +1244,7 @@ namespace Slang
     RefPtr<Expr> SemanticsExprVisitor::visitTypeCastExpr(TypeCastExpr * expr)
     {
         // Check the term we are applying first
-        auto funcExpr = expr->FunctionExpr;
+        auto funcExpr = expr->functionExpr;
         funcExpr = CheckTerm(funcExpr);
 
         // Now ensure that the term represnets a (proper) type.
@@ -1252,11 +1252,11 @@ namespace Slang
         typeExp.exp = funcExpr;
         typeExp = CheckProperType(typeExp);
 
-        expr->FunctionExpr = typeExp.exp;
+        expr->functionExpr = typeExp.exp;
         expr->type.type = typeExp.type;
 
         // Next check the argument expression (there should be only one)
-        for (auto & arg : expr->Arguments)
+        for (auto & arg : expr->arguments)
         {
             arg = CheckExpr(arg);
         }
@@ -1270,9 +1270,9 @@ namespace Slang
         {
             if(auto structDeclRef = declRefType->declRef.as<StructDecl>())
             {
-                if( expr->Arguments.getCount() == 1 )
+                if( expr->arguments.getCount() == 1 )
                 {
-                    auto arg = expr->Arguments[0];
+                    auto arg = expr->arguments[0];
                     if( auto intLitArg = arg.as<IntegerLiteralExpr>() )
                     {
                         if(getIntegerLiteralValue(intLitArg->token) == 0)
@@ -1362,7 +1362,7 @@ namespace Slang
     {
         RefPtr<SwizzleExpr> swizExpr = new SwizzleExpr();
         swizExpr->loc = memberRefExpr->loc;
-        swizExpr->base = memberRefExpr->BaseExpression;
+        swizExpr->base = memberRefExpr->baseExpression;
 
         IntegerLiteralValue limitElement = baseElementCount;
 
@@ -1387,7 +1387,7 @@ namespace Slang
             case 'w': case 'a': elementIndex = 3; break;
             default:
                 // An invalid character in the swizzle is an error
-                getSink()->diagnose(swizExpr, Diagnostics::invalidSwizzleExpr, swizzleText, baseElementType->ToString());
+                getSink()->diagnose(swizExpr, Diagnostics::invalidSwizzleExpr, swizzleText, baseElementType->toString());
                 anyError = true;
                 continue;
             }
@@ -1398,7 +1398,7 @@ namespace Slang
             // Make sure the index is in range for the source type
             if (elementIndex >= limitElement)
             {
-                getSink()->diagnose(swizExpr, Diagnostics::invalidSwizzleExpr, swizzleText, baseElementType->ToString());
+                getSink()->diagnose(swizExpr, Diagnostics::invalidSwizzleExpr, swizzleText, baseElementType->toString());
                 anyError = true;
                 continue;
             }
@@ -1615,10 +1615,10 @@ namespace Slang
 
     RefPtr<Expr> SemanticsExprVisitor::visitStaticMemberExpr(StaticMemberExpr* expr)
     {
-        expr->BaseExpression = CheckExpr(expr->BaseExpression);
+        expr->baseExpression = CheckExpr(expr->baseExpression);
 
         // Not sure this is needed -> but guess someone could do 
-        expr->BaseExpression = MaybeDereference(expr->BaseExpression);
+        expr->baseExpression = MaybeDereference(expr->baseExpression);
 
         // If the base of the member lookup has an interface type
         // *without* a suitable this-type substitution, then we are
@@ -1627,9 +1627,9 @@ namespace Slang
         // can expose its structure.
         //
 
-        expr->BaseExpression = maybeOpenExistential(expr->BaseExpression);
+        expr->baseExpression = maybeOpenExistential(expr->baseExpression);
         // Do a static lookup
-        return _lookupStaticMember(expr, expr->BaseExpression);
+        return _lookupStaticMember(expr, expr->baseExpression);
     }
 
     RefPtr<Expr> SemanticsVisitor::lookupMemberResultFailure(
@@ -1646,9 +1646,9 @@ namespace Slang
 
     RefPtr<Expr> SemanticsExprVisitor::visitMemberExpr(MemberExpr * expr)
     {
-        expr->BaseExpression = CheckExpr(expr->BaseExpression);
+        expr->baseExpression = CheckExpr(expr->baseExpression);
 
-        expr->BaseExpression = MaybeDereference(expr->BaseExpression);
+        expr->baseExpression = MaybeDereference(expr->baseExpression);
 
         // If the base of the member lookup has an interface type
         // *without* a suitable this-type substitution, then we are
@@ -1656,14 +1656,14 @@ namespace Slang
         // and we should "open" the existential here so that we
         // can expose its structure.
         //
-        expr->BaseExpression = maybeOpenExistential(expr->BaseExpression);
+        expr->baseExpression = maybeOpenExistential(expr->baseExpression);
 
         // TODO: Handle the case of an overloaded base expression
         // here, in case we can use the name of the member to
         // disambiguate which of the candidates is meant, or if
         // we can return an overloaded result.
 
-        auto & baseType = expr->BaseExpression->type;
+        auto & baseType = expr->baseExpression->type;
 
         // Note: Checking for vector types before declaration-reference types,
         // because vectors are also declaration reference types...
@@ -1690,11 +1690,11 @@ namespace Slang
         }
         else if( as<NamespaceType>(baseType) )
         {
-            return _lookupStaticMember(expr, expr->BaseExpression);
+            return _lookupStaticMember(expr, expr->baseExpression);
         }
         else if(auto typeType = as<TypeType>(baseType))
         {
-            return _lookupStaticMember(expr, expr->BaseExpression);
+            return _lookupStaticMember(expr, expr->baseExpression);
         }
         else if (as<ErrorType>(baseType))
         {
@@ -1718,7 +1718,7 @@ namespace Slang
             return createLookupResultExpr(
                 expr->name,
                 lookupResult,
-                expr->BaseExpression,
+                expr->baseExpression,
                 expr->loc);
         }
     }
@@ -1756,7 +1756,7 @@ namespace Slang
 
             if( auto funcDeclBase = as<FunctionDeclBase>(containerDecl) )
             {
-                if( funcDeclBase->HasModifier<MutatingAttribute>() )
+                if( funcDeclBase->hasModifier<MutatingAttribute>() )
                 {
                     expr->type.IsLeftValue = true;
                 }

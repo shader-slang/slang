@@ -44,18 +44,18 @@ void buildMemberDictionary(ContainerDecl* decl)
     // are we a generic?
     GenericDecl* genericDecl = as<GenericDecl>(decl);
 
-    const Index membersCount = decl->Members.getCount();
+    const Index membersCount = decl->members.getCount();
 
     SLANG_ASSERT(decl->dictionaryLastCount >= 0 && decl->dictionaryLastCount <= membersCount);
 
     for (Index i = decl->dictionaryLastCount; i < membersCount; ++i)
     {
-        Decl* m = decl->Members[i];
+        Decl* m = decl->members[i];
 
         auto name = m->getName();
 
         // Add any transparent members to a separate list for lookup
-        if (m->HasModifier<TransparentModifier>())
+        if (m->hasModifier<TransparentModifier>())
         {
             TransparentMemberInfo info;
             info.decl = m;
@@ -734,14 +734,14 @@ static void _lookUpInScopes(
                 // The implicit `this`/`This` for a function-like declaration
                 // depends on modifiers attached to the declaration.
                 //
-                if( funcDeclRef.getDecl()->HasModifier<HLSLStaticModifier>() )
+                if( funcDeclRef.getDecl()->hasModifier<HLSLStaticModifier>() )
                 {
                     // A `static` method only has access to an implicit `This`,
                     // and does not have a `this` expression available.
                     //
                     thisParameterMode = LookupResultItem::Breadcrumb::ThisParameterMode::Type;
                 }
-                else if( funcDeclRef.getDecl()->HasModifier<MutatingAttribute>() )
+                else if( funcDeclRef.getDecl()->hasModifier<MutatingAttribute>() )
                 {
                     // In a non-`static` method marked `[mutating]` there is
                     // an implicit `this` parameter that is mutable.

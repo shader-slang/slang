@@ -169,7 +169,7 @@ namespace Slang
         // Anything explicitly marked `static` and not at module scope
         // counts as a static rather than instance declaration.
         //
-        if(decl->HasModifier<HLSLStaticModifier>())
+        if(decl->hasModifier<HLSLStaticModifier>())
             return true;
 
         // Next we need to deal with cases where a declaration is
@@ -224,9 +224,9 @@ namespace Slang
         // comes up just enough that we should probably have a convenience
         // function for it.
 
-        auto parentDecl = decl->ParentDecl;
+        auto parentDecl = decl->parentDecl;
         if(auto genericDecl = as<GenericDecl>(parentDecl))
-            parentDecl = genericDecl->ParentDecl;
+            parentDecl = genericDecl->parentDecl;
 
         return isEffectivelyStatic(decl, parentDecl);
     }
@@ -237,26 +237,26 @@ namespace Slang
         // A global shader parameter must be declared at global or namespace
         // scope, so that it has a single definition across the module.
         //
-        if(!as<NamespaceDeclBase>(decl->ParentDecl)) return false;
+        if(!as<NamespaceDeclBase>(decl->parentDecl)) return false;
 
         // A global variable marked `static` indicates a traditional
         // global variable (albeit one that is implicitly local to
         // the translation unit)
         //
-        if(decl->HasModifier<HLSLStaticModifier>()) return false;
+        if(decl->hasModifier<HLSLStaticModifier>()) return false;
 
         // The `groupshared` modifier indicates that a variable cannot
         // be a shader parameters, but is instead transient storage
         // allocated for the duration of a thread-group's execution.
         //
-        if(decl->HasModifier<HLSLGroupSharedModifier>()) return false;
+        if(decl->hasModifier<HLSLGroupSharedModifier>()) return false;
 
         return true;
     }
 
     static bool _isLocalVar(VarDeclBase* varDecl)
     {
-        auto pp = varDecl->ParentDecl;
+        auto pp = varDecl->parentDecl;
 
         if(as<ScopeDecl>(pp))
             return true;
@@ -325,7 +325,7 @@ namespace Slang
             qualType.type = GetType(varDeclRef);
 
             bool isLValue = true;
-            if(varDeclRef.getDecl()->FindModifier<ConstModifier>())
+            if(varDeclRef.getDecl()->findModifier<ConstModifier>())
                 isLValue = false;
 
             // Global-scope shader parameters should not be writable,
@@ -356,7 +356,7 @@ namespace Slang
                 // the class for the `out` modifier so that we can
                 // make simple checks like this.
                 //
-                if( !varDeclRef.getDecl()->HasModifier<OutModifier>() )
+                if( !varDeclRef.getDecl()->hasModifier<OutModifier>() )
                 {
                     isLValue = false;
                 }
@@ -462,7 +462,7 @@ namespace Slang
         genericSubst->genericDecl = genericDecl;
         genericSubst->outer = outerSubst;
 
-        for( auto mm : genericDecl->Members )
+        for( auto mm : genericDecl->members )
         {
             if( auto genericTypeParamDecl = as<GenericTypeParamDecl>(mm) )
             {
@@ -475,7 +475,7 @@ namespace Slang
         }
 
         // create default substitution arguments for constraints
-        for (auto mm : genericDecl->Members)
+        for (auto mm : genericDecl->members)
         {
             if (auto genericTypeConstraintDecl = as<GenericTypeConstraintDecl>(mm))
             {
@@ -499,7 +499,7 @@ namespace Slang
         Decl*           decl,
         SubstitutionSet outerSubstSet)
     {
-        auto dd = decl->ParentDecl;
+        auto dd = decl->parentDecl;
         if( auto genericDecl = as<GenericDecl>(dd) )
         {
             // We don't want to specialize references to anything
@@ -523,7 +523,7 @@ namespace Slang
         Decl*   decl)
     {
         SubstitutionSet subst;
-        if( auto parentDecl = decl->ParentDecl )
+        if( auto parentDecl = decl->parentDecl )
         {
             subst = createDefaultSubstitutions(session, parentDecl);
         }
@@ -542,7 +542,7 @@ namespace Slang
         if(auto genericDecl = as<GenericDecl>(decl))
             decl = genericDecl->inner;
 
-        if(decl->HasModifier<HLSLStaticModifier>())
+        if(decl->hasModifier<HLSLStaticModifier>())
             return true;
 
         if(as<ConstructorDecl>(decl))
@@ -621,7 +621,7 @@ namespace Slang
         // If the `decl` has already been checked up to or beyond `state`
         // then there is nothing for us to do.
         //
-        if (decl->IsChecked(state)) return;
+        if (decl->isChecked(state)) return;
 
         // Is the declaration already being checked, somewhere up the
         // call stack from us?
@@ -690,14 +690,14 @@ namespace Slang
             //
             if(nextState > decl->checkState.getState())
             {
-                decl->SetCheckState(nextState);
+                decl->setCheckState(nextState);
             }
         }
 
         // Once we are done here, the state of `decl` should have
         // been upgraded to (at least) `state`.
         //
-        SLANG_ASSERT(decl->IsChecked(state));
+        SLANG_ASSERT(decl->isChecked(state));
 
         // Now that we are done checking `decl` we need to restore
         // its "is being checked" flag so that we don't generate
@@ -728,7 +728,7 @@ namespace Slang
             // declarations under a statement (e.g., in a function body),
             // and we don't want to check such local declarations here.
             //
-            for(auto childDecl : containerDecl->Members)
+            for(auto childDecl : containerDecl->members)
             {
                 if(as<ScopeDecl>(childDecl))
                     continue;
@@ -755,7 +755,7 @@ namespace Slang
         if (!arrayType) return false;
 
         // Explicit element count given?
-        auto elementCount = arrayType->ArrayLength;
+        auto elementCount = arrayType->arrayLength;
         if (elementCount) return true;
 
         return true;
@@ -794,7 +794,7 @@ namespace Slang
 
             // If we've gone down this path, then the variable
             // declaration is actually pretty far along in checking
-            varDecl->SetCheckState(DeclCheckState::Checked);
+            varDecl->setCheckState(DeclCheckState::Checked);
         }
         else
         {
@@ -824,7 +824,7 @@ namespace Slang
 
                     maybeInferArraySizeForVariable(varDecl);
 
-                    varDecl->SetCheckState(DeclCheckState::Checked);
+                    varDecl->setCheckState(DeclCheckState::Checked);
                 }
             }
             //
@@ -957,9 +957,9 @@ namespace Slang
 
     void SemanticsDeclHeaderVisitor::visitGenericDecl(GenericDecl* genericDecl)
     {
-        genericDecl->SetCheckState(DeclCheckState::ReadyForLookup);
+        genericDecl->setCheckState(DeclCheckState::ReadyForLookup);
 
-        for (auto m : genericDecl->Members)
+        for (auto m : genericDecl->members)
         {
             if (auto typeParam = as<GenericTypeParamDecl>(m))
             {
@@ -1041,18 +1041,18 @@ namespace Slang
         ///
     static void _registerBuiltinDeclsRec(Session* session, Decl* decl)
     {
-        if (auto builtinMod = decl->FindModifier<BuiltinTypeModifier>())
+        if (auto builtinMod = decl->findModifier<BuiltinTypeModifier>())
         {
             registerBuiltinDecl(session, decl, builtinMod);
         }
-        if (auto magicMod = decl->FindModifier<MagicTypeModifier>())
+        if (auto magicMod = decl->findModifier<MagicTypeModifier>())
         {
             registerMagicDecl(session, decl, magicMod);
         }
 
         if(auto containerDecl = as<ContainerDecl>(decl))
         {
-            for(auto childDecl : containerDecl->Members)
+            for(auto childDecl : containerDecl->members)
             {
                 if(as<ScopeDecl>(childDecl))
                     continue;
@@ -1188,16 +1188,16 @@ namespace Slang
         DeclRef<CallableDecl>   requiredMemberDeclRef,
         RefPtr<WitnessTable>    witnessTable)
     {
-        if(satisfyingMemberDeclRef.getDecl()->HasModifier<MutatingAttribute>()
-            && !requiredMemberDeclRef.getDecl()->HasModifier<MutatingAttribute>())
+        if(satisfyingMemberDeclRef.getDecl()->hasModifier<MutatingAttribute>()
+            && !requiredMemberDeclRef.getDecl()->hasModifier<MutatingAttribute>())
         {
             // A `[mutating]` method can't satisfy a non-`[mutating]` requirement,
             // but vice-versa is okay.
             return false;
         }
 
-        if(satisfyingMemberDeclRef.getDecl()->HasModifier<HLSLStaticModifier>()
-            != requiredMemberDeclRef.getDecl()->HasModifier<HLSLStaticModifier>())
+        if(satisfyingMemberDeclRef.getDecl()->hasModifier<HLSLStaticModifier>()
+            != requiredMemberDeclRef.getDecl()->hasModifier<HLSLStaticModifier>())
         {
             // A `static` method can't satisfy a non-`static` requirement and vice versa.
             return false;
@@ -1216,12 +1216,12 @@ namespace Slang
         DeclRef<GenericDecl>        requirementGenDecl,
         RefPtr<WitnessTable>        witnessTable)
     {
-        if (genDecl.getDecl()->Members.getCount() != requirementGenDecl.getDecl()->Members.getCount())
+        if (genDecl.getDecl()->members.getCount() != requirementGenDecl.getDecl()->members.getCount())
             return false;
-        for (Index i = 0; i < genDecl.getDecl()->Members.getCount(); i++)
+        for (Index i = 0; i < genDecl.getDecl()->members.getCount(); i++)
         {
-            auto genMbr = genDecl.getDecl()->Members[i];
-            auto requiredGenMbr = genDecl.getDecl()->Members[i];
+            auto genMbr = genDecl.getDecl()->members[i];
+            auto requiredGenMbr = genDecl.getDecl()->members[i];
             if (auto genTypeMbr = as<GenericTypeParamDecl>(genMbr))
             {
                 if (auto requiredGenTypeMbr = as<GenericTypeParamDecl>(requiredGenMbr))
@@ -1234,7 +1234,7 @@ namespace Slang
             {
                 if (auto requiredGenValMbr = as<GenericValueParamDecl>(requiredGenMbr))
                 {
-                    if (!genValMbr->type->Equals(requiredGenValMbr->type))
+                    if (!genValMbr->type->equals(requiredGenValMbr->type))
                         return false;
                 }
                 else
@@ -1244,7 +1244,7 @@ namespace Slang
             {
                 if (auto requiredTypeConstraintMbr = as<GenericTypeConstraintDecl>(requiredGenMbr))
                 {
-                    if (!genTypeConstraintMbr->sup->Equals(requiredTypeConstraintMbr->sup))
+                    if (!genTypeConstraintMbr->sup->equals(requiredTypeConstraintMbr->sup))
                     {
                         return false;
                     }
@@ -1870,10 +1870,10 @@ namespace Slang
             RefPtr<Type> enumTypeType = getSession()->getEnumTypeType();
 
             RefPtr<InheritanceDecl> enumConformanceDecl = new InheritanceDecl();
-            enumConformanceDecl->ParentDecl = decl;
+            enumConformanceDecl->parentDecl = decl;
             enumConformanceDecl->loc = decl->loc;
             enumConformanceDecl->base.type = getSession()->getEnumTypeType();
-            decl->Members.add(enumConformanceDecl);
+            decl->members.add(enumConformanceDecl);
 
             // The `__EnumType` interface has one required member, the `__Tag` type.
             // We need to satisfy this requirement automatically, rather than require
@@ -1889,7 +1889,7 @@ namespace Slang
             {
                 if(auto enumTypeTypeInterfaceDecl = as<InterfaceDecl>(enumTypeTypeDeclRefType->declRef.getDecl()))
                 {
-                    for(auto memberDecl : enumTypeTypeInterfaceDecl->Members)
+                    for(auto memberDecl : enumTypeTypeInterfaceDecl->members)
                     {
                         if(memberDecl->getName() == tagAssociatedTypeName)
                         {
@@ -1915,7 +1915,7 @@ namespace Slang
             // the min/max tag values, or the total number of tags, so that people don't
             // have to declare these as additional cases.
 
-            enumConformanceDecl->SetCheckState(DeclCheckState::Checked);
+            enumConformanceDecl->setCheckState(DeclCheckState::Checked);
         }
     }
 
@@ -2002,7 +2002,7 @@ namespace Slang
         // An enum case had better appear inside an enum!
         //
         // TODO: Do we need/want to support generic cases some day?
-        auto parentEnumDecl = as<EnumDecl>(decl->ParentDecl);
+        auto parentEnumDecl = as<EnumDecl>(decl->parentDecl);
         SLANG_ASSERT(parentEnumDecl);
 
         // The tag type should have already been set by
@@ -2053,7 +2053,7 @@ namespace Slang
     void SemanticsDeclHeaderVisitor::visitGlobalGenericParamDecl(GlobalGenericParamDecl* decl)
     {
         // global generic param only allowed in global scope
-        auto program = as<ModuleDecl>(decl->ParentDecl);
+        auto program = as<ModuleDecl>(decl->parentDecl);
         if (!program)
             getSink()->diagnose(decl, Slang::Diagnostics::globalGenParamInGlobalScopeOnly);
     }
@@ -2061,14 +2061,14 @@ namespace Slang
     void SemanticsDeclHeaderVisitor::visitAssocTypeDecl(AssocTypeDecl* decl)
     {
         // assoctype only allowed in an interface
-        auto interfaceDecl = as<InterfaceDecl>(decl->ParentDecl);
+        auto interfaceDecl = as<InterfaceDecl>(decl->parentDecl);
         if (!interfaceDecl)
             getSink()->diagnose(decl, Slang::Diagnostics::assocTypeInInterfaceOnly);
     }
 
     void SemanticsDeclBodyVisitor::visitFunctionDeclBase(FunctionDeclBase* decl)
     {
-        if (auto body = decl->Body)
+        if (auto body = decl->body)
         {
             checkBodyStmt(body, decl);
         }
@@ -2079,7 +2079,7 @@ namespace Slang
         List<Decl*>&                        outParams,
         List<GenericTypeConstraintDecl*>&   outConstraints)
     {
-        for (auto dd : decl->Members)
+        for (auto dd : decl->members)
         {
             if (dd == decl->inner)
                 continue;
@@ -2164,7 +2164,7 @@ namespace Slang
                     // parameters in the same signature. This is a reasonable
                     // assumption for now, but could get thorny down the road.
                     //
-                    if (!leftValueParam->getType()->Equals(rightValueParam->getType()))
+                    if (!leftValueParam->getType()->equals(rightValueParam->getType()))
                     {
                         // If the value parameters have non-matching types,
                         // then the full generic signatures do not match.
@@ -2298,12 +2298,12 @@ namespace Slang
             //
             auto leftSub = leftConstraint->sub;
             auto rightSub = GetSub(rightConstraint);
-            if(!leftSub->Equals(rightSub))
+            if(!leftSub->equals(rightSub))
                 return false;
 
             auto leftSup = leftConstraint->sup;
             auto rightSup = GetSup(rightConstraint);
-            if(!leftSup->Equals(rightSup))
+            if(!leftSup->equals(rightSup))
                 return false;
         }
 
@@ -2336,19 +2336,19 @@ namespace Slang
             auto sndParam = sndParams[ii];
 
             // If a given parameter type doesn't match, then signatures don't match
-            if (!GetType(fstParam)->Equals(GetType(sndParam)))
+            if (!GetType(fstParam)->equals(GetType(sndParam)))
                 return false;
 
             // If one parameter is `out` and the other isn't, then they don't match
             //
             // Note(tfoley): we don't consider `out` and `inout` as distinct here,
             // because there is no way for overload resolution to pick between them.
-            if (fstParam.getDecl()->HasModifier<OutModifier>() != sndParam.getDecl()->HasModifier<OutModifier>())
+            if (fstParam.getDecl()->hasModifier<OutModifier>() != sndParam.getDecl()->hasModifier<OutModifier>())
                 return false;
 
             // If one parameter is `ref` and the other isn't, then they don't match.
             //
-            if(fstParam.getDecl()->HasModifier<RefModifier>() != sndParam.getDecl()->HasModifier<RefModifier>())
+            if(fstParam.getDecl()->hasModifier<RefModifier>() != sndParam.getDecl()->hasModifier<RefModifier>())
                 return false;
         }
 
@@ -2363,7 +2363,7 @@ namespace Slang
     {
         RefPtr<GenericSubstitution> subst = new GenericSubstitution();
         subst->genericDecl = genericDecl;
-        for (auto dd : genericDecl->Members)
+        for (auto dd : genericDecl->members)
         {
             if (dd == genericDecl->inner)
                 continue;
@@ -2399,7 +2399,7 @@ namespace Slang
     // having a target intrinsic isn't a 'body'.
     bool _isDefinition(FuncDecl* decl)
     {
-        return decl->Body || decl->HasModifier<TargetIntrinsicModifier>();
+        return decl->body || decl->hasModifier<TargetIntrinsicModifier>();
     }
 
     Result SemanticsVisitor::checkFuncRedeclaration(
@@ -2427,8 +2427,8 @@ namespace Slang
         //   one can have a body (in which case the other is a forward declaration),
         //   or else we have a redefinition error.
 
-        auto newGenericDecl = as<GenericDecl>(newDecl->ParentDecl);
-        auto oldGenericDecl = as<GenericDecl>(oldDecl->ParentDecl);
+        auto newGenericDecl = as<GenericDecl>(newDecl->parentDecl);
+        auto oldGenericDecl = as<GenericDecl>(oldDecl->parentDecl);
 
         // If one declaration is a prefix/postfix operator, and the
         // other is not a matching operator, then don't consider these
@@ -2438,9 +2438,9 @@ namespace Slang
         // ordinary function-call syntax (if we decided to allow it)
         // would be ambiguous in such a case, of course.
         //
-        if (newDecl->HasModifier<PrefixModifier>() != oldDecl->HasModifier<PrefixModifier>())
+        if (newDecl->hasModifier<PrefixModifier>() != oldDecl->hasModifier<PrefixModifier>())
             return SLANG_OK;
-        if (newDecl->HasModifier<PostfixModifier>() != oldDecl->HasModifier<PostfixModifier>())
+        if (newDecl->hasModifier<PostfixModifier>() != oldDecl->hasModifier<PostfixModifier>())
             return SLANG_OK;
 
         // If one is generic and the other isn't, then there is no match.
@@ -2546,7 +2546,7 @@ namespace Slang
         //
         auto resultType = GetResultType(newDeclRef);
         auto prevResultType = GetResultType(oldDeclRef);
-        if (!resultType->Equals(prevResultType))
+        if (!resultType->equals(prevResultType))
         {
             // Bad redeclaration
             getSink()->diagnose(newDecl, Diagnostics::functionRedeclarationWithDifferentReturnType, newDecl->getName(), resultType, prevResultType);
@@ -2657,7 +2657,7 @@ namespace Slang
         // in the same container.
         //
         auto newDecl = decl;
-        auto parentDecl = decl->ParentDecl;
+        auto parentDecl = decl->parentDecl;
 
         // Sanity check: there should always be a parent declaration.
         //
@@ -2679,7 +2679,7 @@ namespace Slang
             if( newDecl == genericParentDecl->inner )
             {
                 newDecl = parentDecl;
-                parentDecl = genericParentDecl->ParentDecl;
+                parentDecl = genericParentDecl->parentDecl;
             }
         }
 
@@ -2755,7 +2755,7 @@ namespace Slang
             // Note: the `InOutModifier` class inherits from `OutModifier`,
             // so we only need to check for the base case.
             //
-            if(paramDecl->FindModifier<OutModifier>())
+            if(paramDecl->findModifier<OutModifier>())
             {
                 getSink()->diagnose(initExpr, Diagnostics::outputParameterCannotHaveDefaultValue);
             }
@@ -2764,7 +2764,7 @@ namespace Slang
 
     void SemanticsDeclHeaderVisitor::checkCallableDeclCommon(CallableDecl* decl)
     {
-        for(auto& paramDecl : decl->GetParameters())
+        for(auto& paramDecl : decl->getParameters())
         {
             ensureDecl(paramDecl, DeclCheckState::ReadyForReference);
         }
@@ -2772,7 +2772,7 @@ namespace Slang
 
     void SemanticsDeclHeaderVisitor::visitFuncDecl(FuncDecl* funcDecl)
     {
-        auto resultType = funcDecl->ReturnType;
+        auto resultType = funcDecl->returnType;
         if(resultType.exp)
         {
             resultType = CheckProperType(resultType);
@@ -2781,7 +2781,7 @@ namespace Slang
         {
             resultType = TypeExp(getSession()->getVoidType());
         }
-        funcDecl->ReturnType = resultType;
+        funcDecl->returnType = resultType;
 
         checkCallableDeclCommon(funcDecl);
     }
@@ -2802,7 +2802,7 @@ namespace Slang
         if (!arrayType) return;
 
         // Explicit element count given?
-        auto elementCount = arrayType->ArrayLength;
+        auto elementCount = arrayType->arrayLength;
         if (elementCount) return;
 
         // No initializer?
@@ -2812,7 +2812,7 @@ namespace Slang
         // Is the type of the initializer an array type?
         if(auto arrayInitType = as<ArrayExpressionType>(initExpr->type))
         {
-            elementCount = arrayInitType->ArrayLength;
+            elementCount = arrayInitType->arrayLength;
         }
         else
         {
@@ -2832,7 +2832,7 @@ namespace Slang
         auto arrayType = as<ArrayExpressionType>(varDecl->type);
         if (!arrayType) return;
 
-        auto elementCount = arrayType->ArrayLength;
+        auto elementCount = arrayType->arrayLength;
         if (!elementCount)
         {
             // Note(tfoley): For now we allow arrays of unspecified size
@@ -2950,11 +2950,11 @@ namespace Slang
         // the `GenericDecl` and we need to skip past that to
         // the grandparent.
         //
-        auto parent = decl->ParentDecl;
+        auto parent = decl->parentDecl;
         auto genericParent = as<GenericDecl>(parent);
         if (genericParent)
         {
-            parent = genericParent->ParentDecl;
+            parent = genericParent->parentDecl;
         }
 
         // The result type for a constructor is whatever `This` would
@@ -2973,14 +2973,14 @@ namespace Slang
     {
         // We need to compute the result tyep for this declaration,
         // since it wasn't filled in for us.
-        decl->ReturnType.type = findResultTypeForConstructorDecl(decl);
+        decl->returnType.type = findResultTypeForConstructorDecl(decl);
 
         checkCallableDeclCommon(decl);
     }
 
     void SemanticsDeclHeaderVisitor::visitSubscriptDecl(SubscriptDecl* decl)
     {
-        decl->ReturnType = CheckUsableType(decl->ReturnType);
+        decl->returnType = CheckUsableType(decl->returnType);
 
         // If we have a subscript declaration with no accessor declarations,
         // then we should create a single `GetterDecl` to represent
@@ -3000,8 +3000,8 @@ namespace Slang
             RefPtr<GetterDecl> getterDecl = new GetterDecl();
             getterDecl->loc = decl->loc;
 
-            getterDecl->ParentDecl = decl;
-            decl->Members.add(getterDecl);
+            getterDecl->parentDecl = decl;
+            decl->members.add(getterDecl);
         }
 
         checkCallableDeclCommon(decl);
@@ -3013,11 +3013,11 @@ namespace Slang
         // or a property declaration (when we add them). It will derive
         // its return type from the outer declaration, so we handle both
         // of these checks at the same place.
-        auto parent = decl->ParentDecl;
+        auto parent = decl->parentDecl;
         if (auto parentSubscript = as<SubscriptDecl>(parent))
         {
             ensureDecl(parentSubscript, DeclCheckState::CanUseTypeOfValueDecl);
-            decl->ReturnType = parentSubscript->ReturnType;
+            decl->returnType = parentSubscript->returnType;
         }
         // TODO: when we add "property" declarations, check for them here
         else
@@ -3030,7 +3030,7 @@ namespace Slang
 
     GenericDecl* SemanticsVisitor::GetOuterGeneric(Decl* decl)
     {
-        auto parentDecl = decl->ParentDecl;
+        auto parentDecl = decl->parentDecl;
         if (!parentDecl) return nullptr;
         auto parentGeneric = as<GenericDecl>(parentDecl);
         return parentGeneric;
@@ -3144,7 +3144,7 @@ namespace Slang
 
         // In order for this extension to apply to the given type, we
         // need to have a match on the target types.
-        if (!type->Equals(targetType))
+        if (!type->equals(targetType))
             return DeclRef<ExtensionDecl>();
 
 
@@ -3187,7 +3187,7 @@ namespace Slang
         // with the `__exported` modifier
         for (auto importDecl : moduleDecl->getMembersOfType<ImportDecl>())
         {
-            if (!importDecl->HasModifier<ExportedModifier>())
+            if (!importDecl->hasModifier<ExportedModifier>())
                 continue;
 
             importModuleIntoScope(scope, importDecl->importedModuleDecl.Ptr());

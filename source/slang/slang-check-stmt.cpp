@@ -120,24 +120,24 @@ namespace Slang
     {
         WithOuterStmt subContext(this, stmt);
 
-        stmt->Predicate = checkPredicateExpr(stmt->Predicate);
-        subContext.checkStmt(stmt->Statement);
+        stmt->predicate = checkPredicateExpr(stmt->predicate);
+        subContext.checkStmt(stmt->statement);
     }
 
     void SemanticsStmtVisitor::visitForStmt(ForStmt *stmt)
     {
         WithOuterStmt subContext(this, stmt);
 
-        checkStmt(stmt->InitialStatement);
-        if (stmt->PredicateExpression)
+        checkStmt(stmt->initialStatement);
+        if (stmt->predicateExpression)
         {
-            stmt->PredicateExpression = checkPredicateExpr(stmt->PredicateExpression);
+            stmt->predicateExpression = checkPredicateExpr(stmt->predicateExpression);
         }
-        if (stmt->SideEffectExpression)
+        if (stmt->sideEffectExpression)
         {
-            stmt->SideEffectExpression = CheckExpr(stmt->SideEffectExpression);
+            stmt->sideEffectExpression = CheckExpr(stmt->sideEffectExpression);
         }
-        subContext.checkStmt(stmt->Statement);
+        subContext.checkStmt(stmt->statement);
     }
 
     RefPtr<Expr> SemanticsVisitor::checkExpressionAndExpectIntegerConstant(RefPtr<Expr> expr, RefPtr<IntVal>* outIntVal)
@@ -155,7 +155,7 @@ namespace Slang
 
         stmt->varDecl->type.type = getSession()->getIntType();
         addModifier(stmt->varDecl, new ConstModifier());
-        stmt->varDecl->SetCheckState(DeclCheckState::Checked);
+        stmt->varDecl->setCheckState(DeclCheckState::Checked);
 
         RefPtr<IntVal> rangeBeginVal;
         RefPtr<IntVal> rangeEndVal;
@@ -225,9 +225,9 @@ namespace Slang
 
     void SemanticsStmtVisitor::visitIfStmt(IfStmt *stmt)
     {
-        stmt->Predicate = checkPredicateExpr(stmt->Predicate);
-        checkStmt(stmt->PositiveStatement);
-        checkStmt(stmt->NegativeStatement);
+        stmt->predicate = checkPredicateExpr(stmt->predicate);
+        checkStmt(stmt->positiveStatement);
+        checkStmt(stmt->negativeStatement);
     }
 
     void SemanticsStmtVisitor::visitUnparsedStmt(UnparsedStmt*)
@@ -248,21 +248,21 @@ namespace Slang
     void SemanticsStmtVisitor::visitReturnStmt(ReturnStmt *stmt)
     {
         auto function = getParentFunc();
-        if (!stmt->Expression)
+        if (!stmt->expression)
         {
-            if (function && !function->ReturnType.Equals(getSession()->getVoidType()))
+            if (function && !function->returnType.Equals(getSession()->getVoidType()))
             {
                 getSink()->diagnose(stmt, Diagnostics::returnNeedsExpression);
             }
         }
         else
         {
-            stmt->Expression = CheckTerm(stmt->Expression);
-            if (!stmt->Expression->type->Equals(getSession()->getErrorType()))
+            stmt->expression = CheckTerm(stmt->expression);
+            if (!stmt->expression->type->equals(getSession()->getErrorType()))
             {
                 if (function)
                 {
-                    stmt->Expression = coerce(function->ReturnType.Ptr(), stmt->Expression);
+                    stmt->expression = coerce(function->returnType.Ptr(), stmt->expression);
                 }
                 else
                 {
@@ -279,13 +279,13 @@ namespace Slang
     void SemanticsStmtVisitor::visitWhileStmt(WhileStmt *stmt)
     {
         WithOuterStmt subContext(this, stmt);
-        stmt->Predicate = checkPredicateExpr(stmt->Predicate);
-        subContext.checkStmt(stmt->Statement);
+        stmt->predicate = checkPredicateExpr(stmt->predicate);
+        subContext.checkStmt(stmt->statement);
     }
 
     void SemanticsStmtVisitor::visitExpressionStmt(ExpressionStmt *stmt)
     {
-        stmt->Expression = CheckExpr(stmt->Expression);
+        stmt->expression = CheckExpr(stmt->expression);
     }
 
 }

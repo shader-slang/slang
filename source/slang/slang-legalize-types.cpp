@@ -201,7 +201,7 @@ bool isResourceType(IRType* type)
 ModuleDecl* findModuleForDecl(
     Decl*   decl)
 {
-    for (auto dd = decl; dd; dd = dd->ParentDecl)
+    for (auto dd = decl; dd; dd = dd->parentDecl)
     {
         if (auto moduleDecl = as<ModuleDecl>(dd))
             return moduleDecl;

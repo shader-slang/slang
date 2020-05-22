@@ -204,10 +204,10 @@ namespace Slang
             // "fresh" variables and then solve for their values...
             //
 
-            auto genericDeclRef = genericDeclRefType->GetDeclRef();
+            auto genericDeclRef = genericDeclRefType->getDeclRef();
             ensureDecl(genericDeclRef, DeclCheckState::CanSpecializeGeneric);
             List<RefPtr<Expr>> args;
-            for (RefPtr<Decl> member : genericDeclRef.getDecl()->Members)
+            for (RefPtr<Decl> member : genericDeclRef.getDecl()->members)
             {
                 if (auto typeParam = as<GenericTypeParamDecl>(member))
                 {
