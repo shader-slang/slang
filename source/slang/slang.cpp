@@ -3255,13 +3255,13 @@ SLANG_API SlangResult spCompile(
     {
         res = req->executeActions();
     }
-    catch (AbortCompilationException&)
+    catch (const AbortCompilationException&)
     {
         // This situation indicates a fatal (but not necessarily internal) error
         // that forced compilation to terminate. There should already have been
         // a diagnostic produced, so we don't need to add one here.
     }
-    catch (Exception& e)
+    catch (const Exception& e)
     {
         // The compiler failed due to an internal error that was detected.
         // We will print out information on the exception to help out the user

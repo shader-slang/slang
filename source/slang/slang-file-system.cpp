@@ -144,7 +144,7 @@ SLANG_NO_THROW SlangResult SLANG_MCALL OSFileSystemExt::saveFile(const char* pat
         }
 
     }
-    catch (IOException&)
+    catch (const IOException&)
     {
     	return SLANG_E_CANNOT_OPEN;
     }

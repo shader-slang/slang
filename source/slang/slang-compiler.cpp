@@ -2278,7 +2278,7 @@ SlangResult dissassembleDXILUsingDXC(
         {
             stream.write(m_containerBlob->getBufferPointer(), m_containerBlob->getBufferSize());
         }
-        catch (IOException&)
+        catch (const IOException&)
         {
             // Unable to write
             return SLANG_FAIL;

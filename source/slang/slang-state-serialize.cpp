@@ -1071,7 +1071,7 @@ struct LoadContext
     {
         stream = new FileStream(filename, FileMode::Open, FileAccess::Read, FileShare::ReadWrite);
     }
-    catch (IOException&)
+    catch (const IOException&)
     {
     	return SLANG_FAIL;
     }
@@ -1550,7 +1550,7 @@ static SlangResult _findFirstSourcePath(EndToEndCompileRequest* request, String&
             outStream = new FileStream(builder, FileMode::CreateNew, FileAccess::Write, FileShare::WriteOnly);
             return SLANG_OK;
         }
-        catch (IOException&)
+        catch (const IOException&)
         {
         }
 

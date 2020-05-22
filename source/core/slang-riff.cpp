@@ -32,7 +32,7 @@ namespace Slang
     {
         stream->read(&outChunk, sizeof(RiffHeader));
     }
-    catch (IOException&)
+    catch (const IOException&)
     {
     	return SLANG_FAIL;
     }
@@ -77,7 +77,7 @@ namespace Slang
             out->write(end, padSize - payloadSize);
         }
     }
-    catch (IOException&)
+    catch (const IOException&)
     {
         return SLANG_FAIL;
     }
@@ -99,7 +99,7 @@ namespace Slang
         }
         outReadSize = alignedSize;
     }
-    catch (IOException&)
+    catch (const IOException&)
     {
         return SLANG_FAIL;
     }
@@ -126,7 +126,7 @@ namespace Slang
             stream->read(outHeader + 1, headerSize - sizeof(RiffHeader));
         }
     }
-    catch (IOException&)
+    catch (const IOException&)
     {
         return SLANG_FAIL;
     }
