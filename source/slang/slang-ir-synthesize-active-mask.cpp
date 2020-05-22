@@ -209,7 +209,7 @@ struct SynthesizeActiveMaskForModuleContext
         // that use the active mask into two steps.
         //
         // First we identify those functions that *directly* use
-        // the active mask, by virtual of having a `getActiveMask`
+        // the active mask, by virtuae of having a `getActiveMask`
         // instruction in their body.
         //
         markFuncsDirectlyUsingActiveMaskRec(m_module->getModuleInst());
@@ -437,7 +437,7 @@ struct SynthesizeActiveMaskForFunctionContext
         //
         // * When looking at a conditional branch instruction, we can assume:
         //
-        //   * The block with the branch is the only predecessor it the target blocks
+        //   * The block with the branch is the only predecessor of the target blocks
         //
         //   * The block with the branch is the immediate dominator of its target blocks
         //
