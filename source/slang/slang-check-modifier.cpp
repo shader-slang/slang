@@ -133,7 +133,7 @@ namespace Slang
         auto structDecl = lookupResult.item.declRef.as<StructDecl>().getDecl();
         if(!structDecl)
             return nullptr;
-        auto attrUsageAttr = structDecl->FindModifier<AttributeUsageAttribute>();
+        auto attrUsageAttr = structDecl->findModifier<AttributeUsageAttribute>();
         if (!attrUsageAttr)
             return nullptr;
 
@@ -163,7 +163,7 @@ namespace Slang
         //
         // TODO: This step should skip `static` fields.
         //
-        for(auto member : structDecl->Members)
+        for(auto member : structDecl->members)
         {
             if(auto varMember = as<VarDecl>(member))
             {
@@ -173,22 +173,22 @@ namespace Slang
                 paramDecl->nameAndLoc = member->nameAndLoc;
                 paramDecl->type = varMember->type;
                 paramDecl->loc = member->loc;
-                paramDecl->SetCheckState(DeclCheckState::Checked);
+                paramDecl->setCheckState(DeclCheckState::Checked);
 
-                paramDecl->ParentDecl = attrDecl;
-                attrDecl->Members.add(paramDecl);
+                paramDecl->parentDecl = attrDecl;
+                attrDecl->members.add(paramDecl);
             }
         }
 
         // We need to end by putting the new attribute declaration
         // into the AST, so that it can be found via lookup.
         //
-        auto parentDecl = structDecl->ParentDecl;
+        auto parentDecl = structDecl->parentDecl;
         //
         // TODO: handle the case where `parentDecl` is generic?
         //
-        attrDecl->ParentDecl = parentDecl;
-        parentDecl->Members.add(attrDecl);
+        attrDecl->parentDecl = parentDecl;
+        parentDecl->members.add(attrDecl);
         
         // Finally, we perform any required semantic checks on
         // the newly constructed attribute decl.
@@ -615,7 +615,7 @@ namespace Slang
         // If any of these match `attrTarget`, then we are good.
         //
         bool validTarget = false;
-        for(auto attrTargetMod : attrDecl->GetModifiersOfType<AttributeTargetModifier>())
+        for(auto attrTargetMod : attrDecl->getModifiersOfType<AttributeTargetModifier>())
         {
             if(attrTarget->getClass().isSubClassOf(attrTargetMod->syntaxClass))
             {

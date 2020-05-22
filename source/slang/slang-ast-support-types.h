@@ -491,6 +491,12 @@ namespace Slang
             // We include super.m_classId, because it's a subclass of itself.
             return m_classId >= super.m_classId && m_classId <= super.m_lastClassId;
         }
+        // True if typeId derives from this type
+        SLANG_FORCE_INLINE bool isDerivedFrom(uint32_t typeId) const
+        {
+            return typeId >= m_classId && typeId <= m_lastClassId;
+        }
+
         /// Will produce the same result as isSubClassOf, but more slowly by traversing the m_superClass
         /// Works without initRange being called. 
         bool isSubClassOfSlow(const ThisType& super) const;
@@ -994,6 +1000,9 @@ namespace Slang
         Type* operator->() { return Ptr(); }
 
         TypeExp Accept(SyntaxVisitor* visitor);
+
+            /// A global immutable TypeExp, that has no type or exp set.
+        static const TypeExp empty;
     };
 
 

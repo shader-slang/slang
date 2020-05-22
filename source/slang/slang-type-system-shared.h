@@ -74,7 +74,7 @@ FOREACH_BASE_TYPE(DEFINE_BASE_TYPE)
 
         uint16_t flavor;
 
-        Shape GetBaseShape() const { return Shape(flavor & BaseShapeMask); }
+        Shape getBaseShape() const { return Shape(flavor & BaseShapeMask); }
         bool isArray() const { return (flavor & ArrayFlag) != 0; }
         bool isMultisample() const { return (flavor & MultisampleFlag) != 0; }
         //            bool isShadow() const { return (flavor & ShadowFlag) != 0; }

@@ -2488,10 +2488,10 @@ static TypeLayoutResult _createTypeLayout(
         // are only applied to leaf fields/variables of matrix type
         // the difference should be immaterial.
 
-        if (declForModifiers->HasModifier<RowMajorLayoutModifier>())
+        if (declForModifiers->hasModifier<RowMajorLayoutModifier>())
             subContext.matrixLayoutMode = kMatrixLayoutMode_RowMajor;
 
-        if (declForModifiers->HasModifier<ColumnMajorLayoutModifier>())
+        if (declForModifiers->hasModifier<ColumnMajorLayoutModifier>())
             subContext.matrixLayoutMode = kMatrixLayoutMode_ColumnMajor;
 
         // TODO: really need to look for other modifiers that affect
@@ -3294,7 +3294,7 @@ static TypeLayoutResult _createTypeLayout(
         // The layout rules for these vary heavily by resource kind and API.
         //
 
-        auto elementCount = GetElementCount(arrayType->ArrayLength);
+        auto elementCount = GetElementCount(arrayType->arrayLength);
 
         //
         // We can compute the uniform storage layout of an array using

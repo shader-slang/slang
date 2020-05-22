@@ -101,7 +101,7 @@ static inline SlangReflection* convert(ProgramLayout* program)
 unsigned int getUserAttributeCount(Decl* decl)
 {
     unsigned int count = 0;
-    for (auto x : decl->GetModifiersOfType<UserDefinedAttribute>())
+    for (auto x : decl->getModifiersOfType<UserDefinedAttribute>())
     {
         SLANG_UNUSED(x);
         count++;
@@ -112,7 +112,7 @@ unsigned int getUserAttributeCount(Decl* decl)
 SlangReflectionUserAttribute* findUserAttributeByName(Session* session, Decl* decl, const char* name)
 {
     auto nameObj = session->tryGetNameObj(name);
-    for (auto x : decl->GetModifiersOfType<UserDefinedAttribute>())
+    for (auto x : decl->getModifiersOfType<UserDefinedAttribute>())
     {
         if (x->name == nameObj)
             return (SlangReflectionUserAttribute*)(x);
@@ -123,7 +123,7 @@ SlangReflectionUserAttribute* findUserAttributeByName(Session* session, Decl* de
 SlangReflectionUserAttribute* getUserAttributeByIndex(Decl* decl, unsigned int index)
 {
     unsigned int id = 0;
-    for (auto x : decl->GetModifiersOfType<UserDefinedAttribute>())
+    for (auto x : decl->getModifiersOfType<UserDefinedAttribute>())
     {
         if (id == index)
             return convert(x);
@@ -339,7 +339,7 @@ SLANG_API size_t spReflectionType_GetElementCount(SlangReflectionType* inType)
 
     if(auto arrayType = as<ArrayExpressionType>(type))
     {
-        return arrayType->ArrayLength ? (size_t) GetIntVal(arrayType->ArrayLength) : 0;
+        return arrayType->arrayLength ? (size_t) GetIntVal(arrayType->arrayLength) : 0;
     }
     else if( auto vectorType = as<VectorExpressionType>(type))
     {
@@ -579,7 +579,7 @@ SLANG_API char const* spReflectionType_GetName(SlangReflectionType* inType)
         // Don't return a name for auto-generated anonymous types
         // that represent `cbuffer` members, etc.
         auto decl = declRef.getDecl();
-        if(decl->HasModifier<ImplicitParameterGroupElementTypeModifier>())
+        if(decl->hasModifier<ImplicitParameterGroupElementTypeModifier>())
             return nullptr;
 
         return getText(declRef.GetName()).begin();
@@ -943,7 +943,7 @@ SLANG_API char const* spReflectionVariable_GetName(SlangReflectionVariable* inVa
 
     // If the variable is one that has an "external" name that is supposed
     // to be exposed for reflection, then report it here
-    if(auto reflectionNameMod = var->FindModifier<ParameterGroupReflectionName>())
+    if(auto reflectionNameMod = var->findModifier<ParameterGroupReflectionName>())
         return getText(reflectionNameMod->nameAndLoc.name).getBuffer();
 
     return getText(var->getName()).getBuffer();
@@ -966,7 +966,7 @@ SLANG_API SlangReflectionModifier* spReflectionVariable_FindModifier(SlangReflec
     switch( modifierID )
     {
     case SLANG_MODIFIER_SHARED:
-        modifier = var->FindModifier<HLSLEffectSharedModifier>();
+        modifier = var->findModifier<HLSLEffectSharedModifier>();
         break;
 
     default:
@@ -1294,7 +1294,7 @@ SLANG_API void spReflectionEntryPoint_getComputeThreadGroupSize(
     SlangUInt sizeAlongAxis[3] = { 1, 1, 1 };
 
     // First look for the HLSL case, where we have an attribute attached to the entry point function
-    auto numThreadsAttribute = entryPointFunc.getDecl()->FindModifier<NumThreadsAttribute>();
+    auto numThreadsAttribute = entryPointFunc.getDecl()->findModifier<NumThreadsAttribute>();
     if (numThreadsAttribute)
     {
         sizeAlongAxis[0] = numThreadsAttribute->x;

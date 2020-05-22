@@ -933,7 +933,7 @@ struct IRResourceTypeBase : IRType
 
     TextureFlavor::Shape GetBaseShape() const
     {
-        return getFlavor().GetBaseShape();
+        return getFlavor().getBaseShape();
     }
     bool isMultisample() const { return getFlavor().isMultisample(); }
     bool isArray() const { return getFlavor().isArray(); }
