@@ -981,17 +981,7 @@ namespace Slang
         RefPtr<Type> type;
 
         bool equals(Type* other);
-#if 0
-        {
-            return type->Equals(other);
-        }
-#endif
-        bool equals(RefPtr<Type> other);
-#if 0
-        {
-            return type->Equals(other.Ptr());
-        }
-#endif
+
         Type* Ptr() { return type.Ptr(); }
         operator Type*()
         {
@@ -999,7 +989,7 @@ namespace Slang
         }
         Type* operator->() { return Ptr(); }
 
-        TypeExp Accept(SyntaxVisitor* visitor);
+        //TypeExp accept(SyntaxVisitor* visitor);
 
             /// A global immutable TypeExp, that has no type or exp set.
         static const TypeExp empty;

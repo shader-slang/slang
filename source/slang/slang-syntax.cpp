@@ -59,7 +59,7 @@ bool BasicExpressionType::equalsImpl(Type * type)
     return basicType && basicType->baseType == this->baseType;
 }
 
-RefPtr<Type> BasicExpressionType::CreateCanonicalType()
+RefPtr<Type> BasicExpressionType::createCanonicalType()
 {
     // A basic type is already canonical, in our setup
     return this;
@@ -213,11 +213,6 @@ Index getFilterCountImpl(const ReflectClassInfo& clsInfo, MemberFilterStyle filt
         return type->equals(other);
     }
 
-    bool TypeExp::equals(RefPtr<Type> other)
-    {
-        return type->equals(other.Ptr());
-    }
-
     // BasicExpressionType
 
     BasicExpressionType* BasicExpressionType::GetScalarType()
@@ -270,7 +265,7 @@ Index getFilterCountImpl(const ReflectClassInfo& clsInfo, MemberFilterStyle filt
         if (!et->canonicalType)
         {
             // TODO(tfoley): worry about thread safety here?
-            auto canType = et->CreateCanonicalType();
+            auto canType = et->createCanonicalType();
             et->canonicalType = canType;
 
             // TODO(js): That this detachs when canType == this is a little surprising. It would seem
@@ -471,7 +466,7 @@ Index getFilterCountImpl(const ReflectClassInfo& clsInfo, MemberFilterStyle filt
         return this;
     }
 
-    RefPtr<Type> ArrayExpressionType::CreateCanonicalType()
+    RefPtr<Type> ArrayExpressionType::createCanonicalType()
     {
         auto canonicalElementType = baseType->getCanonicalType();
         auto canonicalArrayType = getArrayType(
@@ -515,7 +510,7 @@ Index getFilterCountImpl(const ReflectClassInfo& clsInfo, MemberFilterStyle filt
         return false;
     }
 
-    RefPtr<Type> DeclRefType::CreateCanonicalType()
+    RefPtr<Type> DeclRefType::createCanonicalType()
     {
         // A declaration reference is already canonical
         return this;
@@ -1038,7 +1033,7 @@ Index getFilterCountImpl(const ReflectClassInfo& clsInfo, MemberFilterStyle filt
         return false;
     }
 
-    RefPtr<Type> OverloadGroupType::CreateCanonicalType()
+    RefPtr<Type> OverloadGroupType::createCanonicalType()
     {
         return this;
     }
@@ -1060,7 +1055,7 @@ Index getFilterCountImpl(const ReflectClassInfo& clsInfo, MemberFilterStyle filt
         return false;
     }
 
-    RefPtr<Type> InitializerListType::CreateCanonicalType()
+    RefPtr<Type> InitializerListType::createCanonicalType()
     {
         return this;
     }
@@ -1084,7 +1079,7 @@ Index getFilterCountImpl(const ReflectClassInfo& clsInfo, MemberFilterStyle filt
         return false;
     }
 
-    RefPtr<Type> ErrorType::CreateCanonicalType()
+    RefPtr<Type> ErrorType::createCanonicalType()
     {
         return this;
     }
@@ -1113,7 +1108,7 @@ Index getFilterCountImpl(const ReflectClassInfo& clsInfo, MemberFilterStyle filt
         UNREACHABLE_RETURN(false);
     }
 
-    RefPtr<Type> NamedExpressionType::CreateCanonicalType()
+    RefPtr<Type> NamedExpressionType::createCanonicalType()
     {
         if (!innerType)
             innerType = GetType(declRef);
@@ -1205,7 +1200,7 @@ Index getFilterCountImpl(const ReflectClassInfo& clsInfo, MemberFilterStyle filt
         return substType;
     }
 
-    RefPtr<Type> FuncType::CreateCanonicalType()
+    RefPtr<Type> FuncType::createCanonicalType()
     {
         // result type
         RefPtr<Type> canResultType = resultType->getCanonicalType();
@@ -1257,7 +1252,7 @@ Index getFilterCountImpl(const ReflectClassInfo& clsInfo, MemberFilterStyle filt
         return false;
     }
 
-    RefPtr<Type> TypeType::CreateCanonicalType()
+    RefPtr<Type> TypeType::createCanonicalType()
     {
         auto canType = getTypeType(type->getCanonicalType());
         return canType;
@@ -1291,7 +1286,7 @@ Index getFilterCountImpl(const ReflectClassInfo& clsInfo, MemberFilterStyle filt
         return declRef.getHashCode();
     }
 
-    RefPtr<Type> GenericDeclRefType::CreateCanonicalType()
+    RefPtr<Type> GenericDeclRefType::createCanonicalType()
     {
         return this;
     }
@@ -1320,7 +1315,7 @@ Index getFilterCountImpl(const ReflectClassInfo& clsInfo, MemberFilterStyle filt
         return declRef.getHashCode();
     }
 
-    RefPtr<Type> NamespaceType::CreateCanonicalType()
+    RefPtr<Type> NamespaceType::createCanonicalType()
     {
         return this;
     }
@@ -2695,7 +2690,7 @@ Index getFilterCountImpl(const ReflectClassInfo& clsInfo, MemberFilterStyle filt
         return declRef.getHashCode();
     }
 
-    RefPtr<Type> ExtractExistentialType::CreateCanonicalType()
+    RefPtr<Type> ExtractExistentialType::createCanonicalType()
     {
         return this;
     }
@@ -2807,7 +2802,7 @@ Index getFilterCountImpl(const ReflectClassInfo& clsInfo, MemberFilterStyle filt
         return hashCode;
     }
 
-    RefPtr<Type> TaggedUnionType::CreateCanonicalType()
+    RefPtr<Type> TaggedUnionType::createCanonicalType()
     {
         RefPtr<TaggedUnionType> canType = new TaggedUnionType();
         canType->setSession(getSession());
@@ -3030,7 +3025,7 @@ RefPtr<Val> getCanonicalValue(Val* val)
     return val;
 }
 
-RefPtr<Type> ExistentialSpecializedType::CreateCanonicalType()
+RefPtr<Type> ExistentialSpecializedType::createCanonicalType()
 {
     RefPtr<ExistentialSpecializedType> canType = new ExistentialSpecializedType();
     canType->setSession(getSession());
@@ -3110,7 +3105,7 @@ HashCode ThisType::getHashCode()
         interfaceDeclRef.getHashCode());
 }
 
-RefPtr<Type> ThisType::CreateCanonicalType()
+RefPtr<Type> ThisType::createCanonicalType()
 {
     RefPtr<ThisType> canType = new ThisType();
     canType->setSession(getSession());

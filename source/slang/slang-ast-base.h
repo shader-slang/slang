@@ -141,7 +141,7 @@ public:
 protected:
     virtual bool equalsImpl(Type* type) = 0;
 
-    virtual RefPtr<Type> CreateCanonicalType() = 0;
+    virtual RefPtr<Type> createCanonicalType() = 0;
     Type* canonicalType = nullptr;
 
     SLANG_UNREFLECTED
