@@ -637,7 +637,7 @@ RiffHashCode RiffContainer::DataChunk::calcHash() const
     Data* data = m_dataList;
     while (data)
     {
-        // This is a little contrived (in that we don't use the function GetHashCode), but the
+        // This is a little contrived (in that we don't use the function getHashCode), but the
         // reason to be careful is we want the same result however many Data blocks there are.
         const char* buffer = (const char*)data->getPayload();
         const size_t size = data->getSize();

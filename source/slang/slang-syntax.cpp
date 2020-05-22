@@ -479,12 +479,12 @@ Index getFilterCountImpl(const ReflectClassInfo& clsInfo, MemberFilterStyle filt
             arrayLength);
         return canonicalArrayType;
     }
-    HashCode ArrayExpressionType::GetHashCode()
+    HashCode ArrayExpressionType::getHashCode()
     {
         if (arrayLength)
-            return (baseType->GetHashCode() * 16777619) ^ arrayLength->GetHashCode();
+            return (baseType->getHashCode() * 16777619) ^ arrayLength->getHashCode();
         else
-            return baseType->GetHashCode();
+            return baseType->getHashCode();
     }
     Slang::String ArrayExpressionType::toString()
     {
@@ -501,9 +501,9 @@ Index getFilterCountImpl(const ReflectClassInfo& clsInfo, MemberFilterStyle filt
         return declRef.toString();
     }
 
-    HashCode DeclRefType::GetHashCode()
+    HashCode DeclRefType::getHashCode()
     {
-        return (declRef.GetHashCode() * 16777619) ^ (HashCode)(typeid(this).hash_code());
+        return (declRef.getHashCode() * 16777619) ^ (HashCode)(typeid(this).hash_code());
     }
 
     bool DeclRefType::equalsImpl(Type * type)
@@ -1043,7 +1043,7 @@ Index getFilterCountImpl(const ReflectClassInfo& clsInfo, MemberFilterStyle filt
         return this;
     }
 
-    HashCode OverloadGroupType::GetHashCode()
+    HashCode OverloadGroupType::getHashCode()
     {
         return (HashCode)(size_t(this));
     }
@@ -1065,7 +1065,7 @@ Index getFilterCountImpl(const ReflectClassInfo& clsInfo, MemberFilterStyle filt
         return this;
     }
 
-    HashCode InitializerListType::GetHashCode()
+    HashCode InitializerListType::getHashCode()
     {
         return (HashCode)(size_t(this));
     }
@@ -1094,7 +1094,7 @@ Index getFilterCountImpl(const ReflectClassInfo& clsInfo, MemberFilterStyle filt
         return this;
     }
 
-    HashCode ErrorType::GetHashCode()
+    HashCode ErrorType::getHashCode()
     {
         return HashCode(size_t(this));
     }
@@ -1120,18 +1120,18 @@ Index getFilterCountImpl(const ReflectClassInfo& clsInfo, MemberFilterStyle filt
         return innerType->getCanonicalType();
     }
 
-    HashCode NamedExpressionType::GetHashCode()
+    HashCode NamedExpressionType::getHashCode()
     {
         // Type equality is based on comparing canonical types,
         // so the hash code for a type needs to come from the
         // canonical version of the type. This really means
-        // that `Type::GetHashCode()` should dispatch out to
-        // something like `Type::GetHashCodeImpl()` on the
+        // that `Type::getHashCode()` should dispatch out to
+        // something like `Type::getHashCodeImpl()` on the
         // canonical version of a type, but it is less invasive
         // for now (and hopefully equivalent) to just have any
         // named types automaticlaly route hash-code requests
         // to their canonical type.
-        return getCanonicalType()->GetHashCode();
+        return getCanonicalType()->getHashCode();
     }
 
     // FuncType
@@ -1225,16 +1225,16 @@ Index getFilterCountImpl(const ReflectClassInfo& clsInfo, MemberFilterStyle filt
         return canType;
     }
 
-    HashCode FuncType::GetHashCode()
+    HashCode FuncType::getHashCode()
     {
-        HashCode hashCode = getResultType()->GetHashCode();
+        HashCode hashCode = getResultType()->getHashCode();
         UInt paramCount = getParamCount();
-        hashCode = combineHash(hashCode, Slang::GetHashCode(paramCount));
+        hashCode = combineHash(hashCode, Slang::getHashCode(paramCount));
         for (UInt pp = 0; pp < paramCount; ++pp)
         {
             hashCode = combineHash(
                 hashCode,
-                getParamType(pp)->GetHashCode());
+                getParamType(pp)->getHashCode());
         }
         return hashCode;
     }
@@ -1263,7 +1263,7 @@ Index getFilterCountImpl(const ReflectClassInfo& clsInfo, MemberFilterStyle filt
         return canType;
     }
 
-    HashCode TypeType::GetHashCode()
+    HashCode TypeType::getHashCode()
     {
         SLANG_UNEXPECTED("unreachable");
         UNREACHABLE_RETURN(0);
@@ -1286,9 +1286,9 @@ Index getFilterCountImpl(const ReflectClassInfo& clsInfo, MemberFilterStyle filt
         return false;
     }
 
-    HashCode GenericDeclRefType::GetHashCode()
+    HashCode GenericDeclRefType::getHashCode()
     {
-        return declRef.GetHashCode();
+        return declRef.getHashCode();
     }
 
     RefPtr<Type> GenericDeclRefType::CreateCanonicalType()
@@ -1315,9 +1315,9 @@ Index getFilterCountImpl(const ReflectClassInfo& clsInfo, MemberFilterStyle filt
         return false;
     }
 
-    HashCode NamespaceType::GetHashCode()
+    HashCode NamespaceType::getHashCode()
     {
-        return declRef.GetHashCode();
+        return declRef.getHashCode();
     }
 
     RefPtr<Type> NamespaceType::CreateCanonicalType()
@@ -1435,9 +1435,9 @@ Index getFilterCountImpl(const ReflectClassInfo& clsInfo, MemberFilterStyle filt
         return getText(declRef.GetName());
     }
 
-    HashCode GenericParamIntVal::GetHashCode()
+    HashCode GenericParamIntVal::getHashCode()
     {
-        return declRef.GetHashCode() ^ HashCode(0xFFFF);
+        return declRef.getHashCode() ^ HashCode(0xFFFF);
     }
 
     RefPtr<Val> GenericParamIntVal::substituteImpl(SubstitutionSet subst, int* ioDiff)
@@ -1498,7 +1498,7 @@ Index getFilterCountImpl(const ReflectClassInfo& clsInfo, MemberFilterStyle filt
         return "<error>";
     }
 
-    HashCode ErrorIntVal::GetHashCode()
+    HashCode ErrorIntVal::getHashCode()
     {
         return HashCode(typeid(this).hash_code());
     }
@@ -1609,9 +1609,9 @@ Index getFilterCountImpl(const ReflectClassInfo& clsInfo, MemberFilterStyle filt
         return false;
     }
 
-    HashCode ThisTypeSubstitution::GetHashCode() const
+    HashCode ThisTypeSubstitution::getHashCode() const
     {
-        return witness->GetHashCode();
+        return witness->getHashCode();
     }
 
     RefPtr<Substitutions> GlobalGenericParamSubstitution::applySubstitutionsShallow(SubstitutionSet substSet, RefPtr<Substitutions> substOuter, int* ioDiff)
@@ -2136,9 +2136,9 @@ Index getFilterCountImpl(const ReflectClassInfo& clsInfo, MemberFilterStyle filt
         return DeclRefBase(parentDecl, substToApply);
     }
 
-    HashCode DeclRefBase::GetHashCode() const
+    HashCode DeclRefBase::getHashCode() const
     {
-        return combineHash(PointerHash<1>::GetHashCode(decl), substitutions.GetHashCode());
+        return combineHash(PointerHash<1>::getHashCode(decl), substitutions.getHashCode());
     }
 
     // Val
@@ -2182,7 +2182,7 @@ Index getFilterCountImpl(const ReflectClassInfo& clsInfo, MemberFilterStyle filt
         return String(value);
     }
 
-    HashCode ConstantIntVal::GetHashCode()
+    HashCode ConstantIntVal::getHashCode()
     {
         return (HashCode) value;
     }
@@ -2387,9 +2387,9 @@ Index getFilterCountImpl(const ReflectClassInfo& clsInfo, MemberFilterStyle filt
         return "TypeEqualityWitness(" + sub->toString() + ")";
     }
 
-    HashCode TypeEqualityWitness::GetHashCode()
+    HashCode TypeEqualityWitness::getHashCode()
     {
-        return sub->GetHashCode();
+        return sub->getHashCode();
     }
 
     bool DeclaredSubtypeWitness::equalsVal(Val* val)
@@ -2554,9 +2554,9 @@ Index getFilterCountImpl(const ReflectClassInfo& clsInfo, MemberFilterStyle filt
         return sb.ProduceString();
     }
 
-    HashCode DeclaredSubtypeWitness::GetHashCode()
+    HashCode DeclaredSubtypeWitness::getHashCode()
     {
-        return declRef.GetHashCode();
+        return declRef.getHashCode();
     }
 
     // TransitiveSubtypeWitness
@@ -2628,12 +2628,12 @@ Index getFilterCountImpl(const ReflectClassInfo& clsInfo, MemberFilterStyle filt
         return sb.ProduceString();
     }
 
-    HashCode TransitiveSubtypeWitness::GetHashCode()
+    HashCode TransitiveSubtypeWitness::getHashCode()
     {
-        auto hash = sub->GetHashCode();
-        hash = combineHash(hash, sup->GetHashCode());
-        hash = combineHash(hash, subToMid->GetHashCode());
-        hash = combineHash(hash, midToSup.GetHashCode());
+        auto hash = sub->getHashCode();
+        hash = combineHash(hash, sup->getHashCode());
+        hash = combineHash(hash, subToMid->getHashCode());
+        hash = combineHash(hash, midToSup.getHashCode());
         return hash;
     }
 
@@ -2663,11 +2663,11 @@ Index getFilterCountImpl(const ReflectClassInfo& clsInfo, MemberFilterStyle filt
         return substitutions->equals(substSet.substitutions);
     }
 
-    HashCode SubstitutionSet::GetHashCode() const
+    HashCode SubstitutionSet::getHashCode() const
     {
         HashCode rs = 0;
         if (substitutions)
-            rs = combineHash(rs, substitutions->GetHashCode());
+            rs = combineHash(rs, substitutions->getHashCode());
         return rs;
     }
 
@@ -2690,9 +2690,9 @@ Index getFilterCountImpl(const ReflectClassInfo& clsInfo, MemberFilterStyle filt
         return false;
     }
 
-    HashCode ExtractExistentialType::GetHashCode()
+    HashCode ExtractExistentialType::getHashCode()
     {
-        return declRef.GetHashCode();
+        return declRef.getHashCode();
     }
 
     RefPtr<Type> ExtractExistentialType::CreateCanonicalType()
@@ -2734,9 +2734,9 @@ Index getFilterCountImpl(const ReflectClassInfo& clsInfo, MemberFilterStyle filt
         return result;
     }
 
-    HashCode ExtractExistentialSubtypeWitness::GetHashCode()
+    HashCode ExtractExistentialSubtypeWitness::getHashCode()
     {
-        return declRef.GetHashCode();
+        return declRef.getHashCode();
     }
 
     RefPtr<Val> ExtractExistentialSubtypeWitness::substituteImpl(SubstitutionSet subst, int* ioDiff)
@@ -2797,12 +2797,12 @@ Index getFilterCountImpl(const ReflectClassInfo& clsInfo, MemberFilterStyle filt
         return true;
     }
 
-    HashCode TaggedUnionType::GetHashCode()
+    HashCode TaggedUnionType::getHashCode()
     {
         HashCode hashCode = 0;
         for( auto caseType : caseTypes )
         {
-            hashCode = combineHash(hashCode, caseType->GetHashCode());
+            hashCode = combineHash(hashCode, caseType->getHashCode());
         }
         return hashCode;
     }
@@ -2880,12 +2880,12 @@ String TaggedUnionSubtypeWitness::toString()
     return result;
 }
 
-HashCode TaggedUnionSubtypeWitness::GetHashCode()
+HashCode TaggedUnionSubtypeWitness::getHashCode()
 {
     HashCode hash = 0;
     for( auto caseWitness : caseWitnesses )
     {
-        hash = combineHash(hash, caseWitness->GetHashCode());
+        hash = combineHash(hash, caseWitness->getHashCode());
     }
     return hash;
 }
@@ -3004,7 +3004,7 @@ bool ExistentialSpecializedType::equalsImpl(Type * type)
     return true;
 }
 
-HashCode ExistentialSpecializedType::GetHashCode()
+HashCode ExistentialSpecializedType::getHashCode()
 {
     Hasher hasher;
     hasher.hashObject(baseType);
@@ -3103,11 +3103,11 @@ bool ThisType::equalsImpl(Type * type)
     return true;
 }
 
-HashCode ThisType::GetHashCode()
+HashCode ThisType::getHashCode()
 {
     return combineHash(
         HashCode(typeid(*this).hash_code()),
-        interfaceDeclRef.GetHashCode());
+        interfaceDeclRef.getHashCode());
 }
 
 RefPtr<Type> ThisType::CreateCanonicalType()

@@ -54,11 +54,11 @@ namespace Slang
 			Value = that.Value;
 			return *this;
 		}
-		HashCode GetHashCode()
+		HashCode getHashCode()
 		{
             return combineHash(
-                Slang::GetHashCode(Key),
-                Slang::GetHashCode(Value));
+                Slang::getHashCode(Key),
+                Slang::getHashCode(Value));
 		}
         bool operator==(const KeyValuePair<TKey, TValue>& that) const
         {
@@ -139,7 +139,7 @@ namespace Slang
             // TODO(JS): We probably want a function to convert a Hash to types of integrals
             // because it's size could vary - say on pointer width.
             // Note here, the multiply is performed, on unsigned int size 
-			return int((((unsigned int)GetHashCode(key)) * 2654435761) % bucketSizeMinusOne);
+			return int((((unsigned int)getHashCode(key)) * 2654435761) % bucketSizeMinusOne);
 		}
 		FindPositionResult FindPosition(const TKey& key) const
 		{
@@ -169,7 +169,7 @@ namespace Slang
 			}
 			if (insertPos != -1)
 				return FindPositionResult(-1, insertPos);
-			throw InvalidOperationException("Hash map is full. This indicates an error in Key::Equal or Key::GetHashCode.");
+			throw InvalidOperationException("Hash map is full. This indicates an error in Key::Equal or Key::getHashCode.");
 		}
 		TValue & _Insert(KeyValuePair<TKey, TValue>&& kvPair, int pos)
 		{

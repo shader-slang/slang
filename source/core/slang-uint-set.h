@@ -25,7 +25,7 @@ public:
     UIntSet& operator=(UIntSet&& other);
     UIntSet& operator=(const UIntSet& other);
 
-    HashCode GetHashCode();
+    HashCode getHashCode();
 
         /// Return the count of all bits directly represented
     Int getCount() const { return Int(m_buffer.getCount()) * kElementSize; }

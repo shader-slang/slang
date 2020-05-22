@@ -21,24 +21,24 @@ namespace Slang
     SLANG_FORCE_INLINE HashCode32 toHash32(HashCode value) { return (sizeof(HashCode) == sizeof(int64_t)) ? (HashCode32(uint64_t(value) >> 32) ^ HashCode(value)) : HashCode32(value); }
     SLANG_FORCE_INLINE HashCode64 toHash64(HashCode value) { return (sizeof(HashCode) == sizeof(int64_t)) ? HashCode(value) : ((HashCode64(value) << 32) | value); }
 
-    SLANG_FORCE_INLINE HashCode GetHashCode(int64_t value)
+    SLANG_FORCE_INLINE HashCode getHashCode(int64_t value)
     {
         return (sizeof(HashCode) == sizeof(int64_t)) ? HashCode(value) : (HashCode(uint64_t(value) >> 32) ^ HashCode(value));
     }
-    SLANG_FORCE_INLINE HashCode GetHashCode(uint64_t value)
+    SLANG_FORCE_INLINE HashCode getHashCode(uint64_t value)
     {
         return (sizeof(HashCode) == sizeof(uint64_t)) ? HashCode(value) : (HashCode(value >> 32) ^ HashCode(value));
     }
 
-	inline HashCode GetHashCode(double key)
+	inline HashCode getHashCode(double key)
 	{
-		return GetHashCode(DoubleAsInt64(key));
+		return getHashCode(DoubleAsInt64(key));
 	}
-	inline HashCode GetHashCode(float key)
+	inline HashCode getHashCode(float key)
 	{
 		return FloatAsInt(key);
 	} 
-	inline HashCode GetHashCode(const char* buffer)
+	inline HashCode getHashCode(const char* buffer)
 	{
 		if (!buffer)
 			return 0;
@@ -52,11 +52,11 @@ namespace Slang
 		}
 		return hash;
 	} 
-	inline HashCode GetHashCode(char* buffer)
+	inline HashCode getHashCode(char* buffer)
 	{
-		return GetHashCode(const_cast<const char *>(buffer));
+		return getHashCode(const_cast<const char *>(buffer));
 	}
-    inline HashCode GetHashCode(const char* buffer, size_t numChars)
+    inline HashCode getHashCode(const char* buffer, size_t numChars)
     {
         HashCode hash = 0;
         for (size_t i = 0; i < numChars; ++i)
@@ -101,7 +101,7 @@ namespace Slang
     // TODO(JS): We might want to implement HashCode as just an alias a suitable Hash32/Hash32 based on target.
     // For now just use Stable for 64bit.
     SLANG_FORCE_INLINE HashCode64 getHashCode64(const char* buffer, size_t numChars) { return getStableHashCode64(buffer, numChars); }
-    SLANG_FORCE_INLINE HashCode32 getHashCode32(const char* buffer, size_t numChars) { return toHash32(GetHashCode(buffer, numChars)); }
+    SLANG_FORCE_INLINE HashCode32 getHashCode32(const char* buffer, size_t numChars) { return toHash32(getHashCode(buffer, numChars)); }
 
 	template<int IsInt>
 	class Hash
@@ -113,7 +113,7 @@ namespace Slang
 	{
 	public:
 		template<typename TKey>
-		static HashCode GetHashCode(TKey& key)
+		static HashCode getHashCode(TKey& key)
 		{
 			return (HashCode)key;
 		}
@@ -123,9 +123,9 @@ namespace Slang
 	{
 	public:
 		template<typename TKey>
-		static HashCode GetHashCode(TKey& key)
+		static HashCode getHashCode(TKey& key)
 		{
-			return HashCode(key.GetHashCode());
+			return HashCode(key.getHashCode());
 		}
 	};
 	template<int IsPointer>
@@ -136,7 +136,7 @@ namespace Slang
 	{
 	public:
 		template<typename TKey>
-		static HashCode GetHashCode(TKey const& key)
+		static HashCode getHashCode(TKey const& key)
 		{
 			return (HashCode)((PtrInt)key) / 16; // sizeof(typename std::remove_pointer<TKey>::type);
 		}
@@ -146,22 +146,22 @@ namespace Slang
 	{
 	public:
 		template<typename TKey>
-		static HashCode GetHashCode(TKey& key)
+		static HashCode getHashCode(TKey& key)
 		{
-			return Hash<std::is_integral<TKey>::value || std::is_enum<TKey>::value>::GetHashCode(key);
+			return Hash<std::is_integral<TKey>::value || std::is_enum<TKey>::value>::getHashCode(key);
 		}
 	};
 
 	template<typename TKey>
-	HashCode GetHashCode(const TKey& key)
+	HashCode getHashCode(const TKey& key)
 	{
-		return PointerHash<std::is_pointer<TKey>::value>::GetHashCode(key);
+		return PointerHash<std::is_pointer<TKey>::value>::getHashCode(key);
 	}
 
 	template<typename TKey>
-	HashCode GetHashCode(TKey& key)
+	HashCode getHashCode(TKey& key)
 	{
-		return PointerHash<std::is_pointer<TKey>::value>::GetHashCode(key);
+		return PointerHash<std::is_pointer<TKey>::value>::getHashCode(key);
 	}
 
     inline HashCode combineHash(HashCode left, HashCode right)
@@ -177,13 +177,13 @@ namespace Slang
         template<typename T>
         void hashValue(T const& value)
         {
-            m_hashCode = combineHash(m_hashCode, GetHashCode(value));
+            m_hashCode = combineHash(m_hashCode, getHashCode(value));
         }
 
         template<typename T>
         void hashObject(T const& object)
         {
-            m_hashCode = combineHash(m_hashCode, object->GetHashCode());
+            m_hashCode = combineHash(m_hashCode, object->getHashCode());
         }
 
         HashCode getResult() const

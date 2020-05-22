@@ -299,13 +299,13 @@ bool IRSimpleSpecializationKey::operator==(IRSimpleSpecializationKey const& othe
     return true;
 }
 
-HashCode IRSimpleSpecializationKey::GetHashCode() const
+HashCode IRSimpleSpecializationKey::getHashCode() const
 {
     auto valCount = vals.getCount();
-    HashCode hash = Slang::GetHashCode(valCount);
+    HashCode hash = Slang::getHashCode(valCount);
     for( Index ii = 0; ii < valCount; ++ii )
     {
-        hash = combineHash(hash, Slang::GetHashCode(vals[ii]));
+        hash = combineHash(hash, Slang::getHashCode(vals[ii]));
     }
     return hash;
 }

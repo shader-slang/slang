@@ -119,7 +119,7 @@ struct HLSLIntrinsic
         return isTypeScalar(returnType);
     }
 
-    HashCode GetHashCode() const { return combineHash(int(op), combineHash(Slang::GetHashCode(returnType), Slang::GetHashCode(signatureType))); }
+    HashCode getHashCode() const { return combineHash(int(op), combineHash(Slang::getHashCode(returnType), Slang::getHashCode(signatureType))); }
 
     static const Info& getInfo(Op op) { return s_operationInfos[Index(op)]; }
     static const Info s_operationInfos[];
@@ -134,7 +134,7 @@ struct HLSLIntrinsicRef
 {
     typedef HLSLIntrinsicRef ThisType;
 
-    HashCode GetHashCode() const { return m_intrinsic->GetHashCode(); }
+    HashCode getHashCode() const { return m_intrinsic->getHashCode(); }
     bool operator==(const ThisType& rhs) const { return m_intrinsic == rhs.m_intrinsic || (*m_intrinsic == *rhs.m_intrinsic); }
     bool operator!=(const ThisType& rhs) const { return !(*this == rhs); }
 

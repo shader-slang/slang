@@ -607,7 +607,7 @@ namespace Slang
         {
         }
         bool Equals(const SubstitutionSet& substSet) const;
-        HashCode GetHashCode() const;
+        HashCode getHashCode() const;
     };
 
     template<typename T>
@@ -674,7 +674,7 @@ namespace Slang
         SourceLoc getLoc() const;
         DeclRefBase GetParent() const;
 
-        HashCode GetHashCode() const;
+        HashCode getHashCode() const;
 
         // Debugging:
         String toString() const;

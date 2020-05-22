@@ -19,7 +19,7 @@ public:
 protected:
     virtual bool equalsImpl(Type * type) override;
     virtual RefPtr<Type> CreateCanonicalType() override;
-    virtual HashCode GetHashCode() override;
+    virtual HashCode getHashCode() override;
 };
 
 // The type of an initializer-list expression (before it has
@@ -33,7 +33,7 @@ class InitializerListType : public Type
 protected:
     virtual bool equalsImpl(Type * type) override;
     virtual RefPtr<Type> CreateCanonicalType() override;
-    virtual HashCode GetHashCode() override;
+    virtual HashCode getHashCode() override;
 };
 
 // The type of an expression that was erroneous
@@ -48,7 +48,7 @@ protected:
     virtual bool equalsImpl(Type * type) override;
     virtual RefPtr<Val> substituteImpl(SubstitutionSet subst, int* ioDiff) override;
     virtual RefPtr<Type> CreateCanonicalType() override;
-    virtual HashCode GetHashCode() override;
+    virtual HashCode getHashCode() override;
 };
 
 // A type that takes the form of a reference to some declaration
@@ -72,7 +72,7 @@ class DeclRefType : public Type
         : declRef(declRef)
     {}
 protected:
-    virtual HashCode GetHashCode() override;
+    virtual HashCode getHashCode() override;
     virtual bool equalsImpl(Type * type) override;
     virtual RefPtr<Type> CreateCanonicalType() override;
 };
@@ -399,7 +399,7 @@ protected:
     virtual bool equalsImpl(Type * type) override;
     virtual RefPtr<Type> CreateCanonicalType() override;
     virtual RefPtr<Val> substituteImpl(SubstitutionSet subst, int* ioDiff) override;
-    virtual HashCode GetHashCode() override;
+    virtual HashCode getHashCode() override;
 };
 
 // The "type" of an expression that resolves to a type.
@@ -424,7 +424,7 @@ public:
 protected:
     virtual bool equalsImpl(Type * type) override;
     virtual RefPtr<Type> CreateCanonicalType() override;
-    virtual HashCode GetHashCode() override;
+    virtual HashCode getHashCode() override;
 };
 
 // A vector type, e.g., `vector<T,N>`
@@ -541,7 +541,7 @@ class NamedExpressionType : public Type
 protected:
     virtual bool equalsImpl(Type * type) override;
     virtual RefPtr<Type> CreateCanonicalType() override;
-    virtual HashCode GetHashCode() override;
+    virtual HashCode getHashCode() override;
 };
 
 // A function type is defined by its parameter types
@@ -571,7 +571,7 @@ protected:
     virtual RefPtr<Val> substituteImpl(SubstitutionSet subst, int* ioDiff) override;
     virtual bool equalsImpl(Type * type) override;
     virtual RefPtr<Type> CreateCanonicalType() override;
-    virtual HashCode GetHashCode() override;
+    virtual HashCode getHashCode() override;
 };
 
 // The "type" of an expression that names a generic declaration.
@@ -594,7 +594,7 @@ class GenericDeclRefType : public Type
 
 protected:
     virtual bool equalsImpl(Type * type) override;
-    virtual HashCode GetHashCode() override;
+    virtual HashCode getHashCode() override;
     virtual RefPtr<Type> CreateCanonicalType() override;
 };
 
@@ -614,7 +614,7 @@ class NamespaceType : public Type
 
 protected:
     virtual bool equalsImpl(Type * type) override;
-    virtual HashCode GetHashCode() override;
+    virtual HashCode getHashCode() override;
     virtual RefPtr<Type> CreateCanonicalType() override;    
 };
 
@@ -628,7 +628,7 @@ class ExtractExistentialType : public Type
 
     virtual String toString() override;
     virtual bool equalsImpl(Type * type) override;
-    virtual HashCode GetHashCode() override;
+    virtual HashCode getHashCode() override;
     virtual RefPtr<Type> CreateCanonicalType() override;
     virtual RefPtr<Val> substituteImpl(SubstitutionSet subst, int* ioDiff) override;
 };
@@ -647,7 +647,7 @@ class TaggedUnionType : public Type
 
     virtual String toString() override;
     virtual bool equalsImpl(Type * type) override;
-    virtual HashCode GetHashCode() override;
+    virtual HashCode getHashCode() override;
     virtual RefPtr<Type> CreateCanonicalType() override;
     virtual RefPtr<Val> substituteImpl(SubstitutionSet subst, int* ioDiff) override;
 };
@@ -661,7 +661,7 @@ class ExistentialSpecializedType : public Type
 
     virtual String toString() override;
     virtual bool equalsImpl(Type * type) override;
-    virtual HashCode GetHashCode() override;
+    virtual HashCode getHashCode() override;
     virtual RefPtr<Type> CreateCanonicalType() override;
     virtual RefPtr<Val> substituteImpl(SubstitutionSet subst, int* ioDiff) override;
 };
@@ -675,7 +675,7 @@ class ThisType : public Type
 
     virtual String toString() override;
     virtual bool equalsImpl(Type * type) override;
-    virtual HashCode GetHashCode() override;
+    virtual HashCode getHashCode() override;
     virtual RefPtr<Type> CreateCanonicalType() override;
     virtual RefPtr<Val> substituteImpl(SubstitutionSet subst, int* ioDiff) override;
 

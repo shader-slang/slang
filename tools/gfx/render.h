@@ -21,9 +21,10 @@ namespace gfx {
 using Slang::RefObject;
 using Slang::RefPtr;
 using Slang::Dictionary;
-using Slang::GetHashCode;
-using Slang::combineHash;
 using Slang::List;
+
+using Slang::getHashCode;
+using Slang::combineHash;
 
 typedef SlangResult Result;
 

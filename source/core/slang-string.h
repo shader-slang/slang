@@ -170,9 +170,9 @@ namespace Slang
 
         UnownedStringSlice trim() const;
 
-        HashCode GetHashCode() const
+        HashCode getHashCode() const
         {
-            return Slang::GetHashCode(m_begin, size_t(m_end - m_begin)); 
+            return Slang::getHashCode(m_begin, size_t(m_end - m_begin)); 
         }
 
         template <size_t SIZE> 
@@ -802,9 +802,9 @@ namespace Slang
 			return contains(str.begin());
 		}
 
-		HashCode GetHashCode() const
+		HashCode getHashCode() const
 		{
-			return Slang::GetHashCode(StringRepresentation::asSlice(m_buffer));
+			return Slang::getHashCode(StringRepresentation::asSlice(m_buffer));
 		}
 
         UnownedStringSlice getUnownedSlice() const

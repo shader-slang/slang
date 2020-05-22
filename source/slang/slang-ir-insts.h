@@ -1479,7 +1479,7 @@ struct IRInstKey
 {
     IRInst* inst;
 
-    HashCode GetHashCode();
+    HashCode getHashCode();
 };
 
 bool operator==(IRInstKey const& left, IRInstKey const& right);
@@ -1489,7 +1489,7 @@ struct IRConstantKey
     IRConstant* inst;
 
     bool operator==(const IRConstantKey& rhs) const { return inst->equal(rhs.inst); }
-    HashCode GetHashCode() const { return inst->getHashCode(); }
+    HashCode getHashCode() const { return inst->getHashCode(); }
 };
 
 struct SharedIRBuilder

@@ -154,7 +154,7 @@ public:
     {
         typedef Desc ThisType;
 
-        HashCode GetHashCode() const { return combineHash(HashCode(type), combineHash(HashCode(majorVersion), HashCode(minorVersion))); }
+        HashCode getHashCode() const { return combineHash(HashCode(type), combineHash(HashCode(majorVersion), HashCode(minorVersion))); }
         bool operator==(const ThisType& rhs) const { return type == rhs.type && majorVersion == rhs.majorVersion && minorVersion == rhs.minorVersion;  }
         bool operator!=(const ThisType& rhs) const { return !(*this == rhs); }
 

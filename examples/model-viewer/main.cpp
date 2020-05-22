@@ -1018,13 +1018,13 @@ struct ShaderCache : RefObject
             return true;
         }
 
-        Slang::HashCode GetHashCode() const
+        Slang::HashCode getHashCode() const
         {
-            auto hash = ::GetHashCode(effect);
-            hash = combineHash(hash, ::GetHashCode(parameterBlockCount));
+            auto hash = ::getHashCode(effect);
+            hash = combineHash(hash, ::getHashCode(parameterBlockCount));
             for( UInt ii = 0; ii < parameterBlockCount; ++ii )
             {
-                hash = combineHash(hash, ::GetHashCode(parameterBlockLayouts[ii]));
+                hash = combineHash(hash, ::getHashCode(parameterBlockLayouts[ii]));
             }
             return hash;
         }
