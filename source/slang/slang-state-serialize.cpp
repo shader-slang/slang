@@ -60,7 +60,7 @@ static HashCode32 _calcTypeHash()
     {
         SLANG_STATE_TYPES(SLANG_STATE_TYPE_SIZE)
     };
-    return GetStableHashCode32((const char*)&sizes, sizeof(sizes));
+    return getStableHashCode32((const char*)&sizes, sizeof(sizes));
 }
 
 static HashCode32 _getTypeHash()

@@ -1359,7 +1359,7 @@ bool GLSLSourceEmitter::tryEmitInstExprImpl(IRInst* inst, const EmitOpInfo& inOu
         {
             IRStringLit* lit = cast<IRStringLit>(inst);
             const UnownedStringSlice slice = lit->getStringSlice();
-            m_writer->emit(int32_t(GetStableHashCode32(slice.begin(), slice.getLength())));
+            m_writer->emit(int32_t(getStableHashCode32(slice.begin(), slice.getLength())));
             return true;
         }
         case kIROp_GetStringHash:

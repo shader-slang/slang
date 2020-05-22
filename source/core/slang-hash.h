@@ -18,7 +18,9 @@ namespace Slang
     // A fixed 32bit wide hash on all targets.
     typedef uint32_t HashCode32;
 
-    // TODO(JS): We might want to implement HashCode as just an alias to HashCode32 or HashCode64 based on target.
+    SLANG_FORCE_INLINE HashCode32 toHash32(HashCode value) { return (sizeof(HashCode) == sizeof(int64_t)) ? (HashCode32(uint64_t(value) >> 32) ^ HashCode(value)) : HashCode32(value); }
+    SLANG_FORCE_INLINE HashCode64 toHash64(HashCode value) { return (sizeof(HashCode) == sizeof(int64_t)) ? HashCode(value) : ((HashCode64(value) << 32) | value); }
+
     SLANG_FORCE_INLINE HashCode GetHashCode(int64_t value)
     {
         return (sizeof(HashCode) == sizeof(int64_t)) ? HashCode(value) : (HashCode(uint64_t(value) >> 32) ^ HashCode(value));
@@ -35,7 +37,7 @@ namespace Slang
 	inline HashCode GetHashCode(float key)
 	{
 		return FloatAsInt(key);
-	}
+	} 
 	inline HashCode GetHashCode(const char* buffer)
 	{
 		if (!buffer)
@@ -49,7 +51,7 @@ namespace Slang
 			c = HashCode(*str++);
 		}
 		return hash;
-	}
+	} 
 	inline HashCode GetHashCode(char* buffer)
 	{
 		return GetHashCode(const_cast<const char *>(buffer));
@@ -74,7 +76,7 @@ namespace Slang
 
     In effect this means changing a 'Stable' algorithm will typically require doing a new release. 
     */
-    inline HashCode32 GetStableHashCode32(const char* buffer, size_t numChars)
+    inline HashCode32 getStableHashCode32(const char* buffer, size_t numChars)
     {
         HashCode32 hash = 0;
         for (size_t i = 0; i < numChars; ++i)
@@ -84,7 +86,7 @@ namespace Slang
         return hash;
     }
 
-    inline HashCode64 GetStableHashCode64(const char* buffer, size_t numChars)
+    inline HashCode64 getStableHashCode64(const char* buffer, size_t numChars)
     {
         // Use HashCode64 is assumed unsigned because hash requires wrap around behavior and int is undefined on over/underflows
         HashCode64 hash = 0;
@@ -95,8 +97,11 @@ namespace Slang
         return hash;
     }
 
-    // A 64 bit hash function that can change across platform (for best performance/behavior)
-    SLANG_FORCE_INLINE HashCode64 GetHashCode64(const char* buffer, size_t numChars) { return GetStableHashCode64(buffer, numChars); }
+    // Hash functions with specific sized results
+    // TODO(JS): We might want to implement HashCode as just an alias a suitable Hash32/Hash32 based on target.
+    // For now just use Stable for 64bit.
+    SLANG_FORCE_INLINE HashCode64 getHashCode64(const char* buffer, size_t numChars) { return getStableHashCode64(buffer, numChars); }
+    SLANG_FORCE_INLINE HashCode32 getHashCode32(const char* buffer, size_t numChars) { return toHash32(GetHashCode(buffer, numChars)); }
 
 	template<int IsInt>
 	class Hash

@@ -1571,5 +1571,5 @@ SLANG_API const char* spReflection_getHashedString(
 
 SLANG_API int spComputeStringHash(const char* chars, size_t count)
 {
-    return (int)GetStableHashCode32(chars, count);
+    return (int)getStableHashCode32(chars, count);
 }
