@@ -1363,7 +1363,7 @@ return coerce(typeExp.type, initListExpr);
     {
         RefPtr<MatrixSwizzleExpr> swizExpr = new MatrixSwizzleExpr();
         swizExpr->loc = memberRefExpr->loc;
-        swizExpr->base = memberRefExpr->baseExpression
+        swizExpr->base = memberRefExpr->baseExpression;
 
         int elementIndices[4][2];
         int elementCount = 0;
