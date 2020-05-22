@@ -9,6 +9,8 @@
 namespace Slang
 {
 
+/* static */const TypeExp TypeExp::empty;
+
 // !!!!!!!!!!!!!!!!!!!!!!!!!!!!! DiagnosticSink impls !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 
 void printDiagnosticArg(StringBuilder& sb, Decl* decl)
@@ -18,23 +20,23 @@ void printDiagnosticArg(StringBuilder& sb, Decl* decl)
 
 void printDiagnosticArg(StringBuilder& sb, Type* type)
 {
-    sb << type->ToString();
+    sb << type->toString();
 }
 
 void printDiagnosticArg(StringBuilder& sb, Val* val)
 {
-    sb << val->ToString();
+    sb << val->toString();
 }
 
 void printDiagnosticArg(StringBuilder& sb, TypeExp const& type)
 {
-    sb << type.type->ToString();
+    sb << type.type->toString();
 }
 
 void printDiagnosticArg(StringBuilder& sb, QualType const& type)
 {
     if (type.type)
-        sb << type.type->ToString();
+        sb << type.type->toString();
     else
         sb << "<null>";
 }
@@ -51,7 +53,7 @@ SourceLoc const& getDiagnosticPos(TypeExp const& typeExp)
 
 // !!!!!!!!!!!!!!!!!!!!!!!!!!!!! BasicExpressionType !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 
-bool BasicExpressionType::EqualsImpl(Type * type)
+bool BasicExpressionType::equalsImpl(Type * type)
 {
     auto basicType = as<BasicExpressionType>(type);
     return basicType && basicType->baseType == this->baseType;
@@ -87,7 +89,7 @@ const RefPtr<Decl>* adjustFilterCursorImpl(const ReflectClassInfo& clsInfo, Memb
             for (; ptr != end; ptr++)
             {
                 Decl* decl = *ptr;
-                if (decl->getClassInfo().isSubClassOf(clsInfo) && !decl->HasModifier<HLSLStaticModifier>())
+                if (decl->getClassInfo().isSubClassOf(clsInfo) && !decl->hasModifier<HLSLStaticModifier>())
                 {
                     return ptr;
                 }
@@ -99,7 +101,7 @@ const RefPtr<Decl>* adjustFilterCursorImpl(const ReflectClassInfo& clsInfo, Memb
             for (; ptr != end; ptr++)
             {
                 Decl* decl = *ptr;
-                if (decl->getClassInfo().isSubClassOf(clsInfo) && decl->HasModifier<HLSLStaticModifier>())
+                if (decl->getClassInfo().isSubClassOf(clsInfo) && decl->hasModifier<HLSLStaticModifier>())
                 {
                     return ptr;
                 }
@@ -136,7 +138,7 @@ const RefPtr<Decl>* getFilterCursorByIndexImpl(const ReflectClassInfo& clsInfo, 
             for (; ptr != end; ptr++)
             {
                 Decl* decl = *ptr;
-                if (decl->getClassInfo().isSubClassOf(clsInfo) && !decl->HasModifier<HLSLStaticModifier>())
+                if (decl->getClassInfo().isSubClassOf(clsInfo) && !decl->hasModifier<HLSLStaticModifier>())
                 {
                     if (index <= 0)
                     {
@@ -152,7 +154,7 @@ const RefPtr<Decl>* getFilterCursorByIndexImpl(const ReflectClassInfo& clsInfo, 
             for (; ptr != end; ptr++)
             {
                 Decl* decl = *ptr;
-                if (decl->getClassInfo().isSubClassOf(clsInfo) && decl->HasModifier<HLSLStaticModifier>())
+                if (decl->getClassInfo().isSubClassOf(clsInfo) && decl->hasModifier<HLSLStaticModifier>())
                 {
                     if (index <= 0)
                     {
@@ -187,7 +189,7 @@ Index getFilterCountImpl(const ReflectClassInfo& clsInfo, MemberFilterStyle filt
             for (; ptr != end; ptr++)
             {
                 Decl* decl = *ptr;
-                count += Index(decl->getClassInfo().isSubClassOf(clsInfo)&& !decl->HasModifier<HLSLStaticModifier>());
+                count += Index(decl->getClassInfo().isSubClassOf(clsInfo)&& !decl->hasModifier<HLSLStaticModifier>());
             }
             break;
         }
@@ -196,7 +198,7 @@ Index getFilterCountImpl(const ReflectClassInfo& clsInfo, MemberFilterStyle filt
             for (; ptr != end; ptr++)
             {
                 Decl* decl = *ptr;
-                count += Index(decl->getClassInfo().isSubClassOf(clsInfo) && decl->HasModifier<HLSLStaticModifier>());
+                count += Index(decl->getClassInfo().isSubClassOf(clsInfo) && decl->hasModifier<HLSLStaticModifier>());
             }
             break;
         }
@@ -208,12 +210,12 @@ Index getFilterCountImpl(const ReflectClassInfo& clsInfo, MemberFilterStyle filt
 
     bool TypeExp::Equals(Type* other)
     {
-        return type->Equals(other);
+        return type->equals(other);
     }
 
     bool TypeExp::Equals(RefPtr<Type> other)
     {
-        return type->Equals(other.Ptr());
+        return type->equals(other.Ptr());
     }
 
     // BasicExpressionType
@@ -235,22 +237,22 @@ Index getFilterCountImpl(const ReflectClassInfo& clsInfo, MemberFilterStyle filt
         }
     }
 
-    bool Type::Equals(Type * type)
+    bool Type::equals(Type* type)
     {
-        return GetCanonicalType()->EqualsImpl(type->GetCanonicalType());
+        return getCanonicalType()->equalsImpl(type->getCanonicalType());
     }
 
-    bool Type::EqualsVal(Val* val)
+    bool Type::equalsVal(Val* val)
     {
         if (auto type = dynamicCast<Type>(val))
-            return const_cast<Type*>(this)->Equals(type);
+            return const_cast<Type*>(this)->equals(type);
         return false;
     }
 
-    RefPtr<Val> Type::SubstituteImpl(SubstitutionSet subst, int* ioDiff)
+    RefPtr<Val> Type::substituteImpl(SubstitutionSet subst, int* ioDiff)
     {
         int diff = 0;
-        auto canSubst = GetCanonicalType()->SubstituteImpl(subst, &diff);
+        auto canSubst = getCanonicalType()->substituteImpl(subst, &diff);
 
         // If nothing changed, then don't drop any sugar that is applied
         if (!diff)
@@ -262,7 +264,7 @@ Index getFilterCountImpl(const ReflectClassInfo& clsInfo, MemberFilterStyle filt
         return canSubst;
     }
 
-    Type* Type::GetCanonicalType()
+    Type* Type::getCanonicalType()
     {
         Type* et = const_cast<Type*>(this);
         if (!et->canonicalType)
@@ -429,7 +431,7 @@ Index getFilterCountImpl(const ReflectClassInfo& clsInfo, MemberFilterStyle filt
         RefPtr<ArrayExpressionType> arrayType = new ArrayExpressionType();
         arrayType->setSession(this);
         arrayType->baseType = elementType;
-        arrayType->ArrayLength = elementCount;
+        arrayType->arrayLength = elementCount;
         return arrayType;
     }
 
@@ -444,19 +446,19 @@ Index getFilterCountImpl(const ReflectClassInfo& clsInfo, MemberFilterStyle filt
 
 
 
-    bool ArrayExpressionType::EqualsImpl(Type* type)
+    bool ArrayExpressionType::equalsImpl(Type* type)
     {
         auto arrType = as<ArrayExpressionType>(type);
         if (!arrType)
             return false;
-        return (areValsEqual(ArrayLength, arrType->ArrayLength) && baseType->Equals(arrType->baseType.Ptr()));
+        return (areValsEqual(arrayLength, arrType->arrayLength) && baseType->equals(arrType->baseType.Ptr()));
     }
 
-    RefPtr<Val> ArrayExpressionType::SubstituteImpl(SubstitutionSet subst, int* ioDiff)
+    RefPtr<Val> ArrayExpressionType::substituteImpl(SubstitutionSet subst, int* ioDiff)
     {
         int diff = 0;
-        auto elementType = baseType->SubstituteImpl(subst, &diff).as<Type>();
-        auto arrlen = ArrayLength->SubstituteImpl(subst, &diff).as<IntVal>();
+        auto elementType = baseType->substituteImpl(subst, &diff).as<Type>();
+        auto arrlen = arrayLength->substituteImpl(subst, &diff).as<IntVal>();
         SLANG_ASSERT(arrlen);
         if (diff)
         {
@@ -471,30 +473,30 @@ Index getFilterCountImpl(const ReflectClassInfo& clsInfo, MemberFilterStyle filt
 
     RefPtr<Type> ArrayExpressionType::CreateCanonicalType()
     {
-        auto canonicalElementType = baseType->GetCanonicalType();
+        auto canonicalElementType = baseType->getCanonicalType();
         auto canonicalArrayType = getArrayType(
             canonicalElementType,
-            ArrayLength);
+            arrayLength);
         return canonicalArrayType;
     }
     int ArrayExpressionType::GetHashCode()
     {
-        if (ArrayLength)
-            return (baseType->GetHashCode() * 16777619) ^ ArrayLength->GetHashCode();
+        if (arrayLength)
+            return (baseType->GetHashCode() * 16777619) ^ arrayLength->GetHashCode();
         else
             return baseType->GetHashCode();
     }
-    Slang::String ArrayExpressionType::ToString()
+    Slang::String ArrayExpressionType::toString()
     {
-        if (ArrayLength)
-            return baseType->ToString() + "[" + ArrayLength->ToString() + "]";
+        if (arrayLength)
+            return baseType->toString() + "[" + arrayLength->toString() + "]";
         else
-            return baseType->ToString() + "[]";
+            return baseType->toString() + "[]";
     }
 
     // DeclRefType
 
-    String DeclRefType::ToString()
+    String DeclRefType::toString()
     {
         return declRef.toString();
     }
@@ -504,7 +506,7 @@ Index getFilterCountImpl(const ReflectClassInfo& clsInfo, MemberFilterStyle filt
         return (declRef.GetHashCode() * 16777619) ^ (int)(typeid(this).hash_code());
     }
 
-    bool DeclRefType::EqualsImpl(Type * type)
+    bool DeclRefType::equalsImpl(Type * type)
     {
         if (auto declRefType = as<DeclRefType>(type))
         {
@@ -563,7 +565,7 @@ Index getFilterCountImpl(const ReflectClassInfo& clsInfo, MemberFilterStyle filt
                 SLANG_ASSERT(val);
 
                 return RequirementWitness(
-                    val->Substitute(subst));
+                    val->substitute(subst));
             }
         }
     }
@@ -640,7 +642,7 @@ Index getFilterCountImpl(const ReflectClassInfo& clsInfo, MemberFilterStyle filt
         return RequirementWitness();
     }
 
-    RefPtr<Val> DeclRefType::SubstituteImpl(SubstitutionSet subst, int* ioDiff)
+    RefPtr<Val> DeclRefType::substituteImpl(SubstitutionSet subst, int* ioDiff)
     {
         if (!subst) return this;
 
@@ -658,11 +660,11 @@ Index getFilterCountImpl(const ReflectClassInfo& clsInfo, MemberFilterStyle filt
                 // the generic decl associated with the substitution list must be
                 // the generic decl that declared this parameter
                 auto genericDecl = genericSubst->genericDecl;
-                if (genericDecl != genericTypeParamDecl->ParentDecl)
+                if (genericDecl != genericTypeParamDecl->parentDecl)
                     continue;
 
                 int index = 0;
-                for (auto m : genericDecl->Members)
+                for (auto m : genericDecl->members)
                 {
                     if (m.Ptr() == genericTypeParamDecl)
                     {
@@ -722,7 +724,7 @@ Index getFilterCountImpl(const ReflectClassInfo& clsInfo, MemberFilterStyle filt
                 if(!thisSubst)
                     continue;
 
-                if(auto interfaceDecl = as<InterfaceDecl>(substAssocTypeDecl->ParentDecl))
+                if(auto interfaceDecl = as<InterfaceDecl>(substAssocTypeDecl->parentDecl))
                 {
                     if(thisSubst->interfaceDecl == interfaceDecl)
                     {
@@ -794,7 +796,7 @@ Index getFilterCountImpl(const ReflectClassInfo& clsInfo, MemberFilterStyle filt
         for(;;)
         {
             RefPtr<Decl> childDecl = dd;
-            RefPtr<Decl> parentDecl = dd->ParentDecl;
+            RefPtr<Decl> parentDecl = dd->parentDecl;
             if(!parentDecl)
                 break;
 
@@ -851,14 +853,14 @@ Index getFilterCountImpl(const ReflectClassInfo& clsInfo, MemberFilterStyle filt
     {
         declRef = createDefaultSubstitutionsIfNeeded(session, declRef);
 
-        if (auto builtinMod = declRef.getDecl()->FindModifier<BuiltinTypeModifier>())
+        if (auto builtinMod = declRef.getDecl()->findModifier<BuiltinTypeModifier>())
         {
             auto type = new BasicExpressionType(builtinMod->tag);
             type->setSession(session);
             type->declRef = declRef;
             return type;
         }
-        else if (auto magicMod = declRef.getDecl()->FindModifier<MagicTypeModifier>())
+        else if (auto magicMod = declRef.getDecl()->findModifier<MagicTypeModifier>())
         {
             GenericSubstitution* subst = nullptr;
             for(auto s = declRef.substitutions.substitutions; s; s = s->outer)
@@ -1026,12 +1028,12 @@ Index getFilterCountImpl(const ReflectClassInfo& clsInfo, MemberFilterStyle filt
 
     // OverloadGroupType
 
-    String OverloadGroupType::ToString()
+    String OverloadGroupType::toString()
     {
         return "overload group";
     }
 
-    bool OverloadGroupType::EqualsImpl(Type * /*type*/)
+    bool OverloadGroupType::equalsImpl(Type * /*type*/)
     {
         return false;
     }
@@ -1048,12 +1050,12 @@ Index getFilterCountImpl(const ReflectClassInfo& clsInfo, MemberFilterStyle filt
 
     // InitializerListType
 
-    String InitializerListType::ToString()
+    String InitializerListType::toString()
     {
         return "initializer list";
     }
 
-    bool InitializerListType::EqualsImpl(Type * /*type*/)
+    bool InitializerListType::equalsImpl(Type * /*type*/)
     {
         return false;
     }
@@ -1070,12 +1072,12 @@ Index getFilterCountImpl(const ReflectClassInfo& clsInfo, MemberFilterStyle filt
 
     // ErrorType
 
-    String ErrorType::ToString()
+    String ErrorType::toString()
     {
         return "error";
     }
 
-    bool ErrorType::EqualsImpl(Type* type)
+    bool ErrorType::equalsImpl(Type* type)
     {
         if (auto errorType = as<ErrorType>(type))
             return true;
@@ -1087,7 +1089,7 @@ Index getFilterCountImpl(const ReflectClassInfo& clsInfo, MemberFilterStyle filt
         return this;
     }
 
-    RefPtr<Val> ErrorType::SubstituteImpl(SubstitutionSet /*subst*/, int* /*ioDiff*/)
+    RefPtr<Val> ErrorType::substituteImpl(SubstitutionSet /*subst*/, int* /*ioDiff*/)
     {
         return this;
     }
@@ -1100,12 +1102,12 @@ Index getFilterCountImpl(const ReflectClassInfo& clsInfo, MemberFilterStyle filt
 
     // NamedExpressionType
 
-    String NamedExpressionType::ToString()
+    String NamedExpressionType::toString()
     {
         return getText(declRef.GetName());
     }
 
-    bool NamedExpressionType::EqualsImpl(Type * /*type*/)
+    bool NamedExpressionType::equalsImpl(Type * /*type*/)
     {
         SLANG_UNEXPECTED("unreachable");
         UNREACHABLE_RETURN(false);
@@ -1115,7 +1117,7 @@ Index getFilterCountImpl(const ReflectClassInfo& clsInfo, MemberFilterStyle filt
     {
         if (!innerType)
             innerType = GetType(declRef);
-        return innerType->GetCanonicalType();
+        return innerType->getCanonicalType();
     }
 
     int NamedExpressionType::GetHashCode()
@@ -1129,12 +1131,12 @@ Index getFilterCountImpl(const ReflectClassInfo& clsInfo, MemberFilterStyle filt
         // for now (and hopefully equivalent) to just have any
         // named types automaticlaly route hash-code requests
         // to their canonical type.
-        return GetCanonicalType()->GetHashCode();
+        return getCanonicalType()->GetHashCode();
     }
 
     // FuncType
 
-    String FuncType::ToString()
+    String FuncType::toString()
     {
         StringBuilder sb;
         sb << "(";
@@ -1142,14 +1144,14 @@ Index getFilterCountImpl(const ReflectClassInfo& clsInfo, MemberFilterStyle filt
         for (UInt pp = 0; pp < paramCount; ++pp)
         {
             if (pp != 0) sb << ", ";
-            sb << getParamType(pp)->ToString();
+            sb << getParamType(pp)->toString();
         }
         sb << ") -> ";
-        sb << getResultType()->ToString();
+        sb << getResultType()->toString();
         return sb.ProduceString();
     }
 
-    bool FuncType::EqualsImpl(Type * type)
+    bool FuncType::equalsImpl(Type * type)
     {
         if (auto funcType = as<FuncType>(type))
         {
@@ -1162,11 +1164,11 @@ Index getFilterCountImpl(const ReflectClassInfo& clsInfo, MemberFilterStyle filt
             {
                 auto paramType = getParamType(pp);
                 auto otherParamType = funcType->getParamType(pp);
-                if (!paramType->Equals(otherParamType))
+                if (!paramType->equals(otherParamType))
                     return false;
             }
 
-            if(!resultType->Equals(funcType->resultType))
+            if(!resultType->equals(funcType->resultType))
                 return false;
 
             // TODO: if we ever introduce other kinds
@@ -1177,18 +1179,18 @@ Index getFilterCountImpl(const ReflectClassInfo& clsInfo, MemberFilterStyle filt
         return false;
     }
 
-    RefPtr<Val> FuncType::SubstituteImpl(SubstitutionSet subst, int* ioDiff)
+    RefPtr<Val> FuncType::substituteImpl(SubstitutionSet subst, int* ioDiff)
     {
         int diff = 0;
 
         // result type
-        RefPtr<Type> substResultType = resultType->SubstituteImpl(subst, &diff).as<Type>();
+        RefPtr<Type> substResultType = resultType->substituteImpl(subst, &diff).as<Type>();
 
         // parameter types
         List<RefPtr<Type>> substParamTypes;
         for( auto pp : paramTypes )
         {
-            substParamTypes.add(pp->SubstituteImpl(subst, &diff).as<Type>());
+            substParamTypes.add(pp->substituteImpl(subst, &diff).as<Type>());
         }
 
         // early exit for no change...
@@ -1206,13 +1208,13 @@ Index getFilterCountImpl(const ReflectClassInfo& clsInfo, MemberFilterStyle filt
     RefPtr<Type> FuncType::CreateCanonicalType()
     {
         // result type
-        RefPtr<Type> canResultType = resultType->GetCanonicalType();
+        RefPtr<Type> canResultType = resultType->getCanonicalType();
 
         // parameter types
         List<RefPtr<Type>> canParamTypes;
         for( auto pp : paramTypes )
         {
-            canParamTypes.add(pp->GetCanonicalType());
+            canParamTypes.add(pp->getCanonicalType());
         }
 
         RefPtr<FuncType> canType = new FuncType();
@@ -1239,25 +1241,25 @@ Index getFilterCountImpl(const ReflectClassInfo& clsInfo, MemberFilterStyle filt
 
     // TypeType
 
-    String TypeType::ToString()
+    String TypeType::toString()
     {
         StringBuilder sb;
-        sb << "typeof(" << type->ToString() << ")";
+        sb << "typeof(" << type->toString() << ")";
         return sb.ProduceString();
     }
 
-    bool TypeType::EqualsImpl(Type * t)
+    bool TypeType::equalsImpl(Type * t)
     {
         if (auto typeType = as<TypeType>(t))
         {
-            return t->Equals(typeType->type);
+            return t->equals(typeType->type);
         }
         return false;
     }
 
     RefPtr<Type> TypeType::CreateCanonicalType()
     {
-        auto canType = getTypeType(type->GetCanonicalType());
+        auto canType = getTypeType(type->getCanonicalType());
         return canType;
     }
 
@@ -1269,13 +1271,13 @@ Index getFilterCountImpl(const ReflectClassInfo& clsInfo, MemberFilterStyle filt
 
     // GenericDeclRefType
 
-    String GenericDeclRefType::ToString()
+    String GenericDeclRefType::toString()
     {
         // TODO: what is appropriate here?
         return "<DeclRef<GenericDecl>>";
     }
 
-    bool GenericDeclRefType::EqualsImpl(Type * type)
+    bool GenericDeclRefType::equalsImpl(Type * type)
     {
         if (auto genericDeclRefType = as<GenericDeclRefType>(type))
         {
@@ -1296,26 +1298,26 @@ Index getFilterCountImpl(const ReflectClassInfo& clsInfo, MemberFilterStyle filt
 
     // NamespaceType
 
-    String NamespaceType::ToString()
+    String NamespaceType::toString()
     {
         String result;
         result.append("namespace ");
-        result.append(m_declRef.toString());
+        result.append(declRef.toString());
         return result;
     }
 
-    bool NamespaceType::EqualsImpl(Type * type)
+    bool NamespaceType::equalsImpl(Type * type)
     {
         if (auto namespaceType = as<NamespaceType>(type))
         {
-            return m_declRef.Equals(namespaceType->m_declRef);
+            return declRef.Equals(namespaceType->declRef);
         }
         return false;
     }
 
     int NamespaceType::GetHashCode()
     {
-        return m_declRef.GetHashCode();
+        return declRef.GetHashCode();
     }
 
     RefPtr<Type> NamespaceType::CreateCanonicalType()
@@ -1327,10 +1329,10 @@ Index getFilterCountImpl(const ReflectClassInfo& clsInfo, MemberFilterStyle filt
 
     // VectorExpressionType
 
-    String VectorExpressionType::ToString()
+    String VectorExpressionType::toString()
     {
         StringBuilder sb;
-        sb << "vector<" << elementType->ToString() << "," << elementCount->ToString() << ">";
+        sb << "vector<" << elementType->toString() << "," << elementCount->toString() << ">";
         return sb.ProduceString();
     }
 
@@ -1353,10 +1355,10 @@ Index getFilterCountImpl(const ReflectClassInfo& clsInfo, MemberFilterStyle filt
 
     // MatrixExpressionType
 
-    String MatrixExpressionType::ToString()
+    String MatrixExpressionType::toString()
     {
         StringBuilder sb;
-        sb << "matrix<" << getElementType()->ToString() << "," << getRowCount()->ToString() << "," << getColumnCount()->ToString() << ">";
+        sb << "matrix<" << getElementType()->toString() << "," << getRowCount()->toString() << "," << getColumnCount()->toString() << ">";
         return sb.ProduceString();
     }
 
@@ -1382,11 +1384,11 @@ Index getFilterCountImpl(const ReflectClassInfo& clsInfo, MemberFilterStyle filt
 
     RefPtr<Type> MatrixExpressionType::getRowType()
     {
-        if( !mRowType )
+        if( !rowType )
         {
-            mRowType = getSession()->getVectorType(getElementType(), getColumnCount());
+            rowType = getSession()->getVectorType(getElementType(), getColumnCount());
         }
-        return mRowType;
+        return rowType;
     }
 
     RefPtr<VectorExpressionType> Session::getVectorType(
@@ -1419,7 +1421,7 @@ Index getFilterCountImpl(const ReflectClassInfo& clsInfo, MemberFilterStyle filt
 
     // GenericParamIntVal
 
-    bool GenericParamIntVal::EqualsVal(Val* val)
+    bool GenericParamIntVal::equalsVal(Val* val)
     {
         if (auto genericParamVal = as<GenericParamIntVal>(val))
         {
@@ -1428,7 +1430,7 @@ Index getFilterCountImpl(const ReflectClassInfo& clsInfo, MemberFilterStyle filt
         return false;
     }
 
-    String GenericParamIntVal::ToString()
+    String GenericParamIntVal::toString()
     {
         return getText(declRef.GetName());
     }
@@ -1438,7 +1440,7 @@ Index getFilterCountImpl(const ReflectClassInfo& clsInfo, MemberFilterStyle filt
         return declRef.GetHashCode() ^ 0xFFFF;
     }
 
-    RefPtr<Val> GenericParamIntVal::SubstituteImpl(SubstitutionSet subst, int* ioDiff)
+    RefPtr<Val> GenericParamIntVal::substituteImpl(SubstitutionSet subst, int* ioDiff)
     {
         // search for a substitution that might apply to us
         for(auto s = subst.substitutions; s; s = s->outer)
@@ -1450,11 +1452,11 @@ Index getFilterCountImpl(const ReflectClassInfo& clsInfo, MemberFilterStyle filt
             // the generic decl associated with the substitution list must be
             // the generic decl that declared this parameter
             auto genericDecl = genSubst->genericDecl;
-            if (genericDecl != declRef.getDecl()->ParentDecl)
+            if (genericDecl != declRef.getDecl()->parentDecl)
                 continue;
 
             int index = 0;
-            for (auto m : genericDecl->Members)
+            for (auto m : genericDecl->members)
             {
                 if (m.Ptr() == declRef.getDecl())
                 {
@@ -1482,7 +1484,7 @@ Index getFilterCountImpl(const ReflectClassInfo& clsInfo, MemberFilterStyle filt
 
     // ErrorIntVal
 
-    bool ErrorIntVal::EqualsVal(Val* val)
+    bool ErrorIntVal::equalsVal(Val* val)
     {
         if( auto errorIntVal = as<ErrorIntVal>(val) )
         {
@@ -1491,7 +1493,7 @@ Index getFilterCountImpl(const ReflectClassInfo& clsInfo, MemberFilterStyle filt
         return false;
     }
 
-    String ErrorIntVal::ToString()
+    String ErrorIntVal::toString()
     {
         return "<error>";
     }
@@ -1501,7 +1503,7 @@ Index getFilterCountImpl(const ReflectClassInfo& clsInfo, MemberFilterStyle filt
         return int(typeid(this).hash_code());
     }
 
-    RefPtr<Val> ErrorIntVal::SubstituteImpl(SubstitutionSet subst, int* ioDiff)
+    RefPtr<Val> ErrorIntVal::substituteImpl(SubstitutionSet subst, int* ioDiff)
     {
         SLANG_UNUSED(subst);
         SLANG_UNUSED(ioDiff);
@@ -1519,7 +1521,7 @@ Index getFilterCountImpl(const ReflectClassInfo& clsInfo, MemberFilterStyle filt
         List<RefPtr<Val>> substArgs;
         for (auto a : args)
         {
-            substArgs.add(a->SubstituteImpl(substSet, &diff));
+            substArgs.add(a->substituteImpl(substSet, &diff));
         }
 
         if (!diff) return this;
@@ -1532,7 +1534,7 @@ Index getFilterCountImpl(const ReflectClassInfo& clsInfo, MemberFilterStyle filt
         return substSubst;
     }
 
-    bool GenericSubstitution::Equals(Substitutions* subst)
+    bool GenericSubstitution::equals(Substitutions* subst)
     {
         // both must be NULL, or non-NULL
         if (subst == nullptr)
@@ -1550,14 +1552,14 @@ Index getFilterCountImpl(const ReflectClassInfo& clsInfo, MemberFilterStyle filt
         SLANG_RELEASE_ASSERT(args.getCount() == genericSubst->args.getCount());
         for (Index aa = 0; aa < argCount; ++aa)
         {
-            if (!args[aa]->EqualsVal(genericSubst->args[aa].Ptr()))
+            if (!args[aa]->equalsVal(genericSubst->args[aa].Ptr()))
                 return false;
         }
 
         if (!outer)
             return !genericSubst->outer;
 
-        if (!outer->Equals(genericSubst->outer.Ptr()))
+        if (!outer->equals(genericSubst->outer.Ptr()))
             return false;
 
         return true;
@@ -1570,7 +1572,7 @@ Index getFilterCountImpl(const ReflectClassInfo& clsInfo, MemberFilterStyle filt
         if(substOuter != outer) diff++;
 
         // NOTE: Must use .as because we must have a smart pointer here to keep in scope.
-        auto substWitness = witness->SubstituteImpl(substSet, &diff).as<SubtypeWitness>();
+        auto substWitness = witness->substituteImpl(substSet, &diff).as<SubtypeWitness>();
         
         if (!diff) return this;
 
@@ -1582,7 +1584,7 @@ Index getFilterCountImpl(const ReflectClassInfo& clsInfo, MemberFilterStyle filt
         return substSubst;
     }
 
-    bool ThisTypeSubstitution::Equals(Substitutions* subst)
+    bool ThisTypeSubstitution::equals(Substitutions* subst)
     {
         if (!subst)
             return false;
@@ -1599,7 +1601,7 @@ Index getFilterCountImpl(const ReflectClassInfo& clsInfo, MemberFilterStyle filt
             if(this->interfaceDecl != thisTypeSubst->interfaceDecl)
                 return false;
 
-            if(!this->witness->sub->Equals(thisTypeSubst->witness->sub))
+            if(!this->witness->sub->equals(thisTypeSubst->witness->sub))
                 return false;
 
             return true;
@@ -1620,14 +1622,14 @@ Index getFilterCountImpl(const ReflectClassInfo& clsInfo, MemberFilterStyle filt
 
         if(substOuter != outer) diff++;
 
-        auto substActualType = actualType->SubstituteImpl(substSet, &diff).as<Type>();
+        auto substActualType = actualType->substituteImpl(substSet, &diff).as<Type>();
 
         List<ConstraintArg> substConstraintArgs;
         for(auto constraintArg : constraintArgs)
         {
             ConstraintArg substConstraintArg;
             substConstraintArg.decl = constraintArg.decl;
-            substConstraintArg.val = constraintArg.val->SubstituteImpl(substSet, &diff);
+            substConstraintArg.val = constraintArg.val->substituteImpl(substSet, &diff);
 
             substConstraintArgs.add(substConstraintArg);
         }
@@ -1645,7 +1647,7 @@ Index getFilterCountImpl(const ReflectClassInfo& clsInfo, MemberFilterStyle filt
         return substSubst;
     }
 
-    bool GlobalGenericParamSubstitution::Equals(Substitutions* subst)
+    bool GlobalGenericParamSubstitution::equals(Substitutions* subst)
     {
         if (!subst)
             return false;
@@ -1656,13 +1658,13 @@ Index getFilterCountImpl(const ReflectClassInfo& clsInfo, MemberFilterStyle filt
         {
             if (paramDecl != genSubst->paramDecl)
                 return false;
-            if (!actualType->EqualsVal(genSubst->actualType))
+            if (!actualType->equalsVal(genSubst->actualType))
                 return false;
             if (constraintArgs.getCount() != genSubst->constraintArgs.getCount())
                 return false;
             for (Index i = 0; i < constraintArgs.getCount(); i++)
             {
-                if (!constraintArgs[i].val->EqualsVal(genSubst->constraintArgs[i].val))
+                if (!constraintArgs[i].val->equalsVal(genSubst->constraintArgs[i].val))
                     return false;
             }
             return true;
@@ -1685,7 +1687,7 @@ Index getFilterCountImpl(const ReflectClassInfo& clsInfo, MemberFilterStyle filt
 
         // Otherwise we need to recurse on the type structure
         // and apply substitutions where it makes sense
-        return type->Substitute(substitutions).as<Type>();
+        return type->substitute(substitutions).as<Type>();
     }
 
     DeclRefBase DeclRefBase::Substitute(DeclRefBase declRef) const
@@ -1718,7 +1720,7 @@ Index getFilterCountImpl(const ReflectClassInfo& clsInfo, MemberFilterStyle filt
             if(auto interfaceDecl = as<InterfaceDecl>(dd))
                 return interfaceDecl;
 
-            dd = dd->ParentDecl;
+            dd = dd->parentDecl;
         }
         return nullptr;
     }
@@ -1869,7 +1871,7 @@ Index getFilterCountImpl(const ReflectClassInfo& clsInfo, MemberFilterStyle filt
         // nested directly in a generic, then `substToSpecialize` will either start with
         // the corresponding `GenericSubstitution` or there will be *no* generic substitutions
         // corresponding to that decl.
-        for(Decl* ancestorDecl = declToSpecialize; ancestorDecl; ancestorDecl = ancestorDecl->ParentDecl)
+        for(Decl* ancestorDecl = declToSpecialize; ancestorDecl; ancestorDecl = ancestorDecl->parentDecl)
         {
             if(auto ancestorGenericDecl = as<GenericDecl>(ancestorDecl))
             {
@@ -1883,7 +1885,7 @@ Index getFilterCountImpl(const ReflectClassInfo& clsInfo, MemberFilterStyle filt
                         // keep one matching it in place.
                         int diff = 0;
                         auto restSubst = specializeSubstitutions(
-                            ancestorGenericDecl->ParentDecl,
+                            ancestorGenericDecl->parentDecl,
                             specGenericSubst->outer,
                             substsToApply,
                             &diff);
@@ -1923,7 +1925,7 @@ Index getFilterCountImpl(const ReflectClassInfo& clsInfo, MemberFilterStyle filt
 
                     int diff = 0;
                     auto restSubst = specializeSubstitutions(
-                        ancestorGenericDecl->ParentDecl,
+                        ancestorGenericDecl->parentDecl,
                         substsToSpecialize,
                         substsToApply,
                         &diff);
@@ -1953,7 +1955,7 @@ Index getFilterCountImpl(const ReflectClassInfo& clsInfo, MemberFilterStyle filt
                         // keep one matching it in place.
                         int diff = 0;
                         auto restSubst = specializeSubstitutions(
-                            ancestorInterfaceDecl->ParentDecl,
+                            ancestorInterfaceDecl->parentDecl,
                             specThisTypeSubst->outer,
                             substsToApply,
                             &diff);
@@ -1983,7 +1985,7 @@ Index getFilterCountImpl(const ReflectClassInfo& clsInfo, MemberFilterStyle filt
 
                     int diff = 0;
                     auto restSubst = specializeSubstitutions(
-                        ancestorInterfaceDecl->ParentDecl,
+                        ancestorInterfaceDecl->parentDecl,
                         substsToSpecialize,
                         substsToApply,
                         &diff);
@@ -2089,7 +2091,7 @@ Index getFilterCountImpl(const ReflectClassInfo& clsInfo, MemberFilterStyle filt
         // Can access as method with this->as because it removes any ambiguity.
         using Slang::as;
 
-        auto parentDecl = decl->ParentDecl;
+        auto parentDecl = decl->parentDecl;
         if (!parentDecl)
             return DeclRefBase();
 
@@ -2141,14 +2143,14 @@ Index getFilterCountImpl(const ReflectClassInfo& clsInfo, MemberFilterStyle filt
 
     // Val
 
-    RefPtr<Val> Val::Substitute(SubstitutionSet subst)
+    RefPtr<Val> Val::substitute(SubstitutionSet subst)
     {
         if (!subst) return this;
         int diff = 0;
-        return SubstituteImpl(subst, &diff);
+        return substituteImpl(subst, &diff);
     }
 
-    RefPtr<Val> Val::SubstituteImpl(SubstitutionSet /*subst*/, int* /*ioDiff*/)
+    RefPtr<Val> Val::substituteImpl(SubstitutionSet /*subst*/, int* /*ioDiff*/)
     {
         // Default behavior is to not substitute at all
         return this;
@@ -2168,14 +2170,14 @@ Index getFilterCountImpl(const ReflectClassInfo& clsInfo, MemberFilterStyle filt
 
     // ConstantIntVal
 
-    bool ConstantIntVal::EqualsVal(Val* val)
+    bool ConstantIntVal::equalsVal(Val* val)
     {
         if (auto intVal = as<ConstantIntVal>(val))
             return value == intVal->value;
         return false;
     }
 
-    String ConstantIntVal::ToString()
+    String ConstantIntVal::toString()
     {
         return String(value);
     }
@@ -2208,7 +2210,7 @@ Index getFilterCountImpl(const ReflectClassInfo& clsInfo, MemberFilterStyle filt
         // actually want to register is the generic itself.
         //
         auto declToRegister = decl;
-        if(auto genericDecl = as<GenericDecl>(decl->ParentDecl))
+        if(auto genericDecl = as<GenericDecl>(decl->parentDecl))
             declToRegister = genericDecl;
 
         session->magicDecls[modifier->name] = declToRegister.Ptr();
@@ -2268,7 +2270,7 @@ Index getFilterCountImpl(const ReflectClassInfo& clsInfo, MemberFilterStyle filt
         auto arrayType = new ArrayExpressionType();
         arrayType->setSession(session);
         arrayType->baseType = elementType;
-        arrayType->ArrayLength = elementCount;
+        arrayType->arrayLength = elementCount;
         return arrayType;
     }
 
@@ -2314,13 +2316,13 @@ Index getFilterCountImpl(const ReflectClassInfo& clsInfo, MemberFilterStyle filt
         {
             auto paramDecl = paramDeclRef.getDecl();
             auto paramType = GetType(paramDeclRef);
-            if( paramDecl->FindModifier<RefModifier>() )
+            if( paramDecl->findModifier<RefModifier>() )
             {
                 paramType = session->getRefType(paramType);
             }
-            else if( paramDecl->FindModifier<OutModifier>() )
+            else if( paramDecl->findModifier<OutModifier>() )
             {
-                if(paramDecl->FindModifier<InOutModifier>() || paramDecl->FindModifier<InModifier>())
+                if(paramDecl->findModifier<InOutModifier>() || paramDecl->findModifier<InModifier>())
                 {
                     paramType = session->getInOutType(paramType);
                 }
@@ -2350,7 +2352,7 @@ Index getFilterCountImpl(const ReflectClassInfo& clsInfo, MemberFilterStyle filt
     {
         auto type = new NamespaceType;
         type->setSession(session);
-        type->m_declRef = declRef;
+        type->declRef = declRef;
         return type;
     }
 
@@ -2364,25 +2366,25 @@ Index getFilterCountImpl(const ReflectClassInfo& clsInfo, MemberFilterStyle filt
 
     // TODO: should really have a `type.cpp` and a `witness.cpp`
 
-    bool TypeEqualityWitness::EqualsVal(Val* val)
+    bool TypeEqualityWitness::equalsVal(Val* val)
     {
         auto otherWitness = as<TypeEqualityWitness>(val);
         if (!otherWitness)
             return false;
-        return sub->Equals(otherWitness->sub);
+        return sub->equals(otherWitness->sub);
     }
 
-    RefPtr<Val> TypeEqualityWitness::SubstituteImpl(SubstitutionSet subst, int * ioDiff)
+    RefPtr<Val> TypeEqualityWitness::substituteImpl(SubstitutionSet subst, int * ioDiff)
     {
         RefPtr<TypeEqualityWitness> rs = new TypeEqualityWitness();
-        rs->sub = sub->SubstituteImpl(subst, ioDiff).as<Type>();
-        rs->sup = sup->SubstituteImpl(subst, ioDiff).as<Type>();
+        rs->sub = sub->substituteImpl(subst, ioDiff).as<Type>();
+        rs->sup = sup->substituteImpl(subst, ioDiff).as<Type>();
         return rs;
     }
 
-    String TypeEqualityWitness::ToString()
+    String TypeEqualityWitness::toString()
     {
-        return "TypeEqualityWitness(" + sub->ToString() + ")";
+        return "TypeEqualityWitness(" + sub->toString() + ")";
     }
 
     int TypeEqualityWitness::GetHashCode()
@@ -2390,14 +2392,14 @@ Index getFilterCountImpl(const ReflectClassInfo& clsInfo, MemberFilterStyle filt
         return sub->GetHashCode();
     }
 
-    bool DeclaredSubtypeWitness::EqualsVal(Val* val)
+    bool DeclaredSubtypeWitness::equalsVal(Val* val)
     {
         auto otherWitness = as<DeclaredSubtypeWitness>(val);
         if(!otherWitness)
             return false;
 
-        return sub->Equals(otherWitness->sub)
-            && sup->Equals(otherWitness->sup)
+        return sub->equals(otherWitness->sub)
+            && sup->equals(otherWitness->sup)
             && declRef.Equals(otherWitness->declRef);
     }
 
@@ -2420,7 +2422,7 @@ Index getFilterCountImpl(const ReflectClassInfo& clsInfo, MemberFilterStyle filt
         return nullptr;
     }
 
-    RefPtr<Val> DeclaredSubtypeWitness::SubstituteImpl(SubstitutionSet subst, int * ioDiff)
+    RefPtr<Val> DeclaredSubtypeWitness::substituteImpl(SubstitutionSet subst, int * ioDiff)
     {
         if (auto genConstraintDeclRef = declRef.as<GenericTypeConstraintDecl>())
         {
@@ -2434,12 +2436,12 @@ Index getFilterCountImpl(const ReflectClassInfo& clsInfo, MemberFilterStyle filt
                     // the generic decl associated with the substitution list must be
                     // the generic decl that declared this parameter
                     auto genericDecl = genericSubst->genericDecl;
-                    if (genericDecl != genConstraintDecl->ParentDecl)
+                    if (genericDecl != genConstraintDecl->parentDecl)
                         continue;
 
                     bool found = false;
                     Index index = 0;
-                    for (auto m : genericDecl->Members)
+                    for (auto m : genericDecl->members)
                     {
                         if (auto constraintParam = as<GenericTypeConstraintDecl>(m))
                         {
@@ -2463,7 +2465,7 @@ Index getFilterCountImpl(const ReflectClassInfo& clsInfo, MemberFilterStyle filt
                 else if(auto globalGenericSubst = s.as<GlobalGenericParamSubstitution>())
                 {
                     // check if the substitution is really about this global generic type parameter
-                    if (globalGenericSubst->paramDecl != genConstraintDecl->ParentDecl)
+                    if (globalGenericSubst->paramDecl != genConstraintDecl->parentDecl)
                         continue;
 
                     for(auto constraintArg : globalGenericSubst->constraintArgs)
@@ -2480,8 +2482,8 @@ Index getFilterCountImpl(const ReflectClassInfo& clsInfo, MemberFilterStyle filt
 
         // Perform substitution on the constituent elements.
         int diff = 0;
-        auto substSub = sub->SubstituteImpl(subst, &diff).as<Type>();
-        auto substSup = sup->SubstituteImpl(subst, &diff).as<Type>();
+        auto substSub = sub->substituteImpl(subst, &diff).as<Type>();
+        auto substSup = sup->substituteImpl(subst, &diff).as<Type>();
         auto substDeclRef = declRef.SubstituteImpl(subst, &diff);
         if (!diff)
             return this;
@@ -2500,9 +2502,9 @@ Index getFilterCountImpl(const ReflectClassInfo& clsInfo, MemberFilterStyle filt
         //
         if (auto substTypeConstraintDecl = as<GenericTypeConstraintDecl>(substDeclRef.decl))
         {
-            if (auto substAssocTypeDecl = as<AssocTypeDecl>(substTypeConstraintDecl->ParentDecl))
+            if (auto substAssocTypeDecl = as<AssocTypeDecl>(substTypeConstraintDecl->parentDecl))
             {
-                if (auto interfaceDecl = as<InterfaceDecl>(substAssocTypeDecl->ParentDecl))
+                if (auto interfaceDecl = as<InterfaceDecl>(substAssocTypeDecl->parentDecl))
                 {
                     // At this point we have a constraint decl for an associated type,
                     // and we nee to see if we are dealing with a concrete substitution
@@ -2539,13 +2541,13 @@ Index getFilterCountImpl(const ReflectClassInfo& clsInfo, MemberFilterStyle filt
         return rs;
     }
 
-    String DeclaredSubtypeWitness::ToString()
+    String DeclaredSubtypeWitness::toString()
     {
         StringBuilder sb;
         sb << "DeclaredSubtypeWitness(";
-        sb << this->sub->ToString();
+        sb << this->sub->toString();
         sb << ", ";
-        sb << this->sup->ToString();
+        sb << this->sup->toString();
         sb << ", ";
         sb << this->declRef.toString();
         sb << ")";
@@ -2559,25 +2561,25 @@ Index getFilterCountImpl(const ReflectClassInfo& clsInfo, MemberFilterStyle filt
 
     // TransitiveSubtypeWitness
 
-    bool TransitiveSubtypeWitness::EqualsVal(Val* val)
+    bool TransitiveSubtypeWitness::equalsVal(Val* val)
     {
         auto otherWitness = as<TransitiveSubtypeWitness>(val);
         if(!otherWitness)
             return false;
 
-        return sub->Equals(otherWitness->sub)
-            && sup->Equals(otherWitness->sup)
-            && subToMid->EqualsVal(otherWitness->subToMid)
+        return sub->equals(otherWitness->sub)
+            && sup->equals(otherWitness->sup)
+            && subToMid->equalsVal(otherWitness->subToMid)
             && midToSup.Equals(otherWitness->midToSup);
     }
 
-    RefPtr<Val> TransitiveSubtypeWitness::SubstituteImpl(SubstitutionSet subst, int * ioDiff)
+    RefPtr<Val> TransitiveSubtypeWitness::substituteImpl(SubstitutionSet subst, int * ioDiff)
     {
         int diff = 0;
 
-        RefPtr<Type> substSub = sub->SubstituteImpl(subst, &diff).as<Type>();
-        RefPtr<Type> substSup = sup->SubstituteImpl(subst, &diff).as<Type>();
-        RefPtr<SubtypeWitness> substSubToMid = subToMid->SubstituteImpl(subst, &diff).as<SubtypeWitness>();
+        RefPtr<Type> substSub = sub->substituteImpl(subst, &diff).as<Type>();
+        RefPtr<Type> substSup = sup->substituteImpl(subst, &diff).as<Type>();
+        RefPtr<SubtypeWitness> substSubToMid = subToMid->substituteImpl(subst, &diff).as<SubtypeWitness>();
         DeclRef<Decl> substMidToSup = midToSup.SubstituteImpl(subst, &diff);
 
         // If nothing changed, then we can bail out early.
@@ -2612,14 +2614,14 @@ Index getFilterCountImpl(const ReflectClassInfo& clsInfo, MemberFilterStyle filt
         return result;
     }
 
-    String TransitiveSubtypeWitness::ToString()
+    String TransitiveSubtypeWitness::toString()
     {
         // Note: we only print the constituent
         // witnesses, and rely on them to print
         // the starting and ending types.
         StringBuilder sb;
         sb << "TransitiveSubtypeWitness(";
-        sb << this->subToMid->ToString();
+        sb << this->subToMid->toString();
         sb << ", ";
         sb << this->midToSup.toString();
         sb << ")";
@@ -2658,7 +2660,7 @@ Index getFilterCountImpl(const ReflectClassInfo& clsInfo, MemberFilterStyle filt
         {
             return false;
         }
-        return substitutions->Equals(substSet.substitutions);
+        return substitutions->equals(substSet.substitutions);
     }
 
     int SubstitutionSet::GetHashCode() const
@@ -2671,7 +2673,7 @@ Index getFilterCountImpl(const ReflectClassInfo& clsInfo, MemberFilterStyle filt
 
     // ExtractExistentialType
 
-    String ExtractExistentialType::ToString()
+    String ExtractExistentialType::toString()
     {
         String result;
         result.append(declRef.toString());
@@ -2679,7 +2681,7 @@ Index getFilterCountImpl(const ReflectClassInfo& clsInfo, MemberFilterStyle filt
         return result;
     }
 
-    bool ExtractExistentialType::EqualsImpl(Type* type)
+    bool ExtractExistentialType::equalsImpl(Type* type)
     {
         if( auto extractExistential = as<ExtractExistentialType>(type) )
         {
@@ -2698,7 +2700,7 @@ Index getFilterCountImpl(const ReflectClassInfo& clsInfo, MemberFilterStyle filt
         return this;
     }
 
-    RefPtr<Val> ExtractExistentialType::SubstituteImpl(SubstitutionSet subst, int* ioDiff)
+    RefPtr<Val> ExtractExistentialType::substituteImpl(SubstitutionSet subst, int* ioDiff)
     {
         int diff = 0;
         auto substDeclRef = declRef.SubstituteImpl(subst, &diff);
@@ -2714,7 +2716,7 @@ Index getFilterCountImpl(const ReflectClassInfo& clsInfo, MemberFilterStyle filt
 
     // ExtractExistentialSubtypeWitness
 
-    bool ExtractExistentialSubtypeWitness::EqualsVal(Val* val)
+    bool ExtractExistentialSubtypeWitness::equalsVal(Val* val)
     {
         if( auto extractWitness = as<ExtractExistentialSubtypeWitness>(val) )
         {
@@ -2723,7 +2725,7 @@ Index getFilterCountImpl(const ReflectClassInfo& clsInfo, MemberFilterStyle filt
         return false;
     }
 
-    String ExtractExistentialSubtypeWitness::ToString()
+    String ExtractExistentialSubtypeWitness::toString()
     {
         String result;
         result.append("extractExistentialValue(");
@@ -2737,13 +2739,13 @@ Index getFilterCountImpl(const ReflectClassInfo& clsInfo, MemberFilterStyle filt
         return declRef.GetHashCode();
     }
 
-    RefPtr<Val> ExtractExistentialSubtypeWitness::SubstituteImpl(SubstitutionSet subst, int* ioDiff)
+    RefPtr<Val> ExtractExistentialSubtypeWitness::substituteImpl(SubstitutionSet subst, int* ioDiff)
     {
         int diff = 0;
 
         auto substDeclRef = declRef.SubstituteImpl(subst, &diff);
-        auto substSub = sub->SubstituteImpl(subst, &diff).as<Type>();
-        auto substSup = sup->SubstituteImpl(subst, &diff).as<Type>();
+        auto substSub = sub->substituteImpl(subst, &diff).as<Type>();
+        auto substSup = sup->substituteImpl(subst, &diff).as<Type>();
 
         if(!diff)
             return this;
@@ -2761,7 +2763,7 @@ Index getFilterCountImpl(const ReflectClassInfo& clsInfo, MemberFilterStyle filt
     // TaggedUnionType
     //
 
-    String TaggedUnionType::ToString()
+    String TaggedUnionType::toString()
     {
         String result;
         result.append("__TaggedUnion(");
@@ -2771,13 +2773,13 @@ Index getFilterCountImpl(const ReflectClassInfo& clsInfo, MemberFilterStyle filt
             if(!first) result.append(", ");
             first = false;
 
-            result.append(caseType->ToString());
+            result.append(caseType->toString());
         }
         result.append(")");
         return result;
     }
 
-    bool TaggedUnionType::EqualsImpl(Type* type)
+    bool TaggedUnionType::equalsImpl(Type* type)
     {
         auto taggedUnion = as<TaggedUnionType>(type);
         if(!taggedUnion)
@@ -2789,7 +2791,7 @@ Index getFilterCountImpl(const ReflectClassInfo& clsInfo, MemberFilterStyle filt
 
         for( Index ii = 0; ii < caseCount; ++ii )
         {
-            if(!caseTypes[ii]->Equals(taggedUnion->caseTypes[ii]))
+            if(!caseTypes[ii]->equals(taggedUnion->caseTypes[ii]))
                 return false;
         }
         return true;
@@ -2812,21 +2814,21 @@ Index getFilterCountImpl(const ReflectClassInfo& clsInfo, MemberFilterStyle filt
 
         for( auto caseType : caseTypes )
         {
-            auto canCaseType = caseType->GetCanonicalType();
+            auto canCaseType = caseType->getCanonicalType();
             canType->caseTypes.add(canCaseType);
         }
 
         return canType;
     }
 
-    RefPtr<Val> TaggedUnionType::SubstituteImpl(SubstitutionSet subst, int* ioDiff)
+    RefPtr<Val> TaggedUnionType::substituteImpl(SubstitutionSet subst, int* ioDiff)
     {
         int diff = 0;
 
         List<RefPtr<Type>> substCaseTypes;
         for( auto caseType : caseTypes )
         {
-            substCaseTypes.add(caseType->SubstituteImpl(subst, &diff).as<Type>());
+            substCaseTypes.add(caseType->substituteImpl(subst, &diff).as<Type>());
         }
         if(!diff)
             return this;
@@ -2844,7 +2846,7 @@ Index getFilterCountImpl(const ReflectClassInfo& clsInfo, MemberFilterStyle filt
 //
 
 
-bool TaggedUnionSubtypeWitness::EqualsVal(Val* val)
+bool TaggedUnionSubtypeWitness::equalsVal(Val* val)
 {
     auto taggedUnionWitness = as<TaggedUnionSubtypeWitness>(val);
     if(!taggedUnionWitness)
@@ -2856,14 +2858,14 @@ bool TaggedUnionSubtypeWitness::EqualsVal(Val* val)
 
     for(Index ii = 0; ii < caseCount; ++ii)
     {
-        if(!caseWitnesses[ii]->EqualsVal(taggedUnionWitness->caseWitnesses[ii]))
+        if(!caseWitnesses[ii]->equalsVal(taggedUnionWitness->caseWitnesses[ii]))
             return false;
     }
 
     return true;
 }
 
-String TaggedUnionSubtypeWitness::ToString()
+String TaggedUnionSubtypeWitness::toString()
 {
     String result;
     result.append("TaggedUnionSubtypeWitness(");
@@ -2873,7 +2875,7 @@ String TaggedUnionSubtypeWitness::ToString()
         if(!first) result.append(", ");
         first = false;
 
-        result.append(caseWitness->ToString());
+        result.append(caseWitness->toString());
     }
     return result;
 }
@@ -2888,17 +2890,17 @@ int TaggedUnionSubtypeWitness::GetHashCode()
     return hash;
 }
 
-RefPtr<Val> TaggedUnionSubtypeWitness::SubstituteImpl(SubstitutionSet subst, int* ioDiff)
+RefPtr<Val> TaggedUnionSubtypeWitness::substituteImpl(SubstitutionSet subst, int* ioDiff)
 {
     int diff = 0;
 
-    auto substSub = sub->SubstituteImpl(subst, &diff).as<Type>();
-    auto substSup = sup->SubstituteImpl(subst, &diff).as<Type>();
+    auto substSub = sub->substituteImpl(subst, &diff).as<Type>();
+    auto substSup = sup->substituteImpl(subst, &diff).as<Type>();
 
     List<RefPtr<Val>> substCaseWitnesses;
     for( auto caseWitness : caseWitnesses )
     {
-        substCaseWitnesses.add(caseWitness->SubstituteImpl(subst, &diff));
+        substCaseWitnesses.add(caseWitness->substituteImpl(subst, &diff));
     }
 
     if(!diff)
@@ -2915,7 +2917,7 @@ RefPtr<Val> TaggedUnionSubtypeWitness::SubstituteImpl(SubstitutionSet subst, int
 
 Module* getModule(Decl* decl)
 {
-    for( auto dd = decl; dd; dd = dd->ParentDecl )
+    for( auto dd = decl; dd; dd = dd->parentDecl )
     {
         if(auto moduleDecl = as<ModuleDecl>(dd))
             return moduleDecl->module;
@@ -2961,27 +2963,27 @@ char const* getGLSLNameForImageFormat(ImageFormat format)
 // ExistentialSpecializedType
 //
 
-String ExistentialSpecializedType::ToString()
+String ExistentialSpecializedType::toString()
 {
     String result;
     result.append("__ExistentialSpecializedType(");
-    result.append(baseType->ToString());
+    result.append(baseType->toString());
     for( auto arg : args )
     {
         result.append(", ");
-        result.append(arg.val->ToString());
+        result.append(arg.val->toString());
     }
     result.append(")");
     return result;
 }
 
-bool ExistentialSpecializedType::EqualsImpl(Type * type)
+bool ExistentialSpecializedType::equalsImpl(Type * type)
 {
     auto other = as<ExistentialSpecializedType>(type);
     if(!other)
         return false;
 
-    if(!baseType->Equals(other->baseType))
+    if(!baseType->equals(other->baseType))
         return false;
 
     auto argCount = args.getCount();
@@ -2993,7 +2995,7 @@ bool ExistentialSpecializedType::EqualsImpl(Type * type)
         auto arg = args[ii];
         auto otherArg = other->args[ii];
 
-        if(!arg.val->EqualsVal(otherArg.val))
+        if(!arg.val->equalsVal(otherArg.val))
             return false;
 
         if(!areValsEqual(arg.witness, otherArg.witness))
@@ -3021,7 +3023,7 @@ RefPtr<Val> getCanonicalValue(Val* val)
         return nullptr;
     if(auto type = as<Type>(val))
     {
-        return type->GetCanonicalType();
+        return type->getCanonicalType();
     }
     // TODO: We may eventually need/want some sort of canonicalization
     // for non-type values, but for now there is nothing to do.
@@ -3033,7 +3035,7 @@ RefPtr<Type> ExistentialSpecializedType::CreateCanonicalType()
     RefPtr<ExistentialSpecializedType> canType = new ExistentialSpecializedType();
     canType->setSession(getSession());
 
-    canType->baseType = baseType->GetCanonicalType();
+    canType->baseType = baseType->getCanonicalType();
     for( auto arg : args )
     {
         ExpandedSpecializationArg canArg;
@@ -3047,14 +3049,14 @@ RefPtr<Type> ExistentialSpecializedType::CreateCanonicalType()
 RefPtr<Val> substituteImpl(Val* val, SubstitutionSet subst, int* ioDiff)
 {
     if(!val) return nullptr;
-    return val->SubstituteImpl(subst, ioDiff);
+    return val->substituteImpl(subst, ioDiff);
 }
 
-RefPtr<Val> ExistentialSpecializedType::SubstituteImpl(SubstitutionSet subst, int* ioDiff)
+RefPtr<Val> ExistentialSpecializedType::substituteImpl(SubstitutionSet subst, int* ioDiff)
 {
     int diff = 0;
 
-    auto substBaseType = baseType->SubstituteImpl(subst, &diff).as<Type>();
+    auto substBaseType = baseType->substituteImpl(subst, &diff).as<Type>();
 
     ExpandedSpecializationArgs substArgs;
     for( auto arg : args )
@@ -3081,7 +3083,7 @@ RefPtr<Val> ExistentialSpecializedType::SubstituteImpl(SubstitutionSet subst, in
 // ThisType
 //
 
-String ThisType::ToString()
+String ThisType::toString()
 {
     String result;
     result.append(interfaceDeclRef.toString());
@@ -3089,7 +3091,7 @@ String ThisType::ToString()
     return result;
 }
 
-bool ThisType::EqualsImpl(Type * type)
+bool ThisType::equalsImpl(Type * type)
 {
     auto other = as<ThisType>(type);
     if(!other)
@@ -3118,7 +3120,7 @@ RefPtr<Type> ThisType::CreateCanonicalType()
     return canType;
 }
 
-RefPtr<Val> ThisType::SubstituteImpl(SubstitutionSet subst, int* ioDiff)
+RefPtr<Val> ThisType::substituteImpl(SubstitutionSet subst, int* ioDiff)
 {
     int diff = 0;
 

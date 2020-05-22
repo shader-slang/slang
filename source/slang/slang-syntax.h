@@ -46,7 +46,7 @@ namespace Slang
     inline bool areValsEqual(Val* left, Val* right)
     {
         if(!left || !right) return left == right;
-        return left->EqualsVal(right);
+        return left->equalsVal(right);
     }
 
     //
@@ -77,13 +77,13 @@ namespace Slang
 
     inline FilteredMemberRefList<Decl> getMembers(DeclRef<ContainerDecl> const& declRef, MemberFilterStyle filterStyle = MemberFilterStyle::All)
     {
-        return FilteredMemberRefList<Decl>(declRef.getDecl()->Members, declRef.substitutions, filterStyle);
+        return FilteredMemberRefList<Decl>(declRef.getDecl()->members, declRef.substitutions, filterStyle);
     }
 
     template<typename T>
     inline FilteredMemberRefList<T> getMembersOfType( DeclRef<ContainerDecl> const& declRef, MemberFilterStyle filterStyle = MemberFilterStyle::All)
     {
-        return FilteredMemberRefList<T>(declRef.getDecl()->Members, declRef.substitutions, filterStyle);
+        return FilteredMemberRefList<T>(declRef.getDecl()->members, declRef.substitutions, filterStyle);
     }
 
     template<typename T>
@@ -163,7 +163,7 @@ namespace Slang
 
     inline RefPtr<Type> GetResultType(DeclRef<CallableDecl> const& declRef)
     {
-        return declRef.Substitute(declRef.getDecl()->ReturnType.type.Ptr());
+        return declRef.Substitute(declRef.getDecl()->returnType.type.Ptr());
     }
 
     inline FilteredMemberRefList<ParamDecl> GetParameters(DeclRef<CallableDecl> const& declRef)

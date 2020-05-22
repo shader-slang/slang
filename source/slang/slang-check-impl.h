@@ -96,12 +96,12 @@ namespace Slang
             // that we can encode in our space of keys.
             args[0] = BasicTypeKey::Invalid;
             args[1] = BasicTypeKey::Invalid;
-            if (opExpr->Arguments.getCount() > 2)
+            if (opExpr->arguments.getCount() > 2)
                 return false;
 
-            for (Index i = 0; i < opExpr->Arguments.getCount(); i++)
+            for (Index i = 0; i < opExpr->arguments.getCount(); i++)
             {
-                auto key = makeBasicTypeKey(opExpr->Arguments[i]->type.Ptr());
+                auto key = makeBasicTypeKey(opExpr->arguments[i]->type.Ptr());
                 if (key == BasicTypeKey::Invalid)
                 {
                     return false;
@@ -122,7 +122,7 @@ namespace Slang
             auto prefixExpr = as<PrefixExpr>(opExpr);
             auto postfixExpr = as<PostfixExpr>(opExpr);
 
-            if (auto overloadedBase = as<OverloadedExpr>(opExpr->FunctionExpr))
+            if (auto overloadedBase = as<OverloadedExpr>(opExpr->functionExpr))
             {
                 for(auto item : overloadedBase->lookupResult2 )
                 {
@@ -135,12 +135,12 @@ namespace Slang
 
                     // Reject definitions that have the wrong fixity.
                     //
-                    if(prefixExpr && !funcDecl->FindModifier<PrefixModifier>())
+                    if(prefixExpr && !funcDecl->findModifier<PrefixModifier>())
                         continue;
-                    if(postfixExpr && !funcDecl->FindModifier<PostfixModifier>())
+                    if(postfixExpr && !funcDecl->findModifier<PostfixModifier>())
                         continue;
 
-                    if (auto intrinsicOp = funcDecl->FindModifier<IntrinsicOpModifier>())
+                    if (auto intrinsicOp = funcDecl->findModifier<IntrinsicOpModifier>())
                     {
                         operatorName = intrinsicOp->op;
                         return true;

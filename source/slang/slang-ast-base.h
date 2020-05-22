@@ -78,21 +78,21 @@ class Val : public NodeBase
 
     // construct a new value by applying a set of parameter
     // substitutions to this one
-    RefPtr<Val> Substitute(SubstitutionSet subst);
+    RefPtr<Val> substitute(SubstitutionSet subst);
 
     // Lower-level interface for substitution. Like the basic
     // `Substitute` above, but also takes a by-reference
     // integer parameter that should be incremented when
     // returning a modified value (this can help the caller
     // decide whether they need to do anything).
-    virtual RefPtr<Val> SubstituteImpl(SubstitutionSet subst, int* ioDiff);
+    virtual RefPtr<Val> substituteImpl(SubstitutionSet subst, int* ioDiff);
 
-    virtual bool EqualsVal(Val* val) = 0;
-    virtual String ToString() = 0;
+    virtual bool equalsVal(Val* val) = 0;
+    virtual String toString() = 0;
     virtual int GetHashCode() = 0;
     bool operator == (const Val & v)
     {
-        return EqualsVal(const_cast<Val*>(&v));
+        return equalsVal(const_cast<Val*>(&v));
     }
 };
 
@@ -128,18 +128,18 @@ public:
     Session* getSession() { return this->session; }
     void setSession(Session* s) { this->session = s; }
 
-    bool Equals(Type* type);
+    bool equals(Type* type);
     
-    Type* GetCanonicalType();
+    Type* getCanonicalType();
 
-    virtual RefPtr<Val> SubstituteImpl(SubstitutionSet subst, int* ioDiff) override;
+    virtual RefPtr<Val> substituteImpl(SubstitutionSet subst, int* ioDiff) override;
 
-    virtual bool EqualsVal(Val* val) override;
+    virtual bool equalsVal(Val* val) override;
 
     ~Type();
 
 protected:
-    virtual bool EqualsImpl(Type* type) = 0;
+    virtual bool equalsImpl(Type* type) = 0;
 
     virtual RefPtr<Type> CreateCanonicalType() = 0;
     Type* canonicalType = nullptr;
@@ -149,9 +149,9 @@ protected:
 };
 
 template <typename T>
-SLANG_FORCE_INLINE T* as(Type* obj) { return obj ? dynamicCast<T>(obj->GetCanonicalType()) : nullptr; }
+SLANG_FORCE_INLINE T* as(Type* obj) { return obj ? dynamicCast<T>(obj->getCanonicalType()) : nullptr; }
 template <typename T>
-SLANG_FORCE_INLINE const T* as(const Type* obj) { return obj ? dynamicCast<T>(const_cast<Type*>(obj)->GetCanonicalType()) : nullptr; }
+SLANG_FORCE_INLINE const T* as(const Type* obj) { return obj ? dynamicCast<T>(const_cast<Type*>(obj)->getCanonicalType()) : nullptr; }
 
 // A substitution represents a binding of certain
 // type-level variables to concrete argument values
@@ -166,7 +166,7 @@ class Substitutions: public RefObject
     virtual RefPtr<Substitutions> applySubstitutionsShallow(SubstitutionSet substSet, RefPtr<Substitutions> substOuter, int* ioDiff) = 0;
 
     // Check if these are equivalent substitutions to another set
-    virtual bool Equals(Substitutions* subst) = 0;
+    virtual bool equals(Substitutions* subst) = 0;
     virtual int GetHashCode() const = 0;
 };
 
@@ -185,7 +185,7 @@ class GenericSubstitution : public Substitutions
     virtual RefPtr<Substitutions> applySubstitutionsShallow(SubstitutionSet substSet, RefPtr<Substitutions> substOuter, int* ioDiff)  override;
 
     // Check if these are equivalent substitutions to another set
-    virtual bool Equals(Substitutions* subst) override;
+    virtual bool equals(Substitutions* subst) override;
 
     virtual int GetHashCode() const override
     {
@@ -215,7 +215,7 @@ class ThisTypeSubstitution : public Substitutions
     virtual RefPtr<Substitutions> applySubstitutionsShallow(SubstitutionSet substSet, RefPtr<Substitutions> substOuter, int* ioDiff)  override;
 
     // Check if these are equivalent substitutions to another set
-    virtual bool Equals(Substitutions* subst) override;
+    virtual bool equals(Substitutions* subst) override;
 
     virtual int GetHashCode() const override;
 };
@@ -242,7 +242,7 @@ class GlobalGenericParamSubstitution : public Substitutions
     virtual RefPtr<Substitutions> applySubstitutionsShallow(SubstitutionSet substSet, RefPtr<Substitutions> substOuter, int* ioDiff)  override;
 
     // Check if these are equivalent substitutions to another set
-    virtual bool Equals(Substitutions* subst) override;
+    virtual bool equals(Substitutions* subst) override;
 
     virtual int GetHashCode() const override
     {
@@ -290,17 +290,17 @@ class ModifiableSyntaxNode : public SyntaxNode
     Modifiers modifiers;
 
     template<typename T>
-    FilteredModifierList<T> GetModifiersOfType() { return FilteredModifierList<T>(modifiers.first.Ptr()); }
+    FilteredModifierList<T> getModifiersOfType() { return FilteredModifierList<T>(modifiers.first.Ptr()); }
 
     // Find the first modifier of a given type, or return `nullptr` if none is found.
     template<typename T>
-    T* FindModifier()
+    T* findModifier()
     {
-        return *GetModifiersOfType<T>().begin();
+        return *getModifiersOfType<T>().begin();
     }
 
     template<typename T>
-    bool HasModifier() { return FindModifier<T>() != nullptr; }
+    bool hasModifier() { return findModifier<T>() != nullptr; }
 };
 
 
@@ -319,7 +319,7 @@ class Decl : public DeclBase
 public:
     SLANG_ABSTRACT_CLASS(Decl)
 
-    ContainerDecl* ParentDecl = nullptr;
+    ContainerDecl* parentDecl = nullptr;
 
     NameLoc nameAndLoc;
 
@@ -333,8 +333,8 @@ public:
     // The next declaration defined in the same container with the same name
     Decl* nextInContainerWithSameName = nullptr;
 
-    bool IsChecked(DeclCheckState state) { return checkState >= state; }
-    void SetCheckState(DeclCheckState state)
+    bool isChecked(DeclCheckState state) { return checkState >= state; }
+    void setCheckState(DeclCheckState state)
     {
         SLANG_RELEASE_ASSERT(state >= checkState.getState());
         checkState.setState(state);

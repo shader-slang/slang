@@ -15,7 +15,7 @@ namespace Slang
     ConversionCost SemanticsVisitor::getImplicitConversionCost(
         Decl* decl)
     {
-        if(auto modifier = decl->FindModifier<ImplicitConversionModifier>())
+        if(auto modifier = decl->findModifier<ImplicitConversionModifier>())
         {
             return modifier->cost;
         }
@@ -239,7 +239,7 @@ namespace Slang
 
             auto toElementType = toArrayType->baseType;
 
-            if(auto toElementCount = toArrayType->ArrayLength)
+            if(auto toElementCount = toArrayType->arrayLength)
             {
                 // In the case of a sized array, we need to check that the number
                 // of elements being initialized matches what was declared.
@@ -487,7 +487,7 @@ namespace Slang
     {
         // An important and easy case is when the "to" and "from" types are equal.
         //
-        if( toType->Equals(fromType) )
+        if( toType->equals(fromType) )
         {
             if(outToExpr)
                 *outToExpr = fromExpr;
@@ -722,7 +722,7 @@ namespace Slang
                 //
                 auto castExpr = createImplicitCastExpr();
                 castExpr->loc = fromExpr->loc;
-                castExpr->Arguments.add(fromExpr);
+                castExpr->arguments.add(fromExpr);
                 //
                 // Next we need to set our cast expression as the "original"
                 // expression and then complete the overload process.
@@ -744,8 +744,8 @@ namespace Slang
                 // because we don't allow nested implicit conversions,
                 // but I'd rather play it safe.
                 //
-                castExpr->Arguments.clear();
-                castExpr->Arguments.add(fromExpr);
+                castExpr->arguments.clear();
+                castExpr->arguments.add(fromExpr);
             }
 
             return true;
@@ -830,9 +830,9 @@ namespace Slang
         typeExpr->base.type = toType;
 
         castExpr->loc = fromExpr->loc;
-        castExpr->FunctionExpr = typeExpr;
+        castExpr->functionExpr = typeExpr;
         castExpr->type = QualType(toType);
-        castExpr->Arguments.add(fromExpr);
+        castExpr->arguments.add(fromExpr);
         return castExpr;
     }
 

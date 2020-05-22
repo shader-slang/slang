@@ -122,7 +122,7 @@ namespace Slang
 
         void pushScopeAndSetParent(ContainerDecl* containerDecl)
         {
-            containerDecl->ParentDecl = currentScope->containerDecl;
+            containerDecl->parentDecl = currentScope->containerDecl;
             PushScope(containerDecl);
         }
 
@@ -1078,8 +1078,8 @@ namespace Slang
     {
         if (container)
         {
-            member->ParentDecl = container.Ptr();
-            container->Members.add(member);
+            member->parentDecl = container.Ptr();
+            container->members.add(member);
         }
     }
 
@@ -1166,7 +1166,7 @@ namespace Slang
         parser->genericDepth--;
         parser->ReadToken(TokenType::OpGreater);
         decl->inner = parseInnerFunc(decl);
-        decl->inner->ParentDecl = decl;
+        decl->inner->parentDecl = decl;
 
         // A generic decl hijacks the name of the declaration
         // it wraps, so that lookup can find it.
@@ -1246,23 +1246,23 @@ namespace Slang
         }
         void visitGenericAppExpr(GenericAppExpr * expr)
         {
-            expr->FunctionExpr->accept(this, nullptr);
-            for (auto arg : expr->Arguments)
+            expr->functionExpr->accept(this, nullptr);
+            for (auto arg : expr->arguments)
                 arg->accept(this, nullptr);
         }
         void visitIndexExpr(IndexExpr * expr)
         {
-            expr->BaseExpression->accept(this, nullptr);
-            expr->IndexExpression->accept(this, nullptr);
+            expr->baseExpression->accept(this, nullptr);
+            expr->indexExpression->accept(this, nullptr);
         }
         void visitMemberExpr(MemberExpr * expr)
         {
-            expr->BaseExpression->accept(this, nullptr);
+            expr->baseExpression->accept(this, nullptr);
             expr->scope = scope;
         }
         void visitStaticMemberExpr(StaticMemberExpr * expr)
         {
-            expr->BaseExpression->accept(this, nullptr);
+            expr->baseExpression->accept(this, nullptr);
             expr->scope = scope;
         }
         void visitExpr(Expr* /*expr*/)
@@ -1310,13 +1310,13 @@ namespace Slang
             replaceScopeVisitor.scope = parser->currentScope;
             declaratorInfo.typeSpec->accept(&replaceScopeVisitor, nullptr);
 
-            decl->ReturnType = TypeExp(declaratorInfo.typeSpec);
+            decl->returnType = TypeExp(declaratorInfo.typeSpec);
 
             parser->PushScope(decl);
 
             parseParameterList(parser, decl);
             ParseOptSemantics(parser, decl.Ptr());
-            decl->Body = parseOptBody(parser);
+            decl->body = parseOptBody(parser);
 
             parser->PopScope();
 
@@ -1588,8 +1588,8 @@ namespace Slang
 
                     auto arrayTypeExpr = new IndexExpr();
                     arrayTypeExpr->loc = arrayDeclarator->openBracketLoc;
-                    arrayTypeExpr->BaseExpression = ioInfo->typeSpec;
-                    arrayTypeExpr->IndexExpression = arrayDeclarator->elementCountExpr;
+                    arrayTypeExpr->baseExpression = ioInfo->typeSpec;
+                    arrayTypeExpr->indexExpression = arrayDeclarator->elementCountExpr;
                     ioInfo->typeSpec = arrayTypeExpr;
 
                     declarator = arrayDeclarator->inner;
@@ -1690,14 +1690,14 @@ namespace Slang
         RefPtr<GenericAppExpr> genericApp = new GenericAppExpr();
 
         parser->FillPosition(genericApp.Ptr()); // set up scope for lookup
-        genericApp->FunctionExpr = base;
+        genericApp->functionExpr = base;
         parser->ReadToken(TokenType::OpLess);
         parser->genericDepth++;
         // For now assume all generics have at least one argument
-        genericApp->Arguments.add(ParseGenericArg(parser));
+        genericApp->arguments.add(ParseGenericArg(parser));
         while (AdvanceIf(parser, TokenType::Comma))
         {
-            genericApp->Arguments.add(ParseGenericArg(parser));
+            genericApp->arguments.add(ParseGenericArg(parser));
         }
         parser->genericDepth--;
 
@@ -1774,7 +1774,7 @@ namespace Slang
         RefPtr<MemberExpr> memberExpr = new MemberExpr();
 
         parser->FillPosition(memberExpr.Ptr());
-        memberExpr->BaseExpression = base;
+        memberExpr->baseExpression = base;
         memberExpr->name = expectIdentifier(parser).name;
         return memberExpr;
     }
@@ -1789,11 +1789,11 @@ namespace Slang
         {
             RefPtr<IndexExpr> arrType = new IndexExpr();
             arrType->loc = typeExpr->loc;
-            arrType->BaseExpression = typeExpr;
+            arrType->baseExpression = typeExpr;
             parser->ReadToken(TokenType::LBracket);
             if (!parser->LookAheadToken(TokenType::RBracket))
             {
-                arrType->IndexExpression = parser->ParseExpression();
+                arrType->indexExpression = parser->ParseExpression();
             }
             parser->ReadToken(TokenType::RBracket);
             typeExpr = arrType;
@@ -2331,8 +2331,8 @@ namespace Slang
         // which is the wrapper type applied to the data type
         auto bufferVarTypeExpr = new GenericAppExpr();
         bufferVarTypeExpr->loc = bufferVarDecl->loc;
-        bufferVarTypeExpr->FunctionExpr = bufferWrapperTypeExpr;
-        bufferVarTypeExpr->Arguments.add(bufferDataTypeExpr);
+        bufferVarTypeExpr->functionExpr = bufferWrapperTypeExpr;
+        bufferVarTypeExpr->arguments.add(bufferDataTypeExpr);
 
         bufferVarDecl->type.exp = bufferVarTypeExpr;
 
@@ -2629,7 +2629,7 @@ namespace Slang
 
         parseParameterList(parser, decl);
 
-        decl->Body = parseOptBody(parser);
+        decl->body = parseOptBody(parser);
 
         parser->PopScope();
         return decl;
@@ -2662,7 +2662,7 @@ namespace Slang
 
         if( parser->tokenReader.peekTokenType() == TokenType::LBrace )
         {
-            decl->Body = parser->parseBlockStatement();
+            decl->body = parser->parseBlockStatement();
         }
         else
         {
@@ -2685,7 +2685,7 @@ namespace Slang
 
         if( AdvanceIf(parser, TokenType::RightArrow) )
         {
-            decl->ReturnType = parser->ParseTypeExp();
+            decl->returnType = parser->ParseTypeExp();
         }
 
         if( AdvanceIf(parser, TokenType::LBrace) )
@@ -2801,9 +2801,9 @@ namespace Slang
             parseModernParamList(parser, decl);
             if(AdvanceIf(parser, TokenType::RightArrow))
             {
-                decl->ReturnType = parser->ParseTypeExp();
+                decl->returnType = parser->ParseTypeExp();
             }
-            decl->Body = parseOptBody(parser);
+            decl->body = parseOptBody(parser);
             parser->PopScope();
             return decl;
         });
@@ -3634,13 +3634,13 @@ namespace Slang
         FillPosition(ifStatement.Ptr());
         ReadToken("if");
         ReadToken(TokenType::LParent);
-        ifStatement->Predicate = ParseExpression();
+        ifStatement->predicate = ParseExpression();
         ReadToken(TokenType::RParent);
-        ifStatement->PositiveStatement = ParseStatement();
+        ifStatement->positiveStatement = ParseStatement();
         if (LookAheadToken("else"))
         {
             ReadToken("else");
-            ifStatement->NegativeStatement = ParseStatement();
+            ifStatement->negativeStatement = ParseStatement();
         }
         return ifStatement;
     }
@@ -3679,13 +3679,13 @@ namespace Slang
         ReadToken(TokenType::LParent);
         if (peekTypeName(this))
         {
-            stmt->InitialStatement = parseVarDeclrStatement(Modifiers());
+            stmt->initialStatement = parseVarDeclrStatement(Modifiers());
         }
         else
         {
             if (!LookAheadToken(TokenType::Semicolon))
             {
-                stmt->InitialStatement = ParseExpressionStatement();
+                stmt->initialStatement = ParseExpressionStatement();
             }
             else
             {
@@ -3693,12 +3693,12 @@ namespace Slang
             }
         }
         if (!LookAheadToken(TokenType::Semicolon))
-            stmt->PredicateExpression = ParseExpression();
+            stmt->predicateExpression = ParseExpression();
         ReadToken(TokenType::Semicolon);
         if (!LookAheadToken(TokenType::RParent))
-            stmt->SideEffectExpression = ParseExpression();
+            stmt->sideEffectExpression = ParseExpression();
         ReadToken(TokenType::RParent);
-        stmt->Statement = ParseStatement();
+        stmt->statement = ParseStatement();
 
         if (!brokenScoping)
             PopScope();
@@ -3712,9 +3712,9 @@ namespace Slang
         FillPosition(whileStatement.Ptr());
         ReadToken("while");
         ReadToken(TokenType::LParent);
-        whileStatement->Predicate = ParseExpression();
+        whileStatement->predicate = ParseExpression();
         ReadToken(TokenType::RParent);
-        whileStatement->Statement = ParseStatement();
+        whileStatement->statement = ParseStatement();
         return whileStatement;
     }
 
@@ -3723,10 +3723,10 @@ namespace Slang
         RefPtr<DoWhileStmt> doWhileStatement = new DoWhileStmt();
         FillPosition(doWhileStatement.Ptr());
         ReadToken("do");
-        doWhileStatement->Statement = ParseStatement();
+        doWhileStatement->statement = ParseStatement();
         ReadToken("while");
         ReadToken(TokenType::LParent);
-        doWhileStatement->Predicate = ParseExpression();
+        doWhileStatement->predicate = ParseExpression();
         ReadToken(TokenType::RParent);
         ReadToken(TokenType::Semicolon);
         return doWhileStatement;
@@ -3756,7 +3756,7 @@ namespace Slang
         FillPosition(returnStatement.Ptr());
         ReadToken("return");
         if (!LookAheadToken(TokenType::Semicolon))
-            returnStatement->Expression = ParseExpression();
+            returnStatement->expression = ParseExpression();
         ReadToken(TokenType::Semicolon);
         return returnStatement;
     }
@@ -3766,7 +3766,7 @@ namespace Slang
         RefPtr<ExpressionStmt> statement = new ExpressionStmt();
 
         FillPosition(statement.Ptr());
-        statement->Expression = ParseExpression();
+        statement->expression = ParseExpression();
 
         ReadToken(TokenType::Semicolon);
         return statement;
@@ -3918,9 +3918,9 @@ namespace Slang
     {
         RefPtr<InfixExpr> expr = new InfixExpr();
         expr->loc = op->loc;
-        expr->FunctionExpr = op;
-        expr->Arguments.add(left);
-        expr->Arguments.add(right);
+        expr->functionExpr = op;
+        expr->arguments.add(left);
+        expr->arguments.add(right);
         return expr;
     }
 
@@ -3945,13 +3945,13 @@ namespace Slang
             {
                 RefPtr<SelectExpr> select = new SelectExpr();
                 select->loc = op->loc;
-                select->FunctionExpr = op;
+                select->functionExpr = op;
 
-                select->Arguments.add(expr);
+                select->arguments.add(expr);
 
-                select->Arguments.add(parser->ParseExpression(opPrec));
+                select->arguments.add(parser->ParseExpression(opPrec));
                 parser->ReadToken(TokenType::Colon);
-                select->Arguments.add(parser->ParseExpression(opPrec));
+                select->arguments.add(parser->ParseExpression(opPrec));
 
                 expr = select;
                 continue;
@@ -4282,11 +4282,11 @@ namespace Slang
                 {
                     RefPtr<TypeCastExpr> tcexpr = new ExplicitCastExpr();
                     parser->FillPosition(tcexpr.Ptr());
-                    tcexpr->FunctionExpr = parser->ParseType();
+                    tcexpr->functionExpr = parser->ParseType();
                     parser->ReadToken(TokenType::RParent);
 
                     auto arg = parsePrefixExpr(parser);
-                    tcexpr->Arguments.add(arg);
+                    tcexpr->arguments.add(arg);
 
                     return tcexpr;
                 }
@@ -4613,8 +4613,8 @@ namespace Slang
                 {
                     RefPtr<OperatorExpr> postfixExpr = new PostfixExpr();
                     parser->FillPosition(postfixExpr.Ptr());
-                    postfixExpr->FunctionExpr = parseOperator(parser);
-                    postfixExpr->Arguments.add(expr);
+                    postfixExpr->functionExpr = parseOperator(parser);
+                    postfixExpr->arguments.add(expr);
 
                     expr = postfixExpr;
                 }
@@ -4624,13 +4624,13 @@ namespace Slang
             case TokenType::LBracket:
                 {
                     RefPtr<IndexExpr> indexExpr = new IndexExpr();
-                    indexExpr->BaseExpression = expr;
+                    indexExpr->baseExpression = expr;
                     parser->FillPosition(indexExpr.Ptr());
                     parser->ReadToken(TokenType::LBracket);
                     // TODO: eventually we may want to support multiple arguments inside the `[]`
                     if (!parser->LookAheadToken(TokenType::RBracket))
                     {
-                        indexExpr->IndexExpression = parser->ParseExpression();
+                        indexExpr->indexExpression = parser->ParseExpression();
                     }
                     parser->ReadToken(TokenType::RBracket);
 
@@ -4642,13 +4642,13 @@ namespace Slang
             case TokenType::LParent:
                 {
                     RefPtr<InvokeExpr> invokeExpr = new InvokeExpr();
-                    invokeExpr->FunctionExpr = expr;
+                    invokeExpr->functionExpr = expr;
                     parser->FillPosition(invokeExpr.Ptr());
                     parser->ReadToken(TokenType::LParent);
                     while (!parser->tokenReader.isAtEnd())
                     {
                         if (!parser->LookAheadToken(TokenType::RParent))
-                            invokeExpr->Arguments.add(parser->ParseArgExpr());
+                            invokeExpr->arguments.add(parser->ParseArgExpr());
                         else
                         {
                             break;
@@ -4672,7 +4672,7 @@ namespace Slang
                 staticMemberExpr->scope = parser->currentScope.Ptr();
 
                 parser->FillPosition(staticMemberExpr.Ptr());
-                staticMemberExpr->BaseExpression = expr;
+                staticMemberExpr->baseExpression = expr;
                 parser->ReadToken(TokenType::Scope);
                 staticMemberExpr->name = expectIdentifier(parser).name;
 
@@ -4692,7 +4692,7 @@ namespace Slang
                     memberExpr->scope = parser->currentScope.Ptr();
 
                     parser->FillPosition(memberExpr.Ptr());
-                    memberExpr->BaseExpression = expr;
+                    memberExpr->baseExpression = expr;
                     parser->ReadToken(TokenType::Dot);
                     memberExpr->name = expectIdentifier(parser).name;
 
@@ -4749,11 +4749,11 @@ namespace Slang
         {
             RefPtr<PrefixExpr> prefixExpr = new PrefixExpr();
             parser->FillPosition(prefixExpr.Ptr());
-            prefixExpr->FunctionExpr = parseOperator(parser);
+            prefixExpr->functionExpr = parseOperator(parser);
 
             auto arg = parsePrefixExpr(parser);
 
-            prefixExpr->Arguments.add(arg);
+            prefixExpr->arguments.add(arg);
             return prefixExpr;
         }
         case TokenType::OpBitNot:
@@ -4762,7 +4762,7 @@ namespace Slang
             {
                 RefPtr<PrefixExpr> prefixExpr = new PrefixExpr();
                 parser->FillPosition(prefixExpr.Ptr());
-                prefixExpr->FunctionExpr = parseOperator(parser);
+                prefixExpr->functionExpr = parseOperator(parser);
 
                 auto arg = parsePrefixExpr(parser);
 
@@ -4788,7 +4788,7 @@ namespace Slang
                     return newLiteral;
                 }
 
-                prefixExpr->Arguments.add(arg);
+                prefixExpr->arguments.add(arg);
                 return prefixExpr;
             }
         

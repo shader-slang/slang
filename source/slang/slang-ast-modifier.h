@@ -728,7 +728,7 @@ class EntryPointAttribute : public Attribute
     //
     // TODO: This should be an accessor that uses the
     // ordinary `args` list, rather than side data.
-    Stage stage;;
+    Stage stage;
 };
 
 // A `[__vulkanRayPayload]` attribute, which is used in the

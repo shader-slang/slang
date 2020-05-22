@@ -417,7 +417,7 @@ void setValue(IRGenContext* context, Decl* decl, LoweredValInfo value)
 
 ModuleDecl* findModuleDecl(Decl* decl)
 {
-    for (auto dd = decl; dd; dd = dd->ParentDecl)
+    for (auto dd = decl; dd; dd = dd->parentDecl)
     {
         if (auto moduleDecl = as<ModuleDecl>(dd))
             return moduleDecl;
@@ -427,9 +427,9 @@ ModuleDecl* findModuleDecl(Decl* decl)
 
 bool isFromStdLib(Decl* decl)
 {
-    for (auto dd = decl; dd; dd = dd->ParentDecl)
+    for (auto dd = decl; dd; dd = dd->parentDecl)
     {
-        if (dd->HasModifier<FromStdLibModifier>())
+        if (dd->hasModifier<FromStdLibModifier>())
             return true;
     }
     return false;
@@ -448,7 +448,7 @@ bool isImportedDecl(IRGenContext* context, Decl* decl)
     // Note that in practice for matching during linking uses the fully qualified name - including module name.
     // Thus using extern __attribute isn't useful for symbols that are imported via `import`, only symbols
     // that notionally come from the same module but are split into separate compilations (as can be done with -module-name)
-    if (decl->FindModifier<ExternAttribute>())
+    if (decl->findModifier<ExternAttribute>())
     {
         return true;
     }
@@ -477,7 +477,7 @@ bool isImportedDecl(IRGenContext* context, Decl* decl)
     /// Is `decl` a function that should be force-inlined early in compilation (before linking)?
 static bool isForceInlineEarly(Decl* decl)
 {
-    if(decl->HasModifier<UnsafeForceInlineEarlyAttribute>())
+    if(decl->hasModifier<UnsafeForceInlineEarlyAttribute>())
         return true;
 
     return false;
@@ -630,7 +630,7 @@ LoweredValInfo emitCallToDeclRef(
     }
 
     auto funcDecl = funcDeclRef.getDecl();
-    if(auto intrinsicOpModifier = funcDecl->FindModifier<IntrinsicOpModifier>())
+    if(auto intrinsicOpModifier = funcDecl->findModifier<IntrinsicOpModifier>())
     {
         // The intrinsic op maps to a single IR instruction,
         // so we will emit an instruction with the chosen
@@ -646,7 +646,7 @@ LoweredValInfo emitCallToDeclRef(
 
     if( auto ctorDeclRef = funcDeclRef.as<ConstructorDecl>() )
     {
-        if(!ctorDeclRef.getDecl()->Body)
+        if(!ctorDeclRef.getDecl()->body)
         {
             // HACK: For legacy reasons, all of the built-in initializers
             // in the standard library are declared without proper
@@ -1341,7 +1341,7 @@ struct ValLoweringVisitor : ValVisitor<ValLoweringVisitor, LoweredValInfo, Lower
         auto decl = declRef.getDecl();
 
         // Check for types with teh `__intrinsic_type` modifier.
-        if(decl->FindModifier<IntrinsicTypeModifier>())
+        if(decl->findModifier<IntrinsicTypeModifier>())
         {
             return lowerSimpleIntrinsicType(type);
         }
@@ -1355,7 +1355,7 @@ struct ValLoweringVisitor : ValVisitor<ValLoweringVisitor, LoweredValInfo, Lower
 
     IRType* visitNamedExpressionType(NamedExpressionType* type)
     {
-        return (IRType*)getSimpleVal(context, dispatchType(type->GetCanonicalType()));
+        return (IRType*)getSimpleVal(context, dispatchType(type->getCanonicalType()));
     }
 
     IRType* visitBasicExpressionType(BasicExpressionType* type)
@@ -1389,9 +1389,9 @@ struct ValLoweringVisitor : ValVisitor<ValLoweringVisitor, LoweredValInfo, Lower
     IRType* visitArrayExpressionType(ArrayExpressionType* type)
     {
         auto elementType = lowerType(context, type->baseType);
-        if (type->ArrayLength)
+        if (type->arrayLength)
         {
-            auto elementCount = lowerSimpleVal(context, type->ArrayLength);
+            auto elementCount = lowerSimpleVal(context, type->arrayLength);
             return getBuilder()->getArrayType(
                 elementType,
                 elementCount);
@@ -1408,7 +1408,7 @@ struct ValLoweringVisitor : ValVisitor<ValLoweringVisitor, LoweredValInfo, Lower
     // type with the appropriate opcode.
     IRType* lowerSimpleIntrinsicType(DeclRefType* type)
     {
-        auto intrinsicTypeModifier = type->declRef.getDecl()->FindModifier<IntrinsicTypeModifier>();
+        auto intrinsicTypeModifier = type->declRef.getDecl()->findModifier<IntrinsicTypeModifier>();
         SLANG_ASSERT(intrinsicTypeModifier);
         IROp op = IROp(intrinsicTypeModifier->irOp);
         return getBuilder()->getType(op);
@@ -1419,7 +1419,7 @@ struct ValLoweringVisitor : ValVisitor<ValLoweringVisitor, LoweredValInfo, Lower
     // which can thus be lowered to a simple IR type with the appropriate opcode.
     IRType* lowerGenericIntrinsicType(DeclRefType* type, Type* elementType)
     {
-        auto intrinsicTypeModifier = type->declRef.getDecl()->FindModifier<IntrinsicTypeModifier>();
+        auto intrinsicTypeModifier = type->declRef.getDecl()->findModifier<IntrinsicTypeModifier>();
         SLANG_ASSERT(intrinsicTypeModifier);
         IROp op = IROp(intrinsicTypeModifier->irOp);
         IRInst* irElementType = lowerType(context, elementType);
@@ -1431,7 +1431,7 @@ struct ValLoweringVisitor : ValVisitor<ValLoweringVisitor, LoweredValInfo, Lower
 
     IRType* lowerGenericIntrinsicType(DeclRefType* type, Type* elementType, IntVal* count)
     {
-        auto intrinsicTypeModifier = type->declRef.getDecl()->FindModifier<IntrinsicTypeModifier>();
+        auto intrinsicTypeModifier = type->declRef.getDecl()->findModifier<IntrinsicTypeModifier>();
         SLANG_ASSERT(intrinsicTypeModifier);
         IROp op = IROp(intrinsicTypeModifier->irOp);
         IRInst* irElementType = lowerType(context, elementType);
@@ -1663,7 +1663,7 @@ void maybeSetRate(
 {
     auto builder = context->irBuilder;
 
-    if (decl->HasModifier<HLSLGroupSharedModifier>())
+    if (decl->hasModifier<HLSLGroupSharedModifier>())
     {
         inst->setFullType(builder->getRateQualifiedType(
             builder->getGroupSharedRate(),
@@ -1680,7 +1680,7 @@ static String getNameForNameHint(
     Name* leafName = decl->getName();
 
     // Handle custom name for a global parameter group (e.g., a `cbuffer`)
-    if(auto reflectionNameModifier = decl->FindModifier<ParameterGroupReflectionName>())
+    if(auto reflectionNameModifier = decl->findModifier<ParameterGroupReflectionName>())
     {
         leafName = reflectionNameModifier->nameAndLoc.name;
     }
@@ -1708,11 +1708,11 @@ static String getNameForNameHint(
 
     // For other cases of declaration, we want to consider
     // merging its name with the name of its parent declaration.
-    auto parentDecl = decl->ParentDecl;
+    auto parentDecl = decl->parentDecl;
 
     // Skip past a generic parent, if we are a declaration nested in a generic.
     if(auto genericParentDecl = as<GenericDecl>(parentDecl))
-        parentDecl = genericParentDecl->ParentDecl;
+        parentDecl = genericParentDecl->parentDecl;
 
     // A `ModuleDecl` can have a name too, but in the common case
     // we don't want to generate name hints that include the module
@@ -1726,7 +1726,7 @@ static String getNameForNameHint(
     // For now we skip past a `ModuleDecl` parent.
     //
     if(auto moduleParentDecl = as<ModuleDecl>(parentDecl))
-        parentDecl = moduleParentDecl->ParentDecl;
+        parentDecl = moduleParentDecl->parentDecl;
 
     if(!parentDecl)
     {
@@ -1869,21 +1869,21 @@ enum ParameterDirection
     /// Compute the direction for a parameter based on its declaration
 ParameterDirection getParameterDirection(VarDeclBase* paramDecl)
 {
-    if( paramDecl->HasModifier<RefModifier>() )
+    if( paramDecl->hasModifier<RefModifier>() )
     {
         // The AST specified `ref`:
         return kParameterDirection_Ref;
     }
-    if( paramDecl->HasModifier<InOutModifier>() )
+    if( paramDecl->hasModifier<InOutModifier>() )
     {
         // The AST specified `inout`:
         return kParameterDirection_InOut;
     }
-    if (paramDecl->HasModifier<OutModifier>())
+    if (paramDecl->hasModifier<OutModifier>())
     {
         // We saw an `out` modifier, so now we need
         // to check if there was a paired `in`.
-        if(paramDecl->HasModifier<InModifier>())
+        if(paramDecl->hasModifier<InModifier>())
             return kParameterDirection_InOut;
         else
             return kParameterDirection_Out;
@@ -1902,7 +1902,7 @@ ParameterDirection getThisParamDirection(Decl* parentDecl)
     // by applying the `[mutating]` attribute to their
     // declaration.
     //
-    if( parentDecl->HasModifier<MutatingAttribute>() )
+    if( parentDecl->hasModifier<MutatingAttribute>() )
     {
         return kParameterDirection_InOut;
     }
@@ -2018,8 +2018,8 @@ struct ExprLoweringVisitorBase : ExprVisitor<Derived, LoweredValInfo>
     LoweredValInfo visitIndexExpr(IndexExpr* expr)
     {
         auto type = lowerType(context, expr->type);
-        auto baseVal = lowerSubExpr(expr->BaseExpression);
-        auto indexVal = getSimpleVal(context, lowerRValueExpr(context, expr->IndexExpression));
+        auto baseVal = lowerSubExpr(expr->baseExpression);
+        auto indexVal = getSimpleVal(context, lowerRValueExpr(context, expr->indexExpression));
 
         return subscriptValue(type, baseVal, indexVal);
     }
@@ -2032,7 +2032,7 @@ struct ExprLoweringVisitorBase : ExprVisitor<Derived, LoweredValInfo>
     LoweredValInfo visitMemberExpr(MemberExpr* expr)
     {
         auto loweredType = lowerType(context, expr->type);
-        auto loweredBase = lowerRValueExpr(context, expr->BaseExpression);
+        auto loweredBase = lowerRValueExpr(context, expr->baseExpression);
 
         auto declRef = expr->declRef;
         if (auto fieldDeclRef = declRef.as<VarDecl>())
@@ -2179,7 +2179,7 @@ struct ExprLoweringVisitorBase : ExprVisitor<Derived, LoweredValInfo>
         }
         else if (auto arrayType = as<ArrayExpressionType>(type))
         {
-            UInt elementCount = (UInt) GetIntVal(arrayType->ArrayLength);
+            UInt elementCount = (UInt) GetIntVal(arrayType->arrayLength);
 
             auto irDefaultElement = getSimpleVal(context, getDefaultVal(arrayType->baseType));
 
@@ -2247,7 +2247,7 @@ struct ExprLoweringVisitorBase : ExprVisitor<Derived, LoweredValInfo>
         // fill in the appropriate field of the result
         if (auto arrayType = as<ArrayExpressionType>(type))
         {
-            UInt elementCount = (UInt) GetIntVal(arrayType->ArrayLength);
+            UInt elementCount = (UInt) GetIntVal(arrayType->arrayLength);
 
             for (UInt ee = 0; ee < argCount; ++ee)
             {
@@ -2509,7 +2509,7 @@ struct ExprLoweringVisitorBase : ExprVisitor<Derived, LoweredValInfo>
         List<IRInst*>*         ioArgs,
         List<OutArgumentFixup>* ioFixups)
     {
-        UInt argCount = expr->Arguments.getCount();
+        UInt argCount = expr->arguments.getCount();
         UInt argCounter = 0;
         for (auto paramDeclRef : getMembersOfType<ParamDecl>(funcDeclRef))
         {
@@ -2521,7 +2521,7 @@ struct ExprLoweringVisitorBase : ExprVisitor<Derived, LoweredValInfo>
             RefPtr<Expr> argExpr;
             if(argIndex < argCount)
             {
-                argExpr = expr->Arguments[argIndex];
+                argExpr = expr->arguments[argIndex];
             }
             else
             {
@@ -2637,7 +2637,7 @@ struct ExprLoweringVisitorBase : ExprVisitor<Derived, LoweredValInfo>
         if (auto memberFuncExpr = as<MemberExpr>(funcExpr))
         {
             outInfo->funcDeclRef = memberFuncExpr->declRef;
-            outInfo->baseExpr = memberFuncExpr->BaseExpression;
+            outInfo->baseExpr = memberFuncExpr->baseExpression;
             return true;
         }
         else if (auto staticMemberFuncExpr = as<StaticMemberExpr>(funcExpr))
@@ -2687,7 +2687,7 @@ struct ExprLoweringVisitorBase : ExprVisitor<Derived, LoweredValInfo>
         // back to their arguments.
         List<OutArgumentFixup> argFixups;
 
-        auto funcExpr = expr->FunctionExpr;
+        auto funcExpr = expr->functionExpr;
         ResolvedCallInfo resolvedInfo;
         if( tryResolveDeclRefForCall(funcExpr, &resolvedInfo) )
         {
@@ -3232,9 +3232,9 @@ struct StmtLoweringVisitor : StmtVisitor<StmtLoweringVisitor>
         auto builder = getBuilder();
         startBlockIfNeeded(stmt);
 
-        auto condExpr = stmt->Predicate;
-        auto thenStmt = stmt->PositiveStatement;
-        auto elseStmt = stmt->NegativeStatement;
+        auto condExpr = stmt->predicate;
+        auto thenStmt = stmt->positiveStatement;
+        auto elseStmt = stmt->negativeStatement;
 
         auto irCond = getSimpleVal(context,
             lowerRValueExpr(context, condExpr));
@@ -3274,7 +3274,7 @@ struct StmtLoweringVisitor : StmtVisitor<StmtLoweringVisitor>
         IRInst* inst,
         Stmt*   stmt)
     {
-        if( stmt->FindModifier<UnrollAttribute>() )
+        if( stmt->findModifier<UnrollAttribute>() )
         {
             getBuilder()->addLoopControlDecoration(inst, kIRLoopControl_Unroll);
         }
@@ -3288,7 +3288,7 @@ struct StmtLoweringVisitor : StmtVisitor<StmtLoweringVisitor>
 
         // The initializer clause for the statement
         // can always safetly be emitted to the current block.
-        if (auto initStmt = stmt->InitialStatement)
+        if (auto initStmt = stmt->initialStatement)
         {
             lowerStmt(context, initStmt);
         }
@@ -3321,10 +3321,10 @@ struct StmtLoweringVisitor : StmtVisitor<StmtLoweringVisitor>
 
         // Now that we are within the header block, we
         // want to emit the expression for the loop condition:
-        if (auto condExpr = stmt->PredicateExpression)
+        if (auto condExpr = stmt->predicateExpression)
         {
             auto irCondition = getSimpleVal(context,
-                lowerRValueExpr(context, stmt->PredicateExpression));
+                lowerRValueExpr(context, stmt->predicateExpression));
 
             // Now we want to `break` if the loop condition is false.
             builder->emitLoopTest(
@@ -3335,11 +3335,11 @@ struct StmtLoweringVisitor : StmtVisitor<StmtLoweringVisitor>
 
         // Emit the body of the loop
         insertBlock(bodyLabel);
-        lowerStmt(context, stmt->Statement);
+        lowerStmt(context, stmt->statement);
 
         // Insert the `continue` block
         insertBlock(continueLabel);
-        if (auto incrExpr = stmt->SideEffectExpression)
+        if (auto incrExpr = stmt->sideEffectExpression)
         {
             lowerRValueExpr(context, incrExpr);
         }
@@ -3390,7 +3390,7 @@ struct StmtLoweringVisitor : StmtVisitor<StmtLoweringVisitor>
 
         // Now that we are within the header block, we
         // want to emit the expression for the loop condition:
-        if (auto condExpr = stmt->Predicate)
+        if (auto condExpr = stmt->predicate)
         {
             auto irCondition = getSimpleVal(context,
                 lowerRValueExpr(context, condExpr));
@@ -3404,7 +3404,7 @@ struct StmtLoweringVisitor : StmtVisitor<StmtLoweringVisitor>
 
         // Emit the body of the loop
         insertBlock(bodyLabel);
-        lowerStmt(context, stmt->Statement);
+        lowerStmt(context, stmt->statement);
 
         // At the end of the body we need to jump back to the top.
         emitBranchIfNeeded(loopHead);
@@ -3451,13 +3451,13 @@ struct StmtLoweringVisitor : StmtVisitor<StmtLoweringVisitor>
         insertBlock(loopHead);
 
         // Emit the body of the loop
-        lowerStmt(context, stmt->Statement);
+        lowerStmt(context, stmt->statement);
 
         insertBlock(testLabel);
 
         // Now that we are within the header block, we
         // want to emit the expression for the loop condition:
-        if (auto condExpr = stmt->Predicate)
+        if (auto condExpr = stmt->predicate)
         {
             auto irCondition = getSimpleVal(context,
                 lowerRValueExpr(context, condExpr));
@@ -3488,7 +3488,7 @@ struct StmtLoweringVisitor : StmtVisitor<StmtLoweringVisitor>
         // so that an expression statement that names
         // a location (but doesn't load from it)
         // will not actually emit a load.
-        lowerLValueExpr(context, stmt->Expression);
+        lowerLValueExpr(context, stmt->expression);
     }
 
     void visitDeclStmt(DeclStmt* stmt)
@@ -3534,7 +3534,7 @@ struct StmtLoweringVisitor : StmtVisitor<StmtLoweringVisitor>
         // instruction. If the statement had an argument
         // expression, then we need to lower that to
         // a value first, and then emit the resulting value.
-        if( auto expr = stmt->Expression )
+        if( auto expr = stmt->expression )
         {
             auto loweredExpr = lowerRValueExpr(context, expr);
 
@@ -4301,7 +4301,7 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
 
     LoweredValInfo visitExtensionDecl(ExtensionDecl* decl)
     {
-        for (auto & member : decl->Members)
+        for (auto & member : decl->members)
             ensureDecl(context, member);
         return LoweredValInfo();
     }
@@ -4353,13 +4353,13 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
         // This might be a type constraint on an associated type,
         // in which case it should lower as the key for that
         // interface requirement.
-        if(auto assocTypeDecl = as<AssocTypeDecl>(decl->ParentDecl))
+        if(auto assocTypeDecl = as<AssocTypeDecl>(decl->parentDecl))
         {
             // TODO: might need extra steps if we ever allow
             // generic associated types.
 
 
-            if(auto interfaceDecl = as<InterfaceDecl>(assocTypeDecl->ParentDecl))
+            if(auto interfaceDecl = as<InterfaceDecl>(assocTypeDecl->parentDecl))
             {
                 // Okay, this seems to be an interface rquirement, and
                 // we should lower it as such.
@@ -4367,7 +4367,7 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
             }
         }
 
-        if(auto globalGenericParamDecl = as<GlobalGenericParamDecl>(decl->ParentDecl))
+        if(auto globalGenericParamDecl = as<GlobalGenericParamDecl>(decl->parentDecl))
         {
             // This is a constraint on a global generic type parameters,
             // and so it should lower as a parameter of its own.
@@ -4480,7 +4480,7 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
         // table, because it represents something the
         // interface requires, and not what it provides.
         //
-        auto parentDecl = inheritanceDecl->ParentDecl;
+        auto parentDecl = inheritanceDecl->parentDecl;
         if (auto parentInterfaceDecl = as<InterfaceDecl>(parentDecl))
         {
             return LoweredValInfo::simple(getInterfaceRequirementKey(inheritanceDecl));
@@ -4597,7 +4597,7 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
 
         for (auto accessor : decl->getMembersOfType<AccessorDecl>())
         {
-            if (accessor->HasModifier<IntrinsicOpModifier>())
+            if (accessor->hasModifier<IntrinsicOpModifier>())
                 continue;
 
             ensureDecl(context, accessor);
@@ -4615,7 +4615,7 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
 
     bool isGlobalVarDecl(VarDecl* decl)
     {
-        auto parent = decl->ParentDecl;
+        auto parent = decl->parentDecl;
         if (as<NamespaceDeclBase>(parent))
         {
             // Variable declared at global/namespace scope? -> Global.
@@ -4623,7 +4623,7 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
         }
         else if(as<AggTypeDeclBase>(parent))
         {
-            if(decl->HasModifier<HLSLStaticModifier>())
+            if(decl->hasModifier<HLSLStaticModifier>())
             {
                 // A `static` member variable is effectively global.
                 return true;
@@ -4635,7 +4635,7 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
 
     bool isMemberVarDecl(VarDecl* decl)
     {
-        auto parent = decl->ParentDecl;
+        auto parent = decl->parentDecl;
         if (as<AggTypeDecl>(parent))
         {
             // A variable declared inside of an aggregate type declaration is a member.
@@ -4761,7 +4761,7 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
 
         // A `static const` global is actually a compile-time constant.
         //
-        if (decl->HasModifier<HLSLStaticModifier>() && decl->HasModifier<ConstModifier>())
+        if (decl->hasModifier<HLSLStaticModifier>() && decl->hasModifier<ConstModifier>())
         {
             return lowerGlobalConstantDecl(decl);
         }
@@ -4823,7 +4823,7 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
     bool isFunctionStaticVarDecl(VarDeclBase* decl)
     {
         // Only a variable marked `static` can be static.
-        if(!decl->FindModifier<HLSLStaticModifier>())
+        if(!decl->findModifier<HLSLStaticModifier>())
             return false;
 
         // The immediate parent of a function-scope variable
@@ -4832,7 +4832,7 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
         // TODO: right now the parent links for scopes are *not*
         // set correctly, so we can't just scan up and look
         // for a function in the parent chain...
-        auto parent = decl->ParentDecl;
+        auto parent = decl->parentDecl;
         if( as<ScopeDecl>(parent) )
         {
             return true;
@@ -4862,7 +4862,7 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
         //
         // First we start with type and value parameters,
         // in the order they were declared.
-        for (auto member : genericDecl->Members)
+        for (auto member : genericDecl->members)
         {
             if (auto typeParamDecl = as<GenericTypeParamDecl>(member))
             {
@@ -4875,7 +4875,7 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
         }
         // Then we emit constraint parameters, again in
         // declaration order.
-        for (auto member : genericDecl->Members)
+        for (auto member : genericDecl->members)
         {
             if (auto constraintDecl = as<GenericTypeConstraintDecl>(member))
             {
@@ -4903,7 +4903,7 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
         if(!parentVal)
             return val;
 
-        for(auto pp = decl->ParentDecl; pp; pp = pp->ParentDecl)
+        for(auto pp = decl->parentDecl; pp; pp = pp->parentDecl)
         {
             if(auto genericAncestor = as<GenericDecl>(pp))
             {
@@ -4957,7 +4957,7 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
         VarDeclBase*    decl)
     {
         // We know the variable is `static`, but it might also be `const.
-        if(decl->HasModifier<ConstModifier>())
+        if(decl->hasModifier<ConstModifier>())
             return lowerFunctionStaticConstVarDecl(decl);
 
         // A global variable may need to be generic, if one
@@ -5151,7 +5151,7 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
         // a witness table for the interface type's conformance
         // to its own interface.
         //
-        for (auto requirementDecl : decl->Members)
+        for (auto requirementDecl : decl->members)
         {
             getInterfaceRequirementKey(requirementDecl);
 
@@ -5240,7 +5240,7 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
     LoweredValInfo visitAggTypeDecl(AggTypeDecl* decl)
     {
         // Don't generate an IR `struct` for intrinsic types
-        if(decl->FindModifier<IntrinsicTypeModifier>() || decl->FindModifier<BuiltinTypeModifier>())
+        if(decl->findModifier<IntrinsicTypeModifier>() || decl->findModifier<BuiltinTypeModifier>())
         {
             return LoweredValInfo();
         }
@@ -5271,7 +5271,7 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
 
         for (auto fieldDecl : decl->getMembersOfType<VarDeclBase>())
         {
-            if (fieldDecl->HasModifier<HLSLStaticModifier>())
+            if (fieldDecl->hasModifier<HLSLStaticModifier>())
             {
                 // A `static` field is actually a global variable,
                 // and we should emit it as such.
@@ -5333,7 +5333,7 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
 
         addLinkageDecoration(context, irFieldKey, fieldDecl);
 
-        if (auto semanticModifier = fieldDecl->FindModifier<HLSLSimpleSemantic>())
+        if (auto semanticModifier = fieldDecl->findModifier<HLSLSimpleSemantic>())
         {
             builder->addSemanticDecoration(irFieldKey, semanticModifier->name.getName()->text.getUnownedSlice());
         }
@@ -5478,7 +5478,7 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
         // The parameters introduced by any "parent" declarations
         // will need to come first, so we'll deal with that
         // logic here.
-        if( auto parentDecl = decl->ParentDecl )
+        if( auto parentDecl = decl->parentDecl )
         {
             // Compute the mode to use when collecting parameters from
             // the outer declaration. The most important question here
@@ -5515,7 +5515,7 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
             // we are in a `static` context.
             if( mode == kParameterListCollectMode_Default )
             {
-                for( auto paramDecl : callableDecl->GetParameters() )
+                for( auto paramDecl : callableDecl->getParameters() )
                 {
                     ioParameterLists->params.add(getParameterInfo(paramDecl));
                 }
@@ -5530,11 +5530,11 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
 
     bool isConstExprVar(Decl* decl)
     {
-        if( decl->HasModifier<ConstExprModifier>() )
+        if( decl->hasModifier<ConstExprModifier>() )
         {
             return true;
         }
-        else if(decl->HasModifier<HLSLStaticModifier>() && decl->HasModifier<ConstModifier>())
+        else if(decl->hasModifier<HLSLStaticModifier>() && decl->hasModifier<ConstModifier>())
         {
             return true;
         }
@@ -5576,7 +5576,7 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
         //
         // First we start with type and value parameters,
         // in the order they were declared.
-        for (auto member : genericDecl->Members)
+        for (auto member : genericDecl->members)
         {
             if (auto typeParamDecl = as<GenericTypeParamDecl>(member))
             {
@@ -5596,7 +5596,7 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
         }
         // Then we emit constraint parameters, again in
         // declaration order.
-        for (auto member : genericDecl->Members)
+        for (auto member : genericDecl->members)
         {
             if (auto constraintDecl = as<GenericTypeConstraintDecl>(member))
             {
@@ -5618,7 +5618,7 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
     //
     IRGeneric* emitOuterGenerics(IRGenContext* subContext, Decl* decl, Decl* leafDecl)
     {
-        for(auto pp = decl->ParentDecl; pp; pp = pp->ParentDecl)
+        for(auto pp = decl->parentDecl; pp; pp = pp->parentDecl)
         {
             if(auto genericAncestor = as<GenericDecl>(pp))
             {
@@ -5669,7 +5669,7 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
     {
         auto builder = getBuilder();
 
-        for (auto targetMod : decl->GetModifiersOfType<TargetIntrinsicModifier>())
+        for (auto targetMod : decl->getModifiersOfType<TargetIntrinsicModifier>())
         {
             String definition;
             auto definitionToken = targetMod->definitionToken;
@@ -5712,18 +5712,18 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
         if(as<ConstructorDecl>(decl))
             return false;
 
-        auto dd = decl->ParentDecl;
+        auto dd = decl->parentDecl;
         for(;;)
         {
             if(auto genericDecl = as<GenericDecl>(dd))
             {
-                dd = genericDecl->ParentDecl;
+                dd = genericDecl->parentDecl;
                 continue;
             }
 
             if( auto subscriptDecl = as<SubscriptDecl>(dd) )
             {
-                dd = subscriptDecl->ParentDecl;
+                dd = subscriptDecl->parentDecl;
             }
 
             break;
@@ -5748,7 +5748,7 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
         // We don't need an intrinsic decoration on a function that has a body,
         // since the body can be used as the "catch-all" case.
         //
-        if(decl->Body)
+        if(decl->body)
             return;
 
         // Only standard library declarations should get any kind of catch-all
@@ -5762,7 +5762,7 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
         // No need to worry about functions that lower to intrinsic IR opcodes
         // (or pseudo-ops).
         //
-        if(decl->FindModifier<IntrinsicOpModifier>())
+        if(decl->findModifier<IntrinsicOpModifier>())
             return;
 
         // We also don't need an intrinsic decoration if the function already
@@ -5770,7 +5770,7 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
         //
         for( auto f = decl->primaryDecl; f; f = f->nextDecl )
         {
-            for(auto targetMod : f->GetModifiersOfType<TargetIntrinsicModifier>())
+            for(auto targetMod : f->getModifiersOfType<TargetIntrinsicModifier>())
             {
                 // If we find a catch-all case (marked as either *no* target
                 // token or an empty target name), then we should bail out.
@@ -5807,7 +5807,7 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
         //
         Decl* declForName = decl;
         if(auto accessorDecl = as<AccessorDecl>(decl))
-            declForName = decl->ParentDecl;
+            declForName = decl->parentDecl;
 
         definition.append(getText(declForName->getName()));
 
@@ -5881,7 +5881,7 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
             // We are some kind of accessor, so the parent declaration should
             // know the correct return type to expose.
             //
-            auto parentDecl = accessorDecl->ParentDecl;
+            auto parentDecl = accessorDecl->parentDecl;
             if (auto subscriptDecl = as<SubscriptDecl>(parentDecl))
             {
                 declForReturnType = subscriptDecl;
@@ -5936,7 +5936,7 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
             paramTypes.add(irParamType);
         }
 
-        auto irResultType = lowerType(subContext, declForReturnType->ReturnType);
+        auto irResultType = lowerType(subContext, declForReturnType->returnType);
 
         if (auto setterDecl = as<SetterDecl>(decl))
         {
@@ -5988,7 +5988,7 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
             // Always emit imported declarations as declarations,
             // and not definitions.
         }
-        else if (!decl->Body)
+        else if (!decl->body)
         {
             // This is a function declaration without a body.
             // In Slang we currently try not to support forward declarations
@@ -6065,7 +6065,7 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
                         // TODO: we should consider having all parameter be implicitly
                         // immutable except in a specific "compatibility mode."
                         //
-                        if(paramDecl && paramDecl->FindModifier<ConstModifier>())
+                        if(paramDecl && paramDecl->findModifier<ConstModifier>())
                         {
                             // This parameter was declared to be immutable,
                             // so there should be no assignment to it in the
@@ -6118,7 +6118,7 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
 
             {
 
-                auto attr = decl->FindModifier<PatchConstantFuncAttribute>();
+                auto attr = decl->findModifier<PatchConstantFuncAttribute>();
 
                 // I needed to test for patchConstantFuncDecl here
                 // because it is only set if validateEntryPoint is called with Hull as the required stage
@@ -6162,7 +6162,7 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
             // We lower whatever statement was stored on the declaration
             // as the body of the new IR function.
             //
-            lowerStmt(subContext, decl->Body);
+            lowerStmt(subContext, decl->body);
 
             // We need to carefully add a terminator instruction to the end
             // of the body, in case the user didn't do so.
@@ -6204,7 +6204,7 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
 
         // If this declaration was marked as being an intrinsic for a particular
         // target, then we should reflect that here.
-        for( auto targetMod : decl->GetModifiersOfType<SpecializedForTargetModifier>() )
+        for( auto targetMod : decl->getModifiersOfType<SpecializedForTargetModifier>() )
         {
             // `targetMod` indicates that this particular declaration represents
             // a specialized definition of the particular function for the given
@@ -6225,36 +6225,36 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
         // TODO: We should wrap this an `SpecializedForTargetModifier` together into a single
         // case for enumerating the "capabilities" that a declaration requires.
         //
-        for(auto extensionMod : decl->GetModifiersOfType<RequiredGLSLExtensionModifier>())
+        for(auto extensionMod : decl->getModifiersOfType<RequiredGLSLExtensionModifier>())
         {
             getBuilder()->addRequireGLSLExtensionDecoration(irFunc, extensionMod->extensionNameToken.getContent());
         }
-        for(auto versionMod : decl->GetModifiersOfType<RequiredGLSLVersionModifier>())
+        for(auto versionMod : decl->getModifiersOfType<RequiredGLSLVersionModifier>())
         {
             getBuilder()->addRequireGLSLVersionDecoration(irFunc, Int(getIntegerLiteralValue(versionMod->versionNumberToken)));
         }
-        for (auto versionMod : decl->GetModifiersOfType<RequiredSPIRVVersionModifier>())
+        for (auto versionMod : decl->getModifiersOfType<RequiredSPIRVVersionModifier>())
         {
             getBuilder()->addRequireSPIRVVersionDecoration(irFunc, versionMod->version);
         }
-        for (auto versionMod : decl->GetModifiersOfType<RequiredCUDASMVersionModifier>())
+        for (auto versionMod : decl->getModifiersOfType<RequiredCUDASMVersionModifier>())
         {
             getBuilder()->addRequireCUDASMVersionDecoration(irFunc, versionMod->version);
         }
 
-        if (auto attr = decl->FindModifier<InstanceAttribute>())
+        if (auto attr = decl->findModifier<InstanceAttribute>())
         {
             IRIntLit* intLit = _getIntLitFromAttribute(getBuilder(), attr);
             getBuilder()->addDecoration(irFunc, kIROp_InstanceDecoration, intLit);
         }
 
-        if(auto attr = decl->FindModifier<MaxVertexCountAttribute>())
+        if(auto attr = decl->findModifier<MaxVertexCountAttribute>())
         {
             IRIntLit* intLit = _getIntLitFromAttribute(getBuilder(), attr);
             getBuilder()->addDecoration(irFunc, kIROp_MaxVertexCountDecoration, intLit);
         }
 
-        if(auto attr = decl->FindModifier<NumThreadsAttribute>())
+        if(auto attr = decl->findModifier<NumThreadsAttribute>())
         {
             auto builder = getBuilder();
             IRType* intType = builder->getIntType();
@@ -6268,41 +6268,41 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
            builder->addDecoration(irFunc, kIROp_NumThreadsDecoration, operands, 3);
         }
 
-        if(decl->FindModifier<ReadNoneAttribute>())
+        if(decl->findModifier<ReadNoneAttribute>())
         {
             getBuilder()->addSimpleDecoration<IRReadNoneDecoration>(irFunc);
         }
 
-        if (decl->FindModifier<EarlyDepthStencilAttribute>())
+        if (decl->findModifier<EarlyDepthStencilAttribute>())
         {
             getBuilder()->addSimpleDecoration<IREarlyDepthStencilDecoration>(irFunc);
         }
 
-        if (auto attr = decl->FindModifier<DomainAttribute>())
+        if (auto attr = decl->findModifier<DomainAttribute>())
         {
             IRStringLit* stringLit = _getStringLitFromAttribute(getBuilder(), attr);
             getBuilder()->addDecoration(irFunc, kIROp_DomainDecoration, stringLit);
         }
 
-        if (auto attr = decl->FindModifier<PartitioningAttribute>())
+        if (auto attr = decl->findModifier<PartitioningAttribute>())
         {
             IRStringLit* stringLit = _getStringLitFromAttribute(getBuilder(), attr);
             getBuilder()->addDecoration(irFunc, kIROp_PartitioningDecoration, stringLit);
         }
 
-        if (auto attr = decl->FindModifier<OutputTopologyAttribute>())
+        if (auto attr = decl->findModifier<OutputTopologyAttribute>())
         {
             IRStringLit* stringLit = _getStringLitFromAttribute(getBuilder(), attr);
             getBuilder()->addDecoration(irFunc, kIROp_OutputTopologyDecoration, stringLit);
         }
 
-        if (auto attr = decl->FindModifier<OutputControlPointsAttribute>())
+        if (auto attr = decl->findModifier<OutputControlPointsAttribute>())
         {
             IRIntLit* intLit = _getIntLitFromAttribute(getBuilder(), attr);
             getBuilder()->addDecoration(irFunc, kIROp_OutputControlPointsDecoration, intLit);
         }
 
-        if(decl->FindModifier<UnsafeForceInlineEarlyAttribute>())
+        if(decl->findModifier<UnsafeForceInlineEarlyAttribute>())
         {
             getBuilder()->addDecoration(irFunc, kIROp_UnsafeForceInlineEarlyDecoration);
         }
@@ -6660,7 +6660,7 @@ static void lowerFrontEndEntryPointToIR(
     // But only if this is a definition not a declaration
     if (isDefinition(instToDecorate))
     {
-        FilteredMemberList<ParamDecl> params = entryPointFuncDecl->GetParameters();
+        FilteredMemberList<ParamDecl> params = entryPointFuncDecl->getParameters();
 
         IRGlobalValueWithParams* valueWithParams = as<IRGlobalValueWithParams>(instToDecorate);
         if (valueWithParams)
@@ -6669,7 +6669,7 @@ static void lowerFrontEndEntryPointToIR(
 
             for (auto param : params)
             {
-                if (auto modifier = param->FindModifier<HLSLGeometryShaderInputPrimitiveTypeModifier>())
+                if (auto modifier = param->findModifier<HLSLGeometryShaderInputPrimitiveTypeModifier>())
                 {
                     IROp op = kIROp_Invalid;
 
@@ -6767,7 +6767,7 @@ static void ensureAllDeclsRec(
     //
     if(auto containerDecl = as<AggTypeDeclBase>(decl))
     {
-        for (auto memberDecl : containerDecl->Members)
+        for (auto memberDecl : containerDecl->members)
         {
             ensureAllDeclsRec(context, memberDecl);
         }
@@ -6823,7 +6823,7 @@ IRModule* generateIRForTranslationUnit(
     //
     // Next, ensure that all other global declarations have
     // been emitted.
-    for (auto decl : translationUnit->getModuleDecl()->Members)
+    for (auto decl : translationUnit->getModuleDecl()->members)
     {
         ensureAllDeclsRec(context, decl);
     }
