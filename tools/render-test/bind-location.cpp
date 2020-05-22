@@ -762,7 +762,7 @@ bool BindLocation::operator==(const ThisType& rhs) const
     return (m_bindPointSet && rhs.m_bindPointSet) && (m_bindPointSet->m_points == rhs.m_bindPointSet->m_points);
 }
 
-int BindLocation::GetHashCode() const
+HashCode BindLocation::GetHashCode() const
 {
     if (!m_typeLayout)
     {

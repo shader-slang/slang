@@ -489,11 +489,11 @@ namespace Slang
 
     String getHashedName(const UnownedStringSlice& mangledName)
     {
-        uint64_t hash = GetHashCode64(mangledName.begin(), mangledName.getLength());
+        HashCode64 hash = GetStableHashCode64(mangledName.begin(), mangledName.getLength());
 
         StringBuilder builder;
         builder << "_Sh";
-        builder.append(hash, 16);
+        builder.append(uint64_t(hash), 16);
 
         return builder;
     }

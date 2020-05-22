@@ -1651,7 +1651,7 @@ namespace Slang
         return true;
     }
 
-    int IRInstKey::GetHashCode()
+    HashCode IRInstKey::GetHashCode()
     {
         auto code = Slang::GetHashCode(inst->op);
         code = combineHash(code, Slang::GetHashCode(inst->getFullType()));
@@ -1760,7 +1760,7 @@ namespace Slang
         return isValueEqual(rhs) && getFullType() == rhs->getFullType();
     }
 
-    int IRConstant::getHashCode()
+    HashCode IRConstant::getHashCode()
     {
         auto code = Slang::GetHashCode(op);
         code = combineHash(code, Slang::GetHashCode(getFullType()));

@@ -54,7 +54,7 @@ namespace Slang
 			Value = that.Value;
 			return *this;
 		}
-		int GetHashCode()
+		HashCode GetHashCode()
 		{
             return combineHash(
                 Slang::GetHashCode(Key),
@@ -136,7 +136,10 @@ namespace Slang
 		};
 		inline int GetHashPos(TKey& key) const
 		{
-			return ((unsigned int)(GetHashCode(key) * 2654435761)) % bucketSizeMinusOne;
+            // TODO(JS): We probably want a function to convert a Hash to types of integrals
+            // because it's size could vary - say on pointer width.
+            // Note here, the multiply is performed, on unsigned int size 
+			return int((((unsigned int)GetHashCode(key)) * 2654435761) % bucketSizeMinusOne);
 		}
 		FindPositionResult FindPosition(const TKey& key) const
 		{

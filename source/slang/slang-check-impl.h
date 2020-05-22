@@ -72,9 +72,9 @@ namespace Slang
 
         bool isValid() const { return type1 != BasicTypeKey::Invalid && type2 != BasicTypeKey::Invalid; }
 
-        int GetHashCode()
+        HashCode GetHashCode()
         {
-            return int(type1) << 16 | int(type2);
+            return HashCode(int(type1) << 16 | int(type2));
         }
     };
 
@@ -86,9 +86,9 @@ namespace Slang
         {
             return operatorName == key.operatorName && args[0] == key.args[0] && args[1] == key.args[1];
         }
-        int GetHashCode()
+        HashCode GetHashCode()
         {
-            return ((int)(UInt64)(void*)(operatorName) << 16) ^ (int(args[0]) << 8) ^ (int(args[1]));
+            return HashCode(((int)(UInt64)(void*)(operatorName) << 16) ^ (int(args[0]) << 8) ^ (int(args[1])));
         }
         bool fromOperatorExpr(OperatorExpr* opExpr)
         {

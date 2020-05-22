@@ -7,55 +7,96 @@
 
 namespace Slang
 {
-    typedef int HashCode;
+    // Ideally Hash codes should be unsigned types - makes accumulation simpler (as overflow/underflow behavior are defined)
+    // Only downside is around multiply, where unsigned multiply can be slightly slower on some targets.
 
-	inline int GetHashCode(double key)
+    // HashCode - size may vary by platform. Typically has 'best' combination of bits/performance. Should not be exposed externally as value from same input may change depending on compilation platform.
+    typedef unsigned int HashCode;
+
+    // A fixed 64bit wide hash on all targets.
+    typedef uint64_t HashCode64;
+    // A fixed 32bit wide hash on all targets.
+    typedef uint32_t HashCode32;
+
+    // TODO(JS): We might want to implement HashCode as just an alias to HashCode32 or HashCode64 based on target.
+    SLANG_FORCE_INLINE HashCode GetHashCode(int64_t value)
+    {
+        return (sizeof(HashCode) == sizeof(int64_t)) ? HashCode(value) : (HashCode(uint64_t(value) >> 32) ^ HashCode(value));
+    }
+    SLANG_FORCE_INLINE HashCode GetHashCode(uint64_t value)
+    {
+        return (sizeof(HashCode) == sizeof(uint64_t)) ? HashCode(value) : (HashCode(value >> 32) ^ HashCode(value));
+    }
+
+	inline HashCode GetHashCode(double key)
 	{
-		return FloatAsInt((float)key);
+		return GetHashCode(DoubleAsInt64(key));
 	}
-	inline int GetHashCode(float key)
+	inline HashCode GetHashCode(float key)
 	{
 		return FloatAsInt(key);
 	}
-	inline int GetHashCode(const char * buffer)
+	inline HashCode GetHashCode(const char* buffer)
 	{
 		if (!buffer)
 			return 0;
-		int hash = 0;
-		int c;
+		HashCode hash = 0;
 		auto str = buffer;
-		c = *str++;
+		HashCode c = HashCode(*str++);
 		while (c)
 		{
 			hash = c + (hash << 6) + (hash << 16) - hash;
-			c = *str++;
+			c = HashCode(*str++);
 		}
 		return hash;
 	}
-	inline int GetHashCode(char * buffer)
+	inline HashCode GetHashCode(char* buffer)
 	{
 		return GetHashCode(const_cast<const char *>(buffer));
 	}
-    inline int GetHashCode(const char * buffer, size_t numChars)
+    inline HashCode GetHashCode(const char* buffer, size_t numChars)
     {
-        int hash = 0;
+        HashCode hash = 0;
         for (size_t i = 0; i < numChars; ++i)
         {      
-            hash = int(buffer[i]) + (hash << 6) + (hash << 16) - hash;
+            hash = HashCode(buffer[i]) + (hash << 6) + (hash << 16) - hash;
         }
         return hash;
     }
 
-    inline uint64_t GetHashCode64(const char * buffer, size_t numChars)
+    /* The 'Stable' hash code functions produce hashes that must be
+
+    * The same result for the same inputs on all targets
+    * Rarely change - as their values can change the output of the Slang API/Serialization
+
+    Hash value used from the 'Stable' functions can also be used as part of serialization -
+    so it is in effect part of the API.
+
+    In effect this means changing a 'Stable' algorithm will typically require doing a new release. 
+    */
+    inline HashCode32 GetStableHashCode32(const char* buffer, size_t numChars)
     {
-        // Use uints because hash requires wrap around behavior and int is undefined on over/underflows
-        uint64_t hash = 0;
+        HashCode32 hash = 0;
         for (size_t i = 0; i < numChars; ++i)
         {
-            hash = uint64_t(int64_t(buffer[i])) + (hash << 6) + (hash << 16) - hash;
+            hash = HashCode32(buffer[i]) + (hash << 6) + (hash << 16) - hash;
         }
         return hash;
     }
+
+    inline HashCode64 GetStableHashCode64(const char* buffer, size_t numChars)
+    {
+        // Use HashCode64 is assumed unsigned because hash requires wrap around behavior and int is undefined on over/underflows
+        HashCode64 hash = 0;
+        for (size_t i = 0; i < numChars; ++i)
+        {
+            hash = HashCode64(HashCode64(buffer[i])) + (hash << 6) + (hash << 16) - hash;
+        }
+        return hash;
+    }
+
+    // A 64 bit hash function that can change across platform (for best performance/behavior)
+    SLANG_FORCE_INLINE HashCode64 GetHashCode64(const char* buffer, size_t numChars) { return GetStableHashCode64(buffer, numChars); }
 
 	template<int IsInt>
 	class Hash
@@ -67,9 +108,9 @@ namespace Slang
 	{
 	public:
 		template<typename TKey>
-		static int GetHashCode(TKey & key)
+		static HashCode GetHashCode(TKey& key)
 		{
-			return (int)key;
+			return (HashCode)key;
 		}
 	};
 	template<>
@@ -77,9 +118,9 @@ namespace Slang
 	{
 	public:
 		template<typename TKey>
-		static int GetHashCode(TKey & key)
+		static HashCode GetHashCode(TKey& key)
 		{
-			return int(key.GetHashCode());
+			return HashCode(key.GetHashCode());
 		}
 	};
 	template<int IsPointer>
@@ -90,9 +131,9 @@ namespace Slang
 	{
 	public:
 		template<typename TKey>
-		static int GetHashCode(TKey const& key)
+		static HashCode GetHashCode(TKey const& key)
 		{
-			return (int)((PtrInt)key) / 16; // sizeof(typename std::remove_pointer<TKey>::type);
+			return (HashCode)((PtrInt)key) / 16; // sizeof(typename std::remove_pointer<TKey>::type);
 		}
 	};
 	template<>
@@ -100,25 +141,25 @@ namespace Slang
 	{
 	public:
 		template<typename TKey>
-		static int GetHashCode(TKey & key)
+		static HashCode GetHashCode(TKey& key)
 		{
 			return Hash<std::is_integral<TKey>::value || std::is_enum<TKey>::value>::GetHashCode(key);
 		}
 	};
 
 	template<typename TKey>
-	int GetHashCode(const TKey & key)
+	HashCode GetHashCode(const TKey& key)
 	{
 		return PointerHash<std::is_pointer<TKey>::value>::GetHashCode(key);
 	}
 
 	template<typename TKey>
-	int GetHashCode(TKey & key)
+	HashCode GetHashCode(TKey& key)
 	{
 		return PointerHash<std::is_pointer<TKey>::value>::GetHashCode(key);
 	}
 
-    inline int combineHash(int left, int right)
+    inline HashCode combineHash(HashCode left, HashCode right)
     {
         return (left * 16777619) ^ right;
     }

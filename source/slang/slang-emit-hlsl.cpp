@@ -520,7 +520,8 @@ bool HLSLSourceEmitter::tryEmitInstExprImpl(IRInst* inst, const EmitOpInfo& inOu
         case kIROp_StringLit:
         {
             IRStringLit* lit = cast<IRStringLit>(inst);
-            m_writer->emit(GetHashCode(lit->getStringSlice()));
+            UnownedStringSlice slice = lit->getStringSlice();
+            m_writer->emit(int32_t(GetStableHashCode32(slice.begin(), slice.getLength())));
             return true;
         }
         case kIROp_GetStringHash:

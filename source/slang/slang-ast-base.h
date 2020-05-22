@@ -89,7 +89,7 @@ class Val : public NodeBase
 
     virtual bool equalsVal(Val* val) = 0;
     virtual String toString() = 0;
-    virtual int GetHashCode() = 0;
+    virtual HashCode GetHashCode() = 0;
     bool operator == (const Val & v)
     {
         return equalsVal(const_cast<Val*>(&v));
@@ -167,7 +167,7 @@ class Substitutions: public RefObject
 
     // Check if these are equivalent substitutions to another set
     virtual bool equals(Substitutions* subst) = 0;
-    virtual int GetHashCode() const = 0;
+    virtual HashCode GetHashCode() const = 0;
 };
 
 class GenericSubstitution : public Substitutions
@@ -187,9 +187,9 @@ class GenericSubstitution : public Substitutions
     // Check if these are equivalent substitutions to another set
     virtual bool equals(Substitutions* subst) override;
 
-    virtual int GetHashCode() const override
+    virtual HashCode GetHashCode() const override
     {
-        int rs = 0;
+        HashCode rs = 0;
         for (auto && v : args)
         {
             rs ^= v->GetHashCode();
@@ -217,7 +217,7 @@ class ThisTypeSubstitution : public Substitutions
     // Check if these are equivalent substitutions to another set
     virtual bool equals(Substitutions* subst) override;
 
-    virtual int GetHashCode() const override;
+    virtual HashCode GetHashCode() const override;
 };
 
 class GlobalGenericParamSubstitution : public Substitutions
@@ -244,9 +244,9 @@ class GlobalGenericParamSubstitution : public Substitutions
     // Check if these are equivalent substitutions to another set
     virtual bool equals(Substitutions* subst) override;
 
-    virtual int GetHashCode() const override
+    virtual HashCode GetHashCode() const override
     {
-        int rs = actualType->GetHashCode();
+        HashCode rs = actualType->GetHashCode();
         for (auto && a : constraintArgs)
         {
             rs = combineHash(rs, a.val->GetHashCode());

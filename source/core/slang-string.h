@@ -170,7 +170,7 @@ namespace Slang
 
         UnownedStringSlice trim() const;
 
-        int GetHashCode() const
+        HashCode GetHashCode() const
         {
             return Slang::GetHashCode(m_begin, size_t(m_end - m_begin)); 
         }
@@ -802,9 +802,9 @@ namespace Slang
 			return contains(str.begin());
 		}
 
-		int GetHashCode() const
+		HashCode GetHashCode() const
 		{
-			return Slang::GetHashCode((const char*)begin());
+			return Slang::GetHashCode(StringRepresentation::asSlice(m_buffer));
 		}
 
         UnownedStringSlice getUnownedSlice() const

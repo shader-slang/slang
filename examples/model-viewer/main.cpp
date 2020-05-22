@@ -1018,7 +1018,7 @@ struct ShaderCache : RefObject
             return true;
         }
 
-        UInt GetHashCode() const
+        Slang::HashCode GetHashCode() const
         {
             auto hash = ::GetHashCode(effect);
             hash = combineHash(hash, ::GetHashCode(parameterBlockCount));

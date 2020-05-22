@@ -299,10 +299,10 @@ bool IRSimpleSpecializationKey::operator==(IRSimpleSpecializationKey const& othe
     return true;
 }
 
-int IRSimpleSpecializationKey::GetHashCode() const
+HashCode IRSimpleSpecializationKey::GetHashCode() const
 {
     auto valCount = vals.getCount();
-    int hash = Slang::GetHashCode(valCount);
+    HashCode hash = Slang::GetHashCode(valCount);
     for( Index ii = 0; ii < valCount; ++ii )
     {
         hash = combineHash(hash, Slang::GetHashCode(vals[ii]));
