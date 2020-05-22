@@ -1382,6 +1382,8 @@ return coerce(typeExp.type, initListExpr);
                 return CreateErrorExpr(memberRefExpr);
             }
             int elementIndex[2];
+            elementIndex[0] = 0;
+            elementIndex[1] = 0;
             // Check for the preceding underscore
             if (*coursor++ != '_') {
                 getSink()->diagnose(swizExpr, Diagnostics::invalidSwizzleExpr, swizzleText, baseElementType->toString());
