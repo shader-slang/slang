@@ -138,9 +138,7 @@ namespace Slang
         {
             SLANG_ASSERT(bucketSizeMinusOne > 0);
             const unsigned int hash = (unsigned int)getHashCode(key);
-            // Make sure top bit isn't set
-            const unsigned int mul = (hash * 2654435761) & ((~0u) >> 1);
-            return mul % (unsigned int)(bucketSizeMinusOne);
+            return (hash * 2654435761u) % (unsigned int)(bucketSizeMinusOne);
 		}
 		FindPositionResult FindPosition(const TKey& key) const
 		{
