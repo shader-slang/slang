@@ -136,9 +136,11 @@ namespace Slang
 		};
 		inline int GetHashPos(TKey& key) const
         {
-            // The hash could be negative, but we only want a positive result. Shift down by 1 to make it only +ve
+            SLANG_ASSERT(bucketSizeMinusOne > 0);
             const unsigned int hash = (unsigned int)getHashCode(key);
-            return (hash * 2654435761) % (unsigned int)(bucketSizeMinusOne);
+            // Make sure top bit isn't set
+            const unsigned int mul = (hash * 2654435761) & ((~0u) >> 1);
+            return mul % (unsigned int)(bucketSizeMinusOne);
 		}
 		FindPositionResult FindPosition(const TKey& key) const
 		{
