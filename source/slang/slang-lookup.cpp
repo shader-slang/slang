@@ -439,7 +439,7 @@ static void _lookUpMembersInSuperTypeDeclImpl(
             auto subDeclRefType = as<DeclRefType>(subType);
             if(!subDeclRefType)
                 continue;
-            if(!subDeclRefType->declRef.Equals(genericTypeParamDeclRef))
+            if(!subDeclRefType->declRef.equals(genericTypeParamDeclRef))
                 continue;
 
             _lookUpMembersInSuperType(

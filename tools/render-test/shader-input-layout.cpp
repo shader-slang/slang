@@ -546,7 +546,7 @@ namespace renderer_test
                         entries.add(entry);
                     }
                 }
-                catch (TextFormatException)
+                catch (const TextFormatException&)
                 {
                     throw TextFormatException(String("Invalid input syntax at line ") + parser.NextToken().Position.Line);
                 }

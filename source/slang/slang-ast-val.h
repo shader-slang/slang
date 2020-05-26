@@ -29,7 +29,7 @@ class ConstantIntVal : public IntVal
 
     virtual bool equalsVal(Val* val) override;
     virtual String toString() override;
-    virtual int GetHashCode() override;
+    virtual HashCode getHashCode() override;
 };
 
 // The logical "value" of a rererence to a generic value parameter
@@ -47,7 +47,7 @@ class GenericParamIntVal : public IntVal
 
     virtual bool equalsVal(Val* val) override;
     virtual String toString() override;
-    virtual int GetHashCode() override;
+    virtual HashCode getHashCode() override;
     virtual RefPtr<Val> substituteImpl(SubstitutionSet subst, int* ioDiff) override;
 };
 
@@ -65,7 +65,7 @@ class ErrorIntVal : public IntVal
 
     virtual bool equalsVal(Val* val) override;
     virtual String toString() override;
-    virtual int GetHashCode() override;
+    virtual HashCode getHashCode() override;
     virtual RefPtr<Val> substituteImpl(SubstitutionSet subst, int* ioDiff) override;
 };
 
@@ -127,7 +127,7 @@ class TypeEqualityWitness : public SubtypeWitness
 
     virtual bool equalsVal(Val* val) override;
     virtual String toString() override;
-    virtual int GetHashCode() override;
+    virtual HashCode getHashCode() override;
     virtual RefPtr<Val> substituteImpl(SubstitutionSet subst, int * ioDiff) override;
 };
 
@@ -141,7 +141,7 @@ class DeclaredSubtypeWitness : public SubtypeWitness
 
     virtual bool equalsVal(Val* val) override;
     virtual String toString() override;
-    virtual int GetHashCode() override;
+    virtual HashCode getHashCode() override;
     virtual RefPtr<Val> substituteImpl(SubstitutionSet subst, int * ioDiff) override;
 };
 
@@ -158,7 +158,7 @@ class TransitiveSubtypeWitness : public SubtypeWitness
 
     virtual bool equalsVal(Val* val) override;
     virtual String toString() override;
-    virtual int GetHashCode() override;
+    virtual HashCode getHashCode() override;
     virtual RefPtr<Val> substituteImpl(SubstitutionSet subst, int * ioDiff) override;
 };
 
@@ -173,7 +173,7 @@ class ExtractExistentialSubtypeWitness : public SubtypeWitness
 
     virtual bool equalsVal(Val* val) override;
     virtual String toString() override;
-    virtual int GetHashCode() override;
+    virtual HashCode getHashCode() override;
     virtual RefPtr<Val> substituteImpl(SubstitutionSet subst, int * ioDiff) override;
 };
 
@@ -192,7 +192,7 @@ class TaggedUnionSubtypeWitness : public SubtypeWitness
 
     virtual bool equalsVal(Val* val) override;
     virtual String toString() override;
-    virtual int GetHashCode() override;
+    virtual HashCode getHashCode() override;
     virtual RefPtr<Val> substituteImpl(SubstitutionSet subst, int * ioDiff) override;
 };
 

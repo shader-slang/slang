@@ -689,7 +689,7 @@ struct IRConstant : IRInst
     bool isValueEqual(IRConstant* rhs);
 
         /// Get the hash 
-    int getHashCode();
+    HashCode getHashCode();
 
     IR_PARENT_ISA(Constant)
 

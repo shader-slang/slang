@@ -803,7 +803,7 @@ namespace Slang
 
             TypeExp typeExp = CheckUsableType(varDecl->type);
             varDecl->type = typeExp;
-            if (varDecl->type.Equals(getSession()->getVoidType()))
+            if (varDecl->type.equals(getSession()->getVoidType()))
             {
                 getSink()->diagnose(varDecl, Diagnostics::invalidTypeVoid);
             }

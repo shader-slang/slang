@@ -79,6 +79,7 @@ struct PathInfo
 class SourceLoc
 {
 public:
+    typedef SourceLoc ThisType;
     typedef uint32_t RawValue;
 
 private:
@@ -108,6 +109,7 @@ public:
     {
         return raw != 0;
     }
+    SourceLoc& operator=(const ThisType& rhs) = default;
 };
 
 inline SourceLoc operator+(SourceLoc loc, Int offset)

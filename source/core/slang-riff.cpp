@@ -32,7 +32,7 @@ namespace Slang
     {
         stream->read(&outChunk, sizeof(RiffHeader));
     }
-    catch (IOException&)
+    catch (const IOException&)
     {
     	return SLANG_FAIL;
     }
@@ -77,7 +77,7 @@ namespace Slang
             out->write(end, padSize - payloadSize);
         }
     }
-    catch (IOException&)
+    catch (const IOException&)
     {
         return SLANG_FAIL;
     }
@@ -99,7 +99,7 @@ namespace Slang
         }
         outReadSize = alignedSize;
     }
-    catch (IOException&)
+    catch (const IOException&)
     {
         return SLANG_FAIL;
     }
@@ -126,7 +126,7 @@ namespace Slang
             stream->read(outHeader + 1, headerSize - sizeof(RiffHeader));
         }
     }
-    catch (IOException&)
+    catch (const IOException&)
     {
         return SLANG_FAIL;
     }
@@ -187,7 +187,7 @@ struct DumpVisitor : public RiffContainer::Visitor
         _dumpRiffType(data->m_fourCC);
         m_writer.put(" ");
 
-        int hash = data->calcHash();
+        const RiffHashCode hash = data->calcHash();
 
         // We don't know in general what the contents is or means... but we can display a hash
         HexDumpUtil::dump(uint32_t(hash), m_writer.getWriter());
@@ -630,21 +630,21 @@ RiffReadHelper RiffContainer::DataChunk::asReadHelper() const
     return RiffReadHelper(nullptr, 0);
 }
 
-int RiffContainer::DataChunk::calcHash() const
+RiffHashCode RiffContainer::DataChunk::calcHash() const
 {
-    int hash = 0;
+    RiffHashCode hash = 0;
 
     Data* data = m_dataList;
     while (data)
     {
-        // This is a little contrived (in that we don't use the function GetHashCode), but the
+        // This is a little contrived (in that we don't use the function getHashCode), but the
         // reason to be careful is we want the same result however many Data blocks there are.
         const char* buffer = (const char*)data->getPayload();
         const size_t size = data->getSize();
 
         for (size_t i = 0; i < size; ++i)
         {
-            hash = int(buffer[i]) + (hash << 6) + (hash << 16) - hash;
+            hash = RiffHashCode(buffer[i]) + (hash << 6) + (hash << 16) - hash;
         }
 
         data = data->m_next;

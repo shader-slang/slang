@@ -4,6 +4,7 @@
 #include "slang-list.h"
 #include "slang-math.h"
 #include "slang-common.h"
+#include "slang-hash.h"
 
 #include <memory.h>
 
@@ -24,7 +25,7 @@ public:
     UIntSet& operator=(UIntSet&& other);
     UIntSet& operator=(const UIntSet& other);
 
-    int GetHashCode();
+    HashCode getHashCode();
 
         /// Return the count of all bits directly represented
     Int getCount() const { return Int(m_buffer.getCount()) * kElementSize; }

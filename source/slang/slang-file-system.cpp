@@ -144,7 +144,7 @@ SLANG_NO_THROW SlangResult SLANG_MCALL OSFileSystemExt::saveFile(const char* pat
         }
 
     }
-    catch (IOException&)
+    catch (const IOException&)
     {
     	return SLANG_E_CANNOT_OPEN;
     }
@@ -332,7 +332,7 @@ SlangResult CacheFileSystem::_calcUniqueIdentity(const String& path, String& out
             }
              
             // Calculate the hash on the contents
-            const uint64_t hash = GetHashCode64((const char*)outFileContents->getBufferPointer(), outFileContents->getBufferSize());
+            const uint64_t hash = getHashCode64((const char*)outFileContents->getBufferPointer(), outFileContents->getBufferSize());
 
             String hashString = Path::getFileName(path);
             hashString = hashString.toLower();

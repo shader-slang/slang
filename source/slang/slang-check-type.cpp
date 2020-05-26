@@ -323,7 +323,7 @@ namespace Slang
         {
             if(auto rightVar = as<GenericParamIntVal>(right))
             {
-                return leftVar->declRef.Equals(rightVar->declRef);
+                return leftVar->declRef.equals(rightVar->declRef);
             }
         }
 

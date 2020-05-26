@@ -762,7 +762,7 @@ bool BindLocation::operator==(const ThisType& rhs) const
     return (m_bindPointSet && rhs.m_bindPointSet) && (m_bindPointSet->m_points == rhs.m_bindPointSet->m_points);
 }
 
-int BindLocation::GetHashCode() const
+HashCode BindLocation::getHashCode() const
 {
     if (!m_typeLayout)
     {
@@ -770,11 +770,11 @@ int BindLocation::GetHashCode() const
     }
     if (m_bindPointSet)
     {
-        return m_bindPointSet->GetHashCode();
+        return m_bindPointSet->getHashCode();
     }
     else
     {
-        return Slang::combineHash(Slang::combineHash(m_category, Slang::GetHashCode(m_typeLayout)), m_point.GetHashCode());
+        return Slang::combineHash(Slang::combineHash(m_category, Slang::getHashCode(m_typeLayout)), m_point.getHashCode());
     }
 }
 

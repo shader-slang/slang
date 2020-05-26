@@ -21,10 +21,16 @@ namespace Slang
             float fvalue;
             int ivalue;
 
-            inline static FloatIntUnion makeFromInt(int i) { FloatIntUnion cast; cast.ivalue = i; return cast; }
-            inline static FloatIntUnion makeFromFloat(float f) { FloatIntUnion cast; cast.fvalue = f; return cast; }
+            SLANG_FORCE_INLINE static FloatIntUnion makeFromInt(int i) { FloatIntUnion cast; cast.ivalue = i; return cast; }
+            SLANG_FORCE_INLINE static FloatIntUnion makeFromFloat(float f) { FloatIntUnion cast; cast.fvalue = f; return cast; }
         };
-
+        union DoubleInt64Union
+        {
+            double dvalue;
+            int64_t ivalue;
+            SLANG_FORCE_INLINE static DoubleInt64Union makeFromInt64(int64_t i) { DoubleInt64Union cast; cast.ivalue = i; return cast; }
+            SLANG_FORCE_INLINE static DoubleInt64Union makeFromDouble(double d) { DoubleInt64Union cast; cast.dvalue = d; return cast; }
+        };
         
 		static const float Pi;
 
@@ -170,6 +176,15 @@ namespace Slang
 	{
         return Math::FloatIntUnion::makeFromInt(val).fvalue; 
 	}
+
+    SLANG_FORCE_INLINE int64_t DoubleAsInt64(double val)
+    {
+        return Math::DoubleInt64Union::makeFromDouble(val).ivalue;
+    }
+    SLANG_FORCE_INLINE double Int64AsDouble(int64_t value)
+    {
+        return Math::DoubleInt64Union::makeFromInt64(value).dvalue;
+    }
 
 	inline unsigned short FloatToHalf(float val)
 	{
