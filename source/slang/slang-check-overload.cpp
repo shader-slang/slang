@@ -664,7 +664,7 @@ namespace Slang
     {
         // HACK: if both items refer to the same declaration,
         // then arbitrarily pick one.
-        if(left.declRef.Equals(right.declRef))
+        if(left.declRef.equals(right.declRef))
             return -1;
 
         // There is a very general rule that we would like to enforce

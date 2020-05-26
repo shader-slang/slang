@@ -2259,7 +2259,7 @@ void CLikeSourceEmitter::emitInst(IRInst* inst)
     }
     // Don't emit any context message for an explicit `AbortCompilationException`
     // because it should only happen when an error is already emitted.
-    catch(AbortCompilationException&) { throw; }
+    catch(const AbortCompilationException&) { throw; }
     catch(...)
     {
         noteInternalErrorLoc(inst->sourceLoc);

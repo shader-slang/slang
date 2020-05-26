@@ -155,7 +155,7 @@ class EnumCaseDecl : public Decl
     // type of the parent `enum`
     TypeExp type;
 
-    Type* getType() { return (Type*)type.type.Ptr(); }
+    Type* getType() { return type.type.Ptr(); }
 
     // Tag value
     RefPtr<Expr> tagExpr;

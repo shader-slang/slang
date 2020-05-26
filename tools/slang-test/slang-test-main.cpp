@@ -346,7 +346,7 @@ TestResult gatherTestsForFile(
     {
         fileContents = Slang::File::readAllText(filePath);
     }
-    catch (Slang::IOException)
+    catch (const Slang::IOException&)
     {
         return TestResult::Fail;
     }
@@ -1142,7 +1142,7 @@ TestResult runSimpleTest(TestContext* context, TestInput& input)
     {
         expectedOutput = Slang::File::readAllText(expectedOutputPath);
     }
-    catch (Slang::IOException)
+    catch (const Slang::IOException&)
     {
     }
 
@@ -1291,7 +1291,7 @@ TestResult runReflectionTest(TestContext* context, TestInput& input)
     {
         expectedOutput = Slang::File::readAllText(expectedOutputPath);
     }
-    catch (Slang::IOException)
+    catch (const Slang::IOException&)
     {
     }
 
@@ -1332,7 +1332,7 @@ String getExpectedOutput(String const& outputStem)
     {
         expectedOutput = Slang::File::readAllText(expectedOutputPath);
     }
-    catch (Slang::IOException)
+    catch (const Slang::IOException&)
     {
     }
 
@@ -1479,7 +1479,7 @@ static TestResult runCPPCompilerSharedLibrary(TestContext* context, TestInput& i
                 String expectedOutputPath = outputStem + ".expected";
                 expectedOutput = Slang::File::readAllText(expectedOutputPath);
             }
-            catch (Slang::IOException)
+            catch (const Slang::IOException&)
             {
             }
 
@@ -1619,7 +1619,7 @@ static TestResult runCPPCompilerExecute(TestContext* context, TestInput& input)
             String expectedOutputPath = outputStem + ".expected";
             expectedOutput = Slang::File::readAllText(expectedOutputPath);
         }
-        catch (Slang::IOException)
+        catch (const Slang::IOException&)
         {
         }
 
@@ -1709,7 +1709,7 @@ TestResult runCrossCompilerTest(TestContext* context, TestInput& input)
         {
             Slang::File::writeAllText(expectedOutputPath, expectedOutput);
         }
-        catch (Slang::IOException)
+        catch (const Slang::IOException&)
         {
             return TestResult::Fail;
         }
@@ -1794,7 +1794,7 @@ TestResult generateHLSLBaseline(
     {
         Slang::File::writeAllText(expectedOutputPath, expectedOutput);
     }
-    catch (Slang::IOException)
+    catch (const Slang::IOException&)
     {
         return TestResult::Fail;
     }
@@ -1875,7 +1875,7 @@ static TestResult _runHLSLComparisonTest(
     {
         expectedOutput = Slang::File::readAllText(expectedOutputPath);
     }
-    catch (Slang::IOException)
+    catch (const Slang::IOException&)
     {
     }
 

@@ -1651,17 +1651,17 @@ namespace Slang
         return true;
     }
 
-    int IRInstKey::GetHashCode()
+    HashCode IRInstKey::getHashCode()
     {
-        auto code = Slang::GetHashCode(inst->op);
-        code = combineHash(code, Slang::GetHashCode(inst->getFullType()));
-        code = combineHash(code, Slang::GetHashCode(inst->getOperandCount()));
+        auto code = Slang::getHashCode(inst->op);
+        code = combineHash(code, Slang::getHashCode(inst->getFullType()));
+        code = combineHash(code, Slang::getHashCode(inst->getOperandCount()));
 
         auto argCount = inst->getOperandCount();
         auto args = inst->getOperands();
         for( UInt aa = 0; aa < argCount; ++aa )
         {
-            code = combineHash(code, Slang::GetHashCode(args[aa].get()));
+            code = combineHash(code, Slang::getHashCode(args[aa].get()));
         }
         return code;
     }
@@ -1760,10 +1760,10 @@ namespace Slang
         return isValueEqual(rhs) && getFullType() == rhs->getFullType();
     }
 
-    int IRConstant::getHashCode()
+    HashCode IRConstant::getHashCode()
     {
-        auto code = Slang::GetHashCode(op);
-        code = combineHash(code, Slang::GetHashCode(getFullType()));
+        auto code = Slang::getHashCode(op);
+        code = combineHash(code, Slang::getHashCode(getFullType()));
 
         switch (op)
         {
@@ -1773,16 +1773,16 @@ namespace Slang
             {
                 SLANG_COMPILE_TIME_ASSERT(sizeof(IRFloatingPointValue) == sizeof(IRIntegerValue));
                 // ... we can just compare as bits
-                return combineHash(code, Slang::GetHashCode(value.intVal));
+                return combineHash(code, Slang::getHashCode(value.intVal));
             }
             case kIROp_PtrLit:
             {
-                return combineHash(code, Slang::GetHashCode(value.ptrVal));
+                return combineHash(code, Slang::getHashCode(value.ptrVal));
             }
             case kIROp_StringLit:
             {
                 const UnownedStringSlice slice = getStringSlice();
-                return combineHash(code, Slang::GetHashCode(slice.begin(), slice.getLength()));
+                return combineHash(code, Slang::getHashCode(slice.begin(), slice.getLength()));
             }
             default:
             {
@@ -4586,7 +4586,7 @@ namespace Slang
         {
             // TODO: This is contrived in that we want two types that are the same, but are different
             // pointers to match here.
-            // If we make GetHashCode for IRType* compatible with isTypeEqual, then we should probably use that.
+            // If we make getHashCode for IRType* compatible with isTypeEqual, then we should probably use that.
             return static_cast<IRConstant*>(a)->isValueEqual(static_cast<IRConstant*>(b)) &&
                 isTypeEqual(a->getFullType(), b->getFullType());
         }

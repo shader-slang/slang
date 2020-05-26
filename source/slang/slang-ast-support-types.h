@@ -606,8 +606,8 @@ namespace Slang
             : substitutions(subst)
         {
         }
-        bool Equals(const SubstitutionSet& substSet) const;
-        int GetHashCode() const;
+        bool equals(const SubstitutionSet& substSet) const;
+        HashCode getHashCode() const;
     };
 
     template<typename T>
@@ -663,10 +663,10 @@ namespace Slang
         DeclRef<T> as() const;
 
         // Check if this is an equivalent declaration reference to another
-        bool Equals(DeclRefBase const& declRef) const;
+        bool equals(DeclRefBase const& declRef) const;
         bool operator == (const DeclRefBase& other) const
         {
-            return Equals(other);
+            return equals(other);
         }
 
         // Convenience accessors for common properties of declarations
@@ -674,7 +674,7 @@ namespace Slang
         SourceLoc getLoc() const;
         DeclRefBase GetParent() const;
 
-        int GetHashCode() const;
+        HashCode getHashCode() const;
 
         // Debugging:
         String toString() const;
@@ -961,6 +961,8 @@ namespace Slang
     // We store both the original syntax and the resolved type here.
     struct TypeExp
     {
+        typedef TypeExp ThisType;
+
         TypeExp() {}
         TypeExp(TypeExp const& other)
             : exp(other.exp)
@@ -980,18 +982,8 @@ namespace Slang
         RefPtr<Expr> exp;
         RefPtr<Type> type;
 
-        bool Equals(Type* other);
-#if 0
-        {
-            return type->Equals(other);
-        }
-#endif
-        bool Equals(RefPtr<Type> other);
-#if 0
-        {
-            return type->Equals(other.Ptr());
-        }
-#endif
+        bool equals(Type* other);
+
         Type* Ptr() { return type.Ptr(); }
         operator Type*()
         {
@@ -999,7 +991,9 @@ namespace Slang
         }
         Type* operator->() { return Ptr(); }
 
-        TypeExp Accept(SyntaxVisitor* visitor);
+        ThisType& operator=(const ThisType& rhs) = default;
+
+        //TypeExp accept(SyntaxVisitor* visitor);
 
             /// A global immutable TypeExp, that has no type or exp set.
         static const TypeExp empty;

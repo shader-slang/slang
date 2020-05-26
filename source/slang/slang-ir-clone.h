@@ -173,11 +173,11 @@ struct IRSimpleSpecializationKey
     // In order to use this type as a `Dictionary` key we
     // need it to support equality and hashing.
     //
-    // TODO: honestly we might consider having `GetHashCode`
+    // TODO: honestly we might consider having `getHashCode`
     // and `operator==` defined for `List<T>`.
 
     bool operator==(IRSimpleSpecializationKey const& other) const;
-    int GetHashCode() const;
+    HashCode getHashCode() const;
 };
 
 }

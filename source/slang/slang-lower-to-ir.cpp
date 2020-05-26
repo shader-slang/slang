@@ -3854,7 +3854,7 @@ void lowerStmt(
     }
     // Don't emit any context message for an explicit `AbortCompilationException`
     // because it should only happen when an error is already emitted.
-    catch(AbortCompilationException&) { throw; }
+    catch(const AbortCompilationException&) { throw; }
     catch(...)
     {
         context->getSink()->noteInternalErrorLoc(stmt->loc);
@@ -6332,7 +6332,7 @@ LoweredValInfo lowerDecl(
     }
     // Don't emit any context message for an explicit `AbortCompilationException`
     // because it should only happen when an error is already emitted.
-    catch(AbortCompilationException&) { throw; }
+    catch(const AbortCompilationException&) { throw; }
     catch(...)
     {
         context->getSink()->noteInternalErrorLoc(decl->loc);

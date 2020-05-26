@@ -26,8 +26,8 @@ static const char s_hex[] = "0123456789abcdef";
     SLANG_RETURN_ON_FAIL(helper.write(s_start.begin(), s_start.getLength()));
     SLANG_RETURN_ON_FAIL(helper.print(" %zu", dataCount));
 
-    const int hash = GetHashCode((const char*)data, dataCount);
-    SLANG_RETURN_ON_FAIL(helper.print(" %d\n", hash ));
+    const HashCode32 hash = getStableHashCode32((const char*)data, dataCount);
+    SLANG_RETURN_ON_FAIL(helper.print(" %d\n", int(hash) ));
 
     SLANG_RETURN_ON_FAIL(dump(data, dataCount, maxBytesPerLine, writer));
 
@@ -191,7 +191,7 @@ static SlangResult _findLine(const UnownedStringSlice& find, UnownedStringSlice&
     UnownedStringSlice startLine, endLine;
     SLANG_RETURN_ON_FAIL(findStartAndEndLines(lines, startLine, endLine));
 
-    int hash;
+    HashCode32 hash;
     size_t size;
     {
         // Get the size and the hash
@@ -203,13 +203,13 @@ static SlangResult _findLine(const UnownedStringSlice& find, UnownedStringSlice&
         }
         // Extract the size
         size = StringToInt(String(slices[1]));
-        hash = int(StringToInt(String(slices[2])));
+        hash = HashCode32(StringToInt(String(slices[2])));
     }
 
     SLANG_RETURN_ON_FAIL(parse(UnownedStringSlice(startLine.end(), endLine.begin()), outBytes));
 
     // Calc the hash
-    const int readHash = GetHashCode((const char*)outBytes.begin(), outBytes.getCount());
+    const HashCode32 readHash = getStableHashCode32((const char*)outBytes.begin(), outBytes.getCount());
 
     if (readHash != hash || size_t(outBytes.getCount()) != size)
     {
