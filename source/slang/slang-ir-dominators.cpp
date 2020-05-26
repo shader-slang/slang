@@ -34,6 +34,27 @@ bool IRDominatorTree::immediatelyDominates(IRBlock* dominator, IRBlock* dominate
 
 bool IRDominatorTree::properlyDominates(IRBlock* dominator, IRBlock* dominated)
 {
+    // We need to deal with the cases where `dominator` and/or
+    // `dominated` are unreachable, and thus not represtend
+    // in the nodes of the dominator tree we constructed.
+    //
+    // If `dominated` is unreachable, then there are zero
+    // control flow paths that can reach it, so that *all*
+    // of those (zero) control flow paths go through
+    // `dominator`.
+    //
+    if(isUnreachable(dominated))
+        return true;
+
+    // If `dominated` is reachable then there must exist at least
+    // one control-flow path to it. Thus if `dominator` is not
+    // reachable, it cannot be on that path, and thus must
+    // not be a dominator.
+    //
+    if(isUnreachable(dominator))
+        return false;
+
+
     // Because of how we laid out the tree, we can test if one node
     // properly dominates another in constant time.
     //
@@ -67,6 +88,11 @@ bool IRDominatorTree::dominates(IRBlock* dominator, IRBlock* dominated)
 
 IRBlock* IRDominatorTree::getImmediateDominator(IRBlock* block)
 {
+    // An unreachable block has no immediate dominator.
+    //
+    if(isUnreachable(block))
+        return nullptr;
+
     // The immediate dominator of a block is its parent
     // in the dominator tree. Looking this up is straightforward,
     // and we just need to be a bit careful to deal with
@@ -83,6 +109,11 @@ IRBlock* IRDominatorTree::getImmediateDominator(IRBlock* block)
 
 IRDominatorTree::DominatedList IRDominatorTree::getImmediatelyDominatedBlocks(IRBlock* block)
 {
+    // An unreachable block doesn't immediately dominate anything.
+    //
+    if(isUnreachable(block))
+        return DominatedList();
+
     // Because of our representation, the immediately dominated blocks
     // for a node are contiguous, and we store their range in the
     // node already.
@@ -99,6 +130,13 @@ IRDominatorTree::DominatedList IRDominatorTree::getImmediatelyDominatedBlocks(IR
 
 IRDominatorTree::DominatedList IRDominatorTree::getProperlyDominatedBlocks(IRBlock* block)
 {
+    // Technically each unreachable block dominates all the other
+    // unreachable blocks, but setting things up to answer that
+    // query "correctly" would be a hassle.
+    //
+    if(isUnreachable(block))
+        return DominatedList();
+
     // Because of our representation, the properly dominated blocks
     // for a node are contiguous, and we store their range in the
     // node already.
@@ -122,6 +160,12 @@ Int IRDominatorTree::getBlockIndex(IRBlock* block)
     }
     return index;
 }
+
+bool IRDominatorTree::isUnreachable(IRBlock* block)
+{
+    return !mapBlockToIndex.ContainsKey(block);
+}
+
 
 // IRDominatorTree::DominatedList
 
@@ -179,6 +223,12 @@ bool IRDominatorTree::DominatedList::Iterator::operator==(Iterator const& that) 
 {
     SLANG_ASSERT(mTree == that.mTree);
     return mIndex == that.mIndex;
+}
+
+bool IRDominatorTree::DominatedList::Iterator::operator!=(Iterator const& that) const
+{
+    SLANG_ASSERT(mTree == that.mTree);
+    return mIndex != that.mIndex;
 }
 
 //

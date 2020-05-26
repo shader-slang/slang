@@ -2528,12 +2528,17 @@ __target_intrinsic(cuda, "__activemask()")
 __target_intrinsic(hlsl, "WaveActiveBallot(true).x")
 WaveMask WaveGetConvergedMask();
 
+__intrinsic_op($(kIROp_WaveGetActiveMask))
+WaveMask __WaveGetActiveMask();
+
 __glsl_extension(GL_KHR_shader_subgroup_ballot)
 __spirv_version(1.3)
 __target_intrinsic(glsl, "subgroupBallot(true).x")
 __target_intrinsic(hlsl, "WaveActiveBallot(true).x")
-__target_intrinsic(cuda, "__activemask()") // Note: semantically incorrect, but best we can do for now.
-WaveMask WaveGetActiveMask();
+WaveMask WaveGetActiveMask()
+{
+    return __WaveGetActiveMask();
+}
 
 __glsl_extension(GL_KHR_shader_subgroup_basic)
 __spirv_version(1.3)
