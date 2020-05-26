@@ -138,11 +138,11 @@ static SlangResult _parseGCCFamilyLine(const UnownedStringSlice& line, LineParse
     /* example error output from different scenarios */
     
     /*
-        tests/cpp-compiler/c-compile-error.c: In function ‘int main(int, char**)’:
-        tests/cpp-compiler/c-compile-error.c:8:13: error: ‘b’ was not declared in this scope
+        tests/cpp-compiler/c-compile-error.c: In function 'int main(int, char**)':
+        tests/cpp-compiler/c-compile-error.c:8:13: error: 'b' was not declared in this scope
         int a = b + c;
         ^
-        tests/cpp-compiler/c-compile-error.c:8:17: error: ‘c’ was not declared in this scope
+        tests/cpp-compiler/c-compile-error.c:8:17: error: 'c' was not declared in this scope
         int a = b + c;
         ^
     */
