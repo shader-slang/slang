@@ -1377,7 +1377,7 @@ namespace Slang
 
         // The contents of the string are 0-terminated
         // Every update to cursor corresponds to a check against 0-termination
-        while (cursor != swizzleText.end())
+        while (*cursor)
         {
             // Throw out swizzling with more than 4 output elements
             if (elementCount >= 4) {
