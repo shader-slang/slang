@@ -24,6 +24,9 @@
     <ClInclude Include="slang-ast-base.h">
       <Filter>Header Files</Filter>
     </ClInclude>
+    <ClInclude Include="slang-ast-builder.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
     <ClInclude Include="slang-ast-decl.h">
       <Filter>Header Files</Filter>
     </ClInclude>
@@ -264,11 +267,11 @@
     <ClInclude Include="slang-visitor.h">
       <Filter>Header Files</Filter>
     </ClInclude>
-    <ClInclude Include="slang-ast-builder.h">
-      <Filter>Source Files</Filter>
-    </ClInclude>
   </ItemGroup>
   <ItemGroup>
+    <ClCompile Include="slang-ast-builder.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
     <ClCompile Include="slang-ast-dump.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
@@ -504,9 +507,6 @@
       <Filter>Source Files</Filter>
     </ClCompile>
     <ClCompile Include="slang.cpp">
-      <Filter>Source Files</Filter>
-    </ClCompile>
-    <ClCompile Include="slang-ast-builder.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
   </ItemGroup>
