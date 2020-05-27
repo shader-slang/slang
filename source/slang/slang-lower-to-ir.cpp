@@ -2990,10 +2990,10 @@ struct RValueExprLoweringVisitor : ExprLoweringVisitorBase<RValueExprLoweringVis
         {
             auto index1 = builder->getIntValue(
                 irIntType,
-                (IRIntegerValue)expr->elementIndices[ii][0]);
+                (IRIntegerValue)expr->elementIndices[ii].row);
             auto index2 = builder->getIntValue(
                 irIntType,
-                (IRIntegerValue)expr->elementIndices[ii][1]);
+                (IRIntegerValue)expr->elementIndices[ii].col);
             // First index expression
             auto irExtract1 = subscriptValue(
                 subscript1,
@@ -3005,13 +3005,13 @@ struct RValueExprLoweringVisitor : ExprLoweringVisitorBase<RValueExprLoweringVis
                 irExtract1,
                 index2));
         }
-        auto irArray = builder->emitMakeVector(
+        auto irVector = builder->emitMakeVector(
             resultType,
             elementCount,
             irExtracts
         );
 
-        return LoweredValInfo::simple(irArray);
+        return LoweredValInfo::simple(irVector);
     }
 
     // A swizzle in an r-value context can save time by just

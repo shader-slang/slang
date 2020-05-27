@@ -1286,39 +1286,39 @@ namespace Slang
                             // that takes a single `int` parmaeter and means to call that instead.
                             //
                             // For now that should be a non-issue, and in a pinch such a user
-// could use `T(0)` instead of `(T) 0` to get around this special
-// HLSL legacy feature.
+                            // could use `T(0)` instead of `(T) 0` to get around this special
+                            // HLSL legacy feature.
 
-// We will type-check code like:
-//
-//      MyStruct s = (MyStruct) 0;
-//
-// the same as:
-//
-//      MyStruct s = {};
-//
-// That is, we construct an empty initializer list, and then coerce
-// that initializer list expression to the desired type (letting
-// the code for handling initializer lists work out all of the
-// details of what is/isn't valid). This choice means we get
-// to benefit from the existing codegen support for initializer
-// lists, rather than needing the `(MyStruct) 0` idiom to be
-// special-cased in later stages of the compiler.
-//
-// Note: we use an empty initializer list `{}` instead of an
-// initializer list with a single zero `{0}`, which is semantically
-// significant if the first field of `MyStruct` had its own
-// default initializer defined as part of the `struct` definition.
-// Basically we have chosen to interpret the "cast from zero" syntax
-// as sugar for default initialization, and *not* specifically
-// for zero-initialization. That choice could be revisited if
-// users express displeasure. For now there isn't enough usage
-// of explicit default initializers for `struct` fields to
-// make this a major concern (since they aren't supported in HLSL).
-//
-RefPtr<InitializerListExpr> initListExpr = new InitializerListExpr();
-auto checkedInitListExpr = visitInitializerListExpr(initListExpr);
-return coerce(typeExp.type, initListExpr);
+                            // We will type-check code like:
+                            //
+                            //      MyStruct s = (MyStruct) 0;
+                            //
+                            // the same as:
+                            //
+                            //      MyStruct s = {};
+                            //
+                            // That is, we construct an empty initializer list, and then coerce
+                            // that initializer list expression to the desired type (letting
+                            // the code for handling initializer lists work out all of the
+                            // details of what is/isn't valid). This choice means we get
+                            // to benefit from the existing codegen support for initializer
+                            // lists, rather than needing the `(MyStruct) 0` idiom to be
+                            // special-cased in later stages of the compiler.
+                            //
+                            // Note: we use an empty initializer list `{}` instead of an
+                            // initializer list with a single zero `{0}`, which is semantically
+                            // significant if the first field of `MyStruct` had its own
+                            // default initializer defined as part of the `struct` definition.
+                            // Basically we have chosen to interpret the "cast from zero" syntax
+                            // as sugar for default initialization, and *not* specifically
+                            // for zero-initialization. That choice could be revisited if
+                            // users express displeasure. For now there isn't enough usage
+                            // of explicit default initializers for `struct` fields to
+                            // make this a major concern (since they aren't supported in HLSL).
+                            //
+                            RefPtr<InitializerListExpr> initListExpr = new InitializerListExpr();
+                            auto checkedInitListExpr = visitInitializerListExpr(initListExpr);
+                            return coerce(typeExp.type, initListExpr);
                         }
                     }
                 }
@@ -1365,107 +1365,97 @@ return coerce(typeExp.type, initListExpr);
         swizExpr->loc = memberRefExpr->loc;
         swizExpr->base = memberRefExpr->baseExpression;
 
-        int elementIndices[4][2];
+        // We can have up to 4 swizzles of two elements each
+        MatrixCoord elementIndices[4];
         int elementCount = 0;
 
         bool anyDuplicates = false;
-        int oneIndexed = -1;
+        int zeroIndexOffset = -1;
 
         String swizzleText = getText(memberRefExpr->name);
-        auto coursor = swizzleText.begin();
+        auto cursor = swizzleText.begin();
 
-        while (coursor != swizzleText.end())
+        // The contents of the string are 0-terminated
+        // Every update to cursor corresponds to a check against 0-termination
+        while (cursor != swizzleText.end())
         {
             // Throw out swizzling with more than 4 output elements
             if (elementCount >= 4) {
                 getSink()->diagnose(swizExpr, Diagnostics::invalidSwizzleExpr, swizzleText, baseElementType->toString());
                 return CreateErrorExpr(memberRefExpr);
             }
-            int elementIndex[2];
-            elementIndex[0] = 0;
-            elementIndex[1] = 0;
+            MatrixCoord elementIndex = { 0, 0 };
             // Check for the preceding underscore
-            if (*coursor++ != '_') {
+            if (*cursor++ != '_') {
                 getSink()->diagnose(swizExpr, Diagnostics::invalidSwizzleExpr, swizzleText, baseElementType->toString());
                 return CreateErrorExpr(memberRefExpr);
             }
 
             // Check for one or zero indexing            
-            if (*coursor == 'm') {
+            if (*cursor == 'm') {
                 // Can't mix one and zero indexing
-                if (oneIndexed == 1) {
+                if (zeroIndexOffset == 1) {
                     getSink()->diagnose(swizExpr, Diagnostics::invalidSwizzleExpr, swizzleText, baseElementType->toString());
                     return CreateErrorExpr(memberRefExpr);
                 }
-                oneIndexed = 0;
+                zeroIndexOffset = 0;
                 // Increment the index since we saw 'm'
-                coursor++;
+                cursor++;
             }
             else {
                 // Can't mix one and zero indexing
-                if (oneIndexed == 0) {
+                if (zeroIndexOffset == 0) {
                     getSink()->diagnose(swizExpr, Diagnostics::invalidSwizzleExpr, swizzleText, baseElementType->toString());
                     return CreateErrorExpr(memberRefExpr);
                 }
-                oneIndexed = 1;
+                zeroIndexOffset = 1;
             }
 
             // Check for the ij components
             for (Index j = 0; j < 2; j++) {
-                auto ch = *coursor++;
+                auto ch = *cursor++;
                 int subIndex;
 
-                // Manually enumerating cases to throw out 5+ and letters
-                switch (ch)
-                {
-                case '0': subIndex = 0; break;
-                case '1': subIndex = 1; break;
-                case '2': subIndex = 2; break;
-                case '3': subIndex = 3; break;
-                case '4': subIndex = 4; break;
-                default:
+                if (ch < '0' || ch > '4') {
                     // An invalid character in the swizzle is an error
                     getSink()->diagnose(swizExpr, Diagnostics::invalidSwizzleExpr, swizzleText, baseElementType->toString());
                     return CreateErrorExpr(memberRefExpr);
                 }
+                subIndex = ch - '0' - zeroIndexOffset;
 
                 // Check the limit for either the row or column, depending on the step
                 IntegerLiteralValue elementLimit;
                 if (j == 0) {
                     elementLimit = baseElementRowCount;
-                    elementIndex[0] = subIndex;
+                    elementIndex.row = subIndex;
                 }
                 else {
                     elementLimit = baseElementColCount;
-                    elementIndex[1] = subIndex;
+                    elementIndex.col = subIndex;
                 }
                 // Make sure the index is in range for the source type
                 // Account for off-by-one and reject 0 if oneIndexed
-                if (subIndex >= elementLimit + oneIndexed || subIndex < oneIndexed)
+                if (subIndex >= elementLimit || subIndex < 0)
                 {
                     getSink()->diagnose(swizExpr, Diagnostics::invalidSwizzleExpr, swizzleText, baseElementType->toString());
                     return CreateErrorExpr(memberRefExpr);
                 }
             }
             // Check if we've seen this index before
-            for (int ee = 0; ee < elementCount; ee++)
-            {
-                if (elementIndices[ee][0] == elementIndex[0]
-                    && elementIndices[ee][1] == elementIndex[1])
+            for (int ee = 0; ee < elementCount; ee++) {
+                if (elementIndices[ee] == elementIndex)
                     anyDuplicates = true;
             }
 
             // add to our list...
-            elementIndices[elementCount][0] = elementIndex[0] - oneIndexed;
-            elementIndices[elementCount][1] = elementIndex[1] - oneIndexed;
+            elementIndices[elementCount] = elementIndex;
             elementCount++;
         }
 
         // Store our list in the actual AST node
         for (int ee = 0; ee < elementCount; ++ee)
         {
-            swizExpr->elementIndices[ee][0] = elementIndices[ee][0];
-            swizExpr->elementIndices[ee][1] = elementIndices[ee][1];
+            swizExpr->elementIndices[ee] = elementIndices[ee];
         }
         swizExpr->elementCount = elementCount;
 
