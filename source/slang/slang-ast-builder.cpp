@@ -6,30 +6,97 @@
 
 namespace Slang {
 
-ASTBuilder::ASTBuilder():
-    m_session(nullptr)
+// !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! SharedASTBuilder !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+
+void SharedASTBuilder::init(Session* session)
 {
+    // Save the associated session
+    m_session = session;
+
+    // We just want as a place to store allocations of shared types
+    RefPtr<ASTBuilder> astBuilder(new ASTBuilder);
+
+    astBuilder->m_sharedASTBuilder = this;
+
     memset(m_builtinTypes, 0, sizeof(m_builtinTypes));
+
+    m_errorType = m_astBuilder->create<ErrorType>();
+    m_initializerListType = m_astBuilder->create<InitializerListType>();
+    m_overloadedType = m_astBuilder->create<OverloadGroupType>();
+
+    m_astBuilder = astBuilder.detach();
 }
 
-void ASTBuilder::init(Session* session)
-{
-    SLANG_ASSERT(session);
 
-    for (Index i = 0; i < Index(BaseType::CountOf); ++i)
+Type* SharedASTBuilder::getStringType()
+{
+    if (!m_stringType)
     {
-        m_builtinTypes[i] = session->getBuiltinType(BaseType(i));
+        auto stringTypeDecl = findMagicDecl("StringType");
+        m_stringType = DeclRefType::create(m_astBuilder, makeDeclRef<Decl>(stringTypeDecl));
+    }
+    return m_stringType;
+}
+
+Type* SharedASTBuilder::getEnumTypeType()
+{
+    if (!m_enumTypeType)
+    {
+        auto enumTypeTypeDecl = findMagicDecl("EnumTypeType");
+        m_enumTypeType = DeclRefType::create(m_astBuilder, makeDeclRef<Decl>(enumTypeTypeDecl));
+    }
+    return m_enumTypeType;
+}
+
+SharedASTBuilder::~SharedASTBuilder()
+{
+    // Release built in types..
+    for (Index i = 0; i < SLANG_COUNT_OF(m_builtinTypes); ++i)
+    {
+        m_builtinTypes[i].setNull();
     }
 
-    m_errorType = session->getErrorType();
-    m_initializerListType = session->getInitializerListType();
-    m_overloadedType = session->getOverloadedType();
+    if (m_astBuilder)
+    {
+        m_astBuilder->releaseReference();
+    }
+}
 
-    //m_constExprRate = session->g
-    //m_irBasicBlockType = session->get
+void SharedASTBuilder::registerBuiltinDecl(RefPtr<Decl> decl, RefPtr<BuiltinTypeModifier> modifier)
+{
+    auto type = DeclRefType::create(m_astBuilder, DeclRef<Decl>(decl.Ptr(), nullptr));
+    m_builtinTypes[Index(modifier->tag)] = type;
+}
 
-    m_stringType = session->getStringType();
-    m_enumTypeType = session->getEnumTypeType();
+void SharedASTBuilder::registerMagicDecl(RefPtr<Decl> decl, RefPtr<MagicTypeModifier> modifier)
+{
+    // In some cases the modifier will have been applied to the
+    // "inner" declaration of a `GenericDecl`, but what we
+    // actually want to register is the generic itself.
+    //
+    auto declToRegister = decl;
+    if (auto genericDecl = as<GenericDecl>(decl->parentDecl))
+        declToRegister = genericDecl;
+
+    m_magicDecls[modifier->name] = declToRegister.Ptr();
+}
+
+RefPtr<Decl> SharedASTBuilder::findMagicDecl(const String&   name)
+{
+    return m_magicDecls[name].GetValue();
+}
+
+// !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! ASTBuilder !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+
+ASTBuilder::ASTBuilder(SharedASTBuilder* sharedASTBuilder):
+    m_sharedASTBuilder(sharedASTBuilder)
+{
+    SLANG_ASSERT(sharedASTBuilder);
+}
+
+ASTBuilder::ASTBuilder():
+    m_sharedASTBuilder(nullptr)
+{
 }
 
 RefPtr<PtrType> ASTBuilder::getPtrType( RefPtr<Type>    valueType)
@@ -55,7 +122,7 @@ RefPtr<RefType> ASTBuilder::getRefType(RefPtr<Type> valueType)
 
 RefPtr<PtrTypeBase> ASTBuilder::getPtrType(RefPtr<Type> valueType, char const* ptrTypeName)
 {
-    auto genericDecl = findMagicDecl(m_session, ptrTypeName).dynamicCast<GenericDecl>();
+    auto genericDecl = m_sharedASTBuilder->findMagicDecl(ptrTypeName).dynamicCast<GenericDecl>();
     return getPtrType(valueType, genericDecl);
 }
 
@@ -84,7 +151,7 @@ RefPtr<VectorExpressionType> ASTBuilder::getVectorType(
     RefPtr<Type>    elementType,
     RefPtr<IntVal>  elementCount)
 {
-    auto vectorGenericDecl = findMagicDecl(m_session, "Vector").as<GenericDecl>();
+    auto vectorGenericDecl = m_sharedASTBuilder->findMagicDecl("Vector").as<GenericDecl>();
         
     auto vectorTypeDecl = vectorGenericDecl->inner;
 
@@ -102,5 +169,28 @@ RefPtr<TypeType> ASTBuilder::getTypeType(Type* type)
 {
     return create<TypeType>(type);
 }
+
+SyntaxNodeBase* ASTBuilder::createInstanceOfSyntaxClassByName(const String& name)
+{
+    if (0) {}
+#define CASE(NAME) \
+        else if(name == #NAME) return create<NAME>()
+
+    CASE(GLSLBufferModifier);
+    CASE(GLSLWriteOnlyModifier);
+    CASE(GLSLReadOnlyModifier);
+    CASE(GLSLPatchModifier);
+    CASE(SimpleModifier);
+
+#undef CASE
+        else
+    {
+        SLANG_UNEXPECTED("unhandled syntax class name");
+        UNREACHABLE_RETURN(nullptr);
+    }
+}
+
+
+
 
 } // namespace Slang

@@ -16,29 +16,6 @@ namespace Slang
         return declRef.Substitute(astBuilder, declRef.getDecl()->getSup().type);
     }
 
-    // Note(tfoley): These logically belong to `Type`,
-    // but order-of-declaration stuff makes that tricky
-    //
-    // TODO(tfoley): These should really belong to the compilation context!
-    //
-    void registerBuiltinDecl(
-        Session*                    session,
-        RefPtr<Decl>                decl,
-        RefPtr<BuiltinTypeModifier> modifier);
-    void registerMagicDecl(
-        Session*                    session,
-        RefPtr<Decl>                decl,
-        RefPtr<MagicTypeModifier>   modifier);
-
-    // Look up a magic declaration by its name
-    RefPtr<Decl> findMagicDecl(
-        Session*        session,
-        String const&   name);
-
-    // Create an instance of a syntax class by name
-    SyntaxNodeBase* createInstanceOfSyntaxClassByName(
-        ASTBuilder* astBuilder,
-        String const&   name);
 
     // `Val`
 

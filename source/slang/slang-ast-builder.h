@@ -8,8 +8,52 @@
 namespace Slang
 {
 
-class ASTBuilder
+class SharedASTBuilder : public RefObject
 {
+    friend class ASTBuilder;
+public:
+        /// Must be called before used
+    void init(Session* session);
+
+    // Note(tfoley): These logically belong to `Type`,
+    // but order-of-declaration stuff makes that tricky
+    //
+    // TODO(tfoley): These should really belong to the compilation context!
+    //
+
+    void registerBuiltinDecl(RefPtr<Decl> decl, RefPtr<BuiltinTypeModifier> modifier);
+    void registerMagicDecl(RefPtr<Decl> decl, RefPtr<MagicTypeModifier> modifier);
+
+    Type* getStringType();
+
+    Type* getEnumTypeType();
+
+    // Look up a magic declaration by its name
+    RefPtr<Decl> findMagicDecl(String const& name);
+
+    ~SharedASTBuilder();
+
+protected:
+    // State shared between ASTBuilders
+
+    RefPtr<Type> m_errorType;
+    RefPtr<Type> m_initializerListType;
+    RefPtr<Type> m_overloadedType;
+    RefPtr<Type> m_stringType;
+    RefPtr<Type> m_enumTypeType;
+
+    RefPtr<Type> m_builtinTypes[Index(BaseType::CountOf)];
+
+    Dictionary<String, Decl*> m_magicDecls;
+
+    // This is a private builder used for these shared types
+    ASTBuilder* m_astBuilder = nullptr;
+    Session* m_session = nullptr;
+};
+
+class ASTBuilder : public RefObject
+{
+    friend class SharedASTBuilder;
 public:
     template <typename T>
     T* create() { T* node = new T; node->setASTBuilder(this); return node; }
@@ -20,22 +64,22 @@ public:
     template<typename T, typename P0, typename P1>
     T* create(const P0& p0, const P1& p1) { T* node = new T(p0, p1); node->setASTBuilder(this); return node; }
 
-    SLANG_FORCE_INLINE Type* getBoolType() { return m_builtinTypes[Index(BaseType::Bool)]; }
-    SLANG_FORCE_INLINE Type* getHalfType() { return m_builtinTypes[Index(BaseType::Half)]; }
-    SLANG_FORCE_INLINE Type* getFloatType() { return m_builtinTypes[Index(BaseType::Float)]; }
-    SLANG_FORCE_INLINE Type* getDoubleType() { return m_builtinTypes[Index(BaseType::Double)]; }
-    SLANG_FORCE_INLINE Type* getIntType() { return m_builtinTypes[Index(BaseType::Int)]; }
-    SLANG_FORCE_INLINE Type* getInt64Type() { return m_builtinTypes[Index(BaseType::Int64)]; }
-    SLANG_FORCE_INLINE Type* getUIntType() { return m_builtinTypes[Index(BaseType::UInt)]; }
-    SLANG_FORCE_INLINE Type* getUInt64Type() { return m_builtinTypes[Index(BaseType::UInt64)]; }
-    SLANG_FORCE_INLINE Type* getVoidType() { return m_builtinTypes[Index(BaseType::Void)]; }
-    SLANG_FORCE_INLINE Type* getBuiltinType(BaseType flavor) { return m_builtinTypes[Index(flavor)]; }
+    SLANG_FORCE_INLINE Type* getBoolType() { return m_sharedASTBuilder->m_builtinTypes[Index(BaseType::Bool)]; }
+    SLANG_FORCE_INLINE Type* getHalfType() { return m_sharedASTBuilder->m_builtinTypes[Index(BaseType::Half)]; }
+    SLANG_FORCE_INLINE Type* getFloatType() { return m_sharedASTBuilder->m_builtinTypes[Index(BaseType::Float)]; }
+    SLANG_FORCE_INLINE Type* getDoubleType() { return m_sharedASTBuilder->m_builtinTypes[Index(BaseType::Double)]; }
+    SLANG_FORCE_INLINE Type* getIntType() { return m_sharedASTBuilder->m_builtinTypes[Index(BaseType::Int)]; }
+    SLANG_FORCE_INLINE Type* getInt64Type() { return m_sharedASTBuilder->m_builtinTypes[Index(BaseType::Int64)]; }
+    SLANG_FORCE_INLINE Type* getUIntType() { return m_sharedASTBuilder->m_builtinTypes[Index(BaseType::UInt)]; }
+    SLANG_FORCE_INLINE Type* getUInt64Type() { return m_sharedASTBuilder->m_builtinTypes[Index(BaseType::UInt64)]; }
+    SLANG_FORCE_INLINE Type* getVoidType() { return m_sharedASTBuilder->m_builtinTypes[Index(BaseType::Void)]; }
+    SLANG_FORCE_INLINE Type* getBuiltinType(BaseType flavor) { return m_sharedASTBuilder->m_builtinTypes[Index(flavor)]; }
 
-    Type* getInitializerListType() { return m_initializerListType; }
-    Type* getOverloadedType() { return m_overloadedType; }
-    Type* getErrorType() { return m_errorType; }
-    Type* getStringType() { return m_stringType; }
-    Type* getEnumTypeType() { return m_enumTypeType; }
+    Type* getInitializerListType() { return m_sharedASTBuilder->m_initializerListType; }
+    Type* getOverloadedType() { return m_sharedASTBuilder->m_overloadedType; }
+    Type* getErrorType() { return m_sharedASTBuilder->m_errorType; }
+    Type* getStringType() { return m_sharedASTBuilder->getStringType(); }
+    Type* getEnumTypeType() { return m_sharedASTBuilder->getEnumTypeType(); }
 
         // Construct the type `Ptr<valueType>`, where `Ptr`
         // is looked up as a builtin type.
@@ -64,24 +108,21 @@ public:
 
     RefPtr<TypeType> getTypeType(Type* type);
 
-    Session* getGlobalSession() { return m_session; }
+        // Create an instance of a syntax class by name
+    SyntaxNodeBase* createInstanceOfSyntaxClassByName(String const&   name);
+
+    SharedASTBuilder* getSharedASTBuilder() { return m_sharedASTBuilder; }
+
+    Session* getGlobalSession() { return m_sharedASTBuilder->m_session; }
 
         /// Ctor
-    ASTBuilder();
-
-        /// Must be called before can be used
-    void init(Session* session);
+    ASTBuilder(SharedASTBuilder* sharedASTBuilder);
 
 protected:
-    Type* m_errorType = nullptr;
-    Type* m_initializerListType = nullptr;
-    Type* m_overloadedType = nullptr;
-    Type* m_stringType = nullptr;
-    Type* m_enumTypeType = nullptr;
+    // Special default Ctor that can only be used by SharedASTBuilder
+    ASTBuilder();
 
-    Type* m_builtinTypes[Index(BaseType::CountOf)];
-
-    Session* m_session;
+    SharedASTBuilder* m_sharedASTBuilder;
 };
 
 } // namespace Slang

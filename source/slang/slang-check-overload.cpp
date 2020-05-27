@@ -228,7 +228,7 @@ namespace Slang
                 //
                 if( !typeArg.type )
                 {
-                    typeArg.type = getSession()->getErrorType();
+                    typeArg.type = m_astBuilder->getErrorType();
                     success = false;
                 }
 
@@ -1628,7 +1628,7 @@ namespace Slang
         {
             // Nothing at all was found that we could even consider invoking
             getSink()->diagnose(expr->functionExpr, Diagnostics::expectedFunction, funcExprType);
-            expr->type = QualType(getSession()->getErrorType());
+            expr->type = QualType(m_astBuilder->getErrorType());
             return expr;
         }
     }

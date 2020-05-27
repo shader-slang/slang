@@ -975,7 +975,7 @@ namespace Slang
                     if(!argType)
                     {
                         sink->diagnose(param.loc, Diagnostics::expectedTypeForSpecializationArg, genericTypeParamDecl);
-                        argType = getLinkage()->getSessionImpl()->getErrorType();
+                        argType = getLinkage()->getASTBuilder()->getErrorType();
                     }
 
                     // TODO: There is a serious flaw to this checking logic if we ever have cases where
@@ -1067,7 +1067,7 @@ namespace Slang
                     if(!argType)
                     {
                         sink->diagnose(param.loc, Diagnostics::expectedTypeForSpecializationArg, interfaceType);
-                        argType = getLinkage()->getSessionImpl()->getErrorType();
+                        argType = getLinkage()->getASTBuilder()->getErrorType();
                     }
 
                     auto witness = visitor.tryGetSubtypeWitness(argType, interfaceType);
@@ -1387,7 +1387,7 @@ namespace Slang
             specializationArgs.add(arg);
         }
 
-        RefPtr<ExistentialSpecializedType> specializedType = m_astBuilder.create<ExistentialSpecializedType>();
+        RefPtr<ExistentialSpecializedType> specializedType = m_astBuilder->create<ExistentialSpecializedType>();
         specializedType->baseType = unspecializedType;
         specializedType->args = specializationArgs;
 

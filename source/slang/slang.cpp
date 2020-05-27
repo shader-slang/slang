@@ -137,7 +137,11 @@ void Session::init()
     // Make sure our source manager is initialized
     builtinSourceManager.initialize(nullptr, nullptr);
 
-    m_builtinLinkage = new Linkage(this);
+    m_sharedASTBuilder = new SharedASTBuilder;
+    m_sharedASTBuilder->init(this);
+
+    RefPtr<ASTBuilder> builtinAstBuilder(new ASTBuilder(m_sharedASTBuilder));
+    m_builtinLinkage = new Linkage(this, builtinAstBuilder);
 
     // Because the `Session` retains the builtin `Linkage`,
     // we need to make sure that the parent pointer inside
@@ -149,9 +153,7 @@ void Session::init()
     //
     m_builtinLinkage->_stopRetainingParentSession();
 
-    // Initialize representations of some very basic types:
-    initializeTypes();
-
+  
     // Create scopes for various language builtins.
     //
     // TODO: load these on-demand to avoid parsing
@@ -198,7 +200,8 @@ SLANG_NO_THROW SlangResult SLANG_MCALL Session::createSession(
     slang::SessionDesc const&  desc,
     slang::ISession**          outSession)
 {
-    RefPtr<Linkage> linkage = new Linkage(this);
+    RefPtr<ASTBuilder> astBuilder(new ASTBuilder(m_sharedASTBuilder));
+    RefPtr<Linkage> linkage = new Linkage(this, astBuilder);
 
     Int targetCount = desc.targetCount;
     for(Int ii = 0; ii < targetCount; ++ii)
@@ -507,10 +510,11 @@ Profile getEffectiveProfile(EntryPoint* entryPoint, TargetRequest* target)
 
 //
 
-Linkage::Linkage(Session* session)
+Linkage::Linkage(Session* session, ASTBuilder* astBuilder)
     : m_session(session)
     , m_retainedSession(session)
     , m_sourceManager(&m_defaultSourceManager)
+    , m_astBuilder(astBuilder)
 {
     getNamePool()->setRootNamePool(session->getRootNamePool());
 
@@ -1213,7 +1217,8 @@ EndToEndCompileRequest::EndToEndCompileRequest(
     : m_session(session)
     , m_sink(nullptr)
 {
-    m_linkage = new Linkage(session);
+    RefPtr<ASTBuilder> astBuilder(new ASTBuilder(session->m_sharedASTBuilder));
+    m_linkage = new Linkage(session, astBuilder);
     init();
 }
 
@@ -2612,19 +2617,8 @@ void Session::addBuiltinSource(
 
 Session::~Session()
 {
-    // free all built-in types first
-    errorType = nullptr;
-    initializerListType = nullptr;
-    overloadedType = nullptr;
-    //irBasicBlockType = nullptr;
-    //constExprRate = nullptr;
-
     destroyTypeCheckingCache();
 
-    for (Index i = 0; i < SLANG_COUNT_OF(builtinTypes); ++i)
-    {
-        builtinTypes[i].setNull();
-    }
     // destroy modules next
     loadedModuleCode = decltype(loadedModuleCode)();
 }

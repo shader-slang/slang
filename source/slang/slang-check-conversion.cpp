@@ -865,7 +865,7 @@ namespace Slang
             // really shouldn't *change* the expression that is passed in, but should
             // introduce new AST nodes to coerce its value to a different type...
             return CreateImplicitCastExpr(
-                getSession()->getErrorType(),
+                m_astBuilder->getErrorType(),
                 fromExpr);
         }
         return expr;

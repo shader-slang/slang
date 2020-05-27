@@ -1228,7 +1228,7 @@ namespace Slang
             SlangMatrixLayoutMode mode);
 
             /// Create an initially-empty linkage
-        Linkage(Session* session);
+        Linkage(Session* session, ASTBuilder* astBuilder);
 
             /// Get the parent session for this linkage
         Session* getSessionImpl() { return m_session; }
@@ -1256,9 +1256,9 @@ namespace Slang
 
         NamePool* getNamePool() { return &namePool; }
 
-        ASTBuilder* getASTBuilder() { return &m_astBuilder; }
+        ASTBuilder* getASTBuilder() { return m_astBuilder; }
 
-        ASTBuilder m_astBuilder;
+        RefPtr<ASTBuilder> m_astBuilder;
 
         // Modules that have been dynamically loaded via `import`
         //
@@ -2049,9 +2049,9 @@ namespace Slang
 
             /// This AST Builder should only be used for creating AST nodes that are global across requests
             /// not doing so could lead to memory being consumed but not used.
-        ASTBuilder* getGlobalASTBuilder() { return &astBuilder; }
+        ASTBuilder* getGlobalASTBuilder() { return globalAstBuilder; }
 
-        ASTBuilder astBuilder;
+        RefPtr<ASTBuilder> globalAstBuilder;
 
         // Generated code for stdlib, etc.
         String stdlibPath;
@@ -2064,34 +2064,11 @@ namespace Slang
         String getCoreLibraryCode();
         String getHLSLLibraryCode();
 
-        // Basic types that we don't want to re-create all the time
-        RefPtr<Type> errorType;
-        RefPtr<Type> initializerListType;
-        RefPtr<Type> overloadedType;
-        //RefPtr<Type> constExprRate;
-        //RefPtr<Type> irBasicBlockType;
-
-        RefPtr<Type> stringType;
-        RefPtr<Type> enumTypeType;
-
-        Type* getInitializerListType();
-        Type* getOverloadedType();
-        Type* getErrorType();
-        Type* getStringType();
-        Type* getEnumTypeType();
-
-        SLANG_FORCE_INLINE Type* getBuiltinType(BaseType flavor) { return builtinTypes[Index(flavor)]; }
-
-        RefPtr<Type> builtinTypes[Index(BaseType::CountOf)];
-        Dictionary<String, Decl*> magicDecls;
-
-        void initializeTypes();
-
-
-
         SyntaxClass<RefObject> findSyntaxClass(Name* name);
 
         Dictionary<Name*, SyntaxClass<RefObject> > mapNameToSyntaxClass;
+
+        RefPtr<SharedASTBuilder> m_sharedASTBuilder;
 
         // cache used by type checking, implemented in check.cpp
         TypeCheckingCache* typeCheckingCache = nullptr;

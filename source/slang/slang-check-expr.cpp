@@ -416,7 +416,7 @@ namespace Slang
             overloadedExpr->name = name;
             overloadedExpr->loc = loc;
             overloadedExpr->type = QualType(
-                getSession()->getOverloadedType());
+                m_astBuilder->getOverloadedType());
             overloadedExpr->base = baseExpr;
             overloadedExpr->lookupResult2 = lookupResult;
             return overloadedExpr;
@@ -588,7 +588,7 @@ namespace Slang
 
     RefPtr<Expr> SemanticsVisitor::CreateErrorExpr(Expr* expr)
     {
-        expr->type = QualType(getSession()->getErrorType());
+        expr->type = QualType(m_astBuilder->getErrorType());
         return expr;
     }
 
@@ -1224,7 +1224,7 @@ namespace Slang
         if (expr->declRef)
             return expr;
 
-        expr->type = QualType(getSession()->getErrorType());
+        expr->type = QualType(m_astBuilder->getErrorType());
         auto lookupResult = lookUp(
             m_astBuilder,
             this, expr->name, expr->scope);
@@ -1641,7 +1641,7 @@ namespace Slang
         SLANG_ASSERT(as<StaticMemberExpr>(expr) || as<MemberExpr>(expr));
 
         getSink()->diagnose(expr, Diagnostics::noMemberOfNameInType, expr->name, baseType);
-        expr->type = QualType(getSession()->getErrorType());
+        expr->type = QualType(m_astBuilder->getErrorType());
         return expr;
     }
 
@@ -1735,7 +1735,7 @@ namespace Slang
             arg = CheckTerm(arg);
         }
 
-        expr->type = getSession()->getInitializerListType();
+        expr->type = m_astBuilder->getInitializerListType();
 
         return expr;
     }

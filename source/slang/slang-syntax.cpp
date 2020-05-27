@@ -279,51 +279,6 @@ Index getFilterCountImpl(const ReflectClassInfo& clsInfo, MemberFilterStyle filt
         return et->canonicalType;
     }
 
-    void Session::initializeTypes()
-    {
-        ASTBuilder* globalAstBuilder = getGlobalASTBuilder();
-
-        errorType = globalAstBuilder->create<ErrorType>();
-        initializerListType = globalAstBuilder->create<InitializerListType>();
-        overloadedType = globalAstBuilder->create<OverloadGroupType>();
-    }
-
-    Type* Session::getInitializerListType()
-    {
-        return initializerListType;
-    }
-
-    Type* Session::getOverloadedType()
-    {
-        return overloadedType;
-    }
-
-    Type* Session::getErrorType()
-    {
-        return errorType;
-    }
-
-    Type* Session::getStringType()
-    {
-        if (stringType == nullptr)
-        {
-            auto stringTypeDecl = findMagicDecl(this, "StringType");
-            stringType = DeclRefType::create(getGlobalASTBuilder(), makeDeclRef<Decl>(stringTypeDecl));
-        }
-        return stringType;
-    }
-
-    Type* Session::getEnumTypeType()
-    {
-        if (enumTypeType == nullptr)
-        {
-            auto enumTypeTypeDecl = findMagicDecl(this, "EnumTypeType");
-            enumTypeType = DeclRefType::create(getGlobalASTBuilder(), makeDeclRef<Decl>(enumTypeTypeDecl));
-        }
-        return enumTypeType;
-    }
-
-
     SyntaxClass<RefObject> Session::findSyntaxClass(Name* name)
     {
         SyntaxClass<RefObject> syntaxClass;
@@ -2062,65 +2017,7 @@ Index getFilterCountImpl(const ReflectClassInfo& clsInfo, MemberFilterStyle filt
         return (HashCode) value;
     }
 
-    //
-
-    void registerBuiltinDecl(
-        Session*                    session,
-        RefPtr<Decl>                decl,
-        RefPtr<BuiltinTypeModifier> modifier)
-    {
-        auto type = DeclRefType::create(
-            session->getGlobalASTBuilder(), 
-            DeclRef<Decl>(decl.Ptr(), nullptr));
-        session->builtinTypes[(int)modifier->tag] = type;
-    }
-
-    void registerMagicDecl(
-        Session*                    session,
-        RefPtr<Decl>                decl,
-        RefPtr<MagicTypeModifier>   modifier)
-    {
-        // In some cases the modifier will have been applied to the
-        // "inner" declaration of a `GenericDecl`, but what we
-        // actually want to register is the generic itself.
-        //
-        auto declToRegister = decl;
-        if(auto genericDecl = as<GenericDecl>(decl->parentDecl))
-            declToRegister = genericDecl;
-
-        session->magicDecls[modifier->name] = declToRegister.Ptr();
-    }
-
-    RefPtr<Decl> findMagicDecl(
-        Session*        session,
-        String const&   name)
-    {
-        return session->magicDecls[name].GetValue();
-    }
-
-    //
-
-    SyntaxNodeBase* createInstanceOfSyntaxClassByName(
-        ASTBuilder* astBuilder,
-        String const&   name)
-    {
-        if(0) {}
-    #define CASE(NAME) \
-        else if(name == #NAME) return astBuilder->create<NAME>()
-
-    CASE(GLSLBufferModifier);
-    CASE(GLSLWriteOnlyModifier);
-    CASE(GLSLReadOnlyModifier);
-    CASE(GLSLPatchModifier);
-    CASE(SimpleModifier);
-
-    #undef CASE
-        else
-        {
-            SLANG_UNEXPECTED("unhandled syntax class name");
-            UNREACHABLE_RETURN(nullptr);
-        }
-    }
+    
 
     //
 

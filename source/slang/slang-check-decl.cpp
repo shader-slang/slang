@@ -776,7 +776,7 @@ namespace Slang
             if(!initExpr)
             {
                 getSink()->diagnose(varDecl, Diagnostics::varWithoutTypeMustHaveInitializer);
-                varDecl->type.type = getSession()->getErrorType();
+                varDecl->type.type = m_astBuilder->getErrorType();
             }
             else
             {
@@ -1041,13 +1041,15 @@ namespace Slang
         ///
     static void _registerBuiltinDeclsRec(Session* session, Decl* decl)
     {
+        SharedASTBuilder* sharedASTBuilder = session->m_sharedASTBuilder;
+
         if (auto builtinMod = decl->findModifier<BuiltinTypeModifier>())
         {
-            registerBuiltinDecl(session, decl, builtinMod);
+            sharedASTBuilder->registerBuiltinDecl(decl, builtinMod);
         }
         if (auto magicMod = decl->findModifier<MagicTypeModifier>())
         {
-            registerMagicDecl(session, decl, magicMod);
+            sharedASTBuilder->registerMagicDecl(decl, magicMod);
         }
 
         if(auto containerDecl = as<ContainerDecl>(decl))
@@ -1867,12 +1869,12 @@ namespace Slang
         // seems like the best place to do it.
         {
             // First, look up the type of the `__EnumType` interface.
-            RefPtr<Type> enumTypeType = getSession()->getEnumTypeType();
+            RefPtr<Type> enumTypeType = getASTBuilder()->getEnumTypeType();
 
             RefPtr<InheritanceDecl> enumConformanceDecl = m_astBuilder->create<InheritanceDecl>();
             enumConformanceDecl->parentDecl = decl;
             enumConformanceDecl->loc = decl->loc;
-            enumConformanceDecl->base.type = getSession()->getEnumTypeType();
+            enumConformanceDecl->base.type = getASTBuilder()->getEnumTypeType();
             decl->members.add(enumConformanceDecl);
 
             // The `__EnumType` interface has one required member, the `__Tag` type.
@@ -2959,7 +2961,7 @@ namespace Slang
         if( !thisType )
         {
             getSink()->diagnose(decl, Diagnostics::initializerNotInsideType);
-            thisType = getSession()->getErrorType();
+            thisType = m_astBuilder->getErrorType();
         }
         return thisType;
     }

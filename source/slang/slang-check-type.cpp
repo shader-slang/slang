@@ -37,7 +37,7 @@ namespace Slang
         {
             return typeType->type;
         }
-        return getSession()->getErrorType();
+        return m_astBuilder->getErrorType();
     }
 
     RefPtr<Type> SemanticsVisitor::TranslateTypeNode(const RefPtr<Expr> & node)
@@ -97,7 +97,7 @@ namespace Slang
         {
             return typeType->type;
         }
-        return getSession()->getErrorType();
+        return m_astBuilder->getErrorType();
     }
 
     RefPtr<Type> SemanticsVisitor::ExtractGenericArgType(RefPtr<Expr> exp)
@@ -214,7 +214,7 @@ namespace Slang
                         if (diagSink)
                         {
                             diagSink->diagnose(typeExp.exp.Ptr(), Diagnostics::genericTypeNeedsArgs, typeExp);
-                            *outProperType = getSession()->getErrorType();
+                            *outProperType = m_astBuilder->getErrorType();
                         }
                         return false;
                     }
@@ -230,7 +230,7 @@ namespace Slang
                         if (diagSink)
                         {
                             diagSink->diagnose(typeExp.exp.Ptr(), Diagnostics::unimplemented, "can't fill in default for generic type parameter");
-                            *outProperType = getSession()->getErrorType();
+                            *outProperType = m_astBuilder->getErrorType();
                         }
                         return false;
                     }
@@ -291,7 +291,7 @@ namespace Slang
             {
                 // TODO(tfoley): pick the right diagnostic message
                 getSink()->diagnose(result.exp.Ptr(), Diagnostics::invalidTypeVoid);
-                result.type = getSession()->getErrorType();
+                result.type = m_astBuilder->getErrorType();
                 return result;
             }
         }
@@ -332,9 +332,8 @@ namespace Slang
         RefPtr<Type>  elementType,
         RefPtr<IntVal>          elementCount)
     {
-        auto session = getSession();
-        auto vectorGenericDecl = findMagicDecl(
-            session, "Vector").as<GenericDecl>();
+        auto vectorGenericDecl = m_astBuilder->getSharedASTBuilder()->findMagicDecl("Vector").as<GenericDecl>();
+            
         auto vectorTypeDecl = vectorGenericDecl->inner;
 
         auto substitutions = m_astBuilder->create<GenericSubstitution>();
