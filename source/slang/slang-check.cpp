@@ -234,7 +234,7 @@ namespace Slang
         {
             visitor.dispatch(stmt);
         }
-        catch(AbortCompilationException&) { throw; }
+        catch(const AbortCompilationException&) { throw; }
         catch(...)
         {
             getSink()->noteInternalErrorLoc(stmt->loc);
@@ -249,7 +249,7 @@ namespace Slang
         {
             visitor.dispatch(expr);
         }
-        catch(AbortCompilationException&) { throw; }
+        catch(const AbortCompilationException&) { throw; }
         catch(...)
         {
             getSink()->noteInternalErrorLoc(expr->loc);

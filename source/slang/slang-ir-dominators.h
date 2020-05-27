@@ -54,6 +54,9 @@ namespace Slang
         /// These are the descendents of the block in the dominator tree.
         DominatedList getProperlyDominatedBlocks(IRBlock* block);
 
+            /// Is `block` unrechable in the control flow graph?
+        bool isUnreachable(IRBlock* block);
+
         struct DominatedList
         {
         public:
@@ -67,6 +70,7 @@ namespace Slang
                 IRBlock* operator*() const;
                 void operator++();
                 bool operator==(Iterator const& that) const;
+                bool operator!=(Iterator const& that) const;
 
             private:
                 friend struct DominatedList;

@@ -38,7 +38,7 @@ static SlangResult _compile(SlangCompileRequest* compileRequest, int argc, const
         res = SLANG_FAILED(res) ? SLANG_E_INTERNAL_FAIL : res;
     }
 #ifndef _DEBUG
-    catch (Exception & e)
+    catch (const Exception& e)
     {
         StdWriters::getOut().print("internal compiler error: %S\n", e.Message.toWString().begin());
         res = SLANG_FAIL;

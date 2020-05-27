@@ -91,7 +91,7 @@ struct BindPoint
     bool operator==(const ThisType& rhs) const { return m_space == rhs.m_space && m_offset == rhs.m_offset; }
     bool operator!=(const ThisType& rhs) const { return !(*this == rhs); }
 
-    int GetHashCode() const { return Slang::combineHash(Slang::GetHashCode(m_space), Slang::GetHashCode(m_offset)); }
+    Slang::HashCode getHashCode() const { return Slang::combineHash(Slang::getHashCode(m_space), Slang::getHashCode(m_offset)); }
 
     BindPoint() = default;
     BindPoint(Slang::Index space, size_t offset):m_space(space), m_offset(offset) {}
@@ -157,22 +157,23 @@ struct BindPoints
     }
     bool operator!=(const ThisType& rhs) const { return !(*this == rhs); }
 
-    int GetHashCode() const
+    Slang::HashCode getHashCode() const
     {
-        int hash = 0x5435abbc;
+        using namespace Slang;
+        HashCode hash = 0x5435abbc;
         int bits = 0;
         int bit = 1;
-        for (Slang::Index i = 0; i < SLANG_PARAMETER_CATEGORY_COUNT; ++i, bit += bit)
+        for (Index i = 0; i < SLANG_PARAMETER_CATEGORY_COUNT; ++i, bit += bit)
         {
             const auto& point = m_points[i];
             if (point.isValid())
             {
-                hash = Slang::combineHash(hash, point.GetHashCode());
+                hash = combineHash(hash, point.getHashCode());
                 bits |= bit;
             }
         }
         // The categories set is important too, so merge that in
-        return Slang::combineHash(bits, hash);
+        return combineHash(bits, hash);
     }
 
     BindPoint& operator[](SlangParameterCategory category) { return m_points[Slang::Index(category)]; }
@@ -188,7 +189,7 @@ class BindPointSet : public Slang::RefObject
 public:
     typedef Slang::RefObject Super;
 
-    int GetHashCode() const { return m_points.GetHashCode(); }
+    Slang::HashCode getHashCode() const { return m_points.getHashCode(); }
 
     BindPointSet(const BindPoints& points) :
         m_points(points)
@@ -272,7 +273,7 @@ struct BindLocation
     bool operator!=(const ThisType& rhs) const { return !(*this == rhs); }
 
         /// Get the hash code
-    int GetHashCode() const;
+    Slang::HashCode getHashCode() const;
 
         /// Default Ctor - constructs as invalid
     BindLocation() {}
@@ -294,7 +295,7 @@ struct BindLocation
     BindPoint m_point;                                     ///< If there isn't a bind point set, this defines the point
 
         /// Holds multiple BindPoints.
-        /// To keep invariants (such that GetHashCode and == work), it can only be set if
+        /// To keep invariants (such that getHashCode and == work), it can only be set if
         /// there is more than one category. If there is just one, m_category and m_point *MUST* be used. 
         /// NOTE! Can only be written to if there is a single reference.
     Slang::RefPtr<BindPointSet> m_bindPointSet;             

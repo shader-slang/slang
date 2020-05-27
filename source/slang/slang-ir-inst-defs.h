@@ -417,6 +417,14 @@ INST(Dot, dot, 2, 0)
 
 INST(GetStringHash, getStringHash, 1, 0)
 
+INST(WaveGetActiveMask, waveGetActiveMask, 0, 0)
+
+    /// trueMask = waveMaskBallot(mask, condition)
+INST(WaveMaskBallot, waveMaskBallot, 2, 0)
+
+    /// matchMask = waveMaskBallot(mask, value)
+INST(WaveMaskMatch, waveMaskMatch, 2, 0)
+
 // Texture sampling operation of the form `t.Sample(s,u)`
 INST(Sample, sample, 3, 0)
 

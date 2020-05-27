@@ -278,7 +278,7 @@ namespace Slang
 				}
 				destBuffer[i] = ch;
 			}
-			catch (EndOfStreamException)
+			catch (const EndOfStreamException& )
 			{
 				break;
 			}
@@ -307,7 +307,7 @@ namespace Slang
 				}
 				sb.Append(ch);
 			}
-			catch (EndOfStreamException)
+			catch (const EndOfStreamException&)
 			{
 				break;
 			}
@@ -333,7 +333,7 @@ namespace Slang
 				else
 					sb.Append(ch);
 			}
-			catch (EndOfStreamException)
+			catch (const EndOfStreamException&)
 			{
 				break;
 			}

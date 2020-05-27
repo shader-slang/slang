@@ -1479,7 +1479,7 @@ struct IRInstKey
 {
     IRInst* inst;
 
-    int GetHashCode();
+    HashCode getHashCode();
 };
 
 bool operator==(IRInstKey const& left, IRInstKey const& right);
@@ -1489,7 +1489,7 @@ struct IRConstantKey
     IRConstant* inst;
 
     bool operator==(const IRConstantKey& rhs) const { return inst->equal(rhs.inst); }
-    int GetHashCode() const { return inst->getHashCode(); }
+    HashCode getHashCode() const { return inst->getHashCode(); }
 };
 
 struct SharedIRBuilder
@@ -1509,6 +1509,9 @@ struct SharedIRBuilder
 
     // TODO: We probably shouldn't use this in the long run.
     Dictionary<void*,           IRLayout*>        layoutMap;
+
+
+    void insertBlockAlongEdge(IREdge const& edge);
 };
 
 struct IRBuilderSourceLocRAII;
@@ -2018,6 +2021,12 @@ struct IRBuilder
     IRGlobalConstant* emitGlobalConstant(
         IRType* type,
         IRInst* val);
+
+    IRInst* emitWaveMaskBallot(IRType* type, IRInst* mask, IRInst* condition);
+    IRInst* emitWaveMaskMatch(IRType* type, IRInst* mask, IRInst* value);
+
+    IRInst* emitBitAnd(IRType* type, IRInst* left, IRInst* right);
+    IRInst* emitBitNot(IRType* type, IRInst* value);
 
     //
     // Decorations

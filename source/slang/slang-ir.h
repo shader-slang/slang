@@ -689,7 +689,7 @@ struct IRConstant : IRInst
     bool isValueEqual(IRConstant* rhs);
 
         /// Get the hash 
-    int getHashCode();
+    HashCode getHashCode();
 
     IR_PARENT_ISA(Constant)
 
@@ -749,6 +749,31 @@ struct IRParam : IRInst
     IRParam* getPrevParam();
 
     IR_LEAF_ISA(Param)
+};
+
+    /// A control-flow edge from one basic block to another
+struct IREdge
+{
+public:
+    IREdge()
+    {}
+
+    explicit IREdge(IRUse* use)
+        : m_use(use)
+    {}
+
+    IRBlock* getPredecessor() const;
+    IRBlock* getSuccessor() const;
+
+    IRUse* getUse() const
+    {
+        return m_use;
+    }
+
+    bool isCritical() const;
+
+private:
+    IRUse* m_use = nullptr;
 };
 
 // A basic block is a parent instruction that adds the constraint
@@ -849,6 +874,7 @@ struct IRBlock : IRInst
                 return use != that.use;
             }
 
+            IREdge getEdge() const { return IREdge(use); }
             IRUse* use;
         };
 
@@ -877,6 +903,8 @@ struct IRBlock : IRInst
             {
                 return use != that.use;
             }
+
+            IREdge getEdge() const { return IREdge(use); }
 
             IRUse* use;
             UInt stride;

@@ -39,6 +39,9 @@ enum
     kRiffPadMask = kRiffPadSize - 1,
 };
 
+// Uses it's own version of a hash
+typedef int RiffHashCode;
+
 struct RiffHeader
 {
     FourCC type;                ///< The FourCC code that identifies this chunk
@@ -186,6 +189,7 @@ public:
     struct ListChunk;
     struct DataChunk;
 
+    
     struct Data
     {
             /// Get the payload
@@ -297,7 +301,7 @@ public:
         SLANG_FORCE_INLINE static bool isType(const Chunk* chunk) { return chunk->m_kind == Kind::Data; }
 
             /// Calculate a hash (not necessarily very fast)
-        int calcHash() const;
+        RiffHashCode calcHash() const;
             /// Calculate the payload size
         size_t calcPayloadSize() const;
 

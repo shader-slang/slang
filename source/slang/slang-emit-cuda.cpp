@@ -518,6 +518,31 @@ bool CUDASourceEmitter::tryEmitInstExprImpl(IRInst* inst, const EmitOpInfo& inOu
             m_writer->emit("\n}");
             return true;
         }
+        case kIROp_WaveMaskBallot:
+        {
+            m_writer->emit("__ballot_sync(");
+            emitOperand(inst->getOperand(0), getInfo(EmitOp::General));
+            m_writer->emit(", ");
+            emitOperand(inst->getOperand(1), getInfo(EmitOp::General));
+            m_writer->emit(")");
+            return true;
+        }
+        case kIROp_WaveMaskMatch:
+        {
+            SemanticVersion version;
+            version.set(7, 0);
+            if (version > m_extensionTracker->m_smVersion)
+            {
+                m_extensionTracker->m_smVersion = version;
+            }
+
+            m_writer->emit("__match_any_sync(");
+            emitOperand(inst->getOperand(0), getInfo(EmitOp::General));
+            m_writer->emit(", ");
+            emitOperand(inst->getOperand(1), getInfo(EmitOp::General));
+            m_writer->emit(")");
+            return true;
+        }
         default: break;
     }
 
