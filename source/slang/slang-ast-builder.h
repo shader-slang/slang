@@ -73,14 +73,11 @@ public:
     void init(Session* session);
 
 protected:
-    Type* m_errorType;
-    Type* m_initializerListType;
-    Type* m_overloadedType;
-    Type* m_constExprRate;
-    Type* m_irBasicBlockType;
-
-    Type* m_stringType;
-    Type* m_enumTypeType;
+    Type* m_errorType = nullptr;
+    Type* m_initializerListType = nullptr;
+    Type* m_overloadedType = nullptr;
+    Type* m_stringType = nullptr;
+    Type* m_enumTypeType = nullptr;
 
     Type* m_builtinTypes[Index(BaseType::CountOf)];
 

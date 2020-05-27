@@ -132,7 +132,6 @@ namespace Slang
             currentScope = currentScope->parent;
         }
         Parser(
-            Session* session,
             ASTBuilder* inAstBuilder,
             TokenSpan const& _tokens,
             DiagnosticSink * sink,
@@ -141,12 +140,10 @@ namespace Slang
             , astBuilder(inAstBuilder)
             , sink(sink)
             , outerScope(outerScope)
-            , m_session(session)
         {}
         Parser(const Parser & other) = default;
 
-        Session* m_session = nullptr;
-        Session* getSession() { return m_session; }
+        //Session* getSession() { return m_session; }
 
         Token ReadToken();
         Token ReadToken(TokenType type);
@@ -2866,7 +2863,8 @@ namespace Slang
             // User is specifying the class that should be construted
             auto classNameAndLoc = expectIdentifier(parser);
 
-            syntaxClass = parser->getSession()->findSyntaxClass(classNameAndLoc.name);
+            auto session = parser->astBuilder->getGlobalSession();
+            syntaxClass = session->findSyntaxClass(classNameAndLoc.name);
         }
 
         // If the user specified a syntax class, then we will default
@@ -3005,7 +3003,9 @@ namespace Slang
             // User is specifying the class that should be construted
             auto classNameAndLoc = expectIdentifier(parser);
 
-            syntaxClass = parser->getSession()->findSyntaxClass(classNameAndLoc.name);
+            auto session = parser->astBuilder->getGlobalSession();
+
+            syntaxClass = session->findSyntaxClass(classNameAndLoc.name);
         }
         else
         {
@@ -4417,9 +4417,9 @@ namespace Slang
                 }
 
                 value = _fixIntegerLiteral(suffixBaseType, value, &token, parser->sink);
-            
-                auto session = parser->getSession();
-                Type* suffixType = (suffixBaseType == BaseType::Void) ? session->getErrorType() : session->getBuiltinType(suffixBaseType);
+
+                ASTBuilder* astBuilder = parser->astBuilder;
+                Type* suffixType = (suffixBaseType == BaseType::Void) ? astBuilder->getErrorType() : astBuilder->getBuiltinType(suffixBaseType);
 
                 constExpr->value = value;
                 constExpr->type = QualType(suffixType);
@@ -4532,9 +4532,9 @@ namespace Slang
                     }
                 }
 
-                Session* session = parser->getSession();
+                ASTBuilder* astBuilder = parser->astBuilder;
 
-                Type* suffixType = (suffixBaseType == BaseType::Void) ? session->getErrorType() : session->getBuiltinType(suffixBaseType);
+                Type* suffixType = (suffixBaseType == BaseType::Void) ? astBuilder->getErrorType() : astBuilder->getBuiltinType(suffixBaseType);
 
                 constExpr->value = fixedValue;
                 constExpr->type = QualType(suffixType);
@@ -4815,7 +4815,7 @@ namespace Slang
         NamePool*                       namePool,
         SourceLanguage                  sourceLanguage)
     {
-        Parser parser(astBuilder->getGlobalSession(), astBuilder, tokens, sink, outerScope);
+        Parser parser(astBuilder, tokens, sink, outerScope);
         parser.currentScope = outerScope;
         parser.namePool = namePool;
         parser.sourceLanguage = sourceLanguage;
@@ -4830,7 +4830,7 @@ namespace Slang
         DiagnosticSink*                 sink,
         RefPtr<Scope> const&            outerScope)
     {
-        Parser parser(translationUnit->getSession(), astBuilder, tokens, sink, outerScope);
+        Parser parser(astBuilder, tokens, sink, outerScope);
         parser.namePool = translationUnit->getNamePool();
         parser.sourceLanguage = translationUnit->sourceLanguage;
 
@@ -5225,7 +5225,9 @@ namespace Slang
         auto syntaxClassNameAndLoc = expectIdentifier(parser);
         expect(parser, TokenType::RParent);
 
-        auto syntaxClass = parser->getSession()->findSyntaxClass(syntaxClassNameAndLoc.name);
+        Session* session = parser->astBuilder->getGlobalSession();
+
+        auto syntaxClass = session->findSyntaxClass(syntaxClassNameAndLoc.name);
 
         RefPtr<AttributeTargetModifier> modifier = parser->astBuilder->create<AttributeTargetModifier>();
         modifier->syntaxClass = syntaxClass;

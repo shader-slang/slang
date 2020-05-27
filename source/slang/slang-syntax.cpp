@@ -743,8 +743,6 @@ Index getFilterCountImpl(const ReflectClassInfo& clsInfo, MemberFilterStyle filt
         ASTBuilder*     astBuilder,
         DeclRef<Decl>   declRef)
     {
-        Session* session = astBuilder->getGlobalSession();
-
         declRef = createDefaultSubstitutionsIfNeeded(astBuilder, declRef);
 
         if (auto builtinMod = declRef.getDecl()->findModifier<BuiltinTypeModifier>())
@@ -879,6 +877,8 @@ Index getFilterCountImpl(const ReflectClassInfo& clsInfo, MemberFilterStyle filt
 
             else
             {
+                Session* session = astBuilder->getGlobalSession();
+
                 auto classInfo = session->findSyntaxClass(
                     session->getNamePool()->getName(magicMod->name));
                 if (!classInfo.classInfo)
