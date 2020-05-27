@@ -3464,6 +3464,55 @@ namespace Slang
         return inst;
     }
 
+    IRInst* IRBuilder::emitWaveMaskBallot(IRType* type, IRInst* mask, IRInst* condition)
+    {
+        auto inst = createInst<IRInst>(
+            this,
+            kIROp_WaveMaskBallot,
+            type,
+            mask,
+            condition);
+        addInst(inst);
+        return inst;
+    }
+
+    IRInst* IRBuilder::emitWaveMaskMatch(IRType* type, IRInst* mask, IRInst* value)
+    {
+        auto inst = createInst<IRInst>(
+            this,
+            kIROp_WaveMaskMatch,
+            type,
+            mask,
+            value);
+        addInst(inst);
+        return inst;
+    }
+
+    IRInst* IRBuilder::emitBitAnd(IRType* type, IRInst* left, IRInst* right)
+    {
+        auto inst = createInst<IRInst>(
+            this,
+            kIROp_BitAnd,
+            type,
+            left,
+            right);
+        addInst(inst);
+        return inst;
+    }
+
+    IRInst* IRBuilder::emitBitNot(IRType* type, IRInst* value)
+    {
+        auto inst = createInst<IRInst>(
+            this,
+            kIROp_BitNot,
+            type,
+            value);
+        addInst(inst);
+        return inst;
+    }
+
+
+
     //
     // Decorations
     //

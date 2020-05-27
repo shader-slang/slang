@@ -891,63 +891,127 @@ void processBlock(
     }
 }
 
-static void breakCriticalEdges(
-    ConstructSSAContext*    context)
+IRBlock* IREdge::getPredecessor() const
+{
+    return cast<IRBlock>(getUse()->getUser()->parent);
+}
+
+IRBlock* IREdge::getSuccessor() const
+{
+    return cast<IRBlock>(getUse()->get());
+}
+
+void SharedIRBuilder::insertBlockAlongEdge(
+    IREdge const&       edge)
+{
+    auto pred = edge.getPredecessor();
+    auto succ = edge.getSuccessor();
+    auto edgeUse = edge.getUse();
+
+    IRBuilder builder;
+    builder.sharedBuilder = this;
+    builder.setInsertInto(pred);
+
+    // Create a new block that will sit "along" the edge
+    IRBlock* edgeBlock = builder.createBlock();
+
+    edgeUse->debugValidate();
+
+    // The predecessor block should now branch to
+    // the edge block.
+    edgeUse->set(edgeBlock);
+
+    // The edge block should branch (unconditionally)
+    // to the successor block.
+    builder.setInsertInto(edgeBlock);
+    builder.emitBranch(succ);
+
+    // Insert the new block into the block list
+    // for the function.
+    //
+    // In principle, the order of this list shouldn't
+    // affect the semantics of a program, but we
+    // might want to be careful about ordering anyway.
+    edgeBlock->insertAfter(pred);
+}
+
+bool IREdge::isCritical() const
 {
     // A critical edge is an edge P -> S where
     // P has multiple sucessors, and S has multiple
     // predecessors.
     //
-    // In the context of our CFG representation, such an edge
-    // will be an `IRUse` in the terminator instruction of block P,
-    // which refers to block S.
+    auto pred = getPredecessor();
+    auto succ = getSuccessor();
+
+    // If the predecessor block doesn't have multiple successors,
+    // then this can't be a critical edge.
     //
+    if(pred->getSuccessors().getCount() <= 1)
+        return false;
+
+    // For the edge to be critical, the successor must have
+    // more than one predecessor.
+    //
+    // More than that, we require that it has more than one
+    // *unique* predecessor, to handle the case where multiple
+    // cases of a `switch` might lead to the same block.
+    //
+    // To implement this, we test if it has any predecessor
+    // other than `pred` which we already know about.
+    //
+    bool multiplePreds = false;
+    for (auto pp : succ->getPredecessors())
+    {
+        if (pp != pred)
+        {
+            multiplePreds = true;
+            break;
+        }
+    }
+    if(!multiplePreds)
+        return false;
+
+    // At this point we have confirmed that `edgeUse`
+    // leads from a block with multiple successors
+    // to one with multiple (distinct) predecessors,
+    // so we are sure it is a critical edge.
+    //
+    return true;
+}
+
+static void breakCriticalEdges(
+    ConstructSSAContext*    context)
+{
+    auto globalVal = context->globalVal;
+
     // We will make a pass over the CFG to collect all the critical
     // edges, and then we will break them in a follow-up pass.
-
-    List<IRUse*> criticalEdges;
-
-    auto globalVal = context->globalVal;
+    //
+    List<IREdge> criticalEdges;
     for (auto pred = globalVal->getFirstBlock(); pred; pred = pred->getNextBlock())
     {
+        // As an early out: if the predecessor block
+        // has one (or fewer) successors, then no
+        // edge from that block can be critical.
+        //
         auto successors = pred->getSuccessors();
         if (successors.getCount() <= 1)
             continue;
 
+        // Otherwise, we iterate over its outgoing
+        // edges (represented with its successor list),
+        // and record those that are critical.
+        //
         auto succIter = successors.begin();
         auto succEnd = successors.end();
-
         for (; succIter != succEnd; ++succIter)
         {
-            auto succ = *succIter;
-
-            // For the edge to be critical, the successor must have
-            // more than one predecessor.
-            // More than that, we require that it has more than one
-            // *unique* predecessor, to handle the case where multiple
-            // cases of a `switch` might lead to the same block.
-            //
-            // To implement this, we test if it has any predecessor
-            // other than `pred` which we already know about.
-
-            bool multiplePreds = false;
-            for (auto pp : succ->getPredecessors())
+            auto edge = succIter.getEdge();
+            if( edge.isCritical() )
             {
-                if (pp != pred)
-                {
-                    multiplePreds = true;
-                    break;
-                }
+                criticalEdges.add(edge);
             }
-            if (!multiplePreds)
-                continue;
-
-            // We have found a critical edge from `pred` to `succ`.
-            //
-            // Furthermore, the `IRUse` embedded in `succIter` represents
-            // that edge directly.
-            auto edgeUse = succIter.use;
-            criticalEdges.add(edgeUse);
         }
     }
 
@@ -956,36 +1020,9 @@ static void breakCriticalEdges(
     // to break the edges while doing the initial walk, because
     // that would change the CFG while we are walking it.
 
-    for (auto edgeUse : criticalEdges)
+    for (auto edge : criticalEdges)
     {
-        auto pred = cast<IRBlock>(edgeUse->getUser()->parent);
-        auto succ = cast<IRBlock>(edgeUse->get());
-
-        IRBuilder builder;
-        builder.sharedBuilder = &context->sharedBuilder;
-        builder.setInsertInto(pred);
-
-        // Create a new block that will sit "along" the edge
-        IRBlock* edgeBlock = builder.createBlock();
-
-        edgeUse->debugValidate();
-
-        // The predecessor block should now branch to
-        // the edge block.
-        edgeUse->set(edgeBlock);
-
-        // The edge block should branch (unconditionally)
-        // to the successor block.
-        builder.setInsertInto(edgeBlock);
-        builder.emitBranch(succ);
-
-        // Insert the new block into the block list
-        // for the function.
-        //
-        // In principle, the order of this list shouldn't
-        // affect the semantics of a program, but we
-        // might want to be careful about ordering anyway.
-        edgeBlock->insertAfter(pred);
+        context->sharedBuilder.insertBlockAlongEdge(edge);
     }
 }
 

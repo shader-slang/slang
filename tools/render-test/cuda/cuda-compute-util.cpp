@@ -344,7 +344,7 @@ static int _calcSMCountPerMultiProcessor(int major, int minor)
     const auto& last = infos[SLANG_COUNT_OF(infos) - 1];
 
     // It must be newer presumably
-    SLANG_ASSERT(sm > last.coreCount );
+    SLANG_ASSERT(sm > last.sm);
 
     // Default to the last entry
     return last.coreCount;

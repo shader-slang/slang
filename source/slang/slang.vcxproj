@@ -244,6 +244,7 @@
     <ClInclude Include="slang-ir-string-hash.h" />
     <ClInclude Include="slang-ir-strip-witness-tables.h" />
     <ClInclude Include="slang-ir-strip.h" />
+    <ClInclude Include="slang-ir-synthesize-active-mask.h" />
     <ClInclude Include="slang-ir-type-set.h" />
     <ClInclude Include="slang-ir-union.h" />
     <ClInclude Include="slang-ir-validate.h" />
@@ -326,6 +327,7 @@
     <ClCompile Include="slang-ir-string-hash.cpp" />
     <ClCompile Include="slang-ir-strip-witness-tables.cpp" />
     <ClCompile Include="slang-ir-strip.cpp" />
+    <ClCompile Include="slang-ir-synthesize-active-mask.cpp" />
     <ClCompile Include="slang-ir-type-set.cpp" />
     <ClCompile Include="slang-ir-union.cpp" />
     <ClCompile Include="slang-ir-validate.cpp" />
@@ -380,23 +382,23 @@
       <AdditionalInputs Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">../../bin/windows-x86/release/slang-generate.exe</AdditionalInputs>
       <AdditionalInputs Condition="'$(Configuration)|$(Platform)'=='Release|x64'">../../bin/windows-x64/release/slang-generate.exe</AdditionalInputs>
     </CustomBuild>
-  </ItemGroup>
-  <ItemGroup>
-    <Natvis Include="..\core\core.natvis" />
-    <Natvis Include="slang.natvis" />
     <CustomBuild Include="slang-ast-reflect.h">
       <FileType>Document</FileType>
       <Command Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">"../../bin/windows-x86/debug/slang-cpp-extractor" -d %(RootDir)%(Directory)/ slang-ast-base.h slang-ast-decl.h slang-ast-expr.h slang-ast-modifier.h slang-ast-stmt.h slang-ast-type.h slang-ast-val.h -strip-prefix slang-ast- -o slang-ast-generated -output-fields</Command>
       <Command Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">"../../bin/windows-x64/debug/slang-cpp-extractor" -d %(RootDir)%(Directory)/ slang-ast-base.h slang-ast-decl.h slang-ast-expr.h slang-ast-modifier.h slang-ast-stmt.h slang-ast-type.h slang-ast-val.h -strip-prefix slang-ast- -o slang-ast-generated -output-fields</Command>
       <Command Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">"../../bin/windows-x86/release/slang-cpp-extractor" -d %(RootDir)%(Directory)/ slang-ast-base.h slang-ast-decl.h slang-ast-expr.h slang-ast-modifier.h slang-ast-stmt.h slang-ast-type.h slang-ast-val.h -strip-prefix slang-ast- -o slang-ast-generated -output-fields</Command>
       <Command Condition="'$(Configuration)|$(Platform)'=='Release|x64'">"../../bin/windows-x64/release/slang-cpp-extractor" -d %(RootDir)%(Directory)/ slang-ast-base.h slang-ast-decl.h slang-ast-expr.h slang-ast-modifier.h slang-ast-stmt.h slang-ast-type.h slang-ast-val.h -strip-prefix slang-ast- -o slang-ast-generated -output-fields</Command>
-      <Outputs>%(RootDir)%(Directory)/slang-ast-generated.h;%(RootDir)%(Directory)/slang-ast-generated-macro.h</Outputs>
+      <Outputs>slang-ast-generated.h;slang-ast-generated-macro.h</Outputs>
       <Message>slang-cpp-extractor AST %(Identity)</Message>
-      <AdditionalInputs Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">../../bin/windows-x86/debug/slang-cpp-extractor.exe;%(RootDir)%(Directory)/slang-ast-base.h;%(RootDir)%(Directory)/slang-ast-decl.h;%(RootDir)%(Directory)/slang-ast-expr.h;%(RootDir)%(Directory)/slang-ast-modifier.h;%(RootDir)%(Directory)/slang-ast-stmt.h;%(RootDir)%(Directory)/slang-ast-type.h;%(RootDir)%(Directory)/slang-ast-val.h</AdditionalInputs>
-      <AdditionalInputs Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">../../bin/windows-x64/debug/slang-cpp-extractor.exe;%(RootDir)%(Directory)/slang-ast-base.h;%(RootDir)%(Directory)/slang-ast-decl.h;%(RootDir)%(Directory)/slang-ast-expr.h;%(RootDir)%(Directory)/slang-ast-modifier.h;%(RootDir)%(Directory)/slang-ast-stmt.h;%(RootDir)%(Directory)/slang-ast-type.h;%(RootDir)%(Directory)/slang-ast-val.h</AdditionalInputs>
-      <AdditionalInputs Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">../../bin/windows-x86/release/slang-cpp-extractor.exe;%(RootDir)%(Directory)/slang-ast-base.h;%(RootDir)%(Directory)/slang-ast-decl.h;%(RootDir)%(Directory)/slang-ast-expr.h;%(RootDir)%(Directory)/slang-ast-modifier.h;%(RootDir)%(Directory)/slang-ast-stmt.h;%(RootDir)%(Directory)/slang-ast-type.h;%(RootDir)%(Directory)/slang-ast-val.h</AdditionalInputs>
-      <AdditionalInputs Condition="'$(Configuration)|$(Platform)'=='Release|x64'">../../bin/windows-x64/release/slang-cpp-extractor.exe;%(RootDir)%(Directory)/slang-ast-base.h;%(RootDir)%(Directory)/slang-ast-decl.h;%(RootDir)%(Directory)/slang-ast-expr.h;%(RootDir)%(Directory)/slang-ast-modifier.h;%(RootDir)%(Directory)/slang-ast-stmt.h;%(RootDir)%(Directory)/slang-ast-type.h;%(RootDir)%(Directory)/slang-ast-val.h</AdditionalInputs>
+      <AdditionalInputs Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">../../bin/windows-x86/debug/slang-cpp-extractor.exe;slang-ast-base.h;slang-ast-decl.h;slang-ast-expr.h;slang-ast-modifier.h;slang-ast-stmt.h;slang-ast-type.h;slang-ast-val.h</AdditionalInputs>
+      <AdditionalInputs Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">../../bin/windows-x64/debug/slang-cpp-extractor.exe;slang-ast-base.h;slang-ast-decl.h;slang-ast-expr.h;slang-ast-modifier.h;slang-ast-stmt.h;slang-ast-type.h;slang-ast-val.h</AdditionalInputs>
+      <AdditionalInputs Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">../../bin/windows-x86/release/slang-cpp-extractor.exe;slang-ast-base.h;slang-ast-decl.h;slang-ast-expr.h;slang-ast-modifier.h;slang-ast-stmt.h;slang-ast-type.h;slang-ast-val.h</AdditionalInputs>
+      <AdditionalInputs Condition="'$(Configuration)|$(Platform)'=='Release|x64'">../../bin/windows-x64/release/slang-cpp-extractor.exe;slang-ast-base.h;slang-ast-decl.h;slang-ast-expr.h;slang-ast-modifier.h;slang-ast-stmt.h;slang-ast-type.h;slang-ast-val.h</AdditionalInputs>
     </CustomBuild>
+  </ItemGroup>
+  <ItemGroup>
+    <Natvis Include="..\core\core.natvis" />
+    <Natvis Include="slang.natvis" />
   </ItemGroup>
   <ItemGroup>
     <ProjectReference Include="..\core\core.vcxproj">
