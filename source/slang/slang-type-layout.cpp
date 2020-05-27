@@ -1298,9 +1298,12 @@ LayoutRulesFamilyImpl* getDefaultLayoutRulesFamilyForTarget(TargetRequest* targe
 
 TypeLayoutContext getInitialLayoutContextForTarget(TargetRequest* targetReq, ProgramLayout* programLayout)
 {
+    auto astBuilder = targetReq->getLinkage()->getASTBuilder();
+
     LayoutRulesFamilyImpl* rulesFamily = getDefaultLayoutRulesFamilyForTarget(targetReq);
 
     TypeLayoutContext context;
+    context.astBuilder = astBuilder;
     context.targetReq = targetReq;
     context.programLayout = programLayout;
     context.rules = nullptr;
@@ -3460,7 +3463,7 @@ static TypeLayoutResult _createTypeLayout(
 
                 TypeLayoutResult fieldResult = _createTypeLayout(
                     fieldLayoutContext,
-                    GetType(field).Ptr(),
+                    GetType(context.astBuilder, field).Ptr(),
                     field.getDecl());
                 auto fieldTypeLayout = fieldResult.layout;
 

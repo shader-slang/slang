@@ -188,7 +188,7 @@ namespace Slang
             funcDeclRef.GetName(),
             profile,
             funcDeclRef);
-        entryPoint->m_mangledName = getMangledName(funcDeclRef);
+        entryPoint->m_mangledName = getMangledName(linkage->getASTBuilder(), funcDeclRef);
         return entryPoint;
     }
 

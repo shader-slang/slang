@@ -112,7 +112,7 @@ namespace Slang
     {
         RefPtr<Expr> e = expr;
         e = CheckTerm(e);
-        e = coerce(getSession()->getBoolType(), e);
+        e = coerce(m_astBuilder->getBoolType(), e);
         return e;
     }
 
@@ -153,8 +153,8 @@ namespace Slang
     {
         WithOuterStmt subContext(this, stmt);
 
-        stmt->varDecl->type.type = getSession()->getIntType();
-        addModifier(stmt->varDecl, new ConstModifier());
+        stmt->varDecl->type.type = m_astBuilder->getIntType();
+        addModifier(stmt->varDecl, m_astBuilder->create<ConstModifier>());
         stmt->varDecl->setCheckState(DeclCheckState::Checked);
 
         RefPtr<IntVal> rangeBeginVal;
@@ -166,7 +166,7 @@ namespace Slang
         }
         else
         {
-            RefPtr<ConstantIntVal> rangeBeginConst = new ConstantIntVal();
+            RefPtr<ConstantIntVal> rangeBeginConst = m_astBuilder->create<ConstantIntVal>();
             rangeBeginConst->value = 0;
             rangeBeginVal = rangeBeginConst;
         }
@@ -250,7 +250,7 @@ namespace Slang
         auto function = getParentFunc();
         if (!stmt->expression)
         {
-            if (function && !function->returnType.equals(getSession()->getVoidType()))
+            if (function && !function->returnType.equals(m_astBuilder->getVoidType()))
             {
                 getSink()->diagnose(stmt, Diagnostics::returnNeedsExpression);
             }

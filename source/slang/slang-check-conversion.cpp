@@ -310,9 +310,8 @@ namespace Slang
 
                 // We have a new type for the conversion, based on what
                 // we learned.
-                toType = getSession()->getArrayType(
-                    toElementType,
-                    new ConstantIntVal(elementCount));
+                toType = m_astBuilder->getArrayType(toElementType,
+                    m_astBuilder->create<ConstantIntVal>(elementCount));
             }
         }
         else if(auto toMatrixType = as<MatrixExpressionType>(toType))
@@ -383,7 +382,7 @@ namespace Slang
                 {
                     RefPtr<Expr> coercedArg;
                     bool argResult = _readValueFromInitializerList(
-                        GetType(fieldDeclRef),
+                        GetType(m_astBuilder, fieldDeclRef),
                         outToExpr ? &coercedArg : nullptr,
                         fromInitializerListExpr,
                         ioArgIndex);
@@ -418,7 +417,7 @@ namespace Slang
         //
         if(outToExpr)
         {
-            auto toInitializerListExpr = new InitializerListExpr();
+            auto toInitializerListExpr = m_astBuilder->create<InitializerListExpr>();
             toInitializerListExpr->loc = fromInitializerListExpr->loc;
             toInitializerListExpr->type = QualType(toType);
             toInitializerListExpr->args = coercedArgs;
@@ -575,7 +574,7 @@ namespace Slang
             RefPtr<DerefExpr> derefExpr;
             if(outToExpr)
             {
-                derefExpr = new DerefExpr();
+                derefExpr = m_astBuilder->create<DerefExpr>();
                 derefExpr->base = fromExpr;
                 derefExpr->type = QualType(fromElementType);
             }
@@ -814,7 +813,7 @@ namespace Slang
 
     RefPtr<TypeCastExpr> SemanticsVisitor::createImplicitCastExpr()
     {
-        return new ImplicitCastExpr();
+        return m_astBuilder->create<ImplicitCastExpr>();
     }
 
     RefPtr<Expr> SemanticsVisitor::CreateImplicitCastExpr(
@@ -823,9 +822,9 @@ namespace Slang
     {
         RefPtr<TypeCastExpr> castExpr = createImplicitCastExpr();
 
-        auto typeType = getTypeType(toType);
+        auto typeType = m_astBuilder->getTypeType(toType);
 
-        auto typeExpr = new SharedTypeExpr();
+        auto typeExpr = m_astBuilder->create<SharedTypeExpr>();
         typeExpr->type.type = typeType;
         typeExpr->base.type = toType;
 
@@ -841,7 +840,7 @@ namespace Slang
         RefPtr<Expr>    fromExpr,
         RefPtr<Val>     witness)
     {
-        RefPtr<CastToInterfaceExpr> expr = new CastToInterfaceExpr();
+        RefPtr<CastToInterfaceExpr> expr = m_astBuilder->create<CastToInterfaceExpr>();
         expr->loc = fromExpr->loc;
         expr->type = QualType(toType);
         expr->valueArg = fromExpr;

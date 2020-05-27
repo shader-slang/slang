@@ -31,7 +31,7 @@ namespace Slang
     template<typename F>
     RefPtr<Expr> SemanticsVisitor::moveTemp(RefPtr<Expr> const& expr, F const& func)
     {
-        RefPtr<VarDecl> varDecl = new VarDecl();
+        RefPtr<VarDecl> varDecl = m_astBuilder->create<VarDecl>();
         varDecl->parentDecl = nullptr; // TODO: need to fill this in somehow!
         varDecl->checkState = DeclCheckState::Checked;
         varDecl->nameAndLoc.loc = expr->loc;
@@ -40,7 +40,7 @@ namespace Slang
 
         auto varDeclRef = makeDeclRef(varDecl.Ptr());
 
-        RefPtr<LetExpr> letExpr = new LetExpr();
+        RefPtr<LetExpr> letExpr = m_astBuilder->create<LetExpr>();
         letExpr->decl = varDecl;
 
         auto body = func(varDeclRef);
@@ -102,23 +102,23 @@ namespace Slang
         auto interfaceDecl = interfaceDeclRef.getDecl();
         return maybeMoveTemp(expr, [&](DeclRef<VarDeclBase> varDeclRef)
         {
-            RefPtr<ExtractExistentialType> openedType = new ExtractExistentialType();
+            RefPtr<ExtractExistentialType> openedType = m_astBuilder->create<ExtractExistentialType>();
             openedType->declRef = varDeclRef;
 
-            RefPtr<ExtractExistentialSubtypeWitness> openedWitness = new ExtractExistentialSubtypeWitness();
+            RefPtr<ExtractExistentialSubtypeWitness> openedWitness = m_astBuilder->create<ExtractExistentialSubtypeWitness>();
             openedWitness->sub = openedType;
             openedWitness->sup = expr->type.type;
             openedWitness->declRef = varDeclRef;
 
-            RefPtr<ThisTypeSubstitution> openedThisType = new ThisTypeSubstitution();
+            RefPtr<ThisTypeSubstitution> openedThisType = m_astBuilder->create<ThisTypeSubstitution>();
             openedThisType->outer = interfaceDeclRef.substitutions.substitutions;
             openedThisType->interfaceDecl = interfaceDecl;
             openedThisType->witness = openedWitness;
 
             DeclRef<InterfaceDecl> substDeclRef = DeclRef<InterfaceDecl>(interfaceDecl, openedThisType);
-            auto substDeclRefType = DeclRefType::Create(getSession(), substDeclRef);
+            auto substDeclRefType = DeclRefType::create(m_astBuilder, substDeclRef);
 
-            RefPtr<ExtractExistentialValueExpr> openedValue = new ExtractExistentialValueExpr();
+            RefPtr<ExtractExistentialValueExpr> openedValue = m_astBuilder->create<ExtractExistentialValueExpr>();
             openedValue->declRef = varDeclRef;
             openedValue->type = QualType(substDeclRefType);
 
@@ -218,7 +218,7 @@ namespace Slang
                         declRef.GetName());
                 }
 
-                auto expr = new StaticMemberExpr();
+                auto expr = m_astBuilder->create<StaticMemberExpr>();
                 expr->loc = loc;
                 expr->type = type;
                 expr->baseExpression = baseExpr;
@@ -230,11 +230,11 @@ namespace Slang
             {
                 // Extract the type of the baseExpr
                 auto baseExprType = baseExpr->type.type;
-                RefPtr<SharedTypeExpr> baseTypeExpr = new SharedTypeExpr();
+                RefPtr<SharedTypeExpr> baseTypeExpr = m_astBuilder->create<SharedTypeExpr>();
                 baseTypeExpr->base.type = baseExprType;
-                baseTypeExpr->type.type = getTypeType(baseExprType);
+                baseTypeExpr->type.type = m_astBuilder->getTypeType(baseExprType);
 
-                auto expr = new StaticMemberExpr();
+                auto expr = m_astBuilder->create<StaticMemberExpr>();
                 expr->loc = loc;
                 expr->type = type;
                 expr->baseExpression = baseTypeExpr;
@@ -247,7 +247,7 @@ namespace Slang
                 // If the base expression wasn't a type, then this
                 // is a normal member expression.
                 //
-                auto expr = new MemberExpr();
+                auto expr = m_astBuilder->create<MemberExpr>();
                 expr->loc = loc;
                 expr->type = type;
                 expr->baseExpression = baseExpr;
@@ -274,7 +274,7 @@ namespace Slang
             // If there is no base expression, then the result must
             // be an ordinary variable expression.
             //
-            auto expr = new VarExpr();
+            auto expr = m_astBuilder->create<VarExpr>();
             expr->loc = loc;
             expr->name = declRef.GetName();
             expr->type = type;
@@ -290,7 +290,7 @@ namespace Slang
         auto ptrLikeType = as<PointerLikeType>(base->type);
         SLANG_ASSERT(ptrLikeType);
 
-        auto derefExpr = new DerefExpr();
+        auto derefExpr = m_astBuilder->create<DerefExpr>();
         derefExpr->loc = loc;
         derefExpr->base = base;
         derefExpr->type = QualType(ptrLikeType->elementType);
@@ -364,9 +364,9 @@ namespace Slang
                         // will be `typeof(This)`, which conceptually
                         // `typeof(typeof(this))`
                         //
-                        auto thisTypeType = getTypeType(thisType);
+                        auto thisTypeType = m_astBuilder->getTypeType(thisType);
 
-                        auto typeExpr = new SharedTypeExpr();
+                        auto typeExpr = m_astBuilder->create<SharedTypeExpr>();
                         typeExpr->type.type = thisTypeType;
                         typeExpr->base.type = thisType;
 
@@ -380,7 +380,7 @@ namespace Slang
                         // refernece to `this.someStaticMember` will be translated
                         // over to `This.someStaticMember`.
                         //
-                        RefPtr<ThisExpr> expr = new ThisExpr();
+                        RefPtr<ThisExpr> expr = m_astBuilder->create<ThisExpr>();
                         expr->type.type = thisType;
                         expr->loc = loc;
 
@@ -412,7 +412,7 @@ namespace Slang
     {
         if (lookupResult.isOverloaded())
         {
-            auto overloadedExpr = new OverloadedExpr();
+            auto overloadedExpr = m_astBuilder->create<OverloadedExpr>();
             overloadedExpr->name = name;
             overloadedExpr->loc = loc;
             overloadedExpr->type = QualType(
@@ -617,7 +617,7 @@ namespace Slang
 
     RefPtr<Expr> SemanticsExprVisitor::visitBoolLiteralExpr(BoolLiteralExpr* expr)
     {
-        expr->type = getSession()->getBoolType();
+        expr->type = m_astBuilder->getBoolType();
         return expr;
     }
 
@@ -636,7 +636,7 @@ namespace Slang
         //
         if(!expr->type.type)
         {
-            expr->type = getSession()->getIntType();
+            expr->type = m_astBuilder->getIntType();
         }
         return expr;
     }
@@ -645,21 +645,21 @@ namespace Slang
     {
         if(!expr->type.type)
         {
-            expr->type = getSession()->getFloatType();
+            expr->type = m_astBuilder->getFloatType();
         }
         return expr;
     }
 
     RefPtr<Expr> SemanticsExprVisitor::visitStringLiteralExpr(StringLiteralExpr* expr)
     {
-        expr->type = getSession()->getStringType();
+        expr->type = m_astBuilder->getStringType();
         return expr;
     }
 
     IntVal* SemanticsVisitor::GetIntVal(IntegerLiteralExpr* expr)
     {
         // TODO(tfoley): don't keep allocating here!
-        return new ConstantIntVal(expr->value);
+        return m_astBuilder->create<ConstantIntVal>(expr->value);
     }
 
     RefPtr<IntVal> SemanticsVisitor::TryConstantFoldExpr(
@@ -784,7 +784,7 @@ namespace Slang
             return nullptr;
         }
 
-        RefPtr<IntVal> result = new ConstantIntVal(resultValue);
+        RefPtr<IntVal> result = m_astBuilder->create<ConstantIntVal>(resultValue);
         return result;
     }
 
@@ -811,7 +811,7 @@ namespace Slang
             if (auto genericValParamRef = declRef.as<GenericValueParamDecl>())
             {
                 // TODO(tfoley): handle the case of non-`int` value parameters...
-                return new GenericParamIntVal(genericValParamRef);
+                return m_astBuilder->create<GenericParamIntVal>(genericValParamRef);
             }
 
             // We may also need to check for references to variables that
@@ -826,7 +826,7 @@ namespace Slang
                     if(auto constAttr = varDecl->findModifier<ConstModifier>())
                     {
                         // HLSL `static const` can be used as a constant expression
-                        if(auto initExpr = getInitExpr(varRef))
+                        if(auto initExpr = getInitExpr(m_astBuilder, varRef))
                         {
                             return TryConstantFoldExpr(initExpr.Ptr());
                         }
@@ -836,7 +836,7 @@ namespace Slang
             else if(auto enumRef = declRef.as<EnumCaseDecl>())
             {
                 // The cases in an `enum` declaration can also be used as constant expressions,
-                if(auto tagExpr = getTagExpr(enumRef))
+                if(auto tagExpr = getTagExpr(m_astBuilder, enumRef))
                 {
                     return TryConstantFoldExpr(tagExpr.Ptr());
                 }
@@ -882,7 +882,7 @@ namespace Slang
         if(IsErrorExpr(inExpr)) return nullptr;
 
         // First coerce the expression to the expected type
-        auto expr = coerce(getSession()->getIntType(),inExpr);
+        auto expr = coerce(m_astBuilder->getIntType(),inExpr);
 
         // No need to issue further errors if the type coercion failed.
         if(IsErrorExpr(expr)) return nullptr;
@@ -923,8 +923,8 @@ namespace Slang
         auto baseExpr = subscriptExpr->baseExpression;
         auto indexExpr = subscriptExpr->indexExpression;
 
-        if (!indexExpr->type->equals(getSession()->getIntType()) &&
-            !indexExpr->type->equals(getSession()->getUIntType()))
+        if (!indexExpr->type->equals(m_astBuilder->getIntType()) &&
+            !indexExpr->type->equals(m_astBuilder->getUIntType()))
         {
             getSink()->diagnose(indexExpr, Diagnostics::subscriptIndexNonInteger);
             return CreateErrorExpr(subscriptExpr.Ptr());
@@ -973,10 +973,11 @@ namespace Slang
 
             auto elementType = CoerceToUsableType(TypeExp(baseExpr, baseTypeType->type));
             auto arrayType = getArrayType(
+                m_astBuilder,
                 elementType,
                 elementCount);
 
-            subscriptExpr->type = QualType(getTypeType(arrayType));
+            subscriptExpr->type = QualType(m_astBuilder->getTypeType(arrayType));
             return subscriptExpr;
         }
         else if (auto baseArrayType = as<ArrayExpressionType>(baseType))
@@ -1010,7 +1011,7 @@ namespace Slang
         {
             Name* name = getName("operator[]");
             LookupResult lookupResult = lookUpMember(
-                getSession(),
+                m_astBuilder,
                 this,
                 name,
                 baseType);
@@ -1028,7 +1029,7 @@ namespace Slang
             RefPtr<Expr> subscriptFuncExpr = createLookupResultExpr(
                 name, lookupResult, subscriptExpr->baseExpression, subscriptExpr->loc);
 
-            RefPtr<InvokeExpr> subscriptCallExpr = new InvokeExpr();
+            RefPtr<InvokeExpr> subscriptCallExpr = m_astBuilder->create<InvokeExpr>();
             subscriptCallExpr->loc = subscriptExpr->loc;
             subscriptCallExpr->functionExpr = subscriptFuncExpr;
 
@@ -1225,7 +1226,7 @@ namespace Slang
 
         expr->type = QualType(getSession()->getErrorType());
         auto lookupResult = lookUp(
-            getSession(),
+            m_astBuilder,
             this, expr->name, expr->scope);
         if (lookupResult.isValid())
         {
@@ -1316,7 +1317,7 @@ namespace Slang
                             // of explicit default initializers for `struct` fields to
                             // make this a major concern (since they aren't supported in HLSL).
                             //
-                            RefPtr<InitializerListExpr> initListExpr = new InitializerListExpr();
+                            RefPtr<InitializerListExpr> initListExpr = m_astBuilder->create<InitializerListExpr>();
                             auto checkedInitListExpr = visitInitializerListExpr(initListExpr);
                             return coerce(typeExp.type, initListExpr);
                         }
@@ -1342,7 +1343,7 @@ namespace Slang
                 auto elementType = QualType(pointerLikeType->elementType);
                 elementType.IsLeftValue = baseType.IsLeftValue;
 
-                auto derefExpr = new DerefExpr();
+                auto derefExpr = m_astBuilder->create<DerefExpr>();
                 derefExpr->base = expr;
                 derefExpr->type = elementType;
 
@@ -1360,7 +1361,7 @@ namespace Slang
         RefPtr<Type>      baseElementType,
         IntegerLiteralValue         baseElementCount)
     {
-        RefPtr<SwizzleExpr> swizExpr = new SwizzleExpr();
+        RefPtr<SwizzleExpr> swizExpr = m_astBuilder->create<SwizzleExpr>();
         swizExpr->loc = memberRefExpr->loc;
         swizExpr->base = memberRefExpr->baseExpression;
 
@@ -1439,7 +1440,7 @@ namespace Slang
             // here if the input type had a sugared name...
             swizExpr->type = QualType(createVectorType(
                 baseElementType,
-                new ConstantIntVal(elementCount)));
+                m_astBuilder->create<ConstantIntVal>(elementCount)));
         }
 
         // A swizzle can be used as an l-value as long as there
@@ -1484,7 +1485,7 @@ namespace Slang
             // we can reference the declaration here.
             //
             LookupResult lookupResult = lookUpDirectAndTransparentMembers(
-                getSession(),
+                m_astBuilder,
                 this,
                 expr->name,
                 namespaceDeclRef);
@@ -1515,7 +1516,7 @@ namespace Slang
             }
 
             LookupResult lookupResult = lookUpMember(
-                getSession(),
+                m_astBuilder,
                 this,
                 expr->name,
                 type);
@@ -1703,7 +1704,7 @@ namespace Slang
         else
         {
             LookupResult lookupResult = lookUpMember(
-                getSession(),
+                m_astBuilder,
                 this,
                 expr->name,
                 baseType.Ptr());
@@ -1814,7 +1815,7 @@ namespace Slang
             if( auto typeOrExtensionDecl = as<AggTypeDeclBase>(containerDecl) )
             {
                 auto thisType = calcThisType(makeDeclRef(typeOrExtensionDecl));
-                auto thisTypeType = getTypeType(thisType);
+                auto thisTypeType = m_astBuilder->getTypeType(thisType);
 
                 expr->type.type = thisTypeType;
                 return expr;

@@ -160,7 +160,7 @@ void Session::init()
     baseLanguageScope = new Scope();
 
     auto baseModuleDecl = populateBaseLanguageModule(
-        this,
+        m_builtinLinkage->getASTBuilder(),
         baseLanguageScope);
     loadedModuleCode.add(baseModuleDecl);
 
@@ -868,7 +868,7 @@ RefPtr<Expr> Linkage::parseTermString(String typeStr, RefPtr<Scope> scope)
         nullptr);
 
     return parseTermFromSourceFile(
-        getSessionImpl(),
+        getASTBuilder(),
         tokens, &sink, scope, getNamePool(), SourceLanguage::Slang);
 }
 
@@ -960,7 +960,7 @@ void FrontEndCompileRequest::parseTranslationUnit(
         combinedPreprocessorDefinitions.Add(def.Key, def.Value);
 
     auto module = translationUnit->getModule();
-    RefPtr<ModuleDecl> translationUnitSyntax = new ModuleDecl();
+    RefPtr<ModuleDecl> translationUnitSyntax = linkage->getASTBuilder()->create<ModuleDecl>();
     translationUnitSyntax->nameAndLoc.name = translationUnit->moduleName;
     translationUnitSyntax->module = module;
     module->setModuleDecl(translationUnitSyntax);
@@ -980,7 +980,7 @@ void FrontEndCompileRequest::parseTranslationUnit(
     //
     if( m_isStandardLibraryCode )
     {
-        translationUnitSyntax->modifiers.first = new FromStdLibModifier();
+        translationUnitSyntax->modifiers.first = linkage->getASTBuilder()->create<FromStdLibModifier>();
     }
 
     for (auto sourceFile : translationUnit->getSourceFiles())
@@ -994,6 +994,7 @@ void FrontEndCompileRequest::parseTranslationUnit(
             module);
 
         parseSourceFile(
+            linkage->getASTBuilder(),
             translationUnit,
             tokens,
             getSink(),
@@ -1062,7 +1063,7 @@ void FrontEndCompileRequest::generateIR()
         // * it can generate diagnostics
 
         /// Generate IR for translation unit
-        RefPtr<IRModule> irModule(generateIRForTranslationUnit(translationUnit));
+        RefPtr<IRModule> irModule(generateIRForTranslationUnit(getLinkage()->getASTBuilder(), translationUnit));
 
         if (verifyDebugSerialization)
         {
@@ -1534,7 +1535,7 @@ void Linkage::loadParsedModule(
         // If we didn't run into any errors, then try to generate
         // IR code for the imported module.
         SLANG_ASSERT(errorCountAfter == 0);
-        loadedModule->setIRModule(generateIRForTranslationUnit(translationUnit));
+        loadedModule->setIRModule(generateIRForTranslationUnit(getASTBuilder(), translationUnit));
     }
     loadedModulesList.add(loadedModule);
 }
@@ -2337,7 +2338,7 @@ SpecializedComponentType::SpecializedComponentType(
             if(specializationInfo)
                 funcDeclRef = specializationInfo->specializedFuncDeclRef;
 
-            (*mangledEntryPointNames).add(getMangledName(funcDeclRef));
+            (*mangledEntryPointNames).add(getMangledName(m_astBuilder, funcDeclRef));
         }
 
         void visitModule(Module*, Module::ModuleSpecializationInfo*) SLANG_OVERRIDE
@@ -2346,12 +2347,18 @@ SpecializedComponentType::SpecializedComponentType(
         { visitChildren(composite, specializationInfo); }
         void visitSpecialized(SpecializedComponentType* specialized) SLANG_OVERRIDE
         { visitChildren(specialized); }
+
+        EntryPointMangledNameCollector(ASTBuilder* astBuilder):
+            m_astBuilder(astBuilder)
+        {
+        }
+        ASTBuilder* m_astBuilder;
     };
 
     // With the visitor defined, we apply it to ourself to compute
     // and collect the mangled entry point names.
     //
-    EntryPointMangledNameCollector collector;
+    EntryPointMangledNameCollector collector(getLinkage()->getASTBuilder());
     collector.mangledEntryPointNames = &m_entryPointMangledNames;
     collector.visitSpecialized(this);
 }
@@ -2609,8 +2616,8 @@ Session::~Session()
     errorType = nullptr;
     initializerListType = nullptr;
     overloadedType = nullptr;
-    irBasicBlockType = nullptr;
-    constExprRate = nullptr;
+    //irBasicBlockType = nullptr;
+    //constExprRate = nullptr;
 
     destroyTypeCheckingCache();
 

@@ -1256,6 +1256,10 @@ namespace Slang
 
         NamePool* getNamePool() { return &namePool; }
 
+        ASTBuilder* getASTBuilder() { return &m_astBuilder; }
+
+        ASTBuilder m_astBuilder;
+
         // Modules that have been dynamically loaded via `import`
         //
         // This is a list of unique modules loaded, in the order they were encountered.
@@ -2043,6 +2047,12 @@ namespace Slang
         Name* tryGetNameObj(String name) { return namePool.tryGetName(name); }
         //
 
+            /// This AST Builder should only be used for creating AST nodes that are global across requests
+            /// not doing so could lead to memory being consumed but not used.
+        ASTBuilder* getGlobalASTBuilder() { return &astBuilder; }
+
+        ASTBuilder astBuilder;
+
         // Generated code for stdlib, etc.
         String stdlibPath;
         String coreLibraryCode;
@@ -2058,64 +2068,26 @@ namespace Slang
         RefPtr<Type> errorType;
         RefPtr<Type> initializerListType;
         RefPtr<Type> overloadedType;
-        RefPtr<Type> constExprRate;
-        RefPtr<Type> irBasicBlockType;
+        //RefPtr<Type> constExprRate;
+        //RefPtr<Type> irBasicBlockType;
 
         RefPtr<Type> stringType;
         RefPtr<Type> enumTypeType;
-
-        
-        RefPtr<Type> builtinTypes[Index(BaseType::CountOf)];
-        Dictionary<String, Decl*> magicDecls;
-
-        void initializeTypes();
-
-        Type* getBoolType();
-        Type* getHalfType();
-        Type* getFloatType();
-        Type* getDoubleType();
-        Type* getIntType();
-        Type* getInt64Type();
-        Type* getUIntType();
-        Type* getUInt64Type();
-        Type* getVoidType();
-        Type* getBuiltinType(BaseType flavor);
 
         Type* getInitializerListType();
         Type* getOverloadedType();
         Type* getErrorType();
         Type* getStringType();
-
         Type* getEnumTypeType();
 
-        // Construct the type `Ptr<valueType>`, where `Ptr`
-        // is looked up as a builtin type.
-        RefPtr<PtrType> getPtrType(RefPtr<Type> valueType);
+        SLANG_FORCE_INLINE Type* getBuiltinType(BaseType flavor) { return builtinTypes[Index(flavor)]; }
 
-        // Construct the type `Out<valueType>`
-        RefPtr<OutType> getOutType(RefPtr<Type> valueType);
+        RefPtr<Type> builtinTypes[Index(BaseType::CountOf)];
+        Dictionary<String, Decl*> magicDecls;
 
-        // Construct the type `InOut<valueType>`
-        RefPtr<InOutType> getInOutType(RefPtr<Type> valueType);
+        void initializeTypes();
 
-        // Construct the type `Ref<valueType>`
-        RefPtr<RefType> getRefType(RefPtr<Type> valueType);
 
-        // Construct a pointer type like `Ptr<valueType>`, but where
-        // the actual type name for the pointer type is given by `ptrTypeName`
-        RefPtr<PtrTypeBase> getPtrType(RefPtr<Type> valueType, char const* ptrTypeName);
-
-        // Construct a pointer type like `Ptr<valueType>`, but where
-        // the generic declaration for the pointer type is `genericDecl`
-        RefPtr<PtrTypeBase> getPtrType(RefPtr<Type> valueType, GenericDecl* genericDecl);
-
-        RefPtr<ArrayExpressionType> getArrayType(
-            Type*   elementType,
-            IntVal* elementCount);
-
-        RefPtr<VectorExpressionType> getVectorType(
-            RefPtr<Type>    elementType,
-            RefPtr<IntVal>  elementCount);
 
         SyntaxClass<RefObject> findSyntaxClass(Name* name);
 

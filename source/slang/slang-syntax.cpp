@@ -244,10 +244,10 @@ Index getFilterCountImpl(const ReflectClassInfo& clsInfo, MemberFilterStyle filt
         return false;
     }
 
-    RefPtr<Val> Type::substituteImpl(SubstitutionSet subst, int* ioDiff)
+    RefPtr<Val> Type::substituteImpl(ASTBuilder* astBuilder, SubstitutionSet subst, int* ioDiff)
     {
         int diff = 0;
-        auto canSubst = getCanonicalType()->substituteImpl(subst, &diff);
+        auto canSubst = getCanonicalType()->substituteImpl(astBuilder, subst, &diff);
 
         // If nothing changed, then don't drop any sugar that is applied
         if (!diff)
@@ -281,64 +281,11 @@ Index getFilterCountImpl(const ReflectClassInfo& clsInfo, MemberFilterStyle filt
 
     void Session::initializeTypes()
     {
-        errorType = new ErrorType();
-        errorType->setSession(this);
+        ASTBuilder* globalAstBuilder = getGlobalASTBuilder();
 
-        initializerListType = new InitializerListType();
-        initializerListType->setSession(this);
-
-        overloadedType = new OverloadGroupType();
-        overloadedType->setSession(this);
-    }
-
-    Type* Session::getBoolType()
-    {
-        return getBuiltinType(BaseType::Bool);
-    }
-
-    Type* Session::getHalfType()
-    {
-        return getBuiltinType(BaseType::Half);
-    }
-
-    Type* Session::getFloatType()
-    {
-        return getBuiltinType(BaseType::Float);
-    }
-
-    Type* Session::getDoubleType()
-    {
-        return getBuiltinType(BaseType::Double);
-    }
-
-    Type* Session::getIntType()
-    {
-        return getBuiltinType(BaseType::Int);
-    }
-
-    Type* Session::getInt64Type()
-    {
-        return getBuiltinType(BaseType::Int64);
-    }
-
-    Type* Session::getUIntType()
-    {
-        return getBuiltinType(BaseType::UInt);
-    }
-
-    Type* Session::getUInt64Type()
-    {
-        return getBuiltinType(BaseType::UInt64);
-    }
-
-    Type* Session::getVoidType()
-    {
-        return getBuiltinType(BaseType::Void);
-    }
-
-    Type* Session::getBuiltinType(BaseType flavor)
-    {
-        return builtinTypes[int(flavor)];
+        errorType = globalAstBuilder->create<ErrorType>();
+        initializerListType = globalAstBuilder->create<InitializerListType>();
+        overloadedType = globalAstBuilder->create<OverloadGroupType>();
     }
 
     Type* Session::getInitializerListType()
@@ -361,7 +308,7 @@ Index getFilterCountImpl(const ReflectClassInfo& clsInfo, MemberFilterStyle filt
         if (stringType == nullptr)
         {
             auto stringTypeDecl = findMagicDecl(this, "StringType");
-            stringType = DeclRefType::Create(this, makeDeclRef<Decl>(stringTypeDecl));
+            stringType = DeclRefType::create(getGlobalASTBuilder(), makeDeclRef<Decl>(stringTypeDecl));
         }
         return stringType;
     }
@@ -371,64 +318,11 @@ Index getFilterCountImpl(const ReflectClassInfo& clsInfo, MemberFilterStyle filt
         if (enumTypeType == nullptr)
         {
             auto enumTypeTypeDecl = findMagicDecl(this, "EnumTypeType");
-            enumTypeType = DeclRefType::Create(this, makeDeclRef<Decl>(enumTypeTypeDecl));
+            enumTypeType = DeclRefType::create(getGlobalASTBuilder(), makeDeclRef<Decl>(enumTypeTypeDecl));
         }
         return enumTypeType;
     }
 
-    RefPtr<PtrType> Session::getPtrType(
-        RefPtr<Type>    valueType)
-    {
-        return getPtrType(valueType, "PtrType").dynamicCast<PtrType>();
-    }
-
-        // Construct the type `Out<valueType>`
-    RefPtr<OutType> Session::getOutType(RefPtr<Type> valueType)
-    {
-        return getPtrType(valueType, "OutType").dynamicCast<OutType>();
-    }
-
-    RefPtr<InOutType> Session::getInOutType(RefPtr<Type> valueType)
-    {
-        return getPtrType(valueType, "InOutType").dynamicCast<InOutType>();
-    }
-
-    RefPtr<RefType> Session::getRefType(RefPtr<Type> valueType)
-    {
-        return getPtrType(valueType, "RefType").dynamicCast<RefType>();
-    }
-
-    RefPtr<PtrTypeBase> Session::getPtrType(RefPtr<Type> valueType, char const* ptrTypeName)
-    {
-        auto genericDecl = findMagicDecl(this, ptrTypeName).dynamicCast<GenericDecl>();
-        return getPtrType(valueType, genericDecl);
-    }
-
-    RefPtr<PtrTypeBase> Session::getPtrType(RefPtr<Type> valueType, GenericDecl* genericDecl)
-    {
-        auto typeDecl = genericDecl->inner;
-
-        auto substitutions = new GenericSubstitution();
-        substitutions->genericDecl = genericDecl;
-        substitutions->args.add(valueType);
-
-        auto declRef = DeclRef<Decl>(typeDecl.Ptr(), substitutions);
-        auto rsType = DeclRefType::Create(
-            this,
-            declRef);
-        return as<PtrTypeBase>( rsType);
-    }
-
-    RefPtr<ArrayExpressionType> Session::getArrayType(
-        Type*   elementType,
-        IntVal* elementCount)
-    {
-        RefPtr<ArrayExpressionType> arrayType = new ArrayExpressionType();
-        arrayType->setSession(this);
-        arrayType->baseType = elementType;
-        arrayType->arrayLength = elementCount;
-        return arrayType;
-    }
 
     SyntaxClass<RefObject> Session::findSyntaxClass(Name* name)
     {
@@ -449,16 +343,17 @@ Index getFilterCountImpl(const ReflectClassInfo& clsInfo, MemberFilterStyle filt
         return (areValsEqual(arrayLength, arrType->arrayLength) && baseType->equals(arrType->baseType.Ptr()));
     }
 
-    RefPtr<Val> ArrayExpressionType::substituteImpl(SubstitutionSet subst, int* ioDiff)
+    RefPtr<Val> ArrayExpressionType::substituteImpl(ASTBuilder* astBuilder, SubstitutionSet subst, int* ioDiff)
     {
         int diff = 0;
-        auto elementType = baseType->substituteImpl(subst, &diff).as<Type>();
-        auto arrlen = arrayLength->substituteImpl(subst, &diff).as<IntVal>();
+        auto elementType = baseType->substituteImpl(astBuilder, subst, &diff).as<Type>();
+        auto arrlen = arrayLength->substituteImpl(astBuilder, subst, &diff).as<IntVal>();
         SLANG_ASSERT(arrlen);
         if (diff)
         {
             *ioDiff = 1;
             auto rsType = getArrayType(
+                astBuilder, 
                 elementType,
                 arrlen);
             return rsType;
@@ -469,11 +364,12 @@ Index getFilterCountImpl(const ReflectClassInfo& clsInfo, MemberFilterStyle filt
     RefPtr<Type> ArrayExpressionType::createCanonicalType()
     {
         auto canonicalElementType = baseType->getCanonicalType();
-        auto canonicalArrayType = getArrayType(
+        auto canonicalArrayType = getASTBuilder()->getArrayType(
             canonicalElementType,
             arrayLength);
         return canonicalArrayType;
     }
+
     HashCode ArrayExpressionType::getHashCode()
     {
         if (arrayLength)
@@ -538,7 +434,7 @@ Index getFilterCountImpl(const ReflectClassInfo& clsInfo, MemberFilterStyle filt
     }
 
 
-    RequirementWitness RequirementWitness::specialize(SubstitutionSet const& subst)
+    RequirementWitness RequirementWitness::specialize(ASTBuilder* astBuilder, SubstitutionSet const& subst)
     {
         switch(getFlavor())
         {
@@ -551,7 +447,7 @@ Index getFilterCountImpl(const ReflectClassInfo& clsInfo, MemberFilterStyle filt
             {
                 int diff = 0;
                 return RequirementWitness(
-                    getDeclRef().SubstituteImpl(subst, &diff));
+                    getDeclRef().SubstituteImpl(astBuilder, subst, &diff));
             }
 
         case RequirementWitness::Flavor::val:
@@ -560,12 +456,13 @@ Index getFilterCountImpl(const ReflectClassInfo& clsInfo, MemberFilterStyle filt
                 SLANG_ASSERT(val);
 
                 return RequirementWitness(
-                    val->substitute(subst));
+                    val->substitute(astBuilder, subst));
             }
         }
     }
 
     RequirementWitness tryLookUpRequirementWitness(
+        ASTBuilder*     astBuilder,
         SubtypeWitness* subtypeWitness,
         Decl*           requirementKey)
     {
@@ -625,7 +522,7 @@ Index getFilterCountImpl(const ReflectClassInfo& clsInfo, MemberFilterStyle filt
                     // So, in order to get the *right* end result, we need to apply
                     // the substitutions from the inheritance decl-ref to the witness.
                     //
-                    requirementWitness = requirementWitness.specialize(inheritanceDeclRef.substitutions);
+                    requirementWitness = requirementWitness.specialize(astBuilder, inheritanceDeclRef.substitutions);
 
                     return requirementWitness;
                 }
@@ -637,7 +534,7 @@ Index getFilterCountImpl(const ReflectClassInfo& clsInfo, MemberFilterStyle filt
         return RequirementWitness();
     }
 
-    RefPtr<Val> DeclRefType::substituteImpl(SubstitutionSet subst, int* ioDiff)
+    RefPtr<Val> DeclRefType::substituteImpl(ASTBuilder* astBuilder, SubstitutionSet subst, int* ioDiff)
     {
         if (!subst) return this;
 
@@ -698,7 +595,7 @@ Index getFilterCountImpl(const ReflectClassInfo& clsInfo, MemberFilterStyle filt
             }
         }
         int diff = 0;
-        DeclRef<Decl> substDeclRef = declRef.SubstituteImpl(subst, &diff);
+        DeclRef<Decl> substDeclRef = declRef.SubstituteImpl(astBuilder, subst, &diff);
 
         if (!diff)
             return this;
@@ -726,7 +623,7 @@ Index getFilterCountImpl(const ReflectClassInfo& clsInfo, MemberFilterStyle filt
                         // We need to look up the declaration that satisfies
                         // the requirement named by the associated type.
                         Decl* requirementKey = substAssocTypeDecl;
-                        RequirementWitness requirementWitness = tryLookUpRequirementWitness(thisSubst->witness, requirementKey);
+                        RequirementWitness requirementWitness = tryLookUpRequirementWitness(astBuilder, thisSubst->witness, requirementKey);
                         switch(requirementWitness.getFlavor())
                         {
                         default:
@@ -746,7 +643,7 @@ Index getFilterCountImpl(const ReflectClassInfo& clsInfo, MemberFilterStyle filt
         }
 
         // Re-construct the type in case we are using a specialized sub-class
-        return DeclRefType::Create(getSession(), substDeclRef);
+        return DeclRefType::create(astBuilder, substDeclRef);
     }
 
     static RefPtr<Type> ExtractGenericArgType(RefPtr<Val> val)
@@ -764,7 +661,7 @@ Index getFilterCountImpl(const ReflectClassInfo& clsInfo, MemberFilterStyle filt
     }
 
     DeclRef<Decl> createDefaultSubstitutionsIfNeeded(
-        Session*        session,
+        ASTBuilder*     astBuilder,
         DeclRef<Decl>   declRef)
     {
         // It is possible that `declRef` refers to a generic type,
@@ -822,8 +719,8 @@ Index getFilterCountImpl(const ReflectClassInfo& clsInfo, MemberFilterStyle filt
 
                 if(!foundSubst)
                 {
-                    RefPtr<Substitutions> newSubst = createDefaultSubsitutionsForGeneric(
-                        session,
+                    RefPtr<Substitutions> newSubst = createDefaultSubstitutionsForGeneric(
+                        astBuilder, 
                         genericParentDecl,
                         nullptr);
 
@@ -837,21 +734,22 @@ Index getFilterCountImpl(const ReflectClassInfo& clsInfo, MemberFilterStyle filt
             return declRef;
 
         int diff = 0;
-        return declRef.SubstituteImpl(substsToApply, &diff);
+        return declRef.SubstituteImpl(astBuilder, substsToApply, &diff);
     }
 
     // TODO: need to figure out how to unify this with the logic
     // in the generic case...
-    RefPtr<DeclRefType> DeclRefType::Create(
-        Session*        session,
+    RefPtr<DeclRefType> DeclRefType::create(
+        ASTBuilder*     astBuilder,
         DeclRef<Decl>   declRef)
     {
-        declRef = createDefaultSubstitutionsIfNeeded(session, declRef);
+        Session* session = astBuilder->getGlobalSession();
+
+        declRef = createDefaultSubstitutionsIfNeeded(astBuilder, declRef);
 
         if (auto builtinMod = declRef.getDecl()->findModifier<BuiltinTypeModifier>())
         {
-            auto type = new BasicExpressionType(builtinMod->tag);
-            type->setSession(session);
+            auto type = astBuilder->create<BasicExpressionType>(builtinMod->tag);
             type->declRef = declRef;
             return type;
         }
@@ -869,8 +767,7 @@ Index getFilterCountImpl(const ReflectClassInfo& clsInfo, MemberFilterStyle filt
 
             if (magicMod->name == "SamplerState")
             {
-                auto type = new SamplerStateType();
-                type->setSession(session);
+                auto type = astBuilder->create<SamplerStateType>();
                 type->declRef = declRef;
                 type->flavor = SamplerStateFlavor(magicMod->tag);
                 return type;
@@ -878,8 +775,7 @@ Index getFilterCountImpl(const ReflectClassInfo& clsInfo, MemberFilterStyle filt
             else if (magicMod->name == "Vector")
             {
                 SLANG_ASSERT(subst && subst->args.getCount() == 2);
-                auto vecType = new VectorExpressionType();
-                vecType->setSession(session);
+                auto vecType = astBuilder->create<VectorExpressionType>();
                 vecType->declRef = declRef;
                 vecType->elementType = ExtractGenericArgType(subst->args[0]);
                 vecType->elementCount = ExtractGenericArgInteger(subst->args[1]);
@@ -888,38 +784,34 @@ Index getFilterCountImpl(const ReflectClassInfo& clsInfo, MemberFilterStyle filt
             else if (magicMod->name == "Matrix")
             {
                 SLANG_ASSERT(subst && subst->args.getCount() == 3);
-                auto matType = new MatrixExpressionType();
-                matType->setSession(session);
+                auto matType = astBuilder->create<MatrixExpressionType>();
                 matType->declRef = declRef;
                 return matType;
             }
             else if (magicMod->name == "Texture")
             {
                 SLANG_ASSERT(subst && subst->args.getCount() >= 1);
-                auto textureType = new TextureType(
+                auto textureType = astBuilder->create<TextureType>(
                     TextureFlavor(magicMod->tag),
                     ExtractGenericArgType(subst->args[0]));
-                textureType->setSession(session);
                 textureType->declRef = declRef;
                 return textureType;
             }
             else if (magicMod->name == "TextureSampler")
             {
                 SLANG_ASSERT(subst && subst->args.getCount() >= 1);
-                auto textureType = new TextureSamplerType(
+                auto textureType = astBuilder->create<TextureSamplerType>(
                     TextureFlavor(magicMod->tag),
                     ExtractGenericArgType(subst->args[0]));
-                textureType->setSession(session);
                 textureType->declRef = declRef;
                 return textureType;
             }
             else if (magicMod->name == "GLSLImageType")
             {
                 SLANG_ASSERT(subst && subst->args.getCount() >= 1);
-                auto textureType = new GLSLImageType(
+                auto textureType = astBuilder->create<GLSLImageType>(
                     TextureFlavor(magicMod->tag),
                     ExtractGenericArgType(subst->args[0]));
-                textureType->setSession(session);
                 textureType->declRef = declRef;
                 return textureType;
             }
@@ -930,8 +822,7 @@ Index getFilterCountImpl(const ReflectClassInfo& clsInfo, MemberFilterStyle filt
 
         #define CASE(n,T)													\
             else if(magicMod->name == #n) {									\
-                auto type = new T();									    \
-                type->setSession(session);                                  \
+                auto type = astBuilder->create<T>();						\
                 type->declRef = declRef;									\
                 return type;												\
             }
@@ -944,8 +835,7 @@ Index getFilterCountImpl(const ReflectClassInfo& clsInfo, MemberFilterStyle filt
             #define CASE(n,T)													\
                 else if(magicMod->name == #n) {									\
                     SLANG_ASSERT(subst && subst->args.getCount() == 1);			\
-                    auto type = new T();									    \
-                    type->setSession(session);                                  \
+                    auto type = astBuilder->create<T>();						\
                     type->elementType = ExtractGenericArgType(subst->args[0]);	\
                     type->declRef = declRef;									\
                     return type;												\
@@ -973,8 +863,7 @@ Index getFilterCountImpl(const ReflectClassInfo& clsInfo, MemberFilterStyle filt
             // "magic" builtin types which have no generic parameters
             #define CASE(n,T)													\
                 else if(magicMod->name == #n) {									\
-                    auto type = new T();									    \
-                    type->setSession(session);                                  \
+                    auto type = astBuilder->create<T>();						\
                     type->declRef = declRef;									\
                     return type;												\
                 }
@@ -1008,16 +897,13 @@ Index getFilterCountImpl(const ReflectClassInfo& clsInfo, MemberFilterStyle filt
                 {
                     SLANG_UNEXPECTED("expected a declaration reference type");
                 }
-                declRefType->session = session;
                 declRefType->declRef = declRef;
                 return declRefType;
             }
         }
         else
         {
-            auto type = new DeclRefType(declRef);
-            type->setSession(session);
-            return type;
+            return astBuilder->create<DeclRefType>(declRef);
         }
     }
 
@@ -1084,7 +970,7 @@ Index getFilterCountImpl(const ReflectClassInfo& clsInfo, MemberFilterStyle filt
         return this;
     }
 
-    RefPtr<Val> ErrorType::substituteImpl(SubstitutionSet /*subst*/, int* /*ioDiff*/)
+    RefPtr<Val> ErrorType::substituteImpl(ASTBuilder* /* astBuilder */, SubstitutionSet /*subst*/, int* /*ioDiff*/)
     {
         return this;
     }
@@ -1111,7 +997,7 @@ Index getFilterCountImpl(const ReflectClassInfo& clsInfo, MemberFilterStyle filt
     RefPtr<Type> NamedExpressionType::createCanonicalType()
     {
         if (!innerType)
-            innerType = GetType(declRef);
+            innerType = GetType(m_astBuilder, declRef);
         return innerType->getCanonicalType();
     }
 
@@ -1174,18 +1060,18 @@ Index getFilterCountImpl(const ReflectClassInfo& clsInfo, MemberFilterStyle filt
         return false;
     }
 
-    RefPtr<Val> FuncType::substituteImpl(SubstitutionSet subst, int* ioDiff)
+    RefPtr<Val> FuncType::substituteImpl(ASTBuilder* astBuilder, SubstitutionSet subst, int* ioDiff)
     {
         int diff = 0;
 
         // result type
-        RefPtr<Type> substResultType = resultType->substituteImpl(subst, &diff).as<Type>();
+        RefPtr<Type> substResultType = resultType->substituteImpl(astBuilder, subst, &diff).as<Type>();
 
         // parameter types
         List<RefPtr<Type>> substParamTypes;
         for( auto pp : paramTypes )
         {
-            substParamTypes.add(pp->substituteImpl(subst, &diff).as<Type>());
+            substParamTypes.add(pp->substituteImpl(astBuilder, subst, &diff).as<Type>());
         }
 
         // early exit for no change...
@@ -1193,8 +1079,7 @@ Index getFilterCountImpl(const ReflectClassInfo& clsInfo, MemberFilterStyle filt
             return this;
 
         (*ioDiff)++;
-        RefPtr<FuncType> substType = new FuncType();
-        substType->session = session;
+        RefPtr<FuncType> substType = astBuilder->create<FuncType>();
         substType->resultType = substResultType;
         substType->paramTypes = substParamTypes;
         return substType;
@@ -1212,8 +1097,7 @@ Index getFilterCountImpl(const ReflectClassInfo& clsInfo, MemberFilterStyle filt
             canParamTypes.add(pp->getCanonicalType());
         }
 
-        RefPtr<FuncType> canType = new FuncType();
-        canType->session = session;
+        RefPtr<FuncType> canType = getASTBuilder()->create<FuncType>();
         canType->resultType = resultType;
         canType->paramTypes = canParamTypes;
 
@@ -1254,8 +1138,7 @@ Index getFilterCountImpl(const ReflectClassInfo& clsInfo, MemberFilterStyle filt
 
     RefPtr<Type> TypeType::createCanonicalType()
     {
-        auto canType = getTypeType(type->getCanonicalType());
-        return canType;
+        return getASTBuilder()->getTypeType(type->getCanonicalType());
     }
 
     HashCode TypeType::getHashCode()
@@ -1381,30 +1264,12 @@ Index getFilterCountImpl(const ReflectClassInfo& clsInfo, MemberFilterStyle filt
     {
         if( !rowType )
         {
-            rowType = getSession()->getVectorType(getElementType(), getColumnCount());
+            rowType = m_astBuilder->getVectorType(getElementType(), getColumnCount());
         }
         return rowType;
     }
 
-    RefPtr<VectorExpressionType> Session::getVectorType(
-        RefPtr<Type>    elementType,
-        RefPtr<IntVal>  elementCount)
-    {
-        auto vectorGenericDecl = findMagicDecl(
-            this, "Vector").as<GenericDecl>();
-        auto vectorTypeDecl = vectorGenericDecl->inner;
-
-        auto substitutions = new GenericSubstitution();
-        substitutions->genericDecl = vectorGenericDecl.Ptr();
-        substitutions->args.add(elementType);
-        substitutions->args.add(elementCount);
-
-        auto declRef = DeclRef<Decl>(vectorTypeDecl.Ptr(), substitutions);
-
-        return DeclRefType::Create(
-            this,
-            declRef).as<VectorExpressionType>();
-    }
+    
 
 
     // PtrTypeBase
@@ -1435,7 +1300,7 @@ Index getFilterCountImpl(const ReflectClassInfo& clsInfo, MemberFilterStyle filt
         return declRef.getHashCode() ^ HashCode(0xFFFF);
     }
 
-    RefPtr<Val> GenericParamIntVal::substituteImpl(SubstitutionSet subst, int* ioDiff)
+    RefPtr<Val> GenericParamIntVal::substituteImpl(ASTBuilder* /* astBuilder */, SubstitutionSet subst, int* ioDiff)
     {
         // search for a substitution that might apply to us
         for(auto s = subst.substitutions; s; s = s->outer)
@@ -1498,8 +1363,9 @@ Index getFilterCountImpl(const ReflectClassInfo& clsInfo, MemberFilterStyle filt
         return HashCode(typeid(this).hash_code());
     }
 
-    RefPtr<Val> ErrorIntVal::substituteImpl(SubstitutionSet subst, int* ioDiff)
+    RefPtr<Val> ErrorIntVal::substituteImpl(ASTBuilder* astBuilder, SubstitutionSet subst, int* ioDiff)
     {
+        SLANG_UNUSED(astBuilder);
         SLANG_UNUSED(subst);
         SLANG_UNUSED(ioDiff);
         return this;
@@ -1507,7 +1373,7 @@ Index getFilterCountImpl(const ReflectClassInfo& clsInfo, MemberFilterStyle filt
 
     // Substitutions
 
-    RefPtr<Substitutions> GenericSubstitution::applySubstitutionsShallow(SubstitutionSet substSet, RefPtr<Substitutions> substOuter, int* ioDiff)
+    RefPtr<Substitutions> GenericSubstitution::applySubstitutionsShallow(ASTBuilder* astBuilder, SubstitutionSet substSet, RefPtr<Substitutions> substOuter, int* ioDiff)
     {
         int diff = 0;
 
@@ -1516,7 +1382,7 @@ Index getFilterCountImpl(const ReflectClassInfo& clsInfo, MemberFilterStyle filt
         List<RefPtr<Val>> substArgs;
         for (auto a : args)
         {
-            substArgs.add(a->substituteImpl(substSet, &diff));
+            substArgs.add(a->substituteImpl(astBuilder, substSet, &diff));
         }
 
         if (!diff) return this;
@@ -1560,14 +1426,14 @@ Index getFilterCountImpl(const ReflectClassInfo& clsInfo, MemberFilterStyle filt
         return true;
     }
 
-    RefPtr<Substitutions> ThisTypeSubstitution::applySubstitutionsShallow(SubstitutionSet substSet, RefPtr<Substitutions> substOuter, int* ioDiff)
+    RefPtr<Substitutions> ThisTypeSubstitution::applySubstitutionsShallow(ASTBuilder* astBuilder, SubstitutionSet substSet, RefPtr<Substitutions> substOuter, int* ioDiff)
     {
         int diff = 0;
 
         if(substOuter != outer) diff++;
 
         // NOTE: Must use .as because we must have a smart pointer here to keep in scope.
-        auto substWitness = witness->substituteImpl(substSet, &diff).as<SubtypeWitness>();
+        auto substWitness = witness->substituteImpl(astBuilder, substSet, &diff).as<SubtypeWitness>();
         
         if (!diff) return this;
 
@@ -1609,7 +1475,7 @@ Index getFilterCountImpl(const ReflectClassInfo& clsInfo, MemberFilterStyle filt
         return witness->getHashCode();
     }
 
-    RefPtr<Substitutions> GlobalGenericParamSubstitution::applySubstitutionsShallow(SubstitutionSet substSet, RefPtr<Substitutions> substOuter, int* ioDiff)
+    RefPtr<Substitutions> GlobalGenericParamSubstitution::applySubstitutionsShallow(ASTBuilder* astBuilder, SubstitutionSet substSet, RefPtr<Substitutions> substOuter, int* ioDiff)
     {
         // if we find a GlobalGenericParamSubstitution in subst that references the same type_param decl
         // return a copy of that GlobalGenericParamSubstitution
@@ -1617,14 +1483,14 @@ Index getFilterCountImpl(const ReflectClassInfo& clsInfo, MemberFilterStyle filt
 
         if(substOuter != outer) diff++;
 
-        auto substActualType = actualType->substituteImpl(substSet, &diff).as<Type>();
+        auto substActualType = actualType->substituteImpl(astBuilder, substSet, &diff).as<Type>();
 
         List<ConstraintArg> substConstraintArgs;
         for(auto constraintArg : constraintArgs)
         {
             ConstraintArg substConstraintArg;
             substConstraintArg.decl = constraintArg.decl;
-            substConstraintArg.val = constraintArg.val->substituteImpl(substSet, &diff);
+            substConstraintArg.val = constraintArg.val->substituteImpl(astBuilder, substSet, &diff);
 
             substConstraintArgs.add(substConstraintArg);
         }
@@ -1670,7 +1536,7 @@ Index getFilterCountImpl(const ReflectClassInfo& clsInfo, MemberFilterStyle filt
 
     // DeclRefBase
 
-    RefPtr<Type> DeclRefBase::Substitute(RefPtr<Type> type) const
+    RefPtr<Type> DeclRefBase::Substitute(ASTBuilder* astBuilder, RefPtr<Type> type) const
     {
         // Note that type can be nullptr, and so this function can return nullptr (although only correctly when no substitutions) 
 
@@ -1682,19 +1548,19 @@ Index getFilterCountImpl(const ReflectClassInfo& clsInfo, MemberFilterStyle filt
 
         // Otherwise we need to recurse on the type structure
         // and apply substitutions where it makes sense
-        return type->substitute(substitutions).as<Type>();
+        return type->substitute(astBuilder, substitutions).as<Type>();
     }
 
-    DeclRefBase DeclRefBase::Substitute(DeclRefBase declRef) const
+    DeclRefBase DeclRefBase::Substitute(ASTBuilder* astBuilder, DeclRefBase declRef) const
     {
         if(!substitutions)
             return declRef;
 
         int diff = 0;
-        return declRef.SubstituteImpl(substitutions, &diff);
+        return declRef.SubstituteImpl(astBuilder, substitutions, &diff);
     }
 
-    RefPtr<Expr> DeclRefBase::Substitute(RefPtr<Expr> expr) const
+    RefPtr<Expr> DeclRefBase::Substitute(ASTBuilder* /* astBuilder*/, RefPtr<Expr> expr) const
     {
         // No substitutions? Easy.
         if (!substitutions)
@@ -1740,16 +1606,18 @@ Index getFilterCountImpl(const ReflectClassInfo& clsInfo, MemberFilterStyle filt
     }
 
     RefPtr<Substitutions> specializeSubstitutionsShallow(
+        ASTBuilder*             astBuilder, 
         RefPtr<Substitutions>   substToSpecialize,
         RefPtr<Substitutions>   substsToApply,
         RefPtr<Substitutions>   restSubst,
         int*                    ioDiff)
     {
         SLANG_ASSERT(substToSpecialize);
-        return substToSpecialize->applySubstitutionsShallow(substsToApply, restSubst, ioDiff);
+        return substToSpecialize->applySubstitutionsShallow(astBuilder, substsToApply, restSubst, ioDiff);
     }
 
     RefPtr<Substitutions> specializeGlobalGenericSubstitutions(
+        ASTBuilder*                         astBuilder,
         Decl*                               declToSpecialize,
         RefPtr<Substitutions>               substsToSpecialize,
         RefPtr<Substitutions>               substsToApply,
@@ -1768,6 +1636,7 @@ Index getFilterCountImpl(const ReflectClassInfo& clsInfo, MemberFilterStyle filt
 
             int diff = 0;
             auto restSubst = specializeGlobalGenericSubstitutions(
+                astBuilder,
                 declToSpecialize,
                 specSubst->outer,
                 substsToApply,
@@ -1775,6 +1644,7 @@ Index getFilterCountImpl(const ReflectClassInfo& clsInfo, MemberFilterStyle filt
                 ioParametersFound);
 
             auto firstSubst = specializeSubstitutionsShallow(
+                astBuilder,
                 specGlobalGenericSubst,
                 substsToApply,
                 restSubst,
@@ -1819,7 +1689,7 @@ Index getFilterCountImpl(const ReflectClassInfo& clsInfo, MemberFilterStyle filt
             if(ioParametersFound.Contains(appGlobalGenericSubst->paramDecl))
                 continue;
 
-            RefPtr<GlobalGenericParamSubstitution> newSubst = new GlobalGenericParamSubstitution();
+            RefPtr<GlobalGenericParamSubstitution> newSubst = astBuilder->create<GlobalGenericParamSubstitution>();
             newSubst->paramDecl = appGlobalGenericSubst->paramDecl;
             newSubst->actualType = appGlobalGenericSubst->actualType;
             newSubst->constraintArgs = appGlobalGenericSubst->constraintArgs;
@@ -1832,6 +1702,7 @@ Index getFilterCountImpl(const ReflectClassInfo& clsInfo, MemberFilterStyle filt
     }
 
     RefPtr<Substitutions> specializeGlobalGenericSubstitutions(
+        ASTBuilder*             astBuilder,
         Decl*                   declToSpecialize,
         RefPtr<Substitutions>   substsToSpecialize,
         RefPtr<Substitutions>   substsToApply,
@@ -1840,13 +1711,14 @@ Index getFilterCountImpl(const ReflectClassInfo& clsInfo, MemberFilterStyle filt
         // Keep track of any parameters already present in the
         // existing substitution.
         HashSet<GlobalGenericParamDecl*> parametersFound;
-        return specializeGlobalGenericSubstitutions(declToSpecialize, substsToSpecialize, substsToApply, ioDiff, parametersFound);
+        return specializeGlobalGenericSubstitutions(astBuilder, declToSpecialize, substsToSpecialize, substsToApply, ioDiff, parametersFound);
     }
 
 
     // Construct new substitutions to apply to a declaration,
     // based on a provided substitution set to be applied
     RefPtr<Substitutions> specializeSubstitutions(
+        ASTBuilder*             astBuilder,
         Decl*                   declToSpecialize,
         RefPtr<Substitutions>   substsToSpecialize,
         RefPtr<Substitutions>   substsToApply,
@@ -1880,12 +1752,14 @@ Index getFilterCountImpl(const ReflectClassInfo& clsInfo, MemberFilterStyle filt
                         // keep one matching it in place.
                         int diff = 0;
                         auto restSubst = specializeSubstitutions(
+                            astBuilder,
                             ancestorGenericDecl->parentDecl,
                             specGenericSubst->outer,
                             substsToApply,
                             &diff);
 
                         auto firstSubst = specializeSubstitutionsShallow(
+                            astBuilder,
                             specGenericSubst,
                             substsToApply,
                             restSubst,
@@ -1920,12 +1794,13 @@ Index getFilterCountImpl(const ReflectClassInfo& clsInfo, MemberFilterStyle filt
 
                     int diff = 0;
                     auto restSubst = specializeSubstitutions(
+                        astBuilder,
                         ancestorGenericDecl->parentDecl,
                         substsToSpecialize,
                         substsToApply,
                         &diff);
 
-                    RefPtr<GenericSubstitution> firstSubst = new GenericSubstitution();
+                    RefPtr<GenericSubstitution> firstSubst = astBuilder->create<GenericSubstitution>();
                     firstSubst->genericDecl = ancestorGenericDecl;
                     firstSubst->args = appGenericSubst->args;
                     firstSubst->outer = restSubst;
@@ -1950,12 +1825,14 @@ Index getFilterCountImpl(const ReflectClassInfo& clsInfo, MemberFilterStyle filt
                         // keep one matching it in place.
                         int diff = 0;
                         auto restSubst = specializeSubstitutions(
+                            astBuilder,
                             ancestorInterfaceDecl->parentDecl,
                             specThisTypeSubst->outer,
                             substsToApply,
                             &diff);
 
                         auto firstSubst = specializeSubstitutionsShallow(
+                            astBuilder,
                             specThisTypeSubst,
                             substsToApply,
                             restSubst,
@@ -1980,12 +1857,13 @@ Index getFilterCountImpl(const ReflectClassInfo& clsInfo, MemberFilterStyle filt
 
                     int diff = 0;
                     auto restSubst = specializeSubstitutions(
+                        astBuilder,
                         ancestorInterfaceDecl->parentDecl,
                         substsToSpecialize,
                         substsToApply,
                         &diff);
 
-                    RefPtr<ThisTypeSubstitution> firstSubst = new ThisTypeSubstitution();
+                    RefPtr<ThisTypeSubstitution> firstSubst = astBuilder->create<ThisTypeSubstitution>();
                     firstSubst->interfaceDecl = ancestorInterfaceDecl;
                     firstSubst->witness = appThisTypeSubst->witness;
                     firstSubst->outer = restSubst;
@@ -2016,13 +1894,14 @@ Index getFilterCountImpl(const ReflectClassInfo& clsInfo, MemberFilterStyle filt
         // of them were applicable.
         //
         return specializeGlobalGenericSubstitutions(
+            astBuilder,
             declToSpecialize,
             substsToSpecialize,
             substsToApply,
             ioDiff);
     }
 
-    DeclRefBase DeclRefBase::SubstituteImpl(SubstitutionSet substSet, int* ioDiff)
+    DeclRefBase DeclRefBase::SubstituteImpl(ASTBuilder* astBuilder, SubstitutionSet substSet, int* ioDiff)
     {
         // Nothing to do when we have no declaration.
         if(!decl)
@@ -2033,6 +1912,7 @@ Index getFilterCountImpl(const ReflectClassInfo& clsInfo, MemberFilterStyle filt
         int diff = 0;
 
         auto substSubst = specializeSubstitutions(
+            astBuilder,
             decl,
             substitutions.substitutions,
             substSet.substitutions,
@@ -2138,14 +2018,14 @@ Index getFilterCountImpl(const ReflectClassInfo& clsInfo, MemberFilterStyle filt
 
     // Val
 
-    RefPtr<Val> Val::substitute(SubstitutionSet subst)
+    RefPtr<Val> Val::substitute(ASTBuilder* astBuilder, SubstitutionSet subst)
     {
         if (!subst) return this;
         int diff = 0;
-        return substituteImpl(subst, &diff);
+        return substituteImpl(astBuilder, subst, &diff);
     }
 
-    RefPtr<Val> Val::substituteImpl(SubstitutionSet /*subst*/, int* /*ioDiff*/)
+    RefPtr<Val> Val::substituteImpl(ASTBuilder* /* astBuilder */, SubstitutionSet /*subst*/, int* /*ioDiff*/)
     {
         // Default behavior is to not substitute at all
         return this;
@@ -2189,8 +2069,8 @@ Index getFilterCountImpl(const ReflectClassInfo& clsInfo, MemberFilterStyle filt
         RefPtr<Decl>                decl,
         RefPtr<BuiltinTypeModifier> modifier)
     {
-        auto type = DeclRefType::Create(
-            session,
+        auto type = DeclRefType::create(
+            session->getGlobalASTBuilder(), 
             DeclRef<Decl>(decl.Ptr(), nullptr));
         session->builtinTypes[(int)modifier->tag] = type;
     }
@@ -2221,11 +2101,12 @@ Index getFilterCountImpl(const ReflectClassInfo& clsInfo, MemberFilterStyle filt
     //
 
     SyntaxNodeBase* createInstanceOfSyntaxClassByName(
+        ASTBuilder* astBuilder,
         String const&   name)
     {
         if(0) {}
     #define CASE(NAME) \
-        else if(name == #NAME) return new NAME()
+        else if(name == #NAME) return astBuilder->create<NAME>()
 
     CASE(GLSLBufferModifier);
     CASE(GLSLWriteOnlyModifier);
@@ -2258,72 +2139,59 @@ Index getFilterCountImpl(const ReflectClassInfo& clsInfo, MemberFilterStyle filt
     // Constructors for types
 
     RefPtr<ArrayExpressionType> getArrayType(
+        ASTBuilder* astBuilder,
         Type* elementType,
         IntVal*         elementCount)
     {
-        auto session = elementType->getSession();
-        auto arrayType = new ArrayExpressionType();
-        arrayType->setSession(session);
+        auto arrayType = astBuilder->create<ArrayExpressionType>();
         arrayType->baseType = elementType;
         arrayType->arrayLength = elementCount;
         return arrayType;
     }
 
     RefPtr<ArrayExpressionType> getArrayType(
+        ASTBuilder* astBuilder,
         Type* elementType)
     {
-        auto session = elementType->getSession();
-        auto arrayType = new ArrayExpressionType();
-        arrayType->setSession(session);
+        auto arrayType = astBuilder->create<ArrayExpressionType>();
         arrayType->baseType = elementType;
         return arrayType;
     }
 
     RefPtr<NamedExpressionType> getNamedType(
-        Session*                    session,
+        ASTBuilder*                 astBuilder,
         DeclRef<TypeDefDecl> const& declRef)
     {
-        DeclRef<TypeDefDecl> specializedDeclRef = createDefaultSubstitutionsIfNeeded(session, declRef).as<TypeDefDecl>();
+        DeclRef<TypeDefDecl> specializedDeclRef = createDefaultSubstitutionsIfNeeded(astBuilder, declRef).as<TypeDefDecl>();
 
-        auto namedType = new NamedExpressionType(specializedDeclRef);
-        namedType->setSession(session);
-        return namedType;
+        return astBuilder->create<NamedExpressionType>(specializedDeclRef);
     }
 
-    RefPtr<TypeType> getTypeType(
-        Type* type)
-    {
-        auto session = type->getSession();
-        auto typeType = new TypeType(type);
-        typeType->setSession(session);
-        return typeType;
-    }
-
+    
     RefPtr<FuncType> getFuncType(
-        Session*                        session,
+        ASTBuilder*                     astBuilder,
         DeclRef<CallableDecl> const&    declRef)
     {
-        RefPtr<FuncType> funcType = new FuncType();
-        funcType->setSession(session);
+        RefPtr<FuncType> funcType = astBuilder->create<FuncType>();
 
-        funcType->resultType = GetResultType(declRef);
+        funcType->resultType = GetResultType(astBuilder, declRef);
         for (auto paramDeclRef : GetParameters(declRef))
         {
             auto paramDecl = paramDeclRef.getDecl();
-            auto paramType = GetType(paramDeclRef);
+            auto paramType = GetType(astBuilder, paramDeclRef);
             if( paramDecl->findModifier<RefModifier>() )
             {
-                paramType = session->getRefType(paramType);
+                paramType = astBuilder->getRefType(paramType);
             }
             else if( paramDecl->findModifier<OutModifier>() )
             {
                 if(paramDecl->findModifier<InOutModifier>() || paramDecl->findModifier<InModifier>())
                 {
-                    paramType = session->getInOutType(paramType);
+                    paramType = astBuilder->getInOutType(paramType);
                 }
                 else
                 {
-                    paramType = session->getOutType(paramType);
+                    paramType = astBuilder->getOutType(paramType);
                 }
             }
             funcType->paramTypes.add(paramType);
@@ -2333,30 +2201,25 @@ Index getFilterCountImpl(const ReflectClassInfo& clsInfo, MemberFilterStyle filt
     }
 
     RefPtr<GenericDeclRefType> getGenericDeclRefType(
-        Session*                    session,
+        ASTBuilder*                 astBuilder,
         DeclRef<GenericDecl> const& declRef)
     {
-        auto genericDeclRefType = new GenericDeclRefType(declRef);
-        genericDeclRefType->setSession(session);
-        return genericDeclRefType;
+        return astBuilder->create<GenericDeclRefType>(declRef);
     }
 
     RefPtr<NamespaceType> getNamespaceType(
-        Session*                            session,
+        ASTBuilder*                         astBuilder,
         DeclRef<NamespaceDeclBase> const&   declRef)
     {
-        auto type = new NamespaceType;
-        type->setSession(session);
+        auto type = astBuilder->create<NamespaceType>();
         type->declRef = declRef;
         return type;
     }
 
     RefPtr<SamplerStateType> getSamplerStateType(
-        Session*        session)
+        ASTBuilder*     astBuilder)
     {
-        auto samplerStateType = new SamplerStateType();
-        samplerStateType->setSession(session);
-        return samplerStateType;
+        return astBuilder->create<SamplerStateType>();
     }
 
     // TODO: should really have a `type.cpp` and a `witness.cpp`
@@ -2369,11 +2232,11 @@ Index getFilterCountImpl(const ReflectClassInfo& clsInfo, MemberFilterStyle filt
         return sub->equals(otherWitness->sub);
     }
 
-    RefPtr<Val> TypeEqualityWitness::substituteImpl(SubstitutionSet subst, int * ioDiff)
+    RefPtr<Val> TypeEqualityWitness::substituteImpl(ASTBuilder* astBuilder, SubstitutionSet subst, int * ioDiff)
     {
         RefPtr<TypeEqualityWitness> rs = new TypeEqualityWitness();
-        rs->sub = sub->substituteImpl(subst, ioDiff).as<Type>();
-        rs->sup = sup->substituteImpl(subst, ioDiff).as<Type>();
+        rs->sub = sub->substituteImpl(astBuilder, subst, ioDiff).as<Type>();
+        rs->sup = sup->substituteImpl(astBuilder, subst, ioDiff).as<Type>();
         return rs;
     }
 
@@ -2417,7 +2280,7 @@ Index getFilterCountImpl(const ReflectClassInfo& clsInfo, MemberFilterStyle filt
         return nullptr;
     }
 
-    RefPtr<Val> DeclaredSubtypeWitness::substituteImpl(SubstitutionSet subst, int * ioDiff)
+    RefPtr<Val> DeclaredSubtypeWitness::substituteImpl(ASTBuilder* astBuilder, SubstitutionSet subst, int * ioDiff)
     {
         if (auto genConstraintDeclRef = declRef.as<GenericTypeConstraintDecl>())
         {
@@ -2477,9 +2340,9 @@ Index getFilterCountImpl(const ReflectClassInfo& clsInfo, MemberFilterStyle filt
 
         // Perform substitution on the constituent elements.
         int diff = 0;
-        auto substSub = sub->substituteImpl(subst, &diff).as<Type>();
-        auto substSup = sup->substituteImpl(subst, &diff).as<Type>();
-        auto substDeclRef = declRef.SubstituteImpl(subst, &diff);
+        auto substSub = sub->substituteImpl(astBuilder, subst, &diff).as<Type>();
+        auto substSup = sup->substituteImpl(astBuilder, subst, &diff).as<Type>();
+        auto substDeclRef = declRef.SubstituteImpl(astBuilder, subst, &diff);
         if (!diff)
             return this;
 
@@ -2509,7 +2372,7 @@ Index getFilterCountImpl(const ReflectClassInfo& clsInfo, MemberFilterStyle filt
                         // We need to look up the declaration that satisfies
                         // the requirement named by the associated type.
                         Decl* requirementKey = substTypeConstraintDecl;
-                        RequirementWitness requirementWitness = tryLookUpRequirementWitness(thisTypeSubst->witness, requirementKey);
+                        RequirementWitness requirementWitness = tryLookUpRequirementWitness(astBuilder, thisTypeSubst->witness, requirementKey);
                         switch(requirementWitness.getFlavor())
                         {
                         default:
@@ -2568,14 +2431,14 @@ Index getFilterCountImpl(const ReflectClassInfo& clsInfo, MemberFilterStyle filt
             && midToSup.equals(otherWitness->midToSup);
     }
 
-    RefPtr<Val> TransitiveSubtypeWitness::substituteImpl(SubstitutionSet subst, int * ioDiff)
+    RefPtr<Val> TransitiveSubtypeWitness::substituteImpl(ASTBuilder* astBuilder, SubstitutionSet subst, int * ioDiff)
     {
         int diff = 0;
 
-        RefPtr<Type> substSub = sub->substituteImpl(subst, &diff).as<Type>();
-        RefPtr<Type> substSup = sup->substituteImpl(subst, &diff).as<Type>();
-        RefPtr<SubtypeWitness> substSubToMid = subToMid->substituteImpl(subst, &diff).as<SubtypeWitness>();
-        DeclRef<Decl> substMidToSup = midToSup.SubstituteImpl(subst, &diff);
+        RefPtr<Type> substSub = sub->substituteImpl(astBuilder, subst, &diff).as<Type>();
+        RefPtr<Type> substSup = sup->substituteImpl(astBuilder, subst, &diff).as<Type>();
+        RefPtr<SubtypeWitness> substSubToMid = subToMid->substituteImpl(astBuilder, subst, &diff).as<SubtypeWitness>();
+        DeclRef<Decl> substMidToSup = midToSup.SubstituteImpl(astBuilder, subst, &diff);
 
         // If nothing changed, then we can bail out early.
         if (!diff)
@@ -2601,7 +2464,7 @@ Index getFilterCountImpl(const ReflectClassInfo& clsInfo, MemberFilterStyle filt
 
         // In the simple case, we just construct a new transitive subtype
         // witness, and we move on with life.
-        RefPtr<TransitiveSubtypeWitness> result = new TransitiveSubtypeWitness();
+        RefPtr<TransitiveSubtypeWitness> result = astBuilder->create<TransitiveSubtypeWitness>();
         result->sub = substSub;
         result->sup = substSup;
         result->subToMid = substSubToMid;
@@ -2695,16 +2558,16 @@ Index getFilterCountImpl(const ReflectClassInfo& clsInfo, MemberFilterStyle filt
         return this;
     }
 
-    RefPtr<Val> ExtractExistentialType::substituteImpl(SubstitutionSet subst, int* ioDiff)
+    RefPtr<Val> ExtractExistentialType::substituteImpl(ASTBuilder* astBuilder, SubstitutionSet subst, int* ioDiff)
     {
         int diff = 0;
-        auto substDeclRef = declRef.SubstituteImpl(subst, &diff);
+        auto substDeclRef = declRef.SubstituteImpl(astBuilder, subst, &diff);
         if(!diff)
             return this;
 
         (*ioDiff)++;
 
-        RefPtr<ExtractExistentialType> substValue = new ExtractExistentialType();
+        RefPtr<ExtractExistentialType> substValue = astBuilder->create<ExtractExistentialType>();
         substValue->declRef = declRef;
         return substValue;
     }
@@ -2734,20 +2597,20 @@ Index getFilterCountImpl(const ReflectClassInfo& clsInfo, MemberFilterStyle filt
         return declRef.getHashCode();
     }
 
-    RefPtr<Val> ExtractExistentialSubtypeWitness::substituteImpl(SubstitutionSet subst, int* ioDiff)
+    RefPtr<Val> ExtractExistentialSubtypeWitness::substituteImpl(ASTBuilder* astBuilder, SubstitutionSet subst, int* ioDiff)
     {
         int diff = 0;
 
-        auto substDeclRef = declRef.SubstituteImpl(subst, &diff);
-        auto substSub = sub->substituteImpl(subst, &diff).as<Type>();
-        auto substSup = sup->substituteImpl(subst, &diff).as<Type>();
+        auto substDeclRef = declRef.SubstituteImpl(astBuilder, subst, &diff);
+        auto substSub = sub->substituteImpl(astBuilder, subst, &diff).as<Type>();
+        auto substSup = sup->substituteImpl(astBuilder, subst, &diff).as<Type>();
 
         if(!diff)
             return this;
 
         (*ioDiff)++;
 
-        RefPtr<ExtractExistentialSubtypeWitness> substValue = new ExtractExistentialSubtypeWitness();
+        RefPtr<ExtractExistentialSubtypeWitness> substValue = astBuilder->create<ExtractExistentialSubtypeWitness>();
         substValue->declRef = declRef;
         substValue->sub = substSub;
         substValue->sup = substSup;
@@ -2804,9 +2667,8 @@ Index getFilterCountImpl(const ReflectClassInfo& clsInfo, MemberFilterStyle filt
 
     RefPtr<Type> TaggedUnionType::createCanonicalType()
     {
-        RefPtr<TaggedUnionType> canType = new TaggedUnionType();
-        canType->setSession(getSession());
-
+        RefPtr<TaggedUnionType> canType = m_astBuilder->create<TaggedUnionType>();
+        
         for( auto caseType : caseTypes )
         {
             auto canCaseType = caseType->getCanonicalType();
@@ -2816,22 +2678,21 @@ Index getFilterCountImpl(const ReflectClassInfo& clsInfo, MemberFilterStyle filt
         return canType;
     }
 
-    RefPtr<Val> TaggedUnionType::substituteImpl(SubstitutionSet subst, int* ioDiff)
+    RefPtr<Val> TaggedUnionType::substituteImpl(ASTBuilder* astBuilder, SubstitutionSet subst, int* ioDiff)
     {
         int diff = 0;
 
         List<RefPtr<Type>> substCaseTypes;
         for( auto caseType : caseTypes )
         {
-            substCaseTypes.add(caseType->substituteImpl(subst, &diff).as<Type>());
+            substCaseTypes.add(caseType->substituteImpl(astBuilder, subst, &diff).as<Type>());
         }
         if(!diff)
             return this;
 
         (*ioDiff)++;
 
-        RefPtr<TaggedUnionType> substType = new TaggedUnionType();
-        substType->setSession(getSession());
+        RefPtr<TaggedUnionType> substType = astBuilder->create<TaggedUnionType>();
         substType->caseTypes.swapWith(substCaseTypes);
         return substType;
     }
@@ -2885,17 +2746,17 @@ HashCode TaggedUnionSubtypeWitness::getHashCode()
     return hash;
 }
 
-RefPtr<Val> TaggedUnionSubtypeWitness::substituteImpl(SubstitutionSet subst, int* ioDiff)
+RefPtr<Val> TaggedUnionSubtypeWitness::substituteImpl(ASTBuilder* astBuilder, SubstitutionSet subst, int* ioDiff)
 {
     int diff = 0;
 
-    auto substSub = sub->substituteImpl(subst, &diff).as<Type>();
-    auto substSup = sup->substituteImpl(subst, &diff).as<Type>();
+    auto substSub = sub->substituteImpl(astBuilder, subst, &diff).as<Type>();
+    auto substSup = sup->substituteImpl(astBuilder, subst, &diff).as<Type>();
 
     List<RefPtr<Val>> substCaseWitnesses;
     for( auto caseWitness : caseWitnesses )
     {
-        substCaseWitnesses.add(caseWitness->substituteImpl(subst, &diff));
+        substCaseWitnesses.add(caseWitness->substituteImpl(astBuilder, subst, &diff));
     }
 
     if(!diff)
@@ -3027,9 +2888,8 @@ RefPtr<Val> getCanonicalValue(Val* val)
 
 RefPtr<Type> ExistentialSpecializedType::createCanonicalType()
 {
-    RefPtr<ExistentialSpecializedType> canType = new ExistentialSpecializedType();
-    canType->setSession(getSession());
-
+    RefPtr<ExistentialSpecializedType> canType = m_astBuilder->create<ExistentialSpecializedType>();
+    
     canType->baseType = baseType->getCanonicalType();
     for( auto arg : args )
     {
@@ -3041,24 +2901,24 @@ RefPtr<Type> ExistentialSpecializedType::createCanonicalType()
     return canType;
 }
 
-RefPtr<Val> substituteImpl(Val* val, SubstitutionSet subst, int* ioDiff)
+RefPtr<Val> substituteImpl(ASTBuilder* astBuilder, Val* val, SubstitutionSet subst, int* ioDiff)
 {
     if(!val) return nullptr;
-    return val->substituteImpl(subst, ioDiff);
+    return val->substituteImpl(astBuilder, subst, ioDiff);
 }
 
-RefPtr<Val> ExistentialSpecializedType::substituteImpl(SubstitutionSet subst, int* ioDiff)
+RefPtr<Val> ExistentialSpecializedType::substituteImpl(ASTBuilder* astBuilder, SubstitutionSet subst, int* ioDiff)
 {
     int diff = 0;
 
-    auto substBaseType = baseType->substituteImpl(subst, &diff).as<Type>();
+    auto substBaseType = baseType->substituteImpl(astBuilder, subst, &diff).as<Type>();
 
     ExpandedSpecializationArgs substArgs;
     for( auto arg : args )
     {
         ExpandedSpecializationArg substArg;
-        substArg.val = Slang::substituteImpl(arg.val, subst, &diff);
-        substArg.witness = Slang::substituteImpl(arg.witness, subst, &diff);
+        substArg.val = Slang::substituteImpl(astBuilder, arg.val, subst, &diff);
+        substArg.witness = Slang::substituteImpl(astBuilder, arg.witness, subst, &diff);
         substArgs.add(substArg);
     }
 
@@ -3067,8 +2927,7 @@ RefPtr<Val> ExistentialSpecializedType::substituteImpl(SubstitutionSet subst, in
 
     (*ioDiff)++;
 
-    RefPtr<ExistentialSpecializedType> substType = new ExistentialSpecializedType();
-    substType->setSession(getSession());
+    RefPtr<ExistentialSpecializedType> substType = astBuilder->create<ExistentialSpecializedType>();
     substType->baseType = substBaseType;
     substType->args = substArgs;
     return substType;
@@ -3107,19 +2966,18 @@ HashCode ThisType::getHashCode()
 
 RefPtr<Type> ThisType::createCanonicalType()
 {
-    RefPtr<ThisType> canType = new ThisType();
-    canType->setSession(getSession());
-
+    RefPtr<ThisType> canType = m_astBuilder->create<ThisType>();
+    
     // TODO: need to canonicalize the decl-ref
     canType->interfaceDeclRef = interfaceDeclRef;
     return canType;
 }
 
-RefPtr<Val> ThisType::substituteImpl(SubstitutionSet subst, int* ioDiff)
+RefPtr<Val> ThisType::substituteImpl(ASTBuilder* astBuilder, SubstitutionSet subst, int* ioDiff)
 {
     int diff = 0;
 
-    auto substInterfaceDeclRef = interfaceDeclRef.SubstituteImpl(subst, &diff);
+    auto substInterfaceDeclRef = interfaceDeclRef.SubstituteImpl(astBuilder, subst, &diff);
 
     auto thisTypeSubst = findThisTypeSubstitution(subst.substitutions, substInterfaceDeclRef.getDecl());
     if( thisTypeSubst )
@@ -3132,8 +2990,7 @@ RefPtr<Val> ThisType::substituteImpl(SubstitutionSet subst, int* ioDiff)
 
     (*ioDiff)++;
 
-    RefPtr<ThisType> substType = new ThisType();
-    substType->setSession(getSession());
+    RefPtr<ThisType> substType = m_astBuilder->create<ThisType>();
     substType->interfaceDeclRef = substInterfaceDeclRef;
     return substType;
 }

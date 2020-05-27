@@ -114,7 +114,7 @@ namespace Slang
         // constant expression in context, then we will instead construct
         // a dummy "error" value to represent the result.
         //
-        val = new ErrorIntVal();
+        val = m_astBuilder->create<ErrorIntVal>();
         return val;
     }
 
@@ -149,7 +149,7 @@ namespace Slang
         DeclRef<GenericDecl>        genericDeclRef,
         List<RefPtr<Expr>> const&   args)
     {
-        RefPtr<GenericSubstitution> subst = new GenericSubstitution();
+        RefPtr<GenericSubstitution> subst = m_astBuilder->create<GenericSubstitution>();
         subst->genericDecl = genericDeclRef.getDecl();
         subst->outer = genericDeclRef.substitutions.substitutions;
 
@@ -162,9 +162,7 @@ namespace Slang
         innerDeclRef.decl = GetInner(genericDeclRef);
         innerDeclRef.substitutions = SubstitutionSet(subst);
 
-        return DeclRefType::Create(
-            getSession(),
-            innerDeclRef);
+        return DeclRefType::create(m_astBuilder, innerDeclRef);
     }
 
     bool SemanticsVisitor::CoerceToProperTypeImpl(
@@ -339,16 +337,14 @@ namespace Slang
             session, "Vector").as<GenericDecl>();
         auto vectorTypeDecl = vectorGenericDecl->inner;
 
-        auto substitutions = new GenericSubstitution();
+        auto substitutions = m_astBuilder->create<GenericSubstitution>();
         substitutions->genericDecl = vectorGenericDecl.Ptr();
         substitutions->args.add(elementType);
         substitutions->args.add(elementCount);
 
         auto declRef = DeclRef<Decl>(vectorTypeDecl.Ptr(), substitutions);
 
-        return DeclRefType::Create(
-            session,
-            declRef).as<VectorExpressionType>();
+        return DeclRefType::create(m_astBuilder, declRef).as<VectorExpressionType>();
     }
 
     RefPtr<Expr> SemanticsExprVisitor::visitSharedTypeExpr(SharedTypeExpr* expr)
@@ -366,8 +362,8 @@ namespace Slang
         // We have an expression of the form `__TaggedUnion(A, B, ...)`
         // which will evaluate to a tagged-union type over `A`, `B`, etc.
         //
-        RefPtr<TaggedUnionType> type = new TaggedUnionType();
-        expr->type = QualType(getTypeType(type));
+        RefPtr<TaggedUnionType> type = m_astBuilder->create<TaggedUnionType>();
+        expr->type = QualType(m_astBuilder->getTypeType(type));
 
         for( auto& caseTypeExpr : expr->caseTypes )
         {

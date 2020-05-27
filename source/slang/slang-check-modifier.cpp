@@ -80,15 +80,13 @@ namespace Slang
 
     AttributeDecl* SemanticsVisitor::lookUpAttributeDecl(Name* attributeName, Scope* scope)
     {
-        auto session = getSession();
-
         // We start by looking for an existing attribute matching
         // the name `attributeName`.
         //
         {
             // Look up the name and see what attributes we find.
             //
-            auto lookupResult = lookUp(session, this, attributeName, scope, LookupMask::Attribute);
+            auto lookupResult = lookUp(m_astBuilder, this, attributeName, scope, LookupMask::Attribute);
 
             // If the result was overloaded, then that means there
             // are multiple attributes matching the name, and we
@@ -118,7 +116,7 @@ namespace Slang
         // If the attribute was `[Something(...)]` then we will
         // look for a `struct` named `SomethingAttribute`.
         //
-        LookupResult lookupResult = lookUp(session, this, session->getNameObj(attributeName->text + "Attribute"), scope, LookupMask::type);
+        LookupResult lookupResult = lookUp(m_astBuilder, this, m_astBuilder->getGlobalSession()->getNameObj(attributeName->text + "Attribute"), scope, LookupMask::type);
         //
         // If we didn't find a matching type name, then we give up.
         //
@@ -140,22 +138,24 @@ namespace Slang
         // We will now synthesize a new `AttributeDecl` to mirror
         // what was declared on the `struct` type.
         //
-        RefPtr<AttributeDecl> attrDecl = new AttributeDecl();
+        RefPtr<AttributeDecl> attrDecl = m_astBuilder->create<AttributeDecl>();
         attrDecl->nameAndLoc.name = attributeName;
         attrDecl->nameAndLoc.loc = structDecl->nameAndLoc.loc;
         attrDecl->loc = structDecl->loc;
 
-        RefPtr<AttributeTargetModifier> targetModifier = new AttributeTargetModifier();
+        RefPtr<AttributeTargetModifier> targetModifier = m_astBuilder->create<AttributeTargetModifier>();
         targetModifier->syntaxClass = attrUsageAttr->targetSyntaxClass;
         targetModifier->loc = attrUsageAttr->loc;
         addModifier(attrDecl, targetModifier);
+
+        Session* session = m_astBuilder->getGlobalSession();
 
         // Every attribute declaration is associated with the type
         // of syntax nodes it constructs (via reflection/RTTI).
         //
         // User-defined attributes create instances of
         // `UserDefinedAttribute`.
-        //
+        //        
         attrDecl->syntaxClass = session->findSyntaxClass(session->getNameObj("UserDefinedAttribute"));
 
         // The fields of the user-defined `struct` type become
@@ -169,7 +169,7 @@ namespace Slang
             {
                 ensureDecl(varMember, DeclCheckState::CanUseTypeOfValueDecl);
 
-                RefPtr<ParamDecl> paramDecl = new ParamDecl();
+                RefPtr<ParamDecl> paramDecl = m_astBuilder->create<ParamDecl>();
                 paramDecl->nameAndLoc = member->nameAndLoc;
                 paramDecl->type = varMember->type;
                 paramDecl->loc = member->loc;
