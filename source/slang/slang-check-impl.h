@@ -11,9 +11,7 @@
 
 namespace Slang
 {
-    RefPtr<TypeType> getTypeType(
-        Type* type);
-
+    
         /// Should the given `decl` be treated as a static rather than instance declaration?
     bool isEffectivelyStatic(
         Decl*           decl);
@@ -229,18 +227,25 @@ namespace Slang
             return m_linkage->getSessionImpl();
         }
 
+        Linkage* getLinkage()
+        {
+            return m_linkage;
+        }
     };
 
     struct SemanticsVisitor
     {
         SemanticsVisitor(
             SharedSemanticsContext* shared)
-            : m_shared(shared)
+            : m_shared(shared),
+            m_astBuilder(shared->getLinkage()->getASTBuilder())
         {}
 
         SharedSemanticsContext* m_shared = nullptr;
+        ASTBuilder* m_astBuilder = nullptr;
 
         SharedSemanticsContext* getShared() { return m_shared; }
+        ASTBuilder* getASTBuilder() { return m_astBuilder;}
 
         DiagnosticSink* getSink() { return m_shared->getSink(); }
 
@@ -1304,7 +1309,7 @@ namespace Slang
             DeclRefExpr*     expr,
             QualType const& baseType);
 
-        SharedSemanticsContext & operator = (const SharedSemanticsContext &) = delete;
+        SharedSemanticsContext& operator=(const SharedSemanticsContext &) = delete;
 
 
         //

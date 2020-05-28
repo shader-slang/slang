@@ -1228,7 +1228,7 @@ namespace Slang
             SlangMatrixLayoutMode mode);
 
             /// Create an initially-empty linkage
-        Linkage(Session* session);
+        Linkage(Session* session, ASTBuilder* astBuilder);
 
             /// Get the parent session for this linkage
         Session* getSessionImpl() { return m_session; }
@@ -1255,6 +1255,10 @@ namespace Slang
         NamePool namePool;
 
         NamePool* getNamePool() { return &namePool; }
+
+        ASTBuilder* getASTBuilder() { return m_astBuilder; }
+
+        RefPtr<ASTBuilder> m_astBuilder;
 
         // Modules that have been dynamically loaded via `import`
         //
@@ -2043,6 +2047,12 @@ namespace Slang
         Name* tryGetNameObj(String name) { return namePool.tryGetName(name); }
         //
 
+            /// This AST Builder should only be used for creating AST nodes that are global across requests
+            /// not doing so could lead to memory being consumed but not used.
+        ASTBuilder* getGlobalASTBuilder() { return globalAstBuilder; }
+
+        RefPtr<ASTBuilder> globalAstBuilder;
+
         // Generated code for stdlib, etc.
         String stdlibPath;
         String coreLibraryCode;
@@ -2054,72 +2064,8 @@ namespace Slang
         String getCoreLibraryCode();
         String getHLSLLibraryCode();
 
-        // Basic types that we don't want to re-create all the time
-        RefPtr<Type> errorType;
-        RefPtr<Type> initializerListType;
-        RefPtr<Type> overloadedType;
-        RefPtr<Type> constExprRate;
-        RefPtr<Type> irBasicBlockType;
-
-        RefPtr<Type> stringType;
-        RefPtr<Type> enumTypeType;
-
         
-        RefPtr<Type> builtinTypes[Index(BaseType::CountOf)];
-        Dictionary<String, Decl*> magicDecls;
-
-        void initializeTypes();
-
-        Type* getBoolType();
-        Type* getHalfType();
-        Type* getFloatType();
-        Type* getDoubleType();
-        Type* getIntType();
-        Type* getInt64Type();
-        Type* getUIntType();
-        Type* getUInt64Type();
-        Type* getVoidType();
-        Type* getBuiltinType(BaseType flavor);
-
-        Type* getInitializerListType();
-        Type* getOverloadedType();
-        Type* getErrorType();
-        Type* getStringType();
-
-        Type* getEnumTypeType();
-
-        // Construct the type `Ptr<valueType>`, where `Ptr`
-        // is looked up as a builtin type.
-        RefPtr<PtrType> getPtrType(RefPtr<Type> valueType);
-
-        // Construct the type `Out<valueType>`
-        RefPtr<OutType> getOutType(RefPtr<Type> valueType);
-
-        // Construct the type `InOut<valueType>`
-        RefPtr<InOutType> getInOutType(RefPtr<Type> valueType);
-
-        // Construct the type `Ref<valueType>`
-        RefPtr<RefType> getRefType(RefPtr<Type> valueType);
-
-        // Construct a pointer type like `Ptr<valueType>`, but where
-        // the actual type name for the pointer type is given by `ptrTypeName`
-        RefPtr<PtrTypeBase> getPtrType(RefPtr<Type> valueType, char const* ptrTypeName);
-
-        // Construct a pointer type like `Ptr<valueType>`, but where
-        // the generic declaration for the pointer type is `genericDecl`
-        RefPtr<PtrTypeBase> getPtrType(RefPtr<Type> valueType, GenericDecl* genericDecl);
-
-        RefPtr<ArrayExpressionType> getArrayType(
-            Type*   elementType,
-            IntVal* elementCount);
-
-        RefPtr<VectorExpressionType> getVectorType(
-            RefPtr<Type>    elementType,
-            RefPtr<IntVal>  elementCount);
-
-        SyntaxClass<RefObject> findSyntaxClass(Name* name);
-
-        Dictionary<Name*, SyntaxClass<RefObject> > mapNameToSyntaxClass;
+        RefPtr<SharedASTBuilder> m_sharedASTBuilder;
 
         // cache used by type checking, implemented in check.cpp
         TypeCheckingCache* typeCheckingCache = nullptr;

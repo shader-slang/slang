@@ -489,7 +489,10 @@ SLANG_API SlangReflectionUserAttribute* spReflectionType_FindUserAttributeByName
     if (!type) return 0;
     if (auto declRefType = as<DeclRefType>(type))
     {
-        return findUserAttributeByName(declRefType->getSession(), declRefType->declRef.getDecl(), name);
+        ASTBuilder* astBuilder = declRefType->getASTBuilder();
+        auto globalSession = astBuilder->getGlobalSession();
+
+        return findUserAttributeByName(globalSession, declRefType->declRef.getDecl(), name);
     }
     return 0;
 }

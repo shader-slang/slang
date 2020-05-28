@@ -610,6 +610,8 @@ namespace Slang
         HashCode getHashCode() const;
     };
 
+    class ASTBuilder;
+
     template<typename T>
     struct DeclRef;
 
@@ -644,15 +646,15 @@ namespace Slang
         {}
 
         // Apply substitutions to a type or declaration
-        RefPtr<Type> Substitute(RefPtr<Type> type) const;
+        RefPtr<Type> substitute(ASTBuilder* astBuilder, RefPtr<Type> type) const;
 
-        DeclRefBase Substitute(DeclRefBase declRef) const;
+        DeclRefBase substitute(ASTBuilder* astBuilder, DeclRefBase declRef) const;
 
         // Apply substitutions to an expression
-        RefPtr<Expr> Substitute(RefPtr<Expr> expr) const;
+        RefPtr<Expr> substitute(ASTBuilder* astBuilder, RefPtr<Expr> expr) const;
 
         // Apply substitutions to this declaration reference
-        DeclRefBase SubstituteImpl(SubstitutionSet subst, int* ioDiff);
+        DeclRefBase substituteImpl(ASTBuilder* astBuilder, SubstitutionSet subst, int* ioDiff);
 
         // Returns true if 'as' will return a valid cast
         template <typename T>
@@ -719,26 +721,26 @@ namespace Slang
             return DeclRef<T>((T*) declRef.decl, declRef.substitutions);
         }
 
-        RefPtr<Type> Substitute(RefPtr<Type> type) const
+        RefPtr<Type> substitute(ASTBuilder* astBuilder, RefPtr<Type> type) const
         {
-            return DeclRefBase::Substitute(type);
+            return DeclRefBase::substitute(astBuilder, type);
         }
-        RefPtr<Expr> Substitute(RefPtr<Expr> expr) const
+        RefPtr<Expr> substitute(ASTBuilder* astBuilder, RefPtr<Expr> expr) const
         {
-            return DeclRefBase::Substitute(expr);
+            return DeclRefBase::substitute(astBuilder, expr);
         }
 
         // Apply substitutions to a type or declaration
         template<typename U>
-        DeclRef<U> Substitute(DeclRef<U> declRef) const
+        DeclRef<U> substitute(ASTBuilder* astBuilder, DeclRef<U> declRef) const
         {
-            return DeclRef<U>::unsafeInit(DeclRefBase::Substitute(declRef));
+            return DeclRef<U>::unsafeInit(DeclRefBase::substitute(astBuilder, declRef));
         }
 
         // Apply substitutions to this declaration reference
-        DeclRef<T> SubstituteImpl(SubstitutionSet subst, int* ioDiff)
+        DeclRef<T> substituteImpl(ASTBuilder* astBuilder, SubstitutionSet subst, int* ioDiff)
         {
-            return DeclRef<T>::unsafeInit(DeclRefBase::SubstituteImpl(subst, ioDiff));
+            return DeclRef<T>::unsafeInit(DeclRefBase::substituteImpl(astBuilder, subst, ioDiff));
         }
 
         DeclRef<ContainerDecl> GetParent() const
@@ -1284,7 +1286,7 @@ namespace Slang
 
         RefPtr<WitnessTable> getWitnessTable();
 
-        RequirementWitness specialize(SubstitutionSet const& subst);
+        RequirementWitness specialize(ASTBuilder* astBuilder, SubstitutionSet const& subst);
 
         Flavor              m_flavor;
         DeclRef<Decl>       m_declRef;

@@ -13,12 +13,11 @@ class OverloadGroupType : public Type
 {
     SLANG_CLASS(OverloadGroupType)
 
-public:
     virtual String toString() override;
 
 protected:
-    virtual bool equalsImpl(Type * type) override;
     virtual RefPtr<Type> createCanonicalType() override;
+    virtual bool equalsImpl(Type* type) override;
     virtual HashCode getHashCode() override;
 };
 
@@ -31,8 +30,8 @@ class InitializerListType : public Type
     virtual String toString() override;
 
 protected:
-    virtual bool equalsImpl(Type * type) override;
     virtual RefPtr<Type> createCanonicalType() override;
+    virtual bool equalsImpl(Type* type) override;
     virtual HashCode getHashCode() override;
 };
 
@@ -41,13 +40,12 @@ class ErrorType : public Type
 {
     SLANG_CLASS(ErrorType)
 
-public:
     virtual String toString() override;
 
 protected:
-    virtual bool equalsImpl(Type * type) override;
-    virtual RefPtr<Val> substituteImpl(SubstitutionSet subst, int* ioDiff) override;
     virtual RefPtr<Type> createCanonicalType() override;
+    virtual bool equalsImpl(Type* type) override;
+    virtual RefPtr<Val> substituteImpl(ASTBuilder* astBuilder, SubstitutionSet subst, int* ioDiff) override;
     virtual HashCode getHashCode() override;
 };
 
@@ -59,22 +57,18 @@ class DeclRefType : public Type
     DeclRef<Decl> declRef;
 
     virtual String toString() override;
-    virtual RefPtr<Val> substituteImpl(SubstitutionSet subst, int* ioDiff) override;
+    virtual RefPtr<Val> substituteImpl(ASTBuilder* astBuilder, SubstitutionSet subst, int* ioDiff) override;
 
-    static RefPtr<DeclRefType> Create(
-        Session*        session,
-        DeclRef<Decl>   declRef);
+    static RefPtr<DeclRefType> create(ASTBuilder* astBuilder, DeclRef<Decl> declRef);
 
-    DeclRefType()
-    {}
-    DeclRefType(
-        DeclRef<Decl> declRef)
+protected:
+    DeclRefType( DeclRef<Decl> declRef)
         : declRef(declRef)
     {}
-protected:
+
     virtual HashCode getHashCode() override;
-    virtual bool equalsImpl(Type * type) override;
     virtual RefPtr<Type> createCanonicalType() override;
+    virtual bool equalsImpl(Type* type) override;
 };
 
 // Base class for types that can be used in arithmetic expressions
@@ -90,18 +84,17 @@ class BasicExpressionType : public ArithmeticExpressionType
 {
     SLANG_CLASS(BasicExpressionType)
 
-
     BaseType baseType;
 
-    BasicExpressionType() {}
+protected:
     BasicExpressionType(
         Slang::BaseType baseType)
         : baseType(baseType)
     {}
-protected:
+
     virtual BasicExpressionType* GetScalarType() override;
-    virtual bool equalsImpl(Type * type) override;
     virtual RefPtr<Type> createCanonicalType() override;
+    virtual bool equalsImpl(Type* type) override;
 
 };
 
@@ -111,7 +104,6 @@ protected:
 class BuiltinType : public DeclRefType 
 {
     SLANG_ABSTRACT_CLASS(BuiltinType)
-
 };
 
 // Resources that contain "elements" that can be fetched
@@ -139,14 +131,11 @@ class TextureTypeBase : public ResourceType
 {
     SLANG_ABSTRACT_CLASS(TextureTypeBase)
 
-    TextureTypeBase()
-    {}
-    TextureTypeBase(
-        TextureFlavor flavor,
-        RefPtr<Type> elementType)
+protected:
+    TextureTypeBase(TextureFlavor inFlavor, RefPtr<Type> inElementType)
     {
-        this->elementType = elementType;
-        this->flavor = flavor;
+        elementType = inElementType;
+        flavor = inFlavor;
     }
 };
 
@@ -154,11 +143,8 @@ class TextureType : public TextureTypeBase
 {
     SLANG_CLASS(TextureType)
 
-    TextureType()
-    {}
-    TextureType(
-        TextureFlavor flavor,
-        RefPtr<Type> elementType)
+protected:
+    TextureType(TextureFlavor flavor, RefPtr<Type> elementType)
         : TextureTypeBase(flavor, elementType)
     {}
 };
@@ -169,11 +155,8 @@ class TextureSamplerType : public TextureTypeBase
 {
     SLANG_CLASS(TextureSamplerType)
 
-    TextureSamplerType()
-    {}
-    TextureSamplerType(
-        TextureFlavor flavor,
-        RefPtr<Type> elementType)
+protected:
+    TextureSamplerType(TextureFlavor flavor, RefPtr<Type> elementType)
         : TextureTypeBase(flavor, elementType)
     {}
 };
@@ -183,8 +166,7 @@ class GLSLImageType : public TextureTypeBase
 {
     SLANG_CLASS(GLSLImageType)
 
-    GLSLImageType()
-    {}
+protected:
     GLSLImageType(
         TextureFlavor flavor,
         RefPtr<Type> elementType)
@@ -396,9 +378,9 @@ class ArrayExpressionType : public Type
     virtual String toString() override;
 
 protected:
-    virtual bool equalsImpl(Type * type) override;
     virtual RefPtr<Type> createCanonicalType() override;
-    virtual RefPtr<Val> substituteImpl(SubstitutionSet subst, int* ioDiff) override;
+    virtual bool equalsImpl(Type* type) override;
+    virtual RefPtr<Val> substituteImpl(ASTBuilder* astBuilder, SubstitutionSet subst, int* ioDiff) override;
     virtual HashCode getHashCode() override;
 };
 
@@ -412,18 +394,15 @@ class TypeType : public Type
     // The type that this is the type of...
     RefPtr<Type> type;
 
-public:
-    TypeType()
-    {}
+    virtual String toString() override;
+
+protected:
     TypeType(RefPtr<Type> type)
         : type(type)
     {}
 
-    virtual String toString() override;
-
-protected:
-    virtual bool equalsImpl(Type * type) override;
     virtual RefPtr<Type> createCanonicalType() override;
+    virtual bool equalsImpl(Type* type) override;
     virtual HashCode getHashCode() override;
 };
 
@@ -527,20 +506,18 @@ class NamedExpressionType : public Type
     SLANG_CLASS(NamedExpressionType)
 
     DeclRef<TypeDefDecl> declRef;
-
     RefPtr<Type> innerType;
-    NamedExpressionType()
-    {}
+
+    virtual String toString() override;
+
+protected:
     NamedExpressionType(
         DeclRef<TypeDefDecl> declRef)
         : declRef(declRef)
     {}
 
-    virtual String toString() override;
-
-protected:
-    virtual bool equalsImpl(Type * type) override;
     virtual RefPtr<Type> createCanonicalType() override;
+    virtual bool equalsImpl(Type* type) override;
     virtual HashCode getHashCode() override;
 };
 
@@ -559,18 +536,16 @@ class FuncType : public Type
     List<RefPtr<Type>> paramTypes;
     RefPtr<Type> resultType;
 
-    FuncType()
-    {}
-
     UInt getParamCount() { return paramTypes.getCount(); }
     Type* getParamType(UInt index) { return paramTypes[index]; }
     Type* getResultType() { return resultType; }
 
     virtual String toString() override;
+
 protected:
-    virtual RefPtr<Val> substituteImpl(SubstitutionSet subst, int* ioDiff) override;
-    virtual bool equalsImpl(Type * type) override;
     virtual RefPtr<Type> createCanonicalType() override;
+    virtual RefPtr<Val> substituteImpl(ASTBuilder* astBuilder, SubstitutionSet subst, int* ioDiff) override;
+    virtual bool equalsImpl(Type* type) override;
     virtual HashCode getHashCode() override;
 };
 
@@ -581,19 +556,17 @@ class GenericDeclRefType : public Type
 
     DeclRef<GenericDecl> declRef;
 
-    GenericDeclRefType()
-    {}
-    GenericDeclRefType(
-        DeclRef<GenericDecl> declRef)
-        : declRef(declRef)
-    {}
-
     DeclRef<GenericDecl> const& getDeclRef() const { return declRef; }
 
     virtual String toString() override;
 
 protected:
-    virtual bool equalsImpl(Type * type) override;
+    GenericDeclRefType(
+        DeclRef<GenericDecl> declRef)
+        : declRef(declRef)
+    {}
+
+    virtual bool equalsImpl(Type* type) override;
     virtual HashCode getHashCode() override;
     virtual RefPtr<Type> createCanonicalType() override;
 };
@@ -605,15 +578,12 @@ class NamespaceType : public Type
 
     DeclRef<NamespaceDeclBase> declRef;
 
-    NamespaceType()
-    {}
-
     DeclRef<NamespaceDeclBase> const& getDeclRef() const { return declRef; }
 
     virtual String toString() override;
 
 protected:
-    virtual bool equalsImpl(Type * type) override;
+    virtual bool equalsImpl(Type* type) override;
     virtual HashCode getHashCode() override;
     virtual RefPtr<Type> createCanonicalType() override;    
 };
@@ -627,10 +597,10 @@ class ExtractExistentialType : public Type
     DeclRef<VarDeclBase> declRef;
 
     virtual String toString() override;
-    virtual bool equalsImpl(Type * type) override;
+    virtual bool equalsImpl(Type* type) override;
     virtual HashCode getHashCode() override;
     virtual RefPtr<Type> createCanonicalType() override;
-    virtual RefPtr<Val> substituteImpl(SubstitutionSet subst, int* ioDiff) override;
+    virtual RefPtr<Val> substituteImpl(ASTBuilder* astBuilder, SubstitutionSet subst, int* ioDiff) override;
 };
 
     /// A tagged union of zero or more other types.
@@ -646,10 +616,10 @@ class TaggedUnionType : public Type
     List<RefPtr<Type>> caseTypes;
 
     virtual String toString() override;
-    virtual bool equalsImpl(Type * type) override;
+    virtual bool equalsImpl(Type* type) override;
     virtual HashCode getHashCode() override;
     virtual RefPtr<Type> createCanonicalType() override;
-    virtual RefPtr<Val> substituteImpl(SubstitutionSet subst, int* ioDiff) override;
+    virtual RefPtr<Val> substituteImpl(ASTBuilder* astBuilder, SubstitutionSet subst, int* ioDiff) override;
 };
 
 class ExistentialSpecializedType : public Type 
@@ -660,10 +630,10 @@ class ExistentialSpecializedType : public Type
     ExpandedSpecializationArgs args;
 
     virtual String toString() override;
-    virtual bool equalsImpl(Type * type) override;
+    virtual bool equalsImpl(Type* type) override;
     virtual HashCode getHashCode() override;
     virtual RefPtr<Type> createCanonicalType() override;
-    virtual RefPtr<Val> substituteImpl(SubstitutionSet subst, int* ioDiff) override;
+    virtual RefPtr<Val> substituteImpl(ASTBuilder* astBuilder, SubstitutionSet subst, int* ioDiff) override;
 };
 
     /// The type of `this` within a polymorphic declaration
@@ -674,11 +644,10 @@ class ThisType : public Type
     DeclRef<InterfaceDecl> interfaceDeclRef;
 
     virtual String toString() override;
-    virtual bool equalsImpl(Type * type) override;
+    virtual bool equalsImpl(Type* type) override;
     virtual HashCode getHashCode() override;
     virtual RefPtr<Type> createCanonicalType() override;
-    virtual RefPtr<Val> substituteImpl(SubstitutionSet subst, int* ioDiff) override;
-
+    virtual RefPtr<Val> substituteImpl(ASTBuilder* astBuilder, SubstitutionSet subst, int* ioDiff) override;
 };
 
 } // namespace Slang

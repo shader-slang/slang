@@ -272,7 +272,7 @@ namespace Slang
 
     // Get the type to use when referencing a declaration
     QualType getTypeForDeclRef(
-        Session*                session,
+        ASTBuilder*             astBuilder,
         SemanticsVisitor*       sema,
         DiagnosticSink*         sink,
         DeclRef<Decl>           declRef,
@@ -304,7 +304,7 @@ namespace Slang
                     if(_isLocalVar(varDecl))
                     {
                         sema->getSink()->diagnose(varDecl, Diagnostics::localVariableUsedBeforeDeclared, varDecl);
-                        return QualType(session->getErrorType());
+                        return QualType(astBuilder->getErrorType());
                     }
                 }
             }
@@ -322,7 +322,7 @@ namespace Slang
         if (auto varDeclRef = declRef.as<VarDeclBase>())
         {
             QualType qualType;
-            qualType.type = GetType(varDeclRef);
+            qualType.type = GetType(astBuilder, varDeclRef);
 
             bool isLValue = true;
             if(varDeclRef.getDecl()->findModifier<ConstModifier>())
@@ -368,37 +368,37 @@ namespace Slang
         else if( auto enumCaseDeclRef = declRef.as<EnumCaseDecl>() )
         {
             QualType qualType;
-            qualType.type = getType(enumCaseDeclRef);
+            qualType.type = getType(astBuilder, enumCaseDeclRef);
             qualType.IsLeftValue = false;
             return qualType;
         }
         else if (auto typeAliasDeclRef = declRef.as<TypeDefDecl>())
         {
-            auto type = getNamedType(session, typeAliasDeclRef);
+            auto type = getNamedType(astBuilder, typeAliasDeclRef);
             *outTypeResult = type;
-            return QualType(getTypeType(type));
+            return QualType(astBuilder->getTypeType(type));
         }
         else if (auto aggTypeDeclRef = declRef.as<AggTypeDecl>())
         {
-            auto type = DeclRefType::Create(session, aggTypeDeclRef);
+            auto type = DeclRefType::create(astBuilder, aggTypeDeclRef);
             *outTypeResult = type;
-            return QualType(getTypeType(type));
+            return QualType(astBuilder->getTypeType(type));
         }
         else if (auto simpleTypeDeclRef = declRef.as<SimpleTypeDecl>())
         {
-            auto type = DeclRefType::Create(session, simpleTypeDeclRef);
+            auto type = DeclRefType::create(astBuilder, simpleTypeDeclRef);
             *outTypeResult = type;
-            return QualType(getTypeType(type));
+            return QualType(astBuilder->getTypeType(type));
         }
         else if (auto genericDeclRef = declRef.as<GenericDecl>())
         {
-            auto type = getGenericDeclRefType(session, genericDeclRef);
+            auto type = getGenericDeclRefType(astBuilder, genericDeclRef);
             *outTypeResult = type;
-            return QualType(getTypeType(type));
+            return QualType(astBuilder->getTypeType(type));
         }
         else if (auto funcDeclRef = declRef.as<CallableDecl>())
         {
-            auto type = getFuncType(session, funcDeclRef);
+            auto type = getFuncType(astBuilder, funcDeclRef);
             return QualType(type);
         }
         else if (auto constraintDeclRef = declRef.as<TypeConstraintDecl>())
@@ -406,12 +406,12 @@ namespace Slang
             // When we access a constraint or an inheritance decl (as a member),
             // we are conceptually performing a "cast" to the given super-type,
             // with the declaration showing that such a cast is legal.
-            auto type = GetSup(constraintDeclRef);
+            auto type = GetSup(astBuilder, constraintDeclRef);
             return QualType(type);
         }
         else if( auto namespaceDeclRef = declRef.as<NamespaceDeclBase>())
         {
-            auto type = getNamespaceType(session, namespaceDeclRef);
+            auto type = getNamespaceType(astBuilder, namespaceDeclRef);
             return QualType(type);
         }
         if( sink )
@@ -430,16 +430,16 @@ namespace Slang
             //
             sink->diagnose(loc, Diagnostics::undefinedIdentifier2, declRef.GetName());
         }
-        return QualType(session->getErrorType());
+        return QualType(astBuilder->getErrorType());
     }
 
     QualType getTypeForDeclRef(
-        Session*        session,
+        ASTBuilder*     astBuilder, 
         DeclRef<Decl>   declRef,
         SourceLoc       loc)
     {
         RefPtr<Type> typeResult;
-        return getTypeForDeclRef(session, nullptr, nullptr, declRef, &typeResult, loc);
+        return getTypeForDeclRef(astBuilder, nullptr, nullptr, declRef, &typeResult, loc);
     }
 
     DeclRef<ExtensionDecl> ApplyExtensionToType(
@@ -453,12 +453,12 @@ namespace Slang
         return semantics->ApplyExtensionToType(extDecl, type);
     }
 
-    RefPtr<GenericSubstitution> createDefaultSubsitutionsForGeneric(
-        Session*                session,
+    RefPtr<GenericSubstitution> createDefaultSubstitutionsForGeneric(
+        ASTBuilder*             astBuilder, 
         GenericDecl*            genericDecl,
         RefPtr<Substitutions>   outerSubst)
     {
-        RefPtr<GenericSubstitution> genericSubst = new GenericSubstitution();
+        RefPtr<GenericSubstitution> genericSubst = astBuilder->create<GenericSubstitution>();
         genericSubst->genericDecl = genericDecl;
         genericSubst->outer = outerSubst;
 
@@ -466,11 +466,11 @@ namespace Slang
         {
             if( auto genericTypeParamDecl = as<GenericTypeParamDecl>(mm) )
             {
-                genericSubst->args.add(DeclRefType::Create(session, DeclRef<Decl>(genericTypeParamDecl, outerSubst)));
+                genericSubst->args.add(DeclRefType::create(astBuilder, DeclRef<Decl>(genericTypeParamDecl, outerSubst)));
             }
             else if( auto genericValueParamDecl = as<GenericValueParamDecl>(mm) )
             {
-                genericSubst->args.add(new GenericParamIntVal(DeclRef<GenericValueParamDecl>(genericValueParamDecl, outerSubst)));
+                genericSubst->args.add(astBuilder->create<GenericParamIntVal>(DeclRef<GenericValueParamDecl>(genericValueParamDecl, outerSubst)));
             }
         }
 
@@ -479,7 +479,7 @@ namespace Slang
         {
             if (auto genericTypeConstraintDecl = as<GenericTypeConstraintDecl>(mm))
             {
-                RefPtr<DeclaredSubtypeWitness> witness = new DeclaredSubtypeWitness();
+                RefPtr<DeclaredSubtypeWitness> witness = astBuilder->create<DeclaredSubtypeWitness>();
                 witness->declRef = DeclRef<Decl>(genericTypeConstraintDecl, outerSubst);
                 witness->sub = genericTypeConstraintDecl->sub.type;
                 witness->sup = genericTypeConstraintDecl->sup.type;
@@ -495,7 +495,7 @@ namespace Slang
     // using their archetypes).
     //
     SubstitutionSet createDefaultSubstitutions(
-        Session*        session,
+        ASTBuilder*     astBuilder, 
         Decl*           decl,
         SubstitutionSet outerSubstSet)
     {
@@ -507,8 +507,8 @@ namespace Slang
             if(decl != genericDecl->inner)
                 return outerSubstSet;
 
-            RefPtr<GenericSubstitution> genericSubst = createDefaultSubsitutionsForGeneric(
-                session,
+            RefPtr<GenericSubstitution> genericSubst = createDefaultSubstitutionsForGeneric(
+                astBuilder,
                 genericDecl,
                 outerSubstSet.substitutions);
 
@@ -519,15 +519,15 @@ namespace Slang
     }
 
     SubstitutionSet createDefaultSubstitutions(
-        Session* session,
+        ASTBuilder* astBuilder, 
         Decl*   decl)
     {
         SubstitutionSet subst;
         if( auto parentDecl = decl->parentDecl )
         {
-            subst = createDefaultSubstitutions(session, parentDecl);
+            subst = createDefaultSubstitutions(astBuilder, parentDecl);
         }
-        subst = createDefaultSubstitutions(session, decl, subst);
+        subst = createDefaultSubstitutions(astBuilder, decl, subst);
         return subst;
     }
 
@@ -776,7 +776,7 @@ namespace Slang
             if(!initExpr)
             {
                 getSink()->diagnose(varDecl, Diagnostics::varWithoutTypeMustHaveInitializer);
-                varDecl->type.type = getSession()->getErrorType();
+                varDecl->type.type = m_astBuilder->getErrorType();
             }
             else
             {
@@ -803,7 +803,7 @@ namespace Slang
 
             TypeExp typeExp = CheckUsableType(varDecl->type);
             varDecl->type = typeExp;
-            if (varDecl->type.equals(getSession()->getVoidType()))
+            if (varDecl->type.equals(m_astBuilder->getVoidType()))
             {
                 getSink()->diagnose(varDecl, Diagnostics::invalidTypeVoid);
             }
@@ -921,7 +921,7 @@ namespace Slang
         {
             if (auto declRefType = as<DeclRefType>(sharedTypeExpr->base))
             {
-                declRefType->declRef.substitutions = createDefaultSubstitutions(getSession(), declRefType->declRef.getDecl());
+                declRefType->declRef.substitutions = createDefaultSubstitutions(m_astBuilder, declRefType->declRef.getDecl());
 
                 if (auto typetype = as<TypeType>(typeExp.exp->type))
                     typetype->type = declRefType;
@@ -1041,13 +1041,15 @@ namespace Slang
         ///
     static void _registerBuiltinDeclsRec(Session* session, Decl* decl)
     {
+        SharedASTBuilder* sharedASTBuilder = session->m_sharedASTBuilder;
+
         if (auto builtinMod = decl->findModifier<BuiltinTypeModifier>())
         {
-            registerBuiltinDecl(session, decl, builtinMod);
+            sharedASTBuilder->registerBuiltinDecl(decl, builtinMod);
         }
         if (auto magicMod = decl->findModifier<MagicTypeModifier>())
         {
-            registerMagicDecl(session, decl, magicMod);
+            sharedASTBuilder->registerMagicDecl(decl, magicMod);
         }
 
         if(auto containerDecl = as<ContainerDecl>(decl))
@@ -1283,7 +1285,7 @@ namespace Slang
         for (auto requiredConstraintDeclRef : getMembersOfType<TypeConstraintDecl>(requiredAssociatedTypeDeclRef))
         {
             // Grab the type we expect to conform to from the constraint.
-            auto requiredSuperType = GetSup(requiredConstraintDeclRef);
+            auto requiredSuperType = GetSup(m_astBuilder, requiredConstraintDeclRef);
 
             // Perform a search for a witness to the subtype relationship.
             auto witness = tryGetSubtypeWitness(satisfyingType, requiredSuperType);
@@ -1397,7 +1399,7 @@ namespace Slang
             {
                 ensureDecl(subAggTypeDeclRef, DeclCheckState::CanUseAsType);
 
-                auto satisfyingType = DeclRefType::Create(getSession(), subAggTypeDeclRef);
+                auto satisfyingType = DeclRefType::create(m_astBuilder, subAggTypeDeclRef);
                 return doesTypeSatisfyAssociatedTypeRequirement(satisfyingType, requiredTypeDeclRef, witnessTable);
             }
         }
@@ -1409,7 +1411,7 @@ namespace Slang
             {
                 ensureDecl(typedefDeclRef, DeclCheckState::CanUseAsType);
 
-                auto satisfyingType = getNamedType(getSession(), typedefDeclRef);
+                auto satisfyingType = getNamedType(m_astBuilder, typedefDeclRef);
                 return doesTypeSatisfyAssociatedTypeRequirement(satisfyingType, requiredTypeDeclRef, witnessTable);
             }
         }
@@ -1461,7 +1463,7 @@ namespace Slang
                 context,
                 type,
                 requiredInheritanceDeclRef.getDecl(),
-                getBaseType(requiredInheritanceDeclRef));
+                getBaseType(m_astBuilder, requiredInheritanceDeclRef));
 
             if(!satisfyingWitnessTable)
                 return false;
@@ -1503,7 +1505,7 @@ namespace Slang
         // on subsequent checking in this function to
         // rule out inherited abstract members.
         //
-        auto lookupResult = lookUpMember(getSession(), this, name, type);
+        auto lookupResult = lookUpMember(m_astBuilder, this, name, type);
 
         // Iterate over the members and look for one that matches
         // the expected signature for the requirement.
@@ -1607,9 +1609,7 @@ namespace Slang
             //
             // TODO: need to decide if a this-type substitution is needed here.
             // It probably it.
-            RefPtr<Type> targetType = DeclRefType::Create(
-                getSession(),
-                interfaceDeclRef);
+            RefPtr<Type> targetType = DeclRefType::create(m_astBuilder, interfaceDeclRef);
             auto extDeclRef = ApplyExtensionToType(candidateExt, targetType);
             if(!extDeclRef)
                 continue;
@@ -1713,8 +1713,8 @@ namespace Slang
 
     void SemanticsVisitor::checkExtensionConformance(ExtensionDecl* decl)
     {
-        auto declRef = createDefaultSubstitutionsIfNeeded(getSession(), makeDeclRef(decl)).as<ExtensionDecl>();
-        auto targetType = GetTargetType(declRef);
+        auto declRef = createDefaultSubstitutionsIfNeeded(m_astBuilder, makeDeclRef(decl)).as<ExtensionDecl>();
+        auto targetType = GetTargetType(m_astBuilder, declRef);
 
         for (auto inheritanceDecl : decl->getMembersOfType<InheritanceDecl>())
         {
@@ -1744,8 +1744,10 @@ namespace Slang
             // For non-interface types we need to check conformance.
             //
 
-            auto declRef = createDefaultSubstitutionsIfNeeded(getSession(), makeDeclRef(decl)).as<AggTypeDeclBase>();
-            auto type = DeclRefType::Create(getSession(), declRef);
+            auto astBuilder = getASTBuilder();
+
+            auto declRef = createDefaultSubstitutionsIfNeeded(astBuilder, makeDeclRef(decl)).as<AggTypeDeclBase>();
+            auto type = DeclRefType::create(astBuilder, declRef);
 
             // TODO: Need to figure out what this should do for
             // `abstract` types if we ever add them. Should they
@@ -1845,7 +1847,7 @@ namespace Slang
         // type of their tag.
         if(!tagType)
         {
-            tagType = getSession()->getIntType();
+            tagType = m_astBuilder->getIntType();
         }
         else
         {
@@ -1867,12 +1869,12 @@ namespace Slang
         // seems like the best place to do it.
         {
             // First, look up the type of the `__EnumType` interface.
-            RefPtr<Type> enumTypeType = getSession()->getEnumTypeType();
+            RefPtr<Type> enumTypeType = getASTBuilder()->getEnumTypeType();
 
-            RefPtr<InheritanceDecl> enumConformanceDecl = new InheritanceDecl();
+            RefPtr<InheritanceDecl> enumConformanceDecl = m_astBuilder->create<InheritanceDecl>();
             enumConformanceDecl->parentDecl = decl;
             enumConformanceDecl->loc = decl->loc;
-            enumConformanceDecl->base.type = getSession()->getEnumTypeType();
+            enumConformanceDecl->base.type = getASTBuilder()->getEnumTypeType();
             decl->members.add(enumConformanceDecl);
 
             // The `__EnumType` interface has one required member, the `__Tag` type.
@@ -1921,9 +1923,7 @@ namespace Slang
 
     void SemanticsDeclBodyVisitor::visitEnumDecl(EnumDecl* decl)
     {
-        auto enumType = DeclRefType::Create(
-            getSession(),
-            makeDeclRef(decl));
+        auto enumType = DeclRefType::create(m_astBuilder, makeDeclRef(decl));
 
         auto tagType = decl->tagType;
 
@@ -1979,7 +1979,7 @@ namespace Slang
             {
                 // This tag has no initializer, so it should use
                 // the default tag value we are tracking.
-                RefPtr<IntegerLiteralExpr> tagValExpr = new IntegerLiteralExpr();
+                RefPtr<IntegerLiteralExpr> tagValExpr = m_astBuilder->create<IntegerLiteralExpr>();
                 tagValExpr->loc = caseDecl->loc;
                 tagValExpr->type = QualType(tagType);
                 tagValExpr->value = defaultTag;
@@ -2297,12 +2297,12 @@ namespace Slang
             // and `sup` types are pairwise equivalent.
             //
             auto leftSub = leftConstraint->sub;
-            auto rightSub = GetSub(rightConstraint);
+            auto rightSub = GetSub(m_astBuilder, rightConstraint);
             if(!leftSub->equals(rightSub))
                 return false;
 
             auto leftSup = leftConstraint->sup;
-            auto rightSup = GetSup(rightConstraint);
+            auto rightSup = GetSup(m_astBuilder, rightConstraint);
             if(!leftSup->equals(rightSup))
                 return false;
         }
@@ -2336,7 +2336,7 @@ namespace Slang
             auto sndParam = sndParams[ii];
 
             // If a given parameter type doesn't match, then signatures don't match
-            if (!GetType(fstParam)->equals(GetType(sndParam)))
+            if (!GetType(m_astBuilder, fstParam)->equals(GetType(m_astBuilder, sndParam)))
                 return false;
 
             // If one parameter is `out` and the other isn't, then they don't match
@@ -2361,7 +2361,7 @@ namespace Slang
     RefPtr<GenericSubstitution> SemanticsVisitor::createDummySubstitutions(
         GenericDecl* genericDecl)
     {
-        RefPtr<GenericSubstitution> subst = new GenericSubstitution();
+        RefPtr<GenericSubstitution> subst = m_astBuilder->create<GenericSubstitution>();
         subst->genericDecl = genericDecl;
         for (auto dd : genericDecl->members)
         {
@@ -2370,13 +2370,12 @@ namespace Slang
 
             if (auto typeParam = as<GenericTypeParamDecl>(dd))
             {
-                auto type = DeclRefType::Create(getSession(),
-                    makeDeclRef(typeParam));
+                auto type = DeclRefType::create(m_astBuilder, makeDeclRef(typeParam));
                 subst->args.add(type);
             }
             else if (auto valueParam = as<GenericValueParamDecl>(dd))
             {
-                auto val = new GenericParamIntVal(
+                auto val = m_astBuilder->create<GenericParamIntVal>(
                     makeDeclRef(valueParam));
                 subst->args.add(val);
             }
@@ -2544,8 +2543,8 @@ namespace Slang
         // consider result types earlier, as part of the signature
         // matching step.
         //
-        auto resultType = GetResultType(newDeclRef);
-        auto prevResultType = GetResultType(oldDeclRef);
+        auto resultType = GetResultType(m_astBuilder, newDeclRef);
+        auto prevResultType = GetResultType(m_astBuilder, oldDeclRef);
         if (!resultType->equals(prevResultType))
         {
             // Bad redeclaration
@@ -2779,7 +2778,7 @@ namespace Slang
         }
         else
         {
-            resultType = TypeExp(getSession()->getVoidType());
+            resultType = TypeExp(m_astBuilder->getVoidType());
         }
         funcDecl->returnType = resultType;
 
@@ -2823,6 +2822,7 @@ namespace Slang
         // Create a new array type based on the size we found,
         // and install it into our type.
         varDecl->type.type = getArrayType(
+            m_astBuilder,
             arrayType->baseType,
             elementCount);
     }
@@ -2879,8 +2879,7 @@ namespace Slang
             // conform to the interface and fill in its
             // requirements.
             //
-            RefPtr<ThisType> thisType = new ThisType();
-            thisType->setSession(getSession());
+            RefPtr<ThisType> thisType = m_astBuilder->create<ThisType>();
             thisType->interfaceDeclRef = interfaceDeclRef;
             return thisType;
         }
@@ -2895,9 +2894,7 @@ namespace Slang
             // would need to refer to the eventual concrete
             // type, much like the `interface` case above.
             //
-            return DeclRefType::Create(
-                getSession(),
-                aggTypeDeclRef);
+            return DeclRefType::create(m_astBuilder, aggTypeDeclRef);
         }
         else if (auto extDeclRef = declRef.as<ExtensionDecl>())
         {
@@ -2922,7 +2919,7 @@ namespace Slang
             // sooner or later.
             //
             ensureDecl(extDeclRef, DeclCheckState::CanUseExtensionTargetType);
-            auto targetType = GetTargetType(extDeclRef);
+            auto targetType = GetTargetType(m_astBuilder, extDeclRef);
             return calcThisType(targetType);
         }
         else
@@ -2964,7 +2961,7 @@ namespace Slang
         if( !thisType )
         {
             getSink()->diagnose(decl, Diagnostics::initializerNotInsideType);
-            thisType = getSession()->getErrorType();
+            thisType = m_astBuilder->getErrorType();
         }
         return thisType;
     }
@@ -2997,7 +2994,7 @@ namespace Slang
 
         if(!anyAccessors)
         {
-            RefPtr<GetterDecl> getterDecl = new GetterDecl();
+            RefPtr<GetterDecl> getterDecl = m_astBuilder->create<GetterDecl>();
             getterDecl->loc = decl->loc;
 
             getterDecl->parentDecl = decl;
@@ -3067,7 +3064,7 @@ namespace Slang
         }
 
         // Now extract the target type from our (possibly specialized) extension decl-ref.
-        RefPtr<Type> targetType = GetTargetType(extDeclRef);
+        RefPtr<Type> targetType = GetTargetType(m_astBuilder, extDeclRef);
 
         // As a bit of a kludge here, if the target type of the extension is
         // an interface, and the `type` we are trying to match up has a this-type
@@ -3098,12 +3095,12 @@ namespace Slang
                                     SLANG_ASSERT(!targetInterfaceDeclRef.substitutions.substitutions.as<ThisTypeSubstitution>());
 
                                     // We will create a new substitution to apply to the target type.
-                                    RefPtr<ThisTypeSubstitution> newTargetSubst = new ThisTypeSubstitution();
+                                    RefPtr<ThisTypeSubstitution> newTargetSubst = m_astBuilder->create<ThisTypeSubstitution>();
                                     newTargetSubst->interfaceDecl = appThisTypeSubst->interfaceDecl;
                                     newTargetSubst->witness = appThisTypeSubst->witness;
                                     newTargetSubst->outer = targetInterfaceDeclRef.substitutions.substitutions;
 
-                                    targetType = DeclRefType::Create(getSession(),
+                                    targetType = DeclRefType::create(m_astBuilder,
                                         DeclRef<InterfaceDecl>(targetInterfaceDeclRef.getDecl(), newTargetSubst));
 
                                     // Note: we are constructing a this-type substitution that
@@ -3113,7 +3110,7 @@ namespace Slang
                                     // references to the target type of the extension
                                     // declaration have a chance to resolve the way we want them to.
 
-                                    RefPtr<ThisTypeSubstitution> newExtSubst = new ThisTypeSubstitution();
+                                    RefPtr<ThisTypeSubstitution> newExtSubst = m_astBuilder->create<ThisTypeSubstitution>();
                                     newExtSubst->interfaceDecl = appThisTypeSubst->interfaceDecl;
                                     newExtSubst->witness = appThisTypeSubst->witness;
                                     newExtSubst->outer = extDeclRef.substitutions.substitutions;
@@ -3155,7 +3152,7 @@ namespace Slang
     {
         RefPtr<Type> typeResult;
         return getTypeForDeclRef(
-            getSession(),
+            m_astBuilder,
             this,
             getSink(),
             declRef,
