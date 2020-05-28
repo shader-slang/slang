@@ -279,17 +279,6 @@ Index getFilterCountImpl(const ReflectClassInfo& clsInfo, MemberFilterStyle filt
         return et->canonicalType;
     }
 
-    SyntaxClass<RefObject> Session::findSyntaxClass(Name* name)
-    {
-        SyntaxClass<RefObject> syntaxClass;
-        if (mapNameToSyntaxClass.TryGetValue(name, syntaxClass))
-            return syntaxClass;
-
-        return SyntaxClass<RefObject>();
-    }
-
-
-
     bool ArrayExpressionType::equalsImpl(Type* type)
     {
         auto arrType = as<ArrayExpressionType>(type);
@@ -832,10 +821,7 @@ Index getFilterCountImpl(const ReflectClassInfo& clsInfo, MemberFilterStyle filt
 
             else
             {
-                Session* session = astBuilder->getGlobalSession();
-
-                auto classInfo = session->findSyntaxClass(
-                    session->getNamePool()->getName(magicMod->name));
+                auto classInfo = astBuilder->findSyntaxClass(magicMod->name.getUnownedSlice());
                 if (!classInfo.classInfo)
                 {
                     SLANG_UNEXPECTED("unhandled type");

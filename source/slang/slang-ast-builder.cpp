@@ -8,8 +8,15 @@ namespace Slang {
 
 // !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! SharedASTBuilder !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 
+SharedASTBuilder::SharedASTBuilder()
+{    
+}
+
+
 void SharedASTBuilder::init(Session* session)
 {
+    m_namePool = session->getNamePool();
+
     // Save the associated session
     m_session = session;
 
@@ -25,8 +32,52 @@ void SharedASTBuilder::init(Session* session)
     m_overloadedType = m_astBuilder->create<OverloadGroupType>();
 
     m_astBuilder = astBuilder.detach();
+
+    // We can just iterate over the class pointers.
+    // NOTE! That this adds the names of the abstract classes too(!)
+    for (Index i = 0; i < Index(ASTNodeType::CountOf); ++i)
+    {
+        const ReflectClassInfo* info = ReflectClassInfo::getInfo(ASTNodeType(i));
+        if (info)
+        {
+            m_sliceToTypeMap.Add(UnownedStringSlice(info->m_name), info);
+            Name* name = m_namePool->getName(String(info->m_name));
+            m_nameToTypeMap.Add(name, info);
+        }
+    }
 }
 
+const ReflectClassInfo* SharedASTBuilder::findClassInfo(const UnownedStringSlice& slice)
+{
+    const ReflectClassInfo* typeInfo;
+    return m_sliceToTypeMap.TryGetValue(slice, typeInfo) ? typeInfo : nullptr;
+}
+
+SyntaxClass<RefObject> SharedASTBuilder::findSyntaxClass(const UnownedStringSlice& slice)
+{
+    const ReflectClassInfo* typeInfo;
+    if (m_sliceToTypeMap.TryGetValue(slice, typeInfo))
+    {
+        return SyntaxClass<RefObject>(typeInfo);
+    }
+    return SyntaxClass<RefObject>();
+}
+
+const ReflectClassInfo* SharedASTBuilder::findClassInfo(Name* name)
+{
+    const ReflectClassInfo* typeInfo;
+    return m_nameToTypeMap.TryGetValue(name, typeInfo) ? typeInfo : nullptr;
+}
+
+SyntaxClass<RefObject> SharedASTBuilder::findSyntaxClass(Name* name)
+{
+    const ReflectClassInfo* typeInfo;
+    if (m_nameToTypeMap.TryGetValue(name, typeInfo))
+    {
+        return SyntaxClass<RefObject>(typeInfo);
+    }
+    return SyntaxClass<RefObject>();
+}
 
 Type* SharedASTBuilder::getStringType()
 {
@@ -169,28 +220,6 @@ RefPtr<TypeType> ASTBuilder::getTypeType(Type* type)
 {
     return create<TypeType>(type);
 }
-
-SyntaxNodeBase* ASTBuilder::createInstanceOfSyntaxClassByName(const String& name)
-{
-    if (0) {}
-#define CASE(NAME) \
-        else if(name == #NAME) return create<NAME>()
-
-    CASE(GLSLBufferModifier);
-    CASE(GLSLWriteOnlyModifier);
-    CASE(GLSLReadOnlyModifier);
-    CASE(GLSLPatchModifier);
-    CASE(SimpleModifier);
-
-#undef CASE
-        else
-    {
-        SLANG_UNEXPECTED("unhandled syntax class name");
-        UNREACHABLE_RETURN(nullptr);
-    }
-}
-
-
 
 
 } // namespace Slang

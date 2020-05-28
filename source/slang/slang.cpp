@@ -118,29 +118,17 @@ void Session::init()
     // Set all the shared library function pointers to nullptr
     ::memset(m_sharedLibraryFunctions, 0, sizeof(m_sharedLibraryFunctions));
 
-    
-    // Initialize the lookup table of syntax classes:
-
-    // We can just iterate over the class pointers.
-    // NOTE! That this adds the names of the abstract classes too(!)
-    {
-        for (Index i = 0; i < Index(ASTNodeType::CountOf); ++i)
-        {
-            const ReflectClassInfo* info = ReflectClassInfo::getInfo(ASTNodeType(i));
-            if (info)
-            {
-                mapNameToSyntaxClass.Add(getNamePool()->getName(info->m_name), SyntaxClass<Slang::RefObject>(info));
-            }
-        }
-    }
-
-    // Make sure our source manager is initialized
-    builtinSourceManager.initialize(nullptr, nullptr);
-
+    // Set up shared AST builder
     m_sharedASTBuilder = new SharedASTBuilder;
     m_sharedASTBuilder->init(this);
 
+    //  Use to create a ASTBuilder
     RefPtr<ASTBuilder> builtinAstBuilder(new ASTBuilder(m_sharedASTBuilder));
+    
+    // Make sure our source manager is initialized
+    builtinSourceManager.initialize(nullptr, nullptr);
+
+    
     m_builtinLinkage = new Linkage(this, builtinAstBuilder);
 
     // Because the `Session` retains the builtin `Linkage`,

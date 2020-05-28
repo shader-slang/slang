@@ -2863,8 +2863,7 @@ namespace Slang
             // User is specifying the class that should be construted
             auto classNameAndLoc = expectIdentifier(parser);
 
-            auto session = parser->astBuilder->getGlobalSession();
-            syntaxClass = session->findSyntaxClass(classNameAndLoc.name);
+            syntaxClass = parser->astBuilder->findSyntaxClass(classNameAndLoc.name);
         }
 
         // If the user specified a syntax class, then we will default
@@ -3003,9 +3002,7 @@ namespace Slang
             // User is specifying the class that should be construted
             auto classNameAndLoc = expectIdentifier(parser);
 
-            auto session = parser->astBuilder->getGlobalSession();
-
-            syntaxClass = session->findSyntaxClass(classNameAndLoc.name);
+            syntaxClass = parser->astBuilder->findSyntaxClass(classNameAndLoc.name);
         }
         else
         {
@@ -5225,9 +5222,7 @@ namespace Slang
         auto syntaxClassNameAndLoc = expectIdentifier(parser);
         expect(parser, TokenType::RParent);
 
-        Session* session = parser->astBuilder->getGlobalSession();
-
-        auto syntaxClass = session->findSyntaxClass(syntaxClassNameAndLoc.name);
+        auto syntaxClass = parser->astBuilder->findSyntaxClass(syntaxClassNameAndLoc.name);
 
         RefPtr<AttributeTargetModifier> modifier = parser->astBuilder->create<AttributeTargetModifier>();
         modifier->syntaxClass = syntaxClass;

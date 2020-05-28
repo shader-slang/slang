@@ -2064,10 +2064,7 @@ namespace Slang
         String getCoreLibraryCode();
         String getHLSLLibraryCode();
 
-        SyntaxClass<RefObject> findSyntaxClass(Name* name);
-
-        Dictionary<Name*, SyntaxClass<RefObject> > mapNameToSyntaxClass;
-
+        
         RefPtr<SharedASTBuilder> m_sharedASTBuilder;
 
         // cache used by type checking, implemented in check.cpp

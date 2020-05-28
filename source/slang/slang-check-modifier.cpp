@@ -148,15 +148,13 @@ namespace Slang
         targetModifier->loc = attrUsageAttr->loc;
         addModifier(attrDecl, targetModifier);
 
-        Session* session = m_astBuilder->getGlobalSession();
-
         // Every attribute declaration is associated with the type
         // of syntax nodes it constructs (via reflection/RTTI).
         //
         // User-defined attributes create instances of
         // `UserDefinedAttribute`.
         //        
-        attrDecl->syntaxClass = session->findSyntaxClass(session->getNameObj("UserDefinedAttribute"));
+        attrDecl->syntaxClass = m_astBuilder->findSyntaxClass(UnownedStringSlice::fromLiteral("UserDefinedAttribute"));
 
         // The fields of the user-defined `struct` type become
         // the parameters of the new attribute.
@@ -236,17 +234,17 @@ namespace Slang
     {
         if (typeFlags == (int)UserDefinedAttributeTargets::Struct)
         {
-            cls = getSession()->findSyntaxClass(getSession()->getNameObj("StructDecl"));
+            cls = m_astBuilder->findSyntaxClass(UnownedStringSlice::fromLiteral("StructDecl"));
             return true;
         }
         if (typeFlags == (int)UserDefinedAttributeTargets::Var)
         {
-            cls = getSession()->findSyntaxClass(getSession()->getNameObj("VarDecl"));
+            cls = m_astBuilder->findSyntaxClass(UnownedStringSlice::fromLiteral("VarDecl"));
             return true;
         }
         if (typeFlags == (int)UserDefinedAttributeTargets::Function)
         {
-            cls = getSession()->findSyntaxClass(getSession()->getNameObj("FuncDecl"));
+            cls = m_astBuilder->findSyntaxClass(UnownedStringSlice::fromLiteral("FuncDecl"));
             return true;
         }
         return false;
