@@ -912,6 +912,8 @@ struct LayoutRulesFamilyImpl
 
 struct TypeLayoutContext
 {
+    ASTBuilder* astBuilder;
+
     // The layout rules to use (e.g., we compute
     // layout differently in a `cbuffer` vs. the
     // parameter list of a fragment shader).

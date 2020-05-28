@@ -177,7 +177,6 @@ class CompileTimeForStmt : public ScopeStmt
 class JumpStmt : public ChildStmt 
 {
     SLANG_ABSTRACT_CLASS(JumpStmt)
-
 };
 
 class BreakStmt : public JumpStmt 

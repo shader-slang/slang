@@ -165,9 +165,9 @@ namespace Slang
         //
         // Along the way we will build up a `GenericSubstitution`
         // to represent the arguments that have been coerced to
-        // appropriateforms.
+        // appropriate forms.
         //
-        auto genSubst = new GenericSubstitution();
+        auto genSubst = m_astBuilder->create<GenericSubstitution>();
         candidate.subst = genSubst;
         auto& checkedArgs = genSubst->args;
 
@@ -228,7 +228,7 @@ namespace Slang
                 //
                 if( !typeArg.type )
                 {
-                    typeArg.type = getSession()->getErrorType();
+                    typeArg.type = m_astBuilder->getErrorType();
                     success = false;
                 }
 
@@ -257,7 +257,7 @@ namespace Slang
                     if (context.mode == OverloadResolveContext::Mode::JustTrying)
                     {
                         ConversionCost cost = kConversionCost_None;
-                        if (!canCoerce(GetType(valParamRef), arg->type, &cost))
+                        if (!canCoerce(GetType(m_astBuilder, valParamRef), arg->type, &cost))
                         {
                             success = false;
                         }
@@ -265,7 +265,7 @@ namespace Slang
                     }
                     else
                     {
-                        arg = coerce(GetType(valParamRef), arg);
+                        arg = coerce(GetType(m_astBuilder, valParamRef), arg);
                     }
                 }
 
@@ -288,7 +288,7 @@ namespace Slang
                 //
                 if( !val )
                 {
-                    val = new ErrorIntVal();
+                    val = m_astBuilder->create<ErrorIntVal>();
                 }
                 checkedArgs.add(val);
             }
@@ -343,10 +343,10 @@ namespace Slang
                 if( context.disallowNestedConversions )
                 {
                     // We need an exact match in this case.
-                    if(!GetType(param)->equals(argType))
+                    if(!GetType(m_astBuilder, param)->equals(argType))
                         return false;
                 }
-                else if (!canCoerce(GetType(param), argType, &cost))
+                else if (!canCoerce(GetType(m_astBuilder, param), argType, &cost))
                 {
                     return false;
                 }
@@ -354,7 +354,7 @@ namespace Slang
             }
             else
             {
-                arg = coerce(GetType(param), arg);
+                arg = coerce(GetType(m_astBuilder, param), arg);
             }
         }
         return true;
@@ -396,8 +396,8 @@ namespace Slang
             DeclRef<GenericTypeConstraintDecl> constraintDeclRef(
                 constraintDecl, subset);
 
-            auto sub = GetSub(constraintDeclRef);
-            auto sup = GetSup(constraintDeclRef);
+            auto sub = GetSub(m_astBuilder, constraintDeclRef);
+            auto sup = GetSup(m_astBuilder, constraintDeclRef);
 
             auto subTypeWitness = tryGetSubtypeWitness(sub, sup);
             if(subTypeWitness)
@@ -523,7 +523,7 @@ namespace Slang
                     RefPtr<AppExprBase> callExpr = as<InvokeExpr>(context.originalExpr);
                     if(!callExpr)
                     {
-                        callExpr = new InvokeExpr();
+                        callExpr = m_astBuilder->create<InvokeExpr>();
                         callExpr->loc = context.loc;
 
                         for(Index aa = 0; aa < context.argCount; ++aa)
@@ -940,7 +940,7 @@ namespace Slang
         OverloadCandidate candidate;
         candidate.flavor = OverloadCandidate::Flavor::Func;
         candidate.item = item;
-        candidate.resultType = GetResultType(funcDeclRef);
+        candidate.resultType = GetResultType(m_astBuilder, funcDeclRef);
 
         AddOverloadCandidate(context, candidate);
     }
@@ -1037,7 +1037,7 @@ namespace Slang
                 // So the question is then whether a mismatch during the
                 // unification step should be taken as an immediate failure...
 
-                TryUnifyTypes(constraints, context.getArgType(aa), GetType(params[aa]));
+                TryUnifyTypes(constraints, context.getArgType(aa), GetType(m_astBuilder, params[aa]));
 #endif
             }
         }
@@ -1086,7 +1086,7 @@ namespace Slang
         // some just to make code that does, e.g., `float(1.0f)` work.
 
         LookupResult initializers = lookUpMember(
-            getSession(),
+            m_astBuilder,
             this,
             getName("$init"),
             type);
@@ -1106,9 +1106,7 @@ namespace Slang
         }
         else if (auto aggTypeDeclRef = item.declRef.as<AggTypeDecl>())
         {
-            auto type = DeclRefType::Create(
-                getSession(),
-                aggTypeDeclRef);
+            auto type = DeclRefType::create(m_astBuilder, aggTypeDeclRef);
             AddTypeOverloadCandidates(type, context);
         }
         else if (auto genericDeclRef = item.declRef.as<GenericDecl>())
@@ -1142,14 +1140,12 @@ namespace Slang
         }
         else if( auto typeDefDeclRef = item.declRef.as<TypeDefDecl>() )
         {
-            auto type = getNamedType(getSession(), typeDefDeclRef);
+            auto type = getNamedType(m_astBuilder, typeDefDeclRef);
             AddTypeOverloadCandidates(type, context);
         }
         else if( auto genericTypeParamDeclRef = item.declRef.as<GenericTypeParamDecl>() )
         {
-            auto type = DeclRefType::Create(
-                getSession(),
-                genericTypeParamDeclRef);
+            auto type = DeclRefType::create(m_astBuilder, genericTypeParamDeclRef);
             AddTypeOverloadCandidates(type, context);
         }
         else
@@ -1328,7 +1324,7 @@ namespace Slang
             {
                 if (!first) sb << ", ";
 
-                formatType(sb, GetType(paramDeclRef));
+                formatType(sb, GetType(m_astBuilder, paramDeclRef));
 
                 first = false;
 
@@ -1356,7 +1352,7 @@ namespace Slang
 
                     sb << getText(genericValParam.GetName());
                     sb << ":";
-                    formatType(sb, GetType(genericValParam));
+                    formatType(sb, GetType(m_astBuilder, genericValParam));
                 }
                 else
                 {}
@@ -1395,7 +1391,7 @@ namespace Slang
         else if(auto callableDeclRef = declRef.as<CallableDecl>())
         {
             sb << " -> ";
-            formatType(sb, GetResultType(callableDeclRef));
+            formatType(sb, GetResultType(m_astBuilder, callableDeclRef));
         }
     }
 
@@ -1632,7 +1628,7 @@ namespace Slang
         {
             // Nothing at all was found that we could even consider invoking
             getSink()->diagnose(expr->functionExpr, Diagnostics::expectedFunction, funcExprType);
-            expr->type = QualType(getSession()->getErrorType());
+            expr->type = QualType(m_astBuilder->getErrorType());
             return expr;
         }
     }
@@ -1748,7 +1744,7 @@ namespace Slang
                 // There were multiple viable candidates, but that isn't an error: we just need
                 // to complete all of them and create an overloaded expression as a result.
 
-                auto overloadedExpr = new OverloadedExpr2();
+                auto overloadedExpr = m_astBuilder->create<OverloadedExpr2>();
                 overloadedExpr->base = context.baseExpr;
                 for (auto candidate : context.bestCandidates)
                 {

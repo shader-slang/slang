@@ -27,6 +27,7 @@ namespace Slang
         /// that are imported before code generation can be performed.
         ///
     IRModule* generateIRForTranslationUnit(
+        ASTBuilder*             astBuilder,
         TranslationUnitRequest* translationUnit);
 
         /// Generate an IR module to represent the specializations applied by `componentType`.

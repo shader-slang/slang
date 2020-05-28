@@ -22,7 +22,10 @@ struct ReflectClassInfo;
 class NodeBase : public RefObject
 {
     SLANG_ABSTRACT_CLASS(NodeBase)
-   
+
+        // By default AST types do *not* store the builder. This is called when constructed tho.
+    SLANG_FORCE_INLINE void setASTBuilder(ASTBuilder* astBuilder) { SLANG_UNUSED(astBuilder); }
+
     SyntaxClass<NodeBase> getClass() { return SyntaxClass<NodeBase>(&getClassInfo()); }
 };
 
@@ -78,14 +81,14 @@ class Val : public NodeBase
 
     // construct a new value by applying a set of parameter
     // substitutions to this one
-    RefPtr<Val> substitute(SubstitutionSet subst);
+    RefPtr<Val> substitute(ASTBuilder* astBuilder, SubstitutionSet subst);
 
     // Lower-level interface for substitution. Like the basic
     // `Substitute` above, but also takes a by-reference
     // integer parameter that should be incremented when
     // returning a modified value (this can help the caller
     // decide whether they need to do anything).
-    virtual RefPtr<Val> substituteImpl(SubstitutionSet subst, int* ioDiff);
+    virtual RefPtr<Val> substituteImpl(ASTBuilder* astBuilder, SubstitutionSet subst, int* ioDiff);
 
     virtual bool equalsVal(Val* val) = 0;
     virtual String toString() = 0;
@@ -124,15 +127,20 @@ class Type: public Val
 
     void accept(ITypeVisitor* visitor, void* extra);
 
-public:
-    Session* getSession() { return this->session; }
-    void setSession(Session* s) { this->session = s; }
+        /// Type derived types store the AST builder they were constructed on. The builder calls this function
+        /// after constructing
+    SLANG_FORCE_INLINE void setASTBuilder(ASTBuilder* astBuilder) { m_astBuilder = astBuilder; }
 
+        /// Get the ASTBuilder that was used to construct this Type
+    SLANG_FORCE_INLINE ASTBuilder* getASTBuilder() const { return m_astBuilder; }
+
+    //Session* getSession()  { return this->session; }
+    
     bool equals(Type* type);
     
     Type* getCanonicalType();
 
-    virtual RefPtr<Val> substituteImpl(SubstitutionSet subst, int* ioDiff) override;
+    virtual RefPtr<Val> substituteImpl(ASTBuilder* astBuilder, SubstitutionSet subst, int* ioDiff) override;
 
     virtual bool equalsVal(Val* val) override;
 
@@ -145,7 +153,7 @@ protected:
     Type* canonicalType = nullptr;
 
     SLANG_UNREFLECTED
-    Session* session = nullptr;
+    ASTBuilder* m_astBuilder = nullptr;
 };
 
 template <typename T>
@@ -159,11 +167,14 @@ class Substitutions: public RefObject
 {
     SLANG_ABSTRACT_CLASS(Substitutions)
 
+    // By default AST types do *not* store the builder. This is called when constructed tho.
+    SLANG_FORCE_INLINE void setASTBuilder(ASTBuilder* astBuilder) { SLANG_UNUSED(astBuilder); }
+
     // The next outer that this one refines.
     RefPtr<Substitutions> outer;
 
     // Apply a set of substitutions to the bindings in this substitution
-    virtual RefPtr<Substitutions> applySubstitutionsShallow(SubstitutionSet substSet, RefPtr<Substitutions> substOuter, int* ioDiff) = 0;
+    virtual RefPtr<Substitutions> applySubstitutionsShallow(ASTBuilder* astBuilder, SubstitutionSet substSet, RefPtr<Substitutions> substOuter, int* ioDiff) = 0;
 
     // Check if these are equivalent substitutions to another set
     virtual bool equals(Substitutions* subst) = 0;
@@ -182,7 +193,7 @@ class GenericSubstitution : public Substitutions
     List<RefPtr<Val> > args;
 
     // Apply a set of substitutions to the bindings in this substitution
-    virtual RefPtr<Substitutions> applySubstitutionsShallow(SubstitutionSet substSet, RefPtr<Substitutions> substOuter, int* ioDiff)  override;
+    virtual RefPtr<Substitutions> applySubstitutionsShallow(ASTBuilder* astBuilder, SubstitutionSet substSet, RefPtr<Substitutions> substOuter, int* ioDiff)  override;
 
     // Check if these are equivalent substitutions to another set
     virtual bool equals(Substitutions* subst) override;
@@ -212,7 +223,7 @@ class ThisTypeSubstitution : public Substitutions
 
     // The actual type that provides the lookup scope for an associated type
     // Apply a set of substitutions to the bindings in this substitution
-    virtual RefPtr<Substitutions> applySubstitutionsShallow(SubstitutionSet substSet, RefPtr<Substitutions> substOuter, int* ioDiff)  override;
+    virtual RefPtr<Substitutions> applySubstitutionsShallow(ASTBuilder* astBuilder, SubstitutionSet substSet, RefPtr<Substitutions> substOuter, int* ioDiff)  override;
 
     // Check if these are equivalent substitutions to another set
     virtual bool equals(Substitutions* subst) override;
@@ -239,7 +250,7 @@ class GlobalGenericParamSubstitution : public Substitutions
     List<ConstraintArg> constraintArgs;
 
     // Apply a set of substitutions to the bindings in this substitution
-    virtual RefPtr<Substitutions> applySubstitutionsShallow(SubstitutionSet substSet, RefPtr<Substitutions> substOuter, int* ioDiff)  override;
+    virtual RefPtr<Substitutions> applySubstitutionsShallow(ASTBuilder* astBuilder, SubstitutionSet substSet, RefPtr<Substitutions> substOuter, int* ioDiff)  override;
 
     // Check if these are equivalent substitutions to another set
     virtual bool equals(Substitutions* subst) override;
@@ -360,5 +371,6 @@ class Stmt : public ModifiableSyntaxNode
 
     void accept(IStmtVisitor* visitor, void* extra);
 };
+
 
 } // namespace Slang

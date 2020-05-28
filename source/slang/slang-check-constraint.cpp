@@ -114,7 +114,7 @@ namespace Slang
                     continue;
 
                 // Look up the type in our session.
-                auto candidateType = type->getSession()->getBuiltinType(BaseType(baseTypeFlavorIndex));
+                auto candidateType = type->getASTBuilder()->getBuiltinType(BaseType(baseTypeFlavorIndex));
                 if(!candidateType)
                     continue;
 
@@ -286,7 +286,7 @@ namespace Slang
         // that `X<T>.IndexType == T`.
         for( auto constraintDeclRef : getMembersOfType<GenericTypeConstraintDecl>(genericDeclRef) )
         {
-            if(!TryUnifyTypes(*system, GetSub(constraintDeclRef), GetSup(constraintDeclRef)))
+            if(!TryUnifyTypes(*system, GetSub(m_astBuilder, constraintDeclRef), GetSup(m_astBuilder, constraintDeclRef)))
                 return SubstitutionSet();
         }
         SubstitutionSet resultSubst = genericDeclRef.substitutions;
@@ -391,7 +391,7 @@ namespace Slang
         // search for a conformance `Robin : ISidekick`, which involved
         // apply the substitutions we already know...
 
-        RefPtr<GenericSubstitution> solvedSubst = new GenericSubstitution();
+        RefPtr<GenericSubstitution> solvedSubst = m_astBuilder->create<GenericSubstitution>();
         solvedSubst->genericDecl = genericDeclRef.getDecl();
         solvedSubst->outer = genericDeclRef.substitutions.substitutions;
         solvedSubst->args = args;
@@ -404,8 +404,8 @@ namespace Slang
                 solvedSubst);
 
             // Extract the (substituted) sub- and super-type from the constraint.
-            auto sub = GetSub(constraintDeclRef);
-            auto sup = GetSup(constraintDeclRef);
+            auto sub = GetSub(m_astBuilder, constraintDeclRef);
+            auto sup = GetSup(m_astBuilder, constraintDeclRef);
 
             // Search for a witness that shows the constraint is satisfied.
             auto subTypeWitness = tryGetSubtypeWitness(sub, sup);

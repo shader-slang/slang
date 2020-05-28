@@ -407,6 +407,8 @@ struct ParameterBindingContext
     TargetRequest* getTargetRequest() { return shared->getTargetRequest(); }
     LayoutRulesFamilyImpl* getRulesFamily() { return layoutContext.getRulesFamily(); }
 
+    ASTBuilder* getASTBuilder() { return shared->getLinkage()->getASTBuilder(); }
+
     Linkage* getLinkage() { return shared->getLinkage(); }
 };
 
@@ -700,10 +702,12 @@ static void collectGlobalScopeParameter(
     ShaderParamInfo const&      shaderParamInfo,
     SubstitutionSet             globalGenericSubst)
 {
+    auto astBuilder = context->getASTBuilder();
+
     auto varDeclRef = shaderParamInfo.paramDeclRef;
 
     // We apply any substitutions for global generic parameters here.
-    auto type = GetType(varDeclRef)->substitute(globalGenericSubst).as<Type>();
+    auto type = GetType(astBuilder, varDeclRef)->substitute(astBuilder, globalGenericSubst).as<Type>();
 
     // We use a single operation to both check whether the
     // variable represents a shader parameter, and to compute
@@ -1922,7 +1926,7 @@ static RefPtr<TypeLayout> processEntryPointVaryingParameter(
                 auto fieldTypeLayout = processEntryPointVaryingParameterDecl(
                     context,
                     field.getDecl(),
-                    GetType(field),
+                    GetType(context->getASTBuilder(), field),
                     state,
                     fieldVarLayout);
 
@@ -2039,7 +2043,7 @@ static RefPtr<TypeLayout> computeEntryPointParameterTypeLayout(
     RefPtr<VarLayout>               paramVarLayout,
     EntryPointParameterState&       state)
 {
-    auto paramType = GetType(paramDeclRef);
+    auto paramType = GetType(context->getASTBuilder(), paramDeclRef);
     SLANG_ASSERT(paramType);
 
     if( paramDeclRef.getDecl()->hasModifier<HLSLUniformModifier>() )
@@ -2431,6 +2435,8 @@ static RefPtr<EntryPointLayout> collectEntryPointParameters(
     EntryPoint*                                 entryPoint,
     EntryPoint::EntryPointSpecializationInfo*   specializationInfo)
 {
+    auto astBuilder = context->getASTBuilder();
+
     // We will take responsibility for creating and filling in
     // the `EntryPointLayout` object here.
     //
@@ -2471,7 +2477,7 @@ static RefPtr<EntryPointLayout> collectEntryPointParameters(
     if(specializationInfo)
         entryPointFuncDeclRef = specializationInfo->specializedFuncDeclRef;
 
-    auto entryPointType = DeclRefType::Create(context->getLinkage()->getSessionImpl(), entryPointFuncDeclRef);
+    auto entryPointType = DeclRefType::create(astBuilder, entryPointFuncDeclRef);
 
     entryPointLayout->entryPoint = entryPointFuncDeclRef;
 
@@ -2575,10 +2581,10 @@ static RefPtr<EntryPointLayout> collectEntryPointParameters(
     // TODO: Ideally we should make the layout process more robust to empty/void
     // types and apply this logic unconditionally.
     //
-    auto resultType = GetResultType(entryPointFuncDeclRef);
+    auto resultType = GetResultType(astBuilder, entryPointFuncDeclRef);
     SLANG_ASSERT(resultType);
 
-    if( !resultType->equals(resultType->getSession()->getVoidType()) )
+    if( !resultType->equals(astBuilder->getVoidType()) )
     {
         state.loc = entryPointFuncDeclRef.getLoc();
         state.directionMask = kEntryPointParameterDirection_Output;

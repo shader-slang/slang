@@ -9,13 +9,14 @@ namespace Slang
 {
     // Parse a source file into an existing translation unit
     void parseSourceFile(
+        ASTBuilder*                     astBuilder,
         TranslationUnitRequest*         translationUnit,
         TokenSpan const&                tokens,
         DiagnosticSink*                 sink,
         RefPtr<Scope> const&            outerScope);
 
     RefPtr<Expr> parseTermFromSourceFile(
-        Session*                        session,
+        ASTBuilder*                     astBuilder,
         TokenSpan const&                tokens,
         DiagnosticSink*                 sink,
         RefPtr<Scope> const&            outerScope,
@@ -23,7 +24,7 @@ namespace Slang
         SourceLanguage                  sourceLanguage);
 
     RefPtr<ModuleDecl> populateBaseLanguageModule(
-        Session*        session,
+        ASTBuilder*     astBuilder,
         RefPtr<Scope>   scope);
 }
 

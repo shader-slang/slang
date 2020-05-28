@@ -44,11 +44,13 @@ bool ReflectClassInfo::isSubClassOfSlow(const ThisType& super) const
 // Now try and implement all of the classes
 // Macro generated is of the format
 
-
-template <typename T>
-struct CreateImpl
+struct ASTConstructAccess
 {
-    static void* create() { return new T; }
+    template <typename T>
+    struct CreateImpl
+    {
+        static void* create() { return new T; }
+    };
 };
 
 #define SLANG_GET_SUPER_BASE(SUPER) nullptr
@@ -56,10 +58,10 @@ struct CreateImpl
 #define SLANG_GET_SUPER_LEAF(SUPER) &SUPER::kReflectClassInfo
 
 #define SLANG_GET_CREATE_FUNC_ABSTRACT(NAME) nullptr
-#define SLANG_GET_CREATE_FUNC_NONE(NAME) &CreateImpl<NAME>::create
+#define SLANG_GET_CREATE_FUNC_NONE(NAME) &ASTConstructAccess::CreateImpl<NAME>::create
 
 #define SLANG_GET_CREATE_FUNC_NON_VISITOR_ABSTRACT(NAME) nullptr
-#define SLANG_GET_CREATE_FUNC_NON_VISITOR(NAME) &CreateImpl<NAME>::create
+#define SLANG_GET_CREATE_FUNC_NON_VISITOR(NAME) &ASTConstructAccess::CreateImpl<NAME>::create
 
 
 #define SLANG_REFLECT_CLASS_INFO(NAME, SUPER, ORIGIN, LAST, MARKER, TYPE, param) \
