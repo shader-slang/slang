@@ -8,12 +8,12 @@ namespace Slang
 
     inline RefPtr<Type> GetSub(ASTBuilder* astBuilder, DeclRef<GenericTypeConstraintDecl> const& declRef)
     {
-        return declRef.Substitute(astBuilder, declRef.getDecl()->sub.Ptr());
+        return declRef.substitute(astBuilder, declRef.getDecl()->sub.Ptr());
     }
 
     inline RefPtr<Type> GetSup(ASTBuilder* astBuilder, DeclRef<TypeConstraintDecl> const& declRef)
     {
-        return declRef.Substitute(astBuilder, declRef.getDecl()->getSup().type);
+        return declRef.substitute(astBuilder, declRef.getDecl()->getSup().type);
     }
 
 
@@ -97,27 +97,27 @@ namespace Slang
 
     inline RefPtr<Type> GetType(ASTBuilder* astBuilder, DeclRef<VarDeclBase> const& declRef)
     {
-        return declRef.Substitute(astBuilder, declRef.getDecl()->type.Ptr());
+        return declRef.substitute(astBuilder, declRef.getDecl()->type.Ptr());
     }
 
     inline RefPtr<Expr> getInitExpr(ASTBuilder* astBuilder, DeclRef<VarDeclBase> const& declRef)
     {
-        return declRef.Substitute(astBuilder, declRef.getDecl()->initExpr);
+        return declRef.substitute(astBuilder, declRef.getDecl()->initExpr);
     }
 
     inline RefPtr<Type> getType(ASTBuilder* astBuilder, DeclRef<EnumCaseDecl> const& declRef)
     {
-        return declRef.Substitute(astBuilder, declRef.getDecl()->type.Ptr());
+        return declRef.substitute(astBuilder, declRef.getDecl()->type.Ptr());
     }
 
     inline RefPtr<Expr> getTagExpr(ASTBuilder* astBuilder, DeclRef<EnumCaseDecl> const& declRef)
     {
-        return declRef.Substitute(astBuilder, declRef.getDecl()->tagExpr);
+        return declRef.substitute(astBuilder, declRef.getDecl()->tagExpr);
     }
 
     inline RefPtr<Type> GetTargetType(ASTBuilder* astBuilder, DeclRef<ExtensionDecl> const& declRef)
     {
-        return declRef.Substitute(astBuilder, declRef.getDecl()->targetType.Ptr());
+        return declRef.substitute(astBuilder, declRef.getDecl()->targetType.Ptr());
     }
     
     inline FilteredMemberRefList<VarDecl> GetFields(DeclRef<StructDecl> const& declRef, MemberFilterStyle filterStyle)
@@ -129,17 +129,17 @@ namespace Slang
 
     inline RefPtr<Type> getBaseType(ASTBuilder* astBuilder, DeclRef<InheritanceDecl> const& declRef)
     {
-        return declRef.Substitute(astBuilder, declRef.getDecl()->base.type);
+        return declRef.substitute(astBuilder, declRef.getDecl()->base.type);
     }
     
     inline RefPtr<Type> GetType(ASTBuilder* astBuilder, DeclRef<TypeDefDecl> const& declRef)
     {
-        return declRef.Substitute(astBuilder, declRef.getDecl()->type.Ptr());
+        return declRef.substitute(astBuilder, declRef.getDecl()->type.Ptr());
     }
 
     inline RefPtr<Type> GetResultType(ASTBuilder* astBuilder, DeclRef<CallableDecl> const& declRef)
     {
-        return declRef.Substitute(astBuilder, declRef.getDecl()->returnType.type.Ptr());
+        return declRef.substitute(astBuilder, declRef.getDecl()->returnType.type.Ptr());
     }
 
     inline FilteredMemberRefList<ParamDecl> GetParameters(DeclRef<CallableDecl> const& declRef)

@@ -402,7 +402,7 @@ Index getFilterCountImpl(const ReflectClassInfo& clsInfo, MemberFilterStyle filt
             {
                 int diff = 0;
                 return RequirementWitness(
-                    getDeclRef().SubstituteImpl(astBuilder, subst, &diff));
+                    getDeclRef().substituteImpl(astBuilder, subst, &diff));
             }
 
         case RequirementWitness::Flavor::val:
@@ -550,7 +550,7 @@ Index getFilterCountImpl(const ReflectClassInfo& clsInfo, MemberFilterStyle filt
             }
         }
         int diff = 0;
-        DeclRef<Decl> substDeclRef = declRef.SubstituteImpl(astBuilder, subst, &diff);
+        DeclRef<Decl> substDeclRef = declRef.substituteImpl(astBuilder, subst, &diff);
 
         if (!diff)
             return this;
@@ -689,7 +689,7 @@ Index getFilterCountImpl(const ReflectClassInfo& clsInfo, MemberFilterStyle filt
             return declRef;
 
         int diff = 0;
-        return declRef.SubstituteImpl(astBuilder, substsToApply, &diff);
+        return declRef.substituteImpl(astBuilder, substsToApply, &diff);
     }
 
     // TODO: need to figure out how to unify this with the logic
@@ -1343,7 +1343,7 @@ Index getFilterCountImpl(const ReflectClassInfo& clsInfo, MemberFilterStyle filt
         if (!diff) return this;
 
         (*ioDiff)++;
-        auto substSubst = new GenericSubstitution();
+        auto substSubst = astBuilder->create<GenericSubstitution>();
         substSubst->genericDecl = genericDecl;
         substSubst->args = substArgs;
         substSubst->outer = substOuter;
@@ -1491,7 +1491,7 @@ Index getFilterCountImpl(const ReflectClassInfo& clsInfo, MemberFilterStyle filt
 
     // DeclRefBase
 
-    RefPtr<Type> DeclRefBase::Substitute(ASTBuilder* astBuilder, RefPtr<Type> type) const
+    RefPtr<Type> DeclRefBase::substitute(ASTBuilder* astBuilder, RefPtr<Type> type) const
     {
         // Note that type can be nullptr, and so this function can return nullptr (although only correctly when no substitutions) 
 
@@ -1506,16 +1506,16 @@ Index getFilterCountImpl(const ReflectClassInfo& clsInfo, MemberFilterStyle filt
         return type->substitute(astBuilder, substitutions).as<Type>();
     }
 
-    DeclRefBase DeclRefBase::Substitute(ASTBuilder* astBuilder, DeclRefBase declRef) const
+    DeclRefBase DeclRefBase::substitute(ASTBuilder* astBuilder, DeclRefBase declRef) const
     {
         if(!substitutions)
             return declRef;
 
         int diff = 0;
-        return declRef.SubstituteImpl(astBuilder, substitutions, &diff);
+        return declRef.substituteImpl(astBuilder, substitutions, &diff);
     }
 
-    RefPtr<Expr> DeclRefBase::Substitute(ASTBuilder* /* astBuilder*/, RefPtr<Expr> expr) const
+    RefPtr<Expr> DeclRefBase::substitute(ASTBuilder* /* astBuilder*/, RefPtr<Expr> expr) const
     {
         // No substitutions? Easy.
         if (!substitutions)
@@ -1856,7 +1856,7 @@ Index getFilterCountImpl(const ReflectClassInfo& clsInfo, MemberFilterStyle filt
             ioDiff);
     }
 
-    DeclRefBase DeclRefBase::SubstituteImpl(ASTBuilder* astBuilder, SubstitutionSet substSet, int* ioDiff)
+    DeclRefBase DeclRefBase::substituteImpl(ASTBuilder* astBuilder, SubstitutionSet substSet, int* ioDiff)
     {
         // Nothing to do when we have no declaration.
         if(!decl)
@@ -2239,7 +2239,7 @@ Index getFilterCountImpl(const ReflectClassInfo& clsInfo, MemberFilterStyle filt
         int diff = 0;
         auto substSub = sub->substituteImpl(astBuilder, subst, &diff).as<Type>();
         auto substSup = sup->substituteImpl(astBuilder, subst, &diff).as<Type>();
-        auto substDeclRef = declRef.SubstituteImpl(astBuilder, subst, &diff);
+        auto substDeclRef = declRef.substituteImpl(astBuilder, subst, &diff);
         if (!diff)
             return this;
 
@@ -2335,7 +2335,7 @@ Index getFilterCountImpl(const ReflectClassInfo& clsInfo, MemberFilterStyle filt
         RefPtr<Type> substSub = sub->substituteImpl(astBuilder, subst, &diff).as<Type>();
         RefPtr<Type> substSup = sup->substituteImpl(astBuilder, subst, &diff).as<Type>();
         RefPtr<SubtypeWitness> substSubToMid = subToMid->substituteImpl(astBuilder, subst, &diff).as<SubtypeWitness>();
-        DeclRef<Decl> substMidToSup = midToSup.SubstituteImpl(astBuilder, subst, &diff);
+        DeclRef<Decl> substMidToSup = midToSup.substituteImpl(astBuilder, subst, &diff);
 
         // If nothing changed, then we can bail out early.
         if (!diff)
@@ -2458,7 +2458,7 @@ Index getFilterCountImpl(const ReflectClassInfo& clsInfo, MemberFilterStyle filt
     RefPtr<Val> ExtractExistentialType::substituteImpl(ASTBuilder* astBuilder, SubstitutionSet subst, int* ioDiff)
     {
         int diff = 0;
-        auto substDeclRef = declRef.SubstituteImpl(astBuilder, subst, &diff);
+        auto substDeclRef = declRef.substituteImpl(astBuilder, subst, &diff);
         if(!diff)
             return this;
 
@@ -2498,7 +2498,7 @@ Index getFilterCountImpl(const ReflectClassInfo& clsInfo, MemberFilterStyle filt
     {
         int diff = 0;
 
-        auto substDeclRef = declRef.SubstituteImpl(astBuilder, subst, &diff);
+        auto substDeclRef = declRef.substituteImpl(astBuilder, subst, &diff);
         auto substSub = sub->substituteImpl(astBuilder, subst, &diff).as<Type>();
         auto substSup = sup->substituteImpl(astBuilder, subst, &diff).as<Type>();
 
@@ -2874,7 +2874,7 @@ RefPtr<Val> ThisType::substituteImpl(ASTBuilder* astBuilder, SubstitutionSet sub
 {
     int diff = 0;
 
-    auto substInterfaceDeclRef = interfaceDeclRef.SubstituteImpl(astBuilder, subst, &diff);
+    auto substInterfaceDeclRef = interfaceDeclRef.substituteImpl(astBuilder, subst, &diff);
 
     auto thisTypeSubst = findThisTypeSubstitution(subst.substitutions, substInterfaceDeclRef.getDecl());
     if( thisTypeSubst )
