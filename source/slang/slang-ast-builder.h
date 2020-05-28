@@ -5,6 +5,8 @@
 #include "slang-ast-support-types.h"
 #include "slang-ast-all.h"
 
+#include "../core/slang-type-traits.h"
+
 namespace Slang
 {
 
@@ -55,14 +57,25 @@ class ASTBuilder : public RefObject
 {
     friend class SharedASTBuilder;
 public:
+
+    // For compile time check to see if thing being constructed is an AST type
     template <typename T>
-    T* create() { T* node = new T; node->setASTBuilder(this); return node; }
+    struct IsValidType
+    {
+        enum
+        {
+            Value = IsBaseOf<NodeBase, T>::Value || IsBaseOf<Substitutions, T>::Value
+        };
+    };
+
+    template <typename T>
+    T* create() { SLANG_COMPILE_TIME_ASSERT(IsValidType<T>::Value);  T* node = new T; node->setASTBuilder(this); return node; }
 
     template<typename T, typename P0>
-    T* create(const P0& p0) { T* node = new T(p0); node->setASTBuilder(this); return node;}
+    T* create(const P0& p0) { SLANG_COMPILE_TIME_ASSERT(IsValidType<T>::Value); T* node = new T(p0); node->setASTBuilder(this); return node;}
 
     template<typename T, typename P0, typename P1>
-    T* create(const P0& p0, const P1& p1) { T* node = new T(p0, p1); node->setASTBuilder(this); return node; }
+    T* create(const P0& p0, const P1& p1) { SLANG_COMPILE_TIME_ASSERT(IsValidType<T>::Value); T* node = new T(p0, p1); node->setASTBuilder(this); return node; }
 
     SLANG_FORCE_INLINE Type* getBoolType() { return m_sharedASTBuilder->m_builtinTypes[Index(BaseType::Bool)]; }
     SLANG_FORCE_INLINE Type* getHalfType() { return m_sharedASTBuilder->m_builtinTypes[Index(BaseType::Half)]; }
