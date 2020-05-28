@@ -68,7 +68,7 @@ namespace Slang
         switch (candidate.flavor)
         {
         case OverloadCandidate::Flavor::Func:
-            paramCounts = CountParameters(GetParameters(candidate.item.declRef.as<CallableDecl>()));
+            paramCounts = CountParameters(getParameters(candidate.item.declRef.as<CallableDecl>()));
             break;
 
         case OverloadCandidate::Flavor::Generic:
@@ -257,7 +257,7 @@ namespace Slang
                     if (context.mode == OverloadResolveContext::Mode::JustTrying)
                     {
                         ConversionCost cost = kConversionCost_None;
-                        if (!canCoerce(GetType(m_astBuilder, valParamRef), arg->type, &cost))
+                        if (!canCoerce(getType(m_astBuilder, valParamRef), arg->type, &cost))
                         {
                             success = false;
                         }
@@ -265,7 +265,7 @@ namespace Slang
                     }
                     else
                     {
-                        arg = coerce(GetType(m_astBuilder, valParamRef), arg);
+                        arg = coerce(getType(m_astBuilder, valParamRef), arg);
                     }
                 }
 
@@ -316,7 +316,7 @@ namespace Slang
         switch (candidate.flavor)
         {
         case OverloadCandidate::Flavor::Func:
-            params = GetParameters(candidate.item.declRef.as<CallableDecl>()).toArray();
+            params = getParameters(candidate.item.declRef.as<CallableDecl>()).toArray();
             break;
 
         case OverloadCandidate::Flavor::Generic:
@@ -343,10 +343,10 @@ namespace Slang
                 if( context.disallowNestedConversions )
                 {
                     // We need an exact match in this case.
-                    if(!GetType(m_astBuilder, param)->equals(argType))
+                    if(!getType(m_astBuilder, param)->equals(argType))
                         return false;
                 }
-                else if (!canCoerce(GetType(m_astBuilder, param), argType, &cost))
+                else if (!canCoerce(getType(m_astBuilder, param), argType, &cost))
                 {
                     return false;
                 }
@@ -354,7 +354,7 @@ namespace Slang
             }
             else
             {
-                arg = coerce(GetType(m_astBuilder, param), arg);
+                arg = coerce(getType(m_astBuilder, param), arg);
             }
         }
         return true;
@@ -396,8 +396,8 @@ namespace Slang
             DeclRef<GenericTypeConstraintDecl> constraintDeclRef(
                 constraintDecl, subset);
 
-            auto sub = GetSub(m_astBuilder, constraintDeclRef);
-            auto sup = GetSup(m_astBuilder, constraintDeclRef);
+            auto sub = getSub(m_astBuilder, constraintDeclRef);
+            auto sup = getSup(m_astBuilder, constraintDeclRef);
 
             auto subTypeWitness = tryGetSubtypeWitness(sub, sup);
             if(subTypeWitness)
@@ -465,7 +465,7 @@ namespace Slang
         subst->genericDecl = baseGenericRef.getDecl();
         subst->outer = baseGenericRef.substitutions.substitutions;
 
-        DeclRef<Decl> innerDeclRef(GetInner(baseGenericRef), subst);
+        DeclRef<Decl> innerDeclRef(getInner(baseGenericRef), subst);
 
         RefPtr<Expr> base;
         if (auto mbrExpr = as<MemberExpr>(baseExpr))
@@ -940,7 +940,7 @@ namespace Slang
         OverloadCandidate candidate;
         candidate.flavor = OverloadCandidate::Flavor::Func;
         candidate.item = item;
-        candidate.resultType = GetResultType(m_astBuilder, funcDeclRef);
+        candidate.resultType = getResultType(m_astBuilder, funcDeclRef);
 
         AddOverloadCandidate(context, candidate);
     }
@@ -994,14 +994,14 @@ namespace Slang
         // Construct a reference to the inner declaration that has any generic
         // parameter substitutions in place already, but *not* any substutions
         // for the generic declaration we are currently trying to infer.
-        auto innerDecl = GetInner(genericDeclRef);
+        auto innerDecl = getInner(genericDeclRef);
         DeclRef<Decl> unspecializedInnerRef = DeclRef<Decl>(innerDecl, genericDeclRef.substitutions);
 
         // Check what type of declaration we are dealing with, and then try
         // to match it up with the arguments accordingly...
         if (auto funcDeclRef = unspecializedInnerRef.as<CallableDecl>())
         {
-            auto params = GetParameters(funcDeclRef).toArray();
+            auto params = getParameters(funcDeclRef).toArray();
 
             Index argCount = context.getArgCount();
             Index paramCount = params.getCount();
@@ -1037,7 +1037,7 @@ namespace Slang
                 // So the question is then whether a mismatch during the
                 // unification step should be taken as an immediate failure...
 
-                TryUnifyTypes(constraints, context.getArgType(aa), GetType(m_astBuilder, params[aa]));
+                TryUnifyTypes(constraints, context.getArgType(aa), getType(m_astBuilder, params[aa]));
 #endif
             }
         }
@@ -1320,11 +1320,11 @@ namespace Slang
             sb << "(";
 
             bool first = true;
-            for (auto paramDeclRef : GetParameters(funcDeclRef))
+            for (auto paramDeclRef : getParameters(funcDeclRef))
             {
                 if (!first) sb << ", ";
 
-                formatType(sb, GetType(m_astBuilder, paramDeclRef));
+                formatType(sb, getType(m_astBuilder, paramDeclRef));
 
                 first = false;
 
@@ -1352,14 +1352,14 @@ namespace Slang
 
                     sb << getText(genericValParam.GetName());
                     sb << ":";
-                    formatType(sb, GetType(m_astBuilder, genericValParam));
+                    formatType(sb, getType(m_astBuilder, genericValParam));
                 }
                 else
                 {}
             }
             sb << ">";
 
-            formatDeclParams(sb, DeclRef<Decl>(GetInner(genericDeclRef), genericDeclRef.substitutions));
+            formatDeclParams(sb, DeclRef<Decl>(getInner(genericDeclRef), genericDeclRef.substitutions));
         }
         else
         {
@@ -1383,7 +1383,7 @@ namespace Slang
         DeclRef<Decl> declRef = inDeclRef;
         if(auto genericDeclRef = declRef.as<GenericDecl>())
         {
-            declRef = DeclRef<Decl>(GetInner(genericDeclRef), genericDeclRef.substitutions);
+            declRef = DeclRef<Decl>(getInner(genericDeclRef), genericDeclRef.substitutions);
         }
 
         if(as<ConstructorDecl>(declRef))
@@ -1391,7 +1391,7 @@ namespace Slang
         else if(auto callableDeclRef = declRef.as<CallableDecl>())
         {
             sb << " -> ";
-            formatType(sb, GetResultType(m_astBuilder, callableDeclRef));
+            formatType(sb, getResultType(m_astBuilder, callableDeclRef));
         }
     }
 

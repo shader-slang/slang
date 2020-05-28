@@ -3439,7 +3439,7 @@ static TypeLayoutResult _createTypeLayout(
 
             typeLayoutBuilder.beginLayout(type, rules);
             auto typeLayout = typeLayoutBuilder.getTypeLayout();
-            for (auto field : GetFields(structDeclRef, MemberFilterStyle::Instance))
+            for (auto field : getFields(structDeclRef, MemberFilterStyle::Instance))
             {
                 // The fields of a `struct` type may include existential (interface)
                 // types (including as nested sub-fields), and any types present
@@ -3463,7 +3463,7 @@ static TypeLayoutResult _createTypeLayout(
 
                 TypeLayoutResult fieldResult = _createTypeLayout(
                     fieldLayoutContext,
-                    GetType(context.astBuilder, field).Ptr(),
+                    getType(context.astBuilder, field).Ptr(),
                     field.getDecl());
                 auto fieldTypeLayout = fieldResult.layout;
 

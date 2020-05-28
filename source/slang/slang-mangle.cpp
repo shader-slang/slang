@@ -135,7 +135,7 @@ namespace Slang
         }
         else if( auto namedType = dynamicCast<NamedExpressionType>(type) )
         {
-            emitType(context, GetType(context->astBuilder, namedType->declRef));
+            emitType(context, getType(context->astBuilder, namedType->declRef));
         }
         else if( auto declRefType = dynamicCast<DeclRefType>(type) )
         {
@@ -251,7 +251,7 @@ namespace Slang
         if(auto inheritanceDeclRef = declRef.as<InheritanceDecl>())
         {
             emit(context, "I");
-            emitType(context, GetSup(context->astBuilder, inheritanceDeclRef));
+            emitType(context, getSup(context->astBuilder, inheritanceDeclRef));
             return;
         }
 
@@ -264,7 +264,7 @@ namespace Slang
             // that is in the same module as the type it extends should
             // be treated as equivalent to the type itself.
             emit(context, "X");
-            emitType(context, GetTargetType(context->astBuilder, extensionDeclRef));
+            emitType(context, getTargetType(context->astBuilder, extensionDeclRef));
             return;
         }
 
@@ -339,7 +339,7 @@ namespace Slang
                     else if(auto genericValueParamDecl = mm.as<GenericValueParamDecl>())
                     {
                         emitRaw(context, "v");
-                        emitType(context, GetType(context->astBuilder, genericValueParamDecl));
+                        emitType(context, getType(context->astBuilder, genericValueParamDecl));
                     }
                     else if(mm.as<GenericTypeConstraintDecl>())
                     {
@@ -362,7 +362,7 @@ namespace Slang
         //
         if( auto callableDeclRef = declRef.as<CallableDecl>())
         {
-            auto parameters = GetParameters(callableDeclRef);
+            auto parameters = getParameters(callableDeclRef);
             UInt parameterCount = parameters.getCount();
 
             emitRaw(context, "p");
@@ -371,14 +371,14 @@ namespace Slang
 
             for(auto paramDeclRef : parameters)
             {
-                emitType(context, GetType(context->astBuilder, paramDeclRef));
+                emitType(context, getType(context->astBuilder, paramDeclRef));
             }
 
             // Don't print result type for an initializer/constructor,
             // since it is implicit in the qualified name.
             if (!callableDeclRef.is<ConstructorDecl>())
             {
-                emitType(context, GetResultType(context->astBuilder, callableDeclRef));
+                emitType(context, getResultType(context->astBuilder, callableDeclRef));
             }
         }
     }

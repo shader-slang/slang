@@ -95,7 +95,7 @@ namespace Slang
                 // A structure type should recursively introduce
                 // existential slots for its fields.
                 //
-                for( auto fieldDeclRef : GetFields(structDeclRef, MemberFilterStyle::Instance) )
+                for( auto fieldDeclRef : getFields(structDeclRef, MemberFilterStyle::Instance) )
                 {
                     _collectExistentialSpecializationParamsRec(
                         astBuilder,
@@ -118,7 +118,7 @@ namespace Slang
         _collectExistentialSpecializationParamsRec(
             astBuilder,
             ioSpecializationParams,
-            GetType(astBuilder, paramDeclRef),
+            getType(astBuilder, paramDeclRef),
             paramDeclRef.getLoc());
     }
 
@@ -200,7 +200,7 @@ namespace Slang
         //
         if( auto funcDeclRef = getFuncDeclRef() )
         {
-            for( auto paramDeclRef : GetParameters(funcDeclRef) )
+            for( auto paramDeclRef : getParameters(funcDeclRef) )
             {
                 ShaderParamInfo shaderParamInfo;
                 shaderParamInfo.paramDeclRef = paramDeclRef;
@@ -1035,7 +1035,7 @@ namespace Slang
                     for(auto constraintDecl : genericTypeParamDecl->getMembersOfType<GenericTypeConstraintDecl>())
                     {
                         // Get the type that the constraint is enforcing conformance to
-                        auto interfaceType = GetSup(getLinkage()->getASTBuilder(), DeclRef<GenericTypeConstraintDecl>(constraintDecl, nullptr));
+                        auto interfaceType = getSup(getLinkage()->getASTBuilder(), DeclRef<GenericTypeConstraintDecl>(constraintDecl, nullptr));
 
                         // Use our semantic-checking logic to search for a witness to the required conformance
                         auto witness = visitor.tryGetSubtypeWitness(argType, interfaceType);
@@ -1195,8 +1195,8 @@ namespace Slang
 
                 ASTBuilder* astBuilder = getLinkage()->getASTBuilder();
 
-                auto sub = GetSub(astBuilder, constraintDeclRef);
-                auto sup = GetSup(astBuilder, constraintDeclRef);
+                auto sub = getSub(astBuilder, constraintDeclRef);
+                auto sup = getSup(astBuilder, constraintDeclRef);
 
                 auto subTypeWitness = visitor.tryGetSubtypeWitness(sub, sup);
                 if(subTypeWitness)

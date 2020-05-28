@@ -1028,7 +1028,7 @@ struct ValLoweringVisitor : ValVisitor<ValLoweringVisitor, LoweredValInfo, Lower
     LoweredValInfo visitGenericParamIntVal(GenericParamIntVal* val)
     {
         return emitDeclRef(context, val->declRef,
-            lowerType(context, GetType(context->astBuilder, val->declRef)));
+            lowerType(context, getType(context->astBuilder, val->declRef)));
     }
 
     LoweredValInfo visitDeclaredSubtypeWitness(DeclaredSubtypeWitness* val)
@@ -1179,14 +1179,14 @@ struct ValLoweringVisitor : ValVisitor<ValLoweringVisitor, LoweredValInfo, Lower
                     // for emitting the signature of a `CallableDecl`, and we should
                     // try to re-use that if at all possible.
                     //
-                    auto irParamType = lowerType(context, GetType(context->astBuilder, paramDeclRef));
+                    auto irParamType = lowerType(context, getType(context->astBuilder, paramDeclRef));
                     auto irParam = subBuilder->emitParam(irParamType);
 
                     irParams.add(irParam);
                     irParamTypes.add(irParamType);
                 }
 
-                auto irResultType = lowerType(context, GetResultType(context->astBuilder, callableDeclRef));
+                auto irResultType = lowerType(context, getResultType(context->astBuilder, callableDeclRef));
 
                 auto irFuncType = subBuilder->getFuncType(
                     irParamTypes,
@@ -1484,7 +1484,7 @@ struct ValLoweringVisitor : ValVisitor<ValLoweringVisitor, LoweredValInfo, Lower
     IRType* visitExtractExistentialType(ExtractExistentialType* type)
     {
         auto declRef = type->declRef;
-        auto existentialType = lowerType(context, GetType(context->astBuilder, declRef));
+        auto existentialType = lowerType(context, getType(context->astBuilder, declRef));
         IRInst* existentialVal = getSimpleVal(context, emitDeclRef(context, declRef, existentialType));
         return getBuilder()->emitExtractExistentialType(existentialVal);
     }
@@ -1492,7 +1492,7 @@ struct ValLoweringVisitor : ValVisitor<ValLoweringVisitor, LoweredValInfo, Lower
     LoweredValInfo visitExtractExistentialSubtypeWitness(ExtractExistentialSubtypeWitness* witness)
     {
         auto declRef = witness->declRef;
-        auto existentialType = lowerType(context, GetType(context->astBuilder, declRef));
+        auto existentialType = lowerType(context, getType(context->astBuilder, declRef));
         IRInst* existentialVal = getSimpleVal(context, emitDeclRef(context, declRef, existentialType));
         return LoweredValInfo::simple(getBuilder()->emitExtractExistentialWitnessTable(existentialVal));
     }
@@ -1957,7 +1957,7 @@ RefPtr<Type> getThisParamTypeForContainer(
     }
     else if( auto extensionDeclRef = parentDeclRef.as<ExtensionDecl>() )
     {
-        return GetTargetType(context->astBuilder, extensionDeclRef);
+        return getTargetType(context->astBuilder, extensionDeclRef);
     }
 
     return nullptr;
@@ -2518,7 +2518,7 @@ struct ExprLoweringVisitorBase : ExprVisitor<Derived, LoweredValInfo>
         for (auto paramDeclRef : getMembersOfType<ParamDecl>(funcDeclRef))
         {
             auto paramDecl = paramDeclRef.getDecl();
-            IRType* paramType = lowerType(context, GetType(getASTBuilder(), paramDeclRef));
+            IRType* paramType = lowerType(context, getType(getASTBuilder(), paramDeclRef));
             auto paramDirection = getParameterDirection(paramDecl);
 
             UInt argIndex = argCounter++;
@@ -2883,7 +2883,7 @@ struct ExprLoweringVisitorBase : ExprVisitor<Derived, LoweredValInfo>
 
     LoweredValInfo visitExtractExistentialValueExpr(ExtractExistentialValueExpr* expr)
     {
-        auto existentialType = lowerType(context, GetType(getASTBuilder(), expr->declRef));
+        auto existentialType = lowerType(context, getType(getASTBuilder(), expr->declRef));
         auto existentialVal = getSimpleVal(context, emitDeclRef(context, expr->declRef, existentialType));
 
         auto openedType = lowerType(context, expr->type);

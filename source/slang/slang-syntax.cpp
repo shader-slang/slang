@@ -938,7 +938,7 @@ Index getFilterCountImpl(const ReflectClassInfo& clsInfo, MemberFilterStyle filt
     RefPtr<Type> NamedExpressionType::createCanonicalType()
     {
         if (!innerType)
-            innerType = GetType(m_astBuilder, declRef);
+            innerType = getType(m_astBuilder, declRef);
         return innerType->getCanonicalType();
     }
 
@@ -2057,11 +2057,11 @@ Index getFilterCountImpl(const ReflectClassInfo& clsInfo, MemberFilterStyle filt
     {
         RefPtr<FuncType> funcType = astBuilder->create<FuncType>();
 
-        funcType->resultType = GetResultType(astBuilder, declRef);
-        for (auto paramDeclRef : GetParameters(declRef))
+        funcType->resultType = getResultType(astBuilder, declRef);
+        for (auto paramDeclRef : getParameters(declRef))
         {
             auto paramDecl = paramDeclRef.getDecl();
-            auto paramType = GetType(astBuilder, paramDeclRef);
+            auto paramType = getType(astBuilder, paramDeclRef);
             if( paramDecl->findModifier<RefModifier>() )
             {
                 paramType = astBuilder->getRefType(paramType);

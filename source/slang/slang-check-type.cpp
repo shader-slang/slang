@@ -159,7 +159,7 @@ namespace Slang
         }
 
         DeclRef<Decl> innerDeclRef;
-        innerDeclRef.decl = GetInner(genericDeclRef);
+        innerDeclRef.decl = getInner(genericDeclRef);
         innerDeclRef.substitutions = SubstitutionSet(subst);
 
         return DeclRefType::create(m_astBuilder, innerDeclRef);

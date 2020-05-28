@@ -356,7 +356,7 @@ static void _lookUpMembersInSuperType(
     // The super-type in the constraint (e.g., `Foo` in `T : Foo`)
     // will tell us a type we should use for lookup.
     //
-    auto superType = GetSup(astBuilder, intermediateIsSuperConstraint);
+    auto superType = getSup(astBuilder, intermediateIsSuperConstraint);
     //
     // We will go ahead and perform lookup using `superType`,
     // after dealing with some details.
@@ -437,7 +437,7 @@ static void _lookUpMembersInSuperTypeDeclImpl(
             // We want constraints of the form `T : Foo` where `T` is the
             // generic parameter in question, and `Foo` is whatever we are
             // constraining it to.
-            auto subType = GetSub(astBuilder, constraintDeclRef);
+            auto subType = getSub(astBuilder, constraintDeclRef);
             auto subDeclRefType = as<DeclRefType>(subType);
             if(!subDeclRefType)
                 continue;
@@ -492,7 +492,7 @@ static void _lookUpMembersInSuperTypeDeclImpl(
                 // directly with that type.
                 //
                 ensureDecl(request.semantics, aggTypeDeclRef.getDecl(), DeclCheckState::ReadyForLookup);
-                for(auto extDecl = GetCandidateExtensions(aggTypeDeclRef); extDecl; extDecl = extDecl->nextCandidateExtension)
+                for(auto extDecl = getCandidateExtensions(aggTypeDeclRef); extDecl; extDecl = extDecl->nextCandidateExtension)
                 {
                     // Note: In this case `extDecl` is an extension that was declared to apply
                     // (conditionally) to `aggTypeDeclRef`, which is the decl-ref part of
@@ -691,7 +691,7 @@ static void _lookUpInScopes(
                     // declaration, then the `this` expression will have
                     // a type that uses the "target type" of the `extension`.
                     //
-                    type = GetTargetType(astBuilder, extDeclRef);
+                    type = getTargetType(astBuilder, extDeclRef);
                 }
                 else
                 {

@@ -211,7 +211,7 @@ namespace Slang
                 for (auto genConstraintDeclRef : getMembersOfType<GenericTypeConstraintDecl>(aggTypeDeclRef))
                 {
                     ensureDecl(genConstraintDeclRef, DeclCheckState::CanUseBaseOfInheritanceDecl);
-                    auto inheritedType = GetSup(m_astBuilder, genConstraintDeclRef);
+                    auto inheritedType = getSup(m_astBuilder, genConstraintDeclRef);
                     TypeWitnessBreadcrumb breadcrumb;
                     breadcrumb.prev = inBreadcrumbs;
                     breadcrumb.sub = type;
@@ -233,8 +233,8 @@ namespace Slang
 
                 for( auto constraintDeclRef : getMembersOfType<GenericTypeConstraintDecl>(genericDeclRef) )
                 {
-                    auto sub = GetSub(m_astBuilder, constraintDeclRef);
-                    auto sup = GetSup(m_astBuilder, constraintDeclRef);
+                    auto sub = getSub(m_astBuilder, constraintDeclRef);
+                    auto sup = getSup(m_astBuilder, constraintDeclRef);
 
                     auto subDeclRef = as<DeclRefType>(sub);
                     if(!subDeclRef)

@@ -202,11 +202,6 @@ namespace Slang
             }
 
             void operator++();
-#if 0
-            {
-                current = current->next.Ptr();
-            }
-#endif
 
             bool operator!=(Iterator other)
             {
@@ -251,12 +246,7 @@ namespace Slang
             }
 
             void operator++();
-            #if 0
-            {
-                current = Adjust(current->next.Ptr());
-            }
-            #endif
-
+            
             bool operator!=(Iterator other)
             {
                 return current != other.current;
@@ -276,24 +266,13 @@ namespace Slang
         {}
 
         FilteredModifierList(Modifier* modifiers)
-            : modifiers(Adjust(modifiers))
+            : modifiers(adjust(modifiers))
         {}
 
         Iterator begin() { return Iterator(modifiers); }
         Iterator end() { return Iterator(nullptr); }
 
-        static Modifier* Adjust(Modifier* modifier);
-        #if 0
-        {
-            Modifier* m = modifier;
-            for (;;)
-            {
-                if (!m) return m;
-                if (dynamicCast<T>(m)) return m;
-                m = m->next.Ptr();
-            }
-        }
-        #endif
+        static Modifier* adjust(Modifier* modifier);
 
         Modifier* modifiers;
     };

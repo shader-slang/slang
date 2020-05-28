@@ -322,7 +322,7 @@ namespace Slang
         if (auto varDeclRef = declRef.as<VarDeclBase>())
         {
             QualType qualType;
-            qualType.type = GetType(astBuilder, varDeclRef);
+            qualType.type = getType(astBuilder, varDeclRef);
 
             bool isLValue = true;
             if(varDeclRef.getDecl()->findModifier<ConstModifier>())
@@ -406,7 +406,7 @@ namespace Slang
             // When we access a constraint or an inheritance decl (as a member),
             // we are conceptually performing a "cast" to the given super-type,
             // with the declaration showing that such a cast is legal.
-            auto type = GetSup(astBuilder, constraintDeclRef);
+            auto type = getSup(astBuilder, constraintDeclRef);
             return QualType(type);
         }
         else if( auto namespaceDeclRef = declRef.as<NamespaceDeclBase>())
@@ -1285,7 +1285,7 @@ namespace Slang
         for (auto requiredConstraintDeclRef : getMembersOfType<TypeConstraintDecl>(requiredAssociatedTypeDeclRef))
         {
             // Grab the type we expect to conform to from the constraint.
-            auto requiredSuperType = GetSup(m_astBuilder, requiredConstraintDeclRef);
+            auto requiredSuperType = getSup(m_astBuilder, requiredConstraintDeclRef);
 
             // Perform a search for a witness to the subtype relationship.
             auto witness = tryGetSubtypeWitness(satisfyingType, requiredSuperType);
@@ -1714,7 +1714,7 @@ namespace Slang
     void SemanticsVisitor::checkExtensionConformance(ExtensionDecl* decl)
     {
         auto declRef = createDefaultSubstitutionsIfNeeded(m_astBuilder, makeDeclRef(decl)).as<ExtensionDecl>();
-        auto targetType = GetTargetType(m_astBuilder, declRef);
+        auto targetType = getTargetType(m_astBuilder, declRef);
 
         for (auto inheritanceDecl : decl->getMembersOfType<InheritanceDecl>())
         {
@@ -2297,12 +2297,12 @@ namespace Slang
             // and `sup` types are pairwise equivalent.
             //
             auto leftSub = leftConstraint->sub;
-            auto rightSub = GetSub(m_astBuilder, rightConstraint);
+            auto rightSub = getSub(m_astBuilder, rightConstraint);
             if(!leftSub->equals(rightSub))
                 return false;
 
             auto leftSup = leftConstraint->sup;
-            auto rightSup = GetSup(m_astBuilder, rightConstraint);
+            auto rightSup = getSup(m_astBuilder, rightConstraint);
             if(!leftSup->equals(rightSup))
                 return false;
         }
@@ -2320,8 +2320,8 @@ namespace Slang
     {
 
         // TODO(tfoley): This copies the parameter array, which is bad for performance.
-        auto fstParams = GetParameters(fst).toArray();
-        auto sndParams = GetParameters(snd).toArray();
+        auto fstParams = getParameters(fst).toArray();
+        auto sndParams = getParameters(snd).toArray();
 
         // If the functions have different numbers of parameters, then
         // their signatures trivially don't match.
@@ -2336,7 +2336,7 @@ namespace Slang
             auto sndParam = sndParams[ii];
 
             // If a given parameter type doesn't match, then signatures don't match
-            if (!GetType(m_astBuilder, fstParam)->equals(GetType(m_astBuilder, sndParam)))
+            if (!getType(m_astBuilder, fstParam)->equals(getType(m_astBuilder, sndParam)))
                 return false;
 
             // If one parameter is `out` and the other isn't, then they don't match
@@ -2543,8 +2543,8 @@ namespace Slang
         // consider result types earlier, as part of the signature
         // matching step.
         //
-        auto resultType = GetResultType(m_astBuilder, newDeclRef);
-        auto prevResultType = GetResultType(m_astBuilder, oldDeclRef);
+        auto resultType = getResultType(m_astBuilder, newDeclRef);
+        auto prevResultType = getResultType(m_astBuilder, oldDeclRef);
         if (!resultType->equals(prevResultType))
         {
             // Bad redeclaration
@@ -2919,7 +2919,7 @@ namespace Slang
             // sooner or later.
             //
             ensureDecl(extDeclRef, DeclCheckState::CanUseExtensionTargetType);
-            auto targetType = GetTargetType(m_astBuilder, extDeclRef);
+            auto targetType = getTargetType(m_astBuilder, extDeclRef);
             return calcThisType(targetType);
         }
         else
@@ -3064,7 +3064,7 @@ namespace Slang
         }
 
         // Now extract the target type from our (possibly specialized) extension decl-ref.
-        RefPtr<Type> targetType = GetTargetType(m_astBuilder, extDeclRef);
+        RefPtr<Type> targetType = getTargetType(m_astBuilder, extDeclRef);
 
         // As a bit of a kludge here, if the target type of the extension is
         // an interface, and the `type` we are trying to match up has a this-type

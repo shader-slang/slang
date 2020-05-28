@@ -707,7 +707,7 @@ static void collectGlobalScopeParameter(
     auto varDeclRef = shaderParamInfo.paramDeclRef;
 
     // We apply any substitutions for global generic parameters here.
-    auto type = GetType(astBuilder, varDeclRef)->substitute(astBuilder, globalGenericSubst).as<Type>();
+    auto type = getType(astBuilder, varDeclRef)->substitute(astBuilder, globalGenericSubst).as<Type>();
 
     // We use a single operation to both check whether the
     // variable represents a shader parameter, and to compute
@@ -1915,7 +1915,7 @@ static RefPtr<TypeLayout> processEntryPointVaryingParameter(
             //
             Decl* firstExplicit = nullptr;
             Decl* firstImplicit = nullptr;
-            for( auto field : GetFields(structDeclRef, MemberFilterStyle::Instance) )
+            for( auto field : getFields(structDeclRef, MemberFilterStyle::Instance) )
             {
                 RefPtr<VarLayout> fieldVarLayout = new VarLayout();
                 fieldVarLayout->varDecl = field;
@@ -1926,7 +1926,7 @@ static RefPtr<TypeLayout> processEntryPointVaryingParameter(
                 auto fieldTypeLayout = processEntryPointVaryingParameterDecl(
                     context,
                     field.getDecl(),
-                    GetType(context->getASTBuilder(), field),
+                    getType(context->getASTBuilder(), field),
                     state,
                     fieldVarLayout);
 
@@ -2043,7 +2043,7 @@ static RefPtr<TypeLayout> computeEntryPointParameterTypeLayout(
     RefPtr<VarLayout>               paramVarLayout,
     EntryPointParameterState&       state)
 {
-    auto paramType = GetType(context->getASTBuilder(), paramDeclRef);
+    auto paramType = getType(context->getASTBuilder(), paramDeclRef);
     SLANG_ASSERT(paramType);
 
     if( paramDeclRef.getDecl()->hasModifier<HLSLUniformModifier>() )
@@ -2581,7 +2581,7 @@ static RefPtr<EntryPointLayout> collectEntryPointParameters(
     // TODO: Ideally we should make the layout process more robust to empty/void
     // types and apply this logic unconditionally.
     //
-    auto resultType = GetResultType(astBuilder, entryPointFuncDeclRef);
+    auto resultType = getResultType(astBuilder, entryPointFuncDeclRef);
     SLANG_ASSERT(resultType);
 
     if( !resultType->equals(astBuilder->getVoidType()) )
