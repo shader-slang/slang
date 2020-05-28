@@ -325,10 +325,17 @@ namespace Slang
                 {
                     // TODO: do we need to make something more
                     // explicit here?
-                    bb = ConstructDeclRefExpr(
+                    auto expr = ConstructDeclRefExpr(
                         breadcrumb->declRef,
                         bb,
                         loc);
+
+                    if(bb && bb->type.isLeftValue)
+                    {
+                        expr->type.isLeftValue = true;
+                    }
+
+                    bb = expr;
                 }
                 break;
 

@@ -701,17 +701,17 @@ LoweredValInfo emitCallToDeclRef(
 }
 
 IRInst* getFieldKey(
-    IRGenContext*       context,
-    DeclRef<VarDecl>    field)
+    IRGenContext*   context,
+    DeclRef<Decl>   field)
 {
     return getSimpleVal(context, emitDeclRef(context, field, context->irBuilder->getKeyType()));
 }
 
 LoweredValInfo extractField(
-    IRGenContext*       context,
-    IRType*             fieldType,
-    LoweredValInfo      base,
-    DeclRef<VarDecl>    field)
+    IRGenContext*   context,
+    IRType*         fieldType,
+    LoweredValInfo  base,
+    DeclRef<Decl>   field)
 {
     IRBuilder* builder = context->irBuilder;
 
@@ -2054,6 +2054,21 @@ struct ExprLoweringVisitorBase : ExprVisitor<Derived, LoweredValInfo>
         }
         else if(auto constraintDeclRef = declRef.as<TypeConstraintDecl>())
         {
+            auto superType = getSup(getASTBuilder(), constraintDeclRef);
+            if(auto superDeclRefType = as<DeclRefType>(superType))
+            {
+                if(auto superStructDeclRef = superDeclRefType->declRef.as<StructDecl>())
+                {
+                    // The constraint is saying that the given type inherits
+                    // from a concrete `struct` type, which means it should
+                    // be satisfied by a witness that represents a field
+                    // (TODO: or a chain of fields) to fetch to get the
+                    // final value.
+                    //
+                    return extractField(loweredType, loweredBase, constraintDeclRef);
+                }
+            }
+
             // The code is making use of a "witness" that a value of
             // some generic type conforms to an interface.
             //
@@ -2748,30 +2763,81 @@ struct ExprLoweringVisitorBase : ExprVisitor<Derived, LoweredValInfo>
         UNREACHABLE_RETURN(LoweredValInfo());
     }
 
-    LoweredValInfo visitCastToInterfaceExpr(
-        CastToInterfaceExpr* expr)
+    LoweredValInfo emitGetToConcreteSuperTypeRec(
+        LoweredValInfo const&   value,
+        IRType*                 superType,
+        Val*                    subTypeWitness)
     {
-        // We have an expression that is "up-casting" some concrete value
-        // to an existential type (aka interface type), using a subtype witness
-        // (which will lower as a witness table) to show that the conversion
-        // is valid.
+        if( auto declaredSubtypeWitness = as<DeclaredSubtypeWitness>(subTypeWitness) )
+        {
+            return extractField(superType, value, declaredSubtypeWitness->declRef);
+        }
+        else
+        {
+            SLANG_ASSERT(!"unhandled");
+            return nullptr;
+        }
+    }
+
+    LoweredValInfo visitCastToSuperTypeExpr(
+        CastToSuperTypeExpr* expr)
+    {
+        auto superType = lowerType(context, expr->type);
+        auto value = lowerRValueExpr(context, expr->valueArg);
+
+        // The actual operation that we need to perform here
+        // depends on the kind of subtype relationship we
+        // are making use of.
         //
-        // At the IR level, this will become a `makeExistential` instruction,
-        // which collects the above information into a single IR-level value.
-        // A dynamic CPU implementation of Slang might encode an existential
-        // as a "fat pointer" representation, which includes a pointer to
-        // data for the concrete value, plus a pointer to the witness table.
+        // The first important case is when the super type is
+        // an interface type, such that casting from a concrete
+        // value to that type creates a value of existential
+        // type that binds together the concrete value and the
+        // witness table that represents the subtype relationship.
         //
-        // Note: if/when Slang supports more general existential types, such
-        // as compositions of interface (e.g., `IReadable & IWritable`), then
-        // we should probably extend the AST and IR mechanism here to accept
-        // a sequence of witness tables.
-        //
-        auto existentialType = lowerType(context, expr->type);
-        auto concreteValue = getSimpleVal(context, lowerRValueExpr(context, expr->valueArg));
-        auto witnessTable = lowerSimpleVal(context, expr->witnessArg);
-        auto existentialValue = getBuilder()->emitMakeExistential(existentialType, concreteValue, witnessTable);
-        return LoweredValInfo::simple(existentialValue);
+        if( auto declRefType = as<DeclRefType>(expr->type) )
+        {
+            auto declRef = declRefType->declRef;
+            if( auto interfaceDeclRef = declRef.as<InterfaceDecl>() )
+            {
+                // We have an expression that is "up-casting" some concrete value
+                // to an existential type (aka interface type), using a subtype witness
+                // (which will lower as a witness table) to show that the conversion
+                // is valid.
+                //
+                auto witnessTable = lowerSimpleVal(context, expr->witnessArg);
+
+                // At the IR level, this will become a `makeExistential` instruction,
+                // which collects the above information into a single IR-level value.
+                // A dynamic CPU implementation of Slang might encode an existential
+                // as a "fat pointer" representation, which includes a pointer to
+                // data for the concrete value, plus a pointer to the witness table.
+                //
+                // Note: if/when Slang supports more general existential types, such
+                // as compositions of interface (e.g., `IReadable & IWritable`), then
+                // we should probably extend the AST and IR mechanism here to accept
+                // a sequence of witness tables.
+                //
+                auto concreteValue = getSimpleVal(context, value);
+                auto existentialValue = getBuilder()->emitMakeExistential(
+                    superType,
+                    concreteValue,
+                    witnessTable);
+                return LoweredValInfo::simple(existentialValue);
+            }
+            else if( auto structDeclRef = declRef.as<StructDecl>() )
+            {
+                // We are up-casting to a concrete `struct` super-type,
+                // such that the witness will represent a field of the super-type
+                // that is stored in instances of the sub-type (or a chain
+                // of such fields for a transitive witness).
+                //
+                return emitGetToConcreteSuperTypeRec(value, superType, expr->witnessArg);
+            }
+        }
+
+        SLANG_UNEXPECTED("unexpected case of subtype relationship");
+        UNREACHABLE_RETURN(LoweredValInfo());
     }
 
     LoweredValInfo subscriptValue(
@@ -2815,9 +2881,9 @@ struct ExprLoweringVisitorBase : ExprVisitor<Derived, LoweredValInfo>
     }
 
     LoweredValInfo extractField(
-        IRType*             fieldType,
-        LoweredValInfo      base,
-        DeclRef<VarDecl>    field)
+        IRType*         fieldType,
+        LoweredValInfo  base,
+        DeclRef<Decl>   field)
     {
         return Slang::extractField(context, fieldType, base, field);
     }
@@ -4524,6 +4590,21 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
         // What is the super-type that we have declared we inherit from?
         RefPtr<Type> superType = inheritanceDecl->base.type;
 
+        if(auto superDeclRefType = as<DeclRefType>(superType))
+        {
+            if( auto superStructDeclRef = superDeclRefType->declRef.as<StructDecl>() )
+            {
+                // TODO: the witness that a type inherits from a `struct`
+                // type should probably be a key that will be used for
+                // a field that holds the base type...
+                //
+                auto irKey = getBuilder()->createStructKey();
+                auto keyVal = LoweredValInfo::simple(irKey);
+                setGlobalValue(context, inheritanceDecl, keyVal);
+                return keyVal;
+            }
+        }
+
         // Construct the mangled name for the witness table, which depends
         // on the type that is conforming, and the type that it conforms to.
         //
@@ -5269,6 +5350,27 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
         addLinkageDecoration(context, irStruct, decl);
 
         subBuilder->setInsertInto(irStruct);
+
+        // A `struct` that inherits from another `struct` must start
+        // with a member for the direct base type.
+        //
+        for( auto inheritanceDecl : decl->getMembersOfType<InheritanceDecl>() )
+        {
+            auto superType = inheritanceDecl->base;
+            if(auto superDeclRefType = as<DeclRefType>(superType))
+            {
+                if(auto superStructDeclRef = superDeclRefType->declRef.as<StructDecl>())
+                {
+                    auto superKey = (IRStructKey*) getSimpleVal(context, ensureDecl(context, inheritanceDecl));
+                    auto irSuperType = lowerType(context, superType.type);
+                    subBuilder->createStructField(
+                        irStruct,
+                        superKey,
+                        irSuperType);
+                }
+            }
+        }
+
 
         for (auto fieldDecl : decl->getMembersOfType<VarDeclBase>())
         {

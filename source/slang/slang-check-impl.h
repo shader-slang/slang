@@ -645,7 +645,7 @@ namespace Slang
             /// which packages up the value, its type, and the witness
             /// of its conformance to the interface.
             ///
-        RefPtr<Expr> createCastToInterfaceExpr(
+        RefPtr<Expr> createCastToSuperTypeExpr(
             RefPtr<Type>    toType,
             RefPtr<Expr>    fromExpr,
             RefPtr<Val>     witness);
@@ -925,8 +925,8 @@ namespace Slang
             TypeWitnessBreadcrumb*  breadcrumb);
 
         RefPtr<Val> createTypeWitness(
-            RefPtr<Type>            type,
-            DeclRef<InterfaceDecl>  interfaceDeclRef,
+            RefPtr<Type>            subType,
+            DeclRef<AggTypeDecl>    superTypeDeclRef,
             TypeWitnessBreadcrumb*  inBreadcrumbs);
 
             /// Is the given interface one that a tagged-union type can conform to?
@@ -950,16 +950,20 @@ namespace Slang
             DeclRef<InterfaceDecl>  interfaceDeclRef,
             DeclRef<Decl>           requirementDeclRef);
 
-        bool doesTypeConformToInterfaceImpl(
-            RefPtr<Type>            originalType,
-            RefPtr<Type>            type,
-            DeclRef<InterfaceDecl>  interfaceDeclRef,
+        bool _isDeclaredSubtype(
+            RefPtr<Type>            originalSubType,
+            RefPtr<Type>            subType,
+            DeclRef<AggTypeDecl>    superTypeDeclRef,
             RefPtr<Val>*            outWitness,
             TypeWitnessBreadcrumb*  inBreadcrumbs);
 
-        bool DoesTypeConformToInterface(
-            RefPtr<Type>  type,
-            DeclRef<InterfaceDecl>        interfaceDeclRef);
+        bool isDeclaredSubtype(
+            RefPtr<Type>            subType,
+            DeclRef<AggTypeDecl>    superTypeDeclRef);
+
+        RefPtr<Val> tryGetSubtypeWitness(
+            RefPtr<Type>            subType,
+            DeclRef<AggTypeDecl>    superTypeDeclRef);
 
         RefPtr<Val> tryGetInterfaceConformanceWitness(
             RefPtr<Type>  type,
@@ -1381,7 +1385,7 @@ namespace Slang
         CASE(OverloadedExpr)
         CASE(OverloadedExpr2)
         CASE(AggTypeCtorExpr)
-        CASE(CastToInterfaceExpr)
+        CASE(CastToSuperTypeExpr)
         CASE(LetExpr)
         CASE(ExtractExistentialValueExpr)
 
