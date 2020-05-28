@@ -711,7 +711,7 @@ namespace Slang
 
     static String _getDisplayPath(DiagnosticSink* sink, SourceFile* sourceFile)
     {
-        if (sink->flags & DiagnosticSink::Flag::VerbosePath)
+        if (sink->isFlagSet(DiagnosticSink::Flag::VerbosePath))
         {
             return sourceFile->calcVerbosePath();
         }

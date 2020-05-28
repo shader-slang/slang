@@ -1143,12 +1143,12 @@ SlangResult FrontEndCompileRequest::executeActionsInner()
         parseTranslationUnit(translationUnit.Ptr());
     }
 
-    if (getSink()->GetErrorCount() != 0)
+    if (getSink()->getErrorCount() != 0)
         return SLANG_FAIL;
 
     // Perform semantic checking on the whole collection
     checkAllTranslationUnits();
-    if (getSink()->GetErrorCount() != 0)
+    if (getSink()->getErrorCount() != 0)
         return SLANG_FAIL;
 
 
@@ -1156,13 +1156,13 @@ SlangResult FrontEndCompileRequest::executeActionsInner()
     // and use them to populate the `program` member.
     //
     m_globalComponentType = createUnspecializedGlobalComponentType(this);
-    if (getSink()->GetErrorCount() != 0)
+    if (getSink()->getErrorCount() != 0)
         return SLANG_FAIL;
 
     m_globalAndEntryPointsComponentType = createUnspecializedGlobalAndEntryPointsComponentType(
         this,
         m_unspecializedEntryPoints);
-    if (getSink()->GetErrorCount() != 0)
+    if (getSink()->getErrorCount() != 0)
         return SLANG_FAIL;
 
     // We always generate IR for all the translation units.
@@ -1174,7 +1174,7 @@ SlangResult FrontEndCompileRequest::executeActionsInner()
     // makes sense.
     //
     generateIR();
-    if (getSink()->GetErrorCount() != 0)
+    if (getSink()->getErrorCount() != 0)
         return SLANG_FAIL;
 
     // Do parameter binding generation, for each compilation target.
@@ -1185,7 +1185,7 @@ SlangResult FrontEndCompileRequest::executeActionsInner()
         targetProgram->getOrCreateLayout(getSink());
         targetProgram->getOrCreateIRModuleForLayout(getSink());
     }
-    if (getSink()->GetErrorCount() != 0)
+    if (getSink()->getErrorCount() != 0)
         return SLANG_FAIL;
 
     return SLANG_OK;
@@ -1221,7 +1221,7 @@ EndToEndCompileRequest::EndToEndCompileRequest(
 
 void EndToEndCompileRequest::init()
 {
-    m_sink.sourceManager = m_linkage->getSourceManager();
+    m_sink.setSourceManager(m_linkage->getSourceManager());
 
     // Set all the default writers
     for (int i = 0; i < int(WriterChannel::CountOf); ++i)
@@ -1294,13 +1294,13 @@ SlangResult EndToEndCompileRequest::executeActionsInner()
     if (passThrough == PassThroughMode::None)
     {
         m_specializedGlobalComponentType = createSpecializedGlobalComponentType(this);
-        if (getSink()->GetErrorCount() != 0)
+        if (getSink()->getErrorCount() != 0)
             return SLANG_FAIL;
 
         m_specializedGlobalAndEntryPointsComponentType = createSpecializedGlobalAndEntryPointsComponentType(
             this,
             m_specializedEntryPoints);
-        if (getSink()->GetErrorCount() != 0)
+        if (getSink()->getErrorCount() != 0)
             return SLANG_FAIL;
 
         // For each code generation target, we will generate specialized
@@ -1312,7 +1312,7 @@ SlangResult EndToEndCompileRequest::executeActionsInner()
             auto targetProgram = m_specializedGlobalAndEntryPointsComponentType->getTargetProgram(targetReq);
             targetProgram->getOrCreateLayout(getSink());
         }
-        if (getSink()->GetErrorCount() != 0)
+        if (getSink()->getErrorCount() != 0)
             return SLANG_FAIL;
     }
     else
@@ -1344,7 +1344,7 @@ SlangResult EndToEndCompileRequest::executeActionsInner()
     // Generate output code, in whatever format was requested
     getBackEndReq()->setProgram(getSpecializedGlobalAndEntryPointsComponentType());
     generateOutput(this);
-    if (getSink()->GetErrorCount() != 0)
+    if (getSink()->getErrorCount() != 0)
         return SLANG_FAIL;
 
     return SLANG_OK;
@@ -1515,9 +1515,9 @@ void Linkage::loadParsedModule(
 
     auto sink = translationUnit->compileRequest->getSink();
 
-    int errorCountBefore = sink->GetErrorCount();
+    int errorCountBefore = sink->getErrorCount();
     checkTranslationUnit(translationUnit.Ptr());
-    int errorCountAfter = sink->GetErrorCount();
+    int errorCountAfter = sink->getErrorCount();
 
     if (errorCountAfter != errorCountBefore)
     {
@@ -1572,9 +1572,9 @@ RefPtr<Module> Linkage::loadModule(
     
     translationUnit->addSourceFile(sourceFile);
 
-    int errorCountBefore = sink->GetErrorCount();
+    int errorCountBefore = sink->getErrorCount();
     frontEndReq->parseTranslationUnit(translationUnit);
-    int errorCountAfter = sink->GetErrorCount();
+    int errorCountAfter = sink->getErrorCount();
 
     if( errorCountAfter != errorCountBefore )
     {
@@ -1591,7 +1591,7 @@ RefPtr<Module> Linkage::loadModule(
         name,
         filePathInfo);
 
-    errorCountAfter = sink->GetErrorCount();
+    errorCountAfter = sink->getErrorCount();
 
     if (errorCountAfter != errorCountBefore)
     {
@@ -2436,11 +2436,11 @@ void DiagnosticSink::noteInternalErrorLoc(SourceLoc const& loc)
     // If this is the first source location being noted,
     // then emit a message to help the user isolate what
     // code might have confused the compiler.
-    if(internalErrorLocsNoted == 0)
+    if(m_internalErrorLocsNoted == 0)
     {
         diagnose(loc, Diagnostics::noteLocationOfInternalError);
     }
-    internalErrorLocsNoted++;
+    m_internalErrorLocsNoted++;
 }
 
 SlangResult DiagnosticSink::getBlobIfNeeded(ISlangBlob** outBlob)
@@ -2449,8 +2449,14 @@ SlangResult DiagnosticSink::getBlobIfNeeded(ISlangBlob** outBlob)
     //
     if(!outBlob) return SLANG_OK;
 
+    // For outputBuffer to be valid and hold diagnostics, writer must not be set
+    SLANG_ASSERT(writer == nullptr);
+
     // If there were no errors, and there was no diagnostic output, there is nothing to do.
-    if(!GetErrorCount() && !outputBuffer.getLength()) return SLANG_OK;
+    if(getErrorCount() == 0 && outputBuffer.getLength() == 0)
+    {
+        return SLANG_OK;
+    }
 
     Slang::ComPtr<ISlangBlob> blob = Slang::StringUtil::createStringBlob(outputBuffer);
     *outBlob = blob.detach();
@@ -2554,7 +2560,7 @@ void Session::addBuiltinSource(
     compileRequest->m_isStandardLibraryCode = true;
 
     // Set the source manager on the sink
-    sink.sourceManager = sourceManager;
+    sink.setSourceManager(sourceManager);
     // Make the linkage use the builtin source manager
     Linkage* linkage = compileRequest->getLinkage();
     linkage->setSourceManager(sourceManager);

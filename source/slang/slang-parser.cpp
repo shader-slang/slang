@@ -692,7 +692,7 @@ namespace Slang
         }
 
         // Make a 'token'
-        SourceManager* sourceManager = parser->sink->sourceManager;
+        SourceManager* sourceManager = parser->sink->getSourceManager();
         const UnownedStringSlice scopedIdentifier(sourceManager->allocateStringSlice(scopedIdentifierBuilder.getUnownedSlice()));   
         Token token(TokenType::Identifier, scopedIdentifier, scopedIdSourceLoc);
 
@@ -1745,11 +1745,11 @@ namespace Slang
         TokenSpan tokenSpan;
         tokenSpan.m_begin = parser->tokenReader.m_cursor;
         tokenSpan.m_end = parser->tokenReader.m_end;
-        DiagnosticSink newSink(parser->sink->sourceManager);
+        DiagnosticSink newSink(parser->sink->getSourceManager());
         Parser newParser(*parser);
         newParser.sink = &newSink;
         auto speculateParseRs = parseGenericApp(&newParser, base);
-        if (newSink.errorCount == 0)
+        if (newSink.getErrorCount() == 0)
         {
             // disambiguate based on FOLLOW set
             switch (peekTokenType(&newParser))

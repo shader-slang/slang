@@ -1269,7 +1269,7 @@ namespace Slang
         //
         List<SpecializationArg> args;
         _extractSpecializationArgs(unspecializedEntryPoint, argExprs, args, sink);
-        if(sink->GetErrorCount())
+        if(sink->getErrorCount())
             return nullptr;
 
         return ((ComponentType*) unspecializedEntryPoint)->specialize(
@@ -1429,7 +1429,7 @@ namespace Slang
 
         List<SpecializationArg> specializationArgs;
         _extractSpecializationArgs(unspecializedProgram, specializationArgExprs, specializationArgs, sink);
-        if(sink->GetErrorCount())
+        if(sink->getErrorCount())
             return nullptr;
 
         auto specializedProgram = unspecializedProgram->specialize(
@@ -1511,7 +1511,7 @@ namespace Slang
             globalSpecializationArgs);
 
         // Don't proceed further if anything failed to parse.
-        if(sink->GetErrorCount())
+        if(sink->getErrorCount())
             return nullptr;
 
         // Now we create the initial specialized program by
@@ -1635,7 +1635,7 @@ namespace Slang
         // then try to create a composite where some of the constituent
         // component types might be null.
         //
-        if(endToEndReq->getSink()->GetErrorCount() != 0)
+        if(endToEndReq->getSink()->getErrorCount() != 0)
             return nullptr;
 
         // Any entry points beyond those that were specified up front will be
