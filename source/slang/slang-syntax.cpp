@@ -1393,7 +1393,7 @@ Index getFilterCountImpl(const ReflectClassInfo& clsInfo, MemberFilterStyle filt
         if (!diff) return this;
 
         (*ioDiff)++;
-        auto substSubst = new ThisTypeSubstitution();
+        auto substSubst = astBuilder->create<ThisTypeSubstitution>();
         substSubst->interfaceDecl = interfaceDecl;
         substSubst->witness = substWitness;
         substSubst->outer = substOuter;
@@ -1455,7 +1455,7 @@ Index getFilterCountImpl(const ReflectClassInfo& clsInfo, MemberFilterStyle filt
 
         (*ioDiff)++;
 
-        RefPtr<GlobalGenericParamSubstitution> substSubst = new GlobalGenericParamSubstitution();
+        RefPtr<GlobalGenericParamSubstitution> substSubst = astBuilder->create<GlobalGenericParamSubstitution>();
         substSubst->paramDecl = paramDecl;
         substSubst->actualType = substActualType;
         substSubst->constraintArgs = substConstraintArgs;
@@ -2131,7 +2131,7 @@ Index getFilterCountImpl(const ReflectClassInfo& clsInfo, MemberFilterStyle filt
 
     RefPtr<Val> TypeEqualityWitness::substituteImpl(ASTBuilder* astBuilder, SubstitutionSet subst, int * ioDiff)
     {
-        RefPtr<TypeEqualityWitness> rs = new TypeEqualityWitness();
+        RefPtr<TypeEqualityWitness> rs = astBuilder->create<TypeEqualityWitness>();
         rs->sub = sub->substituteImpl(astBuilder, subst, ioDiff).as<Type>();
         rs->sup = sup->substituteImpl(astBuilder, subst, ioDiff).as<Type>();
         return rs;
@@ -2289,7 +2289,7 @@ Index getFilterCountImpl(const ReflectClassInfo& clsInfo, MemberFilterStyle filt
 
 
 
-        RefPtr<DeclaredSubtypeWitness> rs = new DeclaredSubtypeWitness();
+        RefPtr<DeclaredSubtypeWitness> rs = astBuilder->create<DeclaredSubtypeWitness>();
         rs->sub = substSub;
         rs->sup = substSup;
         rs->declRef = substDeclRef;
@@ -2661,7 +2661,7 @@ RefPtr<Val> TaggedUnionSubtypeWitness::substituteImpl(ASTBuilder* astBuilder, Su
 
     (*ioDiff)++;
 
-    RefPtr<TaggedUnionSubtypeWitness> substWitness = new TaggedUnionSubtypeWitness();
+    RefPtr<TaggedUnionSubtypeWitness> substWitness = astBuilder->create<TaggedUnionSubtypeWitness>();
     substWitness->sub = substSub;
     substWitness->sup = substSup;
     substWitness->caseWitnesses.swapWith(substCaseWitnesses);
