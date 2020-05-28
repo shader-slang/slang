@@ -160,7 +160,7 @@ SlangResult CUDASourceEmitter::calcTypeName(IRType* type, CodeGenTarget target, 
         case kIROp_VectorType:
         {
             auto vecType = static_cast<IRVectorType*>(type);
-            auto vecCount = int(GetIntVal(vecType->getElementCount()));
+            auto vecCount = int(getIntVal(vecType->getElementCount()));
             const IROp elemType = vecType->getElementType()->op;
 
             UnownedStringSlice prefix = getVectorPrefix(elemType);
@@ -178,8 +178,8 @@ SlangResult CUDASourceEmitter::calcTypeName(IRType* type, CodeGenTarget target, 
             auto matType = static_cast<IRMatrixType*>(type);
 
             auto elementType = matType->getElementType();
-            const auto rowCount = int(GetIntVal(matType->getRowCount()));
-            const auto colCount = int(GetIntVal(matType->getColumnCount()));
+            const auto rowCount = int(getIntVal(matType->getRowCount()));
+            const auto colCount = int(getIntVal(matType->getColumnCount()));
 
             out << "Matrix<" << getBuiltinTypeName(elementType->op) << ", " << rowCount << ", " << colCount << ">";
             return SLANG_OK;
@@ -312,7 +312,7 @@ void CUDASourceEmitter::emitCall(const HLSLIntrinsic* specOp, IRInst* inst, cons
 
             if (IRVectorType* vecType = as<IRVectorType>(retType))
             {
-                if (numOperands == GetIntVal(vecType->getElementCount()))
+                if (numOperands == getIntVal(vecType->getElementCount()))
                 {
                     // Get the type name
                     writer->emit("make_");
@@ -366,15 +366,15 @@ static bool _areEquivalent(IRType* a, IRType* b)
         {
             IRVectorType* vecA = static_cast<IRVectorType*>(a);
             IRVectorType* vecB = static_cast<IRVectorType*>(b);
-            return GetIntVal(vecA->getElementCount()) == GetIntVal(vecB->getElementCount()) &&
+            return getIntVal(vecA->getElementCount()) == getIntVal(vecB->getElementCount()) &&
                 _areEquivalent(vecA->getElementType(), vecB->getElementType());
         }
         case kIROp_MatrixType:
         {
             IRMatrixType* matA = static_cast<IRMatrixType*>(a);
             IRMatrixType* matB = static_cast<IRMatrixType*>(b);
-            return GetIntVal(matA->getColumnCount()) == GetIntVal(matB->getColumnCount()) &&
-                GetIntVal(matA->getRowCount()) == GetIntVal(matB->getRowCount()) && 
+            return getIntVal(matA->getColumnCount()) == getIntVal(matB->getColumnCount()) &&
+                getIntVal(matA->getRowCount()) == getIntVal(matB->getRowCount()) && 
                 _areEquivalent(matA->getElementType(), matB->getElementType());
         }
         default:
@@ -401,7 +401,7 @@ void CUDASourceEmitter::_emitInitializerListValue(IRType* dstType, IRInst* value
             {
                 if (auto vecType = as<IRVectorType>(type))
                 {
-                    if (UInt(GetIntVal(vecType->getElementCount())) == value->getOperandCount())
+                    if (UInt(getIntVal(vecType->getElementCount())) == value->getOperandCount())
                     {
                         _emitInitializerList(vecType->getElementType(), value->getOperands(), value->getOperandCount());
                         return;
@@ -409,8 +409,8 @@ void CUDASourceEmitter::_emitInitializerListValue(IRType* dstType, IRInst* value
                 }
                 else if (auto matType = as<IRMatrixType>(type))
                 {
-                    const Index colCount = Index(GetIntVal(matType->getColumnCount()));
-                    const Index rowCount = Index(GetIntVal(matType->getRowCount()));
+                    const Index colCount = Index(getIntVal(matType->getColumnCount()));
+                    const Index rowCount = Index(getIntVal(matType->getRowCount()));
 
                     // TODO(JS): If num cols = 1, then it *doesn't* actually return a vector.
                     // That could be argued is an error because we want swizzling or [] to work.

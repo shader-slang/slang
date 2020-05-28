@@ -118,7 +118,7 @@ IRInst* IRTypeSet::cloneInst(IRInst* inst)
         case kIROp_VectorType:
         {
             auto vecType = static_cast<IRVectorType*>(inst);
-            const Index elementCount = Index(GetIntVal(vecType->getElementCount()));
+            const Index elementCount = Index(getIntVal(vecType->getElementCount()));
 
             if (elementCount <= 1)
             {
@@ -129,8 +129,8 @@ IRInst* IRTypeSet::cloneInst(IRInst* inst)
         case kIROp_MatrixType:
         {
             auto matType = static_cast<IRMatrixType*>(inst);
-            const Index columnCount = Index(GetIntVal(matType->getColumnCount()));
-            const Index rowCount = Index(GetIntVal(matType->getRowCount()));
+            const Index columnCount = Index(getIntVal(matType->getColumnCount()));
+            const Index rowCount = Index(getIntVal(matType->getRowCount()));
 
             if (columnCount <= 1 && rowCount <= 1)
             {

@@ -214,7 +214,7 @@ namespace Slang
 
     // IRConstant
 
-    IRIntegerValue GetIntVal(IRInst* inst)
+    IRIntegerValue getIntVal(IRInst* inst)
     {
         switch (inst->op)
         {

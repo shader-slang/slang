@@ -797,7 +797,7 @@ void GLSLSourceEmitter::emitEntryPointAttributesImpl(IRFunc* irFunc, IREntryPoin
         {
             if (auto decor = irFunc->findDecoration<IRMaxVertexCountDecoration>())
             {
-                auto count = GetIntVal(decor->getCount());
+                auto count = getIntVal(decor->getCount());
                 m_writer->emit("layout(max_vertices = ");
                 m_writer->emit(Int(count));
                 m_writer->emit(") out;\n");
@@ -805,7 +805,7 @@ void GLSLSourceEmitter::emitEntryPointAttributesImpl(IRFunc* irFunc, IREntryPoin
 
             if (auto decor = irFunc->findDecoration<IRInstanceDecoration>())
             {
-                auto count = GetIntVal(decor->getCount());
+                auto count = getIntVal(decor->getCount());
                 m_writer->emit("layout(invocations = ");
                 m_writer->emit(Int(count));
                 m_writer->emit(") in;\n");
@@ -1594,7 +1594,7 @@ void GLSLSourceEmitter::emitSimpleTypeImpl(IRType* type)
         case kIROp_VectorType:
         {
             auto vecType = (IRVectorType*)type;
-            emitVectorTypeNameImpl(vecType->getElementType(), GetIntVal(vecType->getElementCount()));
+            emitVectorTypeNameImpl(vecType->getElementType(), getIntVal(vecType->getElementCount()));
             return;
         }
         case kIROp_MatrixType:

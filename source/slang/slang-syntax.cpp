@@ -926,7 +926,7 @@ Index getFilterCountImpl(const ReflectClassInfo& clsInfo, MemberFilterStyle filt
 
     String NamedExpressionType::toString()
     {
-        return getText(declRef.GetName());
+        return getText(declRef.getName());
     }
 
     bool NamedExpressionType::equalsImpl(Type * /*type*/)
@@ -1233,7 +1233,7 @@ Index getFilterCountImpl(const ReflectClassInfo& clsInfo, MemberFilterStyle filt
 
     String GenericParamIntVal::toString()
     {
-        return getText(declRef.GetName());
+        return getText(declRef.getName());
     }
 
     HashCode GenericParamIntVal::getHashCode()
@@ -1891,7 +1891,7 @@ Index getFilterCountImpl(const ReflectClassInfo& clsInfo, MemberFilterStyle filt
     }
 
     // Convenience accessors for common properties of declarations
-    Name* DeclRefBase::GetName() const
+    Name* DeclRefBase::getName() const
     {
         return decl->nameAndLoc.name;
     }
@@ -1901,7 +1901,7 @@ Index getFilterCountImpl(const ReflectClassInfo& clsInfo, MemberFilterStyle filt
         return decl->loc;
     }
 
-    DeclRefBase DeclRefBase::GetParent() const
+    DeclRefBase DeclRefBase::getParent() const
     {
         // Want access to the free function (the 'as' method by default gets priority)
         // Can access as method with this->as because it removes any ambiguity.
@@ -1974,7 +1974,7 @@ Index getFilterCountImpl(const ReflectClassInfo& clsInfo, MemberFilterStyle filt
 
     // IntVal
 
-    IntegerLiteralValue GetIntVal(RefPtr<IntVal> val)
+    IntegerLiteralValue getIntVal(RefPtr<IntVal> val)
     {
         if (auto constantVal = as<ConstantIntVal>(val))
         {

@@ -285,7 +285,7 @@ struct IREntryPointDecoration : IRDecoration
     IR_LEAF_ISA(EntryPointDecoration)
 
     IRIntLit* getProfileInst() { return cast<IRIntLit>(getOperand(0)); }
-    Profile getProfile() { return Profile(Profile::RawVal(GetIntVal(getProfileInst()))); }
+    Profile getProfile() { return Profile(Profile::RawVal(getIntVal(getProfileInst()))); }
 
     IRStringLit* getName()  { return cast<IRStringLit>(getOperand(1)); }
 };
@@ -435,7 +435,7 @@ struct IRSemanticDecoration : public IRDecoration
     UnownedStringSlice getSemanticName() { return getSemanticNameOperand()->getStringSlice(); }
 
     IRIntLit* getSemanticIndexOperand() { return cast<IRIntLit>(getOperand(1)); }
-    int getSemanticIndex() { return int(GetIntVal(getSemanticIndexOperand())); }
+    int getSemanticIndex() { return int(getIntVal(getSemanticIndexOperand())); }
 };
 
     /// An attribute that can be attached to another instruction as an operand.
@@ -465,7 +465,7 @@ struct IRLayoutResourceInfoAttr : public IRAttr
     IR_PARENT_ISA(LayoutResourceInfoAttr);
 
     IRIntLit* getResourceKindInst() { return cast<IRIntLit>(getOperand(0)); }
-    LayoutResourceKind getResourceKind() { return LayoutResourceKind(GetIntVal(getResourceKindInst())); }
+    LayoutResourceKind getResourceKind() { return LayoutResourceKind(getIntVal(getResourceKindInst())); }
 };
 
     /// An attribute that specifies offset information for a single resource kind.
@@ -479,7 +479,7 @@ struct IRVarOffsetAttr : public IRLayoutResourceInfoAttr
     IR_LEAF_ISA(VarOffsetAttr);
 
     IRIntLit* getOffsetInst() { return cast<IRIntLit>(getOperand(1)); }
-    UInt getOffset() { return UInt(GetIntVal(getOffsetInst())); }
+    UInt getOffset() { return UInt(getIntVal(getOffsetInst())); }
 
     IRIntLit* getSpaceInst()
     {
@@ -491,7 +491,7 @@ struct IRVarOffsetAttr : public IRLayoutResourceInfoAttr
     UInt getSpace()
     {
         if(auto spaceInst = getSpaceInst())
-            return UInt(GetIntVal(spaceInst));
+            return UInt(getIntVal(spaceInst));
         return 0;
     }
 };
@@ -502,7 +502,7 @@ struct IRTypeSizeAttr : public IRLayoutResourceInfoAttr
     IR_LEAF_ISA(TypeSizeAttr);
 
     IRIntLit* getSizeInst() { return cast<IRIntLit>(getOperand(1)); }
-    LayoutSize getSize() { return LayoutSize::fromRaw(LayoutSize::RawValue(GetIntVal(getSizeInst()))); }
+    LayoutSize getSize() { return LayoutSize::fromRaw(LayoutSize::RawValue(getIntVal(getSizeInst()))); }
     size_t getFiniteSize() { return getSize().getFiniteValue(); }
 };
 
@@ -764,7 +764,7 @@ struct IRMatrixTypeLayout : IRTypeLayout
 
     MatrixLayoutMode getMode()
     {
-        return MatrixLayoutMode(GetIntVal(cast<IRIntLit>(getOperand(0))));
+        return MatrixLayoutMode(getIntVal(cast<IRIntLit>(getOperand(0))));
     }
 
     struct Builder : Super::Builder
@@ -880,7 +880,7 @@ struct IRTaggedUnionTypeLayout : IRTypeLayout
         /// Get the (byte) offset of the tagged union's tag (aka "discriminator") field
     LayoutSize getTagOffset()
     {
-        return LayoutSize::fromRaw(LayoutSize::RawValue(GetIntVal(cast<IRIntLit>(getOperand(0)))));
+        return LayoutSize::fromRaw(LayoutSize::RawValue(getIntVal(cast<IRIntLit>(getOperand(0)))));
     }
 
         /// Get all the attributes representing layouts for the difference cases
@@ -962,7 +962,7 @@ struct IRStageAttr : IRAttr
     IR_LEAF_ISA(StageAttr);
 
     IRIntLit* getStageOperand() { return cast<IRIntLit>(getOperand(0)); }
-    Stage getStage() { return Stage(GetIntVal(getStageOperand())); }
+    Stage getStage() { return Stage(getIntVal(getStageOperand())); }
 };
 
     /// Base type for attributes that associate a variable layout with a semantic name and index.
@@ -974,7 +974,7 @@ struct IRSemanticAttr : IRAttr
     UnownedStringSlice getName() { return getNameOperand()->getStringSlice(); }
 
     IRIntLit* getIndexOperand() { return cast<IRIntLit>(getOperand(1)); }
-    UInt getIndex() { return UInt(GetIntVal(getIndexOperand())); }
+    UInt getIndex() { return UInt(getIntVal(getIndexOperand())); }
 };
 
     /// Attribute that associates a variable with a system-value semantic name and index

@@ -540,7 +540,7 @@ namespace Slang
                         const auto& decl = subscriptDeclRef.getDecl();
                         if (decl->getMembersOfType<SetterDecl>().isNonEmpty() || decl->getMembersOfType<RefAccessorDecl>().isNonEmpty())
                         {
-                            callExpr->type.IsLeftValue = true;
+                            callExpr->type.isLeftValue = true;
                         }
                     }
 
@@ -584,9 +584,9 @@ namespace Slang
         if(!declRef)
             return false;
 
-        auto parent = declRef.GetParent();
+        auto parent = declRef.getParent();
         if(parent.as<GenericDecl>())
-            parent = parent.GetParent();
+            parent = parent.getParent();
 
         if(parent.as<InterfaceDecl>())
             return true;
@@ -606,7 +606,7 @@ namespace Slang
         // "inner" declaration of a generic. That means that
         // the parent of the decl ref must be a generic.
         //
-        auto parentGeneric = declRef.GetParent().as<GenericDecl>();
+        auto parentGeneric = declRef.getParent().as<GenericDecl>();
         if(!parentGeneric)
             return 0;
         //
@@ -1253,14 +1253,14 @@ namespace Slang
     void SemanticsVisitor::formatDeclPath(StringBuilder& sb, DeclRef<Decl> declRef)
     {
         // Find the parent declaration
-        auto parentDeclRef = declRef.GetParent();
+        auto parentDeclRef = declRef.getParent();
 
         // If the immediate parent is a generic, then we probably
         // want the declaration above that...
         auto parentGenericDeclRef = parentDeclRef.as<GenericDecl>();
         if(parentGenericDeclRef)
         {
-            parentDeclRef = parentGenericDeclRef.GetParent();
+            parentDeclRef = parentGenericDeclRef.getParent();
         }
 
         // Depending on what the parent is, we may want to format things specially
@@ -1343,14 +1343,14 @@ namespace Slang
                     if (!first) sb << ", ";
                     first = false;
 
-                    sb << getText(genericTypeParam.GetName());
+                    sb << getText(genericTypeParam.getName());
                 }
                 else if(auto genericValParam = paramDeclRef.as<GenericValueParamDecl>())
                 {
                     if (!first) sb << ", ";
                     first = false;
 
-                    sb << getText(genericValParam.GetName());
+                    sb << getText(genericValParam.getName());
                     sb << ":";
                     formatType(sb, getType(m_astBuilder, genericValParam));
                 }

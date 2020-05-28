@@ -951,7 +951,7 @@ static void maybeDiagnoseMissingVulkanLayoutModifier(
     // oversight on their part.
     if( auto registerModifier = varDecl.getDecl()->findModifier<HLSLRegisterSemantic>() )
     {
-        getSink(context)->diagnose(registerModifier, Diagnostics::registerModifierButNoVulkanLayout, varDecl.GetName());
+        getSink(context)->diagnose(registerModifier, Diagnostics::registerModifierButNoVulkanLayout, varDecl.getName());
     }
 }
 
@@ -1007,7 +1007,7 @@ static void addExplicitParameterBindings_GLSL(
         }
         if( attr->binding != 0)
         {
-            getSink(context)->diagnose(attr, Diagnostics::wholeSpaceParameterRequiresZeroBinding, varDecl.GetName(), attr->binding);
+            getSink(context)->diagnose(attr, Diagnostics::wholeSpaceParameterRequiresZeroBinding, varDecl.getName(), attr->binding);
         }
         semanticInfo.index = attr->set;
         semanticInfo.space = 0;
@@ -1852,7 +1852,7 @@ static RefPtr<TypeLayout> processEntryPointVaryingParameter(
     // A matrix is processed as if it was an array of rows
     else if( auto matrixType = as<MatrixExpressionType>(type) )
     {
-        auto rowCount = GetIntVal(matrixType->getRowCount());
+        auto rowCount = getIntVal(matrixType->getRowCount());
         return processSimpleEntryPointParameter(context, matrixType, state, varLayout, (int) rowCount);
     }
     else if( auto arrayType = as<ArrayExpressionType>(type) )
@@ -1860,7 +1860,7 @@ static RefPtr<TypeLayout> processEntryPointVaryingParameter(
         // Note: Bad Things will happen if we have an array input
         // without a semantic already being enforced.
         
-        auto elementCount = (UInt) GetIntVal(arrayType->arrayLength);
+        auto elementCount = (UInt) getIntVal(arrayType->arrayLength);
 
         // We use the first element to derive the layout for the element type
         auto elementTypeLayout = processEntryPointVaryingParameter(context, arrayType->baseType, state, varLayout);

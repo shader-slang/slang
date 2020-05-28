@@ -422,7 +422,7 @@ static void _lookUpMembersInSuperTypeDeclImpl(
         // then the members it provides can only be discovered by looking
         // at the constraints that are placed on that type.
 
-        auto genericDeclRef = genericTypeParamDeclRef.GetParent().as<GenericDecl>();
+        auto genericDeclRef = genericTypeParamDeclRef.getParent().as<GenericDecl>();
         assert(genericDeclRef);
 
         for(auto constraintDeclRef : getMembersOfType<GenericTypeConstraintDecl>(genericDeclRef))

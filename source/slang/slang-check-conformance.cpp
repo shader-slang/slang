@@ -228,7 +228,7 @@ namespace Slang
                 // We need to enumerate the constraints placed on this type by its outer
                 // generic declaration, and see if any of them guarantees that we
                 // satisfy the given interface..
-                auto genericDeclRef = genericTypeParamDeclRef.GetParent().as<GenericDecl>();
+                auto genericDeclRef = genericTypeParamDeclRef.getParent().as<GenericDecl>();
                 SLANG_ASSERT(genericDeclRef);
 
                 for( auto constraintDeclRef : getMembersOfType<GenericTypeConstraintDecl>(genericDeclRef) )

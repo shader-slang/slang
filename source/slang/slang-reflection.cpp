@@ -339,11 +339,11 @@ SLANG_API size_t spReflectionType_GetElementCount(SlangReflectionType* inType)
 
     if(auto arrayType = as<ArrayExpressionType>(type))
     {
-        return arrayType->arrayLength ? (size_t) GetIntVal(arrayType->arrayLength) : 0;
+        return arrayType->arrayLength ? (size_t) getIntVal(arrayType->arrayLength) : 0;
     }
     else if( auto vectorType = as<VectorExpressionType>(type))
     {
-        return (size_t) GetIntVal(vectorType->elementCount);
+        return (size_t) getIntVal(vectorType->elementCount);
     }
 
     return 0;
@@ -381,7 +381,7 @@ SLANG_API unsigned int spReflectionType_GetRowCount(SlangReflectionType* inType)
 
     if(auto matrixType = as<MatrixExpressionType>(type))
     {
-        return (unsigned int) GetIntVal(matrixType->getRowCount());
+        return (unsigned int) getIntVal(matrixType->getRowCount());
     }
     else if(auto vectorType = as<VectorExpressionType>(type))
     {
@@ -402,11 +402,11 @@ SLANG_API unsigned int spReflectionType_GetColumnCount(SlangReflectionType* inTy
 
     if(auto matrixType = as<MatrixExpressionType>(type))
     {
-        return (unsigned int) GetIntVal(matrixType->getColumnCount());
+        return (unsigned int) getIntVal(matrixType->getColumnCount());
     }
     else if(auto vectorType = as<VectorExpressionType>(type))
     {
-        return (unsigned int) GetIntVal(vectorType->elementCount);
+        return (unsigned int) getIntVal(vectorType->elementCount);
     }
     else if( auto basicType = as<BasicExpressionType>(type) )
     {
@@ -585,7 +585,7 @@ SLANG_API char const* spReflectionType_GetName(SlangReflectionType* inType)
         if(decl->hasModifier<ImplicitParameterGroupElementTypeModifier>())
             return nullptr;
 
-        return getText(declRef.GetName()).begin();
+        return getText(declRef.getName()).begin();
     }
 
     return nullptr;
@@ -1498,7 +1498,7 @@ SLANG_API SlangReflectionEntryPoint* spReflection_findEntryPointByName(SlangRefl
     // TODO: improve on naive linear search
     for(auto ep : program->entryPoints)
     {
-        if(ep->entryPoint.GetName()->text == name)
+        if(ep->entryPoint.getName()->text == name)
         {
             return convert(ep);
         }

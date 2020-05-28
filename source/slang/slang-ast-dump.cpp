@@ -417,7 +417,7 @@ struct Context
 
     void dump(const QualType& qualType)
     {
-        if (qualType.IsLeftValue)
+        if (qualType.isLeftValue)
         {
             m_writer->emit("left ");
         }

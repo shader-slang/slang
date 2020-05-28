@@ -13,8 +13,6 @@
 
 #include "slang-ast-reflect.h"
 
-
-
 #include "slang-name.h"
 
 #include <assert.h>
@@ -128,14 +126,6 @@ namespace Slang
 
     class Decl;
     class Val;
-
-#if 0
-    // Forward-declare all syntax classes
-#define SYNTAX_CLASS(NAME, BASE, ...) class NAME;
-#include "slang-object-meta-begin.h"
-#include "slang-syntax-defs.h"
-#include "slang-object-meta-end.h"
-#endif
 
     // Helper type for pairing up a name and the location where it appeared
     struct NameLoc
@@ -306,7 +296,7 @@ namespace Slang
 
     // Try to extract a simple integer value from an `IntVal`.
     // This fill assert-fail if the object doesn't represent a literal value.
-    IntegerLiteralValue GetIntVal(RefPtr<IntVal> val);
+    IntegerLiteralValue getIntVal(RefPtr<IntVal> val);
 
         /// Represents how much checking has been applied to a declaration.
     enum class DeclCheckState : uint8_t
@@ -440,15 +430,15 @@ namespace Slang
     struct QualType
     {
         RefPtr<Type>	type;
-        bool	        IsLeftValue;
+        bool	        isLeftValue;
 
         QualType()
-            : IsLeftValue(false)
+            : isLeftValue(false)
         {}
 
         QualType(Type* type)
             : type(type)
-            , IsLeftValue(false)
+            , isLeftValue(false)
         {}
 
         Type* Ptr() { return type.Ptr(); }
@@ -651,9 +641,9 @@ namespace Slang
         }
 
         // Convenience accessors for common properties of declarations
-        Name* GetName() const;
+        Name* getName() const;
         SourceLoc getLoc() const;
-        DeclRefBase GetParent() const;
+        DeclRefBase getParent() const;
 
         HashCode getHashCode() const;
 
@@ -722,9 +712,9 @@ namespace Slang
             return DeclRef<T>::unsafeInit(DeclRefBase::substituteImpl(astBuilder, subst, ioDiff));
         }
 
-        DeclRef<ContainerDecl> GetParent() const
+        DeclRef<ContainerDecl> getParent() const
         {
-            return DeclRef<ContainerDecl>::unsafeInit(DeclRefBase::GetParent());
+            return DeclRef<ContainerDecl>::unsafeInit(DeclRefBase::getParent());
         }
     };
 
@@ -1180,7 +1170,7 @@ namespace Slang
 
         Name* getName() const
         {
-            return items.getCount() > 1 ? items[0].declRef.GetName() : item.declRef.GetName();
+            return items.getCount() > 1 ? items[0].declRef.getName() : item.declRef.getName();
         }
         LookupResultItem* begin()
         {

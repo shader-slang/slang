@@ -201,7 +201,7 @@ namespace Slang
             // "depth" (how many outer generics) and "index" (which
             // parameter are they at the specified depth).
             emitRaw(context, "K");
-            emitName(context, genericParamIntVal->declRef.GetName());
+            emitName(context, genericParamIntVal->declRef.getName());
         }
         else if( auto constantIntVal = dynamicCast<ConstantIntVal>(val) )
         {
@@ -220,7 +220,7 @@ namespace Slang
         ManglingContext*    context,
         DeclRef<Decl>       declRef)
     {
-        auto parentDeclRef = declRef.GetParent();
+        auto parentDeclRef = declRef.getParent();
         auto parentGenericDeclRef = parentDeclRef.as<GenericDecl>();
         if( parentDeclRef )
         {
@@ -268,7 +268,7 @@ namespace Slang
             return;
         }
 
-        emitName(context, declRef.GetName());
+        emitName(context, declRef.getName());
 
         // Special case: accessors need some way to distinguish themselves
         // so that a getter/setter/ref-er don't all compile to the same name.

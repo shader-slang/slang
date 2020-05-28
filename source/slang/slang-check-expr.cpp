@@ -215,14 +215,14 @@ namespace Slang
                         loc,
                         Diagnostics::staticRefToNonStaticMember,
                         typeType->type,
-                        declRef.GetName());
+                        declRef.getName());
                 }
 
                 auto expr = m_astBuilder->create<StaticMemberExpr>();
                 expr->loc = loc;
                 expr->type = type;
                 expr->baseExpression = baseExpr;
-                expr->name = declRef.GetName();
+                expr->name = declRef.getName();
                 expr->declRef = declRef;
                 return expr;
             }
@@ -238,7 +238,7 @@ namespace Slang
                 expr->loc = loc;
                 expr->type = type;
                 expr->baseExpression = baseTypeExpr;
-                expr->name = declRef.GetName();
+                expr->name = declRef.getName();
                 expr->declRef = declRef;
                 return expr;
             }
@@ -251,7 +251,7 @@ namespace Slang
                 expr->loc = loc;
                 expr->type = type;
                 expr->baseExpression = baseExpr;
-                expr->name = declRef.GetName();
+                expr->name = declRef.getName();
                 expr->declRef = declRef;
 
                 // When referring to a member through an expression,
@@ -261,9 +261,9 @@ namespace Slang
                 // We have already used the `QualType` from the member
                 // above (that is `type`), so we need to take the
                 // l-value status of the base expression into account now.
-                if(!baseExpr->type.IsLeftValue)
+                if(!baseExpr->type.isLeftValue)
                 {
-                    expr->type.IsLeftValue = false;
+                    expr->type.isLeftValue = false;
                 }
 
                 return expr;
@@ -276,7 +276,7 @@ namespace Slang
             //
             auto expr = m_astBuilder->create<VarExpr>();
             expr->loc = loc;
-            expr->name = declRef.GetName();
+            expr->name = declRef.getName();
             expr->type = type;
             expr->declRef = declRef;
             return expr;
@@ -389,7 +389,7 @@ namespace Slang
                         // logic will have computed an appropriate "mode" based
                         // on the context during lookup.
                         //
-                        expr->type.IsLeftValue = thisParameterMode == LookupResultItem::Breadcrumb::ThisParameterMode::MutableValue;
+                        expr->type.isLeftValue = thisParameterMode == LookupResultItem::Breadcrumb::ThisParameterMode::MutableValue;
 
                         bb = expr;
                     }
@@ -485,7 +485,7 @@ namespace Slang
 
     void SemanticsVisitor::diagnoseAmbiguousReference(OverloadedExpr* overloadedExpr, LookupResult const& lookupResult)
     {
-        getSink()->diagnose(overloadedExpr, Diagnostics::ambiguousReference, lookupResult.items[0].declRef.GetName());
+        getSink()->diagnose(overloadedExpr, Diagnostics::ambiguousReference, lookupResult.items[0].declRef.getName());
 
         for(auto item : lookupResult.items)
         {
@@ -656,7 +656,7 @@ namespace Slang
         return expr;
     }
 
-    IntVal* SemanticsVisitor::GetIntVal(IntegerLiteralExpr* expr)
+    IntVal* SemanticsVisitor::getIntVal(IntegerLiteralExpr* expr)
     {
         // TODO(tfoley): don't keep allocating here!
         return m_astBuilder->create<ConstantIntVal>(expr->value);
@@ -734,7 +734,7 @@ namespace Slang
 
         // At this point, all the operands had simple integer values, so we are golden.
         IntegerLiteralValue resultValue = 0;
-        auto opName = funcDeclRef.GetName();
+        auto opName = funcDeclRef.getName();
 
         // handle binary operators
         if (opName == getName("-"))
@@ -800,7 +800,7 @@ namespace Slang
         // TODO(tfoley): more serious constant folding here
         if (auto intLitExpr = as<IntegerLiteralExpr>(expr))
         {
-            return GetIntVal(intLitExpr);
+            return getIntVal(intLitExpr);
         }
 
         // it is possible that we are referring to a generic value param
@@ -933,7 +933,7 @@ namespace Slang
         subscriptExpr->type = QualType(elementType);
 
         // TODO(tfoley): need to be more careful about this stuff
-        subscriptExpr->type.IsLeftValue = baseExpr->type.IsLeftValue;
+        subscriptExpr->type.isLeftValue = baseExpr->type.isLeftValue;
 
         return subscriptExpr;
     }
@@ -1086,7 +1086,7 @@ namespace Slang
         // and if it is immutable.
         if(auto thisExpr = as<ThisExpr>(e))
         {
-            if(!thisExpr->type.IsLeftValue)
+            if(!thisExpr->type.isLeftValue)
             {
                 getSink()->diagnose(thisExpr, Diagnostics::thisIsImmutableByDefault);
             }
@@ -1101,7 +1101,7 @@ namespace Slang
 
         expr->right = coerce(type, CheckTerm(expr->right));
 
-        if (!type.IsLeftValue)
+        if (!type.isLeftValue)
         {
             if (as<ErrorType>(type))
             {
@@ -1157,7 +1157,7 @@ namespace Slang
                         if( pp < expr->arguments.getCount() )
                         {
                             auto argExpr = expr->arguments[pp];
-                            if( !argExpr->type.IsLeftValue )
+                            if( !argExpr->type.isLeftValue )
                             {
                                 getSink()->diagnose(
                                     argExpr,
@@ -1341,7 +1341,7 @@ namespace Slang
             if (auto pointerLikeType = as<PointerLikeType>(baseType))
             {
                 auto elementType = QualType(pointerLikeType->elementType);
-                elementType.IsLeftValue = baseType.IsLeftValue;
+                elementType.isLeftValue = baseType.isLeftValue;
 
                 auto derefExpr = m_astBuilder->create<DerefExpr>();
                 derefExpr->base = expr;
@@ -1445,7 +1445,7 @@ namespace Slang
 
         // A swizzle can be used as an l-value as long as there
         // were no duplicates in the list of components
-        swizExpr->type.IsLeftValue = !anyDuplicates;
+        swizExpr->type.isLeftValue = !anyDuplicates;
 
         return swizExpr;
     }
@@ -1745,7 +1745,7 @@ namespace Slang
     RefPtr<Expr> SemanticsExprVisitor::visitThisExpr(ThisExpr* expr)
     {
         // A `this` expression will default to immutable.
-        expr->type.IsLeftValue = false;
+        expr->type.isLeftValue = false;
 
         // We will do an upwards search starting in the current
         // scope, looking for a surrounding type (or `extension`)
@@ -1759,7 +1759,7 @@ namespace Slang
             {
                 if( funcDeclBase->hasModifier<MutatingAttribute>() )
                 {
-                    expr->type.IsLeftValue = true;
+                    expr->type.isLeftValue = true;
                 }
             }
             else if( auto typeOrExtensionDecl = as<AggTypeDeclBase>(containerDecl) )

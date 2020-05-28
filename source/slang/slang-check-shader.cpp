@@ -1019,7 +1019,7 @@ namespace Slang
                                 sink->diagnose(genericTypeParamDecl,
                                     Diagnostics::cannotSpecializeGlobalGenericToAnotherGenericParam,
                                     genericTypeParamDecl->getName(),
-                                    argGenericParamDeclRef.GetName());
+                                    argGenericParamDeclRef.getName());
                                 continue;
                             }
                         }
@@ -1172,7 +1172,7 @@ namespace Slang
             // the semantic checking machinery to expand out
             // the rest of the arguments via inference...
 
-            auto genericDeclRef = m_funcDeclRef.GetParent().as<GenericDecl>();
+            auto genericDeclRef = m_funcDeclRef.getParent().as<GenericDecl>();
             SLANG_ASSERT(genericDeclRef); // otherwise we wouldn't have generic parameters
 
             RefPtr<GenericSubstitution> genericSubst = getLinkage()->getASTBuilder()->create<GenericSubstitution>();

@@ -362,14 +362,14 @@ namespace Slang
                 }
             }
 
-            qualType.IsLeftValue = isLValue;
+            qualType.isLeftValue = isLValue;
             return qualType;
         }
         else if( auto enumCaseDeclRef = declRef.as<EnumCaseDecl>() )
         {
             QualType qualType;
             qualType.type = getType(astBuilder, enumCaseDeclRef);
-            qualType.IsLeftValue = false;
+            qualType.isLeftValue = false;
             return qualType;
         }
         else if (auto typeAliasDeclRef = declRef.as<TypeDefDecl>())
@@ -428,7 +428,7 @@ namespace Slang
             // TODO: This code could break if we ever go down this path with
             // an identifier that doesn't have a name.
             //
-            sink->diagnose(loc, Diagnostics::undefinedIdentifier2, declRef.GetName());
+            sink->diagnose(loc, Diagnostics::undefinedIdentifier2, declRef.getName());
         }
         return QualType(astBuilder->getErrorType());
     }
@@ -1478,7 +1478,7 @@ namespace Slang
         // since only same-name members will be able to
         // satisfy the requirement.
         //
-        Name* name = requiredMemberDeclRef.GetName();
+        Name* name = requiredMemberDeclRef.getName();
 
         // We start by looking up members of the same
         // name, on the type that is claiming to conform.
