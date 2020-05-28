@@ -131,43 +131,18 @@ namespace Slang
     class DiagnosticSink
     {
     public:
-        DiagnosticSink(SourceManager* sourceManager)
-            : sourceManager(sourceManager)
-        {}
-
+            /// Flags to control some aspects of Diagnostic sink behavior
+        typedef uint32_t Flags;
         struct Flag 
         {
-            enum Enum: uint32_t
+            enum Enum: Flags
             {
                 VerbosePath = 0x1,              ///< Will display a more verbose path (if available) - such as a canonical or absolute path
             };
         };
-        typedef uint32_t Flags;
 
-        StringBuilder outputBuffer;
-//            List<Diagnostic> diagnostics;
-        int errorCount = 0;
-        int internalErrorLocsNoted = 0;
-
-        ISlangWriter* writer                        = nullptr;
-        Flags flags                                 = 0;
-
-        // The source manager to use when mapping source locations to file+line info
-        SourceManager*  sourceManager = nullptr;
-
-/*
-        void Error(int id, const String & msg, const SourceLoc & pos)
-        {
-            diagnostics.Add(Diagnostic(msg, id, pos, Severity::Error));
-            errorCount++;
-        }
-
-        void Warning(int id, const String & msg, const SourceLoc & pos)
-        {
-            diagnostics.Add(Diagnostic(msg, id, pos, Severity::Warning));
-        }
-*/
-        int GetErrorCount() { return errorCount; }
+            /// Get the total amount of errors that have taken place on this DiagnosticSink
+        SLANG_FORCE_INLINE int getErrorCount() { return m_errorCount; }
 
         void diagnoseDispatch(SourceLoc const& pos, DiagnosticInfo const& info)
         {
@@ -204,22 +179,55 @@ namespace Slang
             diagnoseDispatch(getDiagnosticPos(pos), info, args...);
         }
 
-        void diagnoseImpl(SourceLoc const& pos, DiagnosticInfo const& info, int argCount, DiagnosticArg const* const* args);
-
-        // Add a diagnostic with raw text
-        // (used when we get errors from a downstream compiler)
-        void diagnoseRaw(
-            Severity    severity,
-            char const* message);
-        void diagnoseRaw(
-            Severity    severity,
-            const UnownedStringSlice& message);
+            // Add a diagnostic with raw text
+            // (used when we get errors from a downstream compiler)
+        void diagnoseRaw(Severity severity, char const* message);
+        void diagnoseRaw(Severity severity, const UnownedStringSlice& message);
 
             /// During propagation of an exception for an internal
             /// error, note that this source location was involved
         void noteInternalErrorLoc(SourceLoc const& loc);
 
+            /// Create a blob containing diagnostics if there were any errors.
+            /// *note* only works if writer is not set, the blob is created from outputBuffer
         SlangResult getBlobIfNeeded(ISlangBlob** outBlob);
+
+            /// Get the source manager used 
+        SourceManager* getSourceManager() const { return m_sourceManager; }
+            /// Set the source manager used for lookup of source locs
+        void setSourceManager(SourceManager* inSourceManager) { m_sourceManager = inSourceManager; }
+
+            /// Get the flags
+        Flags getFlags() const { return m_flags; }
+            /// Set a flag
+        void setFlag(Flag::Enum flag) { m_flags |= Flags(flag); }
+            /// Reset a flag
+        void resetFlag(Flag::Enum flag) { m_flags &= ~Flags(flag); }
+            /// Test if flag is set
+        bool isFlagSet(Flag::Enum flag) { return (m_flags & Flags(flag)) != 0; }
+
+            /// Ctor
+        DiagnosticSink(SourceManager* sourceManager)
+            : m_sourceManager(sourceManager)
+        {}
+
+        // Public members
+
+            /// The outputBuffer will contain any diagnostics *iff* the writer is *not* set
+        StringBuilder outputBuffer;
+            /// If a writer is set output will *not* be written to the outputBuffer
+        ISlangWriter* writer = nullptr;
+
+    protected:
+        void diagnoseImpl(SourceLoc const& pos, DiagnosticInfo const& info, int argCount, DiagnosticArg const* const* args);
+
+        int m_errorCount = 0;
+        int m_internalErrorLocsNoted = 0;
+
+        Flags m_flags = 0;
+
+        // The source manager to use when mapping source locations to file+line info
+        SourceManager* m_sourceManager = nullptr;
     };
 
         /// An `ISlangWriter` that writes directly to a diagnostic sink.

@@ -559,7 +559,7 @@ struct OptionsParser
                 }
                 else if (argStr == "-verbose-paths")
                 {
-                    requestImpl->getSink()->flags |= DiagnosticSink::Flag::VerbosePath;
+                    requestImpl->getSink()->setFlag(DiagnosticSink::Flag::VerbosePath);
                 }
                 else if (argStr == "-verify-debug-serial-ir")
                 {
@@ -1494,7 +1494,7 @@ struct OptionsParser
             }
         }
 
-        return (sink->GetErrorCount() == 0) ? SLANG_OK : SLANG_FAIL;
+        return (sink->getErrorCount() == 0) ? SLANG_OK : SLANG_FAIL;
     }
 };
 
@@ -1514,7 +1514,7 @@ SlangResult parseOptions(
     Result res = parser.parse(argc, argv);
 
     DiagnosticSink* sink = compileRequest->getSink();
-    if (sink->GetErrorCount() > 0)
+    if (sink->getErrorCount() > 0)
     {
         // Put the errors in the diagnostic 
         compileRequest->mDiagnosticOutput = sink->outputBuffer.ProduceString();
