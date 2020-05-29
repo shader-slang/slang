@@ -545,6 +545,12 @@ struct Context
         m_writer->emit("\n");
     }
 
+    void dump(ASTNodeType nodeType)
+    {
+        SLANG_UNUSED(nodeType)
+        // Don't bother to output anything - as will already have been dumped with the object name
+    }
+
     void dumpObjectFull(NodeBase* node);
 
     Context(SourceWriter* writer, ASTDumpUtil::Style dumpStyle):

@@ -48,7 +48,7 @@ struct ASTConstructAccess
     template <typename T>
     struct CreateImpl
     {
-        static void* create() { return new T; }
+        static void* create(ASTBuilder* astBuilder) { return astBuilder->create<T>(); }
     };
 };
 

@@ -23,10 +23,19 @@ class NodeBase : public RefObject
 {
     SLANG_ABSTRACT_CLASS(NodeBase)
 
-        // By default AST types do *not* store the builder. This is called when constructed tho.
-    SLANG_FORCE_INLINE void setASTBuilder(ASTBuilder* astBuilder) { SLANG_UNUSED(astBuilder); }
+        // MUST be called before used. Called automatically via the ASTBuilder.
+        // Note that the astBuilder is not stored in the NodeBase derived types by default.
+    SLANG_FORCE_INLINE void init(ASTNodeType inAstNodeType, ASTBuilder* /* astBuilder*/ ) { astNodeType = inAstNodeType; }
+
+        /// Get the class info 
+    SLANG_FORCE_INLINE const ReflectClassInfo& getClassInfo() const { return *ReflectClassInfo::getInfo(astNodeType); }
 
     SyntaxClass<NodeBase> getClass() { return SyntaxClass<NodeBase>(&getClassInfo()); }
+
+        /// The type of the node. ASTNodeType(-1) is an invalid node type, and shouldn't appear on any
+        /// correctly constructed (through ASTBuilder) NodeBase derived class. 
+        /// The actual type is set when constructed on the ASTBuilder. 
+    ASTNodeType astNodeType = ASTNodeType(-1);
 };
 
 // Casting of NodeBase
@@ -34,26 +43,27 @@ class NodeBase : public RefObject
 template<typename T>
 SLANG_FORCE_INLINE T* dynamicCast(NodeBase* node)
 {
-    return (node && node->getClassInfo().isSubClassOf(T::kReflectClassInfo)) ? static_cast<T*>(node) : nullptr;
+    return (node && ReflectClassInfo::isSubClassOf(node->astNodeType, T::kReflectClassInfo)) ? static_cast<T*>(node) : nullptr;
 }
 
 template<typename T>
 SLANG_FORCE_INLINE const T* dynamicCast(const NodeBase* node)
 {
-    return (node && node->getClassInfo().isSubClassOf(T::kReflectClassInfo)) ? static_cast<const T*>(node) : nullptr;
+    return (node && ReflectClassInfo::isSubClassOf(node->astNodeType, T::kReflectClassInfo)) ? static_cast<const T*>(node) : nullptr;
 }
 
 template<typename T>
 SLANG_FORCE_INLINE T* as(NodeBase* node)
 {
-    return (node && node->getClassInfo().isSubClassOf(T::kReflectClassInfo)) ? static_cast<T*>(node) : nullptr;
+    return (node && ReflectClassInfo::isSubClassOf(node->astNodeType, T::kReflectClassInfo)) ? static_cast<T*>(node) : nullptr;
 }
 
 template<typename T>
 SLANG_FORCE_INLINE const T* as(const NodeBase* node)
 {
-    return (node && node->getClassInfo().isSubClassOf(T::kReflectClassInfo)) ? static_cast<const T*>(node) : nullptr;
+    return (node && ReflectClassInfo::isSubClassOf(node->astNodeType, T::kReflectClassInfo)) ? static_cast<const T*>(node) : nullptr;
 }
+
 
 
 // Base class for all nodes representing actual syntax
@@ -128,8 +138,8 @@ class Type: public Val
     void accept(ITypeVisitor* visitor, void* extra);
 
         /// Type derived types store the AST builder they were constructed on. The builder calls this function
-        /// after constructing
-    SLANG_FORCE_INLINE void setASTBuilder(ASTBuilder* astBuilder) { m_astBuilder = astBuilder; }
+        /// after constructing.
+    SLANG_FORCE_INLINE void init(ASTNodeType inAstNodeType, ASTBuilder* inAstBuilder) { m_astBuilder = inAstBuilder; astNodeType = inAstNodeType; }
 
         /// Get the ASTBuilder that was used to construct this Type
     SLANG_FORCE_INLINE ASTBuilder* getASTBuilder() const { return m_astBuilder; }
@@ -166,9 +176,6 @@ SLANG_FORCE_INLINE const T* as(const Type* obj) { return obj ? dynamicCast<T>(co
 class Substitutions: public NodeBase
 {
     SLANG_ABSTRACT_CLASS(Substitutions)
-
-    // By default AST types do *not* store the builder. This is called when constructed tho.
-    SLANG_FORCE_INLINE void setASTBuilder(ASTBuilder* astBuilder) { SLANG_UNUSED(astBuilder); }
 
     // The next outer that this one refines.
     RefPtr<Substitutions> outer;

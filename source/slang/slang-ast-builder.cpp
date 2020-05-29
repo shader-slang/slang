@@ -132,7 +132,7 @@ void SharedASTBuilder::registerMagicDecl(RefPtr<Decl> decl, RefPtr<MagicTypeModi
     m_magicDecls[modifier->name] = declToRegister.Ptr();
 }
 
-RefPtr<Decl> SharedASTBuilder::findMagicDecl(const String&   name)
+RefPtr<Decl> SharedASTBuilder::findMagicDecl(const String& name)
 {
     return m_magicDecls[name].GetValue();
 }
@@ -150,7 +150,7 @@ ASTBuilder::ASTBuilder():
 {
 }
 
-RefPtr<PtrType> ASTBuilder::getPtrType( RefPtr<Type>    valueType)
+RefPtr<PtrType> ASTBuilder::getPtrType(RefPtr<Type> valueType)
 {
     return getPtrType(valueType, "PtrType").dynamicCast<PtrType>();
 }
@@ -206,7 +206,7 @@ RefPtr<VectorExpressionType> ASTBuilder::getVectorType(
         
     auto vectorTypeDecl = vectorGenericDecl->inner;
 
-    auto substitutions = new GenericSubstitution();
+    auto substitutions = create<GenericSubstitution>();
     substitutions->genericDecl = vectorGenericDecl.Ptr();
     substitutions->args.add(elementType);
     substitutions->args.add(elementCount);

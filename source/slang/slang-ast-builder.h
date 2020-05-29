@@ -91,13 +91,13 @@ public:
 
         /// Create AST type. 
     template <typename T>
-    T* create() { SLANG_COMPILE_TIME_ASSERT(IsValidType<T>::Value);  T* node = new T; node->setASTBuilder(this); return node; }
+    T* create() { SLANG_COMPILE_TIME_ASSERT(IsValidType<T>::Value);  T* node = new T; node->init(T::kType, this); return node; }
 
     template<typename T, typename P0>
-    T* create(const P0& p0) { SLANG_COMPILE_TIME_ASSERT(IsValidType<T>::Value); T* node = new T(p0); node->setASTBuilder(this); return node;}
+    T* create(const P0& p0) { SLANG_COMPILE_TIME_ASSERT(IsValidType<T>::Value); T* node = new T(p0); node->init(T::kType, this); return node;}
 
     template<typename T, typename P0, typename P1>
-    T* create(const P0& p0, const P1& p1) { SLANG_COMPILE_TIME_ASSERT(IsValidType<T>::Value); T* node = new T(p0, p1); node->setASTBuilder(this); return node; }
+    T* create(const P0& p0, const P1& p1) { SLANG_COMPILE_TIME_ASSERT(IsValidType<T>::Value); T* node = new T(p0, p1); node->init(T::kType, this); return node; }
 
         /// Get the built in types
     SLANG_FORCE_INLINE Type* getBoolType() { return m_sharedASTBuilder->m_builtinTypes[Index(BaseType::Bool)]; }
