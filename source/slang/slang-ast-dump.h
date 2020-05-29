@@ -20,7 +20,6 @@ struct ASTDumpUtil
     };
 
     static void dump(NodeBase* node, Style style, SourceWriter* writer);
-    static void dump(Substitutions* subs, Style style, SourceWriter* writer);
 };
 
 } // namespace Slang

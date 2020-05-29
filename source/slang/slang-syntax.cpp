@@ -827,7 +827,7 @@ Index getFilterCountImpl(const ReflectClassInfo& clsInfo, MemberFilterStyle filt
                     SLANG_UNEXPECTED("unhandled type");
                 }
 
-                RefPtr<RefObject> type = classInfo.createInstance();
+                RefPtr<RefObject> type = classInfo.createInstance(astBuilder);
                 if (!type)
                 {
                     SLANG_UNEXPECTED("constructor failure");
