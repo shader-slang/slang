@@ -714,7 +714,7 @@ struct IRBoolLit : IRConstant
 
 // Get the compile-time constant integer value of an instruction,
 // if it has one, and assert-fail otherwise.
-IRIntegerValue GetIntVal(IRInst* inst);
+IRIntegerValue getIntVal(IRInst* inst);
 
 struct IRStringLit : IRConstant
 {

@@ -3170,7 +3170,7 @@ static TypeLayoutResult _createTypeLayout(
     else if(auto vecType = as<VectorExpressionType>(type))
     {
         auto elementType = vecType->elementType;
-        size_t elementCount = (size_t) GetIntVal(vecType->elementCount);
+        size_t elementCount = (size_t) getIntVal(vecType->elementCount);
 
         auto element = _createTypeLayout(
             context,
@@ -3198,8 +3198,8 @@ static TypeLayoutResult _createTypeLayout(
     }
     else if(auto matType = as<MatrixExpressionType>(type))
     {
-        size_t rowCount = (size_t) GetIntVal(matType->getRowCount());
-        size_t colCount = (size_t) GetIntVal(matType->getColumnCount());
+        size_t rowCount = (size_t) getIntVal(matType->getRowCount());
+        size_t colCount = (size_t) getIntVal(matType->getColumnCount());
 
         auto elementType = matType->getElementType();
         auto elementResult = _createTypeLayout(
@@ -3439,7 +3439,7 @@ static TypeLayoutResult _createTypeLayout(
 
             typeLayoutBuilder.beginLayout(type, rules);
             auto typeLayout = typeLayoutBuilder.getTypeLayout();
-            for (auto field : GetFields(structDeclRef, MemberFilterStyle::Instance))
+            for (auto field : getFields(structDeclRef, MemberFilterStyle::Instance))
             {
                 // The fields of a `struct` type may include existential (interface)
                 // types (including as nested sub-fields), and any types present
@@ -3463,7 +3463,7 @@ static TypeLayoutResult _createTypeLayout(
 
                 TypeLayoutResult fieldResult = _createTypeLayout(
                     fieldLayoutContext,
-                    GetType(context.astBuilder, field).Ptr(),
+                    getType(context.astBuilder, field).Ptr(),
                     field.getDecl());
                 auto fieldTypeLayout = fieldResult.layout;
 
@@ -3788,7 +3788,7 @@ RefPtr<TypeLayout> getSimpleVaryingParameterTypeLayout(
     else if(auto vecType = as<VectorExpressionType>(type))
     {
         auto elementType = vecType->elementType;
-        size_t elementCount = (size_t) GetIntVal(vecType->elementCount);
+        size_t elementCount = (size_t) getIntVal(vecType->elementCount);
 
         BaseType elementBaseType = BaseType::Void;
         if( auto elementBasicType = as<BasicExpressionType>(elementType) )
@@ -3822,8 +3822,8 @@ RefPtr<TypeLayout> getSimpleVaryingParameterTypeLayout(
     }
     else if(auto matType = as<MatrixExpressionType>(type))
     {
-        size_t rowCount = (size_t) GetIntVal(matType->getRowCount());
-        size_t colCount = (size_t) GetIntVal(matType->getColumnCount());
+        size_t rowCount = (size_t) getIntVal(matType->getRowCount());
+        size_t colCount = (size_t) getIntVal(matType->getColumnCount());
         auto elementType = matType->getElementType();
 
         BaseType elementBaseType = BaseType::Void;

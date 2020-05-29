@@ -6,12 +6,12 @@
 namespace Slang
 {
 
-    inline RefPtr<Type> GetSub(ASTBuilder* astBuilder, DeclRef<GenericTypeConstraintDecl> const& declRef)
+    inline RefPtr<Type> getSub(ASTBuilder* astBuilder, DeclRef<GenericTypeConstraintDecl> const& declRef)
     {
         return declRef.substitute(astBuilder, declRef.getDecl()->sub.Ptr());
     }
 
-    inline RefPtr<Type> GetSup(ASTBuilder* astBuilder, DeclRef<TypeConstraintDecl> const& declRef)
+    inline RefPtr<Type> getSup(ASTBuilder* astBuilder, DeclRef<TypeConstraintDecl> const& declRef)
     {
         return declRef.substitute(astBuilder, declRef.getDecl()->getSup().type);
     }
@@ -27,13 +27,13 @@ namespace Slang
 
     //
 
-    inline BaseType GetVectorBaseType(VectorExpressionType* vecType)
+    inline BaseType getVectorBaseType(VectorExpressionType* vecType)
     {
         auto basicExprType = as<BasicExpressionType>(vecType->elementType);
         return basicExprType->baseType;
     }
 
-    inline int GetVectorSize(VectorExpressionType* vecType)
+    inline int getVectorSize(VectorExpressionType* vecType)
     {
         auto constantVal = as<ConstantIntVal>(vecType->elementCount);
         if (constantVal)
@@ -46,7 +46,7 @@ namespace Slang
     // Declarations
     //
 
-    inline ExtensionDecl* GetCandidateExtensions(DeclRef<AggTypeDecl> const& declRef)
+    inline ExtensionDecl* getCandidateExtensions(DeclRef<AggTypeDecl> const& declRef)
     {
         return declRef.getDecl()->candidateExtensions;
     }
@@ -70,7 +70,7 @@ namespace Slang
             rs.add(d);
         if (auto aggDeclRef = declRef.as<AggTypeDecl>())
         {
-            for (auto ext = GetCandidateExtensions(aggDeclRef); ext; ext = ext->nextCandidateExtension)
+            for (auto ext = getCandidateExtensions(aggDeclRef); ext; ext = ext->nextCandidateExtension)
             {
                 auto extMembers = getMembersOfType<T>(DeclRef<ContainerDecl>(ext, declRef.substitutions), filterStyle);
                 for (auto mbr : extMembers)
@@ -95,7 +95,7 @@ namespace Slang
         ///
     Name* getReflectionName(VarDeclBase* varDecl);
 
-    inline RefPtr<Type> GetType(ASTBuilder* astBuilder, DeclRef<VarDeclBase> const& declRef)
+    inline RefPtr<Type> getType(ASTBuilder* astBuilder, DeclRef<VarDeclBase> const& declRef)
     {
         return declRef.substitute(astBuilder, declRef.getDecl()->type.Ptr());
     }
@@ -115,12 +115,12 @@ namespace Slang
         return declRef.substitute(astBuilder, declRef.getDecl()->tagExpr);
     }
 
-    inline RefPtr<Type> GetTargetType(ASTBuilder* astBuilder, DeclRef<ExtensionDecl> const& declRef)
+    inline RefPtr<Type> getTargetType(ASTBuilder* astBuilder, DeclRef<ExtensionDecl> const& declRef)
     {
         return declRef.substitute(astBuilder, declRef.getDecl()->targetType.Ptr());
     }
     
-    inline FilteredMemberRefList<VarDecl> GetFields(DeclRef<StructDecl> const& declRef, MemberFilterStyle filterStyle)
+    inline FilteredMemberRefList<VarDecl> getFields(DeclRef<StructDecl> const& declRef, MemberFilterStyle filterStyle)
     {
         return getMembersOfType<VarDecl>(declRef, filterStyle);
     }
@@ -132,22 +132,22 @@ namespace Slang
         return declRef.substitute(astBuilder, declRef.getDecl()->base.type);
     }
     
-    inline RefPtr<Type> GetType(ASTBuilder* astBuilder, DeclRef<TypeDefDecl> const& declRef)
+    inline RefPtr<Type> getType(ASTBuilder* astBuilder, DeclRef<TypeDefDecl> const& declRef)
     {
         return declRef.substitute(astBuilder, declRef.getDecl()->type.Ptr());
     }
 
-    inline RefPtr<Type> GetResultType(ASTBuilder* astBuilder, DeclRef<CallableDecl> const& declRef)
+    inline RefPtr<Type> getResultType(ASTBuilder* astBuilder, DeclRef<CallableDecl> const& declRef)
     {
         return declRef.substitute(astBuilder, declRef.getDecl()->returnType.type.Ptr());
     }
 
-    inline FilteredMemberRefList<ParamDecl> GetParameters(DeclRef<CallableDecl> const& declRef)
+    inline FilteredMemberRefList<ParamDecl> getParameters(DeclRef<CallableDecl> const& declRef)
     {
         return getMembersOfType<ParamDecl>(declRef);
     }
 
-    inline Decl* GetInner(DeclRef<GenericDecl> const& declRef)
+    inline Decl* getInner(DeclRef<GenericDecl> const& declRef)
     {
         // TODO: Should really return a `DeclRef<Decl>` for the inner
         // declaration, and not just a raw pointer
@@ -192,11 +192,11 @@ namespace Slang
     template<typename T>
     void FilteredModifierList<T>::Iterator::operator++()
     {
-        current = Adjust(current->next.Ptr());
+        current = adjust(current->next.Ptr());
     }
     //
     template<typename T>
-    Modifier* FilteredModifierList<T>::Adjust(Modifier* modifier)
+    Modifier* FilteredModifierList<T>::adjust(Modifier* modifier)
     {
         Modifier* m = modifier;
         for (;;)

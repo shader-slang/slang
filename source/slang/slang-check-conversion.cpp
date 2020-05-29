@@ -382,7 +382,7 @@ namespace Slang
                 {
                     RefPtr<Expr> coercedArg;
                     bool argResult = _readValueFromInitializerList(
-                        GetType(m_astBuilder, fieldDeclRef),
+                        getType(m_astBuilder, fieldDeclRef),
                         outToExpr ? &coercedArg : nullptr,
                         fromInitializerListExpr,
                         ioArgIndex);

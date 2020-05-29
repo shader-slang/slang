@@ -820,7 +820,7 @@ namespace Slang
 
         void validateArraySizeForVariable(VarDeclBase* varDecl);
 
-        IntVal* GetIntVal(IntegerLiteralExpr* expr);
+        IntVal* getIntVal(IntegerLiteralExpr* expr);
 
         Name* getName(String const& text)
         {

@@ -185,7 +185,7 @@ namespace Slang
     {
         RefPtr<EntryPoint> entryPoint = new EntryPoint(
             linkage,
-            funcDeclRef.GetName(),
+            funcDeclRef.getName(),
             profile,
             funcDeclRef);
         entryPoint->m_mangledName = getMangledName(linkage->getASTBuilder(), funcDeclRef);

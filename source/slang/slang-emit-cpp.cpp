@@ -219,7 +219,7 @@ void CPPSourceEmitter::emitTypeDefinition(IRType* inType)
         case kIROp_VectorType:
         {
             auto vecType = static_cast<IRVectorType*>(type);
-            int count = int(GetIntVal(vecType->getElementCount()));
+            int count = int(getIntVal(vecType->getElementCount()));
 
             SLANG_ASSERT(count > 0 && count < 4);
 
@@ -251,8 +251,8 @@ void CPPSourceEmitter::emitTypeDefinition(IRType* inType)
         {
             auto matType = static_cast<IRMatrixType*>(type);
 
-            const auto rowCount = int(GetIntVal(matType->getRowCount()));
-            const auto colCount = int(GetIntVal(matType->getColumnCount()));
+            const auto rowCount = int(getIntVal(matType->getRowCount()));
+            const auto colCount = int(getIntVal(matType->getColumnCount()));
 
             IRType* vecType = m_typeSet.addVectorType(matType->getElementType(), colCount);
             
@@ -420,7 +420,7 @@ SlangResult CPPSourceEmitter::calcTypeName(IRType* type, CodeGenTarget target, S
         case kIROp_VectorType:
         {
             auto vecType = static_cast<IRVectorType*>(type);
-            auto vecCount = int(GetIntVal(vecType->getElementCount()));
+            auto vecCount = int(getIntVal(vecType->getElementCount()));
             auto elemType = vecType->getElementType();
 
             if (target == CodeGenTarget::CPPSource || target == CodeGenTarget::CUDASource)
@@ -446,8 +446,8 @@ SlangResult CPPSourceEmitter::calcTypeName(IRType* type, CodeGenTarget target, S
             auto matType = static_cast<IRMatrixType*>(type);
 
             auto elementType = matType->getElementType();
-            const auto rowCount = int(GetIntVal(matType->getRowCount()));
-            const auto colCount = int(GetIntVal(matType->getColumnCount()));
+            const auto rowCount = int(getIntVal(matType->getRowCount()));
+            const auto colCount = int(getIntVal(matType->getColumnCount()));
 
             if (target == CodeGenTarget::CPPSource || target == CodeGenTarget::CUDASource)
             {
@@ -471,7 +471,7 @@ SlangResult CPPSourceEmitter::calcTypeName(IRType* type, CodeGenTarget target, S
         {
             auto arrayType = static_cast<IRArrayType*>(type);
             auto elementType = arrayType->getElementType();
-            int elementCount = int(GetIntVal(arrayType->getElementCount()));
+            int elementCount = int(getIntVal(arrayType->getElementCount()));
 
             out << "FixedArray<";
             SLANG_RETURN_ON_FAIL(calcTypeName(elementType, target, out));
@@ -606,14 +606,14 @@ static IRBasicType* _getElementType(IRType* type)
         case kIROp_VectorType:
         {
             auto vecType = static_cast<IRVectorType*>(type);
-            const int elemCount = int(GetIntVal(vecType->getElementCount()));
+            const int elemCount = int(getIntVal(vecType->getElementCount()));
             return (!vecSwap) ? TypeDimension{1, elemCount} : TypeDimension{ elemCount, 1};
         }
         case kIROp_MatrixType:
         {
             auto matType = static_cast<IRMatrixType*>(type);
-            const int colCount = int(GetIntVal(matType->getColumnCount()));
-            const int rowCount = int(GetIntVal(matType->getRowCount()));
+            const int colCount = int(getIntVal(matType->getColumnCount()));
+            const int rowCount = int(getIntVal(matType->getRowCount()));
             return TypeDimension{rowCount, colCount};
         }
         default: return TypeDimension{1, 1};
@@ -942,7 +942,7 @@ void CPPSourceEmitter::_emitGetAtDefinition(const UnownedStringSlice& funcName, 
 
         if (auto vectorType = as<IRVectorType>(srcType))
         {
-            int vecSize = int(GetIntVal(vectorType->getElementCount()));
+            int vecSize = int(getIntVal(vectorType->getElementCount()));
 
             writer->emit("assert(b >= 0 && b < ");
             writer->emit(vecSize);
@@ -952,8 +952,8 @@ void CPPSourceEmitter::_emitGetAtDefinition(const UnownedStringSlice& funcName, 
         }
         else if (auto matrixType = as<IRMatrixType>(srcType))
         {
-            //int colCount = int(GetIntVal(matrixType->getColumnCount()));
-            int rowCount = int(GetIntVal(matrixType->getRowCount()));
+            //int colCount = int(getIntVal(matrixType->getColumnCount()));
+            int rowCount = int(getIntVal(matrixType->getRowCount()));
 
             writer->emit("assert(b >= 0 && b < ");
             writer->emit(rowCount);
@@ -1083,7 +1083,7 @@ void CPPSourceEmitter::_emitInitDefinition(const UnownedStringSlice& funcName, c
 
     if (IRVectorType* vecType = as<IRVectorType>(retType))
     {
-        Index elementCount = Index(GetIntVal(vecType->getElementCount()));
+        Index elementCount = Index(getIntVal(vecType->getElementCount()));
 
         Index paramIndex = 0;
         Index paramSubIndex = 0;
@@ -1105,7 +1105,7 @@ void CPPSourceEmitter::_emitInitDefinition(const UnownedStringSlice& funcName, c
 
                 if (IRVectorType* paramVecType = as<IRVectorType>(paramType))
                 {
-                    Index paramElementCount = Index(GetIntVal(paramVecType->getElementCount()));
+                    Index paramElementCount = Index(getIntVal(paramVecType->getElementCount()));
 
                     writer->emitChar('a' + char(paramIndex));
                     writer->emit(".");

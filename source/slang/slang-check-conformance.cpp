@@ -211,7 +211,7 @@ namespace Slang
                 for (auto genConstraintDeclRef : getMembersOfType<GenericTypeConstraintDecl>(aggTypeDeclRef))
                 {
                     ensureDecl(genConstraintDeclRef, DeclCheckState::CanUseBaseOfInheritanceDecl);
-                    auto inheritedType = GetSup(m_astBuilder, genConstraintDeclRef);
+                    auto inheritedType = getSup(m_astBuilder, genConstraintDeclRef);
                     TypeWitnessBreadcrumb breadcrumb;
                     breadcrumb.prev = inBreadcrumbs;
                     breadcrumb.sub = type;
@@ -228,13 +228,13 @@ namespace Slang
                 // We need to enumerate the constraints placed on this type by its outer
                 // generic declaration, and see if any of them guarantees that we
                 // satisfy the given interface..
-                auto genericDeclRef = genericTypeParamDeclRef.GetParent().as<GenericDecl>();
+                auto genericDeclRef = genericTypeParamDeclRef.getParent().as<GenericDecl>();
                 SLANG_ASSERT(genericDeclRef);
 
                 for( auto constraintDeclRef : getMembersOfType<GenericTypeConstraintDecl>(genericDeclRef) )
                 {
-                    auto sub = GetSub(m_astBuilder, constraintDeclRef);
-                    auto sup = GetSup(m_astBuilder, constraintDeclRef);
+                    auto sub = getSub(m_astBuilder, constraintDeclRef);
+                    auto sup = getSup(m_astBuilder, constraintDeclRef);
 
                     auto subDeclRef = as<DeclRefType>(sub);
                     if(!subDeclRef)

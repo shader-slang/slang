@@ -286,7 +286,7 @@ namespace Slang
         // that `X<T>.IndexType == T`.
         for( auto constraintDeclRef : getMembersOfType<GenericTypeConstraintDecl>(genericDeclRef) )
         {
-            if(!TryUnifyTypes(*system, GetSub(m_astBuilder, constraintDeclRef), GetSup(m_astBuilder, constraintDeclRef)))
+            if(!TryUnifyTypes(*system, getSub(m_astBuilder, constraintDeclRef), getSup(m_astBuilder, constraintDeclRef)))
                 return SubstitutionSet();
         }
         SubstitutionSet resultSubst = genericDeclRef.substitutions;
@@ -404,8 +404,8 @@ namespace Slang
                 solvedSubst);
 
             // Extract the (substituted) sub- and super-type from the constraint.
-            auto sub = GetSub(m_astBuilder, constraintDeclRef);
-            auto sup = GetSup(m_astBuilder, constraintDeclRef);
+            auto sub = getSub(m_astBuilder, constraintDeclRef);
+            auto sup = getSup(m_astBuilder, constraintDeclRef);
 
             // Search for a witness that shows the constraint is satisfied.
             auto subTypeWitness = tryGetSubtypeWitness(sub, sup);

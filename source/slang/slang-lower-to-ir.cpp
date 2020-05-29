@@ -1028,7 +1028,7 @@ struct ValLoweringVisitor : ValVisitor<ValLoweringVisitor, LoweredValInfo, Lower
     LoweredValInfo visitGenericParamIntVal(GenericParamIntVal* val)
     {
         return emitDeclRef(context, val->declRef,
-            lowerType(context, GetType(context->astBuilder, val->declRef)));
+            lowerType(context, getType(context->astBuilder, val->declRef)));
     }
 
     LoweredValInfo visitDeclaredSubtypeWitness(DeclaredSubtypeWitness* val)
@@ -1179,14 +1179,14 @@ struct ValLoweringVisitor : ValVisitor<ValLoweringVisitor, LoweredValInfo, Lower
                     // for emitting the signature of a `CallableDecl`, and we should
                     // try to re-use that if at all possible.
                     //
-                    auto irParamType = lowerType(context, GetType(context->astBuilder, paramDeclRef));
+                    auto irParamType = lowerType(context, getType(context->astBuilder, paramDeclRef));
                     auto irParam = subBuilder->emitParam(irParamType);
 
                     irParams.add(irParam);
                     irParamTypes.add(irParamType);
                 }
 
-                auto irResultType = lowerType(context, GetResultType(context->astBuilder, callableDeclRef));
+                auto irResultType = lowerType(context, getResultType(context->astBuilder, callableDeclRef));
 
                 auto irFuncType = subBuilder->getFuncType(
                     irParamTypes,
@@ -1484,7 +1484,7 @@ struct ValLoweringVisitor : ValVisitor<ValLoweringVisitor, LoweredValInfo, Lower
     IRType* visitExtractExistentialType(ExtractExistentialType* type)
     {
         auto declRef = type->declRef;
-        auto existentialType = lowerType(context, GetType(context->astBuilder, declRef));
+        auto existentialType = lowerType(context, getType(context->astBuilder, declRef));
         IRInst* existentialVal = getSimpleVal(context, emitDeclRef(context, declRef, existentialType));
         return getBuilder()->emitExtractExistentialType(existentialVal);
     }
@@ -1492,7 +1492,7 @@ struct ValLoweringVisitor : ValVisitor<ValLoweringVisitor, LoweredValInfo, Lower
     LoweredValInfo visitExtractExistentialSubtypeWitness(ExtractExistentialSubtypeWitness* witness)
     {
         auto declRef = witness->declRef;
-        auto existentialType = lowerType(context, GetType(context->astBuilder, declRef));
+        auto existentialType = lowerType(context, getType(context->astBuilder, declRef));
         IRInst* existentialVal = getSimpleVal(context, emitDeclRef(context, declRef, existentialType));
         return LoweredValInfo::simple(getBuilder()->emitExtractExistentialWitnessTable(existentialVal));
     }
@@ -1957,7 +1957,7 @@ RefPtr<Type> getThisParamTypeForContainer(
     }
     else if( auto extensionDeclRef = parentDeclRef.as<ExtensionDecl>() )
     {
-        return GetTargetType(context->astBuilder, extensionDeclRef);
+        return getTargetType(context->astBuilder, extensionDeclRef);
     }
 
     return nullptr;
@@ -1967,13 +1967,13 @@ RefPtr<Type> getThisParamTypeForCallable(
     IRGenContext*   context,
     DeclRef<Decl>   callableDeclRef)
 {
-    auto parentDeclRef = callableDeclRef.GetParent();
+    auto parentDeclRef = callableDeclRef.getParent();
 
     if(auto subscriptDeclRef = parentDeclRef.as<SubscriptDecl>())
-        parentDeclRef = subscriptDeclRef.GetParent();
+        parentDeclRef = subscriptDeclRef.getParent();
 
     if(auto genericDeclRef = parentDeclRef.as<GenericDecl>())
-        parentDeclRef = genericDeclRef.GetParent();
+        parentDeclRef = genericDeclRef.getParent();
 
     return getThisParamTypeForContainer(context, parentDeclRef);
 }
@@ -2153,7 +2153,7 @@ struct ExprLoweringVisitorBase : ExprVisitor<Derived, LoweredValInfo>
         }
         else if (auto vectorType = as<VectorExpressionType>(type))
         {
-            UInt elementCount = (UInt) GetIntVal(vectorType->elementCount);
+            UInt elementCount = (UInt) getIntVal(vectorType->elementCount);
 
             auto irDefaultValue = getSimpleVal(context, getDefaultVal(vectorType->elementType));
 
@@ -2167,7 +2167,7 @@ struct ExprLoweringVisitorBase : ExprVisitor<Derived, LoweredValInfo>
         }
         else if (auto matrixType = as<MatrixExpressionType>(type))
         {
-            UInt rowCount = (UInt) GetIntVal(matrixType->getRowCount());
+            UInt rowCount = (UInt) getIntVal(matrixType->getRowCount());
 
             auto rowType = matrixType->getRowType();
 
@@ -2183,7 +2183,7 @@ struct ExprLoweringVisitorBase : ExprVisitor<Derived, LoweredValInfo>
         }
         else if (auto arrayType = as<ArrayExpressionType>(type))
         {
-            UInt elementCount = (UInt) GetIntVal(arrayType->arrayLength);
+            UInt elementCount = (UInt) getIntVal(arrayType->arrayLength);
 
             auto irDefaultElement = getSimpleVal(context, getDefaultVal(arrayType->baseType));
 
@@ -2251,7 +2251,7 @@ struct ExprLoweringVisitorBase : ExprVisitor<Derived, LoweredValInfo>
         // fill in the appropriate field of the result
         if (auto arrayType = as<ArrayExpressionType>(type))
         {
-            UInt elementCount = (UInt) GetIntVal(arrayType->arrayLength);
+            UInt elementCount = (UInt) getIntVal(arrayType->arrayLength);
 
             for (UInt ee = 0; ee < argCount; ++ee)
             {
@@ -2273,7 +2273,7 @@ struct ExprLoweringVisitorBase : ExprVisitor<Derived, LoweredValInfo>
         }
         else if (auto vectorType = as<VectorExpressionType>(type))
         {
-            UInt elementCount = (UInt) GetIntVal(vectorType->elementCount);
+            UInt elementCount = (UInt) getIntVal(vectorType->elementCount);
 
             for (UInt ee = 0; ee < argCount; ++ee)
             {
@@ -2295,7 +2295,7 @@ struct ExprLoweringVisitorBase : ExprVisitor<Derived, LoweredValInfo>
         }
         else if (auto matrixType = as<MatrixExpressionType>(type))
         {
-            UInt rowCount = (UInt) GetIntVal(matrixType->getRowCount());
+            UInt rowCount = (UInt) getIntVal(matrixType->getRowCount());
 
             for (UInt rr = 0; rr < argCount; ++rr)
             {
@@ -2518,7 +2518,7 @@ struct ExprLoweringVisitorBase : ExprVisitor<Derived, LoweredValInfo>
         for (auto paramDeclRef : getMembersOfType<ParamDecl>(funcDeclRef))
         {
             auto paramDecl = paramDeclRef.getDecl();
-            IRType* paramType = lowerType(context, GetType(getASTBuilder(), paramDeclRef));
+            IRType* paramType = lowerType(context, getType(getASTBuilder(), paramDeclRef));
             auto paramDirection = getParameterDirection(paramDecl);
 
             UInt argIndex = argCounter++;
@@ -2883,7 +2883,7 @@ struct ExprLoweringVisitorBase : ExprVisitor<Derived, LoweredValInfo>
 
     LoweredValInfo visitExtractExistentialValueExpr(ExtractExistentialValueExpr* expr)
     {
-        auto existentialType = lowerType(context, GetType(getASTBuilder(), expr->declRef));
+        auto existentialType = lowerType(context, getType(getASTBuilder(), expr->declRef));
         auto existentialVal = getSimpleVal(context, emitDeclRef(context, expr->declRef, existentialType));
 
         auto openedType = lowerType(context, expr->type);
@@ -3049,8 +3049,8 @@ struct StmtLoweringVisitor : StmtVisitor<StmtLoweringVisitor>
         // ordinary loop, with an `[unroll]` attribute on
         // it that we would respect.
 
-        auto rangeBeginVal = GetIntVal(stmt->rangeBeginVal);
-        auto rangeEndVal = GetIntVal(stmt->rangeEndVal);
+        auto rangeBeginVal = getIntVal(stmt->rangeBeginVal);
+        auto rangeEndVal = getIntVal(stmt->rangeEndVal);
 
         if (rangeBeginVal >= rangeEndVal)
             return;

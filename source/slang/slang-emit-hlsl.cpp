@@ -27,7 +27,7 @@ void HLSLSourceEmitter::_emitHLSLDecorationSingleInt(const char* name, IRFunc* e
     SLANG_UNUSED(entryPoint);
     SLANG_ASSERT(val);
 
-    auto intVal = GetIntVal(val);
+    auto intVal = getIntVal(val);
 
     m_writer->emit("[");
     m_writer->emit(name);
@@ -326,7 +326,7 @@ void HLSLSourceEmitter::emitEntryPointAttributesImpl(IRFunc* irFunc, IREntryPoin
         {
             if (auto decor = irFunc->findDecoration<IRMaxVertexCountDecoration>())
             {
-                auto count = GetIntVal(decor->getCount());
+                auto count = getIntVal(decor->getCount());
                 m_writer->emit("[maxvertexcount(");
                 m_writer->emit(Int(count));
                 m_writer->emit(")]\n");
@@ -334,7 +334,7 @@ void HLSLSourceEmitter::emitEntryPointAttributesImpl(IRFunc* irFunc, IREntryPoin
 
             if (auto decor = irFunc->findDecoration<IRInstanceDecoration>())
             {
-                auto count = GetIntVal(decor->getCount());
+                auto count = getIntVal(decor->getCount());
                 m_writer->emit("[instance(");
                 m_writer->emit(Int(count));
                 m_writer->emit(")]\n");
@@ -743,7 +743,7 @@ void HLSLSourceEmitter::emitSimpleTypeImpl(IRType* type)
         case kIROp_VectorType:
         {
             auto vecType = (IRVectorType*)type;
-            emitVectorTypeNameImpl(vecType->getElementType(), GetIntVal(vecType->getElementCount()));
+            emitVectorTypeNameImpl(vecType->getElementType(), getIntVal(vecType->getElementCount()));
             return;
         }
         case kIROp_MatrixType:
