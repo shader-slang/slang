@@ -278,6 +278,9 @@
     <ClCompile Include="slang-ast-decl.cpp" />
     <ClCompile Include="slang-ast-dump.cpp" />
     <ClCompile Include="slang-ast-reflect.cpp" />
+    <ClCompile Include="slang-ast-substitutions.cpp" />
+    <ClCompile Include="slang-ast-type.cpp" />
+    <ClCompile Include="slang-ast-val.cpp" />
     <ClCompile Include="slang-check-conformance.cpp" />
     <ClCompile Include="slang-check-constraint.cpp" />
     <ClCompile Include="slang-check-conversion.cpp" />

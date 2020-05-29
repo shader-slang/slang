@@ -281,6 +281,15 @@
     <ClCompile Include="slang-ast-reflect.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
+    <ClCompile Include="slang-ast-substitutions.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="slang-ast-type.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="slang-ast-val.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
     <ClCompile Include="slang-check-conformance.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
