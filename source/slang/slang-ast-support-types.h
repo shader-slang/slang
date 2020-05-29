@@ -448,11 +448,13 @@ namespace Slang
         RefPtr<Type> operator->() { return type; }
     };
 
+    class ASTBuilder;
+
     struct ReflectClassInfo
     {
         typedef ReflectClassInfo ThisType;
 
-        typedef void* (*CreateFunc)();
+        typedef void* (*CreateFunc)(ASTBuilder* astBuilder);
 
         /// A constant time implementation of isSubClassOf
         SLANG_FORCE_INLINE bool isSubClassOf(const ThisType& super) const
@@ -464,6 +466,13 @@ namespace Slang
         SLANG_FORCE_INLINE bool isDerivedFrom(uint32_t typeId) const
         {
             return typeId >= m_classId && typeId <= m_lastClassId;
+        }
+        SLANG_FORCE_INLINE static bool isSubClassOf(ASTNodeType type, const ThisType& super)
+        {
+            // Check the type appears valid
+            SLANG_ASSERT(int(type) >= 0);
+            // We include super.m_classId, because it's a subclass of itself.
+            return uint32_t(type) >= super.m_classId && uint32_t(type) <= super.m_lastClassId;
         }
 
         /// Will produce the same result as isSubClassOf, but more slowly by traversing the m_superClass
@@ -500,7 +509,7 @@ namespace Slang
             : classInfo(inClassInfo)
         {}
 
-        void* createInstanceImpl() const
+        void* createInstanceImpl(ASTBuilder* astBuilder) const
         {
             auto ci = classInfo;
             if (!ci) return nullptr;
@@ -508,7 +517,7 @@ namespace Slang
             auto cf = ci->m_createFunc;
             if (!cf) return nullptr;
 
-            return cf();
+            return cf(astBuilder);
         }
 
         SLANG_FORCE_INLINE bool isSubClassOfImpl(SyntaxClassBase const& super) const { return classInfo->isSubClassOf(*super.classInfo); }
@@ -529,9 +538,9 @@ namespace Slang
         {
         }
 
-        T* createInstance() const
+        T* createInstance(ASTBuilder* astBuilder) const
         {
-            return (T*)createInstanceImpl();
+            return (T*)createInstanceImpl(astBuilder);
         }
 
         SyntaxClass(const ReflectClassInfo* inClassInfo):
