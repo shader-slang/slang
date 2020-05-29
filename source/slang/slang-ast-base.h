@@ -98,15 +98,21 @@ class Val : public NodeBase
     // integer parameter that should be incremented when
     // returning a modified value (this can help the caller
     // decide whether they need to do anything).
-    virtual RefPtr<Val> substituteImpl(ASTBuilder* astBuilder, SubstitutionSet subst, int* ioDiff);
+    RefPtr<Val> substituteImpl(ASTBuilder* astBuilder, SubstitutionSet subst, int* ioDiff);
 
-    virtual bool equalsVal(Val* val) = 0;
-    virtual String toString() = 0;
-    virtual HashCode getHashCode() = 0;
+    bool equalsVal(Val* val);
+    String toString();
+    HashCode getHashCode();
     bool operator == (const Val & v)
     {
         return equalsVal(const_cast<Val*>(&v));
     }
+protected:
+
+    RefPtr<Val> _substituteImplOverride(ASTBuilder* astBuilder, SubstitutionSet subst, int* ioDiff);
+    bool _equalsValOverride(Val* val);
+    String _toStringOverride();
+    HashCode _getHashCodeOverride();
 };
 
 class Type;
@@ -144,22 +150,22 @@ class Type: public Val
         /// Get the ASTBuilder that was used to construct this Type
     SLANG_FORCE_INLINE ASTBuilder* getASTBuilder() const { return m_astBuilder; }
 
-    //Session* getSession()  { return this->session; }
-    
     bool equals(Type* type);
     
     Type* getCanonicalType();
 
-    virtual RefPtr<Val> substituteImpl(ASTBuilder* astBuilder, SubstitutionSet subst, int* ioDiff) override;
-
-    virtual bool equalsVal(Val* val) override;
-
     ~Type();
 
 protected:
-    virtual bool equalsImpl(Type* type) = 0;
+    bool equalsImpl(Type* type);
+    RefPtr<Type> createCanonicalType();
 
-    virtual RefPtr<Type> createCanonicalType() = 0;
+    RefPtr<Val> _substituteImplOverride(ASTBuilder* astBuilder, SubstitutionSet subst, int* ioDiff);
+    bool _equalsValOverride(Val* val);
+
+    bool _equalsImplOverride(Type* type);
+    RefPtr<Type> _createCanonicalTypeOverride();
+
     Type* canonicalType = nullptr;
 
     SLANG_UNREFLECTED
@@ -181,11 +187,16 @@ class Substitutions: public NodeBase
     RefPtr<Substitutions> outer;
 
     // Apply a set of substitutions to the bindings in this substitution
-    virtual RefPtr<Substitutions> applySubstitutionsShallow(ASTBuilder* astBuilder, SubstitutionSet substSet, RefPtr<Substitutions> substOuter, int* ioDiff) = 0;
+    RefPtr<Substitutions> applySubstitutionsShallow(ASTBuilder* astBuilder, SubstitutionSet substSet, RefPtr<Substitutions> substOuter, int* ioDiff);
 
     // Check if these are equivalent substitutions to another set
-    virtual bool equals(Substitutions* subst) = 0;
-    virtual HashCode getHashCode() const = 0;
+    bool equals(Substitutions* subst);
+    HashCode getHashCode() const;
+
+protected:
+    RefPtr<Substitutions> _applySubstitutionsShallowOverride(ASTBuilder* astBuilder, SubstitutionSet substSet, RefPtr<Substitutions> substOuter, int* ioDiff);
+    bool _equalsOverride(Substitutions* subst);
+    HashCode _getHashCodeOverride() const;
 };
 
 class GenericSubstitution : public Substitutions
@@ -199,22 +210,10 @@ class GenericSubstitution : public Substitutions
     // The actual values of the arguments
     List<RefPtr<Val> > args;
 
-    // Apply a set of substitutions to the bindings in this substitution
-    virtual RefPtr<Substitutions> applySubstitutionsShallow(ASTBuilder* astBuilder, SubstitutionSet substSet, RefPtr<Substitutions> substOuter, int* ioDiff)  override;
-
-    // Check if these are equivalent substitutions to another set
-    virtual bool equals(Substitutions* subst) override;
-
-    virtual HashCode getHashCode() const override
-    {
-        HashCode rs = 0;
-        for (auto && v : args)
-        {
-            rs ^= v->getHashCode();
-            rs *= 16777619;
-        }
-        return rs;
-    }
+protected:
+    RefPtr<Substitutions> _applySubstitutionsShallowOverride(ASTBuilder* astBuilder, SubstitutionSet substSet, RefPtr<Substitutions> substOuter, int* ioDiff);
+    bool _equalsOverride(Substitutions* subst);
+    HashCode _getHashCodeOverride() const;
 };
 
 class ThisTypeSubstitution : public Substitutions
@@ -228,14 +227,12 @@ class ThisTypeSubstitution : public Substitutions
     // specialize the interface conforms to the interface.
     RefPtr<SubtypeWitness> witness;
 
+protected:
     // The actual type that provides the lookup scope for an associated type
-    // Apply a set of substitutions to the bindings in this substitution
-    virtual RefPtr<Substitutions> applySubstitutionsShallow(ASTBuilder* astBuilder, SubstitutionSet substSet, RefPtr<Substitutions> substOuter, int* ioDiff)  override;
 
-    // Check if these are equivalent substitutions to another set
-    virtual bool equals(Substitutions* subst) override;
-
-    virtual HashCode getHashCode() const override;
+    RefPtr<Substitutions> _applySubstitutionsShallowOverride(ASTBuilder* astBuilder, SubstitutionSet substSet, RefPtr<Substitutions> substOuter, int* ioDiff);
+    bool _equalsOverride(Substitutions* subst);
+    HashCode _getHashCodeOverride() const;
 };
 
 class GlobalGenericParamSubstitution : public Substitutions
@@ -256,21 +253,10 @@ class GlobalGenericParamSubstitution : public Substitutions
     // the values that satisfy any constraints on the type parameter
     List<ConstraintArg> constraintArgs;
 
-    // Apply a set of substitutions to the bindings in this substitution
-    virtual RefPtr<Substitutions> applySubstitutionsShallow(ASTBuilder* astBuilder, SubstitutionSet substSet, RefPtr<Substitutions> substOuter, int* ioDiff)  override;
-
-    // Check if these are equivalent substitutions to another set
-    virtual bool equals(Substitutions* subst) override;
-
-    virtual HashCode getHashCode() const override
-    {
-        HashCode rs = actualType->getHashCode();
-        for (auto && a : constraintArgs)
-        {
-            rs = combineHash(rs, a.val->getHashCode());
-        }
-        return rs;
-    }
+protected:
+    RefPtr<Substitutions> _applySubstitutionsShallowOverride(ASTBuilder* astBuilder, SubstitutionSet substSet, RefPtr<Substitutions> substOuter, int* ioDiff);
+    bool _equalsOverride(Substitutions* subst);
+    HashCode _getHashCodeOverride() const;
 };
 
 class SyntaxNode : public SyntaxNodeBase

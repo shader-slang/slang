@@ -175,7 +175,7 @@ class TypeConstraintDecl : public  Decl
     const TypeExp& getSup() const;
 protected:
     // Implement _getSupOverride on derived classes to change behavior of getSup, as if getSup is virtual
-    const TypeExp& _getSupOverride() const { SLANG_ASSERT(!"getSup not implemented for this type!"); return TypeExp::empty; }
+    const TypeExp& _getSupOverride() const;
 };
 
 // A kind of pseudo-member that represents an explicit

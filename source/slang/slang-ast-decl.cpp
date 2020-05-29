@@ -6,15 +6,14 @@ namespace Slang {
 
 const TypeExp& TypeConstraintDecl::getSup() const
 {
-    switch (astNodeType)
-    {
-#define SLANG_CASE(NAME, SUPER, ORIGIN, LAST, MARKER, TYPE, param)      case ASTNodeType::NAME: return static_cast<const NAME*>(this)->_getSupOverride();
-        SLANG_ASTNode_TypeConstraintDecl(SLANG_CASE, _)
-#undef SLANG_CASE
-        default: break;
-    }
-    SLANG_ASSERT(!"getSup not implemented for this type!");
+    SLANG_AST_NODE_CONST_VIRTUAL_CALL(TypeConstraintDecl, getSup, ())
+}
+
+const TypeExp& TypeConstraintDecl::_getSupOverride() const
+{
+    SLANG_ASSERT(!"TypeConstraintDecl::_getSupOverride not overridden");
     return TypeExp::empty;
 }
+
 
 } // namespace Slang

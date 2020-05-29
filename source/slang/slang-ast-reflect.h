@@ -28,4 +28,26 @@
 #define SLANG_REFLECTED
 #define SLANG_UNREFLECTED
 
+// Macros for simulating virtual methods without virtual methods
+
+#define SLANG_AST_NODE_INVOKE(method, methodParams) _##method##Override methodParams
+
+#define SLANG_AST_NODE_CASE(NAME, SUPER, ORIGIN, LAST, MARKER, TYPE, param)      case ASTNodeType::NAME: return static_cast<NAME*>(this)-> SLANG_AST_NODE_INVOKE param;
+
+#define SLANG_AST_NODE_VIRTUAL_CALL(base, methodName, methodParams) \
+    switch (astNodeType) \
+    { \
+        SLANG_ASTNode_##base(SLANG_AST_NODE_CASE, (methodName, methodParams)) \
+        default: return SLANG_AST_NODE_INVOKE (methodName, methodParams); \
+    }
+
+// Same but for a method that's const
+#define SLANG_AST_NODE_CONST_CASE(NAME, SUPER, ORIGIN, LAST, MARKER, TYPE, param)      case ASTNodeType::NAME: return static_cast<const NAME*>(this)-> SLANG_AST_NODE_INVOKE param;
+#define SLANG_AST_NODE_CONST_VIRTUAL_CALL(base, methodName, methodParams) \
+    switch (astNodeType) \
+    { \
+        SLANG_ASTNode_##base(SLANG_AST_NODE_CONST_CASE, (methodName, methodParams)) \
+        default: return SLANG_AST_NODE_INVOKE (methodName, methodParams); \
+    }
+
 #endif // SLANG_AST_REFLECT_H
