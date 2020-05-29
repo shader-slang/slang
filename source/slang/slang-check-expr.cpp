@@ -1366,7 +1366,7 @@ namespace Slang
         swizExpr->base = memberRefExpr->baseExpression;
 
         // We can have up to 4 swizzles of two elements each
-        MatrixCoord elementIndices[4];
+        MatrixCoord elementCoords[4];
         int elementCount = 0;
 
         bool anyDuplicates = false;
@@ -1380,19 +1380,23 @@ namespace Slang
         while (*cursor)
         {
             // Throw out swizzling with more than 4 output elements
-            if (elementCount >= 4) {
+            if (elementCount >= 4)
+            {
                 getSink()->diagnose(swizExpr, Diagnostics::invalidSwizzleExpr, swizzleText, baseElementType->toString());
                 return CreateErrorExpr(memberRefExpr);
             }
-            MatrixCoord elementIndex = { 0, 0 };
+            MatrixCoord elementCoord = { 0, 0 };
+
             // Check for the preceding underscore
-            if (*cursor++ != '_') {
+            if (*cursor++ != '_')
+            {
                 getSink()->diagnose(swizExpr, Diagnostics::invalidSwizzleExpr, swizzleText, baseElementType->toString());
                 return CreateErrorExpr(memberRefExpr);
             }
 
             // Check for one or zero indexing            
-            if (*cursor == 'm') {
+            if (*cursor == 'm')
+            {
                 // Can't mix one and zero indexing
                 if (zeroIndexOffset == 1) {
                     getSink()->diagnose(swizExpr, Diagnostics::invalidSwizzleExpr, swizzleText, baseElementType->toString());
@@ -1402,7 +1406,8 @@ namespace Slang
                 // Increment the index since we saw 'm'
                 cursor++;
             }
-            else {
+            else
+            {
                 // Can't mix one and zero indexing
                 if (zeroIndexOffset == 0) {
                     getSink()->diagnose(swizExpr, Diagnostics::invalidSwizzleExpr, swizzleText, baseElementType->toString());
@@ -1412,11 +1417,13 @@ namespace Slang
             }
 
             // Check for the ij components
-            for (Index j = 0; j < 2; j++) {
+            for (Index j = 0; j < 2; j++)
+            {
                 auto ch = *cursor++;
                 int subIndex;
 
-                if (ch < '0' || ch > '4') {
+                if (ch < '0' || ch > '4')
+                {
                     // An invalid character in the swizzle is an error
                     getSink()->diagnose(swizExpr, Diagnostics::invalidSwizzleExpr, swizzleText, baseElementType->toString());
                     return CreateErrorExpr(memberRefExpr);
@@ -1425,13 +1432,14 @@ namespace Slang
 
                 // Check the limit for either the row or column, depending on the step
                 IntegerLiteralValue elementLimit;
-                if (j == 0) {
+                if (j == 0)
+                {
                     elementLimit = baseElementRowCount;
-                    elementIndex.row = subIndex;
+                    elementCoord.row = subIndex;
                 }
                 else {
                     elementLimit = baseElementColCount;
-                    elementIndex.col = subIndex;
+                    elementCoord.col = subIndex;
                 }
                 // Make sure the index is in range for the source type
                 // Account for off-by-one and reject 0 if oneIndexed
@@ -1442,20 +1450,21 @@ namespace Slang
                 }
             }
             // Check if we've seen this index before
-            for (int ee = 0; ee < elementCount; ee++) {
-                if (elementIndices[ee] == elementIndex)
+            for (int ee = 0; ee < elementCount; ee++)
+            {
+                if (elementCoords[ee] == elementCoord)
                     anyDuplicates = true;
             }
 
             // add to our list...
-            elementIndices[elementCount] = elementIndex;
+            elementCoords[elementCount] = elementCoord;
             elementCount++;
         }
 
         // Store our list in the actual AST node
         for (int ee = 0; ee < elementCount; ++ee)
         {
-            swizExpr->elementIndices[ee] = elementIndices[ee];
+            swizExpr->elementCoords[ee] = elementCoords[ee];
         }
         swizExpr->elementCount = elementCount;
 

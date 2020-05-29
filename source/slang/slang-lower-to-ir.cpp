@@ -2974,9 +2974,8 @@ struct RValueExprLoweringVisitor : ExprLoweringVisitorBase<RValueExprLoweringVis
         auto resultType = lowerType(context, expr->type);
         auto base = lowerSubExpr(expr->base);
         auto matType = as<MatrixExpressionType>(expr->base->type.type);
-        if (!matType) {
+        if (!matType)
             SLANG_UNEXPECTED("Expected a matrix type in matrix swizzle");
-        }
         auto subscript2 = lowerType(context, matType->getElementType());
         auto subscript1 = lowerType(context, matType->getRowType());
 
@@ -2990,10 +2989,10 @@ struct RValueExprLoweringVisitor : ExprLoweringVisitorBase<RValueExprLoweringVis
         {
             auto index1 = builder->getIntValue(
                 irIntType,
-                (IRIntegerValue)expr->elementIndices[ii].row);
+                (IRIntegerValue)expr->elementCoords[ii].row);
             auto index2 = builder->getIntValue(
                 irIntType,
-                (IRIntegerValue)expr->elementIndices[ii].col);
+                (IRIntegerValue)expr->elementCoords[ii].col);
             // First index expression
             auto irExtract1 = subscriptValue(
                 subscript1,
