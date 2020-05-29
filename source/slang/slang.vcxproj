@@ -275,6 +275,7 @@
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="slang-ast-builder.cpp" />
+    <ClCompile Include="slang-ast-decl.cpp" />
     <ClCompile Include="slang-ast-dump.cpp" />
     <ClCompile Include="slang-ast-reflect.cpp" />
     <ClCompile Include="slang-check-conformance.cpp" />

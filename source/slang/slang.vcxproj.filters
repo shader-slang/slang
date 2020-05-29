@@ -272,6 +272,9 @@
     <ClCompile Include="slang-ast-builder.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
+    <ClCompile Include="slang-ast-decl.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
     <ClCompile Include="slang-ast-dump.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
