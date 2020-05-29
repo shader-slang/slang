@@ -14,11 +14,15 @@ class GLSLSourceEmitter : public CLikeSourceEmitter
 public:
     typedef CLikeSourceEmitter Super;
 
+    virtual SlangResult init() SLANG_OVERRIDE;
+
     GLSLSourceEmitter(const Desc& desc) :
         Super(desc)
     {
         m_glslExtensionTracker = new GLSLExtensionTracker;
     }
+
+    
 
     virtual RefObject* getExtensionTracker() SLANG_OVERRIDE { return m_glslExtensionTracker; }
 
@@ -99,6 +103,8 @@ protected:
         /// The `bitOp` parameter should be the logical equivalent of `bitOp`
         ///
     bool _tryEmitBitBinOp(IRInst* inst, const EmitOpInfo& bitOp, const EmitOpInfo& boolOp, const EmitOpInfo& inOuterPrec);
+
+    void _requireRayTracing();
 
     RefPtr<GLSLExtensionTracker> m_glslExtensionTracker;
 };
