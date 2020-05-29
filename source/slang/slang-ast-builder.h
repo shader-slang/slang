@@ -85,7 +85,7 @@ public:
     {
         enum
         {
-            Value = IsBaseOf<NodeBase, T>::Value || IsBaseOf<Substitutions, T>::Value
+            Value = IsBaseOf<NodeBase, T>::Value
         };
     };
 

@@ -163,7 +163,7 @@ SLANG_FORCE_INLINE const T* as(const Type* obj) { return obj ? dynamicCast<T>(co
 
 // A substitution represents a binding of certain
 // type-level variables to concrete argument values
-class Substitutions: public RefObject
+class Substitutions: public NodeBase
 {
     SLANG_ABSTRACT_CLASS(Substitutions)
 

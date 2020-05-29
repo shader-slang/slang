@@ -23,7 +23,6 @@ static ReflectClassInfo::Infos _calcInfos()
     ReflectClassInfo::Infos infos;
     memset(&infos, 0, sizeof(infos));
     SLANG_ALL_ASTNode_NodeBase(SLANG_REFLECT_GET_REFLECT_CLASS_INFO, _)
-    SLANG_ALL_ASTNode_Substitutions(SLANG_REFLECT_GET_REFLECT_CLASS_INFO, _)
     return infos;
 }
 
@@ -68,7 +67,6 @@ struct ASTConstructAccess
     /* static */const ReflectClassInfo NAME::kReflectClassInfo = { uint32_t(ASTNodeType::NAME), uint32_t(ASTNodeType::LAST), SLANG_GET_SUPER_##TYPE(SUPER), #NAME, SLANG_GET_CREATE_FUNC_##MARKER(NAME)  };
 
 SLANG_ALL_ASTNode_NodeBase(SLANG_REFLECT_CLASS_INFO, _)
-SLANG_ALL_ASTNode_Substitutions(SLANG_REFLECT_CLASS_INFO, _)
 
 // We dispatch to non 'abstract' types
 #define SLANG_CASE_NONE(NAME)           case ASTNodeType::NAME: return visitor->dispatch_##NAME(static_cast<NAME*>(this), extra);
