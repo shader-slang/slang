@@ -662,6 +662,8 @@ SlangResult emitEntryPointSourceFromIR(
         return SLANG_FAIL;
     }
 
+    SLANG_RETURN_ON_FAIL(sourceEmitter->init());
+
     {
         LinkingAndOptimizationOptions linkingAndOptimizationOptions;
 
@@ -696,29 +698,6 @@ SlangResult emitEntryPointSourceFromIR(
         // TODO: do we want to emit directly from IR, or translate the
         // IR back into AST for emission?
         sourceEmitter->emitModule(irModule);
-    }
-
-    // Deal with cases where a particular stage requires certain GLSL versions
-    // and/or extensions.
-    switch( entryPoint->getStage() )
-    {
-    default:
-        break;
-
-    case Stage::AnyHit:
-    case Stage::Callable:
-    case Stage::ClosestHit:
-    case Stage::Intersection:
-    case Stage::Miss:
-    case Stage::RayGeneration:
-        if( target == CodeGenTarget::GLSL )
-        {
-            auto glslExtensionTracker = as<GLSLExtensionTracker>(sourceEmitter->getExtensionTracker());
-
-            glslExtensionTracker->requireExtension(UnownedStringSlice::fromLiteral("GL_NV_ray_tracing"));
-            glslExtensionTracker->requireVersion(ProfileVersion::GLSL_460);
-        }
-        break;
     }
 
     String code = sourceWriter.getContent();

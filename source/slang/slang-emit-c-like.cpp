@@ -136,6 +136,11 @@ CLikeSourceEmitter::CLikeSourceEmitter(const Desc& desc)
     m_effectiveProfile = desc.effectiveProfile;
 }
 
+SlangResult CLikeSourceEmitter::init()
+{
+    return SLANG_OK;
+}
+
 //
 // Types
 //
