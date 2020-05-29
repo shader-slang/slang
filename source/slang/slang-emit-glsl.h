@@ -104,6 +104,8 @@ protected:
         ///
     bool _tryEmitBitBinOp(IRInst* inst, const EmitOpInfo& bitOp, const EmitOpInfo& boolOp, const EmitOpInfo& inOuterPrec);
 
+    void _requireRayTracing();
+
     RefPtr<GLSLExtensionTracker> m_glslExtensionTracker;
 };
 

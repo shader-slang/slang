@@ -27,14 +27,19 @@ SlangResult GLSLSourceEmitter::init()
         case Stage::Miss:
         case Stage::RayGeneration:
         {
-            m_glslExtensionTracker->requireExtension(UnownedStringSlice::fromLiteral("GL_NV_ray_tracing"));
-            m_glslExtensionTracker->requireVersion(ProfileVersion::GLSL_460);   
+            _requireRayTracing();   
             break;
         }
         default: break;
     }
 
     return SLANG_OK;
+}
+
+void GLSLSourceEmitter::_requireRayTracing()
+{
+    m_glslExtensionTracker->requireExtension(UnownedStringSlice::fromLiteral("GL_NV_ray_tracing"));
+    m_glslExtensionTracker->requireVersion(ProfileVersion::GLSL_460);
 }
 
 void GLSLSourceEmitter::_requireGLSLExtension(const UnownedStringSlice& name)
@@ -1698,12 +1703,11 @@ void GLSLSourceEmitter::emitSimpleTypeImpl(IRType* type)
         switch (untypedBufferType->op)
         {
             case kIROp_RaytracingAccelerationStructureType:
-                // GL_NV_ray_tracing requires GLSL_460
-                _requireGLSLExtension(UnownedStringSlice::fromLiteral("GL_NV_ray_tracing"));
-                m_glslExtensionTracker->requireVersion(ProfileVersion::GLSL_460);
-
+            {
+                _requireRayTracing();
                 m_writer->emit("accelerationStructureNV");
                 break;
+            }
 
                 // TODO: These "translations" are obviously wrong for GLSL.
             case kIROp_HLSLByteAddressBufferType:                   m_writer->emit("ByteAddressBuffer");                  break;
