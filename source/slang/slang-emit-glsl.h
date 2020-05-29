@@ -14,11 +14,15 @@ class GLSLSourceEmitter : public CLikeSourceEmitter
 public:
     typedef CLikeSourceEmitter Super;
 
+    virtual SlangResult init() SLANG_OVERRIDE;
+
     GLSLSourceEmitter(const Desc& desc) :
         Super(desc)
     {
         m_glslExtensionTracker = new GLSLExtensionTracker;
     }
+
+    
 
     virtual RefObject* getExtensionTracker() SLANG_OVERRIDE { return m_glslExtensionTracker; }
 
