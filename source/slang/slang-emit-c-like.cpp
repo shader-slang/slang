@@ -209,7 +209,7 @@ void CLikeSourceEmitter::emitSimpleType(IRType* type)
     IRNumThreadsDecoration* decor = func->findDecoration<IRNumThreadsDecoration>();
     for (int i = 0; i < 3; ++i)
     {
-        outNumThreads[i] = decor ? Int(GetIntVal(decor->getOperand(i))) : 1;
+        outNumThreads[i] = decor ? Int(getIntVal(decor->getOperand(i))) : 1;
     }
     return decor;
 }
@@ -1521,7 +1521,7 @@ void CLikeSourceEmitter::emitIntrinsicCallExprImpl(
                         else if (auto vectorType = as<IRVectorType>(elementType))
                         {
                             // A vector result is expected
-                            auto elementCount = GetIntVal(vectorType->getElementCount());
+                            auto elementCount = getIntVal(vectorType->getElementCount());
 
                             if (elementCount < 4)
                             {
@@ -1553,7 +1553,7 @@ void CLikeSourceEmitter::emitIntrinsicCallExprImpl(
                     auto vectorArg = args[argIndex].get();
                     if (auto vectorType = as<IRVectorType>(vectorArg->getDataType()))
                     {
-                        auto elementCount = GetIntVal(vectorType->getElementCount());
+                        auto elementCount = getIntVal(vectorType->getElementCount());
                         m_writer->emit(elementCount);
                     }
                     else
@@ -1578,7 +1578,7 @@ void CLikeSourceEmitter::emitIntrinsicCallExprImpl(
                     IRType* elementType = arg->getDataType();
                     if (auto vectorType = as<IRVectorType>(elementType))
                     {
-                        elementCount = GetIntVal(vectorType->getElementCount());
+                        elementCount = getIntVal(vectorType->getElementCount());
                         elementType = vectorType->getElementType();
                     }
 
@@ -1685,7 +1685,7 @@ void CLikeSourceEmitter::emitIntrinsicCallExprImpl(
                             if(coordsVecType)
                             {
                                 coordsType = coordsVecType->getElementType();
-                                elementCount = GetIntVal(coordsVecType->getElementCount());
+                                elementCount = getIntVal(coordsVecType->getElementCount());
                             }
 
                             SLANG_ASSERT(coordsType->op == kIROp_UIntType);

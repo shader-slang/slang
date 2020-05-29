@@ -13,8 +13,6 @@
 
 #include "slang-ast-reflect.h"
 
-
-
 #include "slang-name.h"
 
 #include <assert.h>
@@ -129,14 +127,6 @@ namespace Slang
     class Decl;
     class Val;
 
-#if 0
-    // Forward-declare all syntax classes
-#define SYNTAX_CLASS(NAME, BASE, ...) class NAME;
-#include "slang-object-meta-begin.h"
-#include "slang-syntax-defs.h"
-#include "slang-object-meta-end.h"
-#endif
-
     // Helper type for pairing up a name and the location where it appeared
     struct NameLoc
     {
@@ -202,11 +192,6 @@ namespace Slang
             }
 
             void operator++();
-#if 0
-            {
-                current = current->next.Ptr();
-            }
-#endif
 
             bool operator!=(Iterator other)
             {
@@ -251,12 +236,7 @@ namespace Slang
             }
 
             void operator++();
-            #if 0
-            {
-                current = Adjust(current->next.Ptr());
-            }
-            #endif
-
+            
             bool operator!=(Iterator other)
             {
                 return current != other.current;
@@ -276,24 +256,13 @@ namespace Slang
         {}
 
         FilteredModifierList(Modifier* modifiers)
-            : modifiers(Adjust(modifiers))
+            : modifiers(adjust(modifiers))
         {}
 
         Iterator begin() { return Iterator(modifiers); }
         Iterator end() { return Iterator(nullptr); }
 
-        static Modifier* Adjust(Modifier* modifier);
-        #if 0
-        {
-            Modifier* m = modifier;
-            for (;;)
-            {
-                if (!m) return m;
-                if (dynamicCast<T>(m)) return m;
-                m = m->next.Ptr();
-            }
-        }
-        #endif
+        static Modifier* adjust(Modifier* modifier);
 
         Modifier* modifiers;
     };
@@ -327,7 +296,7 @@ namespace Slang
 
     // Try to extract a simple integer value from an `IntVal`.
     // This fill assert-fail if the object doesn't represent a literal value.
-    IntegerLiteralValue GetIntVal(RefPtr<IntVal> val);
+    IntegerLiteralValue getIntVal(RefPtr<IntVal> val);
 
         /// Represents how much checking has been applied to a declaration.
     enum class DeclCheckState : uint8_t
@@ -461,15 +430,15 @@ namespace Slang
     struct QualType
     {
         RefPtr<Type>	type;
-        bool	        IsLeftValue;
+        bool	        isLeftValue;
 
         QualType()
-            : IsLeftValue(false)
+            : isLeftValue(false)
         {}
 
         QualType(Type* type)
             : type(type)
-            , IsLeftValue(false)
+            , isLeftValue(false)
         {}
 
         Type* Ptr() { return type.Ptr(); }
@@ -479,11 +448,13 @@ namespace Slang
         RefPtr<Type> operator->() { return type; }
     };
 
+    class ASTBuilder;
+
     struct ReflectClassInfo
     {
         typedef ReflectClassInfo ThisType;
 
-        typedef void* (*CreateFunc)();
+        typedef void* (*CreateFunc)(ASTBuilder* astBuilder);
 
         /// A constant time implementation of isSubClassOf
         SLANG_FORCE_INLINE bool isSubClassOf(const ThisType& super) const
@@ -495,6 +466,13 @@ namespace Slang
         SLANG_FORCE_INLINE bool isDerivedFrom(uint32_t typeId) const
         {
             return typeId >= m_classId && typeId <= m_lastClassId;
+        }
+        SLANG_FORCE_INLINE static bool isSubClassOf(ASTNodeType type, const ThisType& super)
+        {
+            // Check the type appears valid
+            SLANG_ASSERT(int(type) >= 0);
+            // We include super.m_classId, because it's a subclass of itself.
+            return uint32_t(type) >= super.m_classId && uint32_t(type) <= super.m_lastClassId;
         }
 
         /// Will produce the same result as isSubClassOf, but more slowly by traversing the m_superClass
@@ -531,7 +509,7 @@ namespace Slang
             : classInfo(inClassInfo)
         {}
 
-        void* createInstanceImpl() const
+        void* createInstanceImpl(ASTBuilder* astBuilder) const
         {
             auto ci = classInfo;
             if (!ci) return nullptr;
@@ -539,7 +517,7 @@ namespace Slang
             auto cf = ci->m_createFunc;
             if (!cf) return nullptr;
 
-            return cf();
+            return cf(astBuilder);
         }
 
         SLANG_FORCE_INLINE bool isSubClassOfImpl(SyntaxClassBase const& super) const { return classInfo->isSubClassOf(*super.classInfo); }
@@ -560,9 +538,9 @@ namespace Slang
         {
         }
 
-        T* createInstance() const
+        T* createInstance(ASTBuilder* astBuilder) const
         {
-            return (T*)createInstanceImpl();
+            return (T*)createInstanceImpl(astBuilder);
         }
 
         SyntaxClass(const ReflectClassInfo* inClassInfo):
@@ -610,6 +588,8 @@ namespace Slang
         HashCode getHashCode() const;
     };
 
+    class ASTBuilder;
+
     template<typename T>
     struct DeclRef;
 
@@ -644,15 +624,15 @@ namespace Slang
         {}
 
         // Apply substitutions to a type or declaration
-        RefPtr<Type> Substitute(RefPtr<Type> type) const;
+        RefPtr<Type> substitute(ASTBuilder* astBuilder, RefPtr<Type> type) const;
 
-        DeclRefBase Substitute(DeclRefBase declRef) const;
+        DeclRefBase substitute(ASTBuilder* astBuilder, DeclRefBase declRef) const;
 
         // Apply substitutions to an expression
-        RefPtr<Expr> Substitute(RefPtr<Expr> expr) const;
+        RefPtr<Expr> substitute(ASTBuilder* astBuilder, RefPtr<Expr> expr) const;
 
         // Apply substitutions to this declaration reference
-        DeclRefBase SubstituteImpl(SubstitutionSet subst, int* ioDiff);
+        DeclRefBase substituteImpl(ASTBuilder* astBuilder, SubstitutionSet subst, int* ioDiff);
 
         // Returns true if 'as' will return a valid cast
         template <typename T>
@@ -670,9 +650,9 @@ namespace Slang
         }
 
         // Convenience accessors for common properties of declarations
-        Name* GetName() const;
+        Name* getName() const;
         SourceLoc getLoc() const;
-        DeclRefBase GetParent() const;
+        DeclRefBase getParent() const;
 
         HashCode getHashCode() const;
 
@@ -719,31 +699,31 @@ namespace Slang
             return DeclRef<T>((T*) declRef.decl, declRef.substitutions);
         }
 
-        RefPtr<Type> Substitute(RefPtr<Type> type) const
+        RefPtr<Type> substitute(ASTBuilder* astBuilder, RefPtr<Type> type) const
         {
-            return DeclRefBase::Substitute(type);
+            return DeclRefBase::substitute(astBuilder, type);
         }
-        RefPtr<Expr> Substitute(RefPtr<Expr> expr) const
+        RefPtr<Expr> substitute(ASTBuilder* astBuilder, RefPtr<Expr> expr) const
         {
-            return DeclRefBase::Substitute(expr);
+            return DeclRefBase::substitute(astBuilder, expr);
         }
 
         // Apply substitutions to a type or declaration
         template<typename U>
-        DeclRef<U> Substitute(DeclRef<U> declRef) const
+        DeclRef<U> substitute(ASTBuilder* astBuilder, DeclRef<U> declRef) const
         {
-            return DeclRef<U>::unsafeInit(DeclRefBase::Substitute(declRef));
+            return DeclRef<U>::unsafeInit(DeclRefBase::substitute(astBuilder, declRef));
         }
 
         // Apply substitutions to this declaration reference
-        DeclRef<T> SubstituteImpl(SubstitutionSet subst, int* ioDiff)
+        DeclRef<T> substituteImpl(ASTBuilder* astBuilder, SubstitutionSet subst, int* ioDiff)
         {
-            return DeclRef<T>::unsafeInit(DeclRefBase::SubstituteImpl(subst, ioDiff));
+            return DeclRef<T>::unsafeInit(DeclRefBase::substituteImpl(astBuilder, subst, ioDiff));
         }
 
-        DeclRef<ContainerDecl> GetParent() const
+        DeclRef<ContainerDecl> getParent() const
         {
-            return DeclRef<ContainerDecl>::unsafeInit(DeclRefBase::GetParent());
+            return DeclRef<ContainerDecl>::unsafeInit(DeclRefBase::getParent());
         }
     };
 
@@ -1199,7 +1179,7 @@ namespace Slang
 
         Name* getName() const
         {
-            return items.getCount() > 1 ? items[0].declRef.GetName() : item.declRef.GetName();
+            return items.getCount() > 1 ? items[0].declRef.getName() : item.declRef.getName();
         }
         LookupResultItem* begin()
         {
@@ -1284,7 +1264,7 @@ namespace Slang
 
         RefPtr<WitnessTable> getWitnessTable();
 
-        RequirementWitness specialize(SubstitutionSet const& subst);
+        RequirementWitness specialize(ASTBuilder* astBuilder, SubstitutionSet const& subst);
 
         Flavor              m_flavor;
         DeclRef<Decl>       m_declRef;

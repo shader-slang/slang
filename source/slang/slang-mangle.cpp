@@ -7,6 +7,11 @@ namespace Slang
 {
     struct ManglingContext
     {
+        ManglingContext(ASTBuilder* inAstBuilder):
+            astBuilder(inAstBuilder)
+        {
+        }
+        ASTBuilder* astBuilder;
         StringBuilder sb;
     };
 
@@ -130,7 +135,7 @@ namespace Slang
         }
         else if( auto namedType = dynamicCast<NamedExpressionType>(type) )
         {
-            emitType(context, GetType(namedType->declRef));
+            emitType(context, getType(context->astBuilder, namedType->declRef));
         }
         else if( auto declRefType = dynamicCast<DeclRefType>(type) )
         {
@@ -196,7 +201,7 @@ namespace Slang
             // "depth" (how many outer generics) and "index" (which
             // parameter are they at the specified depth).
             emitRaw(context, "K");
-            emitName(context, genericParamIntVal->declRef.GetName());
+            emitName(context, genericParamIntVal->declRef.getName());
         }
         else if( auto constantIntVal = dynamicCast<ConstantIntVal>(val) )
         {
@@ -215,7 +220,7 @@ namespace Slang
         ManglingContext*    context,
         DeclRef<Decl>       declRef)
     {
-        auto parentDeclRef = declRef.GetParent();
+        auto parentDeclRef = declRef.getParent();
         auto parentGenericDeclRef = parentDeclRef.as<GenericDecl>();
         if( parentDeclRef )
         {
@@ -246,7 +251,7 @@ namespace Slang
         if(auto inheritanceDeclRef = declRef.as<InheritanceDecl>())
         {
             emit(context, "I");
-            emitType(context, GetSup(inheritanceDeclRef));
+            emitType(context, getSup(context->astBuilder, inheritanceDeclRef));
             return;
         }
 
@@ -259,11 +264,11 @@ namespace Slang
             // that is in the same module as the type it extends should
             // be treated as equivalent to the type itself.
             emit(context, "X");
-            emitType(context, GetTargetType(extensionDeclRef));
+            emitType(context, getTargetType(context->astBuilder, extensionDeclRef));
             return;
         }
 
-        emitName(context, declRef.GetName());
+        emitName(context, declRef.getName());
 
         // Special case: accessors need some way to distinguish themselves
         // so that a getter/setter/ref-er don't all compile to the same name.
@@ -334,7 +339,7 @@ namespace Slang
                     else if(auto genericValueParamDecl = mm.as<GenericValueParamDecl>())
                     {
                         emitRaw(context, "v");
-                        emitType(context, GetType(genericValueParamDecl));
+                        emitType(context, getType(context->astBuilder, genericValueParamDecl));
                     }
                     else if(mm.as<GenericTypeConstraintDecl>())
                     {
@@ -357,7 +362,7 @@ namespace Slang
         //
         if( auto callableDeclRef = declRef.as<CallableDecl>())
         {
-            auto parameters = GetParameters(callableDeclRef);
+            auto parameters = getParameters(callableDeclRef);
             UInt parameterCount = parameters.getCount();
 
             emitRaw(context, "p");
@@ -366,14 +371,14 @@ namespace Slang
 
             for(auto paramDeclRef : parameters)
             {
-                emitType(context, GetType(paramDeclRef));
+                emitType(context, getType(context->astBuilder, paramDeclRef));
             }
 
             // Don't print result type for an initializer/constructor,
             // since it is implicit in the qualified name.
             if (!callableDeclRef.is<ConstructorDecl>())
             {
-                emitType(context, GetResultType(callableDeclRef));
+                emitType(context, getResultType(context->astBuilder, callableDeclRef));
             }
         }
     }
@@ -419,29 +424,30 @@ namespace Slang
         emitQualifiedName(context, declRef);
     }
 
-    String getMangledName(DeclRef<Decl> const& declRef)
+    String getMangledName(ASTBuilder* astBuilder, DeclRef<Decl> const& declRef)
     {
-        ManglingContext context;
+        ManglingContext context(astBuilder);
         mangleName(&context, declRef);
         return context.sb.ProduceString();
     }
 
-    String getMangledName(DeclRefBase const & declRef)
+    String getMangledName(ASTBuilder* astBuilder, DeclRefBase const & declRef)
     {
-        return getMangledName(
+        return getMangledName(astBuilder,
             DeclRef<Decl>(declRef.decl, declRef.substitutions));
     }
 
-    String getMangledName(Decl* decl)
+    String getMangledName(ASTBuilder* astBuilder, Decl* decl)
     {
-        return getMangledName(makeDeclRef(decl));
+        return getMangledName(astBuilder, makeDeclRef(decl));
     }
     
     String getMangledNameForConformanceWitness(
+        ASTBuilder* astBuilder,
         DeclRef<Decl> sub,
         DeclRef<Decl> sup)
     {
-        ManglingContext context;
+        ManglingContext context(astBuilder);
         emitRaw(&context, "_SW");
         emitQualifiedName(&context, sub);
         emitQualifiedName(&context, sup);
@@ -449,6 +455,7 @@ namespace Slang
     }
 
     String getMangledNameForConformanceWitness(
+        ASTBuilder* astBuilder,
         DeclRef<Decl> sub,
         Type* sup)
     {
@@ -457,7 +464,7 @@ namespace Slang
         //
         //     {Conforms(sub,sup)} => _SW{sub}{sup}
         //
-        ManglingContext context;
+        ManglingContext context(astBuilder);
         emitRaw(&context, "_SW");
         emitQualifiedName(&context, sub);
         emitType(&context, sup);
@@ -465,6 +472,7 @@ namespace Slang
     }
 
     String getMangledNameForConformanceWitness(
+        ASTBuilder* astBuilder,
         Type* sub,
         Type* sup)
     {
@@ -473,16 +481,16 @@ namespace Slang
         //
         //     {Conforms(sub,sup)} => _SW{sub}{sup}
         //
-        ManglingContext context;
+        ManglingContext context(astBuilder);
         emitRaw(&context, "_SW");
         emitType(&context, sub);
         emitType(&context, sup);
         return context.sb.ProduceString();
     }
 
-    String getMangledTypeName(Type* type)
+    String getMangledTypeName(ASTBuilder* astBuilder, Type* type)
     {
-        ManglingContext context;
+        ManglingContext context(astBuilder);
         emitType(&context, type);
         return context.sb.ProduceString();
     }

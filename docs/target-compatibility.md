@@ -17,9 +17,9 @@ Items with ^ means there is some discussion about support later in the document 
 | u/int64_t Intrinsics        |     No       |   No         |   Yes      |     Yes       |    Yes
 | int matrix                  |     Yes      |   Yes        |   No +     |     Yes       |    Yes
 | tex.GetDimension            |     Yes      |   Yes        |   Yes      |     No        |    Yes
-| SM6.0 Wave Intrinsics       |     No       |   Yes        |  Partial   |     No +      |    No
+| SM6.0 Wave Intrinsics       |     No       |   Yes        |  Partial   |     Yes ^     |    No
 | SM6.0 Quad Intrinsics       |     No       |   Yes        |   No +     |     No        |    No
-| SM6.5 Wave Intrinsics       |     No       |   Yes ^      |   No +     |     No +      |    No
+| SM6.5 Wave Intrinsics       |     No       |   Yes ^      |   No +     |     Yes ^     |    No
 | WaveMask Intrinsics         |     Yes ^    |   Yes ^      |   Yes +    |     Yes       |    No
 | WaveShuffle                 |     No       |   Limited ^  |   Yes      |     Yes       |    No
 | Tesselation                 |     Yes ^    |   Yes ^      |   No +     |     No        |    No
@@ -58,9 +58,9 @@ tex.GetDimensions is the GetDimensions method on 'texture' objects. This is not 
 
 ## SM6.0 Wave Intrinsics
 
-CUDA does not currently support the HLSL Wave intrinsics. It does support 'WaveMask' intrinsics that follow the CUDA sync mechanism, where the programmer has to explicilty specify the lanes involved when calling the intrisnic.
+CUDA has premliminary support for Wave Intrinsics, introduced in [PR #1352](https://github.com/shader-slang/slang/pull/1352). Slang synthesizes the 'WaveMask' based on program flow and the implied 'programmer view' of exectution. This support is built on top of WaveMask intrinsics with Wave Intrinsics being replaced with WaveMask Intrinsic calls with Slang generating the code to calculate the appropriate WaveMasks.
 
-Currently there is the intention to look into making Slang generate suitable masks automatically such that that regular Wave intrinsics work. 
+Please read [PR #1352](https://github.com/shader-slang/slang/pull/1352) for a better description of the status.
 
 ## SM6.5 Wave Intrinsics
 

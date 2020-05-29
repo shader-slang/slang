@@ -5,19 +5,18 @@
 
 #include "slang-ast-generated.h"
 
-// Switch based on node type - only inner and leaf classes define override
-#define SLANG_AST_OVERRIDE_BASE
-#define SLANG_AST_OVERRIDE_INNER override
-#define SLANG_AST_OVERRIDE_LEAF override
-
 // Implementation for SLANG_ABSTRACT_CLASS(x) using reflection from C++ extractor in slang-ast-generated.h
 #define SLANG_CLASS_REFLECT_IMPL(NAME, SUPER, ORIGIN, LAST, MARKER, TYPE, param) \
+    protected: \
+    NAME() = default; \
     public:     \
+    typedef NAME This; \
     typedef SUPER Super; \
     static const ASTNodeType kType = ASTNodeType::NAME; \
     static const ReflectClassInfo kReflectClassInfo;  \
     SLANG_FORCE_INLINE static bool isDerivedFrom(ASTNodeType type) { return int(type) >= int(kType) && int(type) <= int(ASTNodeType::LAST); } \
-    virtual const ReflectClassInfo& getClassInfo() const SLANG_AST_OVERRIDE_##TYPE { return kReflectClassInfo; } \
+    friend class ASTBuilder; \
+    friend struct ASTConstructAccess; 
 
 // Macro definitions - use the SLANG_ASTNode_ definitions to invoke the IMPL to produce the code
 // injected into AST classes

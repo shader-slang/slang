@@ -636,7 +636,7 @@ ScalarizedVal createSimpleGLSLGlobalVarying(
             // TODO: it is kind of gross to be re-running some
             // of the type layout logic here.
 
-            UInt elementCount = (UInt) GetIntVal(dd->elementCount);
+            UInt elementCount = (UInt) getIntVal(dd->elementCount);
             arrayTypeLayoutBuilder.addResourceUsage(
                 kind,
                 resInfo->getSize() * elementCount);
@@ -1146,7 +1146,7 @@ IRInst* materializeTupleValue(
         // then use these to construct our result.
 
         List<IRInst*> arrayElementVals;
-        UInt arrayElementCount = (UInt) GetIntVal(arrayType->getElementCount());
+        UInt arrayElementCount = (UInt) getIntVal(arrayType->getElementCount());
 
         for( UInt ii = 0; ii < arrayElementCount; ++ii )
         {

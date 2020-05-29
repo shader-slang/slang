@@ -360,6 +360,8 @@ struct SharedIRGenContext
 
 struct IRGenContext
 {
+    ASTBuilder* astBuilder;
+
     // Shared state for the IR generation process
     SharedIRGenContext* shared;
 
@@ -378,8 +380,9 @@ struct IRGenContext
     // might be insufficient.
     LoweredValInfo thisVal;
 
-    explicit IRGenContext(SharedIRGenContext* inShared)
+    explicit IRGenContext(SharedIRGenContext* inShared, ASTBuilder* inAstBuilder)
         : shared(inShared)
+        , astBuilder(inAstBuilder)
         , env(&inShared->globalEnv)
         , irBuilder(nullptr)
     {}
@@ -969,7 +972,7 @@ static void addLinkageDecoration(
     IRInst*                     inst,
     Decl*                       decl)
 {
-     String mangledName = getMangledName(decl);
+     String mangledName = getMangledName(context->astBuilder, decl);
 
      if (context->shared->m_obfuscateCode)
      {
@@ -1025,7 +1028,7 @@ struct ValLoweringVisitor : ValVisitor<ValLoweringVisitor, LoweredValInfo, Lower
     LoweredValInfo visitGenericParamIntVal(GenericParamIntVal* val)
     {
         return emitDeclRef(context, val->declRef,
-            lowerType(context, GetType(val->declRef)));
+            lowerType(context, getType(context->astBuilder, val->declRef)));
     }
 
     LoweredValInfo visitDeclaredSubtypeWitness(DeclaredSubtypeWitness* val)
@@ -1176,14 +1179,14 @@ struct ValLoweringVisitor : ValVisitor<ValLoweringVisitor, LoweredValInfo, Lower
                     // for emitting the signature of a `CallableDecl`, and we should
                     // try to re-use that if at all possible.
                     //
-                    auto irParamType = lowerType(context, GetType(paramDeclRef));
+                    auto irParamType = lowerType(context, getType(context->astBuilder, paramDeclRef));
                     auto irParam = subBuilder->emitParam(irParamType);
 
                     irParams.add(irParam);
                     irParamTypes.add(irParamType);
                 }
 
-                auto irResultType = lowerType(context, GetResultType(callableDeclRef));
+                auto irResultType = lowerType(context, getResultType(context->astBuilder, callableDeclRef));
 
                 auto irFuncType = subBuilder->getFuncType(
                     irParamTypes,
@@ -1481,7 +1484,7 @@ struct ValLoweringVisitor : ValVisitor<ValLoweringVisitor, LoweredValInfo, Lower
     IRType* visitExtractExistentialType(ExtractExistentialType* type)
     {
         auto declRef = type->declRef;
-        auto existentialType = lowerType(context, GetType(declRef));
+        auto existentialType = lowerType(context, getType(context->astBuilder, declRef));
         IRInst* existentialVal = getSimpleVal(context, emitDeclRef(context, declRef, existentialType));
         return getBuilder()->emitExtractExistentialType(existentialVal);
     }
@@ -1489,7 +1492,7 @@ struct ValLoweringVisitor : ValVisitor<ValLoweringVisitor, LoweredValInfo, Lower
     LoweredValInfo visitExtractExistentialSubtypeWitness(ExtractExistentialSubtypeWitness* witness)
     {
         auto declRef = witness->declRef;
-        auto existentialType = lowerType(context, GetType(declRef));
+        auto existentialType = lowerType(context, getType(context->astBuilder, declRef));
         IRInst* existentialVal = getSimpleVal(context, emitDeclRef(context, declRef, existentialType));
         return LoweredValInfo::simple(getBuilder()->emitExtractExistentialWitnessTable(existentialVal));
     }
@@ -1520,7 +1523,7 @@ struct ValLoweringVisitor : ValVisitor<ValLoweringVisitor, LoweredValInfo, Lower
             //
             getBuilder()->addExportDecoration(
                 irType,
-                getMangledTypeName(type).getUnownedSlice());
+                getMangledTypeName(context->astBuilder, type).getUnownedSlice());
         }
         return LoweredValInfo::simple(irType);
     }
@@ -1922,7 +1925,7 @@ DeclRef<Decl> createDefaultSpecializedDeclRefImpl(IRGenContext* context, Decl* d
 {
     DeclRef<Decl> declRef;
     declRef.decl = decl;
-    declRef.substitutions = createDefaultSubstitutions(context->getSession(), decl);
+    declRef.substitutions = createDefaultSubstitutions(context->astBuilder, decl);
     return declRef;
 }
 //
@@ -1950,11 +1953,11 @@ RefPtr<Type> getThisParamTypeForContainer(
 {
     if( auto aggTypeDeclRef = parentDeclRef.as<AggTypeDecl>() )
     {
-        return DeclRefType::Create(context->getSession(), aggTypeDeclRef);
+        return DeclRefType::create(context->astBuilder, aggTypeDeclRef);
     }
     else if( auto extensionDeclRef = parentDeclRef.as<ExtensionDecl>() )
     {
-        return GetTargetType(extensionDeclRef);
+        return getTargetType(context->astBuilder, extensionDeclRef);
     }
 
     return nullptr;
@@ -1964,13 +1967,13 @@ RefPtr<Type> getThisParamTypeForCallable(
     IRGenContext*   context,
     DeclRef<Decl>   callableDeclRef)
 {
-    auto parentDeclRef = callableDeclRef.GetParent();
+    auto parentDeclRef = callableDeclRef.getParent();
 
     if(auto subscriptDeclRef = parentDeclRef.as<SubscriptDecl>())
-        parentDeclRef = subscriptDeclRef.GetParent();
+        parentDeclRef = subscriptDeclRef.getParent();
 
     if(auto genericDeclRef = parentDeclRef.as<GenericDecl>())
-        parentDeclRef = genericDeclRef.GetParent();
+        parentDeclRef = genericDeclRef.getParent();
 
     return getThisParamTypeForContainer(context, parentDeclRef);
 }
@@ -1984,6 +1987,7 @@ struct ExprLoweringVisitorBase : ExprVisitor<Derived, LoweredValInfo>
     IRGenContext* context;
 
     IRBuilder* getBuilder() { return context->irBuilder; }
+    ASTBuilder* getASTBuilder() { return context->astBuilder; }
 
     // Lower an expression that should have the same l-value-ness
     // as the visitor itself.
@@ -2149,7 +2153,7 @@ struct ExprLoweringVisitorBase : ExprVisitor<Derived, LoweredValInfo>
         }
         else if (auto vectorType = as<VectorExpressionType>(type))
         {
-            UInt elementCount = (UInt) GetIntVal(vectorType->elementCount);
+            UInt elementCount = (UInt) getIntVal(vectorType->elementCount);
 
             auto irDefaultValue = getSimpleVal(context, getDefaultVal(vectorType->elementType));
 
@@ -2163,7 +2167,7 @@ struct ExprLoweringVisitorBase : ExprVisitor<Derived, LoweredValInfo>
         }
         else if (auto matrixType = as<MatrixExpressionType>(type))
         {
-            UInt rowCount = (UInt) GetIntVal(matrixType->getRowCount());
+            UInt rowCount = (UInt) getIntVal(matrixType->getRowCount());
 
             auto rowType = matrixType->getRowType();
 
@@ -2179,7 +2183,7 @@ struct ExprLoweringVisitorBase : ExprVisitor<Derived, LoweredValInfo>
         }
         else if (auto arrayType = as<ArrayExpressionType>(type))
         {
-            UInt elementCount = (UInt) GetIntVal(arrayType->arrayLength);
+            UInt elementCount = (UInt) getIntVal(arrayType->arrayLength);
 
             auto irDefaultElement = getSimpleVal(context, getDefaultVal(arrayType->baseType));
 
@@ -2247,7 +2251,7 @@ struct ExprLoweringVisitorBase : ExprVisitor<Derived, LoweredValInfo>
         // fill in the appropriate field of the result
         if (auto arrayType = as<ArrayExpressionType>(type))
         {
-            UInt elementCount = (UInt) GetIntVal(arrayType->arrayLength);
+            UInt elementCount = (UInt) getIntVal(arrayType->arrayLength);
 
             for (UInt ee = 0; ee < argCount; ++ee)
             {
@@ -2269,7 +2273,7 @@ struct ExprLoweringVisitorBase : ExprVisitor<Derived, LoweredValInfo>
         }
         else if (auto vectorType = as<VectorExpressionType>(type))
         {
-            UInt elementCount = (UInt) GetIntVal(vectorType->elementCount);
+            UInt elementCount = (UInt) getIntVal(vectorType->elementCount);
 
             for (UInt ee = 0; ee < argCount; ++ee)
             {
@@ -2291,7 +2295,7 @@ struct ExprLoweringVisitorBase : ExprVisitor<Derived, LoweredValInfo>
         }
         else if (auto matrixType = as<MatrixExpressionType>(type))
         {
-            UInt rowCount = (UInt) GetIntVal(matrixType->getRowCount());
+            UInt rowCount = (UInt) getIntVal(matrixType->getRowCount());
 
             for (UInt rr = 0; rr < argCount; ++rr)
             {
@@ -2514,7 +2518,7 @@ struct ExprLoweringVisitorBase : ExprVisitor<Derived, LoweredValInfo>
         for (auto paramDeclRef : getMembersOfType<ParamDecl>(funcDeclRef))
         {
             auto paramDecl = paramDeclRef.getDecl();
-            IRType* paramType = lowerType(context, GetType(paramDeclRef));
+            IRType* paramType = lowerType(context, getType(getASTBuilder(), paramDeclRef));
             auto paramDirection = getParameterDirection(paramDecl);
 
             UInt argIndex = argCounter++;
@@ -2529,7 +2533,7 @@ struct ExprLoweringVisitorBase : ExprVisitor<Derived, LoweredValInfo>
                 // but there are still parameters remaining. This must mean
                 // that these parameters have default argument expressions
                 // associated with them.
-                argExpr = getInitExpr(paramDeclRef);
+                argExpr = getInitExpr(getASTBuilder(), paramDeclRef);
 
                 // Assert that such an expression must have been present.
                 SLANG_ASSERT(argExpr);
@@ -2879,7 +2883,7 @@ struct ExprLoweringVisitorBase : ExprVisitor<Derived, LoweredValInfo>
 
     LoweredValInfo visitExtractExistentialValueExpr(ExtractExistentialValueExpr* expr)
     {
-        auto existentialType = lowerType(context, GetType(expr->declRef));
+        auto existentialType = lowerType(context, getType(getASTBuilder(), expr->declRef));
         auto existentialVal = getSimpleVal(context, emitDeclRef(context, expr->declRef, existentialType));
 
         auto openedType = lowerType(context, expr->type);
@@ -3098,8 +3102,8 @@ struct StmtLoweringVisitor : StmtVisitor<StmtLoweringVisitor>
         // ordinary loop, with an `[unroll]` attribute on
         // it that we would respect.
 
-        auto rangeBeginVal = GetIntVal(stmt->rangeBeginVal);
-        auto rangeEndVal = GetIntVal(stmt->rangeEndVal);
+        auto rangeBeginVal = getIntVal(stmt->rangeBeginVal);
+        auto rangeEndVal = getIntVal(stmt->rangeEndVal);
 
         if (rangeBeginVal >= rangeEndVal)
             return;
@@ -4514,9 +4518,7 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
         }
         else
         {
-            subType = DeclRefType::Create(
-                context->getSession(),
-                makeDeclRef(parentDecl));
+            subType = DeclRefType::create(context->astBuilder, makeDeclRef(parentDecl));
         }
 
         // What is the super-type that we have declared we inherit from?
@@ -4526,7 +4528,7 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
         // on the type that is conforming, and the type that it conforms to.
         //
         // TODO: This approach doesn't really make sense for generic `extension` conformances.
-        auto mangledName = getMangledNameForConformanceWitness(subType, superType);
+        auto mangledName = getMangledNameForConformanceWitness(context->astBuilder, subType, superType);
 
         // A witness table may need to be generic, if the outer
         // declaration (either a type declaration or an `extension`)
@@ -6710,9 +6712,7 @@ static void lowerProgramEntryPointToIR(
 
     // First, lower the entry point like an ordinary function
 
-
-    auto session = context->getSession();
-    auto entryPointFuncType = lowerType(context, getFuncType(session, entryPointFuncDeclRef));
+    auto entryPointFuncType = lowerType(context, getFuncType(context->astBuilder, entryPointFuncDeclRef));
 
     auto builder = context->irBuilder;
     builder->setInsertInto(builder->getModule()->getModuleInst());
@@ -6722,7 +6722,7 @@ static void lowerProgramEntryPointToIR(
 
     if(!loweredEntryPointFunc->findDecoration<IRLinkageDecoration>())
     {
-        builder->addExportDecoration(loweredEntryPointFunc, getMangledName(entryPointFuncDeclRef).getUnownedSlice());
+        builder->addExportDecoration(loweredEntryPointFunc, getMangledName(context->astBuilder, entryPointFuncDeclRef).getUnownedSlice());
     }
 
     // We may have shader parameters of interface/existential type,
@@ -6778,6 +6778,7 @@ static void ensureAllDeclsRec(
 }
 
 IRModule* generateIRForTranslationUnit(
+    ASTBuilder* astBuilder,
     TranslationUnitRequest* translationUnit)
 {
     auto compileRequest = translationUnit->compileRequest;
@@ -6789,7 +6790,7 @@ IRModule* generateIRForTranslationUnit(
         translationUnit->getModuleDecl());
     SharedIRGenContext* sharedContext = &sharedContextStorage;
 
-    IRGenContext contextStorage(sharedContext);
+    IRGenContext contextStorage(sharedContext, astBuilder);
     IRGenContext* context = &contextStorage;
 
     SharedIRBuilder sharedBuilderStorage;
@@ -6979,7 +6980,7 @@ struct SpecializedComponentTypeIRGenContext : ComponentTypeVisitor
         );
         SharedIRGenContext* sharedContext = &sharedContextStorage;
 
-        IRGenContext contextStorage(sharedContext);
+        IRGenContext contextStorage(sharedContext, linkage->getASTBuilder());
         context = &contextStorage;
 
         SharedIRBuilder sharedBuilderStorage;
@@ -7087,8 +7088,8 @@ RefPtr<IRModule> TargetProgram::getOrCreateIRModuleForLayout(DiagnosticSink* sin
     /// Specialized IR generation context for when generating IR for layouts.
 struct IRLayoutGenContext : IRGenContext
 {
-    IRLayoutGenContext(SharedIRGenContext* shared)
-        : IRGenContext(shared)
+    IRLayoutGenContext(SharedIRGenContext* shared, ASTBuilder* astBuilder)
+        : IRGenContext(shared, astBuilder)
     {}
 
         /// Cache for custom key instructions used for entry-point parameter layout information.
@@ -7378,7 +7379,9 @@ RefPtr<IRModule> TargetProgram::createIRModuleForLayout(DiagnosticSink* sink)
         linkage->m_obfuscateCode);
     auto sharedContext = &sharedContextStorage;
 
-    IRLayoutGenContext contextStorage(sharedContext);
+    ASTBuilder* astBuilder = linkage->getASTBuilder();
+
+    IRLayoutGenContext contextStorage(sharedContext, astBuilder);
     auto context = &contextStorage;
 
     SharedIRBuilder sharedBuilderStorage;
@@ -7428,12 +7431,12 @@ RefPtr<IRModule> TargetProgram::createIRModuleForLayout(DiagnosticSink* sink)
         if(!funcDeclRef)
             continue;
 
-        auto irFuncType = lowerType(context, getFuncType(session, funcDeclRef));
+        auto irFuncType = lowerType(context, getFuncType(astBuilder, funcDeclRef));
         auto irFunc = getSimpleVal(context, emitDeclRef(context, funcDeclRef, irFuncType));
 
         if( !irFunc->findDecoration<IRLinkageDecoration>() )
         {
-            builder->addImportDecoration(irFunc, getMangledName(funcDeclRef).getUnownedSlice());
+            builder->addImportDecoration(irFunc, getMangledName(astBuilder, funcDeclRef).getUnownedSlice());
         }
 
         auto irEntryPointLayout = lowerEntryPointLayout(context, entryPointLayout);

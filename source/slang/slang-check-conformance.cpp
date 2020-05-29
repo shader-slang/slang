@@ -10,7 +10,7 @@ namespace Slang
     RefPtr<DeclaredSubtypeWitness> SemanticsVisitor::createSimpleSubtypeWitness(
         TypeWitnessBreadcrumb*  breadcrumb)
     {
-        RefPtr<DeclaredSubtypeWitness> witness = new DeclaredSubtypeWitness();
+        RefPtr<DeclaredSubtypeWitness> witness = m_astBuilder->create<DeclaredSubtypeWitness>();
         witness->sub = breadcrumb->sub;
         witness->sup = breadcrumb->sup;
         witness->declRef = breadcrumb->declRef;
@@ -79,7 +79,7 @@ namespace Slang
             // where `[...]` represents the "hole" we leave
             // open to fill in next.
             //
-            RefPtr<TransitiveSubtypeWitness> transitiveWitness = new TransitiveSubtypeWitness();
+            RefPtr<TransitiveSubtypeWitness> transitiveWitness = m_astBuilder->create<TransitiveSubtypeWitness>();
             transitiveWitness->sub = bb->sub;
             transitiveWitness->sup = bb->sup;
             transitiveWitness->midToSup = bb->declRef;
@@ -190,7 +190,7 @@ namespace Slang
                     // loops better). This would also help avoid checking multiply-inherited
                     // conformances multiple times.
 
-                    auto inheritedType = getBaseType(inheritanceDeclRef);
+                    auto inheritedType = getBaseType(m_astBuilder, inheritanceDeclRef);
 
                     // We need to ensure that the witness that gets created
                     // is a composite one, reflecting lookup through
@@ -211,7 +211,7 @@ namespace Slang
                 for (auto genConstraintDeclRef : getMembersOfType<GenericTypeConstraintDecl>(aggTypeDeclRef))
                 {
                     ensureDecl(genConstraintDeclRef, DeclCheckState::CanUseBaseOfInheritanceDecl);
-                    auto inheritedType = GetSup(genConstraintDeclRef);
+                    auto inheritedType = getSup(m_astBuilder, genConstraintDeclRef);
                     TypeWitnessBreadcrumb breadcrumb;
                     breadcrumb.prev = inBreadcrumbs;
                     breadcrumb.sub = type;
@@ -228,13 +228,13 @@ namespace Slang
                 // We need to enumerate the constraints placed on this type by its outer
                 // generic declaration, and see if any of them guarantees that we
                 // satisfy the given interface..
-                auto genericDeclRef = genericTypeParamDeclRef.GetParent().as<GenericDecl>();
+                auto genericDeclRef = genericTypeParamDeclRef.getParent().as<GenericDecl>();
                 SLANG_ASSERT(genericDeclRef);
 
                 for( auto constraintDeclRef : getMembersOfType<GenericTypeConstraintDecl>(genericDeclRef) )
                 {
-                    auto sub = GetSub(constraintDeclRef);
-                    auto sup = GetSup(constraintDeclRef);
+                    auto sub = getSub(m_astBuilder, constraintDeclRef);
+                    auto sup = getSup(m_astBuilder, constraintDeclRef);
 
                     auto subDeclRef = as<DeclRefType>(sub);
                     if(!subDeclRef)
@@ -313,9 +313,9 @@ namespace Slang
             //
             if(outWitness)
             {
-                RefPtr<TaggedUnionSubtypeWitness> taggedUnionWitness = new TaggedUnionSubtypeWitness();
+                RefPtr<TaggedUnionSubtypeWitness> taggedUnionWitness = m_astBuilder->create<TaggedUnionSubtypeWitness>();
                 taggedUnionWitness->sub = taggedUnionType;
-                taggedUnionWitness->sup = DeclRefType::Create(getSession(), interfaceDeclRef);
+                taggedUnionWitness->sup = DeclRefType::create(m_astBuilder, interfaceDeclRef);
                 taggedUnionWitness->caseWitnesses.swapWith(caseWitnesses);
 
                 *outWitness = taggedUnionWitness;
@@ -346,7 +346,7 @@ namespace Slang
     RefPtr<Val> SemanticsVisitor::createTypeEqualityWitness(
         Type*  type)
     {
-        RefPtr<TypeEqualityWitness> rs = new TypeEqualityWitness();
+        RefPtr<TypeEqualityWitness> rs = m_astBuilder->create<TypeEqualityWitness>();
         rs->sub = type;
         rs->sup = type;
         return rs;

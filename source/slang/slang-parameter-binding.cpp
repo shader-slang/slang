@@ -407,6 +407,8 @@ struct ParameterBindingContext
     TargetRequest* getTargetRequest() { return shared->getTargetRequest(); }
     LayoutRulesFamilyImpl* getRulesFamily() { return layoutContext.getRulesFamily(); }
 
+    ASTBuilder* getASTBuilder() { return shared->getLinkage()->getASTBuilder(); }
+
     Linkage* getLinkage() { return shared->getLinkage(); }
 };
 
@@ -700,10 +702,12 @@ static void collectGlobalScopeParameter(
     ShaderParamInfo const&      shaderParamInfo,
     SubstitutionSet             globalGenericSubst)
 {
+    auto astBuilder = context->getASTBuilder();
+
     auto varDeclRef = shaderParamInfo.paramDeclRef;
 
     // We apply any substitutions for global generic parameters here.
-    auto type = GetType(varDeclRef)->substitute(globalGenericSubst).as<Type>();
+    auto type = getType(astBuilder, varDeclRef)->substitute(astBuilder, globalGenericSubst).as<Type>();
 
     // We use a single operation to both check whether the
     // variable represents a shader parameter, and to compute
@@ -947,7 +951,7 @@ static void maybeDiagnoseMissingVulkanLayoutModifier(
     // oversight on their part.
     if( auto registerModifier = varDecl.getDecl()->findModifier<HLSLRegisterSemantic>() )
     {
-        getSink(context)->diagnose(registerModifier, Diagnostics::registerModifierButNoVulkanLayout, varDecl.GetName());
+        getSink(context)->diagnose(registerModifier, Diagnostics::registerModifierButNoVulkanLayout, varDecl.getName());
     }
 }
 
@@ -1003,7 +1007,7 @@ static void addExplicitParameterBindings_GLSL(
         }
         if( attr->binding != 0)
         {
-            getSink(context)->diagnose(attr, Diagnostics::wholeSpaceParameterRequiresZeroBinding, varDecl.GetName(), attr->binding);
+            getSink(context)->diagnose(attr, Diagnostics::wholeSpaceParameterRequiresZeroBinding, varDecl.getName(), attr->binding);
         }
         semanticInfo.index = attr->set;
         semanticInfo.space = 0;
@@ -1848,7 +1852,7 @@ static RefPtr<TypeLayout> processEntryPointVaryingParameter(
     // A matrix is processed as if it was an array of rows
     else if( auto matrixType = as<MatrixExpressionType>(type) )
     {
-        auto rowCount = GetIntVal(matrixType->getRowCount());
+        auto rowCount = getIntVal(matrixType->getRowCount());
         return processSimpleEntryPointParameter(context, matrixType, state, varLayout, (int) rowCount);
     }
     else if( auto arrayType = as<ArrayExpressionType>(type) )
@@ -1856,7 +1860,7 @@ static RefPtr<TypeLayout> processEntryPointVaryingParameter(
         // Note: Bad Things will happen if we have an array input
         // without a semantic already being enforced.
         
-        auto elementCount = (UInt) GetIntVal(arrayType->arrayLength);
+        auto elementCount = (UInt) getIntVal(arrayType->arrayLength);
 
         // We use the first element to derive the layout for the element type
         auto elementTypeLayout = processEntryPointVaryingParameter(context, arrayType->baseType, state, varLayout);
@@ -1911,7 +1915,7 @@ static RefPtr<TypeLayout> processEntryPointVaryingParameter(
             //
             Decl* firstExplicit = nullptr;
             Decl* firstImplicit = nullptr;
-            for( auto field : GetFields(structDeclRef, MemberFilterStyle::Instance) )
+            for( auto field : getFields(structDeclRef, MemberFilterStyle::Instance) )
             {
                 RefPtr<VarLayout> fieldVarLayout = new VarLayout();
                 fieldVarLayout->varDecl = field;
@@ -1922,7 +1926,7 @@ static RefPtr<TypeLayout> processEntryPointVaryingParameter(
                 auto fieldTypeLayout = processEntryPointVaryingParameterDecl(
                     context,
                     field.getDecl(),
-                    GetType(field),
+                    getType(context->getASTBuilder(), field),
                     state,
                     fieldVarLayout);
 
@@ -2039,7 +2043,7 @@ static RefPtr<TypeLayout> computeEntryPointParameterTypeLayout(
     RefPtr<VarLayout>               paramVarLayout,
     EntryPointParameterState&       state)
 {
-    auto paramType = GetType(paramDeclRef);
+    auto paramType = getType(context->getASTBuilder(), paramDeclRef);
     SLANG_ASSERT(paramType);
 
     if( paramDeclRef.getDecl()->hasModifier<HLSLUniformModifier>() )
@@ -2431,6 +2435,8 @@ static RefPtr<EntryPointLayout> collectEntryPointParameters(
     EntryPoint*                                 entryPoint,
     EntryPoint::EntryPointSpecializationInfo*   specializationInfo)
 {
+    auto astBuilder = context->getASTBuilder();
+
     // We will take responsibility for creating and filling in
     // the `EntryPointLayout` object here.
     //
@@ -2471,7 +2477,7 @@ static RefPtr<EntryPointLayout> collectEntryPointParameters(
     if(specializationInfo)
         entryPointFuncDeclRef = specializationInfo->specializedFuncDeclRef;
 
-    auto entryPointType = DeclRefType::Create(context->getLinkage()->getSessionImpl(), entryPointFuncDeclRef);
+    auto entryPointType = DeclRefType::create(astBuilder, entryPointFuncDeclRef);
 
     entryPointLayout->entryPoint = entryPointFuncDeclRef;
 
@@ -2575,10 +2581,10 @@ static RefPtr<EntryPointLayout> collectEntryPointParameters(
     // TODO: Ideally we should make the layout process more robust to empty/void
     // types and apply this logic unconditionally.
     //
-    auto resultType = GetResultType(entryPointFuncDeclRef);
+    auto resultType = getResultType(astBuilder, entryPointFuncDeclRef);
     SLANG_ASSERT(resultType);
 
-    if( !resultType->equals(resultType->getSession()->getVoidType()) )
+    if( !resultType->equals(astBuilder->getVoidType()) )
     {
         state.loc = entryPointFuncDeclRef.getLoc();
         state.directionMask = kEntryPointParameterDirection_Output;

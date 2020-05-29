@@ -60,7 +60,7 @@ EntryPointLayout* findEntryPointLayout(
 
     for( auto entryPointLayout : programLayout->entryPoints )
     {
-        if(entryPointLayout->entryPoint.GetName() != entryPoint->getName())
+        if(entryPointLayout->entryPoint.getName() != entryPoint->getName())
             continue;
 
         // TODO: We need to be careful about this check, since it relies on

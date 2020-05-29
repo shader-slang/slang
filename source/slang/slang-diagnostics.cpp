@@ -160,7 +160,7 @@ static void formatDiagnostic(
     Diagnostic const&   diagnostic,
     StringBuilder&      sb)
 {
-    auto sourceManager = sink->sourceManager;
+    auto sourceManager = sink->getSourceManager();
 
     SourceView* sourceView = nullptr;
     HumaneSourceLoc humaneLoc;
@@ -174,7 +174,7 @@ static void formatDiagnostic(
         formatDiagnostic(humaneLoc, diagnostic, sb);
     }
      
-    if (sourceView && (sink->flags & DiagnosticSink::Flag::VerbosePath))
+    if (sourceView && sink->isFlagSet(DiagnosticSink::Flag::VerbosePath))
     {
         auto actualHumaneLoc = sourceView->getHumaneLoc(diagnostic.loc, SourceLocType::Actual);
 
@@ -204,7 +204,7 @@ void DiagnosticSink::diagnoseImpl(SourceLoc const& pos, DiagnosticInfo const& in
 
     if (diagnostic.severity >= Severity::Error)
     {
-        errorCount++;
+        m_errorCount++;
     }
 
     // Did the client supply a callback for us to use?
@@ -243,7 +243,7 @@ void DiagnosticSink::diagnoseRaw(
 {
     if (severity >= Severity::Error)
     {
-        errorCount++;
+        m_errorCount++;
     }
 
     // Did the client supply a callback for us to use?

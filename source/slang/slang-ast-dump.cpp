@@ -417,7 +417,7 @@ struct Context
 
     void dump(const QualType& qualType)
     {
-        if (qualType.IsLeftValue)
+        if (qualType.isLeftValue)
         {
             m_writer->emit("left ");
         }
@@ -554,8 +554,13 @@ struct Context
         m_writer->emit("\n");
     }
 
+    void dump(ASTNodeType nodeType)
+    {
+        SLANG_UNUSED(nodeType)
+        // Don't bother to output anything - as will already have been dumped with the object name
+    }
+
     void dumpObjectFull(NodeBase* node);
-    void dumpObjectFull(Substitutions* subs);
 
     Context(SourceWriter* writer, ASTDumpUtil::Style dumpStyle):
         m_writer(writer),
@@ -594,7 +599,6 @@ static void dumpFields_##NAME(NAME* node, Context& context) \
     SLANG_FIELDS_ASTNode_##NAME(SLANG_AST_DUMP_FIELD, _) \
 }
 
-SLANG_ALL_ASTNode_Substitutions(SLANG_AST_DUMP_FIELDS_IMPL, _)
 SLANG_ALL_ASTNode_NodeBase(SLANG_AST_DUMP_FIELDS_IMPL, _)
 
 };
@@ -608,7 +612,6 @@ struct DumpFieldFuncs
     DumpFieldFuncs()
     {
         memset(m_funcs, 0, sizeof(m_funcs));
-        SLANG_ALL_ASTNode_Substitutions(SLANG_AST_GET_DUMP_FUNC, _)
         SLANG_ALL_ASTNode_NodeBase(SLANG_AST_GET_DUMP_FUNC, _)
     }
 
@@ -688,33 +691,11 @@ void Context::dumpObjectFull(NodeBase* node)
     }
 }
 
-void Context::dumpObjectFull(Substitutions* subs)
-{
-    if (!subs)
-    {
-        _dumpPtr(nullptr);
-    }
-    else
-    {
-        const ReflectClassInfo& typeInfo = subs->getClassInfo();
-        Index index = getObjectIndex(typeInfo, subs);
-        dumpObjectFull(typeInfo, subs, index);
-    }
-}
-
 /* static */void ASTDumpUtil::dump(NodeBase* node, Style style, SourceWriter* writer)
 {
     Context context(writer, style);
     context.dumpObjectFull(node);
     context.dumpRemaining();
-}
-
-/* static */void ASTDumpUtil::dump(Substitutions* subs, Style style, SourceWriter* writer)
-{
-    Context context(writer, style);
-    context.dumpObjectFull(subs);
-    context.dumpRemaining();
-
 }
 
 } // namespace Slang

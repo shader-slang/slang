@@ -118,26 +118,18 @@ void Session::init()
     // Set all the shared library function pointers to nullptr
     ::memset(m_sharedLibraryFunctions, 0, sizeof(m_sharedLibraryFunctions));
 
+    // Set up shared AST builder
+    m_sharedASTBuilder = new SharedASTBuilder;
+    m_sharedASTBuilder->init(this);
+
+    //  Use to create a ASTBuilder
+    RefPtr<ASTBuilder> builtinAstBuilder(new ASTBuilder(m_sharedASTBuilder));
     
-    // Initialize the lookup table of syntax classes:
-
-    // We can just iterate over the class pointers.
-    // NOTE! That this adds the names of the abstract classes too(!)
-    {
-        for (Index i = 0; i < Index(ASTNodeType::CountOf); ++i)
-        {
-            const ReflectClassInfo* info = ReflectClassInfo::getInfo(ASTNodeType(i));
-            if (info)
-            {
-                mapNameToSyntaxClass.Add(getNamePool()->getName(info->m_name), SyntaxClass<Slang::RefObject>(info));
-            }
-        }
-    }
-
     // Make sure our source manager is initialized
     builtinSourceManager.initialize(nullptr, nullptr);
 
-    m_builtinLinkage = new Linkage(this);
+    
+    m_builtinLinkage = new Linkage(this, builtinAstBuilder);
 
     // Because the `Session` retains the builtin `Linkage`,
     // we need to make sure that the parent pointer inside
@@ -149,9 +141,7 @@ void Session::init()
     //
     m_builtinLinkage->_stopRetainingParentSession();
 
-    // Initialize representations of some very basic types:
-    initializeTypes();
-
+  
     // Create scopes for various language builtins.
     //
     // TODO: load these on-demand to avoid parsing
@@ -160,7 +150,7 @@ void Session::init()
     baseLanguageScope = new Scope();
 
     auto baseModuleDecl = populateBaseLanguageModule(
-        this,
+        m_builtinLinkage->getASTBuilder(),
         baseLanguageScope);
     loadedModuleCode.add(baseModuleDecl);
 
@@ -198,7 +188,8 @@ SLANG_NO_THROW SlangResult SLANG_MCALL Session::createSession(
     slang::SessionDesc const&  desc,
     slang::ISession**          outSession)
 {
-    RefPtr<Linkage> linkage = new Linkage(this);
+    RefPtr<ASTBuilder> astBuilder(new ASTBuilder(m_sharedASTBuilder));
+    RefPtr<Linkage> linkage = new Linkage(this, astBuilder);
 
     Int targetCount = desc.targetCount;
     for(Int ii = 0; ii < targetCount; ++ii)
@@ -507,10 +498,11 @@ Profile getEffectiveProfile(EntryPoint* entryPoint, TargetRequest* target)
 
 //
 
-Linkage::Linkage(Session* session)
+Linkage::Linkage(Session* session, ASTBuilder* astBuilder)
     : m_session(session)
     , m_retainedSession(session)
     , m_sourceManager(&m_defaultSourceManager)
+    , m_astBuilder(astBuilder)
 {
     getNamePool()->setRootNamePool(session->getRootNamePool());
 
@@ -868,7 +860,7 @@ RefPtr<Expr> Linkage::parseTermString(String typeStr, RefPtr<Scope> scope)
         nullptr);
 
     return parseTermFromSourceFile(
-        getSessionImpl(),
+        getASTBuilder(),
         tokens, &sink, scope, getNamePool(), SourceLanguage::Slang);
 }
 
@@ -960,7 +952,7 @@ void FrontEndCompileRequest::parseTranslationUnit(
         combinedPreprocessorDefinitions.Add(def.Key, def.Value);
 
     auto module = translationUnit->getModule();
-    RefPtr<ModuleDecl> translationUnitSyntax = new ModuleDecl();
+    RefPtr<ModuleDecl> translationUnitSyntax = linkage->getASTBuilder()->create<ModuleDecl>();
     translationUnitSyntax->nameAndLoc.name = translationUnit->moduleName;
     translationUnitSyntax->module = module;
     module->setModuleDecl(translationUnitSyntax);
@@ -980,7 +972,7 @@ void FrontEndCompileRequest::parseTranslationUnit(
     //
     if( m_isStandardLibraryCode )
     {
-        translationUnitSyntax->modifiers.first = new FromStdLibModifier();
+        translationUnitSyntax->modifiers.first = linkage->getASTBuilder()->create<FromStdLibModifier>();
     }
 
     for (auto sourceFile : translationUnit->getSourceFiles())
@@ -994,6 +986,7 @@ void FrontEndCompileRequest::parseTranslationUnit(
             module);
 
         parseSourceFile(
+            linkage->getASTBuilder(),
             translationUnit,
             tokens,
             getSink(),
@@ -1062,7 +1055,7 @@ void FrontEndCompileRequest::generateIR()
         // * it can generate diagnostics
 
         /// Generate IR for translation unit
-        RefPtr<IRModule> irModule(generateIRForTranslationUnit(translationUnit));
+        RefPtr<IRModule> irModule(generateIRForTranslationUnit(getLinkage()->getASTBuilder(), translationUnit));
 
         if (verifyDebugSerialization)
         {
@@ -1150,12 +1143,12 @@ SlangResult FrontEndCompileRequest::executeActionsInner()
         parseTranslationUnit(translationUnit.Ptr());
     }
 
-    if (getSink()->GetErrorCount() != 0)
+    if (getSink()->getErrorCount() != 0)
         return SLANG_FAIL;
 
     // Perform semantic checking on the whole collection
     checkAllTranslationUnits();
-    if (getSink()->GetErrorCount() != 0)
+    if (getSink()->getErrorCount() != 0)
         return SLANG_FAIL;
 
 
@@ -1163,13 +1156,13 @@ SlangResult FrontEndCompileRequest::executeActionsInner()
     // and use them to populate the `program` member.
     //
     m_globalComponentType = createUnspecializedGlobalComponentType(this);
-    if (getSink()->GetErrorCount() != 0)
+    if (getSink()->getErrorCount() != 0)
         return SLANG_FAIL;
 
     m_globalAndEntryPointsComponentType = createUnspecializedGlobalAndEntryPointsComponentType(
         this,
         m_unspecializedEntryPoints);
-    if (getSink()->GetErrorCount() != 0)
+    if (getSink()->getErrorCount() != 0)
         return SLANG_FAIL;
 
     // We always generate IR for all the translation units.
@@ -1181,7 +1174,7 @@ SlangResult FrontEndCompileRequest::executeActionsInner()
     // makes sense.
     //
     generateIR();
-    if (getSink()->GetErrorCount() != 0)
+    if (getSink()->getErrorCount() != 0)
         return SLANG_FAIL;
 
     // Do parameter binding generation, for each compilation target.
@@ -1192,7 +1185,7 @@ SlangResult FrontEndCompileRequest::executeActionsInner()
         targetProgram->getOrCreateLayout(getSink());
         targetProgram->getOrCreateIRModuleForLayout(getSink());
     }
-    if (getSink()->GetErrorCount() != 0)
+    if (getSink()->getErrorCount() != 0)
         return SLANG_FAIL;
 
     return SLANG_OK;
@@ -1212,7 +1205,8 @@ EndToEndCompileRequest::EndToEndCompileRequest(
     : m_session(session)
     , m_sink(nullptr)
 {
-    m_linkage = new Linkage(session);
+    RefPtr<ASTBuilder> astBuilder(new ASTBuilder(session->m_sharedASTBuilder));
+    m_linkage = new Linkage(session, astBuilder);
     init();
 }
 
@@ -1227,7 +1221,7 @@ EndToEndCompileRequest::EndToEndCompileRequest(
 
 void EndToEndCompileRequest::init()
 {
-    m_sink.sourceManager = m_linkage->getSourceManager();
+    m_sink.setSourceManager(m_linkage->getSourceManager());
 
     // Set all the default writers
     for (int i = 0; i < int(WriterChannel::CountOf); ++i)
@@ -1300,13 +1294,13 @@ SlangResult EndToEndCompileRequest::executeActionsInner()
     if (passThrough == PassThroughMode::None)
     {
         m_specializedGlobalComponentType = createSpecializedGlobalComponentType(this);
-        if (getSink()->GetErrorCount() != 0)
+        if (getSink()->getErrorCount() != 0)
             return SLANG_FAIL;
 
         m_specializedGlobalAndEntryPointsComponentType = createSpecializedGlobalAndEntryPointsComponentType(
             this,
             m_specializedEntryPoints);
-        if (getSink()->GetErrorCount() != 0)
+        if (getSink()->getErrorCount() != 0)
             return SLANG_FAIL;
 
         // For each code generation target, we will generate specialized
@@ -1318,7 +1312,7 @@ SlangResult EndToEndCompileRequest::executeActionsInner()
             auto targetProgram = m_specializedGlobalAndEntryPointsComponentType->getTargetProgram(targetReq);
             targetProgram->getOrCreateLayout(getSink());
         }
-        if (getSink()->GetErrorCount() != 0)
+        if (getSink()->getErrorCount() != 0)
             return SLANG_FAIL;
     }
     else
@@ -1350,7 +1344,7 @@ SlangResult EndToEndCompileRequest::executeActionsInner()
     // Generate output code, in whatever format was requested
     getBackEndReq()->setProgram(getSpecializedGlobalAndEntryPointsComponentType());
     generateOutput(this);
-    if (getSink()->GetErrorCount() != 0)
+    if (getSink()->getErrorCount() != 0)
         return SLANG_FAIL;
 
     return SLANG_OK;
@@ -1521,9 +1515,9 @@ void Linkage::loadParsedModule(
 
     auto sink = translationUnit->compileRequest->getSink();
 
-    int errorCountBefore = sink->GetErrorCount();
+    int errorCountBefore = sink->getErrorCount();
     checkTranslationUnit(translationUnit.Ptr());
-    int errorCountAfter = sink->GetErrorCount();
+    int errorCountAfter = sink->getErrorCount();
 
     if (errorCountAfter != errorCountBefore)
     {
@@ -1534,7 +1528,7 @@ void Linkage::loadParsedModule(
         // If we didn't run into any errors, then try to generate
         // IR code for the imported module.
         SLANG_ASSERT(errorCountAfter == 0);
-        loadedModule->setIRModule(generateIRForTranslationUnit(translationUnit));
+        loadedModule->setIRModule(generateIRForTranslationUnit(getASTBuilder(), translationUnit));
     }
     loadedModulesList.add(loadedModule);
 }
@@ -1578,9 +1572,9 @@ RefPtr<Module> Linkage::loadModule(
     
     translationUnit->addSourceFile(sourceFile);
 
-    int errorCountBefore = sink->GetErrorCount();
+    int errorCountBefore = sink->getErrorCount();
     frontEndReq->parseTranslationUnit(translationUnit);
-    int errorCountAfter = sink->GetErrorCount();
+    int errorCountAfter = sink->getErrorCount();
 
     if( errorCountAfter != errorCountBefore )
     {
@@ -1597,7 +1591,7 @@ RefPtr<Module> Linkage::loadModule(
         name,
         filePathInfo);
 
-    errorCountAfter = sink->GetErrorCount();
+    errorCountAfter = sink->getErrorCount();
 
     if (errorCountAfter != errorCountBefore)
     {
@@ -2337,7 +2331,7 @@ SpecializedComponentType::SpecializedComponentType(
             if(specializationInfo)
                 funcDeclRef = specializationInfo->specializedFuncDeclRef;
 
-            (*mangledEntryPointNames).add(getMangledName(funcDeclRef));
+            (*mangledEntryPointNames).add(getMangledName(m_astBuilder, funcDeclRef));
         }
 
         void visitModule(Module*, Module::ModuleSpecializationInfo*) SLANG_OVERRIDE
@@ -2346,12 +2340,18 @@ SpecializedComponentType::SpecializedComponentType(
         { visitChildren(composite, specializationInfo); }
         void visitSpecialized(SpecializedComponentType* specialized) SLANG_OVERRIDE
         { visitChildren(specialized); }
+
+        EntryPointMangledNameCollector(ASTBuilder* astBuilder):
+            m_astBuilder(astBuilder)
+        {
+        }
+        ASTBuilder* m_astBuilder;
     };
 
     // With the visitor defined, we apply it to ourself to compute
     // and collect the mangled entry point names.
     //
-    EntryPointMangledNameCollector collector;
+    EntryPointMangledNameCollector collector(getLinkage()->getASTBuilder());
     collector.mangledEntryPointNames = &m_entryPointMangledNames;
     collector.visitSpecialized(this);
 }
@@ -2436,11 +2436,11 @@ void DiagnosticSink::noteInternalErrorLoc(SourceLoc const& loc)
     // If this is the first source location being noted,
     // then emit a message to help the user isolate what
     // code might have confused the compiler.
-    if(internalErrorLocsNoted == 0)
+    if(m_internalErrorLocsNoted == 0)
     {
         diagnose(loc, Diagnostics::noteLocationOfInternalError);
     }
-    internalErrorLocsNoted++;
+    m_internalErrorLocsNoted++;
 }
 
 SlangResult DiagnosticSink::getBlobIfNeeded(ISlangBlob** outBlob)
@@ -2449,8 +2449,14 @@ SlangResult DiagnosticSink::getBlobIfNeeded(ISlangBlob** outBlob)
     //
     if(!outBlob) return SLANG_OK;
 
+    // For outputBuffer to be valid and hold diagnostics, writer must not be set
+    SLANG_ASSERT(writer == nullptr);
+
     // If there were no errors, and there was no diagnostic output, there is nothing to do.
-    if(!GetErrorCount() && !outputBuffer.getLength()) return SLANG_OK;
+    if(getErrorCount() == 0 && outputBuffer.getLength() == 0)
+    {
+        return SLANG_OK;
+    }
 
     Slang::ComPtr<ISlangBlob> blob = Slang::StringUtil::createStringBlob(outputBuffer);
     *outBlob = blob.detach();
@@ -2554,7 +2560,7 @@ void Session::addBuiltinSource(
     compileRequest->m_isStandardLibraryCode = true;
 
     // Set the source manager on the sink
-    sink.sourceManager = sourceManager;
+    sink.setSourceManager(sourceManager);
     // Make the linkage use the builtin source manager
     Linkage* linkage = compileRequest->getLinkage();
     linkage->setSourceManager(sourceManager);
@@ -2605,19 +2611,8 @@ void Session::addBuiltinSource(
 
 Session::~Session()
 {
-    // free all built-in types first
-    errorType = nullptr;
-    initializerListType = nullptr;
-    overloadedType = nullptr;
-    irBasicBlockType = nullptr;
-    constExprRate = nullptr;
-
     destroyTypeCheckingCache();
 
-    for (Index i = 0; i < SLANG_COUNT_OF(builtinTypes); ++i)
-    {
-        builtinTypes[i].setNull();
-    }
     // destroy modules next
     loadedModuleCode = decltype(loadedModuleCode)();
 }

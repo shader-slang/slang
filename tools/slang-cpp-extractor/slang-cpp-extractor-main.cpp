@@ -1365,7 +1365,7 @@ SlangResult CPPExtractor::_maybeParseType(UnownedStringSlice& outType)
 {
     Index templateDepth = 0;
     SlangResult res = _maybeParseType(outType, templateDepth);
-    if (SLANG_FAILED(res) && m_sink->errorCount)
+    if (SLANG_FAILED(res) && m_sink->getErrorCount())
     {
         return res;
     }
@@ -1472,7 +1472,7 @@ SlangResult CPPExtractor::_maybeParseField()
     UnownedStringSlice typeName;
     if (SLANG_FAILED(_maybeParseType(typeName)))
     {
-        if (m_sink->errorCount)
+        if (m_sink->getErrorCount())
         {
             return SLANG_FAIL;
         }
@@ -1565,7 +1565,7 @@ SlangResult CPPExtractor::parse(SourceFile* sourceFile, const Options* options)
     lexer.initialize(sourceView, m_sink, m_namePool, manager->getMemoryArena());
     m_tokenList = lexer.lexAllTokens();
     // See if there were any errors
-    if (m_sink->errorCount)
+    if (m_sink->getErrorCount())
     {
         return SLANG_FAIL;
     }
@@ -2446,7 +2446,7 @@ int main(int argc, const char*const* argv)
         {
             return 1;
         }
-        if (sink.errorCount)
+        if (sink.getErrorCount())
         {
             return 1;
         }

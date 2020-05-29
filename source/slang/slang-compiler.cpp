@@ -185,10 +185,10 @@ namespace Slang
     {
         RefPtr<EntryPoint> entryPoint = new EntryPoint(
             linkage,
-            funcDeclRef.GetName(),
+            funcDeclRef.getName(),
             profile,
             funcDeclRef);
-        entryPoint->m_mangledName = getMangledName(funcDeclRef);
+        entryPoint->m_mangledName = getMangledName(linkage->getASTBuilder(), funcDeclRef);
         return entryPoint;
     }
 
@@ -711,7 +711,7 @@ namespace Slang
 
     static String _getDisplayPath(DiagnosticSink* sink, SourceFile* sourceFile)
     {
-        if (sink->flags & DiagnosticSink::Flag::VerbosePath)
+        if (sink->isFlagSet(DiagnosticSink::Flag::VerbosePath))
         {
             return sourceFile->calcVerbosePath();
         }
