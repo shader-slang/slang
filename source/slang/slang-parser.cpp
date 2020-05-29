@@ -2834,10 +2834,10 @@ namespace Slang
     // This is a catch-all syntax-construction callback to handle cases where
     // a piece of syntax is fully defined by the keyword to use, along with
     // the class of AST node to construct.
-    static RefPtr<RefObject> parseSimpleSyntax(Parser* /*parser*/, void* userData)
+    static RefPtr<RefObject> parseSimpleSyntax(Parser* parser, void* userData)
     {
         SyntaxClassBase syntaxClass((ReflectClassInfo*) userData);
-        return (RefObject*) syntaxClass.createInstanceImpl();
+        return (RefObject*) syntaxClass.createInstanceImpl(parser->astBuilder);
     }
 
     // Parse a declaration of a keyword that can be used to define further syntax.

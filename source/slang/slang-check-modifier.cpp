@@ -544,7 +544,7 @@ namespace Slang
         }
 
         // Manage scope
-        RefPtr<RefObject> attrInstance = attrDecl->syntaxClass.createInstance();
+        RefPtr<RefObject> attrInstance = attrDecl->syntaxClass.createInstance(m_astBuilder);
         auto attr = attrInstance.as<Attribute>();
         if(!attr)
         {
