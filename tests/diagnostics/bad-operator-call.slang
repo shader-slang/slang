@@ -1,11 +1,7 @@
 // bad-operator-call.slang
-//DIAGNOSTIC_TEST(windows):SIMPLE:
+//DIAGNOSTIC_TEST:SIMPLE:
 
 // Test that bad calls to operators produce reasonable diagnostic messages.
-
-// Note: This test is currently Windows-only becase our Linux builds
-// seem to print references to the stdlib code with paths that don't
-// match the Windows build (which generated our baseline).
 
 struct S {}
 
