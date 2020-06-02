@@ -176,6 +176,23 @@ class StaticMemberExpr: public DeclRefExpr
     RefPtr<Expr> baseExpression;
 };
 
+struct MatrixCoord
+{
+    bool operator==(const MatrixCoord& rhs) const { return row == rhs.row && col == rhs.col; };
+    bool operator!=(const MatrixCoord& rhs) const { return !(*this == rhs); };
+    // Rows and columns are zero indexed 
+    int row;
+    int col;
+};
+
+class MatrixSwizzleExpr : public Expr
+{
+    SLANG_CLASS(MatrixSwizzleExpr)
+    RefPtr<Expr> base;
+    int elementCount;
+    MatrixCoord elementCoords[4];
+};
+
 class SwizzleExpr: public Expr
 {
     SLANG_CLASS(SwizzleExpr)

@@ -450,6 +450,15 @@ struct Context
         m_writer->emit("}");
     }
 
+    void dump(const MatrixCoord& coord)
+    {
+        m_writer->emit("(");
+        m_writer->emit(coord.row);
+        m_writer->emit(", ");
+        m_writer->emit(coord.col);
+        m_writer->emit(")\n");
+    }
+
     void dump(const LookupResult& result)
     {
         auto& nonConstResult = const_cast<LookupResult&>(result);
