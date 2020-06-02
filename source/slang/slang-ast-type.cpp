@@ -19,11 +19,6 @@ Type::~Type()
     }
 }
 
-bool Type::equalsImpl(Type* type)
-{
-    SLANG_AST_NODE_VIRTUAL_CALL(Type, equalsImpl, (type))
-}
-
 RefPtr<Type> Type::createCanonicalType()
 {
     SLANG_AST_NODE_VIRTUAL_CALL(Type, createCanonicalType, ())
@@ -34,9 +29,16 @@ bool Type::equals(Type* type)
     return getCanonicalType()->equalsImpl(type->getCanonicalType());
 }
 
+bool Type::equalsImpl(Type* type)
+{
+    SLANG_AST_NODE_VIRTUAL_CALL(Type, equalsImpl, (type))
+}
+
 bool Type::_equalsImplOverride(Type* type)
 {
-    return getCanonicalType()->equalsImpl(type->getCanonicalType());
+    SLANG_UNUSED(type)
+    SLANG_ASSERT(!"Type::_equalsImplOverride not overridden");
+    return false;
 }
 
 RefPtr<Type> Type::_createCanonicalTypeOverride()
