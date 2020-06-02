@@ -265,7 +265,7 @@ SLANG_NO_THROW void SLANG_MCALL Session::getDownstreamCompilerPrelude(
 
 SLANG_NO_THROW const char* SLANG_MCALL Session::getBuildTagString()
 {
-    return SLANG_TAG_VERSION;
+    return spGetBuildTagString();
 }
 
 SLANG_NO_THROW SlangResult SLANG_MCALL Session::setDefaultDownstreamCompiler(SlangSourceLanguage sourceLanguage, SlangPassThrough defaultCompiler)
@@ -2654,6 +2654,11 @@ SLANG_API void spDestroySession(
     SLANG_ASSERT(session->debugGetReferenceCount() == 1);
     // Release
     session->release();
+}
+
+SLANG_API const char* spGetBuildTagString()
+{
+    return SLANG_TAG_VERSION;
 }
 
 SLANG_API void spAddBuiltins(

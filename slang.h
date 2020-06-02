@@ -1278,6 +1278,22 @@ extern "C"
         SlangCompileRequest*    request,
         SlangOptimizationLevel  level);
 
+
+    /*!
+    @brief Get the build version 'tag' string. The string is the same as produced via `git describe --tags`
+    for the project. If Slang is built separately from the automated build scripts
+    the contents will by default be 'unknown'. Any string can be set by changing the
+    contents of 'slang-tag-version.h' file and recompiling the project.
+
+    This function will return exactly the same result as the method getBuildTag string on IGlobalSession.
+
+    An advantage of using this function over the method is that doing so does not require the creation of
+    a session, which can be a fairly costly operation.
+
+    @return The build tag string
+    */
+    SLANG_API const char* spGetBuildTagString();
+
     /*!
     @brief Set the container format to be used for binary output.
     */
@@ -2868,6 +2884,8 @@ namespace slang
             for the project. If Slang is built separately from the automated build scripts
             the contents will by default be 'unknown'. Any string can be set by changing the
             contents of 'slang-tag-version.h' file and recompiling the project.
+
+            This method will return exactly the same result as the free function spGetBuildTagString.
 
             @return The build tag string
             */
