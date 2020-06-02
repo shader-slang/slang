@@ -2895,6 +2895,13 @@ struct ExprLoweringVisitorBase : ExprVisitor<Derived, LoweredValInfo>
 struct LValueExprLoweringVisitor : ExprLoweringVisitorBase<LValueExprLoweringVisitor>
 {
     // When visiting a swizzle expression in an l-value context,
+    // we need to construct a "swizzled l-value."
+    LoweredValInfo visitMatrixSwizzleExpr(MatrixSwizzleExpr*)
+    {
+        SLANG_UNIMPLEMENTED_X("matrix swizzle lvalue case");
+    }
+
+    // When visiting a swizzle expression in an l-value context,
     // we need to construct a "sizzled l-value."
     LoweredValInfo visitSwizzleExpr(SwizzleExpr* expr)
     {
@@ -2964,6 +2971,52 @@ struct LValueExprLoweringVisitor : ExprLoweringVisitorBase<LValueExprLoweringVis
 
 struct RValueExprLoweringVisitor : ExprLoweringVisitorBase<RValueExprLoweringVisitor>
 {
+    // A matrix swizzle in an r-value context can save time by just
+    // emitting the matrix swizzle instructions directly.
+    LoweredValInfo visitMatrixSwizzleExpr(MatrixSwizzleExpr* expr)
+    {
+        auto resultType = lowerType(context, expr->type);
+        auto base = lowerSubExpr(expr->base);
+        auto matType = as<MatrixExpressionType>(expr->base->type.type);
+        if (!matType)
+            SLANG_UNEXPECTED("Expected a matrix type in matrix swizzle");
+        auto subscript2 = lowerType(context, matType->getElementType());
+        auto subscript1 = lowerType(context, matType->getRowType());
+
+        auto builder = getBuilder();
+
+        auto irIntType = getIntType(context);
+
+        UInt elementCount = (UInt)expr->elementCount;
+        IRInst* irExtracts[4];
+        for (UInt ii = 0; ii < elementCount; ++ii)
+        {
+            auto index1 = builder->getIntValue(
+                irIntType,
+                (IRIntegerValue)expr->elementCoords[ii].row);
+            auto index2 = builder->getIntValue(
+                irIntType,
+                (IRIntegerValue)expr->elementCoords[ii].col);
+            // First index expression
+            auto irExtract1 = subscriptValue(
+                subscript1,
+                base,
+                index1);
+            // Second index expression
+            irExtracts[ii] = getSimpleVal(context, subscriptValue(
+                subscript2,
+                irExtract1,
+                index2));
+        }
+        auto irVector = builder->emitMakeVector(
+            resultType,
+            elementCount,
+            irExtracts
+        );
+
+        return LoweredValInfo::simple(irVector);
+    }
+
     // A swizzle in an r-value context can save time by just
     // emitting the swizzle instructions directly.
     LoweredValInfo visitSwizzleExpr(SwizzleExpr* expr)
