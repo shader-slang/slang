@@ -1362,7 +1362,7 @@ namespace Slang
         IntegerLiteralValue baseElementRowCount,
         IntegerLiteralValue baseElementColCount)
     {
-        RefPtr<MatrixSwizzleExpr> swizExpr = new MatrixSwizzleExpr();
+        RefPtr<MatrixSwizzleExpr> swizExpr = m_astBuilder->create<MatrixSwizzleExpr>();
         swizExpr->loc = memberRefExpr->loc;
         swizExpr->base = memberRefExpr->baseExpression;
 
@@ -1399,7 +1399,8 @@ namespace Slang
             if (*cursor == 'm')
             {
                 // Can't mix one and zero indexing
-                if (zeroIndexOffset == 1) {
+                if (zeroIndexOffset == 1)
+                {
                     getSink()->diagnose(swizExpr, Diagnostics::invalidSwizzleExpr, swizzleText, baseElementType->toString());
                     return CreateErrorExpr(memberRefExpr);
                 }
@@ -1410,7 +1411,8 @@ namespace Slang
             else
             {
                 // Can't mix one and zero indexing
-                if (zeroIndexOffset == 0) {
+                if (zeroIndexOffset == 0)
+                {
                     getSink()->diagnose(swizExpr, Diagnostics::invalidSwizzleExpr, swizzleText, baseElementType->toString());
                     return CreateErrorExpr(memberRefExpr);
                 }
@@ -1421,15 +1423,14 @@ namespace Slang
             for (Index j = 0; j < 2; j++)
             {
                 auto ch = *cursor++;
-                int subIndex;
-
+                
                 if (ch < '0' || ch > '4')
                 {
                     // An invalid character in the swizzle is an error
                     getSink()->diagnose(swizExpr, Diagnostics::invalidSwizzleExpr, swizzleText, baseElementType->toString());
                     return CreateErrorExpr(memberRefExpr);
                 }
-                subIndex = ch - '0' - zeroIndexOffset;
+                const int subIndex = ch - '0' - zeroIndexOffset;
 
                 // Check the limit for either the row or column, depending on the step
                 IntegerLiteralValue elementLimit;
@@ -1438,7 +1439,8 @@ namespace Slang
                     elementLimit = baseElementRowCount;
                     elementCoord.row = subIndex;
                 }
-                else {
+                else
+                {
                     elementLimit = baseElementColCount;
                     elementCoord.col = subIndex;
                 }
@@ -1484,12 +1486,12 @@ namespace Slang
             // here if the input type had a sugared name...
             swizExpr->type = QualType(createVectorType(
                 baseElementType,
-                new ConstantIntVal(elementCount)));
+                m_astBuilder->create<ConstantIntVal>(elementCount)));
         }
 
         // A swizzle can be used as an l-value as long as there
         // were no duplicates in the list of components
-        swizExpr->type.IsLeftValue = !anyDuplicates;
+        swizExpr->type.isLeftValue = !anyDuplicates;
 
         return swizExpr;
     }
@@ -1502,7 +1504,8 @@ namespace Slang
     {
         if (auto constantRowCount = as<ConstantIntVal>(baseRowCount))
         {
-            if (auto constantColCount = as<ConstantIntVal>(baseColCount)) {
+            if (auto constantColCount = as<ConstantIntVal>(baseColCount))
+            {
                 return CheckMatrixSwizzleExpr(memberRefExpr, baseElementType,
                     constantRowCount->value, constantColCount->value);
             }
