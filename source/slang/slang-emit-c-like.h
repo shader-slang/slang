@@ -96,8 +96,12 @@ public:
         {}
     };
 
+        /// Must be called before used
+    virtual SlangResult init();
+
         /// Ctor
     CLikeSourceEmitter(const Desc& desc);
+
     
         /// Get the source manager
     SourceManager* getSourceManager() { return m_compileRequest->getSourceManager(); }
