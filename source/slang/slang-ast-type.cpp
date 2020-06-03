@@ -5,6 +5,8 @@
 
 #include "slang-syntax.h"
 
+#include "slang-ast-generated-macro.h"
+
 namespace Slang {
 
 // !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! Type !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!

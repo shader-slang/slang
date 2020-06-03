@@ -173,7 +173,7 @@ class TypeConstraintDecl : public  Decl
     SLANG_ABSTRACT_CLASS(TypeConstraintDecl)
 
     const TypeExp& getSup() const;
-protected:
+    // Overrides should be public so base classes can access
     // Implement _getSupOverride on derived classes to change behavior of getSup, as if getSup is virtual
     const TypeExp& _getSupOverride() const;
 };
@@ -194,7 +194,7 @@ class InheritanceDecl : public TypeConstraintDecl
     // this inheritance declaration.
     RefPtr<WitnessTable> witnessTable;
 
-protected:
+    // Overrides should be public so base classes can access
     const TypeExp& _getSupOverride() const { return base; }
 };
 
@@ -409,7 +409,8 @@ class GenericTypeConstraintDecl : public TypeConstraintDecl
     // think of these fields as the sub-type and super-type, respectively.
     TypeExp sub;
     TypeExp sup;
-protected:
+
+    // Overrides should be public so base classes can access
     const TypeExp& _getSupOverride() const { return sup; }
 };
 

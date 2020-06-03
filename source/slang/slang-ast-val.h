@@ -21,14 +21,16 @@ class ConstantIntVal : public IntVal
 
     IntegerLiteralValue value;
 
+    // Overrides should be public so base classes can access
+    bool _equalsValOverride(Val* val);
+    String _toStringOverride();
+    HashCode _getHashCodeOverride();
+
 protected:
     ConstantIntVal(IntegerLiteralValue inValue)
         : value(inValue)
     {}
 
-    bool _equalsValOverride(Val* val);
-    String _toStringOverride();
-    HashCode _getHashCodeOverride();
 };
 
 // The logical "value" of a reference to a generic value parameter
@@ -38,16 +40,16 @@ class GenericParamIntVal : public IntVal
 
     DeclRef<VarDeclBase> declRef;
 
-protected:
-    GenericParamIntVal(DeclRef<VarDeclBase> inDeclRef)
-        : declRef(inDeclRef)
-    {}
-
-protected:
+    // Overrides should be public so base classes can access
     bool _equalsValOverride(Val* val);
     String _toStringOverride();
     HashCode _getHashCodeOverride();
     RefPtr<Val> _substituteImplOverride(ASTBuilder* astBuilder, SubstitutionSet subst, int* ioDiff);
+
+protected:
+    GenericParamIntVal(DeclRef<VarDeclBase> inDeclRef)
+        : declRef(inDeclRef)
+    {}
 };
 
     /// An unknown integer value indicating an erroneous sub-expression
@@ -59,7 +61,7 @@ class ErrorIntVal : public IntVal
     // and have all `Val`s that represent ordinary values hold their
     // `Type` so that we can have an `ErrorVal` of any type.
 
-protected:
+    // Overrides should be public so base classes can access
     bool _equalsValOverride(Val* val);
     String _toStringOverride();
     HashCode _getHashCodeOverride();
@@ -121,7 +123,7 @@ class TypeEqualityWitness : public SubtypeWitness
 {
     SLANG_CLASS(TypeEqualityWitness)
 
-protected:
+    // Overrides should be public so base classes can access
     bool _equalsValOverride(Val* val);
     String _toStringOverride();
     HashCode _getHashCodeOverride();
@@ -136,7 +138,7 @@ class DeclaredSubtypeWitness : public SubtypeWitness
 
     DeclRef<Decl> declRef;
 
-protected:
+    // Overrides should be public so base classes can access
     bool _equalsValOverride(Val* val);
     String _toStringOverride();
     HashCode _getHashCodeOverride();
@@ -154,7 +156,7 @@ class TransitiveSubtypeWitness : public SubtypeWitness
     // Witness that `mid : sup`
     DeclRef<Decl> midToSup;
 
-protected:
+    // Overrides should be public so base classes can access
     bool _equalsValOverride(Val* val);
     String _toStringOverride();
     HashCode _getHashCodeOverride();
@@ -170,7 +172,7 @@ class ExtractExistentialSubtypeWitness : public SubtypeWitness
     // The declaration of the existential value that has been opened
     DeclRef<VarDeclBase> declRef;
 
-protected:
+    // Overrides should be public so base classes can access
     bool _equalsValOverride(Val* val);
     String _toStringOverride();
     HashCode _getHashCodeOverride();
@@ -190,7 +192,8 @@ class TaggedUnionSubtypeWitness : public SubtypeWitness
     //
     List<RefPtr<Val>> caseWitnesses;
 
-protected:
+
+    // Overrides should be public so base classes can access
     bool _equalsValOverride(Val* val);
     String _toStringOverride();
     HashCode _getHashCodeOverride();

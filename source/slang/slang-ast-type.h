@@ -13,7 +13,7 @@ class OverloadGroupType : public Type
 {
     SLANG_CLASS(OverloadGroupType)
 
-protected:
+    // Overrides should be public so base classes can access
     String _toStringOverride();
     RefPtr<Type> _createCanonicalTypeOverride();
     bool _equalsImplOverride(Type* type);
@@ -27,7 +27,7 @@ class InitializerListType : public Type
     SLANG_CLASS(InitializerListType)
 
     
-protected:
+    // Overrides should be public so base classes can access
     String _toStringOverride();
     RefPtr<Type> _createCanonicalTypeOverride();
     bool _equalsImplOverride(Type* type);
@@ -39,7 +39,7 @@ class ErrorType : public Type
 {
     SLANG_CLASS(ErrorType)
 
-protected:
+    // Overrides should be public so base classes can access
     String _toStringOverride();
     RefPtr<Type> _createCanonicalTypeOverride();
     bool _equalsImplOverride(Type* type);
@@ -57,16 +57,17 @@ class DeclRefType : public Type
     
     static RefPtr<DeclRefType> create(ASTBuilder* astBuilder, DeclRef<Decl> declRef);
 
-protected:
-    DeclRefType( DeclRef<Decl> declRef)
-        : declRef(declRef)
-    {}
-
+    // Overrides should be public so base classes can access
     String _toStringOverride();
     RefPtr<Type> _createCanonicalTypeOverride();
     bool _equalsImplOverride(Type* type);
     HashCode _getHashCodeOverride();
     RefPtr<Val> _substituteImplOverride(ASTBuilder* astBuilder, SubstitutionSet subst, int* ioDiff);
+
+protected:
+    DeclRefType( DeclRef<Decl> declRef)
+        : declRef(declRef)
+    {}
 };
 
 // Base class for types that can be used in arithmetic expressions
@@ -74,10 +75,9 @@ class ArithmeticExpressionType : public DeclRefType
 {
     SLANG_ABSTRACT_CLASS(ArithmeticExpressionType)
 
-public:
     BasicExpressionType* GetScalarType();
 
-protected:
+    // Overrides should be public so base classes can access
     BasicExpressionType* _GetScalarTypeOverride();
 };
 
@@ -87,17 +87,16 @@ class BasicExpressionType : public ArithmeticExpressionType
 
     BaseType baseType;
 
+    // Overrides should be public so base classes can access
+    RefPtr<Type> _createCanonicalTypeOverride();
+    bool _equalsImplOverride(Type* type);
+    BasicExpressionType* _GetScalarTypeOverride();
+
 protected:
     BasicExpressionType(
         Slang::BaseType baseType)
         : baseType(baseType)
     {}
-
-    
-protected:
-    RefPtr<Type> _createCanonicalTypeOverride();
-    bool _equalsImplOverride(Type* type);
-    BasicExpressionType* _GetScalarTypeOverride();
 };
 
 // Base type for things that are built in to the compiler,
@@ -377,8 +376,7 @@ class ArrayExpressionType : public Type
     RefPtr<Type> baseType;
     RefPtr<IntVal> arrayLength;
 
-    
-protected:
+    // Overrides should be public so base classes can access
     String _toStringOverride();
     RefPtr<Type> _createCanonicalTypeOverride();
     bool _equalsImplOverride(Type* type);
@@ -396,15 +394,18 @@ class TypeType : public Type
     // The type that this is the type of...
     RefPtr<Type> type;
 
+    // Overrides should be public so base classes can access
+    String _toStringOverride();
+    RefPtr<Type> _createCanonicalTypeOverride();
+    bool _equalsImplOverride(Type* type);
+    HashCode _getHashCodeOverride();
+
 protected:
     TypeType(RefPtr<Type> type)
         : type(type)
     {}
 
-    String _toStringOverride();
-    RefPtr<Type> _createCanonicalTypeOverride();
-    bool _equalsImplOverride(Type* type);
-    HashCode _getHashCodeOverride();
+    
 };
 
 // A vector type, e.g., `vector<T,N>`
@@ -419,7 +420,7 @@ class VectorExpressionType : public ArithmeticExpressionType
     // The number of elements
     RefPtr<IntVal> elementCount;
 
-protected:
+    // Overrides should be public so base classes can access
     String _toStringOverride();
     BasicExpressionType* _GetScalarTypeOverride();
 };
@@ -435,7 +436,7 @@ class MatrixExpressionType : public ArithmeticExpressionType
 
     RefPtr<Type> getRowType();
 
-protected:
+    // Overrides should be public so base classes can access
     String _toStringOverride();
     BasicExpressionType* _GetScalarTypeOverride();
 
@@ -507,17 +508,19 @@ class NamedExpressionType : public Type
     DeclRef<TypeDefDecl> declRef;
     RefPtr<Type> innerType;
 
-    
+    // Overrides should be public so base classes can access
+    String _toStringOverride();
+    RefPtr<Type> _createCanonicalTypeOverride();
+    bool _equalsImplOverride(Type* type);
+    HashCode _getHashCodeOverride();
+
 protected:
     NamedExpressionType(
         DeclRef<TypeDefDecl> declRef)
         : declRef(declRef)
     {}
 
-    String _toStringOverride();
-    RefPtr<Type> _createCanonicalTypeOverride();
-    bool _equalsImplOverride(Type* type);
-    HashCode _getHashCodeOverride();
+
 };
 
 // A function type is defined by its parameter types
@@ -539,7 +542,7 @@ class FuncType : public Type
     Type* getParamType(UInt index) { return paramTypes[index]; }
     Type* getResultType() { return resultType; }
 
-protected:
+    // Overrides should be public so base classes can access
     String _toStringOverride();
     RefPtr<Type> _createCanonicalTypeOverride();
     RefPtr<Val> _substituteImplOverride(ASTBuilder* astBuilder, SubstitutionSet subst, int* ioDiff);
@@ -556,17 +559,17 @@ class GenericDeclRefType : public Type
 
     DeclRef<GenericDecl> const& getDeclRef() const { return declRef; }
 
+    // Overrides should be public so base classes can access
+    String _toStringOverride();
+    bool _equalsImplOverride(Type* type);
+    HashCode _getHashCodeOverride();
+    RefPtr<Type> _createCanonicalTypeOverride();
+
 protected:
     GenericDeclRefType(
         DeclRef<GenericDecl> declRef)
         : declRef(declRef)
     {}
-
-protected:
-    String _toStringOverride();
-    bool _equalsImplOverride(Type* type);
-    HashCode _getHashCodeOverride();
-    RefPtr<Type> _createCanonicalTypeOverride();
 };
 
 // The "type" of a reference to a module or namespace
@@ -578,7 +581,7 @@ class NamespaceType : public Type
 
     DeclRef<NamespaceDeclBase> const& getDeclRef() const { return declRef; }
 
-protected:
+    // Overrides should be public so base classes can access
     String _toStringOverride();
     bool _equalsImplOverride(Type* type);
     HashCode _getHashCodeOverride();
@@ -593,7 +596,7 @@ class ExtractExistentialType : public Type
 
     DeclRef<VarDeclBase> declRef;
 
-protected:
+    // Overrides should be public so base classes can access
     String _toStringOverride();
     bool _equalsImplOverride(Type* type);
     HashCode _getHashCodeOverride();
@@ -613,7 +616,7 @@ class TaggedUnionType : public Type
         ///
     List<RefPtr<Type>> caseTypes;
 
-protected:
+    // Overrides should be public so base classes can access
     String _toStringOverride();
     bool _equalsImplOverride(Type* type);
     HashCode _getHashCodeOverride();
@@ -628,7 +631,7 @@ class ExistentialSpecializedType : public Type
     RefPtr<Type> baseType;
     ExpandedSpecializationArgs args;
 
-protected:
+    // Overrides should be public so base classes can access
     String _toStringOverride();
     bool _equalsImplOverride(Type* type);
     HashCode _getHashCodeOverride();
@@ -643,7 +646,7 @@ class ThisType : public Type
 
     DeclRef<InterfaceDecl> interfaceDeclRef;
 
-protected:
+    // Overrides should be public so base classes can access
     String _toStringOverride();
     bool _equalsImplOverride(Type* type);
     HashCode _getHashCodeOverride();

@@ -107,8 +107,8 @@ class Val : public NodeBase
     {
         return equalsVal(const_cast<Val*>(&v));
     }
-protected:
 
+    // Overrides should be public so base classes can access
     RefPtr<Val> _substituteImplOverride(ASTBuilder* astBuilder, SubstitutionSet subst, int* ioDiff);
     bool _equalsValOverride(Val* val);
     String _toStringOverride();
@@ -156,15 +156,15 @@ class Type: public Val
 
     ~Type();
 
+    // Overrides should be public so base classes can access
+    RefPtr<Val> _substituteImplOverride(ASTBuilder* astBuilder, SubstitutionSet subst, int* ioDiff);
+    bool _equalsValOverride(Val* val);
+    bool _equalsImplOverride(Type* type);
+    RefPtr<Type> _createCanonicalTypeOverride();
+
 protected:
     bool equalsImpl(Type* type);
     RefPtr<Type> createCanonicalType();
-
-    RefPtr<Val> _substituteImplOverride(ASTBuilder* astBuilder, SubstitutionSet subst, int* ioDiff);
-    bool _equalsValOverride(Val* val);
-
-    bool _equalsImplOverride(Type* type);
-    RefPtr<Type> _createCanonicalTypeOverride();
 
     Type* canonicalType = nullptr;
 
@@ -193,7 +193,7 @@ class Substitutions: public NodeBase
     bool equals(Substitutions* subst);
     HashCode getHashCode() const;
 
-protected:
+    // Overrides should be public so base classes can access
     RefPtr<Substitutions> _applySubstitutionsShallowOverride(ASTBuilder* astBuilder, SubstitutionSet substSet, RefPtr<Substitutions> substOuter, int* ioDiff);
     bool _equalsOverride(Substitutions* subst);
     HashCode _getHashCodeOverride() const;
@@ -210,7 +210,7 @@ class GenericSubstitution : public Substitutions
     // The actual values of the arguments
     List<RefPtr<Val> > args;
 
-protected:
+    // Overrides should be public so base classes can access
     RefPtr<Substitutions> _applySubstitutionsShallowOverride(ASTBuilder* astBuilder, SubstitutionSet substSet, RefPtr<Substitutions> substOuter, int* ioDiff);
     bool _equalsOverride(Substitutions* subst);
     HashCode _getHashCodeOverride() const;
@@ -227,9 +227,8 @@ class ThisTypeSubstitution : public Substitutions
     // specialize the interface conforms to the interface.
     RefPtr<SubtypeWitness> witness;
 
-protected:
+    // Overrides should be public so base classes can access
     // The actual type that provides the lookup scope for an associated type
-
     RefPtr<Substitutions> _applySubstitutionsShallowOverride(ASTBuilder* astBuilder, SubstitutionSet substSet, RefPtr<Substitutions> substOuter, int* ioDiff);
     bool _equalsOverride(Substitutions* subst);
     HashCode _getHashCodeOverride() const;
@@ -253,7 +252,7 @@ class GlobalGenericParamSubstitution : public Substitutions
     // the values that satisfy any constraints on the type parameter
     List<ConstraintArg> constraintArgs;
 
-protected:
+    // Overrides should be public so base classes can access
     RefPtr<Substitutions> _applySubstitutionsShallowOverride(ASTBuilder* astBuilder, SubstitutionSet substSet, RefPtr<Substitutions> substOuter, int* ioDiff);
     bool _equalsOverride(Substitutions* subst);
     HashCode _getHashCodeOverride() const;

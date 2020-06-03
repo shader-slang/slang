@@ -16,7 +16,7 @@
     static const ReflectClassInfo kReflectClassInfo;  \
     SLANG_FORCE_INLINE static bool isDerivedFrom(ASTNodeType type) { return int(type) >= int(kType) && int(type) <= int(ASTNodeType::LAST); } \
     friend class ASTBuilder; \
-    friend struct ASTConstructAccess; 
+    friend struct ASTConstructAccess;
 
 // Macro definitions - use the SLANG_ASTNode_ definitions to invoke the IMPL to produce the code
 // injected into AST classes
@@ -37,7 +37,7 @@
 #define SLANG_AST_NODE_VIRTUAL_CALL(base, methodName, methodParams) \
     switch (astNodeType) \
     { \
-        SLANG_ASTNode_##base(SLANG_AST_NODE_CASE, (methodName, methodParams)) \
+        SLANG_ALL_ASTNode_##base(SLANG_AST_NODE_CASE, (methodName, methodParams)) \
         default: return SLANG_AST_NODE_INVOKE (methodName, methodParams); \
     }
 
@@ -46,7 +46,7 @@
 #define SLANG_AST_NODE_CONST_VIRTUAL_CALL(base, methodName, methodParams) \
     switch (astNodeType) \
     { \
-        SLANG_ASTNode_##base(SLANG_AST_NODE_CONST_CASE, (methodName, methodParams)) \
+        SLANG_ALL_ASTNode_##base(SLANG_AST_NODE_CONST_CASE, (methodName, methodParams)) \
         default: return SLANG_AST_NODE_INVOKE (methodName, methodParams); \
     }
 

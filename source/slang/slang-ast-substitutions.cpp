@@ -2,6 +2,8 @@
 #include "slang-ast-builder.h"
 #include <assert.h>
 
+#include "slang-ast-generated-macro.h"
+
 namespace Slang {
 
 // !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! Substitutions !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!

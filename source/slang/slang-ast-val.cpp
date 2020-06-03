@@ -3,6 +3,8 @@
 #include <assert.h>
 #include <typeinfo>
 
+#include "slang-ast-generated-macro.h"
+
 #include "slang-syntax.h"
 
 namespace Slang {
