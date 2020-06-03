@@ -2057,7 +2057,7 @@ struct ExprLoweringVisitorBase : ExprVisitor<Derived, LoweredValInfo>
             auto superType = getSup(getASTBuilder(), constraintDeclRef);
             if(auto superDeclRefType = as<DeclRefType>(superType))
             {
-                if(auto superStructDeclRef = superDeclRefType->declRef.as<StructDecl>())
+                if(auto superStructDeclRef = superDeclRefType->declRef.template as<StructDecl>())
                 {
                     // The constraint is saying that the given type inherits
                     // from a concrete `struct` type, which means it should
