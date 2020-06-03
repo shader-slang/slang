@@ -1,4 +1,5 @@
 // bad-operator-call.slang
+
 //DIAGNOSTIC_TEST(windows):SIMPLE:
 
 // Test that bad calls to operators produce reasonable diagnostic messages.

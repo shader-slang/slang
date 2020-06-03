@@ -1356,6 +1356,164 @@ namespace Slang
         }
     }
 
+    RefPtr<Expr> SemanticsVisitor::CheckMatrixSwizzleExpr(
+        MemberExpr* memberRefExpr,
+        RefPtr<Type>      baseElementType,
+        IntegerLiteralValue baseElementRowCount,
+        IntegerLiteralValue baseElementColCount)
+    {
+        RefPtr<MatrixSwizzleExpr> swizExpr = m_astBuilder->create<MatrixSwizzleExpr>();
+        swizExpr->loc = memberRefExpr->loc;
+        swizExpr->base = memberRefExpr->baseExpression;
+
+        // We can have up to 4 swizzles of two elements each
+        MatrixCoord elementCoords[4];
+        int elementCount = 0;
+
+        bool anyDuplicates = false;
+        int zeroIndexOffset = -1;
+
+        String swizzleText = getText(memberRefExpr->name);
+        auto cursor = swizzleText.begin();
+
+        // The contents of the string are 0-terminated
+        // Every update to cursor corresponds to a check against 0-termination
+        while (*cursor)
+        {
+            // Throw out swizzling with more than 4 output elements
+            if (elementCount >= 4)
+            {
+                getSink()->diagnose(swizExpr, Diagnostics::invalidSwizzleExpr, swizzleText, baseElementType->toString());
+                return CreateErrorExpr(memberRefExpr);
+            }
+            MatrixCoord elementCoord = { 0, 0 };
+
+            // Check for the preceding underscore
+            if (*cursor++ != '_')
+            {
+                getSink()->diagnose(swizExpr, Diagnostics::invalidSwizzleExpr, swizzleText, baseElementType->toString());
+                return CreateErrorExpr(memberRefExpr);
+            }
+
+            // Check for one or zero indexing            
+            if (*cursor == 'm')
+            {
+                // Can't mix one and zero indexing
+                if (zeroIndexOffset == 1)
+                {
+                    getSink()->diagnose(swizExpr, Diagnostics::invalidSwizzleExpr, swizzleText, baseElementType->toString());
+                    return CreateErrorExpr(memberRefExpr);
+                }
+                zeroIndexOffset = 0;
+                // Increment the index since we saw 'm'
+                cursor++;
+            }
+            else
+            {
+                // Can't mix one and zero indexing
+                if (zeroIndexOffset == 0)
+                {
+                    getSink()->diagnose(swizExpr, Diagnostics::invalidSwizzleExpr, swizzleText, baseElementType->toString());
+                    return CreateErrorExpr(memberRefExpr);
+                }
+                zeroIndexOffset = 1;
+            }
+
+            // Check for the ij components
+            for (Index j = 0; j < 2; j++)
+            {
+                auto ch = *cursor++;
+                
+                if (ch < '0' || ch > '4')
+                {
+                    // An invalid character in the swizzle is an error
+                    getSink()->diagnose(swizExpr, Diagnostics::invalidSwizzleExpr, swizzleText, baseElementType->toString());
+                    return CreateErrorExpr(memberRefExpr);
+                }
+                const int subIndex = ch - '0' - zeroIndexOffset;
+
+                // Check the limit for either the row or column, depending on the step
+                IntegerLiteralValue elementLimit;
+                if (j == 0)
+                {
+                    elementLimit = baseElementRowCount;
+                    elementCoord.row = subIndex;
+                }
+                else
+                {
+                    elementLimit = baseElementColCount;
+                    elementCoord.col = subIndex;
+                }
+                // Make sure the index is in range for the source type
+                // Account for off-by-one and reject 0 if oneIndexed
+                if (subIndex >= elementLimit || subIndex < 0)
+                {
+                    getSink()->diagnose(swizExpr, Diagnostics::invalidSwizzleExpr, swizzleText, baseElementType->toString());
+                    return CreateErrorExpr(memberRefExpr);
+                }
+            }
+            // Check if we've seen this index before
+            for (int ee = 0; ee < elementCount; ee++)
+            {
+                if (elementCoords[ee] == elementCoord)
+                    anyDuplicates = true;
+            }
+
+            // add to our list...
+            elementCoords[elementCount] = elementCoord;
+            elementCount++;
+        }
+
+        // Store our list in the actual AST node
+        for (int ee = 0; ee < elementCount; ++ee)
+        {
+            swizExpr->elementCoords[ee] = elementCoords[ee];
+        }
+        swizExpr->elementCount = elementCount;
+
+        if (elementCount == 1)
+        {
+            // single-component swizzle produces a scalar
+            //
+            // Note(tfoley): the official HLSL rules seem to be that it produces
+            // a one-component vector, which is then implicitly convertible to
+            // a scalar, but that seems like it just adds complexity.
+            swizExpr->type = QualType(baseElementType);
+        }
+        else
+        {
+            // TODO(tfoley): would be nice to "re-sugar" type
+            // here if the input type had a sugared name...
+            swizExpr->type = QualType(createVectorType(
+                baseElementType,
+                m_astBuilder->create<ConstantIntVal>(elementCount)));
+        }
+
+        // A swizzle can be used as an l-value as long as there
+        // were no duplicates in the list of components
+        swizExpr->type.isLeftValue = !anyDuplicates;
+
+        return swizExpr;
+    }
+
+    RefPtr<Expr> SemanticsVisitor::CheckMatrixSwizzleExpr(
+        MemberExpr* memberRefExpr,
+        RefPtr<Type>		baseElementType,
+        RefPtr<IntVal>				baseRowCount,
+        RefPtr<IntVal>				baseColCount)
+    {
+        if (auto constantRowCount = as<ConstantIntVal>(baseRowCount))
+        {
+            if (auto constantColCount = as<ConstantIntVal>(baseColCount))
+            {
+                return CheckMatrixSwizzleExpr(memberRefExpr, baseElementType,
+                    constantRowCount->value, constantColCount->value);
+            }
+        }
+        getSink()->diagnose(memberRefExpr, Diagnostics::unimplemented, "swizzle on matrix of unknown size");
+        return CreateErrorExpr(memberRefExpr);
+    }
+
     RefPtr<Expr> SemanticsVisitor::CheckSwizzleExpr(
         MemberExpr* memberRefExpr,
         RefPtr<Type>      baseElementType,
@@ -1674,6 +1832,14 @@ namespace Slang
         // members via extension, for vector or scalar types.
         //
         // TODO: Matrix swizzles probably need to be handled at some point.
+        if (auto baseMatrixType = as<MatrixExpressionType>(baseType))
+        {
+            return CheckMatrixSwizzleExpr(
+                expr,
+                baseMatrixType->getElementType(),
+                baseMatrixType->getRowCount(),
+                baseMatrixType->getColumnCount());
+        }
         if (auto baseVecType = as<VectorExpressionType>(baseType))
         {
             return CheckSwizzleExpr(

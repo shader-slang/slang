@@ -4,6 +4,8 @@
 #include "slang-ir.h"
 #include "slang-syntax.h"
 
+#include "../core/slang-string-util.h"
+
 #define STRINGIZE(x) STRINGIZE2(x)
 #define STRINGIZE2(x) #x
 #define LINE_STRING STRINGIZE(__LINE__)
@@ -15,23 +17,13 @@ namespace Slang
         if(stdlibPath.getLength() != 0)
             return stdlibPath;
 
-        StringBuilder pathBuilder;
-        for( auto cc = __FILE__; *cc; ++cc )
-        {
-            switch( *cc )
-            {
-            case '\n':
-            case '\t':
-            case '\\':
-                pathBuilder << "\\";
-                ; // fall-thru
-            default:
-                pathBuilder << *cc;
-                break;
-            }
-        }
-        stdlibPath = pathBuilder.ProduceString();
+        // Make sure we have a line of text from __FILE__, that we'll extract the filename from
+        List<UnownedStringSlice> lines;
+        StringUtil::calcLines(UnownedStringSlice::fromLiteral(__FILE__), lines);
+        SLANG_ASSERT(lines.getCount() > 0 && lines[0].getLength() > 0);
 
+        // Make the path just the filename to remove issues around path being included on different targets
+        stdlibPath = Path::getFileName(lines[0]);
         return stdlibPath;
     }
 
@@ -226,6 +218,13 @@ namespace Slang
         { kIROp_Leq,                        "<=",   "__BuiltinArithmeticType",      ARITHMETIC_MASK | BOOL_RESULT },
     };
 
+    // Both the following functions use these macros.
+    // NOTE! They require a variable named path to emit the #line correctly if in source file.
+#define SLANG_RAW(TEXT) sb << TEXT;
+#define SLANG_SPLICE(EXPR) sb << (EXPR);
+
+#define EMIT_LINE_DIRECTIVE() sb << "#line " << (__LINE__+1) << " \"" << path << "\"\n"
+
     String Session::getCoreLibraryCode()
     {
         if (coreLibraryCode.getLength() > 0)
@@ -233,12 +232,7 @@ namespace Slang
 
         StringBuilder sb;
 
-        String path = getStdlibPath();
-
-#define SLANG_RAW(TEXT) sb << TEXT;
-#define SLANG_SPLICE(EXPR) sb << (EXPR);
-
-#define EMIT_LINE_DIRECTIVE() sb << "#line " << (__LINE__+1) << " \"" << path << "\"\n"
+        const String path = getStdlibPath();
 
         #include "core.meta.slang.h"
 
@@ -250,6 +244,8 @@ namespace Slang
     {
         if (hlslLibraryCode.getLength() > 0)
             return hlslLibraryCode;
+
+        const String path = getStdlibPath();
 
         StringBuilder sb;
 
