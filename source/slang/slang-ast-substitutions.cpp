@@ -29,21 +29,21 @@ RefPtr<Substitutions> Substitutions::_applySubstitutionsShallowOverride(ASTBuild
     SLANG_UNUSED(substSet);
     SLANG_UNUSED(substOuter);
     SLANG_UNUSED(ioDiff);
-    SLANG_ASSERT(!"Substitutions::_applySubstitutionsShallowOverride not overridden");
-    return RefPtr<Substitutions>();
+    SLANG_UNEXPECTED("Substitutions::_applySubstitutionsShallowOverride not overridden");
+    //return RefPtr<Substitutions>();
 }
 
 bool Substitutions::_equalsOverride(Substitutions* subst)
 {
     SLANG_UNUSED(subst);
-    SLANG_ASSERT(!"Substitutions::_equalsOverride not overridden");
-    return false;
+    SLANG_UNEXPECTED("Substitutions::_equalsOverride not overridden");
+    //return false;
 }
 
 HashCode Substitutions::_getHashCodeOverride() const
 {
-    SLANG_ASSERT(!"Substitutions::_getHashCodeOverride not overridden");
-    return HashCode(0);
+    SLANG_UNEXPECTED("Substitutions::_getHashCodeOverride not overridden");
+    //return HashCode(0);
 }
 
 // !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! GenericSubstitution !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!

@@ -13,8 +13,8 @@ const TypeExp& TypeConstraintDecl::getSup() const
 
 const TypeExp& TypeConstraintDecl::_getSupOverride() const
 {
-    SLANG_ASSERT(!"TypeConstraintDecl::_getSupOverride not overridden");
-    return TypeExp::empty;
+    SLANG_UNEXPECTED("TypeConstraintDecl::_getSupOverride not overridden");
+    //return TypeExp::empty;
 }
 
 

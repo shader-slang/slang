@@ -48,20 +48,20 @@ RefPtr<Val> Val::_substituteImplOverride(ASTBuilder* astBuilder, SubstitutionSet
 bool Val::_equalsValOverride(Val* val)
 {
     SLANG_UNUSED(val);
-    SLANG_ASSERT(!"Val::_equalsValOverride not overridden");
-    return false;
+    SLANG_UNEXPECTED("Val::_equalsValOverride not overridden");
+    //return false;
 }
 
 String Val::_toStringOverride()
 {
-    SLANG_ASSERT(!"Val::_toStringOverride not overridden");
-    return String();
+    SLANG_UNEXPECTED("Val::_toStringOverride not overridden");
+    //return String();
 }
 
 HashCode Val::_getHashCodeOverride()
 {
-    SLANG_ASSERT(!"Val::_getHashCodeOverride not overridden");
-    return HashCode(0);
+    SLANG_UNEXPECTED("Val::_getHashCodeOverride not overridden");
+    //return HashCode(0);
 }
 
 // !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! ConstantIntVal !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!

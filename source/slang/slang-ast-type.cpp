@@ -39,14 +39,14 @@ bool Type::equalsImpl(Type* type)
 bool Type::_equalsImplOverride(Type* type)
 {
     SLANG_UNUSED(type)
-    SLANG_ASSERT(!"Type::_equalsImplOverride not overridden");
-    return false;
+    SLANG_UNEXPECTED("Type::_equalsImplOverride not overridden");
+    //return false;
 }
 
 RefPtr<Type> Type::_createCanonicalTypeOverride()
 {
-    SLANG_ASSERT(!"Type::_createCanonicalTypeOverride not overridden");
-    return RefPtr<Type>();
+    SLANG_UNEXPECTED("Type::_createCanonicalTypeOverride not overridden");
+    //return RefPtr<Type>();
 }
 
 bool Type::_equalsValOverride(Val* val)
