@@ -75,10 +75,10 @@ class ArithmeticExpressionType : public DeclRefType
 {
     SLANG_ABSTRACT_CLASS(ArithmeticExpressionType)
 
-    BasicExpressionType* GetScalarType();
+    BasicExpressionType* getScalarType();
 
     // Overrides should be public so base classes can access
-    BasicExpressionType* _GetScalarTypeOverride();
+    BasicExpressionType* _getScalarTypeOverride();
 };
 
 class BasicExpressionType : public ArithmeticExpressionType 
@@ -90,7 +90,7 @@ class BasicExpressionType : public ArithmeticExpressionType
     // Overrides should be public so base classes can access
     RefPtr<Type> _createCanonicalTypeOverride();
     bool _equalsImplOverride(Type* type);
-    BasicExpressionType* _GetScalarTypeOverride();
+    BasicExpressionType* _getScalarTypeOverride();
 
 protected:
     BasicExpressionType(
@@ -422,7 +422,7 @@ class VectorExpressionType : public ArithmeticExpressionType
 
     // Overrides should be public so base classes can access
     String _toStringOverride();
-    BasicExpressionType* _GetScalarTypeOverride();
+    BasicExpressionType* _getScalarTypeOverride();
 };
 
 // A matrix type, e.g., `matrix<T,R,C>`
@@ -438,7 +438,7 @@ class MatrixExpressionType : public ArithmeticExpressionType
 
     // Overrides should be public so base classes can access
     String _toStringOverride();
-    BasicExpressionType* _GetScalarTypeOverride();
+    BasicExpressionType* _getScalarTypeOverride();
 
 private:
     RefPtr<Type> rowType;

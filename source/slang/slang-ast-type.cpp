@@ -306,15 +306,15 @@ RefPtr<Val> DeclRefType::_substituteImplOverride(ASTBuilder* astBuilder, Substit
 // !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! ArithmeticExpressionType !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 
 
-BasicExpressionType* ArithmeticExpressionType::GetScalarType()
+BasicExpressionType* ArithmeticExpressionType::getScalarType()
 {
-    SLANG_AST_NODE_VIRTUAL_CALL(ArithmeticExpressionType, GetScalarType, ())
+    SLANG_AST_NODE_VIRTUAL_CALL(ArithmeticExpressionType, getScalarType, ())
 }
 
-BasicExpressionType* ArithmeticExpressionType::_GetScalarTypeOverride()
+BasicExpressionType* ArithmeticExpressionType::_getScalarTypeOverride()
 {
-    SLANG_ASSERT(!"ArithmeticExpressionType::_GetScalarTypeOverride not overridden");
-    return nullptr;
+    SLANG_UNEXPECTED("ArithmeticExpressionType::_getScalarTypeOverride not overridden");
+    //return nullptr;
 }
 
 // !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! BasicExpressionType !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
@@ -331,7 +331,7 @@ RefPtr<Type> BasicExpressionType::_createCanonicalTypeOverride()
     return this;
 }
 
-BasicExpressionType* BasicExpressionType::_GetScalarTypeOverride()
+BasicExpressionType* BasicExpressionType::_getScalarTypeOverride()
 {
     return this;
 }
@@ -345,7 +345,7 @@ String VectorExpressionType::_toStringOverride()
     return sb.ProduceString();
 }
 
-BasicExpressionType* VectorExpressionType::_GetScalarTypeOverride()
+BasicExpressionType* VectorExpressionType::_getScalarTypeOverride()
 {
     return as<BasicExpressionType>(elementType);
 }
@@ -359,7 +359,7 @@ String MatrixExpressionType::_toStringOverride()
     return sb.ProduceString();
 }
 
-BasicExpressionType* MatrixExpressionType::_GetScalarTypeOverride()
+BasicExpressionType* MatrixExpressionType::_getScalarTypeOverride()
 {
     return as<BasicExpressionType>(getElementType());
 }
@@ -466,8 +466,8 @@ RefPtr<Type> TypeType::_createCanonicalTypeOverride()
 
 HashCode TypeType::_getHashCodeOverride()
 {
-    SLANG_ASSERT(!"unreachable");
-    return HashCode(0);
+    SLANG_UNEXPECTED("TypeType::_getHashCodeOverride should be unreachable");
+    //return HashCode(0);
 }
 
 // !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! GenericDeclRefType !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
@@ -543,8 +543,8 @@ String NamedExpressionType::_toStringOverride()
 
 bool NamedExpressionType::_equalsImplOverride(Type * /*type*/)
 {
-    SLANG_ASSERT(!"unreachable");
-    return false;
+    SLANG_UNEXPECTED("NamedExpressionType::_equalsImplOverride should be unreachable");
+    //return false;
 }
 
 RefPtr<Type> NamedExpressionType::_createCanonicalTypeOverride()
