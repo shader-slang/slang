@@ -210,6 +210,17 @@ namespace Slang
         }        
     }
 
+    //
+
+    RefPtr<ThisTypeSubstitution> findThisTypeSubstitution(
+        Substitutions*  substs,
+        InterfaceDecl*  interfaceDecl);
+
+    RequirementWitness tryLookUpRequirementWitness(
+        ASTBuilder*     astBuilder,
+        SubtypeWitness* subtypeWitness,
+        Decl*           requirementKey);
+
     // TODO: where should this live?
     SubstitutionSet createDefaultSubstitutions(
         ASTBuilder*     astBuilder, 

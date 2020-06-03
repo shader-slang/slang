@@ -171,8 +171,11 @@ class InterfaceDecl : public  AggTypeDecl
 class TypeConstraintDecl : public  Decl
 {
     SLANG_ABSTRACT_CLASS(TypeConstraintDecl)
-    
-    SLANG_INLINE const TypeExp& getSup() const;
+
+    const TypeExp& getSup() const;
+    // Overrides should be public so base classes can access
+    // Implement _getSupOverride on derived classes to change behavior of getSup, as if getSup is virtual
+    const TypeExp& _getSupOverride() const;
 };
 
 // A kind of pseudo-member that represents an explicit
@@ -190,6 +193,9 @@ class InheritanceDecl : public TypeConstraintDecl
     // implementations in the type that contains
     // this inheritance declaration.
     RefPtr<WitnessTable> witnessTable;
+
+    // Overrides should be public so base classes can access
+    const TypeExp& _getSupOverride() const { return base; }
 };
 
 // TODO: may eventually need sub-classes for explicit/direct vs. implicit/indirect inheritance
@@ -403,6 +409,9 @@ class GenericTypeConstraintDecl : public TypeConstraintDecl
     // think of these fields as the sub-type and super-type, respectively.
     TypeExp sub;
     TypeExp sup;
+
+    // Overrides should be public so base classes can access
+    const TypeExp& _getSupOverride() const { return sup; }
 };
 
 class GenericValueParamDecl : public VarDeclBase
@@ -449,19 +458,5 @@ class AttributeDecl : public ContainerDecl
     // What type of syntax node will be produced to represent this attribute.
     SyntaxClass<RefObject> syntaxClass;
 };
-
-// ------------------------------------------------------------------------
-
-const TypeExp& TypeConstraintDecl::getSup() const
-{
-    ASTNodeType type = ASTNodeType(getClassInfo().m_classId);
-    switch (type)
-    {
-        case ASTNodeType::InheritanceDecl:              return static_cast<const InheritanceDecl*>(this)->base;
-        case ASTNodeType::GenericTypeConstraintDecl:    return static_cast<const GenericTypeConstraintDecl*>(this)->sup;
-        default:                                        SLANG_ASSERT(!"getSup not implemented for this type!"); return TypeExp::empty;
-    }
-}
-
 
 } // namespace Slang
