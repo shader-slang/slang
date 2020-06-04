@@ -1,0 +1,21 @@
+---
+BasedOnStyle: LLVM
+IndentWidth: 4
+---
+Language: Cpp
+# Force pointers to the type for C++.
+DerivePointerAlignment: false
+PointerAlignment: Left
+BreakBeforeBraces: Allman
+BinPackArguments: false
+BinPackParameters: false
+ExperimentalAutoDetectBinPacking: false
+AllowAllParametersOfDeclarationOnNextLine: true
+NamespaceIndentation: All
+AccessModifierOffset: -4
+AlignTrailingComments: false
+ConstructorInitializerIndentWidth: 4
+AlignEscapedNewlinesLeft: true
+PenaltyReturnTypeOnItsOwnLine: 100
+ColumnLimit: 100
+IncludeBlocks: Preserve
