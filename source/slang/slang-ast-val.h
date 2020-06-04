@@ -21,14 +21,16 @@ class ConstantIntVal : public IntVal
 
     IntegerLiteralValue value;
 
+    // Overrides should be public so base classes can access
+    bool _equalsValOverride(Val* val);
+    String _toStringOverride();
+    HashCode _getHashCodeOverride();
+
 protected:
     ConstantIntVal(IntegerLiteralValue inValue)
         : value(inValue)
     {}
 
-    virtual bool equalsVal(Val* val) override;
-    virtual String toString() override;
-    virtual HashCode getHashCode() override;
 };
 
 // The logical "value" of a reference to a generic value parameter
@@ -38,15 +40,16 @@ class GenericParamIntVal : public IntVal
 
     DeclRef<VarDeclBase> declRef;
 
+    // Overrides should be public so base classes can access
+    bool _equalsValOverride(Val* val);
+    String _toStringOverride();
+    HashCode _getHashCodeOverride();
+    RefPtr<Val> _substituteImplOverride(ASTBuilder* astBuilder, SubstitutionSet subst, int* ioDiff);
+
 protected:
     GenericParamIntVal(DeclRef<VarDeclBase> inDeclRef)
         : declRef(inDeclRef)
     {}
-
-    virtual bool equalsVal(Val* val) override;
-    virtual String toString() override;
-    virtual HashCode getHashCode() override;
-    virtual RefPtr<Val> substituteImpl(ASTBuilder* astBuilder, SubstitutionSet subst, int* ioDiff) override;
 };
 
     /// An unknown integer value indicating an erroneous sub-expression
@@ -58,10 +61,11 @@ class ErrorIntVal : public IntVal
     // and have all `Val`s that represent ordinary values hold their
     // `Type` so that we can have an `ErrorVal` of any type.
 
-    virtual bool equalsVal(Val* val) override;
-    virtual String toString() override;
-    virtual HashCode getHashCode() override;
-    virtual RefPtr<Val> substituteImpl(ASTBuilder* astBuilder, SubstitutionSet subst, int* ioDiff) override;
+    // Overrides should be public so base classes can access
+    bool _equalsValOverride(Val* val);
+    String _toStringOverride();
+    HashCode _getHashCodeOverride();
+    RefPtr<Val> _substituteImplOverride(ASTBuilder* astBuilder, SubstitutionSet subst, int* ioDiff);
 };
 
 // A witness to the fact that some proposition is true, encoded
@@ -119,10 +123,11 @@ class TypeEqualityWitness : public SubtypeWitness
 {
     SLANG_CLASS(TypeEqualityWitness)
 
-    virtual bool equalsVal(Val* val) override;
-    virtual String toString() override;
-    virtual HashCode getHashCode() override;
-    virtual RefPtr<Val> substituteImpl(ASTBuilder* astBuilder, SubstitutionSet subst, int* ioDiff) override;
+    // Overrides should be public so base classes can access
+    bool _equalsValOverride(Val* val);
+    String _toStringOverride();
+    HashCode _getHashCodeOverride();
+    RefPtr<Val> _substituteImplOverride(ASTBuilder* astBuilder, SubstitutionSet subst, int* ioDiff);
 };
 
 // A witness that one type is a subtype of another
@@ -133,10 +138,11 @@ class DeclaredSubtypeWitness : public SubtypeWitness
 
     DeclRef<Decl> declRef;
 
-    virtual bool equalsVal(Val* val) override;
-    virtual String toString() override;
-    virtual HashCode getHashCode() override;
-    virtual RefPtr<Val> substituteImpl(ASTBuilder* astBuilder, SubstitutionSet subst, int* ioDiff) override;
+    // Overrides should be public so base classes can access
+    bool _equalsValOverride(Val* val);
+    String _toStringOverride();
+    HashCode _getHashCodeOverride();
+    RefPtr<Val> _substituteImplOverride(ASTBuilder* astBuilder, SubstitutionSet subst, int* ioDiff);
 };
 
 // A witness that `sub : sup` because `sub : mid` and `mid : sup`
@@ -150,10 +156,11 @@ class TransitiveSubtypeWitness : public SubtypeWitness
     // Witness that `mid : sup`
     DeclRef<Decl> midToSup;
 
-    virtual bool equalsVal(Val* val) override;
-    virtual String toString() override;
-    virtual HashCode getHashCode() override;
-    virtual RefPtr<Val> substituteImpl(ASTBuilder* astBuilder, SubstitutionSet subst, int* ioDiff) override;
+    // Overrides should be public so base classes can access
+    bool _equalsValOverride(Val* val);
+    String _toStringOverride();
+    HashCode _getHashCodeOverride();
+    RefPtr<Val> _substituteImplOverride(ASTBuilder* astBuilder, SubstitutionSet subst, int* ioDiff);
 };
 
 // A witness taht `sub : sup` because `sub` was wrapped into
@@ -165,10 +172,11 @@ class ExtractExistentialSubtypeWitness : public SubtypeWitness
     // The declaration of the existential value that has been opened
     DeclRef<VarDeclBase> declRef;
 
-    virtual bool equalsVal(Val* val) override;
-    virtual String toString() override;
-    virtual HashCode getHashCode() override;
-    virtual RefPtr<Val> substituteImpl(ASTBuilder* astBuilder, SubstitutionSet subst, int* ioDiff) override;
+    // Overrides should be public so base classes can access
+    bool _equalsValOverride(Val* val);
+    String _toStringOverride();
+    HashCode _getHashCodeOverride();
+    RefPtr<Val> _substituteImplOverride(ASTBuilder* astBuilder, SubstitutionSet subst, int* ioDiff);
 };
 
 // A witness that `sub : sup`, because `sub` is a tagged union
@@ -184,10 +192,12 @@ class TaggedUnionSubtypeWitness : public SubtypeWitness
     //
     List<RefPtr<Val>> caseWitnesses;
 
-    virtual bool equalsVal(Val* val) override;
-    virtual String toString() override;
-    virtual HashCode getHashCode() override;
-    virtual RefPtr<Val> substituteImpl(ASTBuilder* astBuilder, SubstitutionSet subst, int* ioDiff) override;
+
+    // Overrides should be public so base classes can access
+    bool _equalsValOverride(Val* val);
+    String _toStringOverride();
+    HashCode _getHashCodeOverride();
+    RefPtr<Val> _substituteImplOverride(ASTBuilder* astBuilder, SubstitutionSet subst, int* ioDiff);
 };
 
 } // namespace Slang

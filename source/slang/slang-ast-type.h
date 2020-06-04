@@ -13,12 +13,11 @@ class OverloadGroupType : public Type
 {
     SLANG_CLASS(OverloadGroupType)
 
-    virtual String toString() override;
-
-protected:
-    virtual RefPtr<Type> createCanonicalType() override;
-    virtual bool equalsImpl(Type* type) override;
-    virtual HashCode getHashCode() override;
+    // Overrides should be public so base classes can access
+    String _toStringOverride();
+    RefPtr<Type> _createCanonicalTypeOverride();
+    bool _equalsImplOverride(Type* type);
+    HashCode _getHashCodeOverride();
 };
 
 // The type of an initializer-list expression (before it has
@@ -27,12 +26,12 @@ class InitializerListType : public Type
 {
     SLANG_CLASS(InitializerListType)
 
-    virtual String toString() override;
-
-protected:
-    virtual RefPtr<Type> createCanonicalType() override;
-    virtual bool equalsImpl(Type* type) override;
-    virtual HashCode getHashCode() override;
+    
+    // Overrides should be public so base classes can access
+    String _toStringOverride();
+    RefPtr<Type> _createCanonicalTypeOverride();
+    bool _equalsImplOverride(Type* type);
+    HashCode _getHashCodeOverride();
 };
 
 // The type of an expression that was erroneous
@@ -40,13 +39,12 @@ class ErrorType : public Type
 {
     SLANG_CLASS(ErrorType)
 
-    virtual String toString() override;
-
-protected:
-    virtual RefPtr<Type> createCanonicalType() override;
-    virtual bool equalsImpl(Type* type) override;
-    virtual RefPtr<Val> substituteImpl(ASTBuilder* astBuilder, SubstitutionSet subst, int* ioDiff) override;
-    virtual HashCode getHashCode() override;
+    // Overrides should be public so base classes can access
+    String _toStringOverride();
+    RefPtr<Type> _createCanonicalTypeOverride();
+    bool _equalsImplOverride(Type* type);
+    HashCode _getHashCodeOverride();
+    RefPtr<Val> _substituteImplOverride(ASTBuilder* astBuilder, SubstitutionSet subst, int* ioDiff);
 };
 
 // A type that takes the form of a reference to some declaration
@@ -56,19 +54,20 @@ class DeclRefType : public Type
 
     DeclRef<Decl> declRef;
 
-    virtual String toString() override;
-    virtual RefPtr<Val> substituteImpl(ASTBuilder* astBuilder, SubstitutionSet subst, int* ioDiff) override;
-
+    
     static RefPtr<DeclRefType> create(ASTBuilder* astBuilder, DeclRef<Decl> declRef);
+
+    // Overrides should be public so base classes can access
+    String _toStringOverride();
+    RefPtr<Type> _createCanonicalTypeOverride();
+    bool _equalsImplOverride(Type* type);
+    HashCode _getHashCodeOverride();
+    RefPtr<Val> _substituteImplOverride(ASTBuilder* astBuilder, SubstitutionSet subst, int* ioDiff);
 
 protected:
     DeclRefType( DeclRef<Decl> declRef)
         : declRef(declRef)
     {}
-
-    virtual HashCode getHashCode() override;
-    virtual RefPtr<Type> createCanonicalType() override;
-    virtual bool equalsImpl(Type* type) override;
 };
 
 // Base class for types that can be used in arithmetic expressions
@@ -76,8 +75,10 @@ class ArithmeticExpressionType : public DeclRefType
 {
     SLANG_ABSTRACT_CLASS(ArithmeticExpressionType)
 
-public:
-    virtual BasicExpressionType* GetScalarType() = 0;
+    BasicExpressionType* getScalarType();
+
+    // Overrides should be public so base classes can access
+    BasicExpressionType* _getScalarTypeOverride();
 };
 
 class BasicExpressionType : public ArithmeticExpressionType 
@@ -86,16 +87,16 @@ class BasicExpressionType : public ArithmeticExpressionType
 
     BaseType baseType;
 
+    // Overrides should be public so base classes can access
+    RefPtr<Type> _createCanonicalTypeOverride();
+    bool _equalsImplOverride(Type* type);
+    BasicExpressionType* _getScalarTypeOverride();
+
 protected:
     BasicExpressionType(
         Slang::BaseType baseType)
         : baseType(baseType)
     {}
-
-    virtual BasicExpressionType* GetScalarType() override;
-    virtual RefPtr<Type> createCanonicalType() override;
-    virtual bool equalsImpl(Type* type) override;
-
 };
 
 // Base type for things that are built in to the compiler,
@@ -375,13 +376,12 @@ class ArrayExpressionType : public Type
     RefPtr<Type> baseType;
     RefPtr<IntVal> arrayLength;
 
-    virtual String toString() override;
-
-protected:
-    virtual RefPtr<Type> createCanonicalType() override;
-    virtual bool equalsImpl(Type* type) override;
-    virtual RefPtr<Val> substituteImpl(ASTBuilder* astBuilder, SubstitutionSet subst, int* ioDiff) override;
-    virtual HashCode getHashCode() override;
+    // Overrides should be public so base classes can access
+    String _toStringOverride();
+    RefPtr<Type> _createCanonicalTypeOverride();
+    bool _equalsImplOverride(Type* type);
+    RefPtr<Val> _substituteImplOverride(ASTBuilder* astBuilder, SubstitutionSet subst, int* ioDiff);
+    HashCode _getHashCodeOverride();
 };
 
 // The "type" of an expression that resolves to a type.
@@ -394,16 +394,18 @@ class TypeType : public Type
     // The type that this is the type of...
     RefPtr<Type> type;
 
-    virtual String toString() override;
+    // Overrides should be public so base classes can access
+    String _toStringOverride();
+    RefPtr<Type> _createCanonicalTypeOverride();
+    bool _equalsImplOverride(Type* type);
+    HashCode _getHashCodeOverride();
 
 protected:
     TypeType(RefPtr<Type> type)
         : type(type)
     {}
 
-    virtual RefPtr<Type> createCanonicalType() override;
-    virtual bool equalsImpl(Type* type) override;
-    virtual HashCode getHashCode() override;
+    
 };
 
 // A vector type, e.g., `vector<T,N>`
@@ -418,10 +420,9 @@ class VectorExpressionType : public ArithmeticExpressionType
     // The number of elements
     RefPtr<IntVal> elementCount;
 
-    virtual String toString() override;
-
-protected:
-    virtual BasicExpressionType* GetScalarType() override;
+    // Overrides should be public so base classes can access
+    String _toStringOverride();
+    BasicExpressionType* _getScalarTypeOverride();
 };
 
 // A matrix type, e.g., `matrix<T,R,C>`
@@ -435,10 +436,9 @@ class MatrixExpressionType : public ArithmeticExpressionType
 
     RefPtr<Type> getRowType();
 
-    virtual String toString() override;
-
-protected:
-    virtual BasicExpressionType* GetScalarType() override;
+    // Overrides should be public so base classes can access
+    String _toStringOverride();
+    BasicExpressionType* _getScalarTypeOverride();
 
 private:
     RefPtr<Type> rowType;
@@ -465,7 +465,7 @@ class PtrTypeBase : public BuiltinType
     SLANG_CLASS(PtrTypeBase)
 
     // Get the type of the pointed-to value.
-    Type*   getValueType();
+    Type* getValueType();
 };
 
 // A true (user-visible) pointer type, e.g., `T*`
@@ -508,7 +508,11 @@ class NamedExpressionType : public Type
     DeclRef<TypeDefDecl> declRef;
     RefPtr<Type> innerType;
 
-    virtual String toString() override;
+    // Overrides should be public so base classes can access
+    String _toStringOverride();
+    RefPtr<Type> _createCanonicalTypeOverride();
+    bool _equalsImplOverride(Type* type);
+    HashCode _getHashCodeOverride();
 
 protected:
     NamedExpressionType(
@@ -516,9 +520,7 @@ protected:
         : declRef(declRef)
     {}
 
-    virtual RefPtr<Type> createCanonicalType() override;
-    virtual bool equalsImpl(Type* type) override;
-    virtual HashCode getHashCode() override;
+
 };
 
 // A function type is defined by its parameter types
@@ -540,13 +542,12 @@ class FuncType : public Type
     Type* getParamType(UInt index) { return paramTypes[index]; }
     Type* getResultType() { return resultType; }
 
-    virtual String toString() override;
-
-protected:
-    virtual RefPtr<Type> createCanonicalType() override;
-    virtual RefPtr<Val> substituteImpl(ASTBuilder* astBuilder, SubstitutionSet subst, int* ioDiff) override;
-    virtual bool equalsImpl(Type* type) override;
-    virtual HashCode getHashCode() override;
+    // Overrides should be public so base classes can access
+    String _toStringOverride();
+    RefPtr<Type> _createCanonicalTypeOverride();
+    RefPtr<Val> _substituteImplOverride(ASTBuilder* astBuilder, SubstitutionSet subst, int* ioDiff);
+    bool _equalsImplOverride(Type* type);
+    HashCode _getHashCodeOverride();
 };
 
 // The "type" of an expression that names a generic declaration.
@@ -558,17 +559,17 @@ class GenericDeclRefType : public Type
 
     DeclRef<GenericDecl> const& getDeclRef() const { return declRef; }
 
-    virtual String toString() override;
+    // Overrides should be public so base classes can access
+    String _toStringOverride();
+    bool _equalsImplOverride(Type* type);
+    HashCode _getHashCodeOverride();
+    RefPtr<Type> _createCanonicalTypeOverride();
 
 protected:
     GenericDeclRefType(
         DeclRef<GenericDecl> declRef)
         : declRef(declRef)
     {}
-
-    virtual bool equalsImpl(Type* type) override;
-    virtual HashCode getHashCode() override;
-    virtual RefPtr<Type> createCanonicalType() override;
 };
 
 // The "type" of a reference to a module or namespace
@@ -580,12 +581,11 @@ class NamespaceType : public Type
 
     DeclRef<NamespaceDeclBase> const& getDeclRef() const { return declRef; }
 
-    virtual String toString() override;
-
-protected:
-    virtual bool equalsImpl(Type* type) override;
-    virtual HashCode getHashCode() override;
-    virtual RefPtr<Type> createCanonicalType() override;    
+    // Overrides should be public so base classes can access
+    String _toStringOverride();
+    bool _equalsImplOverride(Type* type);
+    HashCode _getHashCodeOverride();
+    RefPtr<Type> _createCanonicalTypeOverride();    
 };
 
 // The concrete type for a value wrapped in an existential, accessible
@@ -596,11 +596,12 @@ class ExtractExistentialType : public Type
 
     DeclRef<VarDeclBase> declRef;
 
-    virtual String toString() override;
-    virtual bool equalsImpl(Type* type) override;
-    virtual HashCode getHashCode() override;
-    virtual RefPtr<Type> createCanonicalType() override;
-    virtual RefPtr<Val> substituteImpl(ASTBuilder* astBuilder, SubstitutionSet subst, int* ioDiff) override;
+    // Overrides should be public so base classes can access
+    String _toStringOverride();
+    bool _equalsImplOverride(Type* type);
+    HashCode _getHashCodeOverride();
+    RefPtr<Type> _createCanonicalTypeOverride();
+    RefPtr<Val> _substituteImplOverride(ASTBuilder* astBuilder, SubstitutionSet subst, int* ioDiff);
 };
 
     /// A tagged union of zero or more other types.
@@ -615,11 +616,12 @@ class TaggedUnionType : public Type
         ///
     List<RefPtr<Type>> caseTypes;
 
-    virtual String toString() override;
-    virtual bool equalsImpl(Type* type) override;
-    virtual HashCode getHashCode() override;
-    virtual RefPtr<Type> createCanonicalType() override;
-    virtual RefPtr<Val> substituteImpl(ASTBuilder* astBuilder, SubstitutionSet subst, int* ioDiff) override;
+    // Overrides should be public so base classes can access
+    String _toStringOverride();
+    bool _equalsImplOverride(Type* type);
+    HashCode _getHashCodeOverride();
+    RefPtr<Type> _createCanonicalTypeOverride();
+    RefPtr<Val> _substituteImplOverride(ASTBuilder* astBuilder, SubstitutionSet subst, int* ioDiff);
 };
 
 class ExistentialSpecializedType : public Type 
@@ -629,11 +631,12 @@ class ExistentialSpecializedType : public Type
     RefPtr<Type> baseType;
     ExpandedSpecializationArgs args;
 
-    virtual String toString() override;
-    virtual bool equalsImpl(Type* type) override;
-    virtual HashCode getHashCode() override;
-    virtual RefPtr<Type> createCanonicalType() override;
-    virtual RefPtr<Val> substituteImpl(ASTBuilder* astBuilder, SubstitutionSet subst, int* ioDiff) override;
+    // Overrides should be public so base classes can access
+    String _toStringOverride();
+    bool _equalsImplOverride(Type* type);
+    HashCode _getHashCodeOverride();
+    RefPtr<Type> _createCanonicalTypeOverride();
+    RefPtr<Val> _substituteImplOverride(ASTBuilder* astBuilder, SubstitutionSet subst, int* ioDiff);
 };
 
     /// The type of `this` within a polymorphic declaration
@@ -643,11 +646,12 @@ class ThisType : public Type
 
     DeclRef<InterfaceDecl> interfaceDeclRef;
 
-    virtual String toString() override;
-    virtual bool equalsImpl(Type* type) override;
-    virtual HashCode getHashCode() override;
-    virtual RefPtr<Type> createCanonicalType() override;
-    virtual RefPtr<Val> substituteImpl(ASTBuilder* astBuilder, SubstitutionSet subst, int* ioDiff) override;
+    // Overrides should be public so base classes can access
+    String _toStringOverride();
+    bool _equalsImplOverride(Type* type);
+    HashCode _getHashCodeOverride();
+    RefPtr<Type> _createCanonicalTypeOverride();
+    RefPtr<Val> _substituteImplOverride(ASTBuilder* astBuilder, SubstitutionSet subst, int* ioDiff);
 };
 
 } // namespace Slang
