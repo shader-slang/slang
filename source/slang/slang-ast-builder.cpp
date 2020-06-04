@@ -21,17 +21,19 @@ void SharedASTBuilder::init(Session* session)
     m_session = session;
 
     // We just want as a place to store allocations of shared types
-    RefPtr<ASTBuilder> astBuilder(new ASTBuilder);
+    {
+        RefPtr<ASTBuilder> astBuilder(new ASTBuilder);
+        astBuilder->m_sharedASTBuilder = this;
+        m_astBuilder = astBuilder.detach();
+    }
 
-    astBuilder->m_sharedASTBuilder = this;
-
+    // Clear the built in types
     memset(m_builtinTypes, 0, sizeof(m_builtinTypes));
 
+    // Create common shared types
     m_errorType = m_astBuilder->create<ErrorType>();
     m_initializerListType = m_astBuilder->create<InitializerListType>();
     m_overloadedType = m_astBuilder->create<OverloadGroupType>();
-
-    m_astBuilder = astBuilder.detach();
 
     // We can just iterate over the class pointers.
     // NOTE! That this adds the names of the abstract classes too(!)
