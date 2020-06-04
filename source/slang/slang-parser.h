@@ -15,7 +15,7 @@ namespace Slang
         DiagnosticSink*                 sink,
         RefPtr<Scope> const&            outerScope);
 
-    RefPtr<Expr> parseTermFromSourceFile(
+    Expr* parseTermFromSourceFile(
         ASTBuilder*                     astBuilder,
         TokenSpan const&                tokens,
         DiagnosticSink*                 sink,
@@ -23,7 +23,7 @@ namespace Slang
         NamePool*                       namePool,
         SourceLanguage                  sourceLanguage);
 
-    RefPtr<ModuleDecl> populateBaseLanguageModule(
+    ModuleDecl* populateBaseLanguageModule(
         ASTBuilder*     astBuilder,
         RefPtr<Scope>   scope);
 }

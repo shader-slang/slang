@@ -11,13 +11,13 @@
 
 namespace Slang
 {
-    RefPtr<ConstantIntVal> SemanticsVisitor::checkConstantIntVal(
-        RefPtr<Expr>    expr)
+    ConstantIntVal* SemanticsVisitor::checkConstantIntVal(
+        Expr*    expr)
     {
         // First type-check the expression as normal
         expr = CheckExpr(expr);
 
-        auto intVal = CheckIntegerConstantExpression(expr.Ptr());
+        auto intVal = CheckIntegerConstantExpression(expr);
         if(!intVal)
             return nullptr;
 
@@ -30,13 +30,13 @@ namespace Slang
         return constIntVal;
     }
 
-    RefPtr<ConstantIntVal> SemanticsVisitor::checkConstantEnumVal(
-        RefPtr<Expr>    expr)
+    ConstantIntVal* SemanticsVisitor::checkConstantEnumVal(
+        Expr*    expr)
     {
         // First type-check the expression as normal
         expr = CheckExpr(expr);
 
-        auto intVal = CheckEnumConstantExpression(expr.Ptr());
+        auto intVal = CheckEnumConstantExpression(expr);
         if(!intVal)
             return nullptr;
 
@@ -52,7 +52,7 @@ namespace Slang
     // Check an expression, coerce it to the `String` type, and then
     // ensure that it has a literal (not just compile-time constant) value.
     bool SemanticsVisitor::checkLiteralStringVal(
-        RefPtr<Expr>    expr,
+        Expr*    expr,
         String*         outVal)
     {
         // TODO: This should actually perform semantic checking, etc.,
@@ -138,12 +138,12 @@ namespace Slang
         // We will now synthesize a new `AttributeDecl` to mirror
         // what was declared on the `struct` type.
         //
-        RefPtr<AttributeDecl> attrDecl = m_astBuilder->create<AttributeDecl>();
+        AttributeDecl* attrDecl = m_astBuilder->create<AttributeDecl>();
         attrDecl->nameAndLoc.name = attributeName;
         attrDecl->nameAndLoc.loc = structDecl->nameAndLoc.loc;
         attrDecl->loc = structDecl->loc;
 
-        RefPtr<AttributeTargetModifier> targetModifier = m_astBuilder->create<AttributeTargetModifier>();
+        AttributeTargetModifier* targetModifier = m_astBuilder->create<AttributeTargetModifier>();
         targetModifier->syntaxClass = attrUsageAttr->targetSyntaxClass;
         targetModifier->loc = attrUsageAttr->loc;
         addModifier(attrDecl, targetModifier);
@@ -167,7 +167,7 @@ namespace Slang
             {
                 ensureDecl(varMember, DeclCheckState::CanUseTypeOfValueDecl);
 
-                RefPtr<ParamDecl> paramDecl = m_astBuilder->create<ParamDecl>();
+                ParamDecl* paramDecl = m_astBuilder->create<ParamDecl>();
                 paramDecl->nameAndLoc = member->nameAndLoc;
                 paramDecl->type = varMember->type;
                 paramDecl->loc = member->loc;
@@ -250,7 +250,7 @@ namespace Slang
         return false;
     }
 
-    bool SemanticsVisitor::validateAttribute(RefPtr<Attribute> attr, AttributeDecl* attribClassDecl)
+    bool SemanticsVisitor::validateAttribute(Attribute* attr, AttributeDecl* attribClassDecl)
     {
         if(auto numThreadsAttr = as<NumThreadsAttribute>(attr))
         {
@@ -401,7 +401,7 @@ namespace Slang
             uint32_t targetClassId = (uint32_t)UserDefinedAttributeTargets::None;
             if (attr->args.getCount() == 1)
             {
-                RefPtr<IntVal> outIntVal;
+                //IntVal* outIntVal;
                 if (auto cInt = checkConstantEnumVal(attr->args[0]))
                 {
                     targetClassId = (uint32_t)(cInt->value);
@@ -522,7 +522,7 @@ namespace Slang
         return true;
     }
 
-    RefPtr<AttributeBase> SemanticsVisitor::checkAttribute(
+    AttributeBase* SemanticsVisitor::checkAttribute(
         UncheckedAttribute*     uncheckedAttr,
         ModifiableSyntaxNode*   attrTarget)
     {
@@ -637,8 +637,8 @@ namespace Slang
         return attr;
     }
 
-    RefPtr<Modifier> SemanticsVisitor::checkModifier(
-        RefPtr<Modifier>        m,
+    Modifier* SemanticsVisitor::checkModifier(
+        Modifier*        m,
         ModifiableSyntaxNode*   syntaxNode)
     {
         if(auto hlslUncheckedAttribute = as<UncheckedAttribute>(m))
@@ -673,10 +673,10 @@ namespace Slang
         // The process of checking a modifier may produce a new modifier in its place,
         // so we will build up a new linked list of modifiers that will replace
         // the old list.
-        RefPtr<Modifier> resultModifiers;
-        RefPtr<Modifier>* resultModifierLink = &resultModifiers;
+        Modifier* resultModifiers;
+        Modifier** resultModifierLink = &resultModifiers;
 
-        RefPtr<Modifier> modifier = syntaxNode->modifiers.first;
+        Modifier* modifier = syntaxNode->modifiers.first;
         while(modifier)
         {
             // Because we are rewriting the list in place, we need to extract

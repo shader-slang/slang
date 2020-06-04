@@ -519,7 +519,7 @@ class AttributeBase : public Modifier
 {
     SLANG_CLASS(AttributeBase)
  
-    List<RefPtr<Expr>> args;
+    List<Expr*> args;
 };
 
 // A `[name(...)]` attribute that hasn't undergone any semantic analysis.
@@ -668,7 +668,7 @@ class PatchConstantFuncAttribute : public Attribute
 {
     SLANG_CLASS(PatchConstantFuncAttribute)
  
-    RefPtr<FuncDecl> patchConstantFuncDecl;
+    FuncDecl* patchConstantFuncDecl;
 };
 class DomainAttribute : public Attribute 
 {

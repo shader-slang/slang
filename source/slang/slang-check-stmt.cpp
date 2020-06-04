@@ -108,9 +108,9 @@ namespace Slang
         stmt->parentStmt = outer;
     }
 
-    RefPtr<Expr> SemanticsVisitor::checkPredicateExpr(Expr* expr)
+    Expr* SemanticsVisitor::checkPredicateExpr(Expr* expr)
     {
-        RefPtr<Expr> e = expr;
+        Expr* e = expr;
         e = CheckTerm(e);
         e = coerce(m_astBuilder->getBoolType(), e);
         return e;
@@ -140,7 +140,7 @@ namespace Slang
         subContext.checkStmt(stmt->statement);
     }
 
-    RefPtr<Expr> SemanticsVisitor::checkExpressionAndExpectIntegerConstant(RefPtr<Expr> expr, RefPtr<IntVal>* outIntVal)
+    Expr* SemanticsVisitor::checkExpressionAndExpectIntegerConstant(Expr* expr, IntVal** outIntVal)
     {
         expr = CheckExpr(expr);
         auto intVal = CheckIntegerConstantExpression(expr);
@@ -157,8 +157,8 @@ namespace Slang
         addModifier(stmt->varDecl, m_astBuilder->create<ConstModifier>());
         stmt->varDecl->setCheckState(DeclCheckState::Checked);
 
-        RefPtr<IntVal> rangeBeginVal;
-        RefPtr<IntVal> rangeEndVal;
+        IntVal* rangeBeginVal;
+        IntVal* rangeEndVal;
 
         if (stmt->rangeBeginExpr)
         {
@@ -166,7 +166,7 @@ namespace Slang
         }
         else
         {
-            RefPtr<ConstantIntVal> rangeBeginConst = m_astBuilder->create<ConstantIntVal>();
+            ConstantIntVal* rangeBeginConst = m_astBuilder->create<ConstantIntVal>();
             rangeBeginConst->value = 0;
             rangeBeginVal = rangeBeginConst;
         }

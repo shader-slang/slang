@@ -1606,7 +1606,7 @@ void addVarDecorations(
     Decl*           decl)
 {
     auto builder = context->irBuilder;
-    for(RefPtr<Modifier> mod : decl->modifiers)
+    for(Modifier* mod : decl->modifiers)
     {
         if(as<HLSLNoInterpolationModifier>(mod))
         {
@@ -1947,7 +1947,7 @@ DeclRef<D> createDefaultSpecializedDeclRef(IRGenContext* context, D* decl)
     /// includes things like function declarations themselves, which inherit the
     /// definition of `this` from their parent/outer declaration.
     ///
-RefPtr<Type> getThisParamTypeForContainer(
+Type* getThisParamTypeForContainer(
     IRGenContext*   context,
     DeclRef<Decl>   parentDeclRef)
 {
@@ -1963,7 +1963,7 @@ RefPtr<Type> getThisParamTypeForContainer(
     return nullptr;
 }
 
-RefPtr<Type> getThisParamTypeForCallable(
+Type* getThisParamTypeForCallable(
     IRGenContext*   context,
     DeclRef<Decl>   callableDeclRef)
 {
@@ -2522,7 +2522,7 @@ struct ExprLoweringVisitorBase : ExprVisitor<Derived, LoweredValInfo>
             auto paramDirection = getParameterDirection(paramDecl);
 
             UInt argIndex = argCounter++;
-            RefPtr<Expr> argExpr;
+            Expr* argExpr;
             if(argIndex < argCount)
             {
                 argExpr = expr->arguments[argIndex];
@@ -2606,7 +2606,7 @@ struct ExprLoweringVisitorBase : ExprVisitor<Derived, LoweredValInfo>
     // with some contextual information about the declaration
     // we are calling.
     bool tryResolveDeclRefForCall(
-        RefPtr<Expr>        funcExpr,
+        Expr*        funcExpr,
         ResolvedCallInfo*   outInfo)
     {
         // TODO: unwrap any "identity" expressions that might
@@ -2658,7 +2658,7 @@ struct ExprLoweringVisitorBase : ExprVisitor<Derived, LoweredValInfo>
         {
             // Seems to be a case of declaration-reference we don't know about.
             SLANG_UNEXPECTED("unknown declaration reference kind");
-            return false;
+            //return false;
         }
     }
 
@@ -4511,7 +4511,7 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
         // the inheritance declaration is on an `extension` declaration,
         // then we need to identify the type being extended.
         //
-        RefPtr<Type> subType;
+        Type* subType;
         if (auto extParentDecl = as<ExtensionDecl>(parentDecl))
         {
             subType = extParentDecl->targetType.type;
@@ -4522,7 +4522,7 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
         }
 
         // What is the super-type that we have declared we inherit from?
-        RefPtr<Type> superType = inheritanceDecl->base.type;
+        Type* superType = inheritanceDecl->base.type;
 
         // Construct the mangled name for the witness table, which depends
         // on the type that is conforming, and the type that it conforms to.
@@ -5392,7 +5392,7 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
     struct ParameterInfo
     {
         // This AST-level type of the parameter
-        RefPtr<Type>        type;
+        Type*        type;
 
         // The direction (`in` vs `out` vs `in out`)
         ParameterDirection  direction;
@@ -6461,7 +6461,7 @@ IRInst* lowerSubstitutionArg(
 }
 
 // Can the IR lowered version of this declaration ever be an `IRGeneric`?
-bool canDeclLowerToAGeneric(RefPtr<Decl> decl)
+bool canDeclLowerToAGeneric(Decl* decl)
 {
     // A callable decl lowers to an `IRFunc`, and can be generic
     if(as<CallableDecl>(decl)) return true;
@@ -6481,8 +6481,8 @@ bool canDeclLowerToAGeneric(RefPtr<Decl> decl)
 
 LoweredValInfo emitDeclRef(
     IRGenContext*           context,
-    RefPtr<Decl>            decl,
-    RefPtr<Substitutions>   subst,
+    Decl*            decl,
+    Substitutions*   subst,
     IRType*                 type)
 {
     // We need to proceed by considering the specializations that
@@ -6512,7 +6512,7 @@ LoweredValInfo emitDeclRef(
     }
 
     // Otherwise, we look at the kind of substitution, and let it guide us.
-    if(auto genericSubst = subst.as<GenericSubstitution>())
+    if(auto genericSubst = as<GenericSubstitution>(subst))
     {
         // A generic substitution means we will need to output
         // a `specialize` instruction to specialize the generic.
@@ -6561,9 +6561,9 @@ LoweredValInfo emitDeclRef(
 
         return LoweredValInfo::simple(irSpecializedVal);
     }
-    else if(auto thisTypeSubst = subst.as<ThisTypeSubstitution>())
+    else if(auto thisTypeSubst = as<ThisTypeSubstitution>(subst))
     {
-        if(decl.Ptr() == thisTypeSubst->interfaceDecl)
+        if(decl == thisTypeSubst->interfaceDecl)
         {
             // This is a reference to the interface type itself,
             // through the this-type substitution, so it is really

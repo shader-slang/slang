@@ -44,7 +44,7 @@ class GenericParamIntVal : public IntVal
     bool _equalsValOverride(Val* val);
     String _toStringOverride();
     HashCode _getHashCodeOverride();
-    RefPtr<Val> _substituteImplOverride(ASTBuilder* astBuilder, SubstitutionSet subst, int* ioDiff);
+    Val* _substituteImplOverride(ASTBuilder* astBuilder, SubstitutionSet subst, int* ioDiff);
 
 protected:
     GenericParamIntVal(DeclRef<VarDeclBase> inDeclRef)
@@ -65,7 +65,7 @@ class ErrorIntVal : public IntVal
     bool _equalsValOverride(Val* val);
     String _toStringOverride();
     HashCode _getHashCodeOverride();
-    RefPtr<Val> _substituteImplOverride(ASTBuilder* astBuilder, SubstitutionSet subst, int* ioDiff);
+    Val* _substituteImplOverride(ASTBuilder* astBuilder, SubstitutionSet subst, int* ioDiff);
 };
 
 // A witness to the fact that some proposition is true, encoded
@@ -115,8 +115,8 @@ class SubtypeWitness : public Witness
 {
     SLANG_ABSTRACT_CLASS(SubtypeWitness)
 
-    RefPtr<Type> sub;
-    RefPtr<Type> sup;
+    Type* sub;
+    Type* sup;
 };
 
 class TypeEqualityWitness : public SubtypeWitness 
@@ -127,7 +127,7 @@ class TypeEqualityWitness : public SubtypeWitness
     bool _equalsValOverride(Val* val);
     String _toStringOverride();
     HashCode _getHashCodeOverride();
-    RefPtr<Val> _substituteImplOverride(ASTBuilder* astBuilder, SubstitutionSet subst, int* ioDiff);
+    Val* _substituteImplOverride(ASTBuilder* astBuilder, SubstitutionSet subst, int* ioDiff);
 };
 
 // A witness that one type is a subtype of another
@@ -142,7 +142,7 @@ class DeclaredSubtypeWitness : public SubtypeWitness
     bool _equalsValOverride(Val* val);
     String _toStringOverride();
     HashCode _getHashCodeOverride();
-    RefPtr<Val> _substituteImplOverride(ASTBuilder* astBuilder, SubstitutionSet subst, int* ioDiff);
+    Val* _substituteImplOverride(ASTBuilder* astBuilder, SubstitutionSet subst, int* ioDiff);
 };
 
 // A witness that `sub : sup` because `sub : mid` and `mid : sup`
@@ -151,7 +151,7 @@ class TransitiveSubtypeWitness : public SubtypeWitness
     SLANG_CLASS(TransitiveSubtypeWitness)
 
     // Witness that `sub : mid`
-    RefPtr<SubtypeWitness> subToMid;
+    SubtypeWitness* subToMid;
 
     // Witness that `mid : sup`
     DeclRef<Decl> midToSup;
@@ -160,7 +160,7 @@ class TransitiveSubtypeWitness : public SubtypeWitness
     bool _equalsValOverride(Val* val);
     String _toStringOverride();
     HashCode _getHashCodeOverride();
-    RefPtr<Val> _substituteImplOverride(ASTBuilder* astBuilder, SubstitutionSet subst, int* ioDiff);
+    Val* _substituteImplOverride(ASTBuilder* astBuilder, SubstitutionSet subst, int* ioDiff);
 };
 
 // A witness taht `sub : sup` because `sub` was wrapped into
@@ -176,7 +176,7 @@ class ExtractExistentialSubtypeWitness : public SubtypeWitness
     bool _equalsValOverride(Val* val);
     String _toStringOverride();
     HashCode _getHashCodeOverride();
-    RefPtr<Val> _substituteImplOverride(ASTBuilder* astBuilder, SubstitutionSet subst, int* ioDiff);
+    Val* _substituteImplOverride(ASTBuilder* astBuilder, SubstitutionSet subst, int* ioDiff);
 };
 
 // A witness that `sub : sup`, because `sub` is a tagged union
@@ -190,14 +190,14 @@ class TaggedUnionSubtypeWitness : public SubtypeWitness
     // Witnesses that each of the "case" types in the union
     // is a subtype of `sup`.
     //
-    List<RefPtr<Val>> caseWitnesses;
+    List<Val*> caseWitnesses;
 
 
     // Overrides should be public so base classes can access
     bool _equalsValOverride(Val* val);
     String _toStringOverride();
     HashCode _getHashCodeOverride();
-    RefPtr<Val> _substituteImplOverride(ASTBuilder* astBuilder, SubstitutionSet subst, int* ioDiff);
+    Val* _substituteImplOverride(ASTBuilder* astBuilder, SubstitutionSet subst, int* ioDiff);
 };
 
 } // namespace Slang

@@ -1318,7 +1318,7 @@ TypeLayoutContext getInitialLayoutContextForTarget(TargetRequest* targetReq, Pro
 }
 
 
-static LayoutSize GetElementCount(RefPtr<IntVal> val)
+static LayoutSize GetElementCount(IntVal* val)
 {
     // Lack of a size indicates an unbounded array.
     if(!val)
@@ -1365,7 +1365,7 @@ bool IsResourceKind(LayoutResourceKind kind)
     ///
 static TypeLayoutResult createSimpleTypeLayout(
     SimpleLayoutInfo        info,
-    RefPtr<Type>            type,
+    Type*            type,
     LayoutRulesImpl*        rules)
 {
     RefPtr<TypeLayout> typeLayout = new TypeLayout();
@@ -1381,7 +1381,7 @@ static TypeLayoutResult createSimpleTypeLayout(
 }
 
 static SimpleLayoutInfo getParameterGroupLayoutInfo(
-    RefPtr<ParameterGroupType>  type,
+    ParameterGroupType*  type,
     LayoutRulesImpl*            rules)
 {
     if( as<ConstantBufferType>(type) )
@@ -1861,7 +1861,7 @@ static void _addUnmaskedResourceUsage(
 
 static RefPtr<TypeLayout> _createParameterGroupTypeLayout(
     TypeLayoutContext const&    context,
-    RefPtr<ParameterGroupType>  parameterGroupType,
+    ParameterGroupType*  parameterGroupType,
     RefPtr<TypeLayout>          rawElementTypeLayout)
 {
     // We are being asked to create a layout for a parameter group,
@@ -2325,8 +2325,8 @@ RefPtr<TypeLayout> createConstantBufferTypeLayoutIfNeeded(
 
 static RefPtr<TypeLayout> _createParameterGroupTypeLayout(
     TypeLayoutContext const&    context,
-    RefPtr<ParameterGroupType>  parameterGroupType,
-    RefPtr<Type>                elementType,
+    ParameterGroupType*  parameterGroupType,
+    Type*                elementType,
     LayoutRulesImpl*            elementTypeRules)
 {
     // We will first compute a layout for the element type of
@@ -2346,7 +2346,7 @@ static RefPtr<TypeLayout> _createParameterGroupTypeLayout(
 }
 
 LayoutRulesImpl* getParameterBufferElementTypeLayoutRules(
-    RefPtr<ParameterGroupType>  parameterGroupType,
+    ParameterGroupType*  parameterGroupType,
     LayoutRulesImpl*            rules)
 {
     if( as<ConstantBufferType>(parameterGroupType) )
@@ -2376,13 +2376,13 @@ LayoutRulesImpl* getParameterBufferElementTypeLayoutRules(
     else
     {
         SLANG_UNEXPECTED("uhandled parameter block type");
-        return nullptr;
+        //return nullptr;
     }
 }
 
 RefPtr<TypeLayout> createParameterGroupTypeLayout(
     TypeLayoutContext const&    context,
-    RefPtr<ParameterGroupType>  parameterGroupType)
+    ParameterGroupType*  parameterGroupType)
 {
     auto parameterGroupRules = context.rules;
 
@@ -2405,7 +2405,7 @@ RefPtr<StructuredBufferTypeLayout>
 createStructuredBufferTypeLayout(
     TypeLayoutContext const&    context,
     ShaderParameterKind         kind,
-    RefPtr<Type>                structuredBufferType,
+    Type*                structuredBufferType,
     RefPtr<TypeLayout>          elementTypeLayout)
 {
     auto rules = context.rules;
@@ -2437,8 +2437,8 @@ RefPtr<StructuredBufferTypeLayout>
 createStructuredBufferTypeLayout(
     TypeLayoutContext const&    context,
     ShaderParameterKind         kind,
-    RefPtr<Type>                structuredBufferType,
-    RefPtr<Type>                elementType)
+    Type*                structuredBufferType,
+    Type*                elementType)
 {
     // look up the appropriate rules via the `LayoutRulesFamily` 
     auto structuredBufferLayoutRules = context.getRulesFamily()->getStructuredBufferRules();
@@ -2446,7 +2446,7 @@ createStructuredBufferTypeLayout(
     // Create and save type layout for the buffer contents.
     auto elementTypeLayout = createTypeLayout(
         context.with(structuredBufferLayoutRules),
-        elementType.Ptr());
+        elementType);
 
     return createStructuredBufferTypeLayout(
         context,
@@ -2504,13 +2504,13 @@ static TypeLayoutResult _createTypeLayout(
     return _createTypeLayout(subContext, type);
 }
 
-RefPtr<Type> findGlobalGenericSpecializationArg(
+Type* findGlobalGenericSpecializationArg(
     TypeLayoutContext const&    context,
     GlobalGenericParamDecl*     decl)
 {
-    RefPtr<Val> arg;
+    Val* arg;
     context.programLayout->globalGenericArgs.TryGetValue(decl, arg);
-    return arg.as<Type>();
+    return as<Type>(arg);
 }
 
 Index findGlobalGenericSpecializationParamIndex(
@@ -2523,7 +2523,7 @@ Index findGlobalGenericSpecializationParamIndex(
         auto param = type->getSpecializationParam(pp);
         if(param.flavor != SpecializationParam::Flavor::GenericType)
             continue;
-        if(param.object.Ptr() != decl)
+        if(param.object != decl)
             continue;
 
         return pp;
@@ -3128,7 +3128,7 @@ static TypeLayoutResult _createTypeLayout(
                 context,                                                \
                 ShaderParameterKind::KIND,                              \
                 type_##TYPE,                                            \
-                type_##TYPE->elementType.Ptr());                        \
+                type_##TYPE->elementType);                        \
         return TypeLayoutResult(typeLayout, info);                      \
     } while(0)
 
@@ -3257,7 +3257,7 @@ static TypeLayoutResult _createTypeLayout(
             colStride = minorStride;
         }
 
-        rowTypeLayout->type = type;
+        rowTypeLayout->type = rowType;
         rowTypeLayout->rules = rules;
         rowTypeLayout->uniformAlignment = elementInfo.getUniformLayout().alignment;
 
@@ -3283,7 +3283,7 @@ static TypeLayoutResult _createTypeLayout(
     {
         auto elementResult = _createTypeLayout(
             context,
-            arrayType->baseType.Ptr());
+            arrayType->baseType);
         auto elementInfo = elementResult.info;
         auto elementTypeLayout = elementResult.layout;
 
@@ -3463,7 +3463,7 @@ static TypeLayoutResult _createTypeLayout(
 
                 TypeLayoutResult fieldResult = _createTypeLayout(
                     fieldLayoutContext,
-                    getType(context.astBuilder, field).Ptr(),
+                    getType(context.astBuilder, field),
                     field.getDecl());
                 auto fieldTypeLayout = fieldResult.layout;
 
@@ -3574,7 +3574,7 @@ static TypeLayoutResult _createTypeLayout(
             if( context.specializationArgCount )
             {
                 auto& specializationArg = context.specializationArgs[0];
-                RefPtr<Type> concreteType = specializationArg.val.as<Type>();
+                Type* concreteType = as<Type>(specializationArg.val);
                 SLANG_ASSERT(concreteType);
 
                 RefPtr<TypeLayout> concreteTypeLayout = createTypeLayout(context, concreteType);
@@ -3944,7 +3944,7 @@ RefPtr<TypeLayout> TypeLayout::unwrapArray()
 }
 
 
-RefPtr<GlobalGenericParamDecl> GenericParamTypeLayout::getGlobalGenericParamDecl()
+GlobalGenericParamDecl* GenericParamTypeLayout::getGlobalGenericParamDecl()
 {
     auto declRefType = as<DeclRefType>(type);
     SLANG_ASSERT(declRefType);

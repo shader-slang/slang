@@ -304,8 +304,8 @@ class TypeLayout : public Layout
 {
 public:
     // The type that was laid out
-    RefPtr<Type>  type;
-    Type* getType() { return type.Ptr(); }
+    Type*  type;
+    Type* getType() { return type; }
 
     // The layout rules that were used to produce this type
     LayoutRulesImpl*        rules;
@@ -593,7 +593,7 @@ public:
 class GenericParamTypeLayout : public TypeLayout
 {
 public:
-    RefPtr<GlobalGenericParamDecl> getGlobalGenericParamDecl();
+    GlobalGenericParamDecl* getGlobalGenericParamDecl();
     Index paramIndex = 0;
 };
 
@@ -691,7 +691,7 @@ public:
         /// The declaration of the generic parameter.
         ///
         /// Could be any subclass of `Decl` that represents a generic value or type parameter.
-    RefPtr<Decl> decl;
+    Decl* decl;
 };
 
     /// Reflection/layout information about an existential/interface specialization parameter.
@@ -703,7 +703,7 @@ public:
         /// Currently, this will be an `interface` type that any concrete
         /// type argument getting plugged in must conform to.
         ///
-    RefPtr<Type> type;
+    Type* type;
 };
 
 // Layout information for the global scope of a program
@@ -751,7 +751,7 @@ public:
         ///
         /// Not useful for reflection, but valuable for code generation.
         ///
-    Dictionary<GlobalGenericParamDecl*, RefPtr<Val>> globalGenericArgs;
+    Dictionary<GlobalGenericParamDecl*, Val*> globalGenericArgs;
 
         /// Layouts for all tagged union types required by this program
         ///
@@ -1118,7 +1118,7 @@ RefPtr<TypeLayout> createTypeLayout(
     /// Create a layout for a parameter-group type (a `ConstantBuffer` or `ParameterBlock`).
 RefPtr<TypeLayout> createParameterGroupTypeLayout(
     TypeLayoutContext const&    context,
-    RefPtr<ParameterGroupType>  parameterGroupType);
+    ParameterGroupType*  parameterGroupType);
 
     /// Create a wrapper constant buffer type layout, if needed.
     ///
@@ -1140,8 +1140,8 @@ RefPtr<StructuredBufferTypeLayout>
 createStructuredBufferTypeLayout(
     TypeLayoutContext const&    context,
     ShaderParameterKind         kind,
-    RefPtr<Type>                structuredBufferType,
-    RefPtr<Type>                elementType);
+    Type*                structuredBufferType,
+    Type*                elementType);
 
     /// Create a type layout for an unspecialized `globalGenericParamDecl`.
 RefPtr<TypeLayout> createTypeLayoutForGlobalGenericTypeParam(
@@ -1150,7 +1150,7 @@ RefPtr<TypeLayout> createTypeLayoutForGlobalGenericTypeParam(
     GlobalGenericParamDecl*     globalGenericParamDecl);
 
     /// Find the concrete type (if any) that was plugged in for the global generic type parameter `decl`.
-RefPtr<Type> findGlobalGenericSpecializationArg(
+Type* findGlobalGenericSpecializationArg(
     TypeLayoutContext const&    context,
     GlobalGenericParamDecl*     decl);
 

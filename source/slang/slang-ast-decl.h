@@ -13,7 +13,7 @@ class DeclGroup: public DeclBase
 {
     SLANG_CLASS(DeclGroup)
 
-    List<RefPtr<Decl>> decls;
+    List<Decl*> decls;
 };
 
 
@@ -22,7 +22,7 @@ class ContainerDecl: public Decl
 {
     SLANG_ABSTRACT_CLASS(ContainerDecl)
 
-    List<RefPtr<Decl>> members;
+    List<Decl*> members;
 
     template<typename T>
     FilteredMemberList<T> getMembersOfType()
@@ -59,10 +59,10 @@ class VarDeclBase : public Decl
     // type of the variable
     TypeExp type;
 
-    Type* getType() { return (Type*)type.type.Ptr(); }
+    Type* getType() { return type.type; }
 
     // Initializer expression (optional)
-    RefPtr<Expr> initExpr;
+    Expr* initExpr;
 };
 
 // Ordinary potentially-mutable variables (locals, globals, and member variables)
@@ -135,7 +135,7 @@ class EnumDecl : public AggTypeDecl
 {
     SLANG_CLASS(EnumDecl)
 
-    RefPtr<Type> tagType;
+    Type* tagType;
 };
 
 // A single case in an enum.
@@ -155,10 +155,10 @@ class EnumCaseDecl : public Decl
     // type of the parent `enum`
     TypeExp type;
 
-    Type* getType() { return type.type.Ptr(); }
+    Type* getType() { return type.type; }
 
     // Tag value
-    RefPtr<Expr> tagExpr;
+    Expr* tagExpr;
 };
 
 // An interface which other types can conform to
@@ -294,7 +294,7 @@ class FunctionDeclBase : public CallableDecl
 {
     SLANG_ABSTRACT_CLASS(FunctionDeclBase)
 
-    RefPtr<Stmt> body;
+    Stmt* body;
 };
 
 // A constructor/initializer to create instances of a type
@@ -376,7 +376,7 @@ class ImportDecl : public Decl
     RefPtr<Scope> scope;
 
     // The module that actually got imported
-    RefPtr<ModuleDecl> importedModuleDecl;
+    ModuleDecl* importedModuleDecl;
 };
 
 // A generic declaration, parameterized on types/values
@@ -384,7 +384,7 @@ class GenericDecl : public ContainerDecl
 {
     SLANG_CLASS(GenericDecl)
     // The decl that is genericized...
-    RefPtr<Decl> inner;
+    Decl* inner;
 };
 
 class GenericTypeParamDecl : public SimpleTypeDecl

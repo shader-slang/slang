@@ -15,10 +15,10 @@
 
 namespace Slang
 {
-    RefPtr<DeclRefType> SemanticsVisitor::getExprDeclRefType(Expr * expr)
+    DeclRefType* SemanticsVisitor::getExprDeclRefType(Expr * expr)
     {
         if (auto typetype = as<TypeType>(expr->type))
-            return typetype->type.dynamicCast<DeclRefType>();
+            return dynamicCast<DeclRefType>(typetype->type);
         else
             return as<DeclRefType>(expr->type);
     }
@@ -29,18 +29,18 @@ namespace Slang
         /// the temporary, and the computation created by `func`.
         ///
     template<typename F>
-    RefPtr<Expr> SemanticsVisitor::moveTemp(RefPtr<Expr> const& expr, F const& func)
+    Expr* SemanticsVisitor::moveTemp(Expr* const& expr, F const& func)
     {
-        RefPtr<VarDecl> varDecl = m_astBuilder->create<VarDecl>();
+        VarDecl* varDecl = m_astBuilder->create<VarDecl>();
         varDecl->parentDecl = nullptr; // TODO: need to fill this in somehow!
         varDecl->checkState = DeclCheckState::Checked;
         varDecl->nameAndLoc.loc = expr->loc;
         varDecl->initExpr = expr;
         varDecl->type.type = expr->type.type;
 
-        auto varDeclRef = makeDeclRef(varDecl.Ptr());
+        auto varDeclRef = makeDeclRef(varDecl);
 
-        RefPtr<LetExpr> letExpr = m_astBuilder->create<LetExpr>();
+        LetExpr* letExpr = m_astBuilder->create<LetExpr>();
         letExpr->decl = varDecl;
 
         auto body = func(varDeclRef);
@@ -58,7 +58,7 @@ namespace Slang
         /// a new variable to hold `expr`, using `moveTemp()`.
         ///
     template<typename F>
-    RefPtr<Expr> SemanticsVisitor::maybeMoveTemp(RefPtr<Expr> const& expr, F const& func)
+    Expr* SemanticsVisitor::maybeMoveTemp(Expr* const& expr, F const& func)
     {
         if(auto varExpr = as<VarExpr>(expr))
         {
@@ -88,8 +88,8 @@ namespace Slang
         /// returns an expression that logically corresponds to `v`: an expression
         /// of type `X`, where the type carries the knowledge that `X` implements `IMover`.
         ///
-    RefPtr<Expr> SemanticsVisitor::openExistential(
-        RefPtr<Expr>            expr,
+    Expr* SemanticsVisitor::openExistential(
+        Expr*            expr,
         DeclRef<InterfaceDecl>  interfaceDeclRef)
     {
         // If `expr` refers to an immutable binding,
@@ -102,15 +102,15 @@ namespace Slang
         auto interfaceDecl = interfaceDeclRef.getDecl();
         return maybeMoveTemp(expr, [&](DeclRef<VarDeclBase> varDeclRef)
         {
-            RefPtr<ExtractExistentialType> openedType = m_astBuilder->create<ExtractExistentialType>();
+            ExtractExistentialType* openedType = m_astBuilder->create<ExtractExistentialType>();
             openedType->declRef = varDeclRef;
 
-            RefPtr<ExtractExistentialSubtypeWitness> openedWitness = m_astBuilder->create<ExtractExistentialSubtypeWitness>();
+            ExtractExistentialSubtypeWitness* openedWitness = m_astBuilder->create<ExtractExistentialSubtypeWitness>();
             openedWitness->sub = openedType;
             openedWitness->sup = expr->type.type;
             openedWitness->declRef = varDeclRef;
 
-            RefPtr<ThisTypeSubstitution> openedThisType = m_astBuilder->create<ThisTypeSubstitution>();
+            ThisTypeSubstitution* openedThisType = m_astBuilder->create<ThisTypeSubstitution>();
             openedThisType->outer = interfaceDeclRef.substitutions.substitutions;
             openedThisType->interfaceDecl = interfaceDecl;
             openedThisType->witness = openedWitness;
@@ -118,7 +118,7 @@ namespace Slang
             DeclRef<InterfaceDecl> substDeclRef = DeclRef<InterfaceDecl>(interfaceDecl, openedThisType);
             auto substDeclRefType = DeclRefType::create(m_astBuilder, substDeclRef);
 
-            RefPtr<ExtractExistentialValueExpr> openedValue = m_astBuilder->create<ExtractExistentialValueExpr>();
+            ExtractExistentialValueExpr* openedValue = m_astBuilder->create<ExtractExistentialValueExpr>();
             openedValue->declRef = varDeclRef;
             openedValue->type = QualType(substDeclRefType);
 
@@ -134,7 +134,7 @@ namespace Slang
         /// See `openExistential` for a discussion of what "opening" an
         /// existential-type value means.
         ///
-    RefPtr<Expr> SemanticsVisitor::maybeOpenExistential(RefPtr<Expr> expr)
+    Expr* SemanticsVisitor::maybeOpenExistential(Expr* expr)
     {
         auto exprType = expr->type.type;
 
@@ -151,7 +151,7 @@ namespace Slang
                 // to the chosen interface decl must be the first substitution on
                 // the list (which is a linked list from the "inside" out).
                 //
-                auto thisTypeSubst = interfaceDeclRef.substitutions.substitutions.as<ThisTypeSubstitution>();
+                auto thisTypeSubst = as<ThisTypeSubstitution>(interfaceDeclRef.substitutions.substitutions);
                 if(thisTypeSubst && thisTypeSubst->interfaceDecl == interfaceDeclRef.decl)
                 {
                     // This isn't really an existential type, because somebody
@@ -170,9 +170,9 @@ namespace Slang
         return expr;
     }
 
-    RefPtr<Expr> SemanticsVisitor::ConstructDeclRefExpr(
+    Expr* SemanticsVisitor::ConstructDeclRefExpr(
         DeclRef<Decl>   declRef,
-        RefPtr<Expr>    baseExpr,
+        Expr*    baseExpr,
         SourceLoc       loc)
     {
         // Compute the type that this declaration reference will have in context.
@@ -230,7 +230,7 @@ namespace Slang
             {
                 // Extract the type of the baseExpr
                 auto baseExprType = baseExpr->type.type;
-                RefPtr<SharedTypeExpr> baseTypeExpr = m_astBuilder->create<SharedTypeExpr>();
+                SharedTypeExpr* baseTypeExpr = m_astBuilder->create<SharedTypeExpr>();
                 baseTypeExpr->base.type = baseExprType;
                 baseTypeExpr->type.type = m_astBuilder->getTypeType(baseExprType);
 
@@ -283,8 +283,8 @@ namespace Slang
         }
     }
 
-    RefPtr<Expr> SemanticsVisitor::ConstructDerefExpr(
-        RefPtr<Expr>    base,
+    Expr* SemanticsVisitor::ConstructDerefExpr(
+        Expr*    base,
         SourceLoc       loc)
     {
         auto ptrLikeType = as<PointerLikeType>(base->type);
@@ -300,9 +300,9 @@ namespace Slang
         return derefExpr;
     }
 
-    RefPtr<Expr> SemanticsVisitor::ConstructLookupResultExpr(
+    Expr* SemanticsVisitor::ConstructLookupResultExpr(
         LookupResultItem const& item,
-        RefPtr<Expr>            baseExpr,
+        Expr*            baseExpr,
         SourceLoc               loc)
     {
         // If we collected any breadcrumbs, then these represent
@@ -380,7 +380,7 @@ namespace Slang
                         // refernece to `this.someStaticMember` will be translated
                         // over to `This.someStaticMember`.
                         //
-                        RefPtr<ThisExpr> expr = m_astBuilder->create<ThisExpr>();
+                        ThisExpr* expr = m_astBuilder->create<ThisExpr>();
                         expr->type.type = thisType;
                         expr->loc = loc;
 
@@ -404,10 +404,10 @@ namespace Slang
         return ConstructDeclRefExpr(item.declRef, bb, loc);
     }
 
-    RefPtr<Expr> SemanticsVisitor::createLookupResultExpr(
+    Expr* SemanticsVisitor::createLookupResultExpr(
         Name*                   name,
         LookupResult const&     lookupResult,
-        RefPtr<Expr>            baseExpr,
+        Expr*            baseExpr,
         SourceLoc               loc)
     {
         if (lookupResult.isOverloaded())
@@ -506,7 +506,7 @@ namespace Slang
         }
     }
 
-    RefPtr<Expr> SemanticsVisitor::_resolveOverloadedExprImpl(RefPtr<OverloadedExpr> overloadedExpr, LookupMask mask, DiagnosticSink* diagSink)
+    Expr* SemanticsVisitor::_resolveOverloadedExprImpl(OverloadedExpr* overloadedExpr, LookupMask mask, DiagnosticSink* diagSink)
     {
         auto lookupResult = overloadedExpr->lookupResult2;
         SLANG_RELEASE_ASSERT(lookupResult.isValid() && lookupResult.isOverloaded());
@@ -561,7 +561,7 @@ namespace Slang
         }
     }
 
-    RefPtr<Expr> SemanticsVisitor::maybeResolveOverloadedExpr(RefPtr<Expr> expr, LookupMask mask, DiagnosticSink* diagSink)
+    Expr* SemanticsVisitor::maybeResolveOverloadedExpr(Expr* expr, LookupMask mask, DiagnosticSink* diagSink)
     {
         if( auto overloadedExpr = as<OverloadedExpr>(expr) )
         {
@@ -573,12 +573,12 @@ namespace Slang
         }
     }
 
-    RefPtr<Expr> SemanticsVisitor::resolveOverloadedExpr(RefPtr<OverloadedExpr> overloadedExpr, LookupMask mask)
+    Expr* SemanticsVisitor::resolveOverloadedExpr(OverloadedExpr* overloadedExpr, LookupMask mask)
     {
         return _resolveOverloadedExprImpl(overloadedExpr, mask, getSink());
     }
 
-    RefPtr<Expr> SemanticsVisitor::CheckTerm(RefPtr<Expr> term)
+    Expr* SemanticsVisitor::CheckTerm(Expr* term)
     {
         if (!term) return nullptr;
 
@@ -586,13 +586,13 @@ namespace Slang
         return exprVisitor.dispatch(term);
     }
 
-    RefPtr<Expr> SemanticsVisitor::CreateErrorExpr(Expr* expr)
+    Expr* SemanticsVisitor::CreateErrorExpr(Expr* expr)
     {
         expr->type = QualType(m_astBuilder->getErrorType());
         return expr;
     }
 
-    bool SemanticsVisitor::IsErrorExpr(RefPtr<Expr> expr)
+    bool SemanticsVisitor::IsErrorExpr(Expr* expr)
     {
         // TODO: we may want other cases here...
 
@@ -602,7 +602,7 @@ namespace Slang
         return false;
     }
 
-    RefPtr<Expr> SemanticsVisitor::GetBaseExpr(RefPtr<Expr> expr)
+    Expr* SemanticsVisitor::GetBaseExpr(Expr* expr)
     {
         if (auto memberExpr = as<MemberExpr>(expr))
         {
@@ -615,13 +615,13 @@ namespace Slang
         return nullptr;
     }
 
-    RefPtr<Expr> SemanticsExprVisitor::visitBoolLiteralExpr(BoolLiteralExpr* expr)
+    Expr* SemanticsExprVisitor::visitBoolLiteralExpr(BoolLiteralExpr* expr)
     {
         expr->type = m_astBuilder->getBoolType();
         return expr;
     }
 
-    RefPtr<Expr> SemanticsExprVisitor::visitIntegerLiteralExpr(IntegerLiteralExpr* expr)
+    Expr* SemanticsExprVisitor::visitIntegerLiteralExpr(IntegerLiteralExpr* expr)
     {
         // The expression might already have a type, determined by its suffix.
         // It it doesn't, we will give it a default type.
@@ -641,7 +641,7 @@ namespace Slang
         return expr;
     }
 
-    RefPtr<Expr> SemanticsExprVisitor::visitFloatingPointLiteralExpr(FloatingPointLiteralExpr* expr)
+    Expr* SemanticsExprVisitor::visitFloatingPointLiteralExpr(FloatingPointLiteralExpr* expr)
     {
         if(!expr->type.type)
         {
@@ -650,7 +650,7 @@ namespace Slang
         return expr;
     }
 
-    RefPtr<Expr> SemanticsExprVisitor::visitStringLiteralExpr(StringLiteralExpr* expr)
+    Expr* SemanticsExprVisitor::visitStringLiteralExpr(StringLiteralExpr* expr)
     {
         expr->type = m_astBuilder->getStringType();
         return expr;
@@ -662,7 +662,7 @@ namespace Slang
         return m_astBuilder->create<ConstantIntVal>(expr->value);
     }
 
-    RefPtr<IntVal> SemanticsVisitor::TryConstantFoldExpr(
+    IntVal* SemanticsVisitor::TryConstantFoldExpr(
         InvokeExpr* invokeExpr)
     {
         // We need all the operands to the expression
@@ -671,7 +671,7 @@ namespace Slang
         //
         // For right now we will look for calls to intrinsic functions, and then inspect
         // their names (this is bad and slow).
-        auto funcDeclRefExpr = invokeExpr->functionExpr.as<DeclRefExpr>();
+        auto funcDeclRefExpr = as<DeclRefExpr>(invokeExpr->functionExpr);
         if (!funcDeclRefExpr) return nullptr;
 
         auto funcDeclRef = funcDeclRefExpr->declRef;
@@ -694,13 +694,13 @@ namespace Slang
             return nullptr;
 
         // Before checking the operation name, let's look at the arguments
-        RefPtr<IntVal> argVals[kMaxArgs];
+        IntVal* argVals[kMaxArgs];
         IntegerLiteralValue constArgVals[kMaxArgs];
         int argCount = 0;
         bool allConst = true;
         for (auto argExpr : invokeExpr->arguments)
         {
-            auto argVal = TryCheckIntegerConstantExpression(argExpr.Ptr());
+            auto argVal = TryCheckIntegerConstantExpression(argExpr);
             if (!argVal)
                 return nullptr;
 
@@ -784,11 +784,11 @@ namespace Slang
             return nullptr;
         }
 
-        RefPtr<IntVal> result = m_astBuilder->create<ConstantIntVal>(resultValue);
+        IntVal* result = m_astBuilder->create<ConstantIntVal>(resultValue);
         return result;
     }
 
-    RefPtr<IntVal> SemanticsVisitor::TryConstantFoldExpr(
+    IntVal* SemanticsVisitor::TryConstantFoldExpr(
         Expr* expr)
     {
         // Unwrap any "identity" expressions
@@ -828,7 +828,7 @@ namespace Slang
                         // HLSL `static const` can be used as a constant expression
                         if(auto initExpr = getInitExpr(m_astBuilder, varRef))
                         {
-                            return TryConstantFoldExpr(initExpr.Ptr());
+                            return TryConstantFoldExpr(initExpr);
                         }
                     }
                 }
@@ -838,14 +838,14 @@ namespace Slang
                 // The cases in an `enum` declaration can also be used as constant expressions,
                 if(auto tagExpr = getTagExpr(m_astBuilder, enumRef))
                 {
-                    return TryConstantFoldExpr(tagExpr.Ptr());
+                    return TryConstantFoldExpr(tagExpr);
                 }
             }
         }
 
         if(auto castExpr = as<TypeCastExpr>(expr))
         {
-            auto val = TryConstantFoldExpr(castExpr->arguments[0].Ptr());
+            auto val = TryConstantFoldExpr(castExpr->arguments[0]);
             if(val)
                 return val;
         }
@@ -859,7 +859,7 @@ namespace Slang
         return nullptr;
     }
 
-    RefPtr<IntVal> SemanticsVisitor::TryCheckIntegerConstantExpression(Expr* exp)
+    IntVal* SemanticsVisitor::TryCheckIntegerConstantExpression(Expr* exp)
     {
         // Check if type is acceptable for an integer constant expression
         if(auto basicType = as<BasicExpressionType>(exp->type.type))
@@ -876,7 +876,7 @@ namespace Slang
         return TryConstantFoldExpr(exp);
     }
 
-    RefPtr<IntVal> SemanticsVisitor::CheckIntegerConstantExpression(Expr* inExpr, DiagnosticSink* sink)
+    IntVal* SemanticsVisitor::CheckIntegerConstantExpression(Expr* inExpr, DiagnosticSink* sink)
     {
         // No need to issue further errors if the expression didn't even type-check.
         if(IsErrorExpr(inExpr)) return nullptr;
@@ -887,7 +887,7 @@ namespace Slang
         // No need to issue further errors if the type coercion failed.
         if(IsErrorExpr(expr)) return nullptr;
 
-        auto result = TryCheckIntegerConstantExpression(expr.Ptr());
+        auto result = TryCheckIntegerConstantExpression(expr);
         if (!result && sink)
         {
             sink->diagnose(expr, Diagnostics::expectedIntegerConstantNotConstant);
@@ -895,12 +895,12 @@ namespace Slang
         return result;
     }
 
-    RefPtr<IntVal> SemanticsVisitor::CheckIntegerConstantExpression(Expr* inExpr)
+    IntVal* SemanticsVisitor::CheckIntegerConstantExpression(Expr* inExpr)
     {
         return CheckIntegerConstantExpression(inExpr, getSink());
     }
 
-    RefPtr<IntVal> SemanticsVisitor::CheckEnumConstantExpression(Expr* expr)
+    IntVal* SemanticsVisitor::CheckEnumConstantExpression(Expr* expr)
     {
         // No need to issue further errors if the expression didn't even type-check.
         if(IsErrorExpr(expr)) return nullptr;
@@ -916,9 +916,9 @@ namespace Slang
         return result;
     }
 
-    RefPtr<Expr> SemanticsVisitor::CheckSimpleSubscriptExpr(
-        RefPtr<IndexExpr>   subscriptExpr,
-        RefPtr<Type>              elementType)
+    Expr* SemanticsVisitor::CheckSimpleSubscriptExpr(
+        IndexExpr*   subscriptExpr,
+        Type*              elementType)
     {
         auto baseExpr = subscriptExpr->baseExpression;
         auto indexExpr = subscriptExpr->indexExpression;
@@ -927,7 +927,7 @@ namespace Slang
             !indexExpr->type->equals(m_astBuilder->getUIntType()))
         {
             getSink()->diagnose(indexExpr, Diagnostics::subscriptIndexNonInteger);
-            return CreateErrorExpr(subscriptExpr.Ptr());
+            return CreateErrorExpr(subscriptExpr);
         }
 
         subscriptExpr->type = QualType(elementType);
@@ -938,12 +938,12 @@ namespace Slang
         return subscriptExpr;
     }
 
-    RefPtr<Expr> SemanticsExprVisitor::visitIndexExpr(IndexExpr* subscriptExpr)
+    Expr* SemanticsExprVisitor::visitIndexExpr(IndexExpr* subscriptExpr)
     {
         auto baseExpr = subscriptExpr->baseExpression;
         baseExpr = CheckExpr(baseExpr);
 
-        RefPtr<Expr> indexExpr = subscriptExpr->indexExpression;
+        Expr* indexExpr = subscriptExpr->indexExpression;
         if (indexExpr)
         {
             indexExpr = CheckExpr(indexExpr);
@@ -965,10 +965,10 @@ namespace Slang
             // We are trying to "index" into a type, so we have an expression like `float[2]`
             // which should be interpreted as resolving to an array type.
 
-            RefPtr<IntVal> elementCount = nullptr;
+            IntVal* elementCount = nullptr;
             if (indexExpr)
             {
-                elementCount = CheckIntegerConstantExpression(indexExpr.Ptr());
+                elementCount = CheckIntegerConstantExpression(indexExpr);
             }
 
             auto elementType = CoerceToUsableType(TypeExp(baseExpr, baseTypeType->type));
@@ -1026,17 +1026,17 @@ namespace Slang
             // Note: the expression may be an `OverloadedExpr`, in which
             // case the attempt to call it will trigger overload
             // resolution.
-            RefPtr<Expr> subscriptFuncExpr = createLookupResultExpr(
+            Expr* subscriptFuncExpr = createLookupResultExpr(
                 name, lookupResult, subscriptExpr->baseExpression, subscriptExpr->loc);
 
-            RefPtr<InvokeExpr> subscriptCallExpr = m_astBuilder->create<InvokeExpr>();
+            InvokeExpr* subscriptCallExpr = m_astBuilder->create<InvokeExpr>();
             subscriptCallExpr->loc = subscriptExpr->loc;
             subscriptCallExpr->functionExpr = subscriptFuncExpr;
 
             // TODO(tfoley): This path can support multiple arguments easily
             subscriptCallExpr->arguments.add(subscriptExpr->indexExpression);
 
-            return CheckInvokeExprWithCheckedOperands(subscriptCallExpr.Ptr());
+            return CheckInvokeExprWithCheckedOperands(subscriptCallExpr);
         }
 
     fail:
@@ -1046,7 +1046,7 @@ namespace Slang
         }
     }
 
-    RefPtr<Expr> SemanticsExprVisitor::visitParenExpr(ParenExpr* expr)
+    Expr* SemanticsExprVisitor::visitParenExpr(ParenExpr* expr)
     {
         auto base = expr->base;
         base = CheckTerm(base);
@@ -1065,7 +1065,7 @@ namespace Slang
         //          | e [ expr ]
         //
         // We will unwrap the `e.name` and `e[expr]` cases in a loop.
-        RefPtr<Expr> e = expr;
+        Expr* e = expr;
         for(;;)
         {
             if(auto memberExpr = as<MemberExpr>(e))
@@ -1093,7 +1093,7 @@ namespace Slang
         }
     }
 
-    RefPtr<Expr> SemanticsExprVisitor::visitAssignExpr(AssignExpr* expr)
+    Expr* SemanticsExprVisitor::visitAssignExpr(AssignExpr* expr)
     {
         expr->left = CheckExpr(expr->left);
 
@@ -1123,7 +1123,7 @@ namespace Slang
         return expr;
     }
 
-    RefPtr<Expr> SemanticsVisitor::CheckExpr(RefPtr<Expr> expr)
+    Expr* SemanticsVisitor::CheckExpr(Expr* expr)
     {
         auto term = CheckTerm(expr);
 
@@ -1133,10 +1133,10 @@ namespace Slang
         return term;
     }
 
-    RefPtr<Expr> SemanticsVisitor::CheckInvokeExprWithCheckedOperands(InvokeExpr *expr)
+    Expr* SemanticsVisitor::CheckInvokeExprWithCheckedOperands(InvokeExpr *expr)
     {
         auto rs = ResolveInvoke(expr);
-        if (auto invoke = as<InvokeExpr>(rs.Ptr()))
+        if (auto invoke = as<InvokeExpr>(rs))
         {
             // if this is still an invoke expression, test arguments passed to inout/out parameter are LValues
             if(auto funcType = as<FuncType>(invoke->functionExpr->type))
@@ -1205,7 +1205,7 @@ namespace Slang
         return rs;
     }
 
-    RefPtr<Expr> SemanticsExprVisitor::visitInvokeExpr(InvokeExpr *expr)
+    Expr* SemanticsExprVisitor::visitInvokeExpr(InvokeExpr *expr)
     {
         // check the base expression first
         expr->functionExpr = CheckExpr(expr->functionExpr);
@@ -1218,7 +1218,7 @@ namespace Slang
         return CheckInvokeExprWithCheckedOperands(expr);
     }
 
-    RefPtr<Expr> SemanticsExprVisitor::visitVarExpr(VarExpr *expr)
+    Expr* SemanticsExprVisitor::visitVarExpr(VarExpr *expr)
     {
         // If we've already resolved this expression, don't try again.
         if (expr->declRef)
@@ -1242,7 +1242,7 @@ namespace Slang
         return expr;
     }
 
-    RefPtr<Expr> SemanticsExprVisitor::visitTypeCastExpr(TypeCastExpr * expr)
+    Expr* SemanticsExprVisitor::visitTypeCastExpr(TypeCastExpr * expr)
     {
         // Check the term we are applying first
         auto funcExpr = expr->functionExpr;
@@ -1267,14 +1267,14 @@ namespace Slang
         // from a literal zero, with the semantics of default
         // initialization.
         //
-        if( auto declRefType = typeExp.type.as<DeclRefType>() )
+        if( auto declRefType = as<DeclRefType>(typeExp.type) )
         {
-            if(auto structDeclRef = declRefType->declRef.as<StructDecl>())
+            if(auto structDeclRef = as<StructDecl>(declRefType->declRef))
             {
                 if( expr->arguments.getCount() == 1 )
                 {
                     auto arg = expr->arguments[0];
-                    if( auto intLitArg = arg.as<IntegerLiteralExpr>() )
+                    if( auto intLitArg = as<IntegerLiteralExpr>(arg) )
                     {
                         if(getIntegerLiteralValue(intLitArg->token) == 0)
                         {
@@ -1317,9 +1317,11 @@ namespace Slang
                             // of explicit default initializers for `struct` fields to
                             // make this a major concern (since they aren't supported in HLSL).
                             //
-                            RefPtr<InitializerListExpr> initListExpr = m_astBuilder->create<InitializerListExpr>();
+                            InitializerListExpr* initListExpr = m_astBuilder->create<InitializerListExpr>();
                             auto checkedInitListExpr = visitInitializerListExpr(initListExpr);
-                            return coerce(typeExp.type, initListExpr);
+
+                            // TODO(JS): I changed this to checkInitListExpr form initListExpr
+                            return coerce(typeExp.type, checkedInitListExpr);
                         }
                     }
                 }
@@ -1332,9 +1334,9 @@ namespace Slang
         return CheckInvokeExprWithCheckedOperands(expr);
     }
 
-    RefPtr<Expr> SemanticsVisitor::MaybeDereference(RefPtr<Expr> inExpr)
+    Expr* SemanticsVisitor::MaybeDereference(Expr* inExpr)
     {
-        RefPtr<Expr> expr = inExpr;
+        Expr* expr = inExpr;
         for (;;)
         {
             auto baseType = expr->type;
@@ -1356,13 +1358,13 @@ namespace Slang
         }
     }
 
-    RefPtr<Expr> SemanticsVisitor::CheckMatrixSwizzleExpr(
+    Expr* SemanticsVisitor::CheckMatrixSwizzleExpr(
         MemberExpr* memberRefExpr,
-        RefPtr<Type>      baseElementType,
+        Type*      baseElementType,
         IntegerLiteralValue baseElementRowCount,
         IntegerLiteralValue baseElementColCount)
     {
-        RefPtr<MatrixSwizzleExpr> swizExpr = m_astBuilder->create<MatrixSwizzleExpr>();
+        MatrixSwizzleExpr* swizExpr = m_astBuilder->create<MatrixSwizzleExpr>();
         swizExpr->loc = memberRefExpr->loc;
         swizExpr->base = memberRefExpr->baseExpression;
 
@@ -1496,11 +1498,11 @@ namespace Slang
         return swizExpr;
     }
 
-    RefPtr<Expr> SemanticsVisitor::CheckMatrixSwizzleExpr(
+    Expr* SemanticsVisitor::CheckMatrixSwizzleExpr(
         MemberExpr* memberRefExpr,
-        RefPtr<Type>		baseElementType,
-        RefPtr<IntVal>				baseRowCount,
-        RefPtr<IntVal>				baseColCount)
+        Type*		baseElementType,
+        IntVal*				baseRowCount,
+        IntVal*				baseColCount)
     {
         if (auto constantRowCount = as<ConstantIntVal>(baseRowCount))
         {
@@ -1514,12 +1516,12 @@ namespace Slang
         return CreateErrorExpr(memberRefExpr);
     }
 
-    RefPtr<Expr> SemanticsVisitor::CheckSwizzleExpr(
+    Expr* SemanticsVisitor::CheckSwizzleExpr(
         MemberExpr* memberRefExpr,
-        RefPtr<Type>      baseElementType,
+        Type*      baseElementType,
         IntegerLiteralValue         baseElementCount)
     {
-        RefPtr<SwizzleExpr> swizExpr = m_astBuilder->create<SwizzleExpr>();
+        SwizzleExpr* swizExpr = m_astBuilder->create<SwizzleExpr>();
         swizExpr->loc = memberRefExpr->loc;
         swizExpr->base = memberRefExpr->baseExpression;
 
@@ -1608,10 +1610,10 @@ namespace Slang
         return swizExpr;
     }
 
-    RefPtr<Expr> SemanticsVisitor::CheckSwizzleExpr(
+    Expr* SemanticsVisitor::CheckSwizzleExpr(
         MemberExpr*	memberRefExpr,
-        RefPtr<Type>		baseElementType,
-        RefPtr<IntVal>				baseElementCount)
+        Type*		baseElementType,
+        IntVal*				baseElementCount)
     {
         if (auto constantElementCount = as<ConstantIntVal>(baseElementCount))
         {
@@ -1624,7 +1626,7 @@ namespace Slang
         }
     }
 
-    RefPtr<Expr> SemanticsVisitor::_lookupStaticMember(RefPtr<DeclRefExpr> expr, RefPtr<Expr> baseExpression)
+    Expr* SemanticsVisitor::_lookupStaticMember(DeclRefExpr* expr, Expr* baseExpression)
     {
         auto& baseType = baseExpression->type;
 
@@ -1772,7 +1774,7 @@ namespace Slang
         return lookupMemberResultFailure(expr, baseType);
     }
 
-    RefPtr<Expr> SemanticsExprVisitor::visitStaticMemberExpr(StaticMemberExpr* expr)
+    Expr* SemanticsExprVisitor::visitStaticMemberExpr(StaticMemberExpr* expr)
     {
         expr->baseExpression = CheckExpr(expr->baseExpression);
 
@@ -1791,7 +1793,7 @@ namespace Slang
         return _lookupStaticMember(expr, expr->baseExpression);
     }
 
-    RefPtr<Expr> SemanticsVisitor::lookupMemberResultFailure(
+    Expr* SemanticsVisitor::lookupMemberResultFailure(
         DeclRefExpr*     expr,
         QualType const& baseType)
     {
@@ -1803,7 +1805,7 @@ namespace Slang
         return expr;
     }
 
-    RefPtr<Expr> SemanticsExprVisitor::visitMemberExpr(MemberExpr * expr)
+    Expr* SemanticsExprVisitor::visitMemberExpr(MemberExpr * expr)
     {
         expr->baseExpression = CheckExpr(expr->baseExpression);
 
@@ -1890,7 +1892,7 @@ namespace Slang
         }
     }
 
-    RefPtr<Expr> SemanticsExprVisitor::visitInitializerListExpr(InitializerListExpr* expr)
+    Expr* SemanticsExprVisitor::visitInitializerListExpr(InitializerListExpr* expr)
     {
         // When faced with an initializer list, we first just check the sub-expressions blindly.
         // Actually making them conform to a desired type will wait for when we know the desired
@@ -1908,7 +1910,7 @@ namespace Slang
 
     // Perform semantic checking of an object-oriented `this`
     // expression.
-    RefPtr<Expr> SemanticsExprVisitor::visitThisExpr(ThisExpr* expr)
+    Expr* SemanticsExprVisitor::visitThisExpr(ThisExpr* expr)
     {
         // A `this` expression will default to immutable.
         expr->type.isLeftValue = false;
@@ -1972,7 +1974,7 @@ namespace Slang
         return CreateErrorExpr(expr);
     }
 
-    RefPtr<Expr> SemanticsExprVisitor::visitThisTypeExpr(ThisTypeExpr* expr)
+    Expr* SemanticsExprVisitor::visitThisTypeExpr(ThisTypeExpr* expr)
     {
         auto scope = expr->scope;
         while (scope)

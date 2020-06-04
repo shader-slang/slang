@@ -483,7 +483,7 @@ namespace Slang
         //
         // TODO: Remove this. Type lookup should only be supported on `Module`s.
         //
-        Dictionary<String, RefPtr<Type>> m_types;
+        Dictionary<String, Type*> m_types;
     };
 
         /// A component type built up from other component types.
@@ -604,7 +604,7 @@ namespace Slang
         List<String> const& getFilePathDependencies() SLANG_OVERRIDE { return m_base->getFilePathDependencies(); }
 
                     /// Get a list of tagged-union types referenced by the specialization parameters.
-        List<RefPtr<TaggedUnionType>> const& getTaggedUnionTypes() { return m_taggedUnionTypes; }
+        List<TaggedUnionType*> const& getTaggedUnionTypes() { return m_taggedUnionTypes; }
 
         RefPtr<IRModule> getIRModule() { return m_irModule; }
 
@@ -632,7 +632,7 @@ namespace Slang
         List<String> m_entryPointMangledNames;
 
         // Any tagged union types that were referenced by the specialization arguments.
-        List<RefPtr<TaggedUnionType>> m_taggedUnionTypes;
+        List<TaggedUnionType*> m_taggedUnionTypes;
 
     };
 
@@ -711,7 +711,7 @@ namespace Slang
         DeclRef<FuncDecl> getFuncDeclRef() { return m_funcDeclRef; }
 
             /// Get the function declaration (without generic arguments).
-        RefPtr<FuncDecl> getFuncDecl() { return m_funcDeclRef.getDecl(); }
+        FuncDecl* getFuncDecl() { return m_funcDeclRef.getDecl(); }
 
             /// Get the name of the entry point
         Name* getName() { return m_name; }
@@ -989,8 +989,8 @@ namespace Slang
         public:
             struct GenericArgInfo
             {
-                RefPtr<Decl> paramDecl;
-                RefPtr<Val> argVal;
+                Decl* paramDecl;
+                Val* argVal;
             };
 
             List<GenericArgInfo> genericArgs;
@@ -1012,7 +1012,7 @@ namespace Slang
 
     private:
         // The AST for the module
-        RefPtr<ModuleDecl>  m_moduleDecl;
+        ModuleDecl*  m_moduleDecl;
 
         // The IR for the module
         RefPtr<IRModule> m_irModule = nullptr;
@@ -1092,7 +1092,7 @@ namespace Slang
         RefPtr<Module> module;
 
         Module* getModule() { return module; }
-        RefPtr<ModuleDecl> getModuleDecl() { return module->getModuleDecl(); }
+        ModuleDecl* getModuleDecl() { return module->getModuleDecl(); }
 
         Session* getSession();
         NamePool* getNamePool();
@@ -1308,7 +1308,7 @@ namespace Slang
         ///
         SlangResult loadFile(String const& path, PathInfo& outPathInfo, ISlangBlob** outBlob);
 
-        RefPtr<Expr> parseTermString(String str, RefPtr<Scope> scope);
+        Expr* parseTermString(String str, RefPtr<Scope> scope);
 
         Type* specializeType(
             Type*           unspecializedType,
@@ -1426,7 +1426,7 @@ namespace Slang
             /// Is the given module in the middle of being imported?
         bool isBeingImported(Module* module);
 
-        List<RefPtr<Type>> m_specializedTypes;
+        List<Type*> m_specializedTypes;
 
     };
 
@@ -2037,7 +2037,7 @@ namespace Slang
         RefPtr<Scope>   hlslLanguageScope;
         RefPtr<Scope>   slangLanguageScope;
 
-        List<RefPtr<ModuleDecl>> loadedModuleCode;
+        List<ModuleDecl*> loadedModuleCode;
 
         SourceManager   builtinSourceManager;
 

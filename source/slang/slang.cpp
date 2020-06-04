@@ -820,7 +820,7 @@ SlangResult Linkage::loadFile(String const& path, PathInfo& outPathInfo, ISlangB
     return SLANG_OK;
 }
 
-RefPtr<Expr> Linkage::parseTermString(String typeStr, RefPtr<Scope> scope)
+Expr* Linkage::parseTermString(String typeStr, RefPtr<Scope> scope)
 {
     // Create a SourceManager on the stack, so any allocations for 'SourceFile'/'SourceView' etc will be cleaned up
     SourceManager localSourceManager;
@@ -868,7 +868,7 @@ RefPtr<Expr> Linkage::parseTermString(String typeStr, RefPtr<Scope> scope)
         tokens, &sink, scope, getNamePool(), SourceLanguage::Slang);
 }
 
-RefPtr<Type> checkProperType(
+Type* checkProperType(
     Linkage*        linkage,
     TypeExp         typeExp,
     DiagnosticSink* sink);
@@ -880,7 +880,7 @@ Type* ComponentType::getTypeFromString(
     // If we've looked up this type name before,
     // then we can re-use it.
     //
-    RefPtr<Type> type;
+    Type* type;
     if(m_types.TryGetValue(typeStr, type))
         return type;
 
@@ -891,7 +891,7 @@ Type* ComponentType::getTypeFromString(
     RefPtr<Scope> scope = _createScopeForLegacyLookup();
 
     auto linkage = getLinkage();
-    RefPtr<Expr> typeExpr = linkage->parseTermString(
+    Expr* typeExpr = linkage->parseTermString(
         typeStr, scope);
     type = checkProperType(linkage, TypeExp(typeExpr), sink);
 
@@ -959,7 +959,7 @@ void FrontEndCompileRequest::parseTranslationUnit(
 
     ASTBuilder* astBuilder = module->getASTBuilder();
 
-    RefPtr<ModuleDecl> translationUnitSyntax = astBuilder->create<ModuleDecl>();
+    ModuleDecl* translationUnitSyntax = astBuilder->create<ModuleDecl>();
     translationUnitSyntax->nameAndLoc.name = translationUnit->moduleName;
     translationUnitSyntax->module = module;
     module->setModuleDecl(translationUnitSyntax);
@@ -2603,13 +2603,13 @@ void Session::addBuiltinSource(
     if (!scope->containerDecl)
     {
         // We are the first chunk of code to be loaded for this scope
-        scope->containerDecl = syntax.Ptr();
+        scope->containerDecl = syntax;
     }
     else
     {
         // We need to create a new scope to link into the whole thing
         auto subScope = new Scope();
-        subScope->containerDecl = syntax.Ptr();
+        subScope->containerDecl = syntax;
         subScope->nextSibling = scope->nextSibling;
         scope->nextSibling = subScope;
     }

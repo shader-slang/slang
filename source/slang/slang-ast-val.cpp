@@ -9,14 +9,14 @@
 
 namespace Slang {
 
-RefPtr<Val> Val::substitute(ASTBuilder* astBuilder, SubstitutionSet subst)
+Val* Val::substitute(ASTBuilder* astBuilder, SubstitutionSet subst)
 {
     if (!subst) return this;
     int diff = 0;
     return substituteImpl(astBuilder, subst, &diff);
 }
 
-RefPtr<Val> Val::substituteImpl(ASTBuilder* astBuilder, SubstitutionSet subst, int* ioDiff)
+Val* Val::substituteImpl(ASTBuilder* astBuilder, SubstitutionSet subst, int* ioDiff)
 {
     SLANG_AST_NODE_VIRTUAL_CALL(Val, substituteImpl, (astBuilder, subst, ioDiff))
 }
@@ -36,7 +36,7 @@ HashCode Val::getHashCode()
     SLANG_AST_NODE_VIRTUAL_CALL(Val, getHashCode, ())
 }
 
-RefPtr<Val> Val::_substituteImplOverride(ASTBuilder* astBuilder, SubstitutionSet subst, int* ioDiff)
+Val* Val::_substituteImplOverride(ASTBuilder* astBuilder, SubstitutionSet subst, int* ioDiff)
 {
     SLANG_UNUSED(astBuilder);
     SLANG_UNUSED(subst);
@@ -104,12 +104,12 @@ HashCode GenericParamIntVal::_getHashCodeOverride()
     return declRef.getHashCode() ^ HashCode(0xFFFF);
 }
 
-RefPtr<Val> GenericParamIntVal::_substituteImplOverride(ASTBuilder* /* astBuilder */, SubstitutionSet subst, int* ioDiff)
+Val* GenericParamIntVal::_substituteImplOverride(ASTBuilder* /* astBuilder */, SubstitutionSet subst, int* ioDiff)
 {
     // search for a substitution that might apply to us
     for (auto s = subst.substitutions; s; s = s->outer)
     {
-        auto genSubst = s.as<GenericSubstitution>();
+        auto genSubst = as<GenericSubstitution>(s);
         if (!genSubst)
             continue;
 
@@ -122,7 +122,7 @@ RefPtr<Val> GenericParamIntVal::_substituteImplOverride(ASTBuilder* /* astBuilde
         int index = 0;
         for (auto m : genericDecl->members)
         {
-            if (m.Ptr() == declRef.getDecl())
+            if (m == declRef.getDecl())
             {
                 // We've found it, so return the corresponding specialization argument
                 (*ioDiff)++;
@@ -167,7 +167,7 @@ HashCode ErrorIntVal::_getHashCodeOverride()
     return HashCode(typeid(this).hash_code());
 }
 
-RefPtr<Val> ErrorIntVal::_substituteImplOverride(ASTBuilder* astBuilder, SubstitutionSet subst, int* ioDiff)
+Val* ErrorIntVal::_substituteImplOverride(ASTBuilder* astBuilder, SubstitutionSet subst, int* ioDiff)
 {
     SLANG_UNUSED(astBuilder);
     SLANG_UNUSED(subst);
@@ -187,11 +187,11 @@ bool TypeEqualityWitness::_equalsValOverride(Val* val)
     return sub->equals(otherWitness->sub);
 }
 
-RefPtr<Val> TypeEqualityWitness::_substituteImplOverride(ASTBuilder* astBuilder, SubstitutionSet subst, int * ioDiff)
+Val* TypeEqualityWitness::_substituteImplOverride(ASTBuilder* astBuilder, SubstitutionSet subst, int * ioDiff)
 {
-    RefPtr<TypeEqualityWitness> rs = astBuilder->create<TypeEqualityWitness>();
-    rs->sub = sub->substituteImpl(astBuilder, subst, ioDiff).as<Type>();
-    rs->sup = sup->substituteImpl(astBuilder, subst, ioDiff).as<Type>();
+    TypeEqualityWitness* rs = astBuilder->create<TypeEqualityWitness>();
+    rs->sub = as<Type>(sub->substituteImpl(astBuilder, subst, ioDiff));
+    rs->sup = as<Type>(sup->substituteImpl(astBuilder, subst, ioDiff));
     return rs;
 }
 
@@ -218,7 +218,7 @@ bool DeclaredSubtypeWitness::_equalsValOverride(Val* val)
         && declRef.equals(otherWitness->declRef);
 }
 
-RefPtr<Val> DeclaredSubtypeWitness::_substituteImplOverride(ASTBuilder* astBuilder, SubstitutionSet subst, int * ioDiff)
+Val* DeclaredSubtypeWitness::_substituteImplOverride(ASTBuilder* astBuilder, SubstitutionSet subst, int * ioDiff)
 {
     if (auto genConstraintDeclRef = declRef.as<GenericTypeConstraintDecl>())
     {
@@ -258,7 +258,7 @@ RefPtr<Val> DeclaredSubtypeWitness::_substituteImplOverride(ASTBuilder* astBuild
                     return genericSubst->args[index + ordinaryParamCount];
                 }
             }
-            else if (auto globalGenericSubst = s.as<GlobalGenericParamSubstitution>())
+            else if (auto globalGenericSubst = as<GlobalGenericParamSubstitution>(s))
             {
                 // check if the substitution is really about this global generic type parameter
                 if (globalGenericSubst->paramDecl != genConstraintDecl->parentDecl)
@@ -266,7 +266,7 @@ RefPtr<Val> DeclaredSubtypeWitness::_substituteImplOverride(ASTBuilder* astBuild
 
                 for (auto constraintArg : globalGenericSubst->constraintArgs)
                 {
-                    if (constraintArg.decl.Ptr() != genConstraintDecl)
+                    if (constraintArg.decl != genConstraintDecl)
                         continue;
 
                     (*ioDiff)++;
@@ -278,8 +278,8 @@ RefPtr<Val> DeclaredSubtypeWitness::_substituteImplOverride(ASTBuilder* astBuild
 
     // Perform substitution on the constituent elements.
     int diff = 0;
-    auto substSub = sub->substituteImpl(astBuilder, subst, &diff).as<Type>();
-    auto substSup = sup->substituteImpl(astBuilder, subst, &diff).as<Type>();
+    auto substSub = as<Type>(sub->substituteImpl(astBuilder, subst, &diff));
+    auto substSup = as<Type>(sup->substituteImpl(astBuilder, subst, &diff));
     auto substDeclRef = declRef.substituteImpl(astBuilder, subst, &diff);
     if (!diff)
         return this;
@@ -327,7 +327,7 @@ RefPtr<Val> DeclaredSubtypeWitness::_substituteImplOverride(ASTBuilder* astBuild
         }
     }
 
-    RefPtr<DeclaredSubtypeWitness> rs = astBuilder->create<DeclaredSubtypeWitness>();
+    DeclaredSubtypeWitness* rs = astBuilder->create<DeclaredSubtypeWitness>();
     rs->sub = substSub;
     rs->sup = substSup;
     rs->declRef = substDeclRef;
@@ -366,13 +366,13 @@ bool TransitiveSubtypeWitness::_equalsValOverride(Val* val)
         && midToSup.equals(otherWitness->midToSup);
 }
 
-RefPtr<Val> TransitiveSubtypeWitness::_substituteImplOverride(ASTBuilder* astBuilder, SubstitutionSet subst, int * ioDiff)
+Val* TransitiveSubtypeWitness::_substituteImplOverride(ASTBuilder* astBuilder, SubstitutionSet subst, int * ioDiff)
 {
     int diff = 0;
 
-    RefPtr<Type> substSub = sub->substituteImpl(astBuilder, subst, &diff).as<Type>();
-    RefPtr<Type> substSup = sup->substituteImpl(astBuilder, subst, &diff).as<Type>();
-    RefPtr<SubtypeWitness> substSubToMid = subToMid->substituteImpl(astBuilder, subst, &diff).as<SubtypeWitness>();
+    Type* substSub = as<Type>(sub->substituteImpl(astBuilder, subst, &diff));
+    Type* substSup = as<Type>(sup->substituteImpl(astBuilder, subst, &diff));
+    SubtypeWitness* substSubToMid = as<SubtypeWitness>(subToMid->substituteImpl(astBuilder, subst, &diff));
     DeclRef<Decl> substMidToSup = midToSup.substituteImpl(astBuilder, subst, &diff);
 
     // If nothing changed, then we can bail out early.
@@ -399,7 +399,7 @@ RefPtr<Val> TransitiveSubtypeWitness::_substituteImplOverride(ASTBuilder* astBui
 
     // In the simple case, we just construct a new transitive subtype
     // witness, and we move on with life.
-    RefPtr<TransitiveSubtypeWitness> result = astBuilder->create<TransitiveSubtypeWitness>();
+    TransitiveSubtypeWitness* result = astBuilder->create<TransitiveSubtypeWitness>();
     result->sub = substSub;
     result->sup = substSup;
     result->subToMid = substSubToMid;
@@ -455,20 +455,20 @@ HashCode ExtractExistentialSubtypeWitness::_getHashCodeOverride()
     return declRef.getHashCode();
 }
 
-RefPtr<Val> ExtractExistentialSubtypeWitness::_substituteImplOverride(ASTBuilder* astBuilder, SubstitutionSet subst, int* ioDiff)
+Val* ExtractExistentialSubtypeWitness::_substituteImplOverride(ASTBuilder* astBuilder, SubstitutionSet subst, int* ioDiff)
 {
     int diff = 0;
 
     auto substDeclRef = declRef.substituteImpl(astBuilder, subst, &diff);
-    auto substSub = sub->substituteImpl(astBuilder, subst, &diff).as<Type>();
-    auto substSup = sup->substituteImpl(astBuilder, subst, &diff).as<Type>();
+    auto substSub = as<Type>(sub->substituteImpl(astBuilder, subst, &diff));
+    auto substSup = as<Type>(sup->substituteImpl(astBuilder, subst, &diff));
 
     if (!diff)
         return this;
 
     (*ioDiff)++;
 
-    RefPtr<ExtractExistentialSubtypeWitness> substValue = astBuilder->create<ExtractExistentialSubtypeWitness>();
+    ExtractExistentialSubtypeWitness* substValue = astBuilder->create<ExtractExistentialSubtypeWitness>();
     substValue->declRef = declRef;
     substValue->sub = substSub;
     substValue->sup = substSup;
@@ -522,14 +522,14 @@ HashCode TaggedUnionSubtypeWitness::_getHashCodeOverride()
     return hash;
 }
 
-RefPtr<Val> TaggedUnionSubtypeWitness::_substituteImplOverride(ASTBuilder* astBuilder, SubstitutionSet subst, int* ioDiff)
+Val* TaggedUnionSubtypeWitness::_substituteImplOverride(ASTBuilder* astBuilder, SubstitutionSet subst, int* ioDiff)
 {
     int diff = 0;
 
-    auto substSub = sub->substituteImpl(astBuilder, subst, &diff).as<Type>();
-    auto substSup = sup->substituteImpl(astBuilder, subst, &diff).as<Type>();
+    auto substSub = as<Type>(sub->substituteImpl(astBuilder, subst, &diff));
+    auto substSup = as<Type>(sup->substituteImpl(astBuilder, subst, &diff));
 
-    List<RefPtr<Val>> substCaseWitnesses;
+    List<Val*> substCaseWitnesses;
     for (auto caseWitness : caseWitnesses)
     {
         substCaseWitnesses.add(caseWitness->substituteImpl(astBuilder, subst, &diff));
@@ -540,7 +540,7 @@ RefPtr<Val> TaggedUnionSubtypeWitness::_substituteImplOverride(ASTBuilder* astBu
 
     (*ioDiff)++;
 
-    RefPtr<TaggedUnionSubtypeWitness> substWitness = astBuilder->create<TaggedUnionSubtypeWitness>();
+    TaggedUnionSubtypeWitness* substWitness = astBuilder->create<TaggedUnionSubtypeWitness>();
     substWitness->sub = substSub;
     substWitness->sup = substSup;
     substWitness->caseWitnesses.swapWith(substCaseWitnesses);

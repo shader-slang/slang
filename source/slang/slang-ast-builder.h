@@ -15,8 +15,8 @@ class SharedASTBuilder : public RefObject
     friend class ASTBuilder;
 public:
     
-    void registerBuiltinDecl(RefPtr<Decl> decl, RefPtr<BuiltinTypeModifier> modifier);
-    void registerMagicDecl(RefPtr<Decl> decl, RefPtr<MagicTypeModifier> modifier);
+    void registerBuiltinDecl(Decl* decl, BuiltinTypeModifier* modifier);
+    void registerMagicDecl(Decl* decl, MagicTypeModifier* modifier);
 
         /// Get the string type
     Type* getStringType();
@@ -30,7 +30,7 @@ public:
     SyntaxClass<RefObject> findSyntaxClass(const UnownedStringSlice& slice);
 
         // Look up a magic declaration by its name
-    RefPtr<Decl> findMagicDecl(String const& name);
+    Decl* findMagicDecl(String const& name);
 
         /// A name pool that can be used for lookup for findClassInfo etc. It is the same pool as the Session.
     NamePool* getNamePool() { return m_namePool; }
@@ -45,9 +45,9 @@ public:
 protected:
     // State shared between ASTBuilders
 
-    RefPtr<Type> m_errorType;
-    RefPtr<Type> m_initializerListType;
-    RefPtr<Type> m_overloadedType;
+    Type* m_errorType;
+    Type* m_initializerListType;
+    Type* m_overloadedType;
 
     // The following types are created lazily, such that part of their definition
     // can be in the standard library
@@ -57,10 +57,10 @@ protected:
     //
     // TODO(tfoley): These should really belong to the compilation context!
     //
-    RefPtr<Type> m_stringType;
-    RefPtr<Type> m_enumTypeType;
+    Type* m_stringType;
+    Type* m_enumTypeType;
 
-    RefPtr<Type> m_builtinTypes[Index(BaseType::CountOf)];
+    Type* m_builtinTypes[Index(BaseType::CountOf)];
 
     Dictionary<String, Decl*> m_magicDecls;
 
@@ -119,30 +119,30 @@ public:
 
         // Construct the type `Ptr<valueType>`, where `Ptr`
         // is looked up as a builtin type.
-    RefPtr<PtrType> getPtrType(RefPtr<Type> valueType);
+    PtrType* getPtrType(Type* valueType);
 
         // Construct the type `Out<valueType>`
-    RefPtr<OutType> getOutType(RefPtr<Type> valueType);
+    OutType* getOutType(Type* valueType);
 
         // Construct the type `InOut<valueType>`
-    RefPtr<InOutType> getInOutType(RefPtr<Type> valueType);
+    InOutType* getInOutType(Type* valueType);
 
         // Construct the type `Ref<valueType>`
-    RefPtr<RefType> getRefType(RefPtr<Type> valueType);
+    RefType* getRefType(Type* valueType);
 
         // Construct a pointer type like `Ptr<valueType>`, but where
         // the actual type name for the pointer type is given by `ptrTypeName`
-    RefPtr<PtrTypeBase> getPtrType(RefPtr<Type> valueType, char const* ptrTypeName);
+    PtrTypeBase* getPtrType(Type* valueType, char const* ptrTypeName);
 
         // Construct a pointer type like `Ptr<valueType>`, but where
         // the generic declaration for the pointer type is `genericDecl`
-    RefPtr<PtrTypeBase> getPtrType(RefPtr<Type> valueType, GenericDecl* genericDecl);
+    PtrTypeBase* getPtrType(Type* valueType, GenericDecl* genericDecl);
 
-    RefPtr<ArrayExpressionType> getArrayType(Type* elementType, IntVal* elementCount);
+    ArrayExpressionType* getArrayType(Type* elementType, IntVal* elementCount);
 
-    RefPtr<VectorExpressionType> getVectorType(RefPtr<Type> elementType, RefPtr<IntVal> elementCount);
+    VectorExpressionType* getVectorType(Type* elementType, IntVal* elementCount);
 
-    RefPtr<TypeType> getTypeType(Type* type);
+    TypeType* getTypeType(Type* type);
 
         /// Helpers to get type info from the SharedASTBuilder
     const ReflectClassInfo* findClassInfo(const UnownedStringSlice& slice) { return m_sharedASTBuilder->findClassInfo(slice); }

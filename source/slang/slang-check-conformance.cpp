@@ -7,21 +7,24 @@
 
 namespace Slang
 {
-    RefPtr<DeclaredSubtypeWitness> SemanticsVisitor::createSimpleSubtypeWitness(
+    DeclaredSubtypeWitness* SemanticsVisitor::createSimpleSubtypeWitness(
         TypeWitnessBreadcrumb*  breadcrumb)
     {
-        RefPtr<DeclaredSubtypeWitness> witness = m_astBuilder->create<DeclaredSubtypeWitness>();
+        DeclaredSubtypeWitness* witness = m_astBuilder->create<DeclaredSubtypeWitness>();
         witness->sub = breadcrumb->sub;
         witness->sup = breadcrumb->sup;
         witness->declRef = breadcrumb->declRef;
         return witness;
     }
 
-    RefPtr<Val> SemanticsVisitor::createTypeWitness(
-        RefPtr<Type>            type,
+    Val* SemanticsVisitor::createTypeWitness(
+        Type*            type,
         DeclRef<InterfaceDecl>  interfaceDeclRef,
         TypeWitnessBreadcrumb*  inBreadcrumbs)
     {
+        SLANG_UNUSED(type);
+        SLANG_UNUSED(interfaceDeclRef);
+
         if(!inBreadcrumbs)
         {
             // We need to construct a witness to the fact
@@ -58,11 +61,11 @@ namespace Slang
 
         // `witness` here will hold the first (outer-most) object
         // we create, which is the overall result.
-        RefPtr<SubtypeWitness> witness;
+        SubtypeWitness* witness;
 
         // `link` will point at the remaining "hole" in the
         // data structure, to be filled in.
-        RefPtr<SubtypeWitness>* link = &witness;
+        SubtypeWitness** link = &witness;
 
         // As long as there is more than one breadcrumb, we
         // need to be creating transitive witnesses.
@@ -79,7 +82,7 @@ namespace Slang
             // where `[...]` represents the "hole" we leave
             // open to fill in next.
             //
-            RefPtr<TransitiveSubtypeWitness> transitiveWitness = m_astBuilder->create<TransitiveSubtypeWitness>();
+            TransitiveSubtypeWitness* transitiveWitness = m_astBuilder->create<TransitiveSubtypeWitness>();
             transitiveWitness->sub = bb->sub;
             transitiveWitness->sup = bb->sup;
             transitiveWitness->midToSup = bb->declRef;
@@ -97,7 +100,7 @@ namespace Slang
         // In our running example this would be `{ A : B }`. We create
         // a simple (declared) subtype witness for it, and plug the
         // final hole, after which there shouldn't be a hole to deal with.
-        RefPtr<DeclaredSubtypeWitness> declaredWitness = createSimpleSubtypeWitness(bb);
+        DeclaredSubtypeWitness* declaredWitness = createSimpleSubtypeWitness(bb);
         *link = declaredWitness;
 
         // We now know that our original `witness` variable has been
@@ -121,6 +124,8 @@ namespace Slang
         DeclRef<InterfaceDecl>  interfaceDeclRef,
         DeclRef<Decl>           requirementDeclRef)
     {
+        SLANG_UNUSED(interfaceDeclRef);
+
         if(auto callableDeclRef = requirementDeclRef.as<CallableDecl>())
         {
             // A `static` method requirement can't be satisfied by a
@@ -146,10 +151,10 @@ namespace Slang
     }
 
     bool SemanticsVisitor::doesTypeConformToInterfaceImpl(
-        RefPtr<Type>            originalType,
-        RefPtr<Type>            type,
+        Type*            originalType,
+        Type*            type,
         DeclRef<InterfaceDecl>  interfaceDeclRef,
-        RefPtr<Val>*            outWitness,
+        Val**            outWitness,
         TypeWitnessBreadcrumb*  inBreadcrumbs)
     {
         // for now look up a conformance member...
@@ -271,10 +276,10 @@ namespace Slang
             // value for the tagged union itself (that is, if
             // `outWitness` is non-null).
             //
-            List<RefPtr<Val>> caseWitnesses;
+            List<Val*> caseWitnesses;
             for(auto caseType : taggedUnionType->caseTypes)
             {
-                RefPtr<Val> caseWitness;
+                Val* caseWitness;
 
                 if(!doesTypeConformToInterfaceImpl(
                     caseType,
@@ -313,7 +318,7 @@ namespace Slang
             //
             if(outWitness)
             {
-                RefPtr<TaggedUnionSubtypeWitness> taggedUnionWitness = m_astBuilder->create<TaggedUnionSubtypeWitness>();
+                TaggedUnionSubtypeWitness* taggedUnionWitness = m_astBuilder->create<TaggedUnionSubtypeWitness>();
                 taggedUnionWitness->sub = taggedUnionType;
                 taggedUnionWitness->sup = DeclRefType::create(m_astBuilder, interfaceDeclRef);
                 taggedUnionWitness->caseWitnesses.swapWith(caseWitnesses);
@@ -328,33 +333,33 @@ namespace Slang
     }
 
     bool SemanticsVisitor::DoesTypeConformToInterface(
-        RefPtr<Type>  type,
+        Type*  type,
         DeclRef<InterfaceDecl>        interfaceDeclRef)
     {
         return doesTypeConformToInterfaceImpl(type, type, interfaceDeclRef, nullptr, nullptr);
     }
 
-    RefPtr<Val> SemanticsVisitor::tryGetInterfaceConformanceWitness(
-        RefPtr<Type>  type,
+    Val* SemanticsVisitor::tryGetInterfaceConformanceWitness(
+        Type*  type,
         DeclRef<InterfaceDecl>        interfaceDeclRef)
     {
-        RefPtr<Val> result;
+        Val* result;
         doesTypeConformToInterfaceImpl(type, type, interfaceDeclRef, &result, nullptr);
         return result;
     }
 
-    RefPtr<Val> SemanticsVisitor::createTypeEqualityWitness(
+    Val* SemanticsVisitor::createTypeEqualityWitness(
         Type*  type)
     {
-        RefPtr<TypeEqualityWitness> rs = m_astBuilder->create<TypeEqualityWitness>();
+        TypeEqualityWitness* rs = m_astBuilder->create<TypeEqualityWitness>();
         rs->sub = type;
         rs->sup = type;
         return rs;
     }
 
-    RefPtr<Val> SemanticsVisitor::tryGetSubtypeWitness(
-        RefPtr<Type>    sub,
-        RefPtr<Type>    sup)
+    Val* SemanticsVisitor::tryGetSubtypeWitness(
+        Type*    sub,
+        Type*    sup)
     {
         if(sub->equals(sup))
         {

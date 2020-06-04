@@ -604,7 +604,7 @@ namespace Slang
 
         for( auto globalDecl : moduleDecl->members )
         {
-            if(auto globalVar = globalDecl.as<VarDecl>())
+            if(auto globalVar = as<VarDecl>(globalDecl))
             {
                 // We do not want to consider global variable declarations
                 // that don't represents shader parameters. This includes
@@ -616,7 +616,7 @@ namespace Slang
                 // At this point we know we have a global shader parameter.
 
                 ShaderParamInfo shaderParamInfo;
-                shaderParamInfo.paramDeclRef = makeDeclRef(globalVar.Ptr());
+                shaderParamInfo.paramDeclRef = makeDeclRef(globalVar);
 
                 // We need to consider what specialization parameters
                 // are introduced by this shader parameter. This step
@@ -628,7 +628,7 @@ namespace Slang
                     getLinkage()->getASTBuilder(),
                     shaderParamInfo,
                     m_specializationParams,
-                    makeDeclRef(globalVar.Ptr()));
+                    makeDeclRef(globalVar));
 
                 m_shaderParams.add(shaderParamInfo);
             }
@@ -968,10 +968,10 @@ namespace Slang
             {
             case SpecializationParam::Flavor::GenericType:
                 {
-                    auto genericTypeParamDecl = param.object.as<GlobalGenericParamDecl>();
+                    auto genericTypeParamDecl = as<GlobalGenericParamDecl>(param.object);
                     SLANG_ASSERT(genericTypeParamDecl);
 
-                    RefPtr<Type> argType = as<Type>(arg.val);
+                    Type* argType = as<Type>(arg.val);
                     if(!argType)
                     {
                         sink->diagnose(param.loc, Diagnostics::expectedTypeForSpecializationArg, genericTypeParamDecl);
@@ -999,7 +999,7 @@ namespace Slang
                     // global generic type parameter is a reference to *another* global generic
                     // type parameter, since that should always be an error.
                     //
-                    if( auto argDeclRefType = argType.as<DeclRefType>() )
+                    if( auto argDeclRefType = as<DeclRefType>(argType) )
                     {
                         auto argDeclRef = argDeclRefType->declRef;
                         if(auto argGenericParamDeclRef = argDeclRef.as<GlobalGenericParamDecl>())
@@ -1060,10 +1060,10 @@ namespace Slang
 
             case SpecializationParam::Flavor::ExistentialType:
                 {
-                    auto interfaceType = param.object.as<Type>();
+                    auto interfaceType = as<Type>(param.object);
                     SLANG_ASSERT(interfaceType);
 
-                    RefPtr<Type> argType = as<Type>(arg.val);
+                    Type* argType = as<Type>(arg.val);
                     if(!argType)
                     {
                         sink->diagnose(param.loc, Diagnostics::expectedTypeForSpecializationArg, interfaceType);
@@ -1091,13 +1091,13 @@ namespace Slang
 
             case SpecializationParam::Flavor::GenericValue:
                 {
-                    auto paramDecl = param.object.as<GlobalGenericValueParamDecl>();
+                    auto paramDecl = as<GlobalGenericValueParamDecl>(param.object);
                     SLANG_ASSERT(paramDecl);
 
                     // Now we need to check that the argument `Val` has the
                     // appropriate type expected by the parameter.
 
-                    RefPtr<IntVal> intVal = as<IntVal>(arg.val);
+                    IntVal* intVal = as<IntVal>(arg.val);
                     if(!intVal)
                     {
                         sink->diagnose(param.loc, Diagnostics::expectedValueOfTypeForSpecializationArg, paramDecl->getType(), paramDecl);
@@ -1123,7 +1123,7 @@ namespace Slang
 
     static void _extractSpecializationArgs(
         ComponentType*              componentType,
-        List<RefPtr<Expr>> const&   argExprs,
+        List<Expr*> const&   argExprs,
         List<SpecializationArg>&    outArgs,
         DiagnosticSink*             sink)
     {
@@ -1175,7 +1175,7 @@ namespace Slang
             auto genericDeclRef = m_funcDeclRef.getParent().as<GenericDecl>();
             SLANG_ASSERT(genericDeclRef); // otherwise we wouldn't have generic parameters
 
-            RefPtr<GenericSubstitution> genericSubst = getLinkage()->getASTBuilder()->create<GenericSubstitution>();
+            GenericSubstitution* genericSubst = getLinkage()->getASTBuilder()->create<GenericSubstitution>();
             genericSubst->outer = genericDeclRef.substitutions.substitutions;
             genericSubst->genericDecl = genericDeclRef.getDecl();
 
@@ -1235,8 +1235,8 @@ namespace Slang
 
             // TODO: We need to handle all the cases of "flavor" for the `param`s (not just types)
 
-            auto paramType = param.object.as<Type>();
-            auto argType = specializationArg.val.as<Type>();
+            auto paramType = as<Type>(param.object);
+            auto argType = as<Type>(specializationArg.val);
 
             auto witness = visitor.tryGetSubtypeWitness(argType, paramType);
             if (!witness)
@@ -1260,7 +1260,7 @@ namespace Slang
             /// Create a specialization an existing entry point based on specialization argument expressions.
     RefPtr<ComponentType> createSpecializedEntryPoint(
         EntryPoint*                 unspecializedEntryPoint,
-        List<RefPtr<Expr>> const&   argExprs,
+        List<Expr*> const&   argExprs,
         DiagnosticSink*             sink)
     {
         // We need to convert all of the `Expr` arguments
@@ -1316,7 +1316,7 @@ namespace Slang
     void parseSpecializationArgStrings(
         EndToEndCompileRequest* endToEndReq,
         List<String> const&     genericArgStrings,
-        List<RefPtr<Expr>>&     outGenericArgs)
+        List<Expr*>&     outGenericArgs)
     {
         auto unspecialiedProgram = endToEndReq->getUnspecializedGlobalComponentType();
 
@@ -1343,7 +1343,7 @@ namespace Slang
         //
         for(auto name : genericArgStrings)
         {
-            RefPtr<Expr> argExpr = linkage->parseTermString(name, scope);
+            Expr* argExpr = linkage->parseTermString(name, scope);
             argExpr = semantics.CheckTerm(argExpr);
 
             if(!argExpr)
@@ -1378,7 +1378,7 @@ namespace Slang
         ExpandedSpecializationArgs specializationArgs;
         for( Int aa = 0; aa < argCount; ++aa )
         {
-            auto paramType = specializationParams[aa].object.as<Type>();
+            auto paramType = as<Type>(specializationParams[aa].object);
             auto argType = args[aa];
 
             ExpandedSpecializationArg arg;
@@ -1387,7 +1387,7 @@ namespace Slang
             specializationArgs.add(arg);
         }
 
-        RefPtr<ExistentialSpecializedType> specializedType = m_astBuilder->create<ExistentialSpecializedType>();
+        ExistentialSpecializedType* specializedType = m_astBuilder->create<ExistentialSpecializedType>();
         specializedType->baseType = unspecializedType;
         specializedType->args = specializationArgs;
 
@@ -1400,7 +1400,7 @@ namespace Slang
     static RefPtr<ComponentType> _createSpecializedProgramImpl(
         Linkage*                    linkage,
         ComponentType*              unspecializedProgram,
-        List<RefPtr<Expr>> const&   specializationArgExprs,
+        List<Expr*> const&   specializationArgExprs,
         DiagnosticSink*             sink)
     {
         // If there are no specialization arguments,
@@ -1455,12 +1455,14 @@ namespace Slang
         EndToEndCompileRequest::EntryPointInfo const&   entryPointInfo)
     {
         auto sink = endToEndReq->getSink();
-        auto entryPointFuncDecl = unspecializedEntryPoint->getFuncDecl();
+
+        // TODO(JS): Not used
+        //auto entryPointFuncDecl = unspecializedEntryPoint->getFuncDecl();
 
         // If the user specified generic arguments for the entry point,
         // then we will need to parse the arguments first.
         //
-        List<RefPtr<Expr>> specializationArgExprs;
+        List<Expr*> specializationArgExprs;
         parseSpecializationArgStrings(
             endToEndReq,
             entryPointInfo.specializationArgStrings,
@@ -1504,7 +1506,7 @@ namespace Slang
         // provided via the API, so that we can match them
         // against what was declared in the program.
         //
-        List<RefPtr<Expr>> globalSpecializationArgs;
+        List<Expr*> globalSpecializationArgs;
         parseSpecializationArgStrings(
             endToEndReq,
             endToEndReq->globalSpecializationArgStrings,

@@ -11,7 +11,7 @@ void ensureDecl(SemanticsVisitor* visitor, Decl* decl, DeclCheckState state);
 DeclRef<ExtensionDecl> ApplyExtensionToType(
     SemanticsVisitor*   semantics,
     ExtensionDecl*          extDecl,
-    RefPtr<Type>  type);
+    Type*  type);
 
 //
 
@@ -268,7 +268,7 @@ LookupResult lookUpDirectAndTransparentMembers(
 }
 
 
-static RefPtr<SubtypeWitness> _makeSubtypeWitness(
+static SubtypeWitness* _makeSubtypeWitness(
     ASTBuilder*                 astBuilder,
     Type*                       subType,
     SubtypeWitness*             subToMidWitness,
@@ -277,7 +277,7 @@ static RefPtr<SubtypeWitness> _makeSubtypeWitness(
 {
     if(subToMidWitness)
     {
-        RefPtr<TransitiveSubtypeWitness> transitiveWitness = astBuilder->create<TransitiveSubtypeWitness>();
+        TransitiveSubtypeWitness* transitiveWitness = astBuilder->create<TransitiveSubtypeWitness>();
         transitiveWitness->subToMid = subToMidWitness;
         transitiveWitness->midToSup = midToSuperConstraint;
         transitiveWitness->sub = subType;
@@ -286,7 +286,7 @@ static RefPtr<SubtypeWitness> _makeSubtypeWitness(
     }
     else
     {
-        RefPtr<DeclaredSubtypeWitness> declaredWitness = astBuilder->create<DeclaredSubtypeWitness>();
+        DeclaredSubtypeWitness* declaredWitness = astBuilder->create<DeclaredSubtypeWitness>();
         declaredWitness->declRef = midToSuperConstraint;
         declaredWitness->sub = subType;
         declaredWitness->sup = superType;
@@ -295,7 +295,7 @@ static RefPtr<SubtypeWitness> _makeSubtypeWitness(
 }
 
 // Same as the above, but we are specializing a type instead of a decl-ref
-static RefPtr<Type> _maybeSpecializeSuperType(
+static Type* _maybeSpecializeSuperType(
     ASTBuilder*                 astBuilder, 
     Type*                       superType,
     SubtypeWitness*             subIsSuperWitness)
@@ -304,7 +304,7 @@ static RefPtr<Type> _maybeSpecializeSuperType(
     {
         if (auto superInterfaceDeclRef = superDeclRefType->declRef.as<InterfaceDecl>())
         {
-            RefPtr<ThisTypeSubstitution> thisTypeSubst = astBuilder->create<ThisTypeSubstitution>();
+            ThisTypeSubstitution* thisTypeSubst = astBuilder->create<ThisTypeSubstitution>();
             thisTypeSubst->interfaceDecl = superInterfaceDeclRef.getDecl();
             thisTypeSubst->witness = subIsSuperWitness;
             thisTypeSubst->outer = superInterfaceDeclRef.substitutions.substitutions;
@@ -322,7 +322,7 @@ static RefPtr<Type> _maybeSpecializeSuperType(
 static void _lookUpMembersInType(
     ASTBuilder*             astBuilder, 
     Name*                   name,
-    RefPtr<Type>            type,
+    Type*            type,
     LookupRequest const&    request,
     LookupResult&           ioResult,
     BreadcrumbInfo*         breadcrumbs);
@@ -584,7 +584,7 @@ static void _lookUpMembersInSuperTypeImpl(
 static void _lookUpMembersInType(
     ASTBuilder*             astBuilder,
     Name*                   name,
-    RefPtr<Type>            type,
+    Type*            type,
     LookupRequest const&    request,
     LookupResult&           ioResult,
     BreadcrumbInfo*         breadcrumbs)
@@ -679,7 +679,7 @@ static void _lookUpInScopes(
                 breadcrumb.declRef = aggTypeDeclBaseRef;
                 breadcrumb.prev = nullptr;
 
-                RefPtr<Type> type;
+                Type* type;
                 if(auto extDeclRef = aggTypeDeclBaseRef.as<ExtensionDecl>())
                 {
                     if( request.semantics )

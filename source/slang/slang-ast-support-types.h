@@ -271,7 +271,7 @@ namespace Slang
     struct Modifiers
     {
         // The first modifier in the linked list of heap-allocated modifiers
-        RefPtr<Modifier> first;
+        Modifier* first;
 
         template<typename T>
         FilteredModifierList<T> getModifiersOfType() { return FilteredModifierList<T>(first.Ptr()); }
@@ -286,7 +286,7 @@ namespace Slang
         template<typename T>
         bool hasModifier() { return findModifier<T>() != nullptr; }
 
-        FilteredModifierList<Modifier>::Iterator begin() { return FilteredModifierList<Modifier>::Iterator(first.Ptr()); }
+        FilteredModifierList<Modifier>::Iterator begin() { return FilteredModifierList<Modifier>::Iterator(first); }
         FilteredModifierList<Modifier>::Iterator end() { return FilteredModifierList<Modifier>::Iterator(nullptr); }
     };
 
@@ -296,7 +296,7 @@ namespace Slang
 
     // Try to extract a simple integer value from an `IntVal`.
     // This fill assert-fail if the object doesn't represent a literal value.
-    IntegerLiteralValue getIntVal(RefPtr<IntVal> val);
+    IntegerLiteralValue getIntVal(IntVal* val);
 
         /// Represents how much checking has been applied to a declaration.
     enum class DeclCheckState : uint8_t
@@ -424,12 +424,12 @@ namespace Slang
     };
 
     void addModifier(
-        RefPtr<ModifiableSyntaxNode>    syntax,
-        RefPtr<Modifier>                modifier);
+        ModifiableSyntaxNode*    syntax,
+        Modifier*                modifier);
 
     struct QualType
     {
-        RefPtr<Type>	type;
+        Type*	type;
         bool	        isLeftValue;
 
         QualType()
@@ -441,11 +441,10 @@ namespace Slang
             , isLeftValue(false)
         {}
 
-        Type* Ptr() { return type.Ptr(); }
+        Type* Ptr() { return type; }
 
         operator Type*() { return type; }
-        operator RefPtr<Type>() { return type; }
-        RefPtr<Type> operator->() { return type; }
+        Type* operator->() { return type; }
     };
 
     class ASTBuilder;
@@ -573,14 +572,14 @@ namespace Slang
 
     struct SubstitutionSet
     {
-        RefPtr<Substitutions> substitutions;
+        Substitutions* substitutions;
         operator Substitutions*() const
         {
             return substitutions;
         }
 
         SubstitutionSet() {}
-        SubstitutionSet(RefPtr<Substitutions> subst)
+        SubstitutionSet(Substitutions* subst)
             : substitutions(subst)
         {
         }
@@ -618,18 +617,18 @@ namespace Slang
             substitutions(subst)
         {}
 
-        DeclRefBase(Decl* decl, RefPtr<Substitutions> subst)
+        DeclRefBase(Decl* decl, Substitutions* subst)
             : decl(decl)
             , substitutions(subst)
         {}
 
         // Apply substitutions to a type or declaration
-        RefPtr<Type> substitute(ASTBuilder* astBuilder, RefPtr<Type> type) const;
+        Type* substitute(ASTBuilder* astBuilder, Type* type) const;
 
         DeclRefBase substitute(ASTBuilder* astBuilder, DeclRefBase declRef) const;
 
         // Apply substitutions to an expression
-        RefPtr<Expr> substitute(ASTBuilder* astBuilder, RefPtr<Expr> expr) const;
+        Expr* substitute(ASTBuilder* astBuilder, Expr* expr) const;
 
         // Apply substitutions to this declaration reference
         DeclRefBase substituteImpl(ASTBuilder* astBuilder, SubstitutionSet subst, int* ioDiff);
@@ -672,7 +671,7 @@ namespace Slang
             : DeclRefBase(decl, subst)
         {}
 
-        DeclRef(T* decl, RefPtr<Substitutions> subst)
+        DeclRef(T* decl, Substitutions* subst)
             : DeclRefBase(decl, SubstitutionSet(subst))
         {}
 
@@ -699,11 +698,11 @@ namespace Slang
             return DeclRef<T>((T*) declRef.decl, declRef.substitutions);
         }
 
-        RefPtr<Type> substitute(ASTBuilder* astBuilder, RefPtr<Type> type) const
+        Type* substitute(ASTBuilder* astBuilder, Type* type) const
         {
             return DeclRefBase::substitute(astBuilder, type);
         }
-        RefPtr<Expr> substitute(ASTBuilder* astBuilder, RefPtr<Expr> expr) const
+        Expr* substitute(ASTBuilder* astBuilder, Expr* expr) const
         {
             return DeclRefBase::substitute(astBuilder, expr);
         }
@@ -749,32 +748,32 @@ namespace Slang
         Static,                     ///< Only static (ie non instance) members
     };
 
-    const RefPtr<Decl>* adjustFilterCursorImpl(const ReflectClassInfo& clsInfo, MemberFilterStyle filterStyle, const RefPtr<Decl>* ptr, const RefPtr<Decl>* end);
-    const RefPtr<Decl>* getFilterCursorByIndexImpl(const ReflectClassInfo& clsInfo, MemberFilterStyle filterStyle, const RefPtr<Decl>* ptr, const RefPtr<Decl>* end, Index index);
-    Index getFilterCountImpl(const ReflectClassInfo& clsInfo, MemberFilterStyle filterStyle, const RefPtr<Decl>* ptr, const RefPtr<Decl>* end);
+    Decl*const* adjustFilterCursorImpl(const ReflectClassInfo& clsInfo, MemberFilterStyle filterStyle, Decl*const* ptr, Decl*const* end);
+    Decl*const* getFilterCursorByIndexImpl(const ReflectClassInfo& clsInfo, MemberFilterStyle filterStyle, Decl*const* ptr, Decl*const* end, Index index);
+    Index getFilterCountImpl(const ReflectClassInfo& clsInfo, MemberFilterStyle filterStyle, Decl*const* ptr, Decl*const* end);
 
 
     template <typename T>
-    const RefPtr<Decl>* adjustFilterCursor(MemberFilterStyle filterStyle, const RefPtr<Decl>* ptr, const RefPtr<Decl>* end)
+    Decl*const* adjustFilterCursor(MemberFilterStyle filterStyle, Decl*const* ptr, Decl*const* end)
     {
         return adjustFilterCursorImpl(T::kReflectClassInfo, filterStyle, ptr, end);
     }
 
         /// Finds the element at index. If there is no element at the index (for example has too few elements), returns nullptr.
     template <typename T>
-    const RefPtr<Decl>* getFilterCursorByIndex(MemberFilterStyle filterStyle, const RefPtr<Decl>* ptr, const RefPtr<Decl>* end, Index index)
+    Decl*const* getFilterCursorByIndex(MemberFilterStyle filterStyle, Decl*const* ptr, Decl*const* end, Index index)
     {
         return getFilterCursorByIndexImpl(T::kReflectClassInfo, filterStyle, ptr, end, index);
     }
      
     template <typename T>
-    Index getFilterCount(MemberFilterStyle filterStyle, const RefPtr<Decl>* ptr, const RefPtr<Decl>* end)
+    Index getFilterCount(MemberFilterStyle filterStyle, Decl*const* ptr, Decl*const* end)
     {
         return getFilterCountImpl(T::kReflectClassInfo, filterStyle, ptr, end);
     }
      
     template <typename T>
-    bool isFilterNonEmpty(MemberFilterStyle filterStyle, const RefPtr<Decl>* ptr, const RefPtr<Decl>* end)
+    bool isFilterNonEmpty(MemberFilterStyle filterStyle, Decl*const* ptr, Decl*const* end)
     {
         return adjustFilterCursorImpl(T::kReflectClassInfo, filterStyle, ptr, end) != end;
     }
@@ -782,7 +781,7 @@ namespace Slang
     template<typename T>
     struct FilteredMemberList
     {
-        typedef RefPtr<Decl> Element;
+        typedef Decl* Element;
 
         FilteredMemberList()
             : m_begin(nullptr)
@@ -829,7 +828,7 @@ namespace Slang
 
         RefPtr<T> operator[](Index index) const
         {
-            const RefPtr<Decl>* ptr = getFilterCursorByIndex<T>(m_filterStyle, m_begin, m_end, index);
+            Decl*const* ptr = getFilterCursorByIndex<T>(m_filterStyle, m_begin, m_end, index);
             SLANG_ASSERT(ptr);
             return  *(RefPtr<T>*)(ptr);
         }
@@ -867,12 +866,12 @@ namespace Slang
     template<typename T>
     struct FilteredMemberRefList
     {
-        List<RefPtr<Decl>> const&	m_decls;
+        List<Decl*> const&	m_decls;
         SubstitutionSet		m_substitutions;
         MemberFilterStyle   m_filterStyle;
 
         FilteredMemberRefList(
-            List<RefPtr<Decl>> const&	decls,
+            List<Decl*> const&	decls,
             SubstitutionSet		substitutions,
             MemberFilterStyle   filterStyle = MemberFilterStyle::All)
             : m_decls(decls)
@@ -889,9 +888,9 @@ namespace Slang
 
         DeclRef<T> operator[](Index index) const
         {
-             const RefPtr<Decl>* decl = getFilterCursorByIndex<T>(m_filterStyle, m_decls.begin(), m_decls.end(), index);
+             Decl*const* decl = getFilterCursorByIndex<T>(m_filterStyle, m_decls.begin(), m_decls.end(), index);
              SLANG_ASSERT(decl);
-             return DeclRef<T>((T*) decl->Ptr(), m_substitutions);
+             return DeclRef<T>((T*) *decl, m_substitutions);
         }
 
         List<DeclRef<T>> toArray() const
@@ -905,15 +904,15 @@ namespace Slang
         struct Iterator
         {
             FilteredMemberRefList const* m_list;
-            const RefPtr<Decl>* m_ptr;
-            const RefPtr<Decl>* m_end;
+            Decl*const* m_ptr;
+            Decl*const* m_end;
             MemberFilterStyle m_filterStyle;
 
             Iterator() : m_list(nullptr), m_ptr(nullptr), m_filterStyle(MemberFilterStyle::All) {}
             Iterator(
                 FilteredMemberRefList const* list,
-                const RefPtr<Decl>* ptr,
-                const RefPtr<Decl>* end,
+                Decl*const* ptr,
+                Decl*const* end,
                 MemberFilterStyle filterStyle
                 )
                 : m_list(list)
@@ -926,7 +925,7 @@ namespace Slang
 
             void operator++() { m_ptr = adjustFilterCursor<T>(m_filterStyle, m_ptr + 1, m_end); }
 
-            DeclRef<T> operator*() { return DeclRef<T>((T*) m_ptr->Ptr(), m_list->m_substitutions); }
+            DeclRef<T> operator*() { return DeclRef<T>((T*)*m_ptr, m_list->m_substitutions); }
         };
 
         Iterator begin() const { return Iterator(this, adjustFilterCursor<T>(m_filterStyle, m_decls.begin(), m_decls.end()), m_decls.end(), m_filterStyle); }
@@ -948,23 +947,23 @@ namespace Slang
             : exp(other.exp)
             , type(other.type)
         {}
-        explicit TypeExp(RefPtr<Expr> exp)
+        explicit TypeExp(Expr* exp)
             : exp(exp)
         {}
-        explicit TypeExp(RefPtr<Type> type)
+        explicit TypeExp(Type* type)
             : type(type)
         {}
-        TypeExp(RefPtr<Expr> exp, RefPtr<Type> type)
+        TypeExp(Expr* exp, Type* type)
             : exp(exp)
             , type(type)
         {}
 
-        RefPtr<Expr> exp;
-        RefPtr<Type> type;
+        Expr* exp;
+        Type* type;
 
         bool equals(Type* other);
 
-        Type* Ptr() { return type.Ptr(); }
+        Type* Ptr() { return type; }
         operator Type*()
         {
             return type;
@@ -1233,7 +1232,7 @@ namespace Slang
             , m_declRef(declRef)
         {}
 
-        RequirementWitness(RefPtr<Val> val);
+        RequirementWitness(Val* val);
 
         RequirementWitness(RefPtr<WitnessTable> witnessTable);
 
@@ -1256,7 +1255,7 @@ namespace Slang
             return m_declRef;
         }
 
-        RefPtr<Val> getVal()
+        Val* getVal()
         {
             SLANG_ASSERT(getFlavor() == Flavor::val);
             return m_obj.as<Val>();
@@ -1292,19 +1291,19 @@ namespace Slang
         };
         Flavor              flavor;
         SourceLoc           loc;
-        RefPtr<NodeBase>    object;
+        NodeBase*    object;
     };
     typedef List<SpecializationParam> SpecializationParams;
 
     struct SpecializationArg
     {
-        RefPtr<Val> val;
+        Val* val;
     };
     typedef List<SpecializationArg> SpecializationArgs;
 
     struct ExpandedSpecializationArg : SpecializationArg
     {
-        RefPtr<Val> witness;
+        Val* witness;
     };
     typedef List<ExpandedSpecializationArg> ExpandedSpecializationArgs;
 
