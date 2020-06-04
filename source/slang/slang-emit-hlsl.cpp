@@ -682,7 +682,7 @@ void HLSLSourceEmitter::emitLoopControlDecorationImpl(IRLoopControlDecoration* d
         m_writer->emit("[loop]\n");
         break;
     default:
-        SLANG_UNREACHABLE("emit loop control decoration");
+        break;
     }
 }
 
