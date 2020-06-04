@@ -970,6 +970,9 @@ namespace Slang
         List<Module*> const& getModuleDependencies() SLANG_OVERRIDE { return m_moduleDependencyList.getModuleList(); }
         List<String> const& getFilePathDependencies() SLANG_OVERRIDE { return m_filePathDependencyList.getFilePathList(); }
 
+            /// Get the ASTBuilder
+        ASTBuilder* getASTBuilder() { return &m_astBuilder; }
+
             /// Collect information on the shader parameters of the module.
             ///
             /// This method should only be called once, after the core
@@ -1044,6 +1047,10 @@ namespace Slang
         // that was defined as part of the module.
         //
         List<RefPtr<EntryPoint>> m_entryPoints;
+
+        // The builder that owns all of the AST nodes from parsing the source of
+        // this module. 
+        ASTBuilder m_astBuilder;
     };
     typedef Module LoadedModule;
 
