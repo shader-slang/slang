@@ -544,12 +544,12 @@ namespace Slang
         if (auto toDeclRefType = as<DeclRefType>(toType))
         {
             auto toTypeDeclRef = toDeclRefType->declRef;
-            if (auto interfaceDeclRef = toTypeDeclRef.as<InterfaceDecl>())
+            if (auto toAggTypeDeclRef = toTypeDeclRef.as<AggTypeDecl>())
             {
-                if(auto witness = tryGetInterfaceConformanceWitness(fromType, interfaceDeclRef))
+                if(auto witness = tryGetSubtypeWitness(fromType, toAggTypeDeclRef))
                 {
                     if (outToExpr)
-                        *outToExpr = createCastToInterfaceExpr(toType, fromExpr, witness);
+                        *outToExpr = createCastToSuperTypeExpr(toType, fromExpr, witness);
                     if (outCost)
                         *outCost = kConversionCost_CastToInterface;
                     return true;
@@ -835,12 +835,12 @@ namespace Slang
         return castExpr;
     }
 
-    RefPtr<Expr> SemanticsVisitor::createCastToInterfaceExpr(
+    RefPtr<Expr> SemanticsVisitor::createCastToSuperTypeExpr(
         RefPtr<Type>    toType,
         RefPtr<Expr>    fromExpr,
         RefPtr<Val>     witness)
     {
-        RefPtr<CastToInterfaceExpr> expr = m_astBuilder->create<CastToInterfaceExpr>();
+        RefPtr<CastToSuperTypeExpr> expr = m_astBuilder->create<CastToSuperTypeExpr>();
         expr->loc = fromExpr->loc;
         expr->type = QualType(toType);
         expr->valueArg = fromExpr;
