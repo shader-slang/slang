@@ -289,8 +289,6 @@ DIAGNOSTIC(31120, Error, invalidAttributeTarget, "invalid syntax target for user
 // Enums
 
 DIAGNOSTIC(32000, Error, invalidEnumTagType,        "invalid tag type for 'enum': '$0'")
-DIAGNOSTIC(32001, Error, enumTypeAlreadyHasTagType, "'enum' type has already declared a tag type")
-DIAGNOSTIC(32002, Note,  seePreviousTagType,        "see previous tag type declaration")
 DIAGNOSTIC(32003, Error, unexpectedEnumTagExpr,     "unexpected form for 'enum' tag value expression")
 
 
@@ -320,6 +318,18 @@ DIAGNOSTIC(30610, Error, ambiguousDefaultInitializerForType, "more than one defa
 // 307xx: parameters
 DIAGNOSTIC(30700, Error, outputParameterCannotHaveDefaultValue, "an 'out' or 'inout' parameter cannot have a default-value expression");
 
+// 308xx: inheritance
+DIAGNOSTIC(30810, Error, baseOfInterfaceMustBeInterface, "interface '$0' cannot inherit from non-interface type '$1'")
+DIAGNOSTIC(30811, Error, baseOfStructMustBeStructOrInterface, "struct '$0' cannot inherit from type '$1' that is neither a struct nor an interface")
+DIAGNOSTIC(30812, Error, baseOfEnumMustBeIntegerOrInterface, "enum '$0' cannot inherit from type '$1' that is neither an interface not a builtin integer type")
+DIAGNOSTIC(30810, Error, baseOfExtensionMustBeInterface, "extension cannot inherit from non-interface type '$1'")
+
+DIAGNOSTIC(30820, Error, baseStructMustBeListedFirst, "a struct type may only inherit from one other struct type, and that type must appear first in the list of bases")
+DIAGNOSTIC(30821, Error, tagTypeMustBeListedFirst, "an unum type may only have a single tag type, and that type must be listed first in the list of bases")
+
+DIAGNOSTIC(30820, Error, cannotInheritFromExplicitlySealedDeclarationInAnotherModule, "cannot inherit from type '$0' marked 'sealed' in module '$1'")
+DIAGNOSTIC(30821, Error, cannotInheritFromImplicitlySealedDeclarationInAnotherModule, "cannot inherit from type '$0' in module '$1' because it is implicitly 'sealed'; mark the base type 'open' to allow inheritance across modules")
+
 // 39999 waiting to be placed in the right range
 
 DIAGNOSTIC(39999, Error, expectedIntegerConstantWrongType, "expected integer constant (found: '$0')")
@@ -342,8 +352,6 @@ DIAGNOSTIC(39999, Error, expectedAGeneric, "expected a generic when using '<...>
 
 DIAGNOSTIC(39999, Error, genericArgumentInferenceFailed, "could not specialize generic for arguments of type $0")
 DIAGNOSTIC(39999, Note, genericSignatureTried, "see declaration of $0")
-
-DIAGNOSTIC(39999, Error, expectedAnInterfaceGot, "expected an interface, got '$0'")
 
 DIAGNOSTIC(39999, Error, ambiguousReference, "ambiguous reference to '$0'");
 DIAGNOSTIC(39999, Error, ambiguousExpression, "ambiguous reference");

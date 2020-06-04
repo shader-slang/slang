@@ -117,9 +117,23 @@ namespace Slang
 
         void visitInheritanceDecl(InheritanceDecl* inheritanceDecl);
 
-        void visitAggTypeDecl(AggTypeDecl* decl);
+            /// Validate that `decl` isn't illegally inheriting from a type in another module.
+            ///
+            /// This call checks a single `inheritanceDecl` to make sure that it either
+            ///     * names a base type from the same module as `decl`, or
+            ///     * names a type that allows cross-module inheritance
+        void _validateCrossModuleInheritance(
+            AggTypeDeclBase* decl,
+            InheritanceDecl* inheritanceDecl);
+
+        void visitInterfaceDecl(InterfaceDecl* decl);
+
+        void visitStructDecl(StructDecl* decl);
 
         void visitEnumDecl(EnumDecl* decl);
+
+            /// Validate that the target type of an extension `decl` is valid.
+        void _validateExtensionDeclTargetType(ExtensionDecl* decl);
 
         void visitExtensionDecl(ExtensionDecl* decl);
     };
@@ -984,25 +998,10 @@ namespace Slang
         base = TranslateTypeNode(base);
         inheritanceDecl->base = base;
 
-        // For now we only allow inheritance from interfaces, so
-        // we will validate that the type expression names an interface
-
-        if(auto declRefType = as<DeclRefType>(base.type))
-        {
-            if(auto interfaceDeclRef = declRefType->declRef.as<InterfaceDecl>())
-            {
-                return;
-            }
-        }
-        else if(base.type.is<ErrorType>())
-        {
-            // If an error was already produced, don't emit a cascading error.
-            return;
-        }
-
-        // If type expression didn't name an interface, we'll emit an error here
-        // TODO: deal with the case of an error in the type expression (don't cascade)
-        getSink()->diagnose( base.exp, Diagnostics::expectedAnInterfaceGot, base.type);
+        // Note: we do not check whether the type being inherited from
+        // is valid to use for inheritance here, because there could
+        // be contextual factors that need to be taken into account
+        // based on the declaration that is doing the inheriting.
     }
 
         // Concretize interface conformances so that we have witnesses as required for lookup.
@@ -1660,6 +1659,12 @@ namespace Slang
                     inheritanceDecl,
                     baseInterfaceDeclRef);
             }
+            else if( auto structDeclRef = baseTypeDeclRef.as<StructDecl>() )
+            {
+                // The type is saying it inherits from a `struct`,
+                // which doesn't require any checking at present
+                return nullptr;
+            }
         }
 
         getSink()->diagnose(inheritanceDecl, Diagnostics::unimplemented, "type not supported for inheritance");
@@ -1761,15 +1766,200 @@ namespace Slang
         }
     }
 
-    void SemanticsDeclBasesVisitor::visitAggTypeDecl(AggTypeDecl* decl)
+    void SemanticsDeclBasesVisitor::_validateCrossModuleInheritance(
+        AggTypeDeclBase* decl,
+        InheritanceDecl* inheritanceDecl)
     {
-        // TODO: We need to enumerate the bases here,
-        // and ideally form a "class precedence list"
-        // from them.
+        // Within a single module, users should be allowed to inherit
+        // one type from another more or less freely, so long as they
+        // don't violate fundamental validity conditions around
+        // inheritance.
+        //
+        // When an inheritance relationship is declared in one module,
+        // and the base type is in another module, we may want to
+        // enforce more restrictions. As a strong example, we probably
+        // don't want people to declare their own subtype of `int`
+        // or `Texture2D<float4>`.
+        //
+        // We start by checking if the type being inherited from is
+        // a decl-ref type, since that means it refers to a declaration
+        // that can be localized to its original module.
+        //
+        auto baseType = inheritanceDecl->base.type;
+        auto baseDeclRefType = as<DeclRefType>(baseType);
+        if( !baseDeclRefType )
+        {
+            return;
+        }
+        auto baseDecl = baseDeclRefType->declRef.decl;
 
+        // Using the parent/child hierarchy baked into `Decl`s we
+        // can find the modules that contain both the `decl` doing
+        // the inheriting, and the `baseDeclRefType` that is being
+        // inherited from.
+        //
+        // If those modules are the same, then we aren't seeing any
+        // kind of cross-module inheritance here, and there is nothing
+        // that needs enforcing.
+        //
+        auto moduleWithInheritance = getModule(decl);
+        auto moduleWithBaseType = getModule(baseDecl);
+        if( moduleWithInheritance == moduleWithBaseType )
+        {
+            return;
+        }
+
+        if( baseDecl->hasModifier<SealedAttribute>() )
+        {
+            // If the original declaration had the `[sealed]` attribute on it,
+            // then it explicitly does *not* allow inheritance from other
+            // modules.
+            //
+            getSink()->diagnose(inheritanceDecl, Diagnostics::cannotInheritFromExplicitlySealedDeclarationInAnotherModule, baseType, moduleWithBaseType->getModuleDecl()->getName());
+            return;
+        }
+        else if( baseDecl->hasModifier<OpenAttribute>() )
+        {
+            // Conversely, if the original declaration had the `[open]` attribute
+            // on it, then it explicit *does* allow inheritance from other
+            // modules.
+            //
+            // In this case we don't need to check anything: the inheritance
+            // is allowed.
+        }
+        else if( as<InterfaceDecl>(baseDecl) )
+        {
+            // If an interface isn't explicitly marked `[open]` or `[sealed]`,
+            // then the default behavior is to treat it as `[open]`, since
+            // interfaces are most often used to define protocols that
+            // users of a module can opt into.
+        }
+        else
+        {
+            // For any non-interface type, if the declaration didn't specify
+            // `[open]` or `[sealed]` then we assume `[sealed]` is the default.
+            //
+            getSink()->diagnose(inheritanceDecl, Diagnostics::cannotInheritFromImplicitlySealedDeclarationInAnotherModule, baseType, moduleWithBaseType->getModuleDecl()->getName());
+            return;
+        }
+    }
+
+    void SemanticsDeclBasesVisitor::visitInterfaceDecl(InterfaceDecl* decl)
+    {
         for( auto inheritanceDecl : decl->getMembersOfType<InheritanceDecl>() )
         {
             ensureDecl(inheritanceDecl, DeclCheckState::CanUseBaseOfInheritanceDecl);
+            auto baseType = inheritanceDecl->base.type;
+
+            // It is possible that there was an error in checking the base type
+            // expression, and in such a case we shouldn't emit a cascading error.
+            //
+            if( auto baseErrorType = as<ErrorType>(baseType) )
+            {
+                continue;
+            }
+
+            // An `interface` type can only inherit from other `interface` types.
+            //
+            // TODO: In the long run it might make sense for an interface to support
+            // an inheritance clause naming a non-interface type, with the meaning
+            // that any type that implements the interface must be a sub-type of the
+            // type named in the inheritance clause.
+            //
+            auto baseDeclRefType = as<DeclRefType>(baseType);
+            if( !baseDeclRefType )
+            {
+                getSink()->diagnose(inheritanceDecl, Diagnostics::baseOfInterfaceMustBeInterface, decl, baseType);
+                continue;
+            }
+
+            auto baseDeclRef = baseDeclRefType->declRef;
+            auto baseInterfaceDeclRef = baseDeclRef.as<InterfaceDecl>();
+            if( !baseInterfaceDeclRef )
+            {
+                getSink()->diagnose(inheritanceDecl, Diagnostics::baseOfInterfaceMustBeInterface, decl, baseType);
+                continue;
+            }
+
+            // TODO: At this point we have the `baseInterfaceDeclRef`
+            // and could use it to perform further validity checks,
+            // and/or to build up a more refined representation of
+            // the inheritance graph for this type (e.g., a "class
+            // precedence list").
+            //
+            // E.g., we can/should check that we aren't introducing
+            // a circular inheritance relationship.
+
+            _validateCrossModuleInheritance(decl, inheritanceDecl);
+        }
+    }
+
+    void SemanticsDeclBasesVisitor::visitStructDecl(StructDecl* decl)
+    {
+        // A `struct` type can only inherit from `struct` or `interface` types.
+        //
+        // Furthermore, only the first inheritance clause (in source
+        // order) is allowed to declare a base `struct` type.
+        //
+        Index inheritanceClauseCounter = 0;
+        for( auto inheritanceDecl : decl->getMembersOfType<InheritanceDecl>() )
+        {
+            Index inheritanceClauseIndex = inheritanceClauseCounter++;
+
+            ensureDecl(inheritanceDecl, DeclCheckState::CanUseBaseOfInheritanceDecl);
+            auto baseType = inheritanceDecl->base.type;
+
+            // It is possible that there was an error in checking the base type
+            // expression, and in such a case we shouldn't emit a cascading error.
+            //
+            if( auto baseErrorType = as<ErrorType>(baseType) )
+            {
+                continue;
+            }
+
+            auto baseDeclRefType = as<DeclRefType>(baseType);
+            if( !baseDeclRefType )
+            {
+                getSink()->diagnose(inheritanceDecl, Diagnostics::baseOfStructMustBeStructOrInterface, decl, baseType);
+                continue;
+            }
+
+            auto baseDeclRef = baseDeclRefType->declRef;
+            if( auto baseInterfaceDeclRef = baseDeclRef.as<InterfaceDecl>() )
+            {
+            }
+            else if( auto baseStructDeclRef = baseDeclRef.as<StructDecl>() )
+            {
+                // To simplify the task of reading and maintaining code,
+                // we require that when a `struct` inherits from another
+                // `struct`, the base `struct` is the first item in
+                // the list of bases (before any interfaces).
+                //
+                // This constraint also has the secondary effect of restricting
+                // it so that a `struct` cannot multiply inherit from other
+                // `struct` types.
+                //
+                if( inheritanceClauseIndex != 0 )
+                {
+                    getSink()->diagnose(inheritanceDecl, Diagnostics::baseStructMustBeListedFirst, decl, baseType);
+                }
+            }
+            else
+            {
+                getSink()->diagnose(inheritanceDecl, Diagnostics::baseOfStructMustBeStructOrInterface, decl, baseType);
+                continue;
+            }
+
+            // TODO: At this point we have the `baseDeclRef`
+            // and could use it to perform further validity checks,
+            // and/or to build up a more refined representation of
+            // the inheritance graph for this type (e.g., a "class
+            // precedence list").
+            //
+            // E.g., we can/should check that we aren't introducing
+            // a circular inheritance relationship.
+
+            _validateCrossModuleInheritance(decl, inheritanceDecl);
         }
     }
 
@@ -1795,46 +1985,74 @@ namespace Slang
 
     void SemanticsDeclBasesVisitor::visitEnumDecl(EnumDecl* decl)
     {
-        // Look at inheritance clauses, and
-        // see if one of them is making the enum
-        // "inherit" from a concrete type.
-        // This will become the "tag" type
-        // of the enum.
+        // An `enum` type can inherit from interfaces, and also
+        // from a single "tag" type that must:
+        //
+        // * be a built-in integer type
+        // * come first in the list of base types
+        //
+        Index inheritanceClauseCounter = 0;
         RefPtr<Type>        tagType;
         InheritanceDecl*    tagTypeInheritanceDecl = nullptr;
         for(auto inheritanceDecl : decl->getMembersOfType<InheritanceDecl>())
         {
+            Index inheritanceClauseIndex = inheritanceClauseCounter++;
+
             ensureDecl(inheritanceDecl, DeclCheckState::CanUseBaseOfInheritanceDecl);
+            auto baseType = inheritanceDecl->base.type;
 
-            // Look at the type being inherited from.
-            auto superType = inheritanceDecl->base.type;
-
-            if(auto errorType = as<ErrorType>(superType))
+            // It is possible that there was an error in checking the base type
+            // expression, and in such a case we shouldn't emit a cascading error.
+            //
+            if( auto baseErrorType = as<ErrorType>(baseType) )
             {
-                // Ignore any erroneous inheritance clauses.
                 continue;
             }
-            else if(auto declRefType = as<DeclRefType>(superType))
+
+            auto baseDeclRefType = as<DeclRefType>(baseType);
+            if( !baseDeclRefType )
             {
-                if(auto interfaceDeclRef = declRefType->declRef.as<InterfaceDecl>())
-                {
-                    // Don't consider interface bases as candidates for
-                    // the tag type.
-                    continue;
-                }
+                getSink()->diagnose(inheritanceDecl, Diagnostics::baseOfEnumMustBeIntegerOrInterface, decl, baseType);
+                continue;
             }
 
-            if(tagType)
+            auto baseDeclRef = baseDeclRefType->declRef;
+            if( auto baseInterfaceDeclRef = baseDeclRef.as<InterfaceDecl>() )
             {
-                // We already found a tag type.
-                getSink()->diagnose(inheritanceDecl, Diagnostics::enumTypeAlreadyHasTagType);
-                getSink()->diagnose(tagTypeInheritanceDecl, Diagnostics::seePreviousTagType);
-                break;
+                _validateCrossModuleInheritance(decl, inheritanceDecl);
+            }
+            else if( auto baseStructDeclRef = baseDeclRef.as<StructDecl>() )
+            {
+                // To simplify the task of reading and maintaining code,
+                // we require that when an `enum` declares an explicit
+                // underlying tag type using an inheritance clause, that
+                // type must be the first item in the list of bases.
+                //
+                // This constraint also has the secondary effect of restricting
+                // it so that an `enum` can't possibly have multiple tag
+                // types declared.
+                //
+                if( inheritanceClauseIndex != 0 )
+                {
+                    getSink()->diagnose(inheritanceDecl, Diagnostics::tagTypeMustBeListedFirst, decl, baseType);
+                }
+                else
+                {
+                    tagType = baseType;
+                    tagTypeInheritanceDecl = inheritanceDecl;
+                }
+
+                // Note: we do *not* apply the code that validates
+                // cross-module inheritance to a base that represnts
+                // a tag type, because declaring a tag type for an
+                // `enum` doesn't actually make it into a subtype
+                // of the tag type, and thus doesn't violate the
+                // rules when the tag type is `sealed`.
             }
             else
             {
-                tagType = superType;
-                tagTypeInheritanceDecl = inheritanceDecl;
+                getSink()->diagnose(inheritanceDecl, Diagnostics::baseOfEnumMustBeIntegerOrInterface, decl, baseType);
+                continue;
             }
         }
 
@@ -1845,6 +2063,7 @@ namespace Slang
         // `enum` types that have a "raw representation" like this from
         // ones that are purely abstract and don't expose their
         // type of their tag.
+        //
         if(!tagType)
         {
             tagType = m_astBuilder->getIntType();
@@ -2852,10 +3071,8 @@ namespace Slang
         }
     }
 
-    void SemanticsDeclBasesVisitor::visitExtensionDecl(ExtensionDecl* decl)
+    void SemanticsDeclBasesVisitor::_validateExtensionDeclTargetType(ExtensionDecl* decl)
     {
-        decl->targetType = CheckProperType(decl->targetType);
-
         if (auto targetDeclRefType = as<DeclRefType>(decl->targetType))
         {
             // Attach our extension to that type as a candidate...
@@ -2867,7 +3084,65 @@ namespace Slang
                 return;
             }
         }
-        getSink()->diagnose(decl->targetType.exp, Diagnostics::unimplemented, "expected a nominal type here");
+        getSink()->diagnose(decl->targetType.exp, Diagnostics::unimplemented, "an 'extension' can only extend a nominal type");
+    }
+
+    void SemanticsDeclBasesVisitor::visitExtensionDecl(ExtensionDecl* decl)
+    {
+        // We check the target type expression, and then validate
+        // that the type it names is one that it makes sense
+        // to extend.
+        //
+        decl->targetType = CheckProperType(decl->targetType);
+        _validateExtensionDeclTargetType(decl);
+
+        for( auto inheritanceDecl : decl->getMembersOfType<InheritanceDecl>() )
+        {
+            ensureDecl(inheritanceDecl, DeclCheckState::CanUseBaseOfInheritanceDecl);
+            auto baseType = inheritanceDecl->base.type;
+
+            // It is possible that there was an error in checking the base type
+            // expression, and in such a case we shouldn't emit a cascading error.
+            //
+            if( auto baseErrorType = as<ErrorType>(baseType) )
+            {
+                continue;
+            }
+
+            // An `extension` can only introduce inheritance from `interface` types.
+            //
+            // TODO: It might in theory make sense to allow an `extension` to
+            // introduce a non-`interface` base if we decide that an `extension`
+            // within the same module as the type it extends counts as just
+            // a continuation of the type's body (like a `partial class` in C#).
+            //
+            auto baseDeclRefType = as<DeclRefType>(baseType);
+            if( !baseDeclRefType )
+            {
+                getSink()->diagnose(inheritanceDecl, Diagnostics::baseOfExtensionMustBeInterface, decl, baseType);
+                continue;
+            }
+
+            auto baseDeclRef = baseDeclRefType->declRef;
+            auto baseInterfaceDeclRef = baseDeclRef.as<InterfaceDecl>();
+            if( !baseInterfaceDeclRef )
+            {
+                getSink()->diagnose(inheritanceDecl, Diagnostics::baseOfExtensionMustBeInterface, decl, baseType);
+                continue;
+            }
+
+            // TODO: At this point we have the `baseInterfaceDeclRef`
+            // and could use it to perform further validity checks,
+            // and/or to build up a more refined representation of
+            // the inheritance graph for this extension (e.g., a "class
+            // precedence list").
+            //
+            // E.g., we can/should check that we aren't introducing
+            // an inheritance relationship that already existed
+            // on the type as originally declared.
+
+            _validateCrossModuleInheritance(decl, inheritanceDecl);
+        }
     }
 
     RefPtr<Type> SemanticsVisitor::calcThisType(DeclRef<Decl> declRef)
