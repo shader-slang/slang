@@ -2522,7 +2522,7 @@ struct ExprLoweringVisitorBase : ExprVisitor<Derived, LoweredValInfo>
             auto paramDirection = getParameterDirection(paramDecl);
 
             UInt argIndex = argCounter++;
-            Expr* argExpr;
+            Expr* argExpr = nullptr;
             if(argIndex < argCount)
             {
                 argExpr = expr->arguments[argIndex];
@@ -4511,7 +4511,7 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
         // the inheritance declaration is on an `extension` declaration,
         // then we need to identify the type being extended.
         //
-        Type* subType;
+        Type* subType = nullptr;
         if (auto extParentDecl = as<ExtensionDecl>(parentDecl))
         {
             subType = extParentDecl->targetType.type;
@@ -5392,14 +5392,14 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
     struct ParameterInfo
     {
         // This AST-level type of the parameter
-        Type*        type;
+        Type*        type = nullptr;
 
         // The direction (`in` vs `out` vs `in out`)
         ParameterDirection  direction;
 
         // The variable/parameter declaration for
         // this parameter (if any)
-        VarDeclBase*        decl;
+        VarDeclBase*        decl = nullptr;
 
         // Is this the representation of a `this` parameter?
         bool                isThisParam = false;

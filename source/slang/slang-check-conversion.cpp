@@ -215,7 +215,7 @@ namespace Slang
 
             for(UInt ee = 0; ee < elementCount; ++ee)
             {
-                Expr* coercedArg;
+                Expr* coercedArg = nullptr;
                 bool argResult = _readValueFromInitializerList(
                     toElementType,
                     outToExpr ? &coercedArg : nullptr,
@@ -263,7 +263,7 @@ namespace Slang
 
                 for(UInt ee = 0; ee < elementCount; ++ee)
                 {
-                    Expr* coercedArg;
+                    Expr* coercedArg = nullptr;
                     bool argResult = _readValueFromInitializerList(
                         toElementType,
                         outToExpr ? &coercedArg : nullptr,
@@ -289,7 +289,7 @@ namespace Slang
                 UInt elementCount = 0;
                 while(ioArgIndex < argCount)
                 {
-                    Expr* coercedArg;
+                    Expr* coercedArg = nullptr;
                     bool argResult = _readValueFromInitializerList(
                         toElementType,
                         outToExpr ? &coercedArg : nullptr,
@@ -352,7 +352,7 @@ namespace Slang
 
             for(UInt rr = 0; rr < rowCount; ++rr)
             {
-                Expr* coercedArg;
+                Expr* coercedArg = nullptr;
                 bool argResult = _readValueFromInitializerList(
                     toRowType,
                     outToExpr ? &coercedArg : nullptr,
@@ -380,7 +380,7 @@ namespace Slang
                 //
                 for(auto fieldDeclRef : getMembersOfType<VarDecl>(toStructDeclRef, MemberFilterStyle::Instance))
                 {
-                    Expr* coercedArg;
+                    Expr* coercedArg = nullptr;
                     bool argResult = _readValueFromInitializerList(
                         getType(m_astBuilder, fieldDeclRef),
                         outToExpr ? &coercedArg : nullptr,
@@ -852,7 +852,7 @@ namespace Slang
         Type*    toType,
         Expr*    fromExpr)
     {
-        Expr* expr;
+        Expr* expr = nullptr;
         if (!_coerce(
             toType,
             &expr,

@@ -160,6 +160,9 @@ public:
         /// Ctor
     ASTBuilder(SharedASTBuilder* sharedASTBuilder);
 
+        /// Dtor
+    ~ASTBuilder();
+
 protected:
     // Special default Ctor that can only be used by SharedASTBuilder
     ASTBuilder();
@@ -169,7 +172,10 @@ protected:
     {
         SLANG_COMPILE_TIME_ASSERT(IsValidType<T>::Value);
 
-        node->init(T::kType, this); 
+        node->init(T::kType, this);
+
+        // Give it a reference, to keep in scope until the ASTBuilder dtors
+        node->addReference();
         m_nodes.add(node);
         return node;
     }

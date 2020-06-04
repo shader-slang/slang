@@ -880,7 +880,7 @@ Type* ComponentType::getTypeFromString(
     // If we've looked up this type name before,
     // then we can re-use it.
     //
-    Type* type;
+    Type* type = nullptr;
     if(m_types.TryGetValue(typeStr, type))
         return type;
 

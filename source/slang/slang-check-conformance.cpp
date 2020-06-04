@@ -61,7 +61,7 @@ namespace Slang
 
         // `witness` here will hold the first (outer-most) object
         // we create, which is the overall result.
-        SubtypeWitness* witness;
+        SubtypeWitness* witness = nullptr;
 
         // `link` will point at the remaining "hole" in the
         // data structure, to be filled in.
@@ -279,7 +279,7 @@ namespace Slang
             List<Val*> caseWitnesses;
             for(auto caseType : taggedUnionType->caseTypes)
             {
-                Val* caseWitness;
+                Val* caseWitness = nullptr;
 
                 if(!doesTypeConformToInterfaceImpl(
                     caseType,
@@ -343,7 +343,7 @@ namespace Slang
         Type*  type,
         DeclRef<InterfaceDecl>        interfaceDeclRef)
     {
-        Val* result;
+        Val* result = nullptr;
         doesTypeConformToInterfaceImpl(type, type, interfaceDeclRef, &result, nullptr);
         return result;
     }

@@ -53,7 +53,7 @@ namespace Slang
     SourceLoc const& getDiagnosticPos(SyntaxNode const* syntax);
     SourceLoc const& getDiagnosticPos(TypeExp const& typeExp);
 
-    typedef RefPtr<RefObject> (*SyntaxParseCallback)(Parser* parser, void* userData);
+    typedef NodeBase* (*SyntaxParseCallback)(Parser* parser, void* userData);
 
     typedef unsigned int ConversionCost;
     enum : ConversionCost

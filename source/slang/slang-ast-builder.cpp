@@ -6,6 +6,10 @@
 
 namespace Slang {
 
+NodeBase::~NodeBase()
+{
+}
+
 // !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! SharedASTBuilder !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 
 SharedASTBuilder::SharedASTBuilder()
@@ -150,6 +154,14 @@ ASTBuilder::ASTBuilder(SharedASTBuilder* sharedASTBuilder):
 ASTBuilder::ASTBuilder():
     m_sharedASTBuilder(nullptr)
 {
+}
+
+ASTBuilder::~ASTBuilder()
+{
+    for (NodeBase* node : m_nodes)
+    {
+        node->releaseReference();
+    }
 }
 
 PtrType* ASTBuilder::getPtrType(Type* valueType)

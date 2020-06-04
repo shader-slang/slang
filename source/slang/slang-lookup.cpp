@@ -679,7 +679,7 @@ static void _lookUpInScopes(
                 breadcrumb.declRef = aggTypeDeclBaseRef;
                 breadcrumb.prev = nullptr;
 
-                Type* type;
+                Type* type = nullptr;
                 if(auto extDeclRef = aggTypeDeclBaseRef.as<ExtensionDecl>())
                 {
                     if( request.semantics )

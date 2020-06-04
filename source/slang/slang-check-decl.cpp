@@ -438,7 +438,7 @@ namespace Slang
         DeclRef<Decl>   declRef,
         SourceLoc       loc)
     {
-        Type* typeResult;
+        Type* typeResult = nullptr;
         return getTypeForDeclRef(astBuilder, nullptr, nullptr, declRef, &typeResult, loc);
     }
 
@@ -2486,7 +2486,7 @@ namespace Slang
             // Then we will compare the parameter types of `foo2`
             // against the specialization `foo1<U>`.
             //
-            GenericSubstitution* subst;
+            GenericSubstitution* subst = nullptr;
             if(!doGenericSignaturesMatch(newGenericDecl, oldGenericDecl, &subst))
                 return SLANG_OK;
 
@@ -3152,7 +3152,7 @@ namespace Slang
 
     QualType SemanticsVisitor::GetTypeForDeclRef(DeclRef<Decl> declRef, SourceLoc loc)
     {
-        Type* typeResult;
+        Type* typeResult = nullptr;
         return getTypeForDeclRef(
             m_astBuilder,
             this,

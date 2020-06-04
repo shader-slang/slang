@@ -673,7 +673,7 @@ namespace Slang
         // The process of checking a modifier may produce a new modifier in its place,
         // so we will build up a new linked list of modifiers that will replace
         // the old list.
-        Modifier* resultModifiers;
+        Modifier* resultModifiers = nullptr;
         Modifier** resultModifierLink = &resultModifiers;
 
         Modifier* modifier = syntaxNode->modifiers.first;

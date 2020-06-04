@@ -2508,7 +2508,7 @@ Type* findGlobalGenericSpecializationArg(
     TypeLayoutContext const&    context,
     GlobalGenericParamDecl*     decl)
 {
-    Val* arg;
+    Val* arg = nullptr;
     context.programLayout->globalGenericArgs.TryGetValue(decl, arg);
     return as<Type>(arg);
 }

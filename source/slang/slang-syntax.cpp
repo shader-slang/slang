@@ -359,7 +359,7 @@ Index getFilterCountImpl(const ReflectClassInfo& clsInfo, MemberFilterStyle filt
 
         // We are going to build up a list of substitutions that need
         // to be applied to the decl-ref to make it specialized.
-        Substitutions* substsToApply;
+        Substitutions* substsToApply = nullptr;
         Substitutions** link = &substsToApply;
 
         Decl* dd = declRef.getDecl();
@@ -738,7 +738,7 @@ Index getFilterCountImpl(const ReflectClassInfo& clsInfo, MemberFilterStyle filt
         if(ioParametersFound.Count() == 0)
             return appGlobalGenericSubsts;
 
-        Substitutions* resultSubst;
+        Substitutions* resultSubst = nullptr;
         Substitutions** link = &resultSubst;
         for(auto appSubst = appGlobalGenericSubsts; appSubst; appSubst = appSubst->outer)
         {

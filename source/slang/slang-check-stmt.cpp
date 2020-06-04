@@ -157,8 +157,8 @@ namespace Slang
         addModifier(stmt->varDecl, m_astBuilder->create<ConstModifier>());
         stmt->varDecl->setCheckState(DeclCheckState::Checked);
 
-        IntVal* rangeBeginVal;
-        IntVal* rangeEndVal;
+        IntVal* rangeBeginVal = nullptr;
+        IntVal* rangeEndVal = nullptr;
 
         if (stmt->rangeBeginExpr)
         {
