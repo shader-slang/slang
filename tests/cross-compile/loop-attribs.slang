@@ -1,7 +1,7 @@
 // loop-attribs.slang
 // Test that loop attributes are correctly emitted to the resulting HLSL.
 
-//TEST:SIMPLE:-target hlsl  -entry main -stage fragment -profile sm_6_0 
+//TEST:CROSS_COMPILE:-target dxil-assembly  -entry main -stage fragment -profile sm_6_0 
 
 float4 main() : SV_Target
 {
