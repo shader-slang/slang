@@ -117,6 +117,11 @@ namespace Slang
 
         void visitInheritanceDecl(InheritanceDecl* inheritanceDecl);
 
+            /// Validate that `decl` isn't illegally inheriting from a type in another module.
+            ///
+            /// This call checks a single `inheritanceDecl` to make sure that it either
+            ///     * names a base type from the same module as `decl`, or
+            ///     * names a type that allows cross-module inheritance
         void _validateCrossModuleInheritance(
             AggTypeDeclBase* decl,
             InheritanceDecl* inheritanceDecl);
@@ -127,6 +132,7 @@ namespace Slang
 
         void visitEnumDecl(EnumDecl* decl);
 
+            /// Validate that the target type of an extension `decl` is valid.
         void _validateExtensionDeclTargetType(ExtensionDecl* decl);
 
         void visitExtensionDecl(ExtensionDecl* decl);

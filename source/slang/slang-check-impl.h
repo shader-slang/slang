@@ -924,6 +924,12 @@ namespace Slang
         RefPtr<DeclaredSubtypeWitness> createSimpleSubtypeWitness(
             TypeWitnessBreadcrumb*  breadcrumb);
 
+            /// Create a withness that `subType` is a sub-type of `superTypeDeclRef`.
+            ///
+            /// The `inBreadcrumbs` parameter represents a linked list of steps
+            /// in the process that validated the sub-type relationship, which
+            /// will be used to inform the construction of the witness.
+            ///
         RefPtr<Val> createTypeWitness(
             RefPtr<Type>            subType,
             DeclRef<AggTypeDecl>    superTypeDeclRef,
@@ -950,6 +956,19 @@ namespace Slang
             DeclRef<InterfaceDecl>  interfaceDeclRef,
             DeclRef<Decl>           requirementDeclRef);
 
+            /// Check whether `subType` is declared a sub-type of `superTypeDeclRef`
+            ///
+            /// If this function returns `true` (because the subtype relationship holds),
+            /// then `outWitness` will be set to a value that serves as a witness
+            /// to the subtype relationship.
+            ///
+            /// This function may be used to validate a transitive subtype relationship
+            /// where, e.g., `A : C` becase `A : B` and `B : C`. In such a case, a recursive
+            /// call to `_isDeclaredSubtype` may occur where `originalSubType` is `A`,
+            /// `subType` is `C`, and `superTypeDeclRef` is `C`. The `inBreadcrumbs` in that
+            /// case would include information for the `A : B` relationship, which can be
+            /// used to construct a witness for `A : C` from the `A : B` and `B : C` witnesses.
+            ///
         bool _isDeclaredSubtype(
             RefPtr<Type>            originalSubType,
             RefPtr<Type>            subType,
@@ -957,17 +976,28 @@ namespace Slang
             RefPtr<Val>*            outWitness,
             TypeWitnessBreadcrumb*  inBreadcrumbs);
 
+            /// Check whether `subType` is a sub-type of `superTypeDeclRef`.
         bool isDeclaredSubtype(
             RefPtr<Type>            subType,
             DeclRef<AggTypeDecl>    superTypeDeclRef);
 
+            /// Check whether `subType` is a sub-type of `superTypeDeclRef`,
+            /// and return a witness to the sub-type relationship if it holds
+            /// (return null otherwise).
+            ///
         RefPtr<Val> tryGetSubtypeWitness(
             RefPtr<Type>            subType,
             DeclRef<AggTypeDecl>    superTypeDeclRef);
 
+            /// Check whether `type` conforms to `interfaceDeclRef`,
+            /// and return a witness to the conformance if it holds
+            /// (return null otherwise).
+            ///
+            /// This function is equivalent to `tryGetSubtypeWitness()`.
+            ///
         RefPtr<Val> tryGetInterfaceConformanceWitness(
-            RefPtr<Type>  type,
-            DeclRef<InterfaceDecl>        interfaceDeclRef);
+            RefPtr<Type>            type,
+            DeclRef<InterfaceDecl>  interfaceDeclRef);
 
         /// Does there exist an implicit conversion from `fromType` to `toType`?
         bool canConvertImplicitly(

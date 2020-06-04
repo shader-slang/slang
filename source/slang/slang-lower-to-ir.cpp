@@ -2763,7 +2763,13 @@ struct ExprLoweringVisitorBase : ExprVisitor<Derived, LoweredValInfo>
         UNREACHABLE_RETURN(LoweredValInfo());
     }
 
-    LoweredValInfo emitGetToConcreteSuperTypeRec(
+        /// Emit code to cast `value` to a concrete `superType` (e.g., a `struct`).
+        ///
+        /// The `subTypeWitness` is expected to witness the sub-type relationship
+        /// by naming a field (or chain of fields) that leads from the type of
+        /// `value` to the field that stores its members for `superType`.
+        ///
+    LoweredValInfo emitCastToConcreteSuperTypeRec(
         LoweredValInfo const&   value,
         IRType*                 superType,
         Val*                    subTypeWitness)
@@ -2832,7 +2838,7 @@ struct ExprLoweringVisitorBase : ExprVisitor<Derived, LoweredValInfo>
                 // that is stored in instances of the sub-type (or a chain
                 // of such fields for a transitive witness).
                 //
-                return emitGetToConcreteSuperTypeRec(value, superType, expr->witnessArg);
+                return emitCastToConcreteSuperTypeRec(value, superType, expr->witnessArg);
             }
         }
 
