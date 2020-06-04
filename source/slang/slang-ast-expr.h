@@ -39,7 +39,7 @@ class OverloadedExpr : public Expr
 
     // Optional: the base expression is this overloaded result
     // arose from a member-reference expression.
-    Expr* base;
+    Expr* base = nullptr;
 
     // The lookup result that was ambiguous
     LookupResult lookupResult2;
@@ -53,7 +53,7 @@ class OverloadedExpr2: public Expr
 
     // Optional: the base expression is this overloaded result
     // arose from a member-reference expression.
-    Expr* base;
+    Expr* base = nullptr;
 
     // The lookup result that was ambiguous
     List<Expr*> candidiateExprs;
@@ -129,7 +129,7 @@ class AppExprBase : public ExprWithArgsBase
 {
     SLANG_ABSTRACT_CLASS(AppExprBase)
 
-    Expr* functionExpr;
+    Expr* functionExpr = nullptr;
 };
 
 class InvokeExpr: public AppExprBase
@@ -159,21 +159,21 @@ class IndexExpr: public Expr
 {
     SLANG_CLASS(IndexExpr)
 
-    Expr* baseExpression;
-    Expr* indexExpression;
+    Expr* baseExpression = nullptr;
+    Expr* indexExpression = nullptr;
 };
 
 class MemberExpr: public DeclRefExpr
 {
     SLANG_CLASS(MemberExpr)
-    Expr* baseExpression;
+    Expr* baseExpression = nullptr;
 };
 
 // Member looked up on a type, rather than a value
 class StaticMemberExpr: public DeclRefExpr
 {
     SLANG_CLASS(StaticMemberExpr)
-    Expr* baseExpression;
+    Expr* baseExpression = nullptr;
 };
 
 struct MatrixCoord
@@ -188,7 +188,7 @@ struct MatrixCoord
 class MatrixSwizzleExpr : public Expr
 {
     SLANG_CLASS(MatrixSwizzleExpr)
-    Expr* base;
+    Expr* base = nullptr;
     int elementCount;
     MatrixCoord elementCoords[4];
 };
@@ -196,7 +196,7 @@ class MatrixSwizzleExpr : public Expr
 class SwizzleExpr: public Expr
 {
     SLANG_CLASS(SwizzleExpr)
-    Expr* base;
+    Expr* base = nullptr;
     int elementCount;
     int elementIndices[4];
 };
@@ -205,7 +205,7 @@ class SwizzleExpr: public Expr
 class DerefExpr: public Expr
 {
     SLANG_CLASS(DerefExpr)
-    Expr* base;
+    Expr* base = nullptr;
 };
 
 // Any operation that performs type-casting
@@ -213,7 +213,7 @@ class TypeCastExpr: public InvokeExpr
 {
     SLANG_CLASS(TypeCastExpr)
 //    TypeExp TargetType;
-//    Expr* Expression;
+//    Expr* Expression = nullptr;
 };
 
 // An explicit type-cast that appear in the user's code with `(type) expr` syntax
@@ -234,10 +234,10 @@ class CastToInterfaceExpr: public Expr
     SLANG_CLASS(CastToInterfaceExpr)
 
         /// The value being cast to an interface type
-    Expr*    valueArg;
+    Expr*    valueArg = nullptr;
 
         /// A witness showing that `valueArg` conforms to the chosen interface
-    Val*     witnessArg;
+    Val*     witnessArg = nullptr;
 };
 
 class SelectExpr: public OperatorExpr
@@ -262,8 +262,8 @@ class SharedTypeExpr: public Expr
 class AssignExpr: public Expr
 {
     SLANG_CLASS(AssignExpr)
-    Expr* left;
-    Expr* right;
+    Expr* left = nullptr;
+    Expr* right = nullptr;
 };
 
 // Just an expression inside parentheses `(exp)`
@@ -273,7 +273,7 @@ class AssignExpr: public Expr
 class ParenExpr: public Expr
 {
     SLANG_CLASS(ParenExpr)
-    Expr* base;
+    Expr* base = nullptr;
 };
 
 // An object-oriented `this` expression, used to
@@ -288,8 +288,8 @@ class ThisExpr: public Expr
 class LetExpr: public Expr
 {
     SLANG_CLASS(LetExpr)
-    VarDecl* decl;
-    Expr* body;
+    VarDecl* decl = nullptr;
+    Expr* body = nullptr;
 };
 
 class ExtractExistentialValueExpr: public Expr

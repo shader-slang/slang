@@ -45,9 +45,9 @@ public:
 protected:
     // State shared between ASTBuilders
 
-    Type* m_errorType;
-    Type* m_initializerListType;
-    Type* m_overloadedType;
+    Type* m_errorType = nullptr;
+    Type* m_initializerListType = nullptr;
+    Type* m_overloadedType = nullptr;
 
     // The following types are created lazily, such that part of their definition
     // can be in the standard library
@@ -57,8 +57,8 @@ protected:
     //
     // TODO(tfoley): These should really belong to the compilation context!
     //
-    Type* m_stringType;
-    Type* m_enumTypeType;
+    Type* m_stringType = nullptr;
+    Type* m_enumTypeType = nullptr;
 
     Type* m_builtinTypes[Index(BaseType::CountOf)];
 

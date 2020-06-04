@@ -668,7 +668,7 @@ class PatchConstantFuncAttribute : public Attribute
 {
     SLANG_CLASS(PatchConstantFuncAttribute)
  
-    FuncDecl* patchConstantFuncDecl;
+    FuncDecl* patchConstantFuncDecl = nullptr;
 };
 class DomainAttribute : public Attribute 
 {

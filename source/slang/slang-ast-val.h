@@ -115,8 +115,8 @@ class SubtypeWitness : public Witness
 {
     SLANG_ABSTRACT_CLASS(SubtypeWitness)
 
-    Type* sub;
-    Type* sup;
+    Type* sub = nullptr;
+    Type* sup = nullptr;
 };
 
 class TypeEqualityWitness : public SubtypeWitness 
@@ -151,7 +151,7 @@ class TransitiveSubtypeWitness : public SubtypeWitness
     SLANG_CLASS(TransitiveSubtypeWitness)
 
     // Witness that `sub : mid`
-    SubtypeWitness* subToMid;
+    SubtypeWitness* subToMid = nullptr;
 
     // Witness that `mid : sup`
     DeclRef<Decl> midToSup;

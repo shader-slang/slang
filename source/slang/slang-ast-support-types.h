@@ -184,7 +184,7 @@ namespace Slang
     {
         struct Iterator
         {
-            Modifier* current;
+            Modifier* current = nullptr;
 
             Modifier* operator*()
             {
@@ -218,7 +218,7 @@ namespace Slang
         Iterator begin() { return Iterator(modifiers); }
         Iterator end() { return Iterator(nullptr); }
 
-        Modifier* modifiers;
+        Modifier* modifiers = nullptr;
     };
 
     // Helper class for iterating over heap-allocated modifiers
@@ -228,7 +228,7 @@ namespace Slang
     {
         struct Iterator
         {
-            Modifier* current;
+            Modifier* current = nullptr;
 
             T* operator*()
             {
@@ -264,14 +264,14 @@ namespace Slang
 
         static Modifier* adjust(Modifier* modifier);
 
-        Modifier* modifiers;
+        Modifier* modifiers = nullptr;
     };
 
     // A set of modifiers attached to a syntax node
     struct Modifiers
     {
         // The first modifier in the linked list of heap-allocated modifiers
-        Modifier* first;
+        Modifier* first = nullptr;
 
         template<typename T>
         FilteredModifierList<T> getModifiersOfType() { return FilteredModifierList<T>(first.Ptr()); }
@@ -429,7 +429,7 @@ namespace Slang
 
     struct QualType
     {
-        Type*	type;
+        Type*	type = nullptr;
         bool	        isLeftValue;
 
         QualType()
@@ -572,7 +572,7 @@ namespace Slang
 
     struct SubstitutionSet
     {
-        Substitutions* substitutions;
+        Substitutions* substitutions = nullptr;
         operator Substitutions*() const
         {
             return substitutions;
@@ -860,7 +860,7 @@ namespace Slang
     struct TransparentMemberInfo
     {
         // The declaration of the transparent member
-        Decl*	decl;
+        Decl*	decl = nullptr;
     };
 
     template<typename T>
@@ -958,8 +958,8 @@ namespace Slang
             , type(type)
         {}
 
-        Expr* exp;
-        Type* type;
+        Expr* exp = nullptr;
+        Type* type = nullptr;
 
         bool equals(Type* other);
 
@@ -993,7 +993,7 @@ namespace Slang
         // Note(tfoley): This is kept as an unowned pointer
         // so that a scope can't keep parts of the AST alive,
         // but the opposite it allowed.
-        ContainerDecl*          containerDecl;
+        ContainerDecl*          containerDecl = nullptr;
     };
 
     // Masks to be applied when lookup up declarations
@@ -1291,19 +1291,19 @@ namespace Slang
         };
         Flavor              flavor;
         SourceLoc           loc;
-        NodeBase*    object;
+        NodeBase*    object = nullptr;
     };
     typedef List<SpecializationParam> SpecializationParams;
 
     struct SpecializationArg
     {
-        Val* val;
+        Val* val = nullptr;
     };
     typedef List<SpecializationArg> SpecializationArgs;
 
     struct ExpandedSpecializationArg : SpecializationArg
     {
-        Val* witness;
+        Val* witness = nullptr;
     };
     typedef List<ExpandedSpecializationArg> ExpandedSpecializationArgs;
 

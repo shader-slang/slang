@@ -989,8 +989,8 @@ namespace Slang
         public:
             struct GenericArgInfo
             {
-                Decl* paramDecl;
-                Val* argVal;
+                Decl* paramDecl = nullptr;
+                Val* argVal = nullptr;
             };
 
             List<GenericArgInfo> genericArgs;
@@ -1012,7 +1012,7 @@ namespace Slang
 
     private:
         // The AST for the module
-        ModuleDecl*  m_moduleDecl;
+        ModuleDecl*  m_moduleDecl = nullptr;
 
         // The IR for the module
         RefPtr<IRModule> m_irModule = nullptr;

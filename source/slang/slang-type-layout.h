@@ -304,7 +304,7 @@ class TypeLayout : public Layout
 {
 public:
     // The type that was laid out
-    Type*  type;
+    Type*  type = nullptr;
     Type* getType() { return type; }
 
     // The layout rules that were used to produce this type
@@ -691,7 +691,7 @@ public:
         /// The declaration of the generic parameter.
         ///
         /// Could be any subclass of `Decl` that represents a generic value or type parameter.
-    Decl* decl;
+    Decl* decl = nullptr;
 };
 
     /// Reflection/layout information about an existential/interface specialization parameter.
@@ -703,7 +703,7 @@ public:
         /// Currently, this will be an `interface` type that any concrete
         /// type argument getting plugged in must conform to.
         ///
-    Type* type;
+    Type* type = nullptr;
 };
 
 // Layout information for the global scope of a program

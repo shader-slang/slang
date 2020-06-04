@@ -12,7 +12,7 @@ class ScopeStmt : public Stmt
 {
     SLANG_ABSTRACT_CLASS(ScopeStmt)
 
-    ScopeDecl* scopeDecl;
+    ScopeDecl* scopeDecl = nullptr;
 };
 
 // A sequence of statements, treated as a single statement
@@ -28,7 +28,7 @@ class BlockStmt : public ScopeStmt
 {
     SLANG_CLASS(BlockStmt)
 
-    Stmt* body;
+    Stmt* body = nullptr;
 };
 
 // A statement that we aren't going to parse or check, because
@@ -55,16 +55,16 @@ class DeclStmt : public Stmt
 {
     SLANG_CLASS(DeclStmt)
 
-    DeclBase* decl;
+    DeclBase* decl = nullptr;
 };
 
 class IfStmt : public Stmt 
 {
     SLANG_CLASS(IfStmt)
 
-    Expr* predicate;
-    Stmt* positiveStatement;
-    Stmt* negativeStatement;
+    Expr* predicate = nullptr;
+    Stmt* positiveStatement = nullptr;
+    Stmt* negativeStatement = nullptr;
 };
 
 // A statement that can be escaped with a `break`
@@ -78,8 +78,8 @@ class SwitchStmt : public BreakableStmt
 {
     SLANG_CLASS(SwitchStmt)
 
-    Expr* condition;
-    Stmt* body;
+    Expr* condition = nullptr;
+    Stmt* body = nullptr;
 };
 
 // A statement that is expected to appear lexically nested inside
@@ -108,7 +108,7 @@ class CaseStmt : public CaseStmtBase
 {
     SLANG_CLASS(CaseStmt)
 
-    Expr* expr;
+    Expr* expr = nullptr;
 };
 
 // a `default` statement inside a `switch`
@@ -129,10 +129,10 @@ class ForStmt : public LoopStmt
 {
     SLANG_CLASS(ForStmt)
 
-    Stmt* initialStatement;
-    Expr* sideEffectExpression;
-    Expr* predicateExpression;
-    Stmt* statement;
+    Stmt* initialStatement = nullptr;
+    Expr* sideEffectExpression = nullptr;
+    Expr* predicateExpression = nullptr;
+    Stmt* statement = nullptr;
 };
 
 // A `for` statement in a language that doesn't restrict the scope
@@ -147,16 +147,16 @@ class WhileStmt : public LoopStmt
 {
     SLANG_CLASS(WhileStmt)
 
-    Expr* predicate;
-    Stmt* statement;
+    Expr* predicate = nullptr;
+    Stmt* statement = nullptr;
 };
 
 class DoWhileStmt : public LoopStmt 
 {
     SLANG_CLASS(DoWhileStmt)
 
-    Stmt* statement;
-    Expr* predicate;
+    Stmt* statement = nullptr;
+    Expr* predicate = nullptr;
 };
 
 // A compile-time, range-based `for` loop, which will not appear in the output code
@@ -164,12 +164,12 @@ class CompileTimeForStmt : public ScopeStmt
 {
     SLANG_CLASS(CompileTimeForStmt)
 
-    VarDecl* varDecl;
-    Expr* rangeBeginExpr;
-    Expr* rangeEndExpr;
-    Stmt* body;
-    IntVal* rangeBeginVal;
-    IntVal* rangeEndVal;
+    VarDecl* varDecl = nullptr;
+    Expr* rangeBeginExpr = nullptr;
+    Expr* rangeEndExpr = nullptr;
+    Stmt* body = nullptr;
+    IntVal* rangeBeginVal = nullptr;
+    IntVal* rangeEndVal = nullptr;
 };
 
 // The case of child statements that do control flow relative
@@ -193,14 +193,14 @@ class ReturnStmt : public Stmt
 {
     SLANG_CLASS(ReturnStmt)
 
-    Expr* expression;
+    Expr* expression = nullptr;
 };
 
 class ExpressionStmt : public Stmt 
 {
     SLANG_CLASS(ExpressionStmt)
 
-    Expr* expression;
+    Expr* expression = nullptr;
 };
 
 } // namespace Slang

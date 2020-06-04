@@ -175,7 +175,7 @@ namespace Slang
         LookupResultItem item;
 
         // The type of the result expression if this candidate is selected
-        Type*	resultType;
+        Type*	resultType = nullptr;
 
         // A system for tracking constraints introduced on generic parameters
         //            ConstraintSystem constraintSystem;
@@ -187,7 +187,7 @@ namespace Slang
         // When required, a candidate can store a pre-checked list of
         // arguments so that we don't have to repeat work across checking
         // phases. Currently this is only needed for generics.
-        Substitutions*   subst;
+        Substitutions*   subst = nullptr;
     };
 
     struct TypeCheckingCache
@@ -268,7 +268,7 @@ namespace Slang
             ///
         struct OuterStmtInfo
         {
-            Stmt*           stmt;
+            Stmt*           stmt = nullptr;
             OuterStmtInfo*  next;
         };
 
@@ -885,8 +885,8 @@ namespace Slang
 
         struct Constraint
         {
-            Decl*		decl; // the declaration of the thing being constraints
-            Val*	val; // the value to which we are constraining it
+            Decl*		decl = nullptr; // the declaration of the thing being constraints
+            Val*	val = nullptr; // the value to which we are constraining it
             bool satisfied = false; // Has this constraint been met?
         };
 
@@ -899,7 +899,7 @@ namespace Slang
 
             // The generic declaration whose parameters we
             // are trying to solve for.
-            GenericDecl* genericDecl;
+            GenericDecl* genericDecl = nullptr;
 
             // Constraints we have accumulated, which constrain
             // the possible arguments for those parameters.
@@ -914,8 +914,8 @@ namespace Slang
         {
             TypeWitnessBreadcrumb*  prev;
 
-            Type*            sub;
-            Type*            sup;
+            Type*            sub = nullptr;
+            Type*            sup = nullptr;
             DeclRef<Decl>           declRef;
         };
 
@@ -1008,7 +1008,7 @@ namespace Slang
             SourceLoc loc;
 
             // The original expression (if any) that triggered things
-            Expr* originalExpr;
+            Expr* originalExpr = nullptr;
 
             // Source location of the "function" part of the expression, if any
             SourceLoc       funcLoc;
@@ -1030,7 +1030,7 @@ namespace Slang
 
             bool disallowNestedConversions = false;
 
-            Expr* baseExpr;
+            Expr* baseExpr = nullptr;
 
             // Are we still trying out candidates, or are we
             // checking the chosen one for real?

@@ -113,7 +113,7 @@ class ResourceType : public BuiltinType
     SLANG_ABSTRACT_CLASS(ResourceType)
 
     // The type that results from fetching an element from this resource
-    Type* elementType;
+    Type* elementType = nullptr;
 
     // Shape and access level information for this resource type
     TextureFlavor flavor;
@@ -188,7 +188,7 @@ class BuiltinGenericType : public BuiltinType
 {
     SLANG_CLASS(BuiltinGenericType)
 
-    Type* elementType;
+    Type* elementType = nullptr;
 
     Type* getElementType() { return elementType; }
 };
@@ -373,8 +373,8 @@ class ArrayExpressionType : public Type
 {
     SLANG_CLASS(ArrayExpressionType)
 
-    Type* baseType;
-    IntVal* arrayLength;
+    Type* baseType = nullptr;
+    IntVal* arrayLength = nullptr;
 
     // Overrides should be public so base classes can access
     String _toStringOverride();
@@ -392,7 +392,7 @@ class TypeType : public Type
     SLANG_CLASS(TypeType)
 
     // The type that this is the type of...
-    Type* type;
+    Type* type = nullptr;
 
     // Overrides should be public so base classes can access
     String _toStringOverride();
@@ -415,10 +415,10 @@ class VectorExpressionType : public ArithmeticExpressionType
 
     // The type of vector elements.
     // As an invariant, this should be a basic type or an alias.
-    Type* elementType;
+    Type* elementType = nullptr;
 
     // The number of elements
-    IntVal* elementCount;
+    IntVal* elementCount = nullptr;
 
     // Overrides should be public so base classes can access
     String _toStringOverride();
@@ -441,7 +441,7 @@ class MatrixExpressionType : public ArithmeticExpressionType
     BasicExpressionType* _getScalarTypeOverride();
 
 private:
-    Type* rowType;
+    Type* rowType = nullptr;
 };
 
 // The built-in `String` type
@@ -506,7 +506,7 @@ class NamedExpressionType : public Type
     SLANG_CLASS(NamedExpressionType)
 
     DeclRef<TypeDefDecl> declRef;
-    Type* innerType;
+    Type* innerType = nullptr;
 
     // Overrides should be public so base classes can access
     String _toStringOverride();
@@ -536,7 +536,7 @@ class FuncType : public Type
     // semantic type underneath.
 
     List<Type*> paramTypes;
-    Type* resultType;
+    Type* resultType = nullptr;
 
     UInt getParamCount() { return paramTypes.getCount(); }
     Type* getParamType(UInt index) { return paramTypes[index]; }
@@ -628,7 +628,7 @@ class ExistentialSpecializedType : public Type
 {
     SLANG_CLASS(ExistentialSpecializedType)
 
-    Type* baseType;
+    Type* baseType = nullptr;
     ExpandedSpecializationArgs args;
 
     // Overrides should be public so base classes can access

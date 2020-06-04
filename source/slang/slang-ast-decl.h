@@ -62,7 +62,7 @@ class VarDeclBase : public Decl
     Type* getType() { return type.type; }
 
     // Initializer expression (optional)
-    Expr* initExpr;
+    Expr* initExpr = nullptr;
 };
 
 // Ordinary potentially-mutable variables (locals, globals, and member variables)
@@ -135,7 +135,7 @@ class EnumDecl : public AggTypeDecl
 {
     SLANG_CLASS(EnumDecl)
 
-    Type* tagType;
+    Type* tagType = nullptr;
 };
 
 // A single case in an enum.
@@ -158,7 +158,7 @@ class EnumCaseDecl : public Decl
     Type* getType() { return type.type; }
 
     // Tag value
-    Expr* tagExpr;
+    Expr* tagExpr = nullptr;
 };
 
 // An interface which other types can conform to
@@ -294,7 +294,7 @@ class FunctionDeclBase : public CallableDecl
 {
     SLANG_ABSTRACT_CLASS(FunctionDeclBase)
 
-    Stmt* body;
+    Stmt* body = nullptr;
 };
 
 // A constructor/initializer to create instances of a type
@@ -376,7 +376,7 @@ class ImportDecl : public Decl
     RefPtr<Scope> scope;
 
     // The module that actually got imported
-    ModuleDecl* importedModuleDecl;
+    ModuleDecl* importedModuleDecl = nullptr;
 };
 
 // A generic declaration, parameterized on types/values
@@ -384,7 +384,7 @@ class GenericDecl : public ContainerDecl
 {
     SLANG_CLASS(GenericDecl)
     // The decl that is genericized...
-    Decl* inner;
+    Decl* inner = nullptr;
 };
 
 class GenericTypeParamDecl : public SimpleTypeDecl

@@ -184,7 +184,7 @@ class Substitutions: public NodeBase
     SLANG_ABSTRACT_CLASS(Substitutions)
 
     // The next outer that this one refines.
-    Substitutions* outer;
+    Substitutions* outer = nullptr;
 
     // Apply a set of substitutions to the bindings in this substitution
     Substitutions* applySubstitutionsShallow(ASTBuilder* astBuilder, SubstitutionSet substSet, Substitutions* substOuter, int* ioDiff);
@@ -205,7 +205,7 @@ class GenericSubstitution : public Substitutions
 
     // The generic declaration that defines the
     // parameters we are binding to arguments
-    GenericDecl* genericDecl;
+    GenericDecl* genericDecl = nullptr;
 
     // The actual values of the arguments
     List<Val* > args;
@@ -225,7 +225,7 @@ class ThisTypeSubstitution : public Substitutions
 
     // A witness that shows that the concrete type used to
     // specialize the interface conforms to the interface.
-    SubtypeWitness* witness;
+    SubtypeWitness* witness = nullptr;
 
     // Overrides should be public so base classes can access
     // The actual type that provides the lookup scope for an associated type
@@ -238,15 +238,15 @@ class GlobalGenericParamSubstitution : public Substitutions
 {
     SLANG_CLASS(GlobalGenericParamSubstitution)
     // the type_param decl to be substituted
-    GlobalGenericParamDecl* paramDecl;
+    GlobalGenericParamDecl* paramDecl = nullptr;
 
     // the actual type to substitute in
-    Type* actualType;
+    Type* actualType = nullptr;
 
     struct ConstraintArg
     {
-        Decl*    decl;
-        Val*     val;
+        Decl*    decl = nullptr;
+        Val*     val = nullptr;
     };
 
     // the values that satisfy any constraints on the type parameter
@@ -276,7 +276,7 @@ class Modifier : public SyntaxNode
     void accept(IModifierVisitor* visitor, void* extra);
 
     // Next modifier in linked list of modifiers on same piece of syntax
-    Modifier* next;
+    Modifier* next = nullptr;
 
     // The keyword that was used to introduce t that was used to name this modifier.
     Name* name;
