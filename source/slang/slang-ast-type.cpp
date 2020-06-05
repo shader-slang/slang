@@ -11,16 +11,6 @@ namespace Slang {
 
 // !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! Type !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 
-Type::~Type()
-{
-    // If the canonicalType !=nullptr AND it is not set to this (ie the canonicalType is another object)
-    // then it needs to be released because it's owned by this object.
-    if (canonicalType && canonicalType != this)
-    {
-        canonicalType->releaseReference();
-    }
-}
-
 Type* Type::createCanonicalType()
 {
     SLANG_AST_NODE_VIRTUAL_CALL(Type, createCanonicalType, ())

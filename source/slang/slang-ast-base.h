@@ -157,8 +157,6 @@ class Type: public Val
     
     Type* getCanonicalType();
 
-    ~Type();
-
     // Overrides should be public so base classes can access
     Val* _substituteImplOverride(ASTBuilder* astBuilder, SubstitutionSet subst, int* ioDiff);
     bool _equalsValOverride(Val* val);
