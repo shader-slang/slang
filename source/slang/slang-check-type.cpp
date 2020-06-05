@@ -6,7 +6,7 @@
 
 namespace Slang
 {
-    RefPtr<Type> checkProperType(
+    Type* checkProperType(
         Linkage*        linkage,
         TypeExp         typeExp,
         DiagnosticSink* sink)
@@ -21,7 +21,7 @@ namespace Slang
         return typeOut.type;
     }
 
-    RefPtr<Expr> SemanticsVisitor::TranslateTypeNodeImpl(const RefPtr<Expr> & node)
+    Expr* SemanticsVisitor::TranslateTypeNodeImpl(Expr* node)
     {
         if (!node) return nullptr;
 
@@ -30,7 +30,7 @@ namespace Slang
         return expr;
     }
 
-    RefPtr<Type> SemanticsVisitor::ExtractTypeFromTypeRepr(const RefPtr<Expr>& typeRepr)
+    Type* SemanticsVisitor::ExtractTypeFromTypeRepr(Expr* typeRepr)
     {
         if (!typeRepr) return nullptr;
         if (auto typeType = as<TypeType>(typeRepr->type))
@@ -40,7 +40,7 @@ namespace Slang
         return m_astBuilder->getErrorType();
     }
 
-    RefPtr<Type> SemanticsVisitor::TranslateTypeNode(const RefPtr<Expr> & node)
+    Type* SemanticsVisitor::TranslateTypeNode(Expr* node)
     {
         if (!node) return nullptr;
         auto typeRepr = TranslateTypeNodeImpl(node);
@@ -70,7 +70,7 @@ namespace Slang
         return TranslateTypeNodeForced(typeExp);
     }
 
-    RefPtr<Expr> SemanticsVisitor::ExpectATypeRepr(RefPtr<Expr> expr)
+    Expr* SemanticsVisitor::ExpectATypeRepr(Expr* expr)
     {
         if (auto overloadedExpr = as<OverloadedExpr>(expr))
         {
@@ -90,7 +90,7 @@ namespace Slang
         return CreateErrorExpr(expr);
     }
 
-    RefPtr<Type> SemanticsVisitor::ExpectAType(RefPtr<Expr> expr)
+    Type* SemanticsVisitor::ExpectAType(Expr* expr)
     {
         auto typeRepr = ExpectATypeRepr(expr);
         if (auto typeType = as<TypeType>(typeRepr->type))
@@ -100,14 +100,14 @@ namespace Slang
         return m_astBuilder->getErrorType();
     }
 
-    RefPtr<Type> SemanticsVisitor::ExtractGenericArgType(RefPtr<Expr> exp)
+    Type* SemanticsVisitor::ExtractGenericArgType(Expr* exp)
     {
         return ExpectAType(exp);
     }
 
-    RefPtr<IntVal> SemanticsVisitor::ExtractGenericArgInteger(RefPtr<Expr> exp, DiagnosticSink* sink)
+    IntVal* SemanticsVisitor::ExtractGenericArgInteger(Expr* exp, DiagnosticSink* sink)
     {
-        RefPtr<IntVal> val = CheckIntegerConstantExpression(exp.Ptr(), sink);
+        IntVal* val = CheckIntegerConstantExpression(exp, sink);
         if(val) return val;
 
         // If the argument expression could not be coerced to an integer
@@ -118,12 +118,12 @@ namespace Slang
         return val;
     }
 
-    RefPtr<IntVal> SemanticsVisitor::ExtractGenericArgInteger(RefPtr<Expr> exp)
+    IntVal* SemanticsVisitor::ExtractGenericArgInteger(Expr* exp)
     {
         return ExtractGenericArgInteger(exp, getSink());
     }
 
-    RefPtr<Val> SemanticsVisitor::ExtractGenericArgVal(RefPtr<Expr> exp)
+    Val* SemanticsVisitor::ExtractGenericArgVal(Expr* exp)
     {
         if (auto overloadedExpr = as<OverloadedExpr>(exp))
         {
@@ -145,11 +145,11 @@ namespace Slang
         }
     }
 
-    RefPtr<Type> SemanticsVisitor::InstantiateGenericType(
+    Type* SemanticsVisitor::InstantiateGenericType(
         DeclRef<GenericDecl>        genericDeclRef,
-        List<RefPtr<Expr>> const&   args)
+        List<Expr*> const&   args)
     {
-        RefPtr<GenericSubstitution> subst = m_astBuilder->create<GenericSubstitution>();
+        GenericSubstitution* subst = m_astBuilder->create<GenericSubstitution>();
         subst->genericDecl = genericDeclRef.getDecl();
         subst->outer = genericDeclRef.substitutions.substitutions;
 
@@ -167,10 +167,10 @@ namespace Slang
 
     bool SemanticsVisitor::CoerceToProperTypeImpl(
         TypeExp const&  typeExp,
-        RefPtr<Type>*   outProperType,
+        Type**   outProperType,
         DiagnosticSink* diagSink)
     {
-        Type* type = typeExp.type.Ptr();
+        Type* type = typeExp.type;
         if(!type && typeExp.exp)
         {
             auto expr = typeExp.exp;
@@ -204,8 +204,8 @@ namespace Slang
 
             auto genericDeclRef = genericDeclRefType->getDeclRef();
             ensureDecl(genericDeclRef, DeclCheckState::CanSpecializeGeneric);
-            List<RefPtr<Expr>> args;
-            for (RefPtr<Decl> member : genericDeclRef.getDecl()->members)
+            List<Expr*> args;
+            for (Decl* member : genericDeclRef.getDecl()->members)
             {
                 if (auto typeParam = as<GenericTypeParamDecl>(member))
                 {
@@ -213,7 +213,7 @@ namespace Slang
                     {
                         if (diagSink)
                         {
-                            diagSink->diagnose(typeExp.exp.Ptr(), Diagnostics::genericTypeNeedsArgs, typeExp);
+                            diagSink->diagnose(typeExp.exp, Diagnostics::genericTypeNeedsArgs, typeExp);
                             *outProperType = m_astBuilder->getErrorType();
                         }
                         return false;
@@ -229,7 +229,7 @@ namespace Slang
                     {
                         if (diagSink)
                         {
-                            diagSink->diagnose(typeExp.exp.Ptr(), Diagnostics::unimplemented, "can't fill in default for generic type parameter");
+                            diagSink->diagnose(typeExp.exp, Diagnostics::unimplemented, "can't fill in default for generic type parameter");
                             *outProperType = m_astBuilder->getErrorType();
                         }
                         return false;
@@ -283,14 +283,14 @@ namespace Slang
     TypeExp SemanticsVisitor::CoerceToUsableType(TypeExp const& typeExp)
     {
         TypeExp result = CoerceToProperType(typeExp);
-        Type* type = result.type.Ptr();
+        Type* type = result.type;
         if (auto basicType = as<BasicExpressionType>(type))
         {
             // TODO: `void` shouldn't be a basic type, to make this easier to avoid
             if (basicType->baseType == BaseType::Void)
             {
                 // TODO(tfoley): pick the right diagnostic message
-                getSink()->diagnose(result.exp.Ptr(), Diagnostics::invalidTypeVoid);
+                getSink()->diagnose(result.exp, Diagnostics::invalidTypeVoid);
                 result.type = m_astBuilder->getErrorType();
                 return result;
             }
@@ -304,8 +304,8 @@ namespace Slang
     }
 
     bool SemanticsVisitor::ValuesAreEqual(
-        RefPtr<IntVal> left,
-        RefPtr<IntVal> right)
+        IntVal* left,
+        IntVal* right)
     {
         if(left == right) return true;
 
@@ -328,25 +328,25 @@ namespace Slang
         return false;
     }
 
-    RefPtr<VectorExpressionType> SemanticsVisitor::createVectorType(
-        RefPtr<Type>  elementType,
-        RefPtr<IntVal>          elementCount)
+    VectorExpressionType* SemanticsVisitor::createVectorType(
+        Type*  elementType,
+        IntVal*          elementCount)
     {
-        auto vectorGenericDecl = m_astBuilder->getSharedASTBuilder()->findMagicDecl("Vector").as<GenericDecl>();
+        auto vectorGenericDecl = as<GenericDecl>(m_astBuilder->getSharedASTBuilder()->findMagicDecl("Vector"));
             
         auto vectorTypeDecl = vectorGenericDecl->inner;
 
         auto substitutions = m_astBuilder->create<GenericSubstitution>();
-        substitutions->genericDecl = vectorGenericDecl.Ptr();
+        substitutions->genericDecl = vectorGenericDecl;
         substitutions->args.add(elementType);
         substitutions->args.add(elementCount);
 
-        auto declRef = DeclRef<Decl>(vectorTypeDecl.Ptr(), substitutions);
+        auto declRef = DeclRef<Decl>(vectorTypeDecl, substitutions);
 
-        return DeclRefType::create(m_astBuilder, declRef).as<VectorExpressionType>();
+        return as<VectorExpressionType>(DeclRefType::create(m_astBuilder, declRef));
     }
 
-    RefPtr<Expr> SemanticsExprVisitor::visitSharedTypeExpr(SharedTypeExpr* expr)
+    Expr* SemanticsExprVisitor::visitSharedTypeExpr(SharedTypeExpr* expr)
     {
         if (!expr->type.Ptr())
         {
@@ -356,12 +356,12 @@ namespace Slang
         return expr;
     }
 
-    RefPtr<Expr> SemanticsExprVisitor::visitTaggedUnionTypeExpr(TaggedUnionTypeExpr* expr)
+    Expr* SemanticsExprVisitor::visitTaggedUnionTypeExpr(TaggedUnionTypeExpr* expr)
     {
         // We have an expression of the form `__TaggedUnion(A, B, ...)`
         // which will evaluate to a tagged-union type over `A`, `B`, etc.
         //
-        RefPtr<TaggedUnionType> type = m_astBuilder->create<TaggedUnionType>();
+        TaggedUnionType* type = m_astBuilder->create<TaggedUnionType>();
         expr->type = QualType(m_astBuilder->getTypeType(type));
 
         for( auto& caseTypeExpr : expr->caseTypes )

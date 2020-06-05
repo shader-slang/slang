@@ -584,7 +584,7 @@ LayoutSemanticInfo ExtractLayoutSemanticInfo(
 // a particular sub-argument and extract its value if present.
 template<typename T>
 static bool findLayoutArg(
-    RefPtr<ModifiableSyntaxNode>    syntax,
+    ModifiableSyntaxNode*    syntax,
     UInt*                           outVal)
 {
     for( auto modifier : syntax->getModifiersOfType<T>() )
@@ -674,7 +674,7 @@ struct EntryPointParameterState
 
 static RefPtr<TypeLayout> processEntryPointVaryingParameter(
     ParameterBindingContext*        context,
-    RefPtr<Type>          type,
+    Type*          type,
     EntryPointParameterState const& state,
     RefPtr<VarLayout>               varLayout);
 
@@ -707,7 +707,7 @@ static void collectGlobalScopeParameter(
     auto varDeclRef = shaderParamInfo.paramDeclRef;
 
     // We apply any substitutions for global generic parameters here.
-    auto type = getType(astBuilder, varDeclRef)->substitute(astBuilder, globalGenericSubst).as<Type>();
+    auto type = as<Type>(getType(astBuilder, varDeclRef)->substitute(astBuilder, globalGenericSubst));
 
     // We use a single operation to both check whether the
     // variable represents a shader parameter, and to compute
@@ -1014,8 +1014,10 @@ static void addExplicitParameterBindings_GLSL(
     }
     else if( (resInfo = typeLayout->FindResourceInfo(LayoutResourceKind::SpecializationConstant)) != nullptr )
     {
+        DeclRef<Decl> varDecl2(varDecl);
+
         // Try to find `constant_id` binding
-        if(!findLayoutArg<GLSLConstantIDLayoutModifier>(varDecl, &semanticInfo.index))
+        if(!findLayoutArg<GLSLConstantIDLayoutModifier>(varDecl2, &semanticInfo.index))
             return;
     }
 
@@ -1382,7 +1384,7 @@ SimpleSemanticInfo decomposeSimpleSemantic(
 
 static RefPtr<TypeLayout> processSimpleEntryPointParameter(
     ParameterBindingContext*        context,
-    RefPtr<Type>          type,
+    Type*          type,
     EntryPointParameterState const& inState,
     RefPtr<VarLayout>               varLayout,
     int                             semanticSlotCount = 1)
@@ -1546,7 +1548,7 @@ static RefPtr<TypeLayout> processSimpleEntryPointParameter(
 static RefPtr<TypeLayout> processEntryPointVaryingParameterDecl(
     ParameterBindingContext*        context,
     Decl*                           decl,
-    RefPtr<Type>                    type,
+    Type*                    type,
     EntryPointParameterState const& inState,
     RefPtr<VarLayout>               varLayout)
 {
@@ -1703,7 +1705,7 @@ static RefPtr<TypeLayout> processEntryPointVaryingParameterDecl(
 
 static RefPtr<TypeLayout> processEntryPointVaryingParameter(
     ParameterBindingContext*        context,
-    RefPtr<Type>                    type,
+    Type*                    type,
     EntryPointParameterState const& state,
     RefPtr<VarLayout>               varLayout)
 {
@@ -2712,7 +2714,7 @@ static void collectSpecializationParams(
         case SpecializationParam::Flavor::GenericValue:
             {
                 RefPtr<GenericSpecializationParamLayout> paramLayout = new GenericSpecializationParamLayout();
-                paramLayout->decl = specializationParam.object.as<Decl>();
+                paramLayout->decl = as<Decl>(specializationParam.object);
                 context->shared->programLayout->specializationParams.add(paramLayout);
             }
             break;
@@ -2721,7 +2723,7 @@ static void collectSpecializationParams(
         case SpecializationParam::Flavor::ExistentialValue:
             {
                 RefPtr<ExistentialSpecializationParamLayout> paramLayout = new ExistentialSpecializationParamLayout();
-                paramLayout->type = specializationParam.object.as<Type>();
+                paramLayout->type = as<Type>(specializationParam.object);
                 context->shared->programLayout->specializationParams.add(paramLayout);
             }
             break;

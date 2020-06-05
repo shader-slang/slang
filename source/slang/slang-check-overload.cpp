@@ -138,8 +138,6 @@ namespace Slang
         {
             return true;
         }
-
-        return false;
     }
 
     bool SemanticsVisitor::TryCheckGenericOverloadCandidateTypes(
@@ -239,7 +237,7 @@ namespace Slang
                 // The case for a generic value parameter is similar to that
                 // for a generic type parameter.
                 //
-                RefPtr<Expr> arg;
+                Expr* arg = nullptr;
                 if( aa >= context.argCount )
                 {
                     // If there are no arguments left to consume, then
@@ -276,7 +274,7 @@ namespace Slang
                 // generalize in order to support generic value parameters
                 // with types other than `int`.
                 //
-                RefPtr<Val> val;
+                Val* val = nullptr;
                 if( arg )
                 {
                     val = ExtractGenericArgInteger(arg, context.mode == OverloadResolveContext::Mode::JustTrying ? nullptr : getSink());
@@ -383,7 +381,7 @@ namespace Slang
         // We should have the existing arguments to the generic
         // handy, so that we can construct a substitution list.
 
-        auto subst = candidate.subst.as<GenericSubstitution>();
+        auto subst = as<GenericSubstitution>(candidate.subst);
         SLANG_ASSERT(subst);
 
         subst->genericDecl = genericDeclRef.getDecl();
@@ -444,10 +442,10 @@ namespace Slang
         candidate.status = OverloadCandidate::Status::Applicable;
     }
 
-    RefPtr<Expr> SemanticsVisitor::createGenericDeclRef(
-        RefPtr<Expr>                baseExpr,
-        RefPtr<Expr>                originalExpr,
-        RefPtr<GenericSubstitution> subst)
+    Expr* SemanticsVisitor::createGenericDeclRef(
+        Expr*                baseExpr,
+        Expr*                originalExpr,
+        GenericSubstitution* subst)
     {
         auto baseDeclRefExpr = as<DeclRefExpr>(baseExpr);
         if (!baseDeclRefExpr)
@@ -467,7 +465,7 @@ namespace Slang
 
         DeclRef<Decl> innerDeclRef(getInner(baseGenericRef), subst);
 
-        RefPtr<Expr> base;
+        Expr* base = nullptr;
         if (auto mbrExpr = as<MemberExpr>(baseExpr))
             base = mbrExpr->baseExpression;
 
@@ -477,7 +475,7 @@ namespace Slang
             originalExpr->loc);
     }
 
-    RefPtr<Expr> SemanticsVisitor::CompleteOverloadCandidate(
+    Expr* SemanticsVisitor::CompleteOverloadCandidate(
         OverloadResolveContext&		context,
         OverloadCandidate&			candidate)
     {
@@ -520,7 +518,7 @@ namespace Slang
             {
             case OverloadCandidate::Flavor::Func:
                 {
-                    RefPtr<AppExprBase> callExpr = as<InvokeExpr>(context.originalExpr);
+                    AppExprBase* callExpr = as<InvokeExpr>(context.originalExpr);
                     if(!callExpr)
                     {
                         callExpr = m_astBuilder->create<InvokeExpr>();
@@ -555,7 +553,7 @@ namespace Slang
                 return createGenericDeclRef(
                     baseExpr,
                     context.originalExpr,
-                    candidate.subst.as<GenericSubstitution>());
+                    as<GenericSubstitution>(candidate.subst));
                 break;
 
             default:
@@ -569,7 +567,7 @@ namespace Slang
 
         if(context.originalExpr)
         {
-            return CreateErrorExpr(context.originalExpr.Ptr());
+            return CreateErrorExpr(context.originalExpr);
         }
         else
         {
@@ -615,7 +613,7 @@ namespace Slang
         // parent generic (and not somthing like a generic
         // parameter).
         //
-        if( parentGeneric.getDecl()->inner.Ptr() != declRef.getDecl())
+        if( parentGeneric.getDecl()->inner != declRef.getDecl())
             return 0;
 
         return CountParameters(parentGeneric).required;
@@ -946,7 +944,7 @@ namespace Slang
     }
 
     void SemanticsVisitor::AddFuncOverloadCandidate(
-        RefPtr<FuncType>        funcType,
+        FuncType*        funcType,
         OverloadResolveContext& context)
     {
         SLANG_UNUSED(funcType);
@@ -955,11 +953,13 @@ namespace Slang
 
     void SemanticsVisitor::AddCtorOverloadCandidate(
         LookupResultItem            typeItem,
-        RefPtr<Type>                type,
+        Type*                type,
         DeclRef<ConstructorDecl>    ctorDeclRef,
         OverloadResolveContext&     context,
-        RefPtr<Type>                resultType)
+        Type*                resultType)
     {
+        SLANG_UNUSED(type)
+
         ensureDecl(ctorDeclRef, DeclCheckState::CanUseFuncSignature);
 
         // `typeItem` refers to the type being constructed (the thing
@@ -1060,7 +1060,7 @@ namespace Slang
     }
 
     void SemanticsVisitor::AddTypeOverloadCandidates(
-        RefPtr<Type>            type,
+        Type*            type,
         OverloadResolveContext&	context)
     {
         // The code being checked is trying to apply `type` like a function.
@@ -1172,7 +1172,7 @@ namespace Slang
     }
 
     void SemanticsVisitor::AddOverloadCandidates(
-        RefPtr<Expr>            funcExpr,
+        Expr*            funcExpr,
         OverloadResolveContext& context)
     {
         // A call of the form `(<something>)(<args>)` should be
@@ -1224,12 +1224,12 @@ namespace Slang
         }
     }
 
-    void SemanticsVisitor::formatType(StringBuilder& sb, RefPtr<Type> type)
+    void SemanticsVisitor::formatType(StringBuilder& sb, Type* type)
     {
         sb << type->toString();
     }
 
-    void SemanticsVisitor::formatVal(StringBuilder& sb, RefPtr<Val> val)
+    void SemanticsVisitor::formatVal(StringBuilder& sb, Val* val)
     {
         sb << val->toString();
     }
@@ -1276,7 +1276,7 @@ namespace Slang
         // signature
         if( parentGenericDeclRef )
         {
-            auto genSubst = declRef.substitutions.substitutions.as<GenericSubstitution>();
+            auto genSubst = as<GenericSubstitution>(declRef.substitutions.substitutions);
             SLANG_RELEASE_ASSERT(genSubst);
             SLANG_RELEASE_ASSERT(genSubst->genericDecl == parentGenericDeclRef.getDecl());
 
@@ -1294,7 +1294,7 @@ namespace Slang
             bool first = true;
             for(auto arg : genSubst->args)
             {
-                // When printing the representation of a sepcialized
+                // When printing the representation of a specialized
                 // generic declaration we don't want to include the
                 // argument values for subtype witnesses since these
                 // do not correspond to parameters of the generic
@@ -1431,14 +1431,14 @@ namespace Slang
         return argsListBuilder.ProduceString();
     }
 
-    RefPtr<Expr> SemanticsVisitor::ResolveInvoke(InvokeExpr * expr)
+    Expr* SemanticsVisitor::ResolveInvoke(InvokeExpr * expr)
     {
         OverloadResolveContext context;
         // check if this is a stdlib operator call, if so we want to use cached results
         // to speed up compilation
         bool shouldAddToCache = false;
         OperatorOverloadCacheKey key;
-        TypeCheckingCache* typeCheckingCache = getSession()->getTypeCheckingCache();
+        TypeCheckingCache* typeCheckingCache = getLinkage()->getTypeCheckingCache();
         if (auto opExpr = as<OperatorExpr>(expr))
         {
             if (key.fromOperatorExpr(opExpr))
@@ -1651,7 +1651,7 @@ namespace Slang
     }
 
     void SemanticsVisitor::AddGenericOverloadCandidates(
-        RefPtr<Expr>	baseExpr,
+        Expr*	baseExpr,
         OverloadResolveContext&			context)
     {
         if(auto baseDeclRefExpr = as<DeclRefExpr>(baseExpr))
@@ -1674,7 +1674,7 @@ namespace Slang
         }
     }
 
-    RefPtr<Expr> SemanticsExprVisitor::visitGenericAppExpr(GenericAppExpr* genericAppExpr)
+    Expr* SemanticsExprVisitor::visitGenericAppExpr(GenericAppExpr* genericAppExpr)
     {
         // Start by checking the base expression and arguments.
         auto& baseExpr = genericAppExpr->functionExpr;
@@ -1689,7 +1689,7 @@ namespace Slang
     }
 
         /// Check a generic application where the operands have already been checked.
-    RefPtr<Expr> SemanticsVisitor::checkGenericAppWithCheckedArgs(GenericAppExpr* genericAppExpr)
+    Expr* SemanticsVisitor::checkGenericAppWithCheckedArgs(GenericAppExpr* genericAppExpr)
     {
         // We are applying a generic to arguments, but there might be multiple generic
         // declarations with the same name, so this becomes a specialized case of

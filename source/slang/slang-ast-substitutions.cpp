@@ -8,7 +8,7 @@ namespace Slang {
 
 // !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! Substitutions !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 
-RefPtr<Substitutions> Substitutions::applySubstitutionsShallow(ASTBuilder* astBuilder, SubstitutionSet substSet, RefPtr<Substitutions> substOuter, int* ioDiff)
+Substitutions* Substitutions::applySubstitutionsShallow(ASTBuilder* astBuilder, SubstitutionSet substSet, Substitutions* substOuter, int* ioDiff)
 {
     SLANG_AST_NODE_VIRTUAL_CALL(Substitutions, applySubstitutionsShallow, (astBuilder, substSet, substOuter, ioDiff))
 }
@@ -23,14 +23,14 @@ HashCode Substitutions::getHashCode() const
     SLANG_AST_NODE_CONST_VIRTUAL_CALL(Substitutions, getHashCode, ())
 }
 
-RefPtr<Substitutions> Substitutions::_applySubstitutionsShallowOverride(ASTBuilder* astBuilder, SubstitutionSet substSet, RefPtr<Substitutions> substOuter, int* ioDiff)
+Substitutions* Substitutions::_applySubstitutionsShallowOverride(ASTBuilder* astBuilder, SubstitutionSet substSet, Substitutions* substOuter, int* ioDiff)
 {
     SLANG_UNUSED(astBuilder);
     SLANG_UNUSED(substSet);
     SLANG_UNUSED(substOuter);
     SLANG_UNUSED(ioDiff);
     SLANG_UNEXPECTED("Substitutions::_applySubstitutionsShallowOverride not overridden");
-    //return RefPtr<Substitutions>();
+    //return Substitutions*();
 }
 
 bool Substitutions::_equalsOverride(Substitutions* subst)
@@ -48,13 +48,13 @@ HashCode Substitutions::_getHashCodeOverride() const
 
 // !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! GenericSubstitution !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 
-RefPtr<Substitutions> GenericSubstitution::_applySubstitutionsShallowOverride(ASTBuilder* astBuilder, SubstitutionSet substSet, RefPtr<Substitutions> substOuter, int* ioDiff)
+Substitutions* GenericSubstitution::_applySubstitutionsShallowOverride(ASTBuilder* astBuilder, SubstitutionSet substSet, Substitutions* substOuter, int* ioDiff)
 {
     int diff = 0;
 
     if (substOuter != outer) diff++;
 
-    List<RefPtr<Val>> substArgs;
+    List<Val*> substArgs;
     for (auto a : args)
     {
         substArgs.add(a->substituteImpl(astBuilder, substSet, &diff));
@@ -88,14 +88,14 @@ bool GenericSubstitution::_equalsOverride(Substitutions* subst)
     SLANG_RELEASE_ASSERT(args.getCount() == genericSubst->args.getCount());
     for (Index aa = 0; aa < argCount; ++aa)
     {
-        if (!args[aa]->equalsVal(genericSubst->args[aa].Ptr()))
+        if (!args[aa]->equalsVal(genericSubst->args[aa]))
             return false;
     }
 
     if (!outer)
         return !genericSubst->outer;
 
-    if (!outer->equals(genericSubst->outer.Ptr()))
+    if (!outer->equals(genericSubst->outer))
         return false;
 
     return true;
@@ -114,14 +114,14 @@ HashCode GenericSubstitution::_getHashCodeOverride() const
 
 // !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! ThisTypeSubstitution !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 
-RefPtr<Substitutions> ThisTypeSubstitution::_applySubstitutionsShallowOverride(ASTBuilder* astBuilder, SubstitutionSet substSet, RefPtr<Substitutions> substOuter, int* ioDiff)
+Substitutions* ThisTypeSubstitution::_applySubstitutionsShallowOverride(ASTBuilder* astBuilder, SubstitutionSet substSet, Substitutions* substOuter, int* ioDiff)
 {
     int diff = 0;
 
     if (substOuter != outer) diff++;
 
     // NOTE: Must use .as because we must have a smart pointer here to keep in scope.
-    auto substWitness = witness->substituteImpl(astBuilder, substSet, &diff).as<SubtypeWitness>();
+    auto substWitness = as<SubtypeWitness>(witness->substituteImpl(astBuilder, substSet, &diff));
 
     if (!diff) return this;
 
@@ -165,7 +165,7 @@ HashCode ThisTypeSubstitution::_getHashCodeOverride() const
 
 // !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! GlobalGenericParamSubstitution !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 
-RefPtr<Substitutions> GlobalGenericParamSubstitution::_applySubstitutionsShallowOverride(ASTBuilder* astBuilder, SubstitutionSet substSet, RefPtr<Substitutions> substOuter, int* ioDiff)
+Substitutions* GlobalGenericParamSubstitution::_applySubstitutionsShallowOverride(ASTBuilder* astBuilder, SubstitutionSet substSet, Substitutions* substOuter, int* ioDiff)
 {
     // if we find a GlobalGenericParamSubstitution in subst that references the same type_param decl
     // return a copy of that GlobalGenericParamSubstitution
@@ -173,7 +173,7 @@ RefPtr<Substitutions> GlobalGenericParamSubstitution::_applySubstitutionsShallow
 
     if (substOuter != outer) diff++;
 
-    auto substActualType = actualType->substituteImpl(astBuilder, substSet, &diff).as<Type>();
+    auto substActualType = as<Type>(actualType->substituteImpl(astBuilder, substSet, &diff));
 
     List<ConstraintArg> substConstraintArgs;
     for (auto constraintArg : constraintArgs)
@@ -190,7 +190,7 @@ RefPtr<Substitutions> GlobalGenericParamSubstitution::_applySubstitutionsShallow
 
     (*ioDiff)++;
 
-    RefPtr<GlobalGenericParamSubstitution> substSubst = astBuilder->create<GlobalGenericParamSubstitution>();
+    GlobalGenericParamSubstitution* substSubst = astBuilder->create<GlobalGenericParamSubstitution>();
     substSubst->paramDecl = paramDecl;
     substSubst->actualType = substActualType;
     substSubst->constraintArgs = substConstraintArgs;

@@ -225,7 +225,7 @@ namespace Slang
         if( parentDeclRef )
         {
             // In certain cases we want to skip emitting the parent
-            if(parentGenericDeclRef && (parentGenericDeclRef.getDecl()->inner.Ptr() != declRef.getDecl()))
+            if(parentGenericDeclRef && (parentGenericDeclRef.getDecl()->inner != declRef.getDecl()))
             {
             }
             else if(parentDeclRef.as<FunctionDeclBase>())
@@ -287,7 +287,7 @@ namespace Slang
 
 
         // Are we the "inner" declaration beneath a generic decl?
-        if(parentGenericDeclRef && (parentGenericDeclRef.getDecl()->inner.Ptr() == declRef.getDecl()))
+        if(parentGenericDeclRef && (parentGenericDeclRef.getDecl()->inner == declRef.getDecl()))
         {
             // There are two cases here: either we have specializations
             // in place for the parent generic declaration, or we don't.

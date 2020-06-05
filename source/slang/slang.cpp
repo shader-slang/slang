@@ -26,6 +26,8 @@
 
 #include "slang-ir-serialize.h"
 
+#include "slang-check-impl.h"
+
 // Used to print exception type names in internal-compiler-error messages
 #include <typeinfo>
 
@@ -123,10 +125,11 @@ void Session::init()
     m_sharedASTBuilder->init(this);
 
     //  Use to create a ASTBuilder
-    RefPtr<ASTBuilder> builtinAstBuilder(new ASTBuilder(m_sharedASTBuilder));
+    RefPtr<ASTBuilder> builtinAstBuilder(new ASTBuilder(m_sharedASTBuilder, "m_builtInLinkage::m_astBuilder"));
 
     // And the global ASTBuilder
-    globalAstBuilder = new ASTBuilder(m_sharedASTBuilder);
+    globalAstBuilder = new ASTBuilder(m_sharedASTBuilder, "globalAstBuilder");
+
 
     // Make sure our source manager is initialized
     builtinSourceManager.initialize(nullptr, nullptr);
@@ -153,10 +156,10 @@ void Session::init()
 
     baseLanguageScope = new Scope();
 
-    auto baseModuleDecl = populateBaseLanguageModule(
+    // Will stay in scope as long as ASTBuilder
+    baseModuleDecl = populateBaseLanguageModule(
         m_builtinLinkage->getASTBuilder(),
         baseLanguageScope);
-    loadedModuleCode.add(baseModuleDecl);
 
     coreLanguageScope = new Scope();
     coreLanguageScope->nextSibling = baseLanguageScope;
@@ -192,7 +195,7 @@ SLANG_NO_THROW SlangResult SLANG_MCALL Session::createSession(
     slang::SessionDesc const&  desc,
     slang::ISession**          outSession)
 {
-    RefPtr<ASTBuilder> astBuilder(new ASTBuilder(m_sharedASTBuilder));
+    RefPtr<ASTBuilder> astBuilder(new ASTBuilder(m_sharedASTBuilder, "Session::astBuilder"));
     RefPtr<Linkage> linkage = new Linkage(this, astBuilder);
 
     Int targetCount = desc.targetCount;
@@ -523,6 +526,26 @@ ISlangUnknown* Linkage::getInterface(const Guid& guid)
     return nullptr;
 }
 
+Linkage::~Linkage()
+{
+    destroyTypeCheckingCache();
+}
+
+TypeCheckingCache* Linkage::getTypeCheckingCache()
+{
+    if (!m_typeCheckingCache)
+    {
+        m_typeCheckingCache = new TypeCheckingCache();
+    }
+    return m_typeCheckingCache;
+}
+
+void Linkage::destroyTypeCheckingCache()
+{
+    delete m_typeCheckingCache;
+    m_typeCheckingCache = nullptr;
+}
+
 SLANG_NO_THROW slang::IGlobalSession* SLANG_MCALL Linkage::getGlobalSession()
 {
     return asExternal(getSessionImpl());
@@ -820,7 +843,7 @@ SlangResult Linkage::loadFile(String const& path, PathInfo& outPathInfo, ISlangB
     return SLANG_OK;
 }
 
-RefPtr<Expr> Linkage::parseTermString(String typeStr, RefPtr<Scope> scope)
+Expr* Linkage::parseTermString(String typeStr, RefPtr<Scope> scope)
 {
     // Create a SourceManager on the stack, so any allocations for 'SourceFile'/'SourceView' etc will be cleaned up
     SourceManager localSourceManager;
@@ -868,7 +891,7 @@ RefPtr<Expr> Linkage::parseTermString(String typeStr, RefPtr<Scope> scope)
         tokens, &sink, scope, getNamePool(), SourceLanguage::Slang);
 }
 
-RefPtr<Type> checkProperType(
+Type* checkProperType(
     Linkage*        linkage,
     TypeExp         typeExp,
     DiagnosticSink* sink);
@@ -880,7 +903,7 @@ Type* ComponentType::getTypeFromString(
     // If we've looked up this type name before,
     // then we can re-use it.
     //
-    RefPtr<Type> type;
+    Type* type = nullptr;
     if(m_types.TryGetValue(typeStr, type))
         return type;
 
@@ -891,7 +914,7 @@ Type* ComponentType::getTypeFromString(
     RefPtr<Scope> scope = _createScopeForLegacyLookup();
 
     auto linkage = getLinkage();
-    RefPtr<Expr> typeExpr = linkage->parseTermString(
+    Expr* typeExpr = linkage->parseTermString(
         typeStr, scope);
     type = checkProperType(linkage, TypeExp(typeExpr), sink);
 
@@ -959,7 +982,10 @@ void FrontEndCompileRequest::parseTranslationUnit(
 
     ASTBuilder* astBuilder = module->getASTBuilder();
 
-    RefPtr<ModuleDecl> translationUnitSyntax = astBuilder->create<ModuleDecl>();
+    //ASTBuilder* astBuilder = linkage->getASTBuilder();
+
+    ModuleDecl* translationUnitSyntax = astBuilder->create<ModuleDecl>();
+
     translationUnitSyntax->nameAndLoc.name = translationUnit->moduleName;
     translationUnitSyntax->module = module;
     module->setModuleDecl(translationUnitSyntax);
@@ -1214,7 +1240,7 @@ EndToEndCompileRequest::EndToEndCompileRequest(
     : m_session(session)
     , m_sink(nullptr)
 {
-    RefPtr<ASTBuilder> astBuilder(new ASTBuilder(session->m_sharedASTBuilder));
+    RefPtr<ASTBuilder> astBuilder(new ASTBuilder(session->m_sharedASTBuilder, "EndToEnd::Linkage::astBuilder"));
     m_linkage = new Linkage(session, astBuilder);
     init();
 }
@@ -1780,7 +1806,7 @@ void FilePathDependencyList::addDependency(Module* module)
 
 Module::Module(Linkage* linkage)
     : ComponentType(linkage)
-    , m_astBuilder(linkage->getASTBuilder()->getSharedASTBuilder())
+    , m_astBuilder(linkage->getASTBuilder()->getSharedASTBuilder(), "Module")
 {
     addModuleDependency(this);
 }
@@ -2597,32 +2623,31 @@ void Session::addBuiltinSource(
     }
 
     // Extract the AST for the code we just parsed
-    auto syntax = compileRequest->translationUnits[translationUnitIndex]->getModuleDecl();
+    auto module = compileRequest->translationUnits[translationUnitIndex]->getModule();
+    auto moduleDecl = module->getModuleDecl();
 
     // Add the resulting code to the appropriate scope
     if (!scope->containerDecl)
     {
         // We are the first chunk of code to be loaded for this scope
-        scope->containerDecl = syntax.Ptr();
+        scope->containerDecl = moduleDecl;
     }
     else
     {
         // We need to create a new scope to link into the whole thing
         auto subScope = new Scope();
-        subScope->containerDecl = syntax.Ptr();
+        subScope->containerDecl = moduleDecl;
         subScope->nextSibling = scope->nextSibling;
         scope->nextSibling = subScope;
     }
 
     // We need to retain this AST so that we can use it in other code
     // (Note that the `Scope` type does not retain the AST it points to)
-    loadedModuleCode.add(syntax);
+    loadedModuleCode.add(module);
 }
 
 Session::~Session()
 {
-    destroyTypeCheckingCache();
-
     // destroy modules next
     loadedModuleCode = decltype(loadedModuleCode)();
 }
@@ -2734,6 +2759,7 @@ SLANG_API void spDestroyCompileRequest(
 {
     if(!request) return;
     auto req = Slang::asInternal(request);
+
     delete req;
 }
 

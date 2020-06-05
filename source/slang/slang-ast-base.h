@@ -14,14 +14,12 @@
 namespace Slang
 {
 
-// Signals to C++ extractor that RefObject is a base class, that isn't reflected to C++ extractor
-SLANG_REFLECT_BASE_CLASS(RefObject)
-
 struct ReflectClassInfo;
 
-class NodeBase : public RefObject
+class NodeBase 
 {
     SLANG_ABSTRACT_CLASS(NodeBase)
+    SLANG_CLASS_ROOT
 
         // MUST be called before used. Called automatically via the ASTBuilder.
         // Note that the astBuilder is not stored in the NodeBase derived types by default.
@@ -91,14 +89,14 @@ class Val : public NodeBase
 
     // construct a new value by applying a set of parameter
     // substitutions to this one
-    RefPtr<Val> substitute(ASTBuilder* astBuilder, SubstitutionSet subst);
+    Val* substitute(ASTBuilder* astBuilder, SubstitutionSet subst);
 
     // Lower-level interface for substitution. Like the basic
     // `Substitute` above, but also takes a by-reference
     // integer parameter that should be incremented when
     // returning a modified value (this can help the caller
     // decide whether they need to do anything).
-    RefPtr<Val> substituteImpl(ASTBuilder* astBuilder, SubstitutionSet subst, int* ioDiff);
+    Val* substituteImpl(ASTBuilder* astBuilder, SubstitutionSet subst, int* ioDiff);
 
     bool equalsVal(Val* val);
     String toString();
@@ -109,7 +107,7 @@ class Val : public NodeBase
     }
 
     // Overrides should be public so base classes can access
-    RefPtr<Val> _substituteImplOverride(ASTBuilder* astBuilder, SubstitutionSet subst, int* ioDiff);
+    Val* _substituteImplOverride(ASTBuilder* astBuilder, SubstitutionSet subst, int* ioDiff);
     bool _equalsValOverride(Val* val);
     String _toStringOverride();
     HashCode _getHashCodeOverride();
@@ -154,17 +152,15 @@ class Type: public Val
     
     Type* getCanonicalType();
 
-    ~Type();
-
     // Overrides should be public so base classes can access
-    RefPtr<Val> _substituteImplOverride(ASTBuilder* astBuilder, SubstitutionSet subst, int* ioDiff);
+    Val* _substituteImplOverride(ASTBuilder* astBuilder, SubstitutionSet subst, int* ioDiff);
     bool _equalsValOverride(Val* val);
     bool _equalsImplOverride(Type* type);
-    RefPtr<Type> _createCanonicalTypeOverride();
+    Type* _createCanonicalTypeOverride();
 
 protected:
     bool equalsImpl(Type* type);
-    RefPtr<Type> createCanonicalType();
+    Type* createCanonicalType();
 
     Type* canonicalType = nullptr;
 
@@ -184,17 +180,17 @@ class Substitutions: public NodeBase
     SLANG_ABSTRACT_CLASS(Substitutions)
 
     // The next outer that this one refines.
-    RefPtr<Substitutions> outer;
+    Substitutions* outer = nullptr;
 
     // Apply a set of substitutions to the bindings in this substitution
-    RefPtr<Substitutions> applySubstitutionsShallow(ASTBuilder* astBuilder, SubstitutionSet substSet, RefPtr<Substitutions> substOuter, int* ioDiff);
+    Substitutions* applySubstitutionsShallow(ASTBuilder* astBuilder, SubstitutionSet substSet, Substitutions* substOuter, int* ioDiff);
 
     // Check if these are equivalent substitutions to another set
     bool equals(Substitutions* subst);
     HashCode getHashCode() const;
 
     // Overrides should be public so base classes can access
-    RefPtr<Substitutions> _applySubstitutionsShallowOverride(ASTBuilder* astBuilder, SubstitutionSet substSet, RefPtr<Substitutions> substOuter, int* ioDiff);
+    Substitutions* _applySubstitutionsShallowOverride(ASTBuilder* astBuilder, SubstitutionSet substSet, Substitutions* substOuter, int* ioDiff);
     bool _equalsOverride(Substitutions* subst);
     HashCode _getHashCodeOverride() const;
 };
@@ -205,13 +201,13 @@ class GenericSubstitution : public Substitutions
 
     // The generic declaration that defines the
     // parameters we are binding to arguments
-    GenericDecl* genericDecl;
+    GenericDecl* genericDecl = nullptr;
 
     // The actual values of the arguments
-    List<RefPtr<Val> > args;
+    List<Val* > args;
 
     // Overrides should be public so base classes can access
-    RefPtr<Substitutions> _applySubstitutionsShallowOverride(ASTBuilder* astBuilder, SubstitutionSet substSet, RefPtr<Substitutions> substOuter, int* ioDiff);
+    Substitutions* _applySubstitutionsShallowOverride(ASTBuilder* astBuilder, SubstitutionSet substSet, Substitutions* substOuter, int* ioDiff);
     bool _equalsOverride(Substitutions* subst);
     HashCode _getHashCodeOverride() const;
 };
@@ -225,11 +221,11 @@ class ThisTypeSubstitution : public Substitutions
 
     // A witness that shows that the concrete type used to
     // specialize the interface conforms to the interface.
-    RefPtr<SubtypeWitness> witness;
+    SubtypeWitness* witness = nullptr;
 
     // Overrides should be public so base classes can access
     // The actual type that provides the lookup scope for an associated type
-    RefPtr<Substitutions> _applySubstitutionsShallowOverride(ASTBuilder* astBuilder, SubstitutionSet substSet, RefPtr<Substitutions> substOuter, int* ioDiff);
+    Substitutions* _applySubstitutionsShallowOverride(ASTBuilder* astBuilder, SubstitutionSet substSet, Substitutions* substOuter, int* ioDiff);
     bool _equalsOverride(Substitutions* subst);
     HashCode _getHashCodeOverride() const;
 };
@@ -238,22 +234,22 @@ class GlobalGenericParamSubstitution : public Substitutions
 {
     SLANG_CLASS(GlobalGenericParamSubstitution)
     // the type_param decl to be substituted
-    GlobalGenericParamDecl* paramDecl;
+    GlobalGenericParamDecl* paramDecl = nullptr;
 
     // the actual type to substitute in
-    RefPtr<Type> actualType;
+    Type* actualType = nullptr;
 
     struct ConstraintArg
     {
-        RefPtr<Decl>    decl;
-        RefPtr<Val>     val;
+        Decl*    decl = nullptr;
+        Val*     val = nullptr;
     };
 
     // the values that satisfy any constraints on the type parameter
     List<ConstraintArg> constraintArgs;
 
     // Overrides should be public so base classes can access
-    RefPtr<Substitutions> _applySubstitutionsShallowOverride(ASTBuilder* astBuilder, SubstitutionSet substSet, RefPtr<Substitutions> substOuter, int* ioDiff);
+    Substitutions* _applySubstitutionsShallowOverride(ASTBuilder* astBuilder, SubstitutionSet substSet, Substitutions* substOuter, int* ioDiff);
     bool _equalsOverride(Substitutions* subst);
     HashCode _getHashCodeOverride() const;
 };
@@ -276,7 +272,7 @@ class Modifier : public SyntaxNode
     void accept(IModifierVisitor* visitor, void* extra);
 
     // Next modifier in linked list of modifiers on same piece of syntax
-    RefPtr<Modifier> next;
+    Modifier* next = nullptr;
 
     // The keyword that was used to introduce t that was used to name this modifier.
     Name* name;
@@ -293,7 +289,7 @@ class ModifiableSyntaxNode : public SyntaxNode
     Modifiers modifiers;
 
     template<typename T>
-    FilteredModifierList<T> getModifiersOfType() { return FilteredModifierList<T>(modifiers.first.Ptr()); }
+    FilteredModifierList<T> getModifiersOfType() { return FilteredModifierList<T>(modifiers.first); }
 
     // Find the first modifier of a given type, or return `nullptr` if none is found.
     template<typename T>

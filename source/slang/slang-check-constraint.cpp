@@ -56,9 +56,9 @@
 
 namespace Slang
 {
-    RefPtr<Type> SemanticsVisitor::TryJoinVectorAndScalarType(
-        RefPtr<VectorExpressionType> vectorType,
-        RefPtr<BasicExpressionType>  scalarType)
+    Type* SemanticsVisitor::TryJoinVectorAndScalarType(
+        VectorExpressionType* vectorType,
+        BasicExpressionType*  scalarType)
     {
         // Join( vector<T,N>, S ) -> vetor<Join(T,S), N>
         //
@@ -75,8 +75,8 @@ namespace Slang
             vectorType->elementCount);
     }
 
-    RefPtr<Type> SemanticsVisitor::TryJoinTypeWithInterface(
-        RefPtr<Type>            type,
+    Type* SemanticsVisitor::TryJoinTypeWithInterface(
+        Type*            type,
         DeclRef<InterfaceDecl>      interfaceDeclRef)
     {
         // The most basic test here should be: does the type declare conformance to the trait.
@@ -104,8 +104,8 @@ namespace Slang
         // the search process if `type` is a builtin scalar type, and then we only search
         // through types `X` that are also builtin scalar types.
         //
-        RefPtr<Type> bestType;
-        if(auto basicType = type.dynamicCast<BasicExpressionType>())
+        Type* bestType = nullptr;
+        if(auto basicType = dynamicCast<BasicExpressionType>(type))
         {
             for(Int baseTypeFlavorIndex = 0; baseTypeFlavorIndex < Int(BaseType::CountOf); baseTypeFlavorIndex++)
             {
@@ -173,9 +173,9 @@ namespace Slang
         return nullptr;
     }
 
-    RefPtr<Type> SemanticsVisitor::TryJoinTypes(
-        RefPtr<Type>  left,
-        RefPtr<Type>  right)
+    Type* SemanticsVisitor::TryJoinTypes(
+        Type*  left,
+        Type*  right)
     {
         // Easy case: they are the same type!
         if (left->equals(right))
@@ -217,7 +217,7 @@ namespace Slang
             if(auto rightVector = as<VectorExpressionType>(right))
             {
                 // Check if the vector sizes match
-                if(!leftVector->elementCount->equalsVal(rightVector->elementCount.Ptr()))
+                if(!leftVector->elementCount->equalsVal(rightVector->elementCount))
                     return nullptr;
 
                 // Try to join the element types
@@ -293,12 +293,12 @@ namespace Slang
         // We will loop over the generic parameters, and for
         // each we will try to find a way to satisfy all
         // the constraints for that parameter
-        List<RefPtr<Val>> args;
+        List<Val*> args;
         for (auto m : getMembers(genericDeclRef))
         {
             if (auto typeParam = m.as<GenericTypeParamDecl>())
             {
-                RefPtr<Type> type = nullptr;
+                Type* type = nullptr;
                 for (auto& c : system->constraints)
                 {
                     if (c.decl != typeParam.getDecl())
@@ -337,7 +337,7 @@ namespace Slang
                 // TODO(tfoley): maybe support more than integers some day?
                 // TODO(tfoley): figure out how this needs to interact with
                 // compile-time integers that aren't just constants...
-                RefPtr<IntVal> val = nullptr;
+                IntVal* val = nullptr;
                 for (auto& c : system->constraints)
                 {
                     if (c.decl != valParam.getDecl())
@@ -391,7 +391,7 @@ namespace Slang
         // search for a conformance `Robin : ISidekick`, which involved
         // apply the substitutions we already know...
 
-        RefPtr<GenericSubstitution> solvedSubst = m_astBuilder->create<GenericSubstitution>();
+        GenericSubstitution* solvedSubst = m_astBuilder->create<GenericSubstitution>();
         solvedSubst->genericDecl = genericDeclRef.getDecl();
         solvedSubst->outer = genericDeclRef.substitutions.substitutions;
         solvedSubst->args = args;
@@ -442,8 +442,8 @@ namespace Slang
 
     bool SemanticsVisitor::TryUnifyVals(
         ConstraintSystem&	constraints,
-        RefPtr<Val>			fst,
-        RefPtr<Val>			snd)
+        Val*			fst,
+        Val*			snd)
     {
         // if both values are types, then unify types
         if (auto fstType = as<Type>(fst))
@@ -503,13 +503,13 @@ namespace Slang
         SLANG_UNIMPLEMENTED_X("value unification case");
 
         // default: fail
-        return false;
+        //return false;
     }
 
     bool SemanticsVisitor::tryUnifySubstitutions(
         ConstraintSystem&       constraints,
-        RefPtr<Substitutions>   fst,
-        RefPtr<Substitutions>   snd)
+        Substitutions*   fst,
+        Substitutions*   snd)
     {
         // They must both be NULL or non-NULL
         if (!fst || !snd)
@@ -533,8 +533,8 @@ namespace Slang
 
     bool SemanticsVisitor::tryUnifyGenericSubstitutions(
         ConstraintSystem&           constraints,
-        RefPtr<GenericSubstitution> fst,
-        RefPtr<GenericSubstitution> snd)
+        GenericSubstitution* fst,
+        GenericSubstitution* snd)
     {
         SLANG_ASSERT(fst);
         SLANG_ASSERT(snd);
@@ -568,13 +568,13 @@ namespace Slang
 
     bool SemanticsVisitor::TryUnifyTypeParam(
         ConstraintSystem&				constraints,
-        RefPtr<GenericTypeParamDecl>	typeParamDecl,
-        RefPtr<Type>			type)
+        GenericTypeParamDecl*	typeParamDecl,
+        Type*			type)
     {
         // We want to constrain the given type parameter
         // to equal the given type.
         Constraint constraint;
-        constraint.decl = typeParamDecl.Ptr();
+        constraint.decl = typeParamDecl;
         constraint.val = type;
 
         constraints.constraints.add(constraint);
@@ -584,8 +584,8 @@ namespace Slang
 
     bool SemanticsVisitor::TryUnifyIntParam(
         ConstraintSystem&               constraints,
-        RefPtr<GenericValueParamDecl>	paramDecl,
-        RefPtr<IntVal>                  val)
+        GenericValueParamDecl*	paramDecl,
+        IntVal*                  val)
     {
         // We only want to accumulate constraints on
         // the parameters of the declarations being
@@ -597,7 +597,7 @@ namespace Slang
 
         // We want to constrain the given parameter to equal the given value.
         Constraint constraint;
-        constraint.decl = paramDecl.Ptr();
+        constraint.decl = paramDecl;
         constraint.val = val;
 
         constraints.constraints.add(constraint);
@@ -608,11 +608,11 @@ namespace Slang
     bool SemanticsVisitor::TryUnifyIntParam(
         ConstraintSystem&       constraints,
         DeclRef<VarDeclBase> const&   varRef,
-        RefPtr<IntVal>          val)
+        IntVal*          val)
     {
         if(auto genericValueParamRef = varRef.as<GenericValueParamDecl>())
         {
-            return TryUnifyIntParam(constraints, RefPtr<GenericValueParamDecl>(genericValueParamRef.getDecl()), val);
+            return TryUnifyIntParam(constraints, genericValueParamRef.getDecl(), val);
         }
         else
         {
@@ -622,8 +622,8 @@ namespace Slang
 
     bool SemanticsVisitor::TryUnifyTypesByStructuralMatch(
         ConstraintSystem&       constraints,
-        RefPtr<Type>  fst,
-        RefPtr<Type>  snd)
+        Type*  fst,
+        Type*  snd)
     {
         if (auto fstDeclRefType = as<DeclRefType>(fst))
         {
@@ -661,8 +661,8 @@ namespace Slang
 
     bool SemanticsVisitor::TryUnifyTypes(
         ConstraintSystem&       constraints,
-        RefPtr<Type>  fst,
-        RefPtr<Type>  snd)
+        Type*  fst,
+        Type*  snd)
     {
         if (fst->equals(snd)) return true;
 

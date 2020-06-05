@@ -373,7 +373,7 @@ public:
     // we maintain a set of already-emitted modules.
     HashSet<ModuleDecl*> m_modulesAlreadyEmitted;
 
-    ModuleDecl* m_program;
+    ModuleDecl* m_program = nullptr;
 
     UInt m_uniqueIDCounter = 1;
     Dictionary<IRInst*, UInt> m_mapIRValueToID;

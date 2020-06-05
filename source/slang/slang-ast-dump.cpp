@@ -17,7 +17,7 @@ struct Context
     struct ObjectInfo
     {
         const ReflectClassInfo* m_typeInfo;
-        RefObject* m_object;
+        NodeBase* m_object;
         bool m_isDumped;
     };
 
@@ -48,10 +48,10 @@ struct Context
         Context* m_context;
     };
 
-    void dumpObject(const ReflectClassInfo& type, RefObject* obj);
+    void dumpObject(const ReflectClassInfo& type, NodeBase* obj);
 
-    void dumpObjectFull(const ReflectClassInfo& type, RefObject* obj, Index objIndex);
-    void dumpObjectReference(const ReflectClassInfo& type, RefObject* obj, Index objIndex);
+    void dumpObjectFull(const ReflectClassInfo& type, NodeBase* obj, Index objIndex);
+    void dumpObjectReference(const ReflectClassInfo& type, NodeBase* obj, Index objIndex);
 
     void dump(NodeBase* node)
     {
@@ -264,7 +264,7 @@ struct Context
         m_writer->emit(" }");
     }
 
-    Index getObjectIndex(const ReflectClassInfo& typeInfo, RefObject* obj)
+    Index getObjectIndex(const ReflectClassInfo& typeInfo, NodeBase* obj)
     {
         Index* indexPtr = m_objectMap.TryGetValueOrAdd(obj, m_objects.getCount());
         if (indexPtr)
@@ -576,7 +576,7 @@ struct Context
     // Using the SourceWriter, for automatic indentation.
     SourceWriter* m_writer;
 
-    Dictionary<RefObject*, Index> m_objectMap;  ///< Object index
+    Dictionary<NodeBase*, Index> m_objectMap;  ///< Object index
     List<ObjectInfo> m_objects;
 
     StringBuilder m_buf;
@@ -605,7 +605,7 @@ SLANG_ALL_ASTNode_NodeBase(SLANG_AST_DUMP_FIELDS_IMPL, _)
 
 #define SLANG_AST_GET_DUMP_FUNC(NAME, SUPER, ORIGIN, LAST, MARKER, TYPE, param) m_funcs[Index(ASTNodeType::NAME)] = (DumpFieldsFunc)&ASTDumpAccess::dumpFields_##NAME;
 
-typedef void (*DumpFieldsFunc)(RefObject* obj, Context& context);
+typedef void (*DumpFieldsFunc)(NodeBase* obj, Context& context);
 
 struct DumpFieldFuncs
 {
@@ -620,13 +620,13 @@ struct DumpFieldFuncs
 
 static const DumpFieldFuncs s_funcs;
 
-void Context::dumpObjectReference(const ReflectClassInfo& type, RefObject* obj, Index objIndex)
+void Context::dumpObjectReference(const ReflectClassInfo& type, NodeBase* obj, Index objIndex)
 {
     SLANG_UNUSED(obj);
     ScopeWrite(this).getBuf() << type.m_name << ":" << objIndex;
 }
 
-void Context::dumpObjectFull(const ReflectClassInfo& type, RefObject* obj, Index objIndex)
+void Context::dumpObjectFull(const ReflectClassInfo& type, NodeBase* obj, Index objIndex)
 {
     ObjectInfo& info = m_objects[objIndex];
     SLANG_ASSERT(info.m_isDumped == false);
@@ -662,7 +662,7 @@ void Context::dumpObjectFull(const ReflectClassInfo& type, RefObject* obj, Index
     m_writer->emit("}\n");
 }
 
-void Context::dumpObject(const ReflectClassInfo& typeInfo, RefObject* obj)
+void Context::dumpObject(const ReflectClassInfo& typeInfo, NodeBase* obj)
 {
     Index index = getObjectIndex(typeInfo, obj);
 
