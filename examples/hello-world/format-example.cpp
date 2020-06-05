@@ -9,9 +9,9 @@
 #include <vulkan.h>
 
 #ifdef __linux__
-#include <X11/Xlib.h>
+#    include <X11/Xlib.h>
 #else
-#include <Windows.h>
+#    include <Windows.h>
 #endif
 
 namespace slang
@@ -47,20 +47,35 @@ public:
     /// <returns></returns>
     int normalFunction(int param1, float* param2)
     {
-        for (int i = 0; i < 100; i++) {
-            switch (i) {
+        for (int i = 0; i < 100; i++)
+        {
+            switch (i)
+            {
             case 0:
             {
                 return normalFunction(0, nullptr);
-            } break;
+            }
+            break;
             case 1:
             {
                 float b = *param2;
                 i--;
-            } break;
+            }
+            break;
             default:
                 break;
             }
+        }
+
+        if (false)
+        {
+            int line = 5;
+            line++;
+        }
+        else
+        {
+            int col = 6;
+            col--;
         }
         if (param1)
             return *param2;
@@ -92,7 +107,8 @@ public:
         //
         baseVal = materialize(context, baseVal);
 
-        switch (baseVal.flavor) {
+        switch (baseVal.flavor)
+        {
         case LoweredValInfo::Flavor::Simple:
             return LoweredValInfo::simple(
                 builder->emitElementExtract(type, getSimpleVal(context, baseVal), indexVal));

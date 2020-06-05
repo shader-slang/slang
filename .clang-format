@@ -4,7 +4,7 @@ IndentWidth: 4
 ---
 Language: Cpp
 # Force pointers to the type for C++.
-# PPDirectiveIndentStyle: AfterHash
+IndentPPDirectives: AfterHash
 DerivePointerAlignment: false
 PointerAlignment: Left
 BinPackArguments: false
@@ -21,7 +21,7 @@ PenaltyReturnTypeOnItsOwnLine: 100
 ColumnLimit: 100
 IncludeBlocks: Preserve
 AlignAfterOpenBracket: AlwaysBreak
-# IndentCaseBlocks: true
+IndentCaseBlocks: true
 SortIncludes: true
 SortUsingDeclarations: true
 UseTab: Never
@@ -35,7 +35,7 @@ BraceWrapping:
   AfterStruct: true
   AfterUnion: true
   SplitEmptyFunction: false
-  # BraceWrappingAfterControlStatementStyle: Always
+  AfterControlStatement: Always
   AfterFunction: true
   AfterNamespace: true
   AfterExternBlock: true
