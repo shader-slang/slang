@@ -1290,7 +1290,7 @@ namespace Slang
         // it defines keywords like `true` and `false`).
         //
         RefPtr<Scope> scope = new Scope();
-        scope->parent = getLinkage()->getSessionImpl()->baseLanguageScope;
+        scope->parent = getLinkage()->getSessionImpl()->slangLanguageScope;
         //
         // Next, the scope needs to include all of the
         // modules in the program as peers, as if they

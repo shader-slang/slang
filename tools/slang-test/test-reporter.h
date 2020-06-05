@@ -9,7 +9,13 @@
 #include "../../source/core/slang-dictionary.h"
 
 
-#define SLANG_CHECK(x) TestReporter::get()->addResultWithLocation((x), #x, __FILE__, __LINE__); 
+#define SLANG_CHECK(x) TestReporter::get()->addResultWithLocation((x), #x, __FILE__, __LINE__);
+#define SLANG_CHECK_ABORT(x)                                                                     \
+    {                                                                                            \
+        bool _slang_check_result = (x);                                                          \
+        TestReporter::get()->addResultWithLocation(_slang_check_result, #x, __FILE__, __LINE__); \
+        if (!_slang_check_result) return;                                                        \
+    }
 
 struct TestRegister
 {

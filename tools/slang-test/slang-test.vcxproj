@@ -177,6 +177,7 @@
     <ClCompile Include="test-reporter.cpp" />
     <ClCompile Include="unit-offset-container.cpp" />
     <ClCompile Include="unit-test-byte-encode.cpp" />
+    <ClCompile Include="unit-test-find-type-by-name.cpp" />
     <ClCompile Include="unit-test-free-list.cpp" />
     <ClCompile Include="unit-test-memory-arena.cpp" />
     <ClCompile Include="unit-test-path.cpp" />
