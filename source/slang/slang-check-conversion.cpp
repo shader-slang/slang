@@ -764,7 +764,7 @@ namespace Slang
         
         bool shouldAddToCache = false;
         ConversionCost cost;
-        TypeCheckingCache* typeCheckingCache = getSession()->getTypeCheckingCache();
+        TypeCheckingCache* typeCheckingCache = getLinkage()->getTypeCheckingCache();
 
         BasicTypeKeyPair cacheKey;
         cacheKey.type1 = makeBasicTypeKey(toType);

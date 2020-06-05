@@ -26,6 +26,8 @@
 
 #include "slang-ir-serialize.h"
 
+#include "slang-check-impl.h"
+
 // Used to print exception type names in internal-compiler-error messages
 #include <typeinfo>
 
@@ -521,6 +523,26 @@ ISlangUnknown* Linkage::getInterface(const Guid& guid)
         return asExternal(this);
 
     return nullptr;
+}
+
+Linkage::~Linkage()
+{
+    destroyTypeCheckingCache();
+}
+
+TypeCheckingCache* Linkage::getTypeCheckingCache()
+{
+    if (!m_typeCheckingCache)
+    {
+        m_typeCheckingCache = new TypeCheckingCache();
+    }
+    return m_typeCheckingCache;
+}
+
+void Linkage::destroyTypeCheckingCache()
+{
+    delete m_typeCheckingCache;
+    m_typeCheckingCache = nullptr;
 }
 
 SLANG_NO_THROW slang::IGlobalSession* SLANG_MCALL Linkage::getGlobalSession()
@@ -2625,8 +2647,6 @@ void Session::addBuiltinSource(
 
 Session::~Session()
 {
-    destroyTypeCheckingCache();
-
     // destroy modules next
     loadedModuleCode = decltype(loadedModuleCode)();
 }
@@ -2739,11 +2759,7 @@ SLANG_API void spDestroyCompileRequest(
     if(!request) return;
     auto req = Slang::asInternal(request);
 
-    Slang::Session* session = req->getSession();
-    
     delete req;
-
-    session->destroyTypeCheckingCache();
 }
 
 SLANG_API void spSetFileSystem(

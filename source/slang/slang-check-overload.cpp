@@ -1438,7 +1438,7 @@ namespace Slang
         // to speed up compilation
         bool shouldAddToCache = false;
         OperatorOverloadCacheKey key;
-        TypeCheckingCache* typeCheckingCache = getSession()->getTypeCheckingCache();
+        TypeCheckingCache* typeCheckingCache = getLinkage()->getTypeCheckingCache();
         if (auto opExpr = as<OperatorExpr>(expr))
         {
             if (key.fromOperatorExpr(opExpr))

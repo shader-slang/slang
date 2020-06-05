@@ -1193,6 +1193,7 @@ namespace Slang
         /// Given a target returns the required downstream compiler
     PassThroughMode getDownstreamCompilerRequiredForTarget(CodeGenTarget target);
 
+    struct TypeCheckingCache;
     
         /// A context for loading and re-using code modules.
     class Linkage : public RefObject, public slang::ISession
@@ -1237,6 +1238,9 @@ namespace Slang
             /// Create an initially-empty linkage
         Linkage(Session* session, ASTBuilder* astBuilder);
 
+            /// Dtor
+        ~Linkage();
+
             /// Get the parent session for this linkage
         Session* getSessionImpl() { return m_session; }
 
@@ -1265,7 +1269,14 @@ namespace Slang
 
         ASTBuilder* getASTBuilder() { return m_astBuilder; }
 
+       
         RefPtr<ASTBuilder> m_astBuilder;
+
+            // cache used by type checking, implemented in check.cpp
+        TypeCheckingCache* getTypeCheckingCache();
+        void destroyTypeCheckingCache();
+
+        TypeCheckingCache* m_typeCheckingCache = nullptr;
 
         // Modules that have been dynamically loaded via `import`
         //
@@ -1952,7 +1963,6 @@ namespace Slang
         EndToEndCompileRequest* endToEndReq,
         SourceResult&           outSource);
 
-    struct TypeCheckingCache;
     //
 
     // Information about BaseType that's useful for checking literals 
@@ -2075,10 +2085,7 @@ namespace Slang
         
         RefPtr<SharedASTBuilder> m_sharedASTBuilder;
 
-        // cache used by type checking, implemented in check.cpp
-        TypeCheckingCache* typeCheckingCache = nullptr;
-        TypeCheckingCache* getTypeCheckingCache();
-        void destroyTypeCheckingCache();
+
         //
 
         void setSharedLibraryLoader(ISlangSharedLibraryLoader* loader);
