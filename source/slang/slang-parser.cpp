@@ -822,7 +822,7 @@ namespace Slang
         // Consume the token that specified the keyword
         auto keywordToken = advanceToken(parser);
 
-        RefObject* parsedObject = syntaxDecl->parseCallback(parser, syntaxDecl->parseUserData);
+        NodeBase* parsedObject = syntaxDecl->parseCallback(parser, syntaxDecl->parseUserData);
         if (!parsedObject)
         {
             return false;
@@ -2859,7 +2859,7 @@ namespace Slang
         auto nameAndLoc = expectIdentifier(parser);
 
         // Next we look for a clause that specified the AST node class.
-        SyntaxClass<RefObject> syntaxClass;
+        SyntaxClass<NodeBase> syntaxClass;
         if (AdvanceIf(parser, TokenType::Colon))
         {
             // User is specifying the class that should be construted
@@ -2998,7 +2998,7 @@ namespace Slang
         // on the amount of per-attribute-type logic that has to occur later.
 
         // Next we look for a clause that specified the AST node class.
-        SyntaxClass<RefObject> syntaxClass;
+        SyntaxClass<NodeBase> syntaxClass;
         if (AdvanceIf(parser, TokenType::Colon))
         {
             // User is specifying the class that should be construted
@@ -4842,7 +4842,7 @@ namespace Slang
         char const*                 nameText,
         SyntaxParseCallback         callback,
         void*                       userData,
-        SyntaxClass<RefObject>      syntaxClass)
+        SyntaxClass<NodeBase>      syntaxClass)
     {
         Name* name = session->getNamePool()->getName(nameText);
 

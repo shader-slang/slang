@@ -206,7 +206,7 @@ Index getFilterCountImpl(const ReflectClassInfo& clsInfo, MemberFilterStyle filt
 
     RequirementWitness::RequirementWitness(Val* val)
         : m_flavor(Flavor::val)
-        , m_obj(val)
+        , m_val(val)
     {}
 
 
@@ -561,7 +561,7 @@ Index getFilterCountImpl(const ReflectClassInfo& clsInfo, MemberFilterStyle filt
                     SLANG_UNEXPECTED("unhandled type");
                 }
 
-                RefPtr<RefObject> type = classInfo.createInstance(astBuilder);
+                NodeBase* type = classInfo.createInstance(astBuilder);
                 if (!type)
                 {
                     SLANG_UNEXPECTED("constructor failure");

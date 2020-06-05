@@ -679,7 +679,7 @@ namespace Slang
         bool hasIntArgs(Attribute* attr, int numArgs);
         bool hasStringArgs(Attribute* attr, int numArgs);
 
-        bool getAttributeTargetSyntaxClasses(SyntaxClass<RefObject> & cls, uint32_t typeFlags);
+        bool getAttributeTargetSyntaxClasses(SyntaxClass<NodeBase> & cls, uint32_t typeFlags);
 
         bool validateAttribute(Attribute* attr, AttributeDecl* attribClassDecl);
 

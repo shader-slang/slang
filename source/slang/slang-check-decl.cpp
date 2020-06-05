@@ -1094,7 +1094,7 @@ namespace Slang
         // TODO: This could be factored into another visitor pass
         // that fits more with the standard checking below.
         //
-        for(auto& importDecl : moduleDecl->getMembersOfType<ImportDecl>())
+        for(auto importDecl : moduleDecl->getMembersOfType<ImportDecl>())
         {
             ensureDecl(importDecl, DeclCheckState::Checked);
         }
@@ -2765,7 +2765,7 @@ namespace Slang
 
     void SemanticsDeclHeaderVisitor::checkCallableDeclCommon(CallableDecl* decl)
     {
-        for(auto& paramDecl : decl->getParameters())
+        for(auto paramDecl : decl->getParameters())
         {
             ensureDecl(paramDecl, DeclCheckState::ReadyForReference);
         }

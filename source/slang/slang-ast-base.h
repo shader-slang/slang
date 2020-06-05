@@ -14,14 +14,12 @@
 namespace Slang
 {
 
-// Signals to C++ extractor that RefObject is a base class, that isn't reflected to C++ extractor
-SLANG_REFLECT_BASE_CLASS(RefObject)
-
 struct ReflectClassInfo;
 
-class NodeBase : public RefObject
+class NodeBase 
 {
     SLANG_ABSTRACT_CLASS(NodeBase)
+    SLANG_CLASS_ROOT
 
         // MUST be called before used. Called automatically via the ASTBuilder.
         // Note that the astBuilder is not stored in the NodeBase derived types by default.

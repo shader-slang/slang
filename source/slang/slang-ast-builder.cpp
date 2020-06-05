@@ -58,14 +58,14 @@ const ReflectClassInfo* SharedASTBuilder::findClassInfo(const UnownedStringSlice
     return m_sliceToTypeMap.TryGetValue(slice, typeInfo) ? typeInfo : nullptr;
 }
 
-SyntaxClass<RefObject> SharedASTBuilder::findSyntaxClass(const UnownedStringSlice& slice)
+SyntaxClass<NodeBase> SharedASTBuilder::findSyntaxClass(const UnownedStringSlice& slice)
 {
     const ReflectClassInfo* typeInfo;
     if (m_sliceToTypeMap.TryGetValue(slice, typeInfo))
     {
-        return SyntaxClass<RefObject>(typeInfo);
+        return SyntaxClass<NodeBase>(typeInfo);
     }
-    return SyntaxClass<RefObject>();
+    return SyntaxClass<NodeBase>();
 }
 
 const ReflectClassInfo* SharedASTBuilder::findClassInfo(Name* name)
@@ -74,14 +74,14 @@ const ReflectClassInfo* SharedASTBuilder::findClassInfo(Name* name)
     return m_nameToTypeMap.TryGetValue(name, typeInfo) ? typeInfo : nullptr;
 }
 
-SyntaxClass<RefObject> SharedASTBuilder::findSyntaxClass(Name* name)
+SyntaxClass<NodeBase> SharedASTBuilder::findSyntaxClass(Name* name)
 {
     const ReflectClassInfo* typeInfo;
     if (m_nameToTypeMap.TryGetValue(name, typeInfo))
     {
-        return SyntaxClass<RefObject>(typeInfo);
+        return SyntaxClass<NodeBase>(typeInfo);
     }
-    return SyntaxClass<RefObject>();
+    return SyntaxClass<NodeBase>();
 }
 
 Type* SharedASTBuilder::getStringType()
@@ -147,14 +147,16 @@ Decl* SharedASTBuilder::findMagicDecl(const String& name)
 ASTBuilder::ASTBuilder(SharedASTBuilder* sharedASTBuilder, const String& name):
     m_sharedASTBuilder(sharedASTBuilder),
     m_name(name),
-    m_id(sharedASTBuilder->m_id++)
+    m_id(sharedASTBuilder->m_id++),
+    m_arena(2048)
 {
     SLANG_ASSERT(sharedASTBuilder);
 }
 
 ASTBuilder::ASTBuilder():
     m_sharedASTBuilder(nullptr),
-    m_id(-1)
+    m_id(-1),
+    m_arena(2048)
 {
     m_name = "ShadedASTBuilder::m_astBuilder";
 }
@@ -163,7 +165,9 @@ ASTBuilder::~ASTBuilder()
 {
     for (NodeBase* node : m_nodes)
     {
-        node->releaseReference();
+        const ReflectClassInfo* info = ReflectClassInfo::getInfo(node->astNodeType);
+        SLANG_ASSERT(info->m_destroyFunc);
+        info->m_destroyFunc(node);
     }
 }
 

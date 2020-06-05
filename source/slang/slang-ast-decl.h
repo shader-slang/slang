@@ -441,7 +441,7 @@ class SyntaxDecl : public Decl
     SLANG_CLASS(SyntaxDecl)
 
     // What type of syntax node will be produced when parsing with this keyword?
-    SyntaxClass<RefObject> syntaxClass;
+    SyntaxClass<NodeBase> syntaxClass;
 
     SLANG_UNREFLECTED
 
@@ -456,7 +456,7 @@ class AttributeDecl : public ContainerDecl
 {
     SLANG_CLASS(AttributeDecl)
     // What type of syntax node will be produced to represent this attribute.
-    SyntaxClass<RefObject> syntaxClass;
+    SyntaxClass<NodeBase> syntaxClass;
 };
 
 } // namespace Slang

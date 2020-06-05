@@ -43,6 +43,8 @@ namespace Slang
     struct TypeExp;
     class Val;
 
+    class NodeBase;
+
     void printDiagnosticArg(StringBuilder& sb, Decl* decl);
     void printDiagnosticArg(StringBuilder& sb, Type* type);
     void printDiagnosticArg(StringBuilder& sb, TypeExp const& type);
@@ -454,6 +456,7 @@ namespace Slang
         typedef ReflectClassInfo ThisType;
 
         typedef void* (*CreateFunc)(ASTBuilder* astBuilder);
+        typedef void (*DestroyFunc)(void* ptr);
 
         /// A constant time implementation of isSubClassOf
         SLANG_FORCE_INLINE bool isSubClassOf(const ThisType& super) const
@@ -484,6 +487,7 @@ namespace Slang
         const ReflectClassInfo* m_superClass;       ///< The super class of this class, or nullptr if has no super class. 
         const char* m_name;                         ///< Textual class name, for debugging 
         CreateFunc m_createFunc;                    ///< Callback to use when creating instances
+        DestroyFunc m_destroyFunc;                  ///< Called to inplace destroy (ie not backing memory) of this type
 
         struct Infos
         {
@@ -806,7 +810,7 @@ namespace Slang
 
             void operator++() { m_cursor = adjustFilterCursor<T>(m_filterStyle, m_cursor + 1, m_end); }
 
-            const RefPtr<T>& operator*() { return  *(RefPtr<T>*)(m_cursor); }
+            T* operator*() { return  static_cast<T*>(*m_cursor); }
         };
 
         Iterator begin()
@@ -826,11 +830,11 @@ namespace Slang
         const RefPtr<T>& getFirst() { return *begin(); }
         Index getCount() { return getFilterCount<T>(m_filterStyle, m_begin, m_end); }
 
-        RefPtr<T> operator[](Index index) const
+        T* operator[](Index index) const
         {
             Decl*const* ptr = getFilterCursorByIndex<T>(m_filterStyle, m_begin, m_end, index);
             SLANG_ASSERT(ptr);
-            return  *(RefPtr<T>*)(ptr);
+            return  static_cast<T*>(*ptr);
         }
 
             /// Returns true if empty (equivalent to getCount() == 0)
@@ -1258,7 +1262,7 @@ namespace Slang
         Val* getVal()
         {
             SLANG_ASSERT(getFlavor() == Flavor::val);
-            return m_obj.as<Val>();
+            return m_val;
         }
 
         RefPtr<WitnessTable> getWitnessTable();
@@ -1268,7 +1272,7 @@ namespace Slang
         Flavor              m_flavor;
         DeclRef<Decl>       m_declRef;
         RefPtr<RefObject>   m_obj;
-
+        Val*                m_val = nullptr;
     };
 
     typedef Dictionary<Decl*, RequirementWitness> RequirementDictionary;
@@ -1278,7 +1282,7 @@ namespace Slang
         RequirementDictionary requirementDictionary;
     };
 
-    typedef Dictionary<unsigned int, RefPtr<RefObject>> AttributeArgumentValueDict;
+    typedef Dictionary<unsigned int, NodeBase*> AttributeArgumentValueDict;
 
     struct SpecializationParam
     {

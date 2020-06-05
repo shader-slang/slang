@@ -3543,7 +3543,7 @@ namespace Slang
 
     void IRBuilder::addHighLevelDeclDecoration(IRInst* inst, Decl* decl)
     {
-        auto ptrConst = getPtrValue(addRefObjectToFree(decl));
+        auto ptrConst = getPtrValue(decl);
         addDecoration(inst, kIROp_HighLevelDeclDecoration, ptrConst);
     }
 

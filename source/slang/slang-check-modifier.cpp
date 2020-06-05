@@ -230,7 +230,7 @@ namespace Slang
         return true;
     }
 
-    bool SemanticsVisitor::getAttributeTargetSyntaxClasses(SyntaxClass<RefObject> & cls, uint32_t typeFlags)
+    bool SemanticsVisitor::getAttributeTargetSyntaxClasses(SyntaxClass<NodeBase> & cls, uint32_t typeFlags)
     {
         if (typeFlags == (int)UserDefinedAttributeTargets::Struct)
         {
@@ -544,8 +544,8 @@ namespace Slang
         }
 
         // Manage scope
-        RefPtr<RefObject> attrInstance = attrDecl->syntaxClass.createInstance(m_astBuilder);
-        auto attr = attrInstance.as<Attribute>();
+        NodeBase* attrInstance = attrDecl->syntaxClass.createInstance(m_astBuilder);
+        auto attr = as<Attribute>(attrInstance);
         if(!attr)
         {
             SLANG_DIAGNOSE_UNEXPECTED(getSink(), attrDecl, "attribute class did not yield an attribute object");

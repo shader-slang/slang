@@ -155,7 +155,7 @@ SLANG_API SlangResult spReflectionUserAttribute_GetArgumentValueInt(SlangReflect
     auto userAttr = convert(attrib);
     if (!userAttr) return SLANG_ERROR_INVALID_PARAMETER;
     if (index >= (unsigned int)userAttr->args.getCount()) return SLANG_ERROR_INVALID_PARAMETER;
-    RefPtr<RefObject> val;
+    NodeBase* val = nullptr;
     if (userAttr->intArgVals.TryGetValue(index, val))
     {
         *rs = (int)as<ConstantIntVal>(val)->value;

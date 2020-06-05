@@ -6,6 +6,7 @@
 #include "slang-ast-all.h"
 
 #include "../core/slang-type-traits.h"
+#include "../core/slang-memory-arena.h"
 
 namespace Slang
 {
@@ -24,10 +25,10 @@ public:
     Type* getEnumTypeType();
 
     const ReflectClassInfo* findClassInfo(Name* name);
-    SyntaxClass<RefObject> findSyntaxClass(Name* name);
+    SyntaxClass<NodeBase> findSyntaxClass(Name* name);
 
     const ReflectClassInfo* findClassInfo(const UnownedStringSlice& slice);
-    SyntaxClass<RefObject> findSyntaxClass(const UnownedStringSlice& slice);
+    SyntaxClass<NodeBase> findSyntaxClass(const UnownedStringSlice& slice);
 
         // Look up a magic declaration by its name
     Decl* findMagicDecl(String const& name);
@@ -91,13 +92,14 @@ public:
         };
     };
 
+
         /// Create AST types 
     template <typename T>
-    T* create() { return _initAndAdd(new T); }
+    T* create() { return _initAndAdd(new (m_arena.allocate(sizeof(T))) T); }
     template<typename T, typename P0>
-    T* create(const P0& p0) { return _initAndAdd(new T(p0)); }
+    T* create(const P0& p0) { return _initAndAdd(new (m_arena.allocate(sizeof(T))) T(p0)); }
     template<typename T, typename P0, typename P1>
-    T* create(const P0& p0, const P1& p1) { return _initAndAdd(new T(p0, p1));}
+    T* create(const P0& p0, const P1& p1) { return _initAndAdd(new (m_arena.allocate(sizeof(T))) T(p0, p1));}
 
         /// Get the built in types
     SLANG_FORCE_INLINE Type* getBoolType() { return m_sharedASTBuilder->m_builtinTypes[Index(BaseType::Bool)]; }
@@ -148,10 +150,12 @@ public:
 
         /// Helpers to get type info from the SharedASTBuilder
     const ReflectClassInfo* findClassInfo(const UnownedStringSlice& slice) { return m_sharedASTBuilder->findClassInfo(slice); }
-    SyntaxClass<RefObject> findSyntaxClass(const UnownedStringSlice& slice) { return m_sharedASTBuilder->findSyntaxClass(slice); }
+    SyntaxClass<NodeBase> findSyntaxClass(const UnownedStringSlice& slice) { return m_sharedASTBuilder->findSyntaxClass(slice); }
 
     const ReflectClassInfo* findClassInfo(Name* name) { return m_sharedASTBuilder->findClassInfo(name); }
-    SyntaxClass<RefObject> findSyntaxClass(Name* name) { return m_sharedASTBuilder->findSyntaxClass(name); }
+    SyntaxClass<NodeBase> findSyntaxClass(Name* name) { return m_sharedASTBuilder->findSyntaxClass(name); }
+
+    MemoryArena& getMemoryArena() { return m_arena; }
 
         /// Get the shared AST builder
     SharedASTBuilder* getSharedASTBuilder() { return m_sharedASTBuilder; }
@@ -177,7 +181,6 @@ protected:
         node->init(T::kType, this);
 
         // Give it a reference, to keep in scope until the ASTBuilder dtors
-        node->addReference();
         m_nodes.add(node);
         return node;
     }
@@ -189,6 +192,8 @@ protected:
     List<NodeBase*> m_nodes;
 
     SharedASTBuilder* m_sharedASTBuilder;
+
+    MemoryArena m_arena;
 };
 
 } // namespace Slang
