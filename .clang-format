@@ -4,14 +4,15 @@ IndentWidth: 4
 ---
 Language: Cpp
 # Force pointers to the type for C++.
+# PPDirectiveIndentStyle: AfterHash
 DerivePointerAlignment: false
 PointerAlignment: Left
-BreakBeforeBraces: Allman
 BinPackArguments: false
 BinPackParameters: false
 ExperimentalAutoDetectBinPacking: false
 AllowAllParametersOfDeclarationOnNextLine: true
-NamespaceIndentation: All
+NamespaceIndentation: None
+FixNamespaceComments: true
 AccessModifierOffset: -4
 AlignTrailingComments: false
 ConstructorInitializerIndentWidth: 4
@@ -19,3 +20,29 @@ AlignEscapedNewlinesLeft: true
 PenaltyReturnTypeOnItsOwnLine: 100
 ColumnLimit: 100
 IncludeBlocks: Preserve
+AlignAfterOpenBracket: AlwaysBreak
+# IndentCaseBlocks: true
+SortIncludes: true
+SortUsingDeclarations: true
+UseTab: Never
+BreakConstructorInitializers: BeforeComma
+BreakInheritanceList: BeforeComma
+BreakBeforeBraces: Custom
+BraceWrapping:
+  AfterCaseLabel: true
+  AfterClass: true
+  AfterEnum: true
+  AfterStruct: true
+  AfterUnion: true
+  SplitEmptyFunction: false
+  # BraceWrappingAfterControlStatementStyle: Always
+  AfterFunction: true
+  AfterNamespace: true
+  AfterExternBlock: true
+  BeforeCatch: true
+  BeforeElse: true
+  # BeforeLambdaBody: true
+  # BeforeWhile: false
+  IndentBraces: false
+  SplitEmptyFunction: false
+  SplitEmptyRecord: false
