@@ -72,6 +72,8 @@ protected:
     // This is a private builder used for these shared types
     ASTBuilder* m_astBuilder = nullptr;
     Session* m_session = nullptr;
+
+    Index m_id = 1;
 };
 
 class ASTBuilder : public RefObject
@@ -158,7 +160,7 @@ public:
     Session* getGlobalSession() { return m_sharedASTBuilder->m_session; }
 
         /// Ctor
-    ASTBuilder(SharedASTBuilder* sharedASTBuilder);
+    ASTBuilder(SharedASTBuilder* sharedASTBuilder, const String& name);
 
         /// Dtor
     ~ASTBuilder();
@@ -179,6 +181,9 @@ protected:
         m_nodes.add(node);
         return node;
     }
+
+    String m_name;
+    Index m_id;
 
         /// All of the nodes constructed on this builder
     List<NodeBase*> m_nodes;

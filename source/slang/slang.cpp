@@ -123,10 +123,10 @@ void Session::init()
     m_sharedASTBuilder->init(this);
 
     //  Use to create a ASTBuilder
-    RefPtr<ASTBuilder> builtinAstBuilder(new ASTBuilder(m_sharedASTBuilder));
+    RefPtr<ASTBuilder> builtinAstBuilder(new ASTBuilder(m_sharedASTBuilder, "m_builtInLinkage::m_astBuilder"));
 
     // And the global ASTBuilder
-    globalAstBuilder = new ASTBuilder(m_sharedASTBuilder);
+    globalAstBuilder = new ASTBuilder(m_sharedASTBuilder, "globalAstBuilder");
 
     // Make sure our source manager is initialized
     builtinSourceManager.initialize(nullptr, nullptr);
@@ -153,10 +153,10 @@ void Session::init()
 
     baseLanguageScope = new Scope();
 
-    auto baseModuleDecl = populateBaseLanguageModule(
+    // Will stay in scope as long as ASTBuilder
+    baseModuleDecl = populateBaseLanguageModule(
         m_builtinLinkage->getASTBuilder(),
         baseLanguageScope);
-    loadedModuleCode.add(baseModuleDecl);
 
     coreLanguageScope = new Scope();
     coreLanguageScope->nextSibling = baseLanguageScope;
@@ -192,7 +192,7 @@ SLANG_NO_THROW SlangResult SLANG_MCALL Session::createSession(
     slang::SessionDesc const&  desc,
     slang::ISession**          outSession)
 {
-    RefPtr<ASTBuilder> astBuilder(new ASTBuilder(m_sharedASTBuilder));
+    RefPtr<ASTBuilder> astBuilder(new ASTBuilder(m_sharedASTBuilder, "Session::astBuilder"));
     RefPtr<Linkage> linkage = new Linkage(this, astBuilder);
 
     Int targetCount = desc.targetCount;
@@ -957,7 +957,10 @@ void FrontEndCompileRequest::parseTranslationUnit(
 
     auto module = translationUnit->getModule();
 
+
     ASTBuilder* astBuilder = module->getASTBuilder();
+
+    //ASTBuilder* astBuilder = linkage->getASTBuilder();
 
     ModuleDecl* translationUnitSyntax = astBuilder->create<ModuleDecl>();
     translationUnitSyntax->nameAndLoc.name = translationUnit->moduleName;
@@ -1214,7 +1217,7 @@ EndToEndCompileRequest::EndToEndCompileRequest(
     : m_session(session)
     , m_sink(nullptr)
 {
-    RefPtr<ASTBuilder> astBuilder(new ASTBuilder(session->m_sharedASTBuilder));
+    RefPtr<ASTBuilder> astBuilder(new ASTBuilder(session->m_sharedASTBuilder, "EndToEnd::Linkage::astBuilder"));
     m_linkage = new Linkage(session, astBuilder);
     init();
 }
@@ -1780,7 +1783,7 @@ void FilePathDependencyList::addDependency(Module* module)
 
 Module::Module(Linkage* linkage)
     : ComponentType(linkage)
-    , m_astBuilder(linkage->getASTBuilder()->getSharedASTBuilder())
+    , m_astBuilder(linkage->getASTBuilder()->getSharedASTBuilder(), "Module")
 {
     addModuleDependency(this);
 }
@@ -2597,26 +2600,27 @@ void Session::addBuiltinSource(
     }
 
     // Extract the AST for the code we just parsed
-    auto syntax = compileRequest->translationUnits[translationUnitIndex]->getModuleDecl();
+    auto module = compileRequest->translationUnits[translationUnitIndex]->getModule();
+    auto moduleDecl = module->getModuleDecl();
 
     // Add the resulting code to the appropriate scope
     if (!scope->containerDecl)
     {
         // We are the first chunk of code to be loaded for this scope
-        scope->containerDecl = syntax;
+        scope->containerDecl = moduleDecl;
     }
     else
     {
         // We need to create a new scope to link into the whole thing
         auto subScope = new Scope();
-        subScope->containerDecl = syntax;
+        subScope->containerDecl = moduleDecl;
         subScope->nextSibling = scope->nextSibling;
         scope->nextSibling = subScope;
     }
 
     // We need to retain this AST so that we can use it in other code
     // (Note that the `Scope` type does not retain the AST it points to)
-    loadedModuleCode.add(syntax);
+    loadedModuleCode.add(module);
 }
 
 Session::~Session()
@@ -2734,7 +2738,12 @@ SLANG_API void spDestroyCompileRequest(
 {
     if(!request) return;
     auto req = Slang::asInternal(request);
+
+    Slang::Session* session = req->getSession();
+    
     delete req;
+
+    session->destroyTypeCheckingCache();
 }
 
 SLANG_API void spSetFileSystem(

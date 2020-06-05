@@ -16,7 +16,6 @@ SharedASTBuilder::SharedASTBuilder()
 {    
 }
 
-
 void SharedASTBuilder::init(Session* session)
 {
     m_namePool = session->getNamePool();
@@ -145,15 +144,19 @@ Decl* SharedASTBuilder::findMagicDecl(const String& name)
 
 // !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! ASTBuilder !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 
-ASTBuilder::ASTBuilder(SharedASTBuilder* sharedASTBuilder):
-    m_sharedASTBuilder(sharedASTBuilder)
+ASTBuilder::ASTBuilder(SharedASTBuilder* sharedASTBuilder, const String& name):
+    m_sharedASTBuilder(sharedASTBuilder),
+    m_name(name),
+    m_id(sharedASTBuilder->m_id++)
 {
     SLANG_ASSERT(sharedASTBuilder);
 }
 
 ASTBuilder::ASTBuilder():
-    m_sharedASTBuilder(nullptr)
+    m_sharedASTBuilder(nullptr),
+    m_id(-1)
 {
+    m_name = "ShadedASTBuilder::m_astBuilder";
 }
 
 ASTBuilder::~ASTBuilder()

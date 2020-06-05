@@ -2037,7 +2037,8 @@ namespace Slang
         RefPtr<Scope>   hlslLanguageScope;
         RefPtr<Scope>   slangLanguageScope;
 
-        List<ModuleDecl*> loadedModuleCode;
+        ModuleDecl* baseModuleDecl = nullptr;
+        List<RefPtr<Module>> loadedModuleCode;
 
         SourceManager   builtinSourceManager;
 
