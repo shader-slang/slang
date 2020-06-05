@@ -42,6 +42,7 @@ struct IRHighLevelDeclDecoration : IRDecoration
 enum IRLoopControl
 {
     kIRLoopControl_Unroll,
+    kIRLoopControl_Loop,
 };
 
 struct IRLoopControlDecoration : IRDecoration
