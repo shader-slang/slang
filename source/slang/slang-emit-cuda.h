@@ -79,6 +79,9 @@ protected:
     void _emitInitializerList(IRType* elementType, IRUse* operands, Index operandCount);
     void _emitInitializerListValue(IRType* elementType, IRInst* value);
 
+        /// Ensure that the generated code is compiled for at least CUDA SM `version`
+    void _requireCUDASMVersion(SemanticVersion const& version);
+
     RefPtr<CUDAExtensionTracker> m_extensionTracker;
 };
 

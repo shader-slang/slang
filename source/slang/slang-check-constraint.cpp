@@ -80,7 +80,7 @@ namespace Slang
         DeclRef<InterfaceDecl>      interfaceDeclRef)
     {
         // The most basic test here should be: does the type declare conformance to the trait.
-        if(DoesTypeConformToInterface(type, interfaceDeclRef))
+        if(isDeclaredSubtype(type, interfaceDeclRef))
             return type;
 
         // Just because `type` doesn't conform to the given `interfaceDeclRef`, that
@@ -119,7 +119,7 @@ namespace Slang
                     continue;
 
                 // We only want to consider types that implement the target interface.
-                if(!DoesTypeConformToInterface(candidateType, interfaceDeclRef))
+                if(!isDeclaredSubtype(candidateType, interfaceDeclRef))
                     continue;
 
                 // We only want to consider types where we can implicitly convert from `type`

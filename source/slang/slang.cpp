@@ -130,6 +130,7 @@ void Session::init()
     // And the global ASTBuilder
     globalAstBuilder = new ASTBuilder(m_sharedASTBuilder, "globalAstBuilder");
 
+
     // Make sure our source manager is initialized
     builtinSourceManager.initialize(nullptr, nullptr);
 
@@ -979,12 +980,12 @@ void FrontEndCompileRequest::parseTranslationUnit(
 
     auto module = translationUnit->getModule();
 
-
     ASTBuilder* astBuilder = module->getASTBuilder();
 
     //ASTBuilder* astBuilder = linkage->getASTBuilder();
 
     ModuleDecl* translationUnitSyntax = astBuilder->create<ModuleDecl>();
+
     translationUnitSyntax->nameAndLoc.name = translationUnit->moduleName;
     translationUnitSyntax->module = module;
     module->setModuleDecl(translationUnitSyntax);

@@ -873,4 +873,14 @@ class UnsafeForceInlineEarlyAttribute : public Attribute
     SLANG_CLASS(UnsafeForceInlineEarlyAttribute)
 };
 
+    /// An attribute that marks a type declaration as either allowing or
+    /// disallowing the type to be inherited from in other modules.
+class InheritanceControlAttribute : public Attribute { SLANG_CLASS(InheritanceControlAttribute) };
+
+    /// An attribute that marks a type declaration as allowing the type to be inherited from in other modules.
+class OpenAttribute : public InheritanceControlAttribute { SLANG_CLASS(OpenAttribute) };
+
+    /// An attribute that marks a type declaration as disallowing the type to be inherited from in other modules.
+class SealedAttribute : public InheritanceControlAttribute { SLANG_CLASS(SealedAttribute) };
+
 } // namespace Slang

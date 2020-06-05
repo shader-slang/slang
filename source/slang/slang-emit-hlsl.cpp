@@ -673,9 +673,16 @@ void HLSLSourceEmitter::emitVectorTypeNameImpl(IRType* elementType, IRIntegerVal
 
 void HLSLSourceEmitter::emitLoopControlDecorationImpl(IRLoopControlDecoration* decl)
 {
-    if (decl->getMode() == kIRLoopControl_Unroll)
+    switch (decl->getMode())
     {
+    case kIRLoopControl_Unroll:
         m_writer->emit("[unroll]\n");
+        break;
+    case kIRLoopControl_Loop:
+        m_writer->emit("[loop]\n");
+        break;
+    default:
+        break;
     }
 }
 
