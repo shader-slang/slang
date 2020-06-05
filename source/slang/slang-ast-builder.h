@@ -2,6 +2,8 @@
 #ifndef SLANG_AST_BUILDER_H
 #define SLANG_AST_BUILDER_H
 
+#include <type_traits>
+
 #include "slang-ast-support-types.h"
 #include "slang-ast-all.h"
 
@@ -180,8 +182,12 @@ protected:
 
         node->init(T::kType, this);
 
-        // Give it a reference, to keep in scope until the ASTBuilder dtors
-        m_nodes.add(node);
+        // Only add it if it has a dtor that does some work
+        if (!std::is_trivially_destructible<T>::value)
+        {
+            // Keep such that dtor can be run on ASTBuilder being dtored
+            m_nodes.add(node);
+        }
         return node;
     }
 

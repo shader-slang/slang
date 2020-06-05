@@ -45,6 +45,13 @@ namespace Slang
 
     class NodeBase;
 
+
+    template <typename T>
+    T* as(NodeBase* node);
+
+    template <typename T>
+    const T* as(const NodeBase* node);
+
     void printDiagnosticArg(StringBuilder& sb, Decl* decl);
     void printDiagnosticArg(StringBuilder& sb, Type* type);
     void printDiagnosticArg(StringBuilder& sb, TypeExp const& type);
@@ -276,7 +283,7 @@ namespace Slang
         Modifier* first = nullptr;
 
         template<typename T>
-        FilteredModifierList<T> getModifiersOfType() { return FilteredModifierList<T>(first.Ptr()); }
+        FilteredModifierList<T> getModifiersOfType() { return FilteredModifierList<T>(first); }
 
         // Find the first modifier of a given type, or return `nullptr` if none is found.
         template<typename T>

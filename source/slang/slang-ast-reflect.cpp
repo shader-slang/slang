@@ -54,6 +54,8 @@ struct ASTConstructAccess
         }
         static void destroy(void* ptr)
         {
+            // Needed because if type has non dtor, Visual Studio claims ptr not used
+            SLANG_UNUSED(ptr);
             reinterpret_cast<T*>(ptr)->~T();
         }
     };

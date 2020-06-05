@@ -34,9 +34,6 @@ class NodeBase
         /// correctly constructed (through ASTBuilder) NodeBase derived class. 
         /// The actual type is set when constructed on the ASTBuilder. 
     ASTNodeType astNodeType = ASTNodeType(-1);
-
-        ///
-    ~NodeBase();
 };
 
 // Casting of NodeBase

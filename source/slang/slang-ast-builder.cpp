@@ -6,10 +6,6 @@
 
 namespace Slang {
 
-NodeBase::~NodeBase()
-{
-}
-
 // !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! SharedASTBuilder !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 
 SharedASTBuilder::SharedASTBuilder()
