@@ -124,13 +124,17 @@ void Session::init()
 
     //  Use to create a ASTBuilder
     RefPtr<ASTBuilder> builtinAstBuilder(new ASTBuilder(m_sharedASTBuilder));
-    
+
+    // And the global ASTBuilder
+    globalAstBuilder = new ASTBuilder(m_sharedASTBuilder);
+
     // Make sure our source manager is initialized
     builtinSourceManager.initialize(nullptr, nullptr);
 
-    
+    // Built in linkage uses the built in builder
     m_builtinLinkage = new Linkage(this, builtinAstBuilder);
 
+    
     // Because the `Session` retains the builtin `Linkage`,
     // we need to make sure that the parent pointer inside
     // `Linkage` doesn't create a retain cycle.
@@ -952,7 +956,10 @@ void FrontEndCompileRequest::parseTranslationUnit(
         combinedPreprocessorDefinitions.Add(def.Key, def.Value);
 
     auto module = translationUnit->getModule();
-    RefPtr<ModuleDecl> translationUnitSyntax = linkage->getASTBuilder()->create<ModuleDecl>();
+
+    ASTBuilder* astBuilder = module->getASTBuilder();
+
+    RefPtr<ModuleDecl> translationUnitSyntax = astBuilder->create<ModuleDecl>();
     translationUnitSyntax->nameAndLoc.name = translationUnit->moduleName;
     translationUnitSyntax->module = module;
     module->setModuleDecl(translationUnitSyntax);
@@ -966,13 +973,13 @@ void FrontEndCompileRequest::parseTranslationUnit(
     //
     // We are adding the marker here, before we even parse the
     // code in the module, in case the subsequent steps would
-    // like to treat the standard library differently. Alternatiely
+    // like to treat the standard library differently. Alternatively
     // we could pass down the `m_isStandardLibraryCode` flag to
     // these passes.
     //
     if( m_isStandardLibraryCode )
     {
-        translationUnitSyntax->modifiers.first = linkage->getASTBuilder()->create<FromStdLibModifier>();
+        translationUnitSyntax->modifiers.first = astBuilder->create<FromStdLibModifier>();
     }
 
     for (auto sourceFile : translationUnit->getSourceFiles())
@@ -986,7 +993,7 @@ void FrontEndCompileRequest::parseTranslationUnit(
             module);
 
         parseSourceFile(
-            linkage->getASTBuilder(),
+            astBuilder,
             translationUnit,
             tokens,
             getSink(),
@@ -1054,7 +1061,9 @@ void FrontEndCompileRequest::generateIR()
         // * it can dump ir 
         // * it can generate diagnostics
 
-        /// Generate IR for translation unit
+        /// Generate IR for translation unit.
+        /// TODO(JS): Use the linkage ASTBuilder, because it seems possible that cross module constructs are possible in
+        /// ir lowering.
         RefPtr<IRModule> irModule(generateIRForTranslationUnit(getLinkage()->getASTBuilder(), translationUnit));
 
         if (verifyDebugSerialization)
@@ -1771,6 +1780,7 @@ void FilePathDependencyList::addDependency(Module* module)
 
 Module::Module(Linkage* linkage)
     : ComponentType(linkage)
+    , m_astBuilder(linkage->getASTBuilder()->getSharedASTBuilder())
 {
     addModuleDependency(this);
 }

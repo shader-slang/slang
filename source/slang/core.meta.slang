@@ -18,9 +18,11 @@ syntax constexpr : ConstExprModifier;
 syntax globallycoherent : GloballyCoherentModifier;
 
 // A type that can be used as an operand for builtins
+[sealed]
 interface __BuiltinType {}
 
 // A type that can be used for arithmetic operations
+[sealed]
 interface __BuiltinArithmeticType : __BuiltinType
 {
         /// Initialize from a 32-bit signed integer value.
@@ -28,19 +30,24 @@ interface __BuiltinArithmeticType : __BuiltinType
 }
 
     /// A type that can be used for logical/bitwsie operations
+[sealed]
 interface __BuiltinLogicalType : __BuiltinType {}
 
 // A type that logically has a sign (positive/negative/zero)
+[sealed]
 interface __BuiltinSignedArithmeticType : __BuiltinArithmeticType {}
 
 // A type that can represent integers
+[sealed]
 interface __BuiltinIntegerType : __BuiltinArithmeticType
 {}
 
 // A type that can represent non-integers
+[sealed]
 interface __BuiltinRealType : __BuiltinSignedArithmeticType {}
 
 // A type that uses a floating-point representation
+[sealed]
 interface __BuiltinFloatingPointType : __BuiltinRealType
 {
         /// Initialize from a 32-bit floating-point value.
@@ -1917,3 +1924,10 @@ attribute_syntax [__extern] : ExternAttribute;
 
 __attributeTarget(FunctionDeclBase)
 attribute_syntax [__unsafeForceInlineEarly] : UnsafeForceInlineEarlyAttribute;
+
+// Inheritance Control
+__attributeTarget(AggTypeDecl)
+attribute_syntax [sealed] : SealedAttribute;
+
+__attributeTarget(AggTypeDecl)
+attribute_syntax [open] : OpenAttribute;

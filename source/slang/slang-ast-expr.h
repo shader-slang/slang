@@ -228,15 +228,21 @@ class ImplicitCastExpr : public TypeCastExpr
     SLANG_CLASS(ImplicitCastExpr)
 };
 
-    /// A cast from a value to an interface ("existential") type.
-class CastToInterfaceExpr: public Expr
+    /// A cast of a value to a super-type of its type.
+    ///
+    /// The type being cast to is stored as this expression's `type`.
+    ///
+class CastToSuperTypeExpr: public Expr
 {
-    SLANG_CLASS(CastToInterfaceExpr)
+    SLANG_CLASS(CastToSuperTypeExpr)
 
-        /// The value being cast to an interface type
+        /// The value being cast to a super type
+        ///
+        /// The type being case from is `valueArg->type`.
+        ///
     RefPtr<Expr>    valueArg;
 
-        /// A witness showing that `valueArg` conforms to the chosen interface
+        /// A witness showing that `valueArg`'s type is a sub-type of this expression's `type`
     RefPtr<Val>     witnessArg;
 };
 

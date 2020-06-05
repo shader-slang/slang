@@ -520,6 +520,8 @@ bool CUDASourceEmitter::tryEmitInstExprImpl(IRInst* inst, const EmitOpInfo& inOu
         }
         case kIROp_WaveMaskBallot:
         {
+            _requireCUDASMVersion(SemanticVersion(7, 0));
+
             m_writer->emit("__ballot_sync(");
             emitOperand(inst->getOperand(0), getInfo(EmitOp::General));
             m_writer->emit(", ");
@@ -529,12 +531,7 @@ bool CUDASourceEmitter::tryEmitInstExprImpl(IRInst* inst, const EmitOpInfo& inOu
         }
         case kIROp_WaveMaskMatch:
         {
-            SemanticVersion version;
-            version.set(7, 0);
-            if (version > m_extensionTracker->m_smVersion)
-            {
-                m_extensionTracker->m_smVersion = version;
-            }
+            _requireCUDASMVersion(SemanticVersion(7, 0));
 
             m_writer->emit("__match_any_sync(");
             emitOperand(inst->getOperand(0), getInfo(EmitOp::General));
@@ -547,6 +544,14 @@ bool CUDASourceEmitter::tryEmitInstExprImpl(IRInst* inst, const EmitOpInfo& inOu
     }
 
     return Super::tryEmitInstExprImpl(inst, inOuterPrec);
+}
+
+void CUDASourceEmitter::_requireCUDASMVersion(SemanticVersion const& version)
+{
+    if (version > m_extensionTracker->m_smVersion)
+    {
+        m_extensionTracker->m_smVersion = version;
+    }
 }
 
 void CUDASourceEmitter::handleCallExprDecorationsImpl(IRInst* funcValue)
@@ -566,11 +571,7 @@ void CUDASourceEmitter::handleCallExprDecorationsImpl(IRInst* funcValue)
         {
             SemanticVersion version;
             version.setFromInteger(SemanticVersion::IntegerType(smDecoration->getCUDASMVersion()));
-
-            if (version > m_extensionTracker->m_smVersion)
-            {
-                m_extensionTracker->m_smVersion = version;
-            }
+            _requireCUDASMVersion(version);
         }
     }
 }
