@@ -11,17 +11,7 @@ namespace Slang {
 
 // !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! Type !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 
-Type::~Type()
-{
-    // If the canonicalType !=nullptr AND it is not set to this (ie the canonicalType is another object)
-    // then it needs to be released because it's owned by this object.
-    if (canonicalType && canonicalType != this)
-    {
-        canonicalType->releaseReference();
-    }
-}
-
-RefPtr<Type> Type::createCanonicalType()
+Type* Type::createCanonicalType()
 {
     SLANG_AST_NODE_VIRTUAL_CALL(Type, createCanonicalType, ())
 }
@@ -43,10 +33,10 @@ bool Type::_equalsImplOverride(Type* type)
     //return false;
 }
 
-RefPtr<Type> Type::_createCanonicalTypeOverride()
+Type* Type::_createCanonicalTypeOverride()
 {
     SLANG_UNEXPECTED("Type::_createCanonicalTypeOverride not overridden");
-    //return RefPtr<Type>();
+    //return Type*();
 }
 
 bool Type::_equalsValOverride(Val* val)
@@ -56,7 +46,7 @@ bool Type::_equalsValOverride(Val* val)
     return false;
 }
 
-RefPtr<Val> Type::_substituteImplOverride(ASTBuilder* astBuilder, SubstitutionSet subst, int* ioDiff)
+Val* Type::_substituteImplOverride(ASTBuilder* astBuilder, SubstitutionSet subst, int* ioDiff)
 {
     int diff = 0;
     auto canSubst = getCanonicalType()->substituteImpl(astBuilder, subst, &diff);
@@ -80,12 +70,6 @@ Type* Type::getCanonicalType()
         auto canType = et->createCanonicalType();
         et->canonicalType = canType;
 
-        // TODO(js): That this detachs when canType == this is a little surprising. It would seem
-        // as if this would create a circular reference on the object, but in practice there are
-        // no leaks so appears correct.
-        // That the dtor only releases if != this, also makes it surprising.
-        canType.detach();
-
         SLANG_ASSERT(et->canonicalType);
     }
     return et->canonicalType;
@@ -103,7 +87,7 @@ bool OverloadGroupType::_equalsImplOverride(Type * /*type*/)
     return false;
 }
 
-RefPtr<Type> OverloadGroupType::_createCanonicalTypeOverride()
+Type* OverloadGroupType::_createCanonicalTypeOverride()
 {
     return this;
 }
@@ -125,7 +109,7 @@ bool InitializerListType::_equalsImplOverride(Type * /*type*/)
     return false;
 }
 
-RefPtr<Type> InitializerListType::_createCanonicalTypeOverride()
+Type* InitializerListType::_createCanonicalTypeOverride()
 {
     return this;
 }
@@ -149,12 +133,12 @@ bool ErrorType::_equalsImplOverride(Type* type)
     return false;
 }
 
-RefPtr<Type> ErrorType::_createCanonicalTypeOverride()
+Type* ErrorType::_createCanonicalTypeOverride()
 {
     return this;
 }
 
-RefPtr<Val> ErrorType::_substituteImplOverride(ASTBuilder* /* astBuilder */, SubstitutionSet /*subst*/, int* /*ioDiff*/)
+Val* ErrorType::_substituteImplOverride(ASTBuilder* /* astBuilder */, SubstitutionSet /*subst*/, int* /*ioDiff*/)
 {
     return this;
 }
@@ -185,13 +169,13 @@ bool DeclRefType::_equalsImplOverride(Type * type)
     return false;
 }
 
-RefPtr<Type> DeclRefType::_createCanonicalTypeOverride()
+Type* DeclRefType::_createCanonicalTypeOverride()
 {
     // A declaration reference is already canonical
     return this;
 }
 
-RefPtr<Val> DeclRefType::_substituteImplOverride(ASTBuilder* astBuilder, SubstitutionSet subst, int* ioDiff)
+Val* DeclRefType::_substituteImplOverride(ASTBuilder* astBuilder, SubstitutionSet subst, int* ioDiff)
 {
     if (!subst) return this;
 
@@ -202,7 +186,7 @@ RefPtr<Val> DeclRefType::_substituteImplOverride(ASTBuilder* astBuilder, Substit
         // search for a substitution that might apply to us
         for (auto s = subst.substitutions; s; s = s->outer)
         {
-            auto genericSubst = s.as<GenericSubstitution>();
+            auto genericSubst = as<GenericSubstitution>(s);
             if (!genericSubst)
                 continue;
 
@@ -215,7 +199,7 @@ RefPtr<Val> DeclRefType::_substituteImplOverride(ASTBuilder* astBuilder, Substit
             int index = 0;
             for (auto m : genericDecl->members)
             {
-                if (m.Ptr() == genericTypeParamDecl)
+                if (m == genericTypeParamDecl)
                 {
                     // We've found it, so return the corresponding specialization argument
                     (*ioDiff)++;
@@ -269,7 +253,7 @@ RefPtr<Val> DeclRefType::_substituteImplOverride(ASTBuilder* astBuilder, Substit
     {
         for (auto s = substDeclRef.substitutions.substitutions; s; s = s->outer)
         {
-            auto thisSubst = s.as<ThisTypeSubstitution>();
+            auto thisSubst = as<ThisTypeSubstitution>(s);
             if (!thisSubst)
                 continue;
 
@@ -325,7 +309,7 @@ bool BasicExpressionType::_equalsImplOverride(Type * type)
     return basicType && basicType->baseType == this->baseType;
 }
 
-RefPtr<Type> BasicExpressionType::_createCanonicalTypeOverride()
+Type* BasicExpressionType::_createCanonicalTypeOverride()
 {
     // A basic type is already canonical, in our setup
     return this;
@@ -379,7 +363,7 @@ IntVal* MatrixExpressionType::getColumnCount()
     return as<IntVal>(findInnerMostGenericSubstitution(declRef.substitutions)->args[2]);
 }
 
-RefPtr<Type> MatrixExpressionType::getRowType()
+Type* MatrixExpressionType::getRowType()
 {
     if (!rowType)
     {
@@ -395,14 +379,14 @@ bool ArrayExpressionType::_equalsImplOverride(Type* type)
     auto arrType = as<ArrayExpressionType>(type);
     if (!arrType)
         return false;
-    return (areValsEqual(arrayLength, arrType->arrayLength) && baseType->equals(arrType->baseType.Ptr()));
+    return (areValsEqual(arrayLength, arrType->arrayLength) && baseType->equals(arrType->baseType));
 }
 
-RefPtr<Val> ArrayExpressionType::_substituteImplOverride(ASTBuilder* astBuilder, SubstitutionSet subst, int* ioDiff)
+Val* ArrayExpressionType::_substituteImplOverride(ASTBuilder* astBuilder, SubstitutionSet subst, int* ioDiff)
 {
     int diff = 0;
-    auto elementType = baseType->substituteImpl(astBuilder, subst, &diff).as<Type>();
-    auto arrlen = arrayLength->substituteImpl(astBuilder, subst, &diff).as<IntVal>();
+    auto elementType = as<Type>(baseType->substituteImpl(astBuilder, subst, &diff));
+    auto arrlen = as<IntVal>(arrayLength->substituteImpl(astBuilder, subst, &diff));
     SLANG_ASSERT(arrlen);
     if (diff)
     {
@@ -416,7 +400,7 @@ RefPtr<Val> ArrayExpressionType::_substituteImplOverride(ASTBuilder* astBuilder,
     return this;
 }
 
-RefPtr<Type> ArrayExpressionType::_createCanonicalTypeOverride()
+Type* ArrayExpressionType::_createCanonicalTypeOverride()
 {
     auto canonicalElementType = baseType->getCanonicalType();
     auto canonicalArrayType = getASTBuilder()->getArrayType(
@@ -459,7 +443,7 @@ bool TypeType::_equalsImplOverride(Type * t)
     return false;
 }
 
-RefPtr<Type> TypeType::_createCanonicalTypeOverride()
+Type* TypeType::_createCanonicalTypeOverride()
 {
     return getASTBuilder()->getTypeType(type->getCanonicalType());
 }
@@ -492,7 +476,7 @@ HashCode GenericDeclRefType::_getHashCodeOverride()
     return declRef.getHashCode();
 }
 
-RefPtr<Type> GenericDeclRefType::_createCanonicalTypeOverride()
+Type* GenericDeclRefType::_createCanonicalTypeOverride()
 {
     return this;
 }
@@ -521,7 +505,7 @@ HashCode NamespaceType::_getHashCodeOverride()
     return declRef.getHashCode();
 }
 
-RefPtr<Type> NamespaceType::_createCanonicalTypeOverride()
+Type* NamespaceType::_createCanonicalTypeOverride()
 {
     return this;
 }
@@ -547,7 +531,7 @@ bool NamedExpressionType::_equalsImplOverride(Type * /*type*/)
     //return false;
 }
 
-RefPtr<Type> NamedExpressionType::_createCanonicalTypeOverride()
+Type* NamedExpressionType::_createCanonicalTypeOverride()
 {
     if (!innerType)
         innerType = getType(m_astBuilder, declRef);
@@ -613,18 +597,18 @@ bool FuncType::_equalsImplOverride(Type * type)
     return false;
 }
 
-RefPtr<Val> FuncType::_substituteImplOverride(ASTBuilder* astBuilder, SubstitutionSet subst, int* ioDiff)
+Val* FuncType::_substituteImplOverride(ASTBuilder* astBuilder, SubstitutionSet subst, int* ioDiff)
 {
     int diff = 0;
 
     // result type
-    RefPtr<Type> substResultType = resultType->substituteImpl(astBuilder, subst, &diff).as<Type>();
+    Type* substResultType = as<Type>(resultType->substituteImpl(astBuilder, subst, &diff));
 
     // parameter types
-    List<RefPtr<Type>> substParamTypes;
+    List<Type*> substParamTypes;
     for (auto pp : paramTypes)
     {
-        substParamTypes.add(pp->substituteImpl(astBuilder, subst, &diff).as<Type>());
+        substParamTypes.add(as<Type>(pp->substituteImpl(astBuilder, subst, &diff)));
     }
 
     // early exit for no change...
@@ -632,26 +616,26 @@ RefPtr<Val> FuncType::_substituteImplOverride(ASTBuilder* astBuilder, Substituti
         return this;
 
     (*ioDiff)++;
-    RefPtr<FuncType> substType = astBuilder->create<FuncType>();
+    FuncType* substType = astBuilder->create<FuncType>();
     substType->resultType = substResultType;
     substType->paramTypes = substParamTypes;
     return substType;
 }
 
-RefPtr<Type> FuncType::_createCanonicalTypeOverride()
+Type* FuncType::_createCanonicalTypeOverride()
 {
     // result type
-    RefPtr<Type> canResultType = resultType->getCanonicalType();
+    Type* canResultType = resultType->getCanonicalType();
 
     // parameter types
-    List<RefPtr<Type>> canParamTypes;
+    List<Type*> canParamTypes;
     for (auto pp : paramTypes)
     {
         canParamTypes.add(pp->getCanonicalType());
     }
 
-    RefPtr<FuncType> canType = getASTBuilder()->create<FuncType>();
-    canType->resultType = resultType;
+    FuncType* canType = getASTBuilder()->create<FuncType>();
+    canType->resultType = canResultType;
     canType->paramTypes = canParamTypes;
 
     return canType;
@@ -695,12 +679,12 @@ HashCode ExtractExistentialType::_getHashCodeOverride()
     return declRef.getHashCode();
 }
 
-RefPtr<Type> ExtractExistentialType::_createCanonicalTypeOverride()
+Type* ExtractExistentialType::_createCanonicalTypeOverride()
 {
     return this;
 }
 
-RefPtr<Val> ExtractExistentialType::_substituteImplOverride(ASTBuilder* astBuilder, SubstitutionSet subst, int* ioDiff)
+Val* ExtractExistentialType::_substituteImplOverride(ASTBuilder* astBuilder, SubstitutionSet subst, int* ioDiff)
 {
     int diff = 0;
     auto substDeclRef = declRef.substituteImpl(astBuilder, subst, &diff);
@@ -709,7 +693,7 @@ RefPtr<Val> ExtractExistentialType::_substituteImplOverride(ASTBuilder* astBuild
 
     (*ioDiff)++;
 
-    RefPtr<ExtractExistentialType> substValue = astBuilder->create<ExtractExistentialType>();
+    ExtractExistentialType* substValue = astBuilder->create<ExtractExistentialType>();
     substValue->declRef = declRef;
     return substValue;
 }
@@ -760,9 +744,9 @@ HashCode TaggedUnionType::_getHashCodeOverride()
     return hashCode;
 }
 
-RefPtr<Type> TaggedUnionType::_createCanonicalTypeOverride()
+Type* TaggedUnionType::_createCanonicalTypeOverride()
 {
-    RefPtr<TaggedUnionType> canType = m_astBuilder->create<TaggedUnionType>();
+    TaggedUnionType* canType = m_astBuilder->create<TaggedUnionType>();
 
     for (auto caseType : caseTypes)
     {
@@ -773,21 +757,21 @@ RefPtr<Type> TaggedUnionType::_createCanonicalTypeOverride()
     return canType;
 }
 
-RefPtr<Val> TaggedUnionType::_substituteImplOverride(ASTBuilder* astBuilder, SubstitutionSet subst, int* ioDiff)
+Val* TaggedUnionType::_substituteImplOverride(ASTBuilder* astBuilder, SubstitutionSet subst, int* ioDiff)
 {
     int diff = 0;
 
-    List<RefPtr<Type>> substCaseTypes;
+    List<Type*> substCaseTypes;
     for (auto caseType : caseTypes)
     {
-        substCaseTypes.add(caseType->substituteImpl(astBuilder, subst, &diff).as<Type>());
+        substCaseTypes.add(as<Type>(caseType->substituteImpl(astBuilder, subst, &diff)));
     }
     if (!diff)
         return this;
 
     (*ioDiff)++;
 
-    RefPtr<TaggedUnionType> substType = astBuilder->create<TaggedUnionType>();
+    TaggedUnionType* substType = astBuilder->create<TaggedUnionType>();
     substType->caseTypes.swapWith(substCaseTypes);
     return substType;
 }
@@ -848,7 +832,7 @@ HashCode ExistentialSpecializedType::_getHashCodeOverride()
     return hasher.getResult();
 }
 
-static RefPtr<Val> _getCanonicalValue(Val* val)
+static Val* _getCanonicalValue(Val* val)
 {
     if (!val)
         return nullptr;
@@ -861,9 +845,9 @@ static RefPtr<Val> _getCanonicalValue(Val* val)
     return val;
 }
 
-RefPtr<Type> ExistentialSpecializedType::_createCanonicalTypeOverride()
+Type* ExistentialSpecializedType::_createCanonicalTypeOverride()
 {
-    RefPtr<ExistentialSpecializedType> canType = m_astBuilder->create<ExistentialSpecializedType>();
+    ExistentialSpecializedType* canType = m_astBuilder->create<ExistentialSpecializedType>();
 
     canType->baseType = baseType->getCanonicalType();
     for (auto arg : args)
@@ -876,17 +860,17 @@ RefPtr<Type> ExistentialSpecializedType::_createCanonicalTypeOverride()
     return canType;
 }
 
-static RefPtr<Val> _substituteImpl(ASTBuilder* astBuilder, Val* val, SubstitutionSet subst, int* ioDiff)
+static Val* _substituteImpl(ASTBuilder* astBuilder, Val* val, SubstitutionSet subst, int* ioDiff)
 {
     if (!val) return nullptr;
     return val->substituteImpl(astBuilder, subst, ioDiff);
 }
 
-RefPtr<Val> ExistentialSpecializedType::_substituteImplOverride(ASTBuilder* astBuilder, SubstitutionSet subst, int* ioDiff)
+Val* ExistentialSpecializedType::_substituteImplOverride(ASTBuilder* astBuilder, SubstitutionSet subst, int* ioDiff)
 {
     int diff = 0;
 
-    auto substBaseType = baseType->substituteImpl(astBuilder, subst, &diff).as<Type>();
+    auto substBaseType = as<Type>(baseType->substituteImpl(astBuilder, subst, &diff));
 
     ExpandedSpecializationArgs substArgs;
     for (auto arg : args)
@@ -902,7 +886,7 @@ RefPtr<Val> ExistentialSpecializedType::_substituteImplOverride(ASTBuilder* astB
 
     (*ioDiff)++;
 
-    RefPtr<ExistentialSpecializedType> substType = astBuilder->create<ExistentialSpecializedType>();
+    ExistentialSpecializedType* substType = astBuilder->create<ExistentialSpecializedType>();
     substType->baseType = substBaseType;
     substType->args = substArgs;
     return substType;
@@ -937,16 +921,16 @@ HashCode ThisType::_getHashCodeOverride()
         interfaceDeclRef.getHashCode());
 }
 
-RefPtr<Type> ThisType::_createCanonicalTypeOverride()
+Type* ThisType::_createCanonicalTypeOverride()
 {
-    RefPtr<ThisType> canType = m_astBuilder->create<ThisType>();
+    ThisType* canType = m_astBuilder->create<ThisType>();
 
     // TODO: need to canonicalize the decl-ref
     canType->interfaceDeclRef = interfaceDeclRef;
     return canType;
 }
 
-RefPtr<Val> ThisType::_substituteImplOverride(ASTBuilder* astBuilder, SubstitutionSet subst, int* ioDiff)
+Val* ThisType::_substituteImplOverride(ASTBuilder* astBuilder, SubstitutionSet subst, int* ioDiff)
 {
     int diff = 0;
 
@@ -963,7 +947,7 @@ RefPtr<Val> ThisType::_substituteImplOverride(ASTBuilder* astBuilder, Substituti
 
     (*ioDiff)++;
 
-    RefPtr<ThisType> substType = m_astBuilder->create<ThisType>();
+    ThisType* substType = m_astBuilder->create<ThisType>();
     substType->interfaceDeclRef = substInterfaceDeclRef;
     return substType;
 }

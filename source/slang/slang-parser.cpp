@@ -50,11 +50,11 @@ namespace Slang
         {
             return find<T>() != nullptr;
         }
-        RefPtr<Modifier> getFirst() { return m_result; };
+        Modifier* getFirst() { return m_result; };
     protected:
 
-        RefPtr<Modifier> m_result;
-        RefPtr<Modifier>* m_next;
+        Modifier* m_result = nullptr;
+        Modifier** m_next;
     };
 
     enum Precedence : int
@@ -151,28 +151,28 @@ namespace Slang
         bool LookAheadToken(TokenType type, int offset = 0);
         bool LookAheadToken(const char * string, int offset = 0);
         void                                        parseSourceFile(ModuleDecl* program);
-        RefPtr<Decl>					ParseStruct();
-        RefPtr<ClassDecl>					    ParseClass();
-        RefPtr<Stmt>					ParseStatement();
-        RefPtr<Stmt>			        parseBlockStatement();
-        RefPtr<DeclStmt>			parseVarDeclrStatement(Modifiers modifiers);
-        RefPtr<IfStmt>				parseIfStatement();
-        RefPtr<ForStmt>				ParseForStatement();
-        RefPtr<WhileStmt>			ParseWhileStatement();
-        RefPtr<DoWhileStmt>			ParseDoWhileStatement();
-        RefPtr<BreakStmt>			ParseBreakStatement();
-        RefPtr<ContinueStmt>			ParseContinueStatement();
-        RefPtr<ReturnStmt>			ParseReturnStatement();
-        RefPtr<ExpressionStmt>		ParseExpressionStatement();
-        RefPtr<Expr>				ParseExpression(Precedence level = Precedence::Comma);
+        Decl*					ParseStruct();
+        ClassDecl*					    ParseClass();
+        Stmt*					ParseStatement();
+        Stmt*			        parseBlockStatement();
+        DeclStmt*			parseVarDeclrStatement(Modifiers modifiers);
+        IfStmt*				parseIfStatement();
+        ForStmt*				ParseForStatement();
+        WhileStmt*			ParseWhileStatement();
+        DoWhileStmt*			ParseDoWhileStatement();
+        BreakStmt*			ParseBreakStatement();
+        ContinueStmt*			ParseContinueStatement();
+        ReturnStmt*			ParseReturnStatement();
+        ExpressionStmt*		ParseExpressionStatement();
+        Expr*				ParseExpression(Precedence level = Precedence::Comma);
 
         // Parse an expression that might be used in an initializer or argument context, so we should avoid operator-comma
-        inline RefPtr<Expr>			ParseInitExpr() { return ParseExpression(Precedence::Assignment); }
-        inline RefPtr<Expr>			ParseArgExpr()  { return ParseExpression(Precedence::Assignment); }
+        inline Expr*			ParseInitExpr() { return ParseExpression(Precedence::Assignment); }
+        inline Expr*			ParseArgExpr()  { return ParseExpression(Precedence::Assignment); }
 
-        RefPtr<Expr>				ParseLeafExpression();
-        RefPtr<ParamDecl>					ParseParameter();
-        RefPtr<Expr>				ParseType();
+        Expr*				ParseLeafExpression();
+        ParamDecl*					ParseParameter();
+        Expr*				ParseType();
         TypeExp										ParseTypeExp();
 
         Parser & operator = (const Parser &) = delete;
@@ -191,20 +191,20 @@ namespace Slang
         Parser*         parser,
         ContainerDecl*  parent);
 
-    static RefPtr<Decl> parseEnumDecl(Parser* parser);
+    static Decl* parseEnumDecl(Parser* parser);
 
-    static RefPtr<Modifier> ParseOptSemantics(
+    static Modifier* ParseOptSemantics(
         Parser* parser);
 
     static void ParseOptSemantics(
         Parser* parser,
         Decl*	decl);
 
-    static RefPtr<DeclBase> ParseDecl(
+    static DeclBase* ParseDecl(
         Parser*			parser,
         ContainerDecl*	containerDecl);
 
-    static RefPtr<Decl> ParseSingleDecl(
+    static Decl* ParseSingleDecl(
         Parser*			parser,
         ContainerDecl*	containerDecl);
 
@@ -586,9 +586,9 @@ namespace Slang
         return false;
     }
 
-    RefPtr<RefObject> ParseTypeDef(Parser* parser, void* /*userData*/)
+    NodeBase* ParseTypeDef(Parser* parser, void* /*userData*/)
     {
-        RefPtr<TypeDefDecl> typeDefDecl = parser->astBuilder->create<TypeDefDecl>();
+        TypeDefDecl* typeDefDecl = parser->astBuilder->create<TypeDefDecl>();
 
         // TODO(tfoley): parse an actual declarator
         auto type = parser->ParseTypeExp();
@@ -603,9 +603,9 @@ namespace Slang
     }
 
     // Add a modifier to a list of modifiers being built
-    static void AddModifier(RefPtr<Modifier>** ioModifierLink, RefPtr<Modifier> modifier)
+    static void AddModifier(Modifier*** ioModifierLink, Modifier* modifier)
     {
-        RefPtr<Modifier>*& modifierLink = *ioModifierLink;
+        Modifier**& modifierLink = *ioModifierLink;
 
         // We'd like to add the modifier to the end of the list,
         // but we need to be careful, in case there is a "shared"
@@ -620,7 +620,7 @@ namespace Slang
                 break;
 
             // About to look at shared modifiers? Done.
-            RefPtr<Modifier> linkMod = *modifierLink;
+            Modifier* linkMod = *modifierLink;
             if(as<SharedModifiers>(linkMod))
             {
                 break;
@@ -648,8 +648,8 @@ namespace Slang
     }
 
     void addModifier(
-        RefPtr<ModifiableSyntaxNode>    syntax,
-        RefPtr<Modifier>                modifier)
+        ModifiableSyntaxNode*    syntax,
+        Modifier*                modifier)
     {
         auto modifierLink = &syntax->modifiers.first;
         AddModifier(&modifierLink, modifier);
@@ -706,7 +706,7 @@ namespace Slang
     }
 
     // Parse HLSL-style `[name(arg, ...)]` style "attribute" modifiers
-    static void ParseSquareBracketAttributes(Parser* parser, RefPtr<Modifier>** ioModifierLink)
+    static void ParseSquareBracketAttributes(Parser* parser, Modifier*** ioModifierLink)
     {
         parser->ReadToken(TokenType::LBracket);
 
@@ -725,7 +725,7 @@ namespace Slang
 
             Token nameToken = parseAttributeName(parser);
 
-            RefPtr<UncheckedAttribute> modifier = parser->astBuilder->create<UncheckedAttribute>();
+            UncheckedAttribute* modifier = parser->astBuilder->create<UncheckedAttribute>();
             modifier->name = nameToken.getName();
             modifier->loc = nameToken.getLoc();
             modifier->scope = parser->currentScope;
@@ -811,7 +811,7 @@ namespace Slang
     bool tryParseUsingSyntaxDecl(
         Parser*     parser,
         SyntaxDecl* syntaxDecl,
-        RefPtr<T>*  outSyntax)
+        T**  outSyntax)
     {
         if (!syntaxDecl)
             return false;
@@ -822,7 +822,7 @@ namespace Slang
         // Consume the token that specified the keyword
         auto keywordToken = advanceToken(parser);
 
-        RefPtr<RefObject> parsedObject = syntaxDecl->parseCallback(parser, syntaxDecl->parseUserData);
+        NodeBase* parsedObject = syntaxDecl->parseCallback(parser, syntaxDecl->parseUserData);
         if (!parsedObject)
         {
             return false;
@@ -849,7 +849,7 @@ namespace Slang
     template<typename T>
     bool tryParseUsingSyntaxDecl(
         Parser*     parser,
-        RefPtr<T>*  outSyntax)
+        T**  outSyntax)
     {
         if (peekTokenType(parser) != TokenType::Identifier)
             return false;
@@ -868,7 +868,7 @@ namespace Slang
     static Modifiers ParseModifiers(Parser* parser)
     {
         Modifiers modifiers;
-        RefPtr<Modifier>* modifierLink = &modifiers.first;
+        Modifier** modifierLink = &modifiers.first;
         for (;;)
         {
             SourceLoc loc = parser->tokenReader.peekLoc();
@@ -887,7 +887,7 @@ namespace Slang
 
                     Token nameToken = peekToken(parser);
 
-                    RefPtr<Modifier> parsedModifier;
+                    Modifier* parsedModifier = nullptr;
                     if (tryParseUsingSyntaxDecl<Modifier>(parser, &parsedModifier))
                     {
                         parsedModifier->name = nameToken.getName();
@@ -926,7 +926,7 @@ namespace Slang
     }
 
 
-    static RefPtr<RefObject> parseImportDecl(
+    static NodeBase* parseImportDecl(
         Parser* parser, void* /*userData*/)
     {
         parser->haveSeenAnyImportDecls = true;
@@ -1060,30 +1060,30 @@ namespace Slang
         SourceLoc openBracketLoc;
 
         // The expression that yields the element count, or NULL
-        RefPtr<Expr>	elementCountExpr;
+        Expr*	elementCountExpr = nullptr;
     };
 
     // "Unwrapped" information about a declarator
     struct DeclaratorInfo
     {
-        RefPtr<Expr>	    typeSpec;
+        Expr*	    typeSpec = nullptr;
         NameLoc             nameAndLoc;
-        RefPtr<Modifier>	semantics;
-        RefPtr<Expr>	    initializer;
+        Modifier*	semantics = nullptr;
+        Expr*	    initializer = nullptr;
     };
 
     // Add a member declaration to its container, and ensure that its
     // parent link is set up correctly.
-    static void AddMember(RefPtr<ContainerDecl> container, RefPtr<Decl> member)
+    static void AddMember(ContainerDecl* container, Decl* member)
     {
         if (container)
         {
-            member->parentDecl = container.Ptr();
+            member->parentDecl = container;
             container->members.add(member);
         }
     }
 
-    static void AddMember(RefPtr<Scope> scope, RefPtr<Decl> member)
+    static void AddMember(RefPtr<Scope> scope, Decl* member)
     {
         if (scope)
         {
@@ -1091,9 +1091,9 @@ namespace Slang
         }
     }
 
-    static RefPtr<Decl> ParseGenericParamDecl(
+    static Decl* ParseGenericParamDecl(
         Parser*             parser,
-        RefPtr<GenericDecl> genericDecl)
+        GenericDecl* genericDecl)
     {
         // simple syntax to introduce a value parameter
         if (AdvanceIf(parser, "let"))
@@ -1114,7 +1114,7 @@ namespace Slang
         else
         {
             // default case is a type parameter
-            RefPtr<GenericTypeParamDecl> paramDecl = parser->astBuilder->create<GenericTypeParamDecl>();
+            GenericTypeParamDecl* paramDecl = parser->astBuilder->create<GenericTypeParamDecl>();
             parser->FillPosition(paramDecl);
             paramDecl->nameAndLoc = NameLoc(parser->ReadToken(TokenType::Identifier));
             if (AdvanceIf(parser, TokenType::Colon))
@@ -1178,13 +1178,13 @@ namespace Slang
     }
 
     template<typename ParseFunc>
-    static RefPtr<Decl> parseOptGenericDecl(
+    static Decl* parseOptGenericDecl(
         Parser* parser, const ParseFunc& parseInner)
     {
         // TODO: may want more advanced disambiguation than this...
         if (parser->LookAheadToken(TokenType::OpLess))
         {
-            RefPtr<GenericDecl> genericDecl = parser->astBuilder->create<GenericDecl>();
+            GenericDecl* genericDecl = parser->astBuilder->create<GenericDecl>();
             parser->FillPosition(genericDecl);
             parser->PushScope(genericDecl);
             ParseGenericDeclImpl(parser, genericDecl, parseInner);
@@ -1197,19 +1197,19 @@ namespace Slang
         }
     }
 
-    static RefPtr<RefObject> ParseGenericDecl(Parser* parser, void*)
+    static NodeBase* ParseGenericDecl(Parser* parser, void*)
     {
-        RefPtr<GenericDecl> decl = parser->astBuilder->create<GenericDecl>();
-        parser->FillPosition(decl.Ptr());
-        parser->PushScope(decl.Ptr());
-        ParseGenericDeclImpl(parser, decl.Ptr(), [=](GenericDecl* genDecl) {return ParseSingleDecl(parser, genDecl); });
+        GenericDecl* decl = parser->astBuilder->create<GenericDecl>();
+        parser->FillPosition(decl);
+        parser->PushScope(decl);
+        ParseGenericDeclImpl(parser, decl, [=](GenericDecl* genDecl) {return ParseSingleDecl(parser, genDecl); });
         parser->PopScope();
         return decl;
     }
 
     static void parseParameterList(
         Parser*                 parser,
-        RefPtr<CallableDecl>    decl)
+        CallableDecl*    decl)
     {
         parser->ReadToken(TokenType::LParent);
 
@@ -1270,7 +1270,7 @@ namespace Slang
     };
 
         /// Parse an optional body statement for a declaration that can have a body.
-    static RefPtr<Stmt> parseOptBody(Parser* parser)
+    static Stmt* parseOptBody(Parser* parser)
     {
         if (AdvanceIf(parser, TokenType::Semicolon))
         {
@@ -1284,12 +1284,12 @@ namespace Slang
     }
 
         /// Complete parsing of a function using traditional (C-like) declarator syntax
-    static RefPtr<Decl> parseTraditionalFuncDecl(
+    static Decl* parseTraditionalFuncDecl(
         Parser*                 parser,
         DeclaratorInfo const&   declaratorInfo)
     {
-        RefPtr<FuncDecl> decl = parser->astBuilder->create<FuncDecl>();
-        parser->FillPosition(decl.Ptr());
+        FuncDecl* decl = parser->astBuilder->create<FuncDecl>();
+        parser->FillPosition(decl);
         decl->loc = declaratorInfo.nameAndLoc.loc;
         decl->nameAndLoc = declaratorInfo.nameAndLoc;
 
@@ -1315,7 +1315,7 @@ namespace Slang
             parser->PushScope(decl);
 
             parseParameterList(parser, decl);
-            ParseOptSemantics(parser, decl.Ptr());
+            ParseOptSemantics(parser, decl);
             decl->body = parseOptBody(parser);
 
             parser->PopScope();
@@ -1324,7 +1324,7 @@ namespace Slang
         });
     }
 
-    static RefPtr<VarDeclBase> CreateVarDeclForContext(
+    static VarDeclBase* CreateVarDeclForContext(
         ASTBuilder* astBuilder, 
         ContainerDecl*  containerDecl )
     {
@@ -1343,12 +1343,12 @@ namespace Slang
     }
 
     // Add modifiers to the end of the modifier list for a declaration
-    void AddModifiers(Decl* decl, RefPtr<Modifier> modifiers)
+    void AddModifiers(Decl* decl, Modifier* modifiers)
     {
         if (!modifiers)
             return;
 
-        RefPtr<Modifier>* link = &decl->modifiers.first;
+        Modifier** link = &decl->modifiers.first;
         while (*link)
         {
             link = &(*link)->next;
@@ -1371,10 +1371,10 @@ namespace Slang
     // Set up a variable declaration based on what we saw in its declarator...
     static void CompleteVarDecl(
         Parser*					parser,
-        RefPtr<VarDeclBase>		decl,
+        VarDeclBase*		decl,
         DeclaratorInfo const&	declaratorInfo)
     {
-        parser->FillPosition(decl.Ptr());
+        parser->FillPosition(decl);
 
         if( !declaratorInfo.nameAndLoc.name )
         {
@@ -1388,7 +1388,7 @@ namespace Slang
         }
         decl->type = TypeExp(declaratorInfo.typeSpec);
 
-        AddModifiers(decl.Ptr(), declaratorInfo.semantics);
+        AddModifiers(decl, declaratorInfo.semantics);
 
         decl->initExpr = declaratorInfo.initializer;
     }
@@ -1527,8 +1527,8 @@ namespace Slang
     struct InitDeclarator
     {
         RefPtr<Declarator>  declarator;
-        RefPtr<Modifier>    semantics;
-        RefPtr<Expr>        initializer;
+        Modifier*    semantics = nullptr;
+        Expr*        initializer = nullptr;
     };
 
     // Parse a declarator plus optional semantics
@@ -1619,13 +1619,13 @@ namespace Slang
     struct DeclGroupBuilder
     {
         SourceLoc        startPosition;
-        RefPtr<Decl>        decl;
-        RefPtr<DeclGroup>   group;
+        Decl*        decl = nullptr;
+        DeclGroup*   group = nullptr;
         ASTBuilder*      astBuilder = nullptr;
 
         // Add a new declaration to the potential group
         void addDecl(
-            RefPtr<Decl>    newDecl)
+            Decl*    newDecl)
         {
             SLANG_ASSERT(newDecl);
 
@@ -1647,7 +1647,7 @@ namespace Slang
             }
         }
 
-        RefPtr<DeclBase> getResult()
+        DeclBase* getResult()
         {
             if(group) return group;
             return decl;
@@ -1655,14 +1655,14 @@ namespace Slang
     };
 
     // Pares an argument to an application of a generic
-    RefPtr<Expr> ParseGenericArg(Parser* parser)
+    Expr* ParseGenericArg(Parser* parser)
     {
         return parser->ParseArgExpr();
     }
 
     // Create a type expression that will refer to the given declaration
-    static RefPtr<Expr>
-    createDeclRefType(Parser* parser, RefPtr<Decl> decl)
+    static Expr*
+    createDeclRefType(Parser* parser, Decl* decl)
     {
         // For now we just construct an expression that
         // will look up the given declaration by name.
@@ -1681,19 +1681,19 @@ namespace Slang
     struct TypeSpec
     {
         // If the type-spec declared something, then put it here
-        RefPtr<Decl>                    decl;
+        Decl*                    decl = nullptr;
 
         // Put the resulting expression (which should evaluate to a type) here
-        RefPtr<Expr>    expr;
+        Expr*    expr = nullptr;
     };
 
-    static RefPtr<Expr> parseGenericApp(
+    static Expr* parseGenericApp(
         Parser*                         parser,
-        RefPtr<Expr>    base)
+        Expr*    base)
     {
-        RefPtr<GenericAppExpr> genericApp = parser->astBuilder->create<GenericAppExpr>();
+        GenericAppExpr* genericApp = parser->astBuilder->create<GenericAppExpr>();
 
-        parser->FillPosition(genericApp.Ptr()); // set up scope for lookup
+        parser->FillPosition(genericApp); // set up scope for lookup
         genericApp->functionExpr = base;
         parser->ReadToken(TokenType::OpLess);
         parser->genericDepth++;
@@ -1730,9 +1730,9 @@ namespace Slang
         return lookupResult.item.declRef.is<GenericDecl>();
     }
 
-    static RefPtr<Expr> tryParseGenericApp(
+    static Expr* tryParseGenericApp(
         Parser*                         parser,
-        RefPtr<Expr>    base)
+        Expr*    base)
     {
         Name * baseName = nullptr;
         if (auto varExpr = as<VarExpr>(base))
@@ -1748,7 +1748,9 @@ namespace Slang
         DiagnosticSink newSink(parser->sink->getSourceManager());
         Parser newParser(*parser);
         newParser.sink = &newSink;
-        auto speculateParseRs = parseGenericApp(&newParser, base);
+
+        /* auto speculateParseRs = */parseGenericApp(&newParser, base);
+
         if (newSink.getErrorCount() == 0)
         {
             // disambiguate based on FOLLOW set
@@ -1771,27 +1773,27 @@ namespace Slang
         }
         return base;
     }
-    static RefPtr<Expr> parseMemberType(Parser * parser, RefPtr<Expr> base)
+    static Expr* parseMemberType(Parser * parser, Expr* base)
     {
         // When called the :: or . have been consumed, so don't need to consume here.
 
-        RefPtr<MemberExpr> memberExpr = parser->astBuilder->create<MemberExpr>();
+        MemberExpr* memberExpr = parser->astBuilder->create<MemberExpr>();
 
-        parser->FillPosition(memberExpr.Ptr());
+        parser->FillPosition(memberExpr);
         memberExpr->baseExpression = base;
         memberExpr->name = expectIdentifier(parser).name;
         return memberExpr;
     }
 
     // Parse option `[]` braces after a type expression, that indicate an array type
-    static RefPtr<Expr> parsePostfixTypeSuffix(
+    static Expr* parsePostfixTypeSuffix(
         Parser* parser,
-        RefPtr<Expr> inTypeExpr)
+        Expr* inTypeExpr)
     {
         auto typeExpr = inTypeExpr;
         while (parser->LookAheadToken(TokenType::LBracket))
         {
-            RefPtr<IndexExpr> arrType = parser->astBuilder->create<IndexExpr>();
+            IndexExpr* arrType = parser->astBuilder->create<IndexExpr>();
             arrType->loc = typeExpr->loc;
             arrType->baseExpression = typeExpr;
             parser->ReadToken(TokenType::LBracket);
@@ -1805,9 +1807,9 @@ namespace Slang
         return typeExpr;
     }
 
-    static RefPtr<Expr> parseTaggedUnionType(Parser* parser)
+    static Expr* parseTaggedUnionType(Parser* parser)
     {
-        RefPtr<TaggedUnionTypeExpr> taggedUnionType = parser->astBuilder->create<TaggedUnionTypeExpr>();
+        TaggedUnionTypeExpr* taggedUnionType = parser->astBuilder->create<TaggedUnionTypeExpr>();
 
         parser->ReadToken(TokenType::LParent);
         while(!AdvanceIfMatch(parser, TokenType::RParent))
@@ -1824,20 +1826,20 @@ namespace Slang
         return taggedUnionType;
     }
 
-    static RefPtr<RefObject> parseTaggedUnionType(Parser* parser, void* /*unused*/)
+    static NodeBase* parseTaggedUnionType(Parser* parser, void* /*unused*/)
     {
         return parseTaggedUnionType(parser);
     }
 
         /// Parse a `This` type expression
-    static RefPtr<Expr> parseThisTypeExpr(Parser* parser)
+    static Expr* parseThisTypeExpr(Parser* parser)
     {
-        RefPtr<ThisTypeExpr> expr = parser->astBuilder->create<ThisTypeExpr>();
+        ThisTypeExpr* expr = parser->astBuilder->create<ThisTypeExpr>();
         expr->scope = parser->currentScope;
         return expr;
     }
 
-    static RefPtr<RefObject> parseThisTypeExpr(Parser* parser, void* /*userData*/)
+    static NodeBase* parseThisTypeExpr(Parser* parser, void* /*userData*/)
     {
         return parseThisTypeExpr(parser);
     }
@@ -1909,7 +1911,7 @@ namespace Slang
         basicType->loc = typeName.loc;
         basicType->name = typeName.getNameOrNull();
 
-        RefPtr<Expr> typeExpr = basicType;
+        Expr* typeExpr = basicType;
 
         bool shouldLoop = true;
         while (shouldLoop)
@@ -1936,7 +1938,7 @@ namespace Slang
         return typeSpec;
     }
 
-    static RefPtr<DeclBase> ParseDeclaratorDecl(
+    static DeclBase* ParseDeclaratorDecl(
         Parser*         parser,
         ContainerDecl*  containerDecl)
     {
@@ -2045,7 +2047,7 @@ namespace Slang
         {
             // easy case: we only had a single declaration!
             UnwrapDeclarator(parser->astBuilder, initDeclarator, &declaratorInfo);
-            RefPtr<VarDeclBase> firstDecl = CreateVarDeclForContext(parser->astBuilder, containerDecl);
+            VarDeclBase* firstDecl = CreateVarDeclForContext(parser->astBuilder, containerDecl);
             CompleteVarDecl(parser, firstDecl, declaratorInfo);
 
             declGroupBuilder.addDecl(firstDecl);
@@ -2068,7 +2070,7 @@ namespace Slang
             declaratorInfo.typeSpec = sharedTypeSpec;
             UnwrapDeclarator(parser->astBuilder, initDeclarator, &declaratorInfo);
 
-            RefPtr<VarDeclBase> varDecl = CreateVarDeclForContext(parser->astBuilder, containerDecl);
+            VarDeclBase* varDecl = CreateVarDeclForContext(parser->astBuilder, containerDecl);
             CompleteVarDecl(parser, varDecl, declaratorInfo);
 
             declGroupBuilder.addDecl(varDecl);
@@ -2182,26 +2184,26 @@ namespace Slang
     //
     // semantic ::= identifier ( '(' args ')' )?
     //
-    static RefPtr<Modifier> ParseSemantic(
+    static Modifier* ParseSemantic(
         Parser* parser)
     {
         if (parser->LookAheadToken("register"))
         {
-            RefPtr<HLSLRegisterSemantic> semantic = parser->astBuilder->create<HLSLRegisterSemantic>();
+            HLSLRegisterSemantic* semantic = parser->astBuilder->create<HLSLRegisterSemantic>();
             parser->FillPosition(semantic);
-            parseHLSLRegisterSemantic(parser, semantic.Ptr());
+            parseHLSLRegisterSemantic(parser, semantic);
             return semantic;
         }
         else if (parser->LookAheadToken("packoffset"))
         {
-            RefPtr<HLSLPackOffsetSemantic> semantic = parser->astBuilder->create<HLSLPackOffsetSemantic>();
+            HLSLPackOffsetSemantic* semantic = parser->astBuilder->create<HLSLPackOffsetSemantic>();
             parser->FillPosition(semantic);
-            parseHLSLPackOffsetSemantic(parser, semantic.Ptr());
+            parseHLSLPackOffsetSemantic(parser, semantic);
             return semantic;
         }
         else if (parser->LookAheadToken(TokenType::Identifier))
         {
-            RefPtr<HLSLSimpleSemantic> semantic = parser->astBuilder->create<HLSLSimpleSemantic>();
+            HLSLSimpleSemantic* semantic = parser->astBuilder->create<HLSLSimpleSemantic>();
             parser->FillPosition(semantic);
             semantic->name = parser->ReadToken(TokenType::Identifier);
             return semantic;
@@ -2217,19 +2219,19 @@ namespace Slang
     //
     // opt-semantics ::= (':' semantic)*
     //
-    static RefPtr<Modifier> ParseOptSemantics(
+    static Modifier* ParseOptSemantics(
         Parser* parser)
     {
         if (!AdvanceIf(parser, TokenType::Colon))
             return nullptr;
 
-        RefPtr<Modifier> result;
-        RefPtr<Modifier>* link = &result;
+        Modifier* result = nullptr;
+        Modifier** link = &result;
         SLANG_ASSERT(!*link);
 
         for (;;)
         {
-            RefPtr<Modifier> semantic = ParseSemantic(parser);
+            Modifier* semantic = ParseSemantic(parser);
             if (semantic)
             {
                 *link = semantic;
@@ -2268,7 +2270,7 @@ namespace Slang
         AddModifiers(decl, ParseOptSemantics(parser));
     }
 
-    static RefPtr<Decl> ParseHLSLBufferDecl(
+    static Decl* ParseHLSLBufferDecl(
         Parser*	parser,
         String  bufferWrapperTypeName)
     {
@@ -2291,12 +2293,12 @@ namespace Slang
         // We are going to represent each buffer as a pair of declarations.
         // The first is a type declaration that holds all the members, while
         // the second is a variable declaration that uses the buffer type.
-        RefPtr<StructDecl> bufferDataTypeDecl = parser->astBuilder->create<StructDecl>();
-        RefPtr<VarDecl> bufferVarDecl = parser->astBuilder->create<VarDecl>();
+        StructDecl* bufferDataTypeDecl = parser->astBuilder->create<StructDecl>();
+        VarDecl* bufferVarDecl = parser->astBuilder->create<VarDecl>();
 
         // Both declarations will have a location that points to the name
-        parser->FillPosition(bufferDataTypeDecl.Ptr());
-        parser->FillPosition(bufferVarDecl.Ptr());
+        parser->FillPosition(bufferDataTypeDecl);
+        parser->FillPosition(bufferVarDecl);
 
         auto reflectionNameToken = parser->ReadToken(TokenType::Identifier);
 
@@ -2343,10 +2345,10 @@ namespace Slang
 
         // Any semantics applied to the buffer declaration are taken as applying
         // to the variable instead.
-        ParseOptSemantics(parser, bufferVarDecl.Ptr());
+        ParseOptSemantics(parser, bufferVarDecl);
 
         // The declarations in the body belong to the data type.
-        parseDeclBody(parser, bufferDataTypeDecl.Ptr());
+        parseDeclBody(parser, bufferDataTypeDecl);
 
         // All HLSL buffer declarations are "transparent" in that their
         // members are implicitly made visible in the parent scope.
@@ -2370,13 +2372,13 @@ namespace Slang
         return bufferVarDecl;
     }
 
-    static RefPtr<RefObject> parseHLSLCBufferDecl(
+    static NodeBase* parseHLSLCBufferDecl(
         Parser*	parser, void* /*userData*/)
     {
         return ParseHLSLBufferDecl(parser, "ConstantBuffer");
     }
 
-    static RefPtr<RefObject> parseHLSLTBufferDecl(
+    static NodeBase* parseHLSLTBufferDecl(
         Parser*	parser, void* /*userData*/)
     {
         return ParseHLSLBufferDecl(parser, "TextureBuffer");
@@ -2401,31 +2403,31 @@ namespace Slang
         }
     }
 
-    static RefPtr<RefObject> ParseExtensionDecl(Parser* parser, void* /*userData*/)
+    static NodeBase* ParseExtensionDecl(Parser* parser, void* /*userData*/)
     {
-        RefPtr<ExtensionDecl> decl = parser->astBuilder->create<ExtensionDecl>();
-        parser->FillPosition(decl.Ptr());
+        ExtensionDecl* decl = parser->astBuilder->create<ExtensionDecl>();
+        parser->FillPosition(decl);
         decl->targetType = parser->ParseTypeExp();
         parseOptionalInheritanceClause(parser, decl);
-        parseDeclBody(parser, decl.Ptr());
+        parseDeclBody(parser, decl);
 
         return decl;
     }
 
 
-    void parseOptionalGenericConstraints(Parser* parser, ContainerDecl* decl)
+    static void parseOptionalGenericConstraints(Parser* parser, ContainerDecl* decl)
     {
         if (AdvanceIf(parser, TokenType::Colon))
         {
             do
             {
-                RefPtr<GenericTypeConstraintDecl> paramConstraint = parser->astBuilder->create<GenericTypeConstraintDecl>();
+                GenericTypeConstraintDecl* paramConstraint = parser->astBuilder->create<GenericTypeConstraintDecl>();
                 parser->FillPosition(paramConstraint);
 
                 // substitution needs to be filled during check
-                RefPtr<DeclRefType> paramType = DeclRefType::create(parser->astBuilder, DeclRef<Decl>(decl, nullptr));
+                DeclRefType* paramType = DeclRefType::create(parser->astBuilder, DeclRef<Decl>(decl, nullptr));
 
-                RefPtr<SharedTypeExpr> paramTypeExpr = parser->astBuilder->create<SharedTypeExpr>();
+                SharedTypeExpr* paramTypeExpr = parser->astBuilder->create<SharedTypeExpr>();
                 paramTypeExpr->loc = decl->loc;
                 paramTypeExpr->base.type = paramType;
                 paramTypeExpr->type = QualType(parser->astBuilder->getTypeType(paramType));
@@ -2438,9 +2440,9 @@ namespace Slang
         }
     }
 
-    RefPtr<RefObject> parseAssocType(Parser* parser, void *)
+    static NodeBase* parseAssocType(Parser* parser, void *)
     {
-        RefPtr<AssocTypeDecl> assocTypeDecl = parser->astBuilder->create<AssocTypeDecl>();
+        AssocTypeDecl* assocTypeDecl = parser->astBuilder->create<AssocTypeDecl>();
 
         auto nameToken = parser->ReadToken(TokenType::Identifier);
         assocTypeDecl->nameAndLoc = NameLoc(nameToken);
@@ -2450,9 +2452,9 @@ namespace Slang
         return assocTypeDecl;
     }
 
-    RefPtr<RefObject> parseGlobalGenericTypeParamDecl(Parser * parser, void *)
+    static NodeBase* parseGlobalGenericTypeParamDecl(Parser * parser, void *)
     {
-        RefPtr<GlobalGenericParamDecl> genParamDecl = parser->astBuilder->create<GlobalGenericParamDecl>();
+        GlobalGenericParamDecl* genParamDecl = parser->astBuilder->create<GlobalGenericParamDecl>();
         auto nameToken = parser->ReadToken(TokenType::Identifier);
         genParamDecl->nameAndLoc = NameLoc(nameToken);
         genParamDecl->loc = nameToken.loc;
@@ -2461,9 +2463,9 @@ namespace Slang
         return genParamDecl;
     }
 
-    RefPtr<RefObject> parseGlobalGenericValueParamDecl(Parser * parser, void *)
+    static NodeBase* parseGlobalGenericValueParamDecl(Parser * parser, void *)
     {
-        RefPtr<GlobalGenericValueParamDecl> genericParamDecl = parser->astBuilder->create<GlobalGenericValueParamDecl>();
+        GlobalGenericValueParamDecl* genericParamDecl = parser->astBuilder->create<GlobalGenericValueParamDecl>();
         auto nameToken = parser->ReadToken(TokenType::Identifier);
         genericParamDecl->nameAndLoc = NameLoc(nameToken);
         genericParamDecl->loc = nameToken.loc;
@@ -2482,20 +2484,20 @@ namespace Slang
         return genericParamDecl;
     }
 
-    static RefPtr<RefObject> parseInterfaceDecl(Parser* parser, void* /*userData*/)
+    static NodeBase* parseInterfaceDecl(Parser* parser, void* /*userData*/)
     {
-        RefPtr<InterfaceDecl> decl = parser->astBuilder->create<InterfaceDecl>();
-        parser->FillPosition(decl.Ptr());
+        InterfaceDecl* decl = parser->astBuilder->create<InterfaceDecl>();
+        parser->FillPosition(decl);
         decl->nameAndLoc = NameLoc(parser->ReadToken(TokenType::Identifier));
 
-        parseOptionalInheritanceClause(parser, decl.Ptr());
+        parseOptionalInheritanceClause(parser, decl);
 
-        parseDeclBody(parser, decl.Ptr());
+        parseDeclBody(parser, decl);
 
         return decl;
     }
 
-    static RefPtr<RefObject> parseNamespaceDecl(Parser* parser, void* /*userData*/)
+    static NodeBase* parseNamespaceDecl(Parser* parser, void* /*userData*/)
     {
         // We start by parsing the name of the namespace that is being opened.
         //
@@ -2535,8 +2537,8 @@ namespace Slang
         // a declaration to the caller (since they will try to add
         // any non-null pointer we return to the AST).
         //
-        RefPtr<NamespaceDecl> namespaceDecl;
-        RefPtr<RefObject> result;
+        NamespaceDecl* namespaceDecl = nullptr;
+        NodeBase* result = nullptr;
         //
         // In order to find out what case we are in, we start by looking
         // for a namespace declaration of the same name in the parent
@@ -2609,15 +2611,15 @@ namespace Slang
         // `{}`-enclosed body to add declarations as children
         // of the namespace.
         //
-        parseDeclBody(parser, namespaceDecl.Ptr());
+        parseDeclBody(parser, namespaceDecl);
 
         return result;
     }
 
-    static RefPtr<RefObject> parseConstructorDecl(Parser* parser, void* /*userData*/)
+    static NodeBase* parseConstructorDecl(Parser* parser, void* /*userData*/)
     {
-        RefPtr<ConstructorDecl> decl = parser->astBuilder->create<ConstructorDecl>();
-        parser->FillPosition(decl.Ptr());
+        ConstructorDecl* decl = parser->astBuilder->create<ConstructorDecl>();
+        parser->FillPosition(decl);
         parser->PushScope(decl);
 
         // TODO: we need to make sure that all initializers have
@@ -2638,11 +2640,11 @@ namespace Slang
         return decl;
     }
 
-    static RefPtr<AccessorDecl> parseAccessorDecl(Parser* parser)
+    static AccessorDecl* parseAccessorDecl(Parser* parser)
     {
         Modifiers modifiers = ParseModifiers(parser);
 
-        RefPtr<AccessorDecl> decl;
+        AccessorDecl* decl = nullptr;
         if( AdvanceIf(parser, "get") )
         {
             decl = parser->astBuilder->create<GetterDecl>();
@@ -2675,10 +2677,10 @@ namespace Slang
         return decl;
     }
 
-    static RefPtr<RefObject> ParseSubscriptDecl(Parser* parser, void* /*userData*/)
+    static NodeBase* ParseSubscriptDecl(Parser* parser, void* /*userData*/)
     {
-        RefPtr<SubscriptDecl> decl = parser->astBuilder->create<SubscriptDecl>();
-        parser->FillPosition(decl.Ptr());
+        SubscriptDecl* decl = parser->astBuilder->create<SubscriptDecl>();
+        parser->FillPosition(decl);
         parser->PushScope(decl);
 
         // TODO: the use of this name here is a bit magical...
@@ -2718,9 +2720,9 @@ namespace Slang
 
     static void parseModernVarDeclBaseCommon(
         Parser*             parser,
-        RefPtr<VarDeclBase> decl)
+        VarDeclBase* decl)
     {
-        parser->FillPosition(decl.Ptr());
+        parser->FillPosition(decl);
         decl->nameAndLoc = NameLoc(parser->ReadToken(TokenType::Identifier));
 
         if(AdvanceIf(parser, TokenType::Colon))
@@ -2736,32 +2738,32 @@ namespace Slang
 
     static void parseModernVarDeclCommon(
         Parser*         parser,
-        RefPtr<VarDecl> decl)
+        VarDecl* decl)
     {
         parseModernVarDeclBaseCommon(parser, decl);
         expect(parser, TokenType::Semicolon);
     }
 
-    static RefPtr<RefObject> parseLetDecl(
+    static NodeBase* parseLetDecl(
         Parser* parser, void* /*userData*/)
     {
-        RefPtr<LetDecl> decl = parser->astBuilder->create<LetDecl>();
+        LetDecl* decl = parser->astBuilder->create<LetDecl>();
         parseModernVarDeclCommon(parser, decl);
         return decl;
     }
 
-    static RefPtr<RefObject> parseVarDecl(
+    static NodeBase* parseVarDecl(
         Parser* parser, void* /*userData*/)
     {
-        RefPtr<VarDecl> decl = parser->astBuilder->create<VarDecl>();
+        VarDecl* decl = parser->astBuilder->create<VarDecl>();
         parseModernVarDeclCommon(parser, decl);
         return decl;
     }
 
-    static RefPtr<ParamDecl> parseModernParamDecl(
+    static ParamDecl* parseModernParamDecl(
         Parser* parser)
     {
-        RefPtr<ParamDecl> decl = parser->astBuilder->create<ParamDecl>();
+        ParamDecl* decl = parser->astBuilder->create<ParamDecl>();
 
         // TODO: "modern" parameters should not accept keyword-based
         // modifiers and should only accept `[attribute]` syntax for
@@ -2777,7 +2779,7 @@ namespace Slang
 
     static void parseModernParamList(
         Parser*                 parser,
-        RefPtr<CallableDecl>    decl)
+        CallableDecl*    decl)
     {
         parser->ReadToken(TokenType::LParent);
 
@@ -2790,17 +2792,17 @@ namespace Slang
         }
     }
 
-    static RefPtr<RefObject> parseFuncDecl(
+    static NodeBase* parseFuncDecl(
         Parser* parser, void* /*userData*/)
     {
-        RefPtr<FuncDecl> decl = parser->astBuilder->create<FuncDecl>();
+        FuncDecl* decl = parser->astBuilder->create<FuncDecl>();
 
-        parser->FillPosition(decl.Ptr());
+        parser->FillPosition(decl);
         decl->nameAndLoc = NameLoc(parser->ReadToken(TokenType::Identifier));
 
         return parseOptGenericDecl(parser, [&](GenericDecl*)
         {
-            parser->PushScope(decl.Ptr());
+            parser->PushScope(decl);
             parseModernParamList(parser, decl);
             if(AdvanceIf(parser, TokenType::RightArrow))
             {
@@ -2812,12 +2814,12 @@ namespace Slang
         });
     }
 
-    static RefPtr<RefObject> parseTypeAliasDecl(
+    static NodeBase* parseTypeAliasDecl(
         Parser* parser, void* /*userData*/)
     {
-        RefPtr<TypeAliasDecl> decl = parser->astBuilder->create<TypeAliasDecl>();
+        TypeAliasDecl* decl = parser->astBuilder->create<TypeAliasDecl>();
 
-        parser->FillPosition(decl.Ptr());
+        parser->FillPosition(decl);
         decl->nameAndLoc = NameLoc(parser->ReadToken(TokenType::Identifier));
 
         return parseOptGenericDecl(parser, [&](GenericDecl*)
@@ -2834,14 +2836,14 @@ namespace Slang
     // This is a catch-all syntax-construction callback to handle cases where
     // a piece of syntax is fully defined by the keyword to use, along with
     // the class of AST node to construct.
-    static RefPtr<RefObject> parseSimpleSyntax(Parser* parser, void* userData)
+    static NodeBase* parseSimpleSyntax(Parser* parser, void* userData)
     {
         SyntaxClassBase syntaxClass((ReflectClassInfo*) userData);
-        return (RefObject*) syntaxClass.createInstanceImpl(parser->astBuilder);
+        return (NodeBase*)syntaxClass.createInstanceImpl(parser->astBuilder);
     }
 
     // Parse a declaration of a keyword that can be used to define further syntax.
-    static RefPtr<RefObject> parseSyntaxDecl(Parser* parser, void* /*userData*/)
+    static NodeBase* parseSyntaxDecl(Parser* parser, void* /*userData*/)
     {
         // Right now the basic form is:
         //
@@ -2857,7 +2859,7 @@ namespace Slang
         auto nameAndLoc = expectIdentifier(parser);
 
         // Next we look for a clause that specified the AST node class.
-        SyntaxClass<RefObject> syntaxClass;
+        SyntaxClass<NodeBase> syntaxClass;
         if (AdvanceIf(parser, TokenType::Colon))
         {
             // User is specifying the class that should be construted
@@ -2914,7 +2916,7 @@ namespace Slang
         // TODO: skip creating the declaration if anything failed, just to not screw things
         // up for downstream code?
 
-        RefPtr<SyntaxDecl> syntaxDecl = parser->astBuilder->create<SyntaxDecl>();
+        SyntaxDecl* syntaxDecl = parser->astBuilder->create<SyntaxDecl>();
         syntaxDecl->nameAndLoc = nameAndLoc;
         syntaxDecl->loc = nameAndLoc.loc;
         syntaxDecl->syntaxClass = syntaxClass;
@@ -2928,11 +2930,11 @@ namespace Slang
     // We are going to use `name: type` syntax just for simplicty, and let the type
     // be optional, because we don't actually need it in all cases.
     //
-    static RefPtr<ParamDecl> parseAttributeParamDecl(Parser* parser)
+    static ParamDecl* parseAttributeParamDecl(Parser* parser)
     {
         auto nameAndLoc = expectIdentifier(parser);
 
-        RefPtr<ParamDecl> paramDecl = parser->astBuilder->create<ParamDecl>();
+        ParamDecl* paramDecl = parser->astBuilder->create<ParamDecl>();
         paramDecl->nameAndLoc = nameAndLoc;
 
         if(AdvanceIf(parser, TokenType::Colon))
@@ -2957,7 +2959,7 @@ namespace Slang
     // using the default attribute-parsing logic and then all specialized behavior takes
     // place during semantic checking.
     //
-    static RefPtr<RefObject> parseAttributeSyntaxDecl(Parser* parser, void* /*userData*/)
+    static NodeBase* parseAttributeSyntaxDecl(Parser* parser, void* /*userData*/)
     {
         // Right now the basic form is:
         //
@@ -2974,7 +2976,7 @@ namespace Slang
         // First we parse the attribute name.
         auto nameAndLoc = expectIdentifier(parser);
 
-        RefPtr<AttributeDecl> attrDecl = parser->astBuilder->create<AttributeDecl>();
+        AttributeDecl* attrDecl = parser->astBuilder->create<AttributeDecl>();
         if(AdvanceIf(parser, TokenType::LParent))
         {
             while(!AdvanceIfMatch(parser, TokenType::RParent))
@@ -2996,7 +2998,7 @@ namespace Slang
         // on the amount of per-attribute-type logic that has to occur later.
 
         // Next we look for a clause that specified the AST node class.
-        SyntaxClass<RefObject> syntaxClass;
+        SyntaxClass<NodeBase> syntaxClass;
         if (AdvanceIf(parser, TokenType::Colon))
         {
             // User is specifying the class that should be construted
@@ -3027,7 +3029,7 @@ namespace Slang
     // Finish up work on a declaration that was parsed
     static void CompleteDecl(
         Parser*				/*parser*/,
-        RefPtr<Decl>		decl,
+        Decl*		decl,
         ContainerDecl*		containerDecl,
         Modifiers			modifiers)
     {
@@ -3037,10 +3039,10 @@ namespace Slang
         // We need to be careful, because if `decl` is a generic declaration,
         // then we really want the modifiers to apply to the inner declaration.
         //
-        RefPtr<Decl> declToModify = decl;
+        Decl* declToModify = decl;
         if(auto genericDecl = as<GenericDecl>(decl))
             declToModify = genericDecl->inner;
-        AddModifiers(declToModify.Ptr(), modifiers.first);
+        AddModifiers(declToModify, modifiers.first);
 
         // Make sure the decl is properly nested inside its lexical parent
         if (containerDecl)
@@ -3049,12 +3051,12 @@ namespace Slang
         }
     }
 
-    static RefPtr<DeclBase> ParseDeclWithModifiers(
+    static DeclBase* ParseDeclWithModifiers(
         Parser*             parser,
         ContainerDecl*      containerDecl,
         Modifiers			modifiers )
     {
-        RefPtr<DeclBase> decl;
+        DeclBase* decl = nullptr;
 
         auto loc = parser->tokenReader.peekLoc();
 
@@ -3070,7 +3072,7 @@ namespace Slang
                 // First we will check whether we can use the identifier token
                 // as a declaration keyword and parse a declaration using
                 // its associated callback:
-                RefPtr<Decl> parsedDecl;
+                Decl* parsedDecl = nullptr;
                 if (tryParseUsingSyntaxDecl<Decl>(parser, &parsedDecl))
                 {
                     decl = parsedDecl;
@@ -3129,7 +3131,7 @@ namespace Slang
         return decl;
     }
 
-    static RefPtr<DeclBase> ParseDecl(
+    static DeclBase* ParseDecl(
         Parser*         parser,
         ContainerDecl*  containerDecl)
     {
@@ -3137,7 +3139,7 @@ namespace Slang
         return ParseDeclWithModifiers(parser, containerDecl, modifiers);
     }
 
-    static RefPtr<Decl> ParseSingleDecl(
+    static Decl* ParseSingleDecl(
         Parser*			parser,
         ContainerDecl*	containerDecl)
     {
@@ -3218,10 +3220,10 @@ namespace Slang
         currentScope = nullptr;
     }
 
-    RefPtr<Decl> Parser::ParseStruct()
+    Decl* Parser::ParseStruct()
     {
-        RefPtr<StructDecl> rs = astBuilder->create<StructDecl>();
-        FillPosition(rs.Ptr());
+        StructDecl* rs = astBuilder->create<StructDecl>();
+        FillPosition(rs);
         ReadToken("struct");
 
         // TODO: support `struct` declaration without tag
@@ -3231,28 +3233,28 @@ namespace Slang
         {
             // We allow for an inheritance clause on a `struct`
             // so that it can conform to interfaces.
-            parseOptionalInheritanceClause(this, rs.Ptr());
-            parseDeclBody(this, rs.Ptr());
+            parseOptionalInheritanceClause(this, rs);
+            parseDeclBody(this, rs);
             return rs;
         });
     }
 
-    RefPtr<ClassDecl> Parser::ParseClass()
+    ClassDecl* Parser::ParseClass()
     {
-        RefPtr<ClassDecl> rs = astBuilder->create<ClassDecl>();
-        FillPosition(rs.Ptr());
+        ClassDecl* rs = astBuilder->create<ClassDecl>();
+        FillPosition(rs);
         ReadToken("class");
         rs->nameAndLoc = expectIdentifier(this);
 
-        parseOptionalInheritanceClause(this, rs.Ptr());
+        parseOptionalInheritanceClause(this, rs);
 
-        parseDeclBody(this, rs.Ptr());
+        parseDeclBody(this, rs);
         return rs;
     }
 
-    static RefPtr<EnumCaseDecl> parseEnumCaseDecl(Parser* parser)
+    static EnumCaseDecl* parseEnumCaseDecl(Parser* parser)
     {
-        RefPtr<EnumCaseDecl> decl = parser->astBuilder->create<EnumCaseDecl>();
+        EnumCaseDecl* decl = parser->astBuilder->create<EnumCaseDecl>();
         decl->nameAndLoc = expectIdentifier(parser);
 
         if(AdvanceIf(parser, TokenType::OpAssign))
@@ -3263,9 +3265,9 @@ namespace Slang
         return decl;
     }
 
-    static RefPtr<Decl> parseEnumDecl(Parser* parser)
+    static Decl* parseEnumDecl(Parser* parser)
     {
-        RefPtr<EnumDecl> decl = parser->astBuilder->create<EnumDecl>();
+        EnumDecl* decl = parser->astBuilder->create<EnumDecl>();
         parser->FillPosition(decl);
 
         parser->ReadToken("enum");
@@ -3288,7 +3290,7 @@ namespace Slang
 
             while(!AdvanceIfMatch(parser, TokenType::RBrace))
             {
-                RefPtr<EnumCaseDecl> caseDecl = parseEnumCaseDecl(parser);
+                EnumCaseDecl* caseDecl = parseEnumCaseDecl(parser);
                 AddMember(decl, caseDecl);
 
                 if(AdvanceIf(parser, TokenType::RBrace))
@@ -3300,10 +3302,10 @@ namespace Slang
         });
     }
 
-    static RefPtr<Stmt> ParseSwitchStmt(Parser* parser)
+    static Stmt* ParseSwitchStmt(Parser* parser)
     {
-        RefPtr<SwitchStmt> stmt = parser->astBuilder->create<SwitchStmt>();
-        parser->FillPosition(stmt.Ptr());
+        SwitchStmt* stmt = parser->astBuilder->create<SwitchStmt>();
+        parser->FillPosition(stmt);
         parser->ReadToken("switch");
         parser->ReadToken(TokenType::LParent);
         stmt->condition = parser->ParseExpression();
@@ -3312,20 +3314,20 @@ namespace Slang
         return stmt;
     }
 
-    static RefPtr<Stmt> ParseCaseStmt(Parser* parser)
+    static Stmt* ParseCaseStmt(Parser* parser)
     {
-        RefPtr<CaseStmt> stmt = parser->astBuilder->create<CaseStmt>();
-        parser->FillPosition(stmt.Ptr());
+        CaseStmt* stmt = parser->astBuilder->create<CaseStmt>();
+        parser->FillPosition(stmt);
         parser->ReadToken("case");
         stmt->expr = parser->ParseExpression();
         parser->ReadToken(TokenType::Colon);
         return stmt;
     }
 
-    static RefPtr<Stmt> ParseDefaultStmt(Parser* parser)
+    static Stmt* ParseDefaultStmt(Parser* parser)
     {
-        RefPtr<DefaultStmt> stmt = parser->astBuilder->create<DefaultStmt>();
-        parser->FillPosition(stmt.Ptr());
+        DefaultStmt* stmt = parser->astBuilder->create<DefaultStmt>();
+        parser->FillPosition(stmt);
         parser->ReadToken("default");
         parser->ReadToken(TokenType::Colon);
         return stmt;
@@ -3365,11 +3367,11 @@ namespace Slang
         return isTypeName(parser, name);
     }
 
-    RefPtr<Stmt> parseCompileTimeForStmt(
+    Stmt* parseCompileTimeForStmt(
         Parser* parser)
     {
-        RefPtr<ScopeDecl> scopeDecl = parser->astBuilder->create<ScopeDecl>();
-        RefPtr<CompileTimeForStmt> stmt = parser->astBuilder->create<CompileTimeForStmt>();
+        ScopeDecl* scopeDecl = parser->astBuilder->create<ScopeDecl>();
+        CompileTimeForStmt* stmt = parser->astBuilder->create<CompileTimeForStmt>();
         stmt->scopeDecl = scopeDecl;
 
 
@@ -3377,7 +3379,7 @@ namespace Slang
         parser->ReadToken(TokenType::LParent);
 
         NameLoc varNameAndLoc = expectIdentifier(parser);
-        RefPtr<VarDecl> varDecl = parser->astBuilder->create<VarDecl>();
+        VarDecl* varDecl = parser->astBuilder->create<VarDecl>();
         varDecl->nameAndLoc = varNameAndLoc;
         varDecl->loc = varNameAndLoc.loc;
 
@@ -3387,8 +3389,8 @@ namespace Slang
         parser->ReadToken("Range");
         parser->ReadToken(TokenType::LParent);
 
-        RefPtr<Expr> rangeBeginExpr;
-        RefPtr<Expr> rangeEndExpr = parser->ParseArgExpr();
+        Expr* rangeBeginExpr = nullptr;
+        Expr* rangeEndExpr = parser->ParseArgExpr();
         if (AdvanceIf(parser, TokenType::Comma))
         {
             rangeBeginExpr = rangeEndExpr;
@@ -3411,7 +3413,7 @@ namespace Slang
         return stmt;
     }
 
-    RefPtr<Stmt> parseCompileTimeStmt(
+    Stmt* parseCompileTimeStmt(
         Parser* parser)
     {
         parser->ReadToken(TokenType::Dollar);
@@ -3426,11 +3428,11 @@ namespace Slang
         }
     }
 
-    RefPtr<Stmt> Parser::ParseStatement()
+    Stmt* Parser::ParseStatement()
     {
         auto modifiers = ParseModifiers(this);
 
-        RefPtr<Stmt> statement;
+        Stmt* statement = nullptr;
         if (LookAheadToken(TokenType::LBrace))
             statement = parseBlockStatement();
         else if (LookAheadToken("if"))
@@ -3450,7 +3452,7 @@ namespace Slang
         else if (LookAheadToken("discard"))
         {
             statement = astBuilder->create<DiscardStmt>();
-            FillPosition(statement.Ptr());
+            FillPosition(statement);
             ReadToken("discard");
             ReadToken(TokenType::Semicolon);
         }
@@ -3492,7 +3494,7 @@ namespace Slang
             // isn't a keyword should we fall back to the approach
             // here.
             //
-            RefPtr<Expr> type = ParseType();
+            Expr* type = ParseType();
 
             // We don't actually care about the type, though, so
             // don't retain it
@@ -3547,7 +3549,7 @@ namespace Slang
         else if (LookAheadToken(TokenType::Semicolon))
         {
             statement = astBuilder->create<EmptyStmt>();
-            FillPosition(statement.Ptr());
+            FillPosition(statement);
             ReadToken(TokenType::Semicolon);
         }
         else
@@ -3569,19 +3571,19 @@ namespace Slang
         return statement;
     }
 
-    RefPtr<Stmt> Parser::parseBlockStatement()
+    Stmt* Parser::parseBlockStatement()
     {
-        RefPtr<ScopeDecl> scopeDecl = astBuilder->create<ScopeDecl>();
-        RefPtr<BlockStmt> blockStatement = astBuilder->create<BlockStmt>();
+        ScopeDecl* scopeDecl = astBuilder->create<ScopeDecl>();
+        BlockStmt* blockStatement = astBuilder->create<BlockStmt>();
         blockStatement->scopeDecl = scopeDecl;
-        pushScopeAndSetParent(scopeDecl.Ptr());
+        pushScopeAndSetParent(scopeDecl);
         ReadToken(TokenType::LBrace);
 
-        RefPtr<Stmt> body;
+        Stmt* body = nullptr;
 
         if(!tokenReader.isAtEnd())
         {
-            FillPosition(blockStatement.Ptr());
+            FillPosition(blockStatement);
         }
         while (!AdvanceIfMatch(this, TokenType::RBrace))
         {
@@ -3598,7 +3600,7 @@ namespace Slang
                 }
                 else
                 {
-                    RefPtr<SeqStmt> newBody = astBuilder->create<SeqStmt>();
+                    SeqStmt* newBody = astBuilder->create<SeqStmt>();
                     newBody->loc = blockStatement->loc;
                     newBody->stmts.add(body);
                     newBody->stmts.add(stmt);
@@ -3620,21 +3622,21 @@ namespace Slang
         return blockStatement;
     }
 
-    RefPtr<DeclStmt> Parser::parseVarDeclrStatement(
+    DeclStmt* Parser::parseVarDeclrStatement(
         Modifiers modifiers)
     {
-        RefPtr<DeclStmt>varDeclrStatement = astBuilder->create<DeclStmt>();
+        DeclStmt*varDeclrStatement = astBuilder->create<DeclStmt>();
 
-        FillPosition(varDeclrStatement.Ptr());
+        FillPosition(varDeclrStatement);
         auto decl = ParseDeclWithModifiers(this, currentScope->containerDecl, modifiers);
         varDeclrStatement->decl = decl;
         return varDeclrStatement;
     }
 
-    RefPtr<IfStmt> Parser::parseIfStatement()
+    IfStmt* Parser::parseIfStatement()
     {
-        RefPtr<IfStmt> ifStatement = astBuilder->create<IfStmt>();
-        FillPosition(ifStatement.Ptr());
+        IfStmt* ifStatement = astBuilder->create<IfStmt>();
+        FillPosition(ifStatement);
         ReadToken("if");
         ReadToken(TokenType::LParent);
         ifStatement->predicate = ParseExpression();
@@ -3648,9 +3650,9 @@ namespace Slang
         return ifStatement;
     }
 
-    RefPtr<ForStmt> Parser::ParseForStatement()
+    ForStmt* Parser::ParseForStatement()
     {
-        RefPtr<ScopeDecl> scopeDecl = astBuilder->create<ScopeDecl>();
+        ScopeDecl* scopeDecl = astBuilder->create<ScopeDecl>();
 
         // HLSL implements the bad approach to scoping a `for` loop
         // variable, and we want to respect that, but *only* when
@@ -3663,7 +3665,7 @@ namespace Slang
         // case, just so that we can correctly handle it in downstream
         // logic.
         //
-        RefPtr<ForStmt> stmt;
+        ForStmt* stmt = nullptr;
         if (brokenScoping)
         {
             stmt = astBuilder->create<UnscopedForStmt>();
@@ -3676,8 +3678,8 @@ namespace Slang
         stmt->scopeDecl = scopeDecl;
 
         if(!brokenScoping)
-            pushScopeAndSetParent(scopeDecl.Ptr());
-        FillPosition(stmt.Ptr());
+            pushScopeAndSetParent(scopeDecl);
+        FillPosition(stmt);
         ReadToken("for");
         ReadToken(TokenType::LParent);
         if (peekTypeName(this))
@@ -3709,10 +3711,10 @@ namespace Slang
         return stmt;
     }
 
-    RefPtr<WhileStmt> Parser::ParseWhileStatement()
+    WhileStmt* Parser::ParseWhileStatement()
     {
-        RefPtr<WhileStmt> whileStatement = astBuilder->create<WhileStmt>();
-        FillPosition(whileStatement.Ptr());
+        WhileStmt* whileStatement = astBuilder->create<WhileStmt>();
+        FillPosition(whileStatement);
         ReadToken("while");
         ReadToken(TokenType::LParent);
         whileStatement->predicate = ParseExpression();
@@ -3721,10 +3723,10 @@ namespace Slang
         return whileStatement;
     }
 
-    RefPtr<DoWhileStmt> Parser::ParseDoWhileStatement()
+    DoWhileStmt* Parser::ParseDoWhileStatement()
     {
-        RefPtr<DoWhileStmt> doWhileStatement = astBuilder->create<DoWhileStmt>();
-        FillPosition(doWhileStatement.Ptr());
+        DoWhileStmt* doWhileStatement = astBuilder->create<DoWhileStmt>();
+        FillPosition(doWhileStatement);
         ReadToken("do");
         doWhileStatement->statement = ParseStatement();
         ReadToken("while");
@@ -3735,28 +3737,28 @@ namespace Slang
         return doWhileStatement;
     }
 
-    RefPtr<BreakStmt> Parser::ParseBreakStatement()
+    BreakStmt* Parser::ParseBreakStatement()
     {
-        RefPtr<BreakStmt> breakStatement = astBuilder->create<BreakStmt>();
-        FillPosition(breakStatement.Ptr());
+        BreakStmt* breakStatement = astBuilder->create<BreakStmt>();
+        FillPosition(breakStatement);
         ReadToken("break");
         ReadToken(TokenType::Semicolon);
         return breakStatement;
     }
 
-    RefPtr<ContinueStmt> Parser::ParseContinueStatement()
+    ContinueStmt* Parser::ParseContinueStatement()
     {
-        RefPtr<ContinueStmt> continueStatement = astBuilder->create<ContinueStmt>();
-        FillPosition(continueStatement.Ptr());
+        ContinueStmt* continueStatement = astBuilder->create<ContinueStmt>();
+        FillPosition(continueStatement);
         ReadToken("continue");
         ReadToken(TokenType::Semicolon);
         return continueStatement;
     }
 
-    RefPtr<ReturnStmt> Parser::ParseReturnStatement()
+    ReturnStmt* Parser::ParseReturnStatement()
     {
-        RefPtr<ReturnStmt> returnStatement = astBuilder->create<ReturnStmt>();
-        FillPosition(returnStatement.Ptr());
+        ReturnStmt* returnStatement = astBuilder->create<ReturnStmt>();
+        FillPosition(returnStatement);
         ReadToken("return");
         if (!LookAheadToken(TokenType::Semicolon))
             returnStatement->expression = ParseExpression();
@@ -3764,20 +3766,20 @@ namespace Slang
         return returnStatement;
     }
 
-    RefPtr<ExpressionStmt> Parser::ParseExpressionStatement()
+    ExpressionStmt* Parser::ParseExpressionStatement()
     {
-        RefPtr<ExpressionStmt> statement = astBuilder->create<ExpressionStmt>();
+        ExpressionStmt* statement = astBuilder->create<ExpressionStmt>();
 
-        FillPosition(statement.Ptr());
+        FillPosition(statement);
         statement->expression = ParseExpression();
 
         ReadToken(TokenType::Semicolon);
         return statement;
     }
 
-    RefPtr<ParamDecl> Parser::ParseParameter()
+    ParamDecl* Parser::ParseParameter()
     {
-        RefPtr<ParamDecl> parameter = astBuilder->create<ParamDecl>();
+        ParamDecl* parameter = astBuilder->create<ParamDecl>();
         parameter->modifiers = ParseModifiers(this);
 
         DeclaratorInfo declaratorInfo;
@@ -3791,7 +3793,7 @@ namespace Slang
         return parameter;
     }
 
-    RefPtr<Expr> Parser::ParseType()
+    Expr* Parser::ParseType()
     {
         auto typeSpec = parseTypeSpec(this);
         if( typeSpec.decl )
@@ -3889,7 +3891,7 @@ namespace Slang
         }
     }
 
-    static RefPtr<Expr> parseOperator(Parser* parser)
+    static Expr* parseOperator(Parser* parser)
     {
         Token opToken;
         switch(parser->tokenReader.peekTokenType())
@@ -3913,13 +3915,13 @@ namespace Slang
 
     }
 
-    static RefPtr<Expr> createInfixExpr(
+    static Expr* createInfixExpr(
         Parser*         parser,
-        RefPtr<Expr>    left,
-        RefPtr<Expr>    op,
-        RefPtr<Expr>    right)
+        Expr*    left,
+        Expr*    op,
+        Expr*    right)
     {
-        RefPtr<InfixExpr> expr = parser->astBuilder->create<InfixExpr>();
+        InfixExpr* expr = parser->astBuilder->create<InfixExpr>();
         expr->loc = op->loc;
         expr->functionExpr = op;
         expr->arguments.add(left);
@@ -3927,9 +3929,9 @@ namespace Slang
         return expr;
     }
 
-    static RefPtr<Expr> parseInfixExprWithPrecedence(
+    static Expr* parseInfixExprWithPrecedence(
         Parser*                         parser,
-        RefPtr<Expr>    inExpr,
+        Expr*    inExpr,
         Precedence                      prec)
     {
         auto expr = inExpr;
@@ -3946,7 +3948,7 @@ namespace Slang
             // one non-binary case we need to deal with.
             if(opTokenType == TokenType::QuestionMark)
             {
-                RefPtr<SelectExpr> select = parser->astBuilder->create<SelectExpr>();
+                SelectExpr* select = parser->astBuilder->create<SelectExpr>();
                 select->loc = op->loc;
                 select->functionExpr = op;
 
@@ -3974,7 +3976,7 @@ namespace Slang
 
             if (opTokenType == TokenType::OpAssign)
             {
-                RefPtr<AssignExpr> assignExpr = parser->astBuilder->create<AssignExpr>();
+                AssignExpr* assignExpr = parser->astBuilder->create<AssignExpr>();
                 assignExpr->loc = op->loc;
                 assignExpr->left = expr;
                 assignExpr->right = right;
@@ -3989,7 +3991,7 @@ namespace Slang
         return expr;
     }
 
-    RefPtr<Expr> Parser::ParseExpression(Precedence level)
+    Expr* Parser::ParseExpression(Precedence level)
     {
         auto expr = ParseLeafExpression();
         return parseInfixExprWithPrecedence(this, expr, level);
@@ -4004,7 +4006,7 @@ namespace Slang
             auto condition = ParseExpression(Precedence(level + 1));
             if (LookAheadToken(TokenType::QuestionMark))
             {
-                RefPtr<SelectExpr> select = new SelectExpr();
+                SelectExpr* select = new SelectExpr();
                 FillPosition(select.Ptr());
 
                 select->Arguments.Add(condition);
@@ -4026,7 +4028,7 @@ namespace Slang
                 auto left = ParseExpression(Precedence(level + 1));
                 while (GetOpLevel(this, tokenReader.PeekTokenType()) == level)
                 {
-                    RefPtr<OperatorExpr> tmp = new InfixExpr();
+                    OperatorExpr* tmp = new InfixExpr();
                     tmp->FunctionExpr = parseOperator(this);
 
                     tmp->Arguments.Add(left);
@@ -4041,7 +4043,7 @@ namespace Slang
                 auto left = ParseExpression(Precedence(level + 1));
                 if (GetOpLevel(this, tokenReader.PeekTokenType()) == level)
                 {
-                    RefPtr<OperatorExpr> tmp = new InfixExpr();
+                    OperatorExpr* tmp = new InfixExpr();
                     tmp->Arguments.Add(left);
                     FillPosition(tmp.Ptr());
                     tmp->FunctionExpr = parseOperator(this);
@@ -4056,40 +4058,40 @@ namespace Slang
 
     // We *might* be looking at an application of a generic to arguments,
     // but we need to disambiguate to make sure.
-    static RefPtr<Expr> maybeParseGenericApp(
+    static Expr* maybeParseGenericApp(
         Parser*                             parser,
 
         // TODO: need to support more general expressions here
-        RefPtr<Expr>     base)
+        Expr*     base)
     {
         if(peekTokenType(parser) != TokenType::OpLess)
             return base;
         return tryParseGenericApp(parser, base);
     }
 
-    static RefPtr<Expr> parsePrefixExpr(Parser* parser);
+    static Expr* parsePrefixExpr(Parser* parser);
 
     // Parse OOP `this` expression syntax
-    static RefPtr<RefObject> parseThisExpr(Parser* parser, void* /*userData*/)
+    static NodeBase* parseThisExpr(Parser* parser, void* /*userData*/)
     {
-        RefPtr<ThisExpr> expr = parser->astBuilder->create<ThisExpr>();
+        ThisExpr* expr = parser->astBuilder->create<ThisExpr>();
         expr->scope = parser->currentScope;
         return expr;
     }
 
-    static RefPtr<Expr> parseBoolLitExpr(Parser* parser, bool value)
+    static Expr* parseBoolLitExpr(Parser* parser, bool value)
     {
-        RefPtr<BoolLiteralExpr> expr = parser->astBuilder->create<BoolLiteralExpr>();
+        BoolLiteralExpr* expr = parser->astBuilder->create<BoolLiteralExpr>();
         expr->value = value;
         return expr;
     }
 
-    static RefPtr<RefObject> parseTrueExpr(Parser* parser, void* /*userData*/)
+    static NodeBase* parseTrueExpr(Parser* parser, void* /*userData*/)
     {
         return parseBoolLitExpr(parser, true);
     }
 
-    static RefPtr<RefObject> parseFalseExpr(Parser* parser, void* /*userData*/)
+    static NodeBase* parseFalseExpr(Parser* parser, void* /*userData*/)
     {
         return parseBoolLitExpr(parser, false);
     }
@@ -4261,7 +4263,7 @@ namespace Slang
         return value;
     }
 
-    static RefPtr<Expr> parseAtomicExpr(Parser* parser)
+    static Expr* parseAtomicExpr(Parser* parser)
     {
         switch( peekTokenType(parser) )
         {
@@ -4283,8 +4285,8 @@ namespace Slang
 
                 if (peekTypeName(parser) && parser->LookAheadToken(TokenType::RParent, 1))
                 {
-                    RefPtr<TypeCastExpr> tcexpr = parser->astBuilder->create<ExplicitCastExpr>();
-                    parser->FillPosition(tcexpr.Ptr());
+                    TypeCastExpr* tcexpr = parser->astBuilder->create<ExplicitCastExpr>();
+                    parser->FillPosition(tcexpr);
                     tcexpr->functionExpr = parser->ParseType();
                     parser->ReadToken(TokenType::RParent);
 
@@ -4295,10 +4297,10 @@ namespace Slang
                 }
                 else
                 {
-                    RefPtr<Expr> base = parser->ParseExpression();
+                    Expr* base = parser->ParseExpression();
                     parser->ReadToken(TokenType::RParent);
 
-                    RefPtr<ParenExpr> parenExpr = parser->astBuilder->create<ParenExpr>();
+                    ParenExpr* parenExpr = parser->astBuilder->create<ParenExpr>();
                     parenExpr->loc = openParen.loc;
                     parenExpr->base = base;
                     return parenExpr;
@@ -4308,13 +4310,13 @@ namespace Slang
         // An initializer list `{ expr, ... }`
         case TokenType::LBrace:
             {
-                RefPtr<InitializerListExpr> initExpr = parser->astBuilder->create<InitializerListExpr>();
-                parser->FillPosition(initExpr.Ptr());
+                InitializerListExpr* initExpr = parser->astBuilder->create<InitializerListExpr>();
+                parser->FillPosition(initExpr);
 
                 // Initializer list
                 parser->ReadToken(TokenType::LBrace);
 
-                List<RefPtr<Expr>> exprs;
+                List<Expr*> exprs;
 
                 for(;;)
                 {
@@ -4338,8 +4340,8 @@ namespace Slang
 
         case TokenType::IntegerLiteral:
             {
-                RefPtr<IntegerLiteralExpr> constExpr = parser->astBuilder->create<IntegerLiteralExpr>();
-                parser->FillPosition(constExpr.Ptr());
+                IntegerLiteralExpr* constExpr = parser->astBuilder->create<IntegerLiteralExpr>();
+                parser->FillPosition(constExpr);
 
                 auto token = parser->tokenReader.advanceToken();
                 constExpr->token = token;
@@ -4427,8 +4429,8 @@ namespace Slang
 
         case TokenType::FloatingPointLiteral:
             {
-                RefPtr<FloatingPointLiteralExpr> constExpr = parser->astBuilder->create<FloatingPointLiteralExpr>();
-                parser->FillPosition(constExpr.Ptr());
+                FloatingPointLiteralExpr* constExpr = parser->astBuilder->create<FloatingPointLiteralExpr>();
+                parser->FillPosition(constExpr);
 
                 auto token = parser->tokenReader.advanceToken();
                 constExpr->token = token;
@@ -4541,10 +4543,10 @@ namespace Slang
 
         case TokenType::StringLiteral:
             {
-                RefPtr<StringLiteralExpr> constExpr = parser->astBuilder->create<StringLiteralExpr>();
+                StringLiteralExpr* constExpr = parser->astBuilder->create<StringLiteralExpr>();
                 auto token = parser->tokenReader.advanceToken();
                 constExpr->token = token;
-                parser->FillPosition(constExpr.Ptr());
+                parser->FillPosition(constExpr);
 
                 if (!parser->LookAheadToken(TokenType::StringLiteral))
                 {
@@ -4572,7 +4574,7 @@ namespace Slang
                 // keywords registered for use as expressions.
                 Token nameToken = peekToken(parser);
 
-                RefPtr<Expr> parsedExpr;
+                Expr* parsedExpr = nullptr;
                 if (tryParseUsingSyntaxDecl<Expr>(parser, &parsedExpr))
                 {
                     if (!parsedExpr->loc.isValid())
@@ -4583,9 +4585,9 @@ namespace Slang
                 }
 
                 // Default behavior is just to create a name expression
-                RefPtr<VarExpr> varExpr = parser->astBuilder->create<VarExpr>();
-                varExpr->scope = parser->currentScope.Ptr();
-                parser->FillPosition(varExpr.Ptr());
+                VarExpr* varExpr = parser->astBuilder->create<VarExpr>();
+                varExpr->scope = parser->currentScope;
+                parser->FillPosition(varExpr);
 
                 auto nameAndLoc = expectIdentifier(parser);
                 varExpr->name = nameAndLoc.name;
@@ -4600,7 +4602,7 @@ namespace Slang
         }
     }
 
-    static RefPtr<Expr> parsePostfixExpr(Parser* parser)
+    static Expr* parsePostfixExpr(Parser* parser)
     {
         auto expr = parseAtomicExpr(parser);
         for(;;)
@@ -4614,8 +4616,8 @@ namespace Slang
             case TokenType::OpInc:
             case TokenType::OpDec:
                 {
-                    RefPtr<OperatorExpr> postfixExpr = parser->astBuilder->create<PostfixExpr>();
-                    parser->FillPosition(postfixExpr.Ptr());
+                    OperatorExpr* postfixExpr = parser->astBuilder->create<PostfixExpr>();
+                    parser->FillPosition(postfixExpr);
                     postfixExpr->functionExpr = parseOperator(parser);
                     postfixExpr->arguments.add(expr);
 
@@ -4626,9 +4628,9 @@ namespace Slang
             // Subscript operation `a[i]`
             case TokenType::LBracket:
                 {
-                    RefPtr<IndexExpr> indexExpr = parser->astBuilder->create<IndexExpr>();
+                    IndexExpr* indexExpr = parser->astBuilder->create<IndexExpr>();
                     indexExpr->baseExpression = expr;
-                    parser->FillPosition(indexExpr.Ptr());
+                    parser->FillPosition(indexExpr);
                     parser->ReadToken(TokenType::LBracket);
                     // TODO: eventually we may want to support multiple arguments inside the `[]`
                     if (!parser->LookAheadToken(TokenType::RBracket))
@@ -4644,9 +4646,9 @@ namespace Slang
             // Call oepration `f(x)`
             case TokenType::LParent:
                 {
-                    RefPtr<InvokeExpr> invokeExpr = parser->astBuilder->create<InvokeExpr>();
+                    InvokeExpr* invokeExpr = parser->astBuilder->create<InvokeExpr>();
                     invokeExpr->functionExpr = expr;
-                    parser->FillPosition(invokeExpr.Ptr());
+                    parser->FillPosition(invokeExpr);
                     parser->ReadToken(TokenType::LParent);
                     while (!parser->tokenReader.isAtEnd())
                     {
@@ -4669,12 +4671,12 @@ namespace Slang
             // Scope access `x::m`
             case TokenType::Scope:
             {
-                RefPtr<StaticMemberExpr> staticMemberExpr = parser->astBuilder->create<StaticMemberExpr>();
+                StaticMemberExpr* staticMemberExpr = parser->astBuilder->create<StaticMemberExpr>();
 
                 // TODO(tfoley): why would a member expression need this?
-                staticMemberExpr->scope = parser->currentScope.Ptr();
+                staticMemberExpr->scope = parser->currentScope;
 
-                parser->FillPosition(staticMemberExpr.Ptr());
+                parser->FillPosition(staticMemberExpr);
                 staticMemberExpr->baseExpression = expr;
                 parser->ReadToken(TokenType::Scope);
                 staticMemberExpr->name = expectIdentifier(parser).name;
@@ -4689,12 +4691,12 @@ namespace Slang
             // Member access `x.m`
             case TokenType::Dot:
                 {
-                    RefPtr<MemberExpr> memberExpr = parser->astBuilder->create<MemberExpr>();
+                    MemberExpr* memberExpr = parser->astBuilder->create<MemberExpr>();
 
                     // TODO(tfoley): why would a member expression need this?
                     memberExpr->scope = parser->currentScope.Ptr();
 
-                    parser->FillPosition(memberExpr.Ptr());
+                    parser->FillPosition(memberExpr);
                     memberExpr->baseExpression = expr;
                     parser->ReadToken(TokenType::Dot);
                     memberExpr->name = expectIdentifier(parser).name;
@@ -4738,7 +4740,7 @@ namespace Slang
         }
     }
 
-    static RefPtr<Expr> parsePrefixExpr(Parser* parser)
+    static Expr* parsePrefixExpr(Parser* parser)
     {
         auto tokenType = peekTokenType(parser);
         switch( tokenType )
@@ -4750,8 +4752,8 @@ namespace Slang
         case TokenType::OpInc:
         case TokenType::OpDec:
         {
-            RefPtr<PrefixExpr> prefixExpr = parser->astBuilder->create<PrefixExpr>();
-            parser->FillPosition(prefixExpr.Ptr());
+            PrefixExpr* prefixExpr = parser->astBuilder->create<PrefixExpr>();
+            parser->FillPosition(prefixExpr);
             prefixExpr->functionExpr = parseOperator(parser);
 
             auto arg = parsePrefixExpr(parser);
@@ -4763,15 +4765,15 @@ namespace Slang
         case TokenType::OpAdd:
         case TokenType::OpSub:
             {
-                RefPtr<PrefixExpr> prefixExpr = parser->astBuilder->create<PrefixExpr>();
-                parser->FillPosition(prefixExpr.Ptr());
+                PrefixExpr* prefixExpr = parser->astBuilder->create<PrefixExpr>();
+                parser->FillPosition(prefixExpr);
                 prefixExpr->functionExpr = parseOperator(parser);
 
                 auto arg = parsePrefixExpr(parser);
 
                 if (auto intLit = as<IntegerLiteralExpr>(arg))
                 {
-                    RefPtr<IntegerLiteralExpr> newLiteral = parser->astBuilder->create<IntegerLiteralExpr>(*intLit);
+                    IntegerLiteralExpr* newLiteral = parser->astBuilder->create<IntegerLiteralExpr>(*intLit);
 
                     IRIntegerValue value = _foldIntegerPrefixOp(tokenType, newLiteral->value);
 
@@ -4786,7 +4788,7 @@ namespace Slang
                 }
                 else if (auto floatLit = as<FloatingPointLiteralExpr>(arg))
                 {
-                    RefPtr<FloatingPointLiteralExpr> newLiteral = parser->astBuilder->create<FloatingPointLiteralExpr>(*floatLit);
+                    FloatingPointLiteralExpr* newLiteral = parser->astBuilder->create<FloatingPointLiteralExpr>(*floatLit);
                     newLiteral->value = _foldFloatPrefixOp(tokenType, floatLit->value);
                     return newLiteral;
                 }
@@ -4799,12 +4801,12 @@ namespace Slang
         }
     }
 
-    RefPtr<Expr> Parser::ParseLeafExpression()
+    Expr* Parser::ParseLeafExpression()
     {
         return parsePrefixExpr(this);
     }
 
-    RefPtr<Expr> parseTermFromSourceFile(
+    Expr* parseTermFromSourceFile(
         ASTBuilder*                     astBuilder,
         TokenSpan const&                tokens,
         DiagnosticSink*                 sink,
@@ -4840,13 +4842,13 @@ namespace Slang
         char const*                 nameText,
         SyntaxParseCallback         callback,
         void*                       userData,
-        SyntaxClass<RefObject>      syntaxClass)
+        SyntaxClass<NodeBase>      syntaxClass)
     {
         Name* name = session->getNamePool()->getName(nameText);
 
         ASTBuilder* globalASTBuilder = session->getGlobalASTBuilder();
 
-        RefPtr<SyntaxDecl> syntaxDecl = globalASTBuilder->create<SyntaxDecl>();
+        SyntaxDecl* syntaxDecl = globalASTBuilder->create<SyntaxDecl>();
         syntaxDecl->nameAndLoc = NameLoc(name);
         syntaxDecl->syntaxClass = syntaxClass;
         syntaxDecl->parseCallback = callback;
@@ -4876,9 +4878,9 @@ namespace Slang
         addBuiltinSyntaxImpl(session, scope, name, &parseSimpleSyntax, (void*) syntaxClass.classInfo, getClass<T>());
     }
 
-    static RefPtr<RefObject> parseIntrinsicOpModifier(Parser* parser, void* /*userData*/)
+    static NodeBase* parseIntrinsicOpModifier(Parser* parser, void* /*userData*/)
     {
-        RefPtr<IntrinsicOpModifier> modifier = parser->astBuilder->create<IntrinsicOpModifier>();
+        IntrinsicOpModifier* modifier = parser->astBuilder->create<IntrinsicOpModifier>();
 
         // We allow a few difference forms here:
         //
@@ -4924,7 +4926,7 @@ namespace Slang
         return modifier;
     }
 
-    static RefPtr<RefObject> parseTargetIntrinsicModifier(Parser* parser, void* /*userData*/)
+    static NodeBase* parseTargetIntrinsicModifier(Parser* parser, void* /*userData*/)
     {
         auto modifier = parser->astBuilder->create<TargetIntrinsicModifier>();
 
@@ -4950,7 +4952,7 @@ namespace Slang
         return modifier;
     }
 
-    static RefPtr<RefObject> parseSpecializedForTargetModifier(Parser* parser, void* /*userData*/)
+    static NodeBase* parseSpecializedForTargetModifier(Parser* parser, void* /*userData*/)
     {
         auto modifier = parser->astBuilder->create<SpecializedForTargetModifier>();
         if (AdvanceIf(parser, TokenType::LParent))
@@ -4961,7 +4963,7 @@ namespace Slang
         return modifier;
     }
 
-    static RefPtr<RefObject> parseGLSLExtensionModifier(Parser* parser, void* /*userData*/)
+    static NodeBase* parseGLSLExtensionModifier(Parser* parser, void* /*userData*/)
     {
         auto modifier = parser->astBuilder->create<RequiredGLSLExtensionModifier>();
 
@@ -4972,7 +4974,7 @@ namespace Slang
         return modifier;
     }
 
-    static RefPtr<RefObject> parseGLSLVersionModifier(Parser* parser, void* /*userData*/)
+    static NodeBase* parseGLSLVersionModifier(Parser* parser, void* /*userData*/)
     {
         auto modifier = parser->astBuilder->create<RequiredGLSLVersionModifier>();
 
@@ -5013,7 +5015,7 @@ namespace Slang
         return SemanticVersion::parse(content, outVersion);
     }
 
-    static RefPtr<RefObject> parseSPIRVVersionModifier(Parser* parser, void* /*userData*/)
+    static NodeBase* parseSPIRVVersionModifier(Parser* parser, void* /*userData*/)
     {
         Token token;
         SemanticVersion version;
@@ -5024,10 +5026,10 @@ namespace Slang
             return modifier;
         }
         parser->sink->diagnose(token, Diagnostics::invalidSPIRVVersion);
-        return RefPtr<RefObject>();
+        return nullptr;
     }
 
-    static RefPtr<RefObject> parseCUDASMVersionModifier(Parser* parser, void* /*userData*/)
+    static NodeBase* parseCUDASMVersionModifier(Parser* parser, void* /*userData*/)
     {
         Token token;
         SemanticVersion version;
@@ -5038,14 +5040,14 @@ namespace Slang
             return modifier;
         }
         parser->sink->diagnose(token, Diagnostics::invalidCUDASMVersion);
-        return RefPtr<RefObject>();
+        return nullptr;
     }
 
-    static RefPtr<RefObject> parseLayoutModifier(Parser* parser, void* /*userData*/)
+    static NodeBase* parseLayoutModifier(Parser* parser, void* /*userData*/)
     {
         ModifierListBuilder listBuilder;
 
-        RefPtr<UncheckedAttribute> numThreadsAttrib;
+        UncheckedAttribute* numThreadsAttrib = nullptr;
 
         listBuilder.add(parser->astBuilder->create<GLSLLayoutModifierGroupBegin>());
         
@@ -5121,7 +5123,7 @@ namespace Slang
             }
             else
             {
-                RefPtr<Modifier> modifier;
+                Modifier* modifier = nullptr;
 
 #define CASE(key, type) if (nameText == #key) { modifier = parser->astBuilder->create<type>(); } else
                 CASE(push_constant, PushConstantAttribute) 
@@ -5164,9 +5166,9 @@ namespace Slang
         return listBuilder.getFirst();
     }
 
-    static RefPtr<RefObject> parseBuiltinTypeModifier(Parser* parser, void* /*userData*/)
+    static NodeBase* parseBuiltinTypeModifier(Parser* parser, void* /*userData*/)
     {
-        RefPtr<BuiltinTypeModifier> modifier = parser->astBuilder->create<BuiltinTypeModifier>();
+        BuiltinTypeModifier* modifier = parser->astBuilder->create<BuiltinTypeModifier>();
         parser->ReadToken(TokenType::LParent);
         modifier->tag = BaseType(StringToInt(parser->ReadToken(TokenType::IntegerLiteral).getContent()));
         parser->ReadToken(TokenType::RParent);
@@ -5174,9 +5176,9 @@ namespace Slang
         return modifier;
     }
 
-    static RefPtr<RefObject> parseMagicTypeModifier(Parser* parser, void* /*userData*/)
+    static NodeBase* parseMagicTypeModifier(Parser* parser, void* /*userData*/)
     {
-        RefPtr<MagicTypeModifier> modifier = parser->astBuilder->create<MagicTypeModifier>();
+        MagicTypeModifier* modifier = parser->astBuilder->create<MagicTypeModifier>();
         parser->ReadToken(TokenType::LParent);
         modifier->name = parser->ReadToken(TokenType::Identifier).getContent();
         if (AdvanceIf(parser, TokenType::Comma))
@@ -5188,9 +5190,9 @@ namespace Slang
         return modifier;
     }
 
-    static RefPtr<RefObject> parseIntrinsicTypeModifier(Parser* parser, void* /*userData*/)
+    static NodeBase* parseIntrinsicTypeModifier(Parser* parser, void* /*userData*/)
     {
-        RefPtr<IntrinsicTypeModifier> modifier = parser->astBuilder->create<IntrinsicTypeModifier>();
+        IntrinsicTypeModifier* modifier = parser->astBuilder->create<IntrinsicTypeModifier>();
         parser->ReadToken(TokenType::LParent);
         modifier->irOp = uint32_t(StringToInt(parser->ReadToken(TokenType::IntegerLiteral).getContent()));
         while( AdvanceIf(parser, TokenType::Comma) )
@@ -5202,9 +5204,9 @@ namespace Slang
 
         return modifier;
     }
-    static RefPtr<RefObject> parseImplicitConversionModifier(Parser* parser, void* /*userData*/)
+    static NodeBase* parseImplicitConversionModifier(Parser* parser, void* /*userData*/)
     {
-        RefPtr<ImplicitConversionModifier> modifier = parser->astBuilder->create<ImplicitConversionModifier>();
+        ImplicitConversionModifier* modifier = parser->astBuilder->create<ImplicitConversionModifier>();
 
         ConversionCost cost = kConversionCost_Default;
         if( AdvanceIf(parser, TokenType::LParent) )
@@ -5216,7 +5218,7 @@ namespace Slang
         return modifier;
     }
 
-    static RefPtr<RefObject> parseAttributeTargetModifier(Parser* parser, void* /*userData*/)
+    static NodeBase* parseAttributeTargetModifier(Parser* parser, void* /*userData*/)
     {
         expect(parser, TokenType::LParent);
         auto syntaxClassNameAndLoc = expectIdentifier(parser);
@@ -5224,19 +5226,19 @@ namespace Slang
 
         auto syntaxClass = parser->astBuilder->findSyntaxClass(syntaxClassNameAndLoc.name);
 
-        RefPtr<AttributeTargetModifier> modifier = parser->astBuilder->create<AttributeTargetModifier>();
+        AttributeTargetModifier* modifier = parser->astBuilder->create<AttributeTargetModifier>();
         modifier->syntaxClass = syntaxClass;
 
         return modifier;
     }
 
-    RefPtr<ModuleDecl> populateBaseLanguageModule(
+    ModuleDecl* populateBaseLanguageModule(
         ASTBuilder*     astBuilder,
         RefPtr<Scope>   scope)
     {
         Session* session = astBuilder->getGlobalSession();
 
-        RefPtr<ModuleDecl> moduleDecl = astBuilder->create<ModuleDecl>();
+        ModuleDecl* moduleDecl = astBuilder->create<ModuleDecl>();
         scope->containerDecl = moduleDecl;
 
         // Add syntax for declaration keywords

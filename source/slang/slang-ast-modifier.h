@@ -511,7 +511,7 @@ class AttributeTargetModifier : public Modifier
     SLANG_CLASS(AttributeTargetModifier)
  
     // A class to which the declared attribute type is applicable
-    SyntaxClass<RefObject> syntaxClass;
+    SyntaxClass<NodeBase> syntaxClass;
 };
 
 // Base class for checked and unchecked `[name(arg0, ...)]` style attribute.
@@ -519,7 +519,7 @@ class AttributeBase : public Modifier
 {
     SLANG_CLASS(AttributeBase)
  
-    List<RefPtr<Expr>> args;
+    List<Expr*> args;
 };
 
 // A `[name(...)]` attribute that hasn't undergone any semantic analysis.
@@ -549,7 +549,7 @@ class AttributeUsageAttribute : public Attribute
 {
     SLANG_CLASS(AttributeUsageAttribute)
  
-    SyntaxClass<RefObject> targetSyntaxClass;
+    SyntaxClass<NodeBase> targetSyntaxClass;
 };
 
 // An `[unroll]` or `[unroll(count)]` attribute
@@ -668,7 +668,7 @@ class PatchConstantFuncAttribute : public Attribute
 {
     SLANG_CLASS(PatchConstantFuncAttribute)
  
-    RefPtr<FuncDecl> patchConstantFuncDecl;
+    FuncDecl* patchConstantFuncDecl = nullptr;
 };
 class DomainAttribute : public Attribute 
 {

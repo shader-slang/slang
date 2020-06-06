@@ -39,7 +39,7 @@ class OverloadedExpr : public Expr
 
     // Optional: the base expression is this overloaded result
     // arose from a member-reference expression.
-    RefPtr<Expr> base;
+    Expr* base = nullptr;
 
     // The lookup result that was ambiguous
     LookupResult lookupResult2;
@@ -53,10 +53,10 @@ class OverloadedExpr2: public Expr
 
     // Optional: the base expression is this overloaded result
     // arose from a member-reference expression.
-    RefPtr<Expr> base;
+    Expr* base = nullptr;
 
     // The lookup result that was ambiguous
-    List<RefPtr<Expr>> candidiateExprs;
+    List<Expr*> candidiateExprs;
 };
 
 class LiteralExpr : public Expr
@@ -103,7 +103,7 @@ class StringLiteralExpr : public LiteralExpr
 class InitializerListExpr : public Expr
 {
     SLANG_CLASS(InitializerListExpr)
-    List<RefPtr<Expr>> args;
+    List<Expr*> args;
 };
 
 // A base class for expressions with arguments
@@ -111,7 +111,7 @@ class ExprWithArgsBase : public Expr
 {
     SLANG_ABSTRACT_CLASS(ExprWithArgsBase)
 
-    List<RefPtr<Expr>> arguments;
+    List<Expr*> arguments;
 };
 
 // An aggregate type constructor
@@ -129,7 +129,7 @@ class AppExprBase : public ExprWithArgsBase
 {
     SLANG_ABSTRACT_CLASS(AppExprBase)
 
-    RefPtr<Expr> functionExpr;
+    Expr* functionExpr = nullptr;
 };
 
 class InvokeExpr: public AppExprBase
@@ -159,21 +159,21 @@ class IndexExpr: public Expr
 {
     SLANG_CLASS(IndexExpr)
 
-    RefPtr<Expr> baseExpression;
-    RefPtr<Expr> indexExpression;
+    Expr* baseExpression = nullptr;
+    Expr* indexExpression = nullptr;
 };
 
 class MemberExpr: public DeclRefExpr
 {
     SLANG_CLASS(MemberExpr)
-    RefPtr<Expr> baseExpression;
+    Expr* baseExpression = nullptr;
 };
 
 // Member looked up on a type, rather than a value
 class StaticMemberExpr: public DeclRefExpr
 {
     SLANG_CLASS(StaticMemberExpr)
-    RefPtr<Expr> baseExpression;
+    Expr* baseExpression = nullptr;
 };
 
 struct MatrixCoord
@@ -188,7 +188,7 @@ struct MatrixCoord
 class MatrixSwizzleExpr : public Expr
 {
     SLANG_CLASS(MatrixSwizzleExpr)
-    RefPtr<Expr> base;
+    Expr* base = nullptr;
     int elementCount;
     MatrixCoord elementCoords[4];
 };
@@ -196,7 +196,7 @@ class MatrixSwizzleExpr : public Expr
 class SwizzleExpr: public Expr
 {
     SLANG_CLASS(SwizzleExpr)
-    RefPtr<Expr> base;
+    Expr* base = nullptr;
     int elementCount;
     int elementIndices[4];
 };
@@ -205,7 +205,7 @@ class SwizzleExpr: public Expr
 class DerefExpr: public Expr
 {
     SLANG_CLASS(DerefExpr)
-    RefPtr<Expr> base;
+    Expr* base = nullptr;
 };
 
 // Any operation that performs type-casting
@@ -213,7 +213,7 @@ class TypeCastExpr: public InvokeExpr
 {
     SLANG_CLASS(TypeCastExpr)
 //    TypeExp TargetType;
-//    RefPtr<Expr> Expression;
+//    Expr* Expression = nullptr;
 };
 
 // An explicit type-cast that appear in the user's code with `(type) expr` syntax
@@ -236,14 +236,14 @@ class CastToSuperTypeExpr: public Expr
 {
     SLANG_CLASS(CastToSuperTypeExpr)
 
-        /// The value being cast to a super type
-        ///
-        /// The type being case from is `valueArg->type`.
-        ///
-    RefPtr<Expr>    valueArg;
+    /// The value being cast to a super type
+    ///
+    /// The type being case from is `valueArg->type`.
+    ///
+    Expr* valueArg = nullptr;
 
-        /// A witness showing that `valueArg`'s type is a sub-type of this expression's `type`
-    RefPtr<Val>     witnessArg;
+    /// A witness showing that `valueArg`'s type is a sub-type of this expression's `type`   
+    Val* witnessArg = nullptr;
 };
 
 class SelectExpr: public OperatorExpr
@@ -268,8 +268,8 @@ class SharedTypeExpr: public Expr
 class AssignExpr: public Expr
 {
     SLANG_CLASS(AssignExpr)
-    RefPtr<Expr> left;
-    RefPtr<Expr> right;
+    Expr* left = nullptr;
+    Expr* right = nullptr;
 };
 
 // Just an expression inside parentheses `(exp)`
@@ -279,7 +279,7 @@ class AssignExpr: public Expr
 class ParenExpr: public Expr
 {
     SLANG_CLASS(ParenExpr)
-    RefPtr<Expr> base;
+    Expr* base = nullptr;
 };
 
 // An object-oriented `this` expression, used to
@@ -294,8 +294,8 @@ class ThisExpr: public Expr
 class LetExpr: public Expr
 {
     SLANG_CLASS(LetExpr)
-    RefPtr<VarDecl> decl;
-    RefPtr<Expr> body;
+    VarDecl* decl = nullptr;
+    Expr* body = nullptr;
 };
 
 class ExtractExistentialValueExpr: public Expr

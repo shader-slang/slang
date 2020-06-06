@@ -54,7 +54,7 @@ SourceLoc const& getDiagnosticPos(TypeExp const& typeExp)
 
 // !!!!!!!!!!!!!!!!!!!!!!!!!!!!!  Free functions !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 
-const RefPtr<Decl>* adjustFilterCursorImpl(const ReflectClassInfo& clsInfo, MemberFilterStyle filterStyle, const RefPtr<Decl>* ptr, const RefPtr<Decl>* end)
+Decl*const* adjustFilterCursorImpl(const ReflectClassInfo& clsInfo, MemberFilterStyle filterStyle, Decl*const* ptr, Decl*const* end)
 {
     switch (filterStyle)
     {
@@ -99,7 +99,7 @@ const RefPtr<Decl>* adjustFilterCursorImpl(const ReflectClassInfo& clsInfo, Memb
     return end;
 }
 
-const RefPtr<Decl>* getFilterCursorByIndexImpl(const ReflectClassInfo& clsInfo, MemberFilterStyle filterStyle, const RefPtr<Decl>* ptr, const RefPtr<Decl>* end, Index index)
+Decl*const* getFilterCursorByIndexImpl(const ReflectClassInfo& clsInfo, MemberFilterStyle filterStyle, Decl*const* ptr, Decl*const* end, Index index)
 {
     switch (filterStyle)
     {
@@ -156,7 +156,7 @@ const RefPtr<Decl>* getFilterCursorByIndexImpl(const ReflectClassInfo& clsInfo, 
     return nullptr;
 }
 
-Index getFilterCountImpl(const ReflectClassInfo& clsInfo, MemberFilterStyle filterStyle, const RefPtr<Decl>* ptr, const RefPtr<Decl>* end)
+Index getFilterCountImpl(const ReflectClassInfo& clsInfo, MemberFilterStyle filterStyle, Decl*const* ptr, Decl*const* end)
 {
     Index count = 0;
     switch (filterStyle)
@@ -204,9 +204,9 @@ Index getFilterCountImpl(const ReflectClassInfo& clsInfo, MemberFilterStyle filt
     // RequirementWitness
     //
 
-    RequirementWitness::RequirementWitness(RefPtr<Val> val)
+    RequirementWitness::RequirementWitness(Val* val)
         : m_flavor(Flavor::val)
-        , m_obj(val)
+        , m_val(val)
     {}
 
 
@@ -324,17 +324,17 @@ Index getFilterCountImpl(const ReflectClassInfo& clsInfo, MemberFilterStyle filt
 
    
 
-    static RefPtr<Type> ExtractGenericArgType(RefPtr<Val> val)
+    static Type* ExtractGenericArgType(Val* val)
     {
-        auto type = val.as<Type>();
-        SLANG_RELEASE_ASSERT(type.Ptr());
+        auto type = as<Type>(val);
+        SLANG_RELEASE_ASSERT(type);
         return type;
     }
 
-    static RefPtr<IntVal> ExtractGenericArgInteger(RefPtr<Val> val)
+    static IntVal* ExtractGenericArgInteger(Val* val)
     {
-        auto intVal = val.as<IntVal>();
-        SLANG_RELEASE_ASSERT(intVal.Ptr());
+        auto intVal = as<IntVal>(val);
+        SLANG_RELEASE_ASSERT(intVal);
         return intVal;
     }
 
@@ -359,30 +359,30 @@ Index getFilterCountImpl(const ReflectClassInfo& clsInfo, MemberFilterStyle filt
 
         // We are going to build up a list of substitutions that need
         // to be applied to the decl-ref to make it specialized.
-        RefPtr<Substitutions> substsToApply;
-        RefPtr<Substitutions>* link = &substsToApply;
+        Substitutions* substsToApply = nullptr;
+        Substitutions** link = &substsToApply;
 
-        RefPtr<Decl> dd = declRef.getDecl();
+        Decl* dd = declRef.getDecl();
         for(;;)
         {
-            RefPtr<Decl> childDecl = dd;
-            RefPtr<Decl> parentDecl = dd->parentDecl;
+            Decl* childDecl = dd;
+            Decl* parentDecl = dd->parentDecl;
             if(!parentDecl)
                 break;
 
             dd = parentDecl;
 
-            if(auto genericParentDecl = parentDecl.as<GenericDecl>())
+            if(auto genericParentDecl = as<GenericDecl>(parentDecl))
             {
                 // Don't specialize any parameters of a generic.
                 if(childDecl != genericParentDecl->inner)
                     break;
 
                 // We have a generic ancestor, but do we have an substitutions for it?
-                RefPtr<GenericSubstitution> foundSubst;
+                GenericSubstitution* foundSubst = nullptr;
                 for(auto s = declRef.substitutions.substitutions; s; s = s->outer)
                 {
-                    auto genSubst = s.as<GenericSubstitution>();
+                    auto genSubst = as<GenericSubstitution>(s);
                     if(!genSubst)
                         continue;
 
@@ -397,7 +397,7 @@ Index getFilterCountImpl(const ReflectClassInfo& clsInfo, MemberFilterStyle filt
 
                 if(!foundSubst)
                 {
-                    RefPtr<Substitutions> newSubst = createDefaultSubstitutionsForGeneric(
+                    Substitutions* newSubst = createDefaultSubstitutionsForGeneric(
                         astBuilder, 
                         genericParentDecl,
                         nullptr);
@@ -417,7 +417,7 @@ Index getFilterCountImpl(const ReflectClassInfo& clsInfo, MemberFilterStyle filt
 
     // TODO: need to figure out how to unify this with the logic
     // in the generic case...
-    RefPtr<DeclRefType> DeclRefType::create(
+    DeclRefType* DeclRefType::create(
         ASTBuilder*     astBuilder,
         DeclRef<Decl>   declRef)
     {
@@ -434,7 +434,7 @@ Index getFilterCountImpl(const ReflectClassInfo& clsInfo, MemberFilterStyle filt
             GenericSubstitution* subst = nullptr;
             for(auto s = declRef.substitutions.substitutions; s; s = s->outer)
             {
-                if(auto genericSubst = s.as<GenericSubstitution>())
+                if(auto genericSubst = as<GenericSubstitution>(s))
                 {
                     subst = genericSubst;
                     break;
@@ -561,7 +561,7 @@ Index getFilterCountImpl(const ReflectClassInfo& clsInfo, MemberFilterStyle filt
                     SLANG_UNEXPECTED("unhandled type");
                 }
 
-                RefPtr<RefObject> type = classInfo.createInstance(astBuilder);
+                NodeBase* type = classInfo.createInstance(astBuilder);
                 if (!type)
                 {
                     SLANG_UNEXPECTED("constructor failure");
@@ -584,9 +584,9 @@ Index getFilterCountImpl(const ReflectClassInfo& clsInfo, MemberFilterStyle filt
 
     //
 
-    RefPtr<GenericSubstitution> findInnerMostGenericSubstitution(Substitutions* subst)
+    GenericSubstitution* findInnerMostGenericSubstitution(Substitutions* subst)
     {
-        for(RefPtr<Substitutions> s = subst; s; s = s->outer)
+        for(Substitutions* s = subst; s; s = s->outer)
         {
             if(auto genericSubst = as<GenericSubstitution>(s))
                 return genericSubst;
@@ -597,7 +597,7 @@ Index getFilterCountImpl(const ReflectClassInfo& clsInfo, MemberFilterStyle filt
    
     // DeclRefBase
 
-    RefPtr<Type> DeclRefBase::substitute(ASTBuilder* astBuilder, RefPtr<Type> type) const
+    Type* DeclRefBase::substitute(ASTBuilder* astBuilder, Type* type) const
     {
         // Note that type can be nullptr, and so this function can return nullptr (although only correctly when no substitutions) 
 
@@ -609,7 +609,7 @@ Index getFilterCountImpl(const ReflectClassInfo& clsInfo, MemberFilterStyle filt
 
         // Otherwise we need to recurse on the type structure
         // and apply substitutions where it makes sense
-        return type->substitute(astBuilder, substitutions).as<Type>();
+        return Slang::as<Type>(type->substitute(astBuilder, substitutions));
     }
 
     DeclRefBase DeclRefBase::substitute(ASTBuilder* astBuilder, DeclRefBase declRef) const
@@ -621,7 +621,7 @@ Index getFilterCountImpl(const ReflectClassInfo& clsInfo, MemberFilterStyle filt
         return declRef.substituteImpl(astBuilder, substitutions, &diff);
     }
 
-    RefPtr<Expr> DeclRefBase::substitute(ASTBuilder* /* astBuilder*/, RefPtr<Expr> expr) const
+    Expr* DeclRefBase::substitute(ASTBuilder* /* astBuilder*/, Expr* expr) const
     {
         // No substitutions? Easy.
         if (!substitutions)
@@ -647,13 +647,13 @@ Index getFilterCountImpl(const ReflectClassInfo& clsInfo, MemberFilterStyle filt
         return nullptr;
     }
 
-    RefPtr<GlobalGenericParamSubstitution> findGlobalGenericSubst(
-        RefPtr<Substitutions>   substs,
+    GlobalGenericParamSubstitution* findGlobalGenericSubst(
+        Substitutions*   substs,
         GlobalGenericParamDecl* paramDecl)
     {
         for(auto s = substs; s; s = s->outer)
         {
-            auto gSubst = s.as<GlobalGenericParamSubstitution>();
+            auto gSubst = as<GlobalGenericParamSubstitution>(s);
             if(!gSubst)
                 continue;
 
@@ -666,22 +666,22 @@ Index getFilterCountImpl(const ReflectClassInfo& clsInfo, MemberFilterStyle filt
         return nullptr;
     }
 
-    RefPtr<Substitutions> specializeSubstitutionsShallow(
+    Substitutions* specializeSubstitutionsShallow(
         ASTBuilder*             astBuilder, 
-        RefPtr<Substitutions>   substToSpecialize,
-        RefPtr<Substitutions>   substsToApply,
-        RefPtr<Substitutions>   restSubst,
+        Substitutions*   substToSpecialize,
+        Substitutions*   substsToApply,
+        Substitutions*   restSubst,
         int*                    ioDiff)
     {
         SLANG_ASSERT(substToSpecialize);
         return substToSpecialize->applySubstitutionsShallow(astBuilder, substsToApply, restSubst, ioDiff);
     }
 
-    RefPtr<Substitutions> specializeGlobalGenericSubstitutions(
+    Substitutions* specializeGlobalGenericSubstitutions(
         ASTBuilder*                         astBuilder,
         Decl*                               declToSpecialize,
-        RefPtr<Substitutions>               substsToSpecialize,
-        RefPtr<Substitutions>               substsToApply,
+        Substitutions*               substsToSpecialize,
+        Substitutions*               substsToApply,
         int*                                ioDiff,
         HashSet<GlobalGenericParamDecl*>&   ioParametersFound)
     {
@@ -689,7 +689,7 @@ Index getFilterCountImpl(const ReflectClassInfo& clsInfo, MemberFilterStyle filt
         // a recursive case that skips the rest of the function.
         for(auto specSubst = substsToSpecialize; specSubst; specSubst = specSubst->outer)
         {
-            auto specGlobalGenericSubst = specSubst.as<GlobalGenericParamSubstitution>();
+            auto specGlobalGenericSubst = as<GlobalGenericParamSubstitution>(specSubst);
             if(!specGlobalGenericSubst)
                 continue;
 
@@ -721,8 +721,8 @@ Index getFilterCountImpl(const ReflectClassInfo& clsInfo, MemberFilterStyle filt
         // We expect global generic substitutions to come at
         // the end of the list in all cases, so lets advance
         // until we see them.
-        RefPtr<Substitutions> appGlobalGenericSubsts = substsToApply;
-        while(appGlobalGenericSubsts && !appGlobalGenericSubsts.as<GlobalGenericParamSubstitution>())
+        Substitutions* appGlobalGenericSubsts = substsToApply;
+        while(appGlobalGenericSubsts && !as<GlobalGenericParamSubstitution>(appGlobalGenericSubsts))
             appGlobalGenericSubsts = appGlobalGenericSubsts->outer;
 
 
@@ -738,11 +738,11 @@ Index getFilterCountImpl(const ReflectClassInfo& clsInfo, MemberFilterStyle filt
         if(ioParametersFound.Count() == 0)
             return appGlobalGenericSubsts;
 
-        RefPtr<Substitutions> resultSubst;
-        RefPtr<Substitutions>* link = &resultSubst;
+        Substitutions* resultSubst = nullptr;
+        Substitutions** link = &resultSubst;
         for(auto appSubst = appGlobalGenericSubsts; appSubst; appSubst = appSubst->outer)
         {
-            auto appGlobalGenericSubst = appSubst.as<GlobalGenericParamSubstitution>();
+            auto appGlobalGenericSubst = as<GlobalGenericParamSubstitution>(appSubst);
             if(!appSubst)
                 continue;
 
@@ -750,7 +750,7 @@ Index getFilterCountImpl(const ReflectClassInfo& clsInfo, MemberFilterStyle filt
             if(ioParametersFound.Contains(appGlobalGenericSubst->paramDecl))
                 continue;
 
-            RefPtr<GlobalGenericParamSubstitution> newSubst = astBuilder->create<GlobalGenericParamSubstitution>();
+            GlobalGenericParamSubstitution* newSubst = astBuilder->create<GlobalGenericParamSubstitution>();
             newSubst->paramDecl = appGlobalGenericSubst->paramDecl;
             newSubst->actualType = appGlobalGenericSubst->actualType;
             newSubst->constraintArgs = appGlobalGenericSubst->constraintArgs;
@@ -762,11 +762,11 @@ Index getFilterCountImpl(const ReflectClassInfo& clsInfo, MemberFilterStyle filt
         return resultSubst;
     }
 
-    RefPtr<Substitutions> specializeGlobalGenericSubstitutions(
+    Substitutions* specializeGlobalGenericSubstitutions(
         ASTBuilder*             astBuilder,
         Decl*                   declToSpecialize,
-        RefPtr<Substitutions>   substsToSpecialize,
-        RefPtr<Substitutions>   substsToApply,
+        Substitutions*   substsToSpecialize,
+        Substitutions*   substsToApply,
         int*                    ioDiff)
     {
         // Keep track of any parameters already present in the
@@ -778,11 +778,11 @@ Index getFilterCountImpl(const ReflectClassInfo& clsInfo, MemberFilterStyle filt
 
     // Construct new substitutions to apply to a declaration,
     // based on a provided substitution set to be applied
-    RefPtr<Substitutions> specializeSubstitutions(
+    Substitutions* specializeSubstitutions(
         ASTBuilder*             astBuilder,
         Decl*                   declToSpecialize,
-        RefPtr<Substitutions>   substsToSpecialize,
-        RefPtr<Substitutions>   substsToApply,
+        Substitutions*   substsToSpecialize,
+        Substitutions*   substsToApply,
         int*                    ioDiff)
     {
         // No declaration? Then nothing to specialize.
@@ -861,7 +861,7 @@ Index getFilterCountImpl(const ReflectClassInfo& clsInfo, MemberFilterStyle filt
                         substsToApply,
                         &diff);
 
-                    RefPtr<GenericSubstitution> firstSubst = astBuilder->create<GenericSubstitution>();
+                    GenericSubstitution* firstSubst = astBuilder->create<GenericSubstitution>();
                     firstSubst->genericDecl = ancestorGenericDecl;
                     firstSubst->args = appGenericSubst->args;
                     firstSubst->outer = restSubst;
@@ -909,7 +909,7 @@ Index getFilterCountImpl(const ReflectClassInfo& clsInfo, MemberFilterStyle filt
                 //
                 for(auto s = substsToApply; s; s = s->outer)
                 {
-                    auto appThisTypeSubst = s.as<ThisTypeSubstitution>();
+                    auto appThisTypeSubst = as<ThisTypeSubstitution>(s);
                     if(!appThisTypeSubst)
                         continue;
 
@@ -924,7 +924,7 @@ Index getFilterCountImpl(const ReflectClassInfo& clsInfo, MemberFilterStyle filt
                         substsToApply,
                         &diff);
 
-                    RefPtr<ThisTypeSubstitution> firstSubst = astBuilder->create<ThisTypeSubstitution>();
+                    ThisTypeSubstitution* firstSubst = astBuilder->create<ThisTypeSubstitution>();
                     firstSubst->interfaceDecl = ancestorInterfaceDecl;
                     firstSubst->witness = appThisTypeSubst->witness;
                     firstSubst->outer = restSubst;
@@ -1033,7 +1033,7 @@ Index getFilterCountImpl(const ReflectClassInfo& clsInfo, MemberFilterStyle filt
 
         // Default is to apply the same set of substitutions/specializations
         // to the parent declaration as were applied to the child.
-        RefPtr<Substitutions> substToApply = substitutions.substitutions;
+        Substitutions* substToApply = substitutions.substitutions;
 
         if(auto interfaceDecl = as<InterfaceDecl>(decl))
         {
@@ -1079,14 +1079,14 @@ Index getFilterCountImpl(const ReflectClassInfo& clsInfo, MemberFilterStyle filt
 
     // IntVal
 
-    IntegerLiteralValue getIntVal(RefPtr<IntVal> val)
+    IntegerLiteralValue getIntVal(IntVal* val)
     {
         if (auto constantVal = as<ConstantIntVal>(val))
         {
             return constantVal->value;
         }
         SLANG_UNEXPECTED("needed a known integer value");
-        return 0;
+        //return 0;
     }
 
     //
@@ -1105,7 +1105,7 @@ Index getFilterCountImpl(const ReflectClassInfo& clsInfo, MemberFilterStyle filt
 
     // Constructors for types
 
-    RefPtr<ArrayExpressionType> getArrayType(
+    ArrayExpressionType* getArrayType(
         ASTBuilder* astBuilder,
         Type* elementType,
         IntVal*         elementCount)
@@ -1116,7 +1116,7 @@ Index getFilterCountImpl(const ReflectClassInfo& clsInfo, MemberFilterStyle filt
         return arrayType;
     }
 
-    RefPtr<ArrayExpressionType> getArrayType(
+    ArrayExpressionType* getArrayType(
         ASTBuilder* astBuilder,
         Type* elementType)
     {
@@ -1125,7 +1125,7 @@ Index getFilterCountImpl(const ReflectClassInfo& clsInfo, MemberFilterStyle filt
         return arrayType;
     }
 
-    RefPtr<NamedExpressionType> getNamedType(
+    NamedExpressionType* getNamedType(
         ASTBuilder*                 astBuilder,
         DeclRef<TypeDefDecl> const& declRef)
     {
@@ -1135,11 +1135,11 @@ Index getFilterCountImpl(const ReflectClassInfo& clsInfo, MemberFilterStyle filt
     }
 
     
-    RefPtr<FuncType> getFuncType(
+    FuncType* getFuncType(
         ASTBuilder*                     astBuilder,
         DeclRef<CallableDecl> const&    declRef)
     {
-        RefPtr<FuncType> funcType = astBuilder->create<FuncType>();
+        FuncType* funcType = astBuilder->create<FuncType>();
 
         funcType->resultType = getResultType(astBuilder, declRef);
         for (auto paramDeclRef : getParameters(declRef))
@@ -1167,14 +1167,14 @@ Index getFilterCountImpl(const ReflectClassInfo& clsInfo, MemberFilterStyle filt
         return funcType;
     }
 
-    RefPtr<GenericDeclRefType> getGenericDeclRefType(
+    GenericDeclRefType* getGenericDeclRefType(
         ASTBuilder*                 astBuilder,
         DeclRef<GenericDecl> const& declRef)
     {
         return astBuilder->create<GenericDeclRefType>(declRef);
     }
 
-    RefPtr<NamespaceType> getNamespaceType(
+    NamespaceType* getNamespaceType(
         ASTBuilder*                         astBuilder,
         DeclRef<NamespaceDeclBase> const&   declRef)
     {
@@ -1183,17 +1183,17 @@ Index getFilterCountImpl(const ReflectClassInfo& clsInfo, MemberFilterStyle filt
         return type;
     }
 
-    RefPtr<SamplerStateType> getSamplerStateType(
+    SamplerStateType* getSamplerStateType(
         ASTBuilder*     astBuilder)
     {
         return astBuilder->create<SamplerStateType>();
     }
 
-    RefPtr<ThisTypeSubstitution> findThisTypeSubstitution(
+    ThisTypeSubstitution* findThisTypeSubstitution(
         Substitutions*  substs,
         InterfaceDecl*  interfaceDecl)
     {
-        for(RefPtr<Substitutions> s = substs; s; s = s->outer)
+        for(Substitutions* s = substs; s; s = s->outer)
         {
             auto thisTypeSubst = as<ThisTypeSubstitution>(s);
             if(!thisTypeSubst)

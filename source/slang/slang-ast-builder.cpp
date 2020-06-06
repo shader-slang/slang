@@ -12,7 +12,6 @@ SharedASTBuilder::SharedASTBuilder()
 {    
 }
 
-
 void SharedASTBuilder::init(Session* session)
 {
     m_namePool = session->getNamePool();
@@ -55,14 +54,14 @@ const ReflectClassInfo* SharedASTBuilder::findClassInfo(const UnownedStringSlice
     return m_sliceToTypeMap.TryGetValue(slice, typeInfo) ? typeInfo : nullptr;
 }
 
-SyntaxClass<RefObject> SharedASTBuilder::findSyntaxClass(const UnownedStringSlice& slice)
+SyntaxClass<NodeBase> SharedASTBuilder::findSyntaxClass(const UnownedStringSlice& slice)
 {
     const ReflectClassInfo* typeInfo;
     if (m_sliceToTypeMap.TryGetValue(slice, typeInfo))
     {
-        return SyntaxClass<RefObject>(typeInfo);
+        return SyntaxClass<NodeBase>(typeInfo);
     }
-    return SyntaxClass<RefObject>();
+    return SyntaxClass<NodeBase>();
 }
 
 const ReflectClassInfo* SharedASTBuilder::findClassInfo(Name* name)
@@ -71,14 +70,14 @@ const ReflectClassInfo* SharedASTBuilder::findClassInfo(Name* name)
     return m_nameToTypeMap.TryGetValue(name, typeInfo) ? typeInfo : nullptr;
 }
 
-SyntaxClass<RefObject> SharedASTBuilder::findSyntaxClass(Name* name)
+SyntaxClass<NodeBase> SharedASTBuilder::findSyntaxClass(Name* name)
 {
     const ReflectClassInfo* typeInfo;
     if (m_nameToTypeMap.TryGetValue(name, typeInfo))
     {
-        return SyntaxClass<RefObject>(typeInfo);
+        return SyntaxClass<NodeBase>(typeInfo);
     }
-    return SyntaxClass<RefObject>();
+    return SyntaxClass<NodeBase>();
 }
 
 Type* SharedASTBuilder::getStringType()
@@ -106,7 +105,7 @@ SharedASTBuilder::~SharedASTBuilder()
     // Release built in types..
     for (Index i = 0; i < SLANG_COUNT_OF(m_builtinTypes); ++i)
     {
-        m_builtinTypes[i].setNull();
+        m_builtinTypes[i] = nullptr;
     }
 
     if (m_astBuilder)
@@ -115,13 +114,13 @@ SharedASTBuilder::~SharedASTBuilder()
     }
 }
 
-void SharedASTBuilder::registerBuiltinDecl(RefPtr<Decl> decl, RefPtr<BuiltinTypeModifier> modifier)
+void SharedASTBuilder::registerBuiltinDecl(Decl* decl, BuiltinTypeModifier* modifier)
 {
-    auto type = DeclRefType::create(m_astBuilder, DeclRef<Decl>(decl.Ptr(), nullptr));
+    auto type = DeclRefType::create(m_astBuilder, DeclRef<Decl>(decl, nullptr));
     m_builtinTypes[Index(modifier->tag)] = type;
 }
 
-void SharedASTBuilder::registerMagicDecl(RefPtr<Decl> decl, RefPtr<MagicTypeModifier> modifier)
+void SharedASTBuilder::registerMagicDecl(Decl* decl, MagicTypeModifier* modifier)
 {
     // In some cases the modifier will have been applied to the
     // "inner" declaration of a `GenericDecl`, but what we
@@ -131,55 +130,71 @@ void SharedASTBuilder::registerMagicDecl(RefPtr<Decl> decl, RefPtr<MagicTypeModi
     if (auto genericDecl = as<GenericDecl>(decl->parentDecl))
         declToRegister = genericDecl;
 
-    m_magicDecls[modifier->name] = declToRegister.Ptr();
+    m_magicDecls[modifier->name] = declToRegister;
 }
 
-RefPtr<Decl> SharedASTBuilder::findMagicDecl(const String& name)
+Decl* SharedASTBuilder::findMagicDecl(const String& name)
 {
     return m_magicDecls[name].GetValue();
 }
 
 // !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! ASTBuilder !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 
-ASTBuilder::ASTBuilder(SharedASTBuilder* sharedASTBuilder):
-    m_sharedASTBuilder(sharedASTBuilder)
+ASTBuilder::ASTBuilder(SharedASTBuilder* sharedASTBuilder, const String& name):
+    m_sharedASTBuilder(sharedASTBuilder),
+    m_name(name),
+    m_id(sharedASTBuilder->m_id++),
+    m_arena(2048)
 {
     SLANG_ASSERT(sharedASTBuilder);
 }
 
 ASTBuilder::ASTBuilder():
-    m_sharedASTBuilder(nullptr)
+    m_sharedASTBuilder(nullptr),
+    m_id(-1),
+    m_arena(2048)
 {
+    m_name = "ShadedASTBuilder::m_astBuilder";
 }
 
-RefPtr<PtrType> ASTBuilder::getPtrType(RefPtr<Type> valueType)
+ASTBuilder::~ASTBuilder()
 {
-    return getPtrType(valueType, "PtrType").dynamicCast<PtrType>();
+    for (NodeBase* node : m_nodes)
+    {
+        const ReflectClassInfo* info = ReflectClassInfo::getInfo(node->astNodeType);
+        SLANG_ASSERT(info->m_destroyFunc);
+        info->m_destroyFunc(node);
+    }
+}
+
+PtrType* ASTBuilder::getPtrType(Type* valueType)
+{
+    return dynamicCast<PtrType>(getPtrType(valueType, "PtrType"));
 }
 
 // Construct the type `Out<valueType>`
-RefPtr<OutType> ASTBuilder::getOutType(RefPtr<Type> valueType)
+OutType* ASTBuilder::getOutType(Type* valueType)
 {
-    return getPtrType(valueType, "OutType").dynamicCast<OutType>();
+    return dynamicCast<OutType>(getPtrType(valueType, "OutType"));
 }
 
-RefPtr<InOutType> ASTBuilder::getInOutType(RefPtr<Type> valueType)
+InOutType* ASTBuilder::getInOutType(Type* valueType)
 {
-    return getPtrType(valueType, "InOutType").dynamicCast<InOutType>();
+    return dynamicCast<InOutType>(getPtrType(valueType, "InOutType"));
 }
 
-RefPtr<RefType> ASTBuilder::getRefType(RefPtr<Type> valueType)
+RefType* ASTBuilder::getRefType(Type* valueType)
 {
-    return getPtrType(valueType, "RefType").dynamicCast<RefType>();
+    return dynamicCast<RefType>(getPtrType(valueType, "RefType"));
 }
 
-RefPtr<PtrTypeBase> ASTBuilder::getPtrType(RefPtr<Type> valueType, char const* ptrTypeName)
+PtrTypeBase* ASTBuilder::getPtrType(Type* valueType, char const* ptrTypeName)
 {
-    auto genericDecl = m_sharedASTBuilder->findMagicDecl(ptrTypeName).dynamicCast<GenericDecl>();
+    auto genericDecl = dynamicCast<GenericDecl>(m_sharedASTBuilder->findMagicDecl(ptrTypeName));
     return getPtrType(valueType, genericDecl);
 }
 
-RefPtr<PtrTypeBase> ASTBuilder::getPtrType(RefPtr<Type> valueType, GenericDecl* genericDecl)
+PtrTypeBase* ASTBuilder::getPtrType(Type* valueType, GenericDecl* genericDecl)
 {
     auto typeDecl = genericDecl->inner;
 
@@ -187,38 +202,38 @@ RefPtr<PtrTypeBase> ASTBuilder::getPtrType(RefPtr<Type> valueType, GenericDecl* 
     substitutions->genericDecl = genericDecl;
     substitutions->args.add(valueType);
 
-    auto declRef = DeclRef<Decl>(typeDecl.Ptr(), substitutions);
+    auto declRef = DeclRef<Decl>(typeDecl, substitutions);
     auto rsType = DeclRefType::create(this, declRef);
     return as<PtrTypeBase>(rsType);
 }
 
-RefPtr<ArrayExpressionType> ASTBuilder::getArrayType(Type* elementType, IntVal* elementCount)
+ArrayExpressionType* ASTBuilder::getArrayType(Type* elementType, IntVal* elementCount)
 {
-    RefPtr<ArrayExpressionType> arrayType = create<ArrayExpressionType>();
+    ArrayExpressionType* arrayType = create<ArrayExpressionType>();
     arrayType->baseType = elementType;
     arrayType->arrayLength = elementCount;
     return arrayType;
 }
 
-RefPtr<VectorExpressionType> ASTBuilder::getVectorType(
-    RefPtr<Type>    elementType,
-    RefPtr<IntVal>  elementCount)
+VectorExpressionType* ASTBuilder::getVectorType(
+    Type*    elementType,
+    IntVal*  elementCount)
 {
-    auto vectorGenericDecl = m_sharedASTBuilder->findMagicDecl("Vector").as<GenericDecl>();
+    auto vectorGenericDecl = as<GenericDecl>(m_sharedASTBuilder->findMagicDecl("Vector"));
         
     auto vectorTypeDecl = vectorGenericDecl->inner;
 
     auto substitutions = create<GenericSubstitution>();
-    substitutions->genericDecl = vectorGenericDecl.Ptr();
+    substitutions->genericDecl = vectorGenericDecl;
     substitutions->args.add(elementType);
     substitutions->args.add(elementCount);
 
-    auto declRef = DeclRef<Decl>(vectorTypeDecl.Ptr(), substitutions);
+    auto declRef = DeclRef<Decl>(vectorTypeDecl, substitutions);
 
-    return DeclRefType::create(this, declRef).as<VectorExpressionType>();
+    return as<VectorExpressionType>(DeclRefType::create(this, declRef));
 }
 
-RefPtr<TypeType> ASTBuilder::getTypeType(Type* type)
+TypeType* ASTBuilder::getTypeType(Type* type)
 {
     return create<TypeType>(type);
 }

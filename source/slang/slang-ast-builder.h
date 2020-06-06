@@ -2,10 +2,13 @@
 #ifndef SLANG_AST_BUILDER_H
 #define SLANG_AST_BUILDER_H
 
+#include <type_traits>
+
 #include "slang-ast-support-types.h"
 #include "slang-ast-all.h"
 
 #include "../core/slang-type-traits.h"
+#include "../core/slang-memory-arena.h"
 
 namespace Slang
 {
@@ -15,8 +18,8 @@ class SharedASTBuilder : public RefObject
     friend class ASTBuilder;
 public:
     
-    void registerBuiltinDecl(RefPtr<Decl> decl, RefPtr<BuiltinTypeModifier> modifier);
-    void registerMagicDecl(RefPtr<Decl> decl, RefPtr<MagicTypeModifier> modifier);
+    void registerBuiltinDecl(Decl* decl, BuiltinTypeModifier* modifier);
+    void registerMagicDecl(Decl* decl, MagicTypeModifier* modifier);
 
         /// Get the string type
     Type* getStringType();
@@ -24,13 +27,13 @@ public:
     Type* getEnumTypeType();
 
     const ReflectClassInfo* findClassInfo(Name* name);
-    SyntaxClass<RefObject> findSyntaxClass(Name* name);
+    SyntaxClass<NodeBase> findSyntaxClass(Name* name);
 
     const ReflectClassInfo* findClassInfo(const UnownedStringSlice& slice);
-    SyntaxClass<RefObject> findSyntaxClass(const UnownedStringSlice& slice);
+    SyntaxClass<NodeBase> findSyntaxClass(const UnownedStringSlice& slice);
 
         // Look up a magic declaration by its name
-    RefPtr<Decl> findMagicDecl(String const& name);
+    Decl* findMagicDecl(String const& name);
 
         /// A name pool that can be used for lookup for findClassInfo etc. It is the same pool as the Session.
     NamePool* getNamePool() { return m_namePool; }
@@ -45,9 +48,9 @@ public:
 protected:
     // State shared between ASTBuilders
 
-    RefPtr<Type> m_errorType;
-    RefPtr<Type> m_initializerListType;
-    RefPtr<Type> m_overloadedType;
+    Type* m_errorType = nullptr;
+    Type* m_initializerListType = nullptr;
+    Type* m_overloadedType = nullptr;
 
     // The following types are created lazily, such that part of their definition
     // can be in the standard library
@@ -57,10 +60,10 @@ protected:
     //
     // TODO(tfoley): These should really belong to the compilation context!
     //
-    RefPtr<Type> m_stringType;
-    RefPtr<Type> m_enumTypeType;
+    Type* m_stringType = nullptr;
+    Type* m_enumTypeType = nullptr;
 
-    RefPtr<Type> m_builtinTypes[Index(BaseType::CountOf)];
+    Type* m_builtinTypes[Index(BaseType::CountOf)];
 
     Dictionary<String, Decl*> m_magicDecls;
 
@@ -72,6 +75,8 @@ protected:
     // This is a private builder used for these shared types
     ASTBuilder* m_astBuilder = nullptr;
     Session* m_session = nullptr;
+
+    Index m_id = 1;
 };
 
 class ASTBuilder : public RefObject
@@ -89,15 +94,14 @@ public:
         };
     };
 
-        /// Create AST type. 
+
+        /// Create AST types 
     template <typename T>
-    T* create() { SLANG_COMPILE_TIME_ASSERT(IsValidType<T>::Value);  T* node = new T; node->init(T::kType, this); return node; }
-
+    T* create() { return _initAndAdd(new (m_arena.allocate(sizeof(T))) T); }
     template<typename T, typename P0>
-    T* create(const P0& p0) { SLANG_COMPILE_TIME_ASSERT(IsValidType<T>::Value); T* node = new T(p0); node->init(T::kType, this); return node;}
-
+    T* create(const P0& p0) { return _initAndAdd(new (m_arena.allocate(sizeof(T))) T(p0)); }
     template<typename T, typename P0, typename P1>
-    T* create(const P0& p0, const P1& p1) { SLANG_COMPILE_TIME_ASSERT(IsValidType<T>::Value); T* node = new T(p0, p1); node->init(T::kType, this); return node; }
+    T* create(const P0& p0, const P1& p1) { return _initAndAdd(new (m_arena.allocate(sizeof(T))) T(p0, p1));}
 
         /// Get the built in types
     SLANG_FORCE_INLINE Type* getBoolType() { return m_sharedASTBuilder->m_builtinTypes[Index(BaseType::Bool)]; }
@@ -121,37 +125,39 @@ public:
 
         // Construct the type `Ptr<valueType>`, where `Ptr`
         // is looked up as a builtin type.
-    RefPtr<PtrType> getPtrType(RefPtr<Type> valueType);
+    PtrType* getPtrType(Type* valueType);
 
         // Construct the type `Out<valueType>`
-    RefPtr<OutType> getOutType(RefPtr<Type> valueType);
+    OutType* getOutType(Type* valueType);
 
         // Construct the type `InOut<valueType>`
-    RefPtr<InOutType> getInOutType(RefPtr<Type> valueType);
+    InOutType* getInOutType(Type* valueType);
 
         // Construct the type `Ref<valueType>`
-    RefPtr<RefType> getRefType(RefPtr<Type> valueType);
+    RefType* getRefType(Type* valueType);
 
         // Construct a pointer type like `Ptr<valueType>`, but where
         // the actual type name for the pointer type is given by `ptrTypeName`
-    RefPtr<PtrTypeBase> getPtrType(RefPtr<Type> valueType, char const* ptrTypeName);
+    PtrTypeBase* getPtrType(Type* valueType, char const* ptrTypeName);
 
         // Construct a pointer type like `Ptr<valueType>`, but where
         // the generic declaration for the pointer type is `genericDecl`
-    RefPtr<PtrTypeBase> getPtrType(RefPtr<Type> valueType, GenericDecl* genericDecl);
+    PtrTypeBase* getPtrType(Type* valueType, GenericDecl* genericDecl);
 
-    RefPtr<ArrayExpressionType> getArrayType(Type* elementType, IntVal* elementCount);
+    ArrayExpressionType* getArrayType(Type* elementType, IntVal* elementCount);
 
-    RefPtr<VectorExpressionType> getVectorType(RefPtr<Type> elementType, RefPtr<IntVal> elementCount);
+    VectorExpressionType* getVectorType(Type* elementType, IntVal* elementCount);
 
-    RefPtr<TypeType> getTypeType(Type* type);
+    TypeType* getTypeType(Type* type);
 
         /// Helpers to get type info from the SharedASTBuilder
     const ReflectClassInfo* findClassInfo(const UnownedStringSlice& slice) { return m_sharedASTBuilder->findClassInfo(slice); }
-    SyntaxClass<RefObject> findSyntaxClass(const UnownedStringSlice& slice) { return m_sharedASTBuilder->findSyntaxClass(slice); }
+    SyntaxClass<NodeBase> findSyntaxClass(const UnownedStringSlice& slice) { return m_sharedASTBuilder->findSyntaxClass(slice); }
 
     const ReflectClassInfo* findClassInfo(Name* name) { return m_sharedASTBuilder->findClassInfo(name); }
-    SyntaxClass<RefObject> findSyntaxClass(Name* name) { return m_sharedASTBuilder->findSyntaxClass(name); }
+    SyntaxClass<NodeBase> findSyntaxClass(Name* name) { return m_sharedASTBuilder->findSyntaxClass(name); }
+
+    MemoryArena& getMemoryArena() { return m_arena; }
 
         /// Get the shared AST builder
     SharedASTBuilder* getSharedASTBuilder() { return m_sharedASTBuilder; }
@@ -160,13 +166,40 @@ public:
     Session* getGlobalSession() { return m_sharedASTBuilder->m_session; }
 
         /// Ctor
-    ASTBuilder(SharedASTBuilder* sharedASTBuilder);
+    ASTBuilder(SharedASTBuilder* sharedASTBuilder, const String& name);
+
+        /// Dtor
+    ~ASTBuilder();
 
 protected:
     // Special default Ctor that can only be used by SharedASTBuilder
     ASTBuilder();
 
+    template <typename T>
+    SLANG_FORCE_INLINE T* _initAndAdd(T* node)
+    {
+        SLANG_COMPILE_TIME_ASSERT(IsValidType<T>::Value);
+
+        node->init(T::kType, this);
+
+        // Only add it if it has a dtor that does some work
+        if (!std::is_trivially_destructible<T>::value)
+        {
+            // Keep such that dtor can be run on ASTBuilder being dtored
+            m_nodes.add(node);
+        }
+        return node;
+    }
+
+    String m_name;
+    Index m_id;
+
+        /// All of the nodes constructed on this builder
+    List<NodeBase*> m_nodes;
+
     SharedASTBuilder* m_sharedASTBuilder;
+
+    MemoryArena m_arena;
 };
 
 } // namespace Slang

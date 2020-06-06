@@ -5,16 +5,20 @@
 
 #include "slang-ast-generated.h"
 
+#define SLANG_CLASS_REFLECT_SUPER_BASE(SUPER)
+#define SLANG_CLASS_REFLECT_SUPER_INNER(SUPER) typedef SUPER Super;
+#define SLANG_CLASS_REFLECT_SUPER_LEAF(SUPER) typedef SUPER Super;
+
 // Implementation for SLANG_ABSTRACT_CLASS(x) using reflection from C++ extractor in slang-ast-generated.h
 #define SLANG_CLASS_REFLECT_IMPL(NAME, SUPER, ORIGIN, LAST, MARKER, TYPE, param) \
     protected: \
     NAME() = default; \
     public:     \
     typedef NAME This; \
-    typedef SUPER Super; \
     static const ASTNodeType kType = ASTNodeType::NAME; \
     static const ReflectClassInfo kReflectClassInfo;  \
     SLANG_FORCE_INLINE static bool isDerivedFrom(ASTNodeType type) { return int(type) >= int(kType) && int(type) <= int(ASTNodeType::LAST); } \
+    SLANG_CLASS_REFLECT_SUPER_##TYPE(SUPER) \
     friend class ASTBuilder; \
     friend struct ASTConstructAccess;
 
@@ -27,6 +31,8 @@
 #define SLANG_REFLECT_BASE_CLASS(NAME)
 #define SLANG_REFLECTED
 #define SLANG_UNREFLECTED
+
+#define SLANG_CLASS_ROOT
 
 // Macros for simulating virtual methods without virtual methods
 

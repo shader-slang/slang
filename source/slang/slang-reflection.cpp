@@ -148,14 +148,14 @@ SlangReflectionType* spReflectionUserAttribute_GetArgumentType(SlangReflectionUs
 {
     auto userAttr = convert(attrib);
     if (!userAttr) return nullptr;
-    return convert(userAttr->args[index]->type.type.Ptr());
+    return convert(userAttr->args[index]->type.type);
 }
 SLANG_API SlangResult spReflectionUserAttribute_GetArgumentValueInt(SlangReflectionUserAttribute* attrib, unsigned int index, int * rs)
 {
     auto userAttr = convert(attrib);
     if (!userAttr) return SLANG_ERROR_INVALID_PARAMETER;
     if (index >= (unsigned int)userAttr->args.getCount()) return SLANG_ERROR_INVALID_PARAMETER;
-    RefPtr<RefObject> val;
+    NodeBase* val = nullptr;
     if (userAttr->intArgVals.TryGetValue(index, val))
     {
         *rs = (int)as<ConstantIntVal>(val)->value;
@@ -356,15 +356,15 @@ SLANG_API SlangReflectionType* spReflectionType_GetElementType(SlangReflectionTy
 
     if(auto arrayType = as<ArrayExpressionType>(type))
     {
-        return (SlangReflectionType*) arrayType->baseType.Ptr();
+        return (SlangReflectionType*) arrayType->baseType;
     }
     else if( auto parameterGroupType = as<ParameterGroupType>(type))
     {
-        return convert(parameterGroupType->elementType.Ptr());
+        return convert(parameterGroupType->elementType);
     }
     else if( auto vectorType = as<VectorExpressionType>(type))
     {
-        return convert(vectorType->elementType.Ptr());
+        return convert(vectorType->elementType);
     }
     else if( auto matrixType = as<MatrixExpressionType>(type))
     {
@@ -427,7 +427,7 @@ SLANG_API SlangScalarType spReflectionType_GetScalarType(SlangReflectionType* in
     }
     else if(auto vectorType = as<VectorExpressionType>(type))
     {
-        type = vectorType->elementType.Ptr();
+        type = vectorType->elementType;
     }
 
     if(auto basicType = as<BasicExpressionType>(type))
@@ -504,7 +504,7 @@ SLANG_API SlangResourceShape spReflectionType_GetResourceShape(SlangReflectionTy
 
     while(auto arrayType = as<ArrayExpressionType>(type))
     {
-        type = arrayType->baseType.Ptr();
+        type = arrayType->baseType;
     }
 
     if(auto textureType = as<TextureTypeBase>(type))
@@ -540,7 +540,7 @@ SLANG_API SlangResourceAccess spReflectionType_GetResourceAccess(SlangReflection
 
     while(auto arrayType = as<ArrayExpressionType>(type))
     {
-        type = arrayType->baseType.Ptr();
+        type = arrayType->baseType;
     }
 
     if(auto textureType = as<TextureTypeBase>(type))
@@ -604,8 +604,8 @@ SLANG_API SlangReflectionType * spReflection_FindTypeByName(SlangReflection * re
 
     try
     {
-        RefPtr<Type> result = program->getTypeFromString(name, &sink);
-        return (SlangReflectionType*)result.Ptr();
+        Type* result = program->getTypeFromString(name, &sink);
+        return (SlangReflectionType*)result;
     }
     catch( ... )
     {
@@ -633,18 +633,18 @@ SLANG_API SlangReflectionType* spReflectionType_GetResourceResultType(SlangRefle
 
     while(auto arrayType = as<ArrayExpressionType>(type))
     {
-        type = arrayType->baseType.Ptr();
+        type = arrayType->baseType;
     }
 
     if (auto textureType = as<TextureTypeBase>(type))
     {
-        return convert(textureType->elementType.Ptr());
+        return convert(textureType->elementType);
     }
 
     // TODO: need a better way to handle this stuff...
 #define CASE(TYPE, SHAPE, ACCESS)                                                       \
     else if(as<TYPE>(type)) do {                                                      \
-        return convert(as<TYPE>(type)->elementType.Ptr());                            \
+        return convert(as<TYPE>(type)->elementType);                            \
     } while(0)
 
     // TODO: structured buffer needs to expose type layout!
@@ -666,7 +666,7 @@ SLANG_API SlangReflectionType* spReflectionTypeLayout_GetType(SlangReflectionTyp
     auto typeLayout = convert(inTypeLayout);
     if(!typeLayout) return nullptr;
 
-    return (SlangReflectionType*) typeLayout->type.Ptr();
+    return (SlangReflectionType*) typeLayout->type;
 }
 
 namespace
