@@ -1826,10 +1826,38 @@ namespace Slang
         //
         expr->baseExpression = maybeOpenExistential(expr->baseExpression);
 
-        // TODO: Handle the case of an overloaded base expression
+        // Handle the case of an overloaded base expression
         // here, in case we can use the name of the member to
         // disambiguate which of the candidates is meant, or if
         // we can return an overloaded result.
+        if (auto overloadedExpr = as<OverloadedExpr>(expr->baseExpression))
+        {
+            if (overloadedExpr->base)
+            {
+                // If a member (dynamic or static) lookup result contains both the actual definition
+                // and the interface definition obtained from inheritance, we want to filter out
+                // the interface definitions.
+                LookupResult filteredLookupResult;
+                for (auto lookupResult : overloadedExpr->lookupResult2)
+                {
+                    bool shouldRemove = false;
+                    if (lookupResult.declRef.getParent().as<InterfaceDecl>())
+                        shouldRemove = true;
+                    if (!shouldRemove)
+                    {
+                        filteredLookupResult.items.add(lookupResult);
+                    }
+                }
+                if (filteredLookupResult.items.getCount() == 1)
+                    filteredLookupResult.item = filteredLookupResult.items.getFirst();
+                expr->baseExpression = createLookupResultExpr(
+                    expr->name,
+                    filteredLookupResult,
+                    overloadedExpr->base,
+                    overloadedExpr->loc);
+            }
+            // TODO: handle other cases of OverloadedExpr that need filtering.
+        }
 
         auto & baseType = expr->baseExpression->type;
 
