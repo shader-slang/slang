@@ -46,7 +46,9 @@ before_deploy: |
   export SLANG_ARCH_NAME=`uname -p`
   export SLANG_TAG=${TRAVIS_TAG#v}
   export SLANG_BINARY_ARCHIVE=slang-${SLANG_TAG}-${SLANG_OS_NAME}-${SLANG_ARCH_NAME}.zip
+  export SLANG_BINARY_ARCHIVE_TAR=slang-${SLANG_TAG}-${SLANG_OS_NAME}-${SLANG_ARCH_NAME}.tar.gz
   zip -r ${SLANG_BINARY_ARCHIVE} bin/*/*/slangc bin/*/*/libslang.so bin/*/*/libslang-glslang.so docs/*.md README.md LICENSE slang.h slang-com-helper.h slang-com-ptr.h slang-tag-version.h prelude/*.h
+  tar -czf ${SLANG_BINARY_ARCHIVE_TAR} bin/*/*/slangc bin/*/*/libslang.so bin/*/*/libslang-glslang.so docs/*.md README.md LICENSE slang.h slang-com-helper.h slang-com-ptr.h slang-tag-version.h prelude/*.h
 
 # We are going to deploy to GitHub Releases
 # on a successful build from a tag, but only
@@ -55,7 +57,9 @@ before_deploy: |
 deploy:
   provider: releases
   api_key: "$GITHUB_RELEASE_TOKEN"
-  file: "$SLANG_BINARY_ARCHIVE"
+  file: 
+    - "$SLANG_BINARY_ARCHIVE"
+    - "$SLANG_BINARY_ARCHIVE_TAR"
   skip_cleanup: true
   on:
     condition: "$SLANG_DEPLOY =  true"
