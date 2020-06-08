@@ -919,18 +919,17 @@ namespace Slang
             DeclRef<Decl>           declRef;
         };
 
-        // Create a subtype witness based on the declared relationship
-        // found in a single breadcrumb
+            // Create a subtype witness based on the declared relationship
+            // found in a single breadcrumb
         DeclaredSubtypeWitness* createSimpleSubtypeWitness(
             TypeWitnessBreadcrumb*  breadcrumb);
 
-        /// Create a withness that `subType` is a sub-type of `superTypeDeclRef`.
-        ///
-        /// The `inBreadcrumbs` parameter represents a linked list of steps
-        /// in the process that validated the sub-type relationship, which
-        /// will be used to inform the construction of the witness.
-        ///
-
+            /// Create a witness that `subType` is a sub-type of `superTypeDeclRef`.
+            ///
+            /// The `inBreadcrumbs` parameter represents a linked list of steps
+            /// in the process that validated the sub-type relationship, which
+            /// will be used to inform the construction of the witness.
+            ///
         Val* createTypeWitness(
             Type*            subType,
             DeclRef<AggTypeDecl>  superTypeDeclRef,

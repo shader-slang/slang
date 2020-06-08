@@ -1456,9 +1456,6 @@ namespace Slang
     {
         auto sink = endToEndReq->getSink();
 
-        // TODO(JS): Not used
-        //auto entryPointFuncDecl = unspecializedEntryPoint->getFuncDecl();
-
         // If the user specified generic arguments for the entry point,
         // then we will need to parse the arguments first.
         //

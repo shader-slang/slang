@@ -181,12 +181,11 @@ protected:
         SLANG_COMPILE_TIME_ASSERT(IsValidType<T>::Value);
 
         node->init(T::kType, this);
-
         // Only add it if it has a dtor that does some work
         if (!std::is_trivially_destructible<T>::value)
         {
             // Keep such that dtor can be run on ASTBuilder being dtored
-            m_nodes.add(node);
+            m_dtorNodes.add(node);
         }
         return node;
     }
@@ -194,8 +193,8 @@ protected:
     String m_name;
     Index m_id;
 
-        /// All of the nodes constructed on this builder
-    List<NodeBase*> m_nodes;
+        /// List of all nodes that require being dtored when ASTBuilder is dtored
+    List<NodeBase*> m_dtorNodes;
 
     SharedASTBuilder* m_sharedASTBuilder;
 

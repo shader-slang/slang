@@ -1327,7 +1327,6 @@ namespace Slang
                             InitializerListExpr* initListExpr = m_astBuilder->create<InitializerListExpr>();
                             auto checkedInitListExpr = visitInitializerListExpr(initListExpr);
 
-                            // TODO(JS): I changed this to checkInitListExpr form initListExpr
                             return coerce(typeExp.type, checkedInitListExpr);
                         }
                     }
