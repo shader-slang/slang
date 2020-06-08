@@ -154,16 +154,16 @@ ASTBuilder::ASTBuilder():
     m_id(-1),
     m_arena(2048)
 {
-    m_name = "ShadedASTBuilder::m_astBuilder";
+    m_name = "SharedASTBuilder::m_astBuilder";
 }
 
 ASTBuilder::~ASTBuilder()
 {
-    for (NodeBase* node : m_nodes)
+    for (NodeBase* node : m_dtorNodes)
     {
         const ReflectClassInfo* info = ReflectClassInfo::getInfo(node->astNodeType);
-        SLANG_ASSERT(info->m_destroyFunc);
-        info->m_destroyFunc(node);
+        SLANG_ASSERT(info->m_destructorFunc);
+        info->m_destructorFunc(node);
     }
 }
 

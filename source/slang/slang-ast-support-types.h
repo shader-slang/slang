@@ -463,7 +463,7 @@ namespace Slang
         typedef ReflectClassInfo ThisType;
 
         typedef void* (*CreateFunc)(ASTBuilder* astBuilder);
-        typedef void (*DestroyFunc)(void* ptr);
+        typedef void (*DestructorFunc)(void* ptr);
 
         /// A constant time implementation of isSubClassOf
         SLANG_FORCE_INLINE bool isSubClassOf(const ThisType& super) const
@@ -493,8 +493,8 @@ namespace Slang
 
         const ReflectClassInfo* m_superClass;       ///< The super class of this class, or nullptr if has no super class. 
         const char* m_name;                         ///< Textual class name, for debugging 
-        CreateFunc m_createFunc;                    ///< Callback to use when creating instances
-        DestroyFunc m_destroyFunc;                  ///< Called to inplace destroy (ie not backing memory) of this type
+        CreateFunc m_createFunc;                    ///< Callback to use when creating instances (using an ASTBuilder for backing memory)
+        DestructorFunc m_destructorFunc;            ///< The destructor for this type. Being just destructor, does not free backing memory for type.
 
         struct Infos
         {
@@ -510,8 +510,6 @@ namespace Slang
     // used to create instances on the fly
     struct SyntaxClassBase
     {
-        typedef void* (*CreateFunc)();
-
         SyntaxClassBase()
         {}
 
