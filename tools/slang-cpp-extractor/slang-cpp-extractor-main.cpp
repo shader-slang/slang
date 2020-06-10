@@ -1288,21 +1288,6 @@ void CPPExtractor::_consumeTypeModifiers()
     while (advanceIfStyle(IdentifierStyle::TypeModifier));
 }
 
-UnownedStringSlice CPPExtractor::_concatTokens(TokenReader::ParsingCursor start)
-{
-    auto endCursor = m_reader.getCursor();
-    m_reader.setCursor(start);
-
-    StringBuilder buf;
-    while (!m_reader.isAtCursor(endCursor))
-    {
-        const Token token = m_reader.advanceToken();
-        buf << token.getContent();
-    }
-
-    return m_typePool->getSlice(m_typePool->add(buf));
-}
-
 // Returns true if there needs to be a spave between the previous token type, and the current token
 // type for correct output. It is assumed that the token stream is appropriate.
 // The implementation might need more sophistication, but this at least avoids Blah const *  -> Blahconst* 
@@ -1314,6 +1299,31 @@ static bool _tokenConcatNeedsSpace(TokenType prev, TokenType cur)
     }
     return false;
 }
+
+UnownedStringSlice CPPExtractor::_concatTokens(TokenReader::ParsingCursor start)
+{
+    auto endCursor = m_reader.getCursor();
+    m_reader.setCursor(start);
+
+    TokenType prevTokenType = TokenType::Unknown;
+
+    StringBuilder buf;
+    while (!m_reader.isAtCursor(endCursor))
+    {
+        const Token token = m_reader.advanceToken();
+        // Check if we need a space between tokens
+        if (_tokenConcatNeedsSpace(prevTokenType, token.type))
+        {
+            buf << " ";
+        }
+        buf << token.getContent();
+            
+        prevTokenType = token.type;
+    }
+
+    return m_typePool->getSlice(m_typePool->add(buf));
+}
+
 
 SlangResult CPPExtractor::_maybeParseType(UnownedStringSlice& outType, Index& ioTemplateDepth)
 {
@@ -1369,29 +1379,7 @@ SlangResult CPPExtractor::_maybeParseType(UnownedStringSlice& outType, Index& io
     }
 
     // We can build up the out type, from the tokens we found
-    {
-        auto endCursor = m_reader.getCursor();
-        m_reader.setCursor(startCursor);
-
-        TokenType prevTokenType = TokenType::Unknown;
-
-        StringBuilder buf;
-        while (!m_reader.isAtCursor(endCursor))
-        {
-            const Token token = m_reader.advanceToken();
-            // Check if we need a space between tokens
-            if (_tokenConcatNeedsSpace(prevTokenType, token.type))
-            {
-                buf << " ";
-            }
-            buf << token.getContent();
-            
-            prevTokenType = token.type;
-        }
-
-        outType = m_typePool->getSlice(m_typePool->add(buf));
-    }
-
+    outType = _concatTokens(startCursor);
     return SLANG_OK;
 }
 
