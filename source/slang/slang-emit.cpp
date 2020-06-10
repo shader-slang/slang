@@ -270,7 +270,8 @@ Result linkAndOptimizeIR(
     // perform specialization of functions based on parameter
     // values that need to be compile-time constants.
     //
-    specializeModule(irModule);
+    if (!compileRequest->allowDynamicCode)
+        specializeModule(irModule);
 
     // Debugging code for IR transformations...
 #if 0
