@@ -1303,10 +1303,12 @@ UnownedStringSlice CPPExtractor::_concatTokens(TokenReader::ParsingCursor start)
     return m_typePool->getSlice(m_typePool->add(buf));
 }
 
-static bool _needsSpace(TokenType a, TokenType b)
+// Returns true if there needs to be a spave between the previous token type, and the current token
+// type for correct output. It is assumed that the token stream is appropriate.
+// The implementation might need more sophistication, but this at least avoids Blah const *  -> Blahconst* 
+static bool _tokenConcatNeedsSpace(TokenType prev, TokenType cur)
 {
-    // This might need more sophistication, but this at least avoids Blah const *  -> Blahconst* 
-    if (a == TokenType::Identifier && b == TokenType::Identifier)
+    if (prev == TokenType::Identifier && cur == TokenType::Identifier)
     {
         return true;
     }
@@ -1377,12 +1379,13 @@ SlangResult CPPExtractor::_maybeParseType(UnownedStringSlice& outType, Index& io
         while (!m_reader.isAtCursor(endCursor))
         {
             const Token token = m_reader.advanceToken();
-            if (_needsSpace(prevTokenType, token.type))
+            // Check if we need a space between tokens
+            if (_tokenConcatNeedsSpace(prevTokenType, token.type))
             {
-                buf.Append(" ");
+                buf << " ";
             }
             buf << token.getContent();
-
+            
             prevTokenType = token.type;
         }
 
