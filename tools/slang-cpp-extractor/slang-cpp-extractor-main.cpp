@@ -1303,6 +1303,16 @@ UnownedStringSlice CPPExtractor::_concatTokens(TokenReader::ParsingCursor start)
     return m_typePool->getSlice(m_typePool->add(buf));
 }
 
+static bool _needsSpace(TokenType a, TokenType b)
+{
+    // This might need more sophistication, but this at least avoids Blah const *  -> Blahconst* 
+    if (a == TokenType::Identifier && b == TokenType::Identifier)
+    {
+        return true;
+    }
+    return false;
+}
+
 SlangResult CPPExtractor::_maybeParseType(UnownedStringSlice& outType, Index& ioTemplateDepth)
 {
     auto startCursor = m_reader.getCursor();
@@ -1357,7 +1367,28 @@ SlangResult CPPExtractor::_maybeParseType(UnownedStringSlice& outType, Index& io
     }
 
     // We can build up the out type, from the tokens we found
-    outType = _concatTokens(startCursor);
+    {
+        auto endCursor = m_reader.getCursor();
+        m_reader.setCursor(startCursor);
+
+        TokenType prevTokenType = TokenType::Unknown;
+
+        StringBuilder buf;
+        while (!m_reader.isAtCursor(endCursor))
+        {
+            const Token token = m_reader.advanceToken();
+            if (_needsSpace(prevTokenType, token.type))
+            {
+                buf.Append(" ");
+            }
+            buf << token.getContent();
+
+            prevTokenType = token.type;
+        }
+
+        outType = m_typePool->getSlice(m_typePool->add(buf));
+    }
+
     return SLANG_OK;
 }
 
