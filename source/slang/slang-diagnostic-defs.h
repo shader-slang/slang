@@ -299,6 +299,7 @@ DIAGNOSTIC(30301, Error, globalGenParamInGlobalScopeOnly, "'type_param' can only
 // TODO: need to assign numbers to all these extra diagnostics...
 DIAGNOSTIC(39999, Fatal, cyclicReference, "cyclic reference '$0'.")
 DIAGNOSTIC(39999, Fatal, localVariableUsedBeforeDeclared, "local variable '$0' is being used before its declaration.")
+DIAGNOSTIC(39999, Error, variableUsedInItsOwnDefinition, "the initial-value expression for variable '$0' depends on the value of the variable itself")
 
 // 304xx: generics
 DIAGNOSTIC(30400, Error, genericTypeNeedsArgs, "generic type '$0' used without argument")

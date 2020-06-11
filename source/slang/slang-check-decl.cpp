@@ -775,6 +775,24 @@ namespace Slang
         return true;
     }
 
+    void SemanticsVisitor::_validateCircularVarDefinition(VarDeclBase* varDecl)
+    {
+        // The easiest way to test if the declaration is circular is to
+        // validate it as a constant.
+        //
+        // TODO: The logic here will only apply for `static const` declarations
+        // of integer type, given that our constant folding currently only
+        // applies to such types. A more robust fix would involve a truly
+        // recursive walk of the AST declarations, and an even *more* robust
+        // fix would wait until after IR linking to detect and diagnose circularity
+        // in case it crosses module boundaries.
+        //
+        //
+        if(!isScalarIntegerType(varDecl->type))
+            return;
+        tryConstantFoldDeclRef(DeclRef<VarDeclBase>(varDecl, nullptr), nullptr);
+    }
+
     void SemanticsDeclHeaderVisitor::checkVarDeclCommon(VarDeclBase* varDecl)
     {
         // A variable that didn't have an explicit type written must
@@ -804,6 +822,8 @@ namespace Slang
 
                 varDecl->initExpr = initExpr;
                 varDecl->type.type = initExpr->type;
+
+                _validateCircularVarDefinition(varDecl);
             }
 
             // If we've gone down this path, then the variable
@@ -857,11 +877,16 @@ namespace Slang
         {
             // If the variable has an explicit initial-value expression,
             // then we simply need to check that expression and coerce
-            // it to the tyep of the variable.
+            // it to the type of the variable.
             //
             initExpr = CheckTerm(initExpr);
             initExpr = coerce(varDecl->type.Ptr(), initExpr);
             varDecl->initExpr = initExpr;
+
+            // We need to ensure that any variable doesn't introduce
+            // a constant with a circular definition.
+            //
+            _validateCircularVarDefinition(varDecl);
         }
         else
         {
@@ -1970,18 +1995,25 @@ namespace Slang
         return (BaseTypeInfo::getInfo(baseType).flags & BaseTypeInfo::Flag::Integer) != 0;
     }
 
+    bool SemanticsVisitor::isScalarIntegerType(Type* type)
+    {
+        auto basicType = as<BasicExpressionType>(type);
+        if(!basicType)
+            return false;
+
+        return isIntegerBaseType(basicType->baseType);
+    }
+
     void SemanticsVisitor::validateEnumTagType(Type* type, SourceLoc const& loc)
     {
-        if(auto basicType = as<BasicExpressionType>(type))
-        {
-            // Allow the built-in integer types.
-            if(isIntegerBaseType(basicType->baseType))
-                return;
+        // Allow the built-in integer types.
+        //
+        if(isScalarIntegerType(type))
+            return;
 
-            // By default, don't allow other types to be used
-            // as an `enum` tag type.
-        }
-
+        // By default, don't allow other types to be used
+        // as an `enum` tag type.
+        //
         getSink()->diagnose(loc, Diagnostics::invalidEnumTagType, type);
     }
 
@@ -2177,7 +2209,7 @@ namespace Slang
                 // the tag value for a successor case that doesn't
                 // provide an explicit tag.
 
-                IntVal* explicitTagVal = TryConstantFoldExpr(explicitTagValExpr);
+                IntVal* explicitTagVal = tryConstantFoldExpr(explicitTagValExpr, nullptr);
                 if(explicitTagVal)
                 {
                     if(auto constIntVal = as<ConstantIntVal>(explicitTagVal))
