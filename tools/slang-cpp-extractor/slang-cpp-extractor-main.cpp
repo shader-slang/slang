@@ -1288,20 +1288,67 @@ void CPPExtractor::_consumeTypeModifiers()
     while (advanceIfStyle(IdentifierStyle::TypeModifier));
 }
 
+// True if two of these token types of the same type placed immediately after one another 
+// produce a different token. Can be conservative, as if not strictly required
+// it will just mean more spacing in the output
+static bool _canRepeatTokenType(TokenType type)
+{
+    switch (type)
+    {
+        case TokenType::OpAdd:
+        case TokenType::OpSub:
+        case TokenType::OpAnd:
+        case TokenType::OpOr:
+        case TokenType::OpGreater:
+        case TokenType::OpLess:
+        case TokenType::Identifier:
+        case TokenType::OpAssign:
+        case TokenType::Colon:
+        {
+            return false;
+        }
+        default: break;
+    }
+    return true;
+}
+
+// Returns true if there needs to be a spave between the previous token type, and the current token
+// type for correct output. It is assumed that the token stream is appropriate.
+// The implementation might need more sophistication, but this at least avoids Blah const *  -> Blahconst* 
+static bool _tokenConcatNeedsSpace(TokenType prev, TokenType cur)
+{
+    if ((cur == TokenType::OpAssign) ||
+        (prev == cur && !_canRepeatTokenType(cur)))
+    {
+        return true;
+    }
+    return false;
+}
+
 UnownedStringSlice CPPExtractor::_concatTokens(TokenReader::ParsingCursor start)
 {
     auto endCursor = m_reader.getCursor();
     m_reader.setCursor(start);
 
+    TokenType prevTokenType = TokenType::Unknown;
+
     StringBuilder buf;
     while (!m_reader.isAtCursor(endCursor))
     {
         const Token token = m_reader.advanceToken();
+        // Check if we need a space between tokens
+        if (_tokenConcatNeedsSpace(prevTokenType, token.type))
+        {
+            buf << " ";
+        }
         buf << token.getContent();
+            
+        prevTokenType = token.type;
     }
 
     return m_typePool->getSlice(m_typePool->add(buf));
 }
+
 
 SlangResult CPPExtractor::_maybeParseType(UnownedStringSlice& outType, Index& ioTemplateDepth)
 {

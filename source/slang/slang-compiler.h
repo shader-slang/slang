@@ -1759,6 +1759,10 @@ namespace Slang
             /// Should SPIR-V be generated directly from Slang IR rather than via translation to GLSL?
         bool shouldEmitSPIRVDirectly = false;
 
+
+        // If true will allow generating dynamic dispatch code for generics.
+        bool allowDynamicCode = false;
+
         String m_dumpIntermediatePrefix;
 
     private:
