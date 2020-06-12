@@ -1286,7 +1286,7 @@ namespace Slang
     {
         RequirementDictionary requirementDictionary;
 
-        // The type that the witness table witnesses conformant to (e.g. an Interface)
+        // The type that the witness table witnesses conformance to (e.g. an Interface)
         Type* baseType;
     };
 
