@@ -836,10 +836,7 @@ namespace Slang
         if(!initExpr)
             return nullptr;
 
-        ConstantFoldingCircularityInfo newCircularityInfo;
-        newCircularityInfo.decl = decl;
-        newCircularityInfo.next = circularityInfo;
-
+        ConstantFoldingCircularityInfo newCircularityInfo(decl, circularityInfo);
         return tryConstantFoldExpr(initExpr, &newCircularityInfo);
     }
 
@@ -885,10 +882,7 @@ namespace Slang
                     if(_checkForCircularityInConstantFolding(enumCaseDecl, circularityInfo))
                         return nullptr;
 
-                    ConstantFoldingCircularityInfo newCircularityInfo;
-                    newCircularityInfo.decl = enumCaseDecl;
-                    newCircularityInfo.next = circularityInfo;
-
+                    ConstantFoldingCircularityInfo newCircularityInfo(enumCaseDecl, circularityInfo);
                     return tryConstantFoldExpr(tagExpr, &newCircularityInfo);
                 }
             }

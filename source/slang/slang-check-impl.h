@@ -846,11 +846,18 @@ namespace Slang
             /// to prevent the compiler from going into infinite loops or overflowing the stack.
         struct ConstantFoldingCircularityInfo
         {
+            ConstantFoldingCircularityInfo(
+                Decl*                           decl,
+                ConstantFoldingCircularityInfo* next)
+                : decl(decl)
+                , next(next)
+            {}
+
                 /// A declaration whose value is contributing to the constant being folded
-            Decl*                           decl;
+            Decl*                           decl = nullptr;
 
                 /// The rest of the links in the chain of declarations being folded
-            ConstantFoldingCircularityInfo* next;
+            ConstantFoldingCircularityInfo* next = nullptr;
         };
 
             /// Try to apply front-end constant folding to determine the value of `invokeExpr`.
