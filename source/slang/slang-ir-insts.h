@@ -1800,7 +1800,7 @@ struct IRBuilder
     IRStructType*   createStructType();
 
     // Create an empty `interface` type.
-    IRInterfaceType* createInterfaceType();
+    IRInterfaceType* createInterfaceType(UInt operandCount, IRInst* const* operands);
 
     // Create a global "key" to use for indexing into a `struct` type.
     IRStructKey*    createStructKey();

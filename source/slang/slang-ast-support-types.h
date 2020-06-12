@@ -1285,6 +1285,7 @@ namespace Slang
     struct WitnessTable : RefObject
     {
         RequirementDictionary requirementDictionary;
+        Type* baseType;
     };
 
     typedef Dictionary<unsigned int, NodeBase*> AttributeArgumentValueDict;

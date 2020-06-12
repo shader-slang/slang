@@ -4489,6 +4489,10 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
         Dictionary<WitnessTable*, IRWitnessTable*>  mapASTToIRWitnessTable)
     {
         auto subBuilder = subContext->irBuilder;
+        SLANG_ASSERT(as<DeclRefType>(astWitnessTable->baseType));
+        auto baseTypeLowerInfo = ensureDecl(subContext, as<DeclRefType>(astWitnessTable->baseType)->declRef.getDecl());
+        SLANG_ASSERT(baseTypeLowerInfo.val);
+        irWitnessTable->setFullType(as<IRType>(baseTypeLowerInfo.val));
 
         for(auto entry : astWitnessTable->requirementDictionary)
         {
@@ -5243,9 +5247,10 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
         // a witness table for the interface type's conformance
         // to its own interface.
         //
+        List<IRStructKey*> requirementKeys;
         for (auto requirementDecl : decl->members)
         {
-            getInterfaceRequirementKey(requirementDecl);
+            requirementKeys.add(getInterfaceRequirementKey(requirementDecl));
 
             // As a special case, any type constraints placed
             // on an associated type will *also* need to be turned
@@ -5254,7 +5259,7 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
             {
                 for (auto constraintDecl : associatedTypeDecl->getMembersOfType<TypeConstraintDecl>())
                 {
-                    getInterfaceRequirementKey(constraintDecl);
+                    requirementKeys.add(getInterfaceRequirementKey(constraintDecl));
                 }
             }
         }
@@ -5267,11 +5272,12 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
         // Emit any generics that should wrap the actual type.
         emitOuterGenerics(subContext, decl, decl);
 
-        IRInterfaceType* irInterface = subBuilder->createInterfaceType();
+        IRInterfaceType* irInterface = subBuilder->createInterfaceType(
+            requirementKeys.getCount(),
+            reinterpret_cast<IRInst**>(requirementKeys.getBuffer()));
         addNameHint(context, irInterface, decl);
         addLinkageDecoration(context, irInterface, decl);
         subBuilder->setInsertInto(irInterface);
-
         // TODO: are there any interface members that should be
         // nested inside the interface type itself?
 
