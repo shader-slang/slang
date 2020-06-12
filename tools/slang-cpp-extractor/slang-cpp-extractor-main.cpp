@@ -1289,7 +1289,7 @@ void CPPExtractor::_consumeTypeModifiers()
 }
 
 // True if two of these token types of the same type placed immediately after one another 
-// produce a different token. Can be conservative, as if not strictly required
+// produce a different token or meaning. Can be conservative, as if not strictly required
 // it will just mean more spacing in the output
 static bool _canRepeatTokenType(TokenType type)
 {
