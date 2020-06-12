@@ -1105,7 +1105,8 @@ struct ValLoweringVisitor : ValVisitor<ValLoweringVisitor, LoweredValInfo, Lower
             UNREACHABLE_RETURN(LoweredValInfo());
         }
 
-        auto irWitnessTable = getBuilder()->createWitnessTable();
+        auto irWitnessTableBaseType = lowerType(context, supDeclRefType);
+        auto irWitnessTable = getBuilder()->createWitnessTable(irWitnessTableBaseType);
 
         // Now we will iterate over the requirements (members) of the
         // interface and try to synthesize an appropriate value for each.
@@ -4489,10 +4490,6 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
         Dictionary<WitnessTable*, IRWitnessTable*>  mapASTToIRWitnessTable)
     {
         auto subBuilder = subContext->irBuilder;
-        SLANG_ASSERT(as<DeclRefType>(astWitnessTable->baseType));
-        auto baseTypeLowerInfo = ensureDecl(subContext, as<DeclRefType>(astWitnessTable->baseType)->declRef.getDecl());
-        SLANG_ASSERT(baseTypeLowerInfo.val);
-        irWitnessTable->setFullType(as<IRType>(baseTypeLowerInfo.val));
 
         for(auto entry : astWitnessTable->requirementDictionary)
         {
@@ -4528,7 +4525,8 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
                     if(!mapASTToIRWitnessTable.TryGetValue(astReqWitnessTable, irSatisfyingWitnessTable))
                     {
                         // Need to construct a sub-witness-table
-                        irSatisfyingWitnessTable = subBuilder->createWitnessTable();
+                        auto irWitnessTableBaseType = lowerType(subContext, astReqWitnessTable->baseType);
+                        irSatisfyingWitnessTable = subBuilder->createWitnessTable(irWitnessTableBaseType);
 
                         // Recursively lower the sub-table.
                         lowerWitnessTable(
@@ -4641,10 +4639,10 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
         // and we need those parameters to lower as references to
         // the parameters of our IR-level generic.
         //
-        lowerType(subContext, superType);
+        auto irWitnessTableBaseType = lowerType(subContext, superType);
 
         // Create the IR-level witness table
-        auto irWitnessTable = subBuilder->createWitnessTable();
+        auto irWitnessTable = subBuilder->createWitnessTable(irWitnessTableBaseType);
         addLinkageDecoration(context, irWitnessTable, inheritanceDecl, mangledName.getUnownedSlice());
 
         // Register the value now, rather than later, to avoid any possible infinite recursion.

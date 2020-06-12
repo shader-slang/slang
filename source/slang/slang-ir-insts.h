@@ -1790,7 +1790,10 @@ struct IRBuilder
         IRType* valueType);
     IRGlobalParam* createGlobalParam(
         IRType* valueType);
-    IRWitnessTable* createWitnessTable();
+
+    /// Creates an IRWitnessTable value.
+    /// @param baseType: The comformant-to type of this witness.
+    IRWitnessTable* createWitnessTable(IRType* baseType);
     IRWitnessTableEntry* createWitnessTableEntry(
         IRWitnessTable* witnessTable,
         IRInst*        requirementKey,

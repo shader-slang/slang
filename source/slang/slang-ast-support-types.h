@@ -1285,6 +1285,8 @@ namespace Slang
     struct WitnessTable : RefObject
     {
         RequirementDictionary requirementDictionary;
+
+        // The type that the witness table witnesses conformant to (e.g. an Interface)
         Type* baseType;
     };
 

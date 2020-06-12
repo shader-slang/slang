@@ -2770,12 +2770,13 @@ namespace Slang
         return inst;
     }
 
-    IRWitnessTable* IRBuilder::createWitnessTable()
+    IRWitnessTable* IRBuilder::createWitnessTable(IRType* baseType)
     {
         IRWitnessTable* witnessTable = createInst<IRWitnessTable>(
             this,
             kIROp_WitnessTable,
-            nullptr);
+            nullptr,
+            baseType);
         addGlobalValue(this, witnessTable);
         return witnessTable;
     }
@@ -4391,7 +4392,6 @@ namespace Slang
 
         case kIROp_WitnessTable:
         case kIROp_StructType:
-        case kIROp_InterfaceType:
             dumpIRParentInst(context, inst);
             return;
 
