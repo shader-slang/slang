@@ -557,6 +557,10 @@ struct OptionsParser
                 {
                     requestImpl->getFrontEndReq()->useSerialIRBottleneck = true;
                 }
+                else if (argStr == "-allow-dynamic-code")
+                {
+                    requestImpl->getBackEndReq()->allowDynamicCode = true;
+                }
                 else if (argStr == "-verbose-paths")
                 {
                     requestImpl->getSink()->setFlag(DiagnosticSink::Flag::VerbosePath);
