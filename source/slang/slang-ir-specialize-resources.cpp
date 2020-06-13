@@ -171,6 +171,27 @@ struct ResourceParameterSpecializationContext
         return anySpecializableParam;
     }
 
+    // Returns true if `type` is an `IRStructType` with array-typed fields.
+    bool isStructTypeWithArray(IRType* type)
+    {
+        if (auto structType = as<IRStructType>(type))
+        {
+            for (auto field : structType->getFields())
+            {
+                if (auto arrayType = as<IRArrayType>(field->getFieldType()))
+                {
+                    return true;
+                }
+                if (auto subStructType = as<IRStructType>(field->getFieldType()))
+                {
+                    if (isStructTypeWithArray(subStructType))
+                        return true;
+                }
+            }
+        }
+        return false;
+    }
+
     // Of course, now we need to back-fill the predicates that
     // the above function used to evaluate prameters and arguments.
 
@@ -208,6 +229,8 @@ struct ResourceParameterSpecializationContext
             if(as<IRHLSLStructuredBufferTypeBase>(type))
                 return true;
             if(as<IRByteAddressBufferTypeBase>(type))
+                return true;
+            if (isStructTypeWithArray(type))
                 return true;
         }
 
@@ -257,7 +280,7 @@ struct ResourceParameterSpecializationContext
             // of the indexing operation is also
             // suitable for specialization.
             //
-            if( arg->op == kIROp_getElement )
+            if( arg->op == kIROp_getElement || arg->op == kIROp_Load )
             {
                 auto base = arg->getOperand(0);
 
@@ -565,6 +588,11 @@ struct ResourceParameterSpecializationContext
             //
             ioInfo.newArgs.add(oldIndex);
         }
+        else if (oldArg->op == kIROp_Load)
+        {
+            auto oldBase = oldArg->getOperand(0);
+            getCallInfoForArg(ioInfo, oldBase);
+        }
         else
         {
             // If we fail to match any of the cases above
@@ -717,6 +745,10 @@ struct ResourceParameterSpecializationContext
             ioInfo.newBodyInsts.add(newVal);
 
             return newVal;
+        }
+        else if (oldArg->op == kIROp_Load)
+        {
+            return getSpecializedValueForArg(ioInfo, oldArg->getOperand(0));
         }
         else
         {
