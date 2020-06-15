@@ -567,7 +567,12 @@ IRWitnessTable* cloneWitnessTableImpl(
     IRWitnessTable* dstTable = nullptr,
     bool registerValue = true)
 {
-    auto clonedTable = dstTable ? dstTable : builder->createWitnessTable();
+    IRWitnessTable* clonedTable = dstTable;
+    if (!clonedTable)
+    {
+        auto clonedBaseType = cloneType(context, as<IRType>(originalTable->getOperand(0)));
+        clonedTable = builder->createWitnessTable(clonedBaseType);
+    }
     cloneSimpleGlobalValueImpl(context, originalTable, originalValues, clonedTable, registerValue);
     return clonedTable;
 }
@@ -599,7 +604,13 @@ IRInterfaceType* cloneInterfaceTypeImpl(
     IRInterfaceType*                originalInterface,
     IROriginalValuesForClone const& originalValues)
 {
-    auto clonedInterface = builder->createInterfaceType();
+    auto clonedInterface = builder->createInterfaceType(originalInterface->getOperandCount(), nullptr);
+    for (UInt i = 0; i < originalInterface->getOperandCount(); i++)
+    {
+        auto clonedKey = findClonedValue(context, originalInterface->getOperand(i));
+        SLANG_ASSERT(clonedKey);
+        clonedInterface->setOperand(i, clonedKey);
+    }
     cloneSimpleGlobalValueImpl(context, originalInterface, originalValues, clonedInterface);
     return clonedInterface;
 }

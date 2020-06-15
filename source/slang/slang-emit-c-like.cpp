@@ -265,6 +265,12 @@ void CLikeSourceEmitter::_emitType(IRType* type, EDeclarator* declarator)
 
 }
 
+void CLikeSourceEmitter::emitWitnessTable(IRWitnessTable* witnessTable)
+{
+    SLANG_UNUSED(witnessTable);
+    SLANG_DIAGNOSE_UNEXPECTED(getSink(), SourceLoc(), "Unimplemented emit: IROpWitnessTable.");
+}
+
 void CLikeSourceEmitter::emitTypeImpl(IRType* type, const StringSliceLoc* nameAndLoc)
 {
     if (nameAndLoc)
@@ -3514,6 +3520,10 @@ void CLikeSourceEmitter::emitGlobalInst(IRInst* inst)
 
     case kIROp_StructType:
         emitStruct(cast<IRStructType>(inst));
+        break;
+
+    case kIROp_WitnessTable:
+        emitWitnessTable(cast<IRWitnessTable>(inst));
         break;
 
     default:
