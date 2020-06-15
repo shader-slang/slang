@@ -1,6 +1,9 @@
 // slang-ast-serialize.cpp
 #include "slang-ast-serialize.h"
 
+#include "slang-ast-generated.h"
+#include "slang-ast-generated-macro.h"
+
 namespace Slang {
 
 // Perhaps we have hold the Rtti type and the the serialize information
@@ -29,6 +32,7 @@ struct Entry
 };
 
 enum class ASTSerialIndex : uint32_t;
+typedef uint32_t ASTSerialSourceLoc;
 
 class ASTSerialReader : public RefObject
 {
@@ -37,6 +41,12 @@ public:
     {
         SLANG_UNUSED(index);
         return nullptr;
+    }
+
+    SourceLoc getSourceLoc(ASTSerialSourceLoc loc)
+    {
+        SLANG_UNUSED(loc);
+        return SourceLoc();
     }
 };
 
@@ -51,6 +61,11 @@ public:
         }
 
         return ASTSerialIndex(0);
+    }
+    ASTSerialSourceLoc addSourceLoc(SourceLoc sourceLoc)
+    {
+        SLANG_UNUSED(sourceLoc);
+        return 0;
     }
 };
 
@@ -78,8 +93,9 @@ struct ASTSerialType
 struct ASTSerialField
 {
     const char* name;           ///< The name of the field
-    ASTSerialType* type;        ///< The type of the field
-    uint32_t offset;            ///< Offset to field from base of type
+    const ASTSerialType* type;        ///< The type of the field
+    uint32_t nativeOffset;      ///< Offset to field from base of type
+    uint32_t serialOffset;      ///< Offset in serial type    
 };
 
 // We need to have a way to map between the two.
@@ -103,7 +119,53 @@ struct ASTSerialBasicType
     static const ASTSerialType* getType()
     {
         static const ASTSerialType type = { sizeof(SerialType), uint8_t(SerialAlignment), &toSerial, &toNative };
-        return type;
+        return &type;
+    }
+};
+
+template <typename NATIVE_T, typename SERIAL_T>
+struct ASTSerialConvertType
+{
+    typedef NATIVE_T NativeType;
+    typedef SERIAL_T SerialType;
+
+    // We want the alignment to be the same as the size of the type for basic types
+    // NOTE! Might be different from SLANG_ALIGN_OF(SerialType) 
+    enum
+    {
+        SerialAlignment = ASTSerialBasicType<SERIAL_T>::SerialAlignment
+    };
+
+    static void toSerial(ASTSerialWriter* writer, const void* native, void* serial) { SLANG_UNUSED(writer); *(SERIAL_T*)serial = SERIAL_T(*(const NATIVE_T*)native); }
+    static void toNative(ASTSerialReader* reader, const void* serial, void* native) { SLANG_UNUSED(reader); *(NATIVE_T*)native = NATIVE_T(*(const T*)serial); }
+
+    static const ASTSerialType* getType()
+    {
+        static const ASTSerialType type = { sizeof(SERIAL_T), uint8_t(SerialAlignment), &toSerial, &toNative };
+        return &type;
+    }
+};
+
+template <typename T>
+struct ASTSerialAsIsType
+{
+    typedef T NativeType;
+    typedef T SerialType;
+
+    // We want the alignment to be the same as the size of the type for basic types
+    // NOTE! Might be different from SLANG_ALIGN_OF(SerialType) 
+    enum
+    {
+        SerialAlignment = SLANG_ALIGN_OF(T)
+    };
+
+    static void toSerial(ASTSerialWriter* writer, const void* native, void* serial) { SLANG_UNUSED(writer); *(T*)serial = *(const T*)native; }
+    static void toNative(ASTSerialReader* reader, const void* serial, void* native) { SLANG_UNUSED(reader); *(T*)native = *(const T*)serial; }
+
+    static const ASTSerialType* getType()
+    {
+        static const ASTSerialType type = { sizeof(SerialType), uint8_t(SerialAlignment), &toSerial, &toNative };
+        return &type;
     }
 };
 
@@ -141,7 +203,7 @@ struct ASTGetSerialType<double> : public ASTSerialBasicType<double> {};
 template <typename T, size_t N>
 struct ASTGetSerialType<T[N]>
 {
-    typedef ASTGetSerialType<T> ElementASTSerialType;
+    typedef typename ASTGetSerialType<T> ElementASTSerialType;
     typedef typename ElementASTSerialType::SerialType SerialElementType;
 
     typedef T NativeType[N];
@@ -229,6 +291,114 @@ struct ASTGetSerialType<T*>
     {
         *(NodeBase**)outNative = reader->getNode(*(const SerialType*)inSerial);
     }
+    static const ASTSerialType* getType()
+    {
+        static const ASTSerialType type = { sizeof(SerialType), uint8_t(SerialAlignment), &toSerial, &toNative };
+        return &type;
+    }
+};
+
+struct ASTGetSerialDeclRefBaseType
+{
+    typedef DeclRefBase NativeType;
+    struct SerialType
+    {
+        ASTSerialIndex substitutions;
+        ASTSerialIndex decl;
+    };
+    enum
+    {
+        SerialAlignment = sizeof(ASTSerialIndex),
+    };
+
+    static void toSerial(ASTSerialWriter* writer, const void* inNative, void* outSerial)
+    {
+        SerialType& serial = *(SerialType*)outSerial;
+        const NativeType& native = *(const NativeType*)inNative;
+
+        serial.decl = writer->getSerialIndex(native.decl);
+        serial.substitutions = writer->getSerialIndex(native.substitutions.substitutions);
+    }
+    static void toNative(ASTSerialReader* reader, const void* inSerial, void* outNative)
+    {
+        DeclRefBase& native = *(DeclRefBase*)(outNative);
+        const SerialType& serial = *(const SerialType*)inSerial;
+
+        native.decl = static_cast<Decl*>(reader->getNode(serial.decl));
+        native.substitutions.substitutions = static_cast<Substitutions*>(reader->getNode(serial.substitutions));
+    }
+    static const ASTSerialType* getType()
+    {
+        static const ASTSerialType type = { sizeof(SerialType), uint8_t(SerialAlignment), &toSerial, &toNative };
+        return &type;
+    }
+};
+
+template <typename T>
+struct ASTGetSerialType<DeclRef<T>> : public ASTGetSerialDeclRefBaseType {};
+
+// MatrixCoord can just go as is
+template <>
+struct ASTGetSerialType<MatrixCoord> : ASTSerialAsIsType<MatrixCoord> {};
+
+// SourceLoc
+
+// Make the type exposed, so we can look for it if we want to remap.
+template <>
+struct ASTGetSerialType<SourceLoc>
+{
+    typedef SourceLoc NativeType;
+    typedef ASTSerialSourceLoc SerialType;
+    enum
+    {
+        SerialAlignment = sizeof(ASTSerialSourceLoc),
+    };
+
+    static void toSerial(ASTSerialWriter* writer, const void* inNative, void* outSerial)
+    {
+        *(SerialType*)outSerial = writer->addSourceLoc(*(const NativeType*)inNative);
+    }
+    static void toNative(ASTSerialReader* reader, const void* inSerial, void* outNative)
+    {
+        *(NativeType*)outNative = reader->getSourceLoc(*(const SerialType*)inSerial);
+    }
+    static const ASTSerialType* getType()
+    {
+        static const ASTSerialType type = { sizeof(SerialType), uint8_t(SerialAlignment), &toSerial, &toNative };
+        return &type;
+    }
+};
+
+
+template <typename T, typename ALLOCATOR>
+struct ASTGetSerialType<List<T, ALLOCATOR>>
+{
+    typedef List<T, ALLOCATOR> NativeType;
+    typedef ASTSerialIndex SerialType;
+    enum
+    {
+        SerialAlignment = sizeof(SerialType),
+    };
+
+    static void toSerial(ASTSerialWriter* writer, const void* inNative, void* outSerial)
+    {
+        SLANG_UNUSED(writer);
+        SLANG_UNUSED(inNative);
+        SLANG_UNUSED(outSerial);
+        //*(SerialType*)outSerial = writer->addSourceLoc(*(const NativeType*)inNative);
+    }
+    static void toNative(ASTSerialReader* reader, const void* inSerial, void* outNative)
+    {
+        SLANG_UNUSED(reader);
+        SLANG_UNUSED(inNative);
+        SLANG_UNUSED(outSerial);
+        //*(NativeType*)outNative = reader->getSourceLoc(*(const SerialType*)inSerial);
+    }
+    static const ASTSerialType* getType()
+    {
+        static const ASTSerialType type = { sizeof(SerialType), uint8_t(SerialAlignment), &toSerial, &toNative };
+        return &type;
+    }
 };
 
 // For array, I can't save the 'type', but I can save the alignment (?) and the element size.
@@ -248,6 +418,40 @@ struct Entry
     Type type;
 };
 #endif
+
+template <typename T>
+ASTSerialField _calcField(const char* name, T& in)
+{
+    uint8_t* ptr = &reinterpret_cast<uint8_t&>(in);
+
+    ASTSerialField field;
+    field.name = name;
+    field.type = ASTGetSerialType<T>::getType();
+    // This only works because we in is an offset from 1
+    field.nativeOffset = uint32_t(size_t(ptr) - 1);
+    field.serialOffset = 0;
+    return field;
+}
+
+#define SLANG_AST_SERIAL_FIELD(FIELD_NAME, TYPE, param) fields.add(_calcField(#FIELD_NAME, obj->FIELD_NAME));
+
+struct ASTFieldAccess
+{
+
+// Note that the obj point is not nullptr, because some compilers notice this is 'indexing from null'
+// and warn/error. So we offset from 1.
+#define SLANG_AST_SERIAL_FIELDS_IMPL(NAME, SUPER, ORIGIN, LAST, MARKER, TYPE, param) \
+    static void serialFields_##NAME(List<ASTSerialField>& fields) \
+    { \
+        NAME* obj = (NAME*)1; \
+        SLANG_UNUSED(fields); \
+        SLANG_UNUSED(obj); \
+        SLANG_FIELDS_ASTNode_##NAME(SLANG_AST_SERIAL_FIELD, param) \
+    }
+
+    SLANG_ALL_ASTNode_NodeBase(SLANG_AST_SERIAL_FIELDS_IMPL, _)
+
+};
 
 /* static */SlangResult ASTSerializeUtil::selfTest()
 {

@@ -20,7 +20,8 @@
     SLANG_FORCE_INLINE static bool isDerivedFrom(ASTNodeType type) { return int(type) >= int(kType) && int(type) <= int(ASTNodeType::LAST); } \
     SLANG_CLASS_REFLECT_SUPER_##TYPE(SUPER) \
     friend class ASTBuilder; \
-    friend struct ASTConstructAccess;
+    friend struct ASTConstructAccess; \
+    friend struct ASTFieldAccess;
 
 // Macro definitions - use the SLANG_ASTNode_ definitions to invoke the IMPL to produce the code
 // injected into AST classes
