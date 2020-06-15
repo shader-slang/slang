@@ -231,7 +231,23 @@ struct ASTGetSerialType<T*>
     }
 };
 
+// For array, I can't save the 'type', but I can save the alignment (?) and the element size.
+// I could just require all indexed things, must be on 64 bit boundaries (and so alignment)
+#if 0
+struct Entry
+{
+    enum class Type
+    {
+        String,    
+        Array,
+        Node,
+    };
 
+    // We could store a skip with each type, that would say the amount of bytes to get to the next entry.
+    // We could keep the types separate from the pointers to the contents, and then different allocations have different alignemnt
+    Type type;
+};
+#endif
 
 /* static */SlangResult ASTSerializeUtil::selfTest()
 {
