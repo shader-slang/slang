@@ -1559,6 +1559,11 @@ void CPPSourceEmitter::emitParamTypeImpl(IRType* type, String const& name)
     emitType(type, name);
 }
 
+void CPPSourceEmitter::emitWitnessTable(IRWitnessTable* witnessTable)
+{
+    SLANG_UNUSED(witnessTable);
+}
+
 bool CPPSourceEmitter::tryEmitGlobalParamImpl(IRGlobalParam* varDecl, IRType* varType)
 {
     SLANG_UNUSED(varDecl);

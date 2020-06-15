@@ -340,6 +340,8 @@ public:
         // Again necessary for & prefix intrinsics. May be removable in the future
     virtual void emitVectorTypeNameImpl(IRType* elementType, IRIntegerValue elementCount) = 0;
 
+    virtual void emitWitnessTable(IRWitnessTable* witnessTable);
+
     virtual void handleCallExprDecorationsImpl(IRInst* funcValue) { SLANG_UNUSED(funcValue); }
 
     virtual bool tryEmitGlobalParamImpl(IRGlobalParam* varDecl, IRType* varType) { SLANG_UNUSED(varDecl); SLANG_UNUSED(varType); return false; }

@@ -75,7 +75,7 @@ protected:
     virtual void emitSimpleFuncImpl(IRFunc* func) SLANG_OVERRIDE;
     virtual void emitOperandImpl(IRInst* inst, EmitOpInfo const&  outerPrec) SLANG_OVERRIDE;
     virtual void emitParamTypeImpl(IRType* type, String const& name) SLANG_OVERRIDE;
-
+    virtual void emitWitnessTable(IRWitnessTable* witnessTable) SLANG_OVERRIDE;
     virtual bool tryEmitGlobalParamImpl(IRGlobalParam* varDecl, IRType* varType) SLANG_OVERRIDE;
     virtual void emitIntrinsicCallExprImpl(IRCall* inst, IRTargetIntrinsicDecoration* targetIntrinsic, EmitOpInfo const& inOuterPrec) SLANG_OVERRIDE;
 

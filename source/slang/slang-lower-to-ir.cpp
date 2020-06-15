@@ -1105,7 +1105,8 @@ struct ValLoweringVisitor : ValVisitor<ValLoweringVisitor, LoweredValInfo, Lower
             UNREACHABLE_RETURN(LoweredValInfo());
         }
 
-        auto irWitnessTable = getBuilder()->createWitnessTable();
+        auto irWitnessTableBaseType = lowerType(context, supDeclRefType);
+        auto irWitnessTable = getBuilder()->createWitnessTable(irWitnessTableBaseType);
 
         // Now we will iterate over the requirements (members) of the
         // interface and try to synthesize an appropriate value for each.
@@ -4524,7 +4525,8 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
                     if(!mapASTToIRWitnessTable.TryGetValue(astReqWitnessTable, irSatisfyingWitnessTable))
                     {
                         // Need to construct a sub-witness-table
-                        irSatisfyingWitnessTable = subBuilder->createWitnessTable();
+                        auto irWitnessTableBaseType = lowerType(subContext, astReqWitnessTable->baseType);
+                        irSatisfyingWitnessTable = subBuilder->createWitnessTable(irWitnessTableBaseType);
 
                         // Recursively lower the sub-table.
                         lowerWitnessTable(
@@ -4637,10 +4639,10 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
         // and we need those parameters to lower as references to
         // the parameters of our IR-level generic.
         //
-        lowerType(subContext, superType);
+        auto irWitnessTableBaseType = lowerType(subContext, superType);
 
         // Create the IR-level witness table
-        auto irWitnessTable = subBuilder->createWitnessTable();
+        auto irWitnessTable = subBuilder->createWitnessTable(irWitnessTableBaseType);
         addLinkageDecoration(context, irWitnessTable, inheritanceDecl, mangledName.getUnownedSlice());
 
         // Register the value now, rather than later, to avoid any possible infinite recursion.
@@ -5243,9 +5245,10 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
         // a witness table for the interface type's conformance
         // to its own interface.
         //
+        List<IRStructKey*> requirementKeys;
         for (auto requirementDecl : decl->members)
         {
-            getInterfaceRequirementKey(requirementDecl);
+            requirementKeys.add(getInterfaceRequirementKey(requirementDecl));
 
             // As a special case, any type constraints placed
             // on an associated type will *also* need to be turned
@@ -5254,7 +5257,7 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
             {
                 for (auto constraintDecl : associatedTypeDecl->getMembersOfType<TypeConstraintDecl>())
                 {
-                    getInterfaceRequirementKey(constraintDecl);
+                    requirementKeys.add(getInterfaceRequirementKey(constraintDecl));
                 }
             }
         }
@@ -5267,11 +5270,12 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
         // Emit any generics that should wrap the actual type.
         emitOuterGenerics(subContext, decl, decl);
 
-        IRInterfaceType* irInterface = subBuilder->createInterfaceType();
+        IRInterfaceType* irInterface = subBuilder->createInterfaceType(
+            requirementKeys.getCount(),
+            reinterpret_cast<IRInst**>(requirementKeys.getBuffer()));
         addNameHint(context, irInterface, decl);
         addLinkageDecoration(context, irInterface, decl);
         subBuilder->setInsertInto(irInterface);
-
         // TODO: are there any interface members that should be
         // nested inside the interface type itself?
 
