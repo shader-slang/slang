@@ -3610,18 +3610,47 @@ struct StmtLoweringVisitor : StmtVisitor<StmtLoweringVisitor>
     {
         startBlockIfNeeded(stmt);
 
-        // A `return` statement turns into a return
-        // instruction. If the statement had an argument
-        // expression, then we need to lower that to
-        // a value first, and then emit the resulting value.
+        // A `return` statement turns into a `return` instruction,
+        // but we have two kinds of `return`: one for returning
+        // a (non-`void`) value, and one for returning "no value"
+        // (which effectively returns a value of type `void`).
+        //
         if( auto expr = stmt->expression )
         {
+            // If the AST `return` statement had an expression, then we
+            // need to lower it to the IR at this point, both to
+            // compute its value and (in case we are returning a
+            // `void`-typed expression) to execute its side effects.
+            //
             auto loweredExpr = lowerRValueExpr(context, expr);
 
-            getBuilder()->emitReturn(getSimpleVal(context, loweredExpr));
+            // If the AST `return` statement was returning a non-`void`
+            // value, then we need to emit an IR `return` of that value.
+            //
+            if(!expr->type.type->equals(context->astBuilder->getVoidType()))
+            {
+                getBuilder()->emitReturn(getSimpleVal(context, loweredExpr));
+            }
+            else
+            {
+                // If the type of the value returned was `void`, then
+                // we don't want to emit an IR-level `return` with a value,
+                // because that could trip up some of our back-end.
+                //
+                // TODO: We should eventually have only a single IR-level
+                // `return` operation that always takes a value (including
+                // values of type `void`), and then treat an AST `return;`
+                // as equivalent to something like `return void();`.
+                //
+                getBuilder()->emitReturn();
+            }
         }
         else
         {
+            // If we hit this case, then the AST `return` was a `return;`
+            // with no value, which can only occur in a function with
+            // a `void` result type.
+            //
             getBuilder()->emitReturn();
         }
     }
