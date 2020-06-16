@@ -826,10 +826,10 @@ struct ComputeVaryingInput
 found via reflection or defined such that it matches the shader appropriately.
 */
 struct UniformEntryPointParams;
-struct UniformState;
+//struct UniformState;
 
-typedef void(*ComputeThreadFunc)(ComputeThreadVaryingInput* varyingInput, UniformEntryPointParams* uniformEntryPointParams, UniformState* uniformState);
-typedef void(*ComputeFunc)(ComputeVaryingInput* varyingInput, UniformEntryPointParams* uniformEntryPointParams, UniformState* uniformState);
+typedef void(*ComputeThreadFunc)(ComputeThreadVaryingInput* varyingInput, UniformEntryPointParams* uniformEntryPointParams, void* uniformState);
+typedef void(*ComputeFunc)(ComputeVaryingInput* varyingInput, UniformEntryPointParams* uniformEntryPointParams, void* uniformState);
 
 #ifdef SLANG_PRELUDE_NAMESPACE
 }
