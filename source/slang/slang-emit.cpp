@@ -11,6 +11,7 @@
 #include "slang-ir-glsl-legalize.h"
 #include "slang-ir-insts.h"
 #include "slang-ir-link.h"
+#include "slang-ir-lower-generics.h"
 #include "slang-ir-restructure.h"
 #include "slang-ir-restructure-scoping.h"
 #include "slang-ir-specialize.h"
@@ -273,6 +274,18 @@ Result linkAndOptimizeIR(
     if (!compileRequest->allowDynamicCode)
         specializeModule(irModule);
 
+    switch (target)
+    {
+    case CodeGenTarget::CPPSource:
+        // For targets that supports dynamic dispatch, we need to lower the
+        // generics / interface types to ordinary functions and types using
+        // function pointers.
+        lowerGenerics(irModule);
+        break;
+    default:
+        break;
+    }
+
     // Debugging code for IR transformations...
 #if 0
     dumpIRIfEnabled(compileRequest, irModule, "SPECIALIZED");
@@ -389,6 +402,7 @@ Result linkAndOptimizeIR(
 #if 0
     dumpIRIfEnabled(compileRequest, irModule, "AFTER RESOURCE SPECIALIZATION");
 #endif
+
     validateIRModuleIfEnabled(compileRequest, irModule);
 
     // For HLSL (and fxc/dxc) only, we need to "wrap" any
@@ -558,12 +572,15 @@ Result linkAndOptimizeIR(
         break;
     }
 
-    // For all targets that don't support true dynamic dispatch through
-    // witness tables (that is all targets at present), we need
-    // to eliminate witness tables from the IR so that they
-    // don't keep symbols live that we don't actually need.
-    stripWitnessTables(irModule);
-#if 0
+    if (!compileRequest->allowDynamicCode)
+    {
+        // For all targets that don't support true dynamic dispatch through
+        // witness tables, we need to eliminate witness tables from the IR so
+        // that they don't keep symbols live that we don't actually need.
+        stripWitnessTables(irModule);
+    }
+
+#if 1
     dumpIRIfEnabled(compileRequest, irModule, "AFTER STRIP WITNESS TABLES");
 #endif
     validateIRModuleIfEnabled(compileRequest, irModule);

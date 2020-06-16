@@ -1564,7 +1564,8 @@ struct IRBuilder
     IRStringType* getStringType();
 
     IRBasicBlockType*   getBasicBlockType();
-    IRType* getWitnessTableType() { return nullptr; }
+    IRType* getWitnessTableType() { return getType(IROp::kIROp_WitnessTableType); }
+    IRType* getTypeType() { return getType(IROp::kIROp_TypeType); }
     IRType* getKeyType() { return nullptr; }
 
     IRTypeKind*     getTypeKind();

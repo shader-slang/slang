@@ -5728,7 +5728,7 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
             {
                 // TODO: use a `TypeKind` to represent the
                 // classifier of the parameter.
-                auto param = subBuilder->emitParam(nullptr);
+                auto param = subBuilder->emitParam(subBuilder->getTypeType());
                 addNameHint(context, param, typeParamDecl);
                 setValue(subContext, typeParamDecl, LoweredValInfo::simple(param));
             }
@@ -5748,7 +5748,7 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
             {
                 // TODO: use a `WitnessTableKind` to represent the
                 // classifier of the parameter.
-                auto param = subBuilder->emitParam(nullptr);
+                auto param = subBuilder->emitParam(subBuilder->getWitnessTableType());
                 addNameHint(context, param, constraintDecl);
                 setValue(subContext, constraintDecl, LoweredValInfo::simple(param));
             }

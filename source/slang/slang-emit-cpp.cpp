@@ -1673,6 +1673,12 @@ void CPPSourceEmitter::emitSimpleFuncImpl(IRFunc* func)
         auto firstParam = func->getFirstParam();
         for (auto pp = firstParam; pp; pp = pp->getNextParam())
         {
+            // Ingore TypeType-typed parameters for now.
+            // In the future we will pass around runtime type info
+            // for TypeType parameters.
+            if (as<IRTypeType>(pp->getFullType()))
+                continue;
+
             if (pp != firstParam)
                 m_writer->emit(", ");
 

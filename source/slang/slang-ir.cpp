@@ -2775,7 +2775,7 @@ namespace Slang
         IRWitnessTable* witnessTable = createInst<IRWitnessTable>(
             this,
             kIROp_WitnessTable,
-            nullptr,
+            getWitnessTableType(),
             baseType);
         addGlobalValue(this, witnessTable);
         return witnessTable;

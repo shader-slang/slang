@@ -267,6 +267,9 @@
     <ClInclude Include="slang-visitor.h">
       <Filter>Header Files</Filter>
     </ClInclude>
+    <ClInclude Include="slang-ir-lower-generics.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="slang-ast-builder.cpp">
@@ -519,6 +522,9 @@
       <Filter>Source Files</Filter>
     </ClCompile>
     <ClCompile Include="slang.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="slang-ir-lower-generics.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
   </ItemGroup>
