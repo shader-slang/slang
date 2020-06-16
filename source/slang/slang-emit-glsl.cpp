@@ -706,6 +706,11 @@ void GLSLSourceEmitter::emitLoopControlDecorationImpl(IRLoopControlDecoration* d
         m_glslExtensionTracker->requireExtension(UnownedStringSlice::fromLiteral("GL_EXT_control_flow_attributes"));
         m_writer->emit("[[unroll]]\n");
     }
+    else if (decl->getMode() == kIRLoopControl_Loop)
+    {
+        m_glslExtensionTracker->requireExtension(UnownedStringSlice::fromLiteral("GL_EXT_control_flow_attributes"));
+        m_writer->emit("[[dont_unroll]]\n");
+    }
 }
 
 void GLSLSourceEmitter::emitSimpleValueImpl(IRInst* inst) 
