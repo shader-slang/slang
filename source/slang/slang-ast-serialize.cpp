@@ -101,7 +101,7 @@ struct ASTSerialField
 // We need to have a way to map between the two.
 // If no mapping is needed, (just a copy), then we don't bother with the functions
 template <typename T>
-struct ASTSerialBasicType
+struct ASTGetSerialBasicType
 {
     typedef T NativeType;
     typedef T SerialType;
@@ -124,7 +124,7 @@ struct ASTSerialBasicType
 };
 
 template <typename NATIVE_T, typename SERIAL_T>
-struct ASTSerialConvertType
+struct ASTGetSerialConvertType
 {
     typedef NATIVE_T NativeType;
     typedef SERIAL_T SerialType;
@@ -133,7 +133,7 @@ struct ASTSerialConvertType
     // NOTE! Might be different from SLANG_ALIGN_OF(SerialType) 
     enum
     {
-        SerialAlignment = ASTSerialBasicType<SERIAL_T>::SerialAlignment
+        SerialAlignment = ASTGetSerialBasicType<SERIAL_T>::SerialAlignment
     };
 
     static void toSerial(ASTSerialWriter* writer, const void* native, void* serial) { SLANG_UNUSED(writer); *(SERIAL_T*)serial = SERIAL_T(*(const NATIVE_T*)native); }
@@ -147,7 +147,7 @@ struct ASTSerialConvertType
 };
 
 template <typename T>
-struct ASTSerialAsIsType
+struct ASTGetSerialIdentityType
 {
     typedef T NativeType;
     typedef T SerialType;
@@ -176,27 +176,27 @@ struct ASTGetSerialType;
 // Implement for Basic Types
 
 template <>
-struct ASTGetSerialType<uint8_t> : public ASTSerialBasicType<uint8_t> {};
+struct ASTGetSerialType<uint8_t> : public ASTGetSerialBasicType<uint8_t> {};
 template <>
-struct ASTGetSerialType<uint16_t> : public ASTSerialBasicType<uint16_t> {};
+struct ASTGetSerialType<uint16_t> : public ASTGetSerialBasicType<uint16_t> {};
 template <>
-struct ASTGetSerialType<uint32_t> : public ASTSerialBasicType<uint32_t> {};
+struct ASTGetSerialType<uint32_t> : public ASTGetSerialBasicType<uint32_t> {};
 template <>
-struct ASTGetSerialType<uint64_t> : public ASTSerialBasicType<uint64_t> {};
+struct ASTGetSerialType<uint64_t> : public ASTGetSerialBasicType<uint64_t> {};
 
 template <>
-struct ASTGetSerialType<int8_t> : public ASTSerialBasicType<int8_t> {};
+struct ASTGetSerialType<int8_t> : public ASTGetSerialBasicType<int8_t> {};
 template <>
-struct ASTGetSerialType<int16_t> : public ASTSerialBasicType<int16_t> {};
+struct ASTGetSerialType<int16_t> : public ASTGetSerialBasicType<int16_t> {};
 template <>
-struct ASTGetSerialType<int32_t> : public ASTSerialBasicType<int32_t> {};
+struct ASTGetSerialType<int32_t> : public ASTGetSerialBasicType<int32_t> {};
 template <>
-struct ASTGetSerialType<int64_t> : public ASTSerialBasicType<int64_t> {};
+struct ASTGetSerialType<int64_t> : public ASTGetSerialBasicType<int64_t> {};
 
 template <>
-struct ASTGetSerialType<float> : public ASTSerialBasicType<float> {};
+struct ASTGetSerialType<float> : public ASTGetSerialBasicType<float> {};
 template <>
-struct ASTGetSerialType<double> : public ASTSerialBasicType<double> {};
+struct ASTGetSerialType<double> : public ASTGetSerialBasicType<double> {};
 
 // Fixed arrays
 
@@ -339,7 +339,7 @@ struct ASTGetSerialType<DeclRef<T>> : public ASTGetSerialDeclRefBaseType {};
 
 // MatrixCoord can just go as is
 template <>
-struct ASTGetSerialType<MatrixCoord> : ASTSerialAsIsType<MatrixCoord> {};
+struct ASTGetSerialType<MatrixCoord> : ASTGetSerialIdentityType<MatrixCoord> {};
 
 // SourceLoc
 
@@ -369,6 +369,7 @@ struct ASTGetSerialType<SourceLoc>
     }
 };
 
+// List
 
 template <typename T, typename ALLOCATOR>
 struct ASTGetSerialType<List<T, ALLOCATOR>>
@@ -400,6 +401,111 @@ struct ASTGetSerialType<List<T, ALLOCATOR>>
         return &type;
     }
 };
+
+// Dictionary
+
+template <typename KEY, typename VALUE>
+struct ASTGetSerialType<Dictionary<KEY, VALUE>>
+{
+    typedef Dictionary<KEY, VALUE> NativeType;
+    struct SerialType
+    {
+        ASTSerialIndex keys;            ///< Index an array
+        ASTSerialIndex values;          ///< Index an array
+    };
+    enum
+    {
+        SerialAlignment = SLANG_ALIGN_OF(ASTSerialIndex)
+    };
+
+    static void toSerial(ASTSerialWriter* writer, const void* inNative, void* outSerial)
+    {
+        SLANG_UNUSED(writer);
+        SLANG_UNUSED(inNative);
+        SLANG_UNUSED(outSerial);
+        //*(SerialType*)outSerial = writer->addSourceLoc(*(const NativeType*)inNative);
+    }
+    static void toNative(ASTSerialReader* reader, const void* inSerial, void* outNative)
+    {
+        SLANG_UNUSED(reader);
+        SLANG_UNUSED(inNative);
+        SLANG_UNUSED(outSerial);
+        //*(NativeType*)outNative = reader->getSourceLoc(*(const SerialType*)inSerial);
+    }
+    static const ASTSerialType* getType()
+    {
+        static const ASTSerialType type = { sizeof(SerialType), uint8_t(SerialAlignment), &toSerial, &toNative };
+        return &type;
+    }
+};
+
+// QualType
+
+template <>
+struct ASTGetSerialType<QualType>
+{
+    typedef QualType NativeType;
+    struct SerialType
+    {
+        ASTSerialIndex type;
+        uint8_t isLeftValue;
+    };
+    enum
+    {
+        SerialAlignment = SLANG_ALIGN_OF(ASTSerialIndex)
+    };
+
+    static void toSerial(ASTSerialWriter* writer, const void* inNative, void* outSerial)
+    {
+        auto dst = (SerialType*)outSerial;
+        auto src = (const NativeType*)inNative;
+        dst->isLeftValue = src->isLeftValue ? 1 : 0;
+        dst->type = writer->getSerialIndex(src->type);
+    }
+    static void toNative(ASTSerialReader* reader, const void* inSerial, void* outNative)
+    {
+        auto src = (const SerialType*)inSerial;
+        auto dst = (NativeType*)outNative;
+        dst->type = dynamicCast<Type>(reader->getNode(src->type));
+        dst->isLeftValue = src->isLeftValue != 0;
+    }
+    static const ASTSerialType* getType()
+    {
+        static const ASTSerialType type = { sizeof(SerialType), uint8_t(SerialAlignment), &toSerial, &toNative };
+        return &type;
+    }
+};
+
+// SamplerStateFlavor
+
+template <>
+struct ASTGetSerialType<SamplerStateFlavor> : public ASTGetSerialConvertType<SamplerStateFlavor, uint8_t> {};
+
+// TextureFlavor
+
+template <>
+struct ASTGetSerialType<TextureFlavor>
+{
+    typedef TextureFlavor NativeType;
+    typedef uint16_t SerialType;
+;
+    enum
+    {
+        SerialAlignment = sizeof(SerialType)
+    };
+
+    static void toSerial(ASTSerialWriter* writer, const void* native, void* serial) { SLANG_UNUSED(writer); *(SerialType*)serial = ((const NativeType*)native)->flavor; }
+    static void toNative(ASTSerialReader* reader, const void* serial, void* native) { SLANG_UNUSED(reader); ((NativeType*)native)->flavor = *(const SerialType*)serial; }
+
+    static const ASTSerialType* getType()
+    {
+        static const ASTSerialType type = { sizeof(SerialType), uint8_t(SerialAlignment), &toSerial, &toNative };
+        return &type;
+    }
+};
+
+
+
 
 // For array, I can't save the 'type', but I can save the alignment (?) and the element size.
 // I could just require all indexed things, must be on 64 bit boundaries (and so alignment)
