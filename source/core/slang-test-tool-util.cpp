@@ -59,12 +59,9 @@ static SlangResult _addCPPPrelude(const String& parentPath, slang::IGlobalSessio
 {
     String includePath;
     SLANG_RETURN_ON_FAIL(_calcIncludePath(parentPath, "../../../prelude/slang-cpp-prelude.h", includePath));
-
     StringBuilder prelude;
     prelude << "#include \"" << includePath << "\"\n\n";
-    
-    session->setPrelude(SLANG_SOURCE_LANGUAGE_CPP, prelude.getBuffer());
-  
+    session->setLanguagePrelude(SLANG_SOURCE_LANGUAGE_CPP, prelude.getBuffer());
     return SLANG_OK;
 }
 
@@ -72,11 +69,9 @@ static SlangResult _addCUDAPrelude(const String& parentPath, slang::IGlobalSessi
 {
     String includePath;
     SLANG_RETURN_ON_FAIL(_calcIncludePath(parentPath, "../../../prelude/slang-cuda-prelude.h", includePath));
-
     StringBuilder prelude;
     prelude << "#include \"" << includePath << "\"\n\n";
-    
-    session->setPrelude(SLANG_SOURCE_LANGUAGE_CUDA, prelude.getBuffer());
+    session->setLanguagePrelude(SLANG_SOURCE_LANGUAGE_CUDA, prelude.getBuffer());
     return SLANG_OK;
 }
 

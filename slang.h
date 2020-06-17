@@ -2862,7 +2862,7 @@ namespace slang
             SlangPassThrough passThrough,
             char const* path) = 0;
 
-            /** DEPRECIATED: Use setPrelude
+            /** DEPRECIATED: Use setLanguagePrelude
 
             Set the 'prelude' for generated code for a 'downstream compiler'.
             @param passThrough The downstream compiler for generated code that will have the prelude applied to it. 
@@ -2874,13 +2874,13 @@ namespace slang
             SlangPassThrough passThrough,
             const char* preludeText) = 0;
 
-            /** DEPRECIATED: Use getPrelude
+            /** DEPRECIATED: Use getLanguagePrelude
 
             Get the 'prelude' for generated code for a 'downstream compiler'.
             @param passThrough The downstream compiler for generated code that will have the prelude applied to it. 
             @param outPrelude  On exit holds a blob that holds the string of the prelude.
             */
-        virtual SLANG_NO_THROW void SLANG_MCALL getPreludeForLanguage(
+        virtual SLANG_NO_THROW void SLANG_MCALL getDownstreamCompilerPrelude(
             SlangPassThrough passThrough,
             ISlangBlob** outPrelude) = 0;
 
@@ -2921,7 +2921,7 @@ namespace slang
 
             Note! That for pass-through usage, prelude is not pre-pended, preludes are for code generation only. 
             */
-        virtual SLANG_NO_THROW void SLANG_MCALL setPrelude(
+        virtual SLANG_NO_THROW void SLANG_MCALL setLanguagePrelude(
             SlangSourceLanguage sourceLanguage,
             const char* preludeText) = 0;
 
@@ -2929,7 +2929,7 @@ namespace slang
             @param sourceLanguage The language the prelude should be inserted on.
             @param outPrelude  On exit holds a blob that holds the string of the prelude.
             */
-        virtual SLANG_NO_THROW void SLANG_MCALL getPrelude(
+        virtual SLANG_NO_THROW void SLANG_MCALL getLanguagePrelude(
             SlangSourceLanguage sourceLanguage,
             ISlangBlob** outPrelude) = 0;
     };

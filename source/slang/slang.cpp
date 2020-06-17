@@ -257,20 +257,20 @@ SLANG_NO_THROW void SLANG_MCALL Session::setDownstreamCompilerPrelude(
     PassThroughMode downstreamCompiler = PassThroughMode(inPassThrough);
     SLANG_ASSERT(int(downstreamCompiler) > int(PassThroughMode::None) && int(downstreamCompiler) < int(PassThroughMode::CountOf));
     const SourceLanguage sourceLanguage = getDefaultSourceLanguageForDownstreamCompiler(downstreamCompiler);
-    setPrelude(SlangSourceLanguage(sourceLanguage), prelude);
+    setLanguagePrelude(SlangSourceLanguage(sourceLanguage), prelude);
 }
 
-SLANG_NO_THROW void SLANG_MCALL Session::getPreludeForLanguage(
+SLANG_NO_THROW void SLANG_MCALL Session::getDownstreamCompilerPrelude(
     SlangPassThrough inPassThrough,
     ISlangBlob** outPrelude)
 {
     PassThroughMode downstreamCompiler = PassThroughMode(inPassThrough);
     SLANG_ASSERT(int(downstreamCompiler) > int(PassThroughMode::None) && int(downstreamCompiler) < int(PassThroughMode::CountOf));
     const SourceLanguage sourceLanguage = getDefaultSourceLanguageForDownstreamCompiler(downstreamCompiler);
-    getPrelude(SlangSourceLanguage(sourceLanguage), outPrelude);
+    getLanguagePrelude(SlangSourceLanguage(sourceLanguage), outPrelude);
 }
 
-SLANG_NO_THROW void SLANG_MCALL Session::setPrelude(
+SLANG_NO_THROW void SLANG_MCALL Session::setLanguagePrelude(
     SlangSourceLanguage inSourceLanguage,
     char const* prelude)
 {
@@ -285,7 +285,7 @@ SLANG_NO_THROW void SLANG_MCALL Session::setPrelude(
     }
 }
 
-SLANG_NO_THROW void SLANG_MCALL Session::getPrelude(
+SLANG_NO_THROW void SLANG_MCALL Session::getLanguagePrelude(
     SlangSourceLanguage inSourceLanguage,
     ISlangBlob** outPrelude)
 {

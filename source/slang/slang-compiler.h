@@ -2023,7 +2023,7 @@ namespace Slang
             SlangPassThrough inPassThrough,
             char const* prelude) override;
 
-        SLANG_NO_THROW void SLANG_MCALL getPreludeForLanguage(
+        SLANG_NO_THROW void SLANG_MCALL getDownstreamCompilerPrelude(
             SlangPassThrough inPassThrough,
             ISlangBlob** outPrelude) override;
 
@@ -2033,10 +2033,10 @@ namespace Slang
 
         SLANG_NO_THROW SlangPassThrough SLANG_MCALL getDefaultDownstreamCompiler(SlangSourceLanguage sourceLanguage) override;
 
-        SLANG_NO_THROW void SLANG_MCALL setPrelude(SlangSourceLanguage inSourceLanguage, char const* prelude) override;
-        SLANG_NO_THROW void SLANG_MCALL getPrelude(SlangSourceLanguage inSourceLanguage, ISlangBlob** outPrelude) override;
+        SLANG_NO_THROW void SLANG_MCALL setLanguagePrelude(SlangSourceLanguage inSourceLanguage, char const* prelude) override;
+        SLANG_NO_THROW void SLANG_MCALL getLanguagePrelude(SlangSourceLanguage inSourceLanguage, ISlangBlob** outPrelude) override;
 
-            /// Get the default cpp compiler for a language
+            /// Get the default compiler for a language
         DownstreamCompiler* getDefaultDownstreamCompiler(SourceLanguage sourceLanguage);
 
         enum class SharedLibraryFuncType
