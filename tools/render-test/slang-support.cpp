@@ -265,7 +265,7 @@ static gfx::StageType _translateStage(SlangStage slangStage)
     {
         // Add an include of the prelude
         ComPtr<ISlangBlob> prelude;
-        session->getPrelude(input.sourceLanguage, prelude.writeRef());
+        session->getLanguagePrelude(input.sourceLanguage, prelude.writeRef());
 
         String preludeString = StringUtil::getString(prelude);
 
