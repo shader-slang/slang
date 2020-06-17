@@ -822,14 +822,11 @@ struct ComputeVaryingInput
     uint3 endGroupID;       ///< Non inclusive end groupID
 };
 
-/* Type that defines the uniform entry point params. The actual content of this type is dependent on the entry point parameters, and can be
-found via reflection or defined such that it matches the shader appropriately.
-*/
-struct UniformEntryPointParams;
-struct UniformState;
+// The uniformEntryPointParams and uniformState must be set to structures that match layout that the kernel expects.
+// This can be determined via eflection for example.
 
-typedef void(*ComputeThreadFunc)(ComputeThreadVaryingInput* varyingInput, UniformEntryPointParams* uniformEntryPointParams, UniformState* uniformState);
-typedef void(*ComputeFunc)(ComputeVaryingInput* varyingInput, UniformEntryPointParams* uniformEntryPointParams, UniformState* uniformState);
+typedef void(*ComputeThreadFunc)(ComputeThreadVaryingInput* varyingInput, void* uniformEntryPointParams, void* uniformState);
+typedef void(*ComputeFunc)(ComputeVaryingInput* varyingInput, void* uniformEntryPointParams, void* uniformState);
 
 #ifdef SLANG_PRELUDE_NAMESPACE
 }

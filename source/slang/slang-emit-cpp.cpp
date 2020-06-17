@@ -1985,6 +1985,18 @@ void CPPSourceEmitter::emitPreprocessorDirectivesImpl()
 
     writer->emit("\n");
 
+    
+    if (m_target == CodeGenTarget::CPPSource)
+    {
+        // Put all into an anonymous namespace
+        // This includes any generated types, and generated intrinsics
+
+        m_writer->emit("namespace { // anonymous \n\n");
+        m_writer->emit("#ifdef SLANG_PRELUDE_NAMESPACE\n");
+        m_writer->emit("using namespace SLANG_PRELUDE_NAMESPACE;\n");
+        m_writer->emit("#endif\n\n");
+    }
+
     if (m_target == CodeGenTarget::CSource)
     {
         // For C output we need to emit type definitions.
@@ -2020,7 +2032,6 @@ void CPPSourceEmitter::emitPreprocessorDirectivesImpl()
         {
             _maybeEmitSpecializedOperationDefinition(intrinsic);
         }
-        
     }
 }
 
@@ -2144,14 +2155,14 @@ void CPPSourceEmitter::_emitEntryPointDefinitionStart(IRFunc* func, IRGlobalPara
 
     m_writer->emit("(");
     m_writer->emit(varyingTypeName);
-    m_writer->emit("* varyingInput, UniformEntryPointParams* params, UniformState* uniformState)");
+    m_writer->emit("* varyingInput, void* params, void* uniformState)");
     emitSemantics(func);
     m_writer->emit("\n{\n");
 
     m_writer->indent();
     // Initialize when constructing so that globals are zeroed
     m_writer->emit("Context context = {};\n");
-    m_writer->emit("context.uniformState = uniformState;\n");
+    m_writer->emit("context.uniformState = (UniformState*)uniformState;\n");
     
     if (entryPointGlobalParams)
     {
@@ -2441,11 +2452,11 @@ void CPPSourceEmitter::emitModuleImpl(IRModule* module)
 
     List<EmitAction> actions;
     computeEmitActions(module, actions);
-
+    
     _emitForwardDeclarations(actions);
 
     IRGlobalParam* entryPointGlobalParams = nullptr;
-
+    
     // Output the global parameters in a 'UniformState' structure
     {
         m_writer->emit("struct UniformState\n{\n");
@@ -2456,7 +2467,7 @@ void CPPSourceEmitter::emitModuleImpl(IRModule* module)
         m_writer->dedent();
         m_writer->emit("\n};\n\n");
     }
-
+    
     // Output the 'Context' which will be used for execution
     {
         m_writer->emit("struct Context\n{\n");
@@ -2464,7 +2475,6 @@ void CPPSourceEmitter::emitModuleImpl(IRModule* module)
 
         m_writer->emit("UniformState* uniformState;\n");
 
-        
         m_writer->emit("uint3 dispatchThreadID;\n");
 
         //if (m_semanticUsedFlags & SemanticUsedFlag::GroupID)
@@ -2511,6 +2521,13 @@ void CPPSourceEmitter::emitModuleImpl(IRModule* module)
 
         m_writer->dedent();
         m_writer->emit("};\n\n");
+
+        if (m_target == CodeGenTarget::CPPSource)
+        {
+            // Need to close the anonymous namespace when outputting for C++
+
+            m_writer->emit("} // anonymous\n\n");
+        }
     }
 
      // Finally we need to output dll entry points
