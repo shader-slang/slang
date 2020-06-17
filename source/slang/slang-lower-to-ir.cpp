@@ -1034,7 +1034,8 @@ struct ValLoweringVisitor : ValVisitor<ValLoweringVisitor, LoweredValInfo, Lower
     LoweredValInfo visitDeclaredSubtypeWitness(DeclaredSubtypeWitness* val)
     {
         return emitDeclRef(context, val->declRef,
-            context->irBuilder->getWitnessTableType());
+            context->irBuilder->getWitnessTableType(
+                lowerType(context, DeclRefType::create(context->astBuilder, val->declRef))));
     }
 
     LoweredValInfo visitTransitiveSubtypeWitness(
@@ -4480,8 +4481,8 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
         {
             // This is a constraint on a global generic type parameters,
             // and so it should lower as a parameter of its own.
-
-            auto inst = getBuilder()->emitGlobalGenericWitnessTableParam();
+            auto supType = lowerType(context, decl->getSup().type);
+            auto inst = getBuilder()->emitGlobalGenericWitnessTableParam(supType);
             addLinkageDecoration(context, inst, decl);
             return LoweredValInfo::simple(inst);
         }
@@ -5728,7 +5729,7 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
             {
                 // TODO: use a `TypeKind` to represent the
                 // classifier of the parameter.
-                auto param = subBuilder->emitParam(nullptr);
+                auto param = subBuilder->emitParam(subBuilder->getTypeType());
                 addNameHint(context, param, typeParamDecl);
                 setValue(subContext, typeParamDecl, LoweredValInfo::simple(param));
             }
@@ -5748,7 +5749,8 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
             {
                 // TODO: use a `WitnessTableKind` to represent the
                 // classifier of the parameter.
-                auto param = subBuilder->emitParam(nullptr);
+                auto param = subBuilder->emitParam(subBuilder->getWitnessTableType(
+                    lowerType(context, constraintDecl->sup.type)));
                 addNameHint(context, param, constraintDecl);
                 setValue(subContext, constraintDecl, LoweredValInfo::simple(param));
             }
@@ -6590,12 +6592,15 @@ IRInst* lowerSubstitutionArg(
     else if (auto declaredSubtypeWitness = as<DeclaredSubtypeWitness>(val))
     {
         // We need to look up the IR-level representation of the witness (which will be a witness table).
+        auto supType = lowerType(
+            context,
+            DeclRefType::create(context->astBuilder, declaredSubtypeWitness->declRef));
         auto irWitnessTable = getSimpleVal(
             context,
             emitDeclRef(
                 context,
                 declaredSubtypeWitness->declRef,
-                context->irBuilder->getWitnessTableType()));
+                context->irBuilder->getWitnessTableType(supType)));
         return irWitnessTable;
     }
     else
