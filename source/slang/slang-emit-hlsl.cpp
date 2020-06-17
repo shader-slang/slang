@@ -135,12 +135,12 @@ void HLSLSourceEmitter::_emitHLSLRegisterSemantics(EmitVarChain* chain, char con
 
     auto layout = chain->varLayout;
 
-    switch (getSourceStyle())
+    switch (getSourceLanguage())
     {
         default:
             return;
 
-        case SourceStyle::HLSL:
+        case SourceLanguage::HLSL:
             break;
     }
 

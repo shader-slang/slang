@@ -308,7 +308,7 @@ Result linkAndOptimizeIR(
 
     // We don't need the legalize pass for C/C++ based types
     if(options.shouldLegalizeExistentialAndResourceTypes )
-//    if (!(sourceStyle == SourceStyle::CPP || sourceStyle == SourceStyle::C))
+//    if (!(sourceLanguage == SourceLanguage::CPP || sourceStyle == SourceLanguage::C))
     {
         // The Slang language allows interfaces to be used like
         // ordinary types (including placing them in constant
@@ -646,27 +646,25 @@ SlangResult emitEntryPointSourceFromIR(
 
     RefPtr<CLikeSourceEmitter> sourceEmitter;
     
-    typedef CLikeSourceEmitter::SourceStyle SourceStyle;
-
-    SourceStyle sourceStyle = CLikeSourceEmitter::getSourceStyle(target);
-    switch (sourceStyle)
+    SourceLanguage sourceLanguage = CLikeSourceEmitter::getSourceLanguage(target);
+    switch (sourceLanguage)
     {
-        case SourceStyle::CPP:
+        case SourceLanguage::CPP:
         {
             sourceEmitter = new CPPSourceEmitter(desc);
             break;
         }
-        case SourceStyle::GLSL:
+        case SourceLanguage::GLSL:
         {
             sourceEmitter = new GLSLSourceEmitter(desc);
             break;
         }
-        case SourceStyle::HLSL:
+        case SourceLanguage::HLSL:
         {
             sourceEmitter = new HLSLSourceEmitter(desc);
             break;
         }
-        case SourceStyle::CUDA:
+        case SourceLanguage::CUDA:
         {
             sourceEmitter = new CUDASourceEmitter(desc);
             break;
@@ -687,14 +685,14 @@ SlangResult emitEntryPointSourceFromIR(
 
         linkingAndOptimizationOptions.sourceEmitter = sourceEmitter;
 
-        switch( sourceStyle )
+        switch( sourceLanguage )
         {
         default:
             break;
 
-        case SourceStyle::CPP:
-        case SourceStyle::C:
-        case SourceStyle::CUDA:
+        case SourceLanguage::CPP:
+        case SourceLanguage::C:
+        case SourceLanguage::CUDA:
             linkingAndOptimizationOptions.shouldLegalizeExistentialAndResourceTypes = false;
             break;
         }
@@ -753,7 +751,6 @@ SlangResult emitEntryPointSourceFromIR(
             // Currently this distinction is only applicable to C++ 
             if (passThru == PassThroughMode::GenericCCpp)
             {
-                const SourceLanguage sourceLanguage = (sourceStyle == SourceStyle::C) ? SourceLanguage::C : SourceLanguage::CPP;
                 // Get the compiler used for the language
                 DownstreamCompiler* compiler = session->getDefaultDownstreamCompiler(sourceLanguage);
                 if (compiler)
