@@ -47,6 +47,8 @@ SLANG_TEST_TOOL_API SlangResult innerMain(StdWriters* stdWriters, SlangSession* 
         if (SLANG_FAILED(res))
         {
             // TODO: print usage message
+
+            spDestroyCompileRequest(compileRequest);
             return res;
         }
     }
