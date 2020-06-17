@@ -1425,7 +1425,7 @@ static RefPtr<TypeLayout> processSimpleEntryPointParameter(
             //
             if( isD3DTarget(context->getTargetRequest()) )
             {
-                auto version = context->getTargetRequest()->targetProfile.GetVersion();
+                auto version = context->getTargetRequest()->targetProfile.getVersion();
                 if( version <= ProfileVersion::DX_5_0 )
                 {
                     // We will address the conflict here by claiming the corresponding

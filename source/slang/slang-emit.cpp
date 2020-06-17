@@ -481,7 +481,7 @@ Result linkAndOptimizeIR(
                 auto profile = targetRequest->targetProfile;
                 if( profile.getFamily() == ProfileFamily::DX )
                 {
-                    if(profile.GetVersion() <= ProfileVersion::DX_5_0)
+                    if(profile.getVersion() <= ProfileVersion::DX_5_0)
                     {
                         // Fxc and earlier dxc versions do not support
                         // a templates `.Load<T>` operation on byte-address

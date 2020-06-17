@@ -624,11 +624,11 @@ struct OptionsParser
                     {
                         auto profile = Profile(profileID);
 
-                        setProfileVersion(getCurrentTarget(), profile.GetVersion());
+                        setProfileVersion(getCurrentTarget(), profile.getVersion());
 
                         // A `-profile` option that also specifies a stage (e.g., `-profile vs_5_0`)
                         // should be treated like a composite (e.g., `-profile sm_5_0 -stage vertex`)
-                        auto stage = profile.GetStage();
+                        auto stage = profile.getStage();
                         if(stage != Stage::Unknown)
                         {
                             setStage(getCurrentEntryPoint(), stage);

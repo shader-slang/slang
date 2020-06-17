@@ -180,7 +180,7 @@ namespace Slang
         Name* getName() { return m_name; }
 
             /// Get the stage that the entry point is to be compiled for
-        Stage getStage() { return m_profile.GetStage(); }
+        Stage getStage() { return m_profile.getStage(); }
 
             /// Get the profile that the entry point is to be compiled for
         Profile getProfile() { return m_profile; }
@@ -725,7 +725,7 @@ namespace Slang
         Profile getProfile() { return m_profile; }
 
             /// Get the stage that the entry point is for.
-        Stage getStage() { return m_profile.GetStage(); }
+        Stage getStage() { return m_profile.getStage(); }
 
             /// Get the module that contains the entry point.
         Module* getModule();

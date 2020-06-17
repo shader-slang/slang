@@ -1001,7 +1001,7 @@ struct LoadContext
 
             const char* name = srcEntryPoint.name ? base.asRaw(srcEntryPoint.name)->getCstr() : nullptr;
 
-            Stage stage = srcEntryPoint.profile.GetStage();
+            Stage stage = srcEntryPoint.profile.getStage();
 
             List<const char*> args = context.toList(srcEntryPoint.specializationArgStrings);
 
@@ -1198,7 +1198,9 @@ static SlangResult _calcCommandLine(OffsetBase& base, StateSerializeUtil::Reques
             case SLANG_LINE_DIRECTIVE_MODE_DEFAULT: break;
             case SLANG_LINE_DIRECTIVE_MODE_NONE:
             {
-                cmd.addArg("-line-directive-mode none"); break;
+                cmd.addArg("-line-directive-mode");
+                cmd.addArg("none");
+                break;
             }
             default: break;
         }
@@ -1255,8 +1257,11 @@ static SlangResult _calcCommandLine(OffsetBase& base, StateSerializeUtil::Reques
             cmd.addArg("-target");
             cmd.addArg(TypeTextUtil::getCompileTargetName(SlangCompileTarget(src.target)));
 
-            cmd.addArg("-profile");
-            cmd.addArg(Profile(src.profile).getName());
+            if (src.profile != Profile::Unknown)
+            {
+                cmd.addArg("-profile");
+                cmd.addArg(Profile(src.profile).getName());
+            }
 
             if (src.targetFlags & SLANG_TARGET_FLAG_PARAMETER_BLOCKS_USE_REGISTER_SPACES)
             {
@@ -1361,7 +1366,7 @@ static SlangResult _calcCommandLine(OffsetBase& base, StateSerializeUtil::Reques
             cmd.addArg(name);
 
             cmd.addArg("-stage");
-            UnownedStringSlice stageText = getStageText(srcEntryPoint.profile.GetStage());
+            UnownedStringSlice stageText = getStageText(srcEntryPoint.profile.getStage());
             cmd.addArg(stageText);
 
             //cmd.addArg("-profile");

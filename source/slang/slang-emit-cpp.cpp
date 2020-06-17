@@ -1622,7 +1622,7 @@ void CPPSourceEmitter::emitEntryPointAttributesImpl(IRFunc* irFunc, IREntryPoint
     SLANG_UNUSED(entryPointDecor);
 
     auto profile = m_effectiveProfile;    
-    auto stage = profile.GetStage();
+    auto stage = profile.getStage();
 
     switch (stage)
     {
@@ -2523,7 +2523,7 @@ void CPPSourceEmitter::emitModuleImpl(IRModule* module)
 
             IREntryPointDecoration* entryPointDecor = func->findDecoration<IREntryPointDecoration>();
           
-            if (entryPointDecor && entryPointDecor->getProfile().GetStage() == Stage::Compute)
+            if (entryPointDecor && entryPointDecor->getProfile().getStage() == Stage::Compute)
             {
                 // https://docs.microsoft.com/en-us/windows/win32/direct3dhlsl/sv-dispatchthreadid
                 // SV_DispatchThreadID is the sum of SV_GroupID * numthreads and GroupThreadID.

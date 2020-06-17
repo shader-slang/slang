@@ -231,7 +231,7 @@ SLANG_NO_THROW SlangResult SLANG_MCALL Session::createSession(
 SLANG_NO_THROW SlangProfileID SLANG_MCALL Session::findProfile(
     char const*     name)
 {
-    return Slang::Profile::LookUp(name).raw;
+    return Slang::Profile::lookUp(name).raw;
 }
 
 SLANG_NO_THROW void SLANG_MCALL Session::setDownstreamCompilerPath(
@@ -426,8 +426,8 @@ Profile getEffectiveProfile(EntryPoint* entryPoint, TargetRequest* target)
         break;
     }
 
-    auto entryPointProfileVersion = entryPointProfile.GetVersion();
-    auto targetProfileVersion = targetProfile.GetVersion();
+    auto entryPointProfileVersion = entryPointProfile.getVersion();
+    auto targetProfileVersion = targetProfile.getVersion();
 
     // Default to the entry point profile, since we know that has the right stage.
     Profile effectiveProfile = entryPointProfile;
@@ -450,7 +450,7 @@ Profile getEffectiveProfile(EntryPoint* entryPoint, TargetRequest* target)
     switch( effectiveProfile.getFamily() )
     {
     case ProfileFamily::DX:
-        switch(effectiveProfile.GetStage())
+        switch(effectiveProfile.getStage())
         {
         default:
             break;
@@ -472,7 +472,7 @@ Profile getEffectiveProfile(EntryPoint* entryPoint, TargetRequest* target)
         break;
 
     case ProfileFamily::GLSL:
-        switch(effectiveProfile.GetStage())
+        switch(effectiveProfile.getStage())
         {
         default:
             break;
@@ -494,7 +494,7 @@ Profile getEffectiveProfile(EntryPoint* entryPoint, TargetRequest* target)
         break;
     }
 
-    if( stageMinVersion > effectiveProfile.GetVersion() )
+    if( stageMinVersion > effectiveProfile.getVersion() )
     {
         effectiveProfile.setVersion(stageMinVersion);
     }
@@ -3166,7 +3166,7 @@ SLANG_API SlangProfileID spFindProfile(
     SlangSession*,
     char const*     name)
 {
-    return Slang::Profile::LookUp(name).raw;
+    return Slang::Profile::lookUp(name).raw;
 }
 
 SLANG_API int spAddEntryPoint(

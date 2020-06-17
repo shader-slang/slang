@@ -320,7 +320,7 @@ namespace Slang
 
     //
 
-    Profile Profile::LookUp(char const* name)
+    Profile Profile::lookUp(char const* name)
     {
         #define PROFILE(TAG, NAME, STAGE, VERSION)	if(strcmp(name, #NAME) == 0) return Profile::TAG;
         #define PROFILE_ALIAS(TAG, DEF, NAME)		if(strcmp(name, #NAME) == 0) return Profile::TAG;
@@ -607,7 +607,7 @@ namespace Slang
         }
 
         char const* stagePrefix = nullptr;
-        switch( profile.GetStage() )
+        switch( profile.getStage() )
         {
             // Note: All of the raytracing-related stages require
             // compiling for a `lib_*` profile, even when only a
@@ -642,7 +642,7 @@ namespace Slang
         }
 
         char const* versionSuffix = nullptr;
-        switch(profile.GetVersion())
+        switch(profile.getVersion())
         {
     #define CASE(TAG, SUFFIX) case ProfileVersion::TAG: versionSuffix = #SUFFIX; break
         CASE(DX_4_0,             _4_0);
