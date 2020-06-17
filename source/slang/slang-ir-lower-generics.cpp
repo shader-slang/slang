@@ -12,7 +12,7 @@ namespace Slang
     struct GenericsLoweringContext
     {
         // For convenience, we will keep a pointer to the module
-        // we are specializing.
+        // we are processing.
         IRModule* module;
 
         Dictionary<IRInst*, IRInst*> loweredGenericFunctions;
@@ -20,8 +20,7 @@ namespace Slang
         SharedIRBuilder sharedBuilderStorage;
 
         // We will use a single work list of instructions that need
-        // to be considered for specialization or simplification,
-        // whether generic, existential, etc.
+        // to be considered for lowering.
         //
         List<IRInst*> workList;
         HashSet<IRInst*> workListSet;
@@ -30,8 +29,8 @@ namespace Slang
             IRInst* inst)
         {
             // We will ignore any code that is nested under a generic,
-            // because it doesn't make sense to perform specialization
-            // on such code.
+            // because they will be recursively processed through specialized
+            // call sites.
             //
             for (auto ii = inst->getParent(); ii; ii = ii->getParent())
             {

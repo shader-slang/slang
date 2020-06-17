@@ -224,20 +224,28 @@ List<IRWitnessTableEntry*> CLikeSourceEmitter::getSortedWitnessTableEntries(IRWi
     List<IRWitnessTableEntry*> sortedWitnessTableEntries;
     auto interfaceType = cast<IRInterfaceType>(witnessTable->getOperand(0));
     auto witnessTableItems = witnessTable->getChildren();
+    // Build a dictionary of witness table entries for fast lookup.
+    Dictionary<IRInst*, IRWitnessTableEntry*> witnessTableEntryDictionary;
+    for (auto item : witnessTableItems)
+    {
+        if (auto entry = as<IRWitnessTableEntry>(item))
+        {
+            witnessTableEntryDictionary[entry->getRequirementKey()] = entry;
+        }
+    }
+    // Get a sorted list of entries using RequirementKeys defined in `interfaceType`.
     for (UInt i = 0; i < interfaceType->getOperandCount(); i++)
     {
         auto reqKey = cast<IRStructKey>(interfaceType->getOperand(i));
         bool matchingEntryFound = false;
-        for (auto item : witnessTableItems)
+        IRWitnessTableEntry* entry = nullptr;
+        if (witnessTableEntryDictionary.TryGetValue(reqKey, entry))
         {
-            if (auto entry = as<IRWitnessTableEntry>(item))
+            if (entry->requirementKey.get() == reqKey)
             {
-                if (entry->requirementKey.get() == reqKey)
-                {
-                    matchingEntryFound = true;
-                    sortedWitnessTableEntries.add(entry);
-                    break;
-                }
+                matchingEntryFound = true;
+                sortedWitnessTableEntries.add(entry);
+                break;
             }
         }
         SLANG_ASSERT(matchingEntryFound);
@@ -1884,6 +1892,7 @@ void CLikeSourceEmitter::emitIntrinsicCallExprImpl(
 
 void CLikeSourceEmitter::_emitCallArgList(IRCall* inst)
 {
+    bool isFirstArg = true;
     m_writer->emit("(");
     UInt argCount = inst->getOperandCount();
     for (UInt aa = 1; aa < argCount; ++aa)
@@ -1897,7 +1906,10 @@ void CLikeSourceEmitter::_emitCallArgList(IRCall* inst)
         if (as<IRType>(operand))
             continue;
 
-        if (aa != 1) m_writer->emit(", ");
+        if (!isFirstArg)
+            m_writer->emit(", ");
+        else
+            isFirstArg = false;
         emitOperand(inst->getOperand(aa), getInfo(EmitOp::General));
     }
     m_writer->emit(")");
