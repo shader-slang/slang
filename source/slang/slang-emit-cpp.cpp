@@ -2161,7 +2161,7 @@ void CPPSourceEmitter::_emitEntryPointDefinitionStart(IRFunc* func, IRGlobalPara
 
     m_writer->indent();
     // Initialize when constructing so that globals are zeroed
-    m_writer->emit("Context context = {};\n");
+    m_writer->emit("KernelContext context = {};\n");
     m_writer->emit("context.uniformState = (UniformState*)uniformState;\n");
     
     if (entryPointGlobalParams)
@@ -2470,7 +2470,7 @@ void CPPSourceEmitter::emitModuleImpl(IRModule* module)
     
     // Output the 'Context' which will be used for execution
     {
-        m_writer->emit("struct Context\n{\n");
+        m_writer->emit("struct KernelContext\n{\n");
         m_writer->indent();
 
         m_writer->emit("UniformState* uniformState;\n");
