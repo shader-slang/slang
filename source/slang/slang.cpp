@@ -254,20 +254,51 @@ SLANG_NO_THROW void SLANG_MCALL Session::setDownstreamCompilerPrelude(
     SlangPassThrough inPassThrough,
     char const* prelude)
 {
-    PassThroughMode passThrough = PassThroughMode(inPassThrough);
-    SLANG_ASSERT(int(passThrough) > int(PassThroughMode::None) && int(passThrough) < int(PassThroughMode::CountOf));
-
-    m_downstreamCompilerPreludes[int(passThrough)] = prelude;
+    PassThroughMode downstreamCompiler = PassThroughMode(inPassThrough);
+    SLANG_ASSERT(int(downstreamCompiler) > int(PassThroughMode::None) && int(downstreamCompiler) < int(PassThroughMode::CountOf));
+    const SourceLanguage sourceLanguage = getDefaultSourceLanguageForDownstreamCompiler(downstreamCompiler);
+    setPrelude(SlangSourceLanguage(sourceLanguage), prelude);
 }
 
-SLANG_NO_THROW void SLANG_MCALL Session::getDownstreamCompilerPrelude(
+SLANG_NO_THROW void SLANG_MCALL Session::getPreludeForLanguage(
     SlangPassThrough inPassThrough,
     ISlangBlob** outPrelude)
 {
-    PassThroughMode passThrough = PassThroughMode(inPassThrough);
-    SLANG_ASSERT(int(passThrough) > int(PassThroughMode::None) && int(passThrough) < int(PassThroughMode::CountOf));
+    PassThroughMode downstreamCompiler = PassThroughMode(inPassThrough);
+    SLANG_ASSERT(int(downstreamCompiler) > int(PassThroughMode::None) && int(downstreamCompiler) < int(PassThroughMode::CountOf));
+    const SourceLanguage sourceLanguage = getDefaultSourceLanguageForDownstreamCompiler(downstreamCompiler);
+    getPrelude(SlangSourceLanguage(sourceLanguage), outPrelude);
+}
 
-    *outPrelude = Slang::StringUtil::createStringBlob(m_downstreamCompilerPreludes[int(passThrough)]).detach();
+SLANG_NO_THROW void SLANG_MCALL Session::setPrelude(
+    SlangSourceLanguage inSourceLanguage,
+    char const* prelude)
+{
+    SourceLanguage sourceLanguage = SourceLanguage(inSourceLanguage);
+    SLANG_ASSERT(int(sourceLanguage) > int(SourceLanguage::Unknown) && int(sourceLanguage) < int(SourceLanguage::CountOf));
+
+    SLANG_ASSERT(sourceLanguage != SourceLanguage::Unknown);
+
+    if (sourceLanguage != SourceLanguage::Unknown)
+    {
+        m_languagePreludes[int(sourceLanguage)] = prelude;
+    }
+}
+
+SLANG_NO_THROW void SLANG_MCALL Session::getPrelude(
+    SlangSourceLanguage inSourceLanguage,
+    ISlangBlob** outPrelude)
+{
+    SourceLanguage sourceLanguage = SourceLanguage(inSourceLanguage);
+    SLANG_ASSERT(int(sourceLanguage) > int(SourceLanguage::Unknown) && int(sourceLanguage) < int(SourceLanguage::CountOf));
+
+    SLANG_ASSERT(sourceLanguage != SourceLanguage::Unknown);
+
+    *outPrelude = nullptr;
+    if (sourceLanguage != SourceLanguage::Unknown)
+    {
+        *outPrelude = Slang::StringUtil::createStringBlob(m_languagePreludes[int(sourceLanguage)]).detach();
+    }
 }
 
 SLANG_NO_THROW const char* SLANG_MCALL Session::getBuildTagString()

@@ -2862,7 +2862,9 @@ namespace slang
             SlangPassThrough passThrough,
             char const* path) = 0;
 
-            /** Set the 'prelude' for generated code for a 'downstream compiler'.
+            /** DEPRECIATED: Use setPrelude
+
+            Set the 'prelude' for generated code for a 'downstream compiler'.
             @param passThrough The downstream compiler for generated code that will have the prelude applied to it. 
             @param preludeText The text added pre-pended verbatim before the generated source
 
@@ -2872,11 +2874,13 @@ namespace slang
             SlangPassThrough passThrough,
             const char* preludeText) = 0;
 
-            /** Get the 'prelude' for generated code for a 'downstream compiler'.
+            /** DEPRECIATED: Use getPrelude
+
+            Get the 'prelude' for generated code for a 'downstream compiler'.
             @param passThrough The downstream compiler for generated code that will have the prelude applied to it. 
             @param outPrelude  On exit holds a blob that holds the string of the prelude.
             */
-        virtual SLANG_NO_THROW void SLANG_MCALL getDownstreamCompilerPrelude(
+        virtual SLANG_NO_THROW void SLANG_MCALL getPreludeForLanguage(
             SlangPassThrough passThrough,
             ISlangBlob** outPrelude) = 0;
 
@@ -2909,6 +2913,25 @@ namespace slang
             @return The downstream compiler for that source language */
         virtual SlangPassThrough SLANG_MCALL getDefaultDownstreamCompiler(
             SlangSourceLanguage sourceLanguage) = 0;
+
+            /* Set the 'prelude' placed before generated code for a specific language type.
+            
+            @param sourceLanguage The language the prelude should be inserted on.
+            @param preludeText The text added pre-pended verbatim before the generated source
+
+            Note! That for pass-through usage, prelude is not pre-pended, preludes are for code generation only. 
+            */
+        virtual SLANG_NO_THROW void SLANG_MCALL setPrelude(
+            SlangSourceLanguage sourceLanguage,
+            const char* preludeText) = 0;
+
+            /** Get the 'prelude' associated with a specific source language. 
+            @param sourceLanguage The language the prelude should be inserted on.
+            @param outPrelude  On exit holds a blob that holds the string of the prelude.
+            */
+        virtual SLANG_NO_THROW void SLANG_MCALL getPrelude(
+            SlangSourceLanguage sourceLanguage,
+            ISlangBlob** outPrelude) = 0;
     };
 
     #define SLANG_UUID_IGlobalSession { 0xc140b5fd, 0xc78, 0x452e, { 0xba, 0x7c, 0x1a, 0x1e, 0x70, 0xc7, 0xf7, 0x1c } };

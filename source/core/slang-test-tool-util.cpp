@@ -62,16 +62,9 @@ static SlangResult _addCPPPrelude(const String& parentPath, slang::IGlobalSessio
 
     StringBuilder prelude;
     prelude << "#include \"" << includePath << "\"\n\n";
-    const SlangPassThrough downstreamCompilers[] = {
-        SLANG_PASS_THROUGH_CLANG,                   ///< Clang C/C++ compiler 
-        SLANG_PASS_THROUGH_VISUAL_STUDIO,           ///< Visual studio C/C++ compiler
-        SLANG_PASS_THROUGH_GCC,                     ///< GCC C/C++ compiler
-        SLANG_PASS_THROUGH_GENERIC_C_CPP,
-    };
-    for (auto downstreamCompiler : downstreamCompilers)
-    {
-        session->setDownstreamCompilerPrelude(downstreamCompiler, prelude.getBuffer());
-    }
+    
+    session->setPrelude(SLANG_SOURCE_LANGUAGE_CPP, prelude.getBuffer());
+  
     return SLANG_OK;
 }
 
@@ -82,13 +75,8 @@ static SlangResult _addCUDAPrelude(const String& parentPath, slang::IGlobalSessi
 
     StringBuilder prelude;
     prelude << "#include \"" << includePath << "\"\n\n";
-    const SlangPassThrough downstreamCompilers[] = {
-        SLANG_PASS_THROUGH_NVRTC,                   ///< nvrtc CUDA compiler
-    };
-    for (auto downstreamCompiler : downstreamCompilers)
-    {
-        session->setDownstreamCompilerPrelude(downstreamCompiler, prelude.getBuffer());
-    }
+    
+    session->setPrelude(SLANG_SOURCE_LANGUAGE_CUDA, prelude.getBuffer());
     return SLANG_OK;
 }
 

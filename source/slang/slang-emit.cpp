@@ -726,42 +726,8 @@ SlangResult emitEntryPointSourceFromIR(
     // it is time to stitch together the final output.
 
     {
-        Session* session = compileRequest->getSession();
-
-        // Get the downstream compiler needed for final target
-        PassThroughMode passThru = getDownstreamCompilerRequiredForTarget(session, targetRequest->target);
-
-        // If nothing was *needed*, we still need some idea of which downstream compiler is going to be used for the
-        // prelude (the prelude is associated with each specific downstream compiler)
-        if (passThru == PassThroughMode::None)
-        {
-            // TODO(JS):
-            // NOTE! This makes the *assumption* that if we are outputting source, we don't want the
-            // prelude for a specific compiler, we are happy to just use the GenericCCpp
-            // If we didn't do this, we would have to do the work out what's available etc.
-            //
-            // This is all a bit unfortunate. The decision to associate preludes on compilers seemed like a good idea, but was perhaps a mistake.
-            // That it would be simpler if prelude was based on output source type.
-            passThru = getPreludeDownstreamCompilerForTarget(session, targetRequest->target);
-        }
-        else
-        {
-            // If a compiler was required that means a downstream compiler *will* be used
-            // so lookup which specific compiler is used, and use it's prelude
-            // Currently this distinction is only applicable to C++ 
-            if (passThru == PassThroughMode::GenericCCpp)
-            {
-                // Get the compiler used for the language
-                DownstreamCompiler* compiler = session->getDefaultDownstreamCompiler(sourceLanguage);
-                if (compiler)
-                {
-                    passThru = PassThroughMode(compiler->getDesc().type);
-                }
-            }
-        }
-
         // If there is a prelude emit it
-        const auto& prelude = compileRequest->getSession()->getDownstreamCompilerPrelude(passThru);
+        const auto& prelude = compileRequest->getSession()->getPreludeForLanguage(sourceLanguage);
         if (prelude.getLength() > 0)
         {
             sourceWriter.emit(prelude.getUnownedSlice());

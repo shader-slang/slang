@@ -408,6 +408,7 @@ namespace Slang
         return session->getOrLoadDownstreamCompiler(passThrough, nullptr) ? SLANG_OK: SLANG_E_NOT_FOUND;
     }
 
+    
     PassThroughMode getPreludeDownstreamCompilerForTarget(Session* session, CodeGenTarget target)
     {
         switch (target)
@@ -484,7 +485,43 @@ namespace Slang
         return PassThroughMode::None;
     }
 
-    PassThroughMode getDownstreamCompilerRequiredForTarget(Session* session, CodeGenTarget target)
+    SourceLanguage getDefaultSourceLanguageForDownstreamCompiler(PassThroughMode compiler)
+    {
+        switch (compiler)
+        {
+            case PassThroughMode::None:
+            {
+                return SourceLanguage::Unknown;
+            }
+            case PassThroughMode::Fxc:   
+            case PassThroughMode::Dxc:
+            {
+                return SourceLanguage::HLSL;
+            }
+            case PassThroughMode::Glslang:
+            {
+                return SourceLanguage::GLSL;
+            }
+            case PassThroughMode::Clang:
+            case PassThroughMode::VisualStudio:
+            case PassThroughMode::Gcc:
+            case PassThroughMode::GenericCCpp:
+            {
+                // These could ingest C, but we only have this function to work out a
+                // 'default' language to ingest.
+                return SourceLanguage::CPP;
+            }
+            case PassThroughMode::NVRTC:
+            {
+                return SourceLanguage::CUDA;
+            }
+            default: break;
+        }
+        SLANG_ASSERT(!"Unknown compiler");
+        return SourceLanguage::Unknown;
+    }
+
+    PassThroughMode getDownstreamCompilerRequiredForTarget(CodeGenTarget target)
     {
         switch (target)
         {
@@ -497,15 +534,52 @@ namespace Slang
             {
                 return PassThroughMode::None;
             }
+            case CodeGenTarget::None:
+            {
+                return PassThroughMode::None;
+            }
+            case CodeGenTarget::SPIRVAssembly:
+            case CodeGenTarget::SPIRV:
+            {
+                return PassThroughMode::Glslang;
+            }
+            case CodeGenTarget::DXBytecode:
+            case CodeGenTarget::DXBytecodeAssembly:
+            {
+                return PassThroughMode::Fxc;
+            }
+            case CodeGenTarget::DXIL:
+            case CodeGenTarget::DXILAssembly:
+            {
+                return PassThroughMode::Dxc;
+            }
+            case CodeGenTarget::GLSL_Vulkan:
+            case CodeGenTarget::GLSL_Vulkan_OneDesc:
+            {
+                return PassThroughMode::Glslang;
+            }
+            case CodeGenTarget::HostCallable:
+            case CodeGenTarget::SharedLibrary:
+            case CodeGenTarget::Executable:
+            {
+                // We need some C/C++ compiler
+                return PassThroughMode::GenericCCpp;
+            }
+            case CodeGenTarget::PTX:
+            {
+                return PassThroughMode::NVRTC;
+            }
+
             default: break;
         }
 
-        return getPreludeDownstreamCompilerForTarget(session, target);
+        SLANG_ASSERT(!"Unhandled target");
+        return PassThroughMode::None;
     }
 
     SlangResult checkCompileTargetSupport(Session* session, CodeGenTarget target)
     {
-        const PassThroughMode mode = getDownstreamCompilerRequiredForTarget(session, target);
+        const PassThroughMode mode = getDownstreamCompilerRequiredForTarget(target);
         return (mode != PassThroughMode::None) ?
             checkExternalCompilerSupport(session, mode) :
             SLANG_OK;

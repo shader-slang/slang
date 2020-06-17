@@ -265,7 +265,7 @@ static gfx::StageType _translateStage(SlangStage slangStage)
     {
         // Add an include of the prelude
         ComPtr<ISlangBlob> prelude;
-        session->getDownstreamCompilerPrelude(SLANG_PASS_THROUGH_GENERIC_C_CPP, prelude.writeRef());
+        session->getPrelude(input.sourceLanguage, prelude.writeRef());
 
         String preludeString = StringUtil::getString(prelude);
 
