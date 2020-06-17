@@ -28,6 +28,8 @@
 
 #include "slang-check-impl.h"
 
+#include "slang-ast-serialize.h"
+
 // Used to print exception type names in internal-compiler-error messages
 #include <typeinfo>
 
@@ -107,6 +109,11 @@ static const Guid IID_ISlangUnknown     = SLANG_UUID_ISlangUnknown;
 
 void Session::init()
 {
+    // HACK
+
+    ASTSerializeUtil::selfTest();
+    
+
     SLANG_ASSERT(BaseTypeInfo::check());
 
     ::memset(m_downstreamCompilerLocators, 0, sizeof(m_downstreamCompilerLocators));
