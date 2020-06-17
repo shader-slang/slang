@@ -76,6 +76,7 @@ protected:
     virtual void emitOperandImpl(IRInst* inst, EmitOpInfo const&  outerPrec) SLANG_OVERRIDE;
     virtual void emitParamTypeImpl(IRType* type, String const& name) SLANG_OVERRIDE;
     virtual void emitWitnessTable(IRWitnessTable* witnessTable) SLANG_OVERRIDE;
+    virtual void emitInterface(IRInterfaceType* interfaceType) SLANG_OVERRIDE;
     virtual bool tryEmitGlobalParamImpl(IRGlobalParam* varDecl, IRType* varType) SLANG_OVERRIDE;
     virtual void emitIntrinsicCallExprImpl(IRCall* inst, IRTargetIntrinsicDecoration* targetIntrinsic, EmitOpInfo const& inOuterPrec) SLANG_OVERRIDE;
 
@@ -85,7 +86,9 @@ protected:
     virtual SlangResult calcTypeName(IRType* type, CodeGenTarget target, StringBuilder& out);
     virtual SlangResult calcFuncName(const HLSLIntrinsic* specOp, StringBuilder& out);
     virtual SlangResult calcScalarFuncName(HLSLIntrinsic::Op op, IRBasicType* type, StringBuilder& outBuilder);
-    
+
+        // Emits a struct of function pointers defined in `interfaceType`.
+    void _maybeEmitWitnessTableTypeDefinition(IRInterfaceType* interfaceType, const List<IRWitnessTableEntry*>& sortedWitnessTableEntries);
     void _maybeEmitSpecializedOperationDefinition(const HLSLIntrinsic* specOp);
 
     void _emitForwardDeclarations(const List<EmitAction>& actions);
@@ -127,6 +130,10 @@ protected:
 
     bool _tryEmitInstExprAsIntrinsic(IRInst* inst, const EmitOpInfo& inOuterPrec);
 
+        // Emit the actual definition (including intializer list)
+        // of all the witness table objects in `pendingWitnessTableDefinitions`.
+    void _emitWitnessTableDefinitions();
+
     HLSLIntrinsic* _addIntrinsic(HLSLIntrinsic::Op op, IRType* returnType, IRType*const* argTypes, Index argTypeCount);
 
     static bool _isVariable(IROp op);
@@ -143,6 +150,11 @@ protected:
     StringSlicePool m_slicePool;
 
     SemanticUsedFlags m_semanticUsedFlags;
+
+    // Witness tables pending for emitting their definitions.
+    // They must be emitted last, after the entire `Context` class so those member functions defined
+    // in `Context` may be referenced.
+    List<IRWitnessTable*> pendingWitnessTableDefinitions;
 };
 
 }

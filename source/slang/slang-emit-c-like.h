@@ -341,6 +341,7 @@ public:
     virtual void emitVectorTypeNameImpl(IRType* elementType, IRIntegerValue elementCount) = 0;
 
     virtual void emitWitnessTable(IRWitnessTable* witnessTable);
+    virtual void emitInterface(IRInterfaceType* interfaceType);
 
     virtual void handleCallExprDecorationsImpl(IRInst* funcValue) { SLANG_UNUSED(funcValue); }
 
@@ -351,6 +352,12 @@ public:
     void _emitUnsizedArrayType(IRUnsizedArrayType* arrayType, EDeclarator* declarator);
     void _emitType(IRType* type, EDeclarator* declarator);
     void _emitInst(IRInst* inst);
+
+        // Emit the argument list (including paranthesis) in a `CallInst`
+    void _emitCallArgList(IRCall* call);
+
+        // Sort witnessTable entries according to the order defined in the witnessed interface type.
+    List<IRWitnessTableEntry*> getSortedWitnessTableEntries(IRWitnessTable* witnessTable);
     
     BackEndCompileRequest* m_compileRequest = nullptr;
 

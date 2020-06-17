@@ -1200,6 +1200,16 @@ struct IRTaggedUnionType : IRType
     IR_LEAF_ISA(TaggedUnionType)
 };
 
+struct IRTypeType : IRType
+{
+    IR_LEAF_ISA(TypeType);
+};
+
+struct IRWitnessTableType : IRType
+{
+    IR_LEAF_ISA(WitnessTableType);
+};
+
 struct IRBindExistentialsType : IRType
 {
     IR_LEAF_ISA(BindExistentialsType)
