@@ -11,7 +11,13 @@ using namespace Slang;
 
 #include <assert.h>
 
-static void diagnosticCallback(
+#ifdef _WIN32
+#define MAIN slangc_main
+#else
+#define MAIN main
+#endif
+
+static void _diagnosticCallback(
     char const* message,
     void*       /*userData*/)
 {
@@ -20,23 +26,9 @@ static void diagnosticCallback(
     stdError.flush();
 }
 
-#ifdef _WIN32
-#define MAIN slangc_main
-#else
-#define MAIN main
-#endif
-
-SLANG_TEST_TOOL_API SlangResult innerMain(StdWriters* stdWriters, SlangSession* session, int argc, const char*const* argv)
+static SlangResult _compile(SlangCompileRequest* compileRequest, int argc, const char*const* argv)
 {
-    StdWriters::setSingleton(stdWriters);
-
-    SlangCompileRequest* compileRequest = spCreateCompileRequest(session);
-
-    spSetDiagnosticCallback(
-        compileRequest,
-        &diagnosticCallback,
-        nullptr);
-
+    spSetDiagnosticCallback(compileRequest, &_diagnosticCallback, nullptr);
     spSetCommandLineCompilerMode(compileRequest);
 
     char const* appName = "slangc";
@@ -71,8 +63,18 @@ SLANG_TEST_TOOL_API SlangResult innerMain(StdWriters* stdWriters, SlangSession* 
     }
 #endif
 
+    return res;
+}
+
+SLANG_TEST_TOOL_API SlangResult innerMain(StdWriters* stdWriters, SlangSession* session, int argc, const char*const* argv)
+{
+    StdWriters::setSingleton(stdWriters);
+
+    SlangCompileRequest* compileRequest = spCreateCompileRequest(session);
+    SlangResult res = _compile(compileRequest, argc, argv);
     // Now that we are done, clean up after ourselves
     spDestroyCompileRequest(compileRequest);
+
     return res;
 }
 
