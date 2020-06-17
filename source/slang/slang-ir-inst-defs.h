@@ -166,7 +166,14 @@ INST(Nop, nop, 0, 0)
 INST(StructType, struct, 0, PARENT)
 INST(InterfaceType, interface, 0, PARENT)
 
-INST_RANGE(Type, VoidType, InterfaceType)
+// A TypeType-typed IRValue represents a IRType.
+// It is used to represent a type parameter/argument in a generics.
+INST(TypeType, type_t, 0, 0)
+
+// An `IRWitnessTable` has type `WitnessTableType`.
+INST(WitnessTableType, witness_table_t, 0, 0)
+
+INST_RANGE(Type, VoidType, WitnessTableType)
 
 /*IRGlobalValueWithCode*/
     /* IRGlobalValueWithParams*/

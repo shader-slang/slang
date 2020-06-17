@@ -2307,6 +2307,16 @@ namespace Slang
             (IRInst* const*) paramTypes);
     }
 
+    IRWitnessTableType* IRBuilder::getWitnessTableType(
+        IRType* baseType)
+    {
+        return (IRWitnessTableType*)findOrEmitHoistableInst(
+            nullptr,
+            kIROp_WitnessTableType,
+            1,
+            (IRInst* const*)&baseType);
+    }
+
     IRConstantBufferType* IRBuilder::getConstantBufferType(IRType* elementType)
     {
         IRInst* operands[] = { elementType };
@@ -2465,7 +2475,7 @@ namespace Slang
     IRInst* IRBuilder::emitExtractExistentialWitnessTable(
         IRInst* existentialValue)
     {
-        auto type = getWitnessTableType();
+        auto type = getWitnessTableType(existentialValue->getDataType());
         auto inst = createInst<IRInst>(
             this,
             kIROp_ExtractExistentialWitnessTable,
@@ -2775,7 +2785,7 @@ namespace Slang
         IRWitnessTable* witnessTable = createInst<IRWitnessTable>(
             this,
             kIROp_WitnessTable,
-            nullptr,
+            getWitnessTableType(baseType),
             baseType);
         addGlobalValue(this, witnessTable);
         return witnessTable;

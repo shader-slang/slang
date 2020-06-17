@@ -232,6 +232,7 @@
     <ClInclude Include="slang-ir-insts.h" />
     <ClInclude Include="slang-ir-layout.h" />
     <ClInclude Include="slang-ir-link.h" />
+    <ClInclude Include="slang-ir-lower-generics.h" />
     <ClInclude Include="slang-ir-missing-return.h" />
     <ClInclude Include="slang-ir-restructure-scoping.h" />
     <ClInclude Include="slang-ir-restructure.h" />
@@ -319,6 +320,7 @@
     <ClCompile Include="slang-ir-layout.cpp" />
     <ClCompile Include="slang-ir-legalize-types.cpp" />
     <ClCompile Include="slang-ir-link.cpp" />
+    <ClCompile Include="slang-ir-lower-generics.cpp" />
     <ClCompile Include="slang-ir-missing-return.cpp" />
     <ClCompile Include="slang-ir-restructure-scoping.cpp" />
     <ClCompile Include="slang-ir-restructure.cpp" />
