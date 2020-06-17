@@ -1,4 +1,3 @@
-//TEST_IGNORE_FILE
 //TEST(compute):COMPARE_COMPUTE:-cpu -xslang -allow-dynamic-code -xslang -dump-ir
 
 // Test basic dynamic dispatch code gen

@@ -1564,7 +1564,7 @@ struct IRBuilder
     IRStringType* getStringType();
 
     IRBasicBlockType*   getBasicBlockType();
-    IRType* getWitnessTableType() { return getType(IROp::kIROp_WitnessTableType); }
+    IRWitnessTableType* getWitnessTableType(IRType* baseType);
     IRType* getTypeType() { return getType(IROp::kIROp_TypeType); }
     IRType* getKeyType() { return nullptr; }
 
@@ -1994,9 +1994,9 @@ struct IRBuilder
         return emitGlobalGenericParam(getTypeKind());
     }
 
-    IRGlobalGenericParam* emitGlobalGenericWitnessTableParam()
+    IRGlobalGenericParam* emitGlobalGenericWitnessTableParam(IRType* comformanceType)
     {
-        return emitGlobalGenericParam(getWitnessTableType());
+        return emitGlobalGenericParam(getWitnessTableType(comformanceType));
     }
 
     IRBindGlobalGenericParam* emitBindGlobalGenericParam(

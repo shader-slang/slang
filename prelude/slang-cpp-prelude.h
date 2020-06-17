@@ -39,3 +39,5 @@
 #endif
 
 #endif
+
+struct Context;
