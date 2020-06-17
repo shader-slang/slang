@@ -580,7 +580,7 @@ Result linkAndOptimizeIR(
         stripWitnessTables(irModule);
     }
 
-#if 1
+#if 0
     dumpIRIfEnabled(compileRequest, irModule, "AFTER STRIP WITNESS TABLES");
 #endif
     validateIRModuleIfEnabled(compileRequest, irModule);

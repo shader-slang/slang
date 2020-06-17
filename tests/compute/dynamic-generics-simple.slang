@@ -1,4 +1,4 @@
-//TEST(compute):COMPARE_COMPUTE:-cpu -xslang -allow-dynamic-code -xslang -dump-ir
+//TEST(compute):COMPARE_COMPUTE:-cpu -xslang -allow-dynamic-code
 
 // Test basic dynamic dispatch code gen
 
