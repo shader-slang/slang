@@ -12,7 +12,7 @@
 
 #include "slang-file-system.h"
 
-#include "slang-state-serialize.h"
+#include "slang-repro.h"
 #include "slang-ir-serialize.h"
 
 #include "../core/slang-type-text-util.h"
@@ -483,7 +483,7 @@ struct OptionsParser
                     String reproName;
                     SLANG_RETURN_ON_FAIL(tryReadCommandLineArgument(sink, arg, &argCursor, argEnd, reproName));
 
-                    SLANG_RETURN_ON_FAIL(StateSerializeUtil::extractFilesToDirectory(reproName));
+                    SLANG_RETURN_ON_FAIL(ReproUtil::extractFilesToDirectory(reproName));
                 }
                 else if (argStr == "-module-name")
                 {
@@ -498,16 +498,16 @@ struct OptionsParser
                     SLANG_RETURN_ON_FAIL(tryReadCommandLineArgument(sink, arg, &argCursor, argEnd, reproName));
 
                     List<uint8_t> buffer;
-                    SLANG_RETURN_ON_FAIL(StateSerializeUtil::loadState(reproName, buffer));
+                    SLANG_RETURN_ON_FAIL(ReproUtil::loadState(reproName, buffer));
 
-                    auto requestState = StateSerializeUtil::getRequest(buffer);
+                    auto requestState = ReproUtil::getRequest(buffer);
                     MemoryOffsetBase base;
                     base.set(buffer.getBuffer(), buffer.getCount());
 
                     // If we can find a directory, that exists, we will set up a file system to load from that directory
                     ComPtr<ISlangFileSystem> fileSystem;
                     String dirPath;
-                    if (SLANG_SUCCEEDED(StateSerializeUtil::calcDirectoryPathFromFilename(reproName, dirPath)))
+                    if (SLANG_SUCCEEDED(ReproUtil::calcDirectoryPathFromFilename(reproName, dirPath)))
                     {
                         SlangPathType pathType;
                         if (SLANG_SUCCEEDED(Path::getPathType(dirPath, &pathType)) && pathType == SLANG_PATH_TYPE_DIRECTORY)
@@ -516,7 +516,7 @@ struct OptionsParser
                         }
                     }
 
-                    SLANG_RETURN_ON_FAIL(StateSerializeUtil::load(base, requestState, fileSystem, requestImpl));
+                    SLANG_RETURN_ON_FAIL(ReproUtil::load(base, requestState, fileSystem, requestImpl));
 
                     hasLoadedRepro = true;
                 }
@@ -526,16 +526,16 @@ struct OptionsParser
                     SLANG_RETURN_ON_FAIL(tryReadCommandLineArgument(sink, arg, &argCursor, argEnd, reproName));
 
                     List<uint8_t> buffer;
-                    SLANG_RETURN_ON_FAIL(StateSerializeUtil::loadState(reproName, buffer));
+                    SLANG_RETURN_ON_FAIL(ReproUtil::loadState(reproName, buffer));
 
-                    auto requestState = StateSerializeUtil::getRequest(buffer);
+                    auto requestState = ReproUtil::getRequest(buffer);
                     MemoryOffsetBase base;
                     base.set(buffer.getBuffer(), buffer.getCount());
 
                     // If we can find a directory, that exists, we will set up a file system to load from that directory
                     ComPtr<ISlangFileSystem> dirFileSystem;
                     String dirPath;
-                    if (SLANG_SUCCEEDED(StateSerializeUtil::calcDirectoryPathFromFilename(reproName, dirPath)))
+                    if (SLANG_SUCCEEDED(ReproUtil::calcDirectoryPathFromFilename(reproName, dirPath)))
                     {
                         SlangPathType pathType;
                         if (SLANG_SUCCEEDED(Path::getPathType(dirPath, &pathType)) && pathType == SLANG_PATH_TYPE_DIRECTORY)
@@ -545,7 +545,7 @@ struct OptionsParser
                     }
 
                     RefPtr<CacheFileSystem> cacheFileSystem;
-                    SLANG_RETURN_ON_FAIL(StateSerializeUtil::loadFileSystem(base, requestState, dirFileSystem, cacheFileSystem));
+                    SLANG_RETURN_ON_FAIL(ReproUtil::loadFileSystem(base, requestState, dirFileSystem, cacheFileSystem));
 
                     // I might want to make the dir file system the fallback file system...
                     cacheFileSystem->setInnerFileSystem(dirFileSystem, cacheFileSystem->getUniqueIdentityMode(), cacheFileSystem->getPathStyle());
