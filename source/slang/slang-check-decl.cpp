@@ -1443,6 +1443,325 @@ namespace Slang
         return false;
     }
 
+    bool SemanticsVisitor::trySynthesizeMethodRequirementWitness(
+        ConformanceCheckingContext* context,
+        LookupResult const&         lookupResult,
+        DeclRef<FuncDecl>           requiredMemberDeclRef,
+        RefPtr<WitnessTable>        witnessTable)
+    {
+        // The situation here is that the context of an inheritance
+        // declaration didn't provide an exact match for a required
+        // method. E.g.:
+        //
+        //      interface ICounter { [mutating] int increment(); }
+        //      struct MyCounter : ICounter
+        //      {
+        //          int increment(int val = 1) { ... }
+        //      }
+        //
+        // It is clear in this case that the `MyCounter` type *can*
+        // satisfy the signature required by `ICounter`, but it has
+        // no explicit method declaration that is a perfect match.
+        //
+        // The approach in this function will be to construct a
+        // synthesized method along the lines of:
+        //
+        //      struct MyCounter ...
+        //      {
+        //          ...
+        //          int synthesized()
+        //          {
+        //              return this.increment();
+        //          }
+        //      }
+        //
+        // That is, we construct a method with the exact signature
+        // of the requirement (same parameter and result types),
+        // and then provide it with a body that simple `return`s
+        // the result of applying the desired requirement name
+        // (`increment` in this case) to those parameters.
+        //
+        // If the synthesized method type-checks, then we can say
+        // that the type must satisfy the requirement structurally,
+        // even if there isn't an exact signature match. More
+        // importantly, the method we just synthesized can be
+        // used as a witness to the fact that the requirement is
+        // satisfied.
+
+        // With the big picture spelled out, we can settle into
+        // the work of constructing our synthesized method.
+        //
+        auto synFuncDecl = m_astBuilder->create<FuncDecl>();
+
+        // For now our synthesized method will use the name and source
+        // location of the requirement we are trying to satisfy.
+        //
+        // TODO: as it stands right now our syntesized method will
+        // get a mangled name, which we don't actually want. Leaving
+        // out the name here doesn't help matters, because then *all*
+        // snthesized methods on a given type would share the same
+        // mangled name!
+        //
+        synFuncDecl->nameAndLoc = requiredMemberDeclRef.getDecl()->nameAndLoc;
+
+        // The result type of our synthesized method will be the expected
+        // result type from the interface requirement.
+        //
+        // TODO: This logic can/will run into problems if the return type
+        // is an associated type.
+        //
+        // The ideal solution is that we should be solving for interface
+        // conformance in two phases: a first phase to solve for how
+        // associated types are satisfied, and then a second phase to solve
+        // for how other requirements are satisfied (where we can substitute
+        // in the associated type witnesses for the abstract associated
+        // types as part of `requiredMemberDeclRef`).
+        //
+        // TODO: We should also double-check that this logic will work
+        // with a method that returns `This`.
+        //
+        auto resultType = getResultType(m_astBuilder, requiredMemberDeclRef);
+        synFuncDecl->returnType.type = resultType;
+
+        // Our synthesized method will have parameters matching the names
+        // and types of those on the requirement, and it will use expressions
+        // that reference those parametesr as arguments for the call expresison
+        // that makes up the body.
+        //
+        List<Expr*> synArgs;
+        for( auto paramDeclRef : getParameters(requiredMemberDeclRef) )
+        {
+            auto paramType = getType(m_astBuilder, paramDeclRef);
+
+            // For each parameter of the requirement, we create a matching
+            // parameter (same name and type) for the synthesized method.
+            //
+            auto synParamDecl = m_astBuilder->create<ParamDecl>();
+            synParamDecl->nameAndLoc = paramDeclRef.getDecl()->nameAndLoc;
+            synParamDecl->type.type = resultType;
+
+            // We need to add the parameter as a child declaration of
+            // the method we are building.
+            //
+            synParamDecl->parentDecl = synFuncDecl;
+            synFuncDecl->members.add(synParamDecl);
+
+            // For each paramter, we will create an argument expression
+            // for the call in the function body.
+            //
+            auto synArg = m_astBuilder->create<VarExpr>();
+            synArg->declRef = makeDeclRef(synParamDecl);
+            synArg->type = paramType;
+            synArgs.add(synArg);
+        }
+
+        // Required interface methods can be `static` or non-`static`,
+        // and non-`static` methods can be `[mutating]` or non-`[mutating]`.
+        // All of these details affect how we introduce our `this` parameter,
+        // if any.
+        //
+        ThisExpr* synThis = nullptr;
+        if( !requiredMemberDeclRef.getDecl()->hasModifier<HLSLStaticModifier>() )
+        {
+            // For a non-`static` requirement, we need a `this` parameter.
+            //
+            synThis = m_astBuilder->create<ThisExpr>();
+
+            // The type of `this` in our method will be the type for
+            // which we are synthesizing a conformance.
+            //
+            synThis->type.type = context->conformingType;
+
+            if( requiredMemberDeclRef.getDecl()->hasModifier<MutatingAttribute>() )
+            {
+                // If the interface requirement is `[mutating]` then our
+                // synthesized method should be too, and also the `this`
+                // parameter should be an l-value.
+                //
+                synThis->type.isLeftValue = true;
+
+                auto synMutatingAttr = m_astBuilder->create<MutatingAttribute>();
+                synFuncDecl->modifiers.first = synMutatingAttr;
+            }
+        }
+
+        // The body of our synthesized method is going to try to
+        // make a call using the name of the method requirement (e.g.,
+        // the name `increment` in our example at the top of this function).
+        //
+        // The caller already passed in a `LookupResult` that represents
+        // an attempt to look up the given name in the type of `this`,
+        // and we really just need to wrap that result up as an overloaded
+        // expression.
+        //
+        auto synBase = m_astBuilder->create<OverloadedExpr>();
+        synBase->lookupResult2 = lookupResult;
+
+        // If `synThis` is non-null, then we will use it as the base of
+        // the overloaded expression, so that we have an overloaded
+        // member reference, and not just an overloaded reference to some
+        // static definitions.
+        //
+        synBase->base = synThis;
+
+        // We now have the reference to the overload group we plan to call,
+        // and we already built up the argument list, so we can construct
+        // an `InvokeExpr` that represents the call we want to make.
+        //
+        auto synCall = m_astBuilder->create<InvokeExpr>();
+        synCall->functionExpr = synBase;
+        synCall->arguments = synArgs;
+
+        // In order to know if our call is well-formed, we need to run
+        // the semantic checking logic for overload resolution. If it
+        // runs into an error, we don't want that being reported back
+        // to the user as some kind of overload-resolution failure.
+        //
+        // In order to protect the user from whatever errors might
+        // occur, we will swap out the current diagnostic sink for
+        // a temporary one.
+        //
+        DiagnosticSink* savedSink = m_shared->m_sink;
+        DiagnosticSink tempSink(savedSink->getSourceManager());
+        m_shared->m_sink = &tempSink;
+
+        // With our temporary diagnostic sink soaking up any messages
+        // from overload resolution, we can now try to resolve
+        // the call to see what happens.
+        //
+        auto checkedCall = ResolveInvoke(synCall);
+
+        // Of course, it is possible that the call went through fine,
+        // but the result isn't of the type we expect/require,
+        // so we also need to coerce the result of the call to
+        // the expected type.
+        //
+        auto coercedCall = coerce(resultType, checkedCall);
+
+        // Once we are done making our semantic checks, we can
+        // restore the original sink, so that subsequent operations
+        // report diagnostics as usual.
+        //
+        m_shared->m_sink = savedSink;
+
+        // If our overload resolution or type coercion failed,
+        // then we have not been able to synthesize a witness
+        // for the requirement.
+        //
+        // TODO: We might want to detect *why* overload resolution
+        // or type coercion failed, and report errors accordingly.
+        //
+        // More detailed diagnostics could help users understand
+        // what they did wrong, e.g.:
+        //
+        // * "We tried to use `foo(int)` but the interface requires `foo(String)`
+        //
+        // * "You have two methods that can apply as `bar()` and we couldn't tell which one you meant
+        //
+        // For now we just bail out here and rely on the caller to
+        // diagnose a generic "failed to satisfying requirement" error.
+        //
+        if(tempSink.getErrorCount() != 0)
+            return false;
+
+        // If we were able to type-check the call, then we should
+        // be able to finish construction of a suitable witness.
+        //
+        // We've already created the outer declaration (including its
+        // parameters), and the inner expression, so the main work
+        // that is left is defining the body of the new function,
+        // which comprises a single `return` statement.
+        //
+        auto synReturn = m_astBuilder->create<ReturnStmt>();
+        synReturn->expression = coercedCall;
+
+        synFuncDecl->body = synReturn;
+
+        // Once we are sure that we want to use the declaration
+        // we've synthesized, aew can go ahead and wire it up
+        // to the AST so that subsequent stages can generate
+        // IR code from it.
+        //
+        // Note: we set the parent of the synthesized declaration
+        // to the parent of the inheritance declaration being
+        // validated (which is either a type declaration or
+        // an `extension`), but we do *not* add the syntehsized
+        // declaration to the list of child declarations at
+        // this point.
+        //
+        // By leaving the synthesized declaration off of the list
+        // of members, we ensure that it doesn't get found
+        // by lookup (e.g., in a module that `import`s this type).
+        // Unfortunately, we may also break invariants in other parts
+        // of the code if they assume that all declarations have
+        // to appear in the parent/child hierarchy of the module.
+        //
+        // TODO: We may need to properly wire the synthesized
+        // declaration into the hierarchy, but then attach a modifier
+        // to it to indicate that it should be ignored by things like lookup.
+        //
+        synFuncDecl->parentDecl = context->parentDecl;
+
+        // Once our synthesized declaration is complete, we need
+        // to install it as the witness that satifies the given
+        // requirement.
+        //
+        // Subsequent code generation should not be able to tell the
+        // difference between our synthetic method and a hand-written
+        // one with the same behavior.
+        //
+        witnessTable->requirementDictionary.Add(requiredMemberDeclRef,
+            RequirementWitness(makeDeclRef(synFuncDecl)));
+        return true;
+    }
+
+    bool SemanticsVisitor::trySynthesizeRequirementWitness(
+        ConformanceCheckingContext* context,
+        LookupResult const&         lookupResult,
+        DeclRef<Decl>               requiredMemberDeclRef,
+        RefPtr<WitnessTable>        witnessTable)
+    {
+        SLANG_UNUSED(lookupResult);
+        SLANG_UNUSED(requiredMemberDeclRef);
+        SLANG_UNUSED(witnessTable);
+
+        if (auto requiredFuncDeclRef = requiredMemberDeclRef.as<FuncDecl>())
+        {
+            // Check signature match.
+            return trySynthesizeMethodRequirementWitness(
+                context,
+                lookupResult,
+                requiredFuncDeclRef,
+                witnessTable);
+        }
+
+        // TODO: There are other kinds of requirements for which synthesis should
+        // be possible:
+        //
+        // * It should be possible to synthesize required initializers
+        //   using an approach similar to what is used for methods.
+        //
+        // * We should be able to synthesize subscripts with different
+        //   signatures (taking into account default parameters) and even
+        //   different accessors (e.g., synthesizing the `get` and `set`
+        //   accessors from a `ref` accessor)
+        //
+        // * When we support property declarations, it should be possible
+        //   to synthesize a property requirement using a field of the
+        //   same name.
+        //
+        // * For specific kinds of generic requirements, we should be able
+        //   to wrap the synthesis of the inner declaration in synthesis
+        //   of an outer generic with a matching signature.
+        //
+        // All of these cases can/should use similar logic to
+        // `trySynthesizeMethodRequirementWitness` where they construct an AST
+        // in the form of what the use site ought to look like, and then
+        // apply existing semantic checking logic to generate the code.
+
+        return false;
+    }
+
     bool SemanticsVisitor::findWitnessForInterfaceRequirement(
         ConformanceCheckingContext* context,
         Type*                       type,
@@ -1525,29 +1844,72 @@ namespace Slang
         //   but would require synthesizing proxy/forwarding
         //   implementations in the type itself.
         //
-        // We will punt on the second issue for now (since
-        // transparent members aren't currently exposed as
-        // a general-purpose feature for users), and rely
-        // on subsequent checking in this function to
-        // rule out inherited abstract members.
+        // For the first issue, we will use a flag to influence
+        // lookup so that it doesn't include results looked up
+        // through interface inheritance clauses (but it *will*
+        // look up result through inheritance clauses corresponding
+        // to concrete types).
         //
-        auto lookupResult = lookUpMember(m_astBuilder, this, name, type);
+        // The second issue of members that require us to proxy/forward
+        // requests will be handled further down. For now we include
+        // lookup results that might be usable, but not as-is.
+        //
+        auto lookupResult = lookUpMember(m_astBuilder, this, name, type, LookupMask::Default, LookupOptions::IgnoreBaseInterfaces);
+
+        if(!lookupResult.isValid())
+        {
+            // If we failed to even look up a member with the name of the
+            // requirement, then we can be certain that the type doesn't
+            // satisfy the requirement.
+            //
+            // TODO: If we ever allowed certain kinds of requirements to
+            // be inferred (e.g., inferring associated types from the
+            // signatures of methods, as is done for Swift), we'd
+            // need to revisit this step.
+            //
+            getSink()->diagnose(inheritanceDecl, Diagnostics::typeDoesntImplementInterfaceRequirement, type, requiredMemberDeclRef);
+            return false;
+        }
 
         // Iterate over the members and look for one that matches
         // the expected signature for the requirement.
         for (auto member : lookupResult)
         {
+            // To a first approximation, any lookup result that required a "breadcrumb"
+            // will not be usable to directly satisfy an interface requirement, since
+            // each breadcrumb will amount to a manipulation of `this` that is required
+            // to make the declaration usable (e.g., casting to a base type).
+            //
+            if(member.breadcrumbs != nullptr)
+                continue;
+
             if (doesMemberSatisfyRequirement(member.declRef, requiredMemberDeclRef, witnessTable))
                 return true;
         }
 
-        // No suitable member found, although there were candidates.
+        // If we reach this point then there were no members suitable
+        // for satisfying the interface requirement *diretly*.
+        //
+        // It is possible that one of the items in `lookupResult` could be
+        // used to synthesize an exact-match witness, by generating the
+        // code required to handle all the conversions that might be
+        // required on `this`.
+        //
+        if( trySynthesizeRequirementWitness(context, lookupResult, requiredMemberDeclRef, witnessTable) )
+        {
+            return true;
+        }
+
+        // We failed to find a member of the type that can be used
+        // to satisfy the requirement (even via synthesis), so we
+        // need to report the failure to the user.
         //
         // TODO: Eventually we might want something akin to the current
         // overload resolution logic, where we keep track of a list
         // of "candidates" for satisfaction of the requirement,
-        // and if nothing is found we print the candidates
-
+        // and if nothing is found we print the candidates that made it
+        // furthest in checking.
+        //
         getSink()->diagnose(inheritanceDecl, Diagnostics::typeDoesntImplementInterfaceRequirement, type, requiredMemberDeclRef);
         return false;
     }
@@ -1701,7 +2063,8 @@ namespace Slang
 
     bool SemanticsVisitor::checkConformance(
         Type*                       type,
-        InheritanceDecl*            inheritanceDecl)
+        InheritanceDecl*            inheritanceDecl,
+        ContainerDecl*              parentDecl)
     {
         if( auto declRefType = as<DeclRefType>(type) )
         {
@@ -1736,6 +2099,8 @@ namespace Slang
         auto baseType = inheritanceDecl->base.type;
 
         ConformanceCheckingContext context;
+        context.conformingType = type;
+        context.parentDecl = parentDecl;
         RefPtr<WitnessTable> witnessTable = checkConformanceToType(&context, type, inheritanceDecl, baseType);
         if(!witnessTable)
             return false;
@@ -1751,7 +2116,7 @@ namespace Slang
 
         for (auto inheritanceDecl : decl->getMembersOfType<InheritanceDecl>())
         {
-            checkConformance(targetType, inheritanceDecl);
+            checkConformance(targetType, inheritanceDecl, decl);
         }
     }
 
@@ -1789,7 +2154,7 @@ namespace Slang
             // (That's what C# does).
             for (auto inheritanceDecl : decl->getMembersOfType<InheritanceDecl>())
             {
-                checkConformance(type, inheritanceDecl);
+                checkConformance(type, inheritanceDecl, decl);
             }
         }
     }

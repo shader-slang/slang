@@ -737,8 +737,34 @@ namespace Slang
         //
         struct ConformanceCheckingContext
         {
+                /// The type for which conformances are being checked
+            Type*           conformingType;
+
+                /// The outer declaration for the conformances being checked (either a type or `extension` declaration)
+            ContainerDecl*  parentDecl;
+
             Dictionary<DeclRef<InterfaceDecl>, RefPtr<WitnessTable>>    mapInterfaceToWitnessTable;
         };
+
+            /// Attempt to synthesize a method that can satisfy `requiredMemberDeclRef` using `lookupResult`.
+            ///
+            /// On success, installs the syntethesized method in `witnessTable` and returns `true`.
+            /// Otherwise, returns `false`.
+        bool trySynthesizeMethodRequirementWitness(
+            ConformanceCheckingContext* context,
+            LookupResult const&         lookupResult,
+            DeclRef<FuncDecl>           requiredMemberDeclRef,
+            RefPtr<WitnessTable>        witnessTable);
+
+            /// Attempt to synthesize a declartion that can satisfy `requiredMemberDeclRef` using `lookupResult`.
+            ///
+            /// On success, installs the syntethesized declaration in `witnessTable` and returns `true`.
+            /// Otherwise, returns `false`.
+        bool trySynthesizeRequirementWitness(
+            ConformanceCheckingContext* context,
+            LookupResult const&         lookupResult,
+            DeclRef<Decl>               requiredMemberDeclRef,
+            RefPtr<WitnessTable>        witnessTable);
 
         // Find the appropriate member of a declared type to
         // satisfy a requirement of an interface the type
@@ -782,7 +808,8 @@ namespace Slang
             /// inheritance to be valid.
         bool checkConformance(
             Type*                       type,
-            InheritanceDecl*            inheritanceDecl);
+            InheritanceDecl*            inheritanceDecl,
+            ContainerDecl*              parentDecl);
 
         void checkExtensionConformance(ExtensionDecl* decl);
 
