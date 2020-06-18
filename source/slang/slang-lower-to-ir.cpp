@@ -6157,6 +6157,8 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
 
                 LoweredValInfo paramVal;
 
+                IRParam* irParam = nullptr;
+
                 switch( paramInfo.direction )
                 {
                 default:
@@ -6166,15 +6168,15 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
                         //
                         // TODO: Is this the best representation we can use?
 
-                        IRParam* irParamPtr = subBuilder->emitParam(irParamType);
+                        irParam = subBuilder->emitParam(irParamType);
                         if(auto paramDecl = paramInfo.decl)
                         {
-                            addVarDecorations(context, irParamPtr, paramDecl);
-                            subBuilder->addHighLevelDeclDecoration(irParamPtr, paramDecl);
+                            addVarDecorations(context, irParam, paramDecl);
+                            subBuilder->addHighLevelDeclDecoration(irParam, paramDecl);
                         }
-                        addParamNameHint(irParamPtr, paramInfo);
+                        addParamNameHint(irParam, paramInfo);
 
-                        paramVal = LoweredValInfo::ptr(irParamPtr);
+                        paramVal = LoweredValInfo::ptr(irParam);
 
                         // TODO: We might want to copy the pointed-to value into
                         // a temporary at the start of the function, and then copy
@@ -6194,7 +6196,7 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
                         // We start by declaring an IR parameter of the same type.
                         //
                         auto paramDecl = paramInfo.decl;
-                        IRParam* irParam = subBuilder->emitParam(irParamType);
+                        irParam = subBuilder->emitParam(irParamType);
                         if( paramDecl )
                         {
                             addVarDecorations(context, irParam, paramDecl);
@@ -6249,6 +6251,14 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
                 if (paramInfo.isThisParam)
                 {
                     subContext->thisVal = paramVal;
+                    subBuilder->addThisPointerDecoration(irParam);
+                }
+
+                // Add a [polymorphic] decoration for generic-typed parameters.
+                if (as<IRParam>(irParamType) &&
+                    as<IRTypeType>(irParamType->getFullType()))
+                {
+                    subBuilder->addPolymorphicDecoration(irParam);
                 }
             }
 
