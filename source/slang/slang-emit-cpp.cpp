@@ -1711,6 +1711,15 @@ void CPPSourceEmitter::_emitWitnessTableDefinitions()
                 m_writer->emit("&KernelContext::");
                 m_writer->emit(_getWitnessTableWrapperFuncName(funcVal));
             }
+            else if (auto witnessTableVal = as<IRWitnessTable>(entry->getSatisfyingVal()))
+            {
+                if (!isFirstEntry)
+                    m_writer->emit(",\n");
+                else
+                    isFirstEntry = false;
+                m_writer->emit("&");
+                m_writer->emit(getName(witnessTableVal));
+            }
             else
             {
                 // TODO: handle other witness table entry types.
@@ -1745,16 +1754,11 @@ void CPPSourceEmitter::_maybeEmitWitnessTableTypeDefinition(
     emitSimpleType(interfaceType);
     m_writer->emit("\n{\n");
     m_writer->indent();
-    bool isFirstEntry = true;
     for (Index i = 0; i < sortedWitnessTableEntries.getCount(); i++)
     {
         auto entry = sortedWitnessTableEntries[i];
         if (auto funcVal = as<IRFunc>(entry->satisfyingVal.get()))
         {
-            if (!isFirstEntry)
-                m_writer->emit(",\n");
-            else
-                isFirstEntry = false;
             emitType(funcVal->getResultType());
             m_writer->emit(" (KernelContext::*");
             m_writer->emit(getName(entry->requirementKey.get()));
@@ -1776,6 +1780,13 @@ void CPPSourceEmitter::_maybeEmitWitnessTableTypeDefinition(
                 emitSimpleFuncParamImpl(param);
             }
             m_writer->emit(");\n");
+        }
+        else if (auto witnessTableVal = as<IRWitnessTable>(entry->getSatisfyingVal()))
+        {
+            emitType(as<IRType>(witnessTableVal->getOperand(0)));
+            m_writer->emit("* ");
+            m_writer->emit(getName(entry->requirementKey.get()));
+            m_writer->emit(";\n");
         }
         else
         {
