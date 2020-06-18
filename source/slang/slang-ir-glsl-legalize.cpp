@@ -1602,7 +1602,7 @@ void legalizeEntryPointForGLSL(
     auto entryPointDecor = func->findDecoration<IREntryPointDecoration>();
     SLANG_ASSERT(entryPointDecor);
 
-    auto stage = entryPointDecor->getProfile().GetStage();
+    auto stage = entryPointDecor->getProfile().getStage();
 
     auto layoutDecoration = func->findDecoration<IRLayoutDecoration>();
     SLANG_ASSERT(layoutDecoration);

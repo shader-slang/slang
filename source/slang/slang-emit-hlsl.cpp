@@ -290,11 +290,11 @@ void HLSLSourceEmitter::emitParameterGroupImpl(IRGlobalParam* varDecl, IRUniform
 void HLSLSourceEmitter::emitEntryPointAttributesImpl(IRFunc* irFunc, IREntryPointDecoration* entryPointDecor)
 {
     auto profile = m_effectiveProfile;
-    auto stage = entryPointDecor->getProfile().GetStage();
+    auto stage = entryPointDecor->getProfile().getStage();
 
     if (profile.getFamily() == ProfileFamily::DX)
     {
-        if (profile.GetVersion() >= ProfileVersion::DX_6_1)
+        if (profile.getVersion() >= ProfileVersion::DX_6_1)
         {
             char const* stageName = getStageName(stage);
             if (stageName)

@@ -208,7 +208,7 @@ struct SpvInst : SpvInstParent
         //
         // > Word Count: The complete number of words taken by an instruction,
         // > including the word holding the word count and opcode, and any optional
-        // > operands. An instruction’s word count is the total space taken by the instruction.
+        // > operands. An instructionâ€™s word count is the total space taken by the instruction.
         //
         SpvWord wordCount = 1 + SpvWord(operandWords.getCount());
 
@@ -531,7 +531,7 @@ struct SPIRVEmitContext
             cursor += 4;
         }
         //
-        // > The final word contains the string’s nul-termination character (0), and
+        // > The final word contains the stringâ€™s nul-termination character (0), and
         // > all contents past the end of the string in the final word are padded with 0.
         //
         // For the last word, the low-order bytes will
@@ -1052,7 +1052,7 @@ struct SPIRVEmitContext
                 // to the new globals, which would be used in the SPIR-V emit case.
 
                 auto entryPointDecor = cast<IREntryPointDecoration>(decoration);
-                auto spvStage = mapStageToExecutionModel(entryPointDecor->getProfile().GetStage());
+                auto spvStage = mapStageToExecutionModel(entryPointDecor->getProfile().getStage());
                 auto name = entryPointDecor->getName()->getStringSlice();
                 emitInst(section, decoration, SpvOpEntryPoint, spvStage, dstID, name);
             }

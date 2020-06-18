@@ -806,7 +806,7 @@ void GLSLSourceEmitter::emitEntryPointAttributesImpl(IRFunc* irFunc, IREntryPoin
     SLANG_ASSERT(entryPointDecor);
 
     auto profile = entryPointDecor->getProfile();
-    auto stage = profile.GetStage();
+    auto stage = profile.getStage();
 
     switch (stage)
     {
@@ -1498,7 +1498,7 @@ void GLSLSourceEmitter::emitPreprocessorDirectivesImpl()
     auto effectiveProfile = m_effectiveProfile;
     if (effectiveProfile.getFamily() == ProfileFamily::GLSL)
     {
-        _requireGLSLVersion(effectiveProfile.GetVersion());
+        _requireGLSLVersion(effectiveProfile.getVersion());
     }
 
     // HACK: We aren't picking GLSL versions carefully right now,

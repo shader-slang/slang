@@ -16,7 +16,7 @@
 
 #include "slang-ast-dump.h"
 
-#include "slang-state-serialize.h"
+#include "slang-repro.h"
 
 #include "slang-file-system.h"
 
@@ -231,7 +231,7 @@ SLANG_NO_THROW SlangResult SLANG_MCALL Session::createSession(
 SLANG_NO_THROW SlangProfileID SLANG_MCALL Session::findProfile(
     char const*     name)
 {
-    return Slang::Profile::LookUp(name).raw;
+    return Slang::Profile::lookUp(name).raw;
 }
 
 SLANG_NO_THROW void SLANG_MCALL Session::setDownstreamCompilerPath(
@@ -457,8 +457,8 @@ Profile getEffectiveProfile(EntryPoint* entryPoint, TargetRequest* target)
         break;
     }
 
-    auto entryPointProfileVersion = entryPointProfile.GetVersion();
-    auto targetProfileVersion = targetProfile.GetVersion();
+    auto entryPointProfileVersion = entryPointProfile.getVersion();
+    auto targetProfileVersion = targetProfile.getVersion();
 
     // Default to the entry point profile, since we know that has the right stage.
     Profile effectiveProfile = entryPointProfile;
@@ -481,7 +481,7 @@ Profile getEffectiveProfile(EntryPoint* entryPoint, TargetRequest* target)
     switch( effectiveProfile.getFamily() )
     {
     case ProfileFamily::DX:
-        switch(effectiveProfile.GetStage())
+        switch(effectiveProfile.getStage())
         {
         default:
             break;
@@ -503,7 +503,7 @@ Profile getEffectiveProfile(EntryPoint* entryPoint, TargetRequest* target)
         break;
 
     case ProfileFamily::GLSL:
-        switch(effectiveProfile.GetStage())
+        switch(effectiveProfile.getStage())
         {
         default:
             break;
@@ -525,7 +525,7 @@ Profile getEffectiveProfile(EntryPoint* entryPoint, TargetRequest* target)
         break;
     }
 
-    if( stageMinVersion > effectiveProfile.GetVersion() )
+    if( stageMinVersion > effectiveProfile.getVersion() )
     {
         effectiveProfile.setVersion(stageMinVersion);
     }
@@ -3197,7 +3197,7 @@ SLANG_API SlangProfileID spFindProfile(
     SlangSession*,
     char const*     name)
 {
-    return Slang::Profile::LookUp(name).raw;
+    return Slang::Profile::lookUp(name).raw;
 }
 
 SLANG_API int spAddEntryPoint(
@@ -3358,7 +3358,7 @@ SLANG_API SlangResult spCompile(
     {
         if (req->dumpRepro.getLength())
         {
-            SlangResult saveRes = StateSerializeUtil::saveState(req, req->dumpRepro);
+            SlangResult saveRes = ReproUtil::saveState(req, req->dumpRepro);
             if (SLANG_FAILED(saveRes))
             {
                 req->getSink()->diagnose(SourceLoc(), Diagnostics::unableToWriteReproFile, req->dumpRepro);
@@ -3371,9 +3371,9 @@ SLANG_API SlangResult spCompile(
             SlangResult saveRes = SLANG_FAIL;
 
             RefPtr<Stream> stream;
-            if (SLANG_SUCCEEDED(StateSerializeUtil::findUniqueReproDumpStream(req, reproFileName, stream)))
+            if (SLANG_SUCCEEDED(ReproUtil::findUniqueReproDumpStream(req, reproFileName, stream)))
             {
-                saveRes = StateSerializeUtil::saveState(req, stream);
+                saveRes = ReproUtil::saveState(req, stream);
             }
 
             if (SLANG_FAILED(saveRes))
@@ -3597,14 +3597,14 @@ SLANG_API SlangResult spLoadRepro(
     auto request = asInternal(inRequest);
 
     List<uint8_t> buffer;
-    SLANG_RETURN_ON_FAIL(StateSerializeUtil::loadState((const uint8_t*)data, size, buffer));
+    SLANG_RETURN_ON_FAIL(ReproUtil::loadState((const uint8_t*)data, size, buffer));
 
     MemoryOffsetBase base;
     base.set(buffer.getBuffer(), buffer.getCount());
 
-    StateSerializeUtil::RequestState* requestState = StateSerializeUtil::getRequest(buffer);
+    ReproUtil::RequestState* requestState = ReproUtil::getRequest(buffer);
 
-    SLANG_RETURN_ON_FAIL(StateSerializeUtil::load(base, requestState, fileSystem, request));
+    SLANG_RETURN_ON_FAIL(ReproUtil::load(base, requestState, fileSystem, request));
     return SLANG_OK;
 }
 
@@ -3617,7 +3617,7 @@ SLANG_API SlangResult spSaveRepro(
 
     OwnedMemoryStream stream(FileAccess::Write);
 
-    SLANG_RETURN_ON_FAIL(StateSerializeUtil::saveState(request, &stream));
+    SLANG_RETURN_ON_FAIL(ReproUtil::saveState(request, &stream));
 
     RefPtr<ListBlob> listBlob(new ListBlob);
 
@@ -3646,14 +3646,14 @@ SLANG_API SlangResult spExtractRepro(SlangSession* session, const void* reproDat
     List<uint8_t> buffer;
     {
         MemoryStreamBase memoryStream(FileAccess::Read, reproData, reproDataSize);
-        SLANG_RETURN_ON_FAIL(StateSerializeUtil::loadState(&memoryStream, buffer));
+        SLANG_RETURN_ON_FAIL(ReproUtil::loadState(&memoryStream, buffer));
     }
 
     MemoryOffsetBase base;
     base.set(buffer.getBuffer(), buffer.getCount());
 
-    StateSerializeUtil::RequestState* requestState = StateSerializeUtil::getRequest(buffer);
-    return StateSerializeUtil::extractFiles(base, requestState, fileSystem);
+    ReproUtil::RequestState* requestState = ReproUtil::getRequest(buffer);
+    return ReproUtil::extractFiles(base, requestState, fileSystem);
 }
 
 SLANG_API SlangResult spLoadReproAsFileSystem(
@@ -3670,14 +3670,14 @@ SLANG_API SlangResult spLoadReproAsFileSystem(
     MemoryStreamBase stream(FileAccess::Read, reproData, reproDataSize);
 
     List<uint8_t> buffer;
-    SLANG_RETURN_ON_FAIL(StateSerializeUtil::loadState(&stream, buffer));
+    SLANG_RETURN_ON_FAIL(ReproUtil::loadState(&stream, buffer));
 
-    auto requestState = StateSerializeUtil::getRequest(buffer);
+    auto requestState = ReproUtil::getRequest(buffer);
     MemoryOffsetBase base;
     base.set(buffer.getBuffer(), buffer.getCount());
 
     RefPtr<CacheFileSystem> cacheFileSystem;
-    SLANG_RETURN_ON_FAIL(StateSerializeUtil::loadFileSystem(base, requestState, replaceFileSystem, cacheFileSystem));
+    SLANG_RETURN_ON_FAIL(ReproUtil::loadFileSystem(base, requestState, replaceFileSystem, cacheFileSystem));
 
     *outFileSystem = cacheFileSystem.detach();
     return SLANG_OK;

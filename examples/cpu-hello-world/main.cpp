@@ -184,7 +184,7 @@ static SlangResult _innerMain(int argc, char** argv)
     // We don't have any entry point parameters so that's passed as NULL
     // We need to cast our definition of the uniform state to the undefined CPPPrelude::UniformState as
     // that type is just a name to indicate what kind of thing needs to be passed in.
-    func(&varyingInput, NULL, (CPPPrelude::UniformState*)&uniformState);
+    func(&varyingInput, NULL, &uniformState);
 
     // bufferContents holds the output
 
