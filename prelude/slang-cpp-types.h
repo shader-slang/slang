@@ -823,7 +823,7 @@ struct ComputeVaryingInput
 };
 
 // The uniformEntryPointParams and uniformState must be set to structures that match layout that the kernel expects.
-// This can be determined via eflection for example.
+// This can be determined via reflection for example.
 
 typedef void(*ComputeThreadFunc)(ComputeThreadVaryingInput* varyingInput, void* uniformEntryPointParams, void* uniformState);
 typedef void(*ComputeFunc)(ComputeVaryingInput* varyingInput, void* uniformEntryPointParams, void* uniformState);
