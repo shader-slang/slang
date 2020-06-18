@@ -308,7 +308,7 @@ Result linkAndOptimizeIR(
 
     // We don't need the legalize pass for C/C++ based types
     if(options.shouldLegalizeExistentialAndResourceTypes )
-//    if (!(sourceStyle == SourceStyle::CPP || sourceStyle == SourceStyle::C))
+//    if (!(sourceLanguage == SourceLanguage::CPP || sourceStyle == SourceLanguage::C))
     {
         // The Slang language allows interfaces to be used like
         // ordinary types (including placing them in constant
@@ -646,27 +646,25 @@ SlangResult emitEntryPointSourceFromIR(
 
     RefPtr<CLikeSourceEmitter> sourceEmitter;
     
-    typedef CLikeSourceEmitter::SourceStyle SourceStyle;
-
-    SourceStyle sourceStyle = CLikeSourceEmitter::getSourceStyle(target);
-    switch (sourceStyle)
+    SourceLanguage sourceLanguage = CLikeSourceEmitter::getSourceLanguage(target);
+    switch (sourceLanguage)
     {
-        case SourceStyle::CPP:
+        case SourceLanguage::CPP:
         {
             sourceEmitter = new CPPSourceEmitter(desc);
             break;
         }
-        case SourceStyle::GLSL:
+        case SourceLanguage::GLSL:
         {
             sourceEmitter = new GLSLSourceEmitter(desc);
             break;
         }
-        case SourceStyle::HLSL:
+        case SourceLanguage::HLSL:
         {
             sourceEmitter = new HLSLSourceEmitter(desc);
             break;
         }
-        case SourceStyle::CUDA:
+        case SourceLanguage::CUDA:
         {
             sourceEmitter = new CUDASourceEmitter(desc);
             break;
@@ -687,14 +685,14 @@ SlangResult emitEntryPointSourceFromIR(
 
         linkingAndOptimizationOptions.sourceEmitter = sourceEmitter;
 
-        switch( sourceStyle )
+        switch( sourceLanguage )
         {
         default:
             break;
 
-        case SourceStyle::CPP:
-        case SourceStyle::C:
-        case SourceStyle::CUDA:
+        case SourceLanguage::CPP:
+        case SourceLanguage::C:
+        case SourceLanguage::CUDA:
             linkingAndOptimizationOptions.shouldLegalizeExistentialAndResourceTypes = false;
             break;
         }
@@ -728,43 +726,8 @@ SlangResult emitEntryPointSourceFromIR(
     // it is time to stitch together the final output.
 
     {
-        Session* session = compileRequest->getSession();
-
-        // Get the downstream compiler needed for final target
-        PassThroughMode passThru = getDownstreamCompilerRequiredForTarget(session, targetRequest->target);
-
-        // If nothing was *needed*, we still need some idea of which downstream compiler is going to be used for the
-        // prelude (the prelude is associated with each specific downstream compiler)
-        if (passThru == PassThroughMode::None)
-        {
-            // TODO(JS):
-            // NOTE! This makes the *assumption* that if we are outputting source, we don't want the
-            // prelude for a specific compiler, we are happy to just use the GenericCCpp
-            // If we didn't do this, we would have to do the work out what's available etc.
-            //
-            // This is all a bit unfortunate. The decision to associate preludes on compilers seemed like a good idea, but was perhaps a mistake.
-            // That it would be simpler if prelude was based on output source type.
-            passThru = getPreludeDownstreamCompilerForTarget(session, targetRequest->target);
-        }
-        else
-        {
-            // If a compiler was required that means a downstream compiler *will* be used
-            // so lookup which specific compiler is used, and use it's prelude
-            // Currently this distinction is only applicable to C++ 
-            if (passThru == PassThroughMode::GenericCCpp)
-            {
-                const SourceLanguage sourceLanguage = (sourceStyle == SourceStyle::C) ? SourceLanguage::C : SourceLanguage::CPP;
-                // Get the compiler used for the language
-                DownstreamCompiler* compiler = session->getDefaultDownstreamCompiler(sourceLanguage);
-                if (compiler)
-                {
-                    passThru = PassThroughMode(compiler->getDesc().type);
-                }
-            }
-        }
-
         // If there is a prelude emit it
-        const auto& prelude = compileRequest->getSession()->getDownstreamCompilerPrelude(passThru);
+        const auto& prelude = compileRequest->getSession()->getPreludeForLanguage(sourceLanguage);
         if (prelude.getLength() > 0)
         {
             sourceWriter.emit(prelude.getUnownedSlice());

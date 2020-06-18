@@ -1191,9 +1191,9 @@ namespace Slang
     };
 
         /// Given a target returns the required downstream compiler
-    PassThroughMode getDownstreamCompilerRequiredForTarget(Session* session, CodeGenTarget target);
+    PassThroughMode getDownstreamCompilerRequiredForTarget(CodeGenTarget target);
         /// Given a target returns a downstream compiler the prelude should be taken from.
-    PassThroughMode getPreludeDownstreamCompilerForTarget(Session* session, CodeGenTarget target);
+    SourceLanguage getDefaultSourceLanguageForDownstreamCompiler(PassThroughMode compiler);
 
     struct TypeCheckingCache;
     
@@ -2033,7 +2033,10 @@ namespace Slang
 
         SLANG_NO_THROW SlangPassThrough SLANG_MCALL getDefaultDownstreamCompiler(SlangSourceLanguage sourceLanguage) override;
 
-            /// Get the default cpp compiler for a language
+        SLANG_NO_THROW void SLANG_MCALL setLanguagePrelude(SlangSourceLanguage inSourceLanguage, char const* prelude) override;
+        SLANG_NO_THROW void SLANG_MCALL getLanguagePrelude(SlangSourceLanguage inSourceLanguage, ISlangBlob** outPrelude) override;
+
+            /// Get the default compiler for a language
         DownstreamCompiler* getDefaultDownstreamCompiler(SourceLanguage sourceLanguage);
 
         enum class SharedLibraryFuncType
@@ -2103,8 +2106,8 @@ namespace Slang
 
         SlangFuncPtr getSharedLibraryFunc(SharedLibraryFuncType type, DiagnosticSink* sink);
 
-            /// Get the downstream compiler prelude
-        const String& getDownstreamCompilerPrelude(PassThroughMode mode) { return m_downstreamCompilerPreludes[int(mode)]; }
+            /// Get the prelude associated with the language
+        const String& getPreludeForLanguage(SourceLanguage language) { return m_languagePreludes[int(language)]; }
 
         void init();
 
@@ -2128,12 +2131,11 @@ namespace Slang
 
         SlangResult _loadRequest(EndToEndCompileRequest* request, const void* data, size_t size);
 
-        
             /// Linkage used for all built-in (stdlib) code.
         RefPtr<Linkage> m_builtinLinkage;
 
-        String m_downstreamCompilerPaths[int(PassThroughMode::CountOf)];              ///< Paths for each pass through
-        String m_downstreamCompilerPreludes[int(PassThroughMode::CountOf)];             ///< Prelude for each type of target
+        String m_downstreamCompilerPaths[int(PassThroughMode::CountOf)];         ///< Paths for each pass through
+        String m_languagePreludes[int(SourceLanguage::CountOf)];                  ///< Prelude for each source language
         PassThroughMode m_defaultDownstreamCompilers[int(SourceLanguage::CountOf)];
     };
 
