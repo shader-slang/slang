@@ -1612,7 +1612,7 @@ void CPPSourceEmitter::_emitWitnessTableDefinitions()
                     m_writer->emit(",\n");
                 else
                     isFirstEntry = false;
-                m_writer->emit("&Context::");
+                m_writer->emit("&KernelContext::");
                 m_writer->emit(getName(funcVal));
             }
             else
@@ -1660,7 +1660,7 @@ void CPPSourceEmitter::_maybeEmitWitnessTableTypeDefinition(
             else
                 isFirstEntry = false;
             emitType(funcVal->getResultType());
-            m_writer->emit(" (Context::*");
+            m_writer->emit(" (KernelContext::*");
             m_writer->emit(getName(entry->requirementKey.get()));
             m_writer->emit(")");
             m_writer->emit("(");
@@ -2144,6 +2144,8 @@ void CPPSourceEmitter::emitPreprocessorDirectivesImpl()
         m_writer->emit("#ifdef SLANG_PRELUDE_NAMESPACE\n");
         m_writer->emit("using namespace SLANG_PRELUDE_NAMESPACE;\n");
         m_writer->emit("#endif\n\n");
+
+        m_writer->emit("struct KernelContext;\n\n");
     }
 
     if (m_target == CodeGenTarget::CSource)
@@ -2669,18 +2671,18 @@ void CPPSourceEmitter::emitModuleImpl(IRModule* module)
         }
 
         m_writer->dedent();
-        m_writer->emit("};\n\n");
-
-        if (m_target == CodeGenTarget::CPPSource)
-        {
-            // Need to close the anonymous namespace when outputting for C++
-
-            m_writer->emit("} // anonymous\n\n");
-        }
+        m_writer->emit("};\n\n");   
     }
 
     // Emit all witness table definitions.
     _emitWitnessTableDefinitions();
+
+    if (m_target == CodeGenTarget::CPPSource)
+    {
+        // Need to close the anonymous namespace when outputting for C++
+
+        m_writer->emit("} // anonymous\n\n");
+    }
 
      // Finally we need to output dll entry points
 
