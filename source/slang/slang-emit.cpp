@@ -731,17 +731,35 @@ SlangResult emitEntryPointSourceFromIR(
         Session* session = compileRequest->getSession();
 
         // Get the downstream compiler needed for final target
-        PassThroughMode passThru = getDownstreamCompilerRequiredForTarget(targetRequest->target);
+        PassThroughMode passThru = getDownstreamCompilerRequiredForTarget(session, targetRequest->target);
 
-        // If generic CPP work out what compiler will actually be used
-        if (passThru == PassThroughMode::GenericCCpp)
+        // If nothing was *needed*, we still need some idea of which downstream compiler is going to be used for the
+        // prelude (the prelude is associated with each specific downstream compiler)
+        if (passThru == PassThroughMode::None)
         {
-            const SourceLanguage sourceLanguage = (sourceStyle == SourceStyle::C) ? SourceLanguage::C : SourceLanguage::CPP;
-            // Get the compiler used for the language
-            DownstreamCompiler* compiler = session->getDefaultDownstreamCompiler(sourceLanguage);
-            if (compiler)
+            // TODO(JS):
+            // NOTE! This makes the *assumption* that if we are outputting source, we don't want the
+            // prelude for a specific compiler, we are happy to just use the GenericCCpp
+            // If we didn't do this, we would have to do the work out what's available etc.
+            //
+            // This is all a bit unfortunate. The decision to associate preludes on compilers seemed like a good idea, but was perhaps a mistake.
+            // That it would be simpler if prelude was based on output source type.
+            passThru = getPreludeDownstreamCompilerForTarget(session, targetRequest->target);
+        }
+        else
+        {
+            // If a compiler was required that means a downstream compiler *will* be used
+            // so lookup which specific compiler is used, and use it's prelude
+            // Currently this distinction is only applicable to C++ 
+            if (passThru == PassThroughMode::GenericCCpp)
             {
-                passThru = PassThroughMode(compiler->getDesc().type);
+                const SourceLanguage sourceLanguage = (sourceStyle == SourceStyle::C) ? SourceLanguage::C : SourceLanguage::CPP;
+                // Get the compiler used for the language
+                DownstreamCompiler* compiler = session->getDefaultDownstreamCompiler(sourceLanguage);
+                if (compiler)
+                {
+                    passThru = PassThroughMode(compiler->getDesc().type);
+                }
             }
         }
 

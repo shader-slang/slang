@@ -1191,7 +1191,9 @@ namespace Slang
     };
 
         /// Given a target returns the required downstream compiler
-    PassThroughMode getDownstreamCompilerRequiredForTarget(CodeGenTarget target);
+    PassThroughMode getDownstreamCompilerRequiredForTarget(Session* session, CodeGenTarget target);
+        /// Given a target returns a downstream compiler the prelude should be taken from.
+    PassThroughMode getPreludeDownstreamCompilerForTarget(Session* session, CodeGenTarget target);
 
     struct TypeCheckingCache;
     
