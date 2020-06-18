@@ -1446,6 +1446,24 @@ UnownedStringSlice CPPSourceEmitter::_getFuncName(const HLSLIntrinsic* specOp)
     return m_slicePool.getSlice(handle);
 }
 
+UnownedStringSlice CPPSourceEmitter::_getWitnessTableWrapperFuncName(IRFunc* func)
+{
+    StringSlicePool::Handle handle = StringSlicePool::kNullHandle;
+    if (m_witnessTableWrapperFuncNameMap.TryGetValue(func, handle))
+    {
+        return m_slicePool.getSlice(handle);
+    }
+
+    StringBuilder builder;
+    builder << getName(func) << "_wtwrapper";
+
+    handle = m_slicePool.add(builder);
+    m_witnessTableWrapperFuncNameMap.Add(func, handle);
+
+    SLANG_ASSERT(handle != StringSlicePool::kNullHandle);
+    return m_slicePool.getSlice(handle);
+}
+
 SlangResult CPPSourceEmitter::calcFuncName(const HLSLIntrinsic* specOp, StringBuilder& outBuilder)
 {
     typedef HLSLIntrinsic::Op Op;
@@ -1591,6 +1609,83 @@ void CPPSourceEmitter::emitWitnessTable(IRWitnessTable* witnessTable)
     pendingWitnessTableDefinitions.add(witnessTable);
 }
 
+void CPPSourceEmitter::_emitWitnessTableWrappers()
+{
+    for (auto witnessTable : pendingWitnessTableDefinitions)
+    {
+        for (auto child : witnessTable->getChildren())
+        {
+            if (auto entry = as<IRWitnessTableEntry>(child))
+            {
+                if (auto funcVal = as<IRFunc>(entry->getSatisfyingVal()))
+                {
+                    emitType(funcVal->getResultType());
+                    m_writer->emit(" ");
+                    m_writer->emit(_getWitnessTableWrapperFuncName(funcVal));
+                    m_writer->emit("(");
+                    // Emit parameter list.
+                    {
+                        bool isFirst = true;
+                        for (auto param : funcVal->getParams())
+                        {
+                            if (as<IRTypeType>(param->getFullType()))
+                                continue;
+
+                            if (isFirst)
+                                isFirst = false;
+                            else
+                                m_writer->emit(",");
+
+                            if (param->findDecoration<IRThisPointerDecoration>())
+                            {
+                                m_writer->emit("void* ");
+                                m_writer->emit(getName(param));
+                                continue;
+                            }
+                            emitSimpleFuncParamImpl(param);
+                        }
+                    }
+                    m_writer->emit(")\n{\n");
+                    m_writer->indent();
+                    m_writer->emit("return ");
+                    m_writer->emit(getName(funcVal));
+                    m_writer->emit("(");
+                    // Emit argument list.
+                    {
+                        bool isFirst = true;
+                        for (auto param : funcVal->getParams())
+                        {
+                            if (as<IRTypeType>(param->getFullType()))
+                                continue;
+
+                            if (isFirst)
+                                isFirst = false;
+                            else
+                                m_writer->emit(", ");
+
+                            if (param->findDecoration<IRThisPointerDecoration>())
+                            {
+                                m_writer->emit("*static_cast<");
+                                emitType(param->getFullType());
+                                m_writer->emit("*>(");
+                                m_writer->emit(getName(param));
+                                m_writer->emit(")");
+                            }
+                            else
+                            {
+                                m_writer->emit(getName(param));
+                            }
+                        }
+                    }
+                    m_writer->emit(");\n");
+                    m_writer->dedent();
+                    m_writer->emit("}\n");
+                }
+            }
+        }
+    }
+}
+
 void CPPSourceEmitter::_emitWitnessTableDefinitions()
 {
     for (auto witnessTable : pendingWitnessTableDefinitions)
@@ -1612,8 +1707,9 @@ void CPPSourceEmitter::_emitWitnessTableDefinitions()
                     m_writer->emit(",\n");
                 else
                     isFirstEntry = false;
+
                 m_writer->emit("&KernelContext::");
-                m_writer->emit(getName(funcVal));
+                m_writer->emit(_getWitnessTableWrapperFuncName(funcVal));
             }
             else
             {
@@ -1671,7 +1767,13 @@ void CPPSourceEmitter::_maybeEmitWitnessTableTypeDefinition(
                     m_writer->emit(", ");
                 else
                     isFirstParam = false;
-                emitParamType(param->getFullType(), getName(param));
+                if (param->findDecoration<IRThisPointerDecoration>())
+                {
+                    m_writer->emit("void* ");
+                    m_writer->emit(getName(param));
+                    continue;
+                }
+                emitSimpleFuncParamImpl(param);
             }
             m_writer->emit(");\n");
         }
@@ -1681,7 +1783,7 @@ void CPPSourceEmitter::_maybeEmitWitnessTableTypeDefinition(
         }
     }
     m_writer->dedent();
-    m_writer->emit("\n};\n");
+    m_writer->emit("};\n");
 }
 
 bool CPPSourceEmitter::tryEmitGlobalParamImpl(IRGlobalParam* varDecl, IRType* varType)
@@ -1875,6 +1977,31 @@ void CPPSourceEmitter::emitSimpleValueImpl(IRInst* inst)
     {
         Super::emitSimpleValueImpl(inst);
     }
+}
+
+static bool isVoidPtrType(IRType* type)
+{
+    auto ptrType = as<IRPtrType>(type);
+    if (!ptrType) return false;
+    return ptrType->getValueType()->op == kIROp_VoidType;
+}
+
+void CPPSourceEmitter::emitSimpleFuncParamImpl(IRParam* param)
+{
+    // Polymorphic types are already translated to void* type in
+    // lower-generics pass. However, the current emitting logic will
+    // emit "void&" instead of "void*" for pointer types.
+    // In the future, we will handle pointer types more properly,
+    // and this override logic will not be necessary.
+    // For now we special-case this scenario.
+    if (param->findDecoration<IRPolymorphicDecoration>() &&
+        isVoidPtrType(param->getDataType()))
+    {
+        m_writer->emit("void* ");
+        m_writer->emit(getName(param));
+        return;
+    }
+    CLikeSourceEmitter::emitSimpleFuncParamImpl(param);
 }
 
 void CPPSourceEmitter::emitVectorTypeNameImpl(IRType* elementType, IRIntegerValue elementCount)
@@ -2100,6 +2227,16 @@ bool CPPSourceEmitter::tryEmitInstExprImpl(IRInst* inst, const EmitOpInfo& inOut
             m_writer->emit("(&");
             m_writer->emit(getName(inst));
             m_writer->emit(")");
+            return true;
+        }
+        case kIROp_getAddr:
+        {
+            // Once we clean up the pointer emitting logic, we can
+            // just use GetElementAddress instruction in place of
+            // getAddr instruction, and this case can be removed.
+            m_writer->emit("(&(");
+            emitInstExpr(inst->getOperand(0), EmitOpInfo::get(EmitOp::General));
+            m_writer->emit("))");
             return true;
         }
     }
@@ -2669,6 +2806,11 @@ void CPPSourceEmitter::emitModuleImpl(IRModule* module)
                 emitGlobalInst(action.inst);
             }
         }
+
+        // Emit wrapper functions for each witness table entry.
+        // These wrapper functions takes an abstract type parameter (void*)
+        // in the place of `this` parameter.
+        _emitWitnessTableWrappers();
 
         m_writer->dedent();
         m_writer->emit("};\n\n");   

@@ -71,6 +71,7 @@ protected:
     virtual bool tryEmitInstExprImpl(IRInst* inst, const EmitOpInfo& inOuterPrec) SLANG_OVERRIDE;
     virtual void emitPreprocessorDirectivesImpl() SLANG_OVERRIDE;
     virtual void emitSimpleValueImpl(IRInst* value) SLANG_OVERRIDE;
+    virtual void emitSimpleFuncParamImpl(IRParam* param) SLANG_OVERRIDE;
     virtual void emitModuleImpl(IRModule* module) SLANG_OVERRIDE;
     virtual void emitSimpleFuncImpl(IRFunc* func) SLANG_OVERRIDE;
     virtual void emitOperandImpl(IRInst* inst, EmitOpInfo const&  outerPrec) SLANG_OVERRIDE;
@@ -117,6 +118,10 @@ protected:
 
     UnownedStringSlice _getFuncName(const HLSLIntrinsic* specOp);
 
+        // Returns a StringSlice representing the mangled name of a witness table
+        // wrapper function.
+    UnownedStringSlice _getWitnessTableWrapperFuncName(IRFunc* func);
+
     UnownedStringSlice _getTypeName(IRType* type);
     
     SlangResult _calcCPPTextureTypeName(IRTextureTypeBase* texType, StringBuilder& outName);
@@ -134,12 +139,20 @@ protected:
         // of all the witness table objects in `pendingWitnessTableDefinitions`.
     void _emitWitnessTableDefinitions();
 
+        // Emit wrapper functions that are referenced in witness tables.
+        // Wrapper functions wraps the actual member function, and takes a `void*`
+        // as the `this` parameter instead of the actual object type, so that
+        // their signature is agnostic to the object type.
+    void _emitWitnessTableWrappers();
+
     HLSLIntrinsic* _addIntrinsic(HLSLIntrinsic::Op op, IRType* returnType, IRType*const* argTypes, Index argTypeCount);
 
     static bool _isVariable(IROp op);
 
     Dictionary<IRType*, StringSlicePool::Handle> m_typeNameMap;
     Dictionary<const HLSLIntrinsic*, StringSlicePool::Handle> m_intrinsicNameMap;
+    Dictionary<IRFunc*, StringSlicePool::Handle> m_witnessTableWrapperFuncNameMap;
+
 
     IRTypeSet m_typeSet;
     RefPtr<HLSLIntrinsicOpLookup> m_opLookup;
