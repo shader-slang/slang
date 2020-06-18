@@ -489,7 +489,7 @@ end
 example "cpu-hello-world"
     kind "ConsoleApp"
 
-example "cpu-hello-world-het"
+example "heterogeneous-hello-world"
     kind "ConsoleApp"
 
 -- Most of the other projects have more interesting configuration going
