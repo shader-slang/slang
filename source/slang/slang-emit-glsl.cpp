@@ -49,7 +49,7 @@ void GLSLSourceEmitter::_requireGLSLExtension(const UnownedStringSlice& name)
 
 void GLSLSourceEmitter::_requireGLSLVersion(ProfileVersion version)
 {
-    if (getSourceStyle() != SourceStyle::GLSL)
+    if (getSourceLanguage() != SourceLanguage::GLSL)
         return;
 
     m_glslExtensionTracker->requireVersion(version);
@@ -553,12 +553,12 @@ void GLSLSourceEmitter::_emitGLSLLayoutQualifiers(IRVarLayout* layout, EmitVarCh
 {
     if (!layout) return;
 
-    switch (getSourceStyle())
+    switch (getSourceLanguage())
     {
         default:
             return;
 
-        case SourceStyle::GLSL:
+        case SourceLanguage::GLSL:
             break;
     }
 
@@ -806,7 +806,7 @@ void GLSLSourceEmitter::emitEntryPointAttributesImpl(IRFunc* irFunc, IREntryPoin
     SLANG_ASSERT(entryPointDecor);
 
     auto profile = entryPointDecor->getProfile();
-    auto stage = profile.GetStage();
+    auto stage = profile.getStage();
 
     switch (stage)
     {
@@ -1498,7 +1498,7 @@ void GLSLSourceEmitter::emitPreprocessorDirectivesImpl()
     auto effectiveProfile = m_effectiveProfile;
     if (effectiveProfile.getFamily() == ProfileFamily::GLSL)
     {
-        _requireGLSLVersion(effectiveProfile.GetVersion());
+        _requireGLSLVersion(effectiveProfile.getVersion());
     }
 
     // HACK: We aren't picking GLSL versions carefully right now,
