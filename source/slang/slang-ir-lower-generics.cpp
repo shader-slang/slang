@@ -79,6 +79,14 @@ namespace Slang
                 block->addParam(as<IRParam>(param));
             }
             loweredGenericFunctions[genericValue] = loweredFunc;
+            // Turn generic parameters into void pointers.
+            for (auto param : cast<IRFunc>(loweredFunc)->getParams())
+            {
+                if (param->findDecoration<IRPolymorphicDecoration>())
+                {
+                    param->setFullType(builder.getPtrType(builder.getVoidType()));
+                }
+            }
             addToWorkList(loweredFunc);
             return loweredFunc;
         }
@@ -103,8 +111,29 @@ namespace Slang
                     builder->sharedBuilder = &sharedBuilderStorage;
                     builder->setInsertBefore(inst);
                     List<IRInst*> args;
+                    auto pp = as<IRFunc>(loweredFunc)->getParams().begin();
+                    auto voidPtrType = builder->getPtrType(builder->getVoidType());
                     for (UInt i = 0; i < callInst->getArgCount(); i++)
-                        args.add(callInst->getArg(i));
+                    {
+                        auto arg = callInst->getArg(i);
+                        if ((*pp)->getDataType() == voidPtrType &&
+                            arg->getDataType() != voidPtrType)
+                        {
+                            // We are calling a generic function that with an argument of
+                            // concrete type. We need to convert this argument o void*.
+
+                            // Ideally this should just be a GetElementAddress inst.
+                            // However the current code emitting logic for this instruction
+                            // doesn't truly respect the pointerness and does not produce
+                            // what we needed. For now we use another instruction here
+                            // to keep changes minimal.
+                            arg = builder->emitGetAddress(
+                                voidPtrType,
+                                arg);
+                        }
+                        args.add(arg);
+                        ++pp;
+                    }
                     for (UInt i = 0; i < specializeInst->getArgCount(); i++)
                         args.add(specializeInst->getArg(i));
                     auto newCall = builder->emitCallInst(callInst->getFullType(), loweredFunc, args);

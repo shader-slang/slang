@@ -3083,6 +3083,20 @@ namespace Slang
         return inst;
     }
 
+    IRInst* IRBuilder::emitGetAddress(
+        IRType* type,
+        IRInst* value)
+    {
+        auto inst = createInst<IRGetAddress>(
+            this,
+            kIROp_getAddr,
+            type,
+            value);
+
+        addInst(inst);
+        return inst;
+    }
+
     IRInst* IRBuilder::emitSwizzle(
         IRType*         type,
         IRInst*         base,

@@ -50,5 +50,3 @@
 #endif
 
 #endif
-
-struct Context;

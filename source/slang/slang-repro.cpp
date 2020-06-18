@@ -1,5 +1,5 @@
-// slang-state-serialize.cpp
-#include "slang-state-serialize.h"
+// slang-repro.cpp
+#include "slang-repro.h"
 
 #include "../core/slang-text-io.h"
 
@@ -14,8 +14,8 @@
 
 namespace Slang {
 
-/* static */const RiffSemanticVersion StateSerializeUtil::g_semanticVersion =
-    RiffSemanticVersion::make(StateSerializeUtil::kMajorVersion, StateSerializeUtil::kMinorVersion, StateSerializeUtil::kPatchVersion);
+/* static */const RiffSemanticVersion ReproUtil::g_semanticVersion =
+    RiffSemanticVersion::make(ReproUtil::kMajorVersion, ReproUtil::kMinorVersion, ReproUtil::kPatchVersion);
 
 // We can't just use sizeof for the sizes of these types, because the hash will be dependent on the ptr size,
 // which isn't an issue for serialization (we turn all pointers into Offset32Ptr -> uint32_t). So we use an x macro
@@ -55,7 +55,7 @@ namespace Slang {
 // A function to calculate the hash related in list in part to how the types used are sized. Can catch crude breaking binary differences.
 static HashCode32 _calcTypeHash()
 {
-    typedef StateSerializeUtil Util;
+    typedef ReproUtil Util;
     const uint32_t sizes[] =
     {
         SLANG_STATE_TYPES(SLANG_STATE_TYPE_SIZE)
@@ -74,9 +74,9 @@ namespace { // anonymous
 
 struct StoreContext
 {
-    typedef StateSerializeUtil::FileState FileState;
-    typedef StateSerializeUtil::SourceFileState SourceFileState;
-    typedef StateSerializeUtil::PathInfoState PathInfoState;
+    typedef ReproUtil::FileState FileState;
+    typedef ReproUtil::SourceFileState SourceFileState;
+    typedef ReproUtil::PathInfoState PathInfoState;
 
     StoreContext(OffsetContainer* container)
     {
@@ -142,7 +142,7 @@ struct StoreContext
 
         auto& base = m_container->asBase();
 
-        Offset32Ptr<StateSerializeUtil::SourceFileState> sourceFileState;
+        Offset32Ptr<ReproUtil::SourceFileState> sourceFileState;
         if (m_sourceFileMap.TryGetValue(sourceFile, sourceFileState))
         {
             return sourceFileState;
@@ -265,9 +265,9 @@ struct StoreContext
         return pathInfo;
     }
 
-    const Offset32Array<StateSerializeUtil::StringPair> calcDefines(const Dictionary<String, String>& srcDefines)
+    const Offset32Array<ReproUtil::StringPair> calcDefines(const Dictionary<String, String>& srcDefines)
     {
-        typedef StateSerializeUtil::StringPair StringPair;
+        typedef ReproUtil::StringPair StringPair;
 
         Offset32Array<StringPair> dstDefines = m_container->newArray<StringPair>(srcDefines.Count());
 
@@ -304,13 +304,13 @@ struct StoreContext
 
     Dictionary<String, Offset32Ptr<OffsetString> > m_stringMap;
 
-    Dictionary<SourceFile*, Offset32Ptr<StateSerializeUtil::SourceFileState> > m_sourceFileMap;
+    Dictionary<SourceFile*, Offset32Ptr<ReproUtil::SourceFileState> > m_sourceFileMap;
     
-    Dictionary<String, Offset32Ptr<StateSerializeUtil::FileState> > m_uniqueToFileMap;
+    Dictionary<String, Offset32Ptr<ReproUtil::FileState> > m_uniqueToFileMap;
 
     Dictionary<const CacheFileSystem::PathInfo*, Offset32Ptr<PathInfoState> > m_pathInfoMap;
 
-    List<Offset32Ptr<StateSerializeUtil::FileState> > m_files; 
+    List<Offset32Ptr<ReproUtil::FileState> > m_files; 
 
     OffsetContainer* m_container;
 };
@@ -332,7 +332,7 @@ static bool _isStorable(const PathInfo::Type type)
     }
 }
 
-/* static */SlangResult StateSerializeUtil::store(EndToEndCompileRequest* request, OffsetContainer& inOutContainer, Offset32Ptr<RequestState>& outRequest)
+/* static */SlangResult ReproUtil::store(EndToEndCompileRequest* request, OffsetContainer& inOutContainer, Offset32Ptr<RequestState>& outRequest)
 {
     StoreContext context(&inOutContainer);
 
@@ -628,9 +628,9 @@ namespace { // anonymous
 
 struct LoadContext
 {
-    typedef StateSerializeUtil::SourceFileState SourceFileState;
-    typedef StateSerializeUtil::FileState FileState;
-    typedef StateSerializeUtil::PathInfoState PathInfoState;
+    typedef ReproUtil::SourceFileState SourceFileState;
+    typedef ReproUtil::FileState FileState;
+    typedef ReproUtil::PathInfoState PathInfoState;
 
     CacheFileSystem::PathInfo* getPathInfoFromFile(FileState* file)
     {
@@ -778,7 +778,7 @@ struct LoadContext
     }
 
 
-    void loadDefines(const Offset32Array<StateSerializeUtil::StringPair>& in, Dictionary<String, String>& out)
+    void loadDefines(const Offset32Array<ReproUtil::StringPair>& in, Dictionary<String, String>& out)
     {
         out.Clear();
 
@@ -809,7 +809,7 @@ struct LoadContext
 } // anonymous
 
 
-/* static */SlangResult StateSerializeUtil::loadFileSystem(OffsetBase& base, RequestState* requestState, ISlangFileSystem* fileSystem, RefPtr<CacheFileSystem>& outFileSystem)
+/* static */SlangResult ReproUtil::loadFileSystem(OffsetBase& base, RequestState* requestState, ISlangFileSystem* fileSystem, RefPtr<CacheFileSystem>& outFileSystem)
 {
     LoadContext context(nullptr, fileSystem, &base);
 
@@ -862,7 +862,7 @@ struct LoadContext
     return SLANG_OK;
 }
 
-/* static */SlangResult StateSerializeUtil::load(OffsetBase& base, RequestState* requestState, ISlangFileSystem* fileSystem, EndToEndCompileRequest* request)
+/* static */SlangResult ReproUtil::load(OffsetBase& base, RequestState* requestState, ISlangFileSystem* fileSystem, EndToEndCompileRequest* request)
 {
     auto externalRequest = asExternal(request);
 
@@ -1001,7 +1001,7 @@ struct LoadContext
 
             const char* name = srcEntryPoint.name ? base.asRaw(srcEntryPoint.name)->getCstr() : nullptr;
 
-            Stage stage = srcEntryPoint.profile.GetStage();
+            Stage stage = srcEntryPoint.profile.getStage();
 
             List<const char*> args = context.toList(srcEntryPoint.specializationArgStrings);
 
@@ -1044,7 +1044,7 @@ struct LoadContext
 }
 
 
-/* static */SlangResult StateSerializeUtil::saveState(EndToEndCompileRequest* request, Stream* stream)
+/* static */SlangResult ReproUtil::saveState(EndToEndCompileRequest* request, Stream* stream)
 {
     OffsetContainer container;
     Offset32Ptr<RequestState> requestState;
@@ -1058,13 +1058,13 @@ struct LoadContext
     return RiffUtil::writeData(&header.m_chunk, sizeof(header),container.getData(), container.getDataCount(), stream);
 }
 
-/* static */SlangResult StateSerializeUtil::saveState(EndToEndCompileRequest* request, const String& filename)
+/* static */SlangResult ReproUtil::saveState(EndToEndCompileRequest* request, const String& filename)
 {
     RefPtr<Stream> stream(new FileStream(filename, FileMode::Create, FileAccess::Write, FileShare::ReadWrite));
     return saveState(request, stream);
 }
 
-/* static */ SlangResult StateSerializeUtil::loadState(const String& filename, List<uint8_t>& outBuffer)
+/* static */ SlangResult ReproUtil::loadState(const String& filename, List<uint8_t>& outBuffer)
 {
     RefPtr<Stream> stream;
     try
@@ -1079,7 +1079,7 @@ struct LoadContext
     return loadState(stream, outBuffer);
 }
 
-/* static */ SlangResult StateSerializeUtil::loadState(Stream* stream, List<uint8_t>& buffer)
+/* static */ SlangResult ReproUtil::loadState(Stream* stream, List<uint8_t>& buffer)
 {
     Header header;
 
@@ -1102,18 +1102,18 @@ struct LoadContext
     return SLANG_OK;
 }
 
-/* static */SlangResult StateSerializeUtil::loadState(const uint8_t* data, size_t size, List<uint8_t>& outBuffer)
+/* static */SlangResult ReproUtil::loadState(const uint8_t* data, size_t size, List<uint8_t>& outBuffer)
 {
     MemoryStreamBase stream(FileAccess::Read, data, size);
     return loadState(&stream, outBuffer);
 }
 
-/* static */ StateSerializeUtil::RequestState* StateSerializeUtil::getRequest(const List<uint8_t>& buffer)
+/* static */ ReproUtil::RequestState* ReproUtil::getRequest(const List<uint8_t>& buffer)
 {
-    return (StateSerializeUtil::RequestState*)(buffer.getBuffer() + kStartOffset);
+    return (ReproUtil::RequestState*)(buffer.getBuffer() + kStartOffset);
 }
 
-/* static */SlangResult StateSerializeUtil::calcDirectoryPathFromFilename(const String& filename, String& outPath)
+/* static */SlangResult ReproUtil::calcDirectoryPathFromFilename(const String& filename, String& outPath)
 {
     String absPath;
     SLANG_RETURN_ON_FAIL(Path::getCanonical(filename, absPath));
@@ -1134,18 +1134,18 @@ struct LoadContext
     return SLANG_OK;
 }
 
-/* static */SlangResult StateSerializeUtil::extractFilesToDirectory(const String& filename)
+/* static */SlangResult ReproUtil::extractFilesToDirectory(const String& filename)
 {
     List<uint8_t> buffer;
-    SLANG_RETURN_ON_FAIL(StateSerializeUtil::loadState(filename, buffer));
+    SLANG_RETURN_ON_FAIL(ReproUtil::loadState(filename, buffer));
 
     MemoryOffsetBase base;
     base.set(buffer.getBuffer(), buffer.getCount());
 
-    RequestState* requestState = StateSerializeUtil::getRequest(buffer);
+    RequestState* requestState = ReproUtil::getRequest(buffer);
 
     String dirPath;
-    SLANG_RETURN_ON_FAIL(StateSerializeUtil::calcDirectoryPathFromFilename(filename, dirPath));
+    SLANG_RETURN_ON_FAIL(ReproUtil::calcDirectoryPathFromFilename(filename, dirPath));
 
     Path::createDirectory(dirPath);
     // Set up a file system to write into this directory
@@ -1154,7 +1154,7 @@ struct LoadContext
     return extractFiles(base, requestState, &relFileSystem);
 }
 
-static void _calcPreprocessorDefines(OffsetBase& base, const Offset32Array<StateSerializeUtil::StringPair>& srcDefines, CommandLine& cmd)
+static void _calcPreprocessorDefines(OffsetBase& base, const Offset32Array<ReproUtil::StringPair>& srcDefines, CommandLine& cmd)
 {
     for (const auto& define : srcDefines)
     {
@@ -1169,10 +1169,10 @@ static void _calcPreprocessorDefines(OffsetBase& base, const Offset32Array<State
     }
 }
 
-static SlangResult _calcCommandLine(OffsetBase& base, StateSerializeUtil::RequestState* requestState, CommandLine& cmd)
+static SlangResult _calcCommandLine(OffsetBase& base, ReproUtil::RequestState* requestState, CommandLine& cmd)
 {
-    typedef StateSerializeUtil::TargetRequestState TargetRequestState;
-    typedef StateSerializeUtil::SourceFileState SourceFileState;
+    typedef ReproUtil::TargetRequestState TargetRequestState;
+    typedef ReproUtil::SourceFileState SourceFileState;
 
     {
         SlangCompileFlags flags = (SlangCompileFlags)requestState->compileFlags;
@@ -1198,7 +1198,9 @@ static SlangResult _calcCommandLine(OffsetBase& base, StateSerializeUtil::Reques
             case SLANG_LINE_DIRECTIVE_MODE_DEFAULT: break;
             case SLANG_LINE_DIRECTIVE_MODE_NONE:
             {
-                cmd.addArg("-line-directive-mode none"); break;
+                cmd.addArg("-line-directive-mode");
+                cmd.addArg("none");
+                break;
             }
             default: break;
         }
@@ -1255,8 +1257,11 @@ static SlangResult _calcCommandLine(OffsetBase& base, StateSerializeUtil::Reques
             cmd.addArg("-target");
             cmd.addArg(TypeTextUtil::getCompileTargetName(SlangCompileTarget(src.target)));
 
-            cmd.addArg("-profile");
-            cmd.addArg(Profile(src.profile).getName());
+            if (src.profile != Profile::Unknown)
+            {
+                cmd.addArg("-profile");
+                cmd.addArg(Profile(src.profile).getName());
+            }
 
             if (src.targetFlags & SLANG_TARGET_FLAG_PARAMETER_BLOCKS_USE_REGISTER_SPACES)
             {
@@ -1361,7 +1366,7 @@ static SlangResult _calcCommandLine(OffsetBase& base, StateSerializeUtil::Reques
             cmd.addArg(name);
 
             cmd.addArg("-stage");
-            UnownedStringSlice stageText = getStageText(srcEntryPoint.profile.GetStage());
+            UnownedStringSlice stageText = getStageText(srcEntryPoint.profile.getStage());
             cmd.addArg(stageText);
 
             //cmd.addArg("-profile");
@@ -1377,7 +1382,7 @@ static SlangResult _calcCommandLine(OffsetBase& base, StateSerializeUtil::Reques
     return SLANG_OK;
 }
 
-/* static */SlangResult StateSerializeUtil::extractFiles(OffsetBase& base, RequestState* requestState, ISlangFileSystemExt* fileSystem)
+/* static */SlangResult ReproUtil::extractFiles(OffsetBase& base, RequestState* requestState, ISlangFileSystemExt* fileSystem)
 {
     StringBuilder builder;
 
@@ -1519,7 +1524,7 @@ static SlangResult _findFirstSourcePath(EndToEndCompileRequest* request, String&
     return SLANG_FAIL;
 }
 
-/* static */SlangResult StateSerializeUtil::findUniqueReproDumpStream(EndToEndCompileRequest* request, String& outFileName, RefPtr<Stream>& outStream)
+/* static */SlangResult ReproUtil::findUniqueReproDumpStream(EndToEndCompileRequest* request, String& outFileName, RefPtr<Stream>& outStream)
 {
     String sourcePath;
 

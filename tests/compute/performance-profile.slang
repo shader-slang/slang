@@ -44,8 +44,9 @@ static void _calc(const RWStructuredBuffer<float>& buf, int start, int end)
 }
 
 SLANG_PRELUDE_EXPORT
-void computeMain(ComputeVaryingInput* varyingInput, UniformEntryPointParams* params, LocalUniformState* uniformState)
+void computeMain(ComputeVaryingInput* varyingInput, void* inParams, void* inUniformState)
 {
+    LocalUniformState* uniformState = (LocalUniformState*)inUniformState;
     _calc(uniformState->outputBuffer_0, varyingInput->startGroupID.x * 16, varyingInput->endGroupID.x * 16);
 }
  
