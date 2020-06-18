@@ -84,7 +84,7 @@ SLANG_FORCE_INLINE float F32_frexp(float x, float& e)
 {
     int ei;
     float m = ::frexpf(x, &ei);
-    e = ei;
+    e = float(ei);
     return m;
 }
 SLANG_FORCE_INLINE float F32_modf(float x, float& ip)
@@ -151,9 +151,10 @@ SLANG_FORCE_INLINE double F64_frexp(double x, double& e)
 {
     int ei;
     double m = ::frexp(x, &ei);
-    e = ei;
+    e = float(ei);
     return m;
 }
+
 SLANG_FORCE_INLINE double F64_modf(double x, double& ip)
 {
     return ::modf(x, &ip);
@@ -236,14 +237,17 @@ SLANG_FORCE_INLINE uint64_t U64_abs(uint64_t f) { return f; }
 SLANG_FORCE_INLINE uint64_t U64_min(uint64_t a, uint64_t b) { return a < b ? a : b; }
 SLANG_FORCE_INLINE uint64_t U64_max(uint64_t a, uint64_t b) { return a > b ? a : b; }
 
+// TODO(JS): We don't define countbits for 64bit in stdlib currently.
+// It's not clear from documentation if it should return 32 or 64 bits, if it exists. 
+// 32 bits can always hold the result, and will be implicitly promoted. 
 SLANG_FORCE_INLINE uint32_t U64_countbits(uint64_t v)
 {
 #if SLANG_GCC_FAMILY    
-    return __builtin_popcountl(v);
+    return uint32_t(__builtin_popcountl(v));
 #elif SLANG_PROCESSOR_X86_64 && SLANG_VC
-    return __popcnt64(v);
+    return uint32_t(__popcnt64(v));
 #else     
-    uint64_t c = 0;
+    uint32_t c = 0;
     while (v)
     {
         c++;
