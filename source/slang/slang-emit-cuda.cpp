@@ -799,7 +799,7 @@ void CUDASourceEmitter::emitModuleImpl(IRModule* module)
                 // must be prefixed to indicate to the OptiX runtime what
                 // stage it is to be compiled for.
                 //
-                auto stage = entryPointDecor->getProfile().GetStage();
+                auto stage = entryPointDecor->getProfile().getStage();
                 switch( stage )
                 {
                 default:

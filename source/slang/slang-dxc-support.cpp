@@ -185,7 +185,7 @@ namespace Slang
         // TODO: Ideally the dxc back-end should be passed some information
         // on the "capabilities" that were used and/or requested in the code.
         //
-        if( profile.GetVersion() >= ProfileVersion::DX_6_2 )
+        if( profile.getVersion() >= ProfileVersion::DX_6_2 )
         {
             args[argCount++] = L"-enable-16bit-types";
         }
@@ -195,7 +195,7 @@ namespace Slang
         ComPtr<IDxcOperationResult> dxcResult;
         SLANG_RETURN_ON_FAIL(dxcCompiler->Compile(dxcSourceBlob,
             sourcePath.toWString().begin(),
-            profile.GetStage() == Stage::Unknown ? L"" : wideEntryPointName.begin(),
+            profile.getStage() == Stage::Unknown ? L"" : wideEntryPointName.begin(),
             wideProfileName.begin(),
             args,
             argCount,
