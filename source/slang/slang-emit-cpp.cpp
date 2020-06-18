@@ -488,6 +488,16 @@ SlangResult CPPSourceEmitter::calcTypeName(IRType* type, CodeGenTarget target, S
             out << ">";
             return SLANG_OK;
         }
+        case kIROp_WitnessTableType:
+        {
+            // A witness table typed value translates to a pointer to the
+            // struct of function pointers corresponding to the interface type.
+            auto witnessTableType = static_cast<IRWitnessTableType*>(type);
+            auto baseType = cast<IRType>(witnessTableType->getOperand(0));
+            emitType(baseType);
+            out << "*";
+            return SLANG_OK;
+        }
         default:
         {
             if (isNominalOp(type->op))
@@ -1561,7 +1571,117 @@ void CPPSourceEmitter::emitParamTypeImpl(IRType* type, String const& name)
 
 void CPPSourceEmitter::emitWitnessTable(IRWitnessTable* witnessTable)
 {
-    SLANG_UNUSED(witnessTable);
+    auto interfaceType = cast<IRInterfaceType>(witnessTable->getOperand(0));
+    auto witnessTableItems = witnessTable->getChildren();
+    List<IRWitnessTableEntry*> sortedWitnessTableEntries = getSortedWitnessTableEntries(witnessTable);
+    _maybeEmitWitnessTableTypeDefinition(interfaceType, sortedWitnessTableEntries);
+
+    // Define a global variable for the witness table.
+    m_writer->emit("extern ");
+    emitSimpleType(interfaceType);
+    m_writer->emit(" ");
+    m_writer->emit(getName(witnessTable));
+    m_writer->emit(";\n");
+
+    // The actual definition of this witness table global variable
+    // is deferred until the entire `Context` class is emitted, so
+    // that the member functions are available for reference.
+    // The witness table definition emission logic is defined in the
+    // `_emitWitnessTableDefinitions` function.
+    pendingWitnessTableDefinitions.add(witnessTable);
+}
+
+void CPPSourceEmitter::_emitWitnessTableDefinitions()
+{
+    for (auto witnessTable : pendingWitnessTableDefinitions)
+    {
+        auto interfaceType = cast<IRInterfaceType>(witnessTable->getOperand(0));
+        List<IRWitnessTableEntry*> sortedWitnessTableEntries = getSortedWitnessTableEntries(witnessTable);
+        emitSimpleType(interfaceType);
+        m_writer->emit(" ");
+        m_writer->emit(getName(witnessTable));
+        m_writer->emit(" = {\n");
+        m_writer->indent();
+        bool isFirstEntry = true;
+        for (Index i = 0; i < sortedWitnessTableEntries.getCount(); i++)
+        {
+            auto entry = sortedWitnessTableEntries[i];
+            if (auto funcVal = as<IRFunc>(entry->satisfyingVal.get()))
+            {
+                if (!isFirstEntry)
+                    m_writer->emit(",\n");
+                else
+                    isFirstEntry = false;
+                m_writer->emit("&Context::");
+                m_writer->emit(getName(funcVal));
+            }
+            else
+            {
+                // TODO: handle other witness table entry types.
+            }
+        }
+        m_writer->dedent();
+        m_writer->emit("\n};\n");
+    }
+}
+
+void CPPSourceEmitter::emitInterface(IRInterfaceType* interfaceType)
+{
+    // The current IRInterfaceType defintion does not contain
+    // sufficient info for emitting a witness table struct by itself
+    // Instead, it defines the order of entries in a witness table.
+    // Therefore, we emit a forward declaration here, and actual definition
+    // for the witness table type during emitWitnessTable.
+    SLANG_UNUSED(interfaceType);
+    m_writer->emit("struct ");
+    emitSimpleType(interfaceType);
+    m_writer->emit(";\n");
+}
+
+    /// Emits witness table type definition given a sorted list of witness tables
+    /// acoording to the order defined by `interfaceType`.
+    ///
+void CPPSourceEmitter::_maybeEmitWitnessTableTypeDefinition(
+    IRInterfaceType* interfaceType,
+    const List<IRWitnessTableEntry*>& sortedWitnessTableEntries)
+{
+    m_writer->emit("struct ");
+    emitSimpleType(interfaceType);
+    m_writer->emit("\n{\n");
+    m_writer->indent();
+    bool isFirstEntry = true;
+    for (Index i = 0; i < sortedWitnessTableEntries.getCount(); i++)
+    {
+        auto entry = sortedWitnessTableEntries[i];
+        if (auto funcVal = as<IRFunc>(entry->satisfyingVal.get()))
+        {
+            if (!isFirstEntry)
+                m_writer->emit(",\n");
+            else
+                isFirstEntry = false;
+            emitType(funcVal->getResultType());
+            m_writer->emit(" (Context::*");
+            m_writer->emit(getName(entry->requirementKey.get()));
+            m_writer->emit(")");
+            m_writer->emit("(");
+            bool isFirstParam = true;
+            for (auto param : funcVal->getParams())
+            {
+                if (!isFirstParam)
+                    m_writer->emit(", ");
+                else
+                    isFirstParam = false;
+                emitParamType(param->getFullType(), getName(param));
+            }
+            m_writer->emit(");\n");
+        }
+        else
+        {
+            // TODO: handle other witness table entry types.
+        }
+    }
+    m_writer->dedent();
+    m_writer->emit("\n};\n");
 }
 
 bool CPPSourceEmitter::tryEmitGlobalParamImpl(IRGlobalParam* varDecl, IRType* varType)
@@ -1673,6 +1793,12 @@ void CPPSourceEmitter::emitSimpleFuncImpl(IRFunc* func)
         auto firstParam = func->getFirstParam();
         for (auto pp = firstParam; pp; pp = pp->getNextParam())
         {
+            // Ingore TypeType-typed parameters for now.
+            // In the future we will pass around runtime type info
+            // for TypeType parameters.
+            if (as<IRTypeType>(pp->getFullType()))
+                continue;
+
             if (pp != firstParam)
                 m_writer->emit(", ");
 
@@ -1950,8 +2076,31 @@ bool CPPSourceEmitter::tryEmitInstExprImpl(IRInst* inst, const EmitOpInfo& inOut
             // Does this function declare any requirements.
             handleCallExprDecorationsImpl(funcValue);
 
+            if (funcValue->op == kIROp_lookup_interface_method)
+            {
+                m_writer->emit("(this->*(");
+                emitOperand(funcValue, EmitOpInfo());
+                m_writer->emit("))");
+                _emitCallArgList(as<IRCall>(inst));
+                return true;
+            }
+
             // try doing automatically
             return _tryEmitInstExprAsIntrinsic(inst, inOuterPrec);
+        }
+        case kIROp_lookup_interface_method:
+        {
+            emitInstExpr(inst->getOperand(0), inOuterPrec);
+            m_writer->emit("->");
+            m_writer->emit(getName(inst->getOperand(1)));
+            return true;
+        }
+        case kIROp_WitnessTable:
+        {
+            m_writer->emit("(&");
+            m_writer->emit(getName(inst));
+            m_writer->emit(")");
+            return true;
         }
     }
 }
@@ -2512,6 +2661,9 @@ void CPPSourceEmitter::emitModuleImpl(IRModule* module)
         m_writer->dedent();
         m_writer->emit("};\n\n");
     }
+
+    // Emit all witness table definitions.
+    _emitWitnessTableDefinitions();
 
      // Finally we need to output dll entry points
 

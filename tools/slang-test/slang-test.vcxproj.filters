@@ -50,6 +50,9 @@
     <ClCompile Include="unit-test-byte-encode.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
+    <ClCompile Include="unit-test-find-type-by-name.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
     <ClCompile Include="unit-test-free-list.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
@@ -63,9 +66,6 @@
       <Filter>Source Files</Filter>
     </ClCompile>
     <ClCompile Include="unit-test-string.cpp">
-      <Filter>Source Files</Filter>
-    </ClCompile>
-    <ClCompile Include="unit-test-find-type-by-name.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
   </ItemGroup>

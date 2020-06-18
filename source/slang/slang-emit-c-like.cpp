@@ -219,6 +219,40 @@ void CLikeSourceEmitter::emitSimpleType(IRType* type)
     return decor;
 }
 
+List<IRWitnessTableEntry*> CLikeSourceEmitter::getSortedWitnessTableEntries(IRWitnessTable* witnessTable)
+{
+    List<IRWitnessTableEntry*> sortedWitnessTableEntries;
+    auto interfaceType = cast<IRInterfaceType>(witnessTable->getOperand(0));
+    auto witnessTableItems = witnessTable->getChildren();
+    // Build a dictionary of witness table entries for fast lookup.
+    Dictionary<IRInst*, IRWitnessTableEntry*> witnessTableEntryDictionary;
+    for (auto item : witnessTableItems)
+    {
+        if (auto entry = as<IRWitnessTableEntry>(item))
+        {
+            witnessTableEntryDictionary[entry->getRequirementKey()] = entry;
+        }
+    }
+    // Get a sorted list of entries using RequirementKeys defined in `interfaceType`.
+    for (UInt i = 0; i < interfaceType->getOperandCount(); i++)
+    {
+        auto reqKey = cast<IRStructKey>(interfaceType->getOperand(i));
+        bool matchingEntryFound = false;
+        IRWitnessTableEntry* entry = nullptr;
+        if (witnessTableEntryDictionary.TryGetValue(reqKey, entry))
+        {
+            if (entry->requirementKey.get() == reqKey)
+            {
+                matchingEntryFound = true;
+                sortedWitnessTableEntries.add(entry);
+                break;
+            }
+        }
+        SLANG_ASSERT(matchingEntryFound);
+    }
+    return sortedWitnessTableEntries;
+}
+
 void CLikeSourceEmitter::_emitArrayType(IRArrayType* arrayType, EDeclarator* declarator)
 {
     EDeclarator arrayDeclarator;
@@ -269,6 +303,12 @@ void CLikeSourceEmitter::emitWitnessTable(IRWitnessTable* witnessTable)
 {
     SLANG_UNUSED(witnessTable);
     SLANG_DIAGNOSE_UNEXPECTED(getSink(), SourceLoc(), "Unimplemented emit: IROpWitnessTable.");
+}
+
+void CLikeSourceEmitter::emitInterface(IRInterfaceType* interfaceType)
+{
+    SLANG_UNUSED(interfaceType);
+    SLANG_DIAGNOSE_UNEXPECTED(getSink(), SourceLoc(), "Unimplemented emit: IROpInterfaceType.");
 }
 
 void CLikeSourceEmitter::emitTypeImpl(IRType* type, const StringSliceLoc* nameAndLoc)
@@ -890,6 +930,7 @@ bool CLikeSourceEmitter::shouldFoldInstIntoUseSites(IRInst* inst)
     case kIROp_FieldAddress:
     case kIROp_getElementPtr:
     case kIROp_Specialize:
+    case kIROp_lookup_interface_method:
         return true;
     }
 
@@ -1849,6 +1890,31 @@ void CLikeSourceEmitter::emitIntrinsicCallExprImpl(
     }
 }
 
+void CLikeSourceEmitter::_emitCallArgList(IRCall* inst)
+{
+    bool isFirstArg = true;
+    m_writer->emit("(");
+    UInt argCount = inst->getOperandCount();
+    for (UInt aa = 1; aa < argCount; ++aa)
+    {
+        auto operand = inst->getOperand(aa);
+        if (as<IRVoidType>(operand->getDataType()))
+            continue;
+
+        // TODO: [generate dynamic dispatch code for generics]
+        // Pass RTTI object here. Ignore type argument for now.
+        if (as<IRType>(operand))
+            continue;
+
+        if (!isFirstArg)
+            m_writer->emit(", ");
+        else
+            isFirstArg = false;
+        emitOperand(inst->getOperand(aa), getInfo(EmitOp::General));
+    }
+    m_writer->emit(")");
+}
+
 void CLikeSourceEmitter::emitCallExpr(IRCall* inst, EmitOpInfo outerPrec)
 {
     auto funcValue = inst->getOperand(0);
@@ -1868,18 +1934,7 @@ void CLikeSourceEmitter::emitCallExpr(IRCall* inst, EmitOpInfo outerPrec)
         bool needClose = maybeEmitParens(outerPrec, prec);
 
         emitOperand(funcValue, leftSide(outerPrec, prec));
-        m_writer->emit("(");
-        UInt argCount = inst->getOperandCount();
-        for( UInt aa = 1; aa < argCount; ++aa )
-        {
-            auto operand = inst->getOperand(aa);
-            if (as<IRVoidType>(operand->getDataType()))
-                continue;
-            if(aa != 1) m_writer->emit(", ");
-            emitOperand(inst->getOperand(aa), getInfo(EmitOp::General));
-        }
-        m_writer->emit(")");
-
+        _emitCallArgList(inst);
         maybeCloseParens(needClose);
     }
 }
@@ -3522,6 +3577,10 @@ void CLikeSourceEmitter::emitGlobalInst(IRInst* inst)
         emitStruct(cast<IRStructType>(inst));
         break;
 
+    case kIROp_InterfaceType:
+        emitInterface(cast<IRInterfaceType>(inst));
+        break;
+
     case kIROp_WitnessTable:
         emitWitnessTable(cast<IRWitnessTable>(inst));
         break;
@@ -3576,11 +3635,15 @@ void CLikeSourceEmitter::ensureInstOperandsRec(ComputeEmitActionsContext* ctx, I
 
 void CLikeSourceEmitter::ensureGlobalInst(ComputeEmitActionsContext* ctx, IRInst* inst, EmitAction::Level requiredLevel)
 {
-    // Skip certain instructions, since they
-    // don't affect output.
+    // Skip certain instructions that don't affect output.
     switch(inst->op)
     {
     case kIROp_WitnessTable:
+        // Only skip witness tables when we are generating
+        // static code.
+        if (!m_compileRequest->allowDynamicCode)
+            return;
+        break;
     case kIROp_Generic:
         return;
 
