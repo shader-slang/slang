@@ -866,10 +866,10 @@ void CUDASourceEmitter::emitModuleImpl(IRModule* module)
                     //
                     // At the binary level, our generated CUDA compute kernels will take
                     // two pointer parameters: the first points to the per-entry-point
-                    // `uniform` parameter data, and the second poinst to the global-scope
+                    // `uniform` parameter data, and the second points to the global-scope
                     // parameter data (if any).
                     //
-                    m_writer->emit("(UniformEntryPointParams* entryPointShaderParameters, UniformState* uniformState)");
+                    m_writer->emit("(void* entryPointShaderParameters, void* uniformState)");
                 }
                 else
                 {
