@@ -8,12 +8,6 @@
 #   include <intrin.h>
 #endif
 
-// Because the signiture of isnan, isfinite, and is isinf changed in C++, we use the macro
-// to use the version in the std namespace. 
-// https://stackoverflow.com/questions/39130040/cmath-hides-isnan-in-math-h-in-c14-c11
-
-#define SLANG_PRELUDE_STD std::
-
 #ifdef SLANG_PRELUDE_NAMESPACE
 namespace SLANG_PRELUDE_NAMESPACE {
 #endif

@@ -3,7 +3,18 @@
 
 #include "../slang.h"
 
-#include <cmath>
+// Because the signiture of isnan, isfinite, and is isinf changed in C++, we use the macro
+// to use the version in the std namespace. 
+// https://stackoverflow.com/questions/39130040/cmath-hides-isnan-in-math-h-in-c14-c11
+ 
+#if SLANG_GCC_FAMILY && __GNUC__ < 6
+#   include <cmath>
+#   define SLANG_PRELUDE_STD std::
+#else
+#   include <math.h>
+#   define SLANG_PRELUDE_STD
+#endif
+
 #include <assert.h>
 #include <stdlib.h>
 
