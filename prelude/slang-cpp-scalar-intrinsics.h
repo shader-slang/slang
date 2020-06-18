@@ -8,6 +8,12 @@
 #   include <intrin.h>
 #endif
 
+// Because the signiture of isnan, isfinite, and is isinf changed in C++, we use the macro
+// to use the version in the std namespace. 
+// https://stackoverflow.com/questions/39130040/cmath-hides-isnan-in-math-h-in-c14-c11
+
+#define SLANG_PRELUDE_STD std::
+
 #ifdef SLANG_PRELUDE_NAMESPACE
 namespace SLANG_PRELUDE_NAMESPACE {
 #endif
@@ -68,9 +74,9 @@ SLANG_FORCE_INLINE float F32_rsqrt(float f) { return 1.0f / F32_sqrt(f); }
 SLANG_FORCE_INLINE float F32_sign(float f) { return ( f == 0.0f) ? f : (( f < 0.0f) ? -1.0f : 1.0f); } 
 SLANG_FORCE_INLINE float F32_frac(float f) { return f - F32_floor(f); }
 
-SLANG_FORCE_INLINE bool F32_isnan(float f) { return isnan(f); }
-SLANG_FORCE_INLINE bool F32_isfinite(float f) { return isfinite(f); }
-SLANG_FORCE_INLINE bool F32_isinf(float f) { return isinf(f); }
+SLANG_FORCE_INLINE bool F32_isnan(float f) { return SLANG_PRELUDE_STD isnan(f); }
+SLANG_FORCE_INLINE bool F32_isfinite(float f) { return SLANG_PRELUDE_STD isfinite(f); }
+SLANG_FORCE_INLINE bool F32_isinf(float f) { return SLANG_PRELUDE_STD isinf(f); }
 
 // Binary
 SLANG_FORCE_INLINE float F32_min(float a, float b) { return ::fminf(a, b); }
@@ -135,9 +141,9 @@ SLANG_FORCE_INLINE double F64_rsqrt(double f) { return 1.0 / F64_sqrt(f); }
 SLANG_FORCE_INLINE double F64_sign(double f) { return (f == 0.0) ? f : ((f < 0.0) ? -1.0 : 1.0); }
 SLANG_FORCE_INLINE double F64_frac(double f) { return f - F64_floor(f); }
 
-SLANG_FORCE_INLINE bool F64_isnan(double f) { return isnan(f); }
-SLANG_FORCE_INLINE bool F64_isfinite(double f) { return isfinite(f); }
-SLANG_FORCE_INLINE bool F64_isinf(double f) { return isinf(f); }
+SLANG_FORCE_INLINE bool F64_isnan(double f) { return SLANG_PRELUDE_STD isnan(f); }
+SLANG_FORCE_INLINE bool F64_isfinite(double f) { return SLANG_PRELUDE_STD isfinite(f); }
+SLANG_FORCE_INLINE bool F64_isinf(double f) { return SLANG_PRELUDE_STD isinf(f); }
 
 // Binary
 SLANG_FORCE_INLINE double F64_min(double a, double b) { return ::fmin(a, b); }

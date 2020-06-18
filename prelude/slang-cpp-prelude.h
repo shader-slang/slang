@@ -3,7 +3,7 @@
 
 #include "../slang.h"
 
-#include <math.h>
+#include <cmath>
 #include <assert.h>
 #include <stdlib.h>
 
