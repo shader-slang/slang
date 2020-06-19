@@ -1456,7 +1456,7 @@ namespace Slang
         //      interface ICounter { [mutating] int increment(); }
         //      struct MyCounter : ICounter
         //      {
-        //          int increment(int val = 1) { ... }
+        //          [murtating] int increment(int val = 1) { ... }
         //      }
         //
         // It is clear in this case that the `MyCounter` type *can*
@@ -1469,7 +1469,7 @@ namespace Slang
         //      struct MyCounter ...
         //      {
         //          ...
-        //          int synthesized()
+        //          [murtating] int synthesized()
         //          {
         //              return this.increment();
         //          }
