@@ -41,9 +41,9 @@ struct Derived : Base, ITweak
 int tweakAndTwiddle<T : ITweak>(T tweaker, int val)
 {
 	int tmp = val;
-	tmp = tweaker.tweak(val);
-	tmp = tweaker.twiddle(val);
-	return val;
+	tmp = tweaker.tweak(tmp);
+	tmp = tweaker.twiddle(tmp);
+	return tmp;
 }
 
 
