@@ -59,7 +59,6 @@ struct Pointer
     template <typename T>
     T* dynamicCast()
     {
-
         return Slang::dynamicCast<T>(_get((T*)nullptr));
     }
      
@@ -100,11 +99,20 @@ public:
         return Pointer();
     }
 
+#if 0
     void* getArray(ASTSerialIndex index, Index& outCount)
     {
         SLANG_UNUSED(index);
         outCount = 0;
         return nullptr;
+    }
+#endif
+
+    template <typename T>
+    void getArray(ASTSerialIndex index, List<T>& outArray)
+    {
+        SLANG_UNUSED(index);
+        outArray.clear();
     }
 
     String getString(ASTSerialIndex index)
@@ -425,36 +433,31 @@ struct ASTSerialTypeInfo<SourceLoc>
 };
 
 // List
-
-// TODO(JS): Not implemented yet
-
 template <typename T, typename ALLOCATOR>
 struct ASTSerialTypeInfo<List<T, ALLOCATOR>>
 {
     typedef List<T, ALLOCATOR> NativeType;
     typedef ASTSerialIndex SerialType;
+
     enum { SerialAlignment = sizeof(SerialType) };
 
     static void toSerial(ASTSerialWriter* writer, const void* native, void* serial)
     {
-        SLANG_UNUSED(writer);
-        SLANG_UNUSED(native);
-        SLANG_UNUSED(serial);
-        //*(SerialType*)outSerial = writer->addSourceLoc(*(const NativeType*)inNative);
+        auto& src = *(const NativeType*)native;
+        auto& dst = *(SerialType*)serial;
+
+        dst = writer->addArray(src.getBuffer(), src.getCount());
     }
     static void toNative(ASTSerialReader* reader, const void* serial, void* native)
     {
-        SLANG_UNUSED(reader);
-        SLANG_UNUSED(serial);
-        SLANG_UNUSED(native);
-        //*(NativeType*)outNative = reader->getSourceLoc(*(const SerialType*)inSerial);
+        auto& dst = *(NativeType*)native;
+        auto& src = *(const SerialType*)serial;
+
+        reader->getArray(src, dst);
     }
 };
 
 // Dictionary
-
-// TODO(JS): Not implemented yet
-
 template <typename KEY, typename VALUE>
 struct ASTSerialTypeInfo<Dictionary<KEY, VALUE>>
 {
@@ -501,21 +504,18 @@ struct ASTSerialTypeInfo<Dictionary<KEY, VALUE>>
         // Clear it
         dst = NativeType();
 
-        Index keysCount, valuesCount;
-        KeySerialType* keys = (KeySerialType*)reader->getArray(src.keys, keysCount);
-        ValueSerialType* values = (ValueSerialType*)reader->getArray(src.values, valuesCount);
+        List<KEY> keys;
+        List<VALUE> values;
 
-        SLANG_ASSERT(keysCount == valuesCount);
+        reader->getArray(src.keys, keys);
+        reader->getArray(src.values, values);
 
-        for (Index i = 0; i < keysCount; ++i)
+        SLANG_ASSERT(keys.getCount() == values.getCount());
+
+        const Index count = keys.getCount();
+        for (Index i = 0; i < count; ++i)
         {
-            KEY key;
-            VALUE value;
-
-            ASTSerialTypeInfo<KEY>::toNative(reader, &keys[i], &key);
-            ASTSerialTypeInfo<VALUE>::toNative(reader, &values[i], &value);
-
-            dst.Add(key, value);
+            dst.Add(keys[i], values[i]);
         }
     }
 };
@@ -548,9 +548,6 @@ struct ASTSerialTypeInfo<QualType>
         dst->isLeftValue = src->isLeftValue != 0;
     }
 };
-
-
-
 // LookupResult
 
 // TODO(JS): Not implemented yet
@@ -654,25 +651,20 @@ struct ASTSerialTypeInfo<Modifiers>
     }
     static void toNative(ASTSerialReader* reader, const void* serial, void* native)
     {
-        Index count;
-        const ASTSerialIndex* indices = (const ASTSerialIndex*)reader->getArray(*(const SerialType*)serial, count);
+        List<Modifier*> modifiers;
+        reader->getArray(*(const SerialType*)serial, modifiers);
 
-        Modifier* first = nullptr;
-        Modifier* current = nullptr;
-
-        for (Index i = 0; i < count; ++i)
+        Modifier* prev = nullptr;
+        for (Modifier* modifier : modifiers)
         {
-            Modifier* modifier = reader->getPointer(indices[i]).dynamicCast<Modifier>();
-            first = (first == nullptr) ? modifier : first;
-            if (current)
+            if (prev)
             {
-                current->next = modifier;
+                prev->next = modifier;
             }
-            current = modifier;
         }
 
         NativeType& dst = *(NativeType*)native;
-        dst.first = first;
+        dst.first = modifiers.getCount() > 0 ? modifiers[0] : nullptr;
     }
 };
 
@@ -809,8 +801,6 @@ struct ASTSerialTypeInfo<Token>
         }
     }
 };
-
-
 
 // NameLoc
 template <>
@@ -981,14 +971,6 @@ struct ASTFieldAccess
 
     return SLANG_OK;
 }
-
-
-
-
-
-// We can generate a function that does the conversion forward and backward.
-// We need to know the offsets in the original type
-
 
 
 } // namespace Slang
