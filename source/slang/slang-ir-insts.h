@@ -166,6 +166,10 @@ IR_SIMPLE_DECORATION(VulkanCallablePayloadDecoration)
 /// to it.
 IR_SIMPLE_DECORATION(VulkanHitAttributesDecoration)
 
+IR_SIMPLE_DECORATION(PolymorphicDecoration)
+IR_SIMPLE_DECORATION(ThisPointerDecoration)
+
+
 struct IRRequireGLSLVersionDecoration : IRDecoration
 {
     enum { kOp = kIROp_RequireGLSLVersionDecoration };
@@ -1145,6 +1149,11 @@ struct IRFieldAddress : IRInst
     IRInst* getField() { return field.get(); }
 };
 
+struct IRGetAddress : IRInst
+{
+    IR_LEAF_ISA(getAddr);
+};
+
 // Terminators
 
 struct IRReturn : IRTerminatorInst
@@ -1564,7 +1573,8 @@ struct IRBuilder
     IRStringType* getStringType();
 
     IRBasicBlockType*   getBasicBlockType();
-    IRType* getWitnessTableType() { return nullptr; }
+    IRWitnessTableType* getWitnessTableType(IRType* baseType);
+    IRType* getTypeType() { return getType(IROp::kIROp_TypeType); }
     IRType* getKeyType() { return nullptr; }
 
     IRTypeKind*     getTypeKind();
@@ -1790,7 +1800,10 @@ struct IRBuilder
         IRType* valueType);
     IRGlobalParam* createGlobalParam(
         IRType* valueType);
-    IRWitnessTable* createWitnessTable();
+
+    /// Creates an IRWitnessTable value.
+    /// @param baseType: The comformant-to type of this witness.
+    IRWitnessTable* createWitnessTable(IRType* baseType);
     IRWitnessTableEntry* createWitnessTableEntry(
         IRWitnessTable* witnessTable,
         IRInst*        requirementKey,
@@ -1800,7 +1813,7 @@ struct IRBuilder
     IRStructType*   createStructType();
 
     // Create an empty `interface` type.
-    IRInterfaceType* createInterfaceType();
+    IRInterfaceType* createInterfaceType(UInt operandCount, IRInst* const* operands);
 
     // Create a global "key" to use for indexing into a `struct` type.
     IRStructKey*    createStructKey();
@@ -1889,6 +1902,10 @@ struct IRBuilder
         IRType*     type,
         IRInst*    basePtr,
         IRInst*    index);
+
+    IRInst* emitGetAddress(
+        IRType* type,
+        IRInst* value);
 
     IRInst* emitSwizzle(
         IRType*         type,
@@ -1990,9 +2007,9 @@ struct IRBuilder
         return emitGlobalGenericParam(getTypeKind());
     }
 
-    IRGlobalGenericParam* emitGlobalGenericWitnessTableParam()
+    IRGlobalGenericParam* emitGlobalGenericWitnessTableParam(IRType* comformanceType)
     {
-        return emitGlobalGenericParam(getWitnessTableType());
+        return emitGlobalGenericParam(getWitnessTableType(comformanceType));
     }
 
     IRBindGlobalGenericParam* emitBindGlobalGenericParam(
@@ -2141,6 +2158,16 @@ struct IRBuilder
     void addLoopControlDecoration(IRInst* value, IRLoopControl mode)
     {
         addDecoration(value, kIROp_LoopControlDecoration, getIntValue(getIntType(), IRIntegerValue(mode)));
+    }
+
+    void addPolymorphicDecoration(IRInst* value)
+    {
+        addDecoration(value, kIROp_PolymorphicDecoration);
+    }
+
+    void addThisPointerDecoration(IRInst* value)
+    {
+        addDecoration(value, kIROp_ThisPointerDecoration);
     }
 
     void addSemanticDecoration(IRInst* value, UnownedStringSlice const& text, int index = 0)

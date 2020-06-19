@@ -232,6 +232,7 @@
     <ClInclude Include="slang-ir-insts.h" />
     <ClInclude Include="slang-ir-layout.h" />
     <ClInclude Include="slang-ir-link.h" />
+    <ClInclude Include="slang-ir-lower-generics.h" />
     <ClInclude Include="slang-ir-missing-return.h" />
     <ClInclude Include="slang-ir-restructure-scoping.h" />
     <ClInclude Include="slang-ir-restructure.h" />
@@ -264,8 +265,8 @@
     <ClInclude Include="slang-profile-defs.h" />
     <ClInclude Include="slang-profile.h" />
     <ClInclude Include="slang-reflection.h" />
+    <ClInclude Include="slang-repro.h" />
     <ClInclude Include="slang-source-loc.h" />
-    <ClInclude Include="slang-state-serialize.h" />
     <ClInclude Include="slang-syntax.h" />
     <ClInclude Include="slang-token-defs.h" />
     <ClInclude Include="slang-token.h" />
@@ -319,6 +320,7 @@
     <ClCompile Include="slang-ir-layout.cpp" />
     <ClCompile Include="slang-ir-legalize-types.cpp" />
     <ClCompile Include="slang-ir-link.cpp" />
+    <ClCompile Include="slang-ir-lower-generics.cpp" />
     <ClCompile Include="slang-ir-missing-return.cpp" />
     <ClCompile Include="slang-ir-restructure-scoping.cpp" />
     <ClCompile Include="slang-ir-restructure.cpp" />
@@ -350,8 +352,8 @@
     <ClCompile Include="slang-preprocessor.cpp" />
     <ClCompile Include="slang-profile.cpp" />
     <ClCompile Include="slang-reflection.cpp" />
+    <ClCompile Include="slang-repro.cpp" />
     <ClCompile Include="slang-source-loc.cpp" />
-    <ClCompile Include="slang-state-serialize.cpp" />
     <ClCompile Include="slang-stdlib.cpp" />
     <ClCompile Include="slang-syntax.cpp" />
     <ClCompile Include="slang-token.cpp" />

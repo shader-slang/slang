@@ -59,19 +59,9 @@ static SlangResult _addCPPPrelude(const String& parentPath, slang::IGlobalSessio
 {
     String includePath;
     SLANG_RETURN_ON_FAIL(_calcIncludePath(parentPath, "../../../prelude/slang-cpp-prelude.h", includePath));
-
     StringBuilder prelude;
     prelude << "#include \"" << includePath << "\"\n\n";
-    const SlangPassThrough downstreamCompilers[] = {
-        SLANG_PASS_THROUGH_CLANG,                   ///< Clang C/C++ compiler 
-        SLANG_PASS_THROUGH_VISUAL_STUDIO,           ///< Visual studio C/C++ compiler
-        SLANG_PASS_THROUGH_GCC,                     ///< GCC C/C++ compiler
-        SLANG_PASS_THROUGH_GENERIC_C_CPP,
-    };
-    for (auto downstreamCompiler : downstreamCompilers)
-    {
-        session->setDownstreamCompilerPrelude(downstreamCompiler, prelude.getBuffer());
-    }
+    session->setLanguagePrelude(SLANG_SOURCE_LANGUAGE_CPP, prelude.getBuffer());
     return SLANG_OK;
 }
 
@@ -79,16 +69,9 @@ static SlangResult _addCUDAPrelude(const String& parentPath, slang::IGlobalSessi
 {
     String includePath;
     SLANG_RETURN_ON_FAIL(_calcIncludePath(parentPath, "../../../prelude/slang-cuda-prelude.h", includePath));
-
     StringBuilder prelude;
     prelude << "#include \"" << includePath << "\"\n\n";
-    const SlangPassThrough downstreamCompilers[] = {
-        SLANG_PASS_THROUGH_NVRTC,                   ///< nvrtc CUDA compiler
-    };
-    for (auto downstreamCompiler : downstreamCompilers)
-    {
-        session->setDownstreamCompilerPrelude(downstreamCompiler, prelude.getBuffer());
-    }
+    session->setLanguagePrelude(SLANG_SOURCE_LANGUAGE_CUDA, prelude.getBuffer());
     return SLANG_OK;
 }
 

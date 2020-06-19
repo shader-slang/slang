@@ -1,6 +1,6 @@
-// slang-state-serialize.h
-#ifndef SLANG_STATE_SERIALIZE_H_INCLUDED
-#define SLANG_STATE_SERIALIZE_H_INCLUDED
+// slang-repro.h
+#ifndef SLANG_REPRO_H_INCLUDED
+#define SLANG_REPRO_H_INCLUDED
 
 #include "../core/slang-riff.h"
 #include "../core/slang-string.h"
@@ -14,7 +14,13 @@
 
 namespace Slang {
 
-struct StateSerializeUtil
+/* Facilities to be able to save and load the full state of a compilation, including source files,
+and all compilation options into 'slang-repro' files. Repro is short for 'reproducible' and it's
+main purposes is to make compilations easily reproducible as everything that is needed from
+a compilation environment is packaged up into a single file. The single file can be used to
+repeat the compilation, or extracted such that everything that was specified in the compilation
+can be inspected and modified. */
+struct ReproUtil
 {
     enum
     {

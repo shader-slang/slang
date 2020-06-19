@@ -89,21 +89,21 @@ namespace Slang
         bool operator==(Profile const& other) const { return raw == other.raw; }
         bool operator!=(Profile const& other) const { return raw != other.raw; }
 
-        Stage GetStage() const { return Stage(uint32_t(raw) & 0xFFFF); }
+        Stage getStage() const { return Stage(uint32_t(raw) & 0xFFFF); }
         void setStage(Stage stage)
         {
             raw = (raw & ~0xFFFF) | uint32_t(stage);
         }
 
-        ProfileVersion GetVersion() const  { return ProfileVersion((uint32_t(raw) >> 16) & 0xFFFF); }
+        ProfileVersion getVersion() const  { return ProfileVersion((uint32_t(raw) >> 16) & 0xFFFF); }
         void setVersion(ProfileVersion version)
         {
             raw = (raw & 0x0000FFFF) | (uint32_t(version) << 16);
         }
 
-        ProfileFamily getFamily() const { return getProfileFamily(GetVersion()); }
+        ProfileFamily getFamily() const { return getProfileFamily(getVersion()); }
 
-        static Profile LookUp(char const* name);
+        static Profile lookUp(char const* name);
         char const* getName();
 
         RawVal raw = Unknown;

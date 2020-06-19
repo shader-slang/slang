@@ -393,12 +393,13 @@ namespace Slang
     struct DeclCheckStateExt
     {
     public:
+        typedef uint8_t RawType;
         DeclCheckStateExt() {}
         DeclCheckStateExt(DeclCheckState state)
             : m_raw(uint8_t(state))
         {}
 
-        enum : uint8_t
+        enum : RawType
         {
                 /// A flag to indicate that a declaration is being checked.
                 ///
@@ -412,7 +413,7 @@ namespace Slang
         DeclCheckState getState() const { return DeclCheckState(m_raw & ~kBeingCheckedBit); }
         void setState(DeclCheckState state)
         {
-            m_raw = (m_raw & kBeingCheckedBit) | uint8_t(state);
+            m_raw = (m_raw & kBeingCheckedBit) | RawType(state);
         }
 
         bool isBeingChecked() const { return (m_raw & kBeingCheckedBit) != 0; }
@@ -428,8 +429,11 @@ namespace Slang
             return getState() >= state;
         }
 
+        RawType getRaw() const { return m_raw; }
+        void setRaw(RawType raw) { m_raw = raw; }
+
     private:
-        uint8_t m_raw = 0;
+        RawType m_raw = 0;
     };
 
     void addModifier(
@@ -1285,6 +1289,9 @@ namespace Slang
     struct WitnessTable : RefObject
     {
         RequirementDictionary requirementDictionary;
+
+        // The type that the witness table witnesses conformance to (e.g. an Interface)
+        Type* baseType;
     };
 
     typedef Dictionary<unsigned int, NodeBase*> AttributeArgumentValueDict;

@@ -192,7 +192,9 @@ ${{{{
     // Declare initializers to convert from various other types
     for (int ss = 0; ss < kBaseTypeCount; ++ss)
     {
-        // Don't allow conversion from `void`
+        // Don't allow conversion to or from `void`
+        if (kBaseTypes[tt].tag == BaseType::Void)
+            continue;
         if (kBaseTypes[ss].tag == BaseType::Void)
             continue;
 
@@ -250,6 +252,21 @@ ${{{{
 ${{{{
         break;
     }
+
+    // If this is the `void` type, then we want to allow
+    // explicit conversion to it from any other type, using
+    // `(void) someExpression`.
+    //
+    if( kBaseTypes[tt].tag == BaseType::Void )
+    {
+}}}}
+        __generic<T>
+        [__readNone]
+        __init(T value)
+        {}
+${{{{
+    }
+
 }}}}
 
 }
@@ -1790,6 +1807,10 @@ int getStringHash(String string);
 __generic<E : __EnumType>
 __intrinsic_op($(kIROp_Eql))
 bool operator==(E left, E right);
+
+__generic<E : __EnumType>
+__intrinsic_op($(kIROp_Neq))
+bool operator!=(E left, E right);
 
 // Binding Attributes
 

@@ -2307,6 +2307,16 @@ namespace Slang
             (IRInst* const*) paramTypes);
     }
 
+    IRWitnessTableType* IRBuilder::getWitnessTableType(
+        IRType* baseType)
+    {
+        return (IRWitnessTableType*)findOrEmitHoistableInst(
+            nullptr,
+            kIROp_WitnessTableType,
+            1,
+            (IRInst* const*)&baseType);
+    }
+
     IRConstantBufferType* IRBuilder::getConstantBufferType(IRType* elementType)
     {
         IRInst* operands[] = { elementType };
@@ -2465,7 +2475,7 @@ namespace Slang
     IRInst* IRBuilder::emitExtractExistentialWitnessTable(
         IRInst* existentialValue)
     {
-        auto type = getWitnessTableType();
+        auto type = getWitnessTableType(existentialValue->getDataType());
         auto inst = createInst<IRInst>(
             this,
             kIROp_ExtractExistentialWitnessTable,
@@ -2770,12 +2780,13 @@ namespace Slang
         return inst;
     }
 
-    IRWitnessTable* IRBuilder::createWitnessTable()
+    IRWitnessTable* IRBuilder::createWitnessTable(IRType* baseType)
     {
         IRWitnessTable* witnessTable = createInst<IRWitnessTable>(
             this,
             kIROp_WitnessTable,
-            nullptr);
+            getWitnessTableType(baseType),
+            baseType);
         addGlobalValue(this, witnessTable);
         return witnessTable;
     }
@@ -2810,12 +2821,14 @@ namespace Slang
         return structType;
     }
 
-    IRInterfaceType* IRBuilder::createInterfaceType()
+    IRInterfaceType* IRBuilder::createInterfaceType(UInt operandCount, IRInst* const* operands)
     {
         IRInterfaceType* interfaceType = createInst<IRInterfaceType>(
             this,
             kIROp_InterfaceType,
-            nullptr);
+            nullptr,
+            operandCount,
+            operands);
         addGlobalValue(this, interfaceType);
         return interfaceType;
     }
@@ -3065,6 +3078,20 @@ namespace Slang
             type,
             basePtr,
             index);
+
+        addInst(inst);
+        return inst;
+    }
+
+    IRInst* IRBuilder::emitGetAddress(
+        IRType* type,
+        IRInst* value)
+    {
+        auto inst = createInst<IRGetAddress>(
+            this,
+            kIROp_getAddr,
+            type,
+            value);
 
         addInst(inst);
         return inst;
@@ -4209,6 +4236,42 @@ namespace Slang
         dump(context, "}");
     }
 
+    static void dumpInstOperandList(
+        IRDumpContext* context,
+        IRInst* inst)
+    {
+        UInt argCount = inst->getOperandCount();
+
+        if (argCount == 0)
+            return;
+
+        UInt ii = 0;
+
+        // Special case: make printing of `call` a bit
+        // nicer to look at
+        if (inst->op == kIROp_Call && argCount > 0)
+        {
+            dump(context, " ");
+            auto argVal = inst->getOperand(ii++);
+            dumpOperand(context, argVal);
+        }
+
+        bool first = true;
+        dump(context, "(");
+        for (; ii < argCount; ++ii)
+        {
+            if (!first)
+                dump(context, ", ");
+
+            auto argVal = inst->getOperand(ii);
+
+            dumpOperand(context, argVal);
+
+            first = false;
+        }
+
+        dump(context, ")");
+    }
 
     void dumpIRWitnessTableEntry(
         IRDumpContext*          context,
@@ -4233,6 +4296,8 @@ namespace Slang
         dumpID(context, inst);
 
         dumpInstTypeClause(context, inst->getFullType());
+
+        dumpInstOperandList(context, inst);
 
         if (!inst->getFirstChild())
         {
@@ -4321,38 +4386,7 @@ namespace Slang
 
         dump(context, opInfo.name);
 
-        UInt argCount = inst->getOperandCount();
-
-        if(argCount == 0)
-            return;
-
-        UInt ii = 0;
-
-        // Special case: make printing of `call` a bit
-        // nicer to look at
-        if (inst->op == kIROp_Call && argCount > 0)
-        {
-            dump(context, " ");
-            auto argVal = inst->getOperand(ii++);
-            dumpOperand(context, argVal);
-        }
-
-        bool first = true;
-        dump(context, "(");
-        for (; ii < argCount; ++ii)
-        {
-            if (!first)
-                dump(context, ", ");
-
-            auto argVal = inst->getOperand(ii);
-
-            dumpOperand(context, argVal);
-
-            first = false;
-        }
-
-        dump(context, ")");
-
+        dumpInstOperandList(context, inst);
     }
 
     static void dumpInstBody(

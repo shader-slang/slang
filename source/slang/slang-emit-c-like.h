@@ -38,18 +38,6 @@ public:
         kThreadGroupAxisCount = 3,
     };
     
-        /// To simplify cases 
-    enum class SourceStyle
-    {
-        Unknown,
-        GLSL,
-        HLSL,
-        C,
-        CPP,
-        CUDA,
-        CountOf,
-    };
-    
     typedef unsigned int ESemanticMask;
     enum
     {
@@ -113,7 +101,7 @@ public:
         /// Get the code gen target
     CodeGenTarget getTarget() { return m_target; }
         /// Get the source style
-    SLANG_FORCE_INLINE SourceStyle getSourceStyle() const { return m_sourceStyle;  }
+    SLANG_FORCE_INLINE SourceLanguage getSourceLanguage() const { return m_sourceLanguage;  }
 
     void noteInternalErrorLoc(SourceLoc loc) { return getSink()->noteInternalErrorLoc(loc); }
 
@@ -298,8 +286,9 @@ public:
 
     virtual RefObject* getExtensionTracker() { return nullptr; }
 
-        /// Gets a source style for a target. Returns Unknown if not a known target
-    static SourceStyle getSourceStyle(CodeGenTarget target);
+        /// Gets a source language for a target for a target. Returns Unknown if not a known target
+    static SourceLanguage getSourceLanguage(CodeGenTarget target);
+
         /// Gets the default type name for built in scalar types. Different impls may require something different.
         /// Returns an empty slice if not a built in type
     static UnownedStringSlice getDefaultBuiltinTypeName(IROp op);
@@ -340,6 +329,9 @@ public:
         // Again necessary for & prefix intrinsics. May be removable in the future
     virtual void emitVectorTypeNameImpl(IRType* elementType, IRIntegerValue elementCount) = 0;
 
+    virtual void emitWitnessTable(IRWitnessTable* witnessTable);
+    virtual void emitInterface(IRInterfaceType* interfaceType);
+
     virtual void handleCallExprDecorationsImpl(IRInst* funcValue) { SLANG_UNUSED(funcValue); }
 
     virtual bool tryEmitGlobalParamImpl(IRGlobalParam* varDecl, IRType* varType) { SLANG_UNUSED(varDecl); SLANG_UNUSED(varType); return false; }
@@ -349,6 +341,12 @@ public:
     void _emitUnsizedArrayType(IRUnsizedArrayType* arrayType, EDeclarator* declarator);
     void _emitType(IRType* type, EDeclarator* declarator);
     void _emitInst(IRInst* inst);
+
+        // Emit the argument list (including paranthesis) in a `CallInst`
+    void _emitCallArgList(IRCall* call);
+
+        // Sort witnessTable entries according to the order defined in the witnessed interface type.
+    List<IRWitnessTableEntry*> getSortedWitnessTableEntries(IRWitnessTable* witnessTable);
     
     BackEndCompileRequest* m_compileRequest = nullptr;
 
@@ -363,8 +361,8 @@ public:
 
     // The target language we want to generate code for
     CodeGenTarget m_target;
-    // Source style - a simplification of the more nuanced m_target
-    SourceStyle m_sourceStyle;
+    // Source language (based on the more nuanced m_target)
+    SourceLanguage m_sourceLanguage;
 
     // Where source is written to
     SourceWriter* m_writer;

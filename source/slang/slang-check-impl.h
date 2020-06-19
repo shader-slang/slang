@@ -491,6 +491,18 @@ namespace Slang
         // Capture the "base" expression in case this is a member reference
         Expr* GetBaseExpr(Expr* expr);
 
+            /// Validate a declaration to ensure that it doesn't introduce a circularly-defined constant
+            ///
+            /// Circular definition in a constant may lead to infinite looping or stack overflow in
+            /// the compiler, so it needs to be protected against.
+            ///
+            /// Note that this function does *not* protect against circular definitions in general,
+            /// and a program that indirectly initializes a global variable using its own value (e.g.,
+            /// by calling a function that indirectly reads the variable) will be allowed and then
+            /// exhibit undefined behavior at runtime.
+            ///
+        void _validateCircularVarDefinition(VarDeclBase* varDecl);
+
     public:
 
         bool ValuesAreEqual(
@@ -778,6 +790,9 @@ namespace Slang
 
         bool isIntegerBaseType(BaseType baseType);
 
+            /// Is `type` a scalar integer type.
+        bool isScalarIntegerType(Type* type);
+
         // Validate that `type` is a suitable type to use
         // as the tag type for an `enum`
         void validateEnumTagType(Type* type, SourceLoc const& loc);
@@ -827,15 +842,50 @@ namespace Slang
             return getNamePool()->getName(text);
         }
 
-        IntVal* TryConstantFoldExpr(
-            InvokeExpr* invokeExpr);
+            /// Helper type to detect and catch circular definitions when folding constants,
+            /// to prevent the compiler from going into infinite loops or overflowing the stack.
+        struct ConstantFoldingCircularityInfo
+        {
+            ConstantFoldingCircularityInfo(
+                Decl*                           decl,
+                ConstantFoldingCircularityInfo* next)
+                : decl(decl)
+                , next(next)
+            {}
 
-        IntVal* TryConstantFoldExpr(
-            Expr* expr);
+                /// A declaration whose value is contributing to the constant being folded
+            Decl*                           decl = nullptr;
 
-        // Try to check an integer constant expression, either returning the value,
-        // or NULL if the expression isn't recognized as a constant.
-        IntVal* TryCheckIntegerConstantExpression(Expr* exp);
+                /// The rest of the links in the chain of declarations being folded
+            ConstantFoldingCircularityInfo* next = nullptr;
+        };
+
+            /// Try to apply front-end constant folding to determine the value of `invokeExpr`.
+        IntVal* tryConstantFoldExpr(
+            InvokeExpr*                     invokeExpr,
+            ConstantFoldingCircularityInfo* circularityInfo);
+
+            /// Try to apply front-end constant folding to determine the value of `expr`.
+        IntVal* tryConstantFoldExpr(
+            Expr*                           expr,
+            ConstantFoldingCircularityInfo* circularityInfo);
+
+        bool _checkForCircularityInConstantFolding(
+            Decl*                           decl,
+            ConstantFoldingCircularityInfo* circularityInfo);
+
+            /// Try to resolve a compile-time constant `IntVal` from the given `declRef`.
+        IntVal* tryConstantFoldDeclRef(
+            DeclRef<VarDeclBase> const&     declRef,
+            ConstantFoldingCircularityInfo* circularityInfo);
+
+            /// Try to extract the value of an integer constant expression, either
+            /// returning the `IntVal` value, or null if the expression isn't recognized
+            /// as an integer constant.
+            ///
+        IntVal* tryFoldIntegerConstantExpression(
+            Expr*                           expr,
+            ConstantFoldingCircularityInfo* circularityInfo);
 
         // Enforce that an expression resolves to an integer constant, and get its value
         IntVal* CheckIntegerConstantExpression(Expr* inExpr);

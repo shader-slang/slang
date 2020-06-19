@@ -1,0 +1,8 @@
+result code = 1
+standard error = {
+tests/diagnostics/gh-1374.slang(9): error 39999: the initial-value expression for variable 'kVal' depends on the value of the variable itself
+tests/diagnostics/gh-1374.slang(11): error 39999: the initial-value expression for variable 'kInf' depends on the value of the variable itself
+tests/diagnostics/gh-1374.slang(14): error 39999: the initial-value expression for variable 'kB' depends on the value of the variable itself
+}
+standard output = {
+}

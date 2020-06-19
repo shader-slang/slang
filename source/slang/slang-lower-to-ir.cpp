@@ -1034,7 +1034,8 @@ struct ValLoweringVisitor : ValVisitor<ValLoweringVisitor, LoweredValInfo, Lower
     LoweredValInfo visitDeclaredSubtypeWitness(DeclaredSubtypeWitness* val)
     {
         return emitDeclRef(context, val->declRef,
-            context->irBuilder->getWitnessTableType());
+            context->irBuilder->getWitnessTableType(
+                lowerType(context, DeclRefType::create(context->astBuilder, val->declRef))));
     }
 
     LoweredValInfo visitTransitiveSubtypeWitness(
@@ -1105,7 +1106,8 @@ struct ValLoweringVisitor : ValVisitor<ValLoweringVisitor, LoweredValInfo, Lower
             UNREACHABLE_RETURN(LoweredValInfo());
         }
 
-        auto irWitnessTable = getBuilder()->createWitnessTable();
+        auto irWitnessTableBaseType = lowerType(context, supDeclRefType);
+        auto irWitnessTable = getBuilder()->createWitnessTable(irWitnessTableBaseType);
 
         // Now we will iterate over the requirements (members) of the
         // interface and try to synthesize an appropriate value for each.
@@ -3609,18 +3611,47 @@ struct StmtLoweringVisitor : StmtVisitor<StmtLoweringVisitor>
     {
         startBlockIfNeeded(stmt);
 
-        // A `return` statement turns into a return
-        // instruction. If the statement had an argument
-        // expression, then we need to lower that to
-        // a value first, and then emit the resulting value.
+        // A `return` statement turns into a `return` instruction,
+        // but we have two kinds of `return`: one for returning
+        // a (non-`void`) value, and one for returning "no value"
+        // (which effectively returns a value of type `void`).
+        //
         if( auto expr = stmt->expression )
         {
+            // If the AST `return` statement had an expression, then we
+            // need to lower it to the IR at this point, both to
+            // compute its value and (in case we are returning a
+            // `void`-typed expression) to execute its side effects.
+            //
             auto loweredExpr = lowerRValueExpr(context, expr);
 
-            getBuilder()->emitReturn(getSimpleVal(context, loweredExpr));
+            // If the AST `return` statement was returning a non-`void`
+            // value, then we need to emit an IR `return` of that value.
+            //
+            if(!expr->type.type->equals(context->astBuilder->getVoidType()))
+            {
+                getBuilder()->emitReturn(getSimpleVal(context, loweredExpr));
+            }
+            else
+            {
+                // If the type of the value returned was `void`, then
+                // we don't want to emit an IR-level `return` with a value,
+                // because that could trip up some of our back-end.
+                //
+                // TODO: We should eventually have only a single IR-level
+                // `return` operation that always takes a value (including
+                // values of type `void`), and then treat an AST `return;`
+                // as equivalent to something like `return void();`.
+                //
+                getBuilder()->emitReturn();
+            }
         }
         else
         {
+            // If we hit this case, then the AST `return` was a `return;`
+            // with no value, which can only occur in a function with
+            // a `void` result type.
+            //
             getBuilder()->emitReturn();
         }
     }
@@ -4450,8 +4481,8 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
         {
             // This is a constraint on a global generic type parameters,
             // and so it should lower as a parameter of its own.
-
-            auto inst = getBuilder()->emitGlobalGenericWitnessTableParam();
+            auto supType = lowerType(context, decl->getSup().type);
+            auto inst = getBuilder()->emitGlobalGenericWitnessTableParam(supType);
             addLinkageDecoration(context, inst, decl);
             return LoweredValInfo::simple(inst);
         }
@@ -4524,7 +4555,8 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
                     if(!mapASTToIRWitnessTable.TryGetValue(astReqWitnessTable, irSatisfyingWitnessTable))
                     {
                         // Need to construct a sub-witness-table
-                        irSatisfyingWitnessTable = subBuilder->createWitnessTable();
+                        auto irWitnessTableBaseType = lowerType(subContext, astReqWitnessTable->baseType);
+                        irSatisfyingWitnessTable = subBuilder->createWitnessTable(irWitnessTableBaseType);
 
                         // Recursively lower the sub-table.
                         lowerWitnessTable(
@@ -4637,10 +4669,10 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
         // and we need those parameters to lower as references to
         // the parameters of our IR-level generic.
         //
-        lowerType(subContext, superType);
+        auto irWitnessTableBaseType = lowerType(subContext, superType);
 
         // Create the IR-level witness table
-        auto irWitnessTable = subBuilder->createWitnessTable();
+        auto irWitnessTable = subBuilder->createWitnessTable(irWitnessTableBaseType);
         addLinkageDecoration(context, irWitnessTable, inheritanceDecl, mangledName.getUnownedSlice());
 
         // Register the value now, rather than later, to avoid any possible infinite recursion.
@@ -5243,9 +5275,10 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
         // a witness table for the interface type's conformance
         // to its own interface.
         //
+        List<IRStructKey*> requirementKeys;
         for (auto requirementDecl : decl->members)
         {
-            getInterfaceRequirementKey(requirementDecl);
+            requirementKeys.add(getInterfaceRequirementKey(requirementDecl));
 
             // As a special case, any type constraints placed
             // on an associated type will *also* need to be turned
@@ -5254,7 +5287,7 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
             {
                 for (auto constraintDecl : associatedTypeDecl->getMembersOfType<TypeConstraintDecl>())
                 {
-                    getInterfaceRequirementKey(constraintDecl);
+                    requirementKeys.add(getInterfaceRequirementKey(constraintDecl));
                 }
             }
         }
@@ -5267,11 +5300,12 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
         // Emit any generics that should wrap the actual type.
         emitOuterGenerics(subContext, decl, decl);
 
-        IRInterfaceType* irInterface = subBuilder->createInterfaceType();
+        IRInterfaceType* irInterface = subBuilder->createInterfaceType(
+            requirementKeys.getCount(),
+            reinterpret_cast<IRInst**>(requirementKeys.getBuffer()));
         addNameHint(context, irInterface, decl);
         addLinkageDecoration(context, irInterface, decl);
         subBuilder->setInsertInto(irInterface);
-
         // TODO: are there any interface members that should be
         // nested inside the interface type itself?
 
@@ -5695,7 +5729,7 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
             {
                 // TODO: use a `TypeKind` to represent the
                 // classifier of the parameter.
-                auto param = subBuilder->emitParam(nullptr);
+                auto param = subBuilder->emitParam(subBuilder->getTypeType());
                 addNameHint(context, param, typeParamDecl);
                 setValue(subContext, typeParamDecl, LoweredValInfo::simple(param));
             }
@@ -5715,7 +5749,8 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
             {
                 // TODO: use a `WitnessTableKind` to represent the
                 // classifier of the parameter.
-                auto param = subBuilder->emitParam(nullptr);
+                auto param = subBuilder->emitParam(subBuilder->getWitnessTableType(
+                    lowerType(context, constraintDecl->sup.type)));
                 addNameHint(context, param, constraintDecl);
                 setValue(subContext, constraintDecl, LoweredValInfo::simple(param));
             }
@@ -6122,6 +6157,8 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
 
                 LoweredValInfo paramVal;
 
+                IRParam* irParam = nullptr;
+
                 switch( paramInfo.direction )
                 {
                 default:
@@ -6131,15 +6168,15 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
                         //
                         // TODO: Is this the best representation we can use?
 
-                        IRParam* irParamPtr = subBuilder->emitParam(irParamType);
+                        irParam = subBuilder->emitParam(irParamType);
                         if(auto paramDecl = paramInfo.decl)
                         {
-                            addVarDecorations(context, irParamPtr, paramDecl);
-                            subBuilder->addHighLevelDeclDecoration(irParamPtr, paramDecl);
+                            addVarDecorations(context, irParam, paramDecl);
+                            subBuilder->addHighLevelDeclDecoration(irParam, paramDecl);
                         }
-                        addParamNameHint(irParamPtr, paramInfo);
+                        addParamNameHint(irParam, paramInfo);
 
-                        paramVal = LoweredValInfo::ptr(irParamPtr);
+                        paramVal = LoweredValInfo::ptr(irParam);
 
                         // TODO: We might want to copy the pointed-to value into
                         // a temporary at the start of the function, and then copy
@@ -6159,7 +6196,7 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
                         // We start by declaring an IR parameter of the same type.
                         //
                         auto paramDecl = paramInfo.decl;
-                        IRParam* irParam = subBuilder->emitParam(irParamType);
+                        irParam = subBuilder->emitParam(irParamType);
                         if( paramDecl )
                         {
                             addVarDecorations(context, irParam, paramDecl);
@@ -6214,6 +6251,14 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
                 if (paramInfo.isThisParam)
                 {
                     subContext->thisVal = paramVal;
+                    subBuilder->addThisPointerDecoration(irParam);
+                }
+
+                // Add a [polymorphic] decoration for generic-typed parameters.
+                if (as<IRParam>(irParamType) &&
+                    as<IRTypeType>(irParamType->getFullType()))
+                {
+                    subBuilder->addPolymorphicDecoration(irParam);
                 }
             }
 
@@ -6557,12 +6602,15 @@ IRInst* lowerSubstitutionArg(
     else if (auto declaredSubtypeWitness = as<DeclaredSubtypeWitness>(val))
     {
         // We need to look up the IR-level representation of the witness (which will be a witness table).
+        auto supType = lowerType(
+            context,
+            DeclRefType::create(context->astBuilder, declaredSubtypeWitness->declRef));
         auto irWitnessTable = getSimpleVal(
             context,
             emitDeclRef(
                 context,
                 declaredSubtypeWitness->declRef,
-                context->irBuilder->getWitnessTableType()));
+                context->irBuilder->getWitnessTableType(supType)));
         return irWitnessTable;
     }
     else

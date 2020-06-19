@@ -3,6 +3,9 @@
 
 #include "slang-name.h"
 
+#include "../core/slang-memory-arena.h"
+#include "../core/slang-dictionary.h"
+
 #include <assert.h>
 
 #ifdef _WIN32
@@ -268,11 +271,86 @@ void DiagnosticSink::diagnoseRaw(
 
 namespace Diagnostics
 {
-#define DIAGNOSTIC(id, severity, name, messageFormat) const DiagnosticInfo name = { id, Severity::severity, messageFormat };
+#define DIAGNOSTIC(id, severity, name, messageFormat) const DiagnosticInfo name = { id, Severity::severity, #name, messageFormat };
 #include "slang-diagnostic-defs.h"
+#undef DIAGNOSTIC
 }
 
-DiagnosticInfo const* findDiagnosticByName(UnownedStringSlice const& name)
+static const DiagnosticInfo* const kAllDiagnostics[] =
+{
+#define DIAGNOSTIC(id, severity, name, messageFormat) &Diagnostics::name, 
+#include "slang-diagnostic-defs.h"
+#undef DIAGNOSTIC
+};
+
+class DiagnosticsLookup : public RefObject
+{
+public:
+    const DiagnosticInfo* findDiagostic(const UnownedStringSlice& slice) const
+    {
+        const Index* indexPtr = m_map.TryGetValue(slice);
+        return indexPtr ? kAllDiagnostics[*indexPtr] : nullptr;
+    }
+    Index _findDiagnosticIndex(const UnownedStringSlice& slice) const
+    {
+        const Index* indexPtr = m_map.TryGetValue(slice);
+        return indexPtr ? *indexPtr : 0;
+    }
+    static DiagnosticsLookup* getSingleton()
+    {
+        static RefPtr<DiagnosticsLookup> singleton = new DiagnosticsLookup;
+        return singleton;
+    }
+
+protected:
+    void _add(const char* name, Index index)
+    {
+        m_map.Add(UnownedStringSlice(name), index);
+
+        // Add a dashed version        
+        {
+            m_work.Clear();
+
+            bool isPreviousLower = false;
+            for (const char* cur = name; *cur; cur++)
+            {
+                char c = *cur;
+                bool isLower = (c >= 'a' && c <= 'z');
+                if (c >= 'A' && c <= 'Z')
+                {
+                    if (isPreviousLower)
+                    {
+                        m_work << '-';
+                    }
+                    // Make it lower
+                    c = c - 'A' + 'a';
+                }
+                m_work << c;
+                isPreviousLower = isLower;
+            }
+
+            UnownedStringSlice dashSlice(m_arena.allocateString(m_work.getBuffer(), m_work.getLength()), m_work.getLength());
+            m_map.AddIfNotExists(dashSlice, index);
+        }
+    }
+    void _addAlias(const char* name, const char* diagnosticName)
+    {
+        const Index index = _findDiagnosticIndex(UnownedStringSlice(diagnosticName));
+        SLANG_ASSERT(index >= 0);
+        if (index >= 0)
+        {
+            _add(name, index);
+        }
+    }
+    DiagnosticsLookup();
+
+    StringBuilder m_work;
+    Dictionary<UnownedStringSlice, Index> m_map;
+    MemoryArena m_arena;
+};
+
+DiagnosticsLookup::DiagnosticsLookup():
+    m_arena(2048)
 {
     // TODO: We should eventually have a more formal system for associating individual
     // diagnostics, or groups of diagnostics, with user-exposed names for use when
@@ -281,21 +359,20 @@ DiagnosticInfo const* findDiagnosticByName(UnownedStringSlice const& name)
     // For now we build an ad hoc mapping from string names to corresponding single
     // diagnostics (not groups).
     //
-    static const struct
-    {
-        char const*             name;
-        DiagnosticInfo const*   diagnostic;
-    } kDiagnostics[] =
-    {
-        { "overlapping-bindings", &Diagnostics::parameterBindingsOverlap },
-    };
 
-    for( auto& entry : kDiagnostics )
+    for (Index i = 0; i < SLANG_COUNT_OF(kAllDiagnostics); ++i)
     {
-        if( name == entry.name )
-            return entry.diagnostic;
+        const DiagnosticInfo* diagnostic = kAllDiagnostics[i];
+        _add(diagnostic->name, i);
     }
-    return nullptr;
+
+    // Add any aliases
+    _addAlias("overlappingBindings", "parameterBindingsOverlap");
+}
+
+DiagnosticInfo const* findDiagnosticByName(UnownedStringSlice const& name)
+{
+    return DiagnosticsLookup::getSingleton()->findDiagostic(name);
 }
 
 

@@ -11,6 +11,7 @@
 #include "slang-ir-glsl-legalize.h"
 #include "slang-ir-insts.h"
 #include "slang-ir-link.h"
+#include "slang-ir-lower-generics.h"
 #include "slang-ir-restructure.h"
 #include "slang-ir-restructure-scoping.h"
 #include "slang-ir-specialize.h"
@@ -270,7 +271,20 @@ Result linkAndOptimizeIR(
     // perform specialization of functions based on parameter
     // values that need to be compile-time constants.
     //
-    specializeModule(irModule);
+    if (!compileRequest->allowDynamicCode)
+        specializeModule(irModule);
+
+    switch (target)
+    {
+    case CodeGenTarget::CPPSource:
+        // For targets that supports dynamic dispatch, we need to lower the
+        // generics / interface types to ordinary functions and types using
+        // function pointers.
+        lowerGenerics(irModule);
+        break;
+    default:
+        break;
+    }
 
     // Debugging code for IR transformations...
 #if 0
@@ -294,7 +308,7 @@ Result linkAndOptimizeIR(
 
     // We don't need the legalize pass for C/C++ based types
     if(options.shouldLegalizeExistentialAndResourceTypes )
-//    if (!(sourceStyle == SourceStyle::CPP || sourceStyle == SourceStyle::C))
+//    if (!(sourceLanguage == SourceLanguage::CPP || sourceStyle == SourceLanguage::C))
     {
         // The Slang language allows interfaces to be used like
         // ordinary types (including placing them in constant
@@ -388,6 +402,7 @@ Result linkAndOptimizeIR(
 #if 0
     dumpIRIfEnabled(compileRequest, irModule, "AFTER RESOURCE SPECIALIZATION");
 #endif
+
     validateIRModuleIfEnabled(compileRequest, irModule);
 
     // For HLSL (and fxc/dxc) only, we need to "wrap" any
@@ -480,7 +495,7 @@ Result linkAndOptimizeIR(
                 auto profile = targetRequest->targetProfile;
                 if( profile.getFamily() == ProfileFamily::DX )
                 {
-                    if(profile.GetVersion() <= ProfileVersion::DX_5_0)
+                    if(profile.getVersion() <= ProfileVersion::DX_5_0)
                     {
                         // Fxc and earlier dxc versions do not support
                         // a templates `.Load<T>` operation on byte-address
@@ -557,11 +572,14 @@ Result linkAndOptimizeIR(
         break;
     }
 
-    // For all targets that don't support true dynamic dispatch through
-    // witness tables (that is all targets at present), we need
-    // to eliminate witness tables from the IR so that they
-    // don't keep symbols live that we don't actually need.
-    stripWitnessTables(irModule);
+    if (!compileRequest->allowDynamicCode)
+    {
+        // For all targets that don't support true dynamic dispatch through
+        // witness tables, we need to eliminate witness tables from the IR so
+        // that they don't keep symbols live that we don't actually need.
+        stripWitnessTables(irModule);
+    }
+
 #if 0
     dumpIRIfEnabled(compileRequest, irModule, "AFTER STRIP WITNESS TABLES");
 #endif
@@ -628,27 +646,25 @@ SlangResult emitEntryPointSourceFromIR(
 
     RefPtr<CLikeSourceEmitter> sourceEmitter;
     
-    typedef CLikeSourceEmitter::SourceStyle SourceStyle;
-
-    SourceStyle sourceStyle = CLikeSourceEmitter::getSourceStyle(target);
-    switch (sourceStyle)
+    SourceLanguage sourceLanguage = CLikeSourceEmitter::getSourceLanguage(target);
+    switch (sourceLanguage)
     {
-        case SourceStyle::CPP:
+        case SourceLanguage::CPP:
         {
             sourceEmitter = new CPPSourceEmitter(desc);
             break;
         }
-        case SourceStyle::GLSL:
+        case SourceLanguage::GLSL:
         {
             sourceEmitter = new GLSLSourceEmitter(desc);
             break;
         }
-        case SourceStyle::HLSL:
+        case SourceLanguage::HLSL:
         {
             sourceEmitter = new HLSLSourceEmitter(desc);
             break;
         }
-        case SourceStyle::CUDA:
+        case SourceLanguage::CUDA:
         {
             sourceEmitter = new CUDASourceEmitter(desc);
             break;
@@ -669,14 +685,14 @@ SlangResult emitEntryPointSourceFromIR(
 
         linkingAndOptimizationOptions.sourceEmitter = sourceEmitter;
 
-        switch( sourceStyle )
+        switch( sourceLanguage )
         {
         default:
             break;
 
-        case SourceStyle::CPP:
-        case SourceStyle::C:
-        case SourceStyle::CUDA:
+        case SourceLanguage::CPP:
+        case SourceLanguage::C:
+        case SourceLanguage::CUDA:
             linkingAndOptimizationOptions.shouldLegalizeExistentialAndResourceTypes = false;
             break;
         }
@@ -697,6 +713,9 @@ SlangResult emitEntryPointSourceFromIR(
         //
         // TODO: do we want to emit directly from IR, or translate the
         // IR back into AST for emission?
+#if 0
+        dumpIR(compileRequest, irModule, "PRE-EMIT");
+#endif
         sourceEmitter->emitModule(irModule);
     }
 
@@ -707,25 +726,8 @@ SlangResult emitEntryPointSourceFromIR(
     // it is time to stitch together the final output.
 
     {
-        Session* session = compileRequest->getSession();
-
-        // Get the downstream compiler needed for final target
-        PassThroughMode passThru = getDownstreamCompilerRequiredForTarget(targetRequest->target);
-
-        // If generic CPP work out what compiler will actually be used
-        if (passThru == PassThroughMode::GenericCCpp)
-        {
-            const SourceLanguage sourceLanguage = (sourceStyle == SourceStyle::C) ? SourceLanguage::C : SourceLanguage::CPP;
-            // Get the compiler used for the language
-            DownstreamCompiler* compiler = session->getDefaultDownstreamCompiler(sourceLanguage);
-            if (compiler)
-            {
-                passThru = PassThroughMode(compiler->getDesc().type);
-            }
-        }
-
         // If there is a prelude emit it
-        const auto& prelude = compileRequest->getSession()->getDownstreamCompilerPrelude(passThru);
+        const auto& prelude = compileRequest->getSession()->getPreludeForLanguage(sourceLanguage);
         if (prelude.getLength() > 0)
         {
             sourceWriter.emit(prelude.getUnownedSlice());
