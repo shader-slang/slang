@@ -160,9 +160,10 @@ struct LinkingAndOptimizationOptions
     CLikeSourceEmitter* sourceEmitter = nullptr;
 };
 
+// TODO(DG): A bit tricky; this needs to be generalized to multiple entry points
 Result linkAndOptimizeIR(
     BackEndCompileRequest*                  compileRequest,
-    Int                                     entryPointIndex,
+    List<Int>                               entryPointIndices,
     CodeGenTarget                           target,
     TargetRequest*                          targetRequest,
     LinkingAndOptimizationOptions const&    options,
@@ -184,7 +185,7 @@ Result linkAndOptimizeIR(
     //
     outLinkedIR = linkIR(
         compileRequest,
-        entryPointIndex,
+        entryPointIndices,
         target,
         targetProgram);
     auto irModule = outLinkedIR.module;
@@ -286,6 +287,9 @@ Result linkAndOptimizeIR(
         break;
     }
 
+    // TODO(DG): There are multiple DCE steps here, which need to be changed
+    // CHECK: how to these modules work?
+    // so that they don't just throw out any non-entry point code
     // Debugging code for IR transformations...
 #if 0
     dumpIRIfEnabled(compileRequest, irModule, "SPECIALIZED");
@@ -604,19 +608,23 @@ Result linkAndOptimizeIR(
     return SLANG_OK;
 }
 
+// TODO(DG): This probably needs to be generalized to a list
 SlangResult emitEntryPointSourceFromIR(
     BackEndCompileRequest*  compileRequest,
-    Int                     entryPointIndex,
+    List<Int>               entryPointIndices,
     CodeGenTarget           target,
     TargetRequest*          targetRequest,
     SourceResult&       outSource)
 {
+    // Temporary assertion for checkpoint
+    SLANG_ASSERT(entryPointIndices.getCount() == 1);
     outSource.reset();
 
     auto sink = compileRequest->getSink();
     auto program = compileRequest->getProgram();
 
-    auto entryPoint = program->getEntryPoint(entryPointIndex);
+    // TODO(DG): Update from assertion
+    auto entryPoint = program->getEntryPoint(entryPointIndices[0]);
 
     auto lineDirectiveMode = compileRequest->getLineDirectiveMode();
     // To try to make the default behavior reasonable, we will
@@ -636,6 +644,8 @@ SlangResult emitEntryPointSourceFromIR(
 
     desc.compileRequest = compileRequest;
     desc.target = target;
+    // TODO(DG): Can't assume a single entry point stage for multiple entry points
+    // CHECK: doesn't this just go into a loop over entryPoints?
     desc.entryPointStage = entryPoint->getStage();
     desc.effectiveProfile = getEffectiveProfile(entryPoint, targetRequest);
     desc.sourceWriter = &sourceWriter;
@@ -699,7 +709,7 @@ SlangResult emitEntryPointSourceFromIR(
 
         linkAndOptimizeIR(
             compileRequest,
-            entryPointIndex,
+            entryPointIndices,
             target,
             targetRequest,
             linkingAndOptimizationOptions,
@@ -770,23 +780,25 @@ SlangResult emitSPIRVFromIR(
 
 SlangResult emitSPIRVForEntryPointDirectly(
     BackEndCompileRequest*  compileRequest,
-    Int                     entryPointIndex,
+    List<Int>               entryPointIndices,
     TargetRequest*          targetRequest,
     List<uint8_t>&          spirvOut)
 {
+    // TODO(DG): Temporary assertion for checkpoint
+    SLANG_ASSERT(entryPointIndices.getCount() == 1);
     auto sink = compileRequest->getSink();
     auto program = compileRequest->getProgram();
     auto targetProgram = program->getTargetProgram(targetRequest);
     auto programLayout = targetProgram->getOrCreateLayout(sink);
 
-    RefPtr<EntryPointLayout> entryPointLayout = programLayout->entryPoints[entryPointIndex];
+    RefPtr<EntryPointLayout> entryPointLayout = programLayout->entryPoints[entryPointIndices[0]];
 
     // Outside because we want to keep IR in scope whilst we are processing emits
     LinkedIR linkedIR;
     LinkingAndOptimizationOptions linkingAndOptimizationOptions;
     linkAndOptimizeIR(
         compileRequest,
-        entryPointIndex,
+        entryPointIndices,
         targetRequest->getTarget(),
         targetRequest,
         linkingAndOptimizationOptions,

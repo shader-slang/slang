@@ -82,7 +82,8 @@ namespace Slang
         // Now let's go ahead and generate HLSL for the entry
         // point, since we'll need that to feed into dxc.
         SourceResult source;
-        SLANG_RETURN_ON_FAIL(emitEntryPointSource(compileRequest, entryPointIndex, targetReq, CodeGenTarget::HLSL, endToEndReq, source));
+        //SLANG_RETURN_ON_FAIL(emitEntryPointsSource(compileRequest, List<Int>(entryPointIndex),
+        //    targetReq, CodeGenTarget::HLSL, endToEndReq, source));
 
         const auto& hlslCode = source.source;
 
@@ -190,7 +191,9 @@ namespace Slang
             args[argCount++] = L"-enable-16bit-types";
         }
 
-        const String sourcePath = calcSourcePathForEntryPoint(endToEndReq, entryPointIndex);
+        List<Int> entryPointIndices;
+        entryPointIndices.add(entryPointIndex);
+        const String sourcePath = calcSourcePathForEntryPoints(endToEndReq, entryPointIndices);
 
         ComPtr<IDxcOperationResult> dxcResult;
         SLANG_RETURN_ON_FAIL(dxcCompiler->Compile(dxcSourceBlob,

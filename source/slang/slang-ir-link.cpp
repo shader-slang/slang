@@ -1346,9 +1346,10 @@ struct IRSpecializationState
     }
 };
 
+// TODO(DG): Generalize to multiple entry points
 LinkedIR linkIR(
     BackEndCompileRequest*  compileRequest,
-    Int                     entryPointIndex,
+    List<Int>               entryPointIndices,
     CodeGenTarget           target,
     TargetProgram*          targetProgram)
 {
@@ -1446,7 +1447,11 @@ LinkedIR linkIR(
     // arguments which might end up affecting the mangled
     // entry point name.
     //
-    auto entryPointMangledName = program->getEntryPointMangledName(entryPointIndex);
+    // TODO(DG): spot to generalize to multiple entry points
+    // Note that only stuff referenced by an entry point gets linked here
+    // Temporary assertion for checkpoint
+    SLANG_ASSERT(entryPointIndices.getCount() == 1);
+    auto entryPointMangledName = program->getEntryPointMangledName(entryPointIndices[0]);
     auto irEntryPoint = specializeIRForEntryPoint(context, entryPointMangledName);
 
     // Bindings for global generic parameters are currently represented

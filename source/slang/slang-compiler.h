@@ -1129,6 +1129,7 @@ namespace Slang
         SlangTargetFlags    targetFlags = 0;
         Slang::Profile      targetProfile = Slang::Profile();
         FloatingPointMode   floatingPointMode = FloatingPointMode::Default;
+        bool                isWholeProgramRequest = false;
 
         Linkage* getLinkage() { return linkage; }
         CodeGenTarget getTarget() { return target; }
@@ -1681,7 +1682,13 @@ namespace Slang
             /// code generation to the given `sink`.
             ///
         CompileResult& getOrCreateEntryPointResult(Int entryPointIndex, DiagnosticSink* sink);
+        CompileResult& getOrCreateWholeProgramResult(List<Int> entryPointIndices, DiagnosticSink* sink);
 
+
+        CompileResult& getExistingWholeProgramResult()
+        {
+            return m_wholeProgramResult;
+        }
             /// Get the compiled code for an entry point on the target.
             ///
             /// This routine assumes that `getOrCreateEntryPointResult`
@@ -1692,7 +1699,10 @@ namespace Slang
             return m_entryPointResults[entryPointIndex];
         }
 
-
+        CompileResult& _createWholeProgramResult(
+            List<Int>               entryPointIndices,
+            BackEndCompileRequest*  backEndRequest,
+            EndToEndCompileRequest* endToEndRequest);
             /// Internal helper for `getOrCreateEntryPointResult`.
             ///
             /// This is used so that command-line and API-based
@@ -1727,6 +1737,7 @@ namespace Slang
         // Generated compile results for each entry point
         // in the parent `Program` (indexing matches
         // the order they are given in the `Program`)
+        CompileResult m_wholeProgramResult;
         List<CompileResult> m_entryPointResults;
 
         RefPtr<IRModule> m_irModuleForLayout;
@@ -1839,6 +1850,7 @@ namespace Slang
             // An empty string indices no output desired for
             // the given entry point.
             Dictionary<Int, String> entryPointOutputPaths;
+            String wholeTargetOutputPath;
         };
         Dictionary<TargetRequest*, RefPtr<TargetInfo>> targetInfos;
 
@@ -1944,7 +1956,9 @@ namespace Slang
     @param endToEndReq The end-to-end compile request which might be using pass-through compilation
     @param entryPointIndex The index of the entry point to compute a filename for.
     @return the appropriate source filename */
-    String calcSourcePathForEntryPoint(EndToEndCompileRequest* endToEndReq, UInt entryPointIndex);
+    // TODO(DG): Note to reviewer; this was changed from UInt to List<Int> -- let me know if that's a problem
+    //   and I can work out the appropriate casts
+    String calcSourcePathForEntryPoints(EndToEndCompileRequest* endToEndReq, List<Int> entryPointIndices);
 
     struct SourceResult
     {
@@ -1961,9 +1975,9 @@ namespace Slang
 
     /* Emits entry point source taking into account if a pass-through or not. Uses 'target' to determine
     the target (not targetReq) */
-    SlangResult emitEntryPointSource(
+    SlangResult emitEntryPointsSource(
         BackEndCompileRequest*  compileRequest,
-        Int                     entryPointIndex,
+        List<Int>               entryPointIndices,
         TargetRequest*          targetReq,
         CodeGenTarget           target,
         EndToEndCompileRequest* endToEndReq,
