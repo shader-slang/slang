@@ -237,18 +237,15 @@ List<IRWitnessTableEntry*> CLikeSourceEmitter::getSortedWitnessTableEntries(IRWi
     for (UInt i = 0; i < interfaceType->getOperandCount(); i++)
     {
         auto reqKey = cast<IRStructKey>(interfaceType->getOperand(i));
-        bool matchingEntryFound = false;
         IRWitnessTableEntry* entry = nullptr;
         if (witnessTableEntryDictionary.TryGetValue(reqKey, entry))
         {
-            if (entry->requirementKey.get() == reqKey)
-            {
-                matchingEntryFound = true;
-                sortedWitnessTableEntries.add(entry);
-                break;
-            }
+            sortedWitnessTableEntries.add(entry);
         }
-        SLANG_ASSERT(matchingEntryFound);
+        else
+        {
+            SLANG_UNREACHABLE("interface requirement key not found in witness table.");
+        }
     }
     return sortedWitnessTableEntries;
 }
