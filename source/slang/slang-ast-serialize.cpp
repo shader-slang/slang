@@ -11,6 +11,11 @@
 
 namespace Slang {
 
+// Type used to implement mechanisms to convert to and from serial types.
+template <typename T>
+struct ASTSerialTypeInfo;
+
+
 // Things stored as references
 // NodeBase derived types
 // String
@@ -154,8 +159,25 @@ public:
     template <typename T>
     ASTSerialIndex addArray(const T* in, Index count)
     {
-        SLANG_UNUSED(in);
-        SLANG_UNUSED(count);
+        typedef typename ASTSerialTypeInfo<T> ElementTypeInfo;
+        typedef typename ElementTypeInfo::SerialType ElementSerialType;
+
+        if (std::is_same<T, ElementSerialType>::value)
+        {
+            // If they are the same we can just write out
+        }
+        else
+        {
+            // Else we need to convert
+            List<ElementSerialType> work;
+            work.setCount(count);
+
+            for (Index i = 0; i < count; ++i)
+            {
+                ElementTypeInfo::toSerial(this, &in[i], &work[i]);
+            }
+        }
+
         return ASTSerialIndex(0);
     }
 
@@ -247,8 +269,10 @@ struct ASTSerialIdentityTypeInfo
     static void toNative(ASTSerialReader* reader, const void* serial, void* native) { SLANG_UNUSED(reader); *(T*)native = *(const T*)serial; }
 };
 
-template <typename T>
-struct ASTSerialTypeInfo;
+// Don't need to convert the index type
+
+template <>
+struct ASTSerialTypeInfo<ASTSerialIndex> : public ASTSerialIdentityTypeInfo<ASTSerialIndex> {};
 
 // Implement for Basic Types
 
@@ -576,6 +600,67 @@ struct ASTSerialTypeInfo<LookupResult>
         auto& dst = *(SerialType*)serial;
 
         SLANG_UNUSED(dst);
+    }
+};
+
+
+// GlobalGenericParamSubstitution::ConstraintArg
+template <>
+struct ASTSerialTypeInfo<GlobalGenericParamSubstitution::ConstraintArg>
+{
+    typedef GlobalGenericParamSubstitution::ConstraintArg NativeType;
+    struct SerialType
+    {
+        ASTSerialIndex decl;
+        ASTSerialIndex val;
+    };
+    enum { SerialAlignment = sizeof(ASTSerialIndex) };
+
+    static void toSerial(ASTSerialWriter* writer, const void* native, void* serial)
+    {
+        auto& dst = *(SerialType*)serial;
+        auto& src = *(const NativeType*)native;
+
+        dst.decl = writer->addPointer(src.decl);
+        dst.val = writer->addPointer(src.val);
+    }
+    static void toNative(ASTSerialReader* reader, const void* serial, void* native)
+    {
+        auto& src = *(const SerialType*)serial;
+        auto& dst = *(NativeType*)native;
+
+        dst.decl = reader->getPointer(src.decl).dynamicCast<Decl>();
+        dst.val = reader->getPointer(src.val).dynamicCast<Val>();
+    }
+};
+
+// ExpandedSpecializationArg
+template <>
+struct ASTSerialTypeInfo<ExpandedSpecializationArg>
+{
+    typedef ExpandedSpecializationArg NativeType;
+    struct SerialType
+    {
+        ASTSerialIndex val;
+        ASTSerialIndex witness;
+    };
+    enum { SerialAlignment = sizeof(ASTSerialIndex) };
+
+    static void toSerial(ASTSerialWriter* writer, const void* native, void* serial)
+    {
+        auto& dst = *(SerialType*)serial;
+        auto& src = *(const NativeType*)native;
+
+        dst.witness = writer->addPointer(src.witness);
+        dst.val = writer->addPointer(src.val);
+    }
+    static void toNative(ASTSerialReader* reader, const void* serial, void* native)
+    {
+        auto& src = *(const SerialType*)serial;
+        auto& dst = *(NativeType*)native;
+
+        dst.witness = reader->getPointer(src.witness).dynamicCast<Val>();
+        dst.val = reader->getPointer(src.val).dynamicCast<Val>();
     }
 };
 
