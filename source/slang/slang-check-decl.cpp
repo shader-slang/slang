@@ -78,9 +78,15 @@ namespace Slang
 
         void visitConstructorDecl(ConstructorDecl* decl);
 
+        void visitAbstractStorageDeclCommon(ContainerDecl* decl);
+
         void visitSubscriptDecl(SubscriptDecl* decl);
 
+        void visitPropertyDecl(PropertyDecl* decl);
+
         void visitAccessorDecl(AccessorDecl* decl);
+
+        void visitSetterDecl(SetterDecl* decl);
     };
 
     struct SemanticsDeclRedeclarationVisitor
@@ -378,6 +384,30 @@ namespace Slang
 
             qualType.isLeftValue = isLValue;
             return qualType;
+        }
+        else if( auto propertyDeclRef = declRef.as<PropertyDecl>() )
+        {
+            // Access to a declared `property` is similar to
+            // access to a variable/field, except that it
+            // is mediated through accessors (getters, seters, etc.).
+
+            QualType qualType;
+            qualType.type = getType(astBuilder, propertyDeclRef);
+
+            bool isLValue = false;
+
+            // If the property has any declared accessors that
+            // can be used to set the property, then the resulting
+            // expression behaves as an l-value.
+            //
+            if(propertyDeclRef.getDecl()->getMembersOfType<SetterDecl>().isNonEmpty())
+                isLValue = true;
+            if(propertyDeclRef.getDecl()->getMembersOfType<RefAccessorDecl>().isNonEmpty())
+                isLValue = true;
+
+            qualType.isLeftValue = isLValue;
+            return qualType;
+
         }
         else if( auto enumCaseDeclRef = declRef.as<EnumCaseDecl>() )
         {
@@ -3652,19 +3682,19 @@ namespace Slang
         checkCallableDeclCommon(decl);
     }
 
-    void SemanticsDeclHeaderVisitor::visitSubscriptDecl(SubscriptDecl* decl)
+    void SemanticsDeclHeaderVisitor::visitAbstractStorageDeclCommon(ContainerDecl* decl)
     {
-        decl->returnType = CheckUsableType(decl->returnType);
-
-        // If we have a subscript declaration with no accessor declarations,
+        // If we have a subscript or property declaration with no accessor declarations,
         // then we should create a single `GetterDecl` to represent
         // the implicit meaning of their declaration, so:
         //
         //      subscript(uint index) -> T;
+        //      property x : Y;
         //
         // becomes:
         //
         //      subscript(uint index) -> T { get; }
+        //      property x : Y { get; }
         //
 
         bool anyAccessors = decl->getMembersOfType<AccessorDecl>().isNonEmpty();
@@ -3677,8 +3707,21 @@ namespace Slang
             getterDecl->parentDecl = decl;
             decl->members.add(getterDecl);
         }
+    }
+
+    void SemanticsDeclHeaderVisitor::visitSubscriptDecl(SubscriptDecl* decl)
+    {
+        decl->returnType = CheckUsableType(decl->returnType);
+
+        visitAbstractStorageDeclCommon(decl);
 
         checkCallableDeclCommon(decl);
+    }
+
+    void SemanticsDeclHeaderVisitor::visitPropertyDecl(PropertyDecl* decl)
+    {
+        decl->type = CheckUsableType(decl->type);
+        visitAbstractStorageDeclCommon(decl);
     }
 
     void SemanticsDeclHeaderVisitor::visitAccessorDecl(AccessorDecl* decl)
@@ -3693,13 +3736,53 @@ namespace Slang
             ensureDecl(parentSubscript, DeclCheckState::CanUseTypeOfValueDecl);
             decl->returnType = parentSubscript->returnType;
         }
-        // TODO: when we add "property" declarations, check for them here
+        else if (auto parentProperty = as<PropertyDecl>(parent))
+        {
+            ensureDecl(parentProperty, DeclCheckState::CanUseTypeOfValueDecl);
+            decl->returnType = parentProperty->type;
+        }
         else
         {
             getSink()->diagnose(decl, Diagnostics::accessorMustBeInsideSubscriptOrProperty);
         }
 
         checkCallableDeclCommon(decl);
+    }
+
+    void SemanticsDeclHeaderVisitor::visitSetterDecl(SetterDecl* decl)
+    {
+        // Make sure to invoke the common checking logic for all accessors.
+        visitAccessorDecl(decl);
+
+        auto params = decl->getParameters();
+        ParamDecl* param = nullptr;
+        if( params.getCount() >= 1 )
+        {
+            param = params.getFirst();
+            if( params.getCount() > 1 )
+            {
+                // TODO: diagnose it!
+            }
+        }
+        else
+        {
+            param = m_astBuilder->create<ParamDecl>();
+            param->nameAndLoc.name = getName("newValue");
+            param->nameAndLoc.loc = decl->loc;
+
+            param->parentDecl = decl;
+            decl->members.add(param);
+        }
+
+        if( param->type.exp != nullptr )
+        {
+            // TODO: need to assert that it matches the outer
+            // property/subscript declaration...
+        }
+        else
+        {
+            param->type.type = decl->returnType;
+        }
     }
 
     GenericDecl* SemanticsVisitor::GetOuterGeneric(Decl* decl)

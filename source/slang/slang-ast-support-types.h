@@ -836,7 +836,7 @@ namespace Slang
 
         // TODO(tfoley): It is ugly to have these.
         // We should probably fix the call sites instead.
-        const RefPtr<T>& getFirst() { return *begin(); }
+        T* getFirst() { return *begin(); }
         Index getCount() { return getFilterCount<T>(m_filterStyle, m_begin, m_end); }
 
         T* operator[](Index index) const

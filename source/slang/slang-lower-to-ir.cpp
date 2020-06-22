@@ -71,34 +71,12 @@ struct SubscriptInfo : ExtendedValueInfo
     DeclRef<SubscriptDecl> declRef;
 };
 
-// This case is used to indicate a reference to an AST-level
-// subscript operation bound to particular arguments.
-//
-// For example in a case like this:
-//
-//     RWStructuredBuffer<Foo> gBuffer;
-//     ... gBuffer[someIndex] ...
-//
-// the expression `gBuffer[someIndex]` will be lowered to
-// a value that references `RWStructureBuffer<Foo>::operator[]`
-// with arguments `(gBuffer, someIndex)`.
-//
-// Such a value can be an l-value, and depending on the context
-// where it is used, can lower into a call to either the getter
-// or setter operations of the subscript.
-//
-struct BoundSubscriptInfo : ExtendedValueInfo
-{
-    DeclRef<SubscriptDecl>  declRef;
-    IRType*                 type;
-    List<IRInst*>           args;
-};
-
 // Some cases of `ExtendedValueInfo` need to
 // recursively contain `LoweredValInfo`s, and
 // so we forward declare them here and fill
 // them in later.
 //
+struct BoundStorageInfo;
 struct BoundMemberInfo;
 struct SwizzledLValueInfo;
 
@@ -130,7 +108,7 @@ struct LoweredValInfo
 
         // An AST-level subscript operation bound to a particular
         // object and arguments.
-        BoundSubscript,
+        BoundStorage,
 
         // The result of applying swizzling to an l-value
         SwizzledLValue,
@@ -189,13 +167,13 @@ struct LoweredValInfo
         return (SubscriptInfo*)ext;
     }
 
-    static LoweredValInfo boundSubscript(
-        BoundSubscriptInfo* boundSubscriptInfo);
+    static LoweredValInfo boundStorage(
+        BoundStorageInfo* boundStorageInfo);
 
-    BoundSubscriptInfo* getBoundSubscriptInfo()
+    BoundStorageInfo* getBoundStorageInfo()
     {
-        SLANG_ASSERT(flavor == Flavor::BoundSubscript);
-        return (BoundSubscriptInfo*)ext;
+        SLANG_ASSERT(flavor == Flavor::BoundStorage);
+        return (BoundStorageInfo*)ext;
     }
 
     static LoweredValInfo swizzledLValue(
@@ -207,6 +185,49 @@ struct LoweredValInfo
         return (SwizzledLValueInfo*)ext;
     }
 };
+
+// This case is used to indicate a reference to an AST-level
+// operation that accesses abstract storage.
+//
+// This could be an invocation of a `subscript` declaration,
+// with argument representing an index or indices:
+//
+//     RWStructuredBuffer<Foo> gBuffer;
+//     ... gBuffer[someIndex] ...
+//
+// the expression `gBuffer[someIndex]` will be lowered to
+// a value that references `RWStructureBuffer<Foo>::operator[]`
+// with arguments `(gBuffer, someIndex)`.
+//
+// This could also be an reference to a `property` declaration,
+// with no arguments:
+//
+//      struct Sphere { property radius : int { get { ... } } }
+//      Sphere sphere;
+//      ... sphere.radius ...
+//
+// the expression `sphere.radius` will be lowered to a value
+// that references `Sphere::radius` with arguments `(sphere)`.
+//
+// Such a value can be an l-value, and depending on the context
+// where it is used, can lower into a call to either the getter
+// or setter operations of the storage.
+//
+struct BoundStorageInfo : ExtendedValueInfo
+{
+        /// The declaration of the abstract storage (subscript or property)
+    DeclRef<ContainerDecl>  declRef;
+
+        /// The IR-level type of the stored value
+    IRType*                 type;
+
+        /// The base value/object on which storage is being accessed
+    LoweredValInfo          base;
+
+        /// Additional arguments required to reify a reference to the storage
+    List<IRInst*>           additionalArgs;
+};
+
 
 // Represents some declaration bound to a particular
 // object. For example, if we had `obj.f` where `f`
@@ -268,12 +289,12 @@ LoweredValInfo LoweredValInfo::subscript(
     return info;
 }
 
-LoweredValInfo LoweredValInfo::boundSubscript(
-    BoundSubscriptInfo* boundSubscriptInfo)
+LoweredValInfo LoweredValInfo::boundStorage(
+    BoundStorageInfo* boundStorageInfo)
 {
     LoweredValInfo info;
-    info.flavor = Flavor::BoundSubscript;
-    info.ext = boundSubscriptInfo;
+    info.flavor = Flavor::BoundStorage;
+    info.ext = boundStorageInfo;
     return info;
 }
 
@@ -570,67 +591,9 @@ LoweredValInfo emitCallToDeclRef(
     UInt            argCount,
     IRInst* const* args)
 {
+    SLANG_ASSERT(funcType);
+
     auto builder = context->irBuilder;
-
-
-    if (auto subscriptDeclRef = funcDeclRef.as<SubscriptDecl>())
-    {
-        // A reference to a subscript declaration is a special case,
-        // because it is not possible to call a subscript directly;
-        // we must call one of its accessors.
-        //
-        // TODO: everything here will also apply to propery declarations
-        // once we have them, so some of this code might be shared
-        // some day.
-
-        DeclRef<GetterDecl> getterDeclRef;
-        bool justAGetter = true;
-        for (auto accessorDeclRef : getMembersOfType<AccessorDecl>(subscriptDeclRef, MemberFilterStyle::Instance))
-        {
-            // We want to track whether this subscript has any accessors other than
-            // `get` (assuming that everything except `get` can be used for setting...).
-
-            if (auto foundGetterDeclRef = accessorDeclRef.as<GetterDecl>())
-            {
-                // We found a getter.
-                getterDeclRef = foundGetterDeclRef;
-            }
-            else
-            {
-                // There was something other than a getter, so we can't
-                // invoke an accessor just now.
-                justAGetter = false;
-            }
-        }
-
-        if (!justAGetter || !getterDeclRef)
-        {
-            // We can't perform an actual call right now, because
-            // this expression might appear in an r-value or l-value
-            // position (or *both* if it is being passed as an argument
-            // for an `in out` parameter!).
-            //
-            // Instead, we will construct a special-case value to
-            // represent the latent subscript operation (abstractly
-            // this is a reference to a storage location).
-
-            // The abstract storage location will need to include
-            // all the arguments being passed to the subscript operation.
-
-            RefPtr<BoundSubscriptInfo> boundSubscript = new BoundSubscriptInfo();
-            boundSubscript->declRef = subscriptDeclRef;
-            boundSubscript->type = type;
-            boundSubscript->args.addRange(args, argCount);
-
-            context->shared->extValues.add(boundSubscript);
-
-            return LoweredValInfo::boundSubscript(boundSubscript);
-        }
-
-        // Otherwise we are just call the getter, and so that
-        // is what we need to be emitting a call to...
-        funcDeclRef = getterDeclRef;
-    }
 
     auto funcDecl = funcDeclRef.getDecl();
     if(auto intrinsicOpModifier = funcDecl->findModifier<IntrinsicOpModifier>())
@@ -670,22 +633,6 @@ LoweredValInfo emitCallToDeclRef(
 
     // Fallback case is to emit an actual call.
     //
-    // TODO: We are constructing a type that we expect the function
-    // being called to have here, but that type doesn't account
-    // for `in` vs. `out`/`inout` parameters, so it could easily
-    // be wrong. We should sort out why this path in the code
-    // even needs to be computing a type (rather than taking
-    // it directly from the declaration).
-    //
-    if(!funcType)
-    {
-        List<IRType*> argTypes;
-        for(UInt ii = 0; ii < argCount; ++ii)
-        {
-            argTypes.add(args[ii]->getDataType());
-        }
-        funcType = builder->getFuncType(argCount, argTypes.getBuffer(), type);
-    }
     LoweredValInfo funcVal = emitDeclRef(context, funcDeclRef, funcType);
     return emitCallToVal(context, type, funcVal, argCount, args);
 }
@@ -698,6 +645,111 @@ LoweredValInfo emitCallToDeclRef(
     List<IRInst*> const&    args)
 {
     return emitCallToDeclRef(context, type, funcDeclRef, funcType, args.getCount(), args.getBuffer());
+}
+
+    /// Represents the "direction" that a parameter is being passed (e.g., `in` or `out`
+enum ParameterDirection
+{
+    kParameterDirection_In,     ///< Copy in
+    kParameterDirection_Out,    ///< Copy out
+    kParameterDirection_InOut,  ///< Copy in, copy out
+    kParameterDirection_Ref,    ///< By-reference
+};
+
+
+    /// Emit a call to the given `accessorDeclRef`.
+    ///
+    /// The `base` value represents the object on which the accessor is being invoked.
+    /// The `args` represent any additional arguments to the accessor. This could be
+    /// because we are invoking a subscript accessor (so the args include any index value(s)),
+    /// and/or because we are invoking a setter (so that the args include the new value
+    /// to be set).
+    ///
+static LoweredValInfo _emitCallToAccessor(
+    IRGenContext*           context,
+    IRType*                 type,
+    DeclRef<AccessorDecl>   accessorDeclRef,
+    LoweredValInfo          base,
+    UInt                    argCount,
+    IRInst* const*          args);
+
+static LoweredValInfo _emitCallToAccessor(
+    IRGenContext*           context,
+    IRType*                 type,
+    DeclRef<AccessorDecl>   accessorDeclRef,
+    LoweredValInfo          base,
+    List<IRInst*> const&    args)
+{
+    return _emitCallToAccessor(context, type, accessorDeclRef, base, args.getCount(), args.getBuffer());
+}
+
+    /// Lower a reference to abstract storage (a property or subscript).
+    ///
+    /// The given `storageDeclRef` is being accessed on some `base` value,
+    /// to yield a value of some expected `type`. The additional `args`
+    /// are only needed in the case of a subscript declaration (for
+    /// a property, `argCount` should be zero).
+    ///
+    /// In the case where there is only a `get` accessor, this function
+    /// will go ahead and invoke it to produce a value here and now.
+    /// Otherwise, it will produce an abstract `LoweredValInfo` that
+    /// encapsulates the reference to the storage so that downstream
+    /// code can decide which accessor(s) to invoke.
+    ///
+static LoweredValInfo lowerStorageReference(
+    IRGenContext*           context,
+    IRType*                 type,
+    DeclRef<ContainerDecl>  storageDeclRef,
+    LoweredValInfo          base,
+    UInt                    argCount,
+    IRInst* const*          args)
+{
+    DeclRef<GetterDecl> getterDeclRef;
+    bool justAGetter = true;
+    for (auto accessorDeclRef : getMembersOfType<AccessorDecl>(storageDeclRef, MemberFilterStyle::Instance))
+    {
+        // We want to track whether this storage has any accessors other than
+        // `get` (assuming that everything except `get` can be used for setting...).
+
+        if (auto foundGetterDeclRef = accessorDeclRef.as<GetterDecl>())
+        {
+            // We found a getter.
+            getterDeclRef = foundGetterDeclRef;
+        }
+        else
+        {
+            // There was something other than a getter, so we can't
+            // invoke an accessor just now.
+            justAGetter = false;
+        }
+    }
+
+    if (!justAGetter || !getterDeclRef)
+    {
+        // We can't perform an actual call right now, because
+        // this expression might appear in an r-value or l-value
+        // position (or *both* if it is being passed as an argument
+        // for an `in out` parameter!).
+        //
+        // Instead, we will construct a special-case value to
+        // represent the latent access operation (abstractly
+        // this is a reference to a storage location).
+
+        // The abstract storage location will need to include
+        // all the arguments being passed in the case of a subscript operation.
+
+        RefPtr<BoundStorageInfo> boundStorage = new BoundStorageInfo();
+        boundStorage->declRef = storageDeclRef;
+        boundStorage->type = type;
+        boundStorage->base = base;
+        boundStorage->additionalArgs.addRange(args, argCount);
+
+        context->shared->extValues.add(boundStorage);
+
+        return LoweredValInfo::boundStorage(boundStorage);
+    }
+
+    return _emitCallToAccessor(context, type, getterDeclRef, base, argCount, args);
 }
 
 IRInst* getFieldKey(
@@ -729,7 +781,7 @@ LoweredValInfo extractField(
         break;
 
     case LoweredValInfo::Flavor::BoundMember:
-    case LoweredValInfo::Flavor::BoundSubscript:
+    case LoweredValInfo::Flavor::BoundStorage:
         {
             // The base value is one that is trying to defer a get-vs-set
             // decision, so we will need to do the same.
@@ -776,9 +828,9 @@ top:
     case LoweredValInfo::Flavor::Ptr:
         return lowered;
 
-    case LoweredValInfo::Flavor::BoundSubscript:
+    case LoweredValInfo::Flavor::BoundStorage:
         {
-            auto boundSubscriptInfo = lowered.getBoundSubscriptInfo();
+            auto boundStorageInfo = lowered.getBoundStorageInfo();
 
             // We are being asked to extract a value from a subscript call
             // (e.g., `base[index]`). We will first check if the subscript
@@ -789,31 +841,34 @@ top:
             // in case the `get` operation has a natural translation for
             // a target, while the general `ref` case does not...)
 
-            auto getters = getMembersOfType<GetterDecl>(boundSubscriptInfo->declRef, MemberFilterStyle::Instance);
+            auto getters = getMembersOfType<GetterDecl>(boundStorageInfo->declRef, MemberFilterStyle::Instance);
             if (getters.getCount())
             {
-                lowered = emitCallToDeclRef(
+                auto getter = *getters.begin();
+                lowered = _emitCallToAccessor(
                     context,
-                    boundSubscriptInfo->type,
-                    *getters.begin(),
-                    nullptr,
-                    boundSubscriptInfo->args);
+                    boundStorageInfo->type,
+                    getter,
+                    boundStorageInfo->base,
+                    boundStorageInfo->additionalArgs);
                 goto top;
             }
 
-            auto refAccessors = getMembersOfType<RefAccessorDecl>(boundSubscriptInfo->declRef, MemberFilterStyle::Instance);
+            auto refAccessors = getMembersOfType<RefAccessorDecl>(boundStorageInfo->declRef, MemberFilterStyle::Instance);
             if(refAccessors.getCount())
             {
+                auto refAccessor = *refAccessors.begin();
+
                 // The `ref` accessor will return a pointer to the value, so
                 // we need to reflect that in the type of our `call` instruction.
-                IRType* ptrType = context->irBuilder->getPtrType(boundSubscriptInfo->type);
+                IRType* ptrType = context->irBuilder->getPtrType(boundStorageInfo->type);
 
-                LoweredValInfo refVal = emitCallToDeclRef(
+                LoweredValInfo refVal = _emitCallToAccessor(
                     context,
                     ptrType,
-                    *refAccessors.begin(),
-                    nullptr,
-                    boundSubscriptInfo->args);
+                    refAccessor,
+                    boundStorageInfo->base,
+                    boundStorageInfo->additionalArgs);
 
                 // The result from the call needs to be implicitly dereferenced,
                 // so that it can work as an l-value of the desired result type.
@@ -1804,27 +1859,185 @@ LoweredValInfo createVar(
     return LoweredValInfo::ptr(irAlloc);
 }
 
-void addArgs(
+    /// Add a single `in` argument value to a list of arguments
+void addInArg(
     IRGenContext*   context,
-    List<IRInst*>* ioArgs,
-    LoweredValInfo  argInfo)
+    List<IRInst*>*  ioArgs,
+    LoweredValInfo  argVal)
 {
     auto& args = *ioArgs;
-    switch( argInfo.flavor )
+    switch( argVal.flavor )
     {
     case LoweredValInfo::Flavor::Simple:
     case LoweredValInfo::Flavor::Ptr:
     case LoweredValInfo::Flavor::SwizzledLValue:
-    case LoweredValInfo::Flavor::BoundSubscript:
+    case LoweredValInfo::Flavor::BoundStorage:
     case LoweredValInfo::Flavor::BoundMember:
-        args.add(getSimpleVal(context, argInfo));
+        args.add(getSimpleVal(context, argVal));
         break;
 
     default:
-        SLANG_UNIMPLEMENTED_X("addArgs case");
+        SLANG_UNIMPLEMENTED_X("addInArg case");
         break;
     }
 }
+
+// After a call to a function with `out` or `in out`
+// parameters, we may need to copy data back into
+// the l-value locations used for output arguments.
+//
+// During lowering of the argument list, we build
+// up a list of these "fixup" assignments that need
+// to be performed.
+struct OutArgumentFixup
+{
+    LoweredValInfo dst;
+    LoweredValInfo src;
+};
+
+    /// Apply any fixups that have been created for `out` and `inout` arguments.
+static void applyOutArgumentFixups(
+    IRGenContext*                   context,
+    List<OutArgumentFixup> const&   fixups)
+{
+    for (auto fixup : fixups)
+    {
+        assign(context, fixup.dst, fixup.src);
+    }
+}
+
+    /// Add one argument value to the argument list for a call being constructed
+void addArg(
+    IRGenContext*           context,
+    List<IRInst*>*          ioArgs,         //< The argument list being built
+    List<OutArgumentFixup>* ioFixups,       //< "Fixup" logic to apply for `out` or `inout` arguments
+    LoweredValInfo          argVal,         //< The lowered value of the argument to add
+    IRType*                 paramType,      //< The type of the corresponding parameter
+    ParameterDirection      paramDirection, //< The direction of the parameter (`in`, `out`, etc.)
+    SourceLoc               loc)            //< A location to use if we need to report an error
+{
+    switch(paramDirection)
+    {
+    case kParameterDirection_Ref:
+        {
+            // According to our "calling convention" we need to
+            // pass a pointer into the callee. Unlike the case for
+            // `out` and `inout` below, it is never valid to do
+            // copy-in/copy-out for a `ref` parameter, so we just
+            // pass in the actual pointer.
+            //
+            IRInst* argPtr = getAddress(context, argVal, loc);
+            addInArg(context, ioArgs, LoweredValInfo::simple(argPtr));
+        }
+        break;
+
+    case kParameterDirection_Out:
+    case kParameterDirection_InOut:
+        {
+            // According to our "calling convention" we need to
+            // pass a pointer into the callee.
+            //
+            // A naive approach would be to just take the address
+            // of `loweredArg` above and pass it in, but that
+            // has two issues:
+            //
+            // 1. The l-value might not be something that has a single
+            //    well-defined "address" (e.g., `foo.xzy`).
+            //
+            // 2. The l-value argument might actually alias some other
+            //    storage that the callee will access (e.g., we are
+            //    passing in a global variable, or two `out` parameters
+            //    are being passed the same location in an array).
+            //
+            // In each of these cases, the safe option is to create
+            // a temporary variable to use for argument-passing,
+            // and then do copy-in/copy-out around the call.
+            //
+            // TODO: We should consider ruling out case (2) as undefined
+            // behavior, and specify that whether `inout` and `out` are
+            // handled via copy-in-copy-out or by-reference parameter
+            // passing is an implementation detail. That would allow
+            // us to avoid introducing a copy except where it is required
+            // for the semantics of (1).
+            //
+            // TODO: We should confirm whether such a change will make
+            // it harder to create SSA values for variables that get
+            // used with `out` or `inout` parameters.
+
+            LoweredValInfo tempVar = createVar(context, paramType);
+
+            // If the parameter is `in out` or `inout`, then we need
+            // to ensure that we pass in the original value stored
+            // in the argument, which we accomplish by assigning
+            // from the l-value to our temp.
+            if(paramDirection == kParameterDirection_InOut)
+            {
+                assign(context, tempVar, argVal);
+            }
+
+            // Now we can pass the address of the temporary variable
+            // to the callee as the actual argument for the `in out`
+            SLANG_ASSERT(tempVar.flavor == LoweredValInfo::Flavor::Ptr);
+            IRInst* tempPtr = getAddress(context, tempVar, loc);
+            addInArg(context, ioArgs, LoweredValInfo::simple(tempPtr));
+
+            // Finally, after the call we will need
+            // to copy in the other direction: from our
+            // temp back to the original l-value.
+            OutArgumentFixup fixup;
+            fixup.src = tempVar;
+            fixup.dst = argVal;
+
+            (*ioFixups).add(fixup);
+
+        }
+        break;
+
+    default:
+        addInArg(context, ioArgs, argVal);
+        break;
+    }
+}
+
+    /// Add argument(s) corresponding to one parameter to a call
+    ///
+    /// The `argExpr` is the AST-level expression being passed as an argument to the call.
+    /// The `paramType` and `paramDirection` represent what is known about the receiving
+    /// parameter of the callee (e.g., if the parameter `in`, `inout`, etc.).
+    /// The `ioArgs` array receives the IR-level argument(s) that are added for the given
+    /// argument expression.
+    /// The `ioFixups` array receives any "fixup" code that needs to be run *after* the
+    /// call completes (e.g., to move from a scratch variable used for an `inout` argument back
+    /// into the original location).
+    ///
+void addCallArgsForParam(
+    IRGenContext*           context,
+    IRType*                 paramType,
+    ParameterDirection      paramDirection,
+    Expr*                   argExpr,
+    List<IRInst*>*          ioArgs,
+    List<OutArgumentFixup>* ioFixups)
+{
+    switch(paramDirection)
+    {
+    case kParameterDirection_Ref:
+    case kParameterDirection_Out:
+    case kParameterDirection_InOut:
+        {
+            LoweredValInfo loweredArg = lowerLValueExpr(context, argExpr);
+            addArg(context, ioArgs, ioFixups, loweredArg, paramType, paramDirection, argExpr->loc);
+        }
+        break;
+
+    default:
+        {
+            LoweredValInfo loweredArg = lowerRValueExpr(context, argExpr);
+            addInArg(context, ioArgs, loweredArg);
+        }
+        break;
+    }
+}
+
 
 //
 
@@ -1862,15 +2075,6 @@ LoweredValInfo tryGetAddress(
     LoweredValInfo const&   inVal,
     TryGetAddressMode       mode);
 
-    /// Represents the "direction" that a parameter is being passed (e.g., `in` or `out`
-enum ParameterDirection
-{
-    kParameterDirection_In,     ///< Copy in
-    kParameterDirection_Out,    ///< Copy out
-    kParameterDirection_InOut,  ///< Copy in, copy out
-    kParameterDirection_Ref,    ///< By-reference
-};
-
     /// Compute the direction for a parameter based on its declaration
 ParameterDirection getParameterDirection(VarDeclBase* paramDecl)
 {
@@ -1901,7 +2105,11 @@ ParameterDirection getParameterDirection(VarDeclBase* paramDecl)
 }
 
     /// Compute the direction for a `this` parameter based on the declaration of its parent function
-ParameterDirection getThisParamDirection(Decl* parentDecl)
+    ///
+    /// If the given declaration doesn't care about the direction of a `this` parameter, then
+    /// it will return the provided `defaultDirection` instead.
+    ///
+ParameterDirection getThisParamDirection(Decl* parentDecl, ParameterDirection defaultDirection)
 {
     // Applications can opt in to a mutable `this` parameter,
     // by applying the `[mutating]` attribute to their
@@ -1912,11 +2120,32 @@ ParameterDirection getThisParamDirection(Decl* parentDecl)
         return kParameterDirection_InOut;
     }
 
-    // TODO: If/when we support user-defined subscripts or properties,
-    // we should probably make the `set` accessor on those default to
-    // `[mutating]` rather than require users to specify it. There
-    // might need to be a `[nonmutating]` modifier for the rare case
-    // where a user wants to opt out.
+    // A `set` accessor on a property or subscript declaration
+    // defaults to a mutable `this` parameter, but the programmer
+    // can opt out of this behavior using `[nonmutating]`
+    //
+    if( parentDecl->hasModifier<NonmutatingAttribute>() )
+    {
+        return kParameterDirection_In;
+    }
+    else if( as<SetterDecl>(parentDecl) )
+    {
+        return kParameterDirection_InOut;
+    }
+
+    // Declarations that represent abstract storage (a property
+    // or subscript) do not want to dictate anything about
+    // the direction of an outer `this` parameter, since that
+    // should be determined by their inner accessors.
+    //
+    if( as<PropertyDecl>(parentDecl) )
+    {
+        return defaultDirection;
+    }
+    if( as<SubscriptDecl>(parentDecl) )
+    {
+        return defaultDirection;
+    }
 
     // For now we make any `this` parameter default to `in`.
     //
@@ -1980,6 +2209,346 @@ Type* getThisParamTypeForCallable(
     return getThisParamTypeForContainer(context, parentDeclRef);
 }
 
+// When lowering something callable (most commonly a function declaration),
+// we need to construct an appropriate parameter list for the IR function
+// that folds in any contributions from both the declaration itself *and*
+// its parent declaration(s).
+//
+// For example, given code like:
+//
+//     struct Foo { int bar(float y) { ... } };
+//
+// we need to generate IR-level code something like:
+//
+//     func Foo_bar(Foo this, float y) -> int;
+//
+// that is, the `this` parameter has become explicit.
+//
+// The same applies to generic parameters, and these
+// should apply even if the nested declaration is `static`:
+//
+//     struct Foo<T> { static int bar(T y) { ... } };
+//
+// becomes:
+//
+//     func Foo_bar<T>(T y) -> int;
+//
+// In order to implement this, we are going to do a recursive
+// walk over a declaration and its parents, collecting separate
+// lists of ordinary and generic parameters that will need
+// to be included in the final declaration's parameter list.
+//
+// When doing code generation for an ordinary value parameter,
+// we mostly care about its type, and then also its "direction"
+// (`in`, `out`, `in out`). We sometimes need acess to the
+// original declaration so that we can inspect it for meta-data,
+// but in some cases there is no such declaration (e.g., a `this`
+// parameter doesn't get an explicit declaration in the AST).
+// To handle this we break out the relevant data into derived
+// structures:
+//
+struct IRLoweringParameterInfo
+{
+    // This AST-level type of the parameter
+    Type*        type = nullptr;
+
+    // The direction (`in` vs `out` vs `in out`)
+    ParameterDirection  direction;
+
+    // The variable/parameter declaration for
+    // this parameter (if any)
+    VarDeclBase*        decl = nullptr;
+
+    // Is this the representation of a `this` parameter?
+    bool                isThisParam = false;
+};
+//
+// We need a way to be able to create a `IRLoweringParameterInfo` given the declaration
+// of a parameter:
+//
+IRLoweringParameterInfo getParameterInfo(
+    IRGenContext*               context,
+    DeclRef<VarDeclBase> const& paramDecl)
+{
+    IRLoweringParameterInfo info;
+    info.type = getType(context->astBuilder, paramDecl);
+    info.decl = paramDecl;
+    info.direction = getParameterDirection(paramDecl);
+    info.isThisParam = false;
+    return info;
+}
+//
+
+// Here's the declaration for the type to hold the lists:
+struct ParameterLists
+{
+    List<IRLoweringParameterInfo> params;
+};
+//
+// Because there might be a `static` declaration somewhere
+// along the lines, we need to be careful to prohibit adding
+// non-generic parameters in some cases.
+enum ParameterListCollectMode
+{
+    // Collect everything: ordinary and generic parameters.
+    kParameterListCollectMode_Default,
+
+
+    // Only collect generic parameters.
+    kParameterListCollectMode_Static,
+};
+//
+// We also need to be able to detect whether a declaration is
+// either explicitly or implicitly treated as `static`:
+ParameterListCollectMode getModeForCollectingParentParameters(
+    Decl*           decl,
+    ContainerDecl*  parentDecl)
+{
+    // If we have a `static` parameter, then it is obvious
+    // that we should use the `static` mode
+    if(isEffectivelyStatic(decl, parentDecl))
+        return kParameterListCollectMode_Static;
+
+    // Otherwise, let's default to collecting everything
+    return kParameterListCollectMode_Default;
+}
+//
+// When dealing with a member function, we need to be able to add the `this`
+// parameter for the enclosing type:
+//
+void addThisParameter(
+    ParameterDirection  direction,
+    Type*               type,
+    ParameterLists*     ioParameterLists)
+{
+    IRLoweringParameterInfo info;
+    info.type = type;
+    info.decl = nullptr;
+    info.direction = direction;
+    info.isThisParam = true;
+
+    ioParameterLists->params.add(info);
+}
+//
+// And here is our function that will do the recursive walk:
+void collectParameterLists(
+    IRGenContext*               context,
+    DeclRef<Decl> const&        declRef,
+    ParameterLists*             ioParameterLists,
+    ParameterListCollectMode    mode,
+    ParameterDirection          thisParamDirection)
+{
+    // The parameters introduced by any "parent" declarations
+    // will need to come first, so we'll deal with that
+    // logic here.
+    if( auto parentDeclRef = declRef.getParent() )
+    {
+        // Compute the mode to use when collecting parameters from
+        // the outer declaration. The most important question here
+        // is whether parameters of the outer declaration should
+        // also count as parameters of the inner declaration.
+        ParameterListCollectMode innerMode = getModeForCollectingParentParameters(declRef, parentDeclRef);
+
+        // Don't down-grade our `static`-ness along the chain.
+        if(innerMode < mode)
+            innerMode = mode;
+
+        ParameterDirection innerThisParamDirection = getThisParamDirection(declRef, thisParamDirection);
+
+
+        // Now collect any parameters from the parent declaration itself
+        collectParameterLists(context, parentDeclRef, ioParameterLists, innerMode, innerThisParamDirection);
+
+        // We also need to consider whether the inner declaration needs to have a `this`
+        // parameter corresponding to the outer declaration.
+        if( innerMode != kParameterListCollectMode_Static )
+        {
+            auto thisType = getThisParamTypeForContainer(context, parentDeclRef);
+            if(thisType)
+            {
+                addThisParameter(innerThisParamDirection, thisType, ioParameterLists);
+            }
+        }
+    }
+
+    // Once we've added any parameters based on parent declarations,
+    // we can see if this declaration itself introduces parameters.
+    //
+    if( auto callableDeclRef = declRef.as<CallableDecl>() )
+    {
+        // Don't collect parameters from the outer scope if
+        // we are in a `static` context.
+        if( mode == kParameterListCollectMode_Default )
+        {
+            for( auto paramDeclRef : getParameters(callableDeclRef) )
+            {
+                ioParameterLists->params.add(getParameterInfo(context, paramDeclRef));
+            }
+        }
+    }
+}
+
+bool isConstExprVar(Decl* decl)
+{
+    if( decl->hasModifier<ConstExprModifier>() )
+    {
+        return true;
+    }
+    else if(decl->hasModifier<HLSLStaticModifier>() && decl->hasModifier<ConstModifier>())
+    {
+        return true;
+    }
+
+    return false;
+}
+
+
+IRType* maybeGetConstExprType(
+    IRBuilder*      builder,
+    IRType*         type,
+    Decl*           decl)
+{
+    if(isConstExprVar(decl))
+    {
+        return builder->getRateQualifiedType(
+            builder->getConstExprRate(),
+            type);
+    }
+
+    return type;
+}
+
+
+struct FuncDeclBaseTypeInfo
+{
+    IRType*         type;
+    IRType*         resultType;
+    ParameterLists  parameterLists;
+    List<IRType*>   paramTypes;
+};
+
+void _lowerFuncDeclBaseTypeInfo(
+    IRGenContext*               context,
+    DeclRef<FunctionDeclBase>   declRef,
+    FuncDeclBaseTypeInfo&       outInfo)
+{
+    auto builder = context->irBuilder;
+
+    // Collect the parameter lists we will use for our new function.
+    auto& parameterLists = outInfo.parameterLists;
+    collectParameterLists(
+        context,
+        declRef,
+        &parameterLists, kParameterListCollectMode_Default, kParameterDirection_In);
+
+    auto& paramTypes = outInfo.paramTypes;
+
+    for( auto paramInfo : parameterLists.params )
+    {
+        IRType* irParamType = lowerType(context, paramInfo.type);
+
+        switch( paramInfo.direction )
+        {
+        case kParameterDirection_In:
+            // Simple case of a by-value input parameter.
+            break;
+
+        // If the parameter is declared `out` or `inout`,
+        // then we will represent it with a pointer type in
+        // the IR, but we will use a specialized pointer
+        // type that encodes the parameter direction information.
+        case kParameterDirection_Out:
+            irParamType = builder->getOutType(irParamType);
+            break;
+        case kParameterDirection_InOut:
+            irParamType = builder->getInOutType(irParamType);
+            break;
+        case kParameterDirection_Ref:
+            irParamType = builder->getRefType(irParamType);
+            break;
+
+        default:
+            SLANG_UNEXPECTED("unknown parameter direction");
+            break;
+        }
+
+        // If the parameter was explicitly marked as being a compile-time
+        // constant (`constexpr`), then attach that information to its
+        // IR-level type explicitly.
+        if( paramInfo.decl )
+        {
+            irParamType = maybeGetConstExprType(builder, irParamType, paramInfo.decl);
+        }
+
+        paramTypes.add(irParamType);
+    }
+
+    auto& irResultType = outInfo.resultType;
+    irResultType = lowerType(context, getResultType(context->astBuilder, declRef));
+
+    if (auto setterDeclRef = declRef.as<SetterDecl>())
+    {
+        // A `set` accessor always returns `void`
+        //
+        // TODO: We should handle this by making the result
+        // type of a `set` accessor be represented accurately
+        // at the AST level (ditto for the `ref` case below).
+        //
+        irResultType = builder->getVoidType();
+    }
+
+    if( auto refAccessorDeclRef = declRef.as<RefAccessorDecl>() )
+    {
+        // A `ref` accessor needs to return a *pointer* to the value
+        // being accessed, rather than a simple value.
+        irResultType = builder->getPtrType(irResultType);
+    }
+
+    outInfo.type = builder->getFuncType(
+        paramTypes.getCount(),
+        paramTypes.getBuffer(),
+        irResultType);
+}
+
+static LoweredValInfo _emitCallToAccessor(
+    IRGenContext*           context,
+    IRType*                 type,
+    DeclRef<AccessorDecl>   accessorDeclRef,
+    LoweredValInfo          base,
+    UInt                    argCount,
+    IRInst* const*          args)
+{
+    FuncDeclBaseTypeInfo info;
+    _lowerFuncDeclBaseTypeInfo(context, accessorDeclRef, info);
+
+    List<IRInst*> allArgs;
+
+    List<OutArgumentFixup> fixups;
+    if(base.flavor != LoweredValInfo::Flavor::None)
+    {
+        SLANG_ASSERT(info.parameterLists.params.getCount() >= 1);
+        SLANG_ASSERT(info.parameterLists.params[0].isThisParam);
+
+        auto thisParam = info.parameterLists.params[0];
+        auto thisParamType = lowerType(context, thisParam.type);
+
+        addArg(context, &allArgs, &fixups, base, thisParamType, thisParam.direction, SourceLoc());
+    }
+
+    allArgs.addRange(args, argCount);
+
+    LoweredValInfo result = emitCallToDeclRef(
+        context,
+        type,
+        accessorDeclRef,
+        info.type,
+        allArgs.getCount(),
+        allArgs.getBuffer());
+
+    applyOutArgumentFixups(context, fixups);
+
+    return result;
+}
 
 //
 
@@ -2038,7 +2607,7 @@ struct ExprLoweringVisitorBase : ExprVisitor<Derived, LoweredValInfo>
     LoweredValInfo visitMemberExpr(MemberExpr* expr)
     {
         auto loweredType = lowerType(context, expr->type);
-        auto loweredBase = lowerRValueExpr(context, expr->baseExpression);
+        auto loweredBase = lowerSubExpr(expr->baseExpression);
 
         auto declRef = expr->declRef;
         if (auto fieldDeclRef = declRef.as<VarDecl>())
@@ -2079,8 +2648,16 @@ struct ExprLoweringVisitorBase : ExprVisitor<Derived, LoweredValInfo>
             // for a cast here (that could become a no-op later).
             return loweredBase;
         }
+        else if(auto propertyDeclRef = declRef.as<PropertyDecl>())
+        {
+            // A reference to a property is a special case, because
+            // we must translate the reference to the property
+            // into a reference to one of its accessors.
+            //
+            return lowerStorageReference(context, loweredType, propertyDeclRef, loweredBase, 0, nullptr);
+        }
 
-        SLANG_UNIMPLEMENTED_X("codegen for subscript expression");
+        SLANG_UNIMPLEMENTED_X("codegen for member expression");
         UNREACHABLE_RETURN(LoweredValInfo());
     }
 
@@ -2399,131 +2976,6 @@ struct ExprLoweringVisitorBase : ExprVisitor<Derived, LoweredValInfo>
         UNREACHABLE_RETURN(LoweredValInfo());
     }
 
-    // After a call to a function with `out` or `in out`
-    // parameters, we may need to copy data back into
-    // the l-value locations used for output arguments.
-    //
-    // During lowering of the argument list, we build
-    // up a list of these "fixup" assignments that need
-    // to be performed.
-    struct OutArgumentFixup
-    {
-        LoweredValInfo dst;
-        LoweredValInfo src;
-    };
-
-        /// Add argument(s) corresponding to one parameter to a call
-        ///
-        /// The `argExpr` is the AST-level expression being passed as an argument to the call.
-        /// The `paramType` and `paramDirection` represent what is known about the receiving
-        /// parameter of the callee (e.g., if the parameter `in`, `inout`, etc.).
-        /// The `ioArgs` array receives the IR-level argument(s) that are added for the given
-        /// argument expression.
-        /// The `ioFixups` array receives any "fixup" code that needs to be run *after* the
-        /// call completes (e.g., to move from a scratch variable used for an `inout` argument back
-        /// into the original location).
-        ///
-    void addCallArgsForParam(
-        IRType*                 paramType,
-        ParameterDirection      paramDirection,
-        Expr*                   argExpr,
-        List<IRInst*>*          ioArgs,
-        List<OutArgumentFixup>* ioFixups)
-    {
-        switch(paramDirection)
-        {
-        case kParameterDirection_Ref:
-            {
-                // A `ref` qualified parameter must be implemented with by-reference
-                // parameter passing, so the argument value should be lowered as
-                // an l-value.
-                //
-                LoweredValInfo loweredArg = lowerLValueExpr(context, argExpr);
-
-                // According to our "calling convention" we need to
-                // pass a pointer into the callee. Unlike the case for
-                // `out` and `inout` below, it is never valid to do
-                // copy-in/copy-out for a `ref` parameter, so we just
-                // pass in the actual pointer.
-                //
-                IRInst* argPtr = getAddress(context, loweredArg, argExpr->loc);
-                (*ioArgs).add(argPtr);
-            }
-            break;
-
-        case kParameterDirection_Out:
-        case kParameterDirection_InOut:
-            {
-                // This is a `out` or `inout` parameter, and so
-                // the argument must be lowered as an l-value.
-
-                LoweredValInfo loweredArg = lowerLValueExpr(context, argExpr);
-
-                // According to our "calling convention" we need to
-                // pass a pointer into the callee.
-                //
-                // A naive approach would be to just take the address
-                // of `loweredArg` above and pass it in, but that
-                // has two issues:
-                //
-                // 1. The l-value might not be something that has a single
-                //    well-defined "address" (e.g., `foo.xzy`).
-                //
-                // 2. The l-value argument might actually alias some other
-                //    storage that the callee will access (e.g., we are
-                //    passing in a global variable, or two `out` parameters
-                //    are being passed the same location in an array).
-                //
-                // In each of these cases, the safe option is to create
-                // a temporary variable to use for argument-passing,
-                // and then do copy-in/copy-out around the call.
-                //
-                // TODO: We should consider ruling out case (2) as undefined
-                // behavior, and specify that whether `inout` and `out` are
-                // handled via copy-in-copy-out or by-reference parameter
-                // passing is an implementation detail. That would allow
-                // us to avoid introducing a copy except where it is required
-                // for the semantics of (1).
-
-                LoweredValInfo tempVar = createVar(context, paramType);
-
-                // If the parameter is `in out` or `inout`, then we need
-                // to ensure that we pass in the original value stored
-                // in the argument, which we accomplish by assigning
-                // from the l-value to our temp.
-                if(paramDirection == kParameterDirection_InOut)
-                {
-                    assign(context, tempVar, loweredArg);
-                }
-
-                // Now we can pass the address of the temporary variable
-                // to the callee as the actual argument for the `in out`
-                SLANG_ASSERT(tempVar.flavor == LoweredValInfo::Flavor::Ptr);
-                (*ioArgs).add(tempVar.val);
-
-                // Finally, after the call we will need
-                // to copy in the other direction: from our
-                // temp back to the original l-value.
-                OutArgumentFixup fixup;
-                fixup.src = tempVar;
-                fixup.dst = loweredArg;
-
-                (*ioFixups).add(fixup);
-
-            }
-            break;
-
-        default:
-            {
-                // This is a pure input parameter, and so we will
-                // pass it as an r-value.
-                LoweredValInfo loweredArg = lowerRValueExpr(context, argExpr);
-                addArgs(context, ioArgs, loweredArg);
-            }
-            break;
-        }
-    }
-
     void addDirectCallArgs(
         InvokeExpr*             expr,
         DeclRef<CallableDecl>   funcDeclRef,
@@ -2571,7 +3023,7 @@ struct ExprLoweringVisitorBase : ExprVisitor<Derived, LoweredValInfo>
                 // make a conscious decision at some point.
             }
 
-            addCallArgsForParam(paramType, paramDirection, argExpr, ioArgs, ioFixups);
+            addCallArgsForParam(context, paramType, paramDirection, argExpr, ioArgs, ioFixups);
         }
     }
 
@@ -2601,14 +3053,6 @@ struct ExprLoweringVisitorBase : ExprVisitor<Derived, LoweredValInfo>
         {
         default:
             return;
-        }
-    }
-
-    void applyOutArgumentFixups(List<OutArgumentFixup> const& fixups)
-    {
-        for (auto fixup : fixups)
-        {
-            assign(context, fixup.dst, fixup.src);
         }
     }
 
@@ -2718,6 +3162,50 @@ struct ExprLoweringVisitorBase : ExprVisitor<Derived, LoweredValInfo>
             auto funcDeclRef = resolvedInfo.funcDeclRef;
             auto baseExpr = resolvedInfo.baseExpr;
 
+            // If the thing being invoked is a subscript operation,
+            // then we need to handle multiple extra details
+            // that don't arise for other kinds of calls.
+            //
+            // TODO: subscript operations probably deserve to
+            // be handled on their own path for this reason...
+            //
+            if (auto subscriptDeclRef = funcDeclRef.as<SubscriptDecl>())
+            {
+                // A reference to a subscript declaration is a special case,
+                // because it is not possible to call a subscript directly;
+                // we must call one of its accessors.
+                //
+                auto loweredBase = lowerSubExpr(baseExpr);
+                addDirectCallArgs(expr, funcDeclRef, &irArgs, &argFixups);
+                auto result = lowerStorageReference(context, type, subscriptDeclRef, loweredBase, irArgs.getCount(), irArgs.getBuffer());
+
+                // TODO: Applying the fixups for arguments to the subscript at this point
+                // won't technically be correct, since the call to the subscript may
+                // not have occured at this point.
+                //
+                // It seems like we need to either:
+                //
+                // * Capture the arguments to the subscript as `LoweredValInfo` instead of `IRInst*`
+                //   so that we can deal with everything related to fixups around the actual call
+                //   site.
+                //
+                // OR
+                //
+                // * Handle everything to do with "fixups" differently, by treating them as deferred
+                // actions that gert queued up on the context itself and then flushed at certain
+                // well-defined points, so that we don't have to be as careful around them.
+                //
+                // OR
+                //
+                // * Switch to a more "destination-driven" approach to code generation, where we
+                // can determine on entry to the lowering of a sub-expression whether it will be
+                // used for read, write, or read/write, and resolve things like the choice of
+                // accessor at that point instead.
+                //
+                applyOutArgumentFixups(context, argFixups);
+                return result;
+            }
+
             // First comes the `this` argument if we are calling
             // a member function:
             if( baseExpr )
@@ -2725,8 +3213,9 @@ struct ExprLoweringVisitorBase : ExprVisitor<Derived, LoweredValInfo>
                 auto thisType = getThisParamTypeForCallable(context, funcDeclRef);
                 auto irThisType = lowerType(context, thisType);
                 addCallArgsForParam(
+                    context,
                     irThisType,
-                    getThisParamDirection(funcDeclRef.getDecl()),
+                    getThisParamDirection(funcDeclRef.getDecl(), kParameterDirection_In),
                     baseExpr,
                     &irArgs,
                     &argFixups);
@@ -2744,7 +3233,7 @@ struct ExprLoweringVisitorBase : ExprVisitor<Derived, LoweredValInfo>
                 funcDeclRef,
                 funcType,
                 irArgs);
-            applyOutArgumentFixups(argFixups);
+            applyOutArgumentFixups(context, argFixups);
             return result;
         }
 
@@ -4053,13 +4542,13 @@ LoweredValInfo tryGetAddress(
         // the address of our value. Easy!
         return val;
 
-    case LoweredValInfo::Flavor::BoundSubscript:
+    case LoweredValInfo::Flavor::BoundStorage:
         {
             // If we are are trying to turn a subscript operation like `buffer[index]`
             // into a pointer, then we need to find a `ref` accessor declared
             // as part of the subscript operation being referenced.
             //
-            auto subscriptInfo = val.getBoundSubscriptInfo();
+            auto subscriptInfo = val.getBoundStorageInfo();
 
             // We don't want to immediately bind to a `ref` accessor if there is
             // a `set` accessor available, unless we are in an "aggressive" mode
@@ -4076,16 +4565,18 @@ LoweredValInfo tryGetAddress(
             auto refAccessors = getMembersOfType<RefAccessorDecl>(subscriptInfo->declRef, MemberFilterStyle::Instance);
             if(refAccessors.isNonEmpty())
             {
+                auto refAccessor = *refAccessors.begin();
+
                 // The `ref` accessor will return a pointer to the value, so
                 // we need to reflect that in the type of our `call` instruction.
                 IRType* ptrType = context->irBuilder->getPtrType(subscriptInfo->type);
 
-                LoweredValInfo refVal = emitCallToDeclRef(
+                LoweredValInfo refVal = _emitCallToAccessor(
                     context,
                     ptrType,
-                    *refAccessors.begin(),
-                    nullptr,
-                    subscriptInfo->args);
+                    refAccessor,
+                    subscriptInfo->base,
+                    subscriptInfo->additionalArgs);
 
                 // The result from the call should be a pointer, and it
                 // is the address that we wanted in the first place.
@@ -4106,7 +4597,7 @@ LoweredValInfo tryGetAddress(
             // to a single field in something, but for whatever reason the
             // higher-level logic was not able to turn it into a pointer
             // already (maybe the base value for the field reference is
-            // a `BoundSubscript`, etc.).
+            // a `BoundStorage`, etc.).
             //
             // We need to read the entire base value out, modify the field
             // we care about, and then write it back.
@@ -4284,7 +4775,7 @@ top:
         }
         break;
 
-    case LoweredValInfo::Flavor::BoundSubscript:
+    case LoweredValInfo::Flavor::BoundStorage:
         {
             // The `left` value refers to a subscript operation on
             // a resource type, bound to particular arguments, e.g.:
@@ -4295,20 +4786,31 @@ top:
             // is one, and then fall back to a `ref` accessor if
             // there is no setter.
             //
-            auto subscriptInfo = left.getBoundSubscriptInfo();
+            auto subscriptInfo = left.getBoundStorageInfo();
 
             // Search for an appropriate "setter" declaration
             auto setters = getMembersOfType<SetterDecl>(subscriptInfo->declRef, MemberFilterStyle::Instance);
             if (setters.isNonEmpty())
             {
-                auto allArgs = subscriptInfo->args;
-                addArgs(context, &allArgs, right);
+                auto setter = *setters.begin();
 
-                emitCallToDeclRef(
+                auto allArgs = subscriptInfo->additionalArgs;
+
+                // Note: here we are assuming that all setters take
+                // the new-value parameter as an `in` rather than
+                // as any kind of reference.
+                //
+                // TODO: If we add support for something like `const&`
+                // for input parameters, we might have to deal with
+                // that here.
+                //
+                addInArg(context, &allArgs, right);
+
+                _emitCallToAccessor(
                     context,
                     builder->getVoidType(),
-                    *setters.begin(),
-                    nullptr,
+                    setter,
+                    subscriptInfo->base,
                     allArgs);
                 return;
             }
@@ -4316,16 +4818,18 @@ top:
             auto refAccessors = getMembersOfType<RefAccessorDecl>(subscriptInfo->declRef, MemberFilterStyle::Instance);
             if(refAccessors.isNonEmpty())
             {
+                auto refAccessor = *refAccessors.begin();
+
                 // The `ref` accessor will return a pointer to the value, so
                 // we need to reflect that in the type of our `call` instruction.
                 IRType* ptrType = context->irBuilder->getPtrType(subscriptInfo->type);
 
-                LoweredValInfo refVal = emitCallToDeclRef(
+                LoweredValInfo refVal = _emitCallToAccessor(
                     context,
                     ptrType,
-                    *refAccessors.begin(),
-                    nullptr,
-                    subscriptInfo->args);
+                    refAccessor,
+                    subscriptInfo->base,
+                    subscriptInfo->additionalArgs);
 
                 // The result from the call needs to be implicitly dereferenced,
                 // so that it can work as an l-value of the desired result type.
@@ -4713,7 +5217,7 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
         return LoweredValInfo();
     }
 
-    LoweredValInfo visitSubscriptDecl(SubscriptDecl* decl)
+    LoweredValInfo visitStorageDeclCommon(ContainerDecl* decl)
     {
         // A subscript operation may encompass one or more
         // accessors, and these are what should actually
@@ -4735,6 +5239,16 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
         // that can represent the combination of callables
         // that make up the subscript operation.
         return LoweredValInfo();
+    }
+
+    LoweredValInfo visitSubscriptDecl(SubscriptDecl* decl)
+    {
+        return visitStorageDeclCommon(decl);
+    }
+
+    LoweredValInfo visitPropertyDecl(PropertyDecl* decl)
+    {
+        return visitStorageDeclCommon(decl);
     }
 
     bool isGlobalVarDecl(VarDecl* decl)
@@ -5497,208 +6011,15 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
 
 
 
-    // When lowering something callable (most commonly a function declaration),
-    // we need to construct an appropriate parameter list for the IR function
-    // that folds in any contributions from both the declaration itself *and*
-    // its parent declaration(s).
-    //
-    // For example, given code like:
-    //
-    //     struct Foo { int bar(float y) { ... } };
-    //
-    // we need to generate IR-level code something like:
-    //
-    //     func Foo_bar(Foo this, float y) -> int;
-    //
-    // that is, the `this` parameter has become explicit.
-    //
-    // The same applies to generic parameters, and these
-    // should apply even if the nested declaration is `static`:
-    //
-    //     struct Foo<T> { static int bar(T y) { ... } };
-    //
-    // becomes:
-    //
-    //     func Foo_bar<T>(T y) -> int;
-    //
-    // In order to implement this, we are going to do a recursive
-    // walk over a declaration and its parents, collecting separate
-    // lists of ordinary and generic parameters that will need
-    // to be included in the final declaration's parameter list.
-    //
-    // When doing code generation for an ordinary value parameter,
-    // we mostly care about its type, and then also its "direction"
-    // (`in`, `out`, `in out`). We sometimes need acess to the
-    // original declaration so that we can inspect it for meta-data,
-    // but in some cases there is no such declaration (e.g., a `this`
-    // parameter doesn't get an explicit declaration in the AST).
-    // To handle this we break out the relevant data into derived
-    // structures:
-    //
-    struct ParameterInfo
-    {
-        // This AST-level type of the parameter
-        Type*        type = nullptr;
-
-        // The direction (`in` vs `out` vs `in out`)
-        ParameterDirection  direction;
-
-        // The variable/parameter declaration for
-        // this parameter (if any)
-        VarDeclBase*        decl = nullptr;
-
-        // Is this the representation of a `this` parameter?
-        bool                isThisParam = false;
-    };
-    //
-    // We need a way to be able to create a `ParameterInfo` given the declaration
-    // of a parameter:
-    //
-    ParameterInfo getParameterInfo(VarDeclBase* paramDecl)
-    {
-        ParameterInfo info;
-        info.type = paramDecl->getType();
-        info.decl = paramDecl;
-        info.direction = getParameterDirection(paramDecl);
-        info.isThisParam = false;
-        return info;
-    }
-    //
-
-    // Here's the declaration for the type to hold the lists:
-    struct ParameterLists
-    {
-        List<ParameterInfo> params;
-    };
-    //
-    // Because there might be a `static` declaration somewhere
-    // along the lines, we need to be careful to prohibit adding
-    // non-generic parameters in some cases.
-    enum ParameterListCollectMode
-    {
-        // Collect everything: ordinary and generic parameters.
-        kParameterListCollectMode_Default,
-
-
-        // Only collect generic parameters.
-        kParameterListCollectMode_Static,
-    };
-    //
-    // We also need to be able to detect whether a declaration is
-    // either explicitly or implicitly treated as `static`:
-    ParameterListCollectMode getModeForCollectingParentParameters(
-        Decl*           decl,
-        ContainerDecl*  parentDecl)
-    {
-        // If we have a `static` parameter, then it is obvious
-        // that we should use the `static` mode
-        if(isEffectivelyStatic(decl, parentDecl))
-            return kParameterListCollectMode_Static;
-
-        // Otherwise, let's default to collecting everything
-        return kParameterListCollectMode_Default;
-    }
-    //
-    // When dealing with a member function, we need to be able to add the `this`
-    // parameter for the enclosing type:
-    //
-    void addThisParameter(
-        ParameterDirection  direction,
-        Type*               type,
-        ParameterLists*     ioParameterLists)
-    {
-        ParameterInfo info;
-        info.type = type;
-        info.decl = nullptr;
-        info.direction = direction;
-        info.isThisParam = true;
-
-        ioParameterLists->params.add(info);
-    }
-    //
-    // And here is our function that will do the recursive walk:
-    void collectParameterLists(
-        Decl*                       decl,
-        ParameterLists*             ioParameterLists,
-        ParameterListCollectMode    mode)
-    {
-        // The parameters introduced by any "parent" declarations
-        // will need to come first, so we'll deal with that
-        // logic here.
-        if( auto parentDecl = decl->parentDecl )
-        {
-            // Compute the mode to use when collecting parameters from
-            // the outer declaration. The most important question here
-            // is whether parameters of the outer declaration should
-            // also count as parameters of the inner declaration.
-            ParameterListCollectMode innerMode = getModeForCollectingParentParameters(decl, parentDecl);
-
-            // Don't down-grade our `static`-ness along the chain.
-            if(innerMode < mode)
-                innerMode = mode;
-
-            // Now collect any parameters from the parent declaration itself
-            collectParameterLists(parentDecl, ioParameterLists, innerMode);
-
-            // We also need to consider whether the inner declaration needs to have a `this`
-            // parameter corresponding to the outer declaration.
-            if( innerMode != kParameterListCollectMode_Static )
-            {
-                ParameterDirection direction = getThisParamDirection(decl);
-                auto thisType = getThisParamTypeForContainer(context, createDefaultSpecializedDeclRef(context, parentDecl));
-                if(thisType)
-                {
-                    addThisParameter(direction, thisType, ioParameterLists);
-                }
-            }
-        }
-
-        // Once we've added any parameters based on parent declarations,
-        // we can see if this declaration itself introduces parameters.
-        //
-        if( auto callableDecl = as<CallableDecl>(decl) )
-        {
-            // Don't collect parameters from the outer scope if
-            // we are in a `static` context.
-            if( mode == kParameterListCollectMode_Default )
-            {
-                for( auto paramDecl : callableDecl->getParameters() )
-                {
-                    ioParameterLists->params.add(getParameterInfo(paramDecl));
-                }
-            }
-        }
-    }
 
     bool isImportedDecl(Decl* decl)
     {
         return Slang::isImportedDecl(context, decl);
     }
 
-    bool isConstExprVar(Decl* decl)
-    {
-        if( decl->hasModifier<ConstExprModifier>() )
-        {
-            return true;
-        }
-        else if(decl->hasModifier<HLSLStaticModifier>() && decl->hasModifier<ConstModifier>())
-        {
-            return true;
-        }
-
-        return false;
-    }
-
     IRType* maybeGetConstExprType(IRType* type, Decl* decl)
     {
-        if(isConstExprVar(decl))
-        {
-            return getBuilder()->getRateQualifiedType(
-                getBuilder()->getConstExprRate(),
-                type);
-        }
-
-        return type;
+        return Slang::maybeGetConstExprType(getBuilder(), type, decl);
     }
 
     IRGeneric* emitOuterGeneric(
@@ -5962,7 +6283,7 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
         getBuilder()->addTargetIntrinsicDecoration(irInst, UnownedStringSlice(), definition.getUnownedSlice());
     }
 
-    void addParamNameHint(IRInst* inst, ParameterInfo info)
+    void addParamNameHint(IRInst* inst, IRLoweringParameterInfo const& info)
     {
         if(auto decl = info.decl)
         {
@@ -6010,31 +6331,16 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
 
         emitOuterGenerics(subContext, decl, decl);
 
-        // Collect the parameter lists we will use for our new function.
-        ParameterLists parameterLists;
-        collectParameterLists(decl, &parameterLists, kParameterListCollectMode_Default);
+        FuncDeclBaseTypeInfo info;
+        _lowerFuncDeclBaseTypeInfo(
+            subContext,
+            createDefaultSpecializedDeclRef(context, decl),
+            info);
 
-        // TODO: if there are any generic parameters in the collected list, then
-        // we need to output an IR function with generic parameters (or a generic
-        // with a nested function... the exact representation is still TBD).
-
-        // In most cases the return type for a declaration can be read off the declaration
-        // itself, but things get a bit more complicated when we have to deal with
-        // accessors for subscript declarations (and eventually for properties).
-        //
-        // We compute a declaration to use for looking up the return type here:
-        CallableDecl* declForReturnType = decl;
-        if (auto accessorDecl = as<AccessorDecl>(decl))
-        {
-            // We are some kind of accessor, so the parent declaration should
-            // know the correct return type to expose.
-            //
-            auto parentDecl = accessorDecl->parentDecl;
-            if (auto subscriptDecl = as<SubscriptDecl>(parentDecl))
-            {
-                declForReturnType = subscriptDecl;
-            }
-        }
+        auto irFuncType = info.type;
+        auto& irResultType = info.resultType;
+        auto& parameterLists = info.parameterLists;
+        auto& paramTypes = info.paramTypes;
 
         // need to create an IR function here
 
@@ -6042,76 +6348,6 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
         addNameHint(context, irFunc, decl);
         addLinkageDecoration(context, irFunc, decl);
 
-        List<IRType*> paramTypes;
-
-        for( auto paramInfo : parameterLists.params )
-        {
-            IRType* irParamType = lowerType(subContext, paramInfo.type);
-
-            switch( paramInfo.direction )
-            {
-            case kParameterDirection_In:
-                // Simple case of a by-value input parameter.
-                break;
-
-            // If the parameter is declared `out` or `inout`,
-            // then we will represent it with a pointer type in
-            // the IR, but we will use a specialized pointer
-            // type that encodes the parameter direction information.
-            case kParameterDirection_Out:
-                irParamType = subBuilder->getOutType(irParamType);
-                break;
-            case kParameterDirection_InOut:
-                irParamType = subBuilder->getInOutType(irParamType);
-                break;
-            case kParameterDirection_Ref:
-                irParamType = subBuilder->getRefType(irParamType);
-                break;
-
-            default:
-                SLANG_UNEXPECTED("unknown parameter direction");
-                break;
-            }
-
-            // If the parameter was explicitly marked as being a compile-time
-            // constant (`constexpr`), then attach that information to its
-            // IR-level type explicitly.
-            if( paramInfo.decl )
-            {
-                irParamType = maybeGetConstExprType(irParamType, paramInfo.decl);
-            }
-
-            paramTypes.add(irParamType);
-        }
-
-        auto irResultType = lowerType(subContext, declForReturnType->returnType);
-
-        if (auto setterDecl = as<SetterDecl>(decl))
-        {
-            // We are lowering a "setter" accessor inside a subscript
-            // declaration, which means we don't want to *return* the
-            // stated return type of the subscript, but instead take
-            // it as a parameter.
-            //
-            IRType* irParamType = irResultType;
-            paramTypes.add(irParamType);
-
-            // Instead, a setter always returns `void`
-            //
-            irResultType = subBuilder->getVoidType();
-        }
-
-        if( auto refAccessorDecl = as<RefAccessorDecl>(decl) )
-        {
-            // A `ref` accessor needs to return a *pointer* to the value
-            // being accessed, rather than a simple value.
-            irResultType = subBuilder->getPtrType(irResultType);
-        }
-
-        auto irFuncType = subBuilder->getFuncType(
-            paramTypes.getCount(),
-            paramTypes.getBuffer(),
-            irResultType);
         irFunc->setFullType(irFuncType);
 
         subBuilder->setInsertInto(irFunc);
@@ -6260,18 +6496,6 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
                 {
                     subBuilder->addPolymorphicDecoration(irParam);
                 }
-            }
-
-            if (auto setterDecl = as<SetterDecl>(decl))
-            {
-                // Add the IR parameter for the new value
-                IRType* irParamType = irResultType;
-                auto irParam = subBuilder->emitParam(irParamType);
-                addNameHint(context, irParam, "newValue");
-
-                // TODO: we need some way to wire this up to the `newValue`
-                // or whatever name we give for that parameter inside
-                // the setter body.
             }
 
             {

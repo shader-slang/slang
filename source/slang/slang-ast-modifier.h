@@ -770,6 +770,15 @@ class MutatingAttribute : public Attribute
     SLANG_CLASS(MutatingAttribute)
 };
 
+// A `[nonmutating]` attribute, which indicates that a
+// `set` accessor does not need to modify anything through
+// its `this` parameter.
+//
+class NonmutatingAttribute : public Attribute 
+{
+    SLANG_CLASS(NonmutatingAttribute)
+};
+
 
 // A `[__readNone]` attribute, which indicates that a function
 // computes its results strictly based on argument values, without
