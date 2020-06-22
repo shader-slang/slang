@@ -1176,12 +1176,16 @@ namespace Slang
     // in the case where the result is overloaded.
     struct LookupResult
     {
-        // The one item that was found, in the smple case
+        // The one item that was found, in the simple case
         LookupResultItem item;
 
         // All of the items that were found, in the complex case.
         // Note: if there was no overloading, then this list isn't
         // used at all, to avoid allocation.
+        // 
+        // Additionally, if `items` is used, then `item` *must* hold an item that
+        // is also in the items list (typically the first entry), as an invariant.
+        // Otherwise isValid/begin will not function correctly.
         List<LookupResultItem> items;
 
         // Was at least one result found?

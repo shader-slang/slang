@@ -755,6 +755,8 @@ struct ASTSerialTypeInfo<LookupResult>
         else
         {
             dst.items.swapWith(items);
+            // We have to set item such that it is valid/member of items, if items is non empty
+            dst.item = dst.items[0];
         }
     }
 };
@@ -933,8 +935,6 @@ struct ASTSerialTypeInfo<SemanticVersion> : public ASTSerialIdentityTypeInfo<Sem
 template <>
 struct ASTSerialTypeInfo<ASTNodeType> : public ASTSerialConvertTypeInfo<ASTNodeType, uint16_t> {};
 
-
-
 // String
 template <>
 struct ASTSerialTypeInfo<String>
@@ -1081,6 +1081,15 @@ struct ASTSerialGetType<DeclRef<T>>
 
 // !!!!!!!!!!!!!!!!!!!!!! Generate fields for a type !!!!!!!!!!!!!!!!!!!!!!!!!!!
 
+struct ASTSerialClass
+{
+    ASTNodeType type;
+    ASTSerialField* fields;
+    Index fieldsCount;
+};
+
+/* static */ASTSerialClass s_classes[Index(ASTNodeType::CountOf)]; 
+
 template <typename T>
 ASTSerialField _calcField(const char* name, T& in)
 {
@@ -1095,29 +1104,44 @@ ASTSerialField _calcField(const char* name, T& in)
     return field;
 }
 
-#define SLANG_AST_SERIAL_FIELD(FIELD_NAME, TYPE, param) fields.add(_calcField(#FIELD_NAME, obj->FIELD_NAME));
-
-struct ASTFieldAccess
+static ASTSerialClass _makeClass(MemoryArena* arena, ASTNodeType type, const List<ASTSerialField>& fields)
 {
+    ASTSerialClass cls = {};
+    cls.type = type;
+    cls.fieldsCount = fields.getCount();
+    cls.fields = arena->allocateAndCopyArray(fields.getBuffer(), fields.getCount());
+    return cls;
+}
+
+#define SLANG_AST_SERIAL_FIELD(FIELD_NAME, TYPE, param) fields.add(_calcField(#FIELD_NAME, obj->FIELD_NAME));
 
 // Note that the obj point is not nullptr, because some compilers notice this is 'indexing from null'
 // and warn/error. So we offset from 1.
-#define SLANG_AST_SERIAL_FIELDS_IMPL(NAME, SUPER, ORIGIN, LAST, MARKER, TYPE, param) \
-    static void serialFields_##NAME(List<ASTSerialField>& fields) \
-    { \
-        NAME* obj = (NAME*)1; \
-        SLANG_UNUSED(fields); \
-        SLANG_UNUSED(obj); \
-        SLANG_FIELDS_ASTNode_##NAME(SLANG_AST_SERIAL_FIELD, param) \
+#define SLANG_AST_SERIAL_MAKE_CLASS(NAME, SUPER, ORIGIN, LAST, MARKER, TYPE, param) \
+{ \
+    NAME* obj = (NAME*)1; \
+    SLANG_UNUSED(obj); \
+    fields.clear(); \
+    SLANG_FIELDS_ASTNode_##NAME(SLANG_AST_SERIAL_FIELD, param) \
+    s_classes[Index(ASTNodeType::NAME)] = _makeClass(arena, ASTNodeType::NAME, fields); \
+}
+
+struct ASTFieldAccess
+{
+    static void makeClasses(MemoryArena* arena)
+    {
+        List<ASTSerialField> fields;
+        SLANG_ALL_ASTNode_NodeBase(SLANG_AST_SERIAL_MAKE_CLASS, _)
     }
-
-    SLANG_ALL_ASTNode_NodeBase(SLANG_AST_SERIAL_FIELDS_IMPL, _)
 };
-
-
 
 /* static */SlangResult ASTSerializeUtil::selfTest()
 {
+    MemoryArena arena;
+    arena.init(2048);
+
+    ASTFieldAccess::makeClasses(&arena);
+
     {
         struct Thing
         {
