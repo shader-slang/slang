@@ -7,21 +7,42 @@
 #include "slang-compiler.h"
 #include "slang-type-layout.h"
 
-
+#include "slang-ast-support-types.h"
 
 namespace Slang {
+
+
+// Things stored as references:
+// 
+// NodeBase derived types
+// Array 
+// 
+// RefObject derived types:
+// 
+// Breadcrumb
+// StringRepresentation
+// Scope
 
 // Type used to implement mechanisms to convert to and from serial types.
 template <typename T>
 struct ASTSerialTypeInfo;
 
+// Helpers to convert fields treated as values
 
-// Things stored as references
-// NodeBase derived types
-// String
-// Array 
-// Scope 
-// LookupResult
+class ASTSerialReader;
+class ASTSerialWriter;
+
+template <typename NATIVE_TYPE, typename SERIAL_TYPE>
+static void _toSerialValue(ASTSerialWriter* writer, const NATIVE_TYPE& src, SERIAL_TYPE& dst)
+{
+    ASTSerialTypeInfo<NATIVE_TYPE>::toSerial(writer, &src, &dst);
+}
+
+template <typename SERIAL_TYPE, typename NATIVE_TYPE>
+static void _toNativeValue(ASTSerialReader* reader, const SERIAL_TYPE& src, NATIVE_TYPE& dst)
+{
+    ASTSerialTypeInfo<NATIVE_TYPE>::toNative(reader, &src, &dst);
+}
 
 // Perhaps we have hold the Rtti type and the the serialize information
 struct ASTSerializeType
@@ -544,6 +565,53 @@ struct ASTSerialTypeInfo<Dictionary<KEY, VALUE>>
     }
 };
 
+// SyntaxClass<T>
+template <typename T>
+struct ASTSerialTypeInfo<SyntaxClass<T>>
+{
+    typedef SyntaxClass<T> NativeType;
+    typedef uint16_t SerialType;
+
+    enum { SerialAlignment = sizeof(SerialType) };
+
+    static void toSerial(ASTSerialWriter* writer, const void* native, void* serial)
+    {
+        SLANG_UNUSED(writer);
+        auto& src = *(const NativeType*)native;
+        auto& dst = *(SerialType*)serial;
+        dst = SerialType(src.classInfo->m_classId);
+    }
+    static void toNative(ASTSerialReader* reader, const void* serial, void* native)
+    {
+        SLANG_UNUSED(reader);
+        auto& src = *(const SerialType*)native;
+        auto& dst = *(NativeType*)serial;
+        dst.classInfo = ReflectClassInfo::getInfo(ASTNodeType(src));
+    }
+};
+
+// Handle RefPtr - just convert into * to do the conversion
+template <typename T>
+struct ASTSerialTypeInfo<RefPtr<T>>
+{
+    typedef RefPtr<T> NativeType;
+    typedef typename ASTSerialTypeInfo<T*>::SerialType SerialType;
+    enum { SerialAlignment = sizeof(SerialType) };
+
+    static void toSerial(ASTSerialWriter* writer, const void* native, void* serial)
+    {
+        auto& src = *(const NativeType*)native;
+        T* obj = src;
+        ASTSerialTypeInfo<T*>::toSerial(writer, &obj, serial);
+    }
+    static void toNative(ASTSerialReader* reader, const void* serial, void* native)
+    {
+        T* obj = nullptr;
+        ASTSerialTypeInfo<T*>::toNative(reader, serial, &obj);
+        *(NativeType*)native = obj;
+    }
+};
+
 // QualType
 
 template <>
@@ -572,9 +640,77 @@ struct ASTSerialTypeInfo<QualType>
         dst->isLeftValue = src->isLeftValue != 0;
     }
 };
-// LookupResult
 
-// TODO(JS): Not implemented yet
+
+// LookupResult::Breadcrumb
+template <>
+struct ASTSerialTypeInfo<LookupResultItem::Breadcrumb>
+{
+    typedef LookupResultItem::Breadcrumb NativeType;
+    struct SerialType
+    {
+        NativeType::Kind kind;
+        NativeType::ThisParameterMode thisParameterMode;
+        ASTSerialTypeInfo<DeclRef<Decl>>::SerialType declRef;
+        ASTSerialTypeInfo<RefPtr<NativeType>> next; 
+    };
+    enum { SerialAlignment = SLANG_ALIGN_OF(SerialType) };
+
+    static void toSerial(ASTSerialWriter* writer, const void* native, void* serial)
+    {
+        auto& src = *(const NativeType*)native;
+        auto& dst = *(SerialType*)serial;
+
+        dst.kind = src.kind;
+        dst.thisParameterMode = src.thisParameterMode;
+        _toSerialValue(writer, src.declRef, dst.declRef);
+        _toSerialValue(writer, src.next, dst.next);
+    }
+     
+    static void toNative(ASTSerialReader* reader, const void* serial, void* native)
+    {
+        auto& dst = *(NativeType*)native;
+        auto& src = *(const SerialType*)serial;
+
+        dst.kind = src.kind;
+        dst.thisParameterMode = src.thisParameterMode;
+        _toNativeValue(reader, src.declRef, dst.declRef);
+        _toNativeValue(reader, src.next, dst.next);
+    }
+};
+
+// LookupResultItem
+template <>
+struct ASTSerialTypeInfo<LookupResultItem>
+{
+    typedef LookupResultItem NativeType;
+    struct SerialType
+    {
+        ASTSerialTypeInfo<DeclRef<Decl>>::SerialType declRef;
+        ASTSerialTypeInfo<RefPtr<NativeType::Breadcrumb>> breadcrumbs;
+    };
+    enum { SerialAlignment = SLANG_ALIGN_OF(SerialType) };
+
+    static void toSerial(ASTSerialWriter* writer, const void* native, void* serial)
+    {
+        auto& src = *(const NativeType*)native;
+        auto& dst = *(SerialType*)serial;
+
+        _toSerialValue(writer, src.declRef, dst.declRef);
+        _toSerialValue(writer, src.breadcrumbs, dst.breadcrumbs);
+    }
+
+    static void toNative(ASTSerialReader* reader, const void* serial, void* native)
+    {
+        auto& dst = *(NativeType*)native;
+        auto& src = *(const SerialType*)serial;
+
+        _toNativeValue(reader, src.declRef, dst.declRef);
+        _toNativeValue(reader, src.breadcrumbs, dst.breadcrumbs);
+    }
+};
+
+// LookupResult
 template <>
 struct ASTSerialTypeInfo<LookupResult>
 {
@@ -584,22 +720,42 @@ struct ASTSerialTypeInfo<LookupResult>
 
     static void toSerial(ASTSerialWriter* writer, const void* native, void* serial)
     {
-        SLANG_UNUSED(writer);
-
         auto& src = *(const NativeType*)native;
-        SLANG_UNUSED(src);
         auto& dst = *(SerialType*)serial;
-        dst = ASTSerialIndex(0);
+
+        if (src.isOverloaded())
+        {
+            // Save off as an array
+            dst = writer->addArray(src.items.getBuffer(), src.items.getCount());
+        }
+        else if (src.item.declRef.getDecl())
+        {
+            dst = writer->addArray(&src.item, 1);
+        }
+        else
+        {
+            dst = ASTSerialIndex(0);
+        }
     }
     static void toNative(ASTSerialReader* reader, const void* serial, void* native)
     {
-        SLANG_UNUSED(reader);
+        auto& dst = *(NativeType*)native;
+        auto& src = *(const SerialType*)serial;
 
-        auto& src = *(const NativeType*)native;
-        SLANG_UNUSED(src);
-        auto& dst = *(SerialType*)serial;
+        // Initialize
+        dst = NativeType();
 
-        SLANG_UNUSED(dst);
+        List<LookupResultItem> items;
+        reader->getArray(src, items);
+
+        if (items.getCount() == 1)
+        {
+            dst.item = items[0];
+        }
+        else
+        {
+            dst.items.swapWith(items);
+        }
     }
 };
 
@@ -777,52 +933,7 @@ struct ASTSerialTypeInfo<SemanticVersion> : public ASTSerialIdentityTypeInfo<Sem
 template <>
 struct ASTSerialTypeInfo<ASTNodeType> : public ASTSerialConvertTypeInfo<ASTNodeType, uint16_t> {};
 
-// SyntaxClass<T>
-template <typename T>
-struct ASTSerialTypeInfo<SyntaxClass<T>>
-{
-    typedef SyntaxClass<T> NativeType;
-    typedef uint16_t SerialType;
 
-    enum { SerialAlignment = sizeof(SerialType) };
-
-    static void toSerial(ASTSerialWriter* writer, const void* native, void* serial)
-    {
-        SLANG_UNUSED(writer);
-        auto& src = *(const NativeType*)native;
-        auto& dst = *(SerialType*)serial;
-        dst = SerialType(src.classInfo->m_classId);
-    }
-    static void toNative(ASTSerialReader* reader, const void* serial, void* native)
-    {
-        SLANG_UNUSED(reader);
-        auto& src = *(const SerialType*)native;
-        auto& dst = *(NativeType*)serial;
-        dst.classInfo = ReflectClassInfo::getInfo(ASTNodeType(src));
-    }
-};
-
-// Handle RefPtr - just convert into * to do the conversion
-template <typename T>
-struct ASTSerialTypeInfo<RefPtr<T>>
-{
-    typedef RefPtr<T> NativeType;
-    typedef ASTSerialIndex SerialType;
-    enum { SerialAlignment = sizeof(SerialType) };
-
-    static void toSerial(ASTSerialWriter* writer, const void* native, void* serial)
-    {
-        auto& src = *(const NativeType*)native;
-        T* obj = src;
-        ASTSerialTypeInfo<T*>::toSerial(writer, &obj, serial);
-    }
-    static void toNative(ASTSerialReader* reader, const void* serial, void* native)
-    {
-        T* obj = nullptr;
-        ASTSerialTypeInfo<T*>::toNative(reader, serial, &obj);
-        *(NativeType*)native = obj;
-    }
-};
 
 // String
 template <>
@@ -844,7 +955,6 @@ struct ASTSerialTypeInfo<String>
         dst = reader->getString(src);
     }
 };
-
 
 // Token
 template <>
@@ -948,8 +1058,9 @@ struct ASTSerialTypeInfo<const DiagnosticInfo*>
     }
 };
 
-
+// !!!!!!!!!!!!!!!!!!!!! ASTSerialGetType<T> !!!!!!!!!!!!!!!!!!!!!!!!!!!
 // Getting the type info, let's use a static variable to hold the state to keep simple
+
 template <typename T>
 struct ASTSerialGetType
 {
@@ -968,24 +1079,7 @@ struct ASTSerialGetType<DeclRef<T>>
     static const ASTSerialType* getType() { return ASTSerialDeclRefBaseTypeInfo::getType(); }
 };
 
-
-// For array, I can't save the 'type', but I can save the alignment (?) and the element size.
-// I could just require all indexed things, must be on 64 bit boundaries (and so alignment)
-#if 0
-struct Entry
-{
-    enum class Type
-    {
-        String,    
-        Array,
-        Node,
-    };
-
-    // We could store a skip with each type, that would say the amount of bytes to get to the next entry.
-    // We could keep the types separate from the pointers to the contents, and then different allocations have different alignemnt
-    Type type;
-};
-#endif
+// !!!!!!!!!!!!!!!!!!!!!! Generate fields for a type !!!!!!!!!!!!!!!!!!!!!!!!!!!
 
 template <typename T>
 ASTSerialField _calcField(const char* name, T& in)
@@ -1018,8 +1112,9 @@ struct ASTFieldAccess
     }
 
     SLANG_ALL_ASTNode_NodeBase(SLANG_AST_SERIAL_FIELDS_IMPL, _)
-
 };
+
+
 
 /* static */SlangResult ASTSerializeUtil::selfTest()
 {
