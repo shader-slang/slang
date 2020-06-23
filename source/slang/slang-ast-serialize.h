@@ -10,6 +10,9 @@
 namespace Slang
 {
 
+// Type used to implement mechanisms to convert to and from serial types.
+template <typename T>
+struct ASTSerialTypeInfo;
 
 struct ASTSerialInfo
 {
@@ -173,7 +176,7 @@ protected:
 template <typename T>
 ASTSerialIndex ASTSerialWriter::addArray(const T* in, Index count)
 {
-    typedef typename ASTSerialTypeInfo<T> ElementTypeInfo;
+    typedef ASTSerialTypeInfo<T> ElementTypeInfo;
     typedef typename ElementTypeInfo::SerialType ElementSerialType;
 
     if (std::is_same<T, ElementSerialType>::value)

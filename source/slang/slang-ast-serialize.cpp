@@ -25,9 +25,7 @@ namespace Slang {
 // StringRepresentation
 // Scope
 
-// Type used to implement mechanisms to convert to and from serial types.
-template <typename T>
-struct ASTSerialTypeInfo;
+
 
 // Helpers to convert fields treated as values
 
@@ -148,7 +146,7 @@ struct ASTSerialTypeInfo<TextureFlavor>
 template <typename T, size_t N>
 struct ASTSerialTypeInfo<T[N]>
 {
-    typedef typename ASTSerialTypeInfo<T> ElementASTSerialType;
+    typedef ASTSerialTypeInfo<T> ElementASTSerialType;
     typedef typename ElementASTSerialType::SerialType SerialElementType;
 
     typedef T NativeType[N];
@@ -869,10 +867,10 @@ struct ASTSerialTypeInfo<const DiagnosticInfo*>
 template <typename T>
 struct ASTSerialGetType
 {
-    typedef typename ASTSerialTypeInfo<T> Info;
     static const ASTSerialType* getType()
     {
-        static const ASTSerialType type = { sizeof(Info::SerialType), uint8_t(Info::SerialAlignment), &Info::toSerial, &Info::toNative };
+        typedef ASTSerialTypeInfo<T> Info;
+        static const ASTSerialType type = { sizeof(typename Info::SerialType), uint8_t(Info::SerialAlignment), &Info::toSerial, &Info::toNative };
         return &type;
     }
 };
