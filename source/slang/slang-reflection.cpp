@@ -1277,7 +1277,7 @@ SLANG_API SlangStage spReflectionEntryPoint_getStage(SlangReflectionEntryPoint* 
 
     if(!entryPointLayout) return SLANG_STAGE_NONE;
 
-    return SlangStage(entryPointLayout->profile.GetStage());
+    return SlangStage(entryPointLayout->profile.getStage());
 }
 
 SLANG_API void spReflectionEntryPoint_getComputeThreadGroupSize(
@@ -1323,7 +1323,7 @@ SLANG_API int spReflectionEntryPoint_usesAnySampleRateInput(
     if(!entryPointLayout)
         return 0;
 
-    if (entryPointLayout->profile.GetStage() != Stage::Fragment)
+    if (entryPointLayout->profile.getStage() != Stage::Fragment)
         return 0;
 
     return (entryPointLayout->flags & EntryPointLayout::Flag::usesAnySampleRateInput) != 0;

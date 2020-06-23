@@ -621,8 +621,8 @@ static SlangResult _newTexture(const InputTextureDesc& desc, slang::TypeLayoutRe
 
 /* static */SlangResult CPUComputeUtil::execute(const ExecuteInfo& info)
 {
-    UniformState* uniformState = (UniformState*)info.m_uniformState;
-    CPPPrelude::UniformEntryPointParams* uniformEntryPointParams = (CPPPrelude::UniformEntryPointParams*)info.m_uniformEntryPointParams;
+    void* uniformState = info.m_uniformState;
+    void* uniformEntryPointParams = info.m_uniformEntryPointParams;
 
     switch (info.m_style)
     {

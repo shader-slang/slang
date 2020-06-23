@@ -527,6 +527,17 @@ static void _lookUpMembersInSuperTypeDeclImpl(
             for (auto inheritanceDeclRef : getMembersOfType<InheritanceDecl>(aggTypeDeclBaseRef))
             {
                 ensureDecl(semantics, inheritanceDeclRef.getDecl(), DeclCheckState::CanUseBaseOfInheritanceDecl);
+
+                auto baseType = getSup(astBuilder, inheritanceDeclRef);
+                if( auto baseDeclRefType = as<DeclRefType>(baseType) )
+                {
+                    if( auto baseInterfaceDeclRef = baseDeclRefType->declRef.as<InterfaceDecl>() )
+                    {
+                        if( int(request.options) & int(LookupOptions::IgnoreBaseInterfaces) )
+                            continue;
+                    }
+                }
+
                 _lookUpMembersInSuperType(astBuilder, name, leafType, leafIsSuperWitness, inheritanceDeclRef, request, ioResult, inBreadcrumbs);
             }
         }
@@ -807,11 +818,13 @@ LookupResult lookUpMember(
     SemanticsVisitor*   semantics,
     Name*               name,
     Type*               type,
-    LookupMask          mask)
+    LookupMask          mask,
+    LookupOptions       options)
 {
     LookupRequest request;
     request.semantics = semantics;
     request.mask = mask;
+    request.options = options;
 
     LookupResult result;
     _lookUpMembersInType(astBuilder, name, type, request, result, nullptr);

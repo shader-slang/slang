@@ -1808,6 +1808,10 @@ __generic<E : __EnumType>
 __intrinsic_op($(kIROp_Eql))
 bool operator==(E left, E right);
 
+__generic<E : __EnumType>
+__intrinsic_op($(kIROp_Neq))
+bool operator!=(E left, E right);
+
 // Binding Attributes
 
 __attributeTarget(DeclBase)

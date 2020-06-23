@@ -246,10 +246,10 @@
     <ClInclude Include="slang-reflection.h">
       <Filter>Header Files</Filter>
     </ClInclude>
-    <ClInclude Include="slang-source-loc.h">
+    <ClInclude Include="slang-repro.h">
       <Filter>Header Files</Filter>
     </ClInclude>
-    <ClInclude Include="slang-state-serialize.h">
+    <ClInclude Include="slang-source-loc.h">
       <Filter>Header Files</Filter>
     </ClInclude>
     <ClInclude Include="slang-syntax.h">
@@ -503,10 +503,10 @@
     <ClCompile Include="slang-reflection.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
-    <ClCompile Include="slang-source-loc.cpp">
+    <ClCompile Include="slang-repro.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
-    <ClCompile Include="slang-state-serialize.cpp">
+    <ClCompile Include="slang-source-loc.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
     <ClCompile Include="slang-stdlib.cpp">

@@ -63,8 +63,8 @@ static SlangResult _innerMain(int argc, char** argv)
     // directory called 'slang-cpp-prelude.h'.
     // 
     // We need to tell slang either the contents of the prelude, or suitable include/s
-    // that will work. The actual API call to set the prelude is `setDownstreamCompilerPrelude`
-    // and this just sets for a specific backend a bit of text placed before generated code.
+    // that will work. The actual API call to set the prelude is `setPrelude`
+    // and this just sets for a specific language a bit of text placed before generated code.
     //
     // Most downstream C++ compilers work on files. In that case slang may generate temporary
     // files that contain the generated code. Typically the generated files  will not be in the

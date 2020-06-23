@@ -320,7 +320,7 @@ namespace Slang
 
     //
 
-    Profile Profile::LookUp(char const* name)
+    Profile Profile::lookUp(char const* name)
     {
         #define PROFILE(TAG, NAME, STAGE, VERSION)	if(strcmp(name, #NAME) == 0) return Profile::TAG;
         #define PROFILE_ALIAS(TAG, DEF, NAME)		if(strcmp(name, #NAME) == 0) return Profile::TAG;
@@ -408,27 +408,57 @@ namespace Slang
         return session->getOrLoadDownstreamCompiler(passThrough, nullptr) ? SLANG_OK: SLANG_E_NOT_FOUND;
     }
 
+    SourceLanguage getDefaultSourceLanguageForDownstreamCompiler(PassThroughMode compiler)
+    {
+        switch (compiler)
+        {
+            case PassThroughMode::None:
+            {
+                return SourceLanguage::Unknown;
+            }
+            case PassThroughMode::Fxc:   
+            case PassThroughMode::Dxc:
+            {
+                return SourceLanguage::HLSL;
+            }
+            case PassThroughMode::Glslang:
+            {
+                return SourceLanguage::GLSL;
+            }
+            case PassThroughMode::Clang:
+            case PassThroughMode::VisualStudio:
+            case PassThroughMode::Gcc:
+            case PassThroughMode::GenericCCpp:
+            {
+                // These could ingest C, but we only have this function to work out a
+                // 'default' language to ingest.
+                return SourceLanguage::CPP;
+            }
+            case PassThroughMode::NVRTC:
+            {
+                return SourceLanguage::CUDA;
+            }
+            default: break;
+        }
+        SLANG_ASSERT(!"Unknown compiler");
+        return SourceLanguage::Unknown;
+    }
+
     PassThroughMode getDownstreamCompilerRequiredForTarget(CodeGenTarget target)
     {
         switch (target)
         {
+            // Don't *require* a downstream compiler for source output
+            case CodeGenTarget::GLSL:
+            case CodeGenTarget::HLSL:
+            case CodeGenTarget::CUDASource:
+            case CodeGenTarget::CPPSource:
+            case CodeGenTarget::CSource:
+            {
+                return PassThroughMode::None;
+            }
             case CodeGenTarget::None:
             {
-                return PassThroughMode::None;
-            }
-            case CodeGenTarget::GLSL:
-            {
-                // Can always output GLSL
-                return PassThroughMode::None; 
-            }
-            case CodeGenTarget::HLSL:
-            {
-                // Can always output HLSL
-                return PassThroughMode::None;
-            }
-            case CodeGenTarget::CUDASource:
-            {
-                // Can always output CUDA
                 return PassThroughMode::None;
             }
             case CodeGenTarget::SPIRVAssembly:
@@ -450,12 +480,6 @@ namespace Slang
             case CodeGenTarget::GLSL_Vulkan_OneDesc:
             {
                 return PassThroughMode::Glslang;
-            }
-            case CodeGenTarget::CPPSource:
-            case CodeGenTarget::CSource:
-            {
-                // Don't need an external compiler to output C and C++ code
-                return PassThroughMode::None;
             }
             case CodeGenTarget::HostCallable:
             case CodeGenTarget::SharedLibrary:
@@ -607,7 +631,7 @@ namespace Slang
         }
 
         char const* stagePrefix = nullptr;
-        switch( profile.GetStage() )
+        switch( profile.getStage() )
         {
             // Note: All of the raytracing-related stages require
             // compiling for a `lib_*` profile, even when only a
@@ -642,7 +666,7 @@ namespace Slang
         }
 
         char const* versionSuffix = nullptr;
-        switch(profile.GetVersion())
+        switch(profile.getVersion())
         {
     #define CASE(TAG, SUFFIX) case ProfileVersion::TAG: versionSuffix = #SUFFIX; break
         CASE(DX_4_0,             _4_0);

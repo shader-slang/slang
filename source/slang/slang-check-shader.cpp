@@ -544,7 +544,7 @@ namespace Slang
         auto entryPointProfile = entryPointReq->getProfile();
         if( auto entryPointAttribute = entryPointFuncDecl->findModifier<EntryPointAttribute>() )
         {
-            auto entryPointStage = entryPointProfile.GetStage();
+            auto entryPointStage = entryPointProfile.getStage();
             if( entryPointStage == Stage::Unknown )
             {
                 entryPointProfile.setStage(entryPointAttribute->stage);

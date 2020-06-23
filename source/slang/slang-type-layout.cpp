@@ -1487,7 +1487,7 @@ static bool isSM5OrEarlier(TargetRequest* targetReq)
 
     if(profile.getFamily() == ProfileFamily::DX)
     {
-        if(profile.GetVersion() <= ProfileVersion::DX_5_0)
+        if(profile.getVersion() <= ProfileVersion::DX_5_0)
             return true;
     }
 
@@ -1503,7 +1503,7 @@ static bool isSM5_1OrLater(TargetRequest* targetReq)
 
     if(profile.getFamily() == ProfileFamily::DX)
     {
-        if(profile.GetVersion() >= ProfileVersion::DX_5_1)
+        if(profile.getVersion() >= ProfileVersion::DX_5_1)
             return true;
     }
 
