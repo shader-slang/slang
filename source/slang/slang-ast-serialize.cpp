@@ -69,180 +69,73 @@ struct Entry
     };
 };
 
-struct Pointer
+// !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! ASTSerialWriter  !!!!!!!!!!!!!!!!!!!!!!!!!!!!
+
+ASTSerialIndex ASTSerialWriter::addPointer(const ASTSerialPointer& ptr)
 {
-    enum class Kind
-    {
-        Unknown,
-        RefObject,
-        NodeBase
-    };
+    SLANG_UNUSED(ptr);
+    return ASTSerialIndex(0);
+}
 
-    // Helpers so we can choose what kind of pointer we have based on the (unused) type of the pointer passed in
-    SLANG_FORCE_INLINE RefObject* _get(const RefObject*) { return m_kind == Kind::RefObject ? reinterpret_cast<RefObject*>(m_ptr) : nullptr; }
-    SLANG_FORCE_INLINE NodeBase* _get(const NodeBase*) { return m_kind == Kind::NodeBase ? reinterpret_cast<NodeBase*>(m_ptr) : nullptr; }
 
-    template <typename T>
-    T* dynamicCast()
-    {
-        return Slang::dynamicCast<T>(_get((T*)nullptr));
-    }
-     
-    Pointer():
-        m_kind(Kind::Unknown),
-        m_ptr(nullptr)
-    {
-    }
-
-    Pointer(RefObject* in):
-        m_kind(Kind::RefObject),
-        m_ptr((void*)in)
-    {
-    }
-    Pointer(NodeBase* in):
-        m_kind(Kind::NodeBase),
-        m_ptr((void*)in)
-    {
-    }
-
-    static Kind getKind(const RefObject*) { return Kind::RefObject; }
-    static Kind getKind(const NodeBase*) { return Kind::NodeBase; }
-
-    Kind m_kind;
-    void* m_ptr;
-};
-
-enum class ASTSerialIndex : uint32_t;
-typedef uint32_t ASTSerialSourceLoc;
-
-class ASTSerialReader : public RefObject
+ASTSerialIndex ASTSerialWriter::addString(const String& in)
 {
-public:
-    
-    Pointer getPointer(ASTSerialIndex index)
-    {
-        SLANG_UNUSED(index);
-        return Pointer();
-    }
+    SLANG_UNUSED(in);
+    return ASTSerialIndex(0);
+}
 
-#if 0
-    void* getArray(ASTSerialIndex index, Index& outCount)
+ASTSerialIndex ASTSerialWriter::addName(const Name* name)
+{
+    if (name == nullptr)
     {
-        SLANG_UNUSED(index);
-        outCount = 0;
+        return ASTSerialIndex(0);
+    }
+    return ASTSerialIndex(0);
+}
+
+ASTSerialSourceLoc ASTSerialWriter::addSourceLoc(SourceLoc sourceLoc)
+{
+    SLANG_UNUSED(sourceLoc);
+    return 0;
+}
+
+// !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! ASTSerialReader  !!!!!!!!!!!!!!!!!!!!!!!!!!!!
+
+ASTSerialPointer ASTSerialReader::getPointer(ASTSerialIndex index)
+{
+    SLANG_UNUSED(index);
+    return ASTSerialPointer();
+}
+
+String ASTSerialReader::getString(ASTSerialIndex index)
+{
+    SLANG_UNUSED(index);
+    return String();
+}
+
+Name* ASTSerialReader::getName(ASTSerialIndex index)
+{
+    if (index == ASTSerialIndex(0))
+    {
         return nullptr;
     }
-#endif
+    return nullptr;
+}
 
-    template <typename T>
-    void getArray(ASTSerialIndex index, List<T>& outArray)
-    {
-        SLANG_UNUSED(index);
-        outArray.clear();
-    }
-
-    String getString(ASTSerialIndex index)
-    {
-        SLANG_UNUSED(index);
-        return String();
-    }
-
-    Name* getName(ASTSerialIndex index)
-    {
-        if (index == ASTSerialIndex(0))
-        {
-            return nullptr;
-        }
-        return nullptr;
-    }
-
-    UnownedStringSlice getStringSlice(ASTSerialIndex index)
-    {
-        SLANG_UNUSED(index);
-        return UnownedStringSlice();
-    }
-
-    SourceLoc getSourceLoc(ASTSerialSourceLoc loc)
-    {
-        SLANG_UNUSED(loc);
-        return SourceLoc();
-    }
-};
-
-class ASTSerialWriter : public RefObject
+UnownedStringSlice ASTSerialReader::getStringSlice(ASTSerialIndex index)
 {
-public:
-    ASTSerialIndex addPointer(const Pointer& ptr)
-    {
-        SLANG_UNUSED(ptr);
-        return ASTSerialIndex(0);
-    }
-    template <typename T>
-    ASTSerialIndex addArray(const T* in, Index count)
-    {
-        typedef typename ASTSerialTypeInfo<T> ElementTypeInfo;
-        typedef typename ElementTypeInfo::SerialType ElementSerialType;
+    SLANG_UNUSED(index);
+    return UnownedStringSlice();
+}
 
-        if (std::is_same<T, ElementSerialType>::value)
-        {
-            // If they are the same we can just write out
-        }
-        else
-        {
-            // Else we need to convert
-            List<ElementSerialType> work;
-            work.setCount(count);
-
-            for (Index i = 0; i < count; ++i)
-            {
-                ElementTypeInfo::toSerial(this, &in[i], &work[i]);
-            }
-        }
-
-        return ASTSerialIndex(0);
-    }
-
-    ASTSerialIndex addString(const String& in)
-    {
-        SLANG_UNUSED(in);
-        return ASTSerialIndex(0);
-    }
-    ASTSerialIndex addName(const Name* name)
-    {
-        if (name == nullptr)
-        {
-            return ASTSerialIndex(0);
-        }
-        return ASTSerialIndex(0);
-    }
-
-
-    ASTSerialSourceLoc addSourceLoc(SourceLoc sourceLoc)
-    {
-        SLANG_UNUSED(sourceLoc);
-        return 0;
-    }
-};
-
-// We need to know the serial size 
-struct ASTSerialType
+SourceLoc ASTSerialReader::getSourceLoc(ASTSerialSourceLoc loc)
 {
-    typedef void(*ToSerialFunc)(ASTSerialWriter* writer, const void* src, void* dst);
-    typedef void(*ToNativeFunc)(ASTSerialReader* reader, const void* src, void* dst);
+    SLANG_UNUSED(loc);
+    return SourceLoc();
+}
 
-    size_t serialSizeInBytes;
-    uint8_t serialAlignment;
-    ToSerialFunc toSerialFunc;
-    ToNativeFunc toNativeFunc;
-};
+// !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! Serial <-> Native conversion  !!!!!!!!!!!!!!!!!!!!!!!!
 
-struct ASTSerialField
-{
-    const char* name;           ///< The name of the field
-    const ASTSerialType* type;        ///< The type of the field
-    uint32_t nativeOffset;      ///< Offset to field from base of type
-    uint32_t serialOffset;      ///< Offset in serial type    
-};
 
 // We need to have a way to map between the two.
 // If no mapping is needed, (just a copy), then we don't bother with the functions
@@ -404,12 +297,12 @@ struct ASTSerialTypeInfo<T*>
 
     enum
     {
-        SerialAlignment = sizeof(SerialType)
+        SerialAlignment = SLANG_ALIGN_OF(SerialType)
     };
 
     static void toSerial(ASTSerialWriter* writer, const void* inNative, void* outSerial)
     {
-        *(SerialType*)outSerial = writer->addPointer(Pointer(*(T**)inNative));
+        *(SerialType*)outSerial = writer->addPointer(ASTSerialPointer(*(T**)inNative));
     }
     static void toNative(ASTSerialReader* reader, const void* inSerial, void* outNative)
     {
@@ -425,7 +318,7 @@ struct ASTSerialDeclRefBaseTypeInfo
         ASTSerialIndex substitutions;
         ASTSerialIndex decl;
     };
-    enum { SerialAlignment = sizeof(ASTSerialIndex) };
+    enum { SerialAlignment = SLANG_ALIGN_OF(SerialType) };
 
     static void toSerial(ASTSerialWriter* writer, const void* inNative, void* outSerial)
     {
@@ -465,7 +358,7 @@ struct ASTSerialTypeInfo<SourceLoc>
 {
     typedef SourceLoc NativeType;
     typedef ASTSerialSourceLoc SerialType;
-    enum { SerialAlignment = sizeof(ASTSerialSourceLoc) };
+    enum { SerialAlignment = SLANG_ALIGN_OF(ASTSerialSourceLoc) };
 
     static void toSerial(ASTSerialWriter* writer, const void* inNative, void* outSerial)
     {
@@ -484,7 +377,7 @@ struct ASTSerialTypeInfo<List<T, ALLOCATOR>>
     typedef List<T, ALLOCATOR> NativeType;
     typedef ASTSerialIndex SerialType;
 
-    enum { SerialAlignment = sizeof(SerialType) };
+    enum { SerialAlignment = SLANG_ALIGN_OF(SerialType) };
 
     static void toSerial(ASTSerialWriter* writer, const void* native, void* serial)
     {
@@ -572,7 +465,7 @@ struct ASTSerialTypeInfo<SyntaxClass<T>>
     typedef SyntaxClass<T> NativeType;
     typedef uint16_t SerialType;
 
-    enum { SerialAlignment = sizeof(SerialType) };
+    enum { SerialAlignment = SLANG_ALIGN_OF(SerialType) };
 
     static void toSerial(ASTSerialWriter* writer, const void* native, void* serial)
     {
@@ -596,7 +489,7 @@ struct ASTSerialTypeInfo<RefPtr<T>>
 {
     typedef RefPtr<T> NativeType;
     typedef typename ASTSerialTypeInfo<T*>::SerialType SerialType;
-    enum { SerialAlignment = sizeof(SerialType) };
+    enum { SerialAlignment = SLANG_ALIGN_OF(SerialType) };
 
     static void toSerial(ASTSerialWriter* writer, const void* native, void* serial)
     {
@@ -716,7 +609,7 @@ struct ASTSerialTypeInfo<LookupResult>
 {
     typedef LookupResult NativeType;
     typedef ASTSerialIndex SerialType;
-    enum { SerialAlignment = sizeof(SerialType) };
+    enum { SerialAlignment = SLANG_ALIGN_OF(SerialType) };
 
     static void toSerial(ASTSerialWriter* writer, const void* native, void* serial)
     {
@@ -772,7 +665,7 @@ struct ASTSerialTypeInfo<GlobalGenericParamSubstitution::ConstraintArg>
         ASTSerialIndex decl;
         ASTSerialIndex val;
     };
-    enum { SerialAlignment = sizeof(ASTSerialIndex) };
+    enum { SerialAlignment = SLANG_ALIGN_OF(ASTSerialIndex) };
 
     static void toSerial(ASTSerialWriter* writer, const void* native, void* serial)
     {
@@ -802,7 +695,7 @@ struct ASTSerialTypeInfo<ExpandedSpecializationArg>
         ASTSerialIndex val;
         ASTSerialIndex witness;
     };
-    enum { SerialAlignment = sizeof(ASTSerialIndex) };
+    enum { SerialAlignment = SLANG_ALIGN_OF(ASTSerialIndex) };
 
     static void toSerial(ASTSerialWriter* writer, const void* native, void* serial)
     {
@@ -832,7 +725,7 @@ struct ASTSerialTypeInfo<TypeExp>
         ASTSerialIndex type;
         ASTSerialIndex expr;
     };
-    enum { SerialAlignment = sizeof(ASTSerialIndex) };
+    enum { SerialAlignment = SLANG_ALIGN_OF(ASTSerialIndex) };
 
     static void toSerial(ASTSerialWriter* writer, const void* native, void* serial)
     {
@@ -859,7 +752,7 @@ struct ASTSerialTypeInfo<DeclCheckStateExt>
     typedef DeclCheckStateExt NativeType;
     typedef DeclCheckStateExt::RawType SerialType;
 
-    enum { SerialAlignment = sizeof(SerialType) };
+    enum { SerialAlignment = SLANG_ALIGN_OF(SerialType) };
 
     static void toSerial(ASTSerialWriter* writer, const void* native, void* serial)
     {
@@ -880,7 +773,7 @@ struct ASTSerialTypeInfo<Modifiers>
     typedef Modifiers NativeType;
     typedef ASTSerialIndex SerialType;
 
-    enum { SerialAlignment = sizeof(SerialType) };
+    enum { SerialAlignment = SLANG_ALIGN_OF(SerialType) };
 
     static void toSerial(ASTSerialWriter* writer, const void* native, void* serial)
     {
@@ -941,7 +834,7 @@ struct ASTSerialTypeInfo<String>
 {
     typedef String NativeType;
     typedef ASTSerialIndex SerialType;
-    enum { SerialAlignment = sizeof(SerialType) };
+    enum { SerialAlignment = SLANG_ALIGN_OF(SerialType) };
 
     static void toSerial(ASTSerialWriter* writer, const void* native, void* serial)
     {
@@ -967,7 +860,7 @@ struct ASTSerialTypeInfo<Token>
         ASTSerialTypeInfo<SourceLoc>::SerialType loc;
         ASTSerialIndex name;
     };
-    enum { SerialAlignment = sizeof(SerialType) };
+    enum { SerialAlignment = SLANG_ALIGN_OF(SerialType) };
 
     static void toSerial(ASTSerialWriter* writer, const void* native, void* serial)
     {
@@ -1007,7 +900,7 @@ struct ASTSerialTypeInfo<NameLoc>
         ASTSerialTypeInfo<SourceLoc>::SerialType loc;
         ASTSerialIndex name;
     };
-    enum { SerialAlignment = sizeof(SerialType) };
+    enum { SerialAlignment = SLANG_ALIGN_OF(SerialType) };
 
     static void toSerial(ASTSerialWriter* writer, const void* native, void* serial)
     {
@@ -1034,7 +927,7 @@ struct ASTSerialTypeInfo<const DiagnosticInfo*>
     typedef const DiagnosticInfo* NativeType;
     typedef ASTSerialIndex SerialType;
 
-    enum { SerialAlignment = sizeof(SerialType) };
+    enum { SerialAlignment = SLANG_ALIGN_OF(SerialType) };
 
     static void toSerial(ASTSerialWriter* writer, const void* native, void* serial)
     {
@@ -1081,14 +974,6 @@ struct ASTSerialGetType<DeclRef<T>>
 
 // !!!!!!!!!!!!!!!!!!!!!! Generate fields for a type !!!!!!!!!!!!!!!!!!!!!!!!!!!
 
-struct ASTSerialClass
-{
-    ASTNodeType type;
-    ASTSerialField* fields;
-    Index fieldsCount;
-};
-
-/* static */ASTSerialClass s_classes[Index(ASTNodeType::CountOf)]; 
 
 template <typename T>
 ASTSerialField _calcField(const char* name, T& in)
@@ -1123,24 +1008,84 @@ static ASTSerialClass _makeClass(MemoryArena* arena, ASTNodeType type, const Lis
     SLANG_UNUSED(obj); \
     fields.clear(); \
     SLANG_FIELDS_ASTNode_##NAME(SLANG_AST_SERIAL_FIELD, param) \
-    s_classes[Index(ASTNodeType::NAME)] = _makeClass(arena, ASTNodeType::NAME, fields); \
+    outClasses[Index(ASTNodeType::NAME)] = _makeClass(arena, ASTNodeType::NAME, fields); \
 }
 
 struct ASTFieldAccess
 {
-    static void makeClasses(MemoryArena* arena)
+    static void calcClasses(MemoryArena* arena, ASTSerialClass outClasses[Index(ASTNodeType::CountOf)])
     {
         List<ASTSerialField> fields;
         SLANG_ALL_ASTNode_NodeBase(SLANG_AST_SERIAL_MAKE_CLASS, _)
     }
 };
 
+ASTSerialClasses::ASTSerialClasses():
+    m_arena(2048)
+{
+    memset(m_classes, 0, sizeof(m_classes));
+    ASTFieldAccess::calcClasses(&m_arena, m_classes);
+
+    // Now work out the layout
+    for (Index i = 0; i < SLANG_COUNT_OF(m_classes); ++i)
+    {
+        // Set up each class in order, from lowest to highest index
+        // Doing so means super class is always setup
+        ASTSerialClass& serialClass = m_classes[i];
+
+        const ReflectClassInfo* info = ReflectClassInfo::getInfo(serialClass.type);
+
+        size_t maxAlignment = 1;
+        size_t offset = 0;
+
+        const ReflectClassInfo* superInfo = info->m_superClass;
+        if (superInfo)
+        {
+            ASTSerialClass& superSerialInfo = m_classes[superInfo->m_classId];
+
+            // If it's been setup, then alignment must be non zero.
+            // The ordering of ASTNodeType, should mean  type have larger ASTNodeType greater than supers ASTNodeType.
+            SLANG_ASSERT(superSerialInfo.alignment != 0);
+
+            // Must be a power of 2
+            SLANG_ASSERT((superSerialInfo.alignment & (superSerialInfo.alignment - 1)) == 0);
+
+            maxAlignment = superSerialInfo.alignment;
+            offset = superSerialInfo.size;
+
+            // Check it is correctly aligned
+            SLANG_ASSERT((offset & (maxAlignment - 1)) == 0);
+        }
+
+        // Okay, go through fields setting their offset
+        ASTSerialField* field = serialClass.fields;
+        for (Index j = 0; j < serialClass.fieldsCount; j++)
+        {
+            size_t alignment = field->type->serialAlignment;
+            // Make sure the offset is aligned for the field requirement
+            offset = (offset + alignment - 1) & ~(alignment - 1);
+
+            // Save the field offset
+            field->serialOffset = uint32_t(offset);
+
+            // Move past the field
+            offset += field->type->serialSizeInBytes;
+
+            // Calc the maximum alignment
+            maxAlignment = (alignment > maxAlignment) ? alignment : maxAlignment;
+        }
+
+        // Align with maximum alignment
+        offset += (offset + maxAlignment - 1) & ~(maxAlignment - 1);
+
+        serialClass.alignment = uint8_t(maxAlignment);
+        serialClass.size = uint32_t(offset);
+    }
+}
+
 /* static */SlangResult ASTSerializeUtil::selfTest()
 {
-    MemoryArena arena;
-    arena.init(2048);
-
-    ASTFieldAccess::makeClasses(&arena);
+    RefPtr<ASTSerialClasses> classes = new ASTSerialClasses;
 
     {
         struct Thing
