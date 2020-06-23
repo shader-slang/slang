@@ -384,10 +384,10 @@ DiagnosticsLookup::DiagnosticsLookup():
     // diagnostics, or groups of diagnostics, with user-exposed names for use when
     // enabling/disabling warnings (or turning warnings into errors, etc.).
     //
-    // For now we build an ad hoc mapping from string names to corresponding single
-    // diagnostics (not groups).
-    //
-
+    // For now we build a map from diagnostic name to it's entry. Two entries are typically
+    // added - the 'original name' as associated with the diagnostic in lowerCamel, and
+    // a dashified version.
+    
     for (Index i = 0; i < SLANG_COUNT_OF(kAllDiagnostics); ++i)
     {
         const DiagnosticInfo* diagnostic = kAllDiagnostics[i];
