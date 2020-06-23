@@ -9,6 +9,8 @@
 
 #include "slang-ast-support-types.h"
 
+#include "../core/slang-byte-encode-util.h"
+
 namespace Slang {
 
 
@@ -42,96 +44,6 @@ template <typename SERIAL_TYPE, typename NATIVE_TYPE>
 static void _toNativeValue(ASTSerialReader* reader, const SERIAL_TYPE& src, NATIVE_TYPE& dst)
 {
     ASTSerialTypeInfo<NATIVE_TYPE>::toNative(reader, &src, &dst);
-}
-
-// Perhaps we have hold the Rtti type and the the serialize information
-struct ASTSerializeType
-{
-    enum class Kind
-    {
-        BasicType,          ///< Int, Float, Char etc
-        Reference,          ///< References some other AST Node (or array)
-        FixedArray,         ///< Needs to hold the underlying type (Hold the size)
-        Struct,             ///< Need to know the fields etc
-        Class,              ///< For now can only be AST nodes, and also has the fields
-    };
-    Kind kind;
-    uint8_t alignment;
-};
-
-struct Entry
-{
-    enum class EntryKind
-    {
-        ASTNode,
-        Array,
-        String,
-    };
-};
-
-// !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! ASTSerialWriter  !!!!!!!!!!!!!!!!!!!!!!!!!!!!
-
-ASTSerialIndex ASTSerialWriter::addPointer(const ASTSerialPointer& ptr)
-{
-    SLANG_UNUSED(ptr);
-    return ASTSerialIndex(0);
-}
-
-
-ASTSerialIndex ASTSerialWriter::addString(const String& in)
-{
-    SLANG_UNUSED(in);
-    return ASTSerialIndex(0);
-}
-
-ASTSerialIndex ASTSerialWriter::addName(const Name* name)
-{
-    if (name == nullptr)
-    {
-        return ASTSerialIndex(0);
-    }
-    return ASTSerialIndex(0);
-}
-
-ASTSerialSourceLoc ASTSerialWriter::addSourceLoc(SourceLoc sourceLoc)
-{
-    SLANG_UNUSED(sourceLoc);
-    return 0;
-}
-
-// !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! ASTSerialReader  !!!!!!!!!!!!!!!!!!!!!!!!!!!!
-
-ASTSerialPointer ASTSerialReader::getPointer(ASTSerialIndex index)
-{
-    SLANG_UNUSED(index);
-    return ASTSerialPointer();
-}
-
-String ASTSerialReader::getString(ASTSerialIndex index)
-{
-    SLANG_UNUSED(index);
-    return String();
-}
-
-Name* ASTSerialReader::getName(ASTSerialIndex index)
-{
-    if (index == ASTSerialIndex(0))
-    {
-        return nullptr;
-    }
-    return nullptr;
-}
-
-UnownedStringSlice ASTSerialReader::getStringSlice(ASTSerialIndex index)
-{
-    SLANG_UNUSED(index);
-    return UnownedStringSlice();
-}
-
-SourceLoc ASTSerialReader::getSourceLoc(ASTSerialSourceLoc loc)
-{
-    SLANG_UNUSED(loc);
-    return SourceLoc();
 }
 
 // !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! Serial <-> Native conversion  !!!!!!!!!!!!!!!!!!!!!!!!
@@ -302,7 +214,7 @@ struct ASTSerialTypeInfo<T*>
 
     static void toSerial(ASTSerialWriter* writer, const void* inNative, void* outSerial)
     {
-        *(SerialType*)outSerial = writer->addPointer(ASTSerialPointer(*(T**)inNative));
+        *(SerialType*)outSerial = writer->addPointer(*(T**)inNative);
     }
     static void toNative(ASTSerialReader* reader, const void* inSerial, void* outNative)
     {
@@ -1082,6 +994,260 @@ ASTSerialClasses::ASTSerialClasses():
         serialClass.size = uint32_t(offset);
     }
 }
+
+
+
+// !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! ASTSerialWriter  !!!!!!!!!!!!!!!!!!!!!!!!!!!!
+
+ASTSerialWriter::ASTSerialWriter(ASTSerialClasses* classes) :
+    m_arena(2048),
+    m_classes(classes)
+{
+    // 0 is always the null pointer
+    m_entries.add(nullptr);
+    m_ptrMap.Add(nullptr, 0);
+}
+
+ASTSerialIndex ASTSerialWriter::addPointer(const NodeBase* node)
+{
+    // Null is always 0
+    if (node == nullptr)
+    {
+        return ASTSerialIndex(0);
+    }
+    // Look up in the map
+    Index* indexPtr = m_ptrMap.TryGetValue(node);
+    if (indexPtr)
+    {
+        return ASTSerialIndex(*indexPtr);
+    }
+
+    const ASTSerialClass* serialClass = m_classes->getSerialClass(node->astNodeType);
+
+    typedef ASTSerialInfo::NodeEntry NodeEntry;
+
+    NodeEntry* nodeEntry = (NodeEntry*)m_arena.allocateAligned(sizeof(NodeEntry) + serialClass->size, 8);
+
+    nodeEntry->type = ASTSerialInfo::Type::Node;
+    nodeEntry->astNodeType = uint16_t(node->astNodeType);
+    nodeEntry->nextAlignment = 0;
+
+    auto index = _add(node, nodeEntry);
+
+    uint8_t* serialPayload = (uint8_t*)(nodeEntry + 1);
+
+    while (serialClass)
+    {
+        for (Index i = 0; i < serialClass->fieldsCount; ++i)
+        {
+            auto field = serialClass->fields[i];
+            // Work out the offsets
+            auto srcField = ((const uint8_t*)node) + field.nativeOffset;
+            auto dstField = serialPayload + field.serialOffset;
+
+            field.type->toSerialFunc(this, srcField, dstField);
+        }
+        // Get the super class
+        const ReflectClassInfo* reflectInfo = ReflectClassInfo::getInfo(serialClass->type);
+        const ReflectClassInfo* superReflectInfo = reflectInfo->m_superClass;
+
+        serialClass = superReflectInfo ? m_classes->getSerialClass(ASTNodeType(superReflectInfo->m_classId)) : nullptr;
+    }
+
+    return index;
+}
+
+ASTSerialIndex ASTSerialWriter::addPointer(const RefObject* obj)
+{
+    // Null is always 0
+    if (obj == nullptr)
+    {
+        return ASTSerialIndex(0);
+    }
+    // Look up in the map
+    Index* indexPtr = m_ptrMap.TryGetValue(obj);
+    if (indexPtr)
+    {
+        return ASTSerialIndex(*indexPtr);
+    }
+
+    if (auto stringRep = dynamicCast<StringRepresentation>(obj))
+    {
+        ASTSerialIndex index = addString(StringRepresentation::asSlice(stringRep));
+        m_ptrMap.Add(obj, Index(index));
+        return index;
+    }
+    else if (auto breadcrumb = dynamicCast<LookupResultItem::Breadcrumb>(obj))
+    {
+        typedef ASTSerialTypeInfo<LookupResultItem::Breadcrumb> TypeInfo;
+        typedef ASTSerialInfo::RefObjectEntry RefObjectEntry;
+
+        RefObjectEntry* refEntry = (RefObjectEntry*)m_arena.allocateAligned(sizeof(RefObjectEntry) + sizeof(TypeInfo::SerialType), 8);
+
+        refEntry->type = ASTSerialInfo::Type::RefObject;
+        refEntry->subType = RefObjectEntry::SubType::Breadcrumb;
+
+        auto index = _add(breadcrumb, refEntry);
+
+        // Do any conversion
+        TypeInfo::toSerial(this, breadcrumb, refEntry + 1);
+        return index;
+    }
+    else if (auto name = dynamicCast<const Name>(obj))
+    {
+        return addName(name);
+    }
+    else if (auto scope = dynamicCast<Scope>(obj))
+    {
+        // We don't serialize scope
+        return ASTSerialIndex(0);
+    }
+    else if (auto module = dynamicCast<Module>(obj))
+    {
+        // We don't serialize Module
+        return ASTSerialIndex(0);
+    }
+
+    SLANG_ASSERT(!"Unhandled type");
+    return ASTSerialIndex(0);
+}
+
+ASTSerialIndex ASTSerialWriter::addString(const UnownedStringSlice& slice)
+{
+    typedef ByteEncodeUtil Util;
+    typedef ASTSerialInfo::StringEntry StringEntry;
+
+    if (slice.getLength() == 0)
+    {
+        return ASTSerialIndex(0);
+    }
+
+    Index newIndex = m_entries.getCount();
+
+    Index* indexPtr = m_sliceMap.TryGetValueOrAdd(slice, newIndex);
+    if (indexPtr)
+    {
+        return ASTSerialIndex(*indexPtr);
+    }
+
+    // Okay we need to add the string
+
+    uint8_t encodeBuf[Util::kMaxLiteEncodeUInt32];
+    const int encodeCount = Util::encodeLiteUInt32(uint32_t(slice.getLength()), encodeBuf);
+
+    StringEntry* entry = (StringEntry*)m_arena.allocateUnaligned(sizeof(StringEntry) + encodeCount + slice.getLength());
+    entry->nextAlignment = 0;
+    entry->type = ASTSerialInfo::Type::String;
+
+    uint8_t* dst = (uint8_t*)(entry + 1);
+    for (int i = 0; i < encodeCount; ++i)
+    {
+        dst[i] = encodeBuf[i];
+    }
+
+    memcpy(dst + encodeCount, slice.begin(), slice.getLength());
+
+    m_entries.add(entry);
+    return ASTSerialIndex(newIndex);
+}
+
+
+ASTSerialIndex ASTSerialWriter::addString(const String& in)
+{
+    return addPointer(in.getStringRepresentation());
+}
+
+ASTSerialIndex ASTSerialWriter::addName(const Name* name)
+{
+    if (name == nullptr)
+    {
+        return ASTSerialIndex(0);
+    }
+
+    // Look it up
+    Index* indexPtr = m_ptrMap.TryGetValue(name);
+    if (indexPtr)
+    {
+        return ASTSerialIndex(*indexPtr);
+    }
+
+    ASTSerialIndex index = addString(name->text);
+    m_ptrMap.Add(name, Index(index));
+    return index;
+}
+
+ASTSerialSourceLoc ASTSerialWriter::addSourceLoc(SourceLoc sourceLoc)
+{
+    SLANG_UNUSED(sourceLoc);
+    return 0;
+}
+
+ASTSerialIndex ASTSerialWriter::_addArray(size_t elementSize, const void* elements, Index elementCount)
+{
+    typedef ASTSerialInfo::ArrayEntry Entry;
+
+    if (elementCount == 0)
+    {
+        return ASTSerialIndex(0);
+    }
+
+    size_t payloadSize = elementCount * elementSize;
+
+    Entry* entry = (Entry*)m_arena.allocateAligned(sizeof(Entry) + payloadSize, 8);
+
+    entry->type = ASTSerialInfo::Type::Array;
+    entry->nextAlignment = 0;
+    entry->elementSize = uint16_t(elementSize);
+    entry->elementCount = uint32_t(elementCount);
+
+    memcpy(entry + 1, elements, payloadSize);
+
+    m_entries.add(entry);
+    ASTSerialIndex index = ASTSerialIndex(m_entries.getCount() - 1);
+
+    // We don't add to a pointer map, because arrays are not shared
+
+    // Do the conversion
+
+    return index;
+}
+
+// !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! ASTSerialReader  !!!!!!!!!!!!!!!!!!!!!!!!!!!!
+
+ASTSerialPointer ASTSerialReader::getPointer(ASTSerialIndex index)
+{
+    SLANG_UNUSED(index);
+    return ASTSerialPointer();
+}
+
+String ASTSerialReader::getString(ASTSerialIndex index)
+{
+    SLANG_UNUSED(index);
+    return String();
+}
+
+Name* ASTSerialReader::getName(ASTSerialIndex index)
+{
+    if (index == ASTSerialIndex(0))
+    {
+        return nullptr;
+    }
+    return nullptr;
+}
+
+UnownedStringSlice ASTSerialReader::getStringSlice(ASTSerialIndex index)
+{
+    SLANG_UNUSED(index);
+    return UnownedStringSlice();
+}
+
+SourceLoc ASTSerialReader::getSourceLoc(ASTSerialSourceLoc loc)
+{
+    SLANG_UNUSED(loc);
+    return SourceLoc();
+}
+
+// !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! ASTSerializeUtil  !!!!!!!!!!!!!!!!!!!!!!!!!!!!
 
 /* static */SlangResult ASTSerializeUtil::selfTest()
 {

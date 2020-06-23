@@ -10,6 +10,50 @@
 namespace Slang
 {
 
+
+struct ASTSerialInfo
+{
+    enum class Type : uint8_t
+    {
+        String,             ///< String                         
+        Node,               ///< NodeBase derived
+        RefObject,          ///< RefObject derived types          
+        Array,              ///< Array
+    };
+
+    struct Entry
+    {
+        Type type;
+        uint8_t nextAlignment;              ///< Alignment of next entry
+    };
+
+    struct StringEntry : Entry
+    {
+    };
+
+    struct NodeEntry : Entry
+    {
+        uint16_t astNodeType;
+        uint32_t _pad0;
+    };
+
+    struct RefObjectEntry : Entry
+    {
+        enum class SubType : uint8_t
+        {
+            Breadcrumb,
+        };
+        SubType subType;
+        uint32_t _pad0;
+    };
+
+    struct ArrayEntry : Entry
+    {
+        uint16_t elementSize;
+        uint32_t elementCount;
+    };
+};
+
 enum class ASTSerialIndex : uint32_t;
 typedef uint32_t ASTSerialSourceLoc;
 
@@ -82,18 +126,47 @@ void ASTSerialReader::getArray(ASTSerialIndex index, List<T>& outArray)
     outArray.clear();
 }
 
+class ASTSerialClasses;
+
 /* This is a class used tby toSerial implementations to turn native type into the serial type */
 class ASTSerialWriter : public RefObject
 {
 public:
-    ASTSerialIndex addPointer(const ASTSerialPointer& ptr);
+    ASTSerialIndex addPointer(const NodeBase* ptr);
+    ASTSerialIndex addPointer(const RefObject* ptr);
 
     template <typename T>
     ASTSerialIndex addArray(const T* in, Index count);
 
+    ASTSerialIndex addString(const UnownedStringSlice& slice);
     ASTSerialIndex addString(const String& in);
     ASTSerialIndex addName(const Name* name);
     ASTSerialSourceLoc addSourceLoc(SourceLoc sourceLoc);
+
+    ASTSerialWriter(ASTSerialClasses* classes);
+
+protected:
+
+    ASTSerialIndex _addArray(size_t elementSize, const void* elements, Index elementCount);
+
+    ASTSerialIndex _add(const void* nativePtr, ASTSerialInfo::Entry* entry)
+    {
+        m_entries.add(entry);
+        // Okay I need to allocate space for this
+        ASTSerialIndex index = ASTSerialIndex(m_entries.getCount() - 1);
+        // Add to the map
+        m_ptrMap.Add(nativePtr, Index(index));
+        return index;
+    }
+
+    Dictionary<const void*, Index> m_ptrMap;    // Maps a pointer to an entry index
+
+    // NOTE! Assumes the content stays in scope!
+    Dictionary<UnownedStringSlice, Index> m_sliceMap;
+
+    List<ASTSerialInfo::Entry*> m_entries;      ///< The entries
+    MemoryArena m_arena;                        ///< Holds the payloads
+    ASTSerialClasses* m_classes;
 };
 
 // ---------------------------------------------------------------------------
@@ -106,6 +179,7 @@ ASTSerialIndex ASTSerialWriter::addArray(const T* in, Index count)
     if (std::is_same<T, ElementSerialType>::value)
     {
         // If they are the same we can just write out
+        return _addArray(sizeof(T), in, count);
     }
     else
     {
@@ -117,11 +191,9 @@ ASTSerialIndex ASTSerialWriter::addArray(const T* in, Index count)
         {
             ElementTypeInfo::toSerial(this, &in[i], &work[i]);
         }
+        return _addArray(sizeof(ElementSerialType), in, count);
     }
-
-    return ASTSerialIndex(0);
 }
-
 
 struct ASTSerialType
 {
