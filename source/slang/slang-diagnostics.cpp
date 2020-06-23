@@ -302,6 +302,23 @@ public:
         return singleton;
     }
 
+    typedef uint8_t CharFlags;
+    struct CharFlag 
+    {
+        enum Enum : CharFlags
+        {
+            Upper = 0x1,
+            Lower = 0x2,
+        };
+    };
+
+    static CharFlags _classifyChar(char c)
+    {
+        CharFlags flags = 0;
+        flags |= (c >= 'a' && c <= 'z') ? CharFlag::Lower : 0;
+        flags |= (c >= 'A' && c <= 'Z') ? CharFlag::Upper : 0;
+        return flags;
+    }
 protected:
     void _add(const char* name, Index index)
     {
@@ -311,22 +328,33 @@ protected:
         {
             m_work.Clear();
 
-            bool isPreviousLower = false;
+            CharFlags prevFlags = 0;
             for (const char* cur = name; *cur; cur++)
             {
                 char c = *cur;
-                bool isLower = (c >= 'a' && c <= 'z');
-                if (c >= 'A' && c <= 'Z')
+                const CharFlags flags = _classifyChar(c);
+
+                if (flags & CharFlag::Upper)
                 {
-                    if (isPreviousLower)
+                    if (prevFlags & CharFlag::Lower)
                     {
+                        // If we go from lower to upper, insert a dash. aA -> a-a
                         m_work << '-';
+                    }
+                    else if (prevFlags & CharFlag::Upper)
+                    {
+                        // Could be an acronym, if the next character is lower, we need to insert a - here
+                        if (_classifyChar(cur[1]) & CharFlag::Lower)
+                        {
+                            m_work << '-';
+                        }
                     }
                     // Make it lower
                     c = c - 'A' + 'a';
                 }
                 m_work << c;
-                isPreviousLower = isLower;
+
+                prevFlags = flags;
             }
 
             UnownedStringSlice dashSlice(m_arena.allocateString(m_work.getBuffer(), m_work.getLength()), m_work.getLength());
