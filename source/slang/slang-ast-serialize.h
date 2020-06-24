@@ -111,7 +111,8 @@ struct ASTSerialInfo
     };
 };
 
-enum class ASTSerialIndex : uint32_t;
+typedef uint32_t ASTSerialIndexRaw;
+enum class ASTSerialIndex : ASTSerialIndexRaw;
 typedef uint32_t ASTSerialSourceLoc;
 
 /* A type to convert pointers into types such that they can be passed around to readers/writers without
@@ -166,6 +167,9 @@ class ASTSerialReader : public RefObject
 {
 public:
 
+    typedef ASTSerialInfo::Entry Entry;
+    typedef ASTSerialInfo::Type Type;
+
     ASTSerialPointer getPointer(ASTSerialIndex index);
     template <typename T>
     void getArray(ASTSerialIndex index, List<T>& outArray);
@@ -173,6 +177,24 @@ public:
     Name* getName(ASTSerialIndex index);
     UnownedStringSlice getStringSlice(ASTSerialIndex index);
     SourceLoc getSourceLoc(ASTSerialSourceLoc loc);
+
+        /// NOTE! data must stay ins scope when reading takes place
+    SlangResult load(const uint8_t* data, ASTBuilder* builder, NamePool* namePool, size_t dataCount);
+
+    ASTSerialReader(ASTSerialClasses* classes):
+        m_classes(classes)
+    {
+    }
+
+protected:
+    List<const Entry*> m_entries;       ///< The entries
+    List<void*> m_objects;              ///< The constructed objects
+
+    List<RefPtr<RefObject>> m_scope;    ///< Objects to keep in scope during construction
+
+    NamePool* m_namePool;
+
+    ASTSerialClasses* m_classes;        ///< Used to deserialize 
 };
 
 // ---------------------------------------------------------------------------

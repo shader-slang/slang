@@ -32,11 +32,6 @@ namespace Slang {
 class ASTSerialReader;
 class ASTSerialWriter;
 
-
-
-
-
-
 template <typename NATIVE_TYPE, typename SERIAL_TYPE>
 static void _toSerialValue(ASTSerialWriter* writer, const NATIVE_TYPE& src, SERIAL_TYPE& dst)
 {
@@ -48,7 +43,6 @@ static void _toNativeValue(ASTSerialReader* reader, const SERIAL_TYPE& src, NATI
 {
     ASTSerialTypeInfo<NATIVE_TYPE>::toNative(reader, &src, &dst);
 }
-
 
 // !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! Serial <-> Native conversion  !!!!!!!!!!!!!!!!!!!!!!!!
 
@@ -1354,14 +1348,77 @@ size_t ASTSerialInfo::Entry::calcSize(ASTSerialClasses* serialClasses) const
 
 ASTSerialPointer ASTSerialReader::getPointer(ASTSerialIndex index)
 {
-    SLANG_UNUSED(index);
+    if (index == ASTSerialIndex(0))
+    {
+        return ASTSerialPointer();
+    }
+
+    SLANG_ASSERT(ASTSerialIndexRaw(index) < ASTSerialIndexRaw(m_entries.getCount()));
+    const Entry* entry = m_entries[Index(index)];
+
+    switch (entry->type)
+    {
+        case Type::String:
+        {
+            // Hmm. Tricky -> we don't know if wille be cast as Name or String. Lets assume string.
+            String string = getString(index);
+            return ASTSerialPointer(string.getStringRepresentation());
+        }
+        case Type::Node:
+        {
+            return ASTSerialPointer((NodeBase*)m_objects[Index(index)]);
+        }
+        case Type::RefObject:
+        {
+            return ASTSerialPointer((RefObject*)m_objects[Index(index)]);
+        }
+        default: break;
+    }
+
+    SLANG_ASSERT(!"Cannot access as a pointer");
     return ASTSerialPointer();
 }
 
 String ASTSerialReader::getString(ASTSerialIndex index)
 {
-    SLANG_UNUSED(index);
-    return String();
+    if (index == ASTSerialIndex(0))
+    {
+        return String();
+    }
+
+    SLANG_ASSERT(ASTSerialIndexRaw(index) < ASTSerialIndexRaw(m_entries.getCount()));
+    const Entry* entry = m_entries[Index(index)];
+
+    // It has to be a string type
+    if (entry->type != Type::String)
+    {
+        SLANG_ASSERT(!"Not a string");
+        return String();
+    }
+
+    RefObject* obj = (RefObject*)m_objects[Index(index)];
+
+    if (obj)
+    {
+        StringRepresentation* stringRep = dynamicCast<StringRepresentation>(obj);
+        if (stringRep)
+        {
+            return String(stringRep);
+        }
+        // Must be a name then
+        Name* name = dynamicCast<Name>(obj);
+        SLANG_ASSERT(name);
+        return name->text;
+    }
+
+    // Okay we need to construct as a string
+    UnownedStringSlice slice = getStringSlice(index);
+    String string(slice);
+    StringRepresentation* stringRep = string.getStringRepresentation();
+
+    m_scope.add(stringRep);
+    m_objects[Index(index)] = stringRep;
+    return string;
 }
 
 Name* ASTSerialReader::getName(ASTSerialIndex index)
@@ -1370,13 +1427,66 @@ Name* ASTSerialReader::getName(ASTSerialIndex index)
     {
         return nullptr;
     }
-    return nullptr;
+
+    SLANG_ASSERT(ASTSerialIndexRaw(index) < ASTSerialIndexRaw(m_entries.getCount()));
+    const Entry* entry = m_entries[Index(index)];
+
+    // It has to be a string type
+    if (entry->type != Type::String)
+    {
+        SLANG_ASSERT(!"Not a string");
+        return nullptr;
+    }
+
+    RefObject* obj = (RefObject*)m_objects[Index(index)];
+
+    if (obj)
+    {
+        Name* name = dynamicCast<Name>(obj);
+        if (name)
+        {
+            return name;
+        }
+        // Can only be a string then
+        StringRepresentation* stringRep = dynamicCast<StringRepresentation>(obj);
+        SLANG_ASSERT(stringRep);
+
+        // I don't need to scope, as scoped in NamePool
+        name  = m_namePool->getName(String(stringRep));
+
+        // Store as name, as can always access the inner string if needed
+        m_objects[Index(index)] = name;
+        return name;
+    }
+
+    UnownedStringSlice slice = getStringSlice(index);
+    String string(slice);
+    Name* name = m_namePool->getName(string);
+    // Don't need to add to scope, because scoped on the pool
+    m_objects[Index(index)] = name;
+    return name;
 }
 
 UnownedStringSlice ASTSerialReader::getStringSlice(ASTSerialIndex index)
 {
-    SLANG_UNUSED(index);
-    return UnownedStringSlice();
+    SLANG_ASSERT(ASTSerialIndexRaw(index) < ASTSerialIndexRaw(m_entries.getCount()));
+    const Entry* entry = m_entries[Index(index)];
+
+    // It has to be a string type
+    if (entry->type != Type::String)
+    {
+        SLANG_ASSERT(!"Not a string");
+        return UnownedStringSlice();
+    }
+
+    auto stringEntry = static_cast<const ASTSerialInfo::StringEntry*>(entry);
+
+    const uint8_t* src = (const uint8_t*)stringEntry->sizeAndChars;
+
+    // Decode the string
+    uint32_t size;
+    int sizeSize = ByteEncodeUtil::decodeLiteUInt32(src, &size);
+    return UnownedStringSlice((const char*)src + sizeSize, size);
 }
 
 SourceLoc ASTSerialReader::getSourceLoc(ASTSerialSourceLoc loc)
@@ -1384,6 +1494,152 @@ SourceLoc ASTSerialReader::getSourceLoc(ASTSerialSourceLoc loc)
     SLANG_UNUSED(loc);
     return SourceLoc();
 }
+
+SlangResult ASTSerialReader::load(const uint8_t* data, ASTBuilder* builder, NamePool* namePool, size_t dataCount)
+{
+    m_namePool = namePool;
+
+    SLANG_ASSERT((size_t(data) & (ASTSerialInfo::MAX_ALIGNMENT - 1)) == 0);
+    m_entries.setCount(1);
+    m_entries[0] = nullptr;
+
+    const uint8_t*const end = data + dataCount;
+
+    const uint8_t* cur = data;
+    while (cur < end)
+    {
+        const Entry* entry = (const Entry*)cur;
+        m_entries.add(entry);
+
+        const size_t entrySize = entry->calcSize(m_classes);
+        cur += entrySize;
+
+        // Need to get the next alignment
+        size_t nextAlignment = ASTSerialInfo::getNextAlignment(entry->info);
+
+        // Need to fix cur with the alignment
+        cur = (const uint8_t*)((size_t(cur) + nextAlignment - 1) & ~(nextAlignment - 1));
+    }
+
+    m_objects.clearAndDeallocate();
+    m_objects.setCount(m_entries.getCount());
+
+    // Go through entries, constructing objects.
+    for (Index i = 1; i < m_entries.getCount(); ++i)
+    {
+        const Entry* entry = m_entries[i];
+
+        switch (entry->type)
+        {
+            case Type::String:
+            {
+                // Don't need to construct an object. This is probably a StringRepresentation, or a Name
+                // Will evaluate lazily.
+                break;
+            }
+            case Type::Node:
+            {
+                auto nodeEntry = static_cast<const ASTSerialInfo::NodeEntry*>(entry);
+                m_objects[i] = builder->createByNodeType(ASTNodeType(nodeEntry->astNodeType));
+                break;
+            }
+            case Type::RefObject:
+            {
+                auto objEntry = static_cast<const ASTSerialInfo::RefObjectEntry*>(entry);
+                switch (objEntry->subType)
+                {
+                    case ASTSerialInfo::RefObjectEntry::SubType::Breadcrumb:
+                    {
+                        typedef LookupResultItem::Breadcrumb Breadcrumb;
+
+                        auto breadcrumb = new LookupResultItem::Breadcrumb(Breadcrumb::Kind::Member, DeclRef<Decl>(), nullptr);
+                        m_scope.add(breadcrumb);
+                        m_objects[i] = breadcrumb;
+                        break;
+                    }
+                    default:
+                    {
+                        SLANG_ASSERT(!"Unknown type");
+                        return SLANG_FAIL;
+                    }
+                }
+                break;
+            }
+            case Type::Array:
+            {
+                // Don't need to construct an object, as will be accessed an interpretted by the object that holds it
+                break;
+            }
+        }
+    }
+
+    // Deserialize
+    for (Index i = 1; i < m_entries.getCount(); ++i)
+    {
+        const Entry* entry = m_entries[i];
+        void* native = m_objects[i];
+        if (!native)
+        {
+            continue;
+        }
+        switch (entry->type)
+        {
+            case Type::Node:
+            {
+                auto nodeEntry = static_cast<const ASTSerialInfo::NodeEntry*>(entry);
+                auto serialClass = m_classes->getSerialClass(ASTNodeType(nodeEntry->astNodeType));
+
+                const uint8_t* src = (const uint8_t*)(nodeEntry + 1);
+                uint8_t* dst = (uint8_t*)m_objects[i];
+
+                // It must be constructed
+                SLANG_ASSERT(dst);
+
+                while (serialClass)
+                {
+                    for (Index j = 0; j < serialClass->fieldsCount; ++j)
+                    {
+                        auto field = serialClass->fields[j];
+                        auto fieldType = field.type;
+                        fieldType->toNativeFunc(this, src + field.serialOffset, dst + field.nativeOffset);
+                    }
+
+                    auto cls = ReflectClassInfo::getInfo(serialClass->type);
+                    auto superCls = cls->m_superClass;
+
+                    // Get the super class
+                    serialClass = superCls ? m_classes->getSerialClass(ASTNodeType(superCls->m_classId)) : nullptr;
+                }
+
+                break;
+            }
+            case Type::RefObject:
+            {
+                auto objEntry = static_cast<const ASTSerialInfo::RefObjectEntry*>(entry);
+                switch (objEntry->subType)
+                {
+                    case ASTSerialInfo::RefObjectEntry::SubType::Breadcrumb:
+                    {
+                        typedef LookupResultItem::Breadcrumb Breadcrumb;
+                        auto serialType = ASTSerialGetType<Breadcrumb>::getType();
+                        serialType->toNativeFunc(this, (entry + 1), m_objects[i]);
+                        break;
+                    }
+                    default:
+                    {
+                        SLANG_ASSERT(!"Unknown type");
+                        return SLANG_FAIL;
+                    }
+                }
+                break;
+            }
+            default: break;
+        }
+    }
+
+    return SLANG_OK;
+}
+
 
 // !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! ASTSerializeUtil  !!!!!!!!!!!!!!!!!!!!!!!!!!!!
 
