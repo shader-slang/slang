@@ -1346,6 +1346,33 @@ size_t ASTSerialInfo::Entry::calcSize(ASTSerialClasses* serialClasses) const
 
 // !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! ASTSerialReader  !!!!!!!!!!!!!!!!!!!!!!!!!!!!
 
+const void* ASTSerialReader::getArray(ASTSerialIndex index, Index& outCount)
+{
+    if (index == ASTSerialIndex(0))
+    {
+        outCount = 0;
+        return nullptr;
+    }
+
+    SLANG_ASSERT(ASTSerialIndexRaw(index) < ASTSerialIndexRaw(m_entries.getCount()));
+    const Entry* entry = m_entries[Index(index)];
+
+    switch (entry->type)
+    {
+        case Type::Array:
+        {
+            auto arrayEntry = static_cast<const ASTSerialInfo::ArrayEntry*>(entry);
+            outCount = Index(arrayEntry->elementCount);
+            return (arrayEntry + 1);
+        }
+        default: break;
+    }
+
+    SLANG_ASSERT(!"Not an array");
+    outCount = 0;
+    return nullptr;
+}
+
 ASTSerialPointer ASTSerialReader::getPointer(ASTSerialIndex index)
 {
     if (index == ASTSerialIndex(0))
@@ -1567,7 +1594,7 @@ SlangResult ASTSerialReader::load(const uint8_t* data, ASTBuilder* builder, Name
             }
             case Type::Array:
             {
-                // Don't need to construct an object, as will be accessed an interpretted by the object that holds it
+                // Don't need to construct an object, as will be accessed an interpreted by the object that holds it
                 break;
             }
         }

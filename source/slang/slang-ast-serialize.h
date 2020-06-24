@@ -170,9 +170,12 @@ public:
     typedef ASTSerialInfo::Entry Entry;
     typedef ASTSerialInfo::Type Type;
 
-    ASTSerialPointer getPointer(ASTSerialIndex index);
     template <typename T>
-    void getArray(ASTSerialIndex index, List<T>& outArray);
+    void getArray(ASTSerialIndex index, List<T>& out);
+
+    const void* getArray(ASTSerialIndex index, Index& outCount);
+
+    ASTSerialPointer getPointer(ASTSerialIndex index);
     String getString(ASTSerialIndex index);
     Name* getName(ASTSerialIndex index);
     UnownedStringSlice getStringSlice(ASTSerialIndex index);
@@ -199,11 +202,37 @@ protected:
 
 // ---------------------------------------------------------------------------
 template <typename T>
-void ASTSerialReader::getArray(ASTSerialIndex index, List<T>& outArray)
+void ASTSerialReader::getArray(ASTSerialIndex index, List<T>& out)
 {
-    SLANG_UNUSED(index);
-    outArray.clear();
+    typedef ASTSerialTypeInfo<T> ElementTypeInfo;
+    typedef typename ElementTypeInfo::SerialType ElementSerialType;
+
+    Index count;
+    auto serialElements = (const ElementSerialType*)getArray(index, count);
+
+    if (count == 0)
+    {
+        out.clear();
+        return;
+    }
+
+    if (std::is_same<T, ElementSerialType>::value)
+    {
+        // If they are the same we can just write out
+        out.clear();
+        out.insertRange(0, (const T*)serialElements, count);
+    }
+    else
+    {
+        // Else we need to convert
+        out.setCount(count);
+        for (Index i = 0; i < count; ++i)
+        {
+            ElementTypeInfo::toNative(this, (const void*)&serialElements[i], (void*)&out[i]);
+        }
+    }
 }
+
 
 class ASTSerialClasses;
 
