@@ -489,6 +489,9 @@ end
 example "cpu-hello-world"
     kind "ConsoleApp"
 
+example "heterogeneous-hello-world"
+    kind "ConsoleApp"
+
 -- Most of the other projects have more interesting configuration going
 -- on, so let's walk through them in order of increasing complexity.
 --
