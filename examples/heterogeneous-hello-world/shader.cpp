@@ -1,4 +1,4 @@
-#include "C:/Users/dgeisler/Documents/slang/prelude/slang-cpp-prelude.h"
+#include "../../prelude/slang-cpp-prelude.h"
 
 
 namespace { // anonymous 
