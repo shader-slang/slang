@@ -7,8 +7,14 @@
 #include "slang-ast-support-types.h"
 #include "slang-ast-all.h"
 
+#include "../core/slang-byte-encode-util.h"
+
+#include "../core/slang-stream.h"
+
 namespace Slang
 {
+
+class ASTSerialClasses;
 
 // Type used to implement mechanisms to convert to and from serial types.
 template <typename T>
@@ -16,6 +22,43 @@ struct ASTSerialTypeInfo;
 
 struct ASTSerialInfo
 {
+    enum
+    {
+        // Data held in serialized format, the maximally allowed alignment 
+        MAX_ALIGNMENT = 8,
+    };
+
+    // We only allow up to MAX_ALIGNMENT bytes of alignment. We store alignments as shifts, so 2 bits needed for 1 - 8
+    enum class EntryInfo : uint8_t
+    {
+        Alignment1 = 0,
+    };
+
+    static EntryInfo makeEntryInfo(int alignment, int nextAlignment)
+    {
+        // Make sure they are power of 2
+        SLANG_ASSERT((alignment & (alignment - 1)) == 0);
+        SLANG_ASSERT((nextAlignment & (nextAlignment - 1)) == 0);
+
+        const int alignmentShift = ByteEncodeUtil::calcMsb8(alignment);
+        const int nextAlignmentShift = ByteEncodeUtil::calcMsb8(nextAlignment);
+        return EntryInfo((nextAlignmentShift << 2) | alignmentShift);
+    }
+    static EntryInfo makeEntryInfo(int alignment)
+    {
+        // Make sure they are power of 2
+        SLANG_ASSERT((alignment & (alignment - 1)) == 0);
+        return EntryInfo(ByteEncodeUtil::calcMsb8(alignment));
+    }
+        /// Apply with the next alignment
+    static EntryInfo combineWithNext(EntryInfo cur, EntryInfo next)
+    {
+        return EntryInfo((int(cur) & ~0xc0) | ((int(next) & 3) << 2));
+    }
+
+    static int getAlignment(EntryInfo info) { return 1 << (int(info) & 3); }
+    static int getNextAlignment(EntryInfo info) { return 1 << ((int(info) >> 2) & 3); }
+
     enum class Type : uint8_t
     {
         String,             ///< String                         
@@ -24,20 +67,30 @@ struct ASTSerialInfo
         Array,              ///< Array
     };
 
+    
+    /* Alignment is a little tricky. We have a 'Entry' header before the payload. The payload alignment may change.
+    If we only align on the Entry header, then it's size *must* be some modulo of the maximum alignment allowed.
+
+    We could hold Entry separate from payload. We could make the header not require the alignment of the payload - but then
+    we'd need payload alignment separate from entry alignment.
+    */
     struct Entry
     {
         Type type;
-        uint8_t nextAlignment;              ///< Alignment of next entry
+        EntryInfo info;
+
+        size_t calcSize(ASTSerialClasses* serialClasses) const;
     };
 
     struct StringEntry : Entry
     {
+        char sizeAndChars[1];
     };
 
     struct NodeEntry : Entry
     {
         uint16_t astNodeType;
-        uint32_t _pad0;
+        uint32_t _pad0;             ///< Necessary, because a node *can* have MAX_ALIGNEMENT
     };
 
     struct RefObjectEntry : Entry
@@ -47,7 +100,8 @@ struct ASTSerialInfo
             Breadcrumb,
         };
         SubType subType;
-        uint32_t _pad0;
+        uint8_t _pad0;
+        uint32_t _pad1;             ///< Necessary because RefObjectEntry *can* have MAX_ALIGNEMENT
     };
 
     struct ArrayEntry : Entry
@@ -146,11 +200,14 @@ public:
     ASTSerialIndex addName(const Name* name);
     ASTSerialSourceLoc addSourceLoc(SourceLoc sourceLoc);
 
+        /// Write to a stream
+    SlangResult write(Stream* stream);
+
     ASTSerialWriter(ASTSerialClasses* classes);
 
 protected:
 
-    ASTSerialIndex _addArray(size_t elementSize, const void* elements, Index elementCount);
+    ASTSerialIndex _addArray(size_t elementSize, size_t alignment, const void* elements, Index elementCount);
 
     ASTSerialIndex _add(const void* nativePtr, ASTSerialInfo::Entry* entry)
     {
@@ -182,7 +239,7 @@ ASTSerialIndex ASTSerialWriter::addArray(const T* in, Index count)
     if (std::is_same<T, ElementSerialType>::value)
     {
         // If they are the same we can just write out
-        return _addArray(sizeof(T), in, count);
+        return _addArray(sizeof(T), SLANG_ALIGN_OF(ElementSerialType), in, count);
     }
     else
     {
@@ -194,7 +251,7 @@ ASTSerialIndex ASTSerialWriter::addArray(const T* in, Index count)
         {
             ElementTypeInfo::toSerial(this, &in[i], &work[i]);
         }
-        return _addArray(sizeof(ElementSerialType), in, count);
+        return _addArray(sizeof(ElementSerialType), SLANG_ALIGN_OF(ElementSerialType), in, count);
     }
 }
 

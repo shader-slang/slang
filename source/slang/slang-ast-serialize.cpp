@@ -32,6 +32,11 @@ namespace Slang {
 class ASTSerialReader;
 class ASTSerialWriter;
 
+
+
+
+
+
 template <typename NATIVE_TYPE, typename SERIAL_TYPE>
 static void _toSerialValue(ASTSerialWriter* writer, const NATIVE_TYPE& src, SERIAL_TYPE& dst)
 {
@@ -43,6 +48,7 @@ static void _toNativeValue(ASTSerialReader* reader, const SERIAL_TYPE& src, NATI
 {
     ASTSerialTypeInfo<NATIVE_TYPE>::toNative(reader, &src, &dst);
 }
+
 
 // !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! Serial <-> Native conversion  !!!!!!!!!!!!!!!!!!!!!!!!
 
@@ -993,8 +999,6 @@ ASTSerialClasses::ASTSerialClasses():
     }
 }
 
-
-
 // !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! ASTSerialWriter  !!!!!!!!!!!!!!!!!!!!!!!!!!!!
 
 ASTSerialWriter::ASTSerialWriter(ASTSerialClasses* classes) :
@@ -1024,11 +1028,11 @@ ASTSerialIndex ASTSerialWriter::addPointer(const NodeBase* node)
 
     typedef ASTSerialInfo::NodeEntry NodeEntry;
 
-    NodeEntry* nodeEntry = (NodeEntry*)m_arena.allocateAligned(sizeof(NodeEntry) + serialClass->size, 8);
+    NodeEntry* nodeEntry = (NodeEntry*)m_arena.allocateAligned(sizeof(NodeEntry) + serialClass->size, ASTSerialInfo::MAX_ALIGNMENT);
 
     nodeEntry->type = ASTSerialInfo::Type::Node;
     nodeEntry->astNodeType = uint16_t(node->astNodeType);
-    nodeEntry->nextAlignment = 0;
+    nodeEntry->info = ASTSerialInfo::makeEntryInfo(serialClass->alignment);
 
     auto index = _add(node, nodeEntry);
 
@@ -1080,15 +1084,19 @@ ASTSerialIndex ASTSerialWriter::addPointer(const RefObject* obj)
         typedef ASTSerialTypeInfo<LookupResultItem::Breadcrumb> TypeInfo;
         typedef ASTSerialInfo::RefObjectEntry RefObjectEntry;
 
-        RefObjectEntry* refEntry = (RefObjectEntry*)m_arena.allocateAligned(sizeof(RefObjectEntry) + sizeof(TypeInfo::SerialType), 8);
+        size_t alignment = TypeInfo::SerialAlignment;
+        alignment = (alignment < SLANG_ALIGN_OF(ASTSerialInfo::RefObjectEntry)) ? SLANG_ALIGN_OF(ASTSerialInfo::RefObjectEntry) : alignment;
 
-        refEntry->type = ASTSerialInfo::Type::RefObject;
-        refEntry->subType = RefObjectEntry::SubType::Breadcrumb;
+        RefObjectEntry* entry = (RefObjectEntry*)m_arena.allocateAligned(sizeof(RefObjectEntry) + sizeof(TypeInfo::SerialType), alignment);
 
-        auto index = _add(breadcrumb, refEntry);
+        entry->type = ASTSerialInfo::Type::RefObject;
+        entry->info = ASTSerialInfo::makeEntryInfo(int(alignment));
+        entry->subType = RefObjectEntry::SubType::Breadcrumb;
+
+        auto index = _add(breadcrumb, entry);
 
         // Do any conversion
-        TypeInfo::toSerial(this, breadcrumb, refEntry + 1);
+        TypeInfo::toSerial(this, breadcrumb, entry + 1);
         return index;
     }
     else if (auto name = dynamicCast<const Name>(obj))
@@ -1133,11 +1141,11 @@ ASTSerialIndex ASTSerialWriter::addString(const UnownedStringSlice& slice)
     uint8_t encodeBuf[Util::kMaxLiteEncodeUInt32];
     const int encodeCount = Util::encodeLiteUInt32(uint32_t(slice.getLength()), encodeBuf);
 
-    StringEntry* entry = (StringEntry*)m_arena.allocateUnaligned(sizeof(StringEntry) + encodeCount + slice.getLength());
-    entry->nextAlignment = 0;
+    StringEntry* entry = (StringEntry*)m_arena.allocateUnaligned(SLANG_OFFSET_OF(StringEntry, sizeAndChars) + encodeCount + slice.getLength());
+    entry->info = ASTSerialInfo::EntryInfo::Alignment1;
     entry->type = ASTSerialInfo::Type::String;
 
-    uint8_t* dst = (uint8_t*)(entry + 1);
+    uint8_t* dst = (uint8_t*)(entry->sizeAndChars);
     for (int i = 0; i < encodeCount; ++i)
     {
         dst[i] = encodeBuf[i];
@@ -1180,7 +1188,7 @@ ASTSerialSourceLoc ASTSerialWriter::addSourceLoc(SourceLoc sourceLoc)
     return 0;
 }
 
-ASTSerialIndex ASTSerialWriter::_addArray(size_t elementSize, const void* elements, Index elementCount)
+ASTSerialIndex ASTSerialWriter::_addArray(size_t elementSize, size_t alignment, const void* elements, Index elementCount)
 {
     typedef ASTSerialInfo::ArrayEntry Entry;
 
@@ -1189,25 +1197,157 @@ ASTSerialIndex ASTSerialWriter::_addArray(size_t elementSize, const void* elemen
         return ASTSerialIndex(0);
     }
 
+    SLANG_ASSERT(alignment >= 1 && alignment <= ASTSerialInfo::MAX_ALIGNMENT);
+
+    // We must at a minimum have the alignment for the array prefix info
+    alignment = (alignment < SLANG_ALIGN_OF(Entry)) ? SLANG_ALIGN_OF(Entry) : alignment;
+
     size_t payloadSize = elementCount * elementSize;
 
-    Entry* entry = (Entry*)m_arena.allocateAligned(sizeof(Entry) + payloadSize, 8);
+    Entry* entry = (Entry*)m_arena.allocateAligned(sizeof(Entry) + payloadSize, alignment);
 
     entry->type = ASTSerialInfo::Type::Array;
-    entry->nextAlignment = 0;
+    entry->info = ASTSerialInfo::makeEntryInfo(int(alignment));
     entry->elementSize = uint16_t(elementSize);
     entry->elementCount = uint32_t(elementCount);
 
     memcpy(entry + 1, elements, payloadSize);
 
     m_entries.add(entry);
-    ASTSerialIndex index = ASTSerialIndex(m_entries.getCount() - 1);
+    return ASTSerialIndex(m_entries.getCount() - 1);
+}
 
-    // We don't add to a pointer map, because arrays are not shared
+SlangResult ASTSerialWriter::write(Stream* stream)
+{
+    const Int entriesCount = m_entries.getCount();
 
-    // Do the conversion
+    // Add a sentinal so we don't need special handling for 
+    ASTSerialInfo::Entry sentinal;
+    sentinal.type = ASTSerialInfo::Type::String;
+    sentinal.info = ASTSerialInfo::EntryInfo::Alignment1;
 
-    return index;
+    m_entries.add(&sentinal);
+    m_entries.removeLast();
+
+    ASTSerialInfo::Entry** entries = m_entries.getBuffer();
+    // Note strictly required in our impl of List. But by writing this and
+    // knowing that removeLast cannot release memory, means the sentinal must be at the last position.
+    entries[entriesCount] = &sentinal;
+
+
+    static const uint8_t fixBuffer[ASTSerialInfo::MAX_ALIGNMENT] { 0, };
+    
+    {
+        size_t offset = 0;
+
+        ASTSerialInfo::Entry* entry = entries[1];
+        // We start on 1, because 0 is nullptr and not used for anything
+        for (Index i = 1; i < entriesCount; ++i)
+        {
+            ASTSerialInfo::Entry* next = entries[i + 1];
+            // Before writing we need to store the next alignment
+
+            const size_t nextAlignment = ASTSerialInfo::getAlignment(next->info);
+            const size_t alignment = ASTSerialInfo::getAlignment(entry->info);
+
+            entry->info = ASTSerialInfo::combineWithNext(entry->info, next->info);
+
+            // Check we are aligned correctly
+            SLANG_ASSERT((offset & (alignment - 1)) == 0);
+
+            // When we write, we need to make sure it take into account the next alignment
+            const size_t entrySize = entry->calcSize(m_classes);
+
+            // Work out the fix for next alignment
+            size_t nextOffset = offset + entrySize;
+            nextOffset = (nextOffset + nextAlignment - 1) & ~(nextAlignment - 1);
+
+            size_t alignmentFixSize = nextOffset - (offset + entrySize);
+
+            // The fix must be less than max alignment. We require it to be less because we aligned each Entry to 
+            // MAX_ALIGNMENT, and so < MAX_ALIGNMENT is the most extra bytes we can write
+            SLANG_ASSERT( alignmentFixSize < ASTSerialInfo::MAX_ALIGNMENT);
+            
+            try
+            {
+                stream->write(entry, entrySize);
+                // If we needed to fix so that subsequent alignment is right, write out extra bytes here
+                if (alignmentFixSize)
+                {
+                    stream->write(fixBuffer, alignmentFixSize);
+                }
+            }
+            catch (const IOException&)
+            {
+                return SLANG_FAIL;
+            }
+
+            // Onto next
+            offset = nextOffset;
+            entry = next;
+        }
+    }
+
+    return SLANG_OK;
+}
+
+// !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! ASTSerialInfo::Entry  !!!!!!!!!!!!!!!!!!!!!!!!
+
+size_t ASTSerialInfo::Entry::calcSize(ASTSerialClasses* serialClasses) const
+{
+    switch (type)
+    {
+        case Type::String:
+        {
+            auto entry = static_cast<const StringEntry*>(this);
+            const uint8_t* cur = (const uint8_t*)entry->sizeAndChars;
+            uint32_t charsSize;
+            int sizeSize = ByteEncodeUtil::decodeLiteUInt32(cur, &charsSize);
+            return SLANG_OFFSET_OF(StringEntry, sizeAndChars) + sizeSize + charsSize;
+        }
+        case Type::Node:
+        {
+            auto entry = static_cast<const NodeEntry*>(this);
+            auto serialClass = serialClasses->getSerialClass(ASTNodeType(entry->astNodeType));
+
+            // Align by the alignment of the entry 
+            size_t alignment = getAlignment(entry->info);
+            size_t size = sizeof(NodeEntry) + serialClass->size;
+
+            size = size + (alignment - 1) & ~(alignment - 1);
+            return size;
+        }
+        case Type::RefObject:
+        {
+            auto entry = static_cast<const RefObjectEntry*>(this);
+
+            size_t payloadSize;
+            switch (entry->subType)
+            {
+                case RefObjectEntry::SubType::Breadcrumb:
+                {
+                    payloadSize = sizeof(ASTSerialTypeInfo<LookupResultItem::Breadcrumb>::SerialType);
+                    break;
+                }
+                default:
+                {
+                    SLANG_ASSERT(!"Unknown type");
+                    return 0;
+                }
+            }
+
+            return sizeof(RefObjectEntry) + payloadSize;
+        }
+        case Type::Array:
+        {
+            auto entry = static_cast<const ArrayEntry*>(this);
+            return sizeof(ArrayEntry) + entry->elementSize * entry->elementCount;
+        }
+        default: break;
+    }
+
+    SLANG_ASSERT(!"Unknown type");
+    return 0;
 }
 
 // !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! ASTSerialReader  !!!!!!!!!!!!!!!!!!!!!!!!!!!!
