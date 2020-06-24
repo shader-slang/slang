@@ -1020,6 +1020,13 @@ namespace Slang
         Default = type | Function | Value,
     };
 
+        /// Flags for options to be used when looking up declarations
+    enum class LookupOptions : uint8_t
+    {
+        None = 0,
+        IgnoreBaseInterfaces = 1 << 0,
+    };
+
     // Represents one item found during lookup
     struct LookupResultItem
     {
@@ -1232,6 +1239,7 @@ namespace Slang
         RefPtr<Scope>       endScope    = nullptr;
 
         LookupMask          mask        = LookupMask::Default;
+        LookupOptions       options     = LookupOptions::None;
     };
 
     struct WitnessTable;

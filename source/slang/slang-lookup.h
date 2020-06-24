@@ -30,7 +30,8 @@ LookupResult lookUpMember(
     SemanticsVisitor*   semantics,
     Name*               name,
     Type*               type,
-    LookupMask          mask = LookupMask::Default);
+    LookupMask          mask = LookupMask::Default,
+    LookupOptions       options = LookupOptions::None);
 
     /// Perform "direct" lookup in a container declaration
 LookupResult lookUpDirectAndTransparentMembers(
