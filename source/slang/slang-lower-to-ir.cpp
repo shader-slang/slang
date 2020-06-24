@@ -3169,7 +3169,7 @@ struct ExprLoweringVisitorBase : ExprVisitor<Derived, LoweredValInfo>
             // TODO: subscript operations probably deserve to
             // be handled on their own path for this reason...
             //
-            if (auto subscriptDeclRef = funcDeclRef.as<SubscriptDecl>())
+            if (auto subscriptDeclRef = funcDeclRef.template as<SubscriptDecl>())
             {
                 // A reference to a subscript declaration is a special case,
                 // because it is not possible to call a subscript directly;
