@@ -22,7 +22,7 @@
 // -1 - Notes that decorate another diagnostic.
 //
 
-DIAGNOSTIC(-1, Note, alsoSeePipelineDefinition, "also see pipeline definition");
+DIAGNOSTIC(-1, Note, alsoSeePipelineDefinition, "also see pipeline definition")
 DIAGNOSTIC(-1, Note, implicitParameterMatchingFailedBecauseNameNotAccessible, "implicit parameter matching failed because the component of the same name is not accessible from '$0'.\ncheck if you have declared necessary requirements and properly used the 'public' qualifier.")
 DIAGNOSTIC(-1, Note, implicitParameterMatchingFailedBecauseShaderDoesNotDefineComponent, "implicit parameter matching failed because shader '$0' does not define component '$1'.")
 DIAGNOSTIC(-1, Note, implicitParameterMatchingFailedBecauseTypeMismatch, "implicit parameter matching failed because the component of the same name does not match parameter type '$0'.")
@@ -62,25 +62,25 @@ DIAGNOSTIC(    8, Error, outputPathsImplyDifferentFormats,
     "the output paths '$0' and '$1' require different code-generation targets")
 
 DIAGNOSTIC(    10, Error, explicitOutputPathsAndMultipleTargets, "canot use both explicit output paths ('-o') and multiple targets ('-target')")
-DIAGNOSTIC(    11, Error, glslIsNotSupported, "the Slang compiler does not support GLSL as a source language");
-DIAGNOSTIC(    12, Error, cannotDeduceSourceLanguage, "can't deduce language for input file '$0'");
-DIAGNOSTIC(    13, Error, unknownCodeGenerationTarget, "unknown code generation target '$0'");
-DIAGNOSTIC(    14, Error, unknownProfile, "unknown profile '$0'");
-DIAGNOSTIC(    15, Error, unknownStage, "unknown stage '$0'");
-DIAGNOSTIC(    16, Error, unknownPassThroughTarget, "unknown pass-through target '$0'");
-DIAGNOSTIC(    17, Error, unknownCommandLineOption, "unknown command-line option '$0'");
-DIAGNOSTIC(    18, Error, unknownFileSystemOption, "unknown file-system option '$0'");
-DIAGNOSTIC(    19, Error, unknownSourceLanguage, "unknown source language '$0'");
+DIAGNOSTIC(    11, Error, glslIsNotSupported, "the Slang compiler does not support GLSL as a source language")
+DIAGNOSTIC(    12, Error, cannotDeduceSourceLanguage, "can't deduce language for input file '$0'")
+DIAGNOSTIC(    13, Error, unknownCodeGenerationTarget, "unknown code generation target '$0'")
+DIAGNOSTIC(    14, Error, unknownProfile, "unknown profile '$0'")
+DIAGNOSTIC(    15, Error, unknownStage, "unknown stage '$0'")
+DIAGNOSTIC(    16, Error, unknownPassThroughTarget, "unknown pass-through target '$0'")
+DIAGNOSTIC(    17, Error, unknownCommandLineOption, "unknown command-line option '$0'")
+DIAGNOSTIC(    18, Error, unknownFileSystemOption, "unknown file-system option '$0'")
+DIAGNOSTIC(    19, Error, unknownSourceLanguage, "unknown source language '$0'")
 
-DIAGNOSTIC(    20, Error, entryPointsNeedToBeAssociatedWithTranslationUnits, "when using multiple source files, entry points must be specified after their corresponding source file(s)");
-DIAGNOSTIC(    21, Error, expectedArgumentForOption, "expected an argument for command-line option '$0'");
+DIAGNOSTIC(    20, Error, entryPointsNeedToBeAssociatedWithTranslationUnits, "when using multiple source files, entry points must be specified after their corresponding source file(s)")
+DIAGNOSTIC(    21, Error, expectedArgumentForOption, "expected an argument for command-line option '$0'")
 
-DIAGNOSTIC(    24, Error, unknownLineDirectiveMode, "unknown '#line' directive mode '$0'");
-DIAGNOSTIC(    25, Error, unknownFloatingPointMode, "unknown floating-point mode '$0'");
-DIAGNOSTIC(    26, Error, unknownOptimiziationLevel, "unknown optimization level '$0'");
-DIAGNOSTIC(    27, Error, unknownDebugInfoLevel, "unknown debug info level '$0'");
+DIAGNOSTIC(    24, Error, unknownLineDirectiveMode, "unknown '#line' directive mode '$0'")
+DIAGNOSTIC(    25, Error, unknownFloatingPointMode, "unknown floating-point mode '$0'")
+DIAGNOSTIC(    26, Error, unknownOptimiziationLevel, "unknown optimization level '$0'")
+DIAGNOSTIC(    27, Error, unknownDebugInfoLevel, "unknown debug info level '$0'")
 
-DIAGNOSTIC(    28, Error, unableToGenerateCodeForTarget, "unable to generate code for target '$0'");
+DIAGNOSTIC(    28, Error, unableToGenerateCodeForTarget, "unable to generate code for target '$0'")
 
 DIAGNOSTIC(    30, Warning, sameStageSpecifiedMoreThanOnce, "the stage '$0' was specified more than once for entry point '$1'")
 DIAGNOSTIC(    31, Error, conflictingStagesForEntryPoint, "conflicting stages have been specified for entry point '$0'")
@@ -109,27 +109,27 @@ DIAGNOSTIC(    70, Error, cannotMatchOutputFileToEntryPoint, "the output path '$
 
 DIAGNOSTIC(    80, Error, duplicateOutputPathsForEntryPointAndTarget, "multiple output paths have been specified entry point '$0' on target '$1'")
 
-DIAGNOSTIC(    82, Error, unableToWriteReproFile, "unable to write repro file '%0'");
-DIAGNOSTIC(    83, Error, unableToWriteModuleContainer, "unable to write module container '%0'");
-DIAGNOSTIC(    84, Error, unableToReadModuleContainer, "unable to read module container '%0'");
-DIAGNOSTIC(    85, Error, unableToAddReferenceToModuleContainer, "unable to add a reference to a module container");
-DIAGNOSTIC(    86, Error, unableToCreateModuleContainer, "unable to create module container");
+DIAGNOSTIC(    82, Error, unableToWriteReproFile, "unable to write repro file '%0'")
+DIAGNOSTIC(    83, Error, unableToWriteModuleContainer, "unable to write module container '%0'")
+DIAGNOSTIC(    84, Error, unableToReadModuleContainer, "unable to read module container '%0'")
+DIAGNOSTIC(    85, Error, unableToAddReferenceToModuleContainer, "unable to add a reference to a module container")
+DIAGNOSTIC(    86, Error, unableToCreateModuleContainer, "unable to create module container")
 
-DIAGNOSTIC(    87, Error, unableToSetDefaultDownstreamCompiler, "unable to set default downstream compiler for source language '%0' to '%1'");
+DIAGNOSTIC(    87, Error, unableToSetDefaultDownstreamCompiler, "unable to set default downstream compiler for source language '%0' to '%1'")
 
 //
 // 1xxxx - Lexical analysis
 //
 
-DIAGNOSTIC(10000, Error, illegalCharacterPrint, "illegal character '$0'");
-DIAGNOSTIC(10000, Error, illegalCharacterHex, "illegal character (0x$0)");
-DIAGNOSTIC(10001, Error, illegalCharacterLiteral, "illegal character literal");
+DIAGNOSTIC(10000, Error, illegalCharacterPrint, "illegal character '$0'")
+DIAGNOSTIC(10000, Error, illegalCharacterHex, "illegal character (0x$0)")
+DIAGNOSTIC(10001, Error, illegalCharacterLiteral, "illegal character literal")
 
 DIAGNOSTIC(10002, Warning, octalLiteral, "'0' prefix indicates octal literal")
 DIAGNOSTIC(10003, Error, invalidDigitForBase, "invalid digit for base-$1 literal: '$0'")
 
-DIAGNOSTIC(10004, Error, endOfFileInLiteral, "end of file in literal");
-DIAGNOSTIC(10005, Error, newlineInLiteral, "newline in literal");
+DIAGNOSTIC(10004, Error, endOfFileInLiteral, "end of file in literal")
+DIAGNOSTIC(10005, Error, newlineInLiteral, "newline in literal")
 
 //
 // 15xxx - Preprocessing
@@ -151,11 +151,11 @@ DIAGNOSTIC(15103, Error, unexpectedTokensAfterDirective, "unexpected tokens foll
 
 
 // 152xx - preprocessor expressions
-DIAGNOSTIC(15200, Error, expectedTokenInPreprocessorExpression, "expected '$0' in preprocessor expression");
-DIAGNOSTIC(15201, Error, syntaxErrorInPreprocessorExpression, "syntax error in preprocessor expression");
-DIAGNOSTIC(15202, Error, divideByZeroInPreprocessorExpression, "division by zero in preprocessor expression");
-DIAGNOSTIC(15203, Error, expectedTokenInDefinedExpression, "expected '$0' in 'defined' expression");
-DIAGNOSTIC(15204, Warning, directiveExpectsExpression, "'$0' directive requires an expression");
+DIAGNOSTIC(15200, Error, expectedTokenInPreprocessorExpression, "expected '$0' in preprocessor expression")
+DIAGNOSTIC(15201, Error, syntaxErrorInPreprocessorExpression, "syntax error in preprocessor expression")
+DIAGNOSTIC(15202, Error, divideByZeroInPreprocessorExpression, "division by zero in preprocessor expression")
+DIAGNOSTIC(15203, Error, expectedTokenInDefinedExpression, "expected '$0' in 'defined' expression")
+DIAGNOSTIC(15204, Warning, directiveExpectsExpression, "'$0' directive requires an expression")
 DIAGNOSTIC(15205, Warning, undefinedIdentifierInPreprocessorExpression, "undefined identifier '$0' in preprocessor expression will evaluate to zero")
 
 DIAGNOSTIC(-1, Note, seeOpeningToken, "see opening '$0'")
@@ -190,22 +190,22 @@ DIAGNOSTIC(15901, Warning,  userDefinedWarning, "#warning: $0")
 // 2xxxx - Parsing
 //
 
-DIAGNOSTIC(20003, Error, unexpectedToken, "unexpected $0");
-DIAGNOSTIC(20001, Error, unexpectedTokenExpectedTokenType, "unexpected $0, expected $1");
-DIAGNOSTIC(20001, Error, unexpectedTokenExpectedTokenName, "unexpected $0, expected '$1'");
+DIAGNOSTIC(20003, Error, unexpectedToken, "unexpected $0")
+DIAGNOSTIC(20001, Error, unexpectedTokenExpectedTokenType, "unexpected $0, expected $1")
+DIAGNOSTIC(20001, Error, unexpectedTokenExpectedTokenName, "unexpected $0, expected '$1'")
 
-DIAGNOSTIC(0, Error, tokenNameExpectedButEOF, "\"$0\" expected but end of file encountered.");
-DIAGNOSTIC(0, Error, tokenTypeExpectedButEOF, "$0 expected but end of file encountered.");
-DIAGNOSTIC(20001, Error, tokenNameExpected, "\"$0\" expected");
-DIAGNOSTIC(20001, Error, tokenNameExpectedButEOF2, "\"$0\" expected but end of file encountered.");
-DIAGNOSTIC(20001, Error, tokenTypeExpected, "$0 expected");
-DIAGNOSTIC(20001, Error, tokenTypeExpectedButEOF2, "$0 expected but end of file encountered.");
-DIAGNOSTIC(20001, Error, typeNameExpectedBut, "unexpected $0, expected type name");
-DIAGNOSTIC(20001, Error, typeNameExpectedButEOF, "type name expected but end of file encountered.");
-DIAGNOSTIC(20001, Error, unexpectedEOF, " Unexpected end of file.");
-DIAGNOSTIC(20002, Error, syntaxError, "syntax error.");
+DIAGNOSTIC(0, Error, tokenNameExpectedButEOF, "\"$0\" expected but end of file encountered.")
+DIAGNOSTIC(0, Error, tokenTypeExpectedButEOF, "$0 expected but end of file encountered.")
+DIAGNOSTIC(20001, Error, tokenNameExpected, "\"$0\" expected")
+DIAGNOSTIC(20001, Error, tokenNameExpectedButEOF2, "\"$0\" expected but end of file encountered.")
+DIAGNOSTIC(20001, Error, tokenTypeExpected, "$0 expected")
+DIAGNOSTIC(20001, Error, tokenTypeExpectedButEOF2, "$0 expected but end of file encountered.")
+DIAGNOSTIC(20001, Error, typeNameExpectedBut, "unexpected $0, expected type name")
+DIAGNOSTIC(20001, Error, typeNameExpectedButEOF, "type name expected but end of file encountered.")
+DIAGNOSTIC(20001, Error, unexpectedEOF, " Unexpected end of file.")
+DIAGNOSTIC(20002, Error, syntaxError, "syntax error.")
 DIAGNOSTIC(20004, Error, unexpectedTokenExpectedComponentDefinition, "unexpected token '$0', only component definitions are allowed in a shader scope.")
-DIAGNOSTIC(20008, Error, invalidOperator, "invalid operator '$0'.");
+DIAGNOSTIC(20008, Error, invalidOperator, "invalid operator '$0'.")
 DIAGNOSTIC(20011, Error, unexpectedColon, "unexpected ':'.")
 DIAGNOSTIC(20012, Error, invalidSPIRVVersion, "Expecting SPIR-V version as either 'major.minor', or quoted if has patch (eg for SPIR-V 1.2, '1.2' or \"1.2\"')")
 DIAGNOSTIC(20013, Error, invalidCUDASMVersion, "Expecting CUDA SM version as either 'major.minor', or quoted if has patch (eg for '7.0' or \"7.0\"')")
@@ -234,10 +234,10 @@ DIAGNOSTIC(30019, Error, typeMismatch, "expected an expression of type '$0', got
 DIAGNOSTIC(30020, Error, importOperatorReturnTypeMismatch, "import operator should return '$1', but the expression has type '$0''. do you forget 'project'?")
 DIAGNOSTIC(30021, Error, noApplicationFunction, "$0: no overload takes arguments ($1)")
 DIAGNOSTIC(30022, Error, invalidTypeCast, "invalid type cast between \"$0\" and \"$1\".")
-DIAGNOSTIC(30023, Error, typeHasNoPublicMemberOfName, "\"$0\" does not have public member \"$1\".");
+DIAGNOSTIC(30023, Error, typeHasNoPublicMemberOfName, "\"$0\" does not have public member \"$1\".")
 DIAGNOSTIC(30025, Error, invalidArraySize, "array size must be larger than zero.")
 DIAGNOSTIC(30026, Error, returnInComponentMustComeLast, "'return' can only appear as the last statement in component definition.")
-DIAGNOSTIC(30027, Error, noMemberOfNameInType, "'$0' is not a member of '$1'.");
+DIAGNOSTIC(30027, Error, noMemberOfNameInType, "'$0' is not a member of '$1'.")
 DIAGNOSTIC(30028, Error, forPredicateTypeError, "'for': predicate expression must evaluate to bool.")
 DIAGNOSTIC(30030, Error, projectionOutsideImportOperator, "'project': invalid use outside import operator.")
 DIAGNOSTIC(30031, Error, projectTypeMismatch, "'project': expression must evaluate to record type '$0'.")
@@ -272,7 +272,7 @@ DIAGNOSTIC(31000, Error, unknownAttributeName, "unknown attribute '$0'")
 DIAGNOSTIC(31001, Error, attributeArgumentCountMismatch, "attribute '$0' expects $1 arguments ($2 provided)")
 DIAGNOSTIC(31002, Error, attributeNotApplicable, "attribute '$0' is not valid here")
 
-DIAGNOSTIC(31003, Error, badlyDefinedPatchConstantFunc, "hull shader '$0' has has badly defined 'patchconstantfunc' attribute.");
+DIAGNOSTIC(31003, Error, badlyDefinedPatchConstantFunc, "hull shader '$0' has has badly defined 'patchconstantfunc' attribute.")
 
 DIAGNOSTIC(31004, Error, expectedSingleIntArg, "attribute '$0' expects a single int argument")
 DIAGNOSTIC(31005, Error, expectedSingleStringArg, "attribute '$0' expects a single string argument")
@@ -305,19 +305,19 @@ DIAGNOSTIC(39999, Error, variableUsedInItsOwnDefinition, "the initial-value expr
 DIAGNOSTIC(30400, Error, genericTypeNeedsArgs, "generic type '$0' used without argument")
 
 // 305xx: initializer lists
-DIAGNOSTIC(30500, Error, tooManyInitializers, "too many initializers (expected $0, got $1)");
-DIAGNOSTIC(30501, Error, cannotUseInitializerListForArrayOfUnknownSize, "cannot use initializer list for array of statically unknown size '$0'");
-DIAGNOSTIC(30502, Error, cannotUseInitializerListForVectorOfUnknownSize, "cannot use initializer list for vector of statically unknown size '$0'");
-DIAGNOSTIC(30503, Error, cannotUseInitializerListForMatrixOfUnknownSize, "cannot use initializer list for matrix of statically unknown size '$0' rows");
+DIAGNOSTIC(30500, Error, tooManyInitializers, "too many initializers (expected $0, got $1)")
+DIAGNOSTIC(30501, Error, cannotUseInitializerListForArrayOfUnknownSize, "cannot use initializer list for array of statically unknown size '$0'")
+DIAGNOSTIC(30502, Error, cannotUseInitializerListForVectorOfUnknownSize, "cannot use initializer list for vector of statically unknown size '$0'")
+DIAGNOSTIC(30503, Error, cannotUseInitializerListForMatrixOfUnknownSize, "cannot use initializer list for matrix of statically unknown size '$0' rows")
 DIAGNOSTIC(30504, Error, cannotUseInitializerListForType, "cannot use initializer list for type '$0'")
 
 // 306xx: variables
-DIAGNOSTIC(30600, Error, varWithoutTypeMustHaveInitializer, "a variable declaration without an initial-value expression must be given an explicit type");
+DIAGNOSTIC(30600, Error, varWithoutTypeMustHaveInitializer, "a variable declaration without an initial-value expression must be given an explicit type")
 
 DIAGNOSTIC(30610, Error, ambiguousDefaultInitializerForType, "more than one default initializer was found for type '$0'")
 
 // 307xx: parameters
-DIAGNOSTIC(30700, Error, outputParameterCannotHaveDefaultValue, "an 'out' or 'inout' parameter cannot have a default-value expression");
+DIAGNOSTIC(30700, Error, outputParameterCannotHaveDefaultValue, "an 'out' or 'inout' parameter cannot have a default-value expression")
 
 // 308xx: inheritance
 DIAGNOSTIC(30810, Error, baseOfInterfaceMustBeInterface, "interface '$0' cannot inherit from non-interface type '$1'")
@@ -354,10 +354,10 @@ DIAGNOSTIC(39999, Error, expectedAGeneric, "expected a generic when using '<...>
 DIAGNOSTIC(39999, Error, genericArgumentInferenceFailed, "could not specialize generic for arguments of type $0")
 DIAGNOSTIC(39999, Note, genericSignatureTried, "see declaration of $0")
 
-DIAGNOSTIC(39999, Error, ambiguousReference, "ambiguous reference to '$0'");
-DIAGNOSTIC(39999, Error, ambiguousExpression, "ambiguous reference");
+DIAGNOSTIC(39999, Error, ambiguousReference, "ambiguous reference to '$0'")
+DIAGNOSTIC(39999, Error, ambiguousExpression, "ambiguous reference")
 
-DIAGNOSTIC(39999, Error, declarationDidntDeclareAnything, "declaration does not declare anything");
+DIAGNOSTIC(39999, Error, declarationDidntDeclareAnything, "declaration does not declare anything")
 
 DIAGNOSTIC(39999, Error, expectedPrefixOperator, "function called as prefix operator was not declared `__prefix`")
 DIAGNOSTIC(39999, Error, expectedPostfixOperator, "function called as postfix operator was not declared `__postfix`")
@@ -403,7 +403,7 @@ DIAGNOSTIC(38022, Error, cannotSpecializeGlobalGenericToItself, "the global type
 DIAGNOSTIC(38023, Error, cannotSpecializeGlobalGenericToAnotherGenericParam, "the global type parameter '$0' cannot be specialized using another global type parameter ('$1')")
 
 
-DIAGNOSTIC(38024, Error, invalidDispatchThreadIDType, "parameter with SV_DispatchThreadID must be either scalar or vector (1 to 3) of uint/int but is $0");
+DIAGNOSTIC(38024, Error, invalidDispatchThreadIDType, "parameter with SV_DispatchThreadID must be either scalar or vector (1 to 3) of uint/int but is $0")
 
 DIAGNOSTIC(-1, Note, noteWhenCompilingEntryPoint, "when compiling entry point '$0'")
 
@@ -446,10 +446,10 @@ DIAGNOSTIC(39016, Error, globalUniformsNotSupported, "'$0' is implicitly a globa
 
 DIAGNOSTIC(39017, Error, tooManyShaderRecordConstantBuffers, "can have at most one 'shader record' attributed constant buffer; found $0.")
 
-DIAGNOSTIC(39018, Error, typeParametersNotAllowedOnEntryPointGlobal, "local-root-signature shader parameter '$0' at global scope must not include existential/interface types");
+DIAGNOSTIC(39018, Error, typeParametersNotAllowedOnEntryPointGlobal, "local-root-signature shader parameter '$0' at global scope must not include existential/interface types")
 
 DIAGNOSTIC(39019, Warning, vkIndexWithoutVkLocation, "ignoring '[[vk::index(...)]]` attribute without a corresponding '[[vk::location(...)]]' attribute")
-DIAGNOSTIC(39020, Error, mixingImplicitAndExplicitBindingForVaryingParams, "mixing explicit and implicit bindings for varying parameters is not supported (see '$0' and '$1')");
+DIAGNOSTIC(39020, Error, mixingImplicitAndExplicitBindingForVaryingParams, "mixing explicit and implicit bindings for varying parameters is not supported (see '$0' and '$1')")
 
 //
 // 4xxxx - IL code generation.
@@ -479,7 +479,7 @@ DIAGNOSTIC(41010, Warning, missingReturn, "control flow may reach end of non-'vo
 // 5xxxx - Target code generation.
 //
 
-DIAGNOSTIC(50010, Internal, missingExistentialBindingsForParameter, "missing argument for existential parameter slot");
+DIAGNOSTIC(50010, Internal, missingExistentialBindingsForParameter, "missing argument for existential parameter slot")
 
 DIAGNOSTIC(50020, Error, invalidTessCoordType,          "TessCoord must have vec2 or vec3 type.")
 DIAGNOSTIC(50020, Error, invalidFragCoordType,          "FragCoord must be a vec4.")
@@ -487,51 +487,51 @@ DIAGNOSTIC(50020, Error, invalidInvocationIdType,       "InvocationId must have 
 DIAGNOSTIC(50020, Error, invalidThreadIdType,           "ThreadId must have int type.")
 DIAGNOSTIC(50020, Error, invalidPrimitiveIdType,        "PrimitiveId must have int type.")
 DIAGNOSTIC(50020, Error, invalidPatchVertexCountType,    "PatchVertexCount must have int type.")
-DIAGNOSTIC(50022, Error, worldIsNotDefined, "world '$0' is not defined.");
-DIAGNOSTIC(50023, Error, stageShouldProvideWorldAttribute, "'$0' should provide 'World' attribute.");
+DIAGNOSTIC(50022, Error, worldIsNotDefined, "world '$0' is not defined.")
+DIAGNOSTIC(50023, Error, stageShouldProvideWorldAttribute, "'$0' should provide 'World' attribute.")
 DIAGNOSTIC(50040, Error, componentHasInvalidTypeForPositionOutput, "'$0': component used as 'loc' output must be of vec4 type.")
 DIAGNOSTIC(50041, Error, componentNotDefined, "'$0': component not defined.")
 
-DIAGNOSTIC(50052, Error, domainShaderRequiresControlPointCount, "'DomainShader' requires attribute 'ControlPointCount'.");
+DIAGNOSTIC(50052, Error, domainShaderRequiresControlPointCount, "'DomainShader' requires attribute 'ControlPointCount'.")
 DIAGNOSTIC(50052, Error, hullShaderRequiresControlPointCount, "'HullShader' requires attribute 'ControlPointCount'.")
-DIAGNOSTIC(50052, Error, hullShaderRequiresControlPointWorld, "'HullShader' requires attribute 'ControlPointWorld'.");
-DIAGNOSTIC(50052, Error, hullShaderRequiresCornerPointWorld, "'HullShader' requires attribute 'CornerPointWorld'.");
-DIAGNOSTIC(50052, Error, hullShaderRequiresDomain, "'HullShader' requires attribute 'Domain'.");
+DIAGNOSTIC(50052, Error, hullShaderRequiresControlPointWorld, "'HullShader' requires attribute 'ControlPointWorld'.")
+DIAGNOSTIC(50052, Error, hullShaderRequiresCornerPointWorld, "'HullShader' requires attribute 'CornerPointWorld'.")
+DIAGNOSTIC(50052, Error, hullShaderRequiresDomain, "'HullShader' requires attribute 'Domain'.")
 DIAGNOSTIC(50052, Error, hullShaderRequiresInputControlPointCount, "'HullShader' requires attribute 'InputControlPointCount'.")
 DIAGNOSTIC(50052, Error, hullShaderRequiresOutputTopology, "'HullShader' requires attribute 'OutputTopology'.")
 DIAGNOSTIC(50052, Error, hullShaderRequiresPartitioning, "'HullShader' requires attribute 'Partitioning'.")
-DIAGNOSTIC(50052, Error, hullShaderRequiresPatchWorld, "'HullShader' requires attribute 'PatchWorld'.");
+DIAGNOSTIC(50052, Error, hullShaderRequiresPatchWorld, "'HullShader' requires attribute 'PatchWorld'.")
 DIAGNOSTIC(50052, Error, hullShaderRequiresTessLevelInner, "'HullShader' requires attribute 'TessLevelInner'.")
 DIAGNOSTIC(50052, Error, hullShaderRequiresTessLevelOuter, "'HullShader' requires attribute 'TessLevelOuter'.")
 
-DIAGNOSTIC(50053, Error, invalidTessellationDomian, "'Domain' should be either 'triangles' or 'quads'.");
-DIAGNOSTIC(50053, Error, invalidTessellationOutputTopology, "'OutputTopology' must be one of: 'point', 'line', 'triangle_cw', or 'triangle_ccw'.");
+DIAGNOSTIC(50053, Error, invalidTessellationDomian, "'Domain' should be either 'triangles' or 'quads'.")
+DIAGNOSTIC(50053, Error, invalidTessellationOutputTopology, "'OutputTopology' must be one of: 'point', 'line', 'triangle_cw', or 'triangle_ccw'.")
 DIAGNOSTIC(50053, Error, invalidTessellationPartitioning, "'Partitioning' must be one of: 'integer', 'pow2', 'fractional_even', or 'fractional_odd'.")
 DIAGNOSTIC(50053, Error, invalidTessellationDomain,     "'Domain' should be either 'triangles' or 'quads'.")
 
 DIAGNOSTIC(50082, Error, importingFromPackedBufferUnsupported, "importing type '$0' from PackedBuffer is not supported by the GLSL backend.")
 DIAGNOSTIC(51090, Error, cannotGenerateCodeForExternComponentType, "cannot generate code for extern component type '$0'.")
 DIAGNOSTIC(51091, Error, typeCannotBePlacedInATexture, "type '$0' cannot be placed in a texture.")
-DIAGNOSTIC(51092, Error, stageDoesntHaveInputWorld, "'$0' doesn't appear to have any input world");
+DIAGNOSTIC(51092, Error, stageDoesntHaveInputWorld, "'$0' doesn't appear to have any input world")
 
-DIAGNOSTIC(52000, Error, multiLevelBreakUnsupported, "control flow appears to require multi-level `break`, which Slang does not yet support");
+DIAGNOSTIC(52000, Error, multiLevelBreakUnsupported, "control flow appears to require multi-level `break`, which Slang does not yet support")
 
-DIAGNOSTIC(52001, Warning, dxilNotFound, "dxil shared library not found, so 'dxc' output cannot be signed! Shader code will not be runnable in non-development environments.");
+DIAGNOSTIC(52001, Warning, dxilNotFound, "dxil shared library not found, so 'dxc' output cannot be signed! Shader code will not be runnable in non-development environments.")
 
-DIAGNOSTIC(52002, Error, passThroughCompilerNotFound, "Could not find a suitable pass-through compiler for '$0'.");
-DIAGNOSTIC(52003, Error, cppCompilerNotFound, "Could not find a suitable C/C++ compiler for '$0'.");
+DIAGNOSTIC(52002, Error, passThroughCompilerNotFound, "Could not find a suitable pass-through compiler for '$0'.")
+DIAGNOSTIC(52003, Error, cppCompilerNotFound, "Could not find a suitable C/C++ compiler for '$0'.")
 
-DIAGNOSTIC(52004, Error, unableToWriteFile, "Unable to write file '$0'");
-DIAGNOSTIC(52005, Error, unableToReadFile, "Unable to read file '$0'");
+DIAGNOSTIC(52004, Error, unableToWriteFile, "Unable to write file '$0'")
+DIAGNOSTIC(52005, Error, unableToReadFile, "Unable to read file '$0'")
 
 // 99999 - Internal compiler errors, and not-yet-classified diagnostics.
 
 DIAGNOSTIC(99999, Internal, unimplemented, "unimplemented feature in Slang compiler: $0")
 DIAGNOSTIC(99999, Internal, unexpected, "unexpected condition encountered in Slang compiler: $0")
 DIAGNOSTIC(99999, Internal, internalCompilerError, "Slang internal compiler error")
-DIAGNOSTIC(99999, Error, compilationAborted, "Slang compilation aborted due to internal error");
-DIAGNOSTIC(99999, Error, compilationAbortedDueToException, "Slang compilation aborted due to an exception of $0: $1");
-DIAGNOSTIC(99999, Note, noteLocationOfInternalError, "the Slang compiler threw an exception while working on code near this location");
-DIAGNOSTIC(99999, Internal, serialDebugVerificationFailed, "Verification of serial debug information failed.");
+DIAGNOSTIC(99999, Error, compilationAborted, "Slang compilation aborted due to internal error")
+DIAGNOSTIC(99999, Error, compilationAbortedDueToException, "Slang compilation aborted due to an exception of $0: $1")
+DIAGNOSTIC(99999, Note, noteLocationOfInternalError, "the Slang compiler threw an exception while working on code near this location")
+DIAGNOSTIC(99999, Internal, serialDebugVerificationFailed, "Verification of serial debug information failed.")
 
 #undef DIAGNOSTIC

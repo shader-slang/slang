@@ -198,6 +198,7 @@
     <ClInclude Include="slang-ast-generated-macro.h" />
     <ClInclude Include="slang-ast-generated.h" />
     <ClInclude Include="slang-ast-modifier.h" />
+    <ClInclude Include="slang-ast-serialize.h" />
     <ClInclude Include="slang-ast-stmt.h" />
     <ClInclude Include="slang-ast-support-types.h" />
     <ClInclude Include="slang-ast-type.h" />
@@ -279,6 +280,7 @@
     <ClCompile Include="slang-ast-decl.cpp" />
     <ClCompile Include="slang-ast-dump.cpp" />
     <ClCompile Include="slang-ast-reflect.cpp" />
+    <ClCompile Include="slang-ast-serialize.cpp" />
     <ClCompile Include="slang-ast-substitutions.cpp" />
     <ClCompile Include="slang-ast-type.cpp" />
     <ClCompile Include="slang-ast-val.cpp" />

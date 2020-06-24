@@ -814,23 +814,6 @@ class HLSLTriangleAdjModifier : public HLSLGeometryShaderInputPrimitiveTypeModif
     SLANG_CLASS(HLSLTriangleAdjModifier)
 };
 
-
-// A modifier to be attached to syntax after we've computed layout
-class ComputedLayoutModifier : public Modifier 
-{
-    SLANG_CLASS(ComputedLayoutModifier)
- 
-    RefPtr<Layout> layout;
-};
-
-
-class TupleVarModifier : public Modifier 
-{
-    SLANG_CLASS(TupleVarModifier)
- 
-//  TupleFieldModifier* tupleField = nullptr;
-};
-
 // A modifier to indicate that a constructor/initializer can be used
 // to perform implicit type conversion, and to specify the cost of
 // the conversion, if applied.

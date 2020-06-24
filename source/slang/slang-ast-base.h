@@ -275,7 +275,7 @@ class Modifier : public SyntaxNode
     Modifier* next = nullptr;
 
     // The keyword that was used to introduce t that was used to name this modifier.
-    Name* name;
+    Name* name = nullptr;
 
     Name* getName() { return name; }
     NameLoc getNameAndLoc() { return NameLoc(name, loc); }

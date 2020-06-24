@@ -40,6 +40,7 @@ namespace Slang
     {
         int id;
         Severity severity;
+        char const* name;               ///< Unique name
         char const* messageFormat;
     };
 
