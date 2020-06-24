@@ -39,10 +39,18 @@ using namespace Slang;
 // laid out in the manner that the generated slang code expects. 
 #define SLANG_PRELUDE_NAMESPACE CPPPrelude
 #include "../../prelude/slang-cpp-types.h"
-#include "shader.h"
+
+struct UniformState
+{
+    CPPPrelude::RWStructuredBuffer<float> ioBuffer;
+};
+
+extern"C" void computeMain(CPPPrelude::ComputeVaryingInput* varyingInput, void* params, void* uniformState);
+
 
 static SlangResult _innerMain(int argc, char** argv)
 {
+
     // the uniformState will be passed as a pointer to the CPU code 
     UniformState uniformState;
 

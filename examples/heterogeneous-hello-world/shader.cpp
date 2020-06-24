@@ -1,7 +1,14 @@
-#define SLANG_PRELUDE_NAMESPACE CPPPrelude
-#include "prelude/slang-cpp-prelude.h"
+#include "C:/Users/dgeisler/Documents/slang/prelude/slang-cpp-prelude.h"
 
-using namespace CPPPrelude;
+
+namespace { // anonymous 
+
+#ifdef SLANG_PRELUDE_NAMESPACE
+using namespace SLANG_PRELUDE_NAMESPACE;
+#endif
+
+struct KernelContext;
+
 
 #line 13 "shader.slang"
 struct UniformState
@@ -14,7 +21,7 @@ struct UniformState
 
 };
 
-struct Context
+struct KernelContext
 {
     UniformState* uniformState;
     uint3 dispatchThreadID;
@@ -54,12 +61,14 @@ struct Context
 
 };
 
+} // anonymous
+
 // [numthreads(4, 1, 1)]
 SLANG_PRELUDE_EXPORT
-void computeMain_Thread(ComputeThreadVaryingInput* varyingInput, UniformEntryPointParams* params, UniformState* uniformState)
+void computeMain_Thread(ComputeThreadVaryingInput* varyingInput, void* params, void* uniformState)
 {
-    Context context = {};
-    context.uniformState = uniformState;
+    KernelContext context = {};
+    context.uniformState = (UniformState*)uniformState;
     context.dispatchThreadID = {
         varyingInput->groupID.x * 4 + varyingInput->groupThreadID.x,
         varyingInput->groupID.y * 1 + varyingInput->groupThreadID.y,
@@ -69,10 +78,10 @@ void computeMain_Thread(ComputeThreadVaryingInput* varyingInput, UniformEntryPoi
 }
 // [numthreads(4, 1, 1)]
 SLANG_PRELUDE_EXPORT
-void computeMain_Group(ComputeVaryingInput* varyingInput, UniformEntryPointParams* params, UniformState* uniformState)
+void computeMain_Group(ComputeVaryingInput* varyingInput, void* params, void* uniformState)
 {
-    Context context = {};
-    context.uniformState = uniformState;
+    KernelContext context = {};
+    context.uniformState = (UniformState*)uniformState;
     const uint3 start = {
         varyingInput->startGroupID.x * 4,
         varyingInput->startGroupID.y * 1,
@@ -87,10 +96,10 @@ void computeMain_Group(ComputeVaryingInput* varyingInput, UniformEntryPointParam
 }
 // [numthreads(4, 1, 1)]
 SLANG_PRELUDE_EXPORT
-void computeMain(ComputeVaryingInput* varyingInput, UniformEntryPointParams* params, UniformState* uniformState)
+void computeMain(ComputeVaryingInput* varyingInput, void* params, void* uniformState)
 {
-    Context context = {};
-    context.uniformState = uniformState;
+    KernelContext context = {};
+    context.uniformState = (UniformState*)uniformState;
     const uint3 start = {
         varyingInput->startGroupID.x * 4,
         varyingInput->startGroupID.y * 1,
