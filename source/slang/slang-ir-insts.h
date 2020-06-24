@@ -165,8 +165,6 @@ IR_SIMPLE_DECORATION(VulkanCallablePayloadDecoration)
 /// vulkan hit attributes, and should have a location assigned
 /// to it.
 IR_SIMPLE_DECORATION(VulkanHitAttributesDecoration)
-
-IR_SIMPLE_DECORATION(PolymorphicDecoration)
 IR_SIMPLE_DECORATION(ThisPointerDecoration)
 
 
@@ -410,9 +408,13 @@ struct IRLookupWitnessMethod : IRInst
 {
     IRUse witnessTable;
     IRUse requirementKey;
+    IRUse interfaceType;
 
     IRInst* getWitnessTable() { return witnessTable.get(); }
     IRInst* getRequirementKey() { return requirementKey.get(); }
+    IRInst* getInterfaceType() { return interfaceType.get(); }
+
+    IR_LEAF_ISA(lookup_interface_method)
 };
 
 struct IRLookupWitnessTable : IRInst
@@ -1675,7 +1677,8 @@ struct IRBuilder
     IRInst* emitLookupInterfaceMethodInst(
         IRType* type,
         IRInst* witnessTableVal,
-        IRInst* interfaceMethodVal);
+        IRInst* interfaceMethodVal,
+        IRType* interfaceType);
 
     IRInst* emitCallInst(
         IRType*         type,
@@ -1809,8 +1812,15 @@ struct IRBuilder
         IRInst*        requirementKey,
         IRInst*        satisfyingVal);
 
+    IRInterfaceRequirementEntry* createInterfaceRequirementEntry(
+        IRInst* requirementKey,
+        IRInst* requirementVal);
+
     // Create an initially empty `struct` type.
     IRStructType*   createStructType();
+
+    // Create an IRType representing an `associatedtype` decl.
+    IRAssociatedType* createAssociatedType();
 
     // Create an empty `interface` type.
     IRInterfaceType* createInterfaceType(UInt operandCount, IRInst* const* operands);
@@ -2160,14 +2170,9 @@ struct IRBuilder
         addDecoration(value, kIROp_LoopControlDecoration, getIntValue(getIntType(), IRIntegerValue(mode)));
     }
 
-    void addPolymorphicDecoration(IRInst* value)
+    void addThisPointerDecoration(IRInst* value, int paramIndex)
     {
-        addDecoration(value, kIROp_PolymorphicDecoration);
-    }
-
-    void addThisPointerDecoration(IRInst* value)
-    {
-        addDecoration(value, kIROp_ThisPointerDecoration);
+        addDecoration(value, kIROp_ThisPointerDecoration, getIntValue(getIntType(), paramIndex));
     }
 
     void addSemanticDecoration(IRInst* value, UnownedStringSlice const& text, int index = 0)

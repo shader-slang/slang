@@ -401,6 +401,18 @@ struct IRGenContext
     {
         return shared->m_mainModuleDecl;
     }
+
+    LoweredValInfo* findLoweredDecl(Decl* decl)
+    {
+        IRGenEnv* envToFindIn = env;
+        while (envToFindIn)
+        {
+            if (auto rs = envToFindIn->mapDeclToValue.TryGetValue(decl))
+                return rs;
+            envToFindIn = envToFindIn->outer;
+        }
+        return nullptr;
+    }
 };
 
 void setGlobalValue(SharedIRGenContext* sharedContext, Decl* decl, LoweredValInfo value)
@@ -986,6 +998,8 @@ IRStructKey* getInterfaceRequirementKey(
     IRGenContext*   context,
     Decl*           requirementDecl)
 {
+    if (auto genericDecl = as<GenericDecl>(requirementDecl))
+        return getInterfaceRequirementKey(context, genericDecl->inner);
     IRStructKey* requirementKey = nullptr;
     if(context->shared->interfaceRequirementKeys.TryGetValue(requirementDecl, requirementKey))
     {
@@ -1059,7 +1073,8 @@ struct ValLoweringVisitor : ValVisitor<ValLoweringVisitor, LoweredValInfo, Lower
         return LoweredValInfo::simple(getBuilder()->emitLookupInterfaceMethodInst(
             nullptr,
             baseWitnessTable,
-            requirementKey));
+            requirementKey,
+            lowerType(context, val->subToMid->sup)));
     }
 
     LoweredValInfo visitTaggedUnionSubtypeWitness(
@@ -1240,7 +1255,8 @@ struct ValLoweringVisitor : ValVisitor<ValLoweringVisitor, LoweredValInfo, Lower
                     auto caseFunc = subBuilder->emitLookupInterfaceMethodInst(
                         caseFuncType,
                         caseWitnessTable,
-                        irReqKey);
+                        irReqKey,
+                        irWitnessTableBaseType);
 
                     // We are going to emit a `call` to the satisfying value
                     // for the case type, so we will collect the arguments for that call.
@@ -4520,7 +4536,7 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
         Dictionary<WitnessTable*, IRWitnessTable*>  mapASTToIRWitnessTable)
     {
         auto subBuilder = subContext->irBuilder;
-
+        
         for(auto entry : astWitnessTable->requirementDictionary)
         {
             auto requiredMemberDecl = entry.Key;
@@ -5275,11 +5291,16 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
         // a witness table for the interface type's conformance
         // to its own interface.
         //
-        List<IRStructKey*> requirementKeys;
+        NestedContext nestedContext(this);
+        auto subBuilder = nestedContext.getBuilder();
+        auto subContext = nestedContext.getContext();
+        List<IRInterfaceRequirementEntry*> requirementEntries;
+
         for (auto requirementDecl : decl->members)
         {
-            requirementKeys.add(getInterfaceRequirementKey(requirementDecl));
-
+            auto key = getInterfaceRequirementKey(requirementDecl);
+            auto entry = subBuilder->createInterfaceRequirementEntry(key, nullptr);
+            requirementEntries.add(entry);
             // As a special case, any type constraints placed
             // on an associated type will *also* need to be turned
             // into requirement keys for this interface.
@@ -5287,22 +5308,20 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
             {
                 for (auto constraintDecl : associatedTypeDecl->getMembersOfType<TypeConstraintDecl>())
                 {
-                    requirementKeys.add(getInterfaceRequirementKey(constraintDecl));
+                    auto constraintKey = getInterfaceRequirementKey(constraintDecl);
+                    requirementEntries.add(
+                        subBuilder->createInterfaceRequirementEntry(constraintKey,
+                            lowerType(context, constraintDecl->getSup().type)));
                 }
             }
         }
-
-
-        NestedContext nestedContext(this);
-        auto subBuilder = nestedContext.getBuilder();
-        auto subContext = nestedContext.getContext();
 
         // Emit any generics that should wrap the actual type.
         emitOuterGenerics(subContext, decl, decl);
 
         IRInterfaceType* irInterface = subBuilder->createInterfaceType(
-            requirementKeys.getCount(),
-            reinterpret_cast<IRInst**>(requirementKeys.getBuffer()));
+            requirementEntries.getCount(),
+            reinterpret_cast<IRInst**>(requirementEntries.getBuffer()));
         addNameHint(context, irInterface, decl);
         addLinkageDecoration(context, irInterface, decl);
         subBuilder->setInsertInto(irInterface);
@@ -5389,63 +5408,76 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
         // Emit any generics that should wrap the actual type.
         emitOuterGenerics(subContext, decl, decl);
 
-        IRStructType* irStruct = subBuilder->createStructType();
-        addNameHint(context, irStruct, decl);
-        addLinkageDecoration(context, irStruct, decl);
-
-        subBuilder->setInsertInto(irStruct);
-
-        // A `struct` that inherits from another `struct` must start
-        // with a member for the direct base type.
-        //
-        for( auto inheritanceDecl : decl->getMembersOfType<InheritanceDecl>() )
+        IRInst* resultType = nullptr;
+        if (as<AssocTypeDecl>(decl))
         {
-            auto superType = inheritanceDecl->base;
-            if(auto superDeclRefType = as<DeclRefType>(superType))
-            {
-                if(auto superStructDeclRef = superDeclRefType->declRef.as<StructDecl>())
-                {
-                    auto superKey = (IRStructKey*) getSimpleVal(context, ensureDecl(context, inheritanceDecl));
-                    auto irSuperType = lowerType(context, superType.type);
-                    subBuilder->createStructField(
-                        irStruct,
-                        superKey,
-                        irSuperType);
-                }
-            }
+            resultType = subBuilder->createAssociatedType();
+        }
+        else
+        {
+            resultType = subBuilder->createStructType();
         }
 
+        addNameHint(context, resultType, decl);
+        addLinkageDecoration(context, resultType, decl);
 
-        for (auto fieldDecl : decl->getMembersOfType<VarDeclBase>())
+        if (resultType->op == kIROp_StructType)
         {
-            if (fieldDecl->hasModifier<HLSLStaticModifier>())
+            IRStructType* irStruct = (IRStructType*)resultType;
+            subBuilder->setInsertInto(irStruct);
+
+            // A `struct` that inherits from another `struct` must start
+            // with a member for the direct base type.
+            //
+            for( auto inheritanceDecl : decl->getMembersOfType<InheritanceDecl>() )
             {
-                // A `static` field is actually a global variable,
-                // and we should emit it as such.
-                ensureDecl(context, fieldDecl);
-                continue;
+                auto superType = inheritanceDecl->base;
+                if(auto superDeclRefType = as<DeclRefType>(superType))
+                {
+                    if(auto superStructDeclRef = superDeclRefType->declRef.as<StructDecl>())
+                    {
+                        auto superKey = (IRStructKey*) getSimpleVal(context, ensureDecl(context, inheritanceDecl));
+                        auto irSuperType = lowerType(context, superType.type);
+                        subBuilder->createStructField(
+                            irStruct,
+                            superKey,
+                            irSuperType);
+                    }
+                }
             }
 
-            // Each ordinary field will need to turn into a struct "key"
-            // that is used for fetching the field.
-            IRInst* fieldKeyInst = getSimpleVal(context,
-                ensureDecl(context, fieldDecl));
-            auto fieldKey = as<IRStructKey>(fieldKeyInst);
-            SLANG_ASSERT(fieldKey);
 
-            // Note: we lower the type of the field in the "sub"
-            // context, so that any generic parameters that were
-            // set up for the type can be referenced by the field type.
-            IRType* fieldType = lowerType(
-                subContext,
-                fieldDecl->getType());
+            for (auto fieldDecl : decl->getMembersOfType<VarDeclBase>())
+            {
+                if (fieldDecl->hasModifier<HLSLStaticModifier>())
+                {
+                    // A `static` field is actually a global variable,
+                    // and we should emit it as such.
+                    ensureDecl(context, fieldDecl);
+                    continue;
+                }
 
-            // Then, the parent `struct` instruction itself will have
-            // a "field" instruction.
-            subBuilder->createStructField(
-                irStruct,
-                fieldKey,
-                fieldType);
+                // Each ordinary field will need to turn into a struct "key"
+                // that is used for fetching the field.
+                IRInst* fieldKeyInst = getSimpleVal(context,
+                    ensureDecl(context, fieldDecl));
+                auto fieldKey = as<IRStructKey>(fieldKeyInst);
+                SLANG_ASSERT(fieldKey);
+
+                // Note: we lower the type of the field in the "sub"
+                // context, so that any generic parameters that were
+                // set up for the type can be referenced by the field type.
+                IRType* fieldType = lowerType(
+                    subContext,
+                    fieldDecl->getType());
+
+                // Then, the parent `struct` instruction itself will have
+                // a "field" instruction.
+                subBuilder->createStructField(
+                    irStruct,
+                    fieldKey,
+                    fieldType);
+            }
         }
 
         // There may be members not handled by the above logic (e.g.,
@@ -5455,10 +5487,10 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
         // Instead we will force emission of all children of aggregate
         // type declarations later, from the top-level emit logic.
 
-        irStruct->moveToEnd();
-        addTargetIntrinsicDecorations(irStruct, decl);
+        resultType->moveToEnd();
+        addTargetIntrinsicDecorations(resultType, decl);
 
-        return LoweredValInfo::simple(finishOuterGenerics(subBuilder, irStruct));
+        return LoweredValInfo::simple(finishOuterGenerics(subBuilder, resultType));
     }
 
     LoweredValInfo lowerMemberVarDecl(VarDecl* fieldDecl)
@@ -5995,28 +6027,16 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
         return as<IRStringLit>(builder->getStringValue(stringLitExpr->value.getUnownedSlice()));
     }
 
-    LoweredValInfo lowerFuncDecl(FunctionDeclBase* decl)
+    void _lowerFuncResultAndParameterTypes(
+        ParameterLists& parameterLists,
+        List<IRType*>& paramTypes,
+        IRType*& irResultType,
+        IRBuilder* subBuilder,
+        IRGenContext* subContext,
+        FunctionDeclBase* decl)
     {
-        // We are going to use a nested builder, because we will
-        // change the parent node that things get nested into.
-        //
-        NestedContext nestedContext(this);
-        auto subBuilder = nestedContext.getBuilder();
-        auto subContext = nestedContext.getContext();
-
-        // The actual `IRFunction` that we emit needs to be nested
-        // inside of one `IRGeneric` for every outer `GenericDecl`
-        // in the declaration hierarchy.
-
-        emitOuterGenerics(subContext, decl, decl);
-
         // Collect the parameter lists we will use for our new function.
-        ParameterLists parameterLists;
         collectParameterLists(decl, &parameterLists, kParameterListCollectMode_Default);
-
-        // TODO: if there are any generic parameters in the collected list, then
-        // we need to output an IR function with generic parameters (or a generic
-        // with a nested function... the exact representation is still TBD).
 
         // In most cases the return type for a declaration can be read off the declaration
         // itself, but things get a bit more complicated when we have to deal with
@@ -6036,14 +6056,6 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
             }
         }
 
-        // need to create an IR function here
-
-        IRFunc* irFunc = subBuilder->createFunc();
-        addNameHint(context, irFunc, decl);
-        addLinkageDecoration(context, irFunc, decl);
-
-        List<IRType*> paramTypes;
-
         for( auto paramInfo : parameterLists.params )
         {
             IRType* irParamType = lowerType(subContext, paramInfo.type);
@@ -6054,10 +6066,10 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
                 // Simple case of a by-value input parameter.
                 break;
 
-            // If the parameter is declared `out` or `inout`,
-            // then we will represent it with a pointer type in
-            // the IR, but we will use a specialized pointer
-            // type that encodes the parameter direction information.
+                // If the parameter is declared `out` or `inout`,
+                // then we will represent it with a pointer type in
+                // the IR, but we will use a specialized pointer
+                // type that encodes the parameter direction information.
             case kParameterDirection_Out:
                 irParamType = subBuilder->getOutType(irParamType);
                 break;
@@ -6084,7 +6096,7 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
             paramTypes.add(irParamType);
         }
 
-        auto irResultType = lowerType(subContext, declForReturnType->returnType);
+        irResultType = lowerType(subContext, declForReturnType->returnType);
 
         if (auto setterDecl = as<SetterDecl>(decl))
         {
@@ -6107,11 +6119,83 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
             // being accessed, rather than a simple value.
             irResultType = subBuilder->getPtrType(irResultType);
         }
+    }
 
-        auto irFuncType = subBuilder->getFuncType(
+    IRFuncType* _lowerFuncTypeImpl(
+        ParameterLists& parameterLists,
+        List<IRType*>& paramTypes,
+        IRType*& irResultType,
+        IRBuilder* builder,
+        IRGenContext* irGenContext,
+        FunctionDeclBase* decl)
+    {
+        _lowerFuncResultAndParameterTypes(
+            parameterLists,
+            paramTypes,
+            irResultType,
+            builder,
+            irGenContext,
+            decl);
+
+        auto irFuncType = builder->getFuncType(
             paramTypes.getCount(),
             paramTypes.getBuffer(),
             irResultType);
+
+        if (parameterLists.params.getCount() && parameterLists.params[0].isThisParam)
+            builder->addThisPointerDecoration(irFuncType, 0);
+        return irFuncType;
+    }
+
+    IRInst* lowerFuncType(FunctionDeclBase* decl)
+    {
+        NestedContext nestedContextFuncType(this);
+        auto funcTypeBuilder = nestedContextFuncType.getBuilder();
+        auto funcTypeContext = nestedContextFuncType.getContext();
+
+        emitOuterGenerics(funcTypeContext, decl, decl);
+
+        ParameterLists parameterLists;
+        List<IRType*> paramTypes;
+        IRType* irResultType = nullptr;
+        auto irFuncType = _lowerFuncTypeImpl(
+            parameterLists,
+            paramTypes,
+            irResultType,
+            funcTypeBuilder,
+            funcTypeContext,
+            decl);
+
+        return finishOuterGenerics(funcTypeBuilder, irFuncType);
+    }
+
+    LoweredValInfo lowerFuncDecl(FunctionDeclBase* decl)
+    {
+        // We are going to use a nested builder, because we will
+        // change the parent node that things get nested into.
+        //
+        NestedContext nestedContextFunc(this);
+        auto subBuilder = nestedContextFunc.getBuilder();
+        auto subContext = nestedContextFunc.getContext();
+
+        emitOuterGenerics(subContext, decl, decl);
+
+        // need to create an IR function here
+
+        IRFunc* irFunc = subBuilder->createFunc();
+        addNameHint(context, irFunc, decl);
+        addLinkageDecoration(context, irFunc, decl);
+
+        ParameterLists parameterLists;
+        List<IRType*> paramTypes;
+        IRType* irResultType = nullptr;
+        auto irFuncType = _lowerFuncTypeImpl(
+            parameterLists,
+            paramTypes,
+            irResultType,
+            subBuilder,
+            subContext,
+            decl);
         irFunc->setFullType(irFuncType);
 
         subBuilder->setInsertInto(irFunc);
@@ -6251,14 +6335,7 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
                 if (paramInfo.isThisParam)
                 {
                     subContext->thisVal = paramVal;
-                    subBuilder->addThisPointerDecoration(irParam);
-                }
-
-                // Add a [polymorphic] decoration for generic-typed parameters.
-                if (as<IRParam>(irParamType) &&
-                    as<IRTypeType>(irParamType->getFullType()))
-                {
-                    subBuilder->addPolymorphicDecoration(irParam);
+                    subBuilder->addThisPointerDecoration(irParam, (int)(paramTypeIndex - 1));
                 }
             }
 
@@ -6470,7 +6547,53 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
         // body appear before the function itself in the list
         // of global values.
         irFunc->moveToEnd();
-        return LoweredValInfo::simple(finishOuterGenerics(subBuilder, irFunc));
+
+        // If this function is defined inside an interface, add a reference to the IRFunc from
+        // the interface's type definition.
+        auto finalVal = finishOuterGenerics(subBuilder, irFunc);
+
+        if (auto genericVal = as<IRGeneric>(finalVal))
+        {
+            auto funcType = lowerFuncType(decl);
+            genericVal->typeUse.set(funcType);
+        }
+
+        maybeAssociateToInterfaceType(decl, finalVal);
+
+        return LoweredValInfo::simple(finalVal);
+    }
+
+    void maybeAssociateToInterfaceType(Decl* decl, IRInst* irFuncVal)
+    {
+        auto parent = decl->parentDecl;
+        InterfaceDecl* interfaceDecl = nullptr;
+        while (parent)
+        {
+            interfaceDecl = as<InterfaceDecl>(parent);
+            if (interfaceDecl) break;
+            parent = parent->parentDecl;
+        }
+        if (!interfaceDecl)
+            return;
+        auto loweredVal = context->findLoweredDecl(interfaceDecl);
+        if (!loweredVal)
+        {
+            return;
+        }
+        IRInst* irFuncType = irFuncVal->typeUse.get();
+        auto irInterfaceType = cast<IRInterfaceType>(loweredVal->val);
+        auto key = getInterfaceRequirementKey(decl);
+        for (UInt i = 0; i < irInterfaceType->getOperandCount(); i++)
+        {
+            auto operand = cast<IRInterfaceRequirementEntry>(irInterfaceType->getOperand(i));
+            if (operand->getOperand(0) == key)
+            {
+                operand->setOperand(1, irFuncType);
+                return;
+            }
+        }
+        SLANG_UNREACHABLE("associating interface function declaration:"
+                          "requirement not found in the interface type.");
     }
 
     LoweredValInfo visitGenericDecl(GenericDecl * genDecl)
@@ -6759,7 +6882,8 @@ LoweredValInfo emitDeclRef(
         auto irSatisfyingVal = context->irBuilder->emitLookupInterfaceMethodInst(
             type,
             irWitnessTable,
-            irRequirementKey);
+            irRequirementKey,
+            lowerType(context, thisTypeSubst->witness->sup));
         return LoweredValInfo::simple(irSatisfyingVal);
     }
     else

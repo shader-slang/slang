@@ -1190,6 +1190,25 @@ struct IRStructType : IRType
     IR_LEAF_ISA(StructType)
 };
 
+struct IRAssociatedType : IRType
+{
+    IR_LEAF_ISA(AssociatedType)
+};
+
+struct IRInterfaceRequirementEntry : IRInst
+{
+    // The AST-level requirement
+    IRUse requirementKey;
+
+    // The IR-level value that represents the declaration of the requirement
+    IRUse requirementVal;
+
+    IRInst* getRequirementKey() { return getOperand(0); }
+    IRInst* getRequirementVal() { return getOperand(1); }
+
+    IR_LEAF_ISA(InterfaceRequirementEntry);
+};
+
 struct IRInterfaceType : IRType
 {
     IR_LEAF_ISA(InterfaceType)

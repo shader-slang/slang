@@ -2508,14 +2508,16 @@ namespace Slang
     IRInst* IRBuilder::emitLookupInterfaceMethodInst(
         IRType* type,
         IRInst* witnessTableVal,
-        IRInst* interfaceMethodVal)
+        IRInst* interfaceMethodVal,
+        IRType* interfaceType)
     {
+        IRInst* args[3] = { witnessTableVal , interfaceMethodVal, interfaceType };
         auto inst = createInst<IRLookupWitnessMethod>(
             this,
             kIROp_lookup_interface_method,
             type,
-            witnessTableVal,
-            interfaceMethodVal);
+            3,
+            args);
 
         addInst(inst);
         return inst;
@@ -2811,6 +2813,20 @@ namespace Slang
         return entry;
     }
 
+    IRInterfaceRequirementEntry* IRBuilder::createInterfaceRequirementEntry(
+        IRInst* requirementKey,
+        IRInst* requirementVal)
+    {
+        IRInterfaceRequirementEntry* entry = createInst<IRInterfaceRequirementEntry>(
+            this,
+            kIROp_InterfaceRequirementEntry,
+            nullptr,
+            requirementKey,
+            requirementVal);
+        addGlobalValue(this, entry);
+        return entry;
+    }
+
     IRStructType* IRBuilder::createStructType()
     {
         IRStructType* structType = createInst<IRStructType>(
@@ -2819,6 +2835,16 @@ namespace Slang
             nullptr);
         addGlobalValue(this, structType);
         return structType;
+    }
+
+    IRAssociatedType* IRBuilder::createAssociatedType()
+    {
+        IRAssociatedType* associatedType = createInst<IRAssociatedType>(
+            this,
+            kIROp_AssociatedType,
+            nullptr);
+        addGlobalValue(this, associatedType);
+        return associatedType;
     }
 
     IRInterfaceType* IRBuilder::createInterfaceType(UInt operandCount, IRInst* const* operands)

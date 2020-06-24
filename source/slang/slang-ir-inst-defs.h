@@ -164,7 +164,8 @@ INST(Nop, nop, 0, 0)
 // `field` instructions.
 //
 INST(StructType, struct, 0, PARENT)
-INST(InterfaceType, interface, 0, PARENT)
+INST(InterfaceType, interface, 0, 0)
+INST(AssociatedType, associated_type, 0, 0)
 
 // A TypeType-typed IRValue represents a IRType.
 // It is used to represent a type parameter/argument in a generics.
@@ -223,6 +224,7 @@ INST(Call, call, 1, 0)
 
 
 INST(WitnessTableEntry, witness_table_entry, 2, 0)
+INST(InterfaceRequirementEntry, interface_req_entry, 2, 0)
 
 INST(Param, param, 0, 0)
 INST(StructField, field, 2, 0)
@@ -507,14 +509,12 @@ INST(HighLevelDeclDecoration,               highLevelDecl,          1, 0)
 
     INST(BindExistentialSlotsDecoration, bindExistentialSlots, 0, 0)
 
-        /// A `[polymorphic]` decoration marks a function parameter that should translate to an abstract type
-        /// e.g. (void*) that are casted to actual type before use. For example, a parameter of generic type
-        /// is marked `[polymorphic]`, so that the code gen logic can emit it as a `void*` parameter,
-        /// allowing the function to be used at sites that are agnostic of the actual object type.
-    INST(PolymorphicDecoration, polymorphic, 0, 0)
 
         /// A `[this_ptr]` decoration marks a function parameter that serves as `this` pointer.
-    INST(ThisPointerDecoration, this_ptr, 0, 0)
+        /// `[this_ptr]` decoration is also used to mark an `IRFunc` as a non-static function.
+        /// The argument is an integer value that represents the index of the `this` parameter,
+        /// which is always 0.
+    INST(ThisPointerDecoration, this_ptr, 1, 0)
 
 
         /// A `[format(f)]` decoration specifies that the format of an image should be `f`

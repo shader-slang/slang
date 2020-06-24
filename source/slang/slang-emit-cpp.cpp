@@ -390,12 +390,27 @@ static UnownedStringSlice _getResourceTypePrefix(IROp op)
     }
 }
 
+static bool isVoidPtrType(IRType* type)
+{
+    auto ptrType = as<IRPtrType>(type);
+    if (!ptrType) return false;
+    return ptrType->getValueType()->op == kIROp_VoidType;
+}
+
 SlangResult CPPSourceEmitter::calcTypeName(IRType* type, CodeGenTarget target, StringBuilder& out)
 {
     switch (type->op)
     {
         case kIROp_PtrType:
         {
+            if (isVoidPtrType(type))
+            {
+                // A `void*` type will always emit as `void*`.
+                // `void*` types are generated as a result of generics lowering
+                // for dynamic dispatch.
+                out << "void*";
+                return SLANG_OK;
+            }
             auto ptrType = static_cast<IRPtrType*>(type);
             SLANG_RETURN_ON_FAIL(calcTypeName(ptrType->getValueType(), target, out));
             // TODO(JS): It seems although it says it is a pointer, it can actually be output as a reference
@@ -494,7 +509,7 @@ SlangResult CPPSourceEmitter::calcTypeName(IRType* type, CodeGenTarget target, S
             // struct of function pointers corresponding to the interface type.
             auto witnessTableType = static_cast<IRWitnessTableType*>(type);
             auto baseType = cast<IRType>(witnessTableType->getOperand(0));
-            emitType(baseType);
+            SLANG_RETURN_ON_FAIL(calcTypeName(baseType, target, out));
             out << "*";
             return SLANG_OK;
         }
@@ -1591,8 +1606,7 @@ void CPPSourceEmitter::emitWitnessTable(IRWitnessTable* witnessTable)
 {
     auto interfaceType = cast<IRInterfaceType>(witnessTable->getOperand(0));
     auto witnessTableItems = witnessTable->getChildren();
-    List<IRWitnessTableEntry*> sortedWitnessTableEntries = getSortedWitnessTableEntries(witnessTable);
-    _maybeEmitWitnessTableTypeDefinition(interfaceType, sortedWitnessTableEntries);
+    _maybeEmitWitnessTableTypeDefinition(interfaceType);
 
     // Define a global variable for the witness table.
     m_writer->emit("extern ");
@@ -1747,17 +1761,16 @@ void CPPSourceEmitter::emitInterface(IRInterfaceType* interfaceType)
     /// acoording to the order defined by `interfaceType`.
     ///
 void CPPSourceEmitter::_maybeEmitWitnessTableTypeDefinition(
-    IRInterfaceType* interfaceType,
-    const List<IRWitnessTableEntry*>& sortedWitnessTableEntries)
+    IRInterfaceType* interfaceType)
 {
     m_writer->emit("struct ");
     emitSimpleType(interfaceType);
     m_writer->emit("\n{\n");
     m_writer->indent();
-    for (Index i = 0; i < sortedWitnessTableEntries.getCount(); i++)
+    for (UInt i = 0; i < interfaceType->getOperandCount(); i++)
     {
-        auto entry = sortedWitnessTableEntries[i];
-        if (auto funcVal = as<IRFunc>(entry->satisfyingVal.get()))
+        auto entry = as<IRInterfaceRequirementEntry>(interfaceType->getOperand(i));
+        if (auto funcVal = as<IRFuncType>(entry->getRequirementVal()))
         {
             emitType(funcVal->getResultType());
             m_writer->emit(" (KernelContext::*");
@@ -1765,32 +1778,34 @@ void CPPSourceEmitter::_maybeEmitWitnessTableTypeDefinition(
             m_writer->emit(")");
             m_writer->emit("(");
             bool isFirstParam = true;
-            for (auto param : funcVal->getParams())
+            for (UInt p = 0; p < funcVal->getParamCount(); p++)
             {
+                auto paramType = funcVal->getParamType(p);
+                // Ingore TypeType-typed parameters for now.
+                if (as<IRTypeType>(paramType))
+                    continue;
+
                 if (!isFirstParam)
                     m_writer->emit(", ");
                 else
                     isFirstParam = false;
-                if (param->findDecoration<IRThisPointerDecoration>())
+                auto thisDecor = funcVal->findDecoration<IRThisPointerDecoration>();
+                if (thisDecor && cast<IRIntLit>(thisDecor->getOperand(0))->value.intVal == (IRIntegerValue)p)
                 {
-                    m_writer->emit("void* ");
-                    m_writer->emit(getName(param));
+                    m_writer->emit("void* param");
+                    m_writer->emit(p);
                     continue;
                 }
-                emitSimpleFuncParamImpl(param);
+                emitParamType(paramType, String("param") + String(p));
             }
             m_writer->emit(");\n");
         }
-        else if (auto witnessTableVal = as<IRWitnessTable>(entry->getSatisfyingVal()))
+        else if (auto constraintInterfaceType = as<IRInterfaceType>(entry->getRequirementVal()))
         {
-            emitType(as<IRType>(witnessTableVal->getOperand(0)));
+            emitType(constraintInterfaceType);
             m_writer->emit("* ");
             m_writer->emit(getName(entry->requirementKey.get()));
             m_writer->emit(";\n");
-        }
-        else
-        {
-            // TODO: handle other witness table entry types.
         }
     }
     m_writer->dedent();
@@ -1990,13 +2005,6 @@ void CPPSourceEmitter::emitSimpleValueImpl(IRInst* inst)
     }
 }
 
-static bool isVoidPtrType(IRType* type)
-{
-    auto ptrType = as<IRPtrType>(type);
-    if (!ptrType) return false;
-    return ptrType->getValueType()->op == kIROp_VoidType;
-}
-
 void CPPSourceEmitter::emitSimpleFuncParamImpl(IRParam* param)
 {
     // Polymorphic types are already translated to void* type in
@@ -2004,9 +2012,7 @@ void CPPSourceEmitter::emitSimpleFuncParamImpl(IRParam* param)
     // emit "void&" instead of "void*" for pointer types.
     // In the future, we will handle pointer types more properly,
     // and this override logic will not be necessary.
-    // For now we special-case this scenario.
-    if (param->findDecoration<IRPolymorphicDecoration>() &&
-        isVoidPtrType(param->getDataType()))
+    if (isVoidPtrType(param->getDataType()))
     {
         m_writer->emit("void* ");
         m_writer->emit(getName(param));
