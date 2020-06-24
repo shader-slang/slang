@@ -1076,7 +1076,7 @@ void FrontEndCompileRequest::parseTranslationUnit(
             }
         }
 
-#if 1
+#if 0
         // Test serialization
         {
             RefPtr<ASTSerialClasses> classes = new ASTSerialClasses;
