@@ -458,7 +458,7 @@ struct IRInst
 
     void setOperand(UInt index, IRInst* value)
     {
-        getOperands()[index].set(value);
+        getOperands()[index].init(this, value);
     }
 
 

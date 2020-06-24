@@ -3633,7 +3633,7 @@ void CLikeSourceEmitter::ensureInstOperandsRec(ComputeEmitActionsContext* ctx, I
         // only need the type they point to to be forward-declared.
         // Similarly, a `call` instruction only needs the callee
         // to be forward-declared, etc.
-       
+
         ensureInstOperand(ctx, inst->getOperand(ii), requiredLevel);
     }
 
