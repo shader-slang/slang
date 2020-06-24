@@ -3,6 +3,9 @@
 
 #include "slang-name.h"
 
+#include "../core/slang-memory-arena.h"
+#include "../core/slang-dictionary.h"
+
 #include <assert.h>
 
 #ifdef _WIN32
@@ -268,34 +271,136 @@ void DiagnosticSink::diagnoseRaw(
 
 namespace Diagnostics
 {
-#define DIAGNOSTIC(id, severity, name, messageFormat) const DiagnosticInfo name = { id, Severity::severity, messageFormat };
+#define DIAGNOSTIC(id, severity, name, messageFormat) const DiagnosticInfo name = { id, Severity::severity, #name, messageFormat };
 #include "slang-diagnostic-defs.h"
+#undef DIAGNOSTIC
 }
 
-DiagnosticInfo const* findDiagnosticByName(UnownedStringSlice const& name)
+static const DiagnosticInfo* const kAllDiagnostics[] =
+{
+#define DIAGNOSTIC(id, severity, name, messageFormat) &Diagnostics::name, 
+#include "slang-diagnostic-defs.h"
+#undef DIAGNOSTIC
+};
+
+class DiagnosticsLookup : public RefObject
+{
+public:
+    const DiagnosticInfo* findDiagostic(const UnownedStringSlice& slice) const
+    {
+        const Index* indexPtr = m_map.TryGetValue(slice);
+        return indexPtr ? kAllDiagnostics[*indexPtr] : nullptr;
+    }
+    Index _findDiagnosticIndex(const UnownedStringSlice& slice) const
+    {
+        const Index* indexPtr = m_map.TryGetValue(slice);
+        return indexPtr ? *indexPtr : 0;
+    }
+    static DiagnosticsLookup* getSingleton()
+    {
+        static RefPtr<DiagnosticsLookup> singleton = new DiagnosticsLookup;
+        return singleton;
+    }
+
+    typedef uint8_t CharFlags;
+    struct CharFlag 
+    {
+        enum Enum : CharFlags
+        {
+            Upper = 0x1,
+            Lower = 0x2,
+        };
+    };
+
+    static CharFlags _classifyChar(char c)
+    {
+        CharFlags flags = 0;
+        flags |= (c >= 'a' && c <= 'z') ? CharFlag::Lower : 0;
+        flags |= (c >= 'A' && c <= 'Z') ? CharFlag::Upper : 0;
+        return flags;
+    }
+protected:
+    void _add(const char* name, Index index)
+    {
+        m_map.Add(UnownedStringSlice(name), index);
+
+        // Add a dashed version        
+        {
+            m_work.Clear();
+
+            CharFlags prevFlags = 0;
+            for (const char* cur = name; *cur; cur++)
+            {
+                char c = *cur;
+                const CharFlags flags = _classifyChar(c);
+
+                if (flags & CharFlag::Upper)
+                {
+                    if (prevFlags & CharFlag::Lower)
+                    {
+                        // If we go from lower to upper, insert a dash. aA -> a-a
+                        m_work << '-';
+                    }
+                    else if (prevFlags & CharFlag::Upper)
+                    {
+                        // Could be an acronym, if the next character is lower, we need to insert a - here
+                        if (_classifyChar(cur[1]) & CharFlag::Lower)
+                        {
+                            m_work << '-';
+                        }
+                    }
+                    // Make it lower
+                    c = c - 'A' + 'a';
+                }
+                m_work << c;
+
+                prevFlags = flags;
+            }
+
+            UnownedStringSlice dashSlice(m_arena.allocateString(m_work.getBuffer(), m_work.getLength()), m_work.getLength());
+            m_map.AddIfNotExists(dashSlice, index);
+        }
+    }
+    void _addAlias(const char* name, const char* diagnosticName)
+    {
+        const Index index = _findDiagnosticIndex(UnownedStringSlice(diagnosticName));
+        SLANG_ASSERT(index >= 0);
+        if (index >= 0)
+        {
+            _add(name, index);
+        }
+    }
+    DiagnosticsLookup();
+
+    StringBuilder m_work;
+    Dictionary<UnownedStringSlice, Index> m_map;
+    MemoryArena m_arena;
+};
+
+DiagnosticsLookup::DiagnosticsLookup():
+    m_arena(2048)
 {
     // TODO: We should eventually have a more formal system for associating individual
     // diagnostics, or groups of diagnostics, with user-exposed names for use when
     // enabling/disabling warnings (or turning warnings into errors, etc.).
     //
-    // For now we build an ad hoc mapping from string names to corresponding single
-    // diagnostics (not groups).
-    //
-    static const struct
+    // For now we build a map from diagnostic name to it's entry. Two entries are typically
+    // added - the 'original name' as associated with the diagnostic in lowerCamel, and
+    // a dashified version.
+    
+    for (Index i = 0; i < SLANG_COUNT_OF(kAllDiagnostics); ++i)
     {
-        char const*             name;
-        DiagnosticInfo const*   diagnostic;
-    } kDiagnostics[] =
-    {
-        { "overlapping-bindings", &Diagnostics::parameterBindingsOverlap },
-    };
-
-    for( auto& entry : kDiagnostics )
-    {
-        if( name == entry.name )
-            return entry.diagnostic;
+        const DiagnosticInfo* diagnostic = kAllDiagnostics[i];
+        _add(diagnostic->name, i);
     }
-    return nullptr;
+
+    // Add any aliases
+    _addAlias("overlappingBindings", "parameterBindingsOverlap");
+}
+
+DiagnosticInfo const* findDiagnosticByName(UnownedStringSlice const& name)
+{
+    return DiagnosticsLookup::getSingleton()->findDiagostic(name);
 }
 
 

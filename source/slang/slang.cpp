@@ -15,6 +15,7 @@
 #include "slang-type-layout.h"
 
 #include "slang-ast-dump.h"
+#include "slang-ast-serialize.h"
 
 #include "slang-repro.h"
 
@@ -1074,6 +1075,18 @@ void FrontEndCompileRequest::parseTranslationUnit(
                 File::writeAllText(fileName, writer.getContent());
             }
         }
+
+#if 0
+        // Test serialization
+        {
+            RefPtr<ASTSerialClasses> classes = new ASTSerialClasses;
+            ASTSerialWriter writer(classes);
+
+            // Lets serialize it all
+            writer.addPointer(translationUnit->getModuleDecl());
+        }
+#endif
+
     }
 }
 
