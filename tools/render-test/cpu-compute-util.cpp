@@ -12,6 +12,8 @@
 #define SLANG_PRELUDE_NAMESPACE CPPPrelude
 #include "../../prelude/slang-cpp-types.h"
 
+struct UniformState;
+
 namespace renderer_test {
 using namespace Slang;
 

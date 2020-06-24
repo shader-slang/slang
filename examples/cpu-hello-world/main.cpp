@@ -40,6 +40,8 @@ using namespace Slang;
 #define SLANG_PRELUDE_NAMESPACE CPPPrelude
 #include "../../prelude/slang-cpp-types.h"
 
+struct UniformState;
+
 static SlangResult _innerMain(int argc, char** argv)
 {
     // First, we need to create a "session" for interacting with the Slang
