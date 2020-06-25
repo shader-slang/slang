@@ -1673,11 +1673,11 @@ SlangResult dissassembleDXILUsingDXC(
     }
 
     SlangResult emitSPIRVForEntryPoints(
-        BackEndCompileRequest*  slangRequest,
-        List<EntryPointAndIndex>entryPoints,
-        TargetRequest*          targetReq,
-        EndToEndCompileRequest* endToEndReq,
-        List<uint8_t>&          spirvOut)
+        BackEndCompileRequest*          slangRequest,
+        List<EntryPointAndIndex> const& entryPoints,
+        TargetRequest*                  targetReq,
+        EndToEndCompileRequest*         endToEndReq,
+        List<uint8_t>&                  spirvOut)
     {
         if( slangRequest->shouldEmitSPIRVDirectly )
         {
@@ -1699,11 +1699,11 @@ SlangResult dissassembleDXILUsingDXC(
     }
 
     SlangResult emitSPIRVAssemblyForEntryPoints(
-        BackEndCompileRequest*  slangRequest,
-        List<EntryPointAndIndex>entryPoints,
-        TargetRequest*          targetReq,
-        EndToEndCompileRequest* endToEndReq,
-        String&                 assemblyOut)
+        BackEndCompileRequest*          slangRequest,
+        List<EntryPointAndIndex> const& entryPoints,
+        TargetRequest*                  targetReq,
+        EndToEndCompileRequest*         endToEndReq,
+        String&                         assemblyOut)
     {
         List<uint8_t> spirv;
         SLANG_RETURN_ON_FAIL(emitSPIRVForEntryPoints(
@@ -1723,7 +1723,7 @@ SlangResult dissassembleDXILUsingDXC(
     // Do emit logic for a zero or more entry points
     CompileResult emitEntryPoints(
         BackEndCompileRequest*          compileRequest,
-        List<EntryPointAndIndex>        entryPoints,
+        List<EntryPointAndIndex> const& entryPoints,
         TargetRequest*                  targetReq,
         EndToEndCompileRequest*         endToEndReq)
     {
