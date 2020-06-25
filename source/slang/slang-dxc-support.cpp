@@ -84,7 +84,7 @@ namespace Slang
         SourceResult source;
         List<Int> entryPointIndices;
         entryPointIndices.add(entryPointIndex);
-        SLANG_RETURN_ON_FAIL(emitEntryPointsSource(compileRequest, entryPointIndex,
+        SLANG_RETURN_ON_FAIL(emitEntryPointsSource(compileRequest, entryPointIndices,
             targetReq, CodeGenTarget::HLSL, endToEndReq, source));
 
         const auto& hlslCode = source.source;
