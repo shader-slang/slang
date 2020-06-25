@@ -797,7 +797,15 @@ struct ASTSerialTypeInfo<Token>
 
         ASTSerialTypeInfo<TokenType>::toSerial(writer, &src.type, &dst.type);
         ASTSerialTypeInfo<SourceLoc>::toSerial(writer, &src.loc, &dst.loc);
-        dst.name = writer->addName(src.getName());
+
+        if (src.flags & TokenFlag::Name)
+        {
+            dst.name = writer->addName(src.getName());
+        }
+        else
+        {
+            dst.name = writer->addString(src.getContent());
+        }
     }
     static void toNative(ASTSerialReader* reader, const void* serial, void* native)
     {
@@ -810,6 +818,7 @@ struct ASTSerialTypeInfo<Token>
         ASTSerialTypeInfo<TokenType>::toNative(reader, &src.type, &dst.type);
         ASTSerialTypeInfo<SourceLoc>::toNative(reader, &src.loc, &dst.loc);
 
+        // At the other end all token content will appear as Names.
         if (src.name != ASTSerialIndex(0))
         {
             dst.charsNameUnion.name = reader->getName(src.name);
