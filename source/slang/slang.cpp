@@ -1080,10 +1080,18 @@ void FrontEndCompileRequest::parseTranslationUnit(
         // Test serialization
         {
             RefPtr<ASTSerialClasses> classes = new ASTSerialClasses;
-            ASTSerialWriter writer(classes);
 
-            // Lets serialize it all
-            writer.addPointer(translationUnit->getModuleDecl());
+            OwnedMemoryStream stream(FileAccess::ReadWrite);
+
+            {
+                ASTSerialWriter writer(classes);
+
+                // Lets serialize it all
+                writer.addPointer(translationUnit->getModuleDecl());
+                // Let's stick it all in a stream
+                writer.write(&stream);
+            }
+
         }
 #endif
 

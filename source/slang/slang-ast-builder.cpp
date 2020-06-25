@@ -167,6 +167,20 @@ ASTBuilder::~ASTBuilder()
     }
 }
 
+NodeBase* ASTBuilder::createByNodeType(ASTNodeType nodeType)
+{
+    const ReflectClassInfo* info = ReflectClassInfo::getInfo(nodeType);
+    
+    auto createFunc = info->m_createFunc;
+    SLANG_ASSERT(createFunc);
+    if (!createFunc)
+    {
+        return nullptr;
+    }
+
+    return (NodeBase*)createFunc(this);
+}
+
 PtrType* ASTBuilder::getPtrType(Type* valueType)
 {
     return dynamicCast<PtrType>(getPtrType(valueType, "PtrType"));
