@@ -181,6 +181,11 @@ public:
     UnownedStringSlice getStringSlice(ASTSerialIndex index);
     SourceLoc getSourceLoc(ASTSerialSourceLoc loc);
 
+
+        /// Load the entries table (without deserializing anything)
+        /// NOTE! data must stay ins scope for outEntries to be valid
+    SlangResult loadEntries(const uint8_t* data, size_t dataCount, List<const ASTSerialInfo::Entry*>& outEntries);
+
         /// NOTE! data must stay ins scope when reading takes place
     SlangResult load(const uint8_t* data, size_t dataCount, ASTBuilder* builder, NamePool* namePool);
 
@@ -250,6 +255,9 @@ public:
     ASTSerialIndex addString(const String& in);
     ASTSerialIndex addName(const Name* name);
     ASTSerialSourceLoc addSourceLoc(SourceLoc sourceLoc);
+
+        /// Get the entries table holding how each index maps to an entry
+    const List<ASTSerialInfo::Entry*>& getEntries() const { return m_entries; }
 
         /// Write to a stream
     SlangResult write(Stream* stream);

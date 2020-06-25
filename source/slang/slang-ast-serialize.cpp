@@ -968,25 +968,27 @@ ASTSerialClasses::ASTSerialClasses():
         }
 
         // Okay, go through fields setting their offset
-        ASTSerialField* field = serialClass.fields;
+        ASTSerialField* fields = serialClass.fields;
         for (Index j = 0; j < serialClass.fieldsCount; j++)
         {
-            size_t alignment = field->type->serialAlignment;
+            ASTSerialField& field = fields[j];
+
+            size_t alignment = field.type->serialAlignment;
             // Make sure the offset is aligned for the field requirement
             offset = (offset + alignment - 1) & ~(alignment - 1);
 
             // Save the field offset
-            field->serialOffset = uint32_t(offset);
+            field.serialOffset = uint32_t(offset);
 
             // Move past the field
-            offset += field->type->serialSizeInBytes;
+            offset += field.type->serialSizeInBytes;
 
             // Calc the maximum alignment
             maxAlignment = (alignment > maxAlignment) ? alignment : maxAlignment;
         }
 
         // Align with maximum alignment
-        offset += (offset + maxAlignment - 1) & ~(maxAlignment - 1);
+        offset = (offset + maxAlignment - 1) & ~(maxAlignment - 1);
 
         serialClass.alignment = uint8_t(maxAlignment);
         serialClass.size = uint32_t(offset);
@@ -1522,13 +1524,13 @@ SourceLoc ASTSerialReader::getSourceLoc(ASTSerialSourceLoc loc)
     return SourceLoc();
 }
 
-SlangResult ASTSerialReader::load(const uint8_t* data, size_t dataCount, ASTBuilder* builder, NamePool* namePool)
+SlangResult ASTSerialReader::loadEntries(const uint8_t* data, size_t dataCount, List<const ASTSerialInfo::Entry*>& outEntries)
 {
-    m_namePool = namePool;
-
+    // Check the input data is at least aligned to the max alignment (otherwise everything cannot be aligned correctly)
     SLANG_ASSERT((size_t(data) & (ASTSerialInfo::MAX_ALIGNMENT - 1)) == 0);
-    m_entries.setCount(1);
-    m_entries[0] = nullptr;
+
+    outEntries.setCount(1);
+    outEntries[0] = nullptr;
 
     const uint8_t*const end = data + dataCount;
 
@@ -1536,17 +1538,26 @@ SlangResult ASTSerialReader::load(const uint8_t* data, size_t dataCount, ASTBuil
     while (cur < end)
     {
         const Entry* entry = (const Entry*)cur;
-        m_entries.add(entry);
+        outEntries.add(entry);
 
         const size_t entrySize = entry->calcSize(m_classes);
         cur += entrySize;
 
         // Need to get the next alignment
-        size_t nextAlignment = ASTSerialInfo::getNextAlignment(entry->info);
+        const size_t nextAlignment = ASTSerialInfo::getNextAlignment(entry->info);
 
         // Need to fix cur with the alignment
         cur = (const uint8_t*)((size_t(cur) + nextAlignment - 1) & ~(nextAlignment - 1));
     }
+
+    return SLANG_OK;
+}
+
+SlangResult ASTSerialReader::load(const uint8_t* data, size_t dataCount, ASTBuilder* builder, NamePool* namePool)
+{
+    SLANG_RETURN_ON_FAIL(loadEntries(data, dataCount, m_entries));
+
+    m_namePool = namePool;
 
     m_objects.clearAndDeallocate();
     m_objects.setCount(m_entries.getCount());
