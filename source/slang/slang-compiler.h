@@ -1958,6 +1958,7 @@ namespace Slang
     @return the appropriate source filename */
     // TODO(DG): Note to reviewer; this was changed from UInt to List<Int> -- let me know if that's a problem
     //   and I can work out the appropriate casts
+    String calcSourcePathForEntryPoint(EndToEndCompileRequest* endToEndReq, Int entryPointIndex);
     String calcSourcePathForEntryPoints(EndToEndCompileRequest* endToEndReq, List<Int> entryPointIndices);
 
     struct SourceResult
