@@ -41,6 +41,6 @@ namespace Slang
         List<Int>               entryPointIndices,
         CodeGenTarget           target,
         TargetRequest*          targetRequest,
-        SourceResult&           outSource);
+        SourceResult&       outSource);
 }
 #endif

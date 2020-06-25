@@ -645,7 +645,6 @@ SlangResult emitEntryPointSourceFromIR(
     desc.compileRequest = compileRequest;
     desc.target = target;
     // TODO(DG): Can't assume a single entry point stage for multiple entry points
-    // CHECK: doesn't this just go into a loop over entryPoints?
     desc.entryPointStage = entryPoint->getStage();
     desc.effectiveProfile = getEffectiveProfile(entryPoint, targetRequest);
     desc.sourceWriter = &sourceWriter;
