@@ -387,8 +387,8 @@ struct ASTSerialTypeInfo<SyntaxClass<T>>
     static void toNative(ASTSerialReader* reader, const void* serial, void* native)
     {
         SLANG_UNUSED(reader);
-        auto& src = *(const SerialType*)native;
-        auto& dst = *(NativeType*)serial;
+        auto& src = *(const SerialType*)serial;
+        auto& dst = *(NativeType*)native;
         dst.classInfo = ReflectClassInfo::getInfo(ASTNodeType(src));
     }
 };
@@ -428,17 +428,17 @@ struct ASTSerialTypeInfo<QualType>
     };
     enum { SerialAlignment = SLANG_ALIGN_OF(ASTSerialIndex) };
 
-    static void toSerial(ASTSerialWriter* writer, const void* inNative, void* outSerial)
+    static void toSerial(ASTSerialWriter* writer, const void* native, void* serial)
     {
-        auto dst = (SerialType*)outSerial;
-        auto src = (const NativeType*)inNative;
+        auto dst = (SerialType*)serial;
+        auto src = (const NativeType*)native;
         dst->isLeftValue = src->isLeftValue ? 1 : 0;
         dst->type = writer->addPointer(src->type);
     }
-    static void toNative(ASTSerialReader* reader, const void* inSerial, void* outNative)
+    static void toNative(ASTSerialReader* reader, const void* serial, void* native)
     {
-        auto src = (const SerialType*)inSerial;
-        auto dst = (NativeType*)outNative;
+        auto src = (const SerialType*)serial;
+        auto dst = (NativeType*)native;
         dst->type = reader->getPointer(src->type).dynamicCast<Type>();
         dst->isLeftValue = src->isLeftValue != 0;
     }
