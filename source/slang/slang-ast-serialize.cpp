@@ -220,6 +220,24 @@ struct ASTSerialTypeInfo<T*>
     }
 };
 
+// Special case Name
+template <>
+struct ASTSerialTypeInfo<Name*> : public ASTSerialTypeInfo<RefObject*>
+{
+    // Special case 
+    typedef Name* NativeType;
+    static void toNative(ASTSerialReader* reader, const void* inSerial, void* outNative)
+    {
+        *(Name**)outNative = reader->getName(*(const SerialType*)inSerial);
+    }
+};
+
+template <>
+struct ASTSerialTypeInfo<const Name*> : public ASTSerialTypeInfo<Name*>
+{
+};
+
+
 struct ASTSerialDeclRefBaseTypeInfo
 {
     typedef DeclRefBase NativeType;
