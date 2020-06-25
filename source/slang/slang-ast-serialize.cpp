@@ -651,7 +651,7 @@ struct ASTSerialTypeInfo<TypeExp>
         auto& dst = *(NativeType*)native;
 
         dst.type = reader->getPointer(src.type).dynamicCast<Type>();
-        dst.exp = reader->getPointer(src.type).dynamicCast<Expr>();
+        dst.exp = reader->getPointer(src.expr).dynamicCast<Expr>();
     }
 };
 
