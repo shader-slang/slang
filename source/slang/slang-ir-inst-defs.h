@@ -173,7 +173,7 @@ INST(AssociatedType, associated_type, 0, 0)
 INST(TypeType, type_t, 0, 0)
 
 // An `IRWitnessTable` has type `WitnessTableType`.
-INST(WitnessTableType, witness_table_t, 0, 0)
+INST(WitnessTableType, witness_table_t, 1, 0)
 
 INST_RANGE(Type, VoidType, WitnessTableType)
 

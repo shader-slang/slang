@@ -1049,7 +1049,7 @@ struct ValLoweringVisitor : ValVisitor<ValLoweringVisitor, LoweredValInfo, Lower
     {
         return emitDeclRef(context, val->declRef,
             context->irBuilder->getWitnessTableType(
-                lowerType(context, DeclRefType::create(context->astBuilder, val->declRef))));
+                lowerType(context, val->sup)));
     }
 
     LoweredValInfo visitTransitiveSubtypeWitness(
@@ -1071,10 +1071,9 @@ struct ValLoweringVisitor : ValVisitor<ValLoweringVisitor, LoweredValInfo, Lower
         // to reflect the right constraints.
 
         return LoweredValInfo::simple(getBuilder()->emitLookupInterfaceMethodInst(
-            nullptr,
+            getBuilder()->getWitnessTableType(lowerType(context, val->sup)),
             baseWitnessTable,
-            requirementKey,
-            lowerType(context, val->subToMid->sup)));
+            requirementKey));
     }
 
     LoweredValInfo visitTaggedUnionSubtypeWitness(
@@ -1255,8 +1254,7 @@ struct ValLoweringVisitor : ValVisitor<ValLoweringVisitor, LoweredValInfo, Lower
                     auto caseFunc = subBuilder->emitLookupInterfaceMethodInst(
                         caseFuncType,
                         caseWitnessTable,
-                        irReqKey,
-                        irWitnessTableBaseType);
+                        irReqKey);
 
                     // We are going to emit a `call` to the satisfying value
                     // for the case type, so we will collect the arguments for that call.
@@ -5311,7 +5309,7 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
                     auto constraintKey = getInterfaceRequirementKey(constraintDecl);
                     requirementEntries.add(
                         subBuilder->createInterfaceRequirementEntry(constraintKey,
-                            lowerType(context, constraintDecl->getSup().type)));
+                            getBuilder()->getWitnessTableType(lowerType(context, constraintDecl->getSup().type))));
                 }
             }
         }
@@ -6578,9 +6576,9 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
         for (UInt i = 0; i < irInterfaceType->getOperandCount(); i++)
         {
             auto operand = cast<IRInterfaceRequirementEntry>(irInterfaceType->getOperand(i));
-            if (operand->getOperand(0) == key)
+            if (operand->getRequirementKey() == key)
             {
-                operand->setOperand(1, irFuncType);
+                operand->setRequirementVal(irFuncType);
                 return;
             }
         }
@@ -6874,8 +6872,7 @@ LoweredValInfo emitDeclRef(
         auto irSatisfyingVal = context->irBuilder->emitLookupInterfaceMethodInst(
             type,
             irWitnessTable,
-            irRequirementKey,
-            lowerType(context, thisTypeSubst->witness->sup));
+            irRequirementKey);
         return LoweredValInfo::simple(irSatisfyingVal);
     }
     else

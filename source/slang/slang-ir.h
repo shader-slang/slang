@@ -1226,6 +1226,10 @@ struct IRTypeType : IRType
 
 struct IRWitnessTableType : IRType
 {
+    IRInst* getConformanceType()
+    {
+        return getOperand(0);
+    }
     IR_LEAF_ISA(WitnessTableType);
 };
 

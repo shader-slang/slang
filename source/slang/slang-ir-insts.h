@@ -408,11 +408,9 @@ struct IRLookupWitnessMethod : IRInst
 {
     IRUse witnessTable;
     IRUse requirementKey;
-    IRUse interfaceType;
 
     IRInst* getWitnessTable() { return witnessTable.get(); }
     IRInst* getRequirementKey() { return requirementKey.get(); }
-    IRInst* getInterfaceType() { return interfaceType.get(); }
 
     IR_LEAF_ISA(lookup_interface_method)
 };
@@ -1680,8 +1678,7 @@ struct IRBuilder
     IRInst* emitLookupInterfaceMethodInst(
         IRType* type,
         IRInst* witnessTableVal,
-        IRInst* interfaceMethodVal,
-        IRType* interfaceType);
+        IRInst* interfaceMethodVal);
 
     IRInst* emitCallInst(
         IRType*         type,
@@ -1806,7 +1803,7 @@ struct IRBuilder
         IRType* valueType);
     IRGlobalParam* createGlobalParam(
         IRType* valueType);
-
+    
     /// Creates an IRWitnessTable value.
     /// @param baseType: The comformant-to type of this witness.
     IRWitnessTable* createWitnessTable(IRType* baseType);

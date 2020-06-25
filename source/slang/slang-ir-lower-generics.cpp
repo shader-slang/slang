@@ -224,7 +224,8 @@ namespace Slang
                         // The callee is a result of witness table lookup, we will only
                         // translate the call.
                         IRInst* callee = nullptr;
-                        auto interfaceType = maybeLowerInterfaceType(cast<IRInterfaceType>(interfaceLookup->getInterfaceType()));
+                        auto witnessTableType = cast<IRWitnessTableType>(interfaceLookup->getWitnessTable()->getFullType());
+                        auto interfaceType = maybeLowerInterfaceType(cast<IRInterfaceType>(witnessTableType->getConformanceType()));
                         for (UInt i = 0; i < interfaceType->getOperandCount(); i++)
                         {
                             auto entry = cast<IRInterfaceRequirementEntry>(interfaceType->getOperand(i));

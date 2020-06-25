@@ -1790,9 +1790,9 @@ void CPPSourceEmitter::_maybeEmitWitnessTableTypeDefinition(
             }
             m_writer->emit(");\n");
         }
-        else if (auto constraintInterfaceType = as<IRInterfaceType>(entry->getRequirementVal()))
+        else if (auto witnessTableType = as<IRWitnessTableType>(entry->getRequirementVal()))
         {
-            emitType(constraintInterfaceType);
+            emitType((IRType*)witnessTableType->getConformanceType());
             m_writer->emit("* ");
             m_writer->emit(getName(entry->getRequirementKey()));
             m_writer->emit(";\n");

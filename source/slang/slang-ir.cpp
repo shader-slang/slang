@@ -1408,10 +1408,7 @@ namespace Slang
 
         inst->op = op;
 
-        if (type)
-        {
-            inst->typeUse.init(inst, type);
-        }
+        inst->typeUse.init(inst, type);
 
         maybeSetSourceLoc(builder, inst);
 
@@ -1422,6 +1419,10 @@ namespace Slang
             if (fixedArgs)
             {
                 operand->init(inst, fixedArgs[aa]);
+            }
+            else
+            {
+                operand->init(inst, nullptr);
             }
             operand++;
         }
@@ -2518,16 +2519,14 @@ namespace Slang
     IRInst* IRBuilder::emitLookupInterfaceMethodInst(
         IRType* type,
         IRInst* witnessTableVal,
-        IRInst* interfaceMethodVal,
-        IRType* interfaceType)
+        IRInst* interfaceMethodVal)
     {
-        IRInst* args[3] = { witnessTableVal , interfaceMethodVal, interfaceType };
         auto inst = createInst<IRLookupWitnessMethod>(
             this,
             kIROp_lookup_interface_method,
             type,
-            3,
-            args);
+            witnessTableVal,
+            interfaceMethodVal);
 
         addInst(inst);
         return inst;
