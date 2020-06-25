@@ -380,6 +380,9 @@ struct IRGenContext
     // might be insufficient.
     LoweredValInfo thisVal;
 
+    // The IRType value to lower into for `ThisType`.
+    IRInst* thisType = nullptr;
+
     explicit IRGenContext(SharedIRGenContext* inShared, ASTBuilder* inAstBuilder)
         : shared(inShared)
         , astBuilder(inAstBuilder)
@@ -1582,6 +1585,8 @@ struct ValLoweringVisitor : ValVisitor<ValLoweringVisitor, LoweredValInfo, Lower
         //
         // For now we punt and emit the `ThisType` of an interface `IFoo` as `IFoo`.
         //
+        if (context->thisType != nullptr)
+            return LoweredValInfo::simple(context->thisType);
         return emitDeclRef(context, type->interfaceDeclRef, getBuilder()->getTypeKind());
     }
 
@@ -5068,6 +5073,8 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
 
             subContextStorage.irBuilder = &subBuilderStorage;
             subContextStorage.env = &subEnvStorage;
+
+            subContextStorage.thisType = outerContext->thisType;
         }
 
         IRBuilder* getBuilder() { return &subBuilderStorage; }
@@ -5292,12 +5299,38 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
         NestedContext nestedContext(this);
         auto subBuilder = nestedContext.getBuilder();
         auto subContext = nestedContext.getContext();
+
+        // Emit any generics that should wrap the actual type.
+        auto outerGeneric = emitOuterGenerics(subContext, decl, decl);
+
+        // Setup subContext for proper lowering `ThisType`, associated types and
+        // the interface decl's self reference.
+        subContext->thisType = getBuilder()->getThisType();
+        // Create a temporary IR value for self references, this will be replaced
+        // by actual interface type after we create the actual interface type.
+        auto temporarySelf = subBuilder->createIntrinsicInst(nullptr, kIROp_undefined, 0, nullptr);
+        subContext->env->mapDeclToValue[decl] = LoweredValInfo::simple(temporarySelf);
+        for (auto member : decl->members)
+        {
+            if (as<AssocTypeDecl>(member))
+            {
+                subContext->env->mapDeclToValue[member] = getBuilder()->getAssociatedType();
+            }
+        }
+
         List<IRInterfaceRequirementEntry*> requirementEntries;
 
         for (auto requirementDecl : decl->members)
         {
             auto key = getInterfaceRequirementKey(requirementDecl);
-            auto entry = subBuilder->createInterfaceRequirementEntry(key, nullptr);
+            IRInst* requirementVal = lowerDecl(subContext, requirementDecl).val;
+            if (requirementVal)
+            {
+                auto reqType = requirementVal->getFullType();
+                requirementVal->removeAndDeallocate();
+                requirementVal = reqType;
+            }
+            auto entry = subBuilder->createInterfaceRequirementEntry(key, requirementVal);
             requirementEntries.add(entry);
             // As a special case, any type constraints placed
             // on an associated type will *also* need to be turned
@@ -5312,10 +5345,8 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
                             getBuilder()->getWitnessTableType(lowerType(context, constraintDecl->getSup().type))));
                 }
             }
+            context->env->mapDeclToValue[requirementDecl] = LoweredValInfo::simple(entry);
         }
-
-        // Emit any generics that should wrap the actual type.
-        auto outerGeneric = emitOuterGenerics(subContext, decl, decl);
 
         IRInterfaceType* irInterface = subBuilder->createInterfaceType(
             requirementEntries.getCount(),
@@ -5330,8 +5361,12 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
 
         addTargetIntrinsicDecorations(irInterface, decl);
 
-
-        return LoweredValInfo::simple(finishOuterGenerics(subBuilder, irInterface, outerGeneric));
+        auto finalVal = finishOuterGenerics(subBuilder, irInterface, outerGeneric);
+        // Now we can replace all self references in the requirement types to the
+        // actual interface type we generated.
+        temporarySelf->replaceUsesWith(finalVal);
+        temporarySelf->removeAndDeallocate();
+        return LoweredValInfo::simple(finalVal);
     }
 
     LoweredValInfo visitEnumCaseDecl(EnumCaseDecl* decl)
@@ -6133,8 +6168,6 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
             paramTypes.getBuffer(),
             irResultType);
 
-        if (parameterLists.params.getCount() && parameterLists.params[0].isThisParam)
-            builder->addThisPointerDecoration(irFuncType, 0);
         return irFuncType;
     }
 
@@ -6326,7 +6359,6 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
                 if (paramInfo.isThisParam)
                 {
                     subContext->thisVal = paramVal;
-                    subBuilder->addThisPointerDecoration(irParam, (int)(paramTypeIndex - 1));
                 }
             }
 
@@ -6548,42 +6580,7 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
             genericVal->setFullType((IRType*)funcType);
         }
 
-        maybeAssociateToInterfaceType(decl, finalVal);
-
         return LoweredValInfo::simple(finalVal);
-    }
-
-    void maybeAssociateToInterfaceType(Decl* decl, IRInst* irFuncVal)
-    {
-        auto parent = decl->parentDecl;
-        InterfaceDecl* interfaceDecl = nullptr;
-        while (parent)
-        {
-            interfaceDecl = as<InterfaceDecl>(parent);
-            if (interfaceDecl) break;
-            parent = parent->parentDecl;
-        }
-        if (!interfaceDecl)
-            return;
-        auto loweredVal = context->findLoweredDecl(interfaceDecl);
-        if (!loweredVal)
-        {
-            return;
-        }
-        IRInst* irFuncType = irFuncVal->typeUse.get();
-        auto irInterfaceType = cast<IRInterfaceType>(loweredVal->val);
-        auto key = getInterfaceRequirementKey(decl);
-        for (UInt i = 0; i < irInterfaceType->getOperandCount(); i++)
-        {
-            auto operand = cast<IRInterfaceRequirementEntry>(irInterfaceType->getOperand(i));
-            if (operand->getRequirementKey() == key)
-            {
-                operand->setRequirementVal(irFuncType);
-                return;
-            }
-        }
-        SLANG_UNREACHABLE("associating interface function declaration:"
-                          "requirement not found in the interface type.");
     }
 
     LoweredValInfo visitGenericDecl(GenericDecl * genDecl)

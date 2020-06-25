@@ -1200,6 +1200,11 @@ struct IRAssociatedType : IRType
     IR_LEAF_ISA(AssociatedType)
 };
 
+struct IRThisType : IRType
+{
+    IR_LEAF_ISA(ThisType)
+};
+
 struct IRInterfaceRequirementEntry : IRInst
 {
     IRInst* getRequirementKey() { return getOperand(0); }

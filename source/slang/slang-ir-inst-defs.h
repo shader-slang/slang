@@ -167,6 +167,7 @@ INST(Nop, nop, 0, 0)
 INST(StructType, struct, 0, PARENT)
 INST(InterfaceType, interface, 0, 0)
 INST(AssociatedType, associated_type, 0, 0)
+INST(ThisType, this_type, 0, 0)
 
 // A TypeType-typed IRValue represents a IRType.
 // It is used to represent a type parameter/argument in a generics.
@@ -509,14 +510,6 @@ INST(HighLevelDeclDecoration,               highLevelDecl,          1, 0)
     INST(KeepAliveDecoration,              keepAlive,             0, 0)
 
     INST(BindExistentialSlotsDecoration, bindExistentialSlots, 0, 0)
-
-
-        /// A `[this_ptr]` decoration marks a function parameter that serves as `this` pointer.
-        /// `[this_ptr]` decoration is also used to mark an `IRFunc` as a non-static function.
-        /// The argument is an integer value that represents the index of the `this` parameter,
-        /// which is always 0.
-    INST(ThisPointerDecoration, this_ptr, 1, 0)
-
 
         /// A `[format(f)]` decoration specifies that the format of an image should be `f`
     INST(FormatDecoration, format, 1, 0)

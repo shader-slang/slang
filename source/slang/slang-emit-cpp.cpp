@@ -1617,12 +1617,27 @@ void CPPSourceEmitter::_emitWitnessTableWrappers()
 {
     for (auto witnessTable : pendingWitnessTableDefinitions)
     {
+        auto interfaceType = cast<IRInterfaceType>(witnessTable->getOperand(0));
         for (auto child : witnessTable->getChildren())
         {
             if (auto entry = as<IRWitnessTableEntry>(child))
             {
                 if (auto funcVal = as<IRFunc>(entry->getSatisfyingVal()))
                 {
+                    IRInst* requirementVal = nullptr;
+                    for (UInt i = 0; i < interfaceType->getOperandCount(); i++)
+                    {
+                        if (auto reqEntry = as<IRInterfaceRequirementEntry>(interfaceType->getOperand(i)))
+                        {
+                            if (reqEntry->getRequirementKey() == entry->getRequirementKey())
+                            {
+                                requirementVal = reqEntry->getRequirementVal();
+                                break;
+                            }
+                        }
+                    }
+                    SLANG_ASSERT(requirementVal != nullptr);
+                    IRFuncType* requirementFuncType = cast<IRFuncType>(requirementVal);
                     emitType(funcVal->getResultType());
                     m_writer->emit(" ");
                     m_writer->emit(_getWitnessTableWrapperFuncName(funcVal));
@@ -1630,23 +1645,20 @@ void CPPSourceEmitter::_emitWitnessTableWrappers()
                     // Emit parameter list.
                     {
                         bool isFirst = true;
-                        for (auto param : funcVal->getParams())
+                        SLANG_ASSERT(funcVal->getParamCount() == requirementFuncType->getParamCount());
+                        auto pp = funcVal->getParams().begin();
+                        for (UInt i = 0; i < requirementFuncType->getParamCount(); ++i, ++pp)
                         {
-                            if (as<IRTypeType>(param->getFullType()))
+                            auto paramType = requirementFuncType->getParamType(i);
+
+                            if (as<IRTypeType>(paramType))
                                 continue;
 
                             if (isFirst)
                                 isFirst = false;
                             else
                                 m_writer->emit(",");
-
-                            if (param->findDecoration<IRThisPointerDecoration>())
-                            {
-                                m_writer->emit("void* ");
-                                m_writer->emit(getName(param));
-                                continue;
-                            }
-                            emitSimpleFuncParamImpl(param);
+                            emitParamType(paramType, getName(*pp));
                         }
                     }
                     m_writer->emit(")\n{\n");
@@ -1657,8 +1669,13 @@ void CPPSourceEmitter::_emitWitnessTableWrappers()
                     // Emit argument list.
                     {
                         bool isFirst = true;
-                        for (auto param : funcVal->getParams())
+                        UInt paramIndex = 0;
+                        for (auto defParamIter = funcVal->getParams().begin();
+                            defParamIter!=funcVal->getParams().end();
+                            ++defParamIter, ++paramIndex)
                         {
+                            auto param = *defParamIter;
+                            auto reqParamType = requirementFuncType->getParamType(paramIndex);
                             if (as<IRTypeType>(param->getFullType()))
                                 continue;
 
@@ -1667,7 +1684,8 @@ void CPPSourceEmitter::_emitWitnessTableWrappers()
                             else
                                 m_writer->emit(", ");
 
-                            if (param->findDecoration<IRThisPointerDecoration>())
+                            if (reqParamType->op == kIROp_RawPointerType &&
+                                param->getFullType()->op != kIROp_RawPointerType)
                             {
                                 m_writer->emit("*static_cast<");
                                 emitType(param->getFullType());
@@ -1779,13 +1797,7 @@ void CPPSourceEmitter::_maybeEmitWitnessTableTypeDefinition(
                     m_writer->emit(", ");
                 else
                     isFirstParam = false;
-                auto thisDecor = funcVal->findDecoration<IRThisPointerDecoration>();
-                if (thisDecor && cast<IRIntLit>(thisDecor->getOperand(0))->value.intVal == (IRIntegerValue)p)
-                {
-                    m_writer->emit("void* param");
-                    m_writer->emit(p);
-                    continue;
-                }
+
                 emitParamType(paramType, String("param") + String(p));
             }
             m_writer->emit(");\n");

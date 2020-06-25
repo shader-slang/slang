@@ -2200,6 +2200,11 @@ namespace Slang
         return (IRAssociatedType*)getType(kIROp_AssociatedType);
     }
 
+    IRThisType* IRBuilder::getThisType()
+    {
+        return (IRThisType*)getType(kIROp_ThisType);
+    }
+
     IRRawPointerType* IRBuilder::getRawPointerType()
     {
         return (IRRawPointerType*)getType(kIROp_RawPointerType);

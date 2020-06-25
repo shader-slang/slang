@@ -165,8 +165,6 @@ IR_SIMPLE_DECORATION(VulkanCallablePayloadDecoration)
 /// vulkan hit attributes, and should have a location assigned
 /// to it.
 IR_SIMPLE_DECORATION(VulkanHitAttributesDecoration)
-IR_SIMPLE_DECORATION(ThisPointerDecoration)
-
 
 struct IRRequireGLSLVersionDecoration : IRDecoration
 {
@@ -1432,6 +1430,11 @@ struct IRWitnessTable : IRInst
         return IRInstList<IRWitnessTableEntry>(getChildren());
     }
 
+    IRInst* getConformanceType()
+    {
+        return getOperand(0);
+    }
+
     IR_LEAF_ISA(WitnessTable)
 };
 
@@ -1572,6 +1575,7 @@ struct IRBuilder
     IRBasicType* getIntType();
     IRStringType* getStringType();
     IRAssociatedType* getAssociatedType();
+    IRThisType* getThisType();
     IRRawPointerType* getRawPointerType();
 
 
@@ -2165,11 +2169,6 @@ struct IRBuilder
     void addLoopControlDecoration(IRInst* value, IRLoopControl mode)
     {
         addDecoration(value, kIROp_LoopControlDecoration, getIntValue(getIntType(), IRIntegerValue(mode)));
-    }
-
-    void addThisPointerDecoration(IRInst* value, int paramIndex)
-    {
-        addDecoration(value, kIROp_ThisPointerDecoration, getIntValue(getIntType(), paramIndex));
     }
 
     void addSemanticDecoration(IRInst* value, UnownedStringSlice const& text, int index = 0)

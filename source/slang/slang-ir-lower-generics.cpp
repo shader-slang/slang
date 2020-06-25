@@ -52,6 +52,7 @@ namespace Slang
                 return true;
             switch (typeInst->op)
             {
+            case kIROp_ThisType:
             case kIROp_AssociatedType:
             case kIROp_InterfaceType:
                 return true;
