@@ -79,7 +79,7 @@ namespace Slang
             builder.sharedBuilder = &sharedBuilderStorage;
             builder.setInsertBefore(genericParent);
             auto loweredFunc = cloneInstAndOperands(&cloneEnv, &builder, func);
-            loweredFunc->setFullType(lowerGenericFuncType(&builder, cast<IRGeneric>(genericParent->typeUse.get())));
+            loweredFunc->setFullType(lowerGenericFuncType(&builder, cast<IRGeneric>(genericParent->getFullType())));
             List<IRInst*> clonedParams;
             for (auto genericParam : genericParent->getParams())
             {
@@ -100,7 +100,7 @@ namespace Slang
             {
                 if (isPolymorphicType(param->getFullType()))
                 {
-                    param->setFullType(builder.getPtrType(builder.getVoidType()));
+                    param->setFullType(builder.getRawPointerType());
                 }
             }
             addToWorkList(loweredFunc);
@@ -114,7 +114,7 @@ namespace Slang
             {
                 if (isPolymorphicType(genericParam->getFullType()))
                 {
-                    genericParamTypes.add(builder->getPtrType(builder->getVoidType()));
+                    genericParamTypes.add(builder->getRawPointerType());
                 }
                 else
                 {
@@ -146,7 +146,7 @@ namespace Slang
                 auto paramType = funcType->getOperand(i);
                 if (isPolymorphicType(paramType))
                 {
-                    newOperands.add(builder->getPtrType(builder->getVoidType()));
+                    newOperands.add(builder->getRawPointerType());
                     translated = true;
                 }
                 else if (paramType->op == kIROp_Specialize)
@@ -154,7 +154,7 @@ namespace Slang
                     // TODO: handle static specialized type here.
                     // For now treat all specialized types as dynamic.
                     // In the future, we need to turn things like Array<IDynamic> into Array<void*>.
-                    newOperands.add(builder->getPtrType(builder->getVoidType()));
+                    newOperands.add(builder->getRawPointerType());
                     translated = true;
                 }
                 else
@@ -194,11 +194,11 @@ namespace Slang
                 {
                     if (auto funcType = as<IRFuncType>(entry->getRequirementVal()))
                     {
-                        entry->requirementVal.set(lowerFuncType(&builder, funcType));
+                        entry->setRequirementVal(lowerFuncType(&builder, funcType));
                     }
                     else if (auto genericFuncType = as<IRGeneric>(entry->getRequirementVal()))
                     {
-                        entry->requirementVal.set(lowerGenericFuncType(&builder, genericFuncType));
+                        entry->setRequirementVal(lowerGenericFuncType(&builder, genericFuncType));
                     }
                 }
             }
@@ -256,12 +256,12 @@ namespace Slang
                     builder->sharedBuilder = &sharedBuilderStorage;
                     builder->setInsertBefore(inst);
                     List<IRInst*> args;
-                    auto voidPtrType = builder->getPtrType(builder->getVoidType());
+                    auto rawPtrType = builder->getRawPointerType();
                     for (UInt i = 0; i < callInst->getArgCount(); i++)
                     {
                         auto arg = callInst->getArg(i);
-                        if (paramTypes[i] == voidPtrType &&
-                            arg->getDataType() != voidPtrType)
+                        if (paramTypes[i] == rawPtrType &&
+                            arg->getDataType() != rawPtrType)
                         {
                             // We are calling a generic function that with an argument of
                             // concrete type. We need to convert this argument o void*.
@@ -272,7 +272,7 @@ namespace Slang
                             // what we needed. For now we use another instruction here
                             // to keep changes minimal.
                             arg = builder->emitGetAddress(
-                                voidPtrType,
+                                rawPtrType,
                                 arg);
                         }
                         args.add(arg);

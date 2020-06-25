@@ -458,7 +458,8 @@ struct IRInst
 
     void setOperand(UInt index, IRInst* value)
     {
-        getOperands()[index].init(this, value);
+        SLANG_ASSERT(getOperands()[index].user != nullptr);
+        getOperands()[index].set(value);
     }
 
 
@@ -1104,11 +1105,15 @@ struct IRPtrTypeBase : IRType
 
 SIMPLE_IR_TYPE(PtrType, PtrTypeBase)
 SIMPLE_IR_TYPE(RefType, PtrTypeBase)
-
 SIMPLE_IR_PARENT_TYPE(OutTypeBase, PtrTypeBase)
 SIMPLE_IR_TYPE(OutType, OutTypeBase)
 SIMPLE_IR_TYPE(InOutType, OutTypeBase)
 SIMPLE_IR_TYPE(ExistentialBoxType, PtrTypeBase)
+
+struct IRRawPointerType : IRType
+{
+    IR_LEAF_ISA(RawPointerType)
+};
 
 struct IRGlobalHashedStringLiterals : IRInst
 {
@@ -1197,14 +1202,9 @@ struct IRAssociatedType : IRType
 
 struct IRInterfaceRequirementEntry : IRInst
 {
-    // The AST-level requirement
-    IRUse requirementKey;
-
-    // The IR-level value that represents the declaration of the requirement
-    IRUse requirementVal;
-
     IRInst* getRequirementKey() { return getOperand(0); }
     IRInst* getRequirementVal() { return getOperand(1); }
+    void setRequirementVal(IRInst* val) { setOperand(1, val); }
 
     IR_LEAF_ISA(InterfaceRequirementEntry);
 };

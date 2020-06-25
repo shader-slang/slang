@@ -89,25 +89,6 @@ struct IRSpecContextBase
     }
 };
 
-enum class GlobalValueClass
-{
-    StructKey,
-    Other
-};
-
-// Get the "class" of a global value. If there are more than one value of the same class,
-// only one value in each class will be selected during linking.
-GlobalValueClass getGlobalValueClass(IRInst* value)
-{
-    switch (value->op)
-    {
-    case kIROp_StructKey:
-        return GlobalValueClass::StructKey;
-    default:
-        return GlobalValueClass::Other;
-    }
-}
-
 void registerClonedValue(
     IRSpecContextBase*  context,
     IRInst*    clonedValue,
@@ -147,11 +128,9 @@ void registerClonedValue(
     IROriginalValuesForClone const& originalValues)
 {
     registerClonedValue(context, clonedValue, originalValues.originalVal);
-    auto valueClass = getGlobalValueClass(clonedValue);
     for( auto s = originalValues.sym; s; s = s->nextWithSameName )
     {
-        if (getGlobalValueClass(s->irGlobalValue) == valueClass)
-            registerClonedValue(context, clonedValue, s->irGlobalValue);
+        registerClonedValue(context, clonedValue, s->irGlobalValue);
     }
 }
 
@@ -1234,12 +1213,10 @@ IRInst* cloneGlobalValueWithLinkage(
     // definitions over declarations.
     //
     IRInst* bestVal = nullptr;
-    auto valueClass = getGlobalValueClass(originalVal);
     for(IRSpecSymbol* ss = sym; ss; ss = ss->nextWithSameName )
     {
         IRInst* newVal = ss->irGlobalValue;
-        if (getGlobalValueClass(newVal) == valueClass &&
-            isBetterForTarget(context, newVal, bestVal))
+        if (isBetterForTarget(context, newVal, bestVal))
             bestVal = newVal;
     }
 

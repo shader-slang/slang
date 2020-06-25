@@ -1573,6 +1573,9 @@ struct IRBuilder
     IRBasicType* getBoolType();
     IRBasicType* getIntType();
     IRStringType* getStringType();
+    IRAssociatedType* getAssociatedType();
+    IRRawPointerType* getRawPointerType();
+
 
     IRBasicBlockType*   getBasicBlockType();
     IRWitnessTableType* getWitnessTableType(IRType* baseType);
@@ -1818,9 +1821,6 @@ struct IRBuilder
 
     // Create an initially empty `struct` type.
     IRStructType*   createStructType();
-
-    // Create an IRType representing an `associatedtype` decl.
-    IRAssociatedType* createAssociatedType();
 
     // Create an empty `interface` type.
     IRInterfaceType* createInterfaceType(UInt operandCount, IRInst* const* operands);

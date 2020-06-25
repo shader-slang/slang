@@ -390,27 +390,12 @@ static UnownedStringSlice _getResourceTypePrefix(IROp op)
     }
 }
 
-static bool isVoidPtrType(IRType* type)
-{
-    auto ptrType = as<IRPtrType>(type);
-    if (!ptrType) return false;
-    return ptrType->getValueType()->op == kIROp_VoidType;
-}
-
 SlangResult CPPSourceEmitter::calcTypeName(IRType* type, CodeGenTarget target, StringBuilder& out)
 {
     switch (type->op)
     {
         case kIROp_PtrType:
         {
-            if (isVoidPtrType(type))
-            {
-                // A `void*` type will always emit as `void*`.
-                // `void*` types are generated as a result of generics lowering
-                // for dynamic dispatch.
-                out << "void*";
-                return SLANG_OK;
-            }
             auto ptrType = static_cast<IRPtrType*>(type);
             SLANG_RETURN_ON_FAIL(calcTypeName(ptrType->getValueType(), target, out));
             // TODO(JS): It seems although it says it is a pointer, it can actually be output as a reference
@@ -511,6 +496,11 @@ SlangResult CPPSourceEmitter::calcTypeName(IRType* type, CodeGenTarget target, S
             auto baseType = cast<IRType>(witnessTableType->getOperand(0));
             SLANG_RETURN_ON_FAIL(calcTypeName(baseType, target, out));
             out << "*";
+            return SLANG_OK;
+        }
+        case kIROp_RawPointerType:
+        {
+            out << "void*";
             return SLANG_OK;
         }
         default:
@@ -1774,7 +1764,7 @@ void CPPSourceEmitter::_maybeEmitWitnessTableTypeDefinition(
         {
             emitType(funcVal->getResultType());
             m_writer->emit(" (KernelContext::*");
-            m_writer->emit(getName(entry->requirementKey.get()));
+            m_writer->emit(getName(entry->getRequirementKey()));
             m_writer->emit(")");
             m_writer->emit("(");
             bool isFirstParam = true;
@@ -1804,7 +1794,7 @@ void CPPSourceEmitter::_maybeEmitWitnessTableTypeDefinition(
         {
             emitType(constraintInterfaceType);
             m_writer->emit("* ");
-            m_writer->emit(getName(entry->requirementKey.get()));
+            m_writer->emit(getName(entry->getRequirementKey()));
             m_writer->emit(";\n");
         }
     }
@@ -2007,17 +1997,6 @@ void CPPSourceEmitter::emitSimpleValueImpl(IRInst* inst)
 
 void CPPSourceEmitter::emitSimpleFuncParamImpl(IRParam* param)
 {
-    // Polymorphic types are already translated to void* type in
-    // lower-generics pass. However, the current emitting logic will
-    // emit "void&" instead of "void*" for pointer types.
-    // In the future, we will handle pointer types more properly,
-    // and this override logic will not be necessary.
-    if (isVoidPtrType(param->getDataType()))
-    {
-        m_writer->emit("void* ");
-        m_writer->emit(getName(param));
-        return;
-    }
     CLikeSourceEmitter::emitSimpleFuncParamImpl(param);
 }
 

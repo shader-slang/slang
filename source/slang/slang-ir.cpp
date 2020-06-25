@@ -2194,6 +2194,16 @@ namespace Slang
         return (IRStringType*)getType(kIROp_StringType);
     }
 
+    IRAssociatedType* IRBuilder::getAssociatedType()
+    {
+        return (IRAssociatedType*)getType(kIROp_AssociatedType);
+    }
+
+    IRRawPointerType* IRBuilder::getRawPointerType()
+    {
+        return (IRRawPointerType*)getType(kIROp_RawPointerType);
+    }
+
     IRBasicBlockType*   IRBuilder::getBasicBlockType()
     {
         return (IRBasicBlockType*)getType(kIROp_BasicBlockType);
@@ -2835,16 +2845,6 @@ namespace Slang
             nullptr);
         addGlobalValue(this, structType);
         return structType;
-    }
-
-    IRAssociatedType* IRBuilder::createAssociatedType()
-    {
-        IRAssociatedType* associatedType = createInst<IRAssociatedType>(
-            this,
-            kIROp_AssociatedType,
-            nullptr);
-        addGlobalValue(this, associatedType);
-        return associatedType;
     }
 
     IRInterfaceType* IRBuilder::createInterfaceType(UInt operandCount, IRInst* const* operands)

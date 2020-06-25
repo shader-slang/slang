@@ -5390,6 +5390,11 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
             return LoweredValInfo();
         }
 
+        if (as<AssocTypeDecl>(decl))
+        {
+            return LoweredValInfo::simple(getBuilder()->getAssociatedType());
+        }
+
         // Given a declaration of a type, we need to make sure
         // to output "witness tables" for any interfaces this
         // type has declared conformance to.
@@ -5407,77 +5412,64 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
 
         // Emit any generics that should wrap the actual type.
         auto outerGeneric = emitOuterGenerics(subContext, decl, decl);
+                
 
-        IRInst* resultType = nullptr;
-        if (as<AssocTypeDecl>(decl))
+        IRStructType* irStruct = subBuilder->createStructType();
+        addNameHint(context, irStruct, decl);
+        addLinkageDecoration(context, irStruct, decl);
+        subBuilder->setInsertInto(irStruct);
+
+        // A `struct` that inherits from another `struct` must start
+        // with a member for the direct base type.
+        //
+        for( auto inheritanceDecl : decl->getMembersOfType<InheritanceDecl>() )
         {
-            resultType = subBuilder->createAssociatedType();
-        }
-        else
-        {
-            resultType = subBuilder->createStructType();
-        }
-
-        addNameHint(context, resultType, decl);
-        addLinkageDecoration(context, resultType, decl);
-
-        if (resultType->op == kIROp_StructType)
-        {
-            IRStructType* irStruct = (IRStructType*)resultType;
-            subBuilder->setInsertInto(irStruct);
-
-            // A `struct` that inherits from another `struct` must start
-            // with a member for the direct base type.
-            //
-            for( auto inheritanceDecl : decl->getMembersOfType<InheritanceDecl>() )
+            auto superType = inheritanceDecl->base;
+            if(auto superDeclRefType = as<DeclRefType>(superType))
             {
-                auto superType = inheritanceDecl->base;
-                if(auto superDeclRefType = as<DeclRefType>(superType))
+                if(auto superStructDeclRef = superDeclRefType->declRef.as<StructDecl>())
                 {
-                    if(auto superStructDeclRef = superDeclRefType->declRef.as<StructDecl>())
-                    {
-                        auto superKey = (IRStructKey*) getSimpleVal(context, ensureDecl(context, inheritanceDecl));
-                        auto irSuperType = lowerType(context, superType.type);
-                        subBuilder->createStructField(
-                            irStruct,
-                            superKey,
-                            irSuperType);
-                    }
+                    auto superKey = (IRStructKey*) getSimpleVal(context, ensureDecl(context, inheritanceDecl));
+                    auto irSuperType = lowerType(context, superType.type);
+                    subBuilder->createStructField(
+                        irStruct,
+                        superKey,
+                        irSuperType);
                 }
             }
+        }
 
 
-            for (auto fieldDecl : decl->getMembersOfType<VarDeclBase>())
+        for (auto fieldDecl : decl->getMembersOfType<VarDeclBase>())
+        {
+            if (fieldDecl->hasModifier<HLSLStaticModifier>())
             {
-                if (fieldDecl->hasModifier<HLSLStaticModifier>())
-                {
-                    // A `static` field is actually a global variable,
-                    // and we should emit it as such.
-                    ensureDecl(context, fieldDecl);
-                    continue;
-                }
-
-                // Each ordinary field will need to turn into a struct "key"
-                // that is used for fetching the field.
-                IRInst* fieldKeyInst = getSimpleVal(context,
-                    ensureDecl(context, fieldDecl));
-                auto fieldKey = as<IRStructKey>(fieldKeyInst);
-                SLANG_ASSERT(fieldKey);
-
-                // Note: we lower the type of the field in the "sub"
-                // context, so that any generic parameters that were
-                // set up for the type can be referenced by the field type.
-                IRType* fieldType = lowerType(
-                    subContext,
-                    fieldDecl->getType());
-
-                // Then, the parent `struct` instruction itself will have
-                // a "field" instruction.
-                subBuilder->createStructField(
-                    irStruct,
-                    fieldKey,
-                    fieldType);
+                // A `static` field is actually a global variable,
+                // and we should emit it as such.
+                ensureDecl(context, fieldDecl);
+                continue;
             }
+
+            // Each ordinary field will need to turn into a struct "key"
+            // that is used for fetching the field.
+            IRInst* fieldKeyInst = getSimpleVal(context,
+                ensureDecl(context, fieldDecl));
+            auto fieldKey = as<IRStructKey>(fieldKeyInst);
+            SLANG_ASSERT(fieldKey);
+
+            // Note: we lower the type of the field in the "sub"
+            // context, so that any generic parameters that were
+            // set up for the type can be referenced by the field type.
+            IRType* fieldType = lowerType(
+                subContext,
+                fieldDecl->getType());
+
+            // Then, the parent `struct` instruction itself will have
+            // a "field" instruction.
+            subBuilder->createStructField(
+                irStruct,
+                fieldKey,
+                fieldType);
         }
 
         // There may be members not handled by the above logic (e.g.,
@@ -5487,10 +5479,10 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
         // Instead we will force emission of all children of aggregate
         // type declarations later, from the top-level emit logic.
 
-        resultType->moveToEnd();
-        addTargetIntrinsicDecorations(resultType, decl);
+        irStruct->moveToEnd();
+        addTargetIntrinsicDecorations(irStruct, decl);
 
-        return LoweredValInfo::simple(finishOuterGenerics(subBuilder, resultType, outerGeneric));
+        return LoweredValInfo::simple(finishOuterGenerics(subBuilder, irStruct, outerGeneric));
     }
 
     LoweredValInfo lowerMemberVarDecl(VarDecl* fieldDecl)
