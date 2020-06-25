@@ -162,7 +162,7 @@ namespace Slang
                     newOperands.add(paramType);
                 }
             }
-            if (!translated)
+            if (!translated && additionalParamCount == 0)
                 return funcType;
             for (UInt i = 0; i < additionalParamCount; i++)
             {

@@ -280,7 +280,8 @@ Result linkAndOptimizeIR(
         // For targets that supports dynamic dispatch, we need to lower the
         // generics / interface types to ordinary functions and types using
         // function pointers.
-        lowerGenerics(irModule);
+        if (compileRequest->allowDynamicCode)
+            lowerGenerics(irModule);
         break;
     default:
         break;

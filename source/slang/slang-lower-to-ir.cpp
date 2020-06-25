@@ -4466,7 +4466,7 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
 
         auto type = lowerType(subContext, decl->type.type);
 
-        return LoweredValInfo::simple(finishOuterGenerics(subBuilder, type));
+        return LoweredValInfo::simple(finishOuterGenerics(subBuilder, type, outerGeneric));
     }
 
     LoweredValInfo visitGenericTypeParamDecl(GenericTypeParamDecl* /*decl*/)
@@ -4536,7 +4536,7 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
         Dictionary<WitnessTable*, IRWitnessTable*>  mapASTToIRWitnessTable)
     {
         auto subBuilder = subContext->irBuilder;
-        
+
         for(auto entry : astWitnessTable->requirementDictionary)
         {
             auto requiredMemberDecl = entry.Key;
@@ -4676,7 +4676,7 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
         NestedContext nested(this);
         auto subBuilder = nested.getBuilder();
         auto subContext = nested.getContext();
-        emitOuterGenerics(subContext, inheritanceDecl, inheritanceDecl);
+        auto outerGeneric = emitOuterGenerics(subContext, inheritanceDecl, inheritanceDecl);
 
         // Lower the super-type to force its declaration to be lowered.
         //
@@ -4705,7 +4705,7 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
 
         irWitnessTable->moveToEnd();
 
-        return LoweredValInfo::simple(finishOuterGenerics(subBuilder, irWitnessTable));
+        return LoweredValInfo::simple(finishOuterGenerics(subBuilder, irWitnessTable, outerGeneric));
     }
 
     LoweredValInfo visitDeclGroup(DeclGroup* declGroup)
@@ -5106,7 +5106,7 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
         auto subBuilder = nestedContext.getBuilder();
         auto subContext = nestedContext.getContext();
         subBuilder->setInsertInto(subBuilder->getModule()->getModuleInst());
-        emitOuterGenerics(subContext, decl, decl);
+        auto outerGeneric = emitOuterGenerics(subContext, decl, decl);
 
         IRType* subVarType = lowerType(subContext, decl->getType());
 
@@ -5207,7 +5207,7 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
         }
 
         irGlobal->moveToEnd();
-        finishOuterGenerics(subBuilder, irGlobal);
+        finishOuterGenerics(subBuilder, irGlobal, outerGeneric);
         return globalVal;
     }
 
@@ -5317,7 +5317,7 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
         }
 
         // Emit any generics that should wrap the actual type.
-        emitOuterGenerics(subContext, decl, decl);
+        auto outerGeneric = emitOuterGenerics(subContext, decl, decl);
 
         IRInterfaceType* irInterface = subBuilder->createInterfaceType(
             requirementEntries.getCount(),
@@ -5333,7 +5333,7 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
         addTargetIntrinsicDecorations(irInterface, decl);
 
 
-        return LoweredValInfo::simple(finishOuterGenerics(subBuilder, irInterface));
+        return LoweredValInfo::simple(finishOuterGenerics(subBuilder, irInterface, outerGeneric));
     }
 
     LoweredValInfo visitEnumCaseDecl(EnumCaseDecl* decl)
@@ -5367,7 +5367,7 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
         NestedContext nestedContext(this);
         auto subBuilder = nestedContext.getBuilder();
         auto subContext = nestedContext.getContext();
-        emitOuterGenerics(subContext, decl, decl);
+        auto outerGeneric = emitOuterGenerics(subContext, decl, decl);
 
         // An `enum` declaration will currently lower directly to its "tag"
         // type, so that any references to the `enum` become referenes to
@@ -5379,7 +5379,7 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
 
         IRType* loweredTagType = lowerType(subContext, decl->tagType);
 
-        return LoweredValInfo::simple(finishOuterGenerics(subBuilder, loweredTagType));
+        return LoweredValInfo::simple(finishOuterGenerics(subBuilder, loweredTagType, outerGeneric));
     }
 
     LoweredValInfo visitAggTypeDecl(AggTypeDecl* decl)
@@ -5406,7 +5406,7 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
         auto subContext = nestedContext.getContext();
 
         // Emit any generics that should wrap the actual type.
-        emitOuterGenerics(subContext, decl, decl);
+        auto outerGeneric = emitOuterGenerics(subContext, decl, decl);
 
         IRInst* resultType = nullptr;
         if (as<AssocTypeDecl>(decl))
@@ -5490,7 +5490,7 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
         resultType->moveToEnd();
         addTargetIntrinsicDecorations(resultType, decl);
 
-        return LoweredValInfo::simple(finishOuterGenerics(subBuilder, resultType));
+        return LoweredValInfo::simple(finishOuterGenerics(subBuilder, resultType, outerGeneric));
     }
 
     LoweredValInfo lowerMemberVarDecl(VarDecl* fieldDecl)
@@ -5819,24 +5819,25 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
     //
     IRInst* finishOuterGenerics(
         IRBuilder*  subBuilder,
-        IRInst*     val)
+        IRInst*     val,
+        IRGeneric*  parentGeneric)
     {
         IRInst* v = val;
-        for(;;)
+        while (parentGeneric)
         {
-            auto parentBlock = as<IRBlock>(v->getParent());
-            if (!parentBlock) break;
-
-            auto parentGeneric = as<IRGeneric>(parentBlock->getParent());
-            if (!parentGeneric) break;
-
-            subBuilder->setInsertInto(parentBlock);
+            subBuilder->setInsertInto(parentGeneric->getFirstBlock());
             subBuilder->emitReturn(v);
             parentGeneric->moveToEnd();
 
             // There might be more outer generics,
             // so we need to loop until we run out.
             v = parentGeneric;
+            auto parentBlock = as<IRBlock>(v->getParent());
+            if (!parentBlock) break;
+
+            parentGeneric = as<IRGeneric>(parentBlock->getParent());
+            if (!parentGeneric) break;
+
         }
         return v;
     }
@@ -6066,10 +6067,10 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
                 // Simple case of a by-value input parameter.
                 break;
 
-                // If the parameter is declared `out` or `inout`,
-                // then we will represent it with a pointer type in
-                // the IR, but we will use a specialized pointer
-                // type that encodes the parameter direction information.
+            // If the parameter is declared `out` or `inout`,
+            // then we will represent it with a pointer type in
+            // the IR, but we will use a specialized pointer
+            // type that encodes the parameter direction information.
             case kParameterDirection_Out:
                 irParamType = subBuilder->getOutType(irParamType);
                 break;
@@ -6153,7 +6154,7 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
         auto funcTypeBuilder = nestedContextFuncType.getBuilder();
         auto funcTypeContext = nestedContextFuncType.getContext();
 
-        emitOuterGenerics(funcTypeContext, decl, decl);
+        auto outerGenerics = emitOuterGenerics(funcTypeContext, decl, decl);
 
         ParameterLists parameterLists;
         List<IRType*> paramTypes;
@@ -6166,7 +6167,7 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
             funcTypeContext,
             decl);
 
-        return finishOuterGenerics(funcTypeBuilder, irFuncType);
+        return finishOuterGenerics(funcTypeBuilder, irFuncType, outerGenerics);
     }
 
     LoweredValInfo lowerFuncDecl(FunctionDeclBase* decl)
@@ -6178,7 +6179,7 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
         auto subBuilder = nestedContextFunc.getBuilder();
         auto subContext = nestedContextFunc.getContext();
 
-        emitOuterGenerics(subContext, decl, decl);
+        auto outerGeneric = emitOuterGenerics(subContext, decl, decl);
 
         // need to create an IR function here
 
@@ -6550,12 +6551,11 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
 
         // If this function is defined inside an interface, add a reference to the IRFunc from
         // the interface's type definition.
-        auto finalVal = finishOuterGenerics(subBuilder, irFunc);
-
+        auto finalVal = finishOuterGenerics(subBuilder, irFunc, outerGeneric);
         if (auto genericVal = as<IRGeneric>(finalVal))
         {
             auto funcType = lowerFuncType(decl);
-            genericVal->typeUse.set(funcType);
+            genericVal->setFullType((IRType*)funcType);
         }
 
         maybeAssociateToInterfaceType(decl, finalVal);

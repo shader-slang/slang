@@ -12,7 +12,6 @@ interface IInterface
 {
     associatedtype Assoc : IAssoc;
 	int Compute(int inVal);
-    Assoc getAssoc();
 };
 
 int GenericCompute<T:IInterface>(T obj, int inVal)
@@ -30,7 +29,6 @@ struct Impl : IInterface
     };
     int base;
 	int Compute(int inVal) { return base + inVal * inVal; }
-    Assoc getAssoc() { Assoc rs; rs.val = 1; return rs; }
 };
 
 int test(int inVal)

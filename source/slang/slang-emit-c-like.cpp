@@ -305,7 +305,8 @@ void CLikeSourceEmitter::emitWitnessTable(IRWitnessTable* witnessTable)
 void CLikeSourceEmitter::emitInterface(IRInterfaceType* interfaceType)
 {
     SLANG_UNUSED(interfaceType);
-    SLANG_DIAGNOSE_UNEXPECTED(getSink(), SourceLoc(), "Unimplemented emit: IROpInterfaceType.");
+    // By default, don't emit anything for interface types.
+    // This behavior is overloaded by concrete emitters.
 }
 
 void CLikeSourceEmitter::emitTypeImpl(IRType* type, const StringSliceLoc* nameAndLoc)
@@ -2289,7 +2290,6 @@ void CLikeSourceEmitter::defaultEmitInstExpr(IRInst* inst, const EmitOpInfo& inO
             m_writer->emit(")");
         }
         break;
-
     default:
         diagnoseUnhandledInst(inst);
         break;
@@ -3654,6 +3654,8 @@ void CLikeSourceEmitter::ensureGlobalInst(ComputeEmitActionsContext* ctx, IRInst
         if (!m_compileRequest->allowDynamicCode)
             return;
         break;
+
+    case kIROp_InterfaceRequirementEntry:
     case kIROp_Generic:
         return;
 
