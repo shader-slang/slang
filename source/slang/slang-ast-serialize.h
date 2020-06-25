@@ -182,7 +182,7 @@ public:
     SourceLoc getSourceLoc(ASTSerialSourceLoc loc);
 
         /// NOTE! data must stay ins scope when reading takes place
-    SlangResult load(const uint8_t* data, ASTBuilder* builder, NamePool* namePool, size_t dataCount);
+    SlangResult load(const uint8_t* data, size_t dataCount, ASTBuilder* builder, NamePool* namePool);
 
     ASTSerialReader(ASTSerialClasses* classes):
         m_classes(classes)
@@ -302,7 +302,7 @@ ASTSerialIndex ASTSerialWriter::addArray(const T* in, Index count)
         {
             ElementTypeInfo::toSerial(this, &in[i], &work[i]);
         }
-        return _addArray(sizeof(ElementSerialType), SLANG_ALIGN_OF(ElementSerialType), in, count);
+        return _addArray(sizeof(ElementSerialType), SLANG_ALIGN_OF(ElementSerialType), work.getBuffer(), count);
     }
 }
 

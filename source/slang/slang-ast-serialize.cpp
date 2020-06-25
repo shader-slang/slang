@@ -1387,7 +1387,7 @@ ASTSerialPointer ASTSerialReader::getPointer(ASTSerialIndex index)
     {
         case Type::String:
         {
-            // Hmm. Tricky -> we don't know if wille be cast as Name or String. Lets assume string.
+            // Hmm. Tricky -> we don't know if will be cast as Name or String. Lets assume string.
             String string = getString(index);
             return ASTSerialPointer(string.getStringRepresentation());
         }
@@ -1522,7 +1522,7 @@ SourceLoc ASTSerialReader::getSourceLoc(ASTSerialSourceLoc loc)
     return SourceLoc();
 }
 
-SlangResult ASTSerialReader::load(const uint8_t* data, ASTBuilder* builder, NamePool* namePool, size_t dataCount)
+SlangResult ASTSerialReader::load(const uint8_t* data, size_t dataCount, ASTBuilder* builder, NamePool* namePool)
 {
     m_namePool = namePool;
 
@@ -1550,6 +1550,7 @@ SlangResult ASTSerialReader::load(const uint8_t* data, ASTBuilder* builder, Name
 
     m_objects.clearAndDeallocate();
     m_objects.setCount(m_entries.getCount());
+    memset(m_objects.getBuffer(), 0, m_objects.getCount() * sizeof(void*));
 
     // Go through entries, constructing objects.
     for (Index i = 1; i < m_entries.getCount(); ++i)
