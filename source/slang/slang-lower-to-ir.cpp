@@ -5307,10 +5307,6 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
         // the interface decl's self reference.
         subContext->thisType = getBuilder()->getThisType();
 
-        // Create a temporary IR value for self references, this will be replaced
-        // by actual interface type after we create the actual interface type.
-        auto temporarySelf = subBuilder->createIntrinsicInst(nullptr, kIROp_undefined, 0, nullptr);
-        subContext->env->mapDeclToValue[decl] = LoweredValInfo::simple(temporarySelf);
         for (auto member : decl->members)
         {
             if (as<AssocTypeDecl>(member))
@@ -5319,7 +5315,28 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
             }
         }
 
-        List<IRInterfaceRequirementEntry*> requirementEntries;
+        // First, compute the number of requirement entries that will be included in this
+        // interface type.
+        UInt operandCount = 0;
+        for (auto requirementDecl : decl->members)
+        {
+            operandCount++;
+            // As a special case, any type constraints placed
+            // on an associated type will *also* need to be turned
+            // into requirement keys for this interface.
+            if (auto associatedTypeDecl = as<AssocTypeDecl>(requirementDecl))
+            {
+                operandCount += associatedTypeDecl->getMembersOfType<TypeConstraintDecl>().getCount();
+            }
+        }
+
+        // Allocate an IRInterfaceType with the `operandCount` operands.
+        IRInterfaceType* irInterface = subBuilder->createInterfaceType(operandCount, nullptr);
+
+        // Add `irInterface` to decl mapping now to prevent cyclic lowering.
+        setValue(subContext, decl, LoweredValInfo::simple(irInterface));
+
+        UInt entryIndex = 0;
 
         for (auto requirementDecl : decl->members)
         {
@@ -5346,18 +5363,19 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
                     }
                 }   
             }
-            requirementEntries.add(entry);
-            // As a special case, any type constraints placed
-            // on an associated type will *also* need to be turned
-            // into requirement keys for this interface.
+            irInterface->setOperand(entryIndex, entry);
+            entryIndex++;
+            // Add addtional requirements for type constraints placed
+            // on an associated types.
             if (auto associatedTypeDecl = as<AssocTypeDecl>(requirementDecl))
             {
                 for (auto constraintDecl : associatedTypeDecl->getMembersOfType<TypeConstraintDecl>())
                 {
                     auto constraintKey = getInterfaceRequirementKey(constraintDecl);
-                    requirementEntries.add(
+                    irInterface->setOperand(entryIndex,
                         subBuilder->createInterfaceRequirementEntry(constraintKey,
                             getBuilder()->getWitnessTableType(lowerType(context, constraintDecl->getSup().type))));
+                    entryIndex++;
                 }
             }
             // Add lowered requirement entry to current decl mapping to prevent
@@ -5366,9 +5384,7 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
             setValue(context, requirementDecl, LoweredValInfo::simple(entry));
         }
 
-        IRInterfaceType* irInterface = subBuilder->createInterfaceType(
-            requirementEntries.getCount(),
-            reinterpret_cast<IRInst**>(requirementEntries.getBuffer()));
+        
         addNameHint(context, irInterface, decl);
         addLinkageDecoration(context, irInterface, decl);
         subBuilder->setInsertInto(irInterface);
@@ -5380,10 +5396,6 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
         addTargetIntrinsicDecorations(irInterface, decl);
 
         auto finalVal = finishOuterGenerics(subBuilder, irInterface, outerGeneric);
-        // Now we can replace all self references in the requirement types to the
-        // actual interface type we generated.
-        temporarySelf->replaceUsesWith(finalVal);
-        temporarySelf->removeAndDeallocate();
         return LoweredValInfo::simple(finalVal);
     }
 
