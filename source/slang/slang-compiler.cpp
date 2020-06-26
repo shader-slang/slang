@@ -818,7 +818,7 @@ namespace Slang
     {
         List<Int> entryPointIndices;
         entryPointIndices.add(entryPointIndex);
-        return calcSourcePathForEntryPoints(endToEndReq, entryPointIndex);
+        return calcSourcePathForEntryPoints(endToEndReq, entryPointIndices);
     }
 
 #if SLANG_ENABLE_DXBC_SUPPORT
@@ -1666,7 +1666,7 @@ SlangResult dissassembleDXILUsingDXC(
 
         SLANG_ASSERT(entryPoints.getCount() == 1);
         auto entryPoint = entryPoints[0];
-        const String sourcePath = calcSourcePathForEntryPoints(endToEndReq, entryPoint.index);
+        const String sourcePath = calcSourcePathForEntryPoint(endToEndReq, entryPoint.index);
 
         glslang_CompileRequest_1_1 request;
         memset(&request, 0, sizeof(request));

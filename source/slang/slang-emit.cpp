@@ -777,7 +777,7 @@ SlangResult emitSPIRVFromIR(
     IRFunc*                 irEntryPoint,
     List<uint8_t>&          spirvOut);
 
-SlangResult emitSPIRVForEntryPointDirectly(
+SlangResult emitSPIRVForEntryPointsDirectly(
     BackEndCompileRequest*  compileRequest,
     List<Int>               entryPointIndices,
     TargetRequest*          targetRequest,
