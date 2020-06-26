@@ -72,7 +72,7 @@ struct ASTConstructAccess
 #define SLANG_GET_DESTROY_FUNC_NONE(NAME) &ASTConstructAccess::Impl<NAME>::destroy
 
 #define SLANG_REFLECT_CLASS_INFO(NAME, SUPER, ORIGIN, LAST, MARKER, TYPE, param) \
-    /* static */const ReflectClassInfo NAME::kReflectClassInfo = { uint32_t(ASTNodeType::NAME), uint32_t(ASTNodeType::LAST), SLANG_GET_SUPER_##TYPE(SUPER), #NAME, SLANG_GET_CREATE_FUNC_##MARKER(NAME), SLANG_GET_DESTROY_FUNC_##MARKER(NAME)  };
+    /* static */const ReflectClassInfo NAME::kReflectClassInfo = { uint32_t(ASTNodeType::NAME), uint32_t(ASTNodeType::LAST), SLANG_GET_SUPER_##TYPE(SUPER), #NAME, SLANG_GET_CREATE_FUNC_##MARKER(NAME), SLANG_GET_DESTROY_FUNC_##MARKER(NAME), uint32_t(sizeof(NAME)), uint8_t(SLANG_ALIGN_OF(NAME)) };
 
 SLANG_ALL_ASTNode_NodeBase(SLANG_REFLECT_CLASS_INFO, _)
 

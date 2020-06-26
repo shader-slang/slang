@@ -7,6 +7,8 @@
 #include "slang-compiler.h"
 #include "slang-type-layout.h"
 
+#include "slang-ast-dump.h"
+
 #include "slang-ast-support-types.h"
 
 #include "../core/slang-byte-encode-util.h"
@@ -220,6 +222,24 @@ struct ASTSerialTypeInfo<T*>
     }
 };
 
+// Special case Name
+template <>
+struct ASTSerialTypeInfo<Name*> : public ASTSerialTypeInfo<RefObject*>
+{
+    // Special case 
+    typedef Name* NativeType;
+    static void toNative(ASTSerialReader* reader, const void* inSerial, void* outNative)
+    {
+        *(Name**)outNative = reader->getName(*(const SerialType*)inSerial);
+    }
+};
+
+template <>
+struct ASTSerialTypeInfo<const Name*> : public ASTSerialTypeInfo<Name*>
+{
+};
+
+
 struct ASTSerialDeclRefBaseTypeInfo
 {
     typedef DeclRefBase NativeType;
@@ -387,8 +407,8 @@ struct ASTSerialTypeInfo<SyntaxClass<T>>
     static void toNative(ASTSerialReader* reader, const void* serial, void* native)
     {
         SLANG_UNUSED(reader);
-        auto& src = *(const SerialType*)native;
-        auto& dst = *(NativeType*)serial;
+        auto& src = *(const SerialType*)serial;
+        auto& dst = *(NativeType*)native;
         dst.classInfo = ReflectClassInfo::getInfo(ASTNodeType(src));
     }
 };
@@ -428,17 +448,17 @@ struct ASTSerialTypeInfo<QualType>
     };
     enum { SerialAlignment = SLANG_ALIGN_OF(ASTSerialIndex) };
 
-    static void toSerial(ASTSerialWriter* writer, const void* inNative, void* outSerial)
+    static void toSerial(ASTSerialWriter* writer, const void* native, void* serial)
     {
-        auto dst = (SerialType*)outSerial;
-        auto src = (const NativeType*)inNative;
+        auto dst = (SerialType*)serial;
+        auto src = (const NativeType*)native;
         dst->isLeftValue = src->isLeftValue ? 1 : 0;
         dst->type = writer->addPointer(src->type);
     }
-    static void toNative(ASTSerialReader* reader, const void* inSerial, void* outNative)
+    static void toNative(ASTSerialReader* reader, const void* serial, void* native)
     {
-        auto src = (const SerialType*)inSerial;
-        auto dst = (NativeType*)outNative;
+        auto src = (const SerialType*)serial;
+        auto dst = (NativeType*)native;
         dst->type = reader->getPointer(src->type).dynamicCast<Type>();
         dst->isLeftValue = src->isLeftValue != 0;
     }
@@ -651,7 +671,7 @@ struct ASTSerialTypeInfo<TypeExp>
         auto& dst = *(NativeType*)native;
 
         dst.type = reader->getPointer(src.type).dynamicCast<Type>();
-        dst.exp = reader->getPointer(src.type).dynamicCast<Expr>();
+        dst.exp = reader->getPointer(src.expr).dynamicCast<Expr>();
     }
 };
 
@@ -779,7 +799,15 @@ struct ASTSerialTypeInfo<Token>
 
         ASTSerialTypeInfo<TokenType>::toSerial(writer, &src.type, &dst.type);
         ASTSerialTypeInfo<SourceLoc>::toSerial(writer, &src.loc, &dst.loc);
-        dst.name = writer->addName(src.getName());
+
+        if (src.flags & TokenFlag::Name)
+        {
+            dst.name = writer->addName(src.getName());
+        }
+        else
+        {
+            dst.name = writer->addString(src.getContent());
+        }
     }
     static void toNative(ASTSerialReader* reader, const void* serial, void* native)
     {
@@ -792,6 +820,7 @@ struct ASTSerialTypeInfo<Token>
         ASTSerialTypeInfo<TokenType>::toNative(reader, &src.type, &dst.type);
         ASTSerialTypeInfo<SourceLoc>::toNative(reader, &src.loc, &dst.loc);
 
+        // At the other end all token content will appear as Names.
         if (src.name != ASTSerialIndex(0))
         {
             dst.charsNameUnion.name = reader->getName(src.name);
@@ -968,32 +997,32 @@ ASTSerialClasses::ASTSerialClasses():
         }
 
         // Okay, go through fields setting their offset
-        ASTSerialField* field = serialClass.fields;
+        ASTSerialField* fields = serialClass.fields;
         for (Index j = 0; j < serialClass.fieldsCount; j++)
         {
-            size_t alignment = field->type->serialAlignment;
+            ASTSerialField& field = fields[j];
+
+            size_t alignment = field.type->serialAlignment;
             // Make sure the offset is aligned for the field requirement
             offset = (offset + alignment - 1) & ~(alignment - 1);
 
             // Save the field offset
-            field->serialOffset = uint32_t(offset);
+            field.serialOffset = uint32_t(offset);
 
             // Move past the field
-            offset += field->type->serialSizeInBytes;
+            offset += field.type->serialSizeInBytes;
 
             // Calc the maximum alignment
             maxAlignment = (alignment > maxAlignment) ? alignment : maxAlignment;
         }
 
         // Align with maximum alignment
-        offset += (offset + maxAlignment - 1) & ~(maxAlignment - 1);
+        offset = (offset + maxAlignment - 1) & ~(maxAlignment - 1);
 
         serialClass.alignment = uint8_t(maxAlignment);
         serialClass.size = uint32_t(offset);
     }
 }
-
-
 
 // !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! ASTSerialWriter  !!!!!!!!!!!!!!!!!!!!!!!!!!!!
 
@@ -1024,11 +1053,11 @@ ASTSerialIndex ASTSerialWriter::addPointer(const NodeBase* node)
 
     typedef ASTSerialInfo::NodeEntry NodeEntry;
 
-    NodeEntry* nodeEntry = (NodeEntry*)m_arena.allocateAligned(sizeof(NodeEntry) + serialClass->size, 8);
+    NodeEntry* nodeEntry = (NodeEntry*)m_arena.allocateAligned(sizeof(NodeEntry) + serialClass->size, ASTSerialInfo::MAX_ALIGNMENT);
 
     nodeEntry->type = ASTSerialInfo::Type::Node;
     nodeEntry->astNodeType = uint16_t(node->astNodeType);
-    nodeEntry->nextAlignment = 0;
+    nodeEntry->info = ASTSerialInfo::makeEntryInfo(serialClass->alignment);
 
     auto index = _add(node, nodeEntry);
 
@@ -1080,15 +1109,19 @@ ASTSerialIndex ASTSerialWriter::addPointer(const RefObject* obj)
         typedef ASTSerialTypeInfo<LookupResultItem::Breadcrumb> TypeInfo;
         typedef ASTSerialInfo::RefObjectEntry RefObjectEntry;
 
-        RefObjectEntry* refEntry = (RefObjectEntry*)m_arena.allocateAligned(sizeof(RefObjectEntry) + sizeof(TypeInfo::SerialType), 8);
+        size_t alignment = TypeInfo::SerialAlignment;
+        alignment = (alignment < SLANG_ALIGN_OF(ASTSerialInfo::RefObjectEntry)) ? SLANG_ALIGN_OF(ASTSerialInfo::RefObjectEntry) : alignment;
 
-        refEntry->type = ASTSerialInfo::Type::RefObject;
-        refEntry->subType = RefObjectEntry::SubType::Breadcrumb;
+        RefObjectEntry* entry = (RefObjectEntry*)m_arena.allocateAligned(sizeof(RefObjectEntry) + sizeof(TypeInfo::SerialType), alignment);
 
-        auto index = _add(breadcrumb, refEntry);
+        entry->type = ASTSerialInfo::Type::RefObject;
+        entry->info = ASTSerialInfo::makeEntryInfo(int(alignment));
+        entry->subType = RefObjectEntry::SubType::Breadcrumb;
+
+        auto index = _add(breadcrumb, entry);
 
         // Do any conversion
-        TypeInfo::toSerial(this, breadcrumb, refEntry + 1);
+        TypeInfo::toSerial(this, breadcrumb, entry + 1);
         return index;
     }
     else if (auto name = dynamicCast<const Name>(obj))
@@ -1133,11 +1166,11 @@ ASTSerialIndex ASTSerialWriter::addString(const UnownedStringSlice& slice)
     uint8_t encodeBuf[Util::kMaxLiteEncodeUInt32];
     const int encodeCount = Util::encodeLiteUInt32(uint32_t(slice.getLength()), encodeBuf);
 
-    StringEntry* entry = (StringEntry*)m_arena.allocateUnaligned(sizeof(StringEntry) + encodeCount + slice.getLength());
-    entry->nextAlignment = 0;
+    StringEntry* entry = (StringEntry*)m_arena.allocateUnaligned(SLANG_OFFSET_OF(StringEntry, sizeAndChars) + encodeCount + slice.getLength());
+    entry->info = ASTSerialInfo::EntryInfo::Alignment1;
     entry->type = ASTSerialInfo::Type::String;
 
-    uint8_t* dst = (uint8_t*)(entry + 1);
+    uint8_t* dst = (uint8_t*)(entry->sizeAndChars);
     for (int i = 0; i < encodeCount; ++i)
     {
         dst[i] = encodeBuf[i];
@@ -1180,7 +1213,7 @@ ASTSerialSourceLoc ASTSerialWriter::addSourceLoc(SourceLoc sourceLoc)
     return 0;
 }
 
-ASTSerialIndex ASTSerialWriter::_addArray(size_t elementSize, const void* elements, Index elementCount)
+ASTSerialIndex ASTSerialWriter::_addArray(size_t elementSize, size_t alignment, const void* elements, Index elementCount)
 {
     typedef ASTSerialInfo::ArrayEntry Entry;
 
@@ -1189,39 +1222,261 @@ ASTSerialIndex ASTSerialWriter::_addArray(size_t elementSize, const void* elemen
         return ASTSerialIndex(0);
     }
 
+    SLANG_ASSERT(alignment >= 1 && alignment <= ASTSerialInfo::MAX_ALIGNMENT);
+
+    // We must at a minimum have the alignment for the array prefix info
+    alignment = (alignment < SLANG_ALIGN_OF(Entry)) ? SLANG_ALIGN_OF(Entry) : alignment;
+
     size_t payloadSize = elementCount * elementSize;
 
-    Entry* entry = (Entry*)m_arena.allocateAligned(sizeof(Entry) + payloadSize, 8);
+    Entry* entry = (Entry*)m_arena.allocateAligned(sizeof(Entry) + payloadSize, alignment);
 
     entry->type = ASTSerialInfo::Type::Array;
-    entry->nextAlignment = 0;
+    entry->info = ASTSerialInfo::makeEntryInfo(int(alignment));
     entry->elementSize = uint16_t(elementSize);
     entry->elementCount = uint32_t(elementCount);
 
     memcpy(entry + 1, elements, payloadSize);
 
     m_entries.add(entry);
-    ASTSerialIndex index = ASTSerialIndex(m_entries.getCount() - 1);
+    return ASTSerialIndex(m_entries.getCount() - 1);
+}
 
-    // We don't add to a pointer map, because arrays are not shared
+SlangResult ASTSerialWriter::write(Stream* stream)
+{
+    const Int entriesCount = m_entries.getCount();
 
-    // Do the conversion
+    // Add a sentinal so we don't need special handling for 
+    ASTSerialInfo::Entry sentinal;
+    sentinal.type = ASTSerialInfo::Type::String;
+    sentinal.info = ASTSerialInfo::EntryInfo::Alignment1;
 
-    return index;
+    m_entries.add(&sentinal);
+    m_entries.removeLast();
+
+    ASTSerialInfo::Entry** entries = m_entries.getBuffer();
+    // Note strictly required in our impl of List. But by writing this and
+    // knowing that removeLast cannot release memory, means the sentinal must be at the last position.
+    entries[entriesCount] = &sentinal;
+
+
+    static const uint8_t fixBuffer[ASTSerialInfo::MAX_ALIGNMENT] { 0, };
+    
+    {
+        size_t offset = 0;
+
+        ASTSerialInfo::Entry* entry = entries[1];
+        // We start on 1, because 0 is nullptr and not used for anything
+        for (Index i = 1; i < entriesCount; ++i)
+        {
+            ASTSerialInfo::Entry* next = entries[i + 1];
+            // Before writing we need to store the next alignment
+
+            const size_t nextAlignment = ASTSerialInfo::getAlignment(next->info);
+            const size_t alignment = ASTSerialInfo::getAlignment(entry->info);
+
+            entry->info = ASTSerialInfo::combineWithNext(entry->info, next->info);
+
+            // Check we are aligned correctly
+            SLANG_ASSERT((offset & (alignment - 1)) == 0);
+
+            // When we write, we need to make sure it take into account the next alignment
+            const size_t entrySize = entry->calcSize(m_classes);
+
+            // Work out the fix for next alignment
+            size_t nextOffset = offset + entrySize;
+            nextOffset = (nextOffset + nextAlignment - 1) & ~(nextAlignment - 1);
+
+            size_t alignmentFixSize = nextOffset - (offset + entrySize);
+
+            // The fix must be less than max alignment. We require it to be less because we aligned each Entry to 
+            // MAX_ALIGNMENT, and so < MAX_ALIGNMENT is the most extra bytes we can write
+            SLANG_ASSERT( alignmentFixSize < ASTSerialInfo::MAX_ALIGNMENT);
+            
+            try
+            {
+                stream->write(entry, entrySize);
+                // If we needed to fix so that subsequent alignment is right, write out extra bytes here
+                if (alignmentFixSize)
+                {
+                    stream->write(fixBuffer, alignmentFixSize);
+                }
+            }
+            catch (const IOException&)
+            {
+                return SLANG_FAIL;
+            }
+
+            // Onto next
+            offset = nextOffset;
+            entry = next;
+        }
+    }
+
+    return SLANG_OK;
+}
+
+// !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! ASTSerialInfo::Entry  !!!!!!!!!!!!!!!!!!!!!!!!
+
+size_t ASTSerialInfo::Entry::calcSize(ASTSerialClasses* serialClasses) const
+{
+    switch (type)
+    {
+        case Type::String:
+        {
+            auto entry = static_cast<const StringEntry*>(this);
+            const uint8_t* cur = (const uint8_t*)entry->sizeAndChars;
+            uint32_t charsSize;
+            int sizeSize = ByteEncodeUtil::decodeLiteUInt32(cur, &charsSize);
+            return SLANG_OFFSET_OF(StringEntry, sizeAndChars) + sizeSize + charsSize;
+        }
+        case Type::Node:
+        {
+            auto entry = static_cast<const NodeEntry*>(this);
+            auto serialClass = serialClasses->getSerialClass(ASTNodeType(entry->astNodeType));
+
+            // Align by the alignment of the entry 
+            size_t alignment = getAlignment(entry->info);
+            size_t size = sizeof(NodeEntry) + serialClass->size;
+
+            size = size + (alignment - 1) & ~(alignment - 1);
+            return size;
+        }
+        case Type::RefObject:
+        {
+            auto entry = static_cast<const RefObjectEntry*>(this);
+
+            size_t payloadSize;
+            switch (entry->subType)
+            {
+                case RefObjectEntry::SubType::Breadcrumb:
+                {
+                    payloadSize = sizeof(ASTSerialTypeInfo<LookupResultItem::Breadcrumb>::SerialType);
+                    break;
+                }
+                default:
+                {
+                    SLANG_ASSERT(!"Unknown type");
+                    return 0;
+                }
+            }
+
+            return sizeof(RefObjectEntry) + payloadSize;
+        }
+        case Type::Array:
+        {
+            auto entry = static_cast<const ArrayEntry*>(this);
+            return sizeof(ArrayEntry) + entry->elementSize * entry->elementCount;
+        }
+        default: break;
+    }
+
+    SLANG_ASSERT(!"Unknown type");
+    return 0;
 }
 
 // !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! ASTSerialReader  !!!!!!!!!!!!!!!!!!!!!!!!!!!!
 
+const void* ASTSerialReader::getArray(ASTSerialIndex index, Index& outCount)
+{
+    if (index == ASTSerialIndex(0))
+    {
+        outCount = 0;
+        return nullptr;
+    }
+
+    SLANG_ASSERT(ASTSerialIndexRaw(index) < ASTSerialIndexRaw(m_entries.getCount()));
+    const Entry* entry = m_entries[Index(index)];
+
+    switch (entry->type)
+    {
+        case Type::Array:
+        {
+            auto arrayEntry = static_cast<const ASTSerialInfo::ArrayEntry*>(entry);
+            outCount = Index(arrayEntry->elementCount);
+            return (arrayEntry + 1);
+        }
+        default: break;
+    }
+
+    SLANG_ASSERT(!"Not an array");
+    outCount = 0;
+    return nullptr;
+}
+
 ASTSerialPointer ASTSerialReader::getPointer(ASTSerialIndex index)
 {
-    SLANG_UNUSED(index);
+    if (index == ASTSerialIndex(0))
+    {
+        return ASTSerialPointer();
+    }
+
+    SLANG_ASSERT(ASTSerialIndexRaw(index) < ASTSerialIndexRaw(m_entries.getCount()));
+    const Entry* entry = m_entries[Index(index)];
+
+    switch (entry->type)
+    {
+        case Type::String:
+        {
+            // Hmm. Tricky -> we don't know if will be cast as Name or String. Lets assume string.
+            String string = getString(index);
+            return ASTSerialPointer(string.getStringRepresentation());
+        }
+        case Type::Node:
+        {
+            return ASTSerialPointer((NodeBase*)m_objects[Index(index)]);
+        }
+        case Type::RefObject:
+        {
+            return ASTSerialPointer((RefObject*)m_objects[Index(index)]);
+        }
+        default: break;
+    }
+
+    SLANG_ASSERT(!"Cannot access as a pointer");
     return ASTSerialPointer();
 }
 
 String ASTSerialReader::getString(ASTSerialIndex index)
 {
-    SLANG_UNUSED(index);
-    return String();
+    if (index == ASTSerialIndex(0))
+    {
+        return String();
+    }
+
+    SLANG_ASSERT(ASTSerialIndexRaw(index) < ASTSerialIndexRaw(m_entries.getCount()));
+    const Entry* entry = m_entries[Index(index)];
+
+    // It has to be a string type
+    if (entry->type != Type::String)
+    {
+        SLANG_ASSERT(!"Not a string");
+        return String();
+    }
+
+    RefObject* obj = (RefObject*)m_objects[Index(index)];
+
+    if (obj)
+    {
+        StringRepresentation* stringRep = dynamicCast<StringRepresentation>(obj);
+        if (stringRep)
+        {
+            return String(stringRep);
+        }
+        // Must be a name then
+        Name* name = dynamicCast<Name>(obj);
+        SLANG_ASSERT(name);
+        return name->text;
+    }
+
+    // Okay we need to construct as a string
+    UnownedStringSlice slice = getStringSlice(index);
+    String string(slice);
+    StringRepresentation* stringRep = string.getStringRepresentation();
+
+    m_scope.add(stringRep);
+    m_objects[Index(index)] = stringRep;
+    return string;
 }
 
 Name* ASTSerialReader::getName(ASTSerialIndex index)
@@ -1230,13 +1485,66 @@ Name* ASTSerialReader::getName(ASTSerialIndex index)
     {
         return nullptr;
     }
-    return nullptr;
+
+    SLANG_ASSERT(ASTSerialIndexRaw(index) < ASTSerialIndexRaw(m_entries.getCount()));
+    const Entry* entry = m_entries[Index(index)];
+
+    // It has to be a string type
+    if (entry->type != Type::String)
+    {
+        SLANG_ASSERT(!"Not a string");
+        return nullptr;
+    }
+
+    RefObject* obj = (RefObject*)m_objects[Index(index)];
+
+    if (obj)
+    {
+        Name* name = dynamicCast<Name>(obj);
+        if (name)
+        {
+            return name;
+        }
+        // Can only be a string then
+        StringRepresentation* stringRep = dynamicCast<StringRepresentation>(obj);
+        SLANG_ASSERT(stringRep);
+
+        // I don't need to scope, as scoped in NamePool
+        name  = m_namePool->getName(String(stringRep));
+
+        // Store as name, as can always access the inner string if needed
+        m_objects[Index(index)] = name;
+        return name;
+    }
+
+    UnownedStringSlice slice = getStringSlice(index);
+    String string(slice);
+    Name* name = m_namePool->getName(string);
+    // Don't need to add to scope, because scoped on the pool
+    m_objects[Index(index)] = name;
+    return name;
 }
 
 UnownedStringSlice ASTSerialReader::getStringSlice(ASTSerialIndex index)
 {
-    SLANG_UNUSED(index);
-    return UnownedStringSlice();
+    SLANG_ASSERT(ASTSerialIndexRaw(index) < ASTSerialIndexRaw(m_entries.getCount()));
+    const Entry* entry = m_entries[Index(index)];
+
+    // It has to be a string type
+    if (entry->type != Type::String)
+    {
+        SLANG_ASSERT(!"Not a string");
+        return UnownedStringSlice();
+    }
+
+    auto stringEntry = static_cast<const ASTSerialInfo::StringEntry*>(entry);
+
+    const uint8_t* src = (const uint8_t*)stringEntry->sizeAndChars;
+
+    // Decode the string
+    uint32_t size;
+    int sizeSize = ByteEncodeUtil::decodeLiteUInt32(src, &size);
+    return UnownedStringSlice((const char*)src + sizeSize, size);
 }
 
 SourceLoc ASTSerialReader::getSourceLoc(ASTSerialSourceLoc loc)
@@ -1245,9 +1553,165 @@ SourceLoc ASTSerialReader::getSourceLoc(ASTSerialSourceLoc loc)
     return SourceLoc();
 }
 
+SlangResult ASTSerialReader::loadEntries(const uint8_t* data, size_t dataCount, List<const ASTSerialInfo::Entry*>& outEntries)
+{
+    // Check the input data is at least aligned to the max alignment (otherwise everything cannot be aligned correctly)
+    SLANG_ASSERT((size_t(data) & (ASTSerialInfo::MAX_ALIGNMENT - 1)) == 0);
+
+    outEntries.setCount(1);
+    outEntries[0] = nullptr;
+
+    const uint8_t*const end = data + dataCount;
+
+    const uint8_t* cur = data;
+    while (cur < end)
+    {
+        const Entry* entry = (const Entry*)cur;
+        outEntries.add(entry);
+
+        const size_t entrySize = entry->calcSize(m_classes);
+        cur += entrySize;
+
+        // Need to get the next alignment
+        const size_t nextAlignment = ASTSerialInfo::getNextAlignment(entry->info);
+
+        // Need to fix cur with the alignment
+        cur = (const uint8_t*)((size_t(cur) + nextAlignment - 1) & ~(nextAlignment - 1));
+    }
+
+    return SLANG_OK;
+}
+
+SlangResult ASTSerialReader::load(const uint8_t* data, size_t dataCount, ASTBuilder* builder, NamePool* namePool)
+{
+    SLANG_RETURN_ON_FAIL(loadEntries(data, dataCount, m_entries));
+
+    m_namePool = namePool;
+
+    m_objects.clearAndDeallocate();
+    m_objects.setCount(m_entries.getCount());
+    memset(m_objects.getBuffer(), 0, m_objects.getCount() * sizeof(void*));
+
+    // Go through entries, constructing objects.
+    for (Index i = 1; i < m_entries.getCount(); ++i)
+    {
+        const Entry* entry = m_entries[i];
+
+        switch (entry->type)
+        {
+            case Type::String:
+            {
+                // Don't need to construct an object. This is probably a StringRepresentation, or a Name
+                // Will evaluate lazily.
+                break;
+            }
+            case Type::Node:
+            {
+                auto nodeEntry = static_cast<const ASTSerialInfo::NodeEntry*>(entry);
+                m_objects[i] = builder->createByNodeType(ASTNodeType(nodeEntry->astNodeType));
+                break;
+            }
+            case Type::RefObject:
+            {
+                auto objEntry = static_cast<const ASTSerialInfo::RefObjectEntry*>(entry);
+                switch (objEntry->subType)
+                {
+                    case ASTSerialInfo::RefObjectEntry::SubType::Breadcrumb:
+                    {
+                        typedef LookupResultItem::Breadcrumb Breadcrumb;
+
+                        auto breadcrumb = new LookupResultItem::Breadcrumb(Breadcrumb::Kind::Member, DeclRef<Decl>(), nullptr);
+                        m_scope.add(breadcrumb);
+                        m_objects[i] = breadcrumb;
+                        break;
+                    }
+                    default:
+                    {
+                        SLANG_ASSERT(!"Unknown type");
+                        return SLANG_FAIL;
+                    }
+                }
+                break;
+            }
+            case Type::Array:
+            {
+                // Don't need to construct an object, as will be accessed an interpreted by the object that holds it
+                break;
+            }
+        }
+    }
+
+    // Deserialize
+    for (Index i = 1; i < m_entries.getCount(); ++i)
+    {
+        const Entry* entry = m_entries[i];
+        void* native = m_objects[i];
+        if (!native)
+        {
+            continue;
+        }
+        switch (entry->type)
+        {
+            case Type::Node:
+            {
+                auto nodeEntry = static_cast<const ASTSerialInfo::NodeEntry*>(entry);
+                auto serialClass = m_classes->getSerialClass(ASTNodeType(nodeEntry->astNodeType));
+
+                const uint8_t* src = (const uint8_t*)(nodeEntry + 1);
+                uint8_t* dst = (uint8_t*)m_objects[i];
+
+                // It must be constructed
+                SLANG_ASSERT(dst);
+
+                while (serialClass)
+                {
+                    for (Index j = 0; j < serialClass->fieldsCount; ++j)
+                    {
+                        auto field = serialClass->fields[j];
+                        auto fieldType = field.type;
+                        fieldType->toNativeFunc(this, src + field.serialOffset, dst + field.nativeOffset);
+                    }
+
+                    auto cls = ReflectClassInfo::getInfo(serialClass->type);
+                    auto superCls = cls->m_superClass;
+
+                    // Get the super class
+                    serialClass = superCls ? m_classes->getSerialClass(ASTNodeType(superCls->m_classId)) : nullptr;
+                }
+
+                break;
+            }
+            case Type::RefObject:
+            {
+                auto objEntry = static_cast<const ASTSerialInfo::RefObjectEntry*>(entry);
+                switch (objEntry->subType)
+                {
+                    case ASTSerialInfo::RefObjectEntry::SubType::Breadcrumb:
+                    {
+                        typedef LookupResultItem::Breadcrumb Breadcrumb;
+                        auto serialType = ASTSerialGetType<Breadcrumb>::getType();
+                        serialType->toNativeFunc(this, (entry + 1), m_objects[i]);
+                        break;
+                    }
+                    default:
+                    {
+                        SLANG_ASSERT(!"Unknown type");
+                        return SLANG_FAIL;
+                    }
+                }
+                break;
+            }
+            default: break;
+        }
+    }
+
+    return SLANG_OK;
+}
+
+
 // !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! ASTSerializeUtil  !!!!!!!!!!!!!!!!!!!!!!!!!!!!
 
-/* static */SlangResult ASTSerializeUtil::selfTest()
+/* static */SlangResult ASTSerialTestUtil::selfTest()
 {
     RefPtr<ASTSerialClasses> classes = new ASTSerialClasses;
 
@@ -1280,6 +1744,93 @@ SourceLoc ASTSerialReader::getSourceLoc(ASTSerialSourceLoc loc)
     {
         const ASTSerialType* type = ASTSerialGetType<Type*[3]>::getType();
         SLANG_UNUSED(type);
+    }
+
+    return SLANG_OK;
+}
+
+/* static */SlangResult ASTSerialTestUtil::testSerialize(NodeBase* node, RootNamePool* rootNamePool, SharedASTBuilder* sharedASTBuilder, SourceManager* sourceManager)
+{
+    RefPtr<ASTSerialClasses> classes = new ASTSerialClasses;
+
+    List<uint8_t> contents;
+
+    {
+        OwnedMemoryStream stream(FileAccess::ReadWrite);
+
+        ASTSerialWriter writer(classes);
+
+        // Lets serialize it all
+        writer.addPointer(node);
+        // Let's stick it all in a stream
+        writer.write(&stream);
+
+        stream.swapContents(contents);
+
+        NamePool namePool;
+        namePool.setRootNamePool(rootNamePool);
+
+        ASTSerialReader reader(classes);
+
+        ASTBuilder builder(sharedASTBuilder, "Serialize Check");
+
+        // We could now check that the loaded data matches
+
+        {
+            const List<ASTSerialInfo::Entry*>& writtenEntries = writer.getEntries();
+            List<const ASTSerialInfo::Entry*> readEntries;
+
+            SlangResult res = reader.loadEntries(contents.getBuffer(), contents.getCount(), readEntries);
+            SLANG_UNUSED(res);
+
+            SLANG_ASSERT(writtenEntries.getCount() == readEntries.getCount());
+
+            // They should be identical up to the
+            for (Index i = 1; i < readEntries.getCount(); ++i)
+            {
+                auto writtenEntry = writtenEntries[i];
+                auto readEntry = readEntries[i];
+
+                const size_t writtenSize = writtenEntry->calcSize(classes);
+                const size_t readSize = readEntry->calcSize(classes);
+
+                SLANG_ASSERT(readSize == writtenSize);
+                // Check the payload is the same
+                SLANG_ASSERT(memcmp(readEntry, writtenEntry, readSize) == 0);
+            }
+
+        }
+
+        {
+            SlangResult res = reader.load(contents.getBuffer(), contents.getCount(), &builder, &namePool);
+            SLANG_UNUSED(res);
+        }
+
+        // Lets see what we have
+        const ASTDumpUtil::Flags dumpFlags = ASTDumpUtil::Flag::HideSourceLoc | ASTDumpUtil::Flag::HideScope;
+
+        String readDump;
+        {
+            SourceWriter sourceWriter(sourceManager, LineDirectiveMode::None);
+            ASTDumpUtil::dump(reader.getPointer(ASTSerialIndex(1)).dynamicCast<NodeBase>(), ASTDumpUtil::Style::Hierachical, dumpFlags, &sourceWriter);
+            readDump = sourceWriter.getContentAndClear();
+
+        }
+        String origDump;
+        {
+            SourceWriter sourceWriter(sourceManager, LineDirectiveMode::None);
+            ASTDumpUtil::dump(node, ASTDumpUtil::Style::Hierachical, dumpFlags, &sourceWriter);
+            origDump = sourceWriter.getContentAndClear();
+        }
+
+        // Write out
+        File::writeAllText("ast-read.ast-dump", readDump);
+        File::writeAllText("ast-orig.ast-dump", origDump);
+
+        if (readDump != origDump)
+        {
+            return SLANG_FAIL;
+        }
     }
 
     return SLANG_OK;

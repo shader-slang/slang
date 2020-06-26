@@ -774,7 +774,7 @@ class MutatingAttribute : public Attribute
 // `set` accessor does not need to modify anything through
 // its `this` parameter.
 //
-class NonmutatingAttribute : public Attribute 
+class NonmutatingAttribute : public Attribute
 {
     SLANG_CLASS(NonmutatingAttribute)
 };

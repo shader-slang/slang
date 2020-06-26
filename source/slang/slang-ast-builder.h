@@ -103,6 +103,8 @@ public:
     template<typename T, typename P0, typename P1>
     T* create(const P0& p0, const P1& p1) { return _initAndAdd(new (m_arena.allocate(sizeof(T))) T(p0, p1));}
 
+    NodeBase* createByNodeType(ASTNodeType nodeType);
+
         /// Get the built in types
     SLANG_FORCE_INLINE Type* getBoolType() { return m_sharedASTBuilder->m_builtinTypes[Index(BaseType::Bool)]; }
     SLANG_FORCE_INLINE Type* getHalfType() { return m_sharedASTBuilder->m_builtinTypes[Index(BaseType::Half)]; }

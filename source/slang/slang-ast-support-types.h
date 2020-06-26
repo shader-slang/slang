@@ -499,6 +499,8 @@ namespace Slang
         const char* m_name;                         ///< Textual class name, for debugging 
         CreateFunc m_createFunc;                    ///< Callback to use when creating instances (using an ASTBuilder for backing memory)
         DestructorFunc m_destructorFunc;            ///< The destructor for this type. Being just destructor, does not free backing memory for type.
+        uint32_t m_sizeInBytes;                     ///< Total size of the type
+        uint8_t m_alignment;                        ///< The required alignment of the type
 
         struct Infos
         {
