@@ -5306,6 +5306,7 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
         // Setup subContext for proper lowering `ThisType`, associated types and
         // the interface decl's self reference.
         subContext->thisType = getBuilder()->getThisType();
+
         // Create a temporary IR value for self references, this will be replaced
         // by actual interface type after we create the actual interface type.
         auto temporarySelf = subBuilder->createIntrinsicInst(nullptr, kIROp_undefined, 0, nullptr);
@@ -5322,15 +5323,29 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
 
         for (auto requirementDecl : decl->members)
         {
-            auto key = getInterfaceRequirementKey(requirementDecl);
+            auto entry = subBuilder->createInterfaceRequirementEntry(
+                getInterfaceRequirementKey(requirementDecl),
+                nullptr);
             IRInst* requirementVal = lowerDecl(subContext, requirementDecl).val;
             if (requirementVal)
             {
                 auto reqType = requirementVal->getFullType();
-                requirementVal->removeAndDeallocate();
-                requirementVal = reqType;
+                entry->setRequirementVal(reqType);
+                if (!requirementVal->hasUses())
+                {
+                    // Remove lowered `IRFunc`s since we only care about
+                    // function types.
+                    switch (requirementVal->op)
+                    {
+                    case kIROp_Func:
+                    case kIROp_Generic:
+                        requirementVal->removeAndDeallocate();
+                        break;
+                    default:
+                        break;
+                    }
+                }   
             }
-            auto entry = subBuilder->createInterfaceRequirementEntry(key, requirementVal);
             requirementEntries.add(entry);
             // As a special case, any type constraints placed
             // on an associated type will *also* need to be turned
@@ -5345,7 +5360,10 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
                             getBuilder()->getWitnessTableType(lowerType(context, constraintDecl->getSup().type))));
                 }
             }
-            context->env->mapDeclToValue[requirementDecl] = LoweredValInfo::simple(entry);
+            // Add lowered requirement entry to current decl mapping to prevent
+            // the function requirements from being lowered again when we get to
+            // `ensureAllDeclsRec`.
+            setValue(context, requirementDecl, LoweredValInfo::simple(entry));
         }
 
         IRInterfaceType* irInterface = subBuilder->createInterfaceType(

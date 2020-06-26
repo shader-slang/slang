@@ -1209,6 +1209,7 @@ struct IRInterfaceRequirementEntry : IRInst
 {
     IRInst* getRequirementKey() { return getOperand(0); }
     IRInst* getRequirementVal() { return getOperand(1); }
+    void setRequirementKey(IRInst* val) { setOperand(0, val); }
     void setRequirementVal(IRInst* val) { setOperand(1, val); }
 
     IR_LEAF_ISA(InterfaceRequirementEntry);
