@@ -544,7 +544,7 @@ struct ASTSerialTestUtil
 
         /// Tries to serialize out, read back in and test the results are the same.
         /// Will write dumped out node to files 
-    static SlangResult ASTSerialTestUtil::testSerialize(NodeBase* node, RootNamePool* rootNamePool, SharedASTBuilder* sharedASTBuilder, SourceManager* sourceManager);
+    static SlangResult testSerialize(NodeBase* node, RootNamePool* rootNamePool, SharedASTBuilder* sharedASTBuilder, SourceManager* sourceManager);
 };
 
 } // namespace Slang
