@@ -7,6 +7,8 @@
 #include "slang-compiler.h"
 #include "slang-type-layout.h"
 
+#include "slang-ast-dump.h"
+
 #include "slang-ast-support-types.h"
 
 #include "../core/slang-byte-encode-util.h"
@@ -219,6 +221,24 @@ struct ASTSerialTypeInfo<T*>
         *(T**)outNative = reader->getPointer(*(const SerialType*)inSerial).dynamicCast<T>();
     }
 };
+
+// Special case Name
+template <>
+struct ASTSerialTypeInfo<Name*> : public ASTSerialTypeInfo<RefObject*>
+{
+    // Special case 
+    typedef Name* NativeType;
+    static void toNative(ASTSerialReader* reader, const void* inSerial, void* outNative)
+    {
+        *(Name**)outNative = reader->getName(*(const SerialType*)inSerial);
+    }
+};
+
+template <>
+struct ASTSerialTypeInfo<const Name*> : public ASTSerialTypeInfo<Name*>
+{
+};
+
 
 struct ASTSerialDeclRefBaseTypeInfo
 {
@@ -651,7 +671,7 @@ struct ASTSerialTypeInfo<TypeExp>
         auto& dst = *(NativeType*)native;
 
         dst.type = reader->getPointer(src.type).dynamicCast<Type>();
-        dst.exp = reader->getPointer(src.type).dynamicCast<Expr>();
+        dst.exp = reader->getPointer(src.expr).dynamicCast<Expr>();
     }
 };
 
@@ -779,7 +799,15 @@ struct ASTSerialTypeInfo<Token>
 
         ASTSerialTypeInfo<TokenType>::toSerial(writer, &src.type, &dst.type);
         ASTSerialTypeInfo<SourceLoc>::toSerial(writer, &src.loc, &dst.loc);
-        dst.name = writer->addName(src.getName());
+
+        if (src.flags & TokenFlag::Name)
+        {
+            dst.name = writer->addName(src.getName());
+        }
+        else
+        {
+            dst.name = writer->addString(src.getContent());
+        }
     }
     static void toNative(ASTSerialReader* reader, const void* serial, void* native)
     {
@@ -792,6 +820,7 @@ struct ASTSerialTypeInfo<Token>
         ASTSerialTypeInfo<TokenType>::toNative(reader, &src.type, &dst.type);
         ASTSerialTypeInfo<SourceLoc>::toNative(reader, &src.loc, &dst.loc);
 
+        // At the other end all token content will appear as Names.
         if (src.name != ASTSerialIndex(0))
         {
             dst.charsNameUnion.name = reader->getName(src.name);
@@ -1682,7 +1711,7 @@ SlangResult ASTSerialReader::load(const uint8_t* data, size_t dataCount, ASTBuil
 
 // !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! ASTSerializeUtil  !!!!!!!!!!!!!!!!!!!!!!!!!!!!
 
-/* static */SlangResult ASTSerializeUtil::selfTest()
+/* static */SlangResult ASTSerialTestUtil::selfTest()
 {
     RefPtr<ASTSerialClasses> classes = new ASTSerialClasses;
 
@@ -1715,6 +1744,93 @@ SlangResult ASTSerialReader::load(const uint8_t* data, size_t dataCount, ASTBuil
     {
         const ASTSerialType* type = ASTSerialGetType<Type*[3]>::getType();
         SLANG_UNUSED(type);
+    }
+
+    return SLANG_OK;
+}
+
+/* static */SlangResult ASTSerialTestUtil::testSerialize(NodeBase* node, RootNamePool* rootNamePool, SharedASTBuilder* sharedASTBuilder, SourceManager* sourceManager)
+{
+    RefPtr<ASTSerialClasses> classes = new ASTSerialClasses;
+
+    List<uint8_t> contents;
+
+    {
+        OwnedMemoryStream stream(FileAccess::ReadWrite);
+
+        ASTSerialWriter writer(classes);
+
+        // Lets serialize it all
+        writer.addPointer(node);
+        // Let's stick it all in a stream
+        writer.write(&stream);
+
+        stream.swapContents(contents);
+
+        NamePool namePool;
+        namePool.setRootNamePool(rootNamePool);
+
+        ASTSerialReader reader(classes);
+
+        ASTBuilder builder(sharedASTBuilder, "Serialize Check");
+
+        // We could now check that the loaded data matches
+
+        {
+            const List<ASTSerialInfo::Entry*>& writtenEntries = writer.getEntries();
+            List<const ASTSerialInfo::Entry*> readEntries;
+
+            SlangResult res = reader.loadEntries(contents.getBuffer(), contents.getCount(), readEntries);
+            SLANG_UNUSED(res);
+
+            SLANG_ASSERT(writtenEntries.getCount() == readEntries.getCount());
+
+            // They should be identical up to the
+            for (Index i = 1; i < readEntries.getCount(); ++i)
+            {
+                auto writtenEntry = writtenEntries[i];
+                auto readEntry = readEntries[i];
+
+                const size_t writtenSize = writtenEntry->calcSize(classes);
+                const size_t readSize = readEntry->calcSize(classes);
+
+                SLANG_ASSERT(readSize == writtenSize);
+                // Check the payload is the same
+                SLANG_ASSERT(memcmp(readEntry, writtenEntry, readSize) == 0);
+            }
+
+        }
+
+        {
+            SlangResult res = reader.load(contents.getBuffer(), contents.getCount(), &builder, &namePool);
+            SLANG_UNUSED(res);
+        }
+
+        // Lets see what we have
+        const ASTDumpUtil::Flags dumpFlags = ASTDumpUtil::Flag::HideSourceLoc | ASTDumpUtil::Flag::HideScope;
+
+        String readDump;
+        {
+            SourceWriter sourceWriter(sourceManager, LineDirectiveMode::None);
+            ASTDumpUtil::dump(reader.getPointer(ASTSerialIndex(1)).dynamicCast<NodeBase>(), ASTDumpUtil::Style::Hierachical, dumpFlags, &sourceWriter);
+            readDump = sourceWriter.getContentAndClear();
+
+        }
+        String origDump;
+        {
+            SourceWriter sourceWriter(sourceManager, LineDirectiveMode::None);
+            ASTDumpUtil::dump(node, ASTDumpUtil::Style::Hierachical, dumpFlags, &sourceWriter);
+            origDump = sourceWriter.getContentAndClear();
+        }
+
+        // Write out
+        File::writeAllText("ast-read.ast-dump", readDump);
+        File::writeAllText("ast-orig.ast-dump", origDump);
+
+        if (readDump != origDump)
+        {
+            return SLANG_FAIL;
+        }
     }
 
     return SLANG_OK;

@@ -10,9 +10,8 @@
 
 namespace Slang {
 
-namespace { // anonymous
 
-struct Context
+struct ASTDumpContext
 {
     struct ObjectInfo
     {
@@ -23,7 +22,7 @@ struct Context
 
     struct ScopeWrite
     {
-        ScopeWrite(Context* context):
+        ScopeWrite(ASTDumpContext* context):
             m_context(context)
         {
             if (m_context->m_scopeWriteCount == 0)
@@ -45,7 +44,7 @@ struct Context
 
         operator StringBuilder&() { return m_context->m_buf; }
 
-        Context* m_context;
+        ASTDumpContext* m_context;
     };
 
     void dumpObject(const ReflectClassInfo& type, NodeBase* obj);
@@ -138,6 +137,11 @@ struct Context
 
     void dump(const Scope* scope)
     {
+        if (m_dumpFlags & ASTDumpUtil::Flag::HideScope)
+        {
+            return;
+        }
+
         if (scope == nullptr)
         {
             _dumpPtr(nullptr);
@@ -212,6 +216,11 @@ struct Context
 
     void dump(SourceLoc sourceLoc)
     {
+        if (m_dumpFlags & ASTDumpUtil::Flag::HideSourceLoc)
+        {
+            return;
+        }
+
         SourceManager* manager = m_writer->getSourceManager();
 
         {
@@ -562,13 +571,15 @@ struct Context
 
     void dumpObjectFull(NodeBase* node);
 
-    Context(SourceWriter* writer, ASTDumpUtil::Style dumpStyle):
+    ASTDumpContext(SourceWriter* writer, ASTDumpUtil::Flags flags, ASTDumpUtil::Style dumpStyle):
         m_writer(writer),
         m_scopeWriteCount(0),
-        m_dumpStyle(dumpStyle)
+        m_dumpStyle(dumpStyle),
+        m_dumpFlags(flags)
     {
     }
 
+    ASTDumpUtil::Flags m_dumpFlags;
     ASTDumpUtil::Style m_dumpStyle;
 
     Index m_scopeWriteCount;
@@ -582,8 +593,6 @@ struct Context
     StringBuilder m_buf;
 };
 
-} // anonymous
-
 // Lets generate functions one for each that attempts to write out *it's* fields.
 // We can write out the Super types fields by looking that up
 
@@ -592,7 +601,7 @@ struct ASTDumpAccess
 #define SLANG_AST_DUMP_FIELD(FIELD_NAME, TYPE, param) context.dumpField(#FIELD_NAME, node->FIELD_NAME); 
 
 #define SLANG_AST_DUMP_FIELDS_IMPL(NAME, SUPER, ORIGIN, LAST, MARKER, TYPE, param) \
-static void dumpFields_##NAME(NAME* node, Context& context) \
+static void dumpFields_##NAME(NAME* node, ASTDumpContext& context) \
 { \
     SLANG_UNUSED(node); \
     SLANG_UNUSED(context); \
@@ -605,7 +614,7 @@ SLANG_ALL_ASTNode_NodeBase(SLANG_AST_DUMP_FIELDS_IMPL, _)
 
 #define SLANG_AST_GET_DUMP_FUNC(NAME, SUPER, ORIGIN, LAST, MARKER, TYPE, param) m_funcs[Index(ASTNodeType::NAME)] = (DumpFieldsFunc)&ASTDumpAccess::dumpFields_##NAME;
 
-typedef void (*DumpFieldsFunc)(NodeBase* obj, Context& context);
+typedef void (*DumpFieldsFunc)(NodeBase* obj, ASTDumpContext& context);
 
 struct DumpFieldFuncs
 {
@@ -620,13 +629,13 @@ struct DumpFieldFuncs
 
 static const DumpFieldFuncs s_funcs;
 
-void Context::dumpObjectReference(const ReflectClassInfo& type, NodeBase* obj, Index objIndex)
+void ASTDumpContext::dumpObjectReference(const ReflectClassInfo& type, NodeBase* obj, Index objIndex)
 {
     SLANG_UNUSED(obj);
     ScopeWrite(this).getBuf() << type.m_name << ":" << objIndex;
 }
 
-void Context::dumpObjectFull(const ReflectClassInfo& type, NodeBase* obj, Index objIndex)
+void ASTDumpContext::dumpObjectFull(const ReflectClassInfo& type, NodeBase* obj, Index objIndex)
 {
     ObjectInfo& info = m_objects[objIndex];
     SLANG_ASSERT(info.m_isDumped == false);
@@ -662,7 +671,7 @@ void Context::dumpObjectFull(const ReflectClassInfo& type, NodeBase* obj, Index 
     m_writer->emit("}\n");
 }
 
-void Context::dumpObject(const ReflectClassInfo& typeInfo, NodeBase* obj)
+void ASTDumpContext::dumpObject(const ReflectClassInfo& typeInfo, NodeBase* obj)
 {
     Index index = getObjectIndex(typeInfo, obj);
 
@@ -677,7 +686,7 @@ void Context::dumpObject(const ReflectClassInfo& typeInfo, NodeBase* obj)
     }
 }
 
-void Context::dumpObjectFull(NodeBase* node)
+void ASTDumpContext::dumpObjectFull(NodeBase* node)
 {
     if (!node)
     {
@@ -691,9 +700,9 @@ void Context::dumpObjectFull(NodeBase* node)
     }
 }
 
-/* static */void ASTDumpUtil::dump(NodeBase* node, Style style, SourceWriter* writer)
+/* static */void ASTDumpUtil::dump(NodeBase* node, Style style, Flags flags, SourceWriter* writer)
 {
-    Context context(writer, style);
+    ASTDumpContext context(writer, flags, style);
     context.dumpObjectFull(node);
     context.dumpRemaining();
 }
