@@ -228,6 +228,7 @@ IRInst* IRSpecContext::maybeCloneValue(IRInst* originalValue)
     case kIROp_StructKey:
     case kIROp_GlobalGenericParam:
     case kIROp_WitnessTable:
+    case kIROp_InterfaceType:
     case kIROp_TaggedUnionType:
         return cloneGlobalValue(this, originalValue);
 
@@ -607,8 +608,7 @@ IRInterfaceType* cloneInterfaceTypeImpl(
     auto clonedInterface = builder->createInterfaceType(originalInterface->getOperandCount(), nullptr);
     for (UInt i = 0; i < originalInterface->getOperandCount(); i++)
     {
-        auto clonedKey = findClonedValue(context, originalInterface->getOperand(i));
-        SLANG_ASSERT(clonedKey);
+        auto clonedKey = cloneValue(context, originalInterface->getOperand(i));
         clonedInterface->setOperand(i, clonedKey);
     }
     cloneSimpleGlobalValueImpl(context, originalInterface, originalValues, clonedInterface);
@@ -628,6 +628,7 @@ void cloneGlobalValueWithCodeCommon(
 
     cloneDecorations(context, clonedValue, originalValue);
     cloneExtraDecorations(context, clonedValue, originalValues);
+    clonedValue->setFullType((IRType*)cloneValue(context, originalValue->getFullType()));
 
     // We will walk through the blocks of the function, and clone each of them.
     //
@@ -1152,7 +1153,6 @@ IRInst* cloneGlobalValueImpl(
     return clonedValue;
 }
 
-
     /// Clone a global value, which has the given `originalLinkage`.
     ///
     /// The `originalVal` is a known global IR value with that linkage, if one is available.
@@ -1216,7 +1216,7 @@ IRInst* cloneGlobalValueWithLinkage(
     for(IRSpecSymbol* ss = sym; ss; ss = ss->nextWithSameName )
     {
         IRInst* newVal = ss->irGlobalValue;
-        if(isBetterForTarget(context, newVal, bestVal))
+        if (isBetterForTarget(context, newVal, bestVal))
             bestVal = newVal;
     }
 

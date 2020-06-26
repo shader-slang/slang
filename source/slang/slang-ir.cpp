@@ -1408,10 +1408,7 @@ namespace Slang
 
         inst->op = op;
 
-        if (type)
-        {
-            inst->typeUse.init(inst, type);
-        }
+        inst->typeUse.init(inst, type);
 
         maybeSetSourceLoc(builder, inst);
 
@@ -1422,6 +1419,10 @@ namespace Slang
             if (fixedArgs)
             {
                 operand->init(inst, fixedArgs[aa]);
+            }
+            else
+            {
+                operand->init(inst, nullptr);
             }
             operand++;
         }
@@ -2194,6 +2195,21 @@ namespace Slang
         return (IRStringType*)getType(kIROp_StringType);
     }
 
+    IRAssociatedType* IRBuilder::getAssociatedType()
+    {
+        return (IRAssociatedType*)getType(kIROp_AssociatedType);
+    }
+
+    IRThisType* IRBuilder::getThisType()
+    {
+        return (IRThisType*)getType(kIROp_ThisType);
+    }
+
+    IRRawPointerType* IRBuilder::getRawPointerType()
+    {
+        return (IRRawPointerType*)getType(kIROp_RawPointerType);
+    }
+
     IRBasicBlockType*   IRBuilder::getBasicBlockType()
     {
         return (IRBasicBlockType*)getType(kIROp_BasicBlockType);
@@ -2808,6 +2824,20 @@ namespace Slang
             entry->insertAtEnd(witnessTable);
         }
 
+        return entry;
+    }
+
+    IRInterfaceRequirementEntry* IRBuilder::createInterfaceRequirementEntry(
+        IRInst* requirementKey,
+        IRInst* requirementVal)
+    {
+        IRInterfaceRequirementEntry* entry = createInst<IRInterfaceRequirementEntry>(
+            this,
+            kIROp_InterfaceRequirementEntry,
+            nullptr,
+            requirementKey,
+            requirementVal);
+        addGlobalValue(this, entry);
         return entry;
     }
 

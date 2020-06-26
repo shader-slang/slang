@@ -166,10 +166,6 @@ IR_SIMPLE_DECORATION(VulkanCallablePayloadDecoration)
 /// to it.
 IR_SIMPLE_DECORATION(VulkanHitAttributesDecoration)
 
-IR_SIMPLE_DECORATION(PolymorphicDecoration)
-IR_SIMPLE_DECORATION(ThisPointerDecoration)
-
-
 struct IRRequireGLSLVersionDecoration : IRDecoration
 {
     enum { kOp = kIROp_RequireGLSLVersionDecoration };
@@ -413,6 +409,8 @@ struct IRLookupWitnessMethod : IRInst
 
     IRInst* getWitnessTable() { return witnessTable.get(); }
     IRInst* getRequirementKey() { return requirementKey.get(); }
+
+    IR_LEAF_ISA(lookup_interface_method)
 };
 
 struct IRLookupWitnessTable : IRInst
@@ -1432,6 +1430,11 @@ struct IRWitnessTable : IRInst
         return IRInstList<IRWitnessTableEntry>(getChildren());
     }
 
+    IRInst* getConformanceType()
+    {
+        return getOperand(0);
+    }
+
     IR_LEAF_ISA(WitnessTable)
 };
 
@@ -1571,6 +1574,10 @@ struct IRBuilder
     IRBasicType* getBoolType();
     IRBasicType* getIntType();
     IRStringType* getStringType();
+    IRAssociatedType* getAssociatedType();
+    IRThisType* getThisType();
+    IRRawPointerType* getRawPointerType();
+
 
     IRBasicBlockType*   getBasicBlockType();
     IRWitnessTableType* getWitnessTableType(IRType* baseType);
@@ -1800,7 +1807,7 @@ struct IRBuilder
         IRType* valueType);
     IRGlobalParam* createGlobalParam(
         IRType* valueType);
-
+    
     /// Creates an IRWitnessTable value.
     /// @param baseType: The comformant-to type of this witness.
     IRWitnessTable* createWitnessTable(IRType* baseType);
@@ -1808,6 +1815,10 @@ struct IRBuilder
         IRWitnessTable* witnessTable,
         IRInst*        requirementKey,
         IRInst*        satisfyingVal);
+
+    IRInterfaceRequirementEntry* createInterfaceRequirementEntry(
+        IRInst* requirementKey,
+        IRInst* requirementVal);
 
     // Create an initially empty `struct` type.
     IRStructType*   createStructType();
@@ -2158,16 +2169,6 @@ struct IRBuilder
     void addLoopControlDecoration(IRInst* value, IRLoopControl mode)
     {
         addDecoration(value, kIROp_LoopControlDecoration, getIntValue(getIntType(), IRIntegerValue(mode)));
-    }
-
-    void addPolymorphicDecoration(IRInst* value)
-    {
-        addDecoration(value, kIROp_PolymorphicDecoration);
-    }
-
-    void addThisPointerDecoration(IRInst* value)
-    {
-        addDecoration(value, kIROp_ThisPointerDecoration);
     }
 
     void addSemanticDecoration(IRInst* value, UnownedStringSlice const& text, int index = 0)

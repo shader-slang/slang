@@ -89,7 +89,7 @@ protected:
     virtual SlangResult calcScalarFuncName(HLSLIntrinsic::Op op, IRBasicType* type, StringBuilder& outBuilder);
 
         // Emits a struct of function pointers defined in `interfaceType`.
-    void _maybeEmitWitnessTableTypeDefinition(IRInterfaceType* interfaceType, const List<IRWitnessTableEntry*>& sortedWitnessTableEntries);
+    void _maybeEmitWitnessTableTypeDefinition(IRInterfaceType* interfaceType);
     void _maybeEmitSpecializedOperationDefinition(const HLSLIntrinsic* specOp);
 
     void _emitForwardDeclarations(const List<EmitAction>& actions);

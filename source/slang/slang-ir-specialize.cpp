@@ -416,6 +416,11 @@ struct SpecializationContext
         case kIROp_BindExistentialsType:
             break;
 
+            // An interface type is always fully specialized.
+        case kIROp_InterfaceType:
+            markInstAsFullySpecialized(inst);
+            break;
+
         case kIROp_Specialize:
             // The `specialize` instruction is a bit sepcial,
             // because it is possible to have a `specialize`

@@ -2,11 +2,14 @@
 
 // Test dynamic dispatch code gen for static member functions
 // of associated type.
-
+interface IGetter
+{
+    int getVal();
+};
 interface IAssoc
 {
     int get();
-    static int getBase();
+    static int getBase<T:IGetter>(T getter);
 }
 interface IInterface
 {
@@ -14,9 +17,15 @@ interface IInterface
 	int Compute(int inVal);
 };
 
+struct GetterImpl : IGetter
+{
+    int getVal() { return 1; }
+};
+
 int GenericCompute<T:IInterface>(T obj, int inVal)
 {
-	return obj.Compute(inVal) + T.Assoc.getBase();
+    GetterImpl getter;
+	return obj.Compute(inVal) + T.Assoc.getBase(getter);
 }
 
 struct Impl : IInterface
@@ -25,7 +34,7 @@ struct Impl : IInterface
     {
         int val;
         int get() { return val; }
-        static int getBase() { return -1; }
+        static int getBase<T:IGetter>(T t) { return t.getVal(); }
     };
     int base;
 	int Compute(int inVal) { return base + inVal * inVal; }
