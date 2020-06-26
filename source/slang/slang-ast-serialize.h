@@ -7,6 +7,8 @@
 #include "slang-ast-support-types.h"
 #include "slang-ast-all.h"
 
+#include "slang-ast-builder.h"
+
 #include "../core/slang-byte-encode-util.h"
 
 #include "../core/slang-stream.h"
@@ -533,9 +535,16 @@ protected:
     ASTSerialClass m_classes[Index(ASTNodeType::CountOf)];
 };
 
-struct ASTSerializeUtil
+
+/* None of the functions in this util should *not* be called from production code,
+they exist to test features of AST Serialization */
+struct ASTSerialTestUtil
 {
     static SlangResult selfTest();
+
+        /// Tries to serialize out, read back in and test the results are the same.
+        /// Will write dumped out node to files 
+    static SlangResult ASTSerialTestUtil::testSerialize(NodeBase* node, RootNamePool* rootNamePool, SharedASTBuilder* sharedASTBuilder, SourceManager* sourceManager);
 };
 
 } // namespace Slang
