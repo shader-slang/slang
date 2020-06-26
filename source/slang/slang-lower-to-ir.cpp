@@ -1001,6 +1001,10 @@ IRStructKey* getInterfaceRequirementKey(
     IRGenContext*   context,
     Decl*           requirementDecl)
 {
+    // TODO: this special case logic can be removed if we also clean up `doesGenericSignatureMatchRequirement`
+    // Currently `doesGenericSignatureMatchRequirement` will use the inner func decl as the key
+    // in AST WitnessTable. Therefore we need to match this behavior by always using the inner
+    // decl as the requirement key.
     if (auto genericDecl = as<GenericDecl>(requirementDecl))
         return getInterfaceRequirementKey(context, genericDecl->inner);
     IRStructKey* requirementKey = nullptr;
