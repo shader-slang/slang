@@ -19,7 +19,17 @@ struct ASTDumpUtil
         Flat,
     };
 
-    static void dump(NodeBase* node, Style style, SourceWriter* writer);
+    typedef uint32_t Flags;
+    struct Flag
+    {
+        enum Enum : Flags
+        {
+            HideSourceLoc = 0x1,
+            HideScope     = 0x2,
+        };
+    };
+
+    static void dump(NodeBase* node, Style style, Flags flags, SourceWriter* writer);
 };
 
 } // namespace Slang
