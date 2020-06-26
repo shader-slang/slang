@@ -2,7 +2,6 @@
 #ifndef SLANG_IR_SERIALIZE_TYPES_H_INCLUDED
 #define SLANG_IR_SERIALIZE_TYPES_H_INCLUDED
 
-#include "../core/slang-object-scope-manager.h"
 #include "../core/slang-riff.h"
 #include "../core/slang-string-slice-pool.h"
 #include "../core/slang-array-view.h"
@@ -22,6 +21,10 @@ enum class IRSerialCompressionType : uint8_t
 
 class StringRepresentationCache
 {
+    // TODO: The name of this type is no longer accurate to its function.
+    // It doesn't *cache* anything, and instead just provides convenient
+    // access to the contents of a serialized string table.
+
     public:
     typedef StringSlicePool::Handle Handle;
 
@@ -29,29 +32,18 @@ class StringRepresentationCache
     {
         uint32_t m_startIndex;
         uint32_t m_numChars;
-        RefObject* m_object;                ///< Could be nullptr, Name, or StringRepresentation. 
     };
 
-        /// Get as a name
-    Name* getName(Handle handle);
-        /// Get as a string
-    String getString(Handle handle);
-        /// Get as string representation
-    StringRepresentation* getStringRepresentation(Handle handle);
         /// Get as a string slice
     UnownedStringSlice getStringSlice(Handle handle) const;
-        /// Get as a 0 terminated 'c style' string
-    char* getCStr(Handle handle);
 
-        /// Initialize a cache to use a string table, namePool and scopeManager
-    void init(const List<char>* stringTable, NamePool* namePool, ObjectScopeManager* scopeManager);
+        /// Initialize a cache to use a string table
+    void init(const List<char>* stringTable);
 
         /// Ctor
     StringRepresentationCache(); 
     
     protected:
-    ObjectScopeManager* m_scopeManager;
-    NamePool* m_namePool;
     const List<char>* m_stringTable;
     List<Entry> m_entries;
 };

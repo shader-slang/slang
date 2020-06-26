@@ -12,7 +12,6 @@
 #include "slang-source-loc.h"
 
 #include "../core/slang-memory-arena.h"
-#include "../core/slang-object-scope-manager.h"
 
 #include "slang-type-system-shared.h"
 
@@ -1356,9 +1355,6 @@ struct IRModule : RefObject
 
     IRInstListBase getGlobalInsts() const { return getModuleInst()->getChildren(); }
 
-        /// Get the object scope manager
-    SLANG_FORCE_INLINE ObjectScopeManager* getObjectScopeManager() { return &m_objectScopeManager; }
-
         /// Ctor
     IRModule():
         memoryArena(kMemoryArenaBlockSize)
@@ -1370,10 +1366,6 @@ struct IRModule : RefObject
     // The compilation session in use.
     Session*    session;
     IRModuleInst* moduleInst;
-
-    protected:
-
-    ObjectScopeManager m_objectScopeManager;
 };
 
     /// How much detail to include in dumped IR.
