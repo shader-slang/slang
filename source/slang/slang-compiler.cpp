@@ -1761,154 +1761,154 @@ SlangResult dissassembleDXILUsingDXC(
         case CodeGenTarget::HostCallable:
         case CodeGenTarget::SharedLibrary:
         case CodeGenTarget::Executable:
-        {
-            RefPtr<DownstreamCompileResult> downstreamResult;
-
-            if (SLANG_SUCCEEDED(emitWithDownstreamForEntryPoints(
-                compileRequest,
-                getEntryPointIndices(entryPoints),
-                targetReq,
-                endToEndReq,
-                downstreamResult)))
             {
-                maybeDumpIntermediate(compileRequest, downstreamResult, target);
+                RefPtr<DownstreamCompileResult> downstreamResult;
 
-                result = CompileResult(downstreamResult);
+                if (SLANG_SUCCEEDED(emitWithDownstreamForEntryPoints(
+                    compileRequest,
+                    getEntryPointIndices(entryPoints),
+                    targetReq,
+                    endToEndReq,
+                    downstreamResult)))
+                {
+                    maybeDumpIntermediate(compileRequest, downstreamResult, target);
+
+                    result = CompileResult(downstreamResult);
+                }
             }
-        }
-        break;
+            break;
         case CodeGenTarget::GLSL:
         case CodeGenTarget::HLSL:
         case CodeGenTarget::CUDASource:
         case CodeGenTarget::CPPSource:
         case CodeGenTarget::CSource:
-        {
-            SourceResult source;
-            if (SLANG_FAILED(emitEntryPointsSource(compileRequest, getEntryPointIndices(entryPoints),
-                targetReq, target, endToEndReq, source)))
             {
-                return result;
-            }
+                SourceResult source;
+                if (SLANG_FAILED(emitEntryPointsSource(compileRequest, getEntryPointIndices(entryPoints),
+                    targetReq, target, endToEndReq, source)))
+                {
+                    return result;
+                }
 
-            const auto& code = source.source;
-            maybeDumpIntermediate(compileRequest, code.getBuffer(), target);
-            result = CompileResult(code);
-        }
-        break;
-
-#if SLANG_ENABLE_DXBC_SUPPORT
-        case CodeGenTarget::DXBytecode:
-        {
-            // Assert only one entry point case -- move out of this function
-            List<uint8_t> code;
-            if (SLANG_SUCCEEDED(emitDXBytecodeForEntryPoint(
-                compileRequest,
-                assertSingleEntryPoint(entryPoints),
-                targetReq,
-                endToEndReq,
-                code)))
-            {
-                maybeDumpIntermediate(compileRequest, code.getBuffer(), code.getCount(), target);
-
-                result = CompileResult(ListBlob::moveCreate(code));
-            }
-        }
-        break;
-
-        case CodeGenTarget::DXBytecodeAssembly:
-        {
-            // Assert only one entry point case
-            String code;
-            if (SLANG_SUCCEEDED(emitDXBytecodeAssemblyForEntryPoint(
-                compileRequest,
-                assertSingleEntryPoint(entryPoints),
-                targetReq,
-                endToEndReq,
-                code)))
-            {
+                const auto& code = source.source;
                 maybeDumpIntermediate(compileRequest, code.getBuffer(), target);
                 result = CompileResult(code);
             }
-        }
-        break;
+            break;
+
+#if SLANG_ENABLE_DXBC_SUPPORT
+        case CodeGenTarget::DXBytecode:
+            {
+                // Assert only one entry point case -- move out of this function
+                List<uint8_t> code;
+                if (SLANG_SUCCEEDED(emitDXBytecodeForEntryPoint(
+                    compileRequest,
+                    assertSingleEntryPoint(entryPoints),
+                    targetReq,
+                    endToEndReq,
+                    code)))
+                {
+                    maybeDumpIntermediate(compileRequest, code.getBuffer(), code.getCount(), target);
+
+                    result = CompileResult(ListBlob::moveCreate(code));
+                }
+            }
+            break;
+
+        case CodeGenTarget::DXBytecodeAssembly:
+            {
+                // Assert only one entry point case
+                String code;
+                if (SLANG_SUCCEEDED(emitDXBytecodeAssemblyForEntryPoint(
+                    compileRequest,
+                    assertSingleEntryPoint(entryPoints),
+                    targetReq,
+                    endToEndReq,
+                    code)))
+                {
+                    maybeDumpIntermediate(compileRequest, code.getBuffer(), target);
+                    result = CompileResult(code);
+                }
+            }
+            break;
 #endif
 
 #if SLANG_ENABLE_DXIL_SUPPORT
         case CodeGenTarget::DXIL:
-        {
-            List<uint8_t> code;
-            EntryPointAndIndex entryPoint = assertSingleEntryPoint(entryPoints);
-            if (SLANG_SUCCEEDED(emitDXILForEntryPointUsingDXC(
-                compileRequest,
-                entryPoint.entryPoint,
-                entryPoint.index,
-                targetReq,
-                endToEndReq,
-                code)))
             {
-                maybeDumpIntermediate(compileRequest, code.getBuffer(), code.getCount(), target);
-                result = CompileResult(ListBlob::moveCreate(code));
+                List<uint8_t> code;
+                EntryPointAndIndex entryPoint = assertSingleEntryPoint(entryPoints);
+                if (SLANG_SUCCEEDED(emitDXILForEntryPointUsingDXC(
+                    compileRequest,
+                    entryPoint.entryPoint,
+                    entryPoint.index,
+                    targetReq,
+                    endToEndReq,
+                    code)))
+                {
+                    maybeDumpIntermediate(compileRequest, code.getBuffer(), code.getCount(), target);
+                    result = CompileResult(ListBlob::moveCreate(code));
+                }
             }
-        }
-        break;
+            break;
 
         case CodeGenTarget::DXILAssembly:
-        {
-            List<uint8_t> code;
-            EntryPointAndIndex entryPoint = assertSingleEntryPoint(entryPoints);
-            if (SLANG_SUCCEEDED(emitDXILForEntryPointUsingDXC(
-                compileRequest,
-                entryPoint.entryPoint,
-                entryPoint.index,
-                targetReq,
-                endToEndReq,
-                code)))
             {
-                String assembly;
-                dissassembleDXILUsingDXC(
+                List<uint8_t> code;
+                EntryPointAndIndex entryPoint = assertSingleEntryPoint(entryPoints);
+                if (SLANG_SUCCEEDED(emitDXILForEntryPointUsingDXC(
                     compileRequest,
-                    code.getBuffer(),
-                    code.getCount(),
-                    assembly);
+                    entryPoint.entryPoint,
+                    entryPoint.index,
+                    targetReq,
+                    endToEndReq,
+                    code)))
+                {
+                    String assembly;
+                    dissassembleDXILUsingDXC(
+                        compileRequest,
+                        code.getBuffer(),
+                        code.getCount(),
+                        assembly);
 
-                maybeDumpIntermediate(compileRequest, assembly.getBuffer(), target);
-                result = CompileResult(assembly);
+                    maybeDumpIntermediate(compileRequest, assembly.getBuffer(), target);
+                    result = CompileResult(assembly);
+                }
             }
-        }
-        break;
+            break;
 #endif
 
         case CodeGenTarget::SPIRV:
-        {
-            List<uint8_t> code;
-            if (SLANG_SUCCEEDED(emitSPIRVForEntryPoints(
-                compileRequest,
-                entryPoints,
-                targetReq,
-                endToEndReq,
-                code)))
             {
-                maybeDumpIntermediate(compileRequest, code.getBuffer(), code.getCount(), target);
-                result = CompileResult(ListBlob::moveCreate(code));
+                List<uint8_t> code;
+                if (SLANG_SUCCEEDED(emitSPIRVForEntryPoints(
+                    compileRequest,
+                    entryPoints,
+                    targetReq,
+                    endToEndReq,
+                    code)))
+                {
+                    maybeDumpIntermediate(compileRequest, code.getBuffer(), code.getCount(), target);
+                    result = CompileResult(ListBlob::moveCreate(code));
+                }
             }
-        }
-        break;
+            break;
 
         case CodeGenTarget::SPIRVAssembly:
-        {
-            String code;
-            if (SLANG_SUCCEEDED(emitSPIRVAssemblyForEntryPoints(
-                compileRequest,
-                entryPoints,
-                targetReq,
-                endToEndReq,
-                code)))
             {
-                maybeDumpIntermediate(compileRequest, code.getBuffer(), target);
-                result = CompileResult(code);
+                String code;
+                if (SLANG_SUCCEEDED(emitSPIRVAssemblyForEntryPoints(
+                    compileRequest,
+                    entryPoints,
+                    targetReq,
+                    endToEndReq,
+                    code)))
+                {
+                    maybeDumpIntermediate(compileRequest, code.getBuffer(), target);
+                    result = CompileResult(code);
+                }
             }
-        }
-        break;
+            break;
 
         case CodeGenTarget::None:
             // The user requested no output
@@ -2055,7 +2055,7 @@ SlangResult dissassembleDXILUsingDXC(
         writer->write(text.getBuffer(), text.getLength());
     }
 
-    static void writeWholeProgramToStandardOutput(
+    static void writeCompileRequestToStandardOutput(
         EndToEndCompileRequest* compileRequest,
         TargetRequest* targetReq,
         CompileResult const& result)
@@ -2158,7 +2158,7 @@ SlangResult dissassembleDXILUsingDXC(
         CompileResult const&        result)
     {
         SLANG_UNUSED(entryPoint);
-        writeWholeProgramToStandardOutput(compileRequest, targetReq, result);
+        writeCompileRequestToStandardOutput(compileRequest, targetReq, result);
     }
 
     static void writeWholeProgramResult(
@@ -2191,7 +2191,7 @@ SlangResult dissassembleDXILUsingDXC(
             }
         }
 
-        writeWholeProgramToStandardOutput(compileRequest, targetReq, result);
+        writeCompileRequestToStandardOutput(compileRequest, targetReq, result);
     }
 
     static void writeEntryPointResult(
