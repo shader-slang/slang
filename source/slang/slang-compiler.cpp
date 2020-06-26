@@ -2087,47 +2087,47 @@ SlangResult dissassembleDXILUsingDXC(
                     switch (targetReq->target)
                     {
                 #if SLANG_ENABLE_DXBC_SUPPORT
-                case CodeGenTarget::DXBytecode:
-                    {
-                        String assembly;
-                        dissassembleDXBC(backEndReq, blobData, blobSize, assembly);
-                        writeOutputToConsole(writer, assembly);
-                    }
-                    break;
+                    case CodeGenTarget::DXBytecode:
+                        {
+                            String assembly;
+                            dissassembleDXBC(backEndReq, blobData, blobSize, assembly);
+                            writeOutputToConsole(writer, assembly);
+                        }
+                        break;
                 #endif
 
                 #if SLANG_ENABLE_DXIL_SUPPORT
-                case CodeGenTarget::DXIL:
-                    {
-                        String assembly;
-                        dissassembleDXILUsingDXC(backEndReq, blobData, blobSize, assembly);
-                        writeOutputToConsole(writer, assembly);
-                    }
-                    break;
+                    case CodeGenTarget::DXIL:
+                        {
+                            String assembly;
+                            dissassembleDXILUsingDXC(backEndReq, blobData, blobSize, assembly);
+                            writeOutputToConsole(writer, assembly);
+                        }
+                        break;
                 #endif
 
-                case CodeGenTarget::SPIRV:
-                    {
-                        String assembly;
-                        dissassembleSPIRV(backEndReq, blobData, blobSize, assembly);
-                        writeOutputToConsole(writer, assembly);
-                    }
-                    break;
+                    case CodeGenTarget::SPIRV:
+                        {
+                            String assembly;
+                            dissassembleSPIRV(backEndReq, blobData, blobSize, assembly);
+                            writeOutputToConsole(writer, assembly);
+                        }
+                        break;
 
-                case CodeGenTarget::PTX:
-                    // For now we just dump PTX out as hex
+                    case CodeGenTarget::PTX:
+                        // For now we just dump PTX out as hex
 
-                case CodeGenTarget::HostCallable:
-                case CodeGenTarget::SharedLibrary:
-                case CodeGenTarget::Executable:
-                    HexDumpUtil::dumpWithMarkers((const uint8_t*)blobData, blobSize, 24, writer);
-                    break;
+                    case CodeGenTarget::HostCallable:
+                    case CodeGenTarget::SharedLibrary:
+                    case CodeGenTarget::Executable:
+                        HexDumpUtil::dumpWithMarkers((const uint8_t*)blobData, blobSize, 24, writer);
+                        break;
 
 
-                default:
-                    SLANG_UNEXPECTED("unhandled output format");
-                    return;
-                    }
+                    default:
+                        SLANG_UNEXPECTED("unhandled output format");
+                        return;
+                        }
                 }
             else
             {
