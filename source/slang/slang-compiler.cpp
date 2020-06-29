@@ -821,6 +821,40 @@ namespace Slang
         return calcSourcePathForEntryPoints(endToEndReq, entryPointIndices);
     }
 
+    struct EntryPointAndIndex {
+        EntryPoint* entryPoint;
+        Int         index;
+        EntryPointAndIndex();
+        EntryPointAndIndex(EntryPoint* entryPoint, Int index);
+    };
+
+    EntryPointAndIndex::EntryPointAndIndex()
+    {
+        entryPoint = NULL;
+        index = -1;
+    }
+
+    EntryPointAndIndex::EntryPointAndIndex(EntryPoint* ep, Int i)
+    {
+        entryPoint = ep;
+        index = i;
+    }
+
+    // Helper function for recovering the entry point code indices from a list of entry points
+    List<Int> getEntryPointIndices(List<EntryPointAndIndex> const& entryPoints) {
+        List<Int> result;
+        for (auto entryPoint = entryPoints.begin(); entryPoint != entryPoints.end(); entryPoint++) {
+            result.add(entryPoint->index);
+        }
+        return result;
+    }
+
+    // Helper function for cases where we can assume a single entry point
+    EntryPointAndIndex assertSingleEntryPoint(List<EntryPointAndIndex> const& entryPoints) {
+        SLANG_ASSERT(entryPoints.getCount() == 1);
+        return *entryPoints.begin();
+    }
+
 #if SLANG_ENABLE_DXBC_SUPPORT
 
     static UnownedStringSlice _getSlice(ID3DBlob* blob)
@@ -921,40 +955,6 @@ namespace Slang
             return S_OK;
         }
     };
-
-    struct EntryPointAndIndex {
-        EntryPoint* entryPoint;
-        Int         index;
-        EntryPointAndIndex();
-        EntryPointAndIndex(EntryPoint* entryPoint, Int index);
-    };
-
-    EntryPointAndIndex::EntryPointAndIndex()
-    {
-        entryPoint = NULL;
-        index = -1;
-    }
-
-    EntryPointAndIndex::EntryPointAndIndex(EntryPoint* ep, Int i)
-    {
-        entryPoint = ep;
-        index = i;
-    }
-
-    // Helper function for recovering the entry point code indices from a list of entry points
-    List<Int> getEntryPointIndices(List<EntryPointAndIndex> const& entryPoints) {
-        List<Int> result;
-        for (auto entryPoint = entryPoints.begin(); entryPoint != entryPoints.end(); entryPoint++) {
-            result.add(entryPoint->index);
-        }
-        return result;
-    }
-
-    // Helper function for cases where we can assume a single entry point
-    EntryPointAndIndex assertSingleEntryPoint(List<EntryPointAndIndex> const& entryPoints) {
-        SLANG_ASSERT(entryPoints.getCount() == 1);
-        return *entryPoints.begin();
-    }
 
     SlangResult emitDXBytecodeForEntryPoint(
         BackEndCompileRequest*  compileRequest,
