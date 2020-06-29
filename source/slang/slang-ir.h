@@ -458,6 +458,7 @@ struct IRInst
 
     void setOperand(UInt index, IRInst* value)
     {
+        SLANG_ASSERT(getOperands()[index].user != nullptr);
         getOperands()[index].set(value);
     }
 
@@ -1104,11 +1105,15 @@ struct IRPtrTypeBase : IRType
 
 SIMPLE_IR_TYPE(PtrType, PtrTypeBase)
 SIMPLE_IR_TYPE(RefType, PtrTypeBase)
-
 SIMPLE_IR_PARENT_TYPE(OutTypeBase, PtrTypeBase)
 SIMPLE_IR_TYPE(OutType, OutTypeBase)
 SIMPLE_IR_TYPE(InOutType, OutTypeBase)
 SIMPLE_IR_TYPE(ExistentialBoxType, PtrTypeBase)
+
+struct IRRawPointerType : IRType
+{
+    IR_LEAF_ISA(RawPointerType)
+};
 
 struct IRGlobalHashedStringLiterals : IRInst
 {
@@ -1190,6 +1195,26 @@ struct IRStructType : IRType
     IR_LEAF_ISA(StructType)
 };
 
+struct IRAssociatedType : IRType
+{
+    IR_LEAF_ISA(AssociatedType)
+};
+
+struct IRThisType : IRType
+{
+    IR_LEAF_ISA(ThisType)
+};
+
+struct IRInterfaceRequirementEntry : IRInst
+{
+    IRInst* getRequirementKey() { return getOperand(0); }
+    IRInst* getRequirementVal() { return getOperand(1); }
+    void setRequirementKey(IRInst* val) { setOperand(0, val); }
+    void setRequirementVal(IRInst* val) { setOperand(1, val); }
+
+    IR_LEAF_ISA(InterfaceRequirementEntry);
+};
+
 struct IRInterfaceType : IRType
 {
     IR_LEAF_ISA(InterfaceType)
@@ -1207,6 +1232,10 @@ struct IRTypeType : IRType
 
 struct IRWitnessTableType : IRType
 {
+    IRInst* getConformanceType()
+    {
+        return getOperand(0);
+    }
     IR_LEAF_ISA(WitnessTableType);
 };
 

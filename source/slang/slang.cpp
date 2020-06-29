@@ -1064,7 +1064,7 @@ void FrontEndCompileRequest::parseTranslationUnit(
             StringBuilder buf;
             SourceWriter writer(linkage->getSourceManager(), LineDirectiveMode::None);
 
-            ASTDumpUtil::dump(translationUnit->getModuleDecl(), ASTDumpUtil::Style::Flat, &writer);
+            ASTDumpUtil::dump(translationUnit->getModuleDecl(), ASTDumpUtil::Style::Flat, 0, &writer);
 
             const String& path = sourceFile->getPathInfo().foundPath;
             if (path.getLength())
@@ -1079,11 +1079,7 @@ void FrontEndCompileRequest::parseTranslationUnit(
 #if 0
         // Test serialization
         {
-            RefPtr<ASTSerialClasses> classes = new ASTSerialClasses;
-            ASTSerialWriter writer(classes);
-
-            // Lets serialize it all
-            writer.addPointer(translationUnit->getModuleDecl());
+            ASTSerialTestUtil::testSerialize(translationUnit->getModuleDecl(), getSession()->getRootNamePool(), getLinkage()->getASTBuilder()->getSharedASTBuilder(), getSourceManager());
         }
 #endif
 

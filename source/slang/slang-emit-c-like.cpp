@@ -203,7 +203,7 @@ void CLikeSourceEmitter::emitSimpleType(IRType* type)
         case kIROp_HalfType:    return UnownedStringSlice("half");     
 
         case kIROp_FloatType:   return UnownedStringSlice("float");    
-        case kIROp_DoubleType:  return UnownedStringSlice("double");   
+        case kIROp_DoubleType:  return UnownedStringSlice("double");
         default:                return UnownedStringSlice();
     }
 }
@@ -236,9 +236,9 @@ List<IRWitnessTableEntry*> CLikeSourceEmitter::getSortedWitnessTableEntries(IRWi
     // Get a sorted list of entries using RequirementKeys defined in `interfaceType`.
     for (UInt i = 0; i < interfaceType->getOperandCount(); i++)
     {
-        auto reqKey = cast<IRStructKey>(interfaceType->getOperand(i));
+        auto reqEntry = cast<IRInterfaceRequirementEntry>(interfaceType->getOperand(i));
         IRWitnessTableEntry* entry = nullptr;
-        if (witnessTableEntryDictionary.TryGetValue(reqKey, entry))
+        if (witnessTableEntryDictionary.TryGetValue(reqEntry->getRequirementKey(), entry))
         {
             sortedWitnessTableEntries.add(entry);
         }
@@ -305,7 +305,8 @@ void CLikeSourceEmitter::emitWitnessTable(IRWitnessTable* witnessTable)
 void CLikeSourceEmitter::emitInterface(IRInterfaceType* interfaceType)
 {
     SLANG_UNUSED(interfaceType);
-    SLANG_DIAGNOSE_UNEXPECTED(getSink(), SourceLoc(), "Unimplemented emit: IROpInterfaceType.");
+    // By default, don't emit anything for interface types.
+    // This behavior is overloaded by concrete emitters.
 }
 
 void CLikeSourceEmitter::emitTypeImpl(IRType* type, const StringSliceLoc* nameAndLoc)
@@ -1962,6 +1963,10 @@ void CLikeSourceEmitter::defaultEmitInstExpr(IRInst* inst, const EmitOpInfo& inO
         are hashed with 'getStringHash' */
         break;
 
+    case kIROp_undefined:
+        m_writer->emit(getName(inst));
+        break;
+
     case kIROp_IntLit:
     case kIROp_FloatLit:
     case kIROp_BoolLit:
@@ -2285,7 +2290,6 @@ void CLikeSourceEmitter::defaultEmitInstExpr(IRInst* inst, const EmitOpInfo& inO
             m_writer->emit(")");
         }
         break;
-
     default:
         diagnoseUnhandledInst(inst);
         break;
@@ -3554,6 +3558,11 @@ void CLikeSourceEmitter::emitGlobalInst(IRInst* inst)
         are hashed with 'getStringHash' */
         break;
 
+    case kIROp_InterfaceRequirementEntry:
+        // Don't emit anything for interface requirement at global level.
+        // They are handled in `emitInterface`.
+        break;
+
     case kIROp_Func:
         emitFunc((IRFunc*) inst);
         break;
@@ -3610,6 +3619,10 @@ void CLikeSourceEmitter::ensureInstOperandsRec(ComputeEmitActionsContext* ctx, I
     ensureInstOperand(ctx, inst->getFullType());
 
     UInt operandCount = inst->operandCount;
+    auto requiredLevel = EmitAction::Definition;
+    if (inst->op == kIROp_InterfaceType)
+        requiredLevel = EmitAction::ForwardDeclaration;
+
     for(UInt ii = 0; ii < operandCount; ++ii)
     {
         // TODO: there are some special cases we can add here,
@@ -3621,7 +3634,7 @@ void CLikeSourceEmitter::ensureInstOperandsRec(ComputeEmitActionsContext* ctx, I
         // Similarly, a `call` instruction only needs the callee
         // to be forward-declared, etc.
 
-        ensureInstOperand(ctx, inst->getOperand(ii));
+        ensureInstOperand(ctx, inst->getOperand(ii), requiredLevel);
     }
 
     for(auto child : inst->getDecorationsAndChildren())
@@ -3641,6 +3654,8 @@ void CLikeSourceEmitter::ensureGlobalInst(ComputeEmitActionsContext* ctx, IRInst
         if (!m_compileRequest->allowDynamicCode)
             return;
         break;
+
+    case kIROp_InterfaceRequirementEntry:
     case kIROp_Generic:
         return;
 
