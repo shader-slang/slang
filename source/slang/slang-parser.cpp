@@ -2649,6 +2649,7 @@ namespace Slang
         Modifiers modifiers = ParseModifiers(parser);
 
         AccessorDecl* decl = nullptr;
+        auto loc = peekToken(parser).loc;
         if( AdvanceIf(parser, "get") )
         {
             decl = parser->astBuilder->create<GetterDecl>();
@@ -2666,6 +2667,7 @@ namespace Slang
             Unexpected(parser);
             return nullptr;
         }
+        decl->loc = loc;
 
         AddModifiers(decl, modifiers.first);
 
