@@ -1992,7 +1992,11 @@ namespace Slang
         {
             auto containerDecl = scope->containerDecl;
 
-            if( auto funcDeclBase = as<FunctionDeclBase>(containerDecl) )
+            if( auto setterDecl = as<SetterDecl>(containerDecl) )
+            {
+                expr->type.isLeftValue = true;
+            }
+            else if( auto funcDeclBase = as<FunctionDeclBase>(containerDecl) )
             {
                 if( funcDeclBase->hasModifier<MutatingAttribute>() )
                 {

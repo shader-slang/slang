@@ -208,6 +208,10 @@ namespace Slang
         Parser*			parser,
         ContainerDecl*	containerDecl);
 
+    static void parseModernParamList(
+        Parser*         parser,
+        CallableDecl*   decl);
+
     //
 
     static void Unexpected(
@@ -1208,7 +1212,7 @@ namespace Slang
     }
 
     static void parseParameterList(
-        Parser*                 parser,
+        Parser*         parser,
         CallableDecl*    decl)
     {
         parser->ReadToken(TokenType::LParent);
@@ -2645,6 +2649,7 @@ namespace Slang
         Modifiers modifiers = ParseModifiers(parser);
 
         AccessorDecl* decl = nullptr;
+        auto loc = peekToken(parser).loc;
         if( AdvanceIf(parser, "get") )
         {
             decl = parser->astBuilder->create<GetterDecl>();
@@ -2662,8 +2667,23 @@ namespace Slang
             Unexpected(parser);
             return nullptr;
         }
+        decl->loc = loc;
 
         AddModifiers(decl, modifiers.first);
+
+        parser->PushScope(decl);
+
+        // A `set` declaration should support declaring an explicit
+        // name for the parameter representing the new value.
+        //
+        // We handle this by supporting an arbitrary parameter list
+        // on any accessor, and then assume that semantic checking
+        // will diagnose any cases that aren't allowed.
+        //
+        if(parser->tokenReader.peekTokenType() == TokenType::LParent)
+        {
+            parseModernParamList(parser, decl);
+        }
 
         if( parser->tokenReader.peekTokenType() == TokenType::LBrace )
         {
@@ -2674,7 +2694,29 @@ namespace Slang
             parser->ReadToken(TokenType::Semicolon);
         }
 
+        parser->PopScope();
+
+
         return decl;
+    }
+
+    static void parseStorageDeclBody(Parser* parser, ContainerDecl* decl)
+    {
+        if( AdvanceIf(parser, TokenType::LBrace) )
+        {
+            // We want to parse nested "accessor" declarations
+            while( !AdvanceIfMatch(parser, TokenType::RBrace) )
+            {
+                auto accessor = parseAccessorDecl(parser);
+                AddMember(decl, accessor);
+            }
+        }
+        else
+        {
+            parser->ReadToken(TokenType::Semicolon);
+
+            // empty body should be treated like `{ get; }`
+        }
     }
 
     static NodeBase* ParseSubscriptDecl(Parser* parser, void* /*userData*/)
@@ -2693,21 +2735,7 @@ namespace Slang
             decl->returnType = parser->ParseTypeExp();
         }
 
-        if( AdvanceIf(parser, TokenType::LBrace) )
-        {
-            // We want to parse nested "accessor" declarations
-            while( !AdvanceIfMatch(parser, TokenType::RBrace) )
-            {
-                auto accessor = parseAccessorDecl(parser);
-                AddMember(decl, accessor);
-            }
-        }
-        else
-        {
-            parser->ReadToken(TokenType::Semicolon);
-
-            // empty body should be treated like `{ get; }`
-        }
+        parseStorageDeclBody(parser, decl);
 
         parser->PopScope();
         return decl;
@@ -2716,6 +2744,25 @@ namespace Slang
     static bool expect(Parser* parser, TokenType tokenType)
     {
         return parser->ReadToken(tokenType).type == tokenType;
+    }
+
+    static NodeBase* ParsePropertyDecl(Parser* parser, void* /*userData*/)
+    {
+        PropertyDecl* decl = parser->astBuilder->create<PropertyDecl>();
+        parser->FillPosition(decl);
+        parser->PushScope(decl);
+
+        decl->nameAndLoc = expectIdentifier(parser);
+
+        if( expect(parser, TokenType::Colon) )
+        {
+            decl->type = parser->ParseTypeExp();
+        }
+
+        parseStorageDeclBody(parser, decl);
+
+        parser->PopScope();
+        return decl;
     }
 
     static void parseModernVarDeclBaseCommon(
@@ -5254,6 +5301,7 @@ namespace Slang
         DECL(extension,       ParseExtensionDecl);
         DECL(__init,          parseConstructorDecl);
         DECL(__subscript,     ParseSubscriptDecl);
+        DECL(property,        ParsePropertyDecl);
         DECL(interface,       parseInterfaceDecl);
         DECL(syntax,          parseSyntaxDecl);
         DECL(attribute_syntax,parseAttributeSyntaxDecl);

@@ -78,9 +78,23 @@ namespace Slang
 
         void visitConstructorDecl(ConstructorDecl* decl);
 
+        void visitAbstractStorageDeclCommon(ContainerDecl* decl);
+
         void visitSubscriptDecl(SubscriptDecl* decl);
 
+        void visitPropertyDecl(PropertyDecl* decl);
+
+
+            /// Get the type of the storage accessed by an accessor.
+            ///
+            /// The type of storage is determined by the parent declaration.
+        Type* _getAccessorStorageType(AccessorDecl* decl);
+
+            /// Perform checks common to all types of accessors.
+        void _visitAccessorDeclCommon(AccessorDecl* decl);
+
         void visitAccessorDecl(AccessorDecl* decl);
+        void visitSetterDecl(SetterDecl* decl);
     };
 
     struct SemanticsDeclRedeclarationVisitor
@@ -378,6 +392,30 @@ namespace Slang
 
             qualType.isLeftValue = isLValue;
             return qualType;
+        }
+        else if( auto propertyDeclRef = declRef.as<PropertyDecl>() )
+        {
+            // Access to a declared `property` is similar to
+            // access to a variable/field, except that it
+            // is mediated through accessors (getters, seters, etc.).
+
+            QualType qualType;
+            qualType.type = getType(astBuilder, propertyDeclRef);
+
+            bool isLValue = false;
+
+            // If the property has any declared accessors that
+            // can be used to set the property, then the resulting
+            // expression behaves as an l-value.
+            //
+            if(propertyDeclRef.getDecl()->getMembersOfType<SetterDecl>().isNonEmpty())
+                isLValue = true;
+            if(propertyDeclRef.getDecl()->getMembersOfType<RefAccessorDecl>().isNonEmpty())
+                isLValue = true;
+
+            qualType.isLeftValue = isLValue;
+            return qualType;
+
         }
         else if( auto enumCaseDeclRef = declRef.as<EnumCaseDecl>() )
         {
@@ -3652,19 +3690,19 @@ namespace Slang
         checkCallableDeclCommon(decl);
     }
 
-    void SemanticsDeclHeaderVisitor::visitSubscriptDecl(SubscriptDecl* decl)
+    void SemanticsDeclHeaderVisitor::visitAbstractStorageDeclCommon(ContainerDecl* decl)
     {
-        decl->returnType = CheckUsableType(decl->returnType);
-
-        // If we have a subscript declaration with no accessor declarations,
+        // If we have a subscript or property declaration with no accessor declarations,
         // then we should create a single `GetterDecl` to represent
         // the implicit meaning of their declaration, so:
         //
         //      subscript(uint index) -> T;
+        //      property x : Y;
         //
         // becomes:
         //
         //      subscript(uint index) -> T { get; }
+        //      property x : Y { get; }
         //
 
         bool anyAccessors = decl->getMembersOfType<AccessorDecl>().isNonEmpty();
@@ -3677,29 +3715,173 @@ namespace Slang
             getterDecl->parentDecl = decl;
             decl->members.add(getterDecl);
         }
+    }
+
+    void SemanticsDeclHeaderVisitor::visitSubscriptDecl(SubscriptDecl* decl)
+    {
+        decl->returnType = CheckUsableType(decl->returnType);
+
+        visitAbstractStorageDeclCommon(decl);
 
         checkCallableDeclCommon(decl);
     }
 
-    void SemanticsDeclHeaderVisitor::visitAccessorDecl(AccessorDecl* decl)
+    void SemanticsDeclHeaderVisitor::visitPropertyDecl(PropertyDecl* decl)
     {
-        // An accessor must appear nested inside a subscript declaration (today),
-        // or a property declaration (when we add them). It will derive
-        // its return type from the outer declaration, so we handle both
-        // of these checks at the same place.
-        auto parent = decl->parentDecl;
-        if (auto parentSubscript = as<SubscriptDecl>(parent))
+        decl->type = CheckUsableType(decl->type);
+        visitAbstractStorageDeclCommon(decl);
+    }
+
+    Type* SemanticsDeclHeaderVisitor::_getAccessorStorageType(AccessorDecl* decl)
+    {
+        auto parentDecl = decl->parentDecl;
+        if (auto parentSubscript = as<SubscriptDecl>(parentDecl))
         {
             ensureDecl(parentSubscript, DeclCheckState::CanUseTypeOfValueDecl);
-            decl->returnType = parentSubscript->returnType;
+            return parentSubscript->returnType;
         }
-        // TODO: when we add "property" declarations, check for them here
+        else if (auto parentProperty = as<PropertyDecl>(parentDecl))
+        {
+            ensureDecl(parentProperty, DeclCheckState::CanUseTypeOfValueDecl);
+            return parentProperty->type.type;
+        }
+        else
+        {
+            return getASTBuilder()->getErrorType();
+        }
+    }
+
+    void SemanticsDeclHeaderVisitor::_visitAccessorDeclCommon(AccessorDecl* decl)
+    {
+        // An accessor must appear nested inside a subscript or property declaration.
+        //
+        auto parentDecl = decl->parentDecl;
+        if (as<SubscriptDecl>(parentDecl))
+        {}
+        else if (as<PropertyDecl>(parentDecl))
+        {}
         else
         {
             getSink()->diagnose(decl, Diagnostics::accessorMustBeInsideSubscriptOrProperty);
         }
+    }
 
-        checkCallableDeclCommon(decl);
+    void SemanticsDeclHeaderVisitor::visitAccessorDecl(AccessorDecl* decl)
+    {
+        _visitAccessorDeclCommon(decl);
+
+        // Note: This subroutine is used by both `get`
+        // and `ref` accessors, but is bypassed by
+        // `set` accessors (which use `visitSetterDecl`
+        // intead).
+
+        // Accessors (other than setters) don't support
+        // parameters.
+        //
+        if( decl->getParameters().getCount() != 0 )
+        {
+            getSink()->diagnose(decl, Diagnostics::nonSetAccessorMustNotHaveParams);
+        }
+
+        // By default, the return type of an accessor is treated as
+        // the type of the abstract storage location being accessed.
+        //
+        // A `ref`  accessor currently relies on this logic even though
+        // it isn't quite correct, because we don't have support
+        // for by-reference return values today. This is a non-issue
+        // for now because we don't support user-defined `ref`
+        // accessors yet.
+        //
+        // TODO: Once we can support the by-reference return value
+        // correctly *or* we can move to something like a coroutine-based
+        // `modify` accessor (a la Swift), we should split out
+        // handling of `RefAccessorDecl` and only use this routine
+        // for `GetterDecl`s.
+        //
+        decl->returnType.type = _getAccessorStorageType(decl);
+    }
+
+    void SemanticsDeclHeaderVisitor::visitSetterDecl(SetterDecl* decl)
+    {
+        // Make sure to invoke the common checking logic for all accessors.
+        _visitAccessorDeclCommon(decl);
+
+        // A `set` accessor always returns `void`.
+        //
+        decl->returnType.type = getASTBuilder()->getVoidType();
+
+        // A setter always receives a single value representing
+        // the new value to set into the storage.
+        //
+        // The user may declare that parameter explicitly and
+        // thereby control its name, or they can declare no
+        // parmaeters and allow the compiler to synthesize one
+        // names `newValue`.
+        //
+        ParamDecl* newValueParam = nullptr;
+        auto params = decl->getParameters();
+        if( params.getCount() >= 1 )
+        {
+            // If the user declared an explicit parameter
+            // then that is the one that will represent
+            // the new value.
+            //
+            newValueParam = params.getFirst();
+
+            if( params.getCount() > 1 )
+            {
+                // If the user declared more than one explicit
+                // parameter, then that is an error.
+                //
+                getSink()->diagnose(params[1], Diagnostics::setAccessorMayNotHaveMoreThanOneParam);
+            }
+        }
+        else
+        {
+            // If the user didn't declare any explicit parameters,
+            // then we create an implicit one and add it into
+            // the AST.
+            //
+            newValueParam = m_astBuilder->create<ParamDecl>();
+            newValueParam->nameAndLoc.name = getName("newValue");
+            newValueParam->nameAndLoc.loc = decl->loc;
+
+            newValueParam->parentDecl = decl;
+            decl->members.add(newValueParam);
+        }
+
+        // The new-value parameter is expected to have the
+        // same type as the abstract storage that the
+        // accessor is setting.
+        //
+        auto newValueType = _getAccessorStorageType(decl);
+
+        // It is allowed and encouraged for the programmer
+        // to leave off the type on the new-value parameter,
+        // in which case we will set it to the expected
+        // type automatically.
+        //
+        if( !newValueParam->type.exp )
+        {
+            newValueParam->type.type = newValueType;
+        }
+        else
+        {
+            // If the user *did* give the new-value parameter
+            // an explicit type, then we need to check it
+            // and then enforce that it matches what we expect.
+            //
+            auto actualType = CheckProperType(newValueParam->type);
+
+            if(as<ErrorType>(actualType))
+            {}
+            else if(actualType->equals(newValueType))
+            {}
+            else
+            {
+                getSink()->diagnose(newValueParam, Diagnostics::setAccessorParamWrongType, newValueParam, actualType, newValueType);
+            }
+        }
     }
 
     GenericDecl* SemanticsVisitor::GetOuterGeneric(Decl* decl)

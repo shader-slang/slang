@@ -3658,7 +3658,7 @@ for (int aa = 0; aa < kBaseBufferAccessLevelCount; ++aa)
 
     if (access != SLANG_RESOURCE_ACCESS_READ)
     {
-        sb << "__target_intrinsic(glsl, \"imageStore($0, int($1), $V2)\") set;\n";
+        sb << "__target_intrinsic(glsl, \"imageStore($0, int($1), $V2)\") [nonmutating] set;\n";
 
         sb << "__intrinsic_op(" << int(kIROp_ImageSubscript) << ") ref;\n";
     }

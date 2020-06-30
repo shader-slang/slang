@@ -331,6 +331,18 @@ DIAGNOSTIC(30821, Error, tagTypeMustBeListedFirst, "an unum type may only have a
 DIAGNOSTIC(30820, Error, cannotInheritFromExplicitlySealedDeclarationInAnotherModule, "cannot inherit from type '$0' marked 'sealed' in module '$1'")
 DIAGNOSTIC(30821, Error, cannotInheritFromImplicitlySealedDeclarationInAnotherModule, "cannot inherit from type '$0' in module '$1' because it is implicitly 'sealed'; mark the base type 'open' to allow inheritance across modules")
 
+// 309xx: subscripts
+
+// 310xx: properties
+
+// 311xx: accessors
+
+DIAGNOSTIC(31100, Error, accessorMustBeInsideSubscriptOrProperty, "an accessor declaration is only allowed inside a subscript or property declaration")
+
+DIAGNOSTIC(31101, Error, nonSetAccessorMustNotHaveParams, "accessors other than 'set' must not have parameters")
+DIAGNOSTIC(31102, Error, setAccessorMayNotHaveMoreThanOneParam, "a 'set' accessor may not have more than one parameter")
+DIAGNOSTIC(31102, Error, setAccessorParamWrongType, "'set' parameter '$0' has type '$1' which does not match the expected type '$2'")
+
 // 39999 waiting to be placed in the right range
 
 DIAGNOSTIC(39999, Error, expectedIntegerConstantWrongType, "expected integer constant (found: '$0')")
@@ -393,7 +405,6 @@ DIAGNOSTIC(38009, Error, expectedValueOfTypeForSpecializationArg, "expected a co
 DIAGNOSTIC(38100, Error, typeDoesntImplementInterfaceRequirement, "type '$0' does not provide required interface member '$1'")
 DIAGNOSTIC(38101, Error, thisExpressionOutsideOfTypeDecl, "'this' expression can only be used in members of an aggregate type")
 DIAGNOSTIC(38102, Error, initializerNotInsideType, "an 'init' declaration is only allowed inside a type or 'extension' declaration")
-DIAGNOSTIC(38102, Error, accessorMustBeInsideSubscriptOrProperty, "an accessor declaration is only allowed inside a subscript or property declaration")
 DIAGNOSTIC(38103, Error, thisTypeOutsideOfTypeDecl, "'This' type can only be used inside of an aggregate type")
 
 DIAGNOSTIC(38020, Error, mismatchEntryPointTypeArgument, "expecting $0 entry-point type arguments, provided $1.")
