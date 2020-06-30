@@ -220,6 +220,7 @@ IR_SIMPLE_DECORATION(ReadNoneDecoration)
 IR_SIMPLE_DECORATION(EarlyDepthStencilDecoration)
 IR_SIMPLE_DECORATION(GloballyCoherentDecoration)
 IR_SIMPLE_DECORATION(PreciseDecoration)
+IR_SIMPLE_DECORATION(PublicDecoration)
 
 
 struct IROutputControlPointsDecoration : IRDecoration
