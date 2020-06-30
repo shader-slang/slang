@@ -1520,10 +1520,6 @@ struct SharedIRBuilder
     Dictionary<IRInstKey,       IRInst*>    globalValueNumberingMap;
     Dictionary<IRConstantKey,   IRConstant*>    constantMap;
 
-    // TODO: We probably shouldn't use this in the long run.
-    Dictionary<void*,           IRLayout*>        layoutMap;
-
-
     void insertBlockAlongEdge(IREdge const& edge);
 };
 
@@ -2077,13 +2073,6 @@ struct IRBuilder
     {
         IRInst* operands[] = { operand0, operand1 };
         return addDecoration(value, op, operands, SLANG_COUNT_OF(operands));
-    }
-
-    template <typename T>
-    T* addRefObjectToFree(T* ptr)
-    {
-        getModule()->getObjectScopeManager()->addMaybeNull(ptr);
-        return ptr;
     }
 
     template<typename T>
