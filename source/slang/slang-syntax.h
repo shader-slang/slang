@@ -105,6 +105,11 @@ namespace Slang
         return declRef.substitute(astBuilder, declRef.getDecl()->initExpr);
     }
 
+    inline Type* getType(ASTBuilder* astBuilder, DeclRef<PropertyDecl> const& declRef)
+    {
+        return declRef.substitute(astBuilder, declRef.getDecl()->type.Ptr());
+    }
+
     inline Type* getType(ASTBuilder* astBuilder, DeclRef<EnumCaseDecl> const& declRef)
     {
         return declRef.substitute(astBuilder, declRef.getDecl()->type.Ptr());

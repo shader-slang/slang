@@ -1421,6 +1421,9 @@ struct OptionsParser
         //
         for(auto& rawOutput : rawOutputs)
         {
+            // TODO(DG): As noted below, change support for output formats
+            // with multiple entry points
+
             // For now, all output formats need to be tightly bound to
             // both a target and an entry point (down the road we will
             // need to support output formats that can store multiple
@@ -1457,6 +1460,10 @@ struct OptionsParser
             // point was handled above, and the user is expected to
             // follow the ordering rules when using multiple entry points.
             //
+            // TODO(DG): check if output format is left unassociated
+            // If (known format for that output && that format supports whole program) {
+            //    set isWholeProgram bit on the TargetRequest }
+            // else { diagnose what happened }
             if( rawOutput.entryPointIndex == -1 )
             {
                 sink->diagnose(SourceLoc(), Diagnostics::cannotMatchOutputFileToEntryPoint, rawOutput.path);
@@ -1472,6 +1479,7 @@ struct OptionsParser
         for(auto& rawOutput : rawOutputs)
         {
             if(rawOutput.targetIndex == -1) continue;
+            // TODO(DG): probably needs updating
             if(rawOutput.entryPointIndex == -1) continue;
 
             auto targetID = rawTargets[rawOutput.targetIndex].targetID;

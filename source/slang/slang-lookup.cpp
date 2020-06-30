@@ -738,6 +738,18 @@ static void _lookUpInScopes(
                 //
                 thisParameterMode = LookupResultItem::Breadcrumb::ThisParameterMode::MutableValue;
             }
+            else if( containerDeclRef.is<SetterDecl>() )
+            {
+                // In the context of a `set` accessor, the members of the
+                // surrounding type are accessible through a mutable `this`.
+                //
+                // TODO: At some point we may want a way to opt out of this
+                // behavior; it is possible to have a setter on a `struct`
+                // that actually just sets data into a buffer that is
+                // referenced by one of the `struct`'s fields.
+                //
+                thisParameterMode = LookupResultItem::Breadcrumb::ThisParameterMode::MutableValue;
+            }
             else if( auto funcDeclRef = containerDeclRef.as<FunctionDeclBase>() )
             {
                 // The implicit `this`/`This` for a function-like declaration

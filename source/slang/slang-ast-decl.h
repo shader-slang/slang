@@ -309,6 +309,14 @@ class SubscriptDecl : public CallableDecl
     SLANG_CLASS(SubscriptDecl)
 };
 
+    /// A property declaration that abstracts over storage with a getter/setter/etc.
+class PropertyDecl : public ContainerDecl
+{
+    SLANG_CLASS(PropertyDecl)
+
+    TypeExp type;
+};
+
 // An "accessor" for a subscript or property
 class AccessorDecl : public FunctionDeclBase
 {

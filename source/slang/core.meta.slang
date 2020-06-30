@@ -1120,7 +1120,7 @@ for (int tt = 0; tt < kBaseTextureTypeCount; ++tt)
                         }
 
                         // Set
-                        sb << " set;\n";
+                        sb << " [nonmutating] set;\n";
                     }
 
                     // !!!!!!!!!!!!!!!!!! ref !!!!!!!!!!!!!!!!!!!!!!!!!
@@ -1917,6 +1917,9 @@ attribute_syntax [__vulkanHitAttributes] : VulkanHitAttributesAttribute;
 
 __attributeTarget(FunctionDeclBase)
 attribute_syntax [mutating] : MutatingAttribute;
+
+__attributeTarget(SetterDecl)
+attribute_syntax [nonmutating] : NonmutatingAttribute;
 
     /// Indicates that a function computes its result as a function of its arguments without loading/storing any memory or other state.
     ///
