@@ -20,7 +20,7 @@ namespace Slang
     //
     LinkedIR linkIR(
         BackEndCompileRequest*  compileRequest,
-        List<Int>               entryPointIndices,
+        const List<Int>&        entryPointIndices,
         CodeGenTarget           target,
         TargetProgram*          targetProgram);
 

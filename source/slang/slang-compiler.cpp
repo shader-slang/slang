@@ -567,7 +567,7 @@ namespace Slang
 
     SlangResult emitEntryPointsSource(
         BackEndCompileRequest*  compileRequest,
-        List<Int>               entryPointIndices,
+        const List<Int>&        entryPointIndices,
         TargetRequest*          targetReq,
         CodeGenTarget           target,
         EndToEndCompileRequest* endToEndReq,
@@ -577,9 +577,9 @@ namespace Slang
 
         if(isPassThroughEnabled(endToEndReq))
         {
-            for (auto entryPointIndex = entryPointIndices.begin(); entryPointIndex != entryPointIndices.end(); entryPointIndex++)
+            for (auto entryPointIndex : entryPointIndices)
             {
-                auto translationUnit = getPassThroughTranslationUnit(endToEndReq, *entryPointIndex);
+                auto translationUnit = getPassThroughTranslationUnit(endToEndReq, entryPointIndex);
                 SLANG_ASSERT(translationUnit);
                 // Generate a string that includes the content of
                 // the source file(s), along with a line directive
@@ -779,7 +779,7 @@ namespace Slang
 
     String calcSourcePathForEntryPoints(
         EndToEndCompileRequest* endToEndReq,
-        List<Int>               entryPointIndices)
+        const List<Int>&        entryPointIndices)
     {
         String failureMode = "slang-generated";
         if (entryPointIndices.getCount() != 1)
@@ -841,10 +841,12 @@ namespace Slang
     }
 
     // Helper function for recovering the entry point code indices from a list of entry points
-    List<Int> getEntryPointIndices(List<EntryPointAndIndex> const& entryPoints) {
+    List<Int> getEntryPointIndices(List<EntryPointAndIndex> const& entryPoints)
+    {
         List<Int> result;
-        for (auto entryPoint = entryPoints.begin(); entryPoint != entryPoints.end(); entryPoint++) {
-            result.add(entryPoint->index);
+        for (auto& entryPoint : entryPoints)
+        {
+            result.add(entryPoint.index);
         }
         return result;
     }
@@ -1276,7 +1278,7 @@ SlangResult dissassembleDXILUsingDXC(
 
     SlangResult emitWithDownstreamForEntryPoints(
         BackEndCompileRequest*  slangRequest,
-        List<Int>               entryPointIndices,
+        const List<Int>&        entryPointIndices,
         TargetRequest*          targetReq,
         EndToEndCompileRequest* endToEndReq,
         RefPtr<DownstreamCompileResult>& outResult)
@@ -1638,7 +1640,7 @@ SlangResult dissassembleDXILUsingDXC(
 
     SlangResult emitSPIRVForEntryPointsDirectly(
         BackEndCompileRequest*  compileRequest,
-        List<Int>               entryPointIndices,
+        const List<Int>&        entryPointIndices,
         TargetRequest*          targetReq,
         List<uint8_t>&          spirvOut);
 
@@ -2229,14 +2231,15 @@ SlangResult dissassembleDXILUsingDXC(
     }
 
     CompileResult& TargetProgram::_createWholeProgramResult(
-        List<Int>               entryPointIndices,
+        const List<Int>&        entryPointIndices,
         BackEndCompileRequest*  backEndRequest,
         EndToEndCompileRequest* endToEndRequest)
     {
         List<EntryPointAndIndex> entryPoints;
-        for (auto entryPointIndex = entryPointIndices.begin(); entryPointIndex != entryPointIndices.end(); entryPointIndex++) {
-            if (*entryPointIndex >= m_entryPointResults.getCount())
-                m_entryPointResults.setCount(*entryPointIndex + 1);
+        for (auto entryPointIndex : entryPointIndices)
+        {
+            if (entryPointIndex >= m_entryPointResults.getCount())
+                m_entryPointResults.setCount(entryPointIndex + 1);
 
             // It is possible that entry points goot added to the `Program`
             // *after* we created this `TargetProgram`, so there might be
@@ -2246,8 +2249,8 @@ SlangResult dissassembleDXILUsingDXC(
             // constructed all at once rather than incrementally, to avoid
             // this problem.
             //
-            auto entryPoint = m_program->getEntryPoint(*entryPointIndex);
-            entryPoints.add(EntryPointAndIndex(entryPoint, *entryPointIndex));
+            auto entryPoint = m_program->getEntryPoint(entryPointIndex);
+            entryPoints.add(EntryPointAndIndex(entryPoint, entryPointIndex));
         }
         auto& result = m_wholeProgramResult;
         result = emitEntryPoints(
@@ -2290,7 +2293,7 @@ SlangResult dissassembleDXILUsingDXC(
     }
 
     CompileResult& TargetProgram::getOrCreateWholeProgramResult(
-        List<Int>       entryPointIndices,
+        const List<Int>& entryPointIndices,
         DiagnosticSink* sink)
     {
         auto& result = m_wholeProgramResult;
