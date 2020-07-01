@@ -739,7 +739,7 @@ void CUDASourceEmitter::emitModuleImpl(IRModule* module)
 
     // Output the 'Context' which will be used for execution
     {
-        m_writer->emit("struct Context\n{\n");
+        m_writer->emit("struct KernelContext\n{\n");
         m_writer->indent();
 
         m_writer->emit("UniformState* uniformState;\n");
@@ -885,7 +885,7 @@ void CUDASourceEmitter::emitModuleImpl(IRModule* module)
                 m_writer->indent();
 
                 // Initialize when constructing so that globals are zeroed
-                m_writer->emit("Context context = {};\n");
+                m_writer->emit("KernelContext context = {};\n");
 
                 // The global-scope parameter data got passed in differently depending on whether we have
                 // a compute shader or a ray-tracing shader, so we need to alter how we initialize
@@ -893,7 +893,7 @@ void CUDASourceEmitter::emitModuleImpl(IRModule* module)
                 //
                 if( stage == Stage::Compute )
                 {
-                    m_writer->emit("context.uniformState = uniformState;\n");
+                    m_writer->emit("context.uniformState = (UniformState*)uniformState;\n");
                 }
                 else
                 {
