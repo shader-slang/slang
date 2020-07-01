@@ -1,4 +1,4 @@
-﻿// vk-device-queue.cpp
+// vk-device-queue.cpp
 #include "vk-device-queue.h"
 
 #include <stdlib.h>
@@ -10,17 +10,20 @@ using namespace Slang;
 
 VulkanDeviceQueue::~VulkanDeviceQueue()
 {
-    for (int i = 0; i < int(EventType::CountOf); ++i)
+    if (m_api)
     {
-        m_api->vkDestroySemaphore(m_api->m_device, m_semaphores[i], nullptr);
-    }
+        for (int i = 0; i < int(EventType::CountOf); ++i)
+        {
+            m_api->vkDestroySemaphore(m_api->m_device, m_semaphores[i], nullptr);
+        }
 
-    for (int i = 0; i < m_numCommandBuffers; i++)
-    {
-        m_api->vkFreeCommandBuffers(m_api->m_device, m_commandPool, 1, &m_commandBuffers[i]);
-        m_api->vkDestroyFence(m_api->m_device, m_fences[i].fence, nullptr);
+        for (int i = 0; i < m_numCommandBuffers; i++)
+        {
+            m_api->vkFreeCommandBuffers(m_api->m_device, m_commandPool, 1, &m_commandBuffers[i]);
+            m_api->vkDestroyFence(m_api->m_device, m_fences[i].fence, nullptr);
+        }
+        m_api->vkDestroyCommandPool(m_api->m_device, m_commandPool, nullptr);
     }
-    m_api->vkDestroyCommandPool(m_api->m_device, m_commandPool, nullptr);
 }
 
 SlangResult VulkanDeviceQueue::init(const VulkanApi& api, VkQueue queue, int queueIndex)
