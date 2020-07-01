@@ -689,6 +689,7 @@ static RefPtr<VarLayout> _createVarLayout(
     if(auto pendingDataTypeLayout = typeLayout->pendingDataTypeLayout)
     {
         RefPtr<VarLayout> pendingVarLayout = new VarLayout();
+        pendingVarLayout->varDecl = varDeclRef;
         pendingVarLayout->typeLayout = pendingDataTypeLayout;
         varLayout->pendingVarLayout = pendingVarLayout;
     }
@@ -2857,28 +2858,40 @@ static void collectParameters(
     program->acceptVisitor(&visitor, nullptr);
 }
 
-    /// Emit a diagnostic about a uniform parameter at global scope.
+    /// Emit a diagnostic about a uniform/ordinary parameter at global scope.
 void diagnoseGlobalUniform(
     SharedParameterBindingContext*  sharedContext,
     VarDeclBase*                    varDecl)
 {
-    // It is entirely possible for Slang to support uniform parameters at the global scope,
-    // by bundling them into an implicit constant buffer, and indeed the layout algorithm
-    // implemented in this file computes a layout *as if* the Slang compiler does just that.
+    // This subroutine gets invoked if a shader parameter containing
+    // "ordinary" data (sometimes just called "uniform" data) is present
+    // at the global scope.
     //
-    // The missing link is the downstream IR and code generation steps, where we would need
-    // to collect all of the global-scope uniforms into a common `struct` type and then
-    // create a new constant buffer parameter over that type.
+    // Slang can support such parameters by aggregating them into
+    // an implicit constant buffer, but it is also common for programmers
+    // to accidentally declare a global-scope shader parameter when they
+    // meant to declare a global variable instead:
     //
-    // For now it is easier to simply ban this case, since most shader authors have
-    // switched to modern HLSL/GLSL style with `cbuffer` or `uniform` block declarations.
+    //      int gCounter = 0; // this is a shader parameter, not a global
     //
-    // TODO: In the long run it may be best to require *all* global-scope shader parameters
-    // to be marked with a keyword (e.g., `uniform`) so that ordinary global variable syntax can be
-    // used safely.
+    // In order to avoid mistakes, we'd like to warn the user when
+    // they write code like the above, and hint to them that they
+    // should make their intention more explicit with a keyword:
     //
-    getSink(sharedContext)->diagnose(varDecl, Diagnostics::globalUniformsNotSupported, varDecl->getName());
+    //      static int gCounter = 0; // this is now a (static) global
+    //
+    //      uniform int gCounter; // this is now explicitly a shader parameter
+    //
+    // We skip the diagnostic whenever the variable was explicitly `uniform`,
+    // under the assumption that the programmer who added that modifier
+    // knew what they were opting into.
+    //
+    if(varDecl->hasModifier<HLSLUniformModifier>())
+        return;
+
+    getSink(sharedContext)->diagnose(varDecl, Diagnostics::globalUniformNotExpected, varDecl->getName());
 }
+
 
 static int _calcTotalNumUsedRegistersForLayoutResourceKind(ParameterBindingContext* bindingContext, LayoutResourceKind kind)
 {

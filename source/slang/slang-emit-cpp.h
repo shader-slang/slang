@@ -37,18 +37,6 @@ public:
         int colCount;
     };
 
-    struct GlobalParamInfo
-    {
-        typedef GlobalParamInfo ThisType;
-        bool operator<(const ThisType& rhs) const { return offset < rhs.offset; }
-        bool operator==(const ThisType& rhs) const { return offset == rhs.offset; }
-        bool operator!=(const ThisType& rhs) const { return !(*this == rhs); }
-
-        IRInst* inst;
-        UInt offset;
-        UInt size;
-    };
-
     virtual void useType(IRType* type);
     virtual void emitCall(const HLSLIntrinsic* specOp, IRInst* inst, const IRUse* operands, int numOperands, const EmitOpInfo& inOuterPrec);
     virtual void emitTypeDefinition(IRType* type);
@@ -94,8 +82,11 @@ protected:
     void _maybeEmitSpecializedOperationDefinition(const HLSLIntrinsic* specOp);
 
     void _emitForwardDeclarations(const List<EmitAction>& actions);
-    void _calcGlobalParams(const List<EmitAction>& actions, List<GlobalParamInfo>& outParams, IRGlobalParam** outEntryPointGlobalParams);
-    void _emitUniformStateMembers(const List<EmitAction>& actions, IRGlobalParam** outEntryPointGlobalParams);
+
+        /// Find the IR global parameters representing the entry-point and global shader parameters (if any)
+    void _findShaderParams(
+        IRGlobalParam** outEntryPointParam,
+        IRGlobalParam** outGlobalParam);
 
     void _emitAryDefinition(const HLSLIntrinsic* specOp);
 
@@ -127,7 +118,7 @@ protected:
     
     SlangResult _calcCPPTextureTypeName(IRTextureTypeBase* texType, StringBuilder& outName);
 
-    void _emitEntryPointDefinitionStart(IRFunc* func, IRGlobalParam* entryPointGlobalParams, const String& funcName, const UnownedStringSlice& varyingTypeName);
+    void _emitEntryPointDefinitionStart(IRFunc* func, IRGlobalParam* entryPointParams, IRGlobalParam* globalParams, const String& funcName, const UnownedStringSlice& varyingTypeName);
     void _emitEntryPointDefinitionEnd(IRFunc* func);
     void _emitEntryPointGroup(const Int sizeAlongAxis[kThreadGroupAxisCount], const String& funcName);
     void _emitEntryPointGroupRange(const Int sizeAlongAxis[kThreadGroupAxisCount], const String& funcName);

@@ -6,6 +6,7 @@
 
 #include "slang-ir-bind-existentials.h"
 #include "slang-ir-byte-address-legalize.h"
+#include "slang-ir-collect-global-uniforms.h"
 #include "slang-ir-dce.h"
 #include "slang-ir-entry-point-uniforms.h"
 #include "slang-ir-glsl-legalize.h"
@@ -224,25 +225,41 @@ Result linkAndOptimizeIR(
 #endif
     validateIRModuleIfEnabled(compileRequest, irModule);
 
-
-
-
-
     // Now that we've linked the IR code, any layout/binding
     // information has been attached to shader parameters
     // and entry points. Now we are safe to make transformations
     // that might move code without worrying about losing
     // the connection between a parameter and its layout.
+
+    // One example of a transformation that needs to wait until
+    // we have layout information is the step where we collect
+    // any global-scope shader parameters with ordinary/uniform
+    // type into an aggregate `struct`, and then (optionally)
+    // wrap that `struct` up in a constant buffer.
     //
-    // An easy transformation of this kind is to take uniform
+    // This step allows shaders to declare parameters of ordinary
+    // type as globals in the input file, while ensuring that
+    // downstream passes for graphics APIs like Vulkan and D3D
+    // can assume that all ordinary/uniform data is strictly
+    // passed using constant buffers.
+    //
+    collectGlobalUniformParameters(irModule, outLinkedIR.globalScopeVarLayout);
+#if 0
+    dumpIRIfEnabled(compileRequest, irModule, "GLOBAL UNIFORMS COLLECTED");
+#endif
+    validateIRModuleIfEnabled(compileRequest, irModule);
+
+    // Another transformation that needed to wait until we
+    // had layout information on parameters is to take uniform
     // parameters of a shader entry point and move them into
     // the global scope instead.
     //
-    moveEntryPointUniformParamsToGlobalScope(irModule, target);
+    moveEntryPointUniformParamsToGlobalScope(irModule);
 #if 0
     dumpIRIfEnabled(compileRequest, irModule, "ENTRY POINT UNIFORMS MOVED");
 #endif
     validateIRModuleIfEnabled(compileRequest, irModule);
+
 
     // Desguar any union types, since these will be illegal on
     // various targets.

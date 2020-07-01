@@ -2,8 +2,8 @@
 //DIAGNOSTIC_TEST:SIMPLE:-target hlsl
 //DIAGNOSTIC_TEST:COMMAND_LINE_SIMPLE:-target hlsl
 
-// Any attempt to declare a global variable that actually declares a
-// global uniform should be diagnosed as unsupported.
+// An attempt to declare a global variable that actually declares a
+// global shader parameter should be diagnosed, unless `uniform` was used.
 
 uniform float a;
 
