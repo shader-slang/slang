@@ -969,10 +969,11 @@ bool CLikeSourceEmitter::shouldFoldInstIntoUseSites(IRInst* inst)
         type = arrayType->getElementType();
     }
 
-    // Don't allow temporaries of pointer types to be created.
+    // Don't allow temporaries of pointer types to be created,
+    // if target langauge doesn't support pointers.
     if(as<IRPtrTypeBase>(type))
     {
-        return true;
+        return !doesTargetSupportPtrTypes();
     }
 
     // First we check for uniform parameter groups,
@@ -1161,6 +1162,50 @@ bool CLikeSourceEmitter::shouldFoldInstIntoUseSites(IRInst* inst)
     return true;
 }
 
+void CLikeSourceEmitter::emitDereferenceOperand(IRInst* inst, EmitOpInfo const& outerPrec)
+{
+    if (doesTargetSupportPtrTypes())
+    {
+        // If `inst` is a variable, dereferencing it is equivalent to just
+        // emit its name. i.e. *&var ==> var.
+        // We apply this peep hole optimization here to reduce the clutter of
+        // resulting code.
+        if (inst->op == kIROp_Var)
+        {
+            m_writer->emit(getName(inst));
+            return;
+        }
+
+        auto dereferencePrec = EmitOpInfo::get(EmitOp::Prefix);
+        EmitOpInfo newOuterPrec = outerPrec;
+        bool needClose = maybeEmitParens(newOuterPrec, dereferencePrec);
+        m_writer->emit("*");
+        emitOperand(inst, rightSide(newOuterPrec, dereferencePrec));
+        maybeCloseParens(needClose);
+    }
+    else
+    {
+        emitOperand(inst, outerPrec);
+    }
+}
+
+void CLikeSourceEmitter::emitVarExpr(IRInst* inst, EmitOpInfo const& outerPrec)
+{
+    if (doesTargetSupportPtrTypes())
+    {
+        auto prec = getInfo(EmitOp::Prefix);
+        auto newOuterPrec = outerPrec;
+        bool needClose = maybeEmitParens(newOuterPrec, prec);
+        m_writer->emit("&");
+        m_writer->emit(getName(inst));
+        maybeCloseParens(needClose);
+    }
+    else
+    {
+        m_writer->emit(getName(inst));
+    }
+}
+
 void CLikeSourceEmitter::emitOperandImpl(IRInst* inst, EmitOpInfo const&  outerPrec)
 {
     if( shouldFoldInstIntoUseSites(inst) )
@@ -1171,7 +1216,10 @@ void CLikeSourceEmitter::emitOperandImpl(IRInst* inst, EmitOpInfo const&  outerP
 
     switch(inst->op)
     {
-    case 0: // nothing yet
+    case kIROp_Var:
+    case kIROp_GlobalVar:
+        emitVarExpr(inst, outerPrec);
+        break;
     default:
         m_writer->emit(getName(inst));
         break;
@@ -2019,18 +2067,35 @@ void CLikeSourceEmitter::defaultEmitInstExpr(IRInst* inst, const EmitOpInfo& inO
 
         IRFieldAddress* ii = (IRFieldAddress*) inst;
 
-        auto prec = getInfo(EmitOp::Postfix);
-        needClose = maybeEmitParens(outerPrec, prec);
-
-        auto base = ii->getBase();
-        emitOperand(base, leftSide(outerPrec, prec));
-        m_writer->emit(".");
-        if(getSourceLanguage() == SourceLanguage::GLSL
-            && as<IRUniformParameterGroupType>(base->getDataType()))
+        if (doesTargetSupportPtrTypes())
         {
-            m_writer->emit("_data.");
+            auto prec = getInfo(EmitOp::Prefix);
+            needClose = maybeEmitParens(outerPrec, prec);
+            m_writer->emit("&");
+            outerPrec = rightSide(outerPrec, prec);
+            auto innerPrec = getInfo(EmitOp::Postfix);
+            bool innerNeedClose = maybeEmitParens(outerPrec, innerPrec);
+            auto base = ii->getBase();
+            emitOperand(base, leftSide(outerPrec, innerPrec));
+            m_writer->emit("->");
+            m_writer->emit(getName(ii->getField()));
+            maybeCloseParens(innerNeedClose);
         }
-        m_writer->emit(getName(ii->getField()));
+        else
+        {
+            auto prec = getInfo(EmitOp::Postfix);
+            needClose = maybeEmitParens(outerPrec, prec);
+
+            auto base = ii->getBase();
+            emitOperand(base, leftSide(outerPrec, prec));
+            m_writer->emit(".");
+            if(getSourceLanguage() == SourceLanguage::GLSL
+                && as<IRUniformParameterGroupType>(base->getDataType()))
+            {
+                m_writer->emit("_data.");
+            }
+            m_writer->emit(getName(ii->getField()));
+        }
         break;
     }
 
@@ -2121,7 +2186,7 @@ void CLikeSourceEmitter::defaultEmitInstExpr(IRInst* inst, const EmitOpInfo& inO
     case kIROp_Load:
         {
             auto base = inst->getOperand(0);
-            emitOperand(base, outerPrec);
+            emitDereferenceOperand(base, outerPrec);
             if(getSourceLanguage() == SourceLanguage::GLSL
                 && as<IRUniformParameterGroupType>(base->getDataType()))
             {
@@ -2135,7 +2200,7 @@ void CLikeSourceEmitter::defaultEmitInstExpr(IRInst* inst, const EmitOpInfo& inO
             auto prec = getInfo(EmitOp::Assign);
             needClose = maybeEmitParens(outerPrec, prec);
 
-            emitOperand(inst->getOperand(0), leftSide(outerPrec, prec));
+            emitDereferenceOperand(inst->getOperand(0), leftSide(outerPrec, prec));
             m_writer->emit(" = ");
             emitOperand(inst->getOperand(1), rightSide(prec, outerPrec));
         }
@@ -2169,13 +2234,31 @@ void CLikeSourceEmitter::defaultEmitInstExpr(IRInst* inst, const EmitOpInfo& inO
         }
         else
         {
-            auto prec = getInfo(EmitOp::Postfix);
-            needClose = maybeEmitParens(outerPrec, prec);
+            if (inst->op == kIROp_getElementPtr && doesTargetSupportPtrTypes())
+            {
+                const auto info = getInfo(EmitOp::Prefix);
+                needClose = maybeEmitParens(outerPrec, info);
+                m_writer->emit("&");
+                auto rightSidePrec = rightSide(outerPrec, info);
+                auto postfixInfo = getInfo(EmitOp::Postfix);
+                bool rightSideNeedClose = maybeEmitParens(rightSidePrec, postfixInfo);
+                emitDereferenceOperand(inst->getOperand(0), leftSide(rightSidePrec, postfixInfo));
+                m_writer->emit("[");
+                emitOperand(inst->getOperand(1), getInfo(EmitOp::General));
+                m_writer->emit("]");
+                maybeCloseParens(rightSideNeedClose);
+                break;
+            }
+            else
+            {
+                auto prec = getInfo(EmitOp::Postfix);
+                needClose = maybeEmitParens(outerPrec, prec);
 
-            emitOperand( inst->getOperand(0), leftSide(outerPrec, prec));
-            m_writer->emit("[");
-            emitOperand(inst->getOperand(1), getInfo(EmitOp::General));
-            m_writer->emit("]");
+                emitOperand(inst->getOperand(0), leftSide(outerPrec, prec));
+                m_writer->emit("[");
+                emitOperand(inst->getOperand(1), getInfo(EmitOp::General));
+                m_writer->emit("]");
+            }
         }
         break;
 
@@ -2436,7 +2519,7 @@ void CLikeSourceEmitter::_emitInst(IRInst* inst)
 
 
             auto ii = cast<IRSwizzledStore>(inst);
-            emitOperand(ii->getDest(), leftSide(subscriptOuter, subscriptPrec));
+            emitDereferenceOperand(ii->getDest(), leftSide(subscriptOuter, subscriptPrec));
             m_writer->emit(".");
             UInt elementCount = ii->getElementCount();
             for (UInt ee = 0; ee < elementCount; ++ee)
