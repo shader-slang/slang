@@ -193,9 +193,7 @@ namespace Slang
             args[argCount++] = L"-enable-16bit-types";
         }
 
-        List<Int> entryPointIndices2;
-        entryPointIndices.add(entryPointIndex);
-        const String sourcePath = calcSourcePathForEntryPoints(endToEndReq, entryPointIndices2);
+        const String sourcePath = calcSourcePathForEntryPoints(endToEndReq, entryPointIndices);
 
         ComPtr<IDxcOperationResult> dxcResult;
         SLANG_RETURN_ON_FAIL(dxcCompiler->Compile(dxcSourceBlob,

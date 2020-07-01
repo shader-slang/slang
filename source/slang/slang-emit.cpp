@@ -163,7 +163,7 @@ struct LinkingAndOptimizationOptions
 // TODO(DG): A bit tricky; this needs to be generalized to multiple entry points
 Result linkAndOptimizeIR(
     BackEndCompileRequest*                  compileRequest,
-    List<Int>                               entryPointIndices,
+    const List<Int>&                        entryPointIndices,
     CodeGenTarget                           target,
     TargetRequest*                          targetRequest,
     LinkingAndOptimizationOptions const&    options,
@@ -612,10 +612,10 @@ Result linkAndOptimizeIR(
 // TODO(DG): This probably needs to be generalized to a list
 SlangResult emitEntryPointSourceFromIR(
     BackEndCompileRequest*  compileRequest,
-    List<Int>               entryPointIndices,
+    const List<Int>&        entryPointIndices,
     CodeGenTarget           target,
     TargetRequest*          targetRequest,
-    SourceResult&       outSource)
+    SourceResult&           outSource)
 {
     // Temporary assertion for checkpoint
     SLANG_ASSERT(entryPointIndices.getCount() == 1);
@@ -780,7 +780,7 @@ SlangResult emitSPIRVFromIR(
 
 SlangResult emitSPIRVForEntryPointsDirectly(
     BackEndCompileRequest*  compileRequest,
-    List<Int>               entryPointIndices,
+    const List<Int>&        entryPointIndices,
     TargetRequest*          targetRequest,
     List<uint8_t>&          spirvOut)
 {

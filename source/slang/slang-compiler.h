@@ -1682,7 +1682,7 @@ namespace Slang
             /// code generation to the given `sink`.
             ///
         CompileResult& getOrCreateEntryPointResult(Int entryPointIndex, DiagnosticSink* sink);
-        CompileResult& getOrCreateWholeProgramResult(List<Int> entryPointIndices, DiagnosticSink* sink);
+        CompileResult& getOrCreateWholeProgramResult(const List<Int>& entryPointIndices, DiagnosticSink* sink);
 
 
         CompileResult& getExistingWholeProgramResult()
@@ -1700,7 +1700,7 @@ namespace Slang
         }
 
         CompileResult& _createWholeProgramResult(
-            List<Int>               entryPointIndices,
+            const List<Int>&        entryPointIndices,
             BackEndCompileRequest*  backEndRequest,
             EndToEndCompileRequest* endToEndRequest);
             /// Internal helper for `getOrCreateEntryPointResult`.
@@ -1959,7 +1959,7 @@ namespace Slang
     // TODO(DG): Note to reviewer; this was changed from UInt to List<Int> -- let me know if that's a problem
     //   and I can work out the appropriate casts
     String calcSourcePathForEntryPoint(EndToEndCompileRequest* endToEndReq, Int entryPointIndex);
-    String calcSourcePathForEntryPoints(EndToEndCompileRequest* endToEndReq, List<Int> entryPointIndices);
+    String calcSourcePathForEntryPoints(EndToEndCompileRequest* endToEndReq, const List<Int>& entryPointIndices);
 
     struct SourceResult
     {
@@ -1978,7 +1978,7 @@ namespace Slang
     the target (not targetReq) */
     SlangResult emitEntryPointsSource(
         BackEndCompileRequest*  compileRequest,
-        List<Int>               entryPointIndices,
+        const List<Int>&        entryPointIndices,
         TargetRequest*          targetReq,
         CodeGenTarget           target,
         EndToEndCompileRequest* endToEndReq,

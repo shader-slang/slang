@@ -38,9 +38,9 @@ namespace Slang
         ///
     SlangResult emitEntryPointSourceFromIR(
         BackEndCompileRequest*  compileRequest,
-        List<Int>               entryPointIndices,
+        const List<Int>&        entryPointIndices,
         CodeGenTarget           target,
         TargetRequest*          targetRequest,
-        SourceResult&       outSource);
+        SourceResult&           outSource);
 }
 #endif
