@@ -8,6 +8,8 @@
 #   include <malloc.h>
 #endif
 
+#include <type_traits>
+
 namespace Slang
 {
 	inline void* alignedAllocate(size_t size, size_t alignment)
