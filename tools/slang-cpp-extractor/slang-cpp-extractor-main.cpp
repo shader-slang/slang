@@ -2478,26 +2478,34 @@ int main(int argc, const char*const* argv)
     using namespace Slang;
 
     {
-        RootNamePool rootNamePool;
-
-        SourceManager sourceManager;
-        sourceManager.initialize(nullptr, nullptr);
-
         ComPtr<ISlangWriter> writer(new FileWriter(stderr, WriterFlag::AutoFlush));
 
-        DiagnosticSink sink(&sourceManager);
-        sink.writer = writer;
-
-        CPPExtractorApp app(&sink, &sourceManager, &rootNamePool);
-        if (SLANG_FAILED(app.executeWithArgs(argc - 1, argv + 1)))
+        try
         {
+            RootNamePool rootNamePool;
+
+            SourceManager sourceManager;
+            sourceManager.initialize(nullptr, nullptr);
+
+            DiagnosticSink sink(&sourceManager);
+            sink.writer = writer;
+
+            CPPExtractorApp app(&sink, &sourceManager, &rootNamePool);
+            if (SLANG_FAILED(app.executeWithArgs(argc - 1, argv + 1)))
+            {
+                return 1;
+            }
+            if (sink.getErrorCount())
+            {
+                return 1;
+            }
+        }
+        catch (...)
+        {
+            WriterHelper helper(writer);
+            helper.print("Unknown internal error in C++ extractor, aborted!\n");
             return 1;
         }
-        if (sink.getErrorCount())
-        {
-            return 1;
-        }
-
     }
     return 0;
 }
