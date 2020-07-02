@@ -930,8 +930,7 @@ ASTSerialField _calcField(const char* name, T& in)
 
 static ASTSerialClass _makeClass(MemoryArena* arena, ASTNodeType type, const List<ASTSerialField>& fields)
 {
-    ASTSerialClass cls = {};
-    cls.type = type;
+    ASTSerialClass cls = { type, 0, 0, 0, 0 };
     cls.fieldsCount = fields.getCount();
     cls.fields = arena->allocateAndCopyArray(fields.getBuffer(), fields.getCount());
     return cls;
