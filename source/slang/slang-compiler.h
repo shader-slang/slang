@@ -1956,8 +1956,6 @@ namespace Slang
     @param endToEndReq The end-to-end compile request which might be using pass-through compilation
     @param entryPointIndex The index of the entry point to compute a filename for.
     @return the appropriate source filename */
-    // TODO(DG): Note to reviewer; this was changed from UInt to List<Int> -- let me know if that's a problem
-    //   and I can work out the appropriate casts
     String calcSourcePathForEntryPoint(EndToEndCompileRequest* endToEndReq, Int entryPointIndex);
     String calcSourcePathForEntryPoints(EndToEndCompileRequest* endToEndReq, const List<Int>& entryPointIndices);
 
@@ -1979,6 +1977,14 @@ namespace Slang
     SlangResult emitEntryPointsSource(
         BackEndCompileRequest*  compileRequest,
         const List<Int>&        entryPointIndices,
+        TargetRequest*          targetReq,
+        CodeGenTarget           target,
+        EndToEndCompileRequest* endToEndReq,
+        SourceResult&           outSource);
+
+    SlangResult emitEntryPointSource(
+        BackEndCompileRequest*  compileRequest,
+        Int                     entryPointIndices,
         TargetRequest*          targetReq,
         CodeGenTarget           target,
         EndToEndCompileRequest* endToEndReq,
