@@ -82,7 +82,7 @@ namespace Slang
 	private:
 		inline int GetProbeOffset(int /*probeId*/) const
 		{
-			// quadratic probing
+			// linear probing
 			return 1;
 		}
 	private:

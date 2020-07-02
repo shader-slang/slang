@@ -14,72 +14,6 @@
 
 namespace Slang
 {
-    
-    template<typename T, int isPOD>
-    class Initializer
-    {
-
-    };
-
-    template<typename T>
-    class Initializer<T, 0>
-    {
-    public:
-        static void initialize(T* buffer, int size)
-        {
-            for (int i = 0; i<size; i++)
-                new (buffer + i) T();
-        }
-    };
-    template<typename T>
-    class Initializer<T, 1>
-    {
-    public:
-        static void initialize(T* buffer, int size)
-        {
-            // It's pod so no initialization required
-            //for (int i = 0; i < size; i++)
-            //    new (buffer + i) T;
-        }
-    };
-
-    template<typename T, typename TAllocator>
-    class AllocateMethod
-    {
-    public:
-        static inline T* allocateArray(Index count)
-        {
-            TAllocator allocator;
-            T * rs = (T*)allocator.allocate(count * sizeof(T));
-            Initializer<T, std::is_pod<T>::value>::initialize(rs, count);
-            return rs;
-        }
-        static inline void deallocateArray(T* ptr, Index count)
-        {
-            TAllocator allocator;
-            if (!std::is_trivially_destructible<T>::value)
-            {
-                for (Index i = 0; i < count; i++)
-                    ptr[i].~T();
-            }
-            allocator.deallocate(ptr);
-        }
-    };
-
-    template<typename T>
-    class AllocateMethod<T, StandardAllocator>
-    {
-    public:
-        static inline T* allocateArray(Index count)
-        {
-            return new T[count];
-        }
-        static inline void deallocateArray(T* ptr, Index /*bufferSize*/)
-        {
-            delete [] ptr;
-        }
-    };
-
     // List is container of values of a type held consecutively in memory (much like std::vector)
     // 
     // Note that in this implementation, the underlying memory is backed via an allocation of T[capacity]
@@ -102,6 +36,7 @@ namespace Slang
         }
         template<typename... Args>
         List(const T& val, Args... args)
+            : m_buffer(nullptr), m_count(0), m_capacity(0)
         {
             _init(val, args...);
         }
@@ -611,6 +546,10 @@ namespace Slang
         {
             return AllocateMethod<T, TAllocator>::allocateArray(count);
         }
+        static void _free(T* buffer, Index count)
+        {
+            return AllocateMethod<T, TAllocator>::deallocateArray(buffer, count);
+        }
 
         template<typename... Args>
         void _init(const T& val, Args... args)
@@ -618,6 +557,8 @@ namespace Slang
             add(val);
             _init(args...);
         }
+
+        void _init() {}
     };
 
     template<typename T>
