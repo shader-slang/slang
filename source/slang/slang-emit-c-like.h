@@ -262,6 +262,7 @@ public:
     void emitParameterGroup(IRGlobalParam* varDecl, IRUniformParameterGroupType* type);
 
     void emitVar(IRVar* varDecl);
+    void emitDereferenceOperand(IRInst* inst, EmitOpInfo const& outerPrec);
 
     void emitGlobalVar(IRGlobalVar* varDecl);
     void emitGlobalParam(IRGlobalParam* varDecl);
@@ -298,6 +299,7 @@ public:
 
     protected:
 
+    virtual bool doesTargetSupportPtrTypes() { return false; }
     virtual void emitLayoutSemanticsImpl(IRInst* inst, char const* uniformSemanticSpelling = "register") { SLANG_UNUSED(inst); SLANG_UNUSED(uniformSemanticSpelling); }
     virtual void emitParameterGroupImpl(IRGlobalParam* varDecl, IRUniformParameterGroupType* type) = 0;
     virtual void emitEntryPointAttributesImpl(IRFunc* irFunc, IREntryPointDecoration* entryPointDecor) = 0;
@@ -318,6 +320,7 @@ public:
     virtual void emitSimpleValueImpl(IRInst* inst);
     virtual void emitModuleImpl(IRModule* module);
     virtual void emitSimpleFuncImpl(IRFunc* func);
+    virtual void emitVarExpr(IRInst* inst, EmitOpInfo const& outerPrec);
     virtual void emitOperandImpl(IRInst* inst, EmitOpInfo const& outerPrec);
     virtual void emitParamTypeImpl(IRType* type, String const& name);
     virtual void emitIntrinsicCallExprImpl(IRCall* inst, IRTargetIntrinsicDecoration* targetIntrinsic, EmitOpInfo const& inOuterPrec);

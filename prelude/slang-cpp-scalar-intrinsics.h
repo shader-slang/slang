@@ -80,16 +80,16 @@ SLANG_FORCE_INLINE float F32_fmod(float a, float b) { return ::fmodf(a, b); }
 SLANG_FORCE_INLINE float F32_remainder(float a, float b) { return ::remainderf(a, b); }
 SLANG_FORCE_INLINE float F32_atan2(float a, float b) { return float(::atan2(a, b)); }
 
-SLANG_FORCE_INLINE float F32_frexp(float x, float& e)
+SLANG_FORCE_INLINE float F32_frexp(float x, float* e)
 {
     int ei;
     float m = ::frexpf(x, &ei);
-    e = float(ei);
+    *e = float(ei);
     return m;
 }
-SLANG_FORCE_INLINE float F32_modf(float x, float& ip)
+SLANG_FORCE_INLINE float F32_modf(float x, float* ip)
 {
-    return ::modff(x, &ip);
+    return ::modff(x, ip);
 }
 
 SLANG_FORCE_INLINE uint32_t F32_asuint(float f) { Union32 u; u.f = f; return u.u; }
@@ -147,33 +147,33 @@ SLANG_FORCE_INLINE double F64_fmod(double a, double b) { return ::fmod(a, b); }
 SLANG_FORCE_INLINE double F64_remainder(double a, double b) { return ::remainder(a, b); }
 SLANG_FORCE_INLINE double F64_atan2(double a, double b) { return ::atan2(a, b); }
 
-SLANG_FORCE_INLINE double F64_frexp(double x, double& e)
+SLANG_FORCE_INLINE double F64_frexp(double x, double* e)
 {
     int ei;
     double m = ::frexp(x, &ei);
-    e = float(ei);
+    *e = float(ei);
     return m;
 }
 
-SLANG_FORCE_INLINE double F64_modf(double x, double& ip)
+SLANG_FORCE_INLINE double F64_modf(double x, double* ip)
 {
-    return ::modf(x, &ip);
+    return ::modf(x, ip);
 }
 
-SLANG_FORCE_INLINE void F64_asuint(double d, uint32_t& low, uint32_t& hi)
+SLANG_FORCE_INLINE void F64_asuint(double d, uint32_t* low, uint32_t* hi)
 {
     Union64 u;
     u.d = d;
-    low = uint32_t(u.u);
-    hi = uint32_t(u.u >> 32);
+    *low = uint32_t(u.u);
+    *hi = uint32_t(u.u >> 32);
 }
 
-SLANG_FORCE_INLINE void F64_asint(double d, int32_t& low, int32_t& hi)
+SLANG_FORCE_INLINE void F64_asint(double d, int32_t* low, int32_t* hi)
 {
     Union64 u;
     u.d = d;
-    low = int32_t(u.u);
-    hi = int32_t(u.u >> 32);
+    *low = int32_t(u.u);
+    *hi = int32_t(u.u >> 32);
 }
 
 // Ternary
