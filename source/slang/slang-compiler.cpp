@@ -1621,7 +1621,7 @@ SlangResult dissassembleDXILUsingDXC(
     SlangResult emitSPIRVForEntryPointsViaGLSL(
         ComponentType*                  program,
         BackEndCompileRequest*          slangRequest,
-        List<Int>                       entryPointIndices,
+        const List<Int>&                entryPointIndices,
         TargetRequest*                  targetReq,
         EndToEndCompileRequest*         endToEndReq,
         List<uint8_t>&                  spirvOut)
@@ -1675,7 +1675,7 @@ SlangResult dissassembleDXILUsingDXC(
     SlangResult emitSPIRVForEntryPoints(
         ComponentType*                  program,
         BackEndCompileRequest*          slangRequest,
-        List<Int>                       entryPointIndices,
+        const List<Int>&                entryPointIndices,
         TargetRequest*                  targetReq,
         EndToEndCompileRequest*         endToEndReq,
         List<uint8_t>&                  spirvOut)
@@ -1703,7 +1703,7 @@ SlangResult dissassembleDXILUsingDXC(
     SlangResult emitSPIRVAssemblyForEntryPoints(
         ComponentType*                  program,
         BackEndCompileRequest*          slangRequest,
-        List<Int>                       entryPointIndices,
+        const List<Int>&                entryPointIndices,
         TargetRequest*                  targetReq,
         EndToEndCompileRequest*         endToEndReq,
         String&                         assemblyOut)
@@ -1728,7 +1728,7 @@ SlangResult dissassembleDXILUsingDXC(
     CompileResult emitEntryPoints(
         ComponentType*                  program,
         BackEndCompileRequest*          compileRequest,
-        List<Int>                       entryPointIndices,
+        const List<Int>&                entryPointIndices,
         TargetRequest*                  targetReq,
         EndToEndCompileRequest*         endToEndReq)
     {

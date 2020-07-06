@@ -1984,7 +1984,7 @@ namespace Slang
 
     SlangResult emitEntryPointSource(
         BackEndCompileRequest*  compileRequest,
-        Int                     entryPointIndices,
+        Int                     entryPointIndex,
         TargetRequest*          targetReq,
         CodeGenTarget           target,
         EndToEndCompileRequest* endToEndReq,
