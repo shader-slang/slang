@@ -63,6 +63,7 @@ public:
 protected:
 
     // Implement CLikeSourceEmitter interface
+    virtual bool doesTargetSupportPtrTypes() SLANG_OVERRIDE { return true; }
     virtual void emitParameterGroupImpl(IRGlobalParam* varDecl, IRUniformParameterGroupType* type) SLANG_OVERRIDE;
     virtual void emitEntryPointAttributesImpl(IRFunc* irFunc, IREntryPointDecoration* entryPointDecor) SLANG_OVERRIDE;
     virtual void emitSimpleTypeImpl(IRType* type) SLANG_OVERRIDE;

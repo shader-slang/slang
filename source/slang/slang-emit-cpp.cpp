@@ -398,10 +398,7 @@ SlangResult CPPSourceEmitter::calcTypeName(IRType* type, CodeGenTarget target, S
         {
             auto ptrType = static_cast<IRPtrType*>(type);
             SLANG_RETURN_ON_FAIL(calcTypeName(ptrType->getValueType(), target, out));
-            // TODO(JS): It seems although it says it is a pointer, it can actually be output as a reference
-            // not clear where the ptr aspect is there, as in the definition it is just 'out', implying out
-            // is somewhere converted to a ptr?
-            out << "&";
+            out << "*";
             return SLANG_OK;
         }
         case kIROp_RefType:
@@ -577,14 +574,6 @@ SlangResult CPPSourceEmitter::calcTypeName(IRType* type, CodeGenTarget target, S
 
 void CPPSourceEmitter::useType(IRType* type)
 {
-    if (type->op == kIROp_PtrType)
-    {
-        // TODO(JS):
-        // If it's a pointer type we ignore. We may want to strip but in practice it's
-        // probably not necessary.
-        return;
-    }
-
     _getTypeName(type);
 }
 
@@ -934,22 +923,26 @@ void CPPSourceEmitter::_emitGetAtDefinition(const UnownedStringSlice& funcName, 
 
     IRType* srcType = funcType->getParamType(0);
 
-    for (Index i = 0; i < 2; ++i)
+    for (Index i = 0; i < 3; ++i)
     {
         UnownedStringSlice typePrefix = (i == 0) ? UnownedStringSlice::fromLiteral("const ") : UnownedStringSlice();
+        bool lValue = (i != 2);
 
         emitFunctionPreambleImpl(nullptr);
 
         writer->emit(typePrefix);
         emitType(specOp->returnType);
-        m_writer->emit("& ");
-
+        if (lValue)
+            m_writer->emit("*");
+        writer->emit(" ");
         writer->emit(funcName);
         writer->emit("(");
 
         writer->emit(typePrefix);
         emitType(funcType->getParamType(0));
-        writer->emit("& a,  ");
+        if (lValue)
+            writer->emit("*");
+        writer->emit(" a,  ");
         emitType(funcType->getParamType(1));
         writer->emit(" b)\n{\n");
 
@@ -962,8 +955,10 @@ void CPPSourceEmitter::_emitGetAtDefinition(const UnownedStringSlice& funcName, 
             writer->emit("assert(b >= 0 && b < ");
             writer->emit(vecSize);
             writer->emit(");\n");
-
-            writer->emit("return (&a.x)[b];\n");
+            if (lValue)
+                writer->emit("return (&a->x) + b;\n");
+            else
+                writer->emit("return (&a.x)[b];\n");
         }
         else if (auto matrixType = as<IRMatrixType>(srcType))
         {
@@ -974,7 +969,10 @@ void CPPSourceEmitter::_emitGetAtDefinition(const UnownedStringSlice& funcName, 
             writer->emit(rowCount);
             writer->emit(");\n");
 
-            writer->emit("return a.rows[b];\n");
+            if (lValue)
+                writer->emit("return &(a->rows[b]);\n");
+            else
+                writer->emit("return a.rows[b];\n");
         }
 
         writer->dedent();
@@ -1566,7 +1564,7 @@ void CPPSourceEmitter::_emitInOutParamType(IRType* type, String const& name, IRT
 
     UnownedStringSlice slice = _getTypeName(valueType);
     m_writer->emit(slice);
-    m_writer->emit("& ");
+    m_writer->emit("* ");
     m_writer->emitName(nameAndLoc);
 }
 
@@ -2095,21 +2093,39 @@ void CPPSourceEmitter::emitIntrinsicCallExprImpl(
         else
         {
             // The user is invoking a built-in subscript operator
-            auto prec = getInfo(EmitOp::Postfix);
-            needClose = maybeEmitParens(outerPrec, prec);
 
-            emitOperand(args[0].get(), leftSide(outerPrec, prec));
-            m_writer->emit("[");
-            emitOperand(args[1].get(), getInfo(EmitOp::General));
-            m_writer->emit("]");
+            // Determine if we are calling the `ref` accessor:
+            // `ref` accessor returns a pointer of element type.
+            auto ptrType = as<IRPtrType>(inst->getFullType());
+            auto resourceType = inst->getOperand(1)->getFullType();
+            auto elementType = resourceType ? resourceType->getOperand(0) : nullptr;
+            bool isRef = ptrType && ptrType->getValueType() == elementType;
 
+            auto emitSubscript = [this, &args](EmitOpInfo _outerPrec)
+            {
+                auto prec = getInfo(EmitOp::Postfix);
+                bool needCloseSubscript = maybeEmitParens(_outerPrec, prec);
+                emitOperand(args[0].get(), leftSide(_outerPrec, prec));
+                m_writer->emit("[");
+                emitOperand(args[1].get(), getInfo(EmitOp::General));
+                m_writer->emit("]");
+                maybeCloseParens(needCloseSubscript);
+            };
+
+            if (isRef)
+            {
+                auto prefixPrec = getInfo(EmitOp::Prefix);
+                needClose = maybeEmitParens(outerPrec, prefixPrec);
+                m_writer->emit("&");
+                outerPrec = rightSide(outerPrec, prefixPrec);
+            }
+            emitSubscript(outerPrec);
+            maybeCloseParens(needClose);
             if (argCount == 3)
             {
                 m_writer->emit(" = ");
                 emitOperand(args[2].get(), getInfo(EmitOp::General));
             }
-
-            maybeCloseParens(needClose);
         }
 
         return;
@@ -2358,19 +2374,6 @@ void CPPSourceEmitter::emitOperandImpl(IRInst* inst, EmitOpInfo const&  outerPre
             {
                 // It's in UniformState
                 m_writer->emit("(");
-
-                switch (inst->getDataType()->op)
-                {
-                    case kIROp_ParameterBlockType:
-                    case kIROp_ConstantBufferType:
-                    case kIROp_StructType:
-                    {
-                        m_writer->emit("*");
-                        break;
-                    }
-                    default: break;
-                }
-
                 m_writer->emit("uniformState->");
                 m_writer->emit(name);
                 m_writer->emit(")");
@@ -2408,12 +2411,14 @@ void CPPSourceEmitter::emitOperandImpl(IRInst* inst, EmitOpInfo const&  outerPre
                     }
                 }
             }
-
-            ;   // Fall-thru
+            m_writer->emit(getName(inst));
+            break;
         }
+        case kIROp_Var:
         case kIROp_GlobalVar:
+            emitVarExpr(inst, outerPrec);
+            break;
         default:
-            // GlobalVar should be fine as should just be a member of Context
             m_writer->emit(getName(inst));
             break;
     }

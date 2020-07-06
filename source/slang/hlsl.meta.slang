@@ -1427,123 +1427,123 @@ void GroupMemoryBarrierWithGroupSync();
 // Atomics
 
 __target_intrinsic(glsl, "$atomicAdd($A, $1)")
-__target_intrinsic(cuda, "atomicAdd(&$0, $1)")
+__target_intrinsic(cuda, "atomicAdd($0, $1)")
 void InterlockedAdd(__ref  int dest,  int value);
 
 __target_intrinsic(glsl, "$atomicAdd($A, $1)")
-__target_intrinsic(cuda, "atomicAdd((uint*)&$0, $1)")
+__target_intrinsic(cuda, "atomicAdd((uint*)$0, $1)")
 void InterlockedAdd(__ref uint dest, uint value);
 
 __target_intrinsic(glsl, "($2 = $atomicAdd($A, $1))")
-__target_intrinsic(cuda, "($2 = atomicAdd(&$0, $1))")
+__target_intrinsic(cuda, "(*$2 = atomicAdd($0, $1))")
 void InterlockedAdd(__ref  int dest,  int value, out  int original_value);
 
 __target_intrinsic(glsl, "($2 = $atomicAdd($A, $1))")
-__target_intrinsic(cuda, "($2 = (uint)atomicAdd((uint*)&$0, $1))")
+__target_intrinsic(cuda, "(*$2 = (uint)atomicAdd((uint*)$0, $1))")
 void InterlockedAdd(__ref uint dest, uint value, out uint original_value);
 
 __target_intrinsic(glsl, "$atomicAnd($A, $1)")
-__target_intrinsic(cuda, "atomicAnd(&$0, $1)")
+__target_intrinsic(cuda, "atomicAnd($0, $1)")
 void InterlockedAnd(__ref  int dest,  int value);
 
 __target_intrinsic(glsl, "$atomicAnd($A, $1)")
-__target_intrinsic(cuda, "atomicAnd((int*)&$0, $1)")
+__target_intrinsic(cuda, "atomicAnd((int*)$0, $1)")
 void InterlockedAnd(__ref uint dest, uint value);
 
 __target_intrinsic(glsl, "($2 = $atomicAnd($A, $1))")
-__target_intrinsic(cuda, "($2 = atomicAnd(&$0, $1))")
+__target_intrinsic(cuda, "(*$2 = atomicAnd($0, $1))")
 void InterlockedAnd(__ref  int dest,  int value, out  int original_value);
 
 __target_intrinsic(glsl, "($2 = $atomicAnd($A, $1))")
-__target_intrinsic(cuda, "($2 = atomicAnd((int*)&$0, $1))")
+__target_intrinsic(cuda, "(*$2 = atomicAnd((int*)$0, $1))")
 void InterlockedAnd(__ref uint dest, uint value, out uint original_value);
 
 __target_intrinsic(glsl, "($3 = $atomicCompSwap($A, $1, $2))")
-__target_intrinsic(cuda, "($3 = atomicCAS(&$0, $1, $2))")
+__target_intrinsic(cuda, "(*$3 = atomicCAS($0, $1, $2))")
 void InterlockedCompareExchange(__ref  int dest,  int compare_value,  int value, out  int original_value);
 
 __target_intrinsic(glsl, "($3 = $atomicCompSwap($A, $1, $2))")
-__target_intrinsic(cuda, "($3 = (uint)atomicCAS((int*)&$0, $1, $2))")
+__target_intrinsic(cuda, "(*$3 = (uint)atomicCAS((int*)$0, $1, $2))")
 void InterlockedCompareExchange(__ref uint dest, uint compare_value, uint value, out uint original_value);
 
 __target_intrinsic(glsl, "$atomicCompSwap($A, $1, $2)")
-__target_intrinsic(cuda, "atomicCAS(&$0, $1, $2)")
+__target_intrinsic(cuda, "atomicCAS($0, $1, $2)")
 void InterlockedCompareStore(__ref int dest,  int compare_value,  int value);
 
 __target_intrinsic(glsl, "$atomicCompSwap($A, $1, $2)")
-__target_intrinsic(cuda, "atomicCAS((int*)&$0, $1, $2)")
+__target_intrinsic(cuda, "atomicCAS((int*)$0, $1, $2)")
 void InterlockedCompareStore(__ref uint dest, uint compare_value, uint value);
 
 __target_intrinsic(glsl, "($2 = $atomicExchange($A, $1))")
-__target_intrinsic(cuda, "($2 = atomicExch(&$0, $1))")
+__target_intrinsic(cuda, "(*$2 = atomicExch($0, $1))")
 void InterlockedExchange(__ref  int dest,  int value, out  int original_value);
 
 __target_intrinsic(glsl, "($2 = $atomicExchange($A, $1))")
-__target_intrinsic(cuda, "($2 = (uint)atomicExch((int*)&$0, $1))")
+__target_intrinsic(cuda, "(*$2 = (uint)atomicExch((int*)$0, $1))")
 void InterlockedExchange(__ref uint dest, uint value, out uint original_value);
 
 __target_intrinsic(glsl, "$atomicMax($A, $1)")
-__target_intrinsic(cuda, "atomicMax(&$0, $1)")
+__target_intrinsic(cuda, "atomicMax($0, $1)")
 void InterlockedMax(__ref  int dest,  int value);
 
 __target_intrinsic(glsl, "$atomicMax($A, $1)")
-__target_intrinsic(cuda, "atomicMax((int*)&$0, $1)")
+__target_intrinsic(cuda, "atomicMax((int*)$0, $1)")
 void InterlockedMax(__ref uint dest, uint value);
 
 __target_intrinsic(glsl, "($2 = $atomicMax($A, $1))")
-__target_intrinsic(cuda, "($2 = atomicMax(&$0, $1))")
+__target_intrinsic(cuda, "(*$2 = atomicMax($0, $1))")
 void InterlockedMax(__ref  int dest,  int value, out  int original_value);
 
 __target_intrinsic(glsl, "($2 = $atomicMax($A, $1))")
-__target_intrinsic(cuda, "($2 = (uint)atomicMax((int*)&$0, $1))")
+__target_intrinsic(cuda, "(*$2 = (uint)atomicMax((int*)$0, $1))")
 void InterlockedMax(__ref uint dest, uint value, out uint original_value);
 
 __target_intrinsic(glsl, "$atomicMin($A, $1)")
-__target_intrinsic(cuda, "atomicMin(&$0, $1)")
+__target_intrinsic(cuda, "atomicMin($0, $1)")
 void InterlockedMin(__ref  int dest,  int value);
 
 __target_intrinsic(glsl, "$atomicMin($A, $1)")
-__target_intrinsic(cuda, "atomicMin((int*)&$0, $1)")
+__target_intrinsic(cuda, "atomicMin((int*)$0, $1)")
 void InterlockedMin(__ref uint dest, uint value);
 
 __target_intrinsic(glsl, "($2 = $atomicMin($A, $1))")
-__target_intrinsic(cuda, "($2 = atomicMin(&$0, $1))")
+__target_intrinsic(cuda, "(*$2 = atomicMin($0, $1))")
 void InterlockedMin(__ref  int dest,  int value, out  int original_value);
 
 __target_intrinsic(glsl, "($2 = $atomicMin($A, $1))")
-__target_intrinsic(cuda, "($2 = (uint)atomicMin((int*)&$0, $1))")
+__target_intrinsic(cuda, "(*$2 = (uint)atomicMin((int*)$0, $1))")
 void InterlockedMin(__ref uint dest, uint value, out uint original_value);
 
 __target_intrinsic(glsl, "$atomicOr($A, $1)")
-__target_intrinsic(cuda, "atomicOr(&$0, $1)")
+__target_intrinsic(cuda, "atomicOr($0, $1)")
 void InterlockedOr(__ref  int dest,  int value);
 
 __target_intrinsic(glsl, "$atomicOr($A, $1)")
-__target_intrinsic(cuda, "atomicOr((int*)&$0, $1)")
+__target_intrinsic(cuda, "atomicOr((int*)$0, $1)")
 void InterlockedOr(__ref uint dest, uint value);
 
 __target_intrinsic(glsl, "($2 = $atomicOr($A, $1))")
-__target_intrinsic(cuda, "($2 = atomicOr(&$0, $1))")
+__target_intrinsic(cuda, "(*$2 = atomicOr($0, $1))")
 void InterlockedOr(__ref  int dest,  int value, out  int original_value);
 
 __target_intrinsic(glsl, "($2 = $atomicOr($A, $1))")
-__target_intrinsic(cuda, "($2 = (uint)atomicOr((int*)&$0, $1))")
+__target_intrinsic(cuda, "(*$2 = (uint)atomicOr((int*)$0, $1))")
 void InterlockedOr(__ref uint dest, uint value, out uint original_value);
 
 __target_intrinsic(glsl, "$atomicXor($A, $1)")
-__target_intrinsic(cuda, "atomicXor(&$0, $1)")
+__target_intrinsic(cuda, "atomicXor($0, $1)")
 void InterlockedXor(__ref  int dest,  int value);
 
 __target_intrinsic(glsl, "$atomicXor($A, $1)")
-__target_intrinsic(cuda, "atomicXor((int*)&$0, $1)")
+__target_intrinsic(cuda, "atomicXor((int*)$0, $1)")
 void InterlockedXor(__ref uint dest, uint value);
 
 __target_intrinsic(glsl, "($2 = $atomicXor($A, $1))")
-__target_intrinsic(cuda, "($2 = atomicXor(&$0, $1))")
+__target_intrinsic(cuda, "(*$2 = atomicXor($0, $1))")
 void InterlockedXor(__ref  int dest,  int value, out  int original_value);
 
 __target_intrinsic(glsl, "($2 = $atomicXor($A, $1))")
-__target_intrinsic(cuda, "($2 = (uint)atomicXor((int*)&$0, $1))")
+__target_intrinsic(cuda, "(*$2 = (uint)atomicXor((int*)$0, $1))")
 void InterlockedXor(__ref uint dest, uint value, out uint original_value);
 
 // Is floating-point value finite?
