@@ -1,10 +1,14 @@
 #ifndef SLANG_CORE_ALLOCATOR_H
 #define SLANG_CORE_ALLOCATOR_H
 
+#include "slang-common.h"
+
 #include <stdlib.h>
 #ifdef _MSC_VER
 #   include <malloc.h>
 #endif
+
+#include <type_traits>
 
 namespace Slang
 {
@@ -59,6 +63,72 @@ namespace Slang
 			return alignedDeallocate(ptr);
 		}
 	};
+
+    // Helper utilties for calling allocators.
+    template<typename T, int isPOD>
+    class Initializer
+    {
+
+    };
+
+    template<typename T>
+    class Initializer<T, 0>
+    {
+    public:
+        static void initialize(T* buffer, int size)
+        {
+            for (int i = 0; i < size; i++)
+                new (buffer + i) T();
+        }
+    };
+    template<typename T>
+    class Initializer<T, 1>
+    {
+    public:
+        static void initialize(T* buffer, int size)
+        {
+            // It's pod so no initialization required
+            //for (int i = 0; i < size; i++)
+            //    new (buffer + i) T;
+        }
+    };
+
+    template<typename T, typename TAllocator>
+    class AllocateMethod
+    {
+    public:
+        static inline T* allocateArray(Index count)
+        {
+            TAllocator allocator;
+            T* rs = (T*)allocator.allocate(count * sizeof(T));
+            Initializer<T, std::is_pod<T>::value>::initialize(rs, count);
+            return rs;
+        }
+        static inline void deallocateArray(T* ptr, Index count)
+        {
+            TAllocator allocator;
+            if (!std::is_trivially_destructible<T>::value)
+            {
+                for (Index i = 0; i < count; i++)
+                    ptr[i].~T();
+            }
+            allocator.deallocate(ptr);
+        }
+    };
+
+    template<typename T>
+    class AllocateMethod<T, StandardAllocator>
+    {
+    public:
+        static inline T* allocateArray(Index count)
+        {
+            return new T[count];
+        }
+        static inline void deallocateArray(T* ptr, Index /*bufferSize*/)
+        {
+            delete[] ptr;
+        }
+    };
 }
 
 #endif

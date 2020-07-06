@@ -198,6 +198,7 @@
     <ClInclude Include="slang-secure-crt.h" />
     <ClInclude Include="slang-semantic-version.h" />
     <ClInclude Include="slang-shared-library.h" />
+    <ClInclude Include="slang-short-list.h" />
     <ClInclude Include="slang-smart-pointer.h" />
     <ClInclude Include="slang-std-writers.h" />
     <ClInclude Include="slang-stream.h" />
