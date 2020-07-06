@@ -1631,9 +1631,11 @@ struct ValLoweringVisitor : ValVisitor<ValLoweringVisitor, LoweredValInfo, Lower
     {
         // A `This` type in an interface decl should lower to `IRThisType`,
         // while `This` type in a concrete `struct` should slower to the `struct` type
-        // itself. This is implemented by setting `context->thisType` when visiting
-        // the corresponding container decl (e.g. in `visitInterfaceDecl`),
-        // and we can just use this value here.
+        // itself. A `This` type reference in a concrete type is already translated to that
+        // type in semantics checking in this setting.
+        // If we see `This` type here, we are dealing with `This` inside an interface decl.
+        // Therefore, `context->thisType` should have been set to `IRThisType`
+        // in `visitInterfaceDecl`, and we can just use that value here.
         //
         if (context->thisType != nullptr)
             return LoweredValInfo::simple(context->thisType);
