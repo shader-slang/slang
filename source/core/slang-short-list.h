@@ -179,6 +179,7 @@ namespace Slang
                     ThisType::_free(arrayView.m_buffer, arrayView.m_count);
                 }
             }
+            T* getBuffer() { return arrayView.getBuffer(); }
         };
         inline GetArrayViewResult getArrayView() const
         {
