@@ -394,6 +394,8 @@ SlangResult CPPSourceEmitter::calcTypeName(IRType* type, CodeGenTarget target, S
 {
     switch (type->op)
     {
+        case kIROp_OutType:
+        case kIROp_InOutType:
         case kIROp_PtrType:
         {
             auto ptrType = static_cast<IRPtrType*>(type);
@@ -496,8 +498,14 @@ SlangResult CPPSourceEmitter::calcTypeName(IRType* type, CodeGenTarget target, S
             return SLANG_OK;
         }
         case kIROp_RawPointerType:
+        case kIROp_SizedPointerType:
         {
             out << "void*";
+            return SLANG_OK;
+        }
+        case kIROp_RTTIType:
+        {
+            out << "__rtti_t";
             return SLANG_OK;
         }
         default:
@@ -1685,11 +1693,22 @@ void CPPSourceEmitter::_emitWitnessTableWrappers()
                             if (reqParamType->op == kIROp_RawPointerType &&
                                 param->getFullType()->op != kIROp_RawPointerType)
                             {
-                                m_writer->emit("*static_cast<");
-                                emitType(param->getFullType());
-                                m_writer->emit("*>(");
-                                m_writer->emit(getName(param));
-                                m_writer->emit(")");
+                                if (as<IRPtrTypeBase>(param->getFullType()))
+                                {
+                                    m_writer->emit("static_cast<");
+                                    emitType(param->getFullType());
+                                    m_writer->emit(">(");
+                                    m_writer->emit(getName(param));
+                                    m_writer->emit(")");
+                                }
+                                else
+                                {
+                                    m_writer->emit("*static_cast<");
+                                    emitType(param->getFullType());
+                                    m_writer->emit("*>(");
+                                    m_writer->emit(getName(param));
+                                    m_writer->emit(")");
+                                }
                             }
                             else
                             {
@@ -1762,6 +1781,34 @@ void CPPSourceEmitter::emitInterface(IRInterfaceType* interfaceType)
     emitSimpleType(interfaceType);
     m_writer->emit(";\n");
 }
+
+void CPPSourceEmitter::emitRTTIObject(IRRTTIObject* rttiObject)
+{
+    m_writer->emit("static __rtti_t ");
+    m_writer->emit(getName(rttiObject));
+    m_writer->emit(" = {");
+    bool isFirstEntry = true;
+    for (UInt i = 0; i < rttiObject->getOperandCount(); i++)
+    {
+        auto entry = rttiObject->getOperand(i);
+        auto key = static_cast<RTTIEntryKeys>(cast<IRIntLit>(entry->getOperand(0))->getValue());
+        if (!isFirstEntry)
+            m_writer->emit(", ");
+        switch (key)
+        {
+        case kRTTISize:
+            m_writer->emit("/* .typeSize = */ ");
+            emitOperand(entry->getOperand(1), getInfo(EmitOp::General));
+            break;
+        default:
+            SLANG_UNREACHABLE("Unknown RTTI entry type.");
+            break;
+        }
+        isFirstEntry = false;
+    }
+    m_writer->emit("};\n");
+}
+
 
     /// Emits witness table type definition given a sorted list of witness tables
     /// acoording to the order defined by `interfaceType`.
@@ -2261,6 +2308,25 @@ bool CPPSourceEmitter::tryEmitInstExprImpl(IRInst* inst, const EmitOpInfo& inOut
             m_writer->emit("(&(");
             emitInstExpr(inst->getOperand(0), EmitOpInfo::get(EmitOp::General));
             m_writer->emit("))");
+            return true;
+        }
+        case kIROp_RTTIObject:
+        {
+            m_writer->emit(getName(inst));
+            return true;
+        }
+        case kIROp_RTTIExtractSize:
+        {
+            emitInstExpr(inst->getOperand(0), inOuterPrec);
+            m_writer->emit("->");
+            m_writer->emit("typeSize");
+            return true;
+        }
+        case kIROp_Alloca:
+        {
+            m_writer->emit("alloca(");
+            emitOperand(inst->getOperand(0), EmitOpInfo::get(EmitOp::General));
+            m_writer->emit(")");
             return true;
         }
     }

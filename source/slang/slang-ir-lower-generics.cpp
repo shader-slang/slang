@@ -2,6 +2,7 @@
 #include "slang-ir-lower-generics.h"
 
 #include "slang-ir.h"
+#include "slang-ir-layout.h"
 #include "slang-ir-clone.h"
 #include "slang-ir-insts.h"
 
@@ -14,6 +15,9 @@ namespace Slang
         // For convenience, we will keep a pointer to the module
         // we are processing.
         IRModule* module;
+
+        // RTTI objects for each type used to call a generic function.
+        Dictionary<IRInst*, IRInst*> rttiObjects;
 
         Dictionary<IRInst*, IRInst*> loweredGenericFunctions;
         HashSet<IRInterfaceType*> loweredInterfaceTypes;
@@ -57,8 +61,26 @@ namespace Slang
             case kIROp_InterfaceType:
                 return true;
             default:
-                return false;
+                break;
             }
+            if (auto ptrType = as<IRPtrTypeBase>(typeInst))
+            {
+                return isPolymorphicType(ptrType->getValueType());
+            }
+            return false;
+        }
+
+        IRInst* lowerParameterType(IRBuilder* builder, IRInst* paramType)
+        {
+            if (paramType && paramType->op == kIROp_TypeType)
+            {
+                return builder->getPtrType(builder->getRTTIType());
+            }
+            if (isPolymorphicType(paramType))
+            {
+                return builder->getRawPointerType();
+            }
+            return paramType;
         }
 
         IRInst* lowerGenericFunction(IRInst* genericValue)
@@ -82,11 +104,24 @@ namespace Slang
             auto loweredFunc = cloneInstAndOperands(&cloneEnv, &builder, func);
             loweredFunc->setFullType(lowerGenericFuncType(&builder, cast<IRGeneric>(genericParent->getFullType())));
             List<IRInst*> clonedParams;
-            for (auto genericParam : genericParent->getParams())
+            for (auto genericChild : genericParent->getFirstBlock()->getChildren())
             {
-                auto clonedParam = cloneInst(&cloneEnv, &builder, genericParam);
-                cloneEnv.mapOldValToNew[genericParam] = clonedParam;
-                clonedParams.add(clonedParam);
+                if (genericChild == func)
+                    continue;
+                if (genericChild->op == kIROp_ReturnVal)
+                    continue;
+                // Process all generic parameters and local type definitions.
+                auto clonedChild = cloneInst(&cloneEnv, &builder, genericChild);
+                if (clonedChild->op == kIROp_Param)
+                {
+                    auto paramType = clonedChild->getFullType();
+                    auto loweredParamType = lowerParameterType(&builder, paramType);
+                    if (loweredParamType != paramType)
+                    {
+                        clonedChild->setFullType((IRType*)loweredParamType);
+                    }
+                    clonedParams.add(clonedChild);
+                }
             }
             cloneInstDecorationsAndChildren(&cloneEnv, &sharedBuilderStorage, func, loweredFunc);
             auto block = as<IRBlock>(loweredFunc->getFirstChild());
@@ -96,14 +131,6 @@ namespace Slang
                 block->addParam(as<IRParam>(param));
             }
             loweredGenericFunctions[genericValue] = loweredFunc;
-            // Turn generic parameters into void pointers.
-            for (auto param : cast<IRFunc>(loweredFunc)->getParams())
-            {
-                if (isPolymorphicType(param->getFullType()))
-                {
-                    param->setFullType(builder.getRawPointerType());
-                }
-            }
             addToWorkList(loweredFunc);
             return loweredFunc;
         }
@@ -113,14 +140,7 @@ namespace Slang
             List<IRInst*> genericParamTypes;
             for (auto genericParam : genericVal->getParams())
             {
-                if (isPolymorphicType(genericParam->getFullType()))
-                {
-                    genericParamTypes.add(builder->getRawPointerType());
-                }
-                else
-                {
-                    genericParamTypes.add(genericParam->getFullType());
-                }
+                genericParamTypes.add(lowerParameterType(builder, genericParam->getFullType()));
             }
 
             auto innerType = (IRFuncType*)lowerFuncType(
@@ -145,22 +165,16 @@ namespace Slang
             for (UInt i = 0; i < funcType->getOperandCount(); i++)
             {
                 auto paramType = funcType->getOperand(i);
-                if (isPolymorphicType(paramType))
+                if (paramType->op == kIROp_Specialize)
                 {
-                    newOperands.add(builder->getRawPointerType());
-                    translated = true;
-                }
-                else if (paramType->op == kIROp_Specialize)
-                {
-                    // TODO: handle static specialized type here.
-                    // For now treat all specialized types as dynamic.
-                    // In the future, we need to turn things like Array<IDynamic> into Array<void*>.
                     newOperands.add(builder->getRawPointerType());
                     translated = true;
                 }
                 else
                 {
-                    newOperands.add(paramType);
+                    auto loweredParamType = lowerParameterType(builder, paramType);
+                    translated = translated || (loweredParamType != paramType);
+                    newOperands.add(loweredParamType);
                 }
             }
             if (!translated && additionalParamCount == 0)
@@ -206,6 +220,76 @@ namespace Slang
 
             loweredInterfaceTypes.Add(interfaceType);
             return interfaceType;
+        }
+
+        void processVarInst(IRInst* varInst)
+        {
+            // We process only var declarations that have type
+            // `Ptr<IRParam>`.
+            // Due to the processing of `lowerGenericFunction`,
+            // A local variable of generic type now appears as
+            // `var X:Ptr<irParam:Ptr<RTTIType>>`
+            // We match this pattern and turn this inst into
+            // `X:RawPtr = alloca(rtti_extract_size(irParam))`
+            auto varTypeInst = varInst->getFullType();
+            if (!varTypeInst)
+                return;
+            auto ptrType = as<IRPtrType>(varTypeInst);
+            if (!ptrType)
+                return;
+            auto varTypeParam = ptrType->getValueType();
+            if (varTypeParam->op != kIROp_Param)
+                return;
+            if (!varTypeParam->getFullType())
+                return;
+            if (varTypeParam->getFullType()->op != kIROp_PtrType)
+                return;
+            if (as<IRPtrType>(varTypeParam->getFullType())->getValueType()->op != kIROp_RTTIType)
+                return;
+
+            // A local variable of generic type has a type that is an IRParam.
+            // This parameter represents the RTTI that tells us the size of the type.
+            // We need to transform the variable into an `alloca` call to allocate its
+            // space based on the provided RTTI object.
+
+            // Initialize IRBuilder for emitting instructions.
+            IRBuilder builderStorage;
+            auto builder = &builderStorage;
+            builder->sharedBuilder = &sharedBuilderStorage;
+            builder->setInsertBefore(varInst);
+
+            auto typeSize = builder->emitRTTIExtractSize(varTypeParam);
+            auto newVarInst = builder->emitAlloca(typeSize);
+            varInst->replaceUsesWith(newVarInst);
+            varInst->removeAndDeallocate();
+        }
+
+        // Emits an IRRTTIObject containing type information for a given type.
+        IRInst* maybeEmitRTTIObject(IRInst* typeInst)
+        {
+            IRInst* result = nullptr;
+            if (rttiObjects.TryGetValue(typeInst, result))
+                return result;
+            IRBuilder builderStorage;
+            auto builder = &builderStorage;
+            builder->sharedBuilder = &sharedBuilderStorage;
+            builder->setInsertBefore(typeInst);
+
+            // For now the only type info we encapsualte is type size.
+            IRSizeAndAlignment sizeAndAlignment;
+            getNaturalSizeAndAlignment((IRType*)typeInst, &sizeAndAlignment);
+            auto typeSize = builder->getIntValue(builder->getIntType(), sizeAndAlignment.size);
+            auto sizeEntry = builder->emitRTTIEntry(kRTTISize, typeSize);
+            result = builder->emitMakeRTTIObject(makeArrayView(sizeEntry));
+
+            // Give a name to the rtti object.
+            if (auto exportDecoration = typeInst->findDecoration<IRExportDecoration>())
+            {
+                String rttiObjName = "__rtti_" + String(exportDecoration->getMangledName());
+                builder->addExportDecoration(result, rttiObjName.getUnownedSlice());
+            }
+            rttiObjects[typeInst] = result;
+            return result;
         }
 
         void processInst(IRInst* inst)
@@ -280,7 +364,34 @@ namespace Slang
                         args.add(arg);
                     }
                     for (UInt i = 0; i < specializeInst->getArgCount(); i++)
-                        args.add(specializeInst->getArg(i));
+                    {
+                        auto arg = specializeInst->getArg(i);
+                        // Translate Type arguments into RTTI object.
+                        if (as<IRType>(arg))
+                        {
+                            // We are using a simple type to specialize a callee.
+                            // Generate RTTI for this type.
+                            auto rttiObject = maybeEmitRTTIObject(arg);
+                            arg = builder->emitGetAddress(
+                                builder->getPtrType(builder->getRTTIType()),
+                                rttiObject);
+                        }
+                        else if (arg->op == kIROp_Specialize)
+                        {
+                            // The type argument used to specialize a callee is itself a
+                            // specialization of some generic type.
+                            // TODO: generate RTTI object for specializations of generic types.
+                            SLANG_UNIMPLEMENTED_X("RTTI object generation for generic types");
+                        }
+                        else if (arg->op == kIROp_RTTIObject)
+                        {
+                            // We are inside a generic function and using a generic parameter
+                            // to specialize another callee. The generic parameter of the caller
+                            // has already been translated into an RTTI object, so we just need
+                            // to pass this object down.
+                        }
+                        args.add(arg);
+                    }
                     auto newCall = builder->emitCallInst(callInst->getFullType(), loweredFunc, args);
                     callInst->replaceUsesWith(newCall);
                     callInst->removeAndDeallocate();
@@ -307,6 +418,10 @@ namespace Slang
             else if (auto interfaceType = as<IRInterfaceType>(inst))
             {
                 maybeLowerInterfaceType(interfaceType);
+            }
+            else if (inst->op == kIROp_Var || inst->op == kIROp_undefined)
+            {
+                processVarInst(inst);
             }
         }
 

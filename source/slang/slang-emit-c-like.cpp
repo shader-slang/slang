@@ -309,6 +309,14 @@ void CLikeSourceEmitter::emitInterface(IRInterfaceType* interfaceType)
     // This behavior is overloaded by concrete emitters.
 }
 
+void CLikeSourceEmitter::emitRTTIObject(IRRTTIObject* rttiObject)
+{
+    SLANG_UNUSED(rttiObject);
+    // Ignore rtti object by default.
+    // This is only used in targets that support dynamic dispatching.
+}
+
+
 void CLikeSourceEmitter::emitTypeImpl(IRType* type, const StringSliceLoc* nameAndLoc)
 {
     if (nameAndLoc)
@@ -908,6 +916,7 @@ bool CLikeSourceEmitter::shouldFoldInstIntoUseSites(IRInst* inst)
     case kIROp_GlobalParam:
     case kIROp_Param:
     case kIROp_Func:
+    case kIROp_Alloca:
         return false;
 
     // Always fold these in, because they are trivial
@@ -2197,12 +2206,30 @@ void CLikeSourceEmitter::defaultEmitInstExpr(IRInst* inst, const EmitOpInfo& inO
 
     case kIROp_Store:
         {
-            auto prec = getInfo(EmitOp::Assign);
-            needClose = maybeEmitParens(outerPrec, prec);
+            auto destPtr = inst->getOperand(0);
+            if (destPtr->getFullType()->op == kIROp_SizedPointerType)
+            {
+                // Storing a generic typed object (whose size is known at runtime).
+                // This is not allowed for targets that doesn't support dynamic dispatch.
+                SLANG_ASSERT(doesTargetSupportPtrTypes());
+                m_writer->emit("memcpy(");
+                emitOperand(inst->getOperand(0), getInfo(EmitOp::General));
+                m_writer->emit(", ");
+                SLANG_ASSERT(inst->getOperand(1)->op == kIROp_Load);
+                emitOperand(inst->getOperand(1)->getOperand(0), getInfo(EmitOp::General));
+                m_writer->emit(", ");
+                emitOperand(destPtr->getFullType()->getOperand(0), getInfo(EmitOp::General));
+                m_writer->emit(")");
+            }
+            else
+            {
+                auto prec = getInfo(EmitOp::Assign);
+                needClose = maybeEmitParens(outerPrec, prec);
 
-            emitDereferenceOperand(inst->getOperand(0), leftSide(outerPrec, prec));
-            m_writer->emit(" = ");
-            emitOperand(inst->getOperand(1), rightSide(prec, outerPrec));
+                emitDereferenceOperand(inst->getOperand(0), leftSide(outerPrec, prec));
+                m_writer->emit(" = ");
+                emitOperand(inst->getOperand(1), rightSide(prec, outerPrec));
+            }
         }
         break;
 
@@ -3646,6 +3673,10 @@ void CLikeSourceEmitter::emitGlobalInst(IRInst* inst)
         // They are handled in `emitInterface`.
         break;
 
+    case kIROp_RTTIEntry:
+        // Don't emit for RTTI entry.
+        break;
+
     case kIROp_Func:
         emitFunc((IRFunc*) inst);
         break;
@@ -3672,6 +3703,10 @@ void CLikeSourceEmitter::emitGlobalInst(IRInst* inst)
 
     case kIROp_WitnessTable:
         emitWitnessTable(cast<IRWitnessTable>(inst));
+        break;
+
+    case kIROp_RTTIObject:
+        emitRTTIObject(cast<IRRTTIObject>(inst));
         break;
 
     default:

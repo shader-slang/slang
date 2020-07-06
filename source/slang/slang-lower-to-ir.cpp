@@ -2198,7 +2198,13 @@ Type* getThisParamTypeForContainer(
     IRGenContext*   context,
     DeclRef<Decl>   parentDeclRef)
 {
-    if( auto aggTypeDeclRef = parentDeclRef.as<AggTypeDecl>() )
+    if (auto interfaceDeclRef = parentDeclRef.as<InterfaceDecl>())
+    {
+        auto thisType = context->astBuilder->create<ThisType>();
+        thisType->interfaceDeclRef = interfaceDeclRef;
+        return thisType;
+    }
+    else if( auto aggTypeDeclRef = parentDeclRef.as<AggTypeDecl>() )
     {
         return DeclRefType::create(context->astBuilder, aggTypeDeclRef);
     }

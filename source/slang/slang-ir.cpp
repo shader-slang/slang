@@ -1936,6 +1936,11 @@ namespace Slang
         keyInst.value.ptrVal = value;
         return (IRPtrLit*) findOrEmitConstant(this, keyInst);
     }
+
+    IRInst* IRBuilder::getRTTIKey(RTTIEntryKeys key)
+    {
+        return getIntValue(getIntType(), key);
+    }
  
     IRInst* IRBuilder::findOrEmitHoistableInst(
         IRType*                 type,
@@ -2208,6 +2213,16 @@ namespace Slang
     IRRawPointerType* IRBuilder::getRawPointerType()
     {
         return (IRRawPointerType*)getType(kIROp_RawPointerType);
+    }
+
+    IRSizedPointerType* IRBuilder::getSizedPointerType(IRInst* size)
+    {
+        return (IRSizedPointerType*)getType(kIROp_SizedPointerType, size);
+    }
+
+    IRRTTIType* IRBuilder::getRTTIType()
+    {
+        return (IRRTTIType*)getType(kIROp_RTTIType);
     }
 
     IRBasicBlockType*   IRBuilder::getBasicBlockType()
@@ -2537,6 +2552,30 @@ namespace Slang
         return inst;
     }
 
+    IRInst* IRBuilder::emitRTTIExtractSize(IRInst* rttiObject)
+    {
+        auto inst = createInst<IRLookupWitnessMethod>(
+            this,
+            kIROp_RTTIExtractSize,
+            getIntType(),
+            rttiObject);
+
+        addInst(inst);
+        return inst;
+    }
+
+    IRInst* IRBuilder::emitAlloca(IRInst* size)
+    {
+        auto inst = createInst<IRLookupWitnessMethod>(
+            this,
+            kIROp_Alloca,
+            getSizedPointerType(size),
+            size);
+
+        addInst(inst);
+        return inst;
+    }
+
     IRInst* IRBuilder::emitCallInst(
         IRType*         type,
         IRInst*        pFunc,
@@ -2596,6 +2635,31 @@ namespace Slang
             type,
             argCount,
             args);
+        addInst(inst);
+        return inst;
+    }
+
+    IRInst* IRBuilder::emitRTTIEntry(RTTIEntryKeys key, IRInst* value)
+    {
+        IRInst* args[] = {getRTTIKey(key), value};
+        auto inst = createInstWithTrailingArgs<IRInst>(
+            this,
+            kIROp_RTTIEntry,
+            nullptr,
+            2,
+            args);
+        addInst(inst);
+        return inst;
+    }
+
+    IRInst* IRBuilder::emitMakeRTTIObject(ArrayView<IRInst*> rttiEntries)
+    {
+        auto inst = createInstWithTrailingArgs<IRInst>(
+            this,
+            kIROp_RTTIObject,
+            nullptr,
+            rttiEntries.getCount(),
+            rttiEntries.getBuffer());
         addInst(inst);
         return inst;
     }

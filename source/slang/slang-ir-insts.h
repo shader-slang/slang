@@ -420,6 +420,24 @@ struct IRLookupWitnessTable : IRInst
     IRUse interfaceType;
 };
 
+/// Extracts type size from an RTTI object.
+///
+struct IRRTTIExtractSize : IRInst
+{
+    IR_LEAF_ISA(RTTIExtractSize)
+
+    IRInst* getRTTIObject() { return getOperand(0); }
+};
+
+/// Allocates space from local stack.
+///
+struct IRAlloca : IRInst
+{
+    IR_LEAF_ISA(Alloca)
+
+    IRInst* getAllocSize() { return getOperand(0); }
+};
+
 // Layout decorations
 
     /// A decoration that marks a field key as having been associated
@@ -1439,6 +1457,11 @@ struct IRWitnessTable : IRInst
     IR_LEAF_ISA(WitnessTable)
 };
 
+struct IRRTTIObject : IRInst
+{
+    IR_LEAF_ISA(RTTIObject)
+};
+
 // An instruction that yields an undefined value.
 //
 // Note that we make this an instruction rather than a value,
@@ -1565,6 +1588,7 @@ struct IRBuilder
     IRInst* getFloatValue(IRType* type, IRFloatingPointValue value);
     IRStringLit* getStringValue(const UnownedStringSlice& slice);
     IRPtrLit* getPtrValue(void* value);
+    IRInst* getRTTIKey(RTTIEntryKeys key);
 
     IRBasicType* getBasicType(BaseType baseType);
     IRBasicType* getVoidType();
@@ -1574,6 +1598,8 @@ struct IRBuilder
     IRAssociatedType* getAssociatedType();
     IRThisType* getThisType();
     IRRawPointerType* getRawPointerType();
+    IRSizedPointerType* getSizedPointerType(IRInst* size);
+    IRRTTIType* getRTTIType();
 
 
     IRBasicBlockType*   getBasicBlockType();
@@ -1681,6 +1707,13 @@ struct IRBuilder
         IRInst* witnessTableVal,
         IRInst* interfaceMethodVal);
 
+    // Extracts type size info from an RTTI object.
+    // Takes 1 operand of type Ptr<RTTIType>.
+    // Result is of integer type.
+    IRInst* emitRTTIExtractSize(IRInst* rttiObject);
+
+    IRInst* emitAlloca(IRInst* size);
+
     IRInst* emitCallInst(
         IRType*         type,
         IRInst*         func,
@@ -1711,6 +1744,11 @@ struct IRBuilder
         IRType*         type,
         UInt            argCount,
         IRInst* const* args);
+
+    IRInst* emitRTTIEntry(RTTIEntryKeys key, IRInst* value);
+
+    // Creates an RTTI object. Result is of `IRRTTIType`.
+    IRInst* emitMakeRTTIObject(ArrayView<IRInst*> rttiEntries);
 
     IRInst* emitMakeVector(
         IRType*         type,

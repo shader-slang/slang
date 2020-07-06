@@ -26,6 +26,7 @@ INST(Nop, nop, 0, 0)
 
     INST(StringType, String, 0, 0)
     INST(RawPointerType, RawPointerType, 0, 0)
+    INST(SizedPointerType, SizedPointerType, 1, 0)
 
     /* ArrayTypeBase */
         INST(ArrayType, Array, 2, 0)
@@ -168,6 +169,7 @@ INST(StructType, struct, 0, PARENT)
 INST(InterfaceType, interface, 0, 0)
 INST(AssociatedType, associated_type, 0, 0)
 INST(ThisType, this_type, 0, 0)
+INST(RTTIType, rtti_type, 0, 0)
 
 // A TypeType-typed IRValue represents a IRType.
 // It is used to represent a type parameter/argument in a generics.
@@ -224,6 +226,10 @@ INST(makeStruct, makeStruct, 0, 0)
 
 INST(Call, call, 1, 0)
 
+INST(RTTIObject, rtti_object, 0, 0)
+INST(RTTIEntry, rtti_entry, 2, 0)
+INST(RTTIExtractSize, rtti_extract_size, 1, 0)
+INST(Alloca, alloca, 1, 0)
 
 INST(WitnessTableEntry, witness_table_entry, 2, 0)
 INST(InterfaceRequirementEntry, interface_req_entry, 2, 0)

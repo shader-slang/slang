@@ -729,6 +729,16 @@ struct IRPtrLit : IRConstant
     void* getValue() { return value.ptrVal; }
 };
 
+// Range of keys of an RTTI entry.
+// For an `RTTIEntry(op0, op1)`, `op0` is an `IRIntLit` whose value
+// must be one of the enums defined in `RTTIEntryKeys`.
+enum RTTIEntryKeys : int32_t
+{
+    kRTTISize, // Size in bytes of the type represented by the RTTI object.
+    kRTTIKeys_End, // Marks the count of possible key values.
+                   // Not a valid value to appear in the IR.
+};
+
 // A instruction that ends a basic block (usually because of control flow)
 struct IRTerminatorInst : IRInst
 {
@@ -1114,6 +1124,12 @@ struct IRRawPointerType : IRType
     IR_LEAF_ISA(RawPointerType)
 };
 
+struct IRSizedPointerType : IRRawPointerType
+{
+    IRInst* getSizeOperand() { return getOperand(0); }
+    IR_LEAF_ISA(SizedPointerType)
+};
+
 struct IRGlobalHashedStringLiterals : IRInst
 {
     IR_LEAF_ISA(GlobalHashedStringLiterals)
@@ -1227,6 +1243,11 @@ struct IRTaggedUnionType : IRType
 struct IRTypeType : IRType
 {
     IR_LEAF_ISA(TypeType);
+};
+
+struct IRRTTIType : IRType
+{
+    IR_LEAF_ISA(RTTIType);
 };
 
 struct IRWitnessTableType : IRType
