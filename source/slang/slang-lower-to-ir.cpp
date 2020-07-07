@@ -1629,20 +1629,13 @@ struct ValLoweringVisitor : ValVisitor<ValLoweringVisitor, LoweredValInfo, Lower
 
     LoweredValInfo visitThisType(ThisType* type)
     {
-        // TODO: In theory, we should only run into a `ThisType` when lowering a concrete
-        // declaration defined on an interface type (e.g., via an `extension`).
-        //
-        // There is an open question of how we should emit a concrete method (say) defined
-        // on an `interface` type. We could emit the code in "object-oriented" style,
-        // passing in a `this` parameter of type `IFoo`, or we could emit it in a "generic"
-        // type where the whole member is wrapped in a generic on `<This : IFoo>`.
-        //
-        // The generic option has the benefit of having a clear solution in the case of
-        // static members that don't have a `this` parameter, but might still need `This`,
-        // but we have so far favored the "object-oriented" lowering for code involving
-        // bare interface types.
-        //
-        // For now we punt and emit the `ThisType` of an interface `IFoo` as `IFoo`.
+        // A `This` type in an interface decl should lower to `IRThisType`,
+        // while `This` type in a concrete `struct` should lower to the `struct` type
+        // itself. A `This` type reference in a concrete type is already translated to that
+        // type in semantics checking in this setting.
+        // If we see `This` type here, we are dealing with `This` inside an interface decl.
+        // Therefore, `context->thisType` should have been set to `IRThisType`
+        // in `visitInterfaceDecl`, and we can just use that value here.
         //
         if (context->thisType != nullptr)
             return LoweredValInfo::simple(context->thisType);
