@@ -617,14 +617,13 @@ SlangResult emitEntryPointSourceFromIR(
     TargetRequest*          targetRequest,
     SourceResult&           outSource)
 {
-    // Temporary assertion for checkpoint
-    SLANG_ASSERT(entryPointIndices.getCount() == 1);
     outSource.reset();
 
     auto sink = compileRequest->getSink();
     auto program = compileRequest->getProgram();
 
-    // TODO(DG): Update from assertion
+    // Temporary assertion for checkpoint
+    SLANG_ASSERT(entryPointIndices.getCount() == 1);
     auto entryPoint = program->getEntryPoint(entryPointIndices[0]);
 
     auto lineDirectiveMode = compileRequest->getLineDirectiveMode();
