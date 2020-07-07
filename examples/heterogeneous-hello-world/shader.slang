@@ -14,3 +14,7 @@ void computeMain(uint3 dispatchThreadID : SV_DispatchThreadID)
 
     ioBuffer[tid] = o;
 }
+
+public int prepMain() {
+    return 5;
+}

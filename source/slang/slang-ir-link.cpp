@@ -1479,6 +1479,22 @@ LinkedIR linkIR(
         }
     }
 
+    for (IRModule* irModule : irModules)
+    {
+        for (auto inst : irModule->getGlobalInsts())
+        {
+            auto hasPublic = inst->findDecoration<IRPublicDecoration>();
+            if (!hasPublic)
+                continue;
+
+            auto cloned = cloneValue(context, inst);
+            if (!cloned->findDecorationImpl(kIROp_KeepAliveDecoration))
+            {
+                context->builder->addKeepAliveDecoration(cloned);
+            }
+        }
+    }
+
     // TODO: *technically* we should consider the case where
     // we have global variables with initializers, since
     // these should get run whether or not the entry point
