@@ -1630,7 +1630,7 @@ struct ValLoweringVisitor : ValVisitor<ValLoweringVisitor, LoweredValInfo, Lower
     LoweredValInfo visitThisType(ThisType* type)
     {
         // A `This` type in an interface decl should lower to `IRThisType`,
-        // while `This` type in a concrete `struct` should slower to the `struct` type
+        // while `This` type in a concrete `struct` should lower to the `struct` type
         // itself. A `This` type reference in a concrete type is already translated to that
         // type in semantics checking in this setting.
         // If we see `This` type here, we are dealing with `This` inside an interface decl.
