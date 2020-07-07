@@ -6716,6 +6716,10 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
             getBuilder()->addRequireCUDASMVersionDecoration(irFunc, versionMod->version);
         }
 
+        if (decl->findModifier<PublicModifier>()) {
+            getBuilder()->addSimpleDecoration<IRPublicDecoration>(irFunc);
+        }
+
         if (auto attr = decl->findModifier<InstanceAttribute>())
         {
             IRIntLit* intLit = _getIntLitFromAttribute(getBuilder(), attr);
