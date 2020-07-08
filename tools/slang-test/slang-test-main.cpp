@@ -2844,6 +2844,12 @@ static bool _canIgnore(TestContext* context, const TestDetails& details)
         return true;
     }
 
+    // Are the required rendering APIs enabled from the -api command line switch
+    if ((requirements.usedRenderApiFlags & context->options.enabledApis) != requirements.usedRenderApiFlags)
+    {
+        return true;
+    }
+
     return false;
 }
 

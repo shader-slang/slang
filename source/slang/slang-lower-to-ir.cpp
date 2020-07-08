@@ -1629,20 +1629,13 @@ struct ValLoweringVisitor : ValVisitor<ValLoweringVisitor, LoweredValInfo, Lower
 
     LoweredValInfo visitThisType(ThisType* type)
     {
-        // TODO: In theory, we should only run into a `ThisType` when lowering a concrete
-        // declaration defined on an interface type (e.g., via an `extension`).
-        //
-        // There is an open question of how we should emit a concrete method (say) defined
-        // on an `interface` type. We could emit the code in "object-oriented" style,
-        // passing in a `this` parameter of type `IFoo`, or we could emit it in a "generic"
-        // type where the whole member is wrapped in a generic on `<This : IFoo>`.
-        //
-        // The generic option has the benefit of having a clear solution in the case of
-        // static members that don't have a `this` parameter, but might still need `This`,
-        // but we have so far favored the "object-oriented" lowering for code involving
-        // bare interface types.
-        //
-        // For now we punt and emit the `ThisType` of an interface `IFoo` as `IFoo`.
+        // A `This` type in an interface decl should lower to `IRThisType`,
+        // while `This` type in a concrete `struct` should lower to the `struct` type
+        // itself. A `This` type reference in a concrete type is already translated to that
+        // type in semantics checking in this setting.
+        // If we see `This` type here, we are dealing with `This` inside an interface decl.
+        // Therefore, `context->thisType` should have been set to `IRThisType`
+        // in `visitInterfaceDecl`, and we can just use that value here.
         //
         if (context->thisType != nullptr)
             return LoweredValInfo::simple(context->thisType);
@@ -6723,6 +6716,10 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
             getBuilder()->addRequireCUDASMVersionDecoration(irFunc, versionMod->version);
         }
 
+        if (decl->findModifier<PublicModifier>()) {
+            getBuilder()->addSimpleDecoration<IRPublicDecoration>(irFunc);
+        }
+
         if (auto attr = decl->findModifier<InstanceAttribute>())
         {
             IRIntLit* intLit = _getIntLitFromAttribute(getBuilder(), attr);
@@ -7586,7 +7583,7 @@ struct IRLayoutGenContext : IRGenContext
     {}
 
         /// Cache for custom key instructions used for entry-point parameter layout information.
-    Dictionary<ParamDecl*, IRStructKey*> mapEntryPointParamToKey;
+    Dictionary<ParamDecl*, IRInst*> mapEntryPointParamToKey;
 };
 
     /// Lower an AST-level type layout to an IR-level type layout.
@@ -7657,7 +7654,7 @@ IRTypeLayout* lowerTypeLayout(
         {
             auto fieldDecl = fieldLayout->varDecl;
 
-            IRStructKey* irFieldKey = nullptr;
+            IRInst* irFieldKey = nullptr;
             if(auto paramDecl = as<ParamDecl>(fieldDecl) )
             {
                 // There is a subtle special case here.
@@ -7702,9 +7699,8 @@ IRTypeLayout* lowerTypeLayout(
             }
             else
             {
-                IRInst* irFieldKeyInst = getSimpleVal(context,
+                irFieldKey = getSimpleVal(context,
                     ensureDecl(context, fieldDecl));
-                irFieldKey = as<IRStructKey>(irFieldKeyInst);
             }
             SLANG_ASSERT(irFieldKey);
 
@@ -7765,9 +7761,9 @@ IRTypeLayout* lowerTypeLayout(
 
 IRVarLayout* lowerVarLayout(
     IRLayoutGenContext* context,
-    VarLayout*          varLayout)
+    VarLayout*          varLayout,
+    IRTypeLayout*       irTypeLayout)
 {
-    auto irTypeLayout = lowerTypeLayout(context, varLayout->typeLayout);
     IRVarLayout::Builder irLayoutBuilder(context->irBuilder, irTypeLayout);
 
     for( auto resInfo : varLayout->resourceInfos )
@@ -7807,6 +7803,14 @@ IRVarLayout* lowerVarLayout(
     }
 
     return irLayoutBuilder.build();
+}
+
+IRVarLayout* lowerVarLayout(
+    IRLayoutGenContext* context,
+    VarLayout*          varLayout)
+{
+    auto irTypeLayout = lowerTypeLayout(context, varLayout->typeLayout);
+    return lowerVarLayout(context, varLayout, irTypeLayout);
 }
 
     /// Handle the lowering of an entry-point result layout to the IR
@@ -7896,10 +7900,12 @@ RefPtr<IRModule> TargetProgram::createIRModuleForLayout(DiagnosticSink* sink)
 
     // Okay, now we need to walk through and decorate everything.
     auto globalStructLayout = getScopeStructLayout(programLayout);
-    for(auto globalVarPair : globalStructLayout->mapVarToLayout)
+
+    IRStructTypeLayout::Builder globalStructTypeLayoutBuilder(builder);
+
+    for(auto varLayout : globalStructLayout->fields)
     {
-        auto varDecl = globalVarPair.Key;
-        auto varLayout = globalVarPair.Value;
+        auto varDecl = varLayout->varDecl;
 
         // Ensure that an `[import(...)]` declaration for the variable
         // has been emitted to this module, so that we will have something
@@ -7912,7 +7918,36 @@ RefPtr<IRModule> TargetProgram::createIRModuleForLayout(DiagnosticSink* sink)
         // Now attach the decoration to the variable.
         //
         builder->addLayoutDecoration(irVar, irLayout);
+
+        // Also add this to our mapping for the global-scope structure type
+        globalStructTypeLayoutBuilder.addField(irVar, irLayout);
     }
+    auto irGlobalStructTypeLayout = _lowerTypeLayoutCommon(context, &globalStructTypeLayoutBuilder, globalStructLayout);
+
+    auto globalScopeVarLayout = programLayout->parametersLayout;
+    auto globalScopeTypeLayout = globalScopeVarLayout->typeLayout;
+    IRTypeLayout* irGlobalScopeTypeLayout = irGlobalStructTypeLayout;
+    if( auto paramGroupTypeLayout = as<ParameterGroupTypeLayout>(globalScopeTypeLayout) )
+    {
+        IRParameterGroupTypeLayout::Builder globalParameterGroupTypeLayoutBuilder(builder);
+
+        auto irElementTypeLayout = irGlobalStructTypeLayout;
+        auto irElementVarLayout = lowerVarLayout(context, paramGroupTypeLayout->elementVarLayout, irElementTypeLayout);
+
+        globalParameterGroupTypeLayoutBuilder.setContainerVarLayout(
+            lowerVarLayout(context, paramGroupTypeLayout->containerVarLayout));
+        globalParameterGroupTypeLayoutBuilder.setElementVarLayout(irElementVarLayout);
+        globalParameterGroupTypeLayoutBuilder.setOffsetElementTypeLayout(
+            lowerTypeLayout(context, paramGroupTypeLayout->offsetElementTypeLayout));
+
+        auto irParamGroupTypeLayout = _lowerTypeLayoutCommon(context, &globalParameterGroupTypeLayoutBuilder, paramGroupTypeLayout);
+
+        irGlobalScopeTypeLayout = irParamGroupTypeLayout;
+    }
+
+    auto irGlobalScopeVarLayout = lowerVarLayout(context, globalScopeVarLayout, irGlobalScopeTypeLayout);
+
+    builder->addLayoutDecoration(irModule->getModuleInst(), irGlobalScopeVarLayout);
 
     for( auto entryPointLayout : programLayout->entryPoints )
     {

@@ -567,7 +567,7 @@ namespace Slang
 
     SlangResult emitEntryPointsSource(
         BackEndCompileRequest*  compileRequest,
-        List<Int>               entryPointIndices,
+        const List<Int>&        entryPointIndices,
         TargetRequest*          targetReq,
         CodeGenTarget           target,
         EndToEndCompileRequest* endToEndReq,
@@ -577,9 +577,9 @@ namespace Slang
 
         if(isPassThroughEnabled(endToEndReq))
         {
-            for (auto entryPointIndex = entryPointIndices.begin(); entryPointIndex != entryPointIndices.end(); entryPointIndex++)
+            for (auto entryPointIndex : entryPointIndices)
             {
-                auto translationUnit = getPassThroughTranslationUnit(endToEndReq, *entryPointIndex);
+                auto translationUnit = getPassThroughTranslationUnit(endToEndReq, entryPointIndex);
                 SLANG_ASSERT(translationUnit);
                 // Generate a string that includes the content of
                 // the source file(s), along with a line directive
@@ -779,7 +779,7 @@ namespace Slang
 
     String calcSourcePathForEntryPoints(
         EndToEndCompileRequest* endToEndReq,
-        List<Int>               entryPointIndices)
+        const List<Int>&        entryPointIndices)
     {
         String failureMode = "slang-generated";
         if (entryPointIndices.getCount() != 1)
@@ -821,38 +821,10 @@ namespace Slang
         return calcSourcePathForEntryPoints(endToEndReq, entryPointIndices);
     }
 
-    struct EntryPointAndIndex {
-        EntryPoint* entryPoint;
-        Int         index;
-        EntryPointAndIndex();
-        EntryPointAndIndex(EntryPoint* entryPoint, Int index);
-    };
-
-    EntryPointAndIndex::EntryPointAndIndex()
-    {
-        entryPoint = NULL;
-        index = -1;
-    }
-
-    EntryPointAndIndex::EntryPointAndIndex(EntryPoint* ep, Int i)
-    {
-        entryPoint = ep;
-        index = i;
-    }
-
-    // Helper function for recovering the entry point code indices from a list of entry points
-    List<Int> getEntryPointIndices(List<EntryPointAndIndex> const& entryPoints) {
-        List<Int> result;
-        for (auto entryPoint = entryPoints.begin(); entryPoint != entryPoints.end(); entryPoint++) {
-            result.add(entryPoint->index);
-        }
-        return result;
-    }
-
     // Helper function for cases where we can assume a single entry point
-    EntryPointAndIndex assertSingleEntryPoint(List<EntryPointAndIndex> const& entryPoints) {
-        SLANG_ASSERT(entryPoints.getCount() == 1);
-        return *entryPoints.begin();
+    Int assertSingleEntryPoint(List<Int> const& entryPointIndices) {
+        SLANG_ASSERT(entryPointIndices.getCount() == 1);
+        return *entryPointIndices.begin();
     }
 
 #if SLANG_ENABLE_DXBC_SUPPORT
@@ -957,8 +929,9 @@ namespace Slang
     };
 
     SlangResult emitDXBytecodeForEntryPoint(
+        ComponentType*          program,
         BackEndCompileRequest*  compileRequest,
-        EntryPointAndIndex      entryPoint,
+        Int                     entryPointIndex,
         TargetRequest*          targetReq,
         EndToEndCompileRequest* endToEndReq,
         List<uint8_t>&          byteCodeOut)
@@ -975,12 +948,13 @@ namespace Slang
         }
 
         SourceResult source;
-        SLANG_RETURN_ON_FAIL(emitEntryPointSource(compileRequest, entryPoint.index, targetReq, CodeGenTarget::HLSL, endToEndReq, source));
+        SLANG_RETURN_ON_FAIL(emitEntryPointSource(compileRequest, entryPointIndex, targetReq, CodeGenTarget::HLSL, endToEndReq, source));
 
         const auto& hlslCode = source.source;
         maybeDumpIntermediate(compileRequest, hlslCode.getBuffer(), CodeGenTarget::HLSL);
 
-        auto profile = getEffectiveProfile(entryPoint.entryPoint, targetReq);
+        auto entryPoint = program->getEntryPoint(entryPointIndex);
+        auto profile = getEffectiveProfile(entryPoint, targetReq);
 
         auto linkage = compileRequest->getLinkage();
 
@@ -1000,7 +974,7 @@ namespace Slang
         FxcIncludeHandler fxcIncludeHandlerStorage;
         FxcIncludeHandler* fxcIncludeHandler = nullptr;
 
-        if(auto translationUnit = findPassThroughTranslationUnit(endToEndReq, entryPoint.index))
+        if(auto translationUnit = findPassThroughTranslationUnit(endToEndReq, entryPointIndex))
         {
             for( auto& define :  translationUnit->compileRequest->preprocessorDefinitions )
             {
@@ -1074,7 +1048,7 @@ namespace Slang
             break;
         }
 
-        const String sourcePath = calcSourcePathForEntryPoint(endToEndReq, entryPoint.index);
+        const String sourcePath = calcSourcePathForEntryPoint(endToEndReq, entryPointIndex);
 
         ComPtr<ID3DBlob> codeBlob;
         ComPtr<ID3DBlob> diagnosticsBlob;
@@ -1084,7 +1058,7 @@ namespace Slang
             sourcePath.getBuffer(),
             dxMacros,
             fxcIncludeHandler,
-            getText(entryPoint.entryPoint->getName()).begin(),
+            getText(entryPoint->getName()).begin(),
             GetHLSLProfileName(profile).getBuffer(),
             flags,
             0, // unused: effect flags
@@ -1143,8 +1117,9 @@ namespace Slang
     }
 
     SlangResult emitDXBytecodeAssemblyForEntryPoint(
+        ComponentType*          program,
         BackEndCompileRequest*  compileRequest,
-        EntryPointAndIndex      entryPoint,
+        Int                     entryPointIndex,
         TargetRequest*          targetReq,
         EndToEndCompileRequest* endToEndReq,
         String&                 assemOut)
@@ -1152,8 +1127,9 @@ namespace Slang
 
         List<uint8_t> dxbc;
         SLANG_RETURN_ON_FAIL(emitDXBytecodeForEntryPoint(
+            program,
             compileRequest,
-            entryPoint,
+            entryPointIndex,
             targetReq,
             endToEndReq,
             dxbc));
@@ -1170,8 +1146,8 @@ namespace Slang
 // Implementations in `dxc-support.cpp`
 
 SlangResult emitDXILForEntryPointUsingDXC(
+    ComponentType*          program,
     BackEndCompileRequest*  compileRequest,
-    EntryPoint*             entryPoint,
     Int                     entryPointIndex,
     TargetRequest*          targetReq,
     EndToEndCompileRequest* endToEndReq,
@@ -1276,7 +1252,7 @@ SlangResult dissassembleDXILUsingDXC(
 
     SlangResult emitWithDownstreamForEntryPoints(
         BackEndCompileRequest*  slangRequest,
-        List<Int>               entryPointIndices,
+        const List<Int>&        entryPointIndices,
         TargetRequest*          targetReq,
         EndToEndCompileRequest* endToEndReq,
         RefPtr<DownstreamCompileResult>& outResult)
@@ -1638,13 +1614,14 @@ SlangResult dissassembleDXILUsingDXC(
 
     SlangResult emitSPIRVForEntryPointsDirectly(
         BackEndCompileRequest*  compileRequest,
-        List<Int>               entryPointIndices,
+        const List<Int>&        entryPointIndices,
         TargetRequest*          targetReq,
         List<uint8_t>&          spirvOut);
 
     SlangResult emitSPIRVForEntryPointsViaGLSL(
+        ComponentType*                  program,
         BackEndCompileRequest*          slangRequest,
-        List<EntryPointAndIndex> const& entryPoints,
+        const List<Int>&                entryPointIndices,
         TargetRequest*                  targetReq,
         EndToEndCompileRequest*         endToEndReq,
         List<uint8_t>&                  spirvOut)
@@ -1653,7 +1630,7 @@ SlangResult dissassembleDXILUsingDXC(
 
         SourceResult source;
 
-        SLANG_RETURN_ON_FAIL(emitEntryPointsSource(slangRequest, getEntryPointIndices(entryPoints), targetReq, CodeGenTarget::GLSL, endToEndReq, source));
+        SLANG_RETURN_ON_FAIL(emitEntryPointsSource(slangRequest, entryPointIndices, targetReq, CodeGenTarget::GLSL, endToEndReq, source));
 
         const auto& rawGLSL = source.source;
 
@@ -1664,9 +1641,7 @@ SlangResult dissassembleDXILUsingDXC(
             ((List<uint8_t>*)userData)->addRange((uint8_t*)data, size);
         };
 
-        SLANG_ASSERT(entryPoints.getCount() == 1);
-        auto entryPoint = entryPoints[0];
-        const String sourcePath = calcSourcePathForEntryPoint(endToEndReq, entryPoint.index);
+        const String sourcePath = calcSourcePathForEntryPoint(endToEndReq, assertSingleEntryPoint(entryPointIndices));
 
         glslang_CompileRequest_1_1 request;
         memset(&request, 0, sizeof(request));
@@ -1674,7 +1649,8 @@ SlangResult dissassembleDXILUsingDXC(
 
         request.action = GLSLANG_ACTION_COMPILE_GLSL_TO_SPIRV;
         request.sourcePath = sourcePath.getBuffer();
-        request.slangStage = (SlangStage)entryPoint.entryPoint->getStage();
+        auto entryPoint = program->getEntryPoint(assertSingleEntryPoint(entryPointIndices));
+        request.slangStage = (SlangStage)entryPoint->getStage();
 
         request.inputBegin = rawGLSL.begin();
         request.inputEnd = rawGLSL.end();
@@ -1697,8 +1673,9 @@ SlangResult dissassembleDXILUsingDXC(
     }
 
     SlangResult emitSPIRVForEntryPoints(
+        ComponentType*                  program,
         BackEndCompileRequest*          slangRequest,
-        List<EntryPointAndIndex> const& entryPoints,
+        const List<Int>&                entryPointIndices,
         TargetRequest*                  targetReq,
         EndToEndCompileRequest*         endToEndReq,
         List<uint8_t>&                  spirvOut)
@@ -1707,15 +1684,16 @@ SlangResult dissassembleDXILUsingDXC(
         {
             return emitSPIRVForEntryPointsDirectly(
                 slangRequest,
-                getEntryPointIndices(entryPoints),
+                entryPointIndices,
                 targetReq,
                 spirvOut);
         }
         else
         {
             return emitSPIRVForEntryPointsViaGLSL(
+                program,
                 slangRequest,
-                entryPoints,
+                entryPointIndices,
                 targetReq,
                 endToEndReq,
                 spirvOut);
@@ -1723,16 +1701,18 @@ SlangResult dissassembleDXILUsingDXC(
     }
 
     SlangResult emitSPIRVAssemblyForEntryPoints(
+        ComponentType*                  program,
         BackEndCompileRequest*          slangRequest,
-        List<EntryPointAndIndex> const& entryPoints,
+        const List<Int>&                entryPointIndices,
         TargetRequest*                  targetReq,
         EndToEndCompileRequest*         endToEndReq,
         String&                         assemblyOut)
     {
         List<uint8_t> spirv;
         SLANG_RETURN_ON_FAIL(emitSPIRVForEntryPoints(
+            program,
             slangRequest,
-            entryPoints,
+            entryPointIndices,
             targetReq,
             endToEndReq,
             spirv));
@@ -1746,8 +1726,9 @@ SlangResult dissassembleDXILUsingDXC(
 
     // Do emit logic for a zero or more entry points
     CompileResult emitEntryPoints(
+        ComponentType*                  program,
         BackEndCompileRequest*          compileRequest,
-        List<EntryPointAndIndex> const& entryPoints,
+        const List<Int>&                entryPointIndices,
         TargetRequest*                  targetReq,
         EndToEndCompileRequest*         endToEndReq)
     {
@@ -1766,7 +1747,7 @@ SlangResult dissassembleDXILUsingDXC(
 
                 if (SLANG_SUCCEEDED(emitWithDownstreamForEntryPoints(
                     compileRequest,
-                    getEntryPointIndices(entryPoints),
+                    entryPointIndices,
                     targetReq,
                     endToEndReq,
                     downstreamResult)))
@@ -1784,7 +1765,7 @@ SlangResult dissassembleDXILUsingDXC(
         case CodeGenTarget::CSource:
             {
                 SourceResult source;
-                if (SLANG_FAILED(emitEntryPointsSource(compileRequest, getEntryPointIndices(entryPoints),
+                if (SLANG_FAILED(emitEntryPointsSource(compileRequest, entryPointIndices,
                     targetReq, target, endToEndReq, source)))
                 {
                     return result;
@@ -1801,9 +1782,11 @@ SlangResult dissassembleDXILUsingDXC(
             {
                 // Assert only one entry point case -- move out of this function
                 List<uint8_t> code;
+                auto entryPointIndex = assertSingleEntryPoint(entryPointIndices);
                 if (SLANG_SUCCEEDED(emitDXBytecodeForEntryPoint(
+                    program,
                     compileRequest,
-                    assertSingleEntryPoint(entryPoints),
+                    entryPointIndex,
                     targetReq,
                     endToEndReq,
                     code)))
@@ -1819,9 +1802,11 @@ SlangResult dissassembleDXILUsingDXC(
             {
                 // Assert only one entry point case
                 String code;
+                auto entryPointIndex = assertSingleEntryPoint(entryPointIndices);
                 if (SLANG_SUCCEEDED(emitDXBytecodeAssemblyForEntryPoint(
+                    program,
                     compileRequest,
-                    assertSingleEntryPoint(entryPoints),
+                    entryPointIndex,
                     targetReq,
                     endToEndReq,
                     code)))
@@ -1837,11 +1822,11 @@ SlangResult dissassembleDXILUsingDXC(
         case CodeGenTarget::DXIL:
             {
                 List<uint8_t> code;
-                EntryPointAndIndex entryPoint = assertSingleEntryPoint(entryPoints);
+                auto entryPointIndex = assertSingleEntryPoint(entryPointIndices);
                 if (SLANG_SUCCEEDED(emitDXILForEntryPointUsingDXC(
+                    program,
                     compileRequest,
-                    entryPoint.entryPoint,
-                    entryPoint.index,
+                    entryPointIndex,
                     targetReq,
                     endToEndReq,
                     code)))
@@ -1855,11 +1840,11 @@ SlangResult dissassembleDXILUsingDXC(
         case CodeGenTarget::DXILAssembly:
             {
                 List<uint8_t> code;
-                EntryPointAndIndex entryPoint = assertSingleEntryPoint(entryPoints);
+                Int entryPointIndex = assertSingleEntryPoint(entryPointIndices);
                 if (SLANG_SUCCEEDED(emitDXILForEntryPointUsingDXC(
+                    program,
                     compileRequest,
-                    entryPoint.entryPoint,
-                    entryPoint.index,
+                    entryPointIndex,
                     targetReq,
                     endToEndReq,
                     code)))
@@ -1882,8 +1867,9 @@ SlangResult dissassembleDXILUsingDXC(
             {
                 List<uint8_t> code;
                 if (SLANG_SUCCEEDED(emitSPIRVForEntryPoints(
+                    program,
                     compileRequest,
-                    entryPoints,
+                    entryPointIndices,
                     targetReq,
                     endToEndReq,
                     code)))
@@ -1898,8 +1884,9 @@ SlangResult dissassembleDXILUsingDXC(
             {
                 String code;
                 if (SLANG_SUCCEEDED(emitSPIRVAssemblyForEntryPoints(
+                    program,
                     compileRequest,
-                    entryPoints,
+                    entryPointIndices,
                     targetReq,
                     endToEndReq,
                     code)))
@@ -1928,14 +1915,15 @@ SlangResult dissassembleDXILUsingDXC(
 
     // Do emit logic for a single entry point
     CompileResult emitEntryPoint(
+        ComponentType*          program,
         BackEndCompileRequest*  compileRequest,
-        EntryPointAndIndex      entryPoint,
+        Int                     entryPointIndex,
         TargetRequest*          targetReq,
         EndToEndCompileRequest* endToEndReq)
     {
-        List<EntryPointAndIndex> entryPoints;
-        entryPoints.add(entryPoint);
-        return emitEntryPoints(compileRequest, entryPoints, targetReq, endToEndReq);
+        List<Int> entryPointIndices;
+        entryPointIndices.add(entryPointIndex);
+        return emitEntryPoints(program, compileRequest, entryPointIndices, targetReq, endToEndReq);
     }
 
     enum class OutputFileKind
@@ -2195,15 +2183,16 @@ SlangResult dissassembleDXILUsingDXC(
     }
 
     static void writeEntryPointResult(
+        ComponentType*          currentProgram,
         EndToEndCompileRequest* compileRequest,
-        EntryPointAndIndex      entryPoint,
+        Int                     entryPointIndex,
         TargetRequest*          targetReq)
     {
         auto program = compileRequest->getSpecializedGlobalAndEntryPointsComponentType();
         auto targetProgram = program->getTargetProgram(targetReq);
         auto backEndReq = compileRequest->getBackEndReq();
 
-        auto& result = targetProgram->getExistingEntryPointResult(entryPoint.index);
+        auto& result = targetProgram->getExistingEntryPointResult(entryPointIndex);
 
         // Skip the case with no output
         if (result.format == ResultFormat::None)
@@ -2215,25 +2204,25 @@ SlangResult dissassembleDXILUsingDXC(
         // get paths specified via command-line options.
         //
         RefPtr<EndToEndCompileRequest::TargetInfo> targetInfo;
+        auto entryPoint = currentProgram->getEntryPoint(entryPointIndex);
         if(compileRequest->targetInfos.TryGetValue(targetReq, targetInfo))
         {
             String outputPath;
-            if(targetInfo->entryPointOutputPaths.TryGetValue(entryPoint.index, outputPath))
+            if(targetInfo->entryPointOutputPaths.TryGetValue(entryPointIndex, outputPath))
             {
-                writeEntryPointResultToFile(backEndReq, entryPoint.entryPoint, outputPath, result);
+                writeEntryPointResultToFile(backEndReq, entryPoint, outputPath, result);
                 return;
             }
         }
 
-        writeEntryPointResultToStandardOutput(compileRequest, entryPoint.entryPoint, targetReq, result);
+        writeEntryPointResultToStandardOutput(compileRequest, entryPoint, targetReq, result);
     }
 
     CompileResult& TargetProgram::_createWholeProgramResult(
-        List<Int>               entryPointIndices,
+        const List<Int>&        entryPointIndices,
         BackEndCompileRequest*  backEndRequest,
         EndToEndCompileRequest* endToEndRequest)
     {
-        List<EntryPointAndIndex> entryPoints;
         for (auto entryPointIndex = entryPointIndices.begin(); entryPointIndex != entryPointIndices.end(); entryPointIndex++) {
             if (*entryPointIndex >= m_entryPointResults.getCount())
                 m_entryPointResults.setCount(*entryPointIndex + 1);
@@ -2246,13 +2235,13 @@ SlangResult dissassembleDXILUsingDXC(
             // constructed all at once rather than incrementally, to avoid
             // this problem.
             //
-            auto entryPoint = m_program->getEntryPoint(*entryPointIndex);
-            entryPoints.add(EntryPointAndIndex(entryPoint, *entryPointIndex));
+            //auto entryPoint = m_program->getEntryPoint(*entryPointIndex);
         }
         auto& result = m_wholeProgramResult;
         result = emitEntryPoints(
+            m_program,
             backEndRequest,
-            entryPoints,
+            entryPointIndices,
             m_targetReq,
             endToEndRequest);
 
@@ -2276,12 +2265,11 @@ SlangResult dissassembleDXILUsingDXC(
         if(entryPointIndex >= m_entryPointResults.getCount())
             m_entryPointResults.setCount(entryPointIndex+1);
 
-        auto entryPoint = m_program->getEntryPoint(entryPointIndex);
-
         auto& result = m_entryPointResults[entryPointIndex];
         result = emitEntryPoint(
+            m_program,
             backEndRequest,
-            EntryPointAndIndex(entryPoint, entryPointIndex),
+            entryPointIndex,
             m_targetReq,
             endToEndRequest);
 
@@ -2290,7 +2278,7 @@ SlangResult dissassembleDXILUsingDXC(
     }
 
     CompileResult& TargetProgram::getOrCreateWholeProgramResult(
-        List<Int>       entryPointIndices,
+        const List<Int>& entryPointIndices,
         DiagnosticSink* sink)
     {
         auto& result = m_wholeProgramResult;
@@ -2589,8 +2577,9 @@ SlangResult dissassembleDXILUsingDXC(
                     for (Index ee = 0; ee < entryPointCount; ++ee)
                     {
                         writeEntryPointResult(
+                            program,
                             compileRequest,
-                            EntryPointAndIndex(program->getEntryPoint(ee), ee),
+                            ee,
                             targetReq);
                     }
                 }

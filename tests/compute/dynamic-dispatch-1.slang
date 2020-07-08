@@ -1,4 +1,5 @@
 //TEST(compute):COMPARE_COMPUTE:-cpu -xslang -allow-dynamic-code
+//DISABLE_TEST(compute):COMPARE_COMPUTE:-cuda -xslang -allow-dynamic-code
 
 // Test dynamic dispatch code gen for non-static member functions.
 

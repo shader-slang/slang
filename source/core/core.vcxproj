@@ -189,7 +189,6 @@
     <ClInclude Include="slang-math.h" />
     <ClInclude Include="slang-memory-arena.h" />
     <ClInclude Include="slang-nvrtc-compiler.h" />
-    <ClInclude Include="slang-object-scope-manager.h" />
     <ClInclude Include="slang-offset-container.h" />
     <ClInclude Include="slang-platform.h" />
     <ClInclude Include="slang-process-util.h" />
@@ -199,6 +198,7 @@
     <ClInclude Include="slang-secure-crt.h" />
     <ClInclude Include="slang-semantic-version.h" />
     <ClInclude Include="slang-shared-library.h" />
+    <ClInclude Include="slang-short-list.h" />
     <ClInclude Include="slang-smart-pointer.h" />
     <ClInclude Include="slang-std-writers.h" />
     <ClInclude Include="slang-stream.h" />
@@ -225,7 +225,6 @@
     <ClCompile Include="slang-io.cpp" />
     <ClCompile Include="slang-memory-arena.cpp" />
     <ClCompile Include="slang-nvrtc-compiler.cpp" />
-    <ClCompile Include="slang-object-scope-manager.cpp" />
     <ClCompile Include="slang-offset-container.cpp" />
     <ClCompile Include="slang-platform.cpp" />
     <ClCompile Include="slang-random-generator.cpp" />

@@ -64,17 +64,13 @@ struct CharReader
 // !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! StringRepresentationCache !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 
 StringRepresentationCache::StringRepresentationCache():
-    m_stringTable(nullptr),
-    m_namePool(nullptr),
-    m_scopeManager(nullptr)
+    m_stringTable(nullptr)
 {
 }
 
-void StringRepresentationCache::init(const List<char>* stringTable, NamePool* namePool, ObjectScopeManager* scopeManager)
+void StringRepresentationCache::init(const List<char>* stringTable)
 {
     m_stringTable = stringTable;
-    m_namePool = namePool;
-    m_scopeManager = scopeManager;
 
     // Decode the table
     m_entries.setCount(StringSlicePool::kDefaultHandlesCount);
@@ -84,13 +80,11 @@ void StringRepresentationCache::init(const List<char>* stringTable, NamePool* na
         Entry& entry = m_entries[0];
         entry.m_numChars = 0;
         entry.m_startIndex = 0;
-        entry.m_object = nullptr;
     }
     {
         Entry& entry = m_entries[1];
         entry.m_numChars = 0;
         entry.m_startIndex = 0;
-        entry.m_object = nullptr;
     }
 
     {
@@ -106,7 +100,6 @@ void StringRepresentationCache::init(const List<char>* stringTable, NamePool* na
             Entry entry;
             entry.m_startIndex = uint32_t(reader.m_pos - start);
             entry.m_numChars = len;
-            entry.m_object = nullptr;
 
             m_entries.add(entry);
 
@@ -117,82 +110,12 @@ void StringRepresentationCache::init(const List<char>* stringTable, NamePool* na
     m_entries.compress();
 }
 
-Name* StringRepresentationCache::getName(Handle handle)
-{
-    if (handle == StringSlicePool::kNullHandle)
-    {
-        return nullptr;
-    }
-
-    Entry& entry = m_entries[int(handle)];
-    if (entry.m_object)
-    {
-        Name* name = dynamicCast<Name>(entry.m_object);
-        if (name)
-        {
-            return name;
-        }
-        StringRepresentation* stringRep = static_cast<StringRepresentation*>(entry.m_object);
-        // Promote it to a name
-        name = m_namePool->getName(String(stringRep));
-        entry.m_object = name;
-        return name;
-    }
-
-    Name* name = m_namePool->getName(String(getStringSlice(handle)));
-    entry.m_object = name;
-    return name;
-}
-
-String StringRepresentationCache::getString(Handle handle)
-{
-    return String(getStringRepresentation(handle));
-}
-
 UnownedStringSlice StringRepresentationCache::getStringSlice(Handle handle) const
 {
     const Entry& entry = m_entries[int(handle)];
     const char* start = m_stringTable->begin();
 
     return UnownedStringSlice(start + entry.m_startIndex, int(entry.m_numChars));
-}
-
-StringRepresentation* StringRepresentationCache::getStringRepresentation(Handle handle)
-{
-    if (handle == StringSlicePool::kNullHandle || handle == StringSlicePool::kEmptyHandle)
-    {
-        return nullptr;
-    }
-
-    Entry& entry = m_entries[int(handle)];
-    if (entry.m_object)
-    {
-        Name* name = dynamicCast<Name>(entry.m_object);
-        if (name)
-        {
-            return name->text.getStringRepresentation();
-        }
-        return static_cast<StringRepresentation*>(entry.m_object);
-    }
-
-    const UnownedStringSlice slice = getStringSlice(handle);
-    const UInt size = slice.getLength();
-
-    StringRepresentation* stringRep = StringRepresentation::createWithCapacityAndLength(size, size);
-    memcpy(stringRep->getData(), slice.begin(), size);
-    entry.m_object = stringRep;
-
-    // Keep the StringRepresentation in scope
-    m_scopeManager->add(stringRep);
-    
-    return stringRep;
-}
-
-char* StringRepresentationCache::getCStr(Handle handle)
-{
-    // It turns out StringRepresentation is always 0 terminated, so can just use that
-    StringRepresentation* rep = getStringRepresentation(handle);
-    return rep->getData();
 }
 
 // !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! SerialStringTableUtil !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!

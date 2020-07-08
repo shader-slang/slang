@@ -18,7 +18,7 @@
   </Expand>
 </Type>
 
-<Type Name="Slang::List&lt;*&gt;">
+<Type Name="Slang::List&lt;*,*&gt;">
     <DisplayString>{{ size={m_count} }}</DisplayString>
     <Expand>
         <Item Name="[size]">m_count</Item>
@@ -30,6 +30,18 @@
     </Expand>
 </Type>
 
+<Type Name="Slang::ShortList&lt;*,*,*&gt;">
+    <DisplayString>{{ size={m_count} }}</DisplayString>
+    <Expand>
+        <Item Name="[size]">m_count</Item>
+        <Item Name="[capacity]">m_capacity</Item>
+        <IndexListItems>
+            <Size>m_count</Size>
+            <ValueNode Condition="$i&lt;$T2">m_shortBuffer + $i</ValueNode>
+            <ValueNode Condition="$i&gt;=$T2">m_buffer + $i - $T2</ValueNode>
+        </IndexListItems>
+    </Expand>
+</Type>
 
 <Type Name="Slang::Array&lt;*,*&gt;">
   <DisplayString>{{ size={m_count} }}</DisplayString>
@@ -47,10 +59,33 @@
     <Expand>
         <Item Name="[size]">_count</Item>
         <Item Name="[capacity]">bucketSizeMinusOne + 1</Item>
-        <ArrayItems>
-           <Size>bucketSizeMinusOne + 1</Size>
-           <ValuePointer>hashMap</ValuePointer>
-        </ArrayItems>
+        <CustomListItems MaxItemsPerView="5000" ExcludeView="Test">
+            <Variable Name="iBucket" InitialValue="0" />
+            <Variable Name="pBucket" InitialValue="hashMap" />
+            <Variable Name="isDeleted" InitialValue="0" />
+            <Variable Name="isEmpty" InitialValue="0" />
+            <Size>_count</Size>
+            <Exec>pBucket = hashMap</Exec>
+            <Loop>
+                <If Condition="iBucket &gt;= bucketSizeMinusOne + 1">
+                    <Break/>
+                </If>
+                <Exec>
+                    isDeleted = marks.m_buffer.m_count &gt; (iBucket*2+1)/32
+                      ? ((marks.m_buffer.m_buffer[(iBucket*2+1)/32]&amp;(1&lt;&lt;(iBucket*2+1)%32)) != 0)
+                      : 0
+                 </Exec>
+                <Exec>
+                    isEmpty = marks.m_buffer.m_count &gt; (iBucket*2)/32
+                    ? ((marks.m_buffer.m_buffer[(iBucket*2)/32]&amp;(1&lt;&lt;(iBucket*2)%32)) == 0)
+                    : 1
+                </Exec>
+                <If Condition="isDeleted+isEmpty==0">
+                    <Item>*(hashMap + iBucket)</Item>
+                </If>
+                <Exec>iBucket++</Exec>
+            </Loop>
+        </CustomListItems>
     </Expand>
 </Type>
 
@@ -101,6 +136,12 @@
 <Type Name="Slang::RelativeString">
     <DisplayString>{(m_sizeThenContents + 1),s}</DisplayString>
     <StringView>(m_sizeThenContents + 1),s</StringView>
+</Type>
+
+<Type Name="Slang::UnownedStringSlice">
+    <DisplayString>{m_begin,[m_end-m_begin]s}</DisplayString>
+    <StringView>m_begin,[m_end-m_begin]s</StringView>
+
 </Type>
 
 </AutoVisualizer>

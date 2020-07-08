@@ -398,10 +398,7 @@ SlangResult CPPSourceEmitter::calcTypeName(IRType* type, CodeGenTarget target, S
         {
             auto ptrType = static_cast<IRPtrType*>(type);
             SLANG_RETURN_ON_FAIL(calcTypeName(ptrType->getValueType(), target, out));
-            // TODO(JS): It seems although it says it is a pointer, it can actually be output as a reference
-            // not clear where the ptr aspect is there, as in the definition it is just 'out', implying out
-            // is somewhere converted to a ptr?
-            out << "&";
+            out << "*";
             return SLANG_OK;
         }
         case kIROp_RefType:
@@ -503,6 +500,16 @@ SlangResult CPPSourceEmitter::calcTypeName(IRType* type, CodeGenTarget target, S
             out << "void*";
             return SLANG_OK;
         }
+        case kIROp_ConstantBufferType:
+        case kIROp_ParameterBlockType:
+        {
+            auto groupType = cast<IRParameterGroupType>(type);
+            auto elementType = groupType->getElementType();
+
+            SLANG_RETURN_ON_FAIL(calcTypeName(elementType, target, out));
+            out << "*";
+            return SLANG_OK;
+        }
         default:
         {
             if (isNominalOp(type->op))
@@ -577,14 +584,6 @@ SlangResult CPPSourceEmitter::calcTypeName(IRType* type, CodeGenTarget target, S
 
 void CPPSourceEmitter::useType(IRType* type)
 {
-    if (type->op == kIROp_PtrType)
-    {
-        // TODO(JS):
-        // If it's a pointer type we ignore. We may want to strip but in practice it's
-        // probably not necessary.
-        return;
-    }
-
     _getTypeName(type);
 }
 
@@ -934,22 +933,26 @@ void CPPSourceEmitter::_emitGetAtDefinition(const UnownedStringSlice& funcName, 
 
     IRType* srcType = funcType->getParamType(0);
 
-    for (Index i = 0; i < 2; ++i)
+    for (Index i = 0; i < 3; ++i)
     {
         UnownedStringSlice typePrefix = (i == 0) ? UnownedStringSlice::fromLiteral("const ") : UnownedStringSlice();
+        bool lValue = (i != 2);
 
         emitFunctionPreambleImpl(nullptr);
 
         writer->emit(typePrefix);
         emitType(specOp->returnType);
-        m_writer->emit("& ");
-
+        if (lValue)
+            m_writer->emit("*");
+        writer->emit(" ");
         writer->emit(funcName);
         writer->emit("(");
 
         writer->emit(typePrefix);
         emitType(funcType->getParamType(0));
-        writer->emit("& a,  ");
+        if (lValue)
+            writer->emit("*");
+        writer->emit(" a,  ");
         emitType(funcType->getParamType(1));
         writer->emit(" b)\n{\n");
 
@@ -962,8 +965,10 @@ void CPPSourceEmitter::_emitGetAtDefinition(const UnownedStringSlice& funcName, 
             writer->emit("assert(b >= 0 && b < ");
             writer->emit(vecSize);
             writer->emit(");\n");
-
-            writer->emit("return (&a.x)[b];\n");
+            if (lValue)
+                writer->emit("return (&a->x) + b;\n");
+            else
+                writer->emit("return (&a.x)[b];\n");
         }
         else if (auto matrixType = as<IRMatrixType>(srcType))
         {
@@ -974,7 +979,10 @@ void CPPSourceEmitter::_emitGetAtDefinition(const UnownedStringSlice& funcName, 
             writer->emit(rowCount);
             writer->emit(");\n");
 
-            writer->emit("return a.rows[b];\n");
+            if (lValue)
+                writer->emit("return &(a->rows[b]);\n");
+            else
+                writer->emit("return a.rows[b];\n");
         }
 
         writer->dedent();
@@ -1566,7 +1574,7 @@ void CPPSourceEmitter::_emitInOutParamType(IRType* type, String const& name, IRT
 
     UnownedStringSlice slice = _getTypeName(valueType);
     m_writer->emit(slice);
-    m_writer->emit("& ");
+    m_writer->emit("* ");
     m_writer->emitName(nameAndLoc);
 }
 
@@ -2095,21 +2103,39 @@ void CPPSourceEmitter::emitIntrinsicCallExprImpl(
         else
         {
             // The user is invoking a built-in subscript operator
-            auto prec = getInfo(EmitOp::Postfix);
-            needClose = maybeEmitParens(outerPrec, prec);
 
-            emitOperand(args[0].get(), leftSide(outerPrec, prec));
-            m_writer->emit("[");
-            emitOperand(args[1].get(), getInfo(EmitOp::General));
-            m_writer->emit("]");
+            // Determine if we are calling the `ref` accessor:
+            // `ref` accessor returns a pointer of element type.
+            auto ptrType = as<IRPtrType>(inst->getFullType());
+            auto resourceType = inst->getOperand(1)->getFullType();
+            auto elementType = resourceType ? resourceType->getOperand(0) : nullptr;
+            bool isRef = ptrType && ptrType->getValueType() == elementType;
 
+            auto emitSubscript = [this, &args](EmitOpInfo _outerPrec)
+            {
+                auto prec = getInfo(EmitOp::Postfix);
+                bool needCloseSubscript = maybeEmitParens(_outerPrec, prec);
+                emitOperand(args[0].get(), leftSide(_outerPrec, prec));
+                m_writer->emit("[");
+                emitOperand(args[1].get(), getInfo(EmitOp::General));
+                m_writer->emit("]");
+                maybeCloseParens(needCloseSubscript);
+            };
+
+            if (isRef)
+            {
+                auto prefixPrec = getInfo(EmitOp::Prefix);
+                needClose = maybeEmitParens(outerPrec, prefixPrec);
+                m_writer->emit("&");
+                outerPrec = rightSide(outerPrec, prefixPrec);
+            }
+            emitSubscript(outerPrec);
+            maybeCloseParens(needClose);
             if (argCount == 3)
             {
                 m_writer->emit(" = ");
                 emitOperand(args[2].get(), getInfo(EmitOp::General));
             }
-
-            maybeCloseParens(needClose);
         }
 
         return;
@@ -2341,42 +2367,6 @@ void CPPSourceEmitter::emitOperandImpl(IRInst* inst, EmitOpInfo const&  outerPre
 
     switch (inst->op)
     {
-        case 0: // nothing yet
-        case kIROp_GlobalParam:
-        {            
-            String name = getName(inst);
-
-            if (inst->findDecorationImpl(kIROp_EntryPointParamDecoration))
-            {
-                // It's an entry point parameter
-                // The parameter is held in a struct so always deref
-                m_writer->emit("(*");
-                m_writer->emit(name);
-                m_writer->emit(")");
-            }
-            else
-            {
-                // It's in UniformState
-                m_writer->emit("(");
-
-                switch (inst->getDataType()->op)
-                {
-                    case kIROp_ParameterBlockType:
-                    case kIROp_ConstantBufferType:
-                    case kIROp_StructType:
-                    {
-                        m_writer->emit("*");
-                        break;
-                    }
-                    default: break;
-                }
-
-                m_writer->emit("uniformState->");
-                m_writer->emit(name);
-                m_writer->emit(")");
-            }
-            break;
-        }
         case kIROp_Param:
         {
             auto varLayout = getVarLayout(inst);
@@ -2408,12 +2398,14 @@ void CPPSourceEmitter::emitOperandImpl(IRInst* inst, EmitOpInfo const&  outerPre
                     }
                 }
             }
-
-            ;   // Fall-thru
+            m_writer->emit(getName(inst));
+            break;
         }
+        case kIROp_Var:
         case kIROp_GlobalVar:
+            emitVarExpr(inst, outerPrec);
+            break;
         default:
-            // GlobalVar should be fine as should just be a member of Context
             m_writer->emit(getName(inst));
             break;
     }
@@ -2438,7 +2430,7 @@ static bool _isFunction(IROp op)
     return op == kIROp_Func;
 }
 
-void CPPSourceEmitter::_emitEntryPointDefinitionStart(IRFunc* func, IRGlobalParam* entryPointGlobalParams, const String& funcName, const UnownedStringSlice& varyingTypeName)
+void CPPSourceEmitter::_emitEntryPointDefinitionStart(IRFunc* func, IRGlobalParam* entryPointParams, IRGlobalParam* globalParams, const String& funcName, const UnownedStringSlice& varyingTypeName)
 {
     auto resultType = func->getResultType();
     
@@ -2451,27 +2443,35 @@ void CPPSourceEmitter::_emitEntryPointDefinitionStart(IRFunc* func, IRGlobalPara
 
     m_writer->emit("(");
     m_writer->emit(varyingTypeName);
-    m_writer->emit("* varyingInput, void* params, void* uniformState)");
+    m_writer->emit("* varyingInput, void* entryPointParams, void* globalParams)");
     emitSemantics(func);
     m_writer->emit("\n{\n");
 
     m_writer->indent();
     // Initialize when constructing so that globals are zeroed
     m_writer->emit("KernelContext context = {};\n");
-    m_writer->emit("context.uniformState = (UniformState*)uniformState;\n");
     
-    if (entryPointGlobalParams)
+    if (entryPointParams)
     {
-        auto varDecl = entryPointGlobalParams;
-        auto rawType = varDecl->getDataType();
-
-        auto varType = rawType;
+        auto param = entryPointParams;
+        auto paramType = param->getDataType();
 
         m_writer->emit("context.");
-        m_writer->emit(getName(varDecl));
+        m_writer->emit(getName(param));
         m_writer->emit(" =  (");
-        emitType(varType);
-        m_writer->emit("*)params; \n");
+        emitType(paramType);
+        m_writer->emit(")entryPointParams; \n");
+    }
+    if (globalParams)
+    {
+        auto param = globalParams;
+        auto paramType = param->getDataType();
+
+        m_writer->emit("context.");
+        m_writer->emit(getName(param));
+        m_writer->emit(" =  (");
+        emitType(paramType);
+        m_writer->emit(")globalParams; \n");
     }
 }
 
@@ -2672,71 +2672,53 @@ void CPPSourceEmitter::_emitForwardDeclarations(const List<EmitAction>& actions)
     }
 }
 
-void CPPSourceEmitter::_calcGlobalParams(const List<EmitAction>& actions, List<GlobalParamInfo>& outParams, IRGlobalParam** outEntryPointGlobalParams)
+void CPPSourceEmitter::_findShaderParams(
+    IRGlobalParam** outEntryPointParam,
+    IRGlobalParam** outGlobalParam)
 {
-    outParams.clear();
-    *outEntryPointGlobalParams = nullptr;
+    SLANG_ASSERT(outEntryPointParam);
+    SLANG_ASSERT(outGlobalParam);
 
-    IRGlobalParam* entryPointGlobalParams = nullptr;
-    for (auto action : actions)
+    IRGlobalParam*& entryPointParam = *outEntryPointParam;
+    IRGlobalParam*& globalParam = *outGlobalParam;
+
+    for(auto inst : m_irModule->getGlobalInsts())
     {
-        if (action.level == EmitAction::Level::Definition && action.inst->op == kIROp_GlobalParam)
+        auto param = as<IRGlobalParam>(inst);
+        if(!param)
+            continue;
+
+        // Currently, the entry-point parameters
+        // are represented as a single parameter
+        // at the global scope, and the same is
+        // true of the parameters that were
+        // originally declared as globals.
+        //
+        // We need to find capture each of these
+        // parameters, and we need to tell them
+        // apart. Luckily, the logic that
+        // moved the entry-point parameters to
+        // global scope will ahve also marked
+        // the entry-point parameters with
+        // a decoration that we can detect.
+        //
+        if (inst->findDecorationImpl(kIROp_EntryPointParamDecoration))
         {
-            auto inst = action.inst;
-
-            if (inst->findDecorationImpl(kIROp_EntryPointParamDecoration))
-            {
-                // Should only be one instruction marked this way
-                SLANG_ASSERT(entryPointGlobalParams == nullptr);
-                entryPointGlobalParams = as<IRGlobalParam>(inst);
-                continue;
-            }
-
-            IRVarLayout* varLayout = CLikeSourceEmitter::getVarLayout(action.inst);
-            SLANG_ASSERT(varLayout);
-
-            IRVarOffsetAttr* offsetAttr = varLayout->findOffsetAttr(LayoutResourceKind::Uniform);
-            IRTypeLayout* typeLayout = varLayout->getTypeLayout();
-            IRTypeSizeAttr* sizeAttr = typeLayout->findSizeAttr(LayoutResourceKind::Uniform);
-
-            GlobalParamInfo paramInfo;
-            paramInfo.inst = action.inst;
-            // Index is the byte offset for uniform
-            paramInfo.offset = offsetAttr ? offsetAttr->getOffset() : 0;
-            paramInfo.size = sizeAttr ? sizeAttr->getFiniteSize() : 0;
-
-            outParams.add(paramInfo);
+            // Should only be one instruction marked this way
+            SLANG_ASSERT(entryPointParam == nullptr);
+            entryPointParam = param;
+            continue;
+        }
+        else
+        {
+            // There should only be one instruction representing
+            // the global-scope shader parameters.
+            //
+            SLANG_ASSERT(globalParam == nullptr);
+            globalParam = param;
+            continue;
         }
     }
-
-    // We want to sort by layout offset, and insert suitable padding
-    outParams.sort();
-
-    *outEntryPointGlobalParams = entryPointGlobalParams;
-}
-
-void CPPSourceEmitter::_emitUniformStateMembers(const List<EmitAction>& actions, IRGlobalParam** outEntryPointGlobalParams)
-{
-    List<GlobalParamInfo> params;
-    _calcGlobalParams(actions, params, outEntryPointGlobalParams);
-
-    int padIndex = 0;
-    size_t offset = 0;
-    for (const auto& paramInfo : params)
-    {
-        if (offset < paramInfo.offset)
-        {
-            // We want to output some padding
-            StringBuilder builder;
-            builder << "uint8_t _pad" << (padIndex++) << "[" << (paramInfo.offset - offset) << "];\n";
-            m_writer->emit(builder);
-        }
-
-        emitGlobalInst(paramInfo.inst);
-        // Set offset after this 
-        offset = paramInfo.offset + paramInfo.size;
-    }
-    m_writer->emit("\n");
 }
 
 void CPPSourceEmitter::emitModuleImpl(IRModule* module)
@@ -2751,25 +2733,14 @@ void CPPSourceEmitter::emitModuleImpl(IRModule* module)
     
     _emitForwardDeclarations(actions);
 
-    IRGlobalParam* entryPointGlobalParams = nullptr;
-    
-    // Output the global parameters in a 'UniformState' structure
-    {
-        m_writer->emit("struct UniformState\n{\n");
-        m_writer->indent();
-
-        _emitUniformStateMembers(actions, &entryPointGlobalParams);
-
-        m_writer->dedent();
-        m_writer->emit("\n};\n\n");
-    }
+    IRGlobalParam* entryPointParams = nullptr;
+    IRGlobalParam* globalParams = nullptr;
+    _findShaderParams(&entryPointParams, &globalParams);
     
     // Output the 'Context' which will be used for execution
     {
         m_writer->emit("struct KernelContext\n{\n");
         m_writer->indent();
-
-        m_writer->emit("UniformState* uniformState;\n");
 
         m_writer->emit("uint3 dispatchThreadID;\n");
 
@@ -2792,9 +2763,14 @@ void CPPSourceEmitter::emitModuleImpl(IRModule* module)
             m_writer->emit("}\n");
         }
 
-        if (entryPointGlobalParams)
+
+        if (globalParams)
         {
-            emitGlobalInst(entryPointGlobalParams);
+            emitGlobalInst(globalParams);
+        }
+        if (entryPointParams)
+        {
+            emitGlobalInst(entryPointParams);
         }
 
         // Output all the thread locals 
@@ -2860,7 +2836,7 @@ void CPPSourceEmitter::emitModuleImpl(IRModule* module)
 
                     String threadFuncName = builder;
 
-                    _emitEntryPointDefinitionStart(func, entryPointGlobalParams, threadFuncName, UnownedStringSlice::fromLiteral("ComputeThreadVaryingInput"));
+                    _emitEntryPointDefinitionStart(func, entryPointParams, globalParams, threadFuncName, UnownedStringSlice::fromLiteral("ComputeThreadVaryingInput"));
 
                     if (m_semanticUsedFlags & SemanticUsedFlag::GroupThreadID)
                     {
@@ -2891,7 +2867,7 @@ void CPPSourceEmitter::emitModuleImpl(IRModule* module)
 
                     String groupFuncName = builder;
 
-                    _emitEntryPointDefinitionStart(func, entryPointGlobalParams, groupFuncName, UnownedStringSlice::fromLiteral("ComputeVaryingInput"));
+                    _emitEntryPointDefinitionStart(func, entryPointParams, globalParams, groupFuncName, UnownedStringSlice::fromLiteral("ComputeVaryingInput"));
 
                     m_writer->emit("const uint3 start = ");
                     _emitInitAxisValues(groupThreadSize, UnownedStringSlice::fromLiteral("varyingInput->startGroupID"), UnownedStringSlice());
@@ -2913,7 +2889,7 @@ void CPPSourceEmitter::emitModuleImpl(IRModule* module)
 
                 // Emit the main version - which takes a dispatch size
                 {
-                    _emitEntryPointDefinitionStart(func, entryPointGlobalParams, funcName, UnownedStringSlice::fromLiteral("ComputeVaryingInput"));
+                    _emitEntryPointDefinitionStart(func, entryPointParams, globalParams, funcName, UnownedStringSlice::fromLiteral("ComputeVaryingInput"));
 
                     m_writer->emit("const uint3 start = ");
                     _emitInitAxisValues(groupThreadSize, UnownedStringSlice::fromLiteral("varyingInput->startGroupID"), UnownedStringSlice());

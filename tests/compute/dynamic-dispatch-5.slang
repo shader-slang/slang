@@ -1,26 +1,29 @@
 //TEST(compute):COMPARE_COMPUTE:-cpu -xslang -allow-dynamic-code
 //DISABLE_TEST(compute):COMPARE_COMPUTE:-cuda -xslang -allow-dynamic-code
 
-// Test basic dynamic dispatch code gen
+// Test dynamic dispatch code gen for general `This` type.
 
 interface IInterface
 {
-	static int Compute(int inVal);
+	int Compute(int inVal, This other);
 };
 
-int GenericCompute<T:IInterface>(int inVal)
+int GenericCompute<T:IInterface>(int inVal, T obj, T other)
 {
-	return T.Compute(inVal);
+	return obj.Compute(inVal, other);
 }
 
 struct Impl : IInterface
 {
-	static int Compute(int inVal) { return inVal * inVal; }
+    int base;
+	int Compute(int inVal, This other) { return other.base + base + inVal; }
 };
-
 int test(int inVal)
 {
-	return GenericCompute<Impl>(inVal);
+    Impl obj1, obj2;
+    obj1.base = 1;
+    obj2.base = 2;
+	return GenericCompute<Impl>(inVal, obj1, obj2);
 }
 
 //TEST_INPUT:ubuffer(data=[0 1 2 3], stride=4):out,name=outputBuffer

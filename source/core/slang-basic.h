@@ -6,6 +6,7 @@
 #include "slang-string.h"
 #include "slang-array.h"
 #include "slang-list.h"
+#include "slang-short-list.h"
 #include "slang-smart-pointer.h"
 #include "slang-exception.h"
 #include "slang-dictionary.h"

@@ -262,6 +262,7 @@ public:
     void emitParameterGroup(IRGlobalParam* varDecl, IRUniformParameterGroupType* type);
 
     void emitVar(IRVar* varDecl);
+    void emitDereferenceOperand(IRInst* inst, EmitOpInfo const& outerPrec);
 
     void emitGlobalVar(IRGlobalVar* varDecl);
     void emitGlobalParam(IRGlobalParam* varDecl);
@@ -277,7 +278,7 @@ public:
     void computeEmitActions(IRModule* module, List<EmitAction>& ioActions);
 
     void executeEmitActions(List<EmitAction> const& actions);
-    void emitModule(IRModule* module) { emitModuleImpl(module); }
+    void emitModule(IRModule* module) { m_irModule = module; emitModuleImpl(module); }
 
     void emitPreprocessorDirectives() { emitPreprocessorDirectivesImpl(); }
     void emitSimpleType(IRType* type);
@@ -298,6 +299,7 @@ public:
 
     protected:
 
+    virtual bool doesTargetSupportPtrTypes() { return false; }
     virtual void emitLayoutSemanticsImpl(IRInst* inst, char const* uniformSemanticSpelling = "register") { SLANG_UNUSED(inst); SLANG_UNUSED(uniformSemanticSpelling); }
     virtual void emitParameterGroupImpl(IRGlobalParam* varDecl, IRUniformParameterGroupType* type) = 0;
     virtual void emitEntryPointAttributesImpl(IRFunc* irFunc, IREntryPointDecoration* entryPointDecor) = 0;
@@ -318,6 +320,7 @@ public:
     virtual void emitSimpleValueImpl(IRInst* inst);
     virtual void emitModuleImpl(IRModule* module);
     virtual void emitSimpleFuncImpl(IRFunc* func);
+    virtual void emitVarExpr(IRInst* inst, EmitOpInfo const& outerPrec);
     virtual void emitOperandImpl(IRInst* inst, EmitOpInfo const& outerPrec);
     virtual void emitParamTypeImpl(IRType* type, String const& name);
     virtual void emitIntrinsicCallExprImpl(IRCall* inst, IRTargetIntrinsicDecoration* targetIntrinsic, EmitOpInfo const& inOuterPrec);
@@ -349,6 +352,7 @@ public:
     List<IRWitnessTableEntry*> getSortedWitnessTableEntries(IRWitnessTable* witnessTable);
     
     BackEndCompileRequest* m_compileRequest = nullptr;
+    IRModule* m_irModule = nullptr;
 
     // The stage for which we are emitting code.
     //
@@ -367,15 +371,8 @@ public:
     // Where source is written to
     SourceWriter* m_writer;
 
-    // We only want to emit each `import`ed module one time, so
-    // we maintain a set of already-emitted modules.
-    HashSet<ModuleDecl*> m_modulesAlreadyEmitted;
-
-    ModuleDecl* m_program = nullptr;
-
     UInt m_uniqueIDCounter = 1;
     Dictionary<IRInst*, UInt> m_mapIRValueToID;
-    Dictionary<Decl*, UInt> m_mapDeclToID;
 
     HashSet<String> m_irDeclsVisited;
 

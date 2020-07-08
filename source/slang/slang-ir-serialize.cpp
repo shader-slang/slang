@@ -1081,7 +1081,7 @@ static int _calcFixSourceLoc(const IRSerialData::DebugSourceInfo& info, SourceVi
     module->session = session;
 
     // Set up the string rep cache
-    m_stringRepresentationCache.init(&data.m_stringTable, session->getNamePool(), module->getObjectScopeManager());
+    m_stringRepresentationCache.init(&data.m_stringTable);
     
     // Add all the instructions
 

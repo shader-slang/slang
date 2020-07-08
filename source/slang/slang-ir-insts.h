@@ -220,6 +220,7 @@ IR_SIMPLE_DECORATION(ReadNoneDecoration)
 IR_SIMPLE_DECORATION(EarlyDepthStencilDecoration)
 IR_SIMPLE_DECORATION(GloballyCoherentDecoration)
 IR_SIMPLE_DECORATION(PreciseDecoration)
+IR_SIMPLE_DECORATION(PublicDecoration)
 
 
 struct IROutputControlPointsDecoration : IRDecoration
@@ -792,9 +793,9 @@ struct IRStructFieldLayoutAttr : IRAttr
 {
     IR_LEAF_ISA(StructFieldLayoutAttr)
 
-    IRStructKey* getFieldKey()
+    IRInst* getFieldKey()
     {
-        return cast<IRStructKey>(getOperand(0));
+        return getOperand(0);
     }
 
     IRVarLayout* getLayout()
@@ -835,7 +836,7 @@ struct IRStructTypeLayout : IRTypeLayout
             : Super::Builder(irBuilder)
         {}
 
-        void addField(IRStructKey* key, IRVarLayout* layout)
+        void addField(IRInst* key, IRVarLayout* layout)
         {
             FieldInfo info;
             info.key = key;
@@ -854,7 +855,7 @@ struct IRStructTypeLayout : IRTypeLayout
 
         struct FieldInfo
         {
-            IRStructKey* key;
+            IRInst* key;
             IRVarLayout* layout;
         };
 
@@ -1520,10 +1521,6 @@ struct SharedIRBuilder
     Dictionary<IRInstKey,       IRInst*>    globalValueNumberingMap;
     Dictionary<IRConstantKey,   IRConstant*>    constantMap;
 
-    // TODO: We probably shouldn't use this in the long run.
-    Dictionary<void*,           IRLayout*>        layoutMap;
-
-
     void insertBlockAlongEdge(IREdge const& edge);
 };
 
@@ -2079,13 +2076,6 @@ struct IRBuilder
         return addDecoration(value, op, operands, SLANG_COUNT_OF(operands));
     }
 
-    template <typename T>
-    T* addRefObjectToFree(T* ptr)
-    {
-        getModule()->getObjectScopeManager()->addMaybeNull(ptr);
-        return ptr;
-    }
-
     template<typename T>
     void addSimpleDecoration(IRInst* value)
     {
@@ -2109,7 +2099,7 @@ struct IRBuilder
     IRPendingLayoutAttr* getPendingLayoutAttr(
         IRLayout* pendingLayout);
     IRStructFieldLayoutAttr* getFieldLayoutAttr(
-        IRStructKey*    key,
+        IRInst*         key,
         IRVarLayout*    layout);
     IRCaseTypeLayoutAttr* getCaseTypeLayoutAttr(
         IRTypeLayout*   layout);
