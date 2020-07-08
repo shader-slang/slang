@@ -1,0 +1,288 @@
+// slang-ir-collect-global-uniforms.cpp
+#include "slang-ir-collect-global-uniforms.h"
+
+#include "slang-ir-insts.h"
+
+namespace Slang
+{
+
+// This file implements a pass that takes input code like:
+//
+//      uniform int gA;
+//      uniform float gB;
+//
+//      void main() { ... gA + gB ... }
+//
+// and transforms it into code like:
+//
+//      struct GlobalParams
+//      {
+//          int gA;
+//          float gB;
+//      }
+//
+//      ConstantBuffer<GlobalParams> globalParams;
+//
+//      void main() { ... globalParams.gA + globalParams.gB ... }
+//
+// The main consequence of this transformation is that we can support
+// global `uniform` shader parameters of "ordinary" data types when
+// compiling for targets that don't directly support that feature
+// (e.g., GLSL/SPIR-V).
+//
+// In addition, on targets that already support a similar transformation
+// (e.g., when compiling to DXBC/DXIL via fxc/dxc), making the `globalParams`
+// constant buffer explicit allows us to control the binding that is
+// assigned to it using our existing logic for automatic layout, rather than
+// being left at the whims of the undocumented defaults of those compilers.
+//
+// A final consequence of this pass is that for targets where *all*
+// shader parameters use "ordinary" data types (because there are no
+// non-first-class types), we end up with a conveniently packaged up
+// single parameter and type that encapsulates all of the shader inputs.
+//
+struct CollectGlobalUniformParametersContext
+{
+    // In orderto perform our transformation, we need access to the module
+    // to be transformed, as well as the layout information representing
+    // the global-scope shader parameters.
+    //
+    IRModule* module;
+    IRVarLayout* globalScopeVarLayout;
+
+    // This is a relatively simple pass, and it is all driven
+    // by a single subroutine.
+    //
+    void processModule()
+    {
+        // We start by looking at the layout that was computed for the global-scope
+        // parameters to determine how the parameters are supposed to be pacakged.
+        //
+        // This step relies on the earlier layout computation logic to have implemented
+        // any target-specific policies around how the global-scope parametesr are
+        // to be passed, and therefore we avoid trying to make any target-specific
+        // decisions in this pass.
+        //
+        auto globalScopeTypeLayout = globalScopeVarLayout->getTypeLayout();
+        auto globalParamsTypeLayout = globalScopeTypeLayout;
+
+        // One example of a difference that might appear in the global-scope layout
+        // depending on the target is that the global-scope parameters might end
+        // up just pacakged as a `struct`, *or* they might be packaged up in a
+        // `ConstantBuffer<...>` or other parameter group that wraps that `struct`.
+        //
+        IRParameterGroupTypeLayout* globalParameterGroupTypeLayout = as<IRParameterGroupTypeLayout>(globalParamsTypeLayout);
+        if( globalParameterGroupTypeLayout )
+        {
+            // In the case where there is a wrapping `ConstantBuffer<...>`, we want to
+            // get at the element type of that constant buffer, because it represents
+            // the packaged-up `struct` that we want to produce.
+            //
+            globalParamsTypeLayout = globalParameterGroupTypeLayout->getElementVarLayout()->getTypeLayout();
+        }
+
+        // As a special case (in order to avoid disruption to any downstream passes),
+        // if the layout for the global-scope parameters doesn't include any "ordinary"
+        // data (represented as `LayoutResourceKind::Uniform`), then we will not do
+        // the "packaging up" step at all.
+        //
+        // This means that the current pass will not change the results for a majority
+        // of targets (notably, all the current graphics APIs) *unless* global shader
+        // parameters are declared that use "ordinary' data.
+        //
+        // TODO: eventually we should remove this special case, and confirm that the resulting
+        // logic works across all shaders (it should). Doing so will be a necessary
+        // step if want to start applying the packaging-up of global-scope parameters on
+        // a per-module basis.
+        //
+        if(!globalParameterGroupTypeLayout && !globalParamsTypeLayout->findSizeAttr(LayoutResourceKind::Uniform))
+            return;
+
+        // We expect that the layout for the global-scope parameters is always
+        // computed for a `struct` type.
+        //
+        auto globalParamsStructTypeLayout = as<IRStructTypeLayout>(globalParamsTypeLayout);
+        SLANG_ASSERT(globalParamsStructTypeLayout);
+
+        // We need to construct a single IR parameter that will represent
+        // the collected global-scope parameters. The `IRBuilder` we construct
+        // for this will also be used when replacing the individual parameters.
+        //
+        SharedIRBuilder sharedBuilder;
+        sharedBuilder.module = this->module;
+        sharedBuilder.session = module->session;
+
+        IRBuilder builderStorage;
+        IRBuilder* builder = &builderStorage;
+
+        builder->sharedBuilder = &sharedBuilder;
+        builder->setInsertInto(module->getModuleInst());
+
+        // The packaged-up global parameters will be turned into fields of
+        // a new global IR `struct` type, which we give a name of `GlobalParams`
+        // so that it is identifiable in the output.
+        //
+        // Note: the equivalent in fxc/dxc is the `$Globals` constant buffer.
+        //
+        auto wrapperStructType = builder->createStructType();
+        builder->addNameHintDecoration(wrapperStructType, UnownedTerminatedStringSlice("GlobalParams"));
+
+        // If the computed layout used a bare `struct` type, then we will use
+        // our `GlobalParams` struct as-is, but if the layout involved an
+        // implicitly defined `ConstantBuffer<...>`, this is where we construct
+        // the type `ConstantBuffer<GlobalParams>`.
+        //
+        IRType* wrapperParamType = wrapperStructType;
+        if( globalParameterGroupTypeLayout )
+        {
+            auto wrapperParamGroupType = builder->getConstantBufferType(wrapperStructType);
+            wrapperParamType = wrapperParamGroupType;
+        }
+
+        // Now that we've determined what the type of the new single global parameter
+        // should be, we can go ahead and emit it into the IR module.
+        //
+        // We will call the implicit parameter for all the globals `globalParams`.
+        //
+        IRGlobalParam* wrapperParam = builder->createGlobalParam(wrapperParamType);
+        builder->addLayoutDecoration(wrapperParam, globalScopeVarLayout);
+        builder->addNameHintDecoration(wrapperParam, UnownedTerminatedStringSlice("globalParams"));
+
+        // With the setup work out of the way, we can iterate over the global
+        // parameters that were present in the layout information (they are
+        // represented as the fields of the global-scope `struct` layout).
+        //
+        for( auto fieldLayoutAttr : globalParamsStructTypeLayout->getFieldLayoutAttrs() )
+        {
+            // We expect the IR layout pass to have encoded field per-field
+            // layout so that the "key" for the field is the corresponding
+            // global shader parameter.
+            //
+            auto globalParam = as<IRGlobalParam>(fieldLayoutAttr->getFieldKey());
+            SLANG_ASSERT(globalParam);
+
+            auto globalParamLayout = fieldLayoutAttr->getLayout();
+
+            // If the given parameter doesn't contribute to uniform/ordinary usage, then
+            // we can safely leave it at the global scope and potentially avoid a lot
+            // of complications that might otherwise arise (that is, we don't need to worry
+            // about downstream passes that might have worked for a simple global parameter,
+            // but that would not work for one nested inside a structure.
+            //
+            // TODO: It would be more consistent and robust to *always* wrap up
+            // these global parameters appropriately, and ensure that all the downstream
+            // passes can handle that case, since they would need to do so in general.
+            //
+            if(!globalParamLayout->getTypeLayout()->findSizeAttr(LayoutResourceKind::Uniform) )
+                continue;
+
+            // Once we have decided to do replacement, we need to
+            // set ourselves up to emit the replacement code.
+            //
+            builder->setInsertBefore(globalParam);
+
+            // This global parameter needs to be turned into a field of the global
+            // parameter structure type, and that field will need a key.
+            //
+            auto fieldKey = builder->createStructKey();
+
+            // The new structure field will need to have whatever decorations
+            // had been put on the global parameter (notably including any name hint)
+            //
+            globalParam->transferDecorationsTo(fieldKey);
+
+            // In order to make sure that the existing IR layout information for
+            // the global scope remains valid, we will swap out the key in the
+            // per-field layout information to reference the key we created
+            // instead of the existing parameter (which we will be removing).
+            //
+            fieldLayoutAttr->setOperand(0, fieldKey);
+
+            // Now we can add a field to the `GlobalParams` type that
+            // will stand in for the parameter: it will have the key we
+            // just generated, and the type of the original parameter.
+            //
+            auto globalParamType = globalParam->getFullType();
+            builder->createStructField(wrapperStructType, fieldKey, globalParamType);
+
+            // Next we need to replace the uses of the parameter will
+            // logic to extract the appropriate field from the aggregated
+            // parameter.
+            //
+            // Unlike trivial cases that can work with `replaceAllUsesWith`,
+            // we are going to need to different code for each use, and that
+            // potentially puts us in the bad case of modifying the use-def
+            // information while also iterating it.
+            //
+            // To worka around the problem, we will make a copy of the list of
+            // uses and work with that instead.
+            //
+            List<IRUse*> uses;
+            for(auto use = globalParam->firstUse; use; use = use->nextUse)
+            {
+                uses.add(use);
+            }
+            for( auto use : uses )
+            {
+                // For each use site for the global parameter, we will
+                // insert new code right before the instruction that uses
+                // the parameter.
+                //
+                // TODO: In some cases we might want to emit a single load of
+                // a global parameter at the start of a function, rather
+                // than individual loads at multiple points in the body
+                // of a function. Ideally we can/should annotate the
+                // `globalParams` parameter with the equivalent of `__restrict__`
+                // so that these loads can be merged/moved without concern
+                // for aliasing.
+                //
+                auto user = use->user;
+                builder->setInsertBefore(user);
+
+                IRInst* value = nullptr;
+                if( globalParameterGroupTypeLayout )
+                {
+                    // If the global parameters are being placed in a
+                    // `ConstantBuffer<GlobalParams>`, then we need to
+                    // emit an instruction to compute a pointer to the
+                    // desired field, and then load from it.
+                    //
+                    auto ptrType = builder->getPtrType(globalParamType);
+                    auto fieldAddr = builder->emitFieldAddress(ptrType, wrapperParam, fieldKey);
+                    value = builder->emitLoad(globalParamType, fieldAddr);
+                }
+                else
+                {
+                    // If the global parameters are being bundled in a
+                    // plain old `struct`, then we simple want to emit
+                    // an instruction to extract the desired field.
+                    //
+                    value = builder->emitFieldExtract(globalParamType, wrapperParam, fieldKey);
+                }
+
+                // Whatever replacement value we computed, we need
+                // to install it as the value to be used at the use site.
+                //
+                use->set(value);
+            }
+
+            // Once we've replaced all uses of the global parameter,
+            // we can remove it from the IR module completely.
+            //
+            globalParam->removeAndDeallocate();
+        }
+    }
+};
+
+void collectGlobalUniformParameters(
+    IRModule*       module,
+    IRVarLayout*    globalScopeVarLayout)
+{
+    CollectGlobalUniformParametersContext context;
+    context.module = module;
+    context.globalScopeVarLayout = globalScopeVarLayout;
+
+    context.processModule();
+}
+
+}

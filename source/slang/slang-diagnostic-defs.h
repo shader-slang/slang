@@ -453,7 +453,7 @@ DIAGNOSTIC(39015, Error, wholeSpaceParameterRequiresZeroBinding, "shader paramet
 DIAGNOSTIC(39013, Error, dontExpectOutParametersForStage, "the '$0' stage does not support `out` or `inout` entry point parameters")
 DIAGNOSTIC(39014, Error, dontExpectInParametersForStage, "the '$0' stage does not support `in` entry point parameters")
 
-DIAGNOSTIC(39016, Error, globalUniformsNotSupported, "'$0' is implicitly a global uniform shader parameter, which is currently unsupported by Slang. If a uniform parameter is intended, use a constant buffer or parameter block. If a global is intended, use the 'static' modifier.")
+DIAGNOSTIC(39016, Warning, globalUniformNotExpected, "'$0' is implicitly a global shader parameter, not a global variable. If a global variable is intended, add the 'static' modifier. If a uniform shader parameter is intended, add the 'uniform' modifier to silence this warning.")
 
 DIAGNOSTIC(39017, Error, tooManyShaderRecordConstantBuffers, "can have at most one 'shader record' attributed constant buffer; found $0.")
 

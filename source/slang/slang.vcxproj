@@ -223,6 +223,7 @@
     <ClInclude Include="slang-ir-bind-existentials.h" />
     <ClInclude Include="slang-ir-byte-address-legalize.h" />
     <ClInclude Include="slang-ir-clone.h" />
+    <ClInclude Include="slang-ir-collect-global-uniforms.h" />
     <ClInclude Include="slang-ir-constexpr.h" />
     <ClInclude Include="slang-ir-dce.h" />
     <ClInclude Include="slang-ir-dominators.h" />
@@ -313,6 +314,7 @@
     <ClCompile Include="slang-ir-bind-existentials.cpp" />
     <ClCompile Include="slang-ir-byte-address-legalize.cpp" />
     <ClCompile Include="slang-ir-clone.cpp" />
+    <ClCompile Include="slang-ir-collect-global-uniforms.cpp" />
     <ClCompile Include="slang-ir-constexpr.cpp" />
     <ClCompile Include="slang-ir-dce.cpp" />
     <ClCompile Include="slang-ir-dominators.cpp" />

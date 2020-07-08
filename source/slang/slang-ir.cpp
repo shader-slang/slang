@@ -3665,7 +3665,7 @@ namespace Slang
     }
 
     IRStructFieldLayoutAttr* IRBuilder::getFieldLayoutAttr(
-        IRStructKey*    key,
+        IRInst*         key,
         IRVarLayout*    layout)
     {
         IRInst* operands[] = { key, layout };
@@ -4983,6 +4983,12 @@ namespace Slang
             return false;
 
         if(as<IRConstant>(this))
+            return false;
+
+        if(as<IRLayout>(this))
+            return false;
+
+        if(as<IRAttr>(this))
             return false;
 
         switch(op)

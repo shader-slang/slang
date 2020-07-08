@@ -1,8 +1,7 @@
-result code = -1
+result code = 0
 standard error = {
-tests/diagnostics/global-uniform.slang(8): error 39016: 'a' is implicitly a global uniform shader parameter, which is currently unsupported by Slang. If a uniform parameter is intended, use a constant buffer or parameter block. If a global is intended, use the 'static' modifier.
-tests/diagnostics/global-uniform.slang(10): error 39016: 'b' is implicitly a global uniform shader parameter, which is currently unsupported by Slang. If a uniform parameter is intended, use a constant buffer or parameter block. If a global is intended, use the 'static' modifier.
-tests/diagnostics/global-uniform.slang(13): error 39016: 'c' is implicitly a global uniform shader parameter, which is currently unsupported by Slang. If a uniform parameter is intended, use a constant buffer or parameter block. If a global is intended, use the 'static' modifier.
+tests/diagnostics/global-uniform.slang(10): warning 39016: 'b' is implicitly a global shader parameter, not a global variable. If a global variable is intended, add the 'static' modifier. If a uniform shader parameter is intended, add the 'uniform' modifier to silence this warning.
+tests/diagnostics/global-uniform.slang(13): warning 39016: 'c' is implicitly a global shader parameter, not a global variable. If a global variable is intended, add the 'static' modifier. If a uniform shader parameter is intended, add the 'uniform' modifier to silence this warning.
 }
 standard output = {
 }
