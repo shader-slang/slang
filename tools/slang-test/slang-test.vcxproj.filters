@@ -65,10 +65,10 @@
     <ClCompile Include="unit-test-riff.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
-    <ClCompile Include="unit-test-string.cpp">
+    <ClCompile Include="unit-test-short-list.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
-    <ClCompile Include="unit-test-short-list.cpp">
+    <ClCompile Include="unit-test-string.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
   </ItemGroup>
