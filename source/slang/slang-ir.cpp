@@ -634,6 +634,13 @@ namespace Slang
         return entryBlock->getParams();
     }
 
+    IRInst* IRGlobalValueWithParams::getFirstNonParamInst()
+    {
+        auto lastParam = getLastParam();
+        if (lastParam == nullptr)
+            return getFirstBlock()->getFirstInst();
+        return lastParam->next;
+    }
 
     // IRFunc
 
@@ -2215,9 +2222,9 @@ namespace Slang
         return (IRRawPointerType*)getType(kIROp_RawPointerType);
     }
 
-    IRSizedPointerType* IRBuilder::getSizedPointerType(IRInst* size)
+    IRRTTIPointerType* IRBuilder::getRTTIPointerType(IRInst* rttiPtr)
     {
-        return (IRSizedPointerType*)getType(kIROp_SizedPointerType, size);
+        return (IRRTTIPointerType*)getType(kIROp_RTTIPointerType, rttiPtr);
     }
 
     IRRTTIType* IRBuilder::getRTTIType()
@@ -2554,7 +2561,7 @@ namespace Slang
 
     IRInst* IRBuilder::emitRTTIExtractSize(IRInst* rttiObject)
     {
-        auto inst = createInst<IRLookupWitnessMethod>(
+        auto inst = createInst<IRRTTIExtractSize>(
             this,
             kIROp_RTTIExtractSize,
             getIntType(),
@@ -2564,13 +2571,27 @@ namespace Slang
         return inst;
     }
 
-    IRInst* IRBuilder::emitAlloca(IRInst* size)
+    IRInst* IRBuilder::emitAlloca(IRInst* type, IRInst* size)
     {
-        auto inst = createInst<IRLookupWitnessMethod>(
+        auto inst = createInst<IRAlloca>(
             this,
             kIROp_Alloca,
-            getSizedPointerType(size),
+            (IRType*)type,
             size);
+
+        addInst(inst);
+        return inst;
+    }
+
+    IRInst* IRBuilder::emitCopy(IRInst* dst, IRInst* src, IRInst* size)
+    {
+        IRInst* args[] = { dst, src, size };
+        auto inst = createInst<IRCopy>(
+            this,
+            kIROp_Copy,
+            getVoidType(),
+            3,
+            args);
 
         addInst(inst);
         return inst;
@@ -5086,6 +5107,10 @@ namespace Slang
             // All of the cases for "global values" are side-effect-free.
         case kIROp_StructType:
         case kIROp_StructField:
+        case kIROp_RTTIPointerType:
+        case kIROp_RTTIObject:
+        case kIROp_RTTIEntry:
+        case kIROp_RTTIType:
         case kIROp_Func:
         case kIROp_Generic:
         case kIROp_GlobalVar: // Note: the IRGlobalVar represents the *address*, so only a load/store would have side effects
@@ -5101,6 +5126,8 @@ namespace Slang
         case kIROp_Nop:
         case kIROp_Specialize:
         case kIROp_lookup_interface_method:
+        case kIROp_RTTIExtractSize:
+        case kIROp_getAddr:
         case kIROp_Construct:
         case kIROp_makeVector:
         case kIROp_MakeMatrix:
@@ -5142,6 +5169,7 @@ namespace Slang
         case kIROp_ExtractExistentialValue:
         case kIROp_ExtractExistentialWitnessTable:
         case kIROp_WrapExistential:
+        case kIROp_BitCast:
             return false;
         }
     }
@@ -5311,4 +5339,15 @@ namespace Slang
                 builder->getConstExprRate(),
                 irValue->getDataType()));
     }
+
+    bool isPointerOfType(IRInst* ptrType, IRInst* elementType)
+    {
+        return ptrType && ptrType->op == kIROp_PtrType && ptrType->getOperand(0) == elementType;
+    }
+    bool isPointerOfType(IRInst* ptrType, IROp opCode)
+    {
+        return ptrType && ptrType->op == kIROp_PtrType && ptrType->getOperand(0) &&
+            ptrType->getOperand(0)->op == opCode;
+    }
 }
+

@@ -498,7 +498,7 @@ SlangResult CPPSourceEmitter::calcTypeName(IRType* type, CodeGenTarget target, S
             return SLANG_OK;
         }
         case kIROp_RawPointerType:
-        case kIROp_SizedPointerType:
+        case kIROp_RTTIPointerType:
         {
             out << "void*";
             return SLANG_OK;
@@ -2326,6 +2326,17 @@ bool CPPSourceEmitter::tryEmitInstExprImpl(IRInst* inst, const EmitOpInfo& inOut
         {
             m_writer->emit("alloca(");
             emitOperand(inst->getOperand(0), EmitOpInfo::get(EmitOp::General));
+            m_writer->emit(")");
+            return true;
+        }
+        case kIROp_Copy:
+        {
+            m_writer->emit("memcpy(");
+            emitOperand(inst->getOperand(0), EmitOpInfo::get(EmitOp::General));
+            m_writer->emit(", ");
+            emitOperand(inst->getOperand(1), EmitOpInfo::get(EmitOp::General));
+            m_writer->emit(", ");
+            emitOperand(inst->getOperand(2), EmitOpInfo::get(EmitOp::General));
             m_writer->emit(")");
             return true;
         }

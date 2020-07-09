@@ -1124,10 +1124,10 @@ struct IRRawPointerType : IRType
     IR_LEAF_ISA(RawPointerType)
 };
 
-struct IRSizedPointerType : IRRawPointerType
+struct IRRTTIPointerType : IRRawPointerType
 {
-    IRInst* getSizeOperand() { return getOperand(0); }
-    IR_LEAF_ISA(SizedPointerType)
+    IRInst* getRTTIOperand() { return getOperand(0); }
+    IR_LEAF_ISA(RTTIPointerType)
 };
 
 struct IRGlobalHashedStringLiterals : IRInst
@@ -1297,6 +1297,7 @@ struct IRGlobalValueWithParams : IRGlobalValueWithCode
     IRParam* getFirstParam();
     IRParam* getLastParam();
     IRInstList<IRParam> getParams();
+    IRInst* getFirstNonParamInst();
 
     IR_PARENT_ISA(GlobalValueWithParams)
 };
@@ -1432,6 +1433,12 @@ IRInst* createEmptyInstWithSize(
 
     /// True if the op type can be handled 'nominally' meaning that pointer identity is applicable. 
 bool isNominalOp(IROp op);
+
+    // True if ptrType is a pointer type to elementType
+bool isPointerOfType(IRInst* ptrType, IRInst* elementType);
+
+    // True if ptrType is a pointer type to a type of opCode
+bool isPointerOfType(IRInst* ptrType, IROp opCode);
 
 }
 

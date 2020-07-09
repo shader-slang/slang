@@ -438,6 +438,17 @@ struct IRAlloca : IRInst
     IRInst* getAllocSize() { return getOperand(0); }
 };
 
+/// Copies `size` bytes from `src` to `dst`.
+///
+struct IRCopy : IRInst
+{
+    IR_LEAF_ISA(Copy)
+
+    IRInst* getDst() { return getOperand(0); }
+    IRInst* getSrc() { return getOperand(1); }
+    IRInst* getSize() { return getOperand(2); }
+};
+
 // Layout decorations
 
     /// A decoration that marks a field key as having been associated
@@ -1140,12 +1151,14 @@ struct IRCall : IRInst
 struct IRLoad : IRInst
 {
     IRUse ptr;
+    IR_LEAF_ISA(Load)
 };
 
 struct IRStore : IRInst
 {
     IRUse ptr;
     IRUse val;
+    IR_LEAF_ISA(Store)
 };
 
 struct IRFieldExtract : IRInst
@@ -1155,6 +1168,8 @@ struct IRFieldExtract : IRInst
 
     IRInst* getBase() { return base.get(); }
     IRInst* getField() { return field.get(); }
+    IR_LEAF_ISA(FieldExtract)
+
 };
 
 struct IRFieldAddress : IRInst
@@ -1164,6 +1179,8 @@ struct IRFieldAddress : IRInst
 
     IRInst* getBase() { return base.get(); }
     IRInst* getField() { return field.get(); }
+    IR_LEAF_ISA(FieldAddress)
+
 };
 
 struct IRGetAddress : IRInst
@@ -1598,7 +1615,7 @@ struct IRBuilder
     IRAssociatedType* getAssociatedType();
     IRThisType* getThisType();
     IRRawPointerType* getRawPointerType();
-    IRSizedPointerType* getSizedPointerType(IRInst* size);
+    IRRTTIPointerType* getRTTIPointerType(IRInst* rttiPtr);
     IRRTTIType* getRTTIType();
 
 
@@ -1712,7 +1729,9 @@ struct IRBuilder
     // Result is of integer type.
     IRInst* emitRTTIExtractSize(IRInst* rttiObject);
 
-    IRInst* emitAlloca(IRInst* size);
+    IRInst* emitAlloca(IRInst* type, IRInst* size);
+
+    IRInst* emitCopy(IRInst* dst, IRInst* src, IRInst* size);
 
     IRInst* emitCallInst(
         IRType*         type,

@@ -101,7 +101,7 @@ namespace Slang
             IRBuilder builder;
             builder.sharedBuilder = &sharedBuilderStorage;
             builder.setInsertBefore(genericParent);
-            auto loweredFunc = cloneInstAndOperands(&cloneEnv, &builder, func);
+            auto loweredFunc = cast<IRFunc>(cloneInstAndOperands(&cloneEnv, &builder, func));
             loweredFunc->setFullType(lowerGenericFuncType(&builder, cast<IRGeneric>(genericParent->getFullType())));
             List<IRInst*> clonedParams;
             for (auto genericChild : genericParent->getFirstBlock()->getChildren())
@@ -130,6 +130,28 @@ namespace Slang
                 param->removeFromParent();
                 block->addParam(as<IRParam>(param));
             }
+            // Lower generic typed parameters into RTTIPointers.
+            auto firstInst = loweredFunc->getFirstNonParamInst();
+            builder.setInsertBefore(firstInst);
+
+            for (IRInst* param = loweredFunc->getFirstParam();
+                param && param->op == kIROp_Param;
+                param = param->getNextInst())
+            {
+                // Generic typed parameters have a type that is a param itself.
+                if (auto rttiParam = as<IRParam>(param->getFullType()))
+                {
+                    SLANG_ASSERT(isPointerOfType(rttiParam->getFullType(), kIROp_RTTIType));
+                    // Lower into a function parameter of raw pointer type.
+                    param->setFullType(builder.getRawPointerType());
+                    auto newType = builder.getRTTIPointerType(rttiParam);
+                    // Cast the raw pointer parameter into a RTTIPointer with RTTI info from the type parameter.
+                    auto typedPtr = builder.emitBitCast(newType, param);
+                    // Replace all uses of param with typePtr.
+                    param->replaceUsesWith(typedPtr);
+                    typedPtr->setOperand(0, param);
+                }
+            }
             loweredGenericFunctions[genericValue] = loweredFunc;
             addToWorkList(loweredFunc);
             return loweredFunc;
@@ -137,7 +159,7 @@ namespace Slang
 
         IRType* lowerGenericFuncType(IRBuilder* builder, IRGeneric* genericVal)
         {
-            List<IRInst*> genericParamTypes;
+            ShortList<IRInst*> genericParamTypes;
             for (auto genericParam : genericVal->getParams())
             {
                 genericParamTypes.add(lowerParameterType(builder, genericParam->getFullType()));
@@ -146,19 +168,12 @@ namespace Slang
             auto innerType = (IRFuncType*)lowerFuncType(
                 builder,
                 cast<IRFuncType>(findGenericReturnVal(genericVal)),
-                genericParamTypes.getCount());
-
-            for (int i = 0; i < genericParamTypes.getCount(); i++)
-            {
-                innerType->setOperand(
-                    innerType->getOperandCount() - genericParamTypes.getCount() + i,
-                    genericParamTypes[i]);
-            }
+                genericParamTypes.getArrayView().arrayView);
 
             return innerType;
         }
 
-        IRType* lowerFuncType(IRBuilder* builder, IRFuncType* funcType, UInt additionalParamCount = 0)
+        IRType* lowerFuncType(IRBuilder* builder, IRFuncType* funcType, ArrayView<IRInst*> additionalParams)
         {
             List<IRInst*> newOperands;
             bool translated = false;
@@ -177,11 +192,11 @@ namespace Slang
                     newOperands.add(loweredParamType);
                 }
             }
-            if (!translated && additionalParamCount == 0)
+            if (!translated && additionalParams.getCount() == 0)
                 return funcType;
-            for (UInt i = 0; i < additionalParamCount; i++)
+            for (Index i = 0; i < additionalParams.getCount(); i++)
             {
-                newOperands.add(nullptr);
+                newOperands.add(additionalParams[i]);
             }
             auto newFuncType = builder->getFuncType(
                 newOperands.getCount() - 1,
@@ -209,7 +224,7 @@ namespace Slang
                 {
                     if (auto funcType = as<IRFuncType>(entry->getRequirementVal()))
                     {
-                        entry->setRequirementVal(lowerFuncType(&builder, funcType));
+                        entry->setRequirementVal(lowerFuncType(&builder, funcType, ArrayView<IRInst*>()));
                     }
                     else if (auto genericFuncType = as<IRGeneric>(entry->getRequirementVal()))
                     {
@@ -258,10 +273,67 @@ namespace Slang
             builder->sharedBuilder = &sharedBuilderStorage;
             builder->setInsertBefore(varInst);
 
+            // The result of `alloca` is an RTTIPointer(rttiObject).
+            auto type = builder->getRTTIPointerType(varTypeParam);
             auto typeSize = builder->emitRTTIExtractSize(varTypeParam);
-            auto newVarInst = builder->emitAlloca(typeSize);
+            auto newVarInst = builder->emitAlloca(type, typeSize);
             varInst->replaceUsesWith(newVarInst);
             varInst->removeAndDeallocate();
+        }
+
+        void processStoreInst(IRStore* storeInst)
+        {
+            auto rttiType = as<IRRTTIPointerType>(storeInst->ptr.get()->getFullType());
+            if (!rttiType)
+                return;
+            // All stores of generic typed variables needs to be translated
+            // to `IRCopy`s.
+            auto valPtr = storeInst->val.get();
+            if (valPtr->getFullType()->op == kIROp_RTTIPointerType)
+            {
+                // If `value` of the store is from another generic variable, it should
+                // have already been replaced with the pointer to that variable by now.
+                // So we don't need to do anything here.
+            }
+            else
+            {
+                // If value does not come from another generic variable, then it must be
+                // a param. In this case, the parameter is a bitCast of the parameter to an
+                // RTTIPointer type, so we just use the original parameter pointer and get
+                // rid of the bitcast.
+                SLANG_ASSERT(valPtr->op == kIROp_BitCast);
+                valPtr = valPtr->getOperand(0);
+                SLANG_ASSERT(valPtr->op == kIROp_Param);
+            }
+            IRBuilder builderStorage;
+            auto builder = &builderStorage;
+            builder->sharedBuilder = &sharedBuilderStorage;
+            builder->setInsertBefore(storeInst);
+            auto size = builder->emitRTTIExtractSize(rttiType->getRTTIOperand());
+            auto copy = builder->emitCopy(storeInst->ptr.get(), valPtr, size);
+            storeInst->replaceUsesWith(copy);
+            storeInst->removeAndDeallocate();
+        }
+
+        void processLoadInst(IRLoad* loadInst)
+        {
+            auto rttiType = as<IRRTTIPointerType>(loadInst->ptr.get()->getFullType());
+            if (!rttiType)
+                return;
+            // All loads of generic typed variables must be eliminated.
+            // There are only two possible uses of a load(genericVar):
+            // 1. store(x, load(genVar)), which will be handled by processStoreInst.
+            // 2. call(f, load(genVar)) when calling a generic function or a member function
+            //    via an interface witness lookup. In this case, we need to replace with
+            //    just `genVar`, since that function has already been lowered to take
+            //    raw pointers.
+            // Here we replace all uses of load to just the pointer itself.
+            // After this, all arguments in `call`s will be in its correct form.
+            // All `store`s will become `store(x, genVar)`, and still need
+            // to be translated into a `copy`, we leave that step when we get to
+            // process the `store` inst.
+            loadInst->replaceUsesWith(loadInst->getOperand(0));
+            loadInst->removeAndDeallocate();
         }
 
         // Emits an IRRTTIObject containing type information for a given type.
@@ -346,11 +418,11 @@ namespace Slang
                     for (UInt i = 0; i < callInst->getArgCount(); i++)
                     {
                         auto arg = callInst->getArg(i);
-                        if (paramTypes[i] == rawPtrType &&
-                            arg->getDataType() != rawPtrType)
+                        if (as<IRRawPointerType>(paramTypes[i]) &&
+                            !as<IRRawPointerType>(arg->getDataType()))
                         {
                             // We are calling a generic function that with an argument of
-                            // concrete type. We need to convert this argument o void*.
+                            // concrete type. We need to convert this argument to void*.
 
                             // Ideally this should just be a GetElementAddress inst.
                             // However the current code emitting logic for this instruction
@@ -422,6 +494,14 @@ namespace Slang
             else if (inst->op == kIROp_Var || inst->op == kIROp_undefined)
             {
                 processVarInst(inst);
+            }
+            else if (inst->op == kIROp_Load)
+            {
+                processLoadInst(cast<IRLoad>(inst));
+            }
+            else if (inst->op == kIROp_Store)
+            {
+                processStoreInst(cast<IRStore>(inst));
             }
         }
 

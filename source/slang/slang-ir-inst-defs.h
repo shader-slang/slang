@@ -26,7 +26,7 @@ INST(Nop, nop, 0, 0)
 
     INST(StringType, String, 0, 0)
     INST(RawPointerType, RawPointerType, 0, 0)
-    INST(SizedPointerType, SizedPointerType, 1, 0)
+    INST(RTTIPointerType, RTTIPointerType, 1, 0)
 
     /* ArrayTypeBase */
         INST(ArrayType, Array, 2, 0)
@@ -240,6 +240,7 @@ INST(Var, var, 0, 0)
 
 INST(Load, load, 1, 0)
 INST(Store, store, 2, 0)
+INST(Copy, copy, 3, 0)
 
 INST(FieldExtract, get_field, 2, 0)
 INST(FieldAddress, get_field_addr, 2, 0)

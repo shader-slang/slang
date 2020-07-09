@@ -2019,6 +2019,8 @@ void CLikeSourceEmitter::defaultEmitInstExpr(IRInst* inst, const EmitOpInfo& inO
         /* Don't need to to output anything for this instruction - it's used for reflecting string literals that
         are hashed with 'getStringHash' */
         break;
+    case kIROp_RTTIPointerType:
+        break;
 
     case kIROp_undefined:
         m_writer->emit(getName(inst));
@@ -2206,30 +2208,12 @@ void CLikeSourceEmitter::defaultEmitInstExpr(IRInst* inst, const EmitOpInfo& inO
 
     case kIROp_Store:
         {
-            auto destPtr = inst->getOperand(0);
-            if (destPtr->getFullType()->op == kIROp_SizedPointerType)
-            {
-                // Storing a generic typed object (whose size is known at runtime).
-                // This is not allowed for targets that doesn't support dynamic dispatch.
-                SLANG_ASSERT(doesTargetSupportPtrTypes());
-                m_writer->emit("memcpy(");
-                emitOperand(inst->getOperand(0), getInfo(EmitOp::General));
-                m_writer->emit(", ");
-                SLANG_ASSERT(inst->getOperand(1)->op == kIROp_Load);
-                emitOperand(inst->getOperand(1)->getOperand(0), getInfo(EmitOp::General));
-                m_writer->emit(", ");
-                emitOperand(destPtr->getFullType()->getOperand(0), getInfo(EmitOp::General));
-                m_writer->emit(")");
-            }
-            else
-            {
-                auto prec = getInfo(EmitOp::Assign);
-                needClose = maybeEmitParens(outerPrec, prec);
+            auto prec = getInfo(EmitOp::Assign);
+            needClose = maybeEmitParens(outerPrec, prec);
 
-                emitDereferenceOperand(inst->getOperand(0), leftSide(outerPrec, prec));
-                m_writer->emit(" = ");
-                emitOperand(inst->getOperand(1), rightSide(prec, outerPrec));
-            }
+            emitDereferenceOperand(inst->getOperand(0), leftSide(outerPrec, prec));
+            m_writer->emit(" = ");
+            emitOperand(inst->getOperand(1), rightSide(prec, outerPrec));
         }
         break;
 
