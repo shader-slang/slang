@@ -634,12 +634,12 @@ namespace Slang
         return entryBlock->getParams();
     }
 
-    IRInst* IRGlobalValueWithParams::getFirstNonParamInst()
+    IRInst* IRGlobalValueWithParams::getFirstOrdinaryInst()
     {
-        auto lastParam = getLastParam();
-        if (lastParam == nullptr)
-            return getFirstBlock()->getFirstInst();
-        return lastParam->next;
+        auto firstBlock = getFirstBlock();
+        if (!firstBlock)
+            return nullptr;
+        return firstBlock->getFirstOrdinaryInst();
     }
 
     // IRFunc
@@ -1944,11 +1944,6 @@ namespace Slang
         return (IRPtrLit*) findOrEmitConstant(this, keyInst);
     }
 
-    IRInst* IRBuilder::getRTTIKey(RTTIEntryKeys key)
-    {
-        return getIntValue(getIntType(), key);
-    }
- 
     IRInst* IRBuilder::findOrEmitHoistableInst(
         IRType*                 type,
         IROp                    op,
@@ -2559,33 +2554,21 @@ namespace Slang
         return inst;
     }
 
-    IRInst* IRBuilder::emitRTTIExtractSize(IRInst* rttiObject)
-    {
-        auto inst = createInst<IRRTTIExtractSize>(
-            this,
-            kIROp_RTTIExtractSize,
-            getIntType(),
-            rttiObject);
-
-        addInst(inst);
-        return inst;
-    }
-
-    IRInst* IRBuilder::emitAlloca(IRInst* type, IRInst* size)
+    IRInst* IRBuilder::emitAlloca(IRInst* type, IRInst* rttiObjPtr)
     {
         auto inst = createInst<IRAlloca>(
             this,
             kIROp_Alloca,
             (IRType*)type,
-            size);
+            rttiObjPtr);
 
         addInst(inst);
         return inst;
     }
 
-    IRInst* IRBuilder::emitCopy(IRInst* dst, IRInst* src, IRInst* size)
+    IRInst* IRBuilder::emitCopy(IRInst* dst, IRInst* src, IRInst* rttiObjPtr)
     {
-        IRInst* args[] = { dst, src, size };
+        IRInst* args[] = { dst, src, rttiObjPtr };
         auto inst = createInst<IRCopy>(
             this,
             kIROp_Copy,
@@ -2660,27 +2643,13 @@ namespace Slang
         return inst;
     }
 
-    IRInst* IRBuilder::emitRTTIEntry(RTTIEntryKeys key, IRInst* value)
+    IRInst* IRBuilder::emitMakeRTTIObject(IRInst* typeInst)
     {
-        IRInst* args[] = {getRTTIKey(key), value};
-        auto inst = createInstWithTrailingArgs<IRInst>(
-            this,
-            kIROp_RTTIEntry,
-            nullptr,
-            2,
-            args);
-        addInst(inst);
-        return inst;
-    }
-
-    IRInst* IRBuilder::emitMakeRTTIObject(ArrayView<IRInst*> rttiEntries)
-    {
-        auto inst = createInstWithTrailingArgs<IRInst>(
+        auto inst = createInst<IRRTTIObject>(
             this,
             kIROp_RTTIObject,
-            nullptr,
-            rttiEntries.getCount(),
-            rttiEntries.getBuffer());
+            getRTTIType(),
+            typeInst);
         addInst(inst);
         return inst;
     }
@@ -5115,7 +5084,6 @@ namespace Slang
         case kIROp_StructField:
         case kIROp_RTTIPointerType:
         case kIROp_RTTIObject:
-        case kIROp_RTTIEntry:
         case kIROp_RTTIType:
         case kIROp_Func:
         case kIROp_Generic:
@@ -5132,7 +5100,6 @@ namespace Slang
         case kIROp_Nop:
         case kIROp_Specialize:
         case kIROp_lookup_interface_method:
-        case kIROp_RTTIExtractSize:
         case kIROp_getAddr:
         case kIROp_Construct:
         case kIROp_makeVector:

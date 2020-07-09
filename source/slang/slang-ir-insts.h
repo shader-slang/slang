@@ -143,6 +143,19 @@ struct IRNameHintDecoration : IRDecoration
     }
 };
 
+/// A decoration on a RTTIObject providing type size information.
+struct IRRTTITypeSizeDecoration : IRDecoration
+{
+    enum { kOp = kIROp_RTTITypeSizeDecoration };
+    IR_LEAF_ISA(RTTITypeSizeDecoration)
+
+    IRIntLit* getTypeSizeOperand() { return cast<IRIntLit>(getOperand(0)); }
+    IRIntegerValue getTypeSize()
+    {
+        return getTypeSizeOperand()->getValue();
+    }
+};
+
 #define IR_SIMPLE_DECORATION(NAME)      \
     struct IR##NAME : IRDecoration      \
     {                                   \
@@ -418,15 +431,6 @@ struct IRLookupWitnessTable : IRInst
 {
     IRUse sourceType;
     IRUse interfaceType;
-};
-
-/// Extracts type size from an RTTI object.
-///
-struct IRRTTIExtractSize : IRInst
-{
-    IR_LEAF_ISA(RTTIExtractSize)
-
-    IRInst* getRTTIObject() { return getOperand(0); }
 };
 
 /// Allocates space from local stack.
@@ -1474,6 +1478,11 @@ struct IRWitnessTable : IRInst
     IR_LEAF_ISA(WitnessTable)
 };
 
+/// Represents an RTTI object.
+/// An IRRTTIObject has 1 operand, specifying the type
+/// this RTTI object provides info for.
+/// All type info are encapsualted as `IRRTTI*Decoration`s attached
+/// to the object.
 struct IRRTTIObject : IRInst
 {
     IR_LEAF_ISA(RTTIObject)
@@ -1605,7 +1614,6 @@ struct IRBuilder
     IRInst* getFloatValue(IRType* type, IRFloatingPointValue value);
     IRStringLit* getStringValue(const UnownedStringSlice& slice);
     IRPtrLit* getPtrValue(void* value);
-    IRInst* getRTTIKey(RTTIEntryKeys key);
 
     IRBasicType* getBasicType(BaseType baseType);
     IRBasicType* getVoidType();
@@ -1724,14 +1732,9 @@ struct IRBuilder
         IRInst* witnessTableVal,
         IRInst* interfaceMethodVal);
 
-    // Extracts type size info from an RTTI object.
-    // Takes 1 operand of type Ptr<RTTIType>.
-    // Result is of integer type.
-    IRInst* emitRTTIExtractSize(IRInst* rttiObject);
+    IRInst* emitAlloca(IRInst* type, IRInst* rttiObjPtr);
 
-    IRInst* emitAlloca(IRInst* type, IRInst* size);
-
-    IRInst* emitCopy(IRInst* dst, IRInst* src, IRInst* size);
+    IRInst* emitCopy(IRInst* dst, IRInst* src, IRInst* rttiObjPtr);
 
     IRInst* emitCallInst(
         IRType*         type,
@@ -1764,10 +1767,8 @@ struct IRBuilder
         UInt            argCount,
         IRInst* const* args);
 
-    IRInst* emitRTTIEntry(RTTIEntryKeys key, IRInst* value);
-
     // Creates an RTTI object. Result is of `IRRTTIType`.
-    IRInst* emitMakeRTTIObject(ArrayView<IRInst*> rttiEntries);
+    IRInst* emitMakeRTTIObject(IRInst* typeInst);
 
     IRInst* emitMakeVector(
         IRType*         type,
@@ -2299,6 +2300,11 @@ struct IRBuilder
     void addFormatDecoration(IRInst* inst, IRInst* format)
     {
         addDecoration(inst, kIROp_FormatDecoration, format);
+    }
+
+    void addRTTITypeSizeDecoration(IRInst* inst, IRIntegerValue value)
+    {
+        addDecoration(inst, kIROp_RTTITypeSizeDecoration, getIntValue(getIntType(), value));
     }
 };
 

@@ -227,8 +227,6 @@ INST(makeStruct, makeStruct, 0, 0)
 INST(Call, call, 1, 0)
 
 INST(RTTIObject, rtti_object, 0, 0)
-INST(RTTIEntry, rtti_entry, 2, 0)
-INST(RTTIExtractSize, rtti_extract_size, 1, 0)
 INST(Alloca, alloca, 1, 0)
 
 INST(WitnessTableEntry, witness_table_entry, 2, 0)
@@ -534,6 +532,10 @@ INST(HighLevelDeclDecoration,               highLevelDecl,          1, 0)
     /* LinkageDecoration */
         INST(ImportDecoration, import, 1, 0)
         INST(ExportDecoration, export, 1, 0)
+
+    /* Decorations for RTTI objects */
+        INST(RTTITypeSizeDecoration, RTTI_typeSize, 1, 0)
+
     INST_RANGE(LinkageDecoration, ImportDecoration, ExportDecoration)
 
     INST(SemanticDecoration, semantic, 2, 0)

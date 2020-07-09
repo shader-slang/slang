@@ -515,7 +515,7 @@ SlangResult CPPSourceEmitter::calcTypeName(IRType* type, CodeGenTarget target, S
         }
         case kIROp_RTTIType:
         {
-            out << "__rtti_t";
+            out << "TypeInfo";
             return SLANG_OK;
         }
         default:
@@ -1700,11 +1700,19 @@ void CPPSourceEmitter::_emitWitnessTableWrappers()
                             else
                                 m_writer->emit(", ");
 
+                            // If the implementation expects a concrete type
+                            // (either in the form of a pointer for `out`/`inout` parameters,
+                            // or in the form a a value for `in` parameters, while
+                            // the interface exposes a raw pointer type (void*),
+                            // we need to cast the raw pointer type to the appropriate
+                            // concerete type. (void*->Concrete* / void*->Concrete&).
                             if (reqParamType->op == kIROp_RawPointerType &&
-                                param->getFullType()->op != kIROp_RawPointerType)
+                                param->getDataType()->op != kIROp_RawPointerType)
                             {
                                 if (as<IRPtrTypeBase>(param->getFullType()))
                                 {
+                                    // The implementation function expects a pointer to the
+                                    // concrete type. This is the case for inout/out parameters.
                                     m_writer->emit("static_cast<");
                                     emitType(param->getFullType());
                                     m_writer->emit(">(");
@@ -1713,6 +1721,8 @@ void CPPSourceEmitter::_emitWitnessTableWrappers()
                                 }
                                 else
                                 {
+                                    // The implementation function expects just a value of the
+                                    // concrete type. We need to insert a dereference in this case.
                                     m_writer->emit("*static_cast<");
                                     emitType(param->getFullType());
                                     m_writer->emit("*>(");
@@ -1794,28 +1804,12 @@ void CPPSourceEmitter::emitInterface(IRInterfaceType* interfaceType)
 
 void CPPSourceEmitter::emitRTTIObject(IRRTTIObject* rttiObject)
 {
-    m_writer->emit("static __rtti_t ");
+    m_writer->emit("static TypeInfo ");
     m_writer->emit(getName(rttiObject));
     m_writer->emit(" = {");
-    bool isFirstEntry = true;
-    for (UInt i = 0; i < rttiObject->getOperandCount(); i++)
-    {
-        auto entry = rttiObject->getOperand(i);
-        auto key = static_cast<RTTIEntryKeys>(cast<IRIntLit>(entry->getOperand(0))->getValue());
-        if (!isFirstEntry)
-            m_writer->emit(", ");
-        switch (key)
-        {
-        case kRTTISize:
-            m_writer->emit("/* .typeSize = */ ");
-            emitOperand(entry->getOperand(1), getInfo(EmitOp::General));
-            break;
-        default:
-            SLANG_UNREACHABLE("Unknown RTTI entry type.");
-            break;
-        }
-        isFirstEntry = false;
-    }
+    auto typeSizeDecoration = rttiObject->findDecoration<IRRTTITypeSizeDecoration>();
+    SLANG_ASSERT(typeSizeDecoration);
+    m_writer->emit(typeSizeDecoration->getTypeSize());
     m_writer->emit("};\n");
 }
 
@@ -2325,18 +2319,11 @@ bool CPPSourceEmitter::tryEmitInstExprImpl(IRInst* inst, const EmitOpInfo& inOut
             m_writer->emit(getName(inst));
             return true;
         }
-        case kIROp_RTTIExtractSize:
-        {
-            emitInstExpr(inst->getOperand(0), inOuterPrec);
-            m_writer->emit("->");
-            m_writer->emit("typeSize");
-            return true;
-        }
         case kIROp_Alloca:
         {
             m_writer->emit("alloca(");
-            emitOperand(inst->getOperand(0), EmitOpInfo::get(EmitOp::General));
-            m_writer->emit(")");
+            emitOperand(inst->getOperand(0), EmitOpInfo::get(EmitOp::Postfix));
+            m_writer->emit("->typeSize)");
             return true;
         }
         case kIROp_Copy:
@@ -2346,8 +2333,8 @@ bool CPPSourceEmitter::tryEmitInstExprImpl(IRInst* inst, const EmitOpInfo& inOut
             m_writer->emit(", ");
             emitOperand(inst->getOperand(1), EmitOpInfo::get(EmitOp::General));
             m_writer->emit(", ");
-            emitOperand(inst->getOperand(2), EmitOpInfo::get(EmitOp::General));
-            m_writer->emit(")");
+            emitOperand(inst->getOperand(2), EmitOpInfo::get(EmitOp::Postfix));
+            m_writer->emit("->typeSize)");
             return true;
         }
     }

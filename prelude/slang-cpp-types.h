@@ -15,7 +15,7 @@
 namespace SLANG_PRELUDE_NAMESPACE {
 #endif
 
-struct __rtti_t
+struct TypeInfo
 {
     size_t typeSize;
 };

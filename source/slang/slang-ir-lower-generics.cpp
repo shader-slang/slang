@@ -17,7 +17,7 @@ namespace Slang
         IRModule* module;
 
         // RTTI objects for each type used to call a generic function.
-        Dictionary<IRInst*, IRInst*> rttiObjects;
+        Dictionary<IRInst*, IRInst*> mapTypeToRTTIObject;
 
         Dictionary<IRInst*, IRInst*> loweredGenericFunctions;
         HashSet<IRInterfaceType*> loweredInterfaceTypes;
@@ -52,7 +52,7 @@ namespace Slang
 
         bool isPolymorphicType(IRInst* typeInst)
         {
-            if (as<IRParam>(typeInst) && as<IRTypeType>(typeInst->getFullType()))
+            if (as<IRParam>(typeInst) && as<IRTypeType>(typeInst->getDataType()))
                 return true;
             switch (typeInst->op)
             {
@@ -131,7 +131,7 @@ namespace Slang
                 block->addParam(as<IRParam>(param));
             }
             // Lower generic typed parameters into RTTIPointers.
-            auto firstInst = loweredFunc->getFirstNonParamInst();
+            auto firstInst = loweredFunc->getFirstOrdinaryInst();
             builder.setInsertBefore(firstInst);
 
             for (IRInst* param = loweredFunc->getFirstParam();
@@ -139,9 +139,9 @@ namespace Slang
                 param = param->getNextInst())
             {
                 // Generic typed parameters have a type that is a param itself.
-                if (auto rttiParam = as<IRParam>(param->getFullType()))
+                if (auto rttiParam = as<IRParam>(param->getDataType()))
                 {
-                    SLANG_ASSERT(isPointerOfType(rttiParam->getFullType(), kIROp_RTTIType));
+                    SLANG_ASSERT(isPointerOfType(rttiParam->getDataType(), kIROp_RTTIType));
                     // Lower into a function parameter of raw pointer type.
                     param->setFullType(builder.getRawPointerType());
                     auto newType = builder.getRTTIPointerType(rttiParam);
@@ -246,21 +246,24 @@ namespace Slang
             // `var X:Ptr<irParam:Ptr<RTTIType>>`
             // We match this pattern and turn this inst into
             // `X:RawPtr = alloca(rtti_extract_size(irParam))`
-            auto varTypeInst = varInst->getFullType();
+            auto varTypeInst = varInst->getDataType();
             if (!varTypeInst)
                 return;
             auto ptrType = as<IRPtrType>(varTypeInst);
             if (!ptrType)
                 return;
+
+            // `varTypeParam` represents a pointer to the RTTI object.
             auto varTypeParam = ptrType->getValueType();
             if (varTypeParam->op != kIROp_Param)
                 return;
-            if (!varTypeParam->getFullType())
+            if (!varTypeParam->getDataType())
                 return;
-            if (varTypeParam->getFullType()->op != kIROp_PtrType)
+            if (varTypeParam->getDataType()->op != kIROp_PtrType)
                 return;
-            if (as<IRPtrType>(varTypeParam->getFullType())->getValueType()->op != kIROp_RTTIType)
+            if (as<IRPtrType>(varTypeParam->getDataType())->getValueType()->op != kIROp_RTTIType)
                 return;
+
 
             // A local variable of generic type has a type that is an IRParam.
             // This parameter represents the RTTI that tells us the size of the type.
@@ -275,21 +278,20 @@ namespace Slang
 
             // The result of `alloca` is an RTTIPointer(rttiObject).
             auto type = builder->getRTTIPointerType(varTypeParam);
-            auto typeSize = builder->emitRTTIExtractSize(varTypeParam);
-            auto newVarInst = builder->emitAlloca(type, typeSize);
+            auto newVarInst = builder->emitAlloca(type, varTypeParam);
             varInst->replaceUsesWith(newVarInst);
             varInst->removeAndDeallocate();
         }
 
         void processStoreInst(IRStore* storeInst)
         {
-            auto rttiType = as<IRRTTIPointerType>(storeInst->ptr.get()->getFullType());
+            auto rttiType = as<IRRTTIPointerType>(storeInst->ptr.get()->getDataType());
             if (!rttiType)
                 return;
             // All stores of generic typed variables needs to be translated
             // to `IRCopy`s.
             auto valPtr = storeInst->val.get();
-            if (valPtr->getFullType()->op == kIROp_RTTIPointerType)
+            if (valPtr->getDataType()->op == kIROp_RTTIPointerType)
             {
                 // If `value` of the store is from another generic variable, it should
                 // have already been replaced with the pointer to that variable by now.
@@ -309,30 +311,46 @@ namespace Slang
             auto builder = &builderStorage;
             builder->sharedBuilder = &sharedBuilderStorage;
             builder->setInsertBefore(storeInst);
-            auto size = builder->emitRTTIExtractSize(rttiType->getRTTIOperand());
-            auto copy = builder->emitCopy(storeInst->ptr.get(), valPtr, size);
+            auto copy = builder->emitCopy(
+                storeInst->ptr.get(),
+                valPtr,
+                rttiType->getRTTIOperand());
             storeInst->replaceUsesWith(copy);
             storeInst->removeAndDeallocate();
         }
 
         void processLoadInst(IRLoad* loadInst)
         {
-            auto rttiType = as<IRRTTIPointerType>(loadInst->ptr.get()->getFullType());
+            auto rttiType = as<IRRTTIPointerType>(loadInst->ptr.get()->getDataType());
             if (!rttiType)
                 return;
-            // All loads of generic typed variables must be eliminated.
             // There are only two possible uses of a load(genericVar):
             // 1. store(x, load(genVar)), which will be handled by processStoreInst.
             // 2. call(f, load(genVar)) when calling a generic function or a member function
             //    via an interface witness lookup. In this case, we need to replace with
             //    just `genVar`, since that function has already been lowered to take
             //    raw pointers.
-            // Here we replace all uses of load to just the pointer itself.
+            // In both cases, we can simply replace the use side with a pointer instead
+            // and never need to represent a "value" typed object explicitly.
+            // However, to preserve the ordering, we must make a copy of every load so
+            // we don't change the meaning of the code if there are `store`s between the
+            // `load` and the use site.
+
+            IRBuilder builderStorage;
+            auto builder = &builderStorage;
+            builder->sharedBuilder = &sharedBuilderStorage;
+            builder->setInsertBefore(loadInst);
+
+            // Allocate a copy of the value.
+            auto allocaInst = builder->emitAlloca(rttiType, rttiType->getRTTIOperand());
+            builder->emitCopy(allocaInst, loadInst->ptr.get(), rttiType->getRTTIOperand());
+
+            // Here we replace all uses of load to just the pointer to the copy.
             // After this, all arguments in `call`s will be in its correct form.
             // All `store`s will become `store(x, genVar)`, and still need
-            // to be translated into a `copy`, we leave that step when we get to
+            // to be translated into another `copy`, we leave that step when we get to
             // process the `store` inst.
-            loadInst->replaceUsesWith(loadInst->getOperand(0));
+            loadInst->replaceUsesWith(allocaInst);
             loadInst->removeAndDeallocate();
         }
 
@@ -340,27 +358,27 @@ namespace Slang
         IRInst* maybeEmitRTTIObject(IRInst* typeInst)
         {
             IRInst* result = nullptr;
-            if (rttiObjects.TryGetValue(typeInst, result))
+            if (mapTypeToRTTIObject.TryGetValue(typeInst, result))
                 return result;
             IRBuilder builderStorage;
             auto builder = &builderStorage;
             builder->sharedBuilder = &sharedBuilderStorage;
-            builder->setInsertBefore(typeInst);
+            builder->setInsertBefore(typeInst->next);
+
+            result = builder->emitMakeRTTIObject(typeInst);
 
             // For now the only type info we encapsualte is type size.
             IRSizeAndAlignment sizeAndAlignment;
             getNaturalSizeAndAlignment((IRType*)typeInst, &sizeAndAlignment);
-            auto typeSize = builder->getIntValue(builder->getIntType(), sizeAndAlignment.size);
-            auto sizeEntry = builder->emitRTTIEntry(kRTTISize, typeSize);
-            result = builder->emitMakeRTTIObject(makeArrayView(sizeEntry));
+            builder->addRTTITypeSizeDecoration(result, sizeAndAlignment.size);
 
             // Give a name to the rtti object.
             if (auto exportDecoration = typeInst->findDecoration<IRExportDecoration>())
             {
-                String rttiObjName = "__rtti_" + String(exportDecoration->getMangledName());
+                String rttiObjName = String(exportDecoration->getMangledName()) + "_rtti";
                 builder->addExportDecoration(result, rttiObjName.getUnownedSlice());
             }
-            rttiObjects[typeInst] = result;
+            mapTypeToRTTIObject[typeInst] = result;
             return result;
         }
 
@@ -381,7 +399,7 @@ namespace Slang
                         // The callee is a result of witness table lookup, we will only
                         // translate the call.
                         IRInst* callee = nullptr;
-                        auto witnessTableType = cast<IRWitnessTableType>(interfaceLookup->getWitnessTable()->getFullType());
+                        auto witnessTableType = cast<IRWitnessTableType>(interfaceLookup->getWitnessTable()->getDataType());
                         auto interfaceType = maybeLowerInterfaceType(cast<IRInterfaceType>(witnessTableType->getConformanceType()));
                         for (UInt i = 0; i < interfaceType->getOperandCount(); i++)
                         {

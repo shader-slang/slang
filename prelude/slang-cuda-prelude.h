@@ -54,7 +54,7 @@
 #   define SLANG_CUDA_BOUNDARY_MODE cudaBoundaryModeZero
 #endif
 
-struct __rtti_t
+struct TypeInfo
 {
     size_t typeSize;
 };

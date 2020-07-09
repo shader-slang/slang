@@ -3657,10 +3657,6 @@ void CLikeSourceEmitter::emitGlobalInst(IRInst* inst)
         // They are handled in `emitInterface`.
         break;
 
-    case kIROp_RTTIEntry:
-        // Don't emit for RTTI entry.
-        break;
-
     case kIROp_Func:
         emitFunc((IRFunc*) inst);
         break;

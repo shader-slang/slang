@@ -729,16 +729,6 @@ struct IRPtrLit : IRConstant
     void* getValue() { return value.ptrVal; }
 };
 
-// Range of keys of an RTTI entry.
-// For an `RTTIEntry(op0, op1)`, `op0` is an `IRIntLit` whose value
-// must be one of the enums defined in `RTTIEntryKeys`.
-enum RTTIEntryKeys : int32_t
-{
-    kRTTISize, // Size in bytes of the type represented by the RTTI object.
-    kRTTIKeys_End, // Marks the count of possible key values.
-                   // Not a valid value to appear in the IR.
-};
-
 // A instruction that ends a basic block (usually because of control flow)
 struct IRTerminatorInst : IRInst
 {
@@ -1119,11 +1109,15 @@ SIMPLE_IR_TYPE(OutType, OutTypeBase)
 SIMPLE_IR_TYPE(InOutType, OutTypeBase)
 SIMPLE_IR_TYPE(ExistentialBoxType, PtrTypeBase)
 
+    /// Represents a pointer to an object of unknown type.
 struct IRRawPointerType : IRType
 {
     IR_LEAF_ISA(RawPointerType)
 };
 
+    /// Represents a pointer to an object whose type is determined at runtime,
+    /// with type information available through `rttiOperand`.
+    ///
 struct IRRTTIPointerType : IRRawPointerType
 {
     IRInst* getRTTIOperand() { return getOperand(0); }
@@ -1245,6 +1239,7 @@ struct IRTypeType : IRType
     IR_LEAF_ISA(TypeType);
 };
 
+    /// Represents the IR type for an `IRRTTIObject`.
 struct IRRTTIType : IRType
 {
     IR_LEAF_ISA(RTTIType);
@@ -1297,7 +1292,7 @@ struct IRGlobalValueWithParams : IRGlobalValueWithCode
     IRParam* getFirstParam();
     IRParam* getLastParam();
     IRInstList<IRParam> getParams();
-    IRInst* getFirstNonParamInst();
+    IRInst* getFirstOrdinaryInst();
 
     IR_PARENT_ISA(GlobalValueWithParams)
 };
