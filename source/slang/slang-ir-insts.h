@@ -822,9 +822,9 @@ struct IRStructFieldLayoutAttr : IRAttr
 {
     IR_LEAF_ISA(StructFieldLayoutAttr)
 
-    IRStructKey* getFieldKey()
+    IRInst* getFieldKey()
     {
-        return cast<IRStructKey>(getOperand(0));
+        return getOperand(0);
     }
 
     IRVarLayout* getLayout()
@@ -865,7 +865,7 @@ struct IRStructTypeLayout : IRTypeLayout
             : Super::Builder(irBuilder)
         {}
 
-        void addField(IRStructKey* key, IRVarLayout* layout)
+        void addField(IRInst* key, IRVarLayout* layout)
         {
             FieldInfo info;
             info.key = key;
@@ -884,7 +884,7 @@ struct IRStructTypeLayout : IRTypeLayout
 
         struct FieldInfo
         {
-            IRStructKey* key;
+            IRInst* key;
             IRVarLayout* layout;
         };
 
@@ -2156,7 +2156,7 @@ struct IRBuilder
     IRPendingLayoutAttr* getPendingLayoutAttr(
         IRLayout* pendingLayout);
     IRStructFieldLayoutAttr* getFieldLayoutAttr(
-        IRStructKey*    key,
+        IRInst*         key,
         IRVarLayout*    layout);
     IRCaseTypeLayoutAttr* getCaseTypeLayoutAttr(
         IRTypeLayout*   layout);

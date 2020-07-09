@@ -98,12 +98,6 @@ struct MoveEntryPointUniformParametersToGlobalScope
     //
     IRModule* module;
 
-    // The target can determine how a variable is moved out into global scope
-    CodeGenTarget codeGenTarget;
-
-    // If true the target needs constant buffer wrapping (for uniforms say)
-    bool targetNeedsConstantBuffer;
-
     // We will process a whole module by visiting all
     // its global functions, looking for entry points.
     //
@@ -168,7 +162,7 @@ struct MoveEntryPointUniformParametersToGlobalScope
         // an explicit IR constant buffer for that wrapper, 
         //
         auto entryPointParamsLayout = entryPointLayout->getParamsLayout();
-        bool needConstantBuffer = targetNeedsConstantBuffer && as<IRParameterGroupTypeLayout>(entryPointParamsLayout->getTypeLayout()); 
+        bool needConstantBuffer = as<IRParameterGroupTypeLayout>(entryPointParamsLayout->getTypeLayout()) != nullptr; 
 
         auto entryPointParamsStructLayout = getScopeStructLayout(entryPointLayout);
 
@@ -237,6 +231,7 @@ struct MoveEntryPointUniformParametersToGlobalScope
                 //
                 builder->setInsertBefore(func);
                 paramStructType = builder->createStructType();
+                builder->addNameHintDecoration(paramStructType, UnownedTerminatedStringSlice("EntryPointParams"));
 
                 if( needConstantBuffer )
                 {
@@ -252,9 +247,6 @@ struct MoveEntryPointUniformParametersToGlobalScope
                     // an instance of `paramStructType`.
                     //
                     globalParam = builder->createGlobalParam(paramStructType);
-
-                    // Mark that this global comes from the entry point
-                    builder->addDecoration(globalParam, kIROp_EntryPointParamDecoration);
                 }
 
                 // No matter what, the global shader parameter should have the layout
@@ -262,6 +254,30 @@ struct MoveEntryPointUniformParametersToGlobalScope
                 // contained parameters will end up in the right place(s).
                 //
                 builder->addLayoutDecoration(globalParam, entryPointParamsLayout);
+
+                // We add a name hint to the global parameter so that it will
+                // emit to more readable code when referenced.
+                //
+                builder->addNameHintDecoration(globalParam, UnownedTerminatedStringSlice("entryPointParams"));
+
+                // We also decorate the parameter for the entry-point parameters
+                // so that we can find it again in downstream passes (like emit
+                // for CPU/CUDA) that might want to treat entry-point parameters
+                // different from other cases.
+                //
+                // TODO: Once we have support for multiple entry points to be emitted
+                // at once, we need a way to associate these per-entry-point parameters
+                // more closely with the original entry point. The two easiest options
+                // are:
+                //
+                // 1. Don't move the new aggregate parameter to the global scope
+                // on those targets, and instead keep it as a parameter of the
+                // entry point.
+                //
+                // 2. Use a decoration on the entry point itself to point at the
+                // global parameter for its per-entry-point parameter data.
+                //
+                builder->addDecoration(globalParam, kIROp_EntryPointParamDecoration);
             }
 
             // Now that we've ensured the global `struct` type and shader paramter
@@ -285,7 +301,7 @@ struct MoveEntryPointUniformParametersToGlobalScope
             // the linker. After all, this pass is traversing the same information
             // anyway, so it could do the work while it is here...
             //
-            auto paramFieldKey = entryPointParamsStructLayout->getFieldLayoutAttrs()[paramIndex]->getFieldKey();
+            auto paramFieldKey = cast<IRStructKey>(entryPointParamsStructLayout->getFieldLayoutAttrs()[paramIndex]->getFieldKey());
 
             auto paramField = builder->createStructField(paramStructType, paramFieldKey, paramType);
             SLANG_UNUSED(paramField);
@@ -435,32 +451,10 @@ struct MoveEntryPointUniformParametersToGlobalScope
 };
 
 void moveEntryPointUniformParamsToGlobalScope(
-    IRModule*   module,
-    CodeGenTarget target)
+    IRModule*   module)
 {
     MoveEntryPointUniformParametersToGlobalScope context;
-    
     context.module = module;
-    context.codeGenTarget = target;
-    context.targetNeedsConstantBuffer = true;
-
-    // Check if this target needs constant buffer wrapping
-    switch (target)
-    {
-        case CodeGenTarget::CPPSource:
-        case CodeGenTarget::CSource:
-        case CodeGenTarget::Executable:
-        case CodeGenTarget::SharedLibrary:
-        case CodeGenTarget::HostCallable:
-        case CodeGenTarget::CUDASource:
-        case CodeGenTarget::PTX:
-        {
-            context.targetNeedsConstantBuffer = false;
-            break;
-        }
-        default: break;
-    }
-
     context.processModule();
 }
 

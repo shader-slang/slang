@@ -30,36 +30,36 @@ layout(binding = 1, set = 1)
 uniform image2D gBlock_explicitFormat_0;
 
 layout(binding = 3)
-uniform image2D _S2;
+uniform image2D entryPointParams_noFormat_0;
 
 layout(rgba16f)
 layout(binding = 4)
-uniform image2D _S3;
+uniform image2D entryPointParams_explicitFormat_0;
 
 layout(location = 0)
-out vec4 _S4;
+out vec4 _S2;
 
 void main()
 {
     const vec4 result_0 = vec4(0);
 
-    float _S5 = (imageLoad((gNoFormat_0), ivec2((C_0._data.index_0))).x);
-    vec4 result_1 = result_0 + _S5;
+    float _S3 = (imageLoad((gNoFormat_0), ivec2((C_0._data.index_0))).x);
+    vec4 result_1 = result_0 + _S3;
 
-    float _S6 = (imageLoad((gExplicitFormat_0), ivec2((C_0._data.index_0))).x);
-    vec4 result_2 = result_1 + _S6;
+    float _S4 = (imageLoad((gExplicitFormat_0), ivec2((C_0._data.index_0))).x);
+    vec4 result_2 = result_1 + _S4;
 
-    vec4 _S7 = (imageLoad((gBlock_noFormat_0), ivec2((C_0._data.index_0))));
-    vec4 result_3 = result_2 + _S7;
+    vec4 _S5 = (imageLoad((gBlock_noFormat_0), ivec2((C_0._data.index_0))));
+    vec4 result_3 = result_2 + _S5;
 
-    vec4 _S8 = (imageLoad((gBlock_explicitFormat_0), ivec2((C_0._data.index_0))));
-    vec4 result_4 = result_3 + _S8;
+    vec4 _S6 = (imageLoad((gBlock_explicitFormat_0), ivec2((C_0._data.index_0))));
+    vec4 result_4 = result_3 + _S6;
 
-    vec4 _S9 = (imageLoad((_S2), ivec2((C_0._data.index_0))));
-    vec4 result_5 = result_4 + _S9;
+    vec4 _S7 = (imageLoad((entryPointParams_noFormat_0), ivec2((C_0._data.index_0))));
+    vec4 result_5 = result_4 + _S7;
 
-    vec4 _S10 = (imageLoad((_S3), ivec2((C_0._data.index_0))));
-    _S4 = result_5 + _S10;
+    vec4 _S8 = (imageLoad((entryPointParams_explicitFormat_0), ivec2((C_0._data.index_0))));
+    _S2 = result_5 + _S8;
 
     return;
 }

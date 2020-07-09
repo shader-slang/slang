@@ -5,10 +5,13 @@
 
 namespace Slang
 {
+    struct IRVarLayout;
+
     struct LinkedIR
     {
         RefPtr<IRModule>    module;
         IRFunc*             entryPoint;
+        IRVarLayout*        globalScopeVarLayout;
     };
 
 

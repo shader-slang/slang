@@ -278,7 +278,7 @@ public:
     void computeEmitActions(IRModule* module, List<EmitAction>& ioActions);
 
     void executeEmitActions(List<EmitAction> const& actions);
-    void emitModule(IRModule* module) { emitModuleImpl(module); }
+    void emitModule(IRModule* module) { m_irModule = module; emitModuleImpl(module); }
 
     void emitPreprocessorDirectives() { emitPreprocessorDirectivesImpl(); }
     void emitSimpleType(IRType* type);
@@ -353,6 +353,7 @@ public:
     List<IRWitnessTableEntry*> getSortedWitnessTableEntries(IRWitnessTable* witnessTable);
     
     BackEndCompileRequest* m_compileRequest = nullptr;
+    IRModule* m_irModule = nullptr;
 
     // The stage for which we are emitting code.
     //
@@ -371,15 +372,8 @@ public:
     // Where source is written to
     SourceWriter* m_writer;
 
-    // We only want to emit each `import`ed module one time, so
-    // we maintain a set of already-emitted modules.
-    HashSet<ModuleDecl*> m_modulesAlreadyEmitted;
-
-    ModuleDecl* m_program = nullptr;
-
     UInt m_uniqueIDCounter = 1;
     Dictionary<IRInst*, UInt> m_mapIRValueToID;
-    Dictionary<Decl*, UInt> m_mapDeclToID;
 
     HashSet<String> m_irDeclsVisited;
 
