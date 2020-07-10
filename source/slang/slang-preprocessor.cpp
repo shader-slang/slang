@@ -633,7 +633,7 @@ static void pushMacroExpansion(
     Preprocessor*   preprocessor,
     MacroExpansion* expansion)
 {
-    // Before pushing a macro as an input strema,
+    // Before pushing a macro as an input stream,
     // we need to set the appropraite "busy" state
     // that will be used during expansions of that
     // macro's definition.
