@@ -1459,9 +1459,9 @@ struct OptionsParser
             // with an entry point, since the case of a single entry
             // point was handled above, and the user is expected to
             // follow the ordering rules when using multiple entry points.
-            if( rawOutput.entryPointIndex == -1)
+            if( rawOutput.entryPointIndex == -1 )
             {
-                if (rawOutput.targetIndex != -1)
+                if (rawOutput.targetIndex != -1 )
                 {
                     auto outputFormat = rawTargets[rawOutput.targetIndex].format;
                     switch (outputFormat)
