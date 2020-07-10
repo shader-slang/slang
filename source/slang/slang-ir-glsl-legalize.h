@@ -1,5 +1,6 @@
 // slang-ir-glsl-legalize.h
 #pragma once
+#include"../core/slang-list.h"
 
 namespace Slang
 {
@@ -12,10 +13,10 @@ class GLSLExtensionTracker;
 struct IRFunc;
 struct IRModule;
 
-void legalizeEntryPointForGLSL(
+void legalizeEntryPointsForGLSL(
     Session*                session,
     IRModule*               module,
-    IRFunc*                 func,
+    const List<IRFunc*>&    func,
     DiagnosticSink*         sink,
     GLSLExtensionTracker*   glslExtensionTracker);
 

@@ -10,8 +10,8 @@ namespace Slang
     struct LinkedIR
     {
         RefPtr<IRModule>    module;
-        IRFunc*             entryPoint;
         IRVarLayout*        globalScopeVarLayout;
+        List<IRFunc*>       entryPoints;
     };
 
 

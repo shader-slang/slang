@@ -108,6 +108,7 @@ DIAGNOSTIC(    62, Error, failedToFindFunctionForCompiler, "failed to find funct
 DIAGNOSTIC(    70, Error, cannotMatchOutputFileToEntryPoint, "the output path '$0' is not associated with any entry point; a '-o' option for a compiled kernel must follow the '-entry' option for its corresponding entry point")
 
 DIAGNOSTIC(    80, Error, duplicateOutputPathsForEntryPointAndTarget, "multiple output paths have been specified entry point '$0' on target '$1'")
+DIAGNOSTIC(    81, Error, duplicateOutputPathsForTarget, "multiple output paths have been specified for target '$0'")
 
 DIAGNOSTIC(    82, Error, unableToWriteReproFile, "unable to write repro file '%0'")
 DIAGNOSTIC(    83, Error, unableToWriteModuleContainer, "unable to write module container '%0'")
