@@ -309,6 +309,14 @@ void CLikeSourceEmitter::emitInterface(IRInterfaceType* interfaceType)
     // This behavior is overloaded by concrete emitters.
 }
 
+void CLikeSourceEmitter::emitRTTIObject(IRRTTIObject* rttiObject)
+{
+    SLANG_UNUSED(rttiObject);
+    // Ignore rtti object by default.
+    // This is only used in targets that support dynamic dispatching.
+}
+
+
 void CLikeSourceEmitter::emitTypeImpl(IRType* type, const StringSliceLoc* nameAndLoc)
 {
     if (nameAndLoc)
@@ -908,6 +916,7 @@ bool CLikeSourceEmitter::shouldFoldInstIntoUseSites(IRInst* inst)
     case kIROp_GlobalParam:
     case kIROp_Param:
     case kIROp_Func:
+    case kIROp_Alloca:
         return false;
 
     // Always fold these in, because they are trivial
@@ -2009,6 +2018,8 @@ void CLikeSourceEmitter::defaultEmitInstExpr(IRInst* inst, const EmitOpInfo& inO
     case kIROp_GlobalHashedStringLiterals:
         /* Don't need to to output anything for this instruction - it's used for reflecting string literals that
         are hashed with 'getStringHash' */
+        break;
+    case kIROp_RTTIPointerType:
         break;
 
     case kIROp_undefined:
@@ -3672,6 +3683,10 @@ void CLikeSourceEmitter::emitGlobalInst(IRInst* inst)
 
     case kIROp_WitnessTable:
         emitWitnessTable(cast<IRWitnessTable>(inst));
+        break;
+
+    case kIROp_RTTIObject:
+        emitRTTIObject(cast<IRRTTIObject>(inst));
         break;
 
     default:

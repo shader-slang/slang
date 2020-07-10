@@ -334,6 +334,7 @@ public:
 
     virtual void emitWitnessTable(IRWitnessTable* witnessTable);
     virtual void emitInterface(IRInterfaceType* interfaceType);
+    virtual void emitRTTIObject(IRRTTIObject* rttiObject);
 
     virtual void handleCallExprDecorationsImpl(IRInst* funcValue) { SLANG_UNUSED(funcValue); }
 

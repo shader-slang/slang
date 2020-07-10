@@ -394,6 +394,8 @@ SlangResult CPPSourceEmitter::calcTypeName(IRType* type, CodeGenTarget target, S
 {
     switch (type->op)
     {
+        case kIROp_OutType:
+        case kIROp_InOutType:
         case kIROp_PtrType:
         {
             auto ptrType = static_cast<IRPtrType*>(type);
@@ -496,6 +498,7 @@ SlangResult CPPSourceEmitter::calcTypeName(IRType* type, CodeGenTarget target, S
             return SLANG_OK;
         }
         case kIROp_RawPointerType:
+        case kIROp_RTTIPointerType:
         {
             out << "void*";
             return SLANG_OK;
@@ -508,6 +511,11 @@ SlangResult CPPSourceEmitter::calcTypeName(IRType* type, CodeGenTarget target, S
 
             SLANG_RETURN_ON_FAIL(calcTypeName(elementType, target, out));
             out << "*";
+            return SLANG_OK;
+        }
+        case kIROp_RTTIType:
+        {
+            out << "TypeInfo";
             return SLANG_OK;
         }
         default:
@@ -1692,14 +1700,35 @@ void CPPSourceEmitter::_emitWitnessTableWrappers()
                             else
                                 m_writer->emit(", ");
 
+                            // If the implementation expects a concrete type
+                            // (either in the form of a pointer for `out`/`inout` parameters,
+                            // or in the form a a value for `in` parameters, while
+                            // the interface exposes a raw pointer type (void*),
+                            // we need to cast the raw pointer type to the appropriate
+                            // concerete type. (void*->Concrete* / void*->Concrete&).
                             if (reqParamType->op == kIROp_RawPointerType &&
-                                param->getFullType()->op != kIROp_RawPointerType)
+                                param->getDataType()->op != kIROp_RawPointerType)
                             {
-                                m_writer->emit("*static_cast<");
-                                emitType(param->getFullType());
-                                m_writer->emit("*>(");
-                                m_writer->emit(getName(param));
-                                m_writer->emit(")");
+                                if (as<IRPtrTypeBase>(param->getFullType()))
+                                {
+                                    // The implementation function expects a pointer to the
+                                    // concrete type. This is the case for inout/out parameters.
+                                    m_writer->emit("static_cast<");
+                                    emitType(param->getFullType());
+                                    m_writer->emit(">(");
+                                    m_writer->emit(getName(param));
+                                    m_writer->emit(")");
+                                }
+                                else
+                                {
+                                    // The implementation function expects just a value of the
+                                    // concrete type. We need to insert a dereference in this case.
+                                    m_writer->emit("*static_cast<");
+                                    emitType(param->getFullType());
+                                    m_writer->emit("*>(");
+                                    m_writer->emit(getName(param));
+                                    m_writer->emit(")");
+                                }
                             }
                             else
                             {
@@ -1772,6 +1801,18 @@ void CPPSourceEmitter::emitInterface(IRInterfaceType* interfaceType)
     emitSimpleType(interfaceType);
     m_writer->emit(";\n");
 }
+
+void CPPSourceEmitter::emitRTTIObject(IRRTTIObject* rttiObject)
+{
+    m_writer->emit("static TypeInfo ");
+    m_writer->emit(getName(rttiObject));
+    m_writer->emit(" = {");
+    auto typeSizeDecoration = rttiObject->findDecoration<IRRTTITypeSizeDecoration>();
+    SLANG_ASSERT(typeSizeDecoration);
+    m_writer->emit(typeSizeDecoration->getTypeSize());
+    m_writer->emit("};\n");
+}
+
 
     /// Emits witness table type definition given a sorted list of witness tables
     /// acoording to the order defined by `interfaceType`.
@@ -2271,6 +2312,29 @@ bool CPPSourceEmitter::tryEmitInstExprImpl(IRInst* inst, const EmitOpInfo& inOut
             m_writer->emit("(&(");
             emitInstExpr(inst->getOperand(0), EmitOpInfo::get(EmitOp::General));
             m_writer->emit("))");
+            return true;
+        }
+        case kIROp_RTTIObject:
+        {
+            m_writer->emit(getName(inst));
+            return true;
+        }
+        case kIROp_Alloca:
+        {
+            m_writer->emit("alloca(");
+            emitOperand(inst->getOperand(0), EmitOpInfo::get(EmitOp::Postfix));
+            m_writer->emit("->typeSize)");
+            return true;
+        }
+        case kIROp_Copy:
+        {
+            m_writer->emit("memcpy(");
+            emitOperand(inst->getOperand(0), EmitOpInfo::get(EmitOp::General));
+            m_writer->emit(", ");
+            emitOperand(inst->getOperand(1), EmitOpInfo::get(EmitOp::General));
+            m_writer->emit(", ");
+            emitOperand(inst->getOperand(2), EmitOpInfo::get(EmitOp::Postfix));
+            m_writer->emit("->typeSize)");
             return true;
         }
     }

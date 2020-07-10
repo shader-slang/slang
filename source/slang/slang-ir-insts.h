@@ -143,6 +143,19 @@ struct IRNameHintDecoration : IRDecoration
     }
 };
 
+/// A decoration on a RTTIObject providing type size information.
+struct IRRTTITypeSizeDecoration : IRDecoration
+{
+    enum { kOp = kIROp_RTTITypeSizeDecoration };
+    IR_LEAF_ISA(RTTITypeSizeDecoration)
+
+    IRIntLit* getTypeSizeOperand() { return cast<IRIntLit>(getOperand(0)); }
+    IRIntegerValue getTypeSize()
+    {
+        return getTypeSizeOperand()->getValue();
+    }
+};
+
 #define IR_SIMPLE_DECORATION(NAME)      \
     struct IR##NAME : IRDecoration      \
     {                                   \
@@ -418,6 +431,26 @@ struct IRLookupWitnessTable : IRInst
 {
     IRUse sourceType;
     IRUse interfaceType;
+};
+
+/// Allocates space from local stack.
+///
+struct IRAlloca : IRInst
+{
+    IR_LEAF_ISA(Alloca)
+
+    IRInst* getAllocSize() { return getOperand(0); }
+};
+
+/// Copies `size` bytes from `src` to `dst`.
+///
+struct IRCopy : IRInst
+{
+    IR_LEAF_ISA(Copy)
+
+    IRInst* getDst() { return getOperand(0); }
+    IRInst* getSrc() { return getOperand(1); }
+    IRInst* getSize() { return getOperand(2); }
 };
 
 // Layout decorations
@@ -1122,12 +1155,14 @@ struct IRCall : IRInst
 struct IRLoad : IRInst
 {
     IRUse ptr;
+    IR_LEAF_ISA(Load)
 };
 
 struct IRStore : IRInst
 {
     IRUse ptr;
     IRUse val;
+    IR_LEAF_ISA(Store)
 };
 
 struct IRFieldExtract : IRInst
@@ -1137,6 +1172,8 @@ struct IRFieldExtract : IRInst
 
     IRInst* getBase() { return base.get(); }
     IRInst* getField() { return field.get(); }
+    IR_LEAF_ISA(FieldExtract)
+
 };
 
 struct IRFieldAddress : IRInst
@@ -1146,6 +1183,8 @@ struct IRFieldAddress : IRInst
 
     IRInst* getBase() { return base.get(); }
     IRInst* getField() { return field.get(); }
+    IR_LEAF_ISA(FieldAddress)
+
 };
 
 struct IRGetAddress : IRInst
@@ -1439,6 +1478,16 @@ struct IRWitnessTable : IRInst
     IR_LEAF_ISA(WitnessTable)
 };
 
+/// Represents an RTTI object.
+/// An IRRTTIObject has 1 operand, specifying the type
+/// this RTTI object provides info for.
+/// All type info are encapsualted as `IRRTTI*Decoration`s attached
+/// to the object.
+struct IRRTTIObject : IRInst
+{
+    IR_LEAF_ISA(RTTIObject)
+};
+
 // An instruction that yields an undefined value.
 //
 // Note that we make this an instruction rather than a value,
@@ -1574,6 +1623,8 @@ struct IRBuilder
     IRAssociatedType* getAssociatedType();
     IRThisType* getThisType();
     IRRawPointerType* getRawPointerType();
+    IRRTTIPointerType* getRTTIPointerType(IRInst* rttiPtr);
+    IRRTTIType* getRTTIType();
 
 
     IRBasicBlockType*   getBasicBlockType();
@@ -1681,6 +1732,10 @@ struct IRBuilder
         IRInst* witnessTableVal,
         IRInst* interfaceMethodVal);
 
+    IRInst* emitAlloca(IRInst* type, IRInst* rttiObjPtr);
+
+    IRInst* emitCopy(IRInst* dst, IRInst* src, IRInst* rttiObjPtr);
+
     IRInst* emitCallInst(
         IRType*         type,
         IRInst*         func,
@@ -1711,6 +1766,9 @@ struct IRBuilder
         IRType*         type,
         UInt            argCount,
         IRInst* const* args);
+
+    // Creates an RTTI object. Result is of `IRRTTIType`.
+    IRInst* emitMakeRTTIObject(IRInst* typeInst);
 
     IRInst* emitMakeVector(
         IRType*         type,
@@ -2242,6 +2300,11 @@ struct IRBuilder
     void addFormatDecoration(IRInst* inst, IRInst* format)
     {
         addDecoration(inst, kIROp_FormatDecoration, format);
+    }
+
+    void addRTTITypeSizeDecoration(IRInst* inst, IRIntegerValue value)
+    {
+        addDecoration(inst, kIROp_RTTITypeSizeDecoration, getIntValue(getIntType(), value));
     }
 };
 
