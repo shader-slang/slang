@@ -3622,6 +3622,29 @@ namespace Slang
         return inst;
     }
 
+    IRInst* IRBuilder::emitAdd(IRType* type, IRInst* left, IRInst* right)
+    {
+        auto inst = createInst<IRInst>(
+            this,
+            kIROp_Add,
+            type,
+            left,
+            right);
+        addInst(inst);
+        return inst;
+    }
+
+    IRInst* IRBuilder::emitMul(IRType* type, IRInst* left, IRInst* right)
+    {
+        auto inst = createInst<IRInst>(
+            this,
+            kIROp_Mul,
+            type,
+            left,
+            right);
+        addInst(inst);
+        return inst;
+    }
 
 
     //

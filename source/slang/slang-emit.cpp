@@ -11,6 +11,7 @@
 #include "slang-ir-entry-point-uniforms.h"
 #include "slang-ir-glsl-legalize.h"
 #include "slang-ir-insts.h"
+#include "slang-ir-legalize-varying-params.h"
 #include "slang-ir-link.h"
 #include "slang-ir-lower-generics.h"
 #include "slang-ir-restructure.h"
@@ -589,6 +590,19 @@ Result linkAndOptimizeIR(
             validateIRModuleIfEnabled(compileRequest, irModule);
     }
     break;
+
+    case CodeGenTarget::CSource:
+    case CodeGenTarget::CPPSource:
+        {
+            legalizeEntryPointVaryingParamsForCPU(irModule, compileRequest->getSink());
+        }
+        break;
+
+    case CodeGenTarget::CUDASource:
+        {
+            legalizeEntryPointVaryingParamsForCUDA(irModule, compileRequest->getSink());
+        }
+        break;
 
     default:
         break;

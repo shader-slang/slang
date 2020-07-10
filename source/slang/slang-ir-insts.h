@@ -292,6 +292,8 @@ struct IRNumThreadsDecoration : IRDecoration
     IRIntLit* getX() { return cast<IRIntLit>(getOperand(0)); }
     IRIntLit* getY() { return cast<IRIntLit>(getOperand(1)); }
     IRIntLit* getZ() { return cast<IRIntLit>(getOperand(2)); }
+
+    IRIntLit* getExtentAlongAxis(int axis) { return cast<IRIntLit>(getOperand(axis)); }
 };
 
 struct IREntryPointDecoration : IRDecoration
@@ -1557,6 +1559,19 @@ struct IRConstantKey
 
 struct SharedIRBuilder
 {
+    SharedIRBuilder()
+    {}
+
+    SharedIRBuilder(Session* session, IRModule* module)
+        : session(session)
+        , module(module)
+    {}
+
+    explicit SharedIRBuilder(IRModule* module)
+        : session(module->getSession())
+        , module(module)
+    {}
+
     // The parent compilation session
     Session* session;
     Session* getSession()
@@ -1577,8 +1592,15 @@ struct IRBuilderSourceLocRAII;
 
 struct IRBuilder
 {
+    IRBuilder()
+    {}
+
+    IRBuilder(SharedIRBuilder* sharedBuilder)
+        : sharedBuilder(sharedBuilder)
+    {}
+
     // Shared state for all IR builders working on the same module
-    SharedIRBuilder*    sharedBuilder;
+    SharedIRBuilder*    sharedBuilder = nullptr;
 
     Session* getSession()
     {
@@ -2111,6 +2133,9 @@ struct IRBuilder
 
     IRInst* emitBitAnd(IRType* type, IRInst* left, IRInst* right);
     IRInst* emitBitNot(IRType* type, IRInst* value);
+
+    IRInst* emitAdd(IRType* type, IRInst* left, IRInst* right);
+    IRInst* emitMul(IRType* type, IRInst* left, IRInst* right);
 
     //
     // Decorations
