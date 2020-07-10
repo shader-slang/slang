@@ -15,6 +15,11 @@
 namespace SLANG_PRELUDE_NAMESPACE {
 #endif
 
+struct TypeInfo
+{
+    size_t typeSize;
+};
+
 template <typename T, size_t SIZE>
 struct FixedArray
 {

@@ -17,6 +17,7 @@
 
 #include <assert.h>
 #include <stdlib.h>
+#include <string.h>
 
 #if defined(_MSC_VER)
 #   define SLANG_PRELUDE_SHARED_LIB_EXPORT __declspec(dllexport)
