@@ -822,6 +822,7 @@ struct IRBlock : IRInst
     }
 
     void addParam(IRParam* param);
+    void insertParamAtHead(IRParam* param);
 
     // The "ordinary" instructions come after the parameters
     IRInst* getFirstOrdinaryInst();

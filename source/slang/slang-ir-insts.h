@@ -1956,6 +1956,8 @@ struct IRBuilder
         IRType* type);
     IRParam* emitParam(
         IRType* type);
+    IRParam* emitParamAtHead(
+        IRType* type);
 
     IRVar* emitVar(
         IRType* type);
