@@ -1465,6 +1465,35 @@ bool isKhronosTarget(TargetRequest* targetReq)
     }
 }
 
+bool isCPUTarget(TargetRequest* targetReq)
+{
+    switch( targetReq->getTarget() )
+    {
+    default:
+        return false;
+
+    case CodeGenTarget::CPPSource:
+    case CodeGenTarget::CSource:
+    case CodeGenTarget::HostCallable:
+    case CodeGenTarget::Executable:
+    case CodeGenTarget::SharedLibrary:
+        return true;
+    }
+}
+
+bool isCUDATarget(TargetRequest* targetReq)
+{
+    switch( targetReq->getTarget() )
+    {
+    default:
+        return false;
+
+    case CodeGenTarget::CUDASource:
+    case CodeGenTarget::PTX:
+        return true;
+    }
+}
+
 static bool isD3D11Target(TargetRequest*)
 {
     // We aren't officially supporting D3D11 right now
@@ -1950,8 +1979,20 @@ static RefPtr<TypeLayout> _createParameterGroupTypeLayout(
     // can't retroactively change whether or not `U` needed
     // a constant buffer).
     //
+    // Note: On CUDA and CPU targets, where we have true pointers,
+    // we always want to create an actual indirection for a parameter
+    // group, since otherwise the layout of a constant buffer would
+    // depend on its contents (in particular, whether or not
+    // the contents are empty).
+    //
+    // TODO: there is a subroutine arleady that tries to determine
+    // if a wrapping constant buffer is needed based on an element
+    // type and layout context; we should be using that here.
+    //
     bool wantConstantBuffer = _usesOrdinaryData(rawElementTypeLayout)
-        || _usesExistentialData(rawElementTypeLayout);
+        || _usesExistentialData(rawElementTypeLayout)
+        || isCUDATarget(context.targetReq)
+        || isCPUTarget(context.targetReq);
     if( wantConstantBuffer )
     {
         // If there is any ordinary data, then we'll need to
@@ -2282,7 +2323,9 @@ static RefPtr<TypeLayout> _createParameterGroupTypeLayout(
 }
 
     /// Do we need to wrap the given element type in a constant buffer layout?
-static bool needsConstantBuffer(RefPtr<TypeLayout> elementTypeLayout)
+static bool needsConstantBuffer(
+    TypeLayoutContext const&    context,
+    RefPtr<TypeLayout>          elementTypeLayout)
 {
     // We need a constant buffer if the element type has ordinary/uniform data.
     //
@@ -2298,6 +2341,14 @@ static bool needsConstantBuffer(RefPtr<TypeLayout> elementTypeLayout)
             return true;
     }
 
+    // Finally, on certain targets we always want to create
+    // wrapper constant buffer layouts, even if there is no
+    // data whatsoever.
+    //
+    auto targetReq = context.targetReq;
+    if( isCPUTarget(targetReq) || isCUDATarget(targetReq) )
+        return true;
+
     return false;
 }
 
@@ -2309,7 +2360,7 @@ RefPtr<TypeLayout> createConstantBufferTypeLayoutIfNeeded(
     // we are trying to lay out even needs a constant buffer allocated
     // for it.
     //
-    if(!needsConstantBuffer(elementTypeLayout))
+    if(!needsConstantBuffer(context, elementTypeLayout))
         return elementTypeLayout;
 
     auto parameterGroupRules = context.getRulesFamily()->getConstantBufferRules();

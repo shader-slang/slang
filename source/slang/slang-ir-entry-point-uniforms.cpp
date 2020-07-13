@@ -10,7 +10,7 @@ namespace Slang
 {
 
 
-// The transformation in this file will solve the problem of taking
+// The transformations in this file will solve the problem of taking
 // code like the following:
 //
 //      float4 fragmentMain(
@@ -88,21 +88,103 @@ namespace Slang
 // `params` above into individual variables for the `t` and
 // `s` fields.
 
-// The overall structure here is similar to many other IR passes.
-// We define a "context" structure to encapsulate the pass.
+// For clarity and flexibility, the work is split across two
+// different IR passes:
 //
-struct MoveEntryPointUniformParametersToGlobalScope
+// * The first pass simply collects together uniform parameters
+//   into a single parameter of `struct` or `ConstantBuffer<...>` type.
+//
+// * The second pass transforms entry-point uniform parameters
+//   into global shader parameters.
+
+// First we start with some helper subroutines for detecting
+// whether a parameter represents a varying input rather than
+// a uniform parameter.
+
+
+// In order to determine whether a parameter is varying based on its
+// layout, we need to know which resource kinds represent varying
+// shader parameters.
+//
+bool isVaryingResourceKind(LayoutResourceKind kind)
+{
+    switch( kind )
+    {
+    default:
+        return false;
+
+        // Note: The set of cases that are considered
+        // varying here would need to be extended if we
+        // add more fine-grained resource kinds (e.g.,
+        // if we ever add an explicit resource kind
+        // for geometry shader output streams).
+        //
+        // Ordinary varying input/output:
+    case LayoutResourceKind::VaryingInput:
+    case LayoutResourceKind::VaryingOutput:
+        //
+        // Ray-tracing shader input/output:
+    case LayoutResourceKind::CallablePayload:
+    case LayoutResourceKind::HitAttributes:
+    case LayoutResourceKind::RayPayload:
+        return true;
+    }
+}
+
+bool isVaryingParameter(IRTypeLayout* typeLayout)
+{
+    // If *any* of the resources consumed by the parameter type
+    // is *not* a varying resource kind, then we consider the
+    // whole parameter to be uniform (and thus not varying).
+    //
+    // Note that this means that an empty type will always
+    // be considered varying, even if it had been explicitly
+    // marked `uniform`.
+    //
+    // Note that this logic rules out support for parameters
+    // that mix varying and non-varying resource kinds.
+    //
+    // TODO: This whole convoluted definition exists because
+    // we currently don't give system-value parameters any
+    // reosurce kind, so they show up as empty. Simply
+    // adding `LayoutResourceKind`s for system-value inputs
+    // and outputs would allow for simpler logic here.
+    //
+    for(auto sizeAttr : typeLayout->getSizeAttrs())
+    {
+        if(!isVaryingResourceKind(sizeAttr->getResourceKind()))
+            return false;
+    }
+    return true;
+}
+
+bool isVaryingParameter(IRVarLayout* varLayout)
+{
+    return isVaryingParameter(varLayout->getTypeLayout());
+}
+
+// Our two passes have a fair amount in common in terms of
+// how they traverse the IR, so we will factor out the
+// shared logic into a base type.
+
+struct PerEntryPointPass
 {
     // We'll hang on to the module we are processing,
     // so that we can refer to it when setting up `IRBuilder`s.
     //
     IRModule* module;
 
+
+    SharedIRBuilder* m_sharedBuilder = nullptr;
+
     // We will process a whole module by visiting all
     // its global functions, looking for entry points.
     //
     void processModule()
     {
+        SharedIRBuilder sharedBuilder(module);
+        m_sharedBuilder = &sharedBuilder;
+
         // Note that we are only looking at true global-scope
         // functions and not functions nested inside of
         // IR generics. When using generic entry points, this
@@ -130,21 +212,57 @@ struct MoveEntryPointUniformParametersToGlobalScope
             if( !func->findDecorationImpl(kIROp_EntryPointDecoration) )
                 continue;
 
-            // If we fine a candidate entry point, then we
+            // If we find a candidate entry point, then we
             // will process it.
             //
             processEntryPoint(func);
         }
     }
 
-    void processEntryPoint(IRFunc* func)
+    void processEntryPoint(IRFunc* entryPointFunc)
     {
+        m_entryPointFunc = entryPointFunc;
+        processEntryPointImpl(entryPointFunc);
+    }
+
+    IRFunc* m_entryPointFunc = nullptr;
+
+    virtual void processEntryPointImpl(IRFunc* entryPointFunc) = 0;
+};
+
+
+struct CollectEntryPointUniformParams : PerEntryPointPass
+{
+    CollectEntryPointUniformParamsOptions m_options;
+
+    // *If* the entry point has any uniform parameter then we want to create a
+    // structure type to house them, and a single collected shader parameter (either
+    // an instance of that type or a constant buffer).
+    //
+    // We only want to create these if actually needed, so we will declare
+    // them here and then initialize them on-demand.
+    //
+    IRStructType* paramStructType = nullptr;
+    IRParam* collectedParam = nullptr;
+
+    IRVarLayout* entryPointParamsLayout = nullptr;
+    bool needConstantBuffer = false;
+
+    void processEntryPointImpl(IRFunc* entryPointFunc) SLANG_OVERRIDE
+    {
+        // This pass object may be used across multiple entry points,
+        // so we need to make sure to reset state that could have been
+        // left over from a previous entry point.
+        //
+        paramStructType = nullptr;
+        collectedParam = nullptr;
+
         // We expect all entry points to have explicit layout information attached.
         //
         // We will assert that we have the information we need, but try to be
         // defensive and bail out in the failure case in release builds.
         //
-        auto funcLayoutDecoration = func->findDecoration<IRLayoutDecoration>();
+        auto funcLayoutDecoration = entryPointFunc->findDecoration<IRLayoutDecoration>();
         SLANG_ASSERT(funcLayoutDecoration);
         if(!funcLayoutDecoration)
             return;
@@ -161,31 +279,18 @@ struct MoveEntryPointUniformParametersToGlobalScope
         // If we are in the latter case we will need to make sure to allocate
         // an explicit IR constant buffer for that wrapper, 
         //
-        auto entryPointParamsLayout = entryPointLayout->getParamsLayout();
-        bool needConstantBuffer = as<IRParameterGroupTypeLayout>(entryPointParamsLayout->getTypeLayout()) != nullptr; 
+        entryPointParamsLayout = entryPointLayout->getParamsLayout();
+        needConstantBuffer = as<IRParameterGroupTypeLayout>(entryPointParamsLayout->getTypeLayout()) != nullptr; 
 
         auto entryPointParamsStructLayout = getScopeStructLayout(entryPointLayout);
 
         // We will set up an IR builder so that we are ready to generate code.
         //
-        SharedIRBuilder sharedBuilderStorage;
-        auto sharedBuilder = &sharedBuilderStorage;
-        sharedBuilder->module = module;
-        sharedBuilder->session = module->getSession();
-
-        IRBuilder builderStorage;
+        IRBuilder builderStorage(m_sharedBuilder);
         auto builder = &builderStorage;
-        builder->sharedBuilder = sharedBuilder;
 
-        // *If* the entry point has any uniform parameter then we want to create a
-        // structure type to house them, and a global shader parameter (either
-        // an instance of that type or a constant buffer).
-        //
-        // We only want to create these if actually needed, so we will declare
-        // them here and then initialize them on-demand.
-        //
-        IRStructType* paramStructType = nullptr;
-        IRGlobalParam* globalParam = nullptr;
+        if(m_options.alwaysCreateCollectedParam)
+            ensureCollectedParamAndTypeHaveBeenCreated();
 
         // We will be removing any uniform parameters we run into, so we
         // need to iterate the parameter list carefully to deal with
@@ -193,7 +298,7 @@ struct MoveEntryPointUniformParametersToGlobalScope
         //
         IRParam* nextParam = nullptr;
         UInt paramCounter = 0;
-        for( IRParam* param = func->getFirstParam(); param; param = nextParam )
+        for( IRParam* param = entryPointFunc->getFirstParam(); param; param = nextParam )
         {
             nextParam = param->getNextParam();
             UInt paramIndex = paramCounter++;
@@ -225,62 +330,9 @@ struct MoveEntryPointUniformParametersToGlobalScope
             // to deal with creating the structure type and global shader
             // parameter that our transformed entry point will use.
             //
-            if( !paramStructType )
-            {
-                // First we create the structure to hold the parameters.
-                //
-                builder->setInsertBefore(func);
-                paramStructType = builder->createStructType();
-                builder->addNameHintDecoration(paramStructType, UnownedTerminatedStringSlice("EntryPointParams"));
+            ensureCollectedParamAndTypeHaveBeenCreated();
 
-                if( needConstantBuffer )
-                {
-                    // If we need a constant buffer, then the global
-                    // shader parameter will be a `ConstantBuffer<paramStructType>`
-                    //
-                    auto constantBufferType = builder->getConstantBufferType(paramStructType);
-                    globalParam = builder->createGlobalParam(constantBufferType);
-                }
-                else
-                {
-                    // Otherwise, the global shader parameter is just
-                    // an instance of `paramStructType`.
-                    //
-                    globalParam = builder->createGlobalParam(paramStructType);
-                }
-
-                // No matter what, the global shader parameter should have the layout
-                // information from the entry point attached to it, so that the
-                // contained parameters will end up in the right place(s).
-                //
-                builder->addLayoutDecoration(globalParam, entryPointParamsLayout);
-
-                // We add a name hint to the global parameter so that it will
-                // emit to more readable code when referenced.
-                //
-                builder->addNameHintDecoration(globalParam, UnownedTerminatedStringSlice("entryPointParams"));
-
-                // We also decorate the parameter for the entry-point parameters
-                // so that we can find it again in downstream passes (like emit
-                // for CPU/CUDA) that might want to treat entry-point parameters
-                // different from other cases.
-                //
-                // TODO: Once we have support for multiple entry points to be emitted
-                // at once, we need a way to associate these per-entry-point parameters
-                // more closely with the original entry point. The two easiest options
-                // are:
-                //
-                // 1. Don't move the new aggregate parameter to the global scope
-                // on those targets, and instead keep it as a parameter of the
-                // entry point.
-                //
-                // 2. Use a decoration on the entry point itself to point at the
-                // global parameter for its per-entry-point parameter data.
-                //
-                builder->addDecoration(globalParam, kIROp_EntryPointParamDecoration);
-            }
-
-            // Now that we've ensured the global `struct` type and shader paramter
+            // Now that we've ensured the global `struct` type and collected shader paramter
             // exist, we need to add a field to the `struct` to represent the
             // current parameter.
             //
@@ -349,7 +401,7 @@ struct MoveEntryPointUniformParametersToGlobalScope
                     //
                     auto fieldAddress = builder->emitFieldAddress(
                         builder->getPtrType(paramType),
-                        globalParam,
+                        collectedParam,
                         paramFieldKey);
                     fieldVal = builder->emitLoad(fieldAddress);
                 }
@@ -361,7 +413,7 @@ struct MoveEntryPointUniformParametersToGlobalScope
                     //
                     fieldVal = builder->emitFieldExtract(
                         paramType,
-                        globalParam,
+                        collectedParam,
                         paramFieldKey);
                 }
 
@@ -380,75 +432,139 @@ struct MoveEntryPointUniformParametersToGlobalScope
             param->removeAndDeallocate();
         }
 
-        fixUpFuncType(func);
-    }
-
-    // We need to be able to determine if a parameter is logically
-    // a "varying" parameter based on its layout.
-    //
-    bool isVaryingParameter(IRVarLayout* layout)
-    {
-        // If *any* of the resources consumed by the parameter
-        // is a varying resource kind (e.g., varying input) then
-        // we consider the whole parameter to be varying.
-        //
-        // This is reasonable because there is no way to declare
-        // a parameter that mixes varying and non-varying fields.
-        //
-        for( auto resInfo : layout->getOffsetAttrs() )
+        if( collectedParam )
         {
-            if(isVaryingResourceKind(resInfo->getResourceKind()))
-                return true;
+            collectedParam->insertBefore(entryPointFunc->getFirstBlock()->getFirstChild());
         }
 
-        // TODO(JS): We probably want a more accurate way of determining if system semantic value
-        // We can use the flags Flag::SemanticValue for one. But main issue with this test, is for some
-        // targets currently (CPU) no resources are consumed. Perhaps this is fixed elsewhere by using a 'notional' resource.
-
-        // Varying parameters with "system value" semantics currently show up as
-        // consuming no resources, so we need to special-case that here.
-        //
-        // Note: an empty `struct` parameter would also show up the same way, but
-        // we should eliminate any such parameters later on during type legalization.
-        //
-        if(layout->getOffsetAttrs().getCount() == 0)
-            return true;
-
-        // if none of the above tests determined that the
-        // parameter was varying, then we can safely consider
-        // it to be non-varying (uniform):
-        return false;
+        fixUpFuncType(entryPointFunc);
     }
 
-    // In order to determine whether a parameter is varying based on its
-    // layout, we need to know which resource kinds represent varying
-    // shader parameters.
-    //
-    bool isVaryingResourceKind(LayoutResourceKind kind)
+    void ensureCollectedParamAndTypeHaveBeenCreated()
     {
-        switch( kind )
-        {
-        default:
-            return false;
+        if(paramStructType)
+            return;
 
-            // Note: The set of cases that are considered
-            // varying here would need to be extended if we
-            // add more fine-grained resource kinds (e.g.,
-            // if we ever add an explicit resource kind
-            // for geometry shader output streams).
+        IRBuilder builder(m_sharedBuilder);
+
+        // First we create the structure to hold the parameters.
+        //
+        builder.setInsertBefore(m_entryPointFunc);
+        paramStructType = builder.createStructType();
+        builder.addNameHintDecoration(paramStructType, UnownedTerminatedStringSlice("EntryPointParams"));
+
+        if( needConstantBuffer )
+        {
+            // If we need a constant buffer, then the global
+            // shader parameter will be a `ConstantBuffer<paramStructType>`
             //
-            // Ordinary varying input/output:
-        case LayoutResourceKind::VaryingInput:
-        case LayoutResourceKind::VaryingOutput:
-            //
-            // Ray-tracing shader input/output:
-        case LayoutResourceKind::CallablePayload:
-        case LayoutResourceKind::HitAttributes:
-        case LayoutResourceKind::RayPayload:
-            return true;
+            auto constantBufferType = builder.getConstantBufferType(paramStructType);
+            collectedParam = builder.createParam(constantBufferType);
         }
+        else
+        {
+            // Otherwise, the global shader parameter is just
+            // an instance of `paramStructType`.
+            //
+            collectedParam = builder.createParam(paramStructType);
+        }
+
+        // No matter what, the global shader parameter should have the layout
+        // information from the entry point attached to it, so that the
+        // contained parameters will end up in the right place(s).
+        //
+        builder.addLayoutDecoration(collectedParam, entryPointParamsLayout);
+
+        // We add a name hint to the global parameter so that it will
+        // emit to more readable code when referenced.
+        //
+        builder.addNameHintDecoration(collectedParam, UnownedTerminatedStringSlice("entryPointParams"));
     }
 };
+
+struct MoveEntryPointUniformParametersToGlobalScope : PerEntryPointPass
+{
+    void processEntryPointImpl(IRFunc* entryPointFunc) SLANG_OVERRIDE
+    {
+        // We will set up an IR builder so that we are ready to generate code.
+        //
+        IRBuilder builderStorage(m_sharedBuilder);
+        auto builder = &builderStorage;
+
+        builder->setInsertBefore(entryPointFunc);
+
+        // We will be removing any uniform parameters we run into, so we
+        // need to iterate the parameter list carefully to deal with
+        // us modifying it along the way.
+        //
+        IRParam* nextParam = nullptr;
+        for( IRParam* param = entryPointFunc->getFirstParam(); param; param = nextParam )
+        {
+            nextParam = param->getNextParam();
+
+            // We expect all entry-point parameters to have layout information,
+            // but we will be defensive and skip parameters without the required
+            // information when we are in a release build.
+            //
+            auto layoutDecoration = param->findDecoration<IRLayoutDecoration>();
+            SLANG_ASSERT(layoutDecoration);
+            if(!layoutDecoration)
+                continue;
+            auto paramLayout = as<IRVarLayout>(layoutDecoration->getLayout());
+            SLANG_ASSERT(paramLayout);
+            if(!paramLayout)
+                continue;
+
+            // A parameter that has varying input/output behavior should be left alone,
+            // since this pass is only supposed to apply to uniform (non-varying)
+            // parameters.
+            //
+            if(isVaryingParameter(paramLayout))
+                continue;
+
+            auto paramType = param->getFullType();
+
+            builder->setInsertBefore(entryPointFunc);
+            auto globalParam = builder->createGlobalParam(paramType);
+
+            param->transferDecorationsTo(globalParam);
+
+            // We also decorate the parameter for the entry-point parameters
+            // so that we can find it again in downstream passes (like emit
+            // for CPU/CUDA) that might want to treat entry-point parameters
+            // different from other cases.
+            //
+            // TODO: Once we have support for multiple entry points to be emitted
+            // at once, we need a way to associate these per-entry-point parameters
+            // more closely with the original entry point. The two easiest options
+            // are:
+            //
+            // 1. Don't move the new aggregate parameter to the global scope
+            // on those targets, and instead keep it as a parameter of the
+            // entry point.
+            //
+            // 2. Use a decoration on the entry point itself to point at the
+            // global parameter for its per-entry-point parameter data.
+            //
+            builder->addDecoration(globalParam, kIROp_EntryPointParamDecoration);
+
+            param->replaceUsesWith(globalParam);
+            param->removeAndDeallocate();
+        }
+
+        fixUpFuncType(entryPointFunc);
+    }
+};
+
+void collectEntryPointUniformParams(
+    IRModule*                                       module,
+    CollectEntryPointUniformParamsOptions const&    options)
+{
+    CollectEntryPointUniformParams context;
+    context.module = module;
+    context.m_options = options;
+    context.processModule();
+}
 
 void moveEntryPointUniformParamsToGlobalScope(
     IRModule*   module)
