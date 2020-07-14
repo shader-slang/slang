@@ -698,8 +698,9 @@ standardProject "slangc"
     links { "core", "slang" }
 
 tool "run-generators"
+    -- This project doesn't build a useful static lib. It is only set up this way 
+    -- as it was a requirement of triggering across linux/windows 
     kind "StaticLib"
-    group "run-generators"
     
     -- We include these, even though they are not really part of the dummy 
     -- build, so that the filters below can pick up the appropriate locations.
