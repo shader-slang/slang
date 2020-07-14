@@ -248,56 +248,6 @@ void CUDASourceEmitter::emitEntryPointAttributesImpl(IRFunc* irFunc, IREntryPoin
     SLANG_UNUSED(entryPointDecor);
 }
 
-void CUDASourceEmitter::emitOperandImpl(IRInst* inst, EmitOpInfo const& outerPrec)
-{
-    if (shouldFoldInstIntoUseSites(inst))
-    {
-        emitInstExpr(inst, outerPrec);
-        return;
-    }
-
-    switch (inst->op)
-    {
-        case kIROp_Param:
-        {
-            auto varLayout = getVarLayout(inst);
-            if (varLayout)
-            {
-                if (auto systemValueSemantic = varLayout->findSystemValueSemanticAttr())
-                {
-                    String semanticNameSpelling = systemValueSemantic->getName();
-                    semanticNameSpelling = semanticNameSpelling.toLower();
-
-                    if (semanticNameSpelling == "sv_dispatchthreadid")
-                    {
-                        m_semanticUsedFlags |= SemanticUsedFlag::DispatchThreadID;
-                        m_writer->emit("((blockIdx * blockDim) + threadIdx)");
-
-                        return;
-                    }
-                    else if (semanticNameSpelling == "sv_groupid")
-                    {
-                        m_semanticUsedFlags |= SemanticUsedFlag::GroupID;
-                        m_writer->emit("blockIdx");
-                        return;
-                    }
-                    else if (semanticNameSpelling == "sv_groupthreadid")
-                    {
-                        m_semanticUsedFlags |= SemanticUsedFlag::GroupThreadID;
-                        m_writer->emit("threadIdx");
-                        return;
-                    }
-                }
-            }
-
-            break;
-        }
-        default: break;
-    }
-
-    Super::emitOperandImpl(inst, outerPrec);
-}
-
 void CUDASourceEmitter::emitCall(const HLSLIntrinsic* specOp, IRInst* inst, const IRUse* operands, int numOperands, const EmitOpInfo& inOuterPrec)
 {
     switch (specOp->op)

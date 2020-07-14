@@ -343,6 +343,25 @@ namespace Slang
         }
     }
 
+    // Similar to addParam, but instead of appending `param` to the end
+    // of the parameter list, this function inserts `param` before the
+    // head of the list.
+    void IRBlock::insertParamAtHead(IRParam* param)
+    {
+        if (auto firstParam = getFirstParam())
+        {
+            param->insertBefore(firstParam);
+        }
+        else if (auto firstOrdinary = getFirstOrdinaryInst())
+        {
+            param->insertBefore(firstOrdinary);
+        }
+        else
+        {
+            param->insertAtEnd(this);
+        }
+    }
+
     IRInst* IRBlock::getFirstOrdinaryInst()
     {
         // Find the last parameter (if any) of the block
@@ -3030,6 +3049,17 @@ namespace Slang
         return param;
     }
 
+    IRParam* IRBuilder::emitParamAtHead(
+        IRType* type)
+    {
+        auto param = createParam(type);
+        if (auto bb = getBlock())
+        {
+            bb->insertParamAtHead(param);
+        }
+        return param;
+    }
+
     IRVar* IRBuilder::emitVar(
         IRType*         type)
     {
@@ -3622,6 +3652,29 @@ namespace Slang
         return inst;
     }
 
+    IRInst* IRBuilder::emitAdd(IRType* type, IRInst* left, IRInst* right)
+    {
+        auto inst = createInst<IRInst>(
+            this,
+            kIROp_Add,
+            type,
+            left,
+            right);
+        addInst(inst);
+        return inst;
+    }
+
+    IRInst* IRBuilder::emitMul(IRType* type, IRInst* left, IRInst* right)
+    {
+        auto inst = createInst<IRInst>(
+            this,
+            kIROp_Mul,
+            type,
+            left,
+            right);
+        addInst(inst);
+        return inst;
+    }
 
 
     //

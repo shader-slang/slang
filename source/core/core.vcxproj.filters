@@ -93,6 +93,9 @@
     <ClInclude Include="slang-shared-library.h">
       <Filter>Header Files</Filter>
     </ClInclude>
+    <ClInclude Include="slang-short-list.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
     <ClInclude Include="slang-smart-pointer.h">
       <Filter>Header Files</Filter>
     </ClInclude>
@@ -136,9 +139,6 @@
       <Filter>Header Files</Filter>
     </ClInclude>
     <ClInclude Include="windows\slang-win-visual-studio-util.h">
-      <Filter>Header Files</Filter>
-    </ClInclude>
-    <ClInclude Include="slang-short-list.h">
       <Filter>Header Files</Filter>
     </ClInclude>
   </ItemGroup>
