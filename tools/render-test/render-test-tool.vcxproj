@@ -98,8 +98,8 @@
     <ClCompile>
       <PrecompiledHeader>NotUsing</PrecompiledHeader>
       <WarningLevel>Level3</WarningLevel>
-      <PreprocessorDefinitions>_DEBUG;SLANG_SHARED_LIBRARY_TOOL;RENDER_TEST_CUDA;RENDER_TEST_OPTIX;%(PreprocessorDefinitions)</PreprocessorDefinitions>
-      <AdditionalIncludeDirectories>..\..;..\..\external;..\..\source;..\gfx;C:\Program Files\NVIDIA GPU Computing Toolkit\CUDA\v10.2\include;C:\Program Files\NVIDIA GPU Computing Toolkit\CUDA\v10.2\common\inc;C:\ProgramData\NVIDIA Corporation\OptiX SDK 7.0.0\include;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <PreprocessorDefinitions>_DEBUG;SLANG_SHARED_LIBRARY_TOOL;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+      <AdditionalIncludeDirectories>..\..;..\..\external;..\..\source;..\gfx;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
       <DebugInformationFormat>EditAndContinue</DebugInformationFormat>
       <Optimization>Disabled</Optimization>
       <RuntimeLibrary>MultiThreadedDebug</RuntimeLibrary>
@@ -107,8 +107,6 @@
     <Link>
       <SubSystem>Windows</SubSystem>
       <GenerateDebugInformation>true</GenerateDebugInformation>
-      <AdditionalDependencies>cuda.lib;cudart.lib;%(AdditionalDependencies)</AdditionalDependencies>
-      <AdditionalLibraryDirectories>C:\Program Files\NVIDIA GPU Computing Toolkit\CUDA\v10.2\lib\Win32;%(AdditionalLibraryDirectories)</AdditionalLibraryDirectories>
       <ImportLibrary>..\..\bin\windows-x86\debug\render-test-tool.lib</ImportLibrary>
     </Link>
     <PostBuildEvent>
@@ -119,8 +117,8 @@
     <ClCompile>
       <PrecompiledHeader>NotUsing</PrecompiledHeader>
       <WarningLevel>Level3</WarningLevel>
-      <PreprocessorDefinitions>_DEBUG;SLANG_SHARED_LIBRARY_TOOL;RENDER_TEST_CUDA;RENDER_TEST_OPTIX;%(PreprocessorDefinitions)</PreprocessorDefinitions>
-      <AdditionalIncludeDirectories>..\..;..\..\external;..\..\source;..\gfx;C:\Program Files\NVIDIA GPU Computing Toolkit\CUDA\v10.2\include;C:\Program Files\NVIDIA GPU Computing Toolkit\CUDA\v10.2\common\inc;C:\ProgramData\NVIDIA Corporation\OptiX SDK 7.0.0\include;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <PreprocessorDefinitions>_DEBUG;SLANG_SHARED_LIBRARY_TOOL;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+      <AdditionalIncludeDirectories>..\..;..\..\external;..\..\source;..\gfx;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
       <DebugInformationFormat>EditAndContinue</DebugInformationFormat>
       <Optimization>Disabled</Optimization>
       <RuntimeLibrary>MultiThreadedDebug</RuntimeLibrary>
@@ -128,8 +126,6 @@
     <Link>
       <SubSystem>Windows</SubSystem>
       <GenerateDebugInformation>true</GenerateDebugInformation>
-      <AdditionalDependencies>cuda.lib;cudart.lib;%(AdditionalDependencies)</AdditionalDependencies>
-      <AdditionalLibraryDirectories>C:\Program Files\NVIDIA GPU Computing Toolkit\CUDA\v10.2\lib\x64;%(AdditionalLibraryDirectories)</AdditionalLibraryDirectories>
       <ImportLibrary>..\..\bin\windows-x64\debug\render-test-tool.lib</ImportLibrary>
     </Link>
     <PostBuildEvent>
@@ -140,8 +136,8 @@
     <ClCompile>
       <PrecompiledHeader>NotUsing</PrecompiledHeader>
       <WarningLevel>Level3</WarningLevel>
-      <PreprocessorDefinitions>NDEBUG;SLANG_SHARED_LIBRARY_TOOL;RENDER_TEST_CUDA;RENDER_TEST_OPTIX;%(PreprocessorDefinitions)</PreprocessorDefinitions>
-      <AdditionalIncludeDirectories>..\..;..\..\external;..\..\source;..\gfx;C:\Program Files\NVIDIA GPU Computing Toolkit\CUDA\v10.2\include;C:\Program Files\NVIDIA GPU Computing Toolkit\CUDA\v10.2\common\inc;C:\ProgramData\NVIDIA Corporation\OptiX SDK 7.0.0\include;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <PreprocessorDefinitions>NDEBUG;SLANG_SHARED_LIBRARY_TOOL;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+      <AdditionalIncludeDirectories>..\..;..\..\external;..\..\source;..\gfx;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
       <Optimization>Full</Optimization>
       <FunctionLevelLinking>true</FunctionLevelLinking>
       <IntrinsicFunctions>true</IntrinsicFunctions>
@@ -153,8 +149,6 @@
       <SubSystem>Windows</SubSystem>
       <EnableCOMDATFolding>true</EnableCOMDATFolding>
       <OptimizeReferences>true</OptimizeReferences>
-      <AdditionalDependencies>cuda.lib;cudart.lib;%(AdditionalDependencies)</AdditionalDependencies>
-      <AdditionalLibraryDirectories>C:\Program Files\NVIDIA GPU Computing Toolkit\CUDA\v10.2\lib\Win32;%(AdditionalLibraryDirectories)</AdditionalLibraryDirectories>
       <ImportLibrary>..\..\bin\windows-x86\release\render-test-tool.lib</ImportLibrary>
     </Link>
     <PostBuildEvent>
@@ -165,8 +159,8 @@
     <ClCompile>
       <PrecompiledHeader>NotUsing</PrecompiledHeader>
       <WarningLevel>Level3</WarningLevel>
-      <PreprocessorDefinitions>NDEBUG;SLANG_SHARED_LIBRARY_TOOL;RENDER_TEST_CUDA;RENDER_TEST_OPTIX;%(PreprocessorDefinitions)</PreprocessorDefinitions>
-      <AdditionalIncludeDirectories>..\..;..\..\external;..\..\source;..\gfx;C:\Program Files\NVIDIA GPU Computing Toolkit\CUDA\v10.2\include;C:\Program Files\NVIDIA GPU Computing Toolkit\CUDA\v10.2\common\inc;C:\ProgramData\NVIDIA Corporation\OptiX SDK 7.0.0\include;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <PreprocessorDefinitions>NDEBUG;SLANG_SHARED_LIBRARY_TOOL;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+      <AdditionalIncludeDirectories>..\..;..\..\external;..\..\source;..\gfx;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
       <Optimization>Full</Optimization>
       <FunctionLevelLinking>true</FunctionLevelLinking>
       <IntrinsicFunctions>true</IntrinsicFunctions>
@@ -178,8 +172,6 @@
       <SubSystem>Windows</SubSystem>
       <EnableCOMDATFolding>true</EnableCOMDATFolding>
       <OptimizeReferences>true</OptimizeReferences>
-      <AdditionalDependencies>cuda.lib;cudart.lib;%(AdditionalDependencies)</AdditionalDependencies>
-      <AdditionalLibraryDirectories>C:\Program Files\NVIDIA GPU Computing Toolkit\CUDA\v10.2\lib\x64;%(AdditionalLibraryDirectories)</AdditionalLibraryDirectories>
       <ImportLibrary>..\..\bin\windows-x64\release\render-test-tool.lib</ImportLibrary>
     </Link>
     <PostBuildEvent>
@@ -189,7 +181,6 @@
   <ItemGroup>
     <ClInclude Include="bind-location.h" />
     <ClInclude Include="cpu-compute-util.h" />
-    <ClInclude Include="cuda\cuda-compute-util.h" />
     <ClInclude Include="options.h" />
     <ClInclude Include="png-serialize-util.h" />
     <ClInclude Include="shader-input-layout.h" />
@@ -200,7 +191,6 @@
   <ItemGroup>
     <ClCompile Include="bind-location.cpp" />
     <ClCompile Include="cpu-compute-util.cpp" />
-    <ClCompile Include="cuda\cuda-compute-util.cpp" />
     <ClCompile Include="options.cpp" />
     <ClCompile Include="png-serialize-util.cpp" />
     <ClCompile Include="render-test-main.cpp" />

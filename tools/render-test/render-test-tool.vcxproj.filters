@@ -15,9 +15,6 @@
     <ClInclude Include="cpu-compute-util.h">
       <Filter>Header Files</Filter>
     </ClInclude>
-    <ClInclude Include="cuda\cuda-compute-util.h">
-      <Filter>Header Files</Filter>
-    </ClInclude>
     <ClInclude Include="options.h">
       <Filter>Header Files</Filter>
     </ClInclude>
@@ -42,9 +39,6 @@
       <Filter>Source Files</Filter>
     </ClCompile>
     <ClCompile Include="cpu-compute-util.cpp">
-      <Filter>Source Files</Filter>
-    </ClCompile>
-    <ClCompile Include="cuda\cuda-compute-util.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
     <ClCompile Include="options.cpp">

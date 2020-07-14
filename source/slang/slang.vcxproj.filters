@@ -1,4 +1,4 @@
-﻿<?xml version="1.0" encoding="utf-8"?>
+<?xml version="1.0" encoding="utf-8"?>
 <Project ToolsVersion="4.0" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
   <ItemGroup>
     <Filter Include="Header Files">
@@ -132,7 +132,16 @@
     <ClInclude Include="slang-ir-dominators.h">
       <Filter>Header Files</Filter>
     </ClInclude>
+    <ClInclude Include="slang-ir-entry-point-raw-ptr-params.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
     <ClInclude Include="slang-ir-entry-point-uniforms.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="slang-ir-explicit-global-context.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="slang-ir-explicit-global-init.h">
       <Filter>Header Files</Filter>
     </ClInclude>
     <ClInclude Include="slang-ir-glsl-legalize.h">
@@ -279,13 +288,6 @@
     <ClInclude Include="slang-visitor.h">
       <Filter>Header Files</Filter>
     </ClInclude>
-    <ClInclude Include="slang-ir-explicit-global-context.h">
-      <Filter>Header Files</Filter>
-    </ClInclude>
-    <ClInclude Include="slang-ir-entry-point-raw-ptr-params.h">
-      <Filter>Header Files</Filter>
-    </ClInclude>
-    <ClInclude Include="slang-ir-explicit-global-init.h" />
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="slang-ast-builder.cpp">
@@ -411,7 +413,16 @@
     <ClCompile Include="slang-ir-dominators.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
+    <ClCompile Include="slang-ir-entry-point-raw-ptr-params.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
     <ClCompile Include="slang-ir-entry-point-uniforms.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="slang-ir-explicit-global-context.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="slang-ir-explicit-global-init.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
     <ClCompile Include="slang-ir-glsl-legalize.cpp">
@@ -552,13 +563,6 @@
     <ClCompile Include="slang.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
-    <ClCompile Include="slang-ir-explicit-global-context.cpp">
-      <Filter>Source Files</Filter>
-    </ClCompile>
-    <ClCompile Include="slang-ir-entry-point-raw-ptr-params.cpp">
-      <Filter>Source Files</Filter>
-    </ClCompile>
-    <ClCompile Include="slang-ir-explicit-global-init.cpp" />
   </ItemGroup>
   <ItemGroup>
     <CustomBuild Include="core.meta.slang">
