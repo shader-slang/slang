@@ -698,10 +698,11 @@ standardProject "slangc"
     links { "core", "slang" }
 
 tool "run-generators"
-    kind "ConsoleApp"
+    kind "Utility"
+    group "run-generators"
     
     -- We include these, even though they are not really part of the dummy 
-    -- build, so that the filters below can pick up the appropriate locations
+    -- build, so that the filters below can pick up the appropriate locations.
     
     files
     {
@@ -715,6 +716,11 @@ tool "run-generators"
     --
     dependson { "slang-cpp-extractor", "slang-generate"  }
     
+    local executableSuffix = "";
+    if(os.target() == "windows") then
+        executableSuffix = ".exe";
+    end
+        
     -- We need to run the C++ extractor to generate some include files
     if executeBinary then
         filter "files:**/slang-ast-reflect.h"
@@ -741,11 +747,6 @@ tool "run-generators"
             -- Specify the files output by the extactor - so custom action will run when these files are needed.
             --
             buildoutputs { sourcePath .. "slang-ast-generated.h", sourcePath .. "slang-ast-generated-macro.h"}
-            
-            local executableSuffix = "";
-            if(os.target() == "windows") then
-                executableSuffix = ".exe";
-            end
             
             -- Make it depend on the extractor tool itself
             local buildInputTable = { "%{cfg.targetdir}/slang-cpp-extractor" .. executableSuffix }
@@ -792,10 +793,6 @@ tool "run-generators"
             -- that the target platform will use. Premake might have a built-in way to
             -- query this, but I couldn't find it, so I am just winging it for now:
             --
-            local executableSuffix = "";
-            if(os.target() == "windows") then
-                executableSuffix = ".exe";
-            end
             --
             buildinputs { "%{cfg.targetdir}/slang-generate" .. executableSuffix }
     end
