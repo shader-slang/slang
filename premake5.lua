@@ -697,77 +697,24 @@ standardProject "slangc"
     kind "ConsoleApp"
     links { "core", "slang" }
 
---
--- TODO: Slang's current `Makefile` build does some careful incantations
--- to make sure that the binaries it generates use a "relative `RPATH`"
--- for loading shared libraries, so that Slang is not dependent on
--- being installed to a fixed path on end-user machines. Before we
--- can use Premake for the Linux build (or eventually MacOS) we would
--- need to figure out how to replicate this incantation in premake.
---
-
---
--- Now that we've gotten all the simple projects out of the way, it is time
--- to get into the more serious build steps.
---
--- First up is the `slang` dynamic library project:
---
-
-standardProject "slang"
-    uuid "DB00DA62-0533-4AFD-B59F-A67D5B3A0808"
-    kind "SharedLib"
-    links { "core" }
-    warnings "Extra"
-    flags { "FatalWarnings" }
-
-    -- The way that we currently configure things through `slang.h`,
-    -- we need to set a preprocessor definitions to ensure that
-    -- we declare the Slang API functions for *export* and not *import*.
-    --
-    defines { "SLANG_DYNAMIC_EXPORT" }
-
-    includedirs { "external/spirv-headers/include" }
-
-    -- On some tests with MSBuild disabling these made build work.
-    -- flags { "NoIncrementalLink", "NoPCH", "NoMinimalRebuild" }
-
-    -- The `standardProject` operation already added all the code in
-    -- `source/slang/*`, but we also want to incldue the umbrella
-    -- `slang.h` header in this prject, so we do that manually here.
-    files { "slang.h" }
-
-    files { "source/core/core.natvis" }
- 
-    -- 
-    -- The most challenging part of building `slang` is that we need
-    -- to invoke the `slang-generate`tools to generate the version
-    -- of the Slang standard library that we embed into the compiler.
-    -- We need to build the `slang-cpp-extractor` for similar reasons.
-    --
+tool "run-generators"
+    kind "ConsoleApp"
+    
+    -- We include these, even though they are not really part of the dummy 
+    -- build, so that the filters below can pick up the appropriate locations
+    
+    files
+    {
+        "source/slang/*.meta.slang",            -- The stdlib files
+        "source/slang/slang-ast-reflect.h",     -- The C++ reflection 
+    }
+    
     -- First, we need to ensure that `slang-generate`/`slang-cpp-extactor` 
     -- gets built before `slang`, so we declare a non-linking dependency between
     -- the projects here:
     --
     dependson { "slang-cpp-extractor", "slang-generate"  }
     
-    -- If we are not building glslang from source, then be
-    -- sure to copy a binary copy over to the output directory
-    if not buildGlslang then
-        filter { "system:windows" }
-            postbuildcommands {
-                "{COPY} ../../external/slang-binaries/bin/" .. targetName .. "/slang-glslang.dll %{cfg.targetdir}"
-            }
-
-        filter { "system:linux" }
-            postbuildcommands {
-                "{COPY} ../../../external/slang-binaries/bin/" .. targetName .. "/libslang-glslang.so %{cfg.targetdir}"
-            }
-    end
-
-    filter { "system:linux" }
-        -- might be able to do pic(true)
-        buildoptions{"-fPIC"}
-       
     -- We need to run the C++ extractor to generate some include files
     if executeBinary then
         filter "files:**/slang-ast-reflect.h"
@@ -852,9 +799,76 @@ standardProject "slang"
             --
             buildinputs { "%{cfg.targetdir}/slang-generate" .. executableSuffix }
     end
+    
+    
+--
+-- TODO: Slang's current `Makefile` build does some careful incantations
+-- to make sure that the binaries it generates use a "relative `RPATH`"
+-- for loading shared libraries, so that Slang is not dependent on
+-- being installed to a fixed path on end-user machines. Before we
+-- can use Premake for the Linux build (or eventually MacOS) we would
+-- need to figure out how to replicate this incantation in premake.
+--
 
+--
+-- Now that we've gotten all the simple projects out of the way, it is time
+-- to get into the more serious build steps.
+--
+-- First up is the `slang` dynamic library project:
+--
 
+standardProject "slang"
+    uuid "DB00DA62-0533-4AFD-B59F-A67D5B3A0808"
+    kind "SharedLib"
+    links { "core" }
+    warnings "Extra"
+    flags { "FatalWarnings" }
 
+    -- The way that we currently configure things through `slang.h`,
+    -- we need to set a preprocessor definitions to ensure that
+    -- we declare the Slang API functions for *export* and not *import*.
+    --
+    defines { "SLANG_DYNAMIC_EXPORT" }
+
+    includedirs { "external/spirv-headers/include" }
+
+    -- On some tests with MSBuild disabling these made build work.
+    -- flags { "NoIncrementalLink", "NoPCH", "NoMinimalRebuild" }
+
+    -- The `standardProject` operation already added all the code in
+    -- `source/slang/*`, but we also want to incldue the umbrella
+    -- `slang.h` header in this prject, so we do that manually here.
+    files { "slang.h" }
+
+    files { "source/core/core.natvis" }
+ 
+    -- 
+    -- The most challenging part of building `slang` is that we need
+    -- to invoke generators such as slang-cpp-extractor and slang-generate
+    -- to generate. We do this by executing the run-generators 'dummy' project
+    -- which produces the appropriate source 
+    
+    dependson { "run-generators" }
+    
+    -- If we are not building glslang from source, then be
+    -- sure to copy a binary copy over to the output directory
+    if not buildGlslang then
+        filter { "system:windows" }
+            postbuildcommands {
+                "{COPY} ../../external/slang-binaries/bin/" .. targetName .. "/slang-glslang.dll %{cfg.targetdir}"
+            }
+
+        filter { "system:linux" }
+            postbuildcommands {
+                "{COPY} ../../../external/slang-binaries/bin/" .. targetName .. "/libslang-glslang.so %{cfg.targetdir}"
+            }
+    end
+
+    filter { "system:linux" }
+        -- might be able to do pic(true)
+        buildoptions{"-fPIC"}
+       
+    
 if enableProfile then
     tool "slang-profile"
         uuid "375CC87D-F34A-4DF1-9607-C5C990FD6227"
