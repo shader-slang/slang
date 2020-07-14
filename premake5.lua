@@ -783,7 +783,7 @@ tool "run-generators"
             -- This needs to be specified because the custom action will only
             -- run when this file needs to be generated.
             --
-            buildoutputs { "%{file.relpath}.h" }
+            buildoutputs { "%{file.abspath}.h" }
 
             -- We will specify an additional build input dependency on the `slang-generate`
             -- tool itself, so that changes to the code for the tool cause the generation
