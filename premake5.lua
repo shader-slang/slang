@@ -783,6 +783,14 @@ tool "run-generators"
             -- This needs to be specified because the custom action will only
             -- run when this file needs to be generated.
             --
+            -- Note the use of abspath here, this ensures windows tests the correct file, otherwise
+            -- triggering doesn't work. The problem still remains on linux, because abspath *isn't* an 
+            -- absolute path, it remains relative. 
+            --
+            -- TODO(JS):
+            -- It's not clear how to determine how to create the absolute path on linux, using 
+            -- path.absolutepath, requires knowing the path to be relative to, and it's neither 
+            -- the current path, the source path or the targetpath.
             buildoutputs { "%{file.abspath}.h" }
 
             -- We will specify an additional build input dependency on the `slang-generate`
