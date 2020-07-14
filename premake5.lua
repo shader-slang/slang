@@ -698,7 +698,7 @@ standardProject "slangc"
     links { "core", "slang" }
 
 tool "run-generators"
-    kind "Utility"
+    kind "StaticLib"
     group "run-generators"
     
     -- We include these, even though they are not really part of the dummy 
