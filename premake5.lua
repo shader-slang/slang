@@ -766,11 +766,8 @@ tool "run-generators"
     --
     if executeBinary then
         filter "files:**.meta.slang"
-            -- abspath isn't an absolute path in linux, so we use the explicit function
-            local absPath = path.getabsolute("%{file.abspath}")
-        
             -- Specify the "friendly" message that should print to the build log for the action
-            buildmessage("slang-generate %{file.relpath} ABS %{file.abspath} " .. absPath)
+            buildmessage "slang-generate %{file.relpath}"
             
             -- Specify the actual command to run for this action.
             --
