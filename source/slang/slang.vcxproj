@@ -232,6 +232,7 @@
     <ClInclude Include="slang-ir-entry-point-uniforms.h" />
     <ClInclude Include="slang-ir-explicit-global-context.h" />
     <ClInclude Include="slang-ir-explicit-global-init.h" />
+    <ClInclude Include="slang-ir-generics-lowering-context.h" />
     <ClInclude Include="slang-ir-glsl-legalize.h" />
     <ClInclude Include="slang-ir-inline.h" />
     <ClInclude Include="slang-ir-inst-defs.h" />
@@ -239,6 +240,9 @@
     <ClInclude Include="slang-ir-layout.h" />
     <ClInclude Include="slang-ir-legalize-varying-params.h" />
     <ClInclude Include="slang-ir-link.h" />
+    <ClInclude Include="slang-ir-lower-generic-call.h" />
+    <ClInclude Include="slang-ir-lower-generic-function.h" />
+    <ClInclude Include="slang-ir-lower-generic-var.h" />
     <ClInclude Include="slang-ir-lower-generics.h" />
     <ClInclude Include="slang-ir-missing-return.h" />
     <ClInclude Include="slang-ir-restructure-scoping.h" />
@@ -327,12 +331,16 @@
     <ClCompile Include="slang-ir-entry-point-uniforms.cpp" />
     <ClCompile Include="slang-ir-explicit-global-context.cpp" />
     <ClCompile Include="slang-ir-explicit-global-init.cpp" />
+    <ClCompile Include="slang-ir-generics-lowering-context.cpp" />
     <ClCompile Include="slang-ir-glsl-legalize.cpp" />
     <ClCompile Include="slang-ir-inline.cpp" />
     <ClCompile Include="slang-ir-layout.cpp" />
     <ClCompile Include="slang-ir-legalize-types.cpp" />
     <ClCompile Include="slang-ir-legalize-varying-params.cpp" />
     <ClCompile Include="slang-ir-link.cpp" />
+    <ClCompile Include="slang-ir-lower-generic-call.cpp" />
+    <ClCompile Include="slang-ir-lower-generic-function.cpp" />
+    <ClCompile Include="slang-ir-lower-generic-var.cpp" />
     <ClCompile Include="slang-ir-lower-generics.cpp" />
     <ClCompile Include="slang-ir-missing-return.cpp" />
     <ClCompile Include="slang-ir-restructure-scoping.cpp" />

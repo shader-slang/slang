@@ -25,8 +25,12 @@ INST(Nop, nop, 0, 0)
     INST_RANGE(BasicType, VoidType, AfterBaseType)
 
     INST(StringType, String, 0, 0)
+
     INST(RawPointerType, RawPointerType, 0, 0)
     INST(RTTIPointerType, RTTIPointerType, 1, 0)
+    INST(AfterRawPointerTypeBase, AfterRawPointerTypeBase, 0, 0)
+    INST_RANGE(RawPointerTypeBase, RawPointerType, AfterRawPointerTypeBase)
+
 
     /* ArrayTypeBase */
         INST(ArrayType, Array, 2, 0)

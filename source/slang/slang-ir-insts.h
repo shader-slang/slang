@@ -1483,6 +1483,11 @@ struct IRWitnessTable : IRInst
         return getOperand(0);
     }
 
+    void setConformanceType(IRInst* type)
+    {
+        setOperand(0, type);
+    }
+
     IR_LEAF_ISA(WitnessTable)
 };
 
