@@ -1,6 +1,8 @@
 // slang-ir-lower-generics.h
 #pragma once
 
+#include "slang-ir.h"
+
 namespace Slang
 {
     struct IRModule;

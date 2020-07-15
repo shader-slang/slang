@@ -1110,8 +1110,14 @@ SIMPLE_IR_TYPE(OutType, OutTypeBase)
 SIMPLE_IR_TYPE(InOutType, OutTypeBase)
 SIMPLE_IR_TYPE(ExistentialBoxType, PtrTypeBase)
 
+    /// The base class of RawPointerType and RTTIPointerType.
+struct IRRawPointerTypeBase : IRType
+{
+    IR_PARENT_ISA(RawPointerTypeBase);
+};
+
     /// Represents a pointer to an object of unknown type.
-struct IRRawPointerType : IRType
+struct IRRawPointerType : IRRawPointerTypeBase
 {
     IR_LEAF_ISA(RawPointerType)
 };
@@ -1119,7 +1125,7 @@ struct IRRawPointerType : IRType
     /// Represents a pointer to an object whose type is determined at runtime,
     /// with type information available through `rttiOperand`.
     ///
-struct IRRTTIPointerType : IRRawPointerType
+struct IRRTTIPointerType : IRRawPointerTypeBase
 {
     IRInst* getRTTIOperand() { return getOperand(0); }
     IR_LEAF_ISA(RTTIPointerType)
