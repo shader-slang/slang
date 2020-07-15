@@ -122,7 +122,8 @@ namespace Slang
                 auto paramType = param->getDataType();
                 if (auto ptrType = as<IRPtrTypeBase>(paramType))
                     paramType = ptrType->getValueType();
-                if (isPointerOfType(paramType->getDataType(), kIROp_RTTIType))
+                if (isPointerOfType(paramType->getDataType(), kIROp_RTTIType) ||
+                    paramType->op == kIROp_lookup_interface_method)
                 {
                     // Lower into a function parameter of raw pointer type.
                     param->setFullType(builder.getRawPointerType());
@@ -277,6 +278,7 @@ namespace Slang
             // Update the type of lookupInst to the lowered type of the corresponding interface requirement val.
 
             // If the requirement is a function, interfaceRequirementVal will be the lowered function type.
+            // If the requirement is an associatedtype, interfaceRequirementVal will be Ptr<RTTIObject>.
             IRInst* interfaceRequirementVal = nullptr;
             auto witnessTableType = cast<IRWitnessTableType>(lookupInst->getWitnessTable()->getDataType());
             auto interfaceType = maybeLowerInterfaceType(cast<IRInterfaceType>(witnessTableType->getConformanceType()));
