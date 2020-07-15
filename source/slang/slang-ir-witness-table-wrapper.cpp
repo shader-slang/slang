@@ -50,7 +50,7 @@ namespace Slang
             builder->setInsertInto(block);
 
             ShortList<IRParam*> params;
-            for (int i = 0; i < funcTypeInInterface->getParamCount(); i++)
+            for (UInt i = 0; i < funcTypeInInterface->getParamCount(); i++)
             {
                 params.add(builder->emitParam(funcTypeInInterface->getParamType(i)));
             }
