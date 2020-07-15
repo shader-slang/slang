@@ -406,7 +406,8 @@ protected:
         m_paramLayout = as<IRVarLayout>(paramLayoutDecoration->getLayout());
         SLANG_ASSERT(m_paramLayout);
 
-        // TODO: We need to detect and skip parameters here that are not varying.
+        if(!isVaryingParameter(m_paramLayout))
+            return;
 
         // TODO: The GLSL-specific variant of this pass has several
         // special cases that handle entry-point parameters for things like
