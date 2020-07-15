@@ -135,7 +135,16 @@
     <ClInclude Include="slang-ir-dominators.h">
       <Filter>Header Files</Filter>
     </ClInclude>
+    <ClInclude Include="slang-ir-entry-point-raw-ptr-params.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
     <ClInclude Include="slang-ir-entry-point-uniforms.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="slang-ir-explicit-global-context.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="slang-ir-explicit-global-init.h">
       <Filter>Header Files</Filter>
     </ClInclude>
     <ClInclude Include="slang-ir-glsl-legalize.h">
@@ -407,7 +416,16 @@
     <ClCompile Include="slang-ir-dominators.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
+    <ClCompile Include="slang-ir-entry-point-raw-ptr-params.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
     <ClCompile Include="slang-ir-entry-point-uniforms.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="slang-ir-explicit-global-context.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="slang-ir-explicit-global-init.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
     <ClCompile Include="slang-ir-glsl-legalize.cpp">
