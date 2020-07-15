@@ -5,6 +5,7 @@
 #include "slang-ir-lower-generic-function.h"
 #include "slang-ir-lower-generic-call.h"
 #include "slang-ir-lower-generic-var.h"
+#include "slang-ir-witness-table-wrapper.h"
 
 namespace Slang
 {
@@ -16,5 +17,6 @@ namespace Slang
         lowerGenericFunctions(&sharedContext);
         lowerGenericCalls(&sharedContext);
         lowerGenericVar(&sharedContext);
+        generateWitnessTableWrapperFunctions(&sharedContext);
     }
 } // namespace Slang

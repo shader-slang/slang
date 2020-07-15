@@ -1467,24 +1467,6 @@ UnownedStringSlice CPPSourceEmitter::_getFuncName(const HLSLIntrinsic* specOp)
     return m_slicePool.getSlice(handle);
 }
 
-UnownedStringSlice CPPSourceEmitter::_getWitnessTableWrapperFuncName(IRFunc* func)
-{
-    StringSlicePool::Handle handle = StringSlicePool::kNullHandle;
-    if (m_witnessTableWrapperFuncNameMap.TryGetValue(func, handle))
-    {
-        return m_slicePool.getSlice(handle);
-    }
-
-    StringBuilder builder;
-    builder << getName(func) << "_wtwrapper";
-
-    handle = m_slicePool.add(builder);
-    m_witnessTableWrapperFuncNameMap.Add(func, handle);
-
-    SLANG_ASSERT(handle != StringSlicePool::kNullHandle);
-    return m_slicePool.getSlice(handle);
-}
-
 SlangResult CPPSourceEmitter::calcFuncName(const HLSLIntrinsic* specOp, StringBuilder& outBuilder)
 {
     typedef HLSLIntrinsic::Op Op;
@@ -1629,122 +1611,6 @@ void CPPSourceEmitter::emitWitnessTable(IRWitnessTable* witnessTable)
     pendingWitnessTableDefinitions.add(witnessTable);
 }
 
-void CPPSourceEmitter::_emitWitnessTableWrappers()
-{
-    for (auto witnessTable : pendingWitnessTableDefinitions)
-    {
-        auto interfaceType = cast<IRInterfaceType>(witnessTable->getOperand(0));
-        for (auto child : witnessTable->getChildren())
-        {
-            if (auto entry = as<IRWitnessTableEntry>(child))
-            {
-                if (auto funcVal = as<IRFunc>(entry->getSatisfyingVal()))
-                {
-                    IRInst* requirementVal = nullptr;
-                    for (UInt i = 0; i < interfaceType->getOperandCount(); i++)
-                    {
-                        if (auto reqEntry = as<IRInterfaceRequirementEntry>(interfaceType->getOperand(i)))
-                        {
-                            if (reqEntry->getRequirementKey() == entry->getRequirementKey())
-                            {
-                                requirementVal = reqEntry->getRequirementVal();
-                                break;
-                            }
-                        }
-                    }
-                    SLANG_ASSERT(requirementVal != nullptr);
-                    IRFuncType* requirementFuncType = cast<IRFuncType>(requirementVal);
-                    emitType(funcVal->getResultType());
-                    m_writer->emit(" ");
-                    m_writer->emit(_getWitnessTableWrapperFuncName(funcVal));
-                    m_writer->emit("(");
-                    // Emit parameter list.
-                    {
-                        bool isFirst = true;
-                        SLANG_ASSERT(funcVal->getParamCount() == requirementFuncType->getParamCount());
-                        auto pp = funcVal->getParams().begin();
-                        for (UInt i = 0; i < requirementFuncType->getParamCount(); ++i, ++pp)
-                        {
-                            auto paramType = requirementFuncType->getParamType(i);
-
-                            if (as<IRTypeType>(paramType))
-                                continue;
-
-                            if (isFirst)
-                                isFirst = false;
-                            else
-                                m_writer->emit(",");
-                            emitParamType(paramType, getName(*pp));
-                        }
-                    }
-                    m_writer->emit(")\n{\n");
-                    m_writer->indent();
-                    m_writer->emit("return ");
-                    m_writer->emit(getName(funcVal));
-                    m_writer->emit("(");
-                    // Emit argument list.
-                    {
-                        bool isFirst = true;
-                        UInt paramIndex = 0;
-                        for (auto defParamIter = funcVal->getParams().begin();
-                            defParamIter!=funcVal->getParams().end();
-                            ++defParamIter, ++paramIndex)
-                        {
-                            auto param = *defParamIter;
-                            auto reqParamType = requirementFuncType->getParamType(paramIndex);
-                            if (as<IRTypeType>(param->getFullType()))
-                                continue;
-
-                            if (isFirst)
-                                isFirst = false;
-                            else
-                                m_writer->emit(", ");
-
-                            // If the implementation expects a concrete type
-                            // (either in the form of a pointer for `out`/`inout` parameters,
-                            // or in the form a a value for `in` parameters, while
-                            // the interface exposes a raw pointer type (void*),
-                            // we need to cast the raw pointer type to the appropriate
-                            // concerete type. (void*->Concrete* / void*->Concrete&).
-                            if (reqParamType->op == kIROp_RawPointerType &&
-                                param->getDataType()->op != kIROp_RawPointerType)
-                            {
-                                if (as<IRPtrTypeBase>(param->getFullType()))
-                                {
-                                    // The implementation function expects a pointer to the
-                                    // concrete type. This is the case for inout/out parameters.
-                                    m_writer->emit("static_cast<");
-                                    emitType(param->getFullType());
-                                    m_writer->emit(">(");
-                                    m_writer->emit(getName(param));
-                                    m_writer->emit(")");
-                                }
-                                else
-                                {
-                                    // The implementation function expects just a value of the
-                                    // concrete type. We need to insert a dereference in this case.
-                                    m_writer->emit("*static_cast<");
-                                    emitType(param->getFullType());
-                                    m_writer->emit("*>(");
-                                    m_writer->emit(getName(param));
-                                    m_writer->emit(")");
-                                }
-                            }
-                            else
-                            {
-                                m_writer->emit(getName(param));
-                            }
-                        }
-                    }
-                    m_writer->emit(");\n");
-                    m_writer->dedent();
-                    m_writer->emit("}\n");
-                }
-            }
-        }
-    }
-}
-
 void CPPSourceEmitter::_emitWitnessTableDefinitions()
 {
     for (auto witnessTable : pendingWitnessTableDefinitions)
@@ -1768,7 +1634,7 @@ void CPPSourceEmitter::_emitWitnessTableDefinitions()
                     isFirstEntry = false;
 
                 m_writer->emit("&KernelContext::");
-                m_writer->emit(_getWitnessTableWrapperFuncName(funcVal));
+                m_writer->emit(getName(funcVal));
             }
             else if (auto witnessTableVal = as<IRWitnessTable>(entry->getSatisfyingVal()))
             {
@@ -1779,9 +1645,18 @@ void CPPSourceEmitter::_emitWitnessTableDefinitions()
                 m_writer->emit("&");
                 m_writer->emit(getName(witnessTableVal));
             }
+            else if (entry->getSatisfyingVal() &&
+                     isPointerOfType(entry->getSatisfyingVal()->getDataType(), kIROp_RTTIType))
+            {
+                if (!isFirstEntry)
+                    m_writer->emit(",\n");
+                else
+                    isFirstEntry = false;
+                emitInstExpr(entry->getSatisfyingVal(), getInfo(EmitOp::General));
+            }
             else
             {
-                // TODO: handle other witness table entry types.
+                SLANG_UNEXPECTED("unknown witnesstable entry type");
             }
         }
         m_writer->dedent();
@@ -1855,6 +1730,12 @@ void CPPSourceEmitter::_maybeEmitWitnessTableTypeDefinition(
         {
             emitType((IRType*)witnessTableType->getConformanceType());
             m_writer->emit("* ");
+            m_writer->emit(getName(entry->getRequirementKey()));
+            m_writer->emit(";\n");
+        }
+        else if (isPointerOfType(entry->getRequirementVal(), kIROp_RTTIType))
+        {
+            m_writer->emit("TypeInfo* ");
             m_writer->emit(getName(entry->getRequirementKey()));
             m_writer->emit(";\n");
         }
@@ -2347,6 +2228,15 @@ bool CPPSourceEmitter::tryEmitInstExprImpl(IRInst* inst, const EmitOpInfo& inOut
             m_writer->emit("->typeSize)");
             return true;
         }
+        case kIROp_BitCast:
+        {
+            m_writer->emit("((");
+            emitType(inst->getDataType());
+            m_writer->emit(")(");
+            emitOperand(inst->getOperand(0), getInfo(EmitOp::General));
+            m_writer->emit("))");
+            return true;
+        }
     }
 }
 
@@ -2813,11 +2703,6 @@ void CPPSourceEmitter::emitModuleImpl(IRModule* module)
                 emitGlobalInst(action.inst);
             }
         }
-
-        // Emit wrapper functions for each witness table entry.
-        // These wrapper functions takes an abstract type parameter (void*)
-        // in the place of `this` parameter.
-        _emitWitnessTableWrappers();
 
         m_writer->dedent();
         m_writer->emit("};\n\n");   
