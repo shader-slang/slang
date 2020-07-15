@@ -84,11 +84,6 @@ protected:
 
     void _emitForwardDeclarations(const List<EmitAction>& actions);
 
-        /// Find the IR global parameters representing the entry-point and global shader parameters (if any)
-    void _findShaderParams(
-        IRGlobalParam** outEntryPointParam,
-        IRGlobalParam** outGlobalParam);
-
     void _emitAryDefinition(const HLSLIntrinsic* specOp);
 
     // Really we don't want any of these defined like they are here, they should be defined in slang stdlib 
@@ -115,7 +110,7 @@ protected:
     
     SlangResult _calcCPPTextureTypeName(IRTextureTypeBase* texType, StringBuilder& outName);
 
-    void _emitEntryPointDefinitionStart(IRFunc* func, IRGlobalParam* entryPointParams, IRGlobalParam* globalParams, const String& funcName, const UnownedStringSlice& varyingTypeName);
+    void _emitEntryPointDefinitionStart(IRFunc* func, const String& funcName, const UnownedStringSlice& varyingTypeName);
     void _emitEntryPointDefinitionEnd(IRFunc* func);
     void _emitEntryPointGroup(const Int sizeAlongAxis[kThreadGroupAxisCount], const String& funcName);
     void _emitEntryPointGroupRange(const Int sizeAlongAxis[kThreadGroupAxisCount], const String& funcName);
