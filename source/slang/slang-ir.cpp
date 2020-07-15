@@ -2919,7 +2919,7 @@ namespace Slang
         IRStructType* structType = createInst<IRStructType>(
             this,
             kIROp_StructType,
-            nullptr);
+            getTypeKind());
         addGlobalValue(this, structType);
         return structType;
     }
@@ -2929,7 +2929,7 @@ namespace Slang
         IRInterfaceType* interfaceType = createInst<IRInterfaceType>(
             this,
             kIROp_InterfaceType,
-            nullptr,
+            getTypeKind(),
             operandCount,
             operands);
         addGlobalValue(this, interfaceType);
