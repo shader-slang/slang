@@ -29,7 +29,6 @@ platform:
 
 configuration:
   - Release
-  - Debug
 
 # In the interests of time, go ahead and immediately fail a build
 # if any job fails, rather than keep on building to discover the
@@ -55,18 +54,7 @@ build:
 
 test_script:
   - ps: |
-      if ($env:CONFIGURATION -eq "Debug")
-      {
-        $testCategory = "smoke"
-      }
-      elseif($env:PLATFORM -eq "x64")
-      {
-        $testCategory = "full"
-      }
-      else
-      {
-        $testCategory = "quick"
-      }
+      $testCategory = "quick"
       .\test.bat -platform %PLATFORM% -configuration %CONFIGURATION% -appveyor -category $testCategory
 
 # Package up the stuff we want to deploy into a single .zip file
