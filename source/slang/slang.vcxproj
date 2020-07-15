@@ -227,7 +227,10 @@
     <ClInclude Include="slang-ir-constexpr.h" />
     <ClInclude Include="slang-ir-dce.h" />
     <ClInclude Include="slang-ir-dominators.h" />
+    <ClInclude Include="slang-ir-entry-point-raw-ptr-params.h" />
     <ClInclude Include="slang-ir-entry-point-uniforms.h" />
+    <ClInclude Include="slang-ir-explicit-global-context.h" />
+    <ClInclude Include="slang-ir-explicit-global-init.h" />
     <ClInclude Include="slang-ir-generics-lowering-context.h" />
     <ClInclude Include="slang-ir-glsl-legalize.h" />
     <ClInclude Include="slang-ir-inline.h" />
@@ -323,7 +326,10 @@
     <ClCompile Include="slang-ir-constexpr.cpp" />
     <ClCompile Include="slang-ir-dce.cpp" />
     <ClCompile Include="slang-ir-dominators.cpp" />
+    <ClCompile Include="slang-ir-entry-point-raw-ptr-params.cpp" />
     <ClCompile Include="slang-ir-entry-point-uniforms.cpp" />
+    <ClCompile Include="slang-ir-explicit-global-context.cpp" />
+    <ClCompile Include="slang-ir-explicit-global-init.cpp" />
     <ClCompile Include="slang-ir-generics-lowering-context.cpp" />
     <ClCompile Include="slang-ir-glsl-legalize.cpp" />
     <ClCompile Include="slang-ir-inline.cpp" />
@@ -428,4 +434,4 @@
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">
   </ImportGroup>
-</Project> 
+</Project>

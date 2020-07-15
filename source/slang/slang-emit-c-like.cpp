@@ -2341,16 +2341,20 @@ void CLikeSourceEmitter::defaultEmitInstExpr(IRInst* inst, const EmitOpInfo& inO
 
     case kIROp_BitCast:
         {
-            // TODO: we can simplify the logic for arbitrary bitcasts
-            // by always bitcasting the source to a `uint*` type (if it
-            // isn't already) and then bitcasting that to the destination
-            // type (if it isn't already `uint*`.
+            // Note: we are currently emitting casts as plain old
+            // C-style casts, which may not always perform a bitcast.
             //
-            // For now we are assuming the source type is *already*
-            // a `uint*` type of the appropriate size.
-            //
-            //  auto fromType = extractBaseType(inst->getOperand(0)->getDataType());
+            // TODO: This operation should map to an intrinsic to be
+            // provided in a prelude for C/C++, so that the target
+            // can easily emit code for whatever the best possible
+            // bitcast is on the platform.
          
+            auto prec = getInfo(EmitOp::Prefix);
+            needClose = maybeEmitParens(outerPrec, prec);
+
+            m_writer->emit("(");
+            emitType(inst->getDataType());
+            m_writer->emit(")");
             m_writer->emit("(");
             emitOperand(inst->getOperand(0), getInfo(EmitOp::General));
             m_writer->emit(")");
