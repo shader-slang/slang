@@ -264,6 +264,9 @@ end
 -- First, we will define a helper routine for adding all
 -- the relevant files from a given directory path:
 --
+-- Note that this does not work recursively 
+-- so projects that spread their source over multiple
+-- directories will need to take more steps.
 function addSourceDir(path)
     files
     {
@@ -286,6 +289,10 @@ end
 -- is nested in `source/`, so we'd (indirectly) call:
 --
 --      baseSlangProject("slangc", "source/slangc")
+--
+-- NOTE! This function does not add any source from the sourceDir
+-- add the source after calling this function with 'addSourceDir', or 
+-- use `baseSlangProjectAddFiles`
 --
 function baseSlangProject(name, sourceDir)
 
@@ -331,15 +338,6 @@ function baseSlangProject(name, sourceDir)
     --
     language "C++"
 
-    -- Since we know the project directory, we can go ahead
-    -- and add any source files locate there.
-    --
-    -- Note that we do *not* recurse into subdirectories,
-    -- so projects that spread their source over multiple
-    -- directories will need to take more steps.
-    --
-    addSourceDir(sourceDir)
-
     -- By default, Premake generates VS project files that
     -- reflect the directory structure of the source code.
     -- While this is nice in principle, it creates messy
@@ -372,7 +370,23 @@ function baseSlangProject(name, sourceDir)
     end
 end
 
--- We can now use the `baseSlangProject()` subroutine to
+function baseSlangProjectAddFiles(name, sourceDir)
+    
+    --
+    -- Set up the base project
+    --
+
+    baseSlangProject(name, sourceDir)
+    
+    --
+    -- Add the files in the sourceDir
+    -- NOTE! This doesn't recursively add files in subdirectories
+    --
+    
+    addSourceDir(sourceDir)
+end
+
+-- We can now use the `baseSlangProjectAddFiles()` subroutine to
 -- define helpers for the different categories of project
 -- in our source tree.
 --
@@ -395,8 +409,8 @@ function tool(name)
     -- Now we invoke our shared project configuration logic,
     -- specifying that the project lives under the `tools/` path.
     --
-    baseSlangProject(name, "tools/" .. name)
-
+    baseSlangProjectAddFiles(name, "tools/" .. name)
+    
     -- Finally, we set the project "kind" to produce a console
     -- application. This is a reasonable default for tools,
     -- and it can be overriden because Premake is stateful,
@@ -420,14 +434,14 @@ function standardProject(name)
 
     -- A standard project has its code under `source/`
     --
-    baseSlangProject(name, "source/" .. name)
+    baseSlangProjectAddFiles(name, "source/" .. name)
 end
 
 function toolSharedLibrary(name)
     group "test-tool"
     -- specifying that the project lives under the `tools/` path.
     --
-    baseSlangProject(name .. "-tool", "tools/" .. name)
+    baseSlangProjectAddFiles(name .. "-tool", "tools/" .. name)
     
     defines { "SLANG_SHARED_LIBRARY_TOOL" }
    
@@ -441,7 +455,7 @@ function example(name)
     group "examples"
 
     -- They have their source code under `examples/<project-name>/`
-    baseSlangProject(name, "examples/" .. name)
+    baseSlangProjectAddFiles(name, "examples/" .. name)
 
     -- By default, all of our examples are GUI applications. One some
     -- platforms there is no meaningful distinction between GUI and
@@ -464,6 +478,30 @@ function example(name)
     -- rather than in each example.
     links { "slang", "core", "gfx" }
 end
+
+--
+-- Create a project that is used as a build step, typically to 
+-- build items needed for other dependencies
+---
+    
+function generatorProject(name, sourcePath)
+    -- We use the `group` command here to specify that the
+    -- next project we create shold be placed into a group
+    -- named "generator" in a generated IDE solution/workspace.
+    --
+    -- This is used in the generated Visual Studio solution
+    -- to group all the tools projects together in a logical
+    -- sub-directory of the solution.
+    --
+    group "generator"
+
+    -- Set up the project, but do NOT add any source files.
+    baseSlangProject(name, sourcePath)
+
+    -- For now we just use static lib to force something
+    -- to build. 
+    kind "StaticLib"
+end   
 
 if isTargetWindows then
     --
@@ -521,7 +559,7 @@ standardProject "core"
     -- We need the core library to be relocatable to be able to link with slang.so
     filter { "system:linux" }
         buildoptions{"-fPIC"}
-    
+
 --
 -- The cpp extractor is a tool that scans C++ header files to extract
 -- reflection like information, and generate files to handle 
@@ -696,11 +734,12 @@ standardProject "slangc"
     uuid "D56CBCEB-1EB5-4CA8-AEC4-48EA35ED61C7"
     kind "ConsoleApp"
     links { "core", "slang" }
-
-tool "run-generators"
-    -- This project doesn't build a useful static lib. It is only set up this way 
-    -- as it was a requirement of triggering across linux/windows 
-    kind "StaticLib"
+    
+    
+generatorProject("run-generators", "source/slang/")
+    
+    -- We make 'source/slang' the location of the source, to make paths to source
+    -- relative to that
     
     -- We include these, even though they are not really part of the dummy 
     -- build, so that the filters below can pick up the appropriate locations.
@@ -709,6 +748,14 @@ tool "run-generators"
     {
         "source/slang/*.meta.slang",            -- The stdlib files
         "source/slang/slang-ast-reflect.h",     -- The C++ reflection 
+        
+        --
+        -- To build we need to have some source! It has to be a source file that 
+        -- does not depend on anything that is generated, so we take something
+        -- from core that will compile without any generation. 
+        --
+       
+        "source/core/slang-string.cpp",          
     }
     
     -- First, we need to ensure that `slang-generate`/`slang-cpp-extactor` 
