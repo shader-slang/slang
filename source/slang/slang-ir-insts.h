@@ -1124,6 +1124,10 @@ struct IRVarLayout : IRLayout
     };
 };
 
+bool isVaryingResourceKind(LayoutResourceKind kind);
+bool isVaryingParameter(IRTypeLayout* typeLayout);
+bool isVaryingParameter(IRVarLayout* varLayout);
+
     /// Associate layout information with an instruction.
     ///
     /// This decoration is used in three main ways:
@@ -1402,6 +1406,8 @@ struct IRVar : IRInst
 /// blocks nested inside this value.
 struct IRGlobalVar : IRGlobalValueWithCode
 {
+    IR_LEAF_ISA(GlobalVar)
+
     IRPtrType* getDataType()
     {
         return cast<IRPtrType>(IRInst::getDataType());
@@ -1475,6 +1481,11 @@ struct IRWitnessTable : IRInst
     IRInst* getConformanceType()
     {
         return getOperand(0);
+    }
+
+    void setConformanceType(IRInst* type)
+    {
+        setOperand(0, type);
     }
 
     IR_LEAF_ISA(WitnessTable)

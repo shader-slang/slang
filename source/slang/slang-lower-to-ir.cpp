@@ -5863,21 +5863,22 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
             IRInst* requirementVal = lowerDecl(subContext, requirementDecl).val;
             if (requirementVal)
             {
-                auto reqType = requirementVal->getFullType();
-                entry->setRequirementVal(reqType);
-                if (!requirementVal->hasUses())
+                switch (requirementVal->op)
+                {
+                case kIROp_Func:
+                case kIROp_Generic:
                 {
                     // Remove lowered `IRFunc`s since we only care about
                     // function types.
-                    switch (requirementVal->op)
-                    {
-                    case kIROp_Func:
-                    case kIROp_Generic:
+                    auto reqType = requirementVal->getFullType();
+                    entry->setRequirementVal(reqType);
+                    if (!requirementVal->hasUses())
                         requirementVal->removeAndDeallocate();
-                        break;
-                    default:
-                        break;
-                    }
+                    break;
+                }
+                default:
+                    entry->setRequirementVal(requirementVal);
+                    break;
                 }   
             }
             irInterface->setOperand(entryIndex, entry);

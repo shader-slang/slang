@@ -9,6 +9,9 @@
 #include "slang-ir-collect-global-uniforms.h"
 #include "slang-ir-dce.h"
 #include "slang-ir-entry-point-uniforms.h"
+#include "slang-ir-entry-point-raw-ptr-params.h"
+#include "slang-ir-explicit-global-context.h"
+#include "slang-ir-explicit-global-init.h"
 #include "slang-ir-glsl-legalize.h"
 #include "slang-ir-insts.h"
 #include "slang-ir-legalize-varying-params.h"
@@ -254,11 +257,42 @@ Result linkAndOptimizeIR(
     // parameters of a shader entry point and move them into
     // the global scope instead.
     //
-    moveEntryPointUniformParamsToGlobalScope(irModule);
-#if 0
-    dumpIRIfEnabled(compileRequest, irModule, "ENTRY POINT UNIFORMS MOVED");
-#endif
-    validateIRModuleIfEnabled(compileRequest, irModule);
+    // TODO: We should skip this step for CUDA targets.
+    //
+    {
+        CollectEntryPointUniformParamsOptions passOptions;
+        switch( target )
+        {
+        default:
+            break;
+
+        case CodeGenTarget::CPPSource:
+        case CodeGenTarget::CUDASource:
+            passOptions.alwaysCreateCollectedParam = true;
+            break;
+        }
+
+        collectEntryPointUniformParams(irModule, passOptions);
+    #if 0
+        dumpIRIfEnabled(compileRequest, irModule, "ENTRY POINT UNIFORMS COLLECTED");
+    #endif
+        validateIRModuleIfEnabled(compileRequest, irModule);
+    }
+
+    switch( target )
+    {
+    default:
+        moveEntryPointUniformParamsToGlobalScope(irModule);
+    #if 0
+        dumpIRIfEnabled(compileRequest, irModule, "ENTRY POINT UNIFORMS MOVED");
+    #endif
+        validateIRModuleIfEnabled(compileRequest, irModule);
+        break;
+
+    case CodeGenTarget::CPPSource:
+    case CodeGenTarget::CUDASource:
+        break;
+    }
 
 
     // Desguar any union types, since these will be illegal on
@@ -603,6 +637,24 @@ Result linkAndOptimizeIR(
         break;
 
     default:
+        break;
+    }
+
+
+    switch( target )
+    {
+    default:
+        break;
+
+    case CodeGenTarget::CPPSource:
+    case CodeGenTarget::CUDASource:
+        moveGlobalVarInitializationToEntryPoints(irModule);
+        introduceExplicitGlobalContext(irModule, target);
+        convertEntryPointPtrParamsToRawPtrs(irModule);
+    #if 0
+        dumpIRIfEnabled(compileRequest, irModule, "EXPLICIT GLOBAL CONTEXT INTRODUCED");
+    #endif
+        validateIRModuleIfEnabled(compileRequest, irModule);
         break;
     }
 
