@@ -1633,7 +1633,6 @@ void CPPSourceEmitter::_emitWitnessTableDefinitions()
                 else
                     isFirstEntry = false;
 
-                m_writer->emit("&KernelContext::");
                 m_writer->emit(getName(funcVal));
             }
             else if (auto witnessTableVal = as<IRWitnessTable>(entry->getSatisfyingVal()))
@@ -1705,7 +1704,7 @@ void CPPSourceEmitter::_maybeEmitWitnessTableTypeDefinition(
         if (auto funcVal = as<IRFuncType>(entry->getRequirementVal()))
         {
             emitType(funcVal->getResultType());
-            m_writer->emit(" (KernelContext::*");
+            m_writer->emit(" (*");
             m_writer->emit(getName(entry->getRequirementKey()));
             m_writer->emit(")");
             m_writer->emit("(");
@@ -1845,8 +1844,7 @@ void CPPSourceEmitter::emitSimpleFuncImpl(IRFunc* func)
         // on CPU/CUDA, and these all bottleneck through the actual `IRFunc`
         // here as a workhorse.
         //
-        // Because the workhorse function is currently emitted as a member of
-        // `KernelContext`, and doesn't have the right signature to service
+        // Because the workhorse function doesn't have the right signature to service
         // general-purpose calls, it is being emitted with a `_` prefix.
         //
         StringBuilder prefixName;
@@ -2169,15 +2167,6 @@ bool CPPSourceEmitter::tryEmitInstExprImpl(IRInst* inst, const EmitOpInfo& inOut
             // Does this function declare any requirements.
             handleCallExprDecorationsImpl(funcValue);
 
-            if (funcValue->op == kIROp_lookup_interface_method)
-            {
-                m_writer->emit("(this->*(");
-                emitOperand(funcValue, EmitOpInfo());
-                m_writer->emit("))");
-                _emitCallArgList(as<IRCall>(inst));
-                return true;
-            }
-
             // try doing automatically
             return _tryEmitInstExprAsIntrinsic(inst, inOuterPrec);
         }
@@ -2279,8 +2268,6 @@ void CPPSourceEmitter::emitPreprocessorDirectivesImpl()
         m_writer->emit("#ifdef SLANG_PRELUDE_NAMESPACE\n");
         m_writer->emit("using namespace SLANG_PRELUDE_NAMESPACE;\n");
         m_writer->emit("#endif\n\n");
-
-        m_writer->emit("struct KernelContext;\n\n");
     }
 
     if (m_target == CodeGenTarget::CSource)
@@ -2360,7 +2347,7 @@ static bool _isFunction(IROp op)
     return op == kIROp_Func;
 }
 
-void CPPSourceEmitter::_emitEntryPointDefinitionStart(IRFunc* func, IRGlobalParam* entryPointParams, IRGlobalParam* globalParams, const String& funcName, const UnownedStringSlice& varyingTypeName)
+void CPPSourceEmitter::_emitEntryPointDefinitionStart(IRFunc* func, const String& funcName, const UnownedStringSlice& varyingTypeName)
 {
     auto resultType = func->getResultType();
     
@@ -2378,31 +2365,6 @@ void CPPSourceEmitter::_emitEntryPointDefinitionStart(IRFunc* func, IRGlobalPara
     m_writer->emit("\n{\n");
 
     m_writer->indent();
-    // Initialize when constructing so that globals are zeroed
-    m_writer->emit("KernelContext context = {};\n");
-    
-    if (entryPointParams)
-    {
-        auto param = entryPointParams;
-        auto paramType = param->getDataType();
-
-        m_writer->emit("context.");
-        m_writer->emit(getName(param));
-        m_writer->emit(" =  (");
-        emitType(paramType);
-        m_writer->emit(")entryPointParams; \n");
-    }
-    if (globalParams)
-    {
-        auto param = globalParams;
-        auto paramType = param->getDataType();
-
-        m_writer->emit("context.");
-        m_writer->emit(getName(param));
-        m_writer->emit(" =  (");
-        emitType(paramType);
-        m_writer->emit(")globalParams; \n");
-    }
 }
 
 void CPPSourceEmitter::_emitEntryPointDefinitionEnd(IRFunc* func)
@@ -2467,9 +2429,9 @@ void CPPSourceEmitter::_emitEntryPointGroup(const Int sizeAlongAxis[kThreadGroup
     }
 
     // just call at inner loop point
-    m_writer->emit("context._");
+    m_writer->emit("_");
     m_writer->emit(funcName);
-    m_writer->emit("(&threadInput);\n");
+    m_writer->emit("(&threadInput, entryPointParams, globalParams);\n");
 
     // Close all the loops
     for (Index i = Index(axes.getCount() - 1); i >= 0; --i)
@@ -2565,97 +2527,6 @@ void CPPSourceEmitter::_emitForwardDeclarations(const List<EmitAction>& actions)
     }
 }
 
-static bool isVaryingResourceKind(LayoutResourceKind kind)
-{
-    switch(kind)
-    {
-    default:
-        return false;
-
-    case LayoutResourceKind::VaryingInput:
-    case LayoutResourceKind::VaryingOutput:
-        return true;
-    }
-}
-
-static bool isVaryingParameter(IRTypeLayout* typeLayout)
-{
-    for(auto sizeAttr : typeLayout->getSizeAttrs())
-    {
-        if(!isVaryingResourceKind(sizeAttr->getResourceKind()))
-            return false;
-    }
-    return true;
-}
-
-static bool isVaryingParameter(IRVarLayout* varLayout)
-{
-    return isVaryingParameter(varLayout->getTypeLayout());
-}
-
-void CPPSourceEmitter::_findShaderParams(
-    IRGlobalParam** outEntryPointParam,
-    IRGlobalParam** outGlobalParam)
-{
-    SLANG_ASSERT(outEntryPointParam);
-    SLANG_ASSERT(outGlobalParam);
-
-    IRGlobalParam*& entryPointParam = *outEntryPointParam;
-    IRGlobalParam*& globalParam = *outGlobalParam;
-
-    for(auto inst : m_irModule->getGlobalInsts())
-    {
-        auto param = as<IRGlobalParam>(inst);
-        if(!param)
-            continue;
-
-        if(auto layoutDecor = param->findDecoration<IRLayoutDecoration>())
-        {
-            if(auto varLayout = as<IRVarLayout>(layoutDecor->getLayout()))
-            {
-                if(isVaryingParameter(varLayout))
-                    continue;
-                auto typeLayout = varLayout->getTypeLayout();
-                if(typeLayout->findSizeAttr(LayoutResourceKind::VaryingInput))
-                    continue;
-                if(typeLayout->findSizeAttr(LayoutResourceKind::VaryingOutput))
-                    continue;
-            }
-        }
-
-        // Currently, the entry-point parameters
-        // are represented as a single parameter
-        // at the global scope, and the same is
-        // true of the parameters that were
-        // originally declared as globals.
-        //
-        // We need to find capture each of these
-        // parameters, and we need to tell them
-        // apart. Luckily, the logic that
-        // moved the entry-point parameters to
-        // global scope will ahve also marked
-        // the entry-point parameters with
-        // a decoration that we can detect.
-        //
-        if (inst->findDecorationImpl(kIROp_EntryPointParamDecoration))
-        {
-            // Should only be one instruction marked this way
-            SLANG_ASSERT(entryPointParam == nullptr);
-            entryPointParam = param;
-            continue;
-        }
-        else
-        {
-            // There should only be one instruction representing
-            // the global-scope shader parameters.
-            //
-            SLANG_ASSERT(globalParam == nullptr);
-            globalParam = param;
-            continue;
-        }
-    }
-}
-
 void CPPSourceEmitter::emitModuleImpl(IRModule* module)
 {
     // Setup all built in types used in the module
@@ -2668,24 +2539,8 @@ void CPPSourceEmitter::emitModuleImpl(IRModule* module)
     
     _emitForwardDeclarations(actions);
 
-    IRGlobalParam* entryPointParams = nullptr;
-    IRGlobalParam* globalParams = nullptr;
-    _findShaderParams(&entryPointParams, &globalParams);
     
-    // Output the 'Context' which will be used for execution
     {
-        m_writer->emit("struct KernelContext\n{\n");
-        m_writer->indent();
-
-        if (globalParams)
-        {
-            emitGlobalInst(globalParams);
-        }
-        if (entryPointParams)
-        {
-            emitGlobalInst(entryPointParams);
-        }
-
         // Output all the thread locals 
         for (auto action : actions)
         {
@@ -2703,9 +2558,6 @@ void CPPSourceEmitter::emitModuleImpl(IRModule* module)
                 emitGlobalInst(action.inst);
             }
         }
-
-        m_writer->dedent();
-        m_writer->emit("};\n\n");   
     }
 
     // Emit all witness table definitions.
@@ -2741,11 +2593,11 @@ void CPPSourceEmitter::emitModuleImpl(IRModule* module)
 
                     String threadFuncName = builder;
 
-                    _emitEntryPointDefinitionStart(func, entryPointParams, globalParams, threadFuncName, UnownedStringSlice::fromLiteral("ComputeThreadVaryingInput"));
+                    _emitEntryPointDefinitionStart(func, threadFuncName, UnownedStringSlice::fromLiteral("ComputeThreadVaryingInput"));
 
-                    m_writer->emit("context._");
+                    m_writer->emit("_");
                     m_writer->emit(funcName);
-                    m_writer->emit("(varyingInput);\n");
+                    m_writer->emit("(varyingInput, entryPointParams, globalParams);\n");
 
                     _emitEntryPointDefinitionEnd(func);
                 }
@@ -2758,7 +2610,7 @@ void CPPSourceEmitter::emitModuleImpl(IRModule* module)
 
                     String groupFuncName = builder;
 
-                    _emitEntryPointDefinitionStart(func, entryPointParams, globalParams, groupFuncName, UnownedStringSlice::fromLiteral("ComputeVaryingInput"));
+                    _emitEntryPointDefinitionStart(func, groupFuncName, UnownedStringSlice::fromLiteral("ComputeVaryingInput"));
 
                     m_writer->emit("ComputeThreadVaryingInput threadInput = {};\n");
                     m_writer->emit("threadInput.groupID = varyingInput->startGroupID;\n");
@@ -2769,7 +2621,7 @@ void CPPSourceEmitter::emitModuleImpl(IRModule* module)
 
                 // Emit the main version - which takes a dispatch size
                 {
-                    _emitEntryPointDefinitionStart(func, entryPointParams, globalParams, funcName, UnownedStringSlice::fromLiteral("ComputeVaryingInput"));
+                    _emitEntryPointDefinitionStart(func, funcName, UnownedStringSlice::fromLiteral("ComputeVaryingInput"));
 
                     m_writer->emit("ComputeVaryingInput vi = *varyingInput;\n");
                     m_writer->emit("ComputeVaryingInput groupVaryingInput = {};\n");
