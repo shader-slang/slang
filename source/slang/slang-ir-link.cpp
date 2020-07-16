@@ -1449,7 +1449,8 @@ LinkedIR linkIR(
     //
 
     List<IRFunc*> irEntryPoints;
-    for (auto entryPointIndex : entryPointIndices) {
+    for (auto entryPointIndex : entryPointIndices)
+    {
         auto entryPointMangledName = program->getEntryPointMangledName(entryPointIndex);
         irEntryPoints.add(specializeIRForEntryPoint(context, entryPointMangledName));
     }

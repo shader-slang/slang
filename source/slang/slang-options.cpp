@@ -143,7 +143,6 @@ struct OptionsParser
 
     SlangCompileFlags flags = 0;
 
-    //TODO(DG): Update this type?
     struct RawOutput
     {
         String          path;
@@ -1424,10 +1423,8 @@ struct OptionsParser
         //
         for(auto& rawOutput : rawOutputs)
         {
-            // For now, all output formats need to be tightly bound to
-            // both a target and an entry point (down the road we will
-            // need to support output formats that can store multiple
-            // entry points in one file).
+            // For now, most output formats need to be tightly bound to
+            // both a target and an entry point.
 
             // If an output doesn't have a target associated with
             // it, then search for the target with the matching format.
@@ -1464,6 +1461,9 @@ struct OptionsParser
                 if (rawOutput.targetIndex != -1 )
                 {
                     auto outputFormat = rawTargets[rawOutput.targetIndex].format;
+                    // Here we check whether the given output format supports multiple entry points
+                    // When we add targets with support for multiple entry points,
+                    // we should update this switch with those new formats
                     switch (outputFormat)
                     {
                     case CodeGenTarget::CPPSource:

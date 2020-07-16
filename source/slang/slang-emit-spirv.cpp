@@ -1115,7 +1115,7 @@ struct SPIRVEmitContext
 SlangResult emitSPIRVFromIR(
     BackEndCompileRequest*  compileRequest,
     IRModule*               irModule,
-    List<IRFunc*>           irEntryPoints,
+    const List<IRFunc*>&    irEntryPoints,
     List<uint8_t>&          spirvOut)
 {
     SLANG_UNUSED(compileRequest);
