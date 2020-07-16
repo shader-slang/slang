@@ -917,7 +917,6 @@ bool CLikeSourceEmitter::shouldFoldInstIntoUseSites(IRInst* inst)
     case kIROp_Param:
     case kIROp_Func:
     case kIROp_Alloca:
-    case kIROp_undefined:
         return false;
 
     // Always fold these in, because they are trivial
@@ -1073,6 +1072,15 @@ bool CLikeSourceEmitter::shouldFoldInstIntoUseSites(IRInst* inst)
     // in ways that require a temporary to be introduced.
     //
     if(inst->findDecoration<IRPreciseDecoration>())
+        return false;
+
+    // In general, undefined value should be emitted as an uninitialized
+    // variable, so we shouldn't fold it.
+    // However, we cannot emit all undefined values a separate variable
+    // definition for certain types on certain targets (e.g. `out TriangleStream<T>`
+    // for GLSL), so we check this only after all those special cases are
+    // considered.
+    if (inst->op == kIROp_undefined)
         return false;
 
     // Okay, at this point we know our instruction must have a single use.
