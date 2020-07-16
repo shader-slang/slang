@@ -805,7 +805,7 @@ SlangResult emitEntryPointSourceFromIR(
         //
         // TODO: do we want to emit directly from IR, or translate the
         // IR back into AST for emission?
-#if 0
+#if 1
         dumpIR(compileRequest, irModule, "PRE-EMIT");
 #endif
         sourceEmitter->emitModule(irModule);

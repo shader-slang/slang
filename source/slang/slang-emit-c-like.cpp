@@ -917,6 +917,7 @@ bool CLikeSourceEmitter::shouldFoldInstIntoUseSites(IRInst* inst)
     case kIROp_Param:
     case kIROp_Func:
     case kIROp_Alloca:
+    case kIROp_undefined:
         return false;
 
     // Always fold these in, because they are trivial
