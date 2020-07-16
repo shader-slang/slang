@@ -3437,6 +3437,11 @@ struct ExprLoweringVisitorBase : ExprVisitor<Derived, LoweredValInfo>
         UNREACHABLE_RETURN(LoweredValInfo());
     }
 
+    LoweredValInfo visitAssocTypeDecl(AssocTypeDecl* decl)
+    {
+        return LoweredValInfo::simple(context->irBuilder->getAssociatedType());
+    }
+
     LoweredValInfo visitAssignExpr(AssignExpr* expr)
     {
         // Because our representation of lowered "values"
