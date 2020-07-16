@@ -127,10 +127,21 @@ namespace Slang
             translateCallInst(callInst, funcType, loweredFunc, specializeInst);
         }
 
+        void lowerCallToInterfaceMethod(IRCall* callInst, IRLookupWitnessMethod* lookupInst)
+        {
+            // If we see a call(lookup_interface_method(...), ...), we need to translate
+            // all occurences of associatedtypes.
+            auto funcType = cast<IRFuncType>(lookupInst->getDataType());
+            auto loweredFunc = lookupInst;
+            translateCallInst(callInst, funcType, loweredFunc, nullptr);
+        }
+
         void lowerCall(IRCall* callInst)
         {
             if (auto specializeInst = as<IRSpecialize>(callInst->getCallee()))
                 lowerCallToSpecializedFunc(callInst, specializeInst);
+            else if (auto lookupInst = as<IRLookupWitnessMethod>(callInst->getCallee()))
+                lowerCallToInterfaceMethod(callInst, lookupInst);
         }
        
         void processInst(IRInst* inst)
