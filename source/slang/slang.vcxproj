@@ -259,6 +259,7 @@
     <ClInclude Include="slang-ir-type-set.h" />
     <ClInclude Include="slang-ir-union.h" />
     <ClInclude Include="slang-ir-validate.h" />
+    <ClInclude Include="slang-ir-witness-table-wrapper.h" />
     <ClInclude Include="slang-ir-wrap-structured-buffers.h" />
     <ClInclude Include="slang-ir.h" />
     <ClInclude Include="slang-legalize-types.h" />
@@ -357,6 +358,7 @@
     <ClCompile Include="slang-ir-type-set.cpp" />
     <ClCompile Include="slang-ir-union.cpp" />
     <ClCompile Include="slang-ir-validate.cpp" />
+    <ClCompile Include="slang-ir-witness-table-wrapper.cpp" />
     <ClCompile Include="slang-ir-wrap-structured-buffers.cpp" />
     <ClCompile Include="slang-ir.cpp" />
     <ClCompile Include="slang-legalize-types.cpp" />

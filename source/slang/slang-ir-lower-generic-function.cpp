@@ -212,6 +212,10 @@ namespace Slang
                     {
                         entry->setRequirementVal(lowerGenericFuncType(&builder, genericFuncType));
                     }
+                    else if (entry->getRequirementVal()->op == kIROp_AssociatedType)
+                    {
+                        entry->setRequirementVal(builder.getPtrType(builder.getRTTIType()));
+                    }
                 }
             }
 
