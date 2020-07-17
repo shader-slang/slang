@@ -20,6 +20,7 @@
 #include "slang-ir-restructure.h"
 #include "slang-ir-restructure-scoping.h"
 #include "slang-ir-specialize.h"
+#include "slang-ir-specialize-arrays.h"
 #include "slang-ir-specialize-resources.h"
 #include "slang-ir-ssa.h"
 #include "slang-ir-strip-witness-tables.h"
@@ -455,6 +456,14 @@ Result linkAndOptimizeIR(
     // pass down the target request along with the IR.
     //
     specializeResourceParameters(compileRequest, targetRequest, irModule);
+
+    // For GLSL targets, we also want to specialize calls to functions that
+    // takes array parameters if possible, to avoid performance issues on
+    // those platforms.
+    if (isKhronosTarget(targetRequest))
+    {
+        specializeArrayParameters(compileRequest, targetRequest, irModule);
+    }
 
 #if 0
     dumpIRIfEnabled(compileRequest, irModule, "AFTER RESOURCE SPECIALIZATION");
