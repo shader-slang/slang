@@ -954,7 +954,7 @@ namespace Slang
     {
         SLANG_ASSERT(argCount == getSpecializationParamCount());
 
-        SharedSemanticsContext semanticsContext(getLinkage(), sink);
+        SharedSemanticsContext semanticsContext(getLinkage(), this, sink);
         SemanticsVisitor visitor(&semanticsContext);
 
         RefPtr<Module::ModuleSpecializationInfo> specializationInfo = new Module::ModuleSpecializationInfo();
@@ -1129,7 +1129,7 @@ namespace Slang
     {
         auto linkage = componentType->getLinkage();
 
-        SharedSemanticsContext semanticsContext(linkage, sink);
+        SharedSemanticsContext semanticsContext(linkage, nullptr, sink);
         SemanticsVisitor semanticsVisitor(&semanticsContext);
 
         auto argCount = argExprs.getCount();
@@ -1152,7 +1152,7 @@ namespace Slang
         auto args = inArgs;
         auto argCount = inArgCount;
 
-        SharedSemanticsContext sharedSemanticsContext(getLinkage(), sink);
+        SharedSemanticsContext sharedSemanticsContext(getLinkage(), nullptr, sink);
         SemanticsVisitor visitor(&sharedSemanticsContext);
 
         // The first N arguments will be for the explicit generic parameters
@@ -1331,6 +1331,7 @@ namespace Slang
 
         SharedSemanticsContext sharedSemanticsContext(
             linkage,
+            nullptr,
             sink);
         SemanticsVisitor semantics(&sharedSemanticsContext);
 
@@ -1367,7 +1368,7 @@ namespace Slang
         // TODO: We should cache and re-use specialized types
         // when the exact same arguments are provided again later.
 
-        SharedSemanticsContext sharedSemanticsContext(this, sink);
+        SharedSemanticsContext sharedSemanticsContext(this, nullptr, sink);
         SemanticsVisitor visitor(&sharedSemanticsContext);
 
         SpecializationParams specializationParams;
@@ -1425,7 +1426,7 @@ namespace Slang
         // We have an appropriate number of arguments for the global specialization parameters,
         // and now we need to check that the arguments conform to the declared constraints.
         //
-        SharedSemanticsContext visitor(linkage, sink);
+        SharedSemanticsContext visitor(linkage, nullptr, sink);
 
         List<SpecializationArg> specializationArgs;
         _extractSpecializationArgs(unspecializedProgram, specializationArgExprs, specializationArgs, sink);
