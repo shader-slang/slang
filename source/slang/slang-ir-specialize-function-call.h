@@ -24,7 +24,7 @@ namespace Slang
     /// those resource parameters (and instead, e.g, refers to the
     /// global shader parameters directly).
     ///
-    void specializeFunctionCall(
+    void specializeFunctionCalls(
         BackEndCompileRequest* compileRequest,
         TargetRequest* targetRequest,
         IRModule* module,

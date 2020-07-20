@@ -47,7 +47,7 @@ void specializeArrayParameters(
     IRModule*       module)
 {
     ArrayParameterSpecializationCondition condition;
-    specializeFunctionCall(compileRequest, targetRequest, module, &condition);
+    specializeFunctionCalls(compileRequest, targetRequest, module, &condition);
 }
 
 } // namesapce Slang

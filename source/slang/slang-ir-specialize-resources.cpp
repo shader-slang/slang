@@ -79,7 +79,7 @@ void specializeResourceParameters(
 {
     ResourceParameterSpecializationCondition condition;
     condition.targetRequest = targetRequest;
-    specializeFunctionCall(compileRequest, targetRequest, module, &condition);
+    specializeFunctionCalls(compileRequest, targetRequest, module, &condition);
 }
 
 } // namesapce Slang

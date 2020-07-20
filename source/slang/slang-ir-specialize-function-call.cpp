@@ -812,7 +812,7 @@ struct FunctionParameterSpecializationContext
 // is straighforward. We set up the context object
 // and then defer to it for the real work.
 //
-void specializeFunctionCall(
+void specializeFunctionCalls(
     BackEndCompileRequest* compileRequest,
     TargetRequest*  targetRequest,
     IRModule*       module,
