@@ -230,8 +230,20 @@ struct ResourceParameterSpecializationContext
                 return true;
             if(as<IRByteAddressBufferTypeBase>(type))
                 return true;
+
+#if 0
+            // This code is disabled, and is part of the optimization `Specialize function calls involving array arguments. (#1389)` on github.
+            // 
+            // It is disabled here because it causes a problem when a struct is passed to a function that contains a structured buffer *and*
+            // an array. It is specialized on the struct type, and so those types become parameters to the function.
+            // If the struct contains a structured buffer this is a problem on GLSL/VK based targets because currently
+            // structured buffers cannot be function parameters.
+            //
+            // The fix for now is to just disable this optimization. 
+
             if (isStructTypeWithArray(type))
                 return true;
+#endif
         }
 
         // For now, we will not treat any other parameters as

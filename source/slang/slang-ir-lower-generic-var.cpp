@@ -19,12 +19,15 @@ namespace Slang
         void processVarInst(IRInst* varInst)
         {
             // We process only var declarations that have type
-            // `Ptr<IRParam>`.
+            // `Ptr<IRParam>` or `Ptr<IRLookupInterfaceMethod>`.
+            //
             // Due to the processing of `lowerGenericFunction`,
             // A local variable of generic type now appears as
-            // `var X:Ptr<irParam:Ptr<RTTIType>>`
+            // `var X:Ptr<y:Ptr<RTTIType>>`,
+            // where y can be an IRParam if it is a generic type,
+            // or an `lookup_interface_method` if it is an associated type.
             // We match this pattern and turn this inst into
-            // `X:RawPtr = alloca(rtti_extract_size(irParam))`
+            // `X:RTTIPtr(irParam) = alloca(irParam)`
             auto varTypeInst = varInst->getDataType();
             if (!varTypeInst)
                 return;
@@ -34,7 +37,7 @@ namespace Slang
 
             // `varTypeParam` represents a pointer to the RTTI object.
             auto varTypeParam = ptrType->getValueType();
-            if (varTypeParam->op != kIROp_Param)
+            if (varTypeParam->op != kIROp_Param && varTypeParam->op != kIROp_lookup_interface_method)
                 return;
             if (!varTypeParam->getDataType())
                 return;
