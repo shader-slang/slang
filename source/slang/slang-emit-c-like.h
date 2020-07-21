@@ -156,6 +156,8 @@ public:
     String scrubName(const String& name);
 
     String generateName(IRInst* inst);
+    virtual String generateEntryPointNameImpl(IREntryPointDecoration* entryPointDecor);
+
     String getName(IRInst* inst);
 
     void emitDeclarator(IRDeclaratorInfo* declarator);    
