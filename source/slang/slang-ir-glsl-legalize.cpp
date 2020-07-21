@@ -1775,4 +1775,17 @@ void legalizeEntryPointForGLSL(
     // the way that things have been moved around.
 }
 
+void legalizeEntryPointsForGLSL(
+    Session*                session,
+    IRModule*               module,
+    const List<IRFunc*>&    funcs,
+    DiagnosticSink*         sink,
+    GLSLExtensionTracker*   glslExtensionTracker)
+{
+    for (auto func : funcs)
+    {
+        legalizeEntryPointForGLSL(session, module, func, sink, glslExtensionTracker);
+    }
+}
+
 } // namespace Slang

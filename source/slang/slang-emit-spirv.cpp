@@ -1115,19 +1115,21 @@ struct SPIRVEmitContext
 SlangResult emitSPIRVFromIR(
     BackEndCompileRequest*  compileRequest,
     IRModule*               irModule,
-    IRFunc*                 irEntryPoint,
+    const List<IRFunc*>&    irEntryPoints,
     List<uint8_t>&          spirvOut)
 {
     SLANG_UNUSED(compileRequest);
     SLANG_UNUSED(irModule);
-    SLANG_UNUSED(irEntryPoint);
 
     spirvOut.clear();
 
     SPIRVEmitContext context;
     context.m_irModule = irModule;
     context.emitFrontMatter();
-    context.ensureInst(irEntryPoint);
+    for (auto irEntryPoint : irEntryPoints)
+    {
+        context.ensureInst(irEntryPoint);
+    }
     context.emitPhysicalLayout();
 
     spirvOut.addRange(

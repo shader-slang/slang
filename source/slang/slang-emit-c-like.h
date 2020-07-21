@@ -362,7 +362,7 @@ public:
     // in some very specific cases to determine how a construct
     // should map to GLSL.
     //
-    Stage m_entryPointStage;
+    Stage m_entryPointStage = Stage::Unknown;
 
     // The target language we want to generate code for
     CodeGenTarget m_target;
