@@ -1,7 +1,9 @@
 // shader.slang
 
 //TEST_INPUT:ubuffer(random(float, 4096, -1.0, 1.0), stride=4):name=ioBuffer
-RWStructuredBuffer<float> ioBuffer;
+//RWStructuredBuffer<float> ioBuffer;
+
+// There's some weird duplication going on here.  It's not clear how we should introduce UniformState
 
 [numthreads(4, 1, 1)]
 public void computeMain(uint3 dispatchThreadID : SV_DispatchThreadID)
@@ -12,8 +14,4 @@ public void computeMain(uint3 dispatchThreadID : SV_DispatchThreadID)
     float o = i < 0.5 ? (i + i) : sqrt(i);
 
     ioBuffer[tid] = o;
-}
-
-public int prepMain() {
-    return 5;
 }
