@@ -95,6 +95,9 @@ class TestContext
         /// If set, then tests are executed
     bool isExecuting() const { return testRequirements == nullptr; }
 
+        /// True if a render API filter is enabled
+    bool isRenderApiFilterEnabled() const { return options.enabledApis != Slang::RenderApiFlag::AllOf && options.enabledApis != 0; }
+
         /// Get compiler set
     Slang::DownstreamCompilerSet* getCompilerSet();
     Slang::DownstreamCompiler* getDefaultCompiler(SlangSourceLanguage sourceLanguage);

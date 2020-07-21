@@ -133,6 +133,10 @@ static bool _isSubCommand(const char* arg)
         {
             optionsOut->shouldBeVerbose = true;
         }
+        else if (strcmp(arg, "-hide-ignored") == 0)
+        {
+            optionsOut->hideIgnored = true;
+        }
         else if (strcmp(arg, "-verbose-paths") == 0)
         {
             optionsOut->verbosePaths = true;

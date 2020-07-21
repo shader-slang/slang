@@ -335,6 +335,9 @@ static TestResult _gatherTestOptions(
     }
 }
 
+
+static RenderApiFlags _getRequiredRenderApisByCommand(const UnownedStringSlice& name);
+
 // Try to read command-line options from the test file itself
 TestResult gatherTestsForFile(
     TestCategorySet*    categorySet,
@@ -378,10 +381,15 @@ TestResult gatherTestsForFile(
             testDetails.options.isEnabled = false;
         }
 
+
         if(match(&cursor, "TEST"))
         { 
             if(_gatherTestOptions(categorySet, &cursor, testDetails.options) != TestResult::Pass)
                 return TestResult::Fail;
+
+            // See if the type of test needs certain APIs available
+            const RenderApiFlags testRequiredApis = _getRequiredRenderApisByCommand(testDetails.options.command.getUnownedSlice());
+            testDetails.requirements.addUsedRenderApis(testRequiredApis);
 
             testList->tests.add(testDetails);
         }
@@ -2611,32 +2619,51 @@ struct TestCommandInfo
 {
     char const*     name;
     TestCallback    callback;
+    RenderApiFlags  requiredRenderApiFlags;     ///< An RenderApi types that are needed to run the tests
 };
 
 static const TestCommandInfo s_testCommandInfos[] =
 {
-    { "SIMPLE",                                 &runSimpleTest},
-    { "SIMPLE_EX",                              &runSimpleTest},
-    { "REFLECTION",                             &runReflectionTest},
-    { "CPU_REFLECTION",                         &runReflectionTest},
-    { "COMMAND_LINE_SIMPLE",                    &runSimpleCompareCommandLineTest},
-    { "COMPARE_HLSL",                           &runDXBCComparisonTest},
-    { "COMPARE_DXIL",                           &runDXILComparisonTest},
-    { "COMPARE_HLSL_RENDER",                    &runHLSLRenderComparisonTest},
-    { "COMPARE_HLSL_CROSS_COMPILE_RENDER",      &runHLSLCrossCompileRenderComparisonTest},
-    { "COMPARE_HLSL_GLSL_RENDER",               &runHLSLAndGLSLRenderComparisonTest},
-    { "COMPARE_COMPUTE",                        &runSlangComputeComparisonTest},
-    { "COMPARE_COMPUTE_EX",                     &runSlangComputeComparisonTestEx},
-    { "HLSL_COMPUTE",                           &runHLSLComputeTest},
-    { "COMPARE_RENDER_COMPUTE",                 &runSlangRenderComputeComparisonTest},
-    { "COMPARE_GLSL",                           &runGLSLComparisonTest},
-    { "CROSS_COMPILE",                          &runCrossCompilerTest},
-    { "CPP_COMPILER_EXECUTE",                   &runCPPCompilerExecute},
-    { "CPP_COMPILER_SHARED_LIBRARY",            &runCPPCompilerSharedLibrary},
-    { "CPP_COMPILER_COMPILE",                   &runCPPCompilerCompile},
-    { "PERFORMANCE_PROFILE",                    &runPerformanceProfile},
-    { "COMPILE",                                &runCompile},
+    { "SIMPLE",                                 &runSimpleTest,                             0 },
+    { "SIMPLE_EX",                              &runSimpleTest,                             0 },
+    { "REFLECTION",                             &runReflectionTest,                         0 },
+    { "CPU_REFLECTION",                         &runReflectionTest,                         0 },
+    { "COMMAND_LINE_SIMPLE",                    &runSimpleCompareCommandLineTest,           0 },
+    { "COMPARE_HLSL",                           &runDXBCComparisonTest,                     0 },
+    { "COMPARE_DXIL",                           &runDXILComparisonTest,                     0 },
+    { "COMPARE_HLSL_RENDER",                    &runHLSLRenderComparisonTest,               0 },
+    { "COMPARE_HLSL_CROSS_COMPILE_RENDER",      &runHLSLCrossCompileRenderComparisonTest,   0 },
+    { "COMPARE_HLSL_GLSL_RENDER",               &runHLSLAndGLSLRenderComparisonTest,        0 },
+    { "COMPARE_COMPUTE",                        &runSlangComputeComparisonTest,             0 },
+    { "COMPARE_COMPUTE_EX",                     &runSlangComputeComparisonTestEx,           0 },
+    { "HLSL_COMPUTE",                           &runHLSLComputeTest,                        0 },
+    { "COMPARE_RENDER_COMPUTE",                 &runSlangRenderComputeComparisonTest,       0 },
+    { "COMPARE_GLSL",                           &runGLSLComparisonTest,                     0 },
+    { "CROSS_COMPILE",                          &runCrossCompilerTest,                      0 },
+    { "CPP_COMPILER_EXECUTE",                   &runCPPCompilerExecute,                     RenderApiFlag::CPU},
+    { "CPP_COMPILER_SHARED_LIBRARY",            &runCPPCompilerSharedLibrary,               RenderApiFlag::CPU},
+    { "CPP_COMPILER_COMPILE",                   &runCPPCompilerCompile,                     RenderApiFlag::CPU},
+    { "PERFORMANCE_PROFILE",                    &runPerformanceProfile,                     0 },
+    { "COMPILE",                                &runCompile,                                0 },
 };
+
+const TestCommandInfo* _findTestCommandInfoByCommand(const UnownedStringSlice& name)
+{
+    for (const auto& command : s_testCommandInfos)
+    {
+        if (name == command.name)
+        {
+            return &command;
+        }
+    }
+    return nullptr;
+}
+
+static RenderApiFlags _getRequiredRenderApisByCommand(const UnownedStringSlice& name)
+{
+    auto info = _findTestCommandInfoByCommand(name);
+    return info ? info->requiredRenderApiFlags : 0;
+}
 
 TestResult runTest(
     TestContext*        context, 
@@ -2654,18 +2681,17 @@ TestResult runTest(
 
     const SpawnType defaultSpawnType = context->options.useExes ? SpawnType::UseExe : SpawnType::UseSharedLibrary;
 
-    for( const auto& command : s_testCommandInfos)
-    {
-        if(testOptions.command != command.name)
-            continue;
+    auto testInfo = _findTestCommandInfoByCommand(testOptions.command.getUnownedSlice());
 
+    if (testInfo)
+    {
         TestInput testInput;
         testInput.filePath = filePath;
         testInput.outputStem = outputStem;
         testInput.testOptions = &testOptions;
         testInput.spawnType = defaultSpawnType;
 
-        return command.callback(context, testInput);
+        return testInfo->callback(context, testInput);
     }
 
     // No actual test runner found!
@@ -2828,6 +2854,12 @@ static bool _canIgnore(TestContext* context, const TestDetails& details)
     }
 
     const auto& requirements = details.requirements;
+
+    // If the render api filter is enabled, the test must 
+    if (details.requirements.usedRenderApiFlags == 0 && context->isRenderApiFilterEnabled())
+    {
+        return true;
+    }
 
     // Work out what render api flags are available
     const RenderApiFlags availableRenderApiFlags = requirements.usedRenderApiFlags ? _getAvailableRenderApiFlags(context) : 0;
@@ -3237,6 +3269,7 @@ SlangResult innerMain(int argc, char** argv)
 
         reporter.m_dumpOutputOnFailure = options.dumpOutputOnFailure;
         reporter.m_isVerbose = options.shouldBeVerbose;
+        reporter.m_hideIgnored = options.hideIgnored;
 
         {
             TestReporter::SuiteScope suiteScope(&reporter, "tests");
@@ -3248,6 +3281,9 @@ SlangResult innerMain(int argc, char** argv)
 
         // Run the unit tests (these are internal C++ tests - not specified via files in a directory) 
         // They are registered with SLANG_UNIT_TEST macro
+        //
+        // We only run if a render filter is not enabled
+        if (!context.isRenderApiFilterEnabled())
         {
             TestReporter::SuiteScope suiteScope(&reporter, "unit tests");
             TestReporter::set(&reporter);
