@@ -1,7 +1,7 @@
 // shader.slang
 
 //TEST_INPUT:ubuffer(random(float, 4096, -1.0, 1.0), stride=4):name=ioBuffer
-//RWStructuredBuffer<float> ioBuffer;
+RWStructuredBuffer<float> ioBuffer;
 
 // There's some weird duplication going on here.  It's not clear how we should introduce UniformState
 
