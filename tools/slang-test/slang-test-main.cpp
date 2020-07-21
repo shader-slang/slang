@@ -46,6 +46,21 @@ struct TestOptions
         Diagnostic,         ///< Diagnostic tests will always run (as form of failure is being tested)  
     };
 
+    void addCategory(TestCategory* category)
+    {
+        if (categories.indexOf(category) < 0)
+        {
+            categories.add(category);
+        }
+    }
+    void addCategories(TestCategory*const* inCategories, Index count)
+    {
+        for (Index i = 0; i < count; ++i)
+        {
+            addCategory(inCategories[i]);
+        }
+    }
+
     Type type = Type::Normal;
 
     String command;
@@ -191,32 +206,29 @@ String collectRestOfLine(char const** ioCursor)
     return getString(textBegin, textEnd);
 }
 
-
-static TestResult _gatherTestOptions(
-    TestCategorySet*    categorySet, 
-    char const**    ioCursor,
-    TestOptions&    outOptions)
+static SlangResult _parseCategories(TestCategorySet* categorySet, char const** ioCursor, TestOptions& out)
 {
     char const* cursor = *ioCursor;
 
     // Right after the `TEST` keyword, the user may specify
     // one or more categories for the test.
-    if(*cursor == '(')
+    if (*cursor == '(')
     {
         cursor++;
         // optional test category
         skipHorizontalSpace(&cursor);
         char const* categoryStart = cursor;
-        for(;;)
+        for (;;)
         {
-            switch( *cursor )
+            switch (*cursor)
             {
-            default:
-                cursor++;
-                continue;
-
-            case ',':
-            case ')':
+                default:
+                {
+                    cursor++;
+                    continue;
+                }
+                case ',':
+                case ')':
                 {
                     char const* categoryEnd = cursor;
                     cursor++;
@@ -224,38 +236,52 @@ static TestResult _gatherTestOptions(
                     auto categoryName = getString(categoryStart, categoryEnd);
                     TestCategory* category = categorySet->find(categoryName);
 
-                    if(!category)
+                    if (!category)
                     {
-                        return TestResult::Fail;
+                        // Failure if we don't find the category
+                        return SLANG_FAIL;
                     }
-                    
 
-                    outOptions.categories.add(category);
+                    out.addCategory(category);
 
-                    if( *categoryEnd == ',' )
+                    if (*categoryEnd == ',')
                     {
                         skipHorizontalSpace(&cursor);
                         categoryStart = cursor;
                         continue;
                     }
+
+                    *ioCursor = cursor;
+                    return SLANG_OK;
                 }
-                break;
-        
-            case 0: case '\r': case '\n':
-                return TestResult::Fail;
+                case 0: case '\r': case '\n':
+                {
+                    return SLANG_FAIL;
+                }
             }
 
             break;
         }
     }
 
-    // If no categories were specified, then add the default category
-    if(outOptions.categories.getCount() == 0)
+    *ioCursor = cursor;
+    return SLANG_OK;
+}
+
+
+static TestResult _gatherTestOptions(
+    TestCategorySet*    categorySet, 
+    char const**    ioCursor,
+    TestOptions&    outOptions)
+{
+    if (SLANG_FAILED(_parseCategories(categorySet, ioCursor, outOptions)))
     {
-        outOptions.categories.add(categorySet->defaultCategory);
+        return TestResult::Fail;
     }
 
-    if(*cursor == ':')
+    char const* cursor = *ioCursor;
+
+     if(*cursor == ':')
         cursor++;
     else
     {
@@ -338,6 +364,21 @@ static TestResult _gatherTestOptions(
 
 static RenderApiFlags _getRequiredRenderApisByCommand(const UnownedStringSlice& name);
 
+static void _combineOptions(
+    TestCategorySet* categorySet,
+    const TestOptions& fileOptions,
+    TestOptions& ioOptions)
+{
+    // And the file categories
+    ioOptions.addCategories(fileOptions.categories.getBuffer(), fileOptions.categories.getCount());
+
+    // If no categories were specified, then add the default category
+    if (ioOptions.categories.getCount() == 0)
+    {
+        ioOptions.categories.add(categorySet->defaultCategory);
+    }
+}
+
 // Try to read command-line options from the test file itself
 TestResult gatherTestsForFile(
     TestCategorySet*    categorySet,
@@ -356,6 +397,9 @@ TestResult gatherTestsForFile(
 
     // Walk through the lines of the file, looking for test commands
     char const* cursor = fileContents.begin();
+
+    // Options that are specified across all tests in the file.
+    TestOptions fileOptions;
 
     while(*cursor)
     {
@@ -381,6 +425,13 @@ TestResult gatherTestsForFile(
             testDetails.options.isEnabled = false;
         }
 
+        if (match(&cursor, "TEST_CATEGORY"))
+        {
+            if (SLANG_FAILED(_parseCategories(categorySet, &cursor, fileOptions)))
+            {
+                return TestResult::Fail;
+            }
+        }
 
         if(match(&cursor, "TEST"))
         { 
@@ -391,12 +442,18 @@ TestResult gatherTestsForFile(
             const RenderApiFlags testRequiredApis = _getRequiredRenderApisByCommand(testDetails.options.command.getUnownedSlice());
             testDetails.requirements.addUsedRenderApis(testRequiredApis);
 
+            // Apply the file wide options
+            _combineOptions(categorySet, fileOptions, testDetails.options);
+
             testList->tests.add(testDetails);
         }
         else if (match(&cursor, "DIAGNOSTIC_TEST"))
         {
             if (_gatherTestOptions(categorySet, &cursor, testDetails.options) != TestResult::Pass)
                 return TestResult::Fail;
+
+            // Apply the file wide options
+            _combineOptions(categorySet, fileOptions, testDetails.options);
 
             // Mark that it is a diagnostic test
             testDetails.options.type = TestOptions::Type::Diagnostic;
@@ -3144,6 +3201,10 @@ SlangResult innerMain(int argc, char** argv)
     auto unitTestCatagory = categorySet.add("unit-test", fullTestCategory);
     auto cudaTestCategory = categorySet.add("cuda", fullTestCategory);
     auto optixTestCategory = categorySet.add("optix", cudaTestCategory);
+
+    auto waveTestCategory = categorySet.add("wave", fullTestCategory);
+    auto waveMaskCategory = categorySet.add("wave-mask", waveTestCategory);
+    auto waveActiveCategory = categorySet.add("wave-active", waveTestCategory);
 
     auto compatibilityIssueCategory = categorySet.add("compatibility-issue", fullTestCategory);
         
