@@ -264,6 +264,20 @@ SLANG_FORCE_INLINE int64_t I64_abs(int64_t f) { return (f < 0) ? -f : f; }
 SLANG_FORCE_INLINE int64_t I64_min(int64_t a, int64_t b) { return a < b ? a : b; }
 SLANG_FORCE_INLINE int64_t I64_max(int64_t a, int64_t b) { return a > b ? a : b; }
 
+
+// ----------------------------- Interlocked ---------------------------------
+#ifdef _WIN32
+#include <intrin.h>
+#endif
+
+void InterlockedAdd(uint32_t* dest, uint32_t value, uint32_t* oldValue)
+{
+#ifdef _WIN32
+    *oldValue = _InterlockedExchangeAdd((long*)dest, (long)value);
+#else
+    *oldValue = __sync_fetch_and_add(dest, value);
+#endif
+}
 #ifdef SLANG_PRELUDE_NAMESPACE
 } 
 #endif
