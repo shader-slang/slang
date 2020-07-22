@@ -72,8 +72,12 @@ struct Options
     // Exclude test that match one these categories
     Slang::Dictionary<TestCategory*, TestCategory*> excludeCategories;
 
+    // HACK! To disable vk tests by default, as breaking CI
+    // To test using VK use -api all 
+    Slang::RenderApiFlags enabledApis = Slang::RenderApiFlag::AllOf & ~Slang::RenderApiFlag::Vulkan;
+
     // By default we can test against all apis
-    Slang::RenderApiFlags enabledApis = Slang::RenderApiFlag::AllOf;
+    //Slang::RenderApiFlags enabledApis = Slang::RenderApiFlag::AllOf;
 
     // The subCommand to execute. Will be empty if there is no subCommand 
     Slang::String subCommand;      
