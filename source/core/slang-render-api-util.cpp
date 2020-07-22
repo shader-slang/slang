@@ -265,7 +265,13 @@ static bool _canLoadSharedLibrary(const char* libName)
     switch (type)
     {
         case RenderApiType::OpenGl:    return _canLoadSharedLibrary("opengl32");
-        case RenderApiType::Vulkan:    return _canLoadSharedLibrary("vulkan-1");
+
+// HACK(tfoley): Disabling all synthesis of Vulkan tests because
+// of CI failures related to driver versions.
+//
+// TODO: Re-enable Vulkan tests once we have a fix and/or workaround.
+//
+//        case RenderApiType::Vulkan:    return _canLoadSharedLibrary("vulkan-1");
         case RenderApiType::D3D11:     return _canLoadSharedLibrary("d3d11"); 
         case RenderApiType::D3D12:     return _canLoadSharedLibrary("d3d12");
         case RenderApiType::CPU:       return true;
