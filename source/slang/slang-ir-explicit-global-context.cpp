@@ -270,6 +270,15 @@ struct IntroduceExplicitGlobalContextPass
             //
             globalUniformsParam->insertBefore(firstOrdinary);
         }
+        else
+        {
+            // The nature of our current ABI for entry points on CPU/CUDA
+            // means that we need an explicit parameter to be *declared*
+            // for the global uniforms, even if it is never used.
+            //
+            auto placeholderParam = builder.createParam(builder.getRawPointerType());
+            placeholderParam->insertBefore(firstOrdinary);
+        }
 
         // The `KernelContext` to use inside the entry point
         // will be a local variable declared in the first block.
