@@ -758,11 +758,15 @@ Renderer* createVKRenderer()
 
 VKRenderer::~VKRenderer()
 {
-    waitForGpu();
+    // Check the device queue is valid else, we can't wait on it..
+    if (m_deviceQueue.isValid())
+    {
+        waitForGpu();
+    }
 
     m_currentPipeline.setNull();
 
-    // Same as clear but releases dtors all elements
+    // Same as clear but, also dtors all elements, which clear does not
     m_boundVertexBuffers = List<BoundVertexBuffer>();
 
     m_currentPipelineLayout.setNull();

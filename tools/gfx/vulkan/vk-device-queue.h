@@ -57,6 +57,9 @@ struct VulkanDeviceQueue
         /// Destroy the device queue
     void destroy();
 
+        /// True if the queue appears to be valid and has been initialized
+    bool isValid() const { return m_api != nullptr; }
+
         /// Dtor
     ~VulkanDeviceQueue();
 
