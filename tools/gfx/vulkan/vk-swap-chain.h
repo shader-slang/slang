@@ -94,6 +94,8 @@ struct VulkanSwapChain
         /// Get the next front render image index. Returns -1, if image couldn't be found
     int nextFrontImageIndex();
 
+    void destroy();
+
         /// Dtor
     ~VulkanSwapChain();
 

@@ -10,6 +10,11 @@ using namespace Slang;
 
 VulkanDeviceQueue::~VulkanDeviceQueue()
 {
+    destroy();
+}
+
+void VulkanDeviceQueue::destroy()
+{
     if (m_api)
     {
         for (int i = 0; i < int(EventType::CountOf); ++i)
@@ -23,6 +28,7 @@ VulkanDeviceQueue::~VulkanDeviceQueue()
             m_api->vkDestroyFence(m_api->m_device, m_fences[i].fence, nullptr);
         }
         m_api->vkDestroyCommandPool(m_api->m_device, m_commandPool, nullptr);
+        m_api = nullptr;
     }
 }
 

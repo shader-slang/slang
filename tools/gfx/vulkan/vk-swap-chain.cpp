@@ -348,7 +348,7 @@ void VulkanSwapChain::_destroySwapChain()
     m_images.clear();
 }
 
-VulkanSwapChain::~VulkanSwapChain()
+void VulkanSwapChain::destroy()
 {
     _destroySwapChain();
 
@@ -357,6 +357,12 @@ VulkanSwapChain::~VulkanSwapChain()
         m_api->vkDestroySurfaceKHR(m_api->m_instance, m_surface, nullptr);
         m_surface = VK_NULL_HANDLE;
     }
+}
+
+
+VulkanSwapChain::~VulkanSwapChain()
+{
+    destroy();
 }
 
 int VulkanSwapChain::nextFrontImageIndex()

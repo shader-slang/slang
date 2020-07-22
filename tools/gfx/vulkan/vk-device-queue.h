@@ -54,6 +54,9 @@ struct VulkanDeviceQueue
         /// Steps to next command buffer and opens. May block if command buffer is still in use
     void flushStepB();
 
+        /// Destroy the device queue
+    void destroy();
+
         /// Dtor
     ~VulkanDeviceQueue();
 
