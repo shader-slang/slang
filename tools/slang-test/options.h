@@ -52,6 +52,9 @@ struct Options
     // When true results from ignored tests are not shown
     bool hideIgnored = false;
 
+    // When true only tests that use an api that matches the enabledApis flags will run
+    bool apiOnly = false;
+
     // Use verbose paths
     bool verbosePaths = false;
 

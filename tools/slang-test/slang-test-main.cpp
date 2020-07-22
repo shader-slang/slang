@@ -2912,14 +2912,11 @@ static bool _canIgnore(TestContext* context, const TestDetails& details)
 
     const auto& requirements = details.requirements;
 
-    // If the render api filter is enabled, the test must 
-    if (details.requirements.usedRenderApiFlags == 0 && context->isRenderApiFilterEnabled())
+    // Check if it's possible in principal to run this test with the render api flags used by this test
+    if (!context->canRunTestWithRenderApiFlags(requirements.usedRenderApiFlags))
     {
         return true;
     }
-
-    // Work out what render api flags are available
-    const RenderApiFlags availableRenderApiFlags = requirements.usedRenderApiFlags ? _getAvailableRenderApiFlags(context) : 0;
 
     // Are all the required backends available?
     if (((requirements.usedBackendFlags & context->availableBackendFlags) != requirements.usedBackendFlags))
@@ -2927,14 +2924,11 @@ static bool _canIgnore(TestContext* context, const TestDetails& details)
         return true;
     }
 
+    // Work out what render api flags are actually available, lazily
+    const RenderApiFlags availableRenderApiFlags = requirements.usedRenderApiFlags ? _getAvailableRenderApiFlags(context) : 0;
+
     // Are all the required rendering apis available?
     if ((requirements.usedRenderApiFlags & availableRenderApiFlags) != requirements.usedRenderApiFlags)
-    {
-        return true;
-    }
-
-    // Are the required rendering APIs enabled from the -api command line switch
-    if ((requirements.usedRenderApiFlags & context->options.enabledApis) != requirements.usedRenderApiFlags)
     {
         return true;
     }
@@ -3343,8 +3337,8 @@ SlangResult innerMain(int argc, char** argv)
         // Run the unit tests (these are internal C++ tests - not specified via files in a directory) 
         // They are registered with SLANG_UNIT_TEST macro
         //
-        // We only run if a render filter is not enabled
-        if (!context.isRenderApiFilterEnabled())
+        // 
+        if (context.canRunUnitTests())
         {
             TestReporter::SuiteScope suiteScope(&reporter, "unit tests");
             TestReporter::set(&reporter);

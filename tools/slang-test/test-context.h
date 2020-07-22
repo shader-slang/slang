@@ -98,6 +98,12 @@ class TestContext
         /// True if a render API filter is enabled
     bool isRenderApiFilterEnabled() const { return options.enabledApis != Slang::RenderApiFlag::AllOf && options.enabledApis != 0; }
 
+        /// True if a test with the requiredFlags can in principal run (it may not be possible if the API is not available though)
+    bool canRunTestWithRenderApiFlags(Slang::RenderApiFlags requiredFlags);
+
+        /// True if can run unit tests
+    bool canRunUnitTests() const { return options.apiOnly == false; }
+
         /// Get compiler set
     Slang::DownstreamCompilerSet* getCompilerSet();
     Slang::DownstreamCompiler* getDefaultCompiler(SlangSourceLanguage sourceLanguage);
