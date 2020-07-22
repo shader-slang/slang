@@ -109,7 +109,7 @@ RefPtr<gfx::ShaderProgram> loadShaderProgram(gfx::Renderer* renderer)
     //
     if(auto diagnostics = spGetDiagnosticOutput(slangRequest))
     {
-        reportError("%s", diagnostics);
+        gfx::reportError("%s", diagnostics);
     }
 
     // If compilation failed, there is no point in continuing any further.
@@ -205,7 +205,7 @@ Result computeMain()
     windowDesc.title = "Hello, World!";
     windowDesc.width = gWindowWidth;
     windowDesc.height = gWindowHeight;
-    gWindow = createWindow(windowDesc);
+    gWindow = gfx::createWindow(windowDesc);
 
     // Initialize the rendering layer.
     //
@@ -214,22 +214,16 @@ Result computeMain()
     // A future version of this example may support multiple
     // platforms/APIs.
     //
-    gRenderer = createD3D11Renderer();
+    gRenderer = gfx::createD3D11Renderer();
     Renderer::Desc rendererDesc;
     rendererDesc.width = gWindowWidth;
     rendererDesc.height = gWindowHeight;
     {
-        Result res = gRenderer->initialize(rendererDesc, getPlatformWindowHandle(gWindow));
+        Result res = gRenderer->initialize(rendererDesc, gfx::getPlatformWindowHandle(gWindow));
         if(SLANG_FAILED(res)) return res;
     }
 
-    // Create a constant buffer for passing the model-view-projection matrix.
-    //
-    // Note: the Slang API supports reflection which could be used
-    // to query the size of the `Uniform` constant buffer, but we
-    // will not deal with that here because Slang also supports
-    // applications that want to hard-code things like memory
-    // layout and parameter locations.
+    // Create a structured buffer for passing the compute data
     //
     int structuredBufferSize = 4 * sizeof(float);
 
@@ -362,7 +356,7 @@ void innerMain(ApplicationContext* context)
 
     if (SLANG_FAILED(computeMain()))
     {
-        return exitApplication(context, 1);
+        return gfx::exitApplication(context, 1);
     }
 }
 
