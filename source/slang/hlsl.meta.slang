@@ -3994,20 +3994,30 @@ void DispatchMesh<P>(uint threadGroupCountX, uint threadGroupCountY, uint thread
 // "Sampler feedback" types `FeedbackTexture2D` and `FeedbackTexture2DArray`.
 //
 
+// https://microsoft.github.io/DirectX-Specs/d3d/SamplerFeedback.html
+
+// The docs describe these as 'types' but their syntax makes them seem enum like, and enum is a simpler way to implement them
+// But slang enums are always 'enum class like', so I use an empty struct type here
+
+interface __BuiltinSamplerFeedbackType {};
+
+struct SAMPLER_FEEDBACK_MIN_MIP : __BuiltinSamplerFeedbackType {};
+struct SAMPLER_FEEDBACK_MIP_REGION_USED : __BuiltinSamplerFeedbackType {};
+
 // Calculate the flavor constants
 ${{{{
 static const int feedbackTexture2DFlavor = int(TextureFlavor::create(TextureFlavor::Shape::Shape2D, SLANG_RESOURCE_ACCESS_READ_WRITE, SLANG_TEXTURE_FEEDBACK_FLAG).flavor);
 static const int feedbackTexture2DArrayFlavor = int(TextureFlavor::create(TextureFlavor::Shape::Shape2D, SLANG_RESOURCE_ACCESS_READ_WRITE, SLANG_TEXTURE_FEEDBACK_FLAG | SLANG_TEXTURE_ARRAY_FLAG).flavor);
 }}}}
 
-__generic<T>
+__generic<T : __BuiltinSamplerFeedbackType>
 __magic_type(Texture, $(feedbackTexture2DFlavor))
 __intrinsic_type($(kIROp_TextureType + (feedbackTexture2DFlavor << kIROpMeta_OtherShift)))
 struct FeedbackTexture2D
 {
 };
 
-__generic<T>
+__generic<T : __BuiltinSamplerFeedbackType>
 __magic_type(Texture, $(feedbackTexture2DArrayFlavor))
 __intrinsic_type($(kIROp_TextureType + (feedbackTexture2DArrayFlavor << kIROpMeta_OtherShift)))
 struct FeedbackTexture2DArray
