@@ -166,7 +166,6 @@ struct LinkingAndOptimizationOptions
     CLikeSourceEmitter* sourceEmitter = nullptr;
 };
 
-// TODO(DG): A bit tricky; this needs to be generalized to multiple entry points
 Result linkAndOptimizeIR(
     BackEndCompileRequest*                  compileRequest,
     const List<Int>&                        entryPointIndices,
@@ -195,7 +194,7 @@ Result linkAndOptimizeIR(
         target,
         targetProgram);
     auto irModule = outLinkedIR.module;
-    auto irEntryPoint = outLinkedIR.entryPoint;
+    auto irEntryPoints = outLinkedIR.entryPoints;
 
 #if 0
     dumpIRIfEnabled(compileRequest, irModule, "LINKED");
@@ -342,8 +341,7 @@ Result linkAndOptimizeIR(
     }
 
     // TODO(DG): There are multiple DCE steps here, which need to be changed
-    // CHECK: how to these modules work?
-    // so that they don't just throw out any non-entry point code
+    //   so that they don't just throw out any non-entry point code
     // Debugging code for IR transformations...
 #if 0
     dumpIRIfEnabled(compileRequest, irModule, "SPECIALIZED");
@@ -620,10 +618,10 @@ Result linkAndOptimizeIR(
     {
         auto glslExtensionTracker = as<GLSLExtensionTracker>(options.sourceEmitter->getExtensionTracker());
 
-        legalizeEntryPointForGLSL(
+        legalizeEntryPointsForGLSL(
             session,
             irModule,
-            irEntryPoint,
+            irEntryPoints,
             compileRequest->getSink(),
             glslExtensionTracker);
 
@@ -701,8 +699,7 @@ Result linkAndOptimizeIR(
     return SLANG_OK;
 }
 
-// TODO(DG): This probably needs to be generalized to a list
-SlangResult emitEntryPointSourceFromIR(
+SlangResult emitEntryPointsSourceFromIR(
     BackEndCompileRequest*  compileRequest,
     const List<Int>&        entryPointIndices,
     CodeGenTarget           target,
@@ -713,10 +710,6 @@ SlangResult emitEntryPointSourceFromIR(
 
     auto sink = compileRequest->getSink();
     auto program = compileRequest->getProgram();
-
-    // Temporary assertion for checkpoint
-    SLANG_ASSERT(entryPointIndices.getCount() == 1);
-    auto entryPoint = program->getEntryPoint(entryPointIndices[0]);
 
     auto lineDirectiveMode = compileRequest->getLineDirectiveMode();
     // To try to make the default behavior reasonable, we will
@@ -737,8 +730,12 @@ SlangResult emitEntryPointSourceFromIR(
     desc.compileRequest = compileRequest;
     desc.target = target;
     // TODO(DG): Can't assume a single entry point stage for multiple entry points
-    desc.entryPointStage = entryPoint->getStage();
-    desc.effectiveProfile = getEffectiveProfile(entryPoint, targetRequest);
+    if (entryPointIndices.getCount() == 1)
+    {
+        auto entryPoint = program->getEntryPoint(entryPointIndices[0]);
+        desc.entryPointStage = entryPoint->getStage();
+        desc.effectiveProfile = getEffectiveProfile(entryPoint, targetRequest);
+    }
     desc.sourceWriter = &sourceWriter;
 
     // Define here, because must be in scope longer than the sourceEmitter, as sourceEmitter might reference
@@ -866,7 +863,7 @@ SlangResult emitEntryPointSourceFromIR(
 SlangResult emitSPIRVFromIR(
     BackEndCompileRequest*  compileRequest,
     IRModule*               irModule,
-    IRFunc*                 irEntryPoint,
+    const List<IRFunc*>&    irEntryPoints,
     List<uint8_t>&          spirvOut);
 
 SlangResult emitSPIRVForEntryPointsDirectly(
@@ -875,8 +872,6 @@ SlangResult emitSPIRVForEntryPointsDirectly(
     TargetRequest*          targetRequest,
     List<uint8_t>&          spirvOut)
 {
-    // TODO(DG): Temporary assertion for checkpoint
-    SLANG_ASSERT(entryPointIndices.getCount() == 1);
     auto sink = compileRequest->getSink();
     auto program = compileRequest->getProgram();
     auto targetProgram = program->getTargetProgram(targetRequest);
@@ -896,12 +891,12 @@ SlangResult emitSPIRVForEntryPointsDirectly(
         linkedIR);
 
     auto irModule = linkedIR.module;
-    auto irEntryPoint = linkedIR.entryPoint;
+    auto irEntryPoints = linkedIR.entryPoints;
 
     emitSPIRVFromIR(
         compileRequest,
         irModule,
-        irEntryPoint,
+        irEntryPoints,
         spirvOut);
 
     return SLANG_OK;

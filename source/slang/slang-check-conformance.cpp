@@ -180,7 +180,8 @@ namespace Slang
             {
                 ensureDecl(aggTypeDeclRef, DeclCheckState::CanEnumerateBases);
 
-                for( auto inheritanceDeclRef : getMembersOfTypeWithExt<InheritanceDecl>(aggTypeDeclRef))
+                bool found = false;
+                foreachDirectOrExtensionMemberOfType<InheritanceDecl>(this, aggTypeDeclRef, [&](DeclRef<InheritanceDecl> const& inheritanceDeclRef)
                 {
                     ensureDecl(inheritanceDeclRef, DeclCheckState::CanUseBaseOfInheritanceDecl);
 
@@ -209,9 +210,12 @@ namespace Slang
 
                     if(_isDeclaredSubtype(originalSubType, inheritedType, superTypeDeclRef, outWitness, &breadcrumb))
                     {
-                        return true;
+                        found = true;
                     }
-                }
+                });
+                if(found)
+                    return true;
+
                 // if an inheritance decl is not found, try to find a GenericTypeConstraintDecl
                 for (auto genConstraintDeclRef : getMembersOfType<GenericTypeConstraintDecl>(aggTypeDeclRef))
                 {

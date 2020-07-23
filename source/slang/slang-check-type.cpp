@@ -13,6 +13,7 @@ namespace Slang
     {
         SharedSemanticsContext sharedSemanticsContext(
             linkage,
+            nullptr,
             sink);
         SemanticsVisitor visitor(&sharedSemanticsContext);
 
