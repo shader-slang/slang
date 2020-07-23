@@ -10,6 +10,11 @@ using namespace Slang;
 
 VulkanDeviceQueue::~VulkanDeviceQueue()
 {
+    destroy();
+}
+
+void VulkanDeviceQueue::destroy()
+{
     if (m_api)
     {
         for (int i = 0; i < int(EventType::CountOf); ++i)
@@ -23,14 +28,14 @@ VulkanDeviceQueue::~VulkanDeviceQueue()
             m_api->vkDestroyFence(m_api->m_device, m_fences[i].fence, nullptr);
         }
         m_api->vkDestroyCommandPool(m_api->m_device, m_commandPool, nullptr);
+        m_api = nullptr;
     }
 }
 
 SlangResult VulkanDeviceQueue::init(const VulkanApi& api, VkQueue queue, int queueIndex)
 {
     assert(m_api == nullptr);
-    m_api = &api;
-
+    
     for (int i = 0; i < int(EventType::CountOf); ++i)
     {
         m_semaphores[i] = VK_NULL_HANDLE;
@@ -78,6 +83,9 @@ SlangResult VulkanDeviceQueue::init(const VulkanApi& api, VkQueue queue, int que
     {
         api.vkCreateSemaphore(api.m_device, &semaphoreCreateInfo, nullptr, &m_semaphores[i]);
     }
+
+    // Set the api - also marks that the queue appears to be valid
+    m_api = &api;
 
     // Second step of flush to prime command buffer
     flushStepB();
