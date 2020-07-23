@@ -46,10 +46,11 @@ namespace Slang
     // Declarations
     //
 
-    inline ExtensionDecl* getCandidateExtensions(DeclRef<AggTypeDecl> const& declRef)
-    {
-        return declRef.getDecl()->candidateExtensions;
-    }
+    struct SemanticsVisitor;
+
+    List<ExtensionDecl*> const& getCandidateExtensions(
+        DeclRef<AggTypeDecl> const& declRef,
+        SemanticsVisitor*           semantics);
 
     inline FilteredMemberRefList<Decl> getMembers(DeclRef<ContainerDecl> const& declRef, MemberFilterStyle filterStyle = MemberFilterStyle::All)
     {
@@ -62,22 +63,27 @@ namespace Slang
         return FilteredMemberRefList<T>(declRef.getDecl()->members, declRef.substitutions, filterStyle);
     }
 
-    template<typename T>
-    inline List<DeclRef<T>> getMembersOfTypeWithExt(DeclRef<ContainerDecl> const& declRef, MemberFilterStyle filterStyle = MemberFilterStyle::All)
+    void _foreachDirectOrExtensionMemberOfType(
+        SemanticsVisitor*               semantics,
+        DeclRef<ContainerDecl> const&   declRef,
+        SyntaxClassBase const&          syntaxClass,
+        void                            (*callback)(DeclRefBase, void*),
+        void const*                     userData);
+
+    template<typename T, typename F>
+    inline void foreachDirectOrExtensionMemberOfType(
+        SemanticsVisitor*               semantics,
+        DeclRef<ContainerDecl> const&   declRef,
+        F const&                        func)
     {
-        List<DeclRef<T>> rs;
-        for (auto d : getMembersOfType<T>(declRef, filterStyle))
-            rs.add(d);
-        if (auto aggDeclRef = declRef.as<AggTypeDecl>())
+        struct Helper
         {
-            for (auto ext = getCandidateExtensions(aggDeclRef); ext; ext = ext->nextCandidateExtension)
+            static void callback(DeclRefBase declRef, void* userData)
             {
-                auto extMembers = getMembersOfType<T>(DeclRef<ContainerDecl>(ext, declRef.substitutions), filterStyle);
-                for (auto mbr : extMembers)
-                    rs.add(mbr);
+                (*(F*)userData)(DeclRef<T>((T*) declRef.decl, declRef.substitutions));
             }
-        }
-        return rs;
+        };
+        _foreachDirectOrExtensionMemberOfType(semantics, declRef, getClass<T>(), &Helper::callback, &func);
     }
 
         /// The the user-level name for a variable that might be a shader parameter.
@@ -256,7 +262,10 @@ namespace Slang
         All = 7
     };
 
-        /// Get the module that a declaration is associated with, if any.
+        /// Get the module dclaration that a declaration is associated with, if any.
+    ModuleDecl* getModuleDecl(Decl* decl);
+
+    /// Get the module that a declaration is associated with, if any.
     Module* getModule(Decl* decl);
 
    

@@ -2028,8 +2028,9 @@ namespace Slang
         //
         // For now we will just walk through the extensions that are known at
         // the time we are compiling and handle those, and punt on the larger issue
-        // for abit longer.
-        for(auto candidateExt = interfaceDeclRef.getDecl()->candidateExtensions; candidateExt; candidateExt = candidateExt->nextCandidateExtension)
+        // for a bit longer.
+        //
+        for(auto candidateExt : getCandidateExtensions(interfaceDeclRef, this))
         {
             // We need to apply the extension to the interface type that our
             // concrete type is inheriting from.
@@ -3519,8 +3520,9 @@ namespace Slang
             if (auto aggTypeDeclRef = targetDeclRefType->declRef.as<AggTypeDecl>())
             {
                 auto aggTypeDecl = aggTypeDeclRef.getDecl();
-                decl->nextCandidateExtension = aggTypeDecl->candidateExtensions;
-                aggTypeDecl->candidateExtensions = decl;
+
+                getShared()->registerCandidateExtension(aggTypeDecl, decl);
+
                 return;
             }
         }
@@ -4088,6 +4090,208 @@ namespace Slang
             module->addModuleDependency(importedModule);
         }
     }
+
+        /// Get a reference to the candidate extension list for `typeDecl` in the given dictionary
+        ///
+        /// Note: this function creates an empty list of candidates for the given type if
+        /// a matching entry doesn't exist already.
+        ///
+    static List<ExtensionDecl*>& _getCandidateExtensionList(
+        AggTypeDecl* typeDecl,
+        Dictionary<AggTypeDecl*, RefPtr<CandidateExtensionList>>& mapTypeToCandidateExtensions)
+    {
+        RefPtr<CandidateExtensionList> entry;
+        if( !mapTypeToCandidateExtensions.TryGetValue(typeDecl, entry) )
+        {
+            entry = new CandidateExtensionList();
+            mapTypeToCandidateExtensions.Add(typeDecl, entry);
+        }
+        return entry->candidateExtensions;
+    }
+
+    List<ExtensionDecl*> const& SharedSemanticsContext::getCandidateExtensionsForTypeDecl(AggTypeDecl* decl)
+    {
+        // We are caching the lists of candidate extensions on the shared
+        // context, so we will only build the lists if they either have
+        // not been built before, or if some code caused the lists to
+        // be invalidated.
+        //
+        // TODO: Similar to the rebuilding of lookup tables in `ContainerDecl`s,
+        // we probably want to optimize this logic to gracefully handle new
+        // extensions encountered during checking instead of tearing the whole
+        // thing down. For now this potentially-quadratic behavior is acceptable
+        // because there just aren't that many extension declarations being used.
+        //
+        if( !m_candidateExtensionListsBuilt )
+        {
+            m_candidateExtensionListsBuilt = true;
+
+            // We need to make sure that all extensions that were declared
+            // as part of our standard-library modules are always visible,
+            // even if they are not explicit `import`ed into user code.
+            //
+            for( auto module : getSession()->stdlibModules )
+            {
+                _addCandidateExtensionsFromModule(module->getModuleDecl());
+            }
+
+            // There are two primary modes in which the `SharedSemanticsContext`
+            // gets used.
+            //
+            // In the first mode, we are checking an entire `ModuelDecl`, and we
+            // need to always check things from the "point of view" of that module
+            // (so that the extensions that should be visible are based on what
+            // that module can access via `import`s).
+            //
+            // In the second mode, we are checking code related to API interactions
+            // by the user (e.g., parsing a type from a string, specializing an
+            // entry point to type arguments, etc.). In these cases there is no
+            // clear module that should determine the point of view for looking
+            // up extensions, and we instead need/want to consider any extensions
+            // from all modules loaded into the linkage.
+            //
+            // We differentiate these cases based on whether a "primary" module
+            // was set at the time the `SharedSemanticsContext` was constructed.
+            //
+            if( m_module )
+            {
+                // We have a "primary" module that is being checked, and we should
+                // look up extensions based on what would be visible to that
+                // module.
+                //
+                // We need to consider the extensions declared in the module itself,
+                // along with everything the module imported.
+                //
+                // Note: there is an implicit assumption here that the `importedModules`
+                // member on the `SharedSemanticsContext` is accurate in this case.
+                //
+                _addCandidateExtensionsFromModule(m_module->getModuleDecl());
+                for( auto moduleDecl : this->importedModules )
+                {
+                    _addCandidateExtensionsFromModule(moduleDecl);
+                }
+            }
+            else
+            {
+                // We are in one of the many ad hoc checking modes where we really
+                // want to resolve things based on the totality of what is
+                // available/defined within the current linkage.
+                //
+                for( auto module : m_linkage->loadedModulesList )
+                {
+                    _addCandidateExtensionsFromModule(module->getModuleDecl());
+                }
+            }
+        }
+
+        // Once we are sure that the dictionary-of-arrays of extensions
+        // has been populated, we return to the user the entry they
+        // asked for.
+        //
+        return _getCandidateExtensionList(decl, m_mapTypeDeclToCandidateExtensions);
+    }
+
+    void SharedSemanticsContext::registerCandidateExtension(AggTypeDecl* typeDecl, ExtensionDecl* extDecl)
+    {
+        // The primary cache of extension declarations is on the `ModuleDecl`.
+        // We will add the `extDecl` to the cache for the module it belongs to.
+        //
+        // We can be sure that the resulting cache won't have lifetime issues,
+        // because all the extensions it contains are owned by the module itself,
+        // and the types used as keys had to be reachable/referenceable from the
+        // code inside the module for the given `extDecl` to extend them.
+        //
+        auto moduleDecl = getModuleDecl(extDecl);
+        _getCandidateExtensionList(typeDecl, moduleDecl->mapTypeToCandidateExtensions).add(extDecl);
+
+        // Because we've loaded a new extension, we need to invalidate whatever
+        // information the `SharedSemanticsContext` had cached about loaded
+        // extensions, and force it to rebuild its cache to include the
+        // new extension we just added.
+        //
+        // TODO: We should probably just go ahead and add `extDecl` directly
+        // into the appropriate entry here, and do a similar step on each
+        // `import`.
+        //
+        m_candidateExtensionListsBuilt = false;
+        m_mapTypeDeclToCandidateExtensions.Clear();
+    }
+
+    void SharedSemanticsContext::_addCandidateExtensionsFromModule(ModuleDecl* moduleDecl)
+    {
+        for( auto& entry : moduleDecl->mapTypeToCandidateExtensions )
+        {
+            auto& list = _getCandidateExtensionList(entry.Key, m_mapTypeDeclToCandidateExtensions);
+            list.addRange(entry.Value->candidateExtensions);
+        }
+    }
+
+    List<ExtensionDecl*> const& getCandidateExtensions(
+        DeclRef<AggTypeDecl> const& declRef,
+        SemanticsVisitor*           semantics)
+    {
+        auto decl = declRef.getDecl();
+        auto shared = semantics->getShared();
+        return shared->getCandidateExtensionsForTypeDecl(decl);
+    }
+
+    void _foreachDirectOrExtensionMemberOfType(
+        SemanticsVisitor*               semantics,
+        DeclRef<ContainerDecl> const&   containerDeclRef,
+        SyntaxClassBase const&          syntaxClass,
+        void                            (*callback)(DeclRefBase, void*),
+        void const*                     userData)
+    {
+        // We are being asked to invoke the given callback on
+        // each direct member of `containerDeclRef`, along with
+        // any members added via `extension` declarations, that
+        // have the correct AST node class (`syntaxClass`).
+        //
+        // We start with the direct members.
+        //
+        for( auto memberDeclRef : getMembers(containerDeclRef) )
+        {
+            if( memberDeclRef.decl->getClass().isSubClassOfImpl(syntaxClass) )
+            {
+                callback(memberDeclRef, (void*)userData);
+            }
+        }
+
+        // Next, in the case wher ethe type can be subject to extensions,
+        // we loop over the applicable extensions and their member.s
+        //
+        if(auto aggTypeDeclRef = containerDeclRef.as<AggTypeDecl>())
+        {
+            auto aggType = DeclRefType::create(semantics->getASTBuilder(), aggTypeDeclRef);
+            for(auto extDecl : getCandidateExtensions(aggTypeDeclRef, semantics))
+            {
+                // Note that `extDecl` may have been declared for a type
+                // base on the declaration that `aggTypeDeclRef` refers
+                // to, but that does not guarantee that it applies to
+                // the type itself. E.g., we might have an extension of
+                // `vector<float, N>` for any `N`, but the current type is
+                // `vector<int, 2>` so that the extension doesn't match.
+                //
+                // In order to make sure that we don't enumerate members
+                // that don't make sense in context, we must apply
+                // the extension to the type and see if we succeed in
+                // making a match.
+                //
+                auto extDeclRef = ApplyExtensionToType(semantics, extDecl, aggType);
+                if(!extDeclRef)
+                    continue;
+
+                for( auto memberDeclRef : getMembers(extDeclRef) )
+                {
+                    if( memberDeclRef.decl->getClass().isSubClassOfImpl(syntaxClass) )
+                    {
+                        callback(memberDeclRef, (void*)userData);
+                    }
+                }
+            }
+        }
+    }
+
 
     static void _dispatchDeclCheckingVisitor(Decl* decl, DeclCheckState state, SharedSemanticsContext* shared)
     {

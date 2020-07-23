@@ -201,6 +201,7 @@ namespace Slang
     {
         SharedSemanticsContext sharedSemanticsContext(
             translationUnit->compileRequest->getLinkage(),
+            translationUnit->getModule(),
             translationUnit->compileRequest->getSink());
 
         SemanticsDeclVisitorBase visitor(&sharedSemanticsContext);

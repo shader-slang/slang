@@ -1242,16 +1242,24 @@ Index getFilterCountImpl(const ReflectClassInfo& clsInfo, MemberFilterStyle filt
         return rs;
     }
 
-    
-    
-Module* getModule(Decl* decl)
+
+ModuleDecl* getModuleDecl(Decl* decl)
 {
     for( auto dd = decl; dd; dd = dd->parentDecl )
     {
         if(auto moduleDecl = as<ModuleDecl>(dd))
-            return moduleDecl->module;
+            return moduleDecl;
     }
     return nullptr;
+}
+
+Module* getModule(Decl* decl)
+{
+    auto moduleDecl = getModuleDecl(decl);
+    if(!moduleDecl)
+        return nullptr;
+
+    return moduleDecl->module;
 }
 
 bool findImageFormatByName(char const* name, ImageFormat* outFormat)

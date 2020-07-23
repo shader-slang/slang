@@ -492,7 +492,7 @@ static void _lookUpMembersInSuperTypeDeclImpl(
                 // directly with that type.
                 //
                 ensureDecl(request.semantics, aggTypeDeclRef.getDecl(), DeclCheckState::ReadyForLookup);
-                for(auto extDecl = getCandidateExtensions(aggTypeDeclRef); extDecl; extDecl = extDecl->nextCandidateExtension)
+                for(auto extDecl : getCandidateExtensions(aggTypeDeclRef, semantics))
                 {
                     // Note: In this case `extDecl` is an extension that was declared to apply
                     // (conditionally) to `aggTypeDeclRef`, which is the decl-ref part of

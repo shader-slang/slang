@@ -96,18 +96,12 @@ class ExtensionDecl : public AggTypeDeclBase
     SLANG_CLASS(ExtensionDecl)
 
     TypeExp targetType;
-
-    // next extension attached to the same nominal type
-    ExtensionDecl* nextCandidateExtension = nullptr;
 };
 
 // Declaration of a type that represents some sort of aggregate
 class AggTypeDecl : public  AggTypeDeclBase
 {
     SLANG_ABSTRACT_CLASS(AggTypeDecl)
-
-    // extensions that might apply to this declaration
-    ExtensionDecl* candidateExtensions = nullptr;
 
     FilteredMemberList<VarDecl> getFields()
     {
@@ -371,6 +365,12 @@ class ModuleDecl : public NamespaceDeclBase
     // its chain of parents.
     //
     Module* module = nullptr;
+
+        /// Map a type to the list of extensions of that type (if any) declared in this module
+        ///
+        /// This mapping is filled in during semantic checking, as `ExtensionDecl`s get checked.
+        ///
+    Dictionary<AggTypeDecl*, RefPtr<CandidateExtensionList>> mapTypeToCandidateExtensions;
 };
 
 class ImportDecl : public Decl
