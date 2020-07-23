@@ -1866,6 +1866,7 @@ extern "C"
         SLANG_RESOURCE_ACCESS_RASTER_ORDERED,
         SLANG_RESOURCE_ACCESS_APPEND,
         SLANG_RESOURCE_ACCESS_CONSUME,
+        SLANG_RESOURCE_ACCESS_WRITE,
     };
 
     typedef unsigned int SlangParameterCategory;

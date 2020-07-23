@@ -80,6 +80,7 @@ FOREACH_BASE_TYPE(DEFINE_BASE_TYPE)
         Shape getBaseShape() const { return Shape(flavor & BaseShapeMask); }
         bool isArray() const { return (flavor & ArrayFlag) != 0; }
         bool isMultisample() const { return (flavor & MultisampleFlag) != 0; }
+        bool isFeedback() const { return (flavor & FeedbackFlag) != 0; }
         //            bool isShadow() const { return (flavor & ShadowFlag) != 0; }
 
         SLANG_FORCE_INLINE bool operator==(const ThisType& rhs) const { return flavor == rhs.flavor; }

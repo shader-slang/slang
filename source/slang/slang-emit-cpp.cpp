@@ -340,21 +340,31 @@ SlangResult CPPSourceEmitter::_calcCPPTextureTypeName(IRTextureTypeBase* texType
         case SLANG_RESOURCE_ACCESS_CONSUME:
             outName << "Consume";
             break;
+        case SLANG_RESOURCE_ACCESS_WRITE:
+            break;
         default:
             SLANG_DIAGNOSE_UNEXPECTED(getSink(), SourceLoc(), "unhandled resource access mode");
             return SLANG_FAIL;
     }
 
-    switch (texType->GetBaseShape())
+    if (texType->isFeedback())
     {
-        case TextureFlavor::Shape::Shape1D:		outName << "Texture1D";		break;
-        case TextureFlavor::Shape::Shape2D:		outName << "Texture2D";		break;
-        case TextureFlavor::Shape::Shape3D:		outName << "Texture3D";		break;
-        case TextureFlavor::Shape::ShapeCube:	outName << "TextureCube";	break;
-        case TextureFlavor::Shape::ShapeBuffer: outName << "Buffer";         break;
-        default:
-            SLANG_DIAGNOSE_UNEXPECTED(getSink(), SourceLoc(), "unhandled resource shape");
-            return SLANG_FAIL;
+        SLANG_ASSERT(texType->GetBaseShape() == TextureFlavor::Shape::Shape2D);
+        outName << "FeedbackTexture2D";
+    }
+    else
+    {
+        switch (texType->GetBaseShape())
+        {
+            case TextureFlavor::Shape::Shape1D:		outName << "Texture1D";		break;
+            case TextureFlavor::Shape::Shape2D:		outName << "Texture2D";		break;
+            case TextureFlavor::Shape::Shape3D:		outName << "Texture3D";		break;
+            case TextureFlavor::Shape::ShapeCube:	outName << "TextureCube";	break;
+            case TextureFlavor::Shape::ShapeBuffer: outName << "Buffer";         break;
+            default:
+                SLANG_DIAGNOSE_UNEXPECTED(getSink(), SourceLoc(), "unhandled resource shape");
+                return SLANG_FAIL;
+        }
     }
 
     if (texType->isMultisample())

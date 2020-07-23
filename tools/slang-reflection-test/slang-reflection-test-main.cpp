@@ -553,7 +553,7 @@ static void emitReflectionResourceTypeBaseInfoJSON(
 
         case SLANG_RESOURCE_ACCESS_READ:
             break;
-
+        case SLANG_RESOURCE_ACCESS_WRITE:           write(writer, "write"); break;
         case SLANG_RESOURCE_ACCESS_READ_WRITE:      write(writer, "readWrite"); break;
         case SLANG_RESOURCE_ACCESS_RASTER_ORDERED:  write(writer, "rasterOrdered"); break;
         case SLANG_RESOURCE_ACCESS_APPEND:          write(writer, "append"); break;

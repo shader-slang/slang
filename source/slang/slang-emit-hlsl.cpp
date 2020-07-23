@@ -224,6 +224,7 @@ void HLSLSourceEmitter::_emitHLSLTextureType(IRTextureTypeBase* texType)
 {
     switch (texType->getAccess())
     {
+        case SLANG_RESOURCE_ACCESS_WRITE:
         case SLANG_RESOURCE_ACCESS_READ:
             break;
 
@@ -248,16 +249,24 @@ void HLSLSourceEmitter::_emitHLSLTextureType(IRTextureTypeBase* texType)
             break;
     }
 
-    switch (texType->GetBaseShape())
+    if (texType->isFeedback())
     {
-        case TextureFlavor::Shape::Shape1D:		m_writer->emit("Texture1D");		break;
-        case TextureFlavor::Shape::Shape2D:		m_writer->emit("Texture2D");		break;
-        case TextureFlavor::Shape::Shape3D:		m_writer->emit("Texture3D");		break;
-        case TextureFlavor::Shape::ShapeCube:	m_writer->emit("TextureCube");	break;
-        case TextureFlavor::Shape::ShapeBuffer:  m_writer->emit("Buffer");         break;
-        default:
-            SLANG_DIAGNOSE_UNEXPECTED(getSink(), SourceLoc(), "unhandled resource shape");
-            break;
+        SLANG_ASSERT(texType->GetBaseShape() == TextureFlavor::Shape::Shape2D);
+        m_writer->emit("FeedbackTexture2D");
+    }
+    else
+    {
+        switch (texType->GetBaseShape())
+        {
+            case TextureFlavor::Shape::Shape1D:		m_writer->emit("Texture1D");		break;
+            case TextureFlavor::Shape::Shape2D:		m_writer->emit("Texture2D");		break;
+            case TextureFlavor::Shape::Shape3D:		m_writer->emit("Texture3D");		break;
+            case TextureFlavor::Shape::ShapeCube:	m_writer->emit("TextureCube");	break;
+            case TextureFlavor::Shape::ShapeBuffer:  m_writer->emit("Buffer");         break;
+            default:
+                SLANG_DIAGNOSE_UNEXPECTED(getSink(), SourceLoc(), "unhandled resource shape");
+                break;
+        }
     }
 
     if (texType->isMultisample())
