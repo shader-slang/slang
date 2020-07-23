@@ -199,8 +199,12 @@ namespace Slang
         /// Shared state for a semantics-checking session.
     struct SharedSemanticsContext
     {
-        Linkage* m_linkage = nullptr;
-        DiagnosticSink* m_sink = nullptr;
+        Linkage*        m_linkage   = nullptr;
+
+            /// The (optional) "primary" module that is the parent to everything that will be checked.
+        Module*         m_module    = nullptr;
+
+        DiagnosticSink* m_sink      = nullptr;
 
         DiagnosticSink* getSink()
         {
@@ -217,8 +221,10 @@ namespace Slang
     public:
         SharedSemanticsContext(
             Linkage*        linkage,
+            Module*         module,
             DiagnosticSink* sink)
             : m_linkage(linkage)
+            , m_module(module)
             , m_sink(sink)
         {}
 
@@ -231,6 +237,27 @@ namespace Slang
         {
             return m_linkage;
         }
+
+        Module* getModule()
+        {
+            return m_module;
+        }
+
+            /// Get the list of extension declarations that appear to apply to `decl` in this context
+        List<ExtensionDecl*> const& getCandidateExtensionsForTypeDecl(AggTypeDecl* decl);
+
+            /// Register a candidate extension `extDecl` for `typeDecl` encountered during checking.
+        void registerCandidateExtension(AggTypeDecl* typeDecl, ExtensionDecl* extDecl);
+
+    private:
+            /// Mapping from type declarations to the known extensiosn that apply to them
+        Dictionary<AggTypeDecl*, RefPtr<CandidateExtensionList>> m_mapTypeDeclToCandidateExtensions;
+
+            /// Is the `m_mapTypeDeclToCandidateExtensions` dictionary valid and up to date?
+        bool m_candidateExtensionListsBuilt = false;
+
+            /// Add candidate extensions declared in `moduleDecl` to `m_mapTypeDeclToCandidateExtensions`
+        void _addCandidateExtensionsFromModule(ModuleDecl* moduleDecl);
     };
 
     struct SemanticsVisitor

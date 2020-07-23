@@ -2683,13 +2683,13 @@ void Session::addBuiltinSource(
 
     // We need to retain this AST so that we can use it in other code
     // (Note that the `Scope` type does not retain the AST it points to)
-    loadedModuleCode.add(module);
+    stdlibModules.add(module);
 }
 
 Session::~Session()
 {
     // destroy modules next
-    loadedModuleCode = decltype(loadedModuleCode)();
+    stdlibModules = decltype(stdlibModules)();
 }
 
 }

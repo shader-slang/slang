@@ -1337,6 +1337,14 @@ namespace Slang
     };
     typedef List<ExpandedSpecializationArg> ExpandedSpecializationArgs;
 
+        /// A reference-counted object to hold a list of candidate extensions
+        /// that might be applicable to a type based on its declaration.
+        ///
+    struct CandidateExtensionList : RefObject
+    {
+        List<ExtensionDecl*> candidateExtensions;
+    };
+
 } // namespace Slang
 
 #endif
