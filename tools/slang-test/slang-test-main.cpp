@@ -2854,7 +2854,9 @@ static void _calcSynthesizedTests(TestContext* context, RenderApiType synthRende
         {
             // TODO(JS): Arguably we should synthesize from explicit tests. In principal we can remove the explicit api apply another
             // although that may not always work.
+            // If it doesn't use any render API or only uses CPU, we don't synthesize
             if (requirements.usedRenderApiFlags == 0 ||
+                requirements.usedRenderApiFlags == RenderApiFlag::CPU ||
                 requirements.explicitRenderApi != RenderApiType::Unknown)
             {
                 continue;
