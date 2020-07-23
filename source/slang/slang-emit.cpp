@@ -126,29 +126,6 @@ StructTypeLayout* getGlobalStructLayout(
     return getScopeStructLayout(programLayout);
 }
 
-static void dumpIR(
-    BackEndCompileRequest* compileRequest,
-    IRModule*       irModule,
-    char const*     label)
-{
-    DiagnosticSinkWriter writerImpl(compileRequest->getSink());
-    WriterHelper writer(&writerImpl);
-
-    if(label)
-    {
-        writer.put("### ");
-        writer.put(label);
-        writer.put(":\n");
-    }
-
-    dumpIR(irModule, writer.getWriter());
-
-    if( label )
-    {
-        writer.put("###\n");
-    }
-}
-
 static void dumpIRIfEnabled(
     BackEndCompileRequest* compileRequest,
     IRModule*       irModule,
@@ -156,7 +133,8 @@ static void dumpIRIfEnabled(
 {
     if(compileRequest->shouldDumpIR)
     {
-        dumpIR(compileRequest, irModule, label);
+        DiagnosticSinkWriter writer(compileRequest->getSink());
+        dumpIR(irModule, &writer, label);
     }
 }
 
