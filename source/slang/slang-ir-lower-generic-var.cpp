@@ -79,6 +79,12 @@ namespace Slang
                 // have already been replaced with the pointer to that variable by now.
                 // So we don't need to do anything here.
             }
+            else if (valPtr->op == kIROp_undefined)
+            {
+                // We don't need to store an undef value.
+                storeInst->removeAndDeallocate();
+                return;
+            }
             else
             {
                 // If value does not come from another generic variable, then it must be
@@ -138,7 +144,7 @@ namespace Slang
 
         void processInst(IRInst* inst)
         {
-            if (inst->op == kIROp_Var || inst->op == kIROp_undefined)
+            if (inst->op == kIROp_Var)
             {
                 processVarInst(inst);
             }
