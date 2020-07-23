@@ -3616,6 +3616,8 @@ matrix<T,N,M> WaveMultiPrefixSum(matrix<T,N,M> value, uint4 mask);
 // `typedef`s to help with the fact that HLSL has been sorta-kinda case insensitive at various points
 typedef Texture2D texture2D;
 
+
+
 ${{{{
 
 // Buffer types
@@ -3989,8 +3991,28 @@ void SetMeshOutputCounts(uint vertexCount, uint primitiveCount);
 void DispatchMesh<P>(uint threadGroupCountX, uint threadGroupCountY, uint threadGroupCountZ, P meshPayload);
 
 //
-// TODO: "Sampler feedback" types `FeedbackTexture2D` and `FeedbackTexture2DArray`.
+// "Sampler feedback" types `FeedbackTexture2D` and `FeedbackTexture2DArray`.
 //
+
+// Calculate the flavor constants
+${{{{
+static const int feedbackTexture2DFlavor = int(TextureFlavor::create(TextureFlavor::Shape::Shape2D, SLANG_RESOURCE_ACCESS_READ_WRITE, SLANG_TEXTURE_FEEDBACK_FLAG).flavor);
+static const int feedbackTexture2DArrayFlavor = int(TextureFlavor::create(TextureFlavor::Shape::Shape2D, SLANG_RESOURCE_ACCESS_READ_WRITE, SLANG_TEXTURE_FEEDBACK_FLAG | SLANG_TEXTURE_ARRAY_FLAG).flavor);
+}}}}
+
+__generic<T>
+__magic_type(Texture, $(feedbackTexture2DFlavor))
+__intrinsic_type($(kIROp_TextureType + (feedbackTexture2DFlavor << kIROpMeta_OtherShift)))
+struct FeedbackTexture2D
+{
+};
+
+__generic<T>
+__magic_type(Texture, $(feedbackTexture2DArrayFlavor))
+__intrinsic_type($(kIROp_TextureType + (feedbackTexture2DArrayFlavor << kIROpMeta_OtherShift)))
+struct FeedbackTexture2DArray
+{
+};
 
 //
 // DXR 1.1 and `TraceRayInline` support

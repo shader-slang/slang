@@ -1841,7 +1841,11 @@ extern "C"
         SLANG_RESOURCE_UNKNOWN              = 0x08,
         SLANG_ACCELERATION_STRUCTURE        = 0x09,
 
-        SLANG_RESOURCE_EXT_SHAPE_MASK       = 0xF0,
+        //SLANG_RESOURCE_EXT_SHAPE_MASK       = 0xF0,
+
+        SLANG_TEXTURE_FLAG_MASK             = 0xF0,
+
+        SLANG_TEXTURE_FEEDBACK_FLAG         = 0x10,
         SLANG_TEXTURE_ARRAY_FLAG            = 0x40,
         SLANG_TEXTURE_MULTISAMPLE_FLAG      = 0x80,
 
