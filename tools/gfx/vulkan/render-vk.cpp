@@ -356,49 +356,6 @@ public:
         List<Binding>                       m_bindings;             ///< Records entities are bound to this descriptor set, and keeps the associated resources/views/state in scope
     };
 
-#if 0
-    struct BindingDetail
-    {
-        VkImageView     m_srv = VK_NULL_HANDLE;
-        VkBufferView    m_uav = VK_NULL_HANDLE;
-        VkSampler       m_sampler = VK_NULL_HANDLE;
-    };
-
-    class BindingStateImpl: public BindingState
-    {
-		public:
-        typedef BindingState Parent;
-
-		BindingStateImpl(const Desc& desc, const VulkanApi* api):
-            Parent(desc),
-			m_api(api)
-		{
-		}
-        ~BindingStateImpl()
-        {
-            for (int i = 0; i < int(m_bindingDetails.Count()); ++i)
-            {
-                BindingDetail& detail = m_bindingDetails[i];
-                if (detail.m_sampler != VK_NULL_HANDLE)
-                {
-                    m_api->vkDestroySampler(m_api->m_device, detail.m_sampler, nullptr);
-                }
-                if (detail.m_srv != VK_NULL_HANDLE)
-                {
-                    m_api->vkDestroyImageView(m_api->m_device, detail.m_srv, nullptr);
-                }
-                if (detail.m_uav != VK_NULL_HANDLE)
-                {
-                    m_api->vkDestroyBufferView(m_api->m_device, detail.m_uav, nullptr);
-                }
-            }
-        }
-
-        const VulkanApi* m_api;
-        List<BindingDetail> m_bindingDetails;
-    };
-#endif
-
     struct BoundVertexBuffer
     {
         RefPtr<BufferResourceImpl> m_buffer;
@@ -423,11 +380,8 @@ public:
 
         const VulkanApi* m_api;
 
-//        VkPrimitiveTopology m_primitiveTopology;
-
         RefPtr<PipelineLayoutImpl>  m_pipelineLayout;
 
-//        RefPtr<InputLayoutImpl> m_inputLayout;
         RefPtr<ShaderProgramImpl> m_shaderProgram;
 
         VkPipeline m_pipeline = VK_NULL_HANDLE;
@@ -804,10 +758,37 @@ Renderer* createVKRenderer()
 
 VKRenderer::~VKRenderer()
 {
+    // Check the device queue is valid else, we can't wait on it..
+    if (m_deviceQueue.isValid())
+    {
+        waitForGpu();
+    }
+
+    m_currentPipeline.setNull();
+
+    // Same as clear but, also dtors all elements, which clear does not
+    m_boundVertexBuffers = List<BoundVertexBuffer>();
+
+    m_currentPipelineLayout.setNull();
+    for (auto& impl : m_currentDescriptorSetImpls)
+    {
+        impl.setNull();
+    }
+
     if (m_renderPass != VK_NULL_HANDLE)
     {
         m_api.vkDestroyRenderPass(m_device, m_renderPass, nullptr);
         m_renderPass = VK_NULL_HANDLE;
+    }
+
+    m_swapChain.destroy();
+
+    m_deviceQueue.destroy();
+
+    if (m_device != VK_NULL_HANDLE)
+    {
+        m_api.vkDestroyDevice(m_device, nullptr);
+        m_device = VK_NULL_HANDLE;
     }
 }
 
