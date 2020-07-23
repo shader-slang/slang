@@ -5151,6 +5151,7 @@ namespace Slang
             return false;
 
         case kIROp_Nop:
+        case kIROp_undefined:
         case kIROp_Specialize:
         case kIROp_lookup_interface_method:
         case kIROp_getAddr:

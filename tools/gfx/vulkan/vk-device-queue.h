@@ -54,6 +54,12 @@ struct VulkanDeviceQueue
         /// Steps to next command buffer and opens. May block if command buffer is still in use
     void flushStepB();
 
+        /// Destroy the device queue
+    void destroy();
+
+        /// True if the queue appears to be valid and has been initialized
+    bool isValid() const { return m_api != nullptr; }
+
         /// Dtor
     ~VulkanDeviceQueue();
 
