@@ -166,6 +166,7 @@ class TestReporter
     TestOutputMode m_outputMode = TestOutputMode::Default;
     bool m_dumpOutputOnFailure;
     bool m_isVerbose = false;
+    bool m_hideIgnored = false;
 
 protected:
     

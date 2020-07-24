@@ -2078,7 +2078,7 @@ namespace Slang
         RefPtr<Scope>   slangLanguageScope;
 
         ModuleDecl* baseModuleDecl = nullptr;
-        List<RefPtr<Module>> loadedModuleCode;
+        List<RefPtr<Module>> stdlibModules;
 
         SourceManager   builtinSourceManager;
 

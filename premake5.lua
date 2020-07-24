@@ -520,14 +520,14 @@ if isTargetWindows then
     -- Let's go ahead and set up the projects for our other example now.
     example "model-viewer"
 
+    example "heterogeneous-hello-world"
+        kind "ConsoleApp"
+
     example "gpu-printing"
         kind "ConsoleApp"
 end
 
 example "cpu-hello-world"
-    kind "ConsoleApp"
-
-example "heterogeneous-hello-world"
     kind "ConsoleApp"
 
 -- Most of the other projects have more interesting configuration going
