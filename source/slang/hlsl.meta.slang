@@ -4016,21 +4016,21 @@ static const int feedbackTexture2DFlavor = int(TextureFlavor::create(TextureFlav
 static const int feedbackTexture2DArrayFlavor = int(TextureFlavor::create(TextureFlavor::Shape::Shape2D, SLANG_RESOURCE_ACCESS_WRITE, SLANG_TEXTURE_FEEDBACK_FLAG | SLANG_TEXTURE_ARRAY_FLAG).flavor);
 }}}}
 
-__generic<T : __BuiltinSamplerFeedbackType>
 __magic_type(Texture, $(feedbackTexture2DFlavor))
 __intrinsic_type($(kIROp_TextureType + (feedbackTexture2DFlavor << kIROpMeta_OtherShift)))
-struct FeedbackTexture2D
+struct FeedbackTexture2D<T : __BuiltinSamplerFeedbackType>
 {
-    void WriteSamplerFeedback();
+    __target_intrinsic(hlsl)
+    void WriteSamplerFeedback<S>(Texture2D<S> texture);
 
-    __generic<S>
-    void WriteSamplerFeedback(Texture2D<S> texture, SamplerState samp, float2 coords, float clamp);
+    __target_intrinsic(hlsl)
+    void WriteSamplerFeedback<S>(Texture2D<S> texture, SamplerState samp, float2 coords, float clamp);
 };
 
-__generic<T : __BuiltinSamplerFeedbackType>
+
 __magic_type(Texture, $(feedbackTexture2DArrayFlavor))
 __intrinsic_type($(kIROp_TextureType + (feedbackTexture2DArrayFlavor << kIROpMeta_OtherShift)))
-struct FeedbackTexture2DArray
+struct FeedbackTexture2DArray<T : __BuiltinSamplerFeedbackType>
 {
 };
 
