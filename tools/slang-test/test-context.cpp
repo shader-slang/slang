@@ -110,3 +110,15 @@ Slang::DownstreamCompiler* TestContext::getDefaultCompiler(SlangSourceLanguage s
     return set ? set->getDefaultCompiler(sourceLanguage) : nullptr;
 }
 
+bool TestContext::canRunTestWithRenderApiFlags(Slang::RenderApiFlags requiredFlags)
+{
+    // If only allow tests that use API - then the requiredFlags must be 0
+    if (options.apiOnly && requiredFlags == 0)
+    {
+        return false;
+    }
+    // Are the required rendering APIs enabled from the -api command line switch
+    return (requiredFlags & options.enabledApis) == requiredFlags;
+}
+
+

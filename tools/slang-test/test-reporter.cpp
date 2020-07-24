@@ -286,6 +286,11 @@ static void _appendTime(double timeInSec, StringBuilder& out)
 
 void TestReporter::_addResult(const TestInfo& info)
 {
+    if (info.testResult == TestResult::Ignored && m_hideIgnored)
+    {
+        return;
+    }
+
     m_totalTestCount++;
 
     switch (info.testResult)
