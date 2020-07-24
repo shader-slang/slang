@@ -149,6 +149,7 @@ struct OptionsParser
         CodeGenTarget   impliedFormat = CodeGenTarget::Unknown;
         int             targetIndex = -1;
         int             entryPointIndex = -1;
+        bool            isWholeProgram = false;
     };
     List<RawOutput> rawOutputs;
 
@@ -159,6 +160,7 @@ struct OptionsParser
         SlangTargetFlags    targetFlags = 0;
         int                 targetID = -1;
         FloatingPointMode   floatingPointMode = FloatingPointMode::Default;
+        bool                isWholeProgramRequest = false;
 
         // State for tracking command-line errors
         bool conflictingProfilesSet = false;
@@ -1421,13 +1423,8 @@ struct OptionsParser
         //
         for(auto& rawOutput : rawOutputs)
         {
-            // TODO(DG): As noted below, change support for output formats
-            // with multiple entry points
-
-            // For now, all output formats need to be tightly bound to
-            // both a target and an entry point (down the road we will
-            // need to support output formats that can store multiple
-            // entry points in one file).
+            // For now, most output formats need to be tightly bound to
+            // both a target and an entry point.
 
             // If an output doesn't have a target associated with
             // it, then search for the target with the matching format.
@@ -1459,14 +1456,24 @@ struct OptionsParser
             // with an entry point, since the case of a single entry
             // point was handled above, and the user is expected to
             // follow the ordering rules when using multiple entry points.
-            //
-            // TODO(DG): check if output format is left unassociated
-            // If (known format for that output && that format supports whole program) {
-            //    set isWholeProgram bit on the TargetRequest }
-            // else { diagnose what happened }
             if( rawOutput.entryPointIndex == -1 )
             {
-                sink->diagnose(SourceLoc(), Diagnostics::cannotMatchOutputFileToEntryPoint, rawOutput.path);
+                if (rawOutput.targetIndex != -1 )
+                {
+                    auto outputFormat = rawTargets[rawOutput.targetIndex].format;
+                    // Here we check whether the given output format supports multiple entry points
+                    // When we add targets with support for multiple entry points,
+                    // we should update this switch with those new formats
+                    switch (outputFormat)
+                    {
+                    case CodeGenTarget::CPPSource:
+                        rawOutput.isWholeProgram = true;
+                        break;
+                    default:
+                        sink->diagnose(SourceLoc(), Diagnostics::cannotMatchOutputFileToEntryPoint, rawOutput.path);
+                        break;
+                    }
+                }
             }
         }
 
@@ -1479,15 +1486,8 @@ struct OptionsParser
         for(auto& rawOutput : rawOutputs)
         {
             if(rawOutput.targetIndex == -1) continue;
-            // TODO(DG): probably needs updating
-            if(rawOutput.entryPointIndex == -1) continue;
-
             auto targetID = rawTargets[rawOutput.targetIndex].targetID;
-            Int entryPointID = rawEntryPoints[rawOutput.entryPointIndex].entryPointID;
-
             auto target = requestImpl->getLinkage()->targets[targetID];
-            auto entryPointReq = requestImpl->getFrontEndReq()->getEntryPointReqs()[entryPointID];
-
             RefPtr<EndToEndCompileRequest::TargetInfo> targetInfo;
             if( !requestImpl->targetInfos.TryGetValue(target, targetInfo) )
             {
@@ -1495,14 +1495,34 @@ struct OptionsParser
                 requestImpl->targetInfos[target] = targetInfo;
             }
 
-            String outputPath;
-            if( targetInfo->entryPointOutputPaths.ContainsKey(entryPointID) )
+            if (rawOutput.isWholeProgram)
             {
-                sink->diagnose(SourceLoc(), Diagnostics::duplicateOutputPathsForEntryPointAndTarget, entryPointReq->getName(), target->getTarget());
+                if (targetInfo->wholeTargetOutputPath != "")
+                {
+                    sink->diagnose(SourceLoc(), Diagnostics::duplicateOutputPathsForTarget, target->getTarget());
+                }
+                else
+                {
+                    target->isWholeProgramRequest = true;
+                    targetInfo->wholeTargetOutputPath = rawOutput.path;
+                }
             }
             else
             {
-                targetInfo->entryPointOutputPaths[entryPointID] = rawOutput.path;
+                if (rawOutput.entryPointIndex == -1) continue;
+
+                Int entryPointID = rawEntryPoints[rawOutput.entryPointIndex].entryPointID;
+                auto entryPointReq = requestImpl->getFrontEndReq()->getEntryPointReqs()[entryPointID];
+
+                //String outputPath;
+                if (targetInfo->entryPointOutputPaths.ContainsKey(entryPointID))
+                {
+                    sink->diagnose(SourceLoc(), Diagnostics::duplicateOutputPathsForEntryPointAndTarget, entryPointReq->getName(), target->getTarget());
+                }
+                else
+                {
+                    targetInfo->entryPointOutputPaths[entryPointID] = rawOutput.path;
+                }
             }
         }
 

@@ -27,18 +27,17 @@ layout(row_major) uniform;
 #define tmp_trace_E         _S18
 #define tmp_trace_ray       _S19
 #define tmp_trace_payload   _S20
-#define tmp_cmp             _S21
-#define tmp_color           _S22
-#define tmp_dot             _S23
-#define tmp_sat             _S24
-#define tmp_trace2_A        _S25
-#define tmp_trace2_B        _S26
-#define tmp_trace2_C        _S27
-#define tmp_trace2_D        _S28
-#define tmp_trace2_E        _S29
-#define tmp_trace2_ray      _S30
-#define tmp_trace2_payload  _S31
-#define tmp_storeIdx        _S32
+#define tmp_color           _S21
+#define tmp_dot             _S22
+#define tmp_sat             _S23
+#define tmp_trace2_A        _S24
+#define tmp_trace2_B        _S25
+#define tmp_trace2_C        _S26
+#define tmp_trace2_D        _S27
+#define tmp_trace2_E        _S28
+#define tmp_trace2_ray      _S39
+#define tmp_trace2_payload  _S30
+#define tmp_storeIdx        _S31
 
 
 layout(binding = 0) uniform texture2D samplerPosition_0;
@@ -198,9 +197,8 @@ void main()
     TraceRay_0(as_0, tmp_trace_A, tmp_trace_B, tmp_trace_C, tmp_trace_D, tmp_trace_E, tmp_trace_ray, tmp_trace_payload);
     shadowRay_0 = tmp_trace_payload;
 
-    bool tmp_cmp = shadowRay_0.hitDistance_0 < lightDist_0;
     ReflectionRay_0 reflectionRay_0;
-    if(tmp_cmp)
+    if(shadowRay_0.hitDistance_0 < lightDist_0)
     {
         atten_0 = (0.00000000000000000000);
     }

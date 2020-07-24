@@ -46,6 +46,21 @@ struct TestOptions
         Diagnostic,         ///< Diagnostic tests will always run (as form of failure is being tested)  
     };
 
+    void addCategory(TestCategory* category)
+    {
+        if (categories.indexOf(category) < 0)
+        {
+            categories.add(category);
+        }
+    }
+    void addCategories(TestCategory*const* inCategories, Index count)
+    {
+        for (Index i = 0; i < count; ++i)
+        {
+            addCategory(inCategories[i]);
+        }
+    }
+
     Type type = Type::Normal;
 
     String command;
@@ -191,32 +206,29 @@ String collectRestOfLine(char const** ioCursor)
     return getString(textBegin, textEnd);
 }
 
-
-static TestResult _gatherTestOptions(
-    TestCategorySet*    categorySet, 
-    char const**    ioCursor,
-    TestOptions&    outOptions)
+static SlangResult _parseCategories(TestCategorySet* categorySet, char const** ioCursor, TestOptions& out)
 {
     char const* cursor = *ioCursor;
 
     // Right after the `TEST` keyword, the user may specify
     // one or more categories for the test.
-    if(*cursor == '(')
+    if (*cursor == '(')
     {
         cursor++;
         // optional test category
         skipHorizontalSpace(&cursor);
         char const* categoryStart = cursor;
-        for(;;)
+        for (;;)
         {
-            switch( *cursor )
+            switch (*cursor)
             {
-            default:
-                cursor++;
-                continue;
-
-            case ',':
-            case ')':
+                default:
+                {
+                    cursor++;
+                    continue;
+                }
+                case ',':
+                case ')':
                 {
                     char const* categoryEnd = cursor;
                     cursor++;
@@ -224,38 +236,52 @@ static TestResult _gatherTestOptions(
                     auto categoryName = getString(categoryStart, categoryEnd);
                     TestCategory* category = categorySet->find(categoryName);
 
-                    if(!category)
+                    if (!category)
                     {
-                        return TestResult::Fail;
+                        // Failure if we don't find the category
+                        return SLANG_FAIL;
                     }
-                    
 
-                    outOptions.categories.add(category);
+                    out.addCategory(category);
 
-                    if( *categoryEnd == ',' )
+                    if (*categoryEnd == ',')
                     {
                         skipHorizontalSpace(&cursor);
                         categoryStart = cursor;
                         continue;
                     }
+
+                    *ioCursor = cursor;
+                    return SLANG_OK;
                 }
-                break;
-        
-            case 0: case '\r': case '\n':
-                return TestResult::Fail;
+                case 0: case '\r': case '\n':
+                {
+                    return SLANG_FAIL;
+                }
             }
 
             break;
         }
     }
 
-    // If no categories were specified, then add the default category
-    if(outOptions.categories.getCount() == 0)
+    *ioCursor = cursor;
+    return SLANG_OK;
+}
+
+
+static TestResult _gatherTestOptions(
+    TestCategorySet*    categorySet, 
+    char const**    ioCursor,
+    TestOptions&    outOptions)
+{
+    if (SLANG_FAILED(_parseCategories(categorySet, ioCursor, outOptions)))
     {
-        outOptions.categories.add(categorySet->defaultCategory);
+        return TestResult::Fail;
     }
 
-    if(*cursor == ':')
+    char const* cursor = *ioCursor;
+
+     if(*cursor == ':')
         cursor++;
     else
     {
@@ -335,6 +361,24 @@ static TestResult _gatherTestOptions(
     }
 }
 
+
+static RenderApiFlags _getRequiredRenderApisByCommand(const UnownedStringSlice& name);
+
+static void _combineOptions(
+    TestCategorySet* categorySet,
+    const TestOptions& fileOptions,
+    TestOptions& ioOptions)
+{
+    // And the file categories
+    ioOptions.addCategories(fileOptions.categories.getBuffer(), fileOptions.categories.getCount());
+
+    // If no categories were specified, then add the default category
+    if (ioOptions.categories.getCount() == 0)
+    {
+        ioOptions.categories.add(categorySet->defaultCategory);
+    }
+}
+
 // Try to read command-line options from the test file itself
 TestResult gatherTestsForFile(
     TestCategorySet*    categorySet,
@@ -353,6 +397,9 @@ TestResult gatherTestsForFile(
 
     // Walk through the lines of the file, looking for test commands
     char const* cursor = fileContents.begin();
+
+    // Options that are specified across all tests in the file.
+    TestOptions fileOptions;
 
     while(*cursor)
     {
@@ -378,10 +425,25 @@ TestResult gatherTestsForFile(
             testDetails.options.isEnabled = false;
         }
 
+        if (match(&cursor, "TEST_CATEGORY"))
+        {
+            if (SLANG_FAILED(_parseCategories(categorySet, &cursor, fileOptions)))
+            {
+                return TestResult::Fail;
+            }
+        }
+
         if(match(&cursor, "TEST"))
         { 
             if(_gatherTestOptions(categorySet, &cursor, testDetails.options) != TestResult::Pass)
                 return TestResult::Fail;
+
+            // See if the type of test needs certain APIs available
+            const RenderApiFlags testRequiredApis = _getRequiredRenderApisByCommand(testDetails.options.command.getUnownedSlice());
+            testDetails.requirements.addUsedRenderApis(testRequiredApis);
+
+            // Apply the file wide options
+            _combineOptions(categorySet, fileOptions, testDetails.options);
 
             testList->tests.add(testDetails);
         }
@@ -389,6 +451,9 @@ TestResult gatherTestsForFile(
         {
             if (_gatherTestOptions(categorySet, &cursor, testDetails.options) != TestResult::Pass)
                 return TestResult::Fail;
+
+            // Apply the file wide options
+            _combineOptions(categorySet, fileOptions, testDetails.options);
 
             // Mark that it is a diagnostic test
             testDetails.options.type = TestOptions::Type::Diagnostic;
@@ -2611,32 +2676,51 @@ struct TestCommandInfo
 {
     char const*     name;
     TestCallback    callback;
+    RenderApiFlags  requiredRenderApiFlags;     ///< An RenderApi types that are needed to run the tests
 };
 
 static const TestCommandInfo s_testCommandInfos[] =
 {
-    { "SIMPLE",                                 &runSimpleTest},
-    { "SIMPLE_EX",                              &runSimpleTest},
-    { "REFLECTION",                             &runReflectionTest},
-    { "CPU_REFLECTION",                         &runReflectionTest},
-    { "COMMAND_LINE_SIMPLE",                    &runSimpleCompareCommandLineTest},
-    { "COMPARE_HLSL",                           &runDXBCComparisonTest},
-    { "COMPARE_DXIL",                           &runDXILComparisonTest},
-    { "COMPARE_HLSL_RENDER",                    &runHLSLRenderComparisonTest},
-    { "COMPARE_HLSL_CROSS_COMPILE_RENDER",      &runHLSLCrossCompileRenderComparisonTest},
-    { "COMPARE_HLSL_GLSL_RENDER",               &runHLSLAndGLSLRenderComparisonTest},
-    { "COMPARE_COMPUTE",                        &runSlangComputeComparisonTest},
-    { "COMPARE_COMPUTE_EX",                     &runSlangComputeComparisonTestEx},
-    { "HLSL_COMPUTE",                           &runHLSLComputeTest},
-    { "COMPARE_RENDER_COMPUTE",                 &runSlangRenderComputeComparisonTest},
-    { "COMPARE_GLSL",                           &runGLSLComparisonTest},
-    { "CROSS_COMPILE",                          &runCrossCompilerTest},
-    { "CPP_COMPILER_EXECUTE",                   &runCPPCompilerExecute},
-    { "CPP_COMPILER_SHARED_LIBRARY",            &runCPPCompilerSharedLibrary},
-    { "CPP_COMPILER_COMPILE",                   &runCPPCompilerCompile},
-    { "PERFORMANCE_PROFILE",                    &runPerformanceProfile},
-    { "COMPILE",                                &runCompile},
+    { "SIMPLE",                                 &runSimpleTest,                             0 },
+    { "SIMPLE_EX",                              &runSimpleTest,                             0 },
+    { "REFLECTION",                             &runReflectionTest,                         0 },
+    { "CPU_REFLECTION",                         &runReflectionTest,                         0 },
+    { "COMMAND_LINE_SIMPLE",                    &runSimpleCompareCommandLineTest,           0 },
+    { "COMPARE_HLSL",                           &runDXBCComparisonTest,                     0 },
+    { "COMPARE_DXIL",                           &runDXILComparisonTest,                     0 },
+    { "COMPARE_HLSL_RENDER",                    &runHLSLRenderComparisonTest,               0 },
+    { "COMPARE_HLSL_CROSS_COMPILE_RENDER",      &runHLSLCrossCompileRenderComparisonTest,   0 },
+    { "COMPARE_HLSL_GLSL_RENDER",               &runHLSLAndGLSLRenderComparisonTest,        0 },
+    { "COMPARE_COMPUTE",                        &runSlangComputeComparisonTest,             0 },
+    { "COMPARE_COMPUTE_EX",                     &runSlangComputeComparisonTestEx,           0 },
+    { "HLSL_COMPUTE",                           &runHLSLComputeTest,                        0 },
+    { "COMPARE_RENDER_COMPUTE",                 &runSlangRenderComputeComparisonTest,       0 },
+    { "COMPARE_GLSL",                           &runGLSLComparisonTest,                     0 },
+    { "CROSS_COMPILE",                          &runCrossCompilerTest,                      0 },
+    { "CPP_COMPILER_EXECUTE",                   &runCPPCompilerExecute,                     RenderApiFlag::CPU},
+    { "CPP_COMPILER_SHARED_LIBRARY",            &runCPPCompilerSharedLibrary,               RenderApiFlag::CPU},
+    { "CPP_COMPILER_COMPILE",                   &runCPPCompilerCompile,                     RenderApiFlag::CPU},
+    { "PERFORMANCE_PROFILE",                    &runPerformanceProfile,                     0 },
+    { "COMPILE",                                &runCompile,                                0 },
 };
+
+const TestCommandInfo* _findTestCommandInfoByCommand(const UnownedStringSlice& name)
+{
+    for (const auto& command : s_testCommandInfos)
+    {
+        if (name == command.name)
+        {
+            return &command;
+        }
+    }
+    return nullptr;
+}
+
+static RenderApiFlags _getRequiredRenderApisByCommand(const UnownedStringSlice& name)
+{
+    auto info = _findTestCommandInfoByCommand(name);
+    return info ? info->requiredRenderApiFlags : 0;
+}
 
 TestResult runTest(
     TestContext*        context, 
@@ -2654,18 +2738,17 @@ TestResult runTest(
 
     const SpawnType defaultSpawnType = context->options.useExes ? SpawnType::UseExe : SpawnType::UseSharedLibrary;
 
-    for( const auto& command : s_testCommandInfos)
-    {
-        if(testOptions.command != command.name)
-            continue;
+    auto testInfo = _findTestCommandInfoByCommand(testOptions.command.getUnownedSlice());
 
+    if (testInfo)
+    {
         TestInput testInput;
         testInput.filePath = filePath;
         testInput.outputStem = outputStem;
         testInput.testOptions = &testOptions;
         testInput.spawnType = defaultSpawnType;
 
-        return command.callback(context, testInput);
+        return testInfo->callback(context, testInput);
     }
 
     // No actual test runner found!
@@ -2771,7 +2854,9 @@ static void _calcSynthesizedTests(TestContext* context, RenderApiType synthRende
         {
             // TODO(JS): Arguably we should synthesize from explicit tests. In principal we can remove the explicit api apply another
             // although that may not always work.
+            // If it doesn't use any render API or only uses CPU, we don't synthesize
             if (requirements.usedRenderApiFlags == 0 ||
+                requirements.usedRenderApiFlags == RenderApiFlag::CPU ||
                 requirements.explicitRenderApi != RenderApiType::Unknown)
             {
                 continue;
@@ -2829,8 +2914,11 @@ static bool _canIgnore(TestContext* context, const TestDetails& details)
 
     const auto& requirements = details.requirements;
 
-    // Work out what render api flags are available
-    const RenderApiFlags availableRenderApiFlags = requirements.usedRenderApiFlags ? _getAvailableRenderApiFlags(context) : 0;
+    // Check if it's possible in principal to run this test with the render api flags used by this test
+    if (!context->canRunTestWithRenderApiFlags(requirements.usedRenderApiFlags))
+    {
+        return true;
+    }
 
     // Are all the required backends available?
     if (((requirements.usedBackendFlags & context->availableBackendFlags) != requirements.usedBackendFlags))
@@ -2838,14 +2926,11 @@ static bool _canIgnore(TestContext* context, const TestDetails& details)
         return true;
     }
 
+    // Work out what render api flags are actually available, lazily
+    const RenderApiFlags availableRenderApiFlags = requirements.usedRenderApiFlags ? _getAvailableRenderApiFlags(context) : 0;
+
     // Are all the required rendering apis available?
     if ((requirements.usedRenderApiFlags & availableRenderApiFlags) != requirements.usedRenderApiFlags)
-    {
-        return true;
-    }
-
-    // Are the required rendering APIs enabled from the -api command line switch
-    if ((requirements.usedRenderApiFlags & context->options.enabledApis) != requirements.usedRenderApiFlags)
     {
         return true;
     }
@@ -3113,6 +3198,10 @@ SlangResult innerMain(int argc, char** argv)
     auto cudaTestCategory = categorySet.add("cuda", fullTestCategory);
     auto optixTestCategory = categorySet.add("optix", cudaTestCategory);
 
+    auto waveTestCategory = categorySet.add("wave", fullTestCategory);
+    auto waveMaskCategory = categorySet.add("wave-mask", waveTestCategory);
+    auto waveActiveCategory = categorySet.add("wave-active", waveTestCategory);
+
     auto compatibilityIssueCategory = categorySet.add("compatibility-issue", fullTestCategory);
         
 #if SLANG_WINDOWS_FAMILY
@@ -3237,6 +3326,7 @@ SlangResult innerMain(int argc, char** argv)
 
         reporter.m_dumpOutputOnFailure = options.dumpOutputOnFailure;
         reporter.m_isVerbose = options.shouldBeVerbose;
+        reporter.m_hideIgnored = options.hideIgnored;
 
         {
             TestReporter::SuiteScope suiteScope(&reporter, "tests");
@@ -3248,6 +3338,9 @@ SlangResult innerMain(int argc, char** argv)
 
         // Run the unit tests (these are internal C++ tests - not specified via files in a directory) 
         // They are registered with SLANG_UNIT_TEST macro
+        //
+        // 
+        if (context.canRunUnitTests())
         {
             TestReporter::SuiteScope suiteScope(&reporter, "unit tests");
             TestReporter::set(&reporter);

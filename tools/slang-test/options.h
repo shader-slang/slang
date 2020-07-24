@@ -49,6 +49,12 @@ struct Options
     // generate extra output (notably: command lines we run)
     bool shouldBeVerbose = false;
 
+    // When true results from ignored tests are not shown
+    bool hideIgnored = false;
+
+    // When true only tests that use an api that matches the enabledApis flags will run
+    bool apiOnly = false;
+
     // Use verbose paths
     bool verbosePaths = false;
 
@@ -72,7 +78,8 @@ struct Options
     // Exclude test that match one these categories
     Slang::Dictionary<TestCategory*, TestCategory*> excludeCategories;
 
-    // By default we can test against all apis
+    // By default we can test against all apis. If is set to anything other than AllOf only tests that *require* the API
+    // will be run.
     Slang::RenderApiFlags enabledApis = Slang::RenderApiFlag::AllOf;
 
     // The subCommand to execute. Will be empty if there is no subCommand 

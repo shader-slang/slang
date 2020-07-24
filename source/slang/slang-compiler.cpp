@@ -622,7 +622,7 @@ namespace Slang
         }
         else
         {
-            return emitEntryPointSourceFromIR(
+            return emitEntryPointsSourceFromIR(
                 compileRequest,
                 entryPointIndices,
                 target,
@@ -1322,10 +1322,10 @@ SlangResult dissassembleDXILUsingDXC(
         /* This is more convoluted than the other scenarios, because when we invoke C/C++ compiler we would ideally like
         to use the original file. We want to do this because we want includes relative to the source file to work, and
         for that to work most easily we want to use the original file, if there is one */
-        // Note also that we require there to be only one entry point to use a translation unit
-        // TODO(DG): Review this assertion later
-        if (isPassThroughEnabled(endToEndReq) && entryPointIndices.getCount() == 1)
+        if (isPassThroughEnabled(endToEndReq))
         {
+            // TODO(DG): Review this assertion later
+            SLANG_ASSERT(entryPointIndices.getCount() == 1);
             auto translationUnit = getPassThroughTranslationUnit(endToEndReq, entryPointIndices[0]);
             // If it's pass through we accumulate the preprocessor definitions. 
             for (auto& define : translationUnit->compileRequest->preprocessorDefinitions)
