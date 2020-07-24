@@ -23,7 +23,9 @@ float4 main() : SV_Target
     
     float idx = 0;
     
-    feedbackMinMip.WriteSamplerFeedback(tex2D, samp, coords2D + (10 * idx++), clamp);
+    feedbackMinMip.WriteSamplerFeedback();
+    
+    //feedbackMinMip.WriteSamplerFeedback(tex2D, samp, coords2D + (10 * idx++), clamp);
     
     return float4(1, 2, 3, 4);
 }

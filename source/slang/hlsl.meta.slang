@@ -4002,8 +4002,10 @@ void DispatchMesh<P>(uint threadGroupCountX, uint threadGroupCountY, uint thread
 [sealed]
 interface __BuiltinSamplerFeedbackType {};
 [sealed]
+__target_intrinsic(hlsl, SAMPLER_FEEDBACK_MIN_MIP)
 struct SAMPLER_FEEDBACK_MIN_MIP : __BuiltinSamplerFeedbackType {};
 [sealed]
+__target_intrinsic(hlsl, SAMPLER_FEEDBACK_MIP_REGION_USED)
 struct SAMPLER_FEEDBACK_MIP_REGION_USED : __BuiltinSamplerFeedbackType {};
 
 // All of these objects are write-only resources that point to a special kind of unordered access view meant for sampler feedback.
@@ -4019,6 +4021,8 @@ __magic_type(Texture, $(feedbackTexture2DFlavor))
 __intrinsic_type($(kIROp_TextureType + (feedbackTexture2DFlavor << kIROpMeta_OtherShift)))
 struct FeedbackTexture2D
 {
+    void WriteSamplerFeedback();
+
     __generic<S>
     void WriteSamplerFeedback(Texture2D<S> texture, SamplerState samp, float2 coords, float clamp);
 };
