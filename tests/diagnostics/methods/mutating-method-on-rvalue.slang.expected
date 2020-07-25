@@ -1,0 +1,8 @@
+result code = -1
+standard error = {
+tests/diagnostics/methods/mutating-method-on-rvalue.slang(13): error 30050: mutating method 'increment' cannot be called on an immutable value
+tests/diagnostics/methods/mutating-method-on-rvalue.slang(13): note 30049: a 'this' parameter is an immutable parameter by default in Slang; apply the `[mutating]` attribute to the function declaration to opt in to a mutable `this`
+tests/diagnostics/methods/mutating-method-on-rvalue.slang(25): error 30050: mutating method 'increment' cannot be called on an immutable value
+}
+standard output = {
+}
