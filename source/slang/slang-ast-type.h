@@ -107,6 +107,19 @@ class BuiltinType : public DeclRefType
     SLANG_ABSTRACT_CLASS(BuiltinType)
 };
 
+class FeedbackType : public BuiltinType
+{
+    SLANG_CLASS(FeedbackType)
+
+    enum class Kind : uint8_t
+    {
+        MinMip,                 /// SAMPLER_FEEDBACK_MIN_MIP
+        MipRegionUsed,          /// SAMPLER_FEEDBACK_MIP_REGION_USED
+    };
+
+    Kind kind;
+};
+
 // Resources that contain "elements" that can be fetched
 class ResourceType : public BuiltinType 
 {
@@ -140,6 +153,8 @@ protected:
     }
 };
 
+
+
 class TextureType : public TextureTypeBase 
 {
     SLANG_CLASS(TextureType)
@@ -149,6 +164,7 @@ protected:
         : TextureTypeBase(flavor, elementType)
     {}
 };
+
 
 // This is a base type for texture/sampler pairs,
 // as they exist in, e.g., GLSL

@@ -100,6 +100,11 @@ struct ASTSerialIdentityTypeInfo
 template <>
 struct ASTSerialTypeInfo<ASTSerialIndex> : public ASTSerialIdentityTypeInfo<ASTSerialIndex> {};
 
+
+// Because is sized, we don't need to convert
+template <>
+struct ASTSerialTypeInfo<FeedbackType::Kind> : public ASTSerialIdentityTypeInfo<FeedbackType::Kind> {};
+
 // Implement for Basic Types
 
 template <>

@@ -1801,6 +1801,7 @@ extern "C"
         SLANG_TYPE_KIND_INTERFACE,
         SLANG_TYPE_KIND_OUTPUT_STREAM,
         SLANG_TYPE_KIND_SPECIALIZED,
+        SLANG_TYPE_KIND_TEXTURE_FEEDBACK,
         SLANG_TYPE_KIND_COUNT,
     };
 
@@ -2210,6 +2211,7 @@ namespace slang
             Interface = SLANG_TYPE_KIND_INTERFACE,
             OutputStream = SLANG_TYPE_KIND_OUTPUT_STREAM,
             Specialized = SLANG_TYPE_KIND_SPECIALIZED,
+            Feedback = SLANG_TYPE_KIND_TEXTURE_FEEDBACK,
         };
 
         enum ScalarType : SlangScalarType

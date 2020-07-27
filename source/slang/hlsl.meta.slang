@@ -4001,10 +4001,14 @@ void DispatchMesh<P>(uint threadGroupCountX, uint threadGroupCountY, uint thread
 
 [sealed]
 interface __BuiltinSamplerFeedbackType {};
+
 [sealed]
+__magic_type(FeedbackType, $(int(FeedbackType::Kind::MinMip)))
 __target_intrinsic(hlsl, SAMPLER_FEEDBACK_MIN_MIP)
 struct SAMPLER_FEEDBACK_MIN_MIP : __BuiltinSamplerFeedbackType {};
+
 [sealed]
+__magic_type(FeedbackType, $(int(FeedbackType::Kind::MipRegionUsed)))
 __target_intrinsic(hlsl, SAMPLER_FEEDBACK_MIP_REGION_USED)
 struct SAMPLER_FEEDBACK_MIP_REGION_USED : __BuiltinSamplerFeedbackType {};
 

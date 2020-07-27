@@ -241,6 +241,10 @@ SLANG_API SlangTypeKind spReflectionType_GetKind(SlangReflectionType* inType)
     {
         return SLANG_TYPE_KIND_RESOURCE;
     }
+    else if (auto feedbackType = as<FeedbackType>(type))
+    {
+        return SLANG_TYPE_KIND_TEXTURE_FEEDBACK;
+    }
     // TODO: need a better way to handle this stuff...
 #define CASE(TYPE)                          \
     else if(as<TYPE>(type)) do {          \

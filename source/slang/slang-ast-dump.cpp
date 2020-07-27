@@ -414,6 +414,21 @@ struct ASTDumpContext
         m_writer->emit(m_buf);
     }
 
+    void dump(FeedbackType::Kind kind)
+    {
+        m_buf.Clear();
+        const char* name = nullptr;
+        switch (kind)
+        {
+            case FeedbackType::Kind::MinMip: name = "MinMip"; break;
+            case FeedbackType::Kind::MipRegionUsed: name = "MipRegionUsed"; break;
+        }
+
+        m_buf << "FeedbackType::Kind{" << name << "}";
+        m_writer->emit(m_buf);
+    }
+
+
     void dump(SamplerStateFlavor flavor)
     {
         switch (flavor)
