@@ -1,5 +1,5 @@
 //TEST:REFLECTION: -entry main -stage fragment -profile sm_6_5 -target hlsl
-//TEST:CROSS_COMPILE: -entry main -stage fragment -profile sm_6_5 -target dxil-assembly
+//DISABLE_TEST:CROSS_COMPILE: -entry main -stage fragment -profile sm_6_5 -target dxil-assembly
 
 FeedbackTexture2D<SAMPLER_FEEDBACK_MIN_MIP> feedbackMinMip;
 FeedbackTexture2D<SAMPLER_FEEDBACK_MIP_REGION_USED> feedbackMipRegionUsed;
@@ -24,7 +24,7 @@ float4 main() : SV_Target
     
     float idx = 0;
     
-    feedbackMinMip.WriteSamplerFeedback(tex2D);
+    //feedbackMinMip.WriteSamplerFeedback(tex2D);
     
     //feedbackMinMip.WriteSamplerFeedback(tex2D, samp, coords2D + (10 * idx++), clamp);
     
