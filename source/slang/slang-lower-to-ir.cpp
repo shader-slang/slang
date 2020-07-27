@@ -7349,9 +7349,10 @@ IRModule* generateIRForTranslationUnit(
     }
 
 #if 0
-    fprintf(stderr, "### GENERATED\n");
-    dumpIR(module);
-    fprintf(stderr, "###\n");
+    {
+        DiagnosticSinkWriter writer(compileRequest->getSink());
+        dumpIR(module, &writer, "GENERATED");
+    }
 #endif
 
     validateIRModuleIfEnabled(compileRequest, module);
@@ -7457,7 +7458,7 @@ IRModule* generateIRForTranslationUnit(
     if(compileRequest->shouldDumpIR)
     {
         DiagnosticSinkWriter writer(compileRequest->getSink());
-        dumpIR(module, &writer);
+        dumpIR(module, &writer, "LOWER-TO-IR");
     }
 
     return module;
