@@ -1416,12 +1416,6 @@ struct ValLoweringVisitor : ValVisitor<ValLoweringVisitor, LoweredValInfo, Lower
             resultType);
     }
 
-    IRType* visitPtrType(PtrType* type)
-    {
-        IRType* valueType = lowerType(context, type->getValueType());
-        return getBuilder()->getPtrType(valueType);
-    }
-
     IRType* visitDeclRefType(DeclRefType* type)
     {
         auto declRef = type->declRef;
@@ -1498,7 +1492,24 @@ struct ValLoweringVisitor : ValVisitor<ValLoweringVisitor, LoweredValInfo, Lower
         auto intrinsicTypeModifier = type->declRef.getDecl()->findModifier<IntrinsicTypeModifier>();
         SLANG_ASSERT(intrinsicTypeModifier);
         IROp op = IROp(intrinsicTypeModifier->irOp);
-        return getBuilder()->getType(op);
+        List<IRInst*> operands;
+        // If there are any substitutions attached to the declRef,
+        // add them as operands of the IR type.
+        for (auto subst = type->declRef.substitutions.substitutions;
+            subst; subst = subst->outer)
+        {
+            if (auto genSubst = as<GenericSubstitution>(subst))
+            {
+                for (auto arg : genSubst->args)
+                {
+                    operands.add(lowerVal(context, arg).val);
+                }
+            }
+        }
+        return getBuilder()->getType(
+            op,
+            static_cast<UInt>(operands.getCount()),
+            operands.getBuffer());
     }
 
     // Lower a type where the type declaration being referenced is assumed
