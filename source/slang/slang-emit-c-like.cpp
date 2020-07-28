@@ -660,6 +660,11 @@ String CLikeSourceEmitter::scrubName(const String& name)
     return sb.ProduceString();
 }
 
+String CLikeSourceEmitter::generateEntryPointNameImpl(IREntryPointDecoration* entryPointDecor)
+{
+    return entryPointDecor->getName()->getStringSlice();
+}
+
 String CLikeSourceEmitter::generateName(IRInst* inst)
 {
     // If the instruction names something
@@ -686,7 +691,7 @@ String CLikeSourceEmitter::generateName(IRInst* inst)
             return "main";
         }
 
-        return entryPointDecor->getName()->getStringSlice();
+        return generateEntryPointNameImpl(entryPointDecor);
     }
 
     // If we have a name hint on the instruction, then we will try to use that
