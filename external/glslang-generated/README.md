@@ -1,11 +1,18 @@
-Glslang Generated
-=================
+Slang Glslang
+=============
 
-This directory holds files that are generated that are need to build glslang.
+This directory holds files that are generated that are need to build glslang, and it's originating project is...
 
 https://github.com/shader-slang/glslang
 
-In the context of Slang we build a glslang shared library. This shared library is built a project created by the regular Slang premake. That process is discussed later as there are a bunch of other steps that need to be completed before we can create the Slang glslang project and build it. 
+Building glslang depends on 
+
+* external/spirv-headers
+* external/spirv-tools
+* external/spirv-tools-generated
+* external/glslang-external
+
+In the context of Slang we build glslang as a Slang specific shared library/dll. The library is built from a project created by the regular Slang premake. That process is discussed later as there are a bunch of other steps that need to be completed before we can create the Slang glslang project and build it. 
 
 First we need to create the `build_info.h` file in glslang. We can do this from the command line via (assuming we are in the Slang root directory). 
 

@@ -1,5 +1,5 @@
-Spir-V Tools
-============
+Slang Spir-V Tools
+==================
 
 The spir-v tools are needed in the Slang project in order to be able to build glslang. We don't necessarily want to build spir-v tools - but we do need the files that are generated, and those files are then stored in this folder, so that they can just be used without needing to be created as part of the normal build process.
 
