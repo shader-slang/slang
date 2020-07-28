@@ -3206,6 +3206,17 @@ void CLikeSourceEmitter::emitParamTypeImpl(IRType* type, String const& name)
 IRInst* CLikeSourceEmitter::getSpecializedValue(IRSpecialize* specInst)
 {
     auto base = specInst->getBase();
+
+    // It is possible to have a `specialize(...)` where the first
+    // operand is also a `specialize(...)`, so that we need to
+    // look at what declaration is being specialized at the inner
+    // step to find the one being specialized at the outer step.
+    //
+    while(auto baseSpecialize = as<IRSpecialize>(base))
+    {
+        base = getSpecializedValue(baseSpecialize);
+    }
+
     auto baseGeneric = as<IRGeneric>(base);
     if (!baseGeneric)
         return base;
