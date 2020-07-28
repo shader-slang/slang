@@ -31,17 +31,6 @@ struct IntroduceExplicitGlobalContextPass
 
         IRBuilder builder(&sharedBuilder);
 
-        // The global context will be represneted by a `struct`
-        // type with a name hint of `KernelContext`.
-        //
-        m_contextStructType = builder.createStructType();
-        builder.addNameHintDecoration(m_contextStructType, UnownedTerminatedStringSlice("KernelContext"));
-
-        // The context will usually be passed around by pointer,
-        // so we get and cache that pointer type up front.
-        //
-        m_contextStructPtrType = builder.getPtrType(m_contextStructType);
-
         // The transformation we will perform will need to affect
         // global variables, global shader parameters, and entry-point
         // function (at the very least), and we start with an explicit
@@ -107,7 +96,13 @@ struct IntroduceExplicitGlobalContextPass
                     // Note: If we ever changed out mind about the representation
                     // and wanted to support multiple global parameters, we could
                     // easily generalize this code to work with a list.
-                    //
+
+                    // For CUDA output, we want to leave the global uniform
+                    // parameter where it is, because it will translate to
+                    // a global `__constant__` variable.
+                    if(m_target == CodeGenTarget::CUDASource)
+                        continue;
+
                     SLANG_ASSERT(!m_globalUniformsParam);
                     m_globalUniformsParam = globalParam;
                 }
@@ -132,9 +127,36 @@ struct IntroduceExplicitGlobalContextPass
             }
         }
 
+        // If there are no global-scope entities that require processing,
+        // then we can completely skip the work of this pass for CUDA.
+        //
+        // Note: We cannot skip the rest of the pass for CPU, because
+        // it is responsible for introducing the explicit entry-point
+        // parameter that is used for passing in the global param(s).
+        //
+        if( m_target == CodeGenTarget::CUDASource )
+        {
+            if( !m_globalUniformsParam && (m_globalVars.getCount() == 0) )
+            {
+                return;
+            }
+        }
+
         // Now that we've capture all the relevant global entities from the IR,
         // we can being to transform them in an appropriate order.
         //
+        // The global context will be represneted by a `struct`
+        // type with a name hint of `KernelContext`.
+        //
+        m_contextStructType = builder.createStructType();
+        builder.addNameHintDecoration(m_contextStructType, UnownedTerminatedStringSlice("KernelContext"));
+
+        // The context will usually be passed around by pointer,
+        // so we get and cache that pointer type up front.
+        //
+        m_contextStructPtrType = builder.getPtrType(m_contextStructType);
+
+
         // The first step will be to create fields in the `KernelContext`
         // type to represent any global parameters or global variables.
         //
@@ -270,9 +292,9 @@ struct IntroduceExplicitGlobalContextPass
             //
             globalUniformsParam->insertBefore(firstOrdinary);
         }
-        else
+        else if(m_target == CodeGenTarget::CPPSource)
         {
-            // The nature of our current ABI for entry points on CPU/CUDA
+            // The nature of our current ABI for entry points on CPU
             // means that we need an explicit parameter to be *declared*
             // for the global uniforms, even if it is never used.
             //

@@ -979,6 +979,22 @@ static SlangResult _loadAndInvokeComputeProgram(
     ScopeCUDAModule cudaModule;
     SLANG_RETURN_ON_FAIL(cudaModule.load(kernelDesc.codeBegin));
 
+    // The global-scope shader parameters in the input Slang program
+    // will be collected into a single `__constant__` global variable
+    // in the output CUDA module.
+    //
+    // We need to query the address of the `__constant__` variable
+    // so that we can copy parameter data into it when invoking
+    // a kernel.
+    //
+    // The Slang compiler always names this symbol `SLANG_globalParams`
+    // so that it is easy to look up independent of the module or
+    // entry point in question.
+    //
+    CUdeviceptr globalParamsSymbol = 0;
+    size_t globalParamsSymbolSize = 0;
+    cuModuleGetGlobal(&globalParamsSymbol, &globalParamsSymbolSize, cudaModule, "SLANG_globalParams");
+
     slang::EntryPointReflection* entryPoint = nullptr;
     auto entryPointCount = reflection->getEntryPointCount();
     SLANG_ASSERT(entryPointCount == 1);
@@ -999,25 +1015,82 @@ static SlangResult _loadAndInvokeComputeProgram(
     int sharedSizeInBytes;
     SLANG_CUDA_RETURN_ON_FAIL(cuFuncGetAttribute(&sharedSizeInBytes, CU_FUNC_ATTRIBUTE_SHARED_SIZE_BYTES, cudaEntryPoint));
 
-    // Work out the args
-    CUdeviceptr uniformCUDAData = MemoryCUDAResource::getCUDAData(bindRoot.getRootValue());
-    CUdeviceptr entryPointCUDAData = MemoryCUDAResource::getCUDAData(bindRoot.getEntryPointValue());
-
-    // NOTE! These are pointers to the cuda memory pointers
-    void* args[] = { &entryPointCUDAData , &uniformCUDAData };
-
+    // A single CUDA kernel can be invoked with thread groups
+    // of different shapes/sizes, but an HLSL/Slang compute
+    // kernel always has a fixed thread group shape baked in.
+    // We use reflection to query the thread-group size that
+    // the kernel expects, so that we can use the right size
+    // when invoking the kernel.
+    //
     SlangUInt numThreadsPerAxis[3];
     entryPoint->getComputeThreadGroupSize(3, numThreadsPerAxis);
 
-    // Launch
+    // The argument data for the kernel has been set up in `bindRoot`,
+    // which encapsulates global buffers for both the global and
+    // entry-point parameter data.
+    //
+    // In the case of global parameters, we just need to extract the
+    // device address of the parameter data, so we can copy it into
+    // the `SLANG_globalParams` symbol.
+    //
+    {
+        CUdeviceptr globalParamsCUDAData = MemoryCUDAResource::getCUDAData(bindRoot.getRootValue());
+        cudaMemcpyAsync(
+            (void*) globalParamsSymbol,
+            (void*) globalParamsCUDAData,
+            globalParamsSymbolSize,
+            cudaMemcpyDeviceToDevice,
+            cudaStream);
+    }
+    //
+    // In the case of the entry-point parameters, we have to deal with
+    // two different wrinkles.
+    //
+    // First, the `bindRoot` will have the entry-point argument data
+    // stored in a GPU-memory buffer, but we actually need it to be
+    // in host CPU memory. We handle that for now by allocating a
+    // temporary host memory buffer (if needed) and copying the data
+    // from device to host.
+    //
+    auto entryPointBindValue = bindRoot.getEntryPointValue();
+    CUdeviceptr entryPointCUDAData = MemoryCUDAResource::getCUDAData(entryPointBindValue);
+    size_t entryPointDataSize = entryPointBindValue ? entryPointBindValue->m_sizeInBytes : 0;
+    void* entryPointHostData = nullptr;
+    if(entryPointDataSize)
+    {
+        entryPointHostData = alloca(entryPointDataSize);
+        cudaMemcpy(entryPointHostData, (void*)entryPointCUDAData, entryPointDataSize, cudaMemcpyDeviceToHost);
+    }
+    //
+    // Second, the argument data for the entry-point parameters has
+    // been allocated and filled in as a single buffer, but `cuLaunchKernel`
+    // defaults to taking pointers to each of the kernel arguments.
+    //
+    // We could loop over the entry-point parameters using the refleciton
+    // information, and set up a pointer to each using the offset stored
+    // for it in the reflection data. Such an approach would require
+    // us to create and fill in a dynamically-sized array here.
+    //
+    // Instead, we take advantage of a documented but seldom-used feature
+    // of `cuLaunchKernel` that allows the argument data for all of the
+    // kernel "launch parameters" to be specified as a single buffer.
+    //
+    void* extraOptions[] = {
+        CU_LAUNCH_PARAM_BUFFER_POINTER, (void*) entryPointHostData,
+        CU_LAUNCH_PARAM_BUFFER_SIZE, &entryPointDataSize,
+        CU_LAUNCH_PARAM_END,
+    };
+
+    // Once we have all the decessary data extracted and/or
+    // set up, we can launch the kernel and see what happens.
+    //
     auto cudaLaunchResult = cuLaunchKernel(cudaEntryPoint,
         dispatchSize[0], dispatchSize[1], dispatchSize[2], 
         int(numThreadsPerAxis[0]), int(numThreadsPerAxis[1]), int(numThreadsPerAxis[2]),        // Threads per block
         0,              // Shared memory size
         cudaStream,     // Stream. 0 is no stream.
-        args,           // Args
-        nullptr);       // extra
-
+        nullptr,        // Not using traditional argument passing
+        extraOptions);  // Instead passing kernel arguments via "extra" options
     SLANG_CUDA_RETURN_ON_FAIL(cudaLaunchResult);
 
     // Do a sync here. Makes sure any issues are detected early and not on some implicit sync

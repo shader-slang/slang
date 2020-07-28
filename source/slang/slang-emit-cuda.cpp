@@ -239,7 +239,15 @@ void CUDASourceEmitter::emitLayoutSemanticsImpl(IRInst* inst, char const* unifor
 
 void CUDASourceEmitter::emitParameterGroupImpl(IRGlobalParam* varDecl, IRUniformParameterGroupType* type)
 {
-    Super::emitParameterGroupImpl(varDecl, type);
+    auto elementType = type->getElementType();
+
+    m_writer->emit("extern \"C\" __constant__ ");
+    emitType(elementType, "SLANG_globalParams");
+    m_writer->emit(";\n");
+
+    m_writer->emit("#define ");
+    m_writer->emit(getName(varDecl));
+    m_writer->emit(" (&SLANG_globalParams)\n");
 }
 
 void CUDASourceEmitter::emitEntryPointAttributesImpl(IRFunc* irFunc, IREntryPointDecoration* entryPointDecor)
@@ -260,6 +268,59 @@ void CUDASourceEmitter::emitFunctionPreambleImpl(IRInst* inst)
     }
 }
 
+String CUDASourceEmitter::generateEntryPointNameImpl(IREntryPointDecoration* entryPointDecor)
+{
+    // We have an entry-point function in the IR module, which we
+    // will want to emit as a `__global__` function in the generated
+    // CUDA C++.
+    //
+    // The most common case will be a compute kernel, in which case
+    // we will emit the function more or less as-is, including
+    // usingits original name as the name of the global symbol.
+    //
+    String funcName = Super::generateEntryPointNameImpl(entryPointDecor);
+    String globalSymbolName = funcName;
+
+    // We also suport emitting ray tracing kernels for use with
+    // OptiX, and in that case the name of the global symbol
+    // must be prefixed to indicate to the OptiX runtime what
+    // stage it is to be compiled for.
+    //
+    auto stage = entryPointDecor->getProfile().getStage();
+    switch( stage )
+    {
+    default:
+        break;
+
+#define CASE(STAGE, PREFIX) \
+    case Stage::STAGE: globalSymbolName = #PREFIX + funcName; break
+
+    // Optix 7 Guide, Section 6.1 (Program input)
+    //
+    // > The input PTX should include one or more NVIDIA OptiX programs.
+    // > The type of program affects how the program can be used during
+    // > the execution of the pipeline. These program types are specified
+    // by prefixing the program’s name with the following:
+    //
+    // >    Program type        Function name prefix
+    CASE(   RayGeneration,      __raygen__);
+    CASE(   Intersection,       __intersection__);
+    CASE(   AnyHit,             __anyhit__);
+    CASE(   ClosestHit,         __closesthit__);
+    CASE(   Miss,               __miss__);
+    CASE(   Callable,           __direct_callable__);
+    //
+    // There are two stages (or "program types") supported by OptiX
+    // that Slang currently cannot target:
+    //
+    // CASE(ContinuationCallable,   __continuation_callable__);
+    // CASE(Exception,              __exception__);
+    //
+#undef CASE
+    }
+
+    return globalSymbolName;
+}
 
 void CUDASourceEmitter::emitCall(const HLSLIntrinsic* specOp, IRInst* inst, const IRUse* operands, int numOperands, const EmitOpInfo& inOuterPrec)
 {
@@ -642,6 +703,24 @@ void CUDASourceEmitter::emitPreprocessorDirectivesImpl()
     }
 }
 
+bool CUDASourceEmitter::tryEmitGlobalParamImpl(IRGlobalParam* varDecl, IRType* varType)
+{
+    // A global shader parameter in the IR for CUDA output will
+    // either be the unique constant buffer that wraps all the
+    // global-scope parameters in the original code (which is
+    // handled as a special-case before this routine would be
+    // called), or it is one of the system-defined varying inputs
+    // like `threadIdx`. We won't need to emit anything in the
+    // output code for the latter case, so we need to emit
+    // nothing here and return `true` so that the base class
+    // uses our logic instead of the default.
+    //
+    SLANG_UNUSED(varDecl);
+    SLANG_UNUSED(varType);
+    return true;
+}
+
+
 void CUDASourceEmitter::emitModuleImpl(IRModule* module)
 {
     // Setup all built in types used in the module
@@ -660,51 +739,7 @@ void CUDASourceEmitter::emitModuleImpl(IRModule* module)
 
     // TODO(JS): We may need to generate types (for example for matrices)
 
-    // TODO(JS): We need to determine which functions we need to inline
-
-    // The IR will usually come in an order that respects
-    // dependencies between global declarations, but this
-    // isn't guaranteed, so we need to be careful about
-    // the order in which we emit things.
-
-    List<EmitAction> actions;
-
-    computeEmitActions(module, actions);
-
-
-    _emitForwardDeclarations(actions);
-
-    // Output group shared variables
-
-    {
-        for (auto action : actions)
-        {
-            if (action.level == EmitAction::Level::Definition && action.inst->op == kIROp_GlobalVar && as<IRGroupSharedRate>(action.inst->getRate()))
-            {
-                emitGlobalInst(action.inst);   
-            }
-        }
-    }
-
-    {
-        // Output all the thread locals 
-        for (auto action : actions)
-        {
-            if (action.level == EmitAction::Level::Definition && action.inst->op == kIROp_GlobalVar && !as<IRGroupSharedRate>(action.inst->getRate()))
-            {
-                emitGlobalInst(action.inst);
-            }
-        }
-
-        // Finally output the functions as methods on the context
-        for (auto action : actions)
-        {
-            if (action.level == EmitAction::Level::Definition && as<IRFunc>(action.inst))
-            {
-                emitGlobalInst(action.inst);
-            }
-        }
-    }
+    CLikeSourceEmitter::emitModuleImpl(module);
 }
 
 
