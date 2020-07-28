@@ -1484,6 +1484,19 @@ struct ValLoweringVisitor : ValVisitor<ValLoweringVisitor, LoweredValInfo, Lower
         }
     }
 
+    // Lower substitution args and collect them into a list of IR operands.
+    void _collectSubstitutionArgs(List<IRInst*>& operands, Substitutions* subst)
+    {
+        if (!subst) return;
+        _collectSubstitutionArgs(operands, subst->outer);
+        if (auto genSubst = as<GenericSubstitution>(subst))
+        {
+            for (auto arg : genSubst->args)
+            {
+                operands.add(lowerVal(context, arg).val);
+            }
+        }
+    }
     // Lower a type where the type declaration being referenced is assumed
     // to be an intrinsic type, which can thus be lowered to a simple IR
     // type with the appropriate opcode.
@@ -1495,17 +1508,7 @@ struct ValLoweringVisitor : ValVisitor<ValLoweringVisitor, LoweredValInfo, Lower
         List<IRInst*> operands;
         // If there are any substitutions attached to the declRef,
         // add them as operands of the IR type.
-        for (auto subst = type->declRef.substitutions.substitutions;
-            subst; subst = subst->outer)
-        {
-            if (auto genSubst = as<GenericSubstitution>(subst))
-            {
-                for (auto arg : genSubst->args)
-                {
-                    operands.add(lowerVal(context, arg).val);
-                }
-            }
-        }
+        _collectSubstitutionArgs(operands, type->declRef.substitutions.substitutions);
         return getBuilder()->getType(
             op,
             static_cast<UInt>(operands.getCount()),
