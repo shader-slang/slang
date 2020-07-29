@@ -9,8 +9,19 @@ Building glslang depends on
 
 * external/spirv-headers
 * external/spirv-tools
+
+These are not external projects but files produces elsewhere and placed in the slang project.
+
 * external/spirv-tools-generated
 * external/glslang-external
+
+To get the latest version of one of the submodules you can use
+
+```
+% git pull origin master
+```
+
+Make sure you have compatible versions of 'external/spirv-header', 'external/spirv-tools' and 'glslang' before you start!
 
 In the context of Slang we build glslang as a Slang specific shared library/dll. The library is built from a project created by the regular Slang premake. That process is discussed later as there are a bunch of other steps that need to be completed before we can create the Slang glslang project and build it. 
 
