@@ -956,6 +956,20 @@ end
 
 if buildGlslang then
 
+standardProject "slang-spirv-tools"
+    uuid "C36F6185-49B3-467E-8388-D0E9BF5F7BB8"
+    kind "StaticLib"
+    includedirs { "external/spirv-tools", "external/spirv-tools/include", "external/spirv-headers/include",  "external/spirv-tools-generated"}
+
+    addSourceDir("external/spirv-tools/source")
+    addSourceDir("external/spirv-tools/source/opt")
+    addSourceDir("external/spirv-tools/source/util")
+    addSourceDir("external/spirv-tools/source/val")
+
+    filter { "system:linux or macosx" }
+        links { "dl", "pthread" }
+        buildoptions{"-pthread"}
+
 --
 -- The single most complicated part of our build is our custom version of glslang.
 -- Is not really set up to produce a shared library with a usable API, so we have
@@ -995,11 +1009,7 @@ standardProject "slang-glslang"
     addSourceDir("external/glslang/OGLCompilersDLL")
     addSourceDir("external/glslang/SPIRV")
     addSourceDir("external/glslang/StandAlone")
-    addSourceDir("external/spirv-tools/source")
-    addSourceDir("external/spirv-tools/source/opt")
-    addSourceDir("external/spirv-tools/source/util")
-    addSourceDir("external/spirv-tools/source/val")
-
+    
     -- Unfortunately, blindly adding files like that also pulled in a declaration
     -- of a main entry point that we do *not* want, so we will specifically
     -- exclude that file from our build.
@@ -1009,6 +1019,8 @@ standardProject "slang-glslang"
     -- and handling of thread-local storage for its multi-threaded mode. We
     -- don't really care about *any* of that, but we can't remove it from the
     -- build so we need to include the appropriate platform-specific sources.
+
+    links { "slang-spirv-tools" }    
 
     filter { "system:windows" }
         -- On Windows we need to add the platform-specific sources and then
@@ -1021,6 +1033,8 @@ standardProject "slang-glslang"
         links { "dl", "pthread" }
         addSourceDir("external/glslang/glslang/OSDependent/Unix")
         buildoptions{"-fPIC", "-pthread"}
+        
+    
         
 --
 -- With glslang's build out of the way, we've now covered everything we have
