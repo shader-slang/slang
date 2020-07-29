@@ -660,6 +660,11 @@ String CLikeSourceEmitter::scrubName(const String& name)
     return sb.ProduceString();
 }
 
+String CLikeSourceEmitter::generateEntryPointNameImpl(IREntryPointDecoration* entryPointDecor)
+{
+    return entryPointDecor->getName()->getStringSlice();
+}
+
 String CLikeSourceEmitter::generateName(IRInst* inst)
 {
     // If the instruction names something
@@ -686,7 +691,7 @@ String CLikeSourceEmitter::generateName(IRInst* inst)
             return "main";
         }
 
-        return entryPointDecor->getName()->getStringSlice();
+        return generateEntryPointNameImpl(entryPointDecor);
     }
 
     // If we have a name hint on the instruction, then we will try to use that
@@ -3206,6 +3211,17 @@ void CLikeSourceEmitter::emitParamTypeImpl(IRType* type, String const& name)
 IRInst* CLikeSourceEmitter::getSpecializedValue(IRSpecialize* specInst)
 {
     auto base = specInst->getBase();
+
+    // It is possible to have a `specialize(...)` where the first
+    // operand is also a `specialize(...)`, so that we need to
+    // look at what declaration is being specialized at the inner
+    // step to find the one being specialized at the outer step.
+    //
+    while(auto baseSpecialize = as<IRSpecialize>(base))
+    {
+        base = getSpecializedValue(baseSpecialize);
+    }
+
     auto baseGeneric = as<IRGeneric>(base);
     if (!baseGeneric)
         return base;
