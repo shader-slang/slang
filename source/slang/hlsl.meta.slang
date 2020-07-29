@@ -160,6 +160,21 @@ struct $(item.name)
         return __byteAddressBufferLoad<T>(this, location);
     }
 
+    // float32 and int64 atomic support. This is a Slang specific extension, it uses
+    // GL_EXT_shader_atomic_float on vk
+    // NvAPI support on DX
+    // NOTE! To use this feature on HLSL, the shader needs to include 'nvHLSLExtns.h' from the NvAPI SDK
+    //
+    __target_intrinsic(hlsl, "($3 = NvInterlockedAddFp32($0, $1, $2))")
+    __glsl_extension(GL_EXT_shader_atomic_float)
+    __target_intrinsic(glsl, "($3 = atomicAdd($0._data[$1/4], $2))")
+    void InterlockedAddFp32(UINT byteAddress, float valueToAdd, out float originalValue);
+
+    __target_intrinsic(hlsl, "(NvInterlockedAddFp32($0, $1, $2))")
+    __glsl_extension(GL_EXT_shader_atomic_float)
+    __target_intrinsic(glsl, "(atomicAdd($0._data[$1/4], $2))")
+    void InterlockedAddFp32(UINT byteAddress, float valueToAdd);
+
     // Added operations:
 
     __target_intrinsic(glsl, "($3 = atomicAdd($0._data[$1/4], $2))")
