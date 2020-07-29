@@ -968,7 +968,7 @@ standardProject "slang-spirv-tools"
 
     filter { "system:linux or macosx" }
         links { "dl", "pthread" }
-        buildoptions{"-pthread"}
+        buildoptions{"-fPIC", "-pthread"}
 
 --
 -- The single most complicated part of our build is our custom version of glslang.
