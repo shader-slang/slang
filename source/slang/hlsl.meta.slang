@@ -4026,29 +4026,29 @@ struct FeedbackTexture2D<T : __BuiltinSamplerFeedbackType>
 {
     // With Clamp
 
-    __target_intrinsic(hlsl)
+    __target_intrinsic(hlsl, "($0).WriteSamplerFeedback($1, $2, $3, $4)")
     void WriteSamplerFeedback<S>(Texture2D<S> tex, SamplerState samp, float2 location, float clamp);
 
-    __target_intrinsic(hlsl)
+    __target_intrinsic(hlsl, "($0).WriteSamplerFeedbackBias($1, $2, $3, $4, $5)")
     void WriteSamplerFeedbackBias<S>(Texture2D<S> tex, SamplerState samp, float2 location, float bias, float clamp);
 
-    __target_intrinsic(hlsl)
+    __target_intrinsic(hlsl, "($0).WriteSamplerFeedbackGrad($1, $2, $3, $4, $5, $6)")
     void WriteSamplerFeedbackGrad<S>(Texture2D<S> tex, SamplerState samp, float2 location, float2 ddx, float2 ddy, float clamp);
 
     // Level
 
-    __target_intrinsic(hlsl)
+    __target_intrinsic(hlsl, "($0).WriteSamplerFeedbackLevel($1, $2, $3, $4)")
     void WriteSamplerFeedbackLevel<S>(Texture2D<S> tex, SamplerState samp, float2 location, float lod);
     
     // Without Clamp
 
-    __target_intrinsic(hlsl)
+    __target_intrinsic(hlsl, "($0).WriteSamplerFeedback($1, $2, $3)")
     void WriteSamplerFeedback<S>(Texture2D<S> tex, SamplerState samp, float2 location);
 
-    __target_intrinsic(hlsl)
+    __target_intrinsic(hlsl, "($0).WriteSamplerFeedbackBias($1, $2, $3, $4)")
     void WriteSamplerFeedbackBias<S>(Texture2D<S> tex, SamplerState samp, float2 location, float bias);
 
-    __target_intrinsic(hlsl)
+    __target_intrinsic(hlsl, "($0).WriteSamplerFeedbackGrad($1, $2, $3, $4, $5)")
     void WriteSamplerFeedbackGrad<S>(Texture2D<S> tex, SamplerState samp, float2 location, float2 ddx, float2 ddy);
 };
 
@@ -4060,29 +4060,29 @@ struct FeedbackTexture2DArray<T : __BuiltinSamplerFeedbackType>
 {
     // With Clamp
 
-    __target_intrinsic(hlsl)
+    __target_intrinsic(hlsl, "($0).WriteSamplerFeedback($1, $2, $3, $4)")
     void WriteSamplerFeedback<S>(Texture2DArray<S> texArray, SamplerState samp, float3 location, float clamp);
 
-    __target_intrinsic(hlsl)
+    __target_intrinsic(hlsl, "($0).WriteSamplerFeedbackBias($1, $2, $3, $4, $5)")
     void WriteSamplerFeedbackBias<S>(Texture2DArray<S> texArray, SamplerState samp, float3 location, float bias, float clamp);
 
-    __target_intrinsic(hlsl)
+    __target_intrinsic(hlsl, "($0).WriteSamplerFeedbackGrad($1, $2, $3, $4, $5, $6)")
     void WriteSamplerFeedbackGrad<S>(Texture2DArray<S> texArray, SamplerState samp, float3 location, float3 ddx, float3 ddy, float clamp);
 
     // Level
 
-    __target_intrinsic(hlsl)
+    __target_intrinsic(hlsl, "($0).WriteSamplerFeedbackLevel($1, $2, $3, $4)")
     void WriteSamplerFeedbackLevel<S>(Texture2DArray<S> texArray, SamplerState samp, float3 location, float lod);
 
     // Without Clamp
 
-    __target_intrinsic(hlsl)
+    __target_intrinsic(hlsl, "($0).WriteSamplerFeedback($1, $2, $3)")
     void WriteSamplerFeedback<S>(Texture2DArray<S> texArray, SamplerState samp, float3 location);
 
-    __target_intrinsic(hlsl)
+    __target_intrinsic(hlsl, "($0).WriteSamplerFeedbackBias($1, $2, $3, $4)")
     void WriteSamplerFeedbackBias<S>(Texture2DArray<S> texArray, SamplerState samp, float3 location, float bias);
 
-    __target_intrinsic(hlsl)
+    __target_intrinsic(hlsl, "($0).WriteSamplerFeedbackGrad($1, $2, $3, $4, $5)")
     void WriteSamplerFeedbackGrad<S>(Texture2DArray<S> texArray, SamplerState samp, float3 location, float3 ddx, float3 ddy);
 };
 
