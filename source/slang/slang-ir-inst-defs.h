@@ -26,6 +26,8 @@ INST(Nop, nop, 0, 0)
 
     INST(StringType, String, 0, 0)
 
+    INST(AnyValueType, AnyValueType, 1, 0)
+
     INST(RawPointerType, RawPointerType, 0, 0)
     INST(RTTIPointerType, RTTIPointerType, 1, 0)
     INST(AfterRawPointerTypeBase, AfterRawPointerTypeBase, 0, 0)
@@ -539,7 +541,9 @@ INST(HighLevelDeclDecoration,               highLevelDecl,          1, 0)
 
     /* Decorations for RTTI objects */
         INST(RTTITypeSizeDecoration, RTTI_typeSize, 1, 0)
+    INST(AnyValueSizeDecoration, AnyValueSize, 1, 0)
 
+    INST(TypeConstraintDecoration, TypeConstraintDecoration, 1, 0)
     INST_RANGE(LinkageDecoration, ImportDecoration, ExportDecoration)
 
     INST(SemanticDecoration, semantic, 2, 0)
