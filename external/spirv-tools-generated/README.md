@@ -1,9 +1,9 @@
-Slang Spir-V Tools
+Slang SPIR-V Tools
 ==================
 
-The spir-v tools are needed in the Slang project in order to be able to build glslang. We don't necessarily want to build spir-v tools - but we do need the files that are generated, and those files are then stored in this folder, so that they can just be used without needing to be created as part of the normal build process.
+The spir-v tools are needed in the Slang project in order to be able to build glslang. We don't necessarily want/neet to build all the spir-v tools - but we do need the files that are generated as part of this process. Those files are then stored in this folder, so that they can just be used without needing to be created as part of the Slang build process.
 
-To build spirv-tools we need to use [cmake](https://cmake.org/download/). On windows we can use cmake with the gui interface. 
+To build spirv-tools we need [cmake](https://cmake.org/download/). On windows we can use cmake with the gui interface. 
 
 Inside the `external/spirv-tools` directory make a directory `build.vs` which is where we are going to generate all the files.
 
@@ -24,4 +24,3 @@ Next run the cmake gui. Set the source path to be `external/spirv-tools` (in the
 Now go into to the `build.vs` directory and open `spirv-tools.sln` with Visual Studio and compile. This will generate many of the files needed, once regular C++/C compilation has started all of the files should have been created. 
 
 Take the files with '.inc' and '.h' extensions from the build.vs directory and copy it into this directory.
-

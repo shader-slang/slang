@@ -1,7 +1,7 @@
 Slang Glslang
 =============
 
-This directory holds files that are generated that are need to build glslang, and it's originating project is...
+This directory holds files that are generated that are needed to build glslang. The github repository that holds slangs current version of glslang is 
 
 https://github.com/shader-slang/glslang
 
@@ -34,13 +34,13 @@ First we need to create the `build_info.h` file in glslang. We can do this from 
 
 Next we need to create glslang/Include/revision.h. In notes it seems like this may not be needed much longer, but was needed for this build. We run the l/unix shell script `make-revision`. On windows it worked fine within cygwin (and did the previous python step). We then copy the file to `external/glslang-generated/glslang/Include/revision.h`.
 
-The glslang project is dependent on 'spirv-tools', so the next step is to set them up. How to do this is described in the README.md file in the external/spirv-tools-generated folder. 
+The glslang project is dependent on 'spirv-tools', so the next step is to set them up. How to do this is described in the README.md file in the `external/spirv-tools-generated` folder. 
 
 ## Creating and building the Slang glslang project
 
-In normal operation our premake5.lua does not build glslang because that is a slow process, so it must be specified explicitly on the command line. 
+In normal operation `premake5.lua` does not build glslang because it is a slow process, so it must be specified explicitly on the command line for `premake`. 
 
-For visual studio
+For Visual Studio 
 
 ```
 % premake vs2015 --build-glslang=true
