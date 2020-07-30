@@ -4024,18 +4024,66 @@ __magic_type(Texture, $(feedbackTexture2DFlavor))
 __intrinsic_type($(kIROp_TextureType + (feedbackTexture2DFlavor << kIROpMeta_OtherShift)))
 struct FeedbackTexture2D<T : __BuiltinSamplerFeedbackType>
 {
-    __target_intrinsic(hlsl)
-    void WriteSamplerFeedback<S>(Texture2D<S> texture);
+    // With Clamp
 
     __target_intrinsic(hlsl)
-    void WriteSamplerFeedback<S>(Texture2D<S> texture, SamplerState samp, float2 coords, float clamp);
+    void WriteSamplerFeedback<S>(Texture2D<S> tex, SamplerState samp, float2 location, float clamp);
+
+    __target_intrinsic(hlsl)
+    void WriteSamplerFeedbackBias<S>(Texture2D<S> tex, SamplerState samp, float2 location, float bias, float clamp);
+
+    __target_intrinsic(hlsl)
+    void WriteSamplerFeedbackGrad<S>(Texture2D<S> tex, SamplerState samp, float2 location, float2 ddx, float2 ddy, float clamp);
+
+    // Level
+
+    __target_intrinsic(hlsl)
+    void WriteSamplerFeedbackLevel<S>(Texture2D<S> tex, SamplerState samp, float2 location, float lod);
+    
+    // Without Clamp
+
+    __target_intrinsic(hlsl)
+    void WriteSamplerFeedback<S>(Texture2D<S> tex, SamplerState samp, float2 location);
+
+    __target_intrinsic(hlsl)
+    void WriteSamplerFeedbackBias<S>(Texture2D<S> tex, SamplerState samp, float2 location, float bias);
+
+    __target_intrinsic(hlsl)
+    void WriteSamplerFeedbackGrad<S>(Texture2D<S> tex, SamplerState samp, float2 location, float2 ddx, float2 ddy);
 };
+
 
 
 __magic_type(Texture, $(feedbackTexture2DArrayFlavor))
 __intrinsic_type($(kIROp_TextureType + (feedbackTexture2DArrayFlavor << kIROpMeta_OtherShift)))
 struct FeedbackTexture2DArray<T : __BuiltinSamplerFeedbackType>
 {
+    // With Clamp
+
+    __target_intrinsic(hlsl)
+    void WriteSamplerFeedback<S>(Texture2DArray<S> texArray, SamplerState samp, float3 location, float clamp);
+
+    __target_intrinsic(hlsl)
+    void WriteSamplerFeedbackBias<S>(Texture2DArray<S> texArray, SamplerState samp, float3 location, float bias, float clamp);
+
+    __target_intrinsic(hlsl)
+    void WriteSamplerFeedbackGrad<S>(Texture2DArray<S> texArray, SamplerState samp, float3 location, float3 ddx, float3 ddy, float clamp);
+
+    // Level
+
+    __target_intrinsic(hlsl)
+    void WriteSamplerFeedbackLevel<S>(Texture2DArray<S> texArray, SamplerState samp, float3 location, float lod);
+
+    // Without Clamp
+
+    __target_intrinsic(hlsl)
+    void WriteSamplerFeedback<S>(Texture2DArray<S> texArray, SamplerState samp, float3 location);
+
+    __target_intrinsic(hlsl)
+    void WriteSamplerFeedbackBias<S>(Texture2DArray<S> texArray, SamplerState samp, float3 location, float bias);
+
+    __target_intrinsic(hlsl)
+    void WriteSamplerFeedbackGrad<S>(Texture2DArray<S> texArray, SamplerState samp, float3 location, float3 ddx, float3 ddy);
 };
 
 //

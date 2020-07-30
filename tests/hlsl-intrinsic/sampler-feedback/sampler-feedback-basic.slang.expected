@@ -71,16 +71,8 @@ standard output = {
             }
         },
         {
-            "name": "tex2D_float4",
-            "binding": {"kind": "shaderResource", "index": 1},
-            "type": {
-                "kind": "resource",
-                "baseShape": "texture2D"
-            }
-        },
-        {
             "name": "tex2DArray",
-            "binding": {"kind": "shaderResource", "index": 2},
+            "binding": {"kind": "shaderResource", "index": 1},
             "type": {
                 "kind": "resource",
                 "baseShape": "texture2D",
