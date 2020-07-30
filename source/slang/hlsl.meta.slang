@@ -167,12 +167,14 @@ struct $(item.name)
     //
     __target_intrinsic(hlsl, "($3 = NvInterlockedAddFp32($0, $1, $2))")
     __glsl_extension(GL_EXT_shader_atomic_float)
-    __target_intrinsic(glsl, "($3 = atomicAdd($0._data[$1/4], $2))")
+    __glsl_extension(GL_EXT_gpu_shader5)
+    __target_intrinsic(glsl, "($3 = atomicAdd((float*)&$0._data[$1/4], $2))")
     void InterlockedAddFp32(UINT byteAddress, float valueToAdd, out float originalValue);
 
     __target_intrinsic(hlsl, "(NvInterlockedAddFp32($0, $1, $2))")
     __glsl_extension(GL_EXT_shader_atomic_float)
-    __target_intrinsic(glsl, "(atomicAdd($0._data[$1/4], $2))")
+    __glsl_extension(GL_EXT_gpu_shader5)
+    __target_intrinsic(glsl, "(atomicAdd((float*)&$0._data[$1/4], $2))")
     void InterlockedAddFp32(UINT byteAddress, float valueToAdd);
 
     // Added operations:
