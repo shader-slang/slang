@@ -30,18 +30,33 @@ struct Node
     StringSpan  span;
 
     // The body of this node for other flavors
-    Node*       body;
+    Node* body = nullptr;
 
     // The next node in the document
-    Node*       next;
+    Node* next = nullptr;
+
+    Node() = default;
+    ~Node()
+    {
+        if (body) delete body;
+        if (next) delete next;
+    }
 };
 
 // Information about a source file
-struct SourceFile
+struct SourceFile : public RefObject
 {
     String inputPath;
-    StringSpan  text;
-    Node*       node;
+    StringSpan   text;
+    Node* node = nullptr;
+    SourceFile() = default;
+    ~SourceFile()
+    {
+        if (text.begin())
+            free((void*)text.begin());
+        if (node)
+            delete node;
+    }
 };
 
 void addNode(
@@ -795,10 +810,12 @@ SourceFile* parseSourceFile(const String& path)
     Node* node = parseSourceFile(sourceFile);
 
     sourceFile->node = node;
+
+    fclose(inputStream);
     return sourceFile;
 }
 
-List<SourceFile*> gSourceFiles;
+List<RefPtr<SourceFile>> gSourceFiles;
 
 int main(
     int     argc,
