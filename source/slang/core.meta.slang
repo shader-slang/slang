@@ -1727,6 +1727,92 @@ for (auto op : intrinsicBinaryOps)
     }
 }
 
+// We will declare the shift operations entirely as generics
+// rather than try to handle all the pairings of left-hand
+// and right-hand side types.
+//
+static const struct ShiftOpInfo
+{
+    char const* name;
+    int op;
+} kShiftOps[] =
+{
+    { "<<",  kIROp_Lsh },
+    { ">>",  kIROp_Rsh },
+};
+for(auto info : kShiftOps) {
+}}}}
+
+__generic<L: __BuiltinIntegerType, R: __BuiltinIntegerType>
+__intrinsic_op($(info.op))
+L operator$(info.name)(L left, R right);
+
+__generic<L: __BuiltinIntegerType, R: __BuiltinIntegerType>
+[__unsafeForceInlineEarly]
+L operator$(info.name)=(in out L left, R right)
+{
+    left = left $(info.name) right;
+    return left;
+}
+
+__generic<L: __BuiltinIntegerType, R: __BuiltinIntegerType, let N : int>
+__intrinsic_op($(info.op))
+vector<L,N> operator$(info.name)(vector<L,N> left, vector<R,N> right);
+
+__generic<L: __BuiltinIntegerType, R: __BuiltinIntegerType, let N : int>
+[__unsafeForceInlineEarly]
+vector<L,N> operator$(info.name)=(in out vector<L,N> left, vector<R,N> right)
+{
+    left = left $(info.name) right;
+    return left;
+}
+
+__generic<L: __BuiltinIntegerType, R: __BuiltinIntegerType, let N : int, let M : int>
+__intrinsic_op($(info.op))
+matrix<L,N,M> operator$(info.name)(matrix<L,N,M> left, matrix<R,N,M> right);
+
+__generic<L: __BuiltinIntegerType, R: __BuiltinIntegerType, let N : int, let M : int>
+[__unsafeForceInlineEarly]
+matrix<L, N, M> operator$(info.name)=(in out matrix<L, N, M> left, matrix<R, N, M> right)
+{
+    left = left $(info.name) right;
+    return left;
+}
+
+__generic<L: __BuiltinIntegerType, R: __BuiltinIntegerType, let N : int>
+__intrinsic_op($(info.op))
+vector<L,N> operator$(info.name)(L left, vector<R,N> right);
+
+__generic<L: __BuiltinIntegerType, R: __BuiltinIntegerType, let N : int, let M : int>
+__intrinsic_op($(info.op))
+matrix<L,N,M> operator$(info.name)(L left, matrix<R,N,M> right);
+
+__generic<L: __BuiltinIntegerType, R: __BuiltinIntegerType, let N : int>
+__intrinsic_op($(info.op))
+vector<L,N> operator$(info.name)(vector<L,N> left, R right);
+
+__generic<L: __BuiltinIntegerType, R: __BuiltinIntegerType, let N : int>
+[__unsafeForceInlineEarly]
+vector<L, N> operator$(info.name)=(in out vector<L, N> left, R right)
+{
+    left = left $(info.name) right;
+    return left;
+}
+
+__generic<L: __BuiltinIntegerType, R: __BuiltinIntegerType, let N : int, let M : int>
+__intrinsic_op($(info.op))
+matrix<L,N,M> operator$(info.name)(matrix<L,N,M> left, R right);
+
+__generic<L: __BuiltinIntegerType, R: __BuiltinIntegerType, let N : int, let M : int>
+[__unsafeForceInlineEarly]
+matrix<L,N,M> operator$(info.name)=(in out matrix<L,N,M> left, R right)
+{
+    left = left $(info.name) right;
+    return left;
+}
+
+${{{{
+}
 
     static const struct CompoundBinaryOpInfo
     {
@@ -1743,8 +1829,6 @@ for (auto op : intrinsicBinaryOps)
         { "&",  "__BuiltinLogicalType" },
         { "|",  "__BuiltinLogicalType" },
         { "^",  "__BuiltinLogicalType" },
-        { "<<", "__BuiltinIntegerType" },
-        { ">>", "__BuiltinIntegerType" },
     };
     for( auto op : kCompoundBinaryOps )
     {
