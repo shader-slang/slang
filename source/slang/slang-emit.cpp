@@ -20,6 +20,7 @@
 #include "slang-ir-restructure.h"
 #include "slang-ir-restructure-scoping.h"
 #include "slang-ir-specialize.h"
+#include "slang-ir-specialize-arrays.h"
 #include "slang-ir-specialize-resources.h"
 #include "slang-ir-ssa.h"
 #include "slang-ir-strip-witness-tables.h"
@@ -125,29 +126,6 @@ StructTypeLayout* getGlobalStructLayout(
     return getScopeStructLayout(programLayout);
 }
 
-static void dumpIR(
-    BackEndCompileRequest* compileRequest,
-    IRModule*       irModule,
-    char const*     label)
-{
-    DiagnosticSinkWriter writerImpl(compileRequest->getSink());
-    WriterHelper writer(&writerImpl);
-
-    if(label)
-    {
-        writer.put("### ");
-        writer.put(label);
-        writer.put(":\n");
-    }
-
-    dumpIR(irModule, writer.getWriter());
-
-    if( label )
-    {
-        writer.put("###\n");
-    }
-}
-
 static void dumpIRIfEnabled(
     BackEndCompileRequest* compileRequest,
     IRModule*       irModule,
@@ -155,7 +133,8 @@ static void dumpIRIfEnabled(
 {
     if(compileRequest->shouldDumpIR)
     {
-        dumpIR(compileRequest, irModule, label);
+        DiagnosticSinkWriter writer(compileRequest->getSink());
+        dumpIR(irModule, &writer, label);
     }
 }
 
@@ -263,20 +242,19 @@ Result linkAndOptimizeIR(
         CollectEntryPointUniformParamsOptions passOptions;
         switch( target )
         {
-        default:
+        case CodeGenTarget::CUDASource:
             break;
 
         case CodeGenTarget::CPPSource:
-        case CodeGenTarget::CUDASource:
             passOptions.alwaysCreateCollectedParam = true;
+        default:
+            collectEntryPointUniformParams(irModule, passOptions);
+        #if 0
+            dumpIRIfEnabled(compileRequest, irModule, "ENTRY POINT UNIFORMS COLLECTED");
+        #endif
+            validateIRModuleIfEnabled(compileRequest, irModule);
             break;
         }
-
-        collectEntryPointUniformParams(irModule, passOptions);
-    #if 0
-        dumpIRIfEnabled(compileRequest, irModule, "ENTRY POINT UNIFORMS COLLECTED");
-    #endif
-        validateIRModuleIfEnabled(compileRequest, irModule);
     }
 
     switch( target )
@@ -453,6 +431,14 @@ Result linkAndOptimizeIR(
     // pass down the target request along with the IR.
     //
     specializeResourceParameters(compileRequest, targetRequest, irModule);
+
+    // For GLSL targets, we also want to specialize calls to functions that
+    // takes array parameters if possible, to avoid performance issues on
+    // those platforms.
+    if (isKhronosTarget(targetRequest))
+    {
+        specializeArrayParameters(compileRequest, targetRequest, irModule);
+    }
 
 #if 0
     dumpIRIfEnabled(compileRequest, irModule, "AFTER RESOURCE SPECIALIZATION");
@@ -650,7 +636,10 @@ Result linkAndOptimizeIR(
     case CodeGenTarget::CUDASource:
         moveGlobalVarInitializationToEntryPoints(irModule);
         introduceExplicitGlobalContext(irModule, target);
-        convertEntryPointPtrParamsToRawPtrs(irModule);
+        if(target == CodeGenTarget::CPPSource)
+        {
+            convertEntryPointPtrParamsToRawPtrs(irModule);
+        }
     #if 0
         dumpIRIfEnabled(compileRequest, irModule, "EXPLICIT GLOBAL CONTEXT INTRODUCED");
     #endif

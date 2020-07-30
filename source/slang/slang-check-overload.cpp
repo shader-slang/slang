@@ -358,11 +358,54 @@ namespace Slang
         return true;
     }
 
-    bool SemanticsVisitor::TryCheckOverloadCandidateDirections(
-        OverloadResolveContext&		/*context*/,
-        OverloadCandidate const&	/*candidate*/)
+    bool isEffectivelyMutating(CallableDecl* decl)
     {
-        // TODO(tfoley): check `in` and `out` markers, as needed.
+        if(decl->hasModifier<MutatingAttribute>())
+            return true;
+
+        if(decl->hasModifier<NonmutatingAttribute>())
+            return false;
+
+        if(as<SetterDecl>(decl))
+            return true;
+
+        return false;
+    }
+
+    bool SemanticsVisitor::TryCheckOverloadCandidateDirections(
+        OverloadResolveContext&     context,
+        OverloadCandidate const&    candidate)
+    {
+        if(candidate.flavor != OverloadCandidate::Flavor::Func)
+            return true;
+
+        auto funcDeclRef = candidate.item.declRef.as<CallableDecl>();
+        SLANG_ASSERT(funcDeclRef);
+
+        // Note: This operation was originally introduced as
+        // a place to add checking around l-value-ness of arguments
+        // and parameters, but currently that checking is being
+        // done in other places.
+        //
+        // For now we will only use this step to check the
+        // mutability of the `this` parameter where necessary.
+        //
+        if(!isEffectivelyStatic(funcDeclRef.getDecl()))
+        {
+            if(isEffectivelyMutating(funcDeclRef.getDecl()))
+            {
+                if(context.baseExpr && !context.baseExpr->type.isLeftValue)
+                {
+                    if(context.mode == OverloadResolveContext::Mode::ForReal)
+                    {
+                        getSink()->diagnose(context.loc, Diagnostics::mutatingMethodOnImmutableValue, funcDeclRef.getName());
+                        maybeDiagnoseThisNotLValue(context.baseExpr);
+                    }
+                    return false;
+                }
+            }
+        }
+
         return true;
     }
 

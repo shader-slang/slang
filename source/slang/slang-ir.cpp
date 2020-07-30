@@ -4637,6 +4637,25 @@ namespace Slang
         writer->flush();
     }
 
+    void dumpIR(IRModule* module, ISlangWriter* slangWriter, char const* label)
+    {
+        WriterHelper writer(slangWriter);
+
+        if (label)
+        {
+            writer.put("### ");
+            writer.put(label);
+            writer.put(":\n");
+        }
+
+        dumpIR(module, slangWriter, IRDumpMode::Simplified);
+
+        if (label)
+        {
+            writer.put("###\n");
+        }
+    }
+
     String getSlangIRAssembly(IRModule* module, IRDumpMode mode)
     {
         StringBuilder sb;
@@ -5151,6 +5170,7 @@ namespace Slang
             return false;
 
         case kIROp_Nop:
+        case kIROp_undefined:
         case kIROp_Specialize:
         case kIROp_lookup_interface_method:
         case kIROp_getAddr:
@@ -5376,4 +5396,3 @@ namespace Slang
             ptrType->getOperand(0)->op == opCode;
     }
 }
-

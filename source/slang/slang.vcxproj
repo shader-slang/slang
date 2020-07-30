@@ -250,6 +250,8 @@
     <ClInclude Include="slang-ir-sccp.h" />
     <ClInclude Include="slang-ir-serialize-types.h" />
     <ClInclude Include="slang-ir-serialize.h" />
+    <ClInclude Include="slang-ir-specialize-arrays.h" />
+    <ClInclude Include="slang-ir-specialize-function-call.h" />
     <ClInclude Include="slang-ir-specialize-resources.h" />
     <ClInclude Include="slang-ir-specialize.h" />
     <ClInclude Include="slang-ir-ssa.h" />
@@ -349,6 +351,8 @@
     <ClCompile Include="slang-ir-sccp.cpp" />
     <ClCompile Include="slang-ir-serialize-types.cpp" />
     <ClCompile Include="slang-ir-serialize.cpp" />
+    <ClCompile Include="slang-ir-specialize-arrays.cpp" />
+    <ClCompile Include="slang-ir-specialize-function-call.cpp" />
     <ClCompile Include="slang-ir-specialize-resources.cpp" />
     <ClCompile Include="slang-ir-specialize.cpp" />
     <ClCompile Include="slang-ir-ssa.cpp" />

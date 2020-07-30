@@ -1484,6 +1484,19 @@ struct ValLoweringVisitor : ValVisitor<ValLoweringVisitor, LoweredValInfo, Lower
         }
     }
 
+    // Lower substitution args and collect them into a list of IR operands.
+    void _collectSubstitutionArgs(List<IRInst*>& operands, Substitutions* subst)
+    {
+        if (!subst) return;
+        _collectSubstitutionArgs(operands, subst->outer);
+        if (auto genSubst = as<GenericSubstitution>(subst))
+        {
+            for (auto arg : genSubst->args)
+            {
+                operands.add(lowerVal(context, arg).val);
+            }
+        }
+    }
     // Lower a type where the type declaration being referenced is assumed
     // to be an intrinsic type, which can thus be lowered to a simple IR
     // type with the appropriate opcode.
@@ -1492,7 +1505,14 @@ struct ValLoweringVisitor : ValVisitor<ValLoweringVisitor, LoweredValInfo, Lower
         auto intrinsicTypeModifier = type->declRef.getDecl()->findModifier<IntrinsicTypeModifier>();
         SLANG_ASSERT(intrinsicTypeModifier);
         IROp op = IROp(intrinsicTypeModifier->irOp);
-        return getBuilder()->getType(op);
+        List<IRInst*> operands;
+        // If there are any substitutions attached to the declRef,
+        // add them as operands of the IR type.
+        _collectSubstitutionArgs(operands, type->declRef.substitutions.substitutions);
+        return getBuilder()->getType(
+            op,
+            static_cast<UInt>(operands.getCount()),
+            operands.getBuffer());
     }
 
     // Lower a type where the type declaration being referenced is assumed
@@ -7343,9 +7363,10 @@ IRModule* generateIRForTranslationUnit(
     }
 
 #if 0
-    fprintf(stderr, "### GENERATED\n");
-    dumpIR(module);
-    fprintf(stderr, "###\n");
+    {
+        DiagnosticSinkWriter writer(compileRequest->getSink());
+        dumpIR(module, &writer, "GENERATED");
+    }
 #endif
 
     validateIRModuleIfEnabled(compileRequest, module);
@@ -7451,7 +7472,7 @@ IRModule* generateIRForTranslationUnit(
     if(compileRequest->shouldDumpIR)
     {
         DiagnosticSinkWriter writer(compileRequest->getSink());
-        dumpIR(module, &writer);
+        dumpIR(module, &writer, "LOWER-TO-IR");
     }
 
     return module;

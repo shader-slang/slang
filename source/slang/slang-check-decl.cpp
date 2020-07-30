@@ -1576,7 +1576,7 @@ namespace Slang
             //
             auto synParamDecl = m_astBuilder->create<ParamDecl>();
             synParamDecl->nameAndLoc = paramDeclRef.getDecl()->nameAndLoc;
-            synParamDecl->type.type = resultType;
+            synParamDecl->type.type = paramType;
 
             // We need to add the parameter as a child declaration of
             // the method we are building.
@@ -1599,7 +1599,12 @@ namespace Slang
         // if any.
         //
         ThisExpr* synThis = nullptr;
-        if( !requiredMemberDeclRef.getDecl()->hasModifier<HLSLStaticModifier>() )
+        if( requiredMemberDeclRef.getDecl()->hasModifier<HLSLStaticModifier>() )
+        {
+            auto synStaticModifier = m_astBuilder->create<HLSLStaticModifier>();
+            synFuncDecl->modifiers.first = synStaticModifier;
+        }
+        else
         {
             // For a non-`static` requirement, we need a `this` parameter.
             //
