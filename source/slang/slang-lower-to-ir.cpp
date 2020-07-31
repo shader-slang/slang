@@ -1433,6 +1433,12 @@ struct ValLoweringVisitor : ValVisitor<ValLoweringVisitor, LoweredValInfo, Lower
             resultType);
     }
 
+    IRType* visitPtrType(PtrType* type)
+    {
+        IRType* valueType = lowerType(context, type->getValueType());
+        return getBuilder()->getPtrType(valueType);
+    }
+
     IRType* visitDeclRefType(DeclRefType* type)
     {
         auto declRef = type->declRef;
