@@ -1265,6 +1265,9 @@ namespace Slang
 
         bool m_obfuscateCode = false;
 
+        // Determine whether to output heterogeneity-related code
+        bool m_heterogeneous = false;
+
         // Name pool for looking up names
         NamePool namePool;
 
