@@ -216,6 +216,12 @@ INST_RANGE(Constant, BoolLit, StringLit)
 
 INST(undefined, undefined, 0, 0)
 
+// A `defaultConstruct` operation creates an initialized
+// value of the result type, and can only be used for types
+// where default construction is a meaningful thing to do.
+//
+INST(DefaultConstruct, defaultConstruct, 0, 0)
+
 INST(Specialize, specialize, 2, 0)
 INST(lookup_interface_method, lookup_interface_method, 2, 0)
 INST(lookup_witness_table, lookup_witness_table, 2, 0)
