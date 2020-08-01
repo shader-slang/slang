@@ -4135,6 +4135,11 @@ static const CANDIDATE_TYPE CANDIDATE_PROCEDURAL_PRIMITIVE = 1;
 __target_intrinsic(hlsl, RayQuery)
 struct RayQuery <let rayFlags : RAY_FLAG = RAY_FLAG_NONE>
 {
+    // Initialize the query object in a "fresh" state.
+    //
+    __intrinsic_op($(kIROp_DefaultConstruct))
+    __init();
+
     // Initialize a ray-tracing query.
     //
     // This method may be called on a "fresh" ray query, or

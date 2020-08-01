@@ -2221,14 +2221,16 @@ namespace Slang
         return (IRStringType*)getType(kIROp_StringType);
     }
 
-    IRAssociatedType* IRBuilder::getAssociatedType()
+    IRAssociatedType* IRBuilder::getAssociatedType(ArrayView<IRInterfaceType*> constraintTypes)
     {
-        return (IRAssociatedType*)getType(kIROp_AssociatedType);
+        return (IRAssociatedType*)getType(kIROp_AssociatedType,
+            constraintTypes.getCount(),
+            (IRInst**)constraintTypes.getBuffer());
     }
 
-    IRThisType* IRBuilder::getThisType()
+    IRThisType* IRBuilder::getThisType(IRInterfaceType* interfaceType)
     {
-        return (IRThisType*)getType(kIROp_ThisType);
+        return (IRThisType*)getType(kIROp_ThisType, interfaceType);
     }
 
     IRRawPointerType* IRBuilder::getRawPointerType()
@@ -2244,6 +2246,17 @@ namespace Slang
     IRRTTIType* IRBuilder::getRTTIType()
     {
         return (IRRTTIType*)getType(kIROp_RTTIType);
+    }
+
+    IRAnyValueType* IRBuilder::getAnyValueType(IRIntegerValue size)
+    {
+        return (IRAnyValueType*)getType(kIROp_AnyValueType,
+            getIntValue(getIntType(), size));
+    }
+
+    IRAnyValueType* IRBuilder::getAnyValueType(IRInst* size)
+    {
+        return (IRAnyValueType*)getType(kIROp_AnyValueType, size);
     }
 
     IRBasicBlockType*   IRBuilder::getBasicBlockType()
@@ -5171,6 +5184,7 @@ namespace Slang
 
         case kIROp_Nop:
         case kIROp_undefined:
+        case kIROp_DefaultConstruct:
         case kIROp_Specialize:
         case kIROp_lookup_interface_method:
         case kIROp_getAddr:
