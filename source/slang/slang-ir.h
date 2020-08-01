@@ -1252,6 +1252,15 @@ struct IRRTTIType : IRType
     IR_LEAF_ISA(RTTIType);
 };
 
+struct IRAnyValueType : IRType
+{
+    IR_LEAF_ISA(AnyValueType);
+    IRInst* getSize()
+    {
+        return getOperand(0);
+    }
+};
+
 struct IRWitnessTableType : IRType
 {
     IRInst* getConformanceType()

@@ -156,6 +156,31 @@ struct IRRTTITypeSizeDecoration : IRDecoration
     }
 };
 
+/// A decoration on `IRInterfaceType` that marks the size of `AnyValue` that should
+/// be used to represent a polymorphic value of the interface.
+struct IRAnyValueSizeDecoration : IRDecoration
+{
+    enum { kOp = kIROp_AnyValueSizeDecoration };
+    IR_LEAF_ISA(AnyValueSizeDecoration)
+
+    IRIntLit* getSizeOperand() { return cast<IRIntLit>(getOperand(0)); }
+    IRIntegerValue getSize()
+    {
+        return getSizeOperand()->getValue();
+    }
+};
+
+/// A decoration on `IRParam`s that represent generic parameters,
+/// marking the interface type that the generic parameter conforms to.
+/// A generic parameter can have more than one `IRTypeConstraintDecoration`s
+struct IRTypeConstraintDecoration : IRDecoration
+{
+    enum { kOp = kIROp_TypeConstraintDecoration };
+    IR_LEAF_ISA(TypeConstraintDecoration)
+
+    IRInst* getConstraintType() { return getOperand(0); }
+};
+
 #define IR_SIMPLE_DECORATION(NAME)      \
     struct IR##NAME : IRDecoration      \
     {                                   \
@@ -1653,12 +1678,13 @@ struct IRBuilder
     IRBasicType* getBoolType();
     IRBasicType* getIntType();
     IRStringType* getStringType();
-    IRAssociatedType* getAssociatedType();
-    IRThisType* getThisType();
+    IRAssociatedType* getAssociatedType(ArrayView<IRInterfaceType*> constraintTypes);
+    IRThisType* getThisType(IRInterfaceType* interfaceType);
     IRRawPointerType* getRawPointerType();
     IRRTTIPointerType* getRTTIPointerType(IRInst* rttiPtr);
     IRRTTIType* getRTTIType();
-
+    IRAnyValueType* getAnyValueType(IRIntegerValue size);
+    IRAnyValueType* getAnyValueType(IRInst* size);
 
     IRBasicBlockType*   getBasicBlockType();
     IRWitnessTableType* getWitnessTableType(IRType* baseType);
@@ -2343,6 +2369,16 @@ struct IRBuilder
     void addRTTITypeSizeDecoration(IRInst* inst, IRIntegerValue value)
     {
         addDecoration(inst, kIROp_RTTITypeSizeDecoration, getIntValue(getIntType(), value));
+    }
+
+    void addAnyValueSizeDecoration(IRInst* inst, IRIntegerValue value)
+    {
+        addDecoration(inst, kIROp_AnyValueSizeDecoration, getIntValue(getIntType(), value));
+    }
+
+    void addTypeConstraintDecoration(IRInst* inst, IRInst* constraintType)
+    {
+        addDecoration(inst, kIROp_TypeConstraintDecoration, constraintType);
     }
 };
 
