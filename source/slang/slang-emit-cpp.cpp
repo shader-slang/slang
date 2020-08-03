@@ -340,6 +340,12 @@ SlangResult CPPSourceEmitter::_calcCPPTextureTypeName(IRTextureTypeBase* texType
         case SLANG_RESOURCE_ACCESS_CONSUME:
             outName << "Consume";
             break;
+        case SLANG_RESOURCE_ACCESS_WRITE:
+            if (texType->isFeedback())
+            {
+                outName << "Feedback";
+            }
+            break;
         default:
             SLANG_DIAGNOSE_UNEXPECTED(getSink(), SourceLoc(), "unhandled resource access mode");
             return SLANG_FAIL;

@@ -243,6 +243,13 @@ void HLSLSourceEmitter::_emitHLSLTextureType(IRTextureTypeBase* texType)
             m_writer->emit("Consume");
             break;
 
+        case SLANG_RESOURCE_ACCESS_WRITE:
+            if (texType->isFeedback())
+            {
+                m_writer->emit("Feedback");
+            }
+            break;
+
         default:
             SLANG_DIAGNOSE_UNEXPECTED(getSink(), SourceLoc(), "unhandled resource access mode");
             break;
