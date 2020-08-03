@@ -4024,6 +4024,9 @@ __magic_type(Texture, $(feedbackTexture2DFlavor))
 __intrinsic_type($(kIROp_TextureType + (feedbackTexture2DFlavor << kIROpMeta_OtherShift)))
 struct FeedbackTexture2D<T : __BuiltinSamplerFeedbackType>
 {
+    __target_intrinsic(hlsl)
+    void GetDimensions(uint mipLevel, out uint width, out uint height);
+
     // With Clamp
 
     __target_intrinsic(hlsl, "($0).WriteSamplerFeedback($1, $2, $3, $4)")
@@ -4058,6 +4061,9 @@ __magic_type(Texture, $(feedbackTexture2DArrayFlavor))
 __intrinsic_type($(kIROp_TextureType + (feedbackTexture2DArrayFlavor << kIROpMeta_OtherShift)))
 struct FeedbackTexture2DArray<T : __BuiltinSamplerFeedbackType>
 {
+    __target_intrinsic(hlsl)
+    void GetDimensions(uint mipLevel, out uint width, out uint height, out uint elements);
+
     // With Clamp
 
     __target_intrinsic(hlsl, "($0).WriteSamplerFeedback($1, $2, $3, $4)")
