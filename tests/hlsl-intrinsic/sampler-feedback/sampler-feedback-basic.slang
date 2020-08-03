@@ -22,9 +22,9 @@ float4 main() : SV_Target
     float2 ddy = float2(3.0F / 32, 4.0F / 32);
     
     uint width, height, elements;
-    feedbackMinMip.GetDimensions(0, width, height);
+    feedbackMinMip.GetDimensions(width, height);
      
-    feedbackMinMipArray.GetDimensions(0, width, height, elements);
+    feedbackMinMipArray.GetDimensions(width, height, elements);
      
     // Clamped
     feedbackMinMip.WriteSamplerFeedback(tex2D, samp, coords2D, clamp);
