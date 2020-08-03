@@ -3641,6 +3641,17 @@ static TypeLayoutResult _createTypeLayout(
 
             return TypeLayoutResult(typeLayout, SimpleLayoutInfo());
         }
+        else if( auto enumDeclRef = declRef.as<EnumDecl>() )
+        {
+            // We lay out an enumeration type as its tag type.
+            //
+            // TODO: This code doesn't handle the case where we might
+            // have a generic `enum` (or an `enum` inside another generic
+            // type), and where the tag type of the `enum` depends on
+            // one or more of the generic parameters.
+            //
+            return _createTypeLayout(context, enumDeclRef.getDecl()->tagType);
+        }
     }
     else if (auto errorType = as<ErrorType>(type))
     {

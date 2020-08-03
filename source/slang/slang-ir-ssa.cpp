@@ -776,6 +776,19 @@ IRInst* readVar(
         return val;
     }
 
+    if( blockInfo->block == var->parent )
+    {
+        // If this is the block that actually *introduces*
+        // the variable, then there is no reason to keep
+        // searching, because its value cannot have been
+        // established in a predecessor block.
+        //
+        auto type = var->getDataType()->getValueType();
+        val = blockInfo->builder.emitUndefined(type);
+        writeVar(context, blockInfo, var, val);
+        return val;
+    }
+
     // Otherwise we need to try to non-trivial/recursive
     // case of lookup.
     return readVarRec(context, blockInfo, var);
