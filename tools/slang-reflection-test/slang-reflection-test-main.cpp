@@ -539,6 +539,11 @@ static void emitReflectionResourceTypeBaseInfoJSON(
         comma(writer);
         write(writer, "\"multisample\": true");
     }
+    if (shape & SLANG_TEXTURE_FEEDBACK_FLAG)
+    {
+        comma(writer);
+        write(writer, "\"feedback\": true");
+    }
 
     if( access != SLANG_RESOURCE_ACCESS_READ )
     {
@@ -553,7 +558,7 @@ static void emitReflectionResourceTypeBaseInfoJSON(
 
         case SLANG_RESOURCE_ACCESS_READ:
             break;
-
+        case SLANG_RESOURCE_ACCESS_WRITE:           write(writer, "write"); break;
         case SLANG_RESOURCE_ACCESS_READ_WRITE:      write(writer, "readWrite"); break;
         case SLANG_RESOURCE_ACCESS_RASTER_ORDERED:  write(writer, "rasterOrdered"); break;
         case SLANG_RESOURCE_ACCESS_APPEND:          write(writer, "append"); break;
@@ -727,6 +732,12 @@ static void emitReflectionTypeInfoJSON(
     case slang::TypeReflection::Kind::Interface:
         comma(writer);
         write(writer, "\"kind\": \"Interface\"");
+        comma(writer);
+        emitReflectionNameInfoJSON(writer, type->getName());
+        break;
+    case slang::TypeReflection::Kind::Feedback:
+        comma(writer);
+        write(writer, "\"kind\": \"Feedback\"");
         comma(writer);
         emitReflectionNameInfoJSON(writer, type->getName());
         break;
@@ -909,9 +920,11 @@ static void emitReflectionTypeLayoutInfoJSON(
             // the relevant cases here.
             //
             auto type = typeLayout->getType();
-            auto shape  = type->getResourceShape();
+            auto shape = type->getResourceShape();
 
-            if( (shape & SLANG_RESOURCE_BASE_SHAPE_MASK) == SLANG_STRUCTURED_BUFFER )
+            const auto baseType = shape & SLANG_RESOURCE_BASE_SHAPE_MASK;
+
+            if (baseType == SLANG_STRUCTURED_BUFFER)
             {
                 emitReflectionResourceTypeBaseInfoJSON(writer, type);
 
@@ -924,9 +937,20 @@ static void emitReflectionTypeLayoutInfoJSON(
                         resultTypeLayout);
                 }
             }
+            else if (shape & SLANG_TEXTURE_FEEDBACK_FLAG)
+            {
+                emitReflectionResourceTypeBaseInfoJSON(writer, type);
+
+                if (auto resultType = typeLayout->getResourceResultType())
+                {
+                    comma(writer);
+                    write(writer, "\"resultType\": ");
+                    emitReflectionTypeJSON(writer, resultType);
+                }
+            }
             else
             {
-                emitReflectionTypeInfoJSON(writer, typeLayout->getType());
+                emitReflectionTypeInfoJSON(writer, type);
             }
         }
         break;

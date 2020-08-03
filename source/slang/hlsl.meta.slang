@@ -3616,6 +3616,8 @@ matrix<T,N,M> WaveMultiPrefixSum(matrix<T,N,M> value, uint4 mask);
 // `typedef`s to help with the fact that HLSL has been sorta-kinda case insensitive at various points
 typedef Texture2D texture2D;
 
+
+
 ${{{{
 
 // Buffer types
@@ -3989,8 +3991,100 @@ void SetMeshOutputCounts(uint vertexCount, uint primitiveCount);
 void DispatchMesh<P>(uint threadGroupCountX, uint threadGroupCountY, uint threadGroupCountZ, P meshPayload);
 
 //
-// TODO: "Sampler feedback" types `FeedbackTexture2D` and `FeedbackTexture2DArray`.
+// "Sampler feedback" types `FeedbackTexture2D` and `FeedbackTexture2DArray`.
 //
+
+// https://microsoft.github.io/DirectX-Specs/d3d/SamplerFeedback.html
+
+// The docs describe these as 'types' but their syntax makes them seem enum like, and enum is a simpler way to implement them
+// But slang enums are always 'enum class like', so I use an empty struct type here
+
+[sealed]
+interface __BuiltinSamplerFeedbackType {};
+
+[sealed]
+__magic_type(FeedbackType, $(int(FeedbackType::Kind::MinMip)))
+__target_intrinsic(hlsl, SAMPLER_FEEDBACK_MIN_MIP)
+struct SAMPLER_FEEDBACK_MIN_MIP : __BuiltinSamplerFeedbackType {};
+
+[sealed]
+__magic_type(FeedbackType, $(int(FeedbackType::Kind::MipRegionUsed)))
+__target_intrinsic(hlsl, SAMPLER_FEEDBACK_MIP_REGION_USED)
+struct SAMPLER_FEEDBACK_MIP_REGION_USED : __BuiltinSamplerFeedbackType {};
+
+// All of these objects are write-only resources that point to a special kind of unordered access view meant for sampler feedback.
+
+// Calculate the flavor constants
+${{{{
+static const int feedbackTexture2DFlavor = int(TextureFlavor::create(TextureFlavor::Shape::Shape2D, SLANG_RESOURCE_ACCESS_WRITE, SLANG_TEXTURE_FEEDBACK_FLAG).flavor);
+static const int feedbackTexture2DArrayFlavor = int(TextureFlavor::create(TextureFlavor::Shape::Shape2D, SLANG_RESOURCE_ACCESS_WRITE, SLANG_TEXTURE_FEEDBACK_FLAG | SLANG_TEXTURE_ARRAY_FLAG).flavor);
+}}}}
+
+__magic_type(Texture, $(feedbackTexture2DFlavor))
+__intrinsic_type($(kIROp_TextureType + (feedbackTexture2DFlavor << kIROpMeta_OtherShift)))
+struct FeedbackTexture2D<T : __BuiltinSamplerFeedbackType>
+{
+    // With Clamp
+
+    __target_intrinsic(hlsl, "($0).WriteSamplerFeedback($1, $2, $3, $4)")
+    void WriteSamplerFeedback<S>(Texture2D<S> tex, SamplerState samp, float2 location, float clamp);
+
+    __target_intrinsic(hlsl, "($0).WriteSamplerFeedbackBias($1, $2, $3, $4, $5)")
+    void WriteSamplerFeedbackBias<S>(Texture2D<S> tex, SamplerState samp, float2 location, float bias, float clamp);
+
+    __target_intrinsic(hlsl, "($0).WriteSamplerFeedbackGrad($1, $2, $3, $4, $5, $6)")
+    void WriteSamplerFeedbackGrad<S>(Texture2D<S> tex, SamplerState samp, float2 location, float2 ddx, float2 ddy, float clamp);
+
+    // Level
+
+    __target_intrinsic(hlsl, "($0).WriteSamplerFeedbackLevel($1, $2, $3, $4)")
+    void WriteSamplerFeedbackLevel<S>(Texture2D<S> tex, SamplerState samp, float2 location, float lod);
+    
+    // Without Clamp
+
+    __target_intrinsic(hlsl, "($0).WriteSamplerFeedback($1, $2, $3)")
+    void WriteSamplerFeedback<S>(Texture2D<S> tex, SamplerState samp, float2 location);
+
+    __target_intrinsic(hlsl, "($0).WriteSamplerFeedbackBias($1, $2, $3, $4)")
+    void WriteSamplerFeedbackBias<S>(Texture2D<S> tex, SamplerState samp, float2 location, float bias);
+
+    __target_intrinsic(hlsl, "($0).WriteSamplerFeedbackGrad($1, $2, $3, $4, $5)")
+    void WriteSamplerFeedbackGrad<S>(Texture2D<S> tex, SamplerState samp, float2 location, float2 ddx, float2 ddy);
+};
+
+
+
+__magic_type(Texture, $(feedbackTexture2DArrayFlavor))
+__intrinsic_type($(kIROp_TextureType + (feedbackTexture2DArrayFlavor << kIROpMeta_OtherShift)))
+struct FeedbackTexture2DArray<T : __BuiltinSamplerFeedbackType>
+{
+    // With Clamp
+
+    __target_intrinsic(hlsl, "($0).WriteSamplerFeedback($1, $2, $3, $4)")
+    void WriteSamplerFeedback<S>(Texture2DArray<S> texArray, SamplerState samp, float3 location, float clamp);
+
+    __target_intrinsic(hlsl, "($0).WriteSamplerFeedbackBias($1, $2, $3, $4, $5)")
+    void WriteSamplerFeedbackBias<S>(Texture2DArray<S> texArray, SamplerState samp, float3 location, float bias, float clamp);
+
+    __target_intrinsic(hlsl, "($0).WriteSamplerFeedbackGrad($1, $2, $3, $4, $5, $6)")
+    void WriteSamplerFeedbackGrad<S>(Texture2DArray<S> texArray, SamplerState samp, float3 location, float3 ddx, float3 ddy, float clamp);
+
+    // Level
+
+    __target_intrinsic(hlsl, "($0).WriteSamplerFeedbackLevel($1, $2, $3, $4)")
+    void WriteSamplerFeedbackLevel<S>(Texture2DArray<S> texArray, SamplerState samp, float3 location, float lod);
+
+    // Without Clamp
+
+    __target_intrinsic(hlsl, "($0).WriteSamplerFeedback($1, $2, $3)")
+    void WriteSamplerFeedback<S>(Texture2DArray<S> texArray, SamplerState samp, float3 location);
+
+    __target_intrinsic(hlsl, "($0).WriteSamplerFeedbackBias($1, $2, $3, $4)")
+    void WriteSamplerFeedbackBias<S>(Texture2DArray<S> texArray, SamplerState samp, float3 location, float bias);
+
+    __target_intrinsic(hlsl, "($0).WriteSamplerFeedbackGrad($1, $2, $3, $4, $5)")
+    void WriteSamplerFeedbackGrad<S>(Texture2DArray<S> texArray, SamplerState samp, float3 location, float3 ddx, float3 ddy);
+};
 
 //
 // DXR 1.1 and `TraceRayInline` support
@@ -4041,6 +4135,11 @@ static const CANDIDATE_TYPE CANDIDATE_PROCEDURAL_PRIMITIVE = 1;
 __target_intrinsic(hlsl, RayQuery)
 struct RayQuery <let rayFlags : RAY_FLAG = RAY_FLAG_NONE>
 {
+    // Initialize the query object in a "fresh" state.
+    //
+    __intrinsic_op($(kIROp_DefaultConstruct))
+    __init();
+
     // Initialize a ray-tracing query.
     //
     // This method may be called on a "fresh" ray query, or

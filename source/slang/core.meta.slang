@@ -1955,3 +1955,6 @@ attribute_syntax [sealed] : SealedAttribute;
 
 __attributeTarget(AggTypeDecl)
 attribute_syntax [open] : OpenAttribute;
+
+__attributeTarget(InterfaceDecl)
+attribute_syntax [anyValueSize(size:int)] : AnyValueSizeAttribute;

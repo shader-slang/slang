@@ -664,6 +664,10 @@ struct OptionsParser
 
                     rawEntryPoints.add(rawEntryPoint);
                 }
+                else if (argStr == "-heterogeneous")
+                {
+                    requestImpl->getLinkage()->m_heterogeneous = true;
+                }
                 else if (argStr == "-lang")
                 {
                     String name;

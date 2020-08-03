@@ -2037,6 +2037,7 @@ void CLikeSourceEmitter::defaultEmitInstExpr(IRInst* inst, const EmitOpInfo& inO
         break;
 
     case kIROp_undefined:
+    case kIROp_DefaultConstruct:
         m_writer->emit(getName(inst));
         break;
 
@@ -2464,6 +2465,7 @@ void CLikeSourceEmitter::_emitInst(IRInst* inst)
         break;
 
     case kIROp_undefined:
+    case kIROp_DefaultConstruct:
         {
             auto type = inst->getDataType();
             emitType(type, getName(inst));

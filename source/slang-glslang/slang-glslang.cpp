@@ -41,21 +41,41 @@
 
 #define UNLIMITED 9999
 
-static TBuiltInResource gResources =
+static TBuiltInResource _calcBuiltinResources()
 {
-    UNLIMITED, UNLIMITED, UNLIMITED, UNLIMITED, UNLIMITED, UNLIMITED, UNLIMITED, UNLIMITED, UNLIMITED, UNLIMITED, 
-    UNLIMITED, UNLIMITED, UNLIMITED, UNLIMITED, UNLIMITED, UNLIMITED, UNLIMITED,-UNLIMITED, UNLIMITED, UNLIMITED, 
-    UNLIMITED, UNLIMITED, UNLIMITED, UNLIMITED, UNLIMITED, UNLIMITED, UNLIMITED, UNLIMITED, UNLIMITED, UNLIMITED, 
-    UNLIMITED, UNLIMITED, UNLIMITED, UNLIMITED, UNLIMITED, UNLIMITED, UNLIMITED, UNLIMITED, UNLIMITED, UNLIMITED, 
-    UNLIMITED, UNLIMITED, UNLIMITED, UNLIMITED, UNLIMITED, UNLIMITED, UNLIMITED, UNLIMITED, UNLIMITED, UNLIMITED, 
-    UNLIMITED, UNLIMITED, UNLIMITED, UNLIMITED, UNLIMITED, UNLIMITED, UNLIMITED, UNLIMITED, UNLIMITED, UNLIMITED, 
-    UNLIMITED, UNLIMITED, UNLIMITED, UNLIMITED, UNLIMITED, UNLIMITED, UNLIMITED, UNLIMITED, UNLIMITED, UNLIMITED, 
-    UNLIMITED, UNLIMITED, UNLIMITED, UNLIMITED, UNLIMITED, UNLIMITED, UNLIMITED, UNLIMITED, UNLIMITED, UNLIMITED, 
-    UNLIMITED, UNLIMITED, UNLIMITED, UNLIMITED, UNLIMITED, UNLIMITED, UNLIMITED, UNLIMITED, UNLIMITED, UNLIMITED, 
-    UNLIMITED, UNLIMITED,
+    // NOTE! This is a bit of a hack - to set all the fields to true/UNLIMITED.
 
-    { true, true, true, true, true, true, true, true, true, }
-};
+    // We are relying on limits being after the other fields. 
+    SLANG_COMPILE_TIME_ASSERT(SLANG_OFFSET_OF(TBuiltInResource, limits) > 0);
+    // We are relying on maxLights being the first parameter, and all values will have the same type
+    SLANG_COMPILE_TIME_ASSERT(SLANG_OFFSET_OF(TBuiltInResource, maxLights) == 0);
+    
+    TBuiltInResource resource;
+    // Set up all the integer values.
+    {
+        
+        auto* dst = &resource.maxLights;
+        const size_t count = SLANG_OFFSET_OF(TBuiltInResource, limits) / sizeof(*dst);
+        for (size_t i = 0; i < count; ++i)
+        {
+            dst[i] = UNLIMITED;
+        }
+    }
+    // Set up the bools
+    {
+        TLimits* limits = &resource.limits;
+        bool* dst = (bool*)limits;
+
+        const size_t count = sizeof(TLimits) / sizeof(bool);
+        for (size_t i = 0; i < count; ++i)
+        {
+            dst[i] = true;
+        }
+    }
+    return resource;
+}
+
+static TBuiltInResource gResources = _calcBuiltinResources();
 
 static void dump(
     void const*         data,
