@@ -48,6 +48,9 @@ FOREACH_BASE_TYPE(DEFINE_BASE_TYPE)
             //
             // TODO(tfoley): is this even meaningful/used?
             // ShadowFlag		= 0x80,
+
+            // For feedback texture
+            FeedbackFlag = SLANG_TEXTURE_FEEDBACK_FLAG,
         };
 
         enum Shape : uint8_t
@@ -57,7 +60,7 @@ FOREACH_BASE_TYPE(DEFINE_BASE_TYPE)
             Shape3D = SLANG_TEXTURE_3D,
             ShapeCube = SLANG_TEXTURE_CUBE,
             ShapeBuffer = SLANG_TEXTURE_BUFFER,
-
+            
             Shape1DArray = Shape1D | ArrayFlag,
             Shape2DArray = Shape2D | ArrayFlag,
             // No Shape3DArray
@@ -77,6 +80,7 @@ FOREACH_BASE_TYPE(DEFINE_BASE_TYPE)
         Shape getBaseShape() const { return Shape(flavor & BaseShapeMask); }
         bool isArray() const { return (flavor & ArrayFlag) != 0; }
         bool isMultisample() const { return (flavor & MultisampleFlag) != 0; }
+        bool isFeedback() const { return (flavor & FeedbackFlag) != 0; }
         //            bool isShadow() const { return (flavor & ShadowFlag) != 0; }
 
         SLANG_FORCE_INLINE bool operator==(const ThisType& rhs) const { return flavor == rhs.flavor; }
@@ -89,6 +93,7 @@ FOREACH_BASE_TYPE(DEFINE_BASE_TYPE)
         TextureFlavor(uint32_t tag) { flavor = (uint16_t)tag; }
 
         static TextureFlavor create(SlangResourceShape shape, SlangResourceAccess access);
+        static TextureFlavor create(SlangResourceShape shape, SlangResourceAccess access, int flags);
     };
 
     enum class SamplerStateFlavor : uint8_t

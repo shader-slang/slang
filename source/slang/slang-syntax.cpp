@@ -491,6 +491,14 @@ Index getFilterCountImpl(const ReflectClassInfo& clsInfo, MemberFilterStyle filt
                 textureType->declRef = declRef;
                 return textureType;
             }
+            else if (magicMod->name == "FeedbackType")
+            {
+                SLANG_ASSERT(subst == nullptr);
+                auto type = astBuilder->create<FeedbackType>();
+                type->declRef = declRef;
+                type->kind = FeedbackType::Kind(magicMod->tag);
+                return type;
+            }
 
             // TODO: eventually everything should follow this pattern,
             // and we can drive the dispatch with a table instead
