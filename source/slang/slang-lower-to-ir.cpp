@@ -1085,6 +1085,23 @@ IRStructKey* getInterfaceRequirementKey(
     return requirementKey;
 }
 
+void getGenericTypeConformances(IRGenContext* context, ShortList<IRType*>& supTypes, Decl* genericParamDecl)
+{
+    auto parent = genericParamDecl->parentDecl;
+    if (parent)
+    {
+        for (auto typeConstraint : parent->getMembersOfType<GenericTypeConstraintDecl>())
+        {
+            if (auto declRefType = as<DeclRefType>(typeConstraint->sub.type))
+            {
+                if (declRefType->declRef.decl == genericParamDecl)
+                {
+                    supTypes.add(lowerType(context, typeConstraint->getSup().type));
+                }
+            }
+        }
+    }
+}
 
 SubstitutionSet lowerSubstitutions(IRGenContext* context, SubstitutionSet subst);
 //
@@ -1416,6 +1433,12 @@ struct ValLoweringVisitor : ValVisitor<ValLoweringVisitor, LoweredValInfo, Lower
             resultType);
     }
 
+    IRType* visitPtrType(PtrType* type)
+    {
+        IRType* valueType = lowerType(context, type->getValueType());
+        return getBuilder()->getPtrType(valueType);
+    }
+
     IRType* visitDeclRefType(DeclRefType* type)
     {
         auto declRef = type->declRef;
@@ -1661,7 +1684,6 @@ struct ValLoweringVisitor : ValVisitor<ValLoweringVisitor, LoweredValInfo, Lower
             return LoweredValInfo::simple(context->thisType);
         return emitDeclRef(context, type->interfaceDeclRef, getBuilder()->getTypeKind());
     }
-
 
     // We do not expect to encounter the following types in ASTs that have
     // passed front-end semantic checking.
@@ -3459,7 +3481,8 @@ struct ExprLoweringVisitorBase : ExprVisitor<Derived, LoweredValInfo>
 
     LoweredValInfo visitAssocTypeDecl(AssocTypeDecl* decl)
     {
-        return LoweredValInfo::simple(context->irBuilder->getAssociatedType());
+        SLANG_UNIMPLEMENTED_X("associatedtype expression during code generation");
+        UNREACHABLE_RETURN(LoweredValInfo());
     }
 
     LoweredValInfo visitAssignExpr(AssignExpr* expr)
@@ -5823,6 +5846,22 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
         return Slang::getInterfaceRequirementKey(context, requirementDecl);
     }
 
+    LoweredValInfo visitAssocTypeDecl(AssocTypeDecl* decl)
+    {
+        SLANG_ASSERT(decl->parentDecl != nullptr);
+        ShortList<IRInterfaceType*> constraintInterfaces;
+        for (auto inheritanceDecl : decl->getMembersOfType<InheritanceDecl>())
+        {
+            auto baseType = lowerType(context, inheritanceDecl->base.type);
+            SLANG_ASSERT(baseType && baseType->op == kIROp_InterfaceType);
+            constraintInterfaces.add((IRInterfaceType*)baseType);
+        }
+        auto assocType = context->irBuilder->getAssociatedType(
+            constraintInterfaces.getArrayView().arrayView);
+        setValue(context, decl, assocType);
+        return LoweredValInfo::simple(assocType);
+    }
+
     LoweredValInfo visitInterfaceDecl(InterfaceDecl* decl)
     {
         // The members of an interface will turn into the keys that will
@@ -5845,18 +5884,6 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
         // Emit any generics that should wrap the actual type.
         auto outerGeneric = emitOuterGenerics(subContext, decl, decl);
 
-        // Setup subContext for proper lowering `ThisType`, associated types and
-        // the interface decl's self reference.
-        subContext->thisType = getBuilder()->getThisType();
-
-        for (auto member : decl->members)
-        {
-            if (as<AssocTypeDecl>(member))
-            {
-                subContext->env->mapDeclToValue[member] = getBuilder()->getAssociatedType();
-            }
-        }
-
         // First, compute the number of requirement entries that will be included in this
         // interface type.
         UInt operandCount = 0;
@@ -5878,6 +5905,17 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
         // Add `irInterface` to decl mapping now to prevent cyclic lowering.
         setValue(subContext, decl, LoweredValInfo::simple(irInterface));
 
+        // Setup subContext for proper lowering `ThisType`, associated types and
+        // the interface decl's self reference.
+        auto thisType = getBuilder()->getThisType(irInterface);
+        subContext->thisType = thisType;
+
+        // Lower associated types first, so they can be referred to when lowering functions.
+        for (auto assocTypeDecl : decl->getMembersOfType<AssocTypeDecl>())
+        {
+            ensureDecl(subContext, assocTypeDecl);
+        }
+
         UInt entryIndex = 0;
 
         for (auto requirementDecl : decl->members)
@@ -5885,7 +5923,7 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
             auto entry = subBuilder->createInterfaceRequirementEntry(
                 getInterfaceRequirementKey(requirementDecl),
                 nullptr);
-            IRInst* requirementVal = lowerDecl(subContext, requirementDecl).val;
+            IRInst* requirementVal = ensureDecl(subContext, requirementDecl).val;
             if (requirementVal)
             {
                 switch (requirementVal->op)
@@ -5904,7 +5942,7 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
                 default:
                     entry->setRequirementVal(requirementVal);
                     break;
-                }   
+                }
             }
             irInterface->setOperand(entryIndex, entry);
             entryIndex++;
@@ -5921,15 +5959,22 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
                     entryIndex++;
                 }
             }
-            // Add lowered requirement entry to current decl mapping to prevent
-            // the function requirements from being lowered again when we get to
-            // `ensureAllDeclsRec`.
-            setValue(context, requirementDecl, LoweredValInfo::simple(entry));
+            else
+            {
+                // Add lowered requirement entry to current decl mapping to prevent
+                // the function requirements from being lowered again when we get to
+                // `ensureAllDeclsRec`.
+                setValue(context, requirementDecl, LoweredValInfo::simple(entry));
+            }
         }
 
-        
         addNameHint(context, irInterface, decl);
         addLinkageDecoration(context, irInterface, decl);
+        if (auto anyValueSizeAttr = decl->findModifier<AnyValueSizeAttribute>())
+        {
+            subBuilder->addAnyValueSizeDecoration(irInterface, anyValueSizeAttr->size);
+        }
+
         subBuilder->setInsertInto(irInterface);
         // TODO: are there any interface members that should be
         // nested inside the interface type itself?
@@ -5998,7 +6043,7 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
 
         if (as<AssocTypeDecl>(decl))
         {
-            return LoweredValInfo::simple(getBuilder()->getAssociatedType());
+            SLANG_UNREACHABLE("associatedtype should have been handled by visitAssocTypeDecl.");
         }
 
         // Given a declaration of a type, we need to make sure
@@ -6186,10 +6231,20 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
             {
                 // TODO: use a `WitnessTableKind` to represent the
                 // classifier of the parameter.
-                auto param = subBuilder->emitParam(subBuilder->getWitnessTableType(
-                    lowerType(context, constraintDecl->sup.type)));
+                auto supType = lowerType(context, constraintDecl->sup.type);
+                auto param = subBuilder->emitParam(subBuilder->getWitnessTableType(supType));
                 addNameHint(context, param, constraintDecl);
                 setValue(subContext, constraintDecl, LoweredValInfo::simple(param));
+
+                // Attach the constraint interface type as a decoration to the IRParam value
+                // representing the generic parameter, to provide downstream passes knowledge
+                // of the correspondence.
+                if (auto declRefType = as<DeclRefType>(constraintDecl->sub.type))
+                {
+                    auto typeParamDeclVal = subContext->findLoweredDecl(declRefType->declRef.decl);
+                    SLANG_ASSERT(typeParamDeclVal && typeParamDeclVal->val);
+                    subBuilder->addTypeConstraintDecoration(typeParamDeclVal->val, supType);
+                }
             }
         }
 
@@ -6849,6 +6904,10 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
         else if( auto extensionDecl = as<ExtensionDecl>(genDecl->inner) )
         {
             return ensureDecl(context, extensionDecl);
+        }
+        else if (auto interfaceDecl = as<InterfaceDecl>(genDecl->inner))
+        {
+            return ensureDecl(context, interfaceDecl);
         }
         SLANG_RELEASE_ASSERT(false);
         UNREACHABLE_RETURN(LoweredValInfo());
