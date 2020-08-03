@@ -39,6 +39,7 @@ Items with ^ means there is some discussion about support later in the document 
 | `[unroll]`                  |     Yes      |   Yes        |   Yes ^    |     Yes       |    Limited + 
 | Atomics                     |     Yes      |   Yes        |   Yes      |     Yes       |    No + 
 | Atomics on RWBuffer         |     Yes      |   Yes        |   Yes      |     No        |    No + 
+| FeedbackTextures            |     No       |   Yes        |   No +     |     No        |    No
 
 ## Half Type
 
@@ -169,3 +170,12 @@ For VK the GLSL output from Slang seems plausible, but VK binding fails in tests
 On CUDA RWBuffer becomes CUsurfObject, which is a 'texture' type and does not support atomics. 
 
 On the CPU atomics are not supported, but will be in the future.
+
+## Sampler Feedback
+
+The HLSL [sampler feedback feature](https://microsoft.github.io/DirectX-Specs/d3d/SamplerFeedback.html) is available for HLSL targets, but requires shader model 6.5. This means it's only available on Direct12 currently.
+
+There doesn't not appear to be a similar feature available in Vulkan, yet but when it is available support should be addeed.
+
+For CPU targets, the implementation of resource types is a 'user space' problem. 
+

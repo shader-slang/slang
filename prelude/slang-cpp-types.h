@@ -377,6 +377,10 @@ struct TextureDimensions
     uint32_t arrayElementCount;                  ///< For array types, 0 otherwise
 };
 
+
+
+
+
 // Texture
 
 struct ITexture
@@ -812,6 +816,143 @@ struct RWTexture2DArray
     T& operator[](const uint3& loc) { return *(T*)texture->refAt(&loc.x); }
 
     IRWTexture* texture;
+};
+
+// FeedbackTexture
+
+struct FeedbackType {};
+struct SAMPLER_FEEDBACK_MIN_MIP : FeedbackType {};
+struct SAMPLER_FEEDBACK_MIP_REGION_USED : FeedbackType {};
+
+struct IFeedbackTexture
+{
+    virtual TextureDimensions GetDimensions(int mipLevel = -1) = 0;
+
+    // Note here we pass the optional clamp parameter as a pointer. Passing nullptr means no clamp. 
+    // This was preferred over having two function definitions, and having to differentiate their names
+    virtual void WriteSamplerFeedback(ITexture* tex, SamplerState samp, const float* location, const float* clamp = nullptr) = 0;
+    virtual void WriteSamplerFeedbackBias(ITexture* tex, SamplerState samp, const float* location, float bias, const float* clamp = nullptr) = 0;
+    virtual void WriteSamplerFeedbackGrad(ITexture* tex, SamplerState samp, const float* location, const float* ddx, const float* ddy, const float* clamp = nullptr) = 0;
+    
+    virtual void WriteSamplerFeedbackLevel(ITexture* tex, SamplerState samp, const float* location, float lod) = 0;
+};
+
+template <typename T>
+struct FeedbackTexture2D
+{
+    void GetDimensions(uint32_t* outWidth, uint32_t* outHeight) 
+    { 
+        const auto dims = texture->GetDimensions(); 
+        *outWidth = dims.width; 
+        *outHeight = dims.height; 
+    }
+    void GetDimensions(uint32_t mipLevel, uint32_t* outWidth, uint32_t* outHeight, uint32_t* outNumberOfLevels)
+    {
+        const auto dims = texture->GetDimensions(mipLevel);
+        *outWidth = dims.width;
+        *outHeight = dims.height;
+        *outNumberOfLevels = dims.numberOfLevels;
+    }
+    void GetDimensions(float* outWidth, float* outHeight) 
+    { 
+        const auto dims = texture->GetDimensions(); 
+        *outWidth = dims.width; 
+        *outHeight = dims.height; 
+    }
+    void GetDimensions(uint32_t mipLevel, float* outWidth, float* outHeight, float* outNumberOfLevels)
+    {
+        const auto dims = texture->GetDimensions(mipLevel);
+        *outWidth = dims.width;
+        *outHeight = dims.height;
+        *outNumberOfLevels = dims.numberOfLevels;
+    }
+    
+    template <typename S>
+    void WriteSamplerFeedback(Texture2D<S> tex, SamplerState samp, float2 location, float clamp) { texture->WriteSamplerFeedback(tex.texture, samp, &location.x, &clamp); } 
+
+    template <typename S>
+    void WriteSamplerFeedbackBias(Texture2D<S> tex, SamplerState samp, float2 location, float bias, float clamp) { texture->WriteSamplerFeedbackBias(tex.texture, samp, &location.x, bias, &clamp); }
+
+    template <typename S>
+    void WriteSamplerFeedbackGrad(Texture2D<S> tex, SamplerState samp, float2 location, float2 ddx, float2 ddy, float clamp) { texture->WriteSamplerFeedbackGrad(tex.texture, samp, &location.x, &ddx.x, &ddy.x, &clamp); }
+
+    // Level
+
+    template <typename S> 
+    void WriteSamplerFeedbackLevel(Texture2D<S> tex, SamplerState samp, float2 location, float lod) { texture->WriteSamplerFeedbackLevel(tex.texture, samp, &location.x, lod); }
+    
+    // Without Clamp
+    template <typename S> 
+    void WriteSamplerFeedback(Texture2D<S> tex, SamplerState samp, float2 location) { texture->WriteSamplerFeedback(tex, samp, &location.x); }
+
+    template <typename S> 
+    void WriteSamplerFeedbackBias(Texture2D<S> tex, SamplerState samp, float2 location, float bias) { texture->WriteSamplerFeedbackBias(tex, samp, &location.x, bias); }
+
+    template <typename S> 
+    void WriteSamplerFeedbackGrad(Texture2D<S> tex, SamplerState samp, float2 location, float2 ddx, float2 ddy) { texture->WriteSamplerFeedbackGrad(tex, samp, &location.x, &ddx.x, &ddy.x); }
+    
+    IFeedbackTexture* texture;
+};
+
+template <typename T>
+struct FeedbackTexture2DArray
+{
+    void GetDimensions(uint32_t* outWidth, uint32_t* outHeight, uint32_t* outElements)
+    {
+        auto dims = texture->GetDimensions(); 
+        *outWidth = dims.width; 
+        *outHeight = dims.height;
+        *outElements = dims.arrayElementCount; 
+    }
+    void GetDimensions(uint32_t mipLevel, uint32_t* outWidth, uint32_t* outHeight, uint32_t* outElements, uint32_t* outNumberOfLevels)
+    {
+        const auto dims = texture->GetDimensions(mipLevel);
+        *outWidth = dims.width;
+        *outHeight = dims.height;
+        *outElements = dims.arrayElementCount;
+        *outNumberOfLevels = dims.numberOfLevels;
+    }
+    void GetDimensions(float* outWidth, float* outHeight, float* outElements)
+    {
+        auto dims = texture->GetDimensions(); 
+        *outWidth = dims.width; 
+        *outHeight = dims.height;
+        *outElements = dims.arrayElementCount; 
+    }
+    void GetDimensions(uint32_t mipLevel, float* outWidth, float* outHeight, float* outElements, float* outNumberOfLevels)
+    {
+        const auto dims = texture->GetDimensions(mipLevel);
+        *outWidth = dims.width;
+        *outHeight = dims.height;
+        *outElements = dims.arrayElementCount;
+        *outNumberOfLevels = dims.numberOfLevels;
+    }
+    
+    template <typename S>
+    void WriteSamplerFeedback(Texture2DArray<S> texArray, SamplerState samp, float3 location, float clamp) { texture->WriteSamplerFeedback(texArray.texture, samp, &location.x, &clamp); }
+
+    template <typename S>
+    void WriteSamplerFeedbackBias(Texture2DArray<S> texArray, SamplerState samp, float3 location, float bias, float clamp) { texture->WriteSamplerFeedbackBias(texArray.texture, samp, &location.x, bias, &clamp); }
+
+    template <typename S>
+    void WriteSamplerFeedbackGrad(Texture2DArray<S> texArray, SamplerState samp, float3 location, float3 ddx, float3 ddy, float clamp) { texture->WriteSamplerFeedbackGrad(texArray.texture, samp, &location.x, &ddx.x, &ddy.x, &clamp); }
+
+    // Level
+    template <typename S>
+    void WriteSamplerFeedbackLevel(Texture2DArray<S> texArray, SamplerState samp, float3 location, float lod) { texture->WriteSamplerFeedbackLevel(texArray.texture, samp, &location.x, lod); }
+
+    // Without Clamp
+
+    template <typename S>
+    void WriteSamplerFeedback(Texture2DArray<S> texArray, SamplerState samp, float3 location) { texture->WriteSamplerFeedback(texArray.texture, samp, &location.x); }
+
+    template <typename S>
+    void WriteSamplerFeedbackBias(Texture2DArray<S> texArray, SamplerState samp, float3 location, float bias) { texture->WriteSamplerFeedbackBias(texArray.texture, samp, &location.x, bias); }
+
+    template <typename S>
+    void WriteSamplerFeedbackGrad(Texture2DArray<S> texArray, SamplerState samp, float3 location, float3 ddx, float3 ddy) { texture->WriteSamplerFeedbackGrad(texArray.texture, samp, &location.x, &ddx.x, &ddy.x); }
+    
+    IFeedbackTexture* texture;
 };
 
 /* Varying input for Compute */
