@@ -1,6 +1,4 @@
-//TEST:SIMPLE: -entry computeMain -stage compute -target dll
-
-//DISABLE_TEST:CROSS_COMPILE: -entry main -stage fragment -profile sm_6_5 -target dxil-assembly
+//TEST:COMPILE: -entry computeMain -stage compute -target dll tests/hlsl-intrinsic/sampler-feedback/compute-sampler-feedback.slang
 
 // Not available on non PS shader
 // dx.op.writeSamplerFeedback 	WriteSamplerFeedback 	

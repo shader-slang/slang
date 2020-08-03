@@ -4025,7 +4025,16 @@ __intrinsic_type($(kIROp_TextureType + (feedbackTexture2DFlavor << kIROpMeta_Oth
 struct FeedbackTexture2D<T : __BuiltinSamplerFeedbackType>
 {
     __target_intrinsic(hlsl)
-    void GetDimensions(uint mipLevel, out uint width, out uint height);
+    void GetDimensions(out uint width, out uint height);
+
+    __target_intrinsic(hlsl)
+    void GetDimensions(uint mipLevel, out uint width, out uint height, out uint numberOfLevels);
+
+    __target_intrinsic(hlsl)
+    void GetDimensions(out float width,out float height);
+
+    __target_intrinsic(hlsl)
+    void GetDimensions(uint mipLevel, out float width,out float height, out float numberOfLevels);
 
     // With Clamp
 
@@ -4062,7 +4071,13 @@ __intrinsic_type($(kIROp_TextureType + (feedbackTexture2DArrayFlavor << kIROpMet
 struct FeedbackTexture2DArray<T : __BuiltinSamplerFeedbackType>
 {
     __target_intrinsic(hlsl)
-    void GetDimensions(uint mipLevel, out uint width, out uint height, out uint elements);
+    void GetDimensions(out uint width,out uint height, out uint elements);
+    __target_intrinsic(hlsl)
+    void GetDimensions(uint mipLevel, out uint width,out uint height, out uint elements, out uint numberOfLevels);
+    __target_intrinsic(hlsl)
+    void GetDimensions(out float width,out float height, out float elements);
+    __target_intrinsic(hlsl)
+    void GetDimensions(uint mipLevel, out float width,out float height, out float elements, out float numberOfLevels);
 
     // With Clamp
 

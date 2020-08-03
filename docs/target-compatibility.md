@@ -39,7 +39,7 @@ Items with ^ means there is some discussion about support later in the document 
 | `[unroll]`                  |     Yes      |   Yes        |   Yes ^    |     Yes       |    Limited + 
 | Atomics                     |     Yes      |   Yes        |   Yes      |     Yes       |    No + 
 | Atomics on RWBuffer         |     Yes      |   Yes        |   Yes      |     No        |    No + 
-| FeedbackTextures            |     No       |   Yes        |   No +     |     No        |    No
+| FeedbackTextures            |     No       |   Yes        |   No +     |     No        |    Yes ^
 
 ## Half Type
 
@@ -173,9 +173,9 @@ On the CPU atomics are not supported, but will be in the future.
 
 ## Sampler Feedback
 
-The HLSL [sampler feedback feature](https://microsoft.github.io/DirectX-Specs/d3d/SamplerFeedback.html) is available for HLSL targets, but requires shader model 6.5. This means it's only available on Direct12 currently.
+The HLSL [sampler feedback feature](https://microsoft.github.io/DirectX-Specs/d3d/SamplerFeedback.html) is available for HLSL targets. The features requires shader model 6.5 and a version of DXC that supports shader model 6.5 or higher. This requirement means it is only available on DirectX12.
 
-There doesn't not appear to be a similar feature available in Vulkan, yet but when it is available support should be addeed.
+There doesn't not appear to be a similar feature available in Vulkan yet, but when it is available support should be addeed.
 
-For CPU targets, the implementation of resource types is a 'user space' problem. 
+For CPU targets there is the IFeedbackTexture interface, that requires an implemention. Slang does not currently include CPU implementations of for texture types.  
 
