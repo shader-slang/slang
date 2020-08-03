@@ -920,12 +920,24 @@ static void emitReflectionTypeLayoutInfoJSON(
             // the relevant cases here.
             //
             auto type = typeLayout->getType();
-            auto shape  = type->getResourceShape();
+            auto shape = type->getResourceShape();
 
             const auto baseType = shape & SLANG_RESOURCE_BASE_SHAPE_MASK;
 
-            if (baseType == SLANG_STRUCTURED_BUFFER ||
-                (shape & SLANG_TEXTURE_FEEDBACK_FLAG))
+            if (baseType == SLANG_STRUCTURED_BUFFER)
+            {
+                emitReflectionResourceTypeBaseInfoJSON(writer, type);
+
+                if( auto resultTypeLayout = typeLayout->getElementTypeLayout() )
+                {
+                    comma(writer);
+                    write(writer, "\"resultType\": ");
+                    emitReflectionTypeLayoutJSON(
+                        writer,
+                        resultTypeLayout);
+                }
+            }
+            else if (shape & SLANG_TEXTURE_FEEDBACK_FLAG)
             {
                 emitReflectionResourceTypeBaseInfoJSON(writer, type);
 
@@ -938,7 +950,7 @@ static void emitReflectionTypeLayoutInfoJSON(
             }
             else
             {
-                emitReflectionTypeInfoJSON(writer, typeLayout->getType());
+                emitReflectionTypeInfoJSON(writer, type);
             }
         }
         break;
