@@ -1,233 +1,313 @@
 // os.cpp
 #include "os.h"
 
+#ifdef _WIN32
+
+// Include Windows header in a way that minimized namespace pollution.
+// TODO: We could try to avoid including this at all, but it would
+// mean trying to hide certain struct layouts, which would add
+// more dynamic allocation.
+#define WIN32_LEAN_AND_MEAN
+#define NOMINMAX
+#include <Windows.h>
+#undef WIN32_LEAN_AND_MEAN
+#undef NOMINMAX
+
+#else
+
+#include <dirent.h>
+#include <errno.h>
+//#include <poll.h>
+#include <sys/stat.h>
+#include <sys/types.h>
+#include <sys/wait.h>
+#include <unistd.h>
+
+#endif
+
 #include <stdio.h>
 #include <stdlib.h>
 
 using namespace Slang;
 
-// Platform-specific code follows
+/* static */FindFilesResult FindFilesResult::findChildDirectories(const Slang::String& directoryPath)
+{
+    RefPtr<FindFilesState> state(FindFilesState::create());
+    if (SLANG_FAILED(state->startFindChildDirectories(directoryPath)))
+    {
+        state.setNull();
+    }
+    return FindFilesResult(state);
+}
+
+/* static */FindFilesResult FindFilesResult::findFilesInDirectoryMatchingPattern(const Slang::String& directoryPath, const Slang::String& pattern)
+{
+    RefPtr<FindFilesState> state(FindFilesState::create());
+    if (SLANG_FAILED(state->startFindFilesInDirectoryMatchingPattern(directoryPath, pattern)))
+    {
+        state.setNull();
+    }
+    return FindFilesResult(state);
+}
+
+/* static */FindFilesResult FindFilesResult::findFilesInDirectory(const Slang::String& directoryPath)
+{
+    RefPtr<FindFilesState> state(FindFilesState::create());
+    if (SLANG_FAILED(state->startFindFilesInDirectory(directoryPath)))
+    {
+        state.setNull();
+    }
+    return FindFilesResult(state);
+}
 
 #ifdef _WIN32
 
-#include <Windows.h>
-
-OSFindFilesResult::~OSFindFilesResult()
+class WinFindFilesState : public FindFilesState
 {
-#ifdef WIN32
-    if (m_findHandle)
+    public:
+    virtual bool findNext() SLANG_OVERRIDE;
+    virtual SlangResult startFindChildDirectories(const String& directoryPath) SLANG_OVERRIDE;
+    virtual SlangResult startFindFilesInDirectory(const String& path) SLANG_OVERRIDE;
+    virtual SlangResult startFindFilesInDirectoryMatchingPattern(const String& directoryPath, const String& pattern) SLANG_OVERRIDE;
+    virtual bool hasResult()  SLANG_OVERRIDE { return m_findHandle != nullptr; }
+    
+    WinFindFilesState():
+        m_findHandle(nullptr)
     {
-        ::FindClose(m_findHandle);
     }
-#else
-    if (m_directory)
+
+    ~WinFindFilesState() { _close(); }
+
+protected:
+    void _close()
     {
-        closedir(m_directory);
+        if (m_findHandle)
+        {
+            ::FindClose(m_findHandle);
+            m_findHandle = nullptr;
+        }
     }
-#endif
-}
+    bool _advance()
+    {
+        if (m_findHandle == nullptr || FindNextFileW(m_findHandle, &m_fileData) == 0)
+        {
+            _close();
+            return false;
+        }
+        return true;
+    }
 
-static bool advance(OSFindFilesResult& result)
-{
-    return FindNextFileW(result.m_findHandle, &result.m_fileData) != 0;
-}
+    HANDLE				m_findHandle;
+    WIN32_FIND_DATAW	m_fileData;
+    DWORD				m_requiredMask;
+    DWORD				m_disallowedMask;
+};
 
-static bool adjustToValidResult(OSFindFilesResult& result)
+bool WinFindFilesState::findNext()
 {
     for (;;)
     {
-        if ((result.m_fileData.dwFileAttributes & result.m_requiredMask) != result.m_requiredMask)
-            goto skip;
+        if (!_advance())
+        {
+            return false;
+        }
 
-        if ((result.m_fileData.dwFileAttributes & result.m_disallowedMask) != 0)
-            goto skip;
+        if (((m_fileData.dwFileAttributes & m_requiredMask) != m_requiredMask) ||
+            (m_fileData.dwFileAttributes & m_disallowedMask) != 0 ||
+            (wcscmp(m_fileData.cFileName, L".") == 0) ||
+            (wcscmp(m_fileData.cFileName, L"..") == 0))
+        {
+            continue;
+        }
 
-        if (wcscmp(result.m_fileData.cFileName, L".") == 0)
-            goto skip;
+        m_filePath = m_directoryPath + String::fromWString(m_fileData.cFileName);
 
-        if (wcscmp(result.m_fileData.cFileName, L"..") == 0)
-            goto skip;
-
-        result.m_filePath = result.m_directoryPath + String::fromWString(result.m_fileData.cFileName);
-        if (result.m_fileData.dwFileAttributes & FILE_ATTRIBUTE_DIRECTORY)
-            result.m_filePath = result.m_filePath + "/";
+        if (m_fileData.dwFileAttributes & FILE_ATTRIBUTE_DIRECTORY)
+            m_filePath.appendChar('/');
 
         return true;
-
-    skip:
-        if (!advance(result))
-            return false;
     }
 }
 
-
-bool OSFindFilesResult::findNextFile()
+SlangResult WinFindFilesState::startFindFilesInDirectoryMatchingPattern(const String& directoryPath, const String& pattern)
 {
-    if (!advance(*this)) return false;
-    return adjustToValidResult(*this);
-}
+    _close();
 
-OSFindFilesResult osFindFilesInDirectoryMatchingPattern(
-    Slang::String directoryPath,
-    Slang::String pattern)
-{
     // TODO: add separator to end of directory path if needed
 
     String searchPath = directoryPath + pattern;
 
-    OSFindFilesResult result;
-    HANDLE findHandle = FindFirstFileW(
-        searchPath.toWString(),
-        &result.m_fileData);
-
-    result.m_directoryPath = directoryPath;
-    result.m_findHandle = findHandle;
-    result.m_requiredMask = 0;
-    result.m_disallowedMask = FILE_ATTRIBUTE_DIRECTORY;
-
-    if (findHandle == INVALID_HANDLE_VALUE)
+    m_findHandle = FindFirstFileW(searchPath.toWString(), &m_fileData);
+    if (!m_findHandle)
     {
-        result.m_findHandle = nullptr;
-        result.m_error = kOSError_FileNotFound;
-        return result;
+        return SLANG_E_NOT_FOUND;
     }
 
-    result.m_error = kOSError_None;
-    if (!adjustToValidResult(result))
-    {
-        result.m_findHandle = nullptr;
-    }
-    return result;
+    m_directoryPath = directoryPath;
+    m_requiredMask = 0;
+    m_disallowedMask = FILE_ATTRIBUTE_DIRECTORY;
+
+    findNext();
+    return SLANG_OK;
 }
 
-OSFindFilesResult osFindFilesInDirectory(
-    Slang::String directoryPath)
+SlangResult WinFindFilesState::startFindChildDirectories(const String& directoryPath)
 {
-    return osFindFilesInDirectoryMatchingPattern(directoryPath, "*");
-}
+    _close();
 
-OSFindFilesResult osFindChildDirectories(
-    Slang::String directoryPath)
-{
     // TODO: add separator to end of directory path if needed
 
     String searchPath = directoryPath + "*";
 
-    OSFindFilesResult result;
-    HANDLE findHandle = FindFirstFileW(
-        searchPath.toWString(),
-        &result.m_fileData);
-
-    result.m_directoryPath = directoryPath;
-    result.m_findHandle = findHandle;
-    result.m_requiredMask = FILE_ATTRIBUTE_DIRECTORY;
-    result.m_disallowedMask = 0;
-
-    if (findHandle == INVALID_HANDLE_VALUE)
+    m_findHandle = FindFirstFileW( searchPath.toWString(), &m_fileData);
+    if (!m_findHandle)
     {
-        result.m_findHandle = nullptr;
-        result.m_error = kOSError_FileNotFound;
-        return result;
+        return SLANG_E_NOT_FOUND;
     }
 
-    result.m_error = kOSError_None;
-    if (!adjustToValidResult(result))
-    {
-        result.m_findHandle = nullptr;
-    }
-    return result;
+    m_directoryPath = directoryPath;
+    
+    m_requiredMask = FILE_ATTRIBUTE_DIRECTORY;
+    m_disallowedMask = 0;
+
+    findNext();
+    return SLANG_OK;
+}
+
+SlangResult WinFindFilesState::startFindFilesInDirectory(const Slang::String& path)
+{
+    return startFindFilesInDirectoryMatchingPattern(path, "*");
+}
+
+/* static */RefPtr<FindFilesState> FindFilesState::create()
+{
+    return new WinFindFilesState;
 }
 
 #else
 
-static bool advance(OSFindFilesResult& result)
+class UnixFindFilesState : public FindFilesState
 {
-    result.m_entry = readdir(result.m_directory);
-    return result.m_entry != nullptr;
+public:
+    virtual bool findNext() SLANG_OVERRIDE;
+    virtual SlangResult startFindChildDirectories(const String& directoryPath) SLANG_OVERRIDE;
+    virtual SlangResult startFindFilesInDirectory(const String& path) SLANG_OVERRIDE;
+    virtual SlangResult startFindFilesInDirectoryMatchingPattern(const String& directoryPath, const String& pattern) SLANG_OVERRIDE;
+    virtual bool hasResult()  SLANG_OVERRIDE { return m_directory != nullptr; }
+
+    UnixFindFilesResult():
+        m_directory(nullptr),
+        m_entry(nullptr)
+    {}
+
+    ~UnixFindFilesResult() { _close(); }
+
+protected:
+    bool _advance();
+
+    void _close()
+    {
+        if (m_directory)
+        {
+            closedir(m_directory);
+            m_directory = nullptr;
+        }
+    }
+
+    DIR*         m_directory;
+    dirent*      m_entry;
+};
+
+bool UnixFindFilesState::_advance()
+{
+    if (m_directory)
+    {
+        m_entry = readdir(m_directory);
+        if (m_entry == nullptr)
+        {
+            _close();
+            return false;
+        }
+        return true;
+    }
+    return false;
 }
 
-static bool checkValidResult(OSFindFilesResult& result)
-{
-//    fprintf(stderr, "checkValidResullt(%s)\n", result.m_entry->d_name);
-
-    if (strcmp(result.m_entry->d_name, ".") == 0)
-        return false;
-
-    if (strcmp(result.m_entry->d_name, "..") == 0)
-        return false;
-
-    String path = result.m_directoryPath
-        + String(result.m_entry->d_name);
-
-//    fprintf(stderr, "stat(%s)\n", path.getBuffer());
-    struct stat fileInfo;
-    if(stat(path.getBuffer(), &fileInfo) != 0)
-        return false;
-
-    if(S_ISDIR(fileInfo.st_mode))
-        path = path + "/";
-
-
-    result.m_filePath = path;
-    return true;    
-}
-
-static bool adjustToValidResult(OSFindFilesResult& result)
+bool UnixFindFilesState::findNext()
 {
     for (;;)
     {
-        if(checkValidResult(result))
-            return true;
-
-        if (!advance(result))
+        if (!_advance())
+        {
             return false;
+        }
+
+        if (strcmp(m_entry->d_name, ".") == 0 ||
+            strcmp(m_entry->d_name, "..") == 0)
+        {
+            continue;
+        }
+
+        // Work out the path. Assumes there is a / in dir path
+        m_filePath = m_directoryPath;
+        m_filePath.append(m_entry->d_name);
+
+        //    fprintf(stderr, "stat(%s)\n", path.getBuffer());
+        struct stat fileInfo;
+        if (stat(m_filePath.getBuffer(), &fileInfo) != 0)
+        {
+            continue;
+        }
+
+        if (S_ISDIR(fileInfo.st_mode))
+            m_filePath.appendChar('/');
+
+        return true;
     }
 }
 
-
-bool OSFindFilesResult::findNextFile()
+SlangResult UnixFindFilesState::startFindChildDirectories(const String& directoryPath)
 {
-//    fprintf(stderr, "OSFindFilesResult::findNextFile()\n");
-    if (!advance(*this)) return false;
-    return adjustToValidResult(*this);
-}
+    _close();
 
-OSFindFilesResult osFindFilesInDirectory(
-    Slang::String directoryPath)
-{
-    OSFindFilesResult result;
-
-//    fprintf(stderr, "osFindFilesInDirectory(%s)\n", directoryPath.getBuffer());
-
-    result.m_directory = opendir(directoryPath.getBuffer());
-    if(!result.m_directory)
+    m_directory = opendir(directoryPath.getBuffer());
+    if (!m_directory)
     {
-        result.m_entry = nullptr;
-        return result;
-    }
-
-    result.m_directoryPath = directoryPath;
-    result.findNextFile();
-    return result;
-}
-
-OSFindFilesResult osFindChildDirectories(
-    Slang::String directoryPath)
-{
-    OSFindFilesResult result;
-
-    result.m_directory = opendir(directoryPath.getBuffer());
-    if(!result.m_directory)
-    {
-        result.m_entry = nullptr;
-        return result;
+        return SLANG_E_NOT_FOUND;
     }
 
     // TODO: Set attributes to ignore everything but directories
 
-    result.m_directoryPath = directoryPath;
-    result.findNextFile();
-    return result;
+    m_directoryPath = directoryPath;
+    findNext();
+    return SLANG_OK;
+}
+
+SlangResult UnixFindFilesState::startFindFilesInDirectory(const Slang::String& path)
+{
+    _close();
+
+//    fprintf(stderr, "osFindFilesInDirectory(%s)\n", directoryPath.getBuffer());
+
+    m_directoryPath = path;
+
+    m_directory = opendir(path.getBuffer());
+    if(!m_directory)
+    {
+        return SLANG_E_NOT_FOUND;
+    }
+    findNext();
+    return SLANG_OK;
+}
+
+SlangResult UnixFindFilesState::startFindFilesInDirectoryMatchingPattern(const String& directoryPath, const String& pattern)
+{
+    return RE4_E_NOT_IMPLEMENTED;
+}
+
+/* static */RefPtr<FindFilesState> FindFilesState::create()
+{
+    return new UnixFindFilesState;
 }
 
 #endif

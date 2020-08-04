@@ -5,136 +5,106 @@
 
 #include "../../source/core/slang-io.h"
 
-// This file encapsulates the platform-specific operations needed by the test
-// runner that are not already provided by the core Slang libs
-
-#ifdef _WIN32
-
-// Include Windows header in a way that minimized namespace pollution.
-// TODO: We could try to avoid including this at all, but it would
-// mean trying to hide certain struct layouts, which would add
-// more dynamic allocation.
-#define WIN32_LEAN_AND_MEAN
-#define NOMINMAX
-#include <Windows.h>
-#undef WIN32_LEAN_AND_MEAN
-#undef NOMINMAX
-
-#else
-
-#include <dirent.h>
-#include <errno.h>
-//#include <poll.h>
-#include <sys/stat.h>
-#include <sys/types.h>
-#include <sys/wait.h>
-#include <unistd.h>
-
-#endif
-
-// A simple set of error codes for possible runtime failures
-enum OSError
+/* Holds the platform specific multable state of a find files operation */
+class FindFilesState : public Slang::RefObject
 {
-    kOSError_None = 0,
-    kOSError_InvalidArgument,
-    kOSError_OperationFailed,
-    kOSError_FileNotFound,
+public:
+    virtual bool findNext() = 0;
+    virtual bool hasResult() = 0;
+    virtual SlangResult startFindChildDirectories(const Slang::String& directoryPath) = 0;
+    virtual SlangResult startFindFilesInDirectory(const Slang::String& path) = 0;
+    virtual SlangResult startFindFilesInDirectoryMatchingPattern(const Slang::String& directoryPath, const Slang::String& pattern) = 0;
+
+        /// Create a find files state. Can only be used after an 'start'. Note that a start function can be called
+        /// on a FindFilesState in any state.
+        /// Also start methods return error codes which can be useful.
+    static Slang::RefPtr<FindFilesState> create();
+
+        /// Get the current path. Only valid if hasResult is true.
+    const Slang::String& getPath() const { return m_filePath; }
+
+protected:
+    Slang::String m_directoryPath;
+    Slang::String m_filePath;
 };
 
-// A helper type used during enumeration of files in a directory.
-struct OSFindFilesResult
+/* A helper class for holding results of a find. Allows for easy iteration via begin/end */
+class FindFilesResult
 {
-    Slang::String				m_directoryPath;
-    Slang::String				m_filePath;
-#ifdef WIN32
-    HANDLE				m_findHandle;
-    WIN32_FIND_DATAW	m_fileData;
-    DWORD				m_requiredMask;
-    DWORD				m_disallowedMask;
-    OSError				m_error;
-#else
-    DIR*         m_directory;
-    dirent*      m_entry;
-#endif
-
-    bool findNextFile();
-
+public:
     struct Iterator
     {
         typedef Iterator ThisType;
-        OSFindFilesResult* m_context;
 
-        bool operator==(const ThisType& other) const { return m_context == other.m_context; } 
+        /// True if there is either no result, or no results in the result
+        bool atEnd() const { return m_state == nullptr || !m_state->hasResult(); }
+
+        /// Equality is only for testing if at the end
+        bool operator==(const ThisType& other) const { return atEnd() == other.atEnd(); }
         bool operator!=(const ThisType& other) const { return !(*this == other); }
 
         void operator++()
         {
-            if (!m_context->findNextFile())
+            if (!m_state->findNext())
             {
-                m_context = nullptr;
+                m_state.setNull();
             }
         }
-        Slang::String const& operator*() const
+        const Slang::String& operator*() const
         {
-            return m_context->m_filePath;
+            SLANG_ASSERT(m_state);
+            return m_state->getPath();
         }
+
+        Iterator(FindFilesState* state) : m_state(state) {}
+    protected:
+        Slang::RefPtr<FindFilesState> m_state;
     };
 
-    Iterator begin()
+    Iterator begin() { return Iterator(m_state); }
+    Iterator end() { return Iterator(nullptr); }
+
+    FindFilesResult(FindFilesState* state):
+        m_state(state)
     {
-#ifdef WIN32
-        Iterator result = { m_findHandle ? this : nullptr };
-#else
-        Iterator result = { m_entry ? this : nullptr };
-#endif
-        return result;
     }
 
-    Iterator end()
-    {
-        Iterator result = { nullptr };
-        return result;
-    }
+        // Enumerate subdirectories in the given `directoryPath` and return a logical
+        // collection of the results that can be iterated with a range-based
+        // `for` loop:
+        //
+        // for( auto subdir : findChildDirectories(dir))
+        // { ... }
+        //
+        // Each element in the range is a `Slang::String` representing the
+        // path to a subdirectory of the directory.
+    static FindFilesResult findChildDirectories(const Slang::String& directoryPath);
 
-    ~OSFindFilesResult();
+        // Enumerate files in the given `directoryPath` that match the provided
+        // `pattern` as a simplified regex for files to return (e.g., "*.txt")
+        // and return a logical collection of the results
+        // that can be iterated with a range-based `for` loop:
+        //
+        // for( auto file : osFindFilesInDirectoryMatchingPattern(dir, "*.txt"))
+        // { ... }
+        //
+        // Each element in the range is a `Slang::String` representing the
+        // path to a file in the directory.
+    static FindFilesResult findFilesInDirectoryMatchingPattern(const Slang::String& directoryPath, const Slang::String& pattern);
+
+        // Enumerate files in the given `directoryPath`  and return a logical
+        // collection of the results that can be iterated with a range-based
+        // `for` loop:
+        //
+        // for( auto file : osFindFilesInDirectory(dir))
+        // { ... }
+        //
+        // Each element in the range is a `Slang::String` representing the
+        // path to a file in the directory.
+    static FindFilesResult findFilesInDirectory(const Slang::String& directoryPath);
+    
+protected:
+    Slang::RefPtr<FindFilesState> m_state;
 };
-
-// Enumerate subdirectories in the given `directoryPath` and return a logical
-// collection of the results that can be iterated with a range-based
-// `for` loop:
-//
-// for( auto subdir : osFindChildDirectories(dir))
-// { ... }
-//
-// Each element in the range is a `Slang::String` representing the
-// path to a subdirecotry of the directory.
-OSFindFilesResult osFindChildDirectories(
-    Slang::String directoryPath);
-
-// Enumerate files in the given `directoryPath` that match the provided
-// `pattern` as a simplified regex for files to return (e.g., "*.txt")
-// and return a logical collection of the results
-// that can be iterated with a range-based `for` loop:
-//
-// for( auto file : osFindFilesInDirectoryMatchingPattern(dir, "*.txt"))
-// { ... }
-//
-// Each element in the range is a `Slang::String` representing the
-// path to a file in the directory.
-OSFindFilesResult osFindFilesInDirectoryMatchingPattern(
-    Slang::String directoryPath,
-    Slang::String pattern);
-
-// Enumerate files in the given `directoryPath`  and return a logical
-// collection of the results that can be iterated with a range-based
-// `for` loop:
-//
-// for( auto file : osFindFilesInDirectory(dir))
-// { ... }
-//
-// Each element in the range is a `Slang::String` representing the
-// path to a file in the directory.
-OSFindFilesResult osFindFilesInDirectory(
-    Slang::String directoryPath);
 
 #endif // SLANG_OS_H

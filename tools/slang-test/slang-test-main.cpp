@@ -3144,7 +3144,7 @@ void runTestsInDirectory(
     TestContext*		context,
     String				directoryPath)
 {
-    for (auto file : osFindFilesInDirectory(directoryPath))
+    for (auto file : FindFilesResult::findFilesInDirectory(directoryPath))
     {
         if( shouldRunTest(context, file) )
         {
@@ -3152,7 +3152,7 @@ void runTestsInDirectory(
             runTestsOnFile(context, file);
         }
     }
-    for (auto subdir : osFindChildDirectories(directoryPath))
+    for (auto subdir : FindFilesResult::findChildDirectories(directoryPath))
     {
         runTestsInDirectory(context, subdir);
     }
