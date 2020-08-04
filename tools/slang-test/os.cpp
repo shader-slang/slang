@@ -242,7 +242,7 @@ bool UnixFindFilesState::findNext()
         {
             m_findType = FindType::Directory;
         }
-        else (S_ISREG(fileInfo.st_mode))
+        else if (S_ISREG(fileInfo.st_mode))
         {
             m_findType = FindType::File;
         }
@@ -254,7 +254,7 @@ bool UnixFindFilesState::findNext()
 
         // Check the type is enabled, else ignore
         const FindTypeFlags typeFlags = FindTypeFlags(1) << int(m_findType);
-        if ((flags & m_allowedTypes) == 0)
+        if ((typeFlags & m_allowedTypes) == 0)
         {
             // Has to be enabled
             continue;
