@@ -34,9 +34,12 @@ public:
         /// True if holds a result. If true, getPath/getFoundType are valid, otherwise they are undefined
     virtual bool hasResult() = 0;
 
-        /// Starts a find. Returns an error if the directory path cannot be found.
-        /// The pattern can only match in the specified directory.
-        /// The allowedTypes flags controls what types (files and/or directories) should be searched for
+        /// Starts a find. 
+        /// The pattern can *only* match the files/directories in the specified directory. Pass '*' to match everything.
+        /// NOTE! The specifics of the pattern matching is currently target specific.
+        /// The allowedTypes flags controls what types (files and/or directories) should be searched for.
+        /// NOTE! Just because startFind returns with a success code, does *not* mean the FindFileState has a result - this will happen with an empty directory.
+        /// @return is SLANG_E_NOT_FOUND if the directoryPath is not found
     virtual SlangResult startFind(const Slang::String& directoryPath, const Slang::String& pattern, FindTypeFlags allowedTypes) = 0;
 
         /// Get the path of the thing found.
@@ -66,10 +69,10 @@ public:
     {
         typedef Iterator ThisType;
 
-        /// True if there is either no result, or no results in the result
+            /// True if there is either no result, or no results in the result
         bool atEnd() const { return m_state == nullptr || !m_state->hasResult(); }
 
-        /// Equality is only for testing if at the end
+            /// Equality is only for testing if at the end
         bool operator==(const ThisType& other) const { return atEnd() == other.atEnd(); }
         bool operator!=(const ThisType& other) const { return !(*this == other); }
 

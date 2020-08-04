@@ -122,7 +122,7 @@ bool WinFindFilesState::findNext()
             continue;
         }
 
-        m_foundPath = m_directoryPath + String::fromWString(m_fileData.cFileName);
+        m_foundPath = Path::combine(m_directoryPath,  String::fromWString(m_fileData.cFileName));
 
         if (m_foundType == FindType::Directory)
             m_foundPath.appendChar('/');
@@ -227,9 +227,7 @@ bool UnixFindFilesState::findNext()
             continue;
         }
 
-        // Work out the path. Assumes there is a / in dir path
-        m_foundPath = m_directoryPath;
-        m_foundPath.append(m_entry->d_name);
+        m_foundPath = Path::combine(m_directoryPath, m_entry->d_name);
 
         //    fprintf(stderr, "stat(%s)\n", path.getBuffer());
         struct stat fileInfo;
