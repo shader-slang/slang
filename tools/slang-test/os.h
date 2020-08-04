@@ -5,15 +5,31 @@
 
 #include "../../source/core/slang-io.h"
 
-/* Holds the platform specific multable state of a find files operation */
+enum class FindType
+{
+    Unknown,
+    File,
+    Directory,
+};
+
+typedef uint32_t FindTypeFlags;
+struct FindTypeFlag
+{
+    enum Enum : FindTypeFlags
+    {
+        File = FindTypeFlags(1) << int(FindType::File),
+        Directory = FindTypeFlags(1) << int(FindType::Directory),
+    };
+};
+
+/* Holds the platform specific mutable state of a find files operation */
 class FindFilesState : public Slang::RefObject
 {
 public:
     virtual bool findNext() = 0;
     virtual bool hasResult() = 0;
-    virtual SlangResult startFindChildDirectories(const Slang::String& directoryPath) = 0;
-    virtual SlangResult startFindFilesInDirectory(const Slang::String& path) = 0;
-    virtual SlangResult startFindFilesInDirectoryMatchingPattern(const Slang::String& directoryPath, const Slang::String& pattern) = 0;
+
+    virtual SlangResult startFind(const Slang::String& directoryPath, const Slang::String& pattern, FindTypeFlags allowedTypes) = 0;
 
         /// Create a find files state. Can only be used after an 'start'. Note that a start function can be called
         /// on a FindFilesState in any state.
@@ -24,8 +40,11 @@ public:
     const Slang::String& getPath() const { return m_filePath; }
 
 protected:
+
     Slang::String m_directoryPath;
     Slang::String m_filePath;
+    FindType m_findType = FindType::Unknown;
+    FindTypeFlags m_allowedTypes = 0;
 };
 
 /* A helper class for holding results of a find. Allows for easy iteration via begin/end */
