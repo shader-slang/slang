@@ -276,7 +276,7 @@ SlangResult UnixFindFilesState::startFind(const String& directoryPath, const Str
     m_directoryPath = directoryPath;
     m_pattern = pattern;
 
-    m_directory = opendir(path.getBuffer());
+    m_directory = opendir(m_directoryPath.getBuffer());
     if (!m_directory)
     {
         return SLANG_E_NOT_FOUND;
