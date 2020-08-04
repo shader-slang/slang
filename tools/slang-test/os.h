@@ -22,7 +22,8 @@ struct FindTypeFlag
     };
 };
 
-/* Holds the platform specific mutable state of a find files operation */
+/* Holds the platform specific mutable state of a find files operation.
+NOTE! That FindFiles can find files and/or directories */
 class FindFilesState : public Slang::RefObject
 {
 public:
@@ -36,15 +37,18 @@ public:
         /// Also start methods return error codes which can be useful.
     static Slang::RefPtr<FindFilesState> create();
 
-        /// Get the current path. Only valid if hasResult is true.
-    const Slang::String& getPath() const { return m_filePath; }
+        /// Get the path of the thing found. 
+    const Slang::String& getPath() const { return m_foundPath; }
+
+        /// Get the type the path relates to
+    FindType getFoundType() const { return m_foundType; }
 
 protected:
 
-    Slang::String m_directoryPath;
-    Slang::String m_filePath;
-    FindType m_findType = FindType::Unknown;
-    FindTypeFlags m_allowedTypes = 0;
+    Slang::String m_directoryPath;                  ///< The directory being searched
+    Slang::String m_foundPath;                      ///< The path to what has been found (if anything)
+    FindType m_foundType = FindType::Unknown;       ///< The type of thing at the foundPath
+    FindTypeFlags m_allowedTypes = 0;               ///< Set of all types allowed
 };
 
 /* A helper class for holding results of a find. Allows for easy iteration via begin/end */
@@ -92,7 +96,7 @@ public:
         // collection of the results that can be iterated with a range-based
         // `for` loop:
         //
-        // for( auto subdir : findChildDirectories(dir))
+        // for( auto subdir : FindFilesResult::findChildDirectories(dir))
         // { ... }
         //
         // Each element in the range is a `Slang::String` representing the
@@ -104,7 +108,7 @@ public:
         // and return a logical collection of the results
         // that can be iterated with a range-based `for` loop:
         //
-        // for( auto file : osFindFilesInDirectoryMatchingPattern(dir, "*.txt"))
+        // for( auto file : FindFilesResult::findFilesInDirectoryMatchingPattern(dir, "*.txt"))
         // { ... }
         //
         // Each element in the range is a `Slang::String` representing the
@@ -115,7 +119,7 @@ public:
         // collection of the results that can be iterated with a range-based
         // `for` loop:
         //
-        // for( auto file : osFindFilesInDirectory(dir))
+        // for( auto file : FindFilesResult::findFilesInDirectory(dir))
         // { ... }
         //
         // Each element in the range is a `Slang::String` representing the

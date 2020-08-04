@@ -84,12 +84,12 @@ protected:
         {
             ::FindClose(m_findHandle);
             m_findHandle = nullptr;
-            m_findType = FindType::Unknown;
+            m_foundType = FindType::Unknown;
         }
     }
     bool _advance()
     {
-        m_findType = FindType::Unknown;
+        m_foundType = FindType::Unknown;
         if (m_findHandle == nullptr || FindNextFileW(m_findHandle, &m_fileData) == 0)
         {
             _close();
@@ -111,9 +111,9 @@ bool WinFindFilesState::findNext()
             return false;
         }
 
-        m_findType = (m_fileData.dwFileAttributes & FILE_ATTRIBUTE_DIRECTORY) ? FindType::Directory : FindType::File;
+        m_foundType = (m_fileData.dwFileAttributes & FILE_ATTRIBUTE_DIRECTORY) ? FindType::Directory : FindType::File;
 
-        const FindTypeFlags typeFlags = FindTypeFlags(1) << int(m_findType);
+        const FindTypeFlags typeFlags = FindTypeFlags(1) << int(m_foundType);
 
         if (((typeFlags & m_allowedTypes) == 0) ||
             (wcscmp(m_fileData.cFileName, L".") == 0) ||
@@ -122,10 +122,10 @@ bool WinFindFilesState::findNext()
             continue;
         }
 
-        m_filePath = m_directoryPath + String::fromWString(m_fileData.cFileName);
+        m_foundPath = m_directoryPath + String::fromWString(m_fileData.cFileName);
 
-        if (m_findType == FindType::Directory)
-            m_filePath.appendChar('/');
+        if (m_foundType == FindType::Directory)
+            m_foundPath.appendChar('/');
 
         return true;
     }
@@ -181,7 +181,7 @@ protected:
         {
             closedir(m_directory);
             m_directory = nullptr;
-            m_findType = FindType::Unknown;
+            m_foundType = FindType::Unknown;
         }
     }
 
@@ -192,7 +192,7 @@ protected:
 
 bool UnixFindFilesState::_advance()
 {
-    m_findType = FindType::Unknown;
+    m_foundType = FindType::Unknown;
     if (m_directory)
     {
         m_entry = readdir(m_directory);
@@ -228,23 +228,23 @@ bool UnixFindFilesState::findNext()
         }
 
         // Work out the path. Assumes there is a / in dir path
-        m_filePath = m_directoryPath;
-        m_filePath.append(m_entry->d_name);
+        m_foundPath = m_directoryPath;
+        m_foundPath.append(m_entry->d_name);
 
         //    fprintf(stderr, "stat(%s)\n", path.getBuffer());
         struct stat fileInfo;
-        if (stat(m_filePath.getBuffer(), &fileInfo) != 0)
+        if (stat(m_foundPath.getBuffer(), &fileInfo) != 0)
         {
             continue;
         }
 
         if (S_ISDIR(fileInfo.st_mode))
         {
-            m_findType = FindType::Directory;
+            m_foundType = FindType::Directory;
         }
         else if (S_ISREG(fileInfo.st_mode))
         {
-            m_findType = FindType::File;
+            m_foundType = FindType::File;
         }
         else
         {
@@ -253,15 +253,15 @@ bool UnixFindFilesState::findNext()
         }
 
         // Check the type is enabled, else ignore
-        const FindTypeFlags typeFlags = FindTypeFlags(1) << int(m_findType);
+        const FindTypeFlags typeFlags = FindTypeFlags(1) << int(m_foundType);
         if ((typeFlags & m_allowedTypes) == 0)
         {
             // Has to be enabled
             continue;
         }
 
-        if (m_findType == FindType::Directory)
-            m_filePath.appendChar('/');
+        if (m_foundType == FindType::Directory)
+            m_foundPath.appendChar('/');
 
         return true;
     }
