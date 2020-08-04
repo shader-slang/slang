@@ -195,6 +195,18 @@ static RefPtr<SamplerState> _createSamplerState(
                     case InputBufferType::StorageBuffer:
                         slotRangeDesc.type = DescriptorSlotType::StorageBuffer;
                         break;
+
+                    case InputBufferType::RootConstantBuffer:
+                        {
+                            // A root constant buffer maps to a root constant range
+                            // where the `count` of slots is equal to the number
+                            // of bytes of data.
+                            //
+                            Slang::UInt size = srcEntry.bufferData.getCount() * sizeof(srcEntry.bufferData[0]);
+                            slotRangeDesc.type = DescriptorSlotType::RootConstant;
+                            slotRangeDesc.count = size;
+                        }
+                        break;
                     }
                 }
                 break;
@@ -268,6 +280,20 @@ static RefPtr<SamplerState> _createSamplerState(
                 {
                     const InputBufferDesc& srcBuffer = srcEntry.bufferDesc;
                     const size_t bufferSize = srcEntry.bufferData.getCount() * sizeof(uint32_t);
+
+                    if( srcBuffer.type == InputBufferType::RootConstantBuffer )
+                    {
+                        // A root constant buffer at the HLSL/Slang level actually
+                        // maps to root constant data stored directly in the descriptor
+                        // set, and thus does not need/want us to allocate a buffer
+                        // to hold the data.
+                        //
+                        // Instead, we set the data directly here and then bypass
+                        // the logic that handles the buffer-backed cases below.
+                        //
+                        descriptorSet->setRootConstants(rangeIndex, 0, bufferSize, srcEntry.bufferData.getBuffer());
+                        break;
+                    }
 
                     RefPtr<BufferResource> bufferResource;
                     SLANG_RETURN_ON_FAIL(createBufferResource(srcEntry.bufferDesc, srcEntry.isOutput, bufferSize, srcEntry.bufferData.getBuffer(), renderer, bufferResource));

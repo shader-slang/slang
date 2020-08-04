@@ -519,6 +519,7 @@ enum class DescriptorSlotType
     DynamicUniformBuffer,
     DynamicStorageBuffer,
     InputAttachment,
+    RootConstant,
 };
 
 class DescriptorSetLayout : public Slang::RefObject
@@ -602,6 +603,11 @@ public:
         UInt index,
         ResourceView*   textureView,
         SamplerState*   sampler) = 0;
+    virtual void setRootConstants(
+        UInt range,
+        UInt offset,
+        UInt size,
+        void const* data) = 0;
 };
 
 enum class StencilOp : uint8_t

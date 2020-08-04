@@ -135,6 +135,7 @@ protected:
         virtual void setRootConstantBufferView(int index, D3D12_GPU_VIRTUAL_ADDRESS gpuBufferLocation) = 0;
         virtual void setRootDescriptorTable(int index, D3D12_GPU_DESCRIPTOR_HANDLE BaseDescriptor) = 0;
         virtual void setRootSignature(ID3D12RootSignature* rootSignature) = 0;
+        virtual void setRootConstants(Index rootParamIndex, Index dstOffsetIn32BitValues, Index countOf32BitValues, void const* srcData) = 0;
     };
 
     struct FrameInfo
@@ -301,19 +302,90 @@ protected:
     class DescriptorSetLayoutImpl : public DescriptorSetLayout
     {
     public:
+        // A "descriptor set" at the level of the `Renderer` API
+        // is similar to a D3D12 "descriptor table," but the match
+        // isn't perfect for a few reasons:
+        //
+        // * Our descriptor sets can contain both resources and
+        //   samplers, while D3D12 descriptor tables are always
+        //   resource-only or sampler-only.
+        //
+        // * Our descriptor sets can include root constant ranges,
+        //   while under D3D12 a root constant range is thought
+        //   of as belonging to the root signature directly.
+        //
+        // We navigate this mismatch in our implementation with
+        // the idea that a single `Renderer`-level descriptor set
+        // maps to zero or more D3D12 root parameters, which can
+        // include:
+        //
+        // * Zero or one root parameter that is used to bind a
+        //   descriptor table of resources.
+        //
+        // * Zero or one root parameter that is used to bind a
+        //   descriptor table of samplers.
+        //
+        // * Zero or more root parameters that represent ranges
+        //   of root constants.
+        //
+        // Binding a descriptor set will band all of its associated
+        // root parameters.
+        //
+        // (Note: this representation could in theory be extended
+        // to also support root resources that are not table-bound)
+        //
+        // Each descriptor slot range in the original `Desc` maps
+        // to a single `RangeInfo` stored here, which captures
+        // derived information used when binding values into
+        // a descriptor table.
+        //
         struct RangeInfo
         {
+                /// The type of descriptor slot in the original `Desc`
             DescriptorSlotType  type;
+
+                /// The number of slots in this range
             Int                 count;
+
+                /// The start index of this range in the appropriate type-specific array.
+                ///
+                /// E.g., for a sampler slot range, this would be the start index
+                /// for the range in the descriptor table used to store all the samplers.
             Int                 arrayIndex;
         };
-
         List<RangeInfo> m_ranges;
 
+        // We need to track additional information about
+        // root cosntant ranges that isn't captured in
+        // `RangeInfo`, so we store an additional array
+        // that just captures the root constant ranges.
+        //
+        struct RootConstantRangeInfo
+        {
+                /// The D3D12 "root parameter index" for this range
+            Int rootParamIndex;
+
+                /// The size in bytes of this range
+            Int size;
+
+                /// The byte offset of this range's data in the backing storage for a descriptor set
+            Int offset;
+        };
+        List<RootConstantRangeInfo> m_rootConstantRanges;
+
+            /// The total size (in bytes) of root constant data across all contained ranged.
+        Int                         m_rootConstantDataSize = 0;
+
+            /// The D3D12-format descriptions of the descriptor ranges in this set
         List<D3D12_DESCRIPTOR_RANGE>    m_dxRanges;
+
+            /// The D3D12-format description of the root parameters introduced by this set
         List<D3D12_ROOT_PARAMETER>      m_dxRootParameters;
 
+            /// How many resource slots (total) were introduced by ranges?
         Int m_resourceCount;
+
+            /// How many sampler slots (total) were introduce by ranges?
         Int m_samplerCount;
     };
 
@@ -335,6 +407,11 @@ protected:
             UInt index,
             ResourceView*   textureView,
             SamplerState*   sampler) override;
+        virtual void setRootConstants(
+            UInt range,
+            UInt offset,
+            UInt size,
+            void const* data) override;
 
         D3D12Renderer*           m_renderer = nullptr;          ///< Weak pointer - must be because if set on Renderer, will have a circular reference
         RefPtr<DescriptorSetLayoutImpl> m_layout;
@@ -355,6 +432,9 @@ protected:
         //
         List<RefPtr<RefObject>>         m_resourceObjects;
         List<RefPtr<SamplerStateImpl>>  m_samplerObjects;
+
+            /// Backing storage for root constant ranges in this descriptor set.
+        List<char>                      m_rootConstantData;
     };
 
 
@@ -436,6 +516,14 @@ protected:
         {
             m_commandList->SetGraphicsRootSignature(rootSignature);
         }
+        void setRootConstants(
+            Index rootParamIndex,
+            Index dstOffsetIn32BitValues,
+            Index countOf32BitValues,
+            void const* srcData) override
+        {
+            m_commandList->SetGraphicsRoot32BitConstants(UINT(rootParamIndex), UINT(countOf32BitValues), srcData, UINT(dstOffsetIn32BitValues));
+        }
 
         GraphicsSubmitter(ID3D12GraphicsCommandList* commandList):
             m_commandList(commandList)
@@ -458,6 +546,14 @@ protected:
         void setRootSignature(ID3D12RootSignature* rootSignature)
         {
             m_commandList->SetComputeRootSignature(rootSignature);
+        }
+        void setRootConstants(
+            Index rootParamIndex,
+            Index dstOffsetIn32BitValues,
+            Index countOf32BitValues,
+            void const* srcData) override
+        {
+            m_commandList->SetComputeRoot32BitConstants(UINT(rootParamIndex), UINT(countOf32BitValues), srcData, UINT(dstOffsetIn32BitValues));
         }
 
         ComputeSubmitter(ID3D12GraphicsCommandList* commandList) :
@@ -1302,6 +1398,16 @@ Result D3D12Renderer::_bindRenderState(PipelineStateImpl* pipelineStateImpl, ID3
                     D3D12_DESCRIPTOR_HEAP_TYPE_SAMPLER);
 
                 submitter->setRootDescriptorTable(int(rootParameterIndex++), gpuHeap.getGpuHandle(gpuDescriptorTable));
+            }
+        }
+        if(auto rootConstantRangeCount = descriptorSetLayout->m_rootConstantRanges.getCount())
+        {
+            auto srcData = descriptorSet->m_rootConstantData.getBuffer();
+
+            for(auto& rootConstantRangeInfo : descriptorSetLayout->m_rootConstantRanges)
+            {
+                auto countOf32bitValues = rootConstantRangeInfo.size / sizeof(uint32_t);
+                submitter->setRootConstants(rootConstantRangeInfo.rootParamIndex, 0, countOf32bitValues, srcData + rootConstantRangeInfo.offset);
             }
         }
     }
@@ -3092,6 +3198,35 @@ void D3D12Renderer::DescriptorSetImpl::setCombinedTextureSampler(
         D3D12_DESCRIPTOR_HEAP_TYPE_SAMPLER);
 }
 
+void D3D12Renderer::DescriptorSetImpl::setRootConstants(
+    UInt range,
+    UInt offset,
+    UInt size,
+    void const* data)
+{
+    // The `range` parameter is the index of the range in
+    // the original `DescriptorSetLayout::Desc`, which must
+    // have been a root-constant range for this call to be
+    // valid.
+    //
+    SLANG_ASSERT(range < m_layout->m_ranges.getCount());
+    auto& rangeInfo = m_layout->m_ranges[range];
+    SLANG_ASSERT(rangeInfo.type == DescriptorSlotType::RootConstant);
+
+    // The `arrayIndex` in that descriptor slot range is the "flat"
+    // index of the root constant range that the user is trying
+    // to write into. The root constant range represents a range
+    // of bytes in the `m_rootConstantData` buffer.
+    //
+    auto rootConstantIndex = rangeInfo.arrayIndex;
+    SLANG_ASSERT(rootConstantIndex >= 0);
+    SLANG_ASSERT(rootConstantIndex < m_layout->m_rootConstantRanges.getCount());
+    auto& rootConstantRangeInfo = m_layout->m_rootConstantRanges[rootConstantIndex];
+    SLANG_ASSERT(offset + size <= rootConstantRangeInfo.size);
+
+    memcpy((char*)m_rootConstantData.getBuffer() + rootConstantRangeInfo.offset + offset, data, size);
+}
+
 void D3D12Renderer::setDescriptorSet(PipelineType pipelineType, PipelineLayout* layout, UInt index, DescriptorSet* descriptorSet)
 {
     // In D3D12, unlike Vulkan, binding a root signature invalidates *all* descriptor table
@@ -3172,6 +3307,11 @@ Result D3D12Renderer::createDescriptorSetLayout(const DescriptorSetLayout::Desc&
         case DescriptorSlotType::CombinedImageSampler:
             combinedCount += rangeDesc.count;
             combinedRangeCount++;
+            break;
+
+        case DescriptorSlotType::RootConstant:
+            // A root constant slot range doesn't contribute
+            // to the toal number of resources or samplers.
             break;
 
         default:
@@ -3270,6 +3410,54 @@ Result D3D12Renderer::createDescriptorSetLayout(const DescriptorSetLayout::Desc&
                 rangeInfo.arrayIndex = combinedCounter;
                 combinedCounter += rangeInfo.count;
                 break;
+
+            case DescriptorSlotType::RootConstant:
+                {
+                    // A root constant range is a bit different than
+                    // the other cases because it does *not* introduce
+                    // any descriptor rangess into D3D12 descriptor tables,
+                    // while it *does* introduce a distinct root parameter.
+                    //
+                    D3D12_ROOT_PARAMETER dxRootParameter = {};
+                    dxRootParameter.ParameterType = D3D12_ROOT_PARAMETER_TYPE_32BIT_CONSTANTS;
+                    dxRootParameter.Constants.Num32BitValues = UINT(rangeInfo.count) / UINT(sizeof(uint32_t));
+
+                    // When binding the data for the range to the pipeline,
+                    // we will need to know the "root parameter index" in
+                    // order to identify the range to D3D12.
+                    //
+                    auto rootParameterIndex = descriptorSetLayoutImpl->m_dxRootParameters.getCount();
+                    descriptorSetLayoutImpl->m_dxRootParameters.add(dxRootParameter);
+
+                    // We need to create and store additional tracking data
+                    // to remember this root constant range and how to set it.
+                    //
+                    // The additional data includes the D3D12 root parameter index,
+                    // and the size of the range (in bytes).
+                    //
+                    DescriptorSetLayoutImpl::RootConstantRangeInfo rootConstantRangeInfo;
+                    rootConstantRangeInfo.rootParamIndex = rootParameterIndex;
+                    rootConstantRangeInfo.size = rangeDesc.count;
+                    //
+                    // We also need to compute an offset for the data in the backing
+                    // storage of a particular descriptor set; we also use this as
+                    // a place to update the  total size of the root constant data.
+                    //
+                    // Note: We don't deal with alignment issues here. D3D12 requires
+                    // all root-constant data to be in multiples of 4 bytes and to be
+                    // 4-byte aligned, and that should mean that alignment works
+                    // out without extra effort on our part.
+                    //
+                    rootConstantRangeInfo.offset = descriptorSetLayoutImpl->m_rootConstantDataSize;
+                    descriptorSetLayoutImpl->m_rootConstantDataSize += rootConstantRangeInfo.size;
+
+                    auto rootConstantIndex = descriptorSetLayoutImpl->m_rootConstantRanges.getCount();
+                    descriptorSetLayoutImpl->m_rootConstantRanges.add(rootConstantRangeInfo);
+
+                    rangeInfo.arrayIndex = rootConstantIndex;
+                    rangeInfo.count = 1;
+                }
+                break;
             }
 
             descriptorSetLayoutImpl->m_ranges.add(rangeInfo);
@@ -3325,6 +3513,36 @@ Result D3D12Renderer::createDescriptorSetLayout(const DescriptorSetLayout::Desc&
                 dxRangeIndex = combinedRangeCounter;
                 dxPairedSamplerRangeIndex = totalResourceRangeCount + combinedRangeCounter;
                 combinedRangeCounter++;
+                break;
+
+
+            case DescriptorSlotType::RootConstant:
+                {
+                    // A root constant range consumes a `b` register binding
+                    // under the D3D12 rules, because it is represented as
+                    // a `cbuffer` or `ConstantBuffer` declaration in HLSL.
+                    //
+                    // We need to allocate a register for the root constant
+                    // buffer here to make the bindings line up, but we
+                    // will skip out of the rest of the logic (via a `continue`
+                    // so that this range doesn't turn into a descriptor
+                    // range in one of the D3D12 descriptor tables.
+                    //
+                    UInt bindingIndex = cbvCounter; cbvCounter += bindingCount;
+
+                    auto rootConstantRangeIndex = descriptorSetLayoutImpl->m_ranges[rr].arrayIndex;
+                    auto rootParamIndex = descriptorSetLayoutImpl->m_rootConstantRanges[rootConstantRangeIndex].rootParamIndex;
+
+                    // The root constant range is represented in the D3D12
+                    // root signature as its own root parameter (not in any
+                    // table), and that root parameter needs to be set up
+                    // to reference the correct binding space and index.
+                    //
+                    auto& dxRootParam = descriptorSetLayoutImpl->m_dxRootParameters[rootParamIndex];
+                    dxRootParam.Constants.RegisterSpace = UINT(bindingSpace);
+                    dxRootParam.Constants.ShaderRegister = UINT(bindingIndex);
+                    continue;
+                }
                 break;
             }
 
@@ -3509,6 +3727,15 @@ Result D3D12Renderer::createPipelineLayout(const PipelineLayout::Desc& desc, Pip
         auto& descriptorSetInfo = desc.descriptorSets[dd];
         auto descriptorSetLayout = (DescriptorSetLayoutImpl*) descriptorSetInfo.layout;
 
+        // For now we assume that the register space used for
+        // logical descriptor set #N will be space N.
+        //
+        // Note: this is the same assumption made in the first
+        // loop, and any change/fix will need to be made to
+        // both places consistently.
+        //
+        UInt bindingSpace   = dd;
+
         // Copy root parameter information from the set layout to our
         // overall pipeline layout.
         for( auto setRootParameter : descriptorSetLayout->m_dxRootParameters )
@@ -3516,14 +3743,27 @@ Result D3D12Renderer::createPipelineLayout(const PipelineLayout::Desc& desc, Pip
             auto& rootParameter = rootParameters[rootParameterCount++];
             rootParameter = setRootParameter;
 
-            // In the case where this parameter is a descriptor table, it
-            // needs to point into our array of ranges (with offsets applied),
-            // so we will fix up those pointers here.
-            //
-            if(rootParameter.ParameterType == D3D12_ROOT_PARAMETER_TYPE_DESCRIPTOR_TABLE)
+            switch( rootParameter.ParameterType )
             {
+            default:
+                break;
+
+            case D3D12_ROOT_PARAMETER_TYPE_DESCRIPTOR_TABLE:
+                // In the case where this parameter is a descriptor table, it
+                // needs to point into our array of ranges (with offsets applied),
+                // so we will fix up those pointers here.
+                //
                 rootParameter.DescriptorTable.pDescriptorRanges = rangePtr;
                 rangePtr += rootParameter.DescriptorTable.NumDescriptorRanges;
+                break;
+
+            case D3D12_ROOT_PARAMETER_TYPE_32BIT_CONSTANTS:
+                // In the case where the parameter is a root constant range,
+                // it needs to reflect the register space for the descriptor
+                // set, as computed based on sets specified.
+                //
+                rootParameter.Constants.RegisterSpace = UINT(bindingSpace);
+                break;
             }
         }
     }
@@ -3595,6 +3835,8 @@ Result D3D12Renderer::createDescriptorSet(DescriptorSetLayout* layout, Descripto
         descriptorSetImpl->m_samplerTable = samplerHeap->allocate(int(samplerCount));
         descriptorSetImpl->m_samplerObjects.setCount(samplerCount);
     }
+
+    descriptorSetImpl->m_rootConstantData.setCount(layoutImpl->m_rootConstantDataSize);
 
     *outDescriptorSet = descriptorSetImpl.detach();
     return SLANG_OK;

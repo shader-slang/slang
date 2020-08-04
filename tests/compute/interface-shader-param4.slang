@@ -83,7 +83,7 @@ void computeMain(
 // the previous test, the concrete type plugged in for `modifier`
 // has no uniform/ordinary data, so we don't need to fill it in.
 //
-//TEST_INPUT:cbuffer(data=[256]):
+//TEST_INPUT:root_constants(data=[256]):
 
             uint3       dispatchThreadID : SV_DispatchThreadID)
 {
