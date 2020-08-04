@@ -273,7 +273,7 @@ SlangResult UnixFindFilesState::startFind(const String& directoryPath, const Str
 
     //    fprintf(stderr, "osFindFilesInDirectory(%s)\n", directoryPath.getBuffer());
     m_allowedTypes = allowedTypes;
-    m_directoryPath = path;
+    m_directoryPath = directoryPath;
     m_pattern = pattern;
 
     m_directory = opendir(path.getBuffer());
