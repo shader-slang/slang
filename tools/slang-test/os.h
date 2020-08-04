@@ -44,54 +44,59 @@ enum OSError
 // A helper type used during enumeration of files in a directory.
 struct OSFindFilesResult
 {
-    Slang::String				directoryPath_;
-    Slang::String				filePath_;
+    Slang::String				m_directoryPath;
+    Slang::String				m_filePath;
 #ifdef WIN32
-    HANDLE				findHandle_;
-    WIN32_FIND_DATAW	fileData_;
-    DWORD				requiredMask_;
-    DWORD				disallowedMask_;
-    OSError				error_;
+    HANDLE				m_findHandle;
+    WIN32_FIND_DATAW	m_fileData;
+    DWORD				m_requiredMask;
+    DWORD				m_disallowedMask;
+    OSError				m_error;
 #else
-    DIR*         directory_;
-    dirent*      entry_;
+    DIR*         m_directory;
+    dirent*      m_entry;
 #endif
 
     bool findNextFile();
 
     struct Iterator
     {
-        OSFindFilesResult* context_;
+        typedef Iterator ThisType;
+        OSFindFilesResult* m_context;
 
-        bool operator!=(Iterator other) const { return context_ != other.context_; }
+        bool operator==(const ThisType& other) const { return m_context == other.m_context; } 
+        bool operator!=(const ThisType& other) const { return !(*this == other); }
+
         void operator++()
         {
-            if (!context_->findNextFile())
+            if (!m_context->findNextFile())
             {
-                context_ = NULL;
+                m_context = nullptr;
             }
         }
         Slang::String const& operator*() const
         {
-            return context_->filePath_;
+            return m_context->m_filePath;
         }
     };
 
     Iterator begin()
     {
 #ifdef WIN32
-        Iterator result = { findHandle_ ? this : NULL };
+        Iterator result = { m_findHandle ? this : nullptr };
 #else
-        Iterator result = { entry_ ? this : NULL };
+        Iterator result = { m_entry ? this : nullptr };
 #endif
         return result;
     }
 
     Iterator end()
     {
-        Iterator result = { NULL };
+        Iterator result = { nullptr };
         return result;
     }
+
+    ~OSFindFilesResult();
 };
 
 // Enumerate subdirectories in the given `directoryPath` and return a logical

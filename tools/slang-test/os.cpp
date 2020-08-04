@@ -12,30 +12,45 @@ using namespace Slang;
 
 #include <Windows.h>
 
+OSFindFilesResult::~OSFindFilesResult()
+{
+#ifdef WIN32
+    if (m_findHandle)
+    {
+        ::FindClose(m_findHandle);
+    }
+#else
+    if (m_directory)
+    {
+        closedir(m_directory);
+    }
+#endif
+}
+
 static bool advance(OSFindFilesResult& result)
 {
-    return FindNextFileW(result.findHandle_, &result.fileData_) != 0;
+    return FindNextFileW(result.m_findHandle, &result.m_fileData) != 0;
 }
 
 static bool adjustToValidResult(OSFindFilesResult& result)
 {
     for (;;)
     {
-        if ((result.fileData_.dwFileAttributes & result.requiredMask_) != result.requiredMask_)
+        if ((result.m_fileData.dwFileAttributes & result.m_requiredMask) != result.m_requiredMask)
             goto skip;
 
-        if ((result.fileData_.dwFileAttributes & result.disallowedMask_) != 0)
+        if ((result.m_fileData.dwFileAttributes & result.m_disallowedMask) != 0)
             goto skip;
 
-        if (wcscmp(result.fileData_.cFileName, L".") == 0)
+        if (wcscmp(result.m_fileData.cFileName, L".") == 0)
             goto skip;
 
-        if (wcscmp(result.fileData_.cFileName, L"..") == 0)
+        if (wcscmp(result.m_fileData.cFileName, L"..") == 0)
             goto skip;
 
-        result.filePath_ = result.directoryPath_ + String::fromWString(result.fileData_.cFileName);
-        if (result.fileData_.dwFileAttributes & FILE_ATTRIBUTE_DIRECTORY)
-            result.filePath_ = result.filePath_ + "/";
+        result.m_filePath = result.m_directoryPath + String::fromWString(result.m_fileData.cFileName);
+        if (result.m_fileData.dwFileAttributes & FILE_ATTRIBUTE_DIRECTORY)
+            result.m_filePath = result.m_filePath + "/";
 
         return true;
 
@@ -63,24 +78,24 @@ OSFindFilesResult osFindFilesInDirectoryMatchingPattern(
     OSFindFilesResult result;
     HANDLE findHandle = FindFirstFileW(
         searchPath.toWString(),
-        &result.fileData_);
+        &result.m_fileData);
 
-    result.directoryPath_ = directoryPath;
-    result.findHandle_ = findHandle;
-    result.requiredMask_ = 0;
-    result.disallowedMask_ = FILE_ATTRIBUTE_DIRECTORY;
+    result.m_directoryPath = directoryPath;
+    result.m_findHandle = findHandle;
+    result.m_requiredMask = 0;
+    result.m_disallowedMask = FILE_ATTRIBUTE_DIRECTORY;
 
     if (findHandle == INVALID_HANDLE_VALUE)
     {
-        result.findHandle_ = NULL;
-        result.error_ = kOSError_FileNotFound;
+        result.m_findHandle = nullptr;
+        result.m_error = kOSError_FileNotFound;
         return result;
     }
 
-    result.error_ = kOSError_None;
+    result.m_error = kOSError_None;
     if (!adjustToValidResult(result))
     {
-        result.findHandle_ = NULL;
+        result.m_findHandle = nullptr;
     }
     return result;
 }
@@ -101,24 +116,24 @@ OSFindFilesResult osFindChildDirectories(
     OSFindFilesResult result;
     HANDLE findHandle = FindFirstFileW(
         searchPath.toWString(),
-        &result.fileData_);
+        &result.m_fileData);
 
-    result.directoryPath_ = directoryPath;
-    result.findHandle_ = findHandle;
-    result.requiredMask_ = FILE_ATTRIBUTE_DIRECTORY;
-    result.disallowedMask_ = 0;
+    result.m_directoryPath = directoryPath;
+    result.m_findHandle = findHandle;
+    result.m_requiredMask = FILE_ATTRIBUTE_DIRECTORY;
+    result.m_disallowedMask = 0;
 
     if (findHandle == INVALID_HANDLE_VALUE)
     {
-        result.findHandle_ = NULL;
-        result.error_ = kOSError_FileNotFound;
+        result.m_findHandle = nullptr;
+        result.m_error = kOSError_FileNotFound;
         return result;
     }
 
-    result.error_ = kOSError_None;
+    result.m_error = kOSError_None;
     if (!adjustToValidResult(result))
     {
-        result.findHandle_ = NULL;
+        result.m_findHandle = nullptr;
     }
     return result;
 }
@@ -127,22 +142,22 @@ OSFindFilesResult osFindChildDirectories(
 
 static bool advance(OSFindFilesResult& result)
 {
-    result.entry_ = readdir(result.directory_);
-    return result.entry_ != NULL;
+    result.m_entry = readdir(result.m_directory);
+    return result.m_entry != nullptr;
 }
 
 static bool checkValidResult(OSFindFilesResult& result)
 {
-//    fprintf(stderr, "checkValidResullt(%s)\n", result.entry_->d_name);
+//    fprintf(stderr, "checkValidResullt(%s)\n", result.m_entry->d_name);
 
-    if (strcmp(result.entry_->d_name, ".") == 0)
+    if (strcmp(result.m_entry->d_name, ".") == 0)
         return false;
 
-    if (strcmp(result.entry_->d_name, "..") == 0)
+    if (strcmp(result.m_entry->d_name, "..") == 0)
         return false;
 
-    String path = result.directoryPath_
-        + String(result.entry_->d_name);
+    String path = result.m_directoryPath
+        + String(result.m_entry->d_name);
 
 //    fprintf(stderr, "stat(%s)\n", path.getBuffer());
     struct stat fileInfo;
@@ -153,7 +168,7 @@ static bool checkValidResult(OSFindFilesResult& result)
         path = path + "/";
 
 
-    result.filePath_ = path;
+    result.m_filePath = path;
     return true;    
 }
 
@@ -184,14 +199,14 @@ OSFindFilesResult osFindFilesInDirectory(
 
 //    fprintf(stderr, "osFindFilesInDirectory(%s)\n", directoryPath.getBuffer());
 
-    result.directory_ = opendir(directoryPath.getBuffer());
-    if(!result.directory_)
+    result.m_directory = opendir(directoryPath.getBuffer());
+    if(!result.m_directory)
     {
-        result.entry_ = NULL;
+        result.m_entry = nullptr;
         return result;
     }
 
-    result.directoryPath_ = directoryPath;
+    result.m_directoryPath = directoryPath;
     result.findNextFile();
     return result;
 }
@@ -201,16 +216,16 @@ OSFindFilesResult osFindChildDirectories(
 {
     OSFindFilesResult result;
 
-    result.directory_ = opendir(directoryPath.getBuffer());
-    if(!result.directory_)
+    result.m_directory = opendir(directoryPath.getBuffer());
+    if(!result.m_directory)
     {
-        result.entry_ = NULL;
+        result.m_entry = nullptr;
         return result;
     }
 
     // TODO: Set attributes to ignore everything but directories
 
-    result.directoryPath_ = directoryPath;
+    result.m_directoryPath = directoryPath;
     result.findNextFile();
     return result;
 }
