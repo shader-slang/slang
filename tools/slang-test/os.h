@@ -27,21 +27,28 @@ NOTE! That FindFiles can find files and/or directories */
 class FindFilesState : public Slang::RefObject
 {
 public:
+        /// Moves to the next thing found. If nothing more is found will return 0, and hasResult will return false.
+        /// findNext will return false if hasResult is false.
+        /// To put it another way if findNext returns true, then hasResult *must* return true, and getPath/getFoundType are valid.
     virtual bool findNext() = 0;
+        /// True if holds a result. If true, getPath/getFoundType are valid, otherwise they are undefined
     virtual bool hasResult() = 0;
 
+        /// Starts a find. Returns an error if the directory path cannot be found.
+        /// The pattern can only match in the specified directory.
+        /// The allowedTypes flags controls what types (files and/or directories) should be searched for
     virtual SlangResult startFind(const Slang::String& directoryPath, const Slang::String& pattern, FindTypeFlags allowedTypes) = 0;
 
-        /// Create a find files state. Can only be used after an 'start'. Note that a start function can be called
-        /// on a FindFilesState in any state.
-        /// Also start methods return error codes which can be useful.
-    static Slang::RefPtr<FindFilesState> create();
-
-        /// Get the path of the thing found. 
+        /// Get the path of the thing found.
     const Slang::String& getPath() const { return m_foundPath; }
 
         /// Get the type the path relates to
     FindType getFoundType() const { return m_foundType; }
+
+        /// Create a find files state. Can only be used after an 'start'. Note that a start function can be called
+        /// on a FindFilesState in any state.
+        /// Also start method return error codes which can be useful.
+    static Slang::RefPtr<FindFilesState> create();
 
 protected:
 
