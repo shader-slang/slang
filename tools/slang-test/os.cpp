@@ -195,12 +195,12 @@ public:
     virtual SlangResult startFindFilesInDirectoryMatchingPattern(const String& directoryPath, const String& pattern) SLANG_OVERRIDE;
     virtual bool hasResult()  SLANG_OVERRIDE { return m_directory != nullptr; }
 
-    UnixFindFilesResult():
+    UnixFindFilesState():
         m_directory(nullptr),
         m_entry(nullptr)
     {}
 
-    ~UnixFindFilesResult() { _close(); }
+    ~UnixFindFilesState() { _close(); }
 
 protected:
     bool _advance();
@@ -302,7 +302,7 @@ SlangResult UnixFindFilesState::startFindFilesInDirectory(const Slang::String& p
 
 SlangResult UnixFindFilesState::startFindFilesInDirectoryMatchingPattern(const String& directoryPath, const String& pattern)
 {
-    return RE4_E_NOT_IMPLEMENTED;
+    return SLANG_E_NOT_IMPLEMENTED;
 }
 
 /* static */RefPtr<FindFilesState> FindFilesState::create()
