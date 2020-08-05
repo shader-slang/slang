@@ -3144,17 +3144,25 @@ void runTestsInDirectory(
     TestContext*		context,
     String				directoryPath)
 {
-    for (auto file : FindFilesResult::findFilesInDirectory(directoryPath))
     {
-        if( shouldRunTest(context, file) )
+        List<String> files;
+        FindFilesUtil::findFilesInDirectory(directoryPath, files);
+        for (auto file : files)
         {
-//            fprintf(stderr, "slang-test: found '%s'\n", file.getBuffer());
-            runTestsOnFile(context, file);
+            if( shouldRunTest(context, file) )
+            {
+    //            fprintf(stderr, "slang-test: found '%s'\n", file.getBuffer());
+                runTestsOnFile(context, file);
+            }
         }
     }
-    for (auto subdir : FindFilesResult::findChildDirectories(directoryPath))
     {
-        runTestsInDirectory(context, subdir);
+        List<String> subDirs;
+        FindFilesUtil::findChildDirectories(directoryPath, subDirs);
+        for (auto subDir : subDirs)
+        {
+            runTestsInDirectory(context, subDir);
+        }
     }
 }
 
