@@ -140,6 +140,11 @@ namespace renderer_test
                             entry.type = ShaderInputType::Buffer;
                             entry.bufferDesc.type = InputBufferType::ConstantBuffer;
                         }
+                        else if (parser.LookAhead("root_constants"))
+                        {
+                            entry.type = ShaderInputType::Buffer;
+                            entry.bufferDesc.type = InputBufferType::RootConstantBuffer;
+                        }
                         else if (parser.LookAhead("ubuffer"))
                         {
                             entry.type = ShaderInputType::Buffer;

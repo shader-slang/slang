@@ -275,6 +275,11 @@ public:
             UInt index,
             ResourceView*   textureView,
             SamplerState*   sampler) override;
+        virtual void setRootConstants(
+            UInt range,
+            UInt offset,
+            UInt size,
+            void const* data) override;
 
         RefPtr<DescriptorSetLayoutImpl>     m_layout;
         List<RefPtr<BufferResourceImpl>>    m_constantBuffers;
@@ -1304,6 +1309,15 @@ void GLRenderer::DescriptorSetImpl::setCombinedTextureSampler(
     m_samplers[arrayIndex] = samplerImpl;
 }
 
+void GLRenderer::DescriptorSetImpl::setRootConstants(
+    UInt range,
+    UInt offset,
+    UInt size,
+    void const* data)
+{
+    SLANG_UNEXPECTED("unimplemented: setRootConstants for GlRenderer");
+}
+
 void GLRenderer::setDescriptorSet(PipelineType pipelineType, PipelineLayout* layout, UInt index, DescriptorSet* descriptorSet)
 {
     auto descriptorSetImpl = (DescriptorSetImpl*)descriptorSet;
@@ -1339,6 +1353,8 @@ Result GLRenderer::createDescriptorSetLayout(const DescriptorSetLayout::Desc& de
             glSlotType = GLDescriptorSlotType::CombinedTextureSampler;
             break;
 
+        case DescriptorSlotType::RootConstant:
+            rangeDesc.count = 1;
         case DescriptorSlotType::UniformBuffer:
         case DescriptorSlotType::DynamicUniformBuffer:
             glSlotType = GLDescriptorSlotType::ConstantBuffer;
