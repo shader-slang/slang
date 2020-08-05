@@ -17,6 +17,12 @@ namespace Slang
         return inst->sourceLoc;
     }
 
+    void printDiagnosticArg(StringBuilder& sb, IRInst* irObject)
+    {
+        if (auto nameHint = irObject->findDecoration<IRNameHintDecoration>())
+            sb << nameHint->getName();
+    }
+
     // !!!!!!!!!!!!!!!!!!!!!!!!!!!! DiagnosticSink Impls !!!!!!!!!!!!!!!!!!!!!
 
     IRInst* cloneGlobalValueWithLinkage(
@@ -2607,6 +2613,30 @@ namespace Slang
             getVoidType(),
             3,
             args);
+
+        addInst(inst);
+        return inst;
+    }
+
+    IRInst* IRBuilder::emitPackAnyValue(IRType* type, IRInst* value)
+    {
+        auto inst = createInst<IRPackAnyValue>(
+            this,
+            kIROp_PackAnyValue,
+            type,
+            value);
+
+        addInst(inst);
+        return inst;
+    }
+
+    IRInst* IRBuilder::emitUnpackAnyValue(IRType* type, IRInst* value)
+    {
+        auto inst = createInst<IRPackAnyValue>(
+            this,
+            kIROp_UnpackAnyValue,
+            type,
+            value);
 
         addInst(inst);
         return inst;

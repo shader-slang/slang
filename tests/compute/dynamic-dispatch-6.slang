@@ -2,7 +2,7 @@
 //DISABLE_TEST(compute):COMPARE_COMPUTE:-cuda -xslang -allow-dynamic-code
 
 // Test dynamic dispatch code gen for generic-typed return values.
-
+[anyValueSize(8)]
 interface IInterface
 {
     [mutating]
