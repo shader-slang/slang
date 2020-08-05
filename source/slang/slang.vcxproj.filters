@@ -177,9 +177,6 @@
     <ClInclude Include="slang-ir-lower-generic-function.h">
       <Filter>Header Files</Filter>
     </ClInclude>
-    <ClInclude Include="slang-ir-lower-generic-var.h">
-      <Filter>Header Files</Filter>
-    </ClInclude>
     <ClInclude Include="slang-ir-lower-generics.h">
       <Filter>Header Files</Filter>
     </ClInclude>
@@ -310,6 +307,9 @@
       <Filter>Header Files</Filter>
     </ClInclude>
     <ClInclude Include="slang-visitor.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="slang-ir-lower-generic-type.h">
       <Filter>Header Files</Filter>
     </ClInclude>
   </ItemGroup>
@@ -476,9 +476,6 @@
     <ClCompile Include="slang-ir-lower-generic-function.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
-    <ClCompile Include="slang-ir-lower-generic-var.cpp">
-      <Filter>Source Files</Filter>
-    </ClCompile>
     <ClCompile Include="slang-ir-lower-generics.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
@@ -606,6 +603,9 @@
       <Filter>Source Files</Filter>
     </ClCompile>
     <ClCompile Include="slang.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="slang-ir-lower-generic-type.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
   </ItemGroup>

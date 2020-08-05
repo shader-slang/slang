@@ -3,6 +3,7 @@
 
 // Test basic dynamic dispatch code gen
 
+[anyValueSize(16)]
 interface IInterface
 {
 	static int Compute(int inVal);

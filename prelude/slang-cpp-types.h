@@ -41,6 +41,26 @@ struct Array
     size_t count;
 };
 
+template<size_t N>
+struct AnyValue
+{
+    uint8_t data[N];
+};
+template<size_t N, typename T>
+AnyValue<N> packAnyValue(const T& val)
+{
+    AnyValue<N> result;
+    memcpy(&result, &val, sizeof(T));
+    return result;
+}
+template<size_t N, typename T>
+T unpackAnyValue(const AnyValue<N>& val)
+{
+    T result;
+    memcpy(&result, &val, sizeof(T));
+    return result;
+}
+
 /* Constant buffers become a pointer to the contained type, so ConstantBuffer<T> becomes T* in C++ code.
 */
 

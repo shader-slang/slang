@@ -509,6 +509,14 @@ SlangResult CPPSourceEmitter::calcTypeName(IRType* type, CodeGenTarget target, S
             out << "void*";
             return SLANG_OK;
         }
+        case kIROp_AnyValueType:
+        {
+            out << "AnyValue<";
+            auto anyValueType = static_cast<IRAnyValueType*>(type);
+            out << getIntVal(anyValueType->getSize());
+            out << ">";
+            return SLANG_OK;
+        }
         case kIROp_ConstantBufferType:
         case kIROp_ParameterBlockType:
         {

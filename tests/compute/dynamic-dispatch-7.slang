@@ -4,12 +4,12 @@
 // Test dynamic dispatch code gen for associated-typed return values
 // and local variables.
 // TODO: test arguments of associated type.
-
+[anyValueSize(8)]
 interface IAssoc
 {
     int Compute();
 }
-
+[anyValueSize(16)]
 interface IInterface
 {
     associatedtype TAssoc : IAssoc;

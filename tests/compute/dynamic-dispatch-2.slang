@@ -4,11 +4,14 @@
 // Test dynamic dispatch code gen for static member functions
 // of associated type.
 
+[anyValueSize(8)]
 interface IAssoc
 {
     int get();
     static int getBase();
 }
+
+[anyValueSize(16)]
 interface IInterface
 {
     associatedtype Assoc : IAssoc;
