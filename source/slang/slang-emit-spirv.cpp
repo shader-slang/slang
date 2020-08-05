@@ -419,9 +419,9 @@ struct SPIRVEmitContext
     // Emitting an instruction starts with picking the opcode
     // and allocating the `SpvInst`.
 
-    // Holds a stack of instructions operands *BEFORE* they added to t
+    // Holds a stack of instructions operands *BEFORE* they added to the instruction.
     List<SpvWord> m_operandStack;
-    // Stack of being constructed instructions. Can only emitOperands if there is current instruction
+    // The current instruction being constructed. Cannot add operands unless it is set.
     SpvInst* m_currentInst = nullptr;
 
     // Operands can only be added when inside of a InstConstructScope 
@@ -567,6 +567,9 @@ struct SPIRVEmitContext
     {
         SLANG_UNUSED(dstInst);
 
+        // Can only emitOperands if we are in an instruction
+        SLANG_ASSERT(m_currentInst);
+        
         // Assert that `text` doesn't contain any embedded nul bytes, since they
         // could lead to invalid encoded results.
         SLANG_ASSERT(text.indexOf(0) < 0);
@@ -583,10 +586,12 @@ struct SPIRVEmitContext
         // 4-byte chunks.
         //
 
+        SLANG_COMPILE_TIME_ASSERT(sizeof(SpvWord) == 4);
+
         const Int textCount = text.getLength();
         // Calculate the minimum amount of bytes needed - which needs to include terminating 0
         const Index minByteCount = textCount + 1;
-        // Calculate the amount of words needed padding if necessary
+        // Calculate the amount of words including padding if necessary
         const Int wordCount = (minByteCount + 3) >> 2;
 
         const Int operandStartIndex = m_operandStack.getCount();
@@ -607,7 +612,7 @@ struct SPIRVEmitContext
         // be left as zeros.
 
         // Set terminating 0, and remaining buffer 0s
-        memset(dst + textCount, 0, wordCount * 4 - textCount);
+        memset(dst + textCount, 0, wordCount * sizeof(SpvWord) - textCount);
     }
 
     // Sometimes we will want to pass down an argument that
