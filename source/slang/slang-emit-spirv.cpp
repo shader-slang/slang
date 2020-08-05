@@ -491,56 +491,13 @@ struct SPIRVEmitContext
         // Reset the operand stack
         m_operandStack.setCount(operandsStartIndex);
     }
-    
-    // Once an instruction has been created, we append the operand
-    // words to it with `emitOperand`. There are a few different
-    // case of operands that we handle.
-    //
-    // The simplest case is when an instruction takes an operand
-    // that is just a literal SPIR-V word.
 
-        /// Emit a literal `word` as an operand to `dst`.
-    void emitOperand(SpvInst* dst, SpvWord word)
-    {
-        // Can only add operands if we are contructing an instruction (ie in _beginInst/_endInst)
-        SLANG_ASSERT(m_currentInst);
-        SLANG_UNUSED(dst);
-        m_operandStack.add(word);
-    }
 
-    // The most common case of operand is an <id> that represents
-    // some other instruction. In cases where we already have
-    // an <id> we can emit it as a literal and the meaning is
-    // the same. If we have a `SpvInst` we can look up or
-    // generate an <id> for it.
-
-        /// Emit an operand to the `dst` instruction, which references `src` by its <id>
-    void emitOperand(SpvInst* dst, SpvInst* src)
-    {
-        emitOperand(dst, getID(src));
-    }
-
-    // Commonly, we will have an operand in the form of an `IRInst`
-    // which might either represent an instruction we've already
-    // emitted (e.g., because it came earlier in a function body)
-    // or which we have yet to emit (because it is a global-scope
-    // instruction that has not been referenced before).
-
-        /// Emit an operand to the `dst` instruction, which references `src` by its <id>
-    void emitOperand(SpvInst* dst, IRInst* src)
-    {
-        // We first ensure that the `src` instruction has been emitted,
-        // and then handle it as for any other <id> operand.
-        //
-        SpvInst* spvSrc = ensureInst(src);
-        emitOperand(dst, getID(spvSrc));
-    }
-
-        /// Ensure that an instruction has been emitted
+    /// Ensure that an instruction has been emitted
     SpvInst* ensureInst(IRInst* irInst)
     {
         SpvInst* spvInst = nullptr;
-        if( !m_mapIRInstToSpvInst.TryGetValue(irInst, spvInst) )
+        if (!m_mapIRInstToSpvInst.TryGetValue(irInst, spvInst))
         {
             // If the `irInst` hasn't already been emitted,
             // then we will assume that is is a global instruction
@@ -558,15 +515,56 @@ struct SPIRVEmitContext
         return spvInst;
     }
 
+    // Whilst an instruction has been created, we append the operand
+    // words to it with `emitOperand`. There are a few different
+    // case of operands that we handle.
+    //
+    // The simplest case is when an instruction takes an operand
+    // that is just a literal SPIR-V word.
+
+        /// Emit a literal `word` as an operand to the current instruction
+    void emitOperand(SpvWord word)
+    {
+        // Can only add operands if we are constructing an instruction (ie in _beginInst/_endInst)
+        SLANG_ASSERT(m_currentInst);
+        m_operandStack.add(word);
+    }
+
+    // The most common case of operand is an <id> that represents
+    // some other instruction. In cases where we already have
+    // an <id> we can emit it as a literal and the meaning is
+    // the same. If we have a `SpvInst` we can look up or
+    // generate an <id> for it.
+
+        /// Emit an operand to the current instruction, which references `src` by its <id>
+    void emitOperand(SpvInst* src)
+    {
+        emitOperand(getID(src));
+    }
+
+    // Commonly, we will have an operand in the form of an `IRInst`
+    // which might either represent an instruction we've already
+    // emitted (e.g., because it came earlier in a function body)
+    // or which we have yet to emit (because it is a global-scope
+    // instruction that has not been referenced before).
+
+        /// Emit an operand to the current instruction, which references `src` by its <id>
+    void emitOperand(IRInst* src)
+    {
+        // We first ensure that the `src` instruction has been emitted,
+        // and then handle it as for any other <id> operand.
+        //
+        SpvInst* spvSrc = ensureInst(src);
+        emitOperand(getID(spvSrc));
+    }
+
     // Some instructions take a string as a literal operand,
     // which requires us to follow the SPIR-V rules to
     // encode the string into multiple operand words.
 
         /// Emit an operand that is encoded as a literal string
-    void emitOperand(SpvInst* dstInst, UnownedStringSlice const& text)
+    void emitOperand(UnownedStringSlice const& text)
     {
-        SLANG_UNUSED(dstInst);
-
         // Can only emitOperands if we are in an instruction
         SLANG_ASSERT(m_currentInst);
         
@@ -622,10 +620,12 @@ struct SPIRVEmitContext
 
     enum ResultIDToken { kResultID };
 
-    void emitOperand(SpvInst* dst, ResultIDToken)
+    void emitOperand(ResultIDToken)
     {
-        // A result <id> operand uses the <id> of the instruction itself.
-        emitOperand(dst, getID(dst));
+        SLANG_ASSERT(m_currentInst);
+
+        // A result <id> operand uses the <id> of the instruction itself (which is m_currentInst)
+        emitOperand(getID(m_currentInst));
     }
 
     // As another convenience, there are often cases where
@@ -635,7 +635,7 @@ struct SPIRVEmitContext
     // Slang IR and SPIR-V instructions agree on the
     // number, order, and meaning of their operands.
 
-        /// Helper type for emitting all the operands of some IR instruction
+        /// Helper type for emitting all the operands of the current IR instruction
     struct OperandsOf
     {
         OperandsOf(IRInst* irInst)
@@ -645,14 +645,14 @@ struct SPIRVEmitContext
         IRInst* irInst = nullptr;
     };
 
-        /// Emit operand words for all the operands of a given IR instruction
-    void emitOperand(SpvInst* dst, OperandsOf const& other)
+        /// Emit operand words for all the operands of the current IR instruction
+    void emitOperand(OperandsOf const& other)
     {
         auto irInst = other.irInst;
         auto operandCount = irInst->getOperandCount();
         for( UInt ii = 0; ii < operandCount; ++ii )
         {
-            emitOperand(dst, irInst->getOperand(ii));
+            emitOperand(irInst->getOperand(ii));
         }
     }
 
@@ -686,7 +686,7 @@ struct SPIRVEmitContext
     {
         InstConstructScope scopeInst(this, opcode, irInst);
         SpvInst* spvInst = scopeInst;
-        emitOperand(spvInst, a);
+        emitOperand(a);
         parent->addInst(spvInst);
         return spvInst;
     }
@@ -696,8 +696,8 @@ struct SPIRVEmitContext
     {
         InstConstructScope scopeInst(this, opcode, irInst);
         SpvInst* spvInst = scopeInst;
-        emitOperand(spvInst, a);
-        emitOperand(spvInst, b);
+        emitOperand(a);
+        emitOperand(b);
         parent->addInst(spvInst);
         return spvInst;
     }
@@ -707,9 +707,9 @@ struct SPIRVEmitContext
     {
         InstConstructScope scopeInst(this, opcode, irInst);
         SpvInst* spvInst = scopeInst;
-        emitOperand(spvInst, a);
-        emitOperand(spvInst, b);
-        emitOperand(spvInst, c);
+        emitOperand(a);
+        emitOperand(b);
+        emitOperand(c);
         parent->addInst(spvInst);
         return spvInst;
     }
@@ -719,10 +719,10 @@ struct SPIRVEmitContext
     {
         InstConstructScope scopeInst(this, opcode, irInst);
         SpvInst* spvInst = scopeInst;
-        emitOperand(spvInst, a);
-        emitOperand(spvInst, b);
-        emitOperand(spvInst, c);
-        emitOperand(spvInst, d);
+        emitOperand(a);
+        emitOperand(b);
+        emitOperand(c);
+        emitOperand(d);
         parent->addInst(spvInst);
         return spvInst;
     }
@@ -732,11 +732,11 @@ struct SPIRVEmitContext
     {
         InstConstructScope scopeInst(this, opcode, irInst);
         SpvInst* spvInst = scopeInst;
-        emitOperand(spvInst, a);
-        emitOperand(spvInst, b);
-        emitOperand(spvInst, c);
-        emitOperand(spvInst, d);
-        emitOperand(spvInst, e);
+        emitOperand(a);
+        emitOperand(b);
+        emitOperand(c);
+        emitOperand(d);
+        emitOperand(e);
         parent->addInst(spvInst);
         return spvInst;
     }
