@@ -32,9 +32,9 @@ ConstantBuffer<Signs> signs;
 
 [numthreads(4, 1, 1)]
 void computeMain(
-//TEST_INPUT:cbuffer(data=[2 0 0 0 3 0 0 0]):name=stuff
+//TEST_INPUT:root_constants(data=[2 0 0 0 3 0 0 0]):name=stuff
 	uniform Stuff  stuff,
-//TEST_INPUT:cbuffer(data=[3]):onlyCPULikeBinding,name=things
+//TEST_INPUT:root_constants(data=[3]):onlyCPULikeBinding,name=things
 	uniform Things things,
 
 //TEST_INPUT:ubuffer(data=[0 0 0 0], stride=4):out,name=outputBuffer

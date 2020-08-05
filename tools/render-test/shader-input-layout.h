@@ -42,7 +42,8 @@ struct InputTextureDesc
 
 enum class InputBufferType
 {
-    ConstantBuffer, StorageBuffer
+    ConstantBuffer, StorageBuffer,
+    RootConstantBuffer,
 };
 
 struct InputBufferDesc
