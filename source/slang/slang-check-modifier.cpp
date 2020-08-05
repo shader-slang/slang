@@ -284,6 +284,31 @@ namespace Slang
             numThreadsAttr->y          = values[1];
             numThreadsAttr->z          = values[2]; 
         }
+        else if (auto anyValueSizeAttr = as<AnyValueSizeAttribute>(attr))
+        {
+            // This case handles GLSL-oriented layout attributes
+            // that take a single integer argument.
+
+            if (attr->args.getCount() != 1)
+            {
+                return false;
+            }
+
+            auto value = checkConstantIntVal(attr->args[0]);
+            if (value == nullptr)
+            {
+                return false;
+            }
+
+            const IRIntegerValue kMaxAnyValueSize = 0x7FFF;
+            if (value->value > kMaxAnyValueSize)
+            {
+                getSink()->diagnose(anyValueSizeAttr->loc, Diagnostics::anyValueSizeExceedsLimit, kMaxAnyValueSize);
+                return false;
+            }
+
+            anyValueSizeAttr->size = int32_t(value->value);
+        }
         else if (auto bindingAttr = as<GLSLBindingAttribute>(attr))
         {
             // This must be vk::binding or gl::binding (as specified in core.meta.slang under vk_binding/gl_binding)

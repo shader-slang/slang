@@ -288,6 +288,7 @@ DIAGNOSTIC(31102, Error, nonPositiveNumThreads, "expected a positive integer in 
 
 DIAGNOSTIC(31120, Error, invalidAttributeTarget, "invalid syntax target for user defined attribute")
 
+DIAGNOSTIC(31121, Error, anyValueSizeExceedsLimit, "'anyValueSize' cannot exceed $0")
 // Enums
 
 DIAGNOSTIC(32000, Error, invalidEnumTagType,        "invalid tag type for 'enum': '$0'")
@@ -481,6 +482,12 @@ DIAGNOSTIC(40006, Error, needCompileTimeConstant, "expected a compile-time const
 DIAGNOSTIC(40007, Internal, irValidationFailed, "IR validation failed: $0")
 
 DIAGNOSTIC(40008, Error, invalidLValueForRefParameter, "the form of this l-value argument is not valid for a `ref` parameter")
+
+DIAGNOSTIC(40009, Error, dynamicInterfaceLacksAnyValueSizeAttribute, "interface '$0' is being used in dynamic dispatch code but has no [anyValueSize] attribute defined.")
+DIAGNOSTIC(40010, Note, seeInterfaceUsage, "see usage of interface '$0'.")
+
+DIAGNOSTIC(40011, Error, unconstrainedGenericParameterNotAllowedInDynamicFunction, "unconstrained generic paramter '$0' is not allowed in a dynamic function.")
+
 
 // 41000 - IR-level validation issues
 

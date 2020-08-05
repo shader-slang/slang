@@ -92,7 +92,9 @@ namespace Slang
 
     void printDiagnosticArg(StringBuilder& sb, TokenType tokenType);
     void printDiagnosticArg(StringBuilder& sb, Token const& token);
-    
+
+    struct IRInst;
+    void printDiagnosticArg(StringBuilder& sb, IRInst* irObject);
     
     template<typename T>
     void printDiagnosticArg(StringBuilder& sb, RefPtr<T> ptr)
