@@ -21,6 +21,9 @@
 #   include <unistd.h>
 // For Path::find
 #   include <fnmatch.h>
+
+#   include <dirent.h>
+#   include <sys/stat.h>
 #endif
 
 #if SLANG_APPLE_FAMILY
@@ -587,7 +590,7 @@ namespace Slang
 #else
     /* static */SlangResult Path::find(const String& directoryPath, const char* pattern, Visitor* visitor)
     {
-        DIR* directory = opendir(m_directoryPath.getBuffer());
+        DIR* directory = opendir(directoryPath.getBuffer());
         
         if (!directory)
         {
@@ -595,10 +598,9 @@ namespace Slang
         }
 
         StringBuilder builder;
-
         for (;;)
         {
-            dirent* entry = readdir(m_directory);
+            dirent* entry = readdir(directory);
             if (entry == nullptr)
             {
                 break;
@@ -616,7 +618,10 @@ namespace Slang
                 continue;
             }
 
-            Path::combineIntoBuilder(directoryPath.getUnownedSlice(), entry->name, builder);
+            UnownedStringSlice filename(entry->name);
+
+            // Produce the full path, to do stat
+            Path::combineIntoBuilder(directoryPath.getUnownedSlice(), filename, builder);
 
             //    fprintf(stderr, "stat(%s)\n", path.getBuffer());
             struct stat fileInfo;
@@ -635,7 +640,7 @@ namespace Slang
                 type = Type::File;
             }
 
-            visitor->accept(type, UnownedStringSlice(entry->name));
+            visitor->accept(type, filename);
         }
 
         closedir(directory);
