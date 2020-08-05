@@ -1,7 +1,5 @@
-#ifndef SLANG_OS_H
-#define SLANG_OS_H
-
-// os.h
+#ifndef SLANG_FIND_FILE_UTIL_H
+#define SLANG_FIND_FILE_UTIL_H
 
 #include "../../source/core/slang-io.h"
 
@@ -34,7 +32,7 @@ protected:
 };
 
 /* A helper class for holding results of a find. Allows for easy iteration via begin/end */
-class FindFilesUtil
+class FindFileUtil
 {
 public:
     
@@ -52,4 +50,4 @@ public:
     static SlangResult findFilesInDirectory(const Slang::String& directoryPath, Slang::List<Slang::String>& outPaths);
 };
 
-#endif // SLANG_OS_H
+#endif // SLANG_FIND_FILE_UTIL_H
