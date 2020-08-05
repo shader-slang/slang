@@ -1220,6 +1220,11 @@ struct IRAssociatedType : IRType
 struct IRThisType : IRType
 {
     IR_LEAF_ISA(ThisType)
+
+    IRInst* getConstraintType()
+    {
+        return getOperand(0);
+    }
 };
 
 struct IRInterfaceRequirementEntry : IRInst

@@ -43,9 +43,8 @@ namespace Slang
             switch (typeInst->op)
             {
             case kIROp_TypeType:
+            case kIROp_TypeKind:
                 return true;
-            case kIROp_lookup_interface_method:
-                return typeInst->getDataType()->op == kIROp_TypeKind;
             default:
                 return false;
             }
@@ -98,5 +97,109 @@ namespace Slang
             auto entry = cast<IRInterfaceRequirementEntry>(interfaceType->getOperand(i));
             (*dict)[entry->getRequirementKey()] = entry->getRequirementVal();
         }
+    }
+
+    IRType* SharedGenericsLoweringContext::lowerAssociatedType(IRBuilder* builder, IRInst* type)
+    {
+        if (type->op != kIROp_AssociatedType)
+            return (IRType*)type;
+        IRIntegerValue anyValueSize = kInvalidAnyValueSize;
+        for (UInt i = 0; i < type->getOperandCount(); i++)
+        {
+            anyValueSize = Math::Min(
+                anyValueSize,
+                getInterfaceAnyValueSize(type->getOperand(i), type->sourceLoc));
+        }
+        if (anyValueSize == kInvalidAnyValueSize)
+        {
+            sink->diagnose(type->sourceLoc, Diagnostics::dynamicInterfaceLacksAnyValueSizeAttribute, type);
+        }
+        return builder->getAnyValueType(anyValueSize);
+    }
+
+    IRType* SharedGenericsLoweringContext::lowerType(IRBuilder* builder, IRInst* paramType, const Dictionary<IRInst*, IRInst*>& typeMapping)
+    {
+        if (!paramType)
+            return nullptr;
+
+        IRInst* resultType;
+        if (typeMapping.TryGetValue(paramType, resultType))
+            return (IRType*)resultType;
+
+        if (isTypeValue(paramType))
+        {
+            return builder->getPtrType(builder->getRTTIType());
+        }
+
+        IRIntegerValue anyValueSize = kInvalidAnyValueSize;
+        switch (paramType->op)
+        {
+        case kIROp_WitnessTableType:
+            // Do not translate witness table type.
+            return (IRType*)paramType;
+        case kIROp_Param:
+        {
+            if (auto anyValueSizeDecor = paramType->findDecoration<IRTypeConstraintDecoration>())
+            {
+                anyValueSize = getInterfaceAnyValueSize(anyValueSizeDecor->getConstraintType(), paramType->sourceLoc);
+                return builder->getAnyValueType(anyValueSize);
+            }
+            sink->diagnose(paramType, Diagnostics::unconstrainedGenericParameterNotAllowedInDynamicFunction, paramType);
+            return builder->getAnyValueType(kInvalidAnyValueSize);
+        }
+        case kIROp_ThisType:
+            anyValueSize = getInterfaceAnyValueSize(
+                cast<IRThisType>(paramType)->getConstraintType(),
+                paramType->sourceLoc);
+            return builder->getAnyValueType(anyValueSize);
+        case kIROp_AssociatedType:
+        {
+            return lowerAssociatedType(builder, paramType);
+        }
+        case kIROp_InterfaceType:
+            anyValueSize = getInterfaceAnyValueSize(paramType, paramType->sourceLoc);
+            return builder->getAnyValueType(anyValueSize);
+        case kIROp_lookup_interface_method:
+        {
+            auto lookupInterface = static_cast<IRLookupWitnessMethod*>(paramType);
+            auto interfaceType = cast<IRInterfaceType>(cast<IRWitnessTableType>(
+                lookupInterface->getWitnessTable()->getDataType())->getConformanceType());
+            // Make sure we are looking up inside the original interface type (prior to lowering).
+            // Only in the original interface type will an associated type entry have an IRAssociatedType value.
+            // We need to extract AnyValueSize from this IRAssociatedType.
+            // In lowered interface type, that entry is lowered into an Ptr(RTTIType) and this info is lost.
+            mapLoweredInterfaceToOriginal.TryGetValue(interfaceType, interfaceType);
+            auto reqVal = findInterfaceRequirementVal(
+                interfaceType,
+                lookupInterface->getRequirementKey());
+            SLANG_ASSERT(reqVal && reqVal->op == kIROp_AssociatedType);
+            return lowerType(builder, reqVal, typeMapping);
+        }
+        default:
+        {
+            bool translated = false;
+            List<IRInst*> loweredOperands;
+            for (UInt i = 0; i < paramType->getOperandCount(); i++)
+            {
+                loweredOperands.add(lowerType(builder, paramType->getOperand(i), typeMapping));
+                if (loweredOperands.getLast() != paramType->getOperand(i))
+                    translated = true;
+            }
+            if (translated)
+                return builder->getType(paramType->op, loweredOperands.getCount(), loweredOperands.getBuffer());
+            return (IRType*)paramType;
+        }
+        }
+    }
+
+    IRIntegerValue SharedGenericsLoweringContext::getInterfaceAnyValueSize(IRInst* type, SourceLoc usageLocation)
+    {
+        if (auto decor = type->findDecoration<IRAnyValueSizeDecoration>())
+        {
+            return decor->getSize();
+        }
+        sink->diagnose(type->sourceLoc, Diagnostics::dynamicInterfaceLacksAnyValueSizeAttribute, type);
+        sink->diagnose(usageLocation, Diagnostics::seeInterfaceUsage, type);
+        return kInvalidAnyValueSize;
     }
 }

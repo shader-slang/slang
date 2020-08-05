@@ -4024,6 +4024,18 @@ __magic_type(Texture, $(feedbackTexture2DFlavor))
 __intrinsic_type($(kIROp_TextureType + (feedbackTexture2DFlavor << kIROpMeta_OtherShift)))
 struct FeedbackTexture2D<T : __BuiltinSamplerFeedbackType>
 {
+    __target_intrinsic(hlsl)
+    void GetDimensions(out uint width, out uint height);
+
+    __target_intrinsic(hlsl)
+    void GetDimensions(uint mipLevel, out uint width, out uint height, out uint numberOfLevels);
+
+    __target_intrinsic(hlsl)
+    void GetDimensions(out float width,out float height);
+
+    __target_intrinsic(hlsl)
+    void GetDimensions(uint mipLevel, out float width,out float height, out float numberOfLevels);
+
     // With Clamp
 
     __target_intrinsic(hlsl, "($0).WriteSamplerFeedback($1, $2, $3, $4)")
@@ -4058,6 +4070,15 @@ __magic_type(Texture, $(feedbackTexture2DArrayFlavor))
 __intrinsic_type($(kIROp_TextureType + (feedbackTexture2DArrayFlavor << kIROpMeta_OtherShift)))
 struct FeedbackTexture2DArray<T : __BuiltinSamplerFeedbackType>
 {
+    __target_intrinsic(hlsl)
+    void GetDimensions(out uint width,out uint height, out uint elements);
+    __target_intrinsic(hlsl)
+    void GetDimensions(uint mipLevel, out uint width,out uint height, out uint elements, out uint numberOfLevels);
+    __target_intrinsic(hlsl)
+    void GetDimensions(out float width,out float height, out float elements);
+    __target_intrinsic(hlsl)
+    void GetDimensions(uint mipLevel, out float width,out float height, out float elements, out float numberOfLevels);
+
     // With Clamp
 
     __target_intrinsic(hlsl, "($0).WriteSamplerFeedback($1, $2, $3, $4)")

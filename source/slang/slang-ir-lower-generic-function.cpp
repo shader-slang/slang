@@ -15,18 +15,6 @@ namespace Slang
     struct GenericFunctionLoweringContext
     {
         SharedGenericsLoweringContext* sharedContext;
-        IRInst* lowerParameterType(IRBuilder* builder, IRInst* paramType)
-        {
-            if (isTypeValue(paramType))
-            {
-                return builder->getPtrType(builder->getRTTIType());
-            }
-            if (isPolymorphicType(paramType))
-            {
-                return builder->getRawPointerType();
-            }
-            return paramType;
-        }
 
         IRInst* lowerGenericFunction(IRInst* genericValue)
         {
@@ -49,6 +37,7 @@ namespace Slang
             auto loweredFunc = cast<IRFunc>(cloneInstAndOperands(&cloneEnv, &builder, func));
             loweredFunc->setFullType(lowerGenericFuncType(&builder, cast<IRGeneric>(genericParent->getFullType())));
             List<IRInst*> clonedParams;
+
             for (auto genericChild : genericParent->getFirstBlock()->getChildren())
             {
                 if (genericChild == func)
@@ -60,7 +49,7 @@ namespace Slang
                 if (clonedChild->op == kIROp_Param)
                 {
                     auto paramType = clonedChild->getFullType();
-                    auto loweredParamType = lowerParameterType(&builder, paramType);
+                    auto loweredParamType = sharedContext->lowerType(&builder, paramType, Dictionary<IRInst*, IRInst*>());
                     if (loweredParamType != paramType)
                     {
                         clonedChild->setFullType((IRType*)loweredParamType);
@@ -70,71 +59,15 @@ namespace Slang
             }
             cloneInstDecorationsAndChildren(&cloneEnv, &sharedContext->sharedBuilderStorage, func, loweredFunc);
 
-            // If the function returns a generic typed value, we need to turn it
-            // into an `out` parameter, since only the caller can allocate space
-            // for it.
-            auto oldFuncType = cast<IRFuncType>(func->getDataType());
-            if (isPolymorphicType(oldFuncType->getResultType()))
-            {
-                builder.setInsertBefore(loweredFunc->getFirstBlock()->getFirstOrdinaryInst());
-                // We defer creation of the returnVal parameter until we see the first
-                // `return` instruction, because we can only obtain the cloned return type
-                // of this function by checking the type of the cloned return inst.
-                IRParam* retValParam = nullptr;
-                // Translate all return insts to `store`s.
-                // Those `store`s will be processed and translated into `copy`s when we
-                // get to process them via workList.
-                for (auto bb : loweredFunc->getBlocks())
-                {
-                    auto retInst = as<IRReturnVal>(bb->getTerminator());
-                    if (!retInst)
-                        continue;
-                    if (!retValParam)
-                    {
-                        // Now we have the return type, emit the returnVal parameter.
-                        // The type of this parameter is still not translated to RawPointer yet,
-                        // and will be processed together with all the other existing parameters.
-                        retValParam = builder.emitParamAtHead(
-                            builder.getOutType(retInst->getVal()->getDataType()));
-                    }
-                    builder.setInsertBefore(retInst);
-                    builder.emitStore(retValParam, retInst->getVal());
-                    builder.emitReturn();
-                    retInst->removeAndDeallocate();
-                }
-            }
-
             auto block = as<IRBlock>(loweredFunc->getFirstChild());
             for (auto param : clonedParams)
             {
                 param->removeFromParent();
                 block->addParam(as<IRParam>(param));
             }
-            // Lower generic typed parameters into RTTIPointers.
+            // Lower generic typed parameters into AnyValueType.
             auto firstInst = loweredFunc->getFirstOrdinaryInst();
             builder.setInsertBefore(firstInst);
-
-            for (IRInst* param = loweredFunc->getFirstParam();
-                param && param->op == kIROp_Param;
-                param = param->getNextInst())
-            {
-                // Generic typed parameters have a type that is a param itself.
-                auto paramType = param->getDataType();
-                if (auto ptrType = as<IRPtrTypeBase>(paramType))
-                    paramType = ptrType->getValueType();
-                if (isPointerOfType(paramType->getDataType(), kIROp_RTTIType) ||
-                    paramType->op == kIROp_lookup_interface_method)
-                {
-                    // Lower into a function parameter of raw pointer type.
-                    param->setFullType(builder.getRawPointerType());
-                    auto newType = builder.getRTTIPointerType(paramType);
-                    // Cast the raw pointer parameter into a RTTIPointer with RTTI info from the type parameter.
-                    auto typedPtr = builder.emitBitCast(newType, param);
-                    // Replace all uses of param with typePtr.
-                    param->replaceUsesWith(typedPtr);
-                    typedPtr->setOperand(0, param);
-                }
-            }
             sharedContext->loweredGenericFunctions[genericValue] = loweredFunc;
             sharedContext->addToWorkList(loweredFunc);
             return loweredFunc;
@@ -143,36 +76,38 @@ namespace Slang
         IRType* lowerGenericFuncType(IRBuilder* builder, IRGeneric* genericVal)
         {
             ShortList<IRInst*> genericParamTypes;
+            Dictionary<IRInst*, IRInst*> typeMapping;
             for (auto genericParam : genericVal->getParams())
             {
-                genericParamTypes.add(lowerParameterType(builder, genericParam->getFullType()));
+                genericParamTypes.add(sharedContext->lowerType(builder, genericParam->getFullType(), Dictionary<IRInst*, IRInst*>()));
+                if (auto anyValueSizeDecor = genericParam->findDecoration<IRTypeConstraintDecoration>())
+                {
+                    auto anyValueSize = sharedContext->getInterfaceAnyValueSize(anyValueSizeDecor->getConstraintType(), genericParam->sourceLoc);
+                    auto anyValueType = builder->getAnyValueType(anyValueSize);
+                    typeMapping[genericParam] = anyValueType;
+                }
             }
 
             auto innerType = (IRFuncType*)lowerFuncType(
                 builder,
                 cast<IRFuncType>(findGenericReturnVal(genericVal)),
+                typeMapping,
                 genericParamTypes.getArrayView().arrayView);
 
             return innerType;
         }
 
-        IRType* lowerFuncType(IRBuilder* builder, IRFuncType* funcType, ArrayView<IRInst*> additionalParams)
+        IRType* lowerFuncType(IRBuilder* builder, IRFuncType* funcType,
+            const Dictionary<IRInst*, IRInst*>& typeMapping,
+            ArrayView<IRInst*> additionalParams)
         {
             List<IRInst*> newOperands;
             bool translated = false;
             for (UInt i = 0; i < funcType->getOperandCount(); i++)
             {
                 auto paramType = funcType->getOperand(i);
-                auto loweredParamType = lowerParameterType(builder, paramType);
+                auto loweredParamType = sharedContext->lowerType(builder, paramType, typeMapping);
                 translated = translated || (loweredParamType != paramType);
-                if (translated && i == 0)
-                {
-                    // We are translating the return value, this means that
-                    // the return value must be passed explicitly via an `out` parameter.
-                    // In this case, the new return value will be `void`, and the
-                    // translated return value type will be the first parameter type;
-                    newOperands.add(builder->getVoidType());
-                }
                 newOperands.add(loweredParamType);
             }
             if (!translated && additionalParams.getCount() == 0)
@@ -193,8 +128,13 @@ namespace Slang
 
         IRInterfaceType* maybeLowerInterfaceType(IRInterfaceType* interfaceType)
         {
-            if (sharedContext->loweredInterfaceTypes.Contains(interfaceType))
+            IRInterfaceType* loweredType = nullptr;
+            if (sharedContext->loweredInterfaceTypes.TryGetValue(interfaceType, loweredType))
+                return loweredType;
+            if (sharedContext->mapLoweredInterfaceToOriginal.ContainsKey(interfaceType))
                 return interfaceType;
+
+            List<IRInterfaceRequirementEntry*> newEntries;
 
             IRBuilder builder;
             builder.sharedBuilder = &sharedContext->sharedBuilderStorage;
@@ -205,23 +145,33 @@ namespace Slang
             {
                 if (auto entry = as<IRInterfaceRequirementEntry>(interfaceType->getOperand(i)))
                 {
+                    IRInst* loweredVal = nullptr;
                     if (auto funcType = as<IRFuncType>(entry->getRequirementVal()))
                     {
-                        entry->setRequirementVal(lowerFuncType(&builder, funcType, ArrayView<IRInst*>()));
+                        loweredVal = lowerFuncType(&builder, funcType, Dictionary<IRInst*, IRInst*>(), ArrayView<IRInst*>());
                     }
                     else if (auto genericFuncType = as<IRGeneric>(entry->getRequirementVal()))
                     {
-                        entry->setRequirementVal(lowerGenericFuncType(&builder, genericFuncType));
+                        loweredVal = lowerGenericFuncType(&builder, genericFuncType);
                     }
                     else if (entry->getRequirementVal()->op == kIROp_AssociatedType)
                     {
-                        entry->setRequirementVal(builder.getPtrType(builder.getRTTIType()));
+                        loweredVal = builder.getPtrType(builder.getRTTIType());
                     }
+                    else
+                    {
+                        loweredVal = entry->getRequirementVal();
+                    }
+                    auto newEntry = builder.createInterfaceRequirementEntry(entry->getRequirementKey(), loweredVal);
+                    newEntries.add(newEntry);
                 }
             }
-
-            sharedContext->loweredInterfaceTypes.Add(interfaceType);
-            return interfaceType;
+            loweredType = builder.createInterfaceType(newEntries.getCount(), (IRInst**)newEntries.getBuffer());
+            interfaceType->transferDecorationsTo(loweredType);
+            interfaceType->replaceUsesWith(loweredType);
+            sharedContext->loweredInterfaceTypes.Add(interfaceType, loweredType);
+            sharedContext->mapLoweredInterfaceToOriginal[loweredType] = interfaceType;
+            return loweredType;
         }
 
         bool isTypeKindVal(IRInst* inst)

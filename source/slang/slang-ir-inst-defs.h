@@ -241,6 +241,9 @@ INST(Call, call, 1, 0)
 INST(RTTIObject, rtti_object, 0, 0)
 INST(Alloca, alloca, 1, 0)
 
+INST(PackAnyValue, packAnyValue, 1, 0)
+INST(UnpackAnyValue, unpackAnyValue, 1, 0)
+
 INST(WitnessTableEntry, witness_table_entry, 2, 0)
 INST(InterfaceRequirementEntry, interface_req_entry, 2, 0)
 
