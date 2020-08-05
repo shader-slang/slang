@@ -482,6 +482,8 @@ struct SPIRVEmitContext
         {
             // Allocate the operands
             m_currentInst->operandWords = m_memoryArena.allocateAndCopyArray(m_operandStack.getBuffer() + operandsStartIndex, operandsCount);
+            // Set the count
+            m_currentInst->operandWordsCount = uint32_t(operandsCount);
         }
 
         // Make the previous inst active
