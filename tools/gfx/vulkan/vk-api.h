@@ -84,6 +84,7 @@ namespace gfx {
     x(vkCmdEndRenderPass) \
     x(vkCmdPipelineBarrier) \
     x(vkCmdCopyBufferToImage)\
+    x(vkCmdPushConstants) \
     \
     x(vkCreateFence) \
     x(vkDestroyFence) \

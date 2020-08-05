@@ -79,7 +79,7 @@ struct Stuff
 
 [numthreads(4, 1, 1)]
 void computeMain(
-//TEST_INPUT:cbuffer(data=[256]):
+//TEST_INPUT:root_constants(data=[256]):
     uniform Stuff stuff,
 
     uint3       dispatchThreadID : SV_DispatchThreadID)

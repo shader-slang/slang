@@ -2363,11 +2363,8 @@ RefPtr<TypeLayout> createConstantBufferTypeLayoutIfNeeded(
     if(!needsConstantBuffer(context, elementTypeLayout))
         return elementTypeLayout;
 
-    auto parameterGroupRules = context.getRulesFamily()->getConstantBufferRules();
-
     return _createParameterGroupTypeLayout(
         context
-            .with(parameterGroupRules)
             .with(context.targetReq->getDefaultMatrixLayoutMode()),
         nullptr,
         elementTypeLayout);

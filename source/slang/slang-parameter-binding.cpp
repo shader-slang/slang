@@ -2108,7 +2108,7 @@ static RefPtr<TypeLayout> computeEntryPointParameterTypeLayout(
 struct ScopeLayoutBuilder
 {
     ParameterBindingContext*    m_context = nullptr;
-    LayoutRulesImpl*            m_rules = nullptr;
+    TypeLayoutContext           m_layoutContext;
     RefPtr<StructTypeLayout>    m_structLayout;
     UniformLayoutInfo           m_structLayoutInfo;
 
@@ -2120,14 +2120,24 @@ struct ScopeLayoutBuilder
     StructTypeLayoutBuilder     m_pendingDataTypeLayoutBuilder;
 
     void beginLayout(
-        ParameterBindingContext* context)
+        ParameterBindingContext*    context,
+        TypeLayoutContext           layoutContext)
     {
         m_context = context;
-        m_rules = context->getRulesFamily()->getConstantBufferRules();
-        m_structLayout = new StructTypeLayout();
-        m_structLayout->rules = m_rules;
+        m_layoutContext = layoutContext;
 
-        m_structLayoutInfo = m_rules->BeginStructLayout();
+        auto rules = layoutContext.rules;
+        m_structLayout = new StructTypeLayout();
+        m_structLayout->rules = rules;
+
+        m_structLayoutInfo = rules->BeginStructLayout();
+    }
+
+
+    void beginLayout(
+        ParameterBindingContext* context)
+    {
+        beginLayout(context, context->layoutContext);
     }
 
     void _addParameter(
@@ -2144,7 +2154,8 @@ struct ScopeLayoutBuilder
                 uniformSize,
                 varLayout->typeLayout->uniformAlignment);
 
-            LayoutSize uniformOffset = m_rules->AddStructField(
+            auto rules = m_layoutContext.rules;
+            LayoutSize uniformOffset = rules->AddStructField(
                 &m_structLayoutInfo,
                 fieldInfo);
 
@@ -2170,7 +2181,8 @@ struct ScopeLayoutBuilder
         //
         if( auto fieldPendingDataTypeLayout = varLayout->typeLayout->pendingDataTypeLayout )
         {
-            m_pendingDataTypeLayoutBuilder.beginLayoutIfNeeded(nullptr, m_rules);
+            auto rules = m_layoutContext.rules;
+            m_pendingDataTypeLayoutBuilder.beginLayoutIfNeeded(nullptr, rules);
             auto fieldPendingDataVarLayout = m_pendingDataTypeLayoutBuilder.addField(varLayout->varDecl, fieldPendingDataTypeLayout);
 
             m_structLayout->pendingDataTypeLayout = m_pendingDataTypeLayoutBuilder.getTypeLayout();
@@ -2196,7 +2208,8 @@ struct ScopeLayoutBuilder
         {
             auto fieldPendingTypeLayout = fieldPendingVarLayout->typeLayout;
 
-            m_pendingDataTypeLayoutBuilder.beginLayoutIfNeeded(nullptr, m_rules);
+            auto rules = m_layoutContext.rules;
+            m_pendingDataTypeLayoutBuilder.beginLayoutIfNeeded(nullptr, rules);
             m_structLayout->pendingDataTypeLayout = m_pendingDataTypeLayoutBuilder.getTypeLayout();
 
             auto fieldUniformLayoutInfo = fieldPendingTypeLayout->FindResourceInfo(LayoutResourceKind::Uniform);
@@ -2209,7 +2222,7 @@ struct ScopeLayoutBuilder
                     fieldUniformSize,
                     fieldPendingTypeLayout->uniformAlignment);
 
-                LayoutSize uniformOffset = m_rules->AddStructField(
+                LayoutSize uniformOffset = rules->AddStructField(
                     m_pendingDataTypeLayoutBuilder.getStructLayoutInfo(),
                     fieldInfo);
 
@@ -2225,7 +2238,8 @@ struct ScopeLayoutBuilder
     {
         // Finish computing the layout for the ordindary data (if any).
         //
-        m_rules->EndStructLayout(&m_structLayoutInfo);
+        auto rules = m_layoutContext.rules;
+        rules->EndStructLayout(&m_structLayoutInfo);
         m_pendingDataTypeLayoutBuilder.endLayout();
 
         // Copy the final layout information computed for ordinary data
@@ -2241,7 +2255,7 @@ struct ScopeLayoutBuilder
         // to reflect the constant buffer that will be generated.
         //
         scopeTypeLayout = createConstantBufferTypeLayoutIfNeeded(
-            m_context->layoutContext,
+            m_layoutContext,
             scopeTypeLayout);
 
         // We now have a bunch of layout information, which we should
@@ -2508,8 +2522,46 @@ static RefPtr<EntryPointLayout> collectEntryPointParameters(
     // in the parameter list (e.g., a `uniform float4x4 mvp` parameter),
     // which is what the `ScopeLayoutBuilder` is designed to help with.
     //
+    TypeLayoutContext layoutContext = context->layoutContext;
+
+    if(isKhronosTarget(context->getTargetRequest()))
+    {
+        // For Vulkan/SPIR-V targets, there are various cases for
+        // how parameters that would otherwise just be a `ConstantBuffer<...>`
+        // get passed, that the compiler and application need to agree
+        // on.
+        //
+        // As a matter of policy, the Slang compiler will interpret
+        // direct entry-point `uniform` parameters as being passed
+        // using whatever is the most natural and efficient mechanism
+        // based on the shader stage.
+        //
+        // In the case of rasterization and compute shaders, this means
+        // passing entry-point `uniform` parmaeters via a "push constant"
+        // buffer.
+        //
+        // In the case of ray-tracing shaders, this means passing entry-point
+        // `uniform` parameters via the "shader record."
+        //
+        switch( entryPoint->getStage() )
+        {
+        default:
+            layoutContext = layoutContext.with(layoutContext.getRulesFamily()->getPushConstantBufferRules());
+            break;
+
+        case Stage::AnyHit:
+        case Stage::Callable:
+        case Stage::ClosestHit:
+        case Stage::Intersection:
+        case Stage::Miss:
+        case Stage::RayGeneration:
+            layoutContext = layoutContext.with(layoutContext.getRulesFamily()->getShaderRecordConstantBufferRules());
+            break;
+        }
+    }
+
     SimpleScopeLayoutBuilder scopeBuilder;
-    scopeBuilder.beginLayout(context);
+    scopeBuilder.beginLayout(context, layoutContext);
     auto paramsStructLayout = scopeBuilder.m_structLayout;
     paramsStructLayout->type = entryPointType;
 

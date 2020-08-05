@@ -51,7 +51,7 @@ ConstantBuffer<IRandomNumberGenerationStrategy> gStrategy;
 [numthreads(4, 1, 1)]
 void computeMain(
 
-//TEST_INPUT:cbuffer(data=[8 0 0 0], stride=4):
+//TEST_INPUT:root_constants(data=[8 0 0 0], stride=4):
     uniform IModifier   modifier,
             uint3       dispatchThreadID : SV_DispatchThreadID)
 {

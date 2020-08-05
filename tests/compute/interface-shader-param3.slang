@@ -83,7 +83,7 @@ void computeMain(
 //
 // Here's the incantation to make the test runner fill in the constant buffer:
 //
-//TEST_INPUT:cbuffer(data=[256 0 0 0 16 0 0 0], stride=4):
+//TEST_INPUT:root_constants(data=[256 0 0 0 16 0 0 0], stride=4):
 //
 // So, the value `256` will be used for `extra` and the value `16`
 // will be written to the first four bytes of the concrete value
