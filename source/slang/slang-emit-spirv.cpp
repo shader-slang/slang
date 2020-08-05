@@ -567,7 +567,8 @@ struct SPIRVEmitContext
     {
         // Can only emitOperands if we are in an instruction
         SLANG_ASSERT(m_currentInst);
-        
+        SLANG_COMPILE_TIME_ASSERT(sizeof(SpvWord) == 4);
+
         // Assert that `text` doesn't contain any embedded nul bytes, since they
         // could lead to invalid encoded results.
         SLANG_ASSERT(text.indexOf(0) < 0);
@@ -579,35 +580,25 @@ struct SPIRVEmitContext
         // > UTF-8 encoding scheme. The UTF-8 octets (8-bit bytes) are packed
         // > four per word, following the little-endian convention (i.e., the
         // > first octet is in the lowest-order 8 bits of the word).
-        //
-        // We start by emitting the contents of `text` in
-        // 4-byte chunks.
-        //
+        // > The final word contains the string’s nul-termination character (0), and
+        // > all contents past the end of the string in the final word are padded with 0.
 
-        SLANG_COMPILE_TIME_ASSERT(sizeof(SpvWord) == 4);
-
-        const Int textCount = text.getLength();
+        // First work out the amount of words we'll need
+        const Index textCount = text.getLength();
         // Calculate the minimum amount of bytes needed - which needs to include terminating 0
         const Index minByteCount = textCount + 1;
         // Calculate the amount of words including padding if necessary
-        const Int wordCount = (minByteCount + 3) >> 2;
+        const Index wordCount = (minByteCount + 3) >> 2;
 
-        const Int operandStartIndex = m_operandStack.getCount();
-        // We must have at least one word (because we add 1 to at minimum 0)
+        // Make space on the operand stack, keeping the free space start in operandStartIndex
+        const Index operandStartIndex = m_operandStack.getCount();
         m_operandStack.setCount(operandStartIndex + wordCount);
 
+        // Set dst to the start of the operand memory
         char* dst = (char*)(m_operandStack.getBuffer() + operandStartIndex);
 
         // Copy the text
         memcpy(dst, text.begin(), textCount);
-
-        // > The final word contains the string’s nul-termination character (0), and
-        // > all contents past the end of the string in the final word are padded with 0.
-        //
-        // For the last word, the low-order bytes will
-        // come from the remainder of the string (if
-        // there is anything left), and the rest will
-        // be left as zeros.
 
         // Set terminating 0, and remaining buffer 0s
         memset(dst + textCount, 0, wordCount * sizeof(SpvWord) - textCount);
