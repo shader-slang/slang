@@ -25,8 +25,39 @@ namespace Slang
 	class Path
 	{
 	public:
+
+        enum class Type
+        {
+            Unknown,
+            File,
+            Directory,
+        };
+
+        typedef uint32_t TypeFlags;
+        struct TypeFlag
+        {
+            enum Enum : TypeFlags
+            {
+                Unknown = TypeFlags(1) << int(Type::Unknown),
+                File = TypeFlags(1) << int(Type::File),
+                Directory = TypeFlags(1) << int(Type::Directory),
+            };
+        };
+
+        class Visitor
+        {
+        public:
+            virtual void accept(Type type, const UnownedStringSlice& filename) = 0;
+        };
+
 		static const char kPathDelimiter = '/';
 
+            /// Finds all all the items in the specified directory, that matches the pattern.
+            ///
+            /// @param directoryPath The directory to do the search in. If the directory is not found, SLANG_E_NOT_FOUND is returned
+            /// @param pattern. The pattern to match against. The pattern matching is targtet specific (ie window matching is different to linux/unix). Passing nullptr means no matching.
+            /// @return is SLANG_E_NOT_FOUND if the directoryPath is not found
+        static SlangResult find(const String& directoryPath, const char* pattern, Visitor* visitor);
 
             /// Returns -1 if no separator is found
         static Index findLastSeparatorIndex(String const& path);

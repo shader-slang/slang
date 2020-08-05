@@ -9,10 +9,10 @@
     </Filter>
   </ItemGroup>
   <ItemGroup>
-    <ClInclude Include="options.h">
+    <ClInclude Include="directory-util.h">
       <Filter>Header Files</Filter>
     </ClInclude>
-    <ClInclude Include="os.h">
+    <ClInclude Include="options.h">
       <Filter>Header Files</Filter>
     </ClInclude>
     <ClInclude Include="slangc-tool.h">
@@ -26,10 +26,10 @@
     </ClInclude>
   </ItemGroup>
   <ItemGroup>
-    <ClCompile Include="options.cpp">
+    <ClCompile Include="directory-util.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
-    <ClCompile Include="os.cpp">
+    <ClCompile Include="options.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
     <ClCompile Include="slang-test-main.cpp">
