@@ -210,7 +210,8 @@ CacheFileSystem::~CacheFileSystem()
 {
     for (const auto& pair : m_uniqueIdentityMap)
     {
-        delete pair.Value;
+        PathInfo* pathInfo = pair.Value;
+        delete pathInfo;
     }
 }
 
@@ -261,7 +262,8 @@ void CacheFileSystem::clearCache()
 {
     for (const auto& pair : m_uniqueIdentityMap)
     {
-        delete pair.Value;
+        PathInfo* pathInfo = pair.Value;
+        delete pathInfo;
     }
 
     m_uniqueIdentityMap.Clear();
