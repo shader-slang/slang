@@ -7,6 +7,8 @@
 
 #include "spirv/unified1/spirv.h"
 
+#include "../core/slang-memory-arena.h"
+
 namespace Slang
 {
 
@@ -190,7 +192,9 @@ struct SpvInst : SpvInstParent
     // need to store a more refined representation here.
 
         /// The additional words of the instruction after the opcode
-    List<SpvWord> operandWords;
+    SpvWord* operandWords = nullptr;
+        /// The amount of operand words
+    uint32_t operandWordsCount = 0;
 
     // We will store the instructions in a given `SpvInstParent`
     // using an intrusive linked list.
@@ -210,7 +214,7 @@ struct SpvInst : SpvInstParent
         // > including the word holding the word count and opcode, and any optional
         // > operands. An instruction’s word count is the total space taken by the instruction.
         //
-        SpvWord wordCount = 1 + SpvWord(operandWords.getCount());
+        SpvWord wordCount = 1 + SpvWord(operandWordsCount);
 
         // [2.3: Physical Layout of a SPIR-V Module and Instruction]
         //
@@ -221,11 +225,8 @@ struct SpvInst : SpvInstParent
 
         // The operand words simply follow the opcode word.
         //
-        for( auto word : operandWords )
-        {
-            ioWords.add(word);
-        }
-
+        ioWords.addRange(operandWords, operandWordsCount);
+        
         // In our representation choice, the children of a
         // parent instruction will always follow the encoded
         // words of a parent:
@@ -418,18 +419,48 @@ struct SPIRVEmitContext
     // Emitting an instruction starts with picking the opcode
     // and allocating the `SpvInst`.
 
+    // Holds a stack of instructions operands *BEFORE* they added to t
+    List<SpvWord> m_operandStack;
+    // Stack of being constructed instructions. Can only emitOperands if there is current instruction
+    SpvInst* m_currentInst = nullptr;
+
+    // Operands can only be added when inside of a InstConstructScope 
+    struct InstConstructScope
+    {
+        SLANG_FORCE_INLINE operator SpvInst*() const { return m_inst; }
+
+        InstConstructScope(SPIRVEmitContext* context, SpvOp opcode, IRInst* irInst = nullptr):
+            m_context(context),
+            m_operandsStartIndex(context->m_operandStack.getCount()),
+            m_previousInst(context->m_currentInst)
+        {
+            m_inst = context->_beginInst(opcode, irInst);
+        }
+        ~InstConstructScope()
+        {
+            SLANG_ASSERT(m_context->m_currentInst == m_inst);
+            m_context->_endInst(m_previousInst, m_operandsStartIndex);
+        }
+
+        SPIRVEmitContext* m_context;        ///< The context
+        SpvInst* m_inst;                    ///< The instruction these operands are associated with
+        SpvInst* m_previousInst;            ///< The previously live inst
+        Index m_operandsStartIndex;         ///< The start index for operands of m_inst
+    };
+
+        /// Holds memory for instructions and operands.
+    MemoryArena m_memoryArena;
+
         /// Begin emitting an instruction with the given SPIR-V `opcode`.
         ///
         /// If `irInst` is non-null, then the resulting SPIR-V instruction
         /// will be registered as corresponding to `irInst`.
         ///
-    SpvInst* beginInst(SpvOp opcode, IRInst* irInst = nullptr)
+    SpvInst* _beginInst(SpvOp opcode, IRInst* irInst = nullptr)
     {
-        // TODO: We are currently just leaking the `SpvInst`s we allocate.
-        // We should set up a pool allocator that this pass can use for
-        // both the `SpvInst`s and for their constituent words.
-        //
-        auto spvInst = new SpvInst();
+        // Allocate the instruction
+
+        auto spvInst = new (m_memoryArena.allocate(sizeof(SpvInst))) SpvInst();
         spvInst->opcode = opcode;
 
         if(irInst)
@@ -437,9 +468,28 @@ struct SPIRVEmitContext
             registerInst(irInst, spvInst);
         }
 
+        m_currentInst = spvInst;
         return spvInst;
     }
 
+    void _endInst(SpvInst* previousInst, Index operandsStartIndex)
+    {
+        SLANG_ASSERT(m_currentInst);
+        // Work out how many operands were added
+        const Index operandsCount = m_operandStack.getCount() - operandsStartIndex;
+
+        if (operandsCount)
+        {
+            // Allocate the operands
+            m_currentInst->operandWords = m_memoryArena.allocateAndCopyArray(m_operandStack.getBuffer() + operandsStartIndex, operandsCount);
+        }
+
+        // Make the previous inst active
+        m_currentInst = previousInst;
+        // Reset the operand stack
+        m_operandStack.setCount(operandsStartIndex);
+    }
+    
     // Once an instruction has been created, we append the operand
     // words to it with `emitOperand`. There are a few different
     // case of operands that we handle.
@@ -450,7 +500,10 @@ struct SPIRVEmitContext
         /// Emit a literal `word` as an operand to `dst`.
     void emitOperand(SpvInst* dst, SpvWord word)
     {
-        dst->operandWords.add(word);
+        // Can only add operands if we are contructing an instruction (ie in _beginInst/_endInst)
+        SLANG_ASSERT(m_currentInst);
+        SLANG_UNUSED(dst);
+        m_operandStack.add(word);
     }
 
     // The most common case of operand is an <id> that represents
@@ -609,7 +662,8 @@ struct SPIRVEmitContext
 
     SpvInst* emitInst(SpvInstParent* parent, IRInst* irInst, SpvOp opcode)
     {
-        auto spvInst = beginInst(opcode, irInst);
+        InstConstructScope scopeInst(this, opcode, irInst);
+        SpvInst* spvInst = scopeInst;
         parent->addInst(spvInst);
         return spvInst;
     }
@@ -617,7 +671,8 @@ struct SPIRVEmitContext
     template<typename A>
     SpvInst* emitInst(SpvInstParent* parent, IRInst* irInst, SpvOp opcode, A const& a)
     {
-        auto spvInst = beginInst(opcode, irInst);
+        InstConstructScope scopeInst(this, opcode, irInst);
+        SpvInst* spvInst = scopeInst;
         emitOperand(spvInst, a);
         parent->addInst(spvInst);
         return spvInst;
@@ -626,7 +681,8 @@ struct SPIRVEmitContext
     template<typename A, typename B>
     SpvInst* emitInst(SpvInstParent* parent, IRInst* irInst, SpvOp opcode, A const& a, B const& b)
     {
-        auto spvInst = beginInst(opcode, irInst);
+        InstConstructScope scopeInst(this, opcode, irInst);
+        SpvInst* spvInst = scopeInst;
         emitOperand(spvInst, a);
         emitOperand(spvInst, b);
         parent->addInst(spvInst);
@@ -636,7 +692,8 @@ struct SPIRVEmitContext
     template<typename A, typename B, typename C>
     SpvInst* emitInst(SpvInstParent* parent, IRInst* irInst, SpvOp opcode, A const& a, B const& b, C const& c)
     {
-        auto spvInst = beginInst(opcode, irInst);
+        InstConstructScope scopeInst(this, opcode, irInst);
+        SpvInst* spvInst = scopeInst;
         emitOperand(spvInst, a);
         emitOperand(spvInst, b);
         emitOperand(spvInst, c);
@@ -647,7 +704,8 @@ struct SPIRVEmitContext
     template<typename A, typename B, typename C, typename D>
     SpvInst* emitInst(SpvInstParent* parent, IRInst* irInst, SpvOp opcode, A const& a, B const& b, C const& c, D const& d)
     {
-        auto spvInst = beginInst(opcode, irInst);
+        InstConstructScope scopeInst(this, opcode, irInst);
+        SpvInst* spvInst = scopeInst;
         emitOperand(spvInst, a);
         emitOperand(spvInst, b);
         emitOperand(spvInst, c);
@@ -659,7 +717,8 @@ struct SPIRVEmitContext
     template<typename A, typename B, typename C, typename D, typename E>
     SpvInst* emitInst(SpvInstParent* parent, IRInst* irInst, SpvOp opcode, A const& a, B const& b, C const& c, D const& d, E const& e)
     {
-        auto spvInst = beginInst(opcode, irInst);
+        InstConstructScope scopeInst(this, opcode, irInst);
+        SpvInst* spvInst = scopeInst;
         emitOperand(spvInst, a);
         emitOperand(spvInst, b);
         emitOperand(spvInst, c);
@@ -1110,6 +1169,12 @@ struct SPIRVEmitContext
 #undef CASE
         }
     }
+
+    SPIRVEmitContext(IRModule* module) :
+        m_irModule(module),
+        m_memoryArena(2048)
+    {
+    }
 };
 
 SlangResult emitSPIRVFromIR(
@@ -1119,12 +1184,11 @@ SlangResult emitSPIRVFromIR(
     List<uint8_t>&          spirvOut)
 {
     SLANG_UNUSED(compileRequest);
-    SLANG_UNUSED(irModule);
-
+    
     spirvOut.clear();
 
-    SPIRVEmitContext context;
-    context.m_irModule = irModule;
+    SPIRVEmitContext context(irModule);
+
     context.emitFrontMatter();
     for (auto irEntryPoint : irEntryPoints)
     {
