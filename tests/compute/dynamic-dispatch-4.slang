@@ -3,6 +3,7 @@
 
 // Test dynamic dispatch code gen for generic-typed local variables.
 
+[anyValueSize(8)]
 interface IInterface
 {
     [mutating]

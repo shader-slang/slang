@@ -14,6 +14,73 @@ namespace Slang
     {
         SharedGenericsLoweringContext* sharedContext;
 
+        // Represents a work item for packing `inout` or `out` arguments after a concrete call.
+        struct ArgumentPackWorkItem
+        {
+            // A `AnyValue` typed destination.
+            IRInst* dstArg;
+            // A concrete value to be packed.
+            IRInst* concreteArg;
+        };
+
+        // Unpack an `arg` of `IRAnyValue` into concrete type if necessary, to make it feedable into the parameter.
+        // If `arg` represents a AnyValue typed variable passed in to a concrete `out` parameter,
+        // this function indicates that it needs to be packed after the call by setting
+        // `packAfterCall`.
+        IRInst* maybeUnpackArg(
+            IRBuilder* builder,
+            IRType* paramType,
+            IRInst* arg,
+            ArgumentPackWorkItem& packAfterCall)
+        {
+            packAfterCall.dstArg = nullptr;
+            packAfterCall.concreteArg = nullptr;
+
+            // If either paramType or argType is a pointer type
+            // (because of `inout` or `out` modifiers), we extract
+            // the underlying value type first.
+            IRType* paramValType = paramType;
+            IRType* argValType = arg->getDataType();
+            IRInst* argVal = arg;
+            bool isParamPointer = false;
+            if (auto ptrType = as<IRPtrTypeBase>(paramType))
+            {
+                isParamPointer = true;
+                paramValType = ptrType->getValueType();
+            }
+            bool isArgPointer = false;
+            auto argType = arg->getDataType();
+            if (auto argPtrType = as<IRPtrTypeBase>(argType))
+            {
+                isArgPointer = true;
+                argValType = argPtrType->getValueType();
+                argVal = builder->emitLoad(arg);
+            }
+
+            // Unpack `arg` if the parameter expects concrete type but
+            // `arg` is an AnyValue.
+            if (!as<IRAnyValueType>(paramValType) && as<IRAnyValueType>(argValType))
+            {
+                auto unpackedArgVal = builder->emitUnpackAnyValue(paramValType, argVal);
+                // if parameter expects an `out` pointer, store the unpacked val into a
+                // variable and pass in a pointer to that variable.
+                if (as<IRPtrTypeBase>(paramType))
+                {
+                    auto tempVar = builder->emitVar(paramValType);
+                    builder->emitStore(tempVar, unpackedArgVal);
+                    // tempVar needs to be unpacked into original var after the call.
+                    packAfterCall.dstArg = arg;
+                    packAfterCall.concreteArg = tempVar;
+                    return tempVar;
+                }
+                else
+                {
+                    return unpackedArgVal;
+                }
+            }
+            return arg;
+        }
+
         IRStringLit* _getWitnessTableWrapperFuncName(IRFunc* func)
         {
             IRBuilder builderStorage;
@@ -56,80 +123,43 @@ namespace Slang
             }
 
             List<IRInst*> args;
-            bool callerAllocatesReturnVal = funcTypeInInterface->getResultType()->op == kIROp_VoidType
-                && func->getResultType()->op != kIROp_VoidType;
-            IRVar* retVar = nullptr;
-            if (callerAllocatesReturnVal)
-            {
-                // If return value is allocated by caller, we need to write the result
-                // of the call into a local variable, and copy from that local variable
-                // to the address passed in by the caller.
-                retVar = builder->emitVar(func->getResultType());
-                SLANG_ASSERT(params.getCount() == (Index)(func->getParamCount() + 1));
-            }
-            else
-            {
-                SLANG_ASSERT(params.getCount() == (Index)func->getParamCount());
-            }
+            List<ArgumentPackWorkItem> argsToPack;
+
+            SLANG_ASSERT(params.getCount() == (Index)func->getParamCount());
             for (UInt i = 0; i < func->getParamCount(); i++)
             {
-                auto wrapperParam = params[i + (callerAllocatesReturnVal ? 1 : 0)];
-                // Type of the parameter in interface requirement.
-                auto reqParamType = wrapperParam->getDataType();
+                auto wrapperParam = params[i];
                 // Type of the parameter in the callee.
                 auto funcParamType = func->getParamType(i);
 
                 // If the implementation expects a concrete type
                 // (either in the form of a pointer for `out`/`inout` parameters,
-                // or in the form a a value for `in` parameters, while
-                // the interface exposes a raw pointer type (void*),
-                // we need to cast the raw pointer type to the appropriate
-                // concerete type. (void*->Concrete* / void*->Concrete&).
-                if (as<IRRawPointerTypeBase>(reqParamType) &&
-                    !as<IRRawPointerTypeBase>(funcParamType))
-                {
-                    if (as<IRPtrTypeBase>(funcParamType))
-                    {
-                        // The implementation function expects a pointer to the
-                        // concrete type. This is the case for inout/out parameters.
-                        auto bitCast = builder->emitBitCast(funcParamType, wrapperParam);
-                        args.add(bitCast);
-                    }
-                    else
-                    {
-                        // The implementation function expects just a value of the
-                        // concrete type. We need to insert a load in this case.
-                        auto bitCast = builder->emitBitCast(
-                            builder->getPtrType(funcParamType),
-                            wrapperParam);
-                        auto load = builder->emitLoad(bitCast);
-                        args.add(load);
-                    }
-                }
-                else
-                {
-                    args.add(wrapperParam);
-                }
+                // or in the form a value for `in` parameters, while
+                // the interface exposes an AnyValue type,
+                // we need to unpack the AnyValue argument to the appropriate
+                // concerete type.
+                ArgumentPackWorkItem packWorkItem = {};
+                auto newArg = maybeUnpackArg(builder, funcParamType, wrapperParam, packWorkItem);
+                args.add(newArg);
+                if (packWorkItem.concreteArg)
+                    argsToPack.add(packWorkItem);
             }
             auto call = builder->emitCallInst(func->getResultType(), func, args);
-            if (retVar)
+
+            // Pack all `out` arguments.
+            for (auto item : argsToPack)
             {
-                // If the caller of the wrapper function allocates space,
-                // we need to store the result of the call into a local varaible,
-                // and then copy the local variable into the caller-provided
-                // buffer (params[0]).
-                builder->emitStore(retVar, call);
-                // The result type of the inner function can only be a concrete type
-                // if we reach here. If it is a generic type or generic associated type,
-                // it would have already been lowered out during interface lowering and
-                // lowerGenericFunction.
-                // This means that we can just grab the rtti object from the type directly.
-                auto rttiObject = sharedContext->maybeEmitRTTIObject(func->getResultType());
-                auto rttiPtr = builder->emitGetAddress(
-                    builder->getPtrType(builder->getRTTIType()),
-                    rttiObject);
-                builder->emitCopy(params[0], retVar, rttiPtr);
-                builder->emitReturn();
+                auto anyValType = cast<IRPtrTypeBase>(item.dstArg->getDataType())->getValueType();
+                auto concreteVal = builder->emitLoad(item.concreteArg);
+                auto packedVal = builder->emitPackAnyValue(anyValType, concreteVal);
+                builder->emitStore(item.dstArg, packedVal);
+            }
+
+            // Pack return value if necessary.
+            if (!as<IRAnyValueType>(call->getDataType()) && as<IRAnyValueType>(funcTypeInInterface->getResultType()))
+            {
+                auto pack = builder->emitPackAnyValue(funcTypeInInterface->getResultType(), call);
+                builder->emitReturn(pack);
             }
             else
             {

@@ -8,9 +8,84 @@ namespace Slang
     {
         SharedGenericsLoweringContext* sharedContext;
 
+        // Represents a work item for unpacking `inout` or `out` arguments after a generic call.
+        struct ArgumentUnpackWorkItem
+        {
+            // Concrete typed destination.
+            IRInst* dstArg;
+            // Packed argument.
+            IRInst* packedArg;
+        };
+
+        // Packs `arg` into a `IRAnyValue` if necessary, to make it feedable into the parameter.
+        // If `arg` represents a concrete typed variable passed in to a generic `out` parameter,
+        // this function indicates that it needs to be unpacked after the call by setting
+        // `unpackAfterCall`.
+        IRInst* maybePackArgument(
+            IRBuilder* builder,
+            IRType* paramType,
+            IRInst* arg,
+            ArgumentUnpackWorkItem& unpackAfterCall)
+        {
+            unpackAfterCall.dstArg = nullptr;
+            unpackAfterCall.packedArg = nullptr;
+
+            // If either paramType or argType is a pointer type
+            // (because of `inout` or `out` modifiers), we extract
+            // the underlying value type first.
+            IRType* paramValType = paramType;
+            IRType* argValType = arg->getDataType();
+            IRInst* argVal = arg;
+            bool isParamPointer = false;
+            if (auto ptrType = as<IRPtrTypeBase>(paramType))
+            {
+                isParamPointer = true;
+                paramValType = ptrType->getValueType();
+            }
+            bool isArgPointer = false;
+            auto argType = arg->getDataType();
+            if (auto argPtrType = as<IRPtrTypeBase>(argType))
+            {
+                isArgPointer = true;
+                argValType = argPtrType->getValueType();
+                argVal = builder->emitLoad(arg);
+            }
+
+            // Pack `arg` if the parameter expects AnyValue but
+            // `arg` is not an AnyValue.
+            if (as<IRAnyValueType>(paramValType) && !as<IRAnyValueType>(argValType))
+            {
+                auto packedArgVal = builder->emitPackAnyValue(paramValType, argVal);
+                // if parameter expects an `out` pointer, store the packed val into a
+                // variable and pass in a pointer to that variable.
+                if (as<IRPtrTypeBase>(paramType))
+                {
+                    auto tempVar = builder->emitVar(paramValType);
+                    builder->emitStore(tempVar, packedArgVal);
+                    // tempVar needs to be unpacked into original var after the call.
+                    unpackAfterCall.dstArg = arg;
+                    unpackAfterCall.packedArg = tempVar;
+                    return tempVar;
+                }
+                else
+                {
+                    return packedArgVal;
+                }
+            }
+            return arg;
+        }
+
+        IRInst* maybeUnpackValue(IRBuilder* builder, IRType* expectedType, IRType* actualType, IRInst* value)
+        {
+            if (as<IRAnyValueType>(actualType) && !as<IRAnyValueType>(expectedType))
+            {
+                auto unpack = builder->emitUnpackAnyValue(expectedType, value);
+                return unpack;
+            }
+            return value;
+        }
+
         // Translate `callInst` into a call of `newCallee`, and respect the new `funcType`.
-        // If `funcType` involve lowered generic parameters or return values, this function
-        // also translates the argument list to match with that.
         // If `newCallee` is a lowered generic function, `specializeInst` contains the type
         // arguments used to specialize the callee.
         void translateCallInst(
@@ -28,41 +103,21 @@ namespace Slang
             builder->sharedBuilder = &sharedContext->sharedBuilderStorage;
             builder->setInsertBefore(callInst);
 
+            // Process the argument list of the call.
+            // For each argument, we test if it needs to be packed into an `AnyValue` for the
+            // call. For `out` and `inout` parameters, they may also need to be unpacked after
+            // the call, in which case we add such the argument to `argsToUnpack` so it can be
+            // processed after the new call inst is emitted.
             List<IRInst*> args;
-
-            // Indicates whether the caller should allocate space for return value.
-            // If the lowered callee returns void and this call inst has a type that is not void,
-            // then we are calling a transformed function that expects caller allocated return value
-            // as the first argument.
-            bool shouldCallerAllocateReturnValue = (funcType->getResultType()->op == kIROp_VoidType &&
-                callInst->getDataType() != funcType->getResultType());
-
-            IRVar* retVarInst = nullptr;
-            int startParamIndex = 0;
-            if (shouldCallerAllocateReturnValue)
-            {
-                // Declare a var for the return value.
-                retVarInst = builder->emitVar(callInst->getFullType());
-                args.add(retVarInst);
-                startParamIndex = 1;
-            }
-
+            List<ArgumentUnpackWorkItem> argsToUnpack;
             for (UInt i = 0; i < callInst->getArgCount(); i++)
             {
                 auto arg = callInst->getArg(i);
-                if (as<IRRawPointerTypeBase>(paramTypes[i] + startParamIndex) &&
-                    !as<IRRawPointerTypeBase>(arg->getDataType()) &&
-                    !as<IRPtrTypeBase>(arg->getDataType()))
-                {
-                    // We are calling a generic function that with an argument of
-                    // some concrete value type. We need to convert this argument to void*.
-                    // We do so by defining a local variable, store the SSA value
-                    // in the variable, and use the pointer of this variable as argument.
-                    auto localVar = builder->emitVar(arg->getDataType());
-                    builder->emitStore(localVar, arg);
-                    arg = localVar;
-                }
-                args.add(arg);
+                ArgumentUnpackWorkItem unpackWorkItem = {};
+                auto newArg = maybePackArgument(builder, paramTypes[i], arg, unpackWorkItem);
+                args.add(newArg);
+                if (unpackWorkItem.packedArg)
+                    argsToUnpack.add(unpackWorkItem);
             }
             if (specializeInst)
             {
@@ -96,18 +151,23 @@ namespace Slang
                     args.add(arg);
                 }
             }
-            auto callInstType = retVarInst ? builder->getVoidType() : callInst->getFullType();
-            auto newCall = builder->emitCallInst(callInstType, newCallee, args);
-            if (retVarInst)
-            {
-                auto loadInst = builder->emitLoad(retVarInst);
-                callInst->replaceUsesWith(loadInst);
-            }
-            else
-            {
-                callInst->replaceUsesWith(newCall);
-            }
+
+            // If callee returns `AnyValue` but we are expecting a concrete value, unpack it.
+            auto calleeRetType = funcType->getResultType();
+            auto newCall = builder->emitCallInst(calleeRetType, newCallee, args);
+            auto callInstType = callInst->getDataType();
+            auto unpackInst = maybeUnpackValue(builder, callInstType, calleeRetType, newCall);
+            callInst->replaceUsesWith(unpackInst);
             callInst->removeAndDeallocate();
+
+            // Unpack other `out` arguments.
+            for (auto& item : argsToUnpack)
+            {
+                auto packedVal = builder->emitLoad(item.packedArg);
+                auto originalValType = cast<IRPtrTypeBase>(item.dstArg->getDataType())->getValueType();
+                auto unpackedVal = builder->emitUnpackAnyValue(originalValType, packedVal);
+                builder->emitStore(item.dstArg, unpackedVal);
+            }
         }
 
         void lowerCallToSpecializedFunc(IRCall* callInst, IRSpecialize* specializeInst)

@@ -242,7 +242,7 @@
     <ClInclude Include="slang-ir-link.h" />
     <ClInclude Include="slang-ir-lower-generic-call.h" />
     <ClInclude Include="slang-ir-lower-generic-function.h" />
-    <ClInclude Include="slang-ir-lower-generic-var.h" />
+    <ClInclude Include="slang-ir-lower-generic-type.h" />
     <ClInclude Include="slang-ir-lower-generics.h" />
     <ClInclude Include="slang-ir-missing-return.h" />
     <ClInclude Include="slang-ir-restructure-scoping.h" />
@@ -343,7 +343,7 @@
     <ClCompile Include="slang-ir-link.cpp" />
     <ClCompile Include="slang-ir-lower-generic-call.cpp" />
     <ClCompile Include="slang-ir-lower-generic-function.cpp" />
-    <ClCompile Include="slang-ir-lower-generic-var.cpp" />
+    <ClCompile Include="slang-ir-lower-generic-type.cpp" />
     <ClCompile Include="slang-ir-lower-generics.cpp" />
     <ClCompile Include="slang-ir-missing-return.cpp" />
     <ClCompile Include="slang-ir-restructure-scoping.cpp" />

@@ -5850,9 +5850,9 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
     {
         SLANG_ASSERT(decl->parentDecl != nullptr);
         ShortList<IRInterfaceType*> constraintInterfaces;
-        for (auto inheritanceDecl : decl->getMembersOfType<InheritanceDecl>())
+        for (auto constraintDecl : decl->getMembersOfType<GenericTypeConstraintDecl>())
         {
-            auto baseType = lowerType(context, inheritanceDecl->base.type);
+            auto baseType = lowerType(context, constraintDecl->sup.type);
             SLANG_ASSERT(baseType && baseType->op == kIROp_InterfaceType);
             constraintInterfaces.add((IRInterfaceType*)baseType);
         }

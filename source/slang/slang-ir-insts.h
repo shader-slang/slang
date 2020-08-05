@@ -480,6 +480,22 @@ struct IRCopy : IRInst
     IRInst* getSize() { return getOperand(2); }
 };
 
+/// Packs a value into an `AnyValue`.
+/// Return type is `IRAnyValueType`.
+struct IRPackAnyValue : IRInst
+{
+    IR_LEAF_ISA(PackAnyValue)
+    IRInst* getValue() { return getOperand(0); }
+};
+
+/// Unpacks a `AnyValue` value into a concrete type.
+/// Operand must have `IRAnyValueType`.
+struct IRUnpackAnyValue : IRInst
+{
+    IR_LEAF_ISA(UnpackAnyValue)
+    IRInst* getValue() { return getOperand(0); }
+};
+
 // Layout decorations
 
     /// A decoration that marks a field key as having been associated
@@ -1794,6 +1810,10 @@ struct IRBuilder
     IRInst* emitAlloca(IRInst* type, IRInst* rttiObjPtr);
 
     IRInst* emitCopy(IRInst* dst, IRInst* src, IRInst* rttiObjPtr);
+
+    IRInst* emitPackAnyValue(IRType* type, IRInst* value);
+
+    IRInst* emitUnpackAnyValue(IRType* type, IRInst* value);
 
     IRInst* emitCallInst(
         IRType*         type,
