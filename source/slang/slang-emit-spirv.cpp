@@ -563,8 +563,14 @@ struct SPIRVEmitContext
     // encode the string into multiple operand words.
 
         /// Emit an operand that is encoded as a literal string
-    void emitOperand(SpvInst* dst, UnownedStringSlice const& text)
+    void emitOperand(SpvInst* dstInst, UnownedStringSlice const& text)
     {
+        SLANG_UNUSED(dstInst);
+
+        // Assert that `text` doesn't contain any embedded nul bytes, since they
+        // could lead to invalid encoded results.
+        SLANG_ASSERT(text.indexOf(0) < 0);
+
         // [Section 2.2.1 : Instructions]
         //
         // > Literal String: A nul-terminated stream of characters consuming
@@ -576,16 +582,22 @@ struct SPIRVEmitContext
         // We start by emitting the contents of `text` in
         // 4-byte chunks.
         //
-        char const* cursor = text.begin();
-        char const* end = text.end();
-        while( (end - cursor) >= 4 )
-        {
-            SpvWord word;
-            memcpy(&word, cursor, 4);
-            emitOperand(dst, word);
-            cursor += 4;
-        }
-        //
+
+        const Int textCount = text.getLength();
+        // Calculate the minimum amount of bytes needed - which needs to include terminating 0
+        const Index minByteCount = textCount + 1;
+        // Calculate the amount of words needed padding if necessary
+        const Int wordCount = (minByteCount + 3) >> 2;
+
+        const Int operandStartIndex = m_operandStack.getCount();
+        // We must have at least one word (because we add 1 to at minimum 0)
+        m_operandStack.setCount(operandStartIndex + wordCount);
+
+        char* dst = (char*)(m_operandStack.getBuffer() + operandStartIndex);
+
+        // Copy the text
+        memcpy(dst, text.begin(), textCount);
+
         // > The final word contains the string’s nul-termination character (0), and
         // > all contents past the end of the string in the final word are padded with 0.
         //
@@ -593,15 +605,9 @@ struct SPIRVEmitContext
         // come from the remainder of the string (if
         // there is anything left), and the rest will
         // be left as zeros.
-        //
-        // TODO: This code should probably assert that `text`
-        // doesn't contain any embedded nul bytes, since they
-        // could lead to invalid encoded results.
-        //
-        SLANG_ASSERT((end - cursor) <= 3);
-        SpvWord lastWord = 0;
-        memcpy(&lastWord, cursor, (end - cursor));
-        emitOperand(dst, lastWord);
+
+        // Set terminating 0, and remaining buffer 0s
+        memset(dst + textCount, 0, wordCount * 4 - textCount);
     }
 
     // Sometimes we will want to pass down an argument that
