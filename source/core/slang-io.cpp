@@ -618,7 +618,7 @@ namespace Slang
                 continue;
             }
 
-            UnownedStringSlice filename(entry->name);
+            const UnownedStringSlice filename(entry->d_name);
 
             // Produce the full path, to do stat
             Path::combineIntoBuilder(directoryPath.getUnownedSlice(), filename, builder);
