@@ -18,9 +18,9 @@ namespace Slang
         struct ArgumentPackWorkItem
         {
             // A `AnyValue` typed destination.
-            IRInst* dstArg;
+            IRInst* dstArg = nullptr;
             // A concrete value to be packed.
-            IRInst* concreteArg;
+            IRInst* concreteArg = nullptr;
         };
 
         // Unpack an `arg` of `IRAnyValue` into concrete type if necessary, to make it feedable into the parameter.
@@ -138,7 +138,7 @@ namespace Slang
                 // the interface exposes an AnyValue type,
                 // we need to unpack the AnyValue argument to the appropriate
                 // concerete type.
-                ArgumentPackWorkItem packWorkItem = {};
+                ArgumentPackWorkItem packWorkItem;
                 auto newArg = maybeUnpackArg(builder, funcParamType, wrapperParam, packWorkItem);
                 args.add(newArg);
                 if (packWorkItem.concreteArg)

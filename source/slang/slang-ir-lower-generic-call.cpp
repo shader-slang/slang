@@ -12,9 +12,9 @@ namespace Slang
         struct ArgumentUnpackWorkItem
         {
             // Concrete typed destination.
-            IRInst* dstArg;
+            IRInst* dstArg = nullptr;
             // Packed argument.
-            IRInst* packedArg;
+            IRInst* packedArg = nullptr;
         };
 
         // Packs `arg` into a `IRAnyValue` if necessary, to make it feedable into the parameter.
@@ -113,7 +113,7 @@ namespace Slang
             for (UInt i = 0; i < callInst->getArgCount(); i++)
             {
                 auto arg = callInst->getArg(i);
-                ArgumentUnpackWorkItem unpackWorkItem = {};
+                ArgumentUnpackWorkItem unpackWorkItem;
                 auto newArg = maybePackArgument(builder, paramTypes[i], arg, unpackWorkItem);
                 args.add(newArg);
                 if (unpackWorkItem.packedArg)
