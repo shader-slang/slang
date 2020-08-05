@@ -1,5 +1,5 @@
-#ifndef SLANG_FIND_FILE_UTIL_H
-#define SLANG_FIND_FILE_UTIL_H
+#ifndef SLANG_DIRECTORY_UTIL_H
+#define SLANG_DIRECTORY_UTIL_H
 
 #include "../../source/core/slang-io.h"
 
@@ -31,23 +31,23 @@ protected:
     Slang::String m_directoryPath;
 };
 
-/* A helper class for holding results of a find. Allows for easy iteration via begin/end */
-class FindFileUtil
+/* A helper class for finding the contents of directories */
+class DirectoryUtil
 {
 public:
-    
         /// Enumerate subdirectories in the given `directoryPath`, storing in outPaths.
-        /// @return SLANG_OK or SLANG_E_NOT_FOUND if directory is not found.
-    static SlangResult findChildDirectories(const Slang::String& directoryPath, Slang::List<Slang::String>& outPaths);
+        /// @return SLANG_OK on success or SLANG_E_NOT_FOUND if directory is not found.
+    static SlangResult findDirectories(const Slang::String& directoryPath, Slang::List<Slang::String>& outPaths);
 
         /// Enumerate files in the given `directoryPath` that match the provided
         /// `pattern` as a simplified regex for files to return (e.g., "*.txt")
-        /// @return SLANG_OK or SLANG_E_NOT_FOUND if directory is not found.
-    static SlangResult findFilesInDirectoryMatchingPattern(const Slang::String& directoryPath, const char* pattern, Slang::List<Slang::String>& outPaths);
+        /// Note that the specifics of the pattern matching are *target specific*
+        /// @return SLANG_OK on success or SLANG_E_NOT_FOUND if directory is not found.
+    static SlangResult findFilesMatchingPattern(const Slang::String& directoryPath, const char* pattern, Slang::List<Slang::String>& outPaths);
 
         /// Enumerate files in the given `directoryPath`, storing in outPaths.
-        /// @return SLANG_OK or SLANG_E_NOT_FOUND if directory is not found.
-    static SlangResult findFilesInDirectory(const Slang::String& directoryPath, Slang::List<Slang::String>& outPaths);
+        /// @return SLANG_OK on success or SLANG_E_NOT_FOUND if directory is not found.
+    static SlangResult findFiles(const Slang::String& directoryPath, Slang::List<Slang::String>& outPaths);
 };
 
-#endif // SLANG_FIND_FILE_UTIL_H
+#endif // SLANG_DIRECTORY_UTIL_H

@@ -1,11 +1,11 @@
 // find-file-util.cpp
-#include "find-file-util.h"
+#include "directory-util.h"
 
 #include "slang-com-helper.h"
 
 using namespace Slang;
 
-/* static */SlangResult FindFileUtil::findChildDirectories(const Slang::String& directoryPath, Slang::List<Slang::String>& outPaths)
+/* static */SlangResult DirectoryUtil::findDirectories(const Slang::String& directoryPath, Slang::List<Slang::String>& outPaths)
 {
     outPaths.clear();
     CombinePathVisitor visitor(directoryPath, Path::TypeFlag::Directory);
@@ -14,7 +14,7 @@ using namespace Slang;
     return SLANG_OK;
 }
 
-/* static */SlangResult FindFileUtil::findFilesInDirectoryMatchingPattern(const Slang::String& directoryPath, const char* pattern, Slang::List<Slang::String>& outPaths)
+/* static */SlangResult DirectoryUtil::findFilesMatchingPattern(const Slang::String& directoryPath, const char* pattern, Slang::List<Slang::String>& outPaths)
 {
     outPaths.clear();
     CombinePathVisitor visitor(directoryPath, Path::TypeFlag::File);
@@ -23,7 +23,7 @@ using namespace Slang;
     return SLANG_OK;
 }
 
-/* static */SlangResult FindFileUtil::findFilesInDirectory(const Slang::String& directoryPath, Slang::List<Slang::String>& outPaths)
+/* static */SlangResult DirectoryUtil::findFiles(const Slang::String& directoryPath, Slang::List<Slang::String>& outPaths)
 {
-    return findFilesInDirectoryMatchingPattern(directoryPath, nullptr, outPaths);
+    return findFilesMatchingPattern(directoryPath, nullptr, outPaths);
 }
