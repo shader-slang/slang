@@ -427,23 +427,21 @@ struct SPIRVEmitContext
     // Operands can only be added when inside of a InstConstructScope 
     struct InstConstructScope
     {
-        SLANG_FORCE_INLINE operator SpvInst*() const { return m_inst; }
+        SLANG_FORCE_INLINE operator SpvInst*() const { return m_context->m_currentInst; }
 
         InstConstructScope(SPIRVEmitContext* context, SpvOp opcode, IRInst* irInst = nullptr):
             m_context(context),
             m_operandsStartIndex(context->m_operandStack.getCount()),
             m_previousInst(context->m_currentInst)
         {
-            m_inst = context->_beginInst(opcode, irInst);
+            m_context->_beginInst(opcode, irInst);
         }
         ~InstConstructScope()
         {
-            SLANG_ASSERT(m_context->m_currentInst == m_inst);
             m_context->_endInst(m_previousInst, m_operandsStartIndex);
         }
 
         SPIRVEmitContext* m_context;        ///< The context
-        SpvInst* m_inst;                    ///< The instruction these operands are associated with
         SpvInst* m_previousInst;            ///< The previously live inst
         Index m_operandsStartIndex;         ///< The start index for operands of m_inst
     };
@@ -456,7 +454,10 @@ struct SPIRVEmitContext
         /// If `irInst` is non-null, then the resulting SPIR-V instruction
         /// will be registered as corresponding to `irInst`.
         ///
-    SpvInst* _beginInst(SpvOp opcode, IRInst* irInst = nullptr)
+        /// The created instruction is stored in m_currentInst.
+        ///
+        /// Should not typically be called directly use InstConstructScope to scope construction
+    void _beginInst(SpvOp opcode, IRInst* irInst = nullptr)
     {
         // Allocate the instruction
 
@@ -467,11 +468,11 @@ struct SPIRVEmitContext
         {
             registerInst(irInst, spvInst);
         }
-
         m_currentInst = spvInst;
-        return spvInst;
     }
 
+        /// End emitting an instruction
+        /// Should not typically be called directly use InstConstructScope to scope construction
     void _endInst(SpvInst* previousInst, Index operandsStartIndex)
     {
         SLANG_ASSERT(m_currentInst);
@@ -491,7 +492,6 @@ struct SPIRVEmitContext
         // Reset the operand stack
         m_operandStack.setCount(operandsStartIndex);
     }
-
 
     /// Ensure that an instruction has been emitted
     SpvInst* ensureInst(IRInst* irInst)
