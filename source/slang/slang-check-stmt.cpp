@@ -288,4 +288,14 @@ namespace Slang
         stmt->expression = CheckExpr(stmt->expression);
     }
 
+    void SemanticsStmtVisitor::visitGpuForeachStmt(GpuForeachStmt*stmt)
+    {
+        stmt->renderer = CheckExpr(stmt->renderer);
+        stmt->gridDims = CheckExpr(stmt->gridDims);
+        ensureDeclBase(stmt->dispatchThreadID, DeclCheckState::Checked);
+        WithOuterStmt subContext(this, stmt);
+        stmt->kernelCall = subContext.CheckExpr(stmt->kernelCall);
+        return;
+    }
+
 }

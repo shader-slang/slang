@@ -4114,6 +4114,13 @@ struct StmtLoweringVisitor : StmtVisitor<StmtLoweringVisitor>
         insertBlock(breakLabel);
     }
 
+    void visitGpuForeachStmt(GpuForeachStmt* stmt)
+    {
+        auto builder = getBuilder();
+        startBlockIfNeeded(stmt);
+        return;
+    }
+
     void visitExpressionStmt(ExpressionStmt* stmt)
     {
         startBlockIfNeeded(stmt);
