@@ -4344,13 +4344,135 @@ namespace Slang
                 }
                 else
                 {
+                    // The above branch catches the case where we have a cast like (Thing), but with
+                    // the scoping operator it will not handle (SomeScope::Thing). In that case this
+                    // branch will be taken. This is okay in so far as SomeScope::Thing will parse
+                    // as an expression.
+                    
                     Expr* base = parser->ParseExpression();
+
                     parser->ReadToken(TokenType::RParent);
 
-                    ParenExpr* parenExpr = parser->astBuilder->create<ParenExpr>();
-                    parenExpr->loc = openParen.loc;
-                    parenExpr->base = base;
-                    return parenExpr;
+                    // The problem now is we need to determine if this is a cast or not
+                    // We can't just look at base and look up if it's a type, because we allow
+                    // out-of-order declarations. So to a first approximation we'll try and
+                    // determine if it is a cast via a heuristic based on what comes next
+
+                    TokenType tokenType = peekTokenType(parser);
+
+                    // :: 
+
+                    // Expression
+                    // ==========
+                    //
+                    // Misc: ; ) [ ] , . = ? (ternary) { } ++ -- -> 
+                    // Binary ops: * / | & ^ % << >> 
+                    // Logical ops: || &&  
+                    // Comparisons: != == < > <= =>
+                    //
+                    // Any assign op
+                    // 
+                    // If we don't have pointers then
+                    // & : (Thing::Another) &v 
+                    // * : (Thing::Another)*ptr is a cast.
+                    //
+                    // Cast
+                    // ====
+                    //
+                    // Misc: (
+                    // Identifier, Literal
+                    // Unary ops: !, ~
+                    // 
+                    // Ambiguous
+                    // =========
+                    //
+                    // - : Can be unary and therefore a cast or a binary subtract, and therefore an expression
+                    // + : Can be unary and therefore could be a cast, or a binary add and therefore an expression
+                    //
+                    // Arbitrary
+                    // =========
+                    //
+                    // End of file, End of directive, Invalid, |, :, ::
+
+                    bool isCast = false;
+
+                    switch (tokenType)
+                    {
+                        case TokenType::LParent:
+                        case TokenType::FloatingPointLiteral:
+                        case TokenType::CharLiteral:
+                        case TokenType::IntegerLiteral:
+                        case TokenType::Identifier:
+                        case TokenType::OpNot:
+                        case TokenType::OpBitNot:
+                        {
+                            isCast = true;
+                            break;
+                        }
+                        case TokenType::OpAdd:
+                        case TokenType::OpSub:
+                        {
+                            // The problem here is we can have
+                            // (Some::Stuff) + 3
+                            // (Some::Stuff) - 3
+                            // Strictly I can only tell if this is an expression or a cast if I know Some::Stuff is a type or not
+                            // but we can't know here in general because we allow out-of-order declarations, so could in general be either
+                            //
+                            // We could do a lookup here, and if the type is defined use that, but that means the semantics change depending on
+                            // the order of definition.
+                            //
+                            // So for now we use a heuristic. If there is no white space between the + or - and what follows
+                            // we will assume they are unary ops, and therefore this is a cast.
+                            // Otherwise we assume they are binary ops.
+                            //
+                            // Ie:
+                            // (Some::Stuff) +3  - must be a cast
+                            // (Some::Stuff) + 3 - must be an expression.
+
+                            {
+                                TokenReader::ParsingCursor cursor = parser->tokenReader.getCursor();
+                                // Skip the + or -
+                                advanceToken(parser);
+                                // Peek the next token to see if it was preceeded by white space
+                                const Token nextToken = peekToken(parser);
+
+                                // If there isn't any whitespace prior, we assume unary, and that means it must be a cast
+                                isCast = ((nextToken.flags & TokenFlag::AfterWhitespace) == 0);
+
+                                // Rewind
+                                parser->tokenReader.setCursor(cursor);
+                            }
+
+                            break;
+                        }
+                        default: break;
+                    }
+
+                    // Try and determine if it's a cast or not
+
+                    if (isCast)
+                    {
+                        // Parse as a cast
+
+                        TypeCastExpr* tcexpr = parser->astBuilder->create<ExplicitCastExpr>();
+                        tcexpr->loc = openParen.loc;
+
+                        tcexpr->functionExpr = base;
+
+                        auto arg = parsePrefixExpr(parser);
+                        tcexpr->arguments.add(arg);
+
+                        return tcexpr;
+                    }
+                    else
+                    {
+                        // Pass as an expression in parentheses
+
+                        ParenExpr* parenExpr = parser->astBuilder->create<ParenExpr>();
+                        parenExpr->loc = openParen.loc;
+                        parenExpr->base = base;
+                        return parenExpr;
+                    }
                 }
             }
 
