@@ -4360,8 +4360,6 @@ namespace Slang
 
                     TokenType tokenType = peekTokenType(parser);
 
-                    // :: 
-
                     // Expression
                     // ==========
                     //
@@ -4392,9 +4390,9 @@ namespace Slang
                     // Arbitrary
                     // =========
                     //
-                    // End of file, End of directive, Invalid, |, :, ::
+                    // End of file, End of directive, Invalid, :, ::
 
-                    // Assume it's not a cast
+                    // First assume it's not a cast
                     bool isCast = false;
 
                     switch (tokenType)
@@ -4407,17 +4405,20 @@ namespace Slang
                         case TokenType::OpNot:
                         case TokenType::OpBitNot:
                         {
+                            // If followed by one of these, must be a cast
                             isCast = true;
                             break;
                         }
                         case TokenType::OpAdd:
                         case TokenType::OpSub:
                         {
-                            // The problem here is we can have
+                            // + - are ambiguous, it could be a binary + or - so -> expression, or unary -> cast
+                            // 
+                            //
                             // (Some::Stuff) + 3
                             // (Some::Stuff) - 3
                             // Strictly I can only tell if this is an expression or a cast if I know Some::Stuff is a type or not
-                            // but we can't know here in general because we allow out-of-order declarations, so could in general be either
+                            // but we can't know here in general because we allow out-of-order declarations.
                             //
                             // We could do a lookup here, and if the type is defined use that, but that means the semantics change depending on
                             // the order of definition.
@@ -4435,6 +4436,8 @@ namespace Slang
                             // But perhaps there other ways of referring to types, that this now misses? With associated types/generics perhaps.
                             // 
                             // For now we'll assume it's not a cast if it's not a StaticMemberExpr
+                            // The reason for the restriction (which perhaps can be broadened), is we don't
+                            // want the interpretation of something in parentheses to be determined by something as common as + or - whitespace.
 
                             if (auto staticMemberExpr = dynamicCast<StaticMemberExpr>(base))
                             {
