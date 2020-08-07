@@ -495,6 +495,7 @@ DIAGNOSTIC(41000, Warning, unreachableCode, "unreachable code detected")
 
 DIAGNOSTIC(41010, Warning, missingReturn, "control flow may reach end of non-'void' function")
 
+DIAGNOSTIC(41011, Error, typeDoesNotFitAnyValueSize, "type '$0' does not fit in the size required by its conforming interface.")
 //
 // 5xxxx - Target code generation.
 //

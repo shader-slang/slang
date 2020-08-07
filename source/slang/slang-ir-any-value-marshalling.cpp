@@ -85,6 +85,19 @@ namespace Slang
             IRInst* anyValueVar;
             // Defines what to do with basic typed data elements.
             virtual void marshalBasicType(IRBuilder* builder, IRType* dataType, IRInst* concreteTypedVar) = 0;
+
+            // Validates that the type fits in the given AnyValueSize.
+            // After calling emitMarshallingCode, `fieldOffset` will be increased to the required `AnyValue` size.
+            // If this is larger than the provided AnyValue size, report a dianogstic. We might want to front load
+            // this in a separate IR validation pass in the future, but this is the easiest way to report the
+            // diagnostic now.
+            void validateAnyTypeSize(DiagnosticSink* sink, IRType* concreteType)
+            {
+                if (fieldOffset > anyValInfo->fieldKeys.getCount())
+                {
+                    sink->diagnose(concreteType->sourceLoc, Diagnostics::typeDoesNotFitAnyValueSize, concreteType);
+                }
+            }
         };
 
         void emitMarshallingCode(
@@ -188,24 +201,30 @@ namespace Slang
                 case kIROp_IntType:
                 case kIROp_FloatType:
                 {
-                    auto srcVal = builder->emitLoad(concreteVar);
-                    auto dstVal = builder->emitBitCast(builder->getUIntType(), srcVal);
-                    auto dstAddr = builder->emitFieldAddress(
-                        uintPtrType,
-                        anyValueVar,
-                        anyValInfo->fieldKeys[fieldOffset]);
-                    builder->emitStore(dstAddr, dstVal);
+                    if (fieldOffset < anyValInfo->fieldKeys.getCount())
+                    {
+                        auto srcVal = builder->emitLoad(concreteVar);
+                        auto dstVal = builder->emitBitCast(builder->getUIntType(), srcVal);
+                        auto dstAddr = builder->emitFieldAddress(
+                            uintPtrType,
+                            anyValueVar,
+                            anyValInfo->fieldKeys[fieldOffset]);
+                        builder->emitStore(dstAddr, dstVal);
+                    }
                     fieldOffset++;
                     break;
                 }
                 case kIROp_UIntType:
                 {
-                    auto srcVal = builder->emitLoad(concreteVar);
-                    auto dstAddr = builder->emitFieldAddress(
-                        uintPtrType,
-                        anyValueVar,
-                        anyValInfo->fieldKeys[fieldOffset]);
-                    builder->emitStore(dstAddr, srcVal);
+                    if (fieldOffset < anyValInfo->fieldKeys.getCount())
+                    {
+                        auto srcVal = builder->emitLoad(concreteVar);
+                        auto dstAddr = builder->emitFieldAddress(
+                            uintPtrType,
+                            anyValueVar,
+                            anyValInfo->fieldKeys[fieldOffset]);
+                        builder->emitStore(dstAddr, srcVal);
+                    }
                     fieldOffset++;
                     break;
                 }
@@ -259,6 +278,7 @@ namespace Slang
             context.uintPtrType = builder.getPtrType(builder.getUIntType());
             context.anyValueVar = resultVar;
             emitMarshallingCode(&builder, &context, concreteTypedVar);
+            context.validateAnyTypeSize(sharedContext->sink, type);
             auto load = builder.emitLoad(resultVar);
             builder.emitReturn(load);
             return func;
@@ -273,24 +293,30 @@ namespace Slang
                 case kIROp_IntType:
                 case kIROp_FloatType:
                 {
-                    auto srcAddr = builder->emitFieldAddress(
-                        uintPtrType,
-                        anyValueVar,
-                        anyValInfo->fieldKeys[fieldOffset]);
-                    auto srcVal = builder->emitLoad(srcAddr);
-                    srcVal = builder->emitBitCast(dataType, srcVal);
-                    builder->emitStore(concreteVar, srcVal);
+                    if (fieldOffset < anyValInfo->fieldKeys.getCount())
+                    {
+                        auto srcAddr = builder->emitFieldAddress(
+                            uintPtrType,
+                            anyValueVar,
+                            anyValInfo->fieldKeys[fieldOffset]);
+                        auto srcVal = builder->emitLoad(srcAddr);
+                        srcVal = builder->emitBitCast(dataType, srcVal);
+                        builder->emitStore(concreteVar, srcVal);
+                    }
                     fieldOffset++;
                     break;
                 }
                 case kIROp_UIntType:
                 {
-                    auto srcAddr = builder->emitFieldAddress(
-                        uintPtrType,
-                        anyValueVar,
-                        anyValInfo->fieldKeys[fieldOffset]);
-                    auto srcVal = builder->emitLoad(srcAddr);
-                    builder->emitStore(concreteVar, srcVal);
+                    if (fieldOffset < anyValInfo->fieldKeys.getCount())
+                    {
+                        auto srcAddr = builder->emitFieldAddress(
+                            uintPtrType,
+                            anyValueVar,
+                            anyValInfo->fieldKeys[fieldOffset]);
+                        auto srcVal = builder->emitLoad(srcAddr);
+                        builder->emitStore(concreteVar, srcVal);
+                    }
                     fieldOffset++;
                     break;
                 }
