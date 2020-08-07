@@ -93,7 +93,7 @@ namespace Slang
             // diagnostic now.
             void validateAnyTypeSize(DiagnosticSink* sink, IRType* concreteType)
             {
-                if (fieldOffset > anyValInfo->fieldKeys.getCount())
+                if (fieldOffset > static_cast<uint32_t>(anyValInfo->fieldKeys.getCount()))
                 {
                     sink->diagnose(concreteType->sourceLoc, Diagnostics::typeDoesNotFitAnyValueSize, concreteType);
                 }
@@ -201,7 +201,7 @@ namespace Slang
                 case kIROp_IntType:
                 case kIROp_FloatType:
                 {
-                    if (fieldOffset < anyValInfo->fieldKeys.getCount())
+                    if (fieldOffset < static_cast<uint32_t>(anyValInfo->fieldKeys.getCount()))
                     {
                         auto srcVal = builder->emitLoad(concreteVar);
                         auto dstVal = builder->emitBitCast(builder->getUIntType(), srcVal);
@@ -216,7 +216,7 @@ namespace Slang
                 }
                 case kIROp_UIntType:
                 {
-                    if (fieldOffset < anyValInfo->fieldKeys.getCount())
+                    if (fieldOffset < static_cast<uint32_t>(anyValInfo->fieldKeys.getCount()))
                     {
                         auto srcVal = builder->emitLoad(concreteVar);
                         auto dstAddr = builder->emitFieldAddress(
@@ -293,7 +293,7 @@ namespace Slang
                 case kIROp_IntType:
                 case kIROp_FloatType:
                 {
-                    if (fieldOffset < anyValInfo->fieldKeys.getCount())
+                    if (fieldOffset < static_cast<uint32_t>(anyValInfo->fieldKeys.getCount()))
                     {
                         auto srcAddr = builder->emitFieldAddress(
                             uintPtrType,
@@ -308,7 +308,7 @@ namespace Slang
                 }
                 case kIROp_UIntType:
                 {
-                    if (fieldOffset < anyValInfo->fieldKeys.getCount())
+                    if (fieldOffset < static_cast<uint32_t>(anyValInfo->fieldKeys.getCount()))
                     {
                         auto srcAddr = builder->emitFieldAddress(
                             uintPtrType,
