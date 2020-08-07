@@ -4394,6 +4394,7 @@ namespace Slang
                     //
                     // End of file, End of directive, Invalid, |, :, ::
 
+                    // Assume it's not a cast
                     bool isCast = false;
 
                     switch (tokenType)
@@ -4429,11 +4430,20 @@ namespace Slang
                             // (Some::Stuff) +3  - must be a cast
                             // (Some::Stuff) + 3 - must be an expression.
 
+                            // TODO(JS): This covers the (identifier) and (SomeScope::Identifier) case
+                            //
+                            // But perhaps there other ways of referring to types, that this now misses? With associated types/generics perhaps.
+                            // 
+                            // For now we'll assume it's not a cast if it's not a StaticMemberExpr
+
+                            if (auto staticMemberExpr = dynamicCast<StaticMemberExpr>(base))
                             {
+                                // Here's the heuristic .. this works but arguably is not good enough.
+
                                 TokenReader::ParsingCursor cursor = parser->tokenReader.getCursor();
                                 // Skip the + or -
                                 advanceToken(parser);
-                                // Peek the next token to see if it was preceeded by white space
+                                // Peek the next token to see if it was preceded by white space
                                 const Token nextToken = peekToken(parser);
 
                                 // If there isn't any whitespace prior, we assume unary, and that means it must be a cast
@@ -4448,8 +4458,7 @@ namespace Slang
                         default: break;
                     }
 
-                    // Try and determine if it's a cast or not
-
+                    // If it's a cast, we make an explicit cast, else it's an expression in parentheses
                     if (isCast)
                     {
                         // Parse as a cast
