@@ -2222,6 +2222,11 @@ namespace Slang
         return (IRBasicType*)getType(kIROp_IntType);
     }
 
+    IRBasicType* IRBuilder::getUIntType()
+    {
+        return (IRBasicType*)getType(kIROp_UIntType);
+    }
+
     IRStringType* IRBuilder::getStringType()
     {
         return (IRStringType*)getType(kIROp_StringType);

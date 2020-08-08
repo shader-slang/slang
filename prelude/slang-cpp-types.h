@@ -41,6 +41,7 @@ struct Array
     size_t count;
 };
 
+#if 0
 template<size_t N>
 struct AnyValue
 {
@@ -60,6 +61,7 @@ T unpackAnyValue(const AnyValue<N>& val)
     memcpy(&result, &val, sizeof(T));
     return result;
 }
+#endif
 
 /* Constant buffers become a pointer to the contained type, so ConstantBuffer<T> becomes T* in C++ code.
 */

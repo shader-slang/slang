@@ -1,6 +1,7 @@
 // slang-ir-lower-generics.cpp
 #include "slang-ir-lower-generics.h"
 
+#include "slang-ir-any-value-marshalling.h"
 #include "slang-ir-generics-lowering-context.h"
 #include "slang-ir-lower-generic-function.h"
 #include "slang-ir-lower-generic-call.h"
@@ -22,10 +23,11 @@ namespace Slang
         lowerGenericFunctions(&sharedContext);
         lowerGenericType(&sharedContext);
         lowerGenericCalls(&sharedContext);
+        generateWitnessTableWrapperFunctions(&sharedContext);
+        generateAnyValueMarshallingFunctions(&sharedContext);
         // We might have generated new temporary variables during lowering.
         // An SSA pass can clean up unnecessary load/stores.
         constructSSA(module);
         eliminateDeadCode(module);
-        generateWitnessTableWrapperFunctions(&sharedContext);
     }
 } // namespace Slang
