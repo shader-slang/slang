@@ -3396,27 +3396,27 @@ namespace Slang
             {
                 return nullptr;
             }
-            AggTypeDecl* aggTypeDecl = as<AggTypeDecl>(baseTypeDecl);
-            if (!aggTypeDecl)
+            if (AggTypeDecl* aggTypeDecl = as<AggTypeDecl>(baseTypeDecl))
             {
-                return nullptr;
-            }
+                // TODO(JS):
+                // Is it valid to always have empty substitution set here?
+                DeclRef<ContainerDecl> declRef(aggTypeDecl, SubstitutionSet());
 
-            // Search all the members
-            for (Decl* member : aggTypeDecl->members)
-            {
-                auto name = member->getName();
+                auto lookupResult = lookUpDirectAndTransparentMembers(
+                     parser->astBuilder,
+                     nullptr, // no semantics visitor available yet
+                     staticMemberExpr->name,
+                     declRef);
 
-                if (name == staticMemberExpr->name)
+                if (!lookupResult.isValid() || lookupResult.isOverloaded())
+                    return nullptr;
+
+                Decl* decl = lookupResult.item.declRef.getDecl();
+                if (_isType(decl))
                 {
-                    if (_isType(member))
-                    {
-                        return member;
-                    }
+                    return decl;
                 }
             }
-
-            // TODO(JS): If we have inheritance, we'll need to go search the parent too
 
             // Didn't find it
             return nullptr;
@@ -4361,6 +4361,130 @@ namespace Slang
         return value;
     }
 
+    static bool _isCast(Parser* parser, Expr* expr)
+    {
+
+        // We can't just look at expr and look up if it's a type, because we allow
+        // out-of-order declarations. So to a first approximation we'll try and
+        // determine if it is a cast via a heuristic based on what comes next
+
+        TokenType tokenType = peekTokenType(parser);
+
+        // Expression
+        // ==========
+        //
+        // Misc: ; ) [ ] , . = ? (ternary) { } ++ -- -> 
+        // Binary ops: * / | & ^ % << >> 
+        // Logical ops: || &&  
+        // Comparisons: != == < > <= =>
+        //
+        // Any assign op
+        // 
+        // If we don't have pointers then
+        // & : (Thing::Another) &v 
+        // * : (Thing::Another)*ptr is a cast.
+        //
+        // Cast
+        // ====
+        //
+        // Misc: (
+        // Identifier, Literal
+        // Unary ops: !, ~
+        // 
+        // Ambiguous
+        // =========
+        //
+        // - : Can be unary and therefore a cast or a binary subtract, and therefore an expression
+        // + : Can be unary and therefore could be a cast, or a binary add and therefore an expression
+        //
+        // Arbitrary
+        // =========
+        //
+        // End of file, End of directive, Invalid, :, ::
+
+        switch (tokenType)
+        {
+            case TokenType::FloatingPointLiteral:
+            case TokenType::CharLiteral:
+            case TokenType::IntegerLiteral:
+            case TokenType::Identifier:
+            case TokenType::OpNot:
+            case TokenType::OpBitNot:
+            {
+                // If followed by one of these, must be a cast
+                return true;
+            }
+            case TokenType::LParent:
+            {
+                // If we are followed by ( it might not be a cast - it could be a method invocation.
+                //
+                // It's hard to know what a heuristic would look like here to try and disambiguate (as we do for + and -)
+                // so this *only* works if the type is defined before the cast.
+                
+                return (_tryResolveTypeDecl(parser, expr) != nullptr);
+            }
+            case TokenType::OpAdd:
+            case TokenType::OpSub:
+            {
+                // + - are ambiguous, it could be a binary + or - so -> expression, or unary -> cast
+                //
+                // (Some::Stuff) + 3
+                // (Some::Stuff) - 3
+                // Strictly I can only tell if this is an expression or a cast if I know Some::Stuff is a type or not
+                // but we can't know here in general because we allow out-of-order declarations.
+
+                // If we can determine it's a type, then it must be a cast, and we are done.
+                // 
+                // NOTE! This test can only determine if it's a type *iff* it has already been defined. A future out
+                // of order declaration, will not be correctly found here.
+                //
+                // This means the semantics change depending on the order of definition (!) 
+                if (_tryResolveTypeDecl(parser, expr))
+                {
+                    return true;
+                }
+
+                // Now we use a heuristic. If there is no white space between the + or - and what follows
+                // we will assume they are unary ops, and therefore this is a cast.
+                // Otherwise we assume they are binary ops.
+                //
+                // Ie:
+                // (Some::Stuff) +3  - must be a cast
+                // (Some::Stuff) + 3 - must be an expression.
+
+                // TODO(JS): This covers the (SomeScope::Identifier) case
+                //
+                // But perhaps there other ways of referring to types, that this now misses? With associated types/generics perhaps.
+                // 
+                // For now we'll assume it's not a cast if it's not a StaticMemberExpr
+                // The reason for the restriction (which perhaps can be broadened), is we don't
+                // want the interpretation of something in parentheses to be determined by something as common as + or - whitespace.
+
+                if (auto staticMemberExpr = dynamicCast<StaticMemberExpr>(expr))
+                {
+                    // Apply the heuristic
+
+                    TokenReader::ParsingCursor cursor = parser->tokenReader.getCursor();
+                    // Skip the + or -
+                    advanceToken(parser);
+                    // Peek the next token to see if it was preceded by white space
+                    const Token nextToken = peekToken(parser);
+
+                    // Rewind
+                    parser->tokenReader.setCursor(cursor);
+
+                    // If there isn't any whitespace prior, we assume unary, and that means it must be a cast
+                    return ((nextToken.flags & TokenFlag::AfterWhitespace) == 0);
+                }
+                break;
+            }
+            default: break;
+        }
+
+        // We'll assume it's not a cast
+        return false;
+    }
+
     static Expr* parseAtomicExpr(Parser* parser)
     {
         switch( peekTokenType(parser) )
@@ -4371,7 +4495,7 @@ namespace Slang
             return nullptr;
 
         // Either:
-        // - parenthized expression `(exp)`
+        // - parenthesized expression `(exp)`
         // - cast `(type) exp`
         //
         // Proper disambiguation requires mixing up parsing
@@ -4404,129 +4528,8 @@ namespace Slang
 
                     parser->ReadToken(TokenType::RParent);
 
-                    // The problem now is we need to determine if this is a cast or not
-                    // We can't just look at base and look up if it's a type, because we allow
-                    // out-of-order declarations. So to a first approximation we'll try and
-                    // determine if it is a cast via a heuristic based on what comes next
-
-                    TokenType tokenType = peekTokenType(parser);
-
-                    // Expression
-                    // ==========
-                    //
-                    // Misc: ; ) [ ] , . = ? (ternary) { } ++ -- -> 
-                    // Binary ops: * / | & ^ % << >> 
-                    // Logical ops: || &&  
-                    // Comparisons: != == < > <= =>
-                    //
-                    // Any assign op
-                    // 
-                    // If we don't have pointers then
-                    // & : (Thing::Another) &v 
-                    // * : (Thing::Another)*ptr is a cast.
-                    //
-                    // Cast
-                    // ====
-                    //
-                    // Misc: (
-                    // Identifier, Literal
-                    // Unary ops: !, ~
-                    // 
-                    // Ambiguous
-                    // =========
-                    //
-                    // - : Can be unary and therefore a cast or a binary subtract, and therefore an expression
-                    // + : Can be unary and therefore could be a cast, or a binary add and therefore an expression
-                    //
-                    // Arbitrary
-                    // =========
-                    //
-                    // End of file, End of directive, Invalid, :, ::
-
-                    // First assume it's not a cast
-                    bool isCast = false;
-
-                    switch (tokenType)
-                    {
-                        case TokenType::FloatingPointLiteral:
-                        case TokenType::CharLiteral:
-                        case TokenType::IntegerLiteral:
-                        case TokenType::Identifier:
-                        case TokenType::OpNot:
-                        case TokenType::OpBitNot:
-                        {
-                            // If followed by one of these, must be a cast
-                            isCast = true;
-                            break;
-                        }
-                        case TokenType::LParent:
-                        {
-                            // If we are followed by ( it might not be a cast - it could be a method invocation.
-                            isCast = (_tryResolveTypeDecl(parser, base) != nullptr);
-                            break;
-                        }
-                        case TokenType::OpAdd:
-                        case TokenType::OpSub:
-                        {
-                            // + - are ambiguous, it could be a binary + or - so -> expression, or unary -> cast
-                            //
-                            // (Some::Stuff) + 3
-                            // (Some::Stuff) - 3
-                            // Strictly I can only tell if this is an expression or a cast if I know Some::Stuff is a type or not
-                            // but we can't know here in general because we allow out-of-order declarations.
-
-                            // If we can determine it's a type, then it must be a cast, and we are done.
-                            // 
-                            // NOTE! This test can only determine if it's a type *iff* it has already been defined. A future out
-                            // of order declaration, will not be correctly found here.
-                            //
-                            // This means the semantics change depending on the order of definition (!) 
-                            if (_tryResolveTypeDecl(parser, base))
-                            {
-                                isCast = true;
-                                break;
-                            }
-
-                            // Now we use a heuristic. If there is no white space between the + or - and what follows
-                            // we will assume they are unary ops, and therefore this is a cast.
-                            // Otherwise we assume they are binary ops.
-                            //
-                            // Ie:
-                            // (Some::Stuff) +3  - must be a cast
-                            // (Some::Stuff) + 3 - must be an expression.
-
-                            // TODO(JS): This covers the (identifier) and (SomeScope::Identifier) case
-                            //
-                            // But perhaps there other ways of referring to types, that this now misses? With associated types/generics perhaps.
-                            // 
-                            // For now we'll assume it's not a cast if it's not a StaticMemberExpr
-                            // The reason for the restriction (which perhaps can be broadened), is we don't
-                            // want the interpretation of something in parentheses to be determined by something as common as + or - whitespace.
-
-                            if (auto staticMemberExpr = dynamicCast<StaticMemberExpr>(base))
-                            {
-                                // Here's the heuristic .. this works but arguably is not good enough.
-
-                                TokenReader::ParsingCursor cursor = parser->tokenReader.getCursor();
-                                // Skip the + or -
-                                advanceToken(parser);
-                                // Peek the next token to see if it was preceded by white space
-                                const Token nextToken = peekToken(parser);
-
-                                // If there isn't any whitespace prior, we assume unary, and that means it must be a cast
-                                isCast = ((nextToken.flags & TokenFlag::AfterWhitespace) == 0);
-
-                                // Rewind
-                                parser->tokenReader.setCursor(cursor);
-                            }
-
-                            break;
-                        }
-                        default: break;
-                    }
-
                     // If it's a cast, we make an explicit cast, else it's an expression in parentheses
-                    if (isCast)
+                    if (_isCast(parser, base))
                     {
                         // Parse as a cast
 
