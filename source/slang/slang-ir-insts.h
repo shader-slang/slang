@@ -1693,6 +1693,7 @@ struct IRBuilder
     IRBasicType* getVoidType();
     IRBasicType* getBoolType();
     IRBasicType* getIntType();
+    IRBasicType* getUIntType();
     IRStringType* getStringType();
     IRAssociatedType* getAssociatedType(ArrayView<IRInterfaceType*> constraintTypes);
     IRThisType* getThisType(IRInterfaceType* interfaceType);
