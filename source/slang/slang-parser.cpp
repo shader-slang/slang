@@ -773,6 +773,15 @@ namespace Slang
         return parser->tokenReader.peekTokenType();
     }
 
+        /// Peek the token `offset` tokens after the cursor
+    static TokenType peekTokenType(Parser* parser, int offset)
+    {
+        TokenReader r = parser->tokenReader;
+        for (int ii = 0; ii < offset; ++ii)
+            r.advanceToken();
+        return r.peekTokenType();
+    }
+
     static Token advanceToken(Parser* parser)
     {
         return parser->ReadToken();
@@ -2746,17 +2755,79 @@ namespace Slang
         return parser->ReadToken(tokenType).type == tokenType;
     }
 
+        /// Peek in the token stream and return `true` if it looks like a modern-style variable declaration is coming up.
+    static bool _peekModernStyleVarDecl(Parser* parser)
+    {
+        // A modern-style variable declaration always starts with an identifier
+        if(peekTokenType(parser) != TokenType::Identifier)
+            return false;
+
+        switch(peekTokenType(parser, 1))
+        {
+        default:
+            return false;
+
+        case TokenType::Colon:
+        case TokenType::Comma:
+        case TokenType::RParent:
+        case TokenType::RBrace:
+        case TokenType::RBracket:
+        case TokenType::LBrace:
+            return true;
+        }
+    }
+
     static NodeBase* ParsePropertyDecl(Parser* parser, void* /*userData*/)
     {
         PropertyDecl* decl = parser->astBuilder->create<PropertyDecl>();
         parser->FillPosition(decl);
         parser->PushScope(decl);
 
-        decl->nameAndLoc = expectIdentifier(parser);
-
-        if( expect(parser, TokenType::Colon) )
+        // We want to support property declarations with two
+        // different syntaxes.
+        //
+        // First, we want to support a syntax that is consistent
+        // with C-style ("traditional") variable declarations:
+        //
+        //                int myVar = 2;
+        //      proprerty int myProp { ... }
+        //
+        // Second we want to support a syntax that is
+        // consistent with `let` and `var` declarations:
+        //
+        //      let      myVar  : int = 2;
+        //      property myProp : int { ... }
+        //
+        // The latter case is more constrained, and we will
+        // detect with two tokens of lookahead. If the 
+        // next token (after `property`) is an identifier,
+        // and the token after that is a colon (`:`), then
+        // we assume we are in the `let`/`var`-style case.
+        //
+        if(_peekModernStyleVarDecl(parser))
         {
+            decl->nameAndLoc = expectIdentifier(parser);
+            expect(parser, TokenType::Colon);
             decl->type = parser->ParseTypeExp();
+        }
+        else
+        {
+            // The traditional syntax requires a bit more
+            // care to parse, since it needs to support
+            // C declarator syntax.
+            //
+            DeclaratorInfo declaratorInfo;
+            declaratorInfo.typeSpec = parser->ParseType();
+
+            auto declarator = parseDeclarator(parser, kDeclaratorParseOptions_None);
+            UnwrapDeclarator(parser->astBuilder, declarator, &declaratorInfo);
+
+            // TODO: We might want to handle the case where the
+            // resulting declarator is not valid to use for
+            // declaring a property (e.g., it has function parameters).
+
+            decl->nameAndLoc = declaratorInfo.nameAndLoc;
+            decl->type = TypeExp(declaratorInfo.typeSpec);
         }
 
         parseStorageDeclBody(parser, decl);
@@ -2807,21 +2878,50 @@ namespace Slang
         return decl;
     }
 
+        /// Parse the common structured of a traditional-style parameter declaration (excluding the trailing semicolon)
+    static void _parseTraditionalParamDeclCommonBase(Parser* parser, VarDeclBase* decl, DeclaratorParseOptions options = kDeclaratorParseOptions_None)
+    {
+        DeclaratorInfo declaratorInfo;
+        declaratorInfo.typeSpec = parser->ParseType();
+
+        InitDeclarator initDeclarator = parseInitDeclarator(parser, options);
+        UnwrapDeclarator(parser->astBuilder, initDeclarator, &declaratorInfo);
+
+        // Assume it is a variable-like declarator
+        CompleteVarDecl(parser, decl, declaratorInfo);
+    }
+
     static ParamDecl* parseModernParamDecl(
         Parser* parser)
     {
-        ParamDecl* decl = parser->astBuilder->create<ParamDecl>();
+        // TODO: For "modern" parameters, we should probably
+        // not allow arbitrary keyword-based modifiers (only allowing
+        // `[attribute]`s), and should require that direction modifiers
+        // like `in`, `out`, and `in out`/`inout` be applied to the
+        // type (after the colon).
+        //
+        auto modifiers = ParseModifiers(parser);
 
-        // TODO: "modern" parameters should not accept keyword-based
-        // modifiers and should only accept `[attribute]` syntax for
-        // modifiers to keep the grammar as simple as possible.
+        // We want to allow both "modern"-style and traditional-style
+        // parameters to appear in any modern-style parameter list,
+        // in order to allow programmers the flexibility to code in
+        // a way that feels natural and not run into lots of
+        // errors.
         //
-        // Further, they should accept `out` and `in out`/`inout`
-        // before the type (e.g., `a: inout float4`).
-        //
-        decl->modifiers = ParseModifiers(parser);
-        parseModernVarDeclBaseCommon(parser, decl);
-        return decl;
+        if(_peekModernStyleVarDecl(parser))
+        {
+            ParamDecl* decl = parser->astBuilder->create<ModernParamDecl>();
+            decl->modifiers = modifiers;
+            parseModernVarDeclBaseCommon(parser, decl);
+            return decl;
+        }
+        else
+        {
+            ParamDecl* decl = parser->astBuilder->create<ParamDecl>();
+            decl->modifiers = modifiers;
+            _parseTraditionalParamDeclCommonBase(parser, decl);
+            return decl;
+        }
     }
 
     static void parseModernParamList(
@@ -3829,14 +3929,8 @@ namespace Slang
         ParamDecl* parameter = astBuilder->create<ParamDecl>();
         parameter->modifiers = ParseModifiers(this);
 
-        DeclaratorInfo declaratorInfo;
-        declaratorInfo.typeSpec = ParseType();
+        _parseTraditionalParamDeclCommonBase(this, parameter, kDeclaratorParseOption_AllowEmpty);
 
-        InitDeclarator initDeclarator = parseInitDeclarator(this, kDeclaratorParseOption_AllowEmpty);
-        UnwrapDeclarator(astBuilder, initDeclarator, &declaratorInfo);
-
-        // Assume it is a variable-like declarator
-        CompleteVarDecl(this, parameter, declaratorInfo);
         return parameter;
     }
 
