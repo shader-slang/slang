@@ -3380,6 +3380,69 @@ namespace Slang
         return stmt;
     }
 
+    static bool _isType(Decl* decl)
+    {
+        return decl && (as<AggTypeDecl>(decl) || as<SimpleTypeDecl>(decl));
+    }
+
+    // TODO(JS):
+    // This only handles StaticMemberExpr, and VarExpr lookup scenarios!
+    static Decl* _tryResolveTypeDecl(Parser* parser, Expr* expr)
+    {
+        if (auto staticMemberExpr = as<StaticMemberExpr>(expr))
+        {
+            Decl* baseTypeDecl = _tryResolveTypeDecl(parser, staticMemberExpr->baseExpression);
+            if (!baseTypeDecl)
+            {
+                return nullptr;
+            }
+            AggTypeDecl* aggTypeDecl = as<AggTypeDecl>(baseTypeDecl);
+            if (!aggTypeDecl)
+            {
+                return nullptr;
+            }
+
+            // Search all the members
+            for (Decl* member : aggTypeDecl->members)
+            {
+                auto name = member->getName();
+
+                if (name == staticMemberExpr->name)
+                {
+                    if (_isType(member))
+                    {
+                        return member;
+                    }
+                }
+            }
+
+            // TODO(JS): If we have inheritance, we'll need to go search the parent too
+
+            // Didn't find it
+            return nullptr;
+        }
+
+        if (auto varExpr = as<VarExpr>(expr))
+        {
+            // Do the lookup in the current scope
+            auto lookupResult = lookUp(
+                parser->astBuilder,
+                nullptr, // no semantics visitor available yet
+                varExpr->name,
+                parser->currentScope);
+            if (!lookupResult.isValid() || lookupResult.isOverloaded())
+                return nullptr;
+
+            Decl* decl = lookupResult.item.declRef.getDecl();
+            if (_isType(decl))
+            {
+                return decl;
+            }
+        }
+
+        return nullptr;
+    }
+
     static bool isTypeName(Parser* parser, Name* name)
     {
         auto lookupResult = lookUp(
@@ -3390,19 +3453,7 @@ namespace Slang
         if(!lookupResult.isValid() || lookupResult.isOverloaded())
             return false;
 
-        auto decl = lookupResult.item.declRef.getDecl();
-        if( auto typeDecl = as<AggTypeDecl>(decl) )
-        {
-            return true;
-        }
-        else if( auto typeVarDecl = as<SimpleTypeDecl>(decl) )
-        {
-            return true;
-        }
-        else
-        {
-            return false;
-        }
+        return _isType(lookupResult.item.declRef.getDecl());
     }
 
     static bool peekTypeName(Parser* parser)
@@ -4397,7 +4448,6 @@ namespace Slang
 
                     switch (tokenType)
                     {
-                        case TokenType::LParent:
                         case TokenType::FloatingPointLiteral:
                         case TokenType::CharLiteral:
                         case TokenType::IntegerLiteral:
@@ -4409,21 +4459,35 @@ namespace Slang
                             isCast = true;
                             break;
                         }
+                        case TokenType::LParent:
+                        {
+                            // If we are followed by ( it might not be a cast - it could be a method invocation.
+                            isCast = (_tryResolveTypeDecl(parser, base) != nullptr);
+                            break;
+                        }
                         case TokenType::OpAdd:
                         case TokenType::OpSub:
                         {
                             // + - are ambiguous, it could be a binary + or - so -> expression, or unary -> cast
-                            // 
                             //
                             // (Some::Stuff) + 3
                             // (Some::Stuff) - 3
                             // Strictly I can only tell if this is an expression or a cast if I know Some::Stuff is a type or not
                             // but we can't know here in general because we allow out-of-order declarations.
+
+                            // If we can determine it's a type, then it must be a cast, and we are done.
+                            // 
+                            // NOTE! This test can only determine if it's a type *iff* it has already been defined. A future out
+                            // of order declaration, will not be correctly found here.
                             //
-                            // We could do a lookup here, and if the type is defined use that, but that means the semantics change depending on
-                            // the order of definition.
-                            //
-                            // So for now we use a heuristic. If there is no white space between the + or - and what follows
+                            // This means the semantics change depending on the order of definition (!) 
+                            if (_tryResolveTypeDecl(parser, base))
+                            {
+                                isCast = true;
+                                break;
+                            }
+
+                            // Now we use a heuristic. If there is no white space between the + or - and what follows
                             // we will assume they are unary ops, and therefore this is a cast.
                             // Otherwise we assume they are binary ops.
                             //
