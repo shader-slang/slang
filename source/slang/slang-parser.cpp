@@ -4416,12 +4416,10 @@ namespace Slang
             }
             case TokenType::LParent:
             {
-                // If we are followed by ( it might not be a cast - it could be a method invocation.
-                //
-                // It's hard to know what a heuristic would look like here to try and disambiguate (as we do for + and -)
-                // so this *only* works if the type is defined before the cast.
-                
-                return (_tryResolveTypeDecl(parser, expr) != nullptr);
+                // If we are followed by ( it might not be a cast - it could be a call invocation.
+                // BUT we can always *assume* it is a call, because such a 'call' will be correctly
+                // handled as a cast if necessary later.
+                return false;
             }
             case TokenType::OpAdd:
             case TokenType::OpSub:
@@ -4444,13 +4442,19 @@ namespace Slang
                     return true;
                 }
 
-                // Now we use a heuristic. If there is no white space between the + or - and what follows
-                // we will assume they are unary ops, and therefore this is a cast.
-                // Otherwise we assume they are binary ops.
+                // Now we use a heuristic.
                 //
+                // Whitespace before, whitespace after->binary
+                // No whitespace before, no whitespace after->binary
+                // Otherwise->unary
+                //
+                // Unary -> cast, binary -> expression.
+                // 
                 // Ie:
                 // (Some::Stuff) +3  - must be a cast
+                // (Some::Stuff)+ 3  - must be a cast (?) This is a bit odd.
                 // (Some::Stuff) + 3 - must be an expression.
+                // (Some::Stuff)+3 - must be an expression.
 
                 // TODO(JS): This covers the (SomeScope::Identifier) case
                 //
@@ -4462,19 +4466,20 @@ namespace Slang
 
                 if (auto staticMemberExpr = dynamicCast<StaticMemberExpr>(expr))
                 {
-                    // Apply the heuristic
-
+                    // Apply the heuristic:
                     TokenReader::ParsingCursor cursor = parser->tokenReader.getCursor();
                     // Skip the + or -
-                    advanceToken(parser);
+                    const Token opToken = advanceToken(parser);
                     // Peek the next token to see if it was preceded by white space
                     const Token nextToken = peekToken(parser);
 
                     // Rewind
                     parser->tokenReader.setCursor(cursor);
 
-                    // If there isn't any whitespace prior, we assume unary, and that means it must be a cast
-                    return ((nextToken.flags & TokenFlag::AfterWhitespace) == 0);
+                    const bool isBinary = (nextToken.flags & TokenFlag::AfterWhitespace) == (opToken.flags & TokenFlag::AfterWhitespace);
+
+                    // If it's binary it's not a cast
+                    return !isBinary;
                 }
                 break;
             }
