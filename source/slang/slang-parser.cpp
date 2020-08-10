@@ -4528,7 +4528,7 @@ namespace Slang
 
                     parser->ReadToken(TokenType::RParent);
 
-                    // If it's a cast, we make an explicit cast, else it's an expression in parentheses
+                    // We now try and determine by what base is, if this is actually a cast or an expression in parentheses
                     if (_isCast(parser, base))
                     {
                         // Parse as a cast
