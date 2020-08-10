@@ -3387,11 +3387,11 @@ namespace Slang
 
     // TODO(JS):
     // This only handles StaticMemberExpr, and VarExpr lookup scenarios!
-    static Decl* _tryResolveTypeDecl(Parser* parser, Expr* expr)
+    static Decl* _tryResolveDecl(Parser* parser, Expr* expr)
     {
         if (auto staticMemberExpr = as<StaticMemberExpr>(expr))
         {
-            Decl* baseTypeDecl = _tryResolveTypeDecl(parser, staticMemberExpr->baseExpression);
+            Decl* baseTypeDecl = _tryResolveDecl(parser, staticMemberExpr->baseExpression);
             if (!baseTypeDecl)
             {
                 return nullptr;
@@ -3403,19 +3403,15 @@ namespace Slang
                 DeclRef<ContainerDecl> declRef(aggTypeDecl, SubstitutionSet());
 
                 auto lookupResult = lookUpDirectAndTransparentMembers(
-                     parser->astBuilder,
-                     nullptr, // no semantics visitor available yet
-                     staticMemberExpr->name,
-                     declRef);
+                    parser->astBuilder,
+                    nullptr, // no semantics visitor available yet
+                    staticMemberExpr->name,
+                    declRef);
 
                 if (!lookupResult.isValid() || lookupResult.isOverloaded())
                     return nullptr;
 
-                Decl* decl = lookupResult.item.declRef.getDecl();
-                if (_isType(decl))
-                {
-                    return decl;
-                }
+                return lookupResult.item.declRef.getDecl();
             }
 
             // Didn't find it
@@ -3433,11 +3429,7 @@ namespace Slang
             if (!lookupResult.isValid() || lookupResult.isOverloaded())
                 return nullptr;
 
-            Decl* decl = lookupResult.item.declRef.getDecl();
-            if (_isType(decl))
-            {
-                return decl;
-            }
+            return lookupResult.item.declRef.getDecl();
         }
 
         return nullptr;
@@ -4436,10 +4428,12 @@ namespace Slang
                 // NOTE! This test can only determine if it's a type *iff* it has already been defined. A future out
                 // of order declaration, will not be correctly found here.
                 //
-                // This means the semantics change depending on the order of definition (!) 
-                if (_tryResolveTypeDecl(parser, expr))
+                // This means the semantics change depending on the order of definition (!)
+                Decl* decl = _tryResolveDecl(parser, expr);
+                // If we can find the decl-> we can resolve unambiguously
+                if (decl)
                 {
-                    return true;
+                    return _isType(decl);
                 }
 
                 // Now we use a heuristic.
