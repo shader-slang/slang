@@ -61,6 +61,9 @@ static TBuiltInResource _calcBuiltinResources()
             dst[i] = UNLIMITED;
         }
     }
+
+    resource.minProgramTexelOffset = -UNLIMITED;
+
     // Set up the bools
     {
         TLimits* limits = &resource.limits;
