@@ -3277,7 +3277,7 @@ uint4 WaveActiveBallot(bool condition)
 __target_intrinsic(hlsl)
 uint WaveActiveCountBits(bool value)
 {
-    return _WaveCountBits(_WaveActiveBallot(value));
+    return WaveMaskCountBits(WaveGetActiveMask(), value);
 }
 
 __glsl_extension(GL_KHR_shader_subgroup_basic)
