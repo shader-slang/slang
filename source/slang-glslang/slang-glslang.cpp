@@ -168,6 +168,8 @@ static void glslang_optimizeSPIRV(std::vector<unsigned int>& spirv, spv_target_e
         break;
     case SLANG_OPTIMIZATION_LEVEL_DEFAULT:
         // Use a minimal set of performance settings
+        // If we run CreateInlineExhaustivePass, We need to run CreateMergeReturnPass first. 
+        optimizer.RegisterPass(spvtools::CreateMergeReturnPass());
         optimizer.RegisterPass(spvtools::CreateInlineExhaustivePass());
         optimizer.RegisterPass(spvtools::CreateAggressiveDCEPass());
         optimizer.RegisterPass(spvtools::CreatePrivateToLocalPass());
