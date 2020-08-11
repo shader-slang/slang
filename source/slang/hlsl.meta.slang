@@ -2568,12 +2568,24 @@ __target_intrinsic(cuda, "__ballot_sync($0, $1)")
 __target_intrinsic(hlsl, "WaveActiveBallot($1)")
 WaveMask WaveMaskBallot(WaveMask mask, bool condition);
 
+// Predeclare this function
+uint _WaveCountBits(uint4 value);
+
+// Ideally we'll do this with WaveMask backing type changing in the future,
+// but for the moment it's stuck on uint. So this is a work around, such that we can make
+// the code Slang code.
 __glsl_extension(GL_KHR_shader_subgroup_ballot)
 __spirv_version(1.3)
-__target_intrinsic(glsl, "bitCount(subgroupBallot($1))")
+__target_intrinsic(glsl, "subgroupBallot($0)")
+uint4 _WaveActiveBallot(bool condition);
+
+__glsl_extension(GL_KHR_shader_subgroup_ballot)
 __target_intrinsic(cuda, "__popc(__ballot_sync($0, $1))")
 __target_intrinsic(hlsl, "WaveActiveCountBits($1)")
-WaveMask WaveMaskCountBits(WaveMask mask, bool value);
+uint WaveMaskCountBits(WaveMask mask, bool value)
+{
+    return _WaveCountBits(_WaveActiveBallot(value));
+}
 
 // Waits until all warp lanes named in mask have executed a WaveMaskSharedSync (with the same mask)
 // before resuming execution. Guarantees memory ordering in shared memory among threads participating
@@ -3262,13 +3274,10 @@ uint4 WaveActiveBallot(bool condition)
     return WaveMaskBallot(WaveGetActiveMask(), condition);
 }
 
-__glsl_extension(GL_KHR_shader_subgroup_ballot)
-__spirv_version(1.3)
-__target_intrinsic(glsl, "bitCount(subgroupBallot($0))")
 __target_intrinsic(hlsl)
 uint WaveActiveCountBits(bool value)
 {
-    return WaveMaskCountBits(WaveGetActiveMask(), value);
+    return _WaveCountBits(_WaveActiveBallot(value));
 }
 
 __glsl_extension(GL_KHR_shader_subgroup_basic)
@@ -3291,6 +3300,27 @@ bool WaveIsFirstLane()
 {
     return WaveMaskIsFirstLane(WaveGetActiveMask());
 }
+
+// It's useful to have a wave uint4 version of countbits, because some wave functions return uint4.
+// This implementation tries to limit the amount of work required by the actual lane count.
+uint _WaveCountBits(uint4 value)
+{
+    // Assume since WaveGetLaneCount should be known at compile time, the branches will boil
+    // away
+    uint waveLaneCount = WaveGetLaneCount();
+    // Use a variable so there is only one return, to improve inlining 
+    uint out;
+    switch (waveLaneCount / 32)
+    {
+        default:
+        case 0: out = countbits(value.x); break;
+        case 1: out = countbits(value.x) + countbits(value.y); break;
+        case 2: out = countbits(value.x) + countbits(value.y) + countbits(value.z); break;
+        case 3: out = countbits(value.x) + countbits(value.y) + countbits(value.z) + countbits(value.w); break;
+    }
+    return out;
+}
+
 
 // Prefix
 
