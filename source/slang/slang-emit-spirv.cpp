@@ -427,20 +427,19 @@ struct SPIRVEmitContext
     // Operands can only be added when inside of a InstConstructScope 
     struct InstConstructScope
     {
-        SLANG_FORCE_INLINE operator SpvInst*() const { return m_context->m_currentInst; }
+        SLANG_FORCE_INLINE operator SpvInst*() const { return m_inst; }
 
         InstConstructScope(SPIRVEmitContext* context, SpvOp opcode, IRInst* irInst = nullptr):
-            m_context(context),
-            m_operandsStartIndex(context->m_operandStack.getCount()),
-            m_previousInst(context->m_currentInst)
+            m_context(context)
         {
-            m_context->_beginInst(opcode, irInst);
+            m_context->_beginInst(opcode, irInst, *this);
         }
         ~InstConstructScope()
         {
-            m_context->_endInst(m_previousInst, m_operandsStartIndex);
+            m_context->_endInst(*this);
         }
 
+        SpvInst* m_inst;                    ///< The instruction associated with this scope
         SPIRVEmitContext* m_context;        ///< The context
         SpvInst* m_previousInst;            ///< The previously live inst
         Index m_operandsStartIndex;         ///< The start index for operands of m_inst
@@ -457,10 +456,11 @@ struct SPIRVEmitContext
         /// The created instruction is stored in m_currentInst.
         ///
         /// Should not typically be called directly use InstConstructScope to scope construction
-    void _beginInst(SpvOp opcode, IRInst* irInst = nullptr)
+    void _beginInst(SpvOp opcode, IRInst* irInst, InstConstructScope& ioScope)
     {
-        // Allocate the instruction
+        SLANG_ASSERT(this == ioScope.m_context);
 
+        // Allocate the instruction
         auto spvInst = new (m_memoryArena.allocate(sizeof(SpvInst))) SpvInst();
         spvInst->opcode = opcode;
 
@@ -468,17 +468,27 @@ struct SPIRVEmitContext
         {
             registerInst(irInst, spvInst);
         }
+
+        // Set up the scope
+        ioScope.m_inst = spvInst;
+        ioScope.m_previousInst = m_currentInst;
+        ioScope.m_operandsStartIndex = m_operandStack.getCount();
+
+        // Set the current instruction
         m_currentInst = spvInst;
     }
 
         /// End emitting an instruction
         /// Should not typically be called directly use InstConstructScope to scope construction
-    void _endInst(SpvInst* previousInst, Index operandsStartIndex)
+    void _endInst(const InstConstructScope& scope)
     {
-        SLANG_ASSERT(m_currentInst);
+        SLANG_ASSERT(scope.m_inst == m_currentInst);
+
+        const Index operandsStartIndex = scope.m_operandsStartIndex;
         // Work out how many operands were added
         const Index operandsCount = m_operandStack.getCount() - operandsStartIndex;
 
+        
         if (operandsCount)
         {
             // Allocate the operands
@@ -488,7 +498,7 @@ struct SPIRVEmitContext
         }
 
         // Make the previous inst active
-        m_currentInst = previousInst;
+        m_currentInst = scope.m_previousInst;
         // Reset the operand stack
         m_operandStack.setCount(operandsStartIndex);
     }
@@ -636,7 +646,7 @@ struct SPIRVEmitContext
         IRInst* irInst = nullptr;
     };
 
-        /// Emit operand words for all the operands of the current IR instruction
+        /// Emit operand words for all the operands of a given IR instruction
     void emitOperand(OperandsOf const& other)
     {
         auto irInst = other.irInst;
