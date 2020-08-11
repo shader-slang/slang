@@ -44,7 +44,8 @@
 static TBuiltInResource _calcBuiltinResources()
 {
     // NOTE! This is a bit of a hack - to set all the fields to true/UNLIMITED.
-
+    // Care must be taken if new variables are introduced, the default may not be appropriate.
+    
     // We are relying on limits being after the other fields. 
     SLANG_COMPILE_TIME_ASSERT(SLANG_OFFSET_OF(TBuiltInResource, limits) > 0);
     // We are relying on maxLights being the first parameter, and all values will have the same type
@@ -61,6 +62,10 @@ static TBuiltInResource _calcBuiltinResources()
             dst[i] = UNLIMITED;
         }
     }
+
+    // In the sea of variables there is a min value
+    resource.minProgramTexelOffset = -UNLIMITED;
+
     // Set up the bools
     {
         TLimits* limits = &resource.limits;
