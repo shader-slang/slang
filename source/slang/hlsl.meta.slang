@@ -3308,17 +3308,15 @@ uint _WaveCountBits(uint4 value)
     // Assume since WaveGetLaneCount should be known at compile time, the branches will boil
     // away
     uint waveLaneCount = WaveGetLaneCount();
-    // Use a variable so there is only one return, to improve inlining 
-    uint out;
+    
     switch (waveLaneCount / 32)
     {
         default:
-        case 0: out = countbits(value.x); break;
-        case 1: out = countbits(value.x) + countbits(value.y); break;
-        case 2: out = countbits(value.x) + countbits(value.y) + countbits(value.z); break;
-        case 3: out = countbits(value.x) + countbits(value.y) + countbits(value.z) + countbits(value.w); break;
+        case 0: return countbits(value.x); 
+        case 1: return countbits(value.x) + countbits(value.y); 
+        case 2: return countbits(value.x) + countbits(value.y) + countbits(value.z); 
+        case 3: return countbits(value.x) + countbits(value.y) + countbits(value.z) + countbits(value.w);
     }
-    return out;
 }
 
 
