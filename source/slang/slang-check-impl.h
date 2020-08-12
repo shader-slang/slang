@@ -737,6 +737,15 @@ namespace Slang
             DeclRef<CallableDecl>   requiredMemberDeclRef,
             RefPtr<WitnessTable>    witnessTable);
 
+        bool doesAccessorMatchRequirement(
+            DeclRef<AccessorDecl>   satisfyingMemberDeclRef,
+            DeclRef<AccessorDecl>   requiredMemberDeclRef);
+
+        bool doesPropertyMatchRequirement(
+            DeclRef<PropertyDecl>   satisfyingMemberDeclRef,
+            DeclRef<PropertyDecl>   requiredMemberDeclRef,
+            RefPtr<WitnessTable>    witnessTable);
+
         bool doesGenericSignatureMatchRequirement(
             DeclRef<GenericDecl>        genDecl,
             DeclRef<GenericDecl>        requirementGenDecl,
@@ -781,6 +790,17 @@ namespace Slang
             ConformanceCheckingContext* context,
             LookupResult const&         lookupResult,
             DeclRef<FuncDecl>           requiredMemberDeclRef,
+            RefPtr<WitnessTable>        witnessTable);
+
+            /// Attempt to synthesize a property that can satisfy `requiredMemberDeclRef` using `lookupResult`.
+            ///
+            /// On success, installs the syntethesized method in `witnessTable` and returns `true`.
+            /// Otherwise, returns `false`.
+            ///
+        bool trySynthesizePropertyRequirementWitness(
+            ConformanceCheckingContext* context,
+            LookupResult const&         lookupResult,
+            DeclRef<PropertyDecl>       requiredMemberDeclRef,
             RefPtr<WitnessTable>        witnessTable);
 
             /// Attempt to synthesize a declartion that can satisfy `requiredMemberDeclRef` using `lookupResult`.
@@ -1453,12 +1473,18 @@ namespace Slang
             Type*		baseElementType,
             IntVal*				baseElementCount);
 
+            /// Perform semantic checking of an assignment where the operands have already been checked.
+        Expr* checkAssignWithCheckedOperands(AssignExpr* expr);
+
         // Look up a static member
         // @param expr Can be StaticMemberExpr or MemberExpr
         // @param baseExpression Is the underlying type expression determined from resolving expr
         Expr* _lookupStaticMember(DeclRefExpr* expr, Expr* baseExpression);
 
         Expr* visitStaticMemberExpr(StaticMemberExpr* expr);
+
+            /// Perform checking operations required for the "base" expression of a member-reference like `base.someField`
+        Expr* checkBaseForMemberExpr(Expr* baseExpr);
 
         Expr* lookupMemberResultFailure(
             DeclRefExpr*     expr,
