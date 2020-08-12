@@ -1,10 +1,10 @@
 // shader.slang
 
 //TEST_INPUT:ubuffer(random(float, 4096, -1.0, 1.0), stride=4):name=ioBuffer
-RWStructuredBuffer<float> ioBuffer;
+RWStructuredBuffer<float> convertBuffer(Ptr<gfx::BufferResource> x);
 
 [numthreads(4, 1, 1)]
-void computeMain(uint3 dispatchThreadID : SV_DispatchThreadID)
+void computeMain(uniform RWStructuredBuffer<float> ioBuffer, uint3 dispatchThreadID : SV_DispatchThreadID)
 {
     uint tid = dispatchThreadID.x;
 
@@ -69,6 +69,8 @@ public bool executeComputation() {
     let window = createWindow(windowWidth, windowHeight);
     let renderer = createRenderer(windowWidth, windowHeight, window);
     let structuredBuffer = createStructuredBuffer(renderer, initialArray);
+    __GPU_FOREACH(renderer, uint3(4, 1, 1), LAMBDA(uint3 dispatchThreadID)
+        { computeMain(convertBuffer(structuredBuffer), dispatchThreadID) ; });
     let shaderProgram = loadShaderProgram(renderer);
     let descriptorSetLayout = buildDescriptorSetLayout(renderer);
     let pipelineLayout = buildPipeline(renderer, descriptorSetLayout);
