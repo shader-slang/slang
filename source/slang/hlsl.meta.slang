@@ -2569,11 +2569,12 @@ __target_intrinsic(hlsl, "WaveActiveBallot($1)")
 WaveMask WaveMaskBallot(WaveMask mask, bool condition);
 
 __glsl_extension(GL_KHR_shader_subgroup_ballot)
-__spirv_version(1.3)
-__target_intrinsic(glsl, "bitCount(subgroupBallot($1))")
 __target_intrinsic(cuda, "__popc(__ballot_sync($0, $1))")
 __target_intrinsic(hlsl, "WaveActiveCountBits($1)")
-WaveMask WaveMaskCountBits(WaveMask mask, bool value);
+uint WaveMaskCountBits(WaveMask mask, bool value)
+{
+    return _WaveCountBits(WaveActiveBallot(value));
+}
 
 // Waits until all warp lanes named in mask have executed a WaveMaskSharedSync (with the same mask)
 // before resuming execution. Guarantees memory ordering in shared memory among threads participating
@@ -3262,9 +3263,6 @@ uint4 WaveActiveBallot(bool condition)
     return WaveMaskBallot(WaveGetActiveMask(), condition);
 }
 
-__glsl_extension(GL_KHR_shader_subgroup_ballot)
-__spirv_version(1.3)
-__target_intrinsic(glsl, "bitCount(subgroupBallot($0))")
 __target_intrinsic(hlsl)
 uint WaveActiveCountBits(bool value)
 {
@@ -3291,6 +3289,23 @@ bool WaveIsFirstLane()
 {
     return WaveMaskIsFirstLane(WaveGetActiveMask());
 }
+
+// It's useful to have a wave uint4 version of countbits, because some wave functions return uint4.
+// This implementation tries to limit the amount of work required by the actual lane count.
+uint _WaveCountBits(uint4 value)
+{
+    // Assume since WaveGetLaneCount should be known at compile time, the branches will hopefully boil away
+    const uint waveLaneCount = WaveGetLaneCount();
+    switch ((waveLaneCount - 1) / 32)
+    {
+        default:
+        case 0: return countbits(value.x); 
+        case 1: return countbits(value.x) + countbits(value.y); 
+        case 2: return countbits(value.x) + countbits(value.y) + countbits(value.z); 
+        case 3: return countbits(value.x) + countbits(value.y) + countbits(value.z) + countbits(value.w);
+    }
+}
+
 
 // Prefix
 
