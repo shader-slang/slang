@@ -3380,6 +3380,56 @@ namespace Slang
         return stmt;
     }
 
+    GpuForeachStmt* ParseGpuForeachStmt(Parser* parser)
+    {
+        // Hard-coding parsing of the following:
+        // __GPU_FOREACH(renderer, gridDims, LAMBDA(uint3 dispatchThreadID) {
+        //  kernelCall(args, ...); });
+
+        // Setup the scope so that dispatchThreadID is in scope for kernelCall
+        ScopeDecl* scopeDecl = parser->astBuilder->create<ScopeDecl>();
+        GpuForeachStmt* stmt = parser->astBuilder->create<GpuForeachStmt>();
+        stmt->scopeDecl = scopeDecl;
+
+        parser->FillPosition(stmt);
+        parser->ReadToken("__GPU_FOREACH");
+        parser->ReadToken(TokenType::LParent);
+        stmt->renderer = parser->ParseArgExpr();
+        parser->ReadToken(TokenType::Comma);
+        stmt->gridDims = parser->ParseArgExpr();
+
+        parser->ReadToken(TokenType::Comma);
+        parser->ReadToken("LAMBDA");
+        parser->ReadToken(TokenType::LParent);
+
+        auto idType = parser->ParseTypeExp();
+        NameLoc varNameAndLoc = expectIdentifier(parser);
+        VarDecl* varDecl = parser->astBuilder->create<VarDecl>();
+        varDecl->nameAndLoc = varNameAndLoc;
+        varDecl->loc = varNameAndLoc.loc;
+        varDecl->type = idType;
+        stmt->dispatchThreadID = varDecl;
+
+        parser->ReadToken(TokenType::RParent);
+        parser->ReadToken(TokenType::LBrace);
+
+        parser->pushScopeAndSetParent(scopeDecl);
+        AddMember(parser->currentScope, varDecl);
+
+        stmt->kernelCall = parser->ParseExpression();
+
+        parser->PopScope();
+
+        parser->ReadToken(TokenType::Semicolon);
+        parser->ReadToken(TokenType::RBrace);
+
+        parser->ReadToken(TokenType::RParent);
+
+        parser->ReadToken(TokenType::Semicolon);
+
+        return stmt;
+    }
+
     static bool _isType(Decl* decl)
     {
         return decl && (as<AggTypeDecl>(decl) || as<SimpleTypeDecl>(decl));
@@ -3552,6 +3602,8 @@ namespace Slang
             statement = ParseCaseStmt(this);
         else if (LookAheadToken("default"))
             statement = ParseDefaultStmt(this);
+        else if (LookAheadToken("__GPU_FOREACH"))
+            statement = ParseGpuForeachStmt(this);
         else if (LookAheadToken(TokenType::Dollar))
         {
             statement = parseCompileTimeStmt(this);
