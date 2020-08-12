@@ -59,24 +59,22 @@ namespace Slang
                 context.addConstantValue(constVal);
             }
         }
-        while (changed)
+        globalValueNumberingMap.Clear();
+        List<IRInst*> instToRemove;
+        for (auto inst : module->getGlobalInsts())
         {
-            globalValueNumberingMap.Clear();
-            changed = false;
-            for (auto inst : module->getGlobalInsts())
+            if (as<IRType>(inst))
             {
-                if (as<IRType>(inst))
+                auto newInst = context.addTypeValue(inst);
+                if (newInst != inst)
                 {
-                    auto newInst = context.addTypeValue(inst);
-                    if (newInst != inst)
-                    {
-                        changed = true;
-                        inst->replaceUsesWith(newInst);
-                        inst->removeAndDeallocate();
-                        break;
-                    }
+                    changed = true;
+                    inst->replaceUsesWith(newInst);
+                    instToRemove.add(inst);
                 }
             }
         }
+        for (auto inst : instToRemove)
+            inst->removeAndDeallocate();
     }
 }
