@@ -127,7 +127,7 @@ namespace Slang
             auto elementIndex = getIntVal(inst->getElementIndex());
             SLANG_ASSERT((Index)elementIndex < loweredTupleInfo->fields.getCount());
 
-            auto field = loweredTupleInfo->fields[elementIndex];
+            auto field = loweredTupleInfo->fields[(Index)elementIndex];
             auto getElement = builder->emitFieldExtract(field->getFieldType(), base, field->getKey());
             inst->replaceUsesWith(getElement);
             inst->removeAndDeallocate();
