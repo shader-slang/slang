@@ -157,8 +157,15 @@ namespace Slang
             return lowerAssociatedType(builder, paramType);
         }
         case kIROp_InterfaceType:
+        {
+            // An existential type translates into a tuple of (AnyValue, WitnessTable, RTTI*)
             anyValueSize = getInterfaceAnyValueSize(paramType, paramType->sourceLoc);
-            return builder->getAnyValueType(anyValueSize);
+            auto anyValueType = builder->getAnyValueType(anyValueSize);
+            auto witnessTableType = builder->getWitnessTableType((IRType*)paramType);
+            auto rttiType = builder->getPtrType(builder->getRTTIType());
+            auto tupleType = builder->getTupleType(anyValueType, witnessTableType, rttiType);
+            return tupleType;
+        }
         case kIROp_lookup_interface_method:
         {
             auto lookupInterface = static_cast<IRLookupWitnessMethod*>(paramType);

@@ -16,6 +16,10 @@ namespace Slang
 
         void processInst(IRInst* inst)
         {
+            // If inst is a type itself, keep its type.
+            if (as<IRType>(inst))
+                return;
+
             IRBuilder builderStorage;
             auto builder = &builderStorage;
             builder->sharedBuilder = &sharedContext->sharedBuilderStorage;
@@ -57,6 +61,7 @@ namespace Slang
                     }
                 }
             }
+            sharedContext->sharedBuilderStorage.deduplicateAndRebuildGlobalNumberingMap();
         }
     };
 
