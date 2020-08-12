@@ -1568,6 +1568,18 @@ struct IRBindGlobalGenericParam : IRInst
     IR_LEAF_ISA(BindGlobalGenericParam)
 };
 
+// An Instruction that creates a tuple value.
+struct IRMakeTuple : IRInst
+{
+    IR_LEAF_ISA(MakeTuple)
+};
+
+struct IRGetTupleElement : IRInst
+{
+    IR_LEAF_ISA(GetTupleElement)
+    IRInst* getTuple() { return getOperand(0); }
+    IRInst* getElementIndex() { return getOperand(1); }
+};
 
     /// An instruction that packs a concrete value into an existential-type "box"
 struct IRMakeExistential : IRInst
@@ -1590,6 +1602,20 @@ struct IRWrapExistential : IRInst
     IR_LEAF_ISA(WrapExistential)
 };
 
+struct IRExtractExistentialValue : IRInst
+{
+    IR_LEAF_ISA(ExtractExistentialValue);
+};
+
+struct IRExtractExistentialType : IRInst
+{
+    IR_LEAF_ISA(ExtractExistentialType);
+};
+
+struct IRExtractExistentialWitnessTable : IRInst
+{
+    IR_LEAF_ISA(ExtractExistentialWitnessTable);
+};
 
 // Description of an instruction to be used for global value numbering
 struct IRInstKey
@@ -1638,6 +1664,10 @@ struct SharedIRBuilder
     Dictionary<IRConstantKey,   IRConstant*>    constantMap;
 
     void insertBlockAlongEdge(IREdge const& edge);
+
+    // Rebuilds `globalValueNumberingMap`. This is necessary if any existing
+    // keys are modified (thus its hash code is changed).
+    void deduplicateAndRebuildGlobalNumberingMap();
 };
 
 struct IRBuilderSourceLocRAII;
@@ -1702,6 +1732,10 @@ struct IRBuilder
     IRRTTIType* getRTTIType();
     IRAnyValueType* getAnyValueType(IRIntegerValue size);
     IRAnyValueType* getAnyValueType(IRInst* size);
+
+    IRTupleType* getTupleType(UInt count, IRType* const* types);
+    IRTupleType* getTupleType(IRType* type0, IRType* type1);
+    IRTupleType* getTupleType(IRType* type0, IRType* type1, IRType* type2);
 
     IRBasicBlockType*   getBasicBlockType();
     IRWitnessTableType* getWitnessTableType(IRType* baseType);
@@ -1849,6 +1883,10 @@ struct IRBuilder
 
     // Creates an RTTI object. Result is of `IRRTTIType`.
     IRInst* emitMakeRTTIObject(IRInst* typeInst);
+
+    IRInst* emitMakeTuple(IRType* type, UInt count, IRInst* const* args);
+
+    IRInst* emitGetTupleElement(IRType* type, IRInst* tuple, UInt element);
 
     IRInst* emitMakeVector(
         IRType*         type,
