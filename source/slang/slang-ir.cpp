@@ -3752,6 +3752,18 @@ namespace Slang
         return inst;
     }
 
+    IRInst* IRBuilder::emitGpuForeach(List<IRInst*> args)
+    {
+        auto inst = createInst<IRInst>(
+            this,
+            kIROp_GpuForeach,
+            getVoidType(),
+            args.getCount(),
+            args.getBuffer());
+        addInst(inst);
+        return inst;
+    }
+
 
     //
     // Decorations

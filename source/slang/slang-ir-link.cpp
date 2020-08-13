@@ -1492,21 +1492,25 @@ LinkedIR linkIR(
         }
     }
 
-    for (IRModule* irModule : irModules)
+    if (target == CodeGenTarget::CPPSource)
     {
-        for (auto inst : irModule->getGlobalInsts())
+        for (IRModule* irModule : irModules)
         {
-            auto hasPublic = inst->findDecoration<IRPublicDecoration>();
-            if (!hasPublic)
-                continue;
-
-            auto cloned = cloneValue(context, inst);
-            if (!cloned->findDecorationImpl(kIROp_KeepAliveDecoration))
+            for (auto inst : irModule->getGlobalInsts())
             {
-                context->builder->addKeepAliveDecoration(cloned);
+                auto hasPublic = inst->findDecoration<IRPublicDecoration>();
+                if (!hasPublic)
+                    continue;
+
+                auto cloned = cloneValue(context, inst);
+                if (!cloned->findDecorationImpl(kIROp_KeepAliveDecoration))
+                {
+                    context->builder->addKeepAliveDecoration(cloned);
+                }
             }
         }
     }
+    
 
     // TODO: *technically* we should consider the case where
     // we have global variables with initializers, since

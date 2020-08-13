@@ -3607,6 +3607,7 @@ namespace Slang
         return isTypeName(parser, name);
     }
 
+    // TODO(DG): Look at this for example of scope
     Stmt* parseCompileTimeForStmt(
         Parser* parser)
     {

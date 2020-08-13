@@ -4116,7 +4116,40 @@ struct StmtLoweringVisitor : StmtVisitor<StmtLoweringVisitor>
 
     void visitGpuForeachStmt(GpuForeachStmt* stmt)
     {
+        auto builder = getBuilder();
         startBlockIfNeeded(stmt);
+        
+        auto renderer = getSimpleVal(context, lowerRValueExpr(context, stmt->renderer));
+        auto gridDims = getSimpleVal(context, lowerRValueExpr(context, stmt->gridDims));
+
+        List<IRInst*> irArgs;
+        if (auto callExpr = as<InvokeExpr>(stmt->kernelCall))
+        {
+            irArgs.add(renderer);
+            irArgs.add(gridDims);
+            auto fref = getSimpleVal(context, lowerRValueExpr(context, callExpr->functionExpr));
+            irArgs.add(fref);
+            for (auto arg : callExpr->arguments)
+            {
+                // if a reference to dispatchThreadID, don't emit
+                if (auto declRefExpr = as<DeclRefExpr>(arg))
+                {
+                    if (declRefExpr->declRef.getDecl() == stmt->dispatchThreadID)
+                    {
+                        continue;
+                    }
+                }
+                auto irArg = getSimpleVal(context, lowerRValueExpr(context, arg));
+                irArgs.add(irArg);
+            }
+        }
+        else
+        {
+            SLANG_UNEXPECTED("GPUForeach parsing produced an invalid result");
+        }
+
+        builder->emitGpuForeach(irArgs);
+
         return;
     }
 

@@ -30,29 +30,22 @@ namespace gfx {
 
 // Forward declarations of cpp functions
 //
-Ptr<gfx::ShaderProgram> loadShaderProgram(Ptr<gfx::Renderer> renderer);
 Ptr<gfx::Window> createWindow(int gWindowWidth, int gWindowHeight);
 Ptr<gfx::Renderer> createRenderer(
     int gWindowWidth,
     int gWindowHeight,
     Ptr<gfx::Window> gWindow);
 Ptr<gfx::BufferResource> createStructuredBuffer(Ptr<gfx::Renderer> gRenderer, float[4] initialArray);
-Ptr<gfx::DescriptorSetLayout> buildDescriptorSetLayout(Ptr<gfx::Renderer> gRenderer);
-Ptr<gfx::PipelineLayout> buildPipeline(Ptr<gfx::Renderer> gRenderer, Ptr<gfx::DescriptorSetLayout> descriptorSetLayout);
-Ptr<gfx::DescriptorSet> buildDescriptorSet(
-    Ptr<gfx::Renderer> gRenderer,
-    Ptr<gfx::DescriptorSetLayout> descriptorSetLayout,
-    Ptr<gfx::BufferResource> gStructuredBuffer);
-Ptr<gfx::PipelineState> buildPipelineState(
-    Ptr<gfx::ShaderProgram> shaderProgram,
-    Ptr<gfx::Renderer> gRenderer,
-    Ptr<gfx::PipelineLayout> gPipelineLayout);
 void printInitialValues(float[4] initialArray, int length);
 void dispatchComputation(
     Ptr<gfx::Renderer> gRenderer,
     Ptr<gfx::PipelineState> gPipelineState,
     Ptr<gfx::PipelineLayout> gPipelineLayout,
-    Ptr<gfx::DescriptorSet> gDescriptorSet);
+    Ptr<gfx::DescriptorSet> gDescriptorSet,
+    uint gridDimsX,
+    uint gridDimsY,
+    uint gridDimsZ);
+
 void print_output(
     Ptr<gfx::Renderer> gRenderer,
     Ptr<gfx::BufferResource> gStructuredBuffer,
@@ -71,13 +64,7 @@ public bool executeComputation() {
     let structuredBuffer = createStructuredBuffer(renderer, initialArray);
     __GPU_FOREACH(renderer, uint3(4, 1, 1), LAMBDA(uint3 dispatchThreadID)
         { computeMain(convertBuffer(structuredBuffer), dispatchThreadID) ; });
-    let shaderProgram = loadShaderProgram(renderer);
-    let descriptorSetLayout = buildDescriptorSetLayout(renderer);
-    let pipelineLayout = buildPipeline(renderer, descriptorSetLayout);
-    let descriptorSet = buildDescriptorSet(renderer, descriptorSetLayout, structuredBuffer);
-    let pipelineState = buildPipelineState(shaderProgram, renderer, pipelineLayout);
     printInitialValues(initialArray, 4);
-    dispatchComputation(renderer, pipelineState, pipelineLayout, descriptorSet);
     print_output(renderer, structuredBuffer, 4);
 
 
