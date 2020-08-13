@@ -48,6 +48,12 @@ struct ByteAddressBuffer
     }
 };
 
+
+// Make the GLSL atomicAdd available
+__target_intrinsic(glsl, "atomicAdd($0, $1)")
+T __atomicAdd<T>(__ref T value, T amount);
+
+
 __intrinsic_op($(kIROp_ByteAddressBufferLoad))
 T __byteAddressBufferLoad<T>(ByteAddressBuffer buffer, int offset);
 
@@ -159,6 +165,10 @@ struct $(item.name)
     {
         return __byteAddressBufferLoad<T>(this, location);
     }
+${{{{
+    if (item.op == kIROp_HLSLRWByteAddressBufferType)
+    {
+}}}}
 
     // float32 and int64 atomic support. This is a Slang specific extension, it uses
     // GL_EXT_shader_atomic_float on vk
@@ -166,16 +176,32 @@ struct $(item.name)
     // NOTE! To use this feature on HLSL, the shader needs to include 'nvHLSLExtns.h' from the NvAPI SDK
     //
     __target_intrinsic(hlsl, "($3 = NvInterlockedAddFp32($0, $1, $2))")
+    void InterlockedAddFp32(uint byteAddress, float valueToAdd, out float originalValue);
+
+    __specialized_for_target(glsl)
     __glsl_extension(GL_EXT_shader_atomic_float)
     __glsl_extension(GL_EXT_gpu_shader5)
-    __target_intrinsic(glsl, "($3 = atomicAdd($0._data[$1/4], $2))")
-    void InterlockedAddFp32(UINT byteAddress, float valueToAdd, out float originalValue);
+    void InterlockedAddFp32(uint byteAddress, float valueToAdd, out float originalValue)
+    {
+        RWStructuredBuffer<float> buf = __getEquivalentStructuredBuffer<float>(this);
+        originalValue = __atomicAdd(buf[byteAddress / 4], valueToAdd);
+    }
 
     __target_intrinsic(hlsl, "(NvInterlockedAddFp32($0, $1, $2))")
+    void InterlockedAddFp32(uint byteAddress, float valueToAdd);
+
+    __specialized_for_target(glsl)
     __glsl_extension(GL_EXT_shader_atomic_float)
     __glsl_extension(GL_EXT_gpu_shader5)
-    __target_intrinsic(glsl, "(atomicAdd(&$0._data[$1/4], $2))")
-    void InterlockedAddFp32(UINT byteAddress, float valueToAdd);
+    void InterlockedAddFp32(uint byteAddress, float valueToAdd)
+    {
+        RWStructuredBuffer<float> buf = __getEquivalentStructuredBuffer<float>(this);
+        __atomicAdd(buf[byteAddress / 4], valueToAdd);
+    }
+
+${{{{
+    }
+}}}}
 
     // Added operations:
 
