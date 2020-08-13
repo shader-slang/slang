@@ -2425,6 +2425,31 @@ void CLikeSourceEmitter::defaultEmitInstExpr(IRInst* inst, const EmitOpInfo& inO
         m_writer->emit(")");
         break;
     }
+    case kIROp_GpuForeach:
+    {
+        auto operand = inst->getOperand(2);
+        if (as<IRFunc>(operand))
+        {
+            //emitOperand(operand->findDecoration<IREntryPointDecoration>(), getInfo(EmitOp::General));
+            emitOperand(operand, getInfo(EmitOp::General));
+        }
+        else
+        {
+            SLANG_UNEXPECTED("Expected 3rd operand to be a function");
+        }
+        m_writer->emit("_wrapper(");
+        emitOperand(inst->getOperand(0), getInfo(EmitOp::General));
+        m_writer->emit(", ");
+        emitOperand(inst->getOperand(1), getInfo(EmitOp::General));
+        UInt argCount = inst->getOperandCount();
+        for (UInt aa = 3; aa < argCount; ++aa)
+        {
+            m_writer->emit(", ");
+            emitOperand(inst->getOperand(aa), getInfo(EmitOp::General));
+        }
+        m_writer->emit(")");
+        break;
+    }
     default:
         diagnoseUnhandledInst(inst);
         break;

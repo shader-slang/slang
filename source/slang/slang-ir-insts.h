@@ -1946,6 +1946,8 @@ struct IRBuilder
         return emitWrapExistential(type, value, slotArgCount, slotArgVals.getBuffer());
     }
 
+    IRInst* emitGpuForeach(List<IRInst*> args);
+
     IRUndefined* emitUndefined(IRType* type);
 
     IRInst* findOrAddInst(

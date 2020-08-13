@@ -50,4 +50,20 @@
 #   define SLANG_UNROLL
 #endif
 
+struct gfx_Renderer_0;
+struct gfx_BufferResource_0;
+struct gfx_ShaderProgram_0;
+struct gfx_DescriptorSetLayout_0;
+struct gfx_PipelineLayout_0;
+struct gfx_DescriptorSet_0;
+struct gfx_BufferResource_0;
+struct gfx_PipelineState_0;
+gfx_ShaderProgram_0* loadShaderProgram_0(gfx_Renderer_0* _0, unsigned char _1[], size_t _2);
+gfx_DescriptorSetLayout_0* buildDescriptorSetLayout_0(gfx_Renderer_0* _0);
+gfx_PipelineLayout_0* buildPipeline_0(gfx_Renderer_0* _0, gfx_DescriptorSetLayout_0* _1);
+gfx_DescriptorSet_0* buildDescriptorSet_0(gfx_Renderer_0* _0, gfx_DescriptorSetLayout_0* _1, gfx_BufferResource_0* _2);
+gfx_PipelineState_0* buildPipelineState_0(gfx_ShaderProgram_0* _0, gfx_Renderer_0* _1, gfx_PipelineLayout_0* _2);
+void dispatchComputation_0(gfx_Renderer_0* _0, gfx_PipelineState_0* _1, gfx_PipelineLayout_0* _2, gfx_DescriptorSet_0* _3, uint32_t _4, uint32_t _5, uint32_t _6);
+gfx_BufferResource_0* unconvertBuffer_0(RWStructuredBuffer<float> _0);
+
 #endif

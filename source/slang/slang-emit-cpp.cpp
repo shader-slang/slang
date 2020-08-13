@@ -2277,8 +2277,8 @@ void CPPSourceEmitter::emitPreprocessorDirectivesImpl()
     {
         // Put all into an anonymous namespace
         // This includes any generated types, and generated intrinsics
-
-        m_writer->emit("namespace { // anonymous \n\n");
+        if (!m_compileRequest->getLinkage()->m_heterogeneous)
+            m_writer->emit("namespace { // anonymous \n\n");
         m_writer->emit("#ifdef SLANG_PRELUDE_NAMESPACE\n");
         m_writer->emit("using namespace SLANG_PRELUDE_NAMESPACE;\n");
         m_writer->emit("#endif\n\n");
@@ -2556,11 +2556,11 @@ void CPPSourceEmitter::emitModuleImpl(IRModule* module)
                 continue;
             if (auto entryPointDecoration = func->findDecoration<IREntryPointDecoration>())
             {
-                String someName = entryPointDecoration->getName()->getStringSlice();
+                String entryPointName  = entryPointDecoration->getName()->getStringSlice();
                 for (int index = 0; index < program->getEntryPointCount(); index++)
                 {
                     auto entryPoint = program->getEntryPoint(index);
-                    if (someName == entryPoint->getName()->text)
+                    if (entryPointName  == entryPoint->getName()->text)
                     {
                         for (auto targetRequest : linkage->targets)
                         {
@@ -2586,13 +2586,13 @@ void CPPSourceEmitter::emitModuleImpl(IRModule* module)
                                 auto ptr = (const unsigned char*)blob->getBufferPointer();
 
                                 m_writer->emit("size_t __");
-                                m_writer->emit(someName);
+                                m_writer->emit(entryPointName );
                                 m_writer->emit("Size = ");
                                 m_writer->emitInt64(blob->getBufferSize());
                                 m_writer->emit(";\n");
 
                                 m_writer->emit("unsigned char __");
-                                m_writer->emit(someName);
+                                m_writer->emit(entryPointName );
                                 m_writer->emit("[] = {");
                                 for (unsigned int i = 0; i < blob->getBufferSize() - 1; i++) {
                                     m_writer->emitUInt64(ptr[i]);
@@ -2602,6 +2602,26 @@ void CPPSourceEmitter::emitModuleImpl(IRModule* module)
                                 m_writer->emit("};\n");
                             }
                         }
+                        // Emit a wrapper function for calling the shader blob
+                        m_writer->emit("void ");
+                        m_writer->emit(entryPointName);
+                        m_writer->emit("_wrapper(gfx_Renderer_0* renderer, Vector<uint32_t, 3> gridDims, \n");
+                        m_writer->emit("\tRWStructuredBuffer<float> buffer)\n{");
+                        m_writer->emit("\n\tgfx_ShaderProgram_0* shaderProgram = loadShaderProgram_0(renderer, __");
+                        m_writer->emit(entryPointName);
+                        m_writer->emit(", __");
+                        m_writer->emit(entryPointName);
+                        m_writer->emit("Size);");
+                        m_writer->emit("\n\tgfx_DescriptorSetLayout_0* setLayout = buildDescriptorSetLayout_0(renderer);");
+                        m_writer->emit("\n\tgfx_PipelineLayout_0* pipelineLayout = buildPipeline_0(renderer, setLayout);");
+                        m_writer->emit("\n\tgfx_DescriptorSet_0* descriptorSet = ");
+                        m_writer->emit("buildDescriptorSet_0(renderer, setLayout, unconvertBuffer_0(buffer));");
+                        m_writer->emit("\n\tgfx_PipelineState_0* pipelineState = ");
+                        m_writer->emit("buildPipelineState_0(shaderProgram, renderer, pipelineLayout);");
+
+                        m_writer->emit("\n\tdispatchComputation_0(renderer, pipelineState, pipelineLayout, ");
+                        m_writer->emit("descriptorSet, gridDims.x, gridDims.y, gridDims.z);");
+                        m_writer->emit("\n}\n");
                     }
                 }
             }
@@ -2645,8 +2665,8 @@ void CPPSourceEmitter::emitModuleImpl(IRModule* module)
     if (m_target == CodeGenTarget::CPPSource)
     {
         // Need to close the anonymous namespace when outputting for C++
-
-        m_writer->emit("} // anonymous\n\n");
+        if (!linkage->m_heterogeneous)
+            m_writer->emit("} // anonymous\n\n");
     }
 
      // Finally we need to output dll entry points
