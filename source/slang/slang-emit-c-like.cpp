@@ -3813,6 +3813,8 @@ void CLikeSourceEmitter::ensureGlobalInst(ComputeEmitActionsContext* ctx, IRInst
     default:
         break;
     }
+    if (as<IRBasicType>(inst))
+        return;
 
     // Have we already processed this instruction?
     EmitAction::Level existingLevel;

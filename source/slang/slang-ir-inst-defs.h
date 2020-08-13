@@ -176,6 +176,7 @@ INST(InterfaceType, interface, 0, 0)
 INST(AssociatedType, associated_type, 0, 0)
 INST(ThisType, this_type, 0, 0)
 INST(RTTIType, rtti_type, 0, 0)
+INST(TupleType, tuple_type, 0, 0)
 
 // A TypeType-typed IRValue represents a IRType.
 // It is used to represent a type parameter/argument in a generics.
@@ -235,6 +236,8 @@ INST(makeVector, makeVector, 0, 0)
 INST(MakeMatrix, makeMatrix, 0, 0)
 INST(makeArray, makeArray, 0, 0)
 INST(makeStruct, makeStruct, 0, 0)
+INST(MakeTuple, makeTuple, 0, 0)
+INST(GetTupleElement, getTupleElement, 2, 0)
 
 INST(Call, call, 1, 0)
 
