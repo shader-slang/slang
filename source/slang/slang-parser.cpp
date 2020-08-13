@@ -773,6 +773,15 @@ namespace Slang
         return parser->tokenReader.peekTokenType();
     }
 
+        /// Peek the token `offset` tokens after the cursor
+    static TokenType peekTokenType(Parser* parser, int offset)
+    {
+        TokenReader r = parser->tokenReader;
+        for (int ii = 0; ii < offset; ++ii)
+            r.advanceToken();
+        return r.peekTokenType();
+    }
+
     static Token advanceToken(Parser* parser)
     {
         return parser->ReadToken();
@@ -2746,17 +2755,79 @@ namespace Slang
         return parser->ReadToken(tokenType).type == tokenType;
     }
 
+        /// Peek in the token stream and return `true` if it looks like a modern-style variable declaration is coming up.
+    static bool _peekModernStyleVarDecl(Parser* parser)
+    {
+        // A modern-style variable declaration always starts with an identifier
+        if(peekTokenType(parser) != TokenType::Identifier)
+            return false;
+
+        switch(peekTokenType(parser, 1))
+        {
+        default:
+            return false;
+
+        case TokenType::Colon:
+        case TokenType::Comma:
+        case TokenType::RParent:
+        case TokenType::RBrace:
+        case TokenType::RBracket:
+        case TokenType::LBrace:
+            return true;
+        }
+    }
+
     static NodeBase* ParsePropertyDecl(Parser* parser, void* /*userData*/)
     {
         PropertyDecl* decl = parser->astBuilder->create<PropertyDecl>();
         parser->FillPosition(decl);
         parser->PushScope(decl);
 
-        decl->nameAndLoc = expectIdentifier(parser);
-
-        if( expect(parser, TokenType::Colon) )
+        // We want to support property declarations with two
+        // different syntaxes.
+        //
+        // First, we want to support a syntax that is consistent
+        // with C-style ("traditional") variable declarations:
+        //
+        //                int myVar = 2;
+        //      proprerty int myProp { ... }
+        //
+        // Second we want to support a syntax that is
+        // consistent with `let` and `var` declarations:
+        //
+        //      let      myVar  : int = 2;
+        //      property myProp : int { ... }
+        //
+        // The latter case is more constrained, and we will
+        // detect with two tokens of lookahead. If the 
+        // next token (after `property`) is an identifier,
+        // and the token after that is a colon (`:`), then
+        // we assume we are in the `let`/`var`-style case.
+        //
+        if(_peekModernStyleVarDecl(parser))
         {
+            decl->nameAndLoc = expectIdentifier(parser);
+            expect(parser, TokenType::Colon);
             decl->type = parser->ParseTypeExp();
+        }
+        else
+        {
+            // The traditional syntax requires a bit more
+            // care to parse, since it needs to support
+            // C declarator syntax.
+            //
+            DeclaratorInfo declaratorInfo;
+            declaratorInfo.typeSpec = parser->ParseType();
+
+            auto declarator = parseDeclarator(parser, kDeclaratorParseOptions_None);
+            UnwrapDeclarator(parser->astBuilder, declarator, &declaratorInfo);
+
+            // TODO: We might want to handle the case where the
+            // resulting declarator is not valid to use for
+            // declaring a property (e.g., it has function parameters).
+
+            decl->nameAndLoc = declaratorInfo.nameAndLoc;
+            decl->type = TypeExp(declaratorInfo.typeSpec);
         }
 
         parseStorageDeclBody(parser, decl);
@@ -2807,21 +2878,50 @@ namespace Slang
         return decl;
     }
 
+        /// Parse the common structured of a traditional-style parameter declaration (excluding the trailing semicolon)
+    static void _parseTraditionalParamDeclCommonBase(Parser* parser, VarDeclBase* decl, DeclaratorParseOptions options = kDeclaratorParseOptions_None)
+    {
+        DeclaratorInfo declaratorInfo;
+        declaratorInfo.typeSpec = parser->ParseType();
+
+        InitDeclarator initDeclarator = parseInitDeclarator(parser, options);
+        UnwrapDeclarator(parser->astBuilder, initDeclarator, &declaratorInfo);
+
+        // Assume it is a variable-like declarator
+        CompleteVarDecl(parser, decl, declaratorInfo);
+    }
+
     static ParamDecl* parseModernParamDecl(
         Parser* parser)
     {
-        ParamDecl* decl = parser->astBuilder->create<ParamDecl>();
+        // TODO: For "modern" parameters, we should probably
+        // not allow arbitrary keyword-based modifiers (only allowing
+        // `[attribute]`s), and should require that direction modifiers
+        // like `in`, `out`, and `in out`/`inout` be applied to the
+        // type (after the colon).
+        //
+        auto modifiers = ParseModifiers(parser);
 
-        // TODO: "modern" parameters should not accept keyword-based
-        // modifiers and should only accept `[attribute]` syntax for
-        // modifiers to keep the grammar as simple as possible.
+        // We want to allow both "modern"-style and traditional-style
+        // parameters to appear in any modern-style parameter list,
+        // in order to allow programmers the flexibility to code in
+        // a way that feels natural and not run into lots of
+        // errors.
         //
-        // Further, they should accept `out` and `in out`/`inout`
-        // before the type (e.g., `a: inout float4`).
-        //
-        decl->modifiers = ParseModifiers(parser);
-        parseModernVarDeclBaseCommon(parser, decl);
-        return decl;
+        if(_peekModernStyleVarDecl(parser))
+        {
+            ParamDecl* decl = parser->astBuilder->create<ModernParamDecl>();
+            decl->modifiers = modifiers;
+            parseModernVarDeclBaseCommon(parser, decl);
+            return decl;
+        }
+        else
+        {
+            ParamDecl* decl = parser->astBuilder->create<ParamDecl>();
+            decl->modifiers = modifiers;
+            _parseTraditionalParamDeclCommonBase(parser, decl);
+            return decl;
+        }
     }
 
     static void parseModernParamList(
@@ -3380,6 +3480,111 @@ namespace Slang
         return stmt;
     }
 
+    GpuForeachStmt* ParseGpuForeachStmt(Parser* parser)
+    {
+        // Hard-coding parsing of the following:
+        // __GPU_FOREACH(renderer, gridDims, LAMBDA(uint3 dispatchThreadID) {
+        //  kernelCall(args, ...); });
+
+        // Setup the scope so that dispatchThreadID is in scope for kernelCall
+        ScopeDecl* scopeDecl = parser->astBuilder->create<ScopeDecl>();
+        GpuForeachStmt* stmt = parser->astBuilder->create<GpuForeachStmt>();
+        stmt->scopeDecl = scopeDecl;
+
+        parser->FillPosition(stmt);
+        parser->ReadToken("__GPU_FOREACH");
+        parser->ReadToken(TokenType::LParent);
+        stmt->renderer = parser->ParseArgExpr();
+        parser->ReadToken(TokenType::Comma);
+        stmt->gridDims = parser->ParseArgExpr();
+
+        parser->ReadToken(TokenType::Comma);
+        parser->ReadToken("LAMBDA");
+        parser->ReadToken(TokenType::LParent);
+
+        auto idType = parser->ParseTypeExp();
+        NameLoc varNameAndLoc = expectIdentifier(parser);
+        VarDecl* varDecl = parser->astBuilder->create<VarDecl>();
+        varDecl->nameAndLoc = varNameAndLoc;
+        varDecl->loc = varNameAndLoc.loc;
+        varDecl->type = idType;
+        stmt->dispatchThreadID = varDecl;
+
+        parser->ReadToken(TokenType::RParent);
+        parser->ReadToken(TokenType::LBrace);
+
+        parser->pushScopeAndSetParent(scopeDecl);
+        AddMember(parser->currentScope, varDecl);
+
+        stmt->kernelCall = parser->ParseExpression();
+
+        parser->PopScope();
+
+        parser->ReadToken(TokenType::Semicolon);
+        parser->ReadToken(TokenType::RBrace);
+
+        parser->ReadToken(TokenType::RParent);
+
+        parser->ReadToken(TokenType::Semicolon);
+
+        return stmt;
+    }
+
+    static bool _isType(Decl* decl)
+    {
+        return decl && (as<AggTypeDecl>(decl) || as<SimpleTypeDecl>(decl));
+    }
+
+    // TODO(JS):
+    // This only handles StaticMemberExpr, and VarExpr lookup scenarios!
+    static Decl* _tryResolveDecl(Parser* parser, Expr* expr)
+    {
+        if (auto staticMemberExpr = as<StaticMemberExpr>(expr))
+        {
+            Decl* baseTypeDecl = _tryResolveDecl(parser, staticMemberExpr->baseExpression);
+            if (!baseTypeDecl)
+            {
+                return nullptr;
+            }
+            if (AggTypeDecl* aggTypeDecl = as<AggTypeDecl>(baseTypeDecl))
+            {
+                // TODO(JS):
+                // Is it valid to always have empty substitution set here?
+                DeclRef<ContainerDecl> declRef(aggTypeDecl, SubstitutionSet());
+
+                auto lookupResult = lookUpDirectAndTransparentMembers(
+                    parser->astBuilder,
+                    nullptr, // no semantics visitor available yet
+                    staticMemberExpr->name,
+                    declRef);
+
+                if (!lookupResult.isValid() || lookupResult.isOverloaded())
+                    return nullptr;
+
+                return lookupResult.item.declRef.getDecl();
+            }
+
+            // Didn't find it
+            return nullptr;
+        }
+
+        if (auto varExpr = as<VarExpr>(expr))
+        {
+            // Do the lookup in the current scope
+            auto lookupResult = lookUp(
+                parser->astBuilder,
+                nullptr, // no semantics visitor available yet
+                varExpr->name,
+                parser->currentScope);
+            if (!lookupResult.isValid() || lookupResult.isOverloaded())
+                return nullptr;
+
+            return lookupResult.item.declRef.getDecl();
+        }
+
+        return nullptr;
+    }
+
     static bool isTypeName(Parser* parser, Name* name)
     {
         auto lookupResult = lookUp(
@@ -3390,19 +3595,7 @@ namespace Slang
         if(!lookupResult.isValid() || lookupResult.isOverloaded())
             return false;
 
-        auto decl = lookupResult.item.declRef.getDecl();
-        if( auto typeDecl = as<AggTypeDecl>(decl) )
-        {
-            return true;
-        }
-        else if( auto typeVarDecl = as<SimpleTypeDecl>(decl) )
-        {
-            return true;
-        }
-        else
-        {
-            return false;
-        }
+        return _isType(lookupResult.item.declRef.getDecl());
     }
 
     static bool peekTypeName(Parser* parser)
@@ -3509,6 +3702,8 @@ namespace Slang
             statement = ParseCaseStmt(this);
         else if (LookAheadToken("default"))
             statement = ParseDefaultStmt(this);
+        else if (LookAheadToken("__GPU_FOREACH"))
+            statement = ParseGpuForeachStmt(this);
         else if (LookAheadToken(TokenType::Dollar))
         {
             statement = parseCompileTimeStmt(this);
@@ -3829,14 +4024,8 @@ namespace Slang
         ParamDecl* parameter = astBuilder->create<ParamDecl>();
         parameter->modifiers = ParseModifiers(this);
 
-        DeclaratorInfo declaratorInfo;
-        declaratorInfo.typeSpec = ParseType();
+        _parseTraditionalParamDeclCommonBase(this, parameter, kDeclaratorParseOption_AllowEmpty);
 
-        InitDeclarator initDeclarator = parseInitDeclarator(this, kDeclaratorParseOption_AllowEmpty);
-        UnwrapDeclarator(astBuilder, initDeclarator, &declaratorInfo);
-
-        // Assume it is a variable-like declarator
-        CompleteVarDecl(this, parameter, declaratorInfo);
         return parameter;
     }
 
@@ -4310,6 +4499,137 @@ namespace Slang
         return value;
     }
 
+    static bool _isCast(Parser* parser, Expr* expr)
+    {
+
+        // We can't just look at expr and look up if it's a type, because we allow
+        // out-of-order declarations. So to a first approximation we'll try and
+        // determine if it is a cast via a heuristic based on what comes next
+
+        TokenType tokenType = peekTokenType(parser);
+
+        // Expression
+        // ==========
+        //
+        // Misc: ; ) [ ] , . = ? (ternary) { } ++ -- -> 
+        // Binary ops: * / | & ^ % << >> 
+        // Logical ops: || &&  
+        // Comparisons: != == < > <= =>
+        //
+        // Any assign op
+        // 
+        // If we don't have pointers then
+        // & : (Thing::Another) &v 
+        // * : (Thing::Another)*ptr is a cast.
+        //
+        // Cast
+        // ====
+        //
+        // Misc: (
+        // Identifier, Literal
+        // Unary ops: !, ~
+        // 
+        // Ambiguous
+        // =========
+        //
+        // - : Can be unary and therefore a cast or a binary subtract, and therefore an expression
+        // + : Can be unary and therefore could be a cast, or a binary add and therefore an expression
+        //
+        // Arbitrary
+        // =========
+        //
+        // End of file, End of directive, Invalid, :, ::
+
+        switch (tokenType)
+        {
+            case TokenType::FloatingPointLiteral:
+            case TokenType::CharLiteral:
+            case TokenType::IntegerLiteral:
+            case TokenType::Identifier:
+            case TokenType::OpNot:
+            case TokenType::OpBitNot:
+            {
+                // If followed by one of these, must be a cast
+                return true;
+            }
+            case TokenType::LParent:
+            {
+                // If we are followed by ( it might not be a cast - it could be a call invocation.
+                // BUT we can always *assume* it is a call, because such a 'call' will be correctly
+                // handled as a cast if necessary later.
+                return false;
+            }
+            case TokenType::OpAdd:
+            case TokenType::OpSub:
+            {
+                // + - are ambiguous, it could be a binary + or - so -> expression, or unary -> cast
+                //
+                // (Some::Stuff) + 3
+                // (Some::Stuff) - 3
+                // Strictly I can only tell if this is an expression or a cast if I know Some::Stuff is a type or not
+                // but we can't know here in general because we allow out-of-order declarations.
+
+                // If we can determine it's a type, then it must be a cast, and we are done.
+                // 
+                // NOTE! This test can only determine if it's a type *iff* it has already been defined. A future out
+                // of order declaration, will not be correctly found here.
+                //
+                // This means the semantics change depending on the order of definition (!)
+                Decl* decl = _tryResolveDecl(parser, expr);
+                // If we can find the decl-> we can resolve unambiguously
+                if (decl)
+                {
+                    return _isType(decl);
+                }
+
+                // Now we use a heuristic.
+                //
+                // Whitespace before, whitespace after->binary
+                // No whitespace before, no whitespace after->binary
+                // Otherwise->unary
+                //
+                // Unary -> cast, binary -> expression.
+                // 
+                // Ie:
+                // (Some::Stuff) +3  - must be a cast
+                // (Some::Stuff)+ 3  - must be a cast (?) This is a bit odd.
+                // (Some::Stuff) + 3 - must be an expression.
+                // (Some::Stuff)+3 - must be an expression.
+
+                // TODO(JS): This covers the (SomeScope::Identifier) case
+                //
+                // But perhaps there other ways of referring to types, that this now misses? With associated types/generics perhaps.
+                // 
+                // For now we'll assume it's not a cast if it's not a StaticMemberExpr
+                // The reason for the restriction (which perhaps can be broadened), is we don't
+                // want the interpretation of something in parentheses to be determined by something as common as + or - whitespace.
+
+                if (auto staticMemberExpr = dynamicCast<StaticMemberExpr>(expr))
+                {
+                    // Apply the heuristic:
+                    TokenReader::ParsingCursor cursor = parser->tokenReader.getCursor();
+                    // Skip the + or -
+                    const Token opToken = advanceToken(parser);
+                    // Peek the next token to see if it was preceded by white space
+                    const Token nextToken = peekToken(parser);
+
+                    // Rewind
+                    parser->tokenReader.setCursor(cursor);
+
+                    const bool isBinary = (nextToken.flags & TokenFlag::AfterWhitespace) == (opToken.flags & TokenFlag::AfterWhitespace);
+
+                    // If it's binary it's not a cast
+                    return !isBinary;
+                }
+                break;
+            }
+            default: break;
+        }
+
+        // We'll assume it's not a cast
+        return false;
+    }
+
     static Expr* parseAtomicExpr(Parser* parser)
     {
         switch( peekTokenType(parser) )
@@ -4320,7 +4640,7 @@ namespace Slang
             return nullptr;
 
         // Either:
-        // - parenthized expression `(exp)`
+        // - parenthesized expression `(exp)`
         // - cast `(type) exp`
         //
         // Proper disambiguation requires mixing up parsing
@@ -4344,13 +4664,39 @@ namespace Slang
                 }
                 else
                 {
+                    // The above branch catches the case where we have a cast like (Thing), but with
+                    // the scoping operator it will not handle (SomeScope::Thing). In that case this
+                    // branch will be taken. This is okay in so far as SomeScope::Thing will parse
+                    // as an expression.
+                    
                     Expr* base = parser->ParseExpression();
+
                     parser->ReadToken(TokenType::RParent);
 
-                    ParenExpr* parenExpr = parser->astBuilder->create<ParenExpr>();
-                    parenExpr->loc = openParen.loc;
-                    parenExpr->base = base;
-                    return parenExpr;
+                    // We now try and determine by what base is, if this is actually a cast or an expression in parentheses
+                    if (_isCast(parser, base))
+                    {
+                        // Parse as a cast
+
+                        TypeCastExpr* tcexpr = parser->astBuilder->create<ExplicitCastExpr>();
+                        tcexpr->loc = openParen.loc;
+
+                        tcexpr->functionExpr = base;
+
+                        auto arg = parsePrefixExpr(parser);
+                        tcexpr->arguments.add(arg);
+
+                        return tcexpr;
+                    }
+                    else
+                    {
+                        // Pass as an expression in parentheses
+
+                        ParenExpr* parenExpr = parser->astBuilder->create<ParenExpr>();
+                        parenExpr->loc = openParen.loc;
+                        parenExpr->base = base;
+                        return parenExpr;
+                    }
                 }
             }
 

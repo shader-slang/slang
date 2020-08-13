@@ -1622,6 +1622,8 @@ namespace Slang
         void visitReturnStmt(ReturnStmt *stmt);
 
         void visitWhileStmt(WhileStmt *stmt);
+        
+        void visitGpuForeachStmt(GpuForeachStmt *stmt);
 
         void visitExpressionStmt(ExpressionStmt *stmt);
     };

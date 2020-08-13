@@ -44,7 +44,8 @@
 static TBuiltInResource _calcBuiltinResources()
 {
     // NOTE! This is a bit of a hack - to set all the fields to true/UNLIMITED.
-
+    // Care must be taken if new variables are introduced, the default may not be appropriate.
+    
     // We are relying on limits being after the other fields. 
     SLANG_COMPILE_TIME_ASSERT(SLANG_OFFSET_OF(TBuiltInResource, limits) > 0);
     // We are relying on maxLights being the first parameter, and all values will have the same type
@@ -61,6 +62,10 @@ static TBuiltInResource _calcBuiltinResources()
             dst[i] = UNLIMITED;
         }
     }
+
+    // In the sea of variables there is a min value
+    resource.minProgramTexelOffset = -UNLIMITED;
+
     // Set up the bools
     {
         TLimits* limits = &resource.limits;
@@ -163,6 +168,8 @@ static void glslang_optimizeSPIRV(std::vector<unsigned int>& spirv, spv_target_e
         break;
     case SLANG_OPTIMIZATION_LEVEL_DEFAULT:
         // Use a minimal set of performance settings
+        // If we run CreateInlineExhaustivePass, We need to run CreateMergeReturnPass first. 
+        optimizer.RegisterPass(spvtools::CreateMergeReturnPass());
         optimizer.RegisterPass(spvtools::CreateInlineExhaustivePass());
         optimizer.RegisterPass(spvtools::CreateAggressiveDCEPass());
         optimizer.RegisterPass(spvtools::CreatePrivateToLocalPass());
