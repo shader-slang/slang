@@ -114,6 +114,9 @@
     <ClInclude Include="slang-image-format-defs.h">
       <Filter>Header Files</Filter>
     </ClInclude>
+    <ClInclude Include="slang-ir-any-value-marshalling.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
     <ClInclude Include="slang-ir-bind-existentials.h">
       <Filter>Header Files</Filter>
     </ClInclude>
@@ -177,7 +180,7 @@
     <ClInclude Include="slang-ir-lower-generic-function.h">
       <Filter>Header Files</Filter>
     </ClInclude>
-    <ClInclude Include="slang-ir-lower-generic-var.h">
+    <ClInclude Include="slang-ir-lower-generic-type.h">
       <Filter>Header Files</Filter>
     </ClInclude>
     <ClInclude Include="slang-ir-lower-generics.h">
@@ -416,6 +419,9 @@
     <ClCompile Include="slang-hlsl-intrinsic-set.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
+    <ClCompile Include="slang-ir-any-value-marshalling.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
     <ClCompile Include="slang-ir-bind-existentials.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
@@ -476,7 +482,7 @@
     <ClCompile Include="slang-ir-lower-generic-function.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
-    <ClCompile Include="slang-ir-lower-generic-var.cpp">
+    <ClCompile Include="slang-ir-lower-generic-type.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
     <ClCompile Include="slang-ir-lower-generics.cpp">

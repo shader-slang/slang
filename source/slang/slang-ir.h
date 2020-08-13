@@ -936,6 +936,7 @@ struct IRResourceTypeBase : IRType
     {
         return getFlavor().getBaseShape();
     }
+    bool isFeedback() const { return getFlavor().isFeedback(); }
     bool isMultisample() const { return getFlavor().isMultisample(); }
     bool isArray() const { return getFlavor().isArray(); }
     SlangResourceShape getShape() const { return getFlavor().getShape(); }
@@ -1219,6 +1220,11 @@ struct IRAssociatedType : IRType
 struct IRThisType : IRType
 {
     IR_LEAF_ISA(ThisType)
+
+    IRInst* getConstraintType()
+    {
+        return getOperand(0);
+    }
 };
 
 struct IRInterfaceRequirementEntry : IRInst
@@ -1250,6 +1256,15 @@ struct IRTypeType : IRType
 struct IRRTTIType : IRType
 {
     IR_LEAF_ISA(RTTIType);
+};
+
+struct IRAnyValueType : IRType
+{
+    IR_LEAF_ISA(AnyValueType);
+    IRInst* getSize()
+    {
+        return getOperand(0);
+    }
 };
 
 struct IRWitnessTableType : IRType

@@ -19,6 +19,11 @@
 
 #if defined(__linux__) || defined(__CYGWIN__) || SLANG_APPLE_FAMILY
 #   include <unistd.h>
+// For Path::find
+#   include <fnmatch.h>
+
+#   include <dirent.h>
+#   include <sys/stat.h>
 #endif
 
 #if SLANG_APPLE_FAMILY
@@ -551,6 +556,97 @@ namespace Slang
 #   endif
 #endif
     }
+
+#if defined(_WIN32)
+    /* static */SlangResult Path::find(const String& directoryPath, const char* pattern, Visitor* visitor)
+    {
+        pattern = pattern ? pattern : "*";
+        String searchPath = Path::combine(directoryPath, pattern);
+
+        WIN32_FIND_DATAW fileData;
+
+        HANDLE findHandle = FindFirstFileW(searchPath.toWString(), &fileData);
+        if (!findHandle)
+        {
+            return SLANG_E_NOT_FOUND;
+        }
+
+        do
+        {
+            if (!((wcscmp(fileData.cFileName, L".") == 0) ||
+                  (wcscmp(fileData.cFileName, L"..") == 0)))
+            {
+                const Type type = (fileData.dwFileAttributes & FILE_ATTRIBUTE_DIRECTORY) ? Type::Directory : Type::File;
+
+                String filename = String::fromWString(fileData.cFileName);
+                visitor->accept(type, filename.getUnownedSlice());
+            }
+        }
+        while (FindNextFileW(findHandle, &fileData) != 0);
+
+         ::FindClose(findHandle);
+         return SLANG_OK;
+    }
+#else
+    /* static */SlangResult Path::find(const String& directoryPath, const char* pattern, Visitor* visitor)
+    {
+        DIR* directory = opendir(directoryPath.getBuffer());
+        
+        if (!directory)
+        {
+            return SLANG_E_NOT_FOUND;
+        }
+
+        StringBuilder builder;
+        for (;;)
+        {
+            dirent* entry = readdir(directory);
+            if (entry == nullptr)
+            {
+                break;
+            }
+
+            if (strcmp(entry->d_name, ".") == 0 ||
+                strcmp(entry->d_name, "..") == 0)
+            {
+                continue;
+            }
+
+            // If there is a pattern, check if it matches, and if it doesn't ignore it
+            if (pattern && fnmatch(pattern, entry->d_name, 0) != 0)
+            {
+                continue;
+            }
+
+            const UnownedStringSlice filename(entry->d_name);
+
+            // Produce the full path, to do stat
+            Path::combineIntoBuilder(directoryPath.getUnownedSlice(), filename, builder);
+
+            //    fprintf(stderr, "stat(%s)\n", path.getBuffer());
+            struct stat fileInfo;
+            if (stat(builder.getBuffer(), &fileInfo) != 0)
+            {
+                continue;
+            }
+
+            Type type = Type::Unknown;
+            if (S_ISDIR(fileInfo.st_mode))
+            {
+                type = Type::Directory;
+            }
+            else if (S_ISREG(fileInfo.st_mode))
+            {
+                type = Type::File;
+            }
+
+            visitor->accept(type, filename);
+        }
+
+        closedir(directory);
+        return SLANG_OK;
+    }
+#endif
 
     /// Gets the path to the executable that was invoked that led to the current threads execution
     /// If run from a shared library/dll will be the path of the executable that loaded said library

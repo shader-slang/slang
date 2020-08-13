@@ -26,6 +26,8 @@ INST(Nop, nop, 0, 0)
 
     INST(StringType, String, 0, 0)
 
+    INST(AnyValueType, AnyValueType, 1, 0)
+
     INST(RawPointerType, RawPointerType, 0, 0)
     INST(RTTIPointerType, RTTIPointerType, 1, 0)
     INST(AfterRawPointerTypeBase, AfterRawPointerTypeBase, 0, 0)
@@ -216,6 +218,12 @@ INST_RANGE(Constant, BoolLit, StringLit)
 
 INST(undefined, undefined, 0, 0)
 
+// A `defaultConstruct` operation creates an initialized
+// value of the result type, and can only be used for types
+// where default construction is a meaningful thing to do.
+//
+INST(DefaultConstruct, defaultConstruct, 0, 0)
+
 INST(Specialize, specialize, 2, 0)
 INST(lookup_interface_method, lookup_interface_method, 2, 0)
 INST(lookup_witness_table, lookup_witness_table, 2, 0)
@@ -232,6 +240,9 @@ INST(Call, call, 1, 0)
 
 INST(RTTIObject, rtti_object, 0, 0)
 INST(Alloca, alloca, 1, 0)
+
+INST(PackAnyValue, packAnyValue, 1, 0)
+INST(UnpackAnyValue, unpackAnyValue, 1, 0)
 
 INST(WitnessTableEntry, witness_table_entry, 2, 0)
 INST(InterfaceRequirementEntry, interface_req_entry, 2, 0)
@@ -539,7 +550,9 @@ INST(HighLevelDeclDecoration,               highLevelDecl,          1, 0)
 
     /* Decorations for RTTI objects */
         INST(RTTITypeSizeDecoration, RTTI_typeSize, 1, 0)
+    INST(AnyValueSizeDecoration, AnyValueSize, 1, 0)
 
+    INST(TypeConstraintDecoration, TypeConstraintDecoration, 1, 0)
     INST_RANGE(LinkageDecoration, ImportDecoration, ExportDecoration)
 
     INST(SemanticDecoration, semantic, 2, 0)

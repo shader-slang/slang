@@ -221,6 +221,7 @@
     <ClInclude Include="slang-glsl-extension-tracker.h" />
     <ClInclude Include="slang-hlsl-intrinsic-set.h" />
     <ClInclude Include="slang-image-format-defs.h" />
+    <ClInclude Include="slang-ir-any-value-marshalling.h" />
     <ClInclude Include="slang-ir-bind-existentials.h" />
     <ClInclude Include="slang-ir-byte-address-legalize.h" />
     <ClInclude Include="slang-ir-clone.h" />
@@ -242,7 +243,7 @@
     <ClInclude Include="slang-ir-link.h" />
     <ClInclude Include="slang-ir-lower-generic-call.h" />
     <ClInclude Include="slang-ir-lower-generic-function.h" />
-    <ClInclude Include="slang-ir-lower-generic-var.h" />
+    <ClInclude Include="slang-ir-lower-generic-type.h" />
     <ClInclude Include="slang-ir-lower-generics.h" />
     <ClInclude Include="slang-ir-missing-return.h" />
     <ClInclude Include="slang-ir-restructure-scoping.h" />
@@ -323,6 +324,7 @@
     <ClCompile Include="slang-file-system.cpp" />
     <ClCompile Include="slang-glsl-extension-tracker.cpp" />
     <ClCompile Include="slang-hlsl-intrinsic-set.cpp" />
+    <ClCompile Include="slang-ir-any-value-marshalling.cpp" />
     <ClCompile Include="slang-ir-bind-existentials.cpp" />
     <ClCompile Include="slang-ir-byte-address-legalize.cpp" />
     <ClCompile Include="slang-ir-clone.cpp" />
@@ -343,7 +345,7 @@
     <ClCompile Include="slang-ir-link.cpp" />
     <ClCompile Include="slang-ir-lower-generic-call.cpp" />
     <ClCompile Include="slang-ir-lower-generic-function.cpp" />
-    <ClCompile Include="slang-ir-lower-generic-var.cpp" />
+    <ClCompile Include="slang-ir-lower-generic-type.cpp" />
     <ClCompile Include="slang-ir-lower-generics.cpp" />
     <ClCompile Include="slang-ir-missing-return.cpp" />
     <ClCompile Include="slang-ir-restructure-scoping.cpp" />
@@ -404,4 +406,4 @@
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">
   </ImportGroup>
-</Project>
+</Project> 

@@ -340,6 +340,12 @@ SlangResult CPPSourceEmitter::_calcCPPTextureTypeName(IRTextureTypeBase* texType
         case SLANG_RESOURCE_ACCESS_CONSUME:
             outName << "Consume";
             break;
+        case SLANG_RESOURCE_ACCESS_WRITE:
+            if (texType->isFeedback())
+            {
+                outName << "Feedback";
+            }
+            break;
         default:
             SLANG_DIAGNOSE_UNEXPECTED(getSink(), SourceLoc(), "unhandled resource access mode");
             return SLANG_FAIL;
@@ -501,6 +507,14 @@ SlangResult CPPSourceEmitter::calcTypeName(IRType* type, CodeGenTarget target, S
         case kIROp_RTTIPointerType:
         {
             out << "void*";
+            return SLANG_OK;
+        }
+        case kIROp_AnyValueType:
+        {
+            out << "AnyValue<";
+            auto anyValueType = static_cast<IRAnyValueType*>(type);
+            out << getIntVal(anyValueType->getSize());
+            out << ">";
             return SLANG_OK;
         }
         case kIROp_ConstantBufferType:
@@ -2529,6 +2543,71 @@ void CPPSourceEmitter::_emitForwardDeclarations(const List<EmitAction>& actions)
 
 void CPPSourceEmitter::emitModuleImpl(IRModule* module)
 {
+    // If we are emitting a heterogeneous program
+    // Emit the binary blob of each non-CPP target
+    ComponentType* program = m_compileRequest->getProgram();
+    auto linkage = m_compileRequest->getLinkage();
+    if (linkage->m_heterogeneous)
+    {
+        for (auto inst : module->getGlobalInsts())
+        {
+            auto func = as<IRFunc>(inst);
+            if (!func)
+                continue;
+            if (auto entryPointDecoration = func->findDecoration<IREntryPointDecoration>())
+            {
+                String someName = entryPointDecoration->getName()->getStringSlice();
+                for (int index = 0; index < program->getEntryPointCount(); index++)
+                {
+                    auto entryPoint = program->getEntryPoint(index);
+                    if (someName == entryPoint->getName()->text)
+                    {
+                        for (auto targetRequest : linkage->targets)
+                        {
+                            // Emit for all non-CPU targets
+                            switch (targetRequest->getTarget())
+                            {
+                            case(CodeGenTarget::CPPSource):
+                            case(CodeGenTarget::CSource):
+                            case(CodeGenTarget::HostCallable):
+                            case(CodeGenTarget::CUDASource):
+
+                                break;
+
+                            default:
+
+                                auto targetProgram = program->getTargetProgram(targetRequest);
+                                DiagnosticSink sink(linkage->getSourceManager());
+                                CompileResult result =
+                                    targetProgram->getOrCreateEntryPointResult(index, &sink);
+
+                                Slang::ComPtr<ISlangBlob> blob;
+                                result.getBlob(blob);
+                                auto ptr = (const unsigned char*)blob->getBufferPointer();
+
+                                m_writer->emit("size_t __");
+                                m_writer->emit(someName);
+                                m_writer->emit("Size = ");
+                                m_writer->emitInt64(blob->getBufferSize());
+                                m_writer->emit(";\n");
+
+                                m_writer->emit("unsigned char __");
+                                m_writer->emit(someName);
+                                m_writer->emit("[] = {");
+                                for (unsigned int i = 0; i < blob->getBufferSize() - 1; i++) {
+                                    m_writer->emitUInt64(ptr[i]);
+                                    m_writer->emit(", ");
+                                }
+                                m_writer->emitUInt64(ptr[blob->getBufferSize() - 1]);
+                                m_writer->emit("};\n");
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+
     // Setup all built in types used in the module
     m_typeSet.addAllBuiltinTypes(module);
     // If any matrix types are used, then we need appropriate vector types too.

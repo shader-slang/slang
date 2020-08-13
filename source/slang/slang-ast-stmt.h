@@ -117,6 +117,17 @@ class DefaultStmt : public CaseStmtBase
     SLANG_CLASS(DefaultStmt)
 };
 
+// a `default` statement inside a `switch`
+class GpuForeachStmt : public ScopeStmt 
+{
+    SLANG_CLASS(GpuForeachStmt)
+
+    Expr* renderer = nullptr;
+    Expr* gridDims = nullptr;
+    VarDecl* dispatchThreadID = nullptr;
+    Expr* kernelCall = nullptr;
+};
+
 // A statement that represents a loop, and can thus be escaped with a `continue`
 class LoopStmt : public BreakableStmt 
 {

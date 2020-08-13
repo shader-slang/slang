@@ -1801,6 +1801,7 @@ extern "C"
         SLANG_TYPE_KIND_INTERFACE,
         SLANG_TYPE_KIND_OUTPUT_STREAM,
         SLANG_TYPE_KIND_SPECIALIZED,
+        SLANG_TYPE_KIND_FEEDBACK,
         SLANG_TYPE_KIND_COUNT,
     };
 
@@ -1842,6 +1843,8 @@ extern "C"
         SLANG_ACCELERATION_STRUCTURE        = 0x09,
 
         SLANG_RESOURCE_EXT_SHAPE_MASK       = 0xF0,
+
+        SLANG_TEXTURE_FEEDBACK_FLAG         = 0x10,
         SLANG_TEXTURE_ARRAY_FLAG            = 0x40,
         SLANG_TEXTURE_MULTISAMPLE_FLAG      = 0x80,
 
@@ -1862,6 +1865,7 @@ extern "C"
         SLANG_RESOURCE_ACCESS_RASTER_ORDERED,
         SLANG_RESOURCE_ACCESS_APPEND,
         SLANG_RESOURCE_ACCESS_CONSUME,
+        SLANG_RESOURCE_ACCESS_WRITE,
     };
 
     typedef unsigned int SlangParameterCategory;
@@ -2205,6 +2209,7 @@ namespace slang
             Interface = SLANG_TYPE_KIND_INTERFACE,
             OutputStream = SLANG_TYPE_KIND_OUTPUT_STREAM,
             Specialized = SLANG_TYPE_KIND_SPECIALIZED,
+            Feedback = SLANG_TYPE_KIND_FEEDBACK,
         };
 
         enum ScalarType : SlangScalarType

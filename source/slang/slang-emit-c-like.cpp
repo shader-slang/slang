@@ -2037,6 +2037,7 @@ void CLikeSourceEmitter::defaultEmitInstExpr(IRInst* inst, const EmitOpInfo& inO
         break;
 
     case kIROp_undefined:
+    case kIROp_DefaultConstruct:
         m_writer->emit(getName(inst));
         break;
 
@@ -2402,6 +2403,28 @@ void CLikeSourceEmitter::defaultEmitInstExpr(IRInst* inst, const EmitOpInfo& inO
             m_writer->emit(")");
         }
         break;
+    case kIROp_PackAnyValue:
+    {
+        m_writer->emit("packAnyValue<");
+        m_writer->emit(getIntVal(cast<IRAnyValueType>(inst->getDataType())->getSize()));
+        m_writer->emit(",");
+        emitType(inst->getOperand(0)->getDataType());
+        m_writer->emit(">(");
+        emitOperand(inst->getOperand(0), getInfo(EmitOp::General));
+        m_writer->emit(")");
+        break;
+    }
+    case kIROp_UnpackAnyValue:
+    {
+        m_writer->emit("unpackAnyValue<");
+        m_writer->emit(getIntVal(cast<IRAnyValueType>(inst->getOperand(0)->getDataType())->getSize()));
+        m_writer->emit(",");
+        emitType(inst->getDataType());
+        m_writer->emit(">(");
+        emitOperand(inst->getOperand(0), getInfo(EmitOp::General));
+        m_writer->emit(")");
+        break;
+    }
     default:
         diagnoseUnhandledInst(inst);
         break;
@@ -2464,6 +2487,7 @@ void CLikeSourceEmitter::_emitInst(IRInst* inst)
         break;
 
     case kIROp_undefined:
+    case kIROp_DefaultConstruct:
         {
             auto type = inst->getDataType();
             emitType(type, getName(inst));

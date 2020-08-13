@@ -39,6 +39,7 @@ Items with ^ means there is some discussion about support later in the document 
 | `[unroll]`                  |     Yes      |   Yes        |   Yes ^    |     Yes       |    Limited + 
 | Atomics                     |     Yes      |   Yes        |   Yes      |     Yes       |    No + 
 | Atomics on RWBuffer         |     Yes      |   Yes        |   Yes      |     No        |    No + 
+| Sampler Feedback            |     No       |   Yes        |   No +     |     No        |    Yes ^
 
 ## Half Type
 
@@ -169,3 +170,12 @@ For VK the GLSL output from Slang seems plausible, but VK binding fails in tests
 On CUDA RWBuffer becomes CUsurfObject, which is a 'texture' type and does not support atomics. 
 
 On the CPU atomics are not supported, but will be in the future.
+
+## Sampler Feedback
+
+The HLSL [sampler feedback feature](https://microsoft.github.io/DirectX-Specs/d3d/SamplerFeedback.html) is available for DirectX12. The features requires shader model 6.5 and therefore a version of [DXC](https://github.com/Microsoft/DirectXShaderCompiler) that supports that model or higher. The Shader Model 6.5 requirement also means only DXIL binary format is supported. 
+
+There doesn't not appear to be a similar feature available in Vulkan yet, but when it is available support should be addeed.
+
+For CPU targets there is the IFeedbackTexture interface that requires an implemention for use. Slang does not currently include CPU implementations for texture types.  
+

@@ -875,4 +875,13 @@ class OpenAttribute : public InheritanceControlAttribute { SLANG_CLASS(OpenAttri
     /// An attribute that marks a type declaration as disallowing the type to be inherited from in other modules.
 class SealedAttribute : public InheritanceControlAttribute { SLANG_CLASS(SealedAttribute) };
 
+    /// An attribute that defines the size of `AnyValue` type to represent a polymoprhic value that conforms to
+    /// the decorated interface type.
+class AnyValueSizeAttribute : public Attribute
+{
+    SLANG_CLASS(AnyValueSizeAttribute)
+
+    int32_t size;
+};
+
 } // namespace Slang

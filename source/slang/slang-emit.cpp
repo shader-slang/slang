@@ -311,11 +311,17 @@ Result linkAndOptimizeIR(
         // generics / interface types to ordinary functions and types using
         // function pointers.
         if (compileRequest->allowDynamicCode)
-            lowerGenerics(irModule);
+        {
+            lowerGenerics(irModule, sink);
+            dumpIRIfEnabled(compileRequest, irModule, "LOWER-GENERICS");
+        }
         break;
     default:
         break;
     }
+
+    if (sink->getErrorCount() != 0)
+        return SLANG_FAIL;
 
     // TODO(DG): There are multiple DCE steps here, which need to be changed
     //   so that they don't just throw out any non-entry point code
@@ -775,13 +781,13 @@ SlangResult emitEntryPointsSourceFromIR(
             break;
         }
 
-        linkAndOptimizeIR(
+        SLANG_RETURN_ON_FAIL(linkAndOptimizeIR(
             compileRequest,
             entryPointIndices,
             target,
             targetRequest,
             linkingAndOptimizationOptions,
-            linkedIR);
+            linkedIR));
 
         auto irModule = linkedIR.module;
 
@@ -862,13 +868,13 @@ SlangResult emitSPIRVForEntryPointsDirectly(
     // Outside because we want to keep IR in scope whilst we are processing emits
     LinkedIR linkedIR;
     LinkingAndOptimizationOptions linkingAndOptimizationOptions;
-    linkAndOptimizeIR(
+    SLANG_RETURN_ON_FAIL(linkAndOptimizeIR(
         compileRequest,
         entryPointIndices,
         targetRequest->getTarget(),
         targetRequest,
         linkingAndOptimizationOptions,
-        linkedIR);
+        linkedIR));
 
     auto irModule = linkedIR.module;
     auto irEntryPoints = linkedIR.entryPoints;

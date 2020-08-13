@@ -363,9 +363,10 @@ public:
         /// Set the payload on a data. Payload can be passed as nullptr, if it is no memory will be copied.
     void setPayload(Data* data, const void* payload, size_t size);
 
-        /// Move ownership to
+        /// Move ownership to.
+        /// NOTE! The payload *must* be deallocatable via 'free'
     void moveOwned(Data* data, void* payload, size_t size);
-        /// Move unowned
+        /// Move unowned. The payload scope must last longer than the RiffContainer
     void setUnowned(Data* data, void* payload, size_t size);
 
         /// End a chunk

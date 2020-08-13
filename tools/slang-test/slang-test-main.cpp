@@ -13,7 +13,7 @@
 
 using namespace Slang;
 
-#include "os.h"
+#include "directory-util.h"
 #include "../../source/core/slang-render-api-util.h"
 #include "test-context.h"
 #include "test-reporter.h"
@@ -3144,17 +3144,25 @@ void runTestsInDirectory(
     TestContext*		context,
     String				directoryPath)
 {
-    for (auto file : osFindFilesInDirectory(directoryPath))
     {
-        if( shouldRunTest(context, file) )
+        List<String> files;
+        DirectoryUtil::findFiles(directoryPath, files);
+        for (auto file : files)
         {
-//            fprintf(stderr, "slang-test: found '%s'\n", file.getBuffer());
-            runTestsOnFile(context, file);
+            if( shouldRunTest(context, file) )
+            {
+    //            fprintf(stderr, "slang-test: found '%s'\n", file.getBuffer());
+                runTestsOnFile(context, file);
+            }
         }
     }
-    for (auto subdir : osFindChildDirectories(directoryPath))
     {
-        runTestsInDirectory(context, subdir);
+        List<String> subDirs;
+        DirectoryUtil::findDirectories(directoryPath, subDirs);
+        for (auto subDir : subDirs)
+        {
+            runTestsInDirectory(context, subDir);
+        }
     }
 }
 

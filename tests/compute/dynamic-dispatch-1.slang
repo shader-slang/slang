@@ -3,6 +3,7 @@
 
 // Test dynamic dispatch code gen for non-static member functions.
 
+[anyValueSize(16)]
 interface IInterface
 {
 	int Compute(int inVal);

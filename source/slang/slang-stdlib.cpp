@@ -208,8 +208,6 @@ namespace Slang
         { kIROp_BitAnd,                     "&",    "__BuiltinLogicalType",         LOGICAL_MASK },
         { kIROp_BitOr,                      "|",    "__BuiltinLogicalType",         LOGICAL_MASK },
         { kIROp_BitXor,                     "^",    "__BuiltinLogicalType",         LOGICAL_MASK },
-        { kIROp_Lsh,                        "<<",   "__BuiltinIntegerType",         INT_MASK },
-        { kIROp_Rsh,                        ">>",   "__BuiltinIntegerType",         INT_MASK },
         { kIROp_Eql,                        "==",   "__BuiltinType",                ANY_MASK | BOOL_RESULT },
         { kIROp_Neq,                        "!=",   "__BuiltinType",                ANY_MASK | BOOL_RESULT },
         { kIROp_Greater,                    ">",    "__BuiltinArithmeticType",      ARITHMETIC_MASK | BOOL_RESULT },
