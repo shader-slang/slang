@@ -168,13 +168,13 @@ struct $(item.name)
     __target_intrinsic(hlsl, "($3 = NvInterlockedAddFp32($0, $1, $2))")
     __glsl_extension(GL_EXT_shader_atomic_float)
     __glsl_extension(GL_EXT_gpu_shader5)
-    __target_intrinsic(glsl, "($3 = atomicAdd((float*)&$0._data[$1/4], $2))")
+    __target_intrinsic(glsl, "($3 = atomicAdd($0._data[$1/4], $2))")
     void InterlockedAddFp32(UINT byteAddress, float valueToAdd, out float originalValue);
 
     __target_intrinsic(hlsl, "(NvInterlockedAddFp32($0, $1, $2))")
     __glsl_extension(GL_EXT_shader_atomic_float)
     __glsl_extension(GL_EXT_gpu_shader5)
-    __target_intrinsic(glsl, "(atomicAdd((float*)&$0._data[$1/4], $2))")
+    __target_intrinsic(glsl, "(atomicAdd(&$0._data[$1/4], $2))")
     void InterlockedAddFp32(UINT byteAddress, float valueToAdd);
 
     // Added operations:
@@ -1107,6 +1107,10 @@ T dot(vector<T, N> x, vector<T, N> y)
 // Helper for computing distance terms for lighting (obsolete)
 
 __generic<T : __BuiltinFloatingPointType> vector<T,4> dst(vector<T,4> x, vector<T,4> y);
+
+// Given a RWByteAddressBuffer allow it to be interpretted as a RWStructuredBuffer
+__intrinsic_op($(kIROp_GetEquivalentStructuredBuffer))
+RWStructuredBuffer<T> __getEquivalentStructuredBuffer<T>(RWByteAddressBuffer b);
 
 // Error message
 
