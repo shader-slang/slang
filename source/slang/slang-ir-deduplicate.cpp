@@ -24,10 +24,11 @@ namespace Slang
         }
         IRInst* addTypeValue(IRInst* value)
         {
-            // Do not deduplicate struct types.
+            // Do not deduplicate struct or interface types.
             switch (value->op)
             {
             case kIROp_StructType:
+            case kIROp_InterfaceType:
                 return value;
             default:
                 break;
