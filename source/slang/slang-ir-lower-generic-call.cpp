@@ -1,5 +1,5 @@
-// slang-ir-lower-generic-function.cpp
-#include "slang-ir-lower-generic-function.h"
+// slang-ir-lower-generic-call.cpp
+#include "slang-ir-lower-generic-call.h"
 #include "slang-ir-generics-lowering-context.h"
 
 namespace Slang
@@ -203,7 +203,7 @@ namespace Slang
             else if (auto lookupInst = as<IRLookupWitnessMethod>(callInst->getCallee()))
                 lowerCallToInterfaceMethod(callInst, lookupInst);
         }
-       
+
         void processInst(IRInst* inst)
         {
             if (auto callInst = as<IRCall>(inst))
