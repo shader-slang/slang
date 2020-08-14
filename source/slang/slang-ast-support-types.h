@@ -577,6 +577,18 @@ namespace Slang
         {
             return isSubClassOf(SyntaxClass<U>::getClass());
         }
+
+        template<typename U>
+        bool operator==(const SyntaxClass<U> other) const
+        {
+            return classInfo == other.classInfo;
+        }
+
+        template<typename U>
+        bool operator!=(const SyntaxClass<U> other) const
+        {
+            return classInfo != other.classInfo;
+        }
     };
 
     template<typename T>
