@@ -2985,6 +2985,16 @@ namespace Slang
             // For now we will just be harsh and require it
             // to be one of a few builtin types.
             validateEnumTagType(tagType, tagTypeInheritanceDecl->loc);
+
+            // Note: The `InheritanceDecl` that introduces a tag
+            // type isn't actually representing a super-type of
+            // the `enum`, and things like name lookup need to
+            // know to ignore that "inheritance" relationship.
+            //
+            // We add a modifier to the `InheritanceDecl` to ensure
+            // that it can be detected and ignored by such steps.
+            //
+            addModifier(tagTypeInheritanceDecl, m_astBuilder->create<IgnoreForLookupModifier>());
         }
         decl->tagType = tagType;
 
