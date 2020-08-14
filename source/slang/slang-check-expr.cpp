@@ -1135,13 +1135,11 @@ namespace Slang
         }
     }
 
-    Expr* SemanticsExprVisitor::visitAssignExpr(AssignExpr* expr)
+    Expr* SemanticsVisitor::checkAssignWithCheckedOperands(AssignExpr* expr)
     {
-        expr->left = CheckExpr(expr->left);
-
         auto type = expr->left->type;
 
-        expr->right = coerce(type, CheckTerm(expr->right));
+        expr->right = coerce(type, expr->right);
 
         if (!type.isLeftValue)
         {
@@ -1163,6 +1161,13 @@ namespace Slang
         }
         expr->type = type;
         return expr;
+    }
+
+    Expr* SemanticsExprVisitor::visitAssignExpr(AssignExpr* expr)
+    {
+        expr->left = CheckExpr(expr->left);
+        expr->right = CheckTerm(expr->right);
+        return checkAssignWithCheckedOperands(expr);
     }
 
     Expr* SemanticsVisitor::CheckExpr(Expr* expr)
@@ -1846,11 +1851,13 @@ namespace Slang
         return expr;
     }
 
-    Expr* SemanticsExprVisitor::visitMemberExpr(MemberExpr * expr)
+    Expr* SemanticsVisitor::checkBaseForMemberExpr(Expr* inBaseExpr)
     {
-        expr->baseExpression = CheckExpr(expr->baseExpression);
+        auto baseExpr = inBaseExpr;
 
-        expr->baseExpression = MaybeDereference(expr->baseExpression);
+        baseExpr = CheckExpr(baseExpr);
+
+        baseExpr = MaybeDereference(baseExpr);
 
         // If the base of the member lookup has an interface type
         // *without* a suitable this-type substitution, then we are
@@ -1858,13 +1865,13 @@ namespace Slang
         // and we should "open" the existential here so that we
         // can expose its structure.
         //
-        expr->baseExpression = maybeOpenExistential(expr->baseExpression);
+        baseExpr = maybeOpenExistential(baseExpr);
 
         // Handle the case of an overloaded base expression
         // here, in case we can use the name of the member to
         // disambiguate which of the candidates is meant, or if
         // we can return an overloaded result.
-        if (auto overloadedExpr = as<OverloadedExpr>(expr->baseExpression))
+        if (auto overloadedExpr = as<OverloadedExpr>(baseExpr))
         {
             if (overloadedExpr->base)
             {
@@ -1884,8 +1891,8 @@ namespace Slang
                 }
                 if (filteredLookupResult.items.getCount() == 1)
                     filteredLookupResult.item = filteredLookupResult.items.getFirst();
-                expr->baseExpression = createLookupResultExpr(
-                    expr->name,
+                baseExpr = createLookupResultExpr(
+                    overloadedExpr->name,
                     filteredLookupResult,
                     overloadedExpr->base,
                     overloadedExpr->loc);
@@ -1893,6 +1900,12 @@ namespace Slang
             // TODO: handle other cases of OverloadedExpr that need filtering.
         }
 
+        return baseExpr;
+    }
+
+    Expr* SemanticsExprVisitor::visitMemberExpr(MemberExpr * expr)
+    {
+        expr->baseExpression = checkBaseForMemberExpr(expr->baseExpression);
         auto & baseType = expr->baseExpression->type;
 
         // Note: Checking for vector types before declaration-reference types,
