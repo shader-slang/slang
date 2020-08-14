@@ -29,6 +29,9 @@ class ExportedModifier : public Modifier { SLANG_CLASS(ExportedModifier)};
 class ConstExprModifier : public Modifier { SLANG_CLASS(ConstExprModifier)};
 class GloballyCoherentModifier : public Modifier { SLANG_CLASS(GloballyCoherentModifier)};
 
+    /// A modifier that indicates an `InheritanceDecl` should be ignored during name lookup (and related checks).
+class IgnoreForLookupModifier : public Modifier { SLANG_CLASS(IgnoreForLookupModifier) };
+
 // A modifier that marks something as an operation that
 // has a one-to-one translation to the IR, and thus
 // has no direct definition in the high-level language.

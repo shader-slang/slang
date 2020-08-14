@@ -167,8 +167,9 @@ namespace Slang
                 }
             }
             loweredType = builder.createInterfaceType(newEntries.getCount(), (IRInst**)newEntries.getBuffer());
-            interfaceType->transferDecorationsTo(loweredType);
-            interfaceType->replaceUsesWith(loweredType);
+            IRCloneEnv cloneEnv;
+            cloneInstDecorationsAndChildren(&cloneEnv, &sharedContext->sharedBuilderStorage,
+                interfaceType, loweredType);
             sharedContext->loweredInterfaceTypes.Add(interfaceType, loweredType);
             sharedContext->mapLoweredInterfaceToOriginal[loweredType] = interfaceType;
             return loweredType;
@@ -272,6 +273,16 @@ namespace Slang
             }
         }
 
+        void replaceLoweredInterfaceTypes()
+        {
+            for (auto lowered : sharedContext->loweredInterfaceTypes)
+            {
+                 lowered.Key->replaceUsesWith(lowered.Value);
+            }
+            // Update hash keys of globalNumberingMap, since the types are modified.
+            sharedContext->sharedBuilderStorage.deduplicateAndRebuildGlobalNumberingMap();
+        }
+
         void processModule()
         {
             // We start by initializing our shared IR building state,
@@ -303,6 +314,8 @@ namespace Slang
                     }
                 }
             }
+
+            replaceLoweredInterfaceTypes();
         }
     };
     void lowerGenericFunctions(SharedGenericsLoweringContext* sharedContext)

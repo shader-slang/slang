@@ -241,6 +241,7 @@
     <ClInclude Include="slang-ir-layout.h" />
     <ClInclude Include="slang-ir-legalize-varying-params.h" />
     <ClInclude Include="slang-ir-link.h" />
+    <ClInclude Include="slang-ir-lower-existential.h" />
     <ClInclude Include="slang-ir-lower-generic-call.h" />
     <ClInclude Include="slang-ir-lower-generic-function.h" />
     <ClInclude Include="slang-ir-lower-generic-type.h" />
@@ -345,6 +346,7 @@
     <ClCompile Include="slang-ir-legalize-types.cpp" />
     <ClCompile Include="slang-ir-legalize-varying-params.cpp" />
     <ClCompile Include="slang-ir-link.cpp" />
+    <ClCompile Include="slang-ir-lower-existential.cpp" />
     <ClCompile Include="slang-ir-lower-generic-call.cpp" />
     <ClCompile Include="slang-ir-lower-generic-function.cpp" />
     <ClCompile Include="slang-ir-lower-generic-type.cpp" />

@@ -3,6 +3,7 @@
 
 #include "slang-ir-any-value-marshalling.h"
 #include "slang-ir-generics-lowering-context.h"
+#include "slang-ir-lower-existential.h"
 #include "slang-ir-lower-generic-function.h"
 #include "slang-ir-lower-generic-call.h"
 #include "slang-ir-lower-generic-type.h"
@@ -20,11 +21,29 @@ namespace Slang
         sharedContext.module = module;
         sharedContext.sink = sink;
 
+        lowerExistentials(&sharedContext);
+        if (sink->getErrorCount() != 0)
+            return;
+
         lowerGenericFunctions(&sharedContext);
+        if (sink->getErrorCount() != 0)
+            return;
+
         lowerGenericType(&sharedContext);
+        if (sink->getErrorCount() != 0)
+            return;
+
         lowerGenericCalls(&sharedContext);
+        if (sink->getErrorCount() != 0)
+            return;
+
         generateWitnessTableWrapperFunctions(&sharedContext);
+        if (sink->getErrorCount() != 0)
+            return;
+
         generateAnyValueMarshallingFunctions(&sharedContext);
+        if (sink->getErrorCount() != 0)
+            return;
         // We might have generated new temporary variables during lowering.
         // An SSA pass can clean up unnecessary load/stores.
         constructSSA(module);
