@@ -45,6 +45,80 @@ namespace Slang
         return UnownedStringSlice();
     }
 
+    // IDxcIncludeHandler
+    // 7f61fc7d-950d-467f-b3e3-3c02fb49187c
+    static const Guid IID_IDxcIncludeHandler = { 0x7f61fc7d, 0x950d, 0x467f, { 0x3c, 0x02, 0xfb, 0x49, 0x18, 0x7c } };
+    static const Guid IID_IUnknown = SLANG_UUID_ISlangUnknown;
+
+    class DXCIncludeHandler : public IDxcIncludeHandler, public RefObject
+    {
+    public:
+        SLANG_NO_THROW HRESULT SLANG_MCALL QueryInterface(const IID& uuid, void** out)
+        { 
+            ISlangUnknown* intf = getInterface(reinterpret_cast<const Guid&>(uuid)); 
+            if (intf) 
+            { 
+                addReference(); 
+                *out = intf; 
+                return SLANG_OK;
+            } 
+            return SLANG_E_NO_INTERFACE;
+        }
+
+        SLANG_NO_THROW ULONG SLANG_MCALL AddRef() SLANG_OVERRIDE { return (uint32_t)addReference(); }
+        SLANG_NO_THROW ULONG SLANG_MCALL Release() SLANG_OVERRIDE { return (uint32_t)releaseReference(); }
+
+
+        virtual HRESULT SLANG_MCALL LoadSource(LPCWSTR inFilename, IDxcBlob** outSource) SLANG_OVERRIDE
+        {
+            // Hmm DXC does something a bit odd - when it sees a path in quotes, it just passes that in with ./ in front!!
+            String filePath = String::fromWString(inFilename);
+
+            // Okay lets try and work around...
+            if (filePath.startsWith("./"))
+            {
+                String remaining(filePath.subString(2, filePath.getLength() - 2));
+
+                // Okay if we strip ./ and what we have is absolute, then it's the absolute path that we care about
+                if (Path::isAbsolute(remaining))
+                {
+                    filePath = remaining;
+                }
+            }
+
+            // NOTE! This only works because ISlangBlob is *binary compatible* with IDxcBlob, if either
+            // change things could go boom
+
+            ComPtr<ISlangBlob> blob;
+            SlangResult res = m_fileSystem->loadFile(filePath.getBuffer(), blob.writeRef());
+
+            *outSource = (IDxcBlob*)blob.detach();
+            //
+
+            return res;
+        }
+
+        DXCIncludeHandler(ISlangFileSystem* fileSystem) :
+            m_fileSystem(fileSystem)
+        {
+        }
+
+    protected:
+        
+        ISlangUnknown* getInterface(const Guid& guid)
+        {
+            if (guid == IID_IUnknown || guid == IID_IDxcIncludeHandler)
+            {
+                return (ISlangUnknown*)(static_cast<IDxcIncludeHandler*>(this));
+            }
+            return nullptr;
+        }
+
+        
+        ISlangFileSystem* m_fileSystem;
+    };
+
+
     SlangResult emitDXILForEntryPointUsingDXC(
         ComponentType*          program,
         BackEndCompileRequest*  compileRequest,
@@ -194,6 +268,8 @@ namespace Slang
 
         const String sourcePath = calcSourcePathForEntryPoint(endToEndReq, entryPointIndex);
 
+        ComPtr<DXCIncludeHandler> includeHandler(new DXCIncludeHandler(linkage->getFileSystemExt()));
+
         ComPtr<IDxcOperationResult> dxcResult;
         SLANG_RETURN_ON_FAIL(dxcCompiler->Compile(dxcSourceBlob,
             sourcePath.toWString().begin(),
@@ -203,7 +279,7 @@ namespace Slang
             argCount,
             nullptr,        // `#define`s
             0,              // `#define` count
-            nullptr,        // `#include` handler
+            includeHandler, // `#include` handler
             dxcResult.writeRef()));
 
         // Retrieve result.

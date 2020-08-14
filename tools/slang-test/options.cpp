@@ -266,6 +266,16 @@ static bool _isSubCommand(const char* arg)
                 return res;
             }
         }
+        else if (strcmp(arg, "-nv-api-path") == 0)
+        {
+            if (argCursor == argEnd)
+            {
+                stdError.print("error: expected operand for '%s'\n", arg);
+                return SLANG_FAIL;
+            }
+
+            optionsOut->nvAPIPath = *argCursor++;
+        }
         else
         {
             stdError.print("unknown option '%s'\n", arg);

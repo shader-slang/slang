@@ -36,6 +36,12 @@ enum class ToolReturnCodeSpan
 /* Utility functions for 'test tools' */
 struct TestToolUtil
 {
+    struct PreludeInfo
+    {
+        const char* exePath = nullptr;
+        const char* nvAPIPath = nullptr;
+    };
+
     typedef SlangResult(*InnerMainFunc)(Slang::StdWriters* stdWriters, SlangSession* session, int argc, const char*const* argv);
 
         /// If the test failed to run or was ignored then we are done
@@ -48,6 +54,8 @@ struct TestToolUtil
     static ToolReturnCode getReturnCode(SlangResult res);
 
         /// Sets the default preludes on the session based on the executable path
+    static SlangResult setSessionDefaultPrelude(const PreludeInfo& preludeInfo, slang::IGlobalSession* session);
+
     static SlangResult setSessionDefaultPrelude(const char* exePath, slang::IGlobalSession* session);
 };
 

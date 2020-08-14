@@ -858,30 +858,54 @@ namespace Slang
 
     struct FxcIncludeHandler : ID3DInclude
     {
-        Linkage*        linkage;
-        DiagnosticSink* sink;
-        IncludeHandler* includeHandler;
-        PathInfo        rootPathInfo;
-
+        
         STDMETHOD(Open)(D3D_INCLUDE_TYPE IncludeType, LPCSTR pFileName, LPCVOID pParentData, LPCVOID *ppData, UINT *pBytes) override
         {
+            // NOTE! The pParentData means the *text* of any previous include.
+            // In order to work out what *path* that came from, we need to seach which source file it came from, and
+            // use it's path
+
             SLANG_UNUSED(IncludeType);
-            SLANG_UNUSED(pParentData);
-
-            String path(pFileName);
-
-            SourceLoc loc;
-
-            PathInfo includedFromPathInfo = rootPathInfo;
-
-            if (!includeHandler)
+            
+            if (!m_includeHandler)
             {
                 return SLANG_E_NOT_IMPLEMENTED;
             }
 
-            // Find the path relative to the foundPath
+            // Assume the root pathInfo initially 
+            PathInfo includedFromPathInfo = m_rootPathInfo;
+
+            // Lets try and find the parent source if there is any
+            if (pParentData)
+            {
+                SourceManager* sourceManager = m_sourceManager;
+                SourceFile* foundSourceFile = nullptr;
+                
+                const char* parentContent = (const char*)pParentData;
+
+                while (sourceManager && foundSourceFile == nullptr)
+                {
+                    for (SourceFile* sourceFile : sourceManager->getSourceFiles())
+                    {
+                        auto content = sourceFile->getContent();
+
+                        if (content.isMemoryContained(UnownedStringSlice(parentContent, parentContent)))
+                        {
+                            foundSourceFile = sourceFile;
+                            includedFromPathInfo = foundSourceFile->getPathInfo();
+                            break;
+                        }
+                    }
+
+                    // Might be in the parent
+                    sourceManager = sourceManager->getParent();
+                }
+            }
+
+            String path(pFileName);
+
             PathInfo filePathInfo;
-            if (SLANG_FAILED(includeHandler->findFile(path, includedFromPathInfo.foundPath, filePathInfo)))
+            if (SLANG_FAILED(m_includeHandler->findFile(path, includedFromPathInfo.foundPath, filePathInfo)))
             {
                 return SLANG_E_CANNOT_OPEN;
             }
@@ -893,30 +917,29 @@ namespace Slang
             }
 
             // Simplify the path
-            filePathInfo.foundPath = includeHandler->simplifyPath(filePathInfo.foundPath);
+            filePathInfo.foundPath = m_includeHandler->simplifyPath(filePathInfo.foundPath);
 
             // See if this an already loaded source file
-            auto sourceManager = linkage->getSourceManager();
-            SourceFile* sourceFile = sourceManager->findSourceFileRecursively(filePathInfo.uniqueIdentity);
+            SourceFile* sourceFile = m_sourceManager->findSourceFileRecursively(filePathInfo.uniqueIdentity);
 
             // If not create a new one, and add to the list of known source files
             if (!sourceFile)
             {
                 ComPtr<ISlangBlob> foundSourceBlob;
-                if (SLANG_FAILED(readFile(linkage, filePathInfo.foundPath, foundSourceBlob.writeRef())))
+                if (SLANG_FAILED(readFile(m_linkage, filePathInfo.foundPath, foundSourceBlob.writeRef())))
                 {
                     return SLANG_E_CANNOT_OPEN;
                 }
 
-                sourceFile = sourceManager->createSourceFileWithBlob(filePathInfo, foundSourceBlob);
-                sourceManager->addSourceFile(filePathInfo.uniqueIdentity, sourceFile);
+                sourceFile = m_sourceManager->createSourceFileWithBlob(filePathInfo, foundSourceBlob);
+                m_sourceManager->addSourceFile(filePathInfo.uniqueIdentity, sourceFile);
             }
 
-            // This is a new parse (even if it's a pre-existing source file), so create a new SourceUnit
-            SourceView* sourceView = sourceManager->createSourceView(sourceFile, &filePathInfo);
+            // We don't need a view, as this include is not using Slang Source loc system, it's used by FXC
 
-            *ppData = sourceView->getContent().begin();
-            *pBytes = (UINT) sourceView->getContentSize();
+            // Return the data
+            *ppData = sourceFile->getContent().begin();
+            *pBytes = (UINT) sourceFile->getContentSize();
 
             return S_OK;
         }
@@ -926,6 +949,22 @@ namespace Slang
             SLANG_UNUSED(pData);
             return S_OK;
         }
+        FxcIncludeHandler(Linkage* linkage, DiagnosticSink* diagnosticSink, IncludeHandler* includeHandler):
+            m_linkage(linkage),
+            m_sink(diagnosticSink),
+            m_includeHandler(includeHandler)
+        {
+            m_sourceManager = diagnosticSink->getSourceManager();
+        }
+
+        PathInfo        m_rootPathInfo;
+
+        Linkage*        m_linkage;
+        DiagnosticSink* m_sink;
+        IncludeHandler* m_includeHandler;
+        // PathInfo        rootPathInfo;
+        SourceManager*  m_sourceManager;
+
     };
 
     SlangResult emitDXBytecodeForEntryPoint(
@@ -971,9 +1010,9 @@ namespace Slang
         includeHandler.linkage = linkage;
         includeHandler.searchDirectories = &linkage->searchDirectories;
 
-        FxcIncludeHandler fxcIncludeHandlerStorage;
-        FxcIncludeHandler* fxcIncludeHandler = nullptr;
-
+        FxcIncludeHandler fxcIncludeHandlerStorage(linkage, sink, &includeHandler);
+        FxcIncludeHandler* fxcIncludeHandler = &fxcIncludeHandlerStorage;
+         
         if(auto translationUnit = findPassThroughTranslationUnit(endToEndReq, entryPointIndex))
         {
             for( auto& define :  translationUnit->compileRequest->preprocessorDefinitions )
@@ -996,10 +1035,7 @@ namespace Slang
             dxMacros = dxMacrosStorage.getBuffer();
 
             fxcIncludeHandler = &fxcIncludeHandlerStorage;
-            fxcIncludeHandler->linkage = linkage;
-            fxcIncludeHandler->sink = compileRequest->getSink();
-            fxcIncludeHandler->includeHandler = &includeHandler;
-            fxcIncludeHandler->rootPathInfo = translationUnit->m_sourceFiles[0]->getPathInfo();
+            fxcIncludeHandlerStorage.m_rootPathInfo = translationUnit->m_sourceFiles[0]->getPathInfo();
         }
 
         DWORD flags = 0;
