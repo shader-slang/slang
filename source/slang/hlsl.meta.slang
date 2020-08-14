@@ -49,9 +49,26 @@ struct ByteAddressBuffer
 };
 
 
-// Make the GLSL atomicAdd available
+// Make the GLSL atomicAdd available.
+// We have separate int/float implementations, as the float version requires some specific extensions
+// https://www.khronos.org/registry/OpenGL/extensions/NV/NV_shader_atomic_float.txt
+
 __target_intrinsic(glsl, "atomicAdd($0, $1)")
-T __atomicAdd<T>(__ref T value, T amount);
+__glsl_version(430)
+__glsl_extension(GL_EXT_shader_atomic_float)
+//__glsl_extension(GL_EXT_gpu_shader5)
+float __atomicAdd(__ref float value, float amount);
+
+// Int versions require glsl 4.30
+// https://www.khronos.org/registry/OpenGL-Refpages/gl4/html/atomicAdd.xhtml
+
+__target_intrinsic(glsl, "atomicAdd($0, $1)")
+__glsl_version(430)
+int __atomicAdd(__ref int value, int amount);
+
+__target_intrinsic(glsl, "atomicAdd($0, $1)")
+__glsl_version(430)
+uint __atomicAdd(__ref uint value, uint amount);
 
 
 __intrinsic_op($(kIROp_ByteAddressBufferLoad))
@@ -179,8 +196,6 @@ ${{{{
     void InterlockedAddFp32(uint byteAddress, float valueToAdd, out float originalValue);
 
     __specialized_for_target(glsl)
-    __glsl_extension(GL_EXT_shader_atomic_float)
-    __glsl_extension(GL_EXT_gpu_shader5)
     void InterlockedAddFp32(uint byteAddress, float valueToAdd, out float originalValue)
     {
         RWStructuredBuffer<float> buf = __getEquivalentStructuredBuffer<float>(this);
@@ -191,8 +206,6 @@ ${{{{
     void InterlockedAddFp32(uint byteAddress, float valueToAdd);
 
     __specialized_for_target(glsl)
-    __glsl_extension(GL_EXT_shader_atomic_float)
-    __glsl_extension(GL_EXT_gpu_shader5)
     void InterlockedAddFp32(uint byteAddress, float valueToAdd)
     {
         RWStructuredBuffer<float> buf = __getEquivalentStructuredBuffer<float>(this);
