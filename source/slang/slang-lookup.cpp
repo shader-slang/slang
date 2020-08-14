@@ -528,6 +528,14 @@ static void _lookUpMembersInSuperTypeDeclImpl(
             {
                 ensureDecl(semantics, inheritanceDeclRef.getDecl(), DeclCheckState::CanUseBaseOfInheritanceDecl);
 
+                // Some things that are syntactically `InheritanceDecl`s don't actually
+                // represent a subtype/supertype relationship, and thus we shouldn't
+                // include members from the base type when doing lookup in the
+                // derived type.
+                //
+                if(inheritanceDeclRef.getDecl()->hasModifier<IgnoreForLookupModifier>())
+                    continue;
+
                 auto baseType = getSup(astBuilder, inheritanceDeclRef);
                 if( auto baseDeclRefType = as<DeclRefType>(baseType) )
                 {
