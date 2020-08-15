@@ -2406,7 +2406,7 @@ void CLikeSourceEmitter::defaultEmitInstExpr(IRInst* inst, const EmitOpInfo& inO
     case kIROp_PackAnyValue:
     {
         m_writer->emit("packAnyValue<");
-        m_writer->emit(getIntVal(cast<IRAnyValueType>(inst->getDataType())->getSize()));
+        m_writer->emit(getIntVal(cast<IRAnyValueTypeBase>(inst->getDataType())->getSize()));
         m_writer->emit(",");
         emitType(inst->getOperand(0)->getDataType());
         m_writer->emit(">(");
@@ -2417,7 +2417,7 @@ void CLikeSourceEmitter::defaultEmitInstExpr(IRInst* inst, const EmitOpInfo& inO
     case kIROp_UnpackAnyValue:
     {
         m_writer->emit("unpackAnyValue<");
-        m_writer->emit(getIntVal(cast<IRAnyValueType>(inst->getOperand(0)->getDataType())->getSize()));
+        m_writer->emit(getIntVal(cast<IRAnyValueTypeBase>(inst->getOperand(0)->getDataType())->getSize()));
         m_writer->emit(",");
         emitType(inst->getDataType());
         m_writer->emit(">(");

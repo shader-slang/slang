@@ -510,9 +510,10 @@ SlangResult CPPSourceEmitter::calcTypeName(IRType* type, CodeGenTarget target, S
             return SLANG_OK;
         }
         case kIROp_AnyValueType:
+        case kIROp_AnyValueTypeWithRTTI:
         {
             out << "AnyValue<";
-            auto anyValueType = static_cast<IRAnyValueType*>(type);
+            auto anyValueType = static_cast<IRAnyValueTypeBase*>(type);
             out << getIntVal(anyValueType->getSize());
             out << ">";
             return SLANG_OK;

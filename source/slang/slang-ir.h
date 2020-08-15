@@ -1265,12 +1265,27 @@ struct IRRTTIType : IRType
     IR_LEAF_ISA(RTTIType);
 };
 
-struct IRAnyValueType : IRType
+struct IRAnyValueTypeBase : IRType
 {
-    IR_LEAF_ISA(AnyValueType);
+    IR_PARENT_ISA(AnyValueTypeBase)
     IRInst* getSize()
     {
         return getOperand(0);
+    }
+};
+
+struct IRAnyValueType : IRAnyValueTypeBase
+{
+    IR_LEAF_ISA(AnyValueType);
+    
+};
+
+struct IRAnyValueTypeWithRTTI : IRAnyValueTypeBase
+{
+    IR_LEAF_ISA(AnyValueTypeWithRTTI);
+    IRInst* getRTTI()
+    {
+        return getOperand(1);
     }
 };
 

@@ -46,7 +46,7 @@ namespace Slang
         // Stores the generated packing/unpacking functions for lookup.
         Dictionary<MarshallingFunctionKey, MarshallingFunctionSet> mapTypeMarshalingFunctions;
 
-        AnyValueTypeInfo* ensureAnyValueType(IRAnyValueType* type)
+        AnyValueTypeInfo* ensureAnyValueType(IRAnyValueTypeBase* type)
         {
             auto size = getIntVal(type->getSize());
             if (auto typeInfo = generatedAnyValueTypes.TryGetValue(size))
@@ -244,7 +244,7 @@ namespace Slang
             }
         };
 
-        IRFunc* generatePackingFunc(IRType* type, IRAnyValueType* anyValueType)
+        IRFunc* generatePackingFunc(IRType* type, IRAnyValueTypeBase* anyValueType)
         {
             IRBuilder builder;
             builder.sharedBuilder = &sharedContext->sharedBuilderStorage;
@@ -336,7 +336,7 @@ namespace Slang
             }
         };
 
-        IRFunc* generateUnpackingFunc(IRType* type, IRAnyValueType* anyValueType)
+        IRFunc* generateUnpackingFunc(IRType* type, IRAnyValueTypeBase* anyValueType)
         {
             IRBuilder builder;
             builder.sharedBuilder = &sharedContext->sharedBuilderStorage;
@@ -373,7 +373,7 @@ namespace Slang
 
         // Ensures the marshalling functions between `type` and `anyValueType` are already generated.
         // Returns the generated marshalling functions.
-        MarshallingFunctionSet ensureMarshallingFunc(IRType* type, IRAnyValueType* anyValueType)
+        MarshallingFunctionSet ensureMarshallingFunc(IRType* type, IRAnyValueTypeBase* anyValueType)
         {
             auto size = getIntVal(anyValueType->getSize());
             MarshallingFunctionKey key;
@@ -393,7 +393,7 @@ namespace Slang
             auto operand = packInst->getValue();
             auto func = ensureMarshallingFunc(
                 operand->getDataType(),
-                cast<IRAnyValueType>(packInst->getDataType()));
+                cast<IRAnyValueTypeBase>(packInst->getDataType()));
             IRBuilder builderStorage;
             auto builder = &builderStorage;
             builder->sharedBuilder = &sharedContext->sharedBuilderStorage;
@@ -408,7 +408,7 @@ namespace Slang
             auto operand = unpackInst->getValue();
             auto func = ensureMarshallingFunc(
                 unpackInst->getDataType(),
-                cast<IRAnyValueType>(operand->getDataType()));
+                cast<IRAnyValueTypeBase>(operand->getDataType()));
             IRBuilder builderStorage;
             auto builder = &builderStorage;
             builder->sharedBuilder = &sharedContext->sharedBuilderStorage;
@@ -418,10 +418,12 @@ namespace Slang
             unpackInst->removeAndDeallocate();
         }
 
-        void processAnyValueType(IRAnyValueType* type)
+        void processAnyValueType(IRAnyValueTypeBase* type)
         {
             auto info = ensureAnyValueType(type);
+            SLANG_ASSERT(info->type);
             type->replaceUsesWith(info->type);
+            type->removeAndDeallocate();
         }
 
         void processInst(IRInst* inst)
@@ -433,6 +435,18 @@ namespace Slang
             else if (auto unpackInst = as<IRUnpackAnyValue>(inst))
             {
                 processUnpackInst(unpackInst);
+            }
+            else if (inst->op == kIROp_BitCast)
+            {
+                // Remove unnecessary BitCasts from IRAnyValueType to IRAnyValueTypeWithRTTI
+                // introduced during generic function lowering, since they are both translated
+                // to the same specialized AnyValueN struct types now.
+                if (as<IRAnyValueTypeWithRTTI>(inst->getDataType()) &&
+                    as<IRAnyValueType>(inst->getOperand(0)->getDataType()))
+                {
+                    inst->replaceUsesWith(inst->getOperand(0));
+                    inst->removeAndDeallocate();
+                }
             }
         }
 
@@ -448,32 +462,38 @@ namespace Slang
 
             sharedContext->addToWorkList(sharedContext->module->getModuleInst());
 
-            // Process all instructions and translate all `IRPackAnyValue` and `IRUnpackAnyValue`.
             while (sharedContext->workList.getCount() != 0)
             {
-                // We will then iterate until our work list goes dry.
-                //
-                while (sharedContext->workList.getCount() != 0)
+                IRInst* inst = sharedContext->workList.getLast();
+
+                sharedContext->workList.removeLast();
+                sharedContext->workListSet.Remove(inst);
+
+                processInst(inst);
+
+                for (auto child = inst->getLastChild(); child; child = child->getPrevInst())
                 {
-                    IRInst* inst = sharedContext->workList.getLast();
-
-                    sharedContext->workList.removeLast();
-                    sharedContext->workListSet.Remove(inst);
-
-                    processInst(inst);
-
-                    for (auto child = inst->getLastChild(); child; child = child->getPrevInst())
-                    {
-                        sharedContext->addToWorkList(child);
-                    }
+                    sharedContext->addToWorkList(child);
                 }
             }
 
-            // Finally, replace all `AnyValueType` with the actual struct type that implements it.
-            for (auto inst : sharedContext->module->getModuleInst()->getChildren())
+            // Finally, replace all `AnyValueType` and `AnyValueTypeWithRTTI`
+            // with the actual struct type that implements it.
+            sharedContext->addToWorkList(sharedContext->module->getModuleInst());
+            while (sharedContext->workList.getCount() != 0)
             {
-                if (auto anyValueType = as<IRAnyValueType>(inst))
+                IRInst* inst = sharedContext->workList.getLast();
+
+                sharedContext->workList.removeLast();
+                sharedContext->workListSet.Remove(inst);
+
+                if (auto anyValueType = as<IRAnyValueTypeBase>(inst))
                     processAnyValueType(anyValueType);
+
+                for (auto child = inst->getLastChild(); child; child = child->getPrevInst())
+                {
+                    sharedContext->addToWorkList(child);
+                }
             }
         }
     };

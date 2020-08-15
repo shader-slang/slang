@@ -27,6 +27,9 @@ INST(Nop, nop, 0, 0)
     INST(StringType, String, 0, 0)
 
     INST(AnyValueType, AnyValueType, 1, 0)
+    INST(AnyValueTypeWithRTTI, AnyValueTypeWithRTTI, 2, 0)
+    INST(AfterAnyValueTypeBase, AfterAnyValueTypeBase, 0, 0)
+    INST_RANGE(AnyValueTypeBase, AnyValueType, AfterAnyValueTypeBase)
 
     INST(RawPointerType, RawPointerType, 0, 0)
     INST(RTTIPointerType, RTTIPointerType, 1, 0)

@@ -59,7 +59,7 @@ namespace Slang
 
             // Unpack `arg` if the parameter expects concrete type but
             // `arg` is an AnyValue.
-            if (!as<IRAnyValueType>(paramValType) && as<IRAnyValueType>(argValType))
+            if (!as<IRAnyValueTypeBase>(paramValType) && as<IRAnyValueTypeBase>(argValType))
             {
                 auto unpackedArgVal = builder->emitUnpackAnyValue(paramValType, argVal);
                 // if parameter expects an `out` pointer, store the unpacked val into a
@@ -156,7 +156,7 @@ namespace Slang
             }
 
             // Pack return value if necessary.
-            if (!as<IRAnyValueType>(call->getDataType()) && as<IRAnyValueType>(funcTypeInInterface->getResultType()))
+            if (!as<IRAnyValueTypeBase>(call->getDataType()) && as<IRAnyValueTypeBase>(funcTypeInInterface->getResultType()))
             {
                 auto pack = builder->emitPackAnyValue(funcTypeInInterface->getResultType(), call);
                 builder->emitReturn(pack);
@@ -211,21 +211,16 @@ namespace Slang
 
             while (sharedContext->workList.getCount() != 0)
             {
-                // We will then iterate until our work list goes dry.
-                //
-                while (sharedContext->workList.getCount() != 0)
+                IRInst* inst = sharedContext->workList.getLast();
+
+                sharedContext->workList.removeLast();
+                sharedContext->workListSet.Remove(inst);
+
+                processInst(inst);
+
+                for (auto child = inst->getLastChild(); child; child = child->getPrevInst())
                 {
-                    IRInst* inst = sharedContext->workList.getLast();
-
-                    sharedContext->workList.removeLast();
-                    sharedContext->workListSet.Remove(inst);
-
-                    processInst(inst);
-
-                    for (auto child = inst->getLastChild(); child; child = child->getPrevInst())
-                    {
-                        sharedContext->addToWorkList(child);
-                    }
+                    sharedContext->addToWorkList(child);
                 }
             }
         }

@@ -28,7 +28,7 @@ namespace Slang
             auto tupleType = builder->getTupleType(anyValueType, witnessTableType, rttiType);
 
             IRInst* rttiObject = nullptr;
-            if (valueType->op != kIROp_AnyValueType)
+            if (valueType->op != kIROp_AnyValueTypeWithRTTI)
             {
                 rttiObject = sharedContext->maybeEmitRTTIObject(valueType);
                 rttiObject = builder->emitGetAddress(
@@ -37,10 +37,10 @@ namespace Slang
             }
             else
             {
-                rttiObject = valueType;
+                rttiObject = static_cast<IRAnyValueTypeWithRTTI*>(valueType)->getRTTI();
             }
             IRInst* packedValue = value;
-            if (valueType->op != kIROp_AnyValueType)
+            if (!as<IRAnyValueTypeBase>(valueType))
                 packedValue = builder->emitPackAnyValue(anyValueType, value);
             IRInst* tupleArgs[] = { packedValue, inst->getWitnessTable(), rttiObject };
             auto tuple = builder->emitMakeTuple(tupleType, 3, tupleArgs);
@@ -119,21 +119,16 @@ namespace Slang
 
             while (sharedContext->workList.getCount() != 0)
             {
-                // We will then iterate until our work list goes dry.
-                //
-                while (sharedContext->workList.getCount() != 0)
+                IRInst* inst = sharedContext->workList.getLast();
+
+                sharedContext->workList.removeLast();
+                sharedContext->workListSet.Remove(inst);
+
+                processInst(inst);
+
+                for (auto child = inst->getLastChild(); child; child = child->getPrevInst())
                 {
-                    IRInst* inst = sharedContext->workList.getLast();
-
-                    sharedContext->workList.removeLast();
-                    sharedContext->workListSet.Remove(inst);
-
-                    processInst(inst);
-
-                    for (auto child = inst->getLastChild(); child; child = child->getPrevInst())
-                    {
-                        sharedContext->addToWorkList(child);
-                    }
+                    sharedContext->addToWorkList(child);
                 }
             }
         }

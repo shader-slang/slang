@@ -1732,6 +1732,7 @@ struct IRBuilder
     IRRTTIType* getRTTIType();
     IRAnyValueType* getAnyValueType(IRIntegerValue size);
     IRAnyValueType* getAnyValueType(IRInst* size);
+    IRAnyValueTypeWithRTTI* getAnyValueTypeWithRTTI(IRIntegerValue size, IRInst* rttiPtr);
 
     IRTupleType* getTupleType(UInt count, IRType* const* types);
     IRTupleType* getTupleType(IRType* type0, IRType* type1);

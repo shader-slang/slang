@@ -13,6 +13,7 @@
 #include "slang-ir-explicit-global-context.h"
 #include "slang-ir-explicit-global-init.h"
 #include "slang-ir-glsl-legalize.h"
+#include "slang-ir-hoist-local-types.h"
 #include "slang-ir-insts.h"
 #include "slang-ir-legalize-varying-params.h"
 #include "slang-ir-link.h"
@@ -325,6 +326,10 @@ Result linkAndOptimizeIR(
         return SLANG_FAIL;
 
     lowerTuples(irModule, sink);
+    if (sink->getErrorCount() != 0)
+        return SLANG_FAIL;
+
+    hoistLocalTypes(irModule, sink);
     if (sink->getErrorCount() != 0)
         return SLANG_FAIL;
 

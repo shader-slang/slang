@@ -65,11 +65,42 @@ namespace Slang
                 param->removeFromParent();
                 block->addParam(as<IRParam>(param));
             }
-            // Lower generic typed parameters into AnyValueType.
             auto firstInst = loweredFunc->getFirstOrdinaryInst();
             builder.setInsertBefore(firstInst);
             sharedContext->loweredGenericFunctions[genericValue] = loweredFunc;
             sharedContext->addToWorkList(loweredFunc);
+
+            // A generic function parameter `t` in `f<T:Interface>(T t)` will translate to
+            // `param t : IRAnyValueTypeWithRTTI(T)`
+            // `IRAnyValueTypeWithRTTI` cannot appear in parameter list since the inter-param-list
+            // dependency is not allowed in our IR (as this will lead to non IRParam insts that defines the dependent types
+            // to be inserted between `IRParam`s, which violates our assumption that all functions begin with a contiguous list
+            // of `IRParam` insts that defines its parameter list.
+            // To work around this issue, We replace `IRAnyValueTypeWithRTTI` with `IRAnyValueType` in the parameter list,
+            // and insert a bit cast in the function body to cast the parameter back to
+            // `IRAnyValueTypeWithRTTI`.
+            // This step must take place before `lower-generic-types`, since that pass will translate all
+            // insts whose type is an `IRParam` to `IRAnyValueTypeWithRTTI`.
+            for (auto param : loweredFunc->getParams())
+            {
+                if (param->getDataType() && param->getDataType()->op == kIROp_Param)
+                {
+                    auto typeParam = param->getDataType();
+                    if (auto anyValueSizeDecor = typeParam->findDecoration<IRTypeConstraintDecoration>())
+                    {
+                        auto anyValueSize = sharedContext->getInterfaceAnyValueSize(
+                            anyValueSizeDecor->getConstraintType(),
+                            param->sourceLoc);
+                        param->setFullType(builder.getAnyValueType(anyValueSize));
+                        builder.setInsertBefore(loweredFunc->getFirstOrdinaryInst());
+                        auto bitCast = builder.emitBitCast(
+                            builder.getAnyValueTypeWithRTTI(anyValueSize, typeParam),
+                            nullptr);
+                        param->replaceUsesWith(bitCast);
+                        bitCast->setOperand(0, param);
+                    }
+                }
+            }
             return loweredFunc;
         }
 
@@ -297,21 +328,16 @@ namespace Slang
 
             while (sharedContext->workList.getCount() != 0)
             {
-                // We will then iterate until our work list goes dry.
-                //
-                while (sharedContext->workList.getCount() != 0)
+                IRInst* inst = sharedContext->workList.getLast();
+
+                sharedContext->workList.removeLast();
+                sharedContext->workListSet.Remove(inst);
+
+                processInst(inst);
+
+                for (auto child = inst->getLastChild(); child; child = child->getPrevInst())
                 {
-                    IRInst* inst = sharedContext->workList.getLast();
-
-                    sharedContext->workList.removeLast();
-                    sharedContext->workListSet.Remove(inst);
-
-                    processInst(inst);
-
-                    for (auto child = inst->getLastChild(); child; child = child->getPrevInst())
-                    {
-                        sharedContext->addToWorkList(child);
-                    }
+                    sharedContext->addToWorkList(child);
                 }
             }
 

@@ -21,15 +21,15 @@ namespace Slang
         sharedContext.module = module;
         sharedContext.sink = sink;
 
-        lowerExistentials(&sharedContext);
-        if (sink->getErrorCount() != 0)
-            return;
-
         lowerGenericFunctions(&sharedContext);
         if (sink->getErrorCount() != 0)
             return;
 
         lowerGenericType(&sharedContext);
+        if (sink->getErrorCount() != 0)
+            return;
+
+        lowerExistentials(&sharedContext);
         if (sink->getErrorCount() != 0)
             return;
 

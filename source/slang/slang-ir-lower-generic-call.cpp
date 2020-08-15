@@ -53,7 +53,7 @@ namespace Slang
 
             // Pack `arg` if the parameter expects AnyValue but
             // `arg` is not an AnyValue.
-            if (as<IRAnyValueType>(paramValType) && !as<IRAnyValueType>(argValType))
+            if (as<IRAnyValueTypeBase>(paramValType) && !as<IRAnyValueTypeBase>(argValType))
             {
                 auto packedArgVal = builder->emitPackAnyValue(paramValType, argVal);
                 // if parameter expects an `out` pointer, store the packed val into a
@@ -77,7 +77,7 @@ namespace Slang
 
         IRInst* maybeUnpackValue(IRBuilder* builder, IRType* expectedType, IRType* actualType, IRInst* value)
         {
-            if (as<IRAnyValueType>(actualType) && !as<IRAnyValueType>(expectedType))
+            if (as<IRAnyValueTypeBase>(actualType) && !as<IRAnyValueTypeBase>(expectedType))
             {
                 auto unpack = builder->emitUnpackAnyValue(expectedType, value);
                 return unpack;
@@ -226,21 +226,16 @@ namespace Slang
 
             while (sharedContext->workList.getCount() != 0)
             {
-                // We will then iterate until our work list goes dry.
-                //
-                while (sharedContext->workList.getCount() != 0)
+                IRInst* inst = sharedContext->workList.getLast();
+
+                sharedContext->workList.removeLast();
+                sharedContext->workListSet.Remove(inst);
+
+                processInst(inst);
+
+                for (auto child = inst->getLastChild(); child; child = child->getPrevInst())
                 {
-                    IRInst* inst = sharedContext->workList.getLast();
-
-                    sharedContext->workList.removeLast();
-                    sharedContext->workListSet.Remove(inst);
-
-                    processInst(inst);
-
-                    for (auto child = inst->getLastChild(); child; child = child->getPrevInst())
-                    {
-                        sharedContext->addToWorkList(child);
-                    }
+                    sharedContext->addToWorkList(child);
                 }
             }
         }

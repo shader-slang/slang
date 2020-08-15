@@ -2270,6 +2270,12 @@ namespace Slang
         return (IRAnyValueType*)getType(kIROp_AnyValueType, size);
     }
 
+    IRAnyValueTypeWithRTTI* IRBuilder::getAnyValueTypeWithRTTI(IRIntegerValue size, IRInst* rttiPtr)
+    {
+        IRInst* args[] = { getIntValue(getIntType(), size), rttiPtr };
+        return (IRAnyValueTypeWithRTTI*)getType(kIROp_AnyValueTypeWithRTTI, 2, args);
+    }
+
     IRTupleType* IRBuilder::getTupleType(UInt count, IRType* const* types)
     {
         return (IRTupleType*)getType(kIROp_TupleType, count, (IRInst*const*)types);

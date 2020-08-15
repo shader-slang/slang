@@ -135,14 +135,16 @@ namespace Slang
         switch (paramType->op)
         {
         case kIROp_WitnessTableType:
-            // Do not translate witness table type.
+        case kIROp_AnyValueTypeWithRTTI:
+        case kIROp_ExtractExistentialType:
+            // Do not translate these types.
             return (IRType*)paramType;
         case kIROp_Param:
         {
             if (auto anyValueSizeDecor = paramType->findDecoration<IRTypeConstraintDecoration>())
             {
                 anyValueSize = getInterfaceAnyValueSize(anyValueSizeDecor->getConstraintType(), paramType->sourceLoc);
-                return builder->getAnyValueType(anyValueSize);
+                return builder->getAnyValueTypeWithRTTI(anyValueSize, paramType);
             }
             sink->diagnose(paramType, Diagnostics::unconstrainedGenericParameterNotAllowedInDynamicFunction, paramType);
             return builder->getAnyValueType(kInvalidAnyValueSize);
