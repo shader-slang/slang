@@ -53,6 +53,7 @@ namespace Slang
     class DxcIncludeHandler : public IDxcIncludeHandler, public RefObject
     {
     public:
+        // Implement IUnknown
         SLANG_NO_THROW HRESULT SLANG_MCALL QueryInterface(const IID& uuid, void** out)
         { 
             ISlangUnknown* intf = getInterface(reinterpret_cast<const Guid&>(uuid)); 
@@ -64,22 +65,25 @@ namespace Slang
             } 
             return SLANG_E_NO_INTERFACE;
         }
-
         SLANG_NO_THROW ULONG SLANG_MCALL AddRef() SLANG_OVERRIDE { return (uint32_t)addReference(); }
         SLANG_NO_THROW ULONG SLANG_MCALL Release() SLANG_OVERRIDE { return (uint32_t)releaseReference(); }
 
-
+        // Implement IDxcIncludeHandler
         virtual HRESULT SLANG_MCALL LoadSource(LPCWSTR inFilename, IDxcBlob** outSource) SLANG_OVERRIDE
         {
-            // Hmm DXC does something a bit odd - when it sees a path in quotes, it just passes that in with ./ in front!!
+            // Hmm DXC does something a bit odd - when it sees a path, it just passes that in with ./ in front!!
+            // NOTE! It doesn't make any difference if it is "" or <> quoted.
+
+            // So we just do a work around where we strip if we see a path starting with ./
             String filePath = String::fromWString(inFilename);
 
-            // Okay lets try and work around...
+            // If it starts with ./ then attempt to strip it
             if (filePath.startsWith("./"))
             {
                 String remaining(filePath.subString(2, filePath.getLength() - 2));
 
-                // Okay if we strip ./ and what we have is absolute, then it's the absolute path that we care about
+                // Okay if we strip ./ and what we have is absolute, then it's the absolute path that we care about,
+                // otherwise we just leave as is.
                 if (Path::isAbsolute(remaining))
                 {
                     filePath = remaining;
@@ -102,7 +106,8 @@ namespace Slang
         }
 
     protected:
-        
+
+        // Used by QueryInterface for casting
         ISlangUnknown* getInterface(const Guid& guid)
         {
             if (guid == IID_IUnknown || guid == IID_IDxcIncludeHandler)
