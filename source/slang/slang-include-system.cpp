@@ -1,5 +1,5 @@
-// slang-include-handler.cpp
-#include "slang-include-handler.h"
+// slang-include-system.cpp
+#include "slang-include-system.h"
 
 #include "../core/slang-io.h"
 #include "../core/slang-string-util.h"
@@ -136,18 +136,6 @@ SlangResult IncludeSystem::findAndLoadFile(const String& pathToInclude, const St
     SLANG_RETURN_ON_FAIL(findFile(pathToInclude, pathIncludedFrom, outPathInfo));
     SLANG_RETURN_ON_FAIL(loadFile(outPathInfo, outBlob));
     return SLANG_OK;
-}
-
-/* !!!!!!!!!!!!!!!!!!!!!!!!!!! IncludeHandlerImpl !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!*/
-
-SlangResult IncludeHandlerImpl::findFile(String const& pathToInclude, String const& pathIncludedFrom, PathInfo& outPathInfo)
-{
-    return m_system.findFile(pathToInclude, pathIncludedFrom, outPathInfo);
-}
-
-String IncludeHandlerImpl::simplifyPath(const String& path)
-{
-    return m_system.simplifyPath(path);
 }
 
 } // namespace Slang

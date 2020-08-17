@@ -114,7 +114,7 @@
     <ClInclude Include="slang-image-format-defs.h">
       <Filter>Header Files</Filter>
     </ClInclude>
-    <ClInclude Include="slang-include-handler.h">
+    <ClInclude Include="slang-include-system.h">
       <Filter>Header Files</Filter>
     </ClInclude>
     <ClInclude Include="slang-ir-any-value-marshalling.h">
@@ -422,7 +422,7 @@
     <ClCompile Include="slang-hlsl-intrinsic-set.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
-    <ClCompile Include="slang-include-handler.cpp">
+    <ClCompile Include="slang-include-system.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
     <ClCompile Include="slang-ir-any-value-marshalling.cpp">

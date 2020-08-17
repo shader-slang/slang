@@ -1,6 +1,6 @@
-#ifndef SLANG_INCLUDE_HANDLER_H
-#define SLANG_INCLUDE_HANDLER_H
-// slang-include-handler.h
+#ifndef SLANG_INCLUDE_SYSTEM_H
+#define SLANG_INCLUDE_SYSTEM_H
+// slang-include-system.h
 
 #include "slang-source-loc.h"
 
@@ -29,6 +29,7 @@ struct SearchDirectoryList
     List<SearchDirectory>   searchDirectories;
 };
 
+/* A helper class that builds basic include handling on top of searchDirectories/fileSystemExt and optionally a sourceManager */
 struct IncludeSystem
 {
     IncludeSystem(SearchDirectoryList* searchDirectories, ISlangFileSystemExt* fileSystemExt, SourceManager* sourceManager = nullptr) :
@@ -54,34 +55,6 @@ protected:
     SearchDirectoryList* m_searchDirectories;
     ISlangFileSystemExt* m_fileSystemExt;
     SourceManager* m_sourceManager;                 ///< If not set, will not look up the content in the source manager
-};
-
-// Callback interface for the preprocessor to use when looking
-// for files in `#include` directives.
-struct IncludeHandler
-{
-    virtual SlangResult findFile(const String& pathToInclude,
-        const String& pathIncludedFrom,
-        PathInfo& pathInfoOut) = 0;
-
-    virtual String simplifyPath(const String& path) = 0;
-};
-
-struct IncludeHandlerImpl : IncludeHandler
-{
-    virtual SlangResult findFile(
-        String const& pathToInclude,
-        String const& pathIncludedFrom,
-        PathInfo& pathInfoOut) override;
-
-    virtual String simplifyPath(const String& path) override;
-
-    IncludeHandlerImpl(SearchDirectoryList* searchDirectories, ISlangFileSystemExt* fileSystemExt) :
-        m_system(searchDirectories, fileSystemExt)
-    {
-    }
-
-    IncludeSystem m_system;
 };
 
 }

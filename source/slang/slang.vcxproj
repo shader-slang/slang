@@ -221,7 +221,7 @@
     <ClInclude Include="slang-glsl-extension-tracker.h" />
     <ClInclude Include="slang-hlsl-intrinsic-set.h" />
     <ClInclude Include="slang-image-format-defs.h" />
-    <ClInclude Include="slang-include-handler.h" />
+    <ClInclude Include="slang-include-system.h" />
     <ClInclude Include="slang-ir-any-value-marshalling.h" />
     <ClInclude Include="slang-ir-bind-existentials.h" />
     <ClInclude Include="slang-ir-byte-address-legalize.h" />
@@ -325,7 +325,7 @@
     <ClCompile Include="slang-file-system.cpp" />
     <ClCompile Include="slang-glsl-extension-tracker.cpp" />
     <ClCompile Include="slang-hlsl-intrinsic-set.cpp" />
-    <ClCompile Include="slang-include-handler.cpp" />
+    <ClCompile Include="slang-include-system.cpp" />
     <ClCompile Include="slang-ir-any-value-marshalling.cpp" />
     <ClCompile Include="slang-ir-bind-existentials.cpp" />
     <ClCompile Include="slang-ir-byte-address-legalize.cpp" />
