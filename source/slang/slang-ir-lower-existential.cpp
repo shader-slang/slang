@@ -85,10 +85,6 @@ namespace Slang
             {
                 processMakeExistential(makeExistential);
             }
-            else if (auto makeExistential2 = as<IRMakeExistential>(inst))
-            {
-                SLANG_ASSERT(false);
-            }
             else if (auto extractExistentialVal = as<IRExtractExistentialValue>(inst))
             {
                 processExtractExistentialValue(extractExistentialVal);

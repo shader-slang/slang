@@ -146,7 +146,7 @@ namespace Slang
             sharedBuilder->deduplicateAndRebuildGlobalNumberingMap();
 
             addToWorkList(module->getModuleInst());
-            
+
             while (workList.getCount() != 0)
             {
                 IRInst* inst = workList.getLast();
