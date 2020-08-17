@@ -776,12 +776,16 @@ SlangResult Linkage::loadFile(String const& path, PathInfo& outPathInfo, ISlangB
 
     ComPtr<ISlangBlob> uniqueIdentity;
     // Get the unique identity
-    SLANG_RETURN_ON_FAIL(m_fileSystemExt->getFileUniqueIdentity(path.getBuffer(), uniqueIdentity.writeRef()));
-
-    outPathInfo.foundPath = path;
-    outPathInfo.type = PathInfo::Type::FoundPath;
-    outPathInfo.uniqueIdentity = StringUtil::getString(uniqueIdentity);
-
+    if (SLANG_FAILED(m_fileSystemExt->getFileUniqueIdentity(path.getBuffer(), uniqueIdentity.writeRef())))
+    {
+        // We didn't get a unique identity, so go with just a found path
+        outPathInfo.type = PathInfo::Type::FoundPath;
+        outPathInfo.foundPath = path;
+    }
+    else
+    {
+        outPathInfo = PathInfo::makeNormal(path, StringUtil::getString(uniqueIdentity));
+    }
     return SLANG_OK;
 }
 

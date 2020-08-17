@@ -53,13 +53,13 @@ String IncludeSystem::simplifyPath(const String& path)
     return StringUtil::getString(simplifiedPath);
 }
 
-SlangResult IncludeSystem::findFile(String const& pathToInclude, String const& pathIncludedFrom, PathInfo& pathInfoOut)
+SlangResult IncludeSystem::findFile(String const& pathToInclude, String const& pathIncludedFrom, PathInfo& outPathInfo)
 {
-    pathInfoOut.type = PathInfo::Type::Unknown;
+    outPathInfo.type = PathInfo::Type::Unknown;
 
     // Try just relative to current path
     {
-        SlangResult res = findFile(SLANG_PATH_TYPE_FILE, pathIncludedFrom, pathToInclude, pathInfoOut);
+        SlangResult res = findFile(SLANG_PATH_TYPE_FILE, pathIncludedFrom, pathToInclude, outPathInfo);
         // It either succeeded or wasn't found, anything else is a failure passed back
         if (SLANG_SUCCEEDED(res) || res != SLANG_E_NOT_FOUND)
         {
@@ -72,7 +72,7 @@ SlangResult IncludeSystem::findFile(String const& pathToInclude, String const& p
     {
         for (auto& dir : sd->searchDirectories)
         {
-            SlangResult res = findFile(SLANG_PATH_TYPE_DIRECTORY, dir.path, pathToInclude, pathInfoOut);
+            SlangResult res = findFile(SLANG_PATH_TYPE_DIRECTORY, dir.path, pathToInclude, outPathInfo);
             if (SLANG_SUCCEEDED(res) || res != SLANG_E_NOT_FOUND)
             {
                 return res;
