@@ -329,96 +329,6 @@ DownstreamCompiler* Session::getDefaultDownstreamCompiler(SourceLanguage sourceL
     return getOrLoadDownstreamCompiler(m_defaultDownstreamCompilers[int(sourceLanguage)], nullptr);
 }
 
-ISlangFileSystemExt* IncludeHandlerImpl::_getFileSystemExt()
-{
-    return linkage->getFileSystemExt();
-}
-
-SlangResult IncludeHandlerImpl::_findFile(SlangPathType fromPathType, const String& fromPath, const String& path, PathInfo& pathInfoOut)
-{
-    ISlangFileSystemExt* fileSystemExt = _getFileSystemExt();
-
-    // Get relative path
-    ComPtr<ISlangBlob> combinedPathBlob;
-    SLANG_RETURN_ON_FAIL(fileSystemExt->calcCombinedPath(fromPathType, fromPath.begin(), path.begin(), combinedPathBlob.writeRef()));
-    String combinedPath(StringUtil::getString(combinedPathBlob));
-    if (combinedPath.getLength() <= 0)
-    {
-        return SLANG_FAIL;
-    }
-     
-    SlangPathType pathType;
-    SLANG_RETURN_ON_FAIL(fileSystemExt->getPathType(combinedPath.begin(), &pathType));
-    if (pathType != SLANG_PATH_TYPE_FILE)
-    {
-        return SLANG_E_NOT_FOUND;
-    }
-
-    // Get the uniqueIdentity
-    ComPtr<ISlangBlob> uniqueIdentityBlob;
-    SLANG_RETURN_ON_FAIL(fileSystemExt->getFileUniqueIdentity(combinedPath.begin(), uniqueIdentityBlob.writeRef()));
-
-    // If the rel path exists -> a uniqueIdentity MUST exists too
-    String uniqueIdentity(StringUtil::getString(uniqueIdentityBlob));
-    if (uniqueIdentity.getLength() <= 0)
-    {   
-        // Unique identity can't be empty
-        return SLANG_FAIL;
-    }
-        
-    pathInfoOut.type = PathInfo::Type::Normal;
-    pathInfoOut.foundPath = combinedPath;
-    pathInfoOut.uniqueIdentity = uniqueIdentity;
-    return SLANG_OK;     
-}
-
-SlangResult IncludeHandlerImpl::findFile(
-    String const& pathToInclude,
-    String const& pathIncludedFrom,
-    PathInfo& pathInfoOut)
-{
-    pathInfoOut.type = PathInfo::Type::Unknown;
-
-    // Try just relative to current path
-    {
-        SlangResult res = _findFile(SLANG_PATH_TYPE_FILE, pathIncludedFrom, pathToInclude, pathInfoOut);
-        // It either succeeded or wasn't found, anything else is a failure passed back
-        if (SLANG_SUCCEEDED(res) || res != SLANG_E_NOT_FOUND)
-        {
-            return res;
-        }
-    }
-
-    // Search all the searchDirectories
-    for(auto sd = searchDirectories; sd; sd = sd->parent)
-    {
-        for(auto& dir : sd->searchDirectories)
-        {
-            SlangResult res = _findFile(SLANG_PATH_TYPE_DIRECTORY, dir.path, pathToInclude, pathInfoOut);
-            if (SLANG_SUCCEEDED(res) || res != SLANG_E_NOT_FOUND)
-            {
-                return res;
-            }
-        }
-    }
-
-    return SLANG_E_NOT_FOUND;
-}
-
-String IncludeHandlerImpl::simplifyPath(const String& path)
-{
-    ISlangFileSystemExt* fileSystemExt = _getFileSystemExt();
-    ComPtr<ISlangBlob> simplifiedPath;
-    if (SLANG_FAILED(fileSystemExt->getSimplifiedPath(path.getBuffer(), simplifiedPath.writeRef())))
-    {
-        return path;
-    }
-    return StringUtil::getString(simplifiedPath);
-}
-
-//
-
-
 Profile getEffectiveProfile(EntryPoint* entryPoint, TargetRequest* target)
 {
     auto entryPointProfile = entryPoint->getProfile();
@@ -975,8 +885,6 @@ FrontEndCompileRequest::FrontEndCompileRequest(
 void FrontEndCompileRequest::parseTranslationUnit(
     TranslationUnitRequest* translationUnit)
 {
-    IncludeHandlerImpl includeHandler;
-
     auto linkage = getLinkage();
 
     // TODO(JS): NOTE! Here we are using the searchDirectories on the linkage. This is because
@@ -986,8 +894,7 @@ void FrontEndCompileRequest::parseTranslationUnit(
     // If searchDirectories.parent pointed to the one in the Linkage would mean linkage paths
     // would be checked too (after those on the FrontEndCompileRequest). 
 
-    includeHandler.linkage = linkage;
-    includeHandler.searchDirectories = &linkage->searchDirectories;
+    IncludeHandlerImpl includeHandler(&linkage->searchDirectories, linkage->getFileSystemExt());
 
     RefPtr<Scope> languageScope;
     switch (translationUnit->sourceLanguage)
@@ -1740,9 +1647,7 @@ RefPtr<Module> Linkage::findOrImportModule(
     // Next, try to find the file of the given name,
     // using our ordinary include-handling logic.
 
-    IncludeHandlerImpl includeHandler;
-    includeHandler.linkage = this;
-    includeHandler.searchDirectories = &searchDirectories;
+    IncludeHandlerImpl includeHandler(&searchDirectories, getFileSystemExt());
 
     // Get the original path info
     PathInfo pathIncludedFromInfo = getSourceManager()->getPathInfo(loc, SourceLocType::Actual);

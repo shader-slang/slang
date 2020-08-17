@@ -521,6 +521,35 @@ SourceFile* SourceManager::findSourceFileRecursively(const String& uniqueIdentit
     return nullptr;
 }
 
+SourceFile* SourceManager::findSourceFileByContentRecursively(const char* text)
+{
+    const SourceManager* manager = this;
+    do
+    {
+        SourceFile* sourceFile = manager->findSourceFileByContent(text);
+        if (sourceFile)
+        {
+            return sourceFile;
+        }
+        manager = manager->m_parent;
+    } while (manager);
+    return nullptr;
+}
+
+SourceFile* SourceManager::findSourceFileByContent(const char* text) const
+{
+    for (SourceFile* sourceFile : getSourceFiles())
+    {
+        auto content = sourceFile->getContent();
+
+        if (text >= content.begin() && text <= content.end())
+        {
+            return sourceFile;
+        }
+    }
+    return nullptr;
+}
+
 void SourceManager::addSourceFile(const String& uniqueIdentity, SourceFile* sourceFile)
 {
     SLANG_ASSERT(!findSourceFileRecursively(uniqueIdentity));

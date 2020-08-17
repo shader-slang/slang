@@ -8,7 +8,6 @@
 #include "../core/slang-riff.h"
 #include "../core/slang-type-text-util.h"
 
-
 #include "slang-check.h"
 #include "slang-compiler.h"
 #include "slang-lexer.h"
@@ -841,106 +840,39 @@ namespace Slang
         return UnownedStringSlice();
     }
 
-        /// Read a file in the context of handling a preprocessor directive
-    static SlangResult readFile(
-        Linkage*        linkage,
-        String const&   path,
-        ISlangBlob**    outBlob)
-    {
-        // The actual file loading will be handled by the file system
-        // associated with the parent linkage.
-        //
-        auto fileSystemExt = linkage->getFileSystemExt();
-        SLANG_RETURN_ON_FAIL(fileSystemExt->loadFile(path.getBuffer(), outBlob));
-
-        return SLANG_OK;
-    }
-
     struct FxcIncludeHandler : ID3DInclude
     {
         
-        STDMETHOD(Open)(D3D_INCLUDE_TYPE IncludeType, LPCSTR pFileName, LPCVOID pParentData, LPCVOID *ppData, UINT *pBytes) override
+        STDMETHOD(Open)(D3D_INCLUDE_TYPE includeType, LPCSTR fileName, LPCVOID parentData, LPCVOID* outData, UINT* outSize) override
         {
+            SLANG_UNUSED(includeType);
             // NOTE! The pParentData means the *text* of any previous include.
             // In order to work out what *path* that came from, we need to seach which source file it came from, and
             // use it's path
-
-            SLANG_UNUSED(IncludeType);
-            
-            if (!m_includeHandler)
-            {
-                return SLANG_E_NOT_IMPLEMENTED;
-            }
 
             // Assume the root pathInfo initially 
             PathInfo includedFromPathInfo = m_rootPathInfo;
 
             // Lets try and find the parent source if there is any
-            if (pParentData)
+            if (parentData)
             {
-                SourceManager* sourceManager = m_sourceManager;
-                SourceFile* foundSourceFile = nullptr;
-                
-                const char* parentContent = (const char*)pParentData;
-
-                while (sourceManager && foundSourceFile == nullptr)
+                SourceFile* foundSourceFile = m_system.getSourceManager()->findSourceFileByContentRecursively((const char*)parentData);
+                if (foundSourceFile)
                 {
-                    for (SourceFile* sourceFile : sourceManager->getSourceFiles())
-                    {
-                        auto content = sourceFile->getContent();
-
-                        if (content.isMemoryContained(UnownedStringSlice(parentContent, parentContent)))
-                        {
-                            foundSourceFile = sourceFile;
-                            includedFromPathInfo = foundSourceFile->getPathInfo();
-                            break;
-                        }
-                    }
-
-                    // Might be in the parent
-                    sourceManager = sourceManager->getParent();
+                    includedFromPathInfo = foundSourceFile->getPathInfo();
                 }
             }
 
-            String path(pFileName);
+            String path(fileName);
+            PathInfo pathInfo;
+            ComPtr<ISlangBlob> blob;
 
-            PathInfo filePathInfo;
-            if (SLANG_FAILED(m_includeHandler->findFile(path, includedFromPathInfo.foundPath, filePathInfo)))
-            {
-                return SLANG_E_CANNOT_OPEN;
-            }
-
-            // We must have a uniqueIdentity to be compare
-            if (!filePathInfo.hasUniqueIdentity())
-            {
-                return SLANG_E_ABORT;
-            }
-
-            // Simplify the path
-            filePathInfo.foundPath = m_includeHandler->simplifyPath(filePathInfo.foundPath);
-
-            // See if this an already loaded source file
-            SourceFile* sourceFile = m_sourceManager->findSourceFileRecursively(filePathInfo.uniqueIdentity);
-
-            // If not create a new one, and add to the list of known source files
-            if (!sourceFile)
-            {
-                ComPtr<ISlangBlob> foundSourceBlob;
-                if (SLANG_FAILED(readFile(m_linkage, filePathInfo.foundPath, foundSourceBlob.writeRef())))
-                {
-                    return SLANG_E_CANNOT_OPEN;
-                }
-
-                sourceFile = m_sourceManager->createSourceFileWithBlob(filePathInfo, foundSourceBlob);
-                m_sourceManager->addSourceFile(filePathInfo.uniqueIdentity, sourceFile);
-            }
-
-            // We don't need a view, as this include is not using Slang Source loc system, it's used by FXC
+            SLANG_RETURN_ON_FAIL(m_system.findAndLoadFile(path, includedFromPathInfo.foundPath, pathInfo, blob));
 
             // Return the data
-            *ppData = sourceFile->getContent().begin();
-            *pBytes = (UINT) sourceFile->getContentSize();
-
+            *outData = blob->getBufferPointer();
+            *outSize = (UINT) blob->getBufferSize();
+            
             return S_OK;
         }
 
@@ -949,22 +881,13 @@ namespace Slang
             SLANG_UNUSED(pData);
             return S_OK;
         }
-        FxcIncludeHandler(Linkage* linkage, DiagnosticSink* diagnosticSink, IncludeHandler* includeHandler):
-            m_linkage(linkage),
-            m_sink(diagnosticSink),
-            m_includeHandler(includeHandler)
+        FxcIncludeHandler(SearchDirectoryList* searchDirectories, ISlangFileSystemExt* fileSystemExt, SourceManager* sourceManager):
+            m_system(searchDirectories, fileSystemExt, sourceManager)
         {
-            m_sourceManager = diagnosticSink->getSourceManager();
         }
 
-        PathInfo        m_rootPathInfo;
-
-        Linkage*        m_linkage;
-        DiagnosticSink* m_sink;
-        IncludeHandler* m_includeHandler;
-        // PathInfo        rootPathInfo;
-        SourceManager*  m_sourceManager;
-
+        PathInfo m_rootPathInfo;
+        IncludeSystem m_system;
     };
 
     SlangResult emitDXBytecodeForEntryPoint(
@@ -1006,11 +929,7 @@ namespace Slang
         List<D3D_SHADER_MACRO> dxMacrosStorage;
         D3D_SHADER_MACRO const* dxMacros = nullptr;
 
-        IncludeHandlerImpl includeHandler;
-        includeHandler.linkage = linkage;
-        includeHandler.searchDirectories = &linkage->searchDirectories;
-
-        FxcIncludeHandler fxcIncludeHandlerStorage(linkage, sink, &includeHandler);
+        FxcIncludeHandler fxcIncludeHandlerStorage(&linkage->searchDirectories, linkage->getFileSystemExt(), sink->getSourceManager());
         FxcIncludeHandler* fxcIncludeHandler = &fxcIncludeHandlerStorage;
          
         if(auto translationUnit = findPassThroughTranslationUnit(endToEndReq, entryPointIndex))

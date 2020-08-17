@@ -50,7 +50,7 @@ namespace Slang
     static const Guid IID_IDxcIncludeHandler = { 0x7f61fc7d, 0x950d, 0x467f, { 0x3c, 0x02, 0xfb, 0x49, 0x18, 0x7c } };
     static const Guid IID_IUnknown = SLANG_UUID_ISlangUnknown;
 
-    class DXCIncludeHandler : public IDxcIncludeHandler, public RefObject
+    class DxcIncludeHandler : public IDxcIncludeHandler, public RefObject
     {
     public:
         SLANG_NO_THROW HRESULT SLANG_MCALL QueryInterface(const IID& uuid, void** out)
@@ -86,20 +86,18 @@ namespace Slang
                 }
             }
 
+            ComPtr<ISlangBlob> blob;
+            PathInfo pathInfo;
+            SlangResult res = m_system.findAndLoadFile(filePath, String(), pathInfo, blob);
+
             // NOTE! This only works because ISlangBlob is *binary compatible* with IDxcBlob, if either
             // change things could go boom
-
-            ComPtr<ISlangBlob> blob;
-            SlangResult res = m_fileSystem->loadFile(filePath.getBuffer(), blob.writeRef());
-
             *outSource = (IDxcBlob*)blob.detach();
-            //
-
             return res;
         }
 
-        DXCIncludeHandler(ISlangFileSystem* fileSystem) :
-            m_fileSystem(fileSystem)
+        DxcIncludeHandler(SearchDirectoryList* searchDirectories, ISlangFileSystemExt* fileSystemExt, SourceManager* sourceManager = nullptr) :
+            m_system(searchDirectories, fileSystemExt, sourceManager)
         {
         }
 
@@ -114,8 +112,7 @@ namespace Slang
             return nullptr;
         }
 
-        
-        ISlangFileSystem* m_fileSystem;
+        IncludeSystem m_system;
     };
 
 
@@ -268,7 +265,7 @@ namespace Slang
 
         const String sourcePath = calcSourcePathForEntryPoint(endToEndReq, entryPointIndex);
 
-        ComPtr<DXCIncludeHandler> includeHandler(new DXCIncludeHandler(linkage->getFileSystemExt()));
+        ComPtr<DxcIncludeHandler> includeHandler(new DxcIncludeHandler(&linkage->searchDirectories, linkage->getFileSystemExt()));
 
         ComPtr<IDxcOperationResult> dxcResult;
         SLANG_RETURN_ON_FAIL(dxcCompiler->Compile(dxcSourceBlob,
