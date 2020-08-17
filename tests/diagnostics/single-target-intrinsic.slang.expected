@@ -1,7 +1,7 @@
 result code = -1
 standard error = {
-tests/diagnostics/single-target-intrinsic.slang(10): error 30201: function 'doThing' already has a body
-tests/diagnostics/single-target-intrinsic.slang(4): note: see previous definition of 'doThing'
+tests/diagnostics/single-target-intrinsic.slang(13): error 30201: function 'doThing' already has a body
+tests/diagnostics/single-target-intrinsic.slang(10): note: see previous definition of 'doThing'
 }
 standard output = {
 }

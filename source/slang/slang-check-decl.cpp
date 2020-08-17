@@ -3552,14 +3552,14 @@ namespace Slang
             }
             Name* targetName = specializedModifier->targetToken.getName();
 
-            ioDict.Add(targetName, decl);
+            ioDict.AddIfNotExists(targetName, decl);
         }
         else
         {
             for (auto modifier : decl->getModifiersOfType<TargetIntrinsicModifier>())
             {
                 Name* targetName = modifier->targetToken.getName();
-                ioDict.Add(targetName, decl);
+                ioDict.AddIfNotExists(targetName, decl);
             }
 
             auto funcDecl = as<FunctionDeclBase>(decl);
@@ -3567,7 +3567,7 @@ namespace Slang
             {
                 // Should only be one body if it isn't specialized for target.
                 // Use nullptr for this scenario
-                ioDict.Add(nullptr, decl);
+                ioDict.AddIfNotExists(nullptr, decl);
             }
         }  
     }

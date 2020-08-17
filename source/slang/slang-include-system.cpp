@@ -37,9 +37,7 @@ SlangResult IncludeSystem::findFile(SlangPathType fromPathType, const String& fr
         return SLANG_FAIL;
     }
 
-    outPathInfo.type = PathInfo::Type::Normal;
-    outPathInfo.foundPath = combinedPath;
-    outPathInfo.uniqueIdentity = uniqueIdentity;
+    outPathInfo = PathInfo::makeNormal(combinedPath, uniqueIdentity);
     return SLANG_OK;
 }
 
