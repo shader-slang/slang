@@ -146,24 +146,19 @@ namespace Slang
             sharedBuilder->deduplicateAndRebuildGlobalNumberingMap();
 
             addToWorkList(module->getModuleInst());
-
+            
             while (workList.getCount() != 0)
             {
-                // We will then iterate until our work list goes dry.
-                //
-                while (workList.getCount() != 0)
+                IRInst* inst = workList.getLast();
+
+                workList.removeLast();
+                workListSet.Remove(inst);
+
+                processInst(inst);
+
+                for (auto child = inst->getLastChild(); child; child = child->getPrevInst())
                 {
-                    IRInst* inst = workList.getLast();
-
-                    workList.removeLast();
-                    workListSet.Remove(inst);
-
-                    processInst(inst);
-
-                    for (auto child = inst->getLastChild(); child; child = child->getPrevInst())
-                    {
-                        addToWorkList(child);
-                    }
+                    addToWorkList(child);
                 }
             }
 

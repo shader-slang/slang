@@ -573,6 +573,10 @@ INST(HighLevelDeclDecoration,               highLevelDecl,          1, 0)
 // shows that `C` conforms to `I`.
 //
 INST(MakeExistential,                   makeExistential,                2, 0)
+// A `MakeExistentialWithRTTI(v, w, t)` is the same with `MakeExistential`,
+// but with the type of `v` being an explict operand.
+INST(MakeExistentialWithRTTI,           makeExistentialWithRTTI,        3, 0)
+
 
 // A `wrapExistential(v, T0,w0, T1,w0) : T` instruction is similar to `makeExistential`.
 // but applies to a value `v` that is of type `BindExistentials(T, T0,w0, ...)`. The

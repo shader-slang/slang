@@ -448,24 +448,18 @@ namespace Slang
 
             sharedContext->addToWorkList(sharedContext->module->getModuleInst());
 
-            // Process all instructions and translate all `IRPackAnyValue` and `IRUnpackAnyValue`.
             while (sharedContext->workList.getCount() != 0)
             {
-                // We will then iterate until our work list goes dry.
-                //
-                while (sharedContext->workList.getCount() != 0)
+                IRInst* inst = sharedContext->workList.getLast();
+
+                sharedContext->workList.removeLast();
+                sharedContext->workListSet.Remove(inst);
+
+                processInst(inst);
+
+                for (auto child = inst->getLastChild(); child; child = child->getPrevInst())
                 {
-                    IRInst* inst = sharedContext->workList.getLast();
-
-                    sharedContext->workList.removeLast();
-                    sharedContext->workListSet.Remove(inst);
-
-                    processInst(inst);
-
-                    for (auto child = inst->getLastChild(); child; child = child->getPrevInst())
-                    {
-                        sharedContext->addToWorkList(child);
-                    }
+                    sharedContext->addToWorkList(child);
                 }
             }
 
