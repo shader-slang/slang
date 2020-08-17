@@ -2,7 +2,9 @@
 
 //DISABLE_TEST(compute):COMPARE_COMPUTE_EX:-cpu -compute
 //DISABLE_TEST(compute):COMPARE_COMPUTE_EX:-slang -compute
+// Disabled because crashes currently on vulkan 
 //DISABLE_TEST(compute, vulkan):COMPARE_COMPUTE_EX:-vk -compute
+// Disabled because requires nvapi to work
 // Note for this feature we require dxc and we can force that with -use-dxil
 //DISABLE_TEST(compute):COMPARE_COMPUTE_EX:-d3d12 -compute -use-dxil
 //TEST(compute):COMPARE_COMPUTE_EX:-cuda -compute -use-dxil
@@ -22,8 +24,6 @@ void computeMain(uint3 dispatchThreadID : SV_DispatchThreadID)
     //const float delta = anotherBuffer[idx & 3];
     const float delta = 0.0f;
 
-    // If atomics work correctly then 3.0 should be added to each thread 4 times.
-    
     float previousValue = 0;
     outputBuffer.InterlockedAddFp32((idx << 2), 1.0f, previousValue);
     //outputBuffer.InterlockedAddFp32((idx ^ 2) << 2, 2.0f + delta);
