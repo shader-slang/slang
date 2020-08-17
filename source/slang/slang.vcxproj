@@ -242,10 +242,12 @@
     <ClInclude Include="slang-ir-layout.h" />
     <ClInclude Include="slang-ir-legalize-varying-params.h" />
     <ClInclude Include="slang-ir-link.h" />
+    <ClInclude Include="slang-ir-lower-existential.h" />
     <ClInclude Include="slang-ir-lower-generic-call.h" />
     <ClInclude Include="slang-ir-lower-generic-function.h" />
     <ClInclude Include="slang-ir-lower-generic-type.h" />
     <ClInclude Include="slang-ir-lower-generics.h" />
+    <ClInclude Include="slang-ir-lower-tuple-types.h" />
     <ClInclude Include="slang-ir-missing-return.h" />
     <ClInclude Include="slang-ir-restructure-scoping.h" />
     <ClInclude Include="slang-ir-restructure.h" />
@@ -333,6 +335,7 @@
     <ClCompile Include="slang-ir-collect-global-uniforms.cpp" />
     <ClCompile Include="slang-ir-constexpr.cpp" />
     <ClCompile Include="slang-ir-dce.cpp" />
+    <ClCompile Include="slang-ir-deduplicate.cpp" />
     <ClCompile Include="slang-ir-dominators.cpp" />
     <ClCompile Include="slang-ir-entry-point-raw-ptr-params.cpp" />
     <ClCompile Include="slang-ir-entry-point-uniforms.cpp" />
@@ -345,10 +348,12 @@
     <ClCompile Include="slang-ir-legalize-types.cpp" />
     <ClCompile Include="slang-ir-legalize-varying-params.cpp" />
     <ClCompile Include="slang-ir-link.cpp" />
+    <ClCompile Include="slang-ir-lower-existential.cpp" />
     <ClCompile Include="slang-ir-lower-generic-call.cpp" />
     <ClCompile Include="slang-ir-lower-generic-function.cpp" />
     <ClCompile Include="slang-ir-lower-generic-type.cpp" />
     <ClCompile Include="slang-ir-lower-generics.cpp" />
+    <ClCompile Include="slang-ir-lower-tuple-types.cpp" />
     <ClCompile Include="slang-ir-missing-return.cpp" />
     <ClCompile Include="slang-ir-restructure-scoping.cpp" />
     <ClCompile Include="slang-ir-restructure.cpp" />

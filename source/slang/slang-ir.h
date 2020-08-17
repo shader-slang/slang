@@ -1247,6 +1247,13 @@ struct IRTaggedUnionType : IRType
     IR_LEAF_ISA(TaggedUnionType)
 };
 
+/// Represents a tuple. Tuples are created by `IRMakeTuple` and its elements
+/// are accessed via `GetTupleElement(tupleValue, IRIntLit)`.
+struct IRTupleType : IRType
+{
+    IR_LEAF_ISA(TupleType)
+};
+
 struct IRTypeType : IRType
 {
     IR_LEAF_ISA(TypeType);

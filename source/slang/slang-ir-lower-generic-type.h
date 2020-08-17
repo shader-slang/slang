@@ -5,7 +5,8 @@ namespace Slang
 {
     struct SharedGenericsLoweringContext;
 
-    /// Lower all references to generic types (ThisType, AssociatedType, etc.) into IRAnyValueType.
+    /// Lower all references to generic types (ThisType, AssociatedType, etc.) into IRAnyValueType,
+    /// and existential types into Tuple<AnyValue, WitnessTable(I), Ptr(RTTIType)>.
     void lowerGenericType(
         SharedGenericsLoweringContext* sharedContext);
 

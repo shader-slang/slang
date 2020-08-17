@@ -2270,6 +2270,23 @@ namespace Slang
         return (IRAnyValueType*)getType(kIROp_AnyValueType, size);
     }
 
+    IRTupleType* IRBuilder::getTupleType(UInt count, IRType* const* types)
+    {
+        return (IRTupleType*)getType(kIROp_TupleType, count, (IRInst*const*)types);
+    }
+
+    IRTupleType* IRBuilder::getTupleType(IRType* type0, IRType* type1)
+    {
+        IRType* operands[] = { type0, type1 };
+        return getTupleType(2, operands);
+    }
+
+    IRTupleType* IRBuilder::getTupleType(IRType* type0, IRType* type1, IRType* type2)
+    {
+        IRType* operands[] = { type0, type1, type2 };
+        return getTupleType(3, operands);
+    }
+
     IRBasicBlockType*   IRBuilder::getBasicBlockType()
     {
         return (IRBasicBlockType*)getType(kIROp_BasicBlockType);
@@ -2719,6 +2736,17 @@ namespace Slang
             typeInst);
         addInst(inst);
         return inst;
+    }
+
+    IRInst* IRBuilder::emitMakeTuple(IRType* type, UInt count, IRInst* const* args)
+    {
+        return emitIntrinsicInst(type, kIROp_MakeTuple, count, args);
+    }
+
+    IRInst* IRBuilder::emitGetTupleElement(IRType* type, IRInst* tuple, UInt element)
+    {
+        IRInst* args[] = { tuple, getIntValue(getIntType(), element) };
+        return emitIntrinsicInst(type, kIROp_GetTupleElement, 2, args);
     }
 
     IRInst* IRBuilder::emitMakeVector(
@@ -3724,6 +3752,17 @@ namespace Slang
         return inst;
     }
 
+    IRInst* IRBuilder::emitGpuForeach(List<IRInst*> args)
+    {
+        auto inst = createInst<IRInst>(
+            this,
+            kIROp_GpuForeach,
+            getVoidType(),
+            args.getCount(),
+            args.getBuffer());
+        addInst(inst);
+        return inst;
+    }
 
     //
     // Decorations

@@ -177,6 +177,9 @@
     <ClInclude Include="slang-ir-link.h">
       <Filter>Header Files</Filter>
     </ClInclude>
+    <ClInclude Include="slang-ir-lower-existential.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
     <ClInclude Include="slang-ir-lower-generic-call.h">
       <Filter>Header Files</Filter>
     </ClInclude>
@@ -187,6 +190,9 @@
       <Filter>Header Files</Filter>
     </ClInclude>
     <ClInclude Include="slang-ir-lower-generics.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="slang-ir-lower-tuple-types.h">
       <Filter>Header Files</Filter>
     </ClInclude>
     <ClInclude Include="slang-ir-missing-return.h">
@@ -446,6 +452,9 @@
     <ClCompile Include="slang-ir-dce.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
+    <ClCompile Include="slang-ir-deduplicate.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
     <ClCompile Include="slang-ir-dominators.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
@@ -482,6 +491,9 @@
     <ClCompile Include="slang-ir-link.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
+    <ClCompile Include="slang-ir-lower-existential.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
     <ClCompile Include="slang-ir-lower-generic-call.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
@@ -492,6 +504,9 @@
       <Filter>Source Files</Filter>
     </ClCompile>
     <ClCompile Include="slang-ir-lower-generics.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="slang-ir-lower-tuple-types.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
     <ClCompile Include="slang-ir-missing-return.cpp">

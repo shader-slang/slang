@@ -1275,6 +1275,114 @@ namespace Slang
         return true;
     }
 
+    bool SemanticsVisitor::doesAccessorMatchRequirement(
+        DeclRef<AccessorDecl>   satisfyingMemberDeclRef,
+        DeclRef<AccessorDecl>   requiredMemberDeclRef)
+    {
+        // We require the AST node class of the satisfying accessor
+        // to be a subclass of the one from the required accessor.
+        //
+        // For our current accessor types, this amounts to requiring
+        // an exact match, but using a subtype test means that if
+        // we ever add an `ExtraSpecialGetDecl` that is a subclass
+        // of `GetDecl`, then one of those would be able to satisfy
+        // a `get` requirement.
+        //
+        auto satisfyingMemberClass = satisfyingMemberDeclRef.getDecl()->getClass();
+        auto requiredMemberClass = requiredMemberDeclRef.getDecl()->getClass();
+        if(!satisfyingMemberClass.isSubClassOfImpl(requiredMemberClass))
+            return false;
+
+        // We do not check the parameters or return types of accessors
+        // here, under the assumption that the validity checks for
+        // the parent `property` declaration would already make sure
+        // they are in order.
+
+        // TODO: There are other checks we need to make here, like not letting
+        // an ordinary `set` satisfy a `[nonmutating] set` requirement.
+
+        return true;
+    }
+
+    bool SemanticsVisitor::doesPropertyMatchRequirement(
+        DeclRef<PropertyDecl>   satisfyingMemberDeclRef,
+        DeclRef<PropertyDecl>   requiredMemberDeclRef,
+        RefPtr<WitnessTable>    witnessTable)
+    {
+        // The type of the satisfying member must match the type of the required member.
+        //
+        // Note: It is possible that a `get`-only property could be satisfied by
+        // a declaration that uses a subtype of the requirement, but that would not
+        // count as an "exact match" and we would rely on the logic to synthesize
+        // a stub implementation in that case.
+        //
+        auto satisfyingType = getType(getASTBuilder(), satisfyingMemberDeclRef);
+        auto requiredType = getType(getASTBuilder(), requiredMemberDeclRef);
+        if(!satisfyingType->equals(requiredType))
+            return false;
+
+        // Each accessor in the requirement must be accounted for by an accessor
+        // in the satisfying member.
+        //
+        // Note: it is fine for the satisfying member to provide *more* accessors
+        // than the original declaration.
+        //
+        Dictionary<DeclRef<AccessorDecl>, DeclRef<AccessorDecl>> mapRequiredToSatisfyingAccessorDeclRef;
+        for( auto requiredAccessorDeclRef : getMembersOfType<AccessorDecl>(requiredMemberDeclRef) )
+        {
+            // We need to search for an accessor that can satisfy the requirement.
+            //
+            // For now we will do the simplest (and slowest) thing of a linear search,
+            // which is mostly fine because the number of accessors is bounded.
+            //
+            bool found = false;
+            for( auto satisfyingAccessorDeclRef : getMembersOfType<AccessorDecl>(satisfyingMemberDeclRef) )
+            {
+                if( doesAccessorMatchRequirement(satisfyingAccessorDeclRef, requiredAccessorDeclRef) )
+                {
+                    // When we find a match on an accessor, we record it so that
+                    // we can set up the witness values later, but we do *not*
+                    // record it into the actual witness table yet, in case
+                    // a later accessor comes along that doesn't find a match.
+                    //
+                    mapRequiredToSatisfyingAccessorDeclRef.Add(requiredAccessorDeclRef, satisfyingAccessorDeclRef);
+                    found = true;
+                    break;
+                }
+            }
+            if(!found)
+                return false;
+        }
+
+        // Once things are done, we will install the satisfying values
+        // into the witness table for the requirements.
+        //
+        for( auto p : mapRequiredToSatisfyingAccessorDeclRef )
+        {
+            witnessTable->requirementDictionary.Add(
+                p.Key,
+                RequirementWitness(p.Value));
+        }
+        //
+        // Note: the property declaration itself isn't something that
+        // has a useful value/representation in downstream passes, so
+        // we are mostly just installing it into the witness table
+        // as a way to mark this requirement as being satisfied.
+        //
+        // TODO: It is possible that having a witness table entry that
+        // doesn't actually map to any IR value could create a problem
+        // in downstream passes. If such propblems arise, we should
+        // probably create a new `RequirementWitness` case that
+        // represents a witness value that is only needed by the front-end,
+        // and that can be ignored by IR and emit logic.
+        //
+        witnessTable->requirementDictionary.Add(
+            requiredMemberDeclRef.getDecl(),
+            RequirementWitness(satisfyingMemberDeclRef));
+        return true;
+    }
+
+
     bool SemanticsVisitor::doesGenericSignatureMatchRequirement(
         DeclRef<GenericDecl>        genDecl,
         DeclRef<GenericDecl>        requirementGenDecl,
@@ -1475,6 +1583,14 @@ namespace Slang
 
                 auto satisfyingType = getNamedType(m_astBuilder, typedefDeclRef);
                 return doesTypeSatisfyAssociatedTypeRequirement(satisfyingType, requiredTypeDeclRef, witnessTable);
+            }
+        }
+        else if( auto propertyDeclRef = memberDeclRef.as<PropertyDecl>() )
+        {
+            if( auto requiredPropertyDeclRef = requiredMemberDeclRef.as<PropertyDecl>() )
+            {
+                ensureDecl(propertyDeclRef, DeclCheckState::CanUseFuncSignature);
+                return doesPropertyMatchRequirement(propertyDeclRef, requiredPropertyDeclRef, witnessTable);
             }
         }
         // Default: just assume that thing aren't being satisfied.
@@ -1758,6 +1874,348 @@ namespace Slang
         return true;
     }
 
+    bool SemanticsVisitor::trySynthesizePropertyRequirementWitness(
+        ConformanceCheckingContext* context,
+        LookupResult const&         lookupResult,
+        DeclRef<PropertyDecl>       requiredMemberDeclRef,
+        RefPtr<WitnessTable>        witnessTable)
+    {
+        // The situation here is that the context of an inheritance
+        // declaration didn't provide an exact match for a required
+        // property. E.g.:
+        //
+        //      interface ICell { property value : int { get; set; } }
+        //      struct MyCell : ICell
+        //      {
+        //          int value;
+        //      }
+        //
+        // It is clear in this case that the `MyCell` type *can*
+        // satisfy the signature required by `ICell`, but it has
+        // no explicit `property` declaration, and instead just
+        // a field with the right name and type.
+        //
+        // The approach in this function will be to construct a
+        // synthesized `preoperty` along the lines of:
+        //
+        //      struct MyCounter ...
+        //      {
+        //          ...
+        //          property value_synthesized : int
+        //          {
+        //              get { return this.value; }
+        //              set(newValue) { this.value = newValue; }
+        //          }
+        //      }
+        //
+        // That is, we construct a `property` with the correct type
+        // and with an accessor for each requirement, where the accesors
+        // all try to read or write `this.value`.
+        //
+        // If those synthesized accessors all type-check, then we can
+        // say that the type must satisfy the requirement structurally,
+        // even if there isn't an exact signature match. More
+        // importantly, the `property` we just synthesized can be
+        // used as a witness to the fact that the requirement is
+        // satisfied.
+        //
+        // The big-picture flow of the logic here is similar to
+        // `trySynthesizeMethodRequirementWitness()` above, and we
+        // will not comment this code as exhaustively, under the
+        // assumption that readers of the code don't benefit from
+        // having the exact same information stated twice.
+
+        // With the introduction out of the way, let's get started
+        // constructing a synthesized `PropertyDecl`.
+        //
+        auto synPropertyDecl = m_astBuilder->create<PropertyDecl>();
+
+        // For now our synthesized property will use the name and source
+        // location of the requirement we are trying to satisfy.
+        //
+        // TODO: as it stands right now our syntesized property and its
+        // accesors will get mangled names, which we don't actually want.
+        // Leaving out the name here doesn't help matters, becaues then
+        // *all* synthesized members on a given type would share the same
+        // mangled name.
+        //
+        synPropertyDecl->nameAndLoc = requiredMemberDeclRef.getDecl()->nameAndLoc;
+
+        // The type of our synthesized property will be the expected type
+        // of the interface requirement.
+        //
+        // TODO: This logic can/will run into problems if the type is,
+        // or uses, an associated type or `This`.
+        //
+        // Ideally we should be looking up the type using a `DeclRef` that
+        // refers to the interface requirement using a `ThisTypeSubstitution`
+        // that refers to the satisfying type declaration, and requirement
+        // checking for non-associated-type requirements should be done *after*
+        // requirement checking for associated-type requirements.
+        //
+        auto propertyType = getType(m_astBuilder, requiredMemberDeclRef);
+        synPropertyDecl->type.type = propertyType;
+
+        // Our synthesized property will have an accessor declaration for
+        // each accessor of the requirement.
+        //
+        // TODO: If we ever start to support synthesis for subscript requirements,
+        // then we probably want to factor the accessor-related logic into
+        // a subroutine so that it can be shared between properties and subscripts.
+        //
+        Dictionary<DeclRef<AccessorDecl>, AccessorDecl*> mapRequiredAccessorToSynAccessor;
+        for( auto requiredAccessorDeclRef : getMembersOfType<AccessorDecl>(requiredMemberDeclRef) )
+        {
+            // The synthesized accessor will be an AST node of the same class as
+            // the required accessor.
+            //
+            auto synAccessorDecl = (AccessorDecl*) m_astBuilder->createByNodeType(requiredAccessorDeclRef.getDecl()->astNodeType);
+
+            // Whatever the required accessor returns, that is what our synthesized accessor will return.
+            //
+            synAccessorDecl->returnType.type = getResultType(m_astBuilder, requiredAccessorDeclRef);
+
+            // Similarly, our synthesized accessor will have parameters matching those of the requirement.
+            //
+            // Note: in practice we expect that only `set` accessors will have any parameters,
+            // and they will only have a single parameter.
+            //
+            List<Expr*> synArgs;
+            for( auto requiredParamDeclRef : getParameters(requiredAccessorDeclRef) )
+            {
+                auto paramType = getType(m_astBuilder, requiredParamDeclRef);
+
+                // The synthesized parameter will ahve the same name and
+                // type as the parameter of the requirement.
+                //
+                auto synParamDecl = m_astBuilder->create<ParamDecl>();
+                synParamDecl->nameAndLoc = requiredParamDeclRef.getDecl()->nameAndLoc;
+                synParamDecl->type.type = paramType;
+
+                // We need to add the parameter as a child declaration of
+                // the accessor we are building.
+                //
+                synParamDecl->parentDecl = synAccessorDecl;
+                synAccessorDecl->members.add(synParamDecl);
+
+                // For each paramter, we will create an argument expression
+                // to represent it in the body of the accessor.
+                //
+                auto synArg = m_astBuilder->create<VarExpr>();
+                synArg->declRef = makeDeclRef(synParamDecl);
+                synArg->type = paramType;
+                synArgs.add(synArg);
+            }
+
+            // We need to create a `this` expression to be used in the body
+            // of the synthesized accessor.
+            //
+            // TODO: if we ever allow `static` properties or subscripts,
+            // we will need to handle that case here, by *not* creating
+            // a `this` expression.
+            //
+            ThisExpr* synThis = m_astBuilder->create<ThisExpr>();
+
+            // The type of `this` in our accessor will be the type for
+            // which we are synthesizing a conformance.
+            //
+            synThis->type.type = context->conformingType;
+
+            // A `get` accessor should default to an immutable `this`,
+            // while other accessors default to mutable `this`.
+            //
+            // TODO: If we ever add other kinds of accessors, we will
+            // need to check that this assumption stays valid.
+            //
+            synThis->type.isLeftValue = true;
+            if(as<GetterDecl>(requiredAccessorDeclRef))
+                synThis->type.isLeftValue = false;
+
+            // If the accessor requirement is `[nonmutating]` then our
+            // synthesized accessor should be too, and also the `this`
+            // parameter should *not* be an l-value.
+            //
+            if( requiredAccessorDeclRef.getDecl()->hasModifier<NonmutatingAttribute>() )
+            {
+                synThis->type.isLeftValue = false;
+
+                auto synAttr = m_astBuilder->create<NonmutatingAttribute>();
+                synAccessorDecl->modifiers.first = synAttr;
+            }
+            //
+            // Note: we don't currently support `[mutating] get` accessors,
+            // but the desired behavior in that case is clear, so we go
+            // ahead and future-proof this code a bit:
+            //
+            else if( requiredAccessorDeclRef.getDecl()->hasModifier<MutatingAttribute>() )
+            {
+                synThis->type.isLeftValue = true;
+
+                auto synAttr = m_astBuilder->create<MutatingAttribute>();
+                synAccessorDecl->modifiers.first = synAttr;
+            }
+
+            // We are going to synthesize an expression and then perform
+            // semantic checking on it, but if there are semantic errors
+            // we do *not* want to report them to the user as such, and
+            // instead want the result to be a failure to synthesize
+            // a valid witness.
+            //
+            // We will buffer up diagnostics into a temporary sink and
+            // then throw them away when we are done.
+            //
+            // TODO: This behavior might be something we want to make
+            // into a more fundamental capability of `DiagnosticSink` and/or
+            // `SemanticsVisitor` so that code can push/pop the emission
+            // of diagnostics more easily.
+            //
+            DiagnosticSink* savedSink = m_shared->m_sink;
+            DiagnosticSink tempSink(savedSink->getSourceManager());
+            m_shared->m_sink = &tempSink;
+
+            // We start by constructing an expression that represents
+            // `this.name` where `name` is the name of the required
+            // member. The caller already passed in a `lookupResult`
+            // that should indicate all the declarations found by
+            // looking up `name`, so we can start with that.
+            //
+            // TODO: Note that there are many cases for member lookup
+            // that are not handled just by using `createLookupResultExpr`
+            // because they are currently being special-cased (the most
+            // notable cases are swizzles, as well as lookup of static
+            // members in types).
+            //
+            // The main result here is that we will not be able to synthesize
+            // a requirement for a built-in scalar/vector/matrix type to
+            // a property with a name like `.xy` based on the presence of
+            // swizles, even though it seems like such a thing should Just Work.
+            //
+            // If this is important we could "fix" it by allowing this
+            // code to dispatch to the special-case logic used when doing
+            // semantic checking for member expressions.
+            //
+            // Note: an alternative would be to change the stdlib declarations
+            // of vectors/matrices so that all the swizzles are defined as
+            // `property` declarations. There are some C++ math libraries (like GLM)
+            // that implement swizzle syntax by a similar approach of statically
+            // enumerating all possible swizzles. The down-side to such an
+            // approach is that the combinatorial space of swizzles is quite
+            // large (especially for matrices) so that supporting them via
+            // general-purpose language features is unlikely to be as efficient
+            // as special-case logic.
+            //
+            auto synMemberRef = createLookupResultExpr(
+                requiredMemberDeclRef.getName(),
+                lookupResult,
+                synThis,
+                requiredMemberDeclRef.getLoc());
+
+            // The body of the accessor will depend on the class of the accessor
+            // we are synthesizing (e.g., `get` vs. `set`).
+            //
+            Stmt* synBodyStmt = nullptr;
+            if( as<GetterDecl>(requiredAccessorDeclRef) )
+            {
+                // A `get` accessor will simply perform:
+                //
+                //      return this.name;
+                //
+                // which involves coercing the member access `this.name` to
+                // the expected type of the property.
+                //
+                auto coercedMemberRef = coerce(propertyType, synMemberRef);
+                auto synReturn = m_astBuilder->create<ReturnStmt>();
+                synReturn->expression = coercedMemberRef;
+
+                synBodyStmt = synReturn;
+            }
+            else if( as<SetterDecl>(requiredAccessorDeclRef) )
+            {
+                // We expect all `set` accessors to have a single argument,
+                // but we will defensively bail out if that is somehow
+                // not the case.
+                //
+                SLANG_ASSERT(synArgs.getCount() == 1);
+                if(synArgs.getCount() != 1)
+                    return false;
+
+                // A `set` accessor will simply perform:
+                //
+                //      this.name = newValue;
+                //
+                // which involves creating and checking an assignment
+                // expression.
+
+                auto synAssign = m_astBuilder->create<AssignExpr>();
+                synAssign->left = synMemberRef;
+                synAssign->right = synArgs[0];
+
+                auto synCheckedAssign = checkAssignWithCheckedOperands(synAssign);
+
+                auto synExprStmt = m_astBuilder->create<ExpressionStmt>();
+                synExprStmt->expression = synCheckedAssign;
+
+                synBodyStmt = synExprStmt;
+            }
+            else
+            {
+                // While there are other kinds of accessors than `get` and `set`,
+                // those are currently only reserved for stdlib-internal use.
+                // We will not bother with synthesis for those cases.
+                //
+                return false;
+            }
+
+            // We restore the semantic checking state that was in place before
+            // we checked the synthesized accessor body, and then bail out
+            // if we ran into any errors (meaning that the synthesized accessor
+            // is not usable).
+            //
+            // TODO: If there were *warnings* emitted to the sink, it would probably
+            // be good to show those warnings to the user, since they might indicate
+            // real issues. E.g., with the current logic a `float` field could
+            // satisfying an `int` property requirement, but the user would probably
+            // want to be warned when they do such a thing.
+            //
+            m_shared->m_sink = savedSink;
+            if(tempSink.getErrorCount() != 0)
+                return false;
+
+            synAccessorDecl->body = synBodyStmt;
+
+            synAccessorDecl->parentDecl = synPropertyDecl;
+            synPropertyDecl->members.add(synAccessorDecl);
+
+            // If synthesis of an accessor worked, then we will record it into
+            // a local dictionary. We do *not* install the accessor into the
+            // witness table yet, because it is possible that synthesis will
+            // succeed for some accessors but not others, and we don't want
+            // to leave the witness table in a state where a requirement is
+            // "partially satisfied."
+            //
+            mapRequiredAccessorToSynAccessor.Add(requiredAccessorDeclRef, synAccessorDecl);
+        }
+
+        synPropertyDecl->parentDecl = context->parentDecl;
+
+        // Once our synthesized declaration is complete, we need
+        // to install it as the witness that satifies the given
+        // requirement.
+        //
+        // Subsequent code generation should not be able to tell the
+        // difference between our synthetic property and a hand-written
+        // one with the same behavior.
+        //
+        for(auto p : mapRequiredAccessorToSynAccessor)
+        {
+            witnessTable->requirementDictionary.Add(p.Key, RequirementWitness(makeDeclRef(p.Value)));
+        }
+        witnessTable->requirementDictionary.Add(requiredMemberDeclRef,
+            RequirementWitness(makeDeclRef(synPropertyDecl)));
+        return true;
+    }
+
+
     bool SemanticsVisitor::trySynthesizeRequirementWitness(
         ConformanceCheckingContext* context,
         LookupResult const&         lookupResult,
@@ -1778,6 +2236,15 @@ namespace Slang
                 witnessTable);
         }
 
+        if( auto requiredPropertyDeclRef = requiredMemberDeclRef.as<PropertyDecl>() )
+        {
+            return trySynthesizePropertyRequirementWitness(
+                context,
+                lookupResult,
+                requiredPropertyDeclRef,
+                witnessTable);
+        }
+
         // TODO: There are other kinds of requirements for which synthesis should
         // be possible:
         //
@@ -1785,13 +2252,7 @@ namespace Slang
         //   using an approach similar to what is used for methods.
         //
         // * We should be able to synthesize subscripts with different
-        //   signatures (taking into account default parameters) and even
-        //   different accessors (e.g., synthesizing the `get` and `set`
-        //   accessors from a `ref` accessor)
-        //
-        // * When we support property declarations, it should be possible
-        //   to synthesize a property requirement using a field of the
-        //   same name.
+        //   signatures (taking into account default parameters).
         //
         // * For specific kinds of generic requirements, we should be able
         //   to wrap the synthesis of the inner declaration in synthesis
@@ -2524,6 +2985,16 @@ namespace Slang
             // For now we will just be harsh and require it
             // to be one of a few builtin types.
             validateEnumTagType(tagType, tagTypeInheritanceDecl->loc);
+
+            // Note: The `InheritanceDecl` that introduces a tag
+            // type isn't actually representing a super-type of
+            // the `enum`, and things like name lookup need to
+            // know to ignore that "inheritance" relationship.
+            //
+            // We add a modifier to the `InheritanceDecl` to ensure
+            // that it can be detected and ignored by such steps.
+            //
+            addModifier(tagTypeInheritanceDecl, m_astBuilder->create<IgnoreForLookupModifier>());
         }
         decl->tagType = tagType;
 

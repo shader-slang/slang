@@ -17,6 +17,7 @@
 #include "slang-ir-legalize-varying-params.h"
 #include "slang-ir-link.h"
 #include "slang-ir-lower-generics.h"
+#include "slang-ir-lower-tuple-types.h"
 #include "slang-ir-restructure.h"
 #include "slang-ir-restructure-scoping.h"
 #include "slang-ir-specialize.h"
@@ -320,6 +321,10 @@ Result linkAndOptimizeIR(
         break;
     }
 
+    if (sink->getErrorCount() != 0)
+        return SLANG_FAIL;
+
+    lowerTuples(irModule, sink);
     if (sink->getErrorCount() != 0)
         return SLANG_FAIL;
 

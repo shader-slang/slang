@@ -66,12 +66,11 @@ bool executeComputation_0();
 extern unsigned char __computeMain[];
 extern size_t __computeMainSize;
 
-gfx::ShaderProgram* loadShaderProgram(gfx::Renderer* renderer)
+gfx::ShaderProgram* loadShaderProgram(gfx::Renderer* renderer, unsigned char computeCode[], size_t computeCodeSize)
 {
     // We extract the begin/end pointers to the output code buffers directly
     //
-    char unsigned const* computeCode = __computeMain;
-    char unsigned const* computeCodeEnd = computeCode + __computeMainSize;
+    char unsigned const* computeCodeEnd = computeCode + computeCodeSize;
 
     // Now we use the operations of the example graphics API abstraction
     // layer to load shader code into the underlying API.
@@ -87,7 +86,7 @@ gfx::ShaderProgram* loadShaderProgram(gfx::Renderer* renderer)
     gfx::ShaderProgram::Desc programDesc;
     programDesc.pipelineType = gfx::PipelineType::Compute;
     programDesc.kernels = &kernelDescs[0];
-    programDesc.kernelCount = 2;
+    programDesc.kernelCount = 1;
 
     gShaderProgram = renderer->createProgram(programDesc);
 
@@ -242,13 +241,16 @@ void dispatchComputation(
     gfx::Renderer* gRenderer,
     gfx::PipelineState* gPipelineState,
     gfx::PipelineLayout* gPipelineLayout,
-    gfx::DescriptorSet* gDescriptorSet)
+    gfx::DescriptorSet* gDescriptorSet,
+    unsigned int gridDimsX,
+    unsigned int gridDimsY,
+    unsigned int gridDimsZ)
 {
 
     gRenderer->setPipelineState(PipelineType::Compute, gPipelineState);
     gRenderer->setDescriptorSet(PipelineType::Compute, gPipelineLayout, 0, gDescriptorSet);
 
-    gRenderer->dispatchCompute(4, 1, 1);
+    gRenderer->dispatchCompute(gridDimsX, gridDimsY, gridDimsZ);
 }
 
 void print_output(
@@ -286,9 +288,9 @@ gfx_BufferResource_0* createStructuredBuffer_0(gfx_Renderer_0* _0, FixedArray<fl
     return (gfx_BufferResource_0*)createStructuredBuffer((gfx::Renderer*)_0, (float*)&_1);
 }
 
-gfx_ShaderProgram_0* loadShaderProgram_0(gfx_Renderer_0* _0)
+gfx_ShaderProgram_0* loadShaderProgram_0(gfx_Renderer_0* _0, unsigned char _1[], size_t _2)
 {
-    return (gfx_ShaderProgram_0*)loadShaderProgram((gfx::Renderer*)_0);
+    return (gfx_ShaderProgram_0*)loadShaderProgram((gfx::Renderer*)_0, _1, _2);
 }
 
 gfx_DescriptorSetLayout_0* buildDescriptorSetLayout_0(gfx_Renderer_0* _0)
@@ -322,13 +324,26 @@ void printInitialValues_0(FixedArray<float, 4> _0, int32_t _1)
     printInitialValues((float*)&_0, _1);
 }
 
-void dispatchComputation_0(gfx_Renderer_0* _0, gfx_PipelineState_0* _1, gfx_PipelineLayout_0* _2, gfx_DescriptorSet_0* _3)
+void dispatchComputation_0(gfx_Renderer_0* _0, gfx_PipelineState_0* _1, gfx_PipelineLayout_0* _2, gfx_DescriptorSet_0* _3, unsigned int gridDimsX, unsigned int gridDimsY, unsigned int gridDimsZ)
 {
     dispatchComputation(
         (gfx::Renderer*)_0,
         (gfx::PipelineState*)_1,
         (gfx::PipelineLayout*)_2,
-        (gfx::DescriptorSet*)_3);
+        (gfx::DescriptorSet*)_3,
+        gridDimsX,
+        gridDimsY,
+        gridDimsZ);
+}
+
+RWStructuredBuffer<float> convertBuffer_0(gfx_BufferResource_0* _0) {
+    RWStructuredBuffer<float> result;
+    result.data = (float*)_0;
+    return result;
+}
+
+gfx_BufferResource_0* unconvertBuffer_0(RWStructuredBuffer<float> _0) {
+    return (gfx_BufferResource_0*)(_0.data);
 }
 
 void print_output_0(gfx_Renderer_0* _0, gfx_BufferResource_0* _1, int32_t _2)
