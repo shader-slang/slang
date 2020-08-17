@@ -33,14 +33,6 @@ namespace Slang
                 return type;
         }
 
-        void appendTypeName(StringBuilder& sb, IRInst* inst)
-        {
-            if (auto name = inst->findDecoration<IRNameHintDecoration>())
-            {
-                sb << name->getName();
-            }
-        }
-
         LoweredTupleInfo* getLoweredTupleType(IRBuilder* builder, IRInst* type)
         {
             if (auto loweredInfo = loweredTuples.TryGetValue(type))
@@ -57,13 +49,12 @@ namespace Slang
             info->tupleType = (IRType*)type;
             auto structType = builder->createStructType();
             info->structType = structType;
-            StringBuilder nameSb, fieldNameSb;
-            nameSb << "Tuple";
+            builder->addNameHintDecoration(structType, UnownedStringSlice("Tuple"));
+
+            StringBuilder fieldNameSb;
             for (UInt i = 0; i < type->getOperandCount(); i++)
             {
                 auto elementType = maybeLowerTupleType(builder, (IRType*)(type->getOperand(i)));
-                nameSb << "_";
-                appendTypeName(nameSb, elementType);
                 auto key = builder->createStructKey();
                 fieldNameSb.Clear();
                 fieldNameSb << "value" << i;
@@ -71,7 +62,6 @@ namespace Slang
                 auto field = builder->createStructField(structType, key, (IRType*)elementType);
                 info->fields.add(field);
             }
-            builder->addNameHintDecoration(structType, nameSb.getUnownedSlice());
             mapLoweredStructToTupleInfo[structType] = info;
             loweredTuples[type] = info;
             return info.Ptr();
@@ -101,16 +91,14 @@ namespace Slang
             builder->setInsertBefore(inst);
 
             auto info = getLoweredTupleType(builder, inst->getDataType());
-            auto var = builder->emitVar(info->structType);
+            List<IRInst*> operands;
             for (Index i = 0; i < info->fields.getCount(); i++)
             {
                 SLANG_ASSERT(i < (Index)inst->getOperandCount());
-                auto ptrType = builder->getPtrType(info->fields[i]->getFieldType());
-                auto addr = builder->emitFieldAddress(ptrType, var, info->fields[i]->getKey());
-                builder->emitStore(addr, inst->getOperand((UInt)i));
+                operands.add(inst->getOperand(i));
             }
-            auto load = builder->emitLoad(var);
-            inst->replaceUsesWith(load);
+            auto makeStruct = builder->emitMakeStruct(info->structType, operands);
+            inst->replaceUsesWith(makeStruct);
             inst->removeAndDeallocate();
         }
 
