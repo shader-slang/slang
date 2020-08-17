@@ -670,6 +670,7 @@ namespace Slang
         bool canCoerce(
             Type*    toType,
             Type*    fromType,
+            Expr*    fromExpr,
             ConversionCost* outCost = 0);
 
         TypeCastExpr* createImplicitCastExpr();

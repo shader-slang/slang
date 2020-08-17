@@ -85,7 +85,7 @@ namespace Slang
         // we want to check for is whether a direct initialization
         // is possible (a type conversion exists).
         //
-        return canCoerce(toType, fromExpr->type);
+        return canCoerce(toType, fromExpr->type, fromExpr);
     }
 
     bool SemanticsVisitor::_readValueFromInitializerList(
@@ -484,6 +484,18 @@ namespace Slang
         Expr*    fromExpr,
         ConversionCost* outCost)
     {
+        // If we are about to try and coerce an overloaded expression,
+        // then we should start by trying to resolve the ambiguous reference
+        // based on prioritization of the different candidates.
+        //
+        if( auto fromOverloadedExpr = as<OverloadedExpr>(fromExpr) )
+        {
+            auto resolvedExpr = maybeResolveOverloadedExpr(fromOverloadedExpr, LookupMask::Default, nullptr);
+
+            fromExpr = resolvedExpr;
+            fromType = resolvedExpr->type;
+        }
+
         // An important and easy case is when the "to" and "from" types are equal.
         //
         if( toType->equals(fromType) )
@@ -756,6 +768,7 @@ namespace Slang
     bool SemanticsVisitor::canCoerce(
         Type*    toType,
         Type*    fromType,
+        Expr*    fromExpr,
         ConversionCost* outCost)
     {
         // As an optimization, we will maintain a cache of conversion results
@@ -795,7 +808,7 @@ namespace Slang
             toType,
             nullptr,
             fromType,
-            nullptr,
+            fromExpr,
             &cost);
 
         if (outCost)
@@ -877,7 +890,7 @@ namespace Slang
     {
         // Can we convert at all?
         ConversionCost conversionCost;
-        if(!canCoerce(toType, fromType, &conversionCost))
+        if(!canCoerce(toType, fromType, nullptr, &conversionCost))
             return false;
 
         // Is the conversion cheap enough to be done implicitly?
