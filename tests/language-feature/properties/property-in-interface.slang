@@ -19,6 +19,8 @@ struct MyCell : ICell
 struct YourCell : ICell
 {
     int value;
+
+    int getValue() { return value; }
 }
 
 int helper<C : ICell>(C cell)
@@ -31,7 +33,14 @@ int test(int value)
 {
     MyCell myCell = { value+1 };
     YourCell yourCell = { value };
-    return helper(myCell)*16 + helper(yourCell);
+
+    // Note: fetching `value` directly from `YourCell`
+    // to confirm that member lookup is prioritizing
+    // the concrete `YourCell::value` member of the inherited
+    // abstract member `ICell::value`.
+    //
+    int f = (yourCell.value + yourCell.getValue()) / 2;
+    return helper(myCell)*16 + helper(yourCell) + f;
 }
 
 //TEST_INPUT:ubuffer(data=[0 1 2 3], stride=4):out,name=outputBuffer
