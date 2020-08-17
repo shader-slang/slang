@@ -40,7 +40,7 @@ Items with ^ means there is some discussion about support later in the document 
 | Atomics                     |     Yes      |   Yes        |   Yes      |     Yes       |    No + 
 | Atomics on RWBuffer         |     Yes      |   Yes        |   Yes      |     No        |    No + 
 | Sampler Feedback            |     No       |   Yes        |   No +     |     No        |    Yes ^
-| Atomic Float                |     No       |   Yes ^      |   Yes ^    |     No        |    No +
+| RWByteAddressBuffer Atomic  |     No       |   Yes ^      |   Yes ^    |     Yes       |    No +
 
 ## Half Type
 
@@ -180,9 +180,9 @@ There doesn't not appear to be a similar feature available in Vulkan yet, but wh
 
 For CPU targets there is the IFeedbackTexture interface that requires an implemention for use. Slang does not currently include CPU implementations for texture types.  
 
-## Atomic Float 
+## RWByteAddressBuffer Atomic
 
-This feature allows atomic float additions on RWByteAddressBuffer. There are methods on RWByteAddressBuffer...
+Currently feature allows atomic float additions on RWByteAddressBuffer. A future update will broader types supported. There are methods on RWByteAddressBuffer...
 
 ```
 void RWByteAddressBuffer::InterlockedAddFp32(uint byteAddress, float valueToAdd, out float originalValue);
