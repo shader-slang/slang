@@ -40,6 +40,7 @@ Items with ^ means there is some discussion about support later in the document 
 | Atomics                     |     Yes      |   Yes        |   Yes      |     Yes       |    No + 
 | Atomics on RWBuffer         |     Yes      |   Yes        |   Yes      |     No        |    No + 
 | Sampler Feedback            |     No       |   Yes        |   No +     |     No        |    Yes ^
+| Atomic Float                |     No       |   Yes ^      |   Yes ^    |     No        |    No +
 
 ## Half Type
 
@@ -178,4 +179,21 @@ The HLSL [sampler feedback feature](https://microsoft.github.io/DirectX-Specs/d3
 There doesn't not appear to be a similar feature available in Vulkan yet, but when it is available support should be addeed.
 
 For CPU targets there is the IFeedbackTexture interface that requires an implemention for use. Slang does not currently include CPU implementations for texture types.  
+
+## Atomic Float 
+
+This feature allows atomic float additions on RWByteAddressBuffer. There are methods on RWByteAddressBuffer...
+
+```
+void RWByteAddressBuffer::InterlockedAddFp32(uint byteAddress, float valueToAdd, out float originalValue);
+void RWByteAddressBuffer::InterlockedAddFp32(uint byteAddress, float valueToAdd);
+```
+
+On HLSL based targets this functionality is achieved using [nvAPI](https://developer.nvidia.com/nvapi) based functionality. Therefore for the feature to work you must have nvAPI installed on your system. Then the 'prelude' functionality allows via the API for an include (or the text) of the relevent files. To see how to do this in practice look at the function `setSessionDefaultPrelude`. This makes the prelude for HLSL hold an include to the *absolute* path to the required include file `nvHLSLExtns.h`. As an absolute path is used, it means other includes that includes, look in the correct place without having to set up special include paths. 
+
+To use nvAPI it is nessary to specify a unordered access views (UAV) based 'u' register that will be used to communicate with nvAPI. Note! Slang does not do any special handling around this, it will be necessary for application code to ensure the UAV is either guarenteed to not collide with what Slang assigns, or it's specified (but not used) in the Slang source. The u register number has to be specified also to the nvAPI runtime library. 
+
+On Vulkan, the [`GL_EXT_shader_atomic_float`](https://www.khronos.org/registry/vulkan/specs/1.2-extensions/man/html/VK_EXT_shader_atomic_float.html) extension is required.
+
+
 
