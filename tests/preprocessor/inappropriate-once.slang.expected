@@ -1,6 +1,0 @@
-result code = 0
-standard error = {
-tests/preprocessor/inappropriate-once.slang(4): warning 15602: pragma once was ignored - this is typically because is not placed in an include
-}
-standard output = {
-}

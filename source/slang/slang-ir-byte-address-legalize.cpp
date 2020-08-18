@@ -61,13 +61,40 @@ struct ByteAddressBufferLegalizationContext
         case kIROp_ByteAddressBufferStore:
             processStore(inst);
             break;
+
+        case kIROp_GetEquivalentStructuredBuffer:
+            processGetEquivalentStructuredBuffer(inst);
+            break;
         }
+
 
         IRInst* nextChild = nullptr;
         for( IRInst* child = inst->getFirstChild(); child; child = nextChild )
         {
             nextChild = child->getNextInst();
             processInstRec(child);
+        }
+    }
+
+    void processGetEquivalentStructuredBuffer(IRInst* inst)
+    {
+        // We need to see what type it is to be interpreted as.
+        auto type = inst->getDataType();
+
+        // We want to determine the element type
+        auto structuredBufferType = as<IRHLSLStructuredBufferTypeBase>(type);
+        auto elementType = structuredBufferType->getElementType();
+
+        // The buffer is operand 0
+        auto buffer = inst->getOperand(0);
+
+        // Get the equivalent structured buffer for the buffer.
+        if( auto structuredBuffer = getEquivalentStructuredBuffer(elementType, buffer) )
+        {
+            // We want to replace the the inst, with the equivalent structured buffer reference
+            inst->replaceUsesWith(structuredBuffer);
+            // Once replaced we don't need anymore
+            inst->removeAndDeallocate();
         }
     }
 

@@ -3,7 +3,7 @@
 //TEST(compute):COMPARE_COMPUTE_EX:-cpu -compute
 //TEST(compute):COMPARE_COMPUTE_EX:-slang -compute
 //TEST(compute, vulkan):COMPARE_COMPUTE_EX:-vk -compute
-//TEST(compute, vulkan):COMPARE_COMPUTE_EX:-d3d12 -compute
+//TEST(compute):COMPARE_COMPUTE_EX:-d3d12 -compute
 
 // Confirm cross-compilation of `(RW)ByteAddressBuffer`
 //

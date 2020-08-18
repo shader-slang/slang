@@ -16,6 +16,8 @@
 
 #include "slang-file-system.h"
 
+#include "slang-include-system.h"
+
 #include "slang-ir-serialize-types.h"
 
 #include "../../slang.h"
@@ -1169,28 +1171,6 @@ namespace Slang
     Profile getEffectiveProfile(EntryPoint* entryPoint, TargetRequest* target);
 
 
-    // A directory to be searched when looking for files (e.g., `#include`)
-    struct SearchDirectory
-    {
-        SearchDirectory() = default;
-        SearchDirectory(SearchDirectory const& other) = default;
-        SearchDirectory(String const& path)
-            : path(path)
-        {}
-
-        String  path;
-    };
-
-        /// A list of directories to search for files (e.g., `#include`)
-    struct SearchDirectoryList
-    {
-        // A parent list that should also be searched
-        SearchDirectoryList*    parent = nullptr;
-
-        // Directories to be searched
-        List<SearchDirectory>   searchDirectories;
-    };
-
         /// Given a target returns the required downstream compiler
     PassThroughMode getDownstreamCompilerRequiredForTarget(CodeGenTarget target);
         /// Given a target returns a downstream compiler the prelude should be taken from.
@@ -2162,23 +2142,6 @@ namespace Slang
         String m_languagePreludes[int(SourceLanguage::CountOf)];                  ///< Prelude for each source language
         PassThroughMode m_defaultDownstreamCompilers[int(SourceLanguage::CountOf)];
     };
-
-struct IncludeHandlerImpl : IncludeHandler
-{
-    Linkage*    linkage;
-    SearchDirectoryList*    searchDirectories;
-
-    ISlangFileSystemExt* _getFileSystemExt();
-
-    SlangResult _findFile(SlangPathType fromPathType, const String& fromPath, const String& path, PathInfo& pathInfoOut);
-
-    virtual SlangResult findFile(
-        String const& pathToInclude,
-        String const& pathIncludedFrom,
-        PathInfo& pathInfoOut) override;
-
-    virtual String simplifyPath(const String& path) override;
-};
 
 
 //

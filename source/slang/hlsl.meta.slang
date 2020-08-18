@@ -48,6 +48,29 @@ struct ByteAddressBuffer
     }
 };
 
+
+// Make the GLSL atomicAdd available.
+// We have separate int/float implementations, as the float version requires some specific extensions
+// https://www.khronos.org/registry/OpenGL/extensions/NV/NV_shader_atomic_float.txt
+
+__target_intrinsic(glsl, "atomicAdd($0, $1)")
+__glsl_version(430)
+__glsl_extension(GL_EXT_shader_atomic_float)
+//__glsl_extension(GL_EXT_gpu_shader5)
+float __atomicAdd(__ref float value, float amount);
+
+// Int versions require glsl 4.30
+// https://www.khronos.org/registry/OpenGL-Refpages/gl4/html/atomicAdd.xhtml
+
+__target_intrinsic(glsl, "atomicAdd($0, $1)")
+__glsl_version(430)
+int __atomicAdd(__ref int value, int amount);
+
+__target_intrinsic(glsl, "atomicAdd($0, $1)")
+__glsl_version(430)
+uint __atomicAdd(__ref uint value, uint amount);
+
+
 __intrinsic_op($(kIROp_ByteAddressBufferLoad))
 T __byteAddressBufferLoad<T>(ByteAddressBuffer buffer, int offset);
 
@@ -159,6 +182,41 @@ struct $(item.name)
     {
         return __byteAddressBufferLoad<T>(this, location);
     }
+${{{{
+    if (item.op == kIROp_HLSLRWByteAddressBufferType)
+    {
+}}}}
+
+    // float32 and int64 atomic support. This is a Slang specific extension, it uses
+    // GL_EXT_shader_atomic_float on vk
+    // NvAPI support on DX
+    // NOTE! To use this feature on HLSL, the shader needs to include 'nvHLSLExtns.h' from the NvAPI SDK
+    //
+    __target_intrinsic(hlsl, "($3 = NvInterlockedAddFp32($0, $1, $2))")
+    __target_intrinsic(cuda, "(*$3 = atomicAdd((float*)$0._getPtrAt($1), $2))")
+    void InterlockedAddFp32(uint byteAddress, float valueToAdd, out float originalValue);
+
+    __specialized_for_target(glsl)
+    void InterlockedAddFp32(uint byteAddress, float valueToAdd, out float originalValue)
+    {
+        RWStructuredBuffer<float> buf = __getEquivalentStructuredBuffer<float>(this);
+        originalValue = __atomicAdd(buf[byteAddress / 4], valueToAdd);
+    }
+
+    __target_intrinsic(hlsl, "(NvInterlockedAddFp32($0, $1, $2))")
+    __target_intrinsic(cuda, "atomicAdd((float*)$0._getPtrAt($1), $2)")
+    void InterlockedAddFp32(uint byteAddress, float valueToAdd);
+
+    __specialized_for_target(glsl)
+    void InterlockedAddFp32(uint byteAddress, float valueToAdd)
+    {
+        RWStructuredBuffer<float> buf = __getEquivalentStructuredBuffer<float>(this);
+        __atomicAdd(buf[byteAddress / 4], valueToAdd);
+    }
+
+${{{{
+    }
+}}}}
 
     // Added operations:
 
@@ -1090,6 +1148,10 @@ T dot(vector<T, N> x, vector<T, N> y)
 // Helper for computing distance terms for lighting (obsolete)
 
 __generic<T : __BuiltinFloatingPointType> vector<T,4> dst(vector<T,4> x, vector<T,4> y);
+
+// Given a RWByteAddressBuffer allow it to be interpretted as a RWStructuredBuffer
+__intrinsic_op($(kIROp_GetEquivalentStructuredBuffer))
+RWStructuredBuffer<T> __getEquivalentStructuredBuffer<T>(RWByteAddressBuffer b);
 
 // Error message
 

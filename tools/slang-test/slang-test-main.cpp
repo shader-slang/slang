@@ -3191,8 +3191,6 @@ SlangResult innerMain(int argc, char** argv)
     TestContext context;
     SLANG_RETURN_ON_FAIL(SLANG_FAILED(context.init()))
 
-    TestToolUtil::setSessionDefaultPrelude(argv[0], context.getSession());
-
     auto& categorySet = context.categorySet;
 
     // Set up our test categories here
@@ -3271,6 +3269,19 @@ SlangResult innerMain(int argc, char** argv)
     SLANG_RETURN_ON_FAIL(Options::parse(argc, argv, &categorySet, StdWriters::getError(), &context.options));
     
     Options& options = context.options;
+
+    // Set up the prelude
+    {
+        TestToolUtil::PreludeInfo info;
+        info.exePath = argv[0];
+
+        if (options.nvAPIPath.getLength())
+        {
+            info.nvAPIPath = options.nvAPIPath.getBuffer();
+        }
+
+        TestToolUtil::setSessionDefaultPrelude(info, context.getSession());
+    }
 
     if (options.outputMode == TestOutputMode::TeamCity)
     {

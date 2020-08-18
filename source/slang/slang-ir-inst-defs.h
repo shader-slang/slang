@@ -590,6 +590,9 @@ INST(ExtractTaggedUnionPayload,         extractTaggedUnionPayload,  1, 0)
 
 INST(BitCast,                           bitCast,                    1, 0)
 
+// Converts other resources (such as ByteAddressBuffer) to the equivalent StructuredBuffer
+INST(GetEquivalentStructuredBuffer,     getEquivalentStructuredBuffer, 1, 0)
+
 /* Layout */
     INST(VarLayout, varLayout, 1, 0)
 
