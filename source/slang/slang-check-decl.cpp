@@ -3520,6 +3520,7 @@ namespace Slang
         return subst;
     }
 
+#if 0
     // For simplicity we will make having a definition of a function include having a body or a target intrinsics defined.
     // It may be useful to add other modifiers to mark as having body - for example perhaps
     // any target intrinsic modifier (like SPIR-V version) should be included.
@@ -3535,6 +3536,40 @@ namespace Slang
     bool _isDefinition(FuncDecl* decl)
     {
         return decl->body || decl->hasModifier<TargetIntrinsicModifier>();
+    }
+#endif
+
+    typedef Dictionary<Name*, CallableDecl*> TargetDeclDictionary;
+
+    static void _addTargetModifiers(CallableDecl* decl, TargetDeclDictionary& ioDict)
+    {
+        if (auto specializedModifier = decl->findModifier<SpecializedForTargetModifier>())
+        {
+            // If it's specialized for target it should have a body...
+            if (auto funcDecl = as<FunctionDeclBase>(decl))
+            {
+                SLANG_ASSERT(funcDecl->body);
+            }
+            Name* targetName = specializedModifier->targetToken.getName();
+
+            ioDict.AddIfNotExists(targetName, decl);
+        }
+        else
+        {
+            for (auto modifier : decl->getModifiersOfType<TargetIntrinsicModifier>())
+            {
+                Name* targetName = modifier->targetToken.getName();
+                ioDict.AddIfNotExists(targetName, decl);
+            }
+
+            auto funcDecl = as<FunctionDeclBase>(decl);
+            if (funcDecl && funcDecl->body)
+            {
+                // Should only be one body if it isn't specialized for target.
+                // Use nullptr for this scenario
+                ioDict.AddIfNotExists(nullptr, decl);
+            }
+        }  
     }
 
     Result SemanticsVisitor::checkFuncRedeclaration(
@@ -3701,23 +3736,55 @@ namespace Slang
         // with the case where the two function declarations
         // might represent different target-specific versions
         // of a function.
-        //
-        // TODO: if the two declarations are specialized for
-        // different targets, then skip the body checks below.
-        //
-        // ???: Why isn't this problem showing up in practice?
-
+       
         // If both of the declarations have a body, then there
         // is trouble, because we wouldn't know which one to
         // use during code generation.
-        if (_isDefinition(newDecl) && _isDefinition(oldDecl))
-        {
-            // Redefinition
-            getSink()->diagnose(newDecl, Diagnostics::functionRedefinition, newDecl->getName());
-            getSink()->diagnose(oldDecl, Diagnostics::seePreviousDefinitionOf, newDecl->getName());
 
-            // Don't bother emitting other errors
-            return SLANG_FAIL;
+        // Here to cover the 'bodies'/target_intrinsics, we find all the targets that
+        // that are previously defined, and make sure the new definition
+        // doesn't try and define what is already defined.
+        {
+            TargetDeclDictionary currentTargets;
+            {
+                CallableDecl* curDecl = newDecl->primaryDecl;
+                while (curDecl)
+                {
+                    if (curDecl != newDecl)
+                    {
+                        _addTargetModifiers(curDecl, currentTargets);
+                    }
+                    curDecl = curDecl->nextDecl;
+                }
+            }
+
+            // Add the targets for this new decl
+            TargetDeclDictionary newTargets;
+            _addTargetModifiers(newDecl, newTargets);
+
+            bool hasConflict = false;
+            for (auto& pair : newTargets)
+            {
+                Name* target = pair.Key;
+                auto found = currentTargets.TryGetValue(target);
+                if (found)
+                {
+                    // Redefinition
+                    if (!hasConflict)
+                    {
+                        getSink()->diagnose(newDecl, Diagnostics::functionRedefinition, newDecl->getName());
+                        hasConflict = true;
+                    }
+
+                    auto prevDecl = *found;
+                    getSink()->diagnose(prevDecl, Diagnostics::seePreviousDefinitionOf, prevDecl->getName());
+                }
+            }
+
+            if (hasConflict)
+            {
+                return SLANG_FAIL;
+            }
         }
 
         // At this point we've processed the redeclaration and

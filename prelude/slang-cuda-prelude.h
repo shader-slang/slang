@@ -472,6 +472,13 @@ struct RWByteAddressBuffer
         *(T*)((char*)data + offset) = value;
     }
     
+        /// Can be used in stdlib to gain access
+    SLANG_CUDA_CALL uint* _getPtrAt(size_t offset)
+    {
+        SLANG_PRELUDE_ASSERT(offset + sizeof(T) <= sizeInBytes && (offset & (alignof(T)-1)) == 0); 
+        return (uint*)(((char*)data) + offset);
+    }
+    
     uint32_t* data;
     size_t sizeInBytes; //< Must be multiple of 4 
 };

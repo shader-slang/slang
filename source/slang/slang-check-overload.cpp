@@ -255,7 +255,7 @@ namespace Slang
                     if (context.mode == OverloadResolveContext::Mode::JustTrying)
                     {
                         ConversionCost cost = kConversionCost_None;
-                        if (!canCoerce(getType(m_astBuilder, valParamRef), arg->type, &cost))
+                        if (!canCoerce(getType(m_astBuilder, valParamRef), arg->type, arg, &cost))
                         {
                             success = false;
                         }
@@ -344,7 +344,7 @@ namespace Slang
                     if(!getType(m_astBuilder, param)->equals(argType))
                         return false;
                 }
-                else if (!canCoerce(getType(m_astBuilder, param), argType, &cost))
+                else if (!canCoerce(getType(m_astBuilder, param), argType, arg, &cost))
                 {
                     return false;
                 }
