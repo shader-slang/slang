@@ -19,12 +19,10 @@ void computeMain(uint3 dispatchThreadID : SV_DispatchThreadID)
     uint tid = dispatchThreadID.x;
     int idx = (tid & 3) ^ (tid >> 2); 
 
-    const int64_t delta = 4;
-
     int64_t previousValue = 0;
     outputBuffer.InterlockedAddI64((idx << 3), 1, previousValue);
     
     int anotherIdx = tid >> 2;
-    outputBuffer.InterlockedAddI64(anotherIdx << 3, -3);
+    outputBuffer.InterlockedAddI64(anotherIdx << 3, 3);
 }
 
