@@ -5032,6 +5032,7 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
     LoweredValInfo visit##NAME(NAME*) { return LoweredValInfo(); }
 
     IGNORED_CASE(ImportDecl)
+    IGNORED_CASE(UsingDecl)
     IGNORED_CASE(EmptyDecl)
     IGNORED_CASE(SyntaxDecl)
     IGNORED_CASE(AttributeDecl)
