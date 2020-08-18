@@ -1963,9 +1963,6 @@ namespace Slang
                 return lookupMemberResultFailure(expr, baseType);
             }
 
-            // TODO: need to filter for declarations that are valid to refer
-            // to in this context...
-
             return createLookupResultExpr(
                 expr->name,
                 lookupResult,
