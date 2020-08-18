@@ -236,7 +236,7 @@ ${{{{
     {
         uint2 valueToAdd;
         valueToAdd.x = uint(inValueToAdd);
-        valueToAdd.y = uint(int64_t(inValueToAdd) >> 32); 
+        valueToAdd.y = uint(uint64_t(inValueToAdd) >> 32); 
 
         const uint2 originalValue = __atomicAdd(this, byteAddress, valueToAdd);
         outOriginalValue = (int64_t(originalValue.y) << 32) | originalValue.x;
@@ -259,7 +259,7 @@ ${{{{
     {
         uint2 valueToAdd;
         valueToAdd.x = uint(inValueToAdd);
-        valueToAdd.y = uint(int64_t(inValueToAdd) >> 32); 
+        valueToAdd.y = uint(uint64_t(inValueToAdd) >> 32); 
         __atomicAdd(this, byteAddress, valueToAdd);
     }
 
