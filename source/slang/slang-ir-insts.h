@@ -1590,6 +1590,16 @@ struct IRMakeExistential : IRInst
     IR_LEAF_ISA(MakeExistential)
 };
 
+struct IRMakeExistentialWithRTTI : IRInst
+{
+    IRInst* getWrappedValue() { return getOperand(0); }
+    IRInst* getWitnessTable() { return getOperand(1); }
+    IRInst* getRTTI() { return getOperand(2); }
+
+
+    IR_LEAF_ISA(MakeExistentialWithRTTI)
+};
+
     /// Generalizes `IRMakeExistential` by allowing a type with existential sub-fields to be boxed
 struct IRWrapExistential : IRInst
 {
@@ -1926,6 +1936,12 @@ struct IRBuilder
         IRType* type,
         IRInst* value,
         IRInst* witnessTable);
+
+    IRInst* emitMakeExistentialWithRTTI(
+        IRType* type,
+        IRInst* value,
+        IRInst* witnessTable,
+        IRInst* rtti);
 
     IRInst* emitWrapExistential(
         IRType*         type,

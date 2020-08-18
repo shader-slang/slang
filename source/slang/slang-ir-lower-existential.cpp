@@ -11,7 +11,7 @@ namespace Slang
     {
         SharedGenericsLoweringContext* sharedContext;
 
-        void processMakeExistential(IRMakeExistential* inst)
+        void processMakeExistential(IRMakeExistentialWithRTTI* inst)
         {
             IRBuilder builderStorage;
             auto builder = &builderStorage;
@@ -27,17 +27,11 @@ namespace Slang
             auto rttiType = builder->getPtrType(builder->getRTTIType());
             auto tupleType = builder->getTupleType(anyValueType, witnessTableType, rttiType);
 
-            IRInst* rttiObject = nullptr;
-            if (valueType->op != kIROp_AnyValueType)
+            IRInst* rttiObject = inst->getRTTI();
+            if (auto type = as<IRType>(rttiObject))
             {
-                rttiObject = sharedContext->maybeEmitRTTIObject(valueType);
-                rttiObject = builder->emitGetAddress(
-                    builder->getPtrType(builder->getRTTIType()),
-                    rttiObject);
-            }
-            else
-            {
-                rttiObject = valueType;
+                rttiObject = sharedContext->maybeEmitRTTIObject(type);
+                rttiObject = builder->emitGetAddress(rttiType, rttiObject);
             }
             IRInst* packedValue = value;
             if (valueType->op != kIROp_AnyValueType)
@@ -87,7 +81,7 @@ namespace Slang
 
         void processInst(IRInst* inst)
         {
-            if (auto makeExistential = as<IRMakeExistential>(inst))
+            if (auto makeExistential = as<IRMakeExistentialWithRTTI>(inst))
             {
                 processMakeExistential(makeExistential);
             }
@@ -119,21 +113,16 @@ namespace Slang
 
             while (sharedContext->workList.getCount() != 0)
             {
-                // We will then iterate until our work list goes dry.
-                //
-                while (sharedContext->workList.getCount() != 0)
+                IRInst* inst = sharedContext->workList.getLast();
+
+                sharedContext->workList.removeLast();
+                sharedContext->workListSet.Remove(inst);
+
+                processInst(inst);
+
+                for (auto child = inst->getLastChild(); child; child = child->getPrevInst())
                 {
-                    IRInst* inst = sharedContext->workList.getLast();
-
-                    sharedContext->workList.removeLast();
-                    sharedContext->workListSet.Remove(inst);
-
-                    processInst(inst);
-
-                    for (auto child = inst->getLastChild(); child; child = child->getPrevInst())
-                    {
-                        sharedContext->addToWorkList(child);
-                    }
+                    sharedContext->addToWorkList(child);
                 }
             }
         }
