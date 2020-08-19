@@ -3522,25 +3522,6 @@ namespace Slang
         return subst;
     }
 
-#if 0
-    // For simplicity we will make having a definition of a function include having a body or a target intrinsics defined.
-    // It may be useful to add other modifiers to mark as having body - for example perhaps
-    // any target intrinsic modifier (like SPIR-V version) should be included.
-    //
-    // Note that not having this check around TargetIntrinsicModifier can lead to a crash in the compiler
-    // with a definition, followed by a declaration with a target intrinsic.
-    // That this doesn't appear to be the case with other modifiers.
-    // TODO: 
-    // We may want to be able to add target intrinsics with other declarations, that being the case this logic
-    // would need to change.
-    // We might also want are more precise error that pointed out the actually problem - because strictly speaking
-    // having a target intrinsic isn't a 'body'.
-    bool _isDefinition(FuncDecl* decl)
-    {
-        return decl->body || decl->hasModifier<TargetIntrinsicModifier>();
-    }
-#endif
-
     typedef Dictionary<Name*, CallableDecl*> TargetDeclDictionary;
 
     static void _addTargetModifiers(CallableDecl* decl, TargetDeclDictionary& ioDict)
