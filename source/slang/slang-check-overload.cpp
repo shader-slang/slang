@@ -1517,6 +1517,25 @@ namespace Slang
                 return CreateErrorExpr(expr);
         }
 
+        for (auto& arg : expr->arguments)
+        {
+            arg = maybeOpenExistential(arg);
+            // If arg.type is refering to an interface decl with a ThisTypeSubstitution, use the
+            // substituted type.
+            if (auto declRefType = as<DeclRefType>(arg->type))
+            {
+                arg->type->substitute(getASTBuilder(), declRefType->declRef.substitutions);
+                if (auto interfaceRef = declRefType->declRef.as<InterfaceDecl>())
+                {
+                    if (auto thisTypeSubst = findThisTypeSubstitution(
+                            declRefType->declRef.substitutions, interfaceRef.getDecl()))
+                    {
+                        arg->type = thisTypeSubst->witness->sub;
+                    }
+                }
+            }
+        }
+
         context.originalExpr = expr;
         context.funcLoc = funcExpr->loc;
 

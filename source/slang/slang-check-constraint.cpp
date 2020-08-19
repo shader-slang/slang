@@ -158,6 +158,11 @@ namespace Slang
                 return bestType;
         }
 
+        if (auto extractExistentialType = as<ExtractExistentialType>(type))
+        {
+            if (extractExistentialType->interfaceDeclRef.equals(interfaceDeclRef))
+                return extractExistentialType;
+        }
         // For all other cases, we will just bail out for now.
         //
         // TODO: In the future we should build some kind of side data structure

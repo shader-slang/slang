@@ -104,6 +104,7 @@ namespace Slang
         {
             ExtractExistentialType* openedType = m_astBuilder->create<ExtractExistentialType>();
             openedType->declRef = varDeclRef;
+            openedType->interfaceDeclRef = interfaceDeclRef;
 
             ExtractExistentialSubtypeWitness* openedWitness = m_astBuilder->create<ExtractExistentialSubtypeWitness>();
             openedWitness->sub = openedType;

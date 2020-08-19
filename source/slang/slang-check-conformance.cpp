@@ -268,6 +268,24 @@ namespace Slang
                 }
             }
         }
+        else if (auto extractExistentialType = as<ExtractExistentialType>(subType))
+        {
+            // An ExtractExistentialType from an existential value of type I
+            // is a subtype of I.
+            if (extractExistentialType->interfaceDeclRef.equals(superTypeDeclRef))
+            {
+                if (outWitness)
+                {
+                    auto witness = getASTBuilder()->create<ExtractExistentialSubtypeWitness>();
+                    *outWitness = witness;
+                    witness->declRef = extractExistentialType->declRef;
+                    witness->sub = extractExistentialType;
+                    witness->sup = DeclRefType::create(getASTBuilder(), superTypeDeclRef);
+                }
+                return true;
+            }
+            return false;
+        }
         else if(auto taggedUnionType = as<TaggedUnionType>(subType))
         {
             // A tagged union type conforms to an interface if all of
