@@ -34,6 +34,8 @@
 
 #include "../d3d/d3d-util.h"
 
+#include "../nvapi/nvapi-util.h"
+
 // We will use the C standard library just for printing error messages.
 #include <stdio.h>
 
@@ -1587,6 +1589,11 @@ Result D3D12Renderer::initialize(const Desc& desc, void* inWindowHandle)
     {
         // Couldn't find an adapter
         return SLANG_FAIL;
+    }
+
+    if (SLANG_SUCCEEDED(NVAPIUtil::initialize()))
+    {
+        m_features.add("nvapi");
     }
 
     // Set the device

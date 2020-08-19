@@ -7,6 +7,7 @@
 //WORKING: #include "options.h"
 #include "../render.h"
 #include "../d3d/d3d-util.h"
+#include "../nvapi/nvapi-util.h"
 
 #include "../surface.h"
 
@@ -583,6 +584,11 @@ SlangResult D3D11Renderer::initialize(const Desc& desc, void* inWindowHandle)
         }
         // Check we have a swap chain, context and device
         SLANG_ASSERT(m_immediateContext && m_swapChain && m_device);
+    }
+
+    if (SLANG_SUCCEEDED(NVAPIUtil::initialize()))
+    {
+        m_features.add("nvapi");
     }
 
     // TODO: Add support for debugging to help detect leaks:

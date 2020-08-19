@@ -111,7 +111,6 @@ newoption {
    value       = "path"
 }
 
-
 newoption {
    trigger     = "enable-profile",
    description = "(Optional) If true will enable slang-profile tool - suitable for gprof usage on linux",
@@ -130,6 +129,10 @@ optixPath = _OPTIONS["optix-sdk-path"]
 enableOptix = not not (_OPTIONS["enable-optix"] == "true" or optixPath)
 enableProfile = (_OPTIONS["enable-profile"] == "true")
 
+-- This is the path where nvapi is expected to be found
+
+nvapiPath = "external/nvapi"
+
 if enableOptix then
     optixPath = optixPath or "C:/ProgramData/NVIDIA Corporation/OptiX SDK 7.0.0/"
     enableCuda = true;
@@ -144,6 +147,14 @@ end
 
 -- Is true when the target is really windows (ie not something on top of windows like cygwin)
 local isTargetWindows = (os.target() == "windows") and not (targetDetail == "mingw" or targetDetail == "cygwin")
+
+-- Even if we have the nvapi path, we only want to currently enable on windows targets
+
+enableNvapi = not not (os.isdir(nvapiPath) and isTargetWindows)
+
+if enableNvapi then
+    printf("Enabled NVAPI")
+end
 
 overrideModule = {}
 local overrideModulePath = _OPTIONS["override-module"]
@@ -660,7 +671,7 @@ toolSharedLibrary "render-test"
         defines { "RENDER_TEST_CUDA" }
         includedirs { cudaPath .. "/include" }
         includedirs { cudaPath .. "/include", cudaPath .. "/common/inc" }
-
+        
         if optixPath then
             defines { "RENDER_TEST_OPTIX" }
             includedirs { optixPath .. "include/" }
@@ -673,6 +684,7 @@ toolSharedLibrary "render-test"
            
         filter { "platforms:x64" }
             libdirs { cudaPath .. "/lib/x64/" }       
+        
     end
   
 --
@@ -688,6 +700,9 @@ tool "gfx"
     kind "StaticLib"
     
     includedirs { ".", "external", "source", "external/imgui" }
+
+    -- Will compile across targets
+    addSourceDir "tools/gfx/nvapi"
 
     -- To special case that we may be building using cygwin on windows. If 'true windows' we build for dx12/vk and run the script
     -- If not we assume it's a cygwin/mingw type situation and remove files that aren't appropriate
@@ -718,6 +733,26 @@ tool "gfx"
         --addSourceDir "tools/gfx/open-gl"
     end
         
+
+    -- If NVAPI is enabled
+    if enableNvapi then
+        -- Add the include path
+        includedirs { nvapiPath }
+        
+        -- Add a define so that render-test code can check if nvapi is available
+        defines { "GFX_NVAPI" }
+        
+        -- Set the nvapi libs directory
+        filter { "platforms:x86" }
+            libdirs { nvapiPath .. "/x86" }
+            links { "nvapi" }
+            
+        filter { "platforms:x64" }
+            libdirs { nvapiPath .. "/amd64" }
+            links { "nvapi64" }
+            
+    end
+    
     filter { "system:linux" }
         -- might be able to do pic(true)
         buildoptions{"-fPIC"}

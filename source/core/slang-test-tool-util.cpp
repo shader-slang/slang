@@ -75,12 +75,12 @@ static SlangResult _addCUDAPrelude(const String& parentPath, slang::IGlobalSessi
     return SLANG_OK;
 }
 
-/* static */SlangResult TestToolUtil::setSessionDefaultPrelude(const PreludeInfo& info, slang::IGlobalSession* session)
+/* static */SlangResult TestToolUtil::setSessionDefaultPrelude(const char* inExePath, slang::IGlobalSession* session)
 {
     // Set the prelude to a path
-    if (info.exePath)
+    if (inExePath)
     {
-        String exePath(info.exePath);
+        String exePath(inExePath);
 
         String canonicalPath;
         if (SLANG_SUCCEEDED(Path::getCanonical(exePath, canonicalPath)))
@@ -97,31 +97,27 @@ static SlangResult _addCUDAPrelude(const String& parentPath, slang::IGlobalSessi
             {
                 SLANG_ASSERT(!"Couldn't find the CUDA prelude relative to the executable");
             }
-        }
-    }
-    // If the nvAPI path is set, and we find nvHLSLExtns.h, put that in the HLSL prelude
-    if (info.nvAPIPath)
-    {
-        String includePath;
-        if (SLANG_SUCCEEDED(_calcIncludePath(info.nvAPIPath, "nvHLSLExtns.h", includePath)))
-        {
-            StringBuilder buf;
 
-            buf << "#include \"" << includePath << "\"\n";
+            // Set the nvapi path for hlsl. 
+            {
+                String includePath;
+                if (SLANG_SUCCEEDED(_calcIncludePath(parentPath, "../../../external/nvapi/nvHLSLExtns.h", includePath)))
+                {
+                    StringBuilder buf;
 
-            session->setLanguagePrelude(SLANG_SOURCE_LANGUAGE_HLSL, buf.getBuffer());
-            return SLANG_OK;
+                    // We have to choose a slot that nvapi will use. Well use u0 because it's simple,
+                    buf << "#define NV_SHADER_EXTN_SLOT u0\n";
+
+                    // Incude the nvapi header
+                    buf << "#include \"" << includePath << "\"\n\n";
+                    
+                    session->setLanguagePrelude(SLANG_SOURCE_LANGUAGE_HLSL, buf.getBuffer());
+                }
+            }
         }
     }
 
     return SLANG_OK;
-}
-
-/* static */SlangResult TestToolUtil::setSessionDefaultPrelude(const char* exePath, slang::IGlobalSession* session)
-{
-    PreludeInfo info;
-    info.exePath = exePath;
-    return setSessionDefaultPrelude(info, session);
 }
 
 }

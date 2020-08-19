@@ -3270,19 +3270,9 @@ SlangResult innerMain(int argc, char** argv)
     
     Options& options = context.options;
 
-    // Set up the prelude
-    {
-        TestToolUtil::PreludeInfo info;
-        info.exePath = argv[0];
-
-        if (options.nvAPIPath.getLength())
-        {
-            info.nvAPIPath = options.nvAPIPath.getBuffer();
-        }
-
-        TestToolUtil::setSessionDefaultPrelude(info, context.getSession());
-    }
-
+    // Set up the prelude/s
+    TestToolUtil::setSessionDefaultPrelude(argv[0], context.getSession());
+    
     if (options.outputMode == TestOutputMode::TeamCity)
     {
         // On TeamCity CI there is an issue with unix/linux targets where test system may be different from the build system
