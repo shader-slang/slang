@@ -2790,6 +2790,16 @@ namespace Slang
         return emitIntrinsicInst(type, kIROp_MakeExistential, SLANG_COUNT_OF(args), args);
     }
 
+    IRInst* IRBuilder::emitMakeExistentialWithRTTI(
+        IRType* type,
+        IRInst* value,
+        IRInst* witnessTable,
+        IRInst* rtti)
+    {
+        IRInst* args[] = { value, witnessTable, rtti };
+        return emitIntrinsicInst(type, kIROp_MakeExistentialWithRTTI, SLANG_COUNT_OF(args), args);
+    }
+
     IRInst* IRBuilder::emitWrapExistential(
         IRType*         type,
         IRInst*         value,
