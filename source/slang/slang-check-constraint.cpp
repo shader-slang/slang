@@ -75,10 +75,31 @@ namespace Slang
             vectorType->elementCount);
     }
 
+    // If type is refering to an interface decl with a ThisTypeSubstitution, use the
+    // substituted type.
+    Type* SemanticsVisitor::maybeApplyThisSubstitutionToExistentialType(Type* type)
+    {
+        if (auto declRefType = as<DeclRefType>(type))
+        {
+            type->substitute(getASTBuilder(), declRefType->declRef.substitutions);
+            if (auto interfaceRef = declRefType->declRef.as<InterfaceDecl>())
+            {
+                if (auto thisTypeSubst = findThisTypeSubstitution(
+                        declRefType->declRef.substitutions, interfaceRef.getDecl()))
+                {
+                    type = thisTypeSubst->witness->sub;
+                }
+            }
+        }
+        return type;
+    }
+
     Type* SemanticsVisitor::TryJoinTypeWithInterface(
         Type*            type,
         DeclRef<InterfaceDecl>      interfaceDeclRef)
     {
+        type = maybeApplyThisSubstitutionToExistentialType(type);
+
         // The most basic test here should be: does the type declare conformance to the trait.
         if(isDeclaredSubtype(type, interfaceDeclRef))
             return type;
@@ -158,11 +179,6 @@ namespace Slang
                 return bestType;
         }
 
-        if (auto extractExistentialType = as<ExtractExistentialType>(type))
-        {
-            if (extractExistentialType->interfaceDeclRef.equals(interfaceDeclRef))
-                return extractExistentialType;
-        }
         // For all other cases, we will just bail out for now.
         //
         // TODO: In the future we should build some kind of side data structure
@@ -243,6 +259,8 @@ namespace Slang
                 return TryJoinVectorAndScalarType(leftVector, rightBasic);
             }
         }
+
+        left = maybeApplyThisSubstitutionToExistentialType(left);
 
         // HACK: trying to work trait types in here...
         if(auto leftDeclRefType = as<DeclRefType>(left))

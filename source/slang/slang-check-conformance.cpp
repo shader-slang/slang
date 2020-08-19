@@ -157,6 +157,7 @@ namespace Slang
         Val**            outWitness,
         TypeWitnessBreadcrumb*  inBreadcrumbs)
     {
+        subType = maybeApplyThisSubstitutionToExistentialType(subType);
         // for now look up a conformance member...
         if(auto declRefType = as<DeclRefType>(subType))
         {

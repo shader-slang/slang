@@ -1005,6 +1005,9 @@ namespace Slang
             /// Determine what type `This` should refer to in an extension of `type`.
         Type* calcThisType(Type* type);
 
+        // If `type` is an InterfaceDeclRef type with a ThisTypeSubstitution whose interfaceDecl is the same
+        // interface, return the type from ThisTypeSubstitution instead.
+        Type* maybeApplyThisSubstitutionToExistentialType(Type* type);
 
         //
 
