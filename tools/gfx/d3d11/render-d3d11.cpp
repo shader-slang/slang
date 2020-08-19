@@ -30,6 +30,13 @@
 #include <d3d11_2.h>
 #include <d3dcompiler.h>
 
+#ifdef GFX_NVAPI
+// NVAPI integration is desribed here
+// https://developer.nvidia.com/unlocking-gpu-intrinsics-hlsl
+
+#   include "../nvapi/nvapi-include.h"
+#endif
+
 // We will use the C standard library just for printing error messages.
 #include <stdio.h>
 
@@ -53,6 +60,7 @@ public:
         kMaxRTVs = 8,
     };
 
+    
     // Renderer    implementation
     virtual SlangResult initialize(const Desc& desc, void* inWindowHandle) override;
     virtual const List<String>& getFeatures() override { return m_features; }
@@ -103,6 +111,17 @@ public:
 
     protected:
 
+    class ScopeNVAPI
+    {
+    public:
+        ScopeNVAPI() : m_renderer(nullptr) {}
+        SlangResult init(D3D11Renderer* renderer, Index regIndex);
+        ~ScopeNVAPI();
+
+    protected:
+        D3D11Renderer* m_renderer;
+    };
+
 #if 0
     struct BindingDetail
     {
@@ -125,6 +144,7 @@ public:
     };
 #endif
 
+    
     enum class D3D11DescriptorSlotType
     {
         ConstantBuffer,
@@ -392,12 +412,52 @@ public:
     float m_clearColor[4] = { 0, 0, 0, 0 };
 
     List<String> m_features;
+
+    bool m_nvapi = false;
 };
 
 Renderer* createD3D11Renderer()
 {
     return new D3D11Renderer();
 }
+
+// !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!ScopeNVAPI !!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+
+SlangResult D3D11Renderer::ScopeNVAPI::init(D3D11Renderer* renderer, Index regIndex)
+{
+    if (!renderer->m_nvapi)
+    {
+        // There is nothing to set as nvapi is not set
+        return SLANG_OK;
+    }
+
+#ifdef GFX_NVAPI
+    NvAPI_Status nvapiStatus = NvAPI_D3D11_SetNvShaderExtnSlot(renderer->m_device, NvU32(regIndex));
+    if (nvapiStatus != NVAPI_OK)
+    {
+        return SLANG_FAIL;
+    }
+#endif
+
+    // Record the renderer so it can be freed
+    m_renderer = renderer;
+    return SLANG_OK;
+}
+
+D3D11Renderer::ScopeNVAPI::~ScopeNVAPI()
+{
+    // If the m_renderer is not set, it must not have been set up
+    if (m_renderer)
+    {
+#ifdef GFX_NVAPI
+        // Disable the slot used
+        NvAPI_Status nvapiStatus = NvAPI_D3D11_SetNvShaderExtnSlot(m_renderer->m_device, ~0);
+        SLANG_ASSERT(nvapiStatus == NVAPI_OK);
+#endif
+    }
+}
+
+// !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!D3D11Renderer !!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 
 /* static */HRESULT D3D11Renderer::captureTextureToSurface(ID3D11Device* device, ID3D11DeviceContext* context, ID3D11Texture2D* texture, Surface& surfaceOut)
 {
@@ -586,9 +646,10 @@ SlangResult D3D11Renderer::initialize(const Desc& desc, void* inWindowHandle)
         SLANG_ASSERT(m_immediateContext && m_swapChain && m_device);
     }
 
-    if (SLANG_SUCCEEDED(NVAPIUtil::initialize()))
+    if (desc.requiredFeatures.indexOf("nvapi") >= 0 && SLANG_SUCCEEDED(NVAPIUtil::initialize()))
     {
         m_features.add("nvapi");
+        m_nvapi = true;
     }
 
     // TODO: Add support for debugging to help detect leaks:
@@ -1511,7 +1572,12 @@ Result D3D11Renderer::createProgram(const ShaderProgram::Desc& desc, ShaderProgr
         auto computeKernel = desc.findKernel(StageType::Compute);
 
         ComPtr<ID3D11ComputeShader> computeShader;
-        SLANG_RETURN_ON_FAIL(m_device->CreateComputeShader(computeKernel->codeBegin, computeKernel->getCodeSize(), nullptr, computeShader.writeRef()));
+
+        {
+            ScopeNVAPI scopeNVAPI;
+            SLANG_RETURN_ON_FAIL(scopeNVAPI.init(this, 0));
+            SLANG_RETURN_ON_FAIL(m_device->CreateComputeShader(computeKernel->codeBegin, computeKernel->getCodeSize(), nullptr, computeShader.writeRef()));
+        }
 
         RefPtr<ShaderProgramImpl> shaderProgram = new ShaderProgramImpl();
         shaderProgram->m_computeShader.swap(computeShader);
@@ -1527,8 +1593,13 @@ Result D3D11Renderer::createProgram(const ShaderProgram::Desc& desc, ShaderProgr
         ComPtr<ID3D11VertexShader> vertexShader;
         ComPtr<ID3D11PixelShader> pixelShader;
 
-        SLANG_RETURN_ON_FAIL(m_device->CreateVertexShader(vertexKernel->codeBegin, vertexKernel->getCodeSize(), nullptr, vertexShader.writeRef()));
-        SLANG_RETURN_ON_FAIL(m_device->CreatePixelShader(fragmentKernel->codeBegin, fragmentKernel->getCodeSize(), nullptr, pixelShader.writeRef()));
+        {
+            ScopeNVAPI scopeNVAPI;
+            SLANG_RETURN_ON_FAIL(scopeNVAPI.init(this, 0));
+
+            SLANG_RETURN_ON_FAIL(m_device->CreateVertexShader(vertexKernel->codeBegin, vertexKernel->getCodeSize(), nullptr, vertexShader.writeRef()));
+            SLANG_RETURN_ON_FAIL(m_device->CreatePixelShader(fragmentKernel->codeBegin, fragmentKernel->getCodeSize(), nullptr, pixelShader.writeRef()));
+        }
 
         RefPtr<ShaderProgramImpl> shaderProgram = new ShaderProgramImpl();
         shaderProgram->m_vertexShader.swap(vertexShader);

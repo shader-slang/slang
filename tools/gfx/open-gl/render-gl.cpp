@@ -717,7 +717,7 @@ SlangResult GLRenderer::initialize(const Desc& desc, void* inWindowHandle)
         }
     }
 
-    if (SLANG_SUCCEEDED(NVAPIUtil::initialize()))
+    if (m_desc.requiredFeatures.indexOf("nvapi") >= 0 && SLANG_SUCCEEDED(NVAPIUtil::initialize()))
     {
         m_features.add("nvapi");
     }

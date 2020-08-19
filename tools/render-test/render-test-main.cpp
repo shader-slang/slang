@@ -692,6 +692,7 @@ static SlangResult _innerMain(Slang::StdWriters* stdWriters, SlangSession* sessi
         desc.width = gWindowWidth;
         desc.height = gWindowHeight;
         desc.adapter = gOptions.adapter;
+        desc.requiredFeatures = gOptions.renderFeatures;
 
         window = renderer_test::Window::create();
         SLANG_RETURN_ON_FAIL(window->initialize(gWindowWidth, gWindowHeight));
