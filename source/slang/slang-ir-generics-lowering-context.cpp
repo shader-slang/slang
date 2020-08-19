@@ -135,7 +135,8 @@ namespace Slang
         switch (paramType->op)
         {
         case kIROp_WitnessTableType:
-            // Do not translate witness table type.
+        case kIROp_ExtractExistentialType:
+            // Do not translate these types.
             return (IRType*)paramType;
         case kIROp_Param:
         {
