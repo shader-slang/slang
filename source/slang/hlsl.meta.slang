@@ -193,6 +193,7 @@ ${{{{
     // NOTE! To use this feature on HLSL, the shader needs to include 'nvHLSLExtns.h' from the NvAPI SDK
     //
     __target_intrinsic(hlsl, "($3 = NvInterlockedAddFp32($0, $1, $2))")
+    __cuda_sm_version(2.0)
     __target_intrinsic(cuda, "(*$3 = atomicAdd((float*)$0._getPtrAt($1), $2))")
     void InterlockedAddFp32(uint byteAddress, float valueToAdd, out float originalValue);
 
@@ -204,6 +205,7 @@ ${{{{
     }
 
     __target_intrinsic(hlsl, "(NvInterlockedAddFp32($0, $1, $2))")
+    __cuda_sm_version(2.0)
     __target_intrinsic(cuda, "atomicAdd((float*)$0._getPtrAt($1), $2)")
     void InterlockedAddFp32(uint byteAddress, float valueToAdd);
 

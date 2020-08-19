@@ -196,6 +196,7 @@
     <ClInclude Include="flag-combiner.h" />
     <ClInclude Include="gui.h" />
     <ClInclude Include="model.h" />
+    <ClInclude Include="nvapi\nvapi-include.h" />
     <ClInclude Include="nvapi\nvapi-util.h" />
     <ClInclude Include="open-gl\render-gl.h" />
     <ClInclude Include="render.h" />

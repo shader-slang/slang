@@ -36,6 +36,9 @@
     <ClInclude Include="model.h">
       <Filter>Header Files</Filter>
     </ClInclude>
+    <ClInclude Include="nvapi\nvapi-include.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
     <ClInclude Include="nvapi\nvapi-util.h">
       <Filter>Header Files</Filter>
     </ClInclude>
