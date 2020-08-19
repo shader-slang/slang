@@ -3229,7 +3229,7 @@ void D3D12Renderer::DescriptorSetImpl::setRootConstants(
     // have been a root-constant range for this call to be
     // valid.
     //
-    SLANG_ASSERT(range < m_layout->m_ranges.getCount());
+    SLANG_ASSERT(range < UInt(m_layout->m_ranges.getCount()));
     auto& rangeInfo = m_layout->m_ranges[range];
     SLANG_ASSERT(rangeInfo.type == DescriptorSlotType::RootConstant);
 
@@ -3242,7 +3242,7 @@ void D3D12Renderer::DescriptorSetImpl::setRootConstants(
     SLANG_ASSERT(rootConstantIndex >= 0);
     SLANG_ASSERT(rootConstantIndex < m_layout->m_rootConstantRanges.getCount());
     auto& rootConstantRangeInfo = m_layout->m_rootConstantRanges[rootConstantIndex];
-    SLANG_ASSERT(offset + size <= rootConstantRangeInfo.size);
+    SLANG_ASSERT(offset + size <= UInt(rootConstantRangeInfo.size));
 
     memcpy((char*)m_rootConstantData.getBuffer() + rootConstantRangeInfo.offset + offset, data, size);
 }

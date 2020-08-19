@@ -2712,7 +2712,7 @@ void VKRenderer::DescriptorSetImpl::setRootConstants(
     SLANG_ASSERT(rootConstantIndex >= 0);
     SLANG_ASSERT(rootConstantIndex < m_layout->m_rootConstantRanges.getCount());
     auto& rootConstantRangeInfo = m_layout->m_rootConstantRanges[rootConstantIndex];
-    SLANG_ASSERT(offset + size <= rootConstantRangeInfo.size);
+    SLANG_ASSERT(offset + size <= UInt(rootConstantRangeInfo.size));
 
     memcpy(m_rootConstantData.getBuffer() + rootConstantRangeInfo.offset + offset, data, size);
 }
