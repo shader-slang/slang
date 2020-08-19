@@ -100,10 +100,10 @@ static SlangResult _addCUDAPrelude(const String& parentPath, slang::IGlobalSessi
         }
     }
     // If the nvAPI path is set, and we find nvHLSLExtns.h, put that in the HLSL prelude
-    if (info.nvAPIPath)
+    if (info.nvapiPath)
     {
         String includePath;
-        if (SLANG_SUCCEEDED(_calcIncludePath(info.nvAPIPath, "nvHLSLExtns.h", includePath)))
+        if (SLANG_SUCCEEDED(_calcIncludePath(info.nvapiPath, "nvHLSLExtns.h", includePath)))
         {
             StringBuilder buf;
 

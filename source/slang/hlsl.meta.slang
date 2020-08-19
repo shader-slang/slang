@@ -196,8 +196,8 @@ ${{{{
 
     // float32 and int64 atomic support. This is a Slang specific extension, it uses
     // GL_EXT_shader_atomic_float on vk
-    // NvAPI support on DX
-    // NOTE! To use this feature on HLSL, the shader needs to include 'nvHLSLExtns.h' from the NvAPI SDK
+    // NVAPI support on DX
+    // NOTE! To use this feature on HLSL, the shader needs to include 'nvHLSLExtns.h' from the NVAPI SDK
     //
 
     // Fp32 

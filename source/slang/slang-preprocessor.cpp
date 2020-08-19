@@ -203,9 +203,8 @@ struct Preprocessor
     // diagnostics sink to use when writing messages
     DiagnosticSink*                         sink;
 
-    // An external callback interface to use when looking
-    // for files in a `#include` directive
-    IncludeHandler*                         includeHandler;
+    // Functionality for looking up files in a `#include` directive
+    IncludeSystem*                          includeSystem;
 
     // Current input stream (top of the stack of input)
     PreprocessorInputStream*                inputStream;
@@ -1818,8 +1817,8 @@ static void HandleIncludeDirective(PreprocessorDirectiveContext* context)
     
     PathInfo includedFromPathInfo = context->preprocessor->getSourceManager()->getPathInfo(directiveLoc, SourceLocType::Actual);
     
-    IncludeHandler* includeHandler = context->preprocessor->includeHandler;
-    if (!includeHandler)
+    IncludeSystem* includeSystem = context->preprocessor->includeSystem;
+    if (!includeSystem)
     {
         GetSink(context)->diagnose(pathToken.loc, Diagnostics::includeFailed, path);
         GetSink(context)->diagnose(pathToken.loc, Diagnostics::noIncludeHandlerSpecified);
@@ -1828,7 +1827,7 @@ static void HandleIncludeDirective(PreprocessorDirectiveContext* context)
     
     /* Find the path relative to the foundPath */
     PathInfo filePathInfo;
-    if (SLANG_FAILED(includeHandler->findFile(path, includedFromPathInfo.foundPath, filePathInfo)))
+    if (SLANG_FAILED(includeSystem->findFile(path, includedFromPathInfo.foundPath, filePathInfo)))
     {
         GetSink(context)->diagnose(pathToken.loc, Diagnostics::includeFailed, path);
         return;
@@ -1853,7 +1852,7 @@ static void HandleIncludeDirective(PreprocessorDirectiveContext* context)
     }
 
     // Simplify the path
-    filePathInfo.foundPath = includeHandler->simplifyPath(filePathInfo.foundPath);
+    filePathInfo.foundPath = includeSystem->simplifyPath(filePathInfo.foundPath);
 
     // Push the new file onto our stack of input streams
     // TODO(tfoley): check if we have made our include stack too deep
@@ -2355,7 +2354,7 @@ static void InitializePreprocessor(
     DiagnosticSink* sink)
 {
     preprocessor->sink = sink;
-    preprocessor->includeHandler = NULL;
+    preprocessor->includeSystem = NULL;
     preprocessor->endOfFileToken.type = TokenType::EndOfFile;
     preprocessor->endOfFileToken.flags = TokenFlag::AtStartOfLine;
 }
@@ -2451,7 +2450,7 @@ static TokenList ReadAllTokens(
 TokenList preprocessSource(
     SourceFile*                 file,
     DiagnosticSink*             sink,
-    IncludeHandler*             includeHandler,
+    IncludeSystem*              includeSystem,
     Dictionary<String, String>  defines,
     Linkage*                    linkage,
     Module*                     parentModule)
@@ -2461,7 +2460,7 @@ TokenList preprocessSource(
     preprocessor.linkage = linkage;
     preprocessor.parentModule = parentModule;
 
-    preprocessor.includeHandler = includeHandler;
+    preprocessor.includeSystem = includeSystem;
     for (auto p : defines)
     {
         DefineMacro(&preprocessor, p.Key, p.Value);

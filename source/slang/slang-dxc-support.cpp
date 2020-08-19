@@ -50,7 +50,7 @@ namespace Slang
     static const Guid IID_IDxcIncludeHandler = { 0x7f61fc7d, 0x950d, 0x467f, { 0x3c, 0x02, 0xfb, 0x49, 0x18, 0x7c } };
     static const Guid IID_IUnknown = SLANG_UUID_ISlangUnknown;
 
-    class DxcIncludeHandler : public IDxcIncludeHandler, public RefObject
+    class DxcIncludeHandler : public IDxcIncludeHandler
     {
     public:
         // Implement IUnknown
@@ -59,14 +59,13 @@ namespace Slang
             ISlangUnknown* intf = getInterface(reinterpret_cast<const Guid&>(uuid)); 
             if (intf) 
             { 
-                addReference(); 
                 *out = intf; 
                 return SLANG_OK;
             } 
             return SLANG_E_NO_INTERFACE;
         }
-        SLANG_NO_THROW ULONG SLANG_MCALL AddRef() SLANG_OVERRIDE { return (uint32_t)addReference(); }
-        SLANG_NO_THROW ULONG SLANG_MCALL Release() SLANG_OVERRIDE { return (uint32_t)releaseReference(); }
+        SLANG_NO_THROW ULONG SLANG_MCALL AddRef() SLANG_OVERRIDE { return 1; }
+        SLANG_NO_THROW ULONG SLANG_MCALL Release() SLANG_OVERRIDE { return 1; }
 
         // Implement IDxcIncludeHandler
         virtual HRESULT SLANG_MCALL LoadSource(LPCWSTR inFilename, IDxcBlob** outSource) SLANG_OVERRIDE
@@ -270,7 +269,7 @@ namespace Slang
 
         const String sourcePath = calcSourcePathForEntryPoint(endToEndReq, entryPointIndex);
 
-        ComPtr<DxcIncludeHandler> includeHandler(new DxcIncludeHandler(&linkage->searchDirectories, linkage->getFileSystemExt()));
+        DxcIncludeHandler includeHandler(&linkage->searchDirectories, linkage->getFileSystemExt(), compileRequest->getSourceManager());
 
         ComPtr<IDxcOperationResult> dxcResult;
         SLANG_RETURN_ON_FAIL(dxcCompiler->Compile(dxcSourceBlob,
@@ -279,9 +278,9 @@ namespace Slang
             wideProfileName.begin(),
             args,
             argCount,
-            nullptr,        // `#define`s
-            0,              // `#define` count
-            includeHandler, // `#include` handler
+            nullptr,            // `#define`s
+            0,                  // `#define` count
+            &includeHandler,    // `#include` handler
             dxcResult.writeRef()));
 
         // Retrieve result.

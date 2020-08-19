@@ -3275,9 +3275,9 @@ SlangResult innerMain(int argc, char** argv)
         TestToolUtil::PreludeInfo info;
         info.exePath = argv[0];
 
-        if (options.nvAPIPath.getLength())
+        if (options.nvapiPath.getLength())
         {
-            info.nvAPIPath = options.nvAPIPath.getBuffer();
+            info.nvapiPath = options.nvapiPath.getBuffer();
         }
 
         TestToolUtil::setSessionDefaultPrelude(info, context.getSession());

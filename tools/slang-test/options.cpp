@@ -266,7 +266,7 @@ static bool _isSubCommand(const char* arg)
                 return res;
             }
         }
-        else if (strcmp(arg, "-nv-api-path") == 0)
+        else if (strcmp(arg, "-nvapi-path") == 0)
         {
             if (argCursor == argEnd)
             {
@@ -274,7 +274,7 @@ static bool _isSubCommand(const char* arg)
                 return SLANG_FAIL;
             }
 
-            optionsOut->nvAPIPath = *argCursor++;
+            optionsOut->nvapiPath = *argCursor++;
         }
         else
         {
