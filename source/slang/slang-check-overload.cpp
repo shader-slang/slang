@@ -1080,7 +1080,7 @@ namespace Slang
                 // So the question is then whether a mismatch during the
                 // unification step should be taken as an immediate failure...
 
-                TryUnifyTypes(constraints, context.getArgTypeForInference(aa), getType(m_astBuilder, params[aa]));
+                TryUnifyTypes(constraints, context.getArgTypeForInference(aa, this), getType(m_astBuilder, params[aa]));
 #endif
             }
         }
