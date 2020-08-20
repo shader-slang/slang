@@ -1005,6 +1005,7 @@ namespace Slang
             /// Determine what type `This` should refer to in an extension of `type`.
         Type* calcThisType(Type* type);
 
+
         //
 
         struct Constraint

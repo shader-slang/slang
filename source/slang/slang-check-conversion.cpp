@@ -569,20 +569,6 @@ namespace Slang
             }
         }
 
-        // If we are casting to an ExtractExistentialType, then we check if fromType can be folded into
-        // the same ExtractExistentialType.
-        if (auto extractExistentialType = as<ExtractExistentialType>(toType))
-        {
-            if (fromType->equals(toType))
-            {
-                if (outToExpr)
-                    *outToExpr = fromExpr;
-                if (outCost)
-                    *outCost = kConversionCost_None;
-                return true;
-            }
-            return false;
-        }
         // We allow implicit conversion of a parameter group type like
         // `ConstantBuffer<X>` or `ParameterBlock<X>` to its element
         // type `X`.

@@ -589,11 +589,6 @@ static void _lookUpMembersInSuperTypeImpl(
     }
     if (auto extractExistentialType = as<ExtractExistentialType>(superType))
     {
-        auto semantics = request.semantics;
-        if (semantics)
-        {
-            ensureDecl(semantics, extractExistentialType->interfaceDeclRef, DeclCheckState::ReadyForLookup);
-        }
         _lookUpMembersInSuperTypeDeclImpl(astBuilder, name, leafType, superType, leafIsSuperWitness, extractExistentialType->interfaceDeclRef, request, ioResult, inBreadcrumbs);
     }
 }
