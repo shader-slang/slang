@@ -1029,6 +1029,9 @@ SlangResult VKRenderer::initialize(const Desc& desc, void* inWindowHandle)
     // Need in this scope because it will be linked into the device creation (if it is available)
     VkPhysicalDeviceFloat16Int8FeaturesKHR float16Features = { VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_FLOAT16_INT8_FEATURES_KHR };
 
+    // AtomicInt64 features
+    VkPhysicalDeviceShaderAtomicInt64FeaturesKHR atomicInt64Features = { VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_SHADER_ATOMIC_INT64_FEATURES_KHR };
+
     // API version check, can't use vkGetPhysicalDeviceProperties2 yet since this device might not support it
     if (VK_MAKE_VERSION(majorVersion, minorVersion, 0) >= VK_API_VERSION_1_1 &&
         m_api.vkGetPhysicalDeviceProperties2 &&
@@ -1046,10 +1049,14 @@ SlangResult VKRenderer::initialize(const Desc& desc, void* inWindowHandle)
         VkPhysicalDeviceFeatures2 deviceFeatures2 = {};
         deviceFeatures2.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_FEATURES_2;
 
-        // Link together for lookup 
+        // Float16
         float16Features.pNext = deviceFeatures2.pNext;
         deviceFeatures2.pNext = &float16Features;
 
+        // Atomic64
+        atomicInt64Features.pNext = deviceFeatures2.pNext;
+        deviceFeatures2.pNext = &atomicInt64Features;
+        
         m_api.vkGetPhysicalDeviceFeatures2(m_api.m_physicalDevice, &deviceFeatures2);
 
         // If we have float16 features then enable
@@ -1064,7 +1071,17 @@ SlangResult VKRenderer::initialize(const Desc& desc, void* inWindowHandle)
 
             // We have half support
             m_features.add("half");
-        }   
+        }
+
+        if (atomicInt64Features.shaderBufferInt64Atomics)
+        {
+            // Link into the creation features
+            atomicInt64Features.pNext = (void*)deviceCreateInfo.pNext;
+            deviceCreateInfo.pNext = &atomicInt64Features;
+
+            deviceExtensions.add(VK_KHR_SHADER_ATOMIC_INT64_EXTENSION_NAME);
+            m_features.add("atomic-int64");
+        }
     }
 
     int queueFamilyIndex = m_api.findQueue(VK_QUEUE_GRAPHICS_BIT | VK_QUEUE_COMPUTE_BIT);

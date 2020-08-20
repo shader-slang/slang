@@ -2,16 +2,17 @@
 
 //DISABLE_TEST(compute):COMPARE_COMPUTE_EX:-cpu -compute -output-using-type
 // Produces a different result
-//DISABLE_TEST(compute):COMPARE_COMPUTE_EX:-dx11 -slang -compute -render-features nvapi -output-using-type
+//TEST(compute):COMPARE_COMPUTE_EX:-dx11 -slang -compute -render-features nvapi -output-using-type
 // Disabled because crashes currently on vulkan 
+// https://vulkan.gpuinfo.org/listdevicescoverage.php?extension=VK_EXT_shader_atomic_float
 //DISABLE_TEST(compute, vulkan):COMPARE_COMPUTE_EX:-vk -compute -output-using-type
-//TEST(compute):COMPARE_COMPUTE_EX:-d3d12 -compute -render-features nvapi -output-using-type
-//TEST(compute):COMPARE_COMPUTE_EX:-d3d12 -compute -use-dxil -render-features nvapi -output-using-type
-// For reasons unyet resolved this doesn't produce the expected result on CUDA
-//DISABLE_TEST(compute):COMPARE_COMPUTE_EX:-cuda -compute -output-using-type
+//TEST(compute):COMPARE_COMPUTE_EX:-d3d12 -compute -render-features nvapi -output-using-type -compile-arg -O2
+//TEST(compute):COMPARE_COMPUTE_EX:-d3d12 -compute -use-dxil -render-features nvapi -output-using-type -compile-arg -O2
+//TEST(compute):COMPARE_COMPUTE_EX:-cuda -compute -output-using-type
 
 // We don't use this, but having this defined makes the 0 slot available if nvapi is going to be used
 // Only strictly necessary on the dx12 path
+//TEST_INPUT:ubuffer(data=[0 0 0 0 ], stride=4):name=nvapiBuffer
 RWStructuredBuffer<int> nvapiBuffer;
 
 //TEST_INPUT:ubuffer(data=[1.0 2.0 3.0 4.0], stride=4):out,name=outputBuffer
