@@ -5,10 +5,14 @@
 // No support for int64_t on fxc - we need SM6.0 and dxil
 // https://docs.microsoft.com/en-us/windows/win32/direct3dhlsl/hlsl-shader-model-6-0-features-for-direct3d-12
 //DISABLE_TEST(compute):COMPARE_COMPUTE_EX:-slang -compute -dx12
-// Disable for now, because can only test when NVAPI is available, and it is not by default.
-//DISABLE_TEST(compute):COMPARE_COMPUTE_EX:-slang -compute -dx12 -profile cs_6_0 -use-dxil 
-//TEST(compute, vulkan):COMPARE_COMPUTE_EX:-vk -compute
+//TEST(compute):COMPARE_COMPUTE_EX:-slang -compute -dx12 -profile cs_6_0 -use-dxil -render-features atomic-int64
+//TEST(compute, vulkan):COMPARE_COMPUTE_EX:-vk -compute -render-features atomic-int64
 //TEST(compute):COMPARE_COMPUTE_EX:-cuda -compute
+
+// We don't use this, but having this defined makes the 0 slot available if nvapi is going to be used
+// Only strictly necessary on the dx12 path
+//TEST_INPUT:ubuffer(data=[0 0 0 0 ], stride=4):name=nvapiBuffer
+RWStructuredBuffer<int> nvapiBuffer;
 
 //TEST_INPUT:ubuffer(data=[0 1 2 3 4 5 6 7]):out,name=outputBuffer
 RWByteAddressBuffer outputBuffer;

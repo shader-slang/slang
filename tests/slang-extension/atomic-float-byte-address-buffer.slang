@@ -7,8 +7,8 @@
 // https://vulkan.gpuinfo.org/listdevicescoverage.php?extension=VK_EXT_shader_atomic_float
 //TEST(compute, vulkan):COMPARE_COMPUTE_EX:-vk -compute -render-features atomic-float -output-using-type
 // Doesn't work on D3D12 for unknown reasons
-//TEST(compute):COMPARE_COMPUTE_EX:-d3d12 -compute -render-features atomic-float -output-using-type -compile-arg -O2
-//TEST(compute):COMPARE_COMPUTE_EX:-d3d12 -compute -use-dxil -render-features atomic-float -output-using-type -compile-arg -O2
+//DISABLE_TEST(compute):COMPARE_COMPUTE_EX:-d3d12 -compute -render-features atomic-float -output-using-type -compile-arg -O2
+//DISABLE_TEST(compute):COMPARE_COMPUTE_EX:-d3d12 -compute -use-dxil -render-features atomic-float -output-using-type -compile-arg -O2
 //TEST(compute):COMPARE_COMPUTE_EX:-cuda -compute -output-using-type 
 
 // We don't use this, but having this defined makes the 0 slot available if nvapi is going to be used
