@@ -191,12 +191,16 @@ ${{{{
     // GL_EXT_shader_atomic_float on vk
     // NvAPI support on DX
     // NOTE! To use this feature on HLSL, the shader needs to include 'nvHLSLExtns.h' from the NvAPI SDK
-    //
+    // 
+    // https://www.khronos.org/registry/vulkan/specs/1.2-extensions/html/vkspec.html#VK_EXT_shader_atomic_float
+    // https://htmlpreview.github.io/?https://github.com/KhronosGroup/SPIRV-Registry/blob/master/extensions/EXT/SPV_EXT_shader_atomic_float_add.html
+
     __target_intrinsic(hlsl, "($3 = NvInterlockedAddFp32($0, $1, $2))")
     __cuda_sm_version(2.0)
     __target_intrinsic(cuda, "(*$3 = atomicAdd((float*)$0._getPtrAt($1), $2))")
     void InterlockedAddFp32(uint byteAddress, float valueToAdd, out float originalValue);
 
+    
     __specialized_for_target(glsl)
     void InterlockedAddFp32(uint byteAddress, float valueToAdd, out float originalValue)
     {
