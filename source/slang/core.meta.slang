@@ -1459,24 +1459,24 @@ for (int tt = 0; tt < kBaseTextureTypeCount; ++tt)
                             sb << "__target_intrinsic(cuda, \"tex2Dgather<$T0>($0, ($2).x, ($2).y, " << componentIndex << ")\")\n";
                         }
                         sb << outputType << " Gather" << componentName << "(SamplerState s, ";
-                        sb << "float" << kBaseTextureTypes[tt].coordCount << " location);\n";
+                        sb << "float" << kBaseTextureTypes[tt].coordCount + isArray << " location);\n";
 
                         EMIT_LINE_DIRECTIVE();
                         sb << "__target_intrinsic(glsl, \"textureGatherOffset($p, $2, $3, " << componentIndex << ")\")\n";
                         sb << outputType << " Gather" << componentName << "(SamplerState s, ";
-                        sb << "float" << kBaseTextureTypes[tt].coordCount << " location, ";
+                        sb << "float" << kBaseTextureTypes[tt].coordCount + isArray << " location, ";
                         sb << "constexpr int" << kBaseTextureTypes[tt].coordCount << " offset);\n";
 
                         EMIT_LINE_DIRECTIVE();
                         sb << outputType << " Gather" << componentName << "(SamplerState s, ";
-                        sb << "float" << kBaseTextureTypes[tt].coordCount << " location, ";
+                        sb << "float" << kBaseTextureTypes[tt].coordCount + isArray << " location, ";
                         sb << "constexpr int" << kBaseTextureTypes[tt].coordCount << " offset, ";
                         sb << "out uint status);\n";
 
                         EMIT_LINE_DIRECTIVE();
                         sb << "__target_intrinsic(glsl, \"textureGatherOffsets($p, $2, int" << kBaseTextureTypes[tt].coordCount << "[]($3, $4, $5, $6), " << componentIndex << ")\")\n";
                         sb << outputType << " Gather" << componentName << "(SamplerState s, ";
-                        sb << "float" << kBaseTextureTypes[tt].coordCount << " location, ";
+                        sb << "float" << kBaseTextureTypes[tt].coordCount + isArray << " location, ";
                         sb << "int" << kBaseTextureTypes[tt].coordCount << " offset1, ";
                         sb << "int" << kBaseTextureTypes[tt].coordCount << " offset2, ";
                         sb << "int" << kBaseTextureTypes[tt].coordCount << " offset3, ";
@@ -1484,7 +1484,7 @@ for (int tt = 0; tt < kBaseTextureTypeCount; ++tt)
 
                         EMIT_LINE_DIRECTIVE();
                         sb << outputType << " Gather" << componentName << "(SamplerState s, ";
-                        sb << "float" << kBaseTextureTypes[tt].coordCount << " location, ";
+                        sb << "float" << kBaseTextureTypes[tt].coordCount + isArray << " location, ";
                         sb << "int" << kBaseTextureTypes[tt].coordCount << " offset1, ";
                         sb << "int" << kBaseTextureTypes[tt].coordCount << " offset2, ";
                         sb << "int" << kBaseTextureTypes[tt].coordCount << " offset3, ";
