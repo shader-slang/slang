@@ -573,7 +573,6 @@ namespace Slang
         // the same ExtractExistentialType.
         if (auto extractExistentialType = as<ExtractExistentialType>(toType))
         {
-            fromType = maybeApplyThisSubstitutionToExistentialType(fromType);
             if (fromType->equals(toType))
             {
                 if (outToExpr)

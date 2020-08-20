@@ -157,7 +157,6 @@ namespace Slang
         Val**            outWitness,
         TypeWitnessBreadcrumb*  inBreadcrumbs)
     {
-        subType = maybeApplyThisSubstitutionToExistentialType(subType);
         // for now look up a conformance member...
         if(auto declRefType = as<DeclRefType>(subType))
         {
@@ -273,15 +272,21 @@ namespace Slang
         {
             // An ExtractExistentialType from an existential value of type I
             // is a subtype of I.
-            if (extractExistentialType->interfaceDeclRef.equals(superTypeDeclRef))
+            // We need to check and make sure the interface type of the `ExtractExistentialType`
+            // is equal to `superType`.
+            auto interfaceDeclRef = extractExistentialType->interfaceDeclRef;
+            auto thisTypeSubst = findThisTypeSubstitution(interfaceDeclRef.substitutions.substitutions, interfaceDeclRef.getDecl());
+            SLANG_ASSERT(thisTypeSubst && thisTypeSubst == interfaceDeclRef.substitutions.substitutions);
+            // The interfaceDeclRef in `extractExistentialType` contains a `ThisTypeSubstitution`
+            // to allow member lookup to return correct substituted types. Here we just need
+            // to know if that interface is the same as the superType, so we need to exclude
+            // the `ThisTypeSubstitution` from comparison.
+            interfaceDeclRef.substitutions.substitutions = thisTypeSubst->outer;
+            if (interfaceDeclRef.equals(superTypeDeclRef))
             {
                 if (outWitness)
                 {
-                    auto witness = getASTBuilder()->create<ExtractExistentialSubtypeWitness>();
-                    *outWitness = witness;
-                    witness->declRef = extractExistentialType->declRef;
-                    witness->sub = extractExistentialType;
-                    witness->sup = DeclRefType::create(getASTBuilder(), superTypeDeclRef);
+                    *outWitness = thisTypeSubst->witness;
                 }
                 return true;
             }

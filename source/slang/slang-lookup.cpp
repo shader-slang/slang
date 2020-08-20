@@ -587,6 +587,15 @@ static void _lookUpMembersInSuperTypeImpl(
 
         _lookUpMembersInSuperTypeDeclImpl(astBuilder, name, leafType, superType, leafIsSuperWitness, declRef, request, ioResult, inBreadcrumbs);
     }
+    if (auto extractExistentialType = as<ExtractExistentialType>(superType))
+    {
+        auto semantics = request.semantics;
+        if (semantics)
+        {
+            ensureDecl(semantics, extractExistentialType->interfaceDeclRef, DeclCheckState::ReadyForLookup);
+        }
+        _lookUpMembersInSuperTypeDeclImpl(astBuilder, name, leafType, superType, leafIsSuperWitness, extractExistentialType->interfaceDeclRef, request, ioResult, inBreadcrumbs);
+    }
 }
 
     /// Perform lookup for `name` in the context of `type`.
