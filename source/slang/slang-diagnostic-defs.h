@@ -255,6 +255,7 @@ DIAGNOSTIC(30052, Error, invalidSwizzleExpr, "invalid swizzle pattern '$0' on ty
 DIAGNOSTIC(30043, Error, getStringHashRequiresStringLiteral, "getStringHash parameter can only accept a string literal")
 
 DIAGNOSTIC(30060, Error, expectedAType, "expected a type, got a '$0'")
+DIAGNOSTIC(30061, Error, expectedANamespace, "expected a namespace, got a '$0'")
 
 DIAGNOSTIC(30100, Error, staticRefToNonStaticMember, "type '$0' cannot be used to refer to non-static member '$1'")
 
