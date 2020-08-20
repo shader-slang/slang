@@ -39,7 +39,7 @@ struct TestToolUtil
     struct PreludeInfo
     {
         const char* exePath = nullptr;
-        const char* nvAPIPath = nullptr;
+        const char* nvapiPath = nullptr;
     };
 
     typedef SlangResult(*InnerMainFunc)(Slang::StdWriters* stdWriters, SlangSession* session, int argc, const char*const* argv);

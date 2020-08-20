@@ -897,8 +897,7 @@ void FrontEndCompileRequest::parseTranslationUnit(
     // Here we should probably be using the searchDirectories on the FrontEndCompileRequest.
     // If searchDirectories.parent pointed to the one in the Linkage would mean linkage paths
     // would be checked too (after those on the FrontEndCompileRequest). 
-
-    IncludeHandlerImpl includeHandler(&linkage->searchDirectories, linkage->getFileSystemExt());
+    IncludeSystem includeSystem(&linkage->searchDirectories, linkage->getFileSystemExt(), linkage->getSourceManager());
 
     RefPtr<Scope> languageScope;
     switch (translationUnit->sourceLanguage)
@@ -956,7 +955,7 @@ void FrontEndCompileRequest::parseTranslationUnit(
         auto tokens = preprocessSource(
             sourceFile,
             getSink(),
-            &includeHandler,
+            &includeSystem,
             combinedPreprocessorDefinitions,
             getLinkage(),
             module);
@@ -1651,14 +1650,14 @@ RefPtr<Module> Linkage::findOrImportModule(
     // Next, try to find the file of the given name,
     // using our ordinary include-handling logic.
 
-    IncludeHandlerImpl includeHandler(&searchDirectories, getFileSystemExt());
+    IncludeSystem includeSystem(&searchDirectories, getFileSystemExt(), getSourceManager());
 
     // Get the original path info
     PathInfo pathIncludedFromInfo = getSourceManager()->getPathInfo(loc, SourceLocType::Actual);
     PathInfo filePathInfo;
 
     // We have to load via the found path - as that is how file was originally loaded 
-    if (SLANG_FAILED(includeHandler.findFile(fileName, pathIncludedFromInfo.foundPath, filePathInfo)))
+    if (SLANG_FAILED(includeSystem.findFile(fileName, pathIncludedFromInfo.foundPath, filePathInfo)))
     {
         sink->diagnose(loc, Diagnostics::cannotFindFile, fileName);
         mapNameToLoadedModules[name] = nullptr;
@@ -1671,7 +1670,7 @@ RefPtr<Module> Linkage::findOrImportModule(
 
     // Try to load it
     ComPtr<ISlangBlob> fileContents;
-    if(SLANG_FAILED(getFileSystemExt()->loadFile(filePathInfo.foundPath.getBuffer(), fileContents.writeRef())))
+    if(SLANG_FAILED(includeSystem.loadFile(filePathInfo, fileContents)))
     {
         sink->diagnose(loc, Diagnostics::cannotOpenFile, fileName);
         mapNameToLoadedModules[name] = nullptr;
