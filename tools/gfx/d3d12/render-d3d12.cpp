@@ -1602,11 +1602,28 @@ Result D3D12Renderer::initialize(const Desc& desc, void* inWindowHandle)
         return SLANG_FAIL;
     }
 
-    // If it needs nvapi look it up
-    if (desc.requiredFeatures.indexOf("nvapi") >= 0 && SLANG_SUCCEEDED(NVAPIUtil::initialize()))
+    // NVAPI
     {
-        m_features.add("nvapi");
-        m_nvapi = true;
+        const char* features[] = { "nvapi", "atomic-float", "atomic-int64" };
+        bool needsNvapi = false;
+        for (Index i = 0; i < SLANG_COUNT_OF(features); ++i)
+        {
+            if (desc.requiredFeatures.indexOf(features[i]) >= 0)
+            {
+                needsNvapi = true;
+                break;
+            }
+        }
+
+        if (needsNvapi && SLANG_SUCCEEDED(NVAPIUtil::initialize()))
+        {
+            // TODO(JS): We should test for specific features here.
+            for (Index i = 0; i < SLANG_COUNT_OF(features); ++i)
+            {
+                m_features.add(features[i]);
+            }
+            m_nvapi = true;
+        }
     }
 
     // Set the device
@@ -3977,7 +3994,6 @@ Result D3D12Renderer::createComputePipelineState(const ComputePipelineStateDesc&
         // Use the same UAV slot index and register space that are declared in the shader.
 
         // For simplicities sake we just use u0
-
         NVAPI_D3D12_PSO_SET_SHADER_EXTENSION_SLOT_DESC extensionDesc;
         extensionDesc.baseVersion = NV_PSO_EXTENSION_DESC_VER;
         extensionDesc.version = NV_SET_SHADER_EXTENSION_SLOT_DESC_VER;
@@ -3985,15 +4001,10 @@ Result D3D12Renderer::createComputePipelineState(const ComputePipelineStateDesc&
         extensionDesc.registerSpace = 0;
 
         // Put the pointer to the extension into an array - there can be multiple extensions enabled at once.
-        // Other supported extensions are: 
-        //     - Extended rasterizer state
-        //  - Pass-through geometry shader, implicit or explicit
-        //  - Depth bound test
         const NVAPI_D3D12_PSO_EXTENSION_DESC* extensions[] = { &extensionDesc };
 
         // Now create the PSO.
-        ID3D12PipelineState* pPSO = nullptr;
-        NvAPI_Status nvapiStatus = NvAPI_D3D12_CreateComputePipelineState(m_device, &computeDesc, SLANG_COUNT_OF(extensions), extensions, pipelineState.writeRef());
+        const NvAPI_Status nvapiStatus = NvAPI_D3D12_CreateComputePipelineState(m_device, &computeDesc, SLANG_COUNT_OF(extensions), extensions, pipelineState.writeRef());
 
         if (nvapiStatus != NVAPI_OK)
         {
