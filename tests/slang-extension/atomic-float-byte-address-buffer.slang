@@ -7,7 +7,7 @@
 // Disabled because requires nvapi to work
 // Note for this feature we require dxc and we can force that with -use-dxil
 //DISABLE_TEST(compute):COMPARE_COMPUTE_EX:-d3d12 -compute -use-dxil
-//TEST(compute):COMPARE_COMPUTE_EX:-cuda -compute -use-dxil
+//TEST(compute):COMPARE_COMPUTE_EX:-cuda -compute
 
 //TEST_INPUT:ubuffer(data=[0.1 0.2 0.3 0.4]):out,name=outputBuffer
 RWByteAddressBuffer outputBuffer;

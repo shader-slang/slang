@@ -373,6 +373,18 @@ class ModuleDecl : public NamespaceDeclBase
     Dictionary<AggTypeDecl*, RefPtr<CandidateExtensionList>> mapTypeToCandidateExtensions;
 };
 
+    /// A declaration that brings members of another declaration or namespace into scope
+class UsingDecl : public Decl
+{
+    SLANG_CLASS(UsingDecl)
+
+        /// An expression that identifies the entity (e.g., a namespace) to be brought into `scope`
+    Expr* arg;
+
+        /// The scope that the entity named by `arg` will be brought into
+    RefPtr<Scope> scope;
+};
+
 class ImportDecl : public Decl
 {
     SLANG_CLASS(ImportDecl)

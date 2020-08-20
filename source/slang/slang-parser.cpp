@@ -933,11 +933,15 @@ namespace Slang
         return parser->getNamePool()->getName(text);
     }
 
+    static bool expect(Parser* parser, TokenType tokenType)
+    {
+        return parser->ReadToken(tokenType).type == tokenType;
+    }
+
     static NameLoc expectIdentifier(Parser* parser)
     {
         return NameLoc(parser->ReadToken(TokenType::Identifier));
     }
-
 
     static NodeBase* parseImportDecl(
         Parser* parser, void* /*userData*/)
@@ -2629,6 +2633,44 @@ namespace Slang
         return result;
     }
 
+    static NodeBase* parseUsingDecl(Parser* parser, void* /*userData*/)
+    {
+        UsingDecl* decl = parser->astBuilder->create<UsingDecl>();
+        parser->FillPosition(decl);
+
+        // A `using` declaration will need to know about the current
+        // scope at the point where it appears, so that it can know
+        // the scope it is attempting to extend.
+        //
+        decl->scope = parser->currentScope;
+
+        // TODO: We may eventually want to support declarations
+        // of the form `using <id> = <expr>;` which introduce
+        // a shorthand alias for a namespace/type/whatever.
+        //
+        // For now we are just sticking to the most basic form.
+
+        // As a compatibility feature for programmers used to C++,
+        // we allow the `namespace` keyword to come after `using`,
+        // where it has no effect.
+        //
+        if(parser->LookAheadToken("namespace"))
+        {
+            advanceToken(parser);
+        }
+
+        // The entity that is going to be used is identified
+        // using an arbitrary expression (although we expect
+        // that valid code will not typically use the full
+        // freedom of what the expression grammar supports.
+        //
+        decl->arg = parser->ParseExpression();
+
+        expect(parser, TokenType::Semicolon);
+
+        return decl;
+    }
+
     static NodeBase* parseConstructorDecl(Parser* parser, void* /*userData*/)
     {
         ConstructorDecl* decl = parser->astBuilder->create<ConstructorDecl>();
@@ -2748,11 +2790,6 @@ namespace Slang
 
         parser->PopScope();
         return decl;
-    }
-
-    static bool expect(Parser* parser, TokenType tokenType)
-    {
-        return parser->ReadToken(tokenType).type == tokenType;
     }
 
         /// Peek in the token stream and return `true` if it looks like a modern-style variable declaration is coming up.
@@ -5659,6 +5696,7 @@ namespace Slang
         DECL(typealias,       parseTypeAliasDecl);
         DECL(__generic_value_param, parseGlobalGenericValueParamDecl);
         DECL(namespace,       parseNamespaceDecl);
+        DECL(using,           parseUsingDecl);
 
     #undef DECL
 

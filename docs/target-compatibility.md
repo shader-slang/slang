@@ -187,13 +187,15 @@ Currently feature allows atomic float additions on RWByteAddressBuffer. A future
 ```
 void RWByteAddressBuffer::InterlockedAddFp32(uint byteAddress, float valueToAdd, out float originalValue);
 void RWByteAddressBuffer::InterlockedAddFp32(uint byteAddress, float valueToAdd);
+
+void RWByteAddressBuffer::InterlockedAddI64(uint byteAddress, int64_t valueToAdd, out int64_t originalValue);
+void RWByteAddressBuffer::InterlockedAddI64(uint byteAddress, int64_t valueToAdd);
 ```
 
-On HLSL based targets this functionality is achieved using [nvAPI](https://developer.nvidia.com/nvapi) based functionality. Therefore for the feature to work you must have nvAPI installed on your system. Then the 'prelude' functionality allows via the API for an include (or the text) of the relevent files. To see how to do this in practice look at the function `setSessionDefaultPrelude`. This makes the prelude for HLSL hold an include to the *absolute* path to the required include file `nvHLSLExtns.h`. As an absolute path is used, it means other includes that includes, look in the correct place without having to set up special include paths. 
+On HLSL based targets this functionality is achieved using [NVAPI](https://developer.nvidia.com/nvapi) based functionality. Therefore for the feature to work you must have NVAPI installed on your system. Then the 'prelude' functionality allows via the API for an include (or the text) of the relevent files. To see how to do this in practice look at the function `setSessionDefaultPrelude`. This makes the prelude for HLSL hold an include to the *absolute* path to the required include file `nvHLSLExtns.h`. As an absolute path is used, it means other includes that includes, look in the correct place without having to set up special include paths. 
 
-To use nvAPI it is nessary to specify a unordered access views (UAV) based 'u' register that will be used to communicate with nvAPI. Note! Slang does not do any special handling around this, it will be necessary for application code to ensure the UAV is either guarenteed to not collide with what Slang assigns, or it's specified (but not used) in the Slang source. The u register number has to be specified also to the nvAPI runtime library. 
+To use NVAPI it is nessary to specify a unordered access views (UAV) based 'u' register that will be used to communicate with NVAPI. Note! Slang does not do any special handling around this, it will be necessary for application code to ensure the UAV is either guarenteed to not collide with what Slang assigns, or it's specified (but not used) in the Slang source. The u register number has to be specified also to the NVAPI runtime library. 
 
-On Vulkan, the [`GL_EXT_shader_atomic_float`](https://www.khronos.org/registry/vulkan/specs/1.2-extensions/man/html/VK_EXT_shader_atomic_float.html) extension is required.
+On Vulkan, for float the [`GL_EXT_shader_atomic_float`](https://www.khronos.org/registry/vulkan/specs/1.2-extensions/man/html/VK_EXT_shader_atomic_float.html) extension is required. For int64 the [`GL_EXT_shader_atomic_int64`](https://raw.githubusercontent.com/KhronosGroup/GLSL/master/extensions/ext/GL_EXT_shader_atomic_int64.txt) extension is required.
 
-
-
+CUDA requires SM6.0 or higher for int64 support. 

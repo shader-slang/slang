@@ -56,6 +56,8 @@ namespace Slang
 
         void visitImportDecl(ImportDecl* decl);
 
+        void visitUsingDecl(UsingDecl* decl);
+
         void visitGenericTypeParamDecl(GenericTypeParamDecl* decl);
 
         void visitGenericValueParamDecl(GenericValueParamDecl* decl);
@@ -3520,25 +3522,6 @@ namespace Slang
         return subst;
     }
 
-#if 0
-    // For simplicity we will make having a definition of a function include having a body or a target intrinsics defined.
-    // It may be useful to add other modifiers to mark as having body - for example perhaps
-    // any target intrinsic modifier (like SPIR-V version) should be included.
-    //
-    // Note that not having this check around TargetIntrinsicModifier can lead to a crash in the compiler
-    // with a definition, followed by a declaration with a target intrinsic.
-    // That this doesn't appear to be the case with other modifiers.
-    // TODO: 
-    // We may want to be able to add target intrinsics with other declarations, that being the case this logic
-    // would need to change.
-    // We might also want are more precise error that pointed out the actually problem - because strictly speaking
-    // having a target intrinsic isn't a 'body'.
-    bool _isDefinition(FuncDecl* decl)
-    {
-        return decl->body || decl->hasModifier<TargetIntrinsicModifier>();
-    }
-#endif
-
     typedef Dictionary<Name*, CallableDecl*> TargetDeclDictionary;
 
     static void _addTargetModifiers(CallableDecl* decl, TargetDeclDictionary& ioDict)
@@ -4632,6 +4615,58 @@ namespace Slang
         {
             module->addModuleDependency(importedModule);
         }
+    }
+
+    void SemanticsDeclHeaderVisitor::visitUsingDecl(UsingDecl* decl)
+    {
+        // First, we need to look up whatever the argument of the `using`
+        // declaration names.
+        //
+        decl->arg = CheckTerm(decl->arg);
+
+        // Next, we want to ensure that whatever is being named by `decl->arg`
+        // is a namespace (or a module, since modules are namespace-like).
+        //
+        // TODO: The logic here assumes that we can't have multiple `NamespaceDecl`s
+        // with the same name in scope, but that assumption is only valid in the
+        // context of a single module (where we deduplicate `namespace`s during
+        // parsing). If a user `import`s multiple modules that all have namespaces
+        // of the same name, it would be possible for `decl->arg` to be overloaded.
+        // In that case we should really iterate over all the entities that are
+        // named and import any that are namespace-like.
+        //
+        NamespaceDeclBase* namespaceDecl = nullptr;
+        if( auto declRefExpr = as<DeclRefExpr>(decl->arg) )
+        {
+            if( auto namespaceDeclRef = declRefExpr->declRef.as<NamespaceDeclBase>() )
+            {
+                SLANG_ASSERT(!namespaceDeclRef.substitutions.substitutions);
+                namespaceDecl = namespaceDeclRef.getDecl();
+            }
+        }
+        if( !namespaceDecl )
+        {
+            getSink()->diagnose(decl->arg, Diagnostics::expectedANamespace, decl->arg->type);
+            return;
+        }
+
+        // Once we have identified the namespace to bring into scope,
+        // we need to create a new sibling sub-scope to add to the
+        // lookup scope that was in place when the `using` was parsed.
+        //
+        // Subsequent lookup in that scope will walk through our new
+        // sub-scope and see the namespace.
+        //
+        // TODO: If we update the `containerDecl` in a scope to allow
+        // for a more general `DeclRef`, or even a full `DeclRefExpr`,
+        // then it would be possible for `using` to apply to more kinds
+        // of entities than just namespaces.
+        //
+        auto scope = decl->scope;
+        auto subScope = new Scope();
+        subScope->containerDecl = namespaceDecl;
+        subScope->nextSibling = scope->nextSibling;
+        scope->nextSibling = subScope;
     }
 
         /// Get a reference to the candidate extension list for `typeDecl` in the given dictionary
