@@ -21,6 +21,8 @@ struct YourCell : ICell
     int value;
 
     int getValue() { return value; }
+
+    [mutating] void setValue(int v) { value = v; }
 }
 
 int helper<C : ICell>(C cell)
