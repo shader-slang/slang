@@ -1523,6 +1523,19 @@ Result D3D12Renderer::_createDevice(DeviceCheckFlags deviceCheckFlags, const Uno
     return SLANG_OK;
 }
 
+static bool _isSupportedNVAPIOp(ID3D12Device* dev, uint32_t op)
+{
+#ifdef GFX_NVAPI
+    {
+        bool isSupported;
+        NvAPI_Status status = NvAPI_D3D12_IsNvShaderExtnOpCodeSupported(dev, NvU32(op), &isSupported);
+        return status == NVAPI_OK && isSupported;
+    }
+#else
+    return false;
+#endif
+}
+
 Result D3D12Renderer::initialize(const Desc& desc, void* inWindowHandle)
 {
     m_hwnd = (HWND)inWindowHandle;
@@ -1614,22 +1627,23 @@ Result D3D12Renderer::initialize(const Desc& desc, void* inWindowHandle)
         }
 
 #ifdef GFX_NVAPI
-        // Applications are expected to bind null UAV to this slot. 
+        // From DOCS: Applications are expected to bind null UAV to this slot.
+        // NOTE! We don't currently do this, but doesn't seem to be a problem.
 
         const NvAPI_Status status = NvAPI_D3D12_SetNvShaderExtnSlotSpace(m_device, NvU32(desc.nvapiExtnSlot), NvU32(0));
-            // NvAPI_D3D12_SetNvShaderExtnSlotSpaceLocalThread(m_device, NvU32(desc.nvapiExtnSlot), NvU32(0));
-
+        
         if (status != NVAPI_OK)
         {
             return SLANG_E_NOT_AVAILABLE;
         }
 
-        const char* features[] = { "atomic-float", "atomic-int64" };
-
-        // TODO(JS): We should test for specific features here.
-        for (Index i = 0; i < SLANG_COUNT_OF(features); ++i)
+        if (_isSupportedNVAPIOp(m_device, NV_EXTN_OP_UINT64_ATOMIC))
         {
-            m_features.add(features[i]);
+            m_features.add("atomic-int64");
+        }
+        if (_isSupportedNVAPIOp(m_device, NV_EXTN_OP_FP32_ATOMIC))
+        {
+            m_features.add("atomic-float");
         }
 
         m_nvapi = true;

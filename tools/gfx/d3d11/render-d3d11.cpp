@@ -514,6 +514,19 @@ D3D11Renderer::ScopeNVAPI::~ScopeNVAPI()
 
 // !!!!!!!!!!!!!!!!!!!!!!!!!!!! Renderer interface !!!!!!!!!!!!!!!!!!!!!!!!!!
 
+static bool _isSupportedNVAPIOp(IUnknown* dev, uint32_t op)
+{
+#ifdef GFX_NVAPI
+    {
+        bool isSupported;
+        NvAPI_Status status = NvAPI_D3D11_IsNvShaderExtnOpCodeSupported(dev, NvU32(op), &isSupported);
+        return status == NVAPI_OK && isSupported;
+    }
+#else
+    return false;
+#endif
+}
+
 SlangResult D3D11Renderer::initialize(const Desc& desc, void* inWindowHandle)
 {
     auto windowHandle = (HWND)inWindowHandle;
@@ -660,12 +673,13 @@ SlangResult D3D11Renderer::initialize(const Desc& desc, void* inWindowHandle)
             return SLANG_E_NOT_AVAILABLE;
         }
 
-        const char* features[] = { "atomic-float", "atomic-int64" };
-
-        // TODO(JS): We should test for specific features here.
-        for (Index i = 0; i < SLANG_COUNT_OF(features); ++i)
+        if (_isSupportedNVAPIOp(m_device, NV_EXTN_OP_UINT64_ATOMIC ))
         {
-            m_features.add(features[i]);
+            m_features.add("atomic-int64");
+        }
+        if (_isSupportedNVAPIOp(m_device, NV_EXTN_OP_FP32_ATOMIC))
+        {
+            m_features.add("atomic-float");
         }
 
         m_nvapi = true;
