@@ -1025,30 +1025,39 @@ SlangResult VKRenderer::initialize(const Desc& desc, void* inWindowHandle)
     const uint32_t majorVersion = VK_VERSION_MAJOR(basicProps.apiVersion);
     const uint32_t minorVersion = VK_VERSION_MINOR(basicProps.apiVersion);
 
-    // Float16 features
     // Need in this scope because it will be linked into the device creation (if it is available)
+
+    // Float16 features
     VkPhysicalDeviceFloat16Int8FeaturesKHR float16Features = { VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_FLOAT16_INT8_FEATURES_KHR };
+    // AtomicInt64 features
+    VkPhysicalDeviceShaderAtomicInt64FeaturesKHR atomicInt64Features = { VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_SHADER_ATOMIC_INT64_FEATURES_KHR };
+    // Atomic Float features
+    VkPhysicalDeviceShaderAtomicFloatFeaturesEXT atomicFloatFeatures = { VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_SHADER_ATOMIC_FLOAT_FEATURES_EXT };
 
     // API version check, can't use vkGetPhysicalDeviceProperties2 yet since this device might not support it
     if (VK_MAKE_VERSION(majorVersion, minorVersion, 0) >= VK_API_VERSION_1_1 &&
         m_api.vkGetPhysicalDeviceProperties2 &&
         m_api.vkGetPhysicalDeviceFeatures2)
     {
-        VkPhysicalDeviceProperties2 physicalDeviceProps2;
-
-        physicalDeviceProps2.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_PROPERTIES_2;
-        physicalDeviceProps2.pNext = nullptr;
-        physicalDeviceProps2.properties = {};
-
-        m_api.vkGetPhysicalDeviceProperties2(m_api.m_physicalDevice, &physicalDeviceProps2);
 
         // Get device features
         VkPhysicalDeviceFeatures2 deviceFeatures2 = {};
         deviceFeatures2.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_FEATURES_2;
 
-        // Link together for lookup 
+        // Float16
         float16Features.pNext = deviceFeatures2.pNext;
         deviceFeatures2.pNext = &float16Features;
+
+        // Atomic64
+        atomicInt64Features.pNext = deviceFeatures2.pNext;
+        deviceFeatures2.pNext = &atomicInt64Features;
+
+        // Atomic Float
+        // To detect atomic float we need
+        // https://www.khronos.org/registry/vulkan/specs/1.2-extensions/man/html/VkPhysicalDeviceShaderAtomicFloatFeaturesEXT.html
+
+        atomicFloatFeatures.pNext = deviceFeatures2.pNext;
+        deviceFeatures2.pNext = &atomicFloatFeatures;
 
         m_api.vkGetPhysicalDeviceFeatures2(m_api.m_physicalDevice, &deviceFeatures2);
 
@@ -1064,7 +1073,27 @@ SlangResult VKRenderer::initialize(const Desc& desc, void* inWindowHandle)
 
             // We have half support
             m_features.add("half");
-        }   
+        }
+
+        if (atomicInt64Features.shaderBufferInt64Atomics)
+        {
+            // Link into the creation features
+            atomicInt64Features.pNext = (void*)deviceCreateInfo.pNext;
+            deviceCreateInfo.pNext = &atomicInt64Features;
+
+            deviceExtensions.add(VK_KHR_SHADER_ATOMIC_INT64_EXTENSION_NAME);
+            m_features.add("atomic-int64");
+        }
+
+        if (atomicFloatFeatures.shaderBufferFloat32AtomicAdd)
+        {
+            // Link into the creation features
+            atomicFloatFeatures.pNext = (void*)deviceCreateInfo.pNext;
+            deviceCreateInfo.pNext = &atomicFloatFeatures;
+
+            deviceExtensions.add(VK_EXT_SHADER_ATOMIC_FLOAT_EXTENSION_NAME);
+            m_features.add("atomic-float");
+        }
     }
 
     int queueFamilyIndex = m_api.findQueue(VK_QUEUE_GRAPHICS_BIT | VK_QUEUE_COMPUTE_BIT);
@@ -2345,8 +2374,7 @@ Result VKRenderer::createDescriptorSetLayout(const DescriptorSetLayout::Desc& de
     RefPtr<DescriptorSetLayoutImpl> descriptorSetLayoutImpl = new DescriptorSetLayoutImpl(m_api);
 
     Slang::List<VkDescriptorSetLayoutBinding> dstBindings;
-
-    uint32_t descriptorCountForTypes[VK_DESCRIPTOR_TYPE_RANGE_SIZE] = { 0, };
+    Slang::List<uint32_t> descriptorCountForTypes; 
 
     UInt rangeCount = desc.slotRangeCount;
     for(UInt rr = 0; rr < rangeCount; ++rr)
@@ -2378,7 +2406,7 @@ Result VKRenderer::createDescriptorSetLayout(const DescriptorSetLayout::Desc& de
             auto rootConstantRangeIndex = descriptorSetLayoutImpl->m_rootConstantRanges.getCount();
             descriptorSetLayoutImpl->m_rootConstantRanges.add(rootConstantRangeInfo);
 
-            // We will also add a `RangeInfo` to reprsent this
+            // We will also add a `RangeInfo` to represent this
             // range, even though it doesn't map to a VK-level
             // descriptor range.
             //
@@ -2413,6 +2441,11 @@ Result VKRenderer::createDescriptorSetLayout(const DescriptorSetLayout::Desc& de
         dstBinding.stageFlags = VK_SHADER_STAGE_ALL;
         dstBinding.pImmutableSamplers = nullptr;
 
+        if (descriptorCountForTypes.getCount() <= dstDescriptorType)
+        {
+            descriptorCountForTypes.setCount(dstDescriptorType + 1);
+        }
+
         descriptorCountForTypes[dstDescriptorType] += uint32_t(srcRange.count);
 
         dstBindings.add(dstBinding);
@@ -2443,23 +2476,23 @@ Result VKRenderer::createDescriptorSetLayout(const DescriptorSetLayout::Desc& de
 
     // Create a pool while we are at it, to allocate descriptor sets of this type.
 
-    VkDescriptorPoolSize poolSizes[VK_DESCRIPTOR_TYPE_RANGE_SIZE];
-    uint32_t poolSizeCount = 0;
-    for (int ii = 0; ii < SLANG_COUNT_OF(descriptorCountForTypes); ++ii)
+    List<VkDescriptorPoolSize> poolSizes; 
+    for (Index ii = 0; ii < descriptorCountForTypes.getCount(); ++ii)
     {
         auto descriptorCount = descriptorCountForTypes[ii];
         if (descriptorCount > 0)
         {
-            poolSizes[poolSizeCount].type = VkDescriptorType(ii);
-            poolSizes[poolSizeCount].descriptorCount = descriptorCount;
-            poolSizeCount++;
+            VkDescriptorPoolSize poolSize;
+            poolSize.type = VkDescriptorType(ii);
+            poolSize.descriptorCount = descriptorCount;
+            poolSizes.add(poolSize);
         }
     }
 
     VkDescriptorPoolCreateInfo descriptorPoolInfo = { VK_STRUCTURE_TYPE_DESCRIPTOR_POOL_CREATE_INFO };
     descriptorPoolInfo.maxSets = 128; // TODO: actually pick a size.
-    descriptorPoolInfo.poolSizeCount = poolSizeCount;
-    descriptorPoolInfo.pPoolSizes = &poolSizes[0];
+    descriptorPoolInfo.poolSizeCount = uint32_t(poolSizes.getCount());
+    descriptorPoolInfo.pPoolSizes = poolSizes.getBuffer();
 
     VkDescriptorPool descriptorPool = VK_NULL_HANDLE;
     SLANG_VK_CHECK(m_api.vkCreateDescriptorPool(m_device, &descriptorPoolInfo, nullptr, &descriptorPool));
@@ -2712,7 +2745,7 @@ void VKRenderer::DescriptorSetImpl::setRootConstants(
     SLANG_ASSERT(rootConstantIndex >= 0);
     SLANG_ASSERT(rootConstantIndex < m_layout->m_rootConstantRanges.getCount());
     auto& rootConstantRangeInfo = m_layout->m_rootConstantRanges[rootConstantIndex];
-    SLANG_ASSERT(offset + size <= rootConstantRangeInfo.size);
+    SLANG_ASSERT(offset + size <= UInt(rootConstantRangeInfo.size));
 
     memcpy(m_rootConstantData.getBuffer() + rootConstantRangeInfo.offset + offset, data, size);
 }

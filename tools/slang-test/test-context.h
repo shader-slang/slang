@@ -83,7 +83,7 @@ class TestContext
         /// Get the slang session
     SlangSession* getSession() const { return m_session;  }
 
-    SlangResult init();
+    SlangResult init(const char* exePath);
 
         /// Get the inner main function (from shared library)
     InnerMainFunc getInnerMainFunc(const Slang::String& dirPath, const Slang::String& name);
@@ -126,6 +126,8 @@ class TestContext
 
     Slang::RefPtr<Slang::DownstreamCompilerSet> compilerSet;
 
+    Slang::String exeDirectoryPath;
+    
 protected:
     struct SharedLibraryTool
     {

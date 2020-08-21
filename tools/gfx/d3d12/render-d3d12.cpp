@@ -23,7 +23,16 @@
 
 #include <dxgi1_4.h>
 #include <d3d12.h>
-#include <d3dcompiler.h>
+//#include <d3dcompiler.h>
+
+#ifndef __ID3D12GraphicsCommandList1_FWD_DEFINED__
+// If can't find a definition of CommandList1, just use an empty definition
+struct ID3D12GraphicsCommandList1 {};
+#endif
+
+#ifdef GFX_NVAPI
+#   include "../nvapi/nvapi-include.h"
+#endif
 
 #include "../../slang-com-ptr.h"
 #include "../flag-combiner.h"
@@ -33,6 +42,8 @@
 #include "circular-resource-heap-d3d12.h"
 
 #include "../d3d/d3d-util.h"
+
+#include "../nvapi/nvapi-util.h"
 
 // We will use the C standard library just for printing error messages.
 #include <stdio.h>
@@ -690,6 +701,8 @@ protected:
     HWND m_hwnd = nullptr;
 
     List<String> m_features;
+
+    bool m_nvapi = false;
 };
 
 Renderer* createD3D12Renderer()
@@ -1587,6 +1600,30 @@ Result D3D12Renderer::initialize(const Desc& desc, void* inWindowHandle)
     {
         // Couldn't find an adapter
         return SLANG_FAIL;
+    }
+
+    // NVAPI
+    {
+        const char* features[] = { "nvapi", "atomic-float", "atomic-int64" };
+        bool needsNvapi = false;
+        for (Index i = 0; i < SLANG_COUNT_OF(features); ++i)
+        {
+            if (desc.requiredFeatures.indexOf(features[i]) >= 0)
+            {
+                needsNvapi = true;
+                break;
+            }
+        }
+
+        if (needsNvapi && SLANG_SUCCEEDED(NVAPIUtil::initialize()))
+        {
+            // TODO(JS): We should test for specific features here.
+            for (Index i = 0; i < SLANG_COUNT_OF(features); ++i)
+            {
+                m_features.add(features[i]);
+            }
+            m_nvapi = true;
+        }
     }
 
     // Set the device
@@ -3209,7 +3246,7 @@ void D3D12Renderer::DescriptorSetImpl::setRootConstants(
     // have been a root-constant range for this call to be
     // valid.
     //
-    SLANG_ASSERT(range < m_layout->m_ranges.getCount());
+    SLANG_ASSERT(range < UInt(m_layout->m_ranges.getCount()));
     auto& rangeInfo = m_layout->m_ranges[range];
     SLANG_ASSERT(rangeInfo.type == DescriptorSlotType::RootConstant);
 
@@ -3222,7 +3259,7 @@ void D3D12Renderer::DescriptorSetImpl::setRootConstants(
     SLANG_ASSERT(rootConstantIndex >= 0);
     SLANG_ASSERT(rootConstantIndex < m_layout->m_rootConstantRanges.getCount());
     auto& rootConstantRangeInfo = m_layout->m_rootConstantRanges[rootConstantIndex];
-    SLANG_ASSERT(offset + size <= rootConstantRangeInfo.size);
+    SLANG_ASSERT(offset + size <= UInt(rootConstantRangeInfo.size));
 
     memcpy((char*)m_rootConstantData.getBuffer() + rootConstantRangeInfo.offset + offset, data, size);
 }
@@ -3951,7 +3988,36 @@ Result D3D12Renderer::createComputePipelineState(const ComputePipelineStateDesc&
     computeDesc.CS = { programImpl->m_computeShader.getBuffer(), SIZE_T(programImpl->m_computeShader.getCount()) };
 
     ComPtr<ID3D12PipelineState> pipelineState;
-    SLANG_RETURN_ON_FAIL(m_device->CreateComputePipelineState(&computeDesc, IID_PPV_ARGS(pipelineState.writeRef())));
+
+#ifdef GFX_NVAPI
+    if (m_nvapi)
+    {
+        // Also fill the extension structure. 
+        // Use the same UAV slot index and register space that are declared in the shader.
+
+        // For simplicities sake we just use u0
+        NVAPI_D3D12_PSO_SET_SHADER_EXTENSION_SLOT_DESC extensionDesc;
+        extensionDesc.baseVersion = NV_PSO_EXTENSION_DESC_VER;
+        extensionDesc.version = NV_SET_SHADER_EXTENSION_SLOT_DESC_VER;
+        extensionDesc.uavSlot = 0;
+        extensionDesc.registerSpace = 0;
+
+        // Put the pointer to the extension into an array - there can be multiple extensions enabled at once.
+        const NVAPI_D3D12_PSO_EXTENSION_DESC* extensions[] = { &extensionDesc };
+
+        // Now create the PSO.
+        const NvAPI_Status nvapiStatus = NvAPI_D3D12_CreateComputePipelineState(m_device, &computeDesc, SLANG_COUNT_OF(extensions), extensions, pipelineState.writeRef());
+
+        if (nvapiStatus != NVAPI_OK)
+        {
+            return SLANG_FAIL;
+        }
+    }
+    else
+#endif
+    {
+        SLANG_RETURN_ON_FAIL(m_device->CreateComputePipelineState(&computeDesc, IID_PPV_ARGS(pipelineState.writeRef())));
+    }
 
     RefPtr<PipelineStateImpl> pipelineStateImpl = new PipelineStateImpl();
     pipelineStateImpl->m_pipelineType = PipelineType::Compute;

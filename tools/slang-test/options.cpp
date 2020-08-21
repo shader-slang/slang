@@ -266,16 +266,6 @@ static bool _isSubCommand(const char* arg)
                 return res;
             }
         }
-        else if (strcmp(arg, "-nvapi-path") == 0)
-        {
-            if (argCursor == argEnd)
-            {
-                stdError.print("error: expected operand for '%s'\n", arg);
-                return SLANG_FAIL;
-            }
-
-            optionsOut->nvapiPath = *argCursor++;
-        }
         else
         {
             stdError.print("unknown option '%s'\n", arg);

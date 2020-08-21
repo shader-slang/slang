@@ -1,6 +1,8 @@
 // render-gl.cpp
 #include "render-gl.h"
 
+#include "../nvapi/nvapi-util.h"
+
 //WORKING:#include "options.h"
 #include "../render.h"
 
@@ -713,6 +715,11 @@ SlangResult GLRenderer::initialize(const Desc& desc, void* inWindowHandle)
         {
             return SLANG_E_NOT_AVAILABLE;
         }
+    }
+
+    if (m_desc.requiredFeatures.indexOf("nvapi") >= 0 && SLANG_SUCCEEDED(NVAPIUtil::initialize()))
+    {
+        m_features.add("nvapi");
     }
 
     auto extensions = glGetString(GL_EXTENSIONS);

@@ -800,9 +800,10 @@ public:
 
     struct Desc
     {
-        int width;                  ///< Width in pixels
-        int height;                 ///< height in pixels
-        Slang::String adapter;      ///< Name to identify the adapter to use
+        int width;                                      ///< Width in pixels
+        int height;                                     ///< height in pixels
+        Slang::String adapter;                          ///< Name to identify the adapter to use
+        Slang::List<Slang::String> requiredFeatures;    ///< The features enabled on this renderer
     };
 
     virtual SlangResult initialize(const Desc& desc, void* inWindowHandle) = 0;

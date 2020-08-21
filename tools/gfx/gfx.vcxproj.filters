@@ -36,6 +36,12 @@
     <ClInclude Include="model.h">
       <Filter>Header Files</Filter>
     </ClInclude>
+    <ClInclude Include="nvapi\nvapi-include.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="nvapi\nvapi-util.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
     <ClInclude Include="open-gl\render-gl.h">
       <Filter>Header Files</Filter>
     </ClInclude>
@@ -96,6 +102,9 @@
       <Filter>Source Files</Filter>
     </ClCompile>
     <ClCompile Include="model.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="nvapi\nvapi-util.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
     <ClCompile Include="open-gl\render-gl.cpp">

@@ -73,12 +73,12 @@ directories and place them in any location.
   - Any Personal Computer version supported by Microsoft
 - Microsoft [Visual Studio](https://www.visualstudio.com/)
   - Versions
-    - [2013 (update 4)](https://www.visualstudio.com/vs/older-downloads/)
     - [2015](https://www.visualstudio.com/vs/older-downloads/)
-    - [2017](https://www.visualstudio.com/vs/downloads/)
+    - [2017](https://www.visualstudio.com/vs/older-downloads/)
+    - [2019](https://www.visualstudio.com/vs/downloads/)
   - The Community Edition of each of the above versions is sufficient, as
     well as any more capable edition.
-- [CMake](http://www.cmake.org/download/) (Version 2.8.11 or better)
+- [CMake 3.10.2](https://cmake.org/files/v3.10/cmake-3.10.2-win64-x64.zip) is recommended.
   - Use the installer option to add CMake to the system PATH
 - Git Client Support
   - [Git for Windows](http://git-scm.com/download/win) is a popular solution
@@ -96,6 +96,8 @@ work with the solution interactively.
 
 #### Windows Quick Start
 
+From a "Developer Command Prompt for VS 201x" console:
+
     cd Vulkan-Headers
     mkdir build
     cd build
@@ -106,8 +108,9 @@ See below for the details.
 
 #### Use `CMake` to Create the Visual Studio Project Files
 
-Change your current directory to the top of the cloned repository directory,
-create a build directory and generate the Visual Studio project files:
+From within a "Developer Command Prompt for VS 201x" console, change your
+current directory to the top of the cloned repository directory, create a
+build directory and generate the Visual Studio project files:
 
     cd Vulkan-Headers
     mkdir build
@@ -189,7 +192,7 @@ Build the `uninstall` target to remove the files from the install directory.
 There are no specific Linux distribution or compiler version requirements for
 building this repository. The required tools are
 
-- cmake (Version 2.8.11 or better)
+- [CMake 3.10.2](https://cmake.org/files/v3.10/cmake-3.10.2-Linux-x86_64.tar.gz) is recommended.
 - git
 
 ### Linux Build
@@ -266,5 +269,6 @@ or
 
 ## Building on MacOS
 
-The instructions for building this repository on MacOS are the same as those
-for Linux.
+The instructions for building this repository on MacOS are similar to those for Linux.
+
+[CMake 3.10.2](https://cmake.org/files/v3.10/cmake-3.10.2-Darwin-x86_64.tar.gz) is recommended.
