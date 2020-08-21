@@ -1517,6 +1517,11 @@ namespace Slang
                 return CreateErrorExpr(expr);
         }
 
+        for (auto& arg : expr->arguments)
+        {
+            arg = maybeOpenExistential(arg);
+        }
+
         context.originalExpr = expr;
         context.funcLoc = funcExpr->loc;
 
