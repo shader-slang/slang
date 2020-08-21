@@ -488,6 +488,14 @@ namespace Slang
         // then we should start by trying to resolve the ambiguous reference
         // based on prioritization of the different candidates.
         //
+        // TODO: A more powerful model would be to try to coerce each
+        // of the constituent overload candidates, filtering down to
+        // those that are coercible, and then disambiguating the result.
+        // Such an approach would let us disambiguate between overloaded
+        // symbols based on their type (e.g., by casting the name of
+        // an overloaded function to the type of the overload we mean
+        // to reference).
+        //
         if( auto fromOverloadedExpr = as<OverloadedExpr>(fromExpr) )
         {
             auto resolvedExpr = maybeResolveOverloadedExpr(fromOverloadedExpr, LookupMask::Default, nullptr);

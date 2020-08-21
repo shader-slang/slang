@@ -1735,6 +1735,7 @@ TestResult runCrossCompilerTest(TestContext* context, TestInput& input)
 
         switch (target)
         {
+            case SLANG_DXIL:
             case SLANG_DXIL_ASM:
             {
                 expectedCmdLine.addArg(filePath + ".hlsl");
@@ -1742,6 +1743,7 @@ TestResult runCrossCompilerTest(TestContext* context, TestInput& input)
                 expectedCmdLine.addArg("dxc");
                 break;
             }
+            case SLANG_DXBC:
             case SLANG_DXBC_ASM:
             {
                 expectedCmdLine.addArg(filePath + ".hlsl");

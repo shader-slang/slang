@@ -676,7 +676,7 @@ bool ExtractExistentialType::_equalsImplOverride(Type* type)
 
 HashCode ExtractExistentialType::_getHashCodeOverride()
 {
-    return declRef.getHashCode();
+    return combineHash(declRef.getHashCode(), interfaceDeclRef.getHashCode());
 }
 
 Type* ExtractExistentialType::_createCanonicalTypeOverride()
@@ -688,13 +688,15 @@ Val* ExtractExistentialType::_substituteImplOverride(ASTBuilder* astBuilder, Sub
 {
     int diff = 0;
     auto substDeclRef = declRef.substituteImpl(astBuilder, subst, &diff);
+    auto interfaceSubstDeclRef = interfaceDeclRef.substituteImpl(astBuilder, subst, &diff);
     if (!diff)
         return this;
 
     (*ioDiff)++;
 
     ExtractExistentialType* substValue = astBuilder->create<ExtractExistentialType>();
-    substValue->declRef = declRef;
+    substValue->declRef = substDeclRef;
+    substValue->interfaceDeclRef = interfaceSubstDeclRef;
     return substValue;
 }
 

@@ -1080,7 +1080,7 @@ namespace Slang
                 // So the question is then whether a mismatch during the
                 // unification step should be taken as an immediate failure...
 
-                TryUnifyTypes(constraints, context.getArgType(aa), getType(m_astBuilder, params[aa]));
+                TryUnifyTypes(constraints, context.getArgTypeForInference(aa, this), getType(m_astBuilder, params[aa]));
 #endif
             }
         }
@@ -1515,6 +1515,11 @@ namespace Slang
         {
             if (IsErrorExpr(arg))
                 return CreateErrorExpr(expr);
+        }
+
+        for (auto& arg : expr->arguments)
+        {
+            arg = maybeOpenExistential(arg);
         }
 
         context.originalExpr = expr;

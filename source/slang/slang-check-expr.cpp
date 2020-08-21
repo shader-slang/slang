@@ -116,11 +116,11 @@ namespace Slang
             openedThisType->witness = openedWitness;
 
             DeclRef<InterfaceDecl> substDeclRef = DeclRef<InterfaceDecl>(interfaceDecl, openedThisType);
-            auto substDeclRefType = DeclRefType::create(m_astBuilder, substDeclRef);
+            openedType->interfaceDeclRef = substDeclRef;
 
             ExtractExistentialValueExpr* openedValue = m_astBuilder->create<ExtractExistentialValueExpr>();
             openedValue->declRef = varDeclRef;
-            openedValue->type = QualType(substDeclRefType);
+            openedValue->type = QualType(openedType);
 
             return openedValue;
         });
@@ -988,7 +988,7 @@ namespace Slang
         Expr* indexExpr = subscriptExpr->indexExpression;
         if (indexExpr)
         {
-            indexExpr = CheckExpr(indexExpr);
+            indexExpr = CheckTerm(indexExpr);
         }
 
         subscriptExpr->baseExpression = baseExpr;
@@ -1167,17 +1167,27 @@ namespace Slang
     {
         expr->left = CheckExpr(expr->left);
         expr->right = CheckTerm(expr->right);
+
         return checkAssignWithCheckedOperands(expr);
     }
 
-    Expr* SemanticsVisitor::CheckExpr(Expr* expr)
+    Expr* SemanticsVisitor::CheckExpr(Expr* uncheckedExpr)
     {
-        auto term = CheckTerm(expr);
+        auto checkedTerm = CheckTerm(uncheckedExpr);
 
-        // TODO(tfoley): Need a step here to ensure that the term actually
-        // resolves to a (single) expression with a real type.
+        // First, we want to do any disambiguation that is needed in order
+        // to turn the `term` into an expression that names a single
+        // value (and not something overloaded).
+        //
+        auto checkedExpr = maybeResolveOverloadedExpr(checkedTerm, LookupMask::Default, getSink());
 
-        return term;
+        // Next, we want to ensure that the `expr` actually has a type
+        // that is allowable in an expression context (e.g., make sure
+        // that `expr` names a value and not a type).
+        //
+        // TODO: Implement this step.
+
+        return checkedExpr;
     }
 
     Expr* SemanticsVisitor::CheckInvokeExprWithCheckedOperands(InvokeExpr *expr)
@@ -1255,11 +1265,11 @@ namespace Slang
     Expr* SemanticsExprVisitor::visitInvokeExpr(InvokeExpr *expr)
     {
         // check the base expression first
-        expr->functionExpr = CheckExpr(expr->functionExpr);
+        expr->functionExpr = CheckTerm(expr->functionExpr);
         // Next check the argument expressions
         for (auto & arg : expr->arguments)
         {
-            arg = CheckExpr(arg);
+            arg = CheckTerm(arg);
         }
 
         return CheckInvokeExprWithCheckedOperands(expr);
@@ -1306,7 +1316,7 @@ namespace Slang
         // Next check the argument expression (there should be only one)
         for (auto & arg : expr->arguments)
         {
-            arg = CheckExpr(arg);
+            arg = CheckTerm(arg);
         }
 
         // LEGACY FEATURE: As a backwards-compatibility feature
@@ -1822,7 +1832,7 @@ namespace Slang
 
     Expr* SemanticsExprVisitor::visitStaticMemberExpr(StaticMemberExpr* expr)
     {
-        expr->baseExpression = CheckExpr(expr->baseExpression);
+        expr->baseExpression = CheckTerm(expr->baseExpression);
 
         // Not sure this is needed -> but guess someone could do 
         expr->baseExpression = MaybeDereference(expr->baseExpression);
@@ -1855,7 +1865,7 @@ namespace Slang
     {
         auto baseExpr = inBaseExpr;
 
-        baseExpr = CheckExpr(baseExpr);
+        baseExpr = CheckTerm(baseExpr);
 
         baseExpr = MaybeDereference(baseExpr);
 

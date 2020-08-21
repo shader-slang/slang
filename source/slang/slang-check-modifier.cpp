@@ -477,7 +477,7 @@ namespace Slang
                     }
                     if (!typeChecked)
                     {
-                        arg = CheckExpr(arg);
+                        arg = CheckTerm(arg);
                         arg = coerce(paramDecl->getType(), arg);
                     }
                 }
