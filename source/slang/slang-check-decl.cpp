@@ -3152,7 +3152,7 @@ namespace Slang
         // that represents the explicit tag for this case.
         if(auto initExpr = decl->tagExpr)
         {
-            initExpr = CheckExpr(initExpr);
+            initExpr = CheckTerm(initExpr);
             initExpr = coerce(tagType, initExpr);
 
             // We want to enforce that this is an integer constant
@@ -3919,7 +3919,7 @@ namespace Slang
             // We must check the expression and coerce it to the
             // actual type of the parameter.
             //
-            initExpr = CheckExpr(initExpr);
+            initExpr = CheckTerm(initExpr);
             initExpr = coerce(typeExpr.type, initExpr);
             paramDecl->initExpr = initExpr;
 
