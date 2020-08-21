@@ -495,6 +495,7 @@ Result spawnAndWaitSharedLibrary(TestContext* context, const String& testPath, c
     if (options.shouldBeVerbose)
     {
         CommandLine testCmdLine;
+
         testCmdLine.setExecutableFilename("slang-test");
 
         if (options.binDir.getLength())
@@ -531,8 +532,10 @@ Result spawnAndWaitSharedLibrary(TestContext* context, const String& testPath, c
             stdWriters.setWriter(SLANG_WRITER_CHANNEL_DIAGNOSTIC, &stdError);
         }
 
+        String exePath = Path::combine(context->exeDirectoryPath, exeName);
+
         List<const char*> args;
-        args.add(exeName.getBuffer());
+        args.add(exePath.getBuffer());
         for (Index i = 0; i < cmdLine.m_args.getCount(); ++i)
         {
             args.add(cmdLine.m_args[i].value.getBuffer());
@@ -3189,7 +3192,7 @@ SlangResult innerMain(int argc, char** argv)
 
     // The context holds useful things used during testing
     TestContext context;
-    SLANG_RETURN_ON_FAIL(SLANG_FAILED(context.init()))
+    SLANG_RETURN_ON_FAIL(SLANG_FAILED(context.init(argv[0])))
 
     auto& categorySet = context.categorySet;
 
@@ -3271,7 +3274,7 @@ SlangResult innerMain(int argc, char** argv)
     Options& options = context.options;
 
     // Set up the prelude/s
-    TestToolUtil::setSessionDefaultPrelude(argv[0], context.getSession());
+    TestToolUtil::setSessionDefaultPreludeFromExePath(argv[0], context.getSession());
     
     if (options.outputMode == TestOutputMode::TeamCity)
     {

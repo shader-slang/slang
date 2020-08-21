@@ -37,7 +37,7 @@ namespace Slang
     }
 }
 
-static SlangResult _calcIncludePath(const String& parentPath, const char* path, String& outIncludePath)
+/* static */SlangResult TestToolUtil::getIncludePath(const String& parentPath, const char* path, String& outIncludePath)
 {
     String includePath;
     SLANG_RETURN_ON_FAIL(Path::getCanonical(Path::combine(parentPath, path), includePath));
@@ -55,68 +55,72 @@ static SlangResult _calcIncludePath(const String& parentPath, const char* path, 
     return SLANG_OK;
 }
 
-static SlangResult _addCPPPrelude(const String& parentPath, slang::IGlobalSession* session)
+static SlangResult _addCPPPrelude(const String& rootPath, slang::IGlobalSession* session)
 {
     String includePath;
-    SLANG_RETURN_ON_FAIL(_calcIncludePath(parentPath, "../../../prelude/slang-cpp-prelude.h", includePath));
+    SLANG_RETURN_ON_FAIL(TestToolUtil::getIncludePath(rootPath, "prelude/slang-cpp-prelude.h", includePath));
     StringBuilder prelude;
     prelude << "#include \"" << includePath << "\"\n\n";
     session->setLanguagePrelude(SLANG_SOURCE_LANGUAGE_CPP, prelude.getBuffer());
     return SLANG_OK;
 }
 
-static SlangResult _addCUDAPrelude(const String& parentPath, slang::IGlobalSession* session)
+static SlangResult _addCUDAPrelude(const String& rootPath, slang::IGlobalSession* session)
 {
     String includePath;
-    SLANG_RETURN_ON_FAIL(_calcIncludePath(parentPath, "../../../prelude/slang-cuda-prelude.h", includePath));
+    SLANG_RETURN_ON_FAIL(TestToolUtil::getIncludePath(rootPath, "prelude/slang-cuda-prelude.h", includePath));
     StringBuilder prelude;
     prelude << "#include \"" << includePath << "\"\n\n";
     session->setLanguagePrelude(SLANG_SOURCE_LANGUAGE_CUDA, prelude.getBuffer());
     return SLANG_OK;
 }
 
-/* static */SlangResult TestToolUtil::setSessionDefaultPrelude(const char* inExePath, slang::IGlobalSession* session)
+/* static */SlangResult TestToolUtil::getExeDirectoryPath(const char* exePath, String& outExeDirectoryPath)
+{
+    String canonicalPath;
+    SLANG_RETURN_ON_FAIL(Path::getCanonical(exePath, canonicalPath));
+    // Get the directory
+    outExeDirectoryPath = Path::getParentDirectory(canonicalPath);
+    return SLANG_OK;
+}
+
+/* static */SlangResult TestToolUtil::getRootPath(const char* inExePath, String& outExePath)
+{
+    // Get the directory holding the exe
+    String parentPath;
+    SLANG_RETURN_ON_FAIL(getExeDirectoryPath(inExePath, parentPath));
+
+    // From directory to the root is ../../.. 
+    // Work out the relative path to the root
+    String rootRelPath = Path::combine(parentPath, "../../../");
+
+    // We want the absolute path to the root
+    SLANG_RETURN_ON_FAIL(Path::getCanonical(rootRelPath, outExePath));
+    return SLANG_OK;
+}
+
+/* static */SlangResult TestToolUtil::setSessionDefaultPreludeFromExePath(const char* inExePath, slang::IGlobalSession* session)
+{
+    String rootPath;
+    SLANG_RETURN_ON_FAIL(getRootPath(inExePath, rootPath));
+    SLANG_RETURN_ON_FAIL(setSessionDefaultPreludeFromRootPath(rootPath, session));
+    return SLANG_OK;
+}
+
+/* static */SlangResult TestToolUtil::setSessionDefaultPreludeFromRootPath(const String& rootPath, slang::IGlobalSession* session)
 {
     // Set the prelude to a path
-    if (inExePath)
+ 
+    if (SLANG_FAILED(_addCPPPrelude(rootPath, session)))
     {
-        String exePath(inExePath);
-
-        String canonicalPath;
-        if (SLANG_SUCCEEDED(Path::getCanonical(exePath, canonicalPath)))
-        {
-            // Get the directory
-            String parentPath = Path::getParentDirectory(canonicalPath);
-
-            if (SLANG_FAILED(_addCPPPrelude(parentPath, session)))
-            {
-                SLANG_ASSERT(!"Couldn't find the C++ prelude relative to the executable");
-            }
-
-            if (SLANG_FAILED(_addCUDAPrelude(parentPath, session)))
-            {
-                SLANG_ASSERT(!"Couldn't find the CUDA prelude relative to the executable");
-            }
-
-            // Set the nvapi path for hlsl. 
-            {
-                String includePath;
-                if (SLANG_SUCCEEDED(_calcIncludePath(parentPath, "../../../external/nvapi/nvHLSLExtns.h", includePath)))
-                {
-                    StringBuilder buf;
-
-                    // We have to choose a slot that nvapi will use. Well use u0 because it's simple,
-                    buf << "#define NV_SHADER_EXTN_SLOT u0\n";
-
-                    // Incude the nvapi header
-                    buf << "#include \"" << includePath << "\"\n\n";
-                    
-                    session->setLanguagePrelude(SLANG_SOURCE_LANGUAGE_HLSL, buf.getBuffer());
-                }
-            }
-        }
+        SLANG_ASSERT(!"Couldn't find the C++ prelude relative to the executable");
     }
 
+    if (SLANG_FAILED(_addCUDAPrelude(rootPath, session)))
+    {
+        SLANG_ASSERT(!"Couldn't find the CUDA prelude relative to the executable");
+    }
+    
     return SLANG_OK;
 }
 

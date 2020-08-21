@@ -50,7 +50,7 @@ static gfx::StageType _translateStage(SlangStage slangStage)
     }
 }
 
-/* static */ SlangResult ShaderCompilerUtil::compileProgram(SlangSession* session, const Input& input, const ShaderCompileRequest& request, Output& out)
+/* static */ SlangResult ShaderCompilerUtil::compileProgram(SlangSession* session, const Options& options, const Input& input, const ShaderCompileRequest& request, Output& out)
 {
     out.reset();
 
@@ -137,7 +137,7 @@ static gfx::StageType _translateStage(SlangStage slangStage)
    Index explicitEntryPointCount = request.entryPoints.getCount();
    for(Index ee = 0; ee < explicitEntryPointCount; ++ee)
    {
-        if(gOptions.dontAddDefaultEntryPoints)
+        if(options.dontAddDefaultEntryPoints)
         {
             // If default entry points are not to be added, then
             // the `request.entryPoints` array should have been
@@ -359,7 +359,7 @@ static gfx::StageType _translateStage(SlangStage slangStage)
     compileRequest.globalSpecializationArgs = layout.globalSpecializationArgs;
     compileRequest.entryPointSpecializationArgs = layout.entryPointSpecializationArgs;
 
-    return ShaderCompilerUtil::compileProgram(session, input, compileRequest, output.output);
+    return ShaderCompilerUtil::compileProgram(session, options, input, compileRequest, output.output);
 }
 
 } // renderer_test

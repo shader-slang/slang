@@ -4,8 +4,9 @@
 //DISABLE_TEST(compute):COMPARE_COMPUTE_EX:-slang -compute
 // No support for int64_t on fxc - we need SM6.0 and dxil
 // https://docs.microsoft.com/en-us/windows/win32/direct3dhlsl/hlsl-shader-model-6-0-features-for-direct3d-12
-//DISABLE_TEST(compute):COMPARE_COMPUTE_EX:-slang -compute -dx12
-//TEST(compute):COMPARE_COMPUTE_EX:-slang -compute -dx12 -profile cs_6_0 -use-dxil -render-features atomic-int64
+//DISABLE_TEST(compute):COMPARE_COMPUTE_EX:-slang -compute -dx12 -nvapi-register u0
+// Doesn't work on current version of driver. The atomics have no effect perhaps meaning they aren't being decoded correctly
+//DISABLE_TEST(compute):COMPARE_COMPUTE_EX:-slang -compute -dx12 -profile cs_6_0 -use-dxil -render-features atomic-int64 -nvapi-register u0 -compile-arg -O2
 //TEST(compute, vulkan):COMPARE_COMPUTE_EX:-vk -compute -render-features atomic-int64
 //TEST(compute):COMPARE_COMPUTE_EX:-cuda -compute
 

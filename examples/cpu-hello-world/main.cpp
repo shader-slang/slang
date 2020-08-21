@@ -72,8 +72,8 @@ static SlangResult _innerMain(int argc, char** argv)
     // is for the prelude code to be an *absolute* path to the 'slang-cpp-prelude.h' - which means
     // this will work wherever the generated code is, and allows accessing other files via relative paths.
     //
-    // Look at the source to TestToolUtil::setSessionDefaultPrelude to see what's involed. 
-    TestToolUtil::setSessionDefaultPrelude(argv[0], slangSession);
+    // Look at the source to TestToolUtil::setSessionDefaultPreludeFromExePath to see what's involed. 
+    TestToolUtil::setSessionDefaultPreludeFromExePath(argv[0], slangSession);
 
     // A compile request represents a single invocation of the compiler,
     // to process some inputs and produce outputs (or errors).

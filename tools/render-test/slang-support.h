@@ -87,7 +87,7 @@ struct ShaderCompilerUtil
 
     static SlangResult readSource(const Slang::String& inSourcePath, List<char>& outSourceText);
 
-    static SlangResult compileProgram(SlangSession* session, const Input& input, const ShaderCompileRequest& request, Output& out);
+    static SlangResult compileProgram(SlangSession* session, const Options& options, const Input& input, const ShaderCompileRequest& request, Output& out);
 };
 
 

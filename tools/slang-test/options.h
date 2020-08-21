@@ -98,9 +98,6 @@ struct Options
     // The adapter to use. If empty will match first found adapter.
     Slang::String adapter;
 
-    // The path to NVAPI if available. 
-    Slang::String nvapiPath;
-
         /// Parse the args, report any errors into stdError, and write the results into optionsOut
     static SlangResult parse(int argc, char** argv, TestCategorySet* categorySet, Slang::WriterHelper stdError, Options* optionsOut);
 };
