@@ -1039,18 +1039,6 @@ SlangResult VKRenderer::initialize(const Desc& desc, void* inWindowHandle)
         m_api.vkGetPhysicalDeviceProperties2 &&
         m_api.vkGetPhysicalDeviceFeatures2)
     {
-        // To detect atomic float we need
-        // https://www.khronos.org/registry/vulkan/specs/1.2-extensions/man/html/VkPhysicalDeviceShaderAtomicFloatFeaturesEXT.html
-
-#if 0
-        VkPhysicalDeviceProperties2 physicalDeviceProps2;
-
-        physicalDeviceProps2.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_PROPERTIES_2;
-        physicalDeviceProps2.pNext = nullptr;
-        physicalDeviceProps2.properties = {};
-
-        m_api.vkGetPhysicalDeviceProperties2(m_api.m_physicalDevice, &physicalDeviceProps2);
-#endif
 
         // Get device features
         VkPhysicalDeviceFeatures2 deviceFeatures2 = {};
@@ -1065,6 +1053,9 @@ SlangResult VKRenderer::initialize(const Desc& desc, void* inWindowHandle)
         deviceFeatures2.pNext = &atomicInt64Features;
 
         // Atomic Float
+        // To detect atomic float we need
+        // https://www.khronos.org/registry/vulkan/specs/1.2-extensions/man/html/VkPhysicalDeviceShaderAtomicFloatFeaturesEXT.html
+
         atomicFloatFeatures.pNext = deviceFeatures2.pNext;
         deviceFeatures2.pNext = &atomicFloatFeatures;
 
