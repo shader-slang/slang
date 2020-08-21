@@ -611,6 +611,7 @@ class ExtractExistentialType : public Type
     SLANG_CLASS(ExtractExistentialType)
 
     DeclRef<VarDeclBase> declRef;
+    DeclRef<InterfaceDecl> interfaceDeclRef;
 
     // Overrides should be public so base classes can access
     String _toStringOverride();

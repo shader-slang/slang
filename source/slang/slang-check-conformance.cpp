@@ -268,6 +268,30 @@ namespace Slang
                 }
             }
         }
+        else if (auto extractExistentialType = as<ExtractExistentialType>(subType))
+        {
+            // An ExtractExistentialType from an existential value of type I
+            // is a subtype of I.
+            // We need to check and make sure the interface type of the `ExtractExistentialType`
+            // is equal to `superType`.
+            auto interfaceDeclRef = extractExistentialType->interfaceDeclRef;
+            auto thisTypeSubst = findThisTypeSubstitution(interfaceDeclRef.substitutions.substitutions, interfaceDeclRef.getDecl());
+            SLANG_ASSERT(thisTypeSubst && thisTypeSubst == interfaceDeclRef.substitutions.substitutions);
+            // The interfaceDeclRef in `extractExistentialType` contains a `ThisTypeSubstitution`
+            // to allow member lookup to return correct substituted types. Here we just need
+            // to know if that interface is the same as the superType, so we need to exclude
+            // the `ThisTypeSubstitution` from comparison.
+            interfaceDeclRef.substitutions.substitutions = thisTypeSubst->outer;
+            if (interfaceDeclRef.equals(superTypeDeclRef))
+            {
+                if (outWitness)
+                {
+                    *outWitness = thisTypeSubst->witness;
+                }
+                return true;
+            }
+            return false;
+        }
         else if(auto taggedUnionType = as<TaggedUnionType>(subType))
         {
             // A tagged union type conforms to an interface if all of

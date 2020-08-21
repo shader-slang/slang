@@ -1191,6 +1191,13 @@ namespace Slang
                 else
                     return getArg(index)->type.type;
             }
+            Type* getArgTypeForInference(Index index, SemanticsVisitor* semantics)
+            {
+                if(argTypes)
+                    return argTypes[index];
+                else
+                    return semantics->maybeResolveOverloadedExpr(getArg(index), LookupMask::Default, nullptr)->type;
+            }
 
             bool disallowNestedConversions = false;
 
