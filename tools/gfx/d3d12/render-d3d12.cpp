@@ -1602,32 +1602,39 @@ Result D3D12Renderer::initialize(const Desc& desc, void* inWindowHandle)
         return SLANG_FAIL;
     }
 
-    // NVAPI
-    {
-        const char* features[] = { "nvapi", "atomic-float", "atomic-int64" };
-        bool needsNvapi = false;
-        for (Index i = 0; i < SLANG_COUNT_OF(features); ++i)
-        {
-            if (desc.requiredFeatures.indexOf(features[i]) >= 0)
-            {
-                needsNvapi = true;
-                break;
-            }
-        }
-
-        if (needsNvapi && SLANG_SUCCEEDED(NVAPIUtil::initialize()))
-        {
-            // TODO(JS): We should test for specific features here.
-            for (Index i = 0; i < SLANG_COUNT_OF(features); ++i)
-            {
-                m_features.add(features[i]);
-            }
-            m_nvapi = true;
-        }
-    }
-
     // Set the device
     m_device = m_deviceInfo.m_device;
+
+    // NVAPI
+    if (desc.nvapiExtnSlot >= 0)
+    {
+        if (SLANG_FAILED(NVAPIUtil::initialize()))
+        {
+            return SLANG_E_NOT_AVAILABLE;
+        }
+
+#ifdef GFX_NVAPI
+        // Applications are expected to bind null UAV to this slot. 
+
+        const NvAPI_Status status = NvAPI_D3D12_SetNvShaderExtnSlotSpace(m_device, NvU32(desc.nvapiExtnSlot), NvU32(0));
+            // NvAPI_D3D12_SetNvShaderExtnSlotSpaceLocalThread(m_device, NvU32(desc.nvapiExtnSlot), NvU32(0));
+
+        if (status != NVAPI_OK)
+        {
+            return SLANG_E_NOT_AVAILABLE;
+        }
+
+        const char* features[] = { "atomic-float", "atomic-int64" };
+
+        // TODO(JS): We should test for specific features here.
+        for (Index i = 0; i < SLANG_COUNT_OF(features); ++i)
+        {
+            m_features.add(features[i]);
+        }
+
+        m_nvapi = true;
+#endif
+    }
 
     // Find what features are supported
     {

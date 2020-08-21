@@ -800,10 +800,11 @@ public:
 
     struct Desc
     {
-        int width;                                      ///< Width in pixels
-        int height;                                     ///< height in pixels
+        int width = 0;                                  ///< Width in pixels
+        int height = 0;                                 ///< height in pixels
         Slang::String adapter;                          ///< Name to identify the adapter to use
         Slang::List<Slang::String> requiredFeatures;    ///< The features enabled on this renderer
+        int nvapiExtnSlot = -1;                         ///< The slot (typically UAV) used to indentify NVAPI intrinsics
     };
 
     virtual SlangResult initialize(const Desc& desc, void* inWindowHandle) = 0;

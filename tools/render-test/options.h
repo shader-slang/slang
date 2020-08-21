@@ -75,7 +75,7 @@ struct Options
 
     uint32_t computeDispatchSize[3] = { 1, 1, 1 };
 
-    Slang::String nvapiRegister;                               ///< The nvapiRegister to use.
+    Slang::String nvapiExtnSlot;                               ///< The nvapiRegister to use.
 
     static SlangResult parse(int argc, const char*const* argv, Slang::WriterHelper stdError, Options& outOptions);
 };

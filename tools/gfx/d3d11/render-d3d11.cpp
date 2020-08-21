@@ -647,29 +647,31 @@ SlangResult D3D11Renderer::initialize(const Desc& desc, void* inWindowHandle)
     }
 
     // NVAPI
+    if (desc.nvapiExtnSlot >= 0)
     {
-        const char* features[] = { "nvapi", "atomic-float", "atomic-int64" };
-        bool needsNvapi = false;
+        if (SLANG_FAILED(NVAPIUtil::initialize()))
+        {
+            return SLANG_E_NOT_AVAILABLE;
+        }
+
+#ifdef GFX_NVAPI
+        if (NvAPI_D3D11_SetNvShaderExtnSlot(m_device, NvU32(desc.nvapiExtnSlot)) != NVAPI_OK)
+        {
+            return SLANG_E_NOT_AVAILABLE;
+        }
+
+        const char* features[] = { "atomic-float", "atomic-int64" };
+
+        // TODO(JS): We should test for specific features here.
         for (Index i = 0; i < SLANG_COUNT_OF(features); ++i)
         {
-            if (desc.requiredFeatures.indexOf(features[i]) >= 0)
-            {
-                needsNvapi = true;
-                break;
-            }
+            m_features.add(features[i]);
         }
 
-        if (needsNvapi && SLANG_SUCCEEDED(NVAPIUtil::initialize()))
-        {
-            // TODO(JS): We should test for specific features here.
-            for (Index i = 0; i < SLANG_COUNT_OF(features); ++i)
-            {
-                m_features.add(features[i]);
-            }
-            m_nvapi = true;
-        }
+        m_nvapi = true;
+#endif
     }
-
+    
     // TODO: Add support for debugging to help detect leaks:
     //
     //      ComPtr<ID3D11Debug> gDebug;
