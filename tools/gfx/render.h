@@ -803,6 +803,7 @@ public:
         int width = 0;                                  ///< Width in pixels
         int height = 0;                                 ///< height in pixels
         Slang::String adapter;                          ///< Name to identify the adapter to use
+        Slang::List<Slang::String> requiredFeatures;    ///< List of required feature names. 
         int nvapiExtnSlot = -1;                         ///< The slot (typically UAV) used to identify NVAPI intrinsics. If >=0 NVAPI is required.
     };
 
