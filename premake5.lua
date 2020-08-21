@@ -92,6 +92,14 @@ newoption {
 }
 
 newoption {
+   trigger     = "enable-nvapi",
+   description = "(Optional) If true will enable NVAPI, if NVAPI is found via CUDA_PATH",
+   value       = "bool",
+   default     = "false",
+   allowed     = { { "true", "True"}, { "false", "False" } }
+}
+
+newoption {
    trigger     = "cuda-sdk-path",
    description = "(Optional) Path to the root of CUDA SDK. If set will enable CUDA in build (ie in effect sets enable-cuda=true too)",
    value       = "path"
@@ -150,7 +158,7 @@ local isTargetWindows = (os.target() == "windows") and not (targetDetail == "min
 
 -- Even if we have the nvapi path, we only want to currently enable on windows targets
 
-enableNvapi = not not (os.isdir(nvapiPath) and isTargetWindows)
+enableNvapi = not not (os.isdir(nvapiPath) and isTargetWindows and _OPTIONS["enable-nvapi"] == "true")
 
 if enableNvapi then
     printf("Enabled NVAPI")
