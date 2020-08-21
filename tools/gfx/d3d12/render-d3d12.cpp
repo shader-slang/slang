@@ -3988,6 +3988,8 @@ Result D3D12Renderer::createComputePipelineState(const ComputePipelineStateDesc&
     computeDesc.CS = { programImpl->m_computeShader.getBuffer(), SIZE_T(programImpl->m_computeShader.getCount()) };
 
     ComPtr<ID3D12PipelineState> pipelineState;
+
+#ifdef GFX_NVAPI
     if (m_nvapi)
     {
         // Also fill the extension structure. 
@@ -4012,6 +4014,7 @@ Result D3D12Renderer::createComputePipelineState(const ComputePipelineStateDesc&
         }
     }
     else
+#endif
     {
         SLANG_RETURN_ON_FAIL(m_device->CreateComputePipelineState(&computeDesc, IID_PPV_ARGS(pipelineState.writeRef())));
     }
