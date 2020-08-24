@@ -1318,6 +1318,9 @@ namespace Slang
 
         // The type that the witness table witnesses conformance to (e.g. an Interface)
         Type* baseType;
+
+        // The type witnessesd by the witness table (a concrete type).
+        Type* witnessedType;
     };
 
     typedef Dictionary<unsigned int, NodeBase*> AttributeArgumentValueDict;

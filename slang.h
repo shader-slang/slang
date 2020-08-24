@@ -3102,6 +3102,13 @@ namespace slang
             LayoutRules     rules = LayoutRules::Default,
             ISlangBlob**    outDiagnostics = nullptr) = 0;
 
+            /** Get the mangled name for a type witness.
+            */
+        virtual SLANG_NO_THROW SlangResult SLANG_MCALL getTypeConformanceWitnessMangledName(
+            TypeReflection* type,
+            TypeReflection* interfaceType,
+            ISlangBlob** outNameBlob) = 0;
+
             /** Create a request to load/compile front-end code.
             */
         virtual SLANG_NO_THROW SlangResult SLANG_MCALL createCompileRequest(

@@ -72,7 +72,7 @@ namespace Slang
         // Give a name to the rtti object.
         if (auto exportDecoration = typeInst->findDecoration<IRExportDecoration>())
         {
-            String rttiObjName = String(exportDecoration->getMangledName()) + "_rtti";
+            String rttiObjName = exportDecoration->getMangledName();
             builder->addExportDecoration(result, rttiObjName.getUnownedSlice());
         }
         mapTypeToRTTIObject[typeInst] = result;

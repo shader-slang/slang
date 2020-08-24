@@ -2450,6 +2450,7 @@ namespace Slang
         {
             witnessTable = new WitnessTable();
             witnessTable->baseType = DeclRefType::create(m_astBuilder, interfaceDeclRef);
+            witnessTable->witnessedType = type;
         }
         context->mapInterfaceToWitnessTable.Add(interfaceDeclRef, witnessTable);
 
@@ -3021,6 +3022,7 @@ namespace Slang
             //
             RefPtr<WitnessTable> witnessTable = new WitnessTable();
             witnessTable->baseType = enumConformanceDecl->base.type;
+            witnessTable->witnessedType = enumTypeType;
             enumConformanceDecl->witnessTable = witnessTable;
 
             Name* tagAssociatedTypeName = getSession()->getNameObj("__Tag");

@@ -1205,6 +1205,10 @@ namespace Slang
             SlangInt               targetIndex = 0,
             slang::LayoutRules     rules = slang::LayoutRules::Default,
             ISlangBlob**    outDiagnostics = nullptr) override;
+        SLANG_NO_THROW SlangResult SLANG_MCALL getTypeConformanceWitnessMangledName(
+            slang::TypeReflection* type,
+            slang::TypeReflection* interfaceType,
+            ISlangBlob** outNameBlob) override;
         SLANG_NO_THROW SlangResult SLANG_MCALL createCompileRequest(
             SlangCompileRequest**   outCompileRequest) override;
 

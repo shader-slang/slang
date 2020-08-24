@@ -1631,6 +1631,7 @@ void CPPSourceEmitter::_emitWitnessTableDefinitions()
     {
         auto interfaceType = cast<IRInterfaceType>(witnessTable->getOperand(0));
         List<IRWitnessTableEntry*> sortedWitnessTableEntries = getSortedWitnessTableEntries(witnessTable);
+        m_writer->emit("extern \"C\" ");
         emitSimpleType(interfaceType);
         m_writer->emit(" ");
         m_writer->emit(getName(witnessTable));
@@ -1692,7 +1693,7 @@ void CPPSourceEmitter::emitInterface(IRInterfaceType* interfaceType)
 
 void CPPSourceEmitter::emitRTTIObject(IRRTTIObject* rttiObject)
 {
-    m_writer->emit("static TypeInfo ");
+    m_writer->emit("extern \"C\" TypeInfo ");
     m_writer->emit(getName(rttiObject));
     m_writer->emit(" = {");
     auto typeSizeDecoration = rttiObject->findDecoration<IRRTTITypeSizeDecoration>();
