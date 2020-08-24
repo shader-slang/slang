@@ -9,8 +9,8 @@
 //TEST(compute, vulkan):COMPARE_COMPUTE_EX:-vk -compute -render-features atomic-int64
 //TEST(compute):COMPARE_COMPUTE_EX:-cuda -compute
 
-// We don't use this, but having this defined makes the 0 slot available if nvapi is going to be used
-// Only strictly necessary on the dx12 path
+// The test doesn't directly use this, but having this defined makes the 0 slot available if NVAPI is going to be used
+// Only strictly necessary on the D3D12 path
 //TEST_INPUT:ubuffer(data=[0 0 0 0 ], stride=4):name=nvapiBuffer
 RWStructuredBuffer<int> nvapiBuffer;
 
