@@ -185,11 +185,13 @@ For CPU targets there is the IFeedbackTexture interface that requires an impleme
 Currently feature allows atomic float additions on RWByteAddressBuffer. A future update will broader types supported. There are methods on RWByteAddressBuffer...
 
 ```
-void RWByteAddressBuffer::InterlockedAddFp32(uint byteAddress, float valueToAdd, out float originalValue);
-void RWByteAddressBuffer::InterlockedAddFp32(uint byteAddress, float valueToAdd);
+void RWByteAddressBuffer::InterlockedAddF32(uint byteAddress, float valueToAdd, out float originalValue);
+void RWByteAddressBuffer::InterlockedAddF32(uint byteAddress, float valueToAdd);
 
 void RWByteAddressBuffer::InterlockedAddI64(uint byteAddress, int64_t valueToAdd, out int64_t originalValue);
 void RWByteAddressBuffer::InterlockedAddI64(uint byteAddress, int64_t valueToAdd);
+
+void RWByteAddressBuffer::InterlockedCompareExchangeU64(uint byteAddress, uint64_t compareValue, uint64_t value, out uint64_t outOriginalValue);
 ```
 
 On HLSL based targets this functionality is achieved using [NVAPI](https://developer.nvidia.com/nvapi). For this to work it is necessary to have NVAPI available on your system. The 'prelude' functionality in the Slang API allows for text to be inserted before any Slang code generated code is output. If the input source uses an NVAPI feature - like the methods above - it will output code that *assumes* that `nvHLSLExtns.h` is included.  The following code from `render-test-main.cpp` sets up a suitable prelude for HLSL that includes `nvHLSLExtns.h` with an absolute path.

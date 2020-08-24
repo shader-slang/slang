@@ -30,12 +30,12 @@ void computeMain(uint3 dispatchThreadID : SV_DispatchThreadID)
     //const float delta = anotherBuffer[idx & 3];
     
     float previousValue = 0;
-    workBuffer.InterlockedAddFp32((idx << 2), 1.0f, previousValue);
-    //workBuffer.InterlockedAddFp32((idx ^ 2) << 2, 2.0f + delta);
+    workBuffer.InterlockedAddF32((idx << 2), 1.0f, previousValue);
+    //workBuffer.InterlockedAddF32((idx ^ 2) << 2, 2.0f + delta);
     
     // The sum of values in anotherBuffer should also be added
     //int anotherIdx = tid >> 2;
-    //workBuffer.InterlockedAddFp32(anotherIdx << 2, delta);
+    //workBuffer.InterlockedAddF32(anotherIdx << 2, delta);
     
     GroupMemoryBarrierWithGroupSync();
     

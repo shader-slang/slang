@@ -14,7 +14,7 @@ layout(std430, binding = 0) buffer _S2 {
 } _S3;
 
 #line 18 "tests/slang-extension/atomic-float-byte-address-buffer-cross.slang"
-void RWByteAddressBuffer_InterlockedAddFp32_0(uint _S4, float _S5, out float _S6)
+void RWByteAddressBuffer_InterlockedAddF32_0(uint _S4, float _S5, out float _S6)
 {
     uint _S7 = _S4 / uint(4);
     float _S8 = (atomicAdd((((_S3)._data[(_S7)])), (_S5)));
@@ -22,7 +22,7 @@ void RWByteAddressBuffer_InterlockedAddFp32_0(uint _S4, float _S5, out float _S6
     return;
 }
 
-void RWByteAddressBuffer_InterlockedAddFp32_1(uint _S9, float _S10)
+void RWByteAddressBuffer_InterlockedAddF32_1(uint _S9, float _S10)
 {
     uint _S11 = _S9 / uint(4);
     float _S12 = (atomicAdd((((_S3)._data[(_S11)])), (_S10)));
@@ -43,8 +43,8 @@ layout(local_size_x = 16, local_size_y = 1, local_size_z = 1) in;void main()
 
 #line 21
     float _S14;
-    RWByteAddressBuffer_InterlockedAddFp32_0(_S13, 1.00000000000000000000, _S14);
-    RWByteAddressBuffer_InterlockedAddFp32_1(uint(int(tid_0 >> 2) << 2), delta_0);
+    RWByteAddressBuffer_InterlockedAddF32_0(_S13, 1.00000000000000000000, _S14);
+    RWByteAddressBuffer_InterlockedAddF32_1(uint(int(tid_0 >> 2) << 2), delta_0);
 
 #line 13
     return;
