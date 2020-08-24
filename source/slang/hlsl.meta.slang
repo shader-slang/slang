@@ -48,6 +48,7 @@ struct ByteAddressBuffer
     }
 };
 
+// AtomicAdd
 
 // Make the GLSL atomicAdd available.
 // We have separate int/float implementations, as the float version requires some specific extensions
@@ -58,9 +59,10 @@ __glsl_version(430)
 __glsl_extension(GL_EXT_shader_atomic_float)
 float __atomicAdd(__ref float value, float amount);
 
-// Helper for hlsl, using nvAPI
+// Helper for hlsl, using NVAPI
 __target_intrinsic(hlsl, "NvInterlockedAddUint64($0, $1, $2)")
 uint2 __atomicAdd(RWByteAddressBuffer buf, uint offset, uint2);
+
 
 // Int versions require glsl 4.30
 // https://www.khronos.org/registry/OpenGL-Refpages/gl4/html/atomicAdd.xhtml
@@ -77,6 +79,32 @@ __target_intrinsic(glsl, "atomicAdd($0, $1)")
 __glsl_version(430)
 __glsl_extension(GL_EXT_shader_atomic_int64)
 int64_t __atomicAdd(__ref int64_t value, int64_t amount);
+
+// CAS - Compare and swap
+
+// Helper for HLSL, using NVAPI
+
+__target_intrinsic(hlsl, "NvInterlockedCompareExchangeUint64($0, $1, $2, $3)")
+uint2 __cas(RWByteAddressBuffer buf, uint offset, uint2 compareValue, uint2 value);
+
+__target_intrinsic(glsl, "atomicCompSwap($0, $1, $2)")
+__glsl_version(430)
+__glsl_extension(GL_EXT_shader_atomic_int64)
+uint64_t __cas(__ref uint64_t ioValue, uint64_t compareValue, uint64_t newValue);
+
+// Conversion between uint64_t and uint2
+
+uint2 __asuint2(uint64_t i)
+{
+    return uint2(uint(i), uint(uint64_t(i) >> 32));
+}
+
+uint64_t __asuint64(uint2 i)
+{
+    return (uint64_t(i.y) << 32) | i.x;
+}
+
+// 
 
 __intrinsic_op($(kIROp_ByteAddressBufferLoad))
 T __byteAddressBufferLoad<T>(ByteAddressBuffer buffer, int offset);
@@ -202,16 +230,15 @@ ${{{{
     // https://www.khronos.org/registry/vulkan/specs/1.2-extensions/html/vkspec.html#VK_EXT_shader_atomic_float
     // https://htmlpreview.github.io/?https://github.com/KhronosGroup/SPIRV-Registry/blob/master/extensions/EXT/SPV_EXT_shader_atomic_float_add.html
 
-    // Fp32 
+    // Fp32 Add
 
     __target_intrinsic(hlsl, "($3 = NvInterlockedAddFp32($0, $1, $2))")
     __cuda_sm_version(2.0)
     __target_intrinsic(cuda, "(*$3 = atomicAdd((float*)$0._getPtrAt($1), $2))")
-    void InterlockedAddFp32(uint byteAddress, float valueToAdd, out float originalValue);
+    void InterlockedAddF32(uint byteAddress, float valueToAdd, out float originalValue);
 
-    
     __specialized_for_target(glsl)
-    void InterlockedAddFp32(uint byteAddress, float valueToAdd, out float originalValue)
+    void InterlockedAddF32(uint byteAddress, float valueToAdd, out float originalValue)
     {
         RWStructuredBuffer<float> buf = __getEquivalentStructuredBuffer<float>(this);
         originalValue = __atomicAdd(buf[byteAddress / 4], valueToAdd);
@@ -222,29 +249,24 @@ ${{{{
     __target_intrinsic(hlsl, "(NvInterlockedAddFp32($0, $1, $2))")
     __cuda_sm_version(2.0)
     __target_intrinsic(cuda, "atomicAdd((float*)$0._getPtrAt($1), $2)")
-    void InterlockedAddFp32(uint byteAddress, float valueToAdd);
+    void InterlockedAddF32(uint byteAddress, float valueToAdd);
 
     __specialized_for_target(glsl)
-    void InterlockedAddFp32(uint byteAddress, float valueToAdd)
+    void InterlockedAddF32(uint byteAddress, float valueToAdd)
     {
         RWStructuredBuffer<float> buf = __getEquivalentStructuredBuffer<float>(this);
         __atomicAdd(buf[byteAddress / 4], valueToAdd);
     }
 
-    // Int64
+    // Int64 Add
     __cuda_sm_version(6.0)
     __target_intrinsic(cuda, "(*$3 = atomicAdd((uint64_t*)$0._getPtrAt($1), $2))")
     void InterlockedAddI64(uint byteAddress, int64_t valueToAdd, out int64_t originalValue);
 
     __specialized_for_target(hlsl)
-    void InterlockedAddI64(uint byteAddress, int64_t inValueToAdd, out int64_t outOriginalValue)
+    void InterlockedAddI64(uint byteAddress, int64_t valueToAdd, out int64_t outOriginalValue)
     {
-        uint2 valueToAdd;
-        valueToAdd.x = uint(inValueToAdd);
-        valueToAdd.y = uint(uint64_t(inValueToAdd) >> 32); 
-
-        const uint2 originalValue = __atomicAdd(this, byteAddress, valueToAdd);
-        outOriginalValue = (int64_t(originalValue.y) << 32) | originalValue.x;
+        outOriginalValue = __asuint64(__atomicAdd(this, byteAddress, __asuint2(valueToAdd)));
     }
 
     __specialized_for_target(glsl)
@@ -260,12 +282,9 @@ ${{{{
     void InterlockedAddI64(uint byteAddress, int64_t valueToAdd);
 
     __specialized_for_target(hlsl)
-    void InterlockedAddI64(uint byteAddress, int64_t inValueToAdd)
+    void InterlockedAddI64(uint byteAddress, int64_t valueToAdd)
     {
-        uint2 valueToAdd;
-        valueToAdd.x = uint(inValueToAdd);
-        valueToAdd.y = uint(uint64_t(inValueToAdd) >> 32); 
-        __atomicAdd(this, byteAddress, valueToAdd);
+        __atomicAdd(this, byteAddress, __asuint2(valueToAdd));
     }
 
     __specialized_for_target(glsl)
@@ -273,6 +292,24 @@ ${{{{
     {
         RWStructuredBuffer<int64_t> buf = __getEquivalentStructuredBuffer<int64_t>(this);
         __atomicAdd(buf[byteAddress / 8], valueToAdd);
+    }
+
+    // CAS UInt64
+
+    __target_intrinsic(cuda, "(*$4 = atomicCAS((uint64_t*)$0._getPtrAt($1), $2, $3))")
+    void InterlockedCompareExchangeU64(uint byteAddress, uint64_t compareValue, uint64_t value, out uint64_t outOriginalValue);
+
+    __specialized_for_target(hlsl)
+    void InterlockedCompareExchangeU64(uint byteAddress, uint64_t compareValue, uint64_t value, out uint64_t outOriginalValue)
+    {
+        outOriginalValue = __asuint64(__cas(this, byteAddress, __asuint2(compareValue), __asuint2(value)));
+    }
+
+    __specialized_for_target(glsl)
+    void InterlockedCompareExchangeU64(uint byteAddress, uint64_t compareValue, uint64_t value, out uint64_t outOriginalValue)
+    {
+        RWStructuredBuffer<uint64_t> buf = __getEquivalentStructuredBuffer<uint64_t>(this);
+        outOriginalValue = __cas(buf[byteAddress / 8], compareValue, value);
     }
 
 ${{{{

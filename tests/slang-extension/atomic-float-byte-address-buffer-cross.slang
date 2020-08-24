@@ -19,9 +19,9 @@ void computeMain(uint3 dispatchThreadID : SV_DispatchThreadID)
     const float delta = anotherBuffer[idx & 3];
     
     float previousValue = 0;
-    outputBuffer.InterlockedAddFp32((idx << 2), 1.0f, previousValue);
+    outputBuffer.InterlockedAddF32((idx << 2), 1.0f, previousValue);
     
     // The sum of values in anotherBuffer should also be added
     int anotherIdx = tid >> 2;
-    outputBuffer.InterlockedAddFp32(anotherIdx << 2, delta);
+    outputBuffer.InterlockedAddF32(anotherIdx << 2, delta);
 }
