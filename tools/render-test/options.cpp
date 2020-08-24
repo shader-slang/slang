@@ -240,7 +240,7 @@ static SlangResult _setRendererType(RendererType type, const char* arg, Slang::W
         {
             outOptions.dontAddDefaultEntryPoints = true;
         }
-        else if (strcmp(arg, "-nvapi-register") == 0)
+        else if (strcmp(arg, "-nvapi-slot") == 0)
         {
             if (argCursor == argEnd)
             {
@@ -248,7 +248,7 @@ static SlangResult _setRendererType(RendererType type, const char* arg, Slang::W
                 return SLANG_FAIL;
             }
 
-            outOptions.nvapiRegister = (*argCursor++);
+            outOptions.nvapiExtnSlot = (*argCursor++);
         }
         else
         {

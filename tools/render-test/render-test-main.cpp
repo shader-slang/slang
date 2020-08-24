@@ -12,6 +12,7 @@
 #include "shader-renderer-util.h"
 
 #include "../source/core/slang-io.h"
+#include "../source/core/slang-string-util.h"
 
 #include "core/slang-token-reader.h"
 
@@ -406,7 +407,7 @@ Result RenderTestApp::update(Window* window)
 static SlangResult _setSessionPrelude(const Options& options, const char* exePath, SlangSession* session)
 {
     // Let's see if we need to set up special prelude for HLSL
-    if (options.nvapiRegister.getLength())
+    if (options.nvapiExtnSlot.getLength())
     {
         String rootPath;
         SLANG_RETURN_ON_FAIL(TestToolUtil::getRootPath(exePath, rootPath));
@@ -416,7 +417,7 @@ static SlangResult _setSessionPrelude(const Options& options, const char* exePat
 
         StringBuilder buf;
         // We have to choose a slot that NVAPI will use. 
-        buf << "#define NV_SHADER_EXTN_SLOT " << options.nvapiRegister << "\n";
+        buf << "#define NV_SHADER_EXTN_SLOT " << options.nvapiExtnSlot << "\n";
 
         // Include the NVAPI header
         buf << "#include \"" << includePath << "\"\n\n";
@@ -589,13 +590,18 @@ static SlangResult _innerMain(Slang::StdWriters* stdWriters, SlangSession* sessi
         }
     }
 
+    Index nvapiExtnSlot = -1;
+
     // Let's see if we need to set up special prelude for HLSL
-    if (options.nvapiRegister.getLength())
+    if (options.nvapiExtnSlot.getLength() && options.nvapiExtnSlot[0] == 'u')
     {
-        // We require nvapi to be available on the device
-        if (options.renderFeatures.indexOf("nvapi") < 0)
+        //
+        Slang::Int value;
+        UnownedStringSlice slice = options.nvapiExtnSlot.getUnownedSlice();
+        UnownedStringSlice indexText(slice.begin() + 1 , slice.end());
+        if (SLANG_SUCCEEDED(StringUtil::parseInt(indexText, value)))
         {
-            options.renderFeatures.add("nvapi");
+            nvapiExtnSlot = Index(value);
         }
     }
 
@@ -716,16 +722,6 @@ static SlangResult _innerMain(Slang::StdWriters* stdWriters, SlangSession* sessi
 #endif
     }
 
-    if (options.nvapiRegister.getLength())
-    {
-        // We require nvapi to be available on the device
-        if (options.renderFeatures.indexOf("nvapi") < 0)
-        {
-            options.renderFeatures.add("nvapi");
-        }
-    }
-
-
     Slang::RefPtr<Renderer> renderer;
     {
         RendererUtil::CreateFunc createFunc = RendererUtil::getCreateFunc(options.rendererType);
@@ -748,6 +744,7 @@ static SlangResult _innerMain(Slang::StdWriters* stdWriters, SlangSession* sessi
         desc.height = gWindowHeight;
         desc.adapter = options.adapter;
         desc.requiredFeatures = options.renderFeatures;
+        desc.nvapiExtnSlot = int(nvapiExtnSlot);
 
         window = renderer_test::Window::create();
         SLANG_RETURN_ON_FAIL(window->initialize(gWindowWidth, gWindowHeight));
@@ -755,7 +752,9 @@ static SlangResult _innerMain(Slang::StdWriters* stdWriters, SlangSession* sessi
         SlangResult res = renderer->initialize(desc, window->getHandle());
         if (SLANG_FAILED(res))
         {
-            if (!options.onlyStartup)
+            // Returns E_NOT_AVAILABLE only when specified features are not available.
+            // Will cause to be ignored.
+            if (!options.onlyStartup && res != SLANG_E_NOT_AVAILABLE)
             {
                 fprintf(stderr, "Unable to initialize renderer %s\n", rendererName.getBuffer());
             }

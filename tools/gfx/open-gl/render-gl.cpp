@@ -717,9 +717,12 @@ SlangResult GLRenderer::initialize(const Desc& desc, void* inWindowHandle)
         }
     }
 
-    if (m_desc.requiredFeatures.indexOf("nvapi") >= 0 && SLANG_SUCCEEDED(NVAPIUtil::initialize()))
+    if (m_desc.nvapiExtnSlot >= 0)
     {
-        m_features.add("nvapi");
+        if (SLANG_FAILED(NVAPIUtil::initialize()))
+        {
+            return SLANG_E_NOT_AVAILABLE;
+        }
     }
 
     auto extensions = glGetString(GL_EXTENSIONS);

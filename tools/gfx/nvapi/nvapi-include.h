@@ -15,5 +15,7 @@
 #   endif
 
 #   include <nvapi.h>
+#   include <nvShaderExtnEnums.h>
+
 #endif
 

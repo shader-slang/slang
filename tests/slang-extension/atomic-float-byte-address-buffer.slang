@@ -1,18 +1,14 @@
 // atomic-float-byte-address-buffer.slang
 
 //DISABLE_TEST(compute):COMPARE_COMPUTE_EX:-cpu -compute -output-using-type
-// Produces a different result
-//TEST(compute):COMPARE_COMPUTE_EX:-dx11 -slang -compute -render-features atomic-float -output-using-type -nvapi-register u0
-// Disabled because crashes currently on vulkan 
-// https://vulkan.gpuinfo.org/listdevicescoverage.php?extension=VK_EXT_shader_atomic_float
+//TEST(compute):COMPARE_COMPUTE_EX:-dx11 -slang -compute -render-features atomic-float -output-using-type -nvapi-slot u0
 //TEST(compute, vulkan):COMPARE_COMPUTE_EX:-vk -compute -render-features atomic-float -output-using-type
-// Doesn't work on D3D12 for unknown reasons
-//DISABLE_TEST(compute):COMPARE_COMPUTE_EX:-d3d12 -compute -render-features atomic-float -output-using-type -compile-arg -O2 -nvapi-register u0
-//DISABLE_TEST(compute):COMPARE_COMPUTE_EX:-d3d12 -compute -use-dxil -render-features atomic-float -output-using-type -compile-arg -O2 -nvapi-register u0
+//TEST(compute):COMPARE_COMPUTE_EX:-d3d12 -compute -render-features atomic-float -output-using-type -compile-arg -O2 -nvapi-slot u0
+//TEST(compute):COMPARE_COMPUTE_EX:-d3d12 -compute -use-dxil -render-features atomic-float -output-using-type -compile-arg -O2 -nvapi-slot u0
 //TEST(compute):COMPARE_COMPUTE_EX:-cuda -compute -output-using-type 
 
-// We don't use this, but having this defined makes the 0 slot available if nvapi is going to be used
-// Only strictly necessary on the dx12 path
+// The test doesn't directly use this, but having this defined makes the 0 slot available if NVAPI is going to be used
+// Only strictly necessary on the D3D11/D3D12 paths
 //TEST_INPUT:ubuffer(data=[0 0 0 0 ], stride=4):name=nvapiBuffer
 RWStructuredBuffer<int> nvapiBuffer;
 
