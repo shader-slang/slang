@@ -1611,7 +1611,7 @@ void CPPSourceEmitter::emitWitnessTable(IRWitnessTable* witnessTable)
     _maybeEmitWitnessTableTypeDefinition(interfaceType);
 
     // Define a global variable for the witness table.
-    m_writer->emit("extern ");
+    m_writer->emit("extern \"C\" ");
     emitSimpleType(interfaceType);
     m_writer->emit(" ");
     m_writer->emit(getName(witnessTable));
@@ -1631,7 +1631,6 @@ void CPPSourceEmitter::_emitWitnessTableDefinitions()
     {
         auto interfaceType = cast<IRInterfaceType>(witnessTable->getOperand(0));
         List<IRWitnessTableEntry*> sortedWitnessTableEntries = getSortedWitnessTableEntries(witnessTable);
-        m_writer->emit("extern \"C\" ");
         emitSimpleType(interfaceType);
         m_writer->emit(" ");
         m_writer->emit(getName(witnessTable));
@@ -1693,7 +1692,13 @@ void CPPSourceEmitter::emitInterface(IRInterfaceType* interfaceType)
 
 void CPPSourceEmitter::emitRTTIObject(IRRTTIObject* rttiObject)
 {
+    // Declare the type info object as `extern "C"` first.
     m_writer->emit("extern \"C\" TypeInfo ");
+    m_writer->emit(getName(rttiObject));
+    m_writer->emit(";\n");
+
+    // Now actually define the object.
+    m_writer->emit("TypeInfo ");
     m_writer->emit(getName(rttiObject));
     m_writer->emit(" = {");
     auto typeSizeDecoration = rttiObject->findDecoration<IRRTTITypeSizeDecoration>();
