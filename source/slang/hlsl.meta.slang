@@ -364,6 +364,7 @@ ${{{{
 
     // Max
 
+    __cuda_sm_version(3.5)
     __target_intrinsic(cuda, "atomicMax((uint64_t*)$0._getPtrAt($1), $2)")
     uint64_t InterlockedMaxU64(uint byteAddress, uint64_t value);
 
@@ -378,7 +379,8 @@ ${{{{
     }
 
     // Min
-
+    
+    __cuda_sm_version(3.5)
     __target_intrinsic(cuda, "atomicMin((uint64_t*)$0._getPtrAt($1), $2)")
     uint64_t InterlockedMinU64(uint byteAddress, uint64_t value);
 
