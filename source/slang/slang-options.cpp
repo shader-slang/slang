@@ -559,9 +559,9 @@ struct OptionsParser
                 {
                     requestImpl->getFrontEndReq()->useSerialIRBottleneck = true;
                 }
-                else if (argStr == "-allow-dynamic-code")
+                else if (argStr == "-disable-specialization")
                 {
-                    requestImpl->getBackEndReq()->allowDynamicCode = true;
+                    requestImpl->getBackEndReq()->disableSpecialization = true;
                 }
                 else if (argStr == "-verbose-paths")
                 {

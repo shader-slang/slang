@@ -3824,13 +3824,6 @@ void CLikeSourceEmitter::ensureGlobalInst(ComputeEmitActionsContext* ctx, IRInst
     // Skip certain instructions that don't affect output.
     switch(inst->op)
     {
-    case kIROp_WitnessTable:
-        // Only skip witness tables when we are generating
-        // static code.
-        if (!m_compileRequest->allowDynamicCode)
-            return;
-        break;
-
     case kIROp_InterfaceRequirementEntry:
     case kIROp_Generic:
         return;
