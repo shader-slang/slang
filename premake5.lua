@@ -1010,8 +1010,8 @@ standardProject "slang-spirv-tools"
     addSourceDir("external/spirv-tools/source/val")
 
     filter { "system:linux or macosx" }
-        links { "dl", "pthread" }
-        buildoptions{"-fPIC", "-pthread"}
+        links { "dl"}
+        buildoptions{"-fPIC"}
 
 --
 -- The single most complicated part of our build is our custom version of glslang.
@@ -1048,7 +1048,6 @@ standardProject "slang-glslang"
     addSourceDir("external/glslang/glslang/GenericCodeGen")
     addSourceDir("external/glslang/glslang/MachineIndependent")
     addSourceDir("external/glslang/glslang/MachineIndependent/preprocessor")
-    addSourceDir("external/glslang/glslang/OSDependent")
     addSourceDir("external/glslang/OGLCompilersDLL")
     addSourceDir("external/glslang/SPIRV")
     addSourceDir("external/glslang/StandAlone")
@@ -1069,13 +1068,11 @@ standardProject "slang-glslang"
         -- On Windows we need to add the platform-specific sources and then
         -- remove the `main.cpp` file since it tries to define a `DllMain`
         -- and we don't want the default glslang one.
-        addSourceDir( "external/glslang/glslang/OSDependent/Windows" )
         removefiles { "external/glslang/glslang/OSDependent/Windows/main.cpp" }
 
     filter { "system:linux or macosx" }
-        links { "dl", "pthread" }
-        addSourceDir("external/glslang/glslang/OSDependent/Unix")
-        buildoptions{"-fPIC", "-pthread"}
+        links { "dl" }
+        buildoptions{"-fPIC"}
         
     
         
