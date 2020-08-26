@@ -22,6 +22,7 @@ struct BreadcrumbInfo
     LookupResultItem::Breadcrumb::Kind kind;
     LookupResultItem::Breadcrumb::ThisParameterMode thisParameterMode = LookupResultItem::Breadcrumb::ThisParameterMode::Default;
     DeclRef<Decl> declRef;
+    Val* val = nullptr;
     BreadcrumbInfo* prev = nullptr;
 };
 
@@ -165,6 +166,7 @@ LookupResultItem CreateLookupResultItem(
         breadcrumbs = new LookupResultItem::Breadcrumb(
             bb->kind,
             bb->declRef,
+            bb->val,
             breadcrumbs,
             bb->thisParameterMode);
     }
@@ -267,6 +269,27 @@ LookupResult lookUpDirectAndTransparentMembers(
     return result;
 }
 
+static SubtypeWitness* _makeSubtypeWitness(
+    ASTBuilder*                 astBuilder,
+    Type*                       subType,
+    SubtypeWitness*             subToMidWitness,
+    Type*                       superType,
+    SubtypeWitness*             midtoSuperWitness)
+{
+    if(subToMidWitness)
+    {
+        TransitiveSubtypeWitness* transitiveWitness = astBuilder->create<TransitiveSubtypeWitness>();
+        transitiveWitness->subToMid = subToMidWitness;
+        transitiveWitness->midToSup = midtoSuperWitness;
+        transitiveWitness->sub = subType;
+        transitiveWitness->sup = superType;
+        return transitiveWitness;
+    }
+    else
+    {
+        return midtoSuperWitness;
+    }
+}
 
 static SubtypeWitness* _makeSubtypeWitness(
     ASTBuilder*                 astBuilder,
@@ -275,23 +298,11 @@ static SubtypeWitness* _makeSubtypeWitness(
     Type*                       superType,
     DeclRef<TypeConstraintDecl> midToSuperConstraint)
 {
-    if(subToMidWitness)
-    {
-        TransitiveSubtypeWitness* transitiveWitness = astBuilder->create<TransitiveSubtypeWitness>();
-        transitiveWitness->subToMid = subToMidWitness;
-        transitiveWitness->midToSup = midToSuperConstraint;
-        transitiveWitness->sub = subType;
-        transitiveWitness->sup = superType;
-        return transitiveWitness;
-    }
-    else
-    {
-        DeclaredSubtypeWitness* declaredWitness = astBuilder->create<DeclaredSubtypeWitness>();
-        declaredWitness->declRef = midToSuperConstraint;
-        declaredWitness->sub = subType;
-        declaredWitness->sup = superType;
-        return declaredWitness;
-    }
+    DeclaredSubtypeWitness* midToSuperWitness = astBuilder->create<DeclaredSubtypeWitness>();
+    midToSuperWitness->declRef = midToSuperConstraint;
+    midToSuperWitness->sub = subType;
+    midToSuperWitness->sup = superType;
+    return _makeSubtypeWitness(astBuilder, subType, subToMidWitness, superType, midToSuperWitness);
 }
 
 // Same as the above, but we are specializing a type instead of a decl-ref
@@ -337,6 +348,46 @@ static void _lookUpMembersInSuperTypeImpl(
     LookupResult&           ioResult,
     BreadcrumbInfo*         inBreadcrumbs);
 
+static void _lookUpMembersInSuperType(
+    ASTBuilder*                 astBuilder,
+    Name*                       name,
+    Type*                       leafType,
+    Type*                       superType,
+    SubtypeWitness*             leafIsSuperWitness,
+    LookupRequest const&        request,
+    LookupResult&               ioResult,
+    BreadcrumbInfo*             inBreadcrumbs)
+{
+    // If we are looking up through an interface type, then
+    // we need to be sure that we add an appropriate
+    // "this type" substitution here, since that needs to
+    // be applied to any members we look up.
+    //
+    superType = _maybeSpecializeSuperType(
+        astBuilder,
+        superType,
+        leafIsSuperWitness);
+
+    // We need to track the indirection we took in lookup,
+    // so that we can construct an appropriate AST on the other
+    // side that includes the "upcast" from sub-type to super-type.
+    //
+    BreadcrumbInfo breadcrumb;
+    breadcrumb.prev = inBreadcrumbs;
+    breadcrumb.kind = LookupResultItem::Breadcrumb::Kind::SuperType;
+    breadcrumb.val = leafIsSuperWitness;
+    breadcrumb.prev = inBreadcrumbs;
+
+    // TODO: Need to consider case where this might recurse infinitely (e.g.,
+    // if an inheritance clause does something like `Bad<T> : Bad<Bad<T>>`.
+    //
+    // TODO: The even simpler thing we need to worry about here is that if
+    // there is ever a "diamond" relationship in the inheritance hierarchy,
+    // we might end up seeing the same interface via different "paths" and
+    // we wouldn't want that to lead to overload-resolution failure.
+    //
+    _lookUpMembersInSuperTypeImpl(astBuilder, name, leafType, superType, leafIsSuperWitness, request, ioResult, &breadcrumb);
+}
 
 static void _lookUpMembersInSuperType(
     ASTBuilder*                 astBuilder, 
@@ -368,35 +419,7 @@ static void _lookUpMembersInSuperType(
         superType,
         intermediateIsSuperConstraint);
 
-    // If we are looking up through an interface type, then
-    // we need to be sure that we add an appropriate
-    // "this type" substitution here, since that needs to
-    // be applied to any members we look up.
-    //
-    superType = _maybeSpecializeSuperType(
-        astBuilder,
-        superType,
-        leafIsSuperWitness);
-
-    // We need to track the indirection we took in lookup,
-    // so that we can construct an appropriate AST on the other
-    // side that includes the "upcast" from sub-type to super-type.
-    //
-    BreadcrumbInfo breadcrumb;
-    breadcrumb.prev = inBreadcrumbs;
-    breadcrumb.kind = LookupResultItem::Breadcrumb::Kind::Constraint;
-    breadcrumb.declRef = intermediateIsSuperConstraint;
-    breadcrumb.prev = inBreadcrumbs;
-
-    // TODO: Need to consider case where this might recurse infinitely (e.g.,
-    // if an inheritance clause does something like `Bad<T> : Bad<Bad<T>>`.
-    //
-    // TODO: The even simpler thing we need to worry about here is that if
-    // there is ever a "diamond" relationship in the inheritance hierarchy,
-    // we might end up seeing the same interface via different "paths" and
-    // we wouldn't want that to lead to overload-resolution failure.
-    //
-    _lookUpMembersInSuperTypeImpl(astBuilder, name, leafType, superType, leafIsSuperWitness, request, ioResult, &breadcrumb);
+    return _lookUpMembersInSuperType(astBuilder, name, leafType, superType, leafIsSuperWitness, request, ioResult, inBreadcrumbs);
 }
 
 static void _lookUpMembersInSuperTypeDeclImpl(
@@ -587,9 +610,31 @@ static void _lookUpMembersInSuperTypeImpl(
 
         _lookUpMembersInSuperTypeDeclImpl(astBuilder, name, leafType, superType, leafIsSuperWitness, declRef, request, ioResult, inBreadcrumbs);
     }
-    if (auto extractExistentialType = as<ExtractExistentialType>(superType))
+    else if (auto extractExistentialType = as<ExtractExistentialType>(superType))
     {
         _lookUpMembersInSuperTypeDeclImpl(astBuilder, name, leafType, superType, leafIsSuperWitness, extractExistentialType->interfaceDeclRef, request, ioResult, inBreadcrumbs);
+    }
+    else if( auto thisType = as<ThisType>(superType) )
+    {
+        // We need to create a witness that represents the next link in the
+        // chain. The `leafIsSuperWitness` represents the knowledge that `leafType : superType`
+        // (and we know that `superType == thisType`,  but we now need to extend that
+        // with the knowledge that `thisType : thisType->interfaceTypeDeclRef`.
+        //
+        auto interfaceType = DeclRefType::create(astBuilder, thisType->interfaceDeclRef);
+
+        auto superIsInterfaceWitness = astBuilder->create<ThisTypeSubtypeWitness>();
+        superIsInterfaceWitness->sub = superType;
+        superIsInterfaceWitness->sup = interfaceType;
+
+        auto leafIsInterfaceWitness = _makeSubtypeWitness(
+            astBuilder,
+            leafType,
+            leafIsSuperWitness,
+            interfaceType,
+            superIsInterfaceWitness);
+
+        _lookUpMembersInSuperTypeDeclImpl(astBuilder, name, leafType, interfaceType, leafIsInterfaceWitness, thisType->interfaceDeclRef, request, ioResult, inBreadcrumbs);
     }
 }
 
