@@ -80,7 +80,7 @@ __glsl_version(430)
 __glsl_extension(GL_EXT_shader_atomic_int64)
 int64_t __atomicAdd(__ref int64_t value, int64_t amount);
 
-// CAS - Compare and swap
+// Cas - Compare and swap
 
 // Helper for HLSL, using NVAPI
 
@@ -91,6 +91,56 @@ __target_intrinsic(glsl, "atomicCompSwap($0, $1, $2)")
 __glsl_version(430)
 __glsl_extension(GL_EXT_shader_atomic_int64)
 uint64_t __cas(__ref uint64_t ioValue, uint64_t compareValue, uint64_t newValue);
+
+// Max
+
+__target_intrinsic(hlsl, "NvInterlockedMaxUint64($0, $1, $2)")
+uint2 __atomicMax(RWByteAddressBuffer buf, uint offset, uint2 value);
+
+__target_intrinsic(glsl, "atomicMax($0, $1)")
+__glsl_version(430)
+__glsl_extension(GL_EXT_shader_atomic_int64)
+uint64_t __atomicMax(__ref uint64_t ioValue, uint64_t value);
+
+// Min
+
+__target_intrinsic(hlsl, "NvInterlockedMinUint64($0, $1, $2)")
+uint2 __atomicMin(RWByteAddressBuffer buf, uint offset, uint2 value);
+
+__target_intrinsic(glsl, "atomicMin($0, $1)")
+__glsl_version(430)
+__glsl_extension(GL_EXT_shader_atomic_int64)
+uint64_t __atomicMin(__ref uint64_t ioValue, uint64_t value);
+
+// And
+
+__target_intrinsic(hlsl, "NvInterlockedAndUint64($0, $1, $2)")
+uint2 __atomicAnd(RWByteAddressBuffer buf, uint offset, uint2 value);
+
+__target_intrinsic(glsl, "atomicAnd($0, $1)")
+__glsl_version(430)
+__glsl_extension(GL_EXT_shader_atomic_int64)
+uint64_t __atomicAnd(__ref uint64_t ioValue, uint64_t value);
+
+// Or
+
+__target_intrinsic(hlsl, "NvInterlockedOrUint64($0, $1, $2)")
+uint2 __atomicOr(RWByteAddressBuffer buf, uint offset, uint2 value);
+
+__target_intrinsic(glsl, "atomicOr($0, $1)")
+__glsl_version(430)
+__glsl_extension(GL_EXT_shader_atomic_int64)
+uint64_t __atomicOr(__ref uint64_t ioValue, uint64_t value);
+
+// Xor
+
+__target_intrinsic(hlsl, "NvInterlockedXorUint64($0, $1, $2)")
+uint2 __atomicXor(RWByteAddressBuffer buf, uint offset, uint2 value);
+
+__target_intrinsic(glsl, "atomicXor($0, $1)")
+__glsl_version(430)
+__glsl_extension(GL_EXT_shader_atomic_int64)
+uint64_t __atomicXor(__ref uint64_t ioValue, uint64_t value);
 
 // Conversion between uint64_t and uint2
 
@@ -219,7 +269,7 @@ struct $(item.name)
     }
 ${{{{
     if (item.op == kIROp_HLSLRWByteAddressBufferType)
-    {
+    {  
 }}}}
 
     // float32 and int64 atomic support. This is a Slang specific extension, it uses
@@ -230,7 +280,7 @@ ${{{{
     // https://www.khronos.org/registry/vulkan/specs/1.2-extensions/html/vkspec.html#VK_EXT_shader_atomic_float
     // https://htmlpreview.github.io/?https://github.com/KhronosGroup/SPIRV-Registry/blob/master/extensions/EXT/SPV_EXT_shader_atomic_float_add.html
 
-    // Fp32 Add
+    // F32 Add
 
     __target_intrinsic(hlsl, "($3 = NvInterlockedAddFp32($0, $1, $2))")
     __cuda_sm_version(2.0)
@@ -294,7 +344,7 @@ ${{{{
         __atomicAdd(buf[byteAddress / 8], valueToAdd);
     }
 
-    // CAS UInt64
+    // Cas uint64_t
 
     __target_intrinsic(cuda, "(*$4 = atomicCAS((uint64_t*)$0._getPtrAt($1), $2, $3))")
     void InterlockedCompareExchangeU64(uint byteAddress, uint64_t compareValue, uint64_t value, out uint64_t outOriginalValue);
@@ -310,6 +360,83 @@ ${{{{
     {
         RWStructuredBuffer<uint64_t> buf = __getEquivalentStructuredBuffer<uint64_t>(this);
         outOriginalValue = __cas(buf[byteAddress / 8], compareValue, value);
+    }
+
+    // Max
+
+    __cuda_sm_version(3.5)
+    __target_intrinsic(cuda, "atomicMax((uint64_t*)$0._getPtrAt($1), $2)")
+    uint64_t InterlockedMaxU64(uint byteAddress, uint64_t value);
+
+    __specialized_for_target(hlsl)
+    uint64_t InterlockedMaxU64(uint byteAddress, uint64_t value) { return __asuint64(__atomicMax(this, byteAddress, __asuint2(value))); }
+
+    __specialized_for_target(glsl)
+    uint64_t InterlockedMaxU64(uint byteAddress, uint64_t value)
+    {
+        RWStructuredBuffer<uint64_t> buf = __getEquivalentStructuredBuffer<uint64_t>(this);
+        return __atomicMax(buf[byteAddress / 8], value);
+    }
+
+    // Min
+    
+    __cuda_sm_version(3.5)
+    __target_intrinsic(cuda, "atomicMin((uint64_t*)$0._getPtrAt($1), $2)")
+    uint64_t InterlockedMinU64(uint byteAddress, uint64_t value);
+
+    __specialized_for_target(hlsl)
+    uint64_t InterlockedMinU64(uint byteAddress, uint64_t value) { return __asuint64(__atomicMin(this, byteAddress, __asuint2(value))); }
+
+    __specialized_for_target(glsl)
+    uint64_t InterlockedMinU64(uint byteAddress, uint64_t value)
+    {
+        RWStructuredBuffer<uint64_t> buf = __getEquivalentStructuredBuffer<uint64_t>(this);
+        return __atomicMin(buf[byteAddress / 8], value);
+    }
+
+    // And
+
+    __target_intrinsic(cuda, "atomicAnd((uint64_t*)$0._getPtrAt($1), $2)")
+    uint64_t InterlockedAndU64(uint byteAddress, uint64_t value);
+
+    __specialized_for_target(hlsl)
+    uint64_t InterlockedAndU64(uint byteAddress, uint64_t value) { return __asuint64(__atomicAnd(this, byteAddress, __asuint2(value))); }
+
+    __specialized_for_target(glsl)
+    uint64_t InterlockedAndU64(uint byteAddress, uint64_t value)
+    {
+        RWStructuredBuffer<uint64_t> buf = __getEquivalentStructuredBuffer<uint64_t>(this);
+        return __atomicAnd(buf[byteAddress / 8], value);
+    }
+
+    // Or
+
+    __target_intrinsic(cuda, "atomicOr((uint64_t*)$0._getPtrAt($1), $2)")
+    uint64_t InterlockedOrU64(uint byteAddress, uint64_t value);
+
+    __specialized_for_target(hlsl)
+    uint64_t InterlockedOrU64(uint byteAddress, uint64_t value) { return __asuint64(__atomicOr(this, byteAddress, __asuint2(value))); }
+
+    __specialized_for_target(glsl)
+    uint64_t InterlockedOrU64(uint byteAddress, uint64_t value)
+    {
+        RWStructuredBuffer<uint64_t> buf = __getEquivalentStructuredBuffer<uint64_t>(this);
+        return __atomicOr(buf[byteAddress / 8], value);
+    }
+
+    // Xor
+
+    __target_intrinsic(cuda, "atomicXor((uint64_t*)$0._getPtrAt($1), $2)")
+    uint64_t InterlockedXorU64(uint byteAddress, uint64_t value);
+
+    __specialized_for_target(hlsl)
+    uint64_t InterlockedXorU64(uint byteAddress, uint64_t value) { return __asuint64(__atomicXor(this, byteAddress, __asuint2(value))); }
+
+    __specialized_for_target(glsl)
+    uint64_t InterlockedXorU64(uint byteAddress, uint64_t value)
+    {
+        RWStructuredBuffer<uint64_t> buf = __getEquivalentStructuredBuffer<uint64_t>(this);
+        return __atomicXor(buf[byteAddress / 8], value);
     }
 
 ${{{{
