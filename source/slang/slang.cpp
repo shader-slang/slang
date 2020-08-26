@@ -623,6 +623,17 @@ SLANG_NO_THROW slang::TypeLayoutReflection* SLANG_MCALL Linkage::getTypeLayout(
     return asExternal(typeLayout);
 }
 
+SLANG_NO_THROW SlangResult SLANG_MCALL Linkage::getTypeConformanceWitnessMangledName(
+    slang::TypeReflection* type, slang::TypeReflection* interfaceType, ISlangBlob** outNameBlob)
+{
+    auto subType = asInternal(type);
+    auto supType = asInternal(interfaceType);
+    auto name = getMangledNameForConformanceWitness(subType->getASTBuilder(), subType, supType);
+    Slang::ComPtr<ISlangBlob> blob = Slang::StringUtil::createStringBlob(name);
+    *outNameBlob = blob.detach();
+    return SLANG_OK;
+}
+
 SLANG_NO_THROW SlangResult SLANG_MCALL Linkage::createCompileRequest(
     SlangCompileRequest**   outCompileRequest)
 {

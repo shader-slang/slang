@@ -5170,7 +5170,11 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
                         // Need to construct a sub-witness-table
                         auto irWitnessTableBaseType = lowerType(subContext, astReqWitnessTable->baseType);
                         irSatisfyingWitnessTable = subBuilder->createWitnessTable(irWitnessTableBaseType);
-
+                        auto mangledName = getMangledNameForConformanceWitness(
+                            subContext->astBuilder,
+                            astReqWitnessTable->witnessedType,
+                            astReqWitnessTable->baseType);
+                        subBuilder->addExportDecoration(irSatisfyingWitnessTable, mangledName.getUnownedSlice());
                         // Recursively lower the sub-table.
                         lowerWitnessTable(
                             subContext,
