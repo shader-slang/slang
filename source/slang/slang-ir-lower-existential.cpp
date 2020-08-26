@@ -25,7 +25,7 @@ namespace Slang
             auto anyValueSize = sharedContext->getInterfaceAnyValueSize(interfaceType, inst->sourceLoc);
             auto anyValueType = builder->getAnyValueType(anyValueSize);
             auto rttiType = builder->getPtrType(builder->getRTTIType());
-            auto tupleType = builder->getTupleType(anyValueType, witnessTableType, rttiType);
+            auto tupleType = builder->getTupleType(rttiType, witnessTableType, anyValueType);
 
             IRInst* rttiObject = inst->getRTTI();
             if (auto type = as<IRType>(rttiObject))
@@ -36,7 +36,7 @@ namespace Slang
             IRInst* packedValue = value;
             if (valueType->op != kIROp_AnyValueType)
                 packedValue = builder->emitPackAnyValue(anyValueType, value);
-            IRInst* tupleArgs[] = { packedValue, inst->getWitnessTable(), rttiObject };
+            IRInst* tupleArgs[] = {rttiObject, inst->getWitnessTable(), packedValue};
             auto tuple = builder->emitMakeTuple(tupleType, 3, tupleArgs);
             inst->replaceUsesWith(tuple);
             inst->removeAndDeallocate();
@@ -66,7 +66,7 @@ namespace Slang
 
         void processExtractExistentialValue(IRExtractExistentialValue* inst)
         {
-            processExtractExistentialElement(inst, 0);
+            processExtractExistentialElement(inst, 2);
         }
 
         void processExtractExistentialWitnessTable(IRExtractExistentialWitnessTable* inst)
@@ -76,7 +76,7 @@ namespace Slang
 
         void processExtractExistentialType(IRExtractExistentialType* inst)
         {
-            processExtractExistentialElement(inst, 2);
+            processExtractExistentialElement(inst, 0);
         }
 
         void processInst(IRInst* inst)
