@@ -82,10 +82,15 @@ namespace Slang
             // where `[...]` represents the "hole" we leave
             // open to fill in next.
             //
+            DeclaredSubtypeWitness* declaredWitness = m_astBuilder->create<DeclaredSubtypeWitness>();
+            declaredWitness->sub = bb->sub;
+            declaredWitness->sup = bb->sup;
+            declaredWitness->declRef = bb->declRef;
+
             TransitiveSubtypeWitness* transitiveWitness = m_astBuilder->create<TransitiveSubtypeWitness>();
-            transitiveWitness->sub = bb->sub;
+            transitiveWitness->sub = subType;
             transitiveWitness->sup = bb->sup;
-            transitiveWitness->midToSup = bb->declRef;
+            transitiveWitness->midToSup = declaredWitness;
 
             // Fill in the current hole, and then set the
             // hole to point into the node we just created.

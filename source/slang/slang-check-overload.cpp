@@ -1014,6 +1014,7 @@ namespace Slang
         ctorItem.breadcrumbs = new LookupResultItem::Breadcrumb(
             LookupResultItem::Breadcrumb::Kind::Member,
             typeItem.declRef,
+            nullptr,
             typeItem.breadcrumbs);
 
         OverloadCandidate candidate;

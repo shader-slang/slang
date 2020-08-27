@@ -1142,12 +1142,19 @@ struct ValLoweringVisitor : ValVisitor<ValLoweringVisitor, LoweredValInfo, Lower
         // that is itself an interface conformance, so the result
         // of lowering this value should be a "key" that we can
         // use to look up a witness table.
-        IRInst* requirementKey = getInterfaceRequirementKey(context, val->midToSup.getDecl());
-
+        //
         // TODO: There are some ugly cases here if `midToSup` is allowed
         // to be an arbitrary witness, rather than just a declared one,
-        // and we should probably change the front-end representation
-        // to reflect the right constraints.
+        // and we probably need to change the logic here so that we
+        // instead think in terms of applying a subtype witness to
+        // either a value or a witness table, to perform the appropriate
+        // casting/lookup logic.
+        //
+        // For now we rely on the fact that the front-end doesn't
+        // produce transitive witnesses in shapes that will cuase us
+        // problems here.
+        //
+        IRInst* requirementKey = lowerSimpleVal(context, val->midToSup);
 
         return LoweredValInfo::simple(getBuilder()->emitLookupInterfaceMethodInst(
             getBuilder()->getWitnessTableType(lowerType(context, val->sup)),
@@ -2671,7 +2678,10 @@ struct ExprLoweringVisitorBase : ExprVisitor<Derived, LoweredValInfo>
     LoweredValInfo visitMemberExpr(MemberExpr* expr)
     {
         auto loweredType = lowerType(context, expr->type);
-        auto loweredBase = lowerSubExpr(expr->baseExpression);
+
+        auto baseExpr = expr->baseExpression;
+        baseExpr = maybeIgnoreCastToInterface(baseExpr);
+        auto loweredBase = lowerSubExpr(baseExpr);
 
         auto declRef = expr->declRef;
         if (auto fieldDeclRef = declRef.as<VarDecl>())
@@ -2686,31 +2696,6 @@ struct ExprLoweringVisitorBase : ExprVisitor<Derived, LoweredValInfo>
             boundMemberInfo->base = loweredBase;
             boundMemberInfo->declRef = callableDeclRef;
             return LoweredValInfo::boundMember(boundMemberInfo);
-        }
-        else if(auto constraintDeclRef = declRef.as<TypeConstraintDecl>())
-        {
-            auto superType = getSup(getASTBuilder(), constraintDeclRef);
-            if(auto superDeclRefType = as<DeclRefType>(superType))
-            {
-                if(auto superStructDeclRef = superDeclRefType->declRef.template as<StructDecl>())
-                {
-                    // The constraint is saying that the given type inherits
-                    // from a concrete `struct` type, which means it should
-                    // be satisfied by a witness that represents a field
-                    // (TODO: or a chain of fields) to fetch to get the
-                    // final value.
-                    //
-                    return extractField(loweredType, loweredBase, constraintDeclRef);
-                }
-            }
-
-            // The code is making use of a "witness" that a value of
-            // some generic type conforms to an interface.
-            //
-            // For now we will just emit the base expression as-is.
-            // TODO: we may need to insert an explicit instruction
-            // for a cast here (that could become a no-op later).
-            return loweredBase;
         }
         else if(auto propertyDeclRef = declRef.as<PropertyDecl>())
         {
@@ -3187,6 +3172,24 @@ struct ExprLoweringVisitorBase : ExprVisitor<Derived, LoweredValInfo>
         }
     }
 
+        /// Return `expr` with any outer casts to interface types stripped away
+    Expr* maybeIgnoreCastToInterface(Expr* expr)
+    {
+        auto e = expr;
+        while( auto castExpr = as<CastToSuperTypeExpr>(e) )
+        {
+            if(auto declRefType = as<DeclRefType>(e->type))
+            {
+                if(declRefType->declRef.as<InterfaceDecl>())
+                {
+                    e = castExpr->valueArg;
+                    continue;
+                }
+            }
+            break;
+        }
+        return e;
+    }
 
     LoweredValInfo visitInvokeExpr(InvokeExpr* expr)
     {
@@ -3274,6 +3277,12 @@ struct ExprLoweringVisitorBase : ExprVisitor<Derived, LoweredValInfo>
             // a member function:
             if( baseExpr )
             {
+                // The base expression might be an "upcast" to a base interface, in
+                // which case we don't want to emit the result of the cast, but instead
+                // the source.
+                //
+                baseExpr = maybeIgnoreCastToInterface(baseExpr);
+
                 auto thisType = getThisParamTypeForCallable(context, funcDeclRef);
                 auto irThisType = lowerType(context, thisType);
                 addCallArgsForParam(
