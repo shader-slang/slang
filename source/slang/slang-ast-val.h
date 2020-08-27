@@ -200,6 +200,7 @@ class TaggedUnionSubtypeWitness : public SubtypeWitness
     Val* _substituteImplOverride(ASTBuilder* astBuilder, SubstitutionSet subst, int* ioDiff);
 };
 
+    /// A witness of the fact that `ThisType(someInterface) : someInterface`
 class ThisTypeSubtypeWitness : public SubtypeWitness
 {
     SLANG_CLASS(ThisTypeSubtypeWitness)
