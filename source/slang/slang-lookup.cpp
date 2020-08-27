@@ -634,7 +634,7 @@ static void _lookUpMembersInSuperTypeImpl(
             interfaceType,
             superIsInterfaceWitness);
 
-        _lookUpMembersInSuperTypeDeclImpl(astBuilder, name, leafType, interfaceType, leafIsInterfaceWitness, thisType->interfaceDeclRef, request, ioResult, inBreadcrumbs);
+        _lookUpMembersInSuperType(astBuilder, name, leafType, interfaceType, leafIsInterfaceWitness, request, ioResult, inBreadcrumbs);
     }
 }
 

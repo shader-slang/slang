@@ -1175,7 +1175,7 @@ LegalType legalizeTypeImpl(
     else if( auto existentialPtrType = as<IRExistentialBoxType>(type))
     {
         // We want to transform an `ExistentialBox<T>` into just
-        // a `T`, with an `iplicitDeref` to make sure that any
+        // a `T`, with an `implicitDeref` to make sure that any
         // pointer-related operations on the box Just Work.
         //
         // Note: the logic here doesn't have to deal with moving
