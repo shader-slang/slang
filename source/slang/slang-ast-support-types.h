@@ -1118,7 +1118,7 @@ namespace Slang
                 // `T` is a subtype of some other type `U`, so that
                 // lookup was able to find a member through type `U`
                 // instead.
-                Constraint,
+                SuperType,
 
                 // The lookup process considered a member of an
                 // enclosing type as being in scope, so that any
@@ -1154,6 +1154,8 @@ namespace Slang
             //
             DeclRef<Decl> declRef;
 
+            Val* val = nullptr;
+
             // The next implicit step that the lookup process took to
             // arrive at a final value.
             RefPtr<Breadcrumb> next;
@@ -1161,11 +1163,13 @@ namespace Slang
             Breadcrumb(
                 Kind                kind,
                 DeclRef<Decl>       declRef,
+                Val*                val,
                 RefPtr<Breadcrumb>  next,
                 ThisParameterMode   thisParameterMode = ThisParameterMode::Default)
                 : kind(kind)
                 , thisParameterMode(thisParameterMode)
                 , declRef(declRef)
+                , val(val)
                 , next(next)
             {}
         };

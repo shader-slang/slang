@@ -321,21 +321,43 @@ namespace Slang
                 bb = ConstructDerefExpr(bb, loc);
                 break;
 
-            case LookupResultItem::Breadcrumb::Kind::Constraint:
+            case LookupResultItem::Breadcrumb::Kind::SuperType:
                 {
-                    // TODO: do we need to make something more
-                    // explicit here?
-                    auto expr = ConstructDeclRefExpr(
-                        breadcrumb->declRef,
-                        bb,
-                        loc);
-
-                    if(bb && bb->type.isLeftValue)
+                    // Note: a lookup through a super-type can
+                    // occur even in the case of a `static` member,
+                    // so we only modify the base expression here
+                    // if there is one.
+                    //
+                    if( bb )
                     {
-                        expr->type.isLeftValue = true;
-                    }
+                        // We know that the breadcrumb reprsents a
+                        // cast of the base expression to a super type,
+                        // so we construct that cast explicitly here.
+                        //
+                        auto witness = as<SubtypeWitness>(breadcrumb->val);
+                        SLANG_ASSERT(witness);
+                        auto expr = createCastToSuperTypeExpr(witness->sup, bb, witness);
 
-                    bb = expr;
+                        // Note that we allow a cast of an l-value to
+                        // be used as an l-value here because it enables
+                        // `[mutating]` methods to be called, and
+                        // mutable properties to be modified, but this
+                        // is probably not *technically* correct, since
+                        // treating an l-value of type `Derived` as
+                        // an l-value of type `Base` implies that we
+                        // can assign an arbitrary value of type `Base`
+                        // to that l-value (which would be an error).
+                        //
+                        // TODO: make sure we believe there are no
+                        // issues here.
+                        //
+                        if(bb && bb->type.isLeftValue)
+                        {
+                            expr->type.isLeftValue = true;
+                        }
+
+                        bb = expr;
+                    }
                 }
                 break;
 
