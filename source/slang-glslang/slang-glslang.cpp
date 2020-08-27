@@ -588,3 +588,24 @@ int glslang_compile(glslang_CompileRequest_1_0* inRequest)
     request.set(*inRequest);
     return glslang_compile_1_1(&request);
 }
+
+static std::mutex g_globalMutex;
+
+namespace glslang {
+
+void InitGlobalLock()
+{
+    
+}
+
+void GetGlobalLock()
+{
+    g_globalMutex.lock();
+}
+
+void ReleaseGlobalLock()
+{
+    g_globalMutex.unlock();
+}
+
+} // namespace glslang
