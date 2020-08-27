@@ -2053,4 +2053,4 @@ __attributeTarget(InterfaceDecl)
 attribute_syntax [anyValueSize(size:int)] : AnyValueSizeAttribute;
 
 __attributeTarget(DeclBase)
-attribute_syntax [builtin] : Attribute;
+attribute_syntax [builtin] : BuiltinAttribute;
