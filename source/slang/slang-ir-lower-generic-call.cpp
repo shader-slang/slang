@@ -196,6 +196,11 @@ namespace Slang
                 // If they are not, they represent an intrinsic function that should not be
                 // modified in this pass.
                 auto innerMostFunc = findInnerMostSpecializingBase(static_cast<IRSpecialize*>(loweredFunc));
+                if (innerMostFunc && innerMostFunc->op == kIROp_Generic)
+                {
+                    innerMostFunc =
+                        findInnerMostGenericReturnVal(static_cast<IRGeneric*>(innerMostFunc));
+                }
                 if (innerMostFunc->findDecoration<IRTargetIntrinsicDecoration>())
                     return;
                 SLANG_UNEXPECTED("Nested generics specialization.");
