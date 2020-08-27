@@ -170,6 +170,14 @@ namespace Slang
             }
         }
 
+        IRInst* findInnerMostSpecializingBase(IRSpecialize* inst)
+        {
+            auto result = inst->getBase();
+            while (auto specialize = as<IRSpecialize>(result))
+                result = specialize->getBase();
+            return result;
+        }
+
         void lowerCallToSpecializedFunc(IRCall* callInst, IRSpecialize* specializeInst)
         {
             // If we see a call(specialize(gFunc, Targs), args),
@@ -178,13 +186,19 @@ namespace Slang
             // All callees should have already been lowered in lower-generic-functions pass.
             // For intrinsic generic functions, they are left as is, and we also need to ignore
             // them here.
-            if (loweredFunc->op != kIROp_Func)
+            if (loweredFunc->op == kIROp_Generic)
             {
-                // The object being specialized must be a func, otherwise this means a case
-                // that this pass cannot handle, e.g. nested generic functions or builtin
-                // generic functions.
-                // All nested generic functions are supposed to be flattend before this pass.
                 return;
+            }
+            else if (loweredFunc->op == kIROp_Specialize)
+            {
+                // All nested generic functions are supposed to be flattend before this pass.
+                // If they are not, they represent an intrinsic function that should not be
+                // modified in this pass.
+                auto innerMostFunc = findInnerMostSpecializingBase(static_cast<IRSpecialize*>(loweredFunc));
+                if (innerMostFunc->findDecoration<IRTargetIntrinsicDecoration>())
+                    return;
+                SLANG_UNEXPECTED("Nested generics specialization.");
             }
             IRFuncType* funcType = cast<IRFuncType>(loweredFunc->getDataType());
             translateCallInst(callInst, funcType, loweredFunc, specializeInst);
