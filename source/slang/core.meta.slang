@@ -19,10 +19,12 @@ syntax globallycoherent : GloballyCoherentModifier;
 
 // A type that can be used as an operand for builtins
 [sealed]
+[builtin]
 interface __BuiltinType {}
 
 // A type that can be used for arithmetic operations
 [sealed]
+[builtin]
 interface __BuiltinArithmeticType : __BuiltinType
 {
         /// Initialize from a 32-bit signed integer value.
@@ -31,23 +33,28 @@ interface __BuiltinArithmeticType : __BuiltinType
 
     /// A type that can be used for logical/bitwsie operations
 [sealed]
+[builtin]
 interface __BuiltinLogicalType : __BuiltinType {}
 
 // A type that logically has a sign (positive/negative/zero)
 [sealed]
+[builtin]
 interface __BuiltinSignedArithmeticType : __BuiltinArithmeticType {}
 
 // A type that can represent integers
 [sealed]
+[builtin]
 interface __BuiltinIntegerType : __BuiltinArithmeticType
 {}
 
 // A type that can represent non-integers
 [sealed]
+[builtin]
 interface __BuiltinRealType : __BuiltinSignedArithmeticType {}
 
 // A type that uses a floating-point representation
 [sealed]
+[builtin]
 interface __BuiltinFloatingPointType : __BuiltinRealType
 {
         /// Initialize from a 32-bit floating-point value.
@@ -58,6 +65,7 @@ interface __BuiltinFloatingPointType : __BuiltinRealType
 }
 
 // A type resulting from an `enum` declaration.
+[builtin]
 __magic_type(EnumTypeType)
 interface __EnumType
 {
@@ -112,6 +120,7 @@ extension __EnumType
 
 // A type resulting from an `enum` declaration
 // with the `[flags]` attribute.
+[builtin]
 interface __FlagsEnumType : __EnumType
 {
 };
@@ -2042,3 +2051,6 @@ attribute_syntax [open] : OpenAttribute;
 
 __attributeTarget(InterfaceDecl)
 attribute_syntax [anyValueSize(size:int)] : AnyValueSizeAttribute;
+
+__attributeTarget(DeclBase)
+attribute_syntax [builtin] : Attribute;

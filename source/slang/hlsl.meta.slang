@@ -4302,6 +4302,7 @@ void DispatchMesh<P>(uint threadGroupCountX, uint threadGroupCountY, uint thread
 // But slang enums are always 'enum class like', so I use an empty struct type here
 
 [sealed]
+[builtin]
 interface __BuiltinSamplerFeedbackType {};
 
 [sealed]
