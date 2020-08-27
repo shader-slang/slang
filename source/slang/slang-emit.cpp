@@ -305,12 +305,15 @@ Result linkAndOptimizeIR(
     if (!compileRequest->disableSpecialization)
         specializeModule(irModule);
 
+    eliminateDeadCode(irModule);
+
     switch (target)
     {
     case CodeGenTarget::CPPSource:
         // For targets that supports dynamic dispatch, we need to lower the
         // generics / interface types to ordinary functions and types using
         // function pointers.
+        dumpIRIfEnabled(compileRequest, irModule, "BEFORE-LOWER-GENERICS");
         lowerGenerics(irModule, sink);
         dumpIRIfEnabled(compileRequest, irModule, "LOWER-GENERICS");
         break;
@@ -657,13 +660,13 @@ Result linkAndOptimizeIR(
 
     switch (target)
     {
+    case CodeGenTarget::CPPSource:
+        break;
     default:
         // For all targets that don't support true dynamic dispatch through
         // witness tables, we need to eliminate witness tables from the IR so
         // that they don't keep symbols live that we don't actually need.
         stripWitnessTables(irModule);
-    case CodeGenTarget::CPPSource:
-    case CodeGenTarget::CUDASource:
         break;
     }
 

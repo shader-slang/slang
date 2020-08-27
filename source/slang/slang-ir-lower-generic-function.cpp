@@ -21,6 +21,9 @@ namespace Slang
             IRInst* result = nullptr;
             if (sharedContext->loweredGenericFunctions.TryGetValue(genericValue, result))
                 return result;
+            // Do not lower intrinsic functions.
+            if (genericValue->findDecoration<IRTargetIntrinsicDecoration>())
+                return genericValue;
             auto genericParent = as<IRGeneric>(genericValue);
             SLANG_ASSERT(genericParent);
             auto func = as<IRFunc>(findGenericReturnVal(genericParent));
@@ -133,7 +136,9 @@ namespace Slang
                 return loweredType;
             if (sharedContext->mapLoweredInterfaceToOriginal.ContainsKey(interfaceType))
                 return interfaceType;
-
+            // Do not lower intrinsic interfaces.
+            if (isBuiltin(interfaceType))
+                return interfaceType;
             List<IRInterfaceRequirementEntry*> newEntries;
 
             IRBuilder builder;
@@ -189,6 +194,8 @@ namespace Slang
             auto interfaceType = maybeLowerInterfaceType(cast<IRInterfaceType>(witnessTable->getConformanceType()));
             if (interfaceType != witnessTable->getConformanceType())
                 witnessTable->setConformanceType(interfaceType);
+            if (isBuiltin(interfaceType))
+                return;
             for (auto child : witnessTable->getChildren())
             {
                 auto entry = as<IRWitnessTableEntry>(child);

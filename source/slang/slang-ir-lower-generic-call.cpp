@@ -193,6 +193,9 @@ namespace Slang
             // all occurences of associatedtypes.
             auto funcType = cast<IRFuncType>(lookupInst->getDataType());
             auto loweredFunc = lookupInst;
+            if (isBuiltin(cast<IRWitnessTableType>(
+                lookupInst->getWitnessTable()->getDataType())->getConformanceType()))
+                return;
             translateCallInst(callInst, funcType, loweredFunc, nullptr);
         }
 

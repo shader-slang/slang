@@ -423,6 +423,15 @@ struct IRNaturalOffsetDecoration : IRDecoration
     IRIntegerValue getOffset() { return getOffsetOperand()->getValue(); }
 };
 
+struct IRBuiltinDecoration : IRDecoration
+{
+    enum
+    {
+        kOp = kIROp_BuiltinDecoration
+    };
+    IR_LEAF_ISA(BuiltinDecoration)
+};
+
 // An instruction that specializes another IR value
 // (representing a generic) to a particular set of generic arguments 
 // (instructions representing types, witness tables, etc.)
@@ -2456,6 +2465,11 @@ struct IRBuilder
     void addTypeConstraintDecoration(IRInst* inst, IRInst* constraintType)
     {
         addDecoration(inst, kIROp_TypeConstraintDecoration, constraintType);
+    }
+
+    void addBuiltinDecoration(IRInst* inst)
+    {
+        addDecoration(inst, kIROp_BuiltinDecoration);
     }
 };
 

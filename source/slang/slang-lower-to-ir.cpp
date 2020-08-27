@@ -5905,6 +5905,16 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
         return LoweredValInfo::simple(assocType);
     }
 
+    Dictionary<IRType*, IRWitnessTable*> placeholderWitnessTables;
+    IRWitnessTable* getPlaceholderWitnessTable(IRType* type)
+    {
+        if (auto rs = placeholderWitnessTables.TryGetValue(type))
+            return *rs;
+        auto w = getBuilder()->createWitnessTable(type);
+        placeholderWitnessTables[type] = w;
+        return w;
+    }
+
     LoweredValInfo visitInterfaceDecl(InterfaceDecl* decl)
     {
         // The members of an interface will turn into the keys that will
@@ -5957,6 +5967,14 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
         for (auto assocTypeDecl : decl->getMembersOfType<AssocTypeDecl>())
         {
             ensureDecl(subContext, assocTypeDecl);
+            // The type constraints on an associated type lowers to a dummy
+            // witness table, since only the type of the witness table matters.
+            for (auto constraintDecl : assocTypeDecl->getMembersOfType<TypeConstraintDecl>())
+            {
+                auto constraintInterfaceType = lowerType(context, constraintDecl->getSup().type);
+                auto placeholderWitnessTable = getPlaceholderWitnessTable(constraintInterfaceType);
+                setValue(context, constraintDecl, LoweredValInfo::simple(placeholderWitnessTable));
+            }
         }
 
         UInt entryIndex = 0;
@@ -5996,9 +6014,13 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
                 for (auto constraintDecl : associatedTypeDecl->getMembersOfType<TypeConstraintDecl>())
                 {
                     auto constraintKey = getInterfaceRequirementKey(constraintDecl);
+                    auto constraintInterfaceType =
+                        lowerType(context, constraintDecl->getSup().type);
+                    auto witnessTableType =
+                        getBuilder()->getWitnessTableType(constraintInterfaceType);
                     irInterface->setOperand(entryIndex,
                         subBuilder->createInterfaceRequirementEntry(constraintKey,
-                            getBuilder()->getWitnessTableType(lowerType(context, constraintDecl->getSup().type))));
+                            witnessTableType));
                     entryIndex++;
                 }
             }
@@ -6017,7 +6039,10 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
         {
             subBuilder->addAnyValueSizeDecoration(irInterface, anyValueSizeAttr->size);
         }
-
+        if (auto builtinAttr = decl->findModifier<BuiltinAttribute>())
+        {
+            subBuilder->addBuiltinDecoration(irInterface);
+        }
         subBuilder->setInsertInto(irInterface);
         // TODO: are there any interface members that should be
         // nested inside the interface type itself?

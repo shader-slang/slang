@@ -174,6 +174,8 @@ namespace Slang
         void lowerWitnessTable(IRWitnessTable* witnessTable)
         {
             auto interfaceType = cast<IRInterfaceType>(witnessTable->getConformanceType());
+            if (isBuiltin(interfaceType))
+                return;
             for (auto child : witnessTable->getChildren())
             {
                 auto entry = as<IRWitnessTableEntry>(child);
