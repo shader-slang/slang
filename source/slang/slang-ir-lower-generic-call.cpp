@@ -178,9 +178,12 @@ namespace Slang
             // All callees should have already been lowered in lower-generic-functions pass.
             // For intrinsic generic functions, they are left as is, and we also need to ignore
             // them here.
-            if (loweredFunc->op == kIROp_Generic)
+            if (loweredFunc->op != kIROp_Func)
             {
-                // This is an intrinsic function, don't transform.
+                // The object being specialized must be a func, otherwise this means a case
+                // that this pass cannot handle, e.g. nested generic functions or builtin
+                // generic functions.
+                // All nested generic functions are supposed to be flattend before this pass.
                 return;
             }
             IRFuncType* funcType = cast<IRFuncType>(loweredFunc->getDataType());

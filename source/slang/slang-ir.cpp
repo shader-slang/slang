@@ -5385,6 +5385,14 @@ namespace Slang
         auto val = returnInst->getVal();
         return val;
     }
+    
+    IRInst* findInnerMostGenericReturnVal(IRGeneric* generic)
+    {
+        IRInst* inst = generic;
+        while (auto genericInst = as<IRGeneric>(inst))
+            inst = findGenericReturnVal(genericInst);
+        return inst;
+    }
 
     IRGeneric* findSpecializedGeneric(IRSpecialize* specialize)
     {
