@@ -2993,10 +2993,23 @@ namespace Slang
 {
 SlangResult _addLibraryReference(EndToEndCompileRequest* req, Stream* stream)
 {
+    // Load up the module
+    RiffContainer container;
+    SLANG_RETURN_ON_FAIL(RiffUtil::read(stream, container));
+
+    List<RefPtr<Module>> modules;
+
+    if (SLANG_FAILED(ASTSerialReader::readContainerModules(&container, req->getLinkage(), modules)))
+    {
+        req->getSink()->diagnose(SourceLoc(), Diagnostics::unableToAddReferenceToModuleContainer);
+        return SLANG_FAIL;
+    }
+
     // Read all of the contained modules
     List<RefPtr<IRModule>> irModules;
     List<FrontEndCompileRequest::ExtraEntryPointInfo> entryPointMangledNames;
-    if (SLANG_FAILED(IRSerialReader::readStreamModules(stream, req->getSession(), req->getFrontEndReq()->getSourceManager(), irModules, entryPointMangledNames)))
+
+    if (SLANG_FAILED(IRSerialReader::readContainerModules(&container, req->getSession(), req->getFrontEndReq()->getSourceManager(), irModules, entryPointMangledNames)))
     {
         req->getSink()->diagnose(SourceLoc(), Diagnostics::unableToAddReferenceToModuleContainer);
         return SLANG_FAIL;

@@ -23,6 +23,8 @@
 #include "slang-glsl-extension-tracker.h"
 #include "slang-emit-cuda.h"
 
+#include "slang-ast-serialize.h"
+
 #include "slang-ir-serialize.h"
 
 // Enable calling through to `fxc` or `dxc` to
@@ -2330,7 +2332,7 @@ SlangResult dissassembleDXILUsingDXC(
 
         {
             // Module list
-            RiffContainer::ScopeChunk listScope(&container, RiffContainer::Chunk::Kind::List, IRSerialBinary::kSlangModuleListFourCc);
+            RiffContainer::ScopeChunk listScope(&container, RiffContainer::Chunk::Kind::List, SerialBinary::kSlangModuleListFourCc);
 
             auto linkage = getLinkage();
             auto sink = getSink();
@@ -2343,9 +2345,11 @@ SlangResult dissassembleDXILUsingDXC(
                 optionFlags |= IRSerialWriter::OptionFlag::DebugInfo;
             }
 
+            RefPtr<ASTSerialClasses> astClasses = new ASTSerialClasses;
+
             SourceManager* sourceManager = frontEndReq->getSourceManager();
 
-            for (auto translationUnit : frontEndReq->translationUnits)
+            for (TranslationUnitRequest* translationUnit : frontEndReq->translationUnits)
             {
                 auto module = translationUnit->module;
                 auto irModule = module->getIRModule();
@@ -2353,10 +2357,27 @@ SlangResult dissassembleDXILUsingDXC(
                 // Okay, we need to serialize this module to our container file.
                 // We currently don't serialize it's name..., but support for that could be added.
 
-                IRSerialData serialData;
-                IRSerialWriter writer;
-                SLANG_RETURN_ON_FAIL(writer.write(irModule, sourceManager, optionFlags, &serialData));
-                SLANG_RETURN_ON_FAIL(IRSerialWriter::writeContainer(serialData, compressionType, &container));
+                // Write the IR information
+                {
+                    IRSerialData serialData;
+                    IRSerialWriter writer;
+                    SLANG_RETURN_ON_FAIL(writer.write(irModule, sourceManager, optionFlags, &serialData));
+                    SLANG_RETURN_ON_FAIL(IRSerialWriter::writeContainer(serialData, compressionType, &container));
+                }
+
+                // Write the AST information
+                {
+                    ModuleDecl* moduleDecl = translationUnit->getModuleDecl();
+
+                    ModuleASTSerialFilter filter(moduleDecl);
+                    ASTSerialWriter writer(astClasses, &filter);
+
+                    // Add the module and everything that isn't filtered out in the filter.
+                    writer.addPointer(moduleDecl);
+
+                    // We can now serialize it into the riff container.
+                    SLANG_RETURN_ON_FAIL(writer.writeIntoContainer(&container));
+                }
             }
 
             auto program = getSpecializedGlobalAndEntryPointsComponentType();
@@ -2382,7 +2403,7 @@ SlangResult dissassembleDXILUsingDXC(
                 auto entryPoint = program->getEntryPoint(ii);
                 auto entryPointMangledName = program->getEntryPointMangledName(ii);
 
-                RiffContainer::ScopeChunk entryPointScope(&container, RiffContainer::Chunk::Kind::Data, IRSerialBinary::kEntryPointFourCc);
+                RiffContainer::ScopeChunk entryPointScope(&container, RiffContainer::Chunk::Kind::Data, SerialBinary::kEntryPointFourCc);
 
                 auto writeString = [&](String const& str)
                 {
@@ -2528,7 +2549,8 @@ SlangResult dissassembleDXILUsingDXC(
                         compileRequest,
                         targetReq);
                 }
-                else {
+                else
+                {
                     for (Index ee = 0; ee < entryPointCount; ++ee)
                     {
                         writeEntryPointResult(

@@ -1335,6 +1335,8 @@ ASTSerialIndex ASTSerialWriter::_addArray(size_t elementSize, size_t alignment, 
     return ASTSerialIndex(m_entries.getCount() - 1);
 }
 
+static const uint8_t s_fixBuffer[ASTSerialInfo::MAX_ALIGNMENT]{ 0, };
+
 SlangResult ASTSerialWriter::write(Stream* stream)
 {
     const Int entriesCount = m_entries.getCount();
@@ -1352,8 +1354,6 @@ SlangResult ASTSerialWriter::write(Stream* stream)
     // knowing that removeLast cannot release memory, means the sentinal must be at the last position.
     entries[entriesCount] = &sentinal;
 
-
-    static const uint8_t fixBuffer[ASTSerialInfo::MAX_ALIGNMENT] { 0, };
     
     {
         size_t offset = 0;
@@ -1392,7 +1392,7 @@ SlangResult ASTSerialWriter::write(Stream* stream)
                 // If we needed to fix so that subsequent alignment is right, write out extra bytes here
                 if (alignmentFixSize)
                 {
-                    stream->write(fixBuffer, alignmentFixSize);
+                    stream->write(s_fixBuffer, alignmentFixSize);
                 }
             }
             catch (const IOException&)
@@ -1403,6 +1403,80 @@ SlangResult ASTSerialWriter::write(Stream* stream)
             // Onto next
             offset = nextOffset;
             entry = next;
+        }
+    }
+
+    return SLANG_OK;
+}
+
+SlangResult ASTSerialWriter::writeIntoContainer(RiffContainer* container)
+{
+    typedef RiffContainer::Chunk Chunk;
+    typedef RiffContainer::ScopeChunk ScopeChunk;
+
+    // This is the container for the AST Data
+    ScopeChunk scopeModule(container, Chunk::Kind::List, ASTSerialBinary::kSlangASTModuleFourCC);
+    {
+        ScopeChunk scopeData(container, Chunk::Kind::Data, ASTSerialBinary::kSlangASTModuleDataFourCC);
+
+        {
+            // Sentinal so we don't need special handling for end of list
+            ASTSerialInfo::Entry sentinal;
+            sentinal.type = ASTSerialInfo::Type::String;
+            sentinal.info = ASTSerialInfo::EntryInfo::Alignment1;
+
+            size_t offset = 0;
+            const Int entriesCount = m_entries.getCount();
+
+            {
+                m_entries.add(&sentinal);
+                m_entries.removeLast();
+                // Note strictly required in our impl of List. But by writing this and
+                // knowing that removeLast cannot release memory, means the sentinal must be at the last position.
+                m_entries.getBuffer()[entriesCount] = &sentinal;
+            }
+
+            ASTSerialInfo::Entry*const* entries = m_entries.getBuffer();
+
+            ASTSerialInfo::Entry* entry = entries[1];
+            // We start on 1, because 0 is nullptr and not used for anything
+            for (Index i = 1; i < entriesCount; ++i)
+            {
+                ASTSerialInfo::Entry* next = entries[i + 1];
+
+                // Before writing we need to store the next alignment
+
+                const size_t nextAlignment = ASTSerialInfo::getAlignment(next->info);
+                const size_t alignment = ASTSerialInfo::getAlignment(entry->info);
+
+                entry->info = ASTSerialInfo::combineWithNext(entry->info, next->info);
+
+                // Check we are aligned correctly
+                SLANG_ASSERT((offset & (alignment - 1)) == 0);
+
+                // When we write, we need to make sure it take into account the next alignment
+                const size_t entrySize = entry->calcSize(m_classes);
+
+                // Work out the fix for next alignment
+                size_t nextOffset = offset + entrySize;
+                nextOffset = (nextOffset + nextAlignment - 1) & ~(nextAlignment - 1);
+
+                size_t alignmentFixSize = nextOffset - (offset + entrySize);
+
+                // The fix must be less than max alignment. We require it to be less because we aligned each Entry to 
+                // MAX_ALIGNMENT, and so < MAX_ALIGNMENT is the most extra bytes we can write
+                SLANG_ASSERT(alignmentFixSize < ASTSerialInfo::MAX_ALIGNMENT);
+
+                container->write(entry, entrySize);
+                if (alignmentFixSize)
+                {
+                    container->write(s_fixBuffer, alignmentFixSize);
+                }
+
+                // Onto next
+                offset = nextOffset;
+                entry = next;
+            }
         }
     }
 
@@ -1801,6 +1875,62 @@ SlangResult ASTSerialReader::load(const uint8_t* data, size_t dataCount, ASTBuil
     return SLANG_OK;
 }
 
+
+/* static */Result ASTSerialReader::readContainerModules(RiffContainer* container, Linkage* linkage, List<RefPtr<Module>>& outModules)
+{
+    List<RiffContainer::ListChunk*> moduleChunks;
+    // First try to find a list
+    {
+        RiffContainer::ListChunk* listChunk = container->getRoot()->findListRec(SerialBinary::kSlangModuleListFourCc);
+        if (listChunk)
+        {
+            listChunk->findContained(ASTSerialBinary::kSlangASTModuleFourCC, moduleChunks);
+        }
+        else
+        {
+            // Maybe its just a single module
+            RiffContainer::ListChunk* moduleChunk = container->getRoot()->findListRec(ASTSerialBinary::kSlangASTModuleFourCC);
+            if (!moduleChunk)
+            {
+                // Couldn't find any modules
+                return SLANG_FAIL;
+            }
+            moduleChunks.add(moduleChunk);
+        }
+    }
+
+    RefPtr<ASTSerialClasses> serialClasses(new ASTSerialClasses);
+
+    // Okay, deserialize the each of the module chunks
+    for (RiffContainer::ListChunk* listChunk : moduleChunks)
+    {
+        // Look for the module data
+        auto data = listChunk->findContainedData(ASTSerialBinary::kSlangASTModuleDataFourCC);
+
+        if (!data)
+        {
+            return SLANG_FAIL;
+        }
+
+        ASTSerialReader reader(serialClasses);
+
+        RefPtr<Module> module(new Module(linkage));
+        SLANG_RETURN_ON_FAIL(reader.load((uint8_t*)data->getPayload(), data->getSize(), module->getASTBuilder(), linkage->getNamePool()));
+
+        ModuleDecl* moduleDecl = reader.getPointer(ASTSerialIndex(1)).dynamicCast<ModuleDecl>();
+        if (!moduleDecl)
+        {
+            return SLANG_FAIL;
+        }
+
+        // Set on the module
+        module->setModuleDecl(moduleDecl);
+
+        outModules.add(module);
+    }
+
+    return SLANG_OK;
+}
 
 // !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! ASTSerializeUtil  !!!!!!!!!!!!!!!!!!!!!!!!!!!!
 

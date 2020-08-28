@@ -989,30 +989,22 @@ static int _calcFixSourceLoc(const IRSerialData::DebugSourceInfo& info, SourceVi
     return int(sourceView->getRange().begin.getRaw()) - int(info.m_startSourceLoc);
 }
 
-// TODO: The following function isn't really part of the IR serialization system, but rather
-// a layered "container" format, and as such probably belongs in a higher-level system that
-// simply calls into the `IRSerialReader` rather than being part of it...
-//
-/* static */Result IRSerialReader::readStreamModules(Stream* stream, Session* session, SourceManager* sourceManager, List<RefPtr<IRModule>>& outModules, List<FrontEndCompileRequest::ExtraEntryPointInfo>& outEntryPoints)
+/* static */Result IRSerialReader::readContainerModules(RiffContainer* container, Session* session, SourceManager* sourceManager, List<RefPtr<IRModule>>& outModules, List<FrontEndCompileRequest::ExtraEntryPointInfo>& outEntryPoints)
 {
-    // Load up the module
-    RiffContainer container;
-    SLANG_RETURN_ON_FAIL(RiffUtil::read(stream, container));
-    
     List<RiffContainer::ListChunk*> moduleChunks;
     List<RiffContainer::DataChunk*> entryPointChunks;
     // First try to find a list
     {
-        RiffContainer::ListChunk* listChunk = container.getRoot()->findListRec(IRSerialBinary::kSlangModuleListFourCc);
+        RiffContainer::ListChunk* listChunk = container->getRoot()->findListRec(SerialBinary::kSlangModuleListFourCc);
         if (listChunk)
         {
             listChunk->findContained(IRSerialBinary::kSlangModuleFourCc, moduleChunks);
-            listChunk->findContained(IRSerialBinary::kEntryPointFourCc, entryPointChunks);
+            listChunk->findContained(SerialBinary::kEntryPointFourCc, entryPointChunks);
         }
         else
         {
             // Maybe its just a single module
-            RiffContainer::ListChunk* moduleChunk = container.getRoot()->findListRec(IRSerialBinary::kSlangModuleFourCc);
+            RiffContainer::ListChunk* moduleChunk = container->getRoot()->findListRec(IRSerialBinary::kSlangModuleFourCc);
             if (!moduleChunk)
             {
                 // Couldn't find any modules
@@ -1037,7 +1029,7 @@ static int _calcFixSourceLoc(const IRSerialData::DebugSourceInfo& info, SourceVi
         outModules.add(irModule);
     }
 
-    for( auto entryPointChunk : entryPointChunks )
+    for (auto entryPointChunk : entryPointChunks)
     {
         auto reader = entryPointChunk->asReadHelper();
 
@@ -1046,8 +1038,8 @@ static int _calcFixSourceLoc(const IRSerialData::DebugSourceInfo& info, SourceVi
             uint32_t length = 0;
             reader.read(length);
 
-            char* begin = (char*) reader.getData();
-            reader.skip(length+1);
+            char* begin = (char*)reader.getData();
+            reader.skip(length + 1);
 
             return UnownedStringSlice(begin, begin + length);
         };
@@ -1061,6 +1053,21 @@ static int _calcFixSourceLoc(const IRSerialData::DebugSourceInfo& info, SourceVi
         outEntryPoints.add(entryPointInfo);
     }
 
+    return SLANG_OK;
+}
+
+
+// TODO: The following function isn't really part of the IR serialization system, but rather
+// a layered "container" format, and as such probably belongs in a higher-level system that
+// simply calls into the `IRSerialReader` rather than being part of it...
+//
+/* static */Result IRSerialReader::readStreamModules(Stream* stream, Session* session, SourceManager* sourceManager, List<RefPtr<IRModule>>& outModules, List<FrontEndCompileRequest::ExtraEntryPointInfo>& outEntryPoints)
+{
+    // Load up the module
+    RiffContainer container;
+    SLANG_RETURN_ON_FAIL(RiffUtil::read(stream, container));
+
+    SLANG_RETURN_ON_FAIL(readContainerModules(&container, session, sourceManager, outModules, outEntryPoints));
     return SLANG_OK;
 }
 

@@ -125,6 +125,9 @@ struct IRSerialReader
         /// Read potentially multiple modules from a stream
     static Result readStreamModules(Stream* stream, Session* session, SourceManager* manager, List<RefPtr<IRModule>>& outModules, List<FrontEndCompileRequest::ExtraEntryPointInfo>& outEntryPoints);
 
+        /// Read potentially multiple modules from a stream
+    static Result readContainerModules(RiffContainer* container, Session* session, SourceManager* manager, List<RefPtr<IRModule>>& outModules, List<FrontEndCompileRequest::ExtraEntryPointInfo>& outEntryPoints);
+
         /// Read a stream to fill in dataOut IRSerialData
     static Result readContainer(RiffContainer::ListChunk* module, IRSerialData* outData);
 
