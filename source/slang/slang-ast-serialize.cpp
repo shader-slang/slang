@@ -99,16 +99,6 @@ ASTSerialIndex ModuleASTSerialFilter::writePointer(ASTSerialWriter* writer, cons
         return ASTSerialIndex(0);
     }
 
-#if 0
-    if (Type* type = as<Type>(ptr))
-    {
-        type->findModifier<BuiltinTypeModifier>();
-
-
-        
-    }
-#endif
-
     // For now for everything else just write it
     return writer->writePointer(ptr);
 }
