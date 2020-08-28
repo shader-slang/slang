@@ -5170,7 +5170,7 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
     {
         auto subBuilder = subContext->irBuilder;
 
-        for(auto entry : astWitnessTable->requirementDictionary)
+        for(auto entry : astWitnessTable->requirementList)
         {
             auto requiredMemberDecl = entry.Key;
             auto satisfyingWitness = entry.Value;

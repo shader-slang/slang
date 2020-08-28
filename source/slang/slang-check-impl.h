@@ -211,12 +211,13 @@ namespace Slang
             return m_sink;
         }
 
-        // We need to track what has been `import`ed,
-        // to avoid importing the same thing more than once
+        // We need to track what has been `import`ed into
+        // the scope of this semantic checking session,
+        // and also to avoid importing the same thing more
+        // than once.
         //
-        // TODO: a smarter approach might be to filter
-        // out duplicate references during lookup.
-        HashSet<ModuleDecl*> importedModules;
+        List<ModuleDecl*> importedModulesList;
+        HashSet<ModuleDecl*> importedModulesSet;
 
     public:
         SharedSemanticsContext(

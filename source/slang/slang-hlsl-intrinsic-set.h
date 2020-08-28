@@ -215,7 +215,8 @@ protected:
     // NOTE that this function must only be called with unique types (ie from the m_typeSet)
     void _calcIntrinsic(HLSLIntrinsic::Op op, IRType* returnType, IRType*const* inArgs, Index argsCount, HLSLIntrinsic& out);
     
-    Dictionary<HLSLIntrinsicRef, HLSLIntrinsic*> m_intrinsics;
+    List<HLSLIntrinsic*> m_intrinsicsList;
+    Dictionary<HLSLIntrinsicRef, HLSLIntrinsic*> m_intrinsicsDict;
 
     FreeList m_intrinsicFreeList;           ///< the storage for the intrinsics when they are in the map
 

@@ -1318,7 +1318,10 @@ namespace Slang
 
     struct WitnessTable : RefObject
     {
+        List<KeyValuePair<Decl*, RequirementWitness>> requirementList;
         RequirementDictionary requirementDictionary;
+
+        void add(Decl* decl, RequirementWitness const& witness);
 
         // The type that the witness table witnesses conformance to (e.g. an Interface)
         Type* baseType;
