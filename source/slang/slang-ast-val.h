@@ -154,7 +154,7 @@ class TransitiveSubtypeWitness : public SubtypeWitness
     SubtypeWitness* subToMid = nullptr;
 
     // Witness that `mid : sup`
-    DeclRef<Decl> midToSup;
+    SubtypeWitness* midToSup = nullptr;
 
     // Overrides should be public so base classes can access
     bool _equalsValOverride(Val* val);
@@ -198,6 +198,12 @@ class TaggedUnionSubtypeWitness : public SubtypeWitness
     String _toStringOverride();
     HashCode _getHashCodeOverride();
     Val* _substituteImplOverride(ASTBuilder* astBuilder, SubstitutionSet subst, int* ioDiff);
+};
+
+    /// A witness of the fact that `ThisType(someInterface) : someInterface`
+class ThisTypeSubtypeWitness : public SubtypeWitness
+{
+    SLANG_CLASS(ThisTypeSubtypeWitness)
 };
 
 } // namespace Slang

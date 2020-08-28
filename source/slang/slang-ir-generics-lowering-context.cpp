@@ -142,6 +142,8 @@ namespace Slang
         {
             if (auto anyValueSizeDecor = paramType->findDecoration<IRTypeConstraintDecoration>())
             {
+                if (isBuiltin(anyValueSizeDecor->getConstraintType()))
+                    return (IRType*)paramType;
                 anyValueSize = getInterfaceAnyValueSize(anyValueSizeDecor->getConstraintType(), paramType->sourceLoc);
                 return builder->getAnyValueType(anyValueSize);
             }
@@ -149,6 +151,8 @@ namespace Slang
             return builder->getAnyValueType(kInvalidAnyValueSize);
         }
         case kIROp_ThisType:
+            if (isBuiltin(cast<IRThisType>(paramType)->getConstraintType()))
+                return (IRType*)paramType;
             anyValueSize = getInterfaceAnyValueSize(
                 cast<IRThisType>(paramType)->getConstraintType(),
                 paramType->sourceLoc);
@@ -159,6 +163,8 @@ namespace Slang
         }
         case kIROp_InterfaceType:
         {
+            if (isBuiltin(paramType))
+                return (IRType*)paramType;
             // An existential type translates into a tuple of (AnyValue, WitnessTable, RTTI*)
             anyValueSize = getInterfaceAnyValueSize(paramType, paramType->sourceLoc);
             auto anyValueType = builder->getAnyValueType(anyValueSize);
@@ -172,6 +178,8 @@ namespace Slang
             auto lookupInterface = static_cast<IRLookupWitnessMethod*>(paramType);
             auto interfaceType = cast<IRInterfaceType>(cast<IRWitnessTableType>(
                 lookupInterface->getWitnessTable()->getDataType())->getConformanceType());
+            if (isBuiltin(interfaceType))
+                return (IRType*)paramType;
             // Make sure we are looking up inside the original interface type (prior to lowering).
             // Only in the original interface type will an associated type entry have an IRAssociatedType value.
             // We need to extract AnyValueSize from this IRAssociatedType.

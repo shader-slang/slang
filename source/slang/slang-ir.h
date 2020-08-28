@@ -1362,6 +1362,8 @@ struct IRGeneric : IRGlobalValueWithParams
 // Find the value that is returned from a generic, so that
 // a pass can glean information from it.
 IRInst* findGenericReturnVal(IRGeneric* generic);
+// Recursively find the inner most generic return value.
+IRInst* findInnerMostGenericReturnVal(IRGeneric* generic);
 
 struct IRSpecialize;
 IRGeneric* findSpecializedGeneric(IRSpecialize* specialize);
@@ -1464,6 +1466,9 @@ bool isPointerOfType(IRInst* ptrType, IRInst* elementType);
 
     // True if ptrType is a pointer type to a type of opCode
 bool isPointerOfType(IRInst* ptrType, IROp opCode);
+
+    // True if the IR inst represents a builtin object (e.g. __BuiltinFloatingPointType).
+bool isBuiltin(IRInst* inst);
 
 }
 

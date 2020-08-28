@@ -363,7 +363,7 @@ bool TransitiveSubtypeWitness::_equalsValOverride(Val* val)
     return sub->equals(otherWitness->sub)
         && sup->equals(otherWitness->sup)
         && subToMid->equalsVal(otherWitness->subToMid)
-        && midToSup.equals(otherWitness->midToSup);
+        && midToSup->equalsVal(otherWitness->midToSup);
 }
 
 Val* TransitiveSubtypeWitness::_substituteImplOverride(ASTBuilder* astBuilder, SubstitutionSet subst, int * ioDiff)
@@ -373,7 +373,7 @@ Val* TransitiveSubtypeWitness::_substituteImplOverride(ASTBuilder* astBuilder, S
     Type* substSub = as<Type>(sub->substituteImpl(astBuilder, subst, &diff));
     Type* substSup = as<Type>(sup->substituteImpl(astBuilder, subst, &diff));
     SubtypeWitness* substSubToMid = as<SubtypeWitness>(subToMid->substituteImpl(astBuilder, subst, &diff));
-    DeclRef<Decl> substMidToSup = midToSup.substituteImpl(astBuilder, subst, &diff);
+    SubtypeWitness* substMidToSup = as<SubtypeWitness>(midToSup->substituteImpl(astBuilder, subst, &diff));
 
     // If nothing changed, then we can bail out early.
     if (!diff)
@@ -416,7 +416,7 @@ String TransitiveSubtypeWitness::_toStringOverride()
     sb << "TransitiveSubtypeWitness(";
     sb << this->subToMid->toString();
     sb << ", ";
-    sb << this->midToSup.toString();
+    sb << this->midToSup->toString();
     sb << ")";
     return sb.ProduceString();
 }
@@ -426,7 +426,7 @@ HashCode TransitiveSubtypeWitness::_getHashCodeOverride()
     auto hash = sub->getHashCode();
     hash = combineHash(hash, sup->getHashCode());
     hash = combineHash(hash, subToMid->getHashCode());
-    hash = combineHash(hash, midToSup.getHashCode());
+    hash = combineHash(hash, midToSup->getHashCode());
     return hash;
 }
 

@@ -1777,7 +1777,7 @@ SlangResult ASTSerialReader::load(const uint8_t* data, size_t dataCount, ASTBuil
                     {
                         typedef LookupResultItem::Breadcrumb Breadcrumb;
 
-                        auto breadcrumb = new LookupResultItem::Breadcrumb(Breadcrumb::Kind::Member, DeclRef<Decl>(), nullptr);
+                        auto breadcrumb = new LookupResultItem::Breadcrumb(Breadcrumb::Kind::Member, DeclRef<Decl>(), nullptr, nullptr);
                         m_scope.add(breadcrumb);
                         m_objects[i] = breadcrumb;
                         break;

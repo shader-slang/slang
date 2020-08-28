@@ -561,6 +561,8 @@ INST(HighLevelDeclDecoration,               highLevelDecl,          1, 0)
     INST(TypeConstraintDecoration, TypeConstraintDecoration, 1, 0)
     INST_RANGE(LinkageDecoration, ImportDecoration, ExportDecoration)
 
+    INST(BuiltinDecoration, BuiltinDecoration, 0, 0)
+
     INST(SemanticDecoration, semantic, 2, 0)
 
     INST_RANGE(Decoration, HighLevelDeclDecoration, SemanticDecoration)

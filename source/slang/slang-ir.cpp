@@ -5263,6 +5263,7 @@ namespace Slang
         case kIROp_GlobalGenericParam:
         case kIROp_WitnessTable:
         case kIROp_WitnessTableEntry:
+        case kIROp_InterfaceRequirementEntry:
         case kIROp_Block:
             return false;
 
@@ -5384,6 +5385,14 @@ namespace Slang
         auto val = returnInst->getVal();
         return val;
     }
+    
+    IRInst* findInnerMostGenericReturnVal(IRGeneric* generic)
+    {
+        IRInst* inst = generic;
+        while (auto genericInst = as<IRGeneric>(inst))
+            inst = findGenericReturnVal(genericInst);
+        return inst;
+    }
 
     IRGeneric* findSpecializedGeneric(IRSpecialize* specialize)
     {
@@ -5488,9 +5497,15 @@ namespace Slang
     {
         return ptrType && ptrType->op == kIROp_PtrType && ptrType->getOperand(0) == elementType;
     }
+
     bool isPointerOfType(IRInst* ptrType, IROp opCode)
     {
         return ptrType && ptrType->op == kIROp_PtrType && ptrType->getOperand(0) &&
             ptrType->getOperand(0)->op == opCode;
     }
-}
+    bool isBuiltin(IRInst* inst)
+    {
+        return inst->findDecoration<IRBuiltinDecoration>() != nullptr;
+    }
+} // namespace Slang
+

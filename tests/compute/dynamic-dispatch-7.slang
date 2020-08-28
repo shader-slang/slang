@@ -1,5 +1,5 @@
-//TEST(compute):COMPARE_COMPUTE:-cpu -xslang -allow-dynamic-code
-//DISABLE_TEST(compute):COMPARE_COMPUTE:-cuda -xslang -allow-dynamic-code
+//TEST(compute):COMPARE_COMPUTE:-cpu -xslang -disable-specialization
+//DISABLE_TEST(compute):COMPARE_COMPUTE:-cuda -xslang -disable-specialization
 
 // Test dynamic dispatch code gen for associated-typed return values
 // and local variables.

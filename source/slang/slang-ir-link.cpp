@@ -1425,17 +1425,6 @@ LinkedIR linkIR(
 
     context->builder->setInsertInto(context->getModule()->getModuleInst());
 
-    // for now, clone all unreferenced witness tables
-    //
-    // TODO: This step should *not* be needed with the current IR
-    // specialization approach, so we should consider removing it.
-    //
-    for (auto sym : context->getSymbols())
-    {
-        if (sym.Value->irGlobalValue->op == kIROp_WitnessTable)
-            cloneGlobalValue(context, (IRWitnessTable*)sym.Value->irGlobalValue);
-    }
-
     // Next, we make sure to clone the global value for
     // the entry point function itself, and rely on
     // this step to recursively copy over anything else

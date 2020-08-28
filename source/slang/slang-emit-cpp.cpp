@@ -1607,6 +1607,11 @@ void CPPSourceEmitter::emitParamTypeImpl(IRType* type, String const& name)
 void CPPSourceEmitter::emitWitnessTable(IRWitnessTable* witnessTable)
 {
     auto interfaceType = cast<IRInterfaceType>(witnessTable->getOperand(0));
+
+    // Ignore witness tables for builtin interface types.
+    if (isBuiltin(interfaceType))
+        return;
+
     auto witnessTableItems = witnessTable->getChildren();
     _maybeEmitWitnessTableTypeDefinition(interfaceType);
 

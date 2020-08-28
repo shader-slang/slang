@@ -1,6 +1,6 @@
 // anyvalue-size-validation.slang
 
-//DIAGNOSTIC_TEST:SIMPLE:-target cpp -stage compute -entry main -allow-dynamic-code
+//DIAGNOSTIC_TEST:SIMPLE:-target cpp -stage compute -entry main -disable-specialization
 
 [anyValueSize(8)]
 interface IInterface

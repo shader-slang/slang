@@ -404,6 +404,9 @@ struct IRGenContext
     // The IRType value to lower into for `ThisType`.
     IRInst* thisType = nullptr;
 
+    // The IR witness value to use for `ThisType`
+    IRInst* thisTypeWitness = nullptr;
+
     explicit IRGenContext(SharedIRGenContext* inShared, ASTBuilder* inAstBuilder)
         : shared(inShared)
         , astBuilder(inAstBuilder)
@@ -1142,12 +1145,19 @@ struct ValLoweringVisitor : ValVisitor<ValLoweringVisitor, LoweredValInfo, Lower
         // that is itself an interface conformance, so the result
         // of lowering this value should be a "key" that we can
         // use to look up a witness table.
-        IRInst* requirementKey = getInterfaceRequirementKey(context, val->midToSup.getDecl());
-
+        //
         // TODO: There are some ugly cases here if `midToSup` is allowed
         // to be an arbitrary witness, rather than just a declared one,
-        // and we should probably change the front-end representation
-        // to reflect the right constraints.
+        // and we probably need to change the logic here so that we
+        // instead think in terms of applying a subtype witness to
+        // either a value or a witness table, to perform the appropriate
+        // casting/lookup logic.
+        //
+        // For now we rely on the fact that the front-end doesn't
+        // produce transitive witnesses in shapes that will cuase us
+        // problems here.
+        //
+        IRInst* requirementKey = lowerSimpleVal(context, val->midToSup);
 
         return LoweredValInfo::simple(getBuilder()->emitLookupInterfaceMethodInst(
             getBuilder()->getWitnessTableType(lowerType(context, val->sup)),
@@ -1407,6 +1417,12 @@ struct ValLoweringVisitor : ValVisitor<ValLoweringVisitor, LoweredValInfo, Lower
         }
 
         return LoweredValInfo::simple(irWitnessTable);
+    }
+
+    LoweredValInfo visitThisTypeSubtypeWitness(ThisTypeSubtypeWitness* val)
+    {
+        SLANG_UNUSED(val);
+        return LoweredValInfo::simple(context->thisTypeWitness);
     }
 
     LoweredValInfo visitConstantIntVal(ConstantIntVal* val)
@@ -2226,6 +2242,31 @@ DeclRef<D> createDefaultSpecializedDeclRef(IRGenContext* context, D* decl)
     return declRef.as<D>();
 }
 
+static Type* _findReplacementThisParamType(
+    IRGenContext*   context,
+    DeclRef<Decl>   parentDeclRef)
+{
+    if( auto extensionDeclRef = parentDeclRef.as<ExtensionDecl>() )
+    {
+        auto targetType = getTargetType(context->astBuilder, extensionDeclRef);
+        if(auto targetDeclRefType = as<DeclRefType>(targetType))
+        {
+            if(auto replacementType = _findReplacementThisParamType(context, targetDeclRefType->declRef))
+                return replacementType;
+        }
+        return targetType;
+    }
+
+    if (auto interfaceDeclRef = parentDeclRef.as<InterfaceDecl>())
+    {
+        auto thisType = context->astBuilder->create<ThisType>();
+        thisType->interfaceDeclRef = interfaceDeclRef;
+        return thisType;
+    }
+
+    return nullptr;
+}
+
     /// Get the type of the `this` parameter introduced by `parentDeclRef`, or null.
     ///
     /// E.g., if `parentDeclRef` is a `struct` declaration, then this will
@@ -2240,19 +2281,12 @@ Type* getThisParamTypeForContainer(
     IRGenContext*   context,
     DeclRef<Decl>   parentDeclRef)
 {
-    if (auto interfaceDeclRef = parentDeclRef.as<InterfaceDecl>())
-    {
-        auto thisType = context->astBuilder->create<ThisType>();
-        thisType->interfaceDeclRef = interfaceDeclRef;
-        return thisType;
-    }
-    else if( auto aggTypeDeclRef = parentDeclRef.as<AggTypeDecl>() )
+    if(auto replacementType = _findReplacementThisParamType(context, parentDeclRef))
+        return replacementType;
+
+    if( auto aggTypeDeclRef = parentDeclRef.as<AggTypeDecl>() )
     {
         return DeclRefType::create(context->astBuilder, aggTypeDeclRef);
-    }
-    else if( auto extensionDeclRef = parentDeclRef.as<ExtensionDecl>() )
-    {
-        return getTargetType(context->astBuilder, extensionDeclRef);
     }
 
     return nullptr;
@@ -2671,7 +2705,10 @@ struct ExprLoweringVisitorBase : ExprVisitor<Derived, LoweredValInfo>
     LoweredValInfo visitMemberExpr(MemberExpr* expr)
     {
         auto loweredType = lowerType(context, expr->type);
-        auto loweredBase = lowerSubExpr(expr->baseExpression);
+
+        auto baseExpr = expr->baseExpression;
+        baseExpr = maybeIgnoreCastToInterface(baseExpr);
+        auto loweredBase = lowerSubExpr(baseExpr);
 
         auto declRef = expr->declRef;
         if (auto fieldDeclRef = declRef.as<VarDecl>())
@@ -2686,31 +2723,6 @@ struct ExprLoweringVisitorBase : ExprVisitor<Derived, LoweredValInfo>
             boundMemberInfo->base = loweredBase;
             boundMemberInfo->declRef = callableDeclRef;
             return LoweredValInfo::boundMember(boundMemberInfo);
-        }
-        else if(auto constraintDeclRef = declRef.as<TypeConstraintDecl>())
-        {
-            auto superType = getSup(getASTBuilder(), constraintDeclRef);
-            if(auto superDeclRefType = as<DeclRefType>(superType))
-            {
-                if(auto superStructDeclRef = superDeclRefType->declRef.template as<StructDecl>())
-                {
-                    // The constraint is saying that the given type inherits
-                    // from a concrete `struct` type, which means it should
-                    // be satisfied by a witness that represents a field
-                    // (TODO: or a chain of fields) to fetch to get the
-                    // final value.
-                    //
-                    return extractField(loweredType, loweredBase, constraintDeclRef);
-                }
-            }
-
-            // The code is making use of a "witness" that a value of
-            // some generic type conforms to an interface.
-            //
-            // For now we will just emit the base expression as-is.
-            // TODO: we may need to insert an explicit instruction
-            // for a cast here (that could become a no-op later).
-            return loweredBase;
         }
         else if(auto propertyDeclRef = declRef.as<PropertyDecl>())
         {
@@ -3187,6 +3199,24 @@ struct ExprLoweringVisitorBase : ExprVisitor<Derived, LoweredValInfo>
         }
     }
 
+        /// Return `expr` with any outer casts to interface types stripped away
+    Expr* maybeIgnoreCastToInterface(Expr* expr)
+    {
+        auto e = expr;
+        while( auto castExpr = as<CastToSuperTypeExpr>(e) )
+        {
+            if(auto declRefType = as<DeclRefType>(e->type))
+            {
+                if(declRefType->declRef.as<InterfaceDecl>())
+                {
+                    e = castExpr->valueArg;
+                    continue;
+                }
+            }
+            break;
+        }
+        return e;
+    }
 
     LoweredValInfo visitInvokeExpr(InvokeExpr* expr)
     {
@@ -3274,6 +3304,12 @@ struct ExprLoweringVisitorBase : ExprVisitor<Derived, LoweredValInfo>
             // a member function:
             if( baseExpr )
             {
+                // The base expression might be an "upcast" to a base interface, in
+                // which case we don't want to emit the result of the cast, but instead
+                // the source.
+                //
+                baseExpr = maybeIgnoreCastToInterface(baseExpr);
+
                 auto thisType = getThisParamTypeForCallable(context, funcDeclRef);
                 auto irThisType = lowerType(context, thisType);
                 addCallArgsForParam(
@@ -5134,7 +5170,7 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
     {
         auto subBuilder = subContext->irBuilder;
 
-        for(auto entry : astWitnessTable->requirementDictionary)
+        for(auto entry : astWitnessTable->requirementList)
         {
             auto requiredMemberDecl = entry.Key;
             auto satisfyingWitness = entry.Value;
@@ -5683,6 +5719,7 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
             subContextStorage.env = &subEnvStorage;
 
             subContextStorage.thisType = outerContext->thisType;
+            subContextStorage.thisTypeWitness = outerContext->thisTypeWitness;
         }
 
         IRBuilder* getBuilder() { return &subBuilderStorage; }
@@ -5905,6 +5942,16 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
         return LoweredValInfo::simple(assocType);
     }
 
+    Dictionary<IRType*, IRWitnessTable*> placeholderWitnessTables;
+    IRWitnessTable* getPlaceholderWitnessTable(IRType* type)
+    {
+        if (auto rs = placeholderWitnessTables.TryGetValue(type))
+            return *rs;
+        auto w = getBuilder()->createWitnessTable(type);
+        placeholderWitnessTables[type] = w;
+        return w;
+    }
+
     LoweredValInfo visitInterfaceDecl(InterfaceDecl* decl)
     {
         // The members of an interface will turn into the keys that will
@@ -5953,10 +6000,21 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
         auto thisType = getBuilder()->getThisType(irInterface);
         subContext->thisType = thisType;
 
+        // TODO: Need to add an appropriate stand-in witness here.
+        subContext->thisTypeWitness = nullptr;
+
         // Lower associated types first, so they can be referred to when lowering functions.
         for (auto assocTypeDecl : decl->getMembersOfType<AssocTypeDecl>())
         {
             ensureDecl(subContext, assocTypeDecl);
+            // The type constraints on an associated type lowers to a dummy
+            // witness table, since only the type of the witness table matters.
+            for (auto constraintDecl : assocTypeDecl->getMembersOfType<TypeConstraintDecl>())
+            {
+                auto constraintInterfaceType = lowerType(context, constraintDecl->getSup().type);
+                auto placeholderWitnessTable = getPlaceholderWitnessTable(constraintInterfaceType);
+                setValue(context, constraintDecl, LoweredValInfo::simple(placeholderWitnessTable));
+            }
         }
 
         UInt entryIndex = 0;
@@ -5996,9 +6054,13 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
                 for (auto constraintDecl : associatedTypeDecl->getMembersOfType<TypeConstraintDecl>())
                 {
                     auto constraintKey = getInterfaceRequirementKey(constraintDecl);
+                    auto constraintInterfaceType =
+                        lowerType(context, constraintDecl->getSup().type);
+                    auto witnessTableType =
+                        getBuilder()->getWitnessTableType(constraintInterfaceType);
                     irInterface->setOperand(entryIndex,
                         subBuilder->createInterfaceRequirementEntry(constraintKey,
-                            getBuilder()->getWitnessTableType(lowerType(context, constraintDecl->getSup().type))));
+                            witnessTableType));
                     entryIndex++;
                 }
             }
@@ -6017,7 +6079,10 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
         {
             subBuilder->addAnyValueSizeDecoration(irInterface, anyValueSizeAttr->size);
         }
-
+        if (auto builtinAttr = decl->findModifier<BuiltinAttribute>())
+        {
+            subBuilder->addBuiltinDecoration(irInterface);
+        }
         subBuilder->setInsertInto(irInterface);
         // TODO: are there any interface members that should be
         // nested inside the interface type itself?
@@ -6294,6 +6359,45 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
         return irGeneric;
     }
 
+    IRGeneric* emitOuterInterfaceGeneric(
+        IRGenContext*   subContext,
+        ContainerDecl*  parentDecl,
+        DeclRefType*    interfaceType,
+        Decl*           leafDecl)
+    {
+        auto subBuilder = subContext->irBuilder;
+
+        // Of course, a generic might itself be nested inside of other generics...
+        emitOuterGenerics(subContext, parentDecl, leafDecl);
+
+        // We need to create an IR generic
+
+        auto irGeneric = subBuilder->emitGeneric();
+        subBuilder->setInsertInto(irGeneric);
+
+        auto irBlock = subBuilder->emitBlock();
+        subBuilder->setInsertInto(irBlock);
+
+        // The generic needs two parameters: one to represent the
+        // `ThisType`, and one to represent a witness that the
+        // `ThisType` conforms to the interface itself.
+        //
+        auto irThisTypeParam = subBuilder->emitParam(subBuilder->getTypeType());
+
+        auto irInterfaceType = lowerType(context, interfaceType);
+        auto irWitnessTableParam = subBuilder->emitParam(subBuilder->getWitnessTableType(irInterfaceType));
+        subBuilder->addTypeConstraintDecoration(irThisTypeParam, irInterfaceType);
+
+        // Now we need to wire up the IR parameters
+        // we created to be used as the `ThisType` in
+        // the body of the code.
+        //
+        subContext->thisType = irThisTypeParam;
+        subContext->thisTypeWitness = irWitnessTableParam;
+
+        return irGeneric;
+    }
+
     // If the given `decl` is enclosed in any generic declarations, then
     // emit IR-level generics to represent them.
     // The `leafDecl` represents the inner-most declaration we are actually
@@ -6306,6 +6410,23 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
             if(auto genericAncestor = as<GenericDecl>(pp))
             {
                 return emitOuterGeneric(subContext, genericAncestor, leafDecl);
+            }
+
+            // We introduce IR generics in one other case, where the input
+            // code wasn't visibly using generics: when a concrete member
+            // is defined on an interface type. In that case, the resulting
+            // definition needs to be generic on a parameter to represent
+            // the `ThisType` of the interface.
+            //
+            if(auto extensionAncestor = as<ExtensionDecl>(pp))
+            {
+                if(auto targetDeclRefType = as<DeclRefType>(extensionAncestor->targetType))
+                {
+                    if(auto interfaceDeclRef = targetDeclRefType->declRef.as<InterfaceDecl>())
+                    {
+                        return emitOuterInterfaceGeneric(subContext, extensionAncestor, targetDeclRefType, leafDecl);
+                    }
+                }
             }
         }
 
@@ -7103,6 +7224,20 @@ bool canDeclLowerToAGeneric(Decl* decl)
     return false;
 }
 
+static bool isInterfaceRequirement(Decl* decl)
+{
+   auto ancestor = decl->parentDecl;
+   for(; ancestor; ancestor = ancestor->parentDecl )
+   {
+       if(as<InterfaceDecl>(ancestor))
+           return true;
+
+       if(as<ExtensionDecl>(ancestor))
+           return false;
+   }
+   return false;
+}
+
 LoweredValInfo emitDeclRef(
     IRGenContext*           context,
     Decl*            decl,
@@ -7195,36 +7330,66 @@ LoweredValInfo emitDeclRef(
             return lowerType(context, thisTypeSubst->witness->sub);
         }
 
-        // Somebody is trying to look up an interface requirement
-        // "through" some concrete type. We need to lower this decl-ref
-        // as a lookup of the corresponding member in a witness table.
-        //
-        // The witness table itself is referenced by the this-type
-        // substitution, so we can just lower that.
-        //
-        // Note: unlike the case for generics above, in the interface-lookup
-        // case, we don't end up caring about any further outer substitutions.
-        // That is because even if we are naming `ISomething<Foo>.doIt()`,
-        // a method inside a generic interface, we don't actually care
-        // about the substitution of `Foo` for the parameter `T` of
-        // `ISomething<T>`. That is because we really care about the
-        // witness table for the concrete type that conforms to `ISomething<Foo>`.
-        //
-        auto irWitnessTable = lowerSimpleVal(context, thisTypeSubst->witness);
-        //
-        // The key to use for looking up the interface member is
-        // derived from the declaration.
-        //
-        auto irRequirementKey = getInterfaceRequirementKey(context, decl);
-        //
-        // Those two pieces of information tell us what we need to
-        // do in order to look up the value that satisfied the requirement.
-        //
-        auto irSatisfyingVal = context->irBuilder->emitLookupInterfaceMethodInst(
-            type,
-            irWitnessTable,
-            irRequirementKey);
-        return LoweredValInfo::simple(irSatisfyingVal);
+        if(isInterfaceRequirement(decl))
+        {
+            // Somebody is trying to look up an interface requirement
+            // "through" some concrete type. We need to lower this decl-ref
+            // as a lookup of the corresponding member in a witness table.
+            //
+            // The witness table itself is referenced by the this-type
+            // substitution, so we can just lower that.
+            //
+            // Note: unlike the case for generics above, in the interface-lookup
+            // case, we don't end up caring about any further outer substitutions.
+            // That is because even if we are naming `ISomething<Foo>.doIt()`,
+            // a method inside a generic interface, we don't actually care
+            // about the substitution of `Foo` for the parameter `T` of
+            // `ISomething<T>`. That is because we really care about the
+            // witness table for the concrete type that conforms to `ISomething<Foo>`.
+            //
+            auto irWitnessTable = lowerSimpleVal(context, thisTypeSubst->witness);
+            //
+            // The key to use for looking up the interface member is
+            // derived from the declaration.
+            //
+            auto irRequirementKey = getInterfaceRequirementKey(context, decl);
+            //
+            // Those two pieces of information tell us what we need to
+            // do in order to look up the value that satisfied the requirement.
+            //
+            auto irSatisfyingVal = context->irBuilder->emitLookupInterfaceMethodInst(
+                type,
+                irWitnessTable,
+                irRequirementKey);
+            return LoweredValInfo::simple(irSatisfyingVal);
+        }
+        else
+        {
+            // This case is a reference to a member declaration of the interface
+            // (or added by an extension of the interface) that does *not*
+            // represent a requirement of the interface.
+            //
+            // Our policy is that concrete methods/members on an interface type
+            // are lowered as generics, where the generic parameter represents
+            // the `ThisType`.
+            //
+            auto genericVal = emitDeclRef(context, decl, thisTypeSubst->outer, context->irBuilder->getGenericKind());
+            auto irGenericVal = getSimpleVal(context, genericVal);
+
+            // In order to reference the member for a particular type, we
+            // specialize the generic for that type.
+            //
+            IRInst* irSubType = lowerType(context, thisTypeSubst->witness->sub);
+            IRInst* irSubTypeWitness = lowerSimpleVal(context, thisTypeSubst->witness);
+
+            IRInst* irSpecializeArgs[] = { irSubType, irSubTypeWitness };
+            auto irSpecializedVal = context->irBuilder->emitSpecializeInst(
+                type,
+                irGenericVal,
+                2,
+                irSpecializeArgs);
+            return LoweredValInfo::simple(irSpecializedVal);
+        }
     }
     else
     {

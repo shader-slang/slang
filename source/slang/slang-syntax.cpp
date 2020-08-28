@@ -322,7 +322,19 @@ Index getFilterCountImpl(const ReflectClassInfo& clsInfo, MemberFilterStyle filt
         return RequirementWitness();
     }
 
-   
+    //
+    // WitnessTable
+    //
+
+    void WitnessTable::add(Decl* decl, RequirementWitness const& witness)
+    {
+        SLANG_ASSERT(!requirementDictionary.ContainsKey(decl));
+
+        requirementDictionary.Add(decl, witness);
+        requirementList.add(KeyValuePair<Decl*, RequirementWitness>(decl, witness));
+    }
+
+    //
 
     static Type* ExtractGenericArgType(Val* val)
     {
