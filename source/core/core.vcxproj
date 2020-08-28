@@ -185,6 +185,7 @@
     <ClInclude Include="slang-hash.h" />
     <ClInclude Include="slang-hex-dump-util.h" />
     <ClInclude Include="slang-io.h" />
+    <ClInclude Include="slang-linked-list.h" />
     <ClInclude Include="slang-list.h" />
     <ClInclude Include="slang-math.h" />
     <ClInclude Include="slang-memory-arena.h" />
@@ -253,4 +254,4 @@
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">
   </ImportGroup>
-</Project>
+</Project> 
