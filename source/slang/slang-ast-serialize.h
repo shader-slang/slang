@@ -415,6 +415,26 @@ void ASTSerialReader::getArray(ASTSerialIndex index, List<T>& out)
 
 
 class ASTSerialClasses;
+class ASTSerialWriter;
+
+class ASTSerialFilter
+{
+public:
+    virtual ASTSerialIndex writePointer(ASTSerialWriter* writer, const NodeBase* ptr) = 0;
+};
+
+class ModuleASTSerialFilter : public ASTSerialFilter
+{
+public:
+    virtual ASTSerialIndex writePointer(ASTSerialWriter* writer, const NodeBase* ptr) SLANG_OVERRIDE;
+
+    ModuleASTSerialFilter(ModuleDecl* moduleDecl):
+        m_moduleDecl(moduleDecl)
+    {
+    }
+
+    ModuleDecl* m_moduleDecl;
+};
 
 /* This is a class used tby toSerial implementations to turn native type into the serial type */
 class ASTSerialWriter : public RefObject
@@ -422,6 +442,9 @@ class ASTSerialWriter : public RefObject
 public:
     ASTSerialIndex addPointer(const NodeBase* ptr);
     ASTSerialIndex addPointer(const RefObject* ptr);
+
+        /// Write the pointer
+    ASTSerialIndex writePointer(const NodeBase* ptr);
 
     template <typename T>
     ASTSerialIndex addArray(const T* in, Index count);
@@ -431,13 +454,16 @@ public:
     ASTSerialIndex addName(const Name* name);
     ASTSerialSourceLoc addSourceLoc(SourceLoc sourceLoc);
 
+        /// Set a the index associated with an index. NOTE! That there cannot be a pre-existing setting.
+    void setPointerIndex(const NodeBase* ptr, ASTSerialIndex index);
+
         /// Get the entries table holding how each index maps to an entry
     const List<ASTSerialInfo::Entry*>& getEntries() const { return m_entries; }
 
         /// Write to a stream
     SlangResult write(Stream* stream);
 
-    ASTSerialWriter(ASTSerialClasses* classes);
+    ASTSerialWriter(ASTSerialClasses* classes, ASTSerialFilter* filter);
 
 protected:
 
@@ -461,6 +487,7 @@ protected:
     List<ASTSerialInfo::Entry*> m_entries;      ///< The entries
     MemoryArena m_arena;                        ///< Holds the payloads
     ASTSerialClasses* m_classes;
+    ASTSerialFilter* m_filter;                  ///< Filter to control what is serialized
 };
 
 // ---------------------------------------------------------------------------

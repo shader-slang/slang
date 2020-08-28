@@ -8,8 +8,11 @@
 #include "slang-type-layout.h"
 
 #include "slang-ast-dump.h"
+#include "slang-mangle.h"
 
 #include "slang-ast-support-types.h"
+
+#include "slang-legalize-types.h"
 
 #include "../core/slang-byte-encode-util.h"
 
@@ -44,6 +47,70 @@ template <typename SERIAL_TYPE, typename NATIVE_TYPE>
 static void _toNativeValue(ASTSerialReader* reader, const SERIAL_TYPE& src, NATIVE_TYPE& dst)
 {
     ASTSerialTypeInfo<NATIVE_TYPE>::toNative(reader, &src, &dst);
+}
+
+// !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! ModuleASTSerialFilter  !!!!!!!!!!!!!!!!!!!!!!!!
+
+
+ASTSerialIndex ModuleASTSerialFilter::writePointer(ASTSerialWriter* writer, const NodeBase* inPtr) 
+{
+    NodeBase* ptr = const_cast<NodeBase*>(inPtr);
+    SLANG_ASSERT(ptr);
+    
+    if (Decl* decl = as<Decl>(ptr))
+    {
+        ModuleDecl* moduleDecl = findModuleForDecl(decl);
+        SLANG_ASSERT(moduleDecl);
+        if (moduleDecl && moduleDecl != m_moduleDecl)
+        {
+            ASTBuilder* astBuilder = m_moduleDecl->module->getASTBuilder();
+
+            // It's a reference to a declaration in another module, so create an ImportExternalDecl.
+
+            String mangledName = getMangledName(astBuilder, decl);
+
+            ImportExternalDecl* importDecl = astBuilder->create<ImportExternalDecl>();
+            importDecl->mangledName = mangledName;
+            const ASTSerialIndex index = writer->writePointer(importDecl);
+
+            // Set as the index of this
+            writer->setPointerIndex(ptr, index);
+
+            return index;
+        }
+        else
+        {
+            // Okay... we can just write it out then
+            return writer->writePointer(ptr);
+        }
+    }
+
+    // TODO(JS): What we really want to do here is to ignore bodies functions.
+    // It's not 100% clear if this is even right though - for example does type inference
+    // imply the body is needed to say infer a return type?
+    // Also not clear if statements in other scenarios (if there are others) might need to be kept.
+    //
+    // For now we just ignore all stmts
+
+    if (Stmt* stmt = as<Stmt>(ptr))
+    {
+        //
+        writer->setPointerIndex(stmt, ASTSerialIndex(0));
+        return ASTSerialIndex(0);
+    }
+
+#if 0
+    if (Type* type = as<Type>(ptr))
+    {
+        type->findModifier<BuiltinTypeModifier>();
+
+
+        
+    }
+#endif
+
+    // For now for everything else just write it
+    return writer->writePointer(ptr);
 }
 
 // !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! Serial <-> Native conversion  !!!!!!!!!!!!!!!!!!!!!!!!
@@ -1030,28 +1097,20 @@ ASTSerialClasses::ASTSerialClasses():
 
 // !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! ASTSerialWriter  !!!!!!!!!!!!!!!!!!!!!!!!!!!!
 
-ASTSerialWriter::ASTSerialWriter(ASTSerialClasses* classes) :
+ASTSerialWriter::ASTSerialWriter(ASTSerialClasses* classes, ASTSerialFilter* filter) :
     m_arena(2048),
-    m_classes(classes)
+    m_classes(classes),
+    m_filter(filter)
 {
     // 0 is always the null pointer
     m_entries.add(nullptr);
     m_ptrMap.Add(nullptr, 0);
 }
 
-ASTSerialIndex ASTSerialWriter::addPointer(const NodeBase* node)
+ASTSerialIndex ASTSerialWriter::writePointer(const NodeBase* node)
 {
-    // Null is always 0
-    if (node == nullptr)
-    {
-        return ASTSerialIndex(0);
-    }
-    // Look up in the map
-    Index* indexPtr = m_ptrMap.TryGetValue(node);
-    if (indexPtr)
-    {
-        return ASTSerialIndex(*indexPtr);
-    }
+    // This pointer cannot be in the map
+    SLANG_ASSERT(m_ptrMap.TryGetValue(node) == nullptr);
 
     const ASTSerialClass* serialClass = m_classes->getSerialClass(node->astNodeType);
 
@@ -1072,6 +1131,7 @@ ASTSerialIndex ASTSerialWriter::addPointer(const NodeBase* node)
         for (Index i = 0; i < serialClass->fieldsCount; ++i)
         {
             auto field = serialClass->fields[i];
+
             // Work out the offsets
             auto srcField = ((const uint8_t*)node) + field.nativeOffset;
             auto dstField = serialPayload + field.serialOffset;
@@ -1086,6 +1146,35 @@ ASTSerialIndex ASTSerialWriter::addPointer(const NodeBase* node)
     }
 
     return index;
+}
+
+void ASTSerialWriter::setPointerIndex(const NodeBase* ptr, ASTSerialIndex index)
+{
+    m_ptrMap.Add(ptr, Index(index));
+}
+
+ASTSerialIndex ASTSerialWriter::addPointer(const NodeBase* node)
+{
+    // Null is always 0
+    if (node == nullptr)
+    {
+        return ASTSerialIndex(0);
+    }
+    // Look up in the map
+    Index* indexPtr = m_ptrMap.TryGetValue(node);
+    if (indexPtr)
+    {
+        return ASTSerialIndex(*indexPtr);
+    }
+
+    if (m_filter)
+    {
+        return m_filter->writePointer(this, node);
+    }
+    else
+    {
+        return writePointer(node);
+    }
 }
 
 ASTSerialIndex ASTSerialWriter::addPointer(const RefObject* obj)
@@ -1762,7 +1851,12 @@ SlangResult ASTSerialReader::load(const uint8_t* data, size_t dataCount, ASTBuil
     {
         OwnedMemoryStream stream(FileAccess::ReadWrite);
 
-        ASTSerialWriter writer(classes);
+        ModuleDecl* moduleDecl = as<ModuleDecl>(node);
+        ModuleASTSerialFilter filterStorage(moduleDecl);
+
+        ASTSerialFilter* filter = moduleDecl ? &filterStorage : nullptr;
+
+        ASTSerialWriter writer(classes, filter);
 
         // Lets serialize it all
         writer.addPointer(node);
@@ -1830,6 +1924,7 @@ SlangResult ASTSerialReader::load(const uint8_t* data, size_t dataCount, ASTBuil
         // Write out
         File::writeAllText("ast-read.ast-dump", readDump);
         File::writeAllText("ast-orig.ast-dump", origDump);
+
 
         if (readDump != origDump)
         {
