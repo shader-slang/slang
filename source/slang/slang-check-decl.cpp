@@ -1271,7 +1271,7 @@ namespace Slang
 
         // TODO: actually implement matching here. For now we'll
         // just pretend that things are satisfied in order to make progress..
-        witnessTable->requirementDictionary.Add(
+        witnessTable->add(
             requiredMemberDeclRef.getDecl(),
             RequirementWitness(satisfyingMemberDeclRef));
         return true;
@@ -1361,7 +1361,7 @@ namespace Slang
         //
         for( auto p : mapRequiredToSatisfyingAccessorDeclRef )
         {
-            witnessTable->requirementDictionary.Add(
+            witnessTable->add(
                 p.Key,
                 RequirementWitness(p.Value));
         }
@@ -1378,7 +1378,7 @@ namespace Slang
         // represents a witness value that is only needed by the front-end,
         // and that can be ignored by IR and emit logic.
         //
-        witnessTable->requirementDictionary.Add(
+        witnessTable->add(
             requiredMemberDeclRef.getDecl(),
             RequirementWitness(satisfyingMemberDeclRef));
         return true;
@@ -1465,7 +1465,7 @@ namespace Slang
             {
                 // If a subtype witness was found, then the conformance
                 // appears to hold, and we can satisfy that requirement.
-                witnessTable->requirementDictionary.Add(requiredConstraintDeclRef, RequirementWitness(witness));
+                witnessTable->add(requiredConstraintDeclRef, RequirementWitness(witness));
             }
             else
             {
@@ -1482,7 +1482,7 @@ namespace Slang
         {
             // If all the constraints were satisfied, then the chosen
             // type can indeed satisfy the interface requirement.
-            witnessTable->requirementDictionary.Add(
+            witnessTable->add(
                 requiredAssociatedTypeDeclRef.getDecl(),
                 RequirementWitness(satisfyingType));
         }
@@ -1871,7 +1871,7 @@ namespace Slang
         // difference between our synthetic method and a hand-written
         // one with the same behavior.
         //
-        witnessTable->requirementDictionary.Add(requiredMemberDeclRef,
+        witnessTable->add(requiredMemberDeclRef,
             RequirementWitness(makeDeclRef(synFuncDecl)));
         return true;
     }
@@ -2210,9 +2210,9 @@ namespace Slang
         //
         for(auto p : mapRequiredAccessorToSynAccessor)
         {
-            witnessTable->requirementDictionary.Add(p.Key, RequirementWitness(makeDeclRef(p.Value)));
+            witnessTable->add(p.Key, RequirementWitness(makeDeclRef(p.Value)));
         }
-        witnessTable->requirementDictionary.Add(requiredMemberDeclRef,
+        witnessTable->add(requiredMemberDeclRef,
             RequirementWitness(makeDeclRef(synPropertyDecl)));
         return true;
     }
@@ -2319,7 +2319,7 @@ namespace Slang
             if(!satisfyingWitnessTable)
                 return false;
 
-            witnessTable->requirementDictionary.Add(
+            witnessTable->add(
                 requiredInheritanceDeclRef.getDecl(),
                 RequirementWitness(satisfyingWitnessTable));
             return true;
@@ -3047,7 +3047,7 @@ namespace Slang
             }
 
             // Okay, add the conformance witness for `__Tag` being satisfied by `tagType`
-            witnessTable->requirementDictionary.Add(tagAssociatedTypeDecl, RequirementWitness(tagType));
+            witnessTable->add(tagAssociatedTypeDecl, RequirementWitness(tagType));
 
             // TODO: we actually also need to synthesize a witness for the conformance of `tagType`
             // to the `__BuiltinIntegerType` interface, because that is a constraint on the
@@ -4553,12 +4553,15 @@ namespace Slang
     {
         // If we've imported this one already, then
         // skip the step where we modify the current scope.
-        auto& importedModules = getShared()->importedModules;
-        if (importedModules.Contains(moduleDecl))
+        auto& importedModulesList = getShared()->importedModulesList;
+        auto& importedModulesSet = getShared()->importedModulesSet;
+        if (importedModulesSet.Contains(moduleDecl))
         {
             return;
         }
-        importedModules.Add(moduleDecl);
+        importedModulesList.add(moduleDecl);
+        importedModulesSet.Add(moduleDecl);
+
 
 
         // Create a new sub-scope to wire the module
@@ -4746,7 +4749,7 @@ namespace Slang
                 // member on the `SharedSemanticsContext` is accurate in this case.
                 //
                 _addCandidateExtensionsFromModule(m_module->getModuleDecl());
-                for( auto moduleDecl : this->importedModules )
+                for( auto moduleDecl : this->importedModulesList )
                 {
                     _addCandidateExtensionsFromModule(moduleDecl);
                 }

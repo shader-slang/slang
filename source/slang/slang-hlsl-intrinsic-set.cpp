@@ -400,9 +400,9 @@ SlangResult HLSLIntrinsicSet::makeIntrinsic(IRInst* inst, HLSLIntrinsic& out)
 
 void HLSLIntrinsicSet::getIntrinsics(List<const HLSLIntrinsic*>& out) const
 {
-    for (auto& pair : m_intrinsics)
+    for (auto& intrinsic : m_intrinsicsList)
     {
-        out.add(pair.Value);
+        out.add(intrinsic);
     }
 }
 
@@ -414,13 +414,18 @@ HLSLIntrinsic* HLSLIntrinsicSet::add(const HLSLIntrinsic& intrinsic)
     HLSLIntrinsic* copy = (HLSLIntrinsic*)m_intrinsicFreeList.allocate();
     *copy = intrinsic;
     HLSLIntrinsicRef ref(copy);
-    HLSLIntrinsic** found =  m_intrinsics.TryGetValueOrAdd(ref, copy);
+    HLSLIntrinsic** found =  m_intrinsicsDict.TryGetValueOrAdd(ref, copy);
     if (found)
     {
         // If we have found an intrinsic, we can free the copy
         m_intrinsicFreeList.deallocate(copy);
         return *found;
     }
+
+    // If we are adding an intrinsic for the first time,
+    // it should be added to the deduplicated list
+    m_intrinsicsList.add(copy);
+
     return copy;
 }
 
