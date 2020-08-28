@@ -170,6 +170,14 @@ namespace Slang
             }
         }
 
+        IRInst* findInnerMostSpecializingBase(IRSpecialize* inst)
+        {
+            auto result = inst->getBase();
+            while (auto specialize = as<IRSpecialize>(result))
+                result = specialize->getBase();
+            return result;
+        }
+
         void lowerCallToSpecializedFunc(IRCall* callInst, IRSpecialize* specializeInst)
         {
             // If we see a call(specialize(gFunc, Targs), args),
@@ -180,8 +188,22 @@ namespace Slang
             // them here.
             if (loweredFunc->op == kIROp_Generic)
             {
-                // This is an intrinsic function, don't transform.
                 return;
+            }
+            else if (loweredFunc->op == kIROp_Specialize)
+            {
+                // All nested generic functions are supposed to be flattend before this pass.
+                // If they are not, they represent an intrinsic function that should not be
+                // modified in this pass.
+                auto innerMostFunc = findInnerMostSpecializingBase(static_cast<IRSpecialize*>(loweredFunc));
+                if (innerMostFunc && innerMostFunc->op == kIROp_Generic)
+                {
+                    innerMostFunc =
+                        findInnerMostGenericReturnVal(static_cast<IRGeneric*>(innerMostFunc));
+                }
+                if (innerMostFunc->findDecoration<IRTargetIntrinsicDecoration>())
+                    return;
+                SLANG_UNEXPECTED("Nested generics specialization.");
             }
             IRFuncType* funcType = cast<IRFuncType>(loweredFunc->getDataType());
             translateCallInst(callInst, funcType, loweredFunc, specializeInst);
@@ -193,6 +215,9 @@ namespace Slang
             // all occurences of associatedtypes.
             auto funcType = cast<IRFuncType>(lookupInst->getDataType());
             auto loweredFunc = lookupInst;
+            if (isBuiltin(cast<IRWitnessTableType>(
+                lookupInst->getWitnessTable()->getDataType())->getConformanceType()))
+                return;
             translateCallInst(callInst, funcType, loweredFunc, nullptr);
         }
 

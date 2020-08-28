@@ -1760,8 +1760,8 @@ namespace Slang
         bool shouldEmitSPIRVDirectly = false;
 
 
-        // If true will allow generating dynamic dispatch code for generics.
-        bool allowDynamicCode = false;
+        // If true will disable generics/existential value specialization pass.
+        bool disableSpecialization = false;
 
         String m_dumpIntermediatePrefix;
 

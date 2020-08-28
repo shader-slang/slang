@@ -21,9 +21,21 @@ namespace Slang
             IRInst* result = nullptr;
             if (sharedContext->loweredGenericFunctions.TryGetValue(genericValue, result))
                 return result;
+            // Do not lower intrinsic functions.
+            if (genericValue->findDecoration<IRTargetIntrinsicDecoration>())
+                return genericValue;
             auto genericParent = as<IRGeneric>(genericValue);
             SLANG_ASSERT(genericParent);
             auto func = as<IRFunc>(findGenericReturnVal(genericParent));
+            if (!func)
+            {
+                // Nested generic functions are supposed to be flattened before entering
+                // this pass. The reason we are still seeing them must be that they are
+                // intrinsic functions. In this case we ignore the function.
+                SLANG_ASSERT(findInnerMostGenericReturnVal(genericParent)
+                                 ->findDecoration<IRTargetIntrinsicDecoration>() != nullptr);
+                return genericValue;
+            }
             SLANG_ASSERT(func);
             if (!func->isDefinition())
             {
@@ -133,7 +145,9 @@ namespace Slang
                 return loweredType;
             if (sharedContext->mapLoweredInterfaceToOriginal.ContainsKey(interfaceType))
                 return interfaceType;
-
+            // Do not lower intrinsic interfaces.
+            if (isBuiltin(interfaceType))
+                return interfaceType;
             List<IRInterfaceRequirementEntry*> newEntries;
 
             IRBuilder builder;
@@ -189,6 +203,8 @@ namespace Slang
             auto interfaceType = maybeLowerInterfaceType(cast<IRInterfaceType>(witnessTable->getConformanceType()));
             if (interfaceType != witnessTable->getConformanceType())
                 witnessTable->setConformanceType(interfaceType);
+            if (isBuiltin(interfaceType))
+                return;
             for (auto child : witnessTable->getChildren())
             {
                 auto entry = as<IRWitnessTableEntry>(child);
