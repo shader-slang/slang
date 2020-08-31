@@ -54,6 +54,9 @@
     <ClInclude Include="slang-io.h">
       <Filter>Header Files</Filter>
     </ClInclude>
+    <ClInclude Include="slang-linked-list.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
     <ClInclude Include="slang-list.h">
       <Filter>Header Files</Filter>
     </ClInclude>

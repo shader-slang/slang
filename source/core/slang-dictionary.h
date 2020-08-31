@@ -2,6 +2,7 @@
 #define SLANG_CORE_DICTIONARY_H
 
 #include "slang-list.h"
+#include "slang-linked-list.h"
 #include "slang-common.h"
 #include "slang-uint-set.h"
 #include "slang-exception.h"
@@ -623,6 +624,365 @@ namespace Slang
 	template <typename T>
 	class HashSet : public HashSetBase<T, Dictionary<T, _DummyClass>>
 	{};
+
+    template <typename TKey, typename TValue>
+    class OrderedDictionary
+    {
+        friend class Iterator;
+        friend class ItemProxy;
+
+    private:
+        inline int GetProbeOffset(int /*probeIdx*/) const
+        {
+            // quadratic probing
+            return 1;
+        }
+
+    private:
+        int bucketSizeMinusOne;
+        int _count;
+        UIntSet marks;
+
+        LinkedList<KeyValuePair<TKey, TValue>> kvPairs;
+        LinkedNode<KeyValuePair<TKey, TValue>>** hashMap;
+        void Free()
+        {
+            if (hashMap)
+                delete[] hashMap;
+            hashMap = 0;
+            kvPairs.Clear();
+        }
+        inline bool IsDeleted(int pos) const { return marks.contains((pos << 1) + 1); }
+        inline bool IsEmpty(int pos) const { return !marks.contains((pos << 1)); }
+        inline void SetDeleted(int pos, bool val)
+        {
+            if (val)
+                marks.add((pos << 1) + 1);
+            else
+                marks.remove((pos << 1) + 1);
+        }
+        inline void SetEmpty(int pos, bool val)
+        {
+            if (val)
+                marks.remove((pos << 1));
+            else
+                marks.add((pos << 1));
+        }
+        struct FindPositionResult
+        {
+            int ObjectPosition;
+            int InsertionPosition;
+            FindPositionResult()
+            {
+                ObjectPosition = -1;
+                InsertionPosition = -1;
+            }
+            FindPositionResult(int objPos, int insertPos)
+            {
+                ObjectPosition = objPos;
+                InsertionPosition = insertPos;
+            }
+        };
+        template <typename T> inline int GetHashPos(T& key) const
+        {
+            const unsigned int hash = (unsigned int)getHashCode(key);
+            return ((unsigned int)(hash * 2654435761)) % bucketSizeMinusOne;
+        }
+        template <typename T> FindPositionResult FindPosition(const T& key) const
+        {
+            int hashPos = GetHashPos((T&)key);
+            int insertPos = -1;
+            int numProbes = 0;
+            while (numProbes <= bucketSizeMinusOne)
+            {
+                if (IsEmpty(hashPos))
+                {
+                    if (insertPos == -1)
+                        return FindPositionResult(-1, hashPos);
+                    else
+                        return FindPositionResult(-1, insertPos);
+                }
+                else if (IsDeleted(hashPos))
+                {
+                    if (insertPos == -1)
+                        insertPos = hashPos;
+                }
+                else if (hashMap[hashPos]->Value.Key == key)
+                {
+                    return FindPositionResult(hashPos, -1);
+                }
+                numProbes++;
+                hashPos = (hashPos + GetProbeOffset(numProbes)) & bucketSizeMinusOne;
+            }
+            if (insertPos != -1)
+                return FindPositionResult(-1, insertPos);
+            throw InvalidOperationException(
+                "Hash map is full. This indicates an error in Key::Equal or Key::GetHashCode.");
+        }
+        TValue& _Insert(KeyValuePair<TKey, TValue>&& kvPair, int pos)
+        {
+            auto node = kvPairs.AddLast();
+            node->Value = _Move(kvPair);
+            hashMap[pos] = node;
+            SetEmpty(pos, false);
+            SetDeleted(pos, false);
+            return node->Value.Value;
+        }
+        void Rehash()
+        {
+            if (bucketSizeMinusOne == -1 || _count / (float)bucketSizeMinusOne >= MaxLoadFactor)
+            {
+                int newSize = (bucketSizeMinusOne + 1) * 2;
+                if (newSize == 0)
+                {
+                    newSize = 16;
+                }
+                OrderedDictionary<TKey, TValue> newDict;
+                newDict.bucketSizeMinusOne = newSize - 1;
+                newDict.hashMap = new LinkedNode<KeyValuePair<TKey, TValue>>*[newSize];
+                newDict.marks.resizeAndClear(newSize * 2);
+                if (hashMap)
+                {
+                    for (auto& kvPair : *this)
+                    {
+                        newDict.Add(_Move(kvPair));
+                    }
+                }
+                *this = _Move(newDict);
+            }
+        }
+
+        bool AddIfNotExists(KeyValuePair<TKey, TValue>&& kvPair)
+        {
+            Rehash();
+            auto pos = FindPosition(kvPair.Key);
+            if (pos.ObjectPosition != -1)
+                return false;
+            else if (pos.InsertionPosition != -1)
+            {
+                _count++;
+                _Insert(_Move(kvPair), pos.InsertionPosition);
+                return true;
+            }
+            else
+                throw InvalidOperationException("Inconsistent find result returned. This is a "
+                                                "bug in Dictionary implementation.");
+        }
+        void Add(KeyValuePair<TKey, TValue>&& kvPair)
+        {
+            if (!AddIfNotExists(_Move(kvPair)))
+                throw KeyExistsException("The key already exists in Dictionary.");
+        }
+        TValue& Set(KeyValuePair<TKey, TValue>&& kvPair)
+        {
+            Rehash();
+            auto pos = FindPosition(kvPair.Key);
+            if (pos.ObjectPosition != -1)
+            {
+                hashMap[pos.ObjectPosition]->Delete();
+                return _Insert(_Move(kvPair), pos.ObjectPosition);
+            }
+            else if (pos.InsertionPosition != -1)
+            {
+                _count++;
+                return _Insert(_Move(kvPair), pos.InsertionPosition);
+            }
+            else
+                throw InvalidOperationException("Inconsistent find result returned. This is a "
+                                                "bug in Dictionary implementation.");
+        }
+
+    public:
+        typedef typename LinkedList<KeyValuePair<TKey, TValue>>::Iterator Iterator;
+
+        typename LinkedList<KeyValuePair<TKey, TValue>>::Iterator begin() const
+        {
+            return kvPairs.begin();
+        }
+        typename LinkedList<KeyValuePair<TKey, TValue>>::Iterator end() const
+        {
+            return kvPairs.end();
+        }
+
+    public:
+        void Add(const TKey& key, const TValue& value)
+        {
+            Add(KeyValuePair<TKey, TValue>(key, value));
+        }
+        void Add(TKey&& key, TValue&& value)
+        {
+            Add(KeyValuePair<TKey, TValue>(_Move(key), _Move(value)));
+        }
+        bool AddIfNotExists(const TKey& key, const TValue& value)
+        {
+            return AddIfNotExists(KeyValuePair<TKey, TValue>(key, value));
+        }
+        bool AddIfNotExists(TKey&& key, TValue&& value)
+        {
+            return AddIfNotExists(KeyValuePair<TKey, TValue>(_Move(key), _Move(value)));
+        }
+        void Remove(const TKey& key)
+        {
+            if (_count > 0)
+            {
+                auto pos = FindPosition(key);
+                if (pos.ObjectPosition != -1)
+                {
+                    kvPairs.Delete(hashMap[pos.ObjectPosition]);
+                    hashMap[pos.ObjectPosition] = 0;
+                    SetDeleted(pos.ObjectPosition, true);
+                    _count--;
+                }
+            }
+        }
+        void Clear()
+        {
+            _count = 0;
+            kvPairs.Clear();
+            marks.clear();
+        }
+        template <typename T> bool ContainsKey(const T& key) const
+        {
+            if (bucketSizeMinusOne == -1)
+                return false;
+            auto pos = FindPosition(key);
+            return pos.ObjectPosition != -1;
+        }
+        template <typename T> TValue* TryGetValue(const T& key) const
+        {
+            if (bucketSizeMinusOne == -1)
+                return nullptr;
+            auto pos = FindPosition(key);
+            if (pos.ObjectPosition != -1)
+            {
+                return &(hashMap[pos.ObjectPosition]->Value.Value);
+            }
+            return nullptr;
+        }
+        template <typename T> bool TryGetValue(const T& key, TValue& value) const
+        {
+            if (bucketSizeMinusOne == -1)
+                return false;
+            auto pos = FindPosition(key);
+            if (pos.ObjectPosition != -1)
+            {
+                value = hashMap[pos.ObjectPosition]->Value.Value;
+                return true;
+            }
+            return false;
+        }
+        class ItemProxy
+        {
+        private:
+            const OrderedDictionary<TKey, TValue>* dict;
+            TKey key;
+
+        public:
+            ItemProxy(const TKey& _key, const OrderedDictionary<TKey, TValue>* _dict)
+            {
+                this->dict = _dict;
+                this->key = _key;
+            }
+            ItemProxy(TKey&& _key, const OrderedDictionary<TKey, TValue>* _dict)
+            {
+                this->dict = _dict;
+                this->key = _Move(_key);
+            }
+            TValue& GetValue() const
+            {
+                auto pos = dict->FindPosition(key);
+                if (pos.ObjectPosition != -1)
+                {
+                    return dict->hashMap[pos.ObjectPosition]->Value.Value;
+                }
+                else
+                {
+                    throw KeyNotFoundException("The key does not exists in dictionary.");
+                }
+            }
+            inline TValue& operator()() const { return GetValue(); }
+            operator TValue&() const { return GetValue(); }
+            TValue& operator=(const TValue& val)
+            {
+                return ((OrderedDictionary<TKey, TValue>*)dict)
+                    ->Set(KeyValuePair<TKey, TValue>(_Move(key), val));
+            }
+            TValue& operator=(TValue&& val)
+            {
+                return ((OrderedDictionary<TKey, TValue>*)dict)
+                    ->Set(KeyValuePair<TKey, TValue>(_Move(key), _Move(val)));
+            }
+        };
+        ItemProxy operator[](const TKey& key) const { return ItemProxy(key, this); }
+        ItemProxy operator[](TKey&& key) const { return ItemProxy(_Move(key), this); }
+        int Count() const { return _count; }
+        KeyValuePair<TKey, TValue>& First() const { return kvPairs.First(); }
+        KeyValuePair<TKey, TValue>& Last() const { return kvPairs.Last(); }
+
+    private:
+        template <typename... Args>
+        void Init(const KeyValuePair<TKey, TValue>& kvPair, Args... args)
+        {
+            Add(kvPair);
+            Init(args...);
+        }
+
+    public:
+        OrderedDictionary()
+        {
+            bucketSizeMinusOne = -1;
+            _count = 0;
+            hashMap = 0;
+        }
+        template <typename Arg, typename... Args> OrderedDictionary(Arg arg, Args... args)
+        {
+            Init(arg, args...);
+        }
+        OrderedDictionary(const OrderedDictionary<TKey, TValue>& other)
+            : bucketSizeMinusOne(-1)
+            , _count(0)
+            , hashMap(0)
+        {
+            *this = other;
+        }
+        OrderedDictionary(OrderedDictionary<TKey, TValue>&& other)
+            : bucketSizeMinusOne(-1)
+            , _count(0)
+            , hashMap(0)
+        {
+            *this = (_Move(other));
+        }
+        OrderedDictionary<TKey, TValue>&
+        operator=(const OrderedDictionary<TKey, TValue>& other)
+        {
+            if (this == &other)
+                return *this;
+            Clear();
+            for (auto& item : other)
+                Add(item.Key, item.Value);
+            return *this;
+        }
+        OrderedDictionary<TKey, TValue>&
+        operator=(OrderedDictionary<TKey, TValue>&& other)
+        {
+            if (this == &other)
+                return *this;
+            Free();
+            bucketSizeMinusOne = other.bucketSizeMinusOne;
+            _count = other._count;
+            hashMap = other.hashMap;
+            marks = _Move(other.marks);
+            other.hashMap = 0;
+            other._count = 0;
+            other.bucketSizeMinusOne = -1;
+            kvPairs = _Move(other.kvPairs);
+            return *this;
+        }
+        ~OrderedDictionary() { Free(); }
+    };
+
+    template <typename T> class OrderedHashSet : public HashSetBase<T, OrderedDictionary<T, _DummyClass>>
+    {};
 }
 
 #endif
