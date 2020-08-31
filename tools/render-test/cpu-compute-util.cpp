@@ -359,6 +359,58 @@ static SlangResult _newTexture(const InputTextureDesc& desc, slang::TypeLayoutRe
     return false;
 }
 
+SlangResult CPUComputeUtil::populateRTTIEntries(
+    ShaderCompilerUtil::OutputAndLayout& compilationAndLayout,
+    ISlangSharedLibrary* sharedLib)
+{
+    slang::ISession* linkage = nullptr;
+    spCompileRequest_getSession(compilationAndLayout.output.request, &linkage);
+    auto& inputLayout = compilationAndLayout.layout;
+    for (auto& entry : inputLayout.entries)
+    {
+        for (auto& rtti : entry.rttiEntries)
+        {
+            void* ptrValue = nullptr;
+            switch (rtti.type)
+            {
+            case RTTIDataEntryType::RTTIObject:
+                ptrValue = sharedLib->findFuncByName(rtti.typeName.getBuffer());
+                break;
+            case RTTIDataEntryType::WitnessTable:
+            {
+                auto reflection = slang::ShaderReflection::get(compilationAndLayout.output.request);
+                auto concreteType = reflection->findTypeByName(rtti.typeName.getBuffer());
+                if (!concreteType)
+                    return SLANG_FAIL;
+                auto interfaceType = reflection->findTypeByName(rtti.interfaceName.getBuffer());
+                if (!interfaceType)
+                    return SLANG_FAIL;
+                ISlangBlob* outName = nullptr;
+                linkage->getTypeConformanceWitnessMangledName(concreteType, interfaceType, &outName);
+                if (!outName)
+                    return SLANG_FAIL;
+                ptrValue = sharedLib->findFuncByName((char*)outName->getBufferPointer());
+                break;
+            }
+            default:
+                break;
+            }
+            if (rtti.offset >= 0 && rtti.offset + sizeof(ptrValue) <= entry.bufferData.getCount() * sizeof(decltype(entry.bufferData[0])))
+            {
+                memcpy(
+                    ((char*)entry.bufferData.getBuffer()) + rtti.offset,
+                    &ptrValue,
+                    sizeof(ptrValue));
+            }
+            else
+            {
+                return SLANG_FAIL;
+            }
+        }
+    }
+    return SLANG_OK;
+}
+
 /* static */SlangResult CPUComputeUtil::calcBindings(const ShaderCompilerUtil::OutputAndLayout& compilationAndLayout, Context& outContext)
 {
     auto request = compilationAndLayout.output.request;

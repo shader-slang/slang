@@ -55,6 +55,11 @@ struct CPUComputeUtil
         /// Runs code across run styles and makes sure output buffers match
     static SlangResult checkStyleConsistency(ISlangSharedLibrary* sharedLib, const uint32_t dispatchSize[3], const ShaderCompilerUtil::OutputAndLayout& compilationAndLayout);
 
+        /// Query and fill in the RTTI pointer values in data buffers.
+    static SlangResult populateRTTIEntries(
+        ShaderCompilerUtil::OutputAndLayout& compilationAndLayout,
+        ISlangSharedLibrary* sharedLib);
+
     static SlangResult calcBindings(const ShaderCompilerUtil::OutputAndLayout& compilationAndLayout, Context& outContext);
     
     static SlangResult calcExecuteInfo(ExecuteStyle style, ISlangSharedLibrary* sharedLib, const uint32_t dispatchSize[3], const ShaderCompilerUtil::OutputAndLayout& compilationAndLayout, Context& context, ExecuteInfo& out);

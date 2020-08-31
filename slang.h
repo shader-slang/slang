@@ -3374,6 +3374,11 @@ SLANG_API SlangResult spCompileRequest_getModule(
     SlangInt                translationUnitIndex,
     slang::IModule**        outModule);
 
+/** Get the `ISession` handle behind the `SlangCompileRequest`.
+*/
+SLANG_API SlangResult spCompileRequest_getSession(
+    SlangCompileRequest* request,
+    slang::ISession** outSession);
 #endif
 
 /* DEPRECATED DEFINITIONS
