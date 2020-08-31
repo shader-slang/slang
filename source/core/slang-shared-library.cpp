@@ -87,4 +87,9 @@ SlangFuncPtr DefaultSharedLibrary::findFuncByName(char const* name)
     return SharedLibrary::findFuncByName(m_sharedLibraryHandle, name); 
 }
 
+void* DefaultSharedLibrary::findObjectByName(char const* name)
+{
+    return SharedLibrary::findObjectByName(m_sharedLibraryHandle, name);
+}
+
 } 

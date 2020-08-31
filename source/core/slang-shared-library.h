@@ -53,6 +53,7 @@ class DefaultSharedLibrary : public ISlangSharedLibrary, public RefObject
 
     // ISlangSharedLibrary
     virtual SLANG_NO_THROW SlangFuncPtr SLANG_MCALL findFuncByName(char const* name) SLANG_OVERRIDE;
+    virtual SLANG_NO_THROW void* SLANG_MCALL findObjectByName(char const* name) SLANG_OVERRIDE;
 
         /// Ctor.
     DefaultSharedLibrary(const SharedLibrary::Handle sharedLibraryHandle):

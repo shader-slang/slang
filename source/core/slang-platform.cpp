@@ -134,6 +134,12 @@ SLANG_COMPILE_TIME_ASSERT(E_OUTOFMEMORY == SLANG_E_OUT_OF_MEMORY);
     return (FuncPtr)GetProcAddress((HMODULE)handle, name);
 }
 
+/* static */ void* SharedLibrary::findObjectByName(Handle handle, char const* name)
+{
+    SLANG_ASSERT(handle);
+    return GetProcAddress((HMODULE)handle, name);
+}
+
 /* static */void SharedLibrary::appendPlatformFileName(const UnownedStringSlice& name, StringBuilder& dst)
 {
     dst.Append(name);
@@ -177,6 +183,12 @@ SLANG_COMPILE_TIME_ASSERT(E_OUTOFMEMORY == SLANG_E_OUT_OF_MEMORY);
 {
     SLANG_ASSERT(handle);
 	return (FuncPtr)dlsym((void*)handle, name);
+}
+
+/* static */ void* SharedLibrary::findObjectByName(Handle handle, char const* name)
+{
+    SLANG_ASSERT(handle);
+    return dlsym((void*)handle, name);
 }
 
 /* static */void SharedLibrary::appendPlatformFileName(const UnownedStringSlice& name, StringBuilder& dst)

@@ -98,6 +98,11 @@ namespace Slang
             /// @param The shared library handle as returned by loadPlatformLibrary
         static FuncPtr findFuncByName(Handle handle, char const* name);
 
+            /// Given a shared library handle and a name, return the associated object
+            /// Return nullptr if object is not found
+            /// @param The shared library handle as returned by loadPlatformLibrary
+        static void* findObjectByName(Handle handle, char const* name);
+
             /// Append to the end of dst, the name, with any platform specific additions
             /// The input name should be unadorned with any 'lib' prefix or extension
         static void appendPlatformFileName(const UnownedStringSlice& name, StringBuilder& dst);
