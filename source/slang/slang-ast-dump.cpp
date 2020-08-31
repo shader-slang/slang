@@ -218,6 +218,7 @@ struct ASTDumpContext
     {
         if (m_dumpFlags & ASTDumpUtil::Flag::HideSourceLoc)
         {
+            ScopeWrite(this).getBuf() << "SourceLoc(0)";
             return;
         }
 
@@ -268,7 +269,7 @@ struct ASTDumpContext
     {
         ScopeWrite(this).getBuf() << " { " << TokenTypeToString(token.type) << ", ";
         dump(token.loc);
-        m_writer->emit(" ");
+        m_writer->emit(", ");
         dump(token.getContent());
         m_writer->emit(" }");
     }
@@ -443,11 +444,11 @@ struct ASTDumpContext
     {
         if (qualType.isLeftValue)
         {
-            m_writer->emit("left ");
+            m_writer->emit("lvalue ");
         }
         else
         {
-            m_writer->emit("right ");
+            m_writer->emit("rvalue ");
         }
         dump(qualType.type);
     }
@@ -580,8 +581,10 @@ struct ASTDumpContext
 
     void dump(ASTNodeType nodeType)
     {
-        SLANG_UNUSED(nodeType)
-        // Don't bother to output anything - as will already have been dumped with the object name
+        // Get the class
+        auto info = ReflectClassInfo::getInfo(nodeType);
+        // Write the name
+        m_writer->emit(info->m_name);
     }
 
     void dumpObjectFull(NodeBase* node);

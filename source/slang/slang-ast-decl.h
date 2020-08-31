@@ -366,6 +366,8 @@ class ModuleDecl : public NamespaceDeclBase
     //
     Module* module = nullptr;
 
+    SLANG_UNREFLECTED
+
         /// Map a type to the list of extensions of that type (if any) declared in this module
         ///
         /// This mapping is filled in during semantic checking, as `ExtensionDecl`s get checked.
@@ -477,6 +479,18 @@ class AttributeDecl : public ContainerDecl
     SLANG_CLASS(AttributeDecl)
     // What type of syntax node will be produced to represent this attribute.
     SyntaxClass<NodeBase> syntaxClass;
+};
+
+// Import a Declaration that has been defined 'externally' and referenced in this module.
+// Includes the managed name of the declaration.
+// This declaration can be added when a module is serialized to any declaration that is
+// external to the module being serialized, such that it replaces the reference to the
+// declaration in another module.
+class ImportExternalDecl : public DeclBase
+{
+    SLANG_CLASS(ImportExternalDecl)
+
+    String mangledName;
 };
 
 } // namespace Slang

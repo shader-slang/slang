@@ -346,16 +346,21 @@ SLANG_FORCE_INLINE int IRSerialData::getOperands(const Inst& inst, const InstInd
     }
 }
 
+// For types/FourCC that work for serializing in general (not just IR). Really this should be placed in some other header
+struct SerialBinary
+{
+    static const FourCC kRiffFourCc = RiffFourCC::kRiff;
+
+    static const FourCC kSlangModuleListFourCc = SLANG_FOUR_CC('S', 'L', 'm', 'l');
+
+    static const FourCC kEntryPointFourCc = SLANG_FOUR_CC('E', 'P', 'n', 't');
+};
+
 // Replace first char with 's'
 #define SLANG_MAKE_COMPRESSED_FOUR_CC(fourCc) SLANG_FOUR_CC_REPLACE_FIRST_CHAR(fourCc, 's')
 
 struct IRSerialBinary
 {
-    
-    static const FourCC kRiffFourCc = RiffFourCC::kRiff;
-
-    static const FourCC kSlangModuleListFourCc = SLANG_FOUR_CC('S', 'L', 'm', 'l');
-
     static const FourCC kSlangModuleFourCc = SLANG_FOUR_CC('S', 'L', 'm', 'd');             ///< Holds all the slang specific chunks
 
     static const FourCC kSlangModuleHeaderFourCc = SLANG_FOUR_CC('S', 'L', 'h', 'd');
@@ -371,7 +376,6 @@ struct IRSerialBinary
     static const FourCC kCompressedChildRunFourCc = SLANG_MAKE_COMPRESSED_FOUR_CC(kChildRunFourCc);
     static const FourCC kCompressedExternalOperandsFourCc = SLANG_MAKE_COMPRESSED_FOUR_CC(kExternalOperandsFourCc);
 
-
     static const FourCC kStringFourCc = SLANG_FOUR_CC('S', 'L', 's', 't');
 
     static const FourCC kUInt32SourceLocFourCc = SLANG_FOUR_CC('S', 'r', 's', '4');
@@ -381,8 +385,6 @@ struct IRSerialBinary
     static const FourCC kDebugAdjustedLineInfoFourCc = SLANG_FOUR_CC('S', 'd', 'a', 'l');
     static const FourCC kDebugSourceInfoFourCc = SLANG_FOUR_CC('S', 'd', 's', 'o');
     static const FourCC kDebugSourceLocRunFourCc = SLANG_FOUR_CC('S', 'd', 's', 'r');
-
-    static const FourCC kEntryPointFourCc = SLANG_FOUR_CC('E', 'P', 'n', 't');
 
     typedef IRSerialCompressionType CompressionType;
 

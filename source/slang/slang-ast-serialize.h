@@ -7,14 +7,17 @@
 #include "slang-ast-support-types.h"
 #include "slang-ast-all.h"
 
+#include "../core/slang-riff.h"
+
 #include "slang-ast-builder.h"
 
 #include "../core/slang-byte-encode-util.h"
 
 #include "../core/slang-stream.h"
-
 namespace Slang
 {
+
+class Linkage;
 
 /*
 AST Serialization Overview
@@ -188,6 +191,16 @@ An extra wrinkle is that we allow accessing of a serialized String as a Name or 
 and a Name remains in scope as long as it's NamePool does which is passed in.
 */
 
+/* Holds RIFF FourCC codes for AST types */
+struct ASTSerialBinary
+{
+    static const FourCC kRiffFourCC = RiffFourCC::kRiff;
+
+        /// AST module LIST container
+    static const FourCC kSlangASTModuleFourCC = SLANG_FOUR_CC('S', 'A', 'm', 'l');
+        /// AST module data 
+    static const FourCC kSlangASTModuleDataFourCC = SLANG_FOUR_CC('S', 'A', 'm', 'd');
+};
 
 class ASTSerialClasses;
 
@@ -364,6 +377,9 @@ public:
         /// NOTE! data must stay ins scope when reading takes place
     SlangResult load(const uint8_t* data, size_t dataCount, ASTBuilder* builder, NamePool* namePool);
 
+        /// Read the modules from the container
+    static Result readContainerModules(RiffContainer* container, Linkage* linkage, List<RefPtr<Module>>& outModules);
+    
     ASTSerialReader(ASTSerialClasses* classes):
         m_classes(classes)
     {
@@ -415,6 +431,26 @@ void ASTSerialReader::getArray(ASTSerialIndex index, List<T>& out)
 
 
 class ASTSerialClasses;
+class ASTSerialWriter;
+
+class ASTSerialFilter
+{
+public:
+    virtual ASTSerialIndex writePointer(ASTSerialWriter* writer, const NodeBase* ptr) = 0;
+};
+
+class ModuleASTSerialFilter : public ASTSerialFilter
+{
+public:
+    virtual ASTSerialIndex writePointer(ASTSerialWriter* writer, const NodeBase* ptr) SLANG_OVERRIDE;
+
+    ModuleASTSerialFilter(ModuleDecl* moduleDecl):
+        m_moduleDecl(moduleDecl)
+    {
+    }
+
+    ModuleDecl* m_moduleDecl;
+};
 
 /* This is a class used tby toSerial implementations to turn native type into the serial type */
 class ASTSerialWriter : public RefObject
@@ -422,6 +458,9 @@ class ASTSerialWriter : public RefObject
 public:
     ASTSerialIndex addPointer(const NodeBase* ptr);
     ASTSerialIndex addPointer(const RefObject* ptr);
+
+        /// Write the pointer
+    ASTSerialIndex writePointer(const NodeBase* ptr);
 
     template <typename T>
     ASTSerialIndex addArray(const T* in, Index count);
@@ -431,13 +470,19 @@ public:
     ASTSerialIndex addName(const Name* name);
     ASTSerialSourceLoc addSourceLoc(SourceLoc sourceLoc);
 
+        /// Set a the index associated with an index. NOTE! That there cannot be a pre-existing setting.
+    void setPointerIndex(const NodeBase* ptr, ASTSerialIndex index);
+
         /// Get the entries table holding how each index maps to an entry
     const List<ASTSerialInfo::Entry*>& getEntries() const { return m_entries; }
 
         /// Write to a stream
     SlangResult write(Stream* stream);
 
-    ASTSerialWriter(ASTSerialClasses* classes);
+        /// Write the state into the container
+    SlangResult writeIntoContainer(RiffContainer* container);
+
+    ASTSerialWriter(ASTSerialClasses* classes, ASTSerialFilter* filter);
 
 protected:
 
@@ -461,6 +506,7 @@ protected:
     List<ASTSerialInfo::Entry*> m_entries;      ///< The entries
     MemoryArena m_arena;                        ///< Holds the payloads
     ASTSerialClasses* m_classes;
+    ASTSerialFilter* m_filter;                  ///< Filter to control what is serialized
 };
 
 // ---------------------------------------------------------------------------
