@@ -1477,9 +1477,11 @@ matrix<T,N,M> exp2(matrix<T,N,M> x)
 // Convert 16-bit float stored in low bits of integer
 __target_intrinsic(glsl, "unpackHalf2x16($0).x")
 __glsl_version(420)
+__target_intrinsic(hlsl)
 float f16tof32(uint value);
 
 __generic<let N : int>
+__target_intrinsic(hlsl)
 vector<float, N> f16tof32(vector<uint, N> value)
 {
     VECTOR_MAP_UNARY(float, N, f16tof32, value);
@@ -1488,9 +1490,11 @@ vector<float, N> f16tof32(vector<uint, N> value)
 // Convert to 16-bit float stored in low bits of integer
 __target_intrinsic(glsl, "packHalf2x16(vec2($0,0.0))")
 __glsl_version(420)
+__target_intrinsic(hlsl)
 uint f32tof16(float value);
 
 __generic<let N : int>
+__target_intrinsic(hlsl)
 vector<uint, N> f32tof16(vector<float, N> value)
 {
     VECTOR_MAP_UNARY(uint, N, f32tof16, value);
