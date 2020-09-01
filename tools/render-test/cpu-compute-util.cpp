@@ -374,7 +374,7 @@ SlangResult CPUComputeUtil::populateRTTIEntries(
             switch (rtti.type)
             {
             case RTTIDataEntryType::RTTIObject:
-                ptrValue = sharedLib->findFuncByName(rtti.typeName.getBuffer());
+                ptrValue = sharedLib->findObjectByName(rtti.typeName.getBuffer());
                 break;
             case RTTIDataEntryType::WitnessTable:
             {
@@ -389,7 +389,7 @@ SlangResult CPUComputeUtil::populateRTTIEntries(
                 linkage->getTypeConformanceWitnessMangledName(concreteType, interfaceType, &outName);
                 if (!outName)
                     return SLANG_FAIL;
-                ptrValue = sharedLib->findFuncByName((char*)outName->getBufferPointer());
+                ptrValue = sharedLib->findObjectByName((char*)outName->getBufferPointer());
                 break;
             }
             default:

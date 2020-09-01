@@ -891,6 +891,7 @@ extern "C"
             @return The function pointer related to the name or nullptr if not found 
             */
         virtual SLANG_NO_THROW SlangFuncPtr SLANG_MCALL findFuncByName(char const* name) = 0;
+        virtual SLANG_NO_THROW void* SLANG_MCALL findObjectByName(char const* name) = 0;
     };
     #define SLANG_UUID_ISlangSharedLibrary { 0x9c9d5bc5, 0xeb61, 0x496f,{ 0x80, 0xd7, 0xd1, 0x47, 0xc4, 0xa2, 0x37, 0x30 } };
 
