@@ -82,14 +82,9 @@ DefaultSharedLibrary::~DefaultSharedLibrary()
     }
 }
 
-SlangFuncPtr DefaultSharedLibrary::findFuncByName(char const* name)
+void* DefaultSharedLibrary::findSymbolAddressByName(char const* name)
 {
-    return SharedLibrary::findFuncByName(m_sharedLibraryHandle, name); 
-}
-
-void* DefaultSharedLibrary::findObjectByName(char const* name)
-{
-    return SharedLibrary::findObjectByName(m_sharedLibraryHandle, name);
+    return SharedLibrary::findSymbolAddressByName(m_sharedLibraryHandle, name);
 }
 
 } 

@@ -363,8 +363,8 @@ SlangResult CPUComputeUtil::populateRTTIEntries(
     ShaderCompilerUtil::OutputAndLayout& compilationAndLayout,
     ISlangSharedLibrary* sharedLib)
 {
-    slang::ISession* linkage = nullptr;
-    spCompileRequest_getSession(compilationAndLayout.output.request, &linkage);
+    Slang::ComPtr<slang::ISession> linkage;
+    spCompileRequest_getSession(compilationAndLayout.output.request, linkage.writeRef());
     auto& inputLayout = compilationAndLayout.layout;
     for (auto& entry : inputLayout.entries)
     {
@@ -374,7 +374,7 @@ SlangResult CPUComputeUtil::populateRTTIEntries(
             switch (rtti.type)
             {
             case RTTIDataEntryType::RTTIObject:
-                ptrValue = sharedLib->findObjectByName(rtti.typeName.getBuffer());
+                ptrValue = sharedLib->findSymbolAddressByName(rtti.typeName.getBuffer());
                 break;
             case RTTIDataEntryType::WitnessTable:
             {
@@ -389,7 +389,7 @@ SlangResult CPUComputeUtil::populateRTTIEntries(
                 linkage->getTypeConformanceWitnessMangledName(concreteType, interfaceType, &outName);
                 if (!outName)
                     return SLANG_FAIL;
-                ptrValue = sharedLib->findObjectByName((char*)outName->getBufferPointer());
+                ptrValue = sharedLib->findSymbolAddressByName((char*)outName->getBufferPointer());
                 break;
             }
             default:

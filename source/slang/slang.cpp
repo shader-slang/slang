@@ -3656,7 +3656,8 @@ SLANG_API SlangResult spCompileRequest_getSession(
     SlangCompileRequest* request,
     slang::ISession** outSession)
 {
-    *outSession = Slang::asInternal(request)->getLinkage();
+    auto session = Slang::asInternal(request)->getLinkage();
+    *outSession = Slang::ComPtr<slang::ISession>(session).detach();
     return SLANG_OK;
 }
 
