@@ -412,6 +412,8 @@ namespace renderer_test
                                             parser.Read(")");
                                             offset += 8;
                                             entry.rttiEntries.add(rttiEntry);
+                                            entry.bufferData.add(0);
+                                            entry.bufferData.add(0);
                                             continue;
                                         }
                                         else if (parser.LookAhead("witness"))
@@ -426,6 +428,8 @@ namespace renderer_test
                                             parser.Read(")");
                                             offset += 8;
                                             entry.rttiEntries.add(rttiEntry);
+                                            entry.bufferData.add(0);
+                                            entry.bufferData.add(0);
                                             continue;
                                         }
 

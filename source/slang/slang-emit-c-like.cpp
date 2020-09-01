@@ -3876,8 +3876,9 @@ void CLikeSourceEmitter::computeEmitActions(IRModule* module, List<EmitAction>& 
     {
         if( as<IRType>(inst) )
         {
-            // Don't emit a type unless it is actually used.
-            continue;
+            // Don't emit a type unless it is actually used or is marked public.
+            if (!inst->findDecoration<IRPublicDecoration>())
+                continue;
         }
 
         ensureGlobalInst(&ctx, inst, EmitAction::Level::Definition);

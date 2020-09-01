@@ -1038,6 +1038,11 @@ static void addLinkageDecoration(
     {
         builder->addExportDecoration(inst, mangledName);
     }
+    if (decl->findModifier<PublicModifier>())
+    {
+        builder->addPublicDecoration(inst);
+        builder->addKeepAliveDecoration(inst);
+    }
 }
 
 static void addLinkageDecoration(
@@ -5161,6 +5166,15 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
         return LoweredValInfo::simple(inst);
     }
 
+    bool isPublicType(Type* type)
+    {
+        if (auto declRefType = as<DeclRefType>(type))
+        {
+            if (declRefType->declRef.getDecl()->findModifier<PublicModifier>())
+                return true;
+        }
+        return false;
+    }
 
     void lowerWitnessTable(
         IRGenContext*                               subContext,
@@ -5211,6 +5225,12 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
                             astReqWitnessTable->witnessedType,
                             astReqWitnessTable->baseType);
                         subBuilder->addExportDecoration(irSatisfyingWitnessTable, mangledName.getUnownedSlice());
+                        if (isPublicType(astReqWitnessTable->witnessedType))
+                        {
+                            subBuilder->addPublicDecoration(irSatisfyingWitnessTable);
+                            subBuilder->addKeepAliveDecoration(irSatisfyingWitnessTable);
+                        }
+
                         // Recursively lower the sub-table.
                         lowerWitnessTable(
                             subContext,
@@ -5327,6 +5347,11 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
         // Create the IR-level witness table
         auto irWitnessTable = subBuilder->createWitnessTable(irWitnessTableBaseType);
         addLinkageDecoration(context, irWitnessTable, inheritanceDecl, mangledName.getUnownedSlice());
+        if (parentDecl->findModifier<PublicModifier>())
+        {
+            subBuilder->addPublicDecoration(irWitnessTable);
+            subBuilder->addKeepAliveDecoration(irWitnessTable);
+        }
 
         // Register the value now, rather than later, to avoid any possible infinite recursion.
         setGlobalValue(context, inheritanceDecl, LoweredValInfo::simple(irWitnessTable));
@@ -6154,6 +6179,8 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
             SLANG_UNREACHABLE("associatedtype should have been handled by visitAssocTypeDecl.");
         }
 
+        bool isPublicType = decl->findModifier<PublicModifier>() != nullptr;
+
         // Given a declaration of a type, we need to make sure
         // to output "witness tables" for any interfaces this
         // type has declared conformance to.
@@ -6171,11 +6198,11 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
 
         // Emit any generics that should wrap the actual type.
         auto outerGeneric = emitOuterGenerics(subContext, decl, decl);
-                
 
         IRStructType* irStruct = subBuilder->createStructType();
         addNameHint(context, irStruct, decl);
         addLinkageDecoration(context, irStruct, decl);
+
         subBuilder->setInsertInto(irStruct);
 
         // A `struct` that inherits from another `struct` must start
@@ -6183,6 +6210,8 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
         //
         for( auto inheritanceDecl : decl->getMembersOfType<InheritanceDecl>() )
         {
+            if (isPublicType)
+                ensureDecl(context, inheritanceDecl);
             auto superType = inheritanceDecl->base;
             if(auto superDeclRefType = as<DeclRefType>(superType))
             {

@@ -3613,6 +3613,17 @@ static TypeLayoutResult _createTypeLayout(
             typeLayout->type = type;
             typeLayout->rules = rules;
 
+            LayoutSize fixedSize = 16;
+            if (auto anyValueAttr =
+                    interfaceDeclRef.getDecl()->findModifier<AnyValueSizeAttribute>())
+            {
+                fixedSize += anyValueAttr->size;
+            }
+            else
+            {
+                fixedSize += 8;
+            }
+            typeLayout->addResourceUsage(LayoutResourceKind::Uniform, fixedSize);
             typeLayout->addResourceUsage(LayoutResourceKind::ExistentialTypeParam, 1);
             typeLayout->addResourceUsage(LayoutResourceKind::ExistentialObjectParam, 1);
 

@@ -10,13 +10,22 @@ namespace Slang
 {
     // This is a subpass of generics lowering IR transformation.
     // This pass lowers all generic/polymorphic types into IRAnyValueType.
-    struct GenericVarLoweringContext
+    struct GenericTypeLoweringContext
     {
         SharedGenericsLoweringContext* sharedContext;
 
         void processInst(IRInst* inst)
         {
-            // If inst is a type itself, keep its type.
+            // Ensure public struct types has RTTI object defined.
+            if (as<IRStructType>(inst))
+            {
+                if (inst->findDecoration<IRPublicDecoration>())
+                {
+                    sharedContext->maybeEmitRTTIObject(inst);
+                }
+            }
+
+            // Don't modify type insts themselves.
             if (as<IRType>(inst))
                 return;
 
@@ -28,6 +37,21 @@ namespace Slang
             auto newType = sharedContext->lowerType(builder, inst->getFullType());
             if (newType != inst->getFullType())
                 inst->setFullType((IRType*)newType);
+
+            switch (inst->op)
+            {
+            default:
+                break;
+            case kIROp_StructField:
+                {
+                    // Translate the struct field type.
+                    auto structField = static_cast<IRStructField*>(inst);
+                    auto loweredFieldType =
+                        sharedContext->lowerType(builder, structField->getFieldType());
+                    structField->setOperand(1, loweredFieldType);
+                }
+                break;
+            }
         }
 
         void processModule()
@@ -62,7 +86,7 @@ namespace Slang
 
     void lowerGenericType(SharedGenericsLoweringContext* sharedContext)
     {
-        GenericVarLoweringContext context;
+        GenericTypeLoweringContext context;
         context.sharedContext = sharedContext;
         context.processModule();
     }

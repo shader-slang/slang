@@ -3110,6 +3110,12 @@ namespace slang
             LayoutRules     rules = LayoutRules::Default,
             ISlangBlob**    outDiagnostics = nullptr) = 0;
 
+            /** Get the mangled name for a type RTTI object.
+            */
+        virtual SLANG_NO_THROW SlangResult SLANG_MCALL getTypeRTTIMangledName(
+            TypeReflection* type,
+            ISlangBlob** outNameBlob) = 0;
+
             /** Get the mangled name for a type witness.
             */
         virtual SLANG_NO_THROW SlangResult SLANG_MCALL getTypeConformanceWitnessMangledName(
