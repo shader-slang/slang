@@ -1924,6 +1924,15 @@ SlangResult CPPExtractorApp::writeAllText(const Slang::String& fileName, const U
 {
     try
     {
+        if (File::exists(fileName))
+        {
+            String existingText;
+            if (readAllText(fileName, existingText) == SLANG_OK)
+            {
+                if (existingText == text)
+                    return SLANG_OK;
+            }
+        }
         StreamWriter writer(new FileStream(fileName, FileMode::Create));
         writer.Write(text);
     }
