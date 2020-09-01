@@ -892,7 +892,7 @@ extern "C"
             */
         inline SlangFuncPtr SLANG_MCALL findFuncByName(char const* name)
         {
-            return static_cast<SlangFuncPtr>(findSymbolAddressByName(name));
+            return reinterpret_cast<SlangFuncPtr>(findSymbolAddressByName(name));
         }
             /** Get a symbol by name. If the library is unloaded will only return nullptr. 
             @param name The name of the symbol 
