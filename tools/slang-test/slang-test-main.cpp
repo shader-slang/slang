@@ -1576,7 +1576,7 @@ static TestResult runCPPCompilerSharedLibrary(TestContext* context, TestInput& i
         typedef int(*TestFunc)(int intValue, const char* textValue, char* outTextValue);
 
         // We could capture output if we passed in a ISlangWriter - but for that to work we'd need a 
-        TestFunc testFunc = (TestFunc)SharedLibrary::findFuncByName(handle, "test");
+        TestFunc testFunc = (TestFunc)SharedLibrary::findSymbolAddressByName(handle, "test");
         if (testFunc)
         {
             value = testFunc(inValue, inBuffer, buffer);

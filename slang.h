@@ -890,7 +890,15 @@ extern "C"
             @param name The name of the function 
             @return The function pointer related to the name or nullptr if not found 
             */
-        virtual SLANG_NO_THROW SlangFuncPtr SLANG_MCALL findFuncByName(char const* name) = 0;
+        inline SlangFuncPtr SLANG_MCALL findFuncByName(char const* name)
+        {
+            return reinterpret_cast<SlangFuncPtr>(findSymbolAddressByName(name));
+        }
+            /** Get a symbol by name. If the library is unloaded will only return nullptr. 
+            @param name The name of the symbol 
+            @return The pointer related to the name or nullptr if not found 
+            */
+        virtual SLANG_NO_THROW void* SLANG_MCALL findSymbolAddressByName(char const* name) = 0;
     };
     #define SLANG_UUID_ISlangSharedLibrary { 0x9c9d5bc5, 0xeb61, 0x496f,{ 0x80, 0xd7, 0xd1, 0x47, 0xc4, 0xa2, 0x37, 0x30 } };
 
@@ -3374,6 +3382,11 @@ SLANG_API SlangResult spCompileRequest_getModule(
     SlangInt                translationUnitIndex,
     slang::IModule**        outModule);
 
+/** Get the `ISession` handle behind the `SlangCompileRequest`.
+*/
+SLANG_API SlangResult spCompileRequest_getSession(
+    SlangCompileRequest* request,
+    slang::ISession** outSession);
 #endif
 
 /* DEPRECATED DEFINITIONS

@@ -398,8 +398,37 @@ namespace renderer_test
                                     parser.Read("=");
 
                                     parser.Read("[");
+                                    uint32_t offset = 0;
                                     while (!parser.IsEnd() && !parser.LookAhead("]"))
                                     {
+                                        RTTIDataEntry rttiEntry;
+                                        if (parser.LookAhead("rtti"))
+                                        {
+                                            parser.ReadToken();
+                                            parser.Read("(");
+                                            rttiEntry.type = RTTIDataEntryType::RTTIObject;
+                                            rttiEntry.typeName = parser.ReadWord();
+                                            rttiEntry.offset = offset;
+                                            parser.Read(")");
+                                            offset += 8;
+                                            entry.rttiEntries.add(rttiEntry);
+                                            continue;
+                                        }
+                                        else if (parser.LookAhead("witness"))
+                                        {
+                                            parser.ReadToken();
+                                            parser.Read("(");
+                                            rttiEntry.type = RTTIDataEntryType::WitnessTable;
+                                            rttiEntry.typeName = parser.ReadWord();
+                                            parser.Read(",");
+                                            rttiEntry.interfaceName = parser.ReadWord();
+                                            rttiEntry.offset = offset;
+                                            parser.Read(")");
+                                            offset += 8;
+                                            entry.rttiEntries.add(rttiEntry);
+                                            continue;
+                                        }
+
                                         bool negate = false;
                                         if(parser.NextToken().Type == TokenType::OpSub)
                                         {
@@ -419,6 +448,7 @@ namespace renderer_test
                                             if(negate) floatNum = -floatNum;
                                             entry.bufferData.add(*(unsigned int*)&floatNum);
                                         }
+                                        offset += 4;
                                     }
                                     parser.Read("]");
                                 }
