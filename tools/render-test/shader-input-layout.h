@@ -63,11 +63,24 @@ struct ArrayDesc
     int size = 0;
 };
 
+enum class RTTIDataEntryType
+{
+    RTTIObject, WitnessTable
+};
+struct RTTIDataEntry
+{
+    RTTIDataEntryType type;
+    Slang::String typeName;
+    Slang::String interfaceName;
+    unsigned int offset;
+};
+
 class ShaderInputLayoutEntry
 {
 public:
     ShaderInputType type;
     Slang::List<unsigned int> bufferData;
+    Slang::List<RTTIDataEntry> rttiEntries;
     InputTextureDesc textureDesc;
     InputBufferDesc bufferDesc;
     InputSamplerDesc samplerDesc;

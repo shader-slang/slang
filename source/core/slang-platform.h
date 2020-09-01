@@ -93,10 +93,10 @@ namespace Slang
             /// @param The valid handle returned from load 
         static void unload(Handle handle);
 
-            /// Given a shared library handle and a name, return the associated function
-            /// Return nullptr if function is not found
+            /// Given a shared library handle and a name, return the associated object
+            /// Return nullptr if object is not found
             /// @param The shared library handle as returned by loadPlatformLibrary
-        static FuncPtr findFuncByName(Handle handle, char const* name);
+        static void* findSymbolAddressByName(Handle handle, char const* name);
 
             /// Append to the end of dst, the name, with any platform specific additions
             /// The input name should be unadorned with any 'lib' prefix or extension

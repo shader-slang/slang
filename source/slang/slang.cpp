@@ -3652,6 +3652,15 @@ SLANG_API SlangResult spCompileRequest_getModule(
     return SLANG_OK;
 }
 
+SLANG_API SlangResult spCompileRequest_getSession(
+    SlangCompileRequest* request,
+    slang::ISession** outSession)
+{
+    auto session = Slang::asInternal(request)->getLinkage();
+    *outSession = Slang::ComPtr<slang::ISession>(session).detach();
+    return SLANG_OK;
+}
+
 SLANG_API SlangResult spCompileRequest_getEntryPoint(
     SlangCompileRequest*    request,
     SlangInt                entryPointIndex,
