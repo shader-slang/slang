@@ -2483,13 +2483,14 @@ SlangResult dissassembleDXILUsingDXC(
         BackEndCompileRequest* compileRequest,
         EndToEndCompileRequest* endToEndReq)
     {
-        // If we are about to generate output code, but we still
+        // When dynamic dispatch is disabled, the program must
+        // be fully specialized by now. So we check if we still
         // have unspecialized generic/existential parameters,
-        // then there is a problem.
+        // and report them as an error.
         //
         auto program = compileRequest->getProgram();
         auto specializationParamCount = program->getSpecializationParamCount();
-        if( specializationParamCount != 0 )
+        if (compileRequest->disableDynamicDispatch && specializationParamCount != 0)
         {
             auto sink = compileRequest->getSink();
             

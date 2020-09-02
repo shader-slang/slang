@@ -1615,12 +1615,12 @@ void CPPSourceEmitter::emitWitnessTable(IRWitnessTable* witnessTable)
     auto witnessTableItems = witnessTable->getChildren();
     _maybeEmitWitnessTableTypeDefinition(interfaceType);
 
-    // Define a global variable for the witness table.
-    m_writer->emit("extern \"C\" ");
+    // Declare a global variable for the witness table.
+    m_writer->emit("extern \"C\" { SLANG_PRELUDE_SHARED_LIB_EXPORT extern ");
     emitSimpleType(interfaceType);
     m_writer->emit(" ");
     m_writer->emit(getName(witnessTable));
-    m_writer->emit(";\n");
+    m_writer->emit("; }\n");
 
     // The actual definition of this witness table global variable
     // is deferred until the entire `Context` class is emitted, so
@@ -1636,6 +1636,9 @@ void CPPSourceEmitter::_emitWitnessTableDefinitions()
     {
         auto interfaceType = cast<IRInterfaceType>(witnessTable->getOperand(0));
         List<IRWitnessTableEntry*> sortedWitnessTableEntries = getSortedWitnessTableEntries(witnessTable);
+        m_writer->emit("extern \"C\"\n{\n");
+        m_writer->indent();
+        m_writer->emit("SLANG_PRELUDE_SHARED_LIB_EXPORT\n");
         emitSimpleType(interfaceType);
         m_writer->emit(" ");
         m_writer->emit(getName(witnessTable));
@@ -1679,6 +1682,8 @@ void CPPSourceEmitter::_emitWitnessTableDefinitions()
         }
         m_writer->dedent();
         m_writer->emit("\n};\n");
+        m_writer->dedent();
+        m_writer->emit("\n}\n");
     }
 }
 
@@ -1698,18 +1703,18 @@ void CPPSourceEmitter::emitInterface(IRInterfaceType* interfaceType)
 void CPPSourceEmitter::emitRTTIObject(IRRTTIObject* rttiObject)
 {
     // Declare the type info object as `extern "C"` first.
-    m_writer->emit("extern \"C\" TypeInfo ");
+    m_writer->emit("extern \"C\"{ SLANG_PRELUDE_SHARED_LIB_EXPORT extern TypeInfo ");
     m_writer->emit(getName(rttiObject));
-    m_writer->emit(";\n");
+    m_writer->emit("; }\n");
 
     // Now actually define the object.
-    m_writer->emit("TypeInfo ");
+    m_writer->emit("extern \"C\" { SLANG_PRELUDE_SHARED_LIB_EXPORT TypeInfo ");
     m_writer->emit(getName(rttiObject));
     m_writer->emit(" = {");
     auto typeSizeDecoration = rttiObject->findDecoration<IRRTTITypeSizeDecoration>();
     SLANG_ASSERT(typeSizeDecoration);
     m_writer->emit(typeSizeDecoration->getTypeSize());
-    m_writer->emit("};\n");
+    m_writer->emit("}; }\n");
 }
 
 

@@ -259,6 +259,7 @@ IR_SIMPLE_DECORATION(EarlyDepthStencilDecoration)
 IR_SIMPLE_DECORATION(GloballyCoherentDecoration)
 IR_SIMPLE_DECORATION(PreciseDecoration)
 IR_SIMPLE_DECORATION(PublicDecoration)
+IR_SIMPLE_DECORATION(KeepAliveDecoration)
 
 
 struct IROutputControlPointsDecoration : IRDecoration
@@ -2429,6 +2430,11 @@ struct IRBuilder
     void addKeepAliveDecoration(IRInst* value)
     {
         addDecoration(value, kIROp_KeepAliveDecoration);
+    }
+
+    void addPublicDecoration(IRInst* value)
+    {
+        addDecoration(value, kIROp_PublicDecoration);
     }
 
         /// Add a decoration that indicates that the given `inst` depends on the given `dependency`.

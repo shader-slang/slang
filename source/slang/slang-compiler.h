@@ -1205,6 +1205,9 @@ namespace Slang
             SlangInt               targetIndex = 0,
             slang::LayoutRules     rules = slang::LayoutRules::Default,
             ISlangBlob**    outDiagnostics = nullptr) override;
+        SLANG_NO_THROW SlangResult SLANG_MCALL getTypeRTTIMangledName(
+            slang::TypeReflection* type,
+            ISlangBlob** outNameBlob) override;
         SLANG_NO_THROW SlangResult SLANG_MCALL getTypeConformanceWitnessMangledName(
             slang::TypeReflection* type,
             slang::TypeReflection* interfaceType,
@@ -1762,6 +1765,9 @@ namespace Slang
 
         // If true will disable generics/existential value specialization pass.
         bool disableSpecialization = false;
+
+        // If true will disable generating dynamic dispatch code.
+        bool disableDynamicDispatch = false;
 
         String m_dumpIntermediatePrefix;
 
