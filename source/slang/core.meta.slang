@@ -520,13 +520,6 @@ for( int C = 2; C <= 4; ++C )
     }
     sb << ");\n";
 
-
-    // initialize from another matrix of the same size
-    //
-    // TODO(tfoley): See comment about how this overlaps
-    // with implicit conversion, in the `vector` case above
-    sb << "__generic<U> __init(matrix<U," << R << ", " << C << ">);\n";
-
     // initialize from a matrix of larger size
     for(int rr = R; rr <= 4; ++rr)
     for( int cc = C; cc <= 4; ++cc )
@@ -536,6 +529,33 @@ for( int C = 2; C <= 4; ++C )
     }
 
     sb << "}\n";
+}
+
+for (int tt = 0; tt < kBaseTypeCount; ++tt)
+{
+    if(kBaseTypes[tt].tag == BaseType::Void) continue;
+    auto toType = kBaseTypes[tt].name;
+}}}}
+__generic<let R : int, let C : int> extension matrix<$(toType),R,C>
+{
+${{{{
+    for (int ff = 0; ff < kBaseTypeCount; ++ff)
+    {
+        if(kBaseTypes[ff].tag == BaseType::Void) continue;
+        if( tt == ff ) continue;
+
+        auto cost = getBaseTypeConversionCost(
+            kBaseTypes[tt],
+            kBaseTypes[ff]);
+        auto fromType = kBaseTypes[ff].name;
+}}}}
+    __implicit_conversion($(cost))
+    __init(matrix<$(fromType),R,C> value);
+${{{{
+    }
+}}}}
+}
+${{{{
 }
 }}}}
 
