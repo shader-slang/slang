@@ -563,6 +563,10 @@ struct OptionsParser
                 {
                     requestImpl->getBackEndReq()->disableSpecialization = true;
                 }
+                else if (argStr == "-disable-dynamic-dispatch")
+                {
+                    requestImpl->getBackEndReq()->disableDynamicDispatch = true;
+                }
                 else if (argStr == "-verbose-paths")
                 {
                     requestImpl->getSink()->setFlag(DiagnosticSink::Flag::VerbosePath);

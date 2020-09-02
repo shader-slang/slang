@@ -75,6 +75,12 @@ namespace Slang
             String rttiObjName = exportDecoration->getMangledName();
             builder->addExportDecoration(result, rttiObjName.getUnownedSlice());
         }
+        // Make sure the RTTI object for a public struct type has public visiblity.
+        if (typeInst->findDecoration<IRPublicDecoration>())
+        {
+            builder->addPublicDecoration(result);
+            builder->addKeepAliveDecoration(result);
+        }
         mapTypeToRTTIObject[typeInst] = result;
         return result;
     }

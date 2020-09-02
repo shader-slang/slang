@@ -374,7 +374,16 @@ SlangResult CPUComputeUtil::populateRTTIEntries(
             switch (rtti.type)
             {
             case RTTIDataEntryType::RTTIObject:
-                ptrValue = sharedLib->findSymbolAddressByName(rtti.typeName.getBuffer());
+                {
+                    auto reflection =
+                        slang::ShaderReflection::get(compilationAndLayout.output.request);
+                    auto concreteType = reflection->findTypeByName(rtti.typeName.getBuffer());
+                    ComPtr<ISlangBlob> outName;
+                    linkage->getTypeRTTIMangledName(concreteType, outName.writeRef());
+                    if (!outName)
+                        return SLANG_FAIL;
+                    ptrValue = sharedLib->findSymbolAddressByName((char*)outName->getBufferPointer());
+                }
                 break;
             case RTTIDataEntryType::WitnessTable:
             {
@@ -385,8 +394,8 @@ SlangResult CPUComputeUtil::populateRTTIEntries(
                 auto interfaceType = reflection->findTypeByName(rtti.interfaceName.getBuffer());
                 if (!interfaceType)
                     return SLANG_FAIL;
-                ISlangBlob* outName = nullptr;
-                linkage->getTypeConformanceWitnessMangledName(concreteType, interfaceType, &outName);
+                ComPtr<ISlangBlob> outName;
+                linkage->getTypeConformanceWitnessMangledName(concreteType, interfaceType, outName.writeRef());
                 if (!outName)
                     return SLANG_FAIL;
                 ptrValue = sharedLib->findSymbolAddressByName((char*)outName->getBufferPointer());
@@ -395,6 +404,8 @@ SlangResult CPUComputeUtil::populateRTTIEntries(
             default:
                 break;
             }
+            if (!ptrValue)
+                return SLANG_FAIL;
             if (rtti.offset >= 0 && rtti.offset + sizeof(ptrValue) <= entry.bufferData.getCount() * sizeof(decltype(entry.bufferData[0])))
             {
                 memcpy(
