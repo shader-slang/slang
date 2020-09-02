@@ -1,6 +1,7 @@
 // Test using interface typed shader parameters with dynamic dispatch.
 
 //TEST(compute):COMPARE_COMPUTE:-cpu -xslang -disable-specialization
+//DISABLE_TEST(compute):COMPARE_COMPUTE:-cuda -xslang -disable-specialization
 
 [anyValueSize(8)]
 interface IInterface
