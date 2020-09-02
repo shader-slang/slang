@@ -73,6 +73,23 @@ struct LayoutSize
         return raw != that.raw;
     }
 
+    bool operator>(LayoutSize that) const
+    {
+        if (that.isFinite())
+        {
+            if (this->isFinite())
+                return this->raw > that.raw;
+            return true;
+
+        }
+        else
+        {
+            if (that.isInfinite())
+                return false;
+            return true;
+        }
+    }
+
     void operator+=(LayoutSize right)
     {
         if( isInfinite() ) {}
@@ -892,6 +909,7 @@ struct LayoutRulesImpl
 
 struct LayoutRulesFamilyImpl
 {
+    virtual LayoutRulesImpl* getAnyValueRules()             = 0;
     virtual LayoutRulesImpl* getConstantBufferRules()       = 0;
     virtual LayoutRulesImpl* getPushConstantBufferRules()   = 0;
     virtual LayoutRulesImpl* getTextureBufferRules()        = 0;
