@@ -3613,17 +3613,29 @@ static TypeLayoutResult _createTypeLayout(
             typeLayout->type = type;
             typeLayout->rules = rules;
 
-            LayoutSize fixedSize = 16;
-            if (auto anyValueAttr =
-                    interfaceDeclRef.getDecl()->findModifier<AnyValueSizeAttribute>())
+            switch (context.targetReq->getTarget())
             {
-                fixedSize += anyValueAttr->size;
+            case CodeGenTarget::CPPSource:
+            case CodeGenTarget::CUDASource:
+                {
+                    LayoutSize fixedSize = 16;
+                    if (auto anyValueAttr =
+                            interfaceDeclRef.getDecl()->findModifier<AnyValueSizeAttribute>())
+                    {
+                        fixedSize += anyValueAttr->size;
+                    }
+                    else
+                    {
+                        // The interface type does not have an `[anyValueSize]` attribute,
+                        // assume a default of 8 bytes.
+                        fixedSize += 8;
+                    }
+                    typeLayout->addResourceUsage(LayoutResourceKind::Uniform, fixedSize);
+                }
+                break;
+            default:
+                break;
             }
-            else
-            {
-                fixedSize += 8;
-            }
-            typeLayout->addResourceUsage(LayoutResourceKind::Uniform, fixedSize);
             typeLayout->addResourceUsage(LayoutResourceKind::ExistentialTypeParam, 1);
             typeLayout->addResourceUsage(LayoutResourceKind::ExistentialObjectParam, 1);
 
