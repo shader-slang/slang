@@ -974,6 +974,18 @@ bool CLikeSourceEmitter::shouldFoldInstIntoUseSites(IRInst* inst)
     // for temporary variables.
     auto type = inst->getDataType();
 
+    // We treat instructions that yield a type as things we should *always* fold.
+    //
+    // TODO: In general, at the point where we emit code we do not expect to
+    // find types being constructed locally (inside function bodies), but this
+    // can end up happening because of interaction between different features.
+    // Notably, if a generic function gets force-inlined early in codegen,
+    // then any types it constructs will be inlined into the body of the caller
+    // by default.
+    //
+    if(as<IRType>(inst) || as<IRTypeKind>(type))
+        return true;
+
     // Unwrap any layers of array-ness from the type, so that
     // we can look at the underlying data type, in case we
     // should *never* expose a value of that type

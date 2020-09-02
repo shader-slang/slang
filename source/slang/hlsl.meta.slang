@@ -990,6 +990,71 @@ __generic<let N : int, let M : int>
 matrix<uint,N,M> asuint(matrix<uint,N,M> x)
 { return x; }
 
+
+// 16-bit bitcast ops (HLSL SM 6.2)
+//
+// TODO: We need to map these to GLSL/SPIR-V
+// operations that don't require an intermediate
+// conversion to fp32.
+
+// Identity cases:
+
+[__unsafeForceInlineEarly] float16_t asfloat16(float16_t value) { return value; }
+[__unsafeForceInlineEarly] vector<float16_t,N> asfloat16<let N : int>(vector<float16_t,N> value) { return value; }
+[__unsafeForceInlineEarly] matrix<float16_t,R,C> asfloat16<let R : int, let C : int>(matrix<float16_t,R,C> value) { return value; }
+
+[__unsafeForceInlineEarly] int16_t asint16(int16_t value) { return value; }
+[__unsafeForceInlineEarly] vector<int16_t,N> asint16<let N : int>(vector<int16_t,N> value) { return value; }
+[__unsafeForceInlineEarly] matrix<int16_t,R,C> asint16<let R : int, let C : int>(matrix<int16_t,R,C> value) { return value; }
+
+[__unsafeForceInlineEarly] uint16_t asuint16(uint16_t value) { return value; }
+[__unsafeForceInlineEarly] vector<uint16_t,N> asuint16<let N : int>(vector<uint16_t,N> value) { return value; }
+[__unsafeForceInlineEarly] matrix<uint16_t,R,C> asuint16<let R : int, let C : int>(matrix<uint16_t,R,C> value) { return value; }
+
+// Signed<->unsigned cases:
+
+[__unsafeForceInlineEarly] int16_t asint16(uint16_t value) { return value; }
+[__unsafeForceInlineEarly] vector<int16_t,N> asint16<let N : int>(vector<uint16_t,N> value) { return value; }
+[__unsafeForceInlineEarly] matrix<int16_t,R,C> asint16<let R : int, let C : int>(matrix<uint16_t,R,C> value) { return value; }
+
+[__unsafeForceInlineEarly] uint16_t asuint16(int16_t value) { return value; }
+[__unsafeForceInlineEarly] vector<uint16_t,N> asuint16<let N : int>(vector<int16_t,N> value) { return value; }
+[__unsafeForceInlineEarly] matrix<uint16_t,R,C> asuint16<let R : int, let C : int>(matrix<int16_t,R,C> value) { return value; }
+
+// Float->unsigned cases:
+
+__target_intrinsic(hlsl)
+__target_intrinsic(glsl, "uint16_t(packHalf2x16(vec2($0, 0.0)))")
+uint16_t asuint16(float16_t value);
+
+vector<uint16_t,N> asuint16<let N : int>(vector<float16_t,N> value)
+{ VECTOR_MAP_UNARY(uint16_t, N, asuint16, value); }
+
+matrix<uint16_t,R,C> asuint16<let R : int, let C : int>(matrix<float16_t,R,C> value)
+{ MATRIX_MAP_UNARY(uint16_t, R, C, asuint16, value); }
+
+// Unsigned->float cases:
+
+__target_intrinsic(hlsl)
+__target_intrinsic(glsl, "float16_t(unpackHalf2x16($0).x)")
+float16_t asfloat16(uint16_t value);
+
+vector<float16_t,N> asfloat16<let N : int>(vector<uint16_t,N> value)
+{ VECTOR_MAP_UNARY(float16_t, N, asfloat16, value); }
+
+matrix<float16_t,R,C> asfloat16<let R : int, let C : int>(matrix<uint16_t,R,C> value)
+{ MATRIX_MAP_UNARY(float16_t, R, C, asfloat16, value); }
+
+// Float<->signed cases:
+
+__target_intrinsic(hlsl) [__unsafeForceInlineEarly] int16_t asint16(float16_t value) { return asuint16(value); }
+__target_intrinsic(hlsl) [__unsafeForceInlineEarly] vector<int16_t,N> asint16<let N : int>(vector<float16_t,N> value) { return asuint16(value); }
+__target_intrinsic(hlsl) [__unsafeForceInlineEarly] matrix<int16_t,R,C> asint16<let R : int, let C : int>(matrix<float16_t,R,C> value) { return asuint16(value); }
+
+__target_intrinsic(hlsl) [__unsafeForceInlineEarly] float16_t asfloat16(int16_t value) { return asfloat16(asuint16(value)); }
+__target_intrinsic(hlsl) [__unsafeForceInlineEarly] vector<float16_t,N> asfloat16<let N : int>(vector<int16_t,N> value) { return asfloat16(asuint16(value)); }
+__target_intrinsic(hlsl) [__unsafeForceInlineEarly] matrix<float16_t,R,C> asfloat16<let R : int, let C : int>(matrix<int16_t,R,C> value) { return asfloat16(asuint16(value)); }
+
 // Inverse tangent (HLSL SM 1.0)
 __generic<T : __BuiltinFloatingPointType>
 __target_intrinsic(hlsl)
@@ -1477,9 +1542,11 @@ matrix<T,N,M> exp2(matrix<T,N,M> x)
 // Convert 16-bit float stored in low bits of integer
 __target_intrinsic(glsl, "unpackHalf2x16($0).x")
 __glsl_version(420)
+__target_intrinsic(hlsl)
 float f16tof32(uint value);
 
 __generic<let N : int>
+__target_intrinsic(hlsl)
 vector<float, N> f16tof32(vector<uint, N> value)
 {
     VECTOR_MAP_UNARY(float, N, f16tof32, value);
@@ -1488,9 +1555,11 @@ vector<float, N> f16tof32(vector<uint, N> value)
 // Convert to 16-bit float stored in low bits of integer
 __target_intrinsic(glsl, "packHalf2x16(vec2($0,0.0))")
 __glsl_version(420)
+__target_intrinsic(hlsl)
 uint f32tof16(float value);
 
 __generic<let N : int>
+__target_intrinsic(hlsl)
 vector<uint, N> f32tof16(vector<float, N> value)
 {
     VECTOR_MAP_UNARY(uint, N, f32tof16, value);
