@@ -1226,7 +1226,7 @@ SlangResult dissassembleDXILUsingDXC(
         CodeGenTarget sourceTarget = CodeGenTarget::None;
         SourceLanguage sourceLanguage = SourceLanguage::Unknown;
 
-        PassThroughMode downstreamCompiler = endToEndReq->passThrough;
+        PassThroughMode downstreamCompiler = endToEndReq ? endToEndReq->passThrough : PassThroughMode::None;
 
         // If we are not in pass through, lookup the default compiler for the emitted source type
         if (downstreamCompiler == PassThroughMode::None)
