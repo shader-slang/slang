@@ -50,6 +50,20 @@ struct CollectGlobalUniformParametersContext
     IRModule* module;
     IRVarLayout* globalScopeVarLayout;
 
+    IRGlobalParam* _getGlobalParamFromLayoutFieldKey(IRInst* key)
+    {
+        switch (key->op)
+        {
+        case kIROp_GlobalParam:
+            return cast<IRGlobalParam>(key);
+        case kIROp_MakeExistential:
+        case kIROp_WrapExistential:
+            return as<IRGlobalParam>(key->getOperand(0));
+        default:
+            return nullptr;
+        }
+    }
+
     // This is a relatively simple pass, and it is all driven
     // by a single subroutine.
     //
@@ -158,7 +172,7 @@ struct CollectGlobalUniformParametersContext
             // layout so that the "key" for the field is the corresponding
             // global shader parameter.
             //
-            auto globalParam = as<IRGlobalParam>(fieldLayoutAttr->getFieldKey());
+            auto globalParam = _getGlobalParamFromLayoutFieldKey(fieldLayoutAttr->getFieldKey());
             SLANG_ASSERT(globalParam);
 
             auto globalParamLayout = fieldLayoutAttr->getLayout();

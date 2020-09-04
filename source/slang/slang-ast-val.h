@@ -206,4 +206,11 @@ class ThisTypeSubtypeWitness : public SubtypeWitness
     SLANG_CLASS(ThisTypeSubtypeWitness)
 };
 
+    /// A witness of the fact that a user provided "__Dynamic" type argument is a
+    /// subtype to the existential type parameter.
+class DynamicSubtypeWitness : public SubtypeWitness
+{
+    SLANG_CLASS(DynamicSubtypeWitness)
+};
+
 } // namespace Slang

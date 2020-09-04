@@ -1420,8 +1420,12 @@ struct ValLoweringVisitor : ValVisitor<ValLoweringVisitor, LoweredValInfo, Lower
             //
             getBuilder()->createWitnessTableEntry(irWitnessTable, irReqKey, irSatisfyingVal);
         }
-
         return LoweredValInfo::simple(irWitnessTable);
+    }
+
+    LoweredValInfo visitDynamicSubtypeWitness(DynamicSubtypeWitness * /*val*/)
+    {
+        return LoweredValInfo::simple(nullptr);
     }
 
     LoweredValInfo visitThisTypeSubtypeWitness(ThisTypeSubtypeWitness* val)
@@ -7859,6 +7863,8 @@ struct SpecializedComponentTypeIRGenContext : ComponentTypeVisitor
 
                 IRInst* irParam = getSimpleVal(context, ensureDecl(context, shaderParam.paramDeclRef));
                 List<IRInst*> irSlotArgs;
+                // Tracks if there are any type args that is not an IRDynamicType.
+                bool hasConcreteTypeArg = false;
                 for( Index jj = 0; jj < specializationArgCount; ++jj )
                 {
                     auto& specializationArg = specializationInfo->existentialArgs[existentialArgOffset++];
@@ -7866,14 +7872,21 @@ struct SpecializedComponentTypeIRGenContext : ComponentTypeVisitor
                     auto irType = lowerSimpleVal(context, specializationArg.val);
                     auto irWitness = lowerSimpleVal(context, specializationArg.witness);
 
+                    if (irType->op != kIROp_DynamicType)
+                        hasConcreteTypeArg = true;
+
                     irSlotArgs.add(irType);
                     irSlotArgs.add(irWitness);
                 }
-
-                builder->addBindExistentialSlotsDecoration(
-                    irParam,
-                    irSlotArgs.getCount(),
-                    irSlotArgs.getBuffer());
+                // Only insert a `BindExistentialSlots` decoration when there are at least
+                // one non-dynamic type argument.
+                if (hasConcreteTypeArg)
+                {
+                    builder->addBindExistentialSlotsDecoration(
+                        irParam,
+                        irSlotArgs.getCount(),
+                        irSlotArgs.getBuffer());
+                }
             }
         }
     }

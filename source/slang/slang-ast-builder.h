@@ -25,6 +25,8 @@ public:
     Type* getStringType();
         /// Get the enum type type
     Type* getEnumTypeType();
+        /// Get the __Dynamic type
+    Type* getDynamicType();
 
     const ReflectClassInfo* findClassInfo(Name* name);
     SyntaxClass<NodeBase> findSyntaxClass(Name* name);
@@ -62,6 +64,7 @@ protected:
     //
     Type* m_stringType = nullptr;
     Type* m_enumTypeType = nullptr;
+    Type* m_dynamicType = nullptr;
 
     Type* m_builtinTypes[Index(BaseType::CountOf)];
 

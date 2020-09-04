@@ -180,8 +180,16 @@ namespace Slang
                 }
                 return true;
             }
-
-            if( auto aggTypeDeclRef = declRef.as<AggTypeDecl>() )
+            if (auto dynamicType = as<DynamicType>(subType))
+            {
+                // A __Dynamic type always conforms to the interface via its witness table.
+                if (outWitness)
+                {
+                    *outWitness = m_astBuilder->create<DynamicSubtypeWitness>();
+                }
+                return true;
+            }
+            else if( auto aggTypeDeclRef = declRef.as<AggTypeDecl>() )
             {
                 ensureDecl(aggTypeDeclRef, DeclCheckState::CanEnumerateBases);
 
@@ -363,7 +371,6 @@ namespace Slang
             }
             return true;
         }
-
         // default is failure
         return false;
     }

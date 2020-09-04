@@ -79,11 +79,33 @@ namespace Slang
             processExtractExistentialElement(inst, 0);
         }
 
+        void processGetValueFromExistentialBox(IRGetValueFromExistentialBox* inst)
+        {
+            IRBuilder builderStorage;
+            auto builder = &builderStorage;
+            builder->sharedBuilder = &sharedContext->sharedBuilderStorage;
+            builder->setInsertBefore(inst);
+
+            auto element = extractTupleElement(builder, inst->getOperand(0), 2);
+            // TODO: it is not technically sound to use `getAddress` on a temporary value.
+            // We probably need to develop a mechanism to allow a temporary value to be used
+            // in the place of a pointer.
+            auto elementAddr = builder->emitGetAddress(
+                builder->getPtrType(element->getDataType()), element);
+            auto reinterpretAddr = builder->emitBitCast(inst->getDataType(), elementAddr);
+            inst->replaceUsesWith(reinterpretAddr);
+            inst->removeAndDeallocate();
+        }
+
         void processInst(IRInst* inst)
         {
             if (auto makeExistential = as<IRMakeExistentialWithRTTI>(inst))
             {
                 processMakeExistential(makeExistential);
+            }
+            else if (auto getExistentialValue = as<IRGetValueFromExistentialBox>(inst))
+            {
+                processGetValueFromExistentialBox(getExistentialValue);
             }
             else if (auto extractExistentialVal = as<IRExtractExistentialValue>(inst))
             {

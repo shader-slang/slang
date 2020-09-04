@@ -197,6 +197,11 @@ namespace Slang
             SLANG_ASSERT(reqVal && reqVal->op == kIROp_AssociatedType);
             return lowerType(builder, reqVal, typeMapping);
         }
+        case kIROp_ExistentialBoxType:
+        {
+            auto existentialBoxType = static_cast<IRExistentialBoxType*>(paramType);
+            return lowerType(builder, existentialBoxType->getInterfaceType(), typeMapping);
+        }
         default:
         {
             bool translated = false;

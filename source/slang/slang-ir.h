@@ -626,6 +626,7 @@ struct IRBoolType : IRBasicType
 
 SIMPLE_IR_TYPE(StringType, Type)
 
+SIMPLE_IR_TYPE(DynamicType, Type)
 
 // True if types are equal
 // Note compares nominal types by name alone 
@@ -1109,7 +1110,12 @@ SIMPLE_IR_TYPE(RefType, PtrTypeBase)
 SIMPLE_IR_PARENT_TYPE(OutTypeBase, PtrTypeBase)
 SIMPLE_IR_TYPE(OutType, OutTypeBase)
 SIMPLE_IR_TYPE(InOutType, OutTypeBase)
-SIMPLE_IR_TYPE(ExistentialBoxType, PtrTypeBase)
+
+struct IRExistentialBoxType : public IRPtrTypeBase
+{
+    IR_LEAF_ISA(ExistentialBoxType);
+    IRType* getInterfaceType() { return (IRType*)getOperand(1); }
+};
 
     /// The base class of RawPointerType and RTTIPointerType.
 struct IRRawPointerTypeBase : IRType
