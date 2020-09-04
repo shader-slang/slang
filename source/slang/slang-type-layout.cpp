@@ -3662,9 +3662,10 @@ static TypeLayoutResult _createTypeLayout(
             typeLayout->rules = rules;
 
             LayoutSize fixedExistentialValueSize = 0;
-            bool useFixedSizedExistentialValue =
+            bool targetSupportsPointer =
                 isCPUTarget(context.targetReq) || isCUDATarget(context.targetReq);
-            if (useFixedSizedExistentialValue)
+
+            if (targetSupportsPointer)
             {
                 fixedExistentialValueSize = 16;
                 if (auto anyValueAttr =
@@ -3672,7 +3673,9 @@ static TypeLayoutResult _createTypeLayout(
                 {
                     fixedExistentialValueSize = anyValueAttr->size;
                 }
-                typeLayout->addResourceUsage(LayoutResourceKind::Uniform, fixedExistentialValueSize + 16);
+                // Append 16 bytes to accommodate RTTI pointer and witness table pointer.
+                auto uniformSlotSize = fixedExistentialValueSize + 16;
+                typeLayout->addResourceUsage(LayoutResourceKind::Uniform, uniformSlotSize);
             }
             typeLayout->addResourceUsage(LayoutResourceKind::ExistentialTypeParam, 1);
             typeLayout->addResourceUsage(LayoutResourceKind::ExistentialObjectParam, 1);
@@ -3695,17 +3698,14 @@ static TypeLayoutResult _createTypeLayout(
                 // the existential value. We should remove this special case logic
                 // and always use anyValueRule once we implement the correct loading
                 // code gen logic for these targets.
-                if (!(isCPUTarget(context.targetReq) || isCUDATarget(context.targetReq)))
+                if (!targetSupportsPointer)
                     anyValueRules = context.rules;
 
                 RefPtr<TypeLayout> concreteTypeLayout =
                     createTypeLayout(context.with(anyValueRules), concreteType);
-                auto uniformLayoutInfo =
-                    concreteTypeLayout->FindResourceInfo(LayoutResourceKind::Uniform);
-                if (!useFixedSizedExistentialValue ||
-                    (uniformLayoutInfo && uniformLayoutInfo->count > fixedExistentialValueSize))
+                if (!targetSupportsPointer)
                 {
-                    // TODO: for targets that supports pointers, oversized existential values
+                    // For targets that supports pointers, oversized existential values
                     // should be placed in an overflow region and only a pointer is needed in
                     // the place of the fixed sized uniform slot.
                     // We only need the "pending layout" mechanism for targets that does not

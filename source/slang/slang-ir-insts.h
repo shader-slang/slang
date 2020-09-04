@@ -1622,6 +1622,11 @@ struct IRWrapExistential : IRInst
     IR_LEAF_ISA(WrapExistential)
 };
 
+struct IRGetValueFromExistentialBox : IRInst
+{
+    IR_LEAF_ISA(GetValueFromExistentialBox);
+};
+
 struct IRExtractExistentialValue : IRInst
 {
     IR_LEAF_ISA(ExtractExistentialValue);
@@ -1745,6 +1750,7 @@ struct IRBuilder
     IRBasicType* getIntType();
     IRBasicType* getUIntType();
     IRStringType* getStringType();
+
     IRAssociatedType* getAssociatedType(ArrayView<IRInterfaceType*> constraintTypes);
     IRThisType* getThisType(IRInterfaceType* interfaceType);
     IRRawPointerType* getRawPointerType();
@@ -1752,6 +1758,7 @@ struct IRBuilder
     IRRTTIType* getRTTIType();
     IRAnyValueType* getAnyValueType(IRIntegerValue size);
     IRAnyValueType* getAnyValueType(IRInst* size);
+    IRDynamicType* getDynamicType();
 
     IRTupleType* getTupleType(UInt count, IRType* const* types);
     IRTupleType* getTupleType(IRType* type0, IRType* type1);
@@ -1770,6 +1777,7 @@ struct IRBuilder
     IRInOutType*  getInOutType(IRType* valueType);
     IRRefType*  getRefType(IRType* valueType);
     IRPtrTypeBase*  getPtrType(IROp op, IRType* valueType);
+    IRExistentialBoxType* getExistentialBoxType(IRType* concreteType, IRType* interfaceType);
 
     IRArrayTypeBase* getArrayTypeBase(
         IROp    op,
@@ -1837,6 +1845,9 @@ struct IRBuilder
     // Set the data type of an instruction, while preserving
     // its rate, if any.
     void setDataType(IRInst* inst, IRType* dataType);
+
+        /// Extract the value wrapped inside an existential box.
+    IRInst* emitGetValueFromExistentialBox(IRType* type, IRInst* existentialBox);
 
         /// Given an existential value, extract the underlying "real" value
     IRInst* emitExtractExistentialValue(

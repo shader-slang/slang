@@ -611,6 +611,33 @@ struct SpecializationContext
         return nullptr;
     }
 
+    void maybeInsertGetExistentialValue(IRInst* inst)
+    {
+        // If inst has `ExistentialBox` type, we need to make sure
+        // all uses are through `GetValueFromExistentialBox`.
+        if (auto existentialBoxType = as<IRExistentialBoxType>(inst->getDataType()))
+        {
+            ShortList<IRUse*> usesToReplace;
+            for (auto use = inst->firstUse; use; use = use->nextUse)
+            {
+                if (use->getUser()->op != kIROp_GetValueFromExistentialBox)
+                    usesToReplace.add(use);
+            }
+            for (auto use : usesToReplace)
+            {
+                auto user = use->getUser();
+                IRBuilder builderStorage;
+                auto builder = &builderStorage;
+                builder->sharedBuilder = &sharedBuilderStorage;
+                builder->setInsertBefore(user);
+                auto getValueInst = builder->emitGetValueFromExistentialBox(
+                    builder->getPtrType(existentialBoxType->getValueType()), inst);
+                use->set(getValueInst);
+                addToWorkList(getValueInst);
+            }
+        }
+    }
+
     // All of the machinery for generic specialization
     // has been defined above, so we will now walk
     // through the flow of the overall specialization pass.
@@ -677,6 +704,10 @@ struct SpecializationContext
             workList.removeLast();
             workListSet.Remove(inst);
             cleanInsts.Add(inst);
+
+            // If inst represents a value of ExistentialBox type, all its uses
+            // must be through a `GetValueFromExistentialBox` inst.
+            maybeInsertGetExistentialValue(inst);
 
             // For each instruction we process, we want to perform
             // a few steps.
@@ -1640,7 +1671,7 @@ struct SpecializationContext
             if(slotOperandCount <= 1) return;
 
             auto concreteType = (IRType*) type->getExistentialArg(0);
-            auto newVal = builder.getPtrType(kIROp_ExistentialBoxType, concreteType);
+            auto newVal = builder.getExistentialBoxType(concreteType, baseInterfaceType);
 
             addUsersToWorkList(type);
             type->replaceUsesWith(newVal);

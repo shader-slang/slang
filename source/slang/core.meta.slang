@@ -315,6 +315,11 @@ __intrinsic_type($(kIROp_StringType))
 struct String
 {};
 
+__magic_type(DynamicType)
+__intrinsic_type($(kIROp_DynamicType))
+struct __Dynamic
+{};
+
     /// An `N` component vector with elements of type `T`.
 __generic<T = float, let N : int = 4>
 __magic_type(Vector)

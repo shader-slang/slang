@@ -942,6 +942,7 @@ bool CLikeSourceEmitter::shouldFoldInstIntoUseSites(IRInst* inst)
     case kIROp_getElementPtr:
     case kIROp_Specialize:
     case kIROp_lookup_interface_method:
+    case kIROp_GetValueFromExistentialBox:
         return true;
     }
 
@@ -2388,6 +2389,7 @@ void CLikeSourceEmitter::defaultEmitInstExpr(IRInst* inst, const EmitOpInfo& inO
         break;
 
     case kIROp_GlobalConstant:
+    case kIROp_GetValueFromExistentialBox:
         emitOperand(inst->getOperand(0), outerPrec);
         break;
 

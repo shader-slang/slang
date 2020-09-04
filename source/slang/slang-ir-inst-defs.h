@@ -26,6 +26,8 @@ INST(Nop, nop, 0, 0)
 
     INST(StringType, String, 0, 0)
 
+    INST(DynamicType, DynamicType, 0, 0)
+
     INST(AnyValueType, AnyValueType, 1, 0)
 
     INST(RawPointerType, RawPointerType, 0, 0)
@@ -586,6 +588,10 @@ INST(MakeExistentialWithRTTI,           makeExistentialWithRTTI,        3, 0)
 // "smuggle" a value of specialized type into computations that expect an unspecialized type.
 //
 INST(WrapExistential,                   wrapExistential,                2, 0)
+
+// A `GetValueFromExistentialBox` takes a `ExistentialBox` value and returns the value wrapped by
+// the existential box.
+INST(GetValueFromExistentialBox,        getValueFromExistentialBox,     1, 0)
 
 INST(ExtractExistentialValue,           extractExistentialValue,        1, 0)
 INST(ExtractExistentialType,            extractExistentialType,         1, 0)

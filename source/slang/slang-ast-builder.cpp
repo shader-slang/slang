@@ -100,6 +100,16 @@ Type* SharedASTBuilder::getEnumTypeType()
     return m_enumTypeType;
 }
 
+Type* SharedASTBuilder::getDynamicType()
+{
+    if (!m_dynamicType)
+    {
+        auto dynamicTypeDecl = findMagicDecl("DynamicType");
+        m_dynamicType = DeclRefType::create(m_astBuilder, makeDeclRef<Decl>(dynamicTypeDecl));
+    }
+    return m_dynamicType;
+}
+
 SharedASTBuilder::~SharedASTBuilder()
 {
     // Release built in types..

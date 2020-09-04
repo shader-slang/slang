@@ -2232,6 +2232,8 @@ namespace Slang
         return (IRStringType*)getType(kIROp_StringType);
     }
 
+    IRDynamicType* IRBuilder::getDynamicType() { return (IRDynamicType*)getType(kIROp_DynamicType); }
+
     IRAssociatedType* IRBuilder::getAssociatedType(ArrayView<IRInterfaceType*> constraintTypes)
     {
         return (IRAssociatedType*)getType(kIROp_AssociatedType,
@@ -2329,6 +2331,12 @@ namespace Slang
             op,
             1,
             operands);
+    }
+
+    IRExistentialBoxType* IRBuilder::getExistentialBoxType(IRType* concreteType, IRType* interfaceType)
+    {
+        IRInst* operands[] = {concreteType, interfaceType};
+        return (IRExistentialBoxType*)getType(kIROp_ExistentialBoxType, 2, operands);
     }
 
     IRArrayTypeBase* IRBuilder::getArrayTypeBase(
@@ -2471,7 +2479,7 @@ namespace Slang
                 // so we just want to return `ExistentialBox<someConcreteType>`.
                 //
                 auto concreteType = (IRType*) slotArgs[0];
-                auto ptrType = getPtrType(kIROp_ExistentialBoxType, concreteType);
+                auto ptrType = getExistentialBoxType(concreteType, (IRType*)baseType);
                 return ptrType;
             }
         }
@@ -2522,6 +2530,14 @@ namespace Slang
             // No rate? Just clobber the data type.
             inst->setFullType(dataType);
         }
+    }
+
+    IRInst* IRBuilder::emitGetValueFromExistentialBox(IRType* type, IRInst* existentialBox)
+    {
+        auto inst =
+            createInst<IRInst>(this, kIROp_GetValueFromExistentialBox, type, 1, &existentialBox);
+        addInst(inst);
+        return inst;
     }
 
 
@@ -5273,6 +5289,7 @@ namespace Slang
         case kIROp_Specialize:
         case kIROp_lookup_interface_method:
         case kIROp_getAddr:
+        case kIROp_GetValueFromExistentialBox:
         case kIROp_Construct:
         case kIROp_makeVector:
         case kIROp_MakeMatrix:

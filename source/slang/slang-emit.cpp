@@ -314,7 +314,7 @@ Result linkAndOptimizeIR(
         // generics / interface types to ordinary functions and types using
         // function pointers.
         dumpIRIfEnabled(compileRequest, irModule, "BEFORE-LOWER-GENERICS");
-        lowerGenerics(irModule, sink);
+        lowerGenerics(targetRequest, irModule, sink);
         dumpIRIfEnabled(compileRequest, irModule, "LOWER-GENERICS");
         break;
     default:

@@ -466,6 +466,11 @@ class StringType : public BuiltinType
     SLANG_CLASS(StringType)
 };
 
+// The built-in `__Dynamic` type
+class DynamicType : public BuiltinType
+{
+    SLANG_CLASS(DynamicType)
+};
 
 // Type built-in `__EnumType` type
 class EnumTypeType : public BuiltinType 
