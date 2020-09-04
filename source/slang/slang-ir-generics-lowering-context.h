@@ -16,6 +16,8 @@ namespace Slang
         // we are processing.
         IRModule* module;
 
+        TargetRequest* targetReq;
+
         DiagnosticSink* sink;
 
         // RTTI objects for each type used to call a generic function.

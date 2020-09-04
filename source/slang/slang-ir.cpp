@@ -5289,6 +5289,7 @@ namespace Slang
         case kIROp_Specialize:
         case kIROp_lookup_interface_method:
         case kIROp_getAddr:
+        case kIROp_GetValueFromExistentialBox:
         case kIROp_Construct:
         case kIROp_makeVector:
         case kIROp_MakeMatrix:

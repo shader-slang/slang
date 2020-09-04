@@ -1210,6 +1210,9 @@ static LegalVal legalizeInst(
     case kIROp_Load:
         return legalizeLoad(context, args[0]);
 
+    case kIROp_GetValueFromExistentialBox:
+        return args[0];
+
     case kIROp_FieldAddress:
         return legalizeFieldAddress(context, type, args[0], args[1]);
 
