@@ -687,6 +687,7 @@ struct HLSLRayTracingLayoutRulesImpl : DefaultVaryingLayoutRulesImpl
     {}
 };
 
+DefaultLayoutRulesImpl kDefaultLayoutRulesImpl;
 Std140LayoutRulesImpl kStd140LayoutRulesImpl;
 Std430LayoutRulesImpl kStd430LayoutRulesImpl;
 HLSLConstantBufferLayoutRulesImpl kHLSLConstantBufferLayoutRulesImpl;
@@ -710,6 +711,7 @@ HLSLRayTracingLayoutRulesImpl kHLSLHitAttributesParameterLayoutRulesImpl(LayoutR
 
 struct GLSLLayoutRulesFamilyImpl : LayoutRulesFamilyImpl
 {
+    virtual LayoutRulesImpl* getAnyValueRules() override;
     virtual LayoutRulesImpl* getConstantBufferRules() override;
     virtual LayoutRulesImpl* getPushConstantBufferRules() override;
     virtual LayoutRulesImpl* getTextureBufferRules() override;
@@ -730,6 +732,7 @@ struct GLSLLayoutRulesFamilyImpl : LayoutRulesFamilyImpl
 
 struct HLSLLayoutRulesFamilyImpl : LayoutRulesFamilyImpl
 {
+    virtual LayoutRulesImpl* getAnyValueRules() override;
     virtual LayoutRulesImpl* getConstantBufferRules() override;
     virtual LayoutRulesImpl* getPushConstantBufferRules() override;
     virtual LayoutRulesImpl* getTextureBufferRules() override;
@@ -750,6 +753,7 @@ struct HLSLLayoutRulesFamilyImpl : LayoutRulesFamilyImpl
 
 struct CPULayoutRulesFamilyImpl : LayoutRulesFamilyImpl
 {
+    virtual LayoutRulesImpl* getAnyValueRules() override;
     virtual LayoutRulesImpl* getConstantBufferRules() override;
     virtual LayoutRulesImpl* getPushConstantBufferRules() override;
     virtual LayoutRulesImpl* getTextureBufferRules() override;
@@ -769,6 +773,7 @@ struct CPULayoutRulesFamilyImpl : LayoutRulesFamilyImpl
 
 struct CUDALayoutRulesFamilyImpl : LayoutRulesFamilyImpl
 {
+    virtual LayoutRulesImpl* getAnyValueRules() override;
     virtual LayoutRulesImpl* getConstantBufferRules() override;
     virtual LayoutRulesImpl* getPushConstantBufferRules() override;
     virtual LayoutRulesImpl* getTextureBufferRules() override;
@@ -903,6 +908,12 @@ LayoutRulesImpl kCPULayoutRulesImpl_ = {
     &kCPULayoutRulesFamilyImpl, &kCPULayoutRulesImpl, &kCPUObjectLayoutRulesImpl,
 };
 
+LayoutRulesImpl kCPUAnyValueLayoutRulesImpl_ = {
+    &kCPULayoutRulesFamilyImpl,
+    &kDefaultLayoutRulesImpl,
+    &kCPUObjectLayoutRulesImpl,
+};
+
 // CUDA
 
 static CUDAObjectLayoutRulesImpl kCUDAObjectLayoutRulesImpl;
@@ -912,6 +923,11 @@ LayoutRulesImpl kCUDALayoutRulesImpl_ = {
     &kCUDALayoutRulesFamilyImpl, &kCUDALayoutRulesImpl, &kCUDAObjectLayoutRulesImpl,
 };
 
+LayoutRulesImpl kCUDAAnyValueLayoutRulesImpl_ = {
+    &kCUDALayoutRulesFamilyImpl,
+    &kDefaultLayoutRulesImpl,
+    &kCUDAObjectLayoutRulesImpl,
+};
 
 // GLSL cases
 
@@ -921,6 +937,12 @@ LayoutRulesImpl kStd140LayoutRulesImpl_ = {
 
 LayoutRulesImpl kStd430LayoutRulesImpl_ = {
     &kGLSLLayoutRulesFamilyImpl, &kStd430LayoutRulesImpl, &kGLSLObjectLayoutRulesImpl,
+};
+
+LayoutRulesImpl kGLSLAnyValueLayoutRulesImpl_ = {
+    &kGLSLLayoutRulesFamilyImpl,
+    &kDefaultLayoutRulesImpl,
+    &kGLSLPushConstantBufferObjectLayoutRulesImpl_,
 };
 
 LayoutRulesImpl kGLSLPushConstantLayoutRulesImpl_ = {
@@ -962,6 +984,12 @@ LayoutRulesImpl kGLSLStructuredBufferLayoutRulesImpl_ = {
 
 // HLSL cases
 
+LayoutRulesImpl kHLSLAnyValueLayoutRulesImpl_ = {
+    &kHLSLLayoutRulesFamilyImpl,
+    &kDefaultLayoutRulesImpl,
+    &kHLSLObjectLayoutRulesImpl,
+};
+
 LayoutRulesImpl kHLSLConstantBufferLayoutRulesImpl_ = {
     &kHLSLLayoutRulesFamilyImpl, &kHLSLConstantBufferLayoutRulesImpl, &kHLSLObjectLayoutRulesImpl,
 };
@@ -991,6 +1019,11 @@ LayoutRulesImpl kHLSLHitAttributesParameterLayoutRulesImpl_ = {
 };
 
 // GLSL Family
+
+LayoutRulesImpl* GLSLLayoutRulesFamilyImpl::getAnyValueRules()
+{
+    return &kGLSLAnyValueLayoutRulesImpl_;
+}
 
 LayoutRulesImpl* GLSLLayoutRulesFamilyImpl::getConstantBufferRules()
 {
@@ -1059,6 +1092,11 @@ LayoutRulesImpl* GLSLLayoutRulesFamilyImpl::getStructuredBufferRules()
 }
 
 // HLSL Family
+
+LayoutRulesImpl* HLSLLayoutRulesFamilyImpl::getAnyValueRules()
+{
+    return &kHLSLAnyValueLayoutRulesImpl_;
+}
 
 LayoutRulesImpl* HLSLLayoutRulesFamilyImpl::getConstantBufferRules()
 {
@@ -1129,6 +1167,11 @@ LayoutRulesImpl* HLSLLayoutRulesFamilyImpl::getHitAttributesParameterRules()
 
 // CPU Family
 
+LayoutRulesImpl* CPULayoutRulesFamilyImpl::getAnyValueRules()
+{
+    return &kCPUAnyValueLayoutRulesImpl_;
+}
+
 LayoutRulesImpl* CPULayoutRulesFamilyImpl::getConstantBufferRules()
 {
     return &kCPULayoutRulesImpl_;
@@ -1189,6 +1232,11 @@ LayoutRulesImpl* CPULayoutRulesFamilyImpl::getStructuredBufferRules()
 }
 
 // CUDA Family
+
+LayoutRulesImpl* CUDALayoutRulesFamilyImpl::getAnyValueRules()
+{
+    return &kCUDAAnyValueLayoutRulesImpl_;
+}
 
 LayoutRulesImpl* CUDALayoutRulesFamilyImpl::getConstantBufferRules()
 {
@@ -3613,21 +3661,18 @@ static TypeLayoutResult _createTypeLayout(
             typeLayout->type = type;
             typeLayout->rules = rules;
 
-            if (isCPUTarget(context.targetReq) || isCUDATarget(context.targetReq))
+            LayoutSize fixedExistentialValueSize = 0;
+            bool useFixedSizedExistentialValue =
+                isCPUTarget(context.targetReq) || isCUDATarget(context.targetReq);
+            if (useFixedSizedExistentialValue)
             {
-                LayoutSize fixedSize = 16;
+                fixedExistentialValueSize = 16;
                 if (auto anyValueAttr =
                         interfaceDeclRef.getDecl()->findModifier<AnyValueSizeAttribute>())
                 {
-                    fixedSize += anyValueAttr->size;
+                    fixedExistentialValueSize = anyValueAttr->size;
                 }
-                else
-                {
-                    // The interface type does not have an `[anyValueSize]` attribute,
-                    // assume a default of 8 bytes.
-                    fixedSize += 8;
-                }
-                typeLayout->addResourceUsage(LayoutResourceKind::Uniform, fixedSize);
+                typeLayout->addResourceUsage(LayoutResourceKind::Uniform, fixedExistentialValueSize + 16);
             }
             typeLayout->addResourceUsage(LayoutResourceKind::ExistentialTypeParam, 1);
             typeLayout->addResourceUsage(LayoutResourceKind::ExistentialObjectParam, 1);
@@ -3635,21 +3680,46 @@ static TypeLayoutResult _createTypeLayout(
             // If there are any concrete types available, the first one will be
             // the value that should be plugged into the slot we just introduced.
             //
-            if( context.specializationArgCount )
+            if (context.specializationArgCount)
             {
                 auto& specializationArg = context.specializationArgs[0];
                 Type* concreteType = as<Type>(specializationArg.val);
                 SLANG_ASSERT(concreteType);
 
-                RefPtr<TypeLayout> concreteTypeLayout = createTypeLayout(context, concreteType);
+                // Always use AnyValueRules regardless of the enclosing environment's layout rule
+                // for existential values.
+                auto anyValueRules = context.getRulesFamily()->getAnyValueRules();
 
-                // Layout for this specialized interface type then results
-                // in a type layout that tracks both the resource usage of the
-                // interface type itself (just the type + value slots introduced
-                // above), plus a "pending data" type that represents the value
-                // conceptually pointed to by the interface-type field/variable at runtime.
-                //
-                typeLayout->pendingDataTypeLayout = concreteTypeLayout;
+                // TODO: for traditional GPU targets (HLSL/GLSL) we don't force
+                // anyValueRule for now, since it requires additional work to load
+                // the existential value. We should remove this special case logic
+                // and always use anyValueRule once we implement the correct loading
+                // code gen logic for these targets.
+                if (!(isCPUTarget(context.targetReq) || isCUDATarget(context.targetReq)))
+                    anyValueRules = context.rules;
+
+                RefPtr<TypeLayout> concreteTypeLayout =
+                    createTypeLayout(context.with(anyValueRules), concreteType);
+                auto uniformLayoutInfo =
+                    concreteTypeLayout->FindResourceInfo(LayoutResourceKind::Uniform);
+                if (!useFixedSizedExistentialValue ||
+                    (uniformLayoutInfo && uniformLayoutInfo->count > fixedExistentialValueSize))
+                {
+                    // TODO: for targets that supports pointers, oversized existential values
+                    // should be placed in an overflow region and only a pointer is needed in
+                    // the place of the fixed sized uniform slot.
+                    // We only need the "pending layout" mechanism for targets that does not
+                    // support pointers.
+
+                    // For legacy targets without pointer support, the layout for this
+                    // specialized interface type then results in a type layout that tracks
+                    // both the resource usage of the interface type itself (just the
+                    // type + value slots introduced above), plus a "pending data" type that
+                    // represents the value conceptually pointed to by the interface-type
+                    // field/variable at runtime.
+                    //
+                    typeLayout->pendingDataTypeLayout = concreteTypeLayout;
+                }
             }
 
             return TypeLayoutResult(typeLayout, SimpleLayoutInfo());
