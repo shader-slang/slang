@@ -3390,6 +3390,13 @@ SLANG_API void const* spGetEntryPointCode(
     size_t*                 outSize)
 {
     using namespace Slang;
+
+    // Zero the size initially, in case need to return nullptr for error.
+    if (outSize)
+    {
+        *outSize = 0;
+    }
+
     auto req = Slang::asInternal(request);
     auto linkage = req->getLinkage();
     auto program = req->getSpecializedGlobalAndEntryPointsComponentType();
@@ -3411,22 +3418,15 @@ SLANG_API void const* spGetEntryPointCode(
         return nullptr;
     CompileResult& result = targetProgram->getExistingEntryPointResult(entryPointIndex);
 
-    void const* data = nullptr;
-    size_t size = 0;
-
     ComPtr<ISlangBlob> blob;
-    if (SLANG_SUCCEEDED(result.getBlob(blob)))
-    {
-        data = blob->getBufferPointer();
-        size = blob->getBufferSize();
-    }
+    SLANG_RETURN_NULL_ON_FAIL(result.getBlob(blob));
 
     if (outSize)
     {
-        *outSize = size;
+        *outSize = blob->getBufferSize();
     }
 
-    return data;
+    return (void*)blob->getBufferPointer();
 }
 
 static SlangResult _getEntryPointResult(
