@@ -122,13 +122,17 @@ namespace Slang
         {
             switch(format)
             {
-                case ResultFormat::None:
                 default:
-                    break;
-
+                case ResultFormat::None:
+                {
+                    // If no blob is returned, it's an error
+                    return SLANG_FAIL;
+                }
                 case ResultFormat::Text:
+                {
                     blob = StringUtil::createStringBlob(outputString);
                     break;
+                }
                 case ResultFormat::Binary:
                 {
                     if (downstreamResult)
@@ -1968,7 +1972,11 @@ SlangResult dissassembleDXILUsingDXC(
         case ResultFormat::Binary:
             {
                 ComPtr<ISlangBlob> blob;
-                result.getBlob(blob);
+                if (SLANG_FAILED(result.getBlob(blob)))
+                {
+                    SLANG_UNEXPECTED("No blob to emit");
+                    return;
+                }
                 writeOutputFile(compileRequest,
                     outputPath,
                     blob->getBufferPointer(),
@@ -2020,6 +2028,7 @@ SlangResult dissassembleDXILUsingDXC(
                 ComPtr<ISlangBlob> blob;
                 if (SLANG_FAILED(result.getBlob(blob)))
                 {
+                    SLANG_UNEXPECTED("No blob to emit");
                     return;
                 }
 

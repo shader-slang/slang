@@ -2598,7 +2598,12 @@ void CPPSourceEmitter::emitModuleImpl(IRModule* module)
                                     targetProgram->getOrCreateEntryPointResult(index, &sink);
 
                                 Slang::ComPtr<ISlangBlob> blob;
-                                result.getBlob(blob);
+                                if (SLANG_FAILED(result.getBlob(blob)))
+                                {
+                                    SLANG_UNEXPECTED("No blob to emit");
+                                    return;
+                                }
+
                                 auto ptr = (const unsigned char*)blob->getBufferPointer();
 
                                 m_writer->emit("size_t __");
