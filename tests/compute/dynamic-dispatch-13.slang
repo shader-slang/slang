@@ -1,4 +1,4 @@
-// Test using interface typed shader parameters with dynamic dispatch.
+// Test using interface typed shader parameters wrapped inside a `StructuredBuffer`.
 
 //TEST(compute):COMPARE_COMPUTE:-cpu
 //DISABLE_TEST(compute):COMPARE_COMPUTE:-cuda -xslang -disable-specialization
