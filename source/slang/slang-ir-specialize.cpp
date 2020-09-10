@@ -786,6 +786,21 @@ struct SpecializationContext
         return nullptr;
     }
 
+    // Returns true if the call inst represents a call to
+    // StructuredBuffer::operator[]/Load/Consume methods.
+    bool isBufferLoadCall(IRCall* inst)
+    {
+        if (auto targetIntrinsic = findTargetIntrinsicDecorationRec(inst->getCallee()))
+        {
+            auto name = targetIntrinsic->getDefinition();
+            if (name == ".operator[]" || name == ".Load" || name == ".Consume")
+            {
+                return true;
+            }
+        }
+        return false;
+    }
+
     // Given a `call` instruction in the IR, we need to detect the case
     // where the callee has some interface-type parameter(s) and at the
     // call site it is statically clear what concrete type(s) the arguments
@@ -793,49 +808,45 @@ struct SpecializationContext
     //
     void maybeSpecializeExistentialsForCall(IRCall* inst)
     {
-        // Handle a special case of `operator[]` calls first.
+        // Handle a special case of `StructuredBuffer.operator[]/Load/Consume` calls first.
         // These calls on builtin generic types, e.g. StructuredBuffer<T> should be handled
         // the same way as a `load` inst.
-        if (auto targetIntrinsic = findTargetIntrinsicDecorationRec(inst->getCallee()))
+        if (isBufferLoadCall(inst))
         {
-            auto name = targetIntrinsic->getDefinition();
-            if (name == ".operator[]")
+            SLANG_ASSERT(inst->getArgCount() > 0);
+            if (auto wrapExistential = as<IRWrapExistential>(inst->getArg(0)))
             {
-                SLANG_ASSERT(inst->getArgCount() > 0);
-                if (auto wrapExistential = as<IRWrapExistential>(inst->getArg(0)))
+                if (auto sbType = as<IRHLSLStructuredBufferTypeBase>(
+                        wrapExistential->getWrappedValue()->getDataType()))
                 {
-                    if (auto sbType = as<IRHLSLStructuredBufferTypeBase>(
-                            wrapExistential->getWrappedValue()->getDataType()))
+                    // We are seeing the instruction sequence in the form of
+                    // .operator[](wrapExistential(structuredBuffer), idx).
+                    // Similar to handling load(wrapExistential(..)) insts,
+                    // we need to replace it into wrapExistential(.operator[](sb, idx))
+                    auto resultType = inst->getFullType();
+                    auto elementType = sbType->getElementType();
+
+                    IRBuilder builder;
+                    builder.sharedBuilder = &sharedBuilderStorage;
+                    builder.setInsertBefore(inst);
+
+                    List<IRInst*> args;
+                    args.add(wrapExistential->getWrappedValue());
+                    for (UInt i = 1; i < inst->getArgCount(); i++)
+                        args.add(inst->getArg(i));
+                    List<IRInst*> slotOperands;
+                    UInt slotOperandCount = wrapExistential->getSlotOperandCount();
+                    for (UInt ii = 0; ii < slotOperandCount; ++ii)
                     {
-                        // We are seeing the instruction sequence in the form of
-                        // .operator[](wrapExistential(structuredBuffer), idx).
-                        // Similar to handling load(wrapExistential(..)) insts,
-                        // we need to replace it into wrapExistential(.operator[](sb, idx))
-                        auto resultType = inst->getFullType();
-                        auto elementType = sbType->getElementType();
-
-                        IRBuilder builder;
-                        builder.sharedBuilder = &sharedBuilderStorage;
-                        builder.setInsertBefore(inst);
-
-                        List<IRInst*> args;
-                        args.add(wrapExistential->getWrappedValue());
-                        for (UInt i = 1; i < inst->getArgCount(); i++)
-                            args.add(inst->getArg(i));
-                        List<IRInst*> slotOperands;
-                        UInt slotOperandCount = wrapExistential->getSlotOperandCount();
-                        for (UInt ii = 0; ii < slotOperandCount; ++ii)
-                        {
-                            slotOperands.add(wrapExistential->getSlotOperand(ii));
-                        }
-                        auto newCall = builder.emitCallInst(elementType, inst->getCallee(), args);
-                        auto newWrapExistential = builder.emitWrapExistential(
-                            resultType, newCall, slotOperandCount, slotOperands.getBuffer());
-                        inst->replaceUsesWith(newWrapExistential);
-                        inst->removeAndDeallocate();
-                        addUsersToWorkList(newWrapExistential);
-                        return;
+                        slotOperands.add(wrapExistential->getSlotOperand(ii));
                     }
+                    auto newCall = builder.emitCallInst(elementType, inst->getCallee(), args);
+                    auto newWrapExistential = builder.emitWrapExistential(
+                        resultType, newCall, slotOperandCount, slotOperands.getBuffer());
+                    inst->replaceUsesWith(newWrapExistential);
+                    inst->removeAndDeallocate();
+                    addUsersToWorkList(newWrapExistential);
+                    return;
                 }
             }
         }

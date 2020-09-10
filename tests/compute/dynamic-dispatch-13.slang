@@ -24,7 +24,7 @@ void computeMain(uint3       dispatchThreadID : SV_DispatchThreadID)
     let tid = dispatchThreadID.x;
 
     let inputVal : int = tid;
-    IInterface v0 = gCb[0];
+    IInterface v0 = gCb.Load(0);
     IInterface v1 = gCb1[0];
     let outputVal = v0.run(inputVal) + v1.run(inputVal);
 
