@@ -21,4 +21,9 @@ namespace Slang
         BackEndCompileRequest* compileRequest,
         TargetRequest*  targetRequest,
         IRModule*       module);
+
+    void specializeResourceOutputs(
+        BackEndCompileRequest*  compileRequest,
+        TargetRequest*          targetRequest,
+        IRModule*               module);
 }

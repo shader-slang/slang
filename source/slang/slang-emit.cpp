@@ -431,16 +431,21 @@ Result linkAndOptimizeIR(
     //
     // Many of our targets place restrictions on how certain
     // resource types can be used, so that having them as
-    // function parameters is invalid. To clean this up,
-    // we will try to specialize called functions based
-    // on the actual resources that are being passed to them
-    // at specific call sites.
+    // function parameters, reults, etc. is invalid.
+    // To clean this up, we apply two kinds of specialization:
+    //
+    // * Specalize call sites based on the actual resources
+    //   that a called function will return/output.
+    //
+    // * Specialize called functions based on teh actual resources
+    //   passed ass input at specific call sites.
     //
     // Because the legalization may depend on what target
     // we are compiling for (certain things might be okay
     // for D3D targets that are not okay for Vulkan), we
     // pass down the target request along with the IR.
     //
+    specializeResourceOutputs(compileRequest, targetRequest, irModule);
     specializeResourceParameters(compileRequest, targetRequest, irModule);
 
     // For GLSL targets, we also want to specialize calls to functions that
