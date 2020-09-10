@@ -854,7 +854,7 @@ struct SpecializationContext
         // We can only specialize a call when the callee function is known.
         //
         auto calleeFunc = as<IRFunc>(inst->getCallee());
-        if (!calleeFunc)
+        if(!calleeFunc)
             return;
 
         // We can only specialize if we have access to a body for the callee.
@@ -1452,8 +1452,9 @@ struct SpecializationContext
             // the type that `load(val)` should return.
             //
             auto elementType = tryGetPointedToType(&builder, val->getDataType());
-            if (!elementType)
+            if(!elementType)
                 return;
+
 
             List<IRInst*> slotOperands;
             UInt slotOperandCount = wrapInst->getSlotOperandCount();
