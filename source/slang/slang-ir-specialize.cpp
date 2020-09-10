@@ -801,16 +801,13 @@ struct SpecializationContext
         return false;
     }
 
-    // Given a `call` instruction in the IR, we need to detect the case
-    // where the callee has some interface-type parameter(s) and at the
-    // call site it is statically clear what concrete type(s) the arguments
-    // will have.
-    //
-    void maybeSpecializeExistentialsForCall(IRCall* inst)
+    /// Transform a buffer load intrinsic call.
+    /// `bufferLoad(wrapExistential(bufferObj, wrapArgs), loadArgs)` should be transformed into
+    /// `wrapExistential(bufferLoad(bufferObj, loadArgs), wragArgs)`.
+    /// Returns true if `inst` matches the pattern and the load is transformed, otherwise,
+    /// returns false.
+    bool maybeSpecializeBufferLoadCall(IRCall* inst)
     {
-        // Handle a special case of `StructuredBuffer.operator[]/Load/Consume` calls first.
-        // These calls on builtin generic types, e.g. StructuredBuffer<T> should be handled
-        // the same way as a `load` inst.
         if (isBufferLoadCall(inst))
         {
             SLANG_ASSERT(inst->getArgCount() > 0);
@@ -846,10 +843,25 @@ struct SpecializationContext
                     inst->replaceUsesWith(newWrapExistential);
                     inst->removeAndDeallocate();
                     addUsersToWorkList(newWrapExistential);
-                    return;
+                    return true;
                 }
             }
         }
+        return false;
+    }
+
+    // Given a `call` instruction in the IR, we need to detect the case
+    // where the callee has some interface-type parameter(s) and at the
+    // call site it is statically clear what concrete type(s) the arguments
+    // will have.
+    //
+    void maybeSpecializeExistentialsForCall(IRCall* inst)
+    {
+        // Handle a special case of `StructuredBuffer.operator[]/Load/Consume`
+        // calls first. These calls on builtin generic types should be handled
+        // the same way as a `load` inst.
+        if (maybeSpecializeBufferLoadCall(inst))
+            return;
 
         // We can only specialize a call when the callee function is known.
         //
