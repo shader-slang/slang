@@ -1353,6 +1353,18 @@ struct IRFunc : IRGlobalValueWithParams
 };
 
     /// Adjust the type of an IR function based on its parameter list.
+    ///
+    /// The function type formed will use the types of the actual
+    /// parameters in the body of `func`, as well as the given `resultType`.
+    ///
+void fixUpFuncType(IRFunc* func, IRType* resultType);
+
+    /// Adjust the type of an IR function based on its parameter list.
+    ///
+    /// The function type formed will use the types of the actual
+    /// parameters in the body of `func`, as well as the result type
+    /// that is found on the current type of `func`.
+    ///
 void fixUpFuncType(IRFunc* func);
 
 // A generic is akin to a function, but is conceptually executed
