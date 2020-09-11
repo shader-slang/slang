@@ -83,7 +83,7 @@ void IRSerialWriter::_addDebugSourceLocRun(SourceLoc sourceLoc, uint32_t startIn
 
             IRSerialData::DebugAdjustedLineInfo adjustedLineInfo;
             adjustedLineInfo.m_lineInfo = lineInfo;
-            adjustedLineInfo.m_pathStringIndex = Ser::kNullStringIndex;
+            adjustedLineInfo.m_pathStringIndex = SerialStringData::kNullStringIndex;
 
             const auto& pool = sourceView->getSourceManager()->getStringSlicePool();
             SLANG_ASSERT(pool.getStyle() == StringSlicePool::Style::Default);

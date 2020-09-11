@@ -45,7 +45,7 @@ struct IRSerialWriter
         /// Get index from string representations
     Ser::StringIndex getStringIndex(StringRepresentation* string) { return Ser::StringIndex(m_stringSlicePool.add(string)); }
     Ser::StringIndex getStringIndex(const UnownedStringSlice& slice) { return Ser::StringIndex(m_stringSlicePool.add(slice)); }
-    Ser::StringIndex getStringIndex(Name* name) { return name ? getStringIndex(name->text) : Ser::kNullStringIndex; }
+    Ser::StringIndex getStringIndex(Name* name) { return name ? getStringIndex(name->text) : SerialStringData::kNullStringIndex; }
     Ser::StringIndex getStringIndex(const char* chars) { return Ser::StringIndex(m_stringSlicePool.add(chars)); }
     Ser::StringIndex getStringIndex(const String& string) { return Ser::StringIndex(m_stringSlicePool.add(string.getUnownedSlice())); }
 

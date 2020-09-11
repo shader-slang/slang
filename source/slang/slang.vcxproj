@@ -284,8 +284,10 @@
     <ClInclude Include="slang-reflection.h" />
     <ClInclude Include="slang-repro.h" />
     <ClInclude Include="slang-serialize-ast.h" />
+    <ClInclude Include="slang-serialize-debug.h" />
     <ClInclude Include="slang-serialize-ir-types.h" />
     <ClInclude Include="slang-serialize-ir.h" />
+    <ClInclude Include="slang-serialize-types.h" />
     <ClInclude Include="slang-source-loc.h" />
     <ClInclude Include="slang-syntax.h" />
     <ClInclude Include="slang-token-defs.h" />
@@ -391,8 +393,10 @@
     <ClCompile Include="slang-reflection.cpp" />
     <ClCompile Include="slang-repro.cpp" />
     <ClCompile Include="slang-serialize-ast.cpp" />
+    <ClCompile Include="slang-serialize-debug.cpp" />
     <ClCompile Include="slang-serialize-ir-types.cpp" />
     <ClCompile Include="slang-serialize-ir.cpp" />
+    <ClCompile Include="slang-serialize-types.cpp" />
     <ClCompile Include="slang-source-loc.cpp" />
     <ClCompile Include="slang-stdlib.cpp" />
     <ClCompile Include="slang-syntax.cpp" />
