@@ -1084,7 +1084,7 @@ static int _calcFixSourceLoc(const IRSerialData::DebugSourceInfo& info, SourceVi
     module->session = session;
 
     // Set up the string rep cache
-    m_stringRepresentationCache.init(&data.m_stringTable);
+    m_stringTable.init(&data.m_stringTable);
     
     // Add all the instructions
 
@@ -1162,7 +1162,7 @@ static int _calcFixSourceLoc(const IRSerialData::DebugSourceInfo& info, SourceVi
                 {
                     SLANG_ASSERT(srcInst.m_payloadType == PayloadType::String_1);
 
-                    const UnownedStringSlice slice = m_stringRepresentationCache.getStringSlice(StringHandle(srcInst.m_payload.m_stringIndices[0]));
+                    const UnownedStringSlice slice = m_stringTable.getStringSlice(StringHandle(srcInst.m_payload.m_stringIndices[0]));
                         
                     const size_t sliceSize = slice.getLength();
                     const size_t instSize = prefixSize + SLANG_OFFSET_OF(IRConstant::StringValue, chars) + sliceSize;

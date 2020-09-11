@@ -19,12 +19,8 @@ enum class IRSerialCompressionType : uint8_t
     VariableByteLite,
 };
 
-class StringRepresentationCache
+class SerialStringTable
 {
-    // TODO: The name of this type is no longer accurate to its function.
-    // It doesn't *cache* anything, and instead just provides convenient
-    // access to the contents of a serialized string table.
-
     public:
     typedef StringSlicePool::Handle Handle;
 
@@ -41,7 +37,7 @@ class StringRepresentationCache
     void init(const List<char>* stringTable);
 
         /// Ctor
-    StringRepresentationCache(); 
+    SerialStringTable(); 
     
     protected:
     const List<char>* m_stringTable;

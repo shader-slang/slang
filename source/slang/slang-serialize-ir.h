@@ -115,7 +115,7 @@ protected:
 struct IRSerialReader
 {
     typedef IRSerialData Ser;
-    typedef StringRepresentationCache::Handle StringHandle;
+    typedef SerialStringTable::Handle StringHandle;
 
         /// Read a stream to fill in dataOut IRSerialData
     static Result readStream(Stream* stream, IRSerialData* dataOut);
@@ -140,7 +140,7 @@ struct IRSerialReader
 
     protected:
 
-    StringRepresentationCache m_stringRepresentationCache;
+    SerialStringTable m_stringTable;
 
     const IRSerialData* m_serialData;
     IRModule* m_module;

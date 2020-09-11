@@ -63,12 +63,12 @@ struct CharReader
 
 // !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! StringRepresentationCache !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 
-StringRepresentationCache::StringRepresentationCache():
+SerialStringTable::SerialStringTable():
     m_stringTable(nullptr)
 {
 }
 
-void StringRepresentationCache::init(const List<char>* stringTable)
+void SerialStringTable::init(const List<char>* stringTable)
 {
     m_stringTable = stringTable;
 
@@ -110,7 +110,7 @@ void StringRepresentationCache::init(const List<char>* stringTable)
     m_entries.compress();
 }
 
-UnownedStringSlice StringRepresentationCache::getStringSlice(Handle handle) const
+UnownedStringSlice SerialStringTable::getStringSlice(Handle handle) const
 {
     const Entry& entry = m_entries[int(handle)];
     const char* start = m_stringTable->begin();
