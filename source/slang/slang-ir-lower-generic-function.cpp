@@ -201,8 +201,15 @@ namespace Slang
         void lowerWitnessTable(IRWitnessTable* witnessTable)
         {
             auto interfaceType = maybeLowerInterfaceType(cast<IRInterfaceType>(witnessTable->getConformanceType()));
+            IRBuilder builderStorage;
+            auto builder = &builderStorage;
+            builder->sharedBuilder = &sharedContext->sharedBuilderStorage;
+            builder->setInsertBefore(witnessTable);
             if (interfaceType != witnessTable->getConformanceType())
-                witnessTable->setConformanceType(interfaceType);
+            {
+                auto newWitnessTableType = builder->getWitnessTableType(interfaceType);
+                witnessTable->setFullType(newWitnessTableType);
+            }
             if (isBuiltin(interfaceType))
                 return;
             for (auto child : witnessTable->getChildren())
@@ -223,10 +230,6 @@ namespace Slang
                 {
                     // Translate a Type value to an RTTI object pointer.
                     auto rttiObject = sharedContext->maybeEmitRTTIObject(entry->getSatisfyingVal());
-                    IRBuilder builderStorage;
-                    auto builder = &builderStorage;
-                    builder->sharedBuilder = &sharedContext->sharedBuilderStorage;
-                    builder->setInsertBefore(witnessTable);
                     auto rttiObjectPtr = builder->emitGetAddress(
                         builder->getPtrType(builder->getRTTIType()),
                         rttiObject);
