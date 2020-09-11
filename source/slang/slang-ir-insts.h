@@ -1531,12 +1531,7 @@ struct IRWitnessTable : IRInst
 
     IRInst* getConformanceType()
     {
-        return getOperand(0);
-    }
-
-    void setConformanceType(IRInst* type)
-    {
-        setOperand(0, type);
+        return cast<IRWitnessTableType>(getDataType())->getConformanceType();
     }
 
     IR_LEAF_ISA(WitnessTable)

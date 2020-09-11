@@ -678,7 +678,7 @@ namespace Slang
         block->insertAtEnd(this);
     }
 
-    void fixUpFuncType(IRFunc* func)
+    void fixUpFuncType(IRFunc* func, IRType* resultType)
     {
         SLANG_ASSERT(func);
 
@@ -699,10 +699,13 @@ namespace Slang
             paramTypes.add(param->getFullType());
         }
 
-        auto resultType = func->getResultType();
-
         auto funcType = builder.getFuncType(paramTypes, resultType);
         builder.setDataType(func, funcType);
+    }
+
+    void fixUpFuncType(IRFunc* func)
+    {
+        fixUpFuncType(func, func->getResultType());
     }
 
     //
@@ -2976,8 +2979,7 @@ namespace Slang
         IRWitnessTable* witnessTable = createInst<IRWitnessTable>(
             this,
             kIROp_WitnessTable,
-            getWitnessTableType(baseType),
-            baseType);
+            getWitnessTableType(baseType));
         addGlobalValue(this, witnessTable);
         return witnessTable;
     }
