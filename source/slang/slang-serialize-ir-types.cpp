@@ -1,5 +1,5 @@
-// slang-ir-serialize-types.cpp
-#include "slang-ir-serialize-types.h"
+// slang-serialize-ir-types.cpp
+#include "slang-serialize-ir-types.h"
 
 #include "../core/slang-text-io.h"
 #include "../core/slang-byte-encode-util.h"

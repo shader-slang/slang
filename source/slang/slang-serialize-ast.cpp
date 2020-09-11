@@ -1,5 +1,5 @@
-// slang-ast-serialize.cpp
-#include "slang-ast-serialize.h"
+// slang-serialize-ast.cpp
+#include "slang-serialize-ast.h"
 
 #include "slang-ast-generated.h"
 #include "slang-ast-generated-macro.h"

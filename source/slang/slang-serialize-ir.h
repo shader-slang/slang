@@ -1,14 +1,12 @@
-// slang-ir-serialize.h
-#ifndef SLANG_IR_SERIALIZE_H_INCLUDED
-#define SLANG_IR_SERIALIZE_H_INCLUDED
+// slang-serialize-ir.h
+#ifndef SLANG_SERIALIZE_IR_H_INCLUDED
+#define SLANG_SERIALIZE_IR_H_INCLUDED
 
-#include "slang-ir-serialize-types.h"
+#include "slang-serialize-ir-types.h"
 
 #include "../core/slang-riff.h"
 
 #include "slang-ir.h"
-
-#include "slang-ir-serialize-types.h"
 
 // For TranslationUnitRequest
 // and FrontEndCompileRequest::ExtraEntryPointInfo

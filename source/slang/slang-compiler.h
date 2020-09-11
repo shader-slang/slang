@@ -18,7 +18,7 @@
 
 #include "slang-include-system.h"
 
-#include "slang-ir-serialize-types.h"
+#include "slang-serialize-ir-types.h"
 
 #include "../../slang.h"
 

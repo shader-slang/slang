@@ -1,6 +1,6 @@
-// slang-ir-serialize-types.h
-#ifndef SLANG_IR_SERIALIZE_TYPES_H_INCLUDED
-#define SLANG_IR_SERIALIZE_TYPES_H_INCLUDED
+// slang-serialize-ir-types.h
+#ifndef SLANG_SERIALIZE_IR_TYPES_H_INCLUDED
+#define SLANG_SERIALIZE_IR_TYPES_H_INCLUDED
 
 #include "../core/slang-riff.h"
 #include "../core/slang-string-slice-pool.h"

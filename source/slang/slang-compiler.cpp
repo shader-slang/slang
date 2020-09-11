@@ -23,9 +23,8 @@
 #include "slang-glsl-extension-tracker.h"
 #include "slang-emit-cuda.h"
 
-#include "slang-ast-serialize.h"
-
-#include "slang-ir-serialize.h"
+#include "slang-serialize-ast.h"
+#include "slang-serialize-ir.h"
 
 // Enable calling through to `fxc` or `dxc` to
 // generate code on Windows.
@@ -137,6 +136,13 @@ namespace Slang
                 {
                     if (downstreamResult)
                     {
+                        // TODO(JS): 
+                        // This seems a little questionable. As it stands downstreamResult, if it doesn't have a blob
+                        // can try and read a file. How this currently works is that every getBlob will potentially try to read that file.
+                        // Setting result to None would stop this, but is that reasonable as the state.
+                        // Perhaps downstreamResult should hold some state that the read failed.
+                        // For now we don't worry though.
+
                         SLANG_RETURN_ON_FAIL(downstreamResult->getBinary(blob));
                     }
                     break;

@@ -48,9 +48,6 @@
     <ClInclude Include="slang-ast-reflect.h">
       <Filter>Header Files</Filter>
     </ClInclude>
-    <ClInclude Include="slang-ast-serialize.h">
-      <Filter>Header Files</Filter>
-    </ClInclude>
     <ClInclude Include="slang-ast-stmt.h">
       <Filter>Header Files</Filter>
     </ClInclude>
@@ -213,12 +210,6 @@
     <ClInclude Include="slang-ir-sccp.h">
       <Filter>Header Files</Filter>
     </ClInclude>
-    <ClInclude Include="slang-ir-serialize-types.h">
-      <Filter>Header Files</Filter>
-    </ClInclude>
-    <ClInclude Include="slang-ir-serialize.h">
-      <Filter>Header Files</Filter>
-    </ClInclude>
     <ClInclude Include="slang-ir-specialize-arrays.h">
       <Filter>Header Files</Filter>
     </ClInclude>
@@ -309,6 +300,15 @@
     <ClInclude Include="slang-repro.h">
       <Filter>Header Files</Filter>
     </ClInclude>
+    <ClInclude Include="slang-serialize-ast.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="slang-serialize-ir-types.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="slang-serialize-ir.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
     <ClInclude Include="slang-source-loc.h">
       <Filter>Header Files</Filter>
     </ClInclude>
@@ -342,9 +342,6 @@
       <Filter>Source Files</Filter>
     </ClCompile>
     <ClCompile Include="slang-ast-reflect.cpp">
-      <Filter>Source Files</Filter>
-    </ClCompile>
-    <ClCompile Include="slang-ast-serialize.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
     <ClCompile Include="slang-ast-substitutions.cpp">
@@ -533,12 +530,6 @@
     <ClCompile Include="slang-ir-sccp.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
-    <ClCompile Include="slang-ir-serialize-types.cpp">
-      <Filter>Source Files</Filter>
-    </ClCompile>
-    <ClCompile Include="slang-ir-serialize.cpp">
-      <Filter>Source Files</Filter>
-    </ClCompile>
     <ClCompile Include="slang-ir-specialize-arrays.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
@@ -624,6 +615,15 @@
       <Filter>Source Files</Filter>
     </ClCompile>
     <ClCompile Include="slang-repro.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="slang-serialize-ast.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="slang-serialize-ir-types.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="slang-serialize-ir.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
     <ClCompile Include="slang-source-loc.cpp">

@@ -14,9 +14,6 @@
 #include "slang-reflection.h"
 #include "slang-type-layout.h"
 
-#include "slang-ast-dump.h"
-#include "slang-ast-serialize.h"
-
 #include "slang-repro.h"
 
 #include "slang-file-system.h"
@@ -25,7 +22,10 @@
 
 #include "slang-source-loc.h"
 
-#include "slang-ir-serialize.h"
+#include "slang-ast-dump.h"
+
+#include "slang-serialize-ast.h"
+#include "slang-serialize-ir.h"
 
 #include "slang-check-impl.h"
 

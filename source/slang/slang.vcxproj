@@ -199,7 +199,6 @@
     <ClInclude Include="slang-ast-generated.h" />
     <ClInclude Include="slang-ast-modifier.h" />
     <ClInclude Include="slang-ast-reflect.h" />
-    <ClInclude Include="slang-ast-serialize.h" />
     <ClInclude Include="slang-ast-stmt.h" />
     <ClInclude Include="slang-ast-support-types.h" />
     <ClInclude Include="slang-ast-type.h" />
@@ -254,8 +253,6 @@
     <ClInclude Include="slang-ir-restructure-scoping.h" />
     <ClInclude Include="slang-ir-restructure.h" />
     <ClInclude Include="slang-ir-sccp.h" />
-    <ClInclude Include="slang-ir-serialize-types.h" />
-    <ClInclude Include="slang-ir-serialize.h" />
     <ClInclude Include="slang-ir-specialize-arrays.h" />
     <ClInclude Include="slang-ir-specialize-function-call.h" />
     <ClInclude Include="slang-ir-specialize-resources.h" />
@@ -286,6 +283,9 @@
     <ClInclude Include="slang-profile.h" />
     <ClInclude Include="slang-reflection.h" />
     <ClInclude Include="slang-repro.h" />
+    <ClInclude Include="slang-serialize-ast.h" />
+    <ClInclude Include="slang-serialize-ir-types.h" />
+    <ClInclude Include="slang-serialize-ir.h" />
     <ClInclude Include="slang-source-loc.h" />
     <ClInclude Include="slang-syntax.h" />
     <ClInclude Include="slang-token-defs.h" />
@@ -299,7 +299,6 @@
     <ClCompile Include="slang-ast-decl.cpp" />
     <ClCompile Include="slang-ast-dump.cpp" />
     <ClCompile Include="slang-ast-reflect.cpp" />
-    <ClCompile Include="slang-ast-serialize.cpp" />
     <ClCompile Include="slang-ast-substitutions.cpp" />
     <ClCompile Include="slang-ast-type.cpp" />
     <ClCompile Include="slang-ast-val.cpp" />
@@ -362,8 +361,6 @@
     <ClCompile Include="slang-ir-restructure-scoping.cpp" />
     <ClCompile Include="slang-ir-restructure.cpp" />
     <ClCompile Include="slang-ir-sccp.cpp" />
-    <ClCompile Include="slang-ir-serialize-types.cpp" />
-    <ClCompile Include="slang-ir-serialize.cpp" />
     <ClCompile Include="slang-ir-specialize-arrays.cpp" />
     <ClCompile Include="slang-ir-specialize-function-call.cpp" />
     <ClCompile Include="slang-ir-specialize-resources.cpp" />
@@ -393,6 +390,9 @@
     <ClCompile Include="slang-profile.cpp" />
     <ClCompile Include="slang-reflection.cpp" />
     <ClCompile Include="slang-repro.cpp" />
+    <ClCompile Include="slang-serialize-ast.cpp" />
+    <ClCompile Include="slang-serialize-ir-types.cpp" />
+    <ClCompile Include="slang-serialize-ir.cpp" />
     <ClCompile Include="slang-source-loc.cpp" />
     <ClCompile Include="slang-stdlib.cpp" />
     <ClCompile Include="slang-syntax.cpp" />

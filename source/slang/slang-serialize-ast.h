@@ -1,6 +1,6 @@
-// slang-ast-serialize.h
-#ifndef SLANG_AST_SERIALIZE_H
-#define SLANG_AST_SERIALIZE_H
+// slang-serialize-ast.h
+#ifndef SLANG_SERIALIZE_AST_H
+#define SLANG_SERIALIZE_AST_H
 
 #include <type_traits>
 
@@ -53,7 +53,7 @@ struct ASTSerialTypeInfo;
 and specialize it for each native type. The specialization holds
 
 SerialType - The type that will be used to represent the native type
-NativeType - The native typs
+NativeType - The native type
 SerialAlignment - A value that holds what kind of alignment the SerialType needs to be serializable (it may be different from SLANG_ALIGN_OF(SerialType)!)
 toSerial - A function that with the help of ASTSerialWriter convert the NativeType into the SerialType
 toNative - A function that with the help of ASTSerialReader convert the SerialType into the NativeType
@@ -70,7 +70,7 @@ which just holds the information held in the ASTSerialTypeInfo template, but add
 
 So we need to define a specialized ASTSerialTypeInfo for each type that can be a field in a NodeBase derived type. We don't need to define
 anything explicitly for the NodeBase derived types, as we will just generate the layout from the fields. How do we know the fields? We just
-used the macros generated from the C++ extactor.
+used the macros generated from the C++ extractor.
 
 So first a few things to observe...
 

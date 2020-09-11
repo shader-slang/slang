@@ -13,7 +13,7 @@
 #include "slang-file-system.h"
 
 #include "slang-repro.h"
-#include "slang-ir-serialize.h"
+#include "slang-serialize-ir.h"
 
 #include "../core/slang-type-text-util.h"
 
