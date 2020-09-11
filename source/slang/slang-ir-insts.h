@@ -1244,6 +1244,20 @@ struct IRFieldAddress : IRInst
 
 };
 
+struct IRGetElement : IRInst
+{
+    IR_LEAF_ISA(getElement);
+    IRInst* getBase() { return getOperand(0); }
+    IRInst* getIndex() { return getOperand(1); }
+};
+
+struct IRGetElementPtr : IRInst
+{
+    IR_LEAF_ISA(getElementPtr);
+    IRInst* getBase() { return getOperand(0); }
+    IRInst* getIndex() { return getOperand(1); }
+};
+
 struct IRGetAddress : IRInst
 {
     IR_LEAF_ISA(getAddr);
