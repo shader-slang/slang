@@ -222,7 +222,7 @@ void CLikeSourceEmitter::emitSimpleType(IRType* type)
 List<IRWitnessTableEntry*> CLikeSourceEmitter::getSortedWitnessTableEntries(IRWitnessTable* witnessTable)
 {
     List<IRWitnessTableEntry*> sortedWitnessTableEntries;
-    auto interfaceType = cast<IRInterfaceType>(witnessTable->getOperand(0));
+    auto interfaceType = cast<IRInterfaceType>(witnessTable->getConformanceType());
     auto witnessTableItems = witnessTable->getChildren();
     // Build a dictionary of witness table entries for fast lookup.
     Dictionary<IRInst*, IRWitnessTableEntry*> witnessTableEntryDictionary;

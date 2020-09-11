@@ -1606,7 +1606,7 @@ void CPPSourceEmitter::emitParamTypeImpl(IRType* type, String const& name)
 
 void CPPSourceEmitter::emitWitnessTable(IRWitnessTable* witnessTable)
 {
-    auto interfaceType = cast<IRInterfaceType>(witnessTable->getOperand(0));
+    auto interfaceType = cast<IRInterfaceType>(witnessTable->getConformanceType());
 
     // Ignore witness tables for builtin interface types.
     if (isBuiltin(interfaceType))
@@ -1634,7 +1634,7 @@ void CPPSourceEmitter::_emitWitnessTableDefinitions()
 {
     for (auto witnessTable : pendingWitnessTableDefinitions)
     {
-        auto interfaceType = cast<IRInterfaceType>(witnessTable->getOperand(0));
+        auto interfaceType = cast<IRInterfaceType>(witnessTable->getConformanceType());
         List<IRWitnessTableEntry*> sortedWitnessTableEntries = getSortedWitnessTableEntries(witnessTable);
         m_writer->emit("extern \"C\"\n{\n");
         m_writer->indent();

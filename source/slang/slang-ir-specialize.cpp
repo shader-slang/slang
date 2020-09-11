@@ -770,6 +770,86 @@ struct SpecializationContext
         }
     }
 
+    // Finds any `IRTargetDecoration` from `inst`. Recursively chasing `specialize` chains.
+    IRTargetIntrinsicDecoration* findTargetIntrinsicDecorationRec(IRInst* inst)
+    {
+        while (auto specialize = as<IRSpecialize>(inst))
+        {
+            inst = specialize->getBase();
+        }
+        while (auto genericInst = as<IRGeneric>(inst))
+        {
+            inst = findGenericReturnVal(genericInst);
+        }
+        if (auto decor = inst->findDecoration<IRTargetIntrinsicDecoration>())
+            return decor;
+        return nullptr;
+    }
+
+    // Returns true if the call inst represents a call to
+    // StructuredBuffer::operator[]/Load/Consume methods.
+    bool isBufferLoadCall(IRCall* inst)
+    {
+        if (auto targetIntrinsic = findTargetIntrinsicDecorationRec(inst->getCallee()))
+        {
+            auto name = targetIntrinsic->getDefinition();
+            if (name == ".operator[]" || name == ".Load" || name == ".Consume")
+            {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    /// Transform a buffer load intrinsic call.
+    /// `bufferLoad(wrapExistential(bufferObj, wrapArgs), loadArgs)` should be transformed into
+    /// `wrapExistential(bufferLoad(bufferObj, loadArgs), wragArgs)`.
+    /// Returns true if `inst` matches the pattern and the load is transformed, otherwise,
+    /// returns false.
+    bool maybeSpecializeBufferLoadCall(IRCall* inst)
+    {
+        if (isBufferLoadCall(inst))
+        {
+            SLANG_ASSERT(inst->getArgCount() > 0);
+            if (auto wrapExistential = as<IRWrapExistential>(inst->getArg(0)))
+            {
+                if (auto sbType = as<IRHLSLStructuredBufferTypeBase>(
+                        wrapExistential->getWrappedValue()->getDataType()))
+                {
+                    // We are seeing the instruction sequence in the form of
+                    // .operator[](wrapExistential(structuredBuffer), idx).
+                    // Similar to handling load(wrapExistential(..)) insts,
+                    // we need to replace it into wrapExistential(.operator[](sb, idx))
+                    auto resultType = inst->getFullType();
+                    auto elementType = sbType->getElementType();
+
+                    IRBuilder builder;
+                    builder.sharedBuilder = &sharedBuilderStorage;
+                    builder.setInsertBefore(inst);
+
+                    List<IRInst*> args;
+                    args.add(wrapExistential->getWrappedValue());
+                    for (UInt i = 1; i < inst->getArgCount(); i++)
+                        args.add(inst->getArg(i));
+                    List<IRInst*> slotOperands;
+                    UInt slotOperandCount = wrapExistential->getSlotOperandCount();
+                    for (UInt ii = 0; ii < slotOperandCount; ++ii)
+                    {
+                        slotOperands.add(wrapExistential->getSlotOperand(ii));
+                    }
+                    auto newCall = builder.emitCallInst(elementType, inst->getCallee(), args);
+                    auto newWrapExistential = builder.emitWrapExistential(
+                        resultType, newCall, slotOperandCount, slotOperands.getBuffer());
+                    inst->replaceUsesWith(newWrapExistential);
+                    inst->removeAndDeallocate();
+                    addUsersToWorkList(newWrapExistential);
+                    return true;
+                }
+            }
+        }
+        return false;
+    }
+
     // Given a `call` instruction in the IR, we need to detect the case
     // where the callee has some interface-type parameter(s) and at the
     // call site it is statically clear what concrete type(s) the arguments
@@ -777,6 +857,12 @@ struct SpecializationContext
     //
     void maybeSpecializeExistentialsForCall(IRCall* inst)
     {
+        // Handle a special case of `StructuredBuffer.operator[]/Load/Consume`
+        // calls first. These calls on builtin generic types should be handled
+        // the same way as a `load` inst.
+        if (maybeSpecializeBufferLoadCall(inst))
+            return;
+
         // We can only specialize a call when the callee function is known.
         //
         auto calleeFunc = as<IRFunc>(inst->getCallee());
@@ -1678,13 +1764,18 @@ struct SpecializationContext
             type->removeAndDeallocate();
             return;
         }
-        else if( auto basePtrLikeType = as<IRPointerLikeType>(baseType) )
+        else if( as<IRPointerLikeType>(baseType) || as<IRHLSLStructuredBufferTypeBase>(baseType) )
         {
             // A `BindExistentials<P<T>, ...>` can be simplified to
             // `P<BindExistentials<T, ...>>` when `P` is a pointer-like
             // type constructor.
             //
-            auto baseElementType = basePtrLikeType->getElementType();
+            IRType* baseElementType = nullptr;
+            if (auto basePtrLikeType = as<IRPointerLikeType>(baseType))
+                baseElementType = basePtrLikeType->getElementType();
+            else if (auto baseSBType = as<IRHLSLStructuredBufferTypeBase>(baseType))
+                baseElementType = baseSBType->getElementType();
+
             IRInst* wrappedElementType = builder.getBindExistentialsType(
                 baseElementType,
                 slotOperandCount,
@@ -1692,7 +1783,7 @@ struct SpecializationContext
             addToWorkList(wrappedElementType);
 
             auto newPtrLikeType = builder.getType(
-                basePtrLikeType->op,
+                baseType->op,
                 1,
                 &wrappedElementType);
             addToWorkList(newPtrLikeType);

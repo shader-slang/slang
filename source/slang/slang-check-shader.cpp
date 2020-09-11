@@ -74,6 +74,12 @@ namespace Slang
                 loc);
             return;
         }
+        else if (auto structuredBufferType = as<HLSLStructuredBufferTypeBase>(type))
+        {
+            _collectExistentialSpecializationParamsRec(
+                astBuilder, ioSpecializationParams, structuredBufferType->getElementType(), loc);
+            return;
+        }
 
         if( auto declRefType = as<DeclRefType>(type) )
         {

@@ -831,26 +831,10 @@ static SlangParameterCategory getParameterCategory(
     return SLANG_PARAMETER_CATEGORY_MIXED;
 }
 
-static TypeLayout* maybeGetContainerLayout(TypeLayout* typeLayout)
-{
-    if (auto parameterGroupTypeLayout = as<ParameterGroupTypeLayout>(typeLayout))
-    {
-        auto containerTypeLayout = parameterGroupTypeLayout->containerVarLayout->typeLayout;
-        if (containerTypeLayout->resourceInfos.getCount() != 0)
-        {
-            return containerTypeLayout;
-        }
-    }
-
-    return typeLayout;
-}
-
 SLANG_API SlangParameterCategory spReflectionTypeLayout_GetParameterCategory(SlangReflectionTypeLayout* inTypeLayout)
 {
     auto typeLayout = convert(inTypeLayout);
     if(!typeLayout) return SLANG_PARAMETER_CATEGORY_NONE;
-
-    typeLayout = maybeGetContainerLayout(typeLayout);
 
     return getParameterCategory(typeLayout);
 }
@@ -860,8 +844,6 @@ SLANG_API unsigned spReflectionTypeLayout_GetCategoryCount(SlangReflectionTypeLa
     auto typeLayout = convert(inTypeLayout);
     if(!typeLayout) return 0;
 
-    typeLayout = maybeGetContainerLayout(typeLayout);
-
     return (unsigned) typeLayout->resourceInfos.getCount();
 }
 
@@ -869,8 +851,6 @@ SLANG_API SlangParameterCategory spReflectionTypeLayout_GetCategoryByIndex(Slang
 {
     auto typeLayout = convert(inTypeLayout);
     if(!typeLayout) return SLANG_PARAMETER_CATEGORY_NONE;
-
-    typeLayout = maybeGetContainerLayout(typeLayout);
 
     return typeLayout->resourceInfos[index].kind;
 }
