@@ -331,7 +331,7 @@ void BindSet::calcValueLocations(const BindLocation& location, Slang::List<BindL
 // Finds the first category from layout reflection that represents an actual value
 // i.e. that is not ExistentialType or ExistentialObject.
 template<typename LayoutReflectionType>
-slang::ParameterCategory findOrdinaryValueCategory(LayoutReflectionType* layout)
+slang::ParameterCategory getFirstNonExistentialValueCategory(LayoutReflectionType* layout)
 {
     slang::ParameterCategory category = slang::ParameterCategory::None;
     for (UInt i = 0; i < layout->getCategoryCount(); i++)
@@ -380,7 +380,7 @@ BindLocation BindSet::toField(const BindLocation& loc, slang::VariableLayoutRefl
     }
     else
     {
-        slang::ParameterCategory category = findOrdinaryValueCategory(field);
+        slang::ParameterCategory category = getFirstNonExistentialValueCategory(field);
         SLANG_ASSERT(category != slang::ParameterCategory::None);
 
         // If I'm going from mixed, then I will have multiple items being tracked (so won't be here)
@@ -513,7 +513,7 @@ BindLocation BindSet::toIndex(const BindLocation& loc, Index index) const
     }
     else
     {
-        slang::ParameterCategory category = findOrdinaryValueCategory(elementTypeLayout);
+        slang::ParameterCategory category = getFirstNonExistentialValueCategory(elementTypeLayout);
         SLANG_ASSERT(category != slang::ParameterCategory::None);
 
         const auto elementStride = typeLayout->getElementStride(category);
