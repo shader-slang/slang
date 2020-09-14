@@ -1969,8 +1969,23 @@ static RefPtr<TypeLayout> _createParameterGroupTypeLayout(
     // element type separately, and then combine these to form
     // the overall layout for the parameter group.
 
+    // Note: We leave the `type` field of the container type layout
+    // as null, because there is no available `Type*` that is suitable
+    // to put there.
+    //
+    // It might seem like we could use the `parameterGroupType` itself,
+    // since it is the logical "container," but doing so creates an
+    // unfortunate situation where we have a layout for a parameter
+    // group type that is not itself a `ParameterGroupTypeLayout`.
+    // Furthermore, it creates a nesting situation where a type layout
+    // for `parameterGroupType` contains a nested layout for `parameterGroupType`,
+    // and thus creates the impression of an infinite regress.
+    //
+    // The down-side to leaving a null pointer here is that it means
+    // we do *not* have an invariant that every `TypeLayout` has a non-null
+    // type, but that property is not explicitly useful/desirable.
+
     RefPtr<TypeLayout> containerTypeLayout = new TypeLayout();
-    containerTypeLayout->type = parameterGroupType;
     containerTypeLayout->rules = parameterGroupRules;
 
     // Because the container and element types will each be situated
