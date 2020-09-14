@@ -328,6 +328,23 @@ void BindSet::calcValueLocations(const BindLocation& location, Slang::List<BindL
     }
 }
 
+// Finds the first category from layout reflection that represents an actual value
+// i.e. that is not ExistentialType or ExistentialObject.
+template<typename LayoutReflectionType>
+slang::ParameterCategory getFirstNonExistentialValueCategory(LayoutReflectionType* layout)
+{
+    slang::ParameterCategory category = slang::ParameterCategory::None;
+    for (UInt i = 0; i < layout->getCategoryCount(); i++)
+    {
+        auto currentCategory = layout->getCategoryByIndex((unsigned int)i);
+        if (currentCategory == slang::ParameterCategory::ExistentialTypeParam ||
+            currentCategory == slang::ParameterCategory::ExistentialObjectParam)
+            continue;
+        category = currentCategory;
+    }
+    return category;
+}
+
 BindLocation BindSet::toField(const BindLocation& loc, slang::VariableLayoutReflection* field) const
 {
     const Index categoryCount = Index(field->getCategoryCount());
@@ -363,8 +380,8 @@ BindLocation BindSet::toField(const BindLocation& loc, slang::VariableLayoutRefl
     }
     else
     {
-        SLANG_ASSERT(categoryCount == 1);
-        auto category = field->getCategoryByIndex(0);
+        slang::ParameterCategory category = getFirstNonExistentialValueCategory(field);
+        SLANG_ASSERT(category != slang::ParameterCategory::None);
 
         // If I'm going from mixed, then I will have multiple items being tracked (so won't be here)
         // If I'm not, then I'm getting an inplace field. It must be relative
@@ -496,8 +513,8 @@ BindLocation BindSet::toIndex(const BindLocation& loc, Index index) const
     }
     else
     {
-        SLANG_ASSERT(categoryCount == 1);
-        auto category = elementTypeLayout->getCategoryByIndex(0);
+        slang::ParameterCategory category = getFirstNonExistentialValueCategory(elementTypeLayout);
+        SLANG_ASSERT(category != slang::ParameterCategory::None);
 
         const auto elementStride = typeLayout->getElementStride(category);
 

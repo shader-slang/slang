@@ -530,6 +530,13 @@ struct SpecializationContext
             maybeSpecializeFieldAddress(as<IRFieldAddress>(inst));
             break;
 
+        case kIROp_getElement:
+            maybeSpecializeGetElement(as<IRGetElement>(inst));
+            break;
+        case kIROp_getElementPtr:
+            maybeSpecializeGetElementAddress(as<IRGetElementPtr>(inst));
+            break;
+
         case kIROp_BindExistentialsType:
             maybeSpecializeBindExistentialsType(as<IRBindExistentialsType>(inst));
             break;
@@ -1506,6 +1513,11 @@ struct SpecializationContext
             type = ptrLikeType->getElementType();
             goto top;
         }
+        else if (auto arrayType = as<IRArrayTypeBase>(type))
+        {
+            type = arrayType->getElementType();
+            goto top;
+        }
         else if( auto structType = as<IRStructType>(type) )
         {
             UInt count = 0;
@@ -1695,6 +1707,82 @@ struct SpecializationContext
         }
     }
 
+    void maybeSpecializeGetElement(IRGetElement* inst)
+    {
+        auto baseArg = inst->getBase();
+        if (auto wrapInst = as<IRWrapExistential>(baseArg))
+        {
+            // We have `getElement(wrapExistential(val, ...), index)`
+            // We need to replace this instruction with
+            // `wrapExistential(getElement(val, index), ...)`
+            auto index = inst->getIndex();
+
+            auto val = wrapInst->getWrappedValue();
+            auto resultType = inst->getFullType();
+
+            IRBuilder builder;
+            builder.sharedBuilder = &sharedBuilderStorage;
+            builder.setInsertBefore(inst);
+
+            auto elementType = cast<IRArrayTypeBase>(val->getDataType())->getElementType();
+
+            List<IRInst*> slotOperands;
+            UInt slotOperandCount = wrapInst->getSlotOperandCount();
+
+            for (UInt ii = 0; ii < slotOperandCount; ++ii)
+            {
+                slotOperands.add(wrapInst->getSlotOperand(ii));
+            }
+
+            auto newGetElement = builder.emitElementExtract(elementType, val, index);
+
+            auto newWrapExistentialInst = builder.emitWrapExistential(
+                resultType, newGetElement, slotOperandCount, slotOperands.getBuffer());
+
+            addUsersToWorkList(inst);
+            inst->replaceUsesWith(newWrapExistentialInst);
+            inst->removeAndDeallocate();
+        }
+    }
+
+    void maybeSpecializeGetElementAddress(IRGetElementPtr* inst)
+    {
+        auto baseArg = inst->getBase();
+        if (auto wrapInst = as<IRWrapExistential>(baseArg))
+        {
+            // We have `getElementPtr(wrapExistential(val, ...), index)`
+            // We need to replace this instruction with
+            // `wrapExistential(getElementPtr(val, index), ...)`
+            auto index = inst->getIndex();
+
+            auto val = wrapInst->getWrappedValue();
+            auto resultType = inst->getFullType();
+
+            IRBuilder builder;
+            builder.sharedBuilder = &sharedBuilderStorage;
+            builder.setInsertBefore(inst);
+
+            auto elementType = cast<IRArrayTypeBase>(val->getDataType())->getElementType();
+
+            List<IRInst*> slotOperands;
+            UInt slotOperandCount = wrapInst->getSlotOperandCount();
+
+            for (UInt ii = 0; ii < slotOperandCount; ++ii)
+            {
+                slotOperands.add(wrapInst->getSlotOperand(ii));
+            }
+
+            auto newElementAddr = builder.emitElementAddress(elementType, val, index);
+
+            auto newWrapExistentialInst = builder.emitWrapExistential(
+                resultType, newElementAddr, slotOperandCount, slotOperands.getBuffer());
+
+            addUsersToWorkList(inst);
+            inst->replaceUsesWith(newWrapExistentialInst);
+            inst->removeAndDeallocate();
+        }
+    }
+
     UInt calcExistentialTypeParamSlotCount(IRType* type)
     {
     top:
@@ -1764,7 +1852,9 @@ struct SpecializationContext
             type->removeAndDeallocate();
             return;
         }
-        else if( as<IRPointerLikeType>(baseType) || as<IRHLSLStructuredBufferTypeBase>(baseType) )
+        else if( as<IRPointerLikeType>(baseType) ||
+                 as<IRHLSLStructuredBufferTypeBase>(baseType) ||
+                 as<IRArrayTypeBase>(baseType))
         {
             // A `BindExistentials<P<T>, ...>` can be simplified to
             // `P<BindExistentials<T, ...>>` when `P` is a pointer-like
@@ -1773,6 +1863,8 @@ struct SpecializationContext
             IRType* baseElementType = nullptr;
             if (auto basePtrLikeType = as<IRPointerLikeType>(baseType))
                 baseElementType = basePtrLikeType->getElementType();
+            else if (auto arrayType = as<IRArrayTypeBase>(baseType))
+                baseElementType = arrayType->getElementType();
             else if (auto baseSBType = as<IRHLSLStructuredBufferTypeBase>(baseType))
                 baseElementType = baseSBType->getElementType();
 
