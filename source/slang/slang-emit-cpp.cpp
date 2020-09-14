@@ -1724,6 +1724,10 @@ void CPPSourceEmitter::emitRTTIObject(IRRTTIObject* rttiObject)
 void CPPSourceEmitter::_maybeEmitWitnessTableTypeDefinition(
     IRInterfaceType* interfaceType)
 {
+    if (m_interfaceTypesEmitted.Contains(interfaceType))
+        return;
+    m_interfaceTypesEmitted.Add(interfaceType);
+
     m_writer->emit("struct ");
     emitSimpleType(interfaceType);
     m_writer->emit("\n{\n");
