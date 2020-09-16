@@ -956,9 +956,10 @@ static bool _hasWriteAccess(SlangResourceAccess access)
     /// Assumes that data for binding the kernel parameters is already
     /// set up in `outContext.`
     ///
-static SlangResult _loadAndInvokeComputeProgram(
+static SlangResult _invokeComputeProgram(
     CUcontext cudaContext,
     ScopeCUDAStream& cudaStream,
+    ScopeCUDAModule& cudaModule,
     const ShaderCompilerUtil::OutputAndLayout& outputAndLayout,
     const uint32_t dispatchSize[3],
     CUDAComputeUtil::Context& outContext)
@@ -967,17 +968,6 @@ static SlangResult _loadAndInvokeComputeProgram(
 
     auto& bindSet = outContext.m_bindSet;
     auto& bindRoot = outContext.m_bindRoot;
-
-    const Index index = outputAndLayout.output.findKernelDescIndex(StageType::Compute);
-    if (index < 0)
-    {
-        return SLANG_FAIL;
-    }
-
-    const auto& kernelDesc = outputAndLayout.output.kernelDescs[index];
-
-    ScopeCUDAModule cudaModule;
-    SLANG_RETURN_ON_FAIL(cudaModule.load(kernelDesc.codeBegin));
 
     // The global-scope shader parameters in the input Slang program
     // will be collected into a single `__constant__` global variable
@@ -1370,10 +1360,87 @@ static SlangResult _loadAndInvokeRayTracingProgram(
 }
 #endif
 
+    // Fill in RTTI pointers values in input buffers.
+static SlangResult _populateRTTIEntries(
+    const ShaderCompilerUtil::OutputAndLayout& compilationAndLayout,
+    ScopeCUDAModule& cudaModule)
+{
+    Slang::ComPtr<slang::ISession> linkage;
+    spCompileRequest_getSession(compilationAndLayout.output.request, linkage.writeRef());
+    auto& inputLayout = compilationAndLayout.layout;
+    for (auto& entry : inputLayout.entries)
+    {
+        for (auto& rtti : entry.rttiEntries)
+        {
+            CUdeviceptr ptrValue = 0;
+            switch (rtti.type)
+            {
+            case RTTIDataEntryType::RTTIObject:
+                {
+                    auto reflection =
+                        slang::ShaderReflection::get(compilationAndLayout.output.request);
+                    auto concreteType = reflection->findTypeByName(rtti.typeName.getBuffer());
+                    ComPtr<ISlangBlob> outName;
+                    linkage->getTypeRTTIMangledName(concreteType, outName.writeRef());
+                    if (!outName)
+                        return SLANG_FAIL;
+                    SLANG_CUDA_RETURN_ON_FAIL(cuModuleGetGlobal(
+                        &ptrValue,
+                        nullptr,
+                        cudaModule.m_module,
+                        (char*)outName->getBufferPointer()));
+                }
+                break;
+            case RTTIDataEntryType::WitnessTable:
+                {
+                    auto reflection =
+                        slang::ShaderReflection::get(compilationAndLayout.output.request);
+                    auto concreteType = reflection->findTypeByName(rtti.typeName.getBuffer());
+                    if (!concreteType)
+                        return SLANG_FAIL;
+                    auto interfaceType = reflection->findTypeByName(rtti.interfaceName.getBuffer());
+                    if (!interfaceType)
+                        return SLANG_FAIL;
+                    ComPtr<ISlangBlob> outName;
+                    linkage->getTypeConformanceWitnessMangledName(
+                        concreteType, interfaceType, outName.writeRef());
+                    if (!outName)
+                        return SLANG_FAIL;
+                    SLANG_CUDA_RETURN_ON_FAIL(cuModuleGetGlobal(
+                        &ptrValue,
+                        nullptr,
+                        cudaModule.m_module,
+                        (char*)outName->getBufferPointer()));
+                    break;
+                }
+            default:
+                break;
+            }
+            if (!ptrValue)
+                return SLANG_FAIL;
+            if (rtti.offset >= 0 &&
+                rtti.offset + sizeof(ptrValue) <=
+                    entry.bufferData.getCount() * sizeof(decltype(entry.bufferData[0])))
+            {
+                memcpy(
+                    ((char*)entry.bufferData.getBuffer()) + rtti.offset,
+                    &ptrValue,
+                    sizeof(ptrValue));
+            }
+            else
+            {
+                return SLANG_FAIL;
+            }
+        }
+    }
+    return SLANG_OK;
+}
+
     /// Fill in the binding information for arguments of a CUDA program.
 static SlangResult _setUpArguments(
     CUcontext cudaContext,
     ScopeCUDAStream& cudaStream,
+    ScopeCUDAModule& cudaModule,
     const ShaderCompilerUtil::OutputAndLayout& outputAndLayout,
     const uint32_t dispatchSize[3],
     CUDAComputeUtil::Context& outContext)
@@ -1392,6 +1459,14 @@ static SlangResult _setUpArguments(
     // Now set up the Values from the test
 
     auto outStream = StdWriters::getOut();
+
+    // Fill in RTTI pointers in input buffers before copying it to GPU memory.
+    // TODO: enable this for Optix path after it is refactored so that context
+    // creation and module loading happens before _setUpArguments.
+    if (outputAndLayout.output.desc.pipelineType == PipelineType::Compute)
+    {
+        SLANG_RETURN_ON_FAIL(_populateRTTIEntries(outputAndLayout, cudaModule));
+    }
     SLANG_RETURN_ON_FAIL(ShaderInputLayout::addBindSetValues(outputAndLayout.layout.entries, outputAndLayout.sourcePath, outStream, bindRoot));
 
     ShaderInputLayout::getValueBuffers(outputAndLayout.layout.entries, bindSet, outContext.m_buffers);
@@ -1613,10 +1688,25 @@ static SlangResult _readBackOutputs(
     return SLANG_OK;
 }
 
+SlangResult _loadCUDAModule(
+    const ShaderCompilerUtil::OutputAndLayout& outputAndLayout,
+    ScopeCUDAModule& outModule)
+{
+    const Index index = outputAndLayout.output.findKernelDescIndex(StageType::Compute);
+    if (index < 0)
+    {
+        return SLANG_FAIL;
+    }
+    const auto& kernelDesc = outputAndLayout.output.kernelDescs[index];
+    SLANG_RETURN_ON_FAIL(outModule.load(kernelDesc.codeBegin));
+    return SLANG_OK;
+}
+
     /// Load and invoke a CUDA program (either compute or ray-tracing)
 SlangResult _loadAndInvokeKernel(
     CUcontext cudaContext,
     ScopeCUDAStream& cudaStream,
+    ScopeCUDAModule& cudaModule,
     const ShaderCompilerUtil::OutputAndLayout& outputAndLayout,
     const uint32_t dispatchSize[3],
     CUDAComputeUtil::Context& outContext)
@@ -1624,11 +1714,13 @@ SlangResult _loadAndInvokeKernel(
     switch( outputAndLayout.output.desc.pipelineType )
     {
     case PipelineType::Compute:
-        return _loadAndInvokeComputeProgram(cudaContext, cudaStream, outputAndLayout, dispatchSize, outContext);
+        return _invokeComputeProgram(
+            cudaContext, cudaStream, cudaModule, outputAndLayout, dispatchSize, outContext);
 
     case PipelineType::RayTracing:
 #ifdef RENDER_TEST_OPTIX
-        return _loadAndInvokeRayTracingProgram(cudaContext, cudaStream, outputAndLayout, dispatchSize, outContext);
+        return _loadAndInvokeRayTracingProgram(
+            cudaContext, cudaStream, outputAndLayout, dispatchSize, outContext);
 #endif
         break;
     
@@ -1652,17 +1744,27 @@ SlangResult _loadAndInvokeKernel(
     ScopeCUDAStream cudaStream;
     //SLANG_CUDA_RETURN_ON_FAIL(cudaStream.init(cudaStreamNonBlocking));
 
+    ScopeCUDAModule cudaModule;
+
     auto& bindSet = outContext.m_bindSet;
     auto& bindRoot = outContext.m_bindRoot;
 
     auto request = outputAndLayout.output.request;
     auto reflection = (slang::ShaderReflection*) spGetReflection(request);
 
+    // Load cuda module first so its symbols may be queried and filled into argument buffers.
+    // TODO: refactor optix path to also front-load its context creation and module loading here.
+    // For now just front-load compute kernels.
+    if (outputAndLayout.output.desc.pipelineType == PipelineType::Compute)
+    {
+        SLANG_RETURN_ON_FAIL(_loadCUDAModule(outputAndLayout, cudaModule));
+    }
+
     SLANG_RETURN_ON_FAIL(_setUpArguments(
-        cudaContext, cudaStream, outputAndLayout, dispatchSize, outContext));
+        cudaContext, cudaStream, cudaModule, outputAndLayout, dispatchSize, outContext));
 
     SLANG_RETURN_ON_FAIL(_loadAndInvokeKernel(
-        cudaContext, cudaStream, outputAndLayout, dispatchSize, outContext));
+        cudaContext, cudaStream, cudaModule, outputAndLayout, dispatchSize, outContext));
 
         // Finally we need to copy the data back
     SLANG_RETURN_ON_FAIL(_readBackOutputs(
