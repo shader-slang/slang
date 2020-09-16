@@ -180,7 +180,8 @@ int DebugSerialReader::calcFixSourceLoc(DebugSerialData::SourceLoc loc, DebugSer
 
     if (m_lastViewIndex < 0)
     {
-        SLANG_ASSERT(!"Invalid Loc mapping");
+        // Set an invalid range, as couldn't find 
+        outRange = DebugSerialData::SourceRange::getInvalid();
         return 0;
     }
 
