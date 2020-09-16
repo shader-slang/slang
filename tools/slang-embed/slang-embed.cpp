@@ -216,9 +216,6 @@ struct App
             }
         }
         fprintf(outputFile, "\";\n");
-
-        fclose(outputFile);
-        fclose(inputFile);
     }
 };
 
