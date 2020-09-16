@@ -157,7 +157,10 @@ namespace Slang
                 // "I need all of these libraries" vs. "I need at least one of these
                 // libraries").
                 //
-                sink->diagnose(SourceLoc(), Diagnostics::failedToLoadDownstreamCompiler, type);
+                if( sink )
+                {
+                    sink->diagnose(SourceLoc(), Diagnostics::failedToLoadDownstreamCompiler, type);
+                }
                 SinkSharedLibraryLoader loader(m_sharedLibraryLoader, sink);
                 locator(m_downstreamCompilerPaths[int(type)], &loader, m_downstreamCompilerSet);
             }

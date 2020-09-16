@@ -47,7 +47,7 @@ struct Options
     char const* testPrefix = nullptr;
 
     // generate extra output (notably: command lines we run)
-    bool shouldBeVerbose = true;
+    bool shouldBeVerbose = false;
 
     // When true results from ignored tests are not shown
     bool hideIgnored = false;
