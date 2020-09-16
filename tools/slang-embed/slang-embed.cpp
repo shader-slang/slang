@@ -14,6 +14,36 @@
 #include <stdlib.h>
 #include <string.h>
 
+// Utility to free pointers on scope exit
+struct ScopedMemory
+{
+    ScopedMemory(void* ptr)
+        : ptr(ptr)
+    {}
+
+    ~ScopedMemory()
+    {
+        if(ptr) free(ptr);
+    }
+
+    void* ptr;
+};
+
+// Utility to close file on scope exit
+struct ScopedFile
+{
+    ScopedFile(FILE* file)
+        : file(file)
+    {}
+
+    ~ScopedFile()
+    {
+        if(file) fclose(file);
+    }
+
+    FILE* file;
+};
+
 // The utility is implemented as a single `struct` type
 // that provides a context for the code. We do this as
 // an alternative to using global variables for passing
@@ -63,6 +93,7 @@ struct App
         // the line ending convention of the host platform)
         //
         FILE* inputFile = fopen(inputPath, "r");
+        ScopedFile inputFileCleanup(inputFile);
         if( !inputFile )
         {
             fprintf(stderr, "%s: error: failed to open '%s' for reading\n", appName, inputPath);
@@ -75,10 +106,12 @@ struct App
         // to specify a desired output path would be an obvious choice.
         //
         char* outputPath = (char*) malloc(strlen(inputPath) + strlen(".cpp") + 1);
+        ScopedMemory outputPathCleanup(outputPath);
         strcpy(outputPath, inputPath);
         strcat(outputPath, ".cpp");
 
         FILE* outputFile = fopen(outputPath, "w");
+        ScopedFile outputFileCleanup(outputFile);
         if( !outputPath )
         {
             fprintf(stderr, "%s: error: failed to open '%s' for reading\n", appName, outputPath);
@@ -103,6 +136,7 @@ struct App
         // that comes after a `.` to trim the name further.
         //
         char* variableName = (char*) malloc(strlen(fileName));
+        ScopedMemory variableNameCleanup(variableName);
         strcpy(variableName, fileName);
         if(auto pos = strchr(variableName, '.'))
             *pos = 0;
