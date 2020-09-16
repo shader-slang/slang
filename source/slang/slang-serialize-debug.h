@@ -147,8 +147,7 @@ public:
 
     SourceLoc getSourceLoc(DebugSerialData::SourceLoc loc);
 
-        /// Works out he fix to source locs.
-        /// Returns the amount to be added to a source loc to get something in
+        /// Works out the amount to fix an input source loc to get a regular Slang::SourceLoc
     int calcFixSourceLoc(DebugSerialData::SourceLoc loc, DebugSerialData::SourceRange& outRange);
 
         /// Calc the loc

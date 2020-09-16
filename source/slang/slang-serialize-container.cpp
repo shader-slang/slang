@@ -509,6 +509,16 @@ namespace Slang {
             }
             SLANG_ASSERT(origSourceView && readSourceView);
 
+            // The offset should be the same
+            Index origOffset = origInst->sourceLoc.getRaw() - origSourceView->getRange().begin.getRaw();
+            Index readOffset = readInst->sourceLoc.getRaw() - readSourceView->getRange().begin.getRaw();
+
+            if (origOffset != readOffset)
+            {
+                SLANG_ASSERT(!"SourceLoc offset debug data didn't match");
+                return SLANG_FAIL;
+            }
+
             {
                 auto origInfo = origSourceView->getHumaneLoc(origInst->sourceLoc, SourceLocType::Actual);
                 auto readInfo = readSourceView->getHumaneLoc(readInst->sourceLoc, SourceLocType::Actual);

@@ -189,7 +189,7 @@ int DebugSerialReader::calcFixSourceLoc(DebugSerialData::SourceLoc loc, DebugSer
     SLANG_ASSERT(view.m_range.contains(loc));
 
     outRange = view.m_range;
-    return int(view.m_sourceView->getRange().begin.getRaw()) - int(loc);
+    return view.m_sourceView->getRange().begin.getRaw() - view.m_range.m_start;
 }
 
 SourceLoc DebugSerialReader::getSourceLoc(DebugSerialData::SourceLoc loc)
