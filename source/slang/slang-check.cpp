@@ -42,7 +42,7 @@ namespace Slang
                 }
                 else
                 {
-                    m_sink->diagnose(SourceLoc(), Diagnostics::failedToLoadDynamicLibrary, path);
+                    m_sink->diagnose(SourceLoc(), Diagnostics::noteFailedToLoadDynamicLibrary, path);
                 }
             }
             return res;
@@ -133,8 +133,34 @@ namespace Slang
         {
             m_downstreamCompilerSet->remove(SlangPassThrough(type));
 
-            SinkSharedLibraryLoader loader(m_sharedLibraryLoader, sink);
-            locator(m_downstreamCompilerPaths[int(type)], &loader, m_downstreamCompilerSet);
+            // We want to be able to report a diagnostic to the user if a loader
+            // was unable to locate the desired downstream compiler, but we
+            // also need to deal with the fact that the locator might "probe"
+            // multiple possible library versions/names, and failing to load
+            // one library should not be taken as a hard error.
+            //
+            // The approach we use here is to first apply the `locator` directly
+            // with our `m_sharedLibraryLoader` and see if it succeeds. If
+            // it does, then we will move along.
+            //
+            if (SLANG_FAILED(locator(m_downstreamCompilerPaths[int(type)], m_sharedLibraryLoader, m_downstreamCompilerSet)))
+            {
+                // If the locator reported a failure the first time we invoked
+                // it, then we will invoke it against with a wrapper shared librar
+                // loader that reported library load failures to our diagnost `sink`.
+                //
+                // This means that in the case of failure the user will see a listing
+                // of all the libraries that the locator attempted to load but failed
+                // to find. The user will know that making one or more of these libraries
+                // available could fix the issue, but we cannot communicate precise
+                // information to them with this approach (e.g., the difference between
+                // "I need all of these libraries" vs. "I need at least one of these
+                // libraries").
+                //
+                sink->diagnose(SourceLoc(), Diagnostics::failedToLoadDownstreamCompiler, type);
+                SinkSharedLibraryLoader loader(m_sharedLibraryLoader, sink);
+                locator(m_downstreamCompilerPaths[int(type)], &loader, m_downstreamCompilerSet);
+            }
 
             DownstreamCompilerUtil::updateDefaults(m_downstreamCompilerSet);
         }

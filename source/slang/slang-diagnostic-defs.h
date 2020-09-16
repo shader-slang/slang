@@ -118,6 +118,15 @@ DIAGNOSTIC(    86, Error, unableToCreateModuleContainer, "unable to create modul
 
 DIAGNOSTIC(    87, Error, unableToSetDefaultDownstreamCompiler, "unable to set default downstream compiler for source language '%0' to '%1'")
 
+
+//
+// 001xx - Downstream Compilers
+//
+
+DIAGNOSTIC(  100, Error, failedToLoadDownstreamCompiler, "failed to load downstream compiler '$0'")
+DIAGNOSTIC(99999, Note, noteFailedToLoadDynamicLibrary, "failed to load dynamic library '$0'")
+
+
 //
 // 1xxxx - Lexical analysis
 //
