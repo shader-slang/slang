@@ -1969,8 +1969,23 @@ static RefPtr<TypeLayout> _createParameterGroupTypeLayout(
     // element type separately, and then combine these to form
     // the overall layout for the parameter group.
 
+    // Note: We leave the `type` field of the container type layout
+    // as null, because there is no available `Type*` that is suitable
+    // to put there.
+    //
+    // It might seem like we could use the `parameterGroupType` itself,
+    // since it is the logical "container," but doing so creates an
+    // unfortunate situation where we have a layout for a parameter
+    // group type that is not itself a `ParameterGroupTypeLayout`.
+    // Furthermore, it creates a nesting situation where a type layout
+    // for `parameterGroupType` contains a nested layout for `parameterGroupType`,
+    // and thus creates the impression of an infinite regress.
+    //
+    // The down-side to leaving a null pointer here is that it means
+    // we do *not* have an invariant that every `TypeLayout` has a non-null
+    // type, but that property is not explicitly useful/desirable.
+
     RefPtr<TypeLayout> containerTypeLayout = new TypeLayout();
-    containerTypeLayout->type = parameterGroupType;
     containerTypeLayout->rules = parameterGroupRules;
 
     // Because the container and element types will each be situated
@@ -3474,6 +3489,13 @@ static TypeLayoutResult _createTypeLayout(
             {
                 arrayResourceCount = elementResourceInfo.count;
             }
+            // The second exception to this is arrays of an existential type
+            // where the entire array should be specialized to a single concrete type.
+            //
+            else if (elementResourceInfo.kind == LayoutResourceKind::ExistentialTypeParam)
+            {
+                arrayResourceCount = elementResourceInfo.count;
+            }
             //
             // The next big exception is when we are forming an unbounded-size
             // array and the element type got "adjusted," because that means
@@ -3662,6 +3684,7 @@ static TypeLayoutResult _createTypeLayout(
             typeLayout->rules = rules;
 
             LayoutSize fixedExistentialValueSize = 0;
+            LayoutSize uniformSlotSize = 0;
             bool targetSupportsPointer =
                 isCPUTarget(context.targetReq) || isCUDATarget(context.targetReq);
 
@@ -3674,7 +3697,7 @@ static TypeLayoutResult _createTypeLayout(
                     fixedExistentialValueSize = anyValueAttr->size;
                 }
                 // Append 16 bytes to accommodate RTTI pointer and witness table pointer.
-                auto uniformSlotSize = fixedExistentialValueSize + 16;
+                uniformSlotSize = fixedExistentialValueSize + 16;
                 typeLayout->addResourceUsage(LayoutResourceKind::Uniform, uniformSlotSize);
             }
             typeLayout->addResourceUsage(LayoutResourceKind::ExistentialTypeParam, 1);
@@ -3721,8 +3744,9 @@ static TypeLayoutResult _createTypeLayout(
                     typeLayout->pendingDataTypeLayout = concreteTypeLayout;
                 }
             }
-
-            return TypeLayoutResult(typeLayout, SimpleLayoutInfo());
+            // Interface type occupies a uniform slot for the fixed size storage, with alignment of 4 bytes.
+            return TypeLayoutResult(
+                typeLayout, SimpleLayoutInfo(LayoutResourceKind::Uniform, uniformSlotSize, 4));
         }
         else if( auto enumDeclRef = declRef.as<EnumDecl>() )
         {

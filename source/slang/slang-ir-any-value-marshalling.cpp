@@ -126,13 +126,14 @@ namespace Slang
                 auto vectorType = static_cast<IRVectorType*>(dataType);
                 auto elementType = vectorType->getElementType();
                 auto elementCount = getIntVal(vectorType->getElementCount());
+                auto elementPtrType = builder->getPtrType(elementType);
                 for (IRIntegerValue i = 0; i < elementCount; i++)
                 {
-                    auto elementVal = builder->emitElementExtract(
-                        elementType,
+                    auto elementAddr = builder->emitElementAddress(
+                        elementPtrType,
                         concreteTypedVar,
                         builder->getIntValue(builder->getIntType(), i));
-                    emitMarshallingCode(builder, context, elementVal);
+                    emitMarshallingCode(builder, context, elementAddr);
                 }
                 break;
             }
@@ -469,6 +470,10 @@ namespace Slang
                 if (auto anyValueType = as<IRAnyValueType>(inst))
                     processAnyValueType(anyValueType);
             }
+            // Because we replaced all `AnyValueType` uses, some old type definitions (e.g. PtrType(AnyValueType))
+            // will become duplicates with new types we introduced (e.g. PtrType(AnyValueStruct)), and therefore
+            // invalidates our `globalValueNumberingMap` hash map. We need to rebuild it.
+            sharedContext->sharedBuilderStorage.deduplicateAndRebuildGlobalNumberingMap();
         }
     };
 

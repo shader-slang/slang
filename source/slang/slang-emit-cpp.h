@@ -137,6 +137,8 @@ protected:
 
     HashSet<const HLSLIntrinsic*> m_intrinsicEmitted;
 
+    HashSet<IRInterfaceType*> m_interfaceTypesEmitted;
+
     StringSlicePool m_slicePool;
 
     SemanticUsedFlags m_semanticUsedFlags;
