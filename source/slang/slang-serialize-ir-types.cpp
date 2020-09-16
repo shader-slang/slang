@@ -46,17 +46,6 @@ SLANG_COMPILE_TIME_ASSERT(SLANG_FOUR_CC_GET_FIRST_CHAR(SLANG_MAKE_COMPRESSED_FOU
 
 struct PrefixString;
 
-namespace { // anonymous
-
-struct CharReader
-{
-    char operator()(int pos) const { SLANG_UNUSED(pos); return *m_pos++; }
-    CharReader(const char* pos) :m_pos(pos) {}
-    mutable const char* m_pos;
-};
-
-} // anonymous
-
 // !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! IRSerialData !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 
 template<typename T>
@@ -75,10 +64,6 @@ size_t IRSerialData::calcSizeInBytes() const
         /* Raw source locs */
         _calcArraySize(m_rawSourceLocs) +
         /* Debug */
-        _calcArraySize(m_debugStringTable) +
-        _calcArraySize(m_debugLineInfos) +
-        _calcArraySize(m_debugSourceInfos) +
-        _calcArraySize(m_debugAdjustedLineInfos) +
         _calcArraySize(m_debugSourceLocRuns);
 }
 
@@ -99,101 +84,19 @@ void IRSerialData::clear()
 
     m_stringTable.clear();
     
-    // Debug data
-    m_debugLineInfos.clear();
-    m_debugAdjustedLineInfos.clear();
-    m_debugSourceInfos.clear();
     m_debugSourceLocRuns.clear();
-    m_debugStringTable.clear();
-}
-
-template <typename T>
-static bool _isEqual(const List<T>& aIn, const List<T>& bIn)
-{
-    if (aIn.getCount() != bIn.getCount())
-    {
-        return false;
-    }
-
-    size_t size = size_t(aIn.getCount());
-
-    const T* a = aIn.begin();
-    const T* b = bIn.begin();
-
-    if (a == b)
-    {
-        return true;
-    }
-
-    for (size_t i = 0; i < size; ++i)
-    {
-        if (a[i] != b[i])
-        {
-            return false;
-        }
-    }
-
-    return true;
 }
 
 bool IRSerialData::operator==(const ThisType& rhs) const
 {
     return (this == &rhs) ||
-        (_isEqual(m_insts, rhs.m_insts) &&
-        _isEqual(m_childRuns, rhs.m_childRuns) &&
-        _isEqual(m_externalOperands, rhs.m_externalOperands) &&
-        _isEqual(m_rawSourceLocs, rhs.m_rawSourceLocs) &&
-        _isEqual(m_stringTable, rhs.m_stringTable) &&
+        (SerialListUtil::isEqual(m_insts, rhs.m_insts) &&
+        SerialListUtil::isEqual(m_childRuns, rhs.m_childRuns) &&
+        SerialListUtil::isEqual(m_externalOperands, rhs.m_externalOperands) &&
+        SerialListUtil::isEqual(m_rawSourceLocs, rhs.m_rawSourceLocs) &&
+        SerialListUtil::isEqual(m_stringTable, rhs.m_stringTable) &&
         /* Debug */
-        _isEqual(m_debugStringTable, rhs.m_debugStringTable) &&
-        _isEqual(m_debugLineInfos, rhs.m_debugLineInfos) &&
-        _isEqual(m_debugAdjustedLineInfos, rhs.m_debugAdjustedLineInfos) &&
-        _isEqual(m_debugSourceInfos, rhs.m_debugSourceInfos) &&
-        _isEqual(m_debugSourceLocRuns, rhs.m_debugSourceLocRuns));
-}
-
-// !!!!!!!!!!!!!!!!!!!!!!!!!!!! IRSerialTypeUtil !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-
-#define SLANG_SERIAL_BINARY_COMPRESSION_TYPE(x) \
-    x(None, none) \
-    x(VariableByteLite, lite)
-
-/* static */SlangResult IRSerialTypeUtil::parseCompressionType(const UnownedStringSlice& text, IRSerialCompressionType& outType)
-{
-    struct Pair
-    {
-        UnownedStringSlice name;
-        IRSerialCompressionType type;
-    };
-
-#define SLANG_SERIAL_BINARY_PAIR(type, name) { UnownedStringSlice::fromLiteral(#name), IRSerialCompressionType::type},
-
-    static const Pair s_pairs[] = {
-        SLANG_SERIAL_BINARY_COMPRESSION_TYPE(SLANG_SERIAL_BINARY_PAIR)
-    };
-
-    for (const auto& pair : s_pairs)
-    {
-        if (pair.name == text)
-        {
-            outType = pair.type;
-            return SLANG_OK;
-        }
-    }
-    return SLANG_FAIL;
-}
-
-/* static */UnownedStringSlice IRSerialTypeUtil::getText(IRSerialCompressionType type)
-{
-#define SLANG_SERIAL_BINARY_CASE(type, name) case IRSerialCompressionType::type: return UnownedStringSlice::fromLiteral(#name);
-    switch (type)
-    {
-        SLANG_SERIAL_BINARY_COMPRESSION_TYPE(SLANG_SERIAL_BINARY_CASE)
-        default: break;
-    }
-
-    SLANG_ASSERT(!"Unknown compression type");
-    return UnownedStringSlice::fromLiteral("unknown");
+        SerialListUtil::isEqual(m_debugSourceLocRuns, rhs.m_debugSourceLocRuns));
 }
 
 } // namespace Slang

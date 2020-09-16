@@ -7,6 +7,7 @@
 #include "../core/slang-array-view.h"
 
 #include "slang-serialize-types.h"
+#include "slang-serialize-debug.h"
 
 #include "slang-name.h"
 #include "slang-source-loc.h"
@@ -15,14 +16,30 @@
 
 namespace Slang {
 
-enum class IRSerialCompressionType : uint8_t
-{
-    None,
-    VariableByteLite,
-};
-
 // Pre-declare
 class Name;
+
+struct IRSerialBinary
+{
+        /// IR module list
+    static const FourCC kIRModuleFourCc = SLANG_FOUR_CC('S', 'i', 'm', 'd');             
+
+    /* NOTE! All FourCC that can be compressed must start with capital 'S', because compressed version is the same FourCC
+    with the 'S' replaced with 's' */
+
+    static const FourCC kInstFourCc = SLANG_FOUR_CC('S', 'L', 'i', 'n');
+    static const FourCC kChildRunFourCc = SLANG_FOUR_CC('S', 'L', 'c', 'r');
+    static const FourCC kExternalOperandsFourCc = SLANG_FOUR_CC('S', 'L', 'e', 'o');
+
+    static const FourCC kCompressedInstFourCc = SLANG_MAKE_COMPRESSED_FOUR_CC(kInstFourCc);
+    static const FourCC kCompressedChildRunFourCc = SLANG_MAKE_COMPRESSED_FOUR_CC(kChildRunFourCc);
+    static const FourCC kCompressedExternalOperandsFourCc = SLANG_MAKE_COMPRESSED_FOUR_CC(kExternalOperandsFourCc);
+
+    static const FourCC kUInt32RawSourceLocFourCc = SLANG_FOUR_CC('S', 'r', 's', '4');
+
+        /// Debug information is held elsewhere, but if this optional section exists, it maps instructions to locs
+    static const FourCC kDebugSourceLocRunFourCc = SLANG_FOUR_CC('S', 'd', 's', 'r');
+};
 
 struct IRSerialData
 {
@@ -34,7 +51,6 @@ struct IRSerialData
     enum class ArrayIndex : uint32_t;
 
     enum class RawSourceLoc : SourceLoc::RawValue;          ///< This is just to copy over source loc data (ie not strictly serialize)
-    // enum class StringOffset : uint32_t;                     ///< Offset into the m_stringsBuffer
     
     typedef uint32_t SizeType;
 
@@ -63,7 +79,7 @@ struct IRSerialData
         bool operator!=(const ThisType& rhs) const { return !(*this == rhs); }
         bool operator<(const ThisType& rhs) const { return m_sourceLoc < rhs.m_sourceLoc;  }
 
-        uint32_t m_sourceLoc;               ///< The source location
+        DebugSerialData::SourceLoc m_sourceLoc;               ///< The source location
         InstIndex m_startInstIndex;         ///< The index to the first instruction
         SizeType m_numInst;                 ///< The number of children
     };
@@ -74,68 +90,7 @@ struct IRSerialData
         uint8_t m_numStrings;
     };
 
-    struct DebugSourceInfo
-    {
-        typedef DebugSourceInfo ThisType;
-
-        bool operator==(const ThisType& rhs) const
-        {
-            return m_pathIndex == rhs.m_pathIndex &&
-                m_startSourceLoc == rhs.m_startSourceLoc &&
-                m_endSourceLoc == rhs.m_endSourceLoc &&
-                m_numLineInfos == rhs.m_numLineInfos &&
-                m_lineInfosStartIndex == rhs.m_lineInfosStartIndex &&
-                m_numLineInfos == rhs.m_numLineInfos;
-        }
-        bool operator!=(const ThisType& rhs) const { return !(*this == rhs); }
-
-        bool isSourceLocInRange(uint32_t sourceLoc) const { return sourceLoc >= m_startSourceLoc && sourceLoc <= m_endSourceLoc;  }
-
-        StringIndex m_pathIndex;                ///< Index to the string table
-        uint32_t m_startSourceLoc;              ///< The offset to the source
-        uint32_t m_endSourceLoc;                ///< The number of bytes in the source
-
-        uint32_t m_numLines;                    ///< Total number of lines in source file
-
-        uint32_t m_lineInfosStartIndex;         ///< Index into m_debugLineInfos
-        uint32_t m_numLineInfos;                ///< The number of line infos
-
-        uint32_t m_adjustedLineInfosStartIndex; ///< Adjusted start index
-        uint32_t m_numAdjustedLineInfos;        ///< The number of line infos
-    };
-
-    struct DebugLineInfo
-    {
-        typedef DebugLineInfo ThisType;
-        bool operator<(const ThisType& rhs) const { return m_lineStartOffset < rhs.m_lineStartOffset;  }
-        bool operator==(const ThisType& rhs) const
-        {
-            return m_lineStartOffset == rhs.m_lineStartOffset &&
-                m_lineIndex == rhs.m_lineIndex;
-        }
-        bool operator!=(const ThisType& rhs) const { return !(*this == rhs); }
-
-        uint32_t m_lineStartOffset;               ///< The offset into the source file 
-        uint32_t m_lineIndex;                     ///< Original line index
-    };
-
-    struct DebugAdjustedLineInfo
-    {
-        typedef DebugAdjustedLineInfo ThisType;
-        bool operator==(const ThisType& rhs) const
-        {
-            return m_lineInfo == rhs.m_lineInfo &&
-                m_adjustedLineIndex == rhs.m_adjustedLineIndex &&
-                m_pathStringIndex == rhs.m_pathStringIndex;
-        }
-        bool operator!=(const ThisType& rhs) const { return !(*this == rhs); }
-        bool operator<(const ThisType& rhs) const { return m_lineInfo < rhs.m_lineInfo;  }
-
-        DebugLineInfo m_lineInfo;
-        uint32_t m_adjustedLineIndex;             ///< The line index with the adjustment (if there is any). Is 0 if m_pathStringIndex is 0.
-        StringIndex m_pathStringIndex;            ///< The path as an index
-    };
-
+    
     // Instruction...
     // We can store SourceLoc values separately. Just store per index information.
     // Parent information is stored in m_childRuns
@@ -225,20 +180,14 @@ struct IRSerialData
     
     List<Inst> m_insts;                         ///< The instructions
 
+    List<RawSourceLoc> m_rawSourceLocs;         ///< A source location per instruction (saved without modification from IRInst)
+
     List<InstRun> m_childRuns;                  ///< Holds the information about children that belong to an instruction
 
     List<InstIndex> m_externalOperands;         ///< Holds external operands (for instructions with more than kNumOperands)
 
     List<char> m_stringTable;                   ///< All strings. Indexed into by StringIndex
 
-    List<RawSourceLoc> m_rawSourceLocs;         ///< A source location per instruction (saved without modification from IRInst)s
-
-    // Data only set if we have debug information
-
-    List<char> m_debugStringTable;              ///< String table for debug use only
-    List<DebugLineInfo> m_debugLineInfos;        ///< Debug line information
-    List<DebugAdjustedLineInfo> m_debugAdjustedLineInfos;        ///< Adjusted line infos
-    List<DebugSourceInfo> m_debugSourceInfos;    ///< Debug source information
     List<SourceLocRun> m_debugSourceLocRuns;    ///< Runs of instructions that use a source loc
 
     static const PayloadInfo s_payloadInfos[int(Inst::PayloadType::CountOf)];
@@ -302,72 +251,6 @@ SLANG_FORCE_INLINE int IRSerialData::getOperands(const Inst& inst, const InstInd
         return s_payloadInfos[int(inst.m_payloadType)].m_numOperands;
     }
 }
-
-// For types/FourCC that work for serializing in general (not just IR). Really this should be placed in some other header
-struct SerialBinary
-{
-    static const FourCC kRiffFourCc = RiffFourCC::kRiff;
-
-    static const FourCC kSlangModuleListFourCc = SLANG_FOUR_CC('S', 'L', 'm', 'l');
-
-    static const FourCC kEntryPointFourCc = SLANG_FOUR_CC('E', 'P', 'n', 't');
-};
-
-// Replace first char with 's'
-#define SLANG_MAKE_COMPRESSED_FOUR_CC(fourCc) SLANG_FOUR_CC_REPLACE_FIRST_CHAR(fourCc, 's')
-
-struct IRSerialBinary
-{
-    static const FourCC kSlangModuleFourCc = SLANG_FOUR_CC('S', 'L', 'm', 'd');             ///< Holds all the slang specific chunks
-
-    static const FourCC kSlangModuleHeaderFourCc = SLANG_FOUR_CC('S', 'L', 'h', 'd');
-
-    /* NOTE! All FourCC that can be compressed must start with capital 'S', because compressed version is the same FourCC
-    with the 'S' replaced with 's' */
-
-    static const FourCC kInstFourCc = SLANG_FOUR_CC('S', 'L', 'i', 'n');
-    static const FourCC kChildRunFourCc = SLANG_FOUR_CC('S', 'L', 'c', 'r');
-    static const FourCC kExternalOperandsFourCc = SLANG_FOUR_CC('S', 'L', 'e', 'o');
-
-    static const FourCC kCompressedInstFourCc = SLANG_MAKE_COMPRESSED_FOUR_CC(kInstFourCc);
-    static const FourCC kCompressedChildRunFourCc = SLANG_MAKE_COMPRESSED_FOUR_CC(kChildRunFourCc);
-    static const FourCC kCompressedExternalOperandsFourCc = SLANG_MAKE_COMPRESSED_FOUR_CC(kExternalOperandsFourCc);
-
-    static const FourCC kStringFourCc = SLANG_FOUR_CC('S', 'L', 's', 't');
-
-    static const FourCC kUInt32SourceLocFourCc = SLANG_FOUR_CC('S', 'r', 's', '4');
-
-    static const FourCC kDebugStringFourCc = SLANG_FOUR_CC('S', 'd', 's', 't');
-    static const FourCC kDebugLineInfoFourCc = SLANG_FOUR_CC('S', 'd', 'l', 'n');
-    static const FourCC kDebugAdjustedLineInfoFourCc = SLANG_FOUR_CC('S', 'd', 'a', 'l');
-    static const FourCC kDebugSourceInfoFourCc = SLANG_FOUR_CC('S', 'd', 's', 'o');
-    static const FourCC kDebugSourceLocRunFourCc = SLANG_FOUR_CC('S', 'd', 's', 'r');
-
-    typedef IRSerialCompressionType CompressionType;
-
-    struct ModuleHeader
-    {
-        uint32_t compressionType;         ///< Holds the compression type used (if used at all)
-    };
-    struct ArrayHeader
-    {
-        uint32_t numEntries;
-    };
-    struct CompressedArrayHeader
-    {
-        uint32_t numEntries;              ///< The number of entries
-        uint32_t numCompressedEntries;    ///< The amount of compressed entries
-    };
-
-};
-
-struct IRSerialTypeUtil
-{
-        /// Given text, finds the compression type
-    static SlangResult parseCompressionType(const UnownedStringSlice& text, IRSerialCompressionType& outType);
-        /// Given a compression type, return text
-    static UnownedStringSlice getText(IRSerialCompressionType type);
-};
 
 
 } // namespace Slang

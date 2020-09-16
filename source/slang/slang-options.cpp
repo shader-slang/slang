@@ -592,7 +592,7 @@ struct OptionsParser
                 {
                     String name;
                     SLANG_RETURN_ON_FAIL(tryReadCommandLineArgument(sink, arg, &argCursor, argEnd, name));
-                    SLANG_RETURN_ON_FAIL(IRSerialTypeUtil::parseCompressionType(name.getUnownedSlice(), requestImpl->getLinkage()->irCompressionType));
+                    SLANG_RETURN_ON_FAIL(SerialParseUtil::parseCompressionType(name.getUnownedSlice(), requestImpl->getLinkage()->serialCompressionType));
                 }
                 else if (argStr == "-target")
                 {

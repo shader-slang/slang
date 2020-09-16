@@ -216,6 +216,9 @@ public:
     struct Chunk;
     typedef SlangResult(*VisitorCallback)(Chunk* chunk, void* data);
 
+    struct ListChunk;
+    struct DataChunk;
+
     class Visitor;
     struct Chunk
     {
@@ -270,6 +273,8 @@ public:
 
         void* findContainedData(FourCC type, size_t minSize) const;
 
+        ListChunk* findContainedList(FourCC type);
+
             /// Finds the contained data. NOTE! Assumes that there is only as single data block, and will return nullptr if there is not
         Data* findContainedData(FourCC type) const;
 
@@ -290,6 +295,9 @@ public:
 
             /// Get the sub type
         FourCC getSubType() const { return m_fourCC; }
+
+            /// A singly linked list of contained chunks directly contained in this chunk
+        Chunk* getFirstContainedChunk() const { return m_containedChunks; }
 
         Chunk* m_containedChunks;               ///< The contained chunks
         Chunk* m_endChunk;                      ///< The last chunk (only set when pushed, and used when popped)
@@ -416,9 +424,14 @@ protected:
 template <typename T>
 T* as(RiffContainer::Chunk* chunk)
 {
-    return T::isType(chunk) ? static_cast<T*>(chunk) : nullptr;
+    return chunk && T::isType(chunk) ? static_cast<T*>(chunk) : nullptr;
 }
-
+// -----------------------------------------------------------------------------
+template <typename T>
+T* as(RiffContainer::Chunk* chunk, FourCC fourCC)
+{
+    return chunk && chunk->m_fourCC == fourCC && T::isType(chunk) ? static_cast<T*>(chunk) : nullptr;
+}
 
 struct RiffUtil
 {
@@ -449,8 +462,11 @@ struct RiffUtil
         /// Get the size taking into account padding
     static size_t getPadSize(size_t in) { return (in + kRiffPadMask) & ~size_t(kRiffPadMask); }
 
-        /// Write a container and contents to a stream
-    static SlangResult write(ListChunk* container, bool isRoot, Stream* stream);
+        /// Write a chunk list and contents to a stream
+    static SlangResult write(ListChunk* listChunk, bool isRoot, Stream* stream);
+        /// Write a container to the stream
+    static SlangResult write(RiffContainer* container, Stream* stream);
+
         /// Read the stream into the container
     static SlangResult read(Stream* stream, RiffContainer& outContainer);
 };

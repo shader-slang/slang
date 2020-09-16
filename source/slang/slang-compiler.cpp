@@ -23,8 +23,7 @@
 #include "slang-glsl-extension-tracker.h"
 #include "slang-emit-cuda.h"
 
-#include "slang-serialize-ast.h"
-#include "slang-serialize-ir.h"
+#include "slang-serialize-container.h"
 
 // Enable calling through to `fxc` or `dxc` to
 // generate code on Windows.
@@ -2342,103 +2341,27 @@ SlangResult dissassembleDXILUsingDXC(
     
     SlangResult EndToEndCompileRequest::writeContainerToStream(Stream* stream)
     {
-        RiffContainer container;
+        auto linkage = getLinkage();
 
-        const IRSerialBinary::CompressionType compressionType = getLinkage()->irCompressionType;
+        // Set up options
+        SerialContainerUtil::WriteOptions options;
 
+        options.compressionType = linkage->serialCompressionType;
+        if (linkage->debugInfoLevel != DebugInfoLevel::None)
         {
-            // Module list
-            RiffContainer::ScopeChunk listScope(&container, RiffContainer::Chunk::Kind::List, SerialBinary::kSlangModuleListFourCc);
-
-            auto linkage = getLinkage();
-            auto sink = getSink();
-            auto frontEndReq = getFrontEndReq();
-
-            IRSerialWriter::OptionFlags optionFlags = 0;
-
-            if (linkage->debugInfoLevel != DebugInfoLevel::None)
-            {
-                optionFlags |= IRSerialWriter::OptionFlag::DebugInfo;
-            }
-
-            RefPtr<ASTSerialClasses> astClasses = new ASTSerialClasses;
-
-            SourceManager* sourceManager = frontEndReq->getSourceManager();
-
-            for (TranslationUnitRequest* translationUnit : frontEndReq->translationUnits)
-            {
-                auto module = translationUnit->module;
-                auto irModule = module->getIRModule();
-
-                // Okay, we need to serialize this module to our container file.
-                // We currently don't serialize it's name..., but support for that could be added.
-
-                // Write the IR information
-                {
-                    IRSerialData serialData;
-                    IRSerialWriter writer;
-                    SLANG_RETURN_ON_FAIL(writer.write(irModule, sourceManager, optionFlags, &serialData));
-                    SLANG_RETURN_ON_FAIL(IRSerialWriter::writeContainer(serialData, compressionType, &container));
-                }
-
-                // Write the AST information
-                {
-                    ModuleDecl* moduleDecl = translationUnit->getModuleDecl();
-
-                    ModuleASTSerialFilter filter(moduleDecl);
-                    ASTSerialWriter writer(astClasses, &filter);
-
-                    // Add the module and everything that isn't filtered out in the filter.
-                    writer.addPointer(moduleDecl);
-
-                    // We can now serialize it into the riff container.
-                    SLANG_RETURN_ON_FAIL(writer.writeIntoContainer(&container));
-                }
-            }
-
-            auto program = getSpecializedGlobalAndEntryPointsComponentType();
-
-            // TODO: in the case where we have specialization, we might need
-            // to serialize IR related to `program`...
-
-            for (auto target : linkage->targets)
-            {
-                auto targetProgram = program->getTargetProgram(target);
-                auto irModule = targetProgram->getOrCreateIRModuleForLayout(sink);
-
-                // Okay, we need to serialize this target program and its IR too...
-                IRSerialData serialData;
-                IRSerialWriter writer;
-                SLANG_RETURN_ON_FAIL(writer.write(irModule, sourceManager, optionFlags, &serialData));
-                SLANG_RETURN_ON_FAIL(IRSerialWriter::writeContainer(serialData, compressionType, &container));
-            }
-
-            auto entryPointCount = program->getEntryPointCount();
-            for( Index ii = 0; ii < entryPointCount; ++ii )
-            {
-                auto entryPoint = program->getEntryPoint(ii);
-                auto entryPointMangledName = program->getEntryPointMangledName(ii);
-
-                RiffContainer::ScopeChunk entryPointScope(&container, RiffContainer::Chunk::Kind::Data, SerialBinary::kEntryPointFourCc);
-
-                auto writeString = [&](String const& str)
-                {
-                    uint32_t length = (uint32_t) str.getLength();
-                    container.write(&length, sizeof(length));
-                    container.write(str.getBuffer(), length+1);
-                };
-
-                writeString(entryPoint->getName()->text);
-
-                Profile profile = entryPoint->getProfile();
-                container.write(&profile, sizeof(profile));
-
-                writeString(entryPointMangledName);
-            }
+            options.optionFlags |= SerialOptionFlag::DebugInfo;
         }
 
-        // We now write the RiffContainer to the stream
-        SLANG_RETURN_ON_FAIL(RiffUtil::write(container.getRoot(), true, stream));
+        {
+            RiffContainer container;
+            {
+                SerialContainerData data;
+                SLANG_RETURN_ON_FAIL(SerialContainerUtil::requestToData(this, options, data));
+                SLANG_RETURN_ON_FAIL(SerialContainerUtil::write(data, options, &container));
+            }
+            // We now write the RiffContainer to the stream
+            SLANG_RETURN_ON_FAIL(RiffUtil::write(container.getRoot(), true, stream));
+        }
 
         return SLANG_OK;
     }

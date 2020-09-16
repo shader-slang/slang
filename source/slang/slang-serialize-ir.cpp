@@ -34,85 +34,7 @@ void IRSerialWriter::_addInstruction(IRInst* inst)
     m_insts.add(inst);
 }
 
-void IRSerialWriter::_addDebugSourceLocRun(SourceLoc sourceLoc, uint32_t startInstIndex, uint32_t numInsts)
-{
-    SourceView* sourceView = m_sourceManager->findSourceView(sourceLoc);
-    if (!sourceView)
-    {
-        return;
-    }
-
-    SourceFile* sourceFile = sourceView->getSourceFile();
-    DebugSourceFile* debugSourceFile;
-    {
-        RefPtr<DebugSourceFile>* ptrDebugSourceFile = m_debugSourceFileMap.TryGetValue(sourceFile);
-        if (ptrDebugSourceFile == nullptr)
-        {
-            const SourceLoc::RawValue baseSourceLoc = m_debugFreeSourceLoc;
-            m_debugFreeSourceLoc += SourceLoc::RawValue(sourceView->getRange().getSize() + 1);
-
-            debugSourceFile = new DebugSourceFile(sourceFile, baseSourceLoc);
-            m_debugSourceFileMap.Add(sourceFile, debugSourceFile);
-        }
-        else
-        {
-            debugSourceFile = *ptrDebugSourceFile;
-        }
-    }
-
-    // We need to work out the line index
-
-    int offset = sourceView->getRange().getOffset(sourceLoc);
-    int lineIndex = sourceFile->calcLineIndexFromOffset(offset);
-
-    IRSerialData::DebugLineInfo lineInfo;
-    lineInfo.m_lineStartOffset = sourceFile->getLineBreakOffsets()[lineIndex];
-    lineInfo.m_lineIndex = lineIndex;
-
-    if (!debugSourceFile->hasLineIndex(lineIndex))
-    {
-        // Add the information about the line        
-        int entryIndex = sourceView->findEntryIndex(sourceLoc);
-        if (entryIndex < 0)
-        {
-            debugSourceFile->m_lineInfos.add(lineInfo);
-        }
-        else
-        {
-            const auto& entry = sourceView->getEntries()[entryIndex];
-
-            IRSerialData::DebugAdjustedLineInfo adjustedLineInfo;
-            adjustedLineInfo.m_lineInfo = lineInfo;
-            adjustedLineInfo.m_pathStringIndex = SerialStringData::kNullStringIndex;
-
-            const auto& pool = sourceView->getSourceManager()->getStringSlicePool();
-            SLANG_ASSERT(pool.getStyle() == StringSlicePool::Style::Default);
-
-            if (!pool.isDefaultHandle(entry.m_pathHandle))
-            {
-                UnownedStringSlice slice = pool.getSlice(entry.m_pathHandle);
-                SLANG_ASSERT(slice.getLength() > 0);
-                adjustedLineInfo.m_pathStringIndex = Ser::StringIndex(m_debugStringSlicePool.add(slice));
-            }
-
-            adjustedLineInfo.m_adjustedLineIndex = lineIndex + entry.m_lineAdjust;
-
-            debugSourceFile->m_adjustedLineInfos.add(adjustedLineInfo);
-        }
-
-        debugSourceFile->setHasLineIndex(lineIndex);
-    }
-
-    // Add the run
-    IRSerialData::SourceLocRun sourceLocRun;
-    sourceLocRun.m_numInst = numInsts;
-    sourceLocRun.m_startInstIndex = IRSerialData::InstIndex(startInstIndex);
-    sourceLocRun.m_sourceLoc = uint32_t(debugSourceFile->m_baseSourceLoc + offset);
-
-    m_serialData->m_debugSourceLocRuns.add(sourceLocRun);
-}
-
-Result IRSerialWriter::_calcDebugInfo()
+Result IRSerialWriter::_calcDebugInfo(DebugSerialWriter* debugWriter)
 {
     // We need to find the unique source Locs
     // We are not going to store SourceLocs directly, because there may be multiple views mapping down to
@@ -147,8 +69,7 @@ Result IRSerialWriter::_calcDebugInfo()
 
     // Sort them
     instLocs.sort();
-    m_debugFreeSourceLoc = 1;
-
+    
     // Look for runs
     const InstLoc* startInstLoc = instLocs.begin();
     const InstLoc* endInstLoc = instLocs.end();
@@ -167,54 +88,26 @@ Result IRSerialWriter::_calcDebugInfo()
         {
         }
 
-        // Try adding the run
-        _addDebugSourceLocRun(SourceLoc::fromRaw(startSourceLoc), startInstLoc->instIndex, curInstIndex - startInstLoc->instIndex);
+        // Add the run
+
+        IRSerialData::SourceLocRun sourceLocRun;
+        sourceLocRun.m_numInst = curInstIndex - startInstLoc->instIndex;;
+        sourceLocRun.m_startInstIndex = IRSerialData::InstIndex(startInstLoc->instIndex);
+        sourceLocRun.m_sourceLoc = debugWriter->addSourceLoc(SourceLoc::fromRaw(startSourceLoc));
+
+        m_serialData->m_debugSourceLocRuns.add(sourceLocRun);
 
         // Next
         startInstLoc = curInstLoc;
     }
 
-    // Okay we can now calculate the final source information
-
-    for (auto& pair : m_debugSourceFileMap)
-    {
-        DebugSourceFile* debugSourceFile = pair.Value;
-        SourceFile* sourceFile = debugSourceFile->m_sourceFile;
-
-        IRSerialData::DebugSourceInfo sourceInfo;
-
-        sourceInfo.m_numLines = uint32_t(debugSourceFile->m_sourceFile->getLineBreakOffsets().getCount());
-
-        sourceInfo.m_startSourceLoc = uint32_t(debugSourceFile->m_baseSourceLoc);
-        sourceInfo.m_endSourceLoc = uint32_t(debugSourceFile->m_baseSourceLoc + sourceFile->getContentSize());
-
-        sourceInfo.m_pathIndex = Ser::StringIndex(m_debugStringSlicePool.add(sourceFile->getPathInfo().foundPath));
-
-        sourceInfo.m_lineInfosStartIndex = uint32_t(m_serialData->m_debugLineInfos.getCount());
-        sourceInfo.m_adjustedLineInfosStartIndex = uint32_t(m_serialData->m_debugAdjustedLineInfos.getCount());
-
-        sourceInfo.m_numLineInfos = uint32_t(debugSourceFile->m_lineInfos.getCount());
-        sourceInfo.m_numAdjustedLineInfos = uint32_t(debugSourceFile->m_adjustedLineInfos.getCount());
-
-        // Add the line infos
-        m_serialData->m_debugLineInfos.addRange(debugSourceFile->m_lineInfos.begin(), debugSourceFile->m_lineInfos.getCount());
-        m_serialData->m_debugAdjustedLineInfos.addRange(debugSourceFile->m_adjustedLineInfos.begin(), debugSourceFile->m_adjustedLineInfos.getCount());
-
-        // Add the source info
-        m_serialData->m_debugSourceInfos.add(sourceInfo);
-    }
-
-    // Convert the string pool
-    SerialStringTableUtil::encodeStringTable(m_debugStringSlicePool, m_serialData->m_debugStringTable);
-
     return SLANG_OK;
 }
 
-Result IRSerialWriter::write(IRModule* module, SourceManager* sourceManager, OptionFlags options, IRSerialData* serialData)
+Result IRSerialWriter::write(IRModule* module, DebugSerialWriter* debugWriter, SerialOptionFlags options, IRSerialData* serialData)
 {
     typedef Ser::Inst::PayloadType PayloadType;
 
-    m_sourceManager = sourceManager;
     m_serialData = serialData;
 
     serialData->clear();
@@ -399,7 +292,7 @@ Result IRSerialWriter::write(IRModule* module, SourceManager* sourceManager, Opt
     }
 
     // If the option to use RawSourceLocations is enabled, serialize out as is
-    if (options & OptionFlag::RawSourceLocation)
+    if (options & SerialOptionFlag::RawSourceLocation)
     {
         const Index numInsts = m_insts.getCount();
         serialData->m_rawSourceLocs.setCount(numInsts);
@@ -414,80 +307,25 @@ Result IRSerialWriter::write(IRModule* module, SourceManager* sourceManager, Opt
         }
     }
 
-    if (options & OptionFlag::DebugInfo)
+    if ((options & SerialOptionFlag::DebugInfo) && debugWriter)
     {
-        _calcDebugInfo();
+        _calcDebugInfo(debugWriter);
     }
 
     m_serialData = nullptr;
     return SLANG_OK;
 }
 
-static Result _writeArrayChunk(IRSerialCompressionType compressionType, FourCC chunkId, const void* data, size_t numEntries, size_t typeSize, RiffContainer* container)
-{
-    typedef RiffContainer::Chunk Chunk;
-    typedef RiffContainer::ScopeChunk ScopeChunk;
-
-    typedef IRSerialBinary Bin;
-    if (numEntries == 0)
-    {
-        return SLANG_OK;
-    }
-
-    // Make compressed fourCC
-    chunkId = (compressionType != IRSerialCompressionType::None) ? SLANG_MAKE_COMPRESSED_FOUR_CC(chunkId) : chunkId;
-
-    ScopeChunk scope(container, Chunk::Kind::Data, chunkId);
-
-    switch (compressionType)
-    {
-        case IRSerialCompressionType::None:
-        {
-            Bin::ArrayHeader header;
-            header.numEntries = uint32_t(numEntries);
-
-            container->write(&header, sizeof(header));
-            container->write(data, typeSize * numEntries);
-            break;
-        }
-        case IRSerialCompressionType::VariableByteLite:
-        {
-            List<uint8_t> compressedPayload;
-
-            size_t numCompressedEntries = (numEntries * typeSize) / sizeof(uint32_t);
-            ByteEncodeUtil::encodeLiteUInt32((const uint32_t*)data, numCompressedEntries, compressedPayload);
-
-            Bin::CompressedArrayHeader header;
-            header.numEntries = uint32_t(numEntries);
-            header.numCompressedEntries = uint32_t(numCompressedEntries);
-
-            container->write(&header, sizeof(header));
-            container->write(compressedPayload.getBuffer(), compressedPayload.getCount());
-            break;
-        }
-        default:
-        {
-            return SLANG_FAIL;
-        }
-    }
-    return SLANG_OK;
-}
-
-template <typename T>
-Result _writeArrayChunk(IRSerialCompressionType compressionType, FourCC chunkId, const List<T>& array, RiffContainer* container)
-{
-    return _writeArrayChunk(compressionType, chunkId, array.begin(), size_t(array.getCount()), sizeof(T), container);
-}
-
-Result _encodeInsts(IRSerialCompressionType compressionType, const List<IRSerialData::Inst>& instsIn, List<uint8_t>& encodeArrayOut)
+Result _encodeInsts(SerialCompressionType compressionType, const List<IRSerialData::Inst>& instsIn, List<uint8_t>& encodeArrayOut)
 {
     typedef IRSerialBinary Bin;
     typedef IRSerialData::Inst::PayloadType PayloadType;
 
-    if (compressionType != IRSerialCompressionType::VariableByteLite)
+    if (compressionType != SerialCompressionType::VariableByteLite)
     {
         return SLANG_FAIL;
     }
+
     encodeArrayOut.clear();
     
     const size_t numInsts = size_t(instsIn.getCount());
@@ -569,7 +407,7 @@ Result _encodeInsts(IRSerialCompressionType compressionType, const List<IRSerial
     return SLANG_OK;
 }
 
-Result _writeInstArrayChunk(IRSerialCompressionType compressionType, FourCC chunkId, const List<IRSerialData::Inst>& array, RiffContainer* container)
+Result _writeInstArrayChunk(SerialCompressionType compressionType, FourCC chunkId, const List<IRSerialData::Inst>& array, RiffContainer* container)
 {
     typedef RiffContainer::Chunk Chunk;
     typedef RiffContainer::ScopeChunk ScopeChunk;
@@ -582,18 +420,18 @@ Result _writeInstArrayChunk(IRSerialCompressionType compressionType, FourCC chun
 
     switch (compressionType)
     {
-        case IRSerialCompressionType::None:
+        case SerialCompressionType::None:
         {
-            return _writeArrayChunk(compressionType, chunkId, array, container);
+            return SerialRiffUtil::writeArrayChunk(compressionType, chunkId, array, container);
         }
-        case IRSerialCompressionType::VariableByteLite:
+        case SerialCompressionType::VariableByteLite:
         {
             List<uint8_t> compressedPayload;
             SLANG_RETURN_ON_FAIL(_encodeInsts(compressionType, array, compressedPayload));
 
             ScopeChunk scope(container, Chunk::Kind::Data, SLANG_MAKE_COMPRESSED_FOUR_CC(chunkId));
 
-            Bin::CompressedArrayHeader header;
+            SerialBinary::CompressedArrayHeader header;
             header.numEntries = uint32_t(array.getCount());
             header.numCompressedEntries = 0;          
 
@@ -607,150 +445,69 @@ Result _writeInstArrayChunk(IRSerialCompressionType compressionType, FourCC chun
     return SLANG_FAIL;
 }
 
-/* static */Result IRSerialWriter::writeContainer(const IRSerialData& data, IRSerialCompressionType compressionType, RiffContainer* container)
+/* static */Result IRSerialWriter::writeContainer(const IRSerialData& data, SerialCompressionType compressionType, RiffContainer* container)
 {
     typedef RiffContainer::Chunk Chunk;
     typedef RiffContainer::ScopeChunk ScopeChunk;
 
-    ScopeChunk scopeModule(container, Chunk::Kind::List, Bin::kSlangModuleFourCc);
-
-    // Write the header
-    {
-        Bin::ModuleHeader moduleHeader;
-        moduleHeader.compressionType = uint32_t(IRSerialCompressionType::VariableByteLite);
-
-        ScopeChunk scopeHeader(container, Chunk::Kind::Data, Bin::kSlangModuleHeaderFourCc);
-        container->write(&moduleHeader, sizeof(moduleHeader));
-    }
+    ScopeChunk scopeModule(container, Chunk::Kind::List, Bin::kIRModuleFourCc);
 
     SLANG_RETURN_ON_FAIL(_writeInstArrayChunk(compressionType, Bin::kInstFourCc, data.m_insts, container));
-    SLANG_RETURN_ON_FAIL(_writeArrayChunk(compressionType, Bin::kChildRunFourCc, data.m_childRuns, container));
-    SLANG_RETURN_ON_FAIL(_writeArrayChunk(compressionType, Bin::kExternalOperandsFourCc, data.m_externalOperands, container));
-    SLANG_RETURN_ON_FAIL(_writeArrayChunk(IRSerialCompressionType::None, Bin::kStringFourCc, data.m_stringTable, container));
+    SLANG_RETURN_ON_FAIL(SerialRiffUtil::writeArrayChunk(compressionType, Bin::kChildRunFourCc, data.m_childRuns, container));
+    SLANG_RETURN_ON_FAIL(SerialRiffUtil::writeArrayChunk(compressionType, Bin::kExternalOperandsFourCc, data.m_externalOperands, container));
+    SLANG_RETURN_ON_FAIL(SerialRiffUtil::writeArrayChunk(SerialCompressionType::None, SerialBinary::kStringTableFourCc, data.m_stringTable, container));
 
-    SLANG_RETURN_ON_FAIL(_writeArrayChunk(IRSerialCompressionType::None, Bin::kUInt32SourceLocFourCc, data.m_rawSourceLocs, container));
+    SLANG_RETURN_ON_FAIL(SerialRiffUtil::writeArrayChunk(SerialCompressionType::None, Bin::kUInt32RawSourceLocFourCc, data.m_rawSourceLocs, container));
 
-    if (data.m_debugSourceInfos.getCount())
+    if (data.m_debugSourceLocRuns.getCount())
     {
-        _writeArrayChunk(IRSerialCompressionType::None, Bin::kDebugStringFourCc, data.m_debugStringTable, container);
-        _writeArrayChunk(IRSerialCompressionType::None, Bin::kDebugLineInfoFourCc, data.m_debugLineInfos, container);
-        _writeArrayChunk(IRSerialCompressionType::None, Bin::kDebugAdjustedLineInfoFourCc, data.m_debugAdjustedLineInfos, container);
-        _writeArrayChunk(IRSerialCompressionType::None, Bin::kDebugSourceInfoFourCc, data.m_debugSourceInfos, container);
-        _writeArrayChunk(compressionType, Bin::kDebugSourceLocRunFourCc, data.m_debugSourceLocRuns, container);
+        SerialRiffUtil::writeArrayChunk(compressionType, Bin::kDebugSourceLocRunFourCc, data.m_debugSourceLocRuns, container);
     }
 
     return SLANG_OK;
 }
 
-/* static */Result IRSerialWriter::writeStream(const IRSerialData& data, IRSerialCompressionType compressionType, Stream* stream)
+/* static */void IRSerialWriter::calcInstructionList(IRModule* module, List<IRInst*>& instsOut)
 {
-    RiffContainer container;
-    SLANG_RETURN_ON_FAIL(writeContainer(data, compressionType, &container));
-    return RiffUtil::write(container.getRoot(), true, stream);
+    // We reserve 0 for null
+    instsOut.setCount(1);
+    instsOut[0] = nullptr;
+
+    // Stack for parentInst
+    List<IRInst*> parentInstStack;
+
+    IRModuleInst* moduleInst = module->getModuleInst();
+    parentInstStack.add(moduleInst);
+
+    // Add to list
+    instsOut.add(moduleInst);
+
+    // Traverse all of the instructions
+    while (parentInstStack.getCount())
+    {
+        // If it's in the stack it is assumed it is already in the inst map
+        IRInst* parentInst = parentInstStack.getLast();
+        parentInstStack.removeLast();
+
+        IRInstListBase childrenList = parentInst->getDecorationsAndChildren();
+        for (IRInst* child : childrenList)
+        {
+            instsOut.add(child);
+            parentInstStack.add(child);
+        }
+    }
 }
 
 // !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! IRSerialReader !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 
-class ListResizer
-{
-    public:
-    virtual void* setSize(size_t newSize) = 0;
-    SLANG_FORCE_INLINE size_t getTypeSize() const { return m_typeSize; }
-    ListResizer(size_t typeSize):m_typeSize(typeSize) {}
-
-    protected:
-    size_t m_typeSize;
-};
-
-template <typename T>
-class ListResizerForType: public ListResizer
-{
-    public:
-    typedef ListResizer Parent;
-
-    SLANG_FORCE_INLINE ListResizerForType(List<T>& list):
-        Parent(sizeof(T)), 
-        m_list(list) 
-    {}
-    
-    virtual void* setSize(size_t newSize) SLANG_OVERRIDE
-    {
-        m_list.setCount(UInt(newSize));
-        return (void*)m_list.begin();
-    }
-
-    protected:
-    List<T>& m_list;
-};
-
-static Result _readArrayChunk(IRSerialCompressionType compressionType, RiffContainer::DataChunk* dataChunk, ListResizer& listOut)
-{
-    typedef IRSerialBinary Bin;
-
-    RiffReadHelper read = dataChunk->asReadHelper();
-    const size_t typeSize = listOut.getTypeSize();
-
-    switch (compressionType)
-    {
-        case IRSerialCompressionType::VariableByteLite:
-        {
-            Bin::CompressedArrayHeader header;
-            SLANG_RETURN_ON_FAIL(read.read(header));
-
-            void* dst = listOut.setSize(header.numEntries);
-            SLANG_ASSERT(header.numCompressedEntries == uint32_t((header.numEntries * typeSize) / sizeof(uint32_t)));
-
-            // Decode..
-            ByteEncodeUtil::decodeLiteUInt32(read.getData(), header.numCompressedEntries, (uint32_t*)dst);
-            break;
-        }
-        case IRSerialCompressionType::None:
-        {
-            // Read uncompressed
-            Bin::ArrayHeader header;
-            SLANG_RETURN_ON_FAIL(read.read(header));
-            const size_t payloadSize = header.numEntries * typeSize;
-            SLANG_ASSERT(payloadSize == read.getRemainingSize());
-            void* dst = listOut.setSize(header.numEntries);
-            ::memcpy(dst, read.getData(), payloadSize);
-            break;
-        }
-    }
-    return SLANG_OK;
-}
-
-template <typename T>
-static Result _readArrayChunk(const IRSerialBinary::ModuleHeader* header, RiffContainer::DataChunk* dataChunk, List<T>& arrayOut)
-{
-    typedef IRSerialBinary Bin;
-
-    Bin::CompressionType compressionType = Bin::CompressionType::None;
-
-    if (dataChunk->m_fourCC == SLANG_MAKE_COMPRESSED_FOUR_CC(dataChunk->m_fourCC))
-    {
-        // If it has compression, use the compression type set in the header
-        compressionType = Bin::CompressionType(header->compressionType);
-    }
-    ListResizerForType<T> resizer(arrayOut);
-    return _readArrayChunk(compressionType, dataChunk, resizer);
-}  
-
-template <typename T>
-static Result _readArrayUncompressedChunk(const IRSerialBinary::ModuleHeader* header, RiffContainer::DataChunk* chunk, List<T>& arrayOut)
-{
-    SLANG_UNUSED(header);
-    ListResizerForType<T> resizer(arrayOut);
-    return _readArrayChunk(IRSerialBinary::CompressionType::None, chunk, resizer);
-}
-
-static Result _decodeInsts(IRSerialCompressionType compressionType, const uint8_t* encodeCur, size_t encodeInSize, List<IRSerialData::Inst>& instsOut)
+static Result _decodeInsts(SerialCompressionType compressionType, const uint8_t* encodeCur, size_t encodeInSize, List<IRSerialData::Inst>& instsOut)
 {
     const uint8_t* encodeEnd = encodeCur + encodeInSize;
 
     typedef IRSerialBinary Bin;
     typedef IRSerialData::Inst::PayloadType PayloadType;
 
-    if (compressionType != IRSerialCompressionType::VariableByteLite)
+    if (compressionType != SerialCompressionType::VariableByteLite)
     {
         return SLANG_FAIL;
     }
@@ -816,28 +573,26 @@ static Result _decodeInsts(IRSerialCompressionType compressionType, const uint8_
     return SLANG_OK;
 }
 
-static Result _readInstArrayChunk(const IRSerialBinary::ModuleHeader* moduleHeader, RiffContainer::DataChunk* chunk, List<IRSerialData::Inst>& arrayOut)
+static Result _readInstArrayChunk(SerialCompressionType containerCompressionType, RiffContainer::DataChunk* chunk, List<IRSerialData::Inst>& arrayOut)
 {
-    typedef IRSerialBinary Bin;
-
-    IRSerialCompressionType compressionType = IRSerialCompressionType::None;
+    SerialCompressionType compressionType = SerialCompressionType::None;
     if (chunk->m_fourCC == SLANG_MAKE_COMPRESSED_FOUR_CC(chunk->m_fourCC))
     {
-        compressionType = IRSerialCompressionType(moduleHeader->compressionType);
+        compressionType = SerialCompressionType(containerCompressionType);
     }
 
     switch (compressionType)
     {
-        case IRSerialCompressionType::None:
+        case SerialCompressionType::None:
         {
-            ListResizerForType<IRSerialData::Inst> resizer(arrayOut);
-            return _readArrayChunk(compressionType, chunk, resizer);
+            SerialRiffUtil::ListResizerForType<IRSerialData::Inst> resizer(arrayOut);
+            return SerialRiffUtil::readArrayChunk(compressionType, chunk, resizer);
         }
-        case IRSerialCompressionType::VariableByteLite:
+        case SerialCompressionType::VariableByteLite:
         {
             RiffReadHelper read = chunk->asReadHelper();
 
-            Bin::CompressedArrayHeader header;
+            SerialBinary::CompressedArrayHeader header;
             SLANG_RETURN_ON_FAIL(read.read(header));
 
             arrayOut.setCount(header.numEntries);
@@ -854,17 +609,11 @@ static Result _readInstArrayChunk(const IRSerialBinary::ModuleHeader* moduleHead
     return SLANG_OK;
 }
 
-/* static */Result IRSerialReader::readContainer(RiffContainer::ListChunk* module, IRSerialData* outData)
+/* static */Result IRSerialReader::readContainer(RiffContainer::ListChunk* module, SerialCompressionType containerCompressionType, IRSerialData* outData)
 {
     typedef IRSerialBinary Bin;
 
     outData->clear();
-
-    Bin::ModuleHeader* header = module->findContainedData<Bin::ModuleHeader>(Bin::kSlangModuleHeaderFourCc);
-    if (!header)
-    {
-        return SLANG_FAIL;
-    }
 
     for (RiffContainer::Chunk* chunk = module->m_containedChunks; chunk; chunk = chunk->m_next)
     {
@@ -879,55 +628,35 @@ static Result _readInstArrayChunk(const IRSerialBinary::ModuleHeader* moduleHead
             case SLANG_MAKE_COMPRESSED_FOUR_CC(Bin::kInstFourCc):
             case Bin::kInstFourCc:
             {
-                SLANG_RETURN_ON_FAIL(_readInstArrayChunk(header, dataChunk, outData->m_insts));
+                SLANG_RETURN_ON_FAIL(_readInstArrayChunk(containerCompressionType, dataChunk, outData->m_insts));
                 break;
             }
             case SLANG_MAKE_COMPRESSED_FOUR_CC(Bin::kChildRunFourCc):
             case Bin::kChildRunFourCc:
             {
-                SLANG_RETURN_ON_FAIL(_readArrayChunk(header, dataChunk, outData->m_childRuns));
+                SLANG_RETURN_ON_FAIL(SerialRiffUtil::readArrayChunk(containerCompressionType, dataChunk, outData->m_childRuns));
                 break;
             }
             case SLANG_MAKE_COMPRESSED_FOUR_CC(Bin::kExternalOperandsFourCc):
             case Bin::kExternalOperandsFourCc:
             {
-                SLANG_RETURN_ON_FAIL(_readArrayChunk(header, dataChunk, outData->m_externalOperands));
+                SLANG_RETURN_ON_FAIL(SerialRiffUtil::readArrayChunk(containerCompressionType, dataChunk, outData->m_externalOperands));
                 break;
             }
-            case Bin::kStringFourCc:
+            case SerialBinary::kStringTableFourCc:
             {
-                SLANG_RETURN_ON_FAIL(_readArrayUncompressedChunk(header, dataChunk, outData->m_stringTable));
+                SLANG_RETURN_ON_FAIL(SerialRiffUtil::readArrayUncompressedChunk(dataChunk, outData->m_stringTable));
                 break;
             }
-            case Bin::kUInt32SourceLocFourCc:
+            case Bin::kUInt32RawSourceLocFourCc:
             {
-                SLANG_RETURN_ON_FAIL(_readArrayUncompressedChunk(header, dataChunk, outData->m_rawSourceLocs));
-                break;
-            }
-            case Bin::kDebugStringFourCc:
-            {
-                SLANG_RETURN_ON_FAIL(_readArrayUncompressedChunk(header, dataChunk, outData->m_debugStringTable));
-                break;
-            }
-            case Bin::kDebugLineInfoFourCc:
-            {
-                SLANG_RETURN_ON_FAIL(_readArrayUncompressedChunk(header, dataChunk, outData->m_debugLineInfos));
-                break;
-            }
-            case Bin::kDebugAdjustedLineInfoFourCc:
-            {
-                SLANG_RETURN_ON_FAIL(_readArrayUncompressedChunk(header, dataChunk, outData->m_debugAdjustedLineInfos));
-                break;
-            }
-            case Bin::kDebugSourceInfoFourCc:
-            {
-                SLANG_RETURN_ON_FAIL(_readArrayChunk(header, dataChunk, outData->m_debugSourceInfos));
+                SLANG_RETURN_ON_FAIL(SerialRiffUtil::readArrayUncompressedChunk(dataChunk, outData->m_rawSourceLocs));
                 break;
             }
             case SLANG_MAKE_COMPRESSED_FOUR_CC(Bin::kDebugSourceLocRunFourCc):
             case Bin::kDebugSourceLocRunFourCc:
             {
-                SLANG_RETURN_ON_FAIL(_readArrayChunk(header, dataChunk, outData->m_debugSourceLocRuns));
+                SLANG_RETURN_ON_FAIL(SerialRiffUtil::readArrayChunk(containerCompressionType, dataChunk, outData->m_debugSourceLocRuns));
                 break;
             }
             default:
@@ -940,145 +669,14 @@ static Result _readInstArrayChunk(const IRSerialBinary::ModuleHeader* moduleHead
     return SLANG_OK;
 }
 
-/* static */Result IRSerialReader::readStream(Stream* stream, IRSerialData* outData)
-{
-    typedef IRSerialBinary Bin;
-
-    outData->clear();
-
-    // Read the riff file
-    RiffContainer container;
-    SLANG_RETURN_ON_FAIL(RiffUtil::read(stream, container));
-
-    // Find the riff module
-    RiffContainer::ListChunk* module = container.getRoot()->findListRec(Bin::kSlangModuleFourCc);
-    if (!module)
-    {
-        return SLANG_FAIL;
-    }
-
-    SLANG_RETURN_ON_FAIL(readContainer(module, outData));
-    return SLANG_OK;
-}
-
-static SourceRange _toSourceRange(const IRSerialData::DebugSourceInfo& info)
-{
-    SourceRange range;
-    range.begin = SourceLoc::fromRaw(info.m_startSourceLoc);
-    range.end = SourceLoc::fromRaw(info.m_endSourceLoc);
-    return range;
-}
-
-static int _findIndex(const List<IRSerialData::DebugSourceInfo>& infos, SourceLoc sourceLoc)
-{
-    const int numInfos = int(infos.getCount());
-    for (int i = 0; i < numInfos; ++i)
-    {
-        if (_toSourceRange(infos[i]).contains(sourceLoc))
-        {
-            return i;
-        }
-    }
-
-    return -1;
-}
-
-static int _calcFixSourceLoc(const IRSerialData::DebugSourceInfo& info, SourceView* sourceView, SourceRange& rangeOut)
-{
-    rangeOut = _toSourceRange(info);
-    return int(sourceView->getRange().begin.getRaw()) - int(info.m_startSourceLoc);
-}
-
-/* static */Result IRSerialReader::readContainerModules(RiffContainer* container, Session* session, SourceManager* sourceManager, List<RefPtr<IRModule>>& outModules, List<FrontEndCompileRequest::ExtraEntryPointInfo>& outEntryPoints)
-{
-    List<RiffContainer::ListChunk*> moduleChunks;
-    List<RiffContainer::DataChunk*> entryPointChunks;
-    // First try to find a list
-    {
-        RiffContainer::ListChunk* listChunk = container->getRoot()->findListRec(SerialBinary::kSlangModuleListFourCc);
-        if (listChunk)
-        {
-            listChunk->findContained(IRSerialBinary::kSlangModuleFourCc, moduleChunks);
-            listChunk->findContained(SerialBinary::kEntryPointFourCc, entryPointChunks);
-        }
-        else
-        {
-            // Maybe its just a single module
-            RiffContainer::ListChunk* moduleChunk = container->getRoot()->findListRec(IRSerialBinary::kSlangModuleFourCc);
-            if (!moduleChunk)
-            {
-                // Couldn't find any modules
-                return SLANG_FAIL;
-            }
-            moduleChunks.add(moduleChunk);
-        }
-    }
-
-    // Okay, we need to decode into ir modules
-    for (auto moduleChunk : moduleChunks)
-    {
-        IRSerialData serialData;
-
-        SLANG_RETURN_ON_FAIL(IRSerialReader::readContainer(moduleChunk, &serialData));
-
-        // Construct into a module
-        RefPtr<IRModule> irModule;
-        IRSerialReader reader;
-        SLANG_RETURN_ON_FAIL(reader.read(serialData, session, sourceManager, irModule));
-
-        outModules.add(irModule);
-    }
-
-    for (auto entryPointChunk : entryPointChunks)
-    {
-        auto reader = entryPointChunk->asReadHelper();
-
-        auto readString = [&]()
-        {
-            uint32_t length = 0;
-            reader.read(length);
-
-            char* begin = (char*)reader.getData();
-            reader.skip(length + 1);
-
-            return UnownedStringSlice(begin, begin + length);
-        };
-
-        FrontEndCompileRequest::ExtraEntryPointInfo entryPointInfo;
-
-        entryPointInfo.name = session->getNamePool()->getName(readString());
-        reader.read(entryPointInfo.profile);
-        entryPointInfo.mangledName = readString();
-
-        outEntryPoints.add(entryPointInfo);
-    }
-
-    return SLANG_OK;
-}
-
-
-// TODO: The following function isn't really part of the IR serialization system, but rather
-// a layered "container" format, and as such probably belongs in a higher-level system that
-// simply calls into the `IRSerialReader` rather than being part of it...
-//
-/* static */Result IRSerialReader::readStreamModules(Stream* stream, Session* session, SourceManager* sourceManager, List<RefPtr<IRModule>>& outModules, List<FrontEndCompileRequest::ExtraEntryPointInfo>& outEntryPoints)
-{
-    // Load up the module
-    RiffContainer container;
-    SLANG_RETURN_ON_FAIL(RiffUtil::read(stream, container));
-
-    SLANG_RETURN_ON_FAIL(readContainerModules(&container, session, sourceManager, outModules, outEntryPoints));
-    return SLANG_OK;
-}
-
-/* static */Result IRSerialReader::read(const IRSerialData& data, Session* session, SourceManager* sourceManager, RefPtr<IRModule>& moduleOut)
+Result IRSerialReader::read(const IRSerialData& data, Session* session, DebugSerialReader* debugReader, RefPtr<IRModule>& outModule)
 {
     typedef Ser::Inst::PayloadType PayloadType;
 
     m_serialData = &data;
  
     auto module = new IRModule();
-    moduleOut = module;
+    outModule = module;
     m_module = module;
 
     module->session = session;
@@ -1268,317 +866,41 @@ static int _calcFixSourceLoc(const IRSerialData::DebugSourceInfo& info, SourceVi
         }
     }
 
-    if (sourceManager && m_serialData->m_debugSourceInfos.getCount())
+    // We now need to apply the runs
+    if (debugReader && m_serialData->m_debugSourceLocRuns.getCount())
     {
-        List<UnownedStringSlice> debugStringSlices;
-        SerialStringTableUtil::decodeStringTable(m_serialData->m_debugStringTable, debugStringSlices);
+        List<IRSerialData::SourceLocRun> sourceRuns(m_serialData->m_debugSourceLocRuns);
+        // They are now in source location order
+        sourceRuns.sort();
 
-        // All of the strings are placed in the manager (and its StringSlicePool) where the SourceView and SourceFile are constructed from
-        List<StringSlicePool::Handle> stringMap;
-        SerialStringTableUtil::calcStringSlicePoolMap(debugStringSlices, sourceManager->getStringSlicePool(), stringMap);
-
-        const List<IRSerialData::DebugSourceInfo>& sourceInfos = m_serialData->m_debugSourceInfos;
-
-        // Construct the source files
-        Index numSourceFiles = sourceInfos.getCount();
-
-        // These hold the views (and SourceFile as there is only one SourceFile per view) in the same order as the sourceInfos
-        List<SourceView*> sourceViews;
-        sourceViews.setCount(numSourceFiles);
-
-        for (Index i = 0; i < numSourceFiles; ++i)
-        {
-            const IRSerialData::DebugSourceInfo& srcSourceInfo = sourceInfos[i];
-
-            PathInfo pathInfo;
-            pathInfo.type = PathInfo::Type::FoundPath;
-            pathInfo.foundPath = debugStringSlices[UInt(srcSourceInfo.m_pathIndex)];
-
-            SourceFile* sourceFile = sourceManager->createSourceFileWithSize(pathInfo, srcSourceInfo.m_endSourceLoc - srcSourceInfo.m_startSourceLoc);
-            SourceView* sourceView = sourceManager->createSourceView(sourceFile, nullptr);
-
-            // We need to accumulate all line numbers, for this source file, both adjusted and unadjusted
-            List<IRSerialData::DebugLineInfo> lineInfos;
-            // Add the adjusted lines
-            {
-                lineInfos.setCount(srcSourceInfo.m_numAdjustedLineInfos);
-                const IRSerialData::DebugAdjustedLineInfo* srcAdjustedLineInfos = m_serialData->m_debugAdjustedLineInfos.getBuffer() + srcSourceInfo.m_adjustedLineInfosStartIndex;
-                const int numAdjustedLines = int(srcSourceInfo.m_numAdjustedLineInfos);
-                for (int j = 0; j < numAdjustedLines; ++j)
-                {
-                    lineInfos[j] = srcAdjustedLineInfos[j].m_lineInfo;
-                }
-            }
-            // Add regular lines
-            lineInfos.addRange(m_serialData->m_debugLineInfos.getBuffer() + srcSourceInfo.m_lineInfosStartIndex, srcSourceInfo.m_numLineInfos);
-            // Put in sourceloc order
-            lineInfos.sort();
-
-            List<uint32_t> lineBreakOffsets;
-
-            // We can now set up the line breaks array
-            const int numLines = int(srcSourceInfo.m_numLines);
-            lineBreakOffsets.setCount(numLines);
-
-            {
-                const Index numLineInfos = lineInfos.getCount();
-                Index lineIndex = 0;
-                
-                // Every line up and including should hold the same offset
-                for (Index lineInfoIndex = 0; lineInfoIndex < numLineInfos; ++lineInfoIndex)
-                {
-                    const auto& lineInfo = lineInfos[lineInfoIndex];
-
-                    const uint32_t offset = lineInfo.m_lineStartOffset;
-                    SLANG_ASSERT(offset > 0);
-                    const int finishIndex = int(lineInfo.m_lineIndex);
-
-                    SLANG_ASSERT(finishIndex < numLines);
-
-                    for (; lineIndex < finishIndex; ++lineIndex)
-                    {
-                        lineBreakOffsets[lineIndex] = offset - 1;
-                    }
-                    lineBreakOffsets[lineIndex] = offset;
-                    lineIndex++;
-                }
-
-                // Do the remaining lines
-                const uint32_t offset = uint32_t(srcSourceInfo.m_endSourceLoc - srcSourceInfo.m_startSourceLoc);
-                for (; lineIndex < numLines; ++lineIndex)
-                {
-                    lineBreakOffsets[lineIndex] = offset;
-                }
-            }
-
-            sourceFile->setLineBreakOffsets(lineBreakOffsets.getBuffer(), lineBreakOffsets.getCount());
-
-            if (srcSourceInfo.m_numAdjustedLineInfos)
-            {
-                List<IRSerialData::DebugAdjustedLineInfo> adjustedLineInfos;
-
-                int numEntries = int(srcSourceInfo.m_numAdjustedLineInfos);
-
-                adjustedLineInfos.addRange(m_serialData->m_debugAdjustedLineInfos.getBuffer() + srcSourceInfo.m_adjustedLineInfosStartIndex, numEntries);
-                adjustedLineInfos.sort();
-
-                // Work out the views adjustments, and place in dstEntries
-                List<SourceView::Entry> dstEntries;
-                dstEntries.setCount(numEntries);
-
-                const uint32_t sourceLocOffset = uint32_t(sourceView->getRange().begin.getRaw());
-
-                for (int j = 0; j < numEntries; ++j)
-                {
-                    const auto& srcEntry = adjustedLineInfos[j];
-                    auto& dstEntry = dstEntries[j];
-
-                    dstEntry.m_pathHandle = stringMap[int(srcEntry.m_pathStringIndex)];
-                    dstEntry.m_startLoc = SourceLoc::fromRaw(srcEntry.m_lineInfo.m_lineStartOffset + sourceLocOffset);
-                    dstEntry.m_lineAdjust = int32_t(srcEntry.m_adjustedLineIndex) - int32_t(srcEntry.m_lineInfo.m_lineIndex);
-                }
-
-                // Set the adjustments on the view
-                sourceView->setEntries(dstEntries.getBuffer(), dstEntries.getCount());
-            }
-
-            sourceViews[i] = sourceView;
-        }
-
-        // We now need to apply the runs
-        {
-            List<IRSerialData::SourceLocRun> sourceRuns(m_serialData->m_debugSourceLocRuns);
-            // They are now in source location order
-            sourceRuns.sort();
-
-            // Just guess initially 0 for the source file that contains the initial run
-            SourceRange range;
-            int fixSourceLoc = _calcFixSourceLoc(sourceInfos[0], sourceViews[0], range);
-
-            const Index numRuns = sourceRuns.getCount();
-            for (Index i = 0; i < numRuns; ++i)
-            {
-                const auto& run = sourceRuns[i];
-                const SourceLoc srcSourceLoc = SourceLoc::fromRaw(run.m_sourceLoc);
-
-                if (!range.contains(srcSourceLoc))
-                {
-                    int index = _findIndex(sourceInfos, srcSourceLoc);
-                    if (index < 0)
-                    {
-                        // Didn't find the match
-                        continue;
-                    }
-                    fixSourceLoc = _calcFixSourceLoc(sourceInfos[index], sourceViews[index], range);
-                    SLANG_ASSERT(range.contains(srcSourceLoc));
-                }
-
-                // Work out the fixed source location
-                SourceLoc sourceLoc = SourceLoc::fromRaw(int(run.m_sourceLoc) + fixSourceLoc); 
-
-                SLANG_ASSERT(Index(uint32_t(run.m_startInstIndex) + run.m_numInst) <= insts.getCount());
-                IRInst** dstInsts = insts.getBuffer() + int(run.m_startInstIndex);
-
-                const int runSize = int(run.m_numInst);
-                for (int j = 0; j < runSize; ++j)
-                {
-                    dstInsts[j]->sourceLoc = sourceLoc;
-                }
-            }
-        }
-    }
-
-    return SLANG_OK;
-}
-
-// !!!!!!!!!!!!!!!!!!!!!!!!!!!! IRSerialUtil !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-
-/* static */void IRSerialUtil::calcInstructionList(IRModule* module, List<IRInst*>& instsOut)
-{
-    // We reserve 0 for null
-    instsOut.setCount(1);
-    instsOut[0] = nullptr;
-
-    // Stack for parentInst
-    List<IRInst*> parentInstStack;
-
-    IRModuleInst* moduleInst = module->getModuleInst();
-    parentInstStack.add(moduleInst);
-
-    // Add to list
-    instsOut.add(moduleInst);
-
-    // Traverse all of the instructions
-    while (parentInstStack.getCount())
-    {
-        // If it's in the stack it is assumed it is already in the inst map
-        IRInst* parentInst = parentInstStack.getLast();
-        parentInstStack.removeLast();
-
-        IRInstListBase childrenList = parentInst->getDecorationsAndChildren();
-        for (IRInst* child : childrenList)
-        {
-            instsOut.add(child);
-            parentInstStack.add(child);
-        }
-    }
-}
-
-/* static */SlangResult IRSerialUtil::verifySerialize(IRModule* module, Session* session, SourceManager* sourceManager, IRSerialCompressionType compressionType, IRSerialWriter::OptionFlags optionFlags)
-{
-    // Verify if we can stream out with debug information
+        // Just guess initially 0 for the source file that contains the initial run
+        DebugSerialData::SourceRange range = DebugSerialData::SourceRange::getInvalid();
+        int fix = 0;
         
-    List<IRInst*> originalInsts;
-    calcInstructionList(module, originalInsts);
-    
-    IRSerialData serialData;
-    {
-        // Write IR out to serialData - copying over SourceLoc information directly
-        IRSerialWriter writer;
-        SLANG_RETURN_ON_FAIL(writer.write(module, sourceManager, optionFlags, &serialData));
-    }
-
-    // Write the data out to stream
-    OwnedMemoryStream memoryStream(FileAccess::ReadWrite);
-    SLANG_RETURN_ON_FAIL(IRSerialWriter::writeStream(serialData, compressionType, &memoryStream));
-
-    // Reset stream
-    memoryStream.seek(SeekOrigin::Start, 0);
-
-    IRSerialData readData;
-
-    SLANG_RETURN_ON_FAIL(IRSerialReader::readStream(&memoryStream, &readData));
-
-    // Check the stream read data is the same
-    if (readData != serialData)
-    {
-        SLANG_ASSERT(!"Streamed in data doesn't match");
-        return SLANG_FAIL;
-    }
-
-    RefPtr<IRModule> irReadModule;
-
-    SourceManager workSourceManager;
-    workSourceManager.initialize(sourceManager, nullptr);
-
-    {
-        IRSerialReader reader;
-        SLANG_RETURN_ON_FAIL(reader.read(serialData, session, &workSourceManager, irReadModule));
-    }
-
-    List<IRInst*> readInsts;
-    calcInstructionList(irReadModule, readInsts);
-
-    if (readInsts.getCount() != originalInsts.getCount())
-    {
-        SLANG_ASSERT(!"Instruction counts don't match");
-        return SLANG_FAIL;
-    }
-
-    if (optionFlags & IRSerialWriter::OptionFlag::RawSourceLocation)
-    {
-        SLANG_ASSERT(readInsts[0] == originalInsts[0]);
-        // All the source locs should be identical
-        for (Index i = 1; i < readInsts.getCount(); ++i)
+        const Index numRuns = sourceRuns.getCount();
+        for (Index i = 0; i < numRuns; ++i)
         {
-            IRInst* origInst = originalInsts[i];
-            IRInst* readInst = readInsts[i];
+            const auto& run = sourceRuns[i];
 
-            if (origInst->sourceLoc.getRaw() != readInst->sourceLoc.getRaw())
+            // Work out the fixed source location
+            SourceLoc sourceLoc;
+            if (run.m_sourceLoc)
             {
-                SLANG_ASSERT(!"Source locs don't match");
-                return SLANG_FAIL;
-            }
-        }
-    }
-    else if (optionFlags & IRSerialWriter::OptionFlag::DebugInfo)
-    {
-        // They should be on the same line nos
-        for (Index i = 1; i < readInsts.getCount(); ++i)
-        {
-            IRInst* origInst = originalInsts[i];
-            IRInst* readInst = readInsts[i];
-
-            if (origInst->sourceLoc.getRaw() == readInst->sourceLoc.getRaw())
-            {
-                continue;
-            }
-
-            // Work out the
-            SourceView* origSourceView = sourceManager->findSourceView(origInst->sourceLoc);
-            SourceView* readSourceView = workSourceManager.findSourceView(readInst->sourceLoc);
-
-            // if both are null we are done
-            if (origSourceView == nullptr && origSourceView == readSourceView)
-            {
-                continue;
-            }
-            SLANG_ASSERT(origSourceView && readSourceView);
-
-            {
-                auto origInfo = origSourceView->getHumaneLoc(origInst->sourceLoc, SourceLocType::Actual);
-                auto readInfo = readSourceView->getHumaneLoc(readInst->sourceLoc, SourceLocType::Actual);
-
-                if (!(origInfo.line == readInfo.line && origInfo.column == readInfo.column && origInfo.pathInfo.foundPath == readInfo.pathInfo.foundPath))
+                if (!range.contains(run.m_sourceLoc))
                 {
-                    SLANG_ASSERT(!"Debug data didn't match");
-                    return SLANG_FAIL;
+                    fix = debugReader->calcFixSourceLoc(run.m_sourceLoc, range);
                 }
+                sourceLoc = debugReader->calcFixedLoc(run.m_sourceLoc, fix, range);
             }
 
-            // We may have adjusted line numbers -> but they may not match, because we only reconstruct one view
-            // So for now disable this test
+            // Write to all the instructions
+            SLANG_ASSERT(Index(uint32_t(run.m_startInstIndex) + run.m_numInst) <= insts.getCount());
+            IRInst** dstInsts = insts.getBuffer() + int(run.m_startInstIndex);
 
-            if (false)
+            const int runSize = int(run.m_numInst);
+            for (int j = 0; j < runSize; ++j)
             {
-                auto origInfo = origSourceView->getHumaneLoc(origInst->sourceLoc, SourceLocType::Nominal);
-                auto readInfo = readSourceView->getHumaneLoc(readInst->sourceLoc, SourceLocType::Nominal);
-
-                if (!(origInfo.line == readInfo.line && origInfo.column == readInfo.column && origInfo.pathInfo.foundPath == readInfo.pathInfo.foundPath))
-                {
-                    SLANG_ASSERT(!"Debug data didn't match");
-                    return SLANG_FAIL;
-                }
+                dstInsts[j]->sourceLoc = sourceLoc;
             }
         }
     }

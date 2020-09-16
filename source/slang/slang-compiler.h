@@ -50,7 +50,7 @@ namespace Slang
         ComputeShader,
     };
 
-    enum class CodeGenTarget
+    enum class CodeGenTarget 
     {
         Unknown             = SLANG_TARGET_UNKNOWN,
         None                = SLANG_TARGET_NONE,
@@ -1374,7 +1374,7 @@ namespace Slang
 
         OptimizationLevel optimizationLevel = OptimizationLevel::Default;
 
-        IRSerialCompressionType irCompressionType = IRSerialCompressionType::VariableByteLite;
+        SerialCompressionType serialCompressionType = SerialCompressionType::VariableByteLite;
 
         bool m_requireCacheFileSystem = false;
         bool m_useFalcorCustomSharedKeywordSemantics = false;

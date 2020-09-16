@@ -313,6 +313,11 @@ struct DumpVisitor : public RiffContainer::Visitor
     return SLANG_OK;
 }
 
+/* static */SlangResult RiffUtil::write(RiffContainer* container, Stream* stream)
+{
+    return write(container->getRoot(), true, stream);
+}
+
 /* static */SlangResult RiffUtil::read(Stream* stream, RiffContainer& outContainer)
 {
     typedef RiffContainer::ScopeChunk ScopeChunk;
@@ -559,6 +564,20 @@ void RiffContainer::ListChunk::findContained(FourCC type, List<DataChunk*>& out)
         }
         chunk = chunk->m_next;
     }
+}
+
+RiffContainer::ListChunk* RiffContainer::ListChunk::findContainedList(FourCC type)
+{
+    Chunk* chunk = m_containedChunks;
+    while (chunk)
+    {
+        if (chunk->m_fourCC == type && chunk->m_kind == Chunk::Kind::List)
+        {
+            return static_cast<ListChunk*>(chunk);
+        }
+        chunk = chunk->m_next;
+    }
+    return nullptr;
 }
 
 RiffContainer::Data* RiffContainer::ListChunk::findContainedData(FourCC type) const
