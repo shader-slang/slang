@@ -2315,6 +2315,7 @@ struct SimpleScopeLayoutBuilder : ScopeLayoutBuilder
             for (auto paramTypeResInfo : paramTypeLayout->resourceInfos)
             {
                 auto kind = paramTypeResInfo.kind;
+                if (kind == LayoutResourceKind::Uniform) continue;
 
                 // We will look for an explicit/existing binding in
                 // the parameter var layout, which would represent
@@ -2344,6 +2345,7 @@ struct SimpleScopeLayoutBuilder : ScopeLayoutBuilder
             for (auto paramTypeResInfo : paramTypeLayout->resourceInfos)
             {
                 auto kind = paramTypeResInfo.kind;
+                if (kind == LayoutResourceKind::Uniform) continue;
 
                 // We only care about parameters that are not already
                 // explicitly bound, so we will skip those that already
@@ -2368,6 +2370,7 @@ struct SimpleScopeLayoutBuilder : ScopeLayoutBuilder
             for (auto paramTypeResInfo : paramTypeLayout->resourceInfos)
             {
                 auto kind = paramTypeResInfo.kind;
+                if (kind == LayoutResourceKind::Uniform) continue;
 
                 auto paramResInfo = paramVarLayout->FindResourceInfo(kind);
                 SLANG_ASSERT(paramResInfo);
