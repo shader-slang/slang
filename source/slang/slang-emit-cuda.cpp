@@ -79,6 +79,15 @@ static bool _isSingleNameBasicType(IROp op)
     }
 }
 
+void CUDASourceEmitter::emitTempModifiers(IRInst* temp)
+{
+    CPPSourceEmitter::emitTempModifiers(temp);
+    if (as<IRModuleInst>(temp->getParent()))
+    {
+        m_writer->emit("__device__ ");
+    }
+}
+
 SlangResult CUDASourceEmitter::_calcCUDATextureTypeName(IRTextureTypeBase* texType, StringBuilder& outName)
 {
     // Not clear how to do this yet
@@ -324,7 +333,7 @@ String CUDASourceEmitter::generateEntryPointNameImpl(IREntryPointDecoration* ent
 
 void CUDASourceEmitter::emitGlobalRTTISymbolPrefix()
 {
-    m_writer->emit("__device__");
+    m_writer->emit("__device__ ");
 }
 
 void CUDASourceEmitter::emitCall(const HLSLIntrinsic* specOp, IRInst* inst, const IRUse* operands, int numOperands, const EmitOpInfo& inOuterPrec)

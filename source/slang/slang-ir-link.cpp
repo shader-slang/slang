@@ -1480,7 +1480,7 @@ LinkedIR linkIR(
             cloneValue(context, bindInst);
         }
     }
-    if (target == CodeGenTarget::CPPSource)
+    if (target == CodeGenTarget::CPPSource || target == CodeGenTarget::CUDASource)
     {
         for (IRModule* irModule : irModules)
         {

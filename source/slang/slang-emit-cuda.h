@@ -34,6 +34,7 @@ public:
     static UnownedStringSlice getVectorPrefix(IROp op);
 
     virtual RefObject* getExtensionTracker() SLANG_OVERRIDE { return m_extensionTracker; }
+    virtual void emitTempModifiers(IRInst* temp) SLANG_OVERRIDE;
 
     CUDASourceEmitter(const Desc& desc) :
         Super(desc),

@@ -254,7 +254,7 @@ public:
     UInt getCallablePayloadLocation(IRInst* inst);
 
         /// Emit modifiers that should apply even for a declaration of an SSA temporary.
-    void emitTempModifiers(IRInst* temp);
+    virtual void emitTempModifiers(IRInst* temp);
 
     void emitVarModifiers(IRVarLayout* layout, IRInst* varDecl, IRType* varType);
 
