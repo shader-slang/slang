@@ -332,6 +332,18 @@
     </ClInclude>
   </ItemGroup>
   <ItemGroup>
+    <ClCompile Include="..\..\prelude\slang-cpp-prelude.h.cpp">
+      <Filter>Header Files</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\prelude\slang-cpp-scalar-intrinsics.h.cpp">
+      <Filter>Header Files</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\prelude\slang-cpp-types.h.cpp">
+      <Filter>Header Files</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\prelude\slang-cuda-prelude.h.cpp">
+      <Filter>Header Files</Filter>
+    </ClCompile>
     <ClCompile Include="slang-ast-builder.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
