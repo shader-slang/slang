@@ -311,8 +311,24 @@ SlangResult NVRTCDownstreamCompiler::compile(const CompileOptions& options, RefP
     }
 
     {
-        // Lowest supported is 3.0
+        // The lowest supported CUDA architecture version supported
+        // by NVRTC is `compute_30`.
+        //
         SemanticVersion version(3);
+
+        // Newer releases of NVRTC only support `compute_35` and up
+        // (with everything before `compute_52` being deprecated).
+        //
+        if( m_desc.majorVersion >= 11 )
+        {
+            version = SemanticVersion(3, 5);
+        }
+
+        // If constructs used in the code to be compield require
+        // a higher architecture version than the minimum, then
+        // we will set the version to the highest version listed
+        // among the requirements.
+        //
         for (const auto& capabilityVersion : options.requiredCapabilityVersions)
         {
             if (capabilityVersion.kind == DownstreamCompiler::CapabilityVersion::Kind::CUDASM)
@@ -478,8 +494,55 @@ SlangResult NVRTCDownstreamCompiler::compile(const CompileOptions& options, RefP
     }
     else
     {
-        const char* libraryName = "nvrtc64_102_0";
-        SLANG_RETURN_ON_FAIL(loader->loadSharedLibrary(libraryName, library.writeRef()));
+        // If the user doesn't supply a path to their preferred version of NVRTC,
+        // we will search for a suitable library version, proceeding from more
+        // recent versions to less recent ones.
+        //
+        // TODO: The list here was cobbled together from what NRTC releases I
+        // could easily identify. It would be good to ver this against some
+        // kind of official list.
+        //
+        // It would probably be good to support 32- and 64-bit here, and also
+        // to deal with any variation in the shared library name across platforms
+        // (
+        //
+        static const char* kNVRTCLibraryNames[]
+        {
+            // As a catch-all for non-Windows platforms, we search for
+            // a library simply named `nvrtc` (well, `libnvrtc`) which
+            // is expected to match whatever the user has installed.
+            //
+            "nvrtc",
+
+            "nvrtc64_110_0",
+            "nvrtc64_102_0",
+            "nvrtc64_101_0",
+            "nvrtc64_100_0",
+            "nvrtc64_92",
+            "nvrtc64_91",
+            "nvrtc64_90",
+            "nvrtc64_80",
+            "nvrtc64_75",
+        };
+
+        SlangResult result = SLANG_FAIL;
+        for( auto libraryName : kNVRTCLibraryNames )
+        {
+            // If we succeed at loading one of the library versions
+            // from our list, we will not continue to search; this
+            // approach assumes that the `kNVRTCLibraryNames` array
+            // has been sorted so that earlier entries are preferable.
+            //
+            result = loader->loadSharedLibrary(libraryName, library.writeRef());
+            if(!SLANG_FAILED(result))
+                break;
+        }
+
+        // If we tried to load all of the candidate versions and none
+        // was successful, then we report back a failure.
+        //
+        if(SLANG_FAILED(result))
+            return result;
     }
 
     RefPtr<NVRTCDownstreamCompiler> compiler(new NVRTCDownstreamCompiler);

@@ -1203,6 +1203,20 @@ __inline__ __device__ uint4 _waveMatchMultiple(WarpMask mask, const T& inVal)
     return make_uint4(matchBits, 0, 0, 0);
 }
 
+__device__ uint getAt(dim3 a,  int b)
+{
+    assert(b >= 0 && b < 3);
+    return (&a.x)[b];
+}
+__device__ uint3 operator*(uint3 a, dim3 b)
+{
+    uint3 r;
+    r.x = a.x * b.x;
+    r.y = a.y * b.y;
+    r.z = a.z * b.z;
+    return r;
+}
+
 /* !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! */
 
 

@@ -845,6 +845,7 @@ namespace Slang
         NVRTC = SLANG_PASS_THROUGH_NVRTC,
         CountOf = SLANG_PASS_THROUGH_COUNT_OF,              
     };
+    void printDiagnosticArg(StringBuilder& sb, PassThroughMode val);
 
     class SourceFile;
 
