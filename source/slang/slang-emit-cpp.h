@@ -65,6 +65,7 @@ protected:
     virtual void emitSimpleFuncImpl(IRFunc* func) SLANG_OVERRIDE;
     virtual void emitOperandImpl(IRInst* inst, EmitOpInfo const&  outerPrec) SLANG_OVERRIDE;
     virtual void emitParamTypeImpl(IRType* type, String const& name) SLANG_OVERRIDE;
+    virtual void emitGlobalRTTISymbolPrefix();
     virtual void emitWitnessTable(IRWitnessTable* witnessTable) SLANG_OVERRIDE;
     virtual void emitInterface(IRInterfaceType* interfaceType) SLANG_OVERRIDE;
     virtual void emitRTTIObject(IRRTTIObject* rttiObject) SLANG_OVERRIDE;
@@ -78,8 +79,6 @@ protected:
     virtual SlangResult calcFuncName(const HLSLIntrinsic* specOp, StringBuilder& out);
     virtual SlangResult calcScalarFuncName(HLSLIntrinsic::Op op, IRBasicType* type, StringBuilder& outBuilder);
 
-        // Emits a struct of function pointers defined in `interfaceType`.
-    void _maybeEmitWitnessTableTypeDefinition(IRInterfaceType* interfaceType);
     void _maybeEmitSpecializedOperationDefinition(const HLSLIntrinsic* specOp);
 
     void _emitForwardDeclarations(const List<EmitAction>& actions);
