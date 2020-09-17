@@ -135,7 +135,7 @@ struct App
         // name, although we will immediately drop any extension
         // that comes after a `.` to trim the name further.
         //
-        char* variableName = (char*) malloc(strlen(fileName));
+        char* variableName = (char*) malloc(strlen(fileName)+1);
         ScopedMemory variableNameCleanup(variableName);
         strcpy(variableName, fileName);
         if(auto pos = strchr(variableName, '.'))
