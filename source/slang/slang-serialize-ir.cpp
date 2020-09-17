@@ -681,11 +681,10 @@ Result IRSerialReader::read(const IRSerialData& data, Session* session, DebugSer
 
     module->session = session;
 
-    // Set up the string rep cache
-    m_stringTable.init(&data.m_stringTable);
-    
-    // Add all the instructions
+    // Convert m_stringTable into StringSlicePool.
+    SerialStringTableUtil::decodeStringTable(data.m_stringTable.getBuffer(), data.m_stringTable.getCount(), m_stringTable);
 
+    // Add all the instructions
     List<IRInst*> insts;
 
     const Index numInsts = data.m_insts.getCount();
@@ -760,7 +759,7 @@ Result IRSerialReader::read(const IRSerialData& data, Session* session, DebugSer
                 {
                     SLANG_ASSERT(srcInst.m_payloadType == PayloadType::String_1);
 
-                    const UnownedStringSlice slice = m_stringTable.getStringSlice(StringHandle(srcInst.m_payload.m_stringIndices[0]));
+                    const UnownedStringSlice slice = m_stringTable.getSlice(StringSlicePool::Handle(srcInst.m_payload.m_stringIndices[0]));
                         
                     const size_t sliceSize = slice.getLength();
                     const size_t instSize = prefixSize + SLANG_OFFSET_OF(IRConstant::StringValue, chars) + sliceSize;

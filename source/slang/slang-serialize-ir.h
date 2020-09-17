@@ -67,8 +67,7 @@ protected:
 struct IRSerialReader
 {
     typedef IRSerialData Ser;
-    typedef SerialStringTable::Handle StringHandle;
-
+    
         /// Read potentially multiple modules from a stream
     static Result readStreamModules(Stream* stream, Session* session, SourceManager* manager, List<RefPtr<IRModule>>& outModules, List<FrontEndCompileRequest::ExtraEntryPointInfo>& outEntryPoints);
 
@@ -80,13 +79,14 @@ struct IRSerialReader
 
     IRSerialReader():
         m_serialData(nullptr),
-        m_module(nullptr)
+        m_module(nullptr),
+        m_stringTable(StringSlicePool::Style::Default)
     {
     }
 
     protected:
 
-    SerialStringTable m_stringTable;
+    StringSlicePool m_stringTable;
 
     const IRSerialData* m_serialData;
     IRModule* m_module;

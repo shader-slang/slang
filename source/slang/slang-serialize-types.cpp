@@ -23,58 +23,6 @@ struct CharReader
 
 } // anonymous
 
-// !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! SerialStringTable !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-
-SerialStringTable::SerialStringTable():
-    m_stringTable(nullptr)
-{
-}
-
-void SerialStringTable::init(const List<char>* stringTable)
-{
-    m_stringTable = stringTable;
-
-    // Decode the table
-    m_entries.setCount(StringSlicePool::kDefaultHandlesCount);
-    SLANG_COMPILE_TIME_ASSERT(StringSlicePool::kDefaultHandlesCount == 2);
-
-    // Set the initial entries
-    {
-        Entry entry = {};
-        m_entries[0] = entry;
-        m_entries[1] = entry;
-    }
-
-    {
-        const char* start = stringTable->begin();
-        const char* cur = start;
-        const char* end = stringTable->end();
-
-        while (cur < end)
-        {
-            CharReader reader(cur);
-            const int len = GetUnicodePointFromUTF8(reader);
-
-            Entry entry;
-            entry.m_startIndex = uint32_t(reader.m_pos - start);
-            entry.m_numChars = len;
-
-            m_entries.add(entry);
-
-            cur = reader.m_pos + len;
-        }
-    }
-
-    m_entries.compress();
-}
-
-UnownedStringSlice SerialStringTable::getStringSlice(Handle handle) const
-{
-    const Entry& entry = m_entries[int(handle)];
-    const char* start = m_stringTable->begin();
-
-    return UnownedStringSlice(start + entry.m_startIndex, int(entry.m_numChars));
-}
 
 // !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! SerialStringTableUtil !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 

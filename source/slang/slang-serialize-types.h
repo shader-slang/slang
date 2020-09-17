@@ -46,31 +46,6 @@ struct SerialStringData
     static const StringIndex kEmptyStringIndex = StringIndex(StringSlicePool::kEmptyHandle);
 };
 
-class SerialStringTable
-{
-    public:
-    typedef StringSlicePool::Handle Handle;
-
-    struct Entry
-    {
-        uint32_t m_startIndex;
-        uint32_t m_numChars;
-    };
-
-        /// Get as a string slice
-    UnownedStringSlice getStringSlice(Handle handle) const;
-
-        /// Initialize a cache to use a string table
-    void init(const List<char>* stringTable);
-
-        /// Ctor
-    SerialStringTable(); 
-    
-    protected:
-    const List<char>* m_stringTable;
-    List<Entry> m_entries;
-};
-
 struct SerialStringTableUtil
 {
         /// Convert a pool into a string table
