@@ -59,6 +59,8 @@ protected:
     virtual void emitFunctionPreambleImpl(IRInst* inst) SLANG_OVERRIDE;
     virtual String generateEntryPointNameImpl(IREntryPointDecoration* entryPointDecor) SLANG_OVERRIDE;
 
+    virtual void emitGlobalRTTISymbolPrefix() SLANG_OVERRIDE;
+
     virtual void emitLoopControlDecorationImpl(IRLoopControlDecoration* decl) SLANG_OVERRIDE;
 
     virtual void handleCallExprDecorationsImpl(IRInst* funcValue) SLANG_OVERRIDE;

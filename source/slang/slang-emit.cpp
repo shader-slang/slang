@@ -310,6 +310,7 @@ Result linkAndOptimizeIR(
     switch (target)
     {
     case CodeGenTarget::CPPSource:
+    case CodeGenTarget::CUDASource:
         // For targets that supports dynamic dispatch, we need to lower the
         // generics / interface types to ordinary functions and types using
         // function pointers.
@@ -666,6 +667,7 @@ Result linkAndOptimizeIR(
     switch (target)
     {
     case CodeGenTarget::CPPSource:
+    case CodeGenTarget::CUDASource:
         break;
     default:
         // For all targets that don't support true dynamic dispatch through
