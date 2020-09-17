@@ -177,6 +177,10 @@ need to be recalculated, before serialization.
 class RiffContainer
 {
 public:
+    enum 
+    {
+        ALLOCATION_ALIGNMENT = 8,
+    };
 
     enum class Ownership
     {
@@ -189,7 +193,6 @@ public:
     struct ListChunk;
     struct DataChunk;
 
-    
     struct Data
     {
             /// Get the payload
