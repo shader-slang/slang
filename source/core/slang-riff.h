@@ -194,9 +194,6 @@ public:
         Owned,              ///< It's owned, but wasn't allocated on the arena
     };
 
-    struct ListChunk;
-    struct DataChunk;
-
     struct Data
     {
             /// Get the payload
@@ -221,11 +218,11 @@ public:
     };
 
     struct Chunk;
-    typedef SlangResult(*VisitorCallback)(Chunk* chunk, void* data);
-
     struct ListChunk;
     struct DataChunk;
 
+    typedef SlangResult(*VisitorCallback)(Chunk* chunk, void* data);
+    
     class Visitor;
     struct Chunk
     {
