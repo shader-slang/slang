@@ -864,7 +864,7 @@ void RiffContainer::setPayload(Data* data, const void* payload, size_t size)
     data->m_ownership = Ownership::Arena;
     data->m_size = size;
 
-    data->m_payload = m_arena.allocateAligned(size, ALLOCATION_ALIGNMENT);
+    data->m_payload = m_arena.allocateAligned(size, PAYLOAD_MIN_ALIGNMENT);
 
     if (payload)
     {
@@ -941,7 +941,7 @@ RiffContainer::Data* RiffContainer::makeSingleData(DataChunk* dataChunk)
         // Okay lets combine all into one block
         const size_t payloadSize = dataChunk->calcPayloadSize();
 
-        void* dst = m_arena.allocateAligned(payloadSize, ALLOCATION_ALIGNMENT);
+        void* dst = m_arena.allocateAligned(payloadSize, PAYLOAD_MIN_ALIGNMENT);
         dataChunk->getPayload(dst);
 
         // Remove other datas
