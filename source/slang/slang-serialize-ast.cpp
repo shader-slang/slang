@@ -1,5 +1,5 @@
-// slang-ast-serialize.cpp
-#include "slang-ast-serialize.h"
+// slang-serialize-ast.cpp
+#include "slang-serialize-ast.h"
 
 #include "slang-ast-generated.h"
 #include "slang-ast-generated-macro.h"
@@ -1087,10 +1087,11 @@ ASTSerialClasses::ASTSerialClasses():
 
 // !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! ASTSerialWriter  !!!!!!!!!!!!!!!!!!!!!!!!!!!!
 
-ASTSerialWriter::ASTSerialWriter(ASTSerialClasses* classes, ASTSerialFilter* filter) :
+ASTSerialWriter::ASTSerialWriter(ASTSerialClasses* classes, ASTSerialFilter* filter, DebugSerialWriter* debugWriter) :
     m_arena(2048),
     m_classes(classes),
-    m_filter(filter)
+    m_filter(filter),
+    m_debugWriter(debugWriter)
 {
     // 0 is always the null pointer
     m_entries.add(nullptr);
@@ -1292,8 +1293,14 @@ ASTSerialIndex ASTSerialWriter::addName(const Name* name)
 
 ASTSerialSourceLoc ASTSerialWriter::addSourceLoc(SourceLoc sourceLoc)
 {
-    SLANG_UNUSED(sourceLoc);
-    return 0;
+    if (sourceLoc.isValid() && m_debugWriter)
+    {
+        return m_debugWriter->addSourceLoc(sourceLoc);
+    }
+    else
+    {
+        return 0;
+    }
 }
 
 ASTSerialIndex ASTSerialWriter::_addArray(size_t elementSize, size_t alignment, const void* elements, Index elementCount)
@@ -1706,8 +1713,7 @@ UnownedStringSlice ASTSerialReader::getStringSlice(ASTSerialIndex index)
 
 SourceLoc ASTSerialReader::getSourceLoc(ASTSerialSourceLoc loc)
 {
-    SLANG_UNUSED(loc);
-    return SourceLoc();
+    return (loc && m_debugReader) ? m_debugReader->getSourceLoc(loc) : SourceLoc();
 }
 
 SlangResult ASTSerialReader::loadEntries(const uint8_t* data, size_t dataCount, List<const ASTSerialInfo::Entry*>& outEntries)
@@ -1865,63 +1871,6 @@ SlangResult ASTSerialReader::load(const uint8_t* data, size_t dataCount, ASTBuil
     return SLANG_OK;
 }
 
-
-/* static */Result ASTSerialReader::readContainerModules(RiffContainer* container, Linkage* linkage, List<RefPtr<Module>>& outModules)
-{
-    List<RiffContainer::ListChunk*> moduleChunks;
-    // First try to find a list
-    {
-        RiffContainer::ListChunk* listChunk = container->getRoot()->findListRec(SerialBinary::kSlangModuleListFourCc);
-        if (listChunk)
-        {
-            listChunk->findContained(ASTSerialBinary::kSlangASTModuleFourCC, moduleChunks);
-        }
-        else
-        {
-            // Maybe its just a single module
-            RiffContainer::ListChunk* moduleChunk = container->getRoot()->findListRec(ASTSerialBinary::kSlangASTModuleFourCC);
-            if (!moduleChunk)
-            {
-                // Couldn't find any modules
-                return SLANG_FAIL;
-            }
-            moduleChunks.add(moduleChunk);
-        }
-    }
-
-    RefPtr<ASTSerialClasses> serialClasses(new ASTSerialClasses);
-
-    // Okay, deserialize the each of the module chunks
-    for (RiffContainer::ListChunk* listChunk : moduleChunks)
-    {
-        // Look for the module data
-        auto data = listChunk->findContainedData(ASTSerialBinary::kSlangASTModuleDataFourCC);
-
-        if (!data)
-        {
-            return SLANG_FAIL;
-        }
-
-        ASTSerialReader reader(serialClasses);
-
-        RefPtr<Module> module(new Module(linkage));
-        SLANG_RETURN_ON_FAIL(reader.load((uint8_t*)data->getPayload(), data->getSize(), module->getASTBuilder(), linkage->getNamePool()));
-
-        ModuleDecl* moduleDecl = reader.getPointer(ASTSerialIndex(1)).dynamicCast<ModuleDecl>();
-        if (!moduleDecl)
-        {
-            return SLANG_FAIL;
-        }
-
-        // Set on the module
-        module->setModuleDecl(moduleDecl);
-
-        outModules.add(module);
-    }
-
-    return SLANG_OK;
-}
-
 // !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! ASTSerializeUtil  !!!!!!!!!!!!!!!!!!!!!!!!!!!!
 
 /* static */SlangResult ASTSerialTestUtil::selfTest()
@@ -1976,7 +1925,7 @@ SlangResult ASTSerialReader::load(const uint8_t* data, size_t dataCount, ASTBuil
 
         ASTSerialFilter* filter = moduleDecl ? &filterStorage : nullptr;
 
-        ASTSerialWriter writer(classes, filter);
+        ASTSerialWriter writer(classes, filter, nullptr);
 
         // Lets serialize it all
         writer.addPointer(node);
@@ -1988,7 +1937,7 @@ SlangResult ASTSerialReader::load(const uint8_t* data, size_t dataCount, ASTBuil
         NamePool namePool;
         namePool.setRootNamePool(rootNamePool);
 
-        ASTSerialReader reader(classes);
+        ASTSerialReader reader(classes, nullptr);
 
         ASTBuilder builder(sharedASTBuilder, "Serialize Check");
 

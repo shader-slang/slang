@@ -13,7 +13,7 @@
 #include "slang-file-system.h"
 
 #include "slang-repro.h"
-#include "slang-ir-serialize.h"
+#include "slang-serialize-ir.h"
 
 #include "../core/slang-type-text-util.h"
 
@@ -592,7 +592,7 @@ struct OptionsParser
                 {
                     String name;
                     SLANG_RETURN_ON_FAIL(tryReadCommandLineArgument(sink, arg, &argCursor, argEnd, name));
-                    SLANG_RETURN_ON_FAIL(IRSerialTypeUtil::parseCompressionType(name.getUnownedSlice(), requestImpl->getLinkage()->irCompressionType));
+                    SLANG_RETURN_ON_FAIL(SerialParseUtil::parseCompressionType(name.getUnownedSlice(), requestImpl->getLinkage()->serialCompressionType));
                 }
                 else if (argStr == "-target")
                 {

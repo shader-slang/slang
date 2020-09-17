@@ -14,9 +14,6 @@
 #include "slang-reflection.h"
 #include "slang-type-layout.h"
 
-#include "slang-ast-dump.h"
-#include "slang-ast-serialize.h"
-
 #include "slang-repro.h"
 
 #include "slang-file-system.h"
@@ -25,7 +22,11 @@
 
 #include "slang-source-loc.h"
 
-#include "slang-ir-serialize.h"
+#include "slang-ast-dump.h"
+
+#include "slang-serialize-ast.h"
+#include "slang-serialize-ir.h"
+#include "slang-serialize-container.h"
 
 #include "slang-check-impl.h"
 
@@ -1074,20 +1075,25 @@ void FrontEndCompileRequest::generateIR()
 
         if (verifyDebugSerialization)
         {
+            SerialContainerUtil::WriteOptions options;
+            options.compressionType = SerialCompressionType::None;
+            options.sourceManager = getSourceManager();
+            options.optionFlags = SerialOptionFlag::DebugInfo;
+
             // Verify debug information
-            if (SLANG_FAILED(IRSerialUtil::verifySerialize(irModule, getSession(), getSourceManager(), IRSerialBinary::CompressionType::None, IRSerialWriter::OptionFlag::DebugInfo)))
+            if (SLANG_FAILED(SerialContainerUtil::verifyIRSerialize(irModule, getSession(), options)))
             {
                 getSink()->diagnose(irModule->moduleInst->sourceLoc, Diagnostics::serialDebugVerificationFailed);
             }
         }
 
         if (useSerialIRBottleneck)
-        {              
+        {
             IRSerialData serialData;
             {
                 // Write IR out to serialData - copying over SourceLoc information directly
                 IRSerialWriter writer;
-                writer.write(irModule, getSourceManager(), IRSerialWriter::OptionFlag::RawSourceLocation, &serialData);
+                writer.write(irModule, nullptr, SerialOptionFlag::RawSourceLocation, &serialData);
 
                 // Destroy irModule such that memory can be used for newly constructed read irReadModule  
                 irModule = nullptr;
@@ -3013,33 +3019,47 @@ namespace Slang
 SlangResult _addLibraryReference(EndToEndCompileRequest* req, Stream* stream)
 {
     // Load up the module
-    RiffContainer container;
-    SLANG_RETURN_ON_FAIL(RiffUtil::read(stream, container));
+    RiffContainer riffContainer;
+    SLANG_RETURN_ON_FAIL(RiffUtil::read(stream, riffContainer));
 
-    List<RefPtr<Module>> modules;
-
-    if (SLANG_FAILED(ASTSerialReader::readContainerModules(&container, req->getLinkage(), modules)))
-    {
-        req->getSink()->diagnose(SourceLoc(), Diagnostics::unableToAddReferenceToModuleContainer);
-        return SLANG_FAIL;
-    }
-
-    // Read all of the contained modules
-    List<RefPtr<IRModule>> irModules;
-    List<FrontEndCompileRequest::ExtraEntryPointInfo> entryPointMangledNames;
-
-    if (SLANG_FAILED(IRSerialReader::readContainerModules(&container, req->getSession(), req->getFrontEndReq()->getSourceManager(), irModules, entryPointMangledNames)))
-    {
-        req->getSink()->diagnose(SourceLoc(), Diagnostics::unableToAddReferenceToModuleContainer);
-        return SLANG_FAIL;
-    }
+    auto linkage = req->getLinkage();
 
     // TODO(JS): May be better to have a ITypeComponent that encapsulates a collection of modules
     // For now just add to the linkage
-    auto linkage = req->getLinkage();
-    linkage->m_libModules.addRange(irModules);
 
-    req->getFrontEndReq()->m_extraEntryPoints.addRange(entryPointMangledNames);
+    {
+        SerialContainerData containerData;
+
+        SerialContainerUtil::ReadOptions options;
+        options.namePool = req->getNamePool();
+        options.session = req->getSession();
+        options.sharedASTBuilder = linkage->getASTBuilder()->getSharedASTBuilder();
+        options.sourceManager = linkage->getSourceManager();
+
+        SLANG_RETURN_ON_FAIL(SerialContainerUtil::read(&riffContainer, options, containerData));
+
+        for (const auto& translationUnit : containerData.translationUnits)
+        {
+            // If the irModule is set, add it
+            if (translationUnit.irModule)
+            {
+                linkage->m_libModules.add(translationUnit.irModule);
+            }
+        }
+
+        FrontEndCompileRequest* frontEndRequest = req->getFrontEndReq();
+
+        for (const auto& entryPoint : containerData.entryPoints)
+        {
+            FrontEndCompileRequest::ExtraEntryPointInfo dst;
+            dst.mangledName = entryPoint.mangledName;
+            dst.name = entryPoint.name;
+            dst.profile = entryPoint.profile;
+
+            // Add entry point
+            frontEndRequest->m_extraEntryPoints.add(dst);
+        }
+    }
 
     return SLANG_OK;
 }
