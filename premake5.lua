@@ -616,6 +616,9 @@ tool "slang-generate"
     uuid "66174227-8541-41FC-A6DF-4764FC66F78E"
     links { "core" }
 
+tool "slang-embed"
+    links { "core" }
+
 --
 -- The `slang-test` test driver also uses the `core` library, and it
 -- currently relies on include paths being set up so that it can find
@@ -791,6 +794,7 @@ generatorProject("run-generators", "source/slang/")
     {
         "source/slang/*.meta.slang",            -- The stdlib files
         "source/slang/slang-ast-reflect.h",     -- The C++ reflection 
+        "prelude/*.h",                          -- The prelude files
         
         --
         -- To build we need to have some source! It has to be a source file that 
@@ -805,7 +809,7 @@ generatorProject("run-generators", "source/slang/")
     -- gets built before `slang`, so we declare a non-linking dependency between
     -- the projects here:
     --
-    dependson { "slang-cpp-extractor", "slang-generate"  }
+    dependson { "slang-cpp-extractor", "slang-generate", "slang-embed" }
     
     local executableSuffix = "";
     if(os.target() == "windows") then
@@ -895,6 +899,14 @@ generatorProject("run-generators", "source/slang/")
             --
             buildinputs { "%{cfg.targetdir}/slang-generate" .. executableSuffix }
     end
+
+    if executeBinary then
+      filter "files:prelude/*.h"
+        buildmessage "slang-embed %{file.relpath}"
+        buildcommands { '"%{cfg.targetdir}/slang-embed" %{file.relpath}' }
+        buildoutputs { "%{file.abspath}.cpp" }
+        buildinputs { "%{cfg.targetdir}/slang-embed" .. executableSuffix }
+    end
     
     
 --
@@ -938,6 +950,12 @@ standardProject "slang"
 
     files { "source/core/core.natvis" }
  
+    -- We explicitly name the prelude file(s) that we need to
+    -- compile for their embedded code, since they will not
+    -- exist at the time projects/makefiles are generated,
+    -- and thus a glob would not match anything.
+    files { "prelude/slang-cuda-prelude.h.cpp" }
+
     -- 
     -- The most challenging part of building `slang` is that we need
     -- to invoke generators such as slang-cpp-extractor and slang-generate
