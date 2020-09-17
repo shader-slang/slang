@@ -1,11 +1,13 @@
-// slang-ast-serialize.h
-#ifndef SLANG_AST_SERIALIZE_H
-#define SLANG_AST_SERIALIZE_H
+// slang-serialize-ast.h
+#ifndef SLANG_SERIALIZE_AST_H
+#define SLANG_SERIALIZE_AST_H
 
 #include <type_traits>
 
 #include "slang-ast-support-types.h"
 #include "slang-ast-all.h"
+
+#include "slang-serialize-debug.h"
 
 #include "../core/slang-riff.h"
 
@@ -53,7 +55,7 @@ struct ASTSerialTypeInfo;
 and specialize it for each native type. The specialization holds
 
 SerialType - The type that will be used to represent the native type
-NativeType - The native typs
+NativeType - The native type
 SerialAlignment - A value that holds what kind of alignment the SerialType needs to be serializable (it may be different from SLANG_ALIGN_OF(SerialType)!)
 toSerial - A function that with the help of ASTSerialWriter convert the NativeType into the SerialType
 toNative - A function that with the help of ASTSerialReader convert the SerialType into the NativeType
@@ -70,7 +72,7 @@ which just holds the information held in the ASTSerialTypeInfo template, but add
 
 So we need to define a specialized ASTSerialTypeInfo for each type that can be a field in a NodeBase derived type. We don't need to define
 anything explicitly for the NodeBase derived types, as we will just generate the layout from the fields. How do we know the fields? We just
-used the macros generated from the C++ extactor.
+used the macros generated from the C++ extractor.
 
 So first a few things to observe...
 
@@ -301,7 +303,7 @@ struct ASTSerialInfo
 
 typedef uint32_t ASTSerialIndexRaw;
 enum class ASTSerialIndex : ASTSerialIndexRaw;
-typedef uint32_t ASTSerialSourceLoc;
+typedef DebugSerialData::SourceLoc ASTSerialSourceLoc;
 
 /* A type to convert pointers into types such that they can be passed around to readers/writers without
 having to know the specific type. If there was a base class that all the serialized types derived from,
@@ -369,7 +371,6 @@ public:
     UnownedStringSlice getStringSlice(ASTSerialIndex index);
     SourceLoc getSourceLoc(ASTSerialSourceLoc loc);
 
-
         /// Load the entries table (without deserializing anything)
         /// NOTE! data must stay ins scope for outEntries to be valid
     SlangResult loadEntries(const uint8_t* data, size_t dataCount, List<const ASTSerialInfo::Entry*>& outEntries);
@@ -377,11 +378,9 @@ public:
         /// NOTE! data must stay ins scope when reading takes place
     SlangResult load(const uint8_t* data, size_t dataCount, ASTBuilder* builder, NamePool* namePool);
 
-        /// Read the modules from the container
-    static Result readContainerModules(RiffContainer* container, Linkage* linkage, List<RefPtr<Module>>& outModules);
-    
-    ASTSerialReader(ASTSerialClasses* classes):
-        m_classes(classes)
+    ASTSerialReader(ASTSerialClasses* classes, DebugSerialReader* debugReader):
+        m_classes(classes),
+        m_debugReader(debugReader)
     {
     }
 
@@ -390,6 +389,8 @@ protected:
     List<void*> m_objects;              ///< The constructed objects
 
     List<RefPtr<RefObject>> m_scope;    ///< Objects to keep in scope during construction
+
+    DebugSerialReader* m_debugReader;
 
     NamePool* m_namePool;
 
@@ -482,7 +483,7 @@ public:
         /// Write the state into the container
     SlangResult writeIntoContainer(RiffContainer* container);
 
-    ASTSerialWriter(ASTSerialClasses* classes, ASTSerialFilter* filter);
+    ASTSerialWriter(ASTSerialClasses* classes, ASTSerialFilter* filter, DebugSerialWriter* debugWriter);
 
 protected:
 
@@ -497,6 +498,8 @@ protected:
         m_ptrMap.Add(nativePtr, Index(index));
         return index;
     }
+
+    DebugSerialWriter* m_debugWriter;           //< For writing/mapping serialized source locs
 
     Dictionary<const void*, Index> m_ptrMap;    // Maps a pointer to an entry index
 
