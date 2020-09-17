@@ -105,6 +105,12 @@ namespace Slang
         }
     }
 
+    void printDiagnosticArg(StringBuilder& sb, PassThroughMode val)
+    {
+        sb << TypeTextUtil::getPassThroughName(SlangPassThrough(val));
+    }
+
+
     // !!!!!!!!!!!!!!!!!!!!!!!!!!!! CompileResult !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 
     SlangResult CompileResult::getSharedLibrary(ComPtr<ISlangSharedLibrary>& outSharedLibrary)
