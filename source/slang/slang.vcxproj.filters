@@ -318,6 +318,9 @@
     <ClInclude Include="slang-serialize-types.h">
       <Filter>Header Files</Filter>
     </ClInclude>
+    <ClInclude Include="slang-serialize.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
     <ClInclude Include="slang-source-loc.h">
       <Filter>Header Files</Filter>
     </ClInclude>
@@ -341,15 +344,6 @@
     </ClInclude>
   </ItemGroup>
   <ItemGroup>
-    <ClCompile Include="..\..\prelude\slang-cpp-prelude.h.cpp">
-      <Filter>Header Files</Filter>
-    </ClCompile>
-    <ClCompile Include="..\..\prelude\slang-cpp-scalar-intrinsics.h.cpp">
-      <Filter>Header Files</Filter>
-    </ClCompile>
-    <ClCompile Include="..\..\prelude\slang-cpp-types.h.cpp">
-      <Filter>Header Files</Filter>
-    </ClCompile>
     <ClCompile Include="..\..\prelude\slang-cuda-prelude.h.cpp">
       <Filter>Header Files</Filter>
     </ClCompile>
@@ -654,6 +648,9 @@
       <Filter>Source Files</Filter>
     </ClCompile>
     <ClCompile Include="slang-serialize-types.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="slang-serialize.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
     <ClCompile Include="slang-source-loc.cpp">
