@@ -79,7 +79,7 @@ struct SerialContainerUtil
     struct WriteOptions
     {
         SerialCompressionType compressionType = SerialCompressionType::VariableByteLite;
-        SerialOptionFlags optionFlags = 0;
+        SerialOptionFlags optionFlags = SerialOptionFlag::ASTModule | SerialOptionFlag::IRModule;
         SourceManager* sourceManager = nullptr;
     };
 

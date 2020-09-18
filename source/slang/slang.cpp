@@ -1076,9 +1076,10 @@ void FrontEndCompileRequest::generateIR()
         if (verifyDebugSerialization)
         {
             SerialContainerUtil::WriteOptions options;
+
             options.compressionType = SerialCompressionType::None;
             options.sourceManager = getSourceManager();
-            options.optionFlags = SerialOptionFlag::DebugInfo;
+            options.optionFlags |= SerialOptionFlag::DebugInfo;
 
             // Verify debug information
             if (SLANG_FAILED(SerialContainerUtil::verifyIRSerialize(irModule, getSession(), options)))

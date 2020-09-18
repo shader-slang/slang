@@ -2357,6 +2357,13 @@ SlangResult dissassembleDXILUsingDXC(
         {
             options.optionFlags |= SerialOptionFlag::DebugInfo;
         }
+        if (linkage->m_obfuscateCode)
+        {
+            // If code is obfuscated, we *disable* AST output as it is not obfuscated and will reveal
+            // too much about IR.
+            // Also currently only IR is needed.
+            options.optionFlags &= ~SerialOptionFlag::ASTModule;
+        }
 
         {
             RiffContainer container;

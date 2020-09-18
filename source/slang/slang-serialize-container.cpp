@@ -88,11 +88,6 @@ namespace Slang {
 
 /* static */SlangResult SerialContainerUtil::write(const SerialContainerData& data, const WriteOptions& options, RiffContainer* container)
 {
-    //auto linkage = request->getLinkage();
-    //auto sink = request->getSink();
-    //auto frontEndReq = request->getFrontEndReq();
-    //SourceManager* sourceManager = frontEndReq->getSourceManager();
-
     RefPtr<DebugSerialWriter> debugWriter;
 
     // The string pool used across the whole of the container
@@ -110,7 +105,7 @@ namespace Slang {
         container->write(&containerHeader, sizeof(containerHeader));
     }
 
-    if (data.translationUnits.getCount())
+    if (data.translationUnits.getCount() && (options.optionFlags & (SerialOptionFlag::IRModule | SerialOptionFlag::ASTModule)))
     {
         // Module list
         RiffContainer::ScopeChunk moduleListScope(container, RiffContainer::Chunk::Kind::List, SerialBinary::kTranslationUnitListFourCc);
@@ -120,7 +115,7 @@ namespace Slang {
             debugWriter = new DebugSerialWriter(options.sourceManager);
         }
 
-        RefPtr<ASTSerialClasses> astClasses = new ASTSerialClasses;
+        RefPtr<ASTSerialClasses> astClasses;
 
         for (const auto& translationUnit : data.translationUnits)
         {
@@ -128,7 +123,7 @@ namespace Slang {
             // We currently don't serialize it's name..., but support for that could be added.
 
             // Write the IR information
-            if (translationUnit.irModule)
+            if ((options.optionFlags & SerialOptionFlag::IRModule) && translationUnit.irModule)
             {
                 IRSerialData serialData;
                 IRSerialWriter writer;
@@ -138,20 +133,28 @@ namespace Slang {
 
             // Write the AST information
 
-            if (ModuleDecl* moduleDecl = as<ModuleDecl>(translationUnit.astRootNode))
+            if (options.optionFlags & SerialOptionFlag::ASTModule)
             {
-                ModuleASTSerialFilter filter(moduleDecl);
-                ASTSerialWriter writer(astClasses, &filter, debugWriter);
+                if (ModuleDecl* moduleDecl = as<ModuleDecl>(translationUnit.astRootNode))
+                {
+                    if (!astClasses)
+                    {
+                        astClasses = new ASTSerialClasses;
+                    }
 
-                // Add the module and everything that isn't filtered out in the filter.
-                writer.addPointer(moduleDecl);
+                    ModuleASTSerialFilter filter(moduleDecl);
+                    ASTSerialWriter writer(astClasses, &filter, debugWriter);
 
-                // We can now serialize it into the riff container.
-                SLANG_RETURN_ON_FAIL(writer.writeIntoContainer(container));
+                    // Add the module and everything that isn't filtered out in the filter.
+                    writer.addPointer(moduleDecl);
+
+                    // We can now serialize it into the riff container.
+                    SLANG_RETURN_ON_FAIL(writer.writeIntoContainer(container));
+                }
             }
         }
 
-        if (data.targetModules.getCount())
+        if (data.targetModules.getCount() && (options.optionFlags & SerialOptionFlag::IRModule))
         {
             // TODO: in the case where we have specialization, we might need
             // to serialize IR related to `program`...
