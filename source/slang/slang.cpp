@@ -41,6 +41,8 @@
 #undef NOMINMAX
 #endif
 
+extern char const* slang_cuda_prelude;
+
 namespace Slang {
 
 /* static */const BaseTypeInfo BaseTypeInfo::s_info[Index(BaseType::CountOf)] = 
@@ -184,6 +186,9 @@ void Session::init()
         m_defaultDownstreamCompilers[Index(SourceLanguage::CPP)] = PassThroughMode::GenericCCpp;
         m_defaultDownstreamCompilers[Index(SourceLanguage::CUDA)] = PassThroughMode::NVRTC;
     }
+
+    // Set up default prelude code for target languages that need a prelude
+    m_languagePreludes[Index(SourceLanguage::CUDA)] = slang_cuda_prelude;
 }
 
 ISlangUnknown* Session::getInterface(const Guid& guid)
