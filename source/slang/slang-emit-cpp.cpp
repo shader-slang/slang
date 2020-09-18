@@ -1604,6 +1604,11 @@ void CPPSourceEmitter::emitParamTypeImpl(IRType* type, String const& name)
     emitType(type, name);
 }
 
+void CPPSourceEmitter::emitGlobalRTTISymbolPrefix()
+{
+    m_writer->emit("SLANG_PRELUDE_SHARED_LIB_EXPORT");
+}
+
 void CPPSourceEmitter::emitWitnessTable(IRWitnessTable* witnessTable)
 {
     auto interfaceType = cast<IRInterfaceType>(witnessTable->getConformanceType());
@@ -1613,10 +1618,11 @@ void CPPSourceEmitter::emitWitnessTable(IRWitnessTable* witnessTable)
         return;
 
     auto witnessTableItems = witnessTable->getChildren();
-    _maybeEmitWitnessTableTypeDefinition(interfaceType);
 
     // Declare a global variable for the witness table.
-    m_writer->emit("extern \"C\" { SLANG_PRELUDE_SHARED_LIB_EXPORT extern ");
+    m_writer->emit("extern \"C\" { ");
+    emitGlobalRTTISymbolPrefix();
+    m_writer->emit(" extern ");
     emitSimpleType(interfaceType);
     m_writer->emit(" ");
     m_writer->emit(getName(witnessTable));
@@ -1638,7 +1644,8 @@ void CPPSourceEmitter::_emitWitnessTableDefinitions()
         List<IRWitnessTableEntry*> sortedWitnessTableEntries = getSortedWitnessTableEntries(witnessTable);
         m_writer->emit("extern \"C\"\n{\n");
         m_writer->indent();
-        m_writer->emit("SLANG_PRELUDE_SHARED_LIB_EXPORT\n");
+        emitGlobalRTTISymbolPrefix();
+        m_writer->emit("\n");
         emitSimpleType(interfaceType);
         m_writer->emit(" ");
         m_writer->emit(getName(witnessTable));
@@ -1689,44 +1696,9 @@ void CPPSourceEmitter::_emitWitnessTableDefinitions()
 
 void CPPSourceEmitter::emitInterface(IRInterfaceType* interfaceType)
 {
-    // The current IRInterfaceType defintion does not contain
-    // sufficient info for emitting a witness table struct by itself
-    // Instead, it defines the order of entries in a witness table.
-    // Therefore, we emit a forward declaration here, and actual definition
-    // for the witness table type during emitWitnessTable.
-    SLANG_UNUSED(interfaceType);
-    m_writer->emit("struct ");
-    emitSimpleType(interfaceType);
-    m_writer->emit(";\n");
-}
-
-void CPPSourceEmitter::emitRTTIObject(IRRTTIObject* rttiObject)
-{
-    // Declare the type info object as `extern "C"` first.
-    m_writer->emit("extern \"C\"{ SLANG_PRELUDE_SHARED_LIB_EXPORT extern TypeInfo ");
-    m_writer->emit(getName(rttiObject));
-    m_writer->emit("; }\n");
-
-    // Now actually define the object.
-    m_writer->emit("extern \"C\" { SLANG_PRELUDE_SHARED_LIB_EXPORT TypeInfo ");
-    m_writer->emit(getName(rttiObject));
-    m_writer->emit(" = {");
-    auto typeSizeDecoration = rttiObject->findDecoration<IRRTTITypeSizeDecoration>();
-    SLANG_ASSERT(typeSizeDecoration);
-    m_writer->emit(typeSizeDecoration->getTypeSize());
-    m_writer->emit("}; }\n");
-}
-
-
-    /// Emits witness table type definition given a sorted list of witness tables
-    /// acoording to the order defined by `interfaceType`.
-    ///
-void CPPSourceEmitter::_maybeEmitWitnessTableTypeDefinition(
-    IRInterfaceType* interfaceType)
-{
-    if (m_interfaceTypesEmitted.Contains(interfaceType))
+    // Skip built-in interfaces.
+    if (isBuiltin(interfaceType))
         return;
-    m_interfaceTypesEmitted.Add(interfaceType);
 
     m_writer->emit("struct ");
     emitSimpleType(interfaceType);
@@ -1775,6 +1747,19 @@ void CPPSourceEmitter::_maybeEmitWitnessTableTypeDefinition(
     }
     m_writer->dedent();
     m_writer->emit("};\n");
+}
+
+void CPPSourceEmitter::emitRTTIObject(IRRTTIObject* rttiObject)
+{
+    m_writer->emit("extern \"C\" { ");
+    emitGlobalRTTISymbolPrefix();
+    m_writer->emit(" TypeInfo ");
+    m_writer->emit(getName(rttiObject));
+    m_writer->emit(" = {");
+    auto typeSizeDecoration = rttiObject->findDecoration<IRRTTITypeSizeDecoration>();
+    SLANG_ASSERT(typeSizeDecoration);
+    m_writer->emit(typeSizeDecoration->getTypeSize());
+    m_writer->emit("}; }\n");
 }
 
 bool CPPSourceEmitter::tryEmitGlobalParamImpl(IRGlobalParam* varDecl, IRType* varType)

@@ -3837,7 +3837,6 @@ void CLikeSourceEmitter::ensureGlobalInst(ComputeEmitActionsContext* ctx, IRInst
     // Skip certain instructions that don't affect output.
     switch(inst->op)
     {
-    case kIROp_InterfaceRequirementEntry:
     case kIROp_Generic:
         return;
 
@@ -3877,6 +3876,16 @@ void CLikeSourceEmitter::ensureGlobalInst(ComputeEmitActionsContext* ctx, IRInst
     }
 
     ctx->mapInstToLevel[inst] = requiredLevel;
+
+    // Skip instructions that don't correspond to an independent entity in output.
+    switch (inst->op)
+    {
+    case kIROp_InterfaceRequirementEntry:
+        return;
+
+    default:
+        break;
+    }
     ctx->actions->add(action);
 }
 

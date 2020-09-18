@@ -300,7 +300,7 @@ String CUDASourceEmitter::generateEntryPointNameImpl(IREntryPointDecoration* ent
     // > The input PTX should include one or more NVIDIA OptiX programs.
     // > The type of program affects how the program can be used during
     // > the execution of the pipeline. These program types are specified
-    // by prefixing the program’s name with the following:
+    // by prefixing the program name with the following:
     //
     // >    Program type        Function name prefix
     CASE(   RayGeneration,      __raygen__);
@@ -320,6 +320,11 @@ String CUDASourceEmitter::generateEntryPointNameImpl(IREntryPointDecoration* ent
     }
 
     return globalSymbolName;
+}
+
+void CUDASourceEmitter::emitGlobalRTTISymbolPrefix()
+{
+    m_writer->emit("__device__");
 }
 
 void CUDASourceEmitter::emitCall(const HLSLIntrinsic* specOp, IRInst* inst, const IRUse* operands, int numOperands, const EmitOpInfo& inOuterPrec)
@@ -740,6 +745,9 @@ void CUDASourceEmitter::emitModuleImpl(IRModule* module)
     // TODO(JS): We may need to generate types (for example for matrices)
 
     CLikeSourceEmitter::emitModuleImpl(module);
+
+    // Emit all witness table definitions.
+    _emitWitnessTableDefinitions();
 }
 
 
