@@ -372,13 +372,10 @@ public:
     void addScope(const RefObject* obj) { m_scope.add(obj); }
 
         /// Ctor
-    SerialReader(SerialClasses* classes, SerialObjectFactory*const factories[Index(SerialTypeKind::CountOf)]):
-        m_classes(classes)
+    SerialReader(SerialClasses* classes, SerialObjectFactory* objectFactory):
+        m_classes(classes),
+        m_objectFactory(objectFactory)
     {
-        for (Index i = 0; i < SLANG_COUNT_OF(m_factories); ++i)
-        {
-            m_factories[i] = factories[i];
-        }
     }
     ~SerialReader();
 
@@ -387,9 +384,9 @@ protected:
     List<void*> m_objects;              ///< The constructed objects
     NamePool* m_namePool;               ///< Pool names are added to
 
-    List<const RefObject*> m_scope;           ///< Keeping objects in scope
+    List<const RefObject*> m_scope;     ///< Keeping objects in scope
 
-    SerialObjectFactory* m_factories[Index(SerialTypeKind::CountOf)];
+    SerialObjectFactory* m_objectFactory;
     SerialClasses* m_classes;           ///< Information used to deserialize 
 };
 
@@ -568,7 +565,7 @@ public:
 
         /// Will add it's own copy into m_classesByType
         /// In process will calculate alignment, offset etc for fields
-        /// NOTE! the super set, *must* be an already allocated and set super
+        /// NOTE! the super set, *must* be an already added to this SerialClasses
     const SerialClass* add(const SerialClass* cls);
 
         /// Returns true if this cls is *owned* by this SerialClasses

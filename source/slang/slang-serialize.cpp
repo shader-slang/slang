@@ -739,14 +739,7 @@ SlangResult SerialReader::load(const uint8_t* data, size_t dataCount, NamePool* 
             case SerialTypeKind::NodeBase:
             {
                 auto objectEntry = static_cast<const SerialInfo::ObjectEntry*>(entry);
-
-                SerialObjectFactory* factory = m_factories[Index(objectEntry->typeKind)];
-                if (!factory)
-                {
-                    return SLANG_FAIL;
-                }
-
-                void* obj = factory->create(objectEntry->typeKind, objectEntry->subType);
+                void* obj = m_objectFactory->create(objectEntry->typeKind, objectEntry->subType);
                 if (!obj)
                 {
                     return SLANG_FAIL;

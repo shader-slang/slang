@@ -315,6 +315,9 @@
     <ClInclude Include="slang-serialize-ir.h">
       <Filter>Header Files</Filter>
     </ClInclude>
+    <ClInclude Include="slang-serialize-reflection.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
     <ClInclude Include="slang-serialize-types.h">
       <Filter>Header Files</Filter>
     </ClInclude>
@@ -645,6 +648,9 @@
       <Filter>Source Files</Filter>
     </ClCompile>
     <ClCompile Include="slang-serialize-ir.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="slang-serialize-reflection.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
     <ClCompile Include="slang-serialize-types.cpp">
