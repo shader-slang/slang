@@ -1076,9 +1076,10 @@ void FrontEndCompileRequest::generateIR()
         if (verifyDebugSerialization)
         {
             SerialContainerUtil::WriteOptions options;
+
             options.compressionType = SerialCompressionType::None;
             options.sourceManager = getSourceManager();
-            options.optionFlags = SerialOptionFlag::DebugInfo;
+            options.optionFlags |= SerialOptionFlag::DebugInfo;
 
             // Verify debug information
             if (SLANG_FAILED(SerialContainerUtil::verifyIRSerialize(irModule, getSession(), options)))
@@ -3038,12 +3039,12 @@ SlangResult _addLibraryReference(EndToEndCompileRequest* req, Stream* stream)
 
         SLANG_RETURN_ON_FAIL(SerialContainerUtil::read(&riffContainer, options, containerData));
 
-        for (const auto& translationUnit : containerData.translationUnits)
+        for (const auto& module : containerData.modules)
         {
             // If the irModule is set, add it
-            if (translationUnit.irModule)
+            if (module.irModule)
             {
-                linkage->m_libModules.add(translationUnit.irModule);
+                linkage->m_libModules.add(module.irModule);
             }
         }
 

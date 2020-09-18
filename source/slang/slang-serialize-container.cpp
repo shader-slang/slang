@@ -33,11 +33,15 @@ namespace Slang {
 
         SLANG_ASSERT(irModule || moduleDecl);
 
-        SerialContainerData::TranslationUnit dstTranslationUnit;
-        dstTranslationUnit.astRootNode = moduleDecl;
-        dstTranslationUnit.irModule = irModule;
+        SerialContainerData::Module dstModule;
 
-        out.translationUnits.add(dstTranslationUnit);
+        // NOTE: The astBuilder is not set here, as not needed to be scoped for serialization (it is assumed the
+        // TranslationUnitRequest stays in scope)
+
+        dstModule.astRootNode = moduleDecl;
+        dstModule.irModule = irModule;
+
+        out.modules.add(dstModule);
     }
 
     auto program = request->getSpecializedGlobalAndEntryPointsComponentType();
@@ -50,18 +54,18 @@ namespace Slang {
             auto targetProgram = program->getTargetProgram(target);
             auto irModule = targetProgram->getOrCreateIRModuleForLayout(sink);
 
-            SerialContainerData::TargetModule targetModule;
+            SerialContainerData::TargetComponent targetComponent;
 
-            targetModule.irModule = irModule;
+            targetComponent.irModule = irModule;
 
-            auto& dstTarget = targetModule.target;
+            auto& dstTarget = targetComponent.target;
 
             dstTarget.floatingPointMode = target->floatingPointMode;
             dstTarget.profile = target->targetProfile;
             dstTarget.flags = target->targetFlags;
             dstTarget.codeGenTarget = target->target;
 
-            out.targetModules.add(targetModule);
+            out.targetComponents.add(targetComponent);
         }
     }
 
@@ -88,11 +92,6 @@ namespace Slang {
 
 /* static */SlangResult SerialContainerUtil::write(const SerialContainerData& data, const WriteOptions& options, RiffContainer* container)
 {
-    //auto linkage = request->getLinkage();
-    //auto sink = request->getSink();
-    //auto frontEndReq = request->getFrontEndReq();
-    //SourceManager* sourceManager = frontEndReq->getSourceManager();
-
     RefPtr<DebugSerialWriter> debugWriter;
 
     // The string pool used across the whole of the container
@@ -110,55 +109,63 @@ namespace Slang {
         container->write(&containerHeader, sizeof(containerHeader));
     }
 
-    if (data.translationUnits.getCount())
+    if (data.modules.getCount() && (options.optionFlags & (SerialOptionFlag::IRModule | SerialOptionFlag::ASTModule)))
     {
         // Module list
-        RiffContainer::ScopeChunk moduleListScope(container, RiffContainer::Chunk::Kind::List, SerialBinary::kTranslationUnitListFourCc);
+        RiffContainer::ScopeChunk moduleListScope(container, RiffContainer::Chunk::Kind::List, SerialBinary::kModuleListFourCc);
 
         if (options.optionFlags & SerialOptionFlag::DebugInfo)
         {
             debugWriter = new DebugSerialWriter(options.sourceManager);
         }
 
-        RefPtr<ASTSerialClasses> astClasses = new ASTSerialClasses;
+        RefPtr<ASTSerialClasses> astClasses;
 
-        for (const auto& translationUnit : data.translationUnits)
+        for (const auto& module : data.modules)
         {
             // Okay, we need to serialize this module to our container file.
             // We currently don't serialize it's name..., but support for that could be added.
 
             // Write the IR information
-            if (translationUnit.irModule)
+            if ((options.optionFlags & SerialOptionFlag::IRModule) && module.irModule)
             {
                 IRSerialData serialData;
                 IRSerialWriter writer;
-                SLANG_RETURN_ON_FAIL(writer.write(translationUnit.irModule, debugWriter, options.optionFlags, &serialData));
+                SLANG_RETURN_ON_FAIL(writer.write(module.irModule, debugWriter, options.optionFlags, &serialData));
                 SLANG_RETURN_ON_FAIL(IRSerialWriter::writeContainer(serialData, options.compressionType, container));
             }
 
             // Write the AST information
 
-            if (ModuleDecl* moduleDecl = as<ModuleDecl>(translationUnit.astRootNode))
+            if (options.optionFlags & SerialOptionFlag::ASTModule)
             {
-                ModuleASTSerialFilter filter(moduleDecl);
-                ASTSerialWriter writer(astClasses, &filter, debugWriter);
+                if (ModuleDecl* moduleDecl = as<ModuleDecl>(module.astRootNode))
+                {
+                    if (!astClasses)
+                    {
+                        astClasses = new ASTSerialClasses;
+                    }
 
-                // Add the module and everything that isn't filtered out in the filter.
-                writer.addPointer(moduleDecl);
+                    ModuleASTSerialFilter filter(moduleDecl);
+                    ASTSerialWriter writer(astClasses, &filter, debugWriter);
 
-                // We can now serialize it into the riff container.
-                SLANG_RETURN_ON_FAIL(writer.writeIntoContainer(container));
+                    // Add the module and everything that isn't filtered out in the filter.
+                    writer.addPointer(moduleDecl);
+
+                    // We can now serialize it into the riff container.
+                    SLANG_RETURN_ON_FAIL(writer.writeIntoContainer(container));
+                }
             }
         }
 
-        if (data.targetModules.getCount())
+        if (data.targetComponents.getCount() && (options.optionFlags & SerialOptionFlag::IRModule))
         {
             // TODO: in the case where we have specialization, we might need
             // to serialize IR related to `program`...
 
-            for (const auto& targetModule : data.targetModules)
+            for (const auto& targetComponent : data.targetComponents)
             {
-                IRModule* irModule = targetModule.irModule;
+                IRModule* irModule = targetComponent.irModule;
 
                 // Okay, we need to serialize this target program and its IR too...
                 IRSerialData serialData;
@@ -252,10 +259,10 @@ namespace Slang {
         SLANG_RETURN_ON_FAIL(debugReader->read(&debugData, options.sourceManager));
     }
 
-    // Add translation units
-    if (RiffContainer::ListChunk* translationUnits = containerChunk->findContainedList(SerialBinary::kTranslationUnitListFourCc))
+    // Add modules
+    if (RiffContainer::ListChunk* moduleList = containerChunk->findContainedList(SerialBinary::kModuleListFourCc))
     {
-        RiffContainer::Chunk* chunk = translationUnits->getFirstContainedChunk();
+        RiffContainer::Chunk* chunk = moduleList->getFirstContainedChunk();
         while (chunk)
         {
             auto startChunk = chunk;
@@ -294,7 +301,7 @@ namespace Slang {
                     // For now we just generate a name.
 
                     StringBuilder buf;
-                    buf << "tu" << out.translationUnits.getCount();
+                    buf << "tu" << out.modules.getCount();
 
                     astBuilder = new ASTBuilder(options.sharedASTBuilder, buf.ProduceString());
 
@@ -312,13 +319,13 @@ namespace Slang {
 
             if (astBuilder || irModule)
             {
-                SerialContainerData::TranslationUnit translationUnit;
+                SerialContainerData::Module module;
 
-                translationUnit.astBuilder = astBuilder;
-                translationUnit.astRootNode = astRootNode;
-                translationUnit.irModule = irModule;
+                module.astBuilder = astBuilder;
+                module.astRootNode = astRootNode;
+                module.irModule = irModule;
 
-                out.translationUnits.add(translationUnit);
+                out.modules.add(module);
             }
 
             // If no progress, step to next chunk

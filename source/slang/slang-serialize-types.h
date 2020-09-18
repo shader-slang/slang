@@ -18,8 +18,10 @@ struct SerialOptionFlag
     typedef uint32_t Type;
     enum Enum : Type
     {
-        RawSourceLocation = 0x01,
-        DebugInfo = 0x02,
+        RawSourceLocation   = 0x01,     ///< If set will store directly SourceLoc - only useful if current source locs will be identical when read in (typically this is *NOT* the case)
+        DebugInfo           = 0x02,     ///< If set will output debug information, that can be reconstructed when read after being stored.
+        ASTModule           = 0x04,     ///< If set will output AST modules - typically required, but potentially not desired (for example with obsfucation)
+        IRModule            = 0x08,     ///< If set will output IR modules - typically required
     };
 };
 typedef SerialOptionFlag::Type SerialOptionFlags;
@@ -125,7 +127,7 @@ struct SerialBinary
     static const FourCC kStringTableFourCc = SLANG_FOUR_CC('S', 'L', 's', 't');
 
         /// TranslationUnitList
-    static const FourCC kTranslationUnitListFourCc = SLANG_FOUR_CC('S', 'L', 'm', 'l');
+    static const FourCC kModuleListFourCc = SLANG_FOUR_CC('S', 'L', 'm', 'l');
 
         /// An entry point
     static const FourCC kEntryPointFourCc = SLANG_FOUR_CC('E', 'P', 'n', 't');
