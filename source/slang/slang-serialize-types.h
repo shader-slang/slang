@@ -127,7 +127,7 @@ struct SerialBinary
     static const FourCC kStringTableFourCc = SLANG_FOUR_CC('S', 'L', 's', 't');
 
         /// TranslationUnitList
-    static const FourCC kTranslationUnitListFourCc = SLANG_FOUR_CC('S', 'L', 'm', 'l');
+    static const FourCC kModuleListFourCc = SLANG_FOUR_CC('S', 'L', 'm', 'l');
 
         /// An entry point
     static const FourCC kEntryPointFourCc = SLANG_FOUR_CC('E', 'P', 'n', 't');

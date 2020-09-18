@@ -41,18 +41,18 @@ struct SerialContainerData
         FloatingPointMode   floatingPointMode = FloatingPointMode::Default;
     };
     
-    struct TargetModule
+    struct TargetComponent
     {
         // IR module for a specific compilation target
         Target target;
         RefPtr<IRModule> irModule;
     };
 
-    struct TranslationUnit
+    struct Module
     {
-        RefPtr<IRModule> irModule;
-        RefPtr<ASTBuilder> astBuilder;
-        NodeBase* astRootNode = nullptr;
+        RefPtr<IRModule> irModule;              ///< The IR for the module
+        RefPtr<ASTBuilder> astBuilder;          ///< The astBuilder that owns the astRootNode
+        NodeBase* astRootNode = nullptr;        ///< The module decl
     };
 
     struct EntryPoint
@@ -65,12 +65,12 @@ struct SerialContainerData
     void clear()
     {
         entryPoints.clear();
-        translationUnits.clear();
-        targetModules.clear();
+        modules.clear();
+        targetComponents.clear();
     }
 
-    List<TranslationUnit> translationUnits;
-    List<TargetModule> targetModules;
+    List<Module> modules;
+    List<TargetComponent> targetComponents;
     List<EntryPoint> entryPoints;
 };
 
@@ -78,9 +78,9 @@ struct SerialContainerUtil
 {
     struct WriteOptions
     {
-        SerialCompressionType compressionType = SerialCompressionType::VariableByteLite;
-        SerialOptionFlags optionFlags = SerialOptionFlag::ASTModule | SerialOptionFlag::IRModule;
-        SourceManager* sourceManager = nullptr;
+        SerialCompressionType compressionType = SerialCompressionType::VariableByteLite;                ///< If compression is used what type to use (only some parts can be compressed)
+        SerialOptionFlags optionFlags = SerialOptionFlag::ASTModule | SerialOptionFlag::IRModule;       ///< Flags controlling what is written
+        SourceManager* sourceManager = nullptr;                                                         ///< The source manager used for the SourceLoc in the input
     };
 
     struct ReadOptions
@@ -94,9 +94,11 @@ struct SerialContainerUtil
         /// Get the serializable contents of the request as data
     static SlangResult requestToData(EndToEndCompileRequest* request, const WriteOptions& options, SerialContainerData& outData);
 
+        /// Write the data into the container
     static SlangResult write(const SerialContainerData& data, const WriteOptions& options, RiffContainer* container);
 
-    static SlangResult read(RiffContainer* container, const ReadOptions& options, SerialContainerData& out);
+        /// Read the container into outData
+    static SlangResult read(RiffContainer* container, const ReadOptions& options, SerialContainerData& outData);
 
         /// Verify IR serialization
     static SlangResult verifyIRSerialize(IRModule* module, Session* session, const WriteOptions& options);

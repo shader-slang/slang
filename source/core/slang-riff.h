@@ -177,14 +177,11 @@ need to be recalculated, before serialization.
 class RiffContainer
 {
 public:
-    enum 
-    {
         // This alignment is only made for arena based allocations.
         // For external blocks it's client code to have appropriate alignment.
         // This is needed because when reading a RiffContainer, all allocation is arena based, and
         // if the payload contains 8 byte aligned data, the overall payload needs to be 8 byte aligned.
-        PAYLOAD_MIN_ALIGNMENT = 8,
-    };
+    static const size_t kPayloadMinAlignment = 8;
 
     enum class Ownership
     {
