@@ -471,7 +471,7 @@ struct ASTSerialTypeInfo<SyntaxClass<T>>
         SLANG_UNUSED(reader);
         auto& src = *(const SerialType*)serial;
         auto& dst = *(NativeType*)native;
-        dst.classInfo = ReflectClassInfo::getInfo(ASTNodeType(src));
+        dst.classInfo = ASTClassInfo::getInfo(ASTNodeType(src));
     }
 };
 
@@ -1033,7 +1033,7 @@ ASTSerialClasses::ASTSerialClasses():
         // Doing so means super class is always setup
         ASTSerialClass& serialClass = m_classes[i];
 
-        const ReflectClassInfo* info = ReflectClassInfo::getInfo(serialClass.type);
+        const ReflectClassInfo* info = ASTClassInfo::getInfo(serialClass.type);
 
         size_t maxAlignment = 1;
         size_t offset = 0;
@@ -1130,7 +1130,7 @@ ASTSerialIndex ASTSerialWriter::writePointer(const NodeBase* node)
             field.type->toSerialFunc(this, srcField, dstField);
         }
         // Get the super class
-        const ReflectClassInfo* reflectInfo = ReflectClassInfo::getInfo(serialClass->type);
+        const ReflectClassInfo* reflectInfo = ASTClassInfo::getInfo(serialClass->type);
         const ReflectClassInfo* superReflectInfo = reflectInfo->m_superClass;
 
         serialClass = superReflectInfo ? m_classes->getSerialClass(ASTNodeType(superReflectInfo->m_classId)) : nullptr;
@@ -1835,7 +1835,7 @@ SlangResult ASTSerialReader::load(const uint8_t* data, size_t dataCount, ASTBuil
                         fieldType->toNativeFunc(this, src + field.serialOffset, dst + field.nativeOffset);
                     }
 
-                    auto cls = ReflectClassInfo::getInfo(serialClass->type);
+                    auto cls = ASTClassInfo::getInfo(serialClass->type);
                     auto superCls = cls->m_superClass;
 
                     // Get the super class
