@@ -66,7 +66,7 @@ SlangResult IncludeSystem::findFile(String const& pathToInclude, String const& p
 {
     outPathInfo.type = PathInfo::Type::Unknown;
 
-    // If it's absolute we only have to try and load it
+    // If it's absolute we only have to try and find if it's there - no need to look at search paths
     if (Path::isAbsolute(pathToInclude))
     {
         // We pass in "" as the from path, so ensure no from path is taken into account
