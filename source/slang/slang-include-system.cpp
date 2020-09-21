@@ -13,6 +13,7 @@ SlangResult IncludeSystem::findFile(SlangPathType fromPathType, const String& fr
 
     if (fromPath.getLength() == 0 || Path::isAbsolute(path))
     {
+        // If the path is absolute or the fromPath is empty, the combined path is just the path
         combinedPath = path;
     }
     else
@@ -65,9 +66,11 @@ SlangResult IncludeSystem::findFile(String const& pathToInclude, String const& p
 {
     outPathInfo.type = PathInfo::Type::Unknown;
 
-    // If it's absolute and it wasn't already found, then we are done
+    // If it's absolute we only have to try and load it
     if (Path::isAbsolute(pathToInclude))
     {
+        // We pass in "" as the from path, so ensure no from path is taken into account
+        // and to allow easy identification that this is in effect absolute
         return findFile(SLANG_PATH_TYPE_DIRECTORY, UnownedStringSlice::fromLiteral(""), pathToInclude, outPathInfo);
     }
 
