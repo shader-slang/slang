@@ -5274,6 +5274,7 @@ namespace Slang
         case kIROp_RTTIType:
         case kIROp_Func:
         case kIROp_Generic:
+        case kIROp_Var:
         case kIROp_GlobalVar: // Note: the IRGlobalVar represents the *address*, so only a load/store would have side effects
         case kIROp_GlobalConstant:
         case kIROp_GlobalParam:

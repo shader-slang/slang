@@ -999,7 +999,8 @@ bool CLikeSourceEmitter::shouldFoldInstIntoUseSites(IRInst* inst)
     // if target langauge doesn't support pointers.
     if(as<IRPtrTypeBase>(type))
     {
-        return !doesTargetSupportPtrTypes();
+        if (!doesTargetSupportPtrTypes())
+            return true;
     }
 
     // First we check for uniform parameter groups,
