@@ -32,7 +32,7 @@ struct ReflectClassInfo
 
     SLANG_FORCE_INLINE static bool isSubClassOf(uint32_t type, const ThisType& super)
     {
-        SLANG_ASSERT(isValidTypeId(typeId) && isValidTypeId(super.m_classId));
+        SLANG_ASSERT(isValidTypeId(type) && isValidTypeId(super.m_classId));
         // We include super.m_classId, because it's a subclass of itself.
         return type >= super.m_classId && type <= super.m_lastClassId;
     }

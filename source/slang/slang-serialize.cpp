@@ -296,7 +296,7 @@ SerialIndex SerialWriter::_addArray(size_t elementSize, size_t alignment, const 
         return SerialIndex(0);
     }
 
-    SLANG_ASSERT(alignment >= 1 && alignment <= ASTSerialInfo::MAX_ALIGNMENT);
+    SLANG_ASSERT(alignment >= 1 && alignment <= SerialInfo::MAX_ALIGNMENT);
 
     // We must at a minimum have the alignment for the array prefix info
     alignment = (alignment < SLANG_ALIGN_OF(Entry)) ? SLANG_ALIGN_OF(Entry) : alignment;
@@ -364,7 +364,7 @@ SlangResult SerialWriter::write(Stream* stream)
 
             // The fix must be less than max alignment. We require it to be less because we aligned each Entry to 
             // MAX_ALIGNMENT, and so < MAX_ALIGNMENT is the most extra bytes we can write
-            SLANG_ASSERT( alignmentFixSize < ASTSerialInfo::MAX_ALIGNMENT);
+            SLANG_ASSERT( alignmentFixSize < SerialInfo::MAX_ALIGNMENT);
             
             try
             {
@@ -443,7 +443,7 @@ SlangResult SerialWriter::writeIntoContainer(FourCC fourCc, RiffContainer* conta
 
                 // The fix must be less than max alignment. We require it to be less because we aligned each Entry to 
                 // MAX_ALIGNMENT, and so < MAX_ALIGNMENT is the most extra bytes we can write
-                SLANG_ASSERT(alignmentFixSize < ASTSerialInfo::MAX_ALIGNMENT);
+                SLANG_ASSERT(alignmentFixSize < SerialInfo::MAX_ALIGNMENT);
 
                 container->write(entry, entrySize);
                 if (alignmentFixSize)
@@ -521,7 +521,7 @@ const void* SerialReader::getArray(SerialIndex index, Index& outCount)
         return nullptr;
     }
 
-    SLANG_ASSERT(ASTSerialIndexRaw(index) < ASTSerialIndexRaw(m_entries.getCount()));
+    SLANG_ASSERT(SerialIndexRaw(index) < SerialIndexRaw(m_entries.getCount()));
     const Entry* entry = m_entries[Index(index)];
 
     switch (entry->typeKind)
@@ -547,7 +547,7 @@ SerialPointer SerialReader::getPointer(SerialIndex index)
         return SerialPointer();
     }
 
-    SLANG_ASSERT(ASTSerialIndexRaw(index) < ASTSerialIndexRaw(m_entries.getCount()));
+    SLANG_ASSERT(SerialIndexRaw(index) < SerialIndexRaw(m_entries.getCount()));
     const Entry* entry = m_entries[Index(index)];
 
     switch (entry->typeKind)
@@ -580,7 +580,7 @@ String SerialReader::getString(SerialIndex index)
         return String();
     }
 
-    SLANG_ASSERT(ASTSerialIndexRaw(index) < ASTSerialIndexRaw(m_entries.getCount()));
+    SLANG_ASSERT(SerialIndexRaw(index) < SerialIndexRaw(m_entries.getCount()));
     const Entry* entry = m_entries[Index(index)];
 
     // It has to be a string type
@@ -622,7 +622,7 @@ Name* SerialReader::getName(SerialIndex index)
         return nullptr;
     }
 
-    SLANG_ASSERT(ASTSerialIndexRaw(index) < ASTSerialIndexRaw(m_entries.getCount()));
+    SLANG_ASSERT(SerialIndexRaw(index) < SerialIndexRaw(m_entries.getCount()));
     const Entry* entry = m_entries[Index(index)];
 
     // It has to be a string type
@@ -686,7 +686,7 @@ UnownedStringSlice SerialReader::getStringSlice(SerialIndex index)
 SlangResult SerialReader::loadEntries(const uint8_t* data, size_t dataCount, List<const SerialInfo::Entry*>& outEntries)
 {
     // Check the input data is at least aligned to the max alignment (otherwise everything cannot be aligned correctly)
-    SLANG_ASSERT((size_t(data) & (ASTSerialInfo::MAX_ALIGNMENT - 1)) == 0);
+    SLANG_ASSERT((size_t(data) & (SerialInfo::MAX_ALIGNMENT - 1)) == 0);
 
     outEntries.setCount(1);
     outEntries[0] = nullptr;
