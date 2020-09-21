@@ -9,15 +9,25 @@ namespace Slang
 
 SlangResult IncludeSystem::findFile(SlangPathType fromPathType, const String& fromPath, const String& path, PathInfo& outPathInfo)
 {
-    // Get relative path
-    ComPtr<ISlangBlob> combinedPathBlob;
-    SLANG_RETURN_ON_FAIL(m_fileSystemExt->calcCombinedPath(fromPathType, fromPath.begin(), path.begin(), combinedPathBlob.writeRef()));
-    String combinedPath(StringUtil::getString(combinedPathBlob));
-    if (combinedPath.getLength() <= 0)
+    String combinedPath;
+
+    if (fromPath.getLength() == 0 || Path::isAbsolute(path))
     {
-        return SLANG_FAIL;
+        combinedPath = path;
+    }
+    else
+    {
+        // Get relative path
+        ComPtr<ISlangBlob> combinedPathBlob;
+        SLANG_RETURN_ON_FAIL(m_fileSystemExt->calcCombinedPath(fromPathType, fromPath.begin(), path.begin(), combinedPathBlob.writeRef()));
+        combinedPath = StringUtil::getString(combinedPathBlob);
+        if (combinedPath.getLength() <= 0)
+        {
+            return SLANG_FAIL;
+        }
     }
 
+    // This checks the path exists
     SlangPathType pathType;
     SLANG_RETURN_ON_FAIL(m_fileSystemExt->getPathType(combinedPath.begin(), &pathType));
     if (pathType != SLANG_PATH_TYPE_FILE)
@@ -54,6 +64,12 @@ String IncludeSystem::simplifyPath(const String& path)
 SlangResult IncludeSystem::findFile(String const& pathToInclude, String const& pathIncludedFrom, PathInfo& outPathInfo)
 {
     outPathInfo.type = PathInfo::Type::Unknown;
+
+    // If it's absolute and it wasn't already found, then we are done
+    if (Path::isAbsolute(pathToInclude))
+    {
+        return findFile(SLANG_PATH_TYPE_DIRECTORY, UnownedStringSlice::fromLiteral(""), pathToInclude, outPathInfo);
+    }
 
     // Try just relative to current path
     {
