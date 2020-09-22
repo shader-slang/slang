@@ -44,7 +44,7 @@ We need a mechanism to be able to do do a conversion between native and serial t
 
 ```
 template <typename T>
-struct ASTSerialTypeInfo;
+struct SerialTypeInfo;
 ```
 
 and specialize it for each native type. The specialization holds
@@ -59,13 +59,13 @@ It is useful to have a structure that holds the type information, so it can be s
 
 ```
 template <typename T>
-struct ASTSerialGetType;
+struct SerialGetType;
 ```
 
-This template can be specialized for a specific native types - but all it holds is just a function getType, which returns a ASTSerialType*,
-which just holds the information held in the ASTSerialTypeInfo template, but additionally including the size of the SerialType.
+This template can be specialized for a specific native types - but all it holds is just a function getType, which returns a SerialType*,
+which just holds the information held in the SerialTypeInfo template, but additionally including the size of the SerialType.
 
-So we need to define a specialized ASTSerialTypeInfo for each type that can be a field in a NodeBase derived type. We don't need to define
+So we need to define a specialized SerialTypeInfo for each type that can be a field in a NodeBase/RefObject derived type. We don't need to define
 anything explicitly for the NodeBase derived types, as we will just generate the layout from the fields. How do we know the fields? We just
 used the macros generated from the C++ extractor.
 
@@ -76,11 +76,11 @@ So first a few things to observe...
 3) Some types can be written out but would not be directly readable or usable with different targets/processors, so need converting
 4) Some types require complex conversions that require programmer code - like Dictionary/List
 
-For types that need no conversion (1), we can just use the template ASTSerialIdentityTypeInfo
+For types that need no conversion (1), we can just use the template SerialIdentityTypeInfo
 
 ```
 template <>
-struct ASTSerialTypeInfo<SomeType> : public ASTSerialIdentityTypeInfo<SomeType> {};
+struct SerialTypeInfo<SomeType> : public SerialIdentityTypeInfo<SomeType> {};
 ```
 
 This specialization means that SomeType can be written out and read in across targets/compilers without problems.
@@ -89,7 +89,7 @@ For (2) we have another template that will do the conversion for us
 
 ```
 template <typename NATIVE_T, typename SERIAL_T>
-struct ASTSerialConvertTypeInfo;
+struct SerialConvertTypeInfo;
 ```
 
 That we can use as above, and specify the native and serial types.
@@ -101,14 +101,14 @@ we store as a uint8_t.
 
 Another example would be double. It's 64 bits, but on some arches/compilers it's SLANG_ALIGN_OF is 4 and on others it's 8. On some
 arches a non aligned read will lead to a fault. To work around this problem therefore we have to ensure double has the alignment that
-will work across all targets - and that alignment is 8. In that specific case that issue is handled via ASTSerialBasicTypeInfo, which
+will work across all targets - and that alignment is 8. In that specific case that issue is handled via SerialBasicTypeInfo, which
 makes the SerialAlignment the sizeof the type.
 
 For (4) there are a few things to say. First a type can always implement a custom version of how to do a conversion by specializing
-`ASTSerialTypeInfo`. But there remains another nagging issue - types which allocate/use other memory that changes at runtime. Clearly
-we cannot define 'any size of memory' in a fixed SerialType defined in a specialization of ASTSerialTypeInfo. The mechanism to work around
-this is to allow arbitrary arrays to be stored, that can be accessed via an ASTSerialIndex. This will be discussed more once we discuss
-a little more about the file system, and ASTSerialIndex. 
+`SerialTypeInfo`. But there remains another nagging issue - types which allocate/use other memory that changes at runtime. Clearly
+we cannot define 'any size of memory' in a fixed SerialType defined in a specialization of SerialTypeInfo. The mechanism to work around
+this is to allow arbitrary arrays to be stored, that can be accessed via an SerialIndex. This will be discussed more once we discuss
+a little more about the file system, and SerialIndex. 
 
 Serialization Format
 ====================
@@ -117,10 +117,10 @@ The serialization format used is 'stream-like' with each 'object' stored in orde
 0 is used to be in effect nullptr. The stream looks like
 
 ```
-ASTSerialInfo::Entry (for index 1)
+SerialInfo::Entry (for index 1)
 Payload for type in entry
 
-ASTSerialInfo::Entry (for index 2)
+SerialInfo::Entry (for index 2)
 Payload for type in entry
 
 ... 
@@ -129,7 +129,12 @@ Payload for type in entry
 That when writing we have an array that maps each index to a pointer to the associated header. We also have a map that maps native pointers
 to their indices. The Payload *is* the SerialType for thing saved. The payload directly follows the Entry data.
 
-Each object in this list can only be a few types of things - those derived from ASTSerialInfo::Type. 
+Each object in this list can only be a few types of things
+
+* NodeBase derived type
+* RefObject derived type
+* String
+* Array
 
 The actual Entry followed by the payloads are allocated and stored when writing in a MemoryArena. When we want to write into a stream, we
 can just iterate over each entry in order and write it out.
@@ -144,29 +149,31 @@ To achieve this we store in the Entry it's alignment requirement *AND* the next 
 through the entries we can find where the next Entry starts. Because the payload comes directly after the Entry - the Entrys size must be
 a modulo of the largest alignment the payload can have.
 
-For the code that does the conversion between native and serial types it uses either the ASTSerialWriter or ASTSerialReader. This provides
+For the code that does the conversion between native and serial types it uses either the SerialWriter or SerialReader. This provides
 the mechanism to turn a pointer into a serializable ASTSerialIndex and vice versa. There are some special functions for turning string like
 types to and forth.
 
 The final mechanism is that of 'Arrays'. An array allows reading or writing a chunk of data associated with a ASTSerialIndex. The chunk of
-data *must* hold data that is serializable. If the array holds pointers - then the serialized array must hold ASTSerialIndices that
+data *must* hold data that is serializable. If the array holds pointers - then the serialized array must hold SerialIndices that
 represent those pointers. When reading back in they are converted back.
 
 Arrays are the escape hatch that allows for more complex types to serialize. Dictionaries for example are saved as a serial type that is
-two ASTSerialIndices one to a keys array and one to a values array.
+two SerialIndices one to a keys array and one to a values array.
 
-Note that writing has two phases, serializing out into an ASTSerialWriter, and then secondly writing out to a stream. 
+Note that writing has two phases, serializing out into an SerialWriter, and then secondly writing out to a stream. 
 
-NodeBase Types
-==============
+Object/Reference Types
+======================
 
-The ASTSerialTypeInfo mechanism is generally for *fields* of NodeBase types. That for NodeBase derived types we use the C++ extractors
+When talking about Object/Reference types this means types that can be referenced natively as pointers. Currently that means NodeBase and
+some RefObject derived types. 
+
+The SerialTypeInfo mechanism is generally for *fields* of object types. That for derived types we use the C++ extractors
 field list to work out the native fields offsets and types. With this we can then calculate the layout for NodeBase types such that they
 follow the requirements for serialization - such as alignment and so forth.
 
-This information is held in the ASTSerialClasses, which for a given ASTNodeType gives an ASTSerialClassInfo, that specifies fields for
-just that type. Super types fields need to be serialized too, and this information can be found by using the ClassReflectInfo to find the
-super type.
+This information is held in the SerialClasses, which for a given TypeKind/SubType gives a SerialClassInfo, that specifies fields for
+just that type. 
 
 Reading
 =======
@@ -174,7 +181,7 @@ Reading
 Due to the care in writing reading is relatively simple. We can just take the contents of the file and put in memory, as long as in memory
 it has an alignment of at least MAX_ALIGNMENT. Then we can build up an entries table by stepping through the data and writing the pointer.
 
-The toNative functions take an ASTSerialReader - this allows the implementation to ask for pointers and arrays from other parts of the serialized
+The toNative functions take an SerialReader - this allows the implementation to ask for pointers and arrays from other parts of the serialized
 data. It also allows for types to be lazily reconstructed if necessary.
 
 Lazy reconstruction may be useful in the future to partially reconstruct a sub part of the serialized data. In the current implementation, lazy
@@ -186,8 +193,63 @@ if it is we have to construct the StringRepresentation that will be used.
 
 An extra wrinkle is that we allow accessing of a serialized String as a Name or a string or a UnownedSubString. Fortunately a Name just holds a string,
 and a Name remains in scope as long as it's NamePool does which is passed in.
-*/
 
+Other Reading issues
+====================
+
+## SourceLoc
+
+SourceLoc present a problem. If we follow the simple mechanism described above, then we require two things
+
+1) That the SourceLoc information is blossomed before anything that defines a SourceLoc
+2) That the structure for accessing SourceLoc information is conveniently available.
+
+This was sidestepped previously because the SourceLoc information was held in a different structure, and a separate Riff section. It was deserialized
+before anything else took place.
+
+That *is* a strategy we could use here. That we could make the SourceLoc information generally serialized. On loading locate it in a Riff section
+deserialize it (perhaps with general serialization), then deserialize the rest using this structure.
+
+## IRModule
+
+In this case we may want to have IRModule serialized in someway unlike the generalized serialization (for example supporting compression). In other
+frameworks this aspect might be handing by 'read/writeReplacing'. Doing so would significantly complicate the simple reading mechanism - because instead
+of just constructing and referencing we would have to care about construction order. That this could perhaps be achieved by having any reference access
+be handled lazily. Note that SourceLoc would still require being handled specially because it requires construction before any SourceLoc is referenced,
+and SourceLocs *aren't* pointers.
+
+## Modified reading
+
+We could modify reading as follows.
+
+1) Don't construct anything at the start
+2) Find 'root's they must be created and deserialized first
+  . Any read/writeReplace is a root
+  . Any marked (like SourceLocData) is a root. (When deconstructed it also needs to add information to the Reader)
+  . The root of the objects (note we could just deserialize first to last if not already constructed)
+3) During deserialization pointer references and constructed on demand
+4) Extra code is needed to make sure there aren't cycles. Any object is either Pre/Created/Deserialized.
+
+For now we might want to just do this with Riff sections for simplicity
+
+Other Issues
+============
+
+A final issue is around the special extra types needed for serializing or deserializing. SourceLoc information (on reading and writing),
+but it could be other types in the future.
+
+We probably don't want to have them as specific types on the SerialReader/SerialWriter, as doing so requires exposing the types to this interface.
+What we really want is a mechanism for the Reader/Writer where it's possible to get a pointer based on some type. We want this to be fairly fast
+because every SourceLoc reference will have to do this lookup.
+
+We could use an enum, and just have an array of pointers on the reader and writer. How that pointer is interpreted is dependent on the Reader/Writer.
+This would be very fast, extendable without making types specific. On debug builds we could do a dynamic cast to make sure it is the expected type. 
+
+Rich Information
+================
+
+Nothing is done here about versioning, patching, backward or forward compatibility.
+*/
 
 // Predeclare
 typedef uint32_t SerialSourceLoc;
@@ -204,6 +266,7 @@ struct SerialField;
 // Type used to implement mechanisms to convert to and from serial types.
 template <typename T>
 struct SerialTypeInfo;
+
 
 enum class SerialTypeKind : uint8_t
 {
@@ -344,7 +407,25 @@ public:
     virtual void* create(SerialTypeKind typeKind, SerialSubType subType) = 0;
 };
 
-/* This class is the interface used by toNative implementations to recreate a type */
+enum class SerialExtraType
+{
+    SerialLocation,
+    CountOf,
+};
+
+class SerialExtraObjects
+{
+public:
+    void set(SerialExtraType type, RefObject* obj) { m_objects[Index(type)] = obj; }
+        /// Get the extra type
+    template <typename T>
+    T* get(SerialExtraType type) { return as<T>(m_extra[Index(type)]); }
+
+protected:
+    RefPtr<RefObject> m_objects[Index(SerialExtraType::CountOf)];
+};
+
+/* This class is the interface used by toNative implementations to recreate a type. */
 class SerialReader : public RefObject
 {
 public:
@@ -371,6 +452,9 @@ public:
         /// Add an object to be kept in scope
     void addScope(const RefObject* obj) { m_scope.add(obj); }
 
+        /// Used for attaching extra objects necessary for serializing
+    SerialExtraObjects& getExtraObjects() { return m_extraObjects; }
+
         /// Ctor
     SerialReader(SerialClasses* classes, SerialObjectFactory* objectFactory):
         m_classes(classes),
@@ -385,6 +469,8 @@ protected:
     NamePool* m_namePool;               ///< Pool names are added to
 
     List<const RefObject*> m_scope;     ///< Keeping objects in scope
+
+    SerialExtraObjects m_extraObjects;
 
     SerialObjectFactory* m_objectFactory;
     SerialClasses* m_classes;           ///< Information used to deserialize 
@@ -455,6 +541,9 @@ public:
         /// Write a data chunk with fourCC
     SlangResult writeIntoContainer(FourCC fourCC, RiffContainer* container);
 
+        /// Used for attaching extra objects necessary for serializing
+    SerialExtraObjects& getExtraObjects() { return m_extraObjects; }
+
     SerialWriter(SerialClasses* classes, SerialFilter* filter);
 
 protected:
@@ -476,10 +565,12 @@ protected:
     // NOTE! Assumes the content stays in scope!
     Dictionary<UnownedStringSlice, Index> m_sliceMap;
 
-    List<SerialInfo::Entry*> m_entries;      ///< The entries
-    MemoryArena m_arena;                        ///< Holds the payloads
+    SerialExtraObjects m_extraObjects;      ///< Extra objects
+
+    List<SerialInfo::Entry*> m_entries;     ///< The entries
+    MemoryArena m_arena;                    ///< Holds the payloads
     SerialClasses* m_classes;
-    SerialFilter* m_filter;                  ///< Filter to control what is serialized
+    SerialFilter* m_filter;                 ///< Filter to control what is serialized
 };
 
 // ---------------------------------------------------------------------------
