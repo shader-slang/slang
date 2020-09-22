@@ -555,6 +555,15 @@ DIAGNOSTIC(52003, Error, cppCompilerNotFound, "Could not find a suitable C/C++ c
 DIAGNOSTIC(52004, Error, unableToWriteFile, "Unable to write file '$0'")
 DIAGNOSTIC(52005, Error, unableToReadFile, "Unable to read file '$0'")
 
+//
+// 8xxxx - Issues specific to a particular library/technology/platform/etc.
+//
+
+// 811xx - NVAPI
+
+DIAGNOSTIC(81110, Error, nvapiMacroMismatch, "conflicting definitions for NVAPI macro '$0': '$1' and '$2'")
+
+
 // 99999 - Internal compiler errors, and not-yet-classified diagnostics.
 
 DIAGNOSTIC(99999, Internal, unimplemented, "unimplemented feature in Slang compiler: $0")

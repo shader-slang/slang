@@ -10,6 +10,7 @@
 
 namespace Slang {
 
+class ASTBuilder;
 class DiagnosticSink;
 class Linkage;
 class Module;
@@ -22,7 +23,8 @@ TokenList preprocessSource(
     IncludeSystem*              includeSystem,
     Dictionary<String, String>  defines,
     Linkage*                    linkage,
-    Module*                     parentModule);
+    Module*                     parentModule,
+    ASTBuilder*                 astBuilder = nullptr);
 
 } // namespace Slang
 

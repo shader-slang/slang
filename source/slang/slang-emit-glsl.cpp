@@ -1452,18 +1452,12 @@ bool GLSLSourceEmitter::tryEmitInstExprImpl(IRInst* inst, const EmitOpInfo& inOu
     return false;
 }
 
-void GLSLSourceEmitter::handleCallExprDecorationsImpl(IRInst* funcValue)
+void GLSLSourceEmitter::handleRequiredCapabilitiesImpl(IRInst* inst)
 {
     // Does this function declare any requirements on GLSL version or
     // extensions, which should affect our output?
 
-    auto decoratedValue = funcValue;
-    while (auto specInst = as<IRSpecialize>(decoratedValue))
-    {
-        decoratedValue = getSpecializedValue(specInst);
-    }
-
-    for (auto decoration : decoratedValue->getDecorations())
+    for (auto decoration : inst->getDecorations())
     {
         switch (decoration->op)
         {

@@ -42,6 +42,7 @@
 #endif
 
 extern char const* slang_cuda_prelude;
+extern char const* slang_hlsl_prelude;
 
 namespace Slang {
 
@@ -189,6 +190,7 @@ void Session::init()
 
     // Set up default prelude code for target languages that need a prelude
     m_languagePreludes[Index(SourceLanguage::CUDA)] = slang_cuda_prelude;
+    m_languagePreludes[Index(SourceLanguage::HLSL)] = slang_hlsl_prelude;
 }
 
 ISlangUnknown* Session::getInterface(const Guid& guid)
@@ -989,7 +991,8 @@ void FrontEndCompileRequest::parseTranslationUnit(
             &includeSystem,
             combinedPreprocessorDefinitions,
             getLinkage(),
-            module);
+            module,
+            astBuilder);
 
         parseSourceFile(
             astBuilder,

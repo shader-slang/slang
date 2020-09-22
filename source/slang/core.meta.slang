@@ -2079,3 +2079,6 @@ attribute_syntax [anyValueSize(size:int)] : AnyValueSizeAttribute;
 
 __attributeTarget(DeclBase)
 attribute_syntax [builtin] : BuiltinAttribute;
+
+__attributeTarget(DeclBase)
+attribute_syntax [__requiresNVAPI] : RequiresNVAPIAttribute;

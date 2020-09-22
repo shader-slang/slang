@@ -285,6 +285,7 @@ ${{{{
     __target_intrinsic(hlsl, "($3 = NvInterlockedAddFp32($0, $1, $2))")
     __cuda_sm_version(2.0)
     __target_intrinsic(cuda, "(*$3 = atomicAdd((float*)$0._getPtrAt($1), $2))")
+    [__requiresNVAPI]
     void InterlockedAddF32(uint byteAddress, float valueToAdd, out float originalValue);
 
     __specialized_for_target(glsl)
