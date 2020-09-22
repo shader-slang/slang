@@ -5,7 +5,14 @@
 
 namespace Slang {
 
-const SerialClass* SerialClasses::add(const SerialClass* cls)
+void SerialClasses::add(SerialClass* cls)
+{
+    SLANG_ASSERT(getSerialClass(cls->typeKind, cls->subType) == nullptr);
+    List<const SerialClass*>& classes = m_classesByTypeKind[Index(cls->typeKind)];
+    classes[cls->subType] = cls;
+}
+
+const SerialClass* SerialClasses::addCopy(const SerialClass* cls)
 {
     List<const SerialClass*>& classes = m_classesByTypeKind[Index(cls->typeKind)]; 
 
@@ -13,18 +20,13 @@ const SerialClass* SerialClasses::add(const SerialClass* cls)
     {
         classes.setCount(cls->subType + 1);
     }
-
-    if (classes[cls->subType])
+    else
     {
-        SLANG_ASSERT(!"Type is already set");
-        return nullptr;
-    }
-
-    if (cls->super && !isOwned(cls->super))
-    {
-        // If a super type is set, it *must* be owned by this 
-        SLANG_ASSERT(!"Super type is not owned");
-        return nullptr;
+        if (classes[cls->subType])
+        {
+            SLANG_ASSERT(!"Type is already set");
+            return nullptr;
+        }
     }
 
     SerialClass* copy = _createSerialClass(cls);

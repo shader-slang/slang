@@ -41,6 +41,10 @@ struct ReflectClassInfo
         /// Works without initRange being called. 
     bool isSubClassOfSlow(const ThisType& super) const;
 
+        /// Calculate infos m_classId for all the infos specified such that they are honor the inheritance relationship
+        /// such that a m_classId of a child is > m_classId && <= m_lastClassId
+    static void calcClassIdHierachy(uint32_t baseIndex, ReflectClassInfo*const* infos, Index infosCount);
+
     uint32_t m_classId;                         ///< Not necessarily set.
     uint32_t m_lastClassId;
 

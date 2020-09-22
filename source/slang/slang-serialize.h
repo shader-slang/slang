@@ -566,7 +566,10 @@ public:
         /// Will add it's own copy into m_classesByType
         /// In process will calculate alignment, offset etc for fields
         /// NOTE! the super set, *must* be an already added to this SerialClasses
-    const SerialClass* add(const SerialClass* cls);
+    const SerialClass* addCopy(const SerialClass* cls);
+
+        /// Associates the typeKind/subType with this class. 
+    void add(SerialClass* cls);
 
         /// Returns true if this cls is *owned* by this SerialClasses
     bool isOwned(const SerialClass* cls) const;
