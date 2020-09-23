@@ -2184,7 +2184,7 @@ bool CPPSourceEmitter::tryEmitInstExprImpl(IRInst* inst, const EmitOpInfo& inOut
             auto funcValue = inst->getOperand(0);
 
             // Does this function declare any requirements.
-            handleCallExprDecorationsImpl(funcValue);
+            handleRequiredCapabilities(funcValue);
 
             // try doing automatically
             return _tryEmitInstExprAsIntrinsic(inst, inOuterPrec);

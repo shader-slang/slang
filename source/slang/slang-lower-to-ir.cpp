@@ -5480,6 +5480,8 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
             builder->addHighLevelDeclDecoration(irParam, decl);
         }
 
+        addTargetIntrinsicDecorations(irParam, decl);
+
         // A global variable's SSA value is a *pointer* to
         // the underlying storage.
         setGlobalValue(context, decl, paramVal);
@@ -6533,6 +6535,11 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
 
             builder->addTargetIntrinsicDecoration(irInst, targetName, definition.getUnownedSlice());
         }
+
+        if(auto nvapiMod = decl->findModifier<NVAPIMagicModifier>())
+        {
+            builder->addNVAPIMagicDecoration(irInst, decl->getName()->text.getUnownedSlice());
+        }
     }
 
         /// Is `decl` a member function (or effectively a member function) when considered as a stdlib declaration?
@@ -6998,6 +7005,11 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
         for (auto versionMod : decl->getModifiersOfType<RequiredCUDASMVersionModifier>())
         {
             getBuilder()->addRequireCUDASMVersionDecoration(irFunc, versionMod->version);
+        }
+
+        if(decl->findModifier<RequiresNVAPIAttribute>())
+        {
+            getBuilder()->addSimpleDecoration<IRRequiresNVAPIDecoration>(irFunc);
         }
 
         if (decl->findModifier<PublicModifier>()) {
@@ -7660,6 +7672,14 @@ IRModule* generateIRForTranslationUnit(
             builder->setInsertInto(module->getModuleInst());
             builder->emitIntrinsicInst(builder->getVoidType(), kIROp_GlobalHashedStringLiterals, stringLitCount, stringLits.getBuffer());
         }
+    }
+
+    if(auto nvapiSlotModifier = translationUnit->getModuleDecl()->findModifier<NVAPISlotModifier>())
+    {
+        builder->addNVAPISlotDecoration(
+            module->getModuleInst(),
+            nvapiSlotModifier->registerName.getUnownedSlice(),
+            nvapiSlotModifier->spaceName.getUnownedSlice());
     }
 
 #if 0

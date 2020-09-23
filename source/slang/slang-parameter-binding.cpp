@@ -377,6 +377,9 @@ struct SharedParameterBindingContext
     // The space to use for auto-generated bindings.
     UInt defaultSpace = 0;
 
+    // Any NVAPI slot binding information that has been generated
+    List<NVAPISlotModifier*> nvapiSlotModifiers;
+
     TargetRequest* getTargetRequest() { return targetRequest; }
     DiagnosticSink* getSink() { return m_sink; }
     Linkage* getLinkage() { return targetRequest->getLinkage(); }
@@ -483,16 +486,19 @@ LayoutResourceKind findRegisterClassFromName(UnownedStringSlice const& registerC
     return LayoutResourceKind::None;
 }
 
-LayoutSemanticInfo ExtractLayoutSemanticInfo(
-    ParameterBindingContext*    context,
-    HLSLLayoutSemantic*         semantic)
+LayoutSemanticInfo extractHLSLLayoutSemanticInfo(
+    UnownedStringSlice  registerName,
+    SourceLoc           registerLoc,
+    UnownedStringSlice  spaceName,
+    SourceLoc           spaceLoc,
+    DiagnosticSink*     sink
+    )
 {
     LayoutSemanticInfo info;
     info.space = 0;
     info.index = 0;
     info.kind = LayoutResourceKind::None;
 
-    UnownedStringSlice registerName = semantic->registerName.getContent();
     if (registerName.getLength() == 0)
         return info;
 
@@ -513,7 +519,7 @@ LayoutSemanticInfo ExtractLayoutSemanticInfo(
     LayoutResourceKind kind = findRegisterClassFromName(registerClassName);
     if(kind == LayoutResourceKind::None)
     {
-        getSink(context)->diagnose(semantic->registerName, Diagnostics::unknownRegisterClass, registerClassName);
+        sink->diagnose(registerLoc, Diagnostics::unknownRegisterClass, registerClassName);
         return info;
     }
 
@@ -521,7 +527,7 @@ LayoutSemanticInfo ExtractLayoutSemanticInfo(
     // how it works for varying input/output semantics).
     if( registerIndexDigits.getLength() == 0 )
     {
-        getSink(context)->diagnose(semantic->registerName, Diagnostics::expectedARegisterIndex, registerClassName);
+        sink->diagnose(registerLoc, Diagnostics::expectedARegisterIndex, registerClassName);
     }
 
     UInt index = 0;
@@ -531,39 +537,60 @@ LayoutSemanticInfo ExtractLayoutSemanticInfo(
         index = index * 10 + (c - '0');
     }
 
-
     UInt space = 0;
-    if( auto registerSemantic = as<HLSLRegisterSemantic>(semantic) )
+    if(spaceName.getLength() != 0)
     {
-        auto const& spaceName = registerSemantic->spaceName.getContent();
-        if(spaceName.getLength() != 0)
-        {
-            UnownedStringSlice spaceSpelling;
-            UnownedStringSlice spaceDigits;
-            splitNameAndIndex(spaceName, spaceSpelling, spaceDigits);
+        UnownedStringSlice spaceSpelling;
+        UnownedStringSlice spaceDigits;
+        splitNameAndIndex(spaceName, spaceSpelling, spaceDigits);
 
-            if( kind == LayoutResourceKind::RegisterSpace )
+        if( kind == LayoutResourceKind::RegisterSpace )
+        {
+            sink->diagnose(spaceLoc, Diagnostics::unexpectedSpecifierAfterSpace, spaceName);
+        }
+        else if( spaceSpelling != UnownedTerminatedStringSlice("space") )
+        {
+            sink->diagnose(spaceLoc, Diagnostics::expectedSpace, spaceSpelling);
+        }
+        else if( spaceDigits.getLength() == 0 )
+        {
+            sink->diagnose(spaceLoc, Diagnostics::expectedSpaceIndex);
+        }
+        else
+        {
+            for(auto c : spaceDigits)
             {
-                getSink(context)->diagnose(registerSemantic->spaceName, Diagnostics::unexpectedSpecifierAfterSpace, spaceName);
-            }
-            else if( spaceSpelling != UnownedTerminatedStringSlice("space") )
-            {
-                getSink(context)->diagnose(registerSemantic->spaceName, Diagnostics::expectedSpace, spaceSpelling);
-            }
-            else if( spaceDigits.getLength() == 0 )
-            {
-                getSink(context)->diagnose(registerSemantic->spaceName, Diagnostics::expectedSpaceIndex);
-            }
-            else
-            {
-                for(auto c : spaceDigits)
-                {
-                    SLANG_ASSERT(isDigit(c));
-                    space = space * 10 + (c - '0');
-                }
+                SLANG_ASSERT(isDigit(c));
+                space = space * 10 + (c - '0');
             }
         }
     }
+
+    info.kind = kind;
+    info.index = (int) index;
+    info.space = space;
+    return info;
+}
+
+LayoutSemanticInfo ExtractLayoutSemanticInfo(
+    ParameterBindingContext*    context,
+    HLSLLayoutSemantic*         semantic)
+{
+    Token const& registerToken = semantic->registerName;
+
+    Token defaultSpaceToken;
+    Token const* spaceToken = &defaultSpaceToken;
+    if( auto registerSemantic = as<HLSLRegisterSemantic>(semantic) )
+    {
+        spaceToken = &registerSemantic->spaceName;
+    }
+
+    LayoutSemanticInfo info = extractHLSLLayoutSemanticInfo(
+        registerToken.getContent(),
+        registerToken.loc,
+        spaceToken->getContent(),
+        spaceToken->loc,
+        getSink(context));
 
     // TODO: handle component mask part of things...
     if( semantic->componentMask.hasContent())
@@ -571,9 +598,6 @@ LayoutSemanticInfo ExtractLayoutSemanticInfo(
         getSink(context)->diagnose(semantic->componentMask, Diagnostics::componentMaskNotSupported);
     }
 
-    info.kind = kind;
-    info.index = (int) index;
-    info.space = space;
     return info;
 }
 
@@ -2886,6 +2910,14 @@ struct CollectParametersVisitor : ComponentTypeVisitor
 
             collectGlobalScopeParameter(m_context, shaderParamInfo, SubstitutionSet());
         }
+
+        if( auto moduleDecl = module->getModuleDecl() )
+        {
+            if( auto nvapiSlotModifier = moduleDecl->findModifier<NVAPISlotModifier>() )
+            {
+                m_context->shared->nvapiSlotModifiers.add(nvapiSlotModifier);
+            }
+        }
     }
 
 };
@@ -3359,6 +3391,82 @@ RefPtr<ProgramLayout> generateParameterBindings(
     for( auto& parameter : sharedContext.parameters )
     {
         generateParameterBindings(&context, parameter);
+    }
+
+    // It is possible that code has specified an explicit location
+    // for the UAV used to communicate with NVAPI, but the code
+    // is not actually including/using the NVAPI header. We still
+    // need to ensure that user-defined shader parameters do not
+    // conflict with the location that will be used by NVAPI.
+    //
+    if( isD3DTarget(targetReq) )
+    {
+        // Information about the NVAPI parameter was recorded
+        // on the AST `ModuleDecl`s during earlier stages of
+        // compilation, and there might be multiple modules
+        // as input to layout and back-end compilation.
+        //
+        // We do not take responsibility for diagnostic conflicts
+        // at this point, and simply process all of the modifiers
+        // we see.
+        //
+        for( auto nvapiSlotModifier : sharedContext.nvapiSlotModifiers )
+        {
+            // For a given modifier, we start by parsing the semantic
+            // strings that were specified, just as we would if they
+            // had been specified via a `register(...)` semantic.
+            //
+            auto info = extractHLSLLayoutSemanticInfo(
+                nvapiSlotModifier->registerName.getUnownedSlice(),
+                nvapiSlotModifier->loc,
+                nvapiSlotModifier->spaceName.getUnownedSlice(),
+                nvapiSlotModifier->loc,
+                sink);
+            auto kind = info.kind;
+            if (kind == LayoutResourceKind::None)
+                continue;
+
+            // The NVAPI parameter always uses a single register.
+            //
+            LayoutSize count = 1;
+
+            // We are going to mark the register range declared for the
+            // NVAPI parameter as used.
+            //
+            // Note: It is possible that the range has *already* been
+            // marked as used, because the `g_NvidiaExt` parameter has
+            // already been processed by the `generateParameterBindings`
+            // logic above. We don't worry about that case and do not
+            // diagnose an error.
+            //
+            // Note: It is *also* possible that some non-NVAPI parameter
+            // with an explicit binding will collide with the NVAPI
+            // parameter, and we also do not diagnose a problem in
+            // that case.
+            //
+            // TODO: We could probably make the user experience nicer
+            // here in the case of conflicts, but we are already deep
+            // into a do-what-I-mean edge case.
+            //
+            // Note: In the case where the user sets up the NVAPI
+            // register/space via the front-end (e.g., by setting a
+            // `NV_SHADER_EXTN_SLOT` macro), but doesn't actually
+            // `#include` the NVAPI header, we will *still* reserve
+            // the appropriate register so that it won't be used
+            // by user paraemter.
+            //
+            // That policy means that simply defining a particular
+            // macro can alter layout behavior, which is conceptually
+            // kind of a mess, but also seems to be the best possible
+            // answer given the constraints.
+            //
+            auto usedRangeSet = findUsedRangeSetForSpace(&context, info.space);
+            markSpaceUsed(&context, nullptr, info.space);
+            usedRangeSet->usedResourceRanges[(int)kind].Add(
+                nullptr,
+                info.index,
+                info.index + count);
+        }
     }
 
     // Once we have a canonical list of all the parameters, we can

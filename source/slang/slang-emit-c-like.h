@@ -270,6 +270,7 @@ public:
     void emitGlobalParam(IRGlobalParam* varDecl);
 
     void emitGlobalInst(IRInst* inst);
+    virtual void emitGlobalInstImpl(IRInst* inst);
 
     void ensureInstOperand(ComputeEmitActionsContext* ctx, IRInst* inst, EmitAction::Level requiredLevel = EmitAction::Level::Definition);
 
@@ -281,6 +282,13 @@ public:
 
     void executeEmitActions(List<EmitAction> const& actions);
     void emitModule(IRModule* module) { m_irModule = module; emitModuleImpl(module); }
+
+        /// Emit any preprocessor directives that should come *before* the prelude code
+        ///
+        /// These are directives that are intended to customize some aspect(s) of the
+        /// prelude's behavior.
+        ///
+    void emitPreludeDirectives() { emitPreludeDirectivesImpl(); }
 
     void emitPreprocessorDirectives() { emitPreprocessorDirectivesImpl(); }
     void emitSimpleType(IRType* type);
@@ -308,6 +316,7 @@ public:
 
     virtual void emitImageFormatModifierImpl(IRInst* varDecl, IRType* varType) { SLANG_UNUSED(varDecl); SLANG_UNUSED(varType); }
     virtual void emitLayoutQualifiersImpl(IRVarLayout* layout) { SLANG_UNUSED(layout); }
+    virtual void emitPreludeDirectivesImpl() {}
     virtual void emitPreprocessorDirectivesImpl() {}
     virtual void emitLayoutDirectivesImpl(TargetRequest* targetReq) { SLANG_UNUSED(targetReq); }
     virtual void emitRateQualifiersImpl(IRRate* rate) { SLANG_UNUSED(rate); }
@@ -338,10 +347,14 @@ public:
     virtual void emitInterface(IRInterfaceType* interfaceType);
     virtual void emitRTTIObject(IRRTTIObject* rttiObject);
 
-    virtual void handleCallExprDecorationsImpl(IRInst* funcValue) { SLANG_UNUSED(funcValue); }
-
     virtual bool tryEmitGlobalParamImpl(IRGlobalParam* varDecl, IRType* varType) { SLANG_UNUSED(varDecl); SLANG_UNUSED(varType); return false; }
     virtual bool tryEmitInstExprImpl(IRInst* inst, const EmitOpInfo& inOuterPrec) { SLANG_UNUSED(inst); SLANG_UNUSED(inOuterPrec); return false; }
+
+        /// Inspect the capabilities required by `inst` (according to its decorations),
+        /// and ensure that those capabilities have been detected and stored in the
+        /// target-specific extension tracker.
+    void handleRequiredCapabilities(IRInst* inst);
+    virtual void handleRequiredCapabilitiesImpl(IRInst* inst) { SLANG_UNUSED(inst); }
 
     void _emitArrayType(IRArrayType* arrayType, EDeclarator* declarator);
     void _emitUnsizedArrayType(IRUnsizedArrayType* arrayType, EDeclarator* declarator);
