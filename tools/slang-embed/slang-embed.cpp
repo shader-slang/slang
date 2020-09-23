@@ -180,7 +180,6 @@ struct App
             }
             fprintf(outputFile, "\"\n");
         }
-        fprintf(outputFile, ";\n");
     }
 
     void processInputFile()
@@ -269,6 +268,8 @@ struct App
         // appear to be higher than they are for string literals.
 
         processInputFile(outputFile, Slang::UnownedStringSlice(inputPath));
+
+        fprintf(outputFile, ";\n");
         fprintf(outputFile, "return sb.ProduceString();\n}\n");
     }
 };
