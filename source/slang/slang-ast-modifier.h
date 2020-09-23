@@ -893,4 +893,47 @@ class AnyValueSizeAttribute : public Attribute
     int32_t size;
 };
 
+    /// A `[__requiresNVAPI]` attribute indicates that the declaration being modifed
+    /// requires NVAPI operations for its implementation on D3D.
+class RequiresNVAPIAttribute : public Attribute
+{
+    SLANG_CLASS(RequiresNVAPIAttribute)
+};
+
+    /// Indicates that the modified declaration is one of the "magic" declarations
+    /// that NVAPI uses to communicate extended operations. When NVAPI is being included
+    /// via the prelude for downstream compilation, declarations with this modifier
+    /// will not be emitted, instead allowing the versions from the prelude to be used.
+class NVAPIMagicModifier : public Modifier
+{
+    SLANG_CLASS(NVAPIMagicModifier)
+};
+
+    /// A modifier that attaches to a `ModuleDecl` to indicate the register/space binding
+    /// that NVAPI wants to use, as indicated by, e.g., the `NV_SHADER_EXTN_SLOT` and
+    /// `NV_SHADER_EXTN_REGISTER_SPACE` preprocessor definitions.
+class NVAPISlotModifier : public Modifier
+{
+    SLANG_CLASS(NVAPISlotModifier)
+
+        /// The name of the register that is to be used (e.g., `"u3"`)
+        ///
+        /// This value will come from the `NV_SHADER_EXTN_SLOT` macro, if set.
+        ///
+        /// The `registerName` field must always be filled in when adding
+        /// an `NVAPISlotModifier` to a module; if no register name is defined,
+        /// then the modifier should not be added.
+        ///
+    String registerName;
+
+        /// The name of the register space to be used (e.g., `space1`)
+        ///
+        /// This value will come from the `NV_SHADER_EXTN_REGISTER_SPACE` macro,
+        /// if set.
+        ///
+        /// It is valid for a user to specify a register name but not a space name,
+        /// and in that case `spaceName` will be set to `"space0"`.
+    String spaceName;
+};
+
 } // namespace Slang

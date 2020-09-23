@@ -1499,6 +1499,45 @@ LinkedIR linkIR(
         }
     }
 
+    // It is possible that metadata has been attached to the input modules
+    // themselves, which should be copied over to the output module.
+    //
+    // In cases where multiple input modules specify the same metadata
+    // decoration, we will need rules to merge such decorations according
+    // to opcode-specific policy (e.g., a `[maxStackSizeRequired(...)]`
+    // decoration might use a maximum over all specified values, while a
+    // `[assumedWaveSize(...)]` decoration might require that all specified
+    // values match exactly).
+    //
+    for (IRModule* irModule : irModules)
+    {
+        for( auto decoration : irModule->getModuleInst()->getDecorations() )
+        {
+            switch( decoration->op )
+            {
+            case kIROp_NVAPISlotDecoration:
+                {
+                    // For now we just clone every decoration we see,
+                    // which means that an arbitrary one will end up
+                    // "winning" and being the one found by searches
+                    // in later code.
+                    //
+                    // TODO: need validation to check if decorations are
+                    // consistent with one another, in the case where
+                    // multiple input modules have matching decorations.
+                    //
+                    auto cloned = cloneInst(context, context->builder, decoration);
+                    cloned->insertAtStart(state->irModule->getModuleInst());
+                }
+                break;
+
+            default:
+                break;
+            }
+        }
+    }
+
+
     // TODO: *technically* we should consider the case where
     // we have global variables with initializers, since
     // these should get run whether or not the entry point

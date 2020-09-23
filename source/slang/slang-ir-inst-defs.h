@@ -565,6 +565,16 @@ INST(HighLevelDeclDecoration,               highLevelDecl,          1, 0)
 
     INST(BuiltinDecoration, BuiltinDecoration, 0, 0)
 
+        /// The decorated instruction requires NVAPI to be included via prelude when compiling for D3D.
+    INST(RequiresNVAPIDecoration, requiresNVAPI, 0, 0)
+
+        /// The decorated instruction is part of the NVAPI "magic" and should always use its original name
+    INST(NVAPIMagicDecoration, nvapiMagic, 1, 0)
+
+        /// A decoration that applies to an entire IR module, and indicates the register/space binding
+        /// that the NVAPI shader parameter intends to use.
+    INST(NVAPISlotDecoration, nvapiSlot, 2, 0)
+
     INST(SemanticDecoration, semantic, 2, 0)
 
     INST_RANGE(Decoration, HighLevelDeclDecoration, SemanticDecoration)

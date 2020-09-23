@@ -592,18 +592,12 @@ void CUDASourceEmitter::_requireCUDASMVersion(SemanticVersion const& version)
     }
 }
 
-void CUDASourceEmitter::handleCallExprDecorationsImpl(IRInst* funcValue)
+void CUDASourceEmitter::handleRequiredCapabilitiesImpl(IRInst* inst)
 {
-    // Does this function declare any requirements on GLSL version or
-    // extensions, which should affect our output?
+    // Does this function declare any requirements on CUDA capabilities
+    // that should affect output?
 
-    auto decoratedValue = funcValue;
-    while (auto specInst = as<IRSpecialize>(decoratedValue))
-    {
-        decoratedValue = getSpecializedValue(specInst);
-    }
-
-    for (auto decoration : decoratedValue->getDecorations())
+    for (auto decoration : inst->getDecorations())
     {
         if( auto smDecoration = as<IRRequireCUDASMVersionDecoration>(decoration))
         {
