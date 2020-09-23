@@ -2422,7 +2422,7 @@ void CLikeSourceEmitter::defaultEmitInstExpr(IRInst* inst, const EmitOpInfo& inO
         emitOperand(inst->getOperand(0), getInfo(EmitOp::General));
         m_writer->emit(").Load<");
         emitType(inst->getDataType());
-        m_writer->emit(">(");
+        m_writer->emit(" >(");
         emitOperand(inst->getOperand(1), getInfo(EmitOp::General));
         m_writer->emit(")");
         break;
