@@ -216,21 +216,24 @@ struct Preprocessor
     // represent end-of-input situations.
     Token                                   endOfFileToken;
 
-        /// The linkage the provides the context for preprocessing
-    Linkage*                                linkage = nullptr;
-
-        /// The module, if any, that the preprocessed result will belong to
-    Module*                                 parentModule = nullptr;
-
-        /// The AST builder that should be used when creating AST nodes for `parentModule`
-    ASTBuilder*                             astBuilder = nullptr;
+        /// Callback handlers
+    PreprocessorHandler*                    handler = nullptr;
 
     // The unique identities of any paths that have issued `#pragma once` directives to
     // stop them from being included again.
     HashSet<String>                         pragmaOnceUniqueIdentities;
 
-    NamePool* getNamePool() { return linkage->getNamePool(); }
-    SourceManager* getSourceManager() { return linkage->getSourceManager(); }
+        /// Name pool to use when creating `Name`s from strings
+    NamePool*                               namePool = nullptr;
+
+        /// File system to use when looking up files
+    ISlangFileSystemExt*                    fileSystem = nullptr;
+
+        /// Source maanger to use when loading source files
+    SourceManager*                          sourceManager = nullptr;
+
+    NamePool* getNamePool() { return namePool; }
+    SourceManager* getSourceManager() { return sourceManager; }
 };
 
 
@@ -1788,17 +1791,16 @@ static SlangResult readFile(
     // The actual file loading will be handled by the file system
     // associated with the parent linkage.
     //
-    auto linkage = context->preprocessor->linkage;
-    auto fileSystemExt = linkage->getFileSystemExt();
+    auto fileSystemExt = context->preprocessor->fileSystem;
     SLANG_RETURN_ON_FAIL(fileSystemExt->loadFile(path.getBuffer(), outBlob));
 
     // If we are running the preprocessor as part of compiling a
     // specific module, then we must keep track of the file we've
     // read as yet another file that the module will depend on.
     //
-    if(auto module = context->preprocessor->parentModule)
+    if( auto handler = context->preprocessor->handler )
     {
-        module->addFilePathDependency(path);
+        handler->handleFileDependency(path);
     }
 
     return SLANG_OK;
@@ -2451,18 +2453,18 @@ static TokenList ReadAllTokens(
 }
 
     /// Try to look up a macro with the given `macroName` and produce its value as a string
-static bool _findMacroValue(
+Result findMacroValue(
     Preprocessor*   preprocessor,
     char const*     macroName,
     String&         outValue,
     SourceLoc&      outLoc)
 {
-    auto namePool = preprocessor->linkage->getNamePool();
+    auto namePool = preprocessor->namePool;
     auto macro = LookupMacro(preprocessor, namePool->getName(macroName));
     if(!macro)
-        return false;
+        return SLANG_FAIL;
     if(macro->flavor != PreprocessorMacroFlavor::ObjectLike)
-        return false;
+        return SLANG_FAIL;
 
     MacroExpansion* expansion = new MacroExpansion();
     initializeMacroExpansion(preprocessor, expansion, macro);
@@ -2482,117 +2484,67 @@ static bool _findMacroValue(
 
     outValue = value;
     outLoc = macro->getLoc();
-    return true;
+    return SLANG_OK;
 }
 
-    /// Validate that a re-defintion of an NVAPI-related macro matches any previous definition
-static void _validateNVAPIMacroMatch(
-    Preprocessor*   preprocessor,
-    char const*     macroName,
-    String const&   existingValue,
-    String const&   newValue,
-    SourceLoc       loc)
+void PreprocessorHandler::handleEndOfFile(Preprocessor* preprocessor)
 {
-    if( existingValue != newValue )
-    {
-        preprocessor->sink->diagnose(loc, Diagnostics::nvapiMacroMismatch, macroName, existingValue, newValue);
-    }
+    SLANG_UNUSED(preprocessor);
 }
 
-    /// Collect macro definitions that are relevant to subsequent compilation steps, and store them
-static void _collectDownstreamRelevantMacros(
-    Preprocessor*   preprocessor)
+void PreprocessorHandler::handleFileDependency(String const& path)
 {
-    // For now, the only case of semantically-relevant macros we need to worrry
-    // about are the NVAPI macros used to establish the register/space to use.
-    //
-    static const char* kNVAPIRegisterMacroName = "NV_SHADER_EXTN_SLOT";
-    static const char* kNVAPISpaceMacroName = "NV_SHADER_EXTN_REGISTER_SPACE";
-
-    // For NVAPI use, the `NV_SHADER_EXTN_SLOT` macro is required to be defined.
-    //
-    String nvapiRegister;
-    SourceLoc nvapiRegisterLoc;
-    if(_findMacroValue(preprocessor, kNVAPIRegisterMacroName, nvapiRegister, nvapiRegisterLoc))
-    {
-        // In contrast, NVAPI can be used without defining `NV_SHADER_EXTN_REGISTER_SPACE`,
-        // which effectively defaults to `space0`.
-        //
-        String nvapiSpace = "space0";
-        SourceLoc nvapiSpaceLoc;
-        _findMacroValue(preprocessor, kNVAPISpaceMacroName, nvapiSpace, nvapiSpaceLoc);
-
-        // We are going to store the values of these macros on the AST-level `ModuleDecl`
-        // so that they will be available to later processing stages.
-        //
-        // Note: An alternative design here would be to either put the data directly
-        // on the `Module`, or to define some kind of side-channel output that the
-        // preprocessor can use to communicate these macro values back (and then
-        // allow another system to create the AST nodes). In practice, all of these
-        // alternatives would actually increase the amount of code/complexity,
-        // so we stick with the simple-but-hacky option of having the
-        // preprocessor create AST nodes directly.
-        //
-        auto module = preprocessor->parentModule;
-        if(!module) return;
-        auto moduleDecl = module->getModuleDecl();
-
-        // We need to make sure that the AST nodes we create will have the right
-        // lifetime (it should match the module we are adding to).
-        //
-        auto astBuilder = preprocessor->astBuilder;
-        if(!astBuilder) return;
-
-        if(auto existingModifier = moduleDecl->findModifier<NVAPISlotModifier>())
-        {
-            // If there is already a modifier attached to the module (perhaps
-            // because of preprocessing a different source file, or because
-            // of settings established via command-line options), then we
-            // need to validate that the values being set in this file
-            // match those already set (or else there is likely to be
-            // some kind of error in the user's code).
-            //
-            _validateNVAPIMacroMatch(preprocessor, kNVAPIRegisterMacroName, existingModifier->registerName, nvapiRegister,  nvapiRegisterLoc);
-            _validateNVAPIMacroMatch(preprocessor, kNVAPISpaceMacroName,    existingModifier->spaceName,    nvapiSpace,     nvapiSpaceLoc);
-        }
-        else
-        {
-            // If there is no existing modifier on the module, then we
-            // take responsibility for adding one, based on the macro
-            // values we saw.
-            //
-            auto modifier = astBuilder->create<NVAPISlotModifier>();
-            modifier->loc = nvapiRegisterLoc;
-            modifier->registerName = nvapiRegister;
-            modifier->spaceName = nvapiSpace;
-
-            addModifier(moduleDecl, modifier);
-        }
-    }
+    SLANG_UNUSED(path);
 }
 
 TokenList preprocessSource(
-    SourceFile*                 file,
-    DiagnosticSink*             sink,
-    IncludeSystem*              includeSystem,
-    Dictionary<String, String>  defines,
-    Linkage*                    linkage,
-    Module*                     parentModule,
-    ASTBuilder*                 astBuilder)
+    SourceFile*                         file,
+    DiagnosticSink*                     sink,
+    IncludeSystem*                      includeSystem,
+    Dictionary<String, String> const&   defines,
+    Linkage*                            linkage,
+    PreprocessorHandler*                handler)
+{
+    PreprocessorDesc desc;
+
+    desc.sink           = sink;
+    desc.includeSystem  = includeSystem;
+    desc.handler        = handler;
+
+    desc.defines = &defines;
+
+    desc.fileSystem     = linkage->getFileSystemExt();
+    desc.namePool       = linkage->getNamePool();
+    desc.sourceManager  = linkage->getSourceManager();
+
+    return preprocessSource(file, desc);
+}
+
+TokenList preprocessSource(
+    SourceFile*             file,
+    PreprocessorDesc const& desc)
 {
     Preprocessor preprocessor;
-    InitializePreprocessor(&preprocessor, sink);
-    preprocessor.linkage = linkage;
-    preprocessor.parentModule = parentModule;
-    preprocessor.astBuilder = astBuilder;
+    InitializePreprocessor(&preprocessor, desc.sink);
 
-    preprocessor.includeSystem = includeSystem;
-    for (auto p : defines)
+    preprocessor.sink = desc.sink;
+    preprocessor.includeSystem = desc.includeSystem;
+    preprocessor.fileSystem = desc.fileSystem;
+    preprocessor.namePool = desc.namePool;
+
+    auto sourceManager = desc.sourceManager;
+    preprocessor.sourceManager = sourceManager;
+
+    auto handler = desc.handler;
+    preprocessor.handler = handler;
+
+    if(desc.defines)
     {
-        DefineMacro(&preprocessor, p.Key, p.Value);
+        for (auto p : *desc.defines)
+        {
+            DefineMacro(&preprocessor, p.Key, p.Value);
+        }
     }
-
-    SourceManager* sourceManager = linkage->getSourceManager();
 
     SourceView* sourceView = sourceManager->createSourceView(file, nullptr);
 
@@ -2601,16 +2553,10 @@ TokenList preprocessSource(
 
     TokenList tokens = ReadAllTokens(&preprocessor);
 
-    // We look at the preprocessor state after reading the entire
-    // source file/string, in order to see if any macros have been
-    // set that should be considered semantically relevant for
-    // later stages of compilation.
-    //
-    // Note: Checking the macro environment *after* preprocessing is complete
-    // means that we can treat macros introduced via `-D` options or the API
-    // equivalently to macros introduced via `#define`s in user code.
-    //
-    _collectDownstreamRelevantMacros(&preprocessor);
+    if(handler)
+    {
+        handler->handleEndOfFile(&preprocessor);
+    }
 
     FinalizePreprocessor(&preprocessor);
 
