@@ -111,13 +111,16 @@ struct App
                 auto fileName =
                     Slang::StringUtil::getAtInSplit(trimedLine.getUnownedSlice(), ' ', 1);
                 if (fileName[0] == '<')
-                    continue;
+                    goto normalProcess;
                 fileName = Slang::UnownedStringSlice(fileName.begin() + 1, fileName.end() - 1);
                 auto path =
                     Slang::Path::combine(Slang::Path::getParentDirectory(inputPath), fileName);
+                if (!Slang::File::exists(path))
+                    goto normalProcess;
                 processInputFile(outputFile, path.getUnownedSlice());
                 continue;
             }
+        normalProcess:;
             if (!useNewStringLit && charCount + line.getLength() > 0x4000)
             {
                 charCount = 0;

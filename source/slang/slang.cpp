@@ -43,7 +43,7 @@
 
 extern Slang::String get_slang_cuda_prelude();
 extern Slang::String get_slang_cpp_prelude();
-extern Slang::String get_hlsl_prelude();
+extern Slang::String get_slang_hlsl_prelude();
 
 namespace Slang {
 
