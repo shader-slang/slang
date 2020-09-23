@@ -41,8 +41,9 @@
 #undef NOMINMAX
 #endif
 
-extern char const* slang_cuda_prelude;
-extern char const* slang_hlsl_prelude;
+extern Slang::String get_slang_cuda_prelude();
+extern Slang::String get_slang_cpp_prelude();
+extern Slang::String get_hlsl_prelude();
 
 namespace Slang {
 
@@ -189,8 +190,9 @@ void Session::init()
     }
 
     // Set up default prelude code for target languages that need a prelude
-    m_languagePreludes[Index(SourceLanguage::CUDA)] = slang_cuda_prelude;
-    m_languagePreludes[Index(SourceLanguage::HLSL)] = slang_hlsl_prelude;
+    m_languagePreludes[Index(SourceLanguage::CUDA)] = get_slang_cuda_prelude();
+    m_languagePreludes[Index(SourceLanguage::CPP)] = get_slang_cpp_prelude();
+    m_languagePreludes[Index(SourceLanguage::HLSL)] = get_slang_hlsl_prelude();
 }
 
 ISlangUnknown* Session::getInterface(const Guid& guid)

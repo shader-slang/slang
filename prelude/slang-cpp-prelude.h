@@ -1,8 +1,6 @@
 #ifndef SLANG_CPP_PRELUDE_H
 #define SLANG_CPP_PRELUDE_H
 
-#include "../slang.h"
-
 // Because the signiture of isnan, isfinite, and is isinf changed in C++, we use the macro
 // to use the version in the std namespace. 
 // https://stackoverflow.com/questions/39130040/cmath-hides-isnan-in-math-h-in-c14-c11
