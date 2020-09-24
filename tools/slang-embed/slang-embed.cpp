@@ -178,7 +178,7 @@ struct App
                     break;
                 }
             }
-            fprintf(outputFile, "\"\n");
+            fprintf(outputFile, "\\n\"\n");
         }
     }
 
