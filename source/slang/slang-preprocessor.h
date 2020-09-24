@@ -10,21 +10,72 @@
 
 namespace Slang {
 
-class ASTBuilder;
 class DiagnosticSink;
 class Linkage;
-class Module;
-class ModuleDecl;
 
-// Take a string of source code and preprocess it into a list of tokens.
+struct Preprocessor;
+
+    /// A handler for callbacks invoked by the preprocessor.
+    ///
+    /// A client of the preprocessor can implement its own `PreprocessorHandler` subtype
+    /// in order to insert custom logic that implements higher-level policies
+    /// that the preprocessor shouldn't need to understand.
+    ///
+struct PreprocessorHandler
+{
+    virtual void handleEndOfFile(Preprocessor* preprocessor);
+    virtual void handleFileDependency(String const& path);
+};
+
+    /// Description of a preprocessor options/dependencies
+struct PreprocessorDesc
+{
+        /// Required: sink to use when emitting preprocessor diagnostic messages
+    DiagnosticSink* sink = nullptr;
+
+        /// Required: name pool to use when creating `Name`s from strings
+    NamePool* namePool = nullptr;
+
+        /// Required: file system to use when looking up files
+    ISlangFileSystemExt* fileSystem = nullptr;
+
+        /// Required: source manager to use when loading source files
+    SourceManager* sourceManager = nullptr;
+
+        /// Optional: include system to use when resolving `#include` directives
+    IncludeSystem*  includeSystem = nullptr;
+
+        /// Optional: preprocessor `#define`s to assume are set on input
+    Dictionary<String, String> const* defines = nullptr;
+
+        /// Optional: handler for callbacks invoked during preprocessing
+    PreprocessorHandler* handler = nullptr;
+};
+
+    /// Take a source `file` and preprocess it into a list of tokens.
 TokenList preprocessSource(
-    SourceFile*                 file,
-    DiagnosticSink*             sink,
-    IncludeSystem*              includeSystem,
-    Dictionary<String, String>  defines,
-    Linkage*                    linkage,
-    Module*                     parentModule,
-    ASTBuilder*                 astBuilder = nullptr);
+    SourceFile*             file,
+    PreprocessorDesc const& desc);
+
+    /// Convenience wrapper for `preprocessSource` when a `Linkage` is available
+TokenList preprocessSource(
+    SourceFile*                         file,
+    DiagnosticSink*                     sink,
+    IncludeSystem*                      includeSystem,
+    Dictionary<String, String> const&   defines,
+    Linkage*                            linkage,
+    PreprocessorHandler*                handler = nullptr);
+
+// The following functions are intended to be used inside of implementations
+// of the `PreprocessorHandler` interface, in order to query the current
+// state of the preprocessor.
+
+    /// Try to look up a macro with the given `macroName` and produce its value as a string
+Result findMacroValue(
+    Preprocessor*   preprocessor,
+    char const*     macroName,
+    String&         outValue,
+    SourceLoc&      outLoc);
 
 } // namespace Slang
 
