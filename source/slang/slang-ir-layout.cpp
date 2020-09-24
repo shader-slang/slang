@@ -49,6 +49,30 @@
 namespace Slang
 {
 
+static Result _calcNaturalArraySizeAndAlignment(IRType* elementType, IRInst* elementCountInst, IRSizeAndAlignment* outSizeAndAlignment)
+{
+    auto elementCountLit = as<IRIntLit>(elementCountInst);
+    if(!elementCountLit)
+        return SLANG_FAIL;
+    auto elementCount = elementCountLit->getValue();
+
+    if( elementCount == 0 )
+    {
+        *outSizeAndAlignment = IRSizeAndAlignment(0, 1);
+        return SLANG_OK;
+    }
+
+    IRSizeAndAlignment elementTypeLayout;
+    SLANG_RETURN_ON_FAIL(getNaturalSizeAndAlignment(elementType, &elementTypeLayout));
+
+    auto elementStride = elementTypeLayout.getStride();
+
+    *outSizeAndAlignment = IRSizeAndAlignment(
+        elementStride * (elementCount - 1) + elementTypeLayout.size,
+        elementTypeLayout.alignment);
+    return SLANG_OK;
+}
+
 static Result _calcNaturalSizeAndAlignment(IRType* type, IRSizeAndAlignment* outSizeAndAlignment)
 {
     switch( type->op )
@@ -141,27 +165,21 @@ static Result _calcNaturalSizeAndAlignment(IRType* type, IRSizeAndAlignment* out
         {
             auto arrayType = cast<IRArrayType>(type);
 
-            auto elementCountLit = as<IRIntLit>(arrayType->getElementCount());
-            if(!elementCountLit)
-                return SLANG_FAIL;
-            auto elementCount = elementCountLit->getValue();
+            return _calcNaturalArraySizeAndAlignment(
+                arrayType->getElementType(),
+                arrayType->getElementCount(),
+                outSizeAndAlignment);
+        }
+        break;
 
-            if( elementCount == 0 )
-            {
-                *outSizeAndAlignment = IRSizeAndAlignment(0, 1);
-                return SLANG_OK;
-            }
+    case kIROp_VectorType:
+        {
+            auto vecType = cast<IRVectorType>(type);
 
-            auto elementType = arrayType->getElementType();
-            IRSizeAndAlignment elementTypeLayout;
-            SLANG_RETURN_ON_FAIL(getNaturalSizeAndAlignment(elementType, &elementTypeLayout));
-
-            auto elementStride = elementTypeLayout.getStride();
-
-            *outSizeAndAlignment = IRSizeAndAlignment(
-                elementStride * (elementCount - 1) + elementTypeLayout.size,
-                elementTypeLayout.alignment);
-            return SLANG_OK;
+            return _calcNaturalArraySizeAndAlignment(
+                vecType->getElementType(),
+                vecType->getElementCount(),
+                outSizeAndAlignment);
         }
         break;
 
