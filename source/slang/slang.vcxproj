@@ -298,6 +298,7 @@
     <ClInclude Include="slang-visitor.h" />
   </ItemGroup>
   <ItemGroup>
+    <ClCompile Include="..\..\prelude\slang-cpp-prelude.h.cpp" />
     <ClCompile Include="..\..\prelude\slang-cuda-prelude.h.cpp" />
     <ClCompile Include="..\..\prelude\slang-hlsl-prelude.h.cpp" />
     <ClCompile Include="slang-ast-builder.cpp" />

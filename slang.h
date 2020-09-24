@@ -1832,6 +1832,8 @@ extern "C"
         SLANG_SCALAR_TYPE_UINT16,
     };
 
+#ifndef SLANG_RESOURCE_SHAPE
+#    define SLANG_RESOURCE_SHAPE
     typedef unsigned int SlangResourceShape;
     enum
     {
@@ -1863,7 +1865,7 @@ extern "C"
         SLANG_TEXTURE_2D_MULTISAMPLE        = SLANG_TEXTURE_2D | SLANG_TEXTURE_MULTISAMPLE_FLAG,
         SLANG_TEXTURE_2D_MULTISAMPLE_ARRAY  = SLANG_TEXTURE_2D | SLANG_TEXTURE_MULTISAMPLE_FLAG | SLANG_TEXTURE_ARRAY_FLAG,
     };
-
+#endif
     typedef unsigned int SlangResourceAccess;
     enum
     {

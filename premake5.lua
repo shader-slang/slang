@@ -901,7 +901,7 @@ generatorProject("run-generators", "source/slang/")
     end
 
     if executeBinary then
-      filter "files:prelude/*.h"
+      filter "files:prelude/*-prelude.h"
         buildmessage "slang-embed %{file.relpath}"
         buildcommands { '"%{cfg.targetdir}/slang-embed" %{file.relpath}' }
         buildoutputs { "%{file.abspath}.cpp" }
@@ -957,6 +957,7 @@ standardProject "slang"
     files {
         "prelude/slang-cuda-prelude.h.cpp",
         "prelude/slang-hlsl-prelude.h.cpp",
+        "prelude/slang-cpp-prelude.h.cpp"
     }
 
     -- 

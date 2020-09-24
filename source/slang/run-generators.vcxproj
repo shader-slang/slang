@@ -154,6 +154,10 @@
     </Link>
   </ItemDefinitionGroup>
   <ItemGroup>
+    <ClInclude Include="..\..\prelude\slang-cpp-scalar-intrinsics.h" />
+    <ClInclude Include="..\..\prelude\slang-cpp-types.h" />
+  </ItemGroup>
+  <ItemGroup>
     <ClCompile Include="..\core\slang-string.cpp" />
   </ItemGroup>
   <ItemGroup>
@@ -164,32 +168,6 @@
       <Command Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">"../../bin/windows-x86/release/slang-embed" %(Identity)</Command>
       <Command Condition="'$(Configuration)|$(Platform)'=='Release|x64'">"../../bin/windows-x64/release/slang-embed" %(Identity)</Command>
       <Outputs>../../prelude/slang-cpp-prelude.h.cpp</Outputs>
-      <Message>slang-embed %(Identity)</Message>
-      <AdditionalInputs Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">../../bin/windows-x86/debug/slang-embed.exe</AdditionalInputs>
-      <AdditionalInputs Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">../../bin/windows-x64/debug/slang-embed.exe</AdditionalInputs>
-      <AdditionalInputs Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">../../bin/windows-x86/release/slang-embed.exe</AdditionalInputs>
-      <AdditionalInputs Condition="'$(Configuration)|$(Platform)'=='Release|x64'">../../bin/windows-x64/release/slang-embed.exe</AdditionalInputs>
-    </CustomBuild>
-    <CustomBuild Include="..\..\prelude\slang-cpp-scalar-intrinsics.h">
-      <FileType>Document</FileType>
-      <Command Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">"../../bin/windows-x86/debug/slang-embed" %(Identity)</Command>
-      <Command Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">"../../bin/windows-x64/debug/slang-embed" %(Identity)</Command>
-      <Command Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">"../../bin/windows-x86/release/slang-embed" %(Identity)</Command>
-      <Command Condition="'$(Configuration)|$(Platform)'=='Release|x64'">"../../bin/windows-x64/release/slang-embed" %(Identity)</Command>
-      <Outputs>../../prelude/slang-cpp-scalar-intrinsics.h.cpp</Outputs>
-      <Message>slang-embed %(Identity)</Message>
-      <AdditionalInputs Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">../../bin/windows-x86/debug/slang-embed.exe</AdditionalInputs>
-      <AdditionalInputs Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">../../bin/windows-x64/debug/slang-embed.exe</AdditionalInputs>
-      <AdditionalInputs Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">../../bin/windows-x86/release/slang-embed.exe</AdditionalInputs>
-      <AdditionalInputs Condition="'$(Configuration)|$(Platform)'=='Release|x64'">../../bin/windows-x64/release/slang-embed.exe</AdditionalInputs>
-    </CustomBuild>
-    <CustomBuild Include="..\..\prelude\slang-cpp-types.h">
-      <FileType>Document</FileType>
-      <Command Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">"../../bin/windows-x86/debug/slang-embed" %(Identity)</Command>
-      <Command Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">"../../bin/windows-x64/debug/slang-embed" %(Identity)</Command>
-      <Command Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">"../../bin/windows-x86/release/slang-embed" %(Identity)</Command>
-      <Command Condition="'$(Configuration)|$(Platform)'=='Release|x64'">"../../bin/windows-x64/release/slang-embed" %(Identity)</Command>
-      <Outputs>../../prelude/slang-cpp-types.h.cpp</Outputs>
       <Message>slang-embed %(Identity)</Message>
       <AdditionalInputs Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">../../bin/windows-x86/debug/slang-embed.exe</AdditionalInputs>
       <AdditionalInputs Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">../../bin/windows-x64/debug/slang-embed.exe</AdditionalInputs>
