@@ -85,6 +85,10 @@ static SlangResult _innerMain(int argc, char** argv)
     // If we wanted a just a shared library/dll, we could have used SLANG_SHARED_LIBRARY.
     int targetIndex = spAddCodeGenTarget(slangRequest, SLANG_HOST_CALLABLE);
 
+    // Set the target flag to indicate that we want to compile all the entrypoints in the
+    // slang shader file into a library.
+    spSetTargetFlags(slangRequest, targetIndex, SLANG_TARGET_FLAG_GENERATE_WHOLE_PROGRAM);
+
     // A compile request can include one or more "translation units," which more or
     // less amount to individual source files (think `.c` files, not the `.h` files they
     // might include).
@@ -99,14 +103,6 @@ static SlangResult _innerMain(int argc, char** argv)
     // There are also variations of this API for adding source code from application-provided buffers.
     //
     spAddTranslationUnitSourceFile(slangRequest, translationUnitIndex, "shader.slang");
-    
-    // Next we will specify the entry points we'd like to compile.
-    // It is often convenient to put more than one entry point in the same file,
-    // and the Slang API makes it convenient to use a single run of the compiler
-    // to compile all entry points. 
-    // 
-    const char entryPointName[] = "computeMain";
-    int computeIndex = spAddEntryPoint(slangRequest, translationUnitIndex, entryPointName,  SLANG_STAGE_COMPUTE);
 
     // Once all of the input options for the compiler have been specified,
     // we can invoke `spCompile` to run the compiler and see if any errors
@@ -133,7 +129,7 @@ static SlangResult _innerMain(int argc, char** argv)
     // Get the 'shared library' (note that this doesn't necessarily have to be implemented as a shared library
     // it's just an interface to executable code).
     ComPtr<ISlangSharedLibrary> sharedLibrary;
-    SLANG_RETURN_ON_FAIL(spGetEntryPointHostCallable(slangRequest, 0, 0, sharedLibrary.writeRef()));
+    SLANG_RETURN_ON_FAIL(spGetTargetHostCallable(slangRequest, 0, sharedLibrary.writeRef()));
 
     // Once we have the sharedLibrary, we no longer need the request
     // unless we want to use reflection, to for example workout how 'UniformState' and 'UniformEntryPointParams' are laid out
@@ -141,10 +137,10 @@ static SlangResult _innerMain(int argc, char** argv)
     spDestroyCompileRequest(slangRequest);
 
     // Get the function we are going to execute 
+    const char entryPointName[] = "computeMain";
     CPPPrelude::ComputeFunc func = (CPPPrelude::ComputeFunc)sharedLibrary->findFuncByName(entryPointName);
     if (!func)
     {
-        spDestroyCompileRequest(slangRequest);
         return SLANG_FAIL;
     }
 
