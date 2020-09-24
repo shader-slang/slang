@@ -40,7 +40,7 @@
 #include "slang-cpp-scalar-intrinsics.h"
 
 // TODO(JS): Hack! Output C++ code from slang can copy uninitialized variables. 
-#if SLANG_VC
+#if defined(_MSC_VER)
 #   pragma warning(disable : 4700)
 #endif
 
