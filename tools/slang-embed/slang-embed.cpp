@@ -95,13 +95,6 @@ struct App
         // the line ending convention of the host platform)
         //
         Slang::StreamReader streamReader(inputPath);
-        FILE* inputFile = fopen(inputPath.getBuffer(), "r");
-        ScopedFile inputFileCleanup(inputFile);
-        if (!inputFile)
-        {
-            fprintf(stderr, "%s: error: failed to open '%s' for reading\n", appName, inputPath.getBuffer());
-            exit(1);
-        }
         while (!streamReader.IsEnd())
         {
             auto line = streamReader.ReadLine();
