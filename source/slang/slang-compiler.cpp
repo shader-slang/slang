@@ -2200,14 +2200,10 @@ SlangResult dissassembleDXILUsingDXC(
         BackEndCompileRequest*  backEndRequest,
         EndToEndCompileRequest* endToEndRequest)
     {
-        // It is possible that entry points goot added to the `Program`
-        // *after* we created this `TargetProgram`, so there might be
-        // a request for an entry point that we didn't allocate space for.
-        //
-        // TODO: Change the construction logic so that a `Program` is
-        // constructed all at once rather than incrementally, to avoid
-        // this problem.
-        //
+        // We want to call `emitEntryPoints` function to generate code that contains
+        // all the entrypoints defined in `m_program`.
+        // The current logic of `emitEntryPoints` takes a list of entry-point indices to
+        // emit code for, so we construct such a list first.
         List<Int> entryPointIndices;
         m_entryPointResults.setCount(m_program->getEntryPointCount());
         entryPointIndices.setCount(m_program->getEntryPointCount());
