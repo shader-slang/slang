@@ -2197,24 +2197,19 @@ SlangResult dissassembleDXILUsingDXC(
     }
 
     CompileResult& TargetProgram::_createWholeProgramResult(
-        const List<Int>&        entryPointIndices,
         BackEndCompileRequest*  backEndRequest,
         EndToEndCompileRequest* endToEndRequest)
     {
-        for (auto entryPointIndex = entryPointIndices.begin(); entryPointIndex != entryPointIndices.end(); entryPointIndex++) {
-            if (*entryPointIndex >= m_entryPointResults.getCount())
-                m_entryPointResults.setCount(*entryPointIndex + 1);
+        // We want to call `emitEntryPoints` function to generate code that contains
+        // all the entrypoints defined in `m_program`.
+        // The current logic of `emitEntryPoints` takes a list of entry-point indices to
+        // emit code for, so we construct such a list first.
+        List<Int> entryPointIndices;
+        m_entryPointResults.setCount(m_program->getEntryPointCount());
+        entryPointIndices.setCount(m_program->getEntryPointCount());
+        for (Index i = 0; i < entryPointIndices.getCount(); i++)
+            entryPointIndices[i] = i;
 
-            // It is possible that entry points goot added to the `Program`
-            // *after* we created this `TargetProgram`, so there might be
-            // a request for an entry point that we didn't allocate space for.
-            //
-            // TODO: Change the construction logic so that a `Program` is
-            // constructed all at once rather than incrementally, to avoid
-            // this problem.
-            //
-            //auto entryPoint = m_program->getEntryPoint(*entryPointIndex);
-        }
         auto& result = m_wholeProgramResult;
         result = emitEntryPoints(
             m_program,
@@ -2224,7 +2219,6 @@ SlangResult dissassembleDXILUsingDXC(
             endToEndRequest);
 
         return result;
-
     }
 
     CompileResult& TargetProgram::_createEntryPointResult(
@@ -2256,7 +2250,6 @@ SlangResult dissassembleDXILUsingDXC(
     }
 
     CompileResult& TargetProgram::getOrCreateWholeProgramResult(
-        const List<Int>& entryPointIndices,
         DiagnosticSink* sink)
     {
         auto& result = m_wholeProgramResult;
@@ -2278,7 +2271,6 @@ SlangResult dissassembleDXILUsingDXC(
             m_program);
 
         return _createWholeProgramResult(
-            entryPointIndices,
             backEndRequest,
             nullptr);
     }
@@ -2325,10 +2317,9 @@ SlangResult dissassembleDXILUsingDXC(
         // Generate target code any entry points that
         // have been requested for compilation.
         auto entryPointCount = program->getEntryPointCount();
-        if (targetReq->isWholeProgramRequest)
+        if (targetReq->isWholeProgramRequest())
         {
             targetProgram->_createWholeProgramResult(
-                List<Int>(),
                 compileReq,
                 endToEndReq);
         }
@@ -2497,7 +2488,7 @@ SlangResult dissassembleDXILUsingDXC(
             for (auto targetReq : linkage->targets)
             {
                 Index entryPointCount = program->getEntryPointCount();
-                if (targetReq->isWholeProgramRequest) {
+                if (targetReq->isWholeProgramRequest()) {
                     writeWholeProgramResult(
                         compileRequest,
                         targetReq);

@@ -584,6 +584,12 @@ extern "C"
            @deprecated This behavior is now enabled unconditionally.
         */
         SLANG_TARGET_FLAG_PARAMETER_BLOCKS_USE_REGISTER_SPACES = 1 << 4,
+
+        /* When set, will generate target code that contains all entrypoints defined
+           in the input source or specified via the `spAddEntryPoint` function in a
+           single output module (library/source file).
+        */
+        SLANG_TARGET_FLAG_GENERATE_WHOLE_PROGRAM = 1 << 8
     };
 
     /*!
@@ -1632,8 +1638,6 @@ extern "C"
     @param targetIndex The index of the target to get code for (default: zero).
     @param outBlob A pointer that will receive the blob of code
     @returns A `SlangResult` to indicate success or failure.
-
-    The lifetime of the output pointer is the same as `request`.
     */
     SLANG_API SlangResult spGetEntryPointCodeBlob(
         SlangCompileRequest*    request,
@@ -1656,6 +1660,34 @@ extern "C"
     SLANG_API SlangResult spGetEntryPointHostCallable(
         SlangCompileRequest*    request,
         int                     entryPointIndex,
+        int                     targetIndex,
+        ISlangSharedLibrary**   outSharedLibrary);
+
+    /** Get the output code associated with a specific target.
+
+    @param request   The request 
+    @param targetIndex The index of the target to get code for (default: zero).
+    @param outBlob A pointer that will receive the blob of code
+    @returns A `SlangResult` to indicate success or failure.
+    */
+    SLANG_API SlangResult spGetTargetCodeBlob(
+        SlangCompileRequest*    request,
+        int                     targetIndex,
+        ISlangBlob**            outBlob);
+
+    /** Get 'callable' functions for a target accessible through the ISlangSharedLibrary interface.
+
+    That the functions remain in scope as long as the ISlangSharedLibrary interface is in scope.
+
+    NOTE! Requires a compilation target of SLANG_HOST_CALLABLE.
+    
+    @param request          The request 
+    @param targetIndex      The index of the target to get code for (default: zero).
+    @param outSharedLibrary A pointer to a ISharedLibrary interface which functions can be queried on.
+    @returns                A `SlangResult` to indicate success or failure.
+    */
+    SLANG_API SlangResult spGetTargetHostCallable(
+        SlangCompileRequest*    request,
         int                     targetIndex,
         ISlangSharedLibrary**   outSharedLibrary);
 

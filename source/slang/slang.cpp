@@ -3613,6 +3613,33 @@ static SlangResult _getEntryPointResult(
     return SLANG_OK;
 }
 
+static SlangResult _getWholeProgramResult(
+    SlangCompileRequest* request,
+    int targetIndex,
+    Slang::CompileResult** outCompileResult)
+{
+    using namespace Slang;
+    if (!request)
+        return SLANG_ERROR_INVALID_PARAMETER;
+
+    auto req = Slang::asInternal(request);
+    auto linkage = req->getLinkage();
+    auto program = req->getSpecializedGlobalAndEntryPointsComponentType();
+
+    Index targetCount = linkage->targets.getCount();
+    if ((targetIndex < 0) || (targetIndex >= targetCount))
+    {
+        return SLANG_ERROR_INVALID_PARAMETER;
+    }
+    auto targetReq = linkage->targets[targetIndex];
+
+    auto targetProgram = program->getTargetProgram(targetReq);
+    if (!targetProgram)
+        return SLANG_FAIL;
+    *outCompileResult = &targetProgram->getExistingWholeProgramResult();
+    return SLANG_OK;
+}
+
 SLANG_API SlangResult spGetEntryPointCodeBlob(
         SlangCompileRequest*    request,
         int                     entryPointIndex,
@@ -3641,6 +3668,43 @@ SLANG_API SlangResult spGetEntryPointHostCallable(
 
     Slang::CompileResult* compileResult = nullptr;
     SLANG_RETURN_ON_FAIL(_getEntryPointResult(request, entryPointIndex, targetIndex, &compileResult));
+
+    ComPtr<ISlangSharedLibrary> sharedLibrary;
+    SLANG_RETURN_ON_FAIL(compileResult->getSharedLibrary(sharedLibrary));
+    *outSharedLibrary = sharedLibrary.detach();
+    return SLANG_OK;
+}
+
+SLANG_API SlangResult spGetTargetCodeBlob(
+    SlangCompileRequest* request,
+    int targetIndex,
+    ISlangBlob** outBlob)
+{
+    using namespace Slang;
+    if (!outBlob)
+        return SLANG_ERROR_INVALID_PARAMETER;
+    Slang::CompileResult* compileResult = nullptr;
+    SLANG_RETURN_ON_FAIL(
+        _getWholeProgramResult(request, targetIndex, &compileResult));
+
+    ComPtr<ISlangBlob> blob;
+    SLANG_RETURN_ON_FAIL(compileResult->getBlob(blob));
+    *outBlob = blob.detach();
+    return SLANG_OK;
+}
+
+SLANG_API SlangResult spGetTargetHostCallable(
+    SlangCompileRequest* request,
+    int targetIndex,
+    ISlangSharedLibrary** outSharedLibrary)
+{
+    using namespace Slang;
+    if (!outSharedLibrary)
+        return SLANG_ERROR_INVALID_PARAMETER;
+
+    Slang::CompileResult* compileResult = nullptr;
+    SLANG_RETURN_ON_FAIL(
+        _getWholeProgramResult(request, targetIndex, &compileResult));
 
     ComPtr<ISlangSharedLibrary> sharedLibrary;
     SLANG_RETURN_ON_FAIL(compileResult->getSharedLibrary(sharedLibrary));
