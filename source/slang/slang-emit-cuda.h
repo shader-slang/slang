@@ -34,6 +34,7 @@ public:
     static UnownedStringSlice getVectorPrefix(IROp op);
 
     virtual RefObject* getExtensionTracker() SLANG_OVERRIDE { return m_extensionTracker; }
+    virtual void emitTempModifiers(IRInst* temp) SLANG_OVERRIDE;
 
     CUDASourceEmitter(const Desc& desc) :
         Super(desc),
@@ -63,7 +64,7 @@ protected:
 
     virtual void emitLoopControlDecorationImpl(IRLoopControlDecoration* decl) SLANG_OVERRIDE;
 
-    virtual void handleCallExprDecorationsImpl(IRInst* funcValue) SLANG_OVERRIDE;
+    virtual void handleRequiredCapabilitiesImpl(IRInst* inst) SLANG_OVERRIDE;
 
     virtual bool tryEmitGlobalParamImpl(IRGlobalParam* varDecl, IRType* varType) SLANG_OVERRIDE;
     virtual bool tryEmitInstExprImpl(IRInst* inst, const EmitOpInfo& inOuterPrec) SLANG_OVERRIDE;

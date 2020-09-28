@@ -1,11 +1,13 @@
 #ifndef SLANG_PRELUDE_SCALAR_INTRINSICS_H
 #define SLANG_PRELUDE_SCALAR_INTRINSICS_H
 
-#include "../slang.h"
-
 #if SLANG_PROCESSOR_X86_64 && SLANG_VC
 // If we have visual studio and 64 bit processor, we can assume we have popcnt, and can include x86 intrinsics
 #   include <intrin.h>
+#endif
+
+#ifndef SLANG_FORCE_INLINE
+#    define SLANG_FORCE_INLINE inline
 #endif
 
 #ifdef SLANG_PRELUDE_NAMESPACE

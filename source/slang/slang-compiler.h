@@ -1132,7 +1132,10 @@ namespace Slang
         SlangTargetFlags    targetFlags = 0;
         Slang::Profile      targetProfile = Slang::Profile();
         FloatingPointMode   floatingPointMode = FloatingPointMode::Default;
-        bool                isWholeProgramRequest = false;
+        bool isWholeProgramRequest()
+        {
+            return (targetFlags & SLANG_TARGET_FLAG_GENERATE_WHOLE_PROGRAM) != 0;
+        }
 
         Linkage* getLinkage() { return linkage; }
         CodeGenTarget getTarget() { return target; }
@@ -1673,7 +1676,7 @@ namespace Slang
             /// code generation to the given `sink`.
             ///
         CompileResult& getOrCreateEntryPointResult(Int entryPointIndex, DiagnosticSink* sink);
-        CompileResult& getOrCreateWholeProgramResult(const List<Int>& entryPointIndices, DiagnosticSink* sink);
+        CompileResult& getOrCreateWholeProgramResult(DiagnosticSink* sink);
 
 
         CompileResult& getExistingWholeProgramResult()
@@ -1691,7 +1694,6 @@ namespace Slang
         }
 
         CompileResult& _createWholeProgramResult(
-            const List<Int>&        entryPointIndices,
             BackEndCompileRequest*  backEndRequest,
             EndToEndCompileRequest* endToEndRequest);
             /// Internal helper for `getOrCreateEntryPointResult`.

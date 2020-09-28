@@ -7,16 +7,27 @@
 namespace Slang
 {
 
+class HLSLExtensionTracker : public RefObject
+{
+public:
+        /// Has any operation been used that requires NVAPI to be included via prelude?
+    bool m_requiresNVAPI = false;
+};
+
 class HLSLSourceEmitter : public CLikeSourceEmitter
 {
 public:
     typedef CLikeSourceEmitter Super;
 
-    HLSLSourceEmitter(const Desc& desc) :
-        Super(desc)
+    HLSLSourceEmitter(const Desc& desc)
+        : Super(desc)
+        , m_extensionTracker(new HLSLExtensionTracker)
     {}
 
+    virtual RefObject* getExtensionTracker() SLANG_OVERRIDE { return m_extensionTracker; }
+
 protected:
+    RefPtr<HLSLExtensionTracker> m_extensionTracker;
 
     virtual void emitLayoutSemanticsImpl(IRInst* inst, char const* uniformSemanticSpelling) SLANG_OVERRIDE;
     virtual void emitParameterGroupImpl(IRGlobalParam* varDecl, IRUniformParameterGroupType* type) SLANG_OVERRIDE;
@@ -34,6 +45,11 @@ protected:
     virtual bool tryEmitInstExprImpl(IRInst* inst, const EmitOpInfo& inOuterPrec) SLANG_OVERRIDE;
     virtual void emitSimpleValueImpl(IRInst* inst) SLANG_OVERRIDE;
     virtual void emitLoopControlDecorationImpl(IRLoopControlDecoration* decl) SLANG_OVERRIDE;
+
+    virtual void handleRequiredCapabilitiesImpl(IRInst* inst) SLANG_OVERRIDE;
+    virtual void emitPreludeDirectivesImpl() SLANG_OVERRIDE;
+
+    virtual void emitGlobalInstImpl(IRInst* inst) SLANG_OVERRIDE;
 
         // Emit a single `register` semantic, as appropriate for a given resource-type-specific layout info
         // Keyword to use in the uniform case (`register` for globals, `packoffset` inside a `cbuffer`)

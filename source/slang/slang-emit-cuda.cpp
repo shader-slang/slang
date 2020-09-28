@@ -79,6 +79,15 @@ static bool _isSingleNameBasicType(IROp op)
     }
 }
 
+void CUDASourceEmitter::emitTempModifiers(IRInst* temp)
+{
+    CPPSourceEmitter::emitTempModifiers(temp);
+    if (as<IRModuleInst>(temp->getParent()))
+    {
+        m_writer->emit("__device__ ");
+    }
+}
+
 SlangResult CUDASourceEmitter::_calcCUDATextureTypeName(IRTextureTypeBase* texType, StringBuilder& outName)
 {
     // Not clear how to do this yet
@@ -324,7 +333,7 @@ String CUDASourceEmitter::generateEntryPointNameImpl(IREntryPointDecoration* ent
 
 void CUDASourceEmitter::emitGlobalRTTISymbolPrefix()
 {
-    m_writer->emit("__device__");
+    m_writer->emit("__device__ ");
 }
 
 void CUDASourceEmitter::emitCall(const HLSLIntrinsic* specOp, IRInst* inst, const IRUse* operands, int numOperands, const EmitOpInfo& inOuterPrec)
@@ -583,18 +592,12 @@ void CUDASourceEmitter::_requireCUDASMVersion(SemanticVersion const& version)
     }
 }
 
-void CUDASourceEmitter::handleCallExprDecorationsImpl(IRInst* funcValue)
+void CUDASourceEmitter::handleRequiredCapabilitiesImpl(IRInst* inst)
 {
-    // Does this function declare any requirements on GLSL version or
-    // extensions, which should affect our output?
+    // Does this function declare any requirements on CUDA capabilities
+    // that should affect output?
 
-    auto decoratedValue = funcValue;
-    while (auto specInst = as<IRSpecialize>(decoratedValue))
-    {
-        decoratedValue = getSpecializedValue(specInst);
-    }
-
-    for (auto decoration : decoratedValue->getDecorations())
+    for (auto decoration : inst->getDecorations())
     {
         if( auto smDecoration = as<IRRequireCUDASMVersionDecoration>(decoration))
         {

@@ -38,12 +38,9 @@ layout(local_size_x = 16, local_size_y = 1, local_size_z = 1) in;void main()
 
     float delta_0 = ((anotherBuffer_0)._data[(uint(idx_0 & 3))]);
 
-
-    uint _S13 = uint(idx_0 << 2);
-
 #line 21
-    float _S14;
-    RWByteAddressBuffer_InterlockedAddF32_0(_S13, 1.00000000000000000000, _S14);
+    float _S13;
+    RWByteAddressBuffer_InterlockedAddF32_0(uint(idx_0 << 2), 1.00000000000000000000, _S13);
     RWByteAddressBuffer_InterlockedAddF32_1(uint(int(tid_0 >> 2) << 2), delta_0);
 
 #line 13

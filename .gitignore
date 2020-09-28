@@ -41,3 +41,5 @@ tests/**/*.slang-module
 /source/slang/slang-ast-generated-macro.h
 /source/slang/hlsl.meta.slang.h
 /source/slang/core.meta.slang.h
+prelude/*.h.cpp
+/source/slang/cpp.hint

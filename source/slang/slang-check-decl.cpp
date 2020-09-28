@@ -89,6 +89,7 @@ namespace Slang
 
         void visitPropertyDecl(PropertyDecl* decl);
 
+        void visitStructDecl(StructDecl* decl);
 
             /// Get the type of the storage accessed by an accessor.
             ///
@@ -914,6 +915,87 @@ namespace Slang
             // arrays in specific cases)
             //
             validateArraySizeForVariable(varDecl);
+        }
+
+        // The NVAPI library allows user code to express extended operations
+        // (not supported natively by D3D HLSL) by communicating with
+        // a specially identified shader parameter called `g_NvidiaExt`.
+        //
+        // By default, that shader parameter would look like an ordinary
+        // global shader parameter to Slang, but we want to be able to
+        // associate special behavior with it to make downstream compilation
+        // work nicely (especially in the case where certain cross-platform
+        // operations in the Slang standard library need to use NVAPI).
+        //
+        // We will detect a global variable declaration that appears to
+        // be declaring `g_NvidiaExt` from NVAPI, and mark it with a special
+        // modifier to allow downstream steps to detect it whether or
+        // not it has an associated name.
+        //
+        if( as<ModuleDecl>(varDecl->parentDecl)
+            && varDecl->getName()
+            && varDecl->getName()->text == "g_NvidiaExt" )
+        {
+            addModifier(varDecl, m_astBuilder->create<NVAPIMagicModifier>());
+        }
+        //
+        // One thing that the `NVAPIMagicModifier` is going to do is ensure
+        // that `g_NvidiaExt` always gets emitted with *exactly* that name,
+        // whether or not obfuscation or other steps are enabled.
+        //
+        // The `g_NvidiaExt` variable is declared as a:
+        //
+        //      RWStructuredBuffer<NvShaderExtnStruct>
+        //
+        // and we also want to make sure that the fields of that struct
+        // retain their original names in output code. We will detect
+        // variable declarations that represent fields of that struct
+        // and flag them as "magic" as well.
+        //
+        // Note: The goal here is to make it so that generated HLSL output
+        // can either use these declarations as they have been preocessed
+        // by the Slang front-end *or* they can use declarations directly
+        // from the NVAPI header during downstream compilation.
+        //
+        // TODO: It would be nice if we had a way to identify *all* of the
+        // declarations that come from the NVAPI header and mark them, so
+        // that the Slang front-end doesn't have to take responsibility
+        // for generating code from them (and can instead rely on the downstream
+        // compiler alone).
+        //
+        // The NVAPI header doesn't put any kind of macro-defined modifier
+        // (defaulting to an empty macro) in front of its declarations,
+        // so the most plausible way to add a modifier to all the declarations
+        // would be to tag the `nvHLSLExtns.h` header in a list of "magic"
+        // headers which should get all their declarations flagged during
+        // front-end processing, and then use the same header again during
+        // downstream compilation.
+        //
+        // For now, the current hackery seems a bit less complicated.
+        //
+        if( auto structDecl = as<StructDecl>(varDecl->parentDecl))
+        {
+            if( structDecl->getName()
+                && structDecl->getName()->text == "NvShaderExtnStruct" )
+            {
+                addModifier(varDecl, m_astBuilder->create<NVAPIMagicModifier>());
+            }
+        }
+    }
+
+    void SemanticsDeclHeaderVisitor::visitStructDecl(StructDecl* structDecl)
+    {
+        // As described above in `SemanticsDeclHeaderVisitor::checkVarDeclCommon`,
+        // we want to identify and tag the "magic" declarations that make NVAPI
+        // work, so that downstream passes can identify them and act accordingly.
+        //
+        // In this case, we are looking for the `NvShaderExtnStruct` type, which
+        // is used by `g_NvidiaExt`.
+        //
+        if( structDecl->getName()
+            && structDecl->getName()->text == "NvShaderExtnStruct" )
+        {
+            addModifier(structDecl, m_astBuilder->create<NVAPIMagicModifier>());
         }
     }
 

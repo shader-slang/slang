@@ -9,12 +9,10 @@
 #define tmp_direction _S4
 #define tmp_tmin _S5
 #define tmp_tmax _S6
-#define tmp_ray _S7
-#define tmp_sphere _S8
-#define tmp_thit _S9
-#define tmp_hitattrs _S10
-#define tmp_dithit _S11
-#define tmp_reportresult _S12
+#define tmp_thit _S7
+#define tmp_hitattrs _S8
+#define tmp_dithit _S9
+#define tmp_reportresult _S10
 
 struct Sphere_0
 {
@@ -83,13 +81,9 @@ void main()
     float tmp_tmax = gl_RayTmaxNV;
     ray_1.TMax_0 = tmp_tmax;
 
-    RayDesc_0 tmp_ray = ray_1;
-
-    Sphere_0 tmp_sphere = U_0._data.gSphere_0;
-
     float tmp_thit;
     SphereHitAttributes_0 tmp_hitattrs;
-    bool tmp_dithit = rayIntersectsSphere_0(tmp_ray, tmp_sphere, tmp_thit, tmp_hitattrs);
+    bool tmp_dithit = rayIntersectsSphere_0(ray_1, U_0._data.gSphere_0, tmp_thit, tmp_hitattrs);
 
     float tHit_2 = tmp_thit;
     SphereHitAttributes_0 attrs_1 = tmp_hitattrs;
