@@ -13,9 +13,12 @@
 
 #include "slang-ast-builder.h"
 
+#include "slang-serialize.h"
+
 #include "../core/slang-byte-encode-util.h"
 
 #include "../core/slang-stream.h"
+
 namespace Slang
 {
 

@@ -282,6 +282,22 @@ enum class SerialTypeKind : uint8_t
 };
 typedef uint16_t SerialSubType;
 
+enum class RefObjectSerialSubType
+{
+    Invalid,                            ///< Invalid (ie not a known RefObject type)
+    LookupResultItem_Breadcrumb,
+
+    // TODO(JS):
+    // ! We don't want to serialize these types.
+    // We could set a nullptr SerialClass in classes ?
+    // Perhaps we need some special SerialClass that indicates we want to always write as 0?
+
+    Scope,
+    Module,
+
+    CountOf,
+};
+
 struct SerialInfo
 {
     enum
@@ -634,18 +650,30 @@ struct SerialField
     uint32_t serialOffset;              ///< Offset in serial type
 };
 
+typedef uint8_t SerialClassFlags;
+
+struct SerialClassFlag
+{
+    enum Enum : SerialClassFlags
+    {
+        DontSerialize = 0x01,               ///< If set the type is not serialized, so can turn into SerialIndex(0)
+    };
+};
+
 struct SerialClass
 {    
     SerialTypeKind typeKind;            ///< The type kind
     SerialSubType subType;              ///< Subtype - meaning depends on typeKind
+
     uint8_t alignment;                  ///< Alignment of this type
+    SerialClassFlags flags;             ///< Flags 
 
     uint32_t size;                      ///< Size of the field in bytes
 
     Index fieldsCount;
-    SerialField* fields;
+    const SerialField* fields;
 
-    SerialClass* super;                 ///< The super class
+    const SerialClass* super;           ///< The super class
 };
 
 // An instance could be shared across Sessions, but for simplicity of life time
@@ -657,10 +685,12 @@ public:
         /// Will add it's own copy into m_classesByType
         /// In process will calculate alignment, offset etc for fields
         /// NOTE! the super set, *must* be an already added to this SerialClasses
-    const SerialClass* addCopy(const SerialClass* cls);
+    const SerialClass* add(const SerialClass* cls);
 
-        /// Associates the typeKind/subType with this class. 
-    void add(SerialClass* cls);
+    const SerialClass* add(SerialTypeKind kind, SerialSubType subType, const SerialField* fields, Index fieldsCount, const SerialClass* superCls);
+
+        /// Add a type which will not serialize
+    const SerialClass* addUnserialized(SerialTypeKind kind, SerialSubType subType);
 
         /// Returns true if this cls is *owned* by this SerialClasses
     bool isOwned(const SerialClass* cls) const;
@@ -671,9 +701,13 @@ public:
         const auto& classes = m_classesByTypeKind[Index(typeKind)];
         return (subType < classes.getCount()) ? classes[subType] : nullptr;
     }
-
+    
         /// Ctor
     SerialClasses();
+
+    static SlangResult create(RefPtr<SerialClasses>& out);
+
+    static RefObjectSerialSubType getSubType(const RefObject* obj);
 
 protected:
     SerialClass* _createSerialClass(const SerialClass* cls);

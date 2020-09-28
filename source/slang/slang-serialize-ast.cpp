@@ -14,6 +14,8 @@
 
 #include "slang-legalize-types.h"
 
+#include "slang-serialize.h"
+
 #include "../core/slang-byte-encode-util.h"
 
 namespace Slang {
@@ -975,7 +977,6 @@ struct ASTSerialGetType<DeclRef<T>>
 
 // !!!!!!!!!!!!!!!!!!!!!! Generate fields for a type !!!!!!!!!!!!!!!!!!!!!!!!!!!
 
-
 template <typename T>
 ASTSerialField _calcField(const char* name, T& in)
 {
@@ -1011,6 +1012,39 @@ static ASTSerialClass _makeClass(MemoryArena* arena, ASTNodeType type, const Lis
     outClasses[Index(ASTNodeType::NAME)] = _makeClass(arena, ASTNodeType::NAME, fields); \
 }
 
+template <typename T>
+SerialField _makeField(const char* name, T& in)
+{
+    uint8_t* ptr = &reinterpret_cast<uint8_t&>(in);
+
+    SerialField field;
+    field.name = name;
+    field.type = (SerialType*)ASTSerialGetType<T>::getType();
+    // This only works because we in is an offset from 1
+    field.nativeOffset = uint32_t(size_t(ptr) - 1);
+    field.serialOffset = 0;
+    return field;
+}
+
+static const SerialClass* _addClass(SerialClasses* serialClasses, ASTNodeType type, ASTNodeType super, const List<SerialField>& fields)
+{
+    const SerialClass* superClass = serialClasses->getSerialClass(SerialTypeKind::NodeBase, SerialSubType(super));
+    return serialClasses->add(SerialTypeKind::NodeBase, SerialSubType(type), fields.getBuffer(), fields.getCount(), superClass);
+}
+
+#define SLANG_AST_ADD_SERIAL_FIELD(FIELD_NAME, TYPE, param) fields.add(_makeField(#FIELD_NAME, obj->FIELD_NAME));
+
+// Note that the obj point is not nullptr, because some compilers notice this is 'indexing from null'
+// and warn/error. So we offset from 1.
+#define SLANG_AST_ADD_SERIAL_CLASS(NAME, SUPER, ORIGIN, LAST, MARKER, TYPE, param) \
+{ \
+    NAME* obj = (NAME*)1; \
+    SLANG_UNUSED(obj); \
+    fields.clear(); \
+    SLANG_FIELDS_ASTNode_##NAME(SLANG_AST_ADD_SERIAL_FIELD, param) \
+    _addClass(serialClasses, ASTNodeType::NAME, ASTNodeType::SUPER, fields); \
+}
+
 struct ASTFieldAccess
 {
     static void calcClasses(MemoryArena* arena, ASTSerialClass outClasses[Index(ASTNodeType::CountOf)])
@@ -1018,6 +1052,97 @@ struct ASTFieldAccess
         List<ASTSerialField> fields;
         SLANG_ALL_ASTNode_NodeBase(SLANG_AST_SERIAL_MAKE_CLASS, _)
     }
+
+    static void calcClasses(SerialClasses* serialClasses)
+    {
+        // Add NodeBase first, and specially handle so that we add a null super class
+        serialClasses->add(SerialTypeKind::NodeBase, SerialSubType(ASTNodeType::NodeBase), nullptr, 0, nullptr);
+
+        // Add the rest in order such that Super class is always added before its children
+        List<SerialField> fields;
+        SLANG_CHILDREN_ASTNode_NodeBase(SLANG_AST_ADD_SERIAL_CLASS, _)
+    }
+};
+
+void addASTTypes(SerialClasses* serialClasses)
+{
+    {
+        ASTFieldAccess::calcClasses(serialClasses);
+    }
+
+    {
+        {
+            // Let's hack Breadcrumbs...
+
+            typedef LookupResultItem::Breadcrumb Type;
+            Type* obj = (Type*)1;
+            SerialField field = _makeField("_", *obj);
+            serialClasses->add(SerialTypeKind::RefObject, SerialSubType(RefObjectSerialSubType::LookupResultItem_Breadcrumb), &field, 1, nullptr);
+        }
+
+        // Set these types to not serialize
+        serialClasses->addUnserialized(SerialTypeKind::RefObject, SerialSubType(RefObjectSerialSubType::Module));
+        serialClasses->addUnserialized(SerialTypeKind::RefObject, SerialSubType(RefObjectSerialSubType::Scope));
+    }
+}
+
+// A Hack for now to turn an RefObject* into a SubType for serialization
+extern RefObjectSerialSubType getRefObjectSubType(const RefObject* obj)
+{
+    if (as<LookupResultItem::Breadcrumb>(obj))
+    {
+        return RefObjectSerialSubType::LookupResultItem_Breadcrumb;
+    }
+    else if (as<Module>(obj))
+    {
+        return RefObjectSerialSubType::Module;
+    }
+    else if (as<Scope>(obj))
+    {
+        return RefObjectSerialSubType::Scope;
+    }
+    return RefObjectSerialSubType::Invalid;
+}
+
+class ASTSerialObjectFactory : public SerialObjectFactory
+{
+public:
+
+    virtual void* create(SerialTypeKind typeKind, SerialSubType subType) SLANG_OVERRIDE
+    {
+        switch (typeKind)
+        {
+            case SerialTypeKind::NodeBase:
+            {
+                return m_astBuilder->createByNodeType(ASTNodeType(subType));
+            }
+            case SerialTypeKind::RefObject:
+            {
+                switch (RefObjectSerialSubType(subType))
+                {
+                    case RefObjectSerialSubType::LookupResultItem_Breadcrumb:
+                    {
+                        typedef LookupResultItem::Breadcrumb Breadcrumb;
+
+                        auto breadcrumb = new LookupResultItem::Breadcrumb(Breadcrumb::Kind::Member, DeclRef<Decl>(), nullptr, nullptr);
+
+                        return breadcrumb;
+                    }
+                    default: break;
+                }
+            }
+            default: break;
+        }
+
+        return nullptr;
+    }
+
+    ASTSerialObjectFactory(ASTBuilder* astBuilder):
+        m_astBuilder(astBuilder)
+    {
+    }
+
+    ASTBuilder* m_astBuilder;
 };
 
 ASTSerialClasses::ASTSerialClasses():

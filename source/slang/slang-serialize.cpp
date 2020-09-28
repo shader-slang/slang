@@ -5,14 +5,7 @@
 
 namespace Slang {
 
-void SerialClasses::add(SerialClass* cls)
-{
-    SLANG_ASSERT(getSerialClass(cls->typeKind, cls->subType) == nullptr);
-    List<const SerialClass*>& classes = m_classesByTypeKind[Index(cls->typeKind)];
-    classes[cls->subType] = cls;
-}
-
-const SerialClass* SerialClasses::addCopy(const SerialClass* cls)
+const SerialClass* SerialClasses::add(const SerialClass* cls)
 {
     List<const SerialClass*>& classes = m_classesByTypeKind[Index(cls->typeKind)]; 
 
@@ -35,6 +28,62 @@ const SerialClass* SerialClasses::addCopy(const SerialClass* cls)
     return copy;
 }
 
+const SerialClass* SerialClasses::add(SerialTypeKind kind, SerialSubType subType, const SerialField* fields, Index fieldsCount, const SerialClass* superCls)
+{
+    SerialClass cls;
+    cls.typeKind = kind;
+    cls.subType = subType;
+        
+    cls.fields = fields;
+    cls.fieldsCount = fieldsCount;
+
+    // If the superCls is set it must be owned
+    SLANG_ASSERT(superCls == nullptr || isOwned(superCls));
+
+    cls.super = superCls;
+
+    // Set to invalid values for now
+    cls.alignment = 0;
+    cls.size = 0;
+    cls.flags = 0;
+
+    return add(&cls);
+}
+
+const SerialClass* SerialClasses::addUnserialized(SerialTypeKind kind, SerialSubType subType)
+{
+    List<const SerialClass*>& classes = m_classesByTypeKind[Index(kind)];
+
+    if (subType >= classes.getCount())
+    {
+        classes.setCount(subType + 1);
+    }
+    else
+    {
+        if (classes[subType])
+        {
+            SLANG_ASSERT(!"Type is already set");
+            return nullptr;
+        }
+    }
+
+    SerialClass* dst = m_arena.allocate<SerialClass>();
+
+    dst->typeKind = kind;
+    dst->subType = subType;
+
+    dst->size = 0;
+    dst->alignment = 0;
+
+    dst->fields = nullptr;
+    dst->fieldsCount = 0;
+    dst->flags = SerialClassFlag::DontSerialize;
+    dst->super = nullptr;
+
+    classes[subType] = dst;
+    return dst;
+}
+
 bool SerialClasses::isOwned(const SerialClass* cls) const
 {
     const List<const SerialClass*>& classes = m_classesByTypeKind[Index(cls->typeKind)];
@@ -48,6 +97,8 @@ SerialClass* SerialClasses::_createSerialClass(const SerialClass* cls)
 
     if (cls->super)
     {
+        SLANG_ASSERT(isOwned(cls->super));
+
         maxAlignment = cls->super->alignment;
         offset = cls->super->size;
     }
@@ -63,10 +114,10 @@ SerialClass* SerialClasses::_createSerialClass(const SerialClass* cls)
     SerialField* dstFields = m_arena.allocateArray<SerialField>(cls->fieldsCount);
 
     // Okay, go through fields setting their offset
-    SerialField* srcFields = cls->fields;
+    const SerialField* srcFields = cls->fields;
     for (Index j = 0; j < cls->fieldsCount; j++)
     {
-        SerialField& srcField = srcFields[j];
+        const SerialField& srcField = srcFields[j];
         SerialField& dstField = dstFields[j];
 
         uint32_t alignment = srcField.type->serialAlignment;
@@ -91,6 +142,7 @@ SerialClass* SerialClasses::_createSerialClass(const SerialClass* cls)
 
     dst->alignment = uint8_t(maxAlignment);
     dst->size = uint32_t(offset);
+    dst->flags = cls->flags;
 
     dst->fields = dstFields;
 
@@ -100,6 +152,24 @@ SerialClass* SerialClasses::_createSerialClass(const SerialClass* cls)
 SerialClasses::SerialClasses():
     m_arena(2048)
 {
+}
+
+// For now just use an extern so we don't need to include AST serialize
+extern void addASTTypes(SerialClasses* serialClasses);
+extern RefObjectSerialSubType getRefObjectSubType(const RefObject* obj);
+
+/* static */SlangResult SerialClasses::create(RefPtr<SerialClasses>& out)
+{
+    RefPtr<SerialClasses> classes(new SerialClasses);
+    addASTTypes(classes);
+
+    out = classes;
+    return SLANG_OK;
+}
+
+/* static */RefObjectSerialSubType SerialClasses::getSubType(const RefObject* obj)
+{
+    return getRefObjectSubType(obj);
 }
 
 // !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! SerialWriter  !!!!!!!!!!!!!!!!!!!!!!!!!!!!
@@ -116,6 +186,11 @@ SerialWriter::SerialWriter(SerialClasses* classes, SerialFilter* filter) :
 
 SerialIndex SerialWriter::writeObject(const SerialClass* serialCls, const void* ptr)
 {
+    if (serialCls->flags & SerialClassFlag::DontSerialize)
+    {
+        return SerialIndex(0);
+    }
+
     // This pointer cannot be in the map
     SLANG_ASSERT(m_ptrMap.TryGetValue(ptr) == nullptr);
 
@@ -161,10 +236,14 @@ SerialIndex SerialWriter::writeObject(const NodeBase* node)
 
 SerialIndex SerialWriter::writeObject(const RefObject* obj)
 {
-    // TODO(JS)!!!
-    // We need to determine arbitrary obj sub types
-    SerialSubType subType = 0;
-    const SerialClass* serialClass = m_classes->getSerialClass(SerialTypeKind::RefObject, subType);
+    const RefObjectSerialSubType subType = SerialClasses::getSubType(obj);
+    if (subType == RefObjectSerialSubType::Invalid)
+    {
+        SLANG_ASSERT(!"Unhandled type");
+        return SerialIndex(0);
+    }
+
+    const SerialClass* serialClass = m_classes->getSerialClass(SerialTypeKind::RefObject, SerialSubType(subType));
     return writeObject(serialClass, (const void*)obj);
 }
 
@@ -211,6 +290,10 @@ SerialIndex SerialWriter::addPointer(const RefObject* obj)
         return SerialIndex(*indexPtr);
     }
 
+    // TODO(JS):
+    // Arguably the lookup for these types should be done the same way as arbitrary RefObject types
+    // and have a enum for them, such we can use a switch instead of all this casting
+
     if (auto stringRep = dynamicCast<StringRepresentation>(obj))
     {
         SerialIndex index = addString(StringRepresentation::asSlice(stringRep));
@@ -221,9 +304,8 @@ SerialIndex SerialWriter::addPointer(const RefObject* obj)
     {
         return addName(name);
     }
-    
-    SLANG_ASSERT(!"Unhandled type");
-    return SerialIndex(0);
+
+    return writeObject(obj);
 }
 
 SerialIndex SerialWriter::addString(const UnownedStringSlice& slice)
@@ -496,7 +578,6 @@ size_t SerialInfo::Entry::calcSize(SerialClasses* serialClasses) const
             size = size + (alignment - 1) & ~(alignment - 1);
             return size;
         }
-        
         
         default: break;
     }
