@@ -62,13 +62,13 @@ struct SerialTypeInfo<SourceLoc>
 
     static void toSerial(SerialWriter* writer, const void* inNative, void* outSerial)
     {
-        DebugSerialWriter* debugWriter = writer->getExtraObjects().get<DebugSerialWriter>();
-        *(SerialType*)outSerial = debugWriter ? debugWriter->addSourceLoc(*(const NativeType*)inNative) : SerialType(0);
+        SerialSourceLocWriter* sourceLocWriter = writer->getExtraObjects().get<SerialSourceLocWriter>();
+        *(SerialType*)outSerial = sourceLocWriter ? sourceLocWriter->addSourceLoc(*(const NativeType*)inNative) : SerialType(0);
     }
     static void toNative(SerialReader* reader, const void* inSerial, void* outNative)
     {
-        DebugSerialReader* debugReader = reader->getExtraObjects().get<DebugSerialReader>();
-        *(NativeType*)outNative = debugReader ? debugReader->getSourceLoc(*(const SerialType*)inSerial) : NativeType::fromRaw(0);
+        SerialSourceLocReader* sourceLocReader = reader->getExtraObjects().get<SerialSourceLocReader>();
+        *(NativeType*)outNative = sourceLocReader ? sourceLocReader->getSourceLoc(*(const SerialType*)inSerial) : NativeType::fromRaw(0);
     }
 };
 

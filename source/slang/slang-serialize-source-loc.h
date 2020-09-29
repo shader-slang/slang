@@ -1,6 +1,6 @@
-// slang-serialize-debug.h
-#ifndef SLANG_SERIALIZE_DEBUG_H
-#define SLANG_SERIALIZE_DEBUG_H
+// slang-serialize-source-loc.h
+#ifndef SLANG_SERIALIZE_SOURCE_LOC_H
+#define SLANG_SERIALIZE_SOURCE_LOC_H
 
 #include "../core/slang-riff.h"
 #include "../core/slang-string-slice-pool.h"
@@ -13,10 +13,10 @@
 
 namespace Slang {
 
-class DebugSerialData
+class SerialSourceLocData
 {
 public:
-    typedef DebugSerialData ThisType;
+    typedef SerialSourceLocData ThisType;
 
     typedef uint32_t SourceLoc;
     typedef SerialStringData::StringIndex StringIndex;
@@ -52,9 +52,9 @@ public:
         SourceLoc m_end;                ///< The number of bytes in the source
     };
 
-    struct DebugSourceInfo
+    struct SourceInfo
     {
-        typedef DebugSourceInfo ThisType;
+        typedef SourceInfo ThisType;
 
         bool operator==(const ThisType& rhs) const
         {
@@ -79,9 +79,9 @@ public:
         uint32_t m_numAdjustedLineInfos;        ///< The number of line infos
     };
 
-    struct DebugLineInfo
+    struct LineInfo
     {
-        typedef DebugLineInfo ThisType;
+        typedef LineInfo ThisType;
         bool operator<(const ThisType& rhs) const { return m_lineStartOffset < rhs.m_lineStartOffset; }
         bool operator==(const ThisType& rhs) const
         {
@@ -94,9 +94,9 @@ public:
         uint32_t m_lineIndex;                     ///< Original line index
     };
 
-    struct DebugAdjustedLineInfo
+    struct AdjustedLineInfo
     {
-        typedef DebugAdjustedLineInfo ThisType;
+        typedef AdjustedLineInfo ThisType;
         bool operator==(const ThisType& rhs) const
         {
             return m_lineInfo == rhs.m_lineInfo &&
@@ -106,7 +106,7 @@ public:
         bool operator!=(const ThisType& rhs) const { return !(*this == rhs); }
         bool operator<(const ThisType& rhs) const { return m_lineInfo < rhs.m_lineInfo; }
 
-        DebugLineInfo m_lineInfo;
+        LineInfo m_lineInfo;
         uint32_t m_adjustedLineIndex;             ///< The line index with the adjustment (if there is any). Is 0 if m_pathStringIndex is 0.
         StringIndex m_pathStringIndex;            ///< The path as an index
     };
@@ -116,10 +116,10 @@ public:
 
     Index findSourceInfoIndex(SourceLoc sourceLoc) const
     {
-        const Index numInfos = m_debugSourceInfos.getCount();
+        const Index numInfos = m_sourceInfos.getCount();
         for (Index i = 0; i < numInfos; ++i)
         {
-            if (m_debugSourceInfos[i].m_range.contains(sourceLoc))
+            if (m_sourceInfos[i].m_range.contains(sourceLoc))
             {
                 return i;
             }
@@ -132,35 +132,33 @@ public:
     Result writeContainer(SerialCompressionType moduleCompressionType, RiffContainer* container);
     Result readContainer(SerialCompressionType moduleCompressionType, RiffContainer::ListChunk* listChunk);
 
-    // Data only set if we have debug information
-
-    List<char> m_debugStringTable;              ///< String table for debug use only
-    List<DebugLineInfo> m_debugLineInfos;        ///< Debug line information
-    List<DebugAdjustedLineInfo> m_debugAdjustedLineInfos;        ///< Adjusted line infos
-    List<DebugSourceInfo> m_debugSourceInfos;    ///< Debug source information
+    List<char> m_stringTable;                       ///< String table for debug use only
+    List<LineInfo> m_lineInfos;                     ///< Line information
+    List<AdjustedLineInfo> m_adjustedLineInfos;     ///< Adjusted line infos
+    List<SourceInfo> m_sourceInfos;                 ///< Source infos
 };
 
-class DebugSerialReader : public RefObject
+class SerialSourceLocReader : public RefObject
 {
 public:
     static const SerialExtraType kExtraType = SerialExtraType::DebugReader;
 
-    Index findViewIndex(DebugSerialData::SourceLoc loc);
+    Index findViewIndex(SerialSourceLocData::SourceLoc loc);
 
-    SourceLoc getSourceLoc(DebugSerialData::SourceLoc loc);
+    SourceLoc getSourceLoc(SerialSourceLocData::SourceLoc loc);
 
         /// Works out the amount to fix an input source loc to get a regular Slang::SourceLoc
-    int calcFixSourceLoc(DebugSerialData::SourceLoc loc, DebugSerialData::SourceRange& outRange);
+    int calcFixSourceLoc(SerialSourceLocData::SourceLoc loc, SerialSourceLocData::SourceRange& outRange);
 
         /// Calc the loc
-    static SourceLoc calcFixedLoc(DebugSerialData::SourceLoc loc, int fix, const DebugSerialData::SourceRange& range) { SLANG_ASSERT(range.contains(loc)); SLANG_UNUSED(range); return SourceLoc::fromRaw(SourceLoc::RawValue(loc + fix)); }
+    static SourceLoc calcFixedLoc(SerialSourceLocData::SourceLoc loc, int fix, const SerialSourceLocData::SourceRange& range) { SLANG_ASSERT(range.contains(loc)); SLANG_UNUSED(range); return SourceLoc::fromRaw(SourceLoc::RawValue(loc + fix)); }
 
-    SlangResult read(const DebugSerialData* serialData, SourceManager* sourceManager);
+    SlangResult read(const SerialSourceLocData* serialData, SourceManager* sourceManager);
 
 protected:
     struct View
     {
-        DebugSerialData::SourceRange m_range;
+        SerialSourceLocData::SourceRange m_range;
         SourceView* m_sourceView;
     };
 
@@ -168,16 +166,16 @@ protected:
     Index m_lastViewIndex = -1;     ///< Caches last lookup
 };
 
-/// Used to write serialized Debug information
-class DebugSerialWriter : public RefObject
+/// Used to write serialized SourceLoc information
+class SerialSourceLocWriter : public RefObject
 {
 public:
     static const SerialExtraType kExtraType = SerialExtraType::DebugWriter;
 
-    class DebugSourceFile : public RefObject
+    class Source : public RefObject
     {
     public:
-        DebugSourceFile(SourceFile* sourceFile, SourceLoc::RawValue baseSourceLoc) :
+        Source(SourceFile* sourceFile, SourceLoc::RawValue baseSourceLoc) :
             m_sourceFile(sourceFile),
             m_baseSourceLoc(baseSourceLoc)
         {
@@ -200,27 +198,27 @@ public:
         List<uint8_t> m_lineIndexUsed;                  ///< Has 1 if the line is used
         List<uint32_t> m_usedLineIndices;               ///< Holds the lines that have been hit                 
 
-        List<DebugSerialData::DebugLineInfo> m_lineInfos;   ///< The line infos
-        List<DebugSerialData::DebugAdjustedLineInfo> m_adjustedLineInfos;  ///< The adjusted line infos
+        List<SerialSourceLocData::LineInfo> m_lineInfos;   ///< The line infos
+        List<SerialSourceLocData::AdjustedLineInfo> m_adjustedLineInfos;  ///< The adjusted line infos
     };
 
         /// Add a source location. Returns the location that can be serialized.
-    DebugSerialData::SourceLoc addSourceLoc(SourceLoc sourceLoc);
+    SerialSourceLocData::SourceLoc addSourceLoc(SourceLoc sourceLoc);
 
         /// Write into outDebugData
-    void write(DebugSerialData* outDebugData);
+    void write(SerialSourceLocData* outSourceLocData);
     
-    DebugSerialWriter(SourceManager* sourceManager):
+    SerialSourceLocWriter(SourceManager* sourceManager):
         m_sourceManager(sourceManager),
-        m_debugStringSlicePool(StringSlicePool::Style::Default),
-        m_debugFreeSourceLoc(1)
+        m_stringSlicePool(StringSlicePool::Style::Default),
+        m_freeSourceLoc(1)
     {
     }
 
     SourceManager* m_sourceManager;
-    StringSlicePool m_debugStringSlicePool;             ///< Slices held just for debug usage
-    SourceLoc::RawValue m_debugFreeSourceLoc;           /// Locations greater than this are free
-    Dictionary<SourceFile*, RefPtr<DebugSourceFile> > m_debugSourceFileMap;
+    StringSlicePool m_stringSlicePool;             ///< Slices held just for debug usage
+    SourceLoc::RawValue m_freeSourceLoc;           ///< Locations greater than this are free
+    Dictionary<SourceFile*, RefPtr<Source> > m_sourceFileMap;
 };
 
 } // namespace Slang

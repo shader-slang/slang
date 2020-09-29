@@ -1,5 +1,5 @@
-// slang-serialize-debug.cpp
-#include "slang-serialize-debug.h"
+// slang-serialize-source-loc.cpp
+#include "slang-serialize-source-loc.h"
 
 #include "../core/slang-text-io.h"
 #include "../core/slang-byte-encode-util.h"
@@ -10,40 +10,40 @@ namespace Slang {
 
 /* !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! DebugSerialData !!!!!!!!!!!!!!!!!!!!!!!!!!!!!! */
 
-size_t DebugSerialData::calcSizeInBytes() const
+size_t SerialSourceLocData::calcSizeInBytes() const
 {
-    return SerialListUtil::calcArraySize(m_debugStringTable) +
-        SerialListUtil::calcArraySize(m_debugLineInfos) +
-        SerialListUtil::calcArraySize(m_debugSourceInfos) +
-        SerialListUtil::calcArraySize(m_debugAdjustedLineInfos);
+    return SerialListUtil::calcArraySize(m_stringTable) +
+        SerialListUtil::calcArraySize(m_lineInfos) +
+        SerialListUtil::calcArraySize(m_sourceInfos) +
+        SerialListUtil::calcArraySize(m_adjustedLineInfos);
 }
 
-void DebugSerialData::clear()
+void SerialSourceLocData::clear()
 {
-    m_debugLineInfos.clear();
-    m_debugAdjustedLineInfos.clear();
-    m_debugSourceInfos.clear();
-    m_debugStringTable.clear();
+    m_lineInfos.clear();
+    m_adjustedLineInfos.clear();
+    m_sourceInfos.clear();
+    m_stringTable.clear();
 }
 
 
-bool DebugSerialData::operator==(const ThisType& rhs) const
+bool SerialSourceLocData::operator==(const ThisType& rhs) const
 {
     return (this == &rhs) ||
-        (   SerialListUtil::isEqual(m_debugStringTable, rhs.m_debugStringTable) &&
-            SerialListUtil::isEqual(m_debugLineInfos, rhs.m_debugLineInfos) &&
-            SerialListUtil::isEqual(m_debugAdjustedLineInfos, rhs.m_debugAdjustedLineInfos) &&
-            SerialListUtil::isEqual(m_debugSourceInfos, rhs.m_debugSourceInfos));
+        (   SerialListUtil::isEqual(m_stringTable, rhs.m_stringTable) &&
+            SerialListUtil::isEqual(m_lineInfos, rhs.m_lineInfos) &&
+            SerialListUtil::isEqual(m_adjustedLineInfos, rhs.m_adjustedLineInfos) &&
+            SerialListUtil::isEqual(m_sourceInfos, rhs.m_sourceInfos));
 }
 
 /* !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! DebugSerialWriter !!!!!!!!!!!!!!!!!!!!!!!!!!!!!! */
 
-DebugSerialData::SourceLoc DebugSerialWriter::addSourceLoc(SourceLoc sourceLoc)
+SerialSourceLocData::SourceLoc SerialSourceLocWriter::addSourceLoc(SourceLoc sourceLoc)
 {
     // If it's not set we can ignore
     if (!sourceLoc.isValid())
     {
-        return DebugSerialData::SourceLoc(0);
+        return SerialSourceLocData::SourceLoc(0);
     }
 
     // Look up the view it's from
@@ -51,20 +51,20 @@ DebugSerialData::SourceLoc DebugSerialWriter::addSourceLoc(SourceLoc sourceLoc)
     if (!sourceView)
     {
         // If not found we just ingore 
-        return DebugSerialData::SourceLoc(0);
+        return SerialSourceLocData::SourceLoc(0);
     }
 
     SourceFile* sourceFile = sourceView->getSourceFile();
-    DebugSourceFile* debugSourceFile;
+    Source* debugSourceFile;
     {
-        RefPtr<DebugSourceFile>* ptrDebugSourceFile = m_debugSourceFileMap.TryGetValue(sourceFile);
+        RefPtr<Source>* ptrDebugSourceFile = m_sourceFileMap.TryGetValue(sourceFile);
         if (ptrDebugSourceFile == nullptr)
         {
-            const SourceLoc::RawValue baseSourceLoc = m_debugFreeSourceLoc;
-            m_debugFreeSourceLoc += SourceLoc::RawValue(sourceView->getRange().getSize() + 1);
+            const SourceLoc::RawValue baseSourceLoc = m_freeSourceLoc;
+            m_freeSourceLoc += SourceLoc::RawValue(sourceView->getRange().getSize() + 1);
 
-            debugSourceFile = new DebugSourceFile(sourceFile, baseSourceLoc);
-            m_debugSourceFileMap.Add(sourceFile, debugSourceFile);
+            debugSourceFile = new Source(sourceFile, baseSourceLoc);
+            m_sourceFileMap.Add(sourceFile, debugSourceFile);
         }
         else
         {
@@ -77,7 +77,7 @@ DebugSerialData::SourceLoc DebugSerialWriter::addSourceLoc(SourceLoc sourceLoc)
     int offset = sourceView->getRange().getOffset(sourceLoc);
     int lineIndex = sourceFile->calcLineIndexFromOffset(offset);
 
-    DebugSerialData::DebugLineInfo lineInfo;
+    SerialSourceLocData::LineInfo lineInfo;
     lineInfo.m_lineStartOffset = sourceFile->getLineBreakOffsets()[lineIndex];
     lineInfo.m_lineIndex = lineIndex;
 
@@ -93,7 +93,7 @@ DebugSerialData::SourceLoc DebugSerialWriter::addSourceLoc(SourceLoc sourceLoc)
         {
             const auto& entry = sourceView->getEntries()[entryIndex];
 
-            DebugSerialData::DebugAdjustedLineInfo adjustedLineInfo;
+            SerialSourceLocData::AdjustedLineInfo adjustedLineInfo;
             adjustedLineInfo.m_lineInfo = lineInfo;
             adjustedLineInfo.m_pathStringIndex = SerialStringData::kNullStringIndex;
 
@@ -104,7 +104,7 @@ DebugSerialData::SourceLoc DebugSerialWriter::addSourceLoc(SourceLoc sourceLoc)
             {
                 UnownedStringSlice slice = pool.getSlice(entry.m_pathHandle);
                 SLANG_ASSERT(slice.getLength() > 0);
-                adjustedLineInfo.m_pathStringIndex = DebugSerialData::StringIndex(m_debugStringSlicePool.add(slice));
+                adjustedLineInfo.m_pathStringIndex = SerialSourceLocData::StringIndex(m_stringSlicePool.add(slice));
             }
 
             adjustedLineInfo.m_adjustedLineIndex = lineIndex + entry.m_lineAdjust;
@@ -115,50 +115,50 @@ DebugSerialData::SourceLoc DebugSerialWriter::addSourceLoc(SourceLoc sourceLoc)
         debugSourceFile->setHasLineIndex(lineIndex);
     }
 
-    return DebugSerialData::SourceLoc(debugSourceFile->m_baseSourceLoc + offset);
+    return SerialSourceLocData::SourceLoc(debugSourceFile->m_baseSourceLoc + offset);
 }
 
-void DebugSerialWriter::write(DebugSerialData* outDebugData)
+void SerialSourceLocWriter::write(SerialSourceLocData* outSourceLocData)
 {
-    outDebugData->clear();
+    outSourceLocData->clear();
 
     // Okay we can now calculate the final source information
 
-    for (auto& pair : m_debugSourceFileMap)
+    for (auto& pair : m_sourceFileMap)
     {
-        DebugSourceFile* debugSourceFile = pair.Value;
+        Source* debugSourceFile = pair.Value;
         SourceFile* sourceFile = debugSourceFile->m_sourceFile;
 
-        DebugSerialData::DebugSourceInfo sourceInfo;
+        SerialSourceLocData::SourceInfo sourceInfo;
 
         sourceInfo.m_numLines = uint32_t(debugSourceFile->m_sourceFile->getLineBreakOffsets().getCount());
 
         sourceInfo.m_range.m_start = uint32_t(debugSourceFile->m_baseSourceLoc);
         sourceInfo.m_range.m_end = uint32_t(debugSourceFile->m_baseSourceLoc + sourceFile->getContentSize());
 
-        sourceInfo.m_pathIndex = DebugSerialData::StringIndex(m_debugStringSlicePool.add(sourceFile->getPathInfo().foundPath));
+        sourceInfo.m_pathIndex = SerialSourceLocData::StringIndex(m_stringSlicePool.add(sourceFile->getPathInfo().foundPath));
 
-        sourceInfo.m_lineInfosStartIndex = uint32_t(outDebugData->m_debugLineInfos.getCount());
-        sourceInfo.m_adjustedLineInfosStartIndex = uint32_t(outDebugData->m_debugAdjustedLineInfos.getCount());
+        sourceInfo.m_lineInfosStartIndex = uint32_t(outSourceLocData->m_lineInfos.getCount());
+        sourceInfo.m_adjustedLineInfosStartIndex = uint32_t(outSourceLocData->m_adjustedLineInfos.getCount());
 
         sourceInfo.m_numLineInfos = uint32_t(debugSourceFile->m_lineInfos.getCount());
         sourceInfo.m_numAdjustedLineInfos = uint32_t(debugSourceFile->m_adjustedLineInfos.getCount());
 
         // Add the line infos
-        outDebugData->m_debugLineInfos.addRange(debugSourceFile->m_lineInfos.begin(), debugSourceFile->m_lineInfos.getCount());
-        outDebugData->m_debugAdjustedLineInfos.addRange(debugSourceFile->m_adjustedLineInfos.begin(), debugSourceFile->m_adjustedLineInfos.getCount());
+        outSourceLocData->m_lineInfos.addRange(debugSourceFile->m_lineInfos.begin(), debugSourceFile->m_lineInfos.getCount());
+        outSourceLocData->m_adjustedLineInfos.addRange(debugSourceFile->m_adjustedLineInfos.begin(), debugSourceFile->m_adjustedLineInfos.getCount());
 
         // Add the source info
-        outDebugData->m_debugSourceInfos.add(sourceInfo);
+        outSourceLocData->m_sourceInfos.add(sourceInfo);
     }
 
     // Convert the string pool
-    SerialStringTableUtil::encodeStringTable(m_debugStringSlicePool, outDebugData->m_debugStringTable);
+    SerialStringTableUtil::encodeStringTable(m_stringSlicePool, outSourceLocData->m_stringTable);
 }
 
 /* !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! DebugSerialReader !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! */
 
-Index DebugSerialReader::findViewIndex(DebugSerialData::SourceLoc loc)
+Index SerialSourceLocReader::findViewIndex(SerialSourceLocData::SourceLoc loc)
 {
     for (Index i = 0; i < m_views.getCount(); ++i)
     {
@@ -171,7 +171,7 @@ Index DebugSerialReader::findViewIndex(DebugSerialData::SourceLoc loc)
 }
 
 
-int DebugSerialReader::calcFixSourceLoc(DebugSerialData::SourceLoc loc, DebugSerialData::SourceRange& outRange)
+int SerialSourceLocReader::calcFixSourceLoc(SerialSourceLocData::SourceLoc loc, SerialSourceLocData::SourceRange& outRange)
 {
     if (m_lastViewIndex < 0 || !m_views[m_lastViewIndex].m_range.contains(loc))
     {
@@ -181,7 +181,7 @@ int DebugSerialReader::calcFixSourceLoc(DebugSerialData::SourceLoc loc, DebugSer
     if (m_lastViewIndex < 0)
     {
         // Set an invalid range, as couldn't find 
-        outRange = DebugSerialData::SourceRange::getInvalid();
+        outRange = SerialSourceLocData::SourceRange::getInvalid();
         return 0;
     }
 
@@ -193,7 +193,7 @@ int DebugSerialReader::calcFixSourceLoc(DebugSerialData::SourceLoc loc, DebugSer
     return view.m_sourceView->getRange().begin.getRaw() - view.m_range.m_start;
 }
 
-SourceLoc DebugSerialReader::getSourceLoc(DebugSerialData::SourceLoc loc)
+SourceLoc SerialSourceLocReader::getSourceLoc(SerialSourceLocData::SourceLoc loc)
 {
     if (loc != 0)
     {
@@ -216,31 +216,31 @@ SourceLoc DebugSerialReader::getSourceLoc(DebugSerialData::SourceLoc loc)
     return SourceLoc();
 }
 
-SlangResult DebugSerialReader::read(const DebugSerialData* serialData, SourceManager* sourceManager)
+SlangResult SerialSourceLocReader::read(const SerialSourceLocData* serialData, SourceManager* sourceManager)
 {
     m_views.setCount(0);
 
-    if (!sourceManager || serialData->m_debugSourceInfos.getCount() == 0)
+    if (!sourceManager || serialData->m_sourceInfos.getCount() == 0)
     {
         return SLANG_OK;
     }
 
     List<UnownedStringSlice> debugStringSlices;
-    SerialStringTableUtil::decodeStringTable(serialData->m_debugStringTable.getBuffer(), serialData->m_debugStringTable.getCount(), debugStringSlices);
+    SerialStringTableUtil::decodeStringTable(serialData->m_stringTable.getBuffer(), serialData->m_stringTable.getCount(), debugStringSlices);
 
     // All of the strings are placed in the manager (and its StringSlicePool) where the SourceView and SourceFile are constructed from
     List<StringSlicePool::Handle> stringMap;
     SerialStringTableUtil::calcStringSlicePoolMap(debugStringSlices, sourceManager->getStringSlicePool(), stringMap);
 
     // Construct the source files
-    const Index numSourceFiles = serialData->m_debugSourceInfos.getCount();
+    const Index numSourceFiles = serialData->m_sourceInfos.getCount();
 
     // These hold the views (and SourceFile as there is only one SourceFile per view) in the same order as the sourceInfos
     m_views.setCount(numSourceFiles);
 
     for (Index i = 0; i < numSourceFiles; ++i)
     {
-        const auto& srcSourceInfo = serialData->m_debugSourceInfos[i];
+        const auto& srcSourceInfo = serialData->m_sourceInfos[i];
 
         PathInfo pathInfo;
         pathInfo.type = PathInfo::Type::FoundPath;
@@ -250,11 +250,11 @@ SlangResult DebugSerialReader::read(const DebugSerialData* serialData, SourceMan
         SourceView* sourceView = sourceManager->createSourceView(sourceFile, nullptr);
 
         // We need to accumulate all line numbers, for this source file, both adjusted and unadjusted
-        List<DebugSerialData::DebugLineInfo> lineInfos;
+        List<SerialSourceLocData::LineInfo> lineInfos;
         // Add the adjusted lines
         {
             lineInfos.setCount(srcSourceInfo.m_numAdjustedLineInfos);
-            const DebugSerialData::DebugAdjustedLineInfo* srcAdjustedLineInfos = serialData->m_debugAdjustedLineInfos.getBuffer() + srcSourceInfo.m_adjustedLineInfosStartIndex;
+            const SerialSourceLocData::AdjustedLineInfo* srcAdjustedLineInfos = serialData->m_adjustedLineInfos.getBuffer() + srcSourceInfo.m_adjustedLineInfosStartIndex;
             const int numAdjustedLines = int(srcSourceInfo.m_numAdjustedLineInfos);
             for (int j = 0; j < numAdjustedLines; ++j)
             {
@@ -262,7 +262,7 @@ SlangResult DebugSerialReader::read(const DebugSerialData* serialData, SourceMan
             }
         }
         // Add regular lines
-        lineInfos.addRange(serialData->m_debugLineInfos.getBuffer() + srcSourceInfo.m_lineInfosStartIndex, srcSourceInfo.m_numLineInfos);
+        lineInfos.addRange(serialData->m_lineInfos.getBuffer() + srcSourceInfo.m_lineInfosStartIndex, srcSourceInfo.m_numLineInfos);
 
         // Put in sourceloc order
         lineInfos.sort();
@@ -310,11 +310,11 @@ SlangResult DebugSerialReader::read(const DebugSerialData* serialData, SourceMan
 
         if (srcSourceInfo.m_numAdjustedLineInfos)
         {
-            List<DebugSerialData::DebugAdjustedLineInfo> adjustedLineInfos;
+            List<SerialSourceLocData::AdjustedLineInfo> adjustedLineInfos;
 
             int numEntries = int(srcSourceInfo.m_numAdjustedLineInfos);
 
-            adjustedLineInfos.addRange(serialData->m_debugAdjustedLineInfos.getBuffer() + srcSourceInfo.m_adjustedLineInfosStartIndex, numEntries);
+            adjustedLineInfos.addRange(serialData->m_adjustedLineInfos.getBuffer() + srcSourceInfo.m_adjustedLineInfosStartIndex, numEntries);
             adjustedLineInfos.sort();
 
             // Work out the views adjustments, and place in dstEntries
@@ -348,21 +348,21 @@ SlangResult DebugSerialReader::read(const DebugSerialData* serialData, SourceMan
 
 /* !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! DebugSerialData !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! */
 
-/* static */Result DebugSerialData::writeContainer(SerialCompressionType moduleCompressionType, RiffContainer* container)
+/* static */Result SerialSourceLocData::writeContainer(SerialCompressionType moduleCompressionType, RiffContainer* container)
 {    
-    RiffContainer::ScopeChunk debugChunkScope(container, RiffContainer::Chunk::Kind::List, DebugSerialData::kDebugFourCc);
+    RiffContainer::ScopeChunk debugChunkScope(container, RiffContainer::Chunk::Kind::List, SerialSourceLocData::kDebugFourCc);
 
-    SLANG_RETURN_ON_FAIL(SerialRiffUtil::writeArrayUncompressedChunk(DebugSerialData::kDebugStringFourCc, m_debugStringTable, container));
-    SLANG_RETURN_ON_FAIL(SerialRiffUtil::writeArrayUncompressedChunk(DebugSerialData::kDebugLineInfoFourCc, m_debugLineInfos, container));
-    SLANG_RETURN_ON_FAIL(SerialRiffUtil::writeArrayUncompressedChunk(DebugSerialData::kDebugAdjustedLineInfoFourCc, m_debugAdjustedLineInfos, container));
-    SLANG_RETURN_ON_FAIL(SerialRiffUtil::writeArrayChunk(moduleCompressionType, DebugSerialData::kDebugSourceInfoFourCc, m_debugSourceInfos, container));
+    SLANG_RETURN_ON_FAIL(SerialRiffUtil::writeArrayUncompressedChunk(SerialSourceLocData::kDebugStringFourCc, m_stringTable, container));
+    SLANG_RETURN_ON_FAIL(SerialRiffUtil::writeArrayUncompressedChunk(SerialSourceLocData::kDebugLineInfoFourCc, m_lineInfos, container));
+    SLANG_RETURN_ON_FAIL(SerialRiffUtil::writeArrayUncompressedChunk(SerialSourceLocData::kDebugAdjustedLineInfoFourCc, m_adjustedLineInfos, container));
+    SLANG_RETURN_ON_FAIL(SerialRiffUtil::writeArrayChunk(moduleCompressionType, SerialSourceLocData::kDebugSourceInfoFourCc, m_sourceInfos, container));
 
     return SLANG_OK;
 }
 
-/* static */Result DebugSerialData::readContainer(SerialCompressionType moduleCompressionType, RiffContainer::ListChunk* listChunk)
+/* static */Result SerialSourceLocData::readContainer(SerialCompressionType moduleCompressionType, RiffContainer::ListChunk* listChunk)
 {
-    SLANG_ASSERT(listChunk->getSubType() == DebugSerialData::kDebugFourCc);
+    SLANG_ASSERT(listChunk->getSubType() == SerialSourceLocData::kDebugFourCc);
 
     clear();
     for (RiffContainer::Chunk* chunk = listChunk->m_containedChunks; chunk; chunk = chunk->m_next)
@@ -375,24 +375,24 @@ SlangResult DebugSerialReader::read(const DebugSerialData* serialData, SourceMan
 
         switch (dataChunk->m_fourCC)
         {
-            case DebugSerialData::kDebugStringFourCc:
+            case SerialSourceLocData::kDebugStringFourCc:
             {
-                SLANG_RETURN_ON_FAIL(SerialRiffUtil::readArrayUncompressedChunk(dataChunk, m_debugStringTable));
+                SLANG_RETURN_ON_FAIL(SerialRiffUtil::readArrayUncompressedChunk(dataChunk, m_stringTable));
                 break;
             }
-            case DebugSerialData::kDebugLineInfoFourCc:
+            case SerialSourceLocData::kDebugLineInfoFourCc:
             {
-                SLANG_RETURN_ON_FAIL(SerialRiffUtil::readArrayUncompressedChunk(dataChunk, m_debugLineInfos));
+                SLANG_RETURN_ON_FAIL(SerialRiffUtil::readArrayUncompressedChunk(dataChunk, m_lineInfos));
                 break;
             }
-            case DebugSerialData::kDebugAdjustedLineInfoFourCc:
+            case SerialSourceLocData::kDebugAdjustedLineInfoFourCc:
             {
-                SLANG_RETURN_ON_FAIL(SerialRiffUtil::readArrayUncompressedChunk(dataChunk, m_debugAdjustedLineInfos));
+                SLANG_RETURN_ON_FAIL(SerialRiffUtil::readArrayUncompressedChunk(dataChunk, m_adjustedLineInfos));
                 break;
             }
-            case DebugSerialData::kDebugSourceInfoFourCc:
+            case SerialSourceLocData::kDebugSourceInfoFourCc:
             {
-                SLANG_RETURN_ON_FAIL(SerialRiffUtil::readArrayChunk(moduleCompressionType, dataChunk, m_debugSourceInfos));
+                SLANG_RETURN_ON_FAIL(SerialRiffUtil::readArrayChunk(moduleCompressionType, dataChunk, m_sourceInfos));
                 break;
             }
         }
