@@ -539,6 +539,7 @@ public:
     SerialIndex addPointer(const NodeBase* ptr);
     SerialIndex addPointer(const RefObject* ptr);
 
+        /// Write the object at ptr of type serialCls
     SerialIndex writeObject(const SerialClass* serialCls, const void* ptr);
 
         /// Write the object at the pointer
@@ -552,7 +553,8 @@ public:
     SerialIndex addString(const String& in);
     SerialIndex addName(const Name* name);
     
-        /// Set a the index associated with an index. NOTE! That there cannot be a pre-existing setting.
+        /// Set a the ptr associated with an index.
+        /// NOTE! That there cannot be a pre-existing setting.
     void setPointerIndex(const NodeBase* ptr, SerialIndex index);
 
         /// Get the entries table holding how each index maps to an entry
@@ -567,6 +569,7 @@ public:
         /// Used for attaching extra objects necessary for serializing
     SerialExtraObjects& getExtraObjects() { return m_extraObjects; }
 
+        /// Ctor
     SerialWriter(SerialClasses* classes, SerialFilter* filter);
 
 protected:
@@ -622,6 +625,8 @@ SerialIndex SerialWriter::addArray(const T* in, Index count)
     }
 }
 
+/* A SerialFieldType describes the size of field, it's alignment, and contains the
+functions that convert between serial and native data */
 struct SerialFieldType
 {
     typedef void(*ToSerialFunc)(SerialWriter* writer, const void* src, void* dst);
@@ -633,6 +638,7 @@ struct SerialFieldType
     ToNativeFunc toNativeFunc;
 };
 
+/* Describes a field in a SerialClass. */
 struct SerialField
 {
     // NOTE! the in field must be from the from ((CLS*)1)->field for this to produce a field correctly
@@ -667,6 +673,8 @@ struct SerialClassFlag
     };
 };
 
+/* SerialClass defines the type (typeKind/subType) and the fields in just this class definition (ie not it's super class).
+Also contains a pointer to the super type if there is one */
 struct SerialClass
 {    
     SerialTypeKind typeKind;            ///< The type kind
@@ -738,6 +746,19 @@ struct SerialGetFieldType
     }
 };
 
+// !!!!!!!!!!!!!!!!!!!!! Convenience functions !!!!!!!!!!!!!!!!!!!!!!!!!!!
+
+template <typename NATIVE_TYPE, typename SERIAL_TYPE>
+SLANG_FORCE_INLINE void toSerialValue(SerialWriter* writer, const NATIVE_TYPE& src, SERIAL_TYPE& dst)
+{
+    SerialTypeInfo<NATIVE_TYPE>::toSerial(writer, &src, &dst);
+}
+
+template <typename SERIAL_TYPE, typename NATIVE_TYPE>
+SLANG_FORCE_INLINE void toNativeValue(SerialReader* reader, const SERIAL_TYPE& src, NATIVE_TYPE& dst)
+{
+    SerialTypeInfo<NATIVE_TYPE>::toNative(reader, &src, &dst);
+}
 
 } // namespace Slang
 
