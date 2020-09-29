@@ -120,6 +120,9 @@ SerialClass* SerialClasses::_createSerialClass(const SerialClass* cls)
         const SerialField& srcField = srcFields[j];
         SerialField& dstField = dstFields[j];
 
+        // Copy the field
+        dstField = srcField;
+
         uint32_t alignment = srcField.type->serialAlignment;
         // Make sure the offset is aligned for the field requirement
         offset = (offset + alignment - 1) & ~(alignment - 1);
@@ -142,7 +145,6 @@ SerialClass* SerialClasses::_createSerialClass(const SerialClass* cls)
 
     dst->alignment = uint8_t(maxAlignment);
     dst->size = uint32_t(offset);
-    dst->flags = cls->flags;
 
     dst->fields = dstFields;
 
