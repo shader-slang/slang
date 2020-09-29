@@ -6,10 +6,18 @@
 #include "../core/slang-string-slice-pool.h"
 #include "../core/slang-array-view.h"
 
-#include "slang-name.h"
-#include "slang-source-loc.h"
+//#include "slang-name.h"
+//#include "slang-source-loc.h"
 
 namespace Slang {
+
+// An enumeration of types that can be set
+enum class SerialExtraType
+{
+    DebugReader,
+    DebugWriter,
+    CountOf,
+};
 
 // Options for IR/AST/Debug serialization
 

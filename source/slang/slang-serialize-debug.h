@@ -143,6 +143,8 @@ public:
 class DebugSerialReader : public RefObject
 {
 public:
+    static const SerialExtraType kExtraType = SerialExtraType::DebugReader;
+
     Index findViewIndex(DebugSerialData::SourceLoc loc);
 
     SourceLoc getSourceLoc(DebugSerialData::SourceLoc loc);
@@ -170,6 +172,7 @@ protected:
 class DebugSerialWriter : public RefObject
 {
 public:
+    static const SerialExtraType kExtraType = SerialExtraType::DebugWriter;
 
     class DebugSourceFile : public RefObject
     {

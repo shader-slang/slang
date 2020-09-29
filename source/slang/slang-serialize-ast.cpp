@@ -1123,10 +1123,7 @@ public:
                     case RefObjectSerialSubType::LookupResultItem_Breadcrumb:
                     {
                         typedef LookupResultItem::Breadcrumb Breadcrumb;
-
-                        auto breadcrumb = new LookupResultItem::Breadcrumb(Breadcrumb::Kind::Member, DeclRef<Decl>(), nullptr, nullptr);
-
-                        return breadcrumb;
+                        return _add(new LookupResultItem::Breadcrumb(Breadcrumb::Kind::Member, DeclRef<Decl>(), nullptr, nullptr));
                     }
                     default: break;
                 }
@@ -1141,6 +1138,16 @@ public:
         m_astBuilder(astBuilder)
     {
     }
+
+protected:
+    RefObject* _add(RefObject* obj)
+    {
+        m_scope.add(obj);
+        return obj;
+    }
+
+    // We keep RefObjects in scope 
+    List<RefPtr<RefObject>> m_scope;
 
     ASTBuilder* m_astBuilder;
 };

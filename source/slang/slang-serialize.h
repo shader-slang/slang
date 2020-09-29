@@ -9,6 +9,8 @@
 
 #include "../core/slang-stream.h"
 
+#include "slang-serialize-types.h"
+
 #include "slang-name.h"
 
 namespace Slang
@@ -423,22 +425,22 @@ public:
     virtual void* create(SerialTypeKind typeKind, SerialSubType subType) = 0;
 };
 
-enum class SerialExtraType
-{
-    SerialLocation,
-    CountOf,
-};
-
 class SerialExtraObjects
 {
 public:
-    void set(SerialExtraType type, RefObject* obj) { m_objects[Index(type)] = obj; }
+    template <typename T>
+    void set(T* obj) { m_objects[Index(T::kExtraType)] = obj; }
         /// Get the extra type
     template <typename T>
-    T* get(SerialExtraType type) { return as<T>(m_extra[Index(type)]); }
+    T* get() { return reinterpret_cast<T*>(m_objects[Index(T::kExtraType)]); }
+
+    SerialExtraObjects()
+    {
+        for (auto& obj : m_objects) obj = nullptr;
+    }
 
 protected:
-    RefPtr<RefObject> m_objects[Index(SerialExtraType::CountOf)];
+   void* m_objects[Index(SerialExtraType::CountOf)];
 };
 
 /* This class is the interface used by toNative implementations to recreate a type. */
