@@ -119,7 +119,7 @@ namespace Slang {
             debugWriter = new DebugSerialWriter(options.sourceManager);
         }
 
-        RefPtr<ASTSerialClasses> astClasses;
+        RefPtr<SerialClasses> serialClasses;
 
         for (const auto& module : data.modules)
         {
@@ -141,19 +141,21 @@ namespace Slang {
             {
                 if (ModuleDecl* moduleDecl = as<ModuleDecl>(module.astRootNode))
                 {
-                    if (!astClasses)
+                    if (!serialClasses)
                     {
-                        astClasses = new ASTSerialClasses;
+                        SLANG_RETURN_ON_FAIL(SerialClasses::create(serialClasses));
                     }
 
-                    ModuleASTSerialFilter filter(moduleDecl);
-                    ASTSerialWriter writer(astClasses, &filter, debugWriter);
+                    ModuleSerialFilter filter(moduleDecl);
+                    SerialWriter writer(serialClasses, &filter);
 
+                    writer.getExtraObjects().set(debugWriter);
+                    
                     // Add the module and everything that isn't filtered out in the filter.
                     writer.addPointer(moduleDecl);
 
                     // We can now serialize it into the riff container.
-                    SLANG_RETURN_ON_FAIL(writer.writeIntoContainer(container));
+                    SLANG_RETURN_ON_FAIL(writer.writeIntoContainer(ASTSerialBinary::kSlangASTModuleFourCC, container));
                 }
             }
         }
@@ -245,7 +247,7 @@ namespace Slang {
     }
 
     RefPtr<DebugSerialReader> debugReader;
-    RefPtr<ASTSerialClasses> astClasses;
+    RefPtr<SerialClasses> serialClasses;
 
     // Debug information
     if (auto debugChunk = containerChunk->findContainedList(DebugSerialData::kDebugFourCc))
@@ -291,9 +293,9 @@ namespace Slang {
 
                 if (astData)
                 {
-                    if (!astClasses)
+                    if (!serialClasses)
                     {
-                        astClasses = new ASTSerialClasses;
+                        SLANG_RETURN_ON_FAIL(SerialClasses::create(serialClasses));
                     }
 
                     // TODO(JS): We probably want to store off better information about each of the translation unit
@@ -305,12 +307,16 @@ namespace Slang {
 
                     astBuilder = new ASTBuilder(options.sharedASTBuilder, buf.ProduceString());
 
-                    ASTSerialReader reader(astClasses, debugReader);
+                    DefaultSerialObjectFactory objectFactory(astBuilder);
 
-                    SLANG_RETURN_ON_FAIL(reader.load((const uint8_t*)astData->getPayload(), astData->getSize(), astBuilder, options.namePool));
+                    SerialReader reader(serialClasses, &objectFactory);
+
+                    reader.getExtraObjects().set(debugReader);
+
+                    SLANG_RETURN_ON_FAIL(reader.load((const uint8_t*)astData->getPayload(), astData->getSize(), options.namePool));
 
                     // Get the root node. It's at index 1 (0 is the null value).
-                    astRootNode = reader.getPointer(ASTSerialIndex(1)).dynamicCast<NodeBase>();
+                    astRootNode = reader.getPointer(SerialIndex(1)).dynamicCast<NodeBase>();
                 }
 
                 // Onto next chunk

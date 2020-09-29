@@ -269,7 +269,6 @@ struct SerialField;
 template <typename T>
 struct SerialTypeInfo;
 
-
 enum class SerialTypeKind : uint8_t
 {
     Unknown,
@@ -430,6 +429,12 @@ class SerialExtraObjects
 public:
     template <typename T>
     void set(T* obj) { m_objects[Index(T::kExtraType)] = obj; }
+    template <typename T>
+    void set(const RefPtr<T>& obj)
+    {
+        m_objects[Index(T::kExtraType)] = obj.Ptr();
+    }
+
         /// Get the extra type
     template <typename T>
     T* get() { return reinterpret_cast<T*>(m_objects[Index(T::kExtraType)]); }
@@ -595,7 +600,7 @@ protected:
 template <typename T>
 SerialIndex SerialWriter::addArray(const T* in, Index count)
 {
-    typedef ASTSerialTypeInfo<T> ElementTypeInfo;
+    typedef SerialTypeInfo<T> ElementTypeInfo;
     typedef typename ElementTypeInfo::SerialType ElementSerialType;
 
     if (std::is_same<T, ElementSerialType>::value)
@@ -617,7 +622,7 @@ SerialIndex SerialWriter::addArray(const T* in, Index count)
     }
 }
 
-struct SerialType
+struct SerialFieldType
 {
     typedef void(*ToSerialFunc)(SerialWriter* writer, const void* src, void* dst);
     typedef void(*ToNativeFunc)(SerialReader* reader, const void* src, void* dst);
@@ -647,7 +652,7 @@ struct SerialField
     }
 
     const char* name;                   ///< The name of the field
-    const SerialType* type;             ///< The type of the field
+    const SerialFieldType* type;             ///< The type of the field
     uint32_t nativeOffset;              ///< Offset to field from base of type
     uint32_t serialOffset;              ///< Offset in serial type
 };
@@ -718,6 +723,21 @@ protected:
 
     List<const SerialClass*> m_classesByTypeKind[Index(SerialTypeKind::CountOf)];
 };
+
+// !!!!!!!!!!!!!!!!!!!!! SerialGetFieldType<T> !!!!!!!!!!!!!!!!!!!!!!!!!!!
+// Getting the type info, let's use a static variable to hold the state to keep simple
+
+template <typename T>
+struct SerialGetFieldType
+{
+    static const SerialFieldType* getFieldType()
+    {
+        typedef SerialTypeInfo<T> Info;
+        static const SerialFieldType type = { sizeof(typename Info::SerialType), uint8_t(Info::SerialAlignment), &Info::toSerial, &Info::toNative };
+        return &type;
+    }
+};
+
 
 } // namespace Slang
 
