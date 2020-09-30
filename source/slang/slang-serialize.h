@@ -641,22 +641,6 @@ struct SerialFieldType
 /* Describes a field in a SerialClass. */
 struct SerialField
 {
-    // NOTE! the in field must be from the from ((CLS*)1)->field for this to produce a field correctly
-    template <typename T>
-    static SerialField makeField(const char* inName, T& in)
-    {
-        uint8_t* ptr = &reinterpret_cast<uint8_t&>(in);
-
-        SerialField field;
-        field.name = inName;
-        field.type = SerialGetType<T>::getType();
-
-        // This only works because we in is an offset from 1
-        field.nativeOffset = uint32_t(size_t(ptr) - 1);
-        field.serialOffset = 0;
-        return field;
-    }
-
     const char* name;                   ///< The name of the field
     const SerialFieldType* type;             ///< The type of the field
     uint32_t nativeOffset;              ///< Offset to field from base of type
