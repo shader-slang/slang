@@ -7,7 +7,7 @@
 #include "../core/slang-riff.h"
 
 #include "slang-ir.h"
-#include "slang-serialize-debug.h"
+#include "slang-serialize-source-loc.h"
 
 // For TranslationUnitRequest
 // and FrontEndCompileRequest::ExtraEntryPointInfo
@@ -20,7 +20,7 @@ struct IRSerialWriter
     typedef IRSerialData Ser;
     typedef IRSerialBinary Bin;
 
-    Result write(IRModule* module, DebugSerialWriter* debugWriter, SerialOptionFlags flags, IRSerialData* serialData);
+    Result write(IRModule* module, SerialSourceLocWriter* sourceLocWriter, SerialOptionFlags flags, IRSerialData* serialData);
   
         /// Write to a container
     static Result writeContainer(const IRSerialData& data, SerialCompressionType compressionType, RiffContainer* container);
@@ -51,7 +51,7 @@ struct IRSerialWriter
 protected:
     
     void _addInstruction(IRInst* inst);
-    Result _calcDebugInfo(DebugSerialWriter* debugWriter);
+    Result _calcDebugInfo(SerialSourceLocWriter* sourceLocWriter);
     
     List<IRInst*> m_insts;                              ///< Instructions in same order as stored in the 
 
@@ -75,7 +75,7 @@ struct IRSerialReader
     static Result readContainer(RiffContainer::ListChunk* module, SerialCompressionType containerCompressionType, IRSerialData* outData);
 
         /// Read a module from serial data
-    Result read(const IRSerialData& data, Session* session, DebugSerialReader* debugReader, RefPtr<IRModule>& outModule);
+    Result read(const IRSerialData& data, Session* session, SerialSourceLocReader* sourceLocReader, RefPtr<IRModule>& outModule);
 
     IRSerialReader():
         m_serialData(nullptr),

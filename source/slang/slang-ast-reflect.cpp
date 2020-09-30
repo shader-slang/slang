@@ -18,27 +18,15 @@ namespace Slang
 
 #define SLANG_REFLECT_GET_REFLECT_CLASS_INFO(NAME, SUPER, ORIGIN, LAST, MARKER, TYPE, param) infos.infos[int(ASTNodeType::NAME)] = &NAME::kReflectClassInfo;
 
-static ReflectClassInfo::Infos _calcInfos()
+static ASTClassInfo::Infos _calcInfos()
 {
-    ReflectClassInfo::Infos infos;
+    ASTClassInfo::Infos infos;
     memset(&infos, 0, sizeof(infos));
     SLANG_ALL_ASTNode_NodeBase(SLANG_REFLECT_GET_REFLECT_CLASS_INFO, _)
     return infos;
 }
 
-/* static */const ReflectClassInfo::Infos ReflectClassInfo::kInfos = _calcInfos();
-
-bool ReflectClassInfo::isSubClassOfSlow(const ThisType& super) const
-{
-    ReflectClassInfo const* info = this;
-    while (info)
-    {
-        if (info == &super)
-            return true;
-        info = info->m_superClass;
-    }
-    return false;
-}
+/* static */const ASTClassInfo::Infos ASTClassInfo::kInfos = _calcInfos();
 
 // Now try and implement all of the classes
 // Macro generated is of the format
@@ -48,8 +36,9 @@ struct ASTConstructAccess
     template <typename T>
     struct Impl
     {
-        static void* create(ASTBuilder* astBuilder)
+        static void* create(void* context)
         {
+            ASTBuilder* astBuilder = (ASTBuilder*)context;
             return astBuilder->create<T>();
         }
         static void destroy(void* ptr)

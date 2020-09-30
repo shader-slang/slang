@@ -306,16 +306,28 @@
     <ClInclude Include="slang-serialize-container.h">
       <Filter>Header Files</Filter>
     </ClInclude>
-    <ClInclude Include="slang-serialize-debug.h">
-      <Filter>Header Files</Filter>
-    </ClInclude>
     <ClInclude Include="slang-serialize-ir-types.h">
       <Filter>Header Files</Filter>
     </ClInclude>
     <ClInclude Include="slang-serialize-ir.h">
       <Filter>Header Files</Filter>
     </ClInclude>
+    <ClInclude Include="slang-serialize-misc-type-info.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="slang-serialize-reflection.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="slang-serialize-source-loc.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="slang-serialize-type-info.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
     <ClInclude Include="slang-serialize-types.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="slang-serialize.h">
       <Filter>Header Files</Filter>
     </ClInclude>
     <ClInclude Include="slang-source-loc.h">
@@ -641,16 +653,22 @@
     <ClCompile Include="slang-serialize-container.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
-    <ClCompile Include="slang-serialize-debug.cpp">
-      <Filter>Source Files</Filter>
-    </ClCompile>
     <ClCompile Include="slang-serialize-ir-types.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
     <ClCompile Include="slang-serialize-ir.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
+    <ClCompile Include="slang-serialize-reflection.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="slang-serialize-source-loc.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
     <ClCompile Include="slang-serialize-types.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="slang-serialize.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
     <ClCompile Include="slang-source-loc.cpp">

@@ -9,7 +9,7 @@
 #include "slang-compiler.h"
 #include "slang-serialize-ast.h"
 #include "slang-serialize-ir.h"
-#include "slang-serialize-debug.h"
+#include "slang-serialize-source-loc.h"
 
 namespace Slang {
 
@@ -92,7 +92,7 @@ namespace Slang {
 
 /* static */SlangResult SerialContainerUtil::write(const SerialContainerData& data, const WriteOptions& options, RiffContainer* container)
 {
-    RefPtr<DebugSerialWriter> debugWriter;
+    RefPtr<SerialSourceLocWriter> sourceLocWriter;
 
     // The string pool used across the whole of the container
     StringSlicePool containerStringPool(StringSlicePool::Style::Default);
@@ -116,10 +116,10 @@ namespace Slang {
 
         if (options.optionFlags & SerialOptionFlag::DebugInfo)
         {
-            debugWriter = new DebugSerialWriter(options.sourceManager);
+            sourceLocWriter = new SerialSourceLocWriter(options.sourceManager);
         }
 
-        RefPtr<ASTSerialClasses> astClasses;
+        RefPtr<SerialClasses> serialClasses;
 
         for (const auto& module : data.modules)
         {
@@ -131,7 +131,7 @@ namespace Slang {
             {
                 IRSerialData serialData;
                 IRSerialWriter writer;
-                SLANG_RETURN_ON_FAIL(writer.write(module.irModule, debugWriter, options.optionFlags, &serialData));
+                SLANG_RETURN_ON_FAIL(writer.write(module.irModule, sourceLocWriter, options.optionFlags, &serialData));
                 SLANG_RETURN_ON_FAIL(IRSerialWriter::writeContainer(serialData, options.compressionType, container));
             }
 
@@ -141,19 +141,21 @@ namespace Slang {
             {
                 if (ModuleDecl* moduleDecl = as<ModuleDecl>(module.astRootNode))
                 {
-                    if (!astClasses)
+                    if (!serialClasses)
                     {
-                        astClasses = new ASTSerialClasses;
+                        SLANG_RETURN_ON_FAIL(SerialClasses::create(serialClasses));
                     }
 
-                    ModuleASTSerialFilter filter(moduleDecl);
-                    ASTSerialWriter writer(astClasses, &filter, debugWriter);
+                    ModuleSerialFilter filter(moduleDecl);
+                    SerialWriter writer(serialClasses, &filter);
 
+                    writer.getExtraObjects().set(sourceLocWriter);
+                    
                     // Add the module and everything that isn't filtered out in the filter.
                     writer.addPointer(moduleDecl);
 
                     // We can now serialize it into the riff container.
-                    SLANG_RETURN_ON_FAIL(writer.writeIntoContainer(container));
+                    SLANG_RETURN_ON_FAIL(writer.writeIntoContainer(ASTSerialBinary::kSlangASTModuleFourCC, container));
                 }
             }
         }
@@ -171,7 +173,7 @@ namespace Slang {
                 IRSerialData serialData;
                 IRSerialWriter writer;
 
-                SLANG_RETURN_ON_FAIL(writer.write(irModule, debugWriter, options.optionFlags, &serialData));
+                SLANG_RETURN_ON_FAIL(writer.write(irModule, sourceLocWriter, options.optionFlags, &serialData));
                 SLANG_RETURN_ON_FAIL(IRSerialWriter::writeContainer(serialData, options.compressionType, container));
             }
         }
@@ -194,11 +196,11 @@ namespace Slang {
     }
 
     // We can now output the debug information. This is for all IR and AST 
-    if (debugWriter)
+    if (sourceLocWriter)
     {
         // Write out the debug info
-        DebugSerialData debugData;
-        debugWriter->write(&debugData);
+        SerialSourceLocData debugData;
+        sourceLocWriter->write(&debugData);
 
         debugData.writeContainer(options.compressionType, container);
     }
@@ -244,19 +246,19 @@ namespace Slang {
         SerialStringTableUtil::decodeStringTable((const char*)stringTableData->getPayload(), stringTableData->getSize(), containerStringPool);
     }
 
-    RefPtr<DebugSerialReader> debugReader;
-    RefPtr<ASTSerialClasses> astClasses;
+    RefPtr<SerialSourceLocReader> sourceLocReader;
+    RefPtr<SerialClasses> serialClasses;
 
     // Debug information
-    if (auto debugChunk = containerChunk->findContainedList(DebugSerialData::kDebugFourCc))
+    if (auto debugChunk = containerChunk->findContainedList(SerialSourceLocData::kDebugFourCc))
     {
         // Read into data
-        DebugSerialData debugData;
-        SLANG_RETURN_ON_FAIL(debugData.readContainer(containerCompressionType, debugChunk));
+        SerialSourceLocData sourceLocData;
+        SLANG_RETURN_ON_FAIL(sourceLocData.readContainer(containerCompressionType, debugChunk));
 
         // Turn into DebugReader
-        debugReader = new DebugSerialReader;
-        SLANG_RETURN_ON_FAIL(debugReader->read(&debugData, options.sourceManager));
+        sourceLocReader = new SerialSourceLocReader;
+        SLANG_RETURN_ON_FAIL(sourceLocReader->read(&sourceLocData, options.sourceManager));
     }
 
     // Add modules
@@ -279,7 +281,7 @@ namespace Slang {
 
                 // Read IR back from serialData
                 IRSerialReader reader;
-                SLANG_RETURN_ON_FAIL(reader.read(serialData, options.session, debugReader, irModule));
+                SLANG_RETURN_ON_FAIL(reader.read(serialData, options.session, sourceLocReader, irModule));
 
                 // Onto next chunk
                 chunk = chunk->m_next;
@@ -291,9 +293,9 @@ namespace Slang {
 
                 if (astData)
                 {
-                    if (!astClasses)
+                    if (!serialClasses)
                     {
-                        astClasses = new ASTSerialClasses;
+                        SLANG_RETURN_ON_FAIL(SerialClasses::create(serialClasses));
                     }
 
                     // TODO(JS): We probably want to store off better information about each of the translation unit
@@ -305,12 +307,16 @@ namespace Slang {
 
                     astBuilder = new ASTBuilder(options.sharedASTBuilder, buf.ProduceString());
 
-                    ASTSerialReader reader(astClasses, debugReader);
+                    DefaultSerialObjectFactory objectFactory(astBuilder);
 
-                    SLANG_RETURN_ON_FAIL(reader.load((const uint8_t*)astData->getPayload(), astData->getSize(), astBuilder, options.namePool));
+                    SerialReader reader(serialClasses, &objectFactory);
+
+                    reader.getExtraObjects().set(sourceLocReader);
+
+                    SLANG_RETURN_ON_FAIL(reader.load((const uint8_t*)astData->getPayload(), astData->getSize(), options.namePool));
 
                     // Get the root node. It's at index 1 (0 is the null value).
-                    astRootNode = reader.getPointer(ASTSerialIndex(1)).dynamicCast<NodeBase>();
+                    astRootNode = reader.getPointer(SerialIndex(1)).dynamicCast<NodeBase>();
                 }
 
                 // Onto next chunk
@@ -386,25 +392,25 @@ namespace Slang {
         // Need to put all of this in a container 
         RiffContainer::ScopeChunk containerScope(&riffContainer, RiffContainer::Chunk::Kind::List, SerialBinary::kContainerFourCc);
 
-        RefPtr<DebugSerialWriter> debugWriter;
+        RefPtr<SerialSourceLocWriter> sourceLocWriter;
 
         if (options.optionFlags & SerialOptionFlag::DebugInfo)
         {
-            debugWriter = new DebugSerialWriter(options.sourceManager);
+            sourceLocWriter = new SerialSourceLocWriter(options.sourceManager);
         }
         
         {
             // Write IR out to serialData - copying over SourceLoc information directly
             IRSerialWriter writer;
-            SLANG_RETURN_ON_FAIL(writer.write(module, debugWriter, options.optionFlags, &irData));
+            SLANG_RETURN_ON_FAIL(writer.write(module, sourceLocWriter, options.optionFlags, &irData));
         }
         SLANG_RETURN_ON_FAIL(IRSerialWriter::writeContainer(irData, options.compressionType, &riffContainer));
     
         // Write the debug info Riff container
-        if (debugWriter)
+        if (sourceLocWriter)
         {
-            DebugSerialData serialData;
-            debugWriter->write(&serialData);
+            SerialSourceLocData serialData;
+            sourceLocWriter->write(&serialData);
 
             SLANG_RETURN_ON_FAIL(serialData.writeContainer(options.compressionType, &riffContainer));
         }
@@ -426,21 +432,21 @@ namespace Slang {
 
         RiffContainer::ListChunk* rootList = riffContainer.getRoot();
 
-        RefPtr<DebugSerialReader> debugReader;
+        RefPtr<SerialSourceLocReader> sourceLocReader;
 
         // If we have debug info then find and read it
         if (options.optionFlags & SerialOptionFlag::DebugInfo)
         {
-            RiffContainer::ListChunk* debugList = rootList->findContainedList(DebugSerialData::kDebugFourCc);
+            RiffContainer::ListChunk* debugList = rootList->findContainedList(SerialSourceLocData::kDebugFourCc);
             if (!debugList)
             {
                 return SLANG_FAIL;
             }
-            DebugSerialData debugData;
-            SLANG_RETURN_ON_FAIL(debugData.readContainer(options.compressionType, debugList));
+            SerialSourceLocData sourceLocData;
+            SLANG_RETURN_ON_FAIL(sourceLocData.readContainer(options.compressionType, debugList));
 
-            debugReader = new DebugSerialReader;
-            SLANG_RETURN_ON_FAIL(debugReader->read(&debugData, &workSourceManager));
+            sourceLocReader = new SerialSourceLocReader;
+            SLANG_RETURN_ON_FAIL(sourceLocReader->read(&sourceLocData, &workSourceManager));
         }
 
         {
@@ -462,7 +468,7 @@ namespace Slang {
                     return SLANG_FAIL;
                 }
 
-                SLANG_RETURN_ON_FAIL(reader.read(irData, session, debugReader, irReadModule));
+                SLANG_RETURN_ON_FAIL(reader.read(irData, session, sourceLocReader, irReadModule));
             }
         }
     }

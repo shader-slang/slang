@@ -34,7 +34,7 @@ void IRSerialWriter::_addInstruction(IRInst* inst)
     m_insts.add(inst);
 }
 
-Result IRSerialWriter::_calcDebugInfo(DebugSerialWriter* debugWriter)
+Result IRSerialWriter::_calcDebugInfo(SerialSourceLocWriter* sourceLocWriter)
 {
     // We need to find the unique source Locs
     // We are not going to store SourceLocs directly, because there may be multiple views mapping down to
@@ -93,7 +93,7 @@ Result IRSerialWriter::_calcDebugInfo(DebugSerialWriter* debugWriter)
         IRSerialData::SourceLocRun sourceLocRun;
         sourceLocRun.m_numInst = curInstIndex - startInstLoc->instIndex;;
         sourceLocRun.m_startInstIndex = IRSerialData::InstIndex(startInstLoc->instIndex);
-        sourceLocRun.m_sourceLoc = debugWriter->addSourceLoc(SourceLoc::fromRaw(startSourceLoc));
+        sourceLocRun.m_sourceLoc = sourceLocWriter->addSourceLoc(SourceLoc::fromRaw(startSourceLoc));
 
         m_serialData->m_debugSourceLocRuns.add(sourceLocRun);
 
@@ -104,7 +104,7 @@ Result IRSerialWriter::_calcDebugInfo(DebugSerialWriter* debugWriter)
     return SLANG_OK;
 }
 
-Result IRSerialWriter::write(IRModule* module, DebugSerialWriter* debugWriter, SerialOptionFlags options, IRSerialData* serialData)
+Result IRSerialWriter::write(IRModule* module, SerialSourceLocWriter* sourceLocWriter, SerialOptionFlags options, IRSerialData* serialData)
 {
     typedef Ser::Inst::PayloadType PayloadType;
 
@@ -307,9 +307,9 @@ Result IRSerialWriter::write(IRModule* module, DebugSerialWriter* debugWriter, S
         }
     }
 
-    if ((options & SerialOptionFlag::DebugInfo) && debugWriter)
+    if ((options & SerialOptionFlag::DebugInfo) && sourceLocWriter)
     {
-        _calcDebugInfo(debugWriter);
+        _calcDebugInfo(sourceLocWriter);
     }
 
     m_serialData = nullptr;
@@ -669,7 +669,7 @@ static Result _readInstArrayChunk(SerialCompressionType containerCompressionType
     return SLANG_OK;
 }
 
-Result IRSerialReader::read(const IRSerialData& data, Session* session, DebugSerialReader* debugReader, RefPtr<IRModule>& outModule)
+Result IRSerialReader::read(const IRSerialData& data, Session* session, SerialSourceLocReader* sourceLocReader, RefPtr<IRModule>& outModule)
 {
     typedef Ser::Inst::PayloadType PayloadType;
 
@@ -866,14 +866,14 @@ Result IRSerialReader::read(const IRSerialData& data, Session* session, DebugSer
     }
 
     // We now need to apply the runs
-    if (debugReader && m_serialData->m_debugSourceLocRuns.getCount())
+    if (sourceLocReader && m_serialData->m_debugSourceLocRuns.getCount())
     {
         List<IRSerialData::SourceLocRun> sourceRuns(m_serialData->m_debugSourceLocRuns);
         // They are now in source location order
         sourceRuns.sort();
 
         // Just guess initially 0 for the source file that contains the initial run
-        DebugSerialData::SourceRange range = DebugSerialData::SourceRange::getInvalid();
+        SerialSourceLocData::SourceRange range = SerialSourceLocData::SourceRange::getInvalid();
         int fix = 0;
         
         const Index numRuns = sourceRuns.getCount();
@@ -887,9 +887,9 @@ Result IRSerialReader::read(const IRSerialData& data, Session* session, DebugSer
             {
                 if (!range.contains(run.m_sourceLoc))
                 {
-                    fix = debugReader->calcFixSourceLoc(run.m_sourceLoc, range);
+                    fix = sourceLocReader->calcFixSourceLoc(run.m_sourceLoc, range);
                 }
-                sourceLoc = debugReader->calcFixedLoc(run.m_sourceLoc, fix, range);
+                sourceLoc = sourceLocReader->calcFixedLoc(run.m_sourceLoc, fix, range);
             }
 
             // Write to all the instructions

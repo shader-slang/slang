@@ -38,7 +38,7 @@ void SharedASTBuilder::init(Session* session)
     // NOTE! That this adds the names of the abstract classes too(!)
     for (Index i = 0; i < Index(ASTNodeType::CountOf); ++i)
     {
-        const ReflectClassInfo* info = ReflectClassInfo::getInfo(ASTNodeType(i));
+        const ReflectClassInfo* info = ASTClassInfo::getInfo(ASTNodeType(i));
         if (info)
         {
             m_sliceToTypeMap.Add(UnownedStringSlice(info->m_name), info);
@@ -171,7 +171,7 @@ ASTBuilder::~ASTBuilder()
 {
     for (NodeBase* node : m_dtorNodes)
     {
-        const ReflectClassInfo* info = ReflectClassInfo::getInfo(node->astNodeType);
+        const ReflectClassInfo* info = ASTClassInfo::getInfo(node->astNodeType);
         SLANG_ASSERT(info->m_destructorFunc);
         info->m_destructorFunc(node);
     }
@@ -179,7 +179,7 @@ ASTBuilder::~ASTBuilder()
 
 NodeBase* ASTBuilder::createByNodeType(ASTNodeType nodeType)
 {
-    const ReflectClassInfo* info = ReflectClassInfo::getInfo(nodeType);
+    const ReflectClassInfo* info = ASTClassInfo::getInfo(nodeType);
     
     auto createFunc = info->m_createFunc;
     SLANG_ASSERT(createFunc);
