@@ -836,7 +836,7 @@ generatorProject("run-generators", "source/slang/")
             -- path with forward slashes, which confused the shell if we don't
             -- quote the executable path.
 
-            local buildcmd = '"%{cfg.targetdir}/slang-cpp-extractor" -d ' .. sourcePath .. " " .. table.concat(inputFiles, " ") .. " -strip-prefix slang-ast- -o slang-ast-generated -output-fields"
+            local buildcmd = '"%{cfg.targetdir}/slang-cpp-extractor" -d ' .. sourcePath .. " " .. table.concat(inputFiles, " ") .. " -strip-prefix slang-ast- -reflect-type ASTNode -o slang-ast-generated -output-fields"
             
             buildcommands { buildcmd }
             
@@ -870,7 +870,7 @@ generatorProject("run-generators", "source/slang/")
             -- path with forward slashes, which confused the shell if we don't
             -- quote the executable path.
 
-            local buildcmd = '"%{cfg.targetdir}/slang-cpp-extractor" -d ' .. sourcePath .. " " .. table.concat(inputFiles, " ") .. " -strip-prefix slang- -o slang-ref-object-generated -output-fields"
+            local buildcmd = '"%{cfg.targetdir}/slang-cpp-extractor" -d ' .. sourcePath .. " " .. table.concat(inputFiles, " ") .. " -strip-prefix slang- -reflect-type RefObject -o slang-ref-object-generated -output-fields"
             
             buildcommands { buildcmd }
             

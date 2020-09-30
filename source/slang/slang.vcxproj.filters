@@ -294,6 +294,12 @@
     <ClInclude Include="slang-profile.h">
       <Filter>Header Files</Filter>
     </ClInclude>
+    <ClInclude Include="slang-ref-object-generated-macro.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="slang-ref-object-generated.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
     <ClInclude Include="slang-ref-object-reflect.h">
       <Filter>Header Files</Filter>
     </ClInclude>

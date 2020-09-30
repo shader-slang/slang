@@ -281,6 +281,8 @@
     <ClInclude Include="slang-preprocessor.h" />
     <ClInclude Include="slang-profile-defs.h" />
     <ClInclude Include="slang-profile.h" />
+    <ClInclude Include="slang-ref-object-generated-macro.h" />
+    <ClInclude Include="slang-ref-object-generated.h" />
     <ClInclude Include="slang-ref-object-reflect.h" />
     <ClInclude Include="slang-reflection.h" />
     <ClInclude Include="slang-repro.h" />

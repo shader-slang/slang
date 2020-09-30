@@ -243,7 +243,18 @@ public:
         /// Stores in out any reflected derived types
     void getReflectedDerivedTypes(List<Node*>& out) const;
 
-    static void filterReflectedClassLike(List<Node*>& io);
+    typedef bool (*Filter)(Node* node);
+
+    static bool isClassLikeReflected(Node* node)
+    {
+        return node->isClassLike() && node->isReflected();
+    }
+    static bool isClassLike(Node* node)
+    {
+        return node->isClassLike();
+    }
+
+    static void filter(Filter filter, List<Node*>& io);
 
     static void calcScopePath(Node* node, List<Node*>& outPath);
 
@@ -670,14 +681,15 @@ void Node::getReflectedDerivedTypes(List<Node*>& out) const
     }
 }
 
-/* static */void Node::filterReflectedClassLike(List<Node*>& ioNodes)
+/* static */void Node::filter(Filter inFilter, List<Node*>& ioNodes)
 {
     // Filter out all the unreflected nodes
     Index count = ioNodes.getCount();
     for (Index j = 0; j < count; )
     {
         Node* node = ioNodes[j];
-        if (!node->isClassLike() || !node->isReflected())
+
+        if (!inFilter(node))
         {
             ioNodes.removeAt(j);
             count--;
@@ -2031,7 +2043,7 @@ SlangResult CPPExtractorApp::calcChildrenHeader(CPPExtractor& extractor, StringB
 
         List<Node*> nodes;
         baseType->calcDerivedDepthFirst(nodes);
-        Node::filterReflectedClassLike(nodes);
+        Node::filter(Node::isClassLike, nodes);
 
         List<Node*> derivedTypes;
 
@@ -2158,7 +2170,7 @@ SlangResult CPPExtractorApp::calcHeader(CPPExtractor& extractor, StringBuilder& 
 
         List<Node*> nodes;
         baseType->calcDerivedDepthFirst(nodes);
-        Node::filterReflectedClassLike(nodes);
+        Node::filter(Node::isClassLike, nodes);
 
         // Write out the types
         {
@@ -2205,6 +2217,7 @@ SlangResult CPPExtractorApp::calcHeader(CPPExtractor& extractor, StringBuilder& 
             out << "// Order is (NAME, SUPER, ORIGIN, LAST, MARKER, TYPE, param) \n";
             out << "// NAME - is the class name\n";
             out << "// SUPER - is the super class name (or NO_SUPER)\n";
+            out << "// ORIGIN - where the definition was found\n";
             out << "// LAST - is the class name for the last in the range (or NO_LAST)\n";
             out << "// MARKER - is the text inbetween in the prefix/postix (like ABSTRACT). If no inbetween text is is 'NONE'\n";
             out << "// TYPE - Can be BASE, INNER or LEAF for the overall base class, an INNER class, or a LEAF class\n";
@@ -2256,7 +2269,7 @@ SlangResult CPPExtractorApp::calcHeader(CPPExtractor& extractor, StringBuilder& 
                 }
                 out << marker << ", ";
 
-                if (node->m_baseType != Node::BaseType::None || node->m_superNode && node->m_superNode->isReflected() == false)
+                if (node->m_superNode == nullptr)
                 {
                     out << "BASE, ";
                 }
