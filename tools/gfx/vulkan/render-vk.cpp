@@ -944,7 +944,7 @@ SlangResult VKRenderer::initialize(const Desc& desc, void* inWindowHandle)
     instanceCreateInfo.ppEnabledExtensionNames = &instanceExtensions[0];
 
 #if ENABLE_VALIDATION_LAYER
-    const char* layerNames[] = { "VK_LAYER_LUNARG_standard_validation" };
+    const char* layerNames[] = { "VK_LAYER_KHRONOS_validation" };
     instanceCreateInfo.enabledLayerCount = SLANG_COUNT_OF(layerNames);
     instanceCreateInfo.ppEnabledLayerNames = layerNames;
 #endif
