@@ -7,7 +7,7 @@
 #include "../core/slang-array-view.h"
 
 #include "slang-serialize-types.h"
-#include "slang-serialize-debug.h"
+#include "slang-serialize-source-loc.h"
 
 #include "slang-name.h"
 #include "slang-source-loc.h"
@@ -79,7 +79,7 @@ struct IRSerialData
         bool operator!=(const ThisType& rhs) const { return !(*this == rhs); }
         bool operator<(const ThisType& rhs) const { return m_sourceLoc < rhs.m_sourceLoc;  }
 
-        DebugSerialData::SourceLoc m_sourceLoc;               ///< The source location
+        SerialSourceLocData::SourceLoc m_sourceLoc;               ///< The source location
         InstIndex m_startInstIndex;         ///< The index to the first instruction
         SizeType m_numInst;                 ///< The number of children
     };

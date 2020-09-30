@@ -7,14 +7,14 @@
 #include "slang-ast-generated.h"
 #include "slang-ast-reflect.h"
 
+#include "slang-serialize-reflection.h"
+
 // This file defines the primary base classes for the hierarchy of
 // AST nodes and related objects. For example, this is where the
 // basic `Decl`, `Stmt`, `Expr`, `type`, etc. definitions come from.
 
 namespace Slang
 {
-
-struct ReflectClassInfo;
 
 class NodeBase 
 {
@@ -26,7 +26,7 @@ class NodeBase
     SLANG_FORCE_INLINE void init(ASTNodeType inAstNodeType, ASTBuilder* /* astBuilder*/ ) { astNodeType = inAstNodeType; }
 
         /// Get the class info 
-    SLANG_FORCE_INLINE const ReflectClassInfo& getClassInfo() const { return *ReflectClassInfo::getInfo(astNodeType); }
+    SLANG_FORCE_INLINE const ReflectClassInfo& getClassInfo() const { return *ASTClassInfo::getInfo(astNodeType); }
 
     SyntaxClass<NodeBase> getClass() { return SyntaxClass<NodeBase>(&getClassInfo()); }
 
@@ -41,25 +41,25 @@ class NodeBase
 template<typename T>
 SLANG_FORCE_INLINE T* dynamicCast(NodeBase* node)
 {
-    return (node && ReflectClassInfo::isSubClassOf(node->astNodeType, T::kReflectClassInfo)) ? static_cast<T*>(node) : nullptr;
+    return (node && ReflectClassInfo::isSubClassOf(uint32_t(node->astNodeType), T::kReflectClassInfo)) ? static_cast<T*>(node) : nullptr;
 }
 
 template<typename T>
 SLANG_FORCE_INLINE const T* dynamicCast(const NodeBase* node)
 {
-    return (node && ReflectClassInfo::isSubClassOf(node->astNodeType, T::kReflectClassInfo)) ? static_cast<const T*>(node) : nullptr;
+    return (node && ReflectClassInfo::isSubClassOf(uint32_t(node->astNodeType), T::kReflectClassInfo)) ? static_cast<const T*>(node) : nullptr;
 }
 
 template<typename T>
 SLANG_FORCE_INLINE T* as(NodeBase* node)
 {
-    return (node && ReflectClassInfo::isSubClassOf(node->astNodeType, T::kReflectClassInfo)) ? static_cast<T*>(node) : nullptr;
+    return (node && ReflectClassInfo::isSubClassOf(uint32_t(node->astNodeType), T::kReflectClassInfo)) ? static_cast<T*>(node) : nullptr;
 }
 
 template<typename T>
 SLANG_FORCE_INLINE const T* as(const NodeBase* node)
 {
-    return (node && ReflectClassInfo::isSubClassOf(node->astNodeType, T::kReflectClassInfo)) ? static_cast<const T*>(node) : nullptr;
+    return (node && ReflectClassInfo::isSubClassOf(uint32_t(node->astNodeType), T::kReflectClassInfo)) ? static_cast<const T*>(node) : nullptr;
 }
 
 

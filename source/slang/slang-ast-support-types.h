@@ -13,6 +13,8 @@
 
 #include "slang-ast-reflect.h"
 
+#include "slang-serialize-reflection.h"
+
 #include "slang-name.h"
 
 #include <assert.h>
@@ -462,53 +464,13 @@ namespace Slang
 
     class ASTBuilder;
 
-    struct ReflectClassInfo
+    struct ASTClassInfo
     {
-        typedef ReflectClassInfo ThisType;
-
-        typedef void* (*CreateFunc)(ASTBuilder* astBuilder);
-        typedef void (*DestructorFunc)(void* ptr);
-
-        /// A constant time implementation of isSubClassOf
-        SLANG_FORCE_INLINE bool isSubClassOf(const ThisType& super) const
-        {
-            // We include super.m_classId, because it's a subclass of itself.
-            return m_classId >= super.m_classId && m_classId <= super.m_lastClassId;
-        }
-        // True if typeId derives from this type
-        SLANG_FORCE_INLINE bool isDerivedFrom(uint32_t typeId) const
-        {
-            return typeId >= m_classId && typeId <= m_lastClassId;
-        }
-        SLANG_FORCE_INLINE static bool isSubClassOf(ASTNodeType type, const ThisType& super)
-        {
-            // Check the type appears valid
-            SLANG_ASSERT(int(type) >= 0);
-            // We include super.m_classId, because it's a subclass of itself.
-            return uint32_t(type) >= super.m_classId && uint32_t(type) <= super.m_lastClassId;
-        }
-
-        /// Will produce the same result as isSubClassOf, but more slowly by traversing the m_superClass
-        /// Works without initRange being called. 
-        bool isSubClassOfSlow(const ThisType& super) const;
-
-        uint32_t m_classId;
-        uint32_t m_lastClassId;
-
-        const ReflectClassInfo* m_superClass;       ///< The super class of this class, or nullptr if has no super class. 
-        const char* m_name;                         ///< Textual class name, for debugging 
-        CreateFunc m_createFunc;                    ///< Callback to use when creating instances (using an ASTBuilder for backing memory)
-        DestructorFunc m_destructorFunc;            ///< The destructor for this type. Being just destructor, does not free backing memory for type.
-        uint32_t m_sizeInBytes;                     ///< Total size of the type
-        uint8_t m_alignment;                        ///< The required alignment of the type
-
         struct Infos
         {
             const ReflectClassInfo* infos[int(ASTNodeType::CountOf)];
         };
-
         SLANG_FORCE_INLINE static const ReflectClassInfo* getInfo(ASTNodeType type) { return kInfos.infos[int(type)]; }
-
         static const Infos kInfos;
     };
 
