@@ -57,6 +57,23 @@ struct ReflectClassInfo
     uint8_t m_alignment;                        ///< The required alignment of the type
 };
 
+// Does nothing - just a mark to the C++ extractor
+#define SLANG_REFLECT_BASE_CLASS(NAME)
+#define SLANG_REFLECTED
+#define SLANG_UNREFLECTED
+
+#define SLANG_CLASS_ROOT
+
+// Use these macros to help define Super, and making the base definition NOT have a Super definition.
+// For example something like...
+
+// #define SLANG_CLASS_REFLECT_IMPL(NAME, SUPER, ORIGIN, LAST, MARKER, TYPE, param) \
+//    SLANG_CLASS_REFLECT_SUPER_##TYPE(SUPER)
+
+#define SLANG_CLASS_REFLECT_SUPER_BASE(SUPER)
+#define SLANG_CLASS_REFLECT_SUPER_INNER(SUPER) typedef SUPER Super;
+#define SLANG_CLASS_REFLECT_SUPER_LEAF(SUPER) typedef SUPER Super;
+
 } // namespace Slang
 
 #endif

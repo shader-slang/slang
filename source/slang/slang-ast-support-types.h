@@ -14,6 +14,7 @@
 #include "slang-ast-reflect.h"
 
 #include "slang-serialize-reflection.h"
+#include "slang-ref-object-reflect.h"
 
 #include "slang-name.h"
 
@@ -1003,6 +1004,10 @@ namespace Slang
         IgnoreBaseInterfaces = 1 << 0,
     };
 
+    class SerialRefObject;
+    // Make sure C++ extractor can see the base class.
+    SLANG_REFLECT_BASE_CLASS(SerialRefObject)
+
     // Represents one item found during lookup
     struct LookupResultItem
     {
@@ -1058,9 +1063,11 @@ namespace Slang
         // the unique result (perhaps by overload resolution), then
         // we can walk the list of breadcrumbs to create a full
         // expression.
-        class Breadcrumb : public RefObject
+        class Breadcrumb : public SerialRefObject
         {
         public:
+            SLANG_OBJ_CLASS(Breadcrumb)
+
             enum class Kind : uint8_t
             {
                 // The lookup process looked "through" an in-scope

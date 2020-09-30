@@ -239,6 +239,19 @@
       <AdditionalInputs Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">../../bin/windows-x86/release/slang-cpp-extractor.exe;slang-ast-base.h;slang-ast-decl.h;slang-ast-expr.h;slang-ast-modifier.h;slang-ast-stmt.h;slang-ast-type.h;slang-ast-val.h</AdditionalInputs>
       <AdditionalInputs Condition="'$(Configuration)|$(Platform)'=='Release|x64'">../../bin/windows-x64/release/slang-cpp-extractor.exe;slang-ast-base.h;slang-ast-decl.h;slang-ast-expr.h;slang-ast-modifier.h;slang-ast-stmt.h;slang-ast-type.h;slang-ast-val.h</AdditionalInputs>
     </CustomBuild>
+    <CustomBuild Include="slang-ref-object-reflect.h">
+      <FileType>Document</FileType>
+      <Command Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">"../../bin/windows-x86/debug/slang-cpp-extractor" -d %(RootDir)%(Directory)/ slang-ast-support-types.h -strip-prefix slang- -o slang-ref-object-generated -output-fields</Command>
+      <Command Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">"../../bin/windows-x64/debug/slang-cpp-extractor" -d %(RootDir)%(Directory)/ slang-ast-support-types.h -strip-prefix slang- -o slang-ref-object-generated -output-fields</Command>
+      <Command Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">"../../bin/windows-x86/release/slang-cpp-extractor" -d %(RootDir)%(Directory)/ slang-ast-support-types.h -strip-prefix slang- -o slang-ref-object-generated -output-fields</Command>
+      <Command Condition="'$(Configuration)|$(Platform)'=='Release|x64'">"../../bin/windows-x64/release/slang-cpp-extractor" -d %(RootDir)%(Directory)/ slang-ast-support-types.h -strip-prefix slang- -o slang-ref-object-generated -output-fields</Command>
+      <Outputs>slang-ref-object-generated.h;slang-ref-object-generated-macro.h</Outputs>
+      <Message>slang-cpp-extractor RefObject %(Identity)</Message>
+      <AdditionalInputs Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">../../bin/windows-x86/debug/slang-cpp-extractor.exe;slang-ast-support-types.h</AdditionalInputs>
+      <AdditionalInputs Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">../../bin/windows-x64/debug/slang-cpp-extractor.exe;slang-ast-support-types.h</AdditionalInputs>
+      <AdditionalInputs Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">../../bin/windows-x86/release/slang-cpp-extractor.exe;slang-ast-support-types.h</AdditionalInputs>
+      <AdditionalInputs Condition="'$(Configuration)|$(Platform)'=='Release|x64'">../../bin/windows-x64/release/slang-cpp-extractor.exe;slang-ast-support-types.h</AdditionalInputs>
+    </CustomBuild>
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">

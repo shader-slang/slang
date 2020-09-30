@@ -22,6 +22,20 @@
 
 #include "slang-cpp-extractor-diagnostics.h"
 
+/*
+
+Some command lines:
+
+For AST
+
+-d source/slang slang-ast-base.h slang-ast-decl.h slang-ast-expr.h slang-ast-modifier.h slang-ast-stmt.h slang-ast-type.h slang-ast-val.h -strip-prefix slang-ast- -o slang-ast-generated -output-fields
+
+For RefObjects
+
+-d source/slang slang-ast-support-types.h -strip-prefix slang- -reflect-type RefObject -o slang-ref-object-generated -output-fields
+
+*/
+
 namespace SlangExperimental
 {
 
@@ -197,6 +211,9 @@ public:
         /// Calculate the absolute name for this namespace/type
     void calcAbsoluteName(StringBuilder& outName) const;
 
+        /// Get the absolute name
+    String getAbsoluteName() const { StringBuilder buf; calcAbsoluteName(buf); return buf.ProduceString(); }
+
         /// Do depth first traversal of nodes
     void calcScopeDepthFirst(List<Node*>& outNodes);
 
@@ -339,6 +356,9 @@ public:
     /// When parsing we don't lookup all up super types/add derived types. This is because
     /// we allow files to be processed in any order, so we have to do the type lookup as a separate operation
     SlangResult calcDerivedTypes();
+
+        /// Find the name in the specified scope
+    Node* findInScope(Node* scope, UnownedStringSlice& name);
 
     /// Only valid after calcDerivedTypes has been executed
     const List<Node*>& getBaseTypes() const { return m_baseTypes; }
@@ -555,24 +575,26 @@ void Node::dump(int indentCount, StringBuilder& out)
 
 void Node::calcAbsoluteName(StringBuilder& outName) const
 {
-    if (m_parentScope == nullptr)
+    List<Node*> path;
+    calcScopePath(const_cast<Node*>(this), path);
+
+    // 1 so we skip the global scope
+    for (Index i = 1; i < path.getCount(); ++i)
     {
-        if (!m_name.hasContent())
+        Node* node = path[i];
+
+        if (i > 1)
         {
-            return;
+            outName << "::";
         }
-        outName << m_name.getContent();
-    }
-    else
-    {
-        outName << "::";
-        if (m_type == Type::AnonymousNamespace)
+
+        if (node->m_type == Type::AnonymousNamespace)
         {
             outName << "{Anonymous}";
         }
         else
         {
-            outName << m_name.getContent();
+            outName << node->m_name.getContent();
         }
     }
 }
@@ -1752,6 +1774,30 @@ SlangResult CPPExtractor::parse(SourceFile* sourceFile, const Options* options)
     }
 }
 
+Node* CPPExtractor::findInScope(Node* scope, UnownedStringSlice& name)
+{
+    // TODO(JS): We may want to lookup based on the path. 
+    // If the name is qualified, we give up for not
+    if (String(name).indexOf("::") >= 0)
+    {
+        return nullptr;
+    }
+
+    // Okay try in all scopes up to the root
+    while (scope)
+    {
+        if (Node* node = scope->findChild(name))
+        {
+            return node;
+        }
+
+        scope = scope->m_parentScope;
+    }
+
+    return nullptr;
+}
+
+
 SlangResult CPPExtractor::_calcDerivedTypesRec(Node* node)
 {
     if (node->isClassLike() && node->m_baseType == Node::BaseType::None)
@@ -1765,12 +1811,13 @@ SlangResult CPPExtractor::_calcDerivedTypesRec(Node* node)
                 return SLANG_FAIL;
             }
 
-            Node* superType = parentScope->findChild(node->m_super.getContent());
+            Node* superType = findInScope(parentScope, node->m_super.getContent());
+
             if (!superType)
             {
                 if (node->isReflected())
                 {
-                    m_sink->diagnose(node->m_name, CPPDiagnostics::superTypeNotFound, node->m_name.getContent());
+                    m_sink->diagnose(node->m_name, CPPDiagnostics::superTypeNotFound, node->getAbsoluteName());
                     return SLANG_FAIL;
                 }
             }
@@ -1778,7 +1825,7 @@ SlangResult CPPExtractor::_calcDerivedTypesRec(Node* node)
             {
                 if (!superType->isClassLike())
                 {
-                    m_sink->diagnose(node->m_name, CPPDiagnostics::superTypeNotAType, node->m_name.getContent());
+                    m_sink->diagnose(node->m_name, CPPDiagnostics::superTypeNotAType, node->getAbsoluteName());
                     return SLANG_FAIL;
                 }
 

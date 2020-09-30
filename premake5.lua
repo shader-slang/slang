@@ -792,9 +792,10 @@ generatorProject("run-generators", "source/slang/")
     
     files
     {
-        "source/slang/*.meta.slang",            -- The stdlib files
-        "source/slang/slang-ast-reflect.h",     -- The C++ reflection 
-        "prelude/*.h",                          -- The prelude files
+        "source/slang/*.meta.slang",                -- The stdlib files
+        "source/slang/slang-ast-reflect.h",         -- C++ reflection 
+        "source/slang/slang-ref-object-reflect.h",  -- More C++ reflection
+        "prelude/*.h",                              -- The prelude files
         
         --
         -- To build we need to have some source! It has to be a source file that 
@@ -842,6 +843,40 @@ generatorProject("run-generators", "source/slang/")
             -- Specify the files output by the extactor - so custom action will run when these files are needed.
             --
             buildoutputs { sourcePath .. "slang-ast-generated.h", sourcePath .. "slang-ast-generated-macro.h"}
+            
+            -- Make it depend on the extractor tool itself
+            local buildInputTable = { "%{cfg.targetdir}/slang-cpp-extractor" .. executableSuffix }
+            for key, inputFile in ipairs(inputFiles) do
+                table.insert(buildInputTable, sourcePath .. inputFile)
+            end
+            
+            --
+            buildinputs(buildInputTable)
+            
+        filter "files:**/slang-ref-object-reflect.h"
+            buildmessage "slang-cpp-extractor RefObject %{file.relpath}"
+
+            -- Where the input files are located
+            local sourcePath = "%{file.directory}/"
+            
+            -- Specify the files that will be used for the generation
+            local inputFiles = { "slang-ast-support-types.h" }
+
+            -- Specify the actual command to run for this action.
+            --
+            -- Note that we use a single-quoted Lua string and wrap the path
+            -- to the `slang-cpp-extractor` command in double quotes to avoid
+            -- confusing the Windows shell. It seems that Premake outputs that
+            -- path with forward slashes, which confused the shell if we don't
+            -- quote the executable path.
+
+            local buildcmd = '"%{cfg.targetdir}/slang-cpp-extractor" -d ' .. sourcePath .. " " .. table.concat(inputFiles, " ") .. " -strip-prefix slang- -o slang-ref-object-generated -output-fields"
+            
+            buildcommands { buildcmd }
+            
+            -- Specify the files output by the extactor - so custom action will run when these files are needed.
+            --
+            buildoutputs { sourcePath .. "slang-ref-object-generated.h", sourcePath .. "slang-ref-object-generated-macro.h"}
             
             -- Make it depend on the extractor tool itself
             local buildInputTable = { "%{cfg.targetdir}/slang-cpp-extractor" .. executableSuffix }

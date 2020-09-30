@@ -281,6 +281,7 @@
     <ClInclude Include="slang-preprocessor.h" />
     <ClInclude Include="slang-profile-defs.h" />
     <ClInclude Include="slang-profile.h" />
+    <ClInclude Include="slang-ref-object-reflect.h" />
     <ClInclude Include="slang-reflection.h" />
     <ClInclude Include="slang-repro.h" />
     <ClInclude Include="slang-serialize-ast.h" />
@@ -398,6 +399,7 @@
     <ClCompile Include="slang-parser.cpp" />
     <ClCompile Include="slang-preprocessor.cpp" />
     <ClCompile Include="slang-profile.cpp" />
+    <ClCompile Include="slang-ref-object-reflect.cpp" />
     <ClCompile Include="slang-reflection.cpp" />
     <ClCompile Include="slang-repro.cpp" />
     <ClCompile Include="slang-serialize-ast.cpp" />

@@ -40,5 +40,8 @@
     <CustomBuild Include="slang-ast-reflect.h">
       <Filter>Header Files</Filter>
     </CustomBuild>
+    <CustomBuild Include="slang-ref-object-reflect.h">
+      <Filter>Header Files</Filter>
+    </CustomBuild>
   </ItemGroup>
 </Project>
