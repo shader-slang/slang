@@ -368,8 +368,8 @@ public:
     /// we allow files to be processed in any order, so we have to do the type lookup as a separate operation
     SlangResult calcDerivedTypes();
 
-        /// Find the name in the specified scope
-    Node* findInScope(Node* scope, UnownedStringSlice& name);
+        /// Find the name starting in specified scope
+    Node* findNode(Node* scope, const UnownedStringSlice& name);
 
     /// Only valid after calcDerivedTypes has been executed
     const List<Node*>& getBaseTypes() const { return m_baseTypes; }
@@ -1781,7 +1781,7 @@ SlangResult CPPExtractor::parse(SourceFile* sourceFile, const Options* options)
     }
 }
 
-Node* CPPExtractor::findInScope(Node* scope, UnownedStringSlice& name)
+Node* CPPExtractor::findNode(Node* scope, const UnownedStringSlice& name)
 {
     // TODO(JS): We may want to lookup based on the path. 
     // If the name is qualified, we give up for not
@@ -1818,7 +1818,7 @@ SlangResult CPPExtractor::_calcDerivedTypesRec(Node* node)
                 return SLANG_FAIL;
             }
 
-            Node* superType = findInScope(parentScope, node->m_super.getContent());
+            Node* superType = findNode(parentScope, node->m_super.getContent());
 
             if (!superType)
             {

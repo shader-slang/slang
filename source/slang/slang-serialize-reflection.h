@@ -67,9 +67,6 @@ struct ReflectClassInfo
 // Use these macros to help define Super, and making the base definition NOT have a Super definition.
 // For example something like...
 
-// #define SLANG_CLASS_REFLECT_IMPL(NAME, SUPER, ORIGIN, LAST, MARKER, TYPE, param) \
-//    SLANG_CLASS_REFLECT_SUPER_##TYPE(SUPER)
-
 #define SLANG_CLASS_REFLECT_SUPER_BASE(SUPER)
 #define SLANG_CLASS_REFLECT_SUPER_INNER(SUPER) typedef SUPER Super;
 #define SLANG_CLASS_REFLECT_SUPER_LEAF(SUPER) typedef SUPER Super;
