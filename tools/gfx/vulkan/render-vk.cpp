@@ -944,9 +944,52 @@ SlangResult VKRenderer::initialize(const Desc& desc, void* inWindowHandle)
     instanceCreateInfo.ppEnabledExtensionNames = &instanceExtensions[0];
 
 #if ENABLE_VALIDATION_LAYER
-    const char* layerNames[] = { "VK_LAYER_KHRONOS_validation" };
-    instanceCreateInfo.enabledLayerCount = SLANG_COUNT_OF(layerNames);
-    instanceCreateInfo.ppEnabledLayerNames = layerNames;
+    // Depending on driver version, validation layer may or may not exist.
+    // Newer drivers comes with "VK_LAYER_KHRONOS_validation", while older
+    // drivers provide only the deprecated
+    // "VK_LAYER_LUNARG_standard_validation" layer.
+    // We will check what layers are available, and use the newer
+    // "VK_LAYER_KHRONOS_validation" layer when possible.
+    uint32_t layerCount;
+    m_api.vkEnumerateInstanceLayerProperties(&layerCount, nullptr);
+
+    List<VkLayerProperties> availableLayers;
+    availableLayers.setCount(layerCount);
+    m_api.vkEnumerateInstanceLayerProperties(&layerCount, availableLayers.getBuffer());
+
+    const char* layerNames[] = { nullptr };
+    for (auto& layer : availableLayers)
+    {
+        if (strncmp(
+                layer.layerName,
+                "VK_LAYER_KHRONOS_validation",
+                sizeof("VK_LAYER_KHRONOS_validation")) == 0)
+        {
+            layerNames[0] = "VK_LAYER_KHRONOS_validation";
+            break;
+        }
+    }
+    // On older drivers, only "VK_LAYER_LUNARG_standard_validation" exists,
+    // so we try to use it if we can't find "VK_LAYER_KHRONOS_validation".
+    if (!layerNames[0])
+    {
+        for (auto& layer : availableLayers)
+        {
+            if (strncmp(
+                    layer.layerName,
+                    "VK_LAYER_LUNARG_standard_validation",
+                    sizeof("VK_LAYER_LUNARG_standard_validation")) == 0)
+            {
+                layerNames[0] = "VK_LAYER_LUNARG_standard_validation";
+                break;
+            }
+        }
+    }
+    if (layerNames[0])
+    {
+        instanceCreateInfo.enabledLayerCount = SLANG_COUNT_OF(layerNames);
+        instanceCreateInfo.ppEnabledLayerNames = layerNames;
+    }
 #endif
 
     SLANG_VK_RETURN_ON_FAIL(m_api.vkCreateInstance(&instanceCreateInfo, nullptr, &instance));
