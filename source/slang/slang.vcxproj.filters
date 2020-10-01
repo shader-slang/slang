@@ -309,10 +309,16 @@
     <ClInclude Include="slang-repro.h">
       <Filter>Header Files</Filter>
     </ClInclude>
+    <ClInclude Include="slang-serialize-ast-type-info.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
     <ClInclude Include="slang-serialize-ast.h">
       <Filter>Header Files</Filter>
     </ClInclude>
     <ClInclude Include="slang-serialize-container.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="slang-serialize-factory.h">
       <Filter>Header Files</Filter>
     </ClInclude>
     <ClInclude Include="slang-serialize-ir-types.h">
@@ -663,6 +669,9 @@
       <Filter>Source Files</Filter>
     </ClCompile>
     <ClCompile Include="slang-serialize-container.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="slang-serialize-factory.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
     <ClCompile Include="slang-serialize-ir-types.cpp">

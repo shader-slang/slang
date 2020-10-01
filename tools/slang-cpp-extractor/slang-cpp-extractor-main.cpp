@@ -626,11 +626,6 @@ Index Node::calcDerivedDepth() const
 
 Node* Node::findLastDerived()
 {
-    if (!isReflected())
-    {
-        return nullptr;
-    }
-
     for (Index i = m_derivedTypes.getCount() - 1; i >= 0; --i)
     {
         Node* derivedType = m_derivedTypes[i];
