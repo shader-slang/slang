@@ -11,9 +11,9 @@
 
 #include "slang-ast-generated.h"
 
-#include "slang-ast-reflect.h"
-
 #include "slang-serialize-reflection.h"
+
+#include "slang-ast-reflect.h"
 #include "slang-ref-object-reflect.h"
 
 #include "slang-name.h"

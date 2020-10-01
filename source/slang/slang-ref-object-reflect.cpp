@@ -7,7 +7,7 @@
 
 #include "slang-ast-support-types.h"
 
-#include "slang-serialize.h"
+//#include "slang-serialize.h"
 
 #include "slang-serialize-ast-type-info.h"
 

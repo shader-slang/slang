@@ -2,7 +2,7 @@
 #ifndef SLANG_SERIALIZE_H
 #define SLANG_SERIALIZE_H
 
-#include <type_traits>
+//#include <type_traits>
 
 #include "../core/slang-riff.h"
 #include "../core/slang-byte-encode-util.h"

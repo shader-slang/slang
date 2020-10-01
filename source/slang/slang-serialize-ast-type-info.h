@@ -2,6 +2,9 @@
 #ifndef SLANG_SERIALIZE_AST_TYPE_INFO_H
 #define SLANG_SERIALIZE_AST_TYPE_INFO_H
 
+#include "slang-ast-support-types.h"
+#include "slang-ast-all.h"
+
 #include "slang-serialize-type-info.h"
 #include "slang-serialize-misc-type-info.h"
 
