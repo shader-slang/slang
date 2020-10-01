@@ -113,7 +113,7 @@ SerialIndex ModuleSerialFilter::writePointer(SerialWriter* writer, const NodeBas
 
 /* !!!!!!!!!!!!!!!!!!!!!!!!!!!!!! SerialClassesUtil !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! */
 
-/* static */SlangResult SerialClassesUtil::add(SerialClasses* serialClasses)
+/* static */SlangResult SerialClassesUtil::addSerialClasses(SerialClasses* serialClasses)
 {
     ASTSerialUtil::addSerialClasses(serialClasses);
     SerialRefObjects::addSerialClasses(serialClasses);
@@ -124,7 +124,7 @@ SerialIndex ModuleSerialFilter::writePointer(SerialWriter* writer, const NodeBas
 /* static */SlangResult SerialClassesUtil::create(RefPtr<SerialClasses>& out)
 {
     RefPtr<SerialClasses> classes(new SerialClasses);
-    SLANG_RETURN_ON_FAIL(add(classes));
+    SLANG_RETURN_ON_FAIL(addSerialClasses(classes));
 
     out = classes;
     return SLANG_OK;

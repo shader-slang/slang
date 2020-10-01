@@ -37,7 +37,7 @@ protected:
 struct SerialClassesUtil
 {
         /// Add all types to serialClasses
-    static SlangResult add(SerialClasses* serialClasses);
+    static SlangResult addSerialClasses(SerialClasses* serialClasses);
         /// Create SerialClasses with all the types added
     static SlangResult create(RefPtr<SerialClasses>& out);
 };

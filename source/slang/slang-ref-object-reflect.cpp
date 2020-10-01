@@ -14,6 +14,24 @@
 namespace Slang
 {
 
+static const SerialClass* _addClass(SerialClasses* serialClasses, RefObjectType type, RefObjectType super, const List<SerialField>& fields)
+{
+    const SerialClass* superClass = serialClasses->getSerialClass(SerialTypeKind::RefObject, SerialSubType(super));
+    return serialClasses->add(SerialTypeKind::RefObject, SerialSubType(type), fields.getBuffer(), fields.getCount(), superClass);
+}
+
+#define SLANG_REF_OBJECT_ADD_SERIAL_FIELD(FIELD_NAME, TYPE, param) fields.add(SerialField::make(#FIELD_NAME, &obj->FIELD_NAME));
+
+// Note that the obj point is not nullptr, because some compilers notice this is 'indexing from null'
+// and warn/error. So we offset from 1.
+#define SLANG_REF_OBJECT_ADD_SERIAL_CLASS(NAME, SUPER, ORIGIN, LAST, MARKER, TYPE, param) \
+{ \
+    NAME* obj = SerialField::getPtr<NAME>(); \
+    SLANG_UNUSED(obj); \
+    fields.clear(); \
+    SLANG_FIELDS_RefObject_##NAME(SLANG_REF_OBJECT_ADD_SERIAL_FIELD, param) \
+    _addClass(serialClasses, RefObjectType::NAME, RefObjectType::SUPER, fields); \
+}
 
 struct RefObjectAccess
 {
@@ -22,6 +40,16 @@ struct RefObjectAccess
     {
         SLANG_UNUSED(context)
         return new T;
+    }
+
+    static void calcClasses(SerialClasses* serialClasses)
+    {
+        // Add SerialRefObject first, and specially handle so that we add a null super class
+        serialClasses->add(SerialTypeKind::RefObject, SerialSubType(RefObjectType::SerialRefObject), nullptr, 0, nullptr);
+
+        // Add the rest in order such that Super class is always added before its children
+        List<SerialField> fields;
+        SLANG_CHILDREN_RefObject_SerialRefObject(SLANG_REF_OBJECT_ADD_SERIAL_CLASS, _)
     }
 };
 
@@ -50,14 +78,7 @@ SerialRefObjects::SerialRefObjects()
 
 /* static */SlangResult SerialRefObjects::addSerialClasses(SerialClasses* serialClasses)
 {
-    {
-        // Let's hack Breadcrumbs...
-
-        typedef LookupResultItem::Breadcrumb Type;
-        SerialField field = SerialField::make("_", SerialField::getPtr<Type>());
-        serialClasses->add(SerialTypeKind::RefObject, SerialSubType(RefObjectType::LookupResultItem_Breadcrumb), &field, 1, nullptr);
-    }
-
+    RefObjectAccess::calcClasses(serialClasses);
     return SLANG_OK;
 }
 

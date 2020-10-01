@@ -385,6 +385,14 @@ struct SerialTypeInfo<Modifiers>
 template <>
 struct SerialTypeInfo<ASTNodeType> : public SerialConvertTypeInfo<ASTNodeType, uint16_t> {};
 
+// LookupResultItem_Breadcrumb::ThisParameterMode
+template <>
+struct SerialTypeInfo<LookupResultItem_Breadcrumb::ThisParameterMode> : public SerialConvertTypeInfo<LookupResultItem_Breadcrumb::ThisParameterMode, uint8_t> {};
+
+// LookupResultItem_Breadcrumb::Kind
+template <>
+struct SerialTypeInfo<LookupResultItem_Breadcrumb::Kind> : public SerialConvertTypeInfo<LookupResultItem_Breadcrumb::Kind, uint8_t> {};
+
 } // namespace Slang
 
 #endif
