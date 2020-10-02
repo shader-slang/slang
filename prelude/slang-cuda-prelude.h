@@ -373,9 +373,9 @@ struct RWStructuredBuffer : StructuredBuffer<T>
     SLANG_CUDA_CALL T& operator[](size_t index) const
     {
 #ifndef SLANG_CUDA_STRUCTURED_BUFFER_NO_COUNT
-        SLANG_CUDA_BOUND_CHECK(index, count);
+        SLANG_CUDA_BOUND_CHECK(index, this->count);
 #endif
-        return data[index];
+        return this->data[index];
     }
 };
 
