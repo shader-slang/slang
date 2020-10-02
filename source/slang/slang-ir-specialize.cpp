@@ -808,6 +808,24 @@ struct SpecializationContext
         return false;
     }
 
+    /// Used by `maybeSpecailizeBufferLoadCall`, this function returns a new specialized callee that
+    /// replaces a `specialize(.operator[], oldType)` to `specialize(.operator[], newElementType)`.
+    IRInst* getNewSpecializedBufferLoadCallee(
+        IRInst* oldSpecializedCallee,
+        IRType* newContainerType,
+        IRType* newElementType)
+    {
+        auto oldSpecialize = cast<IRSpecialize>(oldSpecializedCallee);
+        SLANG_ASSERT(oldSpecialize->getArgCount() == 1);
+        IRBuilder builder;
+        builder.sharedBuilder = &sharedBuilderStorage;
+        builder.setInsertBefore(oldSpecializedCallee);
+        auto calleeType = builder.getFuncType(1, &newContainerType, newElementType);
+        auto newSpecialize = builder.emitSpecializeInst(
+            calleeType, oldSpecialize->getBase(), 1, (IRInst**)&newElementType);
+        return newSpecialize;
+    }
+
     /// Transform a buffer load intrinsic call.
     /// `bufferLoad(wrapExistential(bufferObj, wrapArgs), loadArgs)` should be transformed into
     /// `wrapExistential(bufferLoad(bufferObj, loadArgs), wragArgs)`.
@@ -844,11 +862,18 @@ struct SpecializationContext
                     {
                         slotOperands.add(wrapExistential->getSlotOperand(ii));
                     }
-                    auto newCall = builder.emitCallInst(elementType, inst->getCallee(), args);
+                    // The old callee should be in the form of `specialize(.operator[], IInterfaceType)`,
+                    // we should update it to be `specialize(.operator[], elementType)`, so the return type
+                    // of the load call is `elementType`.
+                    auto oldCallee = inst->getCallee();
+                    auto newCallee = getNewSpecializedBufferLoadCallee(inst->getCallee(), sbType, elementType);
+                    auto newCall = builder.emitCallInst(elementType, newCallee, args);
                     auto newWrapExistential = builder.emitWrapExistential(
                         resultType, newCall, slotOperandCount, slotOperands.getBuffer());
                     inst->replaceUsesWith(newWrapExistential);
                     inst->removeAndDeallocate();
+                    SLANG_ASSERT(!oldCallee->hasUses());
+                    oldCallee->removeAndDeallocate();
                     addUsersToWorkList(newWrapExistential);
                     return true;
                 }
@@ -1080,7 +1105,8 @@ struct SpecializationContext
         //
         if(as<IRInterfaceType>(type))
             return true;
-
+        if (calcExistentialTypeParamSlotCount(type) != 0)
+            return true;
         // Eventually we will also want to handle arrays over
         // existential types, but that will require careful
         // handling in many places.
@@ -1518,6 +1544,11 @@ struct SpecializationContext
             type = arrayType->getElementType();
             goto top;
         }
+        else if (auto sbType = as<IRHLSLStructuredBufferTypeBase>(type))
+        {
+            type = sbType->getElementType();
+            goto top;
+        }
         else if( auto structType = as<IRStructType>(type) )
         {
             UInt count = 0;
@@ -1800,6 +1831,11 @@ struct SpecializationContext
             type = ptrLikeType->getElementType();
             goto top;
         }
+        else if (auto sbType = as<IRHLSLStructuredBufferTypeBase>(type))
+        {
+            type = sbType->getElementType();
+            goto top;
+        }
         else if( auto structType = as<IRStructType>(type) )
         {
             UInt count = 0;
@@ -1872,15 +1908,15 @@ struct SpecializationContext
                 baseElementType,
                 slotOperandCount,
                 type->getExistentialArgs());
-            addToWorkList(wrappedElementType);
 
             auto newPtrLikeType = builder.getType(
                 baseType->op,
                 1,
                 &wrappedElementType);
-            addToWorkList(newPtrLikeType);
-
             addUsersToWorkList(type);
+            addToWorkList(newPtrLikeType);
+            addToWorkList(wrappedElementType);
+
             type->replaceUsesWith(newPtrLikeType);
             type->removeAndDeallocate();
             return;
@@ -1911,10 +1947,13 @@ struct SpecializationContext
             }
 
             IRStructType* newStructType = nullptr;
+            addUsersToWorkList(type);
+
             if( !existentialSpecializedStructs.TryGetValue(key, newStructType) )
             {
                 builder.setInsertBefore(baseStructType);
                 newStructType = builder.createStructType();
+                addToWorkList(newStructType);
 
                 auto fieldSlotArgs = type->getExistentialArgs();
 
@@ -1939,10 +1978,8 @@ struct SpecializationContext
                 }
 
                 existentialSpecializedStructs.Add(key, newStructType);
-                addToWorkList(newStructType);
             }
 
-            addUsersToWorkList(type);
             type->replaceUsesWith(newStructType);
             type->removeAndDeallocate();
             return;
