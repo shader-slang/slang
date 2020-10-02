@@ -2536,8 +2536,19 @@ createStructuredBufferTypeLayout(
         typeLayout->addResourceUsage(info.kind, info.size);
     }
 
+    // If element type contains existential type params and object params,
+    // we need to propagate them through the StructuredBufferLayout.
+    if (auto existentialTypeInfo = elementTypeLayout->FindResourceInfo(LayoutResourceKind::ExistentialTypeParam))
+    {
+        typeLayout->addResourceUsage(existentialTypeInfo->kind, existentialTypeInfo->count);
+    }
+    if (auto existentialObjInfo = elementTypeLayout->FindResourceInfo(LayoutResourceKind::ExistentialObjectParam))
+    {
+        typeLayout->addResourceUsage(existentialObjInfo->kind, existentialObjInfo->count);
+    }
+
     // Note: for now we don't deal with the case of a structured
-    // buffer that might contain anything other than "uniform" data,
+    // buffer that might contain any other resource types,
     // because there really isn't a way to implement that.
 
     return typeLayout;
