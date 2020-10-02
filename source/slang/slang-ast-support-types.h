@@ -9,7 +9,7 @@
 
 #include "../core/slang-semantic-version.h"
 
-#include "slang-ast-generated.h"
+#include "slang-ast-generated.h" 
 
 #include "slang-serialize-reflection.h"
 
@@ -445,6 +445,8 @@ namespace Slang
 
     struct QualType
     {
+        SLANG_VALUE_CLASS(QualType) 
+
         Type*	type = nullptr;
         bool	        isLeftValue;
 
@@ -1006,7 +1008,7 @@ namespace Slang
 
     class SerialRefObject;
     // Make sure C++ extractor can see the base class.
-    SLANG_REFLECT_BASE_CLASS(SerialRefObject)
+    SLANG_PRE_DECLARE(_OBJ_CLASS, class SerialRefObject)
 
     class LookupResultItem_Breadcrumb : public SerialRefObject
     {

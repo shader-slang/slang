@@ -15,6 +15,9 @@
     <ClInclude Include="..\..\prelude\slang-cpp-types.h">
       <Filter>Header Files</Filter>
     </ClInclude>
+    <ClInclude Include="slang-ref-object-reflect.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="..\core\slang-string.cpp">
@@ -38,9 +41,6 @@
       <Filter>Source Files</Filter>
     </CustomBuild>
     <CustomBuild Include="slang-ast-reflect.h">
-      <Filter>Header Files</Filter>
-    </CustomBuild>
-    <CustomBuild Include="slang-ref-object-reflect.h">
       <Filter>Header Files</Filter>
     </CustomBuild>
   </ItemGroup>

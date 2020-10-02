@@ -24,11 +24,8 @@ struct RefObjectAccess;
     SLANG_CLASS_REFLECT_SUPER_##TYPE(SUPER) \
    
 // Placed in any SerialRefObject derived class
-#define SLANG_OBJ_ABSTRACT_CLASS(NAME)  SLANG_RefObject_##NAME(SLANG_OBJ_CLASS_REFLECT_IMPL, _)
+#define SLANG_ABSTRACT_OBJ_CLASS(NAME)  SLANG_RefObject_##NAME(SLANG_OBJ_CLASS_REFLECT_IMPL, _)
 #define SLANG_OBJ_CLASS(NAME)           SLANG_RefObject_##NAME(SLANG_OBJ_CLASS_REFLECT_IMPL, _)
-
-//#define SLANG_OBJ_ABSTRACT_CLASS(NAME)
-//#define SLANG_OBJ_CLASS(NAME)         
 
 namespace Slang
 {

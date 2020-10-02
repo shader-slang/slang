@@ -58,11 +58,10 @@ struct ReflectClassInfo
 };
 
 // Does nothing - just a mark to the C++ extractor
-#define SLANG_REFLECT_BASE_CLASS(NAME)
 #define SLANG_REFLECTED
 #define SLANG_UNREFLECTED
 
-#define SLANG_CLASS_ROOT
+#define SLANG_PRE_DECLARE(SUFFIX, DEF)
 
 // Use these macros to help define Super, and making the base definition NOT have a Super definition.
 // For example something like...
@@ -70,6 +69,9 @@ struct ReflectClassInfo
 #define SLANG_CLASS_REFLECT_SUPER_BASE(SUPER)
 #define SLANG_CLASS_REFLECT_SUPER_INNER(SUPER) typedef SUPER Super;
 #define SLANG_CLASS_REFLECT_SUPER_LEAF(SUPER) typedef SUPER Super;
+
+// Mark a value class
+#define SLANG_VALUE_CLASS(x)
 
 } // namespace Slang
 

@@ -304,6 +304,9 @@
     <ClInclude Include="slang-token.h" />
     <ClInclude Include="slang-type-layout.h" />
     <ClInclude Include="slang-type-system-shared.h" />
+    <ClInclude Include="slang-value-generated-macro.h" />
+    <ClInclude Include="slang-value-generated.h" />
+    <ClInclude Include="slang-value-reflect.h" />
     <ClInclude Include="slang-visitor.h" />
   </ItemGroup>
   <ItemGroup>
@@ -421,6 +424,7 @@
     <ClCompile Include="slang-token.cpp" />
     <ClCompile Include="slang-type-layout.cpp" />
     <ClCompile Include="slang-type-system-shared.cpp" />
+    <ClCompile Include="slang-value-reflect.cpp" />
     <ClCompile Include="slang.cpp" />
   </ItemGroup>
   <ItemGroup>
