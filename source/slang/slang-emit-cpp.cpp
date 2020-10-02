@@ -2238,9 +2238,9 @@ bool CPPSourceEmitter::tryEmitInstExprImpl(IRInst* inst, const EmitOpInfo& inOut
         }
         case kIROp_BitCast:
         {
-            m_writer->emit("((");
+            m_writer->emit("(slang_bit_cast<");
             emitType(inst->getDataType());
-            m_writer->emit(")(");
+            m_writer->emit(">(");
             emitOperand(inst->getOperand(0), getInfo(EmitOp::General));
             m_writer->emit("))");
             return true;
