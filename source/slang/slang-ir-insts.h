@@ -1807,7 +1807,7 @@ struct IRBuilder
     IRInOutType*  getInOutType(IRType* valueType);
     IRRefType*  getRefType(IRType* valueType);
     IRPtrTypeBase*  getPtrType(IROp op, IRType* valueType);
-    IRExistentialBoxType* getExistentialBoxType(IRType* concreteType, IRType* interfaceType);
+    IRType* getExistentialBoxType(IRType* concreteType, IRType* interfaceType);
 
     IRArrayTypeBase* getArrayTypeBase(
         IROp    op,
