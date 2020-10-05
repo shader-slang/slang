@@ -825,6 +825,8 @@ SlangResult emitEntryPointsSourceFromIR(
     // Now that we've emitted the code for all the declarations in the file,
     // it is time to stitch together the final output.
 
+    sourceEmitter->emitPreludeDirectives();
+
     {
         // If there is a prelude emit it
         const auto& prelude = compileRequest->getSession()->getPreludeForLanguage(sourceLanguage);

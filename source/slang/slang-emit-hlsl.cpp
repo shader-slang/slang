@@ -1001,5 +1001,98 @@ void HLSLSourceEmitter::emitMatrixLayoutModifiersImpl(IRVarLayout* layout)
     }
 }
 
+void HLSLSourceEmitter::handleRequiredCapabilitiesImpl(IRInst* inst)
+{
+    if(inst->findDecoration<IRRequiresNVAPIDecoration>())
+    {
+        m_extensionTracker->m_requiresNVAPI = true;
+    }
+}
+
+void HLSLSourceEmitter::emitPreludeDirectivesImpl()
+{
+    if( m_extensionTracker->m_requiresNVAPI )
+    {
+        // If the generated code includes implicit NVAPI use,
+        // then we need to ensure that NVAPI support is included
+        // via the prelude.
+        //
+        m_writer->emit("#define SLANG_HLSL_ENABLE_NVAPI 1\n");
+
+        // In addition, if the user has informed the Slang compiler of
+        // the register/space that it wants to use for NVAPI, then we
+        // need to pass along that information to prelude in the
+        // generated code, so that it can be picked up by the NVAPI
+        // header at the point where it gets included.
+        //
+        // Note: If the user doesn't inform the Slang compiler where
+        // it wants the NVAPI parameter to be bound, then a downstream
+        // compiler error is going to occur. We could try to produce
+        // our own error message here, but our error is unlikely to
+        // be significantly better, and also it is *technically*
+        // possible for the user to use Slang to generate HLSL,
+        // and then go on to compile it manually via fxc/dxc, where
+        // they could pass in these `#define`s using command-line
+        // or API options.
+        //
+        if( auto decor = m_irModule->getModuleInst()->findDecoration<IRNVAPISlotDecoration>() )
+        {
+            m_writer->emit("#define NV_SHADER_EXTN_SLOT ");
+            m_writer->emit(decor->getRegisterName());
+            m_writer->emit("\n");
+
+            // Note: We only emit a preprocessor directive if the space
+            // is not `space0`, because we want to ensure that the output
+            // code can compile with fxc when possible (and fxc has no
+            // understanding of `space`s).
+            //
+            auto spaceName = decor->getSpaceName();
+            if( spaceName != "space0" )
+            {
+                m_writer->emit("#define NV_SHADER_EXTN_REGISTER_SPACE ");
+                m_writer->emit(spaceName);
+                m_writer->emit("\n");
+            }
+        }
+    }
+}
+
+void HLSLSourceEmitter::emitGlobalInstImpl(IRInst* inst)
+{
+    if( auto nvapiDecor = inst->findDecoration<IRNVAPIMagicDecoration>() )
+    {
+        // When emitting one of the "magic" NVAPI declarations,
+        // we will wrap it in a preprocessor conditional that
+        // skips it if the NVAPI header is already being included
+        // via the prelude. In that case, the definitions from
+        // the prelude-included NVAPI will be used instead of
+        // those that were processed by the Slang front-end.
+        //
+        // TODO: In theory we could drop the downstream preprocessor
+        // conditional here, and either emit or not emit the
+        // instruction based on whether the code needs NVAPI (which
+        // is when `SLANG_HLSL_ENABLE_NVAPI` would be set).
+        // Such a change would require that we replace the current
+        // approach of tracking extension use during emit with an
+        // approach that detects requirements as a pure pre-pass.
+        //
+        // Note: We skip `IRStructKey` instructions here because
+        // the fields of the `NvShaderExtnStruct` are also decorated,
+        // but field keys don't produce anything in the output, so
+        // we'd have conditionals that are wrapping empty lines.
+        //
+        if( !as<IRStructKey>(inst) )
+        {
+            m_writer->emit("#ifndef SLANG_HLSL_ENABLE_NVAPI\n");
+            Super::emitGlobalInstImpl(inst);
+            m_writer->emit("#endif\n");
+            return;
+        }
+    }
+
+    Super::emitGlobalInstImpl(inst);
+}
+
+
 
 } // namespace Slang

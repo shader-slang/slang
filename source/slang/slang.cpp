@@ -41,7 +41,9 @@
 #undef NOMINMAX
 #endif
 
-extern char const* slang_cuda_prelude;
+extern Slang::String get_slang_cuda_prelude();
+extern Slang::String get_slang_cpp_prelude();
+extern Slang::String get_slang_hlsl_prelude();
 
 namespace Slang {
 
@@ -188,7 +190,9 @@ void Session::init()
     }
 
     // Set up default prelude code for target languages that need a prelude
-    m_languagePreludes[Index(SourceLanguage::CUDA)] = slang_cuda_prelude;
+    m_languagePreludes[Index(SourceLanguage::CUDA)] = get_slang_cuda_prelude();
+    m_languagePreludes[Index(SourceLanguage::CPP)] = get_slang_cpp_prelude();
+    m_languagePreludes[Index(SourceLanguage::HLSL)] = get_slang_hlsl_prelude();
 }
 
 ISlangUnknown* Session::getInterface(const Guid& guid)
@@ -860,8 +864,7 @@ Expr* Linkage::parseTermString(String typeStr, RefPtr<Scope> scope)
         &sink,
         nullptr,
         Dictionary<String,String>(),
-        this,
-        nullptr);
+        this);
 
     return parseTermFromSourceFile(
         getASTBuilder(),
@@ -916,6 +919,119 @@ FrontEndCompileRequest::FrontEndCompileRequest(
     : CompileRequestBase(linkage, sink)
 {
 }
+
+    /// Handlers for preprocessor callbacks to use when doing ordinary front-end compilation
+struct FrontEndPreprocessorHandler : PreprocessorHandler
+{
+public:
+    FrontEndPreprocessorHandler(
+        Module*         module,
+        ASTBuilder*     astBuilder,
+        DiagnosticSink* sink)
+        : m_module(module)
+        , m_astBuilder(astBuilder)
+        , m_sink(sink)
+    {
+    }
+
+protected:
+    Module*         m_module;
+    ASTBuilder*     m_astBuilder;
+    DiagnosticSink* m_sink;
+
+    // The first task that this handler tries to deal with is
+    // capturing all the files on which a module is dependent.
+    //
+    // That information is exposed through public APIs and used
+    // by applications to decide when they need to "hot reload"
+    // their shader code.
+    //
+    void handleFileDependency(String const& path) SLANG_OVERRIDE
+    {
+        m_module->addFilePathDependency(path);
+    }
+
+    // The second task that this handler deals with is detecting
+    // whether any macro values were set in a given source file
+    // that are semantically relevant to other stages of compilation.
+    //
+    void handleEndOfFile(Preprocessor* preprocessor) SLANG_OVERRIDE
+    {
+        // We look at the preprocessor state after reading the entire
+        // source file/string, in order to see if any macros have been
+        // set that should be considered semantically relevant for
+        // later stages of compilation.
+        //
+        // Note: Checking the macro environment *after* preprocessing is complete
+        // means that we can treat macros introduced via `-D` options or the API
+        // equivalently to macros introduced via `#define`s in user code.
+        //
+        // For now, the only case of semantically-relevant macros we need to worrry
+        // about are the NVAPI macros used to establish the register/space to use.
+        //
+        static const char* kNVAPIRegisterMacroName = "NV_SHADER_EXTN_SLOT";
+        static const char* kNVAPISpaceMacroName = "NV_SHADER_EXTN_REGISTER_SPACE";
+
+        // For NVAPI use, the `NV_SHADER_EXTN_SLOT` macro is required to be defined.
+        //
+        String nvapiRegister;
+        SourceLoc nvapiRegisterLoc;
+        if(!SLANG_FAILED(findMacroValue(preprocessor, kNVAPIRegisterMacroName, nvapiRegister, nvapiRegisterLoc)))
+        {
+            // In contrast, NVAPI can be used without defining `NV_SHADER_EXTN_REGISTER_SPACE`,
+            // which effectively defaults to `space0`.
+            //
+            String nvapiSpace = "space0";
+            SourceLoc nvapiSpaceLoc;
+            findMacroValue(preprocessor, kNVAPISpaceMacroName, nvapiSpace, nvapiSpaceLoc);
+
+            // We are going to store the values of these macros on the AST-level `ModuleDecl`
+            // so that they will be available to later processing stages.
+            //
+            auto moduleDecl = m_module->getModuleDecl();
+
+            if(auto existingModifier = moduleDecl->findModifier<NVAPISlotModifier>())
+            {
+                // If there is already a modifier attached to the module (perhaps
+                // because of preprocessing a different source file, or because
+                // of settings established via command-line options), then we
+                // need to validate that the values being set in this file
+                // match those already set (or else there is likely to be
+                // some kind of error in the user's code).
+                //
+                _validateNVAPIMacroMatch(kNVAPIRegisterMacroName, existingModifier->registerName, nvapiRegister,  nvapiRegisterLoc);
+                _validateNVAPIMacroMatch(kNVAPISpaceMacroName,    existingModifier->spaceName,    nvapiSpace,     nvapiSpaceLoc);
+            }
+            else
+            {
+                // If there is no existing modifier on the module, then we
+                // take responsibility for adding one, based on the macro
+                // values we saw.
+                //
+                auto modifier = m_astBuilder->create<NVAPISlotModifier>();
+                modifier->loc = nvapiRegisterLoc;
+                modifier->registerName = nvapiRegister;
+                modifier->spaceName = nvapiSpace;
+
+                addModifier(moduleDecl, modifier);
+            }
+        }
+    }
+
+        /// Validate that a re-defintion of an NVAPI-related macro matches any previous definition
+    void _validateNVAPIMacroMatch(
+        char const*     macroName,
+        String const&   existingValue,
+        String const&   newValue,
+        SourceLoc       loc)
+    {
+        if( existingValue != newValue )
+        {
+            m_sink->diagnose(loc, Diagnostics::nvapiMacroMismatch, macroName, existingValue, newValue);
+        }
+    }
+};
+
 
 void FrontEndCompileRequest::parseTranslationUnit(
     TranslationUnitRequest* translationUnit)
@@ -981,6 +1097,13 @@ void FrontEndCompileRequest::parseTranslationUnit(
         translationUnitSyntax->modifiers.first = astBuilder->create<FromStdLibModifier>();
     }
 
+    // We use a custom handler for preprocessor callbacks, to
+    // ensure that relevant state that is only visible during
+    // preprocessoing can be communicated to later phases of
+    // compilation.
+    //
+    FrontEndPreprocessorHandler preprocessorHandler(module, astBuilder, getSink());
+
     for (auto sourceFile : translationUnit->getSourceFiles())
     {
         auto tokens = preprocessSource(
@@ -989,7 +1112,7 @@ void FrontEndCompileRequest::parseTranslationUnit(
             &includeSystem,
             combinedPreprocessorDefinitions,
             getLinkage(),
-            module);
+            &preprocessorHandler);
 
         parseSourceFile(
             astBuilder,
@@ -3490,6 +3613,33 @@ static SlangResult _getEntryPointResult(
     return SLANG_OK;
 }
 
+static SlangResult _getWholeProgramResult(
+    SlangCompileRequest* request,
+    int targetIndex,
+    Slang::CompileResult** outCompileResult)
+{
+    using namespace Slang;
+    if (!request)
+        return SLANG_ERROR_INVALID_PARAMETER;
+
+    auto req = Slang::asInternal(request);
+    auto linkage = req->getLinkage();
+    auto program = req->getSpecializedGlobalAndEntryPointsComponentType();
+
+    Index targetCount = linkage->targets.getCount();
+    if ((targetIndex < 0) || (targetIndex >= targetCount))
+    {
+        return SLANG_ERROR_INVALID_PARAMETER;
+    }
+    auto targetReq = linkage->targets[targetIndex];
+
+    auto targetProgram = program->getTargetProgram(targetReq);
+    if (!targetProgram)
+        return SLANG_FAIL;
+    *outCompileResult = &targetProgram->getExistingWholeProgramResult();
+    return SLANG_OK;
+}
+
 SLANG_API SlangResult spGetEntryPointCodeBlob(
         SlangCompileRequest*    request,
         int                     entryPointIndex,
@@ -3518,6 +3668,43 @@ SLANG_API SlangResult spGetEntryPointHostCallable(
 
     Slang::CompileResult* compileResult = nullptr;
     SLANG_RETURN_ON_FAIL(_getEntryPointResult(request, entryPointIndex, targetIndex, &compileResult));
+
+    ComPtr<ISlangSharedLibrary> sharedLibrary;
+    SLANG_RETURN_ON_FAIL(compileResult->getSharedLibrary(sharedLibrary));
+    *outSharedLibrary = sharedLibrary.detach();
+    return SLANG_OK;
+}
+
+SLANG_API SlangResult spGetTargetCodeBlob(
+    SlangCompileRequest* request,
+    int targetIndex,
+    ISlangBlob** outBlob)
+{
+    using namespace Slang;
+    if (!outBlob)
+        return SLANG_ERROR_INVALID_PARAMETER;
+    Slang::CompileResult* compileResult = nullptr;
+    SLANG_RETURN_ON_FAIL(
+        _getWholeProgramResult(request, targetIndex, &compileResult));
+
+    ComPtr<ISlangBlob> blob;
+    SLANG_RETURN_ON_FAIL(compileResult->getBlob(blob));
+    *outBlob = blob.detach();
+    return SLANG_OK;
+}
+
+SLANG_API SlangResult spGetTargetHostCallable(
+    SlangCompileRequest* request,
+    int targetIndex,
+    ISlangSharedLibrary** outSharedLibrary)
+{
+    using namespace Slang;
+    if (!outSharedLibrary)
+        return SLANG_ERROR_INVALID_PARAMETER;
+
+    Slang::CompileResult* compileResult = nullptr;
+    SLANG_RETURN_ON_FAIL(
+        _getWholeProgramResult(request, targetIndex, &compileResult));
 
     ComPtr<ISlangSharedLibrary> sharedLibrary;
     SLANG_RETURN_ON_FAIL(compileResult->getSharedLibrary(sharedLibrary));

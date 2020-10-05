@@ -582,7 +582,7 @@ struct ASTDumpContext
     void dump(ASTNodeType nodeType)
     {
         // Get the class
-        auto info = ReflectClassInfo::getInfo(nodeType);
+        auto info = ASTClassInfo::getInfo(nodeType);
         // Write the name
         m_writer->emit(info->m_name);
     }

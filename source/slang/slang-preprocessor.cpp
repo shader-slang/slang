@@ -216,18 +216,24 @@ struct Preprocessor
     // represent end-of-input situations.
     Token                                   endOfFileToken;
 
-        /// The linkage the provides the context for preprocessing
-    Linkage*                                linkage = nullptr;
-
-        /// The module, if any, that the preprocessed result will belong to
-    Module*                                 parentModule = nullptr;
+        /// Callback handlers
+    PreprocessorHandler*                    handler = nullptr;
 
     // The unique identities of any paths that have issued `#pragma once` directives to
     // stop them from being included again.
     HashSet<String>                         pragmaOnceUniqueIdentities;
 
-    NamePool* getNamePool() { return linkage->getNamePool(); }
-    SourceManager* getSourceManager() { return linkage->getSourceManager(); }
+        /// Name pool to use when creating `Name`s from strings
+    NamePool*                               namePool = nullptr;
+
+        /// File system to use when looking up files
+    ISlangFileSystemExt*                    fileSystem = nullptr;
+
+        /// Source maanger to use when loading source files
+    SourceManager*                          sourceManager = nullptr;
+
+    NamePool* getNamePool() { return namePool; }
+    SourceManager* getSourceManager() { return sourceManager; }
 };
 
 
@@ -1785,17 +1791,16 @@ static SlangResult readFile(
     // The actual file loading will be handled by the file system
     // associated with the parent linkage.
     //
-    auto linkage = context->preprocessor->linkage;
-    auto fileSystemExt = linkage->getFileSystemExt();
+    auto fileSystemExt = context->preprocessor->fileSystem;
     SLANG_RETURN_ON_FAIL(fileSystemExt->loadFile(path.getBuffer(), outBlob));
 
     // If we are running the preprocessor as part of compiling a
     // specific module, then we must keep track of the file we've
     // read as yet another file that the module will depend on.
     //
-    if(auto module = context->preprocessor->parentModule)
+    if( auto handler = context->preprocessor->handler )
     {
-        module->addFilePathDependency(path);
+        handler->handleFileDependency(path);
     }
 
     return SLANG_OK;
@@ -2447,26 +2452,99 @@ static TokenList ReadAllTokens(
     return tokens;
 }
 
-TokenList preprocessSource(
-    SourceFile*                 file,
-    DiagnosticSink*             sink,
-    IncludeSystem*              includeSystem,
-    Dictionary<String, String>  defines,
-    Linkage*                    linkage,
-    Module*                     parentModule)
+    /// Try to look up a macro with the given `macroName` and produce its value as a string
+Result findMacroValue(
+    Preprocessor*   preprocessor,
+    char const*     macroName,
+    String&         outValue,
+    SourceLoc&      outLoc)
 {
-    Preprocessor preprocessor;
-    InitializePreprocessor(&preprocessor, sink);
-    preprocessor.linkage = linkage;
-    preprocessor.parentModule = parentModule;
+    auto namePool = preprocessor->namePool;
+    auto macro = LookupMacro(preprocessor, namePool->getName(macroName));
+    if(!macro)
+        return SLANG_FAIL;
+    if(macro->flavor != PreprocessorMacroFlavor::ObjectLike)
+        return SLANG_FAIL;
 
-    preprocessor.includeSystem = includeSystem;
-    for (auto p : defines)
+    MacroExpansion* expansion = new MacroExpansion();
+    initializeMacroExpansion(preprocessor, expansion, macro);
+    pushMacroExpansion(preprocessor, expansion);
+
+    String value;
+    for(bool first = true;;first = false)
     {
-        DefineMacro(&preprocessor, p.Key, p.Value);
+        Token token = ReadToken(preprocessor);
+        if(token.type == TokenType::EndOfFile)
+            break;
+
+        if(!first && (token.flags & TokenFlag::AfterWhitespace))
+            value.append(" ");
+        value.append(token.getContent());
     }
 
-    SourceManager* sourceManager = linkage->getSourceManager();
+    outValue = value;
+    outLoc = macro->getLoc();
+    return SLANG_OK;
+}
+
+void PreprocessorHandler::handleEndOfFile(Preprocessor* preprocessor)
+{
+    SLANG_UNUSED(preprocessor);
+}
+
+void PreprocessorHandler::handleFileDependency(String const& path)
+{
+    SLANG_UNUSED(path);
+}
+
+TokenList preprocessSource(
+    SourceFile*                         file,
+    DiagnosticSink*                     sink,
+    IncludeSystem*                      includeSystem,
+    Dictionary<String, String> const&   defines,
+    Linkage*                            linkage,
+    PreprocessorHandler*                handler)
+{
+    PreprocessorDesc desc;
+
+    desc.sink           = sink;
+    desc.includeSystem  = includeSystem;
+    desc.handler        = handler;
+
+    desc.defines = &defines;
+
+    desc.fileSystem     = linkage->getFileSystemExt();
+    desc.namePool       = linkage->getNamePool();
+    desc.sourceManager  = linkage->getSourceManager();
+
+    return preprocessSource(file, desc);
+}
+
+TokenList preprocessSource(
+    SourceFile*             file,
+    PreprocessorDesc const& desc)
+{
+    Preprocessor preprocessor;
+    InitializePreprocessor(&preprocessor, desc.sink);
+
+    preprocessor.sink = desc.sink;
+    preprocessor.includeSystem = desc.includeSystem;
+    preprocessor.fileSystem = desc.fileSystem;
+    preprocessor.namePool = desc.namePool;
+
+    auto sourceManager = desc.sourceManager;
+    preprocessor.sourceManager = sourceManager;
+
+    auto handler = desc.handler;
+    preprocessor.handler = handler;
+
+    if(desc.defines)
+    {
+        for (auto p : *desc.defines)
+        {
+            DefineMacro(&preprocessor, p.Key, p.Value);
+        }
+    }
 
     SourceView* sourceView = sourceManager->createSourceView(file, nullptr);
 
@@ -2474,6 +2552,11 @@ TokenList preprocessSource(
     preprocessor.inputStream = CreateInputStreamForSource(&preprocessor, sourceView);
 
     TokenList tokens = ReadAllTokens(&preprocessor);
+
+    if(handler)
+    {
+        handler->handleEndOfFile(&preprocessor);
+    }
 
     FinalizePreprocessor(&preprocessor);
 

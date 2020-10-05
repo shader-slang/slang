@@ -160,7 +160,6 @@ struct OptionsParser
         SlangTargetFlags    targetFlags = 0;
         int                 targetID = -1;
         FloatingPointMode   floatingPointMode = FloatingPointMode::Default;
-        bool                isWholeProgramRequest = false;
 
         // State for tracking command-line errors
         bool conflictingProfilesSet = false;
@@ -1511,7 +1510,7 @@ struct OptionsParser
                 }
                 else
                 {
-                    target->isWholeProgramRequest = true;
+                    target->targetFlags |= SLANG_TARGET_FLAG_GENERATE_WHOLE_PROGRAM;
                     targetInfo->wholeTargetOutputPath = rawOutput.path;
                 }
             }

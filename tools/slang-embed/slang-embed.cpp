@@ -14,6 +14,11 @@
 #include <stdlib.h>
 #include <string.h>
 
+#include "../../source/core/slang-list.h"
+#include "../../source/core/slang-string.h"
+#include "../../source/core/slang-string-util.h"
+#include "../../source/core/slang-io.h"
+
 // Utility to free pointers on scope exit
 struct ScopedMemory
 {
@@ -77,13 +82,10 @@ struct App
             exit(1);
         }
     }
-
-    void processInputFile()
+    size_t charCount = 0;
+    bool useNewStringLit = true;
+    void processInputFile(FILE* outputFile, Slang::String inputPath)
     {
-        // Note: Eventually we might support multiple input files in a
-        // single invocation of the tool, but for now we only have
-        // a single file to process.
-
         // We open the input file in text mode because we are currently
         // embedding textual source files. If/when this utility gets
         // used for binary files another mode could be called for.
@@ -92,13 +94,92 @@ struct App
         // could lead to a difference in the embedded bytes based on
         // the line ending convention of the host platform)
         //
-        FILE* inputFile = fopen(inputPath, "r");
-        ScopedFile inputFileCleanup(inputFile);
-        if( !inputFile )
+        Slang::StreamReader streamReader(inputPath);
+        while (!streamReader.IsEnd())
         {
-            fprintf(stderr, "%s: error: failed to open '%s' for reading\n", appName, inputPath);
-            exit(1);
+            auto line = streamReader.ReadLine();
+            Slang::String trimedLine = line.trimStart();
+            if (trimedLine.startsWith("#include"))
+            {
+                auto fileName =
+                    Slang::StringUtil::getAtInSplit(trimedLine.getUnownedSlice(), ' ', 1);
+                if (fileName[0] == '<')
+                    goto normalProcess;
+                fileName = Slang::UnownedStringSlice(fileName.begin() + 1, fileName.end() - 1);
+                auto path =
+                    Slang::Path::combine(Slang::Path::getParentDirectory(inputPath), fileName);
+                if (!Slang::File::exists(path))
+                    goto normalProcess;
+                processInputFile(outputFile, path.getUnownedSlice());
+                continue;
+            }
+        normalProcess:;
+            if (!useNewStringLit && charCount + line.getLength() > 0x4000)
+            {
+                charCount = 0;
+                useNewStringLit = true;
+                fprintf(outputFile, ";\n");
+            }
+            if (useNewStringLit)
+            {
+                fprintf(outputFile, "sb << \n\"");
+                useNewStringLit = false;
+            }
+            else
+            {
+                fprintf(outputFile, "\"");
+            }
+            charCount += line.getLength();
+            for (auto c : line)
+            {
+                // Based on the byte that we are trying to emit,
+                // we may need to emit an escape sequence.
+                //
+                switch (c)
+                {
+                // The common C escape sequencs are handled directly.
+                //
+                case '"':
+                    fprintf(outputFile, "\\\"");
+                    break;
+                case '\n':
+                    fprintf(outputFile, "\\n");
+                    break;
+                case '\t':
+                    fprintf(outputFile, "\\t");
+                    break;
+
+                default:
+                    // For all other cases, we detect if the byte
+                    // is in the printable ASCII range, and emit
+                    // it directly if sco.
+                    //
+                    if (c >= 32 && c <= 126)
+                    {
+                        fputc(c, outputFile);
+                    }
+                    else
+                    {
+                        // Otherwise, we emit the byte as an octal
+                        // escape sequence, being sure to emit a
+                        // full three digits to avoid errorneous
+                        // encoding if the following byte might
+                        // represent a digit.
+                        //
+                        fprintf(outputFile, "\\%03o", c);
+                    }
+                    break;
+                }
+            }
+            fprintf(outputFile, "\\n\"\n");
         }
+    }
+
+    void processInputFile()
+    {
+        // Note: Eventually we might support multiple input files in a
+        // single invocation of the tool, but for now we only have
+        // a single file to process.
 
         // We derive an output path simply by appending `.cpp` to the input path.
         //
@@ -160,7 +241,11 @@ struct App
         // task of outputting the generated source file is simple.
         //
         fprintf(outputFile, "// generated code; do not edit\n");
-        fprintf(outputFile, "const char* %s =\n", variableName);
+        fprintf(outputFile, "#include \"../source/core/slang-basic.h\"\n");
+
+        fprintf(outputFile, "Slang::String get_%s()\n", variableName);
+        fprintf(outputFile, "{\n");
+        fprintf(outputFile, "Slang::StringBuilder sb;\n");
 
         // Note: For now we are embedding the file as a string
         // literal, with full knowledge that this strategy
@@ -175,47 +260,10 @@ struct App
         // with large array literals, the practical limits
         // appear to be higher than they are for string literals.
 
-        fprintf(outputFile, "\"");
-        for( ;;)
-        {
-            int c = fgetc(inputFile);
-            if( c == EOF )
-                break;
+        processInputFile(outputFile, Slang::UnownedStringSlice(inputPath));
 
-            // Based on the byte that we are trying to emit,
-            // we may need to emit an escape sequence.
-            //
-            switch( c )
-            {
-            // The common C escape sequencs are handled directly.
-            //
-            case '"':   fprintf(outputFile, "\\\"");        break;
-            case '\n':  fprintf(outputFile, "\\n\"\n\"");   break;
-            case '\t':  fprintf(outputFile, "\\t");         break;
-
-            default:
-                // For all other cases, we detect if the byte
-                // is in the printable ASCII range, and emit
-                // it directly if sco.
-                //
-                if( c >= 32 && c <= 126 )
-                {
-                    fputc(c, outputFile);
-                }
-                else
-                {
-                    // Otherwise, we emit the byte as an octal
-                    // escape sequence, being sure to emit a
-                    // full three digits to avoid errorneous
-                    // encoding if the following byte might
-                    // represent a digit.
-                    //
-                    fprintf(outputFile, "\\%03o", c);
-                }
-                break;
-            }
-        }
-        fprintf(outputFile, "\";\n");
+        fprintf(outputFile, ";\n");
+        fprintf(outputFile, "return sb.ProduceString();\n}\n");
     }
 };
 

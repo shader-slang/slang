@@ -1,14 +1,16 @@
 #ifndef SLANG_PRELUDE_CPP_TYPES_H
 #define SLANG_PRELUDE_CPP_TYPES_H
-
-#include "../slang.h"
-
+#include <stdint.h>
 #ifndef SLANG_PRELUDE_ASSERT
 #   ifdef _DEBUG
 #       define SLANG_PRELUDE_ASSERT(VALUE) assert(VALUE)
 #   else
 #       define SLANG_PRELUDE_ASSERT(VALUE) 
 #   endif
+#endif
+
+#ifndef SLANG_FORCE_INLINE
+#    define SLANG_FORCE_INLINE inline
 #endif
 
 #ifdef SLANG_PRELUDE_NAMESPACE
@@ -294,6 +296,42 @@ struct SamplerComparisonState
     ISamplerComparisonState* state;
 };
 
+#ifndef SLANG_RESOURCE_SHAPE
+#    define SLANG_RESOURCE_SHAPE
+typedef unsigned int SlangResourceShape;
+enum
+{
+    SLANG_RESOURCE_BASE_SHAPE_MASK = 0x0F,
+
+    SLANG_RESOURCE_NONE = 0x00,
+
+    SLANG_TEXTURE_1D = 0x01,
+    SLANG_TEXTURE_2D = 0x02,
+    SLANG_TEXTURE_3D = 0x03,
+    SLANG_TEXTURE_CUBE = 0x04,
+    SLANG_TEXTURE_BUFFER = 0x05,
+
+    SLANG_STRUCTURED_BUFFER = 0x06,
+    SLANG_BYTE_ADDRESS_BUFFER = 0x07,
+    SLANG_RESOURCE_UNKNOWN = 0x08,
+    SLANG_ACCELERATION_STRUCTURE = 0x09,
+
+    SLANG_RESOURCE_EXT_SHAPE_MASK = 0xF0,
+
+    SLANG_TEXTURE_FEEDBACK_FLAG = 0x10,
+    SLANG_TEXTURE_ARRAY_FLAG = 0x40,
+    SLANG_TEXTURE_MULTISAMPLE_FLAG = 0x80,
+
+    SLANG_TEXTURE_1D_ARRAY = SLANG_TEXTURE_1D | SLANG_TEXTURE_ARRAY_FLAG,
+    SLANG_TEXTURE_2D_ARRAY = SLANG_TEXTURE_2D | SLANG_TEXTURE_ARRAY_FLAG,
+    SLANG_TEXTURE_CUBE_ARRAY = SLANG_TEXTURE_CUBE | SLANG_TEXTURE_ARRAY_FLAG,
+
+    SLANG_TEXTURE_2D_MULTISAMPLE = SLANG_TEXTURE_2D | SLANG_TEXTURE_MULTISAMPLE_FLAG,
+    SLANG_TEXTURE_2D_MULTISAMPLE_ARRAY =
+        SLANG_TEXTURE_2D | SLANG_TEXTURE_MULTISAMPLE_FLAG | SLANG_TEXTURE_ARRAY_FLAG,
+};
+#endif
+
 // 
 struct TextureDimensions
 {
@@ -393,7 +431,7 @@ struct TextureDimensions
         }
     }
 
-    SlangResourceShape shape;
+    uint32_t shape;
     uint32_t width, height, depth;
     uint32_t numberOfLevels;
     uint32_t arrayElementCount;                  ///< For array types, 0 otherwise

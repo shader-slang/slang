@@ -674,6 +674,18 @@ String CLikeSourceEmitter::generateName(IRInst* inst)
         return String(intrinsicDecoration->getDefinition());
     }
 
+    // If the instruction reprsents one of the "magic" declarations
+    // that makes the NVAPI library work, then we want to make sure
+    // it uses the original name it was declared with, so that our
+    // generated code will work correctly with either a Slang-compiled
+    // or directly `#include`d version of those declarations during
+    // downstream compilation.
+    //
+    if(auto nvapiDecor = inst->findDecoration<IRNVAPIMagicDecoration>())
+    {
+        return String(nvapiDecor->getName());
+    }
+
     auto entryPointDecor = inst->findDecoration<IREntryPointDecoration>();
     if (entryPointDecor)
     {
@@ -1997,12 +2009,23 @@ void CLikeSourceEmitter::_emitCallArgList(IRCall* inst)
     m_writer->emit(")");
 }
 
+void CLikeSourceEmitter::handleRequiredCapabilities(IRInst* inst)
+{
+    auto decoratedValue = inst;
+    while (auto specInst = as<IRSpecialize>(decoratedValue))
+    {
+        decoratedValue = getSpecializedValue(specInst);
+    }
+
+    handleRequiredCapabilitiesImpl(decoratedValue);
+}
+
 void CLikeSourceEmitter::emitCallExpr(IRCall* inst, EmitOpInfo outerPrec)
 {
     auto funcValue = inst->getOperand(0);
 
     // Does this function declare any requirements.
-    handleCallExprDecorationsImpl(funcValue);
+    handleRequiredCapabilities(funcValue);
 
     // We want to detect any call to an intrinsic operation,
     // that we can emit it directly without mangling, etc.
@@ -2399,7 +2422,7 @@ void CLikeSourceEmitter::defaultEmitInstExpr(IRInst* inst, const EmitOpInfo& inO
         emitOperand(inst->getOperand(0), getInfo(EmitOp::General));
         m_writer->emit(").Load<");
         emitType(inst->getDataType());
-        m_writer->emit(">(");
+        m_writer->emit(" >(");
         emitOperand(inst->getOperand(1), getInfo(EmitOp::General));
         m_writer->emit(")");
         break;
@@ -3214,6 +3237,10 @@ void CLikeSourceEmitter::emitSimpleFuncImpl(IRFunc* func)
         emitEntryPointAttributes(func, entryPointDecor);
     }
 
+    // Deal with required features/capabilities of the function
+    //
+    handleRequiredCapabilitiesImpl(func);
+
     emitFunctionPreambleImpl(func);
 
     auto name = getName(func);
@@ -3734,6 +3761,11 @@ void CLikeSourceEmitter::emitGlobalParam(IRGlobalParam* varDecl)
 }
 
 void CLikeSourceEmitter::emitGlobalInst(IRInst* inst)
+{
+    emitGlobalInstImpl(inst);
+}
+
+void CLikeSourceEmitter::emitGlobalInstImpl(IRInst* inst)
 {
     m_writer->advanceToSourceLocation(inst->sourceLoc);
 

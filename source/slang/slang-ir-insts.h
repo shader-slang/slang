@@ -260,7 +260,28 @@ IR_SIMPLE_DECORATION(GloballyCoherentDecoration)
 IR_SIMPLE_DECORATION(PreciseDecoration)
 IR_SIMPLE_DECORATION(PublicDecoration)
 IR_SIMPLE_DECORATION(KeepAliveDecoration)
+IR_SIMPLE_DECORATION(RequiresNVAPIDecoration)
 
+struct IRNVAPIMagicDecoration : IRDecoration
+{
+    enum { kOp = kIROp_NVAPIMagicDecoration };
+    IR_LEAF_ISA(NVAPIMagicDecoration)
+
+    IRStringLit* getNameOperand() { return cast<IRStringLit>(getOperand(0)); }
+    UnownedStringSlice getName() { return getNameOperand()->getStringSlice(); }
+};
+
+struct IRNVAPISlotDecoration : IRDecoration
+{
+    enum { kOp = kIROp_NVAPISlotDecoration };
+    IR_LEAF_ISA(NVAPISlotDecoration)
+
+    IRStringLit* getRegisterNameOperand() { return cast<IRStringLit>(getOperand(0)); }
+    UnownedStringSlice getRegisterName() { return getRegisterNameOperand()->getStringSlice(); }
+
+    IRStringLit* getSpaceNameOperand() { return cast<IRStringLit>(getOperand(1)); }
+    UnownedStringSlice getSpaceName() { return getSpaceNameOperand()->getStringSlice(); }
+};
 
 struct IROutputControlPointsDecoration : IRDecoration
 {
@@ -1786,7 +1807,7 @@ struct IRBuilder
     IRInOutType*  getInOutType(IRType* valueType);
     IRRefType*  getRefType(IRType* valueType);
     IRPtrTypeBase*  getPtrType(IROp op, IRType* valueType);
-    IRExistentialBoxType* getExistentialBoxType(IRType* concreteType, IRType* interfaceType);
+    IRType* getExistentialBoxType(IRType* concreteType, IRType* interfaceType);
 
     IRArrayTypeBase* getArrayTypeBase(
         IROp    op,
@@ -2455,6 +2476,16 @@ struct IRBuilder
     void addPublicDecoration(IRInst* value)
     {
         addDecoration(value, kIROp_PublicDecoration);
+    }
+
+    void addNVAPIMagicDecoration(IRInst* value, UnownedStringSlice const& name)
+    {
+        addDecoration(value, kIROp_NVAPIMagicDecoration, getStringValue(name));
+    }
+
+    void addNVAPISlotDecoration(IRInst* value, UnownedStringSlice const& registerName, UnownedStringSlice const& spaceName)
+    {
+        addDecoration(value, kIROp_NVAPISlotDecoration, getStringValue(registerName), getStringValue(spaceName));
     }
 
         /// Add a decoration that indicates that the given `inst` depends on the given `dependency`.

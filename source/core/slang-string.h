@@ -161,6 +161,11 @@ namespace Slang
             return !(*this == other);
         }
 
+        bool operator!=(char const* str) const
+        {
+            return (*this) != UnownedStringSlice(str, str + ::strlen(str));
+        }
+
         bool startsWith(UnownedStringSlice const& other) const;
         bool startsWith(char const* str) const;
 

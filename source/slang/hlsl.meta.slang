@@ -285,6 +285,7 @@ ${{{{
     __target_intrinsic(hlsl, "($3 = NvInterlockedAddFp32($0, $1, $2))")
     __cuda_sm_version(2.0)
     __target_intrinsic(cuda, "(*$3 = atomicAdd((float*)$0._getPtrAt($1), $2))")
+    [__requiresNVAPI]
     void InterlockedAddF32(uint byteAddress, float valueToAdd, out float originalValue);
 
     __specialized_for_target(glsl)
@@ -2986,6 +2987,7 @@ __glsl_extension(GL_KHR_shader_subgroup_basic)
 __spirv_version(1.3)
 __target_intrinsic(glsl, "subgroupBarrier()")
 __target_intrinsic(hlsl, "GroupMemoryBarrier()")
+__target_intrinsic(cuda, "__syncwarp()")
 void GroupMemoryBarrierWithWaveSync();
 
 // NOTE! WaveMaskBroadcastLaneAt is *NOT* standard HLSL
