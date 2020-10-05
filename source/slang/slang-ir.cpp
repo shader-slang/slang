@@ -2336,10 +2336,14 @@ namespace Slang
             operands);
     }
 
-    IRExistentialBoxType* IRBuilder::getExistentialBoxType(IRType* concreteType, IRType* interfaceType)
+    IRType* IRBuilder::getExistentialBoxType(IRType* concreteType, IRType* interfaceType)
     {
+        // Don't wrap an existential box if concreteType is __Dynamic.
+        if (as<IRDynamicType>(concreteType))
+            return interfaceType;
+
         IRInst* operands[] = {concreteType, interfaceType};
-        return (IRExistentialBoxType*)getType(kIROp_ExistentialBoxType, 2, operands);
+        return getType(kIROp_ExistentialBoxType, 2, operands);
     }
 
     IRArrayTypeBase* IRBuilder::getArrayTypeBase(
@@ -2845,6 +2849,8 @@ namespace Slang
                 // We want to emit `makeExistential(load(value), witnessTable)`.
                 //
                 auto deref = emitLoad(value);
+                if (slotArgs[0]->op == kIROp_DynamicType)
+                    return deref;
                 return emitMakeExistential(type, deref, slotArgs[1]);
             }
         }

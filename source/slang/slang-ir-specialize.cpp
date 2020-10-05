@@ -901,6 +901,12 @@ struct SpecializationContext
         if(!calleeFunc)
             return;
 
+        // Update result type since the callee may have been changed.
+        if (inst->getDataType() != calleeFunc->getResultType())
+        {
+            inst->setFullType(calleeFunc->getResultType());
+        }
+
         // We can only specialize if we have access to a body for the callee.
         //
         if(!calleeFunc->isDefinition())
