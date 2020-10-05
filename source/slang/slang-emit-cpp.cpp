@@ -984,7 +984,7 @@ void CPPSourceEmitter::_emitGetAtDefinition(const UnownedStringSlice& funcName, 
         {
             int vecSize = int(getIntVal(vectorType->getElementCount()));
 
-            writer->emit("assert(b >= 0 && b < ");
+            writer->emit("SLANG_PRELUDE_ASSERT(b >= 0 && b < ");
             writer->emit(vecSize);
             writer->emit(");\n");
             if (lValue)
@@ -997,7 +997,7 @@ void CPPSourceEmitter::_emitGetAtDefinition(const UnownedStringSlice& funcName, 
             //int colCount = int(getIntVal(matrixType->getColumnCount()));
             int rowCount = int(getIntVal(matrixType->getRowCount()));
 
-            writer->emit("assert(b >= 0 && b < ");
+            writer->emit("SLANG_PRELUDE_ASSERT(b >= 0 && b < ");
             writer->emit(rowCount);
             writer->emit(");\n");
 

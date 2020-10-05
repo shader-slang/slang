@@ -2987,6 +2987,7 @@ __glsl_extension(GL_KHR_shader_subgroup_basic)
 __spirv_version(1.3)
 __target_intrinsic(glsl, "subgroupBarrier()")
 __target_intrinsic(hlsl, "GroupMemoryBarrier()")
+__target_intrinsic(cuda, "__syncwarp()")
 void GroupMemoryBarrierWithWaveSync();
 
 // NOTE! WaveMaskBroadcastLaneAt is *NOT* standard HLSL
