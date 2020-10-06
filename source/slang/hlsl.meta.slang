@@ -149,6 +149,17 @@ __glsl_version(430)
 __glsl_extension(GL_EXT_shader_atomic_int64)
 uint64_t __atomicXor(__ref uint64_t ioValue, uint64_t value);
 
+// Exchange
+
+__target_intrinsic(hlsl, "NvInterlockedExchangeUint64($0, $1, $2)")
+[__requiresNVAPI]
+uint2 __atomicExchange(RWByteAddressBuffer buf, uint offset, uint2 value);
+
+__target_intrinsic(glsl, "atomicExchange($0, $1)")
+__glsl_version(430)
+__glsl_extension(GL_EXT_shader_atomic_int64)
+uint64_t __atomicExchange(__ref uint64_t ioValue, uint64_t value);
+
 // Conversion between uint64_t and uint2
 
 uint2 __asuint2(uint64_t i)
@@ -280,9 +291,15 @@ ${{{{
 }}}}
 
     // float32 and int64 atomic support. This is a Slang specific extension, it uses
-    // GL_EXT_shader_atomic_float on vk
+    // GL_EXT_shader_atomic_float on Vulkan
     // NvAPI support on DX
-    // NOTE! To use this feature on HLSL, the shader needs to include 'nvHLSLExtns.h' from the NvAPI SDK
+    // NOTE! To use this feature on HLSL based targets the path to 'nvHLSLExtns.h' from the NvAPI SDK must
+    // be set. That this include will be added to the *output* that is passed to a downstram compiler.
+    // Also note that you *can* include NVAPI headers in your Slang source, and directly use NVAPI functions
+    // Directly using NVAPI functions does *not* add the #include on the output
+    // Finally note you can *mix* NVAPI direct calls, and use of NVAPI intrinsics below. This doesn't cause
+    // any clashes, as Slang will emit any NVAPI function it parsed (say via a include in Slang source) with
+    // unique functions.
     // 
     // https://www.khronos.org/registry/vulkan/specs/1.2-extensions/html/vkspec.html#VK_EXT_shader_atomic_float
     // https://htmlpreview.github.io/?https://github.com/KhronosGroup/SPIRV-Registry/blob/master/extensions/EXT/SPV_EXT_shader_atomic_float_add.html
@@ -446,6 +463,21 @@ ${{{{
     {
         RWStructuredBuffer<uint64_t> buf = __getEquivalentStructuredBuffer<uint64_t>(this);
         return __atomicXor(buf[byteAddress / 8], value);
+    }
+
+    // Exchange
+
+    __target_intrinsic(cuda, "atomicExch((uint64_t*)$0._getPtrAt($1), $2)")
+    uint64_t InterlockedExchangeU64(uint byteAddress, uint64_t value);
+
+    __specialized_for_target(hlsl)
+    uint64_t InterlockedExchangeU64(uint byteAddress, uint64_t value) { return __asuint64(__atomicExchange(this, byteAddress, __asuint2(value))); }
+
+    __specialized_for_target(glsl)
+    uint64_t InterlockedExchangeU64(uint byteAddress, uint64_t value)
+    {
+        RWStructuredBuffer<uint64_t> buf = __getEquivalentStructuredBuffer<uint64_t>(this);
+        return __atomicExchange(buf[byteAddress / 8], value);
     }
 
 ${{{{
