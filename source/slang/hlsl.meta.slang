@@ -61,6 +61,7 @@ float __atomicAdd(__ref float value, float amount);
 
 // Helper for hlsl, using NVAPI
 __target_intrinsic(hlsl, "NvInterlockedAddUint64($0, $1, $2)")
+[__requiresNVAPI]
 uint2 __atomicAdd(RWByteAddressBuffer buf, uint offset, uint2);
 
 
@@ -85,6 +86,7 @@ int64_t __atomicAdd(__ref int64_t value, int64_t amount);
 // Helper for HLSL, using NVAPI
 
 __target_intrinsic(hlsl, "NvInterlockedCompareExchangeUint64($0, $1, $2, $3)")
+[__requiresNVAPI]
 uint2 __cas(RWByteAddressBuffer buf, uint offset, uint2 compareValue, uint2 value);
 
 __target_intrinsic(glsl, "atomicCompSwap($0, $1, $2)")
@@ -95,6 +97,7 @@ uint64_t __cas(__ref uint64_t ioValue, uint64_t compareValue, uint64_t newValue)
 // Max
 
 __target_intrinsic(hlsl, "NvInterlockedMaxUint64($0, $1, $2)")
+[__requiresNVAPI]
 uint2 __atomicMax(RWByteAddressBuffer buf, uint offset, uint2 value);
 
 __target_intrinsic(glsl, "atomicMax($0, $1)")
@@ -105,6 +108,7 @@ uint64_t __atomicMax(__ref uint64_t ioValue, uint64_t value);
 // Min
 
 __target_intrinsic(hlsl, "NvInterlockedMinUint64($0, $1, $2)")
+[__requiresNVAPI]
 uint2 __atomicMin(RWByteAddressBuffer buf, uint offset, uint2 value);
 
 __target_intrinsic(glsl, "atomicMin($0, $1)")
@@ -115,6 +119,7 @@ uint64_t __atomicMin(__ref uint64_t ioValue, uint64_t value);
 // And
 
 __target_intrinsic(hlsl, "NvInterlockedAndUint64($0, $1, $2)")
+[__requiresNVAPI]
 uint2 __atomicAnd(RWByteAddressBuffer buf, uint offset, uint2 value);
 
 __target_intrinsic(glsl, "atomicAnd($0, $1)")
@@ -125,6 +130,7 @@ uint64_t __atomicAnd(__ref uint64_t ioValue, uint64_t value);
 // Or
 
 __target_intrinsic(hlsl, "NvInterlockedOrUint64($0, $1, $2)")
+[__requiresNVAPI]
 uint2 __atomicOr(RWByteAddressBuffer buf, uint offset, uint2 value);
 
 __target_intrinsic(glsl, "atomicOr($0, $1)")
@@ -135,6 +141,7 @@ uint64_t __atomicOr(__ref uint64_t ioValue, uint64_t value);
 // Xor
 
 __target_intrinsic(hlsl, "NvInterlockedXorUint64($0, $1, $2)")
+[__requiresNVAPI]
 uint2 __atomicXor(RWByteAddressBuffer buf, uint offset, uint2 value);
 
 __target_intrinsic(glsl, "atomicXor($0, $1)")
@@ -298,6 +305,7 @@ ${{{{
     // Without returning original value
 
     __target_intrinsic(hlsl, "(NvInterlockedAddFp32($0, $1, $2))")
+    [__requiresNVAPI]
     __cuda_sm_version(2.0)
     __target_intrinsic(cuda, "atomicAdd((float*)$0._getPtrAt($1), $2)")
     void InterlockedAddF32(uint byteAddress, float valueToAdd);
@@ -2987,6 +2995,7 @@ __glsl_extension(GL_KHR_shader_subgroup_basic)
 __spirv_version(1.3)
 __target_intrinsic(glsl, "subgroupBarrier()")
 __target_intrinsic(hlsl, "GroupMemoryBarrier()")
+__target_intrinsic(cuda, "__syncwarp()")
 void GroupMemoryBarrierWithWaveSync();
 
 // NOTE! WaveMaskBroadcastLaneAt is *NOT* standard HLSL

@@ -8,6 +8,7 @@ namespace gfx {
 #define VK_API_GLOBAL_PROCS(x) \
     x(vkGetInstanceProcAddr) \
     x(vkCreateInstance) \
+    x(vkEnumerateInstanceLayerProperties) \
     /* */
 
 #define VK_API_INSTANCE_PROCS_OPT(x) \
