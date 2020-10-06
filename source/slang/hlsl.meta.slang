@@ -291,9 +291,15 @@ ${{{{
 }}}}
 
     // float32 and int64 atomic support. This is a Slang specific extension, it uses
-    // GL_EXT_shader_atomic_float on vk
+    // GL_EXT_shader_atomic_float on Vulkan
     // NvAPI support on DX
-    // NOTE! To use this feature on HLSL, the shader needs to include 'nvHLSLExtns.h' from the NvAPI SDK
+    // NOTE! To use this feature on HLSL based targets the path to 'nvHLSLExtns.h' from the NvAPI SDK must
+    // be set. That this include will be added to the *output* that is passed to a downstram compiler.
+    // Also note that you *can* include NVAPI headers in your Slang source, and directly use NVAPI functions
+    // Directly using NVAPI functions does *not* add the #include on the output
+    // Finally note you can *mix* NVAPI direct calls, and use of NVAPI intrinsics below. This doesn't cause
+    // any clashes, as Slang will emit any NVAPI function it parsed (say via a include in Slang source) with
+    // unique functions.
     // 
     // https://www.khronos.org/registry/vulkan/specs/1.2-extensions/html/vkspec.html#VK_EXT_shader_atomic_float
     // https://htmlpreview.github.io/?https://github.com/KhronosGroup/SPIRV-Registry/blob/master/extensions/EXT/SPV_EXT_shader_atomic_float_add.html
