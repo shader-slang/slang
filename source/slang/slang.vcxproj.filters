@@ -294,16 +294,31 @@
     <ClInclude Include="slang-profile.h">
       <Filter>Header Files</Filter>
     </ClInclude>
+    <ClInclude Include="slang-ref-object-generated-macro.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="slang-ref-object-generated.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="slang-ref-object-reflect.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
     <ClInclude Include="slang-reflection.h">
       <Filter>Header Files</Filter>
     </ClInclude>
     <ClInclude Include="slang-repro.h">
       <Filter>Header Files</Filter>
     </ClInclude>
+    <ClInclude Include="slang-serialize-ast-type-info.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
     <ClInclude Include="slang-serialize-ast.h">
       <Filter>Header Files</Filter>
     </ClInclude>
     <ClInclude Include="slang-serialize-container.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="slang-serialize-factory.h">
       <Filter>Header Files</Filter>
     </ClInclude>
     <ClInclude Include="slang-serialize-ir-types.h">
@@ -346,6 +361,15 @@
       <Filter>Header Files</Filter>
     </ClInclude>
     <ClInclude Include="slang-type-system-shared.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="slang-value-generated-macro.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="slang-value-generated.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="slang-value-reflect.h">
       <Filter>Header Files</Filter>
     </ClInclude>
     <ClInclude Include="slang-visitor.h">
@@ -641,6 +665,9 @@
     <ClCompile Include="slang-profile.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
+    <ClCompile Include="slang-ref-object-reflect.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
     <ClCompile Include="slang-reflection.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
@@ -651,6 +678,9 @@
       <Filter>Source Files</Filter>
     </ClCompile>
     <ClCompile Include="slang-serialize-container.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="slang-serialize-factory.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
     <ClCompile Include="slang-serialize-ir-types.cpp">
@@ -687,6 +717,9 @@
       <Filter>Source Files</Filter>
     </ClCompile>
     <ClCompile Include="slang-type-system-shared.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="slang-value-reflect.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
     <ClCompile Include="slang.cpp">

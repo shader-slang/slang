@@ -14,12 +14,11 @@
 // basic `Decl`, `Stmt`, `Expr`, `type`, etc. definitions come from.
 
 namespace Slang
-{
+{  
 
 class NodeBase 
 {
     SLANG_ABSTRACT_CLASS(NodeBase)
-    SLANG_CLASS_ROOT
 
         // MUST be called before used. Called automatically via the ASTBuilder.
         // Note that the astBuilder is not stored in the NodeBase derived types by default.
