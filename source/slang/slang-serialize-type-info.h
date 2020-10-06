@@ -62,11 +62,6 @@ struct SerialIdentityTypeInfo
 template <>
 struct SerialTypeInfo<SerialIndex> : public SerialIdentityTypeInfo<SerialIndex> {};
 
-
-// Because is sized, we don't need to convert
-template <>
-struct SerialTypeInfo<FeedbackType::Kind> : public SerialIdentityTypeInfo<FeedbackType::Kind> {};
-
 // Implement for Basic Types
 
 template <>

@@ -156,24 +156,6 @@ SerialClasses::SerialClasses():
 {
 }
 
-// For now just use an extern so we don't need to include AST serialize
-extern void addASTTypes(SerialClasses* serialClasses);
-extern RefObjectSerialSubType getRefObjectSubType(const RefObject* obj);
-
-/* static */SlangResult SerialClasses::create(RefPtr<SerialClasses>& out)
-{
-    RefPtr<SerialClasses> classes(new SerialClasses);
-    addASTTypes(classes);
-
-    out = classes;
-    return SLANG_OK;
-}
-
-/* static */RefObjectSerialSubType SerialClasses::getSubType(const RefObject* obj)
-{
-    return getRefObjectSubType(obj);
-}
-
 // !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! SerialWriter  !!!!!!!!!!!!!!!!!!!!!!!!!!!!
 
 SerialWriter::SerialWriter(SerialClasses* classes, SerialFilter* filter) :
@@ -238,18 +220,26 @@ SerialIndex SerialWriter::writeObject(const NodeBase* node)
 
 SerialIndex SerialWriter::writeObject(const RefObject* obj)
 {
-    const RefObjectSerialSubType subType = SerialClasses::getSubType(obj);
-    if (subType == RefObjectSerialSubType::Invalid)
+    const SerialRefObject* serialObj = as<const SerialRefObject>(obj);
+    if (!serialObj)
     {
         SLANG_ASSERT(!"Unhandled type");
         return SerialIndex(0);
     }
 
-    const SerialClass* serialClass = m_classes->getSerialClass(SerialTypeKind::RefObject, SerialSubType(subType));
+    const ReflectClassInfo* classInfo = serialObj->getClassInfo();
+    SLANG_ASSERT(classInfo);
+
+    const SerialClass* serialClass = m_classes->getSerialClass(SerialTypeKind::RefObject, SerialSubType(classInfo->m_classId));
     return writeObject(serialClass, (const void*)obj);
 }
 
 void SerialWriter::setPointerIndex(const NodeBase* ptr, SerialIndex index)
+{
+    m_ptrMap.Add(ptr, Index(index));
+}
+
+void SerialWriter::setPointerIndex(const RefObject* ptr, SerialIndex index)
 {
     m_ptrMap.Add(ptr, Index(index));
 }
@@ -307,7 +297,14 @@ SerialIndex SerialWriter::addPointer(const RefObject* obj)
         return addName(name);
     }
 
-    return writeObject(obj);
+    if (m_filter)
+    {
+        return m_filter->writePointer(this, obj);
+    }
+    else
+    {
+        return writeObject(obj);
+    }
 }
 
 SerialIndex SerialWriter::addString(const UnownedStringSlice& slice)
