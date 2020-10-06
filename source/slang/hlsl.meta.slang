@@ -149,6 +149,17 @@ __glsl_version(430)
 __glsl_extension(GL_EXT_shader_atomic_int64)
 uint64_t __atomicXor(__ref uint64_t ioValue, uint64_t value);
 
+// Exchange
+
+__target_intrinsic(hlsl, "NvInterlockedExchangeUint64($0, $1, $2)")
+[__requiresNVAPI]
+uint2 __atomicExchange(RWByteAddressBuffer buf, uint offset, uint2 value);
+
+__target_intrinsic(glsl, "atomicExchange($0, $1)")
+__glsl_version(430)
+__glsl_extension(GL_EXT_shader_atomic_int64)
+uint64_t __atomicExchange(__ref uint64_t ioValue, uint64_t value);
+
 // Conversion between uint64_t and uint2
 
 uint2 __asuint2(uint64_t i)
@@ -446,6 +457,21 @@ ${{{{
     {
         RWStructuredBuffer<uint64_t> buf = __getEquivalentStructuredBuffer<uint64_t>(this);
         return __atomicXor(buf[byteAddress / 8], value);
+    }
+
+    // Exchange
+
+    __target_intrinsic(cuda, "atomicExch((uint64_t*)$0._getPtrAt($1), $2)")
+    uint64_t InterlockedExchangeU64(uint byteAddress, uint64_t value);
+
+    __specialized_for_target(hlsl)
+    uint64_t InterlockedExchangeU64(uint byteAddress, uint64_t value) { return __asuint64(__atomicExchange(this, byteAddress, __asuint2(value))); }
+
+    __specialized_for_target(glsl)
+    uint64_t InterlockedExchangeU64(uint byteAddress, uint64_t value)
+    {
+        RWStructuredBuffer<uint64_t> buf = __getEquivalentStructuredBuffer<uint64_t>(this);
+        return __atomicExchange(buf[byteAddress / 8], value);
     }
 
 ${{{{
