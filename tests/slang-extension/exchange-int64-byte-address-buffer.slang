@@ -17,29 +17,16 @@ RWStructuredBuffer<int> nvapiBuffer;
 //TEST_INPUT:ubuffer(data=[0 1 2 3 4 5 6 7]):out,name=outputBuffer
 RWByteAddressBuffer outputBuffer;
 
-[numthreads(16, 1, 1)]
+// With only 4 threads there is no contention - which makes for a simple test
+// but doesn't actually test for the exchange atomicity
+[numthreads(4, 1, 1)]
 void computeMain(uint3 dispatchThreadID : SV_DispatchThreadID)
 {    
-    uint tid = dispatchThreadID.x;
-    int idx = (tid & 3) ^ (tid >> 2); 
-
+    int idx = dispatchThreadID.x;
+    
     // Try directly reading
     uint2 currentValue2 = outputBuffer.Load2(idx << 3);
     uint64_t currentValue = uint64_t(currentValue2.y) | currentValue2.x;    
     
-    while (true)
-    {
-        // This is probably not a great way to do this - InterlockedAddI64 would be better
-        // but we are doing this to test CAS.
-        
-        uint64_t readValue;
-        outputBuffer.InterlockedCompareExchangeU64(idx << 3, currentValue, currentValue + 1, readValue);
-        
-        if (readValue == currentValue)
-        {
-            break;
-        }
-        
-        currentValue = readValue;
-    }
+    uint64_t readValue = outputBuffer.InterlockedExchangeU64(idx << 3, currentValue + 1);
 }

@@ -10,6 +10,7 @@
 #include "slang-serialize-ast.h"
 #include "slang-serialize-ir.h"
 #include "slang-serialize-source-loc.h"
+#include "slang-serialize-factory.h"
 
 namespace Slang {
 
@@ -143,7 +144,7 @@ namespace Slang {
                 {
                     if (!serialClasses)
                     {
-                        SLANG_RETURN_ON_FAIL(SerialClasses::create(serialClasses));
+                        SLANG_RETURN_ON_FAIL(SerialClassesUtil::create(serialClasses));
                     }
 
                     ModuleSerialFilter filter(moduleDecl);
@@ -295,7 +296,7 @@ namespace Slang {
                 {
                     if (!serialClasses)
                     {
-                        SLANG_RETURN_ON_FAIL(SerialClasses::create(serialClasses));
+                        SLANG_RETURN_ON_FAIL(SerialClassesUtil::create(serialClasses));
                     }
 
                     // TODO(JS): We probably want to store off better information about each of the translation unit

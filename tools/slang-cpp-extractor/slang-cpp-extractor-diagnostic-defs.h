@@ -23,6 +23,9 @@ DIAGNOSTIC(-1, Note, seeOpen, "see open $0")
 
 DIAGNOSTIC(1, Error, cannotOpenFile, "cannot open file '$0'.")
 
+DIAGNOSTIC(1, Error, extractorFailed, "C++ Extractor failed for '$0'")
+DIAGNOSTIC(1, Error, internalError, "Unknown internal error in C++ Extractor, aborted!")
+
 // Parsing errors
 DIAGNOSTIC(100000, Error, expectingToken, "Expecting token $0")
 DIAGNOSTIC(100001, Error, typeAlreadyDeclared, "Type '$0' already declared")
@@ -35,6 +38,8 @@ DIAGNOSTIC(100007, Error, superTypeNotFound, "Super type not found for $0")
 DIAGNOSTIC(100008, Error, superTypeNotAType, "Named super type is not a type $0")
 DIAGNOSTIC(100009, Error, unexpectedUnbalancedToken, "Unexpected unbalanced token")
 DIAGNOSTIC(100010, Error, unexpectedEndOfFile, "Unexpected end of file")
+DIAGNOSTIC(100011, Error, expectingTypeKeyword, "Expecting type keyword - struct or class, found $0")
+
 
 // Command line errors 100100
 

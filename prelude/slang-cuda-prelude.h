@@ -1237,6 +1237,12 @@ __device__ uint3 operator*(uint3 a, dim3 b)
     return r;
 }
 
+template<typename TResult, typename TInput>
+__inline__ __device__ TResult slang_bit_cast(TInput val)
+{
+    return *(TResult*)(&val);
+}
+
 /* !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! */
 
 

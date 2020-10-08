@@ -3,11 +3,9 @@
 #ifndef SLANG_AST_REFLECT_H
 #define SLANG_AST_REFLECT_H
 
-#include "slang-ast-generated.h"
+#include "slang-serialize-reflection.h"
 
-#define SLANG_CLASS_REFLECT_SUPER_BASE(SUPER)
-#define SLANG_CLASS_REFLECT_SUPER_INNER(SUPER) typedef SUPER Super;
-#define SLANG_CLASS_REFLECT_SUPER_LEAF(SUPER) typedef SUPER Super;
+#include "slang-ast-generated.h"
 
 // Implementation for SLANG_ABSTRACT_CLASS(x) using reflection from C++ extractor in slang-ast-generated.h
 #define SLANG_CLASS_REFLECT_IMPL(NAME, SUPER, ORIGIN, LAST, MARKER, TYPE, param) \
@@ -27,13 +25,6 @@
 // injected into AST classes
 #define SLANG_ABSTRACT_CLASS(NAME)  SLANG_ASTNode_##NAME(SLANG_CLASS_REFLECT_IMPL, _)
 #define SLANG_CLASS(NAME)           SLANG_ASTNode_##NAME(SLANG_CLASS_REFLECT_IMPL, _)
-
-// Does nothing - just a mark to the C++ extractor
-#define SLANG_REFLECT_BASE_CLASS(NAME)
-#define SLANG_REFLECTED
-#define SLANG_UNREFLECTED
-
-#define SLANG_CLASS_ROOT
 
 // Macros for simulating virtual methods without virtual methods
 

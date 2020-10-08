@@ -2,7 +2,7 @@
 #ifndef SLANG_SERIALIZE_H
 #define SLANG_SERIALIZE_H
 
-#include <type_traits>
+//#include <type_traits>
 
 #include "../core/slang-riff.h"
 #include "../core/slang-byte-encode-util.h"
@@ -283,22 +283,6 @@ enum class SerialTypeKind : uint8_t
 };
 typedef uint16_t SerialSubType;
 
-enum class RefObjectSerialSubType
-{
-    Invalid,                            ///< Invalid (ie not a known RefObject type)
-    LookupResultItem_Breadcrumb,
-
-    // TODO(JS):
-    // ! We don't want to serialize these types.
-    // We could set a nullptr SerialClass in classes ?
-    // Perhaps we need some special SerialClass that indicates we want to always write as 0?
-
-    Scope,
-    Module,
-
-    CountOf,
-};
-
 struct SerialInfo
 {
     enum
@@ -416,6 +400,7 @@ class SerialFilter
 {
 public:
     virtual SerialIndex writePointer(SerialWriter* writer, const NodeBase* ptr) = 0;
+    virtual SerialIndex writePointer(SerialWriter* writer, const RefObject* ptr) = 0;
 };
 
 class SerialObjectFactory
@@ -556,6 +541,7 @@ public:
         /// Set a the ptr associated with an index.
         /// NOTE! That there cannot be a pre-existing setting.
     void setPointerIndex(const NodeBase* ptr, SerialIndex index);
+    void setPointerIndex(const RefObject* ptr, SerialIndex index);
 
         /// Get the entries table holding how each index maps to an entry
     const List<SerialInfo::Entry*>& getEntries() const { return m_entries; }
@@ -641,6 +627,14 @@ struct SerialFieldType
 /* Describes a field in a SerialClass. */
 struct SerialField
 {
+        /// Returns a suitable ptr for use in make.
+        /// NOTE! Sets to 1 so it's constant and not 0 (and so nullptr)
+    template <typename T>
+    static T* getPtr() { return (T*)1; } 
+
+    template <typename T>
+    static SerialField make(const char* name, T* in);
+
     const char* name;                   ///< The name of the field
     const SerialFieldType* type;             ///< The type of the field
     uint32_t nativeOffset;              ///< Offset to field from base of type
@@ -704,10 +698,6 @@ public:
         /// Ctor
     SerialClasses();
 
-    static SlangResult create(RefPtr<SerialClasses>& out);
-
-    static RefObjectSerialSubType getSubType(const RefObject* obj);
-
 protected:
     SerialClass* _createSerialClass(const SerialClass* cls);
 
@@ -729,6 +719,22 @@ struct SerialGetFieldType
         return &type;
     }
 };
+
+// !!!!!!!!!!!!!!!!!!!!! SerialGetFieldType<T> !!!!!!!!!!!!!!!!!!!!!!!!!!!
+
+template <typename T>
+/* static */SerialField SerialField::make(const char* name, T* in)
+{
+    uint8_t* ptr = reinterpret_cast<uint8_t*>(in);
+
+    SerialField field;
+    field.name = name;
+    field.type = SerialGetFieldType<T>::getFieldType();
+    // This only works because we in is an offset from 1
+    field.nativeOffset = uint32_t(size_t(ptr) - 1);
+    field.serialOffset = 0;
+    return field;
+}
 
 // !!!!!!!!!!!!!!!!!!!!! Convenience functions !!!!!!!!!!!!!!!!!!!!!!!!!!!
 

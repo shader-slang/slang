@@ -1036,6 +1036,12 @@ struct ComputeVaryingInput
 typedef void(*ComputeThreadFunc)(ComputeThreadVaryingInput* varyingInput, void* uniformEntryPointParams, void* uniformState);
 typedef void(*ComputeFunc)(ComputeVaryingInput* varyingInput, void* uniformEntryPointParams, void* uniformState);
 
+template<typename TResult, typename TInput>
+TResult slang_bit_cast(TInput val)
+{
+    return *(TResult*)(&val);
+}
+
 #ifdef SLANG_PRELUDE_NAMESPACE
 }
 #endif

@@ -22,6 +22,20 @@
 
 #include "slang-cpp-extractor-diagnostics.h"
 
+/*
+Some command lines:
+
+For AST
+-d source/slang slang-ast-base.h slang-ast-decl.h slang-ast-expr.h slang-ast-modifier.h slang-ast-stmt.h slang-ast-type.h slang-ast-val.h -strip-prefix slang-ast- -o slang-ast-generated -output-fields -mark-suffix _CLASS
+
+For RefObjects
+-d source/slang slang-ast-support-types.h -strip-prefix slang- -reflect-type RefObject -o slang-ref-object-generated -output-fields -mark-suffix _OBJ_CLASS
+
+For Values
+
+-d source/slang slang-ast-support-types.h -strip-prefix slang- -reflect-type Value -o slang-value-generated -output-fields -mark-suffix _VALUE_CLASS
+*/
+
 namespace SlangExperimental
 {
 
@@ -32,8 +46,8 @@ enum class IdentifierStyle
     None,               ///< It's not an identifier
 
     Identifier,         ///< Just an identifier
-    Root,
-    BaseClass,          ///< Has the name of a base class defined elsewhere
+
+    PreDeclare,        ///< Declare a type (not visible in C++ code)
 
     TypeModifier,       ///< const, volatile etc
     Keyword,            ///< A keyword C/C++ keyword that is not another type
@@ -63,9 +77,8 @@ struct IdentifierFlag
 static const IdentifierFlags kIdentifierFlags[Index(IdentifierStyle::CountOf)] =
 {
     0,              /// None
-    0,              /// Identifier 
-    0,              /// Root
-    0,              /// BaseClass
+    0,              /// Identifier
+    0,              /// Declare type
     IdentifierFlag::Keyword,              /// TypeModifier
     IdentifierFlag::Keyword,              /// Keyword
     IdentifierFlag::Keyword | IdentifierFlag::StartScope | IdentifierFlag::ClassLike, /// Class
@@ -74,7 +87,6 @@ static const IdentifierFlags kIdentifierFlags[Index(IdentifierStyle::CountOf)] =
     IdentifierFlag::Keyword,                              /// Access
     IdentifierFlag::Reflection,                           /// Reflected
     IdentifierFlag::Reflection,                           /// Unreflected
-
 };
 
 SLANG_FORCE_INLINE IdentifierFlags getFlags(IdentifierStyle style)
@@ -170,13 +182,6 @@ public:
         ReflectionType reflectionType;
     };
 
-    enum class BaseType
-    {
-        None,           ///< Neither a base or marked base
-        Marked,         ///< It's a marked base
-        Unmarked,       ///< It's a base, but it's not marked 
-    };
-
     bool isClassLike() const { return m_type == Type::StructType || m_type == Type::ClassType; }
 
         /// Add a child node to this nodes scope
@@ -196,6 +201,9 @@ public:
 
         /// Calculate the absolute name for this namespace/type
     void calcAbsoluteName(StringBuilder& outName) const;
+
+        /// Get the absolute name
+    String getAbsoluteName() const { StringBuilder buf; calcAbsoluteName(buf); return buf.ProduceString(); }
 
         /// Do depth first traversal of nodes
     void calcScopeDepthFirst(List<Node*>& outNodes);
@@ -226,7 +234,18 @@ public:
         /// Stores in out any reflected derived types
     void getReflectedDerivedTypes(List<Node*>& out) const;
 
-    static void filterReflectedClassLike(List<Node*>& io);
+    typedef bool (*Filter)(Node* node);
+
+    static bool isClassLikeAndReflected(Node* node)
+    {
+        return node->isClassLike() && node->isReflected();
+    }
+    static bool isClassLike(Node* node)
+    {
+        return node->isClassLike();
+    }
+
+    static void filter(Filter filter, List<Node*>& io);
 
     static void calcScopePath(Node* node, List<Node*>& outPath);
 
@@ -236,7 +255,6 @@ public:
         m_reflectionType(ReflectionType::NotReflected),
         m_reflectionOverride(ReflectionType::Reflected),
         m_superNode(nullptr),
-        m_baseType(BaseType::None),
         m_origin(nullptr)
     {
         m_anonymousNamespace = nullptr;
@@ -268,9 +286,6 @@ public:
 
         /// For child types, fields, how reflection is handled. If this type is not reflected
     ReflectionType m_reflectionOverride;    
-
-        /// The base type of this
-    BaseType m_baseType;
 
     Token m_name;           ///< The name of this scope/type
     Token m_super;          ///< Super class name
@@ -340,7 +355,10 @@ public:
     /// we allow files to be processed in any order, so we have to do the type lookup as a separate operation
     SlangResult calcDerivedTypes();
 
-    /// Only valid after calcDerivedTypes has been executed
+        /// Find the name starting in specified scope
+    Node* findNode(Node* scope, const UnownedStringSlice& name);
+
+        /// Only valid after calcDerivedTypes has been executed
     const List<Node*>& getBaseTypes() const { return m_baseTypes; }
 
         /// Get all of the parsed source origins
@@ -355,6 +373,8 @@ protected:
     static Node::Type _toNodeType(IdentifierStyle style);
 
     bool _isMarker(const UnownedStringSlice& name);
+
+    SlangResult _parsePreDeclare();
 
     SlangResult _maybeParseNode(Node::Type type);
     SlangResult _maybeParseField();
@@ -555,24 +575,26 @@ void Node::dump(int indentCount, StringBuilder& out)
 
 void Node::calcAbsoluteName(StringBuilder& outName) const
 {
-    if (m_parentScope == nullptr)
+    List<Node*> path;
+    calcScopePath(const_cast<Node*>(this), path);
+
+    // 1 so we skip the global scope
+    for (Index i = 1; i < path.getCount(); ++i)
     {
-        if (!m_name.hasContent())
+        Node* node = path[i];
+
+        if (i > 1)
         {
-            return;
+            outName << "::";
         }
-        outName << m_name.getContent();
-    }
-    else
-    {
-        outName << "::";
-        if (m_type == Type::AnonymousNamespace)
+
+        if (node->m_type == Type::AnonymousNamespace)
         {
             outName << "{Anonymous}";
         }
         else
         {
-            outName << m_name.getContent();
+            outName << node->m_name.getContent();
         }
     }
 }
@@ -593,11 +615,6 @@ Index Node::calcDerivedDepth() const
 
 Node* Node::findLastDerived()
 {
-    if (!isReflected())
-    {
-        return nullptr;
-    }
-
     for (Index i = m_derivedTypes.getCount() - 1; i >= 0; --i)
     {
         Node* derivedType = m_derivedTypes[i];
@@ -648,14 +665,15 @@ void Node::getReflectedDerivedTypes(List<Node*>& out) const
     }
 }
 
-/* static */void Node::filterReflectedClassLike(List<Node*>& ioNodes)
+/* static */void Node::filter(Filter inFilter, List<Node*>& ioNodes)
 {
     // Filter out all the unreflected nodes
     Index count = ioNodes.getCount();
     for (Index j = 0; j < count; )
     {
         Node* node = ioNodes[j];
-        if (!node->isClassLike() || !node->isReflected())
+
+        if (!inFilter(node))
         {
             ioNodes.removeAt(j);
             count--;
@@ -678,8 +696,8 @@ struct Options
 
     Options()
     {
-        m_prefixMark = "SLANG_";
-        m_postfixMark = "_CLASS";
+        m_markPrefix = "SLANG_";
+        m_markSuffix = "_CLASS";
     }
 
     bool m_defs = false;            ///< If set will output a '-defs.h' file for each of the input files, that corresponds to previous defs files (although doesn't have fields/RAW)
@@ -692,8 +710,8 @@ struct Options
     String m_outputPath;            ///< The ouput path. Note that the extractor can generate multiple output files, and this will actually be the 'stem' of several files
     String m_inputDirectory;        ///< The input directory that is by default used for reading m_inputPaths from. 
     String m_reflectType;           ///< The typename used for output
-    String m_prefixMark;            ///< The prefix of the 'marker' used to identify a reflected type
-    String m_postfixMark;           ///< The postfix of the 'marker' used to identify a reflected type
+    String m_markPrefix;            ///< The prefix of the 'marker' used to identify a reflected type
+    String m_markSuffix;           ///< The postfix of the 'marker' used to identify a reflected type
     String m_stripFilePrefix;       ///< Used for the 'origin' information, this is stripped from the source filename, and the remainder of the filename (without extension) is 'macroized'
 };
 
@@ -704,6 +722,7 @@ struct OptionsParser
 
     SlangResult _parseArgWithValue(const char* option, String& outValue);
     SlangResult _parseArgReplaceValue(const char* option, String& outValue);
+    SlangResult _parseArgFlag(const char* option, bool& outFlag);
 
     String m_reflectType;
 
@@ -712,6 +731,16 @@ struct OptionsParser
     const char*const* m_args;
     DiagnosticSink* m_sink;
 };
+
+SlangResult OptionsParser::_parseArgFlag(const char* option, bool& outFlag)
+{
+     SLANG_ASSERT(UnownedStringSlice(m_args[m_index]) == option);
+     SLANG_ASSERT(m_index < m_argCount);
+
+     m_index ++;
+     outFlag = true;
+     return SLANG_OK;
+}
 
 SlangResult OptionsParser::_parseArgWithValue(const char* option, String& ioValue)
 {
@@ -789,25 +818,25 @@ SlangResult OptionsParser::parse(int argc, const char*const* argv, DiagnosticSin
                 SLANG_RETURN_ON_FAIL(_parseArgWithValue("-reflect-type", outOptions.m_reflectType));
                 continue;
             }
-            else if (arg == "-prefix-mark")
+            else if (arg == "-mark-prefix")
             {
-                SLANG_RETURN_ON_FAIL(_parseArgReplaceValue("-prefix-mark", outOptions.m_prefixMark));
+                SLANG_RETURN_ON_FAIL(_parseArgReplaceValue("-mark-prefix", outOptions.m_markPrefix));
                 continue;
             }
-            else if (arg == "-postfix-mark")
+            else if (arg == "-mark-suffix")
             {
-                SLANG_RETURN_ON_FAIL(_parseArgReplaceValue("-postfix-mark", outOptions.m_postfixMark));
+                SLANG_RETURN_ON_FAIL(_parseArgReplaceValue("-mark-suffix", outOptions.m_markSuffix));
                 continue;
             }
             else if (arg == "-defs")
             {
-                outOptions.m_defs = true;
+                SLANG_RETURN_ON_FAIL(_parseArgFlag("-defs", outOptions.m_defs));
                 continue; 
             }
             else if (arg == "-output-fields")
             {
-                outOptions.m_outputFields = true;
-                break;
+                SLANG_RETURN_ON_FAIL(_parseArgFlag("-output-fields", outOptions.m_outputFields));
+                continue;
             }
             else if (arg == "-strip-prefix")
             {
@@ -855,7 +884,7 @@ CPPExtractor::CPPExtractor(StringSlicePool* typePool, NamePool* namePool, Diagno
 
 bool CPPExtractor::_isMarker(const UnownedStringSlice& name)
 {
-    return name.startsWith(m_options->m_prefixMark.getUnownedSlice()) && name.endsWith(m_options->m_postfixMark.getUnownedSlice());
+    return name.startsWith(m_options->m_markPrefix.getUnownedSlice()) && name.endsWith(m_options->m_markSuffix.getUnownedSlice());
 }
 
 SlangResult CPPExtractor::expect(TokenType type, Token* outToken)
@@ -1587,6 +1616,84 @@ SlangResult CPPExtractor::_maybeParseField()
     }
 }
 
+static UnownedStringSlice _trimUnderscorePrefix(const UnownedStringSlice& slice)
+{
+    if (slice.getLength() && slice[0] == '_')
+    {
+        return UnownedStringSlice(slice.begin() + 1, slice.end());
+    }
+    else
+    {
+        return slice;
+    }
+}
+
+
+SlangResult CPPExtractor::_parsePreDeclare()
+{
+    // Skip the declare type token
+    m_reader.advanceToken();
+
+    SLANG_RETURN_ON_FAIL(expect(TokenType::LParent));
+
+    bool hasMatchingSuffix = false;
+
+    // Get the suffix
+    {
+        Token suffix;
+        SLANG_RETURN_ON_FAIL(expect(TokenType::Identifier, &suffix));
+
+        hasMatchingSuffix = _trimUnderscorePrefix(m_options->m_markSuffix.getUnownedSlice()) == _trimUnderscorePrefix(suffix.getContent());
+    }
+
+    SLANG_RETURN_ON_FAIL(expect(TokenType::Comma));
+
+    // Get the type of type
+    Node::Type nodeType;
+    {
+        Token typeToken;
+        SLANG_RETURN_ON_FAIL(expect(TokenType::Identifier, &typeToken));
+
+        const IdentifierStyle style = m_identifierLookup->get(typeToken.getContent());
+
+        if (style != IdentifierStyle::Struct && style != IdentifierStyle::Class)
+        {
+            m_sink->diagnose(typeToken, CPPDiagnostics::expectingTypeKeyword, typeToken.getContent());
+            return SLANG_FAIL;
+        }
+        nodeType = _toNodeType(style);
+    }
+
+    Token name;
+    Token super;
+
+    SLANG_RETURN_ON_FAIL(expect(TokenType::Identifier, &name));
+
+    if (advanceIfToken(TokenType::Colon))
+    {
+        SLANG_RETURN_ON_FAIL(expect(TokenType::Identifier, &super));
+    }
+
+    SLANG_RETURN_ON_FAIL(expect(TokenType::RParent));
+
+    if (hasMatchingSuffix)
+    {
+        RefPtr<Node> node(new Node(nodeType));
+
+        node->m_name = name;
+        node->m_super = super;
+
+        // Assume it is reflected
+        node->m_reflectionType = ReflectionType::Reflected;
+
+        SLANG_RETURN_ON_FAIL(pushNode(node));
+        // Pop out of it
+        popBrace();
+    }
+    
+    return SLANG_OK;
+}
+
 SlangResult CPPExtractor::parse(SourceFile* sourceFile, const Options* options)
 {
     SLANG_ASSERT(options);
@@ -1629,24 +1736,9 @@ SlangResult CPPExtractor::parse(SourceFile* sourceFile, const Options* options)
                 
                 switch (style)
                 {
-                    case IdentifierStyle::BaseClass:
+                    case IdentifierStyle::PreDeclare:
                     {
-                        m_reader.advanceToken();
-
-                        Token nameToken;
-                        SLANG_RETURN_ON_FAIL(expect(TokenType::LParent));
-                        SLANG_RETURN_ON_FAIL(expect(TokenType::Identifier, &nameToken));
-                        SLANG_RETURN_ON_FAIL(expect(TokenType::RParent));
-
-                        RefPtr<Node> node(new Node(Node::Type::ClassType));
-                        node->m_name = nameToken;
-                        node->m_baseType = Node::BaseType::Marked;
-
-                        // Classes defined this way are not reflected, as the mark means the type exists, but isn't visible
-                        node->m_reflectionType = ReflectionType::NotReflected;
-
-                        SLANG_RETURN_ON_FAIL(pushNode(node));
-                        popBrace();
+                        SLANG_RETURN_ON_FAIL(_parsePreDeclare());
                         break;
                     }
                     case IdentifierStyle::Reflected:
@@ -1665,15 +1757,6 @@ SlangResult CPPExtractor::parse(SourceFile* sourceFile, const Options* options)
                         {
                             m_currentNode->m_reflectionOverride = ReflectionType::NotReflected;
                         }
-                        break;
-                    }
-                    case IdentifierStyle::Root:
-                    {
-                        if (m_currentNode && m_currentNode->isClassLike())
-                        {
-                            m_currentNode->m_baseType = Node::BaseType::Marked;
-                        }
-                        m_reader.advanceToken();
                         break;
                     }
                     default:
@@ -1752,9 +1835,32 @@ SlangResult CPPExtractor::parse(SourceFile* sourceFile, const Options* options)
     }
 }
 
+Node* CPPExtractor::findNode(Node* scope, const UnownedStringSlice& name)
+{
+    // TODO(JS): We may want to lookup based on the path. 
+    // If the name is qualified, we give up for not
+    if (String(name).indexOf("::") >= 0)
+    {
+        return nullptr;
+    }
+
+    // Okay try in all scopes up to the root
+    while (scope)
+    {
+        if (Node* node = scope->findChild(name))
+        {
+            return node;
+        }
+
+        scope = scope->m_parentScope;
+    }
+
+    return nullptr;
+}
+
 SlangResult CPPExtractor::_calcDerivedTypesRec(Node* node)
 {
-    if (node->isClassLike() && node->m_baseType == Node::BaseType::None)
+    if (node->isClassLike())
     {
         if (node->m_super.hasContent())
         {
@@ -1765,12 +1871,13 @@ SlangResult CPPExtractor::_calcDerivedTypesRec(Node* node)
                 return SLANG_FAIL;
             }
 
-            Node* superType = parentScope->findChild(node->m_super.getContent());
+            Node* superType = findNode(parentScope, node->m_super.getContent());
+
             if (!superType)
             {
                 if (node->isReflected())
                 {
-                    m_sink->diagnose(node->m_name, CPPDiagnostics::superTypeNotFound, node->m_name.getContent());
+                    m_sink->diagnose(node->m_name, CPPDiagnostics::superTypeNotFound, node->getAbsoluteName());
                     return SLANG_FAIL;
                 }
             }
@@ -1778,7 +1885,7 @@ SlangResult CPPExtractor::_calcDerivedTypesRec(Node* node)
             {
                 if (!superType->isClassLike())
                 {
-                    m_sink->diagnose(node->m_name, CPPDiagnostics::superTypeNotAType, node->m_name.getContent());
+                    m_sink->diagnose(node->m_name, CPPDiagnostics::superTypeNotAType, node->getAbsoluteName());
                     return SLANG_FAIL;
                 }
 
@@ -1789,14 +1896,12 @@ SlangResult CPPExtractor::_calcDerivedTypesRec(Node* node)
         }
         else
         {
-            // If it has no super class defined, then we can just make it a root without being set
-            node->m_baseType = Node::BaseType::Unmarked;
+            // Add the root nodes
+            if (node->isReflected())
+            {
+                m_baseTypes.add(node);
+            }
         }
-    }
-
-    if (node->m_baseType != Node::BaseType::None)
-    {
-        m_baseTypes.add(node);
     }
 
     for (Node* child : node->m_children)
@@ -1876,6 +1981,8 @@ public:
     SlangResult calcChildrenHeader(CPPExtractor& exctractor, StringBuilder& out);
 
     SlangResult calcDef(CPPExtractor& extractor, SourceOrigin* origin, StringBuilder& out);
+
+    const Options& getOptions() const { return m_options; }
 
     CPPExtractorApp(DiagnosticSink* sink, SourceManager* sourceManager, RootNamePool* rootNamePool):
         m_sink(sink),
@@ -1977,14 +2084,10 @@ SlangResult CPPExtractorApp::calcChildrenHeader(CPPExtractor& extractor, StringB
     for (Index i = 0; i < baseTypes.getCount(); ++i)
     {
         Node* baseType = baseTypes[i];
-        if (baseType->m_baseType != Node::BaseType::Marked)
-        {
-            continue;
-        }
-
+        
         List<Node*> nodes;
         baseType->calcDerivedDepthFirst(nodes);
-        Node::filterReflectedClassLike(nodes);
+        Node::filter(Node::isClassLike, nodes);
 
         List<Node*> derivedTypes;
 
@@ -1996,7 +2099,7 @@ SlangResult CPPExtractorApp::calcChildrenHeader(CPPExtractor& extractor, StringB
             node->getReflectedDerivedTypes(derivedTypes);
 
             // Define the derived types
-            out << "#define " << m_options.m_prefixMark << "CHILDREN_" << reflectTypeName << "_"  << node->m_name.getContent() << "(x, param)";
+            out << "#define " << m_options.m_markPrefix << "CHILDREN_" << reflectTypeName << "_"  << node->m_name.getContent() << "(x, param)";
 
             if (derivedTypes.getCount())
             {
@@ -2005,7 +2108,7 @@ SlangResult CPPExtractorApp::calcChildrenHeader(CPPExtractor& extractor, StringB
                 {
                     Node* derivedType = derivedTypes[j];
                     _indent(1, out);
-                    out << m_options.m_prefixMark << "ALL_" << reflectTypeName << "_" << derivedType->m_name.getContent() << "(x, param)";
+                    out << m_options.m_markPrefix << "ALL_" << reflectTypeName << "_" << derivedType->m_name.getContent() << "(x, param)";
                     if (j < derivedTypes.getCount() - 1)
                     {
                         out << "\\\n";
@@ -2020,16 +2123,16 @@ SlangResult CPPExtractorApp::calcChildrenHeader(CPPExtractor& extractor, StringB
         for (Node* node : nodes)
         {
             // Define the derived types
-            out << "#define " << m_options.m_prefixMark << "ALL_" << reflectTypeName << "_" << node->m_name.getContent() << "(x, param) \\\n";
+            out << "#define " << m_options.m_markPrefix << "ALL_" << reflectTypeName << "_" << node->m_name.getContent() << "(x, param) \\\n";
             _indent(1, out);
-            out << m_options.m_prefixMark << reflectTypeName << "_"  << node->m_name.getContent() << "(x, param)";
+            out << m_options.m_markPrefix << reflectTypeName << "_"  << node->m_name.getContent() << "(x, param)";
 
             // If has derived types output them
             if (node->hasReflectedDerivedType())
             {
                 out << " \\\n";
                 _indent(1, out);
-                out << m_options.m_prefixMark << "CHILDREN_" << reflectTypeName << "_" << node->m_name.getContent() << "(x, param)";
+                out << m_options.m_markPrefix << "CHILDREN_" << reflectTypeName << "_" << node->m_name.getContent() << "(x, param)";
             }
             out << "\n\n";
         }
@@ -2041,7 +2144,7 @@ SlangResult CPPExtractorApp::calcChildrenHeader(CPPExtractor& extractor, StringB
             for (Node* node : nodes)
             {
                 // Define the derived types
-                out << "#define " << m_options.m_prefixMark << "FIELDS_" << reflectTypeName << "_" << node->m_name.getContent() << "(_x_, _param_)";
+                out << "#define " << m_options.m_markPrefix << "FIELDS_" << reflectTypeName << "_" << node->m_name.getContent() << "(_x_, _param_)";
 
                 if (node->m_fields.getCount() > 0)
                 {
@@ -2090,11 +2193,7 @@ SlangResult CPPExtractorApp::calcHeader(CPPExtractor& extractor, StringBuilder& 
     for (Index i = 0; i < baseTypes.getCount(); ++i)
     {
         Node* baseType = baseTypes[i];
-        if (baseType->m_baseType != Node::BaseType::Marked)
-        {
-            continue;
-        }
-
+        
         List<Node*> baseScopePath;
         baseType->calcScopePath(baseScopePath);
 
@@ -2111,7 +2210,7 @@ SlangResult CPPExtractorApp::calcHeader(CPPExtractor& extractor, StringBuilder& 
 
         List<Node*> nodes;
         baseType->calcDerivedDepthFirst(nodes);
-        Node::filterReflectedClassLike(nodes);
+        Node::filter(Node::isClassLikeAndReflected, nodes);
 
         // Write out the types
         {
@@ -2158,6 +2257,7 @@ SlangResult CPPExtractorApp::calcHeader(CPPExtractor& extractor, StringBuilder& 
             out << "// Order is (NAME, SUPER, ORIGIN, LAST, MARKER, TYPE, param) \n";
             out << "// NAME - is the class name\n";
             out << "// SUPER - is the super class name (or NO_SUPER)\n";
+            out << "// ORIGIN - where the definition was found\n";
             out << "// LAST - is the class name for the last in the range (or NO_LAST)\n";
             out << "// MARKER - is the text inbetween in the prefix/postix (like ABSTRACT). If no inbetween text is is 'NONE'\n";
             out << "// TYPE - Can be BASE, INNER or LEAF for the overall base class, an INNER class, or a LEAF class\n";
@@ -2166,7 +2266,7 @@ SlangResult CPPExtractorApp::calcHeader(CPPExtractor& extractor, StringBuilder& 
             // Output all of the definitions for each type
             for (Node* node : nodes)
             {
-                out << "#define " << m_options.m_prefixMark <<  reflectTypeName << "_" << node->m_name.getContent() << "(x, param) ";
+                out << "#define " << m_options.m_markPrefix <<  reflectTypeName << "_" << node->m_name.getContent() << "(x, param) ";
 
                 // Output the X macro part
                 _indent(1, out);
@@ -2199,9 +2299,9 @@ SlangResult CPPExtractorApp::calcHeader(CPPExtractor& extractor, StringBuilder& 
                 // Output any specifics of the markup
                 UnownedStringSlice marker = node->m_marker.getContent();
                 // Need to extract the name
-                if (marker.getLength() > m_options.m_prefixMark.getLength() + m_options.m_postfixMark.getLength())
+                if (marker.getLength() > m_options.m_markPrefix.getLength() + m_options.m_markSuffix.getLength())
                 {
-                    marker = UnownedStringSlice(marker.begin() + m_options.m_prefixMark.getLength(), marker.end() - m_options.m_postfixMark.getLength());
+                    marker = UnownedStringSlice(marker.begin() + m_options.m_markPrefix.getLength(), marker.end() - m_options.m_markSuffix.getLength());
                 }
                 else
                 {
@@ -2209,7 +2309,7 @@ SlangResult CPPExtractorApp::calcHeader(CPPExtractor& extractor, StringBuilder& 
                 }
                 out << marker << ", ";
 
-                if (node->m_baseType != Node::BaseType::None || node->m_superNode && node->m_superNode->isReflected() == false)
+                if (node->m_superNode == nullptr)
                 {
                     out << "BASE, ";
                 }
@@ -2240,7 +2340,7 @@ SlangResult CPPExtractorApp::calcHeader(CPPExtractor& extractor, StringBuilder& 
 
     for (SourceOrigin* origin : extractor.getSourceOrigins())
     {
-        out << "#define " << m_options.m_prefixMark <<  "ORIGIN_" << origin->m_macroOrigin << "_" << reflectTypeName << "(x, param) \\\n";
+        out << "#define " << m_options.m_markPrefix <<  "ORIGIN_" << origin->m_macroOrigin << "_" << reflectTypeName << "(x, param) \\\n";
 
         for (Node* node : origin->m_nodes)
         {
@@ -2355,29 +2455,24 @@ SlangResult CPPExtractorApp::writeOutput(CPPExtractor& extractor)
     // Special markers
     {
         {
+            const char* names[] = { "const", "volatile" };
             StringBuilder buf;
-            buf << options.m_prefixMark;
-            buf << "CLASS_ROOT";
-
-            outLookup.set(buf.getUnownedSlice(), IdentifierStyle::Root);
+            buf << options.m_markPrefix;
+            buf << "PRE_DECLARE";
+            
+            outLookup.set(buf.getUnownedSlice(), IdentifierStyle::PreDeclare);
         }
+
         {
             StringBuilder buf;
-            buf << options.m_prefixMark;
-            buf << "REFLECT_BASE_CLASS";
-
-            outLookup.set(buf.getUnownedSlice(), IdentifierStyle::BaseClass);
-        }
-        {
-            StringBuilder buf;
-            buf << options.m_prefixMark;
+            buf << options.m_markPrefix;
             buf << "REFLECTED";
 
             outLookup.set(buf.getUnownedSlice(), IdentifierStyle::Reflected);
         }
         {
             StringBuilder buf;
-            buf << options.m_prefixMark;
+            buf << options.m_markPrefix;
             buf << "UNREFLECTED";
 
             outLookup.set(buf.getUnownedSlice(), IdentifierStyle::Unreflected);
@@ -2489,30 +2584,33 @@ int main(int argc, const char*const* argv)
     {
         ComPtr<ISlangWriter> writer(new FileWriter(stderr, WriterFlag::AutoFlush));
 
+        RootNamePool rootNamePool;
+
+        SourceManager sourceManager;
+        sourceManager.initialize(nullptr, nullptr);
+
+        DiagnosticSink sink(&sourceManager);
+        sink.writer = writer;
+
+        CPPExtractorApp app(&sink, &sourceManager, &rootNamePool);
+
         try
         {
-            RootNamePool rootNamePool;
-
-            SourceManager sourceManager;
-            sourceManager.initialize(nullptr, nullptr);
-
-            DiagnosticSink sink(&sourceManager);
-            sink.writer = writer;
-
-            CPPExtractorApp app(&sink, &sourceManager, &rootNamePool);
             if (SLANG_FAILED(app.executeWithArgs(argc - 1, argv + 1)))
             {
+                sink.diagnose(SourceLoc(), CPPDiagnostics::extractorFailed, app.getOptions().m_reflectType);
                 return 1;
             }
             if (sink.getErrorCount())
             {
+                sink.diagnose(SourceLoc(), CPPDiagnostics::extractorFailed, app.getOptions().m_reflectType);
                 return 1;
             }
         }
         catch (...)
         {
-            WriterHelper helper(writer);
-            helper.print("Unknown internal error in C++ extractor, aborted!\n");
+            sink.diagnose(SourceLoc(), CPPDiagnostics::internalError);
+            sink.diagnose(SourceLoc(), CPPDiagnostics::extractorFailed, app.getOptions().m_reflectType);
             return 1;
         }
     }
