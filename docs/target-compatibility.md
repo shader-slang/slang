@@ -206,7 +206,7 @@ uint64_t RWByteAddressBuffer::InterlockedXorU64(uint byteAddress, uint64_t value
 ```
 
 On HLSL based targets this functionality is achieved using [NVAPI](https://developer.nvidia.com/nvapi). Support for NVAPI is described
-in the separate [NVAPI Support](nvapi-support.md) document.  
+in the separate [NVAPI Support](https://nvapi-support.md) document.  
 
 On Vulkan, for float the [`GL_EXT_shader_atomic_float`](https://www.khronos.org/registry/vulkan/specs/1.2-extensions/man/html/VK_EXT_shader_atomic_float.html) extension is required. For int64 the [`GL_EXT_shader_atomic_int64`](https://raw.githubusercontent.com/KhronosGroup/GLSL/master/extensions/ext/GL_EXT_shader_atomic_int64.txt) extension is required.
 
