@@ -6,7 +6,7 @@
 
 #include "bind-location.h"
 
-#include "../../source/core/slang-smart-pointer.h"
+#include "../../source/core/slang-basic.h"
 
 namespace renderer_test {
 
@@ -34,6 +34,9 @@ struct CPUComputeUtil
 
             /// Buffers are held in same order as entries in layout (useful for dumping out bindings)
         List<BindSet::Value*> m_buffers;
+
+            /// Bindless resource objects
+        Slang::OrderedDictionary<Slang::String, RefPtr<Resource>> m_bindlessResources;
     };
 
     struct ExecuteInfo
@@ -55,9 +58,12 @@ struct CPUComputeUtil
         /// Runs code across run styles and makes sure output buffers match
     static SlangResult checkStyleConsistency(ISlangSharedLibrary* sharedLib, const uint32_t dispatchSize[3], const ShaderCompilerUtil::OutputAndLayout& compilationAndLayout);
 
-        /// Query and fill in the RTTI pointer values in data buffers.
-    static SlangResult populateRTTIEntries(
+    static SlangResult createBindlessResources(ShaderCompilerUtil::OutputAndLayout& compilationAndLayout, Context& context);
+
+        /// Query and fill in the RTTI pointer and runtime resource handle values in data buffers.
+    static SlangResult fillRuntimeHandleInBuffers(
         ShaderCompilerUtil::OutputAndLayout& compilationAndLayout,
+        Context& context,
         ISlangSharedLibrary* sharedLib);
 
     static SlangResult calcBindings(const ShaderCompilerUtil::OutputAndLayout& compilationAndLayout, Context& outContext);

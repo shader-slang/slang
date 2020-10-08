@@ -650,7 +650,8 @@ static SlangResult _innerMain(Slang::StdWriters* stdWriters, SlangSession* sessi
 
             // calculate binding
             CPUComputeUtil::Context context;
-            SLANG_RETURN_ON_FAIL(CPUComputeUtil::populateRTTIEntries(compilationAndLayout, sharedLibrary.get()));
+            SLANG_RETURN_ON_FAIL(CPUComputeUtil::createBindlessResources(compilationAndLayout, context));
+            SLANG_RETURN_ON_FAIL(CPUComputeUtil::fillRuntimeHandleInBuffers(compilationAndLayout, context, sharedLibrary.get()));
             SLANG_RETURN_ON_FAIL(CPUComputeUtil::calcBindings(compilationAndLayout, context));
 
             // Get the execution info from the lib

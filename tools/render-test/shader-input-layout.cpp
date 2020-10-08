@@ -432,6 +432,20 @@ namespace renderer_test
                                             entry.bufferData.add(0);
                                             continue;
                                         }
+                                        else if (parser.LookAhead("handle"))
+                                        {
+                                            BindlessHandleDataEntry handleEntry;
+                                            parser.ReadToken();
+                                            parser.Read("(");
+                                            handleEntry.name = parser.ReadWord();
+                                            handleEntry.offset = offset;
+                                            parser.Read(")");
+                                            offset += 8;
+                                            entry.bindlessHandleEntry.add(handleEntry);
+                                            entry.bufferData.add(0);
+                                            entry.bufferData.add(0);
+                                            continue;
+                                        }
 
                                         bool negate = false;
                                         if(parser.NextToken().Type == TokenType::OpSub)
@@ -572,6 +586,11 @@ namespace renderer_test
 
                                     entry.name = builder;
                                 }
+                                else if (parser.LookAhead("bindless"))
+                                {
+                                    parser.ReadToken();
+                                    entry.isBindlessObject = true;
+                                }
                                 else
                                 {
                                     fprintf(stderr, "Invalid TEST_INPUT syntax '%s'\n", parser.NextToken().Content.getBuffer());
@@ -601,6 +620,8 @@ namespace renderer_test
         for (Index entryIndex = 0; entryIndex < entries.getCount(); ++entryIndex)
         {
             auto& entry = entries[entryIndex];
+            if (entry.isBindlessObject)
+                continue;
 
             if (entry.name.getLength() == 0)
             {
