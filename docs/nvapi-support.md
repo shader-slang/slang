@@ -4,14 +4,13 @@ NVAPI Support
 Slang provides support for [NVAPI](https://developer.nvidia.com/nvapi) in several ways
 
 * Slang allows the use of NVAPI directly, by the inclusion of the `#include "nvHLSLExtns.h"` header in your Slang code. Doing so will make all the NVAPI functions directly available and usabe within your Slang source code.
-* Some targets use NVAPI to provide cross platform features. For example support for [RWByteAddressBuffer atomics](target-compatibility.md) on HLSL based targets is supported currently via NVAPI. 
-
-It should also be pointed out that is possible to mix the use of direct and implict NVAPI usage. 
+* NVAPI is used to provide features implicitly for certain targets. For example support for [RWByteAddressBuffer atomics](target-compatibility.md) on HLSL based targets is supported currently via NVAPI.
+* Direct and implicit NVAPI usage can be freely mixed. 
 
 Direct usage of NVAPI
 =====================
 
-Direct usage of NVAPI just requires the inclusion of the appropriate NVAPI header, typically with `#include "nvHLSLExtns.h` within your Slang source. As is required by NVAPI before the include it is necessary to specify the slot and perhaps space usage. So a typical usage inside a Slang file might look something like
+Direct usage of NVAPI just requires the inclusion of the appropriate NVAPI header, typically with `#include "nvHLSLExtns.h` within your Slang source. As is required by NVAPI before the `#include` it is necessary to specify the slot and perhaps space usage. For example a typical direct NVAPI usage inside a Slang source file might contain something like...
 
 ```
 #define NV_SHADER_EXTN_SLOT u0 
@@ -50,6 +49,33 @@ The actual values for the slot and optionally the space, are found by Slang exam
 This means that if compile Slang source that has implicit use NVAPI, the slot and optionally the space must be defined. This can be achieved with a command line -D, throught the API or through having suitable `#define`s in the Slang source code.
 
 It is worth noting if you *replace* the default HLSL prelude, and use NVAPI then it will be necessary to have something like the default HLSL prelude part of your custom prelude.
+
+Downstream Compiler Include
+---------------------------
+
+There is a subtle detail that is perhaps worth noting here around the downstream compiler and `#include`s. When Slang outputs HLSL it typically does not contain any `#include`, because all of the `#include` in the original source code have been handled by Slang. Slang then outputs everything required to compile to the downstream compiler *without* any `#include`. When NVAPI is used explicitly this is still the case - the NVAPI headers are consumed by Slang, and then Slang will output HLSL that does not contain any `#include`.
+
+The astute reader may have noticed that the new default Slang HLSL prelude *does* contain an include. So when outputs NVAPI calls from implicit use, this #include will be enabled.
+
+```
+#ifdef SLANG_HLSL_ENABLE_NVAPI
+#include "nvHLSLExtns.h"
+#endif
+```
+
+This means that the *downstream* compiler (such as DXC and FXC) must be able to handle this include. 
+
+As it turns out all the includes specified to Slang (via command line -I or through the API), are passed down to the include handlers for FXC and DXC. 
+
+In the simplest use case where the path to `nvHLSLExtns.h` is specified in the include paths everything should 'just work' - as both Slang and the downstream compilers will see these include paths and so can handle the include. 
+
+Things are more complicated if there is mixed implicit/explitic NVAPI usage and in the Slang source the include path is set up such that NVAPI is included with 
+
+```
+#include "nvapi/nvHLSLExtns.h"
+```
+
+This won't work directly with the implicit usage, as the downstream compiler includes as `"nvHLSLExtns.h"`. One way to work around this by altering the HLSL prelude such as the same `#include` is used. 
 
 Links
 -----
