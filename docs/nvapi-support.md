@@ -4,7 +4,7 @@ NVAPI Support
 Slang provides support for [NVAPI](https://developer.nvidia.com/nvapi) in several ways
 
 * Slang allows the use of NVAPI directly, by the inclusion of the `#include "nvHLSLExtns.h"` header in your Slang code. Doing so will make all the NVAPI functions directly available and usabe within your Slang source code.
-* NVAPI is used to provide features implicitly for certain targets. For example support for [RWByteAddressBuffer atomics](http://target-compatibility.md) on HLSL based targets is supported currently via NVAPI.
+* NVAPI is used to provide features implicitly for certain targets. For example support for [RWByteAddressBuffer atomics](target-compatibility.md) on HLSL based targets is supported currently via NVAPI.
 * Direct and implicit NVAPI usage can be freely mixed. 
 
 Direct usage of NVAPI
