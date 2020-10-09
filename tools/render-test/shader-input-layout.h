@@ -75,19 +75,26 @@ struct RTTIDataEntry
     unsigned int offset;
 };
 
+struct BindlessHandleDataEntry
+{
+    unsigned int offset;
+    Slang::String name;
+};
+
 class ShaderInputLayoutEntry
 {
 public:
     ShaderInputType type;
     Slang::List<unsigned int> bufferData;
     Slang::List<RTTIDataEntry> rttiEntries;
+    Slang::List<BindlessHandleDataEntry> bindlessHandleEntry;
     InputTextureDesc textureDesc;
     InputBufferDesc bufferDesc;
     InputSamplerDesc samplerDesc;
     ArrayDesc arrayDesc;
     bool isOutput = false;
     bool onlyCPULikeBinding = false;        ///< If true, only use on targets that have 'uniform' or 'CPU like' binding, like CPU and CUDA
-
+    bool isBindlessObject = false;          ///< If true, this is a bindless object with no associated binding point in the shader.
     Slang::String name;                     ///< Optional name. Useful for binding through reflection.
 };
 

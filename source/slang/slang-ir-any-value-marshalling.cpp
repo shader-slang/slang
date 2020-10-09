@@ -85,7 +85,8 @@ namespace Slang
             IRInst* anyValueVar;
             // Defines what to do with basic typed data elements.
             virtual void marshalBasicType(IRBuilder* builder, IRType* dataType, IRInst* concreteTypedVar) = 0;
-
+            // Defines what to do with resource handle elements.
+            virtual void marshalResourceHandle(IRBuilder* builder, IRType* dataType, IRInst* concreteTypedVar) = 0;
             // Validates that the type fits in the given AnyValueSize.
             // After calling emitMarshallingCode, `fieldOffset` will be increased to the required `AnyValue` size.
             // If this is larger than the provided AnyValue size, report a dianogstic. We might want to front load
@@ -188,6 +189,11 @@ namespace Slang
                 break;
             }
             default:
+                if (as<IRTextureTypeBase>(dataType) || as<IRSamplerStateTypeBase>(dataType))
+                {
+                    context->marshalResourceHandle(builder, dataType, concreteTypedVar);
+                    return;
+                }
                 SLANG_UNIMPLEMENTED_X("Unimplemented type packing");
                 break;
             }
@@ -241,6 +247,29 @@ namespace Slang
                     break;
                 default:
                     SLANG_UNREACHABLE("unknown basic type");
+                }
+            }
+
+            virtual void marshalResourceHandle(IRBuilder* builder, IRType* dataType, IRInst* concreteVar) override
+            {
+                SLANG_UNUSED(dataType);
+                if (fieldOffset + 1 < static_cast<uint32_t>(anyValInfo->fieldKeys.getCount()))
+                {
+                    auto srcVal = builder->emitLoad(concreteVar);
+                    auto uint64Val = builder->emitBitCast(builder->getUInt64Type(), srcVal);
+                    auto lowBits = builder->emitConstructorInst(builder->getUIntType(), 1, &uint64Val);
+                    auto shiftedBits = builder->emitShr(
+                        builder->getUInt64Type(),
+                        uint64Val,
+                        builder->getIntValue(builder->getIntType(), 32));
+                    auto highBits = builder->emitBitCast(builder->getUIntType(), shiftedBits);
+                    auto dstAddr1 = builder->emitFieldAddress(
+                        uintPtrType, anyValueVar, anyValInfo->fieldKeys[fieldOffset]);
+                    builder->emitStore(dstAddr1, lowBits);
+                    auto dstAddr2 = builder->emitFieldAddress(
+                        uintPtrType, anyValueVar, anyValInfo->fieldKeys[fieldOffset + 1]);
+                    builder->emitStore(dstAddr2, highBits);
+                    fieldOffset += 2;
                 }
             }
         };
@@ -333,6 +362,26 @@ namespace Slang
                     break;
                 default:
                     SLANG_UNREACHABLE("unknown basic type");
+                }
+            }
+
+            virtual void marshalResourceHandle(
+                IRBuilder* builder, IRType* dataType, IRInst* concreteVar) override
+            {
+                if (fieldOffset + 1 < static_cast<uint32_t>(anyValInfo->fieldKeys.getCount()))
+                {
+                    auto srcAddr = builder->emitFieldAddress(
+                        uintPtrType, anyValueVar, anyValInfo->fieldKeys[fieldOffset]);
+                    auto lowBits = builder->emitLoad(srcAddr);
+                    
+                    auto srcAddr1 = builder->emitFieldAddress(
+                        uintPtrType, anyValueVar, anyValInfo->fieldKeys[fieldOffset + 1]);
+                    auto highBits = builder->emitLoad(srcAddr1);
+
+                    auto combinedBits = builder->emitMakeUInt64(lowBits, highBits);
+                    combinedBits = builder->emitBitCast(dataType, combinedBits);
+                    builder->emitStore(concreteVar, combinedBits);
+                    fieldOffset += 2;
                 }
             }
         };

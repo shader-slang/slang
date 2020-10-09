@@ -2090,7 +2090,15 @@ void CLikeSourceEmitter::defaultEmitInstExpr(IRInst* inst, const EmitOpInfo& inO
         emitType(inst->getDataType());
         emitArgs(inst);
         break;
-
+    case kIROp_makeUInt64:
+        m_writer->emit("((");
+        emitType(inst->getDataType());
+        m_writer->emit("(");
+        emitOperand(inst->getOperand(1), getInfo(EmitOp::General));
+        m_writer->emit(") << 32) + ");
+        emitOperand(inst->getOperand(0), getInfo(EmitOp::General));
+        m_writer->emit(")");
+        break;
     case kIROp_constructVectorFromScalar:
     {
         // Simple constructor call
