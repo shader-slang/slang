@@ -24,7 +24,7 @@ Implicit usage of NVAPI
 
 It is convenient and powerful to be able to directly use NVAPI calls, but will only work on such targets that support the mechansism, even if there is a way to support the functionality some other way.
 
-Slang provides some cross platform features on HLSL based targets that are implemented via NVAPI. For example RWByteAddressBuffer atomics are supported on Vulkan, DX12 and CUDA. On DX12 they are made available via NVAPI, whilst CUDA and Vulkan have direct support. When compiling Slang code that uses RWByteAddressBuffer atomice Slang will emit HLSL code that use NVAPI. In order for the downstream compiler to be able to compile this HLSL it must be able to include the NVAPI header `nvHLSLExtns.h`. 
+Slang provides some cross platform features on HLSL based targets that are implemented via NVAPI. For example RWByteAddressBuffer atomics are supported on Vulkan, DX12 and CUDA. On DX12 they are made available via NVAPI, whilst CUDA and Vulkan have direct support. When compiling Slang code that uses RWByteAddressBuffer atomics Slang will emit HLSL code that use NVAPI. In order for the downstream compiler to be able to compile this HLSL it must be able to include the NVAPI header `nvHLSLExtns.h`. 
 
 It worth discussing briefly how this mechanism works. Slang has a 'prelude' mechanism for different source targets. The prelude is a piece of text that is inserted before the source that is output from compiling the input Slang source code. There is a default prelude for HLSL that is something like 
 
