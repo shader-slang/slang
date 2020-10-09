@@ -13,6 +13,7 @@ namespace renderer_test {
 class CUDAResource : public RefObject
 {
 public:
+    virtual uint64_t getBindlessHandle() = 0;
 };
 
 struct CUDAComputeUtil
@@ -44,6 +45,8 @@ struct CUDAComputeUtil
         CPULikeBindRoot m_bindRoot;
             /// Buffers are held in same order as entries in layout (useful for dumping out bindings)
         List<BindSet::Value*> m_buffers;
+        Slang::OrderedDictionary<Slang::String, RefPtr<CUDAResource>> m_bindlessResources;
+        void releaseBindlessResources();
     };
 
     static SlangResult parseFeature(const Slang::UnownedStringSlice& feature, bool& outResult);

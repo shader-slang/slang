@@ -333,7 +333,7 @@ String CUDASourceEmitter::generateEntryPointNameImpl(IREntryPointDecoration* ent
 
 void CUDASourceEmitter::emitGlobalRTTISymbolPrefix()
 {
-    m_writer->emit("__device__ ");
+    m_writer->emit("__constant__ ");
 }
 
 void CUDASourceEmitter::emitCall(const HLSLIntrinsic* specOp, IRInst* inst, const IRUse* operands, int numOperands, const EmitOpInfo& inOuterPrec)
