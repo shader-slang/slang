@@ -193,45 +193,20 @@ void RWByteAddressBuffer::InterlockedAddI64(uint byteAddress, int64_t valueToAdd
 
 void RWByteAddressBuffer::InterlockedCompareExchangeU64(uint byteAddress, uint64_t compareValue, uint64_t value, out uint64_t outOriginalValue);
 
+uint64_t RWByteAddressBuffer::InterlockedExchangeU64(uint byteAddress, uint64_t value);
+
 uint64_t RWByteAddressBuffer::InterlockedMaxU64(uint byteAddress, uint64_t value);
 uint64_t RWByteAddressBuffer::InterlockedMinU64(uint byteAddress, uint64_t value);
 
 uint64_t RWByteAddressBuffer::InterlockedAndU64(uint byteAddress, uint64_t value);
 uint64_t RWByteAddressBuffer::InterlockedOrU64(uint byteAddress, uint64_t value);
 uint64_t RWByteAddressBuffer::InterlockedXorU64(uint byteAddress, uint64_t value);
-```
 
-On HLSL based targets this functionality is achieved using [NVAPI](https://developer.nvidia.com/nvapi). For this to work it is necessary to have NVAPI available on your system. The 'prelude' functionality in the Slang API allows for text to be inserted before any Slang code generated code is output. If the input source uses an NVAPI feature - like the methods above - it will output code that *assumes* that `nvHLSLExtns.h` is included.  The following code from `render-test-main.cpp` sets up a suitable prelude for HLSL that includes `nvHLSLExtns.h` with an absolute path.
 
 ```
-String rootPath;
-SLANG_RETURN_ON_FAIL(TestToolUtil::getRootPath(exePath, rootPath));
 
-String includePath;
-SLANG_RETURN_ON_FAIL(TestToolUtil::getIncludePath(rootPath, "external/nvapi/nvHLSLExtns.h", includePath));
-
-StringBuilder buf;
-// We have to choose a slot that NVAPI will use. 
-buf << "#define NV_SHADER_EXTN_SLOT " << options.nvapiRegister << "\n";
-
-// Include the NVAPI header
-buf << "#include \"" << includePath << "\"\n\n";
-
-session->setLanguagePrelude(SLANG_SOURCE_LANGUAGE_HLSL, buf.getBuffer());
-```        
-
-This sets the HLSL prelude to something like...
-
-```
-#define NV_SHADER_EXTN_SLOT u0
-#include "d:/path/to/nvapi/nvHLSLExtns.h"
-```
-
-Note the use of the *absolute* path to the file `nvHLSLExtns.h`. Doing so means the other includes that `nvHLSLExtns.h` includes look in the correct place without having to set up special include paths. As is required by using NVAPI, before the include it is necessary to specify what UAV will be used. 
-
-To use NVAPI it is nessary to specify a unordered access views (UAV) based 'u' register that will be used to communicate with NVAPI. 
-
-Note! Slang does not do any special handling around this, it will be necessary for application code to ensure the UAV is either guarenteed to not collide with what Slang assigns, or it's specified (but not used) in the Slang source. The u register number has to be specified also to the NVAPI runtime library. 
+On HLSL based targets this functionality is achieved using [NVAPI](https://developer.nvidia.com/nvapi). Support for NVAPI is described
+in the separate [NVAPI Support](nvapi-support.md) document.  
 
 On Vulkan, for float the [`GL_EXT_shader_atomic_float`](https://www.khronos.org/registry/vulkan/specs/1.2-extensions/man/html/VK_EXT_shader_atomic_float.html) extension is required. For int64 the [`GL_EXT_shader_atomic_int64`](https://raw.githubusercontent.com/KhronosGroup/GLSL/master/extensions/ext/GL_EXT_shader_atomic_int64.txt) extension is required.
 

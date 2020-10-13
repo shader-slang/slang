@@ -222,13 +222,39 @@ struct FloatRWTexture : public CPUComputeUtil::Resource, public CPPPrelude::IRWT
 static int _calcDims(const InputTextureDesc& desc, slang::TypeLayoutReflection* typeLayout, CPPPrelude::TextureDimensions& outDims)
 {
     outDims.reset();
-
-    const auto kind = typeLayout->getKind();
-    SLANG_ASSERT(kind == slang::TypeReflection::Kind::Resource);
-
-    auto type = typeLayout->getType();
-    auto shape = type->getResourceShape();
-
+    SlangResourceShape shape = SLANG_TEXTURE_2D;
+    if (typeLayout)
+    {
+        const auto kind = typeLayout->getKind();
+        SLANG_ASSERT(kind == slang::TypeReflection::Kind::Resource);
+        auto type = typeLayout->getType();
+        shape = type->getResourceShape();
+    }
+    else
+    {
+        if (desc.isCube)
+        {
+            shape = SLANG_TEXTURE_CUBE;
+        }
+        else
+        {
+            switch (desc.dimension)
+            {
+            case 1:
+                shape = SLANG_TEXTURE_1D;
+                break;
+            case 2:
+                shape = SLANG_TEXTURE_2D;
+                break;
+            case 3:
+                shape = SLANG_TEXTURE_3D;
+                break;
+            default:
+                break;
+            }
+        }
+    }
+    
     outDims.shape = shape;
 
     const uint32_t size = uint32_t(desc.size);
@@ -293,25 +319,55 @@ static CPUComputeUtil::Resource* _newReadTexture(int elemCount, const CPPPrelude
 
 static SlangResult _newTexture(const InputTextureDesc& desc, slang::TypeLayoutReflection* typeLayout, RefPtr<CPUComputeUtil::Resource>& outResource)
 {
-    const auto kind = typeLayout->getKind();
-    SLANG_ASSERT(kind == slang::TypeReflection::Kind::Resource);
+    SlangResourceAccess access = SLANG_RESOURCE_ACCESS_READ;
+    SlangResourceShape shape = SLANG_TEXTURE_2D;
+    int elemCount = 1;
+    if (typeLayout)
+    {
+        const auto kind = typeLayout->getKind();
+        SLANG_ASSERT(kind == slang::TypeReflection::Kind::Resource);
 
-    auto type = typeLayout->getType();
-    auto shape = type->getResourceShape();
+        auto type = typeLayout->getType();
+        shape = type->getResourceShape();
 
-    auto access = type->getResourceAccess();
+        access = type->getResourceAccess();
+        slang::TypeReflection* typeReflection = typeLayout->getResourceResultType();
+        if (typeReflection->getKind() == slang::TypeReflection::Kind::Vector)
+        {
+            elemCount = int(typeReflection->getElementCount());
+        }
+    }
+    else
+    {
+        if (desc.isCube)
+        {
+            shape = SLANG_TEXTURE_CUBE;
+        }
+        else
+        {
+            switch (desc.dimension)
+            {
+            case 1:
+                shape = SLANG_TEXTURE_1D;
+                break;
+            case 2:
+                shape = SLANG_TEXTURE_2D;
+                break;
+            case 3:
+                shape = SLANG_TEXTURE_3D;
+                break;
+            default:
+                break;
+            }
+        }
+        if (desc.isRWTexture)
+            access = SLANG_RESOURCE_ACCESS_READ_WRITE;
+        elemCount = 4;
+    }
 
     // TODO(JS): Currently we support only textures who's content is either
     // 0 or 1. This is because this is easy to implement.
     // Will need to do something better in the future..
-
-    slang::TypeReflection* typeReflection = typeLayout->getResourceResultType();
-
-    int elemCount = 1;
-    if (typeReflection->getKind() == slang::TypeReflection::Kind::Vector)
-    {
-        elemCount = int(typeReflection->getElementCount());
-    }
 
     float initialValue = 0.0f;
 
@@ -359,8 +415,9 @@ static SlangResult _newTexture(const InputTextureDesc& desc, slang::TypeLayoutRe
     return false;
 }
 
-SlangResult CPUComputeUtil::populateRTTIEntries(
+SlangResult CPUComputeUtil::fillRuntimeHandleInBuffers(
     ShaderCompilerUtil::OutputAndLayout& compilationAndLayout,
+    Context& context,
     ISlangSharedLibrary* sharedLib)
 {
     Slang::ComPtr<slang::ISession> linkage;
@@ -412,6 +469,32 @@ SlangResult CPUComputeUtil::populateRTTIEntries(
                     ((char*)entry.bufferData.getBuffer()) + rtti.offset,
                     &ptrValue,
                     sizeof(ptrValue));
+            }
+            else
+            {
+                return SLANG_FAIL;
+            }
+        }
+        for (auto& handle : entry.bindlessHandleEntry)
+        {
+            RefPtr<Resource> resource;
+            uint64_t handleValue = 0;
+            if (context.m_bindlessResources.TryGetValue(handle.name, resource))
+            {
+                handleValue = (uint64_t)resource->getInterface();
+            }
+            else
+            {
+                return SLANG_FAIL;
+            }
+            if (handle.offset >= 0 &&
+                handle.offset + sizeof(uint64_t) <=
+                    entry.bufferData.getCount() * sizeof(decltype(entry.bufferData[0])))
+            {
+                memcpy(
+                    ((char*)entry.bufferData.getBuffer()) + handle.offset,
+                    &handleValue,
+                    sizeof(handleValue));
             }
             else
             {
@@ -812,6 +895,31 @@ SlangResult CPUComputeUtil::populateRTTIEntries(
         }
     }
 
+    return SLANG_OK;
+}
+
+SlangResult renderer_test::CPUComputeUtil::createBindlessResources(
+    ShaderCompilerUtil::OutputAndLayout& outputAndLayout, Context& context)
+{
+    auto outStream = StdWriters::getOut();
+    for (auto& entry : outputAndLayout.layout.entries)
+    {
+        if (!entry.isBindlessObject)
+            continue;
+        switch (entry.type)
+        {
+        case ShaderInputType::Texture:
+            {
+                RefPtr<Resource> resource;
+                _newTexture(entry.textureDesc, nullptr, resource);
+                context.m_bindlessResources.Add(entry.name, resource);
+                break;
+            }
+        default:
+            outStream.print("Unsupported bindless resource type.\n");
+            return SLANG_FAIL;
+        }
+    }
     return SLANG_OK;
 }
 

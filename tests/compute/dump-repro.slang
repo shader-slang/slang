@@ -1,31 +1,16 @@
-//TEST(compute):SIMPLE:-target hlsl -dump-repro repro.slang-repro
+//DISABLE_TEST(compute):SIMPLE:-profile cs_5_0 -entry computeMain -target dxbc -dump-repro repro.slang-repro
+//TEST:COMPILE:tests/compute/dump-repro.slang -profile cs_5_0 -entry computeMain -target dxbc -dump-repro repro.slang-repro
+//TEST(compute):COMPARE_COMPUTE_EX:-dx11 -compute -no-default-entry-point -compile-arg -load-repro -compile-arg repro.slang-repro
+// We only want to run on one API to test load worked
+//DISABLE_TEST(compute):COMPARE_COMPUTE:-dx12 -load-repro repro.slang-repro
 
 //TEST_INPUT:ubuffer(data=[0 0 0 0 0 0 0 0], stride=4):out,name outputBuffer
 RWStructuredBuffer<int> outputBuffer;
-
-//TEST_INPUT:array(size=2):name g_aoa
-RWStructuredBuffer<int> g_aoa[];
-
-//TEST_INPUT:ubuffer(data=[1 2 3 4], stride=4):name=g_aoa[0]
-//TEST_INPUT:ubuffer(data=[8 17 34], stride=4):name=g_aoa[1]
 
 [numthreads(8, 1, 1)]
 void computeMain(uint3 dispatchThreadID : SV_DispatchThreadID)
 {
     int index = int(dispatchThreadID.x);
     
-    int baseIndex = index >> 2;
-    int innerIndex = index & 3;
-
-    RWStructuredBuffer<int> buffer = g_aoa[baseIndex];
-
-    // Get the size 
-    uint bufferCount, bufferStride;
-    buffer.GetDimensions(bufferCount, bufferStride);
-
-    if (innerIndex >= bufferCount)
-    {
-        innerIndex = bufferCount - 1;
-    }
-	outputBuffer[index] = buffer[innerIndex]; 
+	outputBuffer[index] = index * 2 + 1;
 }

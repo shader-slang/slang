@@ -12,6 +12,11 @@ namespace Slang {
 /* Conversion for serialization for some more misc Slang types
 */
 
+
+// Because is sized, we don't need to convert
+template <>
+struct SerialTypeInfo<FeedbackType::Kind> : public SerialIdentityTypeInfo<FeedbackType::Kind> {};
+
 // SamplerStateFlavor
 
 template <>

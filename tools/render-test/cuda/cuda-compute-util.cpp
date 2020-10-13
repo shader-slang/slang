@@ -178,6 +178,11 @@ public:
         return resource ? resource->m_cudaMemory : CUdeviceptr();
     }
 
+    virtual uint64_t getBindlessHandle() override
+    {
+        return (uint64_t)m_cudaMemory;
+    }
+
     CUdeviceptr m_cudaMemory = CUdeviceptr();
 };
 
@@ -222,6 +227,11 @@ public:
     {
         auto resource = asResource(value);
         return resource ? resource->m_cudaSurfObj : CUsurfObject(0);
+    }
+
+    virtual uint64_t getBindlessHandle() override
+    {
+        return (uint64_t)m_cudaTexObj;
     }
 
     // The texObject is for reading 'texture' like things. This is an opaque type, that's backed by a long long
@@ -537,22 +547,48 @@ static bool _hasWriteAccess(SlangResourceAccess access)
 
 /* static */SlangResult CUDAComputeUtil::createTextureResource(const ShaderInputLayoutEntry& srcEntry, slang::TypeLayoutReflection* typeLayout, RefPtr<CUDAResource>& outResource)
 {
-    auto type = typeLayout->getType();
-    auto shape = type->getResourceShape();
-
-    auto access = type->getResourceAccess();
-
-    if (!(access == SLANG_RESOURCE_ACCESS_READ ||
-        access == SLANG_RESOURCE_ACCESS_READ_WRITE))
+    SlangResourceAccess access = SLANG_RESOURCE_ACCESS_READ;
+    SlangResourceShape baseShape = SLANG_TEXTURE_2D;
+    if (typeLayout)
     {
-        SLANG_ASSERT(!"Only read or read write currently supported");
-        return SLANG_FAIL;
+        auto type = typeLayout->getType();
+        auto shape = type->getResourceShape();
+        access = type->getResourceAccess();
+
+        if (!(access == SLANG_RESOURCE_ACCESS_READ || access == SLANG_RESOURCE_ACCESS_READ_WRITE))
+        {
+            SLANG_ASSERT(!"Only read or read write currently supported");
+            return SLANG_FAIL;
+        }
+        baseShape = shape & SLANG_RESOURCE_BASE_SHAPE_MASK;
     }
-
+    else
+    {
+        if (srcEntry.textureDesc.isCube)
+        {
+            baseShape = SLANG_TEXTURE_CUBE;
+        }
+        else
+        {
+            switch (srcEntry.textureDesc.dimension)
+            {
+            case 1:
+                baseShape = SLANG_TEXTURE_1D;
+                break;
+            case 2:
+                baseShape = SLANG_TEXTURE_2D;
+                break;
+            case 3:
+                baseShape = SLANG_TEXTURE_3D;
+                break;
+            default:
+                break;
+            }
+        }
+        if (srcEntry.textureDesc.isRWTexture)
+            access = SLANG_RESOURCE_ACCESS_READ_WRITE;
+    }
     CUresourcetype resourceType = CU_RESOURCE_TYPE_ARRAY;
-    auto baseShape = shape & SLANG_RESOURCE_BASE_SHAPE_MASK;
-
-    slang::TypeReflection* typeReflection = typeLayout->getResourceResultType();
 
     InputTextureDesc textureDesc = srcEntry.textureDesc;
 
@@ -1360,9 +1396,10 @@ static SlangResult _loadAndInvokeRayTracingProgram(
 }
 #endif
 
-    // Fill in RTTI pointers values in input buffers.
-static SlangResult _populateRTTIEntries(
+    // Fill in runtime handles (e.g. RTTI pointers values and bindless resource handles) in input buffers.
+static SlangResult _fillRuntimeHandlesInBuffers(
     const ShaderCompilerUtil::OutputAndLayout& compilationAndLayout,
+    CUDAComputeUtil::Context& context,
     ScopeCUDAModule& cudaModule)
 {
     Slang::ComPtr<slang::ISession> linkage;
@@ -1432,6 +1469,59 @@ static SlangResult _populateRTTIEntries(
                 return SLANG_FAIL;
             }
         }
+
+        for (auto& handle : entry.bindlessHandleEntry)
+        {
+            RefPtr<CUDAResource> resource;
+            uint64_t handleValue = 0;
+            if (context.m_bindlessResources.TryGetValue(handle.name, resource))
+            {
+                handleValue = resource->getBindlessHandle();
+            }
+            else
+            {
+                return SLANG_FAIL;
+            }
+            if (handle.offset >= 0 &&
+                handle.offset + sizeof(uint64_t) <=
+                    entry.bufferData.getCount() * sizeof(decltype(entry.bufferData[0])))
+            {
+                memcpy(
+                    ((char*)entry.bufferData.getBuffer()) + handle.offset,
+                    &handleValue,
+                    sizeof(handleValue));
+            }
+            else
+            {
+                return SLANG_FAIL;
+            }
+        }
+    }
+    return SLANG_OK;
+}
+
+static SlangResult _createBindlessResources(
+    const ShaderCompilerUtil::OutputAndLayout& outputAndLayout,
+    CUDAComputeUtil::Context& outContext)
+{
+    auto outStream = StdWriters::getOut();
+    for (auto& entry : outputAndLayout.layout.entries)
+    {
+        if (!entry.isBindlessObject)
+            continue;
+        switch (entry.type)
+        {
+        case ShaderInputType::Texture:
+        {
+            RefPtr<CUDAResource> resource;
+            CUDAComputeUtil::createTextureResource(entry, nullptr, resource);
+            outContext.m_bindlessResources.Add(entry.name, resource);
+            break;
+        }
+        default:
+            outStream.print("Unsupported bindless resource type.\n");
+            return SLANG_FAIL;
+        }
     }
     return SLANG_OK;
 }
@@ -1460,13 +1550,17 @@ static SlangResult _setUpArguments(
 
     auto outStream = StdWriters::getOut();
 
-    // Fill in RTTI pointers in input buffers before copying it to GPU memory.
+    _createBindlessResources(outputAndLayout, outContext);
+
+    // Fill in RTTI pointers and bindless handles in input buffers before copying
+    // it to GPU memory.
     // TODO: enable this for Optix path after it is refactored so that context
     // creation and module loading happens before _setUpArguments.
     if (outputAndLayout.output.desc.pipelineType == PipelineType::Compute)
     {
-        SLANG_RETURN_ON_FAIL(_populateRTTIEntries(outputAndLayout, cudaModule));
+        SLANG_RETURN_ON_FAIL(_fillRuntimeHandlesInBuffers(outputAndLayout, outContext, cudaModule));
     }
+
     SLANG_RETURN_ON_FAIL(ShaderInputLayout::addBindSetValues(outputAndLayout.layout.entries, outputAndLayout.sourcePath, outStream, bindRoot));
 
     ShaderInputLayout::getValueBuffers(outputAndLayout.layout.entries, bindSet, outContext.m_buffers);
@@ -1772,9 +1866,15 @@ SlangResult _loadAndInvokeKernel(
 
     // Release all othe CUDA resource/allocations
     bindSet.releaseValueTargets();
+    outContext.releaseBindlessResources();
 
     return SLANG_OK;
 }
 
 
-} // renderer_test
+void CUDAComputeUtil::Context::releaseBindlessResources()
+{
+    m_bindlessResources = decltype(m_bindlessResources)();
+}
+
+} // namespace renderer_test

@@ -984,7 +984,7 @@ void CPPSourceEmitter::_emitGetAtDefinition(const UnownedStringSlice& funcName, 
         {
             int vecSize = int(getIntVal(vectorType->getElementCount()));
 
-            writer->emit("assert(b >= 0 && b < ");
+            writer->emit("SLANG_PRELUDE_ASSERT(b >= 0 && b < ");
             writer->emit(vecSize);
             writer->emit(");\n");
             if (lValue)
@@ -997,7 +997,7 @@ void CPPSourceEmitter::_emitGetAtDefinition(const UnownedStringSlice& funcName, 
             //int colCount = int(getIntVal(matrixType->getColumnCount()));
             int rowCount = int(getIntVal(matrixType->getRowCount()));
 
-            writer->emit("assert(b >= 0 && b < ");
+            writer->emit("SLANG_PRELUDE_ASSERT(b >= 0 && b < ");
             writer->emit(rowCount);
             writer->emit(");\n");
 
@@ -2238,9 +2238,9 @@ bool CPPSourceEmitter::tryEmitInstExprImpl(IRInst* inst, const EmitOpInfo& inOut
         }
         case kIROp_BitCast:
         {
-            m_writer->emit("((");
+            m_writer->emit("(slang_bit_cast<");
             emitType(inst->getDataType());
-            m_writer->emit(")(");
+            m_writer->emit(">(");
             emitOperand(inst->getOperand(0), getInfo(EmitOp::General));
             m_writer->emit("))");
             return true;

@@ -9,11 +9,12 @@
 
 #include "../core/slang-semantic-version.h"
 
-#include "slang-ast-generated.h"
-
-#include "slang-ast-reflect.h"
+#include "slang-ast-generated.h" 
 
 #include "slang-serialize-reflection.h"
+
+#include "slang-ast-reflect.h"
+#include "slang-ref-object-reflect.h"
 
 #include "slang-name.h"
 
@@ -444,6 +445,8 @@ namespace Slang
 
     struct QualType
     {
+        SLANG_VALUE_CLASS(QualType) 
+
         Type*	type = nullptr;
         bool	        isLeftValue;
 
@@ -1003,9 +1006,98 @@ namespace Slang
         IgnoreBaseInterfaces = 1 << 0,
     };
 
+    class SerialRefObject;
+    // Make sure C++ extractor can see the base class.
+    SLANG_PRE_DECLARE(_OBJ_CLASS, class SerialRefObject)
+
+    class LookupResultItem_Breadcrumb : public SerialRefObject
+    {
+    public:
+        SLANG_OBJ_CLASS(LookupResultItem_Breadcrumb)
+
+        enum class Kind : uint8_t
+        {
+            // The lookup process looked "through" an in-scope
+            // declaration to the fields inside of it, so that
+            // even if lookup started with a simple name `f`,
+            // it needs to result in a member expression `obj.f`.
+            Member,
+
+            // The lookup process took a pointer(-like) value, and then
+            // proceeded to derefence it and look at the thing(s)
+            // it points to instead, so that the final expression
+            // needs to have `(*obj)`
+            Deref,
+
+            // The lookup process saw a value `obj` of type `T` and
+            // took into account an in-scope constraint that says
+            // `T` is a subtype of some other type `U`, so that
+            // lookup was able to find a member through type `U`
+            // instead.
+            SuperType,
+
+            // The lookup process considered a member of an
+            // enclosing type as being in scope, so that any
+            // reference to that member needs to use a `this`
+            // expression as appropriate.
+            This,
+        };
+
+        // The kind of lookup step that was performed
+        Kind kind;
+
+        // For the `Kind::This` case, what does the implicit
+        // `this` or `This` parameter refer to?
+        //
+        enum class ThisParameterMode : uint8_t
+        {
+            ImmutableValue, // An immutable `this` value
+            MutableValue,   // A mutable `this` value
+            Type,           // A `This` type
+
+            Default = ImmutableValue,
+        };
+        ThisParameterMode thisParameterMode = ThisParameterMode::Default;
+
+        // As needed, a reference to the declaration that faciliated
+        // the lookup step.
+        //
+        // For a `Member` lookup step, this is the declaration whose
+        // members were implicitly pulled into scope.
+        //
+        // For a `Constraint` lookup step, this is the `ConstraintDecl`
+        // that serves to witness the subtype relationship.
+        //
+        DeclRef<Decl> declRef;
+
+        Val* val = nullptr;
+
+        // The next implicit step that the lookup process took to
+        // arrive at a final value.
+        RefPtr<LookupResultItem_Breadcrumb> next;
+
+        LookupResultItem_Breadcrumb(
+            Kind                kind,
+            DeclRef<Decl>       declRef,
+            Val*                val,
+            RefPtr<LookupResultItem_Breadcrumb>  next,
+            ThisParameterMode   thisParameterMode = ThisParameterMode::Default)
+            : kind(kind)
+            , thisParameterMode(thisParameterMode)
+            , declRef(declRef)
+            , val(val)
+            , next(next)
+        {}
+    protected:
+        // Needed for serialization
+        LookupResultItem_Breadcrumb() = default;
+    };
+
     // Represents one item found during lookup
     struct LookupResultItem
     {
+        typedef LookupResultItem_Breadcrumb Breadcrumb;
+
         // Sometimes lookup finds an item, but there were additional
         // "hops" taken to reach it. We need to remember these steps
         // so that if/when we consturct a full expression we generate
@@ -1058,83 +1150,7 @@ namespace Slang
         // the unique result (perhaps by overload resolution), then
         // we can walk the list of breadcrumbs to create a full
         // expression.
-        class Breadcrumb : public RefObject
-        {
-        public:
-            enum class Kind : uint8_t
-            {
-                // The lookup process looked "through" an in-scope
-                // declaration to the fields inside of it, so that
-                // even if lookup started with a simple name `f`,
-                // it needs to result in a member expression `obj.f`.
-                Member,
-
-                // The lookup process took a pointer(-like) value, and then
-                // proceeded to derefence it and look at the thing(s)
-                // it points to instead, so that the final expression
-                // needs to have `(*obj)`
-                Deref,
-
-                // The lookup process saw a value `obj` of type `T` and
-                // took into account an in-scope constraint that says
-                // `T` is a subtype of some other type `U`, so that
-                // lookup was able to find a member through type `U`
-                // instead.
-                SuperType,
-
-                // The lookup process considered a member of an
-                // enclosing type as being in scope, so that any
-                // reference to that member needs to use a `this`
-                // expression as appropriate.
-                This,
-            };
-
-            // The kind of lookup step that was performed
-            Kind kind;
-
-            // For the `Kind::This` case, what does the implicit
-            // `this` or `This` parameter refer to?
-            //
-            enum class ThisParameterMode : uint8_t
-            {
-                ImmutableValue, // An immutable `this` value
-                MutableValue,   // A mutable `this` value
-                Type,           // A `This` type
-
-                Default = ImmutableValue,
-            };
-            ThisParameterMode thisParameterMode = ThisParameterMode::Default;
-
-            // As needed, a reference to the declaration that faciliated
-            // the lookup step.
-            //
-            // For a `Member` lookup step, this is the declaration whose
-            // members were implicitly pulled into scope.
-            //
-            // For a `Constraint` lookup step, this is the `ConstraintDecl`
-            // that serves to witness the subtype relationship.
-            //
-            DeclRef<Decl> declRef;
-
-            Val* val = nullptr;
-
-            // The next implicit step that the lookup process took to
-            // arrive at a final value.
-            RefPtr<Breadcrumb> next;
-
-            Breadcrumb(
-                Kind                kind,
-                DeclRef<Decl>       declRef,
-                Val*                val,
-                RefPtr<Breadcrumb>  next,
-                ThisParameterMode   thisParameterMode = ThisParameterMode::Default)
-                : kind(kind)
-                , thisParameterMode(thisParameterMode)
-                , declRef(declRef)
-                , val(val)
-                , next(next)
-            {}
-        };
+        
 
         // A properly-specialized reference to the declaration that was found.
         DeclRef<Decl> declRef;

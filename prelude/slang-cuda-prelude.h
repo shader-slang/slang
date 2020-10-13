@@ -339,26 +339,46 @@ SLANG_CUDA_CALL uint32_t U64_countbits(uint64_t v)
 // Missing  Load(_In_  int  Location, _Out_ uint Status);
 
 template <typename T>
-struct RWStructuredBuffer
+struct StructuredBuffer
 {
-    SLANG_CUDA_CALL T& operator[](size_t index) const { SLANG_CUDA_BOUND_CHECK(index, count); return data[index]; }
-    SLANG_CUDA_CALL const T& Load(size_t index) const { SLANG_CUDA_BOUND_CHECK(index, count); return data[index]; }  
+    SLANG_CUDA_CALL const T& operator[](size_t index) const
+    {
+#ifndef SLANG_CUDA_STRUCTURED_BUFFER_NO_COUNT
+        SLANG_CUDA_BOUND_CHECK(index, count);
+#endif
+        return data[index];
+    }
+
+    SLANG_CUDA_CALL const T& Load(size_t index) const
+    {
+#ifndef SLANG_CUDA_STRUCTURED_BUFFER_NO_COUNT
+        SLANG_CUDA_BOUND_CHECK(index, count);
+#endif
+        return data[index];
+    }
+
+#ifndef SLANG_CUDA_STRUCTURED_BUFFER_NO_COUNT
     SLANG_CUDA_CALL void GetDimensions(uint32_t* outNumStructs, uint32_t* outStride) { *outNumStructs = uint32_t(count); *outStride = uint32_t(sizeof(T)); }
-  
+#endif
+
     T* data;
+#ifndef SLANG_CUDA_STRUCTURED_BUFFER_NO_COUNT
     size_t count;
+#endif
 };
 
 template <typename T>
-struct StructuredBuffer
+struct RWStructuredBuffer : StructuredBuffer<T>
 {
-    SLANG_CUDA_CALL const T& operator[](size_t index) const { SLANG_CUDA_BOUND_CHECK(index, count); return data[index]; }
-    SLANG_CUDA_CALL const T& Load(size_t index) const { SLANG_CUDA_BOUND_CHECK(index, count); return data[index]; }
-    SLANG_CUDA_CALL void GetDimensions(uint32_t* outNumStructs, uint32_t* outStride) { *outNumStructs = uint32_t(count); *outStride = uint32_t(sizeof(T)); }
-    
-    T* data;
-    size_t count;
+    SLANG_CUDA_CALL T& operator[](size_t index) const
+    {
+#ifndef SLANG_CUDA_STRUCTURED_BUFFER_NO_COUNT
+        SLANG_CUDA_BOUND_CHECK(index, this->count);
+#endif
+        return this->data[index];
+    }
 };
+
 
     
 // Missing  Load(_In_  int  Location, _Out_ uint Status);
@@ -1205,7 +1225,7 @@ __inline__ __device__ uint4 _waveMatchMultiple(WarpMask mask, const T& inVal)
 
 __device__ uint getAt(dim3 a,  int b)
 {
-    assert(b >= 0 && b < 3);
+    SLANG_PRELUDE_ASSERT(b >= 0 && b < 3);
     return (&a.x)[b];
 }
 __device__ uint3 operator*(uint3 a, dim3 b)
@@ -1215,6 +1235,12 @@ __device__ uint3 operator*(uint3 a, dim3 b)
     r.y = a.y * b.y;
     r.z = a.z * b.z;
     return r;
+}
+
+template<typename TResult, typename TInput>
+__inline__ __device__ TResult slang_bit_cast(TInput val)
+{
+    return *(TResult*)(&val);
 }
 
 /* !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! */

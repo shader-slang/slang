@@ -2230,6 +2230,11 @@ namespace Slang
         return (IRBasicType*)getType(kIROp_UIntType);
     }
 
+    IRBasicType* IRBuilder::getUInt64Type()
+    {
+        return (IRBasicType*)getType(kIROp_UInt64Type);
+    }
+
     IRStringType* IRBuilder::getStringType()
     {
         return (IRStringType*)getType(kIROp_StringType);
@@ -2336,10 +2341,14 @@ namespace Slang
             operands);
     }
 
-    IRExistentialBoxType* IRBuilder::getExistentialBoxType(IRType* concreteType, IRType* interfaceType)
+    IRType* IRBuilder::getExistentialBoxType(IRType* concreteType, IRType* interfaceType)
     {
+        // Don't wrap an existential box if concreteType is __Dynamic.
+        if (as<IRDynamicType>(concreteType))
+            return interfaceType;
+
         IRInst* operands[] = {concreteType, interfaceType};
-        return (IRExistentialBoxType*)getType(kIROp_ExistentialBoxType, 2, operands);
+        return getType(kIROp_ExistentialBoxType, 2, operands);
     }
 
     IRArrayTypeBase* IRBuilder::getArrayTypeBase(
@@ -2746,6 +2755,12 @@ namespace Slang
         return inst;
     }
 
+    IRInst* IRBuilder::emitMakeUInt64(IRInst* low, IRInst* high)
+    {
+        IRInst* args[2] = {low, high};
+        return emitIntrinsicInst(getUInt64Type(), kIROp_makeUInt64, 2, args);
+    }
+
     IRInst* IRBuilder::emitMakeRTTIObject(IRInst* typeInst)
     {
         auto inst = createInst<IRRTTIObject>(
@@ -2845,6 +2860,8 @@ namespace Slang
                 // We want to emit `makeExistential(load(value), witnessTable)`.
                 //
                 auto deref = emitLoad(value);
+                if (slotArgs[0]->op == kIROp_DynamicType)
+                    return deref;
                 return emitMakeExistential(type, deref, slotArgs[1]);
             }
         }
@@ -3776,6 +3793,20 @@ namespace Slang
             type,
             left,
             right);
+        addInst(inst);
+        return inst;
+    }
+
+    IRInst* IRBuilder::emitShr(IRType* type, IRInst* left, IRInst* right)
+    {
+        auto inst = createInst<IRInst>(this, kIROp_Rsh, type, left, right);
+        addInst(inst);
+        return inst;
+    }
+
+    IRInst* IRBuilder::emitShl(IRType* type, IRInst* left, IRInst* right)
+    {
+        auto inst = createInst<IRInst>(this, kIROp_Lsh, type, left, right);
         addInst(inst);
         return inst;
     }
@@ -5294,6 +5325,7 @@ namespace Slang
         case kIROp_getAddr:
         case kIROp_GetValueFromExistentialBox:
         case kIROp_Construct:
+        case kIROp_makeUInt64:
         case kIROp_makeVector:
         case kIROp_MakeMatrix:
         case kIROp_makeArray:

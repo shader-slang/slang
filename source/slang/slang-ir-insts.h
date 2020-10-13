@@ -1779,6 +1779,7 @@ struct IRBuilder
     IRBasicType* getBoolType();
     IRBasicType* getIntType();
     IRBasicType* getUIntType();
+    IRBasicType* getUInt64Type();
     IRStringType* getStringType();
 
     IRAssociatedType* getAssociatedType(ArrayView<IRInterfaceType*> constraintTypes);
@@ -1807,7 +1808,7 @@ struct IRBuilder
     IRInOutType*  getInOutType(IRType* valueType);
     IRRefType*  getRefType(IRType* valueType);
     IRPtrTypeBase*  getPtrType(IROp op, IRType* valueType);
-    IRExistentialBoxType* getExistentialBoxType(IRType* concreteType, IRType* interfaceType);
+    IRType* getExistentialBoxType(IRType* concreteType, IRType* interfaceType);
 
     IRArrayTypeBase* getArrayTypeBase(
         IROp    op,
@@ -1941,6 +1942,8 @@ struct IRBuilder
         IRType*         type,
         UInt            argCount,
         IRInst* const* args);
+
+    IRInst* emitMakeUInt64(IRInst* low, IRInst* high);
 
     // Creates an RTTI object. Result is of `IRRTTIType`.
     IRInst* emitMakeRTTIObject(IRInst* typeInst);
@@ -2303,6 +2306,8 @@ struct IRBuilder
 
     IRInst* emitAdd(IRType* type, IRInst* left, IRInst* right);
     IRInst* emitMul(IRType* type, IRInst* left, IRInst* right);
+    IRInst* emitShr(IRType* type, IRInst* op0, IRInst* op1);
+    IRInst* emitShl(IRType* type, IRInst* op0, IRInst* op1);
 
     //
     // Decorations
