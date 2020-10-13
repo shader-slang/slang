@@ -1560,3 +1560,12 @@ SLANG_API int spComputeStringHash(const char* chars, size_t count)
 {
     return (int)getStableHashCode32(chars, count);
 }
+
+SLANG_API SlangReflectionTypeLayout* spReflection_getGlobalParamsTypeLayout(
+    SlangReflection* reflection)
+{
+    auto programLayout = convert(reflection);
+    if(!programLayout) return nullptr;
+
+    return convert(programLayout->parametersLayout->typeLayout);
+}
