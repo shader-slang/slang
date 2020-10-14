@@ -246,9 +246,25 @@ public:
     {
 		public:
 
-        ShaderProgramImpl(PipelineType pipelineType):
+        ShaderProgramImpl(const VulkanApi& api, PipelineType pipelineType):
+            m_api(&api),
             m_pipelineType(pipelineType)
-        {}
+        {
+            for (auto& shaderModule : m_modules) shaderModule = VK_NULL_HANDLE;
+        }
+
+        ~ShaderProgramImpl()
+        {
+            for (auto shaderModule : m_modules)
+            {
+                if (shaderModule != VK_NULL_HANDLE)
+                {
+                    m_api->vkDestroyShaderModule(m_api->m_device, shaderModule, nullptr);
+                }
+            }
+        }
+
+        const VulkanApi* m_api;
 
         PipelineType m_pipelineType;
 
@@ -257,6 +273,7 @@ public:
         VkPipelineShaderStageCreateInfo m_fragment;
 
 		List<char> m_buffers[2];								//< To keep storage of code in scope
+        VkShaderModule m_modules[2];
     };
 
     class DescriptorSetLayoutImpl : public DescriptorSetLayout
@@ -431,10 +448,13 @@ public:
     VkBool32 handleDebugMessage(VkDebugReportFlagsEXT flags, VkDebugReportObjectTypeEXT objType, uint64_t srcObject,
         size_t location, int32_t msgCode, const char* pLayerPrefix, const char* pMsg);
 
+        /// Note that the outShaderModule value should be cleaned up when no longer needed by caller
+        /// via vkShaderModuleDestroy()
     VkPipelineShaderStageCreateInfo compileEntryPoint(
         ShaderProgram::KernelDesc const&    kernelDesc,
         VkShaderStageFlagBits stage,
-        List<char>& bufferOut);
+        List<char>& outBuffer,
+        VkShaderModule& outShaderModule);
 
     static VKAPI_ATTR VkBool32 VKAPI_CALL debugMessageCallback(VkDebugReportFlagsEXT flags, VkDebugReportObjectTypeEXT objType, uint64_t srcObject,
         size_t location, int32_t msgCode, const char* pLayerPrefix, const char* pMsg, void* pUserData);
@@ -875,7 +895,8 @@ VkBool32 VKRenderer::handleDebugMessage(VkDebugReportFlagsEXT flags, VkDebugRepo
 VkPipelineShaderStageCreateInfo VKRenderer::compileEntryPoint(
     ShaderProgram::KernelDesc const&    kernelDesc,
     VkShaderStageFlagBits stage,
-    List<char>& bufferOut)
+    List<char>& outBuffer,
+    VkShaderModule& outShaderModule)
 {
     char const* dataBegin = (char const*) kernelDesc.codeBegin;
     char const* dataEnd = (char const*) kernelDesc.codeEnd;
@@ -884,9 +905,9 @@ VkPipelineShaderStageCreateInfo VKRenderer::compileEntryPoint(
     // will free the memory after a compile request is closed.
     size_t codeSize = dataEnd - dataBegin;
 
-	bufferOut.insertRange(0, dataBegin, codeSize);
+	outBuffer.insertRange(0, dataBegin, codeSize);
 
-    char* codeBegin = bufferOut.getBuffer();
+    char* codeBegin = outBuffer.getBuffer();
 
     VkShaderModuleCreateInfo moduleCreateInfo = { VK_STRUCTURE_TYPE_SHADER_MODULE_CREATE_INFO };
     moduleCreateInfo.pCode = (uint32_t*)codeBegin;
@@ -894,6 +915,7 @@ VkPipelineShaderStageCreateInfo VKRenderer::compileEntryPoint(
 
     VkShaderModule module;
     SLANG_VK_CHECK(m_api.vkCreateShaderModule(m_device, &moduleCreateInfo, nullptr, &module));
+    outShaderModule = module;
 
     VkPipelineShaderStageCreateInfo shaderStageCreateInfo = { VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO };
     shaderStageCreateInfo.stage = stage;
@@ -2819,19 +2841,19 @@ void VKRenderer::setDescriptorSet(PipelineType pipelineType, PipelineLayout* lay
 
 Result VKRenderer::createProgram(const ShaderProgram::Desc& desc, ShaderProgram** outProgram)
 {
-    RefPtr<ShaderProgramImpl> impl = new ShaderProgramImpl(desc.pipelineType);
+    RefPtr<ShaderProgramImpl> impl = new ShaderProgramImpl(m_api, desc.pipelineType);
     if( desc.pipelineType == PipelineType::Compute)
     {
         auto computeKernel = desc.findKernel(StageType::Compute);
-        impl->m_compute = compileEntryPoint(*computeKernel, VK_SHADER_STAGE_COMPUTE_BIT, impl->m_buffers[0]);
+        impl->m_compute = compileEntryPoint(*computeKernel, VK_SHADER_STAGE_COMPUTE_BIT, impl->m_buffers[0], impl->m_modules[0]);
     }
     else
     {
         auto vertexKernel = desc.findKernel(StageType::Vertex);
         auto fragmentKernel = desc.findKernel(StageType::Fragment);
 
-        impl->m_vertex = compileEntryPoint(*vertexKernel, VK_SHADER_STAGE_VERTEX_BIT, impl->m_buffers[0]);
-        impl->m_fragment = compileEntryPoint(*fragmentKernel, VK_SHADER_STAGE_FRAGMENT_BIT, impl->m_buffers[1]);
+        impl->m_vertex = compileEntryPoint(*vertexKernel, VK_SHADER_STAGE_VERTEX_BIT, impl->m_buffers[0], impl->m_modules[0]);
+        impl->m_fragment = compileEntryPoint(*fragmentKernel, VK_SHADER_STAGE_FRAGMENT_BIT, impl->m_buffers[1], impl->m_modules[1]);
     }
     *outProgram = impl.detach();
     return SLANG_OK;
