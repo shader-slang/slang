@@ -132,19 +132,19 @@ public:
 
     class BufferResourceImpl: public BufferResource
     {
-		public:
+        public:
         typedef BufferResource Parent;
 
         BufferResourceImpl(Resource::Usage initialUsage, const BufferResource::Desc& desc, VKRenderer* renderer):
             Parent(desc),
-			m_renderer(renderer),
+            m_renderer(renderer),
             m_initialUsage(initialUsage)
-		{
-			assert(renderer);
-		}
+        {
+            assert(renderer);
+        }
 
         Resource::Usage m_initialUsage;
-		VKRenderer* m_renderer;
+        VKRenderer* m_renderer;
         Buffer m_buffer;
         Buffer m_uploadBuffer;
         List<uint8_t> m_readBuffer;                         ///< Stores the contents when a map read is performed
@@ -244,7 +244,7 @@ public:
 
     class ShaderProgramImpl: public ShaderProgram
     {
-		public:
+        public:
 
         ShaderProgramImpl(const VulkanApi& api, PipelineType pipelineType):
             m_api(&api),
@@ -272,7 +272,7 @@ public:
         VkPipelineShaderStageCreateInfo m_vertex;
         VkPipelineShaderStageCreateInfo m_fragment;
 
-		List<char> m_buffers[2];								//< To keep storage of code in scope
+        List<char> m_buffers[2];                                //< To keep storage of code in scope
         VkShaderModule m_modules[2];
     };
 
@@ -905,7 +905,7 @@ VkPipelineShaderStageCreateInfo VKRenderer::compileEntryPoint(
     // will free the memory after a compile request is closed.
     size_t codeSize = dataEnd - dataBegin;
 
-	outBuffer.insertRange(0, dataBegin, codeSize);
+    outBuffer.insertRange(0, dataBegin, codeSize);
 
     char* codeBegin = outBuffer.getBuffer();
 
