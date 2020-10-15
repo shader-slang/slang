@@ -2191,6 +2191,9 @@ extern "C"
         /// Count should *NOT* include terminating zero.
     SLANG_API int spComputeStringHash(const char* chars, size_t count);
 
+    SLANG_API SlangReflectionTypeLayout* spReflection_getGlobalParamsTypeLayout(
+        SlangReflection* reflection);
+
 #ifdef __cplusplus
 }
 
@@ -2856,6 +2859,12 @@ namespace slang
         {
             return spReflection_getHashedString((SlangReflection*)this, index, outCount);
         }
+
+        TypeLayoutReflection* getGlobalParamsTypeLayout()
+        {
+            return (TypeLayoutReflection*) spReflection_getGlobalParamsTypeLayout((SlangReflection*) this);
+        }
+
     };
 
     typedef ISlangBlob IBlob;
