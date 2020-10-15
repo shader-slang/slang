@@ -7154,6 +7154,19 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
             auto funcDecl = as<FunctionDeclBase>(dd);
             SLANG_ASSERT(funcDecl);
             lowerFuncDecl(funcDecl);
+
+            // Note: Because we are iterating over multiple declarations,
+            // but only one will be registered as the value for `decl`
+            // in the global mapping by `ensureDecl()`, we have to take
+            // responsibility here for registering a lowered value
+            // for the remaining (non-primary) declarations.
+            //
+            // It doesn't really matter which one we register here, because
+            // they will all have the same mangled name in the IR, but we
+            // default to the `result` that is returned from this visitor,
+            // so that all the declarations share the same IR representative.
+            //
+            setGlobalValue(context->shared, funcDecl, result);
         }
         return result;
     }
