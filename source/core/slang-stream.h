@@ -165,7 +165,7 @@ private:
     void _init(const String& fileName, FileMode fileMode, FileAccess access, FileShare share);
 
     FILE* m_handle;
-    FileAccess m_fileAccess;
+    FileAccess m_fileAccess;            
     bool m_endReached = false;
 };
 

@@ -21,8 +21,15 @@ FileStream::FileStream(const String& fileName, FileMode fileMode, FileAccess acc
 
 void FileStream::_init(const String& fileName, FileMode fileMode, FileAccess access, FileShare share)
 {
-	const wchar_t * mode = L"rt";
-	const char* modeMBCS = "rt";
+    if (fileMode == FileAccess::None)
+    {
+        throw ArgumentException("FileAccess::None not valid to create a FileStream.");
+    }
+
+    // Default to no access, until stream is fully constructed
+    m_fileAccess = FileAccess::None;
+
+	const char* mode = "rt";
 	switch (fileMode)
 	{
 	case FileMode::Create:
@@ -30,35 +37,25 @@ void FileStream::_init(const String& fileName, FileMode fileMode, FileAccess acc
 			throw ArgumentException("Read-only access is incompatible with Create mode.");
 		else if (access == FileAccess::ReadWrite)
 		{
-			mode = L"w+b";
-			modeMBCS = "w+b";
-			this->m_fileAccess = FileAccess::ReadWrite;
+			mode = "w+b";
 		}
 		else
 		{
-			mode = L"wb";
-			modeMBCS = "wb";
-			this->m_fileAccess = FileAccess::Write;
+			mode = "wb";
 		}
 		break;
 	case FileMode::Open:
 		if (access == FileAccess::Read)
 		{
-			mode = L"rb";
-			modeMBCS = "rb";
-			this->m_fileAccess = FileAccess::Read;
+			mode = "rb";
 		}
 		else if (access == FileAccess::ReadWrite)
 		{
-			mode = L"r+b";
-			modeMBCS = "r+b";
-			this->m_fileAccess = FileAccess::ReadWrite;
+			mode = "r+b";
 		}
 		else
 		{
-			mode = L"wb";
-			modeMBCS = "wb";
-			this->m_fileAccess = FileAccess::Write;
+			mode = "wb";
 		}
 		break;
 	case FileMode::CreateNew:
@@ -70,13 +67,11 @@ void FileStream::_init(const String& fileName, FileMode fileMode, FileAccess acc
 			throw ArgumentException("Read-only access is incompatible with Create mode.");
 		else if (access == FileAccess::ReadWrite)
 		{
-			mode = L"w+b";
-			this->m_fileAccess = FileAccess::ReadWrite;
+			mode = "w+b";
 		}
 		else
 		{
-			mode = L"wb";
-			this->m_fileAccess = FileAccess::Write;
+			mode = "wb";
 		}
 		break;
 	case FileMode::Append:
@@ -84,19 +79,32 @@ void FileStream::_init(const String& fileName, FileMode fileMode, FileAccess acc
 			throw ArgumentException("Read-only access is incompatible with Append mode.");
 		else if (access == FileAccess::ReadWrite)
 		{
-			mode = L"a+b";
-			this->m_fileAccess = FileAccess::ReadWrite;
+			mode = "a+b";
 		}
 		else
 		{
-			mode = L"ab";
-			this->m_fileAccess = FileAccess::Write;
+			mode = "ab";
 		}
 		break;
 	default:
 		break;
 	}
 #ifdef _WIN32
+
+    // NOTE! This works because we know all the characters in the mode
+    // are encoded directly as the same value in a wchar_t.
+    // 
+    // Work out the length *including* terminating 0
+    const Index modeLength = Index(::strlen(mode)) + 1;
+    wchar_t wideMode[8];
+    SLANG_ASSERT(modeLength <= SLANG_COUNT_OF(wideMode));
+
+    // Copy to wchar_t 
+    for (Index i = 0; modeLength ; ++i)
+    {
+        wideMode[i] = wchar_t(mode[i]);
+    }
+   
     int shFlag = _SH_DENYRW;
     switch (share)
 	{
@@ -118,16 +126,19 @@ void FileStream::_init(const String& fileName, FileMode fileMode, FileAccess acc
 	}
     if (share == FileShare::None)
 #pragma warning(suppress:4996)
-        m_handle = _wfopen(fileName.toWString(), mode);
+        m_handle = _wfopen(fileName.toWString(), wideMode);
     else
-		m_handle = _wfsopen(fileName.toWString(), mode, shFlag);
+		m_handle = _wfsopen(fileName.toWString(), wideMode, shFlag);
 #else
-	m_handle = fopen(fileName.getBuffer(), modeMBCS);
+	m_handle = fopen(fileName.getBuffer(), mode);
 #endif
 	if (!m_handle)
 	{
 		throw IOException("Cannot open file '" + fileName + "'");
 	}
+
+    // Just set the access specified
+    m_fileAccess = access;
 }
 
 FileStream::~FileStream()
@@ -222,6 +233,9 @@ void FileStream::close()
 	{
 		fclose(m_handle);
 		m_handle = 0;
+
+        // If closed, can neither read or write
+        m_fileAccess = FileAccess::None;
 	}
 }
 
