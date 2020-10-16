@@ -783,14 +783,21 @@ namespace Slang
 
         // If `decl` is a container, then we want to ensure its children.
         if(auto containerDecl = as<ContainerDecl>(decl))
-        {
-            // As an exception, if any of the child is a `ScopeDecl`,
-            // then that indicates that it represents a scope for local
-            // declarations under a statement (e.g., in a function body),
-            // and we don't want to check such local declarations here.
-            //
-            for(auto childDecl : containerDecl->members)
+        {            
+            // NOTE! We purposefully do not iterate with the for(auto childDecl : containerDecl->members) style here,
+            // because the visitor may add a member whilst iteration takes place, invalidating the iterator.
+            // Accessing the members via index side steps the issue.
+            const auto& members = containerDecl->members;
+            for(Index i = 0; i < members.getCount(); ++i)
             {
+                Decl* childDecl = members[i];
+
+                // As an exception, if any of the child is a `ScopeDecl`,
+                // then that indicates that it represents a scope for local
+                // declarations under a statement (e.g., in a function body),
+                // and we don't want to check such local declarations here.
+                //
+
                 if(as<ScopeDecl>(childDecl))
                     continue;
 
