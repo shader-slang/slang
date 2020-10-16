@@ -1133,8 +1133,14 @@ namespace Slang
     {
         genericDecl->setCheckState(DeclCheckState::ReadyForLookup);
 
-        for (auto m : genericDecl->members)
+        // NOTE! We purposefully do not iterate with the for (auto m : genericDecl->members) style here,
+        // because the visitor may add a member whilst iteration takes place, invalidating the iterator.
+        // Accessing the members via index side steps the issue.
+        const auto& members = genericDecl->members;
+        for (Index i = 0; i < members.getCount(); ++i)
         {
+            Decl* m = members[i];
+
             if (auto typeParam = as<GenericTypeParamDecl>(m))
             {
                 ensureDecl(typeParam, DeclCheckState::ReadyForReference);
