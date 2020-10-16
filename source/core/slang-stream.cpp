@@ -21,7 +21,7 @@ FileStream::FileStream(const String& fileName, FileMode fileMode, FileAccess acc
 
 void FileStream::_init(const String& fileName, FileMode fileMode, FileAccess access, FileShare share)
 {
-    if (fileMode == FileAccess::None)
+    if (access == FileAccess::None)
     {
         throw ArgumentException("FileAccess::None not valid to create a FileStream.");
     }
