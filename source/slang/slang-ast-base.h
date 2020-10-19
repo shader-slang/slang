@@ -18,7 +18,7 @@ namespace Slang
 
 class NodeBase 
 {
-    SLANG_ABSTRACT_CLASS(NodeBase)
+    SLANG_ABSTRACT_AST_CLASS(NodeBase)
 
         // MUST be called before used. Called automatically via the ASTBuilder.
         // Note that the astBuilder is not stored in the NodeBase derived types by default.
@@ -67,7 +67,7 @@ SLANG_FORCE_INLINE const T* as(const NodeBase* node)
 // (thus having a location in the source code)
 class SyntaxNodeBase : public NodeBase
 {
-    SLANG_ABSTRACT_CLASS(SyntaxNodeBase)
+    SLANG_ABSTRACT_AST_CLASS(SyntaxNodeBase)
 
     // The primary source location associated with this AST node
     SourceLoc loc;
@@ -80,7 +80,7 @@ class SyntaxNodeBase : public NodeBase
 
 class Val : public NodeBase
 {
-    SLANG_ABSTRACT_CLASS(Val)
+    SLANG_ABSTRACT_AST_CLASS(Val)
 
     typedef IValVisitor Visitor;
 
@@ -132,7 +132,7 @@ SLANG_FORCE_INLINE const T* as(const Type* obj);
 // operate on the raw representation when needed.
 class Type: public Val
 {
-    SLANG_ABSTRACT_CLASS(Type)
+    SLANG_ABSTRACT_AST_CLASS(Type)
 
     friend struct ASTDumpAccess;
 
@@ -176,7 +176,7 @@ SLANG_FORCE_INLINE const T* as(const Type* obj) { return obj ? dynamicCast<T>(co
 // type-level variables to concrete argument values
 class Substitutions: public NodeBase
 {
-    SLANG_ABSTRACT_CLASS(Substitutions)
+    SLANG_ABSTRACT_AST_CLASS(Substitutions)
 
     // The next outer that this one refines.
     Substitutions* outer = nullptr;
@@ -196,7 +196,7 @@ class Substitutions: public NodeBase
 
 class GenericSubstitution : public Substitutions
 {
-    SLANG_CLASS(GenericSubstitution)
+    SLANG_AST_CLASS(GenericSubstitution)
 
     // The generic declaration that defines the
     // parameters we are binding to arguments
@@ -213,7 +213,7 @@ class GenericSubstitution : public Substitutions
 
 class ThisTypeSubstitution : public Substitutions
 {
-    SLANG_CLASS(ThisTypeSubstitution)
+    SLANG_AST_CLASS(ThisTypeSubstitution)
 
     // The declaration of the interface that we are specializing
     InterfaceDecl* interfaceDecl = nullptr;
@@ -231,7 +231,7 @@ class ThisTypeSubstitution : public Substitutions
 
 class GlobalGenericParamSubstitution : public Substitutions
 {
-    SLANG_CLASS(GlobalGenericParamSubstitution)
+    SLANG_AST_CLASS(GlobalGenericParamSubstitution)
     // the type_param decl to be substituted
     GlobalGenericParamDecl* paramDecl = nullptr;
 
@@ -255,7 +255,7 @@ class GlobalGenericParamSubstitution : public Substitutions
 
 class SyntaxNode : public SyntaxNodeBase
 {
-    SLANG_ABSTRACT_CLASS(SyntaxNode);
+    SLANG_ABSTRACT_AST_CLASS(SyntaxNode);
 };
 
 //
@@ -265,7 +265,7 @@ class SyntaxNode : public SyntaxNodeBase
 //
 class Modifier : public SyntaxNode
 {
-    SLANG_ABSTRACT_CLASS(Modifier)
+    SLANG_ABSTRACT_AST_CLASS(Modifier)
     typedef IModifierVisitor Visitor;
 
     void accept(IModifierVisitor* visitor, void* extra);
@@ -283,7 +283,7 @@ class Modifier : public SyntaxNode
 // A syntax node which can have modifiers applied
 class ModifiableSyntaxNode : public SyntaxNode
 {
-    SLANG_ABSTRACT_CLASS(ModifiableSyntaxNode)
+    SLANG_ABSTRACT_AST_CLASS(ModifiableSyntaxNode)
 
     Modifiers modifiers;
 
@@ -305,7 +305,7 @@ class ModifiableSyntaxNode : public SyntaxNode
 // An intermediate type to represent either a single declaration, or a group of declarations
 class DeclBase : public ModifiableSyntaxNode
 {
-    SLANG_ABSTRACT_CLASS(DeclBase)
+    SLANG_ABSTRACT_AST_CLASS(DeclBase)
 
     typedef IDeclVisitor Visitor;
 
@@ -315,7 +315,7 @@ class DeclBase : public ModifiableSyntaxNode
 class Decl : public DeclBase
 {
 public:
-    SLANG_ABSTRACT_CLASS(Decl)
+    SLANG_ABSTRACT_AST_CLASS(Decl)
 
     ContainerDecl* parentDecl = nullptr;
 
@@ -341,7 +341,7 @@ public:
 
 class Expr : public SyntaxNode
 {
-    SLANG_ABSTRACT_CLASS(Expr)
+    SLANG_ABSTRACT_AST_CLASS(Expr)
 
     typedef IExprVisitor Visitor;
 
@@ -352,7 +352,7 @@ class Expr : public SyntaxNode
 
 class Stmt : public ModifiableSyntaxNode
 {
-    SLANG_ABSTRACT_CLASS(Stmt)
+    SLANG_ABSTRACT_AST_CLASS(Stmt)
 
     typedef IStmtVisitor Visitor;
 
