@@ -11,7 +11,8 @@ namespace Slang
 
 FileStream::FileStream(const String& fileName, FileMode fileMode)
 {
-	_init(fileName, fileMode, fileMode==FileMode::Open?FileAccess::Read:FileAccess::Write, FileShare::None);
+    const FileAccess access = (fileMode == FileMode::Open) ? FileAccess::Read : FileAccess::Write;
+	_init(fileName, fileMode, access, FileShare::None);
 }
 
 FileStream::FileStream(const String& fileName, FileMode fileMode, FileAccess access, FileShare share)
