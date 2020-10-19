@@ -100,7 +100,7 @@ void FileStream::_init(const String& fileName, FileMode fileMode, FileAccess acc
     SLANG_ASSERT(modeLength <= SLANG_COUNT_OF(wideMode));
 
     // Copy to wchar_t 
-    for (Index i = 0; modeLength ; ++i)
+    for (Index i = 0; i < modeLength ; ++i)
     {
         wideMode[i] = wchar_t(mode[i]);
     }
