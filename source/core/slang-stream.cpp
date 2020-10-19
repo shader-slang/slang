@@ -161,33 +161,35 @@ Int64 FileStream::getPosition()
     return *(Int64*)(&pos);
 #endif
 }
-void FileStream::seek(SeekOrigin origin, Int64 offset)
+
+void FileStream::seek(SeekOrigin seekOrigin, Int64 offset)
 {
-    int _origin;
-    switch (origin)
+    int fseekOrigin;
+    switch (seekOrigin)
     {
     case SeekOrigin::Start:
-        _origin = SEEK_SET;
-        m_endReached = false;
+        fseekOrigin = SEEK_SET;
         break;
     case SeekOrigin::End:
-        _origin = SEEK_END;
-        // JS TODO: This doesn't seem right, the offset can mean it's not at the end
-        m_endReached = true;
+        fseekOrigin = SEEK_END;
         break;
     case SeekOrigin::Current:
-        _origin = SEEK_CUR;
-        m_endReached = false;
+        fseekOrigin = SEEK_CUR;
         break;
     default:
         throw NotSupportedException("Unsupported seek origin.");
         break;
     }
+
+    // If endReached is intended to be like feof - then doing a seek will reset it
+    m_endReached = false;
+
 #ifdef _WIN32
-    int rs = _fseeki64(m_handle, offset, _origin);
+    int rs = _fseeki64(m_handle, offset, fseekOrigin);
 #else
-    int rs = fseek(m_handle, (int)offset, _origin);
+    int rs = fseek(m_handle, (long int)offset, fseekOrigin);
 #endif
+
     if (rs != 0)
     {
         throw IOException("FileStream seek failed.");
