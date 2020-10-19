@@ -784,8 +784,10 @@ namespace Slang
         // If `decl` is a container, then we want to ensure its children.
         if(auto containerDecl = as<ContainerDecl>(decl))
         {            
-            // NOTE! We purposefully do not iterate with the for(auto childDecl : containerDecl->members) style here,
-            // because the visitor may add a member whilst iteration takes place, invalidating the iterator.
+            // NOTE! We purposefully do not iterate with the for(auto childDecl : containerDecl->members) here,
+            // because the visitor may add to `members` whilst iteration takes place, invalidating the iterator
+            // and likely a crash.
+            // 
             // Accessing the members via index side steps the issue.
             const auto& members = containerDecl->members;
             for(Index i = 0; i < members.getCount(); ++i)
@@ -1133,8 +1135,10 @@ namespace Slang
     {
         genericDecl->setCheckState(DeclCheckState::ReadyForLookup);
 
-        // NOTE! We purposefully do not iterate with the for (auto m : genericDecl->members) style here,
-        // because the visitor may add a member whilst iteration takes place, invalidating the iterator.
+        // NOTE! We purposefully do not iterate with the for(auto m : genericDecl->members) here,
+        // because the visitor may add to `members` whilst iteration takes place, invalidating the iterator
+        // and likely a crash.
+        // 
         // Accessing the members via index side steps the issue.
         const auto& members = genericDecl->members;
         for (Index i = 0; i < members.getCount(); ++i)
