@@ -14,8 +14,8 @@ namespace Slang {
 // Macros to generate from ast-generated-macro file the vistors
 
 // Only runs 'param' macro if the marker is NONE (ie not ABSTRACT here)
-#define SLANG_CLASS_ONLY_ABSTRACT(NAME, SUPER, ORIGIN, LAST, MARKER, TYPE, param)
-#define SLANG_CLASS_ONLY_NONE(NAME, SUPER, ORIGIN, LAST, MARKER, TYPE, param) param(NAME, SUPER, ORIGIN, LAST, MARKER, TYPE, param)
+#define SLANG_CLASS_ONLY_ABSTRACT_AST(NAME, SUPER, ORIGIN, LAST, MARKER, TYPE, param)
+#define SLANG_CLASS_ONLY_AST(NAME, SUPER, ORIGIN, LAST, MARKER, TYPE, param) param(NAME, SUPER, ORIGIN, LAST, MARKER, TYPE, param)
 
 #define SLANG_CLASS_ONLY(NAME, SUPER, ORIGIN, LAST, MARKER, TYPE, param) SLANG_CLASS_ONLY_##MARKER(NAME, SUPER, ORIGIN, LAST, MARKER, TYPE, param)
 

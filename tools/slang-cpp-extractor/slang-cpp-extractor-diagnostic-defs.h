@@ -40,6 +40,7 @@ DIAGNOSTIC(100009, Error, unexpectedUnbalancedToken, "Unexpected unbalanced toke
 DIAGNOSTIC(100010, Error, unexpectedEndOfFile, "Unexpected end of file")
 DIAGNOSTIC(100011, Error, expectingTypeKeyword, "Expecting type keyword - struct or class, found $0")
 
+DIAGNOSTIC(100011, Error, typeInDifferentTypeSet, "Type $0 in different type set $1 from super class $2")
 
 // Command line errors 100100
 

@@ -5,6 +5,7 @@
 
 #include "../core/slang-memory-arena.h"
 #include "../core/slang-dictionary.h"
+#include "../core/slang-string-util.h"
 
 #include <assert.h>
 
@@ -302,60 +303,17 @@ public:
         return singleton;
     }
 
-    typedef uint8_t CharFlags;
-    struct CharFlag 
-    {
-        enum Enum : CharFlags
-        {
-            Upper = 0x1,
-            Lower = 0x2,
-        };
-    };
-
-    static CharFlags _classifyChar(char c)
-    {
-        CharFlags flags = 0;
-        flags |= (c >= 'a' && c <= 'z') ? CharFlag::Lower : 0;
-        flags |= (c >= 'A' && c <= 'Z') ? CharFlag::Upper : 0;
-        return flags;
-    }
 protected:
     void _add(const char* name, Index index)
     {
-        m_map.Add(UnownedStringSlice(name), index);
+        UnownedStringSlice nameSlice(name);
+        m_map.Add(nameSlice, index);
 
         // Add a dashed version        
         {
             m_work.Clear();
 
-            CharFlags prevFlags = 0;
-            for (const char* cur = name; *cur; cur++)
-            {
-                char c = *cur;
-                const CharFlags flags = _classifyChar(c);
-
-                if (flags & CharFlag::Upper)
-                {
-                    if (prevFlags & CharFlag::Lower)
-                    {
-                        // If we go from lower to upper, insert a dash. aA -> a-a
-                        m_work << '-';
-                    }
-                    else if (prevFlags & CharFlag::Upper)
-                    {
-                        // Could be an acronym, if the next character is lower, we need to insert a - here
-                        if (_classifyChar(cur[1]) & CharFlag::Lower)
-                        {
-                            m_work << '-';
-                        }
-                    }
-                    // Make it lower
-                    c = c - 'A' + 'a';
-                }
-                m_work << c;
-
-                prevFlags = flags;
-            }
+            StringUtil::camelCaseToLowerDashed(nameSlice, m_work);
 
             UnownedStringSlice dashSlice(m_arena.allocateString(m_work.getBuffer(), m_work.getLength()), m_work.getLength());
             m_map.AddIfNotExists(dashSlice, index);

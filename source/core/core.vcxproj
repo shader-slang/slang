@@ -176,6 +176,7 @@
     <ClInclude Include="slang-basic.h" />
     <ClInclude Include="slang-blob.h" />
     <ClInclude Include="slang-byte-encode-util.h" />
+    <ClInclude Include="slang-char-util.h" />
     <ClInclude Include="slang-common.h" />
     <ClInclude Include="slang-dictionary.h" />
     <ClInclude Include="slang-downstream-compiler.h" />
@@ -219,6 +220,7 @@
   <ItemGroup>
     <ClCompile Include="slang-blob.cpp" />
     <ClCompile Include="slang-byte-encode-util.cpp" />
+    <ClCompile Include="slang-char-util.cpp" />
     <ClCompile Include="slang-downstream-compiler.cpp" />
     <ClCompile Include="slang-free-list.cpp" />
     <ClCompile Include="slang-gcc-compiler-util.cpp" />

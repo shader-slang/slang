@@ -54,11 +54,11 @@ struct ASTConstructAccess
 #define SLANG_GET_SUPER_INNER(SUPER) &SUPER::kReflectClassInfo
 #define SLANG_GET_SUPER_LEAF(SUPER) &SUPER::kReflectClassInfo
 
-#define SLANG_GET_CREATE_FUNC_ABSTRACT(NAME) nullptr
-#define SLANG_GET_CREATE_FUNC_NONE(NAME) &ASTConstructAccess::Impl<NAME>::create
+#define SLANG_GET_CREATE_FUNC_ABSTRACT_AST(NAME) nullptr
+#define SLANG_GET_CREATE_FUNC_AST(NAME) &ASTConstructAccess::Impl<NAME>::create
 
-#define SLANG_GET_DESTROY_FUNC_ABSTRACT(NAME) nullptr
-#define SLANG_GET_DESTROY_FUNC_NONE(NAME) &ASTConstructAccess::Impl<NAME>::destroy
+#define SLANG_GET_DESTROY_FUNC_ABSTRACT_AST(NAME) nullptr
+#define SLANG_GET_DESTROY_FUNC_AST(NAME) &ASTConstructAccess::Impl<NAME>::destroy
 
 #define SLANG_REFLECT_CLASS_INFO(NAME, SUPER, ORIGIN, LAST, MARKER, TYPE, param) \
     /* static */const ReflectClassInfo NAME::kReflectClassInfo = { uint32_t(ASTNodeType::NAME), uint32_t(ASTNodeType::LAST), SLANG_GET_SUPER_##TYPE(SUPER), #NAME, SLANG_GET_CREATE_FUNC_##MARKER(NAME), SLANG_GET_DESTROY_FUNC_##MARKER(NAME), uint32_t(sizeof(NAME)), uint8_t(SLANG_ALIGN_OF(NAME)) };
@@ -66,8 +66,8 @@ struct ASTConstructAccess
 SLANG_ALL_ASTNode_NodeBase(SLANG_REFLECT_CLASS_INFO, _)
 
 // We dispatch to non 'abstract' types
-#define SLANG_CASE_NONE(NAME)           case ASTNodeType::NAME: return visitor->dispatch_##NAME(static_cast<NAME*>(this), extra);
-#define SLANG_CASE_ABSTRACT(NAME)
+#define SLANG_CASE_AST(NAME)           case ASTNodeType::NAME: return visitor->dispatch_##NAME(static_cast<NAME*>(this), extra);
+#define SLANG_CASE_ABSTRACT_AST(NAME)
 
 #define SLANG_CASE_DISPATCH(NAME, SUPER, ORIGIN, LAST, MARKER, TYPE, param)  SLANG_CASE_##MARKER(NAME)
 
