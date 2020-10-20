@@ -471,16 +471,8 @@ SLANG_FORCE_INLINE static bool _isDigit(char c)
 
     for (Index i = 0; i < count; ++i)
     {
-        char c = src[i];
-        if (c == '_')
-        {
-            c = '-';
-        }
-        else
-        {
-            c = CharUtil::toLower(c);
-        }
-        dst[i] = c;
+        const char c = src[i];
+        dst[i] = (c == '_') ? '-' : CharUtil::toLower(c);
     }
 
     out.appendInPlace(dst, count);
@@ -514,7 +506,7 @@ SLANG_FORCE_INLINE static bool _isDigit(char c)
                     c = CharUtil::toLower(c);
                 }
             }
-            // First character after _, should be capitalized, but otherwise ignored
+            // First character after _, should be capitalized. If the character isn't alpha we just ignore capitalization
             capitalizeNextAlpha = false;
 
             out.appendChar(c);
