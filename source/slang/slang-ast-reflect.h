@@ -8,7 +8,7 @@
 #include "slang-ast-generated.h"
 
 // Implementation for SLANG_ABSTRACT_CLASS(x) using reflection from C++ extractor in slang-ast-generated.h
-#define SLANG_CLASS_REFLECT_IMPL(NAME, SUPER, ORIGIN, LAST, MARKER, TYPE, param) \
+#define SLANG_AST_CLASS_REFLECT_IMPL(NAME, SUPER, ORIGIN, LAST, MARKER, TYPE, param) \
     protected: \
     NAME() = default; \
     public:     \
@@ -23,8 +23,8 @@
 
 // Macro definitions - use the SLANG_ASTNode_ definitions to invoke the IMPL to produce the code
 // injected into AST classes
-#define SLANG_ABSTRACT_CLASS(NAME)  SLANG_ASTNode_##NAME(SLANG_CLASS_REFLECT_IMPL, _)
-#define SLANG_CLASS(NAME)           SLANG_ASTNode_##NAME(SLANG_CLASS_REFLECT_IMPL, _)
+#define SLANG_ABSTRACT_AST_CLASS(NAME)  SLANG_ASTNode_##NAME(SLANG_AST_CLASS_REFLECT_IMPL, _)
+#define SLANG_AST_CLASS(NAME)           SLANG_ASTNode_##NAME(SLANG_AST_CLASS_REFLECT_IMPL, _)
 
 // Macros for simulating virtual methods without virtual methods
 

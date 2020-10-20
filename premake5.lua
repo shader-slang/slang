@@ -870,7 +870,7 @@ generatorProject("run-generators", "source/slang/")
         filter "files:**/slang-ast-reflect.h"        
             do
                 local inputFiles = { "slang-ast-base.h", "slang-ast-decl.h", "slang-ast-expr.h", "slang-ast-modifier.h", "slang-ast-stmt.h", "slang-ast-type.h", "slang-ast-val.h" }
-                runCPPExtractor(sourcePath, "ast", inputFiles, "slang-ast", "ASTNode", "_CLASS")    
+                runCPPExtractor(sourcePath, "ast", inputFiles, "slang-ast", "ASTNode", "_AST_CLASS")    
             end
     end       
        

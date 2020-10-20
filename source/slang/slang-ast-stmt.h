@@ -10,7 +10,7 @@ namespace Slang {
 
 class ScopeStmt : public Stmt 
 {
-    SLANG_ABSTRACT_CLASS(ScopeStmt)
+    SLANG_ABSTRACT_AST_CLASS(ScopeStmt)
 
     ScopeDecl* scopeDecl = nullptr;
 };
@@ -18,7 +18,7 @@ class ScopeStmt : public Stmt
 // A sequence of statements, treated as a single statement
 class SeqStmt : public Stmt 
 {
-    SLANG_CLASS(SeqStmt)
+    SLANG_AST_CLASS(SeqStmt)
 
     List<Stmt*> stmts;
 };
@@ -26,7 +26,7 @@ class SeqStmt : public Stmt
 // The simplest kind of scope statement: just a `{...}` block
 class BlockStmt : public ScopeStmt 
 {
-    SLANG_CLASS(BlockStmt)
+    SLANG_AST_CLASS(BlockStmt)
 
     Stmt* body = nullptr;
 };
@@ -35,7 +35,7 @@ class BlockStmt : public ScopeStmt
 // we want to let a downstream compiler handle any issues
 class UnparsedStmt : public Stmt 
 {
-    SLANG_CLASS(UnparsedStmt)
+    SLANG_AST_CLASS(UnparsedStmt)
 
     // The tokens that were contained between `{` and `}`
     List<Token> tokens;
@@ -43,24 +43,24 @@ class UnparsedStmt : public Stmt
 
 class EmptyStmt : public Stmt 
 {
-    SLANG_CLASS(EmptyStmt)
+    SLANG_AST_CLASS(EmptyStmt)
 };
 
 class DiscardStmt : public Stmt 
 {
-    SLANG_CLASS(DiscardStmt)
+    SLANG_AST_CLASS(DiscardStmt)
 };
 
 class DeclStmt : public Stmt 
 {
-    SLANG_CLASS(DeclStmt)
+    SLANG_AST_CLASS(DeclStmt)
 
     DeclBase* decl = nullptr;
 };
 
 class IfStmt : public Stmt 
 {
-    SLANG_CLASS(IfStmt)
+    SLANG_AST_CLASS(IfStmt)
 
     Expr* predicate = nullptr;
     Stmt* positiveStatement = nullptr;
@@ -70,13 +70,13 @@ class IfStmt : public Stmt
 // A statement that can be escaped with a `break`
 class BreakableStmt : public ScopeStmt 
 {
-    SLANG_ABSTRACT_CLASS(BreakableStmt)
+    SLANG_ABSTRACT_AST_CLASS(BreakableStmt)
 
 };
 
 class SwitchStmt : public BreakableStmt 
 {
-    SLANG_CLASS(SwitchStmt)
+    SLANG_AST_CLASS(SwitchStmt)
 
     Expr* condition = nullptr;
     Stmt* body = nullptr;
@@ -87,7 +87,7 @@ class SwitchStmt : public BreakableStmt
 // outer statement that it is associated with...
 class ChildStmt : public Stmt 
 {
-    SLANG_ABSTRACT_CLASS(ChildStmt)
+    SLANG_ABSTRACT_AST_CLASS(ChildStmt)
 
     Stmt* parentStmt = nullptr;
 };
@@ -99,14 +99,14 @@ class ChildStmt : public Stmt
 // sub-statement. I'm leaving that out for now for simplicity.
 class CaseStmtBase : public ChildStmt 
 {
-    SLANG_ABSTRACT_CLASS(CaseStmtBase)
+    SLANG_ABSTRACT_AST_CLASS(CaseStmtBase)
 
 };
 
 // a `case` statement inside a `switch`
 class CaseStmt : public CaseStmtBase 
 {
-    SLANG_CLASS(CaseStmt)
+    SLANG_AST_CLASS(CaseStmt)
 
     Expr* expr = nullptr;
 };
@@ -114,13 +114,13 @@ class CaseStmt : public CaseStmtBase
 // a `default` statement inside a `switch`
 class DefaultStmt : public CaseStmtBase 
 {
-    SLANG_CLASS(DefaultStmt)
+    SLANG_AST_CLASS(DefaultStmt)
 };
 
 // a `default` statement inside a `switch`
 class GpuForeachStmt : public ScopeStmt 
 {
-    SLANG_CLASS(GpuForeachStmt)
+    SLANG_AST_CLASS(GpuForeachStmt)
 
     Expr* renderer = nullptr;
     Expr* gridDims = nullptr;
@@ -131,14 +131,14 @@ class GpuForeachStmt : public ScopeStmt
 // A statement that represents a loop, and can thus be escaped with a `continue`
 class LoopStmt : public BreakableStmt 
 {
-    SLANG_ABSTRACT_CLASS(LoopStmt)
+    SLANG_ABSTRACT_AST_CLASS(LoopStmt)
 
 };
 
 // A `for` statement
 class ForStmt : public LoopStmt 
 {
-    SLANG_CLASS(ForStmt)
+    SLANG_AST_CLASS(ForStmt)
 
     Stmt* initialStatement = nullptr;
     Expr* sideEffectExpression = nullptr;
@@ -150,13 +150,13 @@ class ForStmt : public LoopStmt
 // of the loop variable to the body.
 class UnscopedForStmt : public ForStmt 
 {
-    SLANG_CLASS(UnscopedForStmt)
+    SLANG_AST_CLASS(UnscopedForStmt)
 ;
 };
 
 class WhileStmt : public LoopStmt 
 {
-    SLANG_CLASS(WhileStmt)
+    SLANG_AST_CLASS(WhileStmt)
 
     Expr* predicate = nullptr;
     Stmt* statement = nullptr;
@@ -164,7 +164,7 @@ class WhileStmt : public LoopStmt
 
 class DoWhileStmt : public LoopStmt 
 {
-    SLANG_CLASS(DoWhileStmt)
+    SLANG_AST_CLASS(DoWhileStmt)
 
     Stmt* statement = nullptr;
     Expr* predicate = nullptr;
@@ -173,7 +173,7 @@ class DoWhileStmt : public LoopStmt
 // A compile-time, range-based `for` loop, which will not appear in the output code
 class CompileTimeForStmt : public ScopeStmt 
 {
-    SLANG_CLASS(CompileTimeForStmt)
+    SLANG_AST_CLASS(CompileTimeForStmt)
 
     VarDecl* varDecl = nullptr;
     Expr* rangeBeginExpr = nullptr;
@@ -187,29 +187,29 @@ class CompileTimeForStmt : public ScopeStmt
 // to their parent statement.
 class JumpStmt : public ChildStmt 
 {
-    SLANG_ABSTRACT_CLASS(JumpStmt)
+    SLANG_ABSTRACT_AST_CLASS(JumpStmt)
 };
 
 class BreakStmt : public JumpStmt 
 {
-    SLANG_CLASS(BreakStmt)
+    SLANG_AST_CLASS(BreakStmt)
 };
 
 class ContinueStmt : public JumpStmt 
 {
-    SLANG_CLASS(ContinueStmt)
+    SLANG_AST_CLASS(ContinueStmt)
 };
 
 class ReturnStmt : public Stmt 
 {
-    SLANG_CLASS(ReturnStmt)
+    SLANG_AST_CLASS(ReturnStmt)
 
     Expr* expression = nullptr;
 };
 
 class ExpressionStmt : public Stmt 
 {
-    SLANG_CLASS(ExpressionStmt)
+    SLANG_AST_CLASS(ExpressionStmt)
 
     Expr* expression = nullptr;
 };
