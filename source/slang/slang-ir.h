@@ -1488,6 +1488,9 @@ bool isPointerOfType(IRInst* ptrType, IROp opCode);
     // True if the IR inst represents a builtin object (e.g. __BuiltinFloatingPointType).
 bool isBuiltin(IRInst* inst);
 
+    // Get the enclosuing function of an instruction.
+IRFunc* getParentFunc(IRInst* inst);
+
 }
 
 #endif
