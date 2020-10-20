@@ -11,7 +11,7 @@ namespace Slang {
 // Base class for expressions that will reference declarations
 class DeclRefExpr: public Expr
 {
-    SLANG_ABSTRACT_CLASS(DeclRefExpr)
+    SLANG_ABSTRACT_AST_CLASS(DeclRefExpr)
 
     // The scope in which to perform lookup
     RefPtr<Scope> scope;
@@ -25,14 +25,14 @@ class DeclRefExpr: public Expr
 
 class VarExpr : public DeclRefExpr
 {
-    SLANG_CLASS(VarExpr)
+    SLANG_AST_CLASS(VarExpr)
 };
 
 // An expression that references an overloaded set of declarations
 // having the same name.
 class OverloadedExpr : public Expr
 {
-    SLANG_CLASS(OverloadedExpr)
+    SLANG_AST_CLASS(OverloadedExpr)
 
     // The name that was looked up and found to be overloaded
     Name* name;
@@ -49,7 +49,7 @@ class OverloadedExpr : public Expr
 // having the same name.
 class OverloadedExpr2: public Expr
 {
-    SLANG_CLASS(OverloadedExpr2)
+    SLANG_AST_CLASS(OverloadedExpr2)
 
     // Optional: the base expression is this overloaded result
     // arose from a member-reference expression.
@@ -61,7 +61,7 @@ class OverloadedExpr2: public Expr
 
 class LiteralExpr : public Expr
 {
-    SLANG_ABSTRACT_CLASS(LiteralExpr)
+    SLANG_ABSTRACT_AST_CLASS(LiteralExpr)
     // The token that was used to express the literal. This can be
     // used to get the raw text of the literal, including any suffix.
     Token token;
@@ -69,26 +69,26 @@ class LiteralExpr : public Expr
 
 class IntegerLiteralExpr : public LiteralExpr
 {
-    SLANG_CLASS(IntegerLiteralExpr)
+    SLANG_AST_CLASS(IntegerLiteralExpr)
 
     IntegerLiteralValue value;
 };
 
 class FloatingPointLiteralExpr: public LiteralExpr
 {
-    SLANG_CLASS(FloatingPointLiteralExpr)
+    SLANG_AST_CLASS(FloatingPointLiteralExpr)
     FloatingPointLiteralValue value;
 };
 
 class BoolLiteralExpr : public LiteralExpr
 {
-    SLANG_CLASS(BoolLiteralExpr)
+    SLANG_AST_CLASS(BoolLiteralExpr)
     bool value;
 };
 
 class StringLiteralExpr : public LiteralExpr
 {
-    SLANG_CLASS(StringLiteralExpr)
+    SLANG_AST_CLASS(StringLiteralExpr)
 
     // TODO: consider storing the "segments" of the string
     // literal, in the case where multiple literals were
@@ -102,14 +102,14 @@ class StringLiteralExpr : public LiteralExpr
 // An initializer list, e.g. `{ 1, 2, 3 }`
 class InitializerListExpr : public Expr
 {
-    SLANG_CLASS(InitializerListExpr)
+    SLANG_AST_CLASS(InitializerListExpr)
     List<Expr*> args;
 };
 
 // A base class for expressions with arguments
 class ExprWithArgsBase : public Expr
 {
-    SLANG_ABSTRACT_CLASS(ExprWithArgsBase)
+    SLANG_ABSTRACT_AST_CLASS(ExprWithArgsBase)
 
     List<Expr*> arguments;
 };
@@ -117,7 +117,7 @@ class ExprWithArgsBase : public Expr
 // An aggregate type constructor
 class AggTypeCtorExpr : public ExprWithArgsBase
 {
-    SLANG_CLASS(AggTypeCtorExpr)
+    SLANG_AST_CLASS(AggTypeCtorExpr)
 
     TypeExp base;
 };
@@ -127,37 +127,37 @@ class AggTypeCtorExpr : public ExprWithArgsBase
 // both ordinary `()` function calls and `<>` generic application
 class AppExprBase : public ExprWithArgsBase
 {
-    SLANG_ABSTRACT_CLASS(AppExprBase)
+    SLANG_ABSTRACT_AST_CLASS(AppExprBase)
 
     Expr* functionExpr = nullptr;
 };
 
 class InvokeExpr: public AppExprBase
 {
-    SLANG_CLASS(InvokeExpr)
+    SLANG_AST_CLASS(InvokeExpr)
 };
 
 class OperatorExpr: public InvokeExpr
 {
-    SLANG_CLASS(OperatorExpr)
+    SLANG_AST_CLASS(OperatorExpr)
 };
 
 class InfixExpr: public OperatorExpr
 {
-    SLANG_CLASS(InfixExpr)
+    SLANG_AST_CLASS(InfixExpr)
 };
 class PrefixExpr: public OperatorExpr
 {
-    SLANG_CLASS(PrefixExpr)
+    SLANG_AST_CLASS(PrefixExpr)
 };
 class PostfixExpr: public OperatorExpr
 {
-    SLANG_CLASS(PostfixExpr)
+    SLANG_AST_CLASS(PostfixExpr)
 };
 
 class IndexExpr: public Expr
 {
-    SLANG_CLASS(IndexExpr)
+    SLANG_AST_CLASS(IndexExpr)
 
     Expr* baseExpression = nullptr;
     Expr* indexExpression = nullptr;
@@ -165,14 +165,14 @@ class IndexExpr: public Expr
 
 class MemberExpr: public DeclRefExpr
 {
-    SLANG_CLASS(MemberExpr)
+    SLANG_AST_CLASS(MemberExpr)
     Expr* baseExpression = nullptr;
 };
 
 // Member looked up on a type, rather than a value
 class StaticMemberExpr: public DeclRefExpr
 {
-    SLANG_CLASS(StaticMemberExpr)
+    SLANG_AST_CLASS(StaticMemberExpr)
     Expr* baseExpression = nullptr;
 };
 
@@ -187,7 +187,7 @@ struct MatrixCoord
 
 class MatrixSwizzleExpr : public Expr
 {
-    SLANG_CLASS(MatrixSwizzleExpr)
+    SLANG_AST_CLASS(MatrixSwizzleExpr)
     Expr* base = nullptr;
     int elementCount;
     MatrixCoord elementCoords[4];
@@ -195,7 +195,7 @@ class MatrixSwizzleExpr : public Expr
 
 class SwizzleExpr: public Expr
 {
-    SLANG_CLASS(SwizzleExpr)
+    SLANG_AST_CLASS(SwizzleExpr)
     Expr* base = nullptr;
     int elementCount;
     int elementIndices[4];
@@ -204,14 +204,14 @@ class SwizzleExpr: public Expr
 // A dereference of a pointer or pointer-like type
 class DerefExpr: public Expr
 {
-    SLANG_CLASS(DerefExpr)
+    SLANG_AST_CLASS(DerefExpr)
     Expr* base = nullptr;
 };
 
 // Any operation that performs type-casting
 class TypeCastExpr: public InvokeExpr
 {
-    SLANG_CLASS(TypeCastExpr)
+    SLANG_AST_CLASS(TypeCastExpr)
 //    TypeExp TargetType;
 //    Expr* Expression = nullptr;
 };
@@ -219,13 +219,13 @@ class TypeCastExpr: public InvokeExpr
 // An explicit type-cast that appear in the user's code with `(type) expr` syntax
 class ExplicitCastExpr: public TypeCastExpr
 {
-    SLANG_CLASS(ExplicitCastExpr)
+    SLANG_AST_CLASS(ExplicitCastExpr)
 };
 
 // An implicit type-cast inserted during semantic checking
 class ImplicitCastExpr : public TypeCastExpr
 {
-    SLANG_CLASS(ImplicitCastExpr)
+    SLANG_AST_CLASS(ImplicitCastExpr)
 };
 
     /// A cast of a value to a super-type of its type.
@@ -234,7 +234,7 @@ class ImplicitCastExpr : public TypeCastExpr
     ///
 class CastToSuperTypeExpr: public Expr
 {
-    SLANG_CLASS(CastToSuperTypeExpr)
+    SLANG_AST_CLASS(CastToSuperTypeExpr)
 
     /// The value being cast to a super type
     ///
@@ -248,26 +248,26 @@ class CastToSuperTypeExpr: public Expr
 
 class SelectExpr: public OperatorExpr
 {
-    SLANG_CLASS(SelectExpr)
+    SLANG_AST_CLASS(SelectExpr)
 };
 
 class GenericAppExpr: public AppExprBase
 {
-    SLANG_CLASS(GenericAppExpr)
+    SLANG_AST_CLASS(GenericAppExpr)
 };
 
 // An expression representing re-use of the syntax for a type in more
 // than once conceptually-distinct declaration
 class SharedTypeExpr: public Expr
 {
-    SLANG_CLASS(SharedTypeExpr)
+    SLANG_AST_CLASS(SharedTypeExpr)
     // The underlying type expression that we want to share
     TypeExp base;
 };
 
 class AssignExpr: public Expr
 {
-    SLANG_CLASS(AssignExpr)
+    SLANG_AST_CLASS(AssignExpr)
     Expr* left = nullptr;
     Expr* right = nullptr;
 };
@@ -278,7 +278,7 @@ class AssignExpr: public Expr
 // when we do rewriter stuff.
 class ParenExpr: public Expr
 {
-    SLANG_CLASS(ParenExpr)
+    SLANG_AST_CLASS(ParenExpr)
     Expr* base = nullptr;
 };
 
@@ -286,21 +286,21 @@ class ParenExpr: public Expr
 // refer to the current instance of an enclosing type.
 class ThisExpr: public Expr
 {
-    SLANG_CLASS(ThisExpr)
+    SLANG_AST_CLASS(ThisExpr)
     RefPtr<Scope> scope;
 };
 
 // An expression that binds a temporary variable in a local expression context
 class LetExpr: public Expr
 {
-    SLANG_CLASS(LetExpr)
+    SLANG_AST_CLASS(LetExpr)
     VarDecl* decl = nullptr;
     Expr* body = nullptr;
 };
 
 class ExtractExistentialValueExpr: public Expr
 {
-    SLANG_CLASS(ExtractExistentialValueExpr)
+    SLANG_AST_CLASS(ExtractExistentialValueExpr)
     DeclRef<VarDeclBase> declRef;
 };
 
@@ -311,7 +311,7 @@ class ExtractExistentialValueExpr: public Expr
     ///
 class TaggedUnionTypeExpr: public Expr
 {
-    SLANG_CLASS(TaggedUnionTypeExpr)
+    SLANG_AST_CLASS(TaggedUnionTypeExpr)
     List<TypeExp> caseTypes;
 };
 
@@ -321,7 +321,7 @@ class TaggedUnionTypeExpr: public Expr
     ///
 class ThisTypeExpr: public Expr
 {
-    SLANG_CLASS(ThisTypeExpr)
+    SLANG_AST_CLASS(ThisTypeExpr)
     RefPtr<Scope> scope;
 };
 

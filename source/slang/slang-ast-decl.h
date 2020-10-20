@@ -11,7 +11,7 @@ namespace Slang {
 // A group of declarations that should be treated as a unit
 class DeclGroup: public DeclBase
 {
-    SLANG_CLASS(DeclGroup)
+    SLANG_AST_CLASS(DeclGroup)
 
     List<Decl*> decls;
 };
@@ -20,7 +20,7 @@ class DeclGroup: public DeclBase
 // A "container" decl is a parent to other declarations
 class ContainerDecl: public Decl
 {
-    SLANG_ABSTRACT_CLASS(ContainerDecl)
+    SLANG_ABSTRACT_AST_CLASS(ContainerDecl)
 
     List<Decl*> members;
 
@@ -54,7 +54,7 @@ class ContainerDecl: public Decl
 // Base class for all variable declarations
 class VarDeclBase : public Decl
 {
-    SLANG_ABSTRACT_CLASS(VarDeclBase)
+    SLANG_ABSTRACT_AST_CLASS(VarDeclBase)
 
     // type of the variable
     TypeExp type;
@@ -68,13 +68,13 @@ class VarDeclBase : public Decl
 // Ordinary potentially-mutable variables (locals, globals, and member variables)
 class VarDecl : public VarDeclBase
 {
-    SLANG_CLASS(VarDecl)
+    SLANG_AST_CLASS(VarDecl)
 };
 
 // A variable declaration that is always immutable (whether local, global, or member variable)
 class LetDecl : public VarDecl
 {
-    SLANG_CLASS(LetDecl)
+    SLANG_AST_CLASS(LetDecl)
 };
 
 // An `AggTypeDeclBase` captures the shared functionality
@@ -87,13 +87,13 @@ class LetDecl : public VarDecl
 //
 class AggTypeDeclBase : public ContainerDecl
 {
-    SLANG_ABSTRACT_CLASS(AggTypeDeclBase);
+    SLANG_ABSTRACT_AST_CLASS(AggTypeDeclBase);
 };
 
 // An extension to apply to an existing type
 class ExtensionDecl : public AggTypeDeclBase
 {
-    SLANG_CLASS(ExtensionDecl)
+    SLANG_AST_CLASS(ExtensionDecl)
 
     TypeExp targetType;
 };
@@ -101,7 +101,7 @@ class ExtensionDecl : public AggTypeDeclBase
 // Declaration of a type that represents some sort of aggregate
 class AggTypeDecl : public  AggTypeDeclBase
 {
-    SLANG_ABSTRACT_CLASS(AggTypeDecl)
+    SLANG_ABSTRACT_AST_CLASS(AggTypeDecl)
 
     FilteredMemberList<VarDecl> getFields()
     {
@@ -111,12 +111,12 @@ class AggTypeDecl : public  AggTypeDeclBase
 
 class StructDecl: public AggTypeDecl
 {
-    SLANG_CLASS(StructDecl);
+    SLANG_AST_CLASS(StructDecl);
 };
 
 class ClassDecl : public AggTypeDecl
 {
-    SLANG_CLASS(ClassDecl)
+    SLANG_AST_CLASS(ClassDecl)
 };
 
 
@@ -127,7 +127,7 @@ class ClassDecl : public AggTypeDecl
 //
 class EnumDecl : public AggTypeDecl
 {
-    SLANG_CLASS(EnumDecl)
+    SLANG_AST_CLASS(EnumDecl)
 
     Type* tagType = nullptr;
 };
@@ -144,7 +144,7 @@ class EnumDecl : public AggTypeDecl
 //
 class EnumCaseDecl : public Decl
 {
-    SLANG_CLASS(EnumCaseDecl)
+    SLANG_AST_CLASS(EnumCaseDecl)
 
     // type of the parent `enum`
     TypeExp type;
@@ -158,13 +158,13 @@ class EnumCaseDecl : public Decl
 // An interface which other types can conform to
 class InterfaceDecl : public  AggTypeDecl
 {
-    SLANG_CLASS(InterfaceDecl)
+    SLANG_AST_CLASS(InterfaceDecl)
 };
 
 
 class TypeConstraintDecl : public  Decl
 {
-    SLANG_ABSTRACT_CLASS(TypeConstraintDecl)
+    SLANG_ABSTRACT_AST_CLASS(TypeConstraintDecl)
 
     const TypeExp& getSup() const;
     // Overrides should be public so base classes can access
@@ -177,7 +177,7 @@ class TypeConstraintDecl : public  Decl
 //
 class InheritanceDecl : public TypeConstraintDecl
 {
-    SLANG_CLASS(InheritanceDecl)
+    SLANG_AST_CLASS(InheritanceDecl)
 
     // The type expression as written
     TypeExp base;
@@ -201,64 +201,64 @@ class InheritanceDecl : public TypeConstraintDecl
 // so that we can easily store conformances/constraints on type variables
 class SimpleTypeDecl : public Decl
 {
-    SLANG_ABSTRACT_CLASS(SimpleTypeDecl)
+    SLANG_ABSTRACT_AST_CLASS(SimpleTypeDecl)
 };
 
 // A `typedef` declaration
 class TypeDefDecl : public SimpleTypeDecl
 {
-    SLANG_CLASS(TypeDefDecl)
+    SLANG_AST_CLASS(TypeDefDecl)
    
     TypeExp type;
 };
 
 class TypeAliasDecl : public TypeDefDecl
 {
-    SLANG_CLASS(TypeAliasDecl)
+    SLANG_AST_CLASS(TypeAliasDecl)
 };
 
 // An 'assoctype' declaration, it is a container of inheritance clauses
 class AssocTypeDecl : public AggTypeDecl
 {
-    SLANG_CLASS(AssocTypeDecl)
+    SLANG_AST_CLASS(AssocTypeDecl)
 };
 
 // A 'type_param' declaration, which defines a generic
 // entry-point parameter. Is a container of GenericTypeConstraintDecl
 class GlobalGenericParamDecl : public AggTypeDecl
 {
-    SLANG_CLASS(GlobalGenericParamDecl)
+    SLANG_AST_CLASS(GlobalGenericParamDecl)
 };
 
 // A `__generic_value_param` declaration, which defines an existential
 // value parameter (not a type parameter.
 class GlobalGenericValueParamDecl : public VarDeclBase
 {
-    SLANG_CLASS(GlobalGenericValueParamDecl)
+    SLANG_AST_CLASS(GlobalGenericValueParamDecl)
 };
 
 // A scope for local declarations (e.g., as part of a statement)
 class ScopeDecl : public  ContainerDecl
 {
-    SLANG_CLASS(ScopeDecl)
+    SLANG_AST_CLASS(ScopeDecl)
 };
 
 // A function/initializer/subscript parameter (potentially mutable)
 class ParamDecl : public VarDeclBase
 {
-    SLANG_CLASS(ParamDecl)
+    SLANG_AST_CLASS(ParamDecl)
 };
 
 // A parameter of a function declared in "modern" types (immutable unless explicitly `out` or `inout`)
 class ModernParamDecl : public ParamDecl
 {
-    SLANG_CLASS(ModernParamDecl)
+    SLANG_AST_CLASS(ModernParamDecl)
 };
 
 // Base class for things that have parameter lists and can thus be applied to arguments ("called")
 class CallableDecl : public ContainerDecl
 {
-    SLANG_ABSTRACT_CLASS(CallableDecl)
+    SLANG_ABSTRACT_AST_CLASS(CallableDecl)
 
     FilteredMemberList<ParamDecl> getParameters()
     {
@@ -286,7 +286,7 @@ class CallableDecl : public ContainerDecl
 // Base class for callable things that may also have a body that is evaluated to produce their result
 class FunctionDeclBase : public CallableDecl
 {
-    SLANG_ABSTRACT_CLASS(FunctionDeclBase)
+    SLANG_ABSTRACT_AST_CLASS(FunctionDeclBase)
 
     Stmt* body = nullptr;
 };
@@ -294,19 +294,19 @@ class FunctionDeclBase : public CallableDecl
 // A constructor/initializer to create instances of a type
 class ConstructorDecl : public FunctionDeclBase
 {
-    SLANG_CLASS(ConstructorDecl)
+    SLANG_AST_CLASS(ConstructorDecl)
 };
 
 // A subscript operation used to index instances of a type
 class SubscriptDecl : public CallableDecl
 {
-    SLANG_CLASS(SubscriptDecl)
+    SLANG_AST_CLASS(SubscriptDecl)
 };
 
     /// A property declaration that abstracts over storage with a getter/setter/etc.
 class PropertyDecl : public ContainerDecl
 {
-    SLANG_CLASS(PropertyDecl)
+    SLANG_AST_CLASS(PropertyDecl)
 
     TypeExp type;
 };
@@ -314,30 +314,30 @@ class PropertyDecl : public ContainerDecl
 // An "accessor" for a subscript or property
 class AccessorDecl : public FunctionDeclBase
 {
-    SLANG_CLASS(AccessorDecl)
+    SLANG_AST_CLASS(AccessorDecl)
 };
 
 class GetterDecl : public AccessorDecl
 {
-    SLANG_CLASS(GetterDecl)
+    SLANG_AST_CLASS(GetterDecl)
 };
 class SetterDecl : public AccessorDecl
 {
-    SLANG_CLASS(SetterDecl)
+    SLANG_AST_CLASS(SetterDecl)
 };
 class RefAccessorDecl : public AccessorDecl
 {
-    SLANG_CLASS(RefAccessorDecl)
+    SLANG_AST_CLASS(RefAccessorDecl)
 };
 
 class FuncDecl : public FunctionDeclBase
 {
-    SLANG_CLASS(FuncDecl)
+    SLANG_AST_CLASS(FuncDecl)
 };
 
 class NamespaceDeclBase : public ContainerDecl
 {
-    SLANG_CLASS(NamespaceDeclBase)
+    SLANG_AST_CLASS(NamespaceDeclBase)
 };
 
     // A `namespace` declaration inside some module, that provides
@@ -350,14 +350,14 @@ class NamespaceDeclBase : public ContainerDecl
     //
 class NamespaceDecl : public NamespaceDeclBase
 {
-    SLANG_CLASS(NamespaceDecl)
+    SLANG_AST_CLASS(NamespaceDecl)
 };
 
     // A "module" of code (essentially, a single translation unit)
     // that provides a scope for some number of declarations.
 class ModuleDecl : public NamespaceDeclBase
 {
-    SLANG_CLASS(ModuleDecl)
+    SLANG_AST_CLASS(ModuleDecl)
     // The API-level module that this declaration belong to.
     //
     // This field allows lookup of the `Module` based on a
@@ -378,7 +378,7 @@ class ModuleDecl : public NamespaceDeclBase
     /// A declaration that brings members of another declaration or namespace into scope
 class UsingDecl : public Decl
 {
-    SLANG_CLASS(UsingDecl)
+    SLANG_AST_CLASS(UsingDecl)
 
         /// An expression that identifies the entity (e.g., a namespace) to be brought into `scope`
     Expr* arg;
@@ -389,7 +389,7 @@ class UsingDecl : public Decl
 
 class ImportDecl : public Decl
 {
-    SLANG_CLASS(ImportDecl)
+    SLANG_AST_CLASS(ImportDecl)
 
     // The name of the module we are trying to import
     NameLoc moduleNameAndLoc;
@@ -404,14 +404,14 @@ class ImportDecl : public Decl
 // A generic declaration, parameterized on types/values
 class GenericDecl : public ContainerDecl
 {
-    SLANG_CLASS(GenericDecl)
+    SLANG_AST_CLASS(GenericDecl)
     // The decl that is genericized...
     Decl* inner = nullptr;
 };
 
 class GenericTypeParamDecl : public SimpleTypeDecl
 {
-    SLANG_CLASS(GenericTypeParamDecl)
+    SLANG_AST_CLASS(GenericTypeParamDecl)
     // The bound for the type parameter represents a trait that any
     // type used as this parameter must conform to
 //            TypeExp bound;
@@ -423,7 +423,7 @@ class GenericTypeParamDecl : public SimpleTypeDecl
 // A constraint placed as part of a generic declaration
 class GenericTypeConstraintDecl : public TypeConstraintDecl
 {
-    SLANG_CLASS(GenericTypeConstraintDecl)
+    SLANG_AST_CLASS(GenericTypeConstraintDecl)
 
     // A type constraint like `T : U` is constraining `T` to be "below" `U`
     // on a lattice of types. This may not be a subtyping relationship
@@ -438,7 +438,7 @@ class GenericTypeConstraintDecl : public TypeConstraintDecl
 
 class GenericValueParamDecl : public VarDeclBase
 {
-    SLANG_CLASS(GenericValueParamDecl)
+    SLANG_AST_CLASS(GenericValueParamDecl)
 };
 
 // An empty declaration (which might still have modifiers attached).
@@ -452,7 +452,7 @@ class GenericValueParamDecl : public VarDeclBase
 //
 class EmptyDecl : public Decl
 {
-    SLANG_CLASS(EmptyDecl)
+    SLANG_AST_CLASS(EmptyDecl)
 };
 
 // A declaration used by the implementation to put syntax keywords
@@ -460,7 +460,7 @@ class EmptyDecl : public Decl
 //
 class SyntaxDecl : public Decl
 {
-    SLANG_CLASS(SyntaxDecl)
+    SLANG_AST_CLASS(SyntaxDecl)
 
     // What type of syntax node will be produced when parsing with this keyword?
     SyntaxClass<NodeBase> syntaxClass;
@@ -476,7 +476,7 @@ class SyntaxDecl : public Decl
 //
 class AttributeDecl : public ContainerDecl
 {
-    SLANG_CLASS(AttributeDecl)
+    SLANG_AST_CLASS(AttributeDecl)
     // What type of syntax node will be produced to represent this attribute.
     SyntaxClass<NodeBase> syntaxClass;
 };
@@ -488,7 +488,7 @@ class AttributeDecl : public ContainerDecl
 // declaration in another module.
 class ImportExternalDecl : public DeclBase
 {
-    SLANG_CLASS(ImportExternalDecl)
+    SLANG_AST_CLASS(ImportExternalDecl)
 
     String mangledName;
 };

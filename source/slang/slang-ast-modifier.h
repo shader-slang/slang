@@ -10,27 +10,27 @@ namespace Slang {
 
 // Simple modifiers have no state beyond their identity
 
-class InModifier : public Modifier { SLANG_CLASS(InModifier)};
-class OutModifier : public Modifier { SLANG_CLASS(OutModifier)};
-class ConstModifier : public Modifier { SLANG_CLASS(ConstModifier)};
-class InstanceModifier : public Modifier { SLANG_CLASS(InstanceModifier)};
-class BuiltinModifier : public Modifier { SLANG_CLASS(BuiltinModifier)};
-class InlineModifier : public Modifier { SLANG_CLASS(InlineModifier)};
-class PublicModifier : public Modifier { SLANG_CLASS(PublicModifier)};
-class RequireModifier : public Modifier { SLANG_CLASS(RequireModifier)};
-class ParamModifier : public Modifier { SLANG_CLASS(ParamModifier)};
-class ExternModifier : public Modifier { SLANG_CLASS(ExternModifier)};
-class InputModifier : public Modifier { SLANG_CLASS(InputModifier)};
-class TransparentModifier : public Modifier { SLANG_CLASS(TransparentModifier)};
-class FromStdLibModifier : public Modifier { SLANG_CLASS(FromStdLibModifier)};
-class PrefixModifier : public Modifier { SLANG_CLASS(PrefixModifier)};
-class PostfixModifier : public Modifier { SLANG_CLASS(PostfixModifier)};
-class ExportedModifier : public Modifier { SLANG_CLASS(ExportedModifier)};
-class ConstExprModifier : public Modifier { SLANG_CLASS(ConstExprModifier)};
-class GloballyCoherentModifier : public Modifier { SLANG_CLASS(GloballyCoherentModifier)};
+class InModifier : public Modifier { SLANG_AST_CLASS(InModifier)};
+class OutModifier : public Modifier { SLANG_AST_CLASS(OutModifier)};
+class ConstModifier : public Modifier { SLANG_AST_CLASS(ConstModifier)};
+class InstanceModifier : public Modifier { SLANG_AST_CLASS(InstanceModifier)};
+class BuiltinModifier : public Modifier { SLANG_AST_CLASS(BuiltinModifier)};
+class InlineModifier : public Modifier { SLANG_AST_CLASS(InlineModifier)};
+class PublicModifier : public Modifier { SLANG_AST_CLASS(PublicModifier)};
+class RequireModifier : public Modifier { SLANG_AST_CLASS(RequireModifier)};
+class ParamModifier : public Modifier { SLANG_AST_CLASS(ParamModifier)};
+class ExternModifier : public Modifier { SLANG_AST_CLASS(ExternModifier)};
+class InputModifier : public Modifier { SLANG_AST_CLASS(InputModifier)};
+class TransparentModifier : public Modifier { SLANG_AST_CLASS(TransparentModifier)};
+class FromStdLibModifier : public Modifier { SLANG_AST_CLASS(FromStdLibModifier)};
+class PrefixModifier : public Modifier { SLANG_AST_CLASS(PrefixModifier)};
+class PostfixModifier : public Modifier { SLANG_AST_CLASS(PostfixModifier)};
+class ExportedModifier : public Modifier { SLANG_AST_CLASS(ExportedModifier)};
+class ConstExprModifier : public Modifier { SLANG_AST_CLASS(ConstExprModifier)};
+class GloballyCoherentModifier : public Modifier { SLANG_AST_CLASS(GloballyCoherentModifier)};
 
     /// A modifier that indicates an `InheritanceDecl` should be ignored during name lookup (and related checks).
-class IgnoreForLookupModifier : public Modifier { SLANG_CLASS(IgnoreForLookupModifier) };
+class IgnoreForLookupModifier : public Modifier { SLANG_AST_CLASS(IgnoreForLookupModifier) };
 
 // A modifier that marks something as an operation that
 // has a one-to-one translation to the IR, and thus
@@ -38,7 +38,7 @@ class IgnoreForLookupModifier : public Modifier { SLANG_CLASS(IgnoreForLookupMod
 //
 class IntrinsicOpModifier : public Modifier 
 {
-    SLANG_CLASS(IntrinsicOpModifier)
+    SLANG_AST_CLASS(IntrinsicOpModifier)
  
     // Token that names the intrinsic op.
     Token opToken;
@@ -52,7 +52,7 @@ class IntrinsicOpModifier : public Modifier
 // for some subset of targets.
 class TargetIntrinsicModifier : public Modifier 
 {
-    SLANG_CLASS(TargetIntrinsicModifier)
+    SLANG_AST_CLASS(TargetIntrinsicModifier)
  
     // Token that names the target that the operation
     // is an intrisic for.
@@ -67,7 +67,7 @@ class TargetIntrinsicModifier : public Modifier
 // target.
 class SpecializedForTargetModifier : public Modifier 
 {
-    SLANG_CLASS(SpecializedForTargetModifier)
+    SLANG_AST_CLASS(SpecializedForTargetModifier)
  
     // Token that names the target that the operation
     // has been specialized for.
@@ -78,7 +78,7 @@ class SpecializedForTargetModifier : public Modifier
 // a certain GLSL extension to be enabled when used
 class RequiredGLSLExtensionModifier : public Modifier 
 {
-    SLANG_CLASS(RequiredGLSLExtensionModifier)
+    SLANG_AST_CLASS(RequiredGLSLExtensionModifier)
  
     Token extensionNameToken;
 };
@@ -87,7 +87,7 @@ class RequiredGLSLExtensionModifier : public Modifier
 // a certain GLSL version to be enabled when used
 class RequiredGLSLVersionModifier : public Modifier 
 {
-    SLANG_CLASS(RequiredGLSLVersionModifier)
+    SLANG_AST_CLASS(RequiredGLSLVersionModifier)
  
     Token versionNumberToken;
 };
@@ -97,7 +97,7 @@ class RequiredGLSLVersionModifier : public Modifier
 // a certain SPIRV version to be enabled when used. Specified as "major.minor"
 class RequiredSPIRVVersionModifier : public Modifier 
 {
-    SLANG_CLASS(RequiredSPIRVVersionModifier)
+    SLANG_AST_CLASS(RequiredSPIRVVersionModifier)
  
     SemanticVersion version;
 };
@@ -106,21 +106,21 @@ class RequiredSPIRVVersionModifier : public Modifier
 // a certain CUDA SM version to be enabled when used. Specified as "major.minor"
 class RequiredCUDASMVersionModifier : public Modifier 
 {
-    SLANG_CLASS(RequiredCUDASMVersionModifier)
+    SLANG_AST_CLASS(RequiredCUDASMVersionModifier)
  
     SemanticVersion version;
 };
 
 class InOutModifier : public OutModifier 
 {
-    SLANG_CLASS(InOutModifier)
+    SLANG_AST_CLASS(InOutModifier)
 };
 
 
 // `__ref` modifier for by-reference parameter passing
 class RefModifier : public Modifier 
 {
-    SLANG_CLASS(RefModifier)
+    SLANG_AST_CLASS(RefModifier)
 };
 
 
@@ -140,7 +140,7 @@ class RefModifier : public Modifier
 //
 class SharedModifiers : public Modifier 
 {
-    SLANG_CLASS(SharedModifiers)
+    SLANG_AST_CLASS(SharedModifiers)
 };
 
 
@@ -156,7 +156,7 @@ class SharedModifiers : public Modifier
 // different constructs.
 class GLSLLayoutModifier : public Modifier 
 {
-    SLANG_ABSTRACT_CLASS(GLSLLayoutModifier)
+    SLANG_ABSTRACT_AST_CLASS(GLSLLayoutModifier)
  
 
     // The token used to introduce the modifier is stored
@@ -169,17 +169,17 @@ class GLSLLayoutModifier : public Modifier
 // AST nodes to represent the begin/end of a `layout` modifier group
 class GLSLLayoutModifierGroupMarker : public Modifier 
 {
-    SLANG_ABSTRACT_CLASS(GLSLLayoutModifierGroupMarker)
+    SLANG_ABSTRACT_AST_CLASS(GLSLLayoutModifierGroupMarker)
 };
 
 class GLSLLayoutModifierGroupBegin : public GLSLLayoutModifierGroupMarker 
 {
-    SLANG_CLASS(GLSLLayoutModifierGroupBegin)
+    SLANG_AST_CLASS(GLSLLayoutModifierGroupBegin)
 };
 
 class GLSLLayoutModifierGroupEnd : public GLSLLayoutModifierGroupMarker 
 {
-    SLANG_CLASS(GLSLLayoutModifierGroupEnd)
+    SLANG_AST_CLASS(GLSLLayoutModifierGroupEnd)
 };
 
 
@@ -188,53 +188,53 @@ class GLSLLayoutModifierGroupEnd : public GLSLLayoutModifierGroupMarker
 // those we have not.
 class GLSLParsedLayoutModifier : public GLSLLayoutModifier 
 {
-    SLANG_ABSTRACT_CLASS(GLSLParsedLayoutModifier)
+    SLANG_ABSTRACT_AST_CLASS(GLSLParsedLayoutModifier)
 };
 
 class GLSLUnparsedLayoutModifier : public GLSLLayoutModifier 
 {
-    SLANG_CLASS(GLSLUnparsedLayoutModifier)
+    SLANG_AST_CLASS(GLSLUnparsedLayoutModifier)
 };
 
 
 // Specific cases for known GLSL `layout` modifiers that we need to work with
 class GLSLConstantIDLayoutModifier : public GLSLParsedLayoutModifier 
 {
-    SLANG_CLASS(GLSLConstantIDLayoutModifier)
+    SLANG_AST_CLASS(GLSLConstantIDLayoutModifier)
 };
 
 class GLSLLocationLayoutModifier : public GLSLParsedLayoutModifier 
 {
-    SLANG_CLASS(GLSLLocationLayoutModifier)
+    SLANG_AST_CLASS(GLSLLocationLayoutModifier)
 };
 
 
 // A catch-all for single-keyword modifiers
 class SimpleModifier : public Modifier 
 {
-    SLANG_CLASS(SimpleModifier)
+    SLANG_AST_CLASS(SimpleModifier)
 };
 
 
 // Some GLSL-specific modifiers
 class GLSLBufferModifier : public SimpleModifier 
 {
-    SLANG_CLASS(GLSLBufferModifier)
+    SLANG_AST_CLASS(GLSLBufferModifier)
 };
 
 class GLSLWriteOnlyModifier : public SimpleModifier 
 {
-    SLANG_CLASS(GLSLWriteOnlyModifier)
+    SLANG_AST_CLASS(GLSLWriteOnlyModifier)
 };
 
 class GLSLReadOnlyModifier : public SimpleModifier 
 {
-    SLANG_CLASS(GLSLReadOnlyModifier)
+    SLANG_AST_CLASS(GLSLReadOnlyModifier)
 };
 
 class GLSLPatchModifier : public SimpleModifier 
 {
-    SLANG_CLASS(GLSLPatchModifier)
+    SLANG_AST_CLASS(GLSLPatchModifier)
 };
 
 
@@ -242,7 +242,7 @@ class GLSLPatchModifier : public SimpleModifier
 // a parameter block declaration in the source program.
 class ImplicitParameterGroupVariableModifier : public Modifier 
 {
-    SLANG_CLASS(ImplicitParameterGroupVariableModifier)
+    SLANG_AST_CLASS(ImplicitParameterGroupVariableModifier)
 };
 
 
@@ -250,14 +250,14 @@ class ImplicitParameterGroupVariableModifier : public Modifier
 // type of a parameter block declaration in the source program.
 class ImplicitParameterGroupElementTypeModifier : public Modifier 
 {
-    SLANG_CLASS(ImplicitParameterGroupElementTypeModifier)
+    SLANG_AST_CLASS(ImplicitParameterGroupElementTypeModifier)
 };
 
 
 // An HLSL semantic
 class HLSLSemantic : public Modifier 
 {
-    SLANG_ABSTRACT_CLASS(HLSLSemantic)
+    SLANG_ABSTRACT_AST_CLASS(HLSLSemantic)
  
     Token name;
 };
@@ -265,7 +265,7 @@ class HLSLSemantic : public Modifier
 // An HLSL semantic that affects layout
 class HLSLLayoutSemantic : public HLSLSemantic 
 {
-    SLANG_CLASS(HLSLLayoutSemantic)
+    SLANG_AST_CLASS(HLSLLayoutSemantic)
  
     Token registerName;
     Token componentMask;
@@ -274,7 +274,7 @@ class HLSLLayoutSemantic : public HLSLSemantic
 // An HLSL `register` semantic
 class HLSLRegisterSemantic : public HLSLLayoutSemantic 
 {
-    SLANG_CLASS(HLSLRegisterSemantic)
+    SLANG_AST_CLASS(HLSLRegisterSemantic)
  
     Token spaceName;
 };
@@ -282,14 +282,14 @@ class HLSLRegisterSemantic : public HLSLLayoutSemantic
 // TODO(tfoley): `packoffset`
 class HLSLPackOffsetSemantic : public HLSLLayoutSemantic 
 {
-    SLANG_CLASS(HLSLPackOffsetSemantic)
+    SLANG_AST_CLASS(HLSLPackOffsetSemantic)
 };
 
 
 // An HLSL semantic that just associated a declaration with a semantic name
 class HLSLSimpleSemantic : public HLSLSemantic 
 {
-    SLANG_CLASS(HLSLSimpleSemantic)
+    SLANG_AST_CLASS(HLSLSimpleSemantic)
 };
 
 
@@ -299,14 +299,14 @@ class HLSLSimpleSemantic : public HLSLSemantic
 // that we need to keep around for later steps
 class GLSLPreprocessorDirective : public Modifier 
 {
-    SLANG_CLASS(GLSLPreprocessorDirective)
+    SLANG_AST_CLASS(GLSLPreprocessorDirective)
 };
 
 
 // A GLSL `#version` directive
 class GLSLVersionDirective : public GLSLPreprocessorDirective 
 {
-    SLANG_CLASS(GLSLVersionDirective)
+    SLANG_AST_CLASS(GLSLVersionDirective)
  
 
     // Token giving the version number to use
@@ -319,7 +319,7 @@ class GLSLVersionDirective : public GLSLPreprocessorDirective
 // A GLSL `#extension` directive
 class GLSLExtensionDirective : public GLSLPreprocessorDirective 
 {
-    SLANG_CLASS(GLSLExtensionDirective)
+    SLANG_AST_CLASS(GLSLExtensionDirective)
  
 
     // Token giving the version number to use
@@ -331,7 +331,7 @@ class GLSLExtensionDirective : public GLSLPreprocessorDirective
 
 class ParameterGroupReflectionName : public Modifier 
 {
-    SLANG_CLASS(ParameterGroupReflectionName)
+    SLANG_AST_CLASS(ParameterGroupReflectionName)
  
     NameLoc nameAndLoc;
 };
@@ -339,7 +339,7 @@ class ParameterGroupReflectionName : public Modifier
 // A modifier that indicates a built-in base type (e.g., `float`)
 class BuiltinTypeModifier : public Modifier 
 {
-    SLANG_CLASS(BuiltinTypeModifier)
+    SLANG_AST_CLASS(BuiltinTypeModifier)
  
     BaseType tag;
 };
@@ -349,7 +349,7 @@ class BuiltinTypeModifier : public Modifier
 // TODO(tfoley): This deserves a better name than "magic"
 class MagicTypeModifier : public Modifier 
 {
-    SLANG_CLASS(MagicTypeModifier)
+    SLANG_AST_CLASS(MagicTypeModifier)
  
     String name;
     uint32_t tag;
@@ -362,7 +362,7 @@ class MagicTypeModifier : public Modifier
 // `MagicTypeModifier` so that we don't have to apply all of them.
 class IntrinsicTypeModifier : public Modifier 
 {
-    SLANG_CLASS(IntrinsicTypeModifier)
+    SLANG_AST_CLASS(IntrinsicTypeModifier)
  
     // The IR opcode to use when constructing a type
     uint32_t irOp;
@@ -375,31 +375,31 @@ class IntrinsicTypeModifier : public Modifier
 // Modifiers that affect the storage layout for matrices
 class MatrixLayoutModifier : public Modifier 
 {
-    SLANG_CLASS(MatrixLayoutModifier)
+    SLANG_AST_CLASS(MatrixLayoutModifier)
 };
 
 
 // Modifiers that specify row- and column-major layout, respectively
 class RowMajorLayoutModifier : public MatrixLayoutModifier 
 {
-    SLANG_CLASS(RowMajorLayoutModifier)
+    SLANG_AST_CLASS(RowMajorLayoutModifier)
 };
 
 class ColumnMajorLayoutModifier : public MatrixLayoutModifier 
 {
-    SLANG_CLASS(ColumnMajorLayoutModifier)
+    SLANG_AST_CLASS(ColumnMajorLayoutModifier)
 };
 
 
 // The HLSL flavor of those modifiers
 class HLSLRowMajorLayoutModifier : public RowMajorLayoutModifier 
 {
-    SLANG_CLASS(HLSLRowMajorLayoutModifier)
+    SLANG_AST_CLASS(HLSLRowMajorLayoutModifier)
 };
 
 class HLSLColumnMajorLayoutModifier : public ColumnMajorLayoutModifier 
 {
-    SLANG_CLASS(HLSLColumnMajorLayoutModifier)
+    SLANG_AST_CLASS(HLSLColumnMajorLayoutModifier)
 };
 
 
@@ -412,12 +412,12 @@ class HLSLColumnMajorLayoutModifier : public ColumnMajorLayoutModifier
 // GLSL specifies them.
 class GLSLRowMajorLayoutModifier : public ColumnMajorLayoutModifier 
 {
-    SLANG_CLASS(GLSLRowMajorLayoutModifier)
+    SLANG_AST_CLASS(GLSLRowMajorLayoutModifier)
 };
 
 class GLSLColumnMajorLayoutModifier : public RowMajorLayoutModifier 
 {
-    SLANG_CLASS(GLSLColumnMajorLayoutModifier)
+    SLANG_AST_CLASS(GLSLColumnMajorLayoutModifier)
 };
 
 
@@ -425,49 +425,49 @@ class GLSLColumnMajorLayoutModifier : public RowMajorLayoutModifier
 
 class InterpolationModeModifier : public Modifier 
 {
-    SLANG_ABSTRACT_CLASS(InterpolationModeModifier)
+    SLANG_ABSTRACT_AST_CLASS(InterpolationModeModifier)
  
 };
 
 // HLSL `nointerpolation` modifier
 class HLSLNoInterpolationModifier : public InterpolationModeModifier 
 {
-    SLANG_CLASS(HLSLNoInterpolationModifier)
+    SLANG_AST_CLASS(HLSLNoInterpolationModifier)
 };
 
 
 // HLSL `noperspective` modifier
 class HLSLNoPerspectiveModifier : public InterpolationModeModifier 
 {
-    SLANG_CLASS(HLSLNoPerspectiveModifier)
+    SLANG_AST_CLASS(HLSLNoPerspectiveModifier)
 };
 
 
 // HLSL `linear` modifier
 class HLSLLinearModifier : public InterpolationModeModifier 
 {
-    SLANG_CLASS(HLSLLinearModifier)
+    SLANG_AST_CLASS(HLSLLinearModifier)
 };
 
 
 // HLSL `sample` modifier
 class HLSLSampleModifier : public InterpolationModeModifier 
 {
-    SLANG_CLASS(HLSLSampleModifier)
+    SLANG_AST_CLASS(HLSLSampleModifier)
 };
 
 
 // HLSL `centroid` modifier
 class HLSLCentroidModifier : public InterpolationModeModifier 
 {
-    SLANG_CLASS(HLSLCentroidModifier)
+    SLANG_AST_CLASS(HLSLCentroidModifier)
 };
 
 
 // HLSL `precise` modifier
 class PreciseModifier : public Modifier 
 {
-    SLANG_CLASS(PreciseModifier)
+    SLANG_AST_CLASS(PreciseModifier)
 };
 
 
@@ -475,14 +475,14 @@ class PreciseModifier : public Modifier
 // and shouldn't be confused with `groupshared`)
 class HLSLEffectSharedModifier : public Modifier 
 {
-    SLANG_CLASS(HLSLEffectSharedModifier)
+    SLANG_AST_CLASS(HLSLEffectSharedModifier)
 };
 
 
 // HLSL `groupshared` modifier
 class HLSLGroupSharedModifier : public Modifier 
 {
-    SLANG_CLASS(HLSLGroupSharedModifier)
+    SLANG_AST_CLASS(HLSLGroupSharedModifier)
 };
 
 
@@ -490,7 +490,7 @@ class HLSLGroupSharedModifier : public Modifier
 // treated as HLSL-specific)
 class HLSLStaticModifier : public Modifier 
 {
-    SLANG_CLASS(HLSLStaticModifier)
+    SLANG_AST_CLASS(HLSLStaticModifier)
 };
 
 
@@ -498,20 +498,20 @@ class HLSLStaticModifier : public Modifier
 // use of the keyword)
 class HLSLUniformModifier : public Modifier 
 {
-    SLANG_CLASS(HLSLUniformModifier)
+    SLANG_AST_CLASS(HLSLUniformModifier)
 };
 
 
 // HLSL `volatile` modifier (ignored)
 class HLSLVolatileModifier : public Modifier 
 {
-    SLANG_CLASS(HLSLVolatileModifier)
+    SLANG_AST_CLASS(HLSLVolatileModifier)
 };
 
 
 class AttributeTargetModifier : public Modifier 
 {
-    SLANG_CLASS(AttributeTargetModifier)
+    SLANG_AST_CLASS(AttributeTargetModifier)
  
     // A class to which the declared attribute type is applicable
     SyntaxClass<NodeBase> syntaxClass;
@@ -520,7 +520,7 @@ class AttributeTargetModifier : public Modifier
 // Base class for checked and unchecked `[name(arg0, ...)]` style attribute.
 class AttributeBase : public Modifier 
 {
-    SLANG_CLASS(AttributeBase)
+    SLANG_AST_CLASS(AttributeBase)
  
     List<Expr*> args;
 };
@@ -529,7 +529,7 @@ class AttributeBase : public Modifier
 // After analysis, this will be transformed into a more specific case.
 class UncheckedAttribute : public AttributeBase 
 {
-    SLANG_CLASS(UncheckedAttribute)
+    SLANG_AST_CLASS(UncheckedAttribute)
  
     RefPtr<Scope> scope;
 };
@@ -537,20 +537,20 @@ class UncheckedAttribute : public AttributeBase
 // A `[name(arg0, ...)]` style attribute that has been validated.
 class Attribute : public AttributeBase 
 {
-    SLANG_CLASS(Attribute)
+    SLANG_AST_CLASS(Attribute)
  
     AttributeArgumentValueDict intArgVals;
 };
 
 class UserDefinedAttribute : public Attribute 
 {
-    SLANG_CLASS(UserDefinedAttribute)
+    SLANG_AST_CLASS(UserDefinedAttribute)
  
 };
 
 class AttributeUsageAttribute : public Attribute 
 {
-    SLANG_CLASS(AttributeUsageAttribute)
+    SLANG_AST_CLASS(AttributeUsageAttribute)
  
     SyntaxClass<NodeBase> targetSyntaxClass;
 };
@@ -558,44 +558,44 @@ class AttributeUsageAttribute : public Attribute
 // An `[unroll]` or `[unroll(count)]` attribute
 class UnrollAttribute : public Attribute 
 {
-    SLANG_CLASS(UnrollAttribute)
+    SLANG_AST_CLASS(UnrollAttribute)
  
     IntegerLiteralValue getCount();
 };
 
 class LoopAttribute : public Attribute 
 {
-    SLANG_CLASS(LoopAttribute)
+    SLANG_AST_CLASS(LoopAttribute)
 };
                // `[loop]`
 class FastOptAttribute : public Attribute 
 {
-    SLANG_CLASS(FastOptAttribute)
+    SLANG_AST_CLASS(FastOptAttribute)
 };
             // `[fastopt]`
 class AllowUAVConditionAttribute : public Attribute 
 {
-    SLANG_CLASS(AllowUAVConditionAttribute)
+    SLANG_AST_CLASS(AllowUAVConditionAttribute)
 };
   // `[allow_uav_condition]`
 class BranchAttribute : public Attribute 
 {
-    SLANG_CLASS(BranchAttribute)
+    SLANG_AST_CLASS(BranchAttribute)
 };
              // `[branch]`
 class FlattenAttribute : public Attribute 
 {
-    SLANG_CLASS(FlattenAttribute)
+    SLANG_AST_CLASS(FlattenAttribute)
 };
             // `[flatten]`
 class ForceCaseAttribute : public Attribute 
 {
-    SLANG_CLASS(ForceCaseAttribute)
+    SLANG_AST_CLASS(ForceCaseAttribute)
 };
           // `[forcecase]`
 class CallAttribute : public Attribute 
 {
-    SLANG_CLASS(CallAttribute)
+    SLANG_AST_CLASS(CallAttribute)
 };
                // `[call]`
 
@@ -603,21 +603,21 @@ class CallAttribute : public Attribute
 // [[vk_push_constant]] [[push_constant]]
 class PushConstantAttribute : public Attribute 
 {
-    SLANG_CLASS(PushConstantAttribute)
+    SLANG_AST_CLASS(PushConstantAttribute)
 };
 
 
 // [[vk_shader_record]] [[shader_record]]
 class ShaderRecordAttribute : public Attribute 
 {
-    SLANG_CLASS(ShaderRecordAttribute)
+    SLANG_AST_CLASS(ShaderRecordAttribute)
 };
 
 
 // [[vk_binding]]
 class GLSLBindingAttribute : public Attribute 
 {
-    SLANG_CLASS(GLSLBindingAttribute)
+    SLANG_AST_CLASS(GLSLBindingAttribute)
  
     int32_t binding = 0;
     int32_t set = 0;
@@ -625,7 +625,7 @@ class GLSLBindingAttribute : public Attribute
 
 class GLSLSimpleIntegerLayoutAttribute : public Attribute 
 {
-    SLANG_CLASS(GLSLSimpleIntegerLayoutAttribute)
+    SLANG_AST_CLASS(GLSLSimpleIntegerLayoutAttribute)
  
     int32_t value = 0;
 };
@@ -633,14 +633,14 @@ class GLSLSimpleIntegerLayoutAttribute : public Attribute
 // [[vk_location]]
 class GLSLLocationAttribute : public GLSLSimpleIntegerLayoutAttribute 
 {
-    SLANG_CLASS(GLSLLocationAttribute)
+    SLANG_AST_CLASS(GLSLLocationAttribute)
 };
 
 
 // [[vk_index]]
 class GLSLIndexAttribute : public GLSLSimpleIntegerLayoutAttribute 
 {
-    SLANG_CLASS(GLSLIndexAttribute)
+    SLANG_AST_CLASS(GLSLIndexAttribute)
 };
 
 
@@ -649,46 +649,46 @@ class GLSLIndexAttribute : public GLSLSimpleIntegerLayoutAttribute
 
 class MaxTessFactorAttribute : public Attribute 
 {
-    SLANG_CLASS(MaxTessFactorAttribute)
+    SLANG_AST_CLASS(MaxTessFactorAttribute)
 };
 
 class OutputControlPointsAttribute : public Attribute 
 {
-    SLANG_CLASS(OutputControlPointsAttribute)
+    SLANG_AST_CLASS(OutputControlPointsAttribute)
 };
 
 class OutputTopologyAttribute : public Attribute 
 {
-    SLANG_CLASS(OutputTopologyAttribute)
+    SLANG_AST_CLASS(OutputTopologyAttribute)
 };
 
 class PartitioningAttribute : public Attribute 
 {
-    SLANG_CLASS(PartitioningAttribute)
+    SLANG_AST_CLASS(PartitioningAttribute)
 };
 
 class PatchConstantFuncAttribute : public Attribute 
 {
-    SLANG_CLASS(PatchConstantFuncAttribute)
+    SLANG_AST_CLASS(PatchConstantFuncAttribute)
  
     FuncDecl* patchConstantFuncDecl = nullptr;
 };
 class DomainAttribute : public Attribute 
 {
-    SLANG_CLASS(DomainAttribute)
+    SLANG_AST_CLASS(DomainAttribute)
 };
 
 
 class EarlyDepthStencilAttribute : public Attribute 
 {
-    SLANG_CLASS(EarlyDepthStencilAttribute)
+    SLANG_AST_CLASS(EarlyDepthStencilAttribute)
 };
   // `[earlydepthstencil]`
 
 // An HLSL `[numthreads(x,y,z)]` attribute
 class NumThreadsAttribute : public Attribute 
 {
-    SLANG_CLASS(NumThreadsAttribute)
+    SLANG_AST_CLASS(NumThreadsAttribute)
  
     // The number of threads to use along each axis
     //
@@ -701,7 +701,7 @@ class NumThreadsAttribute : public Attribute
 
 class MaxVertexCountAttribute : public Attribute 
 {
-    SLANG_CLASS(MaxVertexCountAttribute)
+    SLANG_AST_CLASS(MaxVertexCountAttribute)
  
     // The number of max vertex count for geometry shader
     //
@@ -712,7 +712,7 @@ class MaxVertexCountAttribute : public Attribute
 
 class InstanceAttribute : public Attribute 
 {
-    SLANG_CLASS(InstanceAttribute)
+    SLANG_AST_CLASS(InstanceAttribute)
  
     // The number of instances to run for geometry shader
     //
@@ -725,7 +725,7 @@ class InstanceAttribute : public Attribute
 // to be compiled, and specifies the stage for that entry point
 class EntryPointAttribute : public Attribute 
 {
-    SLANG_CLASS(EntryPointAttribute)
+    SLANG_AST_CLASS(EntryPointAttribute)
  
     // The resolved stage that the entry point is targetting.
     //
@@ -740,7 +740,7 @@ class EntryPointAttribute : public Attribute
 // ray tracing shader to pass per-ray payload information.
 class VulkanRayPayloadAttribute : public Attribute 
 {
-    SLANG_CLASS(VulkanRayPayloadAttribute)
+    SLANG_AST_CLASS(VulkanRayPayloadAttribute)
 };
 
 
@@ -750,7 +750,7 @@ class VulkanRayPayloadAttribute : public Attribute
 // ray tracing shader to pass payload information to/from a callee.
 class VulkanCallablePayloadAttribute : public Attribute 
 {
-    SLANG_CLASS(VulkanCallablePayloadAttribute)
+    SLANG_AST_CLASS(VulkanCallablePayloadAttribute)
 };
 
 
@@ -760,7 +760,7 @@ class VulkanCallablePayloadAttribute : public Attribute
 // intersection shader to pass hit attribute information.
 class VulkanHitAttributesAttribute : public Attribute 
 {
-    SLANG_CLASS(VulkanHitAttributesAttribute)
+    SLANG_AST_CLASS(VulkanHitAttributesAttribute)
 };
 
 
@@ -770,7 +770,7 @@ class VulkanHitAttributesAttribute : public Attribute
 //
 class MutatingAttribute : public Attribute 
 {
-    SLANG_CLASS(MutatingAttribute)
+    SLANG_AST_CLASS(MutatingAttribute)
 };
 
 // A `[nonmutating]` attribute, which indicates that a
@@ -779,7 +779,7 @@ class MutatingAttribute : public Attribute
 //
 class NonmutatingAttribute : public Attribute
 {
-    SLANG_CLASS(NonmutatingAttribute)
+    SLANG_AST_CLASS(NonmutatingAttribute)
 };
 
 
@@ -790,7 +790,7 @@ class NonmutatingAttribute : public Attribute
 //
 class ReadNoneAttribute : public Attribute 
 {
-    SLANG_CLASS(ReadNoneAttribute)
+    SLANG_AST_CLASS(ReadNoneAttribute)
 };
 
 
@@ -798,32 +798,32 @@ class ReadNoneAttribute : public Attribute
 // HLSL modifiers for geometry shader input topology
 class HLSLGeometryShaderInputPrimitiveTypeModifier : public Modifier 
 {
-    SLANG_CLASS(HLSLGeometryShaderInputPrimitiveTypeModifier)
+    SLANG_AST_CLASS(HLSLGeometryShaderInputPrimitiveTypeModifier)
 };
 
 class HLSLPointModifier : public HLSLGeometryShaderInputPrimitiveTypeModifier 
 {
-    SLANG_CLASS(HLSLPointModifier)
+    SLANG_AST_CLASS(HLSLPointModifier)
 };
 
 class HLSLLineModifier : public HLSLGeometryShaderInputPrimitiveTypeModifier 
 {
-    SLANG_CLASS(HLSLLineModifier)
+    SLANG_AST_CLASS(HLSLLineModifier)
 };
 
 class HLSLTriangleModifier : public HLSLGeometryShaderInputPrimitiveTypeModifier 
 {
-    SLANG_CLASS(HLSLTriangleModifier)
+    SLANG_AST_CLASS(HLSLTriangleModifier)
 };
 
 class HLSLLineAdjModifier : public HLSLGeometryShaderInputPrimitiveTypeModifier 
 {
-    SLANG_CLASS(HLSLLineAdjModifier)
+    SLANG_AST_CLASS(HLSLLineAdjModifier)
 };
 
 class HLSLTriangleAdjModifier : public HLSLGeometryShaderInputPrimitiveTypeModifier 
 {
-    SLANG_CLASS(HLSLTriangleAdjModifier)
+    SLANG_AST_CLASS(HLSLTriangleAdjModifier)
 };
 
 // A modifier to indicate that a constructor/initializer can be used
@@ -831,7 +831,7 @@ class HLSLTriangleAdjModifier : public HLSLGeometryShaderInputPrimitiveTypeModif
 // the conversion, if applied.
 class ImplicitConversionModifier : public Modifier 
 {
-    SLANG_CLASS(ImplicitConversionModifier)
+    SLANG_AST_CLASS(ImplicitConversionModifier)
  
     // The conversion cost, used to rank conversions
     ConversionCost cost;
@@ -839,14 +839,14 @@ class ImplicitConversionModifier : public Modifier
 
 class FormatAttribute : public Attribute 
 {
-    SLANG_CLASS(FormatAttribute)
+    SLANG_AST_CLASS(FormatAttribute)
  
     ImageFormat format;
 };
 
 class AllowAttribute : public Attribute 
 {
-    SLANG_CLASS(AllowAttribute)
+    SLANG_AST_CLASS(AllowAttribute)
  
     DiagnosticInfo const* diagnostic = nullptr;
 };
@@ -856,7 +856,7 @@ class AllowAttribute : public Attribute
 //
 class ExternAttribute : public Attribute 
 {
-    SLANG_CLASS(ExternAttribute)
+    SLANG_AST_CLASS(ExternAttribute)
 };
 
 
@@ -865,30 +865,30 @@ class ExternAttribute : public Attribute
 //
 class UnsafeForceInlineEarlyAttribute : public Attribute 
 {
-    SLANG_CLASS(UnsafeForceInlineEarlyAttribute)
+    SLANG_AST_CLASS(UnsafeForceInlineEarlyAttribute)
 };
 
     /// An attribute that marks a type declaration as either allowing or
     /// disallowing the type to be inherited from in other modules.
-class InheritanceControlAttribute : public Attribute { SLANG_CLASS(InheritanceControlAttribute) };
+class InheritanceControlAttribute : public Attribute { SLANG_AST_CLASS(InheritanceControlAttribute) };
 
     /// An attribute that marks a type declaration as allowing the type to be inherited from in other modules.
-class OpenAttribute : public InheritanceControlAttribute { SLANG_CLASS(OpenAttribute) };
+class OpenAttribute : public InheritanceControlAttribute { SLANG_AST_CLASS(OpenAttribute) };
 
     /// An attribute that marks a type declaration as disallowing the type to be inherited from in other modules.
-class SealedAttribute : public InheritanceControlAttribute { SLANG_CLASS(SealedAttribute) };
+class SealedAttribute : public InheritanceControlAttribute { SLANG_AST_CLASS(SealedAttribute) };
 
     /// An attribute that marks a decl as a compiler built-in object.
 class BuiltinAttribute : public Attribute
 {
-    SLANG_CLASS(BuiltinAttribute)
+    SLANG_AST_CLASS(BuiltinAttribute)
 };
 
     /// An attribute that defines the size of `AnyValue` type to represent a polymoprhic value that conforms to
     /// the decorated interface type.
 class AnyValueSizeAttribute : public Attribute
 {
-    SLANG_CLASS(AnyValueSizeAttribute)
+    SLANG_AST_CLASS(AnyValueSizeAttribute)
 
     int32_t size;
 };
@@ -897,7 +897,7 @@ class AnyValueSizeAttribute : public Attribute
     /// requires NVAPI operations for its implementation on D3D.
 class RequiresNVAPIAttribute : public Attribute
 {
-    SLANG_CLASS(RequiresNVAPIAttribute)
+    SLANG_AST_CLASS(RequiresNVAPIAttribute)
 };
 
     /// Indicates that the modified declaration is one of the "magic" declarations
@@ -906,7 +906,7 @@ class RequiresNVAPIAttribute : public Attribute
     /// will not be emitted, instead allowing the versions from the prelude to be used.
 class NVAPIMagicModifier : public Modifier
 {
-    SLANG_CLASS(NVAPIMagicModifier)
+    SLANG_AST_CLASS(NVAPIMagicModifier)
 };
 
     /// A modifier that attaches to a `ModuleDecl` to indicate the register/space binding
@@ -914,7 +914,7 @@ class NVAPIMagicModifier : public Modifier
     /// `NV_SHADER_EXTN_REGISTER_SPACE` preprocessor definitions.
 class NVAPISlotModifier : public Modifier
 {
-    SLANG_CLASS(NVAPISlotModifier)
+    SLANG_AST_CLASS(NVAPISlotModifier)
 
         /// The name of the register that is to be used (e.g., `"u3"`)
         ///

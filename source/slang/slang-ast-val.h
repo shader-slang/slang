@@ -11,13 +11,13 @@ namespace Slang {
 // A compile-time integer (may not have a specific concrete value)
 class IntVal : public Val 
 {
-    SLANG_ABSTRACT_CLASS(IntVal)
+    SLANG_ABSTRACT_AST_CLASS(IntVal)
 };
 
 // Trivial case of a value that is just a constant integer
 class ConstantIntVal : public IntVal 
 {
-    SLANG_CLASS(ConstantIntVal)
+    SLANG_AST_CLASS(ConstantIntVal)
 
     IntegerLiteralValue value;
 
@@ -36,7 +36,7 @@ protected:
 // The logical "value" of a reference to a generic value parameter
 class GenericParamIntVal : public IntVal 
 {
-    SLANG_CLASS(GenericParamIntVal)
+    SLANG_AST_CLASS(GenericParamIntVal)
 
     DeclRef<VarDeclBase> declRef;
 
@@ -55,7 +55,7 @@ protected:
     /// An unknown integer value indicating an erroneous sub-expression
 class ErrorIntVal : public IntVal 
 {
-    SLANG_CLASS(ErrorIntVal)
+    SLANG_AST_CLASS(ErrorIntVal)
 
     // TODO: We should probably eventually just have an `ErrorVal` here
     // and have all `Val`s that represent ordinary values hold their
@@ -103,7 +103,7 @@ class ErrorIntVal : public IntVal
 // 
 class Witness : public Val 
 {
-    SLANG_ABSTRACT_CLASS(Witness)
+    SLANG_ABSTRACT_AST_CLASS(Witness)
 };
 
 // A witness that one type is a subtype of another
@@ -113,7 +113,7 @@ class Witness : public Val
 // TODO: we may need to tease those apart.
 class SubtypeWitness : public Witness 
 {
-    SLANG_ABSTRACT_CLASS(SubtypeWitness)
+    SLANG_ABSTRACT_AST_CLASS(SubtypeWitness)
 
     Type* sub = nullptr;
     Type* sup = nullptr;
@@ -121,7 +121,7 @@ class SubtypeWitness : public Witness
 
 class TypeEqualityWitness : public SubtypeWitness 
 {
-    SLANG_CLASS(TypeEqualityWitness)
+    SLANG_AST_CLASS(TypeEqualityWitness)
 
     // Overrides should be public so base classes can access
     bool _equalsValOverride(Val* val);
@@ -134,7 +134,7 @@ class TypeEqualityWitness : public SubtypeWitness
 // because some in-scope declaration says so
 class DeclaredSubtypeWitness : public SubtypeWitness 
 {
-    SLANG_CLASS(DeclaredSubtypeWitness)
+    SLANG_AST_CLASS(DeclaredSubtypeWitness)
 
     DeclRef<Decl> declRef;
 
@@ -148,7 +148,7 @@ class DeclaredSubtypeWitness : public SubtypeWitness
 // A witness that `sub : sup` because `sub : mid` and `mid : sup`
 class TransitiveSubtypeWitness : public SubtypeWitness 
 {
-    SLANG_CLASS(TransitiveSubtypeWitness)
+    SLANG_AST_CLASS(TransitiveSubtypeWitness)
 
     // Witness that `sub : mid`
     SubtypeWitness* subToMid = nullptr;
@@ -167,7 +167,7 @@ class TransitiveSubtypeWitness : public SubtypeWitness
 // an existential of type `sup`.
 class ExtractExistentialSubtypeWitness : public SubtypeWitness 
 {
-    SLANG_CLASS(ExtractExistentialSubtypeWitness)
+    SLANG_AST_CLASS(ExtractExistentialSubtypeWitness)
 
     // The declaration of the existential value that has been opened
     DeclRef<VarDeclBase> declRef;
@@ -185,7 +185,7 @@ class ExtractExistentialSubtypeWitness : public SubtypeWitness
 //
 class TaggedUnionSubtypeWitness : public SubtypeWitness 
 {
-    SLANG_CLASS(TaggedUnionSubtypeWitness)
+    SLANG_AST_CLASS(TaggedUnionSubtypeWitness)
 
     // Witnesses that each of the "case" types in the union
     // is a subtype of `sup`.
@@ -203,14 +203,14 @@ class TaggedUnionSubtypeWitness : public SubtypeWitness
     /// A witness of the fact that `ThisType(someInterface) : someInterface`
 class ThisTypeSubtypeWitness : public SubtypeWitness
 {
-    SLANG_CLASS(ThisTypeSubtypeWitness)
+    SLANG_AST_CLASS(ThisTypeSubtypeWitness)
 };
 
     /// A witness of the fact that a user provided "__Dynamic" type argument is a
     /// subtype to the existential type parameter.
 class DynamicSubtypeWitness : public SubtypeWitness
 {
-    SLANG_CLASS(DynamicSubtypeWitness)
+    SLANG_AST_CLASS(DynamicSubtypeWitness)
 };
 
 } // namespace Slang
