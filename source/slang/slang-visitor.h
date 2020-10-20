@@ -7,7 +7,7 @@
 
 #include "slang-syntax.h"
 
-#include "slang-ast-generated-macro.h"
+#include "slang-generated-ast-macro.h"
 
 namespace Slang {
 

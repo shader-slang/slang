@@ -6,7 +6,7 @@
 
 #include "../core/slang-string.h"
 
-#include "slang-ast-generated-macro.h"
+#include "slang-generated-ast-macro.h"
 
 namespace Slang {
 

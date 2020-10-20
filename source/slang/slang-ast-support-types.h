@@ -9,7 +9,7 @@
 
 #include "../core/slang-semantic-version.h"
 
-#include "slang-ast-generated.h" 
+#include "slang-generated-ast.h" 
 
 #include "slang-serialize-reflection.h"
 

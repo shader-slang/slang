@@ -26,17 +26,6 @@
 Some command lines:
 
 -d source/slang slang-ast-support-types.h slang-ast-base.h slang-ast-decl.h slang-ast-expr.h slang-ast-modifier.h slang-ast-stmt.h slang-ast-type.h slang-ast-val.h -strip-prefix slang- -o slang-generated -output-fields -mark-suffix _CLASS
-
-
-For AST
--d source/slang slang-ast-base.h slang-ast-decl.h slang-ast-expr.h slang-ast-modifier.h slang-ast-stmt.h slang-ast-type.h slang-ast-val.h -strip-prefix slang-ast- -o slang-ast-generated -output-fields -mark-suffix _CLASS
-
-For RefObjects
--d source/slang slang-ast-support-types.h -strip-prefix slang- -reflect-type RefObject -o slang-ref-object-generated -output-fields -mark-suffix _OBJ_CLASS
-
-For Values
-
--d source/slang slang-ast-support-types.h -strip-prefix slang- -reflect-type Value -o slang-value-generated -output-fields -mark-suffix _VALUE_CLASS
 */
 
 namespace SlangExperimental
@@ -1254,13 +1243,7 @@ SlangResult CPPExtractor::_maybeParseNode(Node::Type type)
         SLANG_ASSERT(_isMarker(slice));
 
         // Strip the prefix and suffix
-        slice = UnownedStringSlice(slice.begin() + m_options->m_markPrefix.getLength(), slice.end());
-
-        UnownedStringSlice classSlice("_CLASS");
-        if (slice.endsWith(classSlice))
-        {
-            slice = UnownedStringSlice(slice.begin(), slice.end() - classSlice.getLength());
-        }
+        slice = UnownedStringSlice(slice.begin() + m_options->m_markPrefix.getLength(), slice.end() - m_options->m_markSuffix.getLength());
 
         // Strip ABSTRACT_ if it's there
         UnownedStringSlice abstractSlice("ABSTRACT_");
