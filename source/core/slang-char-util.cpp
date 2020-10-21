@@ -36,8 +36,8 @@ static const CharUtil::CharFlagMap _calcCharFlagsMap()
     }
 
     {
-        map.flags[size_t(' ')] |= Flag::LineWhitespace;
-        map.flags[size_t('\t')] |= Flag::LineWhitespace;
+        map.flags[size_t(' ')] |= Flag::HorizontalWhitespace;
+        map.flags[size_t('\t')] |= Flag::HorizontalWhitespace;
     }
 
     return map;

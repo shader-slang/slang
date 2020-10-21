@@ -109,8 +109,8 @@ namespace Slang
         const char* start = m_begin;
         const char* end = m_end;
 
-        while (start < end && CharUtil::isLineWhitespace(*start)) start++;
-        while (end > start && CharUtil::isLineWhitespace(end[-1])) end--;
+        while (start < end && CharUtil::isHorizontalWhitespace(*start)) start++;
+        while (end > start && CharUtil::isHorizontalWhitespace(end[-1])) end--;
         return UnownedStringSlice(start, end);
     }
 

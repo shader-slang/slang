@@ -12,18 +12,18 @@ struct CharUtil
     {
         enum Enum : Flags
         {
-            Upper           = 0x01,
-            Lower           = 0x02,
-            Digit           = 0x04,         
-            LineWhitespace  = 0x08,         ///< Whitespace that can appear in a line (ie excluding CR/LF)
-            HexDigit        = 0x10,         ///< 0-9, a-f, A-F
+            Upper                       = 0x01,
+            Lower                       = 0x02,
+            Digit                       = 0x04,         
+            HorizontalWhitespace        = 0x08,         ///< Whitespace that can appear in a line (ie excluding CR/LF)
+            HexDigit                    = 0x10,         ///< 0-9, a-f, A-F
         };
     };
 
     SLANG_FORCE_INLINE static bool isDigit(char c) { return c >= '0' && c <= '9'; }
     SLANG_FORCE_INLINE static bool isLower(char c) { return c >= 'a' && c <= 'z'; }
     SLANG_FORCE_INLINE static bool isUpper(char c) { return c >= 'A' && c <= 'Z'; }
-    SLANG_FORCE_INLINE static bool isLineWhitespace(char c) { return c == ' ' || c == '\t'; }
+    SLANG_FORCE_INLINE static bool isHorizontalWhitespace(char c) { return c == ' ' || c == '\t'; }
 
         /// True if it's alpha
     SLANG_FORCE_INLINE static bool isAlpha(char c) { return (getFlags(c) & (Flag::Upper | Flag::Lower)) != 0; }
@@ -31,7 +31,7 @@ struct CharUtil
     SLANG_FORCE_INLINE static bool isHexDigit(char c) { return (getFlags(c) & Flag::HexDigit) != 0; }
 
         /// For a given character get the associated flags
-    SLANG_FORCE_INLINE static Flags getFlags(char c) { return g_charFlagMap.flags[UInt(c)]; }
+    SLANG_FORCE_INLINE static Flags getFlags(char c) { return g_charFlagMap.flags[size_t(c)]; }
 
         /// Given a character return the lower case equivalent 
     SLANG_FORCE_INLINE static char toLower(char c) { return (c >= 'A' && c <= 'Z') ? (c -'A' + 'a') : c; }
