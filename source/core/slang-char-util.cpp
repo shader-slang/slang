@@ -31,7 +31,7 @@ static const CharUtil::CharFlagMap _calcCharFlagsMap()
         for (Index i = 'a'; i <= 'f'; ++i)
         {
             map.flags[i] |= Flag::HexDigit;
-            map.flags[CharUtil::toUpper(char(i))] |= Flag::HexDigit;
+            map.flags[size_t(CharUtil::toUpper(char(i)))] |= Flag::HexDigit;
         }
     }
 
