@@ -798,7 +798,6 @@ generatorProject("run-generators", "source/slang/")
     {
         "source/slang/*.meta.slang",                -- The stdlib files
         "source/slang/slang-ast-reflect.h",         -- C++ reflection 
-        "source/slang/slang-ref-object-reflect.h",  -- More C++ reflection
         "prelude/*.h",                              -- The prelude files
         
         --
