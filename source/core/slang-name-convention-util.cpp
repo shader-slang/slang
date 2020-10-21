@@ -54,7 +54,7 @@ namespace Slang
                     if (prevFlags & CharFlag::Lower)
                     {
                         // If we go from lower to upper, we have a transition
-                        out.add(UnownedStringSlice(start, cur - 1));
+                        out.add(UnownedStringSlice(start, cur));
                         start = cur;
                     }
                     else if ((prevFlags & CharFlag::Upper) && cur + 1 < end)
