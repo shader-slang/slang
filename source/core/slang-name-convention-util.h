@@ -21,6 +21,14 @@ enum class CharCase
     Lower,
 };
 
+/* This utility is to enable easy conversion and interpretation of names that use standard conventions, typically in programming
+languages. The conventions are largely how to represent multiple words together.
+
+Split is used to split up a name into it's constituent 'words' based on a convention.
+Join is used to combine words based on a convention/character case
+
+Convert uses split and join to allow easy conversion between conventions. 
+*/
 struct NameConventionUtil
 {
         /// Given a slice and a naming convention, split into it's constituent parts. 

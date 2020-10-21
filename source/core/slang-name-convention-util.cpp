@@ -69,7 +69,6 @@ namespace Slang
             break;
         }
     }
-
 }
 
 /* static */void NameConventionUtil::join(const UnownedStringSlice* slices, Index slicesCount, CharCase charCase, char joinChar, StringBuilder& out)
