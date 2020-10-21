@@ -12,10 +12,10 @@ struct CharUtil
     {
         enum Enum : Flags
         {
-            Upper                       = 0x01,
-            Lower                       = 0x02,
-            Digit                       = 0x04,         
-            HorizontalWhitespace        = 0x08,         ///< Whitespace that can appear in a line (ie excluding CR/LF)
+            Upper                       = 0x01,         ///< A-Z
+            Lower                       = 0x02,         ///< a-z
+            Digit                       = 0x04,         ///< 0-9
+            HorizontalWhitespace        = 0x08,         ///< Whitespace that can appear horizontally (ie excluding CR/LF)
             HexDigit                    = 0x10,         ///< 0-9, a-f, A-F
         };
     };
