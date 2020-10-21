@@ -11,20 +11,17 @@ namespace Slang
 {
     switch (convention)
     {
-        case NameConvention::UpperKababCase:
-        case NameConvention::LowerKababCase:
+        case NameConvention::Kabab:
         {
             StringUtil::split(slice, '-', out);
             break;
         }
-        case NameConvention::UpperSnakeCase:
-        case NameConvention::LowerSnakeCase:
+        case NameConvention::Snake:
         {
             StringUtil::split(slice, '_', out);
             break;
         }
-        case NameConvention::UpperCamelCase:
-        case NameConvention::LowerCamelCase:
+        case NameConvention::Camel:
         {
             typedef CharUtil::Flags CharFlags;
             typedef CharUtil::Flag CharFlag;
@@ -138,16 +135,13 @@ namespace Slang
     out.appendInPlace(dstStart, totalSize);
 }
 
-/* static */void NameConventionUtil::join(const UnownedStringSlice* slices, Index slicesCount, NameConvention convention, StringBuilder& out)
+/* static */void NameConventionUtil::join(const UnownedStringSlice* slices, Index slicesCount, CharCase charCase, NameConvention convention, StringBuilder& out)
 {
     switch (convention)
     {
-        case NameConvention::UpperKababCase:        return join(slices, slicesCount, CharCase::Upper, '-', out);
-        case NameConvention::LowerKababCase:        return join(slices, slicesCount, CharCase::Lower, '-', out);
-        case NameConvention::UpperSnakeCase:        return join(slices, slicesCount, CharCase::Upper, '_', out);
-        case NameConvention::LowerSnakeCase:        return join(slices, slicesCount, CharCase::Lower, '_', out);
-        case NameConvention::UpperCamelCase:
-        case NameConvention::LowerCamelCase:
+        case NameConvention::Kabab:        return join(slices, slicesCount, charCase, '-', out);
+        case NameConvention::Snake:        return join(slices, slicesCount, charCase, '_', out);
+        case NameConvention::Camel:
         {
             Index totalSize = 0;
 
@@ -167,9 +161,9 @@ namespace Slang
 
                 Int j = 0;
 
-                if (count > 0 && !(i == 0 && convention == NameConvention::LowerCamelCase))
+                if (count > 0 && !(i == 0 && charCase == CharCase::Lower))
                 {
-                    // Capitalize first letter of each word, unless on first word and lowerCamel
+                    // Capitalize first letter of each word, unless on first word and 'lower'
                     dst[j] = CharUtil::toUpper(src[j]);
                     j++;
                 }
@@ -186,14 +180,14 @@ namespace Slang
     }
 }
 
-/* static */void NameConventionUtil::convert(NameConvention fromConvention, const UnownedStringSlice& slice, NameConvention toConvention, StringBuilder& out)
+/* static */void NameConventionUtil::convert(NameConvention fromConvention, const UnownedStringSlice& slice, CharCase charCase, NameConvention toConvention, StringBuilder& out)
 {
     // Split into slices
     List<UnownedStringSlice> slices;
     split(fromConvention, slice, slices);
 
     // Join the slices in the toConvention
-    join(slices.getBuffer(), slices.getCount(), toConvention, out);
+    join(slices.getBuffer(), slices.getCount(), charCase, toConvention, out);
 }
 
 }

@@ -822,6 +822,8 @@ generatorProject("run-generators", "source/slang/")
     if executeBinary then
         filter "files:**/slang-ast-reflect.h"   
             do 
+                buildmessage "C++ Extractor %{file.relpath}"
+            
                 local sourcePath = "%{file.directory}"
             
                 -- Work out the output files

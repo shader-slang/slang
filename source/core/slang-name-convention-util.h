@@ -7,37 +7,33 @@
 namespace Slang
 {
 
-
 enum class NameConvention
 {
-    UpperKababCase,     /// Words are separated with -. WORDS-ARE-SEPARATED
-    LowerKababCase,     /// Words are separated with -. words-are-separated
-    UpperSnakeCase,     /// Words are separated with _. WORDS_ARE_SEPARATED
-    LowerSnakeCase,     /// Words are separated with _. words_are_separated
-    UpperCamelCase,     /// Words start with a capital, first word starts with upper. WordsStartWithACapital (aka PascalCase)
-    LowerCamelCase,     /// Words start with a capital, first word starts with lower. wordsStartWithACapital (aka camelCase)
+    Kabab,     /// Words are separated with -. WORDS-ARE-SEPARATED
+    Snake,     /// Words are separated with _. WORDS_ARE_SEPARATED
+    Camel,     /// Words start with a capital. (Upper will make first words character capitalized, aka PascalCase)
+};
+
+enum class CharCase
+{
+    None,
+    Upper,
+    Lower,
 };
 
 struct NameConventionUtil
 {
-    enum class CharCase
-    {
-        None,
-        Upper,
-        Lower,
-    };
-
         /// Given a slice and a naming convention, split into it's constituent parts. 
     static void split(NameConvention convention, const UnownedStringSlice& slice, List<UnownedStringSlice>& out);
 
         /// Given slices, join together with the specified convention into out
-    static void join(const UnownedStringSlice* slices, Index slicesCount, NameConvention convention, StringBuilder& out);
+    static void join(const UnownedStringSlice* slices, Index slicesCount, CharCase charCase, NameConvention convention, StringBuilder& out);
 
         /// Join with a join char, and potentially changing case of input slices
     static void join(const UnownedStringSlice* slices, Index slicesCount, CharCase charCase, char joinChar, StringBuilder& out);
 
         /// Convert from one convention to another
-    static void convert(NameConvention fromConvention, const UnownedStringSlice& slice, NameConvention toConvention, StringBuilder& out);
+    static void convert(NameConvention fromConvention, const UnownedStringSlice& slice, CharCase charCase, NameConvention toConvention, StringBuilder& out);
 };
 
 }

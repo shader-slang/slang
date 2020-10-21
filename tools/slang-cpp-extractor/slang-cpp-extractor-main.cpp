@@ -2036,7 +2036,7 @@ SlangResult CPPExtractor::calcDerivedTypes()
     slice = slice.trim('-');
 
     StringBuilder out;
-    NameConventionUtil::convert(NameConvention::LowerKababCase, slice, NameConvention::UpperSnakeCase, out);
+    NameConventionUtil::convert(NameConvention::Kabab, slice, CharCase::Upper, NameConvention::Snake, out);
     return out;
 }
 
@@ -2619,21 +2619,23 @@ SlangResult CPPExtractorApp::execute(const Options& options)
     {
         for (TypeSet* typeSet : extractor.getTypeSets())
         {
+            // The macro name is in upper snake, so split it 
+            List<UnownedStringSlice> slices;
+            NameConventionUtil::split(NameConvention::Snake, typeSet->m_macroName, slices);
+
             if (typeSet->m_fileMark.getLength() == 0)
             {
                 StringBuilder buf;
-                // Let's guess a filename based on the macro name
-                NameConventionUtil::convert(NameConvention::LowerSnakeCase, typeSet->m_macroName, NameConvention::LowerKababCase, buf);
+                // Let's guess a 'fileMark' (it becomes part of the filename) based on the macro name. Use lower kabab.
+                NameConventionUtil::join(slices.getBuffer(), slices.getCount(), CharCase::Lower, NameConvention::Kabab, buf);
                 typeSet->m_fileMark = buf.ProduceString();
             }
 
             if (typeSet->m_typeName.getLength() == 0)
             {
-                // Let's guess a typename from the macro name if one isn't set
-
+                // Let's guess a typename if not set -> go with upper camel
                 StringBuilder buf;
-                // Let's guess a filename based on the macro name
-                NameConventionUtil::convert(NameConvention::LowerSnakeCase, typeSet->m_macroName, NameConvention::UpperCamelCase, buf);
+                NameConventionUtil::join(slices.getBuffer(), slices.getCount(), CharCase::Upper, NameConvention::Camel, buf);
                 typeSet->m_typeName = buf.ProduceString();
             }
         }

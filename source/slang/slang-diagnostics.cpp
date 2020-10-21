@@ -314,7 +314,7 @@ protected:
         {
             m_work.Clear();
 
-            NameConventionUtil::convert(NameConvention::LowerCamelCase, nameSlice, NameConvention::LowerKababCase, m_work);
+            NameConventionUtil::convert(NameConvention::Camel, nameSlice, CharCase::Lower, NameConvention::Kabab, m_work);
 
             UnownedStringSlice dashSlice(m_arena.allocateString(m_work.getBuffer(), m_work.getLength()), m_work.getLength());
             m_map.AddIfNotExists(dashSlice, index);
