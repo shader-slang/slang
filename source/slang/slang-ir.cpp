@@ -5559,5 +5559,16 @@ namespace Slang
     {
         return inst->findDecoration<IRBuiltinDecoration>() != nullptr;
     }
+    IRFunc* getParentFunc(IRInst* inst)
+    {
+        auto parent = inst->getParent();
+        while (parent)
+        {
+            if (auto func = as<IRFunc>(parent))
+                return func;
+            parent = parent->getParent();
+        }
+        return nullptr;
+    }
 } // namespace Slang
 
