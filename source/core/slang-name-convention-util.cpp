@@ -7,6 +7,20 @@
 namespace Slang
 {
 
+/* static */NameConvention NameConventionUtil::getConvention(const UnownedStringSlice& slice)
+{
+    for (const char c : slice)
+    {
+        switch (c)
+        {
+            case '-':   return NameConvention::Kabab;
+            case '_':   return NameConvention::Snake;
+            default: break;
+        }
+    }
+    return NameConvention::Camel;
+}
+
 /* static */void NameConventionUtil::split(NameConvention convention, const UnownedStringSlice& slice, List<UnownedStringSlice>& out)
 {
     switch (convention)
@@ -32,7 +46,7 @@ namespace Slang
             const char* start = slice.begin();
             for (const char* cur = start; cur < end; ++cur)
             {
-                char c = *cur;
+                const char c = *cur;
                 const CharUtil::Flags flags = CharUtil::getFlags(c);
 
                 if (flags & CharFlag::Upper)
@@ -45,11 +59,16 @@ namespace Slang
                     }
                     else if ((prevFlags & CharFlag::Upper) && cur + 1 < end)
                     {
-                        // TODO(JS): This doesn't catch situations where there is a single letter like
-                        // ABox, because of this rule will be split to AB, ox
-                        // If we have acronyms not being capitalized this would not be an issue
+                        // This works with capital or uncapitalized acronyms, but if we have two capitalized acronyms following each other - it can't split.
+                        // 
+                        // For example 
+                        // "IAABBSystem" -> "IAABB", "System"
+                        // 
+                        // If it only accepted lower case acronyms the logic could be changed such that the following could be produced
+                        // "IAabbSystem" -> "I", "Aabb", "System" 
+                        //
+                        // Since Slang source largely goes with upper case acronyms, we work with the heuristic here..
 
-                        // Could be an acronym, if the next character is lower
                         if (CharUtil::isLower(cur[1]))
                         {
                             out.add(UnownedStringSlice(start, cur));
@@ -69,6 +88,11 @@ namespace Slang
             break;
         }
     }
+}
+
+void NameConventionUtil::split(const UnownedStringSlice& slice, List<UnownedStringSlice>& out)
+{
+    split(getConvention(slice), slice, out);
 }
 
 /* static */void NameConventionUtil::join(const UnownedStringSlice* slices, Index slicesCount, CharCase charCase, char joinChar, StringBuilder& out)
@@ -113,15 +137,6 @@ namespace Slang
                 for (Index j = 0; j < count; ++j)
                 {
                     dst[j] = CharUtil::toLower(src[j]);
-                }
-                break;
-            }
-            default:
-            case CharCase::None:
-            {
-                for (Index j = 0; j < count; ++j)
-                {
-                    dst[j] = src[j];
                 }
                 break;
             }
@@ -187,6 +202,11 @@ namespace Slang
 
     // Join the slices in the toConvention
     join(slices.getBuffer(), slices.getCount(), charCase, toConvention, out);
+}
+
+/* static */void NameConventionUtil::convert(const UnownedStringSlice& slice, CharCase charCase, NameConvention toConvention, StringBuilder& out)
+{
+    convert(getConvention(slice), slice, charCase, toConvention, out);
 }
 
 }

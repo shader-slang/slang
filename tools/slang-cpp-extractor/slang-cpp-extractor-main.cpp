@@ -2024,7 +2024,7 @@ SlangResult CPPExtractor::calcDerivedTypes()
     slice = slice.trim('-');
 
     StringBuilder out;
-    NameConventionUtil::convert(NameConvention::Kabab, slice, CharCase::Upper, NameConvention::Snake, out);
+    NameConventionUtil::convert(slice, CharCase::Upper, NameConvention::Snake, out);
     return out;
 }
 
@@ -2609,7 +2609,7 @@ SlangResult CPPExtractorApp::execute(const Options& options)
         {
             // The macro name is in upper snake, so split it 
             List<UnownedStringSlice> slices;
-            NameConventionUtil::split(NameConvention::Snake, typeSet->m_macroName, slices);
+            NameConventionUtil::split(typeSet->m_macroName, slices);
 
             if (typeSet->m_fileMark.getLength() == 0)
             {

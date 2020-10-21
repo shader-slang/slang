@@ -16,7 +16,6 @@ enum class NameConvention
 
 enum class CharCase
 {
-    None,
     Upper,
     Lower,
 };
@@ -31,8 +30,13 @@ Convert uses split and join to allow easy conversion between conventions.
 */
 struct NameConventionUtil
 {
-        /// Given a slice and a naming convention, split into it's constituent parts. 
+        /// Given a slice tries to determine the convention used.
+        /// If no separators are found, will assume Camel
+    static NameConvention getConvention(const UnownedStringSlice& slice);
+
+        /// Given a slice and a naming convention, split into it's constituent parts. If convention isn't specified, will infer from slice using getConvention.
     static void split(NameConvention convention, const UnownedStringSlice& slice, List<UnownedStringSlice>& out);
+    static void split(const UnownedStringSlice& slice, List<UnownedStringSlice>& out);
 
         /// Given slices, join together with the specified convention into out
     static void join(const UnownedStringSlice* slices, Index slicesCount, CharCase charCase, NameConvention convention, StringBuilder& out);
@@ -40,8 +44,9 @@ struct NameConventionUtil
         /// Join with a join char, and potentially changing case of input slices
     static void join(const UnownedStringSlice* slices, Index slicesCount, CharCase charCase, char joinChar, StringBuilder& out);
 
-        /// Convert from one convention to another
+        /// Convert from one convention to another. If fromConvention isn't specified, will infer from slice using getConvention.
     static void convert(NameConvention fromConvention, const UnownedStringSlice& slice, CharCase charCase, NameConvention toConvention, StringBuilder& out);
+    static void convert(const UnownedStringSlice& slice, CharCase charCase, NameConvention toConvention, StringBuilder& out);
 };
 
 }
