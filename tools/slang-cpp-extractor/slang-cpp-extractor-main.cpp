@@ -13,6 +13,7 @@
 #include "../../source/core/slang-io.h"
 #include "../../source/core/slang-string-slice-pool.h"
 #include "../../source/core/slang-writer.h"
+#include "../../source/core/slang-name-convention-util.h"
 
 #include "../../source/slang/slang-source-loc.h"
 #include "../../source/slang/slang-lexer.h"
@@ -2035,7 +2036,7 @@ SlangResult CPPExtractor::calcDerivedTypes()
     slice = slice.trim('-');
 
     StringBuilder out;
-    StringUtil::dashedToUpperSnake(slice, out);
+    NameConventionUtil::dashedToUpperSnake(slice, out);
     return out;
 }
 
@@ -2622,7 +2623,7 @@ SlangResult CPPExtractorApp::execute(const Options& options)
             {
                 StringBuilder buf;
                 // Let's guess a filename based on the macro name
-                StringUtil::snakeCaseToLowerDashed(typeSet->m_macroName, buf);
+                NameConventionUtil::snakeCaseToLowerDashed(typeSet->m_macroName, buf);
                 typeSet->m_fileMark = buf.ProduceString();
             }
 
@@ -2632,7 +2633,7 @@ SlangResult CPPExtractorApp::execute(const Options& options)
 
                 StringBuilder buf;
                 // Let's guess a filename based on the macro name
-                StringUtil::snakeCaseToUpperCamel(typeSet->m_macroName, buf);
+                NameConventionUtil::snakeCaseToUpperCamel(typeSet->m_macroName, buf);
                 typeSet->m_typeName = buf.ProduceString();
             }
         }

@@ -6,6 +6,7 @@
 #include "../core/slang-memory-arena.h"
 #include "../core/slang-dictionary.h"
 #include "../core/slang-string-util.h"
+#include "../core/slang-name-convention-util.h"
 
 #include <assert.h>
 
@@ -313,7 +314,7 @@ protected:
         {
             m_work.Clear();
 
-            StringUtil::camelCaseToLowerDashed(nameSlice, m_work);
+            NameConventionUtil::camelCaseToLowerDashed(nameSlice, m_work);
 
             UnownedStringSlice dashSlice(m_arena.allocateString(m_work.getBuffer(), m_work.getLength()), m_work.getLength());
             m_map.AddIfNotExists(dashSlice, index);

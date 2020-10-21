@@ -94,23 +94,6 @@ struct StringUtil
         /// Convert in to int. Returns SLANG_FAIL on error
     static SlangResult parseInt(const UnownedStringSlice& in, Int& outValue);
 
-        // TODO(JS): These conversions should perhaps be used into their own NameConventionUtil or the like
-
-        /// Calculate as lower case dash delimited. For example
-        /// So MyString -> my-string
-    static void camelCaseToLowerDashed(const UnownedStringSlice& in, StringBuilder& out);
-
-        /// Calculate a snake cased name as as lower dashed.
-        /// So MY_STRING -> my-string
-    static void snakeCaseToLowerDashed(const UnownedStringSlice& in, StringBuilder& out);
-
-        /// Calculate equivalent snake case input to upper camel output
-        /// So MY_STRING -> MyString
-    static void snakeCaseToUpperCamel(const UnownedStringSlice& in, StringBuilder& out);
-
-        /// Convert dashed to upper snake
-        /// So my-string -> MY_STRING
-    static void dashedToUpperSnake(const UnownedStringSlice& in, StringBuilder& out);
 };
 
 /* A helper class that allows parsing of lines from text with iteration. Uses StringUtil::extractLine for the actual underlying implementation. */

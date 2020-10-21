@@ -69,6 +69,9 @@
     <ClInclude Include="slang-memory-arena.h">
       <Filter>Header Files</Filter>
     </ClInclude>
+    <ClInclude Include="slang-name-convention-util.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
     <ClInclude Include="slang-nvrtc-compiler.h">
       <Filter>Header Files</Filter>
     </ClInclude>
@@ -174,6 +177,9 @@
       <Filter>Source Files</Filter>
     </ClCompile>
     <ClCompile Include="slang-memory-arena.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="slang-name-convention-util.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
     <ClCompile Include="slang-nvrtc-compiler.cpp">
