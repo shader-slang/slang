@@ -2036,7 +2036,7 @@ SlangResult CPPExtractor::calcDerivedTypes()
     slice = slice.trim('-');
 
     StringBuilder out;
-    NameConventionUtil::dashedToUpperSnake(slice, out);
+    NameConventionUtil::convert(NameConvention::LowerKababCase, slice, NameConvention::UpperSnakeCase, out);
     return out;
 }
 
@@ -2623,7 +2623,7 @@ SlangResult CPPExtractorApp::execute(const Options& options)
             {
                 StringBuilder buf;
                 // Let's guess a filename based on the macro name
-                NameConventionUtil::snakeCaseToLowerDashed(typeSet->m_macroName, buf);
+                NameConventionUtil::convert(NameConvention::LowerSnakeCase, typeSet->m_macroName, NameConvention::LowerKababCase, buf);
                 typeSet->m_fileMark = buf.ProduceString();
             }
 
@@ -2633,7 +2633,7 @@ SlangResult CPPExtractorApp::execute(const Options& options)
 
                 StringBuilder buf;
                 // Let's guess a filename based on the macro name
-                NameConventionUtil::snakeCaseToUpperCamel(typeSet->m_macroName, buf);
+                NameConventionUtil::convert(NameConvention::LowerSnakeCase, typeSet->m_macroName, NameConvention::UpperCamelCase, buf);
                 typeSet->m_typeName = buf.ProduceString();
             }
         }

@@ -310,11 +310,11 @@ protected:
         UnownedStringSlice nameSlice(name);
         m_map.Add(nameSlice, index);
 
-        // Add a dashed version        
+        // Add a dashed version (KababCase)
         {
             m_work.Clear();
 
-            NameConventionUtil::camelCaseToLowerDashed(nameSlice, m_work);
+            NameConventionUtil::convert(NameConvention::LowerCamelCase, nameSlice, NameConvention::LowerKababCase, m_work);
 
             UnownedStringSlice dashSlice(m_arena.allocateString(m_work.getBuffer(), m_work.getLength()), m_work.getLength());
             m_map.AddIfNotExists(dashSlice, index);

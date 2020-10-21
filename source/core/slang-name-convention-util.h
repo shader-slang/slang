@@ -7,23 +7,37 @@
 namespace Slang
 {
 
+
+enum class NameConvention
+{
+    UpperKababCase,     /// Words are separated with -. WORDS-ARE-SEPARATED
+    LowerKababCase,     /// Words are separated with -. words-are-separated
+    UpperSnakeCase,     /// Words are separated with _. WORDS_ARE_SEPARATED
+    LowerSnakeCase,     /// Words are separated with _. words_are_separated
+    UpperCamelCase,     /// Words start with a capital, first word starts with upper. WordsStartWithACapital (aka PascalCase)
+    LowerCamelCase,     /// Words start with a capital, first word starts with lower. wordsStartWithACapital (aka camelCase)
+};
+
 struct NameConventionUtil
 {
-       /// Calculate as lower case dash delimited. For example
-        /// So MyString -> my-string
-    static void camelCaseToLowerDashed(const UnownedStringSlice& in, StringBuilder& out);
+    enum class CharCase
+    {
+        None,
+        Upper,
+        Lower,
+    };
 
-        /// Calculate a snake cased name as as lower dashed.
-        /// So MY_STRING -> my-string
-    static void snakeCaseToLowerDashed(const UnownedStringSlice& in, StringBuilder& out);
+        /// Given a slice and a naming convention, split into it's constituent parts. 
+    static void split(NameConvention convention, const UnownedStringSlice& slice, List<UnownedStringSlice>& out);
 
-        /// Calculate equivalent snake case input to upper camel output
-        /// So MY_STRING -> MyString
-    static void snakeCaseToUpperCamel(const UnownedStringSlice& in, StringBuilder& out);
+        /// Given slices, join together with the specified convention into out
+    static void join(const UnownedStringSlice* slices, Index slicesCount, NameConvention convention, StringBuilder& out);
 
-        /// Convert dashed to upper snake
-        /// So my-string -> MY_STRING
-    static void dashedToUpperSnake(const UnownedStringSlice& in, StringBuilder& out);
+        /// Join with a join char, and potentially changing case of input slices
+    static void join(const UnownedStringSlice* slices, Index slicesCount, CharCase charCase, char joinChar, StringBuilder& out);
+
+        /// Convert from one convention to another
+    static void convert(NameConvention fromConvention, const UnownedStringSlice& slice, NameConvention toConvention, StringBuilder& out);
 };
 
 }

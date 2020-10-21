@@ -7,111 +7,194 @@
 namespace Slang
 {
 
-/* static */void NameConventionUtil::camelCaseToLowerDashed(const UnownedStringSlice& in, StringBuilder& out)
+/* static */void NameConventionUtil::split(NameConvention convention, const UnownedStringSlice& slice, List<UnownedStringSlice>& out)
 {
-    typedef CharUtil::Flags CharFlags;
-    typedef CharUtil::Flag CharFlag;
-
-    CharFlags prevFlags = 0;
-    const char*const end = in.end();
-    for (const char* cur = in.begin(); cur < end; ++cur)
+    switch (convention)
     {
-        char c = *cur;
-        const CharUtil::Flags flags = CharUtil::getFlags(c);
-
-        if (flags & CharFlag::Upper)
+        case NameConvention::UpperKababCase:
+        case NameConvention::LowerKababCase:
         {
-            if (prevFlags & CharFlag::Lower)
-            {
-                // If we go from lower to upper, insert a dash. aA -> a-a
-                out << '-';
-            }
-            else if ((prevFlags & CharFlag::Upper) && cur + 1 < end)
-            {
-                // Could be an acronym, if the next character is lower, we need to insert a - here
-                if (CharUtil::isLower(cur[1]))
-                {
-                    out << '-';
-                }
-            }
-            // Make it lower
-            c = c - 'A' + 'a';
+            StringUtil::split(slice, '-', out);
+            break;
         }
-        out << c;
-
-        prevFlags = flags;
-    }
-}
-
-
-/* static */void NameConventionUtil::snakeCaseToLowerDashed(const UnownedStringSlice& inSlice, StringBuilder& out)
-{
-    Index count = inSlice.getLength();
-    const char* const src = inSlice.begin();
-
-    char* dst = out.prepareForAppend(count);
-
-    for (Index i = 0; i < count; ++i)
-    {
-        const char c = src[i];
-        dst[i] = (c == '_') ? '-' : CharUtil::toLower(c);
-    }
-
-    out.appendInPlace(dst, count);
-}
-
-
-/* static */void NameConventionUtil::snakeCaseToUpperCamel(const UnownedStringSlice& in, StringBuilder& out)
-{
-    const char*const end = in.end();
-
-    bool capitalizeNextAlpha = true;
-
-    for (const char* cur = in.begin(); cur < end; ++cur)
-    {
-        char c = *cur;
-
-        if (c == '_')
+        case NameConvention::UpperSnakeCase:
+        case NameConvention::LowerSnakeCase:
         {
-            capitalizeNextAlpha = true;
+            StringUtil::split(slice, '_', out);
+            break;
         }
-        else
+        case NameConvention::UpperCamelCase:
+        case NameConvention::LowerCamelCase:
         {
-            if (CharUtil::isAlpha(c))
-            {
-                if (capitalizeNextAlpha)
-                {
-                    c = CharUtil::toUpper(c);
-                }
-                else
-                {
-                    c = CharUtil::toLower(c);
-                }
-            }
-            // First character after _, should be capitalized. If the character isn't alpha we just ignore capitalization
-            capitalizeNextAlpha = false;
+            typedef CharUtil::Flags CharFlags;
+            typedef CharUtil::Flag CharFlag;
 
-            out.appendChar(c);
+            CharFlags prevFlags = 0;
+            const char*const end = slice.end();
+
+            const char* start = slice.begin();
+            for (const char* cur = start; cur < end; ++cur)
+            {
+                char c = *cur;
+                const CharUtil::Flags flags = CharUtil::getFlags(c);
+
+                if (flags & CharFlag::Upper)
+                {
+                    if (prevFlags & CharFlag::Lower)
+                    {
+                        // If we go from lower to upper, we have a transition
+                        out.add(UnownedStringSlice(start, cur - 1));
+                        start = cur;
+                    }
+                    else if ((prevFlags & CharFlag::Upper) && cur + 1 < end)
+                    {
+                        // TODO(JS): This doesn't catch situations where there is a single letter like
+                        // ABox, because of this rule will be split to AB, ox
+                        // If we have acronyms not being capitalized this would not be an issue
+
+                        // Could be an acronym, if the next character is lower
+                        if (CharUtil::isLower(cur[1]))
+                        {
+                            out.add(UnownedStringSlice(start, cur));
+                            start = cur;
+                        }
+                    }
+                }
+                
+                prevFlags = flags;
+            }
+
+            // Add any end section
+            if (start < end)
+            {
+                out.add(UnownedStringSlice(start, end));
+            }
+            break;
         }
     }
+
 }
 
-/* static */void NameConventionUtil::dashedToUpperSnake(const UnownedStringSlice& in, StringBuilder& out)
+/* static */void NameConventionUtil::join(const UnownedStringSlice* slices, Index slicesCount, CharCase charCase, char joinChar, StringBuilder& out)
 {
-    Index count = in.getLength();
-    const char* const src = in.begin();
-
-    char* dst = out.prepareForAppend(count);
-
-    for (Index i = 0; i < count; ++i)
+    if (slicesCount <= 0)
     {
-        const char c = src[i];
-        dst[i] = (c == '-') ? '_' : CharUtil::toUpper(c);
+        return;
     }
 
-    out.appendInPlace(dst, count);
+    Index totalSize = slicesCount + 1;
+    for (Index i = 0; i < slicesCount; ++i)
+    {
+        totalSize = slices[i].getLength();
+    }
+
+    char*const dstStart = out.prepareForAppend(totalSize);
+    char* dst = dstStart;
+
+    for (Index i = 0; i < slicesCount; ++i)
+    {
+        const UnownedStringSlice& slice = slices[i];
+        const Index count = slice.getLength();
+        const char*const src = slice.begin();
+
+        if (i > 0)
+        {
+            *dst++ = joinChar;
+        }
+
+        switch (charCase)
+        {
+            case CharCase::Upper:
+            {
+                for (Index j = 0; j < count; ++j)
+                {
+                    dst[j] = CharUtil::toUpper(src[j]);
+                }
+                break;
+            }
+            case CharCase::Lower:
+            {
+                for (Index j = 0; j < count; ++j)
+                {
+                    dst[j] = CharUtil::toLower(src[j]);
+                }
+                break;
+            }
+            default:
+            case CharCase::None:
+            {
+                for (Index j = 0; j < count; ++j)
+                {
+                    dst[j] = src[j];
+                }
+                break;
+            }
+        }
+
+        dst += count;
+    }
+
+    SLANG_ASSERT(dstStart + totalSize == dst);
+    out.appendInPlace(dstStart, totalSize);
 }
 
+/* static */void NameConventionUtil::join(const UnownedStringSlice* slices, Index slicesCount, NameConvention convention, StringBuilder& out)
+{
+    switch (convention)
+    {
+        case NameConvention::UpperKababCase:        return join(slices, slicesCount, CharCase::Upper, '-', out);
+        case NameConvention::LowerKababCase:        return join(slices, slicesCount, CharCase::Lower, '-', out);
+        case NameConvention::UpperSnakeCase:        return join(slices, slicesCount, CharCase::Upper, '_', out);
+        case NameConvention::LowerSnakeCase:        return join(slices, slicesCount, CharCase::Lower, '_', out);
+        case NameConvention::UpperCamelCase:
+        case NameConvention::LowerCamelCase:
+        {
+            Index totalSize = 0;
+
+            for (Index i = 0; i < slicesCount; ++i)
+            {
+                totalSize += slices[i].getLength();
+            }
+
+            char*const dstStart = out.prepareForAppend(totalSize);
+            char* dst = dstStart;
+
+            for (Index i = 0; i < slicesCount; ++i)
+            {
+                const UnownedStringSlice& slice = slices[i];
+                Index count = slice.getLength();
+                const char* src = slice.begin();
+
+                Int j = 0;
+
+                if (count > 0 && !(i == 0 && convention == NameConvention::LowerCamelCase))
+                {
+                    // Capitalize first letter of each word, unless on first word and lowerCamel
+                    dst[j] = CharUtil::toUpper(src[j]);
+                    j++;
+                }
+
+                for (; j < count; ++j)
+                {
+                    dst[j] = CharUtil::toLower(src[j]);
+                }
+
+                dst += count;
+            }
+            break;
+        }
+    }
+}
+
+/* static */void NameConventionUtil::convert(NameConvention fromConvention, const UnownedStringSlice& slice, NameConvention toConvention, StringBuilder& out)
+{
+    // Split into slices
+    List<UnownedStringSlice> slices;
+    split(fromConvention, slice, slices);
+
+    // Join the slices in the toConvention
+    join(slices.getBuffer(), slices.getCount(), toConvention, out);
+}
 
 }
 
