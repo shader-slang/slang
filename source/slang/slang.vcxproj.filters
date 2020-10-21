@@ -213,6 +213,9 @@
     <ClInclude Include="slang-ir-specialize-arrays.h">
       <Filter>Header Files</Filter>
     </ClInclude>
+    <ClInclude Include="slang-ir-specialize-dispatch.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
     <ClInclude Include="slang-ir-specialize-function-call.h">
       <Filter>Header Files</Filter>
     </ClInclude>
@@ -585,6 +588,9 @@
       <Filter>Source Files</Filter>
     </ClCompile>
     <ClCompile Include="slang-ir-specialize-arrays.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="slang-ir-specialize-dispatch.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
     <ClCompile Include="slang-ir-specialize-function-call.cpp">
