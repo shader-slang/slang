@@ -78,10 +78,10 @@ namespace Slang
         return;
     }
 
-    Index totalSize = slicesCount + 1;
+    Index totalSize = slicesCount - 1;
     for (Index i = 0; i < slicesCount; ++i)
     {
-        totalSize = slices[i].getLength();
+        totalSize += slices[i].getLength();
     }
 
     char*const dstStart = out.prepareForAppend(totalSize);
