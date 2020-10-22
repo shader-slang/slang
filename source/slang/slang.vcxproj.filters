@@ -306,30 +306,6 @@
     <ClInclude Include="slang-profile.h">
       <Filter>Header Files</Filter>
     </ClInclude>
-    <ClInclude Include="slang-ref-object-generated-ast-macro.h">
-      <Filter>Header Files</Filter>
-    </ClInclude>
-    <ClInclude Include="slang-ref-object-generated-ast.h">
-      <Filter>Header Files</Filter>
-    </ClInclude>
-    <ClInclude Include="slang-ref-object-generated-macro.h">
-      <Filter>Header Files</Filter>
-    </ClInclude>
-    <ClInclude Include="slang-ref-object-generated-obj-macro.h">
-      <Filter>Header Files</Filter>
-    </ClInclude>
-    <ClInclude Include="slang-ref-object-generated-obj.h">
-      <Filter>Header Files</Filter>
-    </ClInclude>
-    <ClInclude Include="slang-ref-object-generated-value-macro.h">
-      <Filter>Header Files</Filter>
-    </ClInclude>
-    <ClInclude Include="slang-ref-object-generated-value.h">
-      <Filter>Header Files</Filter>
-    </ClInclude>
-    <ClInclude Include="slang-ref-object-generated.h">
-      <Filter>Header Files</Filter>
-    </ClInclude>
     <ClInclude Include="slang-ref-object-reflect.h">
       <Filter>Header Files</Filter>
     </ClInclude>
@@ -391,12 +367,6 @@
       <Filter>Header Files</Filter>
     </ClInclude>
     <ClInclude Include="slang-type-system-shared.h">
-      <Filter>Header Files</Filter>
-    </ClInclude>
-    <ClInclude Include="slang-value-generated-macro.h">
-      <Filter>Header Files</Filter>
-    </ClInclude>
-    <ClInclude Include="slang-value-generated.h">
       <Filter>Header Files</Filter>
     </ClInclude>
     <ClInclude Include="slang-value-reflect.h">
