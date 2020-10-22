@@ -13,8 +13,8 @@ The major components are
 * Riff container
 * C++ Extractor
 
-Generalized Binary Serialization
-================================
+Generalized Serialization
+=========================
 
 Generalized serializtion is the mechanism used to save 'arbitray' C++ structures. It is currently used for serializing the AST. Although not necessary, generalized serialization is typically helped out by the `C++ extractor`, which can rudamentarily parse C++ source, and extract class-like types and their fields. The extraction then produces header files that contain macros that can then be used to drive serialization. 
 
@@ -39,12 +39,6 @@ The easy cases are types that have an alignment and representation that will wor
 Another odd case is bool - it has been on some compilers 32 bits, and on others 8 bits. Thus we need to potentially convert.
 
 For this and other types it is therefore necessary to have function that can convert to and from the serialized dual representation.
-
-## AST serialization
-
-The AST is currently serialized via the Generalized serialization. 
-
-The AST node types are generally types derived from the NodeBase. The C++ extractor is used to associate an ASTNodeType with every NodeBase type, such that casting is fast and simple and we have a simple integer to uniquely identify those types. The extractor also performs another task of associating with the type name all of the fields held in just that type. The definition of the fields is stored in an 'x macro' which is in the slang-ast-generated-macro.h file, for example
 
 ## Generalized Field Conversion
 
@@ -155,11 +149,19 @@ Note that writing has two phases, serializing out into an SerialWriter, and then
 
 ## Object/Reference Types
 
-When talking about Object/Reference types this means types that can be referenced natively as pointers. Currently that means NodeBase and some RefObject derived types. 
+When talking about Object/Reference types this means types that can be referenced natively as pointers. Currently that means `NodeBase` and `SerialRefObject` derived types. 
 
 The SerialTypeInfo mechanism is generally for *fields* of object types. That for derived types we use the C++ extractors field list to work out the native fields offsets and types. With this we can then calculate the layout for NodeBase types such that they follow the requirements for serialization - such as alignment and so forth.
 
 This information is held in the SerialClasses, which for a given TypeKind/SubType gives a SerialClassInfo, that specifies fields for just that type. 
+
+It is trivial to work out the SubType for a NodeBase derived class - its just the astTypeNode member in the `NodeBase` type. For a SerialRefObject it is determined by first calling 
+
+```
+const ReflectClassInfo* getClassInfo() const;
+```
+
+Then the m_classID in the `ReflectClassInfo` is the subtype.
 
 ## Reading
 
@@ -216,29 +218,63 @@ enum class SerialTypeKind : uint8_t
 
 String and Array are special cases described elsewhere. 
 
-If the SerialTypeKind is NodeBase, then the SubType *is* the ASTNodeType. If the SerialTypeKind is RefObject then the SubType *is* RefObjectType. 
+If the `SerialTypeKind` is `NodeBase`, then the `SerialSubType` *is* the ASTNodeType. If the `SerialTypeKind` is `RefObject` then the `SerialSubType` *is* RefObjectType. 
+
+`SerialClasses` holds the information on how to serialize non-field Serial types. For each `SerialTypeKind`/`SerialSubType` it holds a `SerialClass`. The SerialClass holds the size of the type, the amount of fields, and the field information. The fields themselves contain a `SerialFieldType` - this holds the pointers to the functions to convert to and from `native` to `serial` types. 
+
+In order to set up all types in a SerialClass without tying SerialClasses to an implementation the class `SerialClassesUtil` is used to set up Slang serialized types in a `SerialClasses` instance. 
 
 IR Serialization
 ================
 
-In this case we may want to have IRModule serialized in someway unlike the generalized serialization (for example supporting compression). In other frameworks this aspect might be handing by 'read/writeReplacing'. Doing so would significantly complicate the simple reading mechanism - because instead of just constructing and referencing we would have to care about construction order. That this could perhaps be achieved by having any reference access be handled lazily. Note that SourceLoc would still require being handled specially because it requires construction before any SourceLoc is referenced, and SourceLocs *aren't* pointers.
+Currently IR serialization is handled via a separate mechanism to 'generalized' serialization.
+
+This mechanism is *much* simpler than generalized serialization, because by design the IR types are very homogeneous in style. There are a few special cases, but in general an instruction consists of
+
+* It's type
+* A SourceLoc
+* 0 or more operands.
+* 0 or more children. 
+
+Within the IR instructions are pointers to IRInst derived types. As previously discussed serializing pointers directly is generally not a good idea. To work around this the pointers are turned into 32 bit indices. Additionally we know that an instruction can belong to at most one other instruction. 
+
+When serializing out special handling is made for child instructions - their indices are made to be a contiguous range of indices for all instructions that belong to each parent. The indices are ordered into the same order as the children are held in the parent. By using this mechanism it is not necessary to directly save off the indices that belong to a parent, only the range of indices. 
+
+The actual serialization mechanism is similar to the generalized mechanism - referenced objects are saved off in order of their indices. What is different is that the encoding fixes the size of the Inst to `IRSerialData`. That this can hold up to two operands, if the instruction has more than two operands then one of the UInt32 is the operand count and the other is an offset to a list of operands. It probably makes sense to alter this in the future to stream the instructions payload directly. 
+
+IR serialization allows a simple compression mechanism, that works because much of the IR serialized data is UInt32 data, that can use a variable byte encoding.
 
 SourceLoc Serialization
 =======================
 
 SourceLoc serialization presents several problems. Firstly we have two distinct serialization mechanisms that need to use it - IR serialization and generalized serialization. That being the case it cannot be saved directly in either, even though it may be referenced by either. 
 
-To keep things simple for now we build up SourceLoc information for both IR and general serialization, via their writers. Then we can save this information into a RIFF section, that can be loaded before either general or IR deserialization is used.  
+To keep things simple for now we build up SourceLoc information for both IR and general serialization via their writers adding their information into a SerialSourceLocWriter. Then we can save this information into a RIFF section, that can be loaded before either general or IR deserialization is used.  
 
+When reading the SourceLoc information has to be located and deserialized before any AST or IR deserialization. The SourceLoc data can then be turned into a SerialSourceLocReader, which is then either set on the `SerialReaders` `SerialExtraObjects`. Or passed to the `IRSerialReader`.
 
 Riff Container
 ==============
 
+[Riff](https://en.wikipedia.org/wiki/Resource_Interchange_File_Format) is used as a mechanism to store binary sections. The format allows for a hierarchy of `chunks` that hold binary data. How the data is interpretted depends on the [FOURCC](https://en.wikipedia.org/wiki/FourCC) associated with each chunk. 
+
+As previously touched on there are multiple different mechansims used for serialization. IR serialization, generalized serialization, SourceLoc serialization - there are also other uses, such as serializing of entry point information. Riff is used to combine all of these incompatible binary parts togther such that they can be stored together. 
+
+The handling of these riff containers is held within the `SerialContainerUtil` class. 
 
 C++ Extractor
 =============
 
-The C++ Extractor is a tool `slang-cpp-extractor` that can be used to example C++ files to extract class definitions and associated fields. It can then optionally output two files. These files contain in the form of macros information about each class as well as reflected fields. These generated files can then be used to implement serialization without having to explicitly specify fields in C++ source code.
+The C++ Extractor is the tool `slang-cpp-extractor` that can be used to example C++ files to extract class definitions and associated fields. These files contain in the form of macros information about each class as well as reflected fields. These generated files can then be used to implement serialization without having to explicitly specify fields in C++ source code.
 
+Issues
+======
 
-
+* No support for forward/backward compatibility. 
+** Adding fields/classes will typically break compatibility
+* Binary files do not contain data to describe themselves
+** It is *not* possible to write a stand alone tool that can dump any serialized file - it's iterpretation depends on the version of Slang it was written from
+* The Riff mechanism use for container usage is somewhat ad-hoc
+* Re-referencing AST nodes from other modules does not happen automatically on deserialization
+* There are several mechanisms used for serialization that are not directly compatible
+* Value types should be convertable directly with some macro magic - for the moment they aren't
