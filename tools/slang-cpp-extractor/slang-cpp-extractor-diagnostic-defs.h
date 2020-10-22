@@ -23,7 +23,7 @@ DIAGNOSTIC(-1, Note, seeOpen, "see open $0")
 
 DIAGNOSTIC(1, Error, cannotOpenFile, "cannot open file '$0'.")
 
-DIAGNOSTIC(1, Error, extractorFailed, "C++ Extractor failed for '$0'")
+DIAGNOSTIC(1, Error, extractorFailed, "C++ Extractor failed")
 DIAGNOSTIC(1, Error, internalError, "Unknown internal error in C++ Extractor, aborted!")
 
 // Parsing errors
@@ -40,6 +40,7 @@ DIAGNOSTIC(100009, Error, unexpectedUnbalancedToken, "Unexpected unbalanced toke
 DIAGNOSTIC(100010, Error, unexpectedEndOfFile, "Unexpected end of file")
 DIAGNOSTIC(100011, Error, expectingTypeKeyword, "Expecting type keyword - struct or class, found $0")
 
+DIAGNOSTIC(100011, Error, typeInDifferentTypeSet, "Type $0 in different type set $1 from super class $2")
 
 // Command line errors 100100
 

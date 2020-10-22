@@ -1,8 +1,8 @@
 // slang-serialize-ast.cpp
 #include "slang-serialize-ast.h"
 
-#include "slang-ast-generated.h"
-#include "slang-ast-generated-macro.h"
+#include "slang-generated-ast.h"
+#include "slang-generated-ast-macro.h"
 
 #include "slang-ast-dump.h"
 

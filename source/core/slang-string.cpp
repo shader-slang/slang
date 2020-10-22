@@ -1,6 +1,8 @@
 #include "slang-string.h"
 #include "slang-text-io.h"
 
+#include "slang-char-util.h"
+
 namespace Slang
 {
     // TODO: this belongs in a different file:
@@ -10,11 +12,6 @@ namespace Slang
         // Can be useful to uncomment during debug when problem is on CI
         // printf("Unexpected: %s\n", message);
         throw InternalError(message);
-    }
-
-    SLANG_FORCE_INLINE static bool _isWhiteSpace(char c)
-    {
-        return c == ' ' || c == '\t';
     }
 
     // OSString
@@ -112,11 +109,20 @@ namespace Slang
         const char* start = m_begin;
         const char* end = m_end;
 
-        while (start < end && _isWhiteSpace(*start)) start++;
-        while (end > start && _isWhiteSpace(end[-1])) end--;
+        while (start < end && CharUtil::isHorizontalWhitespace(*start)) start++;
+        while (end > start && CharUtil::isHorizontalWhitespace(end[-1])) end--;
         return UnownedStringSlice(start, end);
     }
 
+    UnownedStringSlice UnownedStringSlice::trim(char c) const
+    {
+        const char* start = m_begin;
+        const char* end = m_end;
+
+        while (start < end && *start == c) start++;
+        while (end > start && end[-1] == c) end--;
+        return UnownedStringSlice(start, end);
+    }
 
     // StringSlice
 

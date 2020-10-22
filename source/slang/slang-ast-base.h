@@ -4,7 +4,7 @@
 
 #include "slang-ast-support-types.h"
 
-#include "slang-ast-generated.h"
+#include "slang-generated-ast.h"
 #include "slang-ast-reflect.h"
 
 #include "slang-serialize-reflection.h"
