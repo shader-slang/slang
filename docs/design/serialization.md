@@ -171,23 +171,74 @@ Lazy reconstruction may be useful in the future to partially reconstruct a sub p
 
 For the String type, we initially store the object pointer as null. If a string is requested from that index, we see if the object pointer is null, if it is we have to construct the StringRepresentation that will be used. An extra wrinkle is that we allow accessing of a serialized String as a Name or a string or a UnownedSubString. Fortunately a Name just holds a string, and a Name remains in scope as long as it's NamePool does which is passed in.
 
+### Serial type replacement
+
+In generalized serialization systems such as with Java there is a mechanism for reference types to replace their representation on writing, and then on reading replace the read type with the actual type. Write replacement is already used when serializing out modules via the `SerialFilter` mechanism. The actual implementation is `ModuleSerialFilter`, if an object is referenced in a different module that is explicitly specified, it is replaced with `ImportExternalDecl`, that names the actual definition to use. 
+
+Currently when deserializing, the `ImportExternalDecl` is *not* turned back into the item it references. This means there are likely pointers which point to invalid objects. 
+
+If we wanted to do a replacement on reconstruction we could
+
+We could modify reading as follows.
+
+1) Don't construct anything at the start
+2) Find 'root's they must be created and deserialized first
+  . Any read/writeReplace is a root
+  . Any marked (like SourceLocData) is a root. (When deconstructed it also needs to add information to the Reader)
+  . The root of the objects (note we could just deserialize first to last if not already constructed)
+3) During deserialization pointer references and constructed on demand
+4) Extra code is needed to make sure there aren't cycles. Any object is either Pre/Created/Deserialized.
+
+### Other reading issues
+
+As touched on elsewhere SourceLoc information has to be carefully handled. Within the generalized serialization we have the additional problem that we probably don't want to attach SourceLoc or other types explicitly to the SerialReader/SerialWriter. The mechanism to work around this is via the `SerialExtraObjects` structure. This allows types to optionally be available to the Reader/Writer without it having to explicitly know anything about the type.
+
+For all types supporting this mechanism they *require* that they are added to the `SerialExtraType` enum, and that they embed a static kExtraType field in the type. This solution is not as flexible as perhaps using a string map or something of that sort, but it does make lookup very fast and simple which is likely significant as many types contain the SourceLoc type for example.
+
 ## Identifying Types
 
+How a NodeBase derived type identifies itself is not directly compatible with how a SerialRefObject represents itself. The NodeBase derived type uses `ASTNodeType` enum. The SerialRefObject uses a `RefObjectType` enum. Thus to uniquely identify a type we typically actually need two bits of information the `SerialTypeKind` as well as the `SerialSubType`. 
+
+```
+enum class SerialTypeKind : uint8_t
+{
+    Unknown,
+
+    String,             ///< String                         
+    Array,              ///< Array
+
+    NodeBase,           ///< NodeBase derived
+    RefObject,          ///< RefObject derived types
+
+    CountOf,
+};
+```
+
+String and Array are special cases described elsewhere. 
+
+If the SerialTypeKind is NodeBase, then the SubType *is* the ASTNodeType. If the SerialTypeKind is RefObject then the SubType *is* RefObjectType. 
 
 IR Serialization
 ================
 
+In this case we may want to have IRModule serialized in someway unlike the generalized serialization (for example supporting compression). In other frameworks this aspect might be handing by 'read/writeReplacing'. Doing so would significantly complicate the simple reading mechanism - because instead of just constructing and referencing we would have to care about construction order. That this could perhaps be achieved by having any reference access be handled lazily. Note that SourceLoc would still require being handled specially because it requires construction before any SourceLoc is referenced, and SourceLocs *aren't* pointers.
+
 SourceLoc Serialization
 =======================
 
+SourceLoc serialization presents several problems. Firstly we have two distinct serialization mechanisms that need to use it - IR serialization and generalized serialization. That being the case it cannot be saved directly in either, even though it may be referenced by either. 
+
+To keep things simple for now we build up SourceLoc information for both IR and general serialization, via their writers. Then we can save this information into a RIFF section, that can be loaded before either general or IR deserialization is used.  
+
+
 Riff Container
 ==============
+
 
 C++ Extractor
 =============
 
 The C++ Extractor is a tool `slang-cpp-extractor` that can be used to example C++ files to extract class definitions and associated fields. It can then optionally output two files. These files contain in the form of macros information about each class as well as reflected fields. These generated files can then be used to implement serialization without having to explicitly specify fields in C++ source code.
-
 
 
 
