@@ -9,7 +9,7 @@
 
 #include "../core/slang-semantic-version.h"
 
-#include "slang-ast-generated.h" 
+#include "slang-generated-ast.h" 
 
 #include "slang-serialize-reflection.h"
 
@@ -1007,8 +1007,13 @@ namespace Slang
     };
 
     class SerialRefObject;
+
     // Make sure C++ extractor can see the base class.
-    SLANG_PRE_DECLARE(_OBJ_CLASS, class SerialRefObject)
+    SLANG_PRE_DECLARE(OBJ, class SerialRefObject)
+
+    SLANG_TYPE_SET(OBJ, RefObject)
+    SLANG_TYPE_SET(VALUE, Value)
+    SLANG_TYPE_SET(AST, ASTNode)
 
     class LookupResultItem_Breadcrumb : public SerialRefObject
     {

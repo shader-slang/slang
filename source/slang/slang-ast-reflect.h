@@ -5,7 +5,7 @@
 
 #include "slang-serialize-reflection.h"
 
-#include "slang-ast-generated.h"
+#include "slang-generated-ast.h"
 
 // Implementation for SLANG_ABSTRACT_CLASS(x) using reflection from C++ extractor in slang-ast-generated.h
 #define SLANG_AST_CLASS_REFLECT_IMPL(NAME, SUPER, ORIGIN, LAST, MARKER, TYPE, param) \

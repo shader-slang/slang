@@ -5,7 +5,7 @@
 
 #include "slang-serialize-reflection.h"
 
-#include "slang-ref-object-generated.h"
+#include "slang-generated-obj.h"
 
 #include "../core/slang-smart-pointer.h"
 

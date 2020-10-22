@@ -36,12 +36,6 @@
     <ClInclude Include="slang-ast-expr.h">
       <Filter>Header Files</Filter>
     </ClInclude>
-    <ClInclude Include="slang-ast-generated-macro.h">
-      <Filter>Header Files</Filter>
-    </ClInclude>
-    <ClInclude Include="slang-ast-generated.h">
-      <Filter>Header Files</Filter>
-    </ClInclude>
     <ClInclude Include="slang-ast-modifier.h">
       <Filter>Header Files</Filter>
     </ClInclude>
@@ -100,6 +94,24 @@
       <Filter>Header Files</Filter>
     </ClInclude>
     <ClInclude Include="slang-file-system.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="slang-generated-ast-macro.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="slang-generated-ast.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="slang-generated-obj-macro.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="slang-generated-obj.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="slang-generated-value-macro.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="slang-generated-value.h">
       <Filter>Header Files</Filter>
     </ClInclude>
     <ClInclude Include="slang-glsl-extension-tracker.h">
@@ -294,7 +306,25 @@
     <ClInclude Include="slang-profile.h">
       <Filter>Header Files</Filter>
     </ClInclude>
+    <ClInclude Include="slang-ref-object-generated-ast-macro.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="slang-ref-object-generated-ast.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
     <ClInclude Include="slang-ref-object-generated-macro.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="slang-ref-object-generated-obj-macro.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="slang-ref-object-generated-obj.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="slang-ref-object-generated-value-macro.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="slang-ref-object-generated-value.h">
       <Filter>Header Files</Filter>
     </ClInclude>
     <ClInclude Include="slang-ref-object-generated.h">

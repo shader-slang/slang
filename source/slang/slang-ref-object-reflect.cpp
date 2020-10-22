@@ -2,8 +2,8 @@
 
 #include "slang-ref-object-reflect.h"
 
-#include "slang-ref-object-generated.h"
-#include "slang-ref-object-generated-macro.h"
+#include "slang-generated-obj.h"
+#include "slang-generated-obj-macro.h"
 
 #include "slang-ast-support-types.h"
 

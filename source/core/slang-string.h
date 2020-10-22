@@ -174,6 +174,7 @@ namespace Slang
 
 
         UnownedStringSlice trim() const;
+        UnownedStringSlice trim(char c) const;
 
         HashCode getHashCode() const
         {
