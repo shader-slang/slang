@@ -773,40 +773,6 @@ tool "gfx"
         -- might be able to do pic(true)
         buildoptions{"-fPIC"}
     
-
-function runCPPExtractor(sourcePath, name, inputFiles, stripPrefix, typeName, markSuffix)    
-
-    local generatedName = "slang-" .. name .. "-generated.h"
-    local generatedMacroName = "slang-" .. name .. "-generated-macro.h"
-    
-    local options = { "-strip-prefix", stripPrefix, "-reflect-type", typeName, " ", "-o", "slang-" .. name .. "-generated", "-output-fields", "-mark-suffix", markSuffix}
-
-    -- Specify the actual command to run for this action.
-    --
-    -- Note that we use a single-quoted Lua string and wrap the path
-    -- to the `slang-cpp-extractor` command in double quotes to avoid
-    -- confusing the Windows shell. It seems that Premake outputs that
-    -- path with forward slashes, which confused the shell if we don't
-    -- quote the executable path.
-
-    local buildcmd = '"%{cfg.targetdir}/slang-cpp-extractor" -d ' .. sourcePath .. " " .. table.concat(inputFiles, " ") .. " " .. table.concat(options, " ")
-    
-    buildcommands { buildcmd }
-    
-    -- Specify the files output by the extactor - so custom action will run when these files are needed.
-    --
-    buildoutputs { sourcePath .. generatedName, sourcePath .. generatedMacroName}
-    
-    -- Make it depend on the extractor tool itself
-    local buildInputTable = { "%{cfg.targetdir}/slang-cpp-extractor" .. getExecutableSuffix() }
-    for key, inputFile in ipairs(inputFiles) do
-        table.insert(buildInputTable, sourcePath .. "/" .. inputFile)
-    end
-    
-    --
-    buildinputs(buildInputTable)
-end
-    
 --
 -- The `slangc` command-line application is just a very thin wrapper
 -- around the Slang dynamic library, so its build is extermely simple.
@@ -832,7 +798,6 @@ generatorProject("run-generators", "source/slang/")
     {
         "source/slang/*.meta.slang",                -- The stdlib files
         "source/slang/slang-ast-reflect.h",         -- C++ reflection 
-        "source/slang/slang-ref-object-reflect.h",  -- More C++ reflection
         "prelude/*.h",                              -- The prelude files
         
         --
@@ -854,24 +819,55 @@ generatorProject("run-generators", "source/slang/")
     
     -- We need to run the C++ extractor to generate some include files
     if executeBinary then
-        local sourcePath = "%{file.directory}"
-    
-        filter "files:**/slang-ast-reflect.h"        
+        filter "files:**/slang-ast-reflect.h"   
+            do 
+                buildmessage "C++ Extractor %{file.relpath}"
             
-            buildmessage "slang-cpp-extractor value%{file.relpath}" 
-    
-            runCPPExtractor(sourcePath, "value", { "slang-ast-support-types.h" }, "slang-", "Value", "_VALUE_CLASS")    
+                local sourcePath = "%{file.directory}"
             
-        filter "files:**/slang-ast-reflect.h"        
-            buildmessage "slang-cpp-extractor ref-object %{file.relpath}" 
-    
-            runCPPExtractor(sourcePath, "ref-object", { "slang-ast-support-types.h" }, "slang-", "RefObject", "_OBJ_CLASS")    
+                -- Work out the output files
             
-        filter "files:**/slang-ast-reflect.h"        
-            do
-                local inputFiles = { "slang-ast-base.h", "slang-ast-decl.h", "slang-ast-expr.h", "slang-ast-modifier.h", "slang-ast-stmt.h", "slang-ast-type.h", "slang-ast-val.h" }
-                runCPPExtractor(sourcePath, "ast", inputFiles, "slang-ast", "ASTNode", "_AST_CLASS")    
+                local outputTypes = { "obj", "ast", "value" };
+                
+                local outputTable = {}
+                
+                for key, outputType in ipairs(outputTypes) do
+                    table.insert(outputTable, sourcePath .. "/slang-generated-" .. outputType .. ".h")
+                    table.insert(outputTable, sourcePath .. "/slang-generated-" .. outputType .. "-macro.h")
+                end
+             
+                -- List all of the input files to be scanned
+             
+                local inputFiles = { "slang-ast-support-types.h", "slang-ast-base.h", "slang-ast-decl.h", "slang-ast-expr.h", "slang-ast-modifier.h", "slang-ast-stmt.h", "slang-ast-type.h", "slang-ast-val.h" }
+
+                local options = { "-strip-prefix", "slang-", "-o", "slang-generated", "-output-fields", "-mark-suffix", "_CLASS"}
+
+                -- Specify the actual command to run for this action.
+                --
+                -- Note that we use a single-quoted Lua string and wrap the path
+                -- to the `slang-cpp-extractor` command in double quotes to avoid
+                -- confusing the Windows shell. It seems that Premake outputs that
+                -- path with forward slashes, which confused the shell if we don't
+                -- quote the executable path.
+
+                local buildcmd = '"%{cfg.targetdir}/slang-cpp-extractor" -d ' .. sourcePath .. " " .. table.concat(inputFiles, " ") .. " " .. table.concat(options, " ")
+                
+                buildcommands { buildcmd }
+                
+                -- Specify the files output by the extactor - so custom action will run when these files are needed.
+                --
+                buildoutputs(outputTable)
+                
+                -- Make it depend on the extractor tool itself
+                local buildInputTable = { "%{cfg.targetdir}/slang-cpp-extractor" .. getExecutableSuffix() }
+                for key, inputFile in ipairs(inputFiles) do
+                    table.insert(buildInputTable, sourcePath .. "/" .. inputFile)
+                end
+                
+                --
+                buildinputs(buildInputTable)
             end
+            
     end       
        
     -- Next, we want to add a custom build rule for each of the

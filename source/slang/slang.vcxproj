@@ -195,8 +195,6 @@
     <ClInclude Include="slang-ast-decl.h" />
     <ClInclude Include="slang-ast-dump.h" />
     <ClInclude Include="slang-ast-expr.h" />
-    <ClInclude Include="slang-ast-generated-macro.h" />
-    <ClInclude Include="slang-ast-generated.h" />
     <ClInclude Include="slang-ast-modifier.h" />
     <ClInclude Include="slang-ast-reflect.h" />
     <ClInclude Include="slang-ast-stmt.h" />
@@ -217,6 +215,12 @@
     <ClInclude Include="slang-emit-source-writer.h" />
     <ClInclude Include="slang-emit.h" />
     <ClInclude Include="slang-file-system.h" />
+    <ClInclude Include="slang-generated-ast-macro.h" />
+    <ClInclude Include="slang-generated-ast.h" />
+    <ClInclude Include="slang-generated-obj-macro.h" />
+    <ClInclude Include="slang-generated-obj.h" />
+    <ClInclude Include="slang-generated-value-macro.h" />
+    <ClInclude Include="slang-generated-value.h" />
     <ClInclude Include="slang-glsl-extension-tracker.h" />
     <ClInclude Include="slang-hlsl-intrinsic-set.h" />
     <ClInclude Include="slang-image-format-defs.h" />
@@ -281,7 +285,13 @@
     <ClInclude Include="slang-preprocessor.h" />
     <ClInclude Include="slang-profile-defs.h" />
     <ClInclude Include="slang-profile.h" />
+    <ClInclude Include="slang-ref-object-generated-ast-macro.h" />
+    <ClInclude Include="slang-ref-object-generated-ast.h" />
     <ClInclude Include="slang-ref-object-generated-macro.h" />
+    <ClInclude Include="slang-ref-object-generated-obj-macro.h" />
+    <ClInclude Include="slang-ref-object-generated-obj.h" />
+    <ClInclude Include="slang-ref-object-generated-value-macro.h" />
+    <ClInclude Include="slang-ref-object-generated-value.h" />
     <ClInclude Include="slang-ref-object-generated.h" />
     <ClInclude Include="slang-ref-object-reflect.h" />
     <ClInclude Include="slang-reflection.h" />

@@ -2,7 +2,7 @@
 #include "slang-ast-builder.h"
 #include <assert.h>
 
-#include "slang-ast-generated-macro.h"
+#include "slang-generated-ast-macro.h"
 
 namespace Slang {
 

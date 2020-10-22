@@ -13,6 +13,7 @@
 #include "../../source/core/slang-io.h"
 #include "../../source/core/slang-string-slice-pool.h"
 #include "../../source/core/slang-writer.h"
+#include "../../source/core/slang-name-convention-util.h"
 
 #include "../../source/slang/slang-source-loc.h"
 #include "../../source/slang/slang-lexer.h"
@@ -25,15 +26,7 @@
 /*
 Some command lines:
 
-For AST
--d source/slang slang-ast-base.h slang-ast-decl.h slang-ast-expr.h slang-ast-modifier.h slang-ast-stmt.h slang-ast-type.h slang-ast-val.h -strip-prefix slang-ast- -o slang-ast-generated -output-fields -mark-suffix _CLASS
-
-For RefObjects
--d source/slang slang-ast-support-types.h -strip-prefix slang- -reflect-type RefObject -o slang-ref-object-generated -output-fields -mark-suffix _OBJ_CLASS
-
-For Values
-
--d source/slang slang-ast-support-types.h -strip-prefix slang- -reflect-type Value -o slang-value-generated -output-fields -mark-suffix _VALUE_CLASS
+-d source/slang slang-ast-support-types.h slang-ast-base.h slang-ast-decl.h slang-ast-expr.h slang-ast-modifier.h slang-ast-stmt.h slang-ast-type.h slang-ast-val.h -strip-prefix slang- -o slang-generated -output-fields -mark-suffix _CLASS
 */
 
 namespace SlangExperimental
@@ -48,6 +41,7 @@ enum class IdentifierStyle
     Identifier,         ///< Just an identifier
 
     PreDeclare,        ///< Declare a type (not visible in C++ code)
+    TypeSet,            ///< TypeSet
 
     TypeModifier,       ///< const, volatile etc
     Keyword,            ///< A keyword C/C++ keyword that is not another type
@@ -79,6 +73,7 @@ static const IdentifierFlags kIdentifierFlags[Index(IdentifierStyle::CountOf)] =
     0,              /// None
     0,              /// Identifier
     0,              /// Declare type
+    0,              /// Type set
     IdentifierFlag::Keyword,              /// TypeModifier
     IdentifierFlag::Keyword,              /// Keyword
     IdentifierFlag::Keyword | IdentifierFlag::StartScope | IdentifierFlag::ClassLike, /// Class
@@ -159,6 +154,8 @@ enum class ReflectionType
     Reflected,
 };
 
+// Pre-declare
+class TypeSet;
 class SourceOrigin;
 
 class Node : public RefObject
@@ -255,7 +252,8 @@ public:
         m_reflectionType(ReflectionType::NotReflected),
         m_reflectionOverride(ReflectionType::Reflected),
         m_superNode(nullptr),
-        m_origin(nullptr)
+        m_origin(nullptr),
+        m_typeSet(nullptr)
     {
         m_anonymousNamespace = nullptr;
     }
@@ -291,8 +289,10 @@ public:
     Token m_super;          ///< Super class name
     Token m_marker;         ///< The marker associated with this scope (typically the marker is SLANG_CLASS etc, that is used to identify reflectedType)
 
+    TypeSet* m_typeSet;     ///< The typeset this type belongs to. 
+
     Node* m_parentScope;    ///< The scope this type/scope is defined in
-    Node* m_superNode;    ///< If this is a class/struct, the type it is derived from (or nullptr if base)
+    Node* m_superNode;      ///< If this is a class/struct, the type it is derived from (or nullptr if base)
 };
 
 class SourceOrigin : public RefObject
@@ -331,6 +331,19 @@ public:
     List<RefPtr<Node> > m_nodes;
 };
 
+class TypeSet : public RefObject
+{
+public:
+
+        /// This is the looked up name.
+    UnownedStringSlice m_macroName;    ///< The name extracted from the macro SLANG_ABSTRACT_AST_CLASS -> AST
+
+    String m_typeName;           ///< The enum type name associated with this type for AST it is ASTNode
+    String m_fileMark;           ///< This 'mark' becomes of the output filename
+
+    List<Node*> m_baseTypes;    ///< The base types for this type set
+};
+
 struct Options;
 
 class CPPExtractor
@@ -351,20 +364,23 @@ public:
         /// Parse the contents of the source file
     SlangResult parse(SourceFile* sourceFile, const Options* options);
 
-    /// When parsing we don't lookup all up super types/add derived types. This is because
-    /// we allow files to be processed in any order, so we have to do the type lookup as a separate operation
+        /// When parsing we don't lookup all up super types/add derived types. This is because
+        /// we allow files to be processed in any order, so we have to do the type lookup as a separate operation
     SlangResult calcDerivedTypes();
 
         /// Find the name starting in specified scope
     Node* findNode(Node* scope, const UnownedStringSlice& name);
 
-        /// Only valid after calcDerivedTypes has been executed
-    const List<Node*>& getBaseTypes() const { return m_baseTypes; }
-
         /// Get all of the parsed source origins
     const List<RefPtr<SourceOrigin> >& getSourceOrigins() const { return m_origins; }
 
-    /// Get the root node
+    TypeSet* getTypeSet(const UnownedStringSlice& slice);
+    TypeSet* getOrAddTypeSet(const UnownedStringSlice& slice);
+
+        /// Get all of the type sets
+    const List<RefPtr<TypeSet>>& getTypeSets() const { return m_typeSets; }
+
+        /// Get the root node
     Node* getRootNode() const { return m_rootNode; }
 
     CPPExtractor(StringSlicePool* typePool, NamePool* namePool, DiagnosticSink* sink, IdentifierLookup* identifierLookup);
@@ -375,6 +391,7 @@ protected:
     bool _isMarker(const UnownedStringSlice& name);
 
     SlangResult _parsePreDeclare();
+    SlangResult _parseTypeSet();
 
     SlangResult _maybeParseNode(Node::Type type);
     SlangResult _maybeParseField();
@@ -405,8 +422,6 @@ protected:
 
     RefPtr<Node> m_rootNode;        ///< The root scope 
 
-    List<Node*> m_baseTypes;        ///< All of the types which are base. Only set after calcDerivedTypes
-
     SourceOrigin* m_origin;
 
     DiagnosticSink* m_sink;
@@ -417,8 +432,11 @@ protected:
 
     const Options* m_options;
 
+    StringSlicePool m_typeSetPool;              ///< Pool for type set names
+    List<RefPtr<TypeSet> > m_typeSets;          ///< The type sets
+
     IdentifierLookup* m_identifierLookup;
-    StringSlicePool* m_typePool;
+    StringSlicePool* m_typePool;                ///< Pool for just types
 };
 
 
@@ -707,9 +725,9 @@ struct Options
 
     List<String> m_inputPaths;      ///< The input paths to the files to be processed
         
-    String m_outputPath;            ///< The ouput path. Note that the extractor can generate multiple output files, and this will actually be the 'stem' of several files
+    String m_outputPath;            ///< The output path. Note that the extractor can generate multiple output files, and this will actually be the 'stem' of several files
+
     String m_inputDirectory;        ///< The input directory that is by default used for reading m_inputPaths from. 
-    String m_reflectType;           ///< The typename used for output
     String m_markPrefix;            ///< The prefix of the 'marker' used to identify a reflected type
     String m_markSuffix;           ///< The postfix of the 'marker' used to identify a reflected type
     String m_stripFilePrefix;       ///< Used for the 'origin' information, this is stripped from the source filename, and the remainder of the filename (without extension) is 'macroized'
@@ -813,11 +831,6 @@ SlangResult OptionsParser::parse(int argc, const char*const* argv, DiagnosticSin
                 m_index++;
                 continue;
             }
-            else if (arg == "-reflect-type")
-            {
-                SLANG_RETURN_ON_FAIL(_parseArgWithValue("-reflect-type", outOptions.m_reflectType));
-                continue;
-            }
             else if (arg == "-mark-prefix")
             {
                 SLANG_RETURN_ON_FAIL(_parseArgReplaceValue("-mark-prefix", outOptions.m_markPrefix));
@@ -861,12 +874,6 @@ SlangResult OptionsParser::parse(int argc, const char*const* argv, DiagnosticSin
         return SLANG_FAIL;
     }
 
-    // Set default name
-    if (outOptions.m_reflectType.getLength() == 0)
-    {
-        outOptions.m_reflectType = "ASTNode";
-    }
-
     return SLANG_OK;
 }
 
@@ -876,10 +883,39 @@ CPPExtractor::CPPExtractor(StringSlicePool* typePool, NamePool* namePool, Diagno
     m_typePool(typePool),
     m_sink(sink),
     m_namePool(namePool),
-    m_identifierLookup(identifierLookup)
+    m_identifierLookup(identifierLookup),
+    m_typeSetPool(StringSlicePool::Style::Empty)
 {
     m_rootNode = new Node(Node::Type::Namespace);
     m_rootNode->m_reflectionType = ReflectionType::Reflected;
+}
+
+TypeSet* CPPExtractor::getTypeSet(const UnownedStringSlice& slice)
+{
+    Index index = m_typeSetPool.findIndex(slice);
+    if (index < 0)
+    {
+        return nullptr;
+    }
+    return m_typeSets[index];
+}
+
+TypeSet* CPPExtractor::getOrAddTypeSet(const UnownedStringSlice& slice)
+{
+    const Index index = Index(m_typeSetPool.add(slice));
+    if (index >= m_typeSets.getCount())
+    {
+        SLANG_ASSERT(m_typeSets.getCount() == index);
+        TypeSet* typeSet = new TypeSet;
+
+        m_typeSets.add(typeSet);
+        typeSet->m_macroName = m_typeSetPool.getSlice(StringSlicePool::Handle(index));
+        return typeSet;
+    }
+    else
+    {
+        return m_typeSets[index];
+    }
 }
 
 bool CPPExtractor::_isMarker(const UnownedStringSlice& name)
@@ -1099,7 +1135,7 @@ SlangResult CPPExtractor::_maybeParseNode(Node::Type type)
     SLANG_RETURN_ON_FAIL(expect(TokenType::Identifier));
     // Next is the class name
     SLANG_RETURN_ON_FAIL(expect(TokenType::Identifier, &name));
-    
+
     if (m_reader.peekTokenType() == TokenType::Semicolon)
     {
         // pre declaration;
@@ -1187,6 +1223,29 @@ SlangResult CPPExtractor::_maybeParseNode(Node::Type type)
         // We still need to add the node,
         SLANG_RETURN_ON_FAIL(pushNode(node));
         return SLANG_OK;
+    }
+
+    // Let's extract the type set
+    {
+        UnownedStringSlice slice(node->m_marker.getContent());
+
+        SLANG_ASSERT(_isMarker(slice));
+
+        // Strip the prefix and suffix
+        slice = UnownedStringSlice(slice.begin() + m_options->m_markPrefix.getLength(), slice.end() - m_options->m_markSuffix.getLength());
+
+        // Strip ABSTRACT_ if it's there
+        UnownedStringSlice abstractSlice("ABSTRACT_");
+        if (slice.startsWith(abstractSlice))
+        {
+            slice = UnownedStringSlice(slice.begin() + abstractSlice.getLength(), slice.end());
+        }
+
+        // TODO: We could strip other stuff or have other heuristics there, but this is
+        // probably okay for now
+
+        // Set the typeSet 
+        node->m_typeSet = getOrAddTypeSet(slice);
     }
 
     // Okay now looking for ( identifier)
@@ -1636,15 +1695,10 @@ SlangResult CPPExtractor::_parsePreDeclare()
 
     SLANG_RETURN_ON_FAIL(expect(TokenType::LParent));
 
-    bool hasMatchingSuffix = false;
-
-    // Get the suffix
-    {
-        Token suffix;
-        SLANG_RETURN_ON_FAIL(expect(TokenType::Identifier, &suffix));
-
-        hasMatchingSuffix = _trimUnderscorePrefix(m_options->m_markSuffix.getUnownedSlice()) == _trimUnderscorePrefix(suffix.getContent());
-    }
+    // Get the typeSet
+    Token typeSetToken;
+    SLANG_RETURN_ON_FAIL(expect(TokenType::Identifier, &typeSetToken));
+    TypeSet* typeSet = getOrAddTypeSet(typeSetToken.getContent());
 
     SLANG_RETURN_ON_FAIL(expect(TokenType::Comma));
 
@@ -1676,21 +1730,45 @@ SlangResult CPPExtractor::_parsePreDeclare()
 
     SLANG_RETURN_ON_FAIL(expect(TokenType::RParent));
 
-    if (hasMatchingSuffix)
-    {
-        RefPtr<Node> node(new Node(nodeType));
+    RefPtr<Node> node(new Node(nodeType));
 
-        node->m_name = name;
-        node->m_super = super;
+    node->m_name = name;
+    node->m_super = super;
+    node->m_typeSet = typeSet;
 
-        // Assume it is reflected
-        node->m_reflectionType = ReflectionType::Reflected;
+    // Assume it is reflected
+    node->m_reflectionType = ReflectionType::Reflected;
 
-        SLANG_RETURN_ON_FAIL(pushNode(node));
-        // Pop out of it
-        popBrace();
-    }
+    SLANG_RETURN_ON_FAIL(pushNode(node));
+    // Pop out of the node
+    popBrace();
     
+    return SLANG_OK;
+}
+
+SlangResult CPPExtractor::_parseTypeSet()
+{
+    // Skip the declare type token
+    m_reader.advanceToken();
+
+    SLANG_RETURN_ON_FAIL(expect(TokenType::LParent));
+
+    Token typeSetToken;
+    SLANG_RETURN_ON_FAIL(expect(TokenType::Identifier, &typeSetToken));
+
+    TypeSet* typeSet = getOrAddTypeSet(typeSetToken.getContent());
+
+    SLANG_RETURN_ON_FAIL(expect(TokenType::Comma));
+
+    // Get the type of type
+    Token typeToken;
+    SLANG_RETURN_ON_FAIL(expect(TokenType::Identifier, &typeToken));
+
+    SLANG_RETURN_ON_FAIL(expect(TokenType::RParent));
+
+    // Set the typename
+    typeSet->m_typeName = typeToken.getContent();
+
     return SLANG_OK;
 }
 
@@ -1739,6 +1817,11 @@ SlangResult CPPExtractor::parse(SourceFile* sourceFile, const Options* options)
                     case IdentifierStyle::PreDeclare:
                     {
                         SLANG_RETURN_ON_FAIL(_parsePreDeclare());
+                        break;
+                    }
+                    case IdentifierStyle::TypeSet:
+                    {
+                        SLANG_RETURN_ON_FAIL(_parseTypeSet());
                         break;
                     }
                     case IdentifierStyle::Reflected:
@@ -1889,8 +1972,13 @@ SlangResult CPPExtractor::_calcDerivedTypesRec(Node* node)
                     return SLANG_FAIL;
                 }
 
-                // The base class must be defined in same scope (as we didn't allow different scopes for base classes)
+                if (superType->m_typeSet != node->m_typeSet)
+                {
+                    m_sink->diagnose(node->m_name, CPPDiagnostics::typeInDifferentTypeSet, node->m_name.getContent(), node->m_typeSet->m_macroName, superType->m_typeSet->m_macroName);
+                    return SLANG_FAIL;
+                }
 
+                // The base class must be defined in same scope (as we didn't allow different scopes for base classes)
                 superType->addDerived(node);
             }
         }
@@ -1899,7 +1987,7 @@ SlangResult CPPExtractor::_calcDerivedTypesRec(Node* node)
             // Add the root nodes
             if (node->isReflected())
             {
-                m_baseTypes.add(node);
+                node->m_typeSet->m_baseTypes.add(node);
             }
         }
     }
@@ -1917,42 +2005,26 @@ SlangResult CPPExtractor::calcDerivedTypes()
     return _calcDerivedTypesRec(m_rootNode);
 }
 
-
 /* static */String CPPExtractor::_calcMacroOrigin(const String& filePath, const Options& options)
 {
+    // Get the filename without extension
     String fileName = Path::getFileNameWithoutExt(filePath);
 
-    if (options.m_stripFilePrefix.getLength() && fileName.startsWith(options.m_stripFilePrefix))
+    // We can work on just the slice
+    UnownedStringSlice slice = fileName.getUnownedSlice();
+
+    // Filename prefix
+    if (options.m_stripFilePrefix.getLength() && slice.startsWith(options.m_stripFilePrefix.getUnownedSlice()))
     {
         const Index len = options.m_stripFilePrefix.getLength();
-        fileName = UnownedStringSlice(fileName.begin() + len, fileName.end());
+        slice = UnownedStringSlice(slice.begin() + len, slice.end());
     }
 
-    const char* start = fileName.begin();
-    const char* end = fileName.end();
-
-    // Trim any - 
-    while (start < end && *start == '-') ++start;
-    while (end - 1 > start && end[-1] == '-') --end;
+    // Trim -
+    slice = slice.trim('-');
 
     StringBuilder out;
-
-    // Make into macro like name
-    for (; start < end; ++start)
-    {
-        char c = *start;
-
-        if (c == '-')
-        {
-            c = '_';
-        }
-        else if (c >= 'a' && c <= 'z')
-        {
-            c = c - 'a' + 'A';
-        }
-        out.append(c);
-    }
-
+    NameConventionUtil::convert(slice, CharCase::Upper, NameConvention::Snake, out);
     return out;
 }
 
@@ -1977,8 +2049,9 @@ public:
     SlangResult writeDefs(CPPExtractor& extractor);
 
         /// Calculate the header 
-    SlangResult calcHeader(CPPExtractor& extractor, StringBuilder& out);
-    SlangResult calcChildrenHeader(CPPExtractor& exctractor, StringBuilder& out);
+    SlangResult calcTypeHeader(CPPExtractor& extractor, TypeSet* typeSet, StringBuilder& out);
+    SlangResult calcChildrenHeader(CPPExtractor& exctractor, TypeSet* typeSet, StringBuilder& out);
+    SlangResult calcOriginHeader(CPPExtractor& extractor, StringBuilder& out);
 
     SlangResult calcDef(CPPExtractor& extractor, SourceOrigin* origin, StringBuilder& out);
 
@@ -2072,275 +2145,123 @@ SlangResult CPPExtractorApp::calcDef(CPPExtractor& extractor, SourceOrigin* orig
     return SLANG_OK;
 }
 
-SlangResult CPPExtractorApp::calcChildrenHeader(CPPExtractor& extractor, StringBuilder& out)
+SlangResult CPPExtractorApp::calcChildrenHeader(CPPExtractor& extractor, TypeSet* typeSet, StringBuilder& out)
 {
-    const List<Node*>& baseTypes = extractor.getBaseTypes();
-
-    const String& reflectTypeName = m_options.m_reflectType;
+    const List<Node*>& baseTypes = typeSet->m_baseTypes;
+    const String& reflectTypeName = typeSet->m_typeName;
 
     out << "#pragma once\n\n";
     out << "// Do not edit this file is generated from slang-cpp-extractor tool\n\n";
 
+    List<Node*> nodes;
     for (Index i = 0; i < baseTypes.getCount(); ++i)
     {
-        Node* baseType = baseTypes[i];
-        
-        List<Node*> nodes;
+        Node* baseType = baseTypes[i];        
         baseType->calcDerivedDepthFirst(nodes);
-        Node::filter(Node::isClassLike, nodes);
+    }
 
-        List<Node*> derivedTypes;
+    Node::filter(Node::isClassLike, nodes);
 
-        out << "\n\n /* !!!!!!!!!!!!!!!!!!!!!!!!!!!!! CHILDREN !!!!!!!!!!!!!!!!!!!!!!!!!!!! */ \n\n";
+    List<Node*> derivedTypes;
 
-        // Now the children 
-        for (Node* node : nodes)
+    out << "\n\n /* !!!!!!!!!!!!!!!!!!!!!!!!!!!!! CHILDREN !!!!!!!!!!!!!!!!!!!!!!!!!!!! */ \n\n";
+
+    // Now the children 
+    for (Node* node : nodes)
+    {
+        node->getReflectedDerivedTypes(derivedTypes);
+
+        // Define the derived types
+        out << "#define " << m_options.m_markPrefix << "CHILDREN_" << reflectTypeName << "_"  << node->m_name.getContent() << "(x, param)";
+
+        if (derivedTypes.getCount())
         {
-            node->getReflectedDerivedTypes(derivedTypes);
-
-            // Define the derived types
-            out << "#define " << m_options.m_markPrefix << "CHILDREN_" << reflectTypeName << "_"  << node->m_name.getContent() << "(x, param)";
-
-            if (derivedTypes.getCount())
+            out << " \\\n";
+            for (Index j = 0; j < derivedTypes.getCount(); ++j)
             {
-                out << " \\\n";
-                for (Index j = 0; j < derivedTypes.getCount(); ++j)
-                {
-                    Node* derivedType = derivedTypes[j];
-                    _indent(1, out);
-                    out << m_options.m_markPrefix << "ALL_" << reflectTypeName << "_" << derivedType->m_name.getContent() << "(x, param)";
-                    if (j < derivedTypes.getCount() - 1)
-                    {
-                        out << "\\\n";
-                    }
-                }    
-            }
-            out << "\n\n";
-        }
-
-        out << "\n\n /* !!!!!!!!!!!!!!!!!!!!!!!!!!!!! ALL !!!!!!!!!!!!!!!!!!!!!!!!!!!! */\n\n";
-
-        for (Node* node : nodes)
-        {
-            // Define the derived types
-            out << "#define " << m_options.m_markPrefix << "ALL_" << reflectTypeName << "_" << node->m_name.getContent() << "(x, param) \\\n";
-            _indent(1, out);
-            out << m_options.m_markPrefix << reflectTypeName << "_"  << node->m_name.getContent() << "(x, param)";
-
-            // If has derived types output them
-            if (node->hasReflectedDerivedType())
-            {
-                out << " \\\n";
+                Node* derivedType = derivedTypes[j];
                 _indent(1, out);
-                out << m_options.m_markPrefix << "CHILDREN_" << reflectTypeName << "_" << node->m_name.getContent() << "(x, param)";
-            }
-            out << "\n\n";
-        }
-
-        if (m_options.m_outputFields)
-        {
-            out << "\n\n /* !!!!!!!!!!!!!!!!!!!!!!!!!!!!! FIELDS !!!!!!!!!!!!!!!!!!!!!!!!!!!! */\n\n";
-
-            for (Node* node : nodes)
-            {
-                // Define the derived types
-                out << "#define " << m_options.m_markPrefix << "FIELDS_" << reflectTypeName << "_" << node->m_name.getContent() << "(_x_, _param_)";
-
-                if (node->m_fields.getCount() > 0)
+                out << m_options.m_markPrefix << "ALL_" << reflectTypeName << "_" << derivedType->m_name.getContent() << "(x, param)";
+                if (j < derivedTypes.getCount() - 1)
                 {
                     out << "\\\n";
+                }
+            }    
+        }
+        out << "\n\n";
+    }
 
-                    const Index fieldsCount = node->m_fields.getCount();
-                    bool previousField = false;
-                    for (Index j = 0; j < fieldsCount; ++j) 
-                    {
-                        const auto& field = node->m_fields[j];
+    out << "\n\n /* !!!!!!!!!!!!!!!!!!!!!!!!!!!!! ALL !!!!!!!!!!!!!!!!!!!!!!!!!!!! */\n\n";
+
+    for (Node* node : nodes)
+    {
+        // Define the derived types
+        out << "#define " << m_options.m_markPrefix << "ALL_" << reflectTypeName << "_" << node->m_name.getContent() << "(x, param) \\\n";
+        _indent(1, out);
+        out << m_options.m_markPrefix << reflectTypeName << "_"  << node->m_name.getContent() << "(x, param)";
+
+        // If has derived types output them
+        if (node->hasReflectedDerivedType())
+        {
+            out << " \\\n";
+            _indent(1, out);
+            out << m_options.m_markPrefix << "CHILDREN_" << reflectTypeName << "_" << node->m_name.getContent() << "(x, param)";
+        }
+        out << "\n\n";
+    }
+
+    if (m_options.m_outputFields)
+    {
+        out << "\n\n /* !!!!!!!!!!!!!!!!!!!!!!!!!!!!! FIELDS !!!!!!!!!!!!!!!!!!!!!!!!!!!! */\n\n";
+
+        for (Node* node : nodes)
+        {
+            // Define the derived types
+            out << "#define " << m_options.m_markPrefix << "FIELDS_" << reflectTypeName << "_" << node->m_name.getContent() << "(_x_, _param_)";
+
+            if (node->m_fields.getCount() > 0)
+            {
+                out << "\\\n";
+
+                const Index fieldsCount = node->m_fields.getCount();
+                bool previousField = false;
+                for (Index j = 0; j < fieldsCount; ++j) 
+                {
+                    const auto& field = node->m_fields[j];
                         
-                        if (field.isReflected())
+                    if (field.isReflected())
+                    {
+                        if (previousField)
                         {
-                            if (previousField)
-                            {
-                                out << "\\\n";
-                            }
-
-                            _indent(1, out);
-
-                            // NOTE! We put the type field in brackets, such that there is no issue with templates containing a comma.
-                            // If stringified
-                            out << "_x_(" << field.name.getContent() << ", (" << field.type << "), _param_)";
-                            previousField = true;
+                            out << "\\\n";
                         }
+
+                        _indent(1, out);
+
+                        // NOTE! We put the type field in brackets, such that there is no issue with templates containing a comma.
+                        // If stringified
+                        out << "_x_(" << field.name.getContent() << ", (" << field.type << "), _param_)";
+                        previousField = true;
                     }
                 }
-                
-                out << "\n\n";
             }
+                
+            out << "\n\n";
         }
     }
 
     return SLANG_OK;
 }
 
-SlangResult CPPExtractorApp::calcHeader(CPPExtractor& extractor, StringBuilder& out)
+SlangResult CPPExtractorApp::calcOriginHeader(CPPExtractor& extractor, StringBuilder& out)
 {
-    const List<Node*>& baseTypes = extractor.getBaseTypes();
-
-    const String& reflectTypeName = m_options.m_reflectType;
-
-    out << "#pragma once\n\n";
-    out << "// Do not edit this file is generated from slang-cpp-extractor tool\n\n";
-
-    for (Index i = 0; i < baseTypes.getCount(); ++i)
-    {
-        Node* baseType = baseTypes[i];
-        
-        List<Node*> baseScopePath;
-        baseType->calcScopePath(baseScopePath);
-
-        // Remove the global scope
-        baseScopePath.removeAt(0);
-        // Remove the type itself
-        baseScopePath.removeLast();
-
-        for (Node* scopeNode : baseScopePath)
-        {
-            SLANG_ASSERT(scopeNode->m_type == Node::Type::Namespace);
-            out << "namespace " << scopeNode->m_name.getContent() << " {\n";
-        }
-
-        List<Node*> nodes;
-        baseType->calcDerivedDepthFirst(nodes);
-        Node::filter(Node::isClassLikeAndReflected, nodes);
-
-        // Write out the types
-        {
-            out << "\n";
-            out << "enum class " << reflectTypeName << "Type\n";
-            out << "{\n";
-
-            Index typeIndex = 0;
-            for (Node* node : nodes)
-            {
-                // Okay first we are going to output the enum values
-                const Index depth = node->calcDerivedDepth() - 1;
-                _indent(depth, out);
-                out << node->m_name.getContent() << " = " << typeIndex << ",\n";
-                typeIndex++;
-            }
-
-            _indent(1, out);
-            out << "CountOf\n";
-
-            out << "};\n\n";
-        }
-
-        // Predeclare the classes
-        {
-            out << "// Predeclare\n\n";
-            for (Node* node : nodes)
-            {
-                SLANG_ASSERT(node->isClassLike());
-                // If it's not reflected we don't output, in the enum list
-                if (node->isReflected())
-                {
-                    const char* type = (node->m_type == Node::Type::ClassType) ? "class" : "struct";
-                    out << type << " " << node->m_name.getContent() << ";\n";
-                }
-            }
-        }
-
-        // Do the macros for each of the types
-
-        {
-            out << "// Type macros\n\n";
-
-            out << "// Order is (NAME, SUPER, ORIGIN, LAST, MARKER, TYPE, param) \n";
-            out << "// NAME - is the class name\n";
-            out << "// SUPER - is the super class name (or NO_SUPER)\n";
-            out << "// ORIGIN - where the definition was found\n";
-            out << "// LAST - is the class name for the last in the range (or NO_LAST)\n";
-            out << "// MARKER - is the text inbetween in the prefix/postix (like ABSTRACT). If no inbetween text is is 'NONE'\n";
-            out << "// TYPE - Can be BASE, INNER or LEAF for the overall base class, an INNER class, or a LEAF class\n";
-            out << "// param is a user defined parameter that can be parsed to the invoked x macro\n\n";
-
-            // Output all of the definitions for each type
-            for (Node* node : nodes)
-            {
-                out << "#define " << m_options.m_markPrefix <<  reflectTypeName << "_" << node->m_name.getContent() << "(x, param) ";
-
-                // Output the X macro part
-                _indent(1, out);
-                out << "x(" << node->m_name.getContent() << ", ";
-
-                if (node->m_superNode)
-                {
-                    out << node->m_superNode->m_name.getContent() << ", ";
-                }
-                else
-                {
-                    out << "NO_SUPER, ";
-                }
-
-                // Output the (file origin)
-                out << node->m_origin->m_macroOrigin;
-                out << ", ";
-
-                // The last type
-                Node* lastDerived = node->findLastDerived();
-                if (lastDerived)
-                {
-                    out << lastDerived->m_name.getContent() << ", ";
-                }
-                else
-                {
-                    out << "NO_LAST, ";
-                }
-
-                // Output any specifics of the markup
-                UnownedStringSlice marker = node->m_marker.getContent();
-                // Need to extract the name
-                if (marker.getLength() > m_options.m_markPrefix.getLength() + m_options.m_markSuffix.getLength())
-                {
-                    marker = UnownedStringSlice(marker.begin() + m_options.m_markPrefix.getLength(), marker.end() - m_options.m_markSuffix.getLength());
-                }
-                else
-                {
-                    marker = UnownedStringSlice::fromLiteral("NONE");
-                }
-                out << marker << ", ";
-
-                if (node->m_superNode == nullptr)
-                {
-                    out << "BASE, ";
-                }
-                else if (node->hasReflectedDerivedType())
-                {
-                    out << "INNER, ";
-                }
-                else
-                {
-                    out << "LEAF, ";
-                }
-                out << "param)\n";
-            }
-        }
-
-    
-        // Now pop the scope in revers
-        for (Index j = baseScopePath.getCount() - 1; j >= 0; j--)
-        {
-            Node* scopeNode = baseScopePath[j];
-            out << "} // namespace " << scopeNode->m_name.getContent() << "\n";
-        }
-    }
-
     // Do macros by origin
 
     out << "// Origin macros\n\n";
 
     for (SourceOrigin* origin : extractor.getSourceOrigins())
-    {
-        out << "#define " << m_options.m_markPrefix <<  "ORIGIN_" << origin->m_macroOrigin << "_" << reflectTypeName << "(x, param) \\\n";
+    {   
+        out << "#define " << m_options.m_markPrefix << "ORIGIN_" << origin->m_macroOrigin << "(x, param) \\\n";
 
         for (Node* node : origin->m_nodes)
         {
@@ -2353,6 +2274,171 @@ SlangResult CPPExtractorApp::calcHeader(CPPExtractor& extractor, StringBuilder& 
             out << "x(" << node->m_name.getContent() << ", param) \\\n";
         }
         out << "/* */\n\n";
+    }
+
+    return SLANG_OK;
+}
+
+SlangResult CPPExtractorApp::calcTypeHeader(CPPExtractor& extractor, TypeSet* typeSet, StringBuilder& out)
+{
+    const List<Node*>& baseTypes = typeSet->m_baseTypes;
+    const String& reflectTypeName = typeSet->m_typeName;
+
+    out << "#pragma once\n\n";
+    out << "// Do not edit this file is generated from slang-cpp-extractor tool\n\n";
+
+    if (baseTypes.getCount() == 0)
+    {
+        return SLANG_OK;
+    }
+
+    // Set up the scope
+    List<Node*> baseScopePath;
+    baseTypes[0]->calcScopePath(baseScopePath);
+
+    // Remove the global scope
+    baseScopePath.removeAt(0);
+    // Remove the type itself
+    baseScopePath.removeLast();
+
+    for (Node* scopeNode : baseScopePath)
+    {
+        SLANG_ASSERT(scopeNode->m_type == Node::Type::Namespace);
+        out << "namespace " << scopeNode->m_name.getContent() << " {\n";
+    }
+
+    // Add all the base types, with in order traversals
+    List<Node*> nodes;
+    for (Index i = 0; i < baseTypes.getCount(); ++i)
+    {
+        Node* baseType = baseTypes[i];
+        baseType->calcDerivedDepthFirst(nodes);
+    }
+
+    Node::filter(Node::isClassLikeAndReflected, nodes);
+
+    // Write out the types
+    {
+        out << "\n";
+        out << "enum class " << reflectTypeName << "Type\n";
+        out << "{\n";
+
+        Index typeIndex = 0;
+        for (Node* node : nodes)
+        {
+            // Okay first we are going to output the enum values
+            const Index depth = node->calcDerivedDepth() - 1;
+            _indent(depth, out);
+            out << node->m_name.getContent() << " = " << typeIndex << ",\n";
+            typeIndex++;
+        }
+
+        _indent(1, out);
+        out << "CountOf\n";
+
+        out << "};\n\n";
+    }
+
+    // TODO(JS):
+    // Strictly speaking if we wanted the types to be in different scopes, we would have to
+    // change the namespaces here
+
+    // Predeclare the classes
+    {
+        out << "// Predeclare\n\n";
+        for (Node* node : nodes)
+        {
+            SLANG_ASSERT(node->isClassLike());
+            // If it's not reflected we don't output, in the enum list
+            if (node->isReflected())
+            {
+                const char* type = (node->m_type == Node::Type::ClassType) ? "class" : "struct";
+                out << type << " " << node->m_name.getContent() << ";\n";
+            }
+        }
+    }
+
+    // Do the macros for each of the types
+
+    {
+        out << "// Type macros\n\n";
+
+        out << "// Order is (NAME, SUPER, ORIGIN, LAST, MARKER, TYPE, param) \n";
+        out << "// NAME - is the class name\n";
+        out << "// SUPER - is the super class name (or NO_SUPER)\n";
+        out << "// ORIGIN - where the definition was found\n";
+        out << "// LAST - is the class name for the last in the range (or NO_LAST)\n";
+        out << "// MARKER - is the text inbetween in the prefix/postix (like ABSTRACT). If no inbetween text is is 'NONE'\n";
+        out << "// TYPE - Can be BASE, INNER or LEAF for the overall base class, an INNER class, or a LEAF class\n";
+        out << "// param is a user defined parameter that can be parsed to the invoked x macro\n\n";
+
+        // Output all of the definitions for each type
+        for (Node* node : nodes)
+        {
+            out << "#define " << m_options.m_markPrefix <<  reflectTypeName << "_" << node->m_name.getContent() << "(x, param) ";
+
+            // Output the X macro part
+            _indent(1, out);
+            out << "x(" << node->m_name.getContent() << ", ";
+
+            if (node->m_superNode)
+            {
+                out << node->m_superNode->m_name.getContent() << ", ";
+            }
+            else
+            {
+                out << "NO_SUPER, ";
+            }
+
+            // Output the (file origin)
+            out << node->m_origin->m_macroOrigin;
+            out << ", ";
+
+            // The last type
+            Node* lastDerived = node->findLastDerived();
+            if (lastDerived)
+            {
+                out << lastDerived->m_name.getContent() << ", ";
+            }
+            else
+            {
+                out << "NO_LAST, ";
+            }
+
+            // Output any specifics of the markup
+            UnownedStringSlice marker = node->m_marker.getContent();
+            // Need to extract the name
+            if (marker.getLength() > m_options.m_markPrefix.getLength() + m_options.m_markSuffix.getLength())
+            {
+                marker = UnownedStringSlice(marker.begin() + m_options.m_markPrefix.getLength(), marker.end() - m_options.m_markSuffix.getLength());
+            }
+            else
+            {
+                marker = UnownedStringSlice::fromLiteral("NONE");
+            }
+            out << marker << ", ";
+
+            if (node->m_superNode == nullptr)
+            {
+                out << "BASE, ";
+            }
+            else if (node->hasReflectedDerivedType())
+            {
+                out << "INNER, ";
+            }
+            else
+            {
+                out << "LEAF, ";
+            }
+            out << "param)\n";
+        }
+    }
+
+    // Now pop the scope in revers
+    for (Index j = baseScopePath.getCount() - 1; j >= 0; j--)
+    {
+        Node* scopeNode = baseScopePath[j];
+        out << "} // namespace " << scopeNode->m_name.getContent() << "\n";
     }
 
     return SLANG_OK;
@@ -2409,29 +2495,29 @@ SlangResult CPPExtractorApp::writeOutput(CPPExtractor& extractor)
     // Strip the extension if set
     path = Path::getPathWithoutExt(path);
 
+    for (TypeSet* typeSet : extractor.getTypeSets())
     {
-        /// Calculate the header
-        StringBuilder header;
-        SLANG_RETURN_ON_FAIL(calcHeader(extractor, header));
+        {
+            /// Calculate the header
+            StringBuilder header;
+            SLANG_RETURN_ON_FAIL(calcTypeHeader(extractor, typeSet, header));
 
-        // Write it out
+            // Write it out
 
-        StringBuilder headerPath;
-        headerPath << path << "." << ext;
-        SLANG_RETURN_ON_FAIL(writeAllText(headerPath, header.getUnownedSlice()));
+            StringBuilder headerPath;
+            headerPath << path << "-" << typeSet->m_fileMark << "." << ext;
+            SLANG_RETURN_ON_FAIL(writeAllText(headerPath, header.getUnownedSlice()));
+        }
+
+        {
+            StringBuilder childrenHeader;
+            SLANG_RETURN_ON_FAIL(calcChildrenHeader(extractor, typeSet, childrenHeader));
+
+            StringBuilder headerPath;
+            headerPath << path << "-" << typeSet->m_fileMark << "-macro." + ext;
+            SLANG_RETURN_ON_FAIL(writeAllText(headerPath, childrenHeader.getUnownedSlice()));
+        }
     }
-
-    {
-        StringBuilder childrenHeader;
-        SLANG_RETURN_ON_FAIL(calcChildrenHeader(extractor, childrenHeader));
-
-        StringBuilder headerPath;
-        headerPath << path << "-macro." + ext;
-        SLANG_RETURN_ON_FAIL(writeAllText(headerPath, childrenHeader.getUnownedSlice()));
-    }
-
-    // Write to output
-    // m_sink->writer->write(header.getBuffer(), header.getLength());
 
     return SLANG_OK;
 }
@@ -2454,31 +2540,18 @@ SlangResult CPPExtractorApp::writeOutput(CPPExtractor& extractor)
 
     // Special markers
     {
-        {
-            const char* names[] = { "const", "volatile" };
-            StringBuilder buf;
-            buf << options.m_markPrefix;
-            buf << "PRE_DECLARE";
-            
-            outLookup.set(buf.getUnownedSlice(), IdentifierStyle::PreDeclare);
-        }
+        const char* names[] = {"PRE_DECLARE", "TYPE_SET", "REFLECTED", "UNREFLECTED"};
+        const IdentifierStyle styles[] = { IdentifierStyle::PreDeclare, IdentifierStyle::TypeSet, IdentifierStyle::Reflected, IdentifierStyle::Unreflected };
+        SLANG_COMPILE_TIME_ASSERT(SLANG_COUNT_OF(names) == SLANG_COUNT_OF(styles));
 
+        StringBuilder buf;        
+        for (Index i = 0; i < SLANG_COUNT_OF(names); ++i)
         {
-            StringBuilder buf;
-            buf << options.m_markPrefix;
-            buf << "REFLECTED";
-
-            outLookup.set(buf.getUnownedSlice(), IdentifierStyle::Reflected);
-        }
-        {
-            StringBuilder buf;
-            buf << options.m_markPrefix;
-            buf << "UNREFLECTED";
-
-            outLookup.set(buf.getUnownedSlice(), IdentifierStyle::Unreflected);
+            buf.Clear();
+            buf << options.m_markPrefix << names[i];
+            outLookup.set(buf.getUnownedSlice(), styles[i]);
         }
     }
-
 
     // Keywords which introduce types/scopes
     {
@@ -2530,6 +2603,32 @@ SlangResult CPPExtractorApp::execute(const Options& options)
 
     SLANG_RETURN_ON_FAIL(extractor.calcDerivedTypes());
 
+    // Okay let's check out the typeSets
+    {
+        for (TypeSet* typeSet : extractor.getTypeSets())
+        {
+            // The macro name is in upper snake, so split it 
+            List<UnownedStringSlice> slices;
+            NameConventionUtil::split(typeSet->m_macroName, slices);
+
+            if (typeSet->m_fileMark.getLength() == 0)
+            {
+                StringBuilder buf;
+                // Let's guess a 'fileMark' (it becomes part of the filename) based on the macro name. Use lower kabab.
+                NameConventionUtil::join(slices.getBuffer(), slices.getCount(), CharCase::Lower, NameConvention::Kabab, buf);
+                typeSet->m_fileMark = buf.ProduceString();
+            }
+
+            if (typeSet->m_typeName.getLength() == 0)
+            {
+                // Let's guess a typename if not set -> go with upper camel
+                StringBuilder buf;
+                NameConventionUtil::join(slices.getBuffer(), slices.getCount(), CharCase::Upper, NameConvention::Camel, buf);
+                typeSet->m_typeName = buf.ProduceString();
+            }
+        }
+    }
+
     // Dump out the tree
     if (options.m_dump)
     {
@@ -2539,8 +2638,9 @@ SlangResult CPPExtractorApp::execute(const Options& options)
             m_sink->writer->write(buf.getBuffer(), buf.getLength());
         }
 
+        for (TypeSet* typeSet : extractor.getTypeSets())
         {
-            const List<Node*>& baseTypes = extractor.getBaseTypes();
+            const List<Node*>& baseTypes = typeSet->m_baseTypes;
 
             for (Node* baseType : baseTypes)
             {
@@ -2598,19 +2698,18 @@ int main(int argc, const char*const* argv)
         {
             if (SLANG_FAILED(app.executeWithArgs(argc - 1, argv + 1)))
             {
-                sink.diagnose(SourceLoc(), CPPDiagnostics::extractorFailed, app.getOptions().m_reflectType);
+                sink.diagnose(SourceLoc(), CPPDiagnostics::extractorFailed);
                 return 1;
             }
             if (sink.getErrorCount())
             {
-                sink.diagnose(SourceLoc(), CPPDiagnostics::extractorFailed, app.getOptions().m_reflectType);
+                sink.diagnose(SourceLoc(), CPPDiagnostics::extractorFailed);
                 return 1;
             }
         }
         catch (...)
         {
             sink.diagnose(SourceLoc(), CPPDiagnostics::internalError);
-            sink.diagnose(SourceLoc(), CPPDiagnostics::extractorFailed, app.getOptions().m_reflectType);
             return 1;
         }
     }

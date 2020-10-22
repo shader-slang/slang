@@ -63,6 +63,8 @@ struct ReflectClassInfo
 
 #define SLANG_PRE_DECLARE(SUFFIX, DEF)
 
+#define SLANG_TYPE_SET(SUFFIX, ...)
+
 // Use these macros to help define Super, and making the base definition NOT have a Super definition.
 // For example something like...
 
