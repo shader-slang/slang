@@ -19,7 +19,11 @@ namespace Slang
 class Linkage;
 
 /*
-General Serialization Overview
+A discussion of the serialization system design can be found in
+
+docs/design/serialization.md
+
+
 ==============================
 
 The AST node types are generally types derived from the NodeBase. The C++ extractor is used to associate an ASTNodeType with
@@ -636,7 +640,7 @@ struct SerialField
     static SerialField make(const char* name, T* in);
 
     const char* name;                   ///< The name of the field
-    const SerialFieldType* type;             ///< The type of the field
+    const SerialFieldType* type;        ///< The type of the field
     uint32_t nativeOffset;              ///< Offset to field from base of type
     uint32_t serialOffset;              ///< Offset in serial type
 };
