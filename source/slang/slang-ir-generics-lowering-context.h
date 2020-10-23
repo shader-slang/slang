@@ -31,6 +31,9 @@ namespace Slang
         // Dictionaries for interface type requirement key-value lookups.
         // Used by `findInterfaceRequirementVal`.
         Dictionary<IRInterfaceType*, Dictionary<IRInst*, IRInst*>> mapInterfaceRequirementKeyValue;
+        
+        // Map from interface requirement keys to its corresponding dispatch method.
+        OrderedDictionary<IRInst*, IRFunc*> mapInterfaceRequirementKeyToDispatchMethods;
 
         SharedIRBuilder sharedBuilderStorage;
 
