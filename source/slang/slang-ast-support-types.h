@@ -396,6 +396,8 @@ namespace Slang
     struct DeclCheckStateExt
     {
     public:
+        SLANG_VALUE_CLASS(DeclCheckStateExt)
+
         typedef uint8_t RawType;
         DeclCheckStateExt() {}
         DeclCheckStateExt(DeclCheckState state)
@@ -932,6 +934,7 @@ namespace Slang
     // We store both the original syntax and the resolved type here.
     struct TypeExp
     {
+        SLANG_VALUE_CLASS(TypeExp)
         typedef TypeExp ThisType;
 
         TypeExp() {}
@@ -1101,6 +1104,8 @@ namespace Slang
     // Represents one item found during lookup
     struct LookupResultItem
     {
+        SLANG_VALUE_CLASS(LookupResultItem)
+
         typedef LookupResultItem_Breadcrumb Breadcrumb;
 
         // Sometimes lookup finds an item, but there were additional

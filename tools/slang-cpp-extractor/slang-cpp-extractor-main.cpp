@@ -1647,6 +1647,17 @@ SlangResult CPPExtractor::_maybeParseField()
     switch (m_reader.peekTokenType())
     {
         case TokenType::OpAssign:
+        {
+            // Special case to handle
+            // Type operator=(...
+
+            m_reader.advanceToken();
+            if (m_reader.peekTokenType() == TokenType::LParent)
+            {
+                // Not a field
+                break;
+            }
+        }
         case TokenType::Semicolon:
         {
             Node::Field field;
@@ -2528,7 +2539,7 @@ SlangResult CPPExtractorApp::writeOutput(CPPExtractor& extractor)
 
     // Some keywords
     {
-        const char* names[] = { "virtual", "typedef", "continue", "if", "case", "break", "catch", "default", "delete", "do", "else", "for", "new", "goto", "return", "switch", "throw", "using", "while" };
+        const char* names[] = { "virtual", "typedef", "continue", "if", "case", "break", "catch", "default", "delete", "do", "else", "for", "new", "goto", "return", "switch", "throw", "using", "while", "operator" };
         outLookup.set(names, SLANG_COUNT_OF(names), IdentifierStyle::Keyword);
     }
 

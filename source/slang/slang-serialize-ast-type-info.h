@@ -8,8 +8,9 @@
 #include "slang-serialize-type-info.h"
 #include "slang-serialize-misc-type-info.h"
 
-namespace Slang {
+#include "slang-serialize-value-type-info.h"
 
+namespace Slang {
 
 /* !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! AST types !!!!!!!!!!!!!!!!!!!!!!!!!!!!! */
 
@@ -85,37 +86,6 @@ struct SerialTypeInfo<DeclRef<T>> : public SerialDeclRefBaseTypeInfo {};
 template <>
 struct SerialTypeInfo<MatrixCoord> : SerialIdentityTypeInfo<MatrixCoord> {};
 
-
-// QualType
-
-template <>
-struct SerialTypeInfo<QualType>
-{
-    typedef QualType NativeType;
-    struct SerialType
-    {
-        SerialIndex type;
-        uint8_t isLeftValue;
-    };
-    enum { SerialAlignment = SLANG_ALIGN_OF(SerialIndex) };
-
-    static void toSerial(SerialWriter* writer, const void* native, void* serial)
-    {
-        auto dst = (SerialType*)serial;
-        auto src = (const NativeType*)native;
-        dst->isLeftValue = src->isLeftValue ? 1 : 0;
-        dst->type = writer->addPointer(src->type);
-    }
-    static void toNative(SerialReader* reader, const void* serial, void* native)
-    {
-        auto src = (const SerialType*)serial;
-        auto dst = (NativeType*)native;
-        dst->type = reader->getPointer(src->type).dynamicCast<Type>();
-        dst->isLeftValue = src->isLeftValue != 0;
-    }
-};
-
-
 // LookupResult::Breadcrumb
 template <>
 struct SerialTypeInfo<LookupResultItem::Breadcrumb>
@@ -183,6 +153,12 @@ struct SerialTypeInfo<LookupResultItem>
         toNativeValue(reader, src.breadcrumbs, dst.breadcrumbs);
     }
 };
+
+// Doesn't work because of Breadcrumb is defined in scope, we need to make C++ extractor handle the scoping when writing out types
+//SLANG_VALUE_TYPE_INFO(LookupResultItem)
+
+// QualType
+SLANG_VALUE_TYPE_INFO(QualType)
 
 // LookupResult
 template <>
@@ -296,34 +272,7 @@ struct SerialTypeInfo<ExpandedSpecializationArg>
 };
 
 // TypeExp
-template <>
-struct SerialTypeInfo<TypeExp>
-{
-    typedef TypeExp NativeType;
-    struct SerialType
-    {
-        SerialIndex type;
-        SerialIndex expr;
-    };
-    enum { SerialAlignment = SLANG_ALIGN_OF(SerialIndex) };
-
-    static void toSerial(SerialWriter* writer, const void* native, void* serial)
-    {
-        auto& dst = *(SerialType*)serial;
-        auto& src = *(const NativeType*)native;
-
-        dst.type = writer->addPointer(src.type);
-        dst.expr = writer->addPointer(src.exp);
-    }
-    static void toNative(SerialReader* reader, const void* serial, void* native)
-    {
-        auto& src = *(const SerialType*)serial;
-        auto& dst = *(NativeType*)native;
-
-        dst.type = reader->getPointer(src.type).dynamicCast<Type>();
-        dst.exp = reader->getPointer(src.expr).dynamicCast<Expr>();
-    }
-};
+SLANG_VALUE_TYPE_INFO(TypeExp)
 
 // DeclCheckStateExt
 template <>
