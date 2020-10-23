@@ -86,76 +86,8 @@ struct SerialTypeInfo<DeclRef<T>> : public SerialDeclRefBaseTypeInfo {};
 template <>
 struct SerialTypeInfo<MatrixCoord> : SerialIdentityTypeInfo<MatrixCoord> {};
 
-// LookupResult::Breadcrumb
-template <>
-struct SerialTypeInfo<LookupResultItem::Breadcrumb>
-{
-    typedef LookupResultItem::Breadcrumb NativeType;
-    struct SerialType
-    {
-        NativeType::Kind kind;
-        NativeType::ThisParameterMode thisParameterMode;
-        SerialTypeInfo<DeclRef<Decl>>::SerialType declRef;
-        SerialTypeInfo<RefPtr<NativeType>> next;
-    };
-    enum { SerialAlignment = SLANG_ALIGN_OF(SerialType) };
-
-    static void toSerial(SerialWriter* writer, const void* native, void* serial)
-    {
-        auto& src = *(const NativeType*)native;
-        auto& dst = *(SerialType*)serial;
-
-        dst.kind = src.kind;
-        dst.thisParameterMode = src.thisParameterMode;
-        toSerialValue(writer, src.declRef, dst.declRef);
-        toSerialValue(writer, src.next, dst.next);
-    }
-
-    static void toNative(SerialReader* reader, const void* serial, void* native)
-    {
-        auto& dst = *(NativeType*)native;
-        auto& src = *(const SerialType*)serial;
-
-        dst.kind = src.kind;
-        dst.thisParameterMode = src.thisParameterMode;
-        toNativeValue(reader, src.declRef, dst.declRef);
-        toNativeValue(reader, src.next, dst.next);
-    }
-};
-
 // LookupResultItem
-template <>
-struct SerialTypeInfo<LookupResultItem>
-{
-    typedef LookupResultItem NativeType;
-    struct SerialType
-    {
-        SerialTypeInfo<DeclRef<Decl>>::SerialType declRef;
-        SerialTypeInfo<RefPtr<NativeType::Breadcrumb>> breadcrumbs;
-    };
-    enum { SerialAlignment = SLANG_ALIGN_OF(SerialType) };
-
-    static void toSerial(SerialWriter* writer, const void* native, void* serial)
-    {
-        auto& src = *(const NativeType*)native;
-        auto& dst = *(SerialType*)serial;
-
-        toSerialValue(writer, src.declRef, dst.declRef);
-        toSerialValue(writer, src.breadcrumbs, dst.breadcrumbs);
-    }
-
-    static void toNative(SerialReader* reader, const void* serial, void* native)
-    {
-        auto& dst = *(NativeType*)native;
-        auto& src = *(const SerialType*)serial;
-
-        toNativeValue(reader, src.declRef, dst.declRef);
-        toNativeValue(reader, src.breadcrumbs, dst.breadcrumbs);
-    }
-};
-
-// Doesn't work because of Breadcrumb is defined in scope, we need to make C++ extractor handle the scoping when writing out types
-//SLANG_VALUE_TYPE_INFO(LookupResultItem)
+SLANG_VALUE_TYPE_INFO(LookupResultItem)
 
 // QualType
 SLANG_VALUE_TYPE_INFO(QualType)
@@ -212,34 +144,7 @@ struct SerialTypeInfo<LookupResult>
 };
 
 // GlobalGenericParamSubstitution::ConstraintArg
-template <>
-struct SerialTypeInfo<GlobalGenericParamSubstitution::ConstraintArg>
-{
-    typedef GlobalGenericParamSubstitution::ConstraintArg NativeType;
-    struct SerialType
-    {
-        SerialIndex decl;
-        SerialIndex val;
-    };
-    enum { SerialAlignment = SLANG_ALIGN_OF(SerialIndex) };
-
-    static void toSerial(SerialWriter* writer, const void* native, void* serial)
-    {
-        auto& dst = *(SerialType*)serial;
-        auto& src = *(const NativeType*)native;
-
-        dst.decl = writer->addPointer(src.decl);
-        dst.val = writer->addPointer(src.val);
-    }
-    static void toNative(SerialReader* reader, const void* serial, void* native)
-    {
-        auto& src = *(const SerialType*)serial;
-        auto& dst = *(NativeType*)native;
-
-        dst.decl = reader->getPointer(src.decl).dynamicCast<Decl>();
-        dst.val = reader->getPointer(src.val).dynamicCast<Val>();
-    }
-};
+SLANG_VALUE_TYPE_INFO(GlobalGenericParamSubstitution_ConstraintArg)
 
 // ExpandedSpecializationArg
 template <>

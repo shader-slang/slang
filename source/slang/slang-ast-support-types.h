@@ -395,7 +395,6 @@ namespace Slang
         /// A `DeclCheckState` plus a bit to track whether a declaration is currently being checked.
     struct DeclCheckStateExt
     {
-    public:
         SLANG_VALUE_CLASS(DeclCheckStateExt)
 
         typedef uint8_t RawType;
@@ -1171,7 +1170,7 @@ namespace Slang
         // This is unused in the simple case where a declaration
         // is being referenced directly (rather than through
         // transparent members).
-        RefPtr<Breadcrumb> breadcrumbs;
+        RefPtr<LookupResultItem_Breadcrumb> breadcrumbs;
 
         LookupResultItem() = default;
         explicit LookupResultItem(DeclRef<Decl> declRef)
