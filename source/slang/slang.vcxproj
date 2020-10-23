@@ -258,6 +258,7 @@
     <ClInclude Include="slang-ir-restructure.h" />
     <ClInclude Include="slang-ir-sccp.h" />
     <ClInclude Include="slang-ir-specialize-arrays.h" />
+    <ClInclude Include="slang-ir-specialize-dispatch.h" />
     <ClInclude Include="slang-ir-specialize-function-call.h" />
     <ClInclude Include="slang-ir-specialize-resources.h" />
     <ClInclude Include="slang-ir-specialize.h" />
@@ -390,6 +391,7 @@
     <ClCompile Include="slang-ir-restructure.cpp" />
     <ClCompile Include="slang-ir-sccp.cpp" />
     <ClCompile Include="slang-ir-specialize-arrays.cpp" />
+    <ClCompile Include="slang-ir-specialize-dispatch.cpp" />
     <ClCompile Include="slang-ir-specialize-function-call.cpp" />
     <ClCompile Include="slang-ir-specialize-resources.cpp" />
     <ClCompile Include="slang-ir-specialize.cpp" />
@@ -453,4 +455,4 @@
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">
   </ImportGroup>
-</Project>
+</Project> 
