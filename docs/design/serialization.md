@@ -128,6 +128,8 @@ If there are problems looking at the contents of `slang-generated-value.h` and `
 
 It should be noted that currently because of limitations in the C++ extractor, all of the types must be defined in the same scope.
 
+Also because value types are always fields in generalized serialization, they do not need to be identified with a sub type, even though C++ extractor does generate a ValueType enum.
+
 ## Generalized Serialization Format
 
 The serialization format used is 'stream-like' with each 'object' stored in order. Each object is given an index starting from 1. 0 is used to be in effect nullptr. The stream looks like
