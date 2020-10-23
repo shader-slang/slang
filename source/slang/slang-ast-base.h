@@ -134,8 +134,6 @@ class Type: public Val
 {
     SLANG_ABSTRACT_AST_CLASS(Type)
 
-    friend struct ASTDumpAccess;
-
     typedef ITypeVisitor Visitor;
 
     void accept(ITypeVisitor* visitor, void* extra);
