@@ -244,6 +244,33 @@ The actual serialization mechanism is similar to the generalized mechanism - ref
 
 IR serialization allows a simple compression mechanism, that works because much of the IR serialized data is UInt32 data, that can use a variable byte encoding.
 
+AST Serialization
+=================
+
+AST serialization uses the generalized serialization mechanism. 
+
+When serializing out an AST module it is typical to want to just serialize out the definitions within that module. Without this, the generalized serializer will crawl over the whole of the AST structure serializing every thing that can be reached - including the whole of the standard library.
+
+The filter `ModuleSerialFilter` can be used when writing the AST module, it will replace any references to elements outside of the current module with a `ImportExternalDecl`. This contains a mangled name to the item being referenced in another module. 
+
+When serializing back in, it may be possible to turn these references into the actual element, if the module containing the definition has been loaded. This probably can't work in general though, as if we have two modules that reference items in the other, then it isn't possible to fix up on load. 
+
+A way around this would be to not replace on reading (or only replace items that can be found). Then go through the `ImportExternalDecl` elements doing the lookup, and potentially loading other modules. There are several issues here though 
+
+* On first loading pointers that have been replaced will claim to be a type they are typically *NOT*
+* Once we have determined what `ImportExternalDecl` should replaced with, how do we replace it?
+
+On the first point, this is perhaps undesirable (on a variety of levels - such as debugging), but isn't as terrible as it could be, as the actual type identification is managed by Slang via the `astTypeNode`. So there is a simple way of identifying what the type actually is.
+
+On the second point - this isn't so simple. If we had an indirection, we could do the replacement quickly and trivially, without having to to fix up all the pointers. We probably don't want to add such an indirection into the pointer based system so choices are
+
+* Store where all the pointers are, and fix them up
+* Traverse the hierarchy replacing pointers
+
+Within the current mechanism storing where all the pointers are is not so simple - it would require the setting of any pointer to record where that pointer is stored, and for that to remain the location. Doing so would require setting all pointers to go through some recording mechansim. Pointers held in containers - like the Dictionary may not be directly available. 
+
+Traversing the hierarchy would be something akin to the serialization process. It would require specially handling for field types to do the replacement. There would need to be special handling for struct value types. 
+
 SourceLoc Serialization
 =======================
 
