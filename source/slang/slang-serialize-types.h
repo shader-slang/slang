@@ -14,8 +14,8 @@ namespace Slang {
 // An enumeration of types that can be set
 enum class SerialExtraType
 {
-    DebugReader,
-    DebugWriter,
+    SourceLocReader,
+    SourceLocWriter,
     CountOf,
 };
 
