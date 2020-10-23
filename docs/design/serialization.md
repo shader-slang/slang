@@ -16,7 +16,7 @@ The major components are
 Generalized Serialization
 =========================
 
-Generalized serializtion is the mechanism used to save 'arbitray' C++ structures. It is currently used for serializing the AST. Although not necessary, generalized serialization is typically helped out by the `C++ extractor`, which can rudamentarily parse C++ source, and extract class-like types and their fields. The extraction then produces header files that contain macros that can then be used to drive serialization. 
+Generalized serialization is the mechanism used to save 'arbitray' C++ structures. It is currently used for serializing the AST. Although not necessary, generalized serialization is typically helped out by the `C++ extractor`, which can rudamentarily parse C++ source, and extract class-like types and their fields. The extraction then produces header files that contain macros that can then be used to drive serialization. 
 
 It's worth discussing briefly what the philosphy is behind the generalized serialization system. To talk about this design it is worth talking a little about serialization in general and the issues involved. Lets say we have a collection of C++ class instances that contain fields. Some of those fields might be pointers. Others of the fields might be a templated container type like a Dictionary<K,V>. We want to take all of these instances, write them to a file, such that when we read the file back we will have the equivalent objects with equivalent relationships. 
 
@@ -267,7 +267,7 @@ On the second point - this isn't so simple. If we had an indirection, we could d
 * Store where all the pointers are, and fix them up
 * Traverse the hierarchy replacing pointers
 
-Within the current mechanism storing where all the pointers are is not so simple - it would require the setting of any pointer to record where that pointer is stored, and for that to remain the location. Doing so would require setting all pointers to go through some recording mechansim. Pointers held in containers - like the Dictionary may not be directly available. 
+Within the current mechanism storing where all the pointers are is not so simple - it would require the setting of any pointer to record where that pointer is stored, and for that to remain the location. Doing so would require setting all pointers to go through some recording mechansim. Pointers held in containers - like the Dictionary may not be directly available. Moreover even if they *were* doing such a behavior may break the containers invarients - for example replacing a keys pointer, may change it's hash.
 
 Traversing the hierarchy would be something akin to the serialization process. It would require specially handling for field types to do the replacement. There would need to be special handling for struct value types. 
 
