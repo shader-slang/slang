@@ -8,6 +8,7 @@
 #include "slang-ir-lower-generic-function.h"
 #include "slang-ir-lower-generic-call.h"
 #include "slang-ir-lower-generic-type.h"
+#include "slang-ir-specialize-dispatch.h"
 #include "slang-ir-witness-table-wrapper.h"
 #include "slang-ir-ssa.h"
 #include "slang-ir-dce.h"
@@ -57,6 +58,15 @@ namespace Slang
         generateAnyValueMarshallingFunctions(&sharedContext);
         if (sink->getErrorCount() != 0)
             return;
+
+        // On non-CPU targets, generate `if` based dispatch functions.
+        if (sharedContext.targetReq->getTarget() != CodeGenTarget::CPPSource)
+        {
+            specializeDispatchFunctions(&sharedContext);
+            if (sink->getErrorCount() != 0)
+                return;
+        }
+
         // We might have generated new temporary variables during lowering.
         // An SSA pass can clean up unnecessary load/stores.
         constructSSA(module);
