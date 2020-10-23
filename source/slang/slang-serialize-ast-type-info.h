@@ -39,6 +39,7 @@ struct SerialTypeInfo<SyntaxClass<T>>
     }
 };
 
+// All the templates for DeclRef<T> can use this implementation.
 struct SerialDeclRefBaseTypeInfo
 {
     typedef DeclRefBase NativeType;
@@ -88,7 +89,6 @@ struct SerialTypeInfo<MatrixCoord> : SerialIdentityTypeInfo<MatrixCoord> {};
 
 // LookupResultItem
 SLANG_VALUE_TYPE_INFO(LookupResultItem)
-
 // QualType
 SLANG_VALUE_TYPE_INFO(QualType)
 
@@ -146,59 +146,14 @@ struct SerialTypeInfo<LookupResult>
 // GlobalGenericParamSubstitution::ConstraintArg
 SLANG_VALUE_TYPE_INFO(GlobalGenericParamSubstitution_ConstraintArg)
 
+// SpecializationArg
+SLANG_VALUE_TYPE_INFO(SpecializationArg)
 // ExpandedSpecializationArg
-template <>
-struct SerialTypeInfo<ExpandedSpecializationArg>
-{
-    typedef ExpandedSpecializationArg NativeType;
-    struct SerialType
-    {
-        SerialIndex val;
-        SerialIndex witness;
-    };
-    enum { SerialAlignment = SLANG_ALIGN_OF(SerialIndex) };
-
-    static void toSerial(SerialWriter* writer, const void* native, void* serial)
-    {
-        auto& dst = *(SerialType*)serial;
-        auto& src = *(const NativeType*)native;
-
-        dst.witness = writer->addPointer(src.witness);
-        dst.val = writer->addPointer(src.val);
-    }
-    static void toNative(SerialReader* reader, const void* serial, void* native)
-    {
-        auto& src = *(const SerialType*)serial;
-        auto& dst = *(NativeType*)native;
-
-        dst.witness = reader->getPointer(src.witness).dynamicCast<Val>();
-        dst.val = reader->getPointer(src.val).dynamicCast<Val>();
-    }
-};
-
+SLANG_VALUE_TYPE_INFO(ExpandedSpecializationArg)
 // TypeExp
 SLANG_VALUE_TYPE_INFO(TypeExp)
-
 // DeclCheckStateExt
-template <>
-struct SerialTypeInfo<DeclCheckStateExt>
-{
-    typedef DeclCheckStateExt NativeType;
-    typedef DeclCheckStateExt::RawType SerialType;
-
-    enum { SerialAlignment = SLANG_ALIGN_OF(SerialType) };
-
-    static void toSerial(SerialWriter* writer, const void* native, void* serial)
-    {
-        SLANG_UNUSED(writer);
-        *(SerialType*)serial = (*(const NativeType*)native).getRaw();
-    }
-    static void toNative(SerialReader* reader, const void* serial, void* native)
-    {
-        SLANG_UNUSED(reader);
-        (*(NativeType*)serial).setRaw(*(const SerialType*)native);
-    }
-};
+SLANG_VALUE_TYPE_INFO(DeclCheckStateExt)
 
 // Modifiers
 template <>

@@ -1336,12 +1336,14 @@ namespace Slang
 
     struct SpecializationArg
     {
+        SLANG_VALUE_CLASS(SpecializationArg)
         Val* val = nullptr;
     };
     typedef List<SpecializationArg> SpecializationArgs;
 
     struct ExpandedSpecializationArg : SpecializationArg
     {
+        SLANG_VALUE_CLASS(ExpandedSpecializationArg)
         Val* witness = nullptr;
     };
     typedef List<ExpandedSpecializationArg> ExpandedSpecializationArgs;

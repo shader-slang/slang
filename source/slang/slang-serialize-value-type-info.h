@@ -40,7 +40,7 @@ static void toSerial(SerialWriter* writer, const void* native, void* serial) \
 #define SLANG_VALUE_TO_NATIVE(NAME, SUPER, ORIGIN, LAST, MARKER, TYPE, param) \
 static void toNative(SerialReader* reader, const void* serial, void* native) \
 { \
-    SLANG_IF_HAS_SUPER_##TYPE(SerialTypeInfo<SUPER>::toSerial(reader, serial, native);) \
+    SLANG_IF_HAS_SUPER_##TYPE(SerialTypeInfo<SUPER>::toNative(reader, serial, native);) \
     auto src = (const SerialType*)serial; \
     auto dst = (NativeType*)native; \
     SLANG_FIELDS_Value_##NAME(SLANG_VALUE_FIELD_TO_NATIVE, param) \
