@@ -436,7 +436,9 @@ namespace Slang
         RawType getRaw() const { return m_raw; }
         void setRaw(RawType raw) { m_raw = raw; }
 
-    private:
+        // TODO(JS):
+        // Unfortunately for automatic serialization to see this member, it has to be public.
+    //private:
         RawType m_raw = 0;
     };
 
