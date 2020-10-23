@@ -8,9 +8,6 @@ namespace Slang
     {
         SharedGenericsLoweringContext* sharedContext;
 
-        // Map from interface requirement keys to its corresponding dispatch method.
-        OrderedDictionary<IRInst*, IRFunc*> mapInterfaceRequirementKeyToDispatchMethods;
-
         // Represents a work item for unpacking `inout` or `out` arguments after a generic call.
         struct ArgumentUnpackWorkItem
         {
@@ -91,8 +88,8 @@ namespace Slang
         // Create a dispatch function for a interface method.
         // On CPU, the dispatch function is implemented as a witness table lookup followed by
         // a function-pointer call.
-        // TODO: On GPU targets, we should implement the dispatch function with a `switch` statement
-        // based on the type ID.
+        // On GPU targets, we can modify the body of the dispatch function in a follow-up
+        // pass to implement it with a `switch` statement based on the type ID.
         IRFunc* _createInterfaceDispatchMethod(
             IRBuilder* builder,
             IRInterfaceType* interfaceType,
@@ -140,11 +137,11 @@ namespace Slang
             IRInst* requirementKey,
             IRInst* requirementVal)
         {
-            if (auto func = mapInterfaceRequirementKeyToDispatchMethods.TryGetValue(requirementKey))
+            if (auto func = sharedContext->mapInterfaceRequirementKeyToDispatchMethods.TryGetValue(requirementKey))
                 return *func;
             auto dispatchFunc =
                 _createInterfaceDispatchMethod(builder, interfaceType, requirementKey, requirementVal);
-            mapInterfaceRequirementKeyToDispatchMethods.AddIfNotExists(
+            sharedContext->mapInterfaceRequirementKeyToDispatchMethods.AddIfNotExists(
                 requirementKey, dispatchFunc);
             return dispatchFunc;
         }

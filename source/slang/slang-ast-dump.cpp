@@ -616,36 +616,25 @@ struct ASTDumpContext
 
 struct ASTDumpAccess
 {
-#define SLANG_AST_DUMP_FIELD(FIELD_NAME, TYPE, param) context.dumpField(#FIELD_NAME, node->FIELD_NAME); 
+
+#define SLANG_AST_DUMP_FIELD(FIELD_NAME, TYPE, param) context.dumpField(#FIELD_NAME, static_cast<param*>(base)->FIELD_NAME); 
 
 #define SLANG_AST_DUMP_FIELDS_IMPL(NAME, SUPER, ORIGIN, LAST, MARKER, TYPE, param) \
-static void dumpFields_##NAME(NAME* node, ASTDumpContext& context) \
+case ASTNodeType::NAME: \
 { \
-    SLANG_UNUSED(node); \
-    SLANG_UNUSED(context); \
-    SLANG_FIELDS_ASTNode_##NAME(SLANG_AST_DUMP_FIELD, _) \
+    SLANG_FIELDS_ASTNode_##NAME(SLANG_AST_DUMP_FIELD, NAME) \
+    break; \
 }
 
-SLANG_ALL_ASTNode_NodeBase(SLANG_AST_DUMP_FIELDS_IMPL, _)
-
-};
-
-#define SLANG_AST_GET_DUMP_FUNC(NAME, SUPER, ORIGIN, LAST, MARKER, TYPE, param) m_funcs[Index(ASTNodeType::NAME)] = (DumpFieldsFunc)&ASTDumpAccess::dumpFields_##NAME;
-
-typedef void (*DumpFieldsFunc)(NodeBase* obj, ASTDumpContext& context);
-
-struct DumpFieldFuncs
-{
-    DumpFieldFuncs()
+    static void dump(ASTNodeType type, NodeBase* base, ASTDumpContext& context)
     {
-        memset(m_funcs, 0, sizeof(m_funcs));
-        SLANG_ALL_ASTNode_NodeBase(SLANG_AST_GET_DUMP_FUNC, _)
+        switch (type)
+        {
+            SLANG_ALL_ASTNode_NodeBase(SLANG_AST_DUMP_FIELDS_IMPL, _)
+            default: break;
+        }
     }
-
-    DumpFieldsFunc m_funcs[Index(ASTNodeType::CountOf)];
 };
-
-static const DumpFieldFuncs s_funcs;
 
 void ASTDumpContext::dumpObjectReference(const ReflectClassInfo& type, NodeBase* obj, Index objIndex)
 {
@@ -678,11 +667,7 @@ void ASTDumpContext::dumpObjectFull(const ReflectClassInfo& type, NodeBase* obj,
     for (Index i = allTypes.getCount() - 1; i >= 0; --i)
     {
         const ReflectClassInfo* curType = allTypes[i];
-        DumpFieldsFunc func = s_funcs.m_funcs[Index(curType->m_classId)];
-        if (func)
-        {
-            func(obj, *this);
-        }
+        ASTDumpAccess::dump(ASTNodeType(curType->m_classId), obj, *this);
     }
 
     m_writer->dedent();

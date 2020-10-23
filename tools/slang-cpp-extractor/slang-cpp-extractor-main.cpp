@@ -1853,6 +1853,12 @@ SlangResult CPPExtractor::parse(SourceFile* sourceFile, const Options* options)
                         }
                         break;
                     }
+                    case IdentifierStyle::Access:
+                    {
+                        m_reader.advanceToken();
+                        SLANG_RETURN_ON_FAIL(expect(TokenType::Colon));
+                        break;
+                    }
                     default:
                     {
                         IdentifierFlags flags = getFlags(style);
