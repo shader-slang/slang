@@ -307,7 +307,7 @@ SerialIndex SerialWriter::addPointer(const RefObject* obj)
     }
 }
 
-SerialIndex SerialWriter::addString(const UnownedStringSlice& slice)
+SerialIndex SerialWriter::_addStringSlice(SerialTypeKind typeKind, SliceMap& sliceMap, const UnownedStringSlice& slice)
 {
     typedef ByteEncodeUtil Util;
     typedef SerialInfo::StringEntry StringEntry;
@@ -317,9 +317,7 @@ SerialIndex SerialWriter::addString(const UnownedStringSlice& slice)
         return SerialIndex(0);
     }
 
-    Index newIndex = m_entries.getCount();
-
-    Index* indexPtr = m_sliceMap.TryGetValueOrAdd(slice, newIndex);
+    Index* indexPtr = sliceMap.TryGetValue(slice);
     if (indexPtr)
     {
         return SerialIndex(*indexPtr);
@@ -332,7 +330,7 @@ SerialIndex SerialWriter::addString(const UnownedStringSlice& slice)
 
     StringEntry* entry = (StringEntry*)m_arena.allocateUnaligned(SLANG_OFFSET_OF(StringEntry, sizeAndChars) + encodeCount + slice.getLength());
     entry->info = SerialInfo::EntryInfo::Alignment1;
-    entry->typeKind = SerialTypeKind::String;
+    entry->typeKind = typeKind;
 
     uint8_t* dst = (uint8_t*)(entry->sizeAndChars);
     for (int i = 0; i < encodeCount; ++i)
@@ -341,6 +339,13 @@ SerialIndex SerialWriter::addString(const UnownedStringSlice& slice)
     }
 
     memcpy(dst + encodeCount, slice.begin(), slice.getLength());
+
+    // Make a key that will stay in scope -> it's actually just stored in the arena.
+    // NOTE! without terminating 0
+    UnownedStringSlice keySlice(((const char*)dst) + encodeCount, slice.getLength());
+
+    Index newIndex = m_entries.getCount();
+    sliceMap.Add(keySlice, newIndex);
 
     m_entries.add(entry);
     return SerialIndex(newIndex);
@@ -550,6 +555,7 @@ size_t SerialInfo::Entry::calcSize(SerialClasses* serialClasses) const
 {
     switch (typeKind)
     {
+        case SerialTypeKind::ImportSymbol: 
         case SerialTypeKind::String:
         {
             auto entry = static_cast<const StringEntry*>(this);
@@ -634,6 +640,15 @@ SerialPointer SerialReader::getPointer(SerialIndex index)
 
     switch (entry->typeKind)
     {
+        case SerialTypeKind::ImportSymbol:
+        {
+            // If hasn't been replaced with the actual imported symbol (and therefore the kind would be replaced
+            // we just return nullptr;
+
+            // TODO(JS): It could be argued that this should return an error (that the pointer should already
+            // be set). For now we just return as nullptr.
+            return SerialPointer();
+        }
         case SerialTypeKind::String:
         {
             // Hmm. Tricky -> we don't know if will be cast as Name or String. Lets assume string.
@@ -728,7 +743,7 @@ Name* SerialReader::getName(SerialIndex index)
         SLANG_ASSERT(stringRep);
 
         // I don't need to scope, as scoped in NamePool
-        name  = m_namePool->getName(String(stringRep));
+        name = m_namePool->getName(String(stringRep));
 
         // Store as name, as can always access the inner string if needed
         m_objects[Index(index)] = name;
@@ -749,20 +764,22 @@ UnownedStringSlice SerialReader::getStringSlice(SerialIndex index)
     const Entry* entry = m_entries[Index(index)];
 
     // It has to be a string type
-    if (entry->typeKind != SerialTypeKind::String)
+    if (entry->typeKind == SerialTypeKind::String ||
+        entry->typeKind == SerialTypeKind::ImportSymbol)
     {
-        SLANG_ASSERT(!"Not a string");
-        return UnownedStringSlice();
+        auto stringEntry = static_cast<const SerialInfo::StringEntry*>(entry);
+
+        const uint8_t* src = (const uint8_t*)stringEntry->sizeAndChars;
+
+        // Decode the string
+        uint32_t size;
+        int sizeSize = ByteEncodeUtil::decodeLiteUInt32(src, &size);
+        return UnownedStringSlice((const char*)src + sizeSize, size);
     }
 
-    auto stringEntry = static_cast<const SerialInfo::StringEntry*>(entry);
-
-    const uint8_t* src = (const uint8_t*)stringEntry->sizeAndChars;
-
-    // Decode the string
-    uint32_t size;
-    int sizeSize = ByteEncodeUtil::decodeLiteUInt32(src, &size);
-    return UnownedStringSlice((const char*)src + sizeSize, size);
+    // Can't be accessed as a slice
+    SLANG_ASSERT(!"Not accessible as a slice");
+    return UnownedStringSlice();
 }
 
 SlangResult SerialReader::loadEntries(const uint8_t* data, size_t dataCount, List<const SerialInfo::Entry*>& outEntries)
@@ -794,10 +811,8 @@ SlangResult SerialReader::loadEntries(const uint8_t* data, size_t dataCount, Lis
     return SLANG_OK;
 }
 
-SlangResult SerialReader::load(const uint8_t* data, size_t dataCount, NamePool* namePool)
+SlangResult SerialReader::constructObjects(NamePool* namePool)
 {
-    SLANG_RETURN_ON_FAIL(loadEntries(data, dataCount, m_entries));
-
     m_namePool = namePool;
 
     m_objects.clearAndDeallocate();
@@ -811,6 +826,13 @@ SlangResult SerialReader::load(const uint8_t* data, size_t dataCount, NamePool* 
 
         switch (entry->typeKind)
         {
+            case SerialTypeKind::ImportSymbol:
+            {
+                // We don't construct any object for an imported symbol.
+                // It will be the responsibility of external code to interpet the symbols and *set* the appopriate
+                // objects prior to a call to `deserializeObjects`
+                break;
+            }
             case SerialTypeKind::String:
             {
                 // Don't need to construct an object. This is probably a StringRepresentation, or a Name
@@ -837,6 +859,11 @@ SlangResult SerialReader::load(const uint8_t* data, size_t dataCount, NamePool* 
         }
     }
 
+    return SLANG_OK;
+}
+
+SlangResult SerialReader::deserializeObjects()
+{
     // Deserialize
     for (Index i = 1; i < m_entries.getCount(); ++i)
     {
@@ -883,6 +910,17 @@ SlangResult SerialReader::load(const uint8_t* data, size_t dataCount, NamePool* 
         }
     }
 
+    return SLANG_OK;
+}
+
+
+SlangResult SerialReader::load(const uint8_t* data, size_t dataCount, NamePool* namePool)
+{
+    // Load and place entries into entries table
+    SLANG_RETURN_ON_FAIL(loadEntries(data, dataCount, m_entries));
+    // Construct all of the objects
+    SLANG_RETURN_ON_FAIL(constructObjects(namePool));
+    SLANG_RETURN_ON_FAIL(deserializeObjects());
     return SLANG_OK;
 }
 

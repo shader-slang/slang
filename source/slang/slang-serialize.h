@@ -46,6 +46,7 @@ enum class SerialTypeKind : uint8_t
 
     String,             ///< String                         
     Array,              ///< Array
+    ImportSymbol,       ///< Holds the name of the import symbol. Represented in exactly the same way as a string
 
     NodeBase,           ///< NodeBase derived
     RefObject,          ///< RefObject derived types
@@ -224,6 +225,10 @@ public:
         /// Load the entries table (without deserializing anything)
         /// NOTE! data must stay ins scope for outEntries to be valid
     SlangResult loadEntries(const uint8_t* data, size_t dataCount, List<const SerialInfo::Entry*>& outEntries);
+        /// For each entry construct an object. Does *NOT* deserialize them
+    SlangResult constructObjects(NamePool* namePool);
+        /// Entries must be loaded (with loadEntries), and objects constructed (with constructObjects) before deserializing
+    SlangResult deserializeObjects();
 
         /// NOTE! data must stay ins scope when reading takes place
     SlangResult load(const uint8_t* data, size_t dataCount, NamePool* namePool);
@@ -305,10 +310,15 @@ public:
     template <typename T>
     SerialIndex addArray(const T* in, Index count);
 
-    SerialIndex addString(const UnownedStringSlice& slice);
+        /// Add the string
+    SerialIndex addString(const UnownedStringSlice& slice) { return _addStringSlice(SerialTypeKind::String, m_sliceMap, slice); }
     SerialIndex addString(const String& in);
     SerialIndex addName(const Name* name);
-    
+
+        /// Adding import symbols
+    SerialIndex addImportSymbol(const UnownedStringSlice& slice) { return _addStringSlice(SerialTypeKind::ImportSymbol, m_importSymbolMap, slice); }
+    SerialIndex addImportSymbol(const String& string){ return _addStringSlice(SerialTypeKind::ImportSymbol, m_importSymbolMap, string.getUnownedSlice()); }
+
         /// Set a the ptr associated with an index.
         /// NOTE! That there cannot be a pre-existing setting.
     void setPointerIndex(const NodeBase* ptr, SerialIndex index);
@@ -331,6 +341,10 @@ public:
 
 protected:
 
+    typedef Dictionary<UnownedStringSlice, Index> SliceMap;
+
+    SerialIndex _addStringSlice(SerialTypeKind typeKind, SliceMap& sliceMap, const UnownedStringSlice& slice);
+
     SerialIndex _addArray(size_t elementSize, size_t alignment, const void* elements, Index elementCount);
 
     SerialIndex _add(const void* nativePtr, SerialInfo::Entry* entry)
@@ -345,8 +359,10 @@ protected:
 
     Dictionary<const void*, Index> m_ptrMap;    // Maps a pointer to an entry index
 
+    
     // NOTE! Assumes the content stays in scope!
-    Dictionary<UnownedStringSlice, Index> m_sliceMap;
+    SliceMap m_sliceMap;
+    SliceMap m_importSymbolMap;
 
     SerialExtraObjects m_extraObjects;      ///< Extra objects
 

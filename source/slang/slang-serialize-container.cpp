@@ -142,6 +142,9 @@ namespace Slang {
             {
                 if (ModuleDecl* moduleDecl = as<ModuleDecl>(module.astRootNode))
                 {
+                    // Put in AST module
+                    RiffContainer::ScopeChunk scopeASTModule(container, RiffContainer::Chunk::Kind::List, ASTSerialBinary::kSlangASTModuleFourCC);
+
                     if (!serialClasses)
                     {
                         SLANG_RETURN_ON_FAIL(SerialClassesUtil::create(serialClasses));
@@ -155,8 +158,9 @@ namespace Slang {
                     // Add the module and everything that isn't filtered out in the filter.
                     writer.addPointer(moduleDecl);
 
+
                     // We can now serialize it into the riff container.
-                    SLANG_RETURN_ON_FAIL(writer.writeIntoContainer(ASTSerialBinary::kSlangASTModuleFourCC, container));
+                    SLANG_RETURN_ON_FAIL(writer.writeIntoContainer(ASTSerialBinary::kSlangASTModuleDataFourCC, container));
                 }
             }
         }
