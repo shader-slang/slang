@@ -351,6 +351,9 @@
     <ClInclude Include="slang-serialize-types.h">
       <Filter>Header Files</Filter>
     </ClInclude>
+    <ClInclude Include="slang-serialize-value-type-info.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
     <ClInclude Include="slang-serialize.h">
       <Filter>Header Files</Filter>
     </ClInclude>
