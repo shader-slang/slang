@@ -111,6 +111,25 @@ Another example would be double. It's 64 bits, but on some arches/compilers it's
 
 For (4) there are a few things to say. First a type can always implement a custom version of how to do a conversion by specializing `SerialTypeInfo`. But there remains another nagging issue - types which allocate/use other memory that changes at runtime. Clearly we cannot define 'any size of memory' in a fixed SerialType defined in a specialization of SerialTypeInfo. The mechanism to work around this is to allow arbitrary arrays to be stored, that can be accessed via an SerialIndex. This will be discussed more once we discuss a little more about the file system, and SerialIndex. 
 
+## Struct value types
+
+There is a mechanism to allow the simple serialization of 'value' struct types for this to work it requires
+
+* The fields of the struct are serializable and public
+* The super class (if there is one) is serializable
+
+If this is the case, it is not necessary to write a `SerialTypeInfo<T>` specialization, the C++ extractor and it's reflection can generate the specialization for you. The steps needed
+
+* Place SLANG_VALUE_CLASS(your type) in the definition of your struct 
+* Make sure that the header containing the struct definition is included in the ones C++ extractor examines
+* Instead of implementing SerialTypeInfo for your type use the macro SLANG_VALUE_TYPE_INFO(your type)
+
+If there are problems looking at the contents of `slang-generated-value.h` and `slang-generated-value-macro.h`.
+
+It should be noted that currently because of limitations in the C++ extractor, all of the types must be defined in the same scope.
+
+Also because value types are always fields in generalized serialization, they do not need to be identified with a sub type, even though C++ extractor does generate a ValueType enum.
+
 ## Generalized Serialization Format
 
 The serialization format used is 'stream-like' with each 'object' stored in order. Each object is given an index starting from 1. 0 is used to be in effect nullptr. The stream looks like
@@ -304,4 +323,9 @@ Issues
 * The Riff mechanism use for container usage is somewhat ad-hoc
 * Re-referencing AST nodes from other modules does not happen automatically on deserialization
 * There are several mechanisms used for serialization that are not directly compatible
-* Value types should be convertible directly with some macro magic - for the moment they aren't
+
+## C++ extractor issues
+
+* All types (and typedefs) that are serialized must be defined in the same scope - child types don't work correctly 
+* When using value serialization serialization all the members that are serializable must be public
+* The types output in slang fields do not correctly take into account scope (this is a similar issue to the issue above)

@@ -395,7 +395,8 @@ namespace Slang
         /// A `DeclCheckState` plus a bit to track whether a declaration is currently being checked.
     struct DeclCheckStateExt
     {
-    public:
+        SLANG_VALUE_CLASS(DeclCheckStateExt)
+
         typedef uint8_t RawType;
         DeclCheckStateExt() {}
         DeclCheckStateExt(DeclCheckState state)
@@ -435,7 +436,9 @@ namespace Slang
         RawType getRaw() const { return m_raw; }
         void setRaw(RawType raw) { m_raw = raw; }
 
-    private:
+        // TODO(JS):
+        // Unfortunately for automatic serialization to see this member, it has to be public.
+    //private:
         RawType m_raw = 0;
     };
 
@@ -932,6 +935,7 @@ namespace Slang
     // We store both the original syntax and the resolved type here.
     struct TypeExp
     {
+        SLANG_VALUE_CLASS(TypeExp)
         typedef TypeExp ThisType;
 
         TypeExp() {}
@@ -1101,6 +1105,8 @@ namespace Slang
     // Represents one item found during lookup
     struct LookupResultItem
     {
+        SLANG_VALUE_CLASS(LookupResultItem)
+
         typedef LookupResultItem_Breadcrumb Breadcrumb;
 
         // Sometimes lookup finds an item, but there were additional
@@ -1166,7 +1172,7 @@ namespace Slang
         // This is unused in the simple case where a declaration
         // is being referenced directly (rather than through
         // transparent members).
-        RefPtr<Breadcrumb> breadcrumbs;
+        RefPtr<LookupResultItem_Breadcrumb> breadcrumbs;
 
         LookupResultItem() = default;
         explicit LookupResultItem(DeclRef<Decl> declRef)
@@ -1332,12 +1338,14 @@ namespace Slang
 
     struct SpecializationArg
     {
+        SLANG_VALUE_CLASS(SpecializationArg)
         Val* val = nullptr;
     };
     typedef List<SpecializationArg> SpecializationArgs;
 
     struct ExpandedSpecializationArg : SpecializationArg
     {
+        SLANG_VALUE_CLASS(ExpandedSpecializationArg)
         Val* witness = nullptr;
     };
     typedef List<ExpandedSpecializationArg> ExpandedSpecializationArgs;

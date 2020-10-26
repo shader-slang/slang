@@ -300,6 +300,7 @@
     <ClInclude Include="slang-serialize-source-loc.h" />
     <ClInclude Include="slang-serialize-type-info.h" />
     <ClInclude Include="slang-serialize-types.h" />
+    <ClInclude Include="slang-serialize-value-type-info.h" />
     <ClInclude Include="slang-serialize.h" />
     <ClInclude Include="slang-source-loc.h" />
     <ClInclude Include="slang-syntax.h" />
@@ -445,4 +446,4 @@
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">
   </ImportGroup>
-</Project> 
+</Project>
