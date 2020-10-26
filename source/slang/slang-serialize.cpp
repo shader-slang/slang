@@ -638,36 +638,31 @@ SerialPointer SerialReader::getPointer(SerialIndex index)
     SLANG_ASSERT(SerialIndexRaw(index) < SerialIndexRaw(m_entries.getCount()));
     const Entry* entry = m_entries[Index(index)];
 
+    const SerialPointer& ptr = m_objects[Index(index)];
+
     switch (entry->typeKind)
     {
-        case SerialTypeKind::ImportSymbol:
-        {
-            // If hasn't been replaced with the actual imported symbol (and therefore the kind would be replaced
-            // we just return nullptr;
-
-            // TODO(JS): It could be argued that this should return an error (that the pointer should already
-            // be set). For now we just return as nullptr.
-            return SerialPointer();
-        }
         case SerialTypeKind::String:
         {
             // Hmm. Tricky -> we don't know if will be cast as Name or String. Lets assume string.
             String string = getString(index);
             return SerialPointer(string.getStringRepresentation());
         }
-        case SerialTypeKind::NodeBase:
+        case SerialTypeKind::ImportSymbol:
         {
-            return SerialPointer((NodeBase*)m_objects[Index(index)]);
-        }
-        case SerialTypeKind::RefObject:
-        {
-            return SerialPointer((RefObject*)m_objects[Index(index)]);
+            if (ptr.m_kind == SerialTypeKind::Unknown)
+            {
+                // TODO(JS):
+                // Could have an error here, because import symbol was not set
+                // For now just return nullptr
+                return SerialPointer();
+            }
+            break;
         }
         default: break;
     }
 
-    SLANG_ASSERT(!"Cannot access as a pointer");
-    return SerialPointer();
+    return ptr;
 }
 
 String SerialReader::getString(SerialIndex index)
@@ -687,7 +682,7 @@ String SerialReader::getString(SerialIndex index)
         return String();
     }
 
-    RefObject* obj = (RefObject*)m_objects[Index(index)];
+    RefObject* obj = m_objects[Index(index)].dynamicCast<RefObject>();
 
     if (obj)
     {
@@ -729,7 +724,7 @@ Name* SerialReader::getName(SerialIndex index)
         return nullptr;
     }
 
-    RefObject* obj = (RefObject*)m_objects[Index(index)];
+    RefObject* obj = m_objects[Index(index)].dynamicCast<RefObject>();
 
     if (obj)
     {
@@ -782,7 +777,7 @@ UnownedStringSlice SerialReader::getStringSlice(SerialIndex index)
     return UnownedStringSlice();
 }
 
-SlangResult SerialReader::loadEntries(const uint8_t* data, size_t dataCount, List<const SerialInfo::Entry*>& outEntries)
+/* static */SlangResult SerialReader::loadEntries(const uint8_t* data, size_t dataCount, SerialClasses* serialClasses, List<const Entry*>& outEntries)
 {
     // Check the input data is at least aligned to the max alignment (otherwise everything cannot be aligned correctly)
     SLANG_ASSERT((size_t(data) & (SerialInfo::MAX_ALIGNMENT - 1)) == 0);
@@ -798,7 +793,7 @@ SlangResult SerialReader::loadEntries(const uint8_t* data, size_t dataCount, Lis
         const Entry* entry = (const Entry*)cur;
         outEntries.add(entry);
 
-        const size_t entrySize = entry->calcSize(m_classes);
+        const size_t entrySize = entry->calcSize(serialClasses);
         cur += entrySize;
 
         // Need to get the next alignment
@@ -848,7 +843,7 @@ SlangResult SerialReader::constructObjects(NamePool* namePool)
                 {
                     return SLANG_FAIL;
                 }
-                m_objects[i] = obj;
+                m_objects[i].set(entry->typeKind, obj);
                 break;
             }
             case SerialTypeKind::Array:
@@ -868,8 +863,9 @@ SlangResult SerialReader::deserializeObjects()
     for (Index i = 1; i < m_entries.getCount(); ++i)
     {
         const Entry* entry = m_entries[i];
-        void* native = m_objects[i];
-        if (!native)
+        // First see if there is anything to construct
+        SerialPointer& dstPtr = m_objects[i];
+        if (!dstPtr)
         {
             continue;
         }
@@ -886,7 +882,7 @@ SlangResult SerialReader::deserializeObjects()
                 }
 
                 const uint8_t* src = (const uint8_t*)(objectEntry + 1);
-                uint8_t* dst = (uint8_t*)m_objects[i];
+                uint8_t* dst = (uint8_t*)dstPtr.m_ptr;
 
                 // It must be constructed
                 SLANG_ASSERT(dst);
@@ -917,7 +913,7 @@ SlangResult SerialReader::deserializeObjects()
 SlangResult SerialReader::load(const uint8_t* data, size_t dataCount, NamePool* namePool)
 {
     // Load and place entries into entries table
-    SLANG_RETURN_ON_FAIL(loadEntries(data, dataCount, m_entries));
+    SLANG_RETURN_ON_FAIL(loadEntries(data, dataCount));
     // Construct all of the objects
     SLANG_RETURN_ON_FAIL(constructObjects(namePool));
     SLANG_RETURN_ON_FAIL(deserializeObjects());

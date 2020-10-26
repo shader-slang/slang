@@ -161,6 +161,12 @@ struct SerialPointer
     {
     }
 
+        /// True if the ptr is set
+    SLANG_FORCE_INLINE operator bool() const { return m_ptr != nullptr; }
+
+        /// Directly set pointer/kind
+    void set(SerialTypeKind kind, void* ptr) { m_kind = kind; m_ptr = ptr; }
+
     static SerialTypeKind getKind(const RefObject*) { return SerialTypeKind::RefObject; }
     static SerialTypeKind getKind(const NodeBase*) { return SerialTypeKind::NodeBase; }
 
@@ -222,9 +228,7 @@ public:
     Name* getName(SerialIndex index);
     UnownedStringSlice getStringSlice(SerialIndex index);
     
-        /// Load the entries table (without deserializing anything)
-        /// NOTE! data must stay ins scope for outEntries to be valid
-    SlangResult loadEntries(const uint8_t* data, size_t dataCount, List<const SerialInfo::Entry*>& outEntries);
+    SlangResult loadEntries(const uint8_t* data, size_t dataCount) { return loadEntries(data, dataCount, m_classes, m_entries); }
         /// For each entry construct an object. Does *NOT* deserialize them
     SlangResult constructObjects(NamePool* namePool);
         /// Entries must be loaded (with loadEntries), and objects constructed (with constructObjects) before deserializing
@@ -232,6 +236,14 @@ public:
 
         /// NOTE! data must stay ins scope when reading takes place
     SlangResult load(const uint8_t* data, size_t dataCount, NamePool* namePool);
+
+        /// Get the entries list
+    const List<const Entry*>& getEntries() const { return m_entries; }
+
+        /// Access the objects list
+        /// NOTE that if a SerialObject holding a RefObject and needs to be kept in scope, add the RefObject* via addScope
+    List<SerialPointer>& getObjects() { return m_objects; }
+    const List<SerialPointer>& getObjects() const { return m_objects; }
 
         /// Add an object to be kept in scope
     void addScope(const RefObject* obj) { m_scope.add(obj); }
@@ -247,9 +259,14 @@ public:
     }
     ~SerialReader();
 
+        /// Load the entries table (without deserializing anything)
+        /// NOTE! data must stay ins scope for outEntries to be valid
+    static SlangResult loadEntries(const uint8_t* data, size_t dataCount, SerialClasses* serialClasses, List<const Entry*>& outEntries);
+
 protected:
     List<const Entry*> m_entries;       ///< The entries
-    List<void*> m_objects;              ///< The constructed objects
+
+    List<SerialPointer> m_objects;      ///< The constructed objects
     NamePool* m_namePool;               ///< Pool names are added to
 
     List<const RefObject*> m_scope;     ///< Keeping objects in scope
