@@ -183,7 +183,7 @@ UInt MangledLexer::readParamCount()
 
 /* !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! MangledNameParser !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! */
 
-/* static */SlangResult MangledNameParser::parseModuleName(const UnownedStringSlice& in, String& outModuleName)
+/* static */SlangResult MangledNameParser::parseModuleName(const UnownedStringSlice& in, UnownedStringSlice& outModuleName)
 {
     MangledLexer lexer(in);
 

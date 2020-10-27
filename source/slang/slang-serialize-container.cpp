@@ -330,6 +330,9 @@ namespace Slang {
                         auto& objects = reader.getObjects();
                         const Index entriesCount = entries.getCount();
 
+                        String currentModuleName;
+                        Module* currentModule = nullptr;
+
                         // Index from 1 (0 is null)
                         for (Index i = 1; i < entriesCount; ++i)
                         {
@@ -338,20 +341,32 @@ namespace Slang {
                             {
                                 UnownedStringSlice mangledName = reader.getStringSlice(SerialIndex(i));
 
-                                String moduleName;
+                                UnownedStringSlice moduleName;
                                 SLANG_RETURN_ON_FAIL(MangledNameParser::parseModuleName(mangledName, moduleName));
 
-                                // Try and access the module
-
-                                Linkage* linkage = options.linkage;
-
-                                NamePool* namePool = linkage->getNamePool();
-                                Name* moduleNameName = namePool->getName(moduleName);
-
-                                Module* readModule = linkage->findOrImportModule(moduleNameName, SourceLoc::fromRaw(0), options.sink);
-                                if (!readModule)
+                                // If we already have looked up this module and it has the same name just use what we have
+                                Module* readModule = nullptr;
+                                if (currentModule && moduleName == currentModuleName.getUnownedSlice())
                                 {
-                                    return SLANG_FAIL;
+                                    readModule = currentModule;
+                                }
+                                else
+                                {
+                                    // The modules are loaded on the linkage.
+                                    Linkage* linkage = options.linkage;
+
+                                    NamePool* namePool = linkage->getNamePool();
+                                    Name* moduleNameName = namePool->getName(moduleName);
+
+                                    readModule = linkage->findOrImportModule(moduleNameName, SourceLoc::fromRaw(0), options.sink);
+                                    if (!readModule)
+                                    {
+                                        return SLANG_FAIL;
+                                    }
+
+                                    // Set the current module and name
+                                    currentModule = readModule;
+                                    currentModuleName = moduleName;
                                 }
 
                                 // Look up the symbol

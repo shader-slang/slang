@@ -126,7 +126,7 @@ SLANG_INLINE void MangledLexer::_expect(char c)
 struct MangledNameParser
 {
         /// Tries to extract the module name from this mangled name. 
-    static SlangResult parseModuleName(const UnownedStringSlice& in, String& outModuleName);
+    static SlangResult parseModuleName(const UnownedStringSlice& in, UnownedStringSlice& outModuleName);
 };
 
 }
