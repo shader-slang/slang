@@ -318,9 +318,13 @@ namespace Slang {
 
                     SerialReader reader(serialClasses, &objectFactory);
 
-                    //
+                    // Sets up the entry table - one entry for each 'object'.
+                    // No native objects are constructed. No objects are deserialized.
                     SLANG_RETURN_ON_FAIL(reader.loadEntries((const uint8_t*)astData->getPayload(), astData->getSize()));
 
+                    // Construct a native object for each table entry (where appropriate).
+                    // Note that this *doesn't* set all object pointers - some are special cased and created on demand (strings)
+                    // and imported symbols will have their object pointers unset (they are resolved in next step)
                     SLANG_RETURN_ON_FAIL(reader.constructObjects(options.namePool));
 
                     // Resolve external references if the linkage is specified
@@ -384,13 +388,22 @@ namespace Slang {
                         }
                     }
 
-                    // TODO(JS): If I want to build up a dictionary of mangled names to declarations,
-                    // I can deserialize *without* the external symbols being set up,
-                    // and create the dictionary. Then resolve the names and deserializeObjects *again*.
-
-                    SLANG_RETURN_ON_FAIL(reader.deserializeObjects());
-
+                    // Set the sourceLocReader before doing de-serialize, such can lookup the remapped sourceLocs
                     reader.getExtraObjects().set(sourceLocReader);
+
+                    // TODO(JS):
+                    // If modules can have more complicated relationships (like a two modules can refer to symbols
+                    // from each other), then we can make this work by
+                    // 1) deserialize *without* the external symbols being set up
+                    // 2) calculate the symbols
+                    // 3) deserialize the other module (in the same way)
+                    // 4) run deserializeObjects *again* on each module
+                    // This is less efficient than it might be (because deserialize phase is done twice) so if this is necessary
+                    // may want a mechanism that *just* does reference lookups.
+                    //
+                    // For now if we assume a module can only access symbols from another module, and not the reverse.
+                    // So we just need to deserialize and we are done
+                    SLANG_RETURN_ON_FAIL(reader.deserializeObjects());
 
                     // Get the root node. It's at index 1 (0 is the null value).
                     astRootNode = reader.getPointer(SerialIndex(1)).dynamicCast<NodeBase>();
