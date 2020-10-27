@@ -5,8 +5,10 @@
 // shader parameters.
 //
 
-//TEST(compute):COMPARE_COMPUTE_EX:-slang -compute
-//TEST(compute):COMPARE_COMPUTE_EX:-slang -compute -dx12
+// Note: D3D11 test disabled because of missing `uint64_t`; re-enable when `uint2` used instead.
+//DISABLE_TEST(compute):COMPARE_COMPUTE_EX:-slang -compute
+
+//TEST(compute):COMPARE_COMPUTE_EX:-slang -compute -dx12 -profile sm_6_0 -use-dxil
 //TEST(compute, vulkan):COMPARE_COMPUTE_EX:-vk -compute
 
 // A lot of the setup is the same as for `interface-shader-param`,
@@ -72,7 +74,7 @@ ConstantBuffer<IRandomNumberGenerationStrategy> gStrategy;
 void computeMain(
 
 // Similarly to the previous test, we are declaring two `uniform`
-// paameters on the entry point, where one will be plugged in
+// parameters on the entry point, where one will be plugged in
 // with a concrete type, and thus get laid out second.
 //
     uniform IModifier   modifier,
@@ -83,7 +85,11 @@ void computeMain(
 // the previous test, the concrete type plugged in for `modifier`
 // has no uniform/ordinary data, so we don't need to fill it in.
 //
-//TEST_INPUT:root_constants(data=[256]):
+// We *do* need to reserve space in the constant buffer for the
+// existential value (RTTI, witness table, any-value) and that
+// needs to come *before* the value for `extra`.
+//
+//TEST_INPUT:root_constants(data=[0 0 0 0 0 0 0 0 256]):
 
             uint3       dispatchThreadID : SV_DispatchThreadID)
 {

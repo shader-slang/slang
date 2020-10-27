@@ -572,7 +572,8 @@ IRWitnessTable* cloneWitnessTableImpl(
     if (!clonedTable)
     {
         auto clonedBaseType = cloneType(context, as<IRType>(originalTable->getConformanceType()));
-        clonedTable = builder->createWitnessTable(clonedBaseType);
+        auto clonedSubType = cloneType(context, as<IRType>(originalTable->getConcreteType()));
+        clonedTable = builder->createWitnessTable(clonedBaseType, clonedSubType);
     }
     cloneSimpleGlobalValueImpl(context, originalTable, originalValues, clonedTable, registerValue);
     return clonedTable;

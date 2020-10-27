@@ -176,6 +176,22 @@ namespace Slang
             auto interfaceType = cast<IRInterfaceType>(witnessTable->getConformanceType());
             if (isBuiltin(interfaceType))
                 return;
+
+            // We need to consider whether the concrete type that is conforming
+            // in this witness table actually fits within the declared any-value
+            // size for the interface.
+            //
+            // If the type doesn't fit then it would be invalid to use for dynamic
+            // dispatch, and the packing/unpacking operations we emit would fail
+            // to generate valid code.
+            //
+            // Such a type might still be useful for static specialization, so
+            // we can't consider this case a hard error.
+            //
+            auto concreteType = witnessTable->getConcreteType();
+            if(!sharedContext->doesTypeFitInAnyValue(concreteType, interfaceType))
+                return;
+
             for (auto child : witnessTable->getChildren())
             {
                 auto entry = as<IRWitnessTableEntry>(child);

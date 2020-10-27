@@ -1111,10 +1111,9 @@ SIMPLE_IR_PARENT_TYPE(OutTypeBase, PtrTypeBase)
 SIMPLE_IR_TYPE(OutType, OutTypeBase)
 SIMPLE_IR_TYPE(InOutType, OutTypeBase)
 
-struct IRExistentialBoxType : public IRPtrTypeBase
+struct IRPseudoPtrType : public IRPtrTypeBase
 {
-    IR_LEAF_ISA(ExistentialBoxType);
-    IRType* getInterfaceType() { return (IRType*)getOperand(1); }
+    IR_LEAF_ISA(PseudoPtrType);
 };
 
     /// The base class of RawPointerType and RTTIPointerType.
@@ -1303,15 +1302,31 @@ struct IRWitnessTableIDType : IRWitnessTableTypeBase
     IR_LEAF_ISA(WitnessTableIDType);
 };
 
-struct IRBindExistentialsType : IRType
+struct IRBindExistentialsTypeBase : IRType
 {
-    IR_LEAF_ISA(BindExistentialsType)
+    IR_PARENT_ISA(BindExistentialsTypeBase)
 
     IRType* getBaseType() { return (IRType*) getOperand(0); }
     UInt getExistentialArgCount() { return getOperandCount() - 1; }
     IRUse* getExistentialArgs() { return getOperands() + 1; }
     IRInst* getExistentialArg(UInt index) { return getExistentialArgs()[index].get(); }
 };
+
+struct IRBindExistentialsType : IRBindExistentialsTypeBase
+{
+    IR_LEAF_ISA(BindExistentialsType)
+
+};
+
+struct IRBoundInterfaceType : IRBindExistentialsTypeBase
+{
+    IR_LEAF_ISA(BoundInterfaceType)
+
+    IRType* getInterfaceType() { return getBaseType(); }
+    IRType* getConcreteType() { return (IRType*) getExistentialArg(0); }
+    IRInst* getWitnessTable() { return getExistentialArg(1); }
+};
+
 
 /// @brief A global value that potentially holds executable code.
 ///

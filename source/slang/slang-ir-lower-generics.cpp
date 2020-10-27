@@ -107,9 +107,9 @@ namespace Slang
     }
 
     void lowerGenerics(
-        TargetRequest* targetReq,
-        IRModule* module,
-        DiagnosticSink* sink)
+        TargetRequest*          targetReq,
+        IRModule*               module,
+        DiagnosticSink*         sink)
     {
         SharedGenericsLoweringContext sharedContext;
         sharedContext.targetReq = targetReq;

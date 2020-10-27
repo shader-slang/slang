@@ -1054,6 +1054,30 @@ struct IRTaggedUnionTypeLayout : IRTypeLayout
     };
 };
 
+    /// Type layout for an existential/interface type.
+struct IRExistentialTypeLayout : IRTypeLayout
+{
+    typedef IRTypeLayout Super;
+
+    IR_LEAF_ISA(ExistentialTypeLayout)
+
+    struct Builder : Super::Builder
+    {
+        Builder(IRBuilder* irBuilder)
+            : Super::Builder(irBuilder)
+        {}
+
+        IRExistentialTypeLayout* build()
+        {
+            return cast<IRExistentialTypeLayout>(Super::Builder::build());
+        }
+
+    protected:
+        IROp getOp() SLANG_OVERRIDE { return kIROp_ExistentialTypeLayout; }
+    };
+};
+
+
     /// Layout information for an entry point
 struct IREntryPointLayout : IRLayout
 {
@@ -1589,6 +1613,11 @@ struct IRWitnessTable : IRInst
         return cast<IRWitnessTableType>(getDataType())->getConformanceType();
     }
 
+    IRType* getConcreteType()
+    {
+        return (IRType*) getOperand(0);
+    }
+
     IR_LEAF_ISA(WitnessTable)
 };
 
@@ -1672,9 +1701,9 @@ struct IRWrapExistential : IRInst
     IR_LEAF_ISA(WrapExistential)
 };
 
-struct IRGetValueFromExistentialBox : IRInst
+struct IRGetValueFromBoundInterface : IRInst
 {
-    IR_LEAF_ISA(GetValueFromExistentialBox);
+    IR_LEAF_ISA(GetValueFromBoundInterface);
 };
 
 struct IRExtractExistentialValue : IRInst
@@ -1815,6 +1844,7 @@ struct IRBuilder
     IRTupleType* getTupleType(UInt count, IRType* const* types);
     IRTupleType* getTupleType(IRType* type0, IRType* type1);
     IRTupleType* getTupleType(IRType* type0, IRType* type1, IRType* type2);
+    IRTupleType* getTupleType(IRType* type0, IRType* type1, IRType* type2, IRType* type3);
 
     IRBasicBlockType*   getBasicBlockType();
     IRWitnessTableType* getWitnessTableType(IRType* baseType);
@@ -1830,7 +1860,6 @@ struct IRBuilder
     IRInOutType*  getInOutType(IRType* valueType);
     IRRefType*  getRefType(IRType* valueType);
     IRPtrTypeBase*  getPtrType(IROp op, IRType* valueType);
-    IRType* getExistentialBoxType(IRType* concreteType, IRType* interfaceType);
 
     IRArrayTypeBase* getArrayTypeBase(
         IROp    op,
@@ -1895,12 +1924,20 @@ struct IRBuilder
         UInt            slotArgCount,
         IRUse const*    slotArgs);
 
+    IRType* getBoundInterfaceType(
+        IRType* interfaceType,
+        IRType* concreteType,
+        IRInst* witnessTable);
+
+    IRType* getPseudoPtrType(
+        IRType* concreteType);
+
     // Set the data type of an instruction, while preserving
     // its rate, if any.
     void setDataType(IRInst* inst, IRType* dataType);
 
         /// Extract the value wrapped inside an existential box.
-    IRInst* emitGetValueFromExistentialBox(IRType* type, IRInst* existentialBox);
+    IRInst* emitGetValueFromBoundInterface(IRType* type, IRInst* boundInterfaceValue);
 
         /// Given an existential value, extract the underlying "real" value
     IRInst* emitExtractExistentialValue(
@@ -2079,7 +2116,8 @@ struct IRBuilder
     
     /// Creates an IRWitnessTable value.
     /// @param baseType: The comformant-to type of this witness.
-    IRWitnessTable* createWitnessTable(IRType* baseType);
+    /// @param subType: The type that is doing the conforming.
+    IRWitnessTable* createWitnessTable(IRType* baseType, IRType* subType);
     IRWitnessTableEntry* createWitnessTableEntry(
         IRWitnessTable* witnessTable,
         IRInst*        requirementKey,

@@ -21,6 +21,7 @@
 
 namespace Slang
 {
+class TargetRequest;
 
     /// Align `value` to the next multiple of `alignment`, which must be a power of two.
 inline IRIntegerValue align(IRIntegerValue value, int alignment)
@@ -56,7 +57,7 @@ struct IRSizeAndAlignment
     /// general-purpose memory for the current target. In that case the
     /// type is considered to have no natural layout.
     ///
-Result getNaturalSizeAndAlignment(IRType* type, IRSizeAndAlignment* outSizeAndAlignment);
+Result getNaturalSizeAndAlignment(TargetRequest* target, IRType* type, IRSizeAndAlignment* outSizeAndAlignment);
 
     /// Compute (if necessary) and return the natural offset of `field`
     ///
@@ -64,7 +65,7 @@ Result getNaturalSizeAndAlignment(IRType* type, IRSizeAndAlignment* outSizeAndAl
     /// that can be stored in general-purpose memory. In that case, the
     /// field is considered to have no natural offset.
     ///
-Result getNaturalOffset(IRStructField* field, IRIntegerValue* outOffset);
+Result getNaturalOffset(TargetRequest* target, IRStructField* field, IRIntegerValue* outOffset);
 
 }
 
