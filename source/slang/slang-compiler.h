@@ -973,6 +973,8 @@ namespace Slang
         List<Module*> const& getModuleDependencies() SLANG_OVERRIDE { return m_moduleDependencyList.getModuleList(); }
         List<String> const& getFilePathDependencies() SLANG_OVERRIDE { return m_filePathDependencyList.getFilePathList(); }
 
+        NodeBase* getExportFromMangledName(const UnownedStringSlice& slice);
+
             /// Get the ASTBuilder
         ASTBuilder* getASTBuilder() { return &m_astBuilder; }
 
@@ -1004,6 +1006,7 @@ namespace Slang
 
         List<RefPtr<EntryPoint>> const& getEntryPoints() { return m_entryPoints; }
         void _addEntryPoint(EntryPoint* entryPoint);
+        void _processFindDeclsExportSymbolsRec(Decl* decl);
 
     protected:
         void acceptVisitor(ComponentTypeVisitor* visitor, SpecializationInfo* specializationInfo) SLANG_OVERRIDE;
@@ -1054,6 +1057,10 @@ namespace Slang
         // The builder that owns all of the AST nodes from parsing the source of
         // this module. 
         ASTBuilder m_astBuilder;
+
+        // Holds map of map of exported mangled names to symbols
+        StringSlicePool m_mangledExportPool;
+        List<NodeBase*> m_mangledExportSymbols;
     };
     typedef Module LoadedModule;
 
@@ -1230,7 +1237,7 @@ namespace Slang
             SlangMatrixLayoutMode mode);
 
             /// Create an initially-empty linkage
-        Linkage(Session* session, ASTBuilder* astBuilder);
+        Linkage(Session* session, ASTBuilder* astBuilder, Linkage* builtinLinkage);
 
             /// Dtor
         ~Linkage();
@@ -2125,6 +2132,9 @@ namespace Slang
 
             /// Get the prelude associated with the language
         const String& getPreludeForLanguage(SourceLanguage language) { return m_languagePreludes[int(language)]; }
+
+            /// Get the built in linkage -> handy to get the stdlibs from
+        Linkage* getBuiltinLinkage() const { return m_builtinLinkage; }
 
         void init();
 

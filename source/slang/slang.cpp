@@ -141,9 +141,8 @@ void Session::init()
     builtinSourceManager.initialize(nullptr, nullptr);
 
     // Built in linkage uses the built in builder
-    m_builtinLinkage = new Linkage(this, builtinAstBuilder);
+    m_builtinLinkage = new Linkage(this, builtinAstBuilder, nullptr);
 
-    
     // Because the `Session` retains the builtin `Linkage`,
     // we need to make sure that the parent pointer inside
     // `Linkage` doesn't create a retain cycle.
@@ -207,7 +206,7 @@ SLANG_NO_THROW SlangResult SLANG_MCALL Session::createSession(
     slang::ISession**          outSession)
 {
     RefPtr<ASTBuilder> astBuilder(new ASTBuilder(m_sharedASTBuilder, "Session::astBuilder"));
-    RefPtr<Linkage> linkage = new Linkage(this, astBuilder);
+    RefPtr<Linkage> linkage = new Linkage(this, astBuilder, getBuiltinLinkage());
 
     Int targetCount = desc.targetCount;
     for(Int ii = 0; ii < targetCount; ++ii)
@@ -457,7 +456,7 @@ Profile getEffectiveProfile(EntryPoint* entryPoint, TargetRequest* target)
 
 //
 
-Linkage::Linkage(Session* session, ASTBuilder* astBuilder)
+Linkage::Linkage(Session* session, ASTBuilder* astBuilder, Linkage* builtinLinkage)
     : m_session(session)
     , m_retainedSession(session)
     , m_sourceManager(&m_defaultSourceManager)
@@ -468,6 +467,15 @@ Linkage::Linkage(Session* session, ASTBuilder* astBuilder)
     m_defaultSourceManager.initialize(session->getBuiltinSourceManager(), nullptr);
 
     setFileSystem(nullptr);
+
+    // Copy of the built in linkages modules
+    if (builtinLinkage)
+    {
+        for (const auto& pair : builtinLinkage->mapNameToLoadedModules)
+        {
+            mapNameToLoadedModules.Add(pair.Key, pair.Value);
+        }
+    }
 }
 
 ISlangUnknown* Linkage::getInterface(const Guid& guid)
@@ -1351,7 +1359,7 @@ EndToEndCompileRequest::EndToEndCompileRequest(
     , m_sink(nullptr)
 {
     RefPtr<ASTBuilder> astBuilder(new ASTBuilder(session->m_sharedASTBuilder, "EndToEnd::Linkage::astBuilder"));
-    m_linkage = new Linkage(session, astBuilder);
+    m_linkage = new Linkage(session, astBuilder, session->getBuiltinLinkage());
     init();
 }
 
@@ -1915,6 +1923,7 @@ void FilePathDependencyList::addDependency(Module* module)
 Module::Module(Linkage* linkage)
     : ComponentType(linkage)
     , m_astBuilder(linkage->getASTBuilder()->getSharedASTBuilder(), "Module")
+    , m_mangledExportPool(StringSlicePool::Style::Empty)
 {
     addModuleDependency(this);
 }
@@ -1965,6 +1974,87 @@ void Module::_addEntryPoint(EntryPoint* entryPoint)
     m_entryPoints.add(entryPoint);
 }
 
+static bool _canExportDeclSymbol(ASTNodeType type)
+{
+    switch (type)
+    {
+        case ASTNodeType::ModuleDecl:
+        case ASTNodeType::EmptyDecl:
+        case ASTNodeType::NamespaceDecl:
+        {
+            return false;
+        }
+        default: break;
+    }
+
+    return true;
+}
+
+static bool _canRecurseExportSymbol(Decl* decl)
+{
+    if (as<FunctionDeclBase>(decl) ||
+        as<ScopeDecl>(decl))
+    {
+        return false;
+    }
+    return true;
+}
+
+void Module::_processFindDeclsExportSymbolsRec(Decl* decl)
+{
+    if (_canExportDeclSymbol(decl->astNodeType))
+    {
+        // It's a reference to a declaration in another module, so first get the symbol name. 
+        String mangledName = getMangledName(getASTBuilder(), decl);
+
+        Index index = Index(m_mangledExportPool.add(mangledName));
+
+        // TODO(JS): It appears that more than one entity might have the same mangled name.
+        // So for now we ignore and just take the first one.
+        if (index == m_mangledExportSymbols.getCount())
+        {
+            m_mangledExportSymbols.add(decl);
+        }
+    }
+
+    if (!_canRecurseExportSymbol(decl))
+    {
+        // We don't need to recurse any further into this
+        return;
+    }
+
+    // process `decl` itself
+    if(auto containerDecl = as<ContainerDecl>(decl))
+    {
+        for (auto child : containerDecl->members)
+        {
+            _processFindDeclsExportSymbolsRec(child);
+        }
+    }
+    else if (auto genericDecl = as<GenericDecl>(decl))
+    {
+        _processFindDeclsExportSymbolsRec(genericDecl->inner);
+    }
+}
+
+NodeBase* Module::getExportFromMangledName(const UnownedStringSlice& slice)
+{
+    // Will be non zero if has been previously attempted
+    if (m_mangledExportSymbols.getCount() == 0)
+    {
+        // Build up the exported mangled name list
+        _processFindDeclsExportSymbolsRec(getModuleDecl());
+
+        // If nothing found, mark that we have tried looking by making m_mangledExportSymbols.getCount() != 0
+        if (m_mangledExportSymbols.getCount() == 0)
+        {
+            m_mangledExportSymbols.add(nullptr);
+        }        
+    }
+
+    const Index index = m_mangledExportPool.findIndex(slice);
+    return (index >= 0) ? m_mangledExportSymbols[index] : nullptr;
+}
 
 // ComponentType
 
@@ -2712,6 +2802,7 @@ void Session::addBuiltinSource(
     Name* moduleName = getNamePool()->getName(path);
     auto translationUnitIndex = compileRequest->addTranslationUnit(SourceLanguage::Slang, moduleName);
 
+    
     compileRequest->addTranslationUnitSourceString(
         translationUnitIndex,
         path,
@@ -2733,6 +2824,9 @@ void Session::addBuiltinSource(
     // Extract the AST for the code we just parsed
     auto module = compileRequest->translationUnits[translationUnitIndex]->getModule();
     auto moduleDecl = module->getModuleDecl();
+
+    // Put in the loaded module map
+    linkage->mapNameToLoadedModules.Add(moduleName, module);
 
     // Add the resulting code to the appropriate scope
     if (!scope->containerDecl)
@@ -3159,6 +3253,8 @@ SlangResult _addLibraryReference(EndToEndCompileRequest* req, Stream* stream)
         options.session = req->getSession();
         options.sharedASTBuilder = linkage->getASTBuilder()->getSharedASTBuilder();
         options.sourceManager = linkage->getSourceManager();
+        options.linkage = req->getLinkage();
+        options.sink = req->getSink();
 
         SLANG_RETURN_ON_FAIL(SerialContainerUtil::read(&riffContainer, options, containerData));
 

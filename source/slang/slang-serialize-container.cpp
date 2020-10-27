@@ -12,6 +12,8 @@
 #include "slang-serialize-source-loc.h"
 #include "slang-serialize-factory.h"
 
+#include "slang-mangled-lexer.h"
+
 namespace Slang {
 
 /* static */SlangResult SerialContainerUtil::requestToData(EndToEndCompileRequest* request, const WriteOptions& options, SerialContainerData& out)
@@ -316,9 +318,64 @@ namespace Slang {
 
                     SerialReader reader(serialClasses, &objectFactory);
 
-                    reader.getExtraObjects().set(sourceLocReader);
+                    //
+                    SLANG_RETURN_ON_FAIL(reader.loadEntries((const uint8_t*)astData->getPayload(), astData->getSize()));
 
-                    SLANG_RETURN_ON_FAIL(reader.load((const uint8_t*)astData->getPayload(), astData->getSize(), options.namePool));
+                    SLANG_RETURN_ON_FAIL(reader.constructObjects(options.namePool));
+
+                    // Resolve external references if the linkage is specified
+                    if (options.linkage)
+                    {
+                        const auto& entries = reader.getEntries();
+                        auto& objects = reader.getObjects();
+                        const Index entriesCount = entries.getCount();
+
+                        // Index from 1 (0 is null)
+                        for (Index i = 1; i < entriesCount; ++i)
+                        {
+                            const SerialInfo::Entry* entry = entries[i];
+                            if (entry->typeKind == SerialTypeKind::ImportSymbol)
+                            {
+                                UnownedStringSlice mangledName = reader.getStringSlice(SerialIndex(i));
+
+                                String moduleName;
+                                SLANG_RETURN_ON_FAIL(MangledNameParser::parseModuleName(mangledName, moduleName));
+
+                                // Try and access the module
+
+                                Linkage* linkage = options.linkage;
+
+                                NamePool* namePool = linkage->getNamePool();
+                                Name* moduleNameName = namePool->getName(moduleName);
+
+                                Module* readModule = linkage->findOrImportModule(moduleNameName, SourceLoc::fromRaw(0), options.sink);
+                                if (!readModule)
+                                {
+                                    return SLANG_FAIL;
+                                }
+
+                                // Look up the symbol
+                                NodeBase* nodeBase = readModule->getExportFromMangledName(mangledName);
+
+                                if (!nodeBase)
+                                {
+                                    // If didn't find the export then we are done
+                                    return SLANG_FAIL;
+                                }
+
+                                // set the result
+                                objects[i] = nodeBase;
+                            }
+                        }
+                    }
+
+                    // TODO(JS): If I want to build up a dictionary of mangled names to declarations,
+                    // I can deserialize *without* the external symbols being set up,
+                    // and create the dictionary. Then resolve the names and deserializeObjects *again*.
+
+                    SLANG_RETURN_ON_FAIL(reader.deserializeObjects());
+
+                    reader.getExtraObjects().set(sourceLocReader);
 
                     // Get the root node. It's at index 1 (0 is the null value).
                     astRootNode = reader.getPointer(SerialIndex(1)).dynamicCast<NodeBase>();
