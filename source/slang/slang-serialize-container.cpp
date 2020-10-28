@@ -16,42 +16,100 @@
 
 namespace Slang {
 
-/* static */SlangResult SerialContainerUtil::requestToData(EndToEndCompileRequest* request, const WriteOptions& options, SerialContainerData& out)
+/* static */SlangResult SerialContainerUtil::write(Module* module, const WriteOptions& options, Stream* stream)
 {
-    SLANG_UNUSED(options);
-
-    out.clear();
-
-    auto linkage = request->getLinkage();
-    auto sink = request->getSink();
-    auto frontEndReq = request->getFrontEndReq();
-
-    for (TranslationUnitRequest* translationUnit : frontEndReq->translationUnits)
+    RiffContainer container;
     {
-        auto module = translationUnit->module;
-        auto irModule = module->getIRModule();
+        SerialContainerData data;
+        SLANG_RETURN_ON_FAIL(SerialContainerUtil::addModuleToData(module, options, data));
+        SLANG_RETURN_ON_FAIL(SerialContainerUtil::write(data, options, &container));
+    }
+    // We now write the RiffContainer to the stream
+    SLANG_RETURN_ON_FAIL(RiffUtil::write(container.getRoot(), true, stream));
+    return SLANG_OK;
+}
 
-        // Root AST node
-        auto moduleDecl = translationUnit->getModuleDecl();
+/* static */SlangResult SerialContainerUtil::write(FrontEndCompileRequest* frontEndReq, const WriteOptions& options, Stream* stream)
+{
+    RiffContainer container;
+    {
+        SerialContainerData data;
+        SLANG_RETURN_ON_FAIL(SerialContainerUtil::addFrontEndRequestToData(frontEndReq, options, data));
+        SLANG_RETURN_ON_FAIL(SerialContainerUtil::write(data, options, &container));
+    }
+    // We now write the RiffContainer to the stream
+    SLANG_RETURN_ON_FAIL(RiffUtil::write(container.getRoot(), true, stream));
+    return SLANG_OK;
+}
 
-        SLANG_ASSERT(irModule || moduleDecl);
+/* static */SlangResult SerialContainerUtil::write(EndToEndCompileRequest* request, const WriteOptions& options, Stream* stream)
+{
+    RiffContainer container;
+    {
+        SerialContainerData data;
+        SLANG_RETURN_ON_FAIL(SerialContainerUtil::addEndToEndRequestToData(request, options, data));
+        SLANG_RETURN_ON_FAIL(SerialContainerUtil::write(data, options, &container));
+    }
+    // We now write the RiffContainer to the stream
+    SLANG_RETURN_ON_FAIL(RiffUtil::write(container.getRoot(), true, stream));
+    return SLANG_OK;
+}
 
+/* static */SlangResult SerialContainerUtil::addModuleToData(Module* module, const WriteOptions& options, SerialContainerData& outData)
+{
+    if (options.optionFlags & (SerialOptionFlag::ASTModule | SerialOptionFlag::IRModule))
+    {
         SerialContainerData::Module dstModule;
 
         // NOTE: The astBuilder is not set here, as not needed to be scoped for serialization (it is assumed the
         // TranslationUnitRequest stays in scope)
 
-        dstModule.astRootNode = moduleDecl;
-        dstModule.irModule = irModule;
+        if (options.optionFlags & SerialOptionFlag::ASTModule)
+        {
+            // Root AST node
+            auto moduleDecl = module->getModuleDecl();
+            SLANG_ASSERT(moduleDecl);
 
-        out.modules.add(dstModule);
+            dstModule.astRootNode = moduleDecl;
+        }
+        if (options.optionFlags & SerialOptionFlag::IRModule)
+        {
+            // IR module
+            dstModule.irModule = module->getIRModule();
+            SLANG_ASSERT(dstModule.irModule);
+        }
+
+        outData.modules.add(dstModule);
     }
 
+    return SLANG_OK;
+}
+
+
+/* static */SlangResult SerialContainerUtil::addFrontEndRequestToData(FrontEndCompileRequest* frontEndReq, const WriteOptions& options, SerialContainerData& outData)
+{
+    // Go through translation units, adding modules
+    for (TranslationUnitRequest* translationUnit : frontEndReq->translationUnits)
+    {
+        SLANG_RETURN_ON_FAIL(addModuleToData(translationUnit->module, options, outData));        
+    }
+
+    return SLANG_OK;
+}
+
+/* static */SlangResult SerialContainerUtil::addEndToEndRequestToData(EndToEndCompileRequest* request, const WriteOptions& options, SerialContainerData& out)
+{    
+    auto linkage = request->getLinkage();
+    auto sink = request->getSink();
+
+    // Output the front end request data
+    SLANG_RETURN_ON_FAIL(addFrontEndRequestToData(request->getFrontEndReq(), options, out));
+
+    //
     auto program = request->getSpecializedGlobalAndEntryPointsComponentType();
 
     // Add all the target modules
     {
-        
         for (auto target : linkage->targets)
         {
             auto targetProgram = program->getTargetProgram(target);
@@ -117,7 +175,7 @@ namespace Slang {
         // Module list
         RiffContainer::ScopeChunk moduleListScope(container, RiffContainer::Chunk::Kind::List, SerialBinary::kModuleListFourCc);
 
-        if (options.optionFlags & SerialOptionFlag::DebugInfo)
+        if (options.optionFlags & SerialOptionFlag::SourceLocation)
         {
             sourceLocWriter = new SerialSourceLocWriter(options.sourceManager);
         }
@@ -489,7 +547,7 @@ namespace Slang {
 
         RefPtr<SerialSourceLocWriter> sourceLocWriter;
 
-        if (options.optionFlags & SerialOptionFlag::DebugInfo)
+        if (options.optionFlags & SerialOptionFlag::SourceLocation)
         {
             sourceLocWriter = new SerialSourceLocWriter(options.sourceManager);
         }
@@ -530,7 +588,7 @@ namespace Slang {
         RefPtr<SerialSourceLocReader> sourceLocReader;
 
         // If we have debug info then find and read it
-        if (options.optionFlags & SerialOptionFlag::DebugInfo)
+        if (options.optionFlags & SerialOptionFlag::SourceLocation)
         {
             RiffContainer::ListChunk* debugList = rootList->findContainedList(SerialSourceLocData::kDebugFourCc);
             if (!debugList)
@@ -593,7 +651,7 @@ namespace Slang {
             }
         }
     }
-    else if (options.optionFlags & SerialOptionFlag::DebugInfo)
+    else if (options.optionFlags & SerialOptionFlag::SourceLocation)
     {
         // They should be on the same line nos
         for (Index i = 1; i < readInsts.getCount(); ++i)

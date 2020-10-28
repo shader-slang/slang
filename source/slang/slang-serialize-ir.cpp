@@ -307,7 +307,7 @@ Result IRSerialWriter::write(IRModule* module, SerialSourceLocWriter* sourceLocW
         }
     }
 
-    if ((options & SerialOptionFlag::DebugInfo) && sourceLocWriter)
+    if ((options & SerialOptionFlag::SourceLocation) && sourceLocWriter)
     {
         _calcDebugInfo(sourceLocWriter);
     }

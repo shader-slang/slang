@@ -175,8 +175,38 @@ void Session::init()
     slangLanguageScope = new Scope();
     slangLanguageScope->nextSibling = hlslLanguageScope;
 
-    addBuiltinSource(coreLanguageScope, "core", getCoreLibraryCode());
-    addBuiltinSource(hlslLanguageScope, "hlsl", getHLSLLibraryCode());
+    if (true)
+    {
+        // Let's try loading serialized modules and adding them
+        _readBuiltinModule(coreLanguageScope, "core");
+        _readBuiltinModule(hlslLanguageScope, "hlsl");
+    }
+    else
+    {
+        addBuiltinSource(coreLanguageScope, "core", getCoreLibraryCode());
+        addBuiltinSource(hlslLanguageScope, "hlsl", getHLSLLibraryCode());
+    }
+
+    if (false)
+    {
+        for (auto& pair : m_builtinLinkage->mapNameToLoadedModules)
+        {
+            const Name* moduleName = pair.Key;
+            Module* module = pair.Value;
+
+            // Set up options
+            SerialContainerUtil::WriteOptions options;
+            options.optionFlags |= SerialOptionFlag::SourceLocation;
+            options.sourceManager = m_builtinLinkage->getSourceManager();
+
+            StringBuilder builder;
+            builder << moduleName->text << ".slang-module";
+
+            FileStream stream(builder.ProduceString(), FileMode::Create, FileAccess::Write, FileShare::ReadWrite);
+
+            SerialContainerUtil::write(module, options, &stream);
+        }
+    }
 
     {
         for (Index i = 0; i < Index(SourceLanguage::CountOf); ++i)
@@ -192,6 +222,79 @@ void Session::init()
     m_languagePreludes[Index(SourceLanguage::CUDA)] = get_slang_cuda_prelude();
     m_languagePreludes[Index(SourceLanguage::CPP)] = get_slang_cpp_prelude();
     m_languagePreludes[Index(SourceLanguage::HLSL)] = get_slang_hlsl_prelude();
+}
+
+SlangResult Session::_readBuiltinModule(Scope* scope, String moduleName)
+{
+    StringBuilder moduleFilename;
+    moduleFilename << moduleName << ".slang-module";
+
+    RiffContainer riffContainer;
+    try
+    {
+        FileStream stream(moduleFilename.ProduceString(), FileMode::Open, FileAccess::Read, FileShare::ReadOnly);
+        // Load the riff container
+        SLANG_RETURN_ON_FAIL(RiffUtil::read(&stream, riffContainer));
+    }
+    catch (const IOException&)
+    {
+        return SLANG_FAIL;
+    }
+
+    // Load up the module
+    
+    SerialContainerData containerData;
+
+    Linkage* linkage = getBuiltinLinkage();
+    //NamePool* namePool = linkage->getNamePool();
+
+    NamePool* namePoolPtr = &namePool;
+
+    SerialContainerUtil::ReadOptions options;
+    options.namePool = namePoolPtr;
+    options.session = this;
+    options.sharedASTBuilder = linkage->getASTBuilder()->getSharedASTBuilder();
+    options.sourceManager = linkage->getSourceManager();
+    options.linkage = linkage;
+
+    // Hmm - don't have a suitable sink yet, so attempt to just not have one
+    options.sink = nullptr;
+
+    SLANG_RETURN_ON_FAIL(SerialContainerUtil::read(&riffContainer, options, containerData));
+
+    for (auto& srcModule : containerData.modules)
+    {
+        RefPtr<Module> module(new Module(linkage, srcModule.astBuilder));
+
+        ModuleDecl* moduleDecl = as<ModuleDecl>(srcModule.astRootNode);
+
+        module->setModuleDecl(moduleDecl);
+        module->setIRModule(srcModule.irModule);
+
+        // Put in the loaded module map
+        linkage->mapNameToLoadedModules.Add(namePoolPtr->getName(moduleName), module);
+
+        // Add the resulting code to the appropriate scope
+        if (!scope->containerDecl)
+        {
+            // We are the first chunk of code to be loaded for this scope
+            scope->containerDecl = moduleDecl;
+        }
+        else
+        {
+            // We need to create a new scope to link into the whole thing
+            auto subScope = new Scope();
+            subScope->containerDecl = moduleDecl;
+            subScope->nextSibling = scope->nextSibling;
+            scope->nextSibling = subScope;
+        }
+
+        // We need to retain this AST so that we can use it in other code
+        // (Note that the `Scope` type does not retain the AST it points to)
+        stdlibModules.add(module);
+    }
+
+    return SLANG_OK;
 }
 
 ISlangUnknown* Session::getInterface(const Guid& guid)
@@ -1210,7 +1313,7 @@ void FrontEndCompileRequest::generateIR()
 
             options.compressionType = SerialCompressionType::None;
             options.sourceManager = getSourceManager();
-            options.optionFlags |= SerialOptionFlag::DebugInfo;
+            options.optionFlags |= SerialOptionFlag::SourceLocation;
 
             // Verify debug information
             if (SLANG_FAILED(SerialContainerUtil::verifyIRSerialize(irModule, getSession(), options)))
@@ -1920,11 +2023,19 @@ void FilePathDependencyList::addDependency(Module* module)
 // Module
 //
 
-Module::Module(Linkage* linkage)
+Module::Module(Linkage* linkage, ASTBuilder* astBuilder)
     : ComponentType(linkage)
-    , m_astBuilder(linkage->getASTBuilder()->getSharedASTBuilder(), "Module")
     , m_mangledExportPool(StringSlicePool::Style::Empty)
 {
+    if (astBuilder)
+    {
+        m_astBuilder = astBuilder;
+    }
+    else
+    {
+        m_astBuilder = new ASTBuilder(linkage->getASTBuilder()->getSharedASTBuilder(), "Module");
+    }
+
     addModuleDependency(this);
 }
 

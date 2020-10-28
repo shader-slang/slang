@@ -93,8 +93,14 @@ struct SerialContainerUtil
         DiagnosticSink* sink = nullptr;
     };
 
+        /// Add module to outData
+    static SlangResult addModuleToData(Module* module, const WriteOptions& options, SerialContainerData& outData);
+
         /// Get the serializable contents of the request as data
-    static SlangResult requestToData(EndToEndCompileRequest* request, const WriteOptions& options, SerialContainerData& outData);
+    static SlangResult addEndToEndRequestToData(EndToEndCompileRequest* request, const WriteOptions& options, SerialContainerData& outData);
+
+        /// Convert front end request into something serializable
+    static SlangResult addFrontEndRequestToData(FrontEndCompileRequest* request, const WriteOptions& options, SerialContainerData& outData);
 
         /// Write the data into the container
     static SlangResult write(const SerialContainerData& data, const WriteOptions& options, RiffContainer* container);
@@ -104,6 +110,12 @@ struct SerialContainerUtil
 
         /// Verify IR serialization
     static SlangResult verifyIRSerialize(IRModule* module, Session* session, const WriteOptions& options);
+
+        /// Write the request to the stream
+    static SlangResult write(FrontEndCompileRequest* frontEndReq, const WriteOptions& options, Stream* stream);
+    static SlangResult write(EndToEndCompileRequest* request, const WriteOptions& options, Stream* stream);
+    static SlangResult write(Module* module, const WriteOptions& options, Stream* stream);
+
 };
 
 } // namespace Slang

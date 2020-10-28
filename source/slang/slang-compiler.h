@@ -925,7 +925,7 @@ namespace Slang
         //
 
             /// Create a module (initially empty).
-        Module(Linkage* linkage);
+        Module(Linkage* linkage, ASTBuilder* astBuilder = nullptr);
 
             /// Get the AST for the module (if it has been parsed)
         ModuleDecl* getModuleDecl() { return m_moduleDecl; }
@@ -978,7 +978,7 @@ namespace Slang
         NodeBase* findExportFromMangledName(const UnownedStringSlice& slice);
 
             /// Get the ASTBuilder
-        ASTBuilder* getASTBuilder() { return &m_astBuilder; }
+        ASTBuilder* getASTBuilder() { return m_astBuilder; }
 
             /// Collect information on the shader parameters of the module.
             ///
@@ -1058,7 +1058,7 @@ namespace Slang
 
         // The builder that owns all of the AST nodes from parsing the source of
         // this module. 
-        ASTBuilder m_astBuilder;
+        RefPtr<ASTBuilder> m_astBuilder;
 
         // Holds map of exported mangled names to symbols. m_mangledExportPool maps names to indices,
         // and m_mangledExportSymbols holds the NodeBase* values for each index. 
@@ -2158,6 +2158,8 @@ namespace Slang
         DownstreamCompilerLocatorFunc m_downstreamCompilerLocators[int(PassThroughMode::CountOf)];
 
     private:
+
+        SlangResult _readBuiltinModule(Scope* scope, String moduleName);
 
         SlangResult _loadRequest(EndToEndCompileRequest* request, const void* data, size_t size);
 
