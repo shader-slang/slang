@@ -454,6 +454,18 @@ struct IRBuiltinDecoration : IRDecoration
     IR_LEAF_ISA(BuiltinDecoration)
 };
 
+struct IRSequentialIDDecoration : IRDecoration
+{
+    enum
+    {
+        kOp = kIROp_SequentialIDDecoration
+    };
+    IR_LEAF_ISA(SequentialIDDecoration)
+
+    IRIntLit* getSequentialIDOperand() { return cast<IRIntLit>(getOperand(0)); }
+    IRIntegerValue getSequentialID() { return getSequentialIDOperand()->getValue(); }
+};
+
 // An instruction that specializes another IR value
 // (representing a generic) to a particular set of generic arguments 
 // (instructions representing types, witness tables, etc.)
@@ -2532,6 +2544,11 @@ struct IRBuilder
     void addBuiltinDecoration(IRInst* inst)
     {
         addDecoration(inst, kIROp_BuiltinDecoration);
+    }
+
+    void addSequentialIDDecoration(IRInst* inst, IRIntegerValue id)
+    {
+        addDecoration(inst, kIROp_SequentialIDDecoration, getIntValue(getUIntType(), id));
     }
 };
 

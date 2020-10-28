@@ -114,9 +114,77 @@ void specializeDispatchFunction(SharedGenericsLoweringContext* sharedContext, IR
     returnInst->removeAndDeallocate();
 }
 
+// Ensures every witness table object has been assigned a sequential ID.
+// All witness tables will have a SequentialID decoration after this function is run.
+// The sequantial ID in the decoration will be the same as the one specified in the Linkage.
+// Otherwise, a new ID will be generated and assigned to the witness table object, and
+// the sequantial ID map in the Linkage will be updated to include the new ID, so they
+// can be looked up by the user via future Slang API calls.
+void ensureWitnessTableSequentialIDs(SharedGenericsLoweringContext* sharedContext)
+{
+    auto linkage = sharedContext->targetReq->getLinkage();
+    for (auto inst : sharedContext->module->getGlobalInsts())
+    {
+        if (inst->op == kIROp_WitnessTable)
+        {
+            UnownedStringSlice witnessTableMangledName;
+            if (auto instLinkage = inst->findDecoration<IRLinkageDecoration>())
+            {
+                witnessTableMangledName = instLinkage->getMangledName();
+            }
+            else
+            {
+                // If this witness table entry does not have a linkage,
+                // don't assign sequential ID for it.
+                continue;
+            }
+
+            // If the inst already has a SequentialIDDecoration, stop now.
+            if (inst->findDecoration<IRSequentialIDDecoration>())
+                continue;
+
+            // Get a sequential ID for the witness table using the map from the Linkage.
+            uint32_t seqID = 0;
+            if (!linkage->mapMangledNameToRTTIObjectIndex.TryGetValue(
+                witnessTableMangledName, seqID))
+            {
+                auto interfaceType =
+                    cast<IRWitnessTableType>(inst->getDataType())->getConformanceType();
+                auto interfaceLinkage = interfaceType->findDecoration<IRLinkageDecoration>();
+                SLANG_ASSERT(
+                    interfaceLinkage && "An interface type does not have a linkage,"
+                                        "but a witness table associated with it has one.");
+                auto interfaceName = interfaceLinkage->getMangledName();
+                auto idAllocator =
+                    linkage->mapInterfaceMangledNameToSequentialIDCounters.TryGetValue(
+                        interfaceName);
+                if (!idAllocator)
+                {
+                    linkage->mapInterfaceMangledNameToSequentialIDCounters[interfaceName] = 0;
+                    idAllocator =
+                        linkage->mapInterfaceMangledNameToSequentialIDCounters.TryGetValue(
+                            interfaceName);
+                }
+                seqID = *idAllocator;
+                ++(*idAllocator);
+                linkage->mapMangledNameToRTTIObjectIndex[witnessTableMangledName] = seqID;
+            }
+
+            // Add a decoration to the inst.
+            IRBuilder builder;
+            builder.sharedBuilder = &sharedContext->sharedBuilderStorage;
+            builder.setInsertBefore(inst);
+            builder.addSequentialIDDecoration(inst, seqID);
+        }
+    }
+}
+
 void specializeDispatchFunctions(SharedGenericsLoweringContext* sharedContext)
 {
     sharedContext->sharedBuilderStorage.deduplicateAndRebuildGlobalNumberingMap();
+
+    // First we ensure that all witness table objects has a sequential ID assigned.
+    ensureWitnessTableSequentialIDs(sharedContext);
 
     for (auto kv : sharedContext->mapInterfaceRequirementKeyToDispatchMethods)
     {

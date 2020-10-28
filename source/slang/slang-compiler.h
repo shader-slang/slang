@@ -1226,6 +1226,10 @@ namespace Slang
             slang::TypeReflection* type,
             slang::TypeReflection* interfaceType,
             ISlangBlob** outNameBlob) override;
+        SLANG_NO_THROW SlangResult SLANG_MCALL getTypeConformanceWitnessSequentialID(
+            slang::TypeReflection* type,
+            slang::TypeReflection* interfaceType,
+            uint32_t*              outId) override;
         SLANG_NO_THROW SlangResult SLANG_MCALL createCompileRequest(
             SlangCompileRequest**   outCompileRequest) override;
 
@@ -1295,6 +1299,13 @@ namespace Slang
 
         // Map from the logical name of a module to its definition
         Dictionary<Name*, RefPtr<LoadedModule>> mapNameToLoadedModules;
+
+        // Map from the mangled name of RTTI objects to sequential IDs
+        // used by `switch`-based dynamic dispatch.
+        Dictionary<String, uint32_t> mapMangledNameToRTTIObjectIndex;
+
+        // Counters for allocating sequential IDs to witness tables conforming to each interface type.
+        Dictionary<String, uint32_t> mapInterfaceMangledNameToSequentialIDCounters;
 
         // The resulting specialized IR module for each entry point request
         List<RefPtr<IRModule>> compiledModules;
