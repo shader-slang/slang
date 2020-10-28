@@ -380,7 +380,7 @@ namespace Slang {
                                 {
                                     if (options.sink)
                                     {
-                                        options.sink->diagnose(SourceLoc(0), Diagnostic::unableToFindSymbolInModule, mangledName, moduleName);
+                                        options.sink->diagnose(SourceLoc::fromRaw(0), Diagnostics::unableToFindSymbolInModule, mangledName, moduleName);
                                     }
 
                                     // If didn't find the export then we are done
