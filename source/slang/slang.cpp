@@ -2037,7 +2037,7 @@ void Module::_processFindDeclsExportSymbolsRec(Decl* decl)
     }
 }
 
-NodeBase* Module::getExportFromMangledName(const UnownedStringSlice& slice)
+NodeBase* Module::findExportFromMangledName(const UnownedStringSlice& slice)
 {
     // Will be non zero if has been previously attempted
     if (m_mangledExportSymbols.getCount() == 0)

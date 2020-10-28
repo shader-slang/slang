@@ -374,10 +374,15 @@ namespace Slang {
                                 }
 
                                 // Look up the symbol
-                                NodeBase* nodeBase = readModule->getExportFromMangledName(mangledName);
+                                NodeBase* nodeBase = readModule->findExportFromMangledName(mangledName);
 
                                 if (!nodeBase)
                                 {
+                                    if (options.sink)
+                                    {
+                                        options.sink->diagnose(SourceLoc(0), Diagnostic::unableToFindSymbolInModule, mangledName, moduleName);
+                                    }
+
                                     // If didn't find the export then we are done
                                     return SLANG_FAIL;
                                 }

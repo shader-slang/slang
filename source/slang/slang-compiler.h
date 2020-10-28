@@ -973,7 +973,9 @@ namespace Slang
         List<Module*> const& getModuleDependencies() SLANG_OVERRIDE { return m_moduleDependencyList.getModuleList(); }
         List<String> const& getFilePathDependencies() SLANG_OVERRIDE { return m_filePathDependencyList.getFilePathList(); }
 
-        NodeBase* getExportFromMangledName(const UnownedStringSlice& slice);
+            /// Given a mangled name finds the exported NodeBase associated with this module.
+            /// If not found returns nullptr.
+        NodeBase* findExportFromMangledName(const UnownedStringSlice& slice);
 
             /// Get the ASTBuilder
         ASTBuilder* getASTBuilder() { return &m_astBuilder; }
@@ -1058,7 +1060,8 @@ namespace Slang
         // this module. 
         ASTBuilder m_astBuilder;
 
-        // Holds map of map of exported mangled names to symbols
+        // Holds map of exported mangled names to symbols. m_mangledExportPool maps names to indices,
+        // and m_mangledExportSymbols holds the NodeBase* values for each index. 
         StringSlicePool m_mangledExportPool;
         List<NodeBase*> m_mangledExportSymbols;
     };
