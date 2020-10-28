@@ -560,6 +560,7 @@ INST(HighLevelDeclDecoration,               highLevelDecl,          1, 0)
     /* Decorations for RTTI objects */
         INST(RTTITypeSizeDecoration, RTTI_typeSize, 1, 0)
     INST(AnyValueSizeDecoration, AnyValueSize, 1, 0)
+    INST(SequentialIDDecoration, SequentialIDDecoration, 1, 0)
 
     INST(TypeConstraintDecoration, TypeConstraintDecoration, 1, 0)
     INST_RANGE(LinkageDecoration, ImportDecoration, ExportDecoration)

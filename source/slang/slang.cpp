@@ -658,6 +658,36 @@ SLANG_NO_THROW SlangResult SLANG_MCALL Linkage::getTypeConformanceWitnessMangled
     return SLANG_OK;
 }
 
+SLANG_NO_THROW SlangResult SLANG_MCALL Linkage::getTypeConformanceWitnessSequentialID(
+    slang::TypeReflection* type,
+    slang::TypeReflection* interfaceType,
+    uint32_t* outId)
+{
+    auto subType = asInternal(type);
+    auto supType = asInternal(interfaceType);
+    auto name = getMangledNameForConformanceWitness(subType->getASTBuilder(), subType, supType);
+    auto interfaceName = getMangledTypeName(supType->getASTBuilder(), supType);
+    uint32_t resultIndex = 0;
+    if (mapMangledNameToRTTIObjectIndex.TryGetValue(name, resultIndex))
+    {
+        if (outId)
+            *outId = resultIndex;
+        return SLANG_OK;
+    }
+    auto idAllocator = mapInterfaceMangledNameToSequentialIDCounters.TryGetValue(interfaceName);
+    if (!idAllocator)
+    {
+        mapInterfaceMangledNameToSequentialIDCounters[interfaceName] = 0;
+        idAllocator = mapInterfaceMangledNameToSequentialIDCounters.TryGetValue(interfaceName);
+    }
+    resultIndex = (*idAllocator);
+    ++(*idAllocator);
+    mapMangledNameToRTTIObjectIndex[name] = resultIndex;
+    if (outId)
+        *outId = resultIndex;
+    return SLANG_OK;
+}
+
 SLANG_NO_THROW SlangResult SLANG_MCALL Linkage::createCompileRequest(
     SlangCompileRequest**   outCompileRequest)
 {
