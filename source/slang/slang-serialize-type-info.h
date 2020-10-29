@@ -150,11 +150,7 @@ struct SerialTypeInfo<T*>
 {
     typedef T* NativeType;
     typedef SerialIndex SerialType;
-
-    enum
-    {
-        SerialAlignment = SLANG_ALIGN_OF(SerialType)
-    };
+    enum { SerialAlignment = SLANG_ALIGN_OF(SerialType) };
 
     static void toSerial(SerialWriter* writer, const void* inNative, void* outSerial)
     {
@@ -163,6 +159,25 @@ struct SerialTypeInfo<T*>
     static void toNative(SerialReader* reader, const void* inSerial, void* outNative)
     {
         *(T**)outNative = reader->getPointer(*(const SerialType*)inSerial).dynamicCast<T>();
+    }
+};
+
+// RefPtr (pretty much the same as T* - except for native rep)
+template <typename T>
+struct SerialTypeInfo<RefPtr<T>>
+{
+    typedef RefPtr<T> NativeType;
+    typedef SerialIndex SerialType;
+    enum { SerialAlignment = SLANG_ALIGN_OF(SerialType) };
+
+    static void toSerial(SerialWriter* writer, const void* native, void* serial)
+    {
+        auto& src = *(const NativeType*)native;
+        *(SerialType*)serial = writer->addPointer(src);
+    }
+    static void toNative(SerialReader* reader, const void* serial, void* native)
+    {
+        *(NativeType*)native = reader->getPointer(*(const SerialType*)serial).dynamicCast<T>();
     }
 };
 
@@ -205,31 +220,6 @@ struct SerialTypeInfo<List<T, ALLOCATOR>>
         auto& src = *(const SerialType*)serial;
 
         reader->getArray(src, dst);
-    }
-};
-
-
-
-
-// Handle RefPtr - just convert into * to do the conversion
-template <typename T>
-struct SerialTypeInfo<RefPtr<T>>
-{
-    typedef RefPtr<T> NativeType;
-    typedef typename SerialTypeInfo<T*>::SerialType SerialType;
-    enum { SerialAlignment = SLANG_ALIGN_OF(SerialType) };
-
-    static void toSerial(SerialWriter* writer, const void* native, void* serial)
-    {
-        auto& src = *(const NativeType*)native;
-        T* obj = src;
-        SerialTypeInfo<T*>::toSerial(writer, &obj, serial);
-    }
-    static void toNative(SerialReader* reader, const void* serial, void* native)
-    {
-        T* obj = nullptr;
-        SerialTypeInfo<T*>::toNative(reader, serial, &obj);
-        *(NativeType*)native = obj;
     }
 };
 
@@ -290,8 +280,9 @@ struct SerialTypeInfo<Dictionary<KEY, VALUE>>
             i++;
         }
 
-        dst.keys = writer->addArray(keys.getBuffer(), count);
-        dst.values = writer->addArray(values.getBuffer(), count);
+        // When we add the array it is already converted to a serializable type, so add as SerialArray
+        dst.keys = writer->addSerialArray<KEY>(keys.getBuffer(), count);
+        dst.values = writer->addSerialArray<VALUE>(values.getBuffer(), count);
     }
     static void toNative(SerialReader* reader, const void* serial, void* native)
     {

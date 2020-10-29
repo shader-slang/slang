@@ -375,7 +375,7 @@ SerialIndex SerialWriter::addName(const Name* name)
     return index;
 }
 
-SerialIndex SerialWriter::_addArray(size_t elementSize, size_t alignment, const void* elements, Index elementCount)
+SerialIndex SerialWriter::addSerialArray(size_t elementSize, size_t alignment, const void* elements, Index elementCount)
 {
     typedef SerialInfo::ArrayEntry Entry;
 
