@@ -186,7 +186,7 @@ void Session::init()
         addBuiltinSource(hlslLanguageScope, "hlsl", getHLSLLibraryCode());
 
         // Write out
-        if (true)
+        if (false)
         {
             for (auto& pair : m_builtinLinkage->mapNameToLoadedModules)
             {
@@ -203,7 +203,9 @@ void Session::init()
 
                 FileStream stream(builder.ProduceString(), FileMode::Create, FileAccess::Write, FileShare::ReadWrite);
 
-                SerialContainerUtil::write(module, options, &stream);
+                SlangResult res = SerialContainerUtil::write(module, options, &stream);
+
+                SLANG_ASSERT(SLANG_SUCCEEDED(res));
             }
         }
     }
