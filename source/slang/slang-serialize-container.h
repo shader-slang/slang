@@ -89,6 +89,8 @@ struct SerialContainerUtil
         SourceManager* sourceManager = nullptr;
         NamePool* namePool = nullptr;
         SharedASTBuilder* sharedASTBuilder = nullptr;
+        Linkage* linkage = nullptr;
+        DiagnosticSink* sink = nullptr;
     };
 
         /// Get the serializable contents of the request as data

@@ -12,6 +12,8 @@
 #include "slang-serialize-source-loc.h"
 #include "slang-serialize-factory.h"
 
+#include "slang-mangled-lexer.h"
+
 namespace Slang {
 
 /* static */SlangResult SerialContainerUtil::requestToData(EndToEndCompileRequest* request, const WriteOptions& options, SerialContainerData& out)
@@ -142,6 +144,9 @@ namespace Slang {
             {
                 if (ModuleDecl* moduleDecl = as<ModuleDecl>(module.astRootNode))
                 {
+                    // Put in AST module
+                    RiffContainer::ScopeChunk scopeASTModule(container, RiffContainer::Chunk::Kind::List, ASTSerialBinary::kSlangASTModuleFourCC);
+
                     if (!serialClasses)
                     {
                         SLANG_RETURN_ON_FAIL(SerialClassesUtil::create(serialClasses));
@@ -155,8 +160,9 @@ namespace Slang {
                     // Add the module and everything that isn't filtered out in the filter.
                     writer.addPointer(moduleDecl);
 
+
                     // We can now serialize it into the riff container.
-                    SLANG_RETURN_ON_FAIL(writer.writeIntoContainer(ASTSerialBinary::kSlangASTModuleFourCC, container));
+                    SLANG_RETURN_ON_FAIL(writer.writeIntoContainer(ASTSerialBinary::kSlangASTModuleDataFourCC, container));
                 }
             }
         }
@@ -312,9 +318,97 @@ namespace Slang {
 
                     SerialReader reader(serialClasses, &objectFactory);
 
+                    // Sets up the entry table - one entry for each 'object'.
+                    // No native objects are constructed. No objects are deserialized.
+                    SLANG_RETURN_ON_FAIL(reader.loadEntries((const uint8_t*)astData->getPayload(), astData->getSize()));
+
+                    // Construct a native object for each table entry (where appropriate).
+                    // Note that this *doesn't* set all object pointers - some are special cased and created on demand (strings)
+                    // and imported symbols will have their object pointers unset (they are resolved in next step)
+                    SLANG_RETURN_ON_FAIL(reader.constructObjects(options.namePool));
+
+                    // Resolve external references if the linkage is specified
+                    if (options.linkage)
+                    {
+                        const auto& entries = reader.getEntries();
+                        auto& objects = reader.getObjects();
+                        const Index entriesCount = entries.getCount();
+
+                        String currentModuleName;
+                        Module* currentModule = nullptr;
+
+                        // Index from 1 (0 is null)
+                        for (Index i = 1; i < entriesCount; ++i)
+                        {
+                            const SerialInfo::Entry* entry = entries[i];
+                            if (entry->typeKind == SerialTypeKind::ImportSymbol)
+                            {
+                                UnownedStringSlice mangledName = reader.getStringSlice(SerialIndex(i));
+
+                                UnownedStringSlice moduleName;
+                                SLANG_RETURN_ON_FAIL(MangledNameParser::parseModuleName(mangledName, moduleName));
+
+                                // If we already have looked up this module and it has the same name just use what we have
+                                Module* readModule = nullptr;
+                                if (currentModule && moduleName == currentModuleName.getUnownedSlice())
+                                {
+                                    readModule = currentModule;
+                                }
+                                else
+                                {
+                                    // The modules are loaded on the linkage.
+                                    Linkage* linkage = options.linkage;
+
+                                    NamePool* namePool = linkage->getNamePool();
+                                    Name* moduleNameName = namePool->getName(moduleName);
+
+                                    readModule = linkage->findOrImportModule(moduleNameName, SourceLoc::fromRaw(0), options.sink);
+                                    if (!readModule)
+                                    {
+                                        return SLANG_FAIL;
+                                    }
+
+                                    // Set the current module and name
+                                    currentModule = readModule;
+                                    currentModuleName = moduleName;
+                                }
+
+                                // Look up the symbol
+                                NodeBase* nodeBase = readModule->findExportFromMangledName(mangledName);
+
+                                if (!nodeBase)
+                                {
+                                    if (options.sink)
+                                    {
+                                        options.sink->diagnose(SourceLoc::fromRaw(0), Diagnostics::unableToFindSymbolInModule, mangledName, moduleName);
+                                    }
+
+                                    // If didn't find the export then we are done
+                                    return SLANG_FAIL;
+                                }
+
+                                // set the result
+                                objects[i] = nodeBase;
+                            }
+                        }
+                    }
+
+                    // Set the sourceLocReader before doing de-serialize, such can lookup the remapped sourceLocs
                     reader.getExtraObjects().set(sourceLocReader);
 
-                    SLANG_RETURN_ON_FAIL(reader.load((const uint8_t*)astData->getPayload(), astData->getSize(), options.namePool));
+                    // TODO(JS):
+                    // If modules can have more complicated relationships (like a two modules can refer to symbols
+                    // from each other), then we can make this work by
+                    // 1) deserialize *without* the external symbols being set up
+                    // 2) calculate the symbols
+                    // 3) deserialize the other module (in the same way)
+                    // 4) run deserializeObjects *again* on each module
+                    // This is less efficient than it might be (because deserialize phase is done twice) so if this is necessary
+                    // may want a mechanism that *just* does reference lookups.
+                    //
+                    // For now if we assume a module can only access symbols from another module, and not the reverse.
+                    // So we just need to deserialize and we are done
+                    SLANG_RETURN_ON_FAIL(reader.deserializeObjects());
 
                     // Get the root node. It's at index 1 (0 is the null value).
                     astRootNode = reader.getPointer(SerialIndex(1)).dynamicCast<NodeBase>();

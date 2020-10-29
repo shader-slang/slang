@@ -24,8 +24,7 @@ namespace Slang
         {}
 
         void visitDeclGroup(DeclGroup*) {}
-        void visitImportExternalDecl(ImportExternalDecl*) {}
-
+        
         void visitDecl(Decl* decl)
         {
             checkModifiers(decl);
@@ -42,9 +41,7 @@ namespace Slang
 
         void visitDecl(Decl*) {}
         void visitDeclGroup(DeclGroup*) {}
-        void visitImportExternalDecl(ImportExternalDecl*) {}
-
-
+       
         void checkVarDeclCommon(VarDeclBase* varDecl);
 
         void visitVarDecl(VarDecl* varDecl)
@@ -113,7 +110,6 @@ namespace Slang
 
         void visitDecl(Decl*) {}
         void visitDeclGroup(DeclGroup*) {}
-        void visitImportExternalDecl(ImportExternalDecl*) {}
 
 #define CASE(TYPE) void visit##TYPE(TYPE* decl) { checkForRedeclaration(decl); }
 
@@ -135,7 +131,6 @@ namespace Slang
 
         void visitDecl(Decl*) {}
         void visitDeclGroup(DeclGroup*) {}
-        void visitImportExternalDecl(ImportExternalDecl*) {}
 
         void visitInheritanceDecl(InheritanceDecl* inheritanceDecl);
 
@@ -170,7 +165,6 @@ namespace Slang
 
         void visitDecl(Decl*) {}
         void visitDeclGroup(DeclGroup*) {}
-        void visitImportExternalDecl(ImportExternalDecl*) {}
 
         void checkVarDeclCommon(VarDeclBase* varDecl);
 
@@ -1186,7 +1180,6 @@ namespace Slang
 
         void visitDecl(Decl*) {}
         void visitDeclGroup(DeclGroup*) {}
-        void visitImportExternalDecl(ImportExternalDecl*) {}
 
         // Any user-defined type may have declared interface conformances,
         // which we should check.

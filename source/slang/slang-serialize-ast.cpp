@@ -84,8 +84,6 @@ struct ASTFieldAccess
         NamePool namePool;
         namePool.setRootNamePool(rootNamePool);
 
-        SerialReader reader(classes, nullptr);
-
         ASTBuilder builder(sharedASTBuilder, "Serialize Check");
 
         DefaultSerialObjectFactory objectFactory(&builder);
@@ -96,7 +94,7 @@ struct ASTFieldAccess
             const List<SerialInfo::Entry*>& writtenEntries = writer.getEntries();
             List<const SerialInfo::Entry*> readEntries;
 
-            SlangResult res = reader.loadEntries(contents.getBuffer(), contents.getCount(), readEntries);
+            SlangResult res = SerialReader::loadEntries(contents.getBuffer(), contents.getCount(), classes, readEntries);
             SLANG_UNUSED(res);
 
             SLANG_ASSERT(writtenEntries.getCount() == readEntries.getCount());
@@ -117,7 +115,9 @@ struct ASTFieldAccess
 
         }
 
+        SerialReader reader(classes, nullptr);
         {
+            
             SlangResult res = reader.load(contents.getBuffer(), contents.getCount(), &namePool);
             SLANG_UNUSED(res);
         }
