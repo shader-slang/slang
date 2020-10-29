@@ -498,7 +498,7 @@ namespace Slang
 			}
 #endif
 		}
-		String(char chr)
+		explicit String(char chr)
 		{
             append(chr);
 #if 0

@@ -699,12 +699,19 @@ String SerialReader::getString(SerialIndex index)
 
     // Okay we need to construct as a string
     UnownedStringSlice slice = getStringSlice(index);
-    String string(slice);
-    StringRepresentation* stringRep = string.getStringRepresentation();
 
-    m_scope.add(stringRep);
+    StringRepresentation* stringRep = nullptr;
+
+    const Index length = slice.getLength();
+    if (length)
+    {
+        stringRep = StringRepresentation::createWithCapacityAndLength(length, length);
+        memcpy(stringRep->getData(), slice.begin(), length * sizeof(char));
+        addScope(stringRep);
+    }
+
     m_objects[Index(index)] = stringRep;
-    return string;
+    return String(stringRep);
 }
 
 Name* SerialReader::getName(SerialIndex index)

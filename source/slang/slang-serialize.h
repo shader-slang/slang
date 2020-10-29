@@ -246,7 +246,9 @@ public:
     const List<SerialPointer>& getObjects() const { return m_objects; }
 
         /// Add an object to be kept in scope
-    void addScope(const RefObject* obj) { m_scope.add(obj); }
+    void addScopeWithoutAddRef(const RefObject* obj) { m_scope.add(obj); }
+        /// Add obj with a reference
+    void addScope(const RefObject* obj) { const_cast<RefObject*>(obj)->addReference(); m_scope.add(obj); }
 
         /// Used for attaching extra objects necessary for serializing
     SerialExtraObjects& getExtraObjects() { return m_extraObjects; }
