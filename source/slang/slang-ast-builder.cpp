@@ -140,7 +140,7 @@ void SharedASTBuilder::registerMagicDecl(Decl* decl, MagicTypeModifier* modifier
     if (auto genericDecl = as<GenericDecl>(decl->parentDecl))
         declToRegister = genericDecl;
 
-    m_magicDecls[modifier->name] = declToRegister;
+    m_magicDecls[modifier->magicName] = declToRegister;
 }
 
 Decl* SharedASTBuilder::findMagicDecl(const String& name)

@@ -5610,7 +5610,7 @@ namespace Slang
     {
         MagicTypeModifier* modifier = parser->astBuilder->create<MagicTypeModifier>();
         parser->ReadToken(TokenType::LParent);
-        modifier->name = parser->ReadToken(TokenType::Identifier).getContent();
+        modifier->magicName = parser->ReadToken(TokenType::Identifier).getContent();
         if (AdvanceIf(parser, TokenType::Comma))
         {
             modifier->tag = uint32_t(StringToInt(parser->ReadToken(TokenType::IntegerLiteral).getContent()));

@@ -332,7 +332,8 @@ public:
     /// Add an array where all the elements are already in serialized format (ie there is no need to do a conversion)
     SerialIndex addSerialArray(const void* elements, Index elementCount)
     {
-        return addSerialArray(sizeof(SerialTypeInfo<NATIVE_TYPE>::SerialType), SerialTypeInfo<NATIVE_TYPE>::SerialAlignment, elements, elementCount);
+        typedef SerialTypeInfo<NATIVE_TYPE> TypeInfo;
+        return addSerialArray(sizeof(typename TypeInfo::SerialType), SerialTypeInfo<NATIVE_TYPE>::SerialAlignment, elements, elementCount);
     }
 
         /// Add an array where all the elements are already in serialized format (ie there is no need to do a conversion)
