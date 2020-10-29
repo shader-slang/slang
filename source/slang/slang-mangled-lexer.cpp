@@ -7,13 +7,13 @@ namespace Slang {
 
 UInt MangledLexer::readCount()
 {
-    int c = _peek();
-    if (!_isDigit((char)c))
+    int c = peekChar();
+    if (!CharUtil::isDigit((char)c))
     {
         SLANG_UNEXPECTED("bad name mangling");
         UNREACHABLE_RETURN(0);
     }
-    _next();
+    nextChar();
 
     if (c == '0')
         return 0;
@@ -22,25 +22,25 @@ UInt MangledLexer::readCount()
     for (;;)
     {
         count = count * 10 + c - '0';
-        c = _peek();
-        if (!_isDigit((char)c))
+        c = peekChar();
+        if (!CharUtil::isDigit((char)c))
             return count;
 
-        _next();
+        nextChar();
     }
 }
 
 void MangledLexer::readGenericParam()
 {
-    switch (_peek())
+    switch (peekChar())
     {
     case 'T':
     case 'C':
-        _next();
+        nextChar();
         break;
 
     case 'v':
-        _next();
+        nextChar();
         readType();
         break;
 
@@ -62,7 +62,7 @@ void MangledLexer::readGenericParams()
 
 void MangledLexer::readType()
 {
-    int c = _peek();
+    int c = peekChar();
     switch (c)
     {
     case 'V':
@@ -73,11 +73,11 @@ void MangledLexer::readType()
     case 'h':
     case 'f':
     case 'd':
-        _next();
+        nextChar();
         break;
 
     case 'v':
-        _next();
+        nextChar();
         readSimpleIntVal();
         readType();
         break;
@@ -90,15 +90,15 @@ void MangledLexer::readType()
 
 void MangledLexer::readVal()
 {
-    switch (_peek())
+    switch (peekChar())
     {
     case 'k':
-        _next();
+        nextChar();
         readCount();
         break;
 
     case 'K':
-        _next();
+        nextChar();
         readRawStringSegment();
         break;
 
@@ -124,7 +124,7 @@ UnownedStringSlice MangledLexer::readSimpleName()
     UnownedStringSlice result;
     for (;;)
     {
-        int c = _peek();
+        int c = peekChar();
 
         if (c == 'g')
         {
@@ -142,7 +142,7 @@ UnownedStringSlice MangledLexer::readSimpleName()
             continue;
         }
 
-        if (!_isDigit((char)c))
+        if (!CharUtil::isDigit((char)c))
             return result;
 
         // Read the length part
@@ -179,6 +179,27 @@ UInt MangledLexer::readParamCount()
     UInt count = readCount();
     _expect("p");
     return count;
+}
+
+/* !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! MangledNameParser !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! */
+
+/* static */SlangResult MangledNameParser::parseModuleName(const UnownedStringSlice& in, UnownedStringSlice& outModuleName)
+{
+    MangledLexer lexer(in);
+
+    if (lexer.peekChar() == 'T')
+    {
+        lexer.nextChar();
+    }
+
+    UnownedStringSlice name = lexer.readRawStringSegment();
+    if (name.getLength() == 0)
+    {
+        return SLANG_FAIL;
+    }
+
+    outModuleName = name;
+    return SLANG_OK;
 }
 
 } // namespace Slang
