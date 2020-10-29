@@ -497,6 +497,14 @@ struct IRLookupWitnessMethod : IRInst
     IR_LEAF_ISA(lookup_interface_method)
 };
 
+// Returns the sequential ID of an RTTI object.
+struct IRGetSequentialID : IRInst
+{
+    IR_LEAF_ISA(GetSequentialID)
+
+    IRInst* getRTTIOperand() { return getOperand(0); }
+};
+
 struct IRLookupWitnessTable : IRInst
 {
     IRUse sourceType;
@@ -1915,6 +1923,8 @@ struct IRBuilder
         IRType* type,
         IRInst* witnessTableVal,
         IRInst* interfaceMethodVal);
+
+    IRInst* emitGetSequentialIDInst(IRInst* rttiObj);
 
     IRInst* emitAlloca(IRInst* type, IRInst* rttiObjPtr);
 
