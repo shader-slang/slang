@@ -2642,6 +2642,14 @@ namespace Slang
         return inst;
     }
 
+    IRInst* IRBuilder::emitGetSequentialIDInst(IRInst* rttiObj)
+    {
+        auto inst = createInst<IRAlloca>(this, kIROp_GetSequentialID, getUIntType(), rttiObj);
+
+        addInst(inst);
+        return inst;
+    }
+
     IRInst* IRBuilder::emitAlloca(IRInst* type, IRInst* rttiObjPtr)
     {
         auto inst = createInst<IRAlloca>(
