@@ -202,10 +202,10 @@ void Session::init()
                 builder << moduleName->text << ".slang-module";
 
                 FileStream stream(builder.ProduceString(), FileMode::Create, FileAccess::Write, FileShare::ReadWrite);
-
-                SlangResult res = SerialContainerUtil::write(module, options, &stream);
-
-                SLANG_ASSERT(SLANG_SUCCEEDED(res));
+                if (SLANG_FAILED(SerialContainerUtil::write(module, options, &stream)))
+                {
+                    SLANG_UNEXPECTED("Unable to load stdlib");
+                }
             }
         }
     }
