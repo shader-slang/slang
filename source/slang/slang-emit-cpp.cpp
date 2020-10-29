@@ -1651,35 +1651,27 @@ void CPPSourceEmitter::_emitWitnessTableDefinitions()
         m_writer->emit(getName(witnessTable));
         m_writer->emit(" = {\n");
         m_writer->indent();
-        bool isFirstEntry = true;
+        auto seqIdDecoration = witnessTable->findDecoration<IRSequentialIDDecoration>();
+        SLANG_ASSERT(seqIdDecoration);
+        m_writer->emit((UInt)seqIdDecoration->getSequentialID());
         for (Index i = 0; i < sortedWitnessTableEntries.getCount(); i++)
         {
             auto entry = sortedWitnessTableEntries[i];
             if (auto funcVal = as<IRFunc>(entry->satisfyingVal.get()))
             {
-                if (!isFirstEntry)
-                    m_writer->emit(",\n");
-                else
-                    isFirstEntry = false;
-
+                m_writer->emit(",\n");
                 m_writer->emit(getName(funcVal));
             }
             else if (auto witnessTableVal = as<IRWitnessTable>(entry->getSatisfyingVal()))
             {
-                if (!isFirstEntry)
-                    m_writer->emit(",\n");
-                else
-                    isFirstEntry = false;
+                m_writer->emit(",\n");
                 m_writer->emit("&");
                 m_writer->emit(getName(witnessTableVal));
             }
             else if (entry->getSatisfyingVal() &&
                      isPointerOfType(entry->getSatisfyingVal()->getDataType(), kIROp_RTTIType))
             {
-                if (!isFirstEntry)
-                    m_writer->emit(",\n");
-                else
-                    isFirstEntry = false;
+                m_writer->emit(",\n");
                 emitInstExpr(entry->getSatisfyingVal(), getInfo(EmitOp::General));
             }
             else
@@ -1704,6 +1696,7 @@ void CPPSourceEmitter::emitInterface(IRInterfaceType* interfaceType)
     emitSimpleType(interfaceType);
     m_writer->emit("\n{\n");
     m_writer->indent();
+    m_writer->emit("uint32_t sequentialID;\n");
     for (UInt i = 0; i < interfaceType->getOperandCount(); i++)
     {
         auto entry = as<IRInterfaceRequirementEntry>(interfaceType->getOperand(i));
@@ -2194,6 +2187,12 @@ bool CPPSourceEmitter::tryEmitInstExprImpl(IRInst* inst, const EmitOpInfo& inOut
             emitInstExpr(inst->getOperand(0), inOuterPrec);
             m_writer->emit("->");
             m_writer->emit(getName(inst->getOperand(1)));
+            return true;
+        }
+        case kIROp_GetSequentialID:
+        {
+            emitInstExpr(inst->getOperand(0), inOuterPrec);
+            m_writer->emit("->sequentialID");
             return true;
         }
         case kIROp_WitnessTable:
