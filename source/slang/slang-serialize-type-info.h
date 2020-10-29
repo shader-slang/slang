@@ -208,6 +208,52 @@ struct SerialTypeInfo<List<T, ALLOCATOR>>
     }
 };
 
+
+
+
+// Handle RefPtr - just convert into * to do the conversion
+template <typename T>
+struct SerialTypeInfo<RefPtr<T>>
+{
+    typedef RefPtr<T> NativeType;
+    typedef typename SerialTypeInfo<T*>::SerialType SerialType;
+    enum { SerialAlignment = SLANG_ALIGN_OF(SerialType) };
+
+    static void toSerial(SerialWriter* writer, const void* native, void* serial)
+    {
+        auto& src = *(const NativeType*)native;
+        T* obj = src;
+        SerialTypeInfo<T*>::toSerial(writer, &obj, serial);
+    }
+    static void toNative(SerialReader* reader, const void* serial, void* native)
+    {
+        T* obj = nullptr;
+        SerialTypeInfo<T*>::toNative(reader, serial, &obj);
+        *(NativeType*)native = obj;
+    }
+};
+
+// String
+template <>
+struct SerialTypeInfo<String>
+{
+    typedef String NativeType;
+    typedef SerialIndex SerialType;
+    enum { SerialAlignment = SLANG_ALIGN_OF(SerialType) };
+
+    static void toSerial(SerialWriter* writer, const void* native, void* serial)
+    {
+        auto& src = *(const NativeType*)native;
+        *(SerialType*)serial = writer->addString(src);
+    }
+    static void toNative(SerialReader* reader, const void* serial, void* native)
+    {
+        auto& src = *(const SerialType*)serial;
+        auto& dst = *(NativeType*)native;
+        dst = reader->getString(src);
+    }
+};
+
 // Dictionary
 template <typename KEY, typename VALUE>
 struct SerialTypeInfo<Dictionary<KEY, VALUE>>
@@ -271,48 +317,41 @@ struct SerialTypeInfo<Dictionary<KEY, VALUE>>
     }
 };
 
-// Handle RefPtr - just convert into * to do the conversion
-template <typename T>
-struct SerialTypeInfo<RefPtr<T>>
+// KeyValuePair
+template<typename KEY, typename VALUE>
+struct SerialTypeInfo<KeyValuePair<KEY, VALUE>>
 {
-    typedef RefPtr<T> NativeType;
-    typedef typename SerialTypeInfo<T*>::SerialType SerialType;
+    typedef KeyValuePair<KEY, VALUE> NativeType;
+
+    typedef typename SerialTypeInfo<KEY>::SerialType KeySerialType;
+    typedef typename SerialTypeInfo<VALUE>::SerialType ValueSerialType;
+
+    struct SerialType
+    {
+        KeySerialType key;
+        ValueSerialType value;
+    };
+
     enum { SerialAlignment = SLANG_ALIGN_OF(SerialType) };
 
     static void toSerial(SerialWriter* writer, const void* native, void* serial)
     {
         auto& src = *(const NativeType*)native;
-        T* obj = src;
-        SerialTypeInfo<T*>::toSerial(writer, &obj, serial);
-    }
-    static void toNative(SerialReader* reader, const void* serial, void* native)
-    {
-        T* obj = nullptr;
-        SerialTypeInfo<T*>::toNative(reader, serial, &obj);
-        *(NativeType*)native = obj;
-    }
-};
+        auto& dst = *(SerialType*)serial;
 
-// String
-template <>
-struct SerialTypeInfo<String>
-{
-    typedef String NativeType;
-    typedef SerialIndex SerialType;
-    enum { SerialAlignment = SLANG_ALIGN_OF(SerialType) };
-
-    static void toSerial(SerialWriter* writer, const void* native, void* serial)
-    {
-        auto& src = *(const NativeType*)native;
-        *(SerialType*)serial = writer->addString(src);
+        SerialTypeInfo<KEY>::toSerial(writer, &src.Key, &dst.key);
+        SerialTypeInfo<VALUE>::toSerial(writer, &src.Value, &dst.value);
     }
     static void toNative(SerialReader* reader, const void* serial, void* native)
     {
         auto& src = *(const SerialType*)serial;
         auto& dst = *(NativeType*)native;
-        dst = reader->getString(src);
+
+        SerialTypeInfo<KEY>::toNative(reader, &src.key, &dst.Key);
+        SerialTypeInfo<VALUE>::toNative(reader, &src.value, &dst.Value);
     }
 };
+
 
 } // namespace Slang
 

@@ -155,6 +155,8 @@ class Type: public Val
     bool _equalsImplOverride(Type* type);
     Type* _createCanonicalTypeOverride();
 
+    void _setASTBuilder(ASTBuilder* astBuilder) { m_astBuilder = astBuilder; }
+
 protected:
     bool equalsImpl(Type* type);
     Type* createCanonicalType();

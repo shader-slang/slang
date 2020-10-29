@@ -454,6 +454,18 @@ namespace Slang {
                     // Set the sourceLocReader before doing de-serialize, such can lookup the remapped sourceLocs
                     reader.getExtraObjects().set(sourceLocReader);
 
+                    // Go through all of the AST nodes
+                    // 1) Set the ASTBuilder on Type nodes
+
+                    for (auto& obj :reader.getObjects())
+                    {
+                        if (Type* type = obj.dynamicCast<Type>())
+                        {
+                            type->_setASTBuilder(astBuilder);
+                        }
+
+                    }
+
                     // TODO(JS):
                     // If modules can have more complicated relationships (like a two modules can refer to symbols
                     // from each other), then we can make this work by

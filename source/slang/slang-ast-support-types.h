@@ -1255,6 +1255,8 @@ namespace Slang
     // requirement by a particular declaration or value.
     struct RequirementWitness
     {
+        SLANG_VALUE_CLASS(RequirementWitness)
+
         RequirementWitness()
             : m_flavor(Flavor::none)
         {}
@@ -1305,8 +1307,10 @@ namespace Slang
 
     typedef Dictionary<Decl*, RequirementWitness> RequirementDictionary;
 
-    struct WitnessTable : RefObject
+    struct WitnessTable : SerialRefObject
     {
+        SLANG_OBJ_CLASS(WitnessTable)
+
         List<KeyValuePair<Decl*, RequirementWitness>> requirementList;
         RequirementDictionary requirementDictionary;
 

@@ -136,7 +136,6 @@ void Session::init()
     // And the global ASTBuilder
     globalAstBuilder = new ASTBuilder(m_sharedASTBuilder, "globalAstBuilder");
 
-
     // Make sure our source manager is initialized
     builtinSourceManager.initialize(nullptr, nullptr);
 
@@ -175,7 +174,7 @@ void Session::init()
     slangLanguageScope = new Scope();
     slangLanguageScope->nextSibling = hlslLanguageScope;
 
-    if (true)
+    if (false)
     {
         // Let's try loading serialized modules and adding them
         _readBuiltinModule(coreLanguageScope, "core");
@@ -185,26 +184,27 @@ void Session::init()
     {
         addBuiltinSource(coreLanguageScope, "core", getCoreLibraryCode());
         addBuiltinSource(hlslLanguageScope, "hlsl", getHLSLLibraryCode());
-    }
 
-    if (false)
-    {
-        for (auto& pair : m_builtinLinkage->mapNameToLoadedModules)
+        // Write out
+        if (true)
         {
-            const Name* moduleName = pair.Key;
-            Module* module = pair.Value;
+            for (auto& pair : m_builtinLinkage->mapNameToLoadedModules)
+            {
+                const Name* moduleName = pair.Key;
+                Module* module = pair.Value;
 
-            // Set up options
-            SerialContainerUtil::WriteOptions options;
-            options.optionFlags |= SerialOptionFlag::SourceLocation;
-            options.sourceManager = m_builtinLinkage->getSourceManager();
+                // Set up options
+                SerialContainerUtil::WriteOptions options;
+                //options.optionFlags |= SerialOptionFlag::SourceLocation;
+                options.sourceManager = m_builtinLinkage->getSourceManager();
 
-            StringBuilder builder;
-            builder << moduleName->text << ".slang-module";
+                StringBuilder builder;
+                builder << moduleName->text << ".slang-module";
 
-            FileStream stream(builder.ProduceString(), FileMode::Create, FileAccess::Write, FileShare::ReadWrite);
+                FileStream stream(builder.ProduceString(), FileMode::Create, FileAccess::Write, FileShare::ReadWrite);
 
-            SerialContainerUtil::write(module, options, &stream);
+                SerialContainerUtil::write(module, options, &stream);
+            }
         }
     }
 
@@ -268,7 +268,16 @@ SlangResult Session::_readBuiltinModule(Scope* scope, String moduleName)
 
         ModuleDecl* moduleDecl = as<ModuleDecl>(srcModule.astRootNode);
 
-        module->setModuleDecl(moduleDecl);
+        if (moduleDecl)
+        {
+            if (isFromStdLib(moduleDecl))
+            {
+                registerBuiltinDecls(this, moduleDecl);
+            }
+            
+            module->setModuleDecl(moduleDecl);
+        }
+
         module->setIRModule(srcModule.irModule);
 
         // Put in the loaded module map
@@ -2134,7 +2143,7 @@ void Module::_processFindDeclsExportSymbolsRec(Decl* decl)
         return;
     }
 
-    // process `decl` itself
+    // If it's a container process it's children
     if(auto containerDecl = as<ContainerDecl>(decl))
     {
         for (auto child : containerDecl->members)
@@ -2142,7 +2151,9 @@ void Module::_processFindDeclsExportSymbolsRec(Decl* decl)
             _processFindDeclsExportSymbolsRec(child);
         }
     }
-    else if (auto genericDecl = as<GenericDecl>(decl))
+
+    // GenericDecl is also a container, so do subsequent test
+    if (auto genericDecl = as<GenericDecl>(decl))
     {
         _processFindDeclsExportSymbolsRec(genericDecl->inner);
     }
