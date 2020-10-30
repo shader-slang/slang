@@ -713,10 +713,10 @@ SlangResult readAllText(char const * fileName, String& outString)
         //memset(buffer, 0, size);
 
         fseek(f, 0, SEEK_SET);
-        fread(buffer, sizeof(char), size, f);
+        size_t readCount = fread(buffer, sizeof(char), size, f);
         fclose(f);
 
-        return SLANG_OK;
+        return (readCount == size) ? SLANG_OK : SLANG_FAIL;
     }
 }
 
