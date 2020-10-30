@@ -283,9 +283,7 @@ namespace renderer_test
                                             scalarTypeNames << info.name;
                                         }
 
-                                        StringBuilder msg;
-                                        msg << "Expecting " << scalarTypeNames << " " << parser.NextToken().Position.Line;
-                                        throw TextFormatException(msg);
+                                        throw TextFormatException(StringBuilder() << "Expecting " << scalarTypeNames << " " << parser.NextToken().Position.Line);
                                     }
 
                                     parser.Read(",");
@@ -551,9 +549,7 @@ namespace renderer_test
                                     Token nameToken = parser.ReadToken();
                                     if (nameToken.Type != TokenType::Identifier)
                                     {
-                                        StringBuilder msg;
-                                        msg << "Invalid input syntax at line " << parser.NextToken().Position.Line;
-                                        throw TextFormatException(msg);
+                                        throw TextFormatException(StringBuilder() << "Invalid input syntax at line " << parser.NextToken().Position.Line);
                                     }
                                     builder << nameToken.Content;
 
@@ -584,9 +580,7 @@ namespace renderer_test
                                         }
                                         else
                                         {
-                                            StringBuilder msg;
-                                            msg << "Invalid input syntax at line " << parser.NextToken().Position.Line;
-                                            throw TextFormatException(msg);
+                                            throw TextFormatException(StringBuilder() << "Invalid input syntax at line " << parser.NextToken().Position.Line);
                                         }
                                     }
 
