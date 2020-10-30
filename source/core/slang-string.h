@@ -14,53 +14,53 @@
 
 namespace Slang
 {
-	class _EndLine
-	{};
-	extern _EndLine EndLine;
+    class _EndLine
+    {};
+    extern _EndLine EndLine;
 
-	// in-place reversion, works only for ascii string
-	inline void ReverseInternalAscii(char * buffer, int length)
-	{
-		int i, j;
-		char c;
-		for (i = 0, j = length - 1; i<j; i++, j--)
-		{
-			c = buffer[i];
-			buffer[i] = buffer[j];
-			buffer[j] = c;
-		}
-	}
-	template<typename IntType>
-	inline int IntToAscii(char * buffer, IntType val, int radix)
-	{
-		int i = 0;
-		IntType sign;
-		sign = val;
-		if (sign < 0)
-			val = (IntType)(0 - val);
-		do
-		{
-			int digit = (val % radix);
-			if (digit <= 9)
-				buffer[i++] = (char)(digit + '0');
-			else
-				buffer[i++] = (char)(digit - 10 + 'A');
-		} while ((val /= radix) > 0);
-		if (sign < 0)
-			buffer[i++] = '-';
-		buffer[i] = '\0';
-		return i;
-	}
+    // in-place reversion, works only for ascii string
+    inline void ReverseInternalAscii(char * buffer, int length)
+    {
+        int i, j;
+        char c;
+        for (i = 0, j = length - 1; i<j; i++, j--)
+        {
+            c = buffer[i];
+            buffer[i] = buffer[j];
+            buffer[j] = c;
+        }
+    }
+    template<typename IntType>
+    inline int IntToAscii(char * buffer, IntType val, int radix)
+    {
+        int i = 0;
+        IntType sign;
+        sign = val;
+        if (sign < 0)
+            val = (IntType)(0 - val);
+        do
+        {
+            int digit = (val % radix);
+            if (digit <= 9)
+                buffer[i++] = (char)(digit + '0');
+            else
+                buffer[i++] = (char)(digit - 10 + 'A');
+        } while ((val /= radix) > 0);
+        if (sign < 0)
+            buffer[i++] = '-';
+        buffer[i] = '\0';
+        return i;
+    }
 
-	inline bool IsUtf8LeadingByte(char ch)
-	{
-		return (((unsigned char)ch) & 0xC0) == 0xC0;
-	}
+    inline bool IsUtf8LeadingByte(char ch)
+    {
+        return (((unsigned char)ch) & 0xC0) == 0xC0;
+    }
 
-	inline bool IsUtf8ContinuationByte(char ch)
-	{
-		return (((unsigned char)ch) & 0xC0) == 0x80;
-	}
+    inline bool IsUtf8ContinuationByte(char ch)
+    {
+        return (((unsigned char)ch) & 0xC0) == 0x80;
+    }
 
     struct UnownedStringSlice
     {
@@ -387,15 +387,15 @@ namespace Slang
         wchar_t* m_end;             ///< Points to terminating 0
     };
 
-	/*!
-	@brief Represents a UTF-8 encoded string.
-	*/
+    /*!
+    @brief Represents a UTF-8 encoded string.
+    */
 
-	class String
-	{
+    class String
+    {
         friend struct StringSlice;
-		friend class StringBuilder;
-	private:
+        friend class StringBuilder;
+    private:
 
 
         char* getData() const
@@ -414,13 +414,13 @@ namespace Slang
             : m_buffer(buffer)
         {}
 
-		static String fromWString(const wchar_t * wstr);
-		static String fromWString(const wchar_t * wstr, const wchar_t * wend);
-		static String fromWChar(const wchar_t ch);
-		static String fromUnicodePoint(unsigned int codePoint);
-		String()
-		{
-		}
+        static String fromWString(const wchar_t * wstr);
+        static String fromWString(const wchar_t * wstr, const wchar_t * wend);
+        static String fromWChar(const wchar_t ch);
+        static String fromUnicodePoint(unsigned int codePoint);
+        String()
+        {
+        }
 
             /// Returns a buffer which can hold at least count chars
         char* prepareForAppend(Index count);
@@ -429,14 +429,14 @@ namespace Slang
 
         SLANG_FORCE_INLINE StringRepresentation* getStringRepresentation() const { return m_buffer; }
 
-		const char * begin() const
-		{
-			return getData();
-		}
-		const char * end() const
-		{
-			return getData() + getLength();
-		}
+        const char * begin() const
+        {
+            return getData();
+        }
+        const char * end() const
+        {
+            return getData() + getLength();
+        }
 
         void append(int32_t value, int radix = 10);
         void append(uint32_t value, int radix = 10);
@@ -455,29 +455,29 @@ namespace Slang
             /// Append a character (to remove ambiguity with other integral types)
         void appendChar(char chr);
 
-		String(const char* str)
-		{
+        String(const char* str)
+        {
             append(str);
 #if 0
-			if (str)
-			{
+            if (str)
+            {
                 buffer = StringRepresentation::createWithLength(strlen(str));
-				memcpy(buffer.Ptr(), str, getLength() + 1);
-			}
+                memcpy(buffer.Ptr(), str, getLength() + 1);
+            }
 #endif
-		}
+        }
         String(const char* textBegin, char const* textEnd)
-		{
+        {
             append(textBegin, textEnd);
 #if 0
-			if (textBegin != textEnd)
-			{
+            if (textBegin != textEnd)
+            {
                 buffer = StringRepresentation::createWithLength(textEnd - textBegin);
-				memcpy(buffer.Ptr(), textBegin, getLength());
+                memcpy(buffer.Ptr(), textBegin, getLength());
                 buffer->getData()[getLength()] = 0;
-			}
+            }
 #endif
-		}
+        }
 
         // Make all String ctors from a numeric explicit, to avoid unexpected/unnecessary conversions
         explicit String(int32_t val, int radix = 10)
@@ -505,29 +505,29 @@ namespace Slang
             append(val, format);
         }
 
-		explicit String(char chr)
-		{
+        explicit String(char chr)
+        {
             append(chr);
 #if 0
-			if (chr)
-			{
+            if (chr)
+            {
                 buffer = StringRepresentation::createWithLength(1);
                 buffer->getData()[0] = chr;
                 buffer->getData()[1] = 0;
-			}
+            }
 #endif
-		}
-		String(String const& str)
-		{
+        }
+        String(String const& str)
+        {
             m_buffer = str.m_buffer;
 #if 0
-			this->operator=(str);
+            this->operator=(str);
 #endif
-		}
-		String(String&& other)
-		{
+        }
+        String(String&& other)
+        {
             m_buffer = _Move(other.m_buffer);
-		}
+        }
 
         String(StringSlice const& slice)
         {
@@ -539,155 +539,155 @@ namespace Slang
             append(slice);
         }
 
-		~String()
-		{
+        ~String()
+        {
             m_buffer.setNull(); 
-		}
+        }
 
-		String & operator=(const String & str)
-		{
+        String & operator=(const String & str)
+        {
             m_buffer = str.m_buffer;
-			return *this;
-		}
-		String & operator=(String&& other)
-		{
+            return *this;
+        }
+        String & operator=(String&& other)
+        {
             m_buffer = _Move(other.m_buffer);
             return *this;
-		}
-		char operator[](Index id) const
-		{
+        }
+        char operator[](Index id) const
+        {
             SLANG_ASSERT(id >= 0 && id < getLength());
-			return begin()[id];
-		}
+            return begin()[id];
+        }
 
         Index getLength() const
         {
             return m_buffer ? m_buffer->getLength() : 0;
         }
 
-		friend String operator+(const char*op1, const String & op2);
-		friend String operator+(const String & op1, const char * op2);
-		friend String operator+(const String & op1, const String & op2);
+        friend String operator+(const char*op1, const String & op2);
+        friend String operator+(const String & op1, const char * op2);
+        friend String operator+(const String & op1, const String & op2);
 
-		StringSlice trimStart() const
-		{
-			if (!m_buffer)
-				return StringSlice();
-			Index startIndex = 0;
+        StringSlice trimStart() const
+        {
+            if (!m_buffer)
+                return StringSlice();
+            Index startIndex = 0;
             const char*const data = getData();
-			while (startIndex < getLength() &&
-				(data[startIndex] == ' ' || data[startIndex] == '\t' || data[startIndex] == '\r' || data[startIndex] == '\n'))
-				startIndex++;
+            while (startIndex < getLength() &&
+                (data[startIndex] == ' ' || data[startIndex] == '\t' || data[startIndex] == '\r' || data[startIndex] == '\n'))
+                startIndex++;
             return StringSlice(m_buffer, startIndex, getLength());
-		}
+        }
 
-		StringSlice trimEnd() const
-		{
-			if (!m_buffer)
-				return StringSlice();
+        StringSlice trimEnd() const
+        {
+            if (!m_buffer)
+                return StringSlice();
 
-			Index endIndex = getLength();
+            Index endIndex = getLength();
             const char*const data = getData();
-			while (endIndex > 0 &&
-				(data[endIndex-1] == ' ' || data[endIndex-1] == '\t' || data[endIndex-1] == '\r' || data[endIndex-1] == '\n'))
-				endIndex--;
+            while (endIndex > 0 &&
+                (data[endIndex-1] == ' ' || data[endIndex-1] == '\t' || data[endIndex-1] == '\r' || data[endIndex-1] == '\n'))
+                endIndex--;
 
             return StringSlice(m_buffer, 0, endIndex);
-		}
+        }
 
-		StringSlice trim() const
-		{
-			if (!m_buffer)
-				return StringSlice();
+        StringSlice trim() const
+        {
+            if (!m_buffer)
+                return StringSlice();
 
-			Index startIndex = 0;
+            Index startIndex = 0;
             const char*const data = getData();
-			while (startIndex < getLength() &&
-				(data[startIndex] == ' ' || data[startIndex] == '\t'))
-				startIndex++;
+            while (startIndex < getLength() &&
+                (data[startIndex] == ' ' || data[startIndex] == '\t'))
+                startIndex++;
             Index endIndex = getLength();
-			while (endIndex > startIndex &&
-				(data[endIndex-1] == ' ' || data[endIndex-1] == '\t'))
-				endIndex--;
+            while (endIndex > startIndex &&
+                (data[endIndex-1] == ' ' || data[endIndex-1] == '\t'))
+                endIndex--;
 
             return StringSlice(m_buffer, startIndex, endIndex);
-		}
+        }
 
-		StringSlice subString(Index id, Index len) const
-		{
-			if (len == 0)
-				return StringSlice();
+        StringSlice subString(Index id, Index len) const
+        {
+            if (len == 0)
+                return StringSlice();
 
             if (id + len > getLength())
-				len = getLength() - id;
+                len = getLength() - id;
 #if _DEBUG
-			if (id < 0 || id >= getLength() || (id + len) > getLength())
-				throw "SubString: index out of range.";
-			if (len < 0)
-				throw "SubString: length less than zero.";
+            if (id < 0 || id >= getLength() || (id + len) > getLength())
+                throw "SubString: index out of range.";
+            if (len < 0)
+                throw "SubString: length less than zero.";
 #endif
             return StringSlice(m_buffer, id, id + len);
-		}
+        }
 
-		char const* getBuffer() const
-		{
+        char const* getBuffer() const
+        {
             return getData();
-		}
+        }
 
         OSString toWString(Index* len = 0) const;
 
-		bool equals(const String & str, bool caseSensitive = true)
-		{
-			if (caseSensitive)
-				return (strcmp(begin(), str.begin()) == 0);
-			else
-			{
+        bool equals(const String & str, bool caseSensitive = true)
+        {
+            if (caseSensitive)
+                return (strcmp(begin(), str.begin()) == 0);
+            else
+            {
 #ifdef _MSC_VER
-				return (_stricmp(begin(), str.begin()) == 0);
+                return (_stricmp(begin(), str.begin()) == 0);
 #else
-				return (strcasecmp(begin(), str.begin()) == 0);
+                return (strcasecmp(begin(), str.begin()) == 0);
 #endif
-			}
-		}
-		bool operator==(const char * strbuffer) const
-		{
-			return (strcmp(begin(), strbuffer) == 0);
-		}
+            }
+        }
+        bool operator==(const char * strbuffer) const
+        {
+            return (strcmp(begin(), strbuffer) == 0);
+        }
 
-		bool operator==(const String & str) const
-		{
-			return (strcmp(begin(), str.begin()) == 0);
-		}
-		bool operator!=(const char * strbuffer) const
-		{
-			return (strcmp(begin(), strbuffer) != 0);
-		}
-		bool operator!=(const String & str) const
-		{
-			return (strcmp(begin(), str.begin()) != 0);
-		}
-		bool operator>(const String & str) const
-		{
-			return (strcmp(begin(), str.begin()) > 0);
-		}
-		bool operator<(const String & str) const
-		{
-			return (strcmp(begin(), str.begin()) < 0);
-		}
-		bool operator>=(const String & str) const
-		{
-			return (strcmp(begin(), str.begin()) >= 0);
-		}
-		bool operator<=(const String & str) const
-		{
-			return (strcmp(begin(), str.begin()) <= 0);
-		}
+        bool operator==(const String & str) const
+        {
+            return (strcmp(begin(), str.begin()) == 0);
+        }
+        bool operator!=(const char * strbuffer) const
+        {
+            return (strcmp(begin(), strbuffer) != 0);
+        }
+        bool operator!=(const String & str) const
+        {
+            return (strcmp(begin(), str.begin()) != 0);
+        }
+        bool operator>(const String & str) const
+        {
+            return (strcmp(begin(), str.begin()) > 0);
+        }
+        bool operator<(const String & str) const
+        {
+            return (strcmp(begin(), str.begin()) < 0);
+        }
+        bool operator>=(const String & str) const
+        {
+            return (strcmp(begin(), str.begin()) >= 0);
+        }
+        bool operator<=(const String & str) const
+        {
+            return (strcmp(begin(), str.begin()) <= 0);
+        }
 
         SLANG_FORCE_INLINE bool operator==(const UnownedStringSlice& slice) const { return getUnownedSlice() == slice; }
         SLANG_FORCE_INLINE bool operator!=(const UnownedStringSlice& slice) const { return getUnownedSlice() != slice; }
 
-		String toUpper() const
-		{
+        String toUpper() const
+        {
             String result;
             for (auto c : *this)
             {
@@ -695,10 +695,10 @@ namespace Slang
                 result.append(d);
             }
             return result;
-		}
+        }
 
-		String toLower() const
-		{
+        String toLower() const
+        {
             String result;
             for (auto c : *this)
             {
@@ -706,321 +706,321 @@ namespace Slang
                 result.append(d);
             }
             return result;
-		}
+        }
 
         Index indexOf(const char * str, Index id) const // String str
-		{
-			if (id >= getLength())
-				return Index(-1);
-			auto findRs = strstr(begin() + id, str);
-			Index res = findRs ? findRs - begin() : Index(-1);
-			return res;
-		}
+        {
+            if (id >= getLength())
+                return Index(-1);
+            auto findRs = strstr(begin() + id, str);
+            Index res = findRs ? findRs - begin() : Index(-1);
+            return res;
+        }
 
         Index indexOf(const String & str, Index id) const
-		{
-			return indexOf(str.begin(), id);
-		}
+        {
+            return indexOf(str.begin(), id);
+        }
 
         Index indexOf(const char * str) const
-		{
-			return indexOf(str, 0);
-		}
+        {
+            return indexOf(str, 0);
+        }
 
         Index indexOf(const String & str) const
-		{
-			return indexOf(str.begin(), 0);
-		}
+        {
+            return indexOf(str.begin(), 0);
+        }
 
         Index indexOf(char ch, Index id) const
-		{
+        {
             const Index length = getLength();
             SLANG_ASSERT(id >= 0 && id <= length);
 
-			if (!m_buffer)
-				return Index(-1);
+            if (!m_buffer)
+                return Index(-1);
 
             const char* data = getData();
-			for (Index i = id; i < length; i++)
-				if (data[i] == ch)
-					return i;
-			return Index(-1);
-		}
+            for (Index i = id; i < length; i++)
+                if (data[i] == ch)
+                    return i;
+            return Index(-1);
+        }
 
         Index indexOf(char ch) const
-		{
-			return indexOf(ch, 0);
-		}
+        {
+            return indexOf(ch, 0);
+        }
 
         Index lastIndexOf(char ch) const
-		{            
+        {            
             const Index length = getLength();
             const char* data = getData();
 
             // TODO(JS): If we know Index is signed we can do this a bit more simply
 
             for (Index i = length; i > 0; i--)
-				if (data[i - 1] == ch)
-					return i - 1;
-			return Index(-1);
-		}
+                if (data[i - 1] == ch)
+                    return i - 1;
+            return Index(-1);
+        }
 
-		bool startsWith(const char * str) const // String str
-		{
-			if (!m_buffer)
-				return false;
+        bool startsWith(const char * str) const // String str
+        {
+            if (!m_buffer)
+                return false;
             Index strLen = Index(::strlen(str));
-			if (strLen > getLength())
-				return false;
+            if (strLen > getLength())
+                return false;
 
             const char*const data = getData();
 
-			for (Index i = 0; i < strLen; i++)
-				if (str[i] != data[i])
-					return false;
-			return true;
-		}
+            for (Index i = 0; i < strLen; i++)
+                if (str[i] != data[i])
+                    return false;
+            return true;
+        }
 
-		bool startsWith(const String& str) const
-		{
-			return startsWith(str.begin());
-		}
+        bool startsWith(const String& str) const
+        {
+            return startsWith(str.begin());
+        }
 
-		bool endsWith(char const * str)  const // String str
-		{
-			if (!m_buffer)
-				return false;
+        bool endsWith(char const * str)  const // String str
+        {
+            if (!m_buffer)
+                return false;
 
-			const Index strLen = Index(::strlen(str));
+            const Index strLen = Index(::strlen(str));
             const Index len = getLength();
 
-			if (strLen > len)
-				return false;
+            if (strLen > len)
+                return false;
             const char* data = getData();
-			for (Index i = strLen; i > 0; i--)
-				if (str[i-1] != data[len - strLen + i-1])
-					return false;
-			return true;
-		}
+            for (Index i = strLen; i > 0; i--)
+                if (str[i-1] != data[len - strLen + i-1])
+                    return false;
+            return true;
+        }
 
-		bool endsWith(const String & str) const
-		{
-			return endsWith(str.begin());
-		}
+        bool endsWith(const String & str) const
+        {
+            return endsWith(str.begin());
+        }
 
-		bool contains(const char * str) const // String str
-		{
-			return m_buffer && indexOf(str) != Index(-1); 
-		}
+        bool contains(const char * str) const // String str
+        {
+            return m_buffer && indexOf(str) != Index(-1); 
+        }
 
-		bool contains(const String & str) const
-		{
-			return contains(str.begin());
-		}
+        bool contains(const String & str) const
+        {
+            return contains(str.begin());
+        }
 
-		HashCode getHashCode() const
-		{
-			return Slang::getHashCode(StringRepresentation::asSlice(m_buffer));
-		}
+        HashCode getHashCode() const
+        {
+            return Slang::getHashCode(StringRepresentation::asSlice(m_buffer));
+        }
 
         UnownedStringSlice getUnownedSlice() const
         {
             return StringRepresentation::asSlice(m_buffer);
         }
-	};
+    };
 
-	class StringBuilder : public String
-	{
-	private:
+    class StringBuilder : public String
+    {
+    private:
         enum { InitialSize = 1024 };
-	public:
-		explicit StringBuilder(UInt bufferSize = InitialSize)
-		{
+    public:
+        explicit StringBuilder(UInt bufferSize = InitialSize)
+        {
             ensureUniqueStorageWithCapacity(bufferSize);
-		}
-		void EnsureCapacity(UInt size)
-		{
+        }
+        void EnsureCapacity(UInt size)
+        {
             ensureUniqueStorageWithCapacity(size);
-		}
-		StringBuilder & operator << (char ch)
-		{
-			Append(&ch, 1);
-			return *this;
-		}
-		StringBuilder & operator << (Int32 val)
-		{
-			Append(val);
-			return *this;
-		}
-		StringBuilder & operator << (UInt32 val)
-		{
-			Append(val);
-			return *this;
-		}
-		StringBuilder & operator << (Int64 val)
-		{
-			Append(val);
-			return *this;
-		}
-		StringBuilder & operator << (UInt64 val)
-		{
-			Append(val);
-			return *this;
-		}
-		StringBuilder & operator << (float val)
-		{
-			Append(val);
-			return *this;
-		}
-		StringBuilder & operator << (double val)
-		{
-			Append(val);
-			return *this;
-		}
-		StringBuilder & operator << (const char * str)
-		{
-			Append(str, strlen(str));
-			return *this;
-		}
-		StringBuilder & operator << (const String & str)
-		{
-			Append(str);
-			return *this;
-		}
-		StringBuilder & operator << (UnownedStringSlice const& str)
-		{
-			append(str);
-			return *this;
-		}
-		StringBuilder & operator << (const _EndLine)
-		{
-			Append('\n');
-			return *this;
-		}
-		void Append(char ch)
-		{
-			Append(&ch, 1);
-		}
-		void Append(float val)
-		{
-			char buf[128];
-			sprintf_s(buf, 128, "%g", val);
-			int len = (int)strnlen_s(buf, 128);
-			Append(buf, len);
-		}
-		void Append(double val)
-		{
-			char buf[128];
-			sprintf_s(buf, 128, "%g", val);
-			int len = (int)strnlen_s(buf, 128);
-			Append(buf, len);
-		}
-		void Append(Int32 value, int radix = 10)
-		{
-			char vBuffer[33];
-			int len = IntToAscii(vBuffer, value, radix);
-			ReverseInternalAscii(vBuffer, len);
-			Append(vBuffer);
-		}
-		void Append(UInt32 value, int radix = 10)
-		{
-			char vBuffer[33];
-			int len = IntToAscii(vBuffer, value, radix);
-			ReverseInternalAscii(vBuffer, len);
-			Append(vBuffer);
-		}
-		void Append(Int64 value, int radix = 10)
-		{
-			char vBuffer[65];
-			int len = IntToAscii(vBuffer, value, radix);
-			ReverseInternalAscii(vBuffer, len);
-			Append(vBuffer);
-		}
-		void Append(UInt64 value, int radix = 10)
-		{
-			char vBuffer[65];
-			int len = IntToAscii(vBuffer, value, radix);
-			ReverseInternalAscii(vBuffer, len);
-			Append(vBuffer);
-		}
-		void Append(const String & str)
-		{
-			Append(str.getBuffer(), str.getLength());
-		}
-		void Append(const char * str)
-		{
-			Append(str, strlen(str));
-		}
-		void Append(const char * str, UInt strLen)
-		{
+        }
+        StringBuilder & operator << (char ch)
+        {
+            Append(&ch, 1);
+            return *this;
+        }
+        StringBuilder & operator << (Int32 val)
+        {
+            Append(val);
+            return *this;
+        }
+        StringBuilder & operator << (UInt32 val)
+        {
+            Append(val);
+            return *this;
+        }
+        StringBuilder & operator << (Int64 val)
+        {
+            Append(val);
+            return *this;
+        }
+        StringBuilder & operator << (UInt64 val)
+        {
+            Append(val);
+            return *this;
+        }
+        StringBuilder & operator << (float val)
+        {
+            Append(val);
+            return *this;
+        }
+        StringBuilder & operator << (double val)
+        {
+            Append(val);
+            return *this;
+        }
+        StringBuilder & operator << (const char * str)
+        {
+            Append(str, strlen(str));
+            return *this;
+        }
+        StringBuilder & operator << (const String & str)
+        {
+            Append(str);
+            return *this;
+        }
+        StringBuilder & operator << (UnownedStringSlice const& str)
+        {
+            append(str);
+            return *this;
+        }
+        StringBuilder & operator << (const _EndLine)
+        {
+            Append('\n');
+            return *this;
+        }
+        void Append(char ch)
+        {
+            Append(&ch, 1);
+        }
+        void Append(float val)
+        {
+            char buf[128];
+            sprintf_s(buf, 128, "%g", val);
+            int len = (int)strnlen_s(buf, 128);
+            Append(buf, len);
+        }
+        void Append(double val)
+        {
+            char buf[128];
+            sprintf_s(buf, 128, "%g", val);
+            int len = (int)strnlen_s(buf, 128);
+            Append(buf, len);
+        }
+        void Append(Int32 value, int radix = 10)
+        {
+            char vBuffer[33];
+            int len = IntToAscii(vBuffer, value, radix);
+            ReverseInternalAscii(vBuffer, len);
+            Append(vBuffer);
+        }
+        void Append(UInt32 value, int radix = 10)
+        {
+            char vBuffer[33];
+            int len = IntToAscii(vBuffer, value, radix);
+            ReverseInternalAscii(vBuffer, len);
+            Append(vBuffer);
+        }
+        void Append(Int64 value, int radix = 10)
+        {
+            char vBuffer[65];
+            int len = IntToAscii(vBuffer, value, radix);
+            ReverseInternalAscii(vBuffer, len);
+            Append(vBuffer);
+        }
+        void Append(UInt64 value, int radix = 10)
+        {
+            char vBuffer[65];
+            int len = IntToAscii(vBuffer, value, radix);
+            ReverseInternalAscii(vBuffer, len);
+            Append(vBuffer);
+        }
+        void Append(const String & str)
+        {
+            Append(str.getBuffer(), str.getLength());
+        }
+        void Append(const char * str)
+        {
+            Append(str, strlen(str));
+        }
+        void Append(const char * str, UInt strLen)
+        {
             append(str, str + strLen);
-		}
+        }
 
 #if 0
-		int Capacity()
-		{
-			return bufferSize;
-		}
+        int Capacity()
+        {
+            return bufferSize;
+        }
 
-		char * Buffer()
-		{
-			return buffer;
-		}
+        char * Buffer()
+        {
+            return buffer;
+        }
 
-		int Length()
-		{
-			return length;
-		}
+        int Length()
+        {
+            return length;
+        }
 #endif
 
-		String ToString()
-		{
+        String ToString()
+        {
             return *this;
-		}
+        }
 
-		String ProduceString()
-		{
+        String ProduceString()
+        {
             return *this;
-		}
+        }
 
 #if 0
-		String GetSubString(int start, int count)
-		{
-			String rs;
-			rs.buffer = new char[count + 1];
-			rs.length = count;
-			strncpy_s(rs.buffer.Ptr(), count + 1, buffer + start, count);
-			rs.buffer[count] = 0;
-			return rs;
-		}
+        String GetSubString(int start, int count)
+        {
+            String rs;
+            rs.buffer = new char[count + 1];
+            rs.length = count;
+            strncpy_s(rs.buffer.Ptr(), count + 1, buffer + start, count);
+            rs.buffer[count] = 0;
+            return rs;
+        }
 #endif
 
 #if 0
-		void Remove(int id, int len)
-		{
+        void Remove(int id, int len)
+        {
 #if _DEBUG
-			if (id >= length || id < 0)
-				throw "Remove: Index out of range.";
-			if (len < 0)
-				throw "Remove: remove length smaller than zero.";
+            if (id >= length || id < 0)
+                throw "Remove: Index out of range.";
+            if (len < 0)
+                throw "Remove: remove length smaller than zero.";
 #endif
-			int actualDelLength = ((id + len) >= length) ? (length - id) : len;
-			for (int i = id + actualDelLength; i <= length; i++)
-				buffer[i - actualDelLength] = buffer[i];
-			length -= actualDelLength;
-		}
+            int actualDelLength = ((id + len) >= length) ? (length - id) : len;
+            for (int i = id + actualDelLength; i <= length; i++)
+                buffer[i - actualDelLength] = buffer[i];
+            length -= actualDelLength;
+        }
 #endif
 
-		void Clear()
-		{
+        void Clear()
+        {
             m_buffer.setNull();
-		}
-	};
+        }
+    };
 
-	int StringToInt(const String & str, int radix = 10);
-	unsigned int StringToUInt(const String & str, int radix = 10);
-	double StringToDouble(const String & str);
-	float StringToFloat(const String & str);
+    int StringToInt(const String & str, int radix = 10);
+    unsigned int StringToUInt(const String & str, int radix = 10);
+    double StringToDouble(const String & str);
+    float StringToFloat(const String & str);
 }
 
 #endif
