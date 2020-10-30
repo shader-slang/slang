@@ -151,6 +151,58 @@ SerialClass* SerialClasses::_createSerialClass(const SerialClass* cls)
     return dst;
 }
 
+bool SerialClasses::isOk() const
+{
+    StringSlicePool pool(StringSlicePool::Style::Default);
+
+    for (const auto& classes : m_classesByTypeKind)
+    {
+        for (const SerialClass* cls : classes)
+        {
+            // It is possible potentially to have gaps
+            if (cls == nullptr)
+            {
+                continue;
+            }
+
+            if (cls->super && cls->super->typeKind != cls->typeKind)
+            {
+                // If has a super type, must be the same typeKind
+                return false;
+            }
+
+            // Make sure the fields are uniquely named
+
+            pool.clear();
+
+            {
+                const SerialClass* curCls = cls;
+
+                do
+                {
+                    for (Index i = 0; i < curCls->fieldsCount; ++i)
+                    {
+                        const SerialField& field = curCls->fields[i];
+
+                        StringSlicePool::Handle handle;
+                        if (pool.findOrAdd(UnownedStringSlice(field.name), handle))
+                        {
+                            return false;
+                        }
+                    }
+
+                    // Add the fields of the parent
+                    curCls = curCls->super;
+                }
+                while (curCls);
+            }
+        }
+    }
+
+    return true;
+}
+
+
 SerialClasses::SerialClasses():
     m_arena(2048)
 {

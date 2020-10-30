@@ -730,7 +730,7 @@ namespace Slang
             Token nameToken = parseAttributeName(parser);
 
             UncheckedAttribute* modifier = parser->astBuilder->create<UncheckedAttribute>();
-            modifier->name = nameToken.getName();
+            modifier->keywordName = nameToken.getName();
             modifier->loc = nameToken.getLoc();
             modifier->scope = parser->currentScope;
 
@@ -903,7 +903,7 @@ namespace Slang
                     Modifier* parsedModifier = nullptr;
                     if (tryParseUsingSyntaxDecl<Modifier>(parser, &parsedModifier))
                     {
-                        parsedModifier->name = nameToken.getName();
+                        parsedModifier->keywordName = nameToken.getName();
                         if (!parsedModifier->loc.isValid())
                         {
                             parsedModifier->loc = nameToken.loc;
@@ -5504,7 +5504,7 @@ namespace Slang
                     numThreadsAttrib->args.setCount(3);
 
                     // Just mark the loc and name from the first in the list
-                    numThreadsAttrib->name = getName(parser, "numthreads");
+                    numThreadsAttrib->keywordName = getName(parser, "numthreads");
                     numThreadsAttrib->loc = nameAndLoc.loc;
                     numThreadsAttrib->scope = parser->currentScope;
                 }
@@ -5566,7 +5566,7 @@ namespace Slang
                 SLANG_ASSERT(modifier);
 #undef CASE
 
-                modifier->name = nameAndLoc.name;
+                modifier->keywordName = nameAndLoc.name;
                 modifier->loc = nameAndLoc.loc;
 
                 // Special handling for GLSLLayoutModifier

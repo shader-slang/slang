@@ -490,7 +490,6 @@ struct SerialClass
 class SerialClasses : public RefObject
 {
 public:
-
         /// Will add it's own copy into m_classesByType
         /// In process will calculate alignment, offset etc for fields
         /// NOTE! the super set, *must* be an already added to this SerialClasses
@@ -503,6 +502,9 @@ public:
 
         /// Returns true if this cls is *owned* by this SerialClasses
     bool isOwned(const SerialClass* cls) const;
+
+        /// Returns true if the SerialClasses structure appears ok
+    bool isOk() const;
 
         /// Get a serial class based on its type/subType
     const SerialClass* getSerialClass(SerialTypeKind typeKind, SerialSubType subType) const

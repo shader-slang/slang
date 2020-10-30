@@ -114,7 +114,7 @@ SlangReflectionUserAttribute* findUserAttributeByName(Session* session, Decl* de
     auto nameObj = session->tryGetNameObj(name);
     for (auto x : decl->getModifiersOfType<UserDefinedAttribute>())
     {
-        if (x->name == nameObj)
+        if (x->keywordName == nameObj)
             return (SlangReflectionUserAttribute*)(x);
     }
     return nullptr;
@@ -136,7 +136,7 @@ SLANG_API char const* spReflectionUserAttribute_GetName(SlangReflectionUserAttri
 {
     auto userAttr = convert(attrib);
     if (!userAttr) return nullptr;
-    return userAttr->getName()->text.getBuffer();
+    return userAttr->getKeywordName()->text.getBuffer();
 }
 SLANG_API unsigned int spReflectionUserAttribute_GetArgumentCount(SlangReflectionUserAttribute* attrib)
 {

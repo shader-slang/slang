@@ -248,12 +248,12 @@ SlangResult Session::_readBuiltinModule(Scope* scope, String moduleName)
     SerialContainerData containerData;
 
     Linkage* linkage = getBuiltinLinkage();
-    //NamePool* namePool = linkage->getNamePool();
 
-    NamePool* namePoolPtr = &namePool;
+    NamePool* sessionNamePool = &namePool;
+    NamePool* linkageNamePool = linkage->getNamePool();
 
     SerialContainerUtil::ReadOptions options;
-    options.namePool = namePoolPtr;
+    options.namePool = linkageNamePool;
     options.session = this;
     options.sharedASTBuilder = linkage->getASTBuilder()->getSharedASTBuilder();
     options.sourceManager = linkage->getSourceManager();
@@ -283,7 +283,7 @@ SlangResult Session::_readBuiltinModule(Scope* scope, String moduleName)
         module->setIRModule(srcModule.irModule);
 
         // Put in the loaded module map
-        linkage->mapNameToLoadedModules.Add(namePoolPtr->getName(moduleName), module);
+        linkage->mapNameToLoadedModules.Add(sessionNamePool->getName(moduleName), module);
 
         // Add the resulting code to the appropriate scope
         if (!scope->containerDecl)
