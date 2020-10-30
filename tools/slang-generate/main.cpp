@@ -690,26 +690,28 @@ void usage(char const* appName)
     fprintf(stderr, "usage: %s <input>\n", appName);
 }
 
-SlangResult readAllText(char const * fileName, String& stringOut)
+SlangResult readAllText(char const * fileName, String& outString)
 {
-    FILE * f;
+    FILE* f;
     fopen_s(&f, fileName, "rb");
     if (!f)
     {
-        stringOut = "";
+        outString = "";
         return SLANG_FAIL;
     }
     else
     {
-        stringOut = 
         fseek(f, 0, SEEK_END);
         auto size = ftell(f);
 
         StringRepresentation* stringRep = StringRepresentation::createWithCapacityAndLength(size, size);
-        stringOut = String(stringRep);
+        outString = String(stringRep);
 
-        char * buffer = stringRep->getData();
-        memset(buffer, 0, size);
+        char* buffer = stringRep->getData();
+
+        // Seems unnecessary
+        //memset(buffer, 0, size);
+
         fseek(f, 0, SEEK_SET);
         fread(buffer, sizeof(char), size, f);
         fclose(f);
@@ -720,7 +722,7 @@ SlangResult readAllText(char const * fileName, String& stringOut)
 
 void writeAllText(char const *srcFileName, char const* fileName, const char* content)
 {
-    FILE * f = nullptr;
+    FILE* f = nullptr;
     fopen_s(&f, fileName, "wb");
     if (!f)
     {

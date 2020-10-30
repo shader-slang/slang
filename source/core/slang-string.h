@@ -166,14 +166,18 @@ namespace Slang
             return (*this) != UnownedStringSlice(str, str + ::strlen(str));
         }
 
+            /// True if contents is a single char of c
+        SLANG_FORCE_INLINE bool isChar(char c) const { return getLength() == 1 && m_begin[0] == c; }
+
         bool startsWith(UnownedStringSlice const& other) const;
         bool startsWith(char const* str) const;
 
         bool endsWith(UnownedStringSlice const& other) const;
         bool endsWith(char const* str) const;
 
-
+            /// Trims any horizontal whitespace from the start and end and returns as a substring 
         UnownedStringSlice trim() const;
+            /// Trims any 'c' from the start or the end, and returns as a substring
         UnownedStringSlice trim(char c) const;
 
         HashCode getHashCode() const
@@ -451,31 +455,7 @@ namespace Slang
             /// Append a character (to remove ambiguity with other integral types)
         void appendChar(char chr);
 
-		String(int32_t val, int radix = 10)
-		{
-            append(val, radix);
-		}
-		String(uint32_t val, int radix = 10)
-		{
-            append(val, radix);
-		}
-		String(int64_t val, int radix = 10)
-		{
-            append(val, radix);
-		}
-		String(uint64_t val, int radix = 10)
-		{
-            append(val, radix);
-		}
-		String(float val, const char * format = "%g")
-		{
-            append(val, format);
-		}
-		String(double val, const char * format = "%g")
-		{
-            append(val, format);
-		}
-		String(const char * str)
+		String(const char* str)
 		{
             append(str);
 #if 0
@@ -498,6 +478,33 @@ namespace Slang
 			}
 #endif
 		}
+
+        // Make all String ctors from a numeric explicit, to avoid unexpected/unnecessary conversions
+        explicit String(int32_t val, int radix = 10)
+        {
+            append(val, radix);
+        }
+        explicit String(uint32_t val, int radix = 10)
+        {
+            append(val, radix);
+        }
+        explicit String(int64_t val, int radix = 10)
+        {
+            append(val, radix);
+        }
+        explicit String(uint64_t val, int radix = 10)
+        {
+            append(val, radix);
+        }
+        explicit String(float val, const char * format = "%g")
+        {
+            append(val, format);
+        }
+        explicit String(double val, const char * format = "%g")
+        {
+            append(val, format);
+        }
+
 		explicit String(char chr)
 		{
             append(chr);
@@ -675,6 +682,9 @@ namespace Slang
 		{
 			return (strcmp(begin(), str.begin()) <= 0);
 		}
+
+        SLANG_FORCE_INLINE bool operator==(const UnownedStringSlice& slice) const { return getUnownedSlice() == slice; }
+        SLANG_FORCE_INLINE bool operator!=(const UnownedStringSlice& slice) const { return getUnownedSlice() != slice; }
 
 		String toUpper() const
 		{
