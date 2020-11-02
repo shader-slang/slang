@@ -284,6 +284,20 @@ namespace Slang {
     return SLANG_OK;
 }
 
+
+static List<ExtensionDecl*>& _getCandidateExtensionList(
+    AggTypeDecl* typeDecl,
+    Dictionary<AggTypeDecl*, RefPtr<CandidateExtensionList>>& mapTypeToCandidateExtensions)
+{
+    RefPtr<CandidateExtensionList> entry;
+    if (!mapTypeToCandidateExtensions.TryGetValue(typeDecl, entry))
+    {
+        entry = new CandidateExtensionList();
+        mapTypeToCandidateExtensions.Add(typeDecl, entry);
+    }
+    return entry->candidateExtensions;
+}
+
 /* static */Result SerialContainerUtil::read(RiffContainer* container, const ReadOptions& options, SerialContainerData& out)
 {
     out.clear();
@@ -456,15 +470,7 @@ namespace Slang {
 
                     // Go through all of the AST nodes
                     // 1) Set the ASTBuilder on Type nodes
-
-                    for (auto& obj :reader.getObjects())
-                    {
-                        if (Type* type = obj.dynamicCast<Type>())
-                        {
-                            type->_setASTBuilder(astBuilder);
-                        }
-
-                    }
+                    
 
                     // TODO(JS):
                     // If modules can have more complicated relationships (like a two modules can refer to symbols
@@ -482,6 +488,34 @@ namespace Slang {
 
                     // Get the root node. It's at index 1 (0 is the null value).
                     astRootNode = reader.getPointer(SerialIndex(1)).dynamicCast<NodeBase>();
+
+                    // 2) Add the extensions to the module mapTypeToCandidateExtensions cache
+
+                    {
+                        ModuleDecl* moduleDecl = as<ModuleDecl>(astRootNode);
+                        
+                        for (auto& obj : reader.getObjects())
+                        {
+                            if (Type* type = obj.dynamicCast<Type>())
+                            {
+                                type->_setASTBuilder(astBuilder);
+                            }
+
+                            if (ExtensionDecl* extensionDecl = obj.dynamicCast<ExtensionDecl>())
+                            {
+                                if (auto targetDeclRefType = as<DeclRefType>(extensionDecl->targetType))
+                                {
+                                    // Attach our extension to that type as a candidate...
+                                    if (auto aggTypeDeclRef = targetDeclRefType->declRef.as<AggTypeDecl>())
+                                    {
+                                        auto aggTypeDecl = aggTypeDeclRef.getDecl();
+
+                                        _getCandidateExtensionList(aggTypeDecl, moduleDecl->mapTypeToCandidateExtensions).add(extensionDecl);
+                                    }
+                                }
+                            }
+                        }
+                    }
                 }
 
                 // Onto next chunk
