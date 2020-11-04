@@ -73,8 +73,8 @@ enum IROp : int32_t
 /* IROpMeta describe values for layout of IROp, as well as values for accessing aspects of IROp bits. */
 enum IROpMeta
 {
-    kIROpMeta_OtherShift = 8,   ///< Number of bits for op (shift right by this to get the other bits)
-    kIROpMeta_OpMask = 0xff,    ///< Mask for just opcode
+    kIROpMeta_OtherShift = 10,   ///< Number of bits for op (shift right by this to get the other bits)
+    kIROpMeta_OpMask = 0x3ff,    ///< Mask for just opcode
 };
 
 IROp findIROp(const UnownedStringSlice& name);

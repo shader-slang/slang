@@ -73,18 +73,11 @@ SerialIndex ModuleSerialFilter::writePointer(SerialWriter* writer, const NodeBas
         {
             ASTBuilder* astBuilder = m_moduleDecl->module->getASTBuilder();
 
-            // It's a reference to a declaration in another module, so create an ImportExternalDecl.
-
+            // It's a reference to a declaration in another module, so first get the symbol name. 
             String mangledName = getMangledName(astBuilder, decl);
 
-            ImportExternalDecl* importDecl = astBuilder->create<ImportExternalDecl>();
-            importDecl->mangledName = mangledName;
-            const SerialIndex index = writer->addPointer(importDecl);
-
-            // Set as the index of this
-            writer->setPointerIndex(ptr, index);
-
-            return index;
+            // Add as an import symbol
+            return writer->addImportSymbol(mangledName);
         }
         else
         {

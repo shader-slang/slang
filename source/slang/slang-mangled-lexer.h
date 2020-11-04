@@ -3,6 +3,7 @@
 #define SLANG_MANGLED_LEXER_H_INCLUDED
 
 #include "../core/slang-basic.h"
+#include "../core/slang-char-util.h"
 
 #include "slang-compiler.h"
 
@@ -41,6 +42,12 @@ public:
 
     UInt readParamCount();
 
+        /// Returns the character at the current position
+    char peekChar() { return *m_cursor; }
+        // Returns the current character and moves to next character.
+    char nextChar() { return *m_cursor++; }
+
+    
         /// Ctor
     SLANG_FORCE_INLINE MangledLexer(const UnownedStringSlice& slice);
 
@@ -49,13 +56,6 @@ private:
     // Call at the beginning of a mangled name,
     // to strip off the main prefix
     void _start() { _expect("_S"); }
-
-    static bool _isDigit(char c) { return (c >= '0') && (c <= '9'); }
-
-        /// Returns the character at the current position
-    char _peek() { return *m_cursor; }
-        // Returns the current character and moves to next character.
-    char _next() { return *m_cursor++; }
 
     SLANG_INLINE void _expect(char c);
 
@@ -82,10 +82,10 @@ SLANG_FORCE_INLINE MangledLexer::MangledLexer(const UnownedStringSlice& slice)
 // ---------------------------------------------------------------------------
 SLANG_INLINE void MangledLexer::readSimpleIntVal()
 {
-    int c = _peek();
-    if (_isDigit((char)c))
+    int c = peekChar();
+    if (CharUtil::isDigit((char)c))
     {
-        _next();
+        nextChar();
     }
     else
     {
@@ -110,9 +110,9 @@ SLANG_INLINE void MangledLexer::readExtensionSpec()
 // ---------------------------------------------------------------------------
 SLANG_INLINE void MangledLexer::_expect(char c)
 {
-    if (_peek() == c)
+    if (peekChar() == c)
     {
-        _next();
+        nextChar();
     }
     else
     {
@@ -120,6 +120,14 @@ SLANG_INLINE void MangledLexer::_expect(char c)
         SLANG_UNEXPECTED("mangled name error");
     }
 }
+
+// !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! MangledNameParser !!!!!!!!!!!!!!!!!!!!!!!!!!
+
+struct MangledNameParser
+{
+        /// Tries to extract the module name from this mangled name. 
+    static SlangResult parseModuleName(const UnownedStringSlice& in, UnownedStringSlice& outModuleName);
+};
 
 }
 #endif

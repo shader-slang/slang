@@ -8,8 +8,9 @@
 #include "slang-serialize-type-info.h"
 #include "slang-serialize-misc-type-info.h"
 
-namespace Slang {
+#include "slang-serialize-value-type-info.h"
 
+namespace Slang {
 
 /* !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! AST types !!!!!!!!!!!!!!!!!!!!!!!!!!!!! */
 
@@ -38,6 +39,7 @@ struct SerialTypeInfo<SyntaxClass<T>>
     }
 };
 
+// All the templates for DeclRef<T> can use this implementation.
 struct SerialDeclRefBaseTypeInfo
 {
     typedef DeclRefBase NativeType;
@@ -85,104 +87,10 @@ struct SerialTypeInfo<DeclRef<T>> : public SerialDeclRefBaseTypeInfo {};
 template <>
 struct SerialTypeInfo<MatrixCoord> : SerialIdentityTypeInfo<MatrixCoord> {};
 
-
-// QualType
-
-template <>
-struct SerialTypeInfo<QualType>
-{
-    typedef QualType NativeType;
-    struct SerialType
-    {
-        SerialIndex type;
-        uint8_t isLeftValue;
-    };
-    enum { SerialAlignment = SLANG_ALIGN_OF(SerialIndex) };
-
-    static void toSerial(SerialWriter* writer, const void* native, void* serial)
-    {
-        auto dst = (SerialType*)serial;
-        auto src = (const NativeType*)native;
-        dst->isLeftValue = src->isLeftValue ? 1 : 0;
-        dst->type = writer->addPointer(src->type);
-    }
-    static void toNative(SerialReader* reader, const void* serial, void* native)
-    {
-        auto src = (const SerialType*)serial;
-        auto dst = (NativeType*)native;
-        dst->type = reader->getPointer(src->type).dynamicCast<Type>();
-        dst->isLeftValue = src->isLeftValue != 0;
-    }
-};
-
-
-// LookupResult::Breadcrumb
-template <>
-struct SerialTypeInfo<LookupResultItem::Breadcrumb>
-{
-    typedef LookupResultItem::Breadcrumb NativeType;
-    struct SerialType
-    {
-        NativeType::Kind kind;
-        NativeType::ThisParameterMode thisParameterMode;
-        SerialTypeInfo<DeclRef<Decl>>::SerialType declRef;
-        SerialTypeInfo<RefPtr<NativeType>> next;
-    };
-    enum { SerialAlignment = SLANG_ALIGN_OF(SerialType) };
-
-    static void toSerial(SerialWriter* writer, const void* native, void* serial)
-    {
-        auto& src = *(const NativeType*)native;
-        auto& dst = *(SerialType*)serial;
-
-        dst.kind = src.kind;
-        dst.thisParameterMode = src.thisParameterMode;
-        toSerialValue(writer, src.declRef, dst.declRef);
-        toSerialValue(writer, src.next, dst.next);
-    }
-
-    static void toNative(SerialReader* reader, const void* serial, void* native)
-    {
-        auto& dst = *(NativeType*)native;
-        auto& src = *(const SerialType*)serial;
-
-        dst.kind = src.kind;
-        dst.thisParameterMode = src.thisParameterMode;
-        toNativeValue(reader, src.declRef, dst.declRef);
-        toNativeValue(reader, src.next, dst.next);
-    }
-};
-
 // LookupResultItem
-template <>
-struct SerialTypeInfo<LookupResultItem>
-{
-    typedef LookupResultItem NativeType;
-    struct SerialType
-    {
-        SerialTypeInfo<DeclRef<Decl>>::SerialType declRef;
-        SerialTypeInfo<RefPtr<NativeType::Breadcrumb>> breadcrumbs;
-    };
-    enum { SerialAlignment = SLANG_ALIGN_OF(SerialType) };
-
-    static void toSerial(SerialWriter* writer, const void* native, void* serial)
-    {
-        auto& src = *(const NativeType*)native;
-        auto& dst = *(SerialType*)serial;
-
-        toSerialValue(writer, src.declRef, dst.declRef);
-        toSerialValue(writer, src.breadcrumbs, dst.breadcrumbs);
-    }
-
-    static void toNative(SerialReader* reader, const void* serial, void* native)
-    {
-        auto& dst = *(NativeType*)native;
-        auto& src = *(const SerialType*)serial;
-
-        toNativeValue(reader, src.declRef, dst.declRef);
-        toNativeValue(reader, src.breadcrumbs, dst.breadcrumbs);
-    }
-};
+SLANG_VALUE_TYPE_INFO(LookupResultItem)
+// QualType
+SLANG_VALUE_TYPE_INFO(QualType)
 
 // LookupResult
 template <>
@@ -236,115 +144,16 @@ struct SerialTypeInfo<LookupResult>
 };
 
 // GlobalGenericParamSubstitution::ConstraintArg
-template <>
-struct SerialTypeInfo<GlobalGenericParamSubstitution::ConstraintArg>
-{
-    typedef GlobalGenericParamSubstitution::ConstraintArg NativeType;
-    struct SerialType
-    {
-        SerialIndex decl;
-        SerialIndex val;
-    };
-    enum { SerialAlignment = SLANG_ALIGN_OF(SerialIndex) };
+SLANG_VALUE_TYPE_INFO(GlobalGenericParamSubstitution_ConstraintArg)
 
-    static void toSerial(SerialWriter* writer, const void* native, void* serial)
-    {
-        auto& dst = *(SerialType*)serial;
-        auto& src = *(const NativeType*)native;
-
-        dst.decl = writer->addPointer(src.decl);
-        dst.val = writer->addPointer(src.val);
-    }
-    static void toNative(SerialReader* reader, const void* serial, void* native)
-    {
-        auto& src = *(const SerialType*)serial;
-        auto& dst = *(NativeType*)native;
-
-        dst.decl = reader->getPointer(src.decl).dynamicCast<Decl>();
-        dst.val = reader->getPointer(src.val).dynamicCast<Val>();
-    }
-};
-
+// SpecializationArg
+SLANG_VALUE_TYPE_INFO(SpecializationArg)
 // ExpandedSpecializationArg
-template <>
-struct SerialTypeInfo<ExpandedSpecializationArg>
-{
-    typedef ExpandedSpecializationArg NativeType;
-    struct SerialType
-    {
-        SerialIndex val;
-        SerialIndex witness;
-    };
-    enum { SerialAlignment = SLANG_ALIGN_OF(SerialIndex) };
-
-    static void toSerial(SerialWriter* writer, const void* native, void* serial)
-    {
-        auto& dst = *(SerialType*)serial;
-        auto& src = *(const NativeType*)native;
-
-        dst.witness = writer->addPointer(src.witness);
-        dst.val = writer->addPointer(src.val);
-    }
-    static void toNative(SerialReader* reader, const void* serial, void* native)
-    {
-        auto& src = *(const SerialType*)serial;
-        auto& dst = *(NativeType*)native;
-
-        dst.witness = reader->getPointer(src.witness).dynamicCast<Val>();
-        dst.val = reader->getPointer(src.val).dynamicCast<Val>();
-    }
-};
-
+SLANG_VALUE_TYPE_INFO(ExpandedSpecializationArg)
 // TypeExp
-template <>
-struct SerialTypeInfo<TypeExp>
-{
-    typedef TypeExp NativeType;
-    struct SerialType
-    {
-        SerialIndex type;
-        SerialIndex expr;
-    };
-    enum { SerialAlignment = SLANG_ALIGN_OF(SerialIndex) };
-
-    static void toSerial(SerialWriter* writer, const void* native, void* serial)
-    {
-        auto& dst = *(SerialType*)serial;
-        auto& src = *(const NativeType*)native;
-
-        dst.type = writer->addPointer(src.type);
-        dst.expr = writer->addPointer(src.exp);
-    }
-    static void toNative(SerialReader* reader, const void* serial, void* native)
-    {
-        auto& src = *(const SerialType*)serial;
-        auto& dst = *(NativeType*)native;
-
-        dst.type = reader->getPointer(src.type).dynamicCast<Type>();
-        dst.exp = reader->getPointer(src.expr).dynamicCast<Expr>();
-    }
-};
-
+SLANG_VALUE_TYPE_INFO(TypeExp)
 // DeclCheckStateExt
-template <>
-struct SerialTypeInfo<DeclCheckStateExt>
-{
-    typedef DeclCheckStateExt NativeType;
-    typedef DeclCheckStateExt::RawType SerialType;
-
-    enum { SerialAlignment = SLANG_ALIGN_OF(SerialType) };
-
-    static void toSerial(SerialWriter* writer, const void* native, void* serial)
-    {
-        SLANG_UNUSED(writer);
-        *(SerialType*)serial = (*(const NativeType*)native).getRaw();
-    }
-    static void toNative(SerialReader* reader, const void* serial, void* native)
-    {
-        SLANG_UNUSED(reader);
-        (*(NativeType*)serial).setRaw(*(const SerialType*)native);
-    }
-};
+SLANG_VALUE_TYPE_INFO(DeclCheckStateExt)
 
 // Modifiers
 template <>

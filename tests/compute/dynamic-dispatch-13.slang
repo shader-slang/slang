@@ -43,3 +43,11 @@ public struct MyImpl : IInterface
         return input + val;
     }
 };
+public struct MyImpl2 : IInterface
+{
+    int val;
+    int run(int input)
+    {
+        return input - val;
+    }
+};

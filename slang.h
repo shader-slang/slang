@@ -3166,6 +3166,13 @@ namespace slang
             TypeReflection* interfaceType,
             ISlangBlob** outNameBlob) = 0;
 
+            /** Get the sequantial ID used to identify a type witness in a dynamic object.
+            */
+        virtual SLANG_NO_THROW SlangResult SLANG_MCALL getTypeConformanceWitnessSequentialID(
+            slang::TypeReflection* type,
+            slang::TypeReflection* interfaceType,
+            uint32_t*              outId) = 0;
+
             /** Create a request to load/compile front-end code.
             */
         virtual SLANG_NO_THROW SlangResult SLANG_MCALL createCompileRequest(

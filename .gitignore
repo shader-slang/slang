@@ -42,3 +42,9 @@ tests/**/*.slang-module
 /source/slang/core.meta.slang.h
 prelude/*.h.cpp
 /source/slang/cpp.hint
+/source/slang/slang-value-generated.h
+/source/slang/slang-value-generated-macro.h
+/source/slang/slang-ref-object-generated.h
+/source/slang/slang-ref-object-generated-macro.h
+/source/slang/slang-ast-generated.h
+/source/slang/slang-ast-generated-macro.h

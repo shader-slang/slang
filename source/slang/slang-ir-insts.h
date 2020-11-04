@@ -454,6 +454,18 @@ struct IRBuiltinDecoration : IRDecoration
     IR_LEAF_ISA(BuiltinDecoration)
 };
 
+struct IRSequentialIDDecoration : IRDecoration
+{
+    enum
+    {
+        kOp = kIROp_SequentialIDDecoration
+    };
+    IR_LEAF_ISA(SequentialIDDecoration)
+
+    IRIntLit* getSequentialIDOperand() { return cast<IRIntLit>(getOperand(0)); }
+    IRIntegerValue getSequentialID() { return getSequentialIDOperand()->getValue(); }
+};
+
 // An instruction that specializes another IR value
 // (representing a generic) to a particular set of generic arguments 
 // (instructions representing types, witness tables, etc.)
@@ -483,6 +495,14 @@ struct IRLookupWitnessMethod : IRInst
     IRInst* getRequirementKey() { return requirementKey.get(); }
 
     IR_LEAF_ISA(lookup_interface_method)
+};
+
+// Returns the sequential ID of an RTTI object.
+struct IRGetSequentialID : IRInst
+{
+    IR_LEAF_ISA(GetSequentialID)
+
+    IRInst* getRTTIOperand() { return getOperand(0); }
 };
 
 struct IRLookupWitnessTable : IRInst
@@ -1904,6 +1924,8 @@ struct IRBuilder
         IRInst* witnessTableVal,
         IRInst* interfaceMethodVal);
 
+    IRInst* emitGetSequentialIDInst(IRInst* rttiObj);
+
     IRInst* emitAlloca(IRInst* type, IRInst* rttiObjPtr);
 
     IRInst* emitCopy(IRInst* dst, IRInst* src, IRInst* rttiObjPtr);
@@ -2532,6 +2554,11 @@ struct IRBuilder
     void addBuiltinDecoration(IRInst* inst)
     {
         addDecoration(inst, kIROp_BuiltinDecoration);
+    }
+
+    void addSequentialIDDecoration(IRInst* inst, IRIntegerValue id)
+    {
+        addDecoration(inst, kIROp_SequentialIDDecoration, getIntValue(getUIntType(), id));
     }
 };
 

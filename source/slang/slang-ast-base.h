@@ -134,8 +134,6 @@ class Type: public Val
 {
     SLANG_ABSTRACT_AST_CLASS(Type)
 
-    friend struct ASTDumpAccess;
-
     typedef ITypeVisitor Visitor;
 
     void accept(ITypeVisitor* visitor, void* extra);
@@ -229,23 +227,27 @@ class ThisTypeSubstitution : public Substitutions
     HashCode _getHashCodeOverride() const;
 };
 
+struct GlobalGenericParamSubstitution_ConstraintArg
+{
+    SLANG_VALUE_CLASS(GlobalGenericParamSubstitution_ConstraintArg)
+    Decl*    decl = nullptr;
+    Val*     val = nullptr;
+};
+
 class GlobalGenericParamSubstitution : public Substitutions
 {
     SLANG_AST_CLASS(GlobalGenericParamSubstitution)
+
+    typedef GlobalGenericParamSubstitution_ConstraintArg ConstraintArg;
+
     // the type_param decl to be substituted
     GlobalGenericParamDecl* paramDecl = nullptr;
 
     // the actual type to substitute in
     Type* actualType = nullptr;
 
-    struct ConstraintArg
-    {
-        Decl*    decl = nullptr;
-        Val*     val = nullptr;
-    };
-
     // the values that satisfy any constraints on the type parameter
-    List<ConstraintArg> constraintArgs;
+    List<GlobalGenericParamSubstitution_ConstraintArg> constraintArgs;
 
     // Overrides should be public so base classes can access
     Substitutions* _applySubstitutionsShallowOverride(ASTBuilder* astBuilder, SubstitutionSet substSet, Substitutions* substOuter, int* ioDiff);

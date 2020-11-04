@@ -1647,6 +1647,17 @@ SlangResult CPPExtractor::_maybeParseField()
     switch (m_reader.peekTokenType())
     {
         case TokenType::OpAssign:
+        {
+            // Special case to handle
+            // Type operator=(...
+
+            m_reader.advanceToken();
+            if (m_reader.peekTokenType() == TokenType::LParent)
+            {
+                // Not a field
+                break;
+            }
+        }
         case TokenType::Semicolon:
         {
             Node::Field field;
@@ -1840,6 +1851,12 @@ SlangResult CPPExtractor::parse(SourceFile* sourceFile, const Options* options)
                         {
                             m_currentNode->m_reflectionOverride = ReflectionType::NotReflected;
                         }
+                        break;
+                    }
+                    case IdentifierStyle::Access:
+                    {
+                        m_reader.advanceToken();
+                        SLANG_RETURN_ON_FAIL(expect(TokenType::Colon));
                         break;
                     }
                     default:
@@ -2528,7 +2545,7 @@ SlangResult CPPExtractorApp::writeOutput(CPPExtractor& extractor)
 
     // Some keywords
     {
-        const char* names[] = { "virtual", "typedef", "continue", "if", "case", "break", "catch", "default", "delete", "do", "else", "for", "new", "goto", "return", "switch", "throw", "using", "while" };
+        const char* names[] = { "virtual", "typedef", "continue", "if", "case", "break", "catch", "default", "delete", "do", "else", "for", "new", "goto", "return", "switch", "throw", "using", "while", "operator" };
         outLookup.set(names, SLANG_COUNT_OF(names), IdentifierStyle::Keyword);
     }
 

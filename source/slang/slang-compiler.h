@@ -973,6 +973,10 @@ namespace Slang
         List<Module*> const& getModuleDependencies() SLANG_OVERRIDE { return m_moduleDependencyList.getModuleList(); }
         List<String> const& getFilePathDependencies() SLANG_OVERRIDE { return m_filePathDependencyList.getFilePathList(); }
 
+            /// Given a mangled name finds the exported NodeBase associated with this module.
+            /// If not found returns nullptr.
+        NodeBase* findExportFromMangledName(const UnownedStringSlice& slice);
+
             /// Get the ASTBuilder
         ASTBuilder* getASTBuilder() { return &m_astBuilder; }
 
@@ -1004,6 +1008,7 @@ namespace Slang
 
         List<RefPtr<EntryPoint>> const& getEntryPoints() { return m_entryPoints; }
         void _addEntryPoint(EntryPoint* entryPoint);
+        void _processFindDeclsExportSymbolsRec(Decl* decl);
 
     protected:
         void acceptVisitor(ComponentTypeVisitor* visitor, SpecializationInfo* specializationInfo) SLANG_OVERRIDE;
@@ -1054,6 +1059,11 @@ namespace Slang
         // The builder that owns all of the AST nodes from parsing the source of
         // this module. 
         ASTBuilder m_astBuilder;
+
+        // Holds map of exported mangled names to symbols. m_mangledExportPool maps names to indices,
+        // and m_mangledExportSymbols holds the NodeBase* values for each index. 
+        StringSlicePool m_mangledExportPool;
+        List<NodeBase*> m_mangledExportSymbols;
     };
     typedef Module LoadedModule;
 
@@ -1216,6 +1226,10 @@ namespace Slang
             slang::TypeReflection* type,
             slang::TypeReflection* interfaceType,
             ISlangBlob** outNameBlob) override;
+        SLANG_NO_THROW SlangResult SLANG_MCALL getTypeConformanceWitnessSequentialID(
+            slang::TypeReflection* type,
+            slang::TypeReflection* interfaceType,
+            uint32_t*              outId) override;
         SLANG_NO_THROW SlangResult SLANG_MCALL createCompileRequest(
             SlangCompileRequest**   outCompileRequest) override;
 
@@ -1230,7 +1244,7 @@ namespace Slang
             SlangMatrixLayoutMode mode);
 
             /// Create an initially-empty linkage
-        Linkage(Session* session, ASTBuilder* astBuilder);
+        Linkage(Session* session, ASTBuilder* astBuilder, Linkage* builtinLinkage);
 
             /// Dtor
         ~Linkage();
@@ -1285,6 +1299,13 @@ namespace Slang
 
         // Map from the logical name of a module to its definition
         Dictionary<Name*, RefPtr<LoadedModule>> mapNameToLoadedModules;
+
+        // Map from the mangled name of RTTI objects to sequential IDs
+        // used by `switch`-based dynamic dispatch.
+        Dictionary<String, uint32_t> mapMangledNameToRTTIObjectIndex;
+
+        // Counters for allocating sequential IDs to witness tables conforming to each interface type.
+        Dictionary<String, uint32_t> mapInterfaceMangledNameToSequentialIDCounters;
 
         // The resulting specialized IR module for each entry point request
         List<RefPtr<IRModule>> compiledModules;
@@ -2125,6 +2146,9 @@ namespace Slang
 
             /// Get the prelude associated with the language
         const String& getPreludeForLanguage(SourceLanguage language) { return m_languagePreludes[int(language)]; }
+
+            /// Get the built in linkage -> handy to get the stdlibs from
+        Linkage* getBuiltinLinkage() const { return m_builtinLinkage; }
 
         void init();
 
