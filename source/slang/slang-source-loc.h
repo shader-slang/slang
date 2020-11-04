@@ -286,10 +286,18 @@ class SourceView
         /// Get the path associated with a location
     PathInfo getPathInfo(SourceLoc loc, SourceLocType type = SourceLocType::Nominal);
 
+        /// Get the initiating source location - that is the source location that caused the this SourceView to be created
+        /// Can be SourceLoc(0) if there is no initiating location.
+        /// For example for a #include - the view's initiating source loc for the view that is the contents of the view
+        /// will be the location of the #include in the source.
+        /// For the original source file (ie not an include) - the view will have an initiating source loc of SourceLoc(0)
+    SourceLoc getInitiatingSourceLoc() const { return m_initiatingSourceLoc; }
+
         /// Ctor
-    SourceView(SourceFile* sourceFile, SourceRange range, const String* viewPath):
+    SourceView(SourceFile* sourceFile, SourceRange range, const String* viewPath, SourceLoc initiatingSourceLoc):
         m_range(range),
-        m_sourceFile(sourceFile)
+        m_sourceFile(sourceFile),
+        m_initiatingSourceLoc(initiatingSourceLoc)
     {
         if (viewPath)
         {
@@ -304,7 +312,9 @@ class SourceView
         /// overridden by m_viewPath
     PathInfo _getPathInfo() const;
 
-    String m_viewPath;                      ///< Path to this view. If empty the path is the path to the SourceView
+    String m_viewPath;                  ///< Path to this view. If empty the path is the path to the SourceView
+
+    SourceLoc m_initiatingSourceLoc;    ///< An optional source loc that defines where this view was initiated from. SourceLoc(0) if not defined.
 
     SourceRange m_range;                ///< The range that this SourceView applies to
     SourceFile* m_sourceFile;           ///< The source file. Can hold the line breaks
@@ -333,7 +343,8 @@ struct SourceManager
         /// Create a new source view from a file
         /// @param sourceFile is the source file that contains the source
         /// @param pathInfo is path used to read the file from
-    SourceView* createSourceView(SourceFile* sourceFile, const PathInfo* pathInfo);
+        /// @param initiatingSourceLoc the (optional) location in the source that led the the creation of this view. If there isn't an initiating source location pass SourceLoc(0)s
+    SourceView* createSourceView(SourceFile* sourceFile, const PathInfo* pathInfo, SourceLoc initiatingSourceLoc);
 
         /// Find a view by a source file location. 
         /// If not found in this manager will look in the parent SourceManager

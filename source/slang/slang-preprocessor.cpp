@@ -1013,10 +1013,12 @@ top:
         StringBuilder sb;
         sb << token.getContent();
 
+        Token poundPoundToken;
+
         while (PeekRawTokenType(preprocessor) == TokenType::PoundPound)
         {
             // Consume the `##`
-            AdvanceRawToken(preprocessor);
+            poundPoundToken = AdvanceRawToken(preprocessor);
 
             // Possibly macro-expand the next token
             MaybeBeginMacroExpansion(preprocessor);
@@ -1035,7 +1037,7 @@ top:
         PathInfo pathInfo = PathInfo::makeTokenPaste();
        
         SourceFile* sourceFile = sourceManager->createSourceFileWithString(pathInfo, sb.ProduceString());
-        SourceView* sourceView = sourceManager->createSourceView(sourceFile, nullptr);
+        SourceView* sourceView = sourceManager->createSourceView(sourceFile, nullptr, poundPoundToken.getLoc());
 
         Lexer lexer;
         lexer.initialize(sourceView, GetSink(preprocessor), preprocessor->getNamePool(), sourceManager->getMemoryArena());
@@ -1881,7 +1883,7 @@ static void HandleIncludeDirective(PreprocessorDirectiveContext* context)
     }
 
     // This is a new parse (even if it's a pre-existing source file), so create a new SourceUnit
-    SourceView* sourceView = sourceManager->createSourceView(sourceFile, &filePathInfo);
+    SourceView* sourceView = sourceManager->createSourceView(sourceFile, &filePathInfo, directiveLoc);
 
     PreprocessorInputStream* inputStream = CreateInputStreamForSource(context->preprocessor, sourceView);
     inputStream->parent = context->preprocessor->inputStream;
@@ -2411,8 +2413,10 @@ static void DefineMacro(
     SourceFile* keyFile = sourceManager->createSourceFileWithString(pathInfo, key);
     SourceFile* valueFile = sourceManager->createSourceFileWithString(pathInfo, value);
 
-    SourceView* keyView = sourceManager->createSourceView(keyFile, nullptr);
-    SourceView* valueView = sourceManager->createSourceView(valueFile, nullptr);
+    // Note that we don't need to pass a special source loc to identify that these are defined on the command line
+    // because the PathInfo on the SourceFile, is marked 'command line'.
+    SourceView* keyView = sourceManager->createSourceView(keyFile, nullptr, SourceLoc::fromRaw(0));
+    SourceView* valueView = sourceManager->createSourceView(valueFile, nullptr, SourceLoc::fromRaw(0));
 
     // Use existing `Lexer` to generate a token stream.
     Lexer lexer;
@@ -2546,7 +2550,9 @@ TokenList preprocessSource(
         }
     }
 
-    SourceView* sourceView = sourceManager->createSourceView(file, nullptr);
+    // This is the originating source we are compiling - there is no 'initiating' source loc,
+    // so pass SourceLoc(0) - meaning it has no initiating location.
+    SourceView* sourceView = sourceManager->createSourceView(file, nullptr, SourceLoc::fromRaw(0));
 
     // create an initial input stream based on the provided buffer
     preprocessor.inputStream = CreateInputStreamForSource(&preprocessor, sourceView);

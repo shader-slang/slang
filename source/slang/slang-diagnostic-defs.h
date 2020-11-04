@@ -43,6 +43,7 @@ DIAGNOSTIC(-1, Note, doYouForgetToMakeComponentAccessible, "do you forget to mak
 DIAGNOSTIC(-1, Note, seeDeclarationOf, "see declaration of '$0'")
 DIAGNOSTIC(-1, Note, seeOtherDeclarationOf, "see other declaration of '$0'")
 DIAGNOSTIC(-1, Note, seePreviousDeclarationOf, "see previous declaration of '$0'")
+DIAGNOSTIC(-1, Note, seeTokenPasteLocation, "see token pasted location")
 
 //
 // 0xxxx -  Command line and interaction with host platform APIs.
