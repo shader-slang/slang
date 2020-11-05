@@ -1289,6 +1289,15 @@ struct IRWitnessTableType : IRType
     IR_LEAF_ISA(WitnessTableType);
 };
 
+struct IRWitnessTableIDType : IRType
+{
+    IRInst* getConformanceType()
+    {
+        return getOperand(0);
+    }
+    IR_LEAF_ISA(WitnessTableIDType);
+};
+
 struct IRBindExistentialsType : IRType
 {
     IR_LEAF_ISA(BindExistentialsType)

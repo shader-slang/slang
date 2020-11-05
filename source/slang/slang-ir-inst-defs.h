@@ -187,7 +187,12 @@ INST(TypeType, type_t, 0, 0)
 // An `IRWitnessTable` has type `WitnessTableType`.
 INST(WitnessTableType, witness_table_t, 1, 0)
 
-INST_RANGE(Type, VoidType, WitnessTableType)
+// An integer type representing a witness table for targets where
+// witness tables are represented as integer IDs. This type is used
+// during the lower-generics pass while generating dynamic dispatch
+// code and will eventually lower into an uint type.
+INST(WitnessTableIDType, witness_table_id_t, 1, 0)
+INST_RANGE(Type, VoidType, WitnessTableIDType)
 
 /*IRGlobalValueWithCode*/
     /* IRGlobalValueWithParams*/
