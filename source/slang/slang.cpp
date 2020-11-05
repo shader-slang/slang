@@ -1071,7 +1071,9 @@ protected:
 };
 
 
-// I guess I can just build a tree. That way I only need to find the root, and then can just recursively traverse
+// Holds the hierarchy of views, and views that are that children of those views.
+// Another choice to this structure, could be holding a list of child views within
+// a SourceView perhaps.
 struct ViewInitiatingHierarchy
 {
     void add(SourceView* parent, SourceView* child)
@@ -1111,7 +1113,7 @@ struct ViewInitiatingHierarchy
         }
     }
 
-    const List<SourceView*> getChildren(SourceView* parent) const
+    const List<SourceView*>& getChildren(SourceView* parent) const
     {
         Index* indexPtr = m_parentIndexMap.TryGetValue(parent);
         return indexPtr ? m_children[*indexPtr] : m_emptyChildren;
@@ -1131,6 +1133,8 @@ struct ViewInitiatingHierarchy
         }
     }
 
+protected:
+
     static bool _compare(SourceView* a, SourceView* b)
     {
         return a->getInitiatingSourceLoc().getRaw() < b->getInitiatingSourceLoc().getRaw();
@@ -1142,10 +1146,16 @@ struct ViewInitiatingHierarchy
     List<SourceView*> m_emptyChildren;
 };
 
+// Given a source file, find the view that is the initial SourceView use of the source. It must have
+// an initiating SourceLoc that is not valid.
+// This could perhaps be improved with a 
 static SourceView* _findInitialSourceView(SourceFile* sourceFile)
 {
     SourceManager* sourceManager = sourceFile->getSourceManager();
 
+    // TODO(JS):
+    // This might be overkill - presumably the SourceView would belong to the same manager as it's SourceFile?
+    // That is not enforced by the SourceManager in any way though so we just search all managers, and all views.
     while (sourceManager)
     {
         for (SourceView* view : sourceManager->getSourceViews())
@@ -1164,9 +1174,6 @@ static SourceView* _findInitialSourceView(SourceFile* sourceFile)
 
 static void _outputInclude(SourceFile* sourceFile, Index depth, DiagnosticSink* sink)
 {
-    const PathInfo& pathInfo = sourceFile->getPathInfo();
-
-    
     StringBuilder buf;
 
     for (Index i = 0; i < depth; ++i)
@@ -1178,6 +1185,7 @@ static void _outputInclude(SourceFile* sourceFile, Index depth, DiagnosticSink* 
     // TODO(JS). We could use the verbose paths flag to control what path is output -> as it may be useful to output the full path
     // for example
 
+    const PathInfo& pathInfo = sourceFile->getPathInfo();
     buf << pathInfo.foundPath;
 
     // TODO(JS)?
@@ -1205,9 +1213,10 @@ static void _outputIncludesRec(SourceView* sourceView, Index depth, ViewInitiati
         default: break;
     }
 
-    // Okay output this at the current depth
+    // Okay output this file at the current depth
     _outputInclude(sourceFile, depth, sink);
 
+    // Now recurse to all of the children at the next depth
     for (SourceView* child : hierarchy.getChildren(sourceView))
     {
         _outputIncludesRec(child, depth + 1, hierarchy, sink);
