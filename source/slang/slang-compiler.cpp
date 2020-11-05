@@ -2346,7 +2346,7 @@ SlangResult dissassembleDXILUsingDXC(
         options.compressionType = linkage->serialCompressionType;
         if (linkage->debugInfoLevel != DebugInfoLevel::None)
         {
-            options.optionFlags |= SerialOptionFlag::DebugInfo;
+            options.optionFlags |= SerialOptionFlag::SourceLocation;
         }
         if (linkage->m_obfuscateCode)
         {
@@ -2360,7 +2360,7 @@ SlangResult dissassembleDXILUsingDXC(
             RiffContainer container;
             {
                 SerialContainerData data;
-                SLANG_RETURN_ON_FAIL(SerialContainerUtil::requestToData(this, options, data));
+                SLANG_RETURN_ON_FAIL(SerialContainerUtil::addEndToEndRequestToData(this, options, data));
                 SLANG_RETURN_ON_FAIL(SerialContainerUtil::write(data, options, &container));
             }
             // We now write the RiffContainer to the stream

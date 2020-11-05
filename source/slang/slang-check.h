@@ -36,4 +36,6 @@ namespace Slang
 
     bool isGlobalShaderParameter(VarDeclBase* decl);
     bool isFromStdLib(Decl* decl);
+
+    void registerBuiltinDecls(Session* session, Decl* decl);
 }

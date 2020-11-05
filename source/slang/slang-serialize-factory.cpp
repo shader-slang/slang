@@ -111,6 +111,9 @@ SerialIndex ModuleSerialFilter::writePointer(SerialWriter* writer, const NodeBas
     ASTSerialUtil::addSerialClasses(serialClasses);
     SerialRefObjects::addSerialClasses(serialClasses);
 
+    // Check if it seems ok
+    SLANG_ASSERT(serialClasses->isOk());
+
     return SLANG_OK;
 }
 
