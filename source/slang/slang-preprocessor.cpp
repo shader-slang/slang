@@ -1882,7 +1882,7 @@ static void HandleIncludeDirective(PreprocessorDirectiveContext* context)
         sourceManager->addSourceFile(filePathInfo.uniqueIdentity, sourceFile);
     }
 
-    // This is a new parse (even if it's a pre-existing source file), so create a new SourceUnit
+    // This is a new parse (even if it's a pre-existing source file), so create a new SourceView
     SourceView* sourceView = sourceManager->createSourceView(sourceFile, &filePathInfo, directiveLoc);
 
     PreprocessorInputStream* inputStream = CreateInputStreamForSource(context->preprocessor, sourceView);

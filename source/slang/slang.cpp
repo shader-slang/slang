@@ -1070,6 +1070,99 @@ protected:
     }
 };
 
+static void _outputIncludes(const TokenList& tokens, SourceManager* sourceManager, DiagnosticSink* sink)
+{
+    // The view that initiated the current source view. nullptr if not defined
+    SourceView* initiatingView = nullptr;
+    // The current sourceView 
+    SourceView* sourceView = nullptr;
+
+    StringBuilder buf;
+
+    Index depth = 0;
+    for (const Token& tok : tokens)
+    {
+        // If no valid loc, nothing to do
+        if (!tok.loc.isValid())
+        {
+            continue;
+        }
+
+        // There is no transition to a new view
+        if (sourceView && sourceView->getRange().contains(tok.loc))
+        {
+            continue;
+        }
+
+        SourceView* locSourceView = sourceManager->findSourceViewRecursively(tok.loc);
+        if (!locSourceView)
+        {
+            // Couldn't find the view... that's odd ... but for now we'll just ignore
+            continue;
+        }
+
+        // The locs view cannot be the same as the sourceView otherwise it would have be caught in the earlier test.
+        SLANG_ASSERT(locSourceView != sourceView);
+
+        SourceFile* locSourceFile = locSourceView->getSourceFile();
+        if (locSourceFile)
+        {
+            const PathInfo& locPathInfo = locSourceFile->getPathInfo();
+
+            // If the new 'SourceFile' at the current loc is due to any of these issues, then this isn't due to an include
+            if (locPathInfo.type == PathInfo::Type::TokenPaste ||
+                locPathInfo.type == PathInfo::Type::CommandLine ||
+                locPathInfo.type == PathInfo::Type::TypeParse)
+            {
+                continue;
+            }
+        }
+
+        SourceView* locInitiatingSourceView = locSourceView->getInitiatingSourceLoc().isValid() ? sourceManager->findSourceViewRecursively(locSourceView->getInitiatingSourceLoc()) : nullptr;
+
+        // If the new locs view is the one that initiated the current view, we can pop the depth
+        if (initiatingView == locSourceView)
+        {
+            depth--;
+            SLANG_ASSERT(depth >= 0);
+        }
+        else 
+        {
+            // Okay we can assume we have an include
+            if (locInitiatingSourceView == sourceView && sourceView)
+            {
+                // Okay we have an include and the depth increases
+                depth++;
+            }
+                
+            buf.Clear();
+            for (Index i = 0; i < depth; ++i)
+            {
+                buf << "  ";
+            }
+
+            SourceFile* sourceFile = locSourceView->getSourceFile();
+            SLANG_ASSERT(sourceFile);
+
+            // Output the found path for now
+            // TODO(JS). We could use the verbose paths flag to control what path is output -> as it may be useful to output the full path
+            // for example
+
+            buf << sourceFile->getPathInfo().foundPath;
+
+            // TODO(JS)?
+            // You might want to know where this include was from.
+            // If I output this though there will be a problem... as the indenting won't be clearly shown.
+            // Perhaps I output in two sections, one the hierarchy and the other the locations of the includes?
+
+            sink->diagnose(SourceLoc(), Diagnostics::includeOutput, buf);
+        }
+
+        // Set the current view
+        sourceView = locSourceView;
+        initiatingView = locInitiatingSourceView;
+    }
+}
 
 void FrontEndCompileRequest::parseTranslationUnit(
     TranslationUnitRequest* translationUnit)
@@ -1151,6 +1244,11 @@ void FrontEndCompileRequest::parseTranslationUnit(
             combinedPreprocessorDefinitions,
             getLinkage(),
             &preprocessorHandler);
+
+        if (outputIncludes)
+        {
+            _outputIncludes(tokens, getSink()->getSourceManager(), getSink());
+        }
 
         parseSourceFile(
             astBuilder,
