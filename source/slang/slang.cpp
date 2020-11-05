@@ -1070,97 +1070,183 @@ protected:
     }
 };
 
-static void _outputIncludes(const TokenList& tokens, SourceManager* sourceManager, DiagnosticSink* sink)
-{
-    // The view that initiated the current source view. nullptr if not defined
-    SourceView* initiatingView = nullptr;
-    // The current sourceView 
-    SourceView* sourceView = nullptr;
 
+// I guess I can just build a tree. That way I only need to find the root, and then can just recursively traverse
+struct ViewInitiatingHierarchy
+{
+    void add(SourceView* parent, SourceView* child)
+    {
+        Index index = m_children.getCount();
+        Index* indexPtr = m_parentIndexMap.TryGetValueOrAdd(parent, index);
+        if (indexPtr)
+        {
+            index = *indexPtr;
+        }
+        else
+        {
+            m_children.add(m_emptyChildren);
+        }
+
+        // It shouldn't have already been added
+        SLANG_ASSERT(m_children[index].indexOf(child) < 0);
+
+        m_children[index].add(child);
+    }
+
+    void addViews(SourceManager* manager, SourceView*const* views, Index viewsCount)
+    {
+        for (Index i = 0; i < viewsCount; ++i)
+        {
+            SourceView* view = views[i];
+
+            if (view->getInitiatingSourceLoc().isValid())
+            {
+                // Look up the view it came from
+                SourceView* parentView = manager->findSourceViewRecursively(view->getInitiatingSourceLoc());
+                if (parentView)
+                {
+                    add(parentView, view);
+                }
+            }
+        }
+    }
+
+    const List<SourceView*> getChildren(SourceView* parent) const
+    {
+        Index* indexPtr = m_parentIndexMap.TryGetValue(parent);
+        return indexPtr ? m_children[*indexPtr] : m_emptyChildren;
+    }
+
+    void clear()
+    {
+        m_parentIndexMap.Clear();
+        m_children.clear();
+    }
+
+    void orderChildren()
+    {
+        for (auto& child : m_children)
+        {
+            child.sort(_compare);
+        }
+    }
+
+    static bool _compare(SourceView* a, SourceView* b)
+    {
+        return a->getInitiatingSourceLoc().getRaw() < b->getInitiatingSourceLoc().getRaw();
+    }
+
+    Dictionary<SourceView*, Index> m_parentIndexMap;
+    List<List<SourceView*>> m_children;
+    // Just for convenience...
+    List<SourceView*> m_emptyChildren;
+};
+
+static SourceView* _findInitialSourceView(SourceFile* sourceFile)
+{
+    SourceManager* sourceManager = sourceFile->getSourceManager();
+
+    while (sourceManager)
+    {
+        for (SourceView* view : sourceManager->getSourceViews())
+        {
+            if (view->getSourceFile() == sourceFile && !view->getInitiatingSourceLoc().isValid())
+            {
+                return view;
+            }
+        }
+
+        sourceManager = sourceManager->getParent();
+    }
+
+    return nullptr;
+}
+
+static void _outputInclude(SourceFile* sourceFile, Index depth, DiagnosticSink* sink)
+{
+    const PathInfo& pathInfo = sourceFile->getPathInfo();
+
+    
     StringBuilder buf;
 
-    Index depth = 0;
-    for (const Token& tok : tokens)
+    for (Index i = 0; i < depth; ++i)
     {
-        // If no valid loc, nothing to do
-        if (!tok.loc.isValid())
+        buf << "  ";
+    }
+
+    // Output the found path for now
+    // TODO(JS). We could use the verbose paths flag to control what path is output -> as it may be useful to output the full path
+    // for example
+
+    buf << pathInfo.foundPath;
+
+    // TODO(JS)?
+    // You might want to know where this include was from.
+    // If I output this though there will be a problem... as the indenting won't be clearly shown.
+    // Perhaps I output in two sections, one the hierarchy and the other the locations of the includes?
+
+    sink->diagnose(SourceLoc(), Diagnostics::includeOutput, buf);
+}
+
+static void _outputIncludesRec(SourceView* sourceView, Index depth, ViewInitiatingHierarchy& hierarchy, DiagnosticSink* sink)
+{
+    SourceFile* sourceFile = sourceView->getSourceFile();
+    const PathInfo& pathInfo = sourceFile->getPathInfo();
+
+    switch (pathInfo.type)
+    {
+        case PathInfo::Type::TokenPaste:
+        case PathInfo::Type::CommandLine:
+        case PathInfo::Type::TypeParse:
         {
-            continue;
+            // If any of these types we don't output
+            return;
         }
+        default: break;
+    }
 
-        // There is no transition to a new view
-        if (sourceView && sourceView->getRange().contains(tok.loc))
+    // Okay output this at the current depth
+    _outputInclude(sourceFile, depth, sink);
+
+    for (SourceView* child : hierarchy.getChildren(sourceView))
+    {
+        _outputIncludesRec(child, depth + 1, hierarchy, sink);
+    }
+}
+
+static void _outputIncludes(const List<SourceFile*>& sourceFiles, SourceManager* sourceManager, DiagnosticSink* sink)
+{
+    // Set up the hierarchy to know how all the source views relate. This could be argued as overkill, but makes recursive
+    // output pretty simple
+    ViewInitiatingHierarchy hierarchy;
+    {
+        SourceManager* curManager = sourceManager;
+        while (curManager)
         {
-            continue;
+            const auto& views = curManager->getSourceViews();
+            hierarchy.addViews(sourceManager, views.getBuffer(), views.getCount());
+            curManager = curManager->getParent();
         }
+    }
+    // We want the children to be listed in the order they are initiated in the source.
+    // Assumes SourceLocs are in source order - which they are right now.
+    hierarchy.orderChildren();
 
-        SourceView* locSourceView = sourceManager->findSourceViewRecursively(tok.loc);
-        if (!locSourceView)
+    // For all the source files
+    for (SourceFile* sourceFile : sourceFiles)
+    {
+        // Find an initial view (this is the view of this file, that doesn't have an initiating loc)
+        SourceView* sourceView = _findInitialSourceView(sourceFile);
+        if (!sourceView)
         {
-            // Couldn't find the view... that's odd ... but for now we'll just ignore
-            continue;
+            // Okay, didn't find one, so just output the file
+            _outputInclude(sourceFile, 0, sink);
         }
-
-        // The locs view cannot be the same as the sourceView otherwise it would have be caught in the earlier test.
-        SLANG_ASSERT(locSourceView != sourceView);
-
-        SourceFile* locSourceFile = locSourceView->getSourceFile();
-        if (locSourceFile)
+        else
         {
-            const PathInfo& locPathInfo = locSourceFile->getPathInfo();
-
-            // If the new 'SourceFile' at the current loc is due to any of these issues, then this isn't due to an include
-            if (locPathInfo.type == PathInfo::Type::TokenPaste ||
-                locPathInfo.type == PathInfo::Type::CommandLine ||
-                locPathInfo.type == PathInfo::Type::TypeParse)
-            {
-                continue;
-            }
+            // Output from this view recursively
+            _outputIncludesRec(sourceView, 0, hierarchy, sink);
         }
-
-        SourceView* locInitiatingSourceView = locSourceView->getInitiatingSourceLoc().isValid() ? sourceManager->findSourceViewRecursively(locSourceView->getInitiatingSourceLoc()) : nullptr;
-
-        // If the new locs view is the one that initiated the current view, we can pop the depth
-        if (initiatingView == locSourceView)
-        {
-            depth--;
-            SLANG_ASSERT(depth >= 0);
-        }
-        else 
-        {
-            // Okay we can assume we have an include
-            if (locInitiatingSourceView == sourceView && sourceView)
-            {
-                // Okay we have an include and the depth increases
-                depth++;
-            }
-                
-            buf.Clear();
-            for (Index i = 0; i < depth; ++i)
-            {
-                buf << "  ";
-            }
-
-            SourceFile* sourceFile = locSourceView->getSourceFile();
-            SLANG_ASSERT(sourceFile);
-
-            // Output the found path for now
-            // TODO(JS). We could use the verbose paths flag to control what path is output -> as it may be useful to output the full path
-            // for example
-
-            buf << sourceFile->getPathInfo().foundPath;
-
-            // TODO(JS)?
-            // You might want to know where this include was from.
-            // If I output this though there will be a problem... as the indenting won't be clearly shown.
-            // Perhaps I output in two sections, one the hierarchy and the other the locations of the includes?
-
-            sink->diagnose(SourceLoc(), Diagnostics::includeOutput, buf);
-        }
-
-        // Set the current view
-        sourceView = locSourceView;
-        initiatingView = locInitiatingSourceView;
     }
 }
 
@@ -1247,7 +1333,7 @@ void FrontEndCompileRequest::parseTranslationUnit(
 
         if (outputIncludes)
         {
-            _outputIncludes(tokens, getSink()->getSourceManager(), getSink());
+            _outputIncludes(translationUnit->getSourceFiles(), getSink()->getSourceManager(), getSink());
         }
 
         parseSourceFile(

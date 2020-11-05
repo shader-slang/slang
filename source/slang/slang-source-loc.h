@@ -396,6 +396,9 @@ struct SourceManager
         /// Get all of the source files
     const List<SourceFile*>& getSourceFiles() const { return m_sourceFiles; }
 
+        /// Get the source views
+    const List<SourceView*>& getSourceViews() const { return m_sourceViews; }
+
     SourceManager() :
         m_memoryArena(2048),
         m_slicePool(StringSlicePool::Style::Default)
