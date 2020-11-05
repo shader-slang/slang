@@ -37,6 +37,23 @@ namespace Slang
         IRValidateContext*  context,
         IRInst*             parent)
     {
+        // We want to check that child instructions are correctly
+        // ordered so that decorations come first, then any parameters,
+        // and then any ordinary instructions.
+        //
+        // We will track what we have seen so far with a simple state
+        // machine, which in valid IR should proceed monitonically
+        // up through the following states:
+        //
+        enum State
+        {
+            kState_Initial = 0,
+            kState_AfterDecoration,
+            kState_AfterParam,
+            kState_AfterOrdinary,
+        };
+        State state = kState_Initial;
+
         IRInst* prevChild = nullptr;
         for(auto child : parent->getDecorationsAndChildren() )
         {
@@ -47,6 +64,21 @@ namespace Slang
 
             // Recursively validate the instruction itself.
             validateIRInst(context, child);
+
+            if( as<IRDecoration>(child) )
+            {
+                validate(context, state <= kState_AfterDecoration, child, "decorations must come before other child instructions");
+                state = kState_AfterDecoration;
+            }
+            else if( as<IRParam>(child) )
+            {
+                validate(context, state <= kState_AfterParam, child, "parameters must come before ordinary instructions");
+                state = kState_AfterParam;
+            }
+            else
+            {
+                state = kState_AfterOrdinary;
+            }
 
             // Do some extra validation around terminator instructions:
             //
