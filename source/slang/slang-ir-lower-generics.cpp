@@ -9,6 +9,7 @@
 #include "slang-ir-lower-generic-call.h"
 #include "slang-ir-lower-generic-type.h"
 #include "slang-ir-specialize-dispatch.h"
+#include "slang-ir-specialize-dynamic-associatedtype-lookup.h"
 #include "slang-ir-witness-table-wrapper.h"
 #include "slang-ir-ssa.h"
 #include "slang-ir-dce.h"
@@ -60,6 +61,10 @@ namespace Slang
             return;
 
         specializeDispatchFunctions(&sharedContext);
+        if (sink->getErrorCount() != 0)
+            return;
+
+        specializeDynamicAssociatedTypeLookup(&sharedContext);
         if (sink->getErrorCount() != 0)
             return;
 
