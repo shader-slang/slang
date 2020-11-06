@@ -190,7 +190,7 @@ Result IRSerialWriter::write(IRModule* module, SerialSourceLocWriter* sourceLocW
             IRInst* srcInst = m_insts[i];
             Ser::Inst& dstInst = m_serialData->m_insts[i];
 
-            dstInst.m_op = uint8_t(srcInst->op & kIROpMeta_OpMask);
+            dstInst.m_op = uint16_t(srcInst->op & kIROpMeta_OpMask);
             dstInst.m_payloadType = PayloadType::Empty;
             
             dstInst.m_resultTypeIndex = getInstIndex(srcInst->getFullType());
@@ -357,8 +357,9 @@ Result _encodeInsts(SerialCompressionType compressionType, const List<IRSerialDa
             encodeOut = encodeArrayOut.begin() + offset;
             encodeEnd = encodeArrayOut.end();
         }
+        memcpy(encodeOut, &inst.m_op, sizeof(inst.m_op));
+        encodeOut += sizeof(inst.m_op);
 
-        *encodeOut++ = uint8_t(inst.m_op);
         *encodeOut++ = uint8_t(inst.m_payloadType);
 
         encodeOut += ByteEncodeUtil::encodeLiteUInt32((uint32_t)inst.m_resultTypeIndex, encodeOut);
@@ -525,7 +526,8 @@ static Result _decodeInsts(SerialCompressionType compressionType, const uint8_t*
 
         auto& inst = insts[i];
 
-        inst.m_op = *encodeCur++;
+        memcpy(&inst.m_op, encodeCur, sizeof(inst.m_op));
+        encodeCur += sizeof(inst.m_op);
         const PayloadType payloadType = PayloadType(*encodeCur++);
         inst.m_payloadType = payloadType;
         
@@ -694,7 +696,7 @@ Result IRSerialReader::read(const IRSerialData& data, Session* session, SerialSo
     insts.setCount(numInsts);
     insts[0] = nullptr;
 
-    // 0 holds null
+    // 0 holds null&
     // 1 holds the IRModuleInst
     {
         // Check that insts[1] is the module inst
