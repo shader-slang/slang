@@ -357,8 +357,7 @@ Result _encodeInsts(SerialCompressionType compressionType, const List<IRSerialDa
             encodeOut = encodeArrayOut.begin() + offset;
             encodeEnd = encodeArrayOut.end();
         }
-        memcpy(encodeOut, &inst.m_op, sizeof(inst.m_op));
-        encodeOut += sizeof(inst.m_op);
+        encodeOut += ByteEncodeUtil::encodeLiteUInt32(inst.m_op, encodeOut);
 
         *encodeOut++ = uint8_t(inst.m_payloadType);
 
@@ -525,9 +524,10 @@ static Result _decodeInsts(SerialCompressionType compressionType, const uint8_t*
         }
 
         auto& inst = insts[i];
+        uint32_t instOp = 0;
+        encodeCur += ByteEncodeUtil::decodeLiteUInt32(encodeCur, &instOp);
+        inst.m_op = (uint16_t)instOp;
 
-        memcpy(&inst.m_op, encodeCur, sizeof(inst.m_op));
-        encodeCur += sizeof(inst.m_op);
         const PayloadType payloadType = PayloadType(*encodeCur++);
         inst.m_payloadType = payloadType;
         
