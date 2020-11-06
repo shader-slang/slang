@@ -1422,7 +1422,7 @@ static SlangResult _fillRuntimeHandlesInBuffers(
                     if (!outName)
                         return SLANG_FAIL;
                     SLANG_CUDA_RETURN_ON_FAIL(cuModuleGetGlobal(
-                        &ptrValue,
+                        (CUdeviceptr*)&ptrValue,
                         nullptr,
                         cudaModule.m_module,
                         (char*)outName->getBufferPointer()));
