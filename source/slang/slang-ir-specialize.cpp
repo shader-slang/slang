@@ -398,7 +398,7 @@ struct SpecializationContext
             // as all of its operands are.
             //
             // TODO: We realistically need a more refined
-            // check here that uses a white-list of instructions
+            // check here that uses an allow-list of instructions
             // that can represent values suitable for use
             // as generic arguments.
             //
