@@ -129,7 +129,7 @@ struct IRSerialData
         
         SLANG_FORCE_INLINE bool operator!=(const ThisType& rhs) const { return !(*this == rhs); }
 
-        uint8_t m_op;                       ///< For now one of IROp 
+        uint16_t m_op;                      ///< For now one of IROp 
         PayloadType m_payloadType;	 		///< The type of payload 
         uint16_t m_pad0;                    ///< Not currently used             
 
