@@ -696,7 +696,7 @@ Result IRSerialReader::read(const IRSerialData& data, Session* session, SerialSo
     insts.setCount(numInsts);
     insts[0] = nullptr;
 
-    // 0 holds null&
+    // 0 holds null
     // 1 holds the IRModuleInst
     {
         // Check that insts[1] is the module inst
