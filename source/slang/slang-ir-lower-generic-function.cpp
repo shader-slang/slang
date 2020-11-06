@@ -170,7 +170,7 @@ namespace Slang
                     }
                     else if (entry->getRequirementVal()->op == kIROp_AssociatedType)
                     {
-                        loweredVal = builder.getPtrType(builder.getRTTIType());
+                        loweredVal = builder.getRTTIHandleType();
                     }
                     else
                     {
@@ -231,7 +231,7 @@ namespace Slang
                     // Translate a Type value to an RTTI object pointer.
                     auto rttiObject = sharedContext->maybeEmitRTTIObject(entry->getSatisfyingVal());
                     auto rttiObjectPtr = builder->emitGetAddress(
-                        builder->getPtrType(builder->getRTTIType()),
+                        builder->getRTTIHandleType(),
                         rttiObject);
                     entry->satisfyingVal.set(rttiObjectPtr);
                 }

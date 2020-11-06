@@ -134,13 +134,14 @@ namespace Slang
 
         if (isTypeValue(paramType))
         {
-            return builder->getPtrType(builder->getRTTIType());
+            return builder->getRTTIHandleType();
         }
 
         IRIntegerValue anyValueSize = kInvalidAnyValueSize;
         switch (paramType->op)
         {
         case kIROp_WitnessTableType:
+        case kIROp_WitnessTableIDType:
         case kIROp_ExtractExistentialType:
             // Do not translate these types.
             return (IRType*)paramType;
@@ -174,8 +175,8 @@ namespace Slang
             // An existential type translates into a tuple of (AnyValue, WitnessTable, RTTI*)
             anyValueSize = getInterfaceAnyValueSize(paramType, paramType->sourceLoc);
             auto anyValueType = builder->getAnyValueType(anyValueSize);
-            auto witnessTableType = builder->getWitnessTableType((IRType*)paramType);
-            auto rttiType = builder->getPtrType(builder->getRTTIType());
+            auto witnessTableType = builder->getWitnessTableIDType((IRType*)paramType);
+            auto rttiType = builder->getRTTIHandleType();
             auto tupleType = builder->getTupleType(rttiType, witnessTableType, anyValueType);
             return tupleType;
         }

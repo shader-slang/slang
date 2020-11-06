@@ -494,6 +494,7 @@ SlangResult CPPSourceEmitter::calcTypeName(IRType* type, CodeGenTarget target, S
             return SLANG_OK;
         }
         case kIROp_WitnessTableType:
+        case kIROp_WitnessTableIDType:
         {
             // A witness table typed value translates to a pointer to the
             // struct of function pointers corresponding to the interface type.
@@ -530,6 +531,11 @@ SlangResult CPPSourceEmitter::calcTypeName(IRType* type, CodeGenTarget target, S
         case kIROp_RTTIType:
         {
             out << "TypeInfo";
+            return SLANG_OK;
+        }
+        case kIROp_RTTIHandleType:
+        {
+            out << "TypeInfo*";
             return SLANG_OK;
         }
         default:
@@ -1652,8 +1658,10 @@ void CPPSourceEmitter::_emitWitnessTableDefinitions()
         m_writer->emit(" = {\n");
         m_writer->indent();
         auto seqIdDecoration = witnessTable->findDecoration<IRSequentialIDDecoration>();
-        SLANG_ASSERT(seqIdDecoration);
-        m_writer->emit((UInt)seqIdDecoration->getSequentialID());
+        if (seqIdDecoration)
+            m_writer->emit((UInt)seqIdDecoration->getSequentialID());
+        else
+            m_writer->emit("0");
         for (Index i = 0; i < sortedWitnessTableEntries.getCount(); i++)
         {
             auto entry = sortedWitnessTableEntries[i];
@@ -1669,7 +1677,7 @@ void CPPSourceEmitter::_emitWitnessTableDefinitions()
                 m_writer->emit(getName(witnessTableVal));
             }
             else if (entry->getSatisfyingVal() &&
-                     isPointerOfType(entry->getSatisfyingVal()->getDataType(), kIROp_RTTIType))
+                     entry->getSatisfyingVal()->getDataType()->op, kIROp_RTTIHandleType)
             {
                 m_writer->emit(",\n");
                 emitInstExpr(entry->getSatisfyingVal(), getInfo(EmitOp::General));
@@ -1731,7 +1739,7 @@ void CPPSourceEmitter::emitInterface(IRInterfaceType* interfaceType)
             m_writer->emit(getName(entry->getRequirementKey()));
             m_writer->emit(";\n");
         }
-        else if (isPointerOfType(entry->getRequirementVal(), kIROp_RTTIType))
+        else if (entry->getRequirementVal()->op == kIROp_RTTIHandleType)
         {
             m_writer->emit("TypeInfo* ");
             m_writer->emit(getName(entry->getRequirementKey()));

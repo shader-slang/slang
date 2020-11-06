@@ -1807,6 +1807,7 @@ struct IRBuilder
     IRRawPointerType* getRawPointerType();
     IRRTTIPointerType* getRTTIPointerType(IRInst* rttiPtr);
     IRRTTIType* getRTTIType();
+    IRRTTIHandleType* getRTTIHandleType();
     IRAnyValueType* getAnyValueType(IRIntegerValue size);
     IRAnyValueType* getAnyValueType(IRInst* size);
     IRDynamicType* getDynamicType();

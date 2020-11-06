@@ -1409,7 +1409,7 @@ static SlangResult _fillRuntimeHandlesInBuffers(
     {
         for (auto& rtti : entry.rttiEntries)
         {
-            CUdeviceptr ptrValue = 0;
+            uint64_t ptrValue = 0;
             switch (rtti.type)
             {
             case RTTIDataEntryType::RTTIObject:
@@ -1438,23 +1438,15 @@ static SlangResult _fillRuntimeHandlesInBuffers(
                     auto interfaceType = reflection->findTypeByName(rtti.interfaceName.getBuffer());
                     if (!interfaceType)
                         return SLANG_FAIL;
-                    ComPtr<ISlangBlob> outName;
-                    linkage->getTypeConformanceWitnessMangledName(
-                        concreteType, interfaceType, outName.writeRef());
-                    if (!outName)
-                        return SLANG_FAIL;
-                    SLANG_CUDA_RETURN_ON_FAIL(cuModuleGetGlobal(
-                        &ptrValue,
-                        nullptr,
-                        cudaModule.m_module,
-                        (char*)outName->getBufferPointer()));
+                    uint32_t id = 0xFFFFFFFF;
+                    linkage->getTypeConformanceWitnessSequentialID(
+                        concreteType, interfaceType, &id);
+                    ptrValue = id;
                     break;
                 }
             default:
                 break;
             }
-            if (!ptrValue)
-                return SLANG_FAIL;
             if (rtti.offset >= 0 &&
                 rtti.offset + sizeof(ptrValue) <=
                     entry.bufferData.getCount() * sizeof(decltype(entry.bufferData[0])))
