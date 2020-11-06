@@ -176,7 +176,7 @@ struct AssociatedTypeLookupSpecializationContext
         });
 
         // Replace all direct uses of IRWitnessTables with its sequential ID.
-        workOnModule([this](IRInst* inst)
+        workOnModule([](IRInst* inst)
         {
             if (inst->op == kIROp_WitnessTable)
             {
