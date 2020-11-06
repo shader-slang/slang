@@ -2596,6 +2596,16 @@ namespace Slang
             (IRInst* const*)&baseType);
     }
 
+    IRWitnessTableIDType* IRBuilder::getWitnessTableIDType(
+        IRType* baseType)
+    {
+        return (IRWitnessTableIDType*)findOrEmitHoistableInst(
+            nullptr,
+            kIROp_WitnessTableIDType,
+            1,
+            (IRInst* const*)&baseType);
+    }
+
     IRConstantBufferType* IRBuilder::getConstantBufferType(IRType* elementType)
     {
         IRInst* operands[] = { elementType };
@@ -5496,6 +5506,7 @@ namespace Slang
         case kIROp_DefaultConstruct:
         case kIROp_Specialize:
         case kIROp_lookup_interface_method:
+        case kIROp_GetSequentialID:
         case kIROp_getAddr:
         case kIROp_GetValueFromExistentialBox:
         case kIROp_Construct:

@@ -76,6 +76,19 @@ namespace Slang
         {
             return lowerType(builder, paramType, Dictionary<IRInst*, IRInst*>());
         }
+
+        // Get a list of all witness tables whose conformance type is `interfaceType`.
+        List<IRWitnessTable*> getWitnessTablesFromInterfaceType(IRInst* interfaceType);
+
+        IRInst* findWitnessTableEntry(IRWitnessTable* table, IRInst* key)
+        {
+            for (auto entry : table->getEntries())
+            {
+                if (entry->getRequirementKey() == key)
+                    return entry->getSatisfyingVal();
+            }
+            return nullptr;
+        }
     };
 
     bool isPolymorphicType(IRInst* typeInst);

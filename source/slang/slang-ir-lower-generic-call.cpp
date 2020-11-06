@@ -266,11 +266,17 @@ namespace Slang
                     return;
                 SLANG_UNEXPECTED("Nested generics specialization.");
             }
+            else if (loweredFunc->op == kIROp_lookup_interface_method)
+            {
+                lowerCallToInterfaceMethod(
+                    callInst, cast<IRLookupWitnessMethod>(loweredFunc), specializeInst);
+                return;
+            }
             IRFuncType* funcType = cast<IRFuncType>(loweredFunc->getDataType());
             translateCallInst(callInst, funcType, loweredFunc, specializeInst);
         }
 
-        void lowerCallToInterfaceMethod(IRCall* callInst, IRLookupWitnessMethod* lookupInst)
+        void lowerCallToInterfaceMethod(IRCall* callInst, IRLookupWitnessMethod* lookupInst, IRSpecialize* specializeInst)
         {
             // If we see a call(lookup_interface_method(...), ...), we need to translate
             // all occurences of associatedtypes.
@@ -312,7 +318,10 @@ namespace Slang
             // Translate the new call inst as normal, taking care of packing/unpacking inputs
             // and outputs.
             translateCallInst(
-                newCall, cast<IRFuncType>(dispatchFunc->getFullType()), dispatchFunc, nullptr);
+                newCall,
+                cast<IRFuncType>(dispatchFunc->getFullType()),
+                dispatchFunc,
+                specializeInst);
         }
 
         void lowerCall(IRCall* callInst)
@@ -320,7 +329,7 @@ namespace Slang
             if (auto specializeInst = as<IRSpecialize>(callInst->getCallee()))
                 lowerCallToSpecializedFunc(callInst, specializeInst);
             else if (auto lookupInst = as<IRLookupWitnessMethod>(callInst->getCallee()))
-                lowerCallToInterfaceMethod(callInst, lookupInst);
+                lowerCallToInterfaceMethod(callInst, lookupInst, nullptr);
         }
 
         void processInst(IRInst* inst)
