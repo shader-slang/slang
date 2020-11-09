@@ -1071,30 +1071,20 @@ protected:
 };
 
 
+
 // Holds the hierarchy of views, and views that are that children of those views.
 // Another choice to this structure, could be holding a list of child views within
 // a SourceView perhaps.
+// Another way to do this, would be to have a List of all pairs, that we sort on parent, and then on children, by 
 struct ViewInitiatingHierarchy
 {
     void add(SourceView* parent, SourceView* child)
     {
-        Index index = m_children.getCount();
-        Index* indexPtr = m_parentIndexMap.TryGetValueOrAdd(parent, index);
-        if (indexPtr)
-        {
-            index = *indexPtr;
-        }
-        else
-        {
-            m_children.add(m_emptyChildren);
-        }
-
+        List<SourceView*>& children = m_hierarchy.GetOrAddValue(parent, List<SourceView*>());
         // It shouldn't have already been added
-        SLANG_ASSERT(m_children[index].indexOf(child) < 0);
-
-        m_children[index].add(child);
+        SLANG_ASSERT(children.indexOf(child) < 0);
+        children.add(child);
     }
-
     void addViews(SourceManager* manager, SourceView*const* views, Index viewsCount)
     {
         for (Index i = 0; i < viewsCount; ++i)
@@ -1115,21 +1105,20 @@ struct ViewInitiatingHierarchy
 
     const List<SourceView*>& getChildren(SourceView* parent) const
     {
-        Index* indexPtr = m_parentIndexMap.TryGetValue(parent);
-        return indexPtr ? m_children[*indexPtr] : m_emptyChildren;
+        List<SourceView*>* children = m_hierarchy.TryGetValue(parent);
+        return children ? *children : m_emptyChildren;
     }
 
     void clear()
     {
-        m_parentIndexMap.Clear();
-        m_children.clear();
+        m_hierarchy.Clear();
     }
 
     void orderChildren()
     {
-        for (auto& child : m_children)
+        for (auto& pair : m_hierarchy)
         {
-            child.sort(_compare);
+            pair.Value.sort(_compare);
         }
     }
 
@@ -1140,8 +1129,7 @@ protected:
         return a->getInitiatingSourceLoc().getRaw() < b->getInitiatingSourceLoc().getRaw();
     }
 
-    Dictionary<SourceView*, Index> m_parentIndexMap;
-    List<List<SourceView*>> m_children;
+    Dictionary<SourceView*, List<SourceView*>> m_hierarchy;
     // Just for convenience...
     List<SourceView*> m_emptyChildren;
 };
