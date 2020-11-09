@@ -1,5 +1,5 @@
 //DIAGNOSTIC_TEST:SIMPLE:
-// bad type for `while` predicate
+
 
 #define SOME %
 #define THING %
