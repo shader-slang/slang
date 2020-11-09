@@ -1185,80 +1185,53 @@ protected:
 };
 
 
+// Holds the hierarchy of views, the children being views that were 'initiated' (have an initiating SourceLoc) in the parent. 
+typedef Dictionary<SourceView*, List<SourceView*>> ViewInitiatingHierarchy;
 
-// Holds the hierarchy of views, and views that are that children of those views.
-// Another choice to this structure, could be holding a list of child views within
-// a SourceView perhaps.
-// Another way to do this, would be to have a List of all pairs, that we sort on parent, and then on children, by 
-struct ViewInitiatingHierarchy
+// Calculate the hierarchy from the sourceManager
+static void _calcViewInitiatingHierarchy(SourceManager* sourceManager, ViewInitiatingHierarchy& outHierarchy)
 {
-    void add(SourceView* parent, SourceView* child)
-    {
-        List<SourceView*>& children = m_hierarchy.GetOrAddValue(parent, List<SourceView*>());
-        // It shouldn't have already been added
-        SLANG_ASSERT(children.indexOf(child) < 0);
-        children.add(child);
-    }
-    void addViews(SourceManager* manager, SourceView*const* views, Index viewsCount)
-    {
-        for (Index i = 0; i < viewsCount; ++i)
-        {
-            SourceView* view = views[i];
+    const List<SourceView*> emptyList;
+    outHierarchy.Clear();
 
+    // Iterate over all managers
+    for (SourceManager* curManager = sourceManager; curManager; curManager = curManager->getParent())
+    {
+        // Iterate over all views
+        for (SourceView* view : curManager->getSourceViews())
+        {
             if (view->getInitiatingSourceLoc().isValid())
             {
                 // Look up the view it came from
-                SourceView* parentView = manager->findSourceViewRecursively(view->getInitiatingSourceLoc());
+                SourceView* parentView = sourceManager->findSourceViewRecursively(view->getInitiatingSourceLoc());
                 if (parentView)
                 {
-                    add(parentView, view);
+                    List<SourceView*>& children = outHierarchy.GetOrAddValue(parentView, emptyList);
+                    // It shouldn't have already been added
+                    SLANG_ASSERT(children.indexOf(view) < 0);
+                    children.add(view);
                 }
             }
         }
     }
 
-    const List<SourceView*>& getChildren(SourceView* parent) const
+    // Order all the children, by their raw SourceLocs. This is desirable, so that a trivial traversal
+    // will traverse children in the order they are initiated in the parent source.
+    // This assumes they increase in SourceLoc implies an later within a source file - this is true currently.
+    for (auto& pair : outHierarchy)
     {
-        List<SourceView*>* children = m_hierarchy.TryGetValue(parent);
-        return children ? *children : m_emptyChildren;
+        pair.Value.sort([](SourceView* a, SourceView* b) { return a->getInitiatingSourceLoc().getRaw() < b->getInitiatingSourceLoc().getRaw(); });
     }
-
-    void clear()
-    {
-        m_hierarchy.Clear();
-    }
-
-    void orderChildren()
-    {
-        for (auto& pair : m_hierarchy)
-        {
-            pair.Value.sort(_compare);
-        }
-    }
-
-protected:
-
-    static bool _compare(SourceView* a, SourceView* b)
-    {
-        return a->getInitiatingSourceLoc().getRaw() < b->getInitiatingSourceLoc().getRaw();
-    }
-
-    Dictionary<SourceView*, List<SourceView*>> m_hierarchy;
-    // Just for convenience...
-    List<SourceView*> m_emptyChildren;
-};
+}
 
 // Given a source file, find the view that is the initial SourceView use of the source. It must have
 // an initiating SourceLoc that is not valid.
-// This could perhaps be improved with a 
 static SourceView* _findInitialSourceView(SourceFile* sourceFile)
 {
-    SourceManager* sourceManager = sourceFile->getSourceManager();
-
     // TODO(JS):
     // This might be overkill - presumably the SourceView would belong to the same manager as it's SourceFile?
     // That is not enforced by the SourceManager in any way though so we just search all managers, and all views.
-    while (sourceManager)
+    for (SourceManager* sourceManager = sourceFile->getSourceManager(); sourceManager; sourceManager = sourceManager->getParent())
     {
         for (SourceView* view : sourceManager->getSourceViews())
         {
@@ -1266,9 +1239,7 @@ static SourceView* _findInitialSourceView(SourceFile* sourceFile)
             {
                 return view;
             }
-        }
-
-        sourceManager = sourceManager->getParent();
+        }        
     }
 
     return nullptr;
@@ -1319,9 +1290,13 @@ static void _outputIncludesRec(SourceView* sourceView, Index depth, ViewInitiati
     _outputInclude(sourceFile, depth, sink);
 
     // Now recurse to all of the children at the next depth
-    for (SourceView* child : hierarchy.getChildren(sourceView))
+    List<SourceView*>* children = hierarchy.TryGetValue(sourceView);
+    if (children)
     {
-        _outputIncludesRec(child, depth + 1, hierarchy, sink);
+        for (SourceView* child : *children)
+        {
+            _outputIncludesRec(child, depth + 1, hierarchy, sink);
+        }
     }
 }
 
@@ -1330,18 +1305,7 @@ static void _outputIncludes(const List<SourceFile*>& sourceFiles, SourceManager*
     // Set up the hierarchy to know how all the source views relate. This could be argued as overkill, but makes recursive
     // output pretty simple
     ViewInitiatingHierarchy hierarchy;
-    {
-        SourceManager* curManager = sourceManager;
-        while (curManager)
-        {
-            const auto& views = curManager->getSourceViews();
-            hierarchy.addViews(sourceManager, views.getBuffer(), views.getCount());
-            curManager = curManager->getParent();
-        }
-    }
-    // We want the children to be listed in the order they are initiated in the source.
-    // Assumes SourceLocs are in source order - which they are right now.
-    hierarchy.orderChildren();
+    _calcViewInitiatingHierarchy(sourceManager, hierarchy);
 
     // For all the source files
     for (SourceFile* sourceFile : sourceFiles)
