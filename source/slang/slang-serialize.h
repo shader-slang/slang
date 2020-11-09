@@ -246,7 +246,9 @@ public:
     const List<SerialPointer>& getObjects() const { return m_objects; }
 
         /// Add an object to be kept in scope
-    void addScope(const RefObject* obj) { m_scope.add(obj); }
+    void addScopeWithoutAddRef(const RefObject* obj) { m_scope.add(obj); }
+        /// Add obj with a reference
+    void addScope(const RefObject* obj) { const_cast<RefObject*>(obj)->addReference(); m_scope.add(obj); }
 
         /// Used for attaching extra objects necessary for serializing
     SerialExtraObjects& getExtraObjects() { return m_extraObjects; }
@@ -324,8 +326,20 @@ public:
     SerialIndex writeObject(const NodeBase* ptr);
     SerialIndex writeObject(const RefObject* ptr);
 
+        /// Add an array - may need to convert to serialized format
     template <typename T>
     SerialIndex addArray(const T* in, Index count);
+
+    template <typename NATIVE_TYPE>
+    /// Add an array where all the elements are already in serialized format (ie there is no need to do a conversion)
+    SerialIndex addSerialArray(const void* elements, Index elementCount)
+    {
+        typedef SerialTypeInfo<NATIVE_TYPE> TypeInfo;
+        return addSerialArray(sizeof(typename TypeInfo::SerialType), SerialTypeInfo<NATIVE_TYPE>::SerialAlignment, elements, elementCount);
+    }
+
+        /// Add an array where all the elements are already in serialized format (ie there is no need to do a conversion)
+    SerialIndex addSerialArray(size_t elementSize, size_t alignment, const void* elements, Index elementCount);
 
         /// Add the string
     SerialIndex addString(const UnownedStringSlice& slice) { return _addStringSlice(SerialTypeKind::String, m_sliceMap, slice); }
@@ -362,8 +376,6 @@ protected:
 
     SerialIndex _addStringSlice(SerialTypeKind typeKind, SliceMap& sliceMap, const UnownedStringSlice& slice);
 
-    SerialIndex _addArray(size_t elementSize, size_t alignment, const void* elements, Index elementCount);
-
     SerialIndex _add(const void* nativePtr, SerialInfo::Entry* entry)
     {
         m_entries.add(entry);
@@ -399,7 +411,7 @@ SerialIndex SerialWriter::addArray(const T* in, Index count)
     if (std::is_same<T, ElementSerialType>::value)
     {
         // If they are the same we can just write out
-        return _addArray(sizeof(T), SLANG_ALIGN_OF(ElementSerialType), in, count);
+        return addSerialArray(sizeof(T), SLANG_ALIGN_OF(ElementSerialType), in, count);
     }
     else
     {
@@ -411,7 +423,7 @@ SerialIndex SerialWriter::addArray(const T* in, Index count)
         {
             ElementTypeInfo::toSerial(this, &in[i], &work[i]);
         }
-        return _addArray(sizeof(ElementSerialType), SLANG_ALIGN_OF(ElementSerialType), work.getBuffer(), count);
+        return addSerialArray(sizeof(ElementSerialType), SLANG_ALIGN_OF(ElementSerialType), work.getBuffer(), count);
     }
 }
 
@@ -478,7 +490,6 @@ struct SerialClass
 class SerialClasses : public RefObject
 {
 public:
-
         /// Will add it's own copy into m_classesByType
         /// In process will calculate alignment, offset etc for fields
         /// NOTE! the super set, *must* be an already added to this SerialClasses
@@ -491,6 +502,9 @@ public:
 
         /// Returns true if this cls is *owned* by this SerialClasses
     bool isOwned(const SerialClass* cls) const;
+
+        /// Returns true if the SerialClasses structure appears ok
+    bool isOk() const;
 
         /// Get a serial class based on its type/subType
     const SerialClass* getSerialClass(SerialTypeKind typeKind, SerialSubType subType) const

@@ -92,6 +92,7 @@ SLANG_VALUE_TYPE_INFO(LookupResultItem)
 // QualType
 SLANG_VALUE_TYPE_INFO(QualType)
 
+
 // LookupResult
 template <>
 struct SerialTypeInfo<LookupResult>
@@ -204,6 +205,13 @@ struct SerialTypeInfo<LookupResultItem_Breadcrumb::ThisParameterMode> : public S
 // LookupResultItem_Breadcrumb::Kind
 template <>
 struct SerialTypeInfo<LookupResultItem_Breadcrumb::Kind> : public SerialConvertTypeInfo<LookupResultItem_Breadcrumb::Kind, uint8_t> {};
+
+// RequirementWitness::Flavor
+template <>
+struct SerialTypeInfo<RequirementWitness::Flavor> : public SerialConvertTypeInfo<RequirementWitness::Flavor, uint8_t> {};
+
+// RequirementWitness
+SLANG_VALUE_TYPE_INFO(RequirementWitness)
 
 } // namespace Slang
 

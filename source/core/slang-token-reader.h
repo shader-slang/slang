@@ -103,7 +103,7 @@ namespace Slang
         {
             auto token = ReadToken();
             bool neg = false;
-            if (token.Content == '-')
+            if (token.Content.getUnownedSlice().isChar('-'))
             {
                 neg = true;
                 token = ReadToken();
@@ -130,7 +130,7 @@ namespace Slang
         {
             auto token = ReadToken();
             bool neg = false;
-            if (token.Content == '-')
+            if (token.Content.getUnownedSlice().isChar('-'))
             {
                 neg = true;
                 token = ReadToken();

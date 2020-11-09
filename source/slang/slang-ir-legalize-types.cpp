@@ -1402,6 +1402,9 @@ static LegalVal legalizeInst(
     case kIROp_GlobalParam:
         return legalizeGlobalParam(context, cast<IRGlobalParam>(inst));
 
+    case kIROp_Block:
+        return LegalVal::simple(inst);
+
     default:
         break;
     }
@@ -1515,27 +1518,6 @@ static void addParamType(List<IRType*>& ioParamTypes, LegalType t)
     }
 }
 
-static void legalizeInstsInParent(
-    IRTypeLegalizationContext*  context,
-    IRInst*                     parent)
-{
-    IRInst* nextChild = nullptr;
-    for(auto child = parent->getFirstDecorationOrChild(); child; child = nextChild)
-    {
-        nextChild = child->getNextInst();
-
-        if (auto block = as<IRBlock>(child))
-        {
-            legalizeInstsInParent(context, block);
-        }
-        else
-        {
-            LegalVal legalVal = legalizeInst(context, child);
-            registerLegalizedValue(context, child, legalVal);
-        }
-    }
-}
-
 static LegalVal legalizeFunc(
     IRTypeLegalizationContext*  context,
     IRFunc*                     irFunc)
@@ -1575,7 +1557,6 @@ static LegalVal legalizeFunc(
 
     context->builder->setDataType(irFunc, newFuncType);
 
-    legalizeInstsInParent(context, irFunc);
     return LegalVal::simple(irFunc);
 }
 
@@ -2470,19 +2451,200 @@ static LegalVal legalizeGlobalParam(
     }
 }
 
+struct IRTypeLegalizationPass
+{
+    IRTypeLegalizationContext* context;
+
+    // The goal of this pass is to ensure that legalization has been
+    // applied to each instruction in a module. We also want to
+    // ensure that an insturction doesn't get processed until after
+    // all of its operands have been processed.
+    //
+    // The basic idea will be to maintain a work list of instructions
+    // that are able to be processed, and also a set to track which
+    // instructions have ever been added to the work list.
+
+    List<IRInst*> workList;
+    HashSet<IRInst*> addedToWorkListSet;
+
+    // We will add a simple query to check whether an instruciton
+    // has been put on the work list before (or if it should be
+    // treated *as if* it has been placed on the work list).
+    //
+    bool hasBeenAddedToWorkList(IRInst* inst)
+    {
+        // Sometimes we end up with instructions that have a null
+        // operand (mostly as the type field of key instructions
+        // like the module itself).
+        //
+        // We want to treat such null pointers like we would an
+        // already-processed instruction.
+        //
+        if(!inst) return true;
+
+        // HACK(tfoley): In most cases it is structurally invalid for our
+        // IR to have a cycle where following the operands (or type) of
+        // instructions can lead back to the original instruction.
+        //
+        // (Note that circular dependencies are still possible, but they
+        // must generally be from *children* of an instruction back
+        // to the instruction itself. E.g., an instruction in the body
+        // of a function can directly or indirectly depend on that function.)
+        //
+        // The one key counterexample is with interface types, because their
+        // requirements and the expected types of those requirements are
+        // encoded as operands. A typical method on inteface `I` will have a type
+        // that involves a `ThisType<I>` parameter for `this`, and that creates
+        // a cycle back to `I`.
+        //
+        // In our type legalization pass we are going to manually break that
+        // cycle by treating all `IRInterfaceRequirementEntry` instructions
+        // as having already been processed, since there is no particular
+        // need for us to handle them as part of legalization.
+        //
+        if(inst->op == kIROp_InterfaceRequirementEntry) return true;
+
+        return addedToWorkListSet.Contains(inst);
+    }
+
+    // Next we define a convenience routine for adding something to the work list.
+    //
+    void addToWorkList(IRInst* inst)
+    {
+        // We want to avoid adding anything we've already added or processed.
+        //
+        if(addedToWorkListSet.Contains(inst))
+            return;
+
+        workList.add(inst);
+        addedToWorkListSet.Add(inst);
+    }
+
+    void processModule(IRModule* module)
+    {
+        // In order to process an entire module, we start by adding the
+        // root module insturction to our work list, and then we will
+        // proceed to process instructions until the work list goes dry.
+        //
+        addToWorkList(module->getModuleInst());
+        while( workList.getCount() != 0 )
+        {
+            // The order of items in the work list is signficiant;
+            // later entries could depend on earlier ones. As such, we
+            // cannot just do something like the `fastRemoveAt(...)`
+            // operation that could potentially lead to instructions
+            // being processed in a different order than they were added.
+            //
+            // Instead, we will make a copy of the current work list
+            // at each step, and swap in an empty work list to be added
+            // to with any new instructions.
+            //
+            List<IRInst*> workListCopy;
+            Swap(workListCopy, workList);
+
+            // Now we simply process each instruction on the copy of
+            // the work list, knowing that `processInst` may add additional
+            // instructions to the original work list.
+            //
+            for( auto inst : workListCopy )
+            {
+                processInst(inst);
+            }
+        }
+
+        // After we are done, there might be various instructions that
+        // were marked for deletion, but have not yet been cleaned up.
+        //
+        // We will clean up all those unnecessary instructions now.
+        //
+        for (auto& lv : context->replacedInstructions)
+        {
+            lv->removeAndDeallocate();
+        }
+    }
+
+    void processInst(IRInst* inst)
+    {
+        // The main logic for legalizing an instruction is defined
+        // earlier in this file.
+        //
+        // Our primary task here is to legalize the instruction, and then
+        // register the result of legalization as the proper value
+        // for that instruction.
+        //
+        LegalVal legalVal = legalizeInst(context, inst);
+        registerLegalizedValue(context, inst, legalVal);
+
+        // Once the instruction has been processed, we need to consider
+        // whether any other instructions might now be ready to process.
+        //
+        // An instruction `i` might have been blocked by `inst` if:
+        //
+        // * `inst` was an operand (including the type operand) of `i`, or
+        // * `inst` was the parent of `i`.
+        //
+        // To turn those relationships around, we want to check instructions
+        // `i` where:
+        //
+        // * `i` is a user of `inst`, or
+        // * `i` is a child of `inst`.
+        // 
+        for( auto use = inst->firstUse; use; use = use->nextUse )
+        {
+            auto user = use->getUser();
+            maybeAddToWorkList(user);
+        }
+        for( auto child : inst->getDecorationsAndChildren() )
+        {
+            maybeAddToWorkList(child);
+        }
+    }
+
+    void maybeAddToWorkList(IRInst* inst)
+    {
+        // Here we have an `inst` that might be ready to go on
+        // the work list, but we need to check that it would
+        // be valid to put it on there.
+        //
+        // First, we don't want to add something if it has
+        // already been added.
+        //
+        if(hasBeenAddedToWorkList(inst))
+            return;
+
+        // Next, we don't want to add something if its parent
+        // hasn't been added already.
+        //
+        if(!hasBeenAddedToWorkList(inst->getParent()))
+            return;
+
+        // Finally, we don't want to add something if its
+        // type and/or operands haven't all been added.
+        //
+        if(!hasBeenAddedToWorkList(inst->getFullType()))
+            return;
+        Index operandCount = (Index) inst->getOperandCount();
+        for( Index i = 0; i < operandCount; ++i )
+        {
+            auto operand = inst->getOperand(i);
+            if(!hasBeenAddedToWorkList(operand))
+                return;
+        }
+
+        // If all those checks pass, then we are ready to
+        // process `inst`, and we will add it to our work list.
+        //
+        addToWorkList(inst);
+    }
+};
 
 static void legalizeTypes(
     IRTypeLegalizationContext*    context)
 {
-    // Legalize all the top-level instructions in the module
-    auto module = context->module;
-    legalizeInstsInParent(context, module->moduleInst);
+    IRTypeLegalizationPass pass;
+    pass.context = context;
 
-    // Clean up after any instructions we replaced along the way.
-    for (auto& lv : context->replacedInstructions)
-    {
-        lv->removeAndDeallocate();
-    }
+    pass.processModule(context->module);
 }
 
 // We use the same basic type legalization machinery for both simplifying

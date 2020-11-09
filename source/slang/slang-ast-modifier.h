@@ -350,9 +350,10 @@ class BuiltinTypeModifier : public Modifier
 class MagicTypeModifier : public Modifier 
 {
     SLANG_AST_CLASS(MagicTypeModifier)
- 
-    String name;
-    uint32_t tag;
+
+        /// Modifier has a name so call this magicModifier to disambiguate
+    String magicName;
+    uint32_t tag = uint32_t(0);
 };
 
 // A modifier applied to declarations of builtin types to indicate how they

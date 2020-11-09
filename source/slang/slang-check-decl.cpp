@@ -1231,6 +1231,11 @@ namespace Slang
         }
     }
 
+    void registerBuiltinDecls(Session* session, Decl* decl)
+    {
+        _registerBuiltinDeclsRec(session, decl);
+    }
+
     void SemanticsDeclVisitorBase::checkModule(ModuleDecl* moduleDecl)
     {
         // When we are dealing with code from the standard library,
