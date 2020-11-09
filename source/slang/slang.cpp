@@ -1259,7 +1259,7 @@ static void _outputInclude(SourceFile* sourceFile, Index depth, DiagnosticSink* 
     // for example
 
     const PathInfo& pathInfo = sourceFile->getPathInfo();
-    buf << pathInfo.foundPath;
+    buf << "'" << pathInfo.foundPath << "'";
 
     // TODO(JS)?
     // You might want to know where this include was from.
