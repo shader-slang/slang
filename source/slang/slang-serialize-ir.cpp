@@ -337,7 +337,7 @@ Result _encodeInsts(SerialCompressionType compressionType, const List<IRSerialDa
     // Calculate the maximum instruction size with worst case possible encoding
     // 2 bytes hold the payload size, and the result type
     // Note that if there were some free bits, we could encode some of this stuff into bits, but if we remove payloadType, then there are no free bits
-    const size_t maxInstSize = 2 + ByteEncodeUtil::kMaxLiteEncodeUInt32 + Math::Max(sizeof(insts->m_payload.m_float64), size_t(2 * ByteEncodeUtil::kMaxLiteEncodeUInt32));
+    const size_t maxInstSize = 1 + ByteEncodeUtil::kMaxLiteEncodeUInt16 + Math::Max(sizeof(insts->m_payload.m_float64), size_t(2 * ByteEncodeUtil::kMaxLiteEncodeUInt32));
 
     for (size_t i = 0; i < numInsts; ++i)
     {

@@ -9,6 +9,7 @@ struct ByteEncodeUtil
 {
     enum
     {
+        kMaxLiteEncodeUInt16 = 3, /// One byte for prefix, the remaining 2 bytes hold the value
         kMaxLiteEncodeUInt32 = 5,                   /// One byte for prefix, the remaining 4 bytes hold the value
         // Cut values for 'Lite' encoding style
         kLiteCut1 = 185,
