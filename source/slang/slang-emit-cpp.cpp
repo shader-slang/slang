@@ -1677,7 +1677,7 @@ void CPPSourceEmitter::_emitWitnessTableDefinitions()
                 m_writer->emit(getName(witnessTableVal));
             }
             else if (entry->getSatisfyingVal() &&
-                     entry->getSatisfyingVal()->getDataType()->op, kIROp_RTTIHandleType)
+                     entry->getSatisfyingVal()->getDataType()->op == kIROp_RTTIHandleType)
             {
                 m_writer->emit(",\n");
                 emitInstExpr(entry->getSatisfyingVal(), getInfo(EmitOp::General));

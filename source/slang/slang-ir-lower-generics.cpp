@@ -16,6 +16,7 @@
 
 namespace Slang
 {
+    // Replace all uses of RTTI objects with its sequential ID.
     void specializeRTTIObjectReferences(SharedGenericsLoweringContext* sharedContext)
     {
         uint32_t id = 0;
@@ -37,6 +38,7 @@ namespace Slang
         }
     }
 
+    // Replace all WitnessTableID type or RTTIHandleType with uint64.
     void cleanUpRTTIHandleTypes(SharedGenericsLoweringContext* sharedContext)
     {
         List<IRInst*> instsToRemove;

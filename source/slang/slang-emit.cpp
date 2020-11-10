@@ -664,6 +664,9 @@ Result linkAndOptimizeIR(
         break;
     }
 
+    // TODO: our current dynamic dispatch pass will remove all uses of witness tables.
+    // If we are going to support function-pointer based, "real" modular dynamic dispatch,
+    // we will need to disable this pass.
     stripWitnessTables(irModule);
 
 #if 0
