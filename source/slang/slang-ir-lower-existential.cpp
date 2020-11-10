@@ -23,12 +23,13 @@ namespace Slang
 
             auto value = inst->getWrappedValue();
             auto valueType = sharedContext->lowerType(builder, value->getDataType());
-            auto witnessTableType = cast<IRWitnessTableType>(inst->getWitnessTable()->getDataType());
+            auto witnessTableType = cast<IRWitnessTableTypeBase>(inst->getWitnessTable()->getDataType());
             auto interfaceType = witnessTableType->getConformanceType();
+            auto witnessTableIdType = builder->getWitnessTableIDType((IRType*)interfaceType);
             auto anyValueSize = sharedContext->getInterfaceAnyValueSize(interfaceType, inst->sourceLoc);
             auto anyValueType = builder->getAnyValueType(anyValueSize);
-            auto rttiType = builder->getPtrType(builder->getRTTIType());
-            auto tupleType = builder->getTupleType(rttiType, witnessTableType, anyValueType);
+            auto rttiType = builder->getRTTIHandleType();
+            auto tupleType = builder->getTupleType(rttiType, witnessTableIdType, anyValueType);
 
             IRInst* rttiObject = inst->getRTTI();
             if (auto type = as<IRType>(rttiObject))

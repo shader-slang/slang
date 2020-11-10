@@ -1271,6 +1271,13 @@ struct IRRTTIType : IRType
     IR_LEAF_ISA(RTTIType);
 };
 
+    /// Represents a handle to an RTTI object.
+    /// This is lowered as an integer number identifying a type.
+struct IRRTTIHandleType : IRType
+{
+    IR_LEAF_ISA(RTTIHandleType);
+};
+
 struct IRAnyValueType : IRType
 {
     IR_LEAF_ISA(AnyValueType);
@@ -1280,21 +1287,19 @@ struct IRAnyValueType : IRType
     }
 };
 
-struct IRWitnessTableType : IRType
+struct IRWitnessTableTypeBase : IRType
 {
-    IRInst* getConformanceType()
-    {
-        return getOperand(0);
-    }
+    IRInst* getConformanceType() { return getOperand(0); }
+    IR_PARENT_ISA(WitnessTableTypeBase);
+};
+
+struct IRWitnessTableType : IRWitnessTableTypeBase
+{
     IR_LEAF_ISA(WitnessTableType);
 };
 
-struct IRWitnessTableIDType : IRType
+struct IRWitnessTableIDType : IRWitnessTableTypeBase
 {
-    IRInst* getConformanceType()
-    {
-        return getOperand(0);
-    }
     IR_LEAF_ISA(WitnessTableIDType);
 };
 
