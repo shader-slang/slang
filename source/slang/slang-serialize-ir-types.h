@@ -131,7 +131,7 @@ struct IRSerialData
 
         uint16_t m_op;                      ///< For now one of IROp 
         PayloadType m_payloadType;	 		///< The type of payload 
-        uint16_t m_pad0;                    ///< Not currently used             
+        uint8_t m_pad0;                    ///< Not currently used             
 
         InstIndex m_resultTypeIndex;	    //< 0 if has no type. The result type of this instruction
 
