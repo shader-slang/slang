@@ -219,6 +219,21 @@ namespace Slang
         }
     }
 
+    List<IRWitnessTable*> SharedGenericsLoweringContext::getWitnessTablesFromInterfaceType(IRInst* interfaceType)
+    {
+        List<IRWitnessTable*> witnessTables;
+        for (auto globalInst : module->getGlobalInsts())
+        {
+            if (globalInst->op == kIROp_WitnessTable &&
+                cast<IRWitnessTableType>(globalInst->getDataType())->getConformanceType() ==
+                    interfaceType)
+            {
+                witnessTables.add(cast<IRWitnessTable>(globalInst));
+            }
+        }
+        return witnessTables;
+    }
+
     IRIntegerValue SharedGenericsLoweringContext::getInterfaceAnyValueSize(IRInst* type, SourceLoc usageLocation)
     {
         if (auto decor = type->findDecoration<IRAnyValueSizeDecoration>())

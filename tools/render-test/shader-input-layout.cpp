@@ -273,17 +273,17 @@ namespace renderer_test
                                     SlangScalarType scalarType = _getScalarType(type.getUnownedSlice());
                                     if (scalarType == SLANG_SCALAR_TYPE_NONE)
                                     {
-                                        StringBuilder builder;
+                                        StringBuilder scalarTypeNames;
                                         for (const auto& info : g_scalarTypeInfos)
                                         {
-                                            if (builder.getLength() != 0)
+                                            if (scalarTypeNames.getLength() != 0)
                                             {
-                                                builder << ", ";
+                                                scalarTypeNames << ", ";
                                             }
-                                            builder << info.name;
+                                            scalarTypeNames << info.name;
                                         }
 
-                                        throw TextFormatException("Expecting " + builder + " " + parser.NextToken().Position.Line);
+                                        throw TextFormatException(StringBuilder() << "Expecting " << scalarTypeNames << " " << parser.NextToken().Position.Line);
                                     }
 
                                     parser.Read(",");
@@ -549,7 +549,7 @@ namespace renderer_test
                                     Token nameToken = parser.ReadToken();
                                     if (nameToken.Type != TokenType::Identifier)
                                     {
-                                        throw TextFormatException(String("Invalid input syntax at line ") + parser.NextToken().Position.Line);
+                                        throw TextFormatException(StringBuilder() << "Invalid input syntax at line " << parser.NextToken().Position.Line);
                                     }
                                     builder << nameToken.Content;
 
@@ -580,7 +580,7 @@ namespace renderer_test
                                         }
                                         else
                                         {
-                                            throw TextFormatException(String("Invalid input syntax at line ") + parser.NextToken().Position.Line);
+                                            throw TextFormatException(StringBuilder() << "Invalid input syntax at line " << parser.NextToken().Position.Line);
                                         }
                                     }
 
@@ -606,7 +606,9 @@ namespace renderer_test
                 }
                 catch (const TextFormatException&)
                 {
-                    throw TextFormatException(String("Invalid input syntax at line ") + parser.NextToken().Position.Line);
+                    StringBuilder msg;
+                    msg << "Invalid input syntax at line " << parser.NextToken().Position.Line;
+                    throw TextFormatException(msg);
                 }
             }
         }

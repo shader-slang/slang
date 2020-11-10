@@ -453,14 +453,14 @@ Index getFilterCountImpl(const ReflectClassInfo& clsInfo, MemberFilterStyle filt
                 }
             }
 
-            if (magicMod->name == "SamplerState")
+            if (magicMod->magicName == "SamplerState")
             {
                 auto type = astBuilder->create<SamplerStateType>();
                 type->declRef = declRef;
                 type->flavor = SamplerStateFlavor(magicMod->tag);
                 return type;
             }
-            else if (magicMod->name == "Vector")
+            else if (magicMod->magicName == "Vector")
             {
                 SLANG_ASSERT(subst && subst->args.getCount() == 2);
                 auto vecType = astBuilder->create<VectorExpressionType>();
@@ -469,14 +469,14 @@ Index getFilterCountImpl(const ReflectClassInfo& clsInfo, MemberFilterStyle filt
                 vecType->elementCount = ExtractGenericArgInteger(subst->args[1]);
                 return vecType;
             }
-            else if (magicMod->name == "Matrix")
+            else if (magicMod->magicName == "Matrix")
             {
                 SLANG_ASSERT(subst && subst->args.getCount() == 3);
                 auto matType = astBuilder->create<MatrixExpressionType>();
                 matType->declRef = declRef;
                 return matType;
             }
-            else if (magicMod->name == "Texture")
+            else if (magicMod->magicName == "Texture")
             {
                 SLANG_ASSERT(subst && subst->args.getCount() >= 1);
                 auto textureType = astBuilder->create<TextureType>(
@@ -485,7 +485,7 @@ Index getFilterCountImpl(const ReflectClassInfo& clsInfo, MemberFilterStyle filt
                 textureType->declRef = declRef;
                 return textureType;
             }
-            else if (magicMod->name == "TextureSampler")
+            else if (magicMod->magicName == "TextureSampler")
             {
                 SLANG_ASSERT(subst && subst->args.getCount() >= 1);
                 auto textureType = astBuilder->create<TextureSamplerType>(
@@ -494,7 +494,7 @@ Index getFilterCountImpl(const ReflectClassInfo& clsInfo, MemberFilterStyle filt
                 textureType->declRef = declRef;
                 return textureType;
             }
-            else if (magicMod->name == "GLSLImageType")
+            else if (magicMod->magicName == "GLSLImageType")
             {
                 SLANG_ASSERT(subst && subst->args.getCount() >= 1);
                 auto textureType = astBuilder->create<GLSLImageType>(
@@ -503,7 +503,7 @@ Index getFilterCountImpl(const ReflectClassInfo& clsInfo, MemberFilterStyle filt
                 textureType->declRef = declRef;
                 return textureType;
             }
-            else if (magicMod->name == "FeedbackType")
+            else if (magicMod->magicName == "FeedbackType")
             {
                 SLANG_ASSERT(subst == nullptr);
                 auto type = astBuilder->create<FeedbackType>();
@@ -517,7 +517,7 @@ Index getFilterCountImpl(const ReflectClassInfo& clsInfo, MemberFilterStyle filt
             // of this ridiculously slow `if` cascade.
 
         #define CASE(n,T)													\
-            else if(magicMod->name == #n) {									\
+            else if(magicMod->magicName == #n) {									\
                 auto type = astBuilder->create<T>();						\
                 type->declRef = declRef;									\
                 return type;												\
@@ -529,7 +529,7 @@ Index getFilterCountImpl(const ReflectClassInfo& clsInfo, MemberFilterStyle filt
         #undef CASE
 
             #define CASE(n,T)													\
-                else if(magicMod->name == #n) {									\
+                else if(magicMod->magicName == #n) {									\
                     SLANG_ASSERT(subst && subst->args.getCount() == 1);			\
                     auto type = astBuilder->create<T>();						\
                     type->elementType = ExtractGenericArgType(subst->args[0]);	\
@@ -558,7 +558,7 @@ Index getFilterCountImpl(const ReflectClassInfo& clsInfo, MemberFilterStyle filt
 
             // "magic" builtin types which have no generic parameters
             #define CASE(n,T)													\
-                else if(magicMod->name == #n) {									\
+                else if(magicMod->magicName == #n) {									\
                     auto type = astBuilder->create<T>();						\
                     type->declRef = declRef;									\
                     return type;												\
@@ -575,7 +575,7 @@ Index getFilterCountImpl(const ReflectClassInfo& clsInfo, MemberFilterStyle filt
 
             else
             {
-                auto classInfo = astBuilder->findSyntaxClass(magicMod->name.getUnownedSlice());
+                auto classInfo = astBuilder->findSyntaxClass(magicMod->magicName.getUnownedSlice());
                 if (!classInfo.classInfo)
                 {
                     SLANG_UNEXPECTED("unhandled type");

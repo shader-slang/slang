@@ -6,29 +6,13 @@
 
 namespace Slang
 {
-IRInst* findWitnessTableEntry(IRWitnessTable* table, IRInst* key)
-{
-    for (auto entry : table->getEntries())
-    {
-        if (entry->getRequirementKey() == key)
-            return entry->getSatisfyingVal();
-    }
-    return nullptr;
-}
-
 IRFunc* specializeDispatchFunction(SharedGenericsLoweringContext* sharedContext, IRFunc* dispatchFunc)
 {
     auto witnessTableType = cast<IRFuncType>(dispatchFunc->getDataType())->getParamType(0);
 
     // Collect all witness tables of `witnessTableType` in current module.
-    List<IRWitnessTable*> witnessTables;
-    for (auto globalInst : sharedContext->module->getGlobalInsts())
-    {
-        if (globalInst->op == kIROp_WitnessTable && globalInst->getDataType() == witnessTableType)
-        {
-            witnessTables.add(cast<IRWitnessTable>(globalInst));
-        }
-    }
+    List<IRWitnessTable*> witnessTables = sharedContext->getWitnessTablesFromInterfaceType(
+        cast<IRWitnessTableType>(witnessTableType)->getConformanceType());
 
     SLANG_ASSERT(dispatchFunc->getFirstBlock() == dispatchFunc->getLastBlock());
     auto block = dispatchFunc->getFirstBlock();
@@ -119,7 +103,7 @@ IRFunc* specializeDispatchFunction(SharedGenericsLoweringContext* sharedContext,
             builder->setInsertInto(defaultBlock);
         }
 
-        auto callee = findWitnessTableEntry(witnessTable, requirementKey);
+        auto callee = sharedContext->findWitnessTableEntry(witnessTable, requirementKey);
         SLANG_ASSERT(callee);
         auto specializedCallInst = builder->emitCallInst(callInst->getFullType(), callee, params);
         if (callInst->getDataType()->op == kIROp_VoidType)

@@ -1328,6 +1328,89 @@ namespace Slang
         return inst;
     }
 
+        /// Return whichever of `left` or `right` represents the later point in a common parent
+    static IRInst* pickLaterInstInSameParent(
+        IRInst* left,
+        IRInst* right)
+    {
+        // When using instructions to represent insertion locations,
+        // a null instruction represents the end of the parent block,
+        // so if either of the two instructions is null, it indicates
+        // the end of the parent, and thus comes later.
+        //
+        if(!left) return nullptr;
+        if(!right) return nullptr;
+
+        // In the non-null case, we must have the precondition that
+        // the two candidates have the same parent.
+        //
+        SLANG_ASSERT(left->getParent() == right->getParent());
+
+        // No matter what, figuring out which instruction comes first
+        // is a linear-time operation in the number of instructions
+        // in the same parent, but we can optimize based on the
+        // assumption that in common cases one of the following will
+        // hold:
+        //
+        // * `left` and `right` are close to one another in the IR
+        // * `left` and/or `right` is close to the start of its parent
+        //
+        // To optimize for those conditions, we create two cursors that
+        // start at `left` and `right` respectively, and scan backward.
+        //
+        auto ll = left;
+        auto rr = right;
+        for(;;)
+        {
+            // If one of the cursors runs into the other while scanning
+            // backwards, then it implies it must have been the later
+            // of the two.
+            //
+            // This is our early-exit condition for `left` and `right`
+            // being close together.
+            //
+            // Note: this condition will trigger on the first iteration
+            // in the case where `left == right`.
+            //
+            if(ll == right) return left;
+            if(rr == left)  return right;
+
+            // If one of the cursors reaches the start of the block,
+            // then that implies it started at the earlier position.
+            // In that case, the other candidate must be the later
+            // one.
+            //
+            // This is the early-exit condition for `left` and/or `right`
+            // being close to the start of the parent.
+            //
+            if(!ll) return right;
+            if(!rr) return left;
+
+            // Otherwise, we move both cursors backward and continue
+            // the search.
+            //
+            ll = ll->getPrevInst();
+            rr = rr->getPrevInst();
+
+            // Note: in the worst case, one of the cursors is
+            // at the end of the parent, and the other is halfway
+            // through, so that each cursor needs to visit half
+            // of the instructions in the parent before we reach
+            // one of our termination conditions.
+            //
+            // As a result the worst-case running time is still O(N),
+            // and there is nothing we can do to improve that
+            // with our linked-list representation.
+            //
+            // If the assumptions given turn out to be wrong, and
+            // we find that a common case is instructions close
+            // to the *end* of a block, we can either flip the
+            // direction that the cursors traverse, or even add
+            // two more cursors that scan forward instead of
+            // backward.
+        }
+    }
+
     // Given an instruction that represents a constant, a type, etc.
     // Try to "hoist" it as far toward the global scope as possible
     // to insert it at a location where it will be maximally visible.
@@ -1359,23 +1442,106 @@ namespace Slang
             parent = mergeCandidateParentsForHoistableInst(parent, operandParent);
         }
 
-        // We better have ended up with a place to insert.
+        // We better have ended up with a parent to insert into,
+        // or else the invariants of our IR have been violated.
+        //
         SLANG_ASSERT(parent);
 
-        // If we have chosen to insert into the same parent that the
-        // IRBuilder is configured to use, then respect its `insertBeforeInst`
-        // setting.
-        if (parent == builder->insertIntoParent)
+        // Once we determine the parent instruction that the
+        // new instruction should be inserted into, we need
+        // to find an appropriate place to insert it.
+        //
+        // There are two concerns at play here, both of which
+        // stem from the property that within a block we
+        // require definitions to precede their uses.
+        //
+        // The first concern is that we want to emit a
+        // "hoistable" instruction like a type as early as possible,
+        // so that if a subsequent optimization pass requests
+        // the same type/value again, it doesn't get a cached/deduplicated
+        // pointer to an instruction that comes after the code being
+        // processed.
+        //
+        // The second concern is that we must emit any hoistable
+        // instruction after any of its operands (or its type)
+        // if they come from the same block/parent.
+        //
+        // These two conditions together indicate that we want
+        // to insert the instruction right after whichever of
+        // its operands come last in the parent block and if
+        // none of the operands come from the same block, we
+        // should try to insert it as early as possible in
+        // that block.
+        //
+        // We want to insert a hoistable instruction at the
+        // earliest possible point in its parent, which
+        // should be right after whichever of its operands
+        // is defined in that same block (if any)
+        //
+        // We will solve this problem by computing the
+        // earliest instruction that it would be valid for
+        // us to insert before.
+        //
+        // We start by considering insertion before the
+        // first instruction in the parent (if any) and
+        // then move the insertion point later as needed.
+        //
+        // Note: a null `insertBeforeInst` is used
+        // here to mean to insert at the end of the parent.
+        //
+        IRInst* insertBeforeInst = parent->getFirstChild();
+
+        // Hoistable instructions are always "ordinary"
+        // instructions, so they need to come after
+        // any parameters of the parent.
+        //
+        while(auto param = as<IRParam>(insertBeforeInst))
+            insertBeforeInst = param->getNextInst();
+
+        // For instructions that will be placed at module scope,
+        // we don't care about relative ordering, but for everything
+        // else, we want to ensure that an instruction comes after
+        // its type and operands.
+        //
+        if( !as<IRModuleInst>(parent) )
         {
-            builder->addInst(inst);
-            return;
+            // We need to make sure that if any of
+            // the operands of `inst` come from the same
+            // block that we insert after them.
+            //
+            for (UInt ii = 0; ii < operandCount; ++ii)
+            {
+                auto operand = inst->getOperand(ii);
+                if (!operand)
+                    continue;
+
+                if(operand->getParent() != parent)
+                    continue;
+
+                insertBeforeInst = pickLaterInstInSameParent(insertBeforeInst, operand->getNextInst());
+            }
+            //
+            // Similarly, if the type of `inst` comes from
+            // the same parent, then we need to make sure
+            // we insert after the type.
+            //
+            if(auto type = inst->getFullType())
+            {
+                if(type->getParent() == parent)
+                {
+                    insertBeforeInst = pickLaterInstInSameParent(insertBeforeInst, type->getNextInst());
+                }
+            }
         }
 
-        // Otherwise, we just want to insert at the end of the chosen parent.
-        //
-        // TODO: be careful about inserting after the terminator of a block...
-
-        inst->insertAtEnd(parent);
+        if( insertBeforeInst )
+        {
+            inst->insertBefore(insertBeforeInst);
+        }
+        else
+        {
+            inst->insertAtEnd(parent);
+        }
     }
 
     static void maybeSetSourceLoc(
@@ -2426,6 +2592,16 @@ namespace Slang
         return (IRWitnessTableType*)findOrEmitHoistableInst(
             nullptr,
             kIROp_WitnessTableType,
+            1,
+            (IRInst* const*)&baseType);
+    }
+
+    IRWitnessTableIDType* IRBuilder::getWitnessTableIDType(
+        IRType* baseType)
+    {
+        return (IRWitnessTableIDType*)findOrEmitHoistableInst(
+            nullptr,
+            kIROp_WitnessTableIDType,
             1,
             (IRInst* const*)&baseType);
     }
@@ -5330,6 +5506,7 @@ namespace Slang
         case kIROp_DefaultConstruct:
         case kIROp_Specialize:
         case kIROp_lookup_interface_method:
+        case kIROp_GetSequentialID:
         case kIROp_getAddr:
         case kIROp_GetValueFromExistentialBox:
         case kIROp_Construct:

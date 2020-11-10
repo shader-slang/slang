@@ -227,7 +227,7 @@ struct DeadCodeEliminationContext
         // return `true` as its default mode, so once we are past that
         // query we know that `inst` is either something "structural"
         // (that makes up the program) rather than executable, or it
-        // is executable but was on a white list of things that are
+        // is executable but was on an allow-list of things that are
         // safe to eliminate.
 
         // Most top-level objects (functions, types, etc.) obviously

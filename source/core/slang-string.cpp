@@ -147,112 +147,112 @@ namespace Slang
 
     //
 
-	_EndLine EndLine;
+    _EndLine EndLine;
 
     String operator+(const char * op1, const String & op2)
-	{
+    {
         String result(op1);
         result.append(op2);
         return result;
-	}
+    }
 
-	String operator+(const String & op1, const char * op2)
-	{
+    String operator+(const String & op1, const char * op2)
+    {
         String result(op1);
         result.append(op2);
         return result;
-	}
+    }
 
-	String operator+(const String & op1, const String & op2)
-	{
+    String operator+(const String & op1, const String & op2)
+    {
         String result(op1);
         result.append(op2);
         return result;
-	}
+    }
 
-	int StringToInt(const String & str, int radix)
-	{
-		if (str.startsWith("0x"))
-			return (int)strtoll(str.getBuffer(), NULL, 16);
-		else
-			return (int)strtoll(str.getBuffer(), NULL, radix);
-	}
-	unsigned int StringToUInt(const String & str, int radix)
-	{
-		if (str.startsWith("0x"))
-			return (unsigned int)strtoull(str.getBuffer(), NULL, 16);
-		else
-			return (unsigned int)strtoull(str.getBuffer(), NULL, radix);
-	}
-	double StringToDouble(const String & str)
-	{
-		return (double)strtod(str.getBuffer(), NULL);
-	}
-	float StringToFloat(const String & str)
-	{
-		return strtof(str.getBuffer(), NULL);
-	}
+    int StringToInt(const String & str, int radix)
+    {
+        if (str.startsWith("0x"))
+            return (int)strtoll(str.getBuffer(), NULL, 16);
+        else
+            return (int)strtoll(str.getBuffer(), NULL, radix);
+    }
+    unsigned int StringToUInt(const String & str, int radix)
+    {
+        if (str.startsWith("0x"))
+            return (unsigned int)strtoull(str.getBuffer(), NULL, 16);
+        else
+            return (unsigned int)strtoull(str.getBuffer(), NULL, radix);
+    }
+    double StringToDouble(const String & str)
+    {
+        return (double)strtod(str.getBuffer(), NULL);
+    }
+    float StringToFloat(const String & str)
+    {
+        return strtof(str.getBuffer(), NULL);
+    }
 
 #if 0
-	String String::ReplaceAll(String src, String dst) const
-	{
-		String rs = *this;
-		int index = 0;
-		int srcLen = src.length;
-		int len = rs.length;
-		while ((index = rs.IndexOf(src, index)) != -1)
-		{
-			rs = rs.SubString(0, index) + dst + rs.SubString(index + srcLen, len - index - srcLen);
-			len = rs.length;
-		}
-		return rs;
-	}
+    String String::ReplaceAll(String src, String dst) const
+    {
+        String rs = *this;
+        int index = 0;
+        int srcLen = src.length;
+        int len = rs.length;
+        while ((index = rs.IndexOf(src, index)) != -1)
+        {
+            rs = rs.SubString(0, index) + dst + rs.SubString(index + srcLen, len - index - srcLen);
+            len = rs.length;
+        }
+        return rs;
+    }
 #endif
 
-	String String::fromWString(const wchar_t * wstr)
-	{
+    String String::fromWString(const wchar_t * wstr)
+    {
 #ifdef _WIN32
-		return Slang::Encoding::UTF16->ToString((const char*)wstr, (int)(wcslen(wstr) * sizeof(wchar_t)));
+        return Slang::Encoding::UTF16->ToString((const char*)wstr, (int)(wcslen(wstr) * sizeof(wchar_t)));
 #else
-		return Slang::Encoding::UTF32->ToString((const char*)wstr, (int)(wcslen(wstr) * sizeof(wchar_t)));
+        return Slang::Encoding::UTF32->ToString((const char*)wstr, (int)(wcslen(wstr) * sizeof(wchar_t)));
 #endif
-	}
+    }
 
-	String String::fromWString(const wchar_t * wstr, const wchar_t * wend)
-	{
+    String String::fromWString(const wchar_t * wstr, const wchar_t * wend)
+    {
 #ifdef _WIN32
-		return Slang::Encoding::UTF16->ToString((const char*)wstr, (int)((wend - wstr) * sizeof(wchar_t)));
+        return Slang::Encoding::UTF16->ToString((const char*)wstr, (int)((wend - wstr) * sizeof(wchar_t)));
 #else
-		return Slang::Encoding::UTF32->ToString((const char*)wstr, (int)((wend - wstr) * sizeof(wchar_t)));
+        return Slang::Encoding::UTF32->ToString((const char*)wstr, (int)((wend - wstr) * sizeof(wchar_t)));
 #endif
-	}
+    }
 
-	String String::fromWChar(const wchar_t ch)
-	{
+    String String::fromWChar(const wchar_t ch)
+    {
 #ifdef _WIN32
-		return Slang::Encoding::UTF16->ToString((const char*)&ch, (int)(sizeof(wchar_t)));
+        return Slang::Encoding::UTF16->ToString((const char*)&ch, (int)(sizeof(wchar_t)));
 #else
-		return Slang::Encoding::UTF32->ToString((const char*)&ch, (int)(sizeof(wchar_t)));
+        return Slang::Encoding::UTF32->ToString((const char*)&ch, (int)(sizeof(wchar_t)));
 #endif
-	}
+    }
 
-	String String::fromUnicodePoint(unsigned int codePoint)
-	{
-		char buf[6];
-		int len = Slang::EncodeUnicodePointToUTF8(buf, (int)codePoint);
-		buf[len] = 0;
-		return String(buf);
-	}
+    String String::fromUnicodePoint(unsigned int codePoint)
+    {
+        char buf[6];
+        int len = Slang::EncodeUnicodePointToUTF8(buf, (int)codePoint);
+        buf[len] = 0;
+        return String(buf);
+    }
 
-	OSString String::toWString(Index* outLength) const
-	{
-		if (!m_buffer)
-		{
+    OSString String::toWString(Index* outLength) const
+    {
+        if (!m_buffer)
+        {
             return OSString();
-		}
-		else
-		{
-			List<char> buf;
+        }
+        else
+        {
+            List<char> buf;
             switch(sizeof(wchar_t))
             {
             case 2:
@@ -268,20 +268,20 @@ namespace Slang
             }
 
             auto length = Index(buf.getCount() / sizeof(wchar_t));
-			if (outLength)
-				*outLength = length;
+            if (outLength)
+                *outLength = length;
 
             for(int ii = 0; ii < sizeof(wchar_t); ++ii)
-    			buf.add(0);
+                buf.add(0);
 
             wchar_t* beginData = (wchar_t*)buf.getBuffer();
             wchar_t* endData = beginData + length;
 
-			buf.detachBuffer();
+            buf.detachBuffer();
 
             return OSString(beginData, endData);
-		}
-	}
+        }
+    }
 
     //
 

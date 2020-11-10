@@ -155,6 +155,8 @@ class Type: public Val
     bool _equalsImplOverride(Type* type);
     Type* _createCanonicalTypeOverride();
 
+    void _setASTBuilder(ASTBuilder* astBuilder) { m_astBuilder = astBuilder; }
+
 protected:
     bool equalsImpl(Type* type);
     Type* createCanonicalType();
@@ -276,10 +278,10 @@ class Modifier : public SyntaxNode
     Modifier* next = nullptr;
 
     // The keyword that was used to introduce t that was used to name this modifier.
-    Name* name = nullptr;
+    Name* keywordName = nullptr;
 
-    Name* getName() { return name; }
-    NameLoc getNameAndLoc() { return NameLoc(name, loc); }
+    Name* getKeywordName() { return keywordName; }
+    NameLoc getKeywordNameAndLoc() { return NameLoc(keywordName, loc); }
 };
 
 // A syntax node which can have modifiers applied
@@ -326,7 +328,6 @@ public:
     Name*     getName()       { return nameAndLoc.name; }
     SourceLoc getNameLoc()    { return nameAndLoc.loc ; }
     NameLoc   getNameAndLoc() { return nameAndLoc     ; }
-
 
     DeclCheckStateExt checkState = DeclCheckState::Unchecked;
 

@@ -395,7 +395,7 @@ namespace Slang
             // Let it go thru iff single string attribute
             if (!hasStringArgs(attr, 1))
             {
-                getSink()->diagnose(attr, Diagnostics::expectedSingleStringArg, attr->name);
+                getSink()->diagnose(attr, Diagnostics::expectedSingleStringArg, attr->keywordName);
             }
         }
         else if (as<OutputControlPointsAttribute>(attr))
@@ -403,7 +403,7 @@ namespace Slang
             // Let it go thru iff single integral attribute
             if (!hasIntArgs(attr, 1))
             {
-                getSink()->diagnose(attr, Diagnostics::expectedSingleIntArg, attr->name);
+                getSink()->diagnose(attr, Diagnostics::expectedSingleIntArg, attr->keywordName);
             }
         }
         else if (as<PushConstantAttribute>(attr))
@@ -433,7 +433,7 @@ namespace Slang
                 }
                 else
                 {
-                    getSink()->diagnose(attr, Diagnostics::expectedSingleIntArg, attr->name);
+                    getSink()->diagnose(attr, Diagnostics::expectedSingleIntArg, attr->keywordName);
                     return false;
                 }
             }
@@ -551,7 +551,7 @@ namespace Slang
         UncheckedAttribute*     uncheckedAttr,
         ModifiableSyntaxNode*   attrTarget)
     {
-        auto attrName = uncheckedAttr->getName();
+        auto attrName = uncheckedAttr->getKeywordName();
         auto attrDecl = lookUpAttributeDecl(
             attrName,
             uncheckedAttr->scope);
@@ -580,7 +580,7 @@ namespace Slang
         // We are going to replace the unchecked attribute with the checked one.
 
         // First copy all of the state over from the original attribute.
-        attr->name  = uncheckedAttr->name;
+        attr->keywordName  = uncheckedAttr->keywordName;
         attr->args  = uncheckedAttr->args;
         attr->loc   = uncheckedAttr->loc;
 

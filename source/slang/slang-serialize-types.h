@@ -27,7 +27,7 @@ struct SerialOptionFlag
     enum Enum : Type
     {
         RawSourceLocation   = 0x01,     ///< If set will store directly SourceLoc - only useful if current source locs will be identical when read in (typically this is *NOT* the case)
-        DebugInfo           = 0x02,     ///< If set will output debug information, that can be reconstructed when read after being stored.
+        SourceLocation      = 0x02,     ///< If set will output SourceLoc information, that can be reconstructed when read after being stored.
         ASTModule           = 0x04,     ///< If set will output AST modules - typically required, but potentially not desired (for example with obsfucation)
         IRModule            = 0x08,     ///< If set will output IR modules - typically required
     };
