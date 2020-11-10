@@ -12,7 +12,7 @@ IRFunc* specializeDispatchFunction(SharedGenericsLoweringContext* sharedContext,
 
     // Collect all witness tables of `witnessTableType` in current module.
     List<IRWitnessTable*> witnessTables = sharedContext->getWitnessTablesFromInterfaceType(
-        cast<IRWitnessTableType>(witnessTableType)->getConformanceType());
+        cast<IRWitnessTableTypeBase>(witnessTableType)->getConformanceType());
 
     SLANG_ASSERT(dispatchFunc->getFirstBlock() == dispatchFunc->getLastBlock());
     auto block = dispatchFunc->getFirstBlock();

@@ -21,7 +21,7 @@ namespace Slang
         DiagnosticSink* sink;
 
         // RTTI objects for each type used to call a generic function.
-        Dictionary<IRInst*, IRInst*> mapTypeToRTTIObject;
+        OrderedDictionary<IRInst*, IRInst*> mapTypeToRTTIObject;
 
         Dictionary<IRInst*, IRInst*> loweredGenericFunctions;
         Dictionary<IRInterfaceType*, IRInterfaceType*> loweredInterfaceTypes;

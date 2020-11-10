@@ -178,20 +178,22 @@ INST(InterfaceType, interface, 0, 0)
 INST(AssociatedType, associated_type, 0, 0)
 INST(ThisType, this_type, 0, 0)
 INST(RTTIType, rtti_type, 0, 0)
+INST(RTTIHandleType, rtti_handle_type, 0, 0)
 INST(TupleType, tuple_type, 0, 0)
 
 // A TypeType-typed IRValue represents a IRType.
 // It is used to represent a type parameter/argument in a generics.
 INST(TypeType, type_t, 0, 0)
 
-// An `IRWitnessTable` has type `WitnessTableType`.
-INST(WitnessTableType, witness_table_t, 1, 0)
-
-// An integer type representing a witness table for targets where
-// witness tables are represented as integer IDs. This type is used
-// during the lower-generics pass while generating dynamic dispatch
-// code and will eventually lower into an uint type.
-INST(WitnessTableIDType, witness_table_id_t, 1, 0)
+/*IRWitnessTableTypeBase*/
+    // An `IRWitnessTable` has type `WitnessTableType`.
+    INST(WitnessTableType, witness_table_t, 1, 0)
+    // An integer type representing a witness table for targets where
+    // witness tables are represented as integer IDs. This type is used
+    // during the lower-generics pass while generating dynamic dispatch
+    // code and will eventually lower into an uint type.
+    INST(WitnessTableIDType, witness_table_id_t, 1, 0)
+INST_RANGE(WitnessTableTypeBase, WitnessTableType, WitnessTableIDType)
 INST_RANGE(Type, VoidType, WitnessTableIDType)
 
 /*IRGlobalValueWithCode*/

@@ -192,7 +192,7 @@ namespace Slang
                         // Generate RTTI for this type.
                         auto rttiObject = sharedContext->maybeEmitRTTIObject(arg);
                         arg = builder->emitGetAddress(
-                            builder->getPtrType(builder->getRTTIType()),
+                            builder->getRTTIHandleType(),
                             rttiObject);
                     }
                     else if (arg->op == kIROp_Specialize)
@@ -281,7 +281,7 @@ namespace Slang
             // If we see a call(lookup_interface_method(...), ...), we need to translate
             // all occurences of associatedtypes.
             auto interfaceType = cast<IRInterfaceType>(
-                cast<IRWitnessTableType>(lookupInst->getWitnessTable()->getDataType())
+                cast<IRWitnessTableTypeBase>(lookupInst->getWitnessTable()->getDataType())
                     ->getConformanceType());
             if (isBuiltin(interfaceType))
                 return;
