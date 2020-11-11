@@ -415,6 +415,19 @@ namespace Slang
         // declarations out of this...
         else if(as<VarDeclBase>(decl))
             emitRaw(context, "V");
+        else if(DeclRef<GenericDecl> genericDecl = declRef.as<GenericDecl>())
+        {
+            // Mark that this is a generic, so we can differentiate bewteen when
+            // mangling the generic and the inner entity
+            emitRaw(context, "G");
+
+            SLANG_ASSERT(genericDecl.substitutions == nullptr);
+
+            auto innerDecl = makeDeclRef(getInner(genericDecl));
+
+            emitQualifiedName(context, innerDecl);
+            return;
+        }
         else
         {
             // TODO: handle other cases
