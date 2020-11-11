@@ -427,7 +427,7 @@ SlangResult CPUComputeUtil::fillRuntimeHandleInBuffers(
     {
         for (auto& rtti : entry.rttiEntries)
         {
-            void* ptrValue = nullptr;
+            uint64_t ptrValue = 0;
             switch (rtti.type)
             {
             case RTTIDataEntryType::RTTIObject:
@@ -439,7 +439,7 @@ SlangResult CPUComputeUtil::fillRuntimeHandleInBuffers(
                     linkage->getTypeRTTIMangledName(concreteType, outName.writeRef());
                     if (!outName)
                         return SLANG_FAIL;
-                    ptrValue = sharedLib->findSymbolAddressByName((char*)outName->getBufferPointer());
+                    ptrValue = (uint64_t)sharedLib->findSymbolAddressByName((char*)outName->getBufferPointer());
                 }
                 break;
             case RTTIDataEntryType::WitnessTable:
@@ -451,18 +451,14 @@ SlangResult CPUComputeUtil::fillRuntimeHandleInBuffers(
                 auto interfaceType = reflection->findTypeByName(rtti.interfaceName.getBuffer());
                 if (!interfaceType)
                     return SLANG_FAIL;
-                ComPtr<ISlangBlob> outName;
-                linkage->getTypeConformanceWitnessMangledName(concreteType, interfaceType, outName.writeRef());
-                if (!outName)
-                    return SLANG_FAIL;
-                ptrValue = sharedLib->findSymbolAddressByName((char*)outName->getBufferPointer());
+                uint32_t id = -1;
+                linkage->getTypeConformanceWitnessSequentialID(concreteType, interfaceType, &id);
+                ptrValue = id;
                 break;
             }
             default:
                 break;
             }
-            if (!ptrValue)
-                return SLANG_FAIL;
             if (rtti.offset >= 0 && rtti.offset + sizeof(ptrValue) <= entry.bufferData.getCount() * sizeof(decltype(entry.bufferData[0])))
             {
                 memcpy(

@@ -1185,6 +1185,146 @@ protected:
 };
 
 
+// Holds the hierarchy of views, the children being views that were 'initiated' (have an initiating SourceLoc) in the parent. 
+typedef Dictionary<SourceView*, List<SourceView*>> ViewInitiatingHierarchy;
+
+// Calculate the hierarchy from the sourceManager
+static void _calcViewInitiatingHierarchy(SourceManager* sourceManager, ViewInitiatingHierarchy& outHierarchy)
+{
+    const List<SourceView*> emptyList;
+    outHierarchy.Clear();
+
+    // Iterate over all managers
+    for (SourceManager* curManager = sourceManager; curManager; curManager = curManager->getParent())
+    {
+        // Iterate over all views
+        for (SourceView* view : curManager->getSourceViews())
+        {
+            if (view->getInitiatingSourceLoc().isValid())
+            {
+                // Look up the view it came from
+                SourceView* parentView = sourceManager->findSourceViewRecursively(view->getInitiatingSourceLoc());
+                if (parentView)
+                {
+                    List<SourceView*>& children = outHierarchy.GetOrAddValue(parentView, emptyList);
+                    // It shouldn't have already been added
+                    SLANG_ASSERT(children.indexOf(view) < 0);
+                    children.add(view);
+                }
+            }
+        }
+    }
+
+    // Order all the children, by their raw SourceLocs. This is desirable, so that a trivial traversal
+    // will traverse children in the order they are initiated in the parent source.
+    // This assumes they increase in SourceLoc implies an later within a source file - this is true currently.
+    for (auto& pair : outHierarchy)
+    {
+        pair.Value.sort([](SourceView* a, SourceView* b) { return a->getInitiatingSourceLoc().getRaw() < b->getInitiatingSourceLoc().getRaw(); });
+    }
+}
+
+// Given a source file, find the view that is the initial SourceView use of the source. It must have
+// an initiating SourceLoc that is not valid.
+static SourceView* _findInitialSourceView(SourceFile* sourceFile)
+{
+    // TODO(JS):
+    // This might be overkill - presumably the SourceView would belong to the same manager as it's SourceFile?
+    // That is not enforced by the SourceManager in any way though so we just search all managers, and all views.
+    for (SourceManager* sourceManager = sourceFile->getSourceManager(); sourceManager; sourceManager = sourceManager->getParent())
+    {
+        for (SourceView* view : sourceManager->getSourceViews())
+        {
+            if (view->getSourceFile() == sourceFile && !view->getInitiatingSourceLoc().isValid())
+            {
+                return view;
+            }
+        }        
+    }
+
+    return nullptr;
+}
+
+static void _outputInclude(SourceFile* sourceFile, Index depth, DiagnosticSink* sink)
+{
+    StringBuilder buf;
+
+    for (Index i = 0; i < depth; ++i)
+    {
+        buf << "  ";
+    }
+
+    // Output the found path for now
+    // TODO(JS). We could use the verbose paths flag to control what path is output -> as it may be useful to output the full path
+    // for example
+
+    const PathInfo& pathInfo = sourceFile->getPathInfo();
+    buf << "'" << pathInfo.foundPath << "'";
+
+    // TODO(JS)?
+    // You might want to know where this include was from.
+    // If I output this though there will be a problem... as the indenting won't be clearly shown.
+    // Perhaps I output in two sections, one the hierarchy and the other the locations of the includes?
+
+    sink->diagnose(SourceLoc(), Diagnostics::includeOutput, buf);
+}
+
+static void _outputIncludesRec(SourceView* sourceView, Index depth, ViewInitiatingHierarchy& hierarchy, DiagnosticSink* sink)
+{
+    SourceFile* sourceFile = sourceView->getSourceFile();
+    const PathInfo& pathInfo = sourceFile->getPathInfo();
+
+    switch (pathInfo.type)
+    {
+        case PathInfo::Type::TokenPaste:
+        case PathInfo::Type::CommandLine:
+        case PathInfo::Type::TypeParse:
+        {
+            // If any of these types we don't output
+            return;
+        }
+        default: break;
+    }
+
+    // Okay output this file at the current depth
+    _outputInclude(sourceFile, depth, sink);
+
+    // Now recurse to all of the children at the next depth
+    List<SourceView*>* children = hierarchy.TryGetValue(sourceView);
+    if (children)
+    {
+        for (SourceView* child : *children)
+        {
+            _outputIncludesRec(child, depth + 1, hierarchy, sink);
+        }
+    }
+}
+
+static void _outputIncludes(const List<SourceFile*>& sourceFiles, SourceManager* sourceManager, DiagnosticSink* sink)
+{
+    // Set up the hierarchy to know how all the source views relate. This could be argued as overkill, but makes recursive
+    // output pretty simple
+    ViewInitiatingHierarchy hierarchy;
+    _calcViewInitiatingHierarchy(sourceManager, hierarchy);
+
+    // For all the source files
+    for (SourceFile* sourceFile : sourceFiles)
+    {
+        // Find an initial view (this is the view of this file, that doesn't have an initiating loc)
+        SourceView* sourceView = _findInitialSourceView(sourceFile);
+        if (!sourceView)
+        {
+            // Okay, didn't find one, so just output the file
+            _outputInclude(sourceFile, 0, sink);
+        }
+        else
+        {
+            // Output from this view recursively
+            _outputIncludesRec(sourceView, 0, hierarchy, sink);
+        }
+    }
+}
+
 void FrontEndCompileRequest::parseTranslationUnit(
     TranslationUnitRequest* translationUnit)
 {
@@ -1265,6 +1405,11 @@ void FrontEndCompileRequest::parseTranslationUnit(
             combinedPreprocessorDefinitions,
             getLinkage(),
             &preprocessorHandler);
+
+        if (outputIncludes)
+        {
+            _outputIncludes(translationUnit->getSourceFiles(), getSink()->getSourceManager(), getSink());
+        }
 
         parseSourceFile(
             astBuilder,

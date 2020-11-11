@@ -664,18 +664,10 @@ Result linkAndOptimizeIR(
         break;
     }
 
-    switch (target)
-    {
-    case CodeGenTarget::CPPSource:
-    case CodeGenTarget::CUDASource:
-        break;
-    default:
-        // For all targets that don't support true dynamic dispatch through
-        // witness tables, we need to eliminate witness tables from the IR so
-        // that they don't keep symbols live that we don't actually need.
-        stripWitnessTables(irModule);
-        break;
-    }
+    // TODO: our current dynamic dispatch pass will remove all uses of witness tables.
+    // If we are going to support function-pointer based, "real" modular dynamic dispatch,
+    // we will need to disable this pass.
+    stripWitnessTables(irModule);
 
 #if 0
     dumpIRIfEnabled(compileRequest, irModule, "AFTER STRIP WITNESS TABLES");

@@ -405,7 +405,7 @@ SourceFile* SourceManager::createSourceFileWithBlob(const PathInfo& pathInfo, IS
     return sourceFile;
 }
 
-SourceView* SourceManager::createSourceView(SourceFile* sourceFile, const PathInfo* pathInfo)
+SourceView* SourceManager::createSourceView(SourceFile* sourceFile, const PathInfo* pathInfo, SourceLoc initiatingSourceLoc)
 {
     SourceRange range = allocateSourceRange(sourceFile->getContentSize());
 
@@ -413,11 +413,11 @@ SourceView* SourceManager::createSourceView(SourceFile* sourceFile, const PathIn
     if (pathInfo &&
         (pathInfo->foundPath.getLength() && sourceFile->getPathInfo().foundPath != pathInfo->foundPath))
     {
-        sourceView = new SourceView(sourceFile, range, &pathInfo->foundPath);
+        sourceView = new SourceView(sourceFile, range, &pathInfo->foundPath, initiatingSourceLoc);
     }
     else
     {
-        sourceView = new SourceView(sourceFile, range, nullptr);
+        sourceView = new SourceView(sourceFile, range, nullptr, initiatingSourceLoc);
     }
 
     m_sourceViews.add(sourceView);
