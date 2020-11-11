@@ -359,6 +359,27 @@ namespace Slang
                 throw InvalidOperationException("Inconsistent find result returned. This is a bug in Dictionary implementation.");
         }
 
+            /// This differs from TryGetValueOrAdd, in that it always returns the Value held in the Dictionary.
+            /// If there isn't already an entry for 'key', a value is added with defaultValue. 
+        TValue& GetOrAddValue(const TKey& key, const TValue& defaultValue)
+        {
+            Rehash();
+            auto pos = FindPosition(key);
+            if (pos.ObjectPosition != -1)
+            {
+                return hashMap[pos.ObjectPosition].Value;
+            }
+            else if (pos.InsertionPosition != -1)
+            {
+                // Make pair
+                KeyValuePair<TKey, TValue> kvPair(_Move(key), _Move(defaultValue));
+                _count++;
+                return _Insert(_Move(kvPair), pos.InsertionPosition);
+            }
+            else
+                throw InvalidOperationException("Inconsistent find result returned. This is a bug in Dictionary implementation.");
+        }
+
 		bool ContainsKey(const TKey& key) const
 		{
 			if (bucketSizeMinusOne == -1)

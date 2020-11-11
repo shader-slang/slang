@@ -1491,6 +1491,9 @@ namespace Slang
 
         bool shouldDumpAST = false;
 
+            /// If true will after lexical analysis output the hierarchy of includes to stdout
+        bool outputIncludes = false;
+
     protected:
         CompileRequestBase(
             Linkage*        linkage,

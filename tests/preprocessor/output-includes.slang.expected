@@ -1,0 +1,15 @@
+result code = -1
+standard error = {
+(0): note: include 'tests/preprocessor/output-includes.slang'
+(0): note: include   'tests/preprocessor/include-a.slang.h'
+(0): note: include   'tests/preprocessor/include/include-pragma-once-c.h'
+(0): note: include     'tests/preprocessor/include/pragma-once-c.h'
+(0): note: include   'tests/preprocessor/include-a.slang.h'
+(0): note: include   'tests/preprocessor/include-a.slang.h'
+tests/preprocessor/include-a.slang.h(3): error 30201: function 'bar' already has a body
+tests/preprocessor/include-a.slang.h(3): note: see previous definition of 'bar'
+tests/preprocessor/include-a.slang.h(3): error 30201: function 'bar' already has a body
+tests/preprocessor/include-a.slang.h(3): note: see previous definition of 'bar'
+}
+standard output = {
+}
