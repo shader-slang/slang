@@ -190,7 +190,7 @@ Result IRSerialWriter::write(IRModule* module, SerialSourceLocWriter* sourceLocW
             IRInst* srcInst = m_insts[i];
             Ser::Inst& dstInst = m_serialData->m_insts[i];
 
-            dstInst.m_op = uint8_t(srcInst->op & kIROpMeta_OpMask);
+            dstInst.m_op = uint16_t(srcInst->op & kIROpMeta_OpMask);
             dstInst.m_payloadType = PayloadType::Empty;
             
             dstInst.m_resultTypeIndex = getInstIndex(srcInst->getFullType());
@@ -337,7 +337,7 @@ Result _encodeInsts(SerialCompressionType compressionType, const List<IRSerialDa
     // Calculate the maximum instruction size with worst case possible encoding
     // 2 bytes hold the payload size, and the result type
     // Note that if there were some free bits, we could encode some of this stuff into bits, but if we remove payloadType, then there are no free bits
-    const size_t maxInstSize = 2 + ByteEncodeUtil::kMaxLiteEncodeUInt32 + Math::Max(sizeof(insts->m_payload.m_float64), size_t(2 * ByteEncodeUtil::kMaxLiteEncodeUInt32));
+    const size_t maxInstSize = 1 + ByteEncodeUtil::kMaxLiteEncodeUInt16 + Math::Max(sizeof(insts->m_payload.m_float64), size_t(2 * ByteEncodeUtil::kMaxLiteEncodeUInt32));
 
     for (size_t i = 0; i < numInsts; ++i)
     {
@@ -357,8 +357,8 @@ Result _encodeInsts(SerialCompressionType compressionType, const List<IRSerialDa
             encodeOut = encodeArrayOut.begin() + offset;
             encodeEnd = encodeArrayOut.end();
         }
+        encodeOut += ByteEncodeUtil::encodeLiteUInt32(inst.m_op, encodeOut);
 
-        *encodeOut++ = uint8_t(inst.m_op);
         *encodeOut++ = uint8_t(inst.m_payloadType);
 
         encodeOut += ByteEncodeUtil::encodeLiteUInt32((uint32_t)inst.m_resultTypeIndex, encodeOut);
@@ -524,8 +524,10 @@ static Result _decodeInsts(SerialCompressionType compressionType, const uint8_t*
         }
 
         auto& inst = insts[i];
+        uint32_t instOp = 0;
+        encodeCur += ByteEncodeUtil::decodeLiteUInt32(encodeCur, &instOp);
+        inst.m_op = (uint16_t)instOp;
 
-        inst.m_op = *encodeCur++;
         const PayloadType payloadType = PayloadType(*encodeCur++);
         inst.m_payloadType = payloadType;
         

@@ -2435,6 +2435,11 @@ namespace Slang
         return (IRRTTIType*)getType(kIROp_RTTIType);
     }
 
+    IRRTTIHandleType* IRBuilder::getRTTIHandleType()
+    {
+        return (IRRTTIHandleType*)getType(kIROp_RTTIHandleType);
+    }
+
     IRAnyValueType* IRBuilder::getAnyValueType(IRIntegerValue size)
     {
         return (IRAnyValueType*)getType(kIROp_AnyValueType,

@@ -247,7 +247,10 @@ SlangResult SerialSourceLocReader::read(const SerialSourceLocData* serialData, S
         pathInfo.foundPath = debugStringSlices[UInt(srcSourceInfo.m_pathIndex)];
 
         SourceFile* sourceFile = sourceManager->createSourceFileWithSize(pathInfo, srcSourceInfo.m_range.getCount());
-        SourceView* sourceView = sourceManager->createSourceView(sourceFile, nullptr);
+
+        // Here the initiatingSourecLoc is passed as 0, as that information is not currently saved
+        // This simplifies the serialization - as currently for this data we save only a single view per file.
+        SourceView* sourceView = sourceManager->createSourceView(sourceFile, nullptr, SourceLoc::fromRaw(0));
 
         // We need to accumulate all line numbers, for this source file, both adjusted and unadjusted
         List<SerialSourceLocData::LineInfo> lineInfos;

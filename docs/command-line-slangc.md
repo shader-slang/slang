@@ -122,7 +122,7 @@ For completeness, here are the options that `slangc` currently accepts:
   * `dxil-assembly` / `dxil-asm`: DirectX Intermediate Language assembly
 
 * `-profile <profile>`: Specify the "profile" to use for the code generation target, which represents an abstact feature level as defined by a particular API standard. Available values include:
-  * The Direct3D "Shader Model" levels are available as `sm_{4_0,4_1,5_0,5_1,6_0,6_1,6_2,6_3}`
+  * The Direct3D "Shader Model" levels are available as `sm_{4_0,4_1,5_0,5_1,6_0,6_1,6_2,6_3,6_4,6_5,6_6}`
   * Profiles corresponding to GLSL langauge versions are available as `glsl_{110,120,130,140,150,330,400,410,420,430,440,450,460}`
   * As a convenience, names matching traditional HLSL shader profiles are provided such that, e.g., `-profile vs_5_0` is an abbreviation for `-profile sm_5_0 -stage vertex`
 
@@ -146,6 +146,8 @@ For completeness, here are the options that `slangc` currently accepts:
   * `-O3`: Enable further optimizations, which might have a significant impact on compile time, or involve unwanted tradeoffs in terms of code size.
 
 * `--`: Stop parsing options, and treat the rest of the command line as input paths
+
+* `-output-includes`: After pre-processing has been performed will output to via the diagnostics the hierarchy of paths to source files reached 
 
 ### Specifying where dlls/shared libraries are loaded from
 

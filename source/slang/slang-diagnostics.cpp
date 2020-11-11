@@ -177,6 +177,42 @@ static void formatDiagnostic(
             humaneLoc = sourceView->getHumaneLoc(sourceLoc);
         }
         formatDiagnostic(humaneLoc, diagnostic, sb);
+
+        {
+            SourceView* currentView = sourceView;
+
+            while (currentView && currentView->getInitiatingSourceLoc().isValid() && currentView->getSourceFile()->getPathInfo().type == PathInfo::Type::TokenPaste)
+            {
+                SourceView* initiatingView = sourceManager->findSourceView(currentView->getInitiatingSourceLoc());
+                if (initiatingView == nullptr)
+                {
+                    break;
+                }
+
+                const DiagnosticInfo& diagnosticInfo = Diagnostics::seeTokenPasteLocation;
+
+                // Turn the message format into a message. For the moment it assumes no parameters.
+                StringBuilder msg;
+                formatDiagnosticMessage(msg, diagnosticInfo.messageFormat, 0, nullptr);
+
+                // Set up the diagnostic.
+                Diagnostic initiationDiagnostic;
+                initiationDiagnostic.ErrorID = diagnosticInfo.id;
+                initiationDiagnostic.Message = msg.ProduceString();
+                initiationDiagnostic.loc = sourceView->getInitiatingSourceLoc();
+                initiationDiagnostic.severity = diagnosticInfo.severity;
+
+                // TODO(JS):
+                // Not 100%  clear what the best sourceLoc type is most useful here - we will go with default for now
+                HumaneSourceLoc pasteHumaneLoc = initiatingView->getHumaneLoc(sourceView->getInitiatingSourceLoc());
+
+                // Okay we should output where the token paste took place
+                formatDiagnostic(pasteHumaneLoc, initiationDiagnostic, sb);
+
+                // Make the initiatingView the current view
+                currentView = initiatingView;
+            }
+        }
     }
      
     if (sourceView && sink->isFlagSet(DiagnosticSink::Flag::VerbosePath))
