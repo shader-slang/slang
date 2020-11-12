@@ -497,17 +497,13 @@ static List<ExtensionDecl*>& _getCandidateExtensionList(
                     {
                         ModuleDecl* moduleDecl = as<ModuleDecl>(astRootNode);
 
-                        NamePool* namePool = options.session->getNamePool();
-
-                        // Maps from name to index in (parseEntries)
+                        // Maps from keyword name name to index in (syntaxParseInfos)
+                        // Will be filled in lazily if needed (for SyntaxDecl setup)
                         Dictionary<Name*, Index> syntaxKeywordDict;
 
-                        const auto parseEntries = getParseSyntaxEntries();
-                        for (Index i = 0; i < parseEntries.getCount(); ++i)
-                        {
-                            const auto& entry = parseEntries[i];
-                            syntaxKeywordDict.Add(namePool->getName(entry.name), i);
-                        }
+                        // Get the parse infos
+                        const auto syntaxParseInfos = getSyntaxParseInfos();
+                        SLANG_ASSERT(syntaxParseInfos.getCount());
 
                         for (auto& obj : reader.getObjects())
                         {
@@ -535,20 +531,33 @@ static List<ExtensionDecl*>& _getCandidateExtensionList(
                                 }
                                 else if (SyntaxDecl* syntaxDecl = dynamicCast<SyntaxDecl>(nodeBase))
                                 {
-                                    // Look up the callback
+                                    // Set up the dictionary lazily
+                                    if (syntaxKeywordDict.Count() == 0)
+                                    {
+                                        NamePool* namePool = options.session->getNamePool();
+                                        for (Index i = 0; i < syntaxParseInfos.getCount(); ++i)
+                                        {
+                                            const auto& entry = syntaxParseInfos[i];
+                                            syntaxKeywordDict.Add(namePool->getName(entry.keywordName), i);
+                                        }
+                                        // Must have something in it at this point
+                                        SLANG_ASSERT(syntaxKeywordDict.Count());
+                                    }
 
+                                    // Look up the index 
                                     Index* entryIndexPtr = syntaxKeywordDict.TryGetValue(syntaxDecl->getName());
                                     if (entryIndexPtr)
                                     {
-                                        auto& entry = parseEntries[*entryIndexPtr];
-                                        syntaxDecl->parseUserData = const_cast<ReflectClassInfo*>(entry.classInfo);
-                                        syntaxDecl->parseCallback = *entry.callback;
+                                        // Set up SyntaxDecl based on the ParseSyntaxIndo
+                                        auto& info = syntaxParseInfos[*entryIndexPtr];
+                                        syntaxDecl->parseCallback = *info.callback;
+                                        syntaxDecl->parseUserData = const_cast<ReflectClassInfo*>(info.classInfo);
                                     }
                                     else
                                     {
-                                        // We use the simple parser, and set the user info to the class name
+                                        // If we don't find a setup entry, we use `parseSimpleSyntax`, and set
+                                        // the parseUserData to the ReflectClassInfo (as parseSimpleSyntax needs this)
                                         syntaxDecl->parseCallback = &parseSimpleSyntax;
-
                                         SLANG_ASSERT(syntaxDecl->syntaxClass.classInfo);
                                         syntaxDecl->parseUserData = const_cast<ReflectClassInfo*>(syntaxDecl->syntaxClass.classInfo);
                                     }

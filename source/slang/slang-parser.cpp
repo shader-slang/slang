@@ -5662,46 +5662,43 @@ namespace Slang
         return modifier;
     }
 
-
-
-    static ParseSyntaxEntry _makeParseExpr(const char* inName, SyntaxParseCallback inCallback)
+    static SyntaxParseInfo _makeParseExpr(const char* keywordName, SyntaxParseCallback callback)
     {
-        ParseSyntaxEntry entry;
+        SyntaxParseInfo entry;
         entry.classInfo = &Expr::kReflectClassInfo;
-        entry.name = inName;
-        entry.callback = inCallback;
+        entry.keywordName = keywordName;
+        entry.callback = callback;
         return entry; 
     }
-    static ParseSyntaxEntry _makeParseDecl(const char* inName, SyntaxParseCallback inCallback)
+    static SyntaxParseInfo _makeParseDecl(const char* keywordName, SyntaxParseCallback callback)
     {
-        ParseSyntaxEntry entry;
-        entry.name = inName;
-        entry.callback = inCallback;
+        SyntaxParseInfo entry;
+        entry.keywordName = keywordName;
+        entry.callback = callback;
         entry.classInfo = &Decl::kReflectClassInfo;
         return entry;
     }
-    static ParseSyntaxEntry _makeParseModifier(const char* inName, const ReflectClassInfo& classInfo)
+    static SyntaxParseInfo _makeParseModifier(const char* keywordName, const ReflectClassInfo& classInfo)
     {
         // If we just have class info - use simple parser
-        ParseSyntaxEntry entry;
-        entry.name = inName;
+        SyntaxParseInfo entry;
+        entry.keywordName = keywordName;
         entry.callback = &parseSimpleSyntax;
         entry.classInfo = &classInfo;
         return entry;
     }
-    static ParseSyntaxEntry _makeParseModifier(const char* inName, SyntaxParseCallback inCallback)
+    static SyntaxParseInfo _makeParseModifier(const char* keywordName, SyntaxParseCallback callback)
     {
-        ParseSyntaxEntry entry;
-        entry.name = inName;
-        entry.callback = inCallback;
+        SyntaxParseInfo entry;
+        entry.keywordName = keywordName;
+        entry.callback = callback;
         entry.classInfo = &Modifier::kReflectClassInfo;
         return entry;
     }
 
     // Maps a keyword to the associated parsing function
-    static const ParseSyntaxEntry g_parseSyntaxEntries[] = 
+    static const SyntaxParseInfo g_parseSyntaxEntries[] = 
     {
-
         // !!!!!!!!!!!!!!!!!!!! Decls !!!!!!!!!!!!!!!!!!
 
         _makeParseDecl("typedef",           parseTypeDef),
@@ -5724,7 +5721,7 @@ namespace Slang
         _makeParseDecl("var",               parseVarDecl ),
         _makeParseDecl("func",              parseFuncDecl ),
         _makeParseDecl("typealias",         parseTypeAliasDecl ),
-        _makeParseDecl("__generic_value_param",parseGlobalGenericValueParamDecl ),
+        _makeParseDecl("__generic_value_param", parseGlobalGenericValueParamDecl ),
         _makeParseDecl("namespace",         parseNamespaceDecl ),
         _makeParseDecl("using",             parseUsingDecl ),
 
@@ -5798,7 +5795,7 @@ namespace Slang
         _makeParseModifier("__intrinsic_type",      parseIntrinsicTypeModifier),
         _makeParseModifier("__implicit_conversion", parseImplicitConversionModifier),
 
-        _makeParseModifier("__attributeTarget", parseAttributeTargetModifier),
+        _makeParseModifier("__attributeTarget",     parseAttributeTargetModifier),
 
         // !!!!!!!!!!!!!!!!!!!!!!! Expr !!!!!!!!!!!!!!!!!!!!!!!!!!!
 
@@ -5809,7 +5806,7 @@ namespace Slang
         _makeParseExpr("__TaggedUnion", parseTaggedUnionType),
     };
 
-    ConstArrayView<ParseSyntaxEntry> getParseSyntaxEntries()
+    ConstArrayView<SyntaxParseInfo> getSyntaxParseInfos()
     {
         return makeConstArrayView(g_parseSyntaxEntries, SLANG_COUNT_OF(g_parseSyntaxEntries));
     }
@@ -5824,13 +5821,11 @@ namespace Slang
         scope->containerDecl = moduleDecl;
 
         // Add syntax for declaration keywords
+        for (const auto& info : getSyntaxParseInfos())
         {
-            for (const auto& entry : g_parseSyntaxEntries)
-            {
-                addBuiltinSyntaxImpl(session, scope, entry.name, entry.callback, const_cast<ReflectClassInfo*>(entry.classInfo), entry.classInfo);
-            }
+            addBuiltinSyntaxImpl(session, scope, info.keywordName, info.callback, const_cast<ReflectClassInfo*>(info.classInfo), info.classInfo);
         }
-
+    
         return moduleDecl;
     }
 
