@@ -156,7 +156,7 @@ void SerialSourceLocWriter::write(SerialSourceLocData* outSourceLocData)
     SerialStringTableUtil::encodeStringTable(m_stringSlicePool, outSourceLocData->m_stringTable);
 }
 
-/* !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! DebugSerialReader !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! */
+/* !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! SerialSourceLocReader !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! */
 
 Index SerialSourceLocReader::findViewIndex(SerialSourceLocData::SourceLoc loc)
 {
@@ -393,6 +393,7 @@ SlangResult SerialSourceLocReader::read(const SerialSourceLocData* serialData, S
                 SLANG_RETURN_ON_FAIL(SerialRiffUtil::readArrayUncompressedChunk(dataChunk, m_adjustedLineInfos));
                 break;
             }
+            case SLANG_MAKE_COMPRESSED_FOUR_CC(SerialSourceLocData::kDebugSourceInfoFourCc):
             case SerialSourceLocData::kDebugSourceInfoFourCc:
             {
                 SLANG_RETURN_ON_FAIL(SerialRiffUtil::readArrayChunk(moduleCompressionType, dataChunk, m_sourceInfos));
