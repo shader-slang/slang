@@ -12,6 +12,8 @@
 #include "slang-serialize-source-loc.h"
 #include "slang-serialize-factory.h"
 
+#include "slang-parser.h"
+
 #include "slang-mangled-lexer.h"
 
 namespace Slang {
@@ -490,27 +492,65 @@ static List<ExtensionDecl*>& _getCandidateExtensionList(
                     astRootNode = reader.getPointer(SerialIndex(1)).dynamicCast<NodeBase>();
 
                     // 2) Add the extensions to the module mapTypeToCandidateExtensions cache
+                    // 3) We need to fix the callback pointers for parsing
 
                     {
                         ModuleDecl* moduleDecl = as<ModuleDecl>(astRootNode);
-                        
+
+                        NamePool* namePool = options.session->getNamePool();
+
+                        // Maps from name to index in (parseEntries)
+                        Dictionary<Name*, Index> syntaxKeywordDict;
+
+                        const auto parseEntries = getParseSyntaxEntries();
+                        for (Index i = 0; i < parseEntries.getCount(); ++i)
+                        {
+                            const auto& entry = parseEntries[i];
+                            syntaxKeywordDict.Add(namePool->getName(entry.name), i);
+                        }
+
                         for (auto& obj : reader.getObjects())
                         {
-                            if (Type* type = obj.dynamicCast<Type>())
+                            if (obj.m_kind == SerialTypeKind::NodeBase)
                             {
-                                type->_setASTBuilder(astBuilder);
-                            }
+                                NodeBase* nodeBase = (NodeBase*)obj.m_ptr;
+                                SLANG_ASSERT(nodeBase);
 
-                            if (ExtensionDecl* extensionDecl = obj.dynamicCast<ExtensionDecl>())
-                            {
-                                if (auto targetDeclRefType = as<DeclRefType>(extensionDecl->targetType))
+                                if (Type* type = dynamicCast<Type>(nodeBase))
                                 {
-                                    // Attach our extension to that type as a candidate...
-                                    if (auto aggTypeDeclRef = targetDeclRefType->declRef.as<AggTypeDecl>())
+                                    type->_setASTBuilder(astBuilder);
+                                }
+                                else if (ExtensionDecl* extensionDecl = dynamicCast<ExtensionDecl>(nodeBase))
+                                {
+                                    if (auto targetDeclRefType = as<DeclRefType>(extensionDecl->targetType))
                                     {
-                                        auto aggTypeDecl = aggTypeDeclRef.getDecl();
+                                        // Attach our extension to that type as a candidate...
+                                        if (auto aggTypeDeclRef = targetDeclRefType->declRef.as<AggTypeDecl>())
+                                        {
+                                            auto aggTypeDecl = aggTypeDeclRef.getDecl();
 
-                                        _getCandidateExtensionList(aggTypeDecl, moduleDecl->mapTypeToCandidateExtensions).add(extensionDecl);
+                                            _getCandidateExtensionList(aggTypeDecl, moduleDecl->mapTypeToCandidateExtensions).add(extensionDecl);
+                                        }
+                                    }
+                                }
+                                else if (SyntaxDecl* syntaxDecl = dynamicCast<SyntaxDecl>(nodeBase))
+                                {
+                                    // Look up the callback
+
+                                    Index* entryIndexPtr = syntaxKeywordDict.TryGetValue(syntaxDecl->getName());
+                                    if (entryIndexPtr)
+                                    {
+                                        auto& entry = parseEntries[*entryIndexPtr];
+                                        syntaxDecl->parseUserData = const_cast<ReflectClassInfo*>(entry.classInfo);
+                                        syntaxDecl->parseCallback = *entry.callback;
+                                    }
+                                    else
+                                    {
+                                        // We use the simple parser, and set the user info to the class name
+                                        syntaxDecl->parseCallback = &parseSimpleSyntax;
+
+                                        SLANG_ASSERT(syntaxDecl->syntaxClass.classInfo);
+                                        syntaxDecl->parseUserData = const_cast<ReflectClassInfo*>(syntaxDecl->syntaxClass.classInfo);
                                     }
                                 }
                             }

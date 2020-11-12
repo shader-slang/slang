@@ -590,7 +590,7 @@ namespace Slang
         return false;
     }
 
-    NodeBase* ParseTypeDef(Parser* parser, void* /*userData*/)
+    NodeBase* parseTypeDef(Parser* parser, void* /*userData*/)
     {
         TypeDefDecl* typeDefDecl = parser->astBuilder->create<TypeDefDecl>();
 
@@ -1214,7 +1214,7 @@ namespace Slang
         }
     }
 
-    static NodeBase* ParseGenericDecl(Parser* parser, void*)
+    static NodeBase* parseGenericDecl(Parser* parser, void*)
     {
         GenericDecl* decl = parser->astBuilder->create<GenericDecl>();
         parser->FillPosition(decl);
@@ -2420,7 +2420,7 @@ namespace Slang
         }
     }
 
-    static NodeBase* ParseExtensionDecl(Parser* parser, void* /*userData*/)
+    static NodeBase* parseExtensionDecl(Parser* parser, void* /*userData*/)
     {
         ExtensionDecl* decl = parser->astBuilder->create<ExtensionDecl>();
         parser->FillPosition(decl);
@@ -2770,7 +2770,7 @@ namespace Slang
         }
     }
 
-    static NodeBase* ParseSubscriptDecl(Parser* parser, void* /*userData*/)
+    static NodeBase* parseSubscriptDecl(Parser* parser, void* /*userData*/)
     {
         SubscriptDecl* decl = parser->astBuilder->create<SubscriptDecl>();
         parser->FillPosition(decl);
@@ -2814,7 +2814,7 @@ namespace Slang
         }
     }
 
-    static NodeBase* ParsePropertyDecl(Parser* parser, void* /*userData*/)
+    static NodeBase* parsePropertyDecl(Parser* parser, void* /*userData*/)
     {
         PropertyDecl* decl = parser->astBuilder->create<PropertyDecl>();
         parser->FillPosition(decl);
@@ -3020,7 +3020,7 @@ namespace Slang
     // This is a catch-all syntax-construction callback to handle cases where
     // a piece of syntax is fully defined by the keyword to use, along with
     // the class of AST node to construct.
-    static NodeBase* parseSimpleSyntax(Parser* parser, void* userData)
+    NodeBase* parseSimpleSyntax(Parser* parser, void* userData)
     {
         SyntaxClassBase syntaxClass((ReflectClassInfo*) userData);
         return (NodeBase*)syntaxClass.createInstanceImpl(parser->astBuilder);
@@ -5662,6 +5662,158 @@ namespace Slang
         return modifier;
     }
 
+
+
+    static ParseSyntaxEntry _makeParseExpr(const char* inName, SyntaxParseCallback inCallback)
+    {
+        ParseSyntaxEntry entry;
+        entry.classInfo = &Expr::kReflectClassInfo;
+        entry.name = inName;
+        entry.callback = inCallback;
+        return entry; 
+    }
+    static ParseSyntaxEntry _makeParseDecl(const char* inName, SyntaxParseCallback inCallback)
+    {
+        ParseSyntaxEntry entry;
+        entry.name = inName;
+        entry.callback = inCallback;
+        entry.classInfo = &Decl::kReflectClassInfo;
+        return entry;
+    }
+    static ParseSyntaxEntry _makeParseModifier(const char* inName, const ReflectClassInfo& classInfo)
+    {
+        // If we just have class info - use simple parser
+        ParseSyntaxEntry entry;
+        entry.name = inName;
+        entry.callback = &parseSimpleSyntax;
+        entry.classInfo = &classInfo;
+        return entry;
+    }
+    static ParseSyntaxEntry _makeParseModifier(const char* inName, SyntaxParseCallback inCallback)
+    {
+        ParseSyntaxEntry entry;
+        entry.name = inName;
+        entry.callback = inCallback;
+        entry.classInfo = &Modifier::kReflectClassInfo;
+        return entry;
+    }
+
+    // Maps a keyword to the associated parsing function
+    static const ParseSyntaxEntry g_parseSyntaxEntries[] = 
+    {
+
+        // !!!!!!!!!!!!!!!!!!!! Decls !!!!!!!!!!!!!!!!!!
+
+        _makeParseDecl("typedef",           parseTypeDef),
+        _makeParseDecl("associatedtype",    parseAssocType),
+        _makeParseDecl("type_param",        parseGlobalGenericTypeParamDecl ),
+        _makeParseDecl("cbuffer",           parseHLSLCBufferDecl ),
+        _makeParseDecl("tbuffer",           parseHLSLTBufferDecl ),
+        _makeParseDecl("__generic",         parseGenericDecl ),
+        _makeParseDecl("__extension",       parseExtensionDecl ),
+        _makeParseDecl("extension",         parseExtensionDecl ),
+        _makeParseDecl("__init",            parseConstructorDecl ),
+        _makeParseDecl("__subscript",       parseSubscriptDecl ),
+        _makeParseDecl("property",          parsePropertyDecl ),
+        _makeParseDecl("interface",         parseInterfaceDecl ),
+        _makeParseDecl("syntax",            parseSyntaxDecl ),
+        _makeParseDecl("attribute_syntax",  parseAttributeSyntaxDecl ),
+        _makeParseDecl("__import",          parseImportDecl ),
+        _makeParseDecl("import",            parseImportDecl ),
+        _makeParseDecl("let",               parseLetDecl ),
+        _makeParseDecl("var",               parseVarDecl ),
+        _makeParseDecl("func",              parseFuncDecl ),
+        _makeParseDecl("typealias",         parseTypeAliasDecl ),
+        _makeParseDecl("__generic_value_param",parseGlobalGenericValueParamDecl ),
+        _makeParseDecl("namespace",         parseNamespaceDecl ),
+        _makeParseDecl("using",             parseUsingDecl ),
+
+        // !!!!!!!!!!!!!!!!!!!!!! Modifer !!!!!!!!!!!!!!!!!!!!!!
+
+        // Add syntax for "simple" modifier keywords.
+        // These are the ones that just appear as a single
+        // keyword (no further tokens expected/allowed),
+        // and which can be represented just by creating
+        // a new AST node of the corresponding type.
+
+        _makeParseModifier("in",            InModifier::kReflectClassInfo),
+        _makeParseModifier("input",         InputModifier::kReflectClassInfo),
+        _makeParseModifier("out",           OutModifier::kReflectClassInfo),
+        _makeParseModifier("inout",         InOutModifier::kReflectClassInfo),
+        _makeParseModifier("__ref",         RefModifier::kReflectClassInfo),
+        _makeParseModifier("const",         ConstModifier::kReflectClassInfo),
+        _makeParseModifier("instance",      InstanceModifier::kReflectClassInfo),
+        _makeParseModifier("__builtin",     BuiltinModifier::kReflectClassInfo),
+
+        _makeParseModifier("inline",        InlineModifier::kReflectClassInfo),
+        _makeParseModifier("public",        PublicModifier::kReflectClassInfo),
+        _makeParseModifier("require",       RequireModifier::kReflectClassInfo),
+        _makeParseModifier("param",         ParamModifier::kReflectClassInfo),
+        _makeParseModifier("extern",        ExternModifier::kReflectClassInfo),
+
+        _makeParseModifier("row_major",     HLSLRowMajorLayoutModifier::kReflectClassInfo),
+        _makeParseModifier("column_major",  HLSLColumnMajorLayoutModifier::kReflectClassInfo),
+
+        _makeParseModifier("nointerpolation",   HLSLNoInterpolationModifier::kReflectClassInfo),
+        _makeParseModifier("noperspective",     HLSLNoPerspectiveModifier::kReflectClassInfo),
+        _makeParseModifier("linear",        HLSLLinearModifier::kReflectClassInfo),
+        _makeParseModifier("sample",        HLSLSampleModifier::kReflectClassInfo),
+        _makeParseModifier("centroid",      HLSLCentroidModifier::kReflectClassInfo),
+        _makeParseModifier("precise",       PreciseModifier::kReflectClassInfo),
+        _makeParseModifier("shared",        HLSLEffectSharedModifier::kReflectClassInfo),
+        _makeParseModifier("groupshared",   HLSLGroupSharedModifier::kReflectClassInfo),
+        _makeParseModifier("static",        HLSLStaticModifier::kReflectClassInfo),
+        _makeParseModifier("uniform",       HLSLUniformModifier::kReflectClassInfo),
+        _makeParseModifier("volatile",      HLSLVolatileModifier::kReflectClassInfo),
+
+        // Modifiers for geometry shader input
+        _makeParseModifier("point",         HLSLPointModifier::kReflectClassInfo),
+        _makeParseModifier("line",          HLSLLineModifier::kReflectClassInfo),
+        _makeParseModifier("triangle",      HLSLTriangleModifier::kReflectClassInfo),
+        _makeParseModifier("lineadj",       HLSLLineAdjModifier::kReflectClassInfo),
+        _makeParseModifier("triangleadj",   HLSLTriangleAdjModifier::kReflectClassInfo),
+
+        // Modifiers for unary operator declarations
+        _makeParseModifier("__prefix",      PrefixModifier::kReflectClassInfo),
+        _makeParseModifier("__postfix",     PostfixModifier::kReflectClassInfo),
+
+        // Modifier to apply to `import` that should be re-exported
+        _makeParseModifier("__exported",    ExportedModifier::kReflectClassInfo),
+
+        // Add syntax for more complex modifiers, which allow
+        // or expect more tokens after the initial keyword.
+
+        _makeParseModifier("layout",                parseLayoutModifier),
+
+        _makeParseModifier("__intrinsic_op",        parseIntrinsicOpModifier),
+        _makeParseModifier("__target_intrinsic",    parseTargetIntrinsicModifier),
+        _makeParseModifier("__specialized_for_target",    parseSpecializedForTargetModifier),
+        _makeParseModifier("__glsl_extension",      parseGLSLExtensionModifier),
+        _makeParseModifier("__glsl_version",        parseGLSLVersionModifier),
+        _makeParseModifier("__spirv_version",       parseSPIRVVersionModifier),
+        _makeParseModifier("__cuda_sm_version",     parseCUDASMVersionModifier),
+
+        _makeParseModifier("__builtin_type",        parseBuiltinTypeModifier),
+        _makeParseModifier("__magic_type",          parseMagicTypeModifier),
+        _makeParseModifier("__intrinsic_type",      parseIntrinsicTypeModifier),
+        _makeParseModifier("__implicit_conversion", parseImplicitConversionModifier),
+
+        _makeParseModifier("__attributeTarget", parseAttributeTargetModifier),
+
+        // !!!!!!!!!!!!!!!!!!!!!!! Expr !!!!!!!!!!!!!!!!!!!!!!!!!!!
+
+        _makeParseExpr("this",  parseThisExpr),
+        _makeParseExpr("This",  parseThisTypeExpr),
+        _makeParseExpr("true",  parseTrueExpr),
+        _makeParseExpr("false", parseFalseExpr),
+        _makeParseExpr("__TaggedUnion", parseTaggedUnionType),
+    };
+
+    ConstArrayView<ParseSyntaxEntry> getParseSyntaxEntries()
+    {
+        return makeConstArrayView(g_parseSyntaxEntries, SLANG_COUNT_OF(g_parseSyntaxEntries));
+    }
+
     ModuleDecl* populateBaseLanguageModule(
         ASTBuilder*     astBuilder,
         RefPtr<Scope>   scope)
@@ -5672,124 +5824,12 @@ namespace Slang
         scope->containerDecl = moduleDecl;
 
         // Add syntax for declaration keywords
-    #define DECL(KEYWORD, CALLBACK) \
-        addBuiltinSyntax<Decl>(session, scope, #KEYWORD, &CALLBACK)
-        DECL(typedef,         ParseTypeDef);
-        DECL(associatedtype,  parseAssocType);
-        DECL(type_param,    parseGlobalGenericTypeParamDecl);
-        DECL(cbuffer,         parseHLSLCBufferDecl);
-        DECL(tbuffer,         parseHLSLTBufferDecl);
-        DECL(__generic,       ParseGenericDecl);
-        DECL(__extension,     ParseExtensionDecl);
-        DECL(extension,       ParseExtensionDecl);
-        DECL(__init,          parseConstructorDecl);
-        DECL(__subscript,     ParseSubscriptDecl);
-        DECL(property,        ParsePropertyDecl);
-        DECL(interface,       parseInterfaceDecl);
-        DECL(syntax,          parseSyntaxDecl);
-        DECL(attribute_syntax,parseAttributeSyntaxDecl);
-        DECL(__import,        parseImportDecl);
-        DECL(import,          parseImportDecl);
-        DECL(let,             parseLetDecl);
-        DECL(var,             parseVarDecl);
-        DECL(func,            parseFuncDecl);
-        DECL(typealias,       parseTypeAliasDecl);
-        DECL(__generic_value_param, parseGlobalGenericValueParamDecl);
-        DECL(namespace,       parseNamespaceDecl);
-        DECL(using,           parseUsingDecl);
-
-    #undef DECL
-
-        // Add syntax for "simple" modifier keywords.
-        // These are the ones that just appear as a single
-        // keyword (no further tokens expected/allowed),
-        // and which can be represented just by creating
-        // a new AST node of the corresponding type.
-    #define MODIFIER(KEYWORD, CLASS) \
-        addSimpleModifierSyntax<CLASS>(session, scope, #KEYWORD)
-
-        MODIFIER(in,        InModifier);
-        MODIFIER(input,     InputModifier);
-        MODIFIER(out,       OutModifier);
-        MODIFIER(inout,     InOutModifier);
-        MODIFIER(__ref,     RefModifier);
-        MODIFIER(const,     ConstModifier);
-        MODIFIER(instance,  InstanceModifier);
-        MODIFIER(__builtin, BuiltinModifier);
-
-        MODIFIER(inline,    InlineModifier);
-        MODIFIER(public,    PublicModifier);
-        MODIFIER(require,   RequireModifier);
-        MODIFIER(param,     ParamModifier);
-        MODIFIER(extern,    ExternModifier);
-
-        MODIFIER(row_major,     HLSLRowMajorLayoutModifier);
-        MODIFIER(column_major,  HLSLColumnMajorLayoutModifier);
-
-        MODIFIER(nointerpolation,   HLSLNoInterpolationModifier);
-        MODIFIER(noperspective,     HLSLNoPerspectiveModifier);
-        MODIFIER(linear,            HLSLLinearModifier);
-        MODIFIER(sample,            HLSLSampleModifier);
-        MODIFIER(centroid,          HLSLCentroidModifier);
-        MODIFIER(precise,           PreciseModifier);
-        MODIFIER(shared,            HLSLEffectSharedModifier);
-        MODIFIER(groupshared,       HLSLGroupSharedModifier);
-        MODIFIER(static,            HLSLStaticModifier);
-        MODIFIER(uniform,           HLSLUniformModifier);
-        MODIFIER(volatile,          HLSLVolatileModifier);
-
-        // Modifiers for geometry shader input
-        MODIFIER(point,         HLSLPointModifier);
-        MODIFIER(line,          HLSLLineModifier);
-        MODIFIER(triangle,      HLSLTriangleModifier);
-        MODIFIER(lineadj,       HLSLLineAdjModifier);
-        MODIFIER(triangleadj,   HLSLTriangleAdjModifier);
-
-        // Modifiers for unary operator declarations
-        MODIFIER(__prefix,   PrefixModifier);
-        MODIFIER(__postfix,  PostfixModifier);
-
-        // Modifier to apply to `import` that should be re-exported
-        MODIFIER(__exported,  ExportedModifier);
-
-    #undef MODIFIER
-
-        // Add syntax for more complex modifiers, which allow
-        // or expect more tokens after the initial keyword.
-    #define MODIFIER(KEYWORD, CALLBACK) \
-        addBuiltinSyntax<Modifier>(session, scope, #KEYWORD, &CALLBACK)
-
-        MODIFIER(layout,            parseLayoutModifier);
-
-        MODIFIER(__intrinsic_op,        parseIntrinsicOpModifier);
-        MODIFIER(__target_intrinsic,    parseTargetIntrinsicModifier);
-        MODIFIER(__specialized_for_target,    parseSpecializedForTargetModifier);
-        MODIFIER(__glsl_extension,  parseGLSLExtensionModifier);
-        MODIFIER(__glsl_version,    parseGLSLVersionModifier);
-        MODIFIER(__spirv_version,   parseSPIRVVersionModifier);
-        MODIFIER(__cuda_sm_version, parseCUDASMVersionModifier);
-
-        MODIFIER(__builtin_type,    parseBuiltinTypeModifier);
-        MODIFIER(__magic_type,      parseMagicTypeModifier);
-        MODIFIER(__intrinsic_type,    parseIntrinsicTypeModifier);
-        MODIFIER(__implicit_conversion,     parseImplicitConversionModifier);
-
-        MODIFIER(__attributeTarget, parseAttributeTargetModifier);
-
-
-#undef MODIFIER
-
-        // Add syntax for expression keywords
-    #define EXPR(KEYWORD, CALLBACK) \
-        addBuiltinSyntax<Expr>(session, scope, #KEYWORD, &CALLBACK)
-
-        EXPR(this,  parseThisExpr);
-        EXPR(This,  parseThisTypeExpr);
-        EXPR(true,  parseTrueExpr);
-        EXPR(false, parseFalseExpr);
-        EXPR(__TaggedUnion, parseTaggedUnionType);
-
-    #undef EXPR
+        {
+            for (const auto& entry : g_parseSyntaxEntries)
+            {
+                addBuiltinSyntaxImpl(session, scope, entry.name, entry.callback, const_cast<ReflectClassInfo*>(entry.classInfo), entry.classInfo);
+            }
+        }
 
         return moduleDecl;
     }

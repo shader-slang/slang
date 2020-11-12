@@ -26,6 +26,19 @@ namespace Slang
     ModuleDecl* populateBaseLanguageModule(
         ASTBuilder*     astBuilder,
         RefPtr<Scope>   scope);
+
+    struct ParseSyntaxEntry
+    {
+        const char* name;
+        SyntaxParseCallback callback;
+        const ReflectClassInfo* classInfo;
+    };
+
+    ConstArrayView<ParseSyntaxEntry> getParseSyntaxEntries();
+
+        /// Assumes the userInfo is the ReflectClassInfo
+    NodeBase* parseSimpleSyntax(Parser* parser, void* userData);
+
 }
 
 #endif
