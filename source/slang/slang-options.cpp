@@ -441,7 +441,7 @@ struct OptionsParser
             char const* arg = *argCursor++;
             if (arg[0] == '-')
             {
-                String argStr = String(arg);
+                UnownedStringSlice argStr = UnownedStringSlice(arg);
 
                 if(argStr == "-no-mangle" )
                 {
@@ -460,6 +460,10 @@ struct OptionsParser
                     String prefix;
                     SLANG_RETURN_ON_FAIL(tryReadCommandLineArgument(sink, arg, &argCursor, argEnd, prefix));
                     requestImpl->getBackEndReq()->m_dumpIntermediatePrefix = prefix;
+                }
+                else if (argStr == "-output-includes")
+                {
+                    requestImpl->getFrontEndReq()->outputIncludes = true;
                 }
                 else if(argStr == "-dump-ir" )
                 {
@@ -972,9 +976,10 @@ struct OptionsParser
                             String name;
                             SLANG_RETURN_ON_FAIL(tryReadCommandLineArgument(sink, arg, &argCursor, argEnd, name));
 
-                            String slice = argStr.subString(1, index - 1);
+                            // Skip the initial -, up to the last -
+                            UnownedStringSlice passThruSlice(argStr.begin() + 1, argStr.begin() + index);
                             SlangPassThrough passThrough = SLANG_PASS_THROUGH_NONE;
-                            if (SLANG_SUCCEEDED(TypeTextUtil::findPassThrough(slice.getUnownedSlice(), passThrough)))
+                            if (SLANG_SUCCEEDED(TypeTextUtil::findPassThrough(passThruSlice, passThrough)))
                             {
                                 session->setDownstreamCompilerPath(passThrough, name.getBuffer());
                                 continue;

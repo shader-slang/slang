@@ -1799,7 +1799,7 @@ SlangResult CPPExtractor::parse(SourceFile* sourceFile, const Options* options)
 
     SourceManager* manager = sourceFile->getSourceManager();
 
-    SourceView* sourceView = manager->createSourceView(sourceFile, nullptr);
+    SourceView* sourceView = manager->createSourceView(sourceFile, nullptr, SourceLoc::fromRaw(0));
 
     Lexer lexer;
 
