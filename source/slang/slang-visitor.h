@@ -55,7 +55,7 @@ struct ITypeVisitor
     SLANG_CHILDREN_ASTNode_Type(SLANG_CLASS_ONLY, SLANG_VISITOR_DISPATCH_DECL)
 };
 
-// Supress VS2017 Unreachable code warning
+// Suppress VS2017 Unreachable code warning
 #ifdef _MSC_VER
 #    pragma warning(push)
 #    pragma warning(disable:4702)
