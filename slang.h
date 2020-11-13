@@ -3003,7 +3003,7 @@ namespace slang
 
             /** Save the StdLib modules to the file system
             NOTE! API is experimental and not ready for production code  */
-        virtual SLANG_NO_THROW SlangResult saveStdLib() = 0;
+        virtual SLANG_NO_THROW SlangResult SLANG_MCALL saveStdLib() = 0;
     };
 
     #define SLANG_UUID_IGlobalSession { 0xc140b5fd, 0xc78, 0x452e, { 0xba, 0x7c, 0x1a, 0x1e, 0x70, 0xc7, 0xf7, 0x1c } };
