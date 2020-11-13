@@ -2988,6 +2988,22 @@ namespace slang
         virtual SLANG_NO_THROW void SLANG_MCALL getLanguagePrelude(
             SlangSourceLanguage sourceLanguage,
             ISlangBlob** outPrelude) = 0;
+
+        
+            /** Compile from (embedded source) the StdLib on the session.
+            Will return a failure if there is already a StdLib available
+            NOTE! API is experimental and not ready for production code 
+            */
+        virtual SLANG_NO_THROW SlangResult SLANG_MCALL compileStdLib() = 0;
+
+            /** Load the StdLib. Currently loads modules from the file system
+            NOTE! API is experimental and not ready for production code 
+            */
+        virtual SLANG_NO_THROW SlangResult SLANG_MCALL loadStdLib() = 0;
+
+            /** Save the StdLib modules to the file system
+            NOTE! API is experimental and not ready for production code  */
+        virtual SLANG_NO_THROW SlangResult saveStdLib() = 0;
     };
 
     #define SLANG_UUID_IGlobalSession { 0xc140b5fd, 0xc78, 0x452e, { 0xba, 0x7c, 0x1a, 0x1e, 0x70, 0xc7, 0xf7, 0x1c } };
@@ -3378,9 +3394,28 @@ namespace slang
     };
 }
 
+// Passed into functions to create globalSession to identify the API version client code is
+// using. 
 #define SLANG_API_VERSION 0
 
+/* Create a global session, with built in StdLib.
+
+@param apiVersion Pass in SLANG_API_VERSION
+@param outGlobalSession (out)The created global session. 
+*/
 SLANG_API SlangResult slang_createGlobalSession(
+    SlangInt                apiVersion,
+    slang::IGlobalSession** outGlobalSession);
+
+/* Create a global session, but do not set up the stdlib. The stdlib can
+then be loaded via loadStdLib or compileStdLib
+
+@param apiVersion Pass in SLANG_API_VERSION
+@param outGlobalSession (out)The created global session that doesn't have a StdLib setup.
+
+NOTE! API is experimental and not ready for production code 
+*/
+SLANG_API SlangResult slang_createGlobalSessionWithoutStdLib(
     SlangInt                apiVersion,
     slang::IGlobalSession** outGlobalSession);
 

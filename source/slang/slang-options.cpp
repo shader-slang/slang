@@ -447,6 +447,10 @@ struct OptionsParser
                 {
                     flags |= SLANG_COMPILE_FLAG_NO_MANGLING;
                 }
+                if(argStr == "-save-stdlib")
+                {
+                    SLANG_RETURN_ON_FAIL(session->saveStdLib());
+                }
                 else if (argStr == "-no-codegen")
                 {
                     flags |= SLANG_COMPILE_FLAG_NO_CODEGEN;

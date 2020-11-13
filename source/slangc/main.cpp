@@ -78,19 +78,49 @@ SLANG_TEST_TOOL_API SlangResult innerMain(StdWriters* stdWriters, SlangSession* 
     return res;
 }
 
+static SlangResult _commandLineMain(int argc, char** argv)
+{
+    ComPtr<slang::IGlobalSession> globalSession;
+    slang_createGlobalSessionWithoutStdLib(SLANG_API_VERSION, globalSession.writeRef());
+    // I guess we can be fancy and remove that parameter so it only works from the command line
+
+    bool loadStdLib = false;
+
+    List<char*> args;
+    args.add(argv[0]);
+
+    // If one of the params is -load-stdlib, then load the stdlib
+    for (Index i = 1; i < argc; ++i)
+    {
+        if (UnownedStringSlice(argv[i]) == "-load-stdlib")
+        {
+            loadStdLib = true;
+        }
+        else
+        {
+            args.add(argv[i]);
+        }
+    }
+
+    if (loadStdLib)
+    {
+        SLANG_RETURN_ON_FAIL(globalSession->loadStdLib());
+    }
+    else
+    {
+        SLANG_RETURN_ON_FAIL(globalSession->compileStdLib());
+    }
+
+    TestToolUtil::setSessionDefaultPreludeFromExePath(argv[0], globalSession);
+
+    auto stdWriters = StdWriters::initDefaultSingleton();
+
+    return innerMain(stdWriters, globalSession, int(args.getCount()), args.getBuffer());
+}
+
 int MAIN(int argc, char** argv)
 {
-    SlangResult res;
-    {
-        SlangSession* session = spCreateSession(nullptr);
-        TestToolUtil::setSessionDefaultPreludeFromExePath(argv[0], session);
-
-        auto stdWriters = StdWriters::initDefaultSingleton();
-        
-        res = innerMain(stdWriters, session, argc, argv);
-        spDestroySession(session);
-    }
-    return (int)TestToolUtil::getReturnCode(res);
+    return (int)TestToolUtil::getReturnCode(_commandLineMain(argc, argv));
 }
 
 #ifdef _WIN32
