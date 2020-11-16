@@ -70,18 +70,20 @@ SLANG_TEST_TOOL_API SlangResult innerMain(StdWriters* stdWriters, slang::IGlobal
 {
     StdWriters::setSingleton(stdWriters);
 
-    // We need to set
     // Assume we will used the shared session
-    slang::IGlobalSession* session = sharedSession;
+    ComPtr<slang::IGlobalSession> session(sharedSession);
 
-    // The sharedSession always has a pre-loaded stdlib.
+    // The sharedSession always has a pre-loaded stdlib, is sharedSession is not nullptr.
     // This differed test checks if the command line has an option to setup the stdlib.
     // If so we *don't* use the sharedSession, and create a new stdlib-less session just for this compilation. 
-    ComPtr<slang::IGlobalSession> localSession;
     if (TestToolUtil::hasDeferredStdLib(Index(argc - 1), argv + 1))
     {
-        SLANG_RETURN_ON_FAIL(slang_createGlobalSessionWithoutStdLib(SLANG_API_VERSION, localSession.writeRef()));
-        session = localSession;
+        SLANG_RETURN_ON_FAIL(slang_createGlobalSessionWithoutStdLib(SLANG_API_VERSION, session.writeRef()));
+    }
+    else if (!session)
+    {
+        // Just create the global session in the regular way if there isn't one set
+        SLANG_RETURN_ON_FAIL(slang_createGlobalSession(SLANG_API_VERSION, session.writeRef()));
     }
 
     SlangCompileRequest* compileRequest = spCreateCompileRequest(session);
