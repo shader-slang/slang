@@ -8,17 +8,16 @@ using namespace Slang;
 
 SLANG_API void spSetCommandLineCompilerMode(SlangCompileRequest* request);
 
-#if 0
 static void _diagnosticCallback(char const* message, void* /*userData*/)
 {
     auto stdError = StdWriters::getError();
     stdError.put(message);
     stdError.flush();
 }
-#endif
 
 static SlangResult _compile(SlangCompileRequest* compileRequest, int argc, const char*const* argv)
 {
+    spSetDiagnosticCallback(compileRequest, &_diagnosticCallback, nullptr);
     spSetCommandLineCompilerMode(compileRequest);
 
     {
