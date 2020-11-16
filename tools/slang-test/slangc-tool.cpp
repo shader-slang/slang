@@ -8,15 +8,19 @@ using namespace Slang;
 
 SLANG_API void spSetCommandLineCompilerMode(SlangCompileRequest* request);
 
+#if 0
 static void _diagnosticCallback(char const* message, void* /*userData*/)
 {
     auto stdError = StdWriters::getError();
     stdError.put(message);
     stdError.flush();
 }
+#endif
 
 static SlangResult _compile(SlangCompileRequest* compileRequest, int argc, const char*const* argv)
 {
+    spSetCommandLineCompilerMode(compileRequest);
+
     {
         const SlangResult res = spProcessCommandLineArguments(compileRequest, &argv[1], argc - 1);
         if (SLANG_FAILED(res))
@@ -65,6 +69,13 @@ SlangResult SlangCTool::innerMain(StdWriters* stdWriters, slang::IGlobalSession*
     }
 
     SlangCompileRequest* compileRequest = spCreateCompileRequest(session);
+
+    // Do any app specific configuration
+    for (int i = 0; i < SLANG_WRITER_CHANNEL_COUNT_OF; ++i)
+    {
+        spSetWriter(compileRequest, SlangWriterChannel(i), stdWriters->getWriter(i));
+    }
+
     SlangResult res = _compile(compileRequest, argc, argv);
     // Now that we are done, clean up after ourselves
     spDestroyCompileRequest(compileRequest);
