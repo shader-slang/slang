@@ -447,7 +447,7 @@ struct OptionsParser
                 {
                     flags |= SLANG_COMPILE_FLAG_NO_MANGLING;
                 }
-                if(argStr == "-save-stdlib")
+                else if (argStr == "-save-stdlib")
                 {
                     SLANG_RETURN_ON_FAIL(session->saveStdLib());
                 }
