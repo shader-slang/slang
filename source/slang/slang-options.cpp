@@ -447,6 +447,14 @@ struct OptionsParser
                 {
                     flags |= SLANG_COMPILE_FLAG_NO_MANGLING;
                 }
+                else if (argStr == "-load-stdlib")
+                {
+                    SLANG_RETURN_ON_FAIL(session->loadStdLib());
+                }
+                else if (argStr == "-compile-stdlib")
+                {
+                    SLANG_RETURN_ON_FAIL(session->compileStdLib());
+                }
                 else if (argStr == "-save-stdlib")
                 {
                     SLANG_RETURN_ON_FAIL(session->saveStdLib());

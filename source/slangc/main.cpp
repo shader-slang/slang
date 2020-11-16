@@ -66,9 +66,23 @@ static SlangResult _compile(SlangCompileRequest* compileRequest, int argc, const
     return res;
 }
 
-SLANG_TEST_TOOL_API SlangResult innerMain(StdWriters* stdWriters, SlangSession* session, int argc, const char*const* argv)
+SLANG_TEST_TOOL_API SlangResult innerMain(StdWriters* stdWriters, slang::IGlobalSession* sharedSession, int argc, const char*const* argv)
 {
     StdWriters::setSingleton(stdWriters);
+
+    // We need to set
+    // Assume we will used the shared session
+    slang::IGlobalSession* session = sharedSession;
+
+    // The sharedSession always has a pre-loaded stdlib.
+    // This differed test checks if the command line has an option to setup the stdlib.
+    // If so we *don't* use the sharedSession, and create a new stdlib-less session just for this compilation. 
+    ComPtr<slang::IGlobalSession> localSession;
+    if (TestToolUtil::hasDeferredStdLib(Index(argc - 1), argv + 1))
+    {
+        SLANG_RETURN_ON_FAIL(slang_createGlobalSessionWithoutStdLib(SLANG_API_VERSION, localSession.writeRef()));
+        session = localSession;
+    }
 
     SlangCompileRequest* compileRequest = spCreateCompileRequest(session);
     SlangResult res = _compile(compileRequest, argc, argv);
@@ -78,49 +92,11 @@ SLANG_TEST_TOOL_API SlangResult innerMain(StdWriters* stdWriters, SlangSession* 
     return res;
 }
 
-static SlangResult _commandLineMain(int argc, char** argv)
-{
-    ComPtr<slang::IGlobalSession> globalSession;
-    slang_createGlobalSessionWithoutStdLib(SLANG_API_VERSION, globalSession.writeRef());
-    // I guess we can be fancy and remove that parameter so it only works from the command line
-
-    bool loadStdLib = false;
-
-    List<char*> args;
-    args.add(argv[0]);
-
-    // If one of the params is -load-stdlib, then load the stdlib
-    for (Index i = 1; i < argc; ++i)
-    {
-        if (UnownedStringSlice(argv[i]) == "-load-stdlib")
-        {
-            loadStdLib = true;
-        }
-        else
-        {
-            args.add(argv[i]);
-        }
-    }
-
-    if (loadStdLib)
-    {
-        SLANG_RETURN_ON_FAIL(globalSession->loadStdLib());
-    }
-    else
-    {
-        SLANG_RETURN_ON_FAIL(globalSession->compileStdLib());
-    }
-
-    TestToolUtil::setSessionDefaultPreludeFromExePath(argv[0], globalSession);
-
-    auto stdWriters = StdWriters::initDefaultSingleton();
-
-    return innerMain(stdWriters, globalSession, int(args.getCount()), args.getBuffer());
-}
-
 int MAIN(int argc, char** argv)
 {
-    return (int)TestToolUtil::getReturnCode(_commandLineMain(argc, argv));
+    auto stdWriters = StdWriters::initDefaultSingleton();
+    SlangResult res = innerMain(stdWriters, nullptr, argc, argv);
+    return (int)TestToolUtil::getReturnCode(res);
 }
 
 #ifdef _WIN32

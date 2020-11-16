@@ -1,5 +1,5 @@
 //TEST:COMPILE: -save-stdlib
-//TEST:COMMAND_LINE_SIMPLE: -load-stdlib
+//TEST:COMPARE_COMPUTE: -compile-arg -load-stdlib 
 
 struct A
 {
