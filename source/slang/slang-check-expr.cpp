@@ -730,7 +730,6 @@ namespace Slang
         bool allConst = true;
         for (auto argExpr : invokeExpr->arguments)
         {
-            CheckExpr(argExpr);
             auto argVal = tryFoldIntegerConstantExpression(argExpr, circularityInfo);
             if (!argVal)
                 return nullptr;
