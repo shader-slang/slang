@@ -11,6 +11,6 @@ cat slang-tag-version.h
 ./premake5 gmake --cc=${CC}
 
 # Build the configuration
-make config=${CONFIGURATION}_x64
+make config=${CONFIGURATION}_x64 -j2
 
 
