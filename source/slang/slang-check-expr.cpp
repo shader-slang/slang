@@ -730,6 +730,7 @@ namespace Slang
         bool allConst = true;
         for (auto argExpr : invokeExpr->arguments)
         {
+            CheckExpr(argExpr);
             auto argVal = tryFoldIntegerConstantExpression(argExpr, circularityInfo);
             if (!argVal)
                 return nullptr;
@@ -857,7 +858,8 @@ namespace Slang
         auto initExpr = getInitExpr(m_astBuilder, declRef);
         if(!initExpr)
             return nullptr;
-
+        if (!decl->checkState.isBeingChecked())
+            ensureDecl(declRef.decl, DeclCheckState::Checked);
         ConstantFoldingCircularityInfo newCircularityInfo(decl, circularityInfo);
         return tryConstantFoldExpr(initExpr, &newCircularityInfo);
     }
@@ -934,7 +936,7 @@ namespace Slang
         //
         if(!isScalarIntegerType(expr->type))
             return nullptr;
-
+        
         // Consider operations that we might be able to constant-fold...
         //
         return tryConstantFoldExpr(expr, circularityInfo);
@@ -1315,7 +1317,6 @@ namespace Slang
                 nullptr,
                 expr->loc);
         }
-
         getSink()->diagnose(expr, Diagnostics::undefinedIdentifier2, expr->name);
 
         return expr;
