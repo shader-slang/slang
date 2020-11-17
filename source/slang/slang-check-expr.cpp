@@ -936,7 +936,7 @@ namespace Slang
         //
         if(!isScalarIntegerType(expr->type))
             return nullptr;
-        
+
         // Consider operations that we might be able to constant-fold...
         //
         return tryConstantFoldExpr(expr, circularityInfo);
