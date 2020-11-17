@@ -1317,6 +1317,7 @@ namespace Slang
                 nullptr,
                 expr->loc);
         }
+
         getSink()->diagnose(expr, Diagnostics::undefinedIdentifier2, expr->name);
 
         return expr;
