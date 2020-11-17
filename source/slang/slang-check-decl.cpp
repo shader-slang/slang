@@ -1013,6 +1013,7 @@ namespace Slang
             initExpr = CheckTerm(initExpr);
             initExpr = coerce(varDecl->type.Ptr(), initExpr);
             varDecl->initExpr = initExpr;
+
             // We need to ensure that any variable doesn't introduce
             // a constant with a circular definition.
             //
