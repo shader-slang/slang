@@ -1149,7 +1149,7 @@ struct LoadContext
 
     Path::createDirectory(dirPath);
     // Set up a file system to write into this directory
-    RelativeFileSystem relFileSystem(OSFileSystemExt::getSingleton(), dirPath);
+    RelativeFileSystem relFileSystem(OSFileSystem::getMutableSingleton(), dirPath);
 
     return extractFiles(base, requestState, &relFileSystem);
 }
@@ -1382,7 +1382,7 @@ static SlangResult _calcCommandLine(OffsetBase& base, ReproUtil::RequestState* r
     return SLANG_OK;
 }
 
-/* static */SlangResult ReproUtil::extractFiles(OffsetBase& base, RequestState* requestState, ISlangFileSystemExt* fileSystem)
+/* static */SlangResult ReproUtil::extractFiles(OffsetBase& base, RequestState* requestState, ISlangMutableFileSystem* fileSystem)
 {
     StringBuilder builder;
 

@@ -930,6 +930,10 @@ extern "C"
         SLANG_PATH_TYPE_FILE,           /**< Path specified is to a file. */
     };
 
+    /* Callback to enumerate the contents of of a directory in a ISlangFileSystemExt.
+    The name is the name of a file system object (directory/file) in the specified path */
+    typedef void (*FileSystemContentsCallBack)(SlangPathType pathType, const char* name, void* userData);
+
     /** An extended file system abstraction.
     
     Implementing and using this interface over ISlangFileSystem gives much more control over how paths
@@ -1027,9 +1031,26 @@ extern "C"
         /** Clears any cached information */
         virtual SLANG_NO_THROW void SLANG_MCALL clearCache() = 0;
 
-        /** Write the data specified with data and size to the specified path.
+        /** Enumerate the contents of the path
+        
+        Note that for normal Slang operation it isn't necessary to enumerate contents this can return SLANG_E_NOT_IMPLEMENTED.
+        
+        @param The path to enumerate
+        @param callback This callback is called for each entry in the path. 
+        @param userData This is passed to the callback
+        @returns SLANG_OK if successful 
+        */
+        virtual SLANG_NO_THROW SlangResult SLANG_MCALL enumeratePathContents(
+            const char* path,
+            FileSystemContentsCallBack callback,
+            void* userData) = 0;
+    };
 
-        Note that for normal slang operation it doesn't write files so this can return SLANG_E_NOT_IMPLEMENTED.
+    #define SLANG_UUID_ISlangFileSystemExt { 0x5fb632d2, 0x979d, 0x4481, { 0x9f, 0xee, 0x66, 0x3c, 0x3f, 0x14, 0x49, 0xe1 } }
+
+    struct ISlangMutableFileSystem : public ISlangFileSystemExt
+    {
+        /** Write the data specified with data and size to the specified path.
 
         @param path The path for data to be saved to
         @param data The data to be saved
@@ -1040,9 +1061,28 @@ extern "C"
             const char* path,
             const void* data,
             size_t size) = 0;
+
+        /** Remove the entry in the path (directory of file). Will only delete an empty directory, if not empty
+        will return an error.
+
+        @param path The path to remove 
+        @returns SLANG_OK if successful 
+        */
+        virtual SLANG_NO_THROW SlangResult SLANG_MCALL remove(
+            const char* path) = 0;
+
+        /** Create a directory.
+
+        The path to the directory must exist
+
+        @param path To the directory to create. The parent path *must* exist otherwise will return an erro.
+        @returns SLANG_OK if successful 
+        */
+        virtual SLANG_NO_THROW SlangResult SLANG_MCALL createDirectory(
+            const char* path) = 0;
     };
 
-    #define SLANG_UUID_ISlangFileSystemExt { 0x5fb632d2, 0x979d, 0x4481, { 0x9f, 0xee, 0x66, 0x3c, 0x3f, 0x14, 0x49, 0xe1 } }
+    #define SLANG_UUID_ISlangMutableFileSystem  { 0xa058675c, 0x1d65, 0x452a, { 0x84, 0x58, 0xcc, 0xde, 0xd1, 0x42, 0x71, 0x5 } }
 
     /* Identifies different types of writer target*/
     typedef unsigned int SlangWriterChannel;
@@ -1773,7 +1813,7 @@ extern "C"
         SlangSession* session,
         const void* reproData,
         size_t reproDataSize,
-        ISlangFileSystemExt* fileSystem);
+        ISlangMutableFileSystem* fileSystem);
 
     /* Turns a repro into a file system.
 

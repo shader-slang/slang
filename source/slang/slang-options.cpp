@@ -517,7 +517,7 @@ struct OptionsParser
                         SlangPathType pathType;
                         if (SLANG_SUCCEEDED(Path::getPathType(dirPath, &pathType)) && pathType == SLANG_PATH_TYPE_DIRECTORY)
                         {
-                            fileSystem = new RelativeFileSystem(OSFileSystemExt::getSingleton(), dirPath);
+                            fileSystem = new RelativeFileSystem(OSFileSystem::getImmutableSingleton(), dirPath);
                         }
                     }
 
@@ -545,7 +545,7 @@ struct OptionsParser
                         SlangPathType pathType;
                         if (SLANG_SUCCEEDED(Path::getPathType(dirPath, &pathType)) && pathType == SLANG_PATH_TYPE_DIRECTORY)
                         {
-                            dirFileSystem = new RelativeFileSystem(OSFileSystemExt::getSingleton(), dirPath, true);
+                            dirFileSystem = new RelativeFileSystem(OSFileSystem::getImmutableSingleton(), dirPath, true);
                         }
                     }
 
@@ -895,13 +895,13 @@ struct OptionsParser
                     }
                     else if (name == "load-file")
                     {
-                        // OSFileSystem just implements loadFile interface, so will be wrapped with CacheFileSystem internally
-                        spSetFileSystem(compileRequest, OSFileSystem::getSingleton());
+                        // 'Simple' just implements loadFile interface, so will be wrapped with CacheFileSystem internally
+                        spSetFileSystem(compileRequest, OSFileSystem::getSimpleSingleton());
                     }
                     else if (name == "os")
                     {
-                        // OSFileSystemExt implements the ISlangFileSystemExt interface - and will be used directly
-                        spSetFileSystem(compileRequest, OSFileSystemExt::getSingleton());
+                        // 'Immutable' implements the ISlangFileSystemExt interface - and will be used directly
+                        spSetFileSystem(compileRequest, OSFileSystem::getImmutableSingleton());
                     }
                     else
                     {

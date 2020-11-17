@@ -13,8 +13,15 @@
 namespace Slang
 {
 
-// Implementation of ISlangFileSystemExt for the OS
-class OSFileSystemExt : public ISlangFileSystemExt
+enum class FileSystemStyle
+{
+    Simple,             ///< Equivalent to ISlangFileSystem
+    Immutable,          ///< Equivalent to ISlangFileSystemExt
+    Mutable,            ///< Equivalent to ISlangModifyableFileSystem
+};
+
+// Can be used for all styles of file system
+class OSFileSystem : public ISlangMutableFileSystem
 {
 public:
     // ISlangUnknown 
@@ -24,83 +31,44 @@ public:
     SLANG_NO_THROW uint32_t SLANG_MCALL release() SLANG_OVERRIDE { return 1; } 
 
     // ISlangFileSystem
-    virtual SLANG_NO_THROW SlangResult SLANG_MCALL loadFile(
-        char const*     path,
-        ISlangBlob**    outBlob) SLANG_OVERRIDE;
+    virtual SLANG_NO_THROW SlangResult SLANG_MCALL loadFile(char const* path, ISlangBlob** outBlob) SLANG_OVERRIDE;
 
     // ISlangFileSystemExt
-    virtual SLANG_NO_THROW SlangResult SLANG_MCALL getFileUniqueIdentity(
-            const char* path,
-            ISlangBlob** uniqueIdentityOut) SLANG_OVERRIDE;
-
-    virtual SLANG_NO_THROW SlangResult SLANG_MCALL calcCombinedPath(
-        SlangPathType fromPathType,
-        const char* fromPath,
-        const char* path,
-        ISlangBlob** pathOut) SLANG_OVERRIDE;
-
-    virtual SLANG_NO_THROW SlangResult SLANG_MCALL getPathType(
-        const char* path,
-        SlangPathType* pathTypeOut) SLANG_OVERRIDE;
-
-    virtual SLANG_NO_THROW SlangResult SLANG_MCALL getSimplifiedPath(
-        const char* path,
-        ISlangBlob** outSimplifiedPath) SLANG_OVERRIDE;
-
-    virtual SLANG_NO_THROW SlangResult SLANG_MCALL getCanonicalPath(
-        const char* path,
-        ISlangBlob** outCanonicalPath) SLANG_OVERRIDE;
-
+    virtual SLANG_NO_THROW SlangResult SLANG_MCALL getFileUniqueIdentity(const char* path, ISlangBlob** uniqueIdentityOut) SLANG_OVERRIDE;
+    virtual SLANG_NO_THROW SlangResult SLANG_MCALL calcCombinedPath(SlangPathType fromPathType, const char* fromPath, const char* path, ISlangBlob** pathOut) SLANG_OVERRIDE;
+    virtual SLANG_NO_THROW SlangResult SLANG_MCALL getPathType(const char* path, SlangPathType* pathTypeOut) SLANG_OVERRIDE;
+    virtual SLANG_NO_THROW SlangResult SLANG_MCALL getSimplifiedPath(const char* path, ISlangBlob** outSimplifiedPath) SLANG_OVERRIDE;
+    virtual SLANG_NO_THROW SlangResult SLANG_MCALL getCanonicalPath(const char* path, ISlangBlob** outCanonicalPath) SLANG_OVERRIDE;
     virtual SLANG_NO_THROW void SLANG_MCALL clearCache() SLANG_OVERRIDE {}
+    virtual SLANG_NO_THROW SlangResult SLANG_MCALL enumeratePathContents(const char* path, FileSystemContentsCallBack callback, void* userData) SLANG_OVERRIDE;
 
-    virtual SLANG_NO_THROW SlangResult SLANG_MCALL saveFile(
-        const char* path,
-        const void* data,
-        size_t size) SLANG_OVERRIDE ;
-
+    // ISlangModifyableFileSystem
+    virtual SLANG_NO_THROW SlangResult SLANG_MCALL saveFile(const char* path, const void* data, size_t size) SLANG_OVERRIDE;
+    virtual SLANG_NO_THROW SlangResult SLANG_MCALL remove(const char* path) SLANG_OVERRIDE;
+    virtual SLANG_NO_THROW SlangResult SLANG_MCALL createDirectory(const char* path) SLANG_OVERRIDE;
 
         /// Get a default instance
-    static ISlangFileSystemExt* getSingleton() { return &s_singleton; }
+    static ISlangFileSystem* getSimpleSingleton() { return &g_simple; }
+    static ISlangFileSystemExt* getImmutableSingleton() { return &g_immutable; }
+    static ISlangMutableFileSystem* getMutableSingleton() { return &g_mutable; }
 
 private:
-        /// Make so not constructible
-    OSFileSystemExt() {}
-    virtual ~OSFileSystemExt() {}
 
-    ISlangUnknown* getInterface(const Guid& guid);
-
-    static OSFileSystemExt s_singleton;
-};
-
-// Implementation of ISlangFileSystem for the OS (ie only has simplified interface of just loadFile)
-class OSFileSystem : public ISlangFileSystem
-{
-public:
-        // ISlangUnknown 
-    SLANG_IUNKNOWN_QUERY_INTERFACE
-    SLANG_NO_THROW uint32_t SLANG_MCALL addRef() SLANG_OVERRIDE { return 1; }
-    SLANG_NO_THROW uint32_t SLANG_MCALL release() SLANG_OVERRIDE { return 1; }
-
-    // ISlangFileSystem
-    virtual SLANG_NO_THROW SlangResult SLANG_MCALL loadFile(
-        char const*     path,
-        ISlangBlob**    outBlob) SLANG_OVERRIDE
-    {
-        // Can just use OsFileSystemExt impl
-        return OSFileSystemExt::getSingleton()->loadFile(path, outBlob);
-    }
-
-     static ISlangFileSystem* getSingleton() { return &s_singleton; }
-
-private:
     /// Make so not constructible
-        OSFileSystem() {}
+    OSFileSystem(FileSystemStyle style):
+        m_style(style)
+    {}
+
     virtual ~OSFileSystem() {}
 
     ISlangUnknown* getInterface(const Guid& guid);
-    static OSFileSystem s_singleton;
-};
 
+    FileSystemStyle m_style;
+
+    static OSFileSystem g_simple;
+    static OSFileSystem g_immutable;
+    static OSFileSystem g_mutable;
+};
 
  #define SLANG_UUID_CacheFileSystem { 0x2f4d1d03, 0xa0d1, 0x434b, { 0x87, 0x7a, 0x65, 0x5, 0xa4, 0xa0, 0x9a, 0x3b } };
 
@@ -180,43 +148,16 @@ class CacheFileSystem: public ISlangFileSystemExt, public RefObject
     SLANG_REF_OBJECT_IUNKNOWN_RELEASE
 
     // ISlangFileSystem
-    virtual SLANG_NO_THROW SlangResult SLANG_MCALL loadFile(
-        char const*     path,
-        ISlangBlob**    outBlob) SLANG_OVERRIDE;
+    virtual SLANG_NO_THROW SlangResult SLANG_MCALL loadFile(char const* path, ISlangBlob** outBlob) SLANG_OVERRIDE;
 
     // ISlangFileSystemExt
-    virtual SLANG_NO_THROW SlangResult SLANG_MCALL getFileUniqueIdentity(
-        const char* path,
-        ISlangBlob** outUniqueIdentity) SLANG_OVERRIDE;
-
-    virtual SLANG_NO_THROW SlangResult SLANG_MCALL calcCombinedPath(
-        SlangPathType fromPathType,
-        const char* fromPath,
-        const char* path,
-        ISlangBlob** pathOut) SLANG_OVERRIDE;
-
-    virtual SLANG_NO_THROW SlangResult SLANG_MCALL getPathType(
-        const char* path,
-        SlangPathType* outPathType) SLANG_OVERRIDE;
-
-    virtual SLANG_NO_THROW SlangResult SLANG_MCALL getSimplifiedPath(
-        const char* path,
-        ISlangBlob** outSimplifiedPath) SLANG_OVERRIDE;
-
-    virtual SLANG_NO_THROW SlangResult SLANG_MCALL getCanonicalPath(
-        const char* path,
-        ISlangBlob** outCanonicalPath) SLANG_OVERRIDE;
-
+    virtual SLANG_NO_THROW SlangResult SLANG_MCALL getFileUniqueIdentity(const char* path, ISlangBlob** outUniqueIdentity) SLANG_OVERRIDE;
+    virtual SLANG_NO_THROW SlangResult SLANG_MCALL calcCombinedPath(SlangPathType fromPathType, const char* fromPath, const char* path, ISlangBlob** pathOut) SLANG_OVERRIDE;
+    virtual SLANG_NO_THROW SlangResult SLANG_MCALL getPathType(const char* path, SlangPathType* outPathType) SLANG_OVERRIDE;
+    virtual SLANG_NO_THROW SlangResult SLANG_MCALL getSimplifiedPath(const char* path, ISlangBlob** outSimplifiedPath) SLANG_OVERRIDE;
+    virtual SLANG_NO_THROW SlangResult SLANG_MCALL getCanonicalPath(const char* path, ISlangBlob** outCanonicalPath) SLANG_OVERRIDE;
     virtual SLANG_NO_THROW void SLANG_MCALL clearCache() SLANG_OVERRIDE;
-
-    virtual SLANG_NO_THROW SlangResult SLANG_MCALL saveFile(const char* path, const void* data, size_t size) SLANG_OVERRIDE
-    {
-        SLANG_UNUSED(path);
-        SLANG_UNUSED(data);
-        SLANG_UNUSED(size);
-
-        return SLANG_E_NOT_IMPLEMENTED;
-    }
+    virtual SLANG_NO_THROW SlangResult SLANG_MCALL enumeratePathContents(const char* path, FileSystemContentsCallBack callback, void* userData) SLANG_OVERRIDE;
 
         /// Get the unique identity mode
     UniqueIdentityMode getUniqueIdentityMode() const { return m_uniqueIdentityMode; }
@@ -236,8 +177,6 @@ class CacheFileSystem: public ISlangFileSystemExt, public RefObject
     static const Result s_compressedResultToResult[int(CompressedResult::CountOf)];
 
 protected:
-    ISlangUnknown* getInterface(const Guid& guid);
-
     
         /// Given a path, works out a uniqueIdentity, based on the uniqueIdentityMode. outFileContents will be set if file had to be read to produce the uniqueIdentity (ie with Hash)
     SlangResult _calcUniqueIdentity(const String& path, String& outUniqueIdentity, ComPtr<ISlangBlob>& outFileContents);
@@ -248,6 +187,8 @@ protected:
     PathInfo* _resolveUniqueIdentityCacheInfo(const String& path);
         /// Will simplify the path (if possible) to lookup on the pathCache else will create on uniqueIdentityMap
     PathInfo* _resolveSimplifiedPathCacheInfo(const String& path);
+
+    SlangResult _getPathType(PathInfo* pathInfo, const char* inPath, SlangPathType* pathTypeOut);
 
     /* TODO: This may be improved by mapping to a ISlangBlob. This makes output fast and easy, and if constructed 
     as a StringBlob, we can just static_cast to get as a string to use internally, instead of constantly converting. 
@@ -264,51 +205,37 @@ protected:
     ComPtr<ISlangFileSystemExt> m_fileSystemExt;        ///< Optionally set -> if nullptr will fall back on the m_fileSystem and emulate all the other methods of ISlangFileSystemExt
 };
 
-class RelativeFileSystem : public ISlangFileSystemExt, public RefObject
+class RelativeFileSystem : public ISlangMutableFileSystem, public RefObject
 {
 public:
     SLANG_REF_OBJECT_IUNKNOWN_ALL
 
     // ISlangFileSystem
-    virtual SLANG_NO_THROW SlangResult SLANG_MCALL loadFile(
-        char const*     path,
-        ISlangBlob**    outBlob) SLANG_OVERRIDE;
+    virtual SLANG_NO_THROW SlangResult SLANG_MCALL loadFile(char const* path, ISlangBlob** outBlob) SLANG_OVERRIDE;
 
     // ISlangFileSystemExt
-    virtual SLANG_NO_THROW SlangResult SLANG_MCALL getFileUniqueIdentity(
-        const char* path,
-        ISlangBlob** outUniqueIdentity) SLANG_OVERRIDE;
-
-    virtual SLANG_NO_THROW SlangResult SLANG_MCALL calcCombinedPath(
-        SlangPathType fromPathType,
-        const char* fromPath,
-        const char* path,
-        ISlangBlob** pathOut) SLANG_OVERRIDE;
-
-    virtual SLANG_NO_THROW SlangResult SLANG_MCALL getPathType(
-        const char* path,
-        SlangPathType* outPathType) SLANG_OVERRIDE;
-
-    virtual SLANG_NO_THROW SlangResult SLANG_MCALL getSimplifiedPath(
-        const char* path,
-        ISlangBlob** outSimplifiedPath) SLANG_OVERRIDE;
-
-    virtual SLANG_NO_THROW SlangResult SLANG_MCALL getCanonicalPath(
-        const char* path,
-        ISlangBlob** outCanonicalPath) SLANG_OVERRIDE;
-
+    virtual SLANG_NO_THROW SlangResult SLANG_MCALL getFileUniqueIdentity(const char* path, ISlangBlob** outUniqueIdentity) SLANG_OVERRIDE;
+    virtual SLANG_NO_THROW SlangResult SLANG_MCALL calcCombinedPath(SlangPathType fromPathType, const char* fromPath, const char* path, ISlangBlob** pathOut) SLANG_OVERRIDE;
+    virtual SLANG_NO_THROW SlangResult SLANG_MCALL getPathType(const char* path, SlangPathType* outPathType) SLANG_OVERRIDE;
+    virtual SLANG_NO_THROW SlangResult SLANG_MCALL getSimplifiedPath(const char* path, ISlangBlob** outSimplifiedPath) SLANG_OVERRIDE;
+    virtual SLANG_NO_THROW SlangResult SLANG_MCALL getCanonicalPath(const char* path, ISlangBlob** outCanonicalPath) SLANG_OVERRIDE;
     virtual SLANG_NO_THROW void SLANG_MCALL clearCache() SLANG_OVERRIDE;
+    virtual SLANG_NO_THROW SlangResult SLANG_MCALL enumeratePathContents(const char* path, FileSystemContentsCallBack callback, void* userData) SLANG_OVERRIDE;
 
+    // ISlangModifyableFileSystem
     virtual SLANG_NO_THROW SlangResult SLANG_MCALL saveFile(const char* path, const void* data, size_t size) SLANG_OVERRIDE;
+    virtual SLANG_NO_THROW SlangResult SLANG_MCALL remove(const char* path) SLANG_OVERRIDE;
+    virtual SLANG_NO_THROW SlangResult SLANG_MCALL createDirectory(const char* path) SLANG_OVERRIDE;
 
-    RelativeFileSystem(ISlangFileSystemExt* fileSystem, const String& relativePath, bool stripPath = false):
-        m_fileSystem(fileSystem),
-        m_relativePath(relativePath),
-        m_stripPath(stripPath)
-    {
-    }
+    RelativeFileSystem(ISlangFileSystem* fileSystem, const String& relativePath, bool stripPath = false);
 
 protected:
+
+    ISlangFileSystem* _getSimple() { return reinterpret_cast<ISlangFileSystem*>(m_fileSystem.get()); }
+    ISlangFileSystemExt* _getImmutable() { return Index(m_style) >= Index(FileSystemStyle::Immutable) ? reinterpret_cast<ISlangFileSystemExt*>(m_fileSystem.get()) : nullptr; }
+    ISlangMutableFileSystem* _getMutable() { return Index(m_style) >= Index(FileSystemStyle::Mutable) ? reinterpret_cast<ISlangMutableFileSystem*>(m_fileSystem.get()) : nullptr; }
+
+    SlangResult _calcCombinedPathInner(SlangPathType fromPathType, const char* fromPath, const char* path, ISlangBlob** pathOut);
 
     SlangResult _getFixedPath(const char* path, String& outPath);
 
@@ -316,7 +243,9 @@ protected:
 
     bool m_stripPath;
 
-    ComPtr<ISlangFileSystemExt> m_fileSystem;
+    FileSystemStyle m_style;
+    ComPtr<ISlangFileSystem> m_fileSystem;          ///< NOTE! Has to match what's in style, such style can be reached via reinterpret_cast
+
     String m_relativePath;
 };
 
