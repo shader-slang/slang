@@ -1024,6 +1024,16 @@ if enableProfile then
 
         files { "source/core/core.natvis" }
 
+        -- We explicitly name the prelude file(s) that we need to
+        -- compile for their embedded code, since they will not
+        -- exist at the time projects/makefiles are generated,
+        -- and thus a glob would not match anything.
+        files {
+            "prelude/slang-cuda-prelude.h.cpp",
+            "prelude/slang-hlsl-prelude.h.cpp",
+            "prelude/slang-cpp-prelude.h.cpp"
+        }
+        
         -- Add the slang source
         addSourceDir "source/slang"
 
