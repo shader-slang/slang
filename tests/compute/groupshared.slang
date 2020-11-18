@@ -15,15 +15,15 @@ static const int THREAD_COUNT = A * B;
 groupshared int gA[THREAD_COUNT];
 int test(int val)
 {
-  gA[val] = val;
-  GroupMemoryBarrierWithGroupSync();
-  val = gA[val ^ 1];
+	gA[val] = val;
+	GroupMemoryBarrierWithGroupSync();
+	val = gA[val ^ 1];
 
 /* TODO: once function-scope `static` works
-  static groupshared int gB[THREAD_COUNT];
-  gB[val] = val;
-  GroupMemoryBarrierWithGroupSync();
-  val = gB[val ^ 2];
+	static groupshared int gB[THREAD_COUNT];
+	gB[val] = val;
+	GroupMemoryBarrierWithGroupSync();
+	val = gB[val ^ 2];
 */
 
   return val;
@@ -32,9 +32,9 @@ int test(int val)
 [numthreads(THREAD_COUNT, 1, 1)]
 void computeMain(uint3 dispatchThreadID : SV_DispatchThreadID)
 {
-  uint tid = dispatchThreadID.x;
+	uint tid = dispatchThreadID.x;
 
-  int val = int(tid);
-  val = test(val);
-  gBuffer[tid] = val;
+	int val = int(tid);
+	val = test(val);
+	gBuffer[tid] = val;
 }
