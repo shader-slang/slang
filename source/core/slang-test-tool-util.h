@@ -63,6 +63,9 @@ struct TestToolUtil
     
         /// Sets the default preludes on the session based on the executable path
     static SlangResult setSessionDefaultPreludeFromExePath(const char* exePath, slang::IGlobalSession* session);
+
+        /// Returns true if the StdLib should not be initialized immediately (eg when doing a -load-stdlib).
+    static bool hasDeferredStdLib(Index numArgs, const char*const* args);
 };
 
 } // namespace Slang
