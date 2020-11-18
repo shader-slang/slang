@@ -872,7 +872,8 @@ extern "C"
         @param outBlob A destination pointer to receive the blob of the file contents.
         @returns A `SlangResult` to indicate success or failure in loading the file.
 
-        NOTE! That the Blob should contain the directly binary data contained in the file.
+        NOTE! This is a *binary* load - the blob should contain the exact same bytes
+        as are found in the backing file. 
 
         If load is successful, the implementation should create a blob to hold
         the file's content, store it to `outBlob`, and return 0.
@@ -933,7 +934,7 @@ extern "C"
     };
 
     /* Callback to enumerate the contents of of a directory in a ISlangFileSystemExt.
-    The name is the name of a file system object (directory/file) in the specified path */
+    The name is the name of a file system object (directory/file) in the specified path (ie it is without a path) */
     typedef void (*FileSystemContentsCallBack)(SlangPathType pathType, const char* name, void* userData);
 
     /** An extended file system abstraction.
@@ -1077,7 +1078,7 @@ extern "C"
 
         The path to the directory must exist
 
-        @param path To the directory to create. The parent path *must* exist otherwise will return an erro.
+        @param path To the directory to create. The parent path *must* exist otherwise will return an error.
         @returns SLANG_OK if successful 
         */
         virtual SLANG_NO_THROW SlangResult SLANG_MCALL createDirectory(

@@ -312,7 +312,7 @@ SLANG_NO_THROW SlangResult SLANG_MCALL CacheFileSystem::queryInterface(SlangUUID
     if (_canCast(FileSystemStyle::Ext, uuid))
     {
         addReference();
-        *outObject = this;
+        *outObject = static_cast<ISlangFileSystemExt*>(this);
         return SLANG_OK;
     }
     return SLANG_E_NO_INTERFACE;
@@ -878,7 +878,10 @@ SlangResult RelativeFileSystem::enumeratePathContents(const char* path, FileSyst
 {
     auto fileSystem = _getExt();
     if (!fileSystem) return SLANG_E_NOT_IMPLEMENTED;
-    return fileSystem->enumeratePathContents(path, callback, userData);
+
+    String fixedPath;
+    SLANG_RETURN_ON_FAIL(_getFixedPath(path, fixedPath));
+    return fileSystem->enumeratePathContents(fixedPath.getBuffer(), callback, userData);
 }
 
 SlangResult RelativeFileSystem::saveFile(const char* path, const void* data, size_t size)
@@ -898,7 +901,7 @@ SlangResult RelativeFileSystem::remove(const char* path)
 
     String fixedPath;
     SLANG_RETURN_ON_FAIL(_getFixedPath(path, fixedPath));
-    return fileSystem->remove(path);
+    return fileSystem->remove(fixedPath.getBuffer());
 }
 
 SlangResult RelativeFileSystem::createDirectory(const char* path)
@@ -908,7 +911,7 @@ SlangResult RelativeFileSystem::createDirectory(const char* path)
 
     String fixedPath;
     SLANG_RETURN_ON_FAIL(_getFixedPath(path, fixedPath));
-    return fileSystem->createDirectory(path);
+    return fileSystem->createDirectory(fixedPath.getBuffer());
 }
 
 } 
