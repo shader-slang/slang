@@ -3018,7 +3018,7 @@ void Linkage::setFileSystem(ISlangFileSystem* inFileSystem)
     // If nullptr passed in set up default 
     if (inFileSystem == nullptr)
     {
-        m_cacheFileSystem = new Slang::CacheFileSystem(Slang::OSFileSystem::getImmutableSingleton());
+        m_cacheFileSystem = new Slang::CacheFileSystem(Slang::OSFileSystem::getExtSingleton());
         m_fileSystemExt = m_cacheFileSystem;
     }
     else

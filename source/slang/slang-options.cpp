@@ -517,7 +517,7 @@ struct OptionsParser
                         SlangPathType pathType;
                         if (SLANG_SUCCEEDED(Path::getPathType(dirPath, &pathType)) && pathType == SLANG_PATH_TYPE_DIRECTORY)
                         {
-                            fileSystem = new RelativeFileSystem(OSFileSystem::getImmutableSingleton(), dirPath);
+                            fileSystem = new RelativeFileSystem(OSFileSystem::getExtSingleton(), dirPath);
                         }
                     }
 
@@ -545,7 +545,7 @@ struct OptionsParser
                         SlangPathType pathType;
                         if (SLANG_SUCCEEDED(Path::getPathType(dirPath, &pathType)) && pathType == SLANG_PATH_TYPE_DIRECTORY)
                         {
-                            dirFileSystem = new RelativeFileSystem(OSFileSystem::getImmutableSingleton(), dirPath, true);
+                            dirFileSystem = new RelativeFileSystem(OSFileSystem::getExtSingleton(), dirPath, true);
                         }
                     }
 
@@ -896,12 +896,12 @@ struct OptionsParser
                     else if (name == "load-file")
                     {
                         // 'Simple' just implements loadFile interface, so will be wrapped with CacheFileSystem internally
-                        spSetFileSystem(compileRequest, OSFileSystem::getSimpleSingleton());
+                        spSetFileSystem(compileRequest, OSFileSystem::getLoadSingleton());
                     }
                     else if (name == "os")
                     {
                         // 'Immutable' implements the ISlangFileSystemExt interface - and will be used directly
-                        spSetFileSystem(compileRequest, OSFileSystem::getImmutableSingleton());
+                        spSetFileSystem(compileRequest, OSFileSystem::getExtSingleton());
                     }
                     else
                     {

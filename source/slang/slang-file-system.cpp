@@ -15,8 +15,7 @@ static const Guid IID_ISlangMutableFileSystem = SLANG_UUID_ISlangMutableFileSyst
 
 static const Guid IID_SlangCacheFileSystem = SLANG_UUID_CacheFileSystem;
 
-SLANG_FORCE_INLINE static SlangResult _checkSimple(FileSystemStyle) { return SLANG_OK; }
-SLANG_FORCE_INLINE static SlangResult _checkImmutable(FileSystemStyle style) { return Index(style) >= Index(FileSystemStyle::Immutable) ? SLANG_OK : SLANG_E_NOT_IMPLEMENTED; }
+SLANG_FORCE_INLINE static SlangResult _checkExt(FileSystemStyle style) { return Index(style) >= Index(FileSystemStyle::Ext) ? SLANG_OK : SLANG_E_NOT_IMPLEMENTED; }
 SLANG_FORCE_INLINE static SlangResult _checkMutable(FileSystemStyle style) { return Index(style) >= Index(FileSystemStyle::Mutable) ? SLANG_OK : SLANG_E_NOT_IMPLEMENTED; }
 
 SLANG_FORCE_INLINE static bool _canCast(FileSystemStyle style, const Guid& guid)
@@ -27,7 +26,7 @@ SLANG_FORCE_INLINE static bool _canCast(FileSystemStyle style, const Guid& guid)
     }
     else if (guid == IID_ISlangFileSystemExt)
     {
-        return Index(style) >= Index(FileSystemStyle::Immutable);
+        return Index(style) >= Index(FileSystemStyle::Ext);
     }
     else if (guid == IID_ISlangMutableFileSystem)
     {
@@ -39,16 +38,25 @@ SLANG_FORCE_INLINE static bool _canCast(FileSystemStyle style, const Guid& guid)
 static FileSystemStyle _getFileSystemStyle(ISlangFileSystem* system, ComPtr<ISlangFileSystem>& out)
 {
     SLANG_ASSERT(system);
-    if (system->queryInterface(IID_ISlangMutableFileSystem, (void**)out.writeRef()))
+
+    FileSystemStyle style = FileSystemStyle::Load;
+
+    if (SLANG_SUCCEEDED(system->queryInterface(IID_ISlangMutableFileSystem, (void**)out.writeRef())))
     {
-        return FileSystemStyle::Mutable;
+        style = FileSystemStyle::Mutable; 
     }
-    else if (system->queryInterface(IID_ISlangFileSystemExt, (void**)out.writeRef()))
+    else if (SLANG_SUCCEEDED(system->queryInterface(IID_ISlangFileSystemExt, (void**)out.writeRef())))
     {
-        return FileSystemStyle::Immutable;
+        style = FileSystemStyle::Ext;
     }
-    out = system;
-    return FileSystemStyle::Simple;
+    else
+    {
+        style = FileSystemStyle::Load;
+        out = system;
+    }
+
+    SLANG_ASSERT(out);
+    return style;
 }
 
 // Cacluate a combined path, just using Path:: string processing
@@ -75,8 +83,8 @@ static SlangResult _calcCombinedPath(SlangPathType fromPathType, const char* fro
 
 /* !!!!!!!!!!!!!!!!!!!!!!!!!!!!! OSFileSystem !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!*/
 
-/* static */OSFileSystem OSFileSystem::g_simple(FileSystemStyle::Simple);
-/* static */OSFileSystem OSFileSystem::g_immutable(FileSystemStyle::Immutable);
+/* static */OSFileSystem OSFileSystem::g_load(FileSystemStyle::Load);
+/* static */OSFileSystem OSFileSystem::g_ext(FileSystemStyle::Ext);
 /* static */OSFileSystem OSFileSystem::g_mutable(FileSystemStyle::Mutable);
 
 ISlangUnknown* OSFileSystem::getInterface(const Guid& guid)
@@ -97,7 +105,7 @@ static String _fixPathDelimiters(const char* pathIn)
 
 SlangResult OSFileSystem::getFileUniqueIdentity(const char* pathIn, ISlangBlob** outUniqueIdentity)
 {
-    SLANG_RETURN_ON_FAIL(_checkImmutable(m_style));
+    SLANG_RETURN_ON_FAIL(_checkExt(m_style));
 
     // By default we use the canonical path to uniquely identify a file
     return getCanonicalPath(pathIn, outUniqueIdentity);
@@ -105,7 +113,7 @@ SlangResult OSFileSystem::getFileUniqueIdentity(const char* pathIn, ISlangBlob**
 
 SlangResult OSFileSystem::getCanonicalPath(const char* path, ISlangBlob** outCanonicalPath)
 {
-    SLANG_RETURN_ON_FAIL(_checkImmutable(m_style));
+    SLANG_RETURN_ON_FAIL(_checkExt(m_style));
 
     String canonicalPath;
     SLANG_RETURN_ON_FAIL(Path::getCanonical(_fixPathDelimiters(path), canonicalPath));
@@ -115,7 +123,7 @@ SlangResult OSFileSystem::getCanonicalPath(const char* path, ISlangBlob** outCan
 
 SlangResult OSFileSystem::getSimplifiedPath(const char* pathIn, ISlangBlob** outSimplifiedPath)
 {
-    SLANG_RETURN_ON_FAIL(_checkImmutable(m_style));
+    SLANG_RETURN_ON_FAIL(_checkExt(m_style));
 
     String simplifiedPath = Path::simplify(_fixPathDelimiters(pathIn));
     *outSimplifiedPath = StringUtil::createStringBlob(simplifiedPath).detach();
@@ -124,7 +132,7 @@ SlangResult OSFileSystem::getSimplifiedPath(const char* pathIn, ISlangBlob** out
 
 SlangResult OSFileSystem::calcCombinedPath(SlangPathType fromPathType, const char* fromPath, const char* path, ISlangBlob** pathOut)
 {
-    SLANG_RETURN_ON_FAIL(_checkImmutable(m_style));
+    SLANG_RETURN_ON_FAIL(_checkExt(m_style));
 
     // Don't need to fix delimiters - because combine path handles both path delimiter types
     return _calcCombinedPath(fromPathType, fromPath, path, pathOut);
@@ -132,15 +140,14 @@ SlangResult OSFileSystem::calcCombinedPath(SlangPathType fromPathType, const cha
 
 SlangResult SLANG_MCALL OSFileSystem::getPathType(const char* pathIn, SlangPathType* pathTypeOut)
 {
-    SLANG_RETURN_ON_FAIL(_checkImmutable(m_style));
+    SLANG_RETURN_ON_FAIL(_checkExt(m_style));
 
     return Path::getPathType(_fixPathDelimiters(pathIn), pathTypeOut);
 }
 
+
 SlangResult OSFileSystem::loadFile(char const* pathIn, ISlangBlob** outBlob)
 {
-    SLANG_RETURN_ON_FAIL(_checkImmutable(m_style));
-
     // Default implementation that uses the `core` libraries facilities for talking to the OS filesystem.
     //
     // TODO: we might want to conditionally compile these in, so that
@@ -155,8 +162,36 @@ SlangResult OSFileSystem::loadFile(char const* pathIn, ISlangBlob** outBlob)
 
     try
     {
-        String sourceString = File::readAllText(path);
-        *outBlob = StringUtil::createStringBlob(sourceString).detach();
+        FileStream stream(path, FileMode::Open, FileAccess::Read, FileShare::ReadWrite);
+
+        stream.seek(SeekOrigin::End, 0);
+        const Int64 positionSizeInBytes = stream.getPosition();
+        stream.seek(SeekOrigin::Start, 0);
+
+        if (UInt64(positionSizeInBytes) > UInt64(~size_t(0)))
+        {
+            // It's too large to fit in memory.
+            return SLANG_FAIL;
+        }
+
+        const size_t sizeInBytes = size_t(positionSizeInBytes);
+
+        ScopedAllocation alloc;
+        void* data = alloc.allocate(sizeInBytes);
+        if (!data)
+        {
+            return SLANG_E_OUT_OF_MEMORY;
+        }
+
+        const size_t readSizeInBytes = stream.read(data, sizeInBytes);
+
+        // If not all read just return an error
+        if (sizeInBytes != readSizeInBytes)
+        {
+            return SLANG_FAIL;
+        }
+
+        *outBlob = RawBlob::moveCreate((uint8_t*)alloc.detach(), sizeInBytes).detach();
         return SLANG_OK;
     }
     catch (...)
@@ -167,7 +202,7 @@ SlangResult OSFileSystem::loadFile(char const* pathIn, ISlangBlob** outBlob)
 
 SlangResult OSFileSystem::enumeratePathContents(const char* path, FileSystemContentsCallBack callback, void* userData) 
 {
-    SLANG_RETURN_ON_FAIL(_checkImmutable(m_style));
+    SLANG_RETURN_ON_FAIL(_checkExt(m_style));
 
     struct Visitor : Path::Visitor
     {
@@ -274,7 +309,7 @@ SLANG_NO_THROW SlangResult SLANG_MCALL CacheFileSystem::queryInterface(SlangUUID
         return SLANG_OK;
     }
 
-    if (_canCast(FileSystemStyle::Immutable, uuid))
+    if (_canCast(FileSystemStyle::Ext, uuid))
     {
         addReference();
         *outObject = this;
@@ -747,7 +782,7 @@ ISlangUnknown* RelativeFileSystem::getInterface(const Guid& guid)
 
 SlangResult RelativeFileSystem::_calcCombinedPathInner(SlangPathType fromPathType, const char* fromPath, const char* path, ISlangBlob** outPath)
 {
-    ISlangFileSystemExt* fileSystem = _getImmutable();
+    ISlangFileSystemExt* fileSystem = _getExt();
     if (fileSystem)
     {
         return fileSystem->calcCombinedPath(fromPathType, fromPath, path, outPath);
@@ -775,7 +810,7 @@ SlangResult RelativeFileSystem::_getFixedPath(const char* path, String& outPath)
     return SLANG_OK;
 }
 
-SlangResult RelativeFileSystem::loadFile(char const* path, ISlangBlob**    outBlob)
+SlangResult RelativeFileSystem::loadFile(char const* path, ISlangBlob** outBlob)
 {
     String fixedPath;
     SLANG_RETURN_ON_FAIL(_getFixedPath(path, fixedPath));
@@ -784,7 +819,7 @@ SlangResult RelativeFileSystem::loadFile(char const* path, ISlangBlob**    outBl
 
 SlangResult RelativeFileSystem::getFileUniqueIdentity(const char* path, ISlangBlob** outUniqueIdentity) 
 {
-    auto fileSystem = _getImmutable();
+    auto fileSystem = _getExt();
     if (!fileSystem) return SLANG_E_NOT_IMPLEMENTED;
 
     String fixedPath;
@@ -794,7 +829,7 @@ SlangResult RelativeFileSystem::getFileUniqueIdentity(const char* path, ISlangBl
 
 SlangResult RelativeFileSystem::calcCombinedPath(SlangPathType fromPathType, const char* fromPath, const char* path, ISlangBlob** outPath)
 {
-    auto fileSystem = _getImmutable();
+    auto fileSystem = _getExt();
     if (!fileSystem) return SLANG_E_NOT_IMPLEMENTED;
 
     String fixedFromPath;
@@ -805,7 +840,7 @@ SlangResult RelativeFileSystem::calcCombinedPath(SlangPathType fromPathType, con
 
 SlangResult RelativeFileSystem::getPathType(const char* path, SlangPathType* outPathType)
 {
-    auto fileSystem = _getImmutable();
+    auto fileSystem = _getExt();
     if (!fileSystem) return SLANG_E_NOT_IMPLEMENTED;
 
     String fixedPath;
@@ -815,7 +850,7 @@ SlangResult RelativeFileSystem::getPathType(const char* path, SlangPathType* out
 
 SlangResult RelativeFileSystem::getSimplifiedPath(const char* path, ISlangBlob** outSimplifiedPath)
 {
-    auto fileSystem = _getImmutable();
+    auto fileSystem = _getExt();
     if (!fileSystem) return SLANG_E_NOT_IMPLEMENTED;
 
     return fileSystem->getSimplifiedPath(path, outSimplifiedPath);
@@ -823,7 +858,7 @@ SlangResult RelativeFileSystem::getSimplifiedPath(const char* path, ISlangBlob**
 
 SlangResult RelativeFileSystem::getCanonicalPath(const char* path, ISlangBlob** outCanonicalPath)
 {
-    auto fileSystem = _getImmutable();
+    auto fileSystem = _getExt();
     if (!fileSystem) return SLANG_E_NOT_IMPLEMENTED;
 
     String fixedPath;
@@ -833,7 +868,7 @@ SlangResult RelativeFileSystem::getCanonicalPath(const char* path, ISlangBlob** 
 
 void RelativeFileSystem::clearCache()
 {
-    auto fileSystem = _getImmutable();
+    auto fileSystem = _getExt();
     if (!fileSystem) return;
 
     fileSystem->clearCache();
@@ -841,7 +876,7 @@ void RelativeFileSystem::clearCache()
 
 SlangResult RelativeFileSystem::enumeratePathContents(const char* path, FileSystemContentsCallBack callback, void* userData)
 {
-    auto fileSystem = _getImmutable();
+    auto fileSystem = _getExt();
     if (!fileSystem) return SLANG_E_NOT_IMPLEMENTED;
     return fileSystem->enumeratePathContents(path, callback, userData);
 }

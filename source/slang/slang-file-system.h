@@ -15,8 +15,8 @@ namespace Slang
 
 enum class FileSystemStyle
 {
-    Simple,             ///< Equivalent to ISlangFileSystem
-    Immutable,          ///< Equivalent to ISlangFileSystemExt
+    Load,               ///< Equivalent to ISlangFileSystem
+    Ext,                ///< Equivalent to ISlangFileSystemExt
     Mutable,            ///< Equivalent to ISlangModifyableFileSystem
 };
 
@@ -48,8 +48,8 @@ public:
     virtual SLANG_NO_THROW SlangResult SLANG_MCALL createDirectory(const char* path) SLANG_OVERRIDE;
 
         /// Get a default instance
-    static ISlangFileSystem* getSimpleSingleton() { return &g_simple; }
-    static ISlangFileSystemExt* getImmutableSingleton() { return &g_immutable; }
+    static ISlangFileSystem* getLoadSingleton() { return &g_load; }
+    static ISlangFileSystemExt* getExtSingleton() { return &g_ext; }
     static ISlangMutableFileSystem* getMutableSingleton() { return &g_mutable; }
 
 private:
@@ -65,8 +65,8 @@ private:
 
     FileSystemStyle m_style;
 
-    static OSFileSystem g_simple;
-    static OSFileSystem g_immutable;
+    static OSFileSystem g_load;
+    static OSFileSystem g_ext;
     static OSFileSystem g_mutable;
 };
 
@@ -231,8 +231,7 @@ public:
 
 protected:
 
-    ISlangFileSystem* _getSimple() { return reinterpret_cast<ISlangFileSystem*>(m_fileSystem.get()); }
-    ISlangFileSystemExt* _getImmutable() { return Index(m_style) >= Index(FileSystemStyle::Immutable) ? reinterpret_cast<ISlangFileSystemExt*>(m_fileSystem.get()) : nullptr; }
+    ISlangFileSystemExt* _getExt() { return Index(m_style) >= Index(FileSystemStyle::Ext) ? reinterpret_cast<ISlangFileSystemExt*>(m_fileSystem.get()) : nullptr; }
     ISlangMutableFileSystem* _getMutable() { return Index(m_style) >= Index(FileSystemStyle::Mutable) ? reinterpret_cast<ISlangMutableFileSystem*>(m_fileSystem.get()) : nullptr; }
 
     SlangResult _calcCombinedPathInner(SlangPathType fromPathType, const char* fromPath, const char* path, ISlangBlob** pathOut);

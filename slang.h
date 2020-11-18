@@ -872,6 +872,8 @@ extern "C"
         @param outBlob A destination pointer to receive the blob of the file contents.
         @returns A `SlangResult` to indicate success or failure in loading the file.
 
+        NOTE! That the Blob should contain the directly binary data contained in the file.
+
         If load is successful, the implementation should create a blob to hold
         the file's content, store it to `outBlob`, and return 0.
         If the load fails, the implementation should return a failure status
