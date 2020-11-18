@@ -55,6 +55,12 @@ struct ITypeVisitor
     SLANG_CHILDREN_ASTNode_Type(SLANG_CLASS_ONLY, SLANG_VISITOR_DISPATCH_DECL)
 };
 
+// Suppress VS2017 Unreachable code warning
+#ifdef _MSC_VER
+#    pragma warning(push)
+#    pragma warning(disable:4702)
+#endif
+
 template<typename Derived, typename Result = void, typename Base = ITypeVisitor>
 struct TypeVisitor : Base
 {
@@ -305,6 +311,10 @@ struct ValVisitor<Derived, void, void> : TypeVisitor<Derived, void, IValVisitor>
     SLANG_CHILDREN_ASTNode_Val(SLANG_VISITOR_VOID_VISIT_IMPL, _)
 };
 
+// Re-activate VS2017 warning settings
+#ifdef _MSC_VER
+#    pragma warning(pop)
+#endif
 }
 
 #endif
