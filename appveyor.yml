@@ -1,6 +1,6 @@
 # Our solution file is currently set up for VS2015
 image: Visual Studio 2015
-
+skip_non_tags: true
 init:
   # Construct a version number suitable for using as a release name
   - ps: >-
