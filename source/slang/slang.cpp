@@ -195,7 +195,9 @@ void Session::init()
 
                 // Set up options
                 SerialContainerUtil::WriteOptions options;
-                //options.optionFlags |= SerialOptionFlag::SourceLocation;
+
+                options.optionFlags |= SerialOptionFlag::SourceLocation;
+                // TODO(JS): Should this be the Session::getBuiltinSourceManager()
                 options.sourceManager = m_builtinLinkage->getSourceManager();
 
                 StringBuilder builder;
@@ -249,6 +251,8 @@ SlangResult Session::_readBuiltinModule(Scope* scope, String moduleName)
 
     Linkage* linkage = getBuiltinLinkage();
 
+    SourceManager* sourceManger = getBuiltinSourceManager();
+
     NamePool* sessionNamePool = &namePool;
     NamePool* linkageNamePool = linkage->getNamePool();
 
@@ -256,7 +260,7 @@ SlangResult Session::_readBuiltinModule(Scope* scope, String moduleName)
     options.namePool = linkageNamePool;
     options.session = this;
     options.sharedASTBuilder = linkage->getASTBuilder()->getSharedASTBuilder();
-    options.sourceManager = linkage->getSourceManager();
+    options.sourceManager = sourceManger;
     options.linkage = linkage;
 
     // Hmm - don't have a suitable sink yet, so attempt to just not have one
