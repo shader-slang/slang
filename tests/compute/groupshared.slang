@@ -21,12 +21,13 @@ int test(int val)
 
 /* TODO: once function-scope `static` works
 	static groupshared int gB[THREAD_COUNT];
+
 	gB[val] = val;
 	GroupMemoryBarrierWithGroupSync();
 	val = gB[val ^ 2];
 */
 
-  return val;
+	return val;
 }
 
 [numthreads(THREAD_COUNT, 1, 1)]
