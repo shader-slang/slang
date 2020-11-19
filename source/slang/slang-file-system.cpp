@@ -125,7 +125,7 @@ SlangResult OSFileSystem::getSimplifiedPath(const char* pathIn, ISlangBlob** out
 {
     SLANG_RETURN_ON_FAIL(_checkExt(m_style));
 
-    String simplifiedPath = Path::simplify(_fixPathDelimiters(pathIn));
+    String simplifiedPath = Path::simplify(pathIn);
     *outSimplifiedPath = StringUtil::createStringBlob(simplifiedPath).detach();
     return SLANG_OK;
 }
@@ -710,7 +710,7 @@ SlangResult CacheFileSystem::getSimplifiedPath(const char* path, ISlangBlob** ou
         }
         case PathStyle::Simplifiable:
         {
-            String simplifiedPath = Path::simplify(_fixPathDelimiters(path));
+            String simplifiedPath = Path::simplify(path);
             *outSimplifiedPath = StringUtil::createStringBlob(simplifiedPath).detach();
             return SLANG_OK;
         }
