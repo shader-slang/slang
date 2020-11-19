@@ -1017,6 +1017,7 @@ namespace Slang
             // We need to ensure that any variable doesn't introduce
             // a constant with a circular definition.
             //
+            varDecl->setCheckState(DeclCheckState::Checked);
             _validateCircularVarDefinition(varDecl);
         }
         else
