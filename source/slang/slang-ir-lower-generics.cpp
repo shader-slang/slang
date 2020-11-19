@@ -17,6 +17,8 @@
 namespace Slang
 {
     // Replace all uses of RTTI objects with its sequential ID.
+    // Currently we don't use RTTI objects at all, so all of them
+    // are 0.
     void specializeRTTIObjectReferences(SharedGenericsLoweringContext* sharedContext)
     {
         uint32_t id = 0;
@@ -26,7 +28,12 @@ namespace Slang
             builder.sharedBuilder = &sharedContext->sharedBuilderStorage;
             builder.setInsertBefore(rtti.Value);
             IRUse* nextUse = nullptr;
-            auto idOperand = builder.getIntValue(builder.getUInt64Type(), id);
+            auto uint2Type = builder.getVectorType(
+                builder.getUIntType(), builder.getIntValue(builder.getIntType(), 2));
+            IRInst* uint2Args[] = {
+                builder.getIntValue(builder.getUIntType(), id),
+                builder.getIntValue(builder.getUIntType(), 0)};
+            auto idOperand = builder.emitMakeVector(uint2Type, 2, uint2Args);
             for (auto use = rtti.Value->firstUse; use; use = nextUse)
             {
                 nextUse = use->nextUse;
@@ -38,7 +45,7 @@ namespace Slang
         }
     }
 
-    // Replace all WitnessTableID type or RTTIHandleType with uint64.
+    // Replace all WitnessTableID type or RTTIHandleType with `uint2`.
     void cleanUpRTTIHandleTypes(SharedGenericsLoweringContext* sharedContext)
     {
         List<IRInst*> instsToRemove;
@@ -52,7 +59,9 @@ namespace Slang
                     IRBuilder builder;
                     builder.sharedBuilder = &sharedContext->sharedBuilderStorage;
                     builder.setInsertBefore(inst);
-                    inst->replaceUsesWith(builder.getUInt64Type());
+                    auto uint2Type = builder.getVectorType(
+                        builder.getUIntType(), builder.getIntValue(builder.getIntType(), 2));
+                    inst->replaceUsesWith(uint2Type);
                     instsToRemove.add(inst);
                 }
                 break;
