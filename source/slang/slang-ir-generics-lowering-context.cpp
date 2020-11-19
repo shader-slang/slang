@@ -66,7 +66,7 @@ namespace Slang
 
         // For now the only type info we encapsualte is type size.
         IRSizeAndAlignment sizeAndAlignment;
-        getNaturalSizeAndAlignment((IRType*)typeInst, &sizeAndAlignment);
+        getNaturalSizeAndAlignment(targetReq, (IRType*)typeInst, &sizeAndAlignment);
         builder->addRTTITypeSizeDecoration(result, sizeAndAlignment.size);
 
         // Give a name to the rtti object.
@@ -118,12 +118,19 @@ namespace Slang
         }
         if (anyValueSize == kInvalidAnyValueSize)
         {
-            sink->diagnose(type->sourceLoc, Diagnostics::dynamicInterfaceLacksAnyValueSizeAttribute, type);
+            // We could conceivably make it an error to have an associated type
+            // without an `[anyValueSize(...)]` attribute, but then we risk
+            // producing error messages even when doing 100% static specialization.
+            //
+            // It is simpler to use a reasonable default size and treat any
+            // type without an explicit attribute as using that size.
+            //
+            anyValueSize = kDefaultAnyValueSize;
         }
         return builder->getAnyValueType(anyValueSize);
     }
 
-    IRType* SharedGenericsLoweringContext::lowerType(IRBuilder* builder, IRInst* paramType, const Dictionary<IRInst*, IRInst*>& typeMapping)
+    IRType* SharedGenericsLoweringContext::lowerType(IRBuilder* builder, IRInst* paramType, const Dictionary<IRInst*, IRInst*>& typeMapping, IRType* concreteType)
     {
         if (!paramType)
             return nullptr;
@@ -137,7 +144,6 @@ namespace Slang
             return builder->getRTTIHandleType();
         }
 
-        IRIntegerValue anyValueSize = kInvalidAnyValueSize;
         switch (paramType->op)
         {
         case kIROp_WitnessTableType:
@@ -151,19 +157,28 @@ namespace Slang
             {
                 if (isBuiltin(anyValueSizeDecor->getConstraintType()))
                     return (IRType*)paramType;
-                anyValueSize = getInterfaceAnyValueSize(anyValueSizeDecor->getConstraintType(), paramType->sourceLoc);
+                auto anyValueSize = getInterfaceAnyValueSize(anyValueSizeDecor->getConstraintType(), paramType->sourceLoc);
                 return builder->getAnyValueType(anyValueSize);
             }
-            sink->diagnose(paramType, Diagnostics::unconstrainedGenericParameterNotAllowedInDynamicFunction, paramType);
-            return builder->getAnyValueType(kInvalidAnyValueSize);
+            // We could conceivably make it an error to have a generic parameter
+            // without an `[anyValueSize(...)]` attribute, but then we risk
+            // producing error messages even when doing 100% static specialization.
+            //
+            // It is simpler to use a reasonable default size and treat any
+            // type without an explicit attribute as using that size.
+            //
+            return builder->getAnyValueType(kDefaultAnyValueSize);
         }
         case kIROp_ThisType:
+        {
+
             if (isBuiltin(cast<IRThisType>(paramType)->getConstraintType()))
                 return (IRType*)paramType;
-            anyValueSize = getInterfaceAnyValueSize(
+            auto anyValueSize = getInterfaceAnyValueSize(
                 cast<IRThisType>(paramType)->getConstraintType(),
                 paramType->sourceLoc);
             return builder->getAnyValueType(anyValueSize);
+        }
         case kIROp_AssociatedType:
         {
             return lowerAssociatedType(builder, paramType);
@@ -172,12 +187,97 @@ namespace Slang
         {
             if (isBuiltin(paramType))
                 return (IRType*)paramType;
-            // An existential type translates into a tuple of (AnyValue, WitnessTable, RTTI*)
-            anyValueSize = getInterfaceAnyValueSize(paramType, paramType->sourceLoc);
+
+            // In the dynamic-dispatch case, a value of interface type
+            // is going to be packed into the "any value" part of a tuple.
+            // The size of the "any value" part depends on the interface
+            // type (e.g., it might have an `[anyValueSize(8)]` attribute
+            // indicating that 8 bytes needs to be reserved).
+            //
+            auto anyValueSize = getInterfaceAnyValueSize(paramType, paramType->sourceLoc);
+
+            // If there is a non-null `concreteType` parameter, then this
+            // interface type is one that has been statically bound (via
+            // specialization parameters) to hold a value of that concrete
+            // type.
+            //
+            IRType* pendingType = nullptr;
+            if( concreteType )
+            {
+                // Because static specialization is being used (at least in part),
+                // we do *not* have a guarantee that the `concreteType` is one
+                // that can fit into the `anyValueSize` of the interface.
+                //
+                // We will use the IR layout logic to see if we can compute
+                // a size for the type, which can lead to a few different outcomes:
+                //
+                // * If a size is computed successfully, and it is smaller than or
+                //   equal to `anyValueSize`, then the concrete value will fit into
+                //   the reserved area, and the layout will match the dynamic case.
+                //
+                // * If a size is computed successfully, and it is larger than
+                //   `anyValueSize`, then the concrete value cannot fit into the
+                //   reserved area, and it needs to be stored out-of-line.
+                //
+                // * If size cannot be computed, then that implies that the type
+                //   includes non-ordinary data (e.g., a `Texture2D` on a D3D11
+                //   target), and cannot possible fit into the reserved area
+                //   (which consists of only uniform bytes). In this case, the
+                //   value must be stored out-of-line.
+                //
+                IRSizeAndAlignment sizeAndAlignment;
+                Result result = getNaturalSizeAndAlignment(targetReq, concreteType, &sizeAndAlignment);
+                if(SLANG_FAILED(result) || (sizeAndAlignment.size > anyValueSize))
+                {
+                    // If the value must be stored out-of-line, we construct
+                    // a "pseudo pointer" to the concrete type, and the
+                    // constructed tuple will contain such a pseudo pointer.
+                    //
+                    // Semantically, the pseudo pointer behaves a bit like
+                    // a pointer to the concrete type, in that it can be
+                    // (pseudo-)dereferenced to produce a value of the chosen
+                    // type.
+                    //
+                    // In terms of layout, the pseudo pointer occupies no
+                    // space in the parent tuple/type, and will be automatically
+                    // moved out-of-line by a later type legalization pass.
+                    //
+                    pendingType = builder->getPseudoPtrType(concreteType);
+                }
+            }
+
             auto anyValueType = builder->getAnyValueType(anyValueSize);
             auto witnessTableType = builder->getWitnessTableIDType((IRType*)paramType);
             auto rttiType = builder->getRTTIHandleType();
-            auto tupleType = builder->getTupleType(rttiType, witnessTableType, anyValueType);
+
+            IRType* tupleType = nullptr;
+            if( !pendingType )
+            {
+                // In the oridnary (dynamic) case, an existential type decomposes
+                // into a tuple of:
+                //
+                //      (RTTI, witness table, any-value).
+                //
+                tupleType = builder->getTupleType(rttiType, witnessTableType, anyValueType);
+            }
+            else
+            {
+                // In the case where static specialization mandateds out-of-line storage,
+                // an existential type decomposes into a tuple of:
+                //
+                //      (RTTI, witness table, pseudo pointer, any-value)
+                //
+                tupleType = builder->getTupleType(rttiType, witnessTableType, pendingType, anyValueType);
+                //
+                // Note that in each of the cases, the third element of the tuple
+                // is a representation of the value being stored in the existential.
+                //
+                // Also note that each of these representations has the same
+                // size and alignment when only "ordinary" data is considered
+                // (the pseudo-pointer will eventually be legalized away, leaving
+                // behind a tuple with equivalent layout).
+            }
+
             return tupleType;
         }
         case kIROp_lookup_interface_method:
@@ -196,12 +296,20 @@ namespace Slang
                 interfaceType,
                 lookupInterface->getRequirementKey());
             SLANG_ASSERT(reqVal && reqVal->op == kIROp_AssociatedType);
-            return lowerType(builder, reqVal, typeMapping);
+            return lowerType(builder, reqVal, typeMapping, nullptr);
         }
-        case kIROp_ExistentialBoxType:
+        case kIROp_BoundInterfaceType:
         {
-            auto existentialBoxType = static_cast<IRExistentialBoxType*>(paramType);
-            return lowerType(builder, existentialBoxType->getInterfaceType(), typeMapping);
+            // A bound interface type represents an existential together with
+            // static knowledge that the value stored in the extistential has
+            // a particular concrete type.
+            //
+            // We handle this case by lowering the underlying interface type,
+            // but pass along the concrete type so that it can impact the
+            // layout of the interface type.
+            //
+            auto boundInterfaceType = static_cast<IRBoundInterfaceType*>(paramType);
+            return lowerType(builder, boundInterfaceType->getInterfaceType(), typeMapping, boundInterfaceType->getConcreteType());
         }
         default:
         {
@@ -209,7 +317,7 @@ namespace Slang
             List<IRInst*> loweredOperands;
             for (UInt i = 0; i < paramType->getOperandCount(); i++)
             {
-                loweredOperands.add(lowerType(builder, paramType->getOperand(i), typeMapping));
+                loweredOperands.add(lowerType(builder, paramType->getOperand(i), typeMapping, nullptr));
                 if (loweredOperands.getLast() != paramType->getOperand(i))
                     translated = true;
             }
@@ -237,12 +345,40 @@ namespace Slang
 
     IRIntegerValue SharedGenericsLoweringContext::getInterfaceAnyValueSize(IRInst* type, SourceLoc usageLocation)
     {
+        SLANG_UNUSED(usageLocation);
+
         if (auto decor = type->findDecoration<IRAnyValueSizeDecoration>())
         {
             return decor->getSize();
         }
-        sink->diagnose(type->sourceLoc, Diagnostics::dynamicInterfaceLacksAnyValueSizeAttribute, type);
-        sink->diagnose(usageLocation, Diagnostics::seeInterfaceUsage, type);
-        return kInvalidAnyValueSize;
+
+        // We could conceivably make it an error to have an interface
+        // without an `[anyValueSize(...)]` attribute, but then we risk
+        // producing error messages even when doing 100% static specialization.
+        //
+        // It is simpler to use a reasonable default size and treat any
+        // type without an explicit attribute as using that size.
+        //
+        return kDefaultAnyValueSize;
     }
+
+
+    bool SharedGenericsLoweringContext::doesTypeFitInAnyValue(IRType* concreteType, IRInterfaceType* interfaceType)
+    {
+        auto anyValueSize = getInterfaceAnyValueSize(interfaceType, interfaceType->sourceLoc);
+
+        IRSizeAndAlignment sizeAndAlignment;
+        Result result = getNaturalSizeAndAlignment(targetReq, concreteType, &sizeAndAlignment);
+        if(SLANG_FAILED(result) || (sizeAndAlignment.size > anyValueSize))
+        {
+            // The value does not fit, either because it is too large,
+            // or because it includes types that cannot be stored
+            // in uniform/ordinary memory for this target.
+            //
+            return false;
+        }
+
+        return true;
+    }
+
 }

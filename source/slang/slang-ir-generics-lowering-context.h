@@ -4,11 +4,14 @@
 #include "slang-ir.h"
 #include "slang-ir-insts.h"
 
+#include "slang-ir-lower-generics.h"
+
 namespace Slang
 {
     struct IRModule;
 
     constexpr IRIntegerValue kInvalidAnyValueSize = 0xFFFFFFFF;
+    constexpr IRIntegerValue kDefaultAnyValueSize = 16;
 
     struct SharedGenericsLoweringContext
     {
@@ -70,11 +73,11 @@ namespace Slang
         IRIntegerValue getInterfaceAnyValueSize(IRInst* type, SourceLoc usageLocation);
         IRType* lowerAssociatedType(IRBuilder* builder, IRInst* type);
 
-        IRType* lowerType(IRBuilder* builder, IRInst* paramType, const Dictionary<IRInst*, IRInst*>& typeMapping);
+        IRType* lowerType(IRBuilder* builder, IRInst* paramType, const Dictionary<IRInst*, IRInst*>& typeMapping, IRType* concreteType);
 
         IRType* lowerType(IRBuilder* builder, IRInst* paramType)
         {
-            return lowerType(builder, paramType, Dictionary<IRInst*, IRInst*>());
+            return lowerType(builder, paramType, Dictionary<IRInst*, IRInst*>(), nullptr);
         }
 
         // Get a list of all witness tables whose conformance type is `interfaceType`.
@@ -89,6 +92,9 @@ namespace Slang
             }
             return nullptr;
         }
+
+            /// Does the given `concreteType` fit within the any-value size deterined by `interfaceType`?
+        bool doesTypeFitInAnyValue(IRType* concreteType, IRInterfaceType* interfaceType);
     };
 
     bool isPolymorphicType(IRInst* typeInst);

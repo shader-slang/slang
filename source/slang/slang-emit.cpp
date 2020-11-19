@@ -307,20 +307,12 @@ Result linkAndOptimizeIR(
 
     eliminateDeadCode(irModule);
 
-    switch (target)
-    {
-    case CodeGenTarget::CPPSource:
-    case CodeGenTarget::CUDASource:
-        // For targets that supports dynamic dispatch, we need to lower the
-        // generics / interface types to ordinary functions and types using
-        // function pointers.
-        dumpIRIfEnabled(compileRequest, irModule, "BEFORE-LOWER-GENERICS");
-        lowerGenerics(targetRequest, irModule, sink);
-        dumpIRIfEnabled(compileRequest, irModule, "LOWER-GENERICS");
-        break;
-    default:
-        break;
-    }
+    // For targets that supports dynamic dispatch, we need to lower the
+    // generics / interface types to ordinary functions and types using
+    // function pointers.
+    dumpIRIfEnabled(compileRequest, irModule, "BEFORE-LOWER-GENERICS");
+    lowerGenerics(targetRequest, irModule, sink);
+    dumpIRIfEnabled(compileRequest, irModule, "LOWER-GENERICS");
 
     if (sink->getErrorCount() != 0)
         return SLANG_FAIL;
@@ -571,7 +563,7 @@ Result linkAndOptimizeIR(
             break;
         }
 
-        legalizeByteAddressBufferOps(session, irModule, byteAddressBufferOptions);
+        legalizeByteAddressBufferOps(session, targetRequest, irModule, byteAddressBufferOptions);
     }
 
     // For CUDA targets only, we will need to turn operations

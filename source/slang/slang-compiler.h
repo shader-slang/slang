@@ -1169,6 +1169,9 @@ namespace Slang
         /// Are we generating code for a Khronos API (OpenGL or Vulkan)?
     bool isKhronosTarget(TargetRequest* targetReq);
 
+        /// Are resource types "bindless" (implemented as ordinary data) on the given `target`?
+    bool areResourceTypesBindlessOnTarget(TargetRequest* target);
+
     // Compute the "effective" profile to use when outputting the given entry point
     // for the chosen code-generation target.
     //

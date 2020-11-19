@@ -238,6 +238,38 @@ struct CollectGlobalUniformParametersContext
             }
             for( auto use : uses )
             {
+                auto user = use->user;
+
+                // There is an annoying gotcha here, in that we are using
+                // global shader parameters themselves (the `IRGlobalParam`s)
+                // to represent their "keys" in the layout objects that
+                // represent the layout of the global scope.
+                //
+                // We don't want to replace the reference to the global
+                // parameter in one of these layouts with a reference
+                // to a field of our new collected parameter, and instead
+                // want to replace such a reference with the key for that
+                // field.
+                //
+                // TODO: We should probably be assigning keys to global
+                // parameters, and using those keys in the layout instructions
+                // instead of directly using the parameters. The parameters
+                // could then have a decoration to assocaite them with their
+                // key.
+                //
+                // TODO: Alternatively, we could considering doing this
+                // kind of collection work earlier, on a per-module basis,
+                // so that we don't need to perform collection as a back-end step.
+                // (Note that the main sticking point there is explicit layout
+                // markers on global parameters, that stop the entire parameter
+                // range for a module from being contiguous).
+                //
+                if(auto layoutAttr = as<IRStructFieldLayoutAttr>(user))
+                {
+                    layoutAttr->setOperand(0, fieldKey);
+                    continue;
+                }
+
                 // For each use site for the global parameter, we will
                 // insert new code right before the instruction that uses
                 // the parameter.
@@ -250,7 +282,6 @@ struct CollectGlobalUniformParametersContext
                 // so that these loads can be merged/moved without concern
                 // for aliasing.
                 //
-                auto user = use->user;
                 builder->setInsertBefore(user);
 
                 IRInst* value = nullptr;

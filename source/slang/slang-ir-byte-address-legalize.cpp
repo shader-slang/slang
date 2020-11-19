@@ -24,6 +24,7 @@ struct ByteAddressBufferLegalizationContext
     // that control what constructs we legalize, and how.
     //
     Session* m_session = nullptr;
+    TargetRequest* m_target = nullptr;
     ByteAddressBufferLegalizationOptions m_options;
 
     // We will also use a central IR builder when generating new
@@ -260,7 +261,7 @@ struct ByteAddressBufferLegalizationContext
                 // then we fail to legalize this load.
                 //
                 IRIntegerValue fieldOffset = 0;
-                SLANG_RETURN_NULL_ON_FAIL(getNaturalOffset(field, &fieldOffset));
+                SLANG_RETURN_NULL_ON_FAIL(getNaturalOffset(m_target, field, &fieldOffset));
 
                 // Otherwise, we load the field by recursively calling this function
                 // on the field type, with an adjusted immediate offset.
@@ -422,7 +423,7 @@ struct ByteAddressBufferLegalizationContext
         // the "stride" of the element type.
         //
         IRSizeAndAlignment elementLayout;
-        SLANG_RETURN_NULL_ON_FAIL(getNaturalSizeAndAlignment(elementType, &elementLayout));
+        SLANG_RETURN_NULL_ON_FAIL(getNaturalSizeAndAlignment(m_target, elementType, &elementLayout));
         IRIntegerValue elementStride = elementLayout.getStride();
 
         // We will collect all the element values into an array so
@@ -512,7 +513,7 @@ struct ByteAddressBufferLegalizationContext
                 auto offsetType = offset->getDataType();
 
                 IRSizeAndAlignment typeLayout;
-                SLANG_RETURN_NULL_ON_FAIL(getNaturalSizeAndAlignment(type, &typeLayout));
+                SLANG_RETURN_NULL_ON_FAIL(getNaturalSizeAndAlignment(m_target, type, &typeLayout));
                 auto typeStrideVal = typeLayout.getStride();
 
                 auto typeStrideInst = m_builder.getIntValue(offsetType, typeStrideVal);
@@ -808,7 +809,7 @@ struct ByteAddressBufferLegalizationContext
                 auto fieldType = field->getFieldType();
 
                 IRIntegerValue fieldOffset;
-                SLANG_RETURN_ON_FAIL(getNaturalOffset(field, &fieldOffset));
+                SLANG_RETURN_ON_FAIL(getNaturalOffset(m_target, field, &fieldOffset));
 
                 auto fieldVal = m_builder.emitFieldExtract(fieldType, value, field->getKey());
                 SLANG_RETURN_ON_FAIL(emitLegalStore(fieldType, buffer, baseOffset, immediateOffset + fieldOffset, fieldVal));
@@ -892,7 +893,7 @@ struct ByteAddressBufferLegalizationContext
                 auto indexType = offset->getDataType();
 
                 IRSizeAndAlignment typeLayout;
-                SLANG_RETURN_ON_FAIL(getNaturalSizeAndAlignment(type, &typeLayout));
+                SLANG_RETURN_ON_FAIL(getNaturalSizeAndAlignment(m_target, type, &typeLayout));
 
                 auto typeStride = m_builder.getIntValue(indexType, typeLayout.getStride());
 
@@ -920,7 +921,7 @@ struct ByteAddressBufferLegalizationContext
         // We iterate over the elements and fetch then store each one.
         //
         IRSizeAndAlignment elementLayout;
-        SLANG_RETURN_ON_FAIL(getNaturalSizeAndAlignment(elementType, &elementLayout));
+        SLANG_RETURN_ON_FAIL(getNaturalSizeAndAlignment(m_target, elementType, &elementLayout));
         IRIntegerValue elementStride = elementLayout.getStride();
 
         auto indexType = m_builder.getIntType();
@@ -938,11 +939,13 @@ struct ByteAddressBufferLegalizationContext
 
 void legalizeByteAddressBufferOps(
     Session*                                    session,
+    TargetRequest*                              target,
     IRModule*                                   module,
     ByteAddressBufferLegalizationOptions const& options)
 {
     ByteAddressBufferLegalizationContext context;
     context.m_session = session;
+    context.m_target = target;
     context.m_options = options;
     context.processModule(module);
 }

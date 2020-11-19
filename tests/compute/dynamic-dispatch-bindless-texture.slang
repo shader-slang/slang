@@ -2,7 +2,7 @@
 //TEST(compute):COMPARE_COMPUTE:-cpu
 //TEST(compute):COMPARE_COMPUTE:-cuda
 
-[anyValueSize(8)]
+[anyValueSize(16)]
 interface IInterface
 {
     float run();

@@ -12,8 +12,8 @@ namespace Slang
     /// Lower generic and interface-based code to ordinary types and functions using
     /// dynamic dispatch mechanisms.
     void lowerGenerics(
-        TargetRequest* targetReq,
-        IRModule* module,
-        DiagnosticSink* sink);
+        TargetRequest*          targetReq,
+        IRModule*               module,
+        DiagnosticSink*         sink);
 
 }
