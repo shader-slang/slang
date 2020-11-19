@@ -858,6 +858,7 @@ namespace Slang
         if(!initExpr)
             return nullptr;
 
+        ensureDecl(declRef.decl, DeclCheckState::Checked);
         ConstantFoldingCircularityInfo newCircularityInfo(decl, circularityInfo);
         return tryConstantFoldExpr(initExpr, &newCircularityInfo);
     }

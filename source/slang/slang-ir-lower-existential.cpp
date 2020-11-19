@@ -83,28 +83,53 @@ namespace Slang
             processExtractExistentialElement(inst, 0);
         }
 
-        void processGetValueFromExistentialBox(IRGetValueFromExistentialBox* inst)
+        void processGetValueFromBoundInterface(IRGetValueFromBoundInterface* inst)
         {
-            // Currently we do not translate on HLSL/GLSL targets,
-            // since we don't attempt to actually layout the value inside an fixed sized
-            // existential box for these targets.
-            if (isCPUTarget(sharedContext->targetReq) || isCUDATarget(sharedContext->targetReq))
-            {
-                IRBuilder builderStorage;
-                auto builder = &builderStorage;
-                builder->sharedBuilder = &sharedContext->sharedBuilderStorage;
-                builder->setInsertBefore(inst);
+            IRBuilder builderStorage;
+            auto builder = &builderStorage;
+            builder->sharedBuilder = &sharedContext->sharedBuilderStorage;
+            builder->setInsertBefore(inst);
 
-                auto element = extractTupleElement(builder, inst->getOperand(0), 2);
-                // TODO: it is not technically sound to use `getAddress` on a temporary value.
-                // We probably need to develop a mechanism to allow a temporary value to be used
-                // in the place of a pointer.
-                auto elementAddr =
-                    builder->emitGetAddress(builder->getPtrType(element->getDataType()), element);
-                auto reinterpretAddr = builder->emitBitCast(inst->getDataType(), elementAddr);
-                inst->replaceUsesWith(reinterpretAddr);
-                inst->removeAndDeallocate();
+            // A value of interface will lower as a tuple, and
+            // the third element of that tuple represents the
+            // concrete value that was put into the existential.
+            //
+            auto element = extractTupleElement(builder, inst->getOperand(0), 2);
+            auto elementType = element->getDataType();
+
+            // There are two cases we expect to see for that
+            // tuple element.
+            //
+            IRInst* replacement = nullptr;
+            if(as<IRPseudoPtrType>(elementType))
+            {
+                // The first case is when legacy static specialization
+                // is applied, and the element is a "pseudo-pointer."
+                //
+                // Semantically, we should emit a (pseudo-)load from the pseudo-pointer
+                // to go from `PseudoPtr<T>` to `T`.
+                //
+                // TODO: Actually introduce and emit a "psedudo-load" instruction
+                // here. For right now we are just using the value directly and
+                // downstream passes seem okay with it, but it isn't really
+                // type-correct to be doing this.
+                //
+                replacement = element;
             }
+            else
+            {
+                // The second case is when the dynamic-dispatch layout is
+                // being used, and the element is an "any-value."
+                //
+                // In this case we need to emit an unpacking operation
+                // to get from `AnyValue` to `T`.
+                //
+                SLANG_ASSERT(as<IRAnyValueType>(elementType));
+                replacement = builder->emitUnpackAnyValue(inst->getFullType(), element);
+            }
+
+            inst->replaceUsesWith(replacement);
+            inst->removeAndDeallocate();
         }
 
         void processInst(IRInst* inst)
@@ -113,9 +138,9 @@ namespace Slang
             {
                 processMakeExistential(makeExistential);
             }
-            else if (auto getExistentialValue = as<IRGetValueFromExistentialBox>(inst))
+            else if (auto getValueFromBoundInterface = as<IRGetValueFromBoundInterface>(inst))
             {
-                processGetValueFromExistentialBox(getExistentialValue);
+                processGetValueFromBoundInterface(getValueFromBoundInterface);
             }
             else if (auto extractExistentialVal = as<IRExtractExistentialValue>(inst))
             {

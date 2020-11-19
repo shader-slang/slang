@@ -2468,6 +2468,12 @@ namespace Slang
         return getTupleType(3, operands);
     }
 
+    IRTupleType* IRBuilder::getTupleType(IRType* type0, IRType* type1, IRType* type2, IRType* type3)
+    {
+        IRType* operands[] = { type0, type1, type2, type3 };
+        return getTupleType(SLANG_COUNT_OF(operands), operands);
+    }
+
     IRBasicBlockType*   IRBuilder::getBasicBlockType()
     {
         return (IRBasicBlockType*)getType(kIROp_BasicBlockType);
@@ -2510,16 +2516,6 @@ namespace Slang
             op,
             1,
             operands);
-    }
-
-    IRType* IRBuilder::getExistentialBoxType(IRType* concreteType, IRType* interfaceType)
-    {
-        // Don't wrap an existential box if concreteType is __Dynamic.
-        if (as<IRDynamicType>(concreteType))
-            return interfaceType;
-
-        IRInst* operands[] = {concreteType, interfaceType};
-        return getType(kIROp_ExistentialBoxType, 2, operands);
     }
 
     IRArrayTypeBase* IRBuilder::getArrayTypeBase(
@@ -2666,13 +2662,14 @@ namespace Slang
         // 
         if(as<IRInterfaceType>(baseType))
         {
-            if(slotArgCount >= 1)
+            if(slotArgCount >= 2)
             {
                 // We are being asked to emit `BindExistentials(someInterface, someConcreteType, ...)`
                 // so we just want to return `ExistentialBox<someConcreteType>`.
                 //
                 auto concreteType = (IRType*) slotArgs[0];
-                auto ptrType = getExistentialBoxType(concreteType, (IRType*)baseType);
+                auto witnessTable = slotArgs[1];
+                auto ptrType = getBoundInterfaceType((IRType*) baseType, concreteType, witnessTable);
                 return ptrType;
             }
         }
@@ -2704,6 +2701,25 @@ namespace Slang
             slotArgs.getBuffer());
     }
 
+    IRType* IRBuilder::getBoundInterfaceType(
+        IRType* interfaceType,
+        IRType* concreteType,
+        IRInst* witnessTable)
+    {
+        // Don't wrap an existential box if concreteType is __Dynamic.
+        if (as<IRDynamicType>(concreteType))
+            return interfaceType;
+
+        IRInst* operands[] = {interfaceType, concreteType, witnessTable};
+        return getType(kIROp_BoundInterfaceType, SLANG_COUNT_OF(operands), operands);
+    }
+
+    IRType* IRBuilder::getPseudoPtrType(
+        IRType* concreteType)
+    {
+        IRInst* operands[] = {concreteType};
+        return getType(kIROp_PseudoPtrType, SLANG_COUNT_OF(operands), operands);
+    }
 
 
     void IRBuilder::setDataType(IRInst* inst, IRType* dataType)
@@ -2725,10 +2741,10 @@ namespace Slang
         }
     }
 
-    IRInst* IRBuilder::emitGetValueFromExistentialBox(IRType* type, IRInst* existentialBox)
+    IRInst* IRBuilder::emitGetValueFromBoundInterface(IRType* type, IRInst* boundInterfaceValue)
     {
         auto inst =
-            createInst<IRInst>(this, kIROp_GetValueFromExistentialBox, type, 1, &existentialBox);
+            createInst<IRInst>(this, kIROp_GetValueFromBoundInterface, type, 1, &boundInterfaceValue);
         addInst(inst);
         return inst;
     }
@@ -2812,6 +2828,14 @@ namespace Slang
         IRInst* witnessTableVal,
         IRInst* interfaceMethodVal)
     {
+        // TODO: if somebody tries to declare a struct that inherits
+        // an interface conformance from a base type, then we hit
+        // this assert. The problem should be fixed higher up in
+        // the emit logic, but this is a reasonably early place
+        // to catch it.
+        //
+        SLANG_ASSERT(witnessTableVal->op != kIROp_StructKey);
+
         auto inst = createInst<IRLookupWitnessMethod>(
             this,
             kIROp_lookup_interface_method,
@@ -3044,14 +3068,16 @@ namespace Slang
                 // We are being asked to emit `wrapExistential(value, concreteType, witnessTable, ...) : someInterface`
                 //
                 // We also know that a concrete value being wrapped will always be an existential box,
-                // so we expect that `value : ExistentialBox<T>` for some `T`.
+                // so we expect that `value : BindInterface<I, C>` for some concrete `C`.
                 //
-                // We want to emit `makeExistential(load(value), witnessTable)`.
+                // We want to emit `makeExistential(getValueFromBoundInterface(value) : C, witnessTable)`.
                 //
-                auto deref = emitLoad(value);
+                auto concreteType = cast<IRType>(slotArgs[0]);
+                auto witnessTable = slotArgs[1];
                 if (slotArgs[0]->op == kIROp_DynamicType)
-                    return deref;
-                return emitMakeExistential(type, deref, slotArgs[1]);
+                    return value;
+                auto deref = emitGetValueFromBoundInterface(concreteType, value);
+                return emitMakeExistential(type, deref, witnessTable);
             }
         }
 
@@ -3180,12 +3206,13 @@ namespace Slang
         return inst;
     }
 
-    IRWitnessTable* IRBuilder::createWitnessTable(IRType* baseType)
+    IRWitnessTable* IRBuilder::createWitnessTable(IRType* baseType, IRType* subType)
     {
         IRWitnessTable* witnessTable = createInst<IRWitnessTable>(
             this,
             kIROp_WitnessTable,
-            getWitnessTableType(baseType));
+            getWitnessTableType(baseType),
+            subType);
         addGlobalValue(this, witnessTable);
         return witnessTable;
     }
@@ -5513,7 +5540,7 @@ namespace Slang
         case kIROp_lookup_interface_method:
         case kIROp_GetSequentialID:
         case kIROp_getAddr:
-        case kIROp_GetValueFromExistentialBox:
+        case kIROp_GetValueFromBoundInterface:
         case kIROp_Construct:
         case kIROp_makeUInt64:
         case kIROp_makeVector:

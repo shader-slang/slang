@@ -10,7 +10,13 @@ interface IModifier
     int modify(int val);
 }
 
-IModifier gModifier;
+// Note: a constant buffer for the global scope gets introduced
+// at this point, since `gModifier` introduces uniform storage
+// for the RTTI, witness table, and "any value" parts of the
+// existential.
+//
+//TEST_INPUT:cbuffer(data=[1 2 3 4 5 6 7 8], stride=4):
+uniform IModifier gModifier;
 
 int test(
     int val)

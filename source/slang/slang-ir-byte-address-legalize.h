@@ -4,6 +4,7 @@
 namespace Slang
 {
 class Session;
+class TargetRequest;
 struct IRModule;
 
 struct ByteAddressBufferLegalizationOptions
@@ -21,6 +22,7 @@ struct ByteAddressBufferLegalizationOptions
     ///
 void legalizeByteAddressBufferOps(
     Session*                                    session,
+    TargetRequest*                              target,
     IRModule*                                   module,
     ByteAddressBufferLegalizationOptions const& options);
 }

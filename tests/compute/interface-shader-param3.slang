@@ -4,8 +4,10 @@
 // interface types at more complicated places in the overall layout.
 //
 
-//TEST(compute):COMPARE_COMPUTE_EX:-slang -compute
-//TEST(compute):COMPARE_COMPUTE_EX:-slang -compute -dx12
+// Note: D3D11 test disabled because of missing `uint64_t`; re-enable when `uint2` used instead.
+//DISABLE_TEST(compute):COMPARE_COMPUTE_EX:-slang -compute
+
+//TEST(compute):COMPARE_COMPUTE_EX:-slang -compute -dx12 -profile sm_6_0 -use-dxil
 //TEST(compute, vulkan):COMPARE_COMPUTE_EX:-vk -compute
 
 // A lot of the setup is the same as for `interface-shader-param`,
@@ -56,7 +58,7 @@ ConstantBuffer<IRandomNumberGenerationStrategy> gStrategy;
 // type argument at the same time.
 //
 //TEST_INPUT: globalExistentialType MyStrategy
-//TEST_INPUT:cbuffer(data=[1 0 0 0], stride=4):
+//TEST_INPUT:cbuffer(data=[0 0 0 0 1 0 0 0], stride=4):
 
 [numthreads(4, 1, 1)]
 void computeMain(
@@ -83,7 +85,7 @@ void computeMain(
 //
 // Here's the incantation to make the test runner fill in the constant buffer:
 //
-//TEST_INPUT:root_constants(data=[256 0 0 0 16 0 0 0], stride=4):
+//TEST_INPUT:root_constants(data=[0 0 0 0 16 0 0 0 256], stride=4):
 //
 // So, the value `256` will be used for `extra` and the value `16`
 // will be written to the first four bytes of the concrete value

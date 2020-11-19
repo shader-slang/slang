@@ -787,14 +787,25 @@ static SlangResult _innerMain(Slang::StdWriters* stdWriters, SlangSession* sessi
 	}
 }
 
-SLANG_TEST_TOOL_API SlangResult innerMain(Slang::StdWriters* stdWriters, SlangSession* session, int argcIn, const char*const* argvIn)
+SLANG_TEST_TOOL_API SlangResult innerMain(Slang::StdWriters* stdWriters, SlangSession* sharedSession, int inArgc, const char*const* inArgv)
 {
     using namespace Slang;
+
+    // Assume we will used the shared session
+    ComPtr<slang::IGlobalSession> session(sharedSession);
+
+    // The sharedSession always has a pre-loaded stdlib.
+    // This differed test checks if the command line has an option to setup the stdlib.
+    // If so we *don't* use the sharedSession, and create a new stdlib-less session just for this compilation. 
+    if (TestToolUtil::hasDeferredStdLib(Index(inArgc - 1), inArgv + 1))
+    {
+        SLANG_RETURN_ON_FAIL(slang_createGlobalSessionWithoutStdLib(SLANG_API_VERSION, session.writeRef()));
+    }
 
     SlangResult res = SLANG_FAIL;
     try
     {
-        res = _innerMain(stdWriters, session, argcIn, argvIn);
+        res = _innerMain(stdWriters, session, inArgc, inArgv);
     }
     catch (const Slang::Exception& exception)
     {

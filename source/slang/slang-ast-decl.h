@@ -468,8 +468,8 @@ class SyntaxDecl : public Decl
     SLANG_UNREFLECTED
 
     // Callback to invoke in order to parse syntax with this keyword.
-    SyntaxParseCallback  parseCallback;
-    void*                parseUserData;
+    SyntaxParseCallback  parseCallback = nullptr;
+    void*                parseUserData = nullptr;
 };
 
 // A declaration of an attribute to be used with `[name(...)]` syntax.

@@ -3,8 +3,10 @@
 // This test puts interface-type shader parameters
 // inside of structure types to make sure that works
 
-//TEST(compute):COMPARE_COMPUTE_EX:-slang -compute
-//TEST(compute):COMPARE_COMPUTE_EX:-slang -compute -dx12
+// Note: D3D11 test disabled because of missing `uint64_t`; re-enable when `uint2` used instead.
+//DISABLE_TEST(compute):COMPARE_COMPUTE_EX:-slang -compute
+
+//TEST(compute):COMPARE_COMPUTE_EX:-slang -compute -dx12 -profile sm_6_0 -use-dxil
 //TEST(compute, vulkan):COMPARE_COMPUTE_EX:-vk -compute
 
 // A lot of the setup is the same as for `interface-shader-param`,
@@ -51,7 +53,7 @@ RWStructuredBuffer<int> gOutputBuffer;
 // that it *will* contain uniform/ordinary data
 // after specialization.
 //
-//TEST_INPUT:cbuffer(data=[0]):
+//TEST_INPUT:cbuffer(data=[0 0 0 0 0 0 0 0]):
 cbuffer C
 {
    IRandomNumberGenerationStrategy gStrategy;
@@ -79,7 +81,7 @@ struct Stuff
 
 [numthreads(4, 1, 1)]
 void computeMain(
-//TEST_INPUT:root_constants(data=[256]):
+//TEST_INPUT:root_constants(data=[0 0 0 0 0 0 0 0 256]):
     uniform Stuff stuff,
 
     uint3       dispatchThreadID : SV_DispatchThreadID)

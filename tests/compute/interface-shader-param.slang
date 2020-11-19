@@ -3,8 +3,10 @@
 // Test using interface tops as top-level shader parameters
 // (whether global, or on an entry point).
 
-//TEST(compute):COMPARE_COMPUTE_EX:-slang -compute
-//TEST(compute):COMPARE_COMPUTE_EX:-slang -compute -dx12
+// Note: D3D11 test disabled because of missing `uint64_t`; re-enable when `uint2` used instead.
+//DISABLE_TEST(compute):COMPARE_COMPUTE_EX:-slang -compute
+
+//TEST(compute):COMPARE_COMPUTE_EX:-slang -compute -dx12 -profile sm_6_0 -use-dxil
 //TEST(compute, vulkan):COMPARE_COMPUTE_EX:-vk -compute
 //DISABLE_TEST(compute):COMPARE_COMPUTE_EX:-cpu -compute
 
@@ -69,6 +71,20 @@ int test(
     return modifiedVal;
 }
 
+// The global-scope parameters for this example include
+// some `uniform` parameters, and that will trigger
+// the allocation of a global-scope constant buffer to
+// hold them. Slang's layout rules mean that the buffer
+// will be allocated before any other global-scope parameters.
+//
+// In this example, the buffer will not be needed after specialization,
+// but we need to declare/allocate it here so that the application
+// creates a descriptor table/set that matches what the shader
+// signature expects.
+//
+//TEST_INPUT:cbuffer(data=[0], stride=4):name=gStrategy
+
+
 
 // Now we'll define a shader entry point that will use
 // these interfaces to define its behavior.
@@ -81,7 +97,7 @@ RWStructuredBuffer<int> gOutputBuffer;
 // Now we'll define a global shader parameter for the
 // random number generation strategy.
 //
-IRandomNumberGenerationStrategy gStrategy;
+uniform IRandomNumberGenerationStrategy gStrategy;
 
 // The other parameter (for the modifier) will be attached
 // the entry point instead, so that we are testing both
@@ -89,6 +105,7 @@ IRandomNumberGenerationStrategy gStrategy;
 //
 [numthreads(4, 1, 1)]
 void computeMain(
+//TEST_INPUT:root_constants(data=[0], stride=4):
     uniform IModifier   modifier,
             uint3       dispatchThreadID : SV_DispatchThreadID)
 {

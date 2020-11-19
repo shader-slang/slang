@@ -1542,6 +1542,11 @@ bool isCUDATarget(TargetRequest* targetReq)
     }
 }
 
+bool areResourceTypesBindlessOnTarget(TargetRequest* targetReq)
+{
+    return isCPUTarget(targetReq) || isCUDATarget(targetReq);
+}
+
 static bool isD3D11Target(TargetRequest*)
 {
     // We aren't officially supporting D3D11 right now
@@ -3675,84 +3680,212 @@ static TypeLayoutResult _createTypeLayout(
         }
         else if( auto interfaceDeclRef = declRef.as<InterfaceDecl>() )
         {
+            RefPtr<ExistentialTypeLayout> typeLayout = new ExistentialTypeLayout();
+            typeLayout->type = type;
+            typeLayout->rules = rules;
+
             // When laying out a type that includes interface-type fields,
             // we cannot know how much space the concrete type that
             // gets stored into the field consumes.
             //
-            // If we were doing layout for a typical CPU target, then
-            // we could just say that each interface-type field consumes
-            // some fixed number of pointers (e.g., a data pointer plus a witness
-            // table pointer).
+            // For target platforms with flexible memory addressing,
+            // we can reserve a fixed amount of uniform/ordinary storage
+            // to hold a value of "any" type, with the expectation that:
             //
-            // We will borrow the intuition from that and invent a new
-            // resource kind for "existential slots" which conceptually
-            // represents the indirections needed to reference the
-            // data to be referenced by this field.
+            // * Values which fit entirely in the storage we've reserved
+            //   will be stored there directly.
             //
+            // * Values that are too big to store directly will be referenced
+            //   indirectly, by a pointer stored in the reserved space.
+            //
+            // Note: the latter condition means that the minimum
+            // reservation must be large enough to store a pointer.
+            //
+            // Note: the layout choice here does *not* depend on whether
+            // or not specialization is being used, because we do not
+            // want host code that sets parameters to have to be re-run (and
+            // behave differently) depending on whether specialization is
+            // being used for a particular dispatch.
+            //
+            // For target platforms that do not support flexible memory
+            // addressing, we can follow the same approach in cases
+            // where a value fits in the reserved memory space, and we
+            // will discuss what happens in the other cases in a bit.
+            //
+            // The default reservation will be 16 bytes (and this number
+            // becomes part of our ABI contract), but the `interface`
+            // that is being used to bound the existential can have
+            // an attribute that specifies a different size to use for
+            // its instances.
+            //
+            // Note: changing the "any value size" attribute for an interface
+            // breaks binary compatibility with existing code that uses
+            // or implements that interface).
+            //
+            LayoutSize fixedExistentialValueSize = 16;
+            if (auto anyValueAttr =
+                    interfaceDeclRef.getDecl()->findModifier<AnyValueSizeAttribute>())
+            {
+                fixedExistentialValueSize = anyValueAttr->size;
+            }
 
-            RefPtr<TypeLayout> typeLayout = new TypeLayout();
-            typeLayout->type = type;
-            typeLayout->rules = rules;
+            // The `fixedExistentialValueSize` only accounts for the storage
+            // of a value that conforms to the interface type; you can think
+            // of it like a C `union` where it stores the bits of a value, but
+            // has no way of knowing what the type of the value is.
+            //
+            // For dynamic dispatch we also need to be able to know two key
+            // pieces of information:
+            //
+            // * Some kind of run-time type information (RTTI) that can identify
+            //   the actual type stored in the existential, and which can therefore
+            //   be used to allocate/copy/release the value stored.
+            //
+            // * A value that "witnesses" the fact that the above type actually
+            //   implements the interface, and thus gives us a way to look up
+            //   methods, etc. that implement the interface operations for that
+            //   type. For a C++-minded programmer, you can think of  this like
+            //   a virtual function table pointer, stored alongside the object pointer.
+            //
+            // We reserve 16 bytes to accomodate the RTTI and witness table information,
+            // which should be enough space to store a pointer for each on 64-bit
+            // platforms. Note that we don't try to vary this size based on platform-specific
+            // information, because we prefer to keep the encoding of existentials as
+            // simple as we can get away with.
+            //
+            // TODO: This layout logic does *not* accomodate the case where an
+            // existential type is formed from a conjuction of interfaces (e.g.,
+            // a type like `IReadable & IWritable`). In such a case we'd have
+            // to change the layout to accomodate N >= 0 witness tables, either
+            // stored directly in the existential value, or pointed to indirectly
+            // to keep the size independent of N.
+            //
+            LayoutSize uniformSlotSize = fixedExistentialValueSize + 16;
+            typeLayout->addResourceUsage(LayoutResourceKind::Uniform, uniformSlotSize);
 
-            LayoutSize fixedExistentialValueSize = 0;
-            LayoutSize uniformSlotSize = 0;
+            // In addition to the uniform/ordinary storage, we will mark
+            // every interface-type parameter as consuming a few additional
+            // "fictitious" resources that allow applications to keep track
+            // of existential-type parameters in case they want to perform
+            // specialization.
+            //
+            // Each leaf parameter of existential type introduces a potential
+            // specialization parameter into the program, so we add the
+            // parameter to represent that here.
+            //
+            typeLayout->addResourceUsage(LayoutResourceKind::ExistentialTypeParam, 1);
+
+            // A leaf parameter of existential type also introduces a conceptual
+            // "sub-object" that needs to be tracked by an application building
+            // a shader object or parameter block abstraction.
+            //
+            typeLayout->addResourceUsage(LayoutResourceKind::ExistentialObjectParam, 1);
+            //
+            // Note: It might be unclear at this point what the difference is between
+            // `ExistentialTypeParam` and `ExistentialObjectParam` is. The reason for
+            // the confusion is that in this code we are only looking at a single
+            // leaf parameter with a type like `ILight`, which both introduces the
+            // type parameter (for picking a specialized light type), and the object
+            // parameter (for passing in the actual light data).
+            //
+            // In a more general setting we might have `ILight someLights[10]`, and
+            // in that case we would expect to have ten `ExistentialObjectParam`s
+            // (one for each light in the array), but for specialization we would
+            // still only want one `ExistentialTypeParam`.
+            //
+            // Keeping the `LayoutResourceKind`s separate allows us to scale them
+            // differently when a type gets used as part of an array or buffer.
+
+            // At this point we have determined the layout of the existential
+            // type itself, but there are additional steps we need to take
+            // if we are on a platform that doesn't support general-purpose
+            // pointers and addressing *and* we also know of a concrete
+            // type argument that the parameter will be specialized to.
+            //
             bool targetSupportsPointer =
                 isCPUTarget(context.targetReq) || isCUDATarget(context.targetReq);
-
-            if (targetSupportsPointer)
+            bool hasConcreteSpecializationArg = context.specializationArgCount != 0;
+            if (!targetSupportsPointer && hasConcreteSpecializationArg)
             {
-                fixedExistentialValueSize = 16;
-                if (auto anyValueAttr =
-                        interfaceDeclRef.getDecl()->findModifier<AnyValueSizeAttribute>())
-                {
-                    fixedExistentialValueSize = anyValueAttr->size;
-                }
-                // Append 16 bytes to accommodate RTTI pointer and witness table pointer.
-                uniformSlotSize = fixedExistentialValueSize + 16;
-                typeLayout->addResourceUsage(LayoutResourceKind::Uniform, uniformSlotSize);
-            }
-            typeLayout->addResourceUsage(LayoutResourceKind::ExistentialTypeParam, 1);
-            typeLayout->addResourceUsage(LayoutResourceKind::ExistentialObjectParam, 1);
-
-            // If there are any concrete types available, the first one will be
-            // the value that should be plugged into the slot we just introduced.
-            //
-            if (context.specializationArgCount)
-            {
+                // We have a concrete specialization argument, so we
+                // can determine the concrete type that is going to
+                // be stored in this parameter.
+                //
                 auto& specializationArg = context.specializationArgs[0];
                 Type* concreteType = as<Type>(specializationArg.val);
                 SLANG_ASSERT(concreteType);
 
-                // Always use AnyValueRules regardless of the enclosing environment's layout rule
-                // for existential values.
+                // Our first job here is to figure out how `concreteType` will
+                // be laid out when stored into this existential.
+                //
+                // We know that *if* the value fits in the "any value" storage,
+                // then that is where it will be stored. We start by computing
+                // how much space the value would take up if stored in
+                // the any-value area.
+                //
                 auto anyValueRules = context.getRulesFamily()->getAnyValueRules();
-
-                // TODO: for traditional GPU targets (HLSL/GLSL) we don't force
-                // anyValueRule for now, since it requires additional work to load
-                // the existential value. We should remove this special case logic
-                // and always use anyValueRule once we implement the correct loading
-                // code gen logic for these targets.
-                if (!targetSupportsPointer)
-                    anyValueRules = context.rules;
-
-                RefPtr<TypeLayout> concreteTypeLayout =
+                RefPtr<TypeLayout> concreteTypeAnyValueLayout =
                     createTypeLayout(context.with(anyValueRules), concreteType);
-                if (!targetSupportsPointer)
-                {
-                    // For targets that supports pointers, oversized existential values
-                    // should be placed in an overflow region and only a pointer is needed in
-                    // the place of the fixed sized uniform slot.
-                    // We only need the "pending layout" mechanism for targets that does not
-                    // support pointers.
 
-                    // For legacy targets without pointer support, the layout for this
-                    // specialized interface type then results in a type layout that tracks
-                    // both the resource usage of the interface type itself (just the
-                    // type + value slots introduced above), plus a "pending data" type that
-                    // represents the value conceptually pointed to by the interface-type
-                    // field/variable at runtime.
+                // We will look at the resource usage of the concrete type
+                // to determine if it "fits" in the reserved space.
+                //
+                bool fits = true;
+                for(auto usage : concreteTypeAnyValueLayout->resourceInfos)
+                {
+                    if(usage.kind == LayoutResourceKind::Uniform)
+                    {
+                        // If the amount of uniform storage that the concrete type
+                        // requires is more than has been reserved, when the
+                        // type does not fit.
+                        //
+                        if(usage.count > fixedExistentialValueSize)
+                        {
+                            fits = false;
+                            break;
+                        }
+                    }
+                    else
+                    {
+                        // If the concrete type requires any kind of storage
+                        // beyond ordinary uniform data, then it also
+                        // does not fit.
+                        //
+                        // TODO: Make sure this is okay with nested existentials.
+                        //
+                        fits = false;
+                        break;
+                    }
+                }
+
+                // If the value does fit, then there is nothing else to be
+                // done; the layout that would have been computed without
+                // knowing the `concreteType` is sufficient.
+                //
+                // If the value does *not* fit, then we need to figure out
+                // where the excess data will go.
+                //
+                if(!fits)
+                {
+                    // If we were doing layout for a typical CPU target, then
+                    // we could just say that the fixed-size storage contains
+                    // a data pointer to a "payload" of the data that wouldn't fit.
                     //
-                    typeLayout->pendingDataTypeLayout = concreteTypeLayout;
+                    // We will borrow intuition from the approach, by saying that
+                    // the payload is stored somewhere else, but we will *not*
+                    // lock down where precisely "somewhere else" is going to be
+                    // at this point.
+                    //
+                    // Instead, we will store information about the layout of
+                    // the data that needs to go somewhere else, and leave it
+                    // up to the parent type/context to find a suitable place
+                    // for the data.
+                    //
+                    // Because we know the layout of the data, but not the placement,
+                    // it is considered to be a "pending" part of the type layout.
+                    //
+                    typeLayout->pendingDataTypeLayout =
+                        createTypeLayout(context, concreteType);
                 }
             }
             // Interface type occupies a uniform slot for the fixed size storage, with alignment of 4 bytes.

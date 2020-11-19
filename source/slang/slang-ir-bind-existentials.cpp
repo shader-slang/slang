@@ -318,26 +318,45 @@ struct BindExistentialSlots
         // new ones we'll be making.
         //
         List<IRUse*> usesToReplace;
-        for(auto use = inst->firstUse; use; use = use->nextUse )
+        for( auto use = inst->firstUse; use; use = use->nextUse )
+        {
+            auto user = use->getUser();
+
+            // Note: We don't want to replace uses that are
+            // just referring to an instruction to identify
+            // it (e.g., a global shader parameter). We enumerate
+            // the relevant cases here and skip them.
+            //
+            if(as<IRDecoration>(user))
+                continue;
+            if(as<IRAttr>(user))
+                continue;
+            if(as<IRLayout>(user))
+                continue;
+
             usesToReplace.add(use);
+        }
 
         // Now we can loop over our list of uses and replace each.
         //
         for(auto use : usesToReplace)
         {
-            // First we emit a `makeExisential` right before the
-            // use site.
+            // We are going to emit a `wrapExistential` (or `makeExistential`)
+            // right before each use site of the value.
             //
             builder.setInsertBefore(use->getUser());
+
+            // The `inst` used to have an existential/interface type,
+            // but will now have a concrete/bound type, and we need
+            // to wrap it up again to get a value of the original
+            // expected type.
+            //
             auto newVal = builder.emitWrapExistential(
                 fullType,
                 inst,
                 slotOperandCount,
                 slotOperands.getBuffer());
 
-            // Second we make the use site point at the new
-            // value instead.
-            //
             use->set(newVal);
         }
     }

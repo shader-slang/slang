@@ -636,7 +636,35 @@ public:
     LayoutSize tagOffset;
 };
 
+    /// Layout information for an interface/existential type
+    ///
+    /// This class is used to represent the layout of an interface type
+    /// such as `IThing`, including both the information about the
+    /// space consumed by the existential itself (including, e.g., the
+    /// RTTI and witness-table infromation), along with any
+    /// "pending" data related to legacy static specialization.
+    ///
+class ExistentialTypeLayout : public TypeLayout
+{
+public:
+};
+
     /// Layout information for a type with existential (sub-)field types specialized.
+    ///
+    /// This class is used to represent a type like `SomeStruct` that
+    /// contains nested existential-type fields, and which has been explicitly
+    /// specialized with concrete type information for those fields.
+    ///
+    /// Note that the front-end language should not ever produce types that
+    /// make use of layouts like this. The only way such a type layout can
+    /// arise is if a user explicitly specialized a type with existential-type
+    /// fields using the Slang API, and then used that specialized type as
+    /// a type argument for a shader. This type layout class serves to remember
+    /// the specialization information (and resulting layout) for the type.
+    ///
+    /// TODO: Given our changes to how layout for existential types is being
+    /// handled, the details of this type probably need to be re-thought.
+    ///
 class ExistentialSpecializedTypeLayout : public TypeLayout
 {
 public:

@@ -26,6 +26,23 @@ namespace Slang
     ModuleDecl* populateBaseLanguageModule(
         ASTBuilder*     astBuilder,
         RefPtr<Scope>   scope);
+
+        /// Information used to set up SyntaxDecl. Such decls
+        /// when correctly setup define a callback. For some of the callbacks it's necessary
+        /// for the `parseUserData` to be set the the associated classInfo
+    struct SyntaxParseInfo
+    {
+        const char* keywordName;                ///< The keyword associated with this parse
+        SyntaxParseCallback callback;           ///< The callback to apply to the parse
+        const ReflectClassInfo* classInfo;      ///< 
+    };
+
+        /// Get all of the predefined SyntaxParseInfos
+    ConstArrayView<SyntaxParseInfo> getSyntaxParseInfos();
+
+        /// Assumes the userInfo is the ReflectClassInfo
+    NodeBase* parseSimpleSyntax(Parser* parser, void* userData);
+
 }
 
 #endif

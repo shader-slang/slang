@@ -61,7 +61,7 @@ namespace Slang
                 if (clonedChild->op == kIROp_Param)
                 {
                     auto paramType = clonedChild->getFullType();
-                    auto loweredParamType = sharedContext->lowerType(&builder, paramType, Dictionary<IRInst*, IRInst*>());
+                    auto loweredParamType = sharedContext->lowerType(&builder, paramType);
                     if (loweredParamType != paramType)
                     {
                         clonedChild->setFullType((IRType*)loweredParamType);
@@ -91,7 +91,7 @@ namespace Slang
             Dictionary<IRInst*, IRInst*> typeMapping;
             for (auto genericParam : genericVal->getParams())
             {
-                genericParamTypes.add(sharedContext->lowerType(builder, genericParam->getFullType(), Dictionary<IRInst*, IRInst*>()));
+                genericParamTypes.add(sharedContext->lowerType(builder, genericParam->getFullType()));
                 if (auto anyValueSizeDecor = genericParam->findDecoration<IRTypeConstraintDecoration>())
                 {
                     auto anyValueSize = sharedContext->getInterfaceAnyValueSize(anyValueSizeDecor->getConstraintType(), genericParam->sourceLoc);
@@ -118,7 +118,7 @@ namespace Slang
             for (UInt i = 0; i < funcType->getOperandCount(); i++)
             {
                 auto paramType = funcType->getOperand(i);
-                auto loweredParamType = sharedContext->lowerType(builder, paramType, typeMapping);
+                auto loweredParamType = sharedContext->lowerType(builder, paramType, typeMapping, nullptr);
                 translated = translated || (loweredParamType != paramType);
                 newOperands.add(loweredParamType);
             }

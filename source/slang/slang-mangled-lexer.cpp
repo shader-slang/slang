@@ -187,9 +187,18 @@ UInt MangledLexer::readParamCount()
 {
     MangledLexer lexer(in);
 
-    if (lexer.peekChar() == 'T')
     {
-        lexer.nextChar();
+        switch (lexer.peekChar())
+        {
+            case 'T':
+            case 'G':
+            case 'V':
+            {
+                lexer.nextChar();
+                break;
+            }
+            default: break;
+        }
     }
 
     UnownedStringSlice name = lexer.readRawStringSegment();

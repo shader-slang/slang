@@ -49,13 +49,23 @@ INST(Nop, nop, 0, 0)
 
     INST(TaggedUnionType, TaggedUnion, 0, 0)
 
-    // A `BindExistentials<B, T0,w0, T1,w1, ...>` represents
-    // taking type `B` and binding each of its existential type
-    // parameters, recursively, with the specified arguments,
-    // where each `Ti, wi` pair represents the concrete type
-    // and witness table to plug in for parameter `i`.
-    //
-    INST(BindExistentialsType, BindExistentials, 1, 0)
+    /* BindExistentialsTypeBase */
+
+        // A `BindExistentials<B, T0,w0, T1,w1, ...>` represents
+        // taking type `B` and binding each of its existential type
+        // parameters, recursively, with the specified arguments,
+        // where each `Ti, wi` pair represents the concrete type
+        // and witness table to plug in for parameter `i`.
+        //
+        INST(BindExistentialsType, BindExistentials, 1, 0)
+
+        // An `BindInterface<B, T0, w0>` represents the special case
+        // of a `BindExistentials` where the type `B` is known to be
+        // an interface type.
+        //
+        INST(BoundInterfaceType, BoundInterface, 3, 0)
+
+    INST_RANGE(BindExistentialsTypeBase, BindExistentialsType, BoundInterfaceType)
 
     /* Rate */
         INST(ConstExprRate, ConstExpr, 0, 0)
@@ -78,12 +88,12 @@ INST(Nop, nop, 0, 0)
         INST(PtrType, Ptr, 1, 0)
         INST(RefType, Ref, 1, 0)
 
-        // An `ExistentialBox<T>` represents a logical pointer to a value of type `T`.
-        // On targets that support pointers this might lower to a pointer, but on
-        // current targets it will lower to zero bytes, with a value of type `T`
-        // being stored "out of line" somewhere.
-        //
-        INST(ExistentialBoxType, ExistentialBox, 1, 0)
+        // A `PsuedoPtr<T>` logically represents a pointer to a value of type
+        // `T` on a platform that cannot support pointers. The expectation
+        // is that the "pointer" will be legalized away by storing a value
+        // of type `T` somewhere out-of-line.
+
+        INST(PseudoPtrType, PseudoPtr, 1, 0)
 
         /* OutTypeBase */
             INST(OutType, Out, 1, 0)
@@ -607,11 +617,12 @@ INST(MakeExistentialWithRTTI,           makeExistentialWithRTTI,        3, 0)
 // result of the `wrapExistentials` operation is a value of type `T`, allowing us to
 // "smuggle" a value of specialized type into computations that expect an unspecialized type.
 //
-INST(WrapExistential,                   wrapExistential,                2, 0)
+INST(WrapExistential,                   wrapExistential,                1, 0)
 
-// A `GetValueFromExistentialBox` takes a `ExistentialBox` value and returns the value wrapped by
-// the existential box.
-INST(GetValueFromExistentialBox,        getValueFromExistentialBox,     1, 0)
+// A `GetValueFromBoundInterface` takes a `BindInterface<I, T, w0>` value and returns the
+// value of concrete type `T` value that is being stored.
+//
+INST(GetValueFromBoundInterface,        getValueFromBoundInterface,     1, 0)
 
 INST(ExtractExistentialValue,           extractExistentialValue,        1, 0)
 INST(ExtractExistentialType,            extractExistentialType,         1, 0)
@@ -635,6 +646,7 @@ INST(GetEquivalentStructuredBuffer,     getEquivalentStructuredBuffer, 1, 0)
         INST(StreamOutputTypeLayout, streamOutputTypeLayout, 1, 0)
         INST(MatrixTypeLayout, matrixTypeLayout, 1, 0)
         INST(TaggedUnionTypeLayout, taggedUnionTypeLayout, 0, 0)
+        INST(ExistentialTypeLayout, existentialTypeLayout, 0, 0)
         INST(StructTypeLayout, structTypeLayout, 0, 0)
     INST_RANGE(TypeLayout, TypeLayoutBase, StructTypeLayout)
 

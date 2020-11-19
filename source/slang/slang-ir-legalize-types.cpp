@@ -1210,7 +1210,7 @@ static LegalVal legalizeInst(
     case kIROp_Load:
         return legalizeLoad(context, args[0]);
 
-    case kIROp_GetValueFromExistentialBox:
+    case kIROp_GetValueFromBoundInterface:
         return args[0];
 
     case kIROp_FieldAddress:
@@ -1826,6 +1826,58 @@ static void _addFieldsToWrappedBufferElementTypeLayout(
 
     case LegalElementWrapping::Flavor::tuple:
         {
+            auto tupleInfo = elementInfo.getTuple();
+
+            // There is an extremely special case that we need to deal with here,
+            // which is the case where the original element/field had an interface
+            // type, which was subject to static specialization.
+            //
+            // In such a case, the layout will show a simple type layout for
+            // the field/element itself (just uniform data) plus a "pending"
+            // layout for any fields related to the static specialization.
+            //
+            // In contrast, the actual IR type structure will have been turned
+            // into a `struct` type with multiple fields, one of which is a
+            // pseudo-pointer to the "pending" data. That field would require
+            // legalization, sending us down this path.
+            //
+            // The situation here is that we have an `elementTypeLayout` that
+            // is for a single field of interface type, but an `elementInfo`
+            // that corresponds to a struct with 3 or more fields (the tuple
+            // that was introduced to represent the interface type).
+            //
+            // We expect that `elementInfo` will represent a tuple with
+            // only a single element, and that element will reference the third
+            // field of the tuple/struct (the payload).
+            //
+            // What we want to do in this case is instead add the fields
+            // corresponding to the payload type, which are stored as
+            // the pending type layout on `elementTypeLayout`.
+            //
+            if( isSpecial )
+            {
+                if( auto existentialTypeLayout = as<IRExistentialTypeLayout>(elementTypeLayout) )
+                {
+                    if( auto pendingTypeLayout = existentialTypeLayout->getPendingDataTypeLayout() )
+                    {
+                        SLANG_ASSERT(tupleInfo->elements.getCount() == 1);
+
+                        for( auto ee : tupleInfo->elements )
+                        {
+                            _addFieldsToWrappedBufferElementTypeLayout(
+                                irBuilder,
+                                existentialTypeLayout,
+                                newTypeLayout,
+                                ee.field,
+                                varChain,
+                                true);
+                        }
+
+                        return;
+                    }
+                }
+            }
+
             // A tuple comes up when we've turned an aggregate
             // with one or more interface-type fields into
             // distinct fields at the top level.
@@ -1835,7 +1887,6 @@ static void _addFieldsToWrappedBufferElementTypeLayout(
             // the recursive calls, since we never use tuples
             // to store anything that isn't special.
 
-            auto tupleInfo = elementInfo.getTuple();
             for( auto ee : tupleInfo->elements )
             {
                 auto oldFieldLayout = getFieldLayout(elementTypeLayout, ee.key);
@@ -2702,7 +2753,7 @@ struct IRExistentialTypeLegalizationContext : IRTypeLegalizationContext
         // boxes, or arrays thereof.
         //
         auto type = unwrapArray(inType);
-        return as<IRExistentialBoxType>(type) != nullptr;
+        return as<IRPseudoPtrType>(type) != nullptr;
     }
 
     LegalType createLegalUniformBufferType(

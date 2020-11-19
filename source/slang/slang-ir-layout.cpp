@@ -49,7 +49,11 @@
 namespace Slang
 {
 
-static Result _calcNaturalArraySizeAndAlignment(IRType* elementType, IRInst* elementCountInst, IRSizeAndAlignment* outSizeAndAlignment)
+static Result _calcNaturalArraySizeAndAlignment(
+    TargetRequest*      target,
+    IRType*             elementType,
+    IRInst*             elementCountInst,
+    IRSizeAndAlignment* outSizeAndAlignment)
 {
     auto elementCountLit = as<IRIntLit>(elementCountInst);
     if(!elementCountLit)
@@ -63,7 +67,7 @@ static Result _calcNaturalArraySizeAndAlignment(IRType* elementType, IRInst* ele
     }
 
     IRSizeAndAlignment elementTypeLayout;
-    SLANG_RETURN_ON_FAIL(getNaturalSizeAndAlignment(elementType, &elementTypeLayout));
+    SLANG_RETURN_ON_FAIL(getNaturalSizeAndAlignment(target, elementType, &elementTypeLayout));
 
     auto elementStride = elementTypeLayout.getStride();
 
@@ -73,7 +77,10 @@ static Result _calcNaturalArraySizeAndAlignment(IRType* elementType, IRInst* ele
     return SLANG_OK;
 }
 
-static Result _calcNaturalSizeAndAlignment(IRType* type, IRSizeAndAlignment* outSizeAndAlignment)
+static Result _calcNaturalSizeAndAlignment(
+    TargetRequest*      target, 
+    IRType*             type,
+    IRSizeAndAlignment* outSizeAndAlignment)
 {
     switch( type->op )
     {
@@ -127,7 +134,7 @@ static Result _calcNaturalSizeAndAlignment(IRType* type, IRSizeAndAlignment* out
             for( auto field : structType->getFields() )
             {
                 IRSizeAndAlignment fieldTypeLayout;
-                SLANG_RETURN_ON_FAIL(getNaturalSizeAndAlignment(field->getFieldType(), &fieldTypeLayout));
+                SLANG_RETURN_ON_FAIL(getNaturalSizeAndAlignment(target, field->getFieldType(), &fieldTypeLayout));
 
                 structLayout.size = align(structLayout.size, fieldTypeLayout.alignment);
                 structLayout.alignment = std::max(structLayout.alignment, fieldTypeLayout.alignment);
@@ -166,6 +173,7 @@ static Result _calcNaturalSizeAndAlignment(IRType* type, IRSizeAndAlignment* out
             auto arrayType = cast<IRArrayType>(type);
 
             return _calcNaturalArraySizeAndAlignment(
+                target,
                 arrayType->getElementType(),
                 arrayType->getElementCount(),
                 outSizeAndAlignment);
@@ -177,6 +185,7 @@ static Result _calcNaturalSizeAndAlignment(IRType* type, IRSizeAndAlignment* out
             auto vecType = cast<IRVectorType>(type);
 
             return _calcNaturalArraySizeAndAlignment(
+                target,
                 vecType->getElementType(),
                 vecType->getElementCount(),
                 outSizeAndAlignment);
@@ -184,11 +193,31 @@ static Result _calcNaturalSizeAndAlignment(IRType* type, IRSizeAndAlignment* out
         break;
 
     default:
-        return SLANG_FAIL;
+        break;
     }
+
+    if( areResourceTypesBindlessOnTarget(target) )
+    {
+        // TODO: need this to be based on target, instead of hard-coded
+        int pointerSize = sizeof(void*);
+
+        if(as<IRTextureType>(type) )
+        {
+            *outSizeAndAlignment = IRSizeAndAlignment(pointerSize, pointerSize);
+            return SLANG_OK;
+        }
+        else if(as<IRSamplerStateTypeBase>(type) )
+        {
+            *outSizeAndAlignment = IRSizeAndAlignment(pointerSize, pointerSize);
+            return SLANG_OK;
+        }
+        // TODO: the remaining cases for "bindless" resources on CPU/CUDA targets
+    }
+
+    return SLANG_FAIL;
 }
 
-Result getNaturalSizeAndAlignment(IRType* type, IRSizeAndAlignment* outSizeAndAlignment)
+Result getNaturalSizeAndAlignment(TargetRequest* target, IRType* type, IRSizeAndAlignment* outSizeAndAlignment)
 {
     if( auto decor = type->findDecoration<IRNaturalSizeAndAlignmentDecoration>() )
     {
@@ -197,7 +226,7 @@ Result getNaturalSizeAndAlignment(IRType* type, IRSizeAndAlignment* outSizeAndAl
     }
 
     IRSizeAndAlignment sizeAndAlignment;
-    SLANG_RETURN_ON_FAIL(_calcNaturalSizeAndAlignment(type, &sizeAndAlignment));
+    SLANG_RETURN_ON_FAIL(_calcNaturalSizeAndAlignment(target, type, &sizeAndAlignment));
 
     if( auto module = type->getModule() )
     {
@@ -221,7 +250,7 @@ Result getNaturalSizeAndAlignment(IRType* type, IRSizeAndAlignment* outSizeAndAl
 }
 
 
-Result getNaturalOffset(IRStructField* field, IRIntegerValue* outOffset)
+Result getNaturalOffset(TargetRequest* target, IRStructField* field, IRIntegerValue* outOffset)
 {
     if( auto decor = field->findDecoration<IRNaturalOffsetDecoration>() )
     {
@@ -239,7 +268,7 @@ Result getNaturalOffset(IRStructField* field, IRIntegerValue* outOffset)
         return SLANG_FAIL;
 
     IRSizeAndAlignment structTypeLayout;
-    SLANG_RETURN_ON_FAIL(getNaturalSizeAndAlignment(structType, &structTypeLayout));
+    SLANG_RETURN_ON_FAIL(getNaturalSizeAndAlignment(target, structType, &structTypeLayout));
 
     if( auto decor = field->findDecoration<IRNaturalOffsetDecoration>() )
     {
