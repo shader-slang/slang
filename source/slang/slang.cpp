@@ -3043,7 +3043,7 @@ void Linkage::setFileSystem(ISlangFileSystem* inFileSystem)
     // If nullptr passed in set up default 
     if (inFileSystem == nullptr)
     {
-        m_cacheFileSystem = new Slang::CacheFileSystem(Slang::OSFileSystemExt::getSingleton());
+        m_cacheFileSystem = new Slang::CacheFileSystem(Slang::OSFileSystem::getExtSingleton());
         m_fileSystemExt = m_cacheFileSystem;
     }
     else
@@ -4245,7 +4245,7 @@ SLANG_API SlangResult spEnableReproCapture(
     return SLANG_OK;
 }
 
-SLANG_API SlangResult spExtractRepro(SlangSession* session, const void* reproData, size_t reproDataSize, ISlangFileSystemExt* fileSystem)
+SLANG_API SlangResult spExtractRepro(SlangSession* session, const void* reproData, size_t reproDataSize, ISlangMutableFileSystem* fileSystem)
 {
     using namespace Slang;
     SLANG_UNUSED(session);
