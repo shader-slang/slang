@@ -832,6 +832,41 @@ namespace Slang
         return _Move(buffer);
     }
 
+    SlangResult File::readAllBytes(const String& path, ScopedAllocation& out)
+    {
+        FileStream stream(path, FileMode::Open, FileAccess::Read, FileShare::ReadWrite);
+
+        const Int64 start = stream.getPosition();
+        stream.seek(SeekOrigin::End, 0);
+        const Int64 end = stream.getPosition();
+        stream.seek(SeekOrigin::Start, start);
+
+        const Int64 positionSizeInBytes = end - start;
+
+        if (UInt64(positionSizeInBytes) > UInt64(~size_t(0)))
+        {
+            // It's too large to fit in memory.
+            return SLANG_FAIL;
+        }
+
+        const size_t sizeInBytes = size_t(positionSizeInBytes);
+        void* data = out.allocate(sizeInBytes);
+        if (!data)
+        {
+            return SLANG_E_OUT_OF_MEMORY;
+        }
+
+        const size_t readSizeInBytes = stream.read(data, sizeInBytes);
+
+        // If not all read just return an error
+        if (sizeInBytes != readSizeInBytes)
+        {
+            return SLANG_FAIL;
+        }
+
+        return SLANG_OK;
+    }
+
     void File::writeAllText(const Slang::String& fileName, const Slang::String& text)
     {
         StreamWriter writer(new FileStream(fileName, FileMode::Create));

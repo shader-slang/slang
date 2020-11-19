@@ -5,6 +5,7 @@
 #include "slang-stream.h"
 #include "slang-text-io.h"
 #include "slang-secure-crt.h"
+#include "slang-blob.h"
 
 namespace Slang
 {
@@ -15,6 +16,9 @@ namespace Slang
 		static String readAllText(const String& fileName);
 		static List<unsigned char> readAllBytes(const String& fileName);
 		static void writeAllText(const String& fileName, const String& text);
+
+        static SlangResult readAllBytes(const String& fileName, ScopedAllocation& out);
+
         static SlangResult remove(const String& fileName);
 
         static SlangResult makeExecutable(const String& fileName);

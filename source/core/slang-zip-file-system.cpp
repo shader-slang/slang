@@ -65,19 +65,34 @@ public:
     virtual SLANG_NO_THROW SlangResult SLANG_MCALL createDirectory(const char* path) SLANG_OVERRIDE;
 
     ZipFileSystem();
+    ~ZipFileSystem();
 
     SlangResult init(const uint8_t* archive, size_t size);
 
 protected:
 
-    bool _hasArchive() { return m_data.getSizeInBytes() > 0; }
+    enum class Mode
+    {
+        None,
+        Read,
+        Write,
+    };
+
+    SlangResult _requireMode(Mode mode);
+
+    bool _hasArchive() { return m_mode != Mode::None; }
     SlangResult _getFixedPath(const char* path, String& outPath);
     SlangResult _findEntryIndex(const char* path, mz_uint& outIndex);
+    SlangResult _findEntryIndexFromFixedPath(const String& fixedPath, mz_uint& outIndex);
 
     ISlangMutableFileSystem* getInterface(const Guid& guid);
 
     ScopedAllocation m_data;
-    mz_zip_archive m_archive;
+
+    mz_uint m_compressionLevel = MZ_BEST_COMPRESSION;
+    Mode m_mode = Mode::None;
+
+    mz_zip_archive m_archive;           
 };
 
 ISlangMutableFileSystem* ZipFileSystem::getInterface(const Guid& guid)
@@ -85,12 +100,20 @@ ISlangMutableFileSystem* ZipFileSystem::getInterface(const Guid& guid)
     return (guid == IID_ISlangUnknown || guid == IID_ISlangFileSystem || guid == IID_ISlangFileSystemExt || guid == IID_ISlangMutableFileSystem) ? static_cast<ISlangMutableFileSystem*>(this) : nullptr;
 }
 
-ZipFileSystem::ZipFileSystem()
+ZipFileSystem::ZipFileSystem():
+    m_mode(Mode::None)
 {
 }
 
+ ZipFileSystem::~ZipFileSystem()
+ {
+     _requireMode(Mode::None);
+ }
+
 SlangResult ZipFileSystem::init(const uint8_t* archive, size_t size)
 {
+     SLANG_RETURN_ON_FAIL(_requireMode(Mode::None));
+
      // Store a copy
      if (!m_data.set(archive, size))
      {
@@ -98,7 +121,8 @@ SlangResult ZipFileSystem::init(const uint8_t* archive, size_t size)
      }
 
      // Initialize archive
-     memset(&m_archive, 0, sizeof(m_archive));
+     mz_zip_zero_struct(&m_archive);
+
      // Read the contents of the archive
      if (!mz_zip_reader_init_mem(&m_archive, m_data.getData(), m_data.getSizeInBytes(), 0))
      {
@@ -106,19 +130,107 @@ SlangResult ZipFileSystem::init(const uint8_t* archive, size_t size)
          return SLANG_FAIL;
      }
 
+     m_mode = Mode::Read;
      return SLANG_OK;
+}
+
+SlangResult ZipFileSystem::_requireMode(Mode newMode)
+{
+    if (newMode == m_mode)
+    {
+        return SLANG_OK;
+    }
+
+    switch (m_mode)
+    {
+        case Mode::None:
+        {
+            switch (newMode)
+            {
+                case Mode::Read:
+                {
+                    mz_uint flags = 0;
+                    mz_zip_zero_struct(&m_archive);
+                    mz_zip_reader_init(&m_archive, 0, flags );
+                    break;
+                }
+                case Mode::Write:
+                {
+                    mz_zip_zero_struct(&m_archive);
+                    mz_zip_writer_init(&m_archive, 0);
+                    break;
+                }
+                default: break;
+            }
+            break;
+        }
+        case Mode::Read:
+        {
+            switch (newMode)
+            {
+                case Mode::None:
+                {
+                    m_data.deallocate();
+                    mz_zip_end(&m_archive);
+                    break;
+                }
+                case Mode::Write:
+                {
+                    // Convert the reader into the writer
+                    if (!mz_zip_writer_init_from_reader(&m_archive, nullptr))
+                    {
+                        m_data.deallocate();
+                        m_mode = Mode::None;
+                        return SLANG_FAIL;
+                    }
+                    break;
+                }
+            }
+            break;
+        }
+        case Mode::Write:
+        {
+            switch (newMode)
+            {                
+                case Mode::None:
+                {
+                    mz_zip_writer_end(&m_archive);
+                    break;
+                }
+                case Mode::Read:
+                {
+                    // First turn into a zip
+                    void* buf;
+                    size_t size;
+                    mz_zip_writer_finalize_heap_archive(&m_archive, &buf, &size);
+                    m_data.attach(buf, size);
+
+                    mz_zip_writer_end(&m_archive);
+
+                    // Read
+                    mz_zip_zero_struct(&m_archive);
+                    if (!mz_zip_reader_init_mem(&m_archive, m_data.getData(), m_data.getSizeInBytes(), 0))
+                    {
+                        m_data.deallocate();
+                        return SLANG_FAIL;
+                    }
+                    break;
+                }
+                default: break;
+            }
+        }
+    }
+
+    m_mode = newMode;
+    return SLANG_OK;
 }
 
 SlangResult ZipFileSystem::_getFixedPath(const char* path, String& outPath)
 {
-    // If we have no archive we have no path conversion
-    if (!_hasArchive())
-    {
-        return SLANG_FAIL;
-    }
-
     String simplifiedPath = Path::simplify(UnownedStringSlice(path));
-    if (Path::hasRelativeElement(simplifiedPath))
+    // Can simplify to just ., thats okay, if it otherwise has something relative it means it couldn't be simplified into the
+    // contents of the archive
+    if (simplifiedPath != "." && Path::hasRelativeElement(simplifiedPath))
     {
         // If it still has a relative element, then it must be 'outside' of the archive
         return SLANG_E_NOT_FOUND;
@@ -128,19 +240,30 @@ SlangResult ZipFileSystem::_getFixedPath(const char* path, String& outPath)
     return SLANG_OK;
 }
 
-SlangResult ZipFileSystem::_findEntryIndex(const char* path, mz_uint& outIndex)
+
+SlangResult ZipFileSystem::_findEntryIndexFromFixedPath(const String& fixedPath, mz_uint& outIndex)
 {
-    String fixedPath;
-    SLANG_RETURN_ON_FAIL(_getFixedPath(path, fixedPath));
+    if (!_hasArchive())
+    {
+        return SLANG_E_NOT_FOUND;
+    }
 
     mz_uint32 index;
     const mz_uint flags = 0;
-    if (!mz_zip_reader_locate_file_v2(&m_archive, path, NULL, flags, &index))
+    if (!mz_zip_reader_locate_file_v2(&m_archive, fixedPath.getBuffer(), NULL, flags, &index))
     {
         return SLANG_E_NOT_FOUND;
     }
 
     outIndex = index;
+    return SLANG_OK;
+}
+
+SlangResult ZipFileSystem::_findEntryIndex(const char* path, mz_uint& outIndex)
+{
+    String fixedPath;
+    SLANG_RETURN_ON_FAIL(_getFixedPath(path, fixedPath));
+    SLANG_RETURN_ON_FAIL(_findEntryIndexFromFixedPath(fixedPath, outIndex));
     return SLANG_OK;
 }
 
@@ -239,8 +362,18 @@ SlangResult ZipFileSystem::getSimplifiedPath(const char* path, ISlangBlob** outS
 
 SlangResult ZipFileSystem::enumeratePathContents(const char* path, FileSystemContentsCallBack callback, void* userData)
 {
+    if (!_hasArchive())
+    {
+        return SLANG_E_NOT_FOUND;
+    }
+
     String fixedPath;
     SLANG_RETURN_ON_FAIL(_getFixedPath(path, fixedPath));
+
+    if (fixedPath == ".")
+    {
+        fixedPath = "";
+    }
 
     StringBuilder buf;
 
@@ -285,25 +418,100 @@ SlangResult ZipFileSystem::enumeratePathContents(const char* path, FileSystemCon
 
 SlangResult ZipFileSystem::saveFile(const char* path, const void* data, size_t size)
 {
-    SLANG_UNUSED(path);
-    SLANG_UNUSED(data);
-    SLANG_UNUSED(size);
+    String fixedPath;
+    SLANG_RETURN_ON_FAIL(_getFixedPath(path, fixedPath));
+
+    mz_uint32 index;
+    if (SLANG_SUCCEEDED(_findEntryIndexFromFixedPath(fixedPath, index)))
+    {
+        // We need to replace this index
+    }
+
+    // We need to check the directory exists 
+
+    // Need to add to the end of the file
 
     return SLANG_E_NOT_IMPLEMENTED;
 }
 SlangResult ZipFileSystem::remove(const char* path)
 {
-    SLANG_UNUSED(path);
+    String fixedPath;
+    SLANG_RETURN_ON_FAIL(_getFixedPath(path, fixedPath));
 
+    mz_uint32 index;
+    SLANG_RETURN_ON_FAIL(_findEntryIndexFromFixedPath(fixedPath, index));
 
+    mz_zip_archive_file_stat fileStat;
+    if (!mz_zip_reader_file_stat(&m_archive, index, &fileStat))
+    {
+        return SLANG_FAIL;
+    }
+
+    if (fileStat.m_is_directory)
+    {
+        // We need to see if there is anything in this directory
+        fixedPath.appendChar('/');
+
+        const mz_uint32 entryCount = mz_zip_reader_get_num_files(&m_archive);
+
+        for (mz_uint32 i = 0; i < entryCount; ++i)
+        {
+            if (i == index)
+            {
+                continue;
+            }
+
+            if (!mz_zip_reader_file_stat(&m_archive, index, &fileStat))
+            {
+                return SLANG_FAIL;
+            }
+
+            // Does this start with 
+            if (UnownedStringSlice(fileStat.m_filename).startsWith(fixedPath.getUnownedSlice()))
+            {
+                // If it contains children we can't remove it
+                return SLANG_FAIL;
+            }
+        }
+    }
+
+    // Do something to delete it!
+    
     return SLANG_E_NOT_IMPLEMENTED;
 }
 
 SlangResult ZipFileSystem::createDirectory(const char* path)
 {
-    SLANG_UNUSED(path);
+    String fixedPath;
+    SLANG_RETURN_ON_FAIL(_getFixedPath(path, fixedPath));
 
-    return SLANG_E_NOT_IMPLEMENTED;
+    // If we find something with this name, we can't create it
+    mz_uint32 index;
+    if (SLANG_SUCCEEDED(_findEntryIndexFromFixedPath(fixedPath, index)))
+    {
+        return SLANG_FAIL;
+    }
+
+    // Make writable
+    SLANG_RETURN_ON_FAIL(_requireMode(Mode::Write));
+
+    // The terminating / in the path indicates it's a directory
+    fixedPath.appendChar('/');
+    if (!mz_zip_writer_add_mem(&m_archive, fixedPath.getBuffer(), nullptr, 0, m_compressionLevel))
+    {
+        return SLANG_FAIL;
+    }
+     
+    return SLANG_OK;
+}
+
+/* static */SlangResult ZipCompressionUtil::create(const void* data, size_t size, ComPtr<ISlangMutableFileSystem>& out)
+{
+    RefPtr<ZipFileSystem> fileSystem(new ZipFileSystem);
+    SLANG_RETURN_ON_FAIL(fileSystem->init((const uint8_t*)data, size));
+
+    out = fileSystem;
+    return SLANG_OK;
 }
 
 /* static */void ZipCompressionUtil::unitTest()
