@@ -2,6 +2,7 @@
 #include "slangc-tool.h"
 
 #include "../../source/core/slang-exception.h"
+#include "../../source/core/slang-test-tool-util.h"
 
 using namespace Slang;
 
@@ -16,6 +17,9 @@ static void _diagnosticCallback(char const* message, void* /*userData*/)
 
 static SlangResult _compile(SlangCompileRequest* compileRequest, int argc, const char*const* argv)
 {
+    spSetDiagnosticCallback(compileRequest, &_diagnosticCallback, nullptr);
+    spSetCommandLineCompilerMode(compileRequest);
+
     {
         const SlangResult res = spProcessCommandLineArguments(compileRequest, &argv[1], argc - 1);
         if (SLANG_FAILED(res))
@@ -48,22 +52,32 @@ static SlangResult _compile(SlangCompileRequest* compileRequest, int argc, const
     return res;
 }
 
-SlangResult SlangCTool::innerMain(StdWriters* stdWriters, SlangSession* session, int argc, const char*const* argv)
+SlangResult SlangCTool::innerMain(StdWriters* stdWriters, slang::IGlobalSession* sharedSession, int argc, const char*const* argv)
 {
-    SlangCompileRequest* compileRequest = spCreateCompileRequest(session);
-    spSetDiagnosticCallback(compileRequest, &_diagnosticCallback, nullptr);
+    StdWriters::setSingleton(stdWriters);
 
-    spSetCommandLineCompilerMode(compileRequest);
+    // Assume we will used the shared session
+    ComPtr<slang::IGlobalSession> session(sharedSession);
+
+    // The sharedSession always has a pre-loaded stdlib.
+    // This differed test checks if the command line has an option to setup the stdlib.
+    // If so we *don't* use the sharedSession, and create a new stdlib-less session just for this compilation. 
+    if (TestToolUtil::hasDeferredStdLib(Index(argc - 1), argv + 1))
+    {
+        SLANG_RETURN_ON_FAIL(slang_createGlobalSessionWithoutStdLib(SLANG_API_VERSION, session.writeRef()));
+    }
+
+    SlangCompileRequest* compileRequest = spCreateCompileRequest(session);
+
     // Do any app specific configuration
     for (int i = 0; i < SLANG_WRITER_CHANNEL_COUNT_OF; ++i)
     {
         spSetWriter(compileRequest, SlangWriterChannel(i), stdWriters->getWriter(i));
     }
-    
-    SlangResult res = _compile(compileRequest, argc, argv);
 
+    SlangResult res = _compile(compileRequest, argc, argv);
     // Now that we are done, clean up after ourselves
     spDestroyCompileRequest(compileRequest);
+
     return res;
 }
-

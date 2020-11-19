@@ -872,6 +872,9 @@ extern "C"
         @param outBlob A destination pointer to receive the blob of the file contents.
         @returns A `SlangResult` to indicate success or failure in loading the file.
 
+        NOTE! This is a *binary* load - the blob should contain the exact same bytes
+        as are found in the backing file. 
+
         If load is successful, the implementation should create a blob to hold
         the file's content, store it to `outBlob`, and return 0.
         If the load fails, the implementation should return a failure status
@@ -929,6 +932,10 @@ extern "C"
         SLANG_PATH_TYPE_DIRECTORY,      /**< Path specified specifies a directory. */
         SLANG_PATH_TYPE_FILE,           /**< Path specified is to a file. */
     };
+
+    /* Callback to enumerate the contents of of a directory in a ISlangFileSystemExt.
+    The name is the name of a file system object (directory/file) in the specified path (ie it is without a path) */
+    typedef void (*FileSystemContentsCallBack)(SlangPathType pathType, const char* name, void* userData);
 
     /** An extended file system abstraction.
     
@@ -1027,9 +1034,26 @@ extern "C"
         /** Clears any cached information */
         virtual SLANG_NO_THROW void SLANG_MCALL clearCache() = 0;
 
-        /** Write the data specified with data and size to the specified path.
+        /** Enumerate the contents of the path
+        
+        Note that for normal Slang operation it isn't necessary to enumerate contents this can return SLANG_E_NOT_IMPLEMENTED.
+        
+        @param The path to enumerate
+        @param callback This callback is called for each entry in the path. 
+        @param userData This is passed to the callback
+        @returns SLANG_OK if successful 
+        */
+        virtual SLANG_NO_THROW SlangResult SLANG_MCALL enumeratePathContents(
+            const char* path,
+            FileSystemContentsCallBack callback,
+            void* userData) = 0;
+    };
 
-        Note that for normal slang operation it doesn't write files so this can return SLANG_E_NOT_IMPLEMENTED.
+    #define SLANG_UUID_ISlangFileSystemExt { 0x5fb632d2, 0x979d, 0x4481, { 0x9f, 0xee, 0x66, 0x3c, 0x3f, 0x14, 0x49, 0xe1 } }
+
+    struct ISlangMutableFileSystem : public ISlangFileSystemExt
+    {
+        /** Write the data specified with data and size to the specified path.
 
         @param path The path for data to be saved to
         @param data The data to be saved
@@ -1040,9 +1064,28 @@ extern "C"
             const char* path,
             const void* data,
             size_t size) = 0;
+
+        /** Remove the entry in the path (directory of file). Will only delete an empty directory, if not empty
+        will return an error.
+
+        @param path The path to remove 
+        @returns SLANG_OK if successful 
+        */
+        virtual SLANG_NO_THROW SlangResult SLANG_MCALL remove(
+            const char* path) = 0;
+
+        /** Create a directory.
+
+        The path to the directory must exist
+
+        @param path To the directory to create. The parent path *must* exist otherwise will return an error.
+        @returns SLANG_OK if successful 
+        */
+        virtual SLANG_NO_THROW SlangResult SLANG_MCALL createDirectory(
+            const char* path) = 0;
     };
 
-    #define SLANG_UUID_ISlangFileSystemExt { 0x5fb632d2, 0x979d, 0x4481, { 0x9f, 0xee, 0x66, 0x3c, 0x3f, 0x14, 0x49, 0xe1 } }
+    #define SLANG_UUID_ISlangMutableFileSystem  { 0xa058675c, 0x1d65, 0x452a, { 0x84, 0x58, 0xcc, 0xde, 0xd1, 0x42, 0x71, 0x5 } }
 
     /* Identifies different types of writer target*/
     typedef unsigned int SlangWriterChannel;
@@ -1773,7 +1816,7 @@ extern "C"
         SlangSession* session,
         const void* reproData,
         size_t reproDataSize,
-        ISlangFileSystemExt* fileSystem);
+        ISlangMutableFileSystem* fileSystem);
 
     /* Turns a repro into a file system.
 
@@ -2988,6 +3031,22 @@ namespace slang
         virtual SLANG_NO_THROW void SLANG_MCALL getLanguagePrelude(
             SlangSourceLanguage sourceLanguage,
             ISlangBlob** outPrelude) = 0;
+
+        
+            /** Compile from (embedded source) the StdLib on the session.
+            Will return a failure if there is already a StdLib available
+            NOTE! API is experimental and not ready for production code 
+            */
+        virtual SLANG_NO_THROW SlangResult SLANG_MCALL compileStdLib() = 0;
+
+            /** Load the StdLib. Currently loads modules from the file system
+            NOTE! API is experimental and not ready for production code 
+            */
+        virtual SLANG_NO_THROW SlangResult SLANG_MCALL loadStdLib() = 0;
+
+            /** Save the StdLib modules to the file system
+            NOTE! API is experimental and not ready for production code  */
+        virtual SLANG_NO_THROW SlangResult SLANG_MCALL saveStdLib() = 0;
     };
 
     #define SLANG_UUID_IGlobalSession { 0xc140b5fd, 0xc78, 0x452e, { 0xba, 0x7c, 0x1a, 0x1e, 0x70, 0xc7, 0xf7, 0x1c } };
@@ -3378,9 +3437,28 @@ namespace slang
     };
 }
 
+// Passed into functions to create globalSession to identify the API version client code is
+// using. 
 #define SLANG_API_VERSION 0
 
+/* Create a global session, with built in StdLib.
+
+@param apiVersion Pass in SLANG_API_VERSION
+@param outGlobalSession (out)The created global session. 
+*/
 SLANG_API SlangResult slang_createGlobalSession(
+    SlangInt                apiVersion,
+    slang::IGlobalSession** outGlobalSession);
+
+/* Create a global session, but do not set up the stdlib. The stdlib can
+then be loaded via loadStdLib or compileStdLib
+
+@param apiVersion Pass in SLANG_API_VERSION
+@param outGlobalSession (out)The created global session that doesn't have a StdLib setup.
+
+NOTE! API is experimental and not ready for production code 
+*/
+SLANG_API SlangResult slang_createGlobalSessionWithoutStdLib(
     SlangInt                apiVersion,
     slang::IGlobalSession** outGlobalSession);
 

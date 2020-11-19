@@ -557,6 +557,49 @@ namespace Slang
 #endif
     }
 
+    SlangResult Path::remove(const String& path)
+    {
+#ifdef _WIN32
+        // Need to determine if its a file or directory
+
+        SlangPathType pathType;
+        SLANG_RETURN_ON_FAIL(getPathType(path, &pathType));
+
+        
+        switch (pathType)
+        {
+            case SLANG_PATH_TYPE_FILE:
+            {
+                // https://docs.microsoft.com/en-us/windows/desktop/api/fileapi/nf-fileapi-deletefilea
+                if (DeleteFileA(path.getBuffer()))
+                {
+                    return SLANG_OK;
+                }
+                break;
+            }
+            case SLANG_PATH_TYPE_DIRECTORY:
+            {
+                // https://docs.microsoft.com/en-us/windows/win32/api/fileapi/nf-fileapi-removedirectorya
+                if (RemoveDirectoryA(path.getBuffer()))
+                {
+                    return SLANG_OK;
+                }
+                break;
+            }
+            default: break;
+        }
+
+        return SLANG_FAIL;
+#else
+        // https://linux.die.net/man/3/remove
+        if (::remove(path.getBuffer()) == 0)
+        {
+            return SLANG_OK;
+        }
+        return SLANG_FAIL;
+#endif
+    }
+
 #if defined(_WIN32)
     /* static */SlangResult Path::find(const String& directoryPath, const char* pattern, Visitor* visitor)
     {

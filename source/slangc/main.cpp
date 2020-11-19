@@ -66,9 +66,27 @@ static SlangResult _compile(SlangCompileRequest* compileRequest, int argc, const
     return res;
 }
 
-SLANG_TEST_TOOL_API SlangResult innerMain(StdWriters* stdWriters, SlangSession* session, int argc, const char*const* argv)
+SLANG_TEST_TOOL_API SlangResult innerMain(StdWriters* stdWriters, slang::IGlobalSession* sharedSession, int argc, const char*const* argv)
 {
     StdWriters::setSingleton(stdWriters);
+
+    // Assume we will used the shared session
+    ComPtr<slang::IGlobalSession> session(sharedSession);
+
+    // The sharedSession always has a pre-loaded stdlib, is sharedSession is not nullptr.
+    // This differed test checks if the command line has an option to setup the stdlib.
+    // If so we *don't* use the sharedSession, and create a new stdlib-less session just for this compilation. 
+    if (TestToolUtil::hasDeferredStdLib(Index(argc - 1), argv + 1))
+    {
+        SLANG_RETURN_ON_FAIL(slang_createGlobalSessionWithoutStdLib(SLANG_API_VERSION, session.writeRef()));
+        TestToolUtil::setSessionDefaultPreludeFromExePath(argv[0], session);
+    }
+    else if (!session)
+    {
+        // Just create the global session in the regular way if there isn't one set
+        SLANG_RETURN_ON_FAIL(slang_createGlobalSession(SLANG_API_VERSION, session.writeRef()));
+        TestToolUtil::setSessionDefaultPreludeFromExePath(argv[0], session);
+    }
 
     SlangCompileRequest* compileRequest = spCreateCompileRequest(session);
     SlangResult res = _compile(compileRequest, argc, argv);
@@ -80,16 +98,8 @@ SLANG_TEST_TOOL_API SlangResult innerMain(StdWriters* stdWriters, SlangSession* 
 
 int MAIN(int argc, char** argv)
 {
-    SlangResult res;
-    {
-        SlangSession* session = spCreateSession(nullptr);
-        TestToolUtil::setSessionDefaultPreludeFromExePath(argv[0], session);
-
-        auto stdWriters = StdWriters::initDefaultSingleton();
-        
-        res = innerMain(stdWriters, session, argc, argv);
-        spDestroySession(session);
-    }
+    auto stdWriters = StdWriters::initDefaultSingleton();
+    SlangResult res = innerMain(stdWriters, nullptr, argc, argv);
     return (int)TestToolUtil::getReturnCode(res);
 }
 

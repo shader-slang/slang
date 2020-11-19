@@ -8,7 +8,9 @@
 //TEST_INPUT:ubuffer(data=[0 0 0 0], stride=4):out, name=gBuffer
 RWStructuredBuffer<int> gBuffer;
 
-#define THREAD_COUNT 4
+static const int A = 4;
+static const int B = 1;
+static const int THREAD_COUNT = A * B;
 
 groupshared int gA[THREAD_COUNT];
 int test(int val)

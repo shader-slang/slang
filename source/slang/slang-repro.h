@@ -186,7 +186,7 @@ struct ReproUtil
 
     static SlangResult extractFilesToDirectory(const String& file);
 
-    static SlangResult extractFiles(OffsetBase& base, RequestState* requestState, ISlangFileSystemExt* fileSystem);
+    static SlangResult extractFiles(OffsetBase& base, RequestState* requestState, ISlangMutableFileSystem* fileSystem);
 
         /// Given the repo file work out a suitable path
     static SlangResult calcDirectoryPathFromFilename(const String& filename, String& outPath);

@@ -126,6 +126,11 @@ namespace Slang
             /// @param path Path to extract first element from
             /// @return The first element of the path, or empty 
         static UnownedStringSlice getFirstElement(const UnownedStringSlice& path);
+
+            /// Remove a file or directory at specified path. The directory must be empty for it to be removed
+            /// @param path
+            /// @return SLANG_OK if file or directory is removed
+        static SlangResult remove(const String& path);
 	};
 
     // Helper class to clean up temporary files on dtor

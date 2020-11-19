@@ -152,7 +152,6 @@ void Session::init()
     //
     m_builtinLinkage->_stopRetainingParentSession();
 
-  
     // Create scopes for various language builtins.
     //
     // TODO: load these on-demand to avoid parsing
@@ -174,44 +173,6 @@ void Session::init()
     slangLanguageScope = new Scope();
     slangLanguageScope->nextSibling = hlslLanguageScope;
 
-    if (false)
-    {
-        // Let's try loading serialized modules and adding them
-        _readBuiltinModule(coreLanguageScope, "core");
-        _readBuiltinModule(hlslLanguageScope, "hlsl");
-    }
-    else
-    {
-        addBuiltinSource(coreLanguageScope, "core", getCoreLibraryCode());
-        addBuiltinSource(hlslLanguageScope, "hlsl", getHLSLLibraryCode());
-
-        // Write out
-        if (false)
-        {
-            for (auto& pair : m_builtinLinkage->mapNameToLoadedModules)
-            {
-                const Name* moduleName = pair.Key;
-                Module* module = pair.Value;
-
-                // Set up options
-                SerialContainerUtil::WriteOptions options;
-
-                options.optionFlags |= SerialOptionFlag::SourceLocation;
-                // TODO(JS): Should this be the Session::getBuiltinSourceManager()
-                options.sourceManager = m_builtinLinkage->getSourceManager();
-
-                StringBuilder builder;
-                builder << moduleName->text << ".slang-module";
-
-                FileStream stream(builder.ProduceString(), FileMode::Create, FileAccess::Write, FileShare::ReadWrite);
-                if (SLANG_FAILED(SerialContainerUtil::write(module, options, &stream)))
-                {
-                    SLANG_UNEXPECTED("Unable to load stdlib");
-                }
-            }
-        }
-    }
-
     {
         for (Index i = 0; i < Index(SourceLanguage::CountOf); ++i)
         {
@@ -226,6 +187,66 @@ void Session::init()
     m_languagePreludes[Index(SourceLanguage::CUDA)] = get_slang_cuda_prelude();
     m_languagePreludes[Index(SourceLanguage::CPP)] = get_slang_cpp_prelude();
     m_languagePreludes[Index(SourceLanguage::HLSL)] = get_slang_hlsl_prelude();
+}
+
+SlangResult Session::compileStdLib()
+{
+    if (m_builtinLinkage->mapNameToLoadedModules.Count())
+    {
+        // Already have a StdLib loaded
+        return SLANG_FAIL;
+    }
+
+    // TODO(JS): Could make this return a SlangResult as opposed to exception
+    addBuiltinSource(coreLanguageScope, "core", getCoreLibraryCode());
+    addBuiltinSource(hlslLanguageScope, "hlsl", getHLSLLibraryCode());
+    return SLANG_OK;
+}
+
+SlangResult Session::loadStdLib()
+{
+    if (m_builtinLinkage->mapNameToLoadedModules.Count())
+    {
+        // Already have a StdLib loaded
+        return SLANG_FAIL;
+    }
+
+    // Let's try loading serialized modules and adding them
+    SLANG_RETURN_ON_FAIL(_readBuiltinModule(coreLanguageScope, "core"));
+    SLANG_RETURN_ON_FAIL(_readBuiltinModule(hlslLanguageScope, "hlsl"));
+    return SLANG_OK;
+}
+
+SlangResult Session::saveStdLib()
+{
+    if (m_builtinLinkage->mapNameToLoadedModules.Count() == 0)
+    {
+        // There is no standard lib loaded
+        return SLANG_FAIL;
+    }
+
+    for (auto& pair : m_builtinLinkage->mapNameToLoadedModules)
+    {
+        const Name* moduleName = pair.Key;
+        Module* module = pair.Value;
+
+        // Set up options
+        SerialContainerUtil::WriteOptions options;
+
+        // Save with SourceLocation information
+        options.optionFlags |= SerialOptionFlag::SourceLocation;
+
+        // TODO(JS): Should this be the Session::getBuiltinSourceManager()?
+        options.sourceManager = m_builtinLinkage->getSourceManager();
+
+        StringBuilder builder;
+        builder << moduleName->text << ".slang-module";
+
+        FileStream stream(builder.ProduceString(), FileMode::Create, FileAccess::Write, FileShare::ReadWrite);
+        SLANG_RETURN_ON_FAIL(SerialContainerUtil::write(module, options, &stream));
+    }
+
+    return SLANG_OK;
 }
 
 SlangResult Session::_readBuiltinModule(Scope* scope, String moduleName)
@@ -3022,7 +3043,7 @@ void Linkage::setFileSystem(ISlangFileSystem* inFileSystem)
     // If nullptr passed in set up default 
     if (inFileSystem == nullptr)
     {
-        m_cacheFileSystem = new Slang::CacheFileSystem(Slang::OSFileSystemExt::getSingleton());
+        m_cacheFileSystem = new Slang::CacheFileSystem(Slang::OSFileSystem::getExtSingleton());
         m_fileSystemExt = m_cacheFileSystem;
     }
     else
@@ -3163,22 +3184,41 @@ Session::~Session()
 
 SLANG_API SlangSession* spCreateSession(const char*)
 {
-    Slang::RefPtr<Slang::Session> session(new Slang::Session());
-    session->init();
+    Slang::ComPtr<slang::IGlobalSession> globalSession;
+    if (SLANG_FAILED(slang_createGlobalSession(SLANG_API_VERSION, globalSession.writeRef())))
+    {
+        return nullptr;
+    }
     // Will be returned with a refcount of 1
-    return asExternal(session.detach());
+    return globalSession.detach();
 }
 
 SLANG_API SlangResult slang_createGlobalSession(
     SlangInt                apiVersion,
     slang::IGlobalSession** outGlobalSession)
 {
-    if(apiVersion != 0)
+    Slang::ComPtr<slang::IGlobalSession> globalSession;
+    SLANG_RETURN_ON_FAIL(slang_createGlobalSessionWithoutStdLib(apiVersion, globalSession.writeRef()));
+    SLANG_RETURN_ON_FAIL(globalSession->compileStdLib());
+    *outGlobalSession = globalSession.detach();
+    return SLANG_OK;
+}
+
+SLANG_API SlangResult slang_createGlobalSessionWithoutStdLib(
+    SlangInt                apiVersion,
+    slang::IGlobalSession** outGlobalSession)
+{
+    if (apiVersion != 0)
         return SLANG_E_NOT_IMPLEMENTED;
 
-    Slang::RefPtr<Slang::Session> globalSession(new Slang::Session());
+    // Create the session
+    Slang::Session* globalSession = new Slang::Session();
+    // Put an interface ref on it
+    Slang::ComPtr<slang::IGlobalSession> result(globalSession);
+
+    // Initialize it
     globalSession->init();
-    Slang::ComPtr<slang::IGlobalSession> result(Slang::asExternal(globalSession));
+
     *outGlobalSession = result.detach();
     return SLANG_OK;
 }
@@ -4205,7 +4245,7 @@ SLANG_API SlangResult spEnableReproCapture(
     return SLANG_OK;
 }
 
-SLANG_API SlangResult spExtractRepro(SlangSession* session, const void* reproData, size_t reproDataSize, ISlangFileSystemExt* fileSystem)
+SLANG_API SlangResult spExtractRepro(SlangSession* session, const void* reproData, size_t reproDataSize, ISlangMutableFileSystem* fileSystem)
 {
     using namespace Slang;
     SLANG_UNUSED(session);
