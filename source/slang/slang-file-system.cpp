@@ -451,11 +451,10 @@ SlangResult CacheFileSystem::enumeratePathContents(const char* path, FileSystemC
             remaining = UnownedStringSlice(remaining.begin() + 1, remaining.end());
         }
 
-        // If it has a / then it's either not simplified - so we ignore (we only want to invoke on the simplified path version as there is only one
+        // If it has a path separator then it's either not simplified - so we ignore (we only want to invoke on the simplified path version as there is only one
         // of these for every PathInfo)
         // or it is a child file/directory, and so we ignore that too.
-        Index index = remaining.indexOf('/');
-        if (index >= 0)
+        if (remaining.indexOf('/') >= 0 || remaining.indexOf('\\') >= 0)
         {
             continue;
         }
