@@ -37,6 +37,19 @@ namespace Slang
     }
 }
 
+/* static */bool TestToolUtil::hasDeferredStdLib(Index argc, const char*const* argv)
+{
+    for (Index i = 0; i < argc; ++i)
+    {
+        UnownedStringSlice option(argv[i]);
+        if (option == "-load-stdlib" || option == "-compile-stdlib")
+        {
+            return true;
+        }
+    }
+    return false;
+}
+
 /* static */SlangResult TestToolUtil::getIncludePath(const String& parentPath, const char* path, String& outIncludePath)
 {
     String includePath;

@@ -86,6 +86,16 @@ SerialIndex ModuleSerialFilter::writePointer(SerialWriter* writer, const NodeBas
         }
     }
 
+    // TODO(JS): If I enable this section then the stdlib doesn't work correctly, it appears to be because of
+    // `addCatchAllIntrinsicDecorationIfNeeded`. If this is enabled when AST is serialized, the 'body' (ie Stmt)
+    // will not be serialized. When serialized back in, it will appear to be a function without a body.
+    // In that case `addCatchAllIntrinsicDecorationIfNeeded` will add an intrinsic which in some cases is incorrect.
+    // This happens during lowering. 
+    //
+    // So it seems the fix is for some other mechanism. Another solution is perhaps to run something like `addCatchAllIntrinsicDecorationIfNeeded`
+    // on the stdlib after compilation, and before serialization. Then removing it from lowering.
+
+#if 0
     // TODO(JS): What we really want to do here is to ignore bodies functions.
     // It's not 100% clear if this is even right though - for example does type inference
     // imply the body is needed to say infer a return type?
@@ -99,6 +109,7 @@ SerialIndex ModuleSerialFilter::writePointer(SerialWriter* writer, const NodeBas
         writer->setPointerIndex(stmt, SerialIndex(0));
         return SerialIndex(0);
     }
+#endif
 
     // For now for everything else just write it
     return writer->writeObject(ptr);

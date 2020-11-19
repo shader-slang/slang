@@ -12,6 +12,8 @@
 #include "slang-serialize-source-loc.h"
 #include "slang-serialize-factory.h"
 
+#include "slang-parser.h"
+
 #include "slang-mangled-lexer.h"
 
 namespace Slang {
@@ -490,27 +492,74 @@ static List<ExtensionDecl*>& _getCandidateExtensionList(
                     astRootNode = reader.getPointer(SerialIndex(1)).dynamicCast<NodeBase>();
 
                     // 2) Add the extensions to the module mapTypeToCandidateExtensions cache
+                    // 3) We need to fix the callback pointers for parsing
 
                     {
                         ModuleDecl* moduleDecl = as<ModuleDecl>(astRootNode);
-                        
+
+                        // Maps from keyword name name to index in (syntaxParseInfos)
+                        // Will be filled in lazily if needed (for SyntaxDecl setup)
+                        Dictionary<Name*, Index> syntaxKeywordDict;
+
+                        // Get the parse infos
+                        const auto syntaxParseInfos = getSyntaxParseInfos();
+                        SLANG_ASSERT(syntaxParseInfos.getCount());
+
                         for (auto& obj : reader.getObjects())
                         {
-                            if (Type* type = obj.dynamicCast<Type>())
+                            if (obj.m_kind == SerialTypeKind::NodeBase)
                             {
-                                type->_setASTBuilder(astBuilder);
-                            }
+                                NodeBase* nodeBase = (NodeBase*)obj.m_ptr;
+                                SLANG_ASSERT(nodeBase);
 
-                            if (ExtensionDecl* extensionDecl = obj.dynamicCast<ExtensionDecl>())
-                            {
-                                if (auto targetDeclRefType = as<DeclRefType>(extensionDecl->targetType))
+                                if (Type* type = dynamicCast<Type>(nodeBase))
                                 {
-                                    // Attach our extension to that type as a candidate...
-                                    if (auto aggTypeDeclRef = targetDeclRefType->declRef.as<AggTypeDecl>())
+                                    type->_setASTBuilder(astBuilder);
+                                }
+                                else if (ExtensionDecl* extensionDecl = dynamicCast<ExtensionDecl>(nodeBase))
+                                {
+                                    if (auto targetDeclRefType = as<DeclRefType>(extensionDecl->targetType))
                                     {
-                                        auto aggTypeDecl = aggTypeDeclRef.getDecl();
+                                        // Attach our extension to that type as a candidate...
+                                        if (auto aggTypeDeclRef = targetDeclRefType->declRef.as<AggTypeDecl>())
+                                        {
+                                            auto aggTypeDecl = aggTypeDeclRef.getDecl();
 
-                                        _getCandidateExtensionList(aggTypeDecl, moduleDecl->mapTypeToCandidateExtensions).add(extensionDecl);
+                                            _getCandidateExtensionList(aggTypeDecl, moduleDecl->mapTypeToCandidateExtensions).add(extensionDecl);
+                                        }
+                                    }
+                                }
+                                else if (SyntaxDecl* syntaxDecl = dynamicCast<SyntaxDecl>(nodeBase))
+                                {
+                                    // Set up the dictionary lazily
+                                    if (syntaxKeywordDict.Count() == 0)
+                                    {
+                                        NamePool* namePool = options.session->getNamePool();
+                                        for (Index i = 0; i < syntaxParseInfos.getCount(); ++i)
+                                        {
+                                            const auto& entry = syntaxParseInfos[i];
+                                            syntaxKeywordDict.Add(namePool->getName(entry.keywordName), i);
+                                        }
+                                        // Must have something in it at this point
+                                        SLANG_ASSERT(syntaxKeywordDict.Count());
+                                    }
+
+                                    // Look up the index 
+                                    Index* entryIndexPtr = syntaxKeywordDict.TryGetValue(syntaxDecl->getName());
+                                    if (entryIndexPtr)
+                                    {
+                                        // Set up SyntaxDecl based on the ParseSyntaxIndo
+                                        auto& info = syntaxParseInfos[*entryIndexPtr];
+                                        syntaxDecl->parseCallback = *info.callback;
+                                        syntaxDecl->parseUserData = const_cast<ReflectClassInfo*>(info.classInfo);
+                                    }
+                                    else
+                                    {
+                                        // If we don't find a setup entry, we use `parseSimpleSyntax`, and set
+                                        // the parseUserData to the ReflectClassInfo (as parseSimpleSyntax needs this)
+                                        syntaxDecl->parseCallback = &parseSimpleSyntax;
+                                        SLANG_ASSERT(syntaxDecl->syntaxClass.classInfo);
+                                        syntaxDecl->parseUserData = const_cast<ReflectClassInfo*>(syntaxDecl->syntaxClass.classInfo);
                                     }
                                 }
                             }

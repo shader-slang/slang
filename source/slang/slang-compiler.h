@@ -2077,6 +2077,10 @@ namespace Slang
         SLANG_NO_THROW void SLANG_MCALL setLanguagePrelude(SlangSourceLanguage inSourceLanguage, char const* prelude) override;
         SLANG_NO_THROW void SLANG_MCALL getLanguagePrelude(SlangSourceLanguage inSourceLanguage, ISlangBlob** outPrelude) override;
 
+        SLANG_NO_THROW SlangResult SLANG_MCALL compileStdLib() override;
+        SLANG_NO_THROW SlangResult SLANG_MCALL loadStdLib() override;
+        SLANG_NO_THROW SlangResult SLANG_MCALL saveStdLib() override;
+
             /// Get the default compiler for a language
         DownstreamCompiler* getDefaultDownstreamCompiler(SourceLanguage sourceLanguage);
 
@@ -2132,7 +2136,7 @@ namespace Slang
         String getCoreLibraryCode();
         String getHLSLLibraryCode();
 
-        
+     
         RefPtr<SharedASTBuilder> m_sharedASTBuilder;
 
 
