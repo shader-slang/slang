@@ -42,7 +42,7 @@ static const Guid IID_ISlangFileSystem = SLANG_UUID_ISlangFileSystem;
 static const Guid IID_ISlangFileSystemExt = SLANG_UUID_ISlangFileSystemExt;
 static const Guid IID_ISlangMutableFileSystem = SLANG_UUID_ISlangMutableFileSystem;
 
-class ZipFileSystem : public RefObject, public ISlangMutableFileSystem
+class ZipFileSystemImpl : public ZipFileSystem 
 {
 public:
     // ISlangUnknown 
@@ -66,8 +66,11 @@ public:
     virtual SLANG_NO_THROW SlangResult SLANG_MCALL remove(const char* path) SLANG_OVERRIDE;
     virtual SLANG_NO_THROW SlangResult SLANG_MCALL createDirectory(const char* path) SLANG_OVERRIDE;
 
-    ZipFileSystem();
-    ~ZipFileSystem();
+    // ZipFileSystem
+    virtual ArrayView<uint8_t> getArchive() SLANG_OVERRIDE;
+
+    ZipFileSystemImpl();
+    ~ZipFileSystemImpl();
 
     SlangResult init(const uint8_t* archive, size_t size);
 
@@ -150,22 +153,22 @@ protected:
     mz_zip_archive m_archive;           
 };
 
-ISlangMutableFileSystem* ZipFileSystem::getInterface(const Guid& guid)
+ISlangMutableFileSystem* ZipFileSystemImpl::getInterface(const Guid& guid)
 {
     return (guid == IID_ISlangUnknown || guid == IID_ISlangFileSystem || guid == IID_ISlangFileSystemExt || guid == IID_ISlangMutableFileSystem) ? static_cast<ISlangMutableFileSystem*>(this) : nullptr;
 }
 
-ZipFileSystem::ZipFileSystem():
+ZipFileSystemImpl::ZipFileSystemImpl():
     m_mode(Mode::None)
 {
 }
 
- ZipFileSystem::~ZipFileSystem()
+ ZipFileSystemImpl::~ZipFileSystemImpl()
  {
      _requireMode(Mode::None);
  }
 
-SlangResult ZipFileSystem::init(const uint8_t* archive, size_t size)
+SlangResult ZipFileSystemImpl::init(const uint8_t* archive, size_t size)
 {
      SLANG_RETURN_ON_FAIL(_requireMode(Mode::None));
 
@@ -175,15 +178,14 @@ SlangResult ZipFileSystem::init(const uint8_t* archive, size_t size)
          return SLANG_E_OUT_OF_MEMORY;
      }
 
-     // Initialize archive
-     mz_zip_zero_struct(&m_archive);
+    // Initialize archive
+    mz_zip_zero_struct(&m_archive);
 
-     // Read the contents of the archive
-     if (!mz_zip_reader_init_mem(&m_archive, m_data.getData(), m_data.getSizeInBytes(), 0))
-     {
-         m_data.deallocate();
-         return SLANG_FAIL;
-     }
+    // Read the contents of the archive, and make m_archive own it
+    if (!mz_zip_reader_init_mem(&m_archive, m_data.getData(), size, 0))
+    {
+        return SLANG_FAIL;
+    }
 
      m_mode = Mode::Read;
 
@@ -193,7 +195,7 @@ SlangResult ZipFileSystem::init(const uint8_t* archive, size_t size)
      return SLANG_OK;
 }
 
-void ZipFileSystem::_rebuildMap()
+void ZipFileSystemImpl::_rebuildMap()
 {
     m_pathMap.clear();
 
@@ -218,7 +220,7 @@ void ZipFileSystem::_rebuildMap()
     }
 }
 
-UnownedStringSlice ZipFileSystem::_getPathAtIndex(Index index)
+UnownedStringSlice ZipFileSystemImpl::_getPathAtIndex(Index index)
 {
     SLANG_ASSERT(m_mode != Mode::None);
 
@@ -232,20 +234,20 @@ UnownedStringSlice ZipFileSystem::_getPathAtIndex(Index index)
     return UnownedStringSlice(fileStat.m_filename).trim('/');
 }
 
-SlangResult ZipFileSystem::_copyToAndInitWriter(mz_zip_archive& outWriter)
+SlangResult ZipFileSystemImpl::_copyToAndInitWriter(mz_zip_archive& outWriter)
 {
     mz_zip_zero_struct(&outWriter);
     switch (m_mode)
     {
         case Mode::None:
         {
-            mz_zip_writer_init(&outWriter, 0);
+            mz_zip_writer_init_heap(&outWriter, 0, 0);
             return SLANG_OK;
         }
         case Mode::Read:
         case Mode::Write:
         {
-            mz_zip_writer_init(&outWriter, 0);
+            mz_zip_writer_init_heap(&outWriter, 0, 0);
 
             const mz_uint entryCount = mz_zip_reader_get_num_files(&m_archive);
 
@@ -274,7 +276,7 @@ SlangResult ZipFileSystem::_copyToAndInitWriter(mz_zip_archive& outWriter)
     return SLANG_FAIL;   
 }
 
-SlangResult ZipFileSystem::_requireModeImpl(Mode newMode)
+SlangResult ZipFileSystemImpl::_requireModeImpl(Mode newMode)
 {
     SLANG_ASSERT(newMode != m_mode);
 
@@ -294,7 +296,7 @@ SlangResult ZipFileSystem::_requireModeImpl(Mode newMode)
                 case Mode::Write:
                 {
                     mz_zip_zero_struct(&m_archive);
-                    mz_zip_writer_init(&m_archive, 0);
+                    mz_zip_writer_init_heap(&m_archive, 0, 0);
                     break;
                 }
                 default: break;
@@ -321,6 +323,8 @@ SlangResult ZipFileSystem::_requireModeImpl(Mode newMode)
                         {
                             return SLANG_FAIL;
                         }
+                        // If it's now a writer the memory is owned by the m_archive
+                        m_data.detach();
                     }
                     else
                     {
@@ -396,7 +400,7 @@ SlangResult ZipFileSystem::_requireModeImpl(Mode newMode)
     return SLANG_OK;
 }
 
-SlangResult ZipFileSystem::_requireMode(Mode newMode)
+SlangResult ZipFileSystemImpl::_requireMode(Mode newMode)
 {
     if (newMode == m_mode)
     {
@@ -428,7 +432,7 @@ SlangResult ZipFileSystem::_requireMode(Mode newMode)
     return SLANG_OK;
 }
 
-SlangResult ZipFileSystem::_getFixedPath(const char* path, String& outPath)
+SlangResult ZipFileSystemImpl::_getFixedPath(const char* path, String& outPath)
 {
     String simplifiedPath = Path::simplify(UnownedStringSlice(path));
     // Can simplify to just ., thats okay, if it otherwise has something relative it means it couldn't be simplified into the
@@ -443,7 +447,7 @@ SlangResult ZipFileSystem::_getFixedPath(const char* path, String& outPath)
     return SLANG_OK;
 }
 
-SlangResult ZipFileSystem::_findEntryIndexFromFixedPath(const String& fixedPath, mz_uint& outIndex)
+SlangResult ZipFileSystemImpl::_findEntryIndexFromFixedPath(const String& fixedPath, mz_uint& outIndex)
 {
     const Index index = m_pathMap.get(fixedPath.getUnownedSlice());
 
@@ -457,7 +461,7 @@ SlangResult ZipFileSystem::_findEntryIndexFromFixedPath(const String& fixedPath,
     return SLANG_OK;
 }
 
-SlangResult ZipFileSystem::_findEntryIndex(const char* path, mz_uint& outIndex)
+SlangResult ZipFileSystemImpl::_findEntryIndex(const char* path, mz_uint& outIndex)
 {
     String fixedPath;
     SLANG_RETURN_ON_FAIL(_getFixedPath(path, fixedPath));
@@ -465,7 +469,7 @@ SlangResult ZipFileSystem::_findEntryIndex(const char* path, mz_uint& outIndex)
     return SLANG_OK;
 }
 
-SlangResult ZipFileSystem::loadFile(char const* path, ISlangBlob** outBlob)
+SlangResult ZipFileSystemImpl::loadFile(char const* path, ISlangBlob** outBlob)
 {
     mz_uint index;
     SLANG_RETURN_ON_FAIL(_findEntryIndex(path, index));
@@ -495,7 +499,7 @@ SlangResult ZipFileSystem::loadFile(char const* path, ISlangBlob** outBlob)
     return SLANG_OK;
 }
 
-SlangResult ZipFileSystem::getPathType(const char* path, SlangPathType* outPathType)
+SlangResult ZipFileSystemImpl::getPathType(const char* path, SlangPathType* outPathType)
 {
     mz_uint index;
     SLANG_RETURN_ON_FAIL(_findEntryIndex(path, index));
@@ -510,7 +514,7 @@ SlangResult ZipFileSystem::getPathType(const char* path, SlangPathType* outPathT
     return SLANG_OK;
 }
 
-SlangResult ZipFileSystem::getCanonicalPath(const char* path, ISlangBlob** outCanonicalPath)
+SlangResult ZipFileSystemImpl::getCanonicalPath(const char* path, ISlangBlob** outCanonicalPath)
 {
     mz_uint index;
     SLANG_RETURN_ON_FAIL(_findEntryIndex(path, index));
@@ -526,12 +530,12 @@ SlangResult ZipFileSystem::getCanonicalPath(const char* path, ISlangBlob** outCa
     return SLANG_OK;
 }
 
-SlangResult ZipFileSystem::getFileUniqueIdentity(const char* path, ISlangBlob** outUniqueIdentity)
+SlangResult ZipFileSystemImpl::getFileUniqueIdentity(const char* path, ISlangBlob** outUniqueIdentity)
 {
     return getCanonicalPath(path, outUniqueIdentity);
 }
 
-SlangResult ZipFileSystem::calcCombinedPath(SlangPathType fromPathType, const char* fromPath, const char* path, ISlangBlob** pathOut)
+SlangResult ZipFileSystemImpl::calcCombinedPath(SlangPathType fromPathType, const char* fromPath, const char* path, ISlangBlob** pathOut)
 {
     String relPath;
     switch (fromPathType)
@@ -552,13 +556,13 @@ SlangResult ZipFileSystem::calcCombinedPath(SlangPathType fromPathType, const ch
     return SLANG_OK;
 }
 
-SlangResult ZipFileSystem::getSimplifiedPath(const char* path, ISlangBlob** outSimplifiedPath)
+SlangResult ZipFileSystemImpl::getSimplifiedPath(const char* path, ISlangBlob** outSimplifiedPath)
 {
     *outSimplifiedPath = StringUtil::createStringBlob(Path::simplify(path)).detach();
     return SLANG_OK;
 }
 
-SlangResult ZipFileSystem::enumeratePathContents(const char* path, FileSystemContentsCallBack callback, void* userData)
+SlangResult ZipFileSystemImpl::enumeratePathContents(const char* path, FileSystemContentsCallBack callback, void* userData)
 {
     if (!_hasArchive())
     {
@@ -620,7 +624,7 @@ SlangResult ZipFileSystem::enumeratePathContents(const char* path, FileSystemCon
     return SLANG_OK;
 }
 
-SlangResult ZipFileSystem::saveFile(const char* path, const void* data, size_t size)
+SlangResult ZipFileSystemImpl::saveFile(const char* path, const void* data, size_t size)
 {
     String fixedPath;
     SLANG_RETURN_ON_FAIL(_getFixedPath(path, fixedPath));
@@ -653,7 +657,7 @@ SlangResult ZipFileSystem::saveFile(const char* path, const void* data, size_t s
     return SLANG_OK;
 }
 
-SlangResult ZipFileSystem::remove(const char* path)
+SlangResult ZipFileSystemImpl::remove(const char* path)
 {
     String fixedPath;
     SLANG_RETURN_ON_FAIL(_getFixedPath(path, fixedPath));
@@ -701,7 +705,7 @@ SlangResult ZipFileSystem::remove(const char* path)
     return SLANG_OK;
 }
 
-SlangResult ZipFileSystem::createDirectory(const char* path)
+SlangResult ZipFileSystemImpl::createDirectory(const char* path)
 {
     String fixedPath;
     SLANG_RETURN_ON_FAIL(_getFixedPath(path, fixedPath));
@@ -735,9 +739,22 @@ SlangResult ZipFileSystem::createDirectory(const char* path)
     return SLANG_OK;
 }
 
-/* static */SlangResult ZipCompressionUtil::create(const void* data, size_t size, ComPtr<ISlangMutableFileSystem>& out)
+ArrayView<uint8_t> ZipFileSystemImpl::getArchive()
 {
-    RefPtr<ZipFileSystem> fileSystem(new ZipFileSystem);
+    // If we have anything deleted in 'Read', we need to convert to 'Write' and then back to read
+    if (m_mode == Mode::Read && !m_removedSet.isEmpty())
+    {
+        _requireMode(Mode::Write);
+    }
+        
+    _requireMode(Mode::Read);
+    return ArrayView<uint8_t>((uint8_t*)m_data.getData(), Index(m_data.getSizeInBytes()));
+}
+
+
+/* static */SlangResult ZipFileSystem::create(const void* data, size_t size, ComPtr<ZipFileSystem>& out)
+{
+    RefPtr<ZipFileSystemImpl> fileSystem(new ZipFileSystemImpl);
     SLANG_RETURN_ON_FAIL(fileSystem->init((const uint8_t*)data, size));
 
     out = fileSystem;

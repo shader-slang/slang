@@ -8,11 +8,20 @@
 namespace Slang
 {
 
+class ZipFileSystem : public RefObject, public ISlangMutableFileSystem
+{
+public:
+
+    virtual ArrayView<uint8_t> getArchive() = 0;
+
+    static SlangResult create(const void* data, size_t size, ComPtr<ZipFileSystem>& out);
+};
+
 struct ZipCompressionUtil
 {
     static void unitTest();
 
-    static SlangResult create(const void* data, size_t size, ComPtr<ISlangMutableFileSystem>& out);
+    
 };
 
 }
