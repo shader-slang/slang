@@ -119,9 +119,9 @@ protected:
 
     enum class Mode
     {
-        None,
-        Read,
-        Write,
+        None,               // m_archive is not initialized
+        Read,               // m_archive is a reader
+        ReadWrite,          // m_archive is a writer (that can be read from)
     };
 
     SlangResult _requireMode(Mode mode);
@@ -160,7 +160,6 @@ ISlangMutableFileSystem* ZipFileSystem::getInterface(const Guid& guid)
 {
     return (guid == IID_ISlangUnknown || guid == IID_ISlangFileSystem || guid == IID_ISlangFileSystemExt || guid == IID_ISlangMutableFileSystem) ? static_cast<ISlangMutableFileSystem*>(this) : nullptr;
 }
-
 
 ZipFileSystem::ZipFileSystem():
     m_mode(Mode::None)
@@ -248,7 +247,7 @@ static size_t _readFunc(void *pOpaque, mz_uint64 file_ofs, void *pBuf, size_t n)
     return s;
 }
 
-static void _initWriter(mz_zip_archive& outWriter)
+static void _initReadWrite(mz_zip_archive& outWriter)
 {
     mz_zip_zero_struct(&outWriter);
     mz_zip_writer_init_heap(&outWriter, 0, 0);
@@ -262,13 +261,13 @@ SlangResult ZipFileSystem::_copyToAndInitWriter(mz_zip_archive& outWriter)
     {
         case Mode::None:
         {
-            _initWriter(outWriter);
+            _initReadWrite(outWriter);
             return SLANG_OK;
         }
         case Mode::Read:
-        case Mode::Write:
+        case Mode::ReadWrite:
         {
-            _initWriter(outWriter);
+            _initReadWrite(outWriter);
 
             const mz_uint entryCount = mz_zip_reader_get_num_files(&m_archive);
 
@@ -314,9 +313,9 @@ SlangResult ZipFileSystem::_requireModeImpl(Mode newMode)
                     mz_zip_reader_init(&m_archive, 0, flags);
                     break;
                 }
-                case Mode::Write:
+                case Mode::ReadWrite:
                 {
-                    _initWriter(m_archive);
+                    _initReadWrite(m_archive);
                     break;
                 }
                 default: break;
@@ -333,7 +332,7 @@ SlangResult ZipFileSystem::_requireModeImpl(Mode newMode)
                     mz_zip_end(&m_archive);
                     break;
                 }
-                case Mode::Write:
+                case Mode::ReadWrite:
                 {
                     // If nothing is removed, we can just convert
                     if (m_removedSet.isEmpty())
@@ -368,7 +367,7 @@ SlangResult ZipFileSystem::_requireModeImpl(Mode newMode)
             }
             break;
         }
-        case Mode::Write:
+        case Mode::ReadWrite:
         {
             switch (newMode)
             {
@@ -642,7 +641,7 @@ SlangResult ZipFileSystem::saveFile(const char* path, const void* data, size_t s
     }
 
     // We need to be able to write to the archive
-    _requireMode(Mode::Write);
+    _requireMode(Mode::ReadWrite);
 
     // TODO(JS):
     // We need to check the directory exists that holds the path exists
@@ -723,7 +722,7 @@ SlangResult ZipFileSystem::createDirectory(const char* path)
     }
 
     // Make writable
-    SLANG_RETURN_ON_FAIL(_requireMode(Mode::Write));
+    SLANG_RETURN_ON_FAIL(_requireMode(Mode::ReadWrite));
 
     const mz_uint entryCount = mz_zip_reader_get_num_files(&m_archive);
 
@@ -749,7 +748,7 @@ ArrayView<uint8_t> ZipFileSystem::getArchive()
     // If we have anything deleted in 'Read', we need to convert to 'Write' and then back to read
     if (m_mode == Mode::Read && !m_removedSet.isEmpty())
     {
-        _requireMode(Mode::Write);
+        _requireMode(Mode::ReadWrite);
     }
         
     _requireMode(Mode::Read);
