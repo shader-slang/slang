@@ -506,7 +506,7 @@ SlangResult ZipFileSystem::loadFile(char const* path, ISlangBlob** outBlob)
     }
 
     ScopedAllocation alloc;
-    if (!alloc.allocate(fileStat.m_uncomp_size))
+    if (!alloc.allocate(size_t(fileStat.m_uncomp_size)))
     {
         return SLANG_E_OUT_OF_MEMORY;
     }
