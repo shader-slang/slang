@@ -3,8 +3,7 @@
 // This test puts interface-type shader parameters
 // inside of structure types to make sure that works
 
-// Note: D3D11 test disabled because of missing `uint64_t`; re-enable when `uint2` used instead.
-//DISABLE_TEST(compute):COMPARE_COMPUTE_EX:-slang -compute
+//TEST(compute):COMPARE_COMPUTE_EX:-slang -compute
 
 //TEST(compute):COMPARE_COMPUTE_EX:-slang -compute -dx12 -profile sm_6_0 -use-dxil
 //TEST(compute, vulkan):COMPARE_COMPUTE_EX:-vk -compute
