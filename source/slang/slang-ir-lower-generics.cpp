@@ -108,6 +108,8 @@ namespace Slang
         if (sink->getErrorCount() != 0)
             return;
 
+        sharedContext->sharedBuilderStorage.deduplicateAndRebuildGlobalNumberingMap();
+
         specializeRTTIObjectReferences(sharedContext);
 
         cleanUpRTTIHandleTypes(sharedContext);

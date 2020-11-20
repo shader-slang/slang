@@ -1481,21 +1481,19 @@ LinkedIR linkIR(
             cloneValue(context, bindInst);
         }
     }
-    if (target == CodeGenTarget::CPPSource || target == CodeGenTarget::CUDASource)
-    {
-        for (IRModule* irModule : irModules)
-        {
-            for (auto inst : irModule->getGlobalInsts())
-            {
-                auto hasPublic = inst->findDecoration<IRPublicDecoration>();
-                if (!hasPublic)
-                    continue;
 
-                auto cloned = cloneValue(context, inst);
-                if (!cloned->findDecorationImpl(kIROp_KeepAliveDecoration))
-                {
-                    context->builder->addKeepAliveDecoration(cloned);
-                }
+    for (IRModule* irModule : irModules)
+    {
+        for (auto inst : irModule->getGlobalInsts())
+        {
+            auto hasPublic = inst->findDecoration<IRPublicDecoration>();
+            if (!hasPublic)
+                continue;
+
+            auto cloned = cloneValue(context, inst);
+            if (!cloned->findDecorationImpl(kIROp_KeepAliveDecoration))
+            {
+                context->builder->addKeepAliveDecoration(cloned);
             }
         }
     }
