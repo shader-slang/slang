@@ -142,6 +142,8 @@ public:
     {
     }
 
+    ~ScopedAllocation() { deallocate(); }
+
 private:
     // disable
     ScopedAllocation(const ThisType& rhs) = delete;
