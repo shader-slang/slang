@@ -64,6 +64,21 @@ void UIntSet::clear()
     ::memset(m_buffer.getBuffer(), 0, m_buffer.getCount() * sizeof(Element));
 }
 
+bool UIntSet::isEmpty() const
+{
+    const Element*const src = m_buffer.getBuffer();
+    const Index count = m_buffer.getCount();
+
+    for (Index i = 0; i < count; ++i)
+    {
+        if (src[i])
+        {
+            return false;
+        }
+    }
+    return true;
+}
+
 void UIntSet::clearAndDeallocate()
 {
     m_buffer.clearAndDeallocate();
