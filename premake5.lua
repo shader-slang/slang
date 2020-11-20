@@ -633,7 +633,7 @@ tool "slang-embed"
 tool "slang-test"
     uuid "0C768A18-1D25-4000-9F37-DA5FE99E3B64"
     includedirs { "." }
-    links { "core", "slang" }
+    links { "core", "slang", "miniz" }
 
 --
 -- The reflection test harness `slang-reflection-test` is pretty
@@ -1045,6 +1045,23 @@ if enableProfile then
             buildoptions{ "-pg" }
 
 end
+
+standardProject "miniz"
+    uuid "E76ACB11-4A12-4F0A-BE1E-CE0B8836EB7F"
+    kind "StaticLib"
+
+    files
+    {
+        "external/miniz/miniz.c",
+        "external/miniz/miniz_tdef.c",
+        "external/miniz/miniz_tinfl.c",
+        "external/miniz/miniz_zip.c"
+    }
+    
+    filter { "system:linux or macosx" }
+        links { "dl"}
+        buildoptions{"-fPIC"}
+
 
 if buildGlslang then
 

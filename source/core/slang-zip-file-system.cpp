@@ -28,11 +28,6 @@
 #include "../../external/miniz/miniz_tinfl.h"
 #include "../../external/miniz/miniz_zip.h"
 
-#include "../../external/miniz/miniz.c"
-#include "../../external/miniz/miniz_tdef.c"
-#include "../../external/miniz/miniz_tinfl.c"
-#include "../../external/miniz/miniz_zip.c"
-
 namespace Slang
 {
 
@@ -142,6 +137,8 @@ protected:
 
     ISlangMutableFileSystem* getInterface(const Guid& guid);
 
+    void _initReadWrite(mz_zip_archive& outWriter);
+
     SubStringIndexMap m_pathMap;
     // If bit is set (at the archive index) this index has been deleted.
     UIntSet m_removedSet;
@@ -161,9 +158,42 @@ ISlangMutableFileSystem* ZipFileSystem::getInterface(const Guid& guid)
     return (guid == IID_ISlangUnknown || guid == IID_ISlangFileSystem || guid == IID_ISlangFileSystemExt || guid == IID_ISlangMutableFileSystem) ? static_cast<ISlangMutableFileSystem*>(this) : nullptr;
 }
 
+// This is a very awkward hack to make it so we can get a read func, without having to implement all of the tracking etc.
+// All this does is create an empty zip, convert into a reader, and then grab the read function
+static mz_file_read_func _calcReadFunc()
+{
+    mz_zip_archive archive;
+    mz_zip_zero_struct(&archive);
+    mz_zip_writer_init_heap(&archive, 0, 0);
+    // Convert to reader
+
+    void* buf;
+    size_t size;
+    mz_zip_writer_finalize_heap_archive(&archive, &buf, &size);
+    ScopedAllocation alloc;
+    alloc.attach(buf, size);
+    mz_zip_writer_end(&archive);
+
+    // Read
+    mz_zip_zero_struct(&archive);
+    mz_zip_reader_init_mem(&archive, alloc.getData(), alloc.getSizeInBytes(), 0);
+
+    auto readFunc = archive.m_pRead;
+
+    mz_zip_end(&archive);
+    return readFunc;
+}
+
+static mz_file_read_func _getReadFunc()
+{
+    static const auto readFunc = _calcReadFunc();
+    return readFunc;
+}
+
 ZipFileSystem::ZipFileSystem():
     m_mode(Mode::None)
 {
+   m_readFunc = _getReadFunc();
 }
 
  ZipFileSystem::~ZipFileSystem()
@@ -237,21 +267,11 @@ UnownedStringSlice ZipFileSystem::_getPathAtIndex(Index index)
     return UnownedStringSlice(fileStat.m_filename).trim('/');
 }
 
-
-// This is compatible with the heap write func. By setting on the writer, we can read from it.
-static size_t _readFunc(void *pOpaque, mz_uint64 file_ofs, void *pBuf, size_t n)
-{
-    mz_zip_archive *pZip = (mz_zip_archive *)pOpaque;
-    size_t s = (file_ofs >= pZip->m_archive_size) ? 0 : (size_t)MZ_MIN(pZip->m_archive_size - file_ofs, n);
-    memcpy(pBuf, (const mz_uint8 *)pZip->m_pState->m_pMem + file_ofs, s);
-    return s;
-}
-
-static void _initReadWrite(mz_zip_archive& outWriter)
+void ZipFileSystem::_initReadWrite(mz_zip_archive& outWriter)
 {
     mz_zip_zero_struct(&outWriter);
     mz_zip_writer_init_heap(&outWriter, 0, 0);
-    outWriter.m_pRead = &_readFunc;
+    outWriter.m_pRead = m_readFunc;
 }
 
 SlangResult ZipFileSystem::_copyToAndInitWriter(mz_zip_archive& outWriter)
