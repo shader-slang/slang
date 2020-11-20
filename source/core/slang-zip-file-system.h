@@ -8,20 +8,26 @@
 namespace Slang
 {
 
-class ZipFileSystem : public RefObject, public ISlangMutableFileSystem
+class CompressedFileSystem : public RefObject, public ISlangMutableFileSystem
 {
 public:
 
+    enum class CompressionType
+    {
+        BestSpeed,
+        BestCompression,
+    };
+
+        /// Get as an archive (that can be saved to disk)
     virtual ArrayView<uint8_t> getArchive() = 0;
+        /// Set the compression - used for any subsequent items added
+    virtual void setCompressionType(CompressionType type) = 0;
 
-    static SlangResult create(const void* data, size_t size, ComPtr<ZipFileSystem>& out);
-};
+        /// Create a zip with the contents of data/size (the contents of a zip file)
+    static SlangResult createZip(const void* data, size_t size, RefPtr<CompressedFileSystem>& out);
 
-struct ZipCompressionUtil
-{
-    static void unitTest();
-
-    
+        /// Create an empty zip
+    static SlangResult createZip(RefPtr<CompressedFileSystem>& out);
 };
 
 }
