@@ -1,6 +1,8 @@
 // Test using interface typed shader parameters with associated types.
 
+//TEST(compute):COMPARE_COMPUTE:-dx11
 //TEST(compute):COMPARE_COMPUTE:-cpu
+//TEST(compute):COMPARE_COMPUTE:-vk
 //TEST(compute):COMPARE_COMPUTE:-cuda
 
 [anyValueSize(8)]
@@ -20,10 +22,10 @@ interface IInterface
 RWStructuredBuffer<int> gOutputBuffer;
 
 //TEST_INPUT:ubuffer(data=[rtti(MyImpl) witness(MyImpl, IInterface) 1 0], stride=4):name=gCb
-StructuredBuffer<IInterface> gCb;
+RWStructuredBuffer<IInterface> gCb;
 
 //TEST_INPUT:ubuffer(data=[rtti(MyImpl) witness(MyImpl, IInterface) 1 0], stride=4):name=gCb1
-StructuredBuffer<IInterface> gCb1;
+RWStructuredBuffer<IInterface> gCb1;
 
 [numthreads(4, 1, 1)]
 void computeMain(uint3       dispatchThreadID : SV_DispatchThreadID)
