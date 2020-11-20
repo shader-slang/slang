@@ -1,6 +1,8 @@
 // Test using interface typed shader parameters with dynamic dispatch.
 
+//TEST(compute):COMPARE_COMPUTE:-dx11
 //TEST(compute):COMPARE_COMPUTE:-cpu
+//TEST(compute):COMPARE_COMPUTE:-vk
 //TEST(compute):COMPARE_COMPUTE:-cuda
 
 [anyValueSize(8)]
