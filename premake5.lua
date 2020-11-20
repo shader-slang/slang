@@ -202,7 +202,7 @@ workspace "slang"
     targetdir("bin/" .. targetName .. "/%{cfg.buildcfg:lower()}")
 
     -- Statically link to the C/C++ runtime rather than create a DLL dependency.
-    flags { "StaticRuntime" }
+    flags { "StaticRuntime", "C++11" }
 
     -- Once we've set up the common settings, we will make some tweaks
     -- that only apply in a subset of cases. Each call to `filter()`
@@ -219,8 +219,10 @@ workspace "slang"
     filter { "platforms:aarch64"}
         architecture "ARM"
 
+
+
     filter { "toolset:clang or gcc*" }
-        buildoptions { "-Wno-unused-parameter", "-Wno-type-limits", "-Wno-sign-compare", "-Wno-unused-variable", "-Wno-reorder", "-Wno-switch", "-Wno-return-type", "-Wno-unused-local-typedefs", "-Wno-parentheses",  "-std=c++11", "-fvisibility=hidden" , "-Wno-ignored-optimization-argument", "-Wno-unknown-warning-option", "-Wno-class-memaccess"} 
+        buildoptions { "-Wno-unused-parameter", "-Wno-type-limits", "-Wno-sign-compare", "-Wno-unused-variable", "-Wno-reorder", "-Wno-switch", "-Wno-return-type", "-Wno-unused-local-typedefs", "-Wno-parentheses",  "-fvisibility=hidden" , "-Wno-ignored-optimization-argument", "-Wno-unknown-warning-option", "-Wno-class-memaccess"} 
         
     filter { "toolset:gcc*"}
         buildoptions { "-Wno-unused-but-set-variable", "-Wno-implicit-fallthrough"  }
