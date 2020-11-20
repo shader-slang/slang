@@ -6,6 +6,8 @@
 #include "slang-io.h"
 #include "slang-string-util.h"
 #include "slang-blob.h"
+#include "slang-string-slice-pool.h"
+#include "slang-uint-set.h"
 
 // These match what is in amalgamate.sh - so we can just
 // use the github repro with the appropriate tag (and submodules)
@@ -71,6 +73,46 @@ public:
 
 protected:
 
+    /// Maps a SubString (owned) to an index
+    struct SubStringIndexMap
+    {
+        void set(const UnownedStringSlice& slice, Index index)
+        {
+            StringSlicePool::Handle handle;
+            m_pool.findOrAdd(slice, handle);
+            const Index poolIndex = StringSlicePool::asIndex(handle);
+
+            if (poolIndex >= m_indexMap.getCount())
+            {
+                SLANG_ASSERT(poolIndex == m_indexMap.getCount());
+                m_indexMap.add(index);
+            }
+            else
+            {
+                m_indexMap[poolIndex] = index;
+            }
+        }
+        Index get(const UnownedStringSlice& slice)
+        {
+            const Index poolIndex = m_pool.findIndex(slice);
+            return (poolIndex >= 0) ? m_indexMap[poolIndex] : -1;
+        }
+
+        void clear()
+        {
+            m_pool.clear();
+            m_indexMap.clear();
+        }
+
+        SubStringIndexMap():
+            m_pool(StringSlicePool::Style::Empty)
+        {
+        }
+
+        StringSlicePool m_pool;     ///< Pool holds the substrings
+        List<Index> m_indexMap;     ///< Maps a pool index to the output index
+    };
+
     enum class Mode
     {
         None,
@@ -79,13 +121,26 @@ protected:
     };
 
     SlangResult _requireMode(Mode mode);
+        /// Do the mode change.
+    SlangResult _requireModeImpl(Mode newMode);
 
     bool _hasArchive() { return m_mode != Mode::None; }
     SlangResult _getFixedPath(const char* path, String& outPath);
     SlangResult _findEntryIndex(const char* path, mz_uint& outIndex);
     SlangResult _findEntryIndexFromFixedPath(const String& fixedPath, mz_uint& outIndex);
 
+    SlangResult _copyToAndInitWriter(mz_zip_archive& outWriter);
+
+    void _rebuildMap();
+
+        /// Returns true if the named item is at the index
+    UnownedStringSlice _getPathAtIndex(Index index);
+
     ISlangMutableFileSystem* getInterface(const Guid& guid);
+
+    SubStringIndexMap m_pathMap;
+    // If bit is set (at the archive index) this index has been deleted.
+    UIntSet m_removedSet;
 
     ScopedAllocation m_data;
 
@@ -131,15 +186,97 @@ SlangResult ZipFileSystem::init(const uint8_t* archive, size_t size)
      }
 
      m_mode = Mode::Read;
+
+     // Set up the mapping from paths to indices
+     _rebuildMap();
+
      return SLANG_OK;
 }
 
-SlangResult ZipFileSystem::_requireMode(Mode newMode)
+void ZipFileSystem::_rebuildMap()
 {
-    if (newMode == m_mode)
+    m_pathMap.clear();
+
+    const mz_uint entryCount = mz_zip_reader_get_num_files(&m_archive);
+
+    m_removedSet.resizeAndClear(0);
+
+    for (mz_uint i = 0; i < entryCount; ++i)
     {
-        return SLANG_OK;
+        mz_zip_archive_file_stat fileStat;
+        if (!mz_zip_reader_file_stat(&m_archive, mz_uint(i), &fileStat))
+        {
+            continue;
+        }
+
+        UnownedStringSlice currentName(fileStat.m_filename);
+
+        // Get rid of '/'
+        currentName = currentName.trim('/');
+
+        m_pathMap.set(currentName, Index(i));
     }
+}
+
+UnownedStringSlice ZipFileSystem::_getPathAtIndex(Index index)
+{
+    SLANG_ASSERT(m_mode != Mode::None);
+
+    mz_zip_archive_file_stat fileStat;
+    // Check it's added at the end
+    if (!mz_zip_reader_file_stat(&m_archive, mz_uint(index), &fileStat))
+    {
+        return UnownedStringSlice();
+    }
+
+    return UnownedStringSlice(fileStat.m_filename).trim('/');
+}
+
+SlangResult ZipFileSystem::_copyToAndInitWriter(mz_zip_archive& outWriter)
+{
+    mz_zip_zero_struct(&outWriter);
+    switch (m_mode)
+    {
+        case Mode::None:
+        {
+            mz_zip_writer_init(&outWriter, 0);
+            return SLANG_OK;
+        }
+        case Mode::Read:
+        case Mode::Write:
+        {
+            mz_zip_writer_init(&outWriter, 0);
+
+            const mz_uint entryCount = mz_zip_reader_get_num_files(&m_archive);
+
+            for (mz_uint i = 0; i < entryCount; ++i)
+            {
+                if (m_removedSet.contains(i))
+                {
+                    continue;
+                }
+
+                // Hmm.. Not clear if this will work, because m_archive might not be a reader.
+                // And on the other hand if it's a writer, it's not clear how to convert a writer to a reader *selectively* which
+                // we require if we are going to lazily handle removals
+                if (! mz_zip_writer_add_from_zip_reader(&outWriter, &m_archive, i))
+                {
+                    mz_zip_end(&outWriter);
+                    return SLANG_FAIL;
+                }
+            }
+
+            return SLANG_OK;
+        }
+
+        default: break;
+    }
+    return SLANG_FAIL;   
+}
+
+SlangResult ZipFileSystem::_requireModeImpl(Mode newMode)
+{
+    SLANG_ASSERT(newMode != m_mode);
 
     switch (m_mode)
     {
@@ -151,7 +288,7 @@ SlangResult ZipFileSystem::_requireMode(Mode newMode)
                 {
                     mz_uint flags = 0;
                     mz_zip_zero_struct(&m_archive);
-                    mz_zip_reader_init(&m_archive, 0, flags );
+                    mz_zip_reader_init(&m_archive, 0, flags);
                     break;
                 }
                 case Mode::Write:
@@ -176,12 +313,31 @@ SlangResult ZipFileSystem::_requireMode(Mode newMode)
                 }
                 case Mode::Write:
                 {
-                    // Convert the reader into the writer
-                    if (!mz_zip_writer_init_from_reader(&m_archive, nullptr))
+                    // If nothing is removed, we can just convert
+                    if (m_removedSet.isEmpty())
                     {
+                        // Convert the reader into the writer
+                        if (!mz_zip_writer_init_from_reader(&m_archive, nullptr))
+                        {
+                            return SLANG_FAIL;
+                        }
+                    }
+                    else
+                    {
+                        // Copy into a new writer
+                        mz_zip_archive writer;
+                        SLANG_RETURN_ON_FAIL(_copyToAndInitWriter(writer));
+
+                        // In the process we have removed anything that was deleted
+                        m_removedSet.clear();
+                        // Don't need the read data anymore
                         m_data.deallocate();
-                        m_mode = Mode::None;
-                        return SLANG_FAIL;
+
+                        // Free the current archive
+                        mz_zip_end(&m_archive);
+                        // Make the writer current
+                        m_archive = writer;
+                        break;
                     }
                     break;
                 }
@@ -191,7 +347,7 @@ SlangResult ZipFileSystem::_requireMode(Mode newMode)
         case Mode::Write:
         {
             switch (newMode)
-            {                
+            {
                 case Mode::None:
                 {
                     mz_zip_writer_end(&m_archive);
@@ -199,7 +355,21 @@ SlangResult ZipFileSystem::_requireMode(Mode newMode)
                 }
                 case Mode::Read:
                 {
-                    // First turn into a zip
+                    // If anything has been removed we copy selectively into a new writer, and then convert that
+                    if (!m_removedSet.isEmpty())
+                    {
+                        // There are entries that are deleted... so we need to copy selectively
+                        mz_zip_archive writer;
+                        SLANG_RETURN_ON_FAIL(_copyToAndInitWriter(writer));
+
+                        // In the process we have removed anything that was deleted
+                        m_removedSet.clear();
+
+                        // Get rid of the old writer
+                        mz_zip_writer_end(&m_archive);
+                        m_archive = writer;
+                    }
+
                     void* buf;
                     size_t size;
                     mz_zip_writer_finalize_heap_archive(&m_archive, &buf, &size);
@@ -221,7 +391,40 @@ SlangResult ZipFileSystem::_requireMode(Mode newMode)
         }
     }
 
+    // Set the new mode
     m_mode = newMode;
+    return SLANG_OK;
+}
+
+SlangResult ZipFileSystem::_requireMode(Mode newMode)
+{
+    if (newMode == m_mode)
+    {
+        return SLANG_OK;
+    }
+
+    SlangResult res = _requireModeImpl(newMode); 
+    if (SLANG_FAILED(res))
+    {
+        // If we failed torch the archive
+        if (m_mode != Mode::None)
+        {
+            mz_zip_end(&m_archive);
+            mz_zip_zero_struct(&m_archive);
+        }
+
+        // Set the mode to none
+        m_mode = Mode::None;
+
+        // Clear the map/s and data
+        m_pathMap.clear();
+        m_removedSet.clearAndDeallocate();
+        m_data.deallocate();
+
+        return res;
+    }
+
+    _rebuildMap();
     return SLANG_OK;
 }
 
@@ -240,22 +443,17 @@ SlangResult ZipFileSystem::_getFixedPath(const char* path, String& outPath)
     return SLANG_OK;
 }
 
-
 SlangResult ZipFileSystem::_findEntryIndexFromFixedPath(const String& fixedPath, mz_uint& outIndex)
 {
-    if (!_hasArchive())
+    const Index index = m_pathMap.get(fixedPath.getUnownedSlice());
+
+    // If not in list or deleted - it is removed
+    if (index < 0 || m_removedSet.contains(index))
     {
         return SLANG_E_NOT_FOUND;
     }
 
-    mz_uint32 index;
-    const mz_uint flags = 0;
-    if (!mz_zip_reader_locate_file_v2(&m_archive, fixedPath.getBuffer(), NULL, flags, &index))
-    {
-        return SLANG_E_NOT_FOUND;
-    }
-
-    outIndex = index;
+    outIndex = mz_uint(index);
     return SLANG_OK;
 }
 
@@ -381,6 +579,12 @@ SlangResult ZipFileSystem::enumeratePathContents(const char* path, FileSystemCon
     const Index entryCount = Index(mz_zip_reader_get_num_files(&m_archive));
     for (Index i = 0; i < entryCount; ++i)
     {
+        // Skip if it's been deleted.
+        if (m_removedSet.contains(i))
+        {
+            continue;
+        }
+
         mz_zip_archive_file_stat fileStat;
         if (!mz_zip_reader_file_stat(&m_archive, mz_uint(i), &fileStat))
         {
@@ -424,15 +628,31 @@ SlangResult ZipFileSystem::saveFile(const char* path, const void* data, size_t s
     mz_uint32 index;
     if (SLANG_SUCCEEDED(_findEntryIndexFromFixedPath(fixedPath, index)))
     {
-        // We need to replace this index
+        // Mark as removed
+        m_removedSet.add(index);
     }
 
-    // We need to check the directory exists 
+    // We need to be able to write to the archive
+    _requireMode(Mode::Write);
+
+    // TODO(JS):
+    // We need to check the directory exists that holds the path exists
 
     // Need to add to the end of the file
+    const mz_uint32 entryCount = mz_zip_reader_get_num_files(&m_archive);
+    if (!mz_zip_writer_add_mem(&m_archive, fixedPath.getBuffer(), data, size, m_compressionLevel))
+    {
+        return SLANG_FAIL;
+    }
 
-    return SLANG_E_NOT_IMPLEMENTED;
+    // Make sure it is added at expended index
+    SLANG_ASSERT(_getPathAtIndex(entryCount) == fixedPath.getUnownedSlice());
+
+    // Set in the map
+    m_pathMap.set(fixedPath.getUnownedSlice(), entryCount);
+    return SLANG_OK;
 }
+
 SlangResult ZipFileSystem::remove(const char* path)
 {
     String fixedPath;
@@ -456,12 +676,12 @@ SlangResult ZipFileSystem::remove(const char* path)
 
         for (mz_uint32 i = 0; i < entryCount; ++i)
         {
-            if (i == index)
+            if (i == index || m_removedSet.contains(i))
             {
                 continue;
             }
 
-            if (!mz_zip_reader_file_stat(&m_archive, index, &fileStat))
+            if (!mz_zip_reader_file_stat(&m_archive, i, &fileStat))
             {
                 return SLANG_FAIL;
             }
@@ -475,9 +695,10 @@ SlangResult ZipFileSystem::remove(const char* path)
         }
     }
 
-    // Do something to delete it!
+    // Mark as removed
+    m_removedSet.add(index);
     
-    return SLANG_E_NOT_IMPLEMENTED;
+    return SLANG_OK;
 }
 
 SlangResult ZipFileSystem::createDirectory(const char* path)
@@ -495,13 +716,22 @@ SlangResult ZipFileSystem::createDirectory(const char* path)
     // Make writable
     SLANG_RETURN_ON_FAIL(_requireMode(Mode::Write));
 
+    const mz_uint entryCount = mz_zip_reader_get_num_files(&m_archive);
+
     // The terminating / in the path indicates it's a directory
-    fixedPath.appendChar('/');
-    if (!mz_zip_writer_add_mem(&m_archive, fixedPath.getBuffer(), nullptr, 0, m_compressionLevel))
     {
-        return SLANG_FAIL;
+        String dirPath(fixedPath);
+        dirPath.appendChar('/');
+        if (!mz_zip_writer_add_mem(&m_archive, dirPath.getBuffer(), nullptr, 0, m_compressionLevel))
+        {
+            return SLANG_FAIL;
+        }
     }
-     
+
+    SLANG_ASSERT(_getPathAtIndex(entryCount) == fixedPath.getUnownedSlice());
+
+    // Set the index, that we added at end
+    m_pathMap.set(fixedPath.getUnownedSlice(), entryCount); 
     return SLANG_OK;
 }
 
