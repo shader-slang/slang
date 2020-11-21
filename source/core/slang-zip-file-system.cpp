@@ -84,6 +84,16 @@ protected:
             return (poolIndex >= 0) ? m_indexMap[poolIndex] : -1;
         }
 
+        Index getCount() const { return m_indexMap.getCount(); }
+
+        KeyValuePair<UnownedStringSlice, Index> getAt(Index index) const
+        {
+            KeyValuePair<UnownedStringSlice, Index> pair;
+            pair.Key = m_pool.getSlice(StringSlicePool::Handle(index));
+            pair.Value = m_indexMap[index];
+            return pair;
+        }
+
         void clear()
         {
             m_pool.clear();
@@ -116,6 +126,10 @@ protected:
     SlangResult _findEntryIndexFromFixedPath(const String& fixedPath, mz_uint& outIndex);
 
     SlangResult _copyToAndInitWriter(mz_zip_archive& outWriter);
+
+        /// Returns SLANG_E_NOT_FOUND if no directory or contents found
+        /// If outContents not set, will just determine if the directory exists
+    SlangResult _getPathContents(const String& fixedPath, SubStringIndexMap* outContents);
 
     void _rebuildMap();
 
@@ -512,17 +526,38 @@ SlangResult ZipFileSystem::loadFile(char const* path, ISlangBlob** outBlob)
 
 SlangResult ZipFileSystem::getPathType(const char* path, SlangPathType* outPathType)
 {
-    mz_uint index;
-    SLANG_RETURN_ON_FAIL(_findEntryIndex(path, index));
-
-    mz_zip_archive_file_stat fileStat;
-    if (!mz_zip_reader_file_stat(&m_archive, index, &fileStat))
+    if (!_hasArchive())
     {
-        return SLANG_FAIL;
+        return SLANG_E_NOT_FOUND;
     }
 
-    *outPathType = fileStat.m_is_directory ? SLANG_PATH_TYPE_DIRECTORY : SLANG_PATH_TYPE_FILE;
-    return SLANG_OK;
+    String fixedPath;
+    SLANG_RETURN_ON_FAIL(_getFixedPath(path, fixedPath));
+
+    // First look for an explicit directory
+    mz_uint index;
+    if (SLANG_SUCCEEDED(_findEntryIndexFromFixedPath(fixedPath, index)))
+    {
+        mz_zip_archive_file_stat fileStat;
+        if (!mz_zip_reader_file_stat(&m_archive, index, &fileStat))
+        {
+            return SLANG_FAIL;
+        }
+
+        *outPathType = fileStat.m_is_directory ? SLANG_PATH_TYPE_DIRECTORY : SLANG_PATH_TYPE_FILE;
+        return SLANG_OK;
+    }
+    else
+    {
+        // It could be an *implicit* directory (ie as part of a path). So lets look for that
+        if (SLANG_SUCCEEDED(_getPathContents(fixedPath, nullptr)))
+        {
+            *outPathType = SLANG_PATH_TYPE_DIRECTORY;
+            return SLANG_OK;
+        }
+    }
+
+    return SLANG_E_NOT_FOUND;
 }
 
 SlangResult ZipFileSystem::getCanonicalPath(const char* path, ISlangBlob** outCanonicalPath)
@@ -573,22 +608,24 @@ SlangResult ZipFileSystem::getSimplifiedPath(const char* path, ISlangBlob** outS
     return SLANG_OK;
 }
 
-SlangResult ZipFileSystem::enumeratePathContents(const char* path, FileSystemContentsCallBack callback, void* userData)
+SlangResult ZipFileSystem::_getPathContents(const String& inFixedPath, SubStringIndexMap* outContents)
 {
     if (!_hasArchive())
     {
         return SLANG_E_NOT_FOUND;
     }
 
-    String fixedPath;
-    SLANG_RETURN_ON_FAIL(_getFixedPath(path, fixedPath));
-
+    String fixedPath(inFixedPath);
     if (fixedPath == ".")
     {
         fixedPath = "";
     }
+    else
+    {
+        fixedPath.append('/');
+    }
 
-    StringBuilder buf;
+    bool foundExplicitDirectory = false;
 
     // Okay - I want to iterate through all of the entries and look for the ones with this prefix
     const Index entryCount = Index(mz_zip_reader_get_num_files(&m_archive));
@@ -614,22 +651,68 @@ SlangResult ZipFileSystem::enumeratePathContents(const char* path, FileSystemCon
 
         UnownedStringSlice remaining(currentPath.begin() + fixedPath.getLength(), currentPath.end());
 
-        // Trim delimiter from start and end
-        remaining = remaining.trim('/').trim('\\');
-
-        // If it contains a delimiter, then it must be in a child directory 
-        if (remaining.indexOf('/') >= 0 || remaining.indexOf('\\') >= 0)
+        // If nothing after it's an explicit directory
+        if (remaining.getLength() == 0)
         {
-            continue;
+            foundExplicitDirectory = true;
+            if (!outContents)
+            {
+                return SLANG_OK;
+            }
         }
 
-        const SlangPathType pathType = fileStat.m_is_directory ? SLANG_PATH_TYPE_DIRECTORY : SLANG_PATH_TYPE_FILE;
+        SlangPathType pathType = fileStat.m_is_directory ? SLANG_PATH_TYPE_DIRECTORY : SLANG_PATH_TYPE_FILE;
 
-        // We need zero termination
-        buf.Clear();
-        buf.append(remaining);
+        // Work out if it's a file that implicitly implies the directory
+        const Index delimiterIndex = remaining.indexOf('/');
 
-        callback(pathType, buf.getBuffer(), userData);
+        // If we have the delimiter index, then it's an implied directory
+        if (delimiterIndex >= 0)
+        {
+            remaining = UnownedStringSlice(remaining.begin(), delimiterIndex);
+            pathType = SLANG_PATH_TYPE_DIRECTORY;
+        }
+
+        if (!outContents)
+        {
+            // We found the directory - as we found contents
+            return SLANG_OK;
+        }
+
+        // Set what type this path is
+        outContents->set(remaining, pathType);
+    }
+
+    // We found the directory if we found it explicitly or implicitly
+    return (outContents && outContents->getCount() > 0) || foundExplicitDirectory ? SLANG_OK : SLANG_E_NOT_FOUND;
+}
+
+SlangResult ZipFileSystem::enumeratePathContents(const char* path, FileSystemContentsCallBack callback, void* userData)
+{
+    if (!_hasArchive())
+    {
+        return SLANG_E_NOT_FOUND;
+    }
+
+    String fixedPath;
+    SLANG_RETURN_ON_FAIL(_getFixedPath(path, fixedPath));
+
+    // Maps the name to the SLANG_PATH_TYPE
+    SubStringIndexMap map;
+    SLANG_RETURN_ON_FAIL(_getPathContents(fixedPath, &map));
+
+    // Okay - I want to iterate through all of the entries and look for the ones with this prefix
+    const Index entryCount = map.getCount();
+    for (Index i = 0; i < entryCount; ++i)
+    {
+        auto pair = map.getAt(i);
+        SlangPathType pathType = SlangPathType(pair.Value);
+        UnownedStringSlice name = pair.Key;
+
+        // Name is zero terminated (as in StringPool). Lets check that though..
+        SLANG_ASSERT(name.begin()[name.getLength()] == 0);
+     
+        callback(pathType, name.begin(), userData);
     }
 
     return SLANG_OK;
@@ -684,35 +767,19 @@ SlangResult ZipFileSystem::remove(const char* path)
 
     if (fileStat.m_is_directory)
     {
-        // We need to see if there is anything in this directory
-        fixedPath.appendChar('/');
+        // Find the directory contents
+        SubStringIndexMap map;
+        SLANG_RETURN_ON_FAIL(_getPathContents(fixedPath, &map));
 
-        const mz_uint32 entryCount = mz_zip_reader_get_num_files(&m_archive);
-
-        for (mz_uint32 i = 0; i < entryCount; ++i)
+        if (map.getCount() > 0)
         {
-            if (i == index || m_removedSet.contains(i))
-            {
-                continue;
-            }
-
-            if (!mz_zip_reader_file_stat(&m_archive, i, &fileStat))
-            {
-                return SLANG_FAIL;
-            }
-
-            // Does this start with 
-            if (UnownedStringSlice(fileStat.m_filename).startsWith(fixedPath.getUnownedSlice()))
-            {
-                // If it contains children we can't remove it
-                return SLANG_FAIL;
-            }
+            // If it contains children we can't remove it
+            return SLANG_FAIL;
         }
     }
 
     // Mark as removed
     m_removedSet.add(index);
-    
     return SLANG_OK;
 }
 
