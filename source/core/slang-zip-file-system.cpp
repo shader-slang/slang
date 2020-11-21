@@ -140,6 +140,7 @@ protected:
 
     void _initReadWrite(mz_zip_archive& outWriter);
 
+    // Maps from a path to an index in the m_archive
     SubStringIndexMap m_pathMap;
     // If bit is set (at the archive index) this index has been deleted.
     UIntSet m_removedSet;
@@ -534,7 +535,7 @@ SlangResult ZipFileSystem::getPathType(const char* path, SlangPathType* outPathT
     String fixedPath;
     SLANG_RETURN_ON_FAIL(_getFixedPath(path, fixedPath));
 
-    // First look for an explicit directory
+    // First look if there is an *explicit* entry - either file or directory
     mz_uint index;
     if (SLANG_SUCCEEDED(_findEntryIndexFromFixedPath(fixedPath, index)))
     {
@@ -549,7 +550,7 @@ SlangResult ZipFileSystem::getPathType(const char* path, SlangPathType* outPathT
     }
     else
     {
-        // It could be an *implicit* directory (ie as part of a path). So lets look for that
+        // It could be an *implicit* directory (ie as part of a path). So lets look for that...
         if (SLANG_SUCCEEDED(_getPathContents(fixedPath, nullptr)))
         {
             *outPathType = SLANG_PATH_TYPE_DIRECTORY;
@@ -678,7 +679,7 @@ SlangResult ZipFileSystem::_getPathContents(const String& inFixedPath, SubString
         }
         else
         {
-            // Just use what the repro says the type is
+            // Just use what the zip archive says the type is
             pathType = fileStat.m_is_directory ? SLANG_PATH_TYPE_DIRECTORY : SLANG_PATH_TYPE_FILE;
         }
 
@@ -704,7 +705,6 @@ SlangResult ZipFileSystem::enumeratePathContents(const char* path, FileSystemCon
     SubStringIndexMap map;
     SLANG_RETURN_ON_FAIL(_getPathContents(fixedPath, &map));
 
-    // Okay - I want to iterate through all of the entries and look for the ones with this prefix
     const Index entryCount = map.getCount();
     for (Index i = 0; i < entryCount; ++i)
     {
@@ -737,7 +737,17 @@ SlangResult ZipFileSystem::saveFile(const char* path, const void* data, size_t s
     _requireMode(Mode::ReadWrite);
 
     // TODO(JS):
-    // We need to check the directory exists that holds the path exists
+    // We may want to check the directory exists that holds the path exists
+    // Which is easy to do. Without this check it allows directories to come into exisitance
+    // when the path to the file is used.
+    // This behaviour *isn't* strictly the same as the file system, which requires the path
+    // to a file to exist before it is written.
+    //
+    // Not enforcing this allows zips that don't explicitly specify paths - which saves space
+    // and is simpler.
+    //
+    // NOTE! This also means that if a file that produces an implicit path is *removed* that
+    // the implicit directories are also in effect removed.
 
     // Need to add to the end of the file
     const mz_uint32 entryCount = mz_zip_reader_get_num_files(&m_archive);
