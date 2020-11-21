@@ -625,7 +625,7 @@ SlangResult ZipFileSystem::_getPathContents(const String& inFixedPath, SubString
         fixedPath.append('/');
     }
 
-    bool foundExplicitDirectory = false;
+    bool foundDirectory = false;
 
     // Okay - I want to iterate through all of the entries and look for the ones with this prefix
     const Index entryCount = Index(mz_zip_reader_get_num_files(&m_archive));
@@ -651,40 +651,43 @@ SlangResult ZipFileSystem::_getPathContents(const String& inFixedPath, SubString
 
         UnownedStringSlice remaining(currentPath.begin() + fixedPath.getLength(), currentPath.end());
 
-        // If nothing after it's an explicit directory
-        if (remaining.getLength() == 0)
+        if (!outContents)
         {
-            foundExplicitDirectory = true;
-            if (!outContents)
-            {
-                return SLANG_OK;
-            }
+            // We found the directory, as we found contents. And since we aren't adding to map, we are done
+            return SLANG_OK;
         }
 
-        SlangPathType pathType = fileStat.m_is_directory ? SLANG_PATH_TYPE_DIRECTORY : SLANG_PATH_TYPE_FILE;
+        // We found the directory (either implicitly or explicitly)
+        foundDirectory = true;
 
-        // Work out if it's a file that implicitly implies the directory
+        if (remaining.getLength() == 0)
+        {
+            // It's the explicit directory to this path, we don't need to add
+            continue;
+        }
+
+        // Work out if it's a file that implicitly implies the directory, by looking for it it contains a /
         const Index delimiterIndex = remaining.indexOf('/');
 
-        // If we have the delimiter index, then it's an implied directory
+        SlangPathType pathType;
         if (delimiterIndex >= 0)
         {
+            // If we have the delimiter index, then it's an implicit *contained* directory, and we need to strip to just get the name.
             remaining = UnownedStringSlice(remaining.begin(), delimiterIndex);
             pathType = SLANG_PATH_TYPE_DIRECTORY;
         }
-
-        if (!outContents)
+        else
         {
-            // We found the directory - as we found contents
-            return SLANG_OK;
+            // Just use what the repro says the type is
+            pathType = fileStat.m_is_directory ? SLANG_PATH_TYPE_DIRECTORY : SLANG_PATH_TYPE_FILE;
         }
 
         // Set what type this path is
         outContents->set(remaining, pathType);
     }
 
-    // We found the directory if we found it explicitly or implicitly
-    return (outContents && outContents->getCount() > 0) || foundExplicitDirectory ? SLANG_OK : SLANG_E_NOT_FOUND;
+    // Check we found the directory at all...
+    return foundDirectory ? SLANG_OK : SLANG_E_NOT_FOUND;
 }
 
 SlangResult ZipFileSystem::enumeratePathContents(const char* path, FileSystemContentsCallBack callback, void* userData)

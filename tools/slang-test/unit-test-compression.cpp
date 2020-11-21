@@ -17,6 +17,18 @@ static bool _equals(const char (&text)[SIZE], ISlangBlob* blob)
     return _equals(text, SIZE, blob);
 }
 
+static List<String> _getContents(ISlangFileSystemExt* fileSystem, char* path)
+{
+    List<String> objs;
+
+    fileSystem->enumeratePathContents(path, [](SlangPathType pathType, const char* name, void* userData) {
+        List<String>& out = *(List<String>*)userData;
+        out.add(name);
+    }, &objs);
+
+    return objs;
+}
+
 static void compressionUnitTest()
 {
     // Create a zip to add stuff to
@@ -63,18 +75,41 @@ static void compressionUnitTest()
 
         // Enumerate
         {
-            List<String> objs;
-            fileSystem->enumeratePathContents("", [](SlangPathType pathType, const char* name, void* userData) {
-                List<String>& out = *(List<String>*)userData;
-                out.add(name);
-            }, &objs);
-
-            for (const auto& obj : objs)
+            for (const auto& obj : _getContents(fileSystem, ""))
             {
                 // All of these should exist
                 SlangPathType pathType;
                 SLANG_CHECK(SLANG_SUCCEEDED(fileSystem->getPathType(obj.getBuffer(), &pathType)));
             }
+        }
+
+        SLANG_CHECK(SLANG_SUCCEEDED(fileSystem->saveFile("implicit-path/file2.txt", contents3, SLANG_COUNT_OF(contents3))));
+
+        {
+            SlangPathType pathType;
+            SLANG_CHECK(SLANG_SUCCEEDED(fileSystem->getPathType("implicit-path", &pathType)));
+
+            SLANG_CHECK(pathType == SLANG_PATH_TYPE_DIRECTORY);
+
+            List<String> objs = _getContents(fileSystem, "implicit-path");
+
+            // It contains a file
+            SLANG_CHECK(objs.getCount() == 1);
+
+            for (const auto& obj : objs)
+            {
+                String path = Path::combine("implicit-path", obj);
+
+                // All of these should exist
+                SlangPathType pathType;
+                SLANG_CHECK(SLANG_SUCCEEDED(fileSystem->getPathType(path.getBuffer(), &pathType)));
+            }
+
+            // Make an explicit path, and see whe have the same results
+            fileSystem->createDirectory("implicit-path");
+
+            objs = _getContents(fileSystem, "implicit-path");
+            SLANG_CHECK(objs.getCount() == 1);
         }
     }
 
