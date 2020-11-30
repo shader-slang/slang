@@ -300,9 +300,13 @@ SlangResult ZipFileSystem::_copyToAndInitWriter(mz_zip_archive& outWriter)
                     continue;
                 }
 
-                // Hmm.. Not clear if this will work, because m_archive might not be a reader.
-                // And on the other hand if it's a writer, it's not clear how to convert a writer to a reader *selectively* which
-                // we require if we are going to lazily handle removals
+                // It's worth noting - it's not clear if this will work, because m_archive might not be a reader, in the miniz docs.
+                // If it's a writer, it's not clear how to convert a writer to a reader *selectively* which
+                // we require if we are going to lazily handle removals.
+                //
+                // The fix to make this work is the hack that sets the m_reader, such that in effect the writer is both read and write.
+                // That works because the default writer behavior is a single block of memory for the archive, and that is compatible
+                // with the reader.
                 if (! mz_zip_writer_add_from_zip_reader(&outWriter, &m_archive, i))
                 {
                     mz_zip_end(&outWriter);
