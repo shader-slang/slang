@@ -61,6 +61,9 @@ public:
         /// Store the intersection between this and set in this
     void intersectWith(const UIntSet& set);
 
+        /// 
+    bool isEmpty() const;
+
         /// Store the union of set1 and set2 in outRs
     static void calcUnion(UIntSet& outRs, const UIntSet& set1, const UIntSet& set2);
         /// Store the intersection of set1 and set2 in outRs
@@ -99,7 +102,7 @@ inline void UIntSet::remove(UInt val)
 inline bool UIntSet::contains(UInt val) const
 {
     const Index idx = Index(val >> kElementShift);
-    return idx <= m_buffer.getCount() &&
+    return idx < m_buffer.getCount() &&
         ((m_buffer[idx] & (Element(1) << (val & kElementMask))) != 0);
 }
 
