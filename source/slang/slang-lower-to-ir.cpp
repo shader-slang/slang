@@ -2231,6 +2231,14 @@ ParameterDirection getThisParamDirection(Decl* parentDecl, ParameterDirection de
         return defaultDirection;
     }
 
+    // A parent generic declaration should not change the
+    // mutating-ness of the inner declaration.
+    //
+    if( as<GenericDecl>(parentDecl) )
+    {
+        return defaultDirection;
+    }
+
     // For now we make any `this` parameter default to `in`.
     //
     return kParameterDirection_In;
