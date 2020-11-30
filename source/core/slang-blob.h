@@ -109,16 +109,40 @@ public:
         m_sizeInBytes = size;
     }
 
+    void* set(const void* data, size_t size)
+    {
+        void* dst = allocate(size);
+        if (dst)
+        {
+            memcpy(dst, data, size);
+        }
+        return dst;
+    }
+
     /// Get the allocated data. Returns nullptr if there is no allocated data
     void* getData() const { return m_data; }
     /// Get the size of the allocated data.
     size_t getSizeInBytes() const { return m_sizeInBytes; }
+
+    void swap(ThisType& rhs)
+    {
+        void*const data = m_data;
+        const size_t sizeInBytes = m_sizeInBytes;
+
+        m_data = rhs.m_data;
+        m_sizeInBytes = rhs.m_sizeInBytes;
+
+        rhs.m_data = data;
+        rhs.m_sizeInBytes = sizeInBytes;
+    }
 
     ScopedAllocation() :
         m_data(nullptr),
         m_sizeInBytes(0)
     {
     }
+
+    ~ScopedAllocation() { deallocate(); }
 
 private:
     // disable
@@ -151,6 +175,12 @@ public:
     {
         RawBlob* blob = new RawBlob;
         blob->m_data.attach(data, dataCount);
+        return blob;
+    }
+    static RefPtr<RawBlob> moveCreate(ScopedAllocation& alloc)
+    {
+        RawBlob* blob = new RawBlob;
+        blob->m_data.swap(alloc);
         return blob;
     }
 
