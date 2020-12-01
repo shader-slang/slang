@@ -2779,7 +2779,7 @@ namespace slang
 
             /** Create a compile request.
             */
-        virtual SLANG_NO_THROW SlangCompileRequest* SLANG_MCALL createCompileRequest(
+        virtual SLANG_NO_THROW SlangResult SLANG_MCALL createCompileRequest(
             slang::ICompileRequest** outCompileRequest) = 0;
 
             /** Add new builtin declarations to be used in subsequent compiles.

@@ -423,7 +423,7 @@ SLANG_NO_THROW SlangResult SLANG_MCALL Session::createSession(
     return SLANG_OK;
 }
 
-SLANG_NO_THROW SlangCompileRequest* SLANG_MCALL Session::createCompileRequest(slang::ICompileRequest** outCompileRequest)
+SLANG_NO_THROW SlangResult SLANG_MCALL Session::createCompileRequest(slang::ICompileRequest** outCompileRequest)
 {
     auto req = new EndToEndCompileRequest(this);
 
