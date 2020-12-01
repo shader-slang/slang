@@ -32,6 +32,8 @@ namespace Slang
     class TargetRequest;
     class TypeLayout;
 
+    extern const Guid IID_EndToEndCompileRequest;
+
     enum class CompilerMode
     {
         ProduceLibrary,
@@ -1805,6 +1807,9 @@ namespace Slang
         RefPtr<ComponentType> m_program;
     };
 
+    // UUID to identify EndToEndCompileRequest from an interface
+    #define SLANG_UUID_EndToEndCompileRequest { 0xce6d2383, 0xee1b, 0x4fd7, { 0xa0, 0xf, 0xb8, 0xb6, 0x33, 0x12, 0x95, 0xc8 } };
+
         /// A compile request that spans the front and back ends of the compiler
         ///
         /// This is what the command-line `slangc` uses, as well as the legacy
@@ -1813,9 +1818,74 @@ namespace Slang
         /// number of additional features that primarily make sense for
         /// command-line usage.
         ///
-    class EndToEndCompileRequest : public RefObject
+    class EndToEndCompileRequest : public RefObject, public slang::ICompileRequest
     {
     public:
+        // ISlangUnknown
+        SLANG_NO_THROW SlangResult SLANG_MCALL queryInterface(SlangUUID const& uuid, void** outObject) SLANG_OVERRIDE;
+        SLANG_REF_OBJECT_IUNKNOWN_ADD_REF
+        SLANG_REF_OBJECT_IUNKNOWN_RELEASE
+
+        // slang::ICompileRequest
+        virtual SLANG_NO_THROW void SLANG_MCALL setFileSystem(ISlangFileSystem* fileSystem) SLANG_OVERRIDE;
+        virtual SLANG_NO_THROW void SLANG_MCALL setCompileFlags(SlangCompileFlags flags) SLANG_OVERRIDE;
+        virtual SLANG_NO_THROW void SLANG_MCALL setDumpIntermediates(int  enable) SLANG_OVERRIDE;
+        virtual SLANG_NO_THROW void SLANG_MCALL setDumpIntermediatePrefix(const char* prefix) SLANG_OVERRIDE;
+        virtual SLANG_NO_THROW void SLANG_MCALL setLineDirectiveMode(SlangLineDirectiveMode  mode) SLANG_OVERRIDE;
+        virtual SLANG_NO_THROW void SLANG_MCALL setCodeGenTarget(SlangCompileTarget target) SLANG_OVERRIDE;
+        virtual SLANG_NO_THROW int SLANG_MCALL addCodeGenTarget(SlangCompileTarget target) SLANG_OVERRIDE;
+        virtual SLANG_NO_THROW void SLANG_MCALL setTargetProfile(int targetIndex, SlangProfileID profile) SLANG_OVERRIDE;
+        virtual SLANG_NO_THROW void SLANG_MCALL setTargetFlags(int targetIndex, SlangTargetFlags flags) SLANG_OVERRIDE;
+        virtual SLANG_NO_THROW void SLANG_MCALL setTargetFloatingPointMode(int targetIndex, SlangFloatingPointMode mode) SLANG_OVERRIDE;
+        virtual SLANG_NO_THROW void SLANG_MCALL setTargetMatrixLayoutMode(int targetIndex, SlangMatrixLayoutMode mode) SLANG_OVERRIDE;
+        virtual SLANG_NO_THROW void SLANG_MCALL setMatrixLayoutMode(SlangMatrixLayoutMode mode) SLANG_OVERRIDE;
+        virtual SLANG_NO_THROW void SLANG_MCALL setDebugInfoLevel(SlangDebugInfoLevel level) SLANG_OVERRIDE;
+        virtual SLANG_NO_THROW void SLANG_MCALL setOptimizationLevel(SlangOptimizationLevel level) SLANG_OVERRIDE;
+        virtual SLANG_NO_THROW void SLANG_MCALL setOutputContainerFormat(SlangContainerFormat format) SLANG_OVERRIDE;
+        virtual SLANG_NO_THROW void SLANG_MCALL setPassThrough(SlangPassThrough passThrough) SLANG_OVERRIDE;
+        virtual SLANG_NO_THROW void SLANG_MCALL setDiagnosticCallback(SlangDiagnosticCallback callback, void const* userData) SLANG_OVERRIDE;
+        virtual SLANG_NO_THROW void SLANG_MCALL setWriter(SlangWriterChannel channel, ISlangWriter* writer) SLANG_OVERRIDE;
+        virtual SLANG_NO_THROW ISlangWriter* SLANG_MCALL getWriter(SlangWriterChannel channel) SLANG_OVERRIDE;
+        virtual SLANG_NO_THROW void SLANG_MCALL addSearchPath(const char* searchDir) SLANG_OVERRIDE;
+        virtual SLANG_NO_THROW void SLANG_MCALL addPreprocessorDefine(const char* key, const char* value) SLANG_OVERRIDE;
+        virtual SLANG_NO_THROW SlangResult SLANG_MCALL processCommandLineArguments(char const* const* args, int argCount) SLANG_OVERRIDE;
+        virtual SLANG_NO_THROW int SLANG_MCALL addTranslationUnit(SlangSourceLanguage language, char const* name) SLANG_OVERRIDE;
+        virtual SLANG_NO_THROW void SLANG_MCALL setDefaultModuleName(const char* defaultModuleName) SLANG_OVERRIDE;
+        virtual SLANG_NO_THROW void SLANG_MCALL addTranslationUnitPreprocessorDefine(int translationUnitIndex, const char* key, const char* value) SLANG_OVERRIDE;
+        virtual SLANG_NO_THROW void SLANG_MCALL addTranslationUnitSourceFile(int translationUnitIndex, char const* path) SLANG_OVERRIDE;
+        virtual SLANG_NO_THROW void SLANG_MCALL addTranslationUnitSourceString(int translationUnitIndex, char const* path, char const* source) SLANG_OVERRIDE;
+        virtual SLANG_NO_THROW SlangResult SLANG_MCALL addLibraryReference(const void* libData, size_t libDataSize) SLANG_OVERRIDE;
+        virtual SLANG_NO_THROW void SLANG_MCALL addTranslationUnitSourceStringSpan(int translationUnitIndex, char const* path, char const* sourceBegin, char const* sourceEnd) SLANG_OVERRIDE;
+        virtual SLANG_NO_THROW void SLANG_MCALL addTranslationUnitSourceBlob(int translationUnitIndex, char const* path, ISlangBlob* sourceBlob) SLANG_OVERRIDE;
+        virtual SLANG_NO_THROW int SLANG_MCALL addEntryPoint(int translationUnitIndex, char const* name, SlangStage stage) SLANG_OVERRIDE;
+        virtual SLANG_NO_THROW int SLANG_MCALL addEntryPointEx(int translationUnitIndex, char const* name, SlangStage stage, int genericArgCount, char const** genericArgs) SLANG_OVERRIDE;
+        virtual SLANG_NO_THROW SlangResult SLANG_MCALL setGlobalGenericArgs(int genericArgCount, char const** genericArgs) SLANG_OVERRIDE;
+        virtual SLANG_NO_THROW SlangResult SLANG_MCALL setTypeNameForGlobalExistentialTypeParam(int slotIndex, char const* typeName) SLANG_OVERRIDE;
+        virtual SLANG_NO_THROW SlangResult SLANG_MCALL setTypeNameForEntryPointExistentialTypeParam(int entryPointIndex, int slotIndex, char const* typeName) SLANG_OVERRIDE;
+        virtual SLANG_NO_THROW SlangResult SLANG_MCALL compile() SLANG_OVERRIDE;
+        virtual SLANG_NO_THROW char const* SLANG_MCALL getDiagnosticOutput() SLANG_OVERRIDE;
+        virtual SLANG_NO_THROW SlangResult SLANG_MCALL getDiagnosticOutputBlob(ISlangBlob** outBlob) SLANG_OVERRIDE;
+        virtual SLANG_NO_THROW int SLANG_MCALL getDependencyFileCount() SLANG_OVERRIDE;
+        virtual SLANG_NO_THROW char const* SLANG_MCALL getDependencyFilePath(int index) SLANG_OVERRIDE;
+        virtual SLANG_NO_THROW int SLANG_MCALL getTranslationUnitCount() SLANG_OVERRIDE;
+        virtual SLANG_NO_THROW char const* SLANG_MCALL getEntryPointSource(int entryPointIndex) SLANG_OVERRIDE;
+        virtual SLANG_NO_THROW void const* SLANG_MCALL getEntryPointCode(int entryPointIndex, size_t* outSize) SLANG_OVERRIDE;
+        virtual SLANG_NO_THROW SlangResult SLANG_MCALL getEntryPointCodeBlob(int entryPointIndex, int targetIndex, ISlangBlob** outBlob) SLANG_OVERRIDE;
+        virtual SLANG_NO_THROW SlangResult SLANG_MCALL getEntryPointHostCallable(int entryPointIndex, int targetIndex, ISlangSharedLibrary**   outSharedLibrary) SLANG_OVERRIDE;
+        virtual SLANG_NO_THROW SlangResult SLANG_MCALL getTargetCodeBlob(int targetIndex, ISlangBlob** outBlob) SLANG_OVERRIDE;
+        virtual SLANG_NO_THROW SlangResult SLANG_MCALL getTargetHostCallable(int targetIndex, ISlangSharedLibrary** outSharedLibrary) SLANG_OVERRIDE;
+        virtual SLANG_NO_THROW void const* SLANG_MCALL getCompileRequestCode(size_t* outSize) SLANG_OVERRIDE;
+        virtual SLANG_NO_THROW SlangResult SLANG_MCALL getContainerCode(ISlangBlob** outBlob) SLANG_OVERRIDE;
+        virtual SLANG_NO_THROW SlangResult SLANG_MCALL loadRepro(ISlangFileSystem* fileSystem, const void* data, size_t size) SLANG_OVERRIDE;
+        virtual SLANG_NO_THROW SlangResult SLANG_MCALL saveRepro(ISlangBlob** outBlob) SLANG_OVERRIDE;
+        virtual SLANG_NO_THROW SlangResult SLANG_MCALL enableReproCapture() SLANG_OVERRIDE;
+        virtual SLANG_NO_THROW SlangResult SLANG_MCALL getProgram(slang::IComponentType** outProgram) SLANG_OVERRIDE;
+        virtual SLANG_NO_THROW SlangResult SLANG_MCALL getEntryPoint(SlangInt entryPointIndex, slang::IComponentType** outEntryPoint) SLANG_OVERRIDE;
+        virtual SLANG_NO_THROW SlangResult SLANG_MCALL getModule(SlangInt translationUnitIndex, slang::IModule** outModule) SLANG_OVERRIDE;
+        virtual SLANG_NO_THROW SlangResult SLANG_MCALL getSession(slang::ISession** outSession) SLANG_OVERRIDE;
+        virtual SLANG_NO_THROW SlangReflection* SLANG_MCALL getReflection() SLANG_OVERRIDE;
+        virtual SLANG_NO_THROW void SLANG_MCALL setCommandLineCompilerMode() SLANG_OVERRIDE;
+
         EndToEndCompileRequest(
             Session* session);
 
@@ -1923,6 +1993,9 @@ namespace Slang
         }
 
     private:
+
+        ISlangUnknown* getInterface(const Guid& guid);
+
         void init();
 
         Session*                        m_session = nullptr;
@@ -2261,15 +2334,19 @@ SLANG_FORCE_INLINE slang::TypeLayoutReflection* asExternal(TypeLayout* type)
 
 SLANG_FORCE_INLINE SlangCompileRequest* asExternal(EndToEndCompileRequest* request)
 {
-    return reinterpret_cast<SlangCompileRequest*>(request);
+    return static_cast<SlangCompileRequest*>(request);
 }
 
 SLANG_FORCE_INLINE EndToEndCompileRequest* asInternal(SlangCompileRequest* request)
 {
-    return reinterpret_cast<EndToEndCompileRequest*>(request);
+    // Converts to the internal type -- does a runtime type check through queryInterfae
+    SLANG_ASSERT(request);
+    EndToEndCompileRequest* endToEndRequest = nullptr;
+    // NOTE! We aren't using to access an interface, so *doesn't* return with a refcount
+    request->queryInterface(IID_EndToEndCompileRequest, (void**)&endToEndRequest);
+    SLANG_ASSERT(endToEndRequest);
+    return endToEndRequest;
 }
-
-
 
 }
 

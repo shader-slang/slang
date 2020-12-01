@@ -1556,14 +1556,14 @@ struct OptionsParser
 
 
 SlangResult parseOptions(
-    SlangCompileRequest*    compileRequestIn,
+    SlangCompileRequest*    inCompileRequest,
     int                     argc,
     char const* const*      argv)
 {
-    Slang::EndToEndCompileRequest* compileRequest = (Slang::EndToEndCompileRequest*) compileRequestIn;
+    Slang::EndToEndCompileRequest* compileRequest = asInternal(inCompileRequest);
 
     OptionsParser parser;
-    parser.compileRequest = compileRequestIn;
+    parser.compileRequest = inCompileRequest;
     parser.requestImpl = compileRequest;
     parser.session = (SlangSession*)compileRequest->getSession();
 
@@ -1582,10 +1582,4 @@ SlangResult parseOptions(
 
 } // namespace Slang
 
-SLANG_API SlangResult spProcessCommandLineArguments(
-    SlangCompileRequest*    request,
-    char const* const*      args,
-    int                     argCount)
-{
-    return Slang::parseOptions(request, argCount, args);
-}
+
