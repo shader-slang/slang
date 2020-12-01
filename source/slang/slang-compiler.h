@@ -2033,11 +2033,8 @@ namespace Slang
         DownstreamCompileResult* compileResult,
         CodeGenTarget   target);
 
-    /* Returns SLANG_OK if a codeGen target is available. */
-    SlangResult checkCompileTargetSupport(Session* session, CodeGenTarget target);
     /* Returns SLANG_OK if pass through support is available */
     SlangResult checkExternalCompilerSupport(Session* session, PassThroughMode passThrough);
-
     /* Report an error appearing from external compiler to the diagnostic sink error to the diagnostic sink.
     @param compilerName The name of the compiler the error came for (or nullptr if not known)
     @param res Result associated with the error. The error code will be reported. (Can take HRESULT - and will expand to string if known)
@@ -2123,35 +2120,26 @@ namespace Slang
 
         ISlangUnknown* getInterface(const Guid& guid);
 
-            /** Create a new linkage.
-            */
-        SLANG_NO_THROW SlangResult SLANG_MCALL createSession(
-            slang::SessionDesc const&  desc,
-            slang::ISession**          outSession) override;
-
-        SLANG_NO_THROW SlangProfileID SLANG_MCALL findProfile(
-            char const*     name) override;
-
-        SLANG_NO_THROW void SLANG_MCALL setDownstreamCompilerPath(
-            SlangPassThrough passThrough,
-            char const* path) override;
-
-        SLANG_NO_THROW void SLANG_MCALL setDownstreamCompilerPrelude(
-            SlangPassThrough inPassThrough,
-            char const* prelude) override;
-
-        SLANG_NO_THROW void SLANG_MCALL getDownstreamCompilerPrelude(
-            SlangPassThrough inPassThrough,
-            ISlangBlob** outPrelude) override;
-
+        // slang::IGlobalSession 
+        SLANG_NO_THROW SlangResult SLANG_MCALL createSession(slang::SessionDesc const&  desc, slang::ISession** outSession) override;
+        SLANG_NO_THROW SlangProfileID SLANG_MCALL findProfile(char const* name) override;
+        SLANG_NO_THROW void SLANG_MCALL setDownstreamCompilerPath(SlangPassThrough passThrough, char const* path) override;
+        SLANG_NO_THROW void SLANG_MCALL setDownstreamCompilerPrelude(SlangPassThrough inPassThrough, char const* prelude) override;
+        SLANG_NO_THROW void SLANG_MCALL getDownstreamCompilerPrelude(SlangPassThrough inPassThrough, ISlangBlob** outPrelude) override;
         SLANG_NO_THROW const char* SLANG_MCALL getBuildTagString() override;
-
         SLANG_NO_THROW SlangResult SLANG_MCALL setDefaultDownstreamCompiler(SlangSourceLanguage sourceLanguage, SlangPassThrough defaultCompiler) override;
-
         SLANG_NO_THROW SlangPassThrough SLANG_MCALL getDefaultDownstreamCompiler(SlangSourceLanguage sourceLanguage) override;
 
         SLANG_NO_THROW void SLANG_MCALL setLanguagePrelude(SlangSourceLanguage inSourceLanguage, char const* prelude) override;
         SLANG_NO_THROW void SLANG_MCALL getLanguagePrelude(SlangSourceLanguage inSourceLanguage, ISlangBlob** outPrelude) override;
+
+        SLANG_NO_THROW SlangCompileRequest* SLANG_MCALL createCompileRequest(slang::ICompileRequest** outCompileRequest) override;
+        
+        SLANG_NO_THROW void SLANG_MCALL addBuiltins(char const* sourcePath, char const* sourceString) override;
+        SLANG_NO_THROW void SLANG_MCALL setSharedLibraryLoader(ISlangSharedLibraryLoader* loader) override;
+        SLANG_NO_THROW ISlangSharedLibraryLoader* SLANG_MCALL getSharedLibraryLoader() override;
+        SLANG_NO_THROW SlangResult SLANG_MCALL checkCompileTargetSupport(SlangCompileTarget target) override;
+        SLANG_NO_THROW SlangResult SLANG_MCALL checkPassThroughSupport(SlangPassThrough passThrough) override;
 
         SLANG_NO_THROW SlangResult SLANG_MCALL compileStdLib() override;
         SLANG_NO_THROW SlangResult SLANG_MCALL loadStdLib() override;
@@ -2218,7 +2206,7 @@ namespace Slang
 
         //
 
-        void setSharedLibraryLoader(ISlangSharedLibraryLoader* loader);
+        void _setSharedLibraryLoader(ISlangSharedLibraryLoader* loader);
 
             /// Will try to load the library by specified name (using the set loader), if not one already available.
         DownstreamCompiler* getOrLoadDownstreamCompiler(PassThroughMode type, DiagnosticSink* sink);

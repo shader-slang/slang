@@ -1168,50 +1168,31 @@ extern "C"
     SLANG_API void spDestroySession(
         SlangSession*   session);
 
-    /*!
-    @brief Set the session shared library loader. If this changes the loader, it may cause shared libraries to be unloaded
-    @param session Session to set the loader on
-    @param loader The loader to set. Setting nullptr sets the default loader. 
+    /** @see slang::IGlobalSession::setSharedLibraryLoader
     */
     SLANG_API void spSessionSetSharedLibraryLoader(
         SlangSession*               session,
         ISlangSharedLibraryLoader*  loader);
 
-    /*!
-    @brief Gets the currently set shared library loader
-    @param session Session to get the loader from
-    @return Gets the currently set loader. If returns nullptr, it's the default loader
+    /** @see slang::IGlobalSession::getSharedLibraryLoader
     */
     SLANG_API ISlangSharedLibraryLoader* spSessionGetSharedLibraryLoader(
         SlangSession*   session);
 
-    /*!
-    @brief Returns SLANG_OK if a the compilation target is supported for this session
-    @param session Session
-    @param target The compilation target to test
-    @return SLANG_OK if the target is available
-            SLANG_E_NOT_IMPLEMENTED if not implemented in this build
-            SLANG_E_NOT_FOUND if other resources (such as shared libraries) required to make target work could not be found
-            SLANG_FAIL other kinds of failures */
+    /** @see slang::IGlobalSession::checkCompileTargetSupport
+    */
     SLANG_API SlangResult spSessionCheckCompileTargetSupport(
         SlangSession*       session,
         SlangCompileTarget  target);
 
-    /*!
-    @brief Returns SLANG_OK if a the pass through support is supported for this session
-    @param session Session
-    @param target The compilation target to test
-    @return SLANG_OK if the target is available
-    SLANG_E_NOT_IMPLEMENTED if not implemented in this build
-    SLANG_E_NOT_FOUND if other resources (such as shared libraries) required to make target work could not be found
-    SLANG_FAIL other kinds of failures */
+    /** @see slang::IGlobalSession::checkPassThroughSupport
+    */
     SLANG_API SlangResult spSessionCheckPassThroughSupport(
         SlangSession*       session,
         SlangPassThrough    passThrough
     );
 
-    /*!
-    @brief Add new builtin declarations to be used in subsequent compiles.
+    /** @see slang::IGlobalSession::addBuiltins
     */
     SLANG_API void spAddBuiltins(
         SlangSession*   session,
@@ -1240,19 +1221,17 @@ extern "C"
     */
     SLANG_API const char* spGetBuildTagString();
 
-    /*!
-    @brief Create a compile request.
+    /* @see slang::IGlobalSession::createCompileRequest
     */
     SLANG_API SlangCompileRequest* spCreateCompileRequest(
         SlangSession* session);
 
     /*!
     @brief Destroy a compile request.
+    Note a request is a COM object and can be destroyed via 'Release'.
     */
     SLANG_API void spDestroyCompileRequest(
         SlangCompileRequest*    request);
-
-
 
     /*! @see slang::ICompileRequest::setFileSystem */
     SLANG_API void spSetFileSystem(
@@ -2798,7 +2777,48 @@ namespace slang
             SlangSourceLanguage sourceLanguage,
             ISlangBlob** outPrelude) = 0;
 
-        
+            /** Create a compile request.
+            */
+        virtual SLANG_NO_THROW SlangCompileRequest* SLANG_MCALL createCompileRequest(
+            slang::ICompileRequest** outCompileRequest) = 0;
+
+            /** Add new builtin declarations to be used in subsequent compiles.
+            */
+        virtual SLANG_NO_THROW void SLANG_MCALL addBuiltins(
+            char const*     sourcePath,
+            char const*     sourceString) = 0;
+
+            /** Set the session shared library loader. If this changes the loader, it may cause shared libraries to be unloaded
+            @param loader The loader to set. Setting nullptr sets the default loader. 
+            */
+        virtual SLANG_NO_THROW void SLANG_MCALL setSharedLibraryLoader(
+            ISlangSharedLibraryLoader* loader) = 0;
+
+            /** Gets the currently set shared library loader
+            @return Gets the currently set loader. If returns nullptr, it's the default loader
+            */
+        virtual SLANG_NO_THROW ISlangSharedLibraryLoader* SLANG_MCALL getSharedLibraryLoader() = 0;
+
+            /** Returns SLANG_OK if a the compilation target is supported for this session
+            
+            @param target The compilation target to test
+            @return SLANG_OK if the target is available
+            SLANG_E_NOT_IMPLEMENTED if not implemented in this build
+            SLANG_E_NOT_FOUND if other resources (such as shared libraries) required to make target work could not be found
+            SLANG_FAIL other kinds of failures */
+        virtual SLANG_NO_THROW SlangResult SLANG_MCALL checkCompileTargetSupport(
+            SlangCompileTarget  target) = 0;
+
+            /** Returns SLANG_OK if a the pass through support is supported for this session
+            @param session Session
+            @param target The compilation target to test
+            @return SLANG_OK if the target is available
+            SLANG_E_NOT_IMPLEMENTED if not implemented in this build
+            SLANG_E_NOT_FOUND if other resources (such as shared libraries) required to make target work could not be found
+            SLANG_FAIL other kinds of failures */
+        virtual SLANG_NO_THROW SlangResult SLANG_MCALL checkPassThroughSupport(
+            SlangPassThrough    passThrough) = 0;
+
             /** Compile from (embedded source) the StdLib on the session.
             Will return a failure if there is already a StdLib available
             NOTE! API is experimental and not ready for production code 

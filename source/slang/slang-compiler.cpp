@@ -516,14 +516,6 @@ namespace Slang
         return PassThroughMode::None;
     }
 
-    SlangResult checkCompileTargetSupport(Session* session, CodeGenTarget target)
-    {
-        const PassThroughMode mode = getDownstreamCompilerRequiredForTarget(target);
-        return (mode != PassThroughMode::None) ?
-            checkExternalCompilerSupport(session, mode) :
-            SLANG_OK;
-    }
-
     bool isPassThroughEnabled(
         EndToEndCompileRequest* endToEndReq)
     {        // If there isn't an end-to-end compile going on,

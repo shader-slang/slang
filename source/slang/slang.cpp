@@ -196,6 +196,45 @@ void Session::init()
     m_languagePreludes[Index(SourceLanguage::HLSL)] = get_slang_hlsl_prelude();
 }
 
+void Session::addBuiltins(
+    char const*     sourcePath,
+    char const*     sourceString)
+{
+    // TODO(tfoley): Add ability to directly new builtins to the appropriate scope
+    addBuiltinSource(
+        coreLanguageScope,
+        sourcePath,
+        sourceString);
+}
+
+void Session::setSharedLibraryLoader(ISlangSharedLibraryLoader* loader)
+{
+    // External API allows passing of nullptr to reset the loader
+    loader = loader ? loader : DefaultSharedLibraryLoader::getSingleton();
+
+    _setSharedLibraryLoader(loader);
+}
+
+ISlangSharedLibraryLoader* Session::getSharedLibraryLoader()
+{
+    return (m_sharedLibraryLoader == DefaultSharedLibraryLoader::getSingleton()) ? nullptr : m_sharedLibraryLoader.get();
+}
+
+SlangResult Session::checkCompileTargetSupport(SlangCompileTarget inTarget)
+{
+    auto target = CodeGenTarget(inTarget);
+
+    const PassThroughMode mode = getDownstreamCompilerRequiredForTarget(target);
+    return (mode != PassThroughMode::None) ?
+        checkPassThroughSupport(SlangPassThrough(mode)) :
+        SLANG_OK;
+}
+
+SlangResult Session::checkPassThroughSupport(SlangPassThrough inPassThrough)
+{
+    return checkExternalCompilerSupport(this, PassThroughMode(inPassThrough));
+}
+
 SlangResult Session::compileStdLib()
 {
     if (m_builtinLinkage->mapNameToLoadedModules.Count())
@@ -381,6 +420,19 @@ SLANG_NO_THROW SlangResult SLANG_MCALL Session::createSession(
     }
 
     *outSession = asExternal(linkage.detach());
+    return SLANG_OK;
+}
+
+SLANG_NO_THROW SlangCompileRequest* SLANG_MCALL Session::createCompileRequest(slang::ICompileRequest** outCompileRequest)
+{
+    auto req = new EndToEndCompileRequest(this);
+
+    // Give it a ref (for output)
+    req->addRef();
+    // Check it is what we think it should be
+    SLANG_ASSERT(req->debugGetReferenceCount() == 1);
+
+    *outCompileRequest = req;
     return SLANG_OK;
 }
 
@@ -3273,65 +3325,50 @@ SLANG_API void spAddBuiltins(
     char const*     sourcePath,
     char const*     sourceString)
 {
-    auto s = Slang::asInternal(session);
-
-    // TODO(tfoley): Add ability to directly new builtins to the approriate scope
-
-    s->addBuiltinSource(
-        s->coreLanguageScope,
-        sourcePath,
-        sourceString);
+    session->addBuiltins(sourcePath, sourceString);
 }
 
 SLANG_API void spSessionSetSharedLibraryLoader(
     SlangSession*               session,
     ISlangSharedLibraryLoader* loader)
 {
-    auto s = Slang::asInternal(session);
-    loader = loader ? loader : Slang::DefaultSharedLibraryLoader::getSingleton();
-    s->setSharedLibraryLoader(loader);
+    session->setSharedLibraryLoader(loader);
 }
 
 SLANG_API ISlangSharedLibraryLoader* spSessionGetSharedLibraryLoader(
     SlangSession*               session)
 {
-    auto s = Slang::asInternal(session);
-    return (s->m_sharedLibraryLoader == Slang::DefaultSharedLibraryLoader::getSingleton()) ? nullptr : s->m_sharedLibraryLoader.get();
+    return session->getSharedLibraryLoader();
 }
 
 SLANG_API SlangResult spSessionCheckCompileTargetSupport(
     SlangSession*                session,
     SlangCompileTarget           target)
 {
-    auto s = Slang::asInternal(session);
-    return Slang::checkCompileTargetSupport(s, Slang::CodeGenTarget(target));
+    return session->checkCompileTargetSupport(target);
 }
 
 SLANG_API SlangResult spSessionCheckPassThroughSupport(
     SlangSession*       session,
     SlangPassThrough    passThrough)
 {
-    auto s = Slang::asInternal(session);
-    return Slang::checkExternalCompilerSupport(s, Slang::PassThroughMode(passThrough));
+    return session->checkPassThroughSupport(passThrough);
 }
 
 SLANG_API SlangCompileRequest* spCreateCompileRequest(
     SlangSession* session)
 {
-    auto s = Slang::asInternal(session);
-    auto req = new Slang::EndToEndCompileRequest(s);
-    // Give it a ref count of 1
-    req->addRef();
-    SLANG_ASSERT(req->debugGetReferenceCount() == 1);
-
-    return req;
+    slang::ICompileRequest* request = nullptr;
+    // Will return with suitable ref count
+    session->createCompileRequest(&request);
+    return request;
 }
 
 SLANG_API SlangProfileID spFindProfile(
-    SlangSession*,
+    SlangSession* session,
     char const*     name)
 {
-    return Slang::Profile::lookUp(name).raw;
+    return session->findProfile(name);
 }
 
 /* !!!!!!!!!!!!!!!!!! EndToEndCompileRequestImpl !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! */
