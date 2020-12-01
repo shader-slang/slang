@@ -1513,7 +1513,7 @@ namespace Slang
         List<Expr*> globalSpecializationArgs;
         parseSpecializationArgStrings(
             endToEndReq,
-            endToEndReq->globalSpecializationArgStrings,
+            endToEndReq->m_globalSpecializationArgStrings,
             globalSpecializationArgs);
 
         // Don't proceed further if anything failed to parse.
@@ -1548,11 +1548,11 @@ namespace Slang
         // ahead and consider all the entry points that were found
         // by the front-end.
         //
-        Index entryPointCount = endToEndReq->entryPoints.getCount();
+        Index entryPointCount = endToEndReq->m_entryPoints.getCount();
         if( entryPointCount == 0 )
         {
             entryPointCount = unspecializedProgram->getEntryPointCount();
-            endToEndReq->entryPoints.setCount(entryPointCount);
+            endToEndReq->m_entryPoints.setCount(entryPointCount);
         }
 
         return specializedProgram;
@@ -1617,7 +1617,7 @@ namespace Slang
         // We will thus draw a distinction between the "specified" entry points,
         // and the "found" entry points.
         //
-        auto specifiedEntryPointCount = endToEndReq->entryPoints.getCount();
+        auto specifiedEntryPointCount = endToEndReq->m_entryPoints.getCount();
         auto foundEntryPointCount = unspecializedGlobalAndEntryPointsComponentType->getEntryPointCount();
 
         SLANG_ASSERT(foundEntryPointCount >= specifiedEntryPointCount);
@@ -1627,7 +1627,7 @@ namespace Slang
         //
         for(Index ii = 0; ii < specifiedEntryPointCount; ++ii)
         {
-            auto& entryPointInfo = endToEndReq->entryPoints[ii];
+            auto& entryPointInfo = endToEndReq->m_entryPoints[ii];
             auto unspecializedEntryPoint = unspecializedGlobalAndEntryPointsComponentType->getEntryPoint(ii);
 
             auto specializedEntryPoint = createSpecializedEntryPoint(endToEndReq, unspecializedEntryPoint, entryPointInfo);

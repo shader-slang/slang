@@ -352,7 +352,7 @@ static bool _isStorable(const PathInfo::Type type)
         dst->debugInfoLevel = linkage->debugInfoLevel;
         dst->optimizationLevel = linkage->optimizationLevel;
         dst->containerFormat = request->m_containerFormat;
-        dst->passThroughMode = request->passThrough;
+        dst->passThroughMode = request->m_passThrough;
 
 
         dst->useUnknownImageFormatAsDefault = request->getBackEndReq()->useUnknownImageFormatAsDefault;
@@ -364,7 +364,7 @@ static bool _isStorable(const PathInfo::Type type)
     // Entry points
     {
         const auto& srcEntryPoints = request->getFrontEndReq()->m_entryPointReqs;
-        const auto& srcEndToEndEntryPoints = request->entryPoints;
+        const auto& srcEndToEndEntryPoints = request->m_entryPoints;
 
         SLANG_ASSERT(srcEntryPoints.getCount() == srcEndToEndEntryPoints.getCount());
 
@@ -424,7 +424,7 @@ static bool _isStorable(const PathInfo::Type type)
 
             // Copy the entry point/target output names
             {
-                const auto& srcTargetInfos = request->targetInfos;
+                const auto& srcTargetInfos = request->m_targetInfos;
 
                 if (RefPtr<EndToEndCompileRequest::TargetInfo>* infosPtr = srcTargetInfos.TryGetValue(srcTargetRequest))
                 {
@@ -871,7 +871,7 @@ struct LoadContext
     // TODO(JS): Really should be more exhaustive here, and set up to initial state ideally
     // Reset state
     {
-        request->targetInfos.Clear();
+        request->m_targetInfos.Clear();
         // Remove any requests
         linkage->targets.clear();
     }
@@ -887,7 +887,7 @@ struct LoadContext
         spSetDebugInfoLevel(externalRequest, SlangDebugInfoLevel(requestState->debugInfoLevel));
         spSetOptimizationLevel(externalRequest, SlangOptimizationLevel(requestState->optimizationLevel));
         spSetOutputContainerFormat(externalRequest, SlangContainerFormat(requestState->containerFormat));
-        spSetPassThrough(externalRequest, SlangPassThrough(request->passThrough));
+        spSetPassThrough(externalRequest, SlangPassThrough(request->m_passThrough));
 
         request->getBackEndReq()->useUnknownImageFormatAsDefault = requestState->useUnknownImageFormatAsDefault;
         linkage->m_obfuscateCode = requestState->obfuscateCode;
@@ -914,7 +914,7 @@ struct LoadContext
             if (src.outputStates.getCount())
             {
                 RefPtr<EndToEndCompileRequest::TargetInfo> dstTargetInfo(new EndToEndCompileRequest::TargetInfo);
-                request->targetInfos[dstTarget] = dstTargetInfo;
+                request->m_targetInfos[dstTarget] = dstTargetInfo;
 
                 for (const auto& srcOutputStateOffset : src.outputStates)
                 {

@@ -80,7 +80,7 @@ namespace Slang
         } 
     }
 
-    void Session::setSharedLibraryLoader(ISlangSharedLibraryLoader* loader)
+    void Session::_setSharedLibraryLoader(ISlangSharedLibraryLoader* loader)
     {
         if (m_sharedLibraryLoader != loader)
         {
@@ -117,7 +117,7 @@ namespace Slang
 
         if (type == PassThroughMode::GenericCCpp)
         {
-            // try testing for availablilty on all C/C++ compilers
+            // try testing for availability on all C/C++ compilers
             getOrLoadDownstreamCompiler(PassThroughMode::Clang, sink);
             getOrLoadDownstreamCompiler(PassThroughMode::Gcc, sink);
             getOrLoadDownstreamCompiler(PassThroughMode::VisualStudio, sink);
