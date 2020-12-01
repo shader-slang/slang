@@ -1809,7 +1809,7 @@ SlangResult EndToEndCompileRequest::executeActionsInner()
     // We only do parsing and semantic checking if we *aren't* doing
     // a pass-through compilation.
     //
-    if (passThrough == PassThroughMode::None)
+    if (m_passThrough == PassThroughMode::None)
     {
         SLANG_RETURN_ON_FAIL(getFrontEndReq()->executeActionsInner());
     }
@@ -1817,7 +1817,7 @@ SlangResult EndToEndCompileRequest::executeActionsInner()
     // If command line specifies to skip codegen, we exit here.
     // Note: this is a debugging option.
     //
-    if (shouldSkipCodegen ||
+    if (m_shouldSkipCodegen ||
         ((getFrontEndReq()->compileFlags & SLANG_COMPILE_FLAG_NO_CODEGEN) != 0))
     {
         // We will use the program (and matching layout information)
@@ -1837,7 +1837,7 @@ SlangResult EndToEndCompileRequest::executeActionsInner()
     // If codegen is enabled, we need to move along to
     // apply any generic specialization that the user asked for.
     //
-    if (passThrough == PassThroughMode::None)
+    if (m_passThrough == PassThroughMode::None)
     {
         m_specializedGlobalComponentType = createSpecializedGlobalComponentType(this);
         if (getSink()->getErrorCount() != 0)
@@ -1900,7 +1900,7 @@ SlangResult EndToEndCompileRequest::executeActionsInner()
 SlangResult EndToEndCompileRequest::executeActions()
 {
     SlangResult res = executeActionsInner();
-    mDiagnosticOutput = getSink()->outputBuffer.ProduceString();
+    m_diagnosticOutput = getSink()->outputBuffer.ProduceString();
     return res;
 }
 
@@ -2024,8 +2024,8 @@ int EndToEndCompileRequest::addEntryPoint(
     for (auto typeName : genericTypeNames)
         entryPointInfo.specializationArgStrings.add(typeName);
 
-    Index result = entryPoints.getCount();
-    entryPoints.add(_Move(entryPointInfo));
+    Index result = m_entryPoints.getCount();
+    m_entryPoints.add(_Move(entryPointInfo));
     return (int) result;
 }
 
@@ -3404,7 +3404,7 @@ void EndToEndCompileRequest::setLineDirectiveMode(SlangLineDirectiveMode mode)
 
 void EndToEndCompileRequest::setCommandLineCompilerMode()
 {
-    isCommandLineCompile = true;
+    m_isCommandLineCompile = true;
 }
 
 void EndToEndCompileRequest::setCodeGenTarget(SlangCompileTarget target)
@@ -3462,7 +3462,7 @@ void EndToEndCompileRequest::setOutputContainerFormat(SlangContainerFormat forma
 
 void EndToEndCompileRequest::setPassThrough(SlangPassThrough inPassThrough)
 {
-    passThrough = PassThroughMode(inPassThrough);
+    m_passThrough = PassThroughMode(inPassThrough);
 }
 
 void EndToEndCompileRequest::setDiagnosticCallback(SlangDiagnosticCallback callback, void const* userData)
@@ -3493,19 +3493,19 @@ void EndToEndCompileRequest::addPreprocessorDefine(const char* key, const char* 
 
 char const* EndToEndCompileRequest::getDiagnosticOutput()
 {
-    return mDiagnosticOutput.begin();
+    return m_diagnosticOutput.begin();
 }
 
 SlangResult EndToEndCompileRequest::getDiagnosticOutputBlob(ISlangBlob** outBlob)   
 {
     if (!outBlob) return SLANG_ERROR_INVALID_PARAMETER;
 
-    if (!diagnosticOutputBlob)
+    if (!m_diagnosticOutputBlob)
     {
-        diagnosticOutputBlob = StringUtil::createStringBlob(mDiagnosticOutput);
+        m_diagnosticOutputBlob = StringUtil::createStringBlob(m_diagnosticOutput);
     }
 
-    ComPtr<ISlangBlob> resultBlob = diagnosticOutputBlob;
+    ComPtr<ISlangBlob> resultBlob = m_diagnosticOutputBlob;
     *outBlob = resultBlob.detach();
     return SLANG_OK;
 }
@@ -3653,7 +3653,7 @@ int EndToEndCompileRequest::addEntryPointEx(int translationUnitIndex, char const
 
 SlangResult EndToEndCompileRequest::setGlobalGenericArgs(int genericArgCount, char const** genericArgs)
 {
-    auto& argStrings = globalSpecializationArgStrings;
+    auto& argStrings = m_globalSpecializationArgStrings;
     argStrings.clear();
     for (int i = 0; i < genericArgCount; i++)
         argStrings.add(genericArgs[i]);
@@ -3666,7 +3666,7 @@ SlangResult EndToEndCompileRequest::setTypeNameForGlobalExistentialTypeParam(int
     if (slotIndex < 0)   return SLANG_FAIL;
     if (!typeName)       return SLANG_FAIL;
 
-    auto& typeArgStrings = globalSpecializationArgStrings;
+    auto& typeArgStrings = m_globalSpecializationArgStrings;
     if (Index(slotIndex) >= typeArgStrings.getCount())
         typeArgStrings.setCount(slotIndex + 1);
     typeArgStrings[slotIndex] = String(typeName);
@@ -3679,10 +3679,10 @@ SlangResult EndToEndCompileRequest::setTypeNameForEntryPointExistentialTypeParam
     if (slotIndex < 0)       return SLANG_FAIL;
     if (!typeName)           return SLANG_FAIL;
 
-    if (Index(entryPointIndex) >=entryPoints.getCount())
+    if (Index(entryPointIndex) >=m_entryPoints.getCount())
         return SLANG_FAIL;
 
-    auto& entryPointInfo = entryPoints[entryPointIndex];
+    auto& entryPointInfo = m_entryPoints[entryPointIndex];
     auto& typeArgStrings = entryPointInfo.specializationArgStrings;
     if (Index(slotIndex) >= typeArgStrings.getCount())
         typeArgStrings.setCount(slotIndex + 1);
@@ -3731,7 +3731,7 @@ SlangResult EndToEndCompileRequest::EndToEndCompileRequest::compile()
         // and not some other component in their system.
         getSink()->diagnose(SourceLoc(), Diagnostics::compilationAborted);
     }
-    mDiagnosticOutput = getSink()->outputBuffer.ProduceString();
+    m_diagnosticOutput = getSink()->outputBuffer.ProduceString();
 
 #else
     // When debugging, we probably don't want to filter out any errors, since
@@ -3743,16 +3743,16 @@ SlangResult EndToEndCompileRequest::EndToEndCompileRequest::compile()
 
     // Repro dump handling
     {
-        if (dumpRepro.getLength())
+        if (m_dumpRepro.getLength())
         {
-            SlangResult saveRes = ReproUtil::saveState(this, dumpRepro);
+            SlangResult saveRes = ReproUtil::saveState(this, m_dumpRepro);
             if (SLANG_FAILED(saveRes))
             {
-                getSink()->diagnose(SourceLoc(), Diagnostics::unableToWriteReproFile, dumpRepro);
+                getSink()->diagnose(SourceLoc(), Diagnostics::unableToWriteReproFile, m_dumpRepro);
                 return saveRes;
             }
         }
-        else if (dumpReproOnError && SLANG_FAILED(res))
+        else if (m_dumpReproOnError && SLANG_FAILED(res))
         {
             String reproFileName;
             SlangResult saveRes = SLANG_FAIL;
@@ -3847,7 +3847,7 @@ static SlangResult _getEntryPointResult(
     }
     auto targetReq = linkage->targets[targetIndex];
 
-    Index entryPointCount = req->entryPoints.getCount();
+    Index entryPointCount = req->m_entryPoints.getCount();
     if ((entryPointIndex < 0) || (entryPointIndex >= entryPointCount))
     {
         return SLANG_ERROR_INVALID_PARAMETER;

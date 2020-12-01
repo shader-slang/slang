@@ -526,7 +526,7 @@ namespace Slang
         // And if pass-through isn't set, we don't need
         // access to the translation unit.
         //
-        if(endToEndReq->passThrough == PassThroughMode::None) return false;
+        if(endToEndReq->m_passThrough == PassThroughMode::None) return false;
         return true;
     }
     /// If there is a pass-through compile going on, find the translation unit for the given entry point.
@@ -536,7 +536,7 @@ namespace Slang
         Int                     entryPointIndex)
     {
         SLANG_ASSERT(endToEndReq);
-        SLANG_ASSERT(endToEndReq->passThrough != PassThroughMode::None);
+        SLANG_ASSERT(endToEndReq->m_passThrough != PassThroughMode::None);
         auto frontEndReq = endToEndReq->getFrontEndReq();
         auto entryPointReq = frontEndReq->getEntryPointReq(entryPointIndex);
         auto translationUnit = entryPointReq->getTranslationUnit();
@@ -1233,7 +1233,7 @@ SlangResult dissassembleDXILUsingDXC(
         CodeGenTarget sourceTarget = CodeGenTarget::None;
         SourceLanguage sourceLanguage = SourceLanguage::Unknown;
 
-        PassThroughMode downstreamCompiler = endToEndReq ? endToEndReq->passThrough : PassThroughMode::None;
+        PassThroughMode downstreamCompiler = endToEndReq ? endToEndReq->m_passThrough : PassThroughMode::None;
 
         // If we are not in pass through, lookup the default compiler for the emitted source type
         if (downstreamCompiler == PassThroughMode::None)
@@ -2139,7 +2139,7 @@ SlangResult dissassembleDXILUsingDXC(
         // get paths specified via command-line options.
         //
         RefPtr<EndToEndCompileRequest::TargetInfo> targetInfo;
-        if (compileRequest->targetInfos.TryGetValue(targetReq, targetInfo))
+        if (compileRequest->m_targetInfos.TryGetValue(targetReq, targetInfo))
         {
             String outputPath = targetInfo->wholeTargetOutputPath;
             if (outputPath != "")
@@ -2175,7 +2175,7 @@ SlangResult dissassembleDXILUsingDXC(
         //
         RefPtr<EndToEndCompileRequest::TargetInfo> targetInfo;
         auto entryPoint = currentProgram->getEntryPoint(entryPointIndex);
-        if(compileRequest->targetInfos.TryGetValue(targetReq, targetInfo))
+        if(compileRequest->m_targetInfos.TryGetValue(targetReq, targetInfo))
         {
             String outputPath;
             if(targetInfo->entryPointOutputPaths.TryGetValue(entryPointIndex, outputPath))
@@ -2473,7 +2473,7 @@ SlangResult dissassembleDXILUsingDXC(
         // If we are in command-line mode, we might be expected to actually
         // write output to one or more files here.
 
-        if (compileRequest->isCommandLineCompile)
+        if (compileRequest->m_isCommandLineCompile)
         {
             auto linkage = compileRequest->getLinkage();
             auto program = compileRequest->getSpecializedGlobalAndEntryPointsComponentType();

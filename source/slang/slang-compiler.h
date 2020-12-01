@@ -1904,27 +1904,27 @@ namespace Slang
         String m_containerOutputPath;
 
         // Should we just pass the input to another compiler?
-        PassThroughMode passThrough = PassThroughMode::None;
+        PassThroughMode m_passThrough = PassThroughMode::None;
 
             /// Source code for the specialization arguments to use for the global specialization parameters of the program.
-        List<String> globalSpecializationArgStrings;
+        List<String> m_globalSpecializationArgStrings;
 
-        bool shouldSkipCodegen = false;
+        bool m_shouldSkipCodegen = false;
 
         // Are we being driven by the command-line `slangc`, and should act accordingly?
-        bool isCommandLineCompile = false;
+        bool m_isCommandLineCompile = false;
 
-        String mDiagnosticOutput;
+        String m_diagnosticOutput;
 
 
             // If set, will dump the compilation state 
-        String dumpRepro;
+        String m_dumpRepro;
 
             /// If set, if a compilation failure occurs will attempt to save off a dump repro with a unique name
-        bool dumpReproOnError = false;
+        bool m_dumpReproOnError = false;
 
             /// A blob holding the diagnostic output
-        ComPtr<ISlangBlob> diagnosticOutputBlob;
+        ComPtr<ISlangBlob> m_diagnosticOutputBlob;
 
             /// Per-entry-point information not tracked by other compile requests
         class EntryPointInfo : public RefObject
@@ -1933,7 +1933,7 @@ namespace Slang
                 /// Source code for the specialization arguments to use for the specialization parameters of the entry point.
             List<String> specializationArgStrings;
         };
-        List<EntryPointInfo> entryPoints;
+        List<EntryPointInfo> m_entryPoints;
 
             /// Per-target information only needed for command-line compiles
         class TargetInfo : public RefObject
@@ -1945,7 +1945,7 @@ namespace Slang
             Dictionary<Int, String> entryPointOutputPaths;
             String wholeTargetOutputPath;
         };
-        Dictionary<TargetRequest*, RefPtr<TargetInfo>> targetInfos;
+        Dictionary<TargetRequest*, RefPtr<TargetInfo>> m_targetInfos;
 
             /// Writes the modules in a container to the stream
         SlangResult writeContainerToStream(Stream* stream);
