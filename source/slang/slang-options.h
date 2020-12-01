@@ -10,5 +10,10 @@ namespace Slang
 
 UnownedStringSlice getCodeGenTargetName(SlangCompileTarget target);
 
+SlangResult parseOptions(
+    SlangCompileRequest*    compileRequestIn,
+    int                     argc,
+    char const* const*      argv);
+
 }
 #endif
