@@ -11,11 +11,11 @@ static void pathUnitTest()
 {
     {
         String path;
-        SlangResult res = Path::getCanonical(".", path);
+        SlangResult res = Path::getCanonical("source/slang", path);
         SLANG_CHECK(SLANG_SUCCEEDED(res));
 
         String parentPath;
-        res = Path::getCanonical("..", parentPath);
+        res = Path::getCanonical("source", parentPath);
         SLANG_CHECK(SLANG_SUCCEEDED(res));
 
         String parentPath2 = Path::getParentDirectory(path);
