@@ -216,6 +216,7 @@
     <ClInclude Include="slang-uint-set.h" />
     <ClInclude Include="slang-visual-studio-compiler-util.h" />
     <ClInclude Include="slang-writer.h" />
+    <ClInclude Include="slang-zip-file-system.h" />
     <ClInclude Include="windows\slang-win-visual-studio-util.h" />
   </ItemGroup>
   <ItemGroup>
@@ -249,6 +250,7 @@
     <ClCompile Include="slang-uint-set.cpp" />
     <ClCompile Include="slang-visual-studio-compiler-util.cpp" />
     <ClCompile Include="slang-writer.cpp" />
+    <ClCompile Include="slang-zip-file-system.cpp" />
     <ClCompile Include="windows\slang-win-process-util.cpp" />
     <ClCompile Include="windows\slang-win-visual-studio-util.cpp" />
   </ItemGroup>

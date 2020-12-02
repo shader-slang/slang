@@ -112,7 +112,7 @@ inline void UIntSet::add(UInt val)
     const Index idx = Index(val >> kElementShift);
     if (idx >= m_buffer.getCount())
     {
-        resize(val);
+        resize(val + 1);
     }
     m_buffer[idx] |= Element(1) << (val & kElementMask);
 }
