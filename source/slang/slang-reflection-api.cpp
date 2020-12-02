@@ -16,16 +16,10 @@
 // Slang developers can switch this when debugging.
 #define SLANG_REFLECTION_UNEXPECTED() do {} while(0)
 
-// Implementation to back public-facing reflection API
-
-using namespace Slang;
-
+namespace Slang
+{
 
 // Conversion routines to help with strongly-typed reflection API
-static inline Session* convert(SlangSession* session)
-{
-    return (Session*)session;
-}
 
 static inline UserDefinedAttribute* convert(SlangReflectionUserAttribute* attrib)
 {
@@ -35,6 +29,7 @@ static inline SlangReflectionUserAttribute* convert(UserDefinedAttribute* attrib
 {
     return (SlangReflectionUserAttribute*)attrib;
 }
+
 static inline Type* convert(SlangReflectionType* type)
 {
     return (Type*) type;
@@ -100,9 +95,9 @@ static inline SlangReflection* convert(ProgramLayout* program)
     return (SlangReflection*) program;
 }
 
-// user attaribute
+// user attribute
 
-unsigned int getUserAttributeCount(Decl* decl)
+static unsigned int getUserAttributeCount(Decl* decl)
 {
     unsigned int count = 0;
     for (auto x : decl->getModifiersOfType<UserDefinedAttribute>())
@@ -113,7 +108,7 @@ unsigned int getUserAttributeCount(Decl* decl)
     return count;
 }
 
-SlangReflectionUserAttribute* findUserAttributeByName(Session* session, Decl* decl, const char* name)
+static SlangReflectionUserAttribute* findUserAttributeByName(Session* session, Decl* decl, const char* name)
 {
     auto nameObj = session->tryGetNameObj(name);
     for (auto x : decl->getModifiersOfType<UserDefinedAttribute>())
@@ -124,7 +119,7 @@ SlangReflectionUserAttribute* findUserAttributeByName(Session* session, Decl* de
     return nullptr;
 }
 
-SlangReflectionUserAttribute* getUserAttributeByIndex(Decl* decl, unsigned int index)
+static SlangReflectionUserAttribute* getUserAttributeByIndex(Decl* decl, unsigned int index)
 {
     unsigned int id = 0;
     for (auto x : decl->getModifiersOfType<UserDefinedAttribute>())
@@ -135,6 +130,119 @@ SlangReflectionUserAttribute* getUserAttributeByIndex(Decl* decl, unsigned int i
     }
     return nullptr;
 }
+
+
+// Attempt "do what I mean" remapping from the parameter category the user asked about,
+// over to a parameter category that they might have meant.
+static SlangParameterCategory maybeRemapParameterCategory(
+    TypeLayout*             typeLayout,
+    SlangParameterCategory  category)
+{
+    // Do we have an entry for the category they asked about? Then use that.
+    if (typeLayout->FindResourceInfo(LayoutResourceKind(category)))
+        return category;
+
+    // Do we have an entry for the `DescriptorTableSlot` category?
+    if (typeLayout->FindResourceInfo(LayoutResourceKind::DescriptorTableSlot))
+    {
+        // Is the category they were asking about one that makes sense for the type
+        // of this variable?
+        Type* type = typeLayout->getType();
+        while (auto arrayType = as<ArrayExpressionType>(type))
+            type = arrayType->baseType;
+        switch (spReflectionType_GetKind(convert(type)))
+        {
+            case SLANG_TYPE_KIND_CONSTANT_BUFFER:
+                if (category == SLANG_PARAMETER_CATEGORY_CONSTANT_BUFFER)
+                    return SLANG_PARAMETER_CATEGORY_DESCRIPTOR_TABLE_SLOT;
+                break;
+
+            case SLANG_TYPE_KIND_RESOURCE:
+                if (category == SLANG_PARAMETER_CATEGORY_SHADER_RESOURCE)
+                    return SLANG_PARAMETER_CATEGORY_DESCRIPTOR_TABLE_SLOT;
+                break;
+
+            case SLANG_TYPE_KIND_SAMPLER_STATE:
+                if (category == SLANG_PARAMETER_CATEGORY_SAMPLER_STATE)
+                    return SLANG_PARAMETER_CATEGORY_DESCRIPTOR_TABLE_SLOT;
+                break;
+
+                // TODO: implement more helpers here
+
+            default:
+                break;
+        }
+    }
+
+    return category;
+}
+
+// Helpers for getting parameter count
+
+static unsigned getParameterCount(RefPtr<TypeLayout> typeLayout)
+{
+    if (auto parameterGroupLayout = as<ParameterGroupTypeLayout>(typeLayout))
+    {
+        typeLayout = parameterGroupLayout->offsetElementTypeLayout;
+    }
+
+    if (auto structLayout = as<StructTypeLayout>(typeLayout))
+    {
+        return (unsigned)structLayout->fields.getCount();
+    }
+
+    return 0;
+}
+
+static VarLayout* getParameterByIndex(RefPtr<TypeLayout> typeLayout, unsigned index)
+{
+    if (auto parameterGroupLayout = as<ParameterGroupTypeLayout>(typeLayout))
+    {
+        typeLayout = parameterGroupLayout->offsetElementTypeLayout;
+    }
+
+    if (auto structLayout = as<StructTypeLayout>(typeLayout))
+    {
+        return structLayout->fields[index];
+    }
+
+    return 0;
+}
+
+static SlangParameterCategory getParameterCategory(
+    LayoutResourceKind kind)
+{
+    return SlangParameterCategory(kind);
+}
+
+static SlangParameterCategory getParameterCategory(
+    TypeLayout*  typeLayout)
+{
+    auto resourceInfoCount = typeLayout->resourceInfos.getCount();
+    if (resourceInfoCount == 1)
+    {
+        return getParameterCategory(typeLayout->resourceInfos[0].kind);
+    }
+    else if (resourceInfoCount == 0)
+    {
+        // TODO: can this ever happen?
+        return SLANG_PARAMETER_CATEGORY_NONE;
+    }
+    return SLANG_PARAMETER_CATEGORY_MIXED;
+}
+
+static bool hasDefaultConstantBuffer(ScopeLayout* layout)
+{
+    auto typeLayout = layout->parametersLayout->getTypeLayout();
+    return as<ParameterGroupTypeLayout>(typeLayout) != nullptr;
+}
+
+
+} // namespace Slang
+
+using namespace Slang;
+
+// Implementation to back public-facing reflection API
 
 SLANG_API char const* spReflectionUserAttribute_GetName(SlangReflectionUserAttribute* attrib)
 {
@@ -193,10 +301,7 @@ SLANG_API const char* spReflectionUserAttribute_GetArgumentValueString(SlangRefl
     return nullptr;
 }
 
-
-
 // type Reflection
-
 
 SLANG_API SlangTypeKind spReflectionType_GetKind(SlangReflectionType* inType)
 {
@@ -813,28 +918,6 @@ SLANG_API SlangReflectionVariableLayout* spReflectionTypeLayout_getContainerVarL
     return nullptr;
 }
 
-static SlangParameterCategory getParameterCategory(
-    LayoutResourceKind kind)
-{
-    return SlangParameterCategory(kind);
-}
-
-static SlangParameterCategory getParameterCategory(
-    TypeLayout*  typeLayout)
-{
-    auto resourceInfoCount = typeLayout->resourceInfos.getCount();
-    if(resourceInfoCount == 1)
-    {
-        return getParameterCategory(typeLayout->resourceInfos[0].kind);
-    }
-    else if(resourceInfoCount == 0)
-    {
-        // TODO: can this ever happen?
-        return SLANG_PARAMETER_CATEGORY_NONE;
-    }
-    return SLANG_PARAMETER_CATEGORY_MIXED;
-}
-
 SLANG_API SlangParameterCategory spReflectionTypeLayout_GetParameterCategory(SlangReflectionTypeLayout* inTypeLayout)
 {
     auto typeLayout = convert(inTypeLayout);
@@ -983,7 +1066,7 @@ SLANG_API SlangReflectionUserAttribute* spReflectionVariable_FindUserAttributeBy
 {
     auto varDecl = convert(inVar);
     if (!varDecl) return 0;
-    return findUserAttributeByName(convert(session), varDecl, name);
+    return findUserAttributeByName(asInternal(session), varDecl, name);
 }
 
 // Variable Layout Reflection
@@ -1002,54 +1085,6 @@ SLANG_API SlangReflectionTypeLayout* spReflectionVariableLayout_GetTypeLayout(Sl
     if(!varLayout) return nullptr;
 
     return convert(varLayout->getTypeLayout());
-}
-
-namespace Slang
-{
-    // Attempt "do what I mean" remapping from the parameter category the user asked about,
-    // over to a parameter category that they might have meant.
-    static SlangParameterCategory maybeRemapParameterCategory(
-        TypeLayout*             typeLayout,
-        SlangParameterCategory  category)
-    {
-        // Do we have an entry for the category they asked about? Then use that.
-        if (typeLayout->FindResourceInfo(LayoutResourceKind(category)))
-            return category;
-
-        // Do we have an entry for the `DescriptorTableSlot` category?
-        if (typeLayout->FindResourceInfo(LayoutResourceKind::DescriptorTableSlot))
-        {
-            // Is the category they were asking about one that makes sense for the type
-            // of this variable?
-            Type* type = typeLayout->getType();
-            while (auto arrayType = as<ArrayExpressionType>(type))
-                type = arrayType->baseType;
-            switch (spReflectionType_GetKind(convert(type)))
-            {
-            case SLANG_TYPE_KIND_CONSTANT_BUFFER:
-                if(category == SLANG_PARAMETER_CATEGORY_CONSTANT_BUFFER)
-                    return SLANG_PARAMETER_CATEGORY_DESCRIPTOR_TABLE_SLOT;
-                break;
-
-            case SLANG_TYPE_KIND_RESOURCE:
-                if(category == SLANG_PARAMETER_CATEGORY_SHADER_RESOURCE)
-                    return SLANG_PARAMETER_CATEGORY_DESCRIPTOR_TABLE_SLOT;
-                break;
-
-            case SLANG_TYPE_KIND_SAMPLER_STATE:
-                if(category == SLANG_PARAMETER_CATEGORY_SAMPLER_STATE)
-                    return SLANG_PARAMETER_CATEGORY_DESCRIPTOR_TABLE_SLOT;
-                break;
-
-            // TODO: implement more helpers here
-
-            default:
-                break;
-            }
-        }
-
-        return category;
-    }
 }
 
 SLANG_API size_t spReflectionVariableLayout_GetOffset(SlangReflectionVariableLayout* inVarLayout, SlangParameterCategory category)
@@ -1196,40 +1231,7 @@ SLANG_API unsigned spReflectionParameter_GetBindingSpace(SlangReflectionParamete
             spReflectionVariableLayout_GetTypeLayout(varLayout)));
 }
 
-// Helpers for getting parameter count
 
-namespace Slang
-{
-    static unsigned getParameterCount(RefPtr<TypeLayout> typeLayout)
-    {
-        if(auto parameterGroupLayout = as<ParameterGroupTypeLayout>(typeLayout))
-        {
-            typeLayout = parameterGroupLayout->offsetElementTypeLayout;
-        }
-
-        if(auto structLayout = as<StructTypeLayout>(typeLayout))
-        {
-            return (unsigned) structLayout->fields.getCount();
-        }
-
-        return 0;
-    }
-
-    static VarLayout* getParameterByIndex(RefPtr<TypeLayout> typeLayout, unsigned index)
-    {
-        if(auto parameterGroupLayout = as<ParameterGroupTypeLayout>(typeLayout))
-        {
-            typeLayout = parameterGroupLayout->offsetElementTypeLayout;
-        }
-
-        if(auto structLayout = as<StructTypeLayout>(typeLayout))
-        {
-            return structLayout->fields[index];
-        }
-
-        return 0;
-    }
-}
 
 // Entry Point Reflection
 
@@ -1335,13 +1337,6 @@ SLANG_API SlangReflectionVariableLayout* spReflectionEntryPoint_getResultVarLayo
         return nullptr;
 
     return convert(entryPointLayout->resultLayout);
-}
-
-
-static bool hasDefaultConstantBuffer(ScopeLayout* layout)
-{
-    auto typeLayout = layout->parametersLayout->getTypeLayout();
-    return as<ParameterGroupTypeLayout>(typeLayout) != nullptr;
 }
 
 SLANG_API int spReflectionEntryPoint_hasDefaultConstantBuffer(
