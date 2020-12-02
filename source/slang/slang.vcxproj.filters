@@ -315,9 +315,6 @@
     <ClInclude Include="slang-ref-object-reflect.h">
       <Filter>Header Files</Filter>
     </ClInclude>
-    <ClInclude Include="slang-reflection.h">
-      <Filter>Header Files</Filter>
-    </ClInclude>
     <ClInclude Include="slang-repro.h">
       <Filter>Header Files</Filter>
     </ClInclude>
@@ -394,6 +391,9 @@
     </ClCompile>
     <ClCompile Include="..\..\prelude\slang-hlsl-prelude.h.cpp">
       <Filter>Header Files</Filter>
+    </ClCompile>
+    <ClCompile Include="slang-api.cpp">
+      <Filter>Source Files</Filter>
     </ClCompile>
     <ClCompile Include="slang-ast-builder.cpp">
       <Filter>Source Files</Filter>
@@ -683,7 +683,7 @@
     <ClCompile Include="slang-ref-object-reflect.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
-    <ClCompile Include="slang-reflection.cpp">
+    <ClCompile Include="slang-reflection-api.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
     <ClCompile Include="slang-repro.cpp">

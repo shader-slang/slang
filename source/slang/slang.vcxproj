@@ -288,7 +288,6 @@
     <ClInclude Include="slang-profile-defs.h" />
     <ClInclude Include="slang-profile.h" />
     <ClInclude Include="slang-ref-object-reflect.h" />
-    <ClInclude Include="slang-reflection.h" />
     <ClInclude Include="slang-repro.h" />
     <ClInclude Include="slang-serialize-ast-type-info.h" />
     <ClInclude Include="slang-serialize-ast.h" />
@@ -316,6 +315,7 @@
     <ClCompile Include="..\..\prelude\slang-cpp-prelude.h.cpp" />
     <ClCompile Include="..\..\prelude\slang-cuda-prelude.h.cpp" />
     <ClCompile Include="..\..\prelude\slang-hlsl-prelude.h.cpp" />
+    <ClCompile Include="slang-api.cpp" />
     <ClCompile Include="slang-ast-builder.cpp" />
     <ClCompile Include="slang-ast-decl.cpp" />
     <ClCompile Include="slang-ast-dump.cpp" />
@@ -412,7 +412,7 @@
     <ClCompile Include="slang-preprocessor.cpp" />
     <ClCompile Include="slang-profile.cpp" />
     <ClCompile Include="slang-ref-object-reflect.cpp" />
-    <ClCompile Include="slang-reflection.cpp" />
+    <ClCompile Include="slang-reflection-api.cpp" />
     <ClCompile Include="slang-repro.cpp" />
     <ClCompile Include="slang-serialize-ast.cpp" />
     <ClCompile Include="slang-serialize-container.cpp" />
