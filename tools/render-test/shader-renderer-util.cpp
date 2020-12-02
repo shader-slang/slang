@@ -149,7 +149,7 @@ static SamplerState::Desc _calcSamplerDesc(const InputSamplerDesc& srcDesc)
     return dstDesc;
 }
 
-static RefPtr<SamplerState> _createSamplerState(
+RefPtr<SamplerState> _createSamplerState(
     Renderer*               renderer,
     const InputSamplerDesc& srcDesc)
 {

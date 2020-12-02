@@ -1082,270 +1082,6 @@ Result D3D12Renderer::captureTextureToSurface(D3D12Resource& resource, Surface& 
     }
 }
 
-#if 0
-Result D3D12Renderer::calcComputePipelineState(ComPtr<ID3D12RootSignature>& signatureOut, ComPtr<ID3D12PipelineState>& pipelineStateOut)
-{
-    BindParameters bindParameters;
-    _calcBindParameters(bindParameters);
-
-    ComPtr<ID3D12RootSignature> rootSignature;
-    ComPtr<ID3D12PipelineState> pipelineState;
-
-    {
-        D3D12_ROOT_SIGNATURE_DESC rootSignatureDesc;
-        rootSignatureDesc.NumParameters = bindParameters.m_paramIndex;
-        rootSignatureDesc.pParameters = bindParameters.m_parameters;
-        rootSignatureDesc.NumStaticSamplers = 0;
-        rootSignatureDesc.pStaticSamplers = nullptr;
-        rootSignatureDesc.Flags = D3D12_ROOT_SIGNATURE_FLAG_NONE;
-
-        ComPtr<ID3DBlob> signature;
-        ComPtr<ID3DBlob> error;
-        SLANG_RETURN_ON_FAIL(m_D3D12SerializeRootSignature(&rootSignatureDesc, D3D_ROOT_SIGNATURE_VERSION_1, signature.writeRef(), error.writeRef()));
-        SLANG_RETURN_ON_FAIL(m_device->CreateRootSignature(0, signature->GetBufferPointer(), signature->GetBufferSize(), IID_PPV_ARGS(rootSignature.writeRef())));
-    }
-
-    {
-        // Describe and create the compute pipeline state object
-        D3D12_COMPUTE_PIPELINE_STATE_DESC computeDesc = {};
-        computeDesc.pRootSignature = rootSignature;
-        computeDesc.CS = { m_boundShaderProgram->m_computeShader.getBuffer(), m_boundShaderProgram->m_computeShader.Count() };
-        SLANG_RETURN_ON_FAIL(m_device->CreateComputePipelineState(&computeDesc, IID_PPV_ARGS(pipelineState.writeRef())));
-    }
-
-    signatureOut.swap(rootSignature);
-    pipelineStateOut.swap(pipelineState);
-
-    return SLANG_OK;
-}
-#endif
-
-#if 0
-D3D12Renderer::RenderState* D3D12Renderer::findRenderState(PipelineType pipelineType)
-{
-    switch (pipelineType)
-    {
-        case PipelineType::Compute:
-        {
-            // Check if current state is a match
-            if (m_currentRenderState)
-            {
-                if (m_currentRenderState->m_bindingState == m_boundBindingState &&
-                    m_currentRenderState->m_shaderProgram == m_boundShaderProgram)
-                {
-                    return m_currentRenderState;
-                }
-            }
-
-            const int num = int(m_renderStates.Count());
-            for (int i = 0; i < num; i++)
-            {
-                RenderState* renderState = m_renderStates[i];
-                if (renderState->m_bindingState == m_boundBindingState &&
-                    renderState->m_shaderProgram == m_boundShaderProgram)
-                {
-                    return renderState;
-                }
-            }
-            break;
-        }
-        case PipelineType::Graphics:
-        {
-            if (m_currentRenderState)
-            {
-                if (m_currentRenderState->m_bindingState == m_boundBindingState &&
-                    m_currentRenderState->m_inputLayout == m_boundInputLayout &&
-                    m_currentRenderState->m_shaderProgram == m_boundShaderProgram &&
-                    m_currentRenderState->m_primitiveTopologyType == m_primitiveTopologyType)
-                {
-                    return m_currentRenderState;
-                }
-            }
-            // See if matches one in the list
-            {
-                const int num = int(m_renderStates.Count());
-                for (int i = 0; i < num; i++)
-                {
-                    RenderState* renderState = m_renderStates[i];
-                    if (renderState->m_bindingState == m_boundBindingState &&
-                        renderState->m_inputLayout == m_boundInputLayout &&
-                        renderState->m_shaderProgram == m_boundShaderProgram &&
-                        renderState->m_primitiveTopologyType == m_primitiveTopologyType)
-                    {
-                        // Okay we have a match
-                        return renderState;
-                    }
-                }
-            }
-            break;
-        }
-        default: break;
-    }
-    return nullptr;
-}
-
-D3D12Renderer::RenderState* D3D12Renderer::calcRenderState()
-{
-    if (!m_boundShaderProgram)
-    {
-        return nullptr;
-    }
-    m_currentRenderState = findRenderState(m_boundShaderProgram->m_pipelineType);
-    if (m_currentRenderState)
-    {
-        return m_currentRenderState;
-    }
-
-    ComPtr<ID3D12RootSignature> rootSignature;
-    ComPtr<ID3D12PipelineState> pipelineState;
-
-    switch (m_boundShaderProgram->m_pipelineType)
-    {
-        case PipelineType::Compute:
-        {
-            if (SLANG_FAILED(calcComputePipelineState(rootSignature, pipelineState)))
-            {
-                return nullptr;
-            }
-            break;
-        }
-        case PipelineType::Graphics:
-        {
-            if (SLANG_FAILED(calcGraphicsPipelineState(rootSignature, pipelineState)))
-            {
-                return nullptr;
-            }
-            break;
-        }
-        default: return nullptr;
-    }
-
-    RenderState* renderState = new RenderState;
-
-    renderState->m_primitiveTopologyType = m_primitiveTopologyType;
-    renderState->m_bindingState = m_boundBindingState;
-    renderState->m_inputLayout = m_boundInputLayout;
-    renderState->m_shaderProgram = m_boundShaderProgram;
-
-    renderState->m_rootSignature.swap(rootSignature);
-    renderState->m_pipelineState.swap(pipelineState);
-
-    m_renderStates.Add(renderState);
-
-    m_currentRenderState = renderState;
-
-    return renderState;
-}
-
-Result D3D12Renderer::_calcBindParameters(BindParameters& params)
-{
-    int numConstantBuffers = 0;
-    {
-        if (m_boundBindingState)
-        {
-            const int numBoundConstantBuffers = numConstantBuffers;
-
-            const BindingState::Desc& bindingStateDesc = m_boundBindingState->getDesc();
-
-            const auto& bindings = bindingStateDesc.m_bindings;
-            const auto& details = m_boundBindingState->m_bindingDetails;
-
-            const int numBindings = int(bindings.Count());
-
-            for (int i = 0; i < numBindings; i++)
-            {
-                const auto& binding = bindings[i];
-                const auto& detail = details[i];
-
-                const int bindingIndex = binding.registerRange.getSingleIndex();
-
-                if (binding.bindingType == BindingType::Buffer)
-                {
-                    assert(binding.resource && binding.resource->isBuffer());
-                    if (binding.resource->canBind(Resource::BindFlag::ConstantBuffer))
-                    {
-                        // Make sure it's not overlapping the ones we just statically defined
-                        //assert(binding.m_binding < numBoundConstantBuffers);
-
-                        D3D12_ROOT_PARAMETER& param = params.nextParameter();
-                        param.ParameterType = D3D12_ROOT_PARAMETER_TYPE_CBV;
-                        param.ShaderVisibility = D3D12_SHADER_VISIBILITY_ALL;
-
-                        D3D12_ROOT_DESCRIPTOR& descriptor = param.Descriptor;
-                        descriptor.ShaderRegister = bindingIndex;
-                        descriptor.RegisterSpace = 0;
-
-                        numConstantBuffers++;
-                    }
-                }
-
-                if (detail.m_srvIndex >= 0)
-                {
-                    D3D12_DESCRIPTOR_RANGE& range = params.nextRange();
-
-                    range.RangeType = D3D12_DESCRIPTOR_RANGE_TYPE_SRV;
-                    range.NumDescriptors = 1;
-                    range.BaseShaderRegister = bindingIndex;
-                    range.RegisterSpace = 0;
-                    range.OffsetInDescriptorsFromTableStart = D3D12_DESCRIPTOR_RANGE_OFFSET_APPEND;
-
-                    D3D12_ROOT_PARAMETER& param = params.nextParameter();
-
-                    param.ParameterType = D3D12_ROOT_PARAMETER_TYPE_DESCRIPTOR_TABLE;
-                    param.ShaderVisibility = D3D12_SHADER_VISIBILITY_ALL;
-
-                    D3D12_ROOT_DESCRIPTOR_TABLE& table = param.DescriptorTable;
-                    table.NumDescriptorRanges = 1;
-                    table.pDescriptorRanges = &range;
-                }
-
-                if (detail.m_uavIndex >= 0)
-                {
-                    D3D12_DESCRIPTOR_RANGE& range = params.nextRange();
-
-                    range.RangeType = D3D12_DESCRIPTOR_RANGE_TYPE_UAV;
-                    range.NumDescriptors = 1;
-                    range.BaseShaderRegister = bindingIndex;
-                    range.RegisterSpace = 0;
-                    range.OffsetInDescriptorsFromTableStart = D3D12_DESCRIPTOR_RANGE_OFFSET_APPEND;
-
-                    D3D12_ROOT_PARAMETER& param = params.nextParameter();
-
-                    param.ParameterType = D3D12_ROOT_PARAMETER_TYPE_DESCRIPTOR_TABLE;
-                    param.ShaderVisibility = D3D12_SHADER_VISIBILITY_ALL;
-
-                    D3D12_ROOT_DESCRIPTOR_TABLE& table = param.DescriptorTable;
-                    table.NumDescriptorRanges = 1;
-                    table.pDescriptorRanges = &range;
-                }
-            }
-        }
-    }
-
-    // All the samplers are in one continuous section of the sampler heap
-    if (m_boundBindingState && m_boundBindingState->m_samplerHeap.getUsedSize() > 0)
-    {
-        D3D12_DESCRIPTOR_RANGE& range = params.nextRange();
-
-        range.RangeType = D3D12_DESCRIPTOR_RANGE_TYPE_SAMPLER;
-        range.NumDescriptors = m_boundBindingState->m_samplerHeap.getUsedSize();
-        range.BaseShaderRegister = 0;
-        range.RegisterSpace = 0;
-        range.OffsetInDescriptorsFromTableStart = D3D12_DESCRIPTOR_RANGE_OFFSET_APPEND;
-
-        D3D12_ROOT_PARAMETER& param = params.nextParameter();
-
-        param.ParameterType = D3D12_ROOT_PARAMETER_TYPE_DESCRIPTOR_TABLE;
-        param.ShaderVisibility = D3D12_SHADER_VISIBILITY_ALL;
-
-        D3D12_ROOT_DESCRIPTOR_TABLE& table = param.DescriptorTable;
-        table.NumDescriptorRanges = 1;
-        table.pDescriptorRanges = &range;
-    }
-    return SLANG_OK;
-}
-#endif
-
 Result D3D12Renderer::_bindRenderState(PipelineStateImpl* pipelineStateImpl, ID3D12GraphicsCommandList* commandList, Submitter* submitter)
 {
     // TODO: we should only set some of this state as needed...
@@ -2952,176 +2688,6 @@ void D3D12Renderer::dispatchCompute(int x, int y, int z)
     commandList->Dispatch(x, y, z);
 }
 
-#if 0
-BindingState* D3D12Renderer::createBindingState(const BindingState::Desc& bindingStateDesc)
-{
-    RefPtr<BindingStateImpl> bindingState(new BindingStateImpl(bindingStateDesc));
-
-    SLANG_RETURN_NULL_ON_FAIL(bindingState->init(m_device));
-
-    const auto& srcBindings = bindingStateDesc.m_bindings;
-    const int numBindings = int(srcBindings.Count());
-
-    auto& dstDetails = bindingState->m_bindingDetails;
-    dstDetails.SetSize(numBindings);
-
-    for (int i = 0; i < numBindings; ++i)
-    {
-        const auto& srcEntry = srcBindings[i];
-        auto& dstDetail = dstDetails[i];
-
-        const int bindingIndex = srcEntry.registerRange.getSingleIndex();
-
-        switch (srcEntry.bindingType)
-        {
-            case BindingType::Buffer:
-            {
-                assert(srcEntry.resource && srcEntry.resource->isBuffer());
-                BufferResourceImpl* bufferResource = static_cast<BufferResourceImpl*>(srcEntry.resource.Ptr());
-                const BufferResource::Desc& desc = bufferResource->getDesc();
-
-                const size_t bufferSize = bufferDesc.sizeInBytes;
-                const int elemSize = bufferDesc.elementSize <= 0 ? sizeof(uint32_t) : bufferDesc.elementSize;
-
-                const  bool createSrv = false;
-
-                // NOTE! In this arrangement the buffer can either be a ConstantBuffer or a 'StorageBuffer'.
-                // If it's a storage buffer then it has a 'uav'.
-                // In neither circumstance is there an associated srv
-                // This departs a little from dx11 code - in that it will create srv and uav for a storage buffer.
-                if (bufferDesc.bindFlags & Resource::BindFlag::UnorderedAccess)
-                {
-                    dstDetail.m_uavIndex = bindingState->m_viewHeap.allocate();
-                    if (dstDetail.m_uavIndex < 0)
-                    {
-                        return nullptr;
-                    }
-
-                    D3D12_UNORDERED_ACCESS_VIEW_DESC uavDesc = {};
-
-                    uavDesc.ViewDimension = D3D12_UAV_DIMENSION_BUFFER;
-                    uavDesc.Format = D3DUtil::getMapFormat(bufferDesc.format);
-
-                    uavDesc.Buffer.StructureByteStride = elemSize;
-
-                    uavDesc.Buffer.FirstElement = 0;
-                    uavDesc.Buffer.NumElements = (UINT)(bufferSize / elemSize);
-                    uavDesc.Buffer.Flags = D3D12_BUFFER_UAV_FLAG_NONE;
-
-                    if (bufferDesc.elementSize == 0 && bufferDesc.format == Format::Unknown)
-                    {
-                        uavDesc.Buffer.Flags |= D3D12_BUFFER_UAV_FLAG_RAW;
-                        uavDesc.Format = DXGI_FORMAT_R32_TYPELESS;
-
-                        uavDesc.Buffer.StructureByteStride = 0;
-                    }
-                    else if( bufferDesc.format != Format::Unknown )
-                    {
-                        uavDesc.Buffer.StructureByteStride = 0;
-                    }
-
-                    m_device->CreateUnorderedAccessView(bufferResource->m_resource, nullptr, &uavDesc, bindingState->m_viewHeap.getCpuHandle(dstDetail.m_uavIndex));
-                }
-                if (createSrv && (bufferDesc.bindFlags & (Resource::BindFlag::NonPixelShaderResource | Resource::BindFlag::PixelShaderResource)))
-                {
-                    dstDetail.m_srvIndex = bindingState->m_viewHeap.allocate();
-                    if (dstDetail.m_srvIndex < 0)
-                    {
-                        return nullptr;
-                    }
-
-                    D3D12_SHADER_RESOURCE_VIEW_DESC srvDesc;
-
-                    srvDesc.ViewDimension = D3D12_SRV_DIMENSION_BUFFER;
-                    srvDesc.Format = DXGI_FORMAT_UNKNOWN;
-                    srvDesc.Shader4ComponentMapping = D3D12_DEFAULT_SHADER_4_COMPONENT_MAPPING;
-
-                    srvDesc.Buffer.FirstElement = 0;
-                    srvDesc.Buffer.NumElements = (UINT)(bufferSize / elemSize);
-                    srvDesc.Buffer.StructureByteStride = elemSize;
-                    srvDesc.Buffer.Flags = D3D12_BUFFER_SRV_FLAG_NONE;
-
-                    if (bufferDesc.elementSize == 0)
-                    {
-                        srvDesc.Format = DXGI_FORMAT_R32_FLOAT;
-                    }
-
-                    m_device->CreateShaderResourceView(bufferResource->m_resource, &srvDesc, bindingState->m_viewHeap.getCpuHandle(dstDetail.m_srvIndex));
-                }
-
-                break;
-            }
-            case BindingType::Texture:
-            {
-                assert(srcEntry.resource && srcEntry.resource->isTexture());
-
-                TextureResourceImpl* textureResource = static_cast<TextureResourceImpl*>(srcEntry.resource.Ptr());
-
-                dstDetail.m_srvIndex = bindingState->m_viewHeap.allocate();
-                if (dstDetail.m_srvIndex < 0)
-                {
-                    return nullptr;
-                }
-
-                {
-                    const D3D12_RESOURCE_DESC resourceDesc = textureResource->m_resource.getResource()->GetDesc();
-                    const DXGI_FORMAT pixelFormat = resourceDesc.Format;
-
-                    D3D12_SHADER_RESOURCE_VIEW_DESC srvDesc;
-                    _initSrvDesc(textureResource->getType(), textureResource->getDesc(), resourceDesc, pixelFormat, srvDesc);
-
-                    // Create descriptor
-                    m_device->CreateShaderResourceView(textureResource->m_resource, &srvDesc, bindingState->m_viewHeap.getCpuHandle(dstDetail.m_srvIndex));
-                }
-
-                break;
-            }
-            case BindingType::Sampler:
-            {
-                const BindingState::SamplerDesc& samplerDesc = bindingStateDesc.m_samplerDescs[srcEntry.descIndex];
-
-                const int samplerIndex = bindingIndex;
-                dstDetail.m_samplerIndex = samplerIndex;
-                bindingState->m_samplerHeap.placeAt(samplerIndex);
-
-                D3D12_SAMPLER_DESC desc = {};
-                desc.AddressU = desc.AddressV = desc.AddressW = D3D12_TEXTURE_ADDRESS_MODE_WRAP;
-                desc.ComparisonFunc = D3D12_COMPARISON_FUNC_ALWAYS;
-
-                if (samplerDesc.isCompareSampler)
-                {
-                    desc.ComparisonFunc = D3D12_COMPARISON_FUNC_LESS_EQUAL;
-                    desc.Filter = D3D12_FILTER_MIN_LINEAR_MAG_MIP_POINT;
-                }
-                else
-                {
-                    desc.Filter = D3D12_FILTER_ANISOTROPIC;
-                    desc.MaxAnisotropy = 8;
-                    desc.MinLOD = 0.0f;
-                    desc.MaxLOD = 100.0f;
-                }
-
-                m_device->CreateSampler(&desc, bindingState->m_samplerHeap.getCpuHandle(samplerIndex));
-
-                break;
-            }
-            case BindingType::CombinedTextureSampler:
-            {
-                assert(!"Not implemented");
-                return nullptr;
-            }
-        }
-    }
-
-    return bindingState.detach();
-}
-
-void D3D12Renderer::setBindingState(BindingState* state)
-{
-    m_boundBindingState = static_cast<BindingStateImpl*>(state);
-}
-#endif
-
 void D3D12Renderer::DescriptorSetImpl::setConstantBuffer(UInt range, UInt index, BufferResource* buffer)
 {
     auto dxDevice = m_renderer->m_device;
@@ -3525,10 +3091,10 @@ Result D3D12Renderer::createDescriptorSetLayout(const DescriptorSetLayout::Desc&
     // Finally, we will go through and fill in ready-to-go D3D
     // register range information.
     {
-        UInt cbvCounter = 0;
-        UInt srvCounter = 0;
-        UInt uavCounter = 0;
-        UInt samplerCounter = 0;
+        UInt cbvRegisterCounter = 0;
+        UInt srvRegisterCounter = 0;
+        UInt uavRegisterCounter = 0;
+        UInt samplerRegisterCounter = 0;
 
         Int resourceRangeCounter = 0;
         Int samplerRangeCounter = 0;
@@ -3548,7 +3114,6 @@ Result D3D12Renderer::createDescriptorSetLayout(const DescriptorSetLayout::Desc&
 
             Int dxRangeIndex = -1;
             Int dxPairedSamplerRangeIndex = -1;
-
             switch(rangeDesc.type)
             {
             default:
@@ -3586,7 +3151,12 @@ Result D3D12Renderer::createDescriptorSetLayout(const DescriptorSetLayout::Desc&
                     // so that this range doesn't turn into a descriptor
                     // range in one of the D3D12 descriptor tables.
                     //
-                    UInt bindingIndex = cbvCounter; cbvCounter += bindingCount;
+                    Int dxRegister = rangeDesc.binding;
+                    if( dxRegister < 0 )
+                    {
+                        dxRegister = cbvRegisterCounter;
+                    }
+                    cbvRegisterCounter = dxRegister + bindingCount;
 
                     auto rootConstantRangeIndex = descriptorSetLayoutImpl->m_ranges[rr].arrayIndex;
                     auto rootParamIndex = descriptorSetLayoutImpl->m_rootConstantRanges[rootConstantRangeIndex].rootParamIndex;
@@ -3598,7 +3168,7 @@ Result D3D12Renderer::createDescriptorSetLayout(const DescriptorSetLayout::Desc&
                     //
                     auto& dxRootParam = descriptorSetLayoutImpl->m_dxRootParameters[rootParamIndex];
                     dxRootParam.Constants.RegisterSpace = UINT(bindingSpace);
-                    dxRootParam.Constants.ShaderRegister = UINT(bindingIndex);
+                    dxRootParam.Constants.ShaderRegister = UINT(dxRegister);
                     continue;
                 }
                 break;
@@ -3606,6 +3176,8 @@ Result D3D12Renderer::createDescriptorSetLayout(const DescriptorSetLayout::Desc&
 
             D3D12_DESCRIPTOR_RANGE& dxRange = descriptorSetLayoutImpl->m_dxRanges[dxRangeIndex];
             memset(&dxRange, 0, sizeof(dxRange));
+
+            Int dxRegister = rangeDesc.binding;
 
             switch(rangeDesc.type)
             {
@@ -3615,11 +3187,15 @@ Result D3D12Renderer::createDescriptorSetLayout(const DescriptorSetLayout::Desc&
 
             case DescriptorSlotType::Sampler:
                 {
-                    UInt bindingIndex = samplerCounter; samplerCounter += bindingCount;
+                    if( dxRegister < 0 )
+                    {
+                        dxRegister = samplerRegisterCounter;
+                    }
+                    samplerRegisterCounter = dxRegister + bindingCount;
 
                     dxRange.RangeType = D3D12_DESCRIPTOR_RANGE_TYPE_SAMPLER;
                     dxRange.NumDescriptors = UINT(bindingCount);
-                    dxRange.BaseShaderRegister = UINT(bindingIndex);
+                    dxRange.BaseShaderRegister = UINT(dxRegister);
                     dxRange.RegisterSpace = UINT(bindingSpace);
                     dxRange.OffsetInDescriptorsFromTableStart = D3D12_DESCRIPTOR_RANGE_OFFSET_APPEND;
                 }
@@ -3628,11 +3204,15 @@ Result D3D12Renderer::createDescriptorSetLayout(const DescriptorSetLayout::Desc&
             case DescriptorSlotType::SampledImage:
             case DescriptorSlotType::UniformTexelBuffer:
                 {
-                    UInt bindingIndex = srvCounter; srvCounter += bindingCount;
+                    if( dxRegister < 0 )
+                    {
+                        dxRegister = srvRegisterCounter;
+                    }
+                    srvRegisterCounter = dxRegister + bindingCount;
 
                     dxRange.RangeType = D3D12_DESCRIPTOR_RANGE_TYPE_SRV;
                     dxRange.NumDescriptors = UINT(bindingCount);
-                    dxRange.BaseShaderRegister = UINT(bindingIndex);
+                    dxRange.BaseShaderRegister = UINT(dxRegister);
                     dxRange.RegisterSpace = UINT(bindingSpace);
                     dxRange.OffsetInDescriptorsFromTableStart = D3D12_DESCRIPTOR_RANGE_OFFSET_APPEND;
                 }
@@ -3642,15 +3222,31 @@ Result D3D12Renderer::createDescriptorSetLayout(const DescriptorSetLayout::Desc&
                 {
                     // The combined texture/sampler case basically just
                     // does the work of both the SRV and sampler cases above.
+                    //
+                    // TODO(tfoley): The current API for passing down an
+                    // explicit register/binding can't handle the requirement
+                    // that we specify *two* registers/bindings for the
+                    // combined image/sampler case.
+                    //
+                    // Realistically, the `Renderer` implementation for
+                    // targes that don't support combined texture/sampler
+                    // bindings should just error out when a client attempts
+                    // to create a descriptor set that uses them (rather than
+                    // the current behavior which adds a lot of complexity
+                    // in the name of trying to make them work).
 
                     {
                         // Here's the SRV logic:
-
-                        UInt bindingIndex = srvCounter; srvCounter += bindingCount;
+                        Int srvRegister = dxRegister;
+                        if( srvRegister < 0 )
+                        {
+                            srvRegister = srvRegisterCounter;
+                        }
+                        srvRegisterCounter = srvRegister + bindingCount;
 
                         dxRange.RangeType = D3D12_DESCRIPTOR_RANGE_TYPE_SRV;
                         dxRange.NumDescriptors = UINT(bindingCount);
-                        dxRange.BaseShaderRegister = UINT(bindingIndex);
+                        dxRange.BaseShaderRegister = UINT(srvRegister);
                         dxRange.RegisterSpace = UINT(bindingSpace);
                         dxRange.OffsetInDescriptorsFromTableStart = D3D12_DESCRIPTOR_RANGE_OFFSET_APPEND;
                     }
@@ -3660,11 +3256,16 @@ Result D3D12Renderer::createDescriptorSetLayout(const DescriptorSetLayout::Desc&
                         D3D12_DESCRIPTOR_RANGE& dxPairedSamplerRange = descriptorSetLayoutImpl->m_dxRanges[dxPairedSamplerRangeIndex];
                         memset(&dxPairedSamplerRange, 0, sizeof(dxPairedSamplerRange));
 
-                        UInt pairedSamplerBindingIndex = srvCounter; srvCounter += bindingCount;
+                        Int samplerRegister = dxRegister;
+                        if( samplerRegister < 0 )
+                        {
+                            samplerRegister = samplerRegisterCounter;
+                        }
+                        samplerRegisterCounter = samplerRegister + bindingCount;
 
                         dxPairedSamplerRange.RangeType = D3D12_DESCRIPTOR_RANGE_TYPE_SAMPLER;
                         dxPairedSamplerRange.NumDescriptors = UINT(bindingCount);
-                        dxPairedSamplerRange.BaseShaderRegister = UINT(pairedSamplerBindingIndex);
+                        dxPairedSamplerRange.BaseShaderRegister = UINT(samplerRegister);
                         dxPairedSamplerRange.RegisterSpace = UINT(bindingSpace);
                         dxPairedSamplerRange.OffsetInDescriptorsFromTableStart = D3D12_DESCRIPTOR_RANGE_OFFSET_APPEND;
                     }
@@ -3679,11 +3280,15 @@ Result D3D12Renderer::createDescriptorSetLayout(const DescriptorSetLayout::Desc&
             case DescriptorSlotType::StorageBuffer:
             case DescriptorSlotType::DynamicStorageBuffer:
                 {
-                    UInt bindingIndex = uavCounter; uavCounter += bindingCount;
+                    if( dxRegister < 0 )
+                    {
+                        dxRegister = uavRegisterCounter;
+                    }
+                    uavRegisterCounter = dxRegister + bindingCount;
 
                     dxRange.RangeType = D3D12_DESCRIPTOR_RANGE_TYPE_UAV;
                     dxRange.NumDescriptors = UINT(bindingCount);
-                    dxRange.BaseShaderRegister = UINT(bindingIndex);
+                    dxRange.BaseShaderRegister = UINT(dxRegister);
                     dxRange.RegisterSpace = UINT(bindingSpace);
                     dxRange.OffsetInDescriptorsFromTableStart = D3D12_DESCRIPTOR_RANGE_OFFSET_APPEND;
                 }
@@ -3692,15 +3297,23 @@ Result D3D12Renderer::createDescriptorSetLayout(const DescriptorSetLayout::Desc&
             case DescriptorSlotType::UniformBuffer:
             case DescriptorSlotType::DynamicUniformBuffer:
                 {
-                    UInt bindingIndex = cbvCounter; cbvCounter += bindingCount;
+                    if( dxRegister < 0 )
+                    {
+                        dxRegister = cbvRegisterCounter;
+                    }
+                    cbvRegisterCounter = dxRegister + bindingCount;
 
                     dxRange.RangeType = D3D12_DESCRIPTOR_RANGE_TYPE_CBV;
                     dxRange.NumDescriptors = UINT(bindingCount);
-                    dxRange.BaseShaderRegister = UINT(bindingIndex);
+                    dxRange.BaseShaderRegister = UINT(dxRegister);
                     dxRange.RegisterSpace = UINT(bindingSpace);
                     dxRange.OffsetInDescriptorsFromTableStart = D3D12_DESCRIPTOR_RANGE_OFFSET_APPEND;
                 }
                 break;
+
+
+
+
             }
         }
     }
@@ -3722,6 +3335,8 @@ Result D3D12Renderer::createPipelineLayout(const PipelineLayout::Desc& desc, Pip
 
     auto descriptorSetCount = desc.descriptorSetCount;
 
+    Int spaceCounter = 0;
+
     // We are going to make two passes over the descriptor set layouts
     // that are being used to build the pipeline layout. In the first
     // pass we will collect all the descriptor ranges that have been
@@ -3740,7 +3355,12 @@ Result D3D12Renderer::createPipelineLayout(const PipelineLayout::Desc& desc, Pip
         // that comes from multiple spaces (e.g., if it contains an unbounded
         // array).
         //
-        UInt bindingSpace   = dd;
+        Int space = descriptorSetInfo.space;
+        if( space < 0 )
+        {
+            space = spaceCounter;
+        }
+        spaceCounter = space+1;
 
         // Copy descriptor range information from the set layout into our
         // temporary copy (this is required because the same set layout
@@ -3754,7 +3374,7 @@ Result D3D12Renderer::createPipelineLayout(const PipelineLayout::Desc& desc, Pip
         {
             auto& range = ranges[rangeCount++];
             range = setDescriptorRange;
-            range.RegisterSpace = UINT(bindingSpace);
+            range.RegisterSpace = UINT(space);
 
             // HACK: in order to deal with SM5.0 shaders, `u` registers
             // in `space0` need to start with a number *after* the number

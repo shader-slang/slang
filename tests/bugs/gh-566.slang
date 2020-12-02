@@ -1,8 +1,8 @@
 // legalize-struct-init.slang
 
 //TEST(compute):COMPARE_COMPUTE:
-//TEST_INPUT:ubuffer(data=[0 0 0 0], stride=4):out
-//TEST_INPUT:ubuffer(data=[4 3 2 1], stride=4):
+//TEST_INPUT:ubuffer(data=[0 0 0 0], stride=4):out,name outputBuffer
+//TEST_INPUT:ubuffer(data=[4 3 2 1], stride=4):name inputBuffer
 
 
 RWStructuredBuffer<uint> outputBuffer;

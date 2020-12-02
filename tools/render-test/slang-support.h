@@ -10,6 +10,8 @@
 
 namespace renderer_test {
 
+gfx::StageType translateStage(SlangStage slangStage);
+
 struct ShaderCompilerUtil
 {
     struct Input
@@ -42,19 +44,21 @@ struct ShaderCompilerUtil
             }
 
             kernelDescs.clear();
-            if (request && session)
+            if (m_requestForKernels && session)
             {
-                spDestroyCompileRequest(request);
+                spDestroyCompileRequest(m_requestForKernels);
+            }
+            if (m_extraRequestForReflection && session)
+            {
+                spDestroyCompileRequest(m_extraRequestForReflection);
             }
             session = nullptr;
-            request = nullptr;
+            m_requestForKernels = nullptr;
+            m_extraRequestForReflection = nullptr;
         }
         ~Output()
         {
-            if (request && session)
-            {
-                 spDestroyCompileRequest(request);
-            }
+            reset();
         }
 
         Slang::Index findKernelDescIndex(gfx::StageType stage) const
@@ -71,7 +75,16 @@ struct ShaderCompilerUtil
 
         List<ShaderProgram::KernelDesc> kernelDescs;
         ShaderProgram::Desc desc;
-        SlangCompileRequest* request = nullptr;
+
+            /// Compile request that owns the lifetime of compiled kernel code.
+        SlangCompileRequest* m_requestForKernels = nullptr;
+
+            /// Compile request that owns the lifetime of reflection information.
+        SlangCompileRequest* m_extraRequestForReflection = nullptr;
+
+        SlangCompileRequest* getRequestForKernels() const { return m_requestForKernels; }
+        SlangCompileRequest* getRequestForReflection() const { return m_extraRequestForReflection ? m_extraRequestForReflection : m_requestForKernels; }
+
         SlangSession* session = nullptr;
 
     };
@@ -87,6 +100,7 @@ struct ShaderCompilerUtil
 
     static SlangResult readSource(const Slang::String& inSourcePath, List<char>& outSourceText);
 
+    static SlangResult _compileProgramImpl(SlangSession* session, const Options& options, const Input& input, const ShaderCompileRequest& request, Output& out);
     static SlangResult compileProgram(SlangSession* session, const Options& options, const Input& input, const ShaderCompileRequest& request, Output& out);
 };
 

@@ -3,6 +3,10 @@
 
 #include <stdint.h>
 
+#ifndef SLANG_HANDLE_RESULT_FAIL
+#define SLANG_HANDLE_RESULT_FAIL(x) assert(!"failure")
+#endif
+
 #include "../../slang-com-helper.h"
 #include "../../source/core/slang-writer.h"
 
@@ -62,6 +66,8 @@ struct Options
 
     bool useDXIL = false;
     bool onlyStartup = false;
+
+    bool useShaderObjects = false;
 
     bool performanceProfile = false;
 
