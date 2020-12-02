@@ -488,12 +488,12 @@ struct OptionsParser
                 }
                 else if (argStr == "-dump-repro")
                 {
-                    SLANG_RETURN_ON_FAIL(tryReadCommandLineArgument(sink, arg, &argCursor, argEnd, requestImpl->dumpRepro));
+                    SLANG_RETURN_ON_FAIL(tryReadCommandLineArgument(sink, arg, &argCursor, argEnd, requestImpl->m_dumpRepro));
                     spEnableReproCapture(compileRequest);
                 }
                 else if (argStr == "-dump-repro-on-error")
                 {
-                    requestImpl->dumpReproOnError = true;
+                    requestImpl->m_dumpReproOnError = true;
                 }
                 else if (argStr == "-extract-repro")
                 {
@@ -597,7 +597,7 @@ struct OptionsParser
                 }
                 else if(argStr == "-skip-codegen" )
                 {
-                    requestImpl->shouldSkipCodegen = true;
+                    requestImpl->m_shouldSkipCodegen = true;
                 }
                 else if(argStr == "-parameter-blocks-use-register-spaces" )
                 {
@@ -1170,7 +1170,7 @@ struct OptionsParser
         // because fxc/dxc/glslang don't have a facility for taking
         // a named entry point and pulling its stage from an attribute.
         //
-        if(_passThroughRequiresStage(requestImpl->passThrough) )
+        if(_passThroughRequiresStage(requestImpl->m_passThrough) )
         {
             for( auto& rawEntryPoint : rawEntryPoints )
             {
@@ -1513,10 +1513,10 @@ struct OptionsParser
             auto targetID = rawTargets[rawOutput.targetIndex].targetID;
             auto target = requestImpl->getLinkage()->targets[targetID];
             RefPtr<EndToEndCompileRequest::TargetInfo> targetInfo;
-            if( !requestImpl->targetInfos.TryGetValue(target, targetInfo) )
+            if( !requestImpl->m_targetInfos.TryGetValue(target, targetInfo) )
             {
                 targetInfo = new EndToEndCompileRequest::TargetInfo();
-                requestImpl->targetInfos[target] = targetInfo;
+                requestImpl->m_targetInfos[target] = targetInfo;
             }
 
             if (rawOutput.isWholeProgram)
@@ -1556,14 +1556,14 @@ struct OptionsParser
 
 
 SlangResult parseOptions(
-    SlangCompileRequest*    compileRequestIn,
+    SlangCompileRequest*    inCompileRequest,
     int                     argc,
     char const* const*      argv)
 {
-    Slang::EndToEndCompileRequest* compileRequest = (Slang::EndToEndCompileRequest*) compileRequestIn;
+    Slang::EndToEndCompileRequest* compileRequest = asInternal(inCompileRequest);
 
     OptionsParser parser;
-    parser.compileRequest = compileRequestIn;
+    parser.compileRequest = inCompileRequest;
     parser.requestImpl = compileRequest;
     parser.session = (SlangSession*)compileRequest->getSession();
 
@@ -1573,7 +1573,7 @@ SlangResult parseOptions(
     if (sink->getErrorCount() > 0)
     {
         // Put the errors in the diagnostic 
-        compileRequest->mDiagnosticOutput = sink->outputBuffer.ProduceString();
+        compileRequest->m_diagnosticOutput = sink->outputBuffer.ProduceString();
     }
 
     return res;
@@ -1582,10 +1582,4 @@ SlangResult parseOptions(
 
 } // namespace Slang
 
-SLANG_API SlangResult spProcessCommandLineArguments(
-    SlangCompileRequest*    request,
-    char const* const*      args,
-    int                     argCount)
-{
-    return Slang::parseOptions(request, argCount, args);
-}
+
