@@ -50,6 +50,9 @@
     <ClCompile Include="unit-test-byte-encode.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
+    <ClCompile Include="unit-test-compression.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
     <ClCompile Include="unit-test-find-type-by-name.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>

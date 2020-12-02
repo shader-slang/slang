@@ -5,26 +5,34 @@
 #include "slang-stream.h"
 #include "slang-text-io.h"
 #include "slang-secure-crt.h"
+#include "slang-blob.h"
 
 namespace Slang
 {
-	class File
-	{
-	public:
-		static bool exists(const String& fileName);
-		static String readAllText(const String& fileName);
-		static List<unsigned char> readAllBytes(const String& fileName);
-		static void writeAllText(const String& fileName, const String& text);
+    class File
+    {
+    public:
+        static bool exists(const String& fileName);
+
+        static String readAllText(const String& fileName);
+
+        static List<unsigned char> readAllBytes(const String& fileName);
+        static SlangResult readAllBytes(const String& fileName, ScopedAllocation& out);
+
+        static void writeAllText(const String& fileName, const String& text);
+
+        static SlangResult writeAllBytes(const String& fileName, const void* data, size_t size);
+        
         static SlangResult remove(const String& fileName);
 
         static SlangResult makeExecutable(const String& fileName);
 
         static SlangResult generateTemporary(const UnownedStringSlice& prefix, String& outFileName);
-	};
+    };
 
-	class Path
-	{
-	public:
+    class Path
+    {
+    public:
 
         enum class Type
         {
@@ -50,7 +58,7 @@ namespace Slang
             virtual void accept(Type type, const UnownedStringSlice& filename) = 0;
         };
 
-		static const char kPathDelimiter = '/';
+        static const char kPathDelimiter = '/';
 
             /// Finds all all the items in the specified directory, that matches the pattern.
             ///
@@ -64,16 +72,16 @@ namespace Slang
             /// Finds the index of the last dot in a path, else returns -1
         static Index findExtIndex(String const& path);
 
-		static String replaceExt(const String& path, const char* newExt);
-		static String getFileName(const String& path);
-		static String getPathWithoutExt(const String& path);
-		static String getPathExt(const String& path);
-		static String getParentDirectory(const String& path);
+        static String replaceExt(const String& path, const char* newExt);
+        static String getFileName(const String& path);
+        static String getPathWithoutExt(const String& path);
+        static String getPathExt(const String& path);
+        static String getParentDirectory(const String& path);
 
         static String getFileNameWithoutExt(const String& path);
 
-		static String combine(const String& path1, const String& path2);
-		static String combine(const String& path1, const String& path2, const String& path3);
+        static String combine(const String& path1, const String& path2);
+        static String combine(const String& path1, const String& path2, const String& path3);
 
             /// Combine path sections and store the result in outBuilder
         static void combineIntoBuilder(const UnownedStringSlice& path1, const UnownedStringSlice& path2, StringBuilder& outBuilder);
@@ -81,7 +89,7 @@ namespace Slang
             /// Append a path, taking into account path separators onto the end of ioBuilder 
         static void append(StringBuilder& ioBuilder, const UnownedStringSlice& path);
 
-		static bool createDirectory(const String& path);
+        static bool createDirectory(const String& path);
 
             /// Accept either style of delimiter
         SLANG_FORCE_INLINE static bool isDelimiter(char c) { return c == '/' || c == '\\'; }
@@ -131,7 +139,7 @@ namespace Slang
             /// @param path
             /// @return SLANG_OK if file or directory is removed
         static SlangResult remove(const String& path);
-	};
+    };
 
     // Helper class to clean up temporary files on dtor
     class TemporaryFileSet: public RefObject

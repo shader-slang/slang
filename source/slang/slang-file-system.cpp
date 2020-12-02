@@ -125,7 +125,7 @@ SlangResult OSFileSystem::getSimplifiedPath(const char* pathIn, ISlangBlob** out
 {
     SLANG_RETURN_ON_FAIL(_checkExt(m_style));
 
-    String simplifiedPath = Path::simplify(_fixPathDelimiters(pathIn));
+    String simplifiedPath = Path::simplify(pathIn);
     *outSimplifiedPath = StringUtil::createStringBlob(simplifiedPath).detach();
     return SLANG_OK;
 }
@@ -160,44 +160,10 @@ SlangResult OSFileSystem::loadFile(char const* pathIn, ISlangBlob** outBlob)
         return SLANG_E_NOT_FOUND;
     }
 
-    try
-    {
-        FileStream stream(path, FileMode::Open, FileAccess::Read, FileShare::ReadWrite);
-
-        stream.seek(SeekOrigin::End, 0);
-        const Int64 positionSizeInBytes = stream.getPosition();
-        stream.seek(SeekOrigin::Start, 0);
-
-        if (UInt64(positionSizeInBytes) > UInt64(~size_t(0)))
-        {
-            // It's too large to fit in memory.
-            return SLANG_FAIL;
-        }
-
-        const size_t sizeInBytes = size_t(positionSizeInBytes);
-
-        ScopedAllocation alloc;
-        void* data = alloc.allocate(sizeInBytes);
-        if (!data)
-        {
-            return SLANG_E_OUT_OF_MEMORY;
-        }
-
-        const size_t readSizeInBytes = stream.read(data, sizeInBytes);
-
-        // If not all read just return an error
-        if (sizeInBytes != readSizeInBytes)
-        {
-            return SLANG_FAIL;
-        }
-
-        *outBlob = RawBlob::moveCreate((uint8_t*)alloc.detach(), sizeInBytes).detach();
-        return SLANG_OK;
-    }
-    catch (...)
-    {
-    }
-    return SLANG_E_CANNOT_OPEN;
+    ScopedAllocation alloc;
+    SLANG_RETURN_ON_FAIL(File::readAllBytes(path, alloc));
+    *outBlob = RawBlob::moveCreate(alloc).detach();
+    return SLANG_OK;
 }
 
 SlangResult OSFileSystem::enumeratePathContents(const char* path, FileSystemContentsCallBack callback, void* userData) 
@@ -431,6 +397,12 @@ SlangResult CacheFileSystem::enumeratePathContents(const char* path, FileSystemC
     // Simplify the path
     String simplifiedPath = Path::simplify(path);
 
+    // If the simplified path is just a . then we don't have any prefix
+    if (simplifiedPath == ".")
+    {
+        simplifiedPath = "";
+    }
+
     for (auto& pair : m_pathMap)
     {
         // NOTE! The currentPath can be a *non* simplified path (the m_pathMap is the cache of paths simplified and other to a file/directory)
@@ -451,11 +423,10 @@ SlangResult CacheFileSystem::enumeratePathContents(const char* path, FileSystemC
             remaining = UnownedStringSlice(remaining.begin() + 1, remaining.end());
         }
 
-        // If it has a / then it's either not simplified - so we ignore (we only want to invoke on the simplified path version as there is only one
+        // If it has a path separator then it's either not simplified - so we ignore (we only want to invoke on the simplified path version as there is only one
         // of these for every PathInfo)
         // or it is a child file/directory, and so we ignore that too.
-        Index index = remaining.indexOf('/');
-        if (index >= 0)
+        if (remaining.indexOf('/') >= 0 || remaining.indexOf('\\') >= 0)
         {
             continue;
         }
@@ -711,7 +682,7 @@ SlangResult CacheFileSystem::getSimplifiedPath(const char* path, ISlangBlob** ou
         }
         case PathStyle::Simplifiable:
         {
-            String simplifiedPath = Path::simplify(_fixPathDelimiters(path));
+            String simplifiedPath = Path::simplify(path);
             *outSimplifiedPath = StringUtil::createStringBlob(simplifiedPath).detach();
             return SLANG_OK;
         }
