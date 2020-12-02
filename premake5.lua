@@ -567,6 +567,8 @@ if isTargetWindows then
 
     example "gpu-printing"
         kind "ConsoleApp"
+
+    example "shader-toy"
 end
 
 example "cpu-hello-world"
