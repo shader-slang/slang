@@ -39,33 +39,11 @@ jobs:
           tar -czf ${SLANG_BINARY_ARCHIVE_TAR} bin/*/*/slangc bin/*/*/libslang.so bin/*/*/libslang-glslang.so docs/*.md README.md LICENSE slang.h slang-com-helper.h slang-com-ptr.h slang-tag-version.h prelude/*.h
           echo "::set-output name=SLANG_BINARY_ARCHIVE::${SLANG_BINARY_ARCHIVE}"
           echo "::set-output name=SLANG_BINARY_ARCHIVE_TAR::${SLANG_BINARY_ARCHIVE_TAR}"
-      - name: Create Release
-        id: create_release
-        uses: actions/create-release@v1
+      - name: UploadBinary
+        uses: softprops/action-gh-release@v1
+        with:
+          files: |
+            ${{ steps.build.outputs.SLANG_BINARY_ARCHIVE }}
+            ${{ steps.build.outputs.SLANG_BINARY_ARCHIVE_TAR }}
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        with:
-          tag_name: ${{ github.ref }}
-          release_name: Release ${{ github.ref }}
-          draft: false
-          prerelease: false
-      - name: Upload Release Asset (zip)
-        id: upload-release-asset-zip 
-        uses: actions/upload-release-asset@v1
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        with:
-          upload_url: ${{ steps.create_release.outputs.upload_url }}
-          asset_path: ./${{ steps.build.outputs.SLANG_BINARY_ARCHIVE }}
-          asset_name: ${{ steps.build.outputs.SLANG_BINARY_ARCHIVE }}
-          asset_content_type: application/zip
-      - name: Upload Release Asset (tar)
-        id: upload-release-asset-tar 
-        uses: actions/upload-release-asset@v1
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        with:
-          upload_url: ${{ steps.create_release.outputs.upload_url }}
-          asset_path: ./${{ steps.build.outputs.SLANG_BINARY_ARCHIVE_TAR }}
-          asset_name: ${{ steps.build.outputs.SLANG_BINARY_ARCHIVE_TAR }}
-          asset_content_type: application/zip
