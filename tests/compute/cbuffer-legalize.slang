@@ -1,8 +1,8 @@
 //TEST(compute):COMPARE_COMPUTE:-cpu
-//TEST(compute):COMPARE_COMPUTE:
+//TEST(compute):COMPARE_COMPUTE:-shaderobj
 
-//TEST_INPUT:cbuffer(data=[1 2 3 4]):name=C.p.c
-//TEST_INPUT:Texture2D(size=4, content = one):name=C.p.t
+//TEST_INPUT: Uniform(data=[1 2 3 4]):name=C.p.c
+//TEST_INPUT: Texture2D(size=4, content = one):name=C.p.t
 //TEST_INPUT: Sampler:name=C.p.s
 //TEST_INPUT: ubuffer(data=[0 0 0 0], stride=4):out,name=outputBuffer
 

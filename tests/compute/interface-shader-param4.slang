@@ -44,7 +44,7 @@ int test(
 }
 
 
-//TEST_INPUT:ubuffer(data=[0 0 0 0], stride=4):out
+//TEST_INPUT:ubuffer(data=[0 0 0 0], stride=4):out,name=gOutputBuffer
 RWStructuredBuffer<int> gOutputBuffer;
 
 // Note: a constant buffer register/binding is always claimed
@@ -53,7 +53,7 @@ RWStructuredBuffer<int> gOutputBuffer;
 // that gets plugged in will involve uniform/ordinary data
 // or not.
 //
-//TEST_INPUT:cbuffer(data=[0]):
+//TEST_INPUT:cbuffer(data=[0]):name=gStrategy
 //
 ConstantBuffer<IRandomNumberGenerationStrategy> gStrategy;
 

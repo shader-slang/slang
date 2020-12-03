@@ -20,7 +20,7 @@ static const char fragmentEntryPointName[] = "fragmentMain";
 static const char computeEntryPointName[] = "computeMain";
 static const char rtEntryPointName[] = "raygenMain";
 
-static gfx::StageType _translateStage(SlangStage slangStage)
+gfx::StageType translateStage(SlangStage slangStage)
 {
     switch(slangStage)
     {
@@ -50,12 +50,12 @@ static gfx::StageType _translateStage(SlangStage slangStage)
     }
 }
 
-/* static */ SlangResult ShaderCompilerUtil::compileProgram(SlangSession* session, const Options& options, const Input& input, const ShaderCompileRequest& request, Output& out)
+/* static */ SlangResult ShaderCompilerUtil::_compileProgramImpl(SlangSession* session, const Options& options, const Input& input, const ShaderCompileRequest& request, Output& out)
 {
     out.reset();
 
     SlangCompileRequest* slangRequest = spCreateCompileRequest(session);
-    out.request = slangRequest;
+    out.m_requestForKernels = slangRequest;
     out.session = session;
 
     // Parse all the extra args
@@ -215,7 +215,7 @@ static gfx::StageType _translateStage(SlangStage slangStage)
         size_t codeSize = 0;
         char const* code = (char const*) spGetEntryPointCode(slangRequest, int(ee), &codeSize);
 
-        auto gfxStage = _translateStage(actualEntryPoint.slangStage);
+        auto gfxStage = translateStage(actualEntryPoint.slangStage);
 
         ShaderProgram::KernelDesc kernelDesc;
         kernelDesc.stage = gfxStage;
@@ -229,6 +229,58 @@ static gfx::StageType _translateStage(SlangStage slangStage)
     out.set(input.pipelineType, kernelDescs.getBuffer(), kernelDescs.getCount());
 
     return SLANG_OK;
+}
+
+/* static */ SlangResult ShaderCompilerUtil::compileProgram(SlangSession* session, const Options& options, const Input& input, const ShaderCompileRequest& request, Output& out)
+{
+    if( input.passThrough == SLANG_PASS_THROUGH_NONE )
+    {
+        return _compileProgramImpl(session, options, input, request, out);
+    }
+    else
+    {
+        bool canUseSlangForPrecompile = false;
+        switch (input.passThrough)
+        {
+        case SLANG_PASS_THROUGH_DXC:
+        case SLANG_PASS_THROUGH_FXC:
+            canUseSlangForPrecompile = true;
+            break;
+        default:
+            break;
+        }
+        // If we are doing a HLSL pass-through compilation, then we can't rely
+        // on the downstream compiler for the reflection information that
+        // will drive all of our parameter binding. As such, we will first
+        // compile with Slang to get reflection information, and then
+        // compile in another pass using the desired downstream compiler
+        // so that we can get the refleciton information we need.
+        //
+        Output slangOutput;
+        if (canUseSlangForPrecompile)
+        {
+            ShaderCompilerUtil::Input slangInput = input;
+            slangInput.sourceLanguage = SLANG_SOURCE_LANGUAGE_SLANG;
+            slangInput.passThrough = SLANG_PASS_THROUGH_NONE;
+            // TODO: we want to pass along a flag to skip codegen...
+
+
+            SLANG_RETURN_ON_FAIL(_compileProgramImpl(session, options, slangInput, request, slangOutput));
+        }
+
+        // Now we have what we need to be able to do the downstream compile better.
+        //
+        // TODO: We should be able to use the output from the Slang compilation
+        // to fill in the actual entry points to be used for this compilation,
+        // so that discovery of entry points via `[shader(...)]` attributes will work.
+        //
+        SLANG_RETURN_ON_FAIL(_compileProgramImpl(session, options, input, request, out));
+
+        out.m_extraRequestForReflection = slangOutput.getRequestForReflection();
+        slangOutput.m_requestForKernels = nullptr;
+
+        return SLANG_OK;
+    }
 }
 
 /* static */SlangResult ShaderCompilerUtil::readSource(const String& inSourcePath, List<char>& outSourceText)

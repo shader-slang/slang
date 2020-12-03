@@ -23,13 +23,13 @@ struct S
     int    b;
 };
 
-//TEST_INPUT:cbuffer(data=[1 2 3 4 5 6 7 8 9 10 11 12 13 14 15 16 17 18 19 20 21 22 23 24]):
+//TEST_INPUT:cbuffer(data=[1 2 3 4 5 6 7 8 9 10 11 12 13 14 15 16 17 18 19 20 21 22 23 24]):name=C0
 cbuffer C0
 {
     S s;
 };
 
-//TEST_INPUT:cbuffer(data=[1 2 3 4 5 6 7 8 9 10 11 12 13 14 15 16 17 18 19 20 21 22 23 24]):
+//TEST_INPUT:cbuffer(data=[1 2 3 4 5 6 7 8 9 10 11 12 13 14 15 16 17 18 19 20 21 22 23 24]):name=C1
 cbuffer C1
 {
 

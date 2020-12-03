@@ -1,11 +1,13 @@
 //TEST(smoke,compute):COMPARE_COMPUTE:
-//TEST_INPUT: cbuffer(data=[0.5 0 0 0], stride=4):
-//TEST_INPUT: cbuffer(data=[1.0], stride=4):
-//TEST_INPUT: Texture2D(size=4, content = zero):
-//TEST_INPUT: Texture2D(size=4, content = one):
-//TEST_INPUT: Sampler:
-//TEST_INPUT: Sampler:
-//TEST_INPUT: ubuffer(data=[0], stride=4):out
+
+//TEST_INPUT: ubuffer(data=[0], stride=4):out,name outputBuffer
+//TEST_INPUT: cbuffer(data=[0.5 0 0 0], stride=4):name existingBuffer
+//__disabled__TEST_INPUT: object(type=Impl):name impl
+//TEST_INPUT: root_constants(data=[1.0], stride=4):name impl.base
+//TEST_INPUT: Texture2D(size=4, content = zero):name tex1
+//TEST_INPUT: Texture2D(size=4, content = one):name impl.tex
+//TEST_INPUT: Sampler:name sampler
+//TEST_INPUT: Sampler:name impl.sampler
 //TEST_INPUT: type Impl
 
 

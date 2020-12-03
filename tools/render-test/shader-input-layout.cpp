@@ -140,10 +140,18 @@ namespace renderer_test
                             entry.type = ShaderInputType::Buffer;
                             entry.bufferDesc.type = InputBufferType::ConstantBuffer;
                         }
+                        else if (parser.LookAhead("object"))
+                        {
+                            entry.type = ShaderInputType::Object;
+                        }
                         else if (parser.LookAhead("root_constants"))
                         {
                             entry.type = ShaderInputType::Buffer;
                             entry.bufferDesc.type = InputBufferType::RootConstantBuffer;
+                        }
+                        else if (parser.LookAhead("Uniform"))
+                        {
+                            entry.type = ShaderInputType::Uniform;
                         }
                         else if (parser.LookAhead("ubuffer"))
                         {
@@ -225,6 +233,10 @@ namespace renderer_test
                         {
                             numRenderTargets = parser.ReadInt();
                             continue;
+                        }
+                        else
+                        {
+                            throw TextFormatException(String("Invalid input syntax at line ") + String(parser.NextToken().Position.Line));
                         }
                         parser.ReadToken();
                         // parse options
@@ -509,6 +521,11 @@ namespace renderer_test
                                 {
                                     parser.Read("=");
                                     entry.textureDesc.mipMapCount = int(parser.ReadInt());
+                                }
+                                else if( word == "type" )
+                                {
+                                    parser.Read("=");
+                                    entry.objectDesc.typeName = parser.ReadWord();
                                 }
 
                                 if (parser.LookAhead(","))

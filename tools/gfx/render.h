@@ -520,6 +520,8 @@ enum class DescriptorSlotType
     DynamicStorageBuffer,
     InputAttachment,
     RootConstant,
+    InlineUniformBlock,
+    RayTracingAccelerationStructure,
 };
 
 class DescriptorSetLayout : public Slang::RefObject
@@ -529,6 +531,17 @@ public:
     {
         DescriptorSlotType  type            = DescriptorSlotType::Unknown;
         UInt                count           = 1;
+
+            /// The underlying API-specific binding/register to use for this slot range.
+            ///
+            /// A value of `-1` indicates that the implementation should
+            /// automatically compute the binding/register to use
+            /// based on the preceeding slot range(s).
+            ///
+            /// Some implementations do not have a concept of bindings/regsiters
+            /// for slot ranges, and will ignore this field.
+            ///
+        Int                 binding         = -1;
 
         SlotRangeDesc()
         {}
@@ -554,6 +567,17 @@ public:
     struct DescriptorSetDesc
     {
         DescriptorSetLayout*    layout          = nullptr;
+
+            /// The underlying API-specific space/set number to use for this set.
+            ///
+            /// A value of `-1` indicates that the implementation should
+            /// automatically compute the space/set to use basd on
+            /// the preceeding set(s)
+            ///
+            /// Some implementations do not have a concept of space/set numbers
+            /// for descriptor sets, and will ignore this field.
+            ///
+        Int                     space = -1;
 
         DescriptorSetDesc()
         {}

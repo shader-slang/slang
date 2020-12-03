@@ -1000,7 +1000,7 @@ static SlangResult _invokeComputeProgram(
     const uint32_t dispatchSize[3],
     CUDAComputeUtil::Context& outContext)
 {
-    auto reflection = slang::ProgramLayout::get(outputAndLayout.output.request);
+    auto reflection = slang::ProgramLayout::get(outputAndLayout.output.getRequestForReflection());
 
     auto& bindSet = outContext.m_bindSet;
     auto& bindRoot = outContext.m_bindRoot;
@@ -1403,7 +1403,7 @@ static SlangResult _fillRuntimeHandlesInBuffers(
     ScopeCUDAModule& cudaModule)
 {
     Slang::ComPtr<slang::ISession> linkage;
-    spCompileRequest_getSession(compilationAndLayout.output.request, linkage.writeRef());
+    spCompileRequest_getSession(compilationAndLayout.output.getRequestForReflection(), linkage.writeRef());
     auto& inputLayout = compilationAndLayout.layout;
     for (auto& entry : inputLayout.entries)
     {
@@ -1415,7 +1415,7 @@ static SlangResult _fillRuntimeHandlesInBuffers(
             case RTTIDataEntryType::RTTIObject:
                 {
                     auto reflection =
-                        slang::ShaderReflection::get(compilationAndLayout.output.request);
+                        slang::ShaderReflection::get(compilationAndLayout.output.getRequestForReflection());
                     auto concreteType = reflection->findTypeByName(rtti.typeName.getBuffer());
                     ComPtr<ISlangBlob> outName;
                     linkage->getTypeRTTIMangledName(concreteType, outName.writeRef());
@@ -1431,7 +1431,7 @@ static SlangResult _fillRuntimeHandlesInBuffers(
             case RTTIDataEntryType::WitnessTable:
                 {
                     auto reflection =
-                        slang::ShaderReflection::get(compilationAndLayout.output.request);
+                        slang::ShaderReflection::get(compilationAndLayout.output.getRequestForReflection());
                     auto concreteType = reflection->findTypeByName(rtti.typeName.getBuffer());
                     if (!concreteType)
                         return SLANG_FAIL;
@@ -1527,7 +1527,7 @@ static SlangResult _setUpArguments(
     const uint32_t dispatchSize[3],
     CUDAComputeUtil::Context& outContext)
 {
-    auto reflection = slang::ProgramLayout::get(outputAndLayout.output.request);
+    auto reflection = slang::ProgramLayout::get(outputAndLayout.output.getRequestForReflection());
 
     auto& bindSet = outContext.m_bindSet;
     auto& bindRoot = outContext.m_bindRoot;
@@ -1835,7 +1835,7 @@ SlangResult _loadAndInvokeKernel(
     auto& bindSet = outContext.m_bindSet;
     auto& bindRoot = outContext.m_bindRoot;
 
-    auto request = outputAndLayout.output.request;
+    auto request = outputAndLayout.output.getRequestForReflection();
     auto reflection = (slang::ShaderReflection*) spGetReflection(request);
 
     // Load cuda module first so its symbols may be queried and filled into argument buffers.
