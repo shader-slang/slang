@@ -426,11 +426,6 @@
     <Natvis Include="..\..\..\source\core\core.natvis" />
     <Natvis Include="..\..\..\source\slang\slang.natvis" />
   </ItemGroup>
-  <ItemGroup>
-    <ProjectReference Include="..\core\core.vcxproj">
-      <Project>{F9BE7957-8399-899E-0C49-E714FDDD4B65}</Project>
-    </ProjectReference>
-  </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">
   </ImportGroup>

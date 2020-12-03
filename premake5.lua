@@ -937,7 +937,6 @@ generatorProject("run-generators", nil)
 standardProject("api-less-slang", "source/slang")
     uuid "E2EA7B60-414C-4347-8A00-C4654F6D43AC"
     kind "StaticLib"
-    links { "core" }
     warnings "Extra"
     flags { "FatalWarnings" }
     
@@ -993,12 +992,10 @@ standardProject("static-slang", nil)
     warnings "Extra"
     flags { "FatalWarnings" }
 
-    -- The way that we currently configure things through `slang.h`,
-    -- we need to set a preprocessor definitions to ensure that
-    -- we declare the Slang API functions for *export* and not *import*.
+    -- 
+    -- Defined such that linkage for API functions is static.
     --
     defines { "SLANG_STATIC" }
-
 
     -- Add the API files
     files { 
