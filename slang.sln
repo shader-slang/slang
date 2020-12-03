@@ -1,6 +1,11 @@
 ﻿
 Microsoft Visual Studio Solution File, Format Version 12.00
 # Visual Studio 14
+Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "api-less-slang", "build\visual-studio\api-less-slang\api-less-slang.vcxproj", "{E2EA7B60-414C-4347-8A00-C4654F6D43AC}"
+	ProjectSection(ProjectDependencies) = postProject
+		{E145B2B8-CD13-A6BE-B6A7-16E5A2148223} = {E145B2B8-CD13-A6BE-B6A7-16E5A2148223}
+	EndProjectSection
+EndProject
 Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "core", "build\visual-studio\core\core.vcxproj", "{F9BE7957-8399-899E-0C49-E714FDDD4B65}"
 EndProject
 Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "examples", "examples", "{EB5FC2C6-D72D-B6CC-C0C1-26F3AC2E9231}"
@@ -27,11 +32,10 @@ EndProject
 Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "miniz", "build\visual-studio\miniz\miniz.vcxproj", "{E76ACB11-4A12-4F0A-BE1E-CE0B8836EB7F}"
 EndProject
 Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "slang", "build\visual-studio\slang\slang.vcxproj", "{DB00DA62-0533-4AFD-B59F-A67D5B3A0808}"
-	ProjectSection(ProjectDependencies) = postProject
-		{E145B2B8-CD13-A6BE-B6A7-16E5A2148223} = {E145B2B8-CD13-A6BE-B6A7-16E5A2148223}
-	EndProjectSection
 EndProject
 Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "slangc", "build\visual-studio\slangc\slangc.vcxproj", "{D56CBCEB-1EB5-4CA8-AEC4-48EA35ED61C7}"
+EndProject
+Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "static-slang", "build\visual-studio\static-slang\static-slang.vcxproj", "{3F15CD52-035A-46E3-8A26-A5AA3BD725CF}"
 EndProject
 Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "test-tool", "test-tool", "{57B5AA5E-C340-1823-CC51-9B17385C7423}"
 EndProject
@@ -59,6 +63,14 @@ Global
 		Release|x64 = Release|x64
 	EndGlobalSection
 	GlobalSection(ProjectConfigurationPlatforms) = postSolution
+		{E2EA7B60-414C-4347-8A00-C4654F6D43AC}.Debug|Win32.ActiveCfg = Debug|Win32
+		{E2EA7B60-414C-4347-8A00-C4654F6D43AC}.Debug|Win32.Build.0 = Debug|Win32
+		{E2EA7B60-414C-4347-8A00-C4654F6D43AC}.Debug|x64.ActiveCfg = Debug|x64
+		{E2EA7B60-414C-4347-8A00-C4654F6D43AC}.Debug|x64.Build.0 = Debug|x64
+		{E2EA7B60-414C-4347-8A00-C4654F6D43AC}.Release|Win32.ActiveCfg = Release|Win32
+		{E2EA7B60-414C-4347-8A00-C4654F6D43AC}.Release|Win32.Build.0 = Release|Win32
+		{E2EA7B60-414C-4347-8A00-C4654F6D43AC}.Release|x64.ActiveCfg = Release|x64
+		{E2EA7B60-414C-4347-8A00-C4654F6D43AC}.Release|x64.Build.0 = Release|x64
 		{F9BE7957-8399-899E-0C49-E714FDDD4B65}.Debug|Win32.ActiveCfg = Debug|Win32
 		{F9BE7957-8399-899E-0C49-E714FDDD4B65}.Debug|Win32.Build.0 = Debug|Win32
 		{F9BE7957-8399-899E-0C49-E714FDDD4B65}.Debug|x64.ActiveCfg = Debug|x64
@@ -139,6 +151,14 @@ Global
 		{D56CBCEB-1EB5-4CA8-AEC4-48EA35ED61C7}.Release|Win32.Build.0 = Release|Win32
 		{D56CBCEB-1EB5-4CA8-AEC4-48EA35ED61C7}.Release|x64.ActiveCfg = Release|x64
 		{D56CBCEB-1EB5-4CA8-AEC4-48EA35ED61C7}.Release|x64.Build.0 = Release|x64
+		{3F15CD52-035A-46E3-8A26-A5AA3BD725CF}.Debug|Win32.ActiveCfg = Debug|Win32
+		{3F15CD52-035A-46E3-8A26-A5AA3BD725CF}.Debug|Win32.Build.0 = Debug|Win32
+		{3F15CD52-035A-46E3-8A26-A5AA3BD725CF}.Debug|x64.ActiveCfg = Debug|x64
+		{3F15CD52-035A-46E3-8A26-A5AA3BD725CF}.Debug|x64.Build.0 = Debug|x64
+		{3F15CD52-035A-46E3-8A26-A5AA3BD725CF}.Release|Win32.ActiveCfg = Release|Win32
+		{3F15CD52-035A-46E3-8A26-A5AA3BD725CF}.Release|Win32.Build.0 = Release|Win32
+		{3F15CD52-035A-46E3-8A26-A5AA3BD725CF}.Release|x64.ActiveCfg = Release|x64
+		{3F15CD52-035A-46E3-8A26-A5AA3BD725CF}.Release|x64.Build.0 = Release|x64
 		{61F7EB00-7281-4BF3-9470-7C2EA92620C3}.Debug|Win32.ActiveCfg = Debug|Win32
 		{61F7EB00-7281-4BF3-9470-7C2EA92620C3}.Debug|Win32.Build.0 = Debug|Win32
 		{61F7EB00-7281-4BF3-9470-7C2EA92620C3}.Debug|x64.ActiveCfg = Debug|x64

@@ -31,6 +31,8 @@
 
 #include "slang-check-impl.h"
 
+#include "../../slang-tag-version.h"
+
 // Used to print exception type names in internal-compiler-error messages
 #include <typeinfo>
 
@@ -116,6 +118,11 @@ static const Guid IID_ICompileRequest   = SLANG_UUID_ICompileRequest;
 
 // Available to other modules so not static
 const Guid IID_EndToEndCompileRequest   = SLANG_UUID_EndToEndCompileRequest;
+
+const char* getBuildTagString()
+{
+    return SLANG_TAG_VERSION;
+}
 
 void Session::init()
 {
@@ -510,7 +517,7 @@ SLANG_NO_THROW void SLANG_MCALL Session::getLanguagePrelude(
 
 SLANG_NO_THROW const char* SLANG_MCALL Session::getBuildTagString()
 {
-    return spGetBuildTagString();
+    return ::Slang::getBuildTagString();
 }
 
 SLANG_NO_THROW SlangResult SLANG_MCALL Session::setDefaultDownstreamCompiler(SlangSourceLanguage sourceLanguage, SlangPassThrough defaultCompiler)

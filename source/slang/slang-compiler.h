@@ -1195,6 +1195,9 @@ namespace Slang
         /// Given a target returns a downstream compiler the prelude should be taken from.
     SourceLanguage getDefaultSourceLanguageForDownstreamCompiler(PassThroughMode compiler);
 
+        /// Get the build tag string
+    const char* getBuildTagString();
+
     struct TypeCheckingCache;
     
         /// A context for loading and re-using code modules.

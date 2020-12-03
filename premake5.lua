@@ -934,35 +934,13 @@ generatorProject("run-generators", nil)
     end
     
     
---
--- TODO: Slang's current `Makefile` build does some careful incantations
--- to make sure that the binaries it generates use a "relative `RPATH`"
--- for loading shared libraries, so that Slang is not dependent on
--- being installed to a fixed path on end-user machines. Before we
--- can use Premake for the Linux build (or eventually MacOS) we would
--- need to figure out how to replicate this incantation in premake.
---
-
---
--- Now that we've gotten all the simple projects out of the way, it is time
--- to get into the more serious build steps.
---
--- First up is the `slang` dynamic library project:
---
-
-standardProject("slang", "source/slang")
-    uuid "DB00DA62-0533-4AFD-B59F-A67D5B3A0808"
-    kind "SharedLib"
+standardProject("api-less-slang", "source/slang")
+    uuid "E2EA7B60-414C-4347-8A00-C4654F6D43AC"
+    kind "StaticLib"
     links { "core" }
     warnings "Extra"
     flags { "FatalWarnings" }
-
-    -- The way that we currently configure things through `slang.h`,
-    -- we need to set a preprocessor definitions to ensure that
-    -- we declare the Slang API functions for *export* and not *import*.
-    --
-    defines { "SLANG_DYNAMIC_EXPORT" }
-
+    
     includedirs { "external/spirv-headers/include" }
 
     -- On some tests with MSBuild disabling these made build work.
@@ -985,6 +963,13 @@ standardProject("slang", "source/slang")
         "prelude/slang-cpp-prelude.h.cpp"
     }
 
+    -- This static library is 'API-less'
+
+    removefiles {
+        "source/slang/slang-api.cpp",
+        "source/slang/slang-reflection-api.cpp",
+    }
+
     -- 
     -- The most challenging part of building `slang` is that we need
     -- to invoke generators such as slang-cpp-extractor and slang-generate
@@ -992,6 +977,79 @@ standardProject("slang", "source/slang")
     -- which produces the appropriate source 
     
     dependson { "run-generators" }
+    
+    filter { "system:linux" }
+        -- might be able to do pic(true)
+        buildoptions{"-fPIC"}
+
+--
+-- A static library version of Slang --
+--  
+  
+standardProject("static-slang", nil)
+    uuid "3F15CD52-035A-46E3-8A26-A5AA3BD725CF"
+    kind "StaticLib"
+    links { "core", "api-less-slang" }
+    warnings "Extra"
+    flags { "FatalWarnings" }
+
+    -- The way that we currently configure things through `slang.h`,
+    -- we need to set a preprocessor definitions to ensure that
+    -- we declare the Slang API functions for *export* and not *import*.
+    --
+    defines { "SLANG_STATIC" }
+
+
+    -- Add the API files
+    files { 
+        "slang.h",
+        "source/slang/slang-api.cpp",
+        "source/slang/slang-reflection-api.cpp" 
+    }
+
+    files { "source/core/core.natvis" }
+   
+    filter { "system:linux" }
+        -- might be able to do pic(true)
+        buildoptions{"-fPIC"}    
+    
+--
+-- TODO: Slang's current `Makefile` build does some careful incantations
+-- to make sure that the binaries it generates use a "relative `RPATH`"
+-- for loading shared libraries, so that Slang is not dependent on
+-- being installed to a fixed path on end-user machines. Before we
+-- can use Premake for the Linux build (or eventually MacOS) we would
+-- need to figure out how to replicate this incantation in premake.
+--
+
+--
+-- Now that we've gotten all the simple projects out of the way, it is time
+-- to get into the more serious build steps.
+--
+-- First up is the `slang` dynamic library project:
+--
+
+standardProject("slang", nil)
+    uuid "DB00DA62-0533-4AFD-B59F-A67D5B3A0808"
+    kind "SharedLib"
+    links { "core", "api-less-slang" }
+    warnings "Extra"
+    flags { "FatalWarnings" }
+
+    -- The way that we currently configure things through `slang.h`,
+    -- we need to set a preprocessor definitions to ensure that
+    -- we declare the Slang API functions for *export* and not *import*.
+    --
+    defines { "SLANG_DYNAMIC_EXPORT" }
+
+    -- Add slang.h and the API files
+    files { 
+        "slang.h",
+        "source/slang/slang-api.cpp",
+        "source/slang/slang-reflection-api.cpp" 
+    }
+
+    files { "source/core/core.natvis" }
     
     -- If we are not building glslang from source, then be
     -- sure to copy a binary copy over to the output directory
@@ -1011,7 +1069,8 @@ standardProject("slang", "source/slang")
         -- might be able to do pic(true)
         buildoptions{"-fPIC"}
        
-    
+  
+  
 if enableProfile then
     tool "slang-profile"
         uuid "375CC87D-F34A-4DF1-9607-C5C990FD6227"

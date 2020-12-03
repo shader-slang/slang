@@ -4,8 +4,6 @@
 
 #include "slang-repro.h"
 
-#include "../../slang-tag-version.h"
-
 // implementation of C interface
 
 SLANG_API SlangSession* spCreateSession(const char*)
@@ -64,7 +62,7 @@ SLANG_API void spDestroySession(
 
 SLANG_API const char* spGetBuildTagString()
 {
-    return SLANG_TAG_VERSION;
+    return Slang::getBuildTagString();
 }
 
 SLANG_API void spAddBuiltins(

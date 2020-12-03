@@ -175,7 +175,7 @@ struct OptionsParser
         Stage               impliedStage)
     {
         auto translationUnitIndex = rawTranslationUnits.getCount();
-        auto translationUnitID = spAddTranslationUnit(compileRequest, language, nullptr);
+        auto translationUnitID = compileRequest->addTranslationUnit(language, nullptr);
 
         // As a sanity check: the API should be returning the same translation
         // unit index as we maintain internally. This invariant would only
@@ -205,10 +205,7 @@ struct OptionsParser
             slangTranslationUnitIndex = addTranslationUnit(SLANG_SOURCE_LANGUAGE_SLANG, Stage::Unknown);
         }
 
-        spAddTranslationUnitSourceFile(
-            compileRequest,
-            rawTranslationUnits[slangTranslationUnitIndex].translationUnitID,
-            path.begin());
+        compileRequest->addTranslationUnitSourceFile(rawTranslationUnits[slangTranslationUnitIndex].translationUnitID, path.begin());
 
         // Set the translation unit to be used by subsequent entry points
         currentTranslationUnitIndex = slangTranslationUnitIndex;
@@ -222,10 +219,7 @@ struct OptionsParser
         translationUnitCount++;
         currentTranslationUnitIndex = addTranslationUnit(language, impliedStage);
 
-        spAddTranslationUnitSourceFile(
-            compileRequest,
-            rawTranslationUnits[currentTranslationUnitIndex].translationUnitID,
-            path.begin());
+        compileRequest->addTranslationUnitSourceFile(rawTranslationUnits[currentTranslationUnitIndex].translationUnitID, path.begin());
     }
 
     static Profile::RawVal findGlslProfileFromPath(const String& path)
@@ -346,7 +340,7 @@ struct OptionsParser
 
         if (ext == "slang-module" || ext == "slang-lib")
         {
-            spSetOutputContainerFormat(compileRequest, SLANG_CONTAINER_FORMAT_SLANG_MODULE);
+            compileRequest->setOutputContainerFormat(SLANG_CONTAINER_FORMAT_SLANG_MODULE);
             requestImpl->m_containerOutputPath = path;
         }
         else
@@ -465,7 +459,7 @@ struct OptionsParser
                 }
                 else if (argStr == "-dump-intermediates")
                 {
-                    spSetDumpIntermediates(compileRequest, true);
+                    compileRequest->setDumpIntermediates(true);
                 }
                 else if (argStr == "-dump-intermediate-prefix")
                 {
@@ -489,7 +483,7 @@ struct OptionsParser
                 else if (argStr == "-dump-repro")
                 {
                     SLANG_RETURN_ON_FAIL(tryReadCommandLineArgument(sink, arg, &argCursor, argEnd, requestImpl->m_dumpRepro));
-                    spEnableReproCapture(compileRequest);
+                    compileRequest->enableReproCapture();
                 }
                 else if (argStr == "-dump-repro-on-error")
                 {
@@ -507,7 +501,7 @@ struct OptionsParser
                     String moduleName;
                     SLANG_RETURN_ON_FAIL(tryReadCommandLineArgument(sink, arg, &argCursor, argEnd, moduleName));
 
-                    spSetDefaultModuleName(compileRequest, moduleName.getBuffer());
+                    compileRequest->setDefaultModuleName(moduleName.getBuffer());
                 }
                 else if(argStr == "-load-repro")
                 {
@@ -568,7 +562,7 @@ struct OptionsParser
                     cacheFileSystem->setInnerFileSystem(dirFileSystem, cacheFileSystem->getUniqueIdentityMode(), cacheFileSystem->getPathStyle());
 
                     // Set as the file system
-                    spSetFileSystem(compileRequest, cacheFileSystem);
+                    compileRequest->setFileSystem(cacheFileSystem);
                 }
                 else if (argStr == "-serial-ir")
                 {
@@ -635,7 +629,7 @@ struct OptionsParser
                     String name;
                     SLANG_RETURN_ON_FAIL(tryReadCommandLineArgument(sink, arg, &argCursor, argEnd, name));
 
-                    SlangProfileID profileID = spFindProfile(session, name.begin());
+                    SlangProfileID profileID = session->findProfile(name.begin());
                     if( profileID == SLANG_PROFILE_UNKNOWN )
                     {
                         sink->diagnose(SourceLoc(), Diagnostics::unknownProfile, name);
@@ -719,7 +713,7 @@ struct OptionsParser
                         return SLANG_FAIL;
                     }
 
-                    spSetPassThrough(compileRequest, passThrough);
+                    compileRequest->setPassThrough(passThrough);
                 }
                 else if (argStr.getLength() >= 2 && argStr[1] == 'D')
                 {
@@ -750,20 +744,12 @@ struct OptionsParser
                     if (eqPos)
                     {
                         // If we found an `=`, we split the string...
-
-                        spAddPreprocessorDefine(
-                            compileRequest,
-                            String(defineStr, eqPos).begin(),
-                            String(eqPos+1).begin());
+                        compileRequest->addPreprocessorDefine(String(defineStr, eqPos).begin(), String(eqPos+1).begin());
                     }
                     else
                     {
                         // If there was no `=`, then just #define it to an empty string
-
-                        spAddPreprocessorDefine(
-                            compileRequest,
-                            String(defineStr).begin(),
-                            "");
+                        compileRequest->addPreprocessorDefine(String(defineStr).begin(), "");
                     }
                 }
                 else if (argStr.getLength() >= 2 && argStr[1] == 'I')
@@ -780,9 +766,7 @@ struct OptionsParser
                         SLANG_RETURN_ON_FAIL(tryReadCommandLineArgumentRaw(sink, arg, &argCursor, argEnd, &includeDirStr));
                     }
 
-                    spAddSearchPath(
-                        compileRequest,
-                        String(includeDirStr).begin());
+                    compileRequest->addSearchPath(String(includeDirStr).begin());
                 }
                 //
                 // A `-o` option is used to specify a desired output file.
@@ -818,7 +802,7 @@ struct OptionsParser
                         return SLANG_FAIL;
                     }
 
-                    spSetLineDirectiveMode(compileRequest, mode);
+                    compileRequest->setLineDirectiveMode(mode);
 
                 }
                 else if( argStr == "-fp-mode" || argStr == "-floating-point-mode" )
@@ -866,7 +850,7 @@ struct OptionsParser
                         return SLANG_FAIL;
                     }
 
-                    spSetOptimizationLevel(compileRequest, level);
+                    compileRequest->setOptimizationLevel(level);
                 }
 
                 // Note: unlike with `-O` above, we have to consider that other
@@ -874,19 +858,19 @@ struct OptionsParser
                 // just detect it as a prefix.
                 else if( argStr == "-g" || argStr == "-g2" )
                 {
-                    spSetDebugInfoLevel(compileRequest, SLANG_DEBUG_INFO_LEVEL_STANDARD);
+                    compileRequest->setDebugInfoLevel(SLANG_DEBUG_INFO_LEVEL_STANDARD);
                 }
                 else if( argStr == "-g0" )
                 {
-                    spSetDebugInfoLevel(compileRequest, SLANG_DEBUG_INFO_LEVEL_NONE);
+                    compileRequest->setDebugInfoLevel(SLANG_DEBUG_INFO_LEVEL_NONE);
                 }
                 else if( argStr == "-g1" )
                 {
-                    spSetDebugInfoLevel(compileRequest, SLANG_DEBUG_INFO_LEVEL_MINIMAL);
+                    compileRequest->setDebugInfoLevel(SLANG_DEBUG_INFO_LEVEL_MINIMAL);
                 }
                 else if( argStr == "-g3" )
                 {
-                    spSetDebugInfoLevel(compileRequest, SLANG_DEBUG_INFO_LEVEL_MAXIMAL);
+                    compileRequest->setDebugInfoLevel(SLANG_DEBUG_INFO_LEVEL_MAXIMAL);
                 }
                 else if( argStr == "-default-image-format-unknown" )
                 {
@@ -903,17 +887,17 @@ struct OptionsParser
 
                     if (name == "default")
                     {
-                        spSetFileSystem(compileRequest, nullptr);
+                        compileRequest->setFileSystem(nullptr);
                     }
                     else if (name == "load-file")
                     {
                         // 'Simple' just implements loadFile interface, so will be wrapped with CacheFileSystem internally
-                        spSetFileSystem(compileRequest, OSFileSystem::getLoadSingleton());
+                        compileRequest->setFileSystem(OSFileSystem::getLoadSingleton());
                     }
                     else if (name == "os")
                     {
                         // 'Immutable' implements the ISlangFileSystemExt interface - and will be used directly
-                        spSetFileSystem(compileRequest, OSFileSystem::getExtSingleton());
+                        compileRequest->setFileSystem(OSFileSystem::getExtSingleton());
                     }
                     else
                     {
@@ -1019,7 +1003,7 @@ struct OptionsParser
             return SLANG_OK;
         }
 
-        spSetCompileFlags(compileRequest, flags);
+        compileRequest->setCompileFlags(flags);
 
         // As a compatability feature, if the user didn't list any explicit entry
         // point names, *and* they are compiling a single translation unit, *and* they
@@ -1191,8 +1175,7 @@ struct OptionsParser
 
             auto translationUnitID = rawTranslationUnits[rawEntryPoint.translationUnitIndex].translationUnitID;
 
-            int entryPointID = spAddEntryPoint(
-                compileRequest,
+            int entryPointID = compileRequest->addEntryPoint(
                 translationUnitID,
                 rawEntryPoint.name.begin(),
                 SlangStage(rawEntryPoint.stage));
@@ -1393,28 +1376,28 @@ struct OptionsParser
         //
         for(auto& rawTarget : rawTargets)
         {
-            int targetID = spAddCodeGenTarget(compileRequest, SlangCompileTarget(rawTarget.format));
+            int targetID = compileRequest->addCodeGenTarget(SlangCompileTarget(rawTarget.format));
             rawTarget.targetID = targetID;
 
             if( rawTarget.profileVersion != ProfileVersion::Unknown )
             {
-                spSetTargetProfile(compileRequest, targetID, Profile(rawTarget.profileVersion).raw);
+                compileRequest->setTargetProfile(targetID, Profile(rawTarget.profileVersion).raw);
             }
 
             if( rawTarget.targetFlags )
             {
-                spSetTargetFlags(compileRequest, targetID, rawTarget.targetFlags);
+                compileRequest->setTargetFlags(targetID, rawTarget.targetFlags);
             }
 
             if( rawTarget.floatingPointMode != FloatingPointMode::Default )
             {
-                spSetTargetFloatingPointMode(compileRequest, targetID, SlangFloatingPointMode(rawTarget.floatingPointMode));
+                compileRequest->setTargetFloatingPointMode(targetID, SlangFloatingPointMode(rawTarget.floatingPointMode));
             }
         }
 
         if(defaultMatrixLayoutMode != SLANG_MATRIX_LAYOUT_MODE_UNKNOWN)
         {
-            spSetMatrixLayoutMode(compileRequest, defaultMatrixLayoutMode);
+            compileRequest->setMatrixLayoutMode(defaultMatrixLayoutMode);
         }
 
         // Next we need to sort out the output files specified with `-o`, and
