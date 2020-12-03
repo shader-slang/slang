@@ -373,7 +373,6 @@ function baseSlangProject(name, sourceDir)
     --
     objdir("intermediate/" .. targetName .. "/%{cfg.buildcfg:lower()}/%{prj.name}")
     
-    
     -- All of our projects are written in C++.
     --
     language "C++"
