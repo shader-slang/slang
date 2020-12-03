@@ -1,55 +1,55 @@
 ﻿
 Microsoft Visual Studio Solution File, Format Version 12.00
 # Visual Studio 14
-Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "core", "source\core\core.vcxproj", "{F9BE7957-8399-899E-0C49-E714FDDD4B65}"
+Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "core", "build\visual-studio\core\core.vcxproj", "{F9BE7957-8399-899E-0C49-E714FDDD4B65}"
 EndProject
 Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "examples", "examples", "{EB5FC2C6-D72D-B6CC-C0C1-26F3AC2E9231}"
 EndProject
-Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "cpu-hello-world", "examples\cpu-hello-world\cpu-hello-world.vcxproj", "{4B47A364-37C4-96A7-6041-97BB4C1D333B}"
+Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "cpu-hello-world", "build\visual-studio\cpu-hello-world\cpu-hello-world.vcxproj", "{4B47A364-37C4-96A7-6041-97BB4C1D333B}"
 EndProject
-Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "gpu-printing", "examples\gpu-printing\gpu-printing.vcxproj", "{57C81DD3-4304-213D-AC16-39349871C957}"
+Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "gpu-printing", "build\visual-studio\gpu-printing\gpu-printing.vcxproj", "{57C81DD3-4304-213D-AC16-39349871C957}"
 EndProject
-Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "hello-world", "examples\hello-world\hello-world.vcxproj", "{010BE414-ED5B-CF56-16C0-BD18027062C0}"
+Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "hello-world", "build\visual-studio\hello-world\hello-world.vcxproj", "{010BE414-ED5B-CF56-16C0-BD18027062C0}"
 EndProject
-Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "heterogeneous-hello-world", "examples\heterogeneous-hello-world\heterogeneous-hello-world.vcxproj", "{150CAA5A-0177-6A66-AA92-CFCB96DC2D49}"
+Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "heterogeneous-hello-world", "build\visual-studio\heterogeneous-hello-world\heterogeneous-hello-world.vcxproj", "{150CAA5A-0177-6A66-AA92-CFCB96DC2D49}"
 EndProject
-Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "model-viewer", "examples\model-viewer\model-viewer.vcxproj", "{2F8724C6-1BC3-2730-84D5-3F277030D04A}"
+Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "model-viewer", "build\visual-studio\model-viewer\model-viewer.vcxproj", "{2F8724C6-1BC3-2730-84D5-3F277030D04A}"
 EndProject
 Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "generator", "generator", "{F3AB4ED5-5F37-BC99-6848-3F8ED452189A}"
 EndProject
-Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "run-generators", "source\slang\run-generators.vcxproj", "{811F1997-6DDA-0843-1692-818D022C53D3}"
+Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "run-generators", "build\visual-studio\run-generators\run-generators.vcxproj", "{E145B2B8-CD13-A6BE-B6A7-16E5A2148223}"
 	ProjectSection(ProjectDependencies) = postProject
 		{CA8A30D1-8FA9-4330-B7F7-84709246D8DC} = {CA8A30D1-8FA9-4330-B7F7-84709246D8DC}
 		{66174227-8541-41FC-A6DF-4764FC66F78E} = {66174227-8541-41FC-A6DF-4764FC66F78E}
 		{7F773DD9-EB8F-2403-B43C-B49C2014B99C} = {7F773DD9-EB8F-2403-B43C-B49C2014B99C}
 	EndProjectSection
 EndProject
-Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "miniz", "source\miniz\miniz.vcxproj", "{E76ACB11-4A12-4F0A-BE1E-CE0B8836EB7F}"
+Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "miniz", "build\visual-studio\miniz\miniz.vcxproj", "{E76ACB11-4A12-4F0A-BE1E-CE0B8836EB7F}"
 EndProject
-Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "slang", "source\slang\slang.vcxproj", "{DB00DA62-0533-4AFD-B59F-A67D5B3A0808}"
+Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "slang", "build\visual-studio\slang\slang.vcxproj", "{DB00DA62-0533-4AFD-B59F-A67D5B3A0808}"
 	ProjectSection(ProjectDependencies) = postProject
-		{811F1997-6DDA-0843-1692-818D022C53D3} = {811F1997-6DDA-0843-1692-818D022C53D3}
+		{E145B2B8-CD13-A6BE-B6A7-16E5A2148223} = {E145B2B8-CD13-A6BE-B6A7-16E5A2148223}
 	EndProjectSection
 EndProject
-Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "slangc", "source\slangc\slangc.vcxproj", "{D56CBCEB-1EB5-4CA8-AEC4-48EA35ED61C7}"
+Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "slangc", "build\visual-studio\slangc\slangc.vcxproj", "{D56CBCEB-1EB5-4CA8-AEC4-48EA35ED61C7}"
 EndProject
 Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "test-tool", "test-tool", "{57B5AA5E-C340-1823-CC51-9B17385C7423}"
 EndProject
-Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "render-test-tool", "tools\render-test\render-test-tool.vcxproj", "{61F7EB00-7281-4BF3-9470-7C2EA92620C3}"
+Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "render-test-tool", "build\visual-studio\render-test-tool\render-test-tool.vcxproj", "{61F7EB00-7281-4BF3-9470-7C2EA92620C3}"
 EndProject
-Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "slang-reflection-test-tool", "tools\slang-reflection-test\slang-reflection-test-tool.vcxproj", "{C5ACCA6E-C04D-4B36-8516-3752B3C13C2F}"
+Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "slang-reflection-test-tool", "build\visual-studio\slang-reflection-test-tool\slang-reflection-test-tool.vcxproj", "{C5ACCA6E-C04D-4B36-8516-3752B3C13C2F}"
 EndProject
 Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "tools", "tools", "{FD47AE19-69FD-260F-F2F1-20E65EA61D13}"
 EndProject
-Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "gfx", "tools\gfx\gfx.vcxproj", "{222F7498-B40C-4F3F-A704-DDEB91A4484A}"
+Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "gfx", "build\visual-studio\gfx\gfx.vcxproj", "{222F7498-B40C-4F3F-A704-DDEB91A4484A}"
 EndProject
-Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "slang-cpp-extractor", "tools\slang-cpp-extractor\slang-cpp-extractor.vcxproj", "{CA8A30D1-8FA9-4330-B7F7-84709246D8DC}"
+Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "slang-cpp-extractor", "build\visual-studio\slang-cpp-extractor\slang-cpp-extractor.vcxproj", "{CA8A30D1-8FA9-4330-B7F7-84709246D8DC}"
 EndProject
-Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "slang-embed", "tools\slang-embed\slang-embed.vcxproj", "{7F773DD9-EB8F-2403-B43C-B49C2014B99C}"
+Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "slang-embed", "build\visual-studio\slang-embed\slang-embed.vcxproj", "{7F773DD9-EB8F-2403-B43C-B49C2014B99C}"
 EndProject
-Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "slang-generate", "tools\slang-generate\slang-generate.vcxproj", "{66174227-8541-41FC-A6DF-4764FC66F78E}"
+Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "slang-generate", "build\visual-studio\slang-generate\slang-generate.vcxproj", "{66174227-8541-41FC-A6DF-4764FC66F78E}"
 EndProject
-Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "slang-test", "tools\slang-test\slang-test.vcxproj", "{0C768A18-1D25-4000-9F37-DA5FE99E3B64}"
+Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "slang-test", "build\visual-studio\slang-test\slang-test.vcxproj", "{0C768A18-1D25-4000-9F37-DA5FE99E3B64}"
 EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
@@ -107,14 +107,14 @@ Global
 		{2F8724C6-1BC3-2730-84D5-3F277030D04A}.Release|Win32.Build.0 = Release|Win32
 		{2F8724C6-1BC3-2730-84D5-3F277030D04A}.Release|x64.ActiveCfg = Release|x64
 		{2F8724C6-1BC3-2730-84D5-3F277030D04A}.Release|x64.Build.0 = Release|x64
-		{811F1997-6DDA-0843-1692-818D022C53D3}.Debug|Win32.ActiveCfg = Debug|Win32
-		{811F1997-6DDA-0843-1692-818D022C53D3}.Debug|Win32.Build.0 = Debug|Win32
-		{811F1997-6DDA-0843-1692-818D022C53D3}.Debug|x64.ActiveCfg = Debug|x64
-		{811F1997-6DDA-0843-1692-818D022C53D3}.Debug|x64.Build.0 = Debug|x64
-		{811F1997-6DDA-0843-1692-818D022C53D3}.Release|Win32.ActiveCfg = Release|Win32
-		{811F1997-6DDA-0843-1692-818D022C53D3}.Release|Win32.Build.0 = Release|Win32
-		{811F1997-6DDA-0843-1692-818D022C53D3}.Release|x64.ActiveCfg = Release|x64
-		{811F1997-6DDA-0843-1692-818D022C53D3}.Release|x64.Build.0 = Release|x64
+		{E145B2B8-CD13-A6BE-B6A7-16E5A2148223}.Debug|Win32.ActiveCfg = Debug|Win32
+		{E145B2B8-CD13-A6BE-B6A7-16E5A2148223}.Debug|Win32.Build.0 = Debug|Win32
+		{E145B2B8-CD13-A6BE-B6A7-16E5A2148223}.Debug|x64.ActiveCfg = Debug|x64
+		{E145B2B8-CD13-A6BE-B6A7-16E5A2148223}.Debug|x64.Build.0 = Debug|x64
+		{E145B2B8-CD13-A6BE-B6A7-16E5A2148223}.Release|Win32.ActiveCfg = Release|Win32
+		{E145B2B8-CD13-A6BE-B6A7-16E5A2148223}.Release|Win32.Build.0 = Release|Win32
+		{E145B2B8-CD13-A6BE-B6A7-16E5A2148223}.Release|x64.ActiveCfg = Release|x64
+		{E145B2B8-CD13-A6BE-B6A7-16E5A2148223}.Release|x64.Build.0 = Release|x64
 		{E76ACB11-4A12-4F0A-BE1E-CE0B8836EB7F}.Debug|Win32.ActiveCfg = Debug|Win32
 		{E76ACB11-4A12-4F0A-BE1E-CE0B8836EB7F}.Debug|Win32.Build.0 = Debug|Win32
 		{E76ACB11-4A12-4F0A-BE1E-CE0B8836EB7F}.Debug|x64.ActiveCfg = Debug|x64
@@ -205,7 +205,7 @@ Global
 		{010BE414-ED5B-CF56-16C0-BD18027062C0} = {EB5FC2C6-D72D-B6CC-C0C1-26F3AC2E9231}
 		{150CAA5A-0177-6A66-AA92-CFCB96DC2D49} = {EB5FC2C6-D72D-B6CC-C0C1-26F3AC2E9231}
 		{2F8724C6-1BC3-2730-84D5-3F277030D04A} = {EB5FC2C6-D72D-B6CC-C0C1-26F3AC2E9231}
-		{811F1997-6DDA-0843-1692-818D022C53D3} = {F3AB4ED5-5F37-BC99-6848-3F8ED452189A}
+		{E145B2B8-CD13-A6BE-B6A7-16E5A2148223} = {F3AB4ED5-5F37-BC99-6848-3F8ED452189A}
 		{61F7EB00-7281-4BF3-9470-7C2EA92620C3} = {57B5AA5E-C340-1823-CC51-9B17385C7423}
 		{C5ACCA6E-C04D-4B36-8516-3752B3C13C2F} = {57B5AA5E-C340-1823-CC51-9B17385C7423}
 		{222F7498-B40C-4F3F-A704-DDEB91A4484A} = {FD47AE19-69FD-260F-F2F1-20E65EA61D13}
