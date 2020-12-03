@@ -999,7 +999,7 @@ standardProject("slang", "source/slang")
     if not buildGlslang then
         filter { "system:windows" }
             postbuildcommands {
-                "{COPY} ../../external/slang-binaries/bin/" .. targetName .. "/slang-glslang.dll %{cfg.targetdir}"
+                "{COPY} ../../../external/slang-binaries/bin/" .. targetName .. "/slang-glslang.dll %{cfg.targetdir}"
             }
 
         filter { "system:linux" }
