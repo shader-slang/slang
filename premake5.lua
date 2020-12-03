@@ -307,12 +307,12 @@ function addSourceDir(path)
     }
 end
 
--- 
--- Set the project files in subdirectory of 'build'.
--- Visual studio is special case as the project files are part of the project.
 --
-
--- Note we can't use Tokens for this setting
+-- A function to return a name to place project files under 
+-- in build directory
+--
+-- This is complicated in so far as when this is used (with location for example)
+-- we can't use Tokens 
 -- https://github.com/premake/premake-core/wiki/Tokens
 
 function getBuildLocationName()
