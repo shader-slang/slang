@@ -17,7 +17,7 @@ int test(int inVal)
     return int(dot(v, float4(1, 16, 256, 4096)));
 }
 
-//TEST_INPUT:ubuffer(data=[9 9 9 9], stride=4):out
+//TEST_INPUT:ubuffer(data=[9 9 9 9], stride=4):out,name outputBuffer
 RWStructuredBuffer<int> outputBuffer : register(u0);
 
 [numthreads(4, 1, 1)]

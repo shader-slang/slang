@@ -29,7 +29,7 @@ int test(int val)
     return tmp;
 }
 
-//TEST_INPUT:ubuffer(data=[0 0 0 0], stride=4):out
+//TEST_INPUT:ubuffer(data=[0 0 0 0], stride=4):out,name gBuffer
 RWStructuredBuffer<int> gBuffer;
 
 [numthreads(4, 1, 1)]

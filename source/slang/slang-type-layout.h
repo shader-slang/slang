@@ -405,6 +405,46 @@ public:
         /// Otherwise, returns this type layout.
         ///
     RefPtr<TypeLayout> unwrapArray();
+
+
+        /// Extended information about type layout, used for "flat" reflection API
+    struct ExtendedInfo : public RefObject
+    {
+        struct DescriptorRangeInfo
+        {
+            SlangBindingType    bindingType;
+            LayoutResourceKind  kind;
+            LayoutSize          count;
+            Int                 indexOffset;
+        };
+
+        struct DescriptorSetInfo : public RefObject
+        {
+            Int                         spaceOffset;
+            List<DescriptorRangeInfo>   descriptorRanges;
+        };
+
+        struct BindingRangeInfo
+        {
+            TypeLayout*         leafTypeLayout;
+            SlangBindingType    bindingType;
+            LayoutSize          count;
+            Int                 descriptorSetIndex;
+            Int                 firstDescriptorRangeIndex;
+            Int                 descriptorRangeCount;
+        };
+
+        struct SubObjectRangeInfo
+        {
+            Int     bindingRangeIndex;
+        };
+
+        List<RefPtr<DescriptorSetInfo>> m_descriptorSets;
+        List<BindingRangeInfo> m_bindingRanges;
+        List<SubObjectRangeInfo> m_subObjectRanges;
+    };
+
+    RefPtr<ExtendedInfo> m_extendedInfo;
 };
 
 typedef unsigned int VarLayoutFlags;
@@ -495,6 +535,12 @@ public:
     void removeResourceUsage(LayoutResourceKind kind);
 
     RefPtr<VarLayout> pendingVarLayout;
+
+        /// Offset in binding ranges within the parent type
+        ///
+        /// Note: only usable when extended layout information has been calculated.
+        ///
+    Index bindingRangeOffset = -1;
 };
 
 // type layout for a variable that has a constant-buffer type

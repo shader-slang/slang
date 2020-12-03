@@ -420,8 +420,9 @@ SlangResult CPUComputeUtil::fillRuntimeHandleInBuffers(
     Context& context,
     ISlangSharedLibrary* sharedLib)
 {
+    auto request = compilationAndLayout.output.getRequestForReflection();
     Slang::ComPtr<slang::ISession> linkage;
-    spCompileRequest_getSession(compilationAndLayout.output.request, linkage.writeRef());
+    spCompileRequest_getSession(request, linkage.writeRef());
     auto& inputLayout = compilationAndLayout.layout;
     for (auto& entry : inputLayout.entries)
     {
@@ -433,7 +434,7 @@ SlangResult CPUComputeUtil::fillRuntimeHandleInBuffers(
             case RTTIDataEntryType::RTTIObject:
                 {
                     auto reflection =
-                        slang::ShaderReflection::get(compilationAndLayout.output.request);
+                        slang::ShaderReflection::get(request);
                     auto concreteType = reflection->findTypeByName(rtti.typeName.getBuffer());
                     ComPtr<ISlangBlob> outName;
                     linkage->getTypeRTTIMangledName(concreteType, outName.writeRef());
@@ -444,7 +445,7 @@ SlangResult CPUComputeUtil::fillRuntimeHandleInBuffers(
                 break;
             case RTTIDataEntryType::WitnessTable:
             {
-                auto reflection = slang::ShaderReflection::get(compilationAndLayout.output.request);
+                auto reflection = slang::ShaderReflection::get(request);
                 auto concreteType = reflection->findTypeByName(rtti.typeName.getBuffer());
                 if (!concreteType)
                     return SLANG_FAIL;
@@ -503,7 +504,7 @@ SlangResult CPUComputeUtil::fillRuntimeHandleInBuffers(
 
 /* static */SlangResult CPUComputeUtil::calcBindings(const ShaderCompilerUtil::OutputAndLayout& compilationAndLayout, Context& outContext)
 {
-    auto request = compilationAndLayout.output.request;
+    auto request = compilationAndLayout.output.getRequestForReflection();
     auto reflection = (slang::ShaderReflection*) spGetReflection(request);
 
     const auto& sourcePath = compilationAndLayout.sourcePath;
@@ -684,7 +685,7 @@ SlangResult CPUComputeUtil::fillRuntimeHandleInBuffers(
 
 /* static */SlangResult CPUComputeUtil::calcExecuteInfo(ExecuteStyle style, ISlangSharedLibrary* sharedLib, const uint32_t dispatchSize[3], const ShaderCompilerUtil::OutputAndLayout& compilationAndLayout, Context& context, ExecuteInfo& out)
 {
-    auto request = compilationAndLayout.output.request;
+    auto request = compilationAndLayout.output.getRequestForReflection();
     auto reflection = (slang::ShaderReflection*) spGetReflection(request);
 
     slang::EntryPointReflection* entryPoint = nullptr;

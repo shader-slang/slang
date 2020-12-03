@@ -17,7 +17,8 @@ using namespace gfx;
 
 enum class ShaderInputType
 {
-    Buffer, Texture, Sampler, CombinedTextureSampler, Array
+    Buffer, Texture, Sampler, CombinedTextureSampler, Array, Uniform,
+    Object,
 };
 
 enum class InputTextureContent
@@ -81,6 +82,11 @@ struct BindlessHandleDataEntry
     Slang::String name;
 };
 
+struct InputObjectDesc
+{
+    Slang::String typeName;
+};
+
 class ShaderInputLayoutEntry
 {
 public:
@@ -92,6 +98,7 @@ public:
     InputBufferDesc bufferDesc;
     InputSamplerDesc samplerDesc;
     ArrayDesc arrayDesc;
+    InputObjectDesc objectDesc;
     bool isOutput = false;
     bool onlyCPULikeBinding = false;        ///< If true, only use on targets that have 'uniform' or 'CPU like' binding, like CPU and CUDA
     bool isBindlessObject = false;          ///< If true, this is a bindless object with no associated binding point in the shader.

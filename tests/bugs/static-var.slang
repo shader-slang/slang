@@ -7,7 +7,7 @@ int test(int inVal)
     return inVal + kVal;
 }
 
-//TEST_INPUT:ubuffer(data=[9 9 9 9], stride=4):out
+//TEST_INPUT:ubuffer(data=[9 9 9 9], stride=4):out,name outputBuffer
 RWStructuredBuffer<int> outputBuffer : register(u0);
 
 [numthreads(4, 1, 1)]

@@ -390,6 +390,11 @@ SLANG_API SlangTypeKind spReflectionType_GetKind(SlangReflectionType* inType)
         {
             return SLANG_TYPE_KIND_INTERFACE;
         }
+        else if (declRef.is<FuncDecl>())
+        {
+            // This is a reference to an entry point
+            return SLANG_TYPE_KIND_STRUCT;
+        }
     }
     else if( auto specializedType = as<ExistentialSpecializedType>(type) )
     {
@@ -782,6 +787,28 @@ SLANG_API SlangReflectionType* spReflectionTypeLayout_GetType(SlangReflectionTyp
     return (SlangReflectionType*) typeLayout->type;
 }
 
+SLANG_API SlangTypeKind spReflectionTypeLayout_getKind(SlangReflectionTypeLayout* inTypeLayout)
+{
+    if(!inTypeLayout) return SLANG_TYPE_KIND_NONE;
+
+    if( auto type = spReflectionTypeLayout_GetType(inTypeLayout) )
+    {
+        return spReflectionType_GetKind(type);
+    }
+
+    auto typeLayout = convert(inTypeLayout);
+    if( as<StructTypeLayout>(typeLayout) )
+    {
+        return SLANG_TYPE_KIND_STRUCT;
+    }
+    else if( as<ParameterGroupTypeLayout>(typeLayout) )
+    {
+        return SLANG_TYPE_KIND_CONSTANT_BUFFER;
+    }
+
+    return SLANG_TYPE_KIND_NONE;
+}
+
 namespace
 {
     static size_t getReflectionSize(LayoutSize size)
@@ -830,6 +857,27 @@ SLANG_API SlangReflectionVariableLayout* spReflectionTypeLayout_GetFieldByIndex(
     }
 
     return nullptr;
+}
+
+SLANG_API SlangInt spReflectionTypeLayout_findFieldIndexByName(SlangReflectionTypeLayout* inTypeLayout, const char* nameBegin, const char* nameEnd)
+{
+    auto typeLayout = convert(inTypeLayout);
+    if(!typeLayout) return -1;
+
+    UnownedStringSlice name = nameEnd != nullptr ? UnownedStringSlice(nameBegin, nameEnd) : UnownedTerminatedStringSlice(nameBegin);
+
+    if(auto structTypeLayout = as<StructTypeLayout>(typeLayout))
+    {
+        Index fieldCount = structTypeLayout->fields.getCount();
+        for(Index f = 0; f < fieldCount; ++f)
+        {
+            auto field = structTypeLayout->fields[f];
+            if(getReflectionName(field->varDecl)->text.getUnownedSlice() == name)
+                return f;
+        }
+    }
+
+    return -1;
 }
 
 SLANG_API size_t spReflectionTypeLayout_GetElementStride(SlangReflectionTypeLayout* inTypeLayout, SlangParameterCategory category)
@@ -1007,6 +1055,887 @@ SLANG_API SlangReflectionVariableLayout* spReflectionTypeLayout_getSpecializedTy
     }
 }
 
+namespace Slang
+{
+    struct BindingRangePathLink
+    {
+        BindingRangePathLink(
+            BindingRangePathLink*   parent,
+            VarLayout*              var)
+            : parent(parent)
+            , var(var)
+        {}
+
+        BindingRangePathLink*   parent;
+        VarLayout*              var;
+    };
+
+
+    Int _calcIndexOffset(BindingRangePathLink* path, LayoutResourceKind kind)
+    {
+        Int result = 0;
+        for( auto link = path; link; link = link->parent )
+        {
+            if( auto resInfo = link->var->FindResourceInfo(kind) )
+            {
+                result += resInfo->index;
+            }
+        }
+        return result;
+    }
+
+    Int _calcSpaceOffset(BindingRangePathLink* path, LayoutResourceKind kind)
+    {
+        Int result = 0;
+        for( auto link = path; link; link = link->parent )
+        {
+            if( auto resInfo = link->var->FindResourceInfo(kind) )
+            {
+                result += resInfo->space;
+            }
+        }
+        return result;
+    }
+
+    SlangBindingType _calcResourceBindingType(
+        Type* type)
+    {
+        if( auto resourceType = as<ResourceType>(type) )
+        {
+            auto shape = resourceType->getBaseShape();
+
+            auto access = resourceType->getAccess();
+            auto mutableFlag = access != SLANG_RESOURCE_ACCESS_READ ? SLANG_BINDING_TYPE_MUTABLE_FLAG : 0;
+
+            switch( shape )
+            {
+            default:
+                return SLANG_BINDING_TYPE_TEXTURE | mutableFlag;
+
+            case SLANG_TEXTURE_BUFFER:
+                return SLANG_BINDING_TYPE_TYPED_BUFFER | mutableFlag;
+            }
+
+        }
+        else if( auto structuredBufferType = as<HLSLStructuredBufferTypeBase>(type) )
+        {
+            if( as<HLSLStructuredBufferType>(type) )
+            {
+                return SLANG_BINDING_TYPE_RAW_BUFFER;
+            }
+            else
+            {
+                return SLANG_BINDING_TYPE_MUTABLE_RAW_BUFFER;
+            }
+        }
+        else if( as<RaytracingAccelerationStructureType>(type) )
+        {
+            return SLANG_BINDING_TYPE_RAY_TRACTING_ACCELERATION_STRUCTURE;
+        }
+        else if( auto untypedBufferType = as<UntypedBufferResourceType>(type) )
+        {
+            if( as<HLSLByteAddressBufferType>(type) )
+            {
+                return SLANG_BINDING_TYPE_RAW_BUFFER;
+            }
+            else
+            {
+                return SLANG_BINDING_TYPE_MUTABLE_RAW_BUFFER;
+            }
+        }
+        else if( as<ConstantBufferType>(type) )
+        {
+            return SLANG_BINDING_TYPE_CONSTANT_BUFFER;
+        }
+        else
+        {
+            SLANG_UNEXPECTED("unhandled resource binding type");
+        }
+    }
+
+    SlangBindingType _calcResourceBindingType(
+        TypeLayout* typeLayout)
+    {
+        if(auto type = typeLayout->getType())
+        {
+            return _calcResourceBindingType(type);
+        }
+
+        if(as<ParameterGroupTypeLayout>(typeLayout))
+        {
+            return SLANG_BINDING_TYPE_CONSTANT_BUFFER;
+        }
+        else
+        {
+            SLANG_UNEXPECTED("unhandled resource binding type");
+        }
+    }
+
+
+    SlangBindingType _calcBindingType(
+        Slang::TypeLayout*  typeLayout,
+        LayoutResourceKind  kind)
+    {
+        switch( kind )
+        {
+        default:
+            return SLANG_BINDING_TYPE_UNKNOWN;
+
+        // Some cases of `LayoutResourceKind` can be mapped
+        // directly to a `BindingType` because there is only
+        // one case of types that have that resource kind.
+
+    #define CASE(FROM, TO) \
+        case LayoutResourceKind::FROM: return SLANG_BINDING_TYPE_##TO
+
+        CASE(ConstantBuffer, CONSTANT_BUFFER);
+        CASE(SamplerState, SAMPLER);
+        CASE(VaryingInput, VARYING_INPUT);
+        CASE(VaryingOutput, VARYING_OUTPUT);
+        CASE(ExistentialObjectParam, EXISTENTIAL_VALUE);
+        CASE(PushConstantBuffer, PUSH_CONSTANT);
+        // TODO: register space
+
+    #undef CASE
+
+        case LayoutResourceKind::ShaderResource:
+        case LayoutResourceKind::UnorderedAccess:
+        case LayoutResourceKind::DescriptorTableSlot:
+            return _calcResourceBindingType(typeLayout);
+        }
+    }
+
+    static DeclRefType* asInterfaceType(Type* type)
+    {
+        if(auto declRefType = as<DeclRefType>(type))
+        {
+            if(declRefType->declRef.as<InterfaceDecl>())
+            {
+                return declRefType;
+            }
+        }
+        return nullptr;
+    }
+
+    struct ExtendedTypeLayoutContext
+    {
+        TypeLayout* m_typeLayout;
+        TypeLayout::ExtendedInfo* m_extendedInfo;
+
+        Dictionary<Int, Int> m_mapSpaceToDescriptorSetIndex;
+
+        Int _findOrAddDescriptorSet(Int space)
+        {
+            Int index = 0;
+            if(m_mapSpaceToDescriptorSetIndex.TryGetValue(space, index))
+                return index;
+
+            index = m_extendedInfo->m_descriptorSets.getCount();
+            m_mapSpaceToDescriptorSetIndex.Add(space, index);
+
+            RefPtr<TypeLayout::ExtendedInfo::DescriptorSetInfo> descriptorSet = new TypeLayout::ExtendedInfo::DescriptorSetInfo();
+            m_extendedInfo->m_descriptorSets.add(descriptorSet);
+
+            return index;
+        }
+
+        void addRangesRec(TypeLayout* typeLayout, BindingRangePathLink* path, LayoutSize multiplier)
+        {
+            if( auto structTypeLayout = as<StructTypeLayout>(typeLayout) )
+            {
+                // For a structure type, we need to recursively
+                // add the ranges for each field.
+                //
+                // Along the way we will make sure to properly update
+                // the offset information on the fields so that
+                // they properly show their binding-range offset
+                // within the parent type.
+                //
+                Index structBindingRangeIndex = m_extendedInfo->m_bindingRanges.getCount();
+                for( auto fieldVarLayout : structTypeLayout->fields )
+                {
+                    Index fieldBindingRangeIndex = m_extendedInfo->m_bindingRanges.getCount();
+                    fieldVarLayout->bindingRangeOffset = fieldBindingRangeIndex - structBindingRangeIndex;
+
+                    auto fieldTypeLayout = fieldVarLayout->getTypeLayout();
+
+
+                    BindingRangePathLink fieldLink(path, fieldVarLayout);
+                    addRangesRec(fieldTypeLayout, &fieldLink, multiplier);
+                }
+                return;
+            }
+            else if( auto arrayTypeLayout = as<ArrayTypeLayout>(typeLayout) )
+            {
+                // For an array, we need to recursively add the
+                // element type of the array, but with an adjusted
+                // `multiplier` to account for the element count.
+                //
+                auto elementTypeLayout = arrayTypeLayout->elementTypeLayout;
+                LayoutSize elementCount = LayoutSize::infinite();
+                if( auto arrayType = as<ArrayExpressionType>(arrayTypeLayout->type) )
+                {
+                    if( auto elementCountVal = arrayType->arrayLength )
+                    {
+                        elementCount = LayoutSize::RawValue(getIntVal(elementCountVal));
+                    }
+                }
+                addRangesRec(elementTypeLayout, path, multiplier * elementCount);
+                return;
+            }
+            else if( auto parameterGroupTypeLayout = as<ParameterGroupTypeLayout>(typeLayout))
+            {
+                // A parameter group (whether a `ConstantBuffer<>` or `ParameterBlock<>`
+                // introduces a separately-allocated "sub-object" in the application's
+                // layout for shader objects.
+                //
+                // We will represent the parameter group with a single sub-object
+                // binding range (and an associated sub-object range).
+                //
+                // We start out by looking at the resources consumed by the parameter group
+                // itself, to determine what kind of binding range to report it as.
+                //
+                Index bindingRangeIndex = m_extendedInfo->m_bindingRanges.getCount();
+                SlangBindingType bindingType = SLANG_BINDING_TYPE_CONSTANT_BUFFER;
+                Index spaceOffset = -1;
+                LayoutResourceKind kind = LayoutResourceKind::None;
+                for(auto& resInfo : parameterGroupTypeLayout->resourceInfos)
+                {
+                    kind = resInfo.kind;
+                    switch(kind)
+                    {
+                    default:
+                        continue;
+
+                    case LayoutResourceKind::ConstantBuffer:
+                    case LayoutResourceKind::PushConstantBuffer:
+                    case LayoutResourceKind::RegisterSpace:
+                    case LayoutResourceKind::DescriptorTableSlot:
+                        break;
+                    }
+
+                    bindingType = _calcBindingType(typeLayout, kind);
+                    spaceOffset = _calcSpaceOffset(path, kind);
+                    break;
+                }
+
+                TypeLayout::ExtendedInfo::BindingRangeInfo bindingRange;
+                bindingRange.leafTypeLayout = typeLayout;
+                bindingRange.bindingType = bindingType;
+                bindingRange.count = multiplier;
+                bindingRange.descriptorSetIndex = -1;
+                bindingRange.firstDescriptorRangeIndex = 0;
+                bindingRange.descriptorRangeCount = 0;
+
+                if( kind == LayoutResourceKind::PushConstantBuffer )
+                {
+                    if(auto resInfo = parameterGroupTypeLayout->elementVarLayout->typeLayout->FindResourceInfo(LayoutResourceKind::Uniform))
+                    {
+                        bindingRange.count *= resInfo->count;
+                    }
+                }
+
+                // Every parameter group will introduce a sub-object range,
+                // which will include bindings based on the type of data
+                // inside the sub-object.
+                //
+                TypeLayout::ExtendedInfo::SubObjectRangeInfo subObjectRange;
+                subObjectRange.bindingRangeIndex = bindingRangeIndex;
+
+                // It is possible that the sub-object has descriptor ranges
+                // that will need to be exposed upward, into the parent.
+                //
+                if( spaceOffset != -1 )
+                {
+                    Int descriptorSetIndex = _findOrAddDescriptorSet(spaceOffset);
+                    auto descriptorSet = m_extendedInfo->m_descriptorSets[descriptorSetIndex];
+                    auto firstDescriptorRangeIndex = descriptorSet->descriptorRanges.getCount();
+
+                    // TODO: We need to recursively add descriptor ranges (but not binding
+                    // ranges!) for anything in the element type that "leaks" into
+                    // the surrounding context.
+                    //
+                    switch(kind)
+                    {
+                    case LayoutResourceKind::RegisterSpace:
+                    case LayoutResourceKind::Uniform:
+                    case LayoutResourceKind::None:
+                        break;
+
+                    default:
+                        {
+                            // This means we are in the constant-buffer-like case
+                            // (even if the user wrote `ParameterBlock<T>`), and any
+                            // resource usage inside the element type should "leak"
+                            // out to the parent scope.
+                            //
+                            // It *also* means we should add a suitable descriptor
+                            // range if one is required for the "container" type.
+                            //
+                            for(auto resInfo : parameterGroupTypeLayout->containerVarLayout->typeLayout->resourceInfos)
+                            {
+                                switch( resInfo.kind )
+                                {
+                                case LayoutResourceKind::RegisterSpace:
+                                case LayoutResourceKind::Uniform:
+                                    continue;
+
+                                default:
+                                    break;
+                                }
+
+                                TypeLayout::ExtendedInfo::DescriptorRangeInfo descriptorRange;
+                                descriptorRange.kind = resInfo.kind;
+                                descriptorRange.bindingType = _calcBindingType(typeLayout, resInfo.kind);
+                                descriptorRange.count = multiplier;
+                                descriptorRange.indexOffset = _calcIndexOffset(path, resInfo.kind);
+
+                                if( resInfo.kind == LayoutResourceKind::PushConstantBuffer )
+                                {
+                                    if(auto uniformResInfo = parameterGroupTypeLayout->elementVarLayout->typeLayout->FindResourceInfo(LayoutResourceKind::Uniform))
+                                    {
+                                        descriptorRange.count *= uniformResInfo->count;
+                                    }
+                                }
+
+                                descriptorSet->descriptorRanges.add(descriptorRange);
+                            }
+
+                            // Now we need to recursively walk the element type and add all its
+                            // descriptor ranges, so that they can be used for binding in
+                            // the parent.
+                            //
+                            // We have this a bit by collecting both binding ranges and
+                            // descriptor ranges, and then throwing away the binding ranges
+                            // from the element type.
+                            //
+                            BindingRangePathLink elementPath(path, parameterGroupTypeLayout->elementVarLayout);
+
+                            Index bindingRangeCountBefore = m_extendedInfo->m_bindingRanges.getCount();
+                            Index subObjectRangeCountBefore = m_extendedInfo->m_subObjectRanges.getCount();
+
+                            addRangesRec(parameterGroupTypeLayout->elementVarLayout->typeLayout, &elementPath, multiplier);
+
+                            m_extendedInfo->m_bindingRanges.setCount(bindingRangeCountBefore);
+                            m_extendedInfo->m_subObjectRanges.setCount(subObjectRangeCountBefore);
+                        }
+                        break;
+                    }
+
+                    auto descriptorRangeCount = descriptorSet->descriptorRanges.getCount() - firstDescriptorRangeIndex;
+                    bindingRange.descriptorSetIndex = descriptorSetIndex;
+                    bindingRange.firstDescriptorRangeIndex = firstDescriptorRangeIndex;
+                    bindingRange.descriptorRangeCount = descriptorRangeCount;
+                }
+
+                m_extendedInfo->m_bindingRanges.add(bindingRange);
+                m_extendedInfo->m_subObjectRanges.add(subObjectRange);
+                return;
+            }
+            else if(asInterfaceType(typeLayout->type))
+            {
+                // An `interface` type should introduce a sub-object range,
+                // with no concrete descriptor ranges to store its value
+                // (since we don't know until runtime what type of
+                // value will be plugged in).
+                //
+
+                LayoutResourceKind kind = LayoutResourceKind::ExistentialObjectParam;
+                auto count = multiplier;
+                auto spaceOffset = _calcSpaceOffset(path, kind);
+
+                Int descriptorSetIndex = _findOrAddDescriptorSet(spaceOffset);
+                auto descriptorSet = m_extendedInfo->m_descriptorSets[descriptorSetIndex];
+
+                TypeLayout::ExtendedInfo::BindingRangeInfo bindingRange;
+                bindingRange.leafTypeLayout = typeLayout;
+                bindingRange.bindingType = SLANG_BINDING_TYPE_EXISTENTIAL_VALUE;
+                bindingRange.count = multiplier;
+                bindingRange.descriptorSetIndex = descriptorSetIndex;
+                bindingRange.firstDescriptorRangeIndex = descriptorSet->descriptorRanges.getCount();
+                bindingRange.descriptorRangeCount = 1;
+
+                TypeLayout::ExtendedInfo::SubObjectRangeInfo subObjectRange;
+                subObjectRange.bindingRangeIndex = m_extendedInfo->m_bindingRanges.getCount();
+
+                m_extendedInfo->m_bindingRanges.add(bindingRange);
+                m_extendedInfo->m_subObjectRanges.add(subObjectRange);
+            }
+            // TODO: We need to handle `interface` types here, because they are
+            // another case that introduces a "sub-object" for the purposes of
+            // application-side allocation.
+            //
+            // TODO: There are a few cases of "leaf" fields that might
+            // still result in multiple descriptors (or at least multiple
+            // `LayoutResourceKind`s) depending on the target.
+            //
+            // For eample, combined texture-sampler types should be treated
+            // as "leaf" fields for this code (since a portable engine would
+            // need to abstract over them), but would map to two descriptors
+            // on targets that don't actually support combining them.
+            else
+            {
+                Int resourceKindCount = typeLayout->resourceInfos.getCount();
+                if(resourceKindCount == 0)
+                {
+                    // This is a field that consumes no resources, and as
+                    // such does not need a binding or descriptor ranges
+                    // allocated for it.
+                    //
+                    return;
+                }
+                else if(resourceKindCount == 1)
+                {
+                    auto& resInfo = typeLayout->resourceInfos[0];
+                    LayoutResourceKind kind = resInfo.kind;
+
+                    if(kind == LayoutResourceKind::Uniform)
+                    {
+                        // We do not consider uniform resource usage
+                        // in the ranges we compute.
+                        //
+                        // TODO: We may need to revise that rule for types that
+                        // represent resources, even when one or more targets
+                        // map those resource types to ordinary/uniform data.
+                        //
+                        return;
+                    }
+
+                    // This leaf field will map to a single binding range and,
+                    // if it is appropriate, a single descriptor range.
+                    //
+                    auto bindingType = _calcBindingType(typeLayout, kind);
+                    auto count = resInfo.count * multiplier;
+                    auto indexOffset = _calcIndexOffset(path, kind);
+                    auto spaceOffset = _calcSpaceOffset(path, kind);
+
+                    Int descriptorSetIndex = -1;
+                    Int firstDescriptorIndex = 0;
+                    RefPtr<TypeLayout::ExtendedInfo::DescriptorSetInfo> descriptorSet;
+                    switch( kind )
+                    {
+                    case LayoutResourceKind::RegisterSpace:
+                    case LayoutResourceKind::VaryingInput:
+                    case LayoutResourceKind::VaryingOutput:
+                    case LayoutResourceKind::HitAttributes:
+                    case LayoutResourceKind::RayPayload:
+                        // Resource kinds that represent "varying" input/output
+                        // do not manifest as entries in API descriptor tables.
+                        //
+                        // TODO: Neither do root constants, if we are being
+                        // precise. This API really needs to carefully match
+                        // the semantics of the target platform/API in terms
+                        // of what things are descriptor-bound and which are
+                        // not, so that a user can easily allocate the platform-specific
+                        // descriptor sets using this info.
+                        //
+                        // (That said, we are purposefully *not* breaking apart
+                        // samplers and SRV/UAV/CBV stuff for our D3D reflection
+                        // of descriptor sets. It seems like the policy here
+                        // really requires careful thought)
+                        //
+                        // TODO: Maybe the best answer is to leave decomposition
+                        // of stuff into descriptor sets up to the application
+                        // layer? This is especially true if a common case would
+                        // be an application that doesn't support arbitrary manual
+                        // binding of parameters to register/spaces.
+                        //
+                        break;
+
+                    default:
+                        {
+                            TypeLayout::ExtendedInfo::DescriptorRangeInfo descriptorRange;
+                            descriptorRange.kind = kind;
+                            descriptorRange.bindingType = bindingType;
+                            descriptorRange.count = count;
+                            descriptorRange.indexOffset = indexOffset;
+
+                            descriptorSetIndex = _findOrAddDescriptorSet(spaceOffset);
+                            descriptorSet = m_extendedInfo->m_descriptorSets[descriptorSetIndex];
+
+                            firstDescriptorIndex = descriptorSet->descriptorRanges.getCount();
+                            descriptorSet->descriptorRanges.add(descriptorRange);
+                        }
+                        break;
+                    }
+
+
+                    TypeLayout::ExtendedInfo::BindingRangeInfo bindingRange;
+                    bindingRange.leafTypeLayout = typeLayout;
+                    bindingRange.bindingType = _calcBindingType(typeLayout, kind);
+                    bindingRange.count = count;
+                    bindingRange.descriptorSetIndex = descriptorSetIndex;
+                    bindingRange.firstDescriptorRangeIndex = firstDescriptorIndex;
+                    bindingRange.descriptorRangeCount = 1;
+
+                    m_extendedInfo->m_bindingRanges.add(bindingRange);
+                }
+                else
+                {
+                    // This type appears to be one that consumes multiple
+                    // resource kinds, but was not handled by any of
+                    // the special-case logic above. In such a case we
+                    // are in trouble.
+                    //
+                    return;
+                }
+            }
+        }
+    };
+
+    TypeLayout::ExtendedInfo* getExtendedTypeLayout(TypeLayout* typeLayout)
+    {
+        if( !typeLayout->m_extendedInfo )
+        {
+            RefPtr<TypeLayout::ExtendedInfo> extendedInfo = new TypeLayout::ExtendedInfo;
+
+            ExtendedTypeLayoutContext context;
+            context.m_typeLayout = typeLayout;
+            context.m_extendedInfo = extendedInfo;
+
+            context.addRangesRec(typeLayout, nullptr, 1);
+
+            typeLayout->m_extendedInfo = extendedInfo;
+        }
+        return typeLayout->m_extendedInfo;
+    }
+}
+
+SLANG_API SlangInt spReflectionTypeLayout_getBindingRangeCount(SlangReflectionTypeLayout* inTypeLayout)
+{
+    auto typeLayout = convert(inTypeLayout);
+    if(!typeLayout) return 0;
+
+    auto extTypeLayout = Slang::getExtendedTypeLayout(typeLayout);
+    return extTypeLayout->m_bindingRanges.getCount();
+}
+
+SLANG_API SlangBindingType spReflectionTypeLayout_getBindingRangeType(SlangReflectionTypeLayout* inTypeLayout, SlangInt index)
+{
+    auto typeLayout = convert(inTypeLayout);
+    if(!typeLayout) return SLANG_BINDING_TYPE_UNKNOWN;
+
+    auto extTypeLayout = Slang::getExtendedTypeLayout(typeLayout);
+    if(index < 0) return 0;
+    if(index >= extTypeLayout->m_bindingRanges.getCount()) return 0;
+    auto& bindingRange = extTypeLayout->m_bindingRanges[index];
+
+    return bindingRange.bindingType;
+}
+
+SLANG_API SlangInt spReflectionTypeLayout_getBindingRangeBindingCount(SlangReflectionTypeLayout* inTypeLayout, SlangInt index)
+{
+    auto typeLayout = convert(inTypeLayout);
+    if(!typeLayout) return 0;
+
+    auto extTypeLayout = Slang::getExtendedTypeLayout(typeLayout);
+    if(index < 0) return 0;
+    if(index >= extTypeLayout->m_bindingRanges.getCount()) return 0;
+    auto& bindingRange = extTypeLayout->m_bindingRanges[index];
+
+    auto count = bindingRange.count;
+    return count.isFinite() ? SlangInt(count.getFiniteValue()) : -1;
+}
+
+#if 0
+SLANG_API SlangInt spReflectionTypeLayout_getBindingRangeIndexOffset(SlangReflectionTypeLayout* inTypeLayout, SlangInt index)
+{
+    auto typeLayout = convert(inTypeLayout);
+    if(!typeLayout) return 0;
+
+    return Slang::_findBindingRange(typeLayout, index).indexOffset;
+}
+
+SLANG_API SlangInt spReflectionTypeLayout_getBindingRangeSpaceOffset(SlangReflectionTypeLayout* inTypeLayout, SlangInt index)
+{
+    auto typeLayout = convert(inTypeLayout);
+    if(!typeLayout) return 0;
+
+    return Slang::_findBindingRange(typeLayout, index).spaceOffset;
+}
+#endif
+
+SLANG_API SlangReflectionTypeLayout* spReflectionTypeLayout_getBindingRangeLeafTypeLayout(SlangReflectionTypeLayout* inTypeLayout, SlangInt index)
+{
+    auto typeLayout = convert(inTypeLayout);
+    if(!typeLayout) return 0;
+
+    auto extTypeLayout = Slang::getExtendedTypeLayout(typeLayout);
+    if(index < 0) return 0;
+    if(index >= extTypeLayout->m_bindingRanges.getCount()) return 0;
+    auto& bindingRange = extTypeLayout->m_bindingRanges[index];
+
+    return convert(bindingRange.leafTypeLayout);
+}
+
+SLANG_API SlangInt spReflectionTypeLayout_getBindingRangeDescriptorSetIndex(SlangReflectionTypeLayout* inTypeLayout, SlangInt index)
+{
+    auto typeLayout = convert(inTypeLayout);
+    if(!typeLayout) return 0;
+
+    auto extTypeLayout = Slang::getExtendedTypeLayout(typeLayout);
+    if(index < 0) return 0;
+    if(index >= extTypeLayout->m_bindingRanges.getCount()) return 0;
+    auto& bindingRange = extTypeLayout->m_bindingRanges[index];
+
+    return bindingRange.descriptorSetIndex;
+}
+
+SLANG_API SlangInt spReflectionTypeLayout_getBindingRangeFirstDescriptorRangeIndex(SlangReflectionTypeLayout* inTypeLayout, SlangInt index)
+{
+    auto typeLayout = convert(inTypeLayout);
+    if(!typeLayout) return 0;
+
+    auto extTypeLayout = Slang::getExtendedTypeLayout(typeLayout);
+    if(index < 0) return 0;
+    if(index >= extTypeLayout->m_bindingRanges.getCount()) return 0;
+    auto& bindingRange = extTypeLayout->m_bindingRanges[index];
+
+    return bindingRange.firstDescriptorRangeIndex;
+}
+
+SLANG_API SlangInt spReflectionTypeLayout_getDescriptorSetCount(SlangReflectionTypeLayout* inTypeLayout)
+{
+    auto typeLayout = convert(inTypeLayout);
+    if(!typeLayout) return 0;
+
+    auto extTypeLayout = Slang::getExtendedTypeLayout(typeLayout);
+
+    return extTypeLayout->m_descriptorSets.getCount();
+}
+
+SLANG_API SlangInt spReflectionTypeLayout_getDescriptorSetSpaceOffset(SlangReflectionTypeLayout* inTypeLayout, SlangInt setIndex)
+{
+    auto typeLayout = convert(inTypeLayout);
+    if(!typeLayout) return 0;
+
+    auto extTypeLayout = Slang::getExtendedTypeLayout(typeLayout);
+
+    if(setIndex < 0) return 0;
+    if(setIndex >= extTypeLayout->m_descriptorSets.getCount()) return 0;
+    auto descriptorSet = extTypeLayout->m_descriptorSets[setIndex];
+
+    return descriptorSet->spaceOffset;
+}
+
+SLANG_API SlangInt spReflectionTypeLayout_getDescriptorSetDescriptorRangeCount(SlangReflectionTypeLayout* inTypeLayout, SlangInt setIndex)
+{
+    auto typeLayout = convert(inTypeLayout);
+    if(!typeLayout) return 0;
+
+    auto extTypeLayout = Slang::getExtendedTypeLayout(typeLayout);
+
+    if(setIndex < 0) return 0;
+    if(setIndex >= extTypeLayout->m_descriptorSets.getCount()) return 0;
+    auto descriptorSet = extTypeLayout->m_descriptorSets[setIndex];
+
+    return descriptorSet->descriptorRanges.getCount();
+}
+
+SLANG_API SlangInt spReflectionTypeLayout_getDescriptorSetDescriptorRangeIndexOffset(SlangReflectionTypeLayout* inTypeLayout, SlangInt setIndex, SlangInt rangeIndex)
+{
+    auto typeLayout = convert(inTypeLayout);
+    if(!typeLayout) return 0;
+
+    auto extTypeLayout = Slang::getExtendedTypeLayout(typeLayout);
+
+    if(setIndex < 0) return 0;
+    if(setIndex >= extTypeLayout->m_descriptorSets.getCount()) return 0;
+    auto descriptorSet = extTypeLayout->m_descriptorSets[setIndex];
+
+    if(rangeIndex < 0) return 0;
+    if(rangeIndex >= descriptorSet->descriptorRanges.getCount()) return 0;
+    auto& range = descriptorSet->descriptorRanges[rangeIndex];
+
+    return range.indexOffset;
+}
+
+SLANG_API SlangInt spReflectionTypeLayout_getDescriptorSetDescriptorRangeDescriptorCount(SlangReflectionTypeLayout* inTypeLayout, SlangInt setIndex, SlangInt rangeIndex)
+{
+    auto typeLayout = convert(inTypeLayout);
+    if(!typeLayout) return 0;
+
+    auto extTypeLayout = Slang::getExtendedTypeLayout(typeLayout);
+
+    if(setIndex < 0) return 0;
+    if(setIndex >= extTypeLayout->m_descriptorSets.getCount()) return 0;
+    auto descriptorSet = extTypeLayout->m_descriptorSets[setIndex];
+
+    if(rangeIndex < 0) return 0;
+    if(rangeIndex >= descriptorSet->descriptorRanges.getCount()) return 0;
+    auto& range = descriptorSet->descriptorRanges[rangeIndex];
+
+    auto count = range.count;
+    return count.isFinite() ? count.getFiniteValue() : -1;
+}
+
+SLANG_API SlangBindingType spReflectionTypeLayout_getDescriptorSetDescriptorRangeType(SlangReflectionTypeLayout* inTypeLayout, SlangInt setIndex, SlangInt rangeIndex)
+{
+    auto typeLayout = convert(inTypeLayout);
+    if(!typeLayout) return 0;
+
+    auto extTypeLayout = Slang::getExtendedTypeLayout(typeLayout);
+
+    if(setIndex < 0) return 0;
+    if(setIndex >= extTypeLayout->m_descriptorSets.getCount()) return 0;
+    auto descriptorSet = extTypeLayout->m_descriptorSets[setIndex];
+
+    if(rangeIndex < 0) return 0;
+    if(rangeIndex >= descriptorSet->descriptorRanges.getCount()) return 0;
+    auto& range = descriptorSet->descriptorRanges[rangeIndex];
+
+    return range.bindingType;
+}
+
+SLANG_API SlangParameterCategory spReflectionTypeLayout_getDescriptorSetDescriptorRangeCategory(SlangReflectionTypeLayout* inTypeLayout, SlangInt setIndex, SlangInt rangeIndex)
+{
+    auto typeLayout = convert(inTypeLayout);
+    if(!typeLayout) return 0;
+
+    auto extTypeLayout = Slang::getExtendedTypeLayout(typeLayout);
+
+    if(setIndex < 0) return 0;
+    if(setIndex >= extTypeLayout->m_descriptorSets.getCount()) return 0;
+    auto descriptorSet = extTypeLayout->m_descriptorSets[setIndex];
+
+    if(rangeIndex < 0) return 0;
+    if(rangeIndex >= descriptorSet->descriptorRanges.getCount()) return 0;
+    auto& range = descriptorSet->descriptorRanges[rangeIndex];
+
+    return SlangParameterCategory(range.kind);
+}
+
+SLANG_API SlangInt spReflectionTypeLayout_getSubObjectRangeCount(SlangReflectionTypeLayout* inTypeLayout)
+{
+    auto typeLayout = convert(inTypeLayout);
+    if(!typeLayout) return 0;
+
+    auto extTypeLayout = Slang::getExtendedTypeLayout(typeLayout);
+
+    return extTypeLayout->m_subObjectRanges.getCount();
+}
+
+SLANG_API SlangInt spReflectionTypeLayout_getSubObjectRangeBindingRangeIndex(SlangReflectionTypeLayout* inTypeLayout, SlangInt subObjectRangeIndex)
+{
+    auto typeLayout = convert(inTypeLayout);
+    if(!typeLayout) return 0;
+
+    auto extTypeLayout = Slang::getExtendedTypeLayout(typeLayout);
+
+    if(subObjectRangeIndex < 0) return 0;
+    if(subObjectRangeIndex >= extTypeLayout->m_subObjectRanges.getCount()) return 0;
+
+    return extTypeLayout->m_subObjectRanges[subObjectRangeIndex].bindingRangeIndex;
+}
+
+
+#if 0
+SLANG_API SlangInt spReflectionTypeLayout_getBindingRangeSubObjectRangeIndex(SlangReflectionTypeLayout* inTypeLayout, SlangInt index)
+{
+    auto typeLayout = convert(inTypeLayout);
+    if(!typeLayout) return 0;
+
+    return Slang::_findBindingRange(typeLayout, index).subObjectRangeIndex;
+}
+#endif
+
+
+SLANG_API SlangInt spReflectionTypeLayout_getFieldBindingRangeOffset(SlangReflectionTypeLayout* inTypeLayout, SlangInt fieldIndex)
+{
+    auto typeLayout = convert(inTypeLayout);
+    if(!typeLayout) return 0;
+
+    if( auto structTypeLayout = as<StructTypeLayout>(typeLayout) )
+    {
+        getExtendedTypeLayout(structTypeLayout);
+
+        return structTypeLayout->fields[fieldIndex]->bindingRangeOffset;
+    }
+
+    return 0;
+}
+
+#if 0
+SLANG_API SlangInt spReflectionTypeLayout_getSubObjectRangeCount(SlangReflectionTypeLayout* inTypeLayout)
+{
+    auto typeLayout = convert(inTypeLayout);
+    if(!typeLayout) return 0;
+
+    return Slang::_calcSubObjectRangeCount(typeLayout);
+}
+
+SLANG_API SlangInt spReflectionTypeLayout_getSubObjectRangeObjectCount(SlangReflectionTypeLayout* inTypeLayout, SlangInt index)
+{
+    auto typeLayout = convert(inTypeLayout);
+    if(!typeLayout) return 0;
+
+    auto count = Slang::_findSubObjectRange(typeLayout, index).count;
+    return count.isFinite() ? SlangInt(count.getFiniteValue()) : -1;
+}
+
+SLANG_API SlangInt spReflectionTypeLayout_getSubObjectRangeBindingRangeIndex(SlangReflectionTypeLayout* inTypeLayout, SlangInt index)
+{
+    auto typeLayout = convert(inTypeLayout);
+    if(!typeLayout) return 0;
+
+    return Slang::_findSubObjectRange(typeLayout, index).bindingRangeIndex;
+}
+
+
+SLANG_API SlangReflectionTypeLayout* spReflectionTypeLayout_getSubObjectRangeTypeLayout(SlangReflectionTypeLayout* inTypeLayout, SlangInt index)
+{
+    auto typeLayout = convert(inTypeLayout);
+    if(!typeLayout) return 0;
+
+    return convert(Slang::_findSubObjectRange(typeLayout, index).leafTypeLayout);
+}
+
+SLANG_API SlangInt spReflectionTypeLayout_getSubObjectRangeDescriptorRangeCount(SlangReflectionTypeLayout* inTypeLayout, SlangInt subObjectRangeIndex)
+{
+    auto typeLayout = convert(inTypeLayout);
+    if(!typeLayout) return 0;
+
+    auto subObjectRange = Slang::_findSubObjectRange(typeLayout, subObjectRangeIndex);
+    return Slang::_getSubObjectDescriptorRangeCount(subObjectRange);
+}
+
+SLANG_API SlangBindingType spReflectionTypeLayout_getSubObjectRangeDescriptorRangeBindingType(SlangReflectionTypeLayout* inTypeLayout, SlangInt subObjectRangeIndex, SlangInt bindingRangeIndexInSubObject)
+{
+    auto typeLayout = convert(inTypeLayout);
+    if(!typeLayout) return 0;
+
+    auto subObjectRange = Slang::_findSubObjectRange(typeLayout, subObjectRangeIndex);
+    return Slang::_getSubObjectDescriptorRange(subObjectRange, bindingRangeIndexInSubObject).bindingType;
+}
+
+SLANG_API SlangInt spReflectionTypeLayout_getSubObjectRangeDescriptorRangeBindingCount(SlangReflectionTypeLayout* inTypeLayout, SlangInt subObjectRangeIndex, SlangInt bindingRangeIndexInSubObject)
+{
+    auto typeLayout = convert(inTypeLayout);
+    if(!typeLayout) return 0;
+
+    auto subObjectRange = Slang::_findSubObjectRange(typeLayout, subObjectRangeIndex);
+    auto count = Slang::_getSubObjectDescriptorRange(subObjectRange, bindingRangeIndexInSubObject).count;
+    return count.isFinite() ? count.getFiniteValue() : -1;
+}
+
+SLANG_API SlangInt spReflectionTypeLayout_getSubObjectRangeDescriptorRangeIndexOffset(SlangReflectionTypeLayout* inTypeLayout, SlangInt subObjectRangeIndex, SlangInt bindingRangeIndexInSubObject)
+{
+    auto typeLayout = convert(inTypeLayout);
+    if(!typeLayout) return 0;
+
+    auto subObjectRange = Slang::_findSubObjectRange(typeLayout, subObjectRangeIndex);
+    return Slang::_getSubObjectDescriptorRange(subObjectRange, bindingRangeIndexInSubObject).indexOffset;
+}
+
+SLANG_API SlangInt spReflectionTypeLayout_getSubObjectRangeDescriptorRangeSpaceOffset(SlangReflectionTypeLayout* inTypeLayout, SlangInt subObjectRangeIndex, SlangInt bindingRangeIndexInSubObject)
+{
+    auto typeLayout = convert(inTypeLayout);
+    if(!typeLayout) return 0;
+
+    auto subObjectRange = Slang::_findSubObjectRange(typeLayout, subObjectRangeIndex);
+    return Slang::_getSubObjectDescriptorRange(subObjectRange, bindingRangeIndexInSubObject).spaceOffset;
+}
+#endif
 
 // Variable Reflection
 
@@ -1424,6 +2353,14 @@ SLANG_API SlangReflectionParameter* spReflection_GetParameterByIndex(SlangReflec
         return 0;
 
     return convert(globalStructLayout->fields[index].Ptr());
+}
+
+SLANG_API SlangReflectionVariableLayout* spReflection_getGlobalParamsVarLayout(SlangReflection* inProgram)
+{
+    auto program = convert(inProgram);
+    if(!program) return nullptr;
+
+    return convert(program->parametersLayout);
 }
 
 SLANG_API unsigned int spReflection_GetTypeParameterCount(SlangReflection * reflection)

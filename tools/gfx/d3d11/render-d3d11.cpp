@@ -1019,6 +1019,11 @@ Result D3D11Renderer::createBufferResource(Resource::Usage initialUsage, const B
         }
     }
 
+    if( bufferDesc.Usage == D3D11_USAGE_DYNAMIC )
+    {
+        bufferDesc.CPUAccessFlags |= D3D11_CPU_ACCESS_WRITE;
+    }
+
     D3D11_SUBRESOURCE_DATA subResourceData = { 0 };
     subResourceData.pSysMem = initData;
 
@@ -1394,7 +1399,7 @@ void* D3D11Renderer::map(BufferResource* bufferIn, MapFlavor flavor)
             mapType = D3D11_MAP_WRITE_DISCARD;
             break;
         case MapFlavor::HostWrite:
-            mapType = D3D11_MAP_WRITE;
+            mapType = D3D11_MAP_WRITE_NO_OVERWRITE;
             break;
         case MapFlavor::HostRead:
             mapType = D3D11_MAP_READ;
@@ -2104,299 +2109,6 @@ Result D3D11Renderer::createDescriptorSet(DescriptorSetLayout* layout, Descripto
 }
 
 
-#if 0
-BindingState* D3D11Renderer::createBindingState(const BindingState::Desc& bindingStateDesc)
-{
-    RefPtr<BindingStateImpl> bindingState(new BindingStateImpl(bindingStateDesc));
-
-    const auto& srcBindings = bindingStateDesc.m_bindings;
-    const int numBindings = int(srcBindings.Count());
-
-    auto& dstDetails = bindingState->m_bindingDetails;
-    dstDetails.SetSize(numBindings);
-
-    for (int i = 0; i < numBindings; ++i)
-    {
-        auto& dstDetail = dstDetails[i];
-        const auto& srcBinding = srcBindings[i];
-
-        assert(srcBinding.registerRange.isSingle());
-
-        switch (srcBinding.bindingType)
-        {
-            case BindingType::Buffer:
-            {
-                assert(srcBinding.resource && srcBinding.resource->isBuffer());
-
-                BufferResourceImpl* buffer = static_cast<BufferResourceImpl*>(srcBinding.resource.Ptr());
-                const BufferResource::Desc& desc = buffer->getDesc();
-
-                const int elemSize = bufferDesc.elementSize <= 0 ? 1 : bufferDesc.elementSize;
-
-                if (bufferDesc.bindFlags & Resource::BindFlag::UnorderedAccess)
-                {
-                    D3D11_UNORDERED_ACCESS_VIEW_DESC viewDesc;
-                    memset(&viewDesc, 0, sizeof(viewDesc));
-                    viewDesc.Buffer.FirstElement = 0;
-                    viewDesc.Buffer.NumElements = (UINT)(bufferDesc.sizeInBytes / elemSize);
-                    viewDesc.Buffer.Flags = 0;
-                    viewDesc.ViewDimension = D3D11_UAV_DIMENSION_BUFFER;
-                    viewDesc.Format = D3DUtil::getMapFormat(bufferDesc.format);
-
-                    if (bufferDesc.elementSize == 0 && bufferDesc.format == Format::Unknown)
-                    {
-                        viewDesc.Buffer.Flags |= D3D11_BUFFER_UAV_FLAG_RAW;
-                        viewDesc.Format = DXGI_FORMAT_R32_TYPELESS;
-                    }
-
-                    SLANG_RETURN_NULL_ON_FAIL(m_device->CreateUnorderedAccessView(buffer->m_buffer, &viewDesc, dstDetail.m_uav.writeRef()));
-                }
-                if (bufferDesc.bindFlags & (Resource::BindFlag::NonPixelShaderResource | Resource::BindFlag::PixelShaderResource))
-                {
-                    D3D11_SHADER_RESOURCE_VIEW_DESC viewDesc;
-                    memset(&viewDesc, 0, sizeof(viewDesc));
-                    viewDesc.Buffer.FirstElement = 0;
-                    viewDesc.Buffer.ElementWidth = elemSize;
-                    viewDesc.Buffer.NumElements = (UINT)(bufferDesc.sizeInBytes / elemSize);
-                    viewDesc.Buffer.ElementOffset = 0;
-                    viewDesc.ViewDimension = D3D11_SRV_DIMENSION_BUFFER;
-                    viewDesc.Format = DXGI_FORMAT_UNKNOWN;
-
-                    if (bufferDesc.elementSize == 0)
-                    {
-                        viewDesc.Format = DXGI_FORMAT_R32_FLOAT;
-                    }
-
-                    SLANG_RETURN_NULL_ON_FAIL(m_device->CreateShaderResourceView(buffer->m_buffer, &viewDesc, dstDetail.m_srv.writeRef()));
-                }
-                break;
-            }
-            case BindingType::Texture:
-            case BindingType::CombinedTextureSampler:
-            {
-                assert(srcBinding.resource && srcBinding.resource->isTexture());
-
-                TextureResourceImpl* texture = static_cast<TextureResourceImpl*>(srcBinding.resource.Ptr());
-
-                const TextureResource::Desc& textureDesc = texture->getDesc();
-
-                D3D11_SHADER_RESOURCE_VIEW_DESC viewDesc;
-                viewDesc.Format = D3DUtil::getMapFormat(textureDesc.format);
-
-                switch (texture->getType())
-                {
-                    case Resource::Type::Texture1D:
-                    {
-                        if (textureDesc.arraySize <= 0)
-                        {
-                            viewDesc.ViewDimension =  D3D11_SRV_DIMENSION_TEXTURE1D;
-                            viewDesc.Texture1D.MipLevels = textureDesc.numMipLevels;
-                            viewDesc.Texture1D.MostDetailedMip = 0;
-                        }
-                        else
-                        {
-                            viewDesc.ViewDimension = D3D11_SRV_DIMENSION_TEXTURE1DARRAY;
-                            viewDesc.Texture1DArray.ArraySize = textureDesc.arraySize;
-                            viewDesc.Texture1DArray.FirstArraySlice = 0;
-                            viewDesc.Texture1DArray.MipLevels = textureDesc.numMipLevels;
-                            viewDesc.Texture1DArray.MostDetailedMip = 0;
-                        }
-                        break;
-                    }
-                    case Resource::Type::Texture2D:
-                    {
-                        if (textureDesc.arraySize <= 0)
-                        {
-                            viewDesc.ViewDimension = D3D11_SRV_DIMENSION_TEXTURE2D;
-                            viewDesc.Texture2D.MipLevels = textureDesc.numMipLevels;
-                            viewDesc.Texture2D.MostDetailedMip = 0;
-                        }
-                        else
-                        {
-                            viewDesc.ViewDimension = D3D11_SRV_DIMENSION_TEXTURE2DARRAY;
-                            viewDesc.Texture2DArray.ArraySize = textureDesc.arraySize;
-                            viewDesc.Texture2DArray.FirstArraySlice = 0;
-                            viewDesc.Texture2DArray.MipLevels = textureDesc.numMipLevels;
-                            viewDesc.Texture2DArray.MostDetailedMip = 0;
-                        }
-                        break;
-                    }
-                    case Resource::Type::TextureCube:
-                    {
-                        if (textureDesc.arraySize <= 0)
-                        {
-                            viewDesc.ViewDimension = D3D11_SRV_DIMENSION_TEXTURECUBE;
-                            viewDesc.TextureCube.MipLevels = textureDesc.numMipLevels;
-                            viewDesc.TextureCube.MostDetailedMip = 0;
-                        }
-                        else
-                        {
-                            viewDesc.ViewDimension = D3D11_SRV_DIMENSION_TEXTURECUBEARRAY;
-                            viewDesc.TextureCubeArray.MipLevels = textureDesc.numMipLevels;
-                            viewDesc.TextureCubeArray.MostDetailedMip = 0;
-                            viewDesc.TextureCubeArray.First2DArrayFace = 0;
-                            viewDesc.TextureCubeArray.NumCubes = textureDesc.arraySize;
-                        }
-                        break;
-                    }
-                    case Resource::Type::Texture3D:
-                    {
-                        viewDesc.ViewDimension = D3D11_SRV_DIMENSION_TEXTURE3D;
-                        viewDesc.Texture3D.MipLevels = textureDesc.numMipLevels;            // Old code fixed as one
-                        viewDesc.Texture3D.MostDetailedMip = 0;
-                        break;
-                    }
-                    default:
-                    {
-                        assert(!"Unhandled type");
-                        return nullptr;
-                    }
-                }
-
-                SLANG_RETURN_NULL_ON_FAIL(m_device->CreateShaderResourceView(texture->m_resource, &viewDesc, dstDetail.m_srv.writeRef()));
-                break;
-            }
-            case BindingType::Sampler:
-            {
-                const BindingState::SamplerDesc& samplerDesc = bindingStateDesc.m_samplerDescs[srcBinding.descIndex];
-
-                D3D11_SAMPLER_DESC desc = {};
-                desc.AddressU = desc.AddressV = desc.AddressW = D3D11_TEXTURE_ADDRESS_WRAP;
-
-                if (samplerDesc.isCompareSampler)
-                {
-                    desc.ComparisonFunc = D3D11_COMPARISON_LESS_EQUAL;
-                    desc.Filter = D3D11_FILTER_MIN_LINEAR_MAG_MIP_POINT;
-                    desc.MinLOD = desc.MaxLOD = 0.0f;
-                }
-                else
-                {
-                    desc.Filter = D3D11_FILTER_ANISOTROPIC;
-                    desc.MaxAnisotropy = 8;
-                    desc.MinLOD = 0.0f;
-                    desc.MaxLOD = 100.0f;
-                }
-                SLANG_RETURN_NULL_ON_FAIL(m_device->CreateSamplerState(&desc, dstDetail.m_samplerState.writeRef()));
-                break;
-            }
-            default:
-            {
-                assert(!"Unhandled type");
-                return nullptr;
-            }
-        }
-    }
-
-    // Done
-    return bindingState.detach();
-}
-
-void D3D11Renderer::_applyBindingState(bool isCompute)
-{
-    auto context = m_immediateContext.get();
-
-    const auto& details = m_currentBindings->m_bindingDetails;
-    const auto& bindings = m_currentBindings->getDesc().m_bindings;
-
-    const int numBindings = int(bindings.Count());
-
-    for (int i = 0; i < numBindings; ++i)
-    {
-        const auto& binding = bindings[i];
-        const auto& detail = details[i];
-
-        const int bindingIndex = binding.registerRange.getSingleIndex();
-
-        switch (binding.bindingType)
-        {
-            case BindingType::Buffer:
-            {
-                assert(binding.resource && binding.resource->isBuffer());
-                if (binding.resource->canBind(Resource::BindFlag::ConstantBuffer))
-                {
-                    ID3D11Buffer* buffer = static_cast<BufferResourceImpl*>(binding.resource.Ptr())->m_buffer;
-                    if (isCompute)
-                        context->CSSetConstantBuffers(bindingIndex, 1, &buffer);
-                    else
-                    {
-                        context->VSSetConstantBuffers(bindingIndex, 1, &buffer);
-                        context->PSSetConstantBuffers(bindingIndex, 1, &buffer);
-                    }
-                }
-                else if (detail.m_uav)
-                {
-                    if (isCompute)
-                        context->CSSetUnorderedAccessViews(bindingIndex, 1, detail.m_uav.readRef(), nullptr);
-                    else
-                        context->OMSetRenderTargetsAndUnorderedAccessViews(
-                            m_currentBindings->getDesc().m_numRenderTargets,
-                            m_renderTargetViews.getBuffer()->readRef(),
-                            m_depthStencilView,
-                            bindingIndex,
-                            1,
-                            detail.m_uav.readRef(),
-                            nullptr);
-                }
-                else
-                {
-                    if (isCompute)
-                        context->CSSetShaderResources(bindingIndex, 1, detail.m_srv.readRef());
-                    else
-                    {
-                        context->PSSetShaderResources(bindingIndex, 1, detail.m_srv.readRef());
-                        context->VSSetShaderResources(bindingIndex, 1, detail.m_srv.readRef());
-                    }
-                }
-                break;
-            }
-            case BindingType::Texture:
-            {
-                if (detail.m_uav)
-                {
-                    if (isCompute)
-                        context->CSSetUnorderedAccessViews(bindingIndex, 1, detail.m_uav.readRef(), nullptr);
-                    else
-                        context->OMSetRenderTargetsAndUnorderedAccessViews(D3D11_KEEP_RENDER_TARGETS_AND_DEPTH_STENCIL,
-                            nullptr, nullptr, bindingIndex, 1, detail.m_uav.readRef(), nullptr);
-                }
-                else
-                {
-                    if (isCompute)
-                        context->CSSetShaderResources(bindingIndex, 1, detail.m_srv.readRef());
-                    else
-                    {
-                        context->PSSetShaderResources(bindingIndex, 1, detail.m_srv.readRef());
-                        context->VSSetShaderResources(bindingIndex, 1, detail.m_srv.readRef());
-                    }
-                }
-                break;
-            }
-            case BindingType::Sampler:
-            {
-                if (isCompute)
-                    context->CSSetSamplers(bindingIndex, 1, detail.m_samplerState.readRef());
-                else
-                {
-                    context->PSSetSamplers(bindingIndex, 1, detail.m_samplerState.readRef());
-                    context->VSSetSamplers(bindingIndex, 1, detail.m_samplerState.readRef());
-                }
-                break;
-            }
-            default:
-            {
-                assert(!"Not implemented");
-                return;
-            }
-        }
-    }
-}
-
-void D3D11Renderer::setBindingState(BindingState* state)
-{
-    m_currentBindings = static_cast<BindingStateImpl*>(state);
-}
-#endif
-
 void D3D11Renderer::_flushGraphicsState()
 {
     auto pipelineType = int(PipelineType::Graphics);
@@ -2453,22 +2165,37 @@ void D3D11Renderer::DescriptorSetImpl::setResource(UInt range, UInt index, Resou
 {
     auto viewImpl = (ResourceViewImpl*)view;
     auto& rangeInfo = m_layout->m_ranges[range];
+    auto flatIndex = rangeInfo.arrayIndex + index;
 
     switch (rangeInfo.type)
     {
     case D3D11DescriptorSlotType::ShaderResourceView:
         {
-            assert(viewImpl->m_type == ResourceViewImpl::Type::SRV);
-            auto srvImpl = (ShaderResourceViewImpl*)viewImpl;
-            m_srvs[rangeInfo.arrayIndex + index] = srvImpl->m_srv;
+            if( viewImpl )
+            {
+                assert(viewImpl->m_type == ResourceViewImpl::Type::SRV);
+                auto srvImpl = (ShaderResourceViewImpl*)viewImpl;
+                m_srvs[flatIndex] = srvImpl->m_srv;
+            }
+            else
+            {
+                m_srvs[flatIndex] = nullptr;
+            }
         }
         break;
 
     case D3D11DescriptorSlotType::UnorderedAccessView:
         {
-            assert(viewImpl->m_type == ResourceViewImpl::Type::UAV);
-            auto uavImpl = (UnorderedAccessViewImpl*)viewImpl;
-            m_uavs[rangeInfo.arrayIndex + index] = uavImpl->m_uav;
+            if( viewImpl )
+            {
+                assert(viewImpl->m_type == ResourceViewImpl::Type::UAV);
+                auto uavImpl = (UnorderedAccessViewImpl*)viewImpl;
+                m_uavs[flatIndex] = uavImpl->m_uav;
+            }
+            else
+            {
+                m_uavs[flatIndex] = nullptr;
+            }
         }
         break;
 

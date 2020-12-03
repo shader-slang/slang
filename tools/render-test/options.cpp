@@ -250,6 +250,10 @@ static SlangResult _setRendererType(RendererType type, const char* arg, Slang::W
 
             outOptions.nvapiExtnSlot = (*argCursor++);
         }
+        else if (strcmp(arg, "-shaderobj") == 0)
+        {
+            outOptions.useShaderObjects = true;
+        }
         else
         {
             // Lookup
