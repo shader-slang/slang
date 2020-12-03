@@ -195,6 +195,8 @@
     <ClInclude Include="slang-ast-decl.h" />
     <ClInclude Include="slang-ast-dump.h" />
     <ClInclude Include="slang-ast-expr.h" />
+    <ClInclude Include="slang-ast-generated-macro.h" />
+    <ClInclude Include="slang-ast-generated.h" />
     <ClInclude Include="slang-ast-modifier.h" />
     <ClInclude Include="slang-ast-reflect.h" />
     <ClInclude Include="slang-ast-stmt.h" />
@@ -287,6 +289,8 @@
     <ClInclude Include="slang-preprocessor.h" />
     <ClInclude Include="slang-profile-defs.h" />
     <ClInclude Include="slang-profile.h" />
+    <ClInclude Include="slang-ref-object-generated-macro.h" />
+    <ClInclude Include="slang-ref-object-generated.h" />
     <ClInclude Include="slang-ref-object-reflect.h" />
     <ClInclude Include="slang-reflection.h" />
     <ClInclude Include="slang-repro.h" />
@@ -309,6 +313,8 @@
     <ClInclude Include="slang-token.h" />
     <ClInclude Include="slang-type-layout.h" />
     <ClInclude Include="slang-type-system-shared.h" />
+    <ClInclude Include="slang-value-generated-macro.h" />
+    <ClInclude Include="slang-value-generated.h" />
     <ClInclude Include="slang-value-reflect.h" />
     <ClInclude Include="slang-visitor.h" />
   </ItemGroup>
