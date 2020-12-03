@@ -1773,6 +1773,61 @@ extern "C"
         SLANG_PARAMETER_CATEGORY_FRAGMENT_OUTPUT = SLANG_PARAMETER_CATEGORY_VARYING_OUTPUT,
     };
 
+    /** Types of API-managed bindings that a parameter might use.
+    
+    `SlangBindingType` represents the distinct types of binding ranges that might be
+    understood by an underlying graphics API or cross-API abstraction layer.
+    Several of the enumeration cases here correspond to cases of `VkDescriptorType`
+    defined by the Vulkan API. Note however that the values of this enumeration
+    are not the same as those of any particular API.
+
+    The `SlangBindingType` enumeration is distinct from `SlangParameterCategory`
+    because `SlangParameterCategory` differentiates the types of parameters for
+    the purposes of layout, where the layout rules of some targets will treat
+    parameters of different types as occupying the same binding space for layout
+    (e.g., in SPIR-V both a `Texture2D` and `SamplerState` use the same space of
+    `binding` indices, and are not allowed to overlap), while those same types
+    map to different types of bindingsin the API (e.g., both textures and samplers
+    use different `VkDescriptorType` values).
+
+    When you want to answer "what register/binding did this parameter use?" you
+    should use `SlangParameterCategory`.
+
+    When you wnat to answer "what type of descriptor range should this parameter use?"
+    you should use `SlangBindingType`.
+    */
+    typedef SlangUInt32 SlangBindingType;
+    enum
+    {
+        SLANG_BINDING_TYPE_UNKNOWN = 0,
+
+        SLANG_BINDING_TYPE_SAMPLER,
+        SLANG_BINDING_TYPE_TEXTURE,
+        SLANG_BINDING_TYPE_CONSTANT_BUFFER,
+        SLANG_BINDING_TYPE_PARAMETER_BLOCK,
+        SLANG_BINDING_TYPE_TYPED_BUFFER,
+        SLANG_BINDING_TYPE_RAW_BUFFER,
+        SLANG_BINDING_TYPE_COMBINED_TEXTURE_SAMPLER,
+        SLANG_BINDING_TYPE_INPUT_RENDER_TARGET,
+        SLANG_BINDING_TYPE_INLINE_UNIFORM_DATA,
+        SLANG_BINDING_TYPE_RAY_TRACTING_ACCELERATION_STRUCTURE,
+
+        SLANG_BINDING_TYPE_VARYING_INPUT,
+        SLANG_BINDING_TYPE_VARYING_OUTPUT,
+
+        SLANG_BINDING_TYPE_EXISTENTIAL_VALUE,
+        SLANG_BINDING_TYPE_PUSH_CONSTANT,
+
+        SLANG_BINDING_TYPE_MUTABLE_FLAG = 0x100,
+
+        SLANG_BINDING_TYPE_MUTABLE_TETURE = SLANG_BINDING_TYPE_TEXTURE | SLANG_BINDING_TYPE_MUTABLE_FLAG,
+        SLANG_BINDING_TYPE_MUTABLE_TYPED_BUFFER = SLANG_BINDING_TYPE_TYPED_BUFFER | SLANG_BINDING_TYPE_MUTABLE_FLAG,
+        SLANG_BINDING_TYPE_MUTABLE_RAW_BUFFER = SLANG_BINDING_TYPE_RAW_BUFFER | SLANG_BINDING_TYPE_MUTABLE_FLAG,
+
+        SLANG_BINDING_TYPE_BASE_MASK = 0x00FF,
+        SLANG_BINDING_TYPE_EXT_MASK  = 0xFF00,
+    };
+
     typedef SlangUInt32 SlangLayoutRules;
     enum
     {
@@ -1837,10 +1892,13 @@ extern "C"
     // Type Layout Reflection
 
     SLANG_API SlangReflectionType* spReflectionTypeLayout_GetType(SlangReflectionTypeLayout* type);
+    SLANG_API SlangTypeKind spReflectionTypeLayout_getKind(SlangReflectionTypeLayout* type);
     SLANG_API size_t spReflectionTypeLayout_GetSize(SlangReflectionTypeLayout* type, SlangParameterCategory category);
     SLANG_API int32_t spReflectionTypeLayout_getAlignment(SlangReflectionTypeLayout* type, SlangParameterCategory category);
 
     SLANG_API SlangReflectionVariableLayout* spReflectionTypeLayout_GetFieldByIndex(SlangReflectionTypeLayout* type, unsigned index);
+
+    SLANG_API SlangInt spReflectionTypeLayout_findFieldIndexByName(SlangReflectionTypeLayout* typeLayout, const char* nameBegin, const char* nameEnd);
 
     SLANG_API size_t spReflectionTypeLayout_GetElementStride(SlangReflectionTypeLayout* type, SlangParameterCategory category);
     SLANG_API SlangReflectionTypeLayout* spReflectionTypeLayout_GetElementTypeLayout(SlangReflectionTypeLayout* type);
@@ -1859,6 +1917,39 @@ extern "C"
     SLANG_API SlangReflectionTypeLayout* spReflectionTypeLayout_getPendingDataTypeLayout(SlangReflectionTypeLayout* type);
 
     SLANG_API SlangReflectionVariableLayout* spReflectionTypeLayout_getSpecializedTypePendingDataVarLayout(SlangReflectionTypeLayout* type);
+
+    SLANG_API SlangInt spReflectionTypeLayout_getBindingRangeCount(SlangReflectionTypeLayout* typeLayout);
+    SLANG_API SlangBindingType spReflectionTypeLayout_getBindingRangeType(SlangReflectionTypeLayout* typeLayout, SlangInt index);
+    SLANG_API SlangInt spReflectionTypeLayout_getBindingRangeBindingCount(SlangReflectionTypeLayout* typeLayout, SlangInt index);
+    SLANG_API SlangReflectionTypeLayout* spReflectionTypeLayout_getBindingRangeLeafTypeLayout(SlangReflectionTypeLayout* typeLayout, SlangInt index);
+    SLANG_API SlangInt spReflectionTypeLayout_getFieldBindingRangeOffset(SlangReflectionTypeLayout* typeLayout, SlangInt fieldIndex);
+
+    SLANG_API SlangInt spReflectionTypeLayout_getBindingRangeDescriptorSetIndex(SlangReflectionTypeLayout* typeLayout, SlangInt index);
+    SLANG_API SlangInt spReflectionTypeLayout_getBindingRangeFirstDescriptorRangeIndex(SlangReflectionTypeLayout* typeLayout, SlangInt index);
+
+    SLANG_API SlangInt spReflectionTypeLayout_getDescriptorSetCount(SlangReflectionTypeLayout* typeLayout);
+    SLANG_API SlangInt spReflectionTypeLayout_getDescriptorSetSpaceOffset(SlangReflectionTypeLayout* typeLayout, SlangInt setIndex);
+    SLANG_API SlangInt spReflectionTypeLayout_getDescriptorSetDescriptorRangeCount(SlangReflectionTypeLayout* typeLayout, SlangInt setIndex);
+    SLANG_API SlangInt spReflectionTypeLayout_getDescriptorSetDescriptorRangeIndexOffset(SlangReflectionTypeLayout* typeLayout, SlangInt setIndex, SlangInt rangeIndex);
+    SLANG_API SlangInt spReflectionTypeLayout_getDescriptorSetDescriptorRangeDescriptorCount(SlangReflectionTypeLayout* typeLayout, SlangInt setIndex, SlangInt rangeIndex);
+    SLANG_API SlangBindingType spReflectionTypeLayout_getDescriptorSetDescriptorRangeType(SlangReflectionTypeLayout* typeLayout, SlangInt setIndex, SlangInt rangeIndex);
+    SLANG_API SlangParameterCategory spReflectionTypeLayout_getDescriptorSetDescriptorRangeCategory(SlangReflectionTypeLayout* typeLayout, SlangInt setIndex, SlangInt rangeIndex);
+
+    SLANG_API SlangInt spReflectionTypeLayout_getSubObjectRangeCount(SlangReflectionTypeLayout* typeLayout);
+    SLANG_API SlangInt spReflectionTypeLayout_getSubObjectRangeBindingRangeIndex(SlangReflectionTypeLayout* typeLayout, SlangInt subObjectRangeIndex);
+
+#if 0
+    SLANG_API SlangInt spReflectionTypeLayout_getSubObjectRangeCount(SlangReflectionTypeLayout* typeLayout);
+    SLANG_API SlangInt spReflectionTypeLayout_getSubObjectRangeObjectCount(SlangReflectionTypeLayout* typeLayout, SlangInt index);
+    SLANG_API SlangInt spReflectionTypeLayout_getSubObjectRangeBindingRangeIndex(SlangReflectionTypeLayout* typeLayout, SlangInt index);
+    SLANG_API SlangReflectionTypeLayout* spReflectionTypeLayout_getSubObjectRangeTypeLayout(SlangReflectionTypeLayout* typeLayout, SlangInt index);
+
+    SLANG_API SlangInt spReflectionTypeLayout_getSubObjectRangeDescriptorRangeCount(SlangReflectionTypeLayout* typeLayout, SlangInt subObjectRangeIndex);
+    SLANG_API SlangBindingType spReflectionTypeLayout_getSubObjectRangeDescriptorRangeBindingType(SlangReflectionTypeLayout* typeLayout, SlangInt subObjectRangeIndex, SlangInt bindingRangeIndexInSubObject);
+    SLANG_API SlangInt spReflectionTypeLayout_getSubObjectRangeDescriptorRangeBindingCount(SlangReflectionTypeLayout* typeLayout, SlangInt subObjectRangeIndex, SlangInt bindingRangeIndexInSubObject);
+    SLANG_API SlangInt spReflectionTypeLayout_getSubObjectRangeDescriptorRangeIndexOffset(SlangReflectionTypeLayout* typeLayout, SlangInt subObjectRangeIndex, SlangInt bindingRangeIndexInSubObject);
+    SLANG_API SlangInt spReflectionTypeLayout_getSubObjectRangeDescriptorRangeSpaceOffset(SlangReflectionTypeLayout* typeLayout, SlangInt subObjectRangeIndex, SlangInt bindingRangeIndexInSubObject);
+#endif
 
     // Variable Reflection
 
@@ -1979,7 +2070,12 @@ extern "C"
         /// Count should *NOT* include terminating zero.
     SLANG_API int spComputeStringHash(const char* chars, size_t count);
 
+        /// Get a type layout representing reflection information for the global-scope prameters.
     SLANG_API SlangReflectionTypeLayout* spReflection_getGlobalParamsTypeLayout(
+        SlangReflection* reflection);
+
+        /// Get a variable layout representing reflection information for the global-scope prameters.
+    SLANG_API SlangReflectionVariableLayout* spReflection_getGlobalParamsVarLayout(
         SlangReflection* reflection);
 
 #ifdef __cplusplus
@@ -2198,6 +2294,35 @@ namespace slang
         FragmentOutput = SLANG_PARAMETER_CATEGORY_FRAGMENT_OUTPUT,
     };
 
+    enum class BindingType : SlangBindingType
+    {
+        Unknown                             = SLANG_BINDING_TYPE_UNKNOWN,
+
+        Sampler                             = SLANG_BINDING_TYPE_SAMPLER,
+        Texture                             = SLANG_BINDING_TYPE_TEXTURE,
+        ConstantBuffer                      = SLANG_BINDING_TYPE_CONSTANT_BUFFER,
+        ParameterBlock                      = SLANG_BINDING_TYPE_PARAMETER_BLOCK,
+        TypedBuffer                         = SLANG_BINDING_TYPE_TYPED_BUFFER,
+        RawBuffer                           = SLANG_BINDING_TYPE_RAW_BUFFER,
+        CombinedTextureSampler              = SLANG_BINDING_TYPE_COMBINED_TEXTURE_SAMPLER,
+        InputRenderTarget                   = SLANG_BINDING_TYPE_INPUT_RENDER_TARGET,
+        InlineUniformData                   = SLANG_BINDING_TYPE_INLINE_UNIFORM_DATA,
+        RayTracingAccelerationStructure     = SLANG_BINDING_TYPE_RAY_TRACTING_ACCELERATION_STRUCTURE,
+        VaryingInput                        = SLANG_BINDING_TYPE_VARYING_INPUT,
+        VaryingOutput                       = SLANG_BINDING_TYPE_VARYING_OUTPUT,
+        ExistentialValue                    = SLANG_BINDING_TYPE_EXISTENTIAL_VALUE,
+        PushConstant                        = SLANG_BINDING_TYPE_PUSH_CONSTANT,
+
+        MutableFlag                         = SLANG_BINDING_TYPE_MUTABLE_FLAG,
+
+        MutableTexture                      = SLANG_BINDING_TYPE_MUTABLE_TETURE,
+        MutableTypedBuffer                  = SLANG_BINDING_TYPE_MUTABLE_TYPED_BUFFER,
+        MutableRawBuffer                    = SLANG_BINDING_TYPE_MUTABLE_RAW_BUFFER,
+
+        BaseMask                            = SLANG_BINDING_TYPE_BASE_MASK,
+        ExtMask                             = SLANG_BINDING_TYPE_EXT_MASK,
+    };
+
     struct TypeLayoutReflection
     {
         TypeReflection* getType()
@@ -2205,7 +2330,10 @@ namespace slang
             return (TypeReflection*) spReflectionTypeLayout_GetType((SlangReflectionTypeLayout*) this);
         }
 
-        TypeReflection::Kind getKind() { return getType()->getKind(); }
+        TypeReflection::Kind getKind()
+        {
+            return (TypeReflection::Kind) spReflectionTypeLayout_getKind((SlangReflectionTypeLayout*) this);
+        }
 
         size_t getSize(SlangParameterCategory category = SLANG_PARAMETER_CATEGORY_UNIFORM)
         {
@@ -2225,6 +2353,11 @@ namespace slang
         VariableLayoutReflection* getFieldByIndex(unsigned int index)
         {
             return (VariableLayoutReflection*) spReflectionTypeLayout_GetFieldByIndex((SlangReflectionTypeLayout*) this, index);
+        }
+
+        SlangInt findFieldIndexByName(char const* nameBegin, char const* nameEnd = nullptr)
+        {
+            return spReflectionTypeLayout_findFieldIndexByName((SlangReflectionTypeLayout*) this, nameBegin, nameEnd);
         }
 
         bool isArray() { return getType()->isArray(); }
@@ -2342,6 +2475,136 @@ namespace slang
         {
             return (VariableLayoutReflection*) spReflectionTypeLayout_getSpecializedTypePendingDataVarLayout(
                 (SlangReflectionTypeLayout*) this);
+        }
+
+        SlangInt getBindingRangeCount()
+        {
+            return spReflectionTypeLayout_getBindingRangeCount(
+                (SlangReflectionTypeLayout*) this);
+        }
+
+        BindingType getBindingRangeType(SlangInt index)
+        {
+            return (BindingType) spReflectionTypeLayout_getBindingRangeType(
+                (SlangReflectionTypeLayout*) this,
+                index);
+        }
+
+        SlangInt getBindingRangeBindingCount(SlangInt index)
+        {
+            return spReflectionTypeLayout_getBindingRangeBindingCount(
+                (SlangReflectionTypeLayout*) this,
+                index);
+        }
+
+        /*
+        SlangInt getBindingRangeIndexOffset(SlangInt index)
+        {
+            return spReflectionTypeLayout_getBindingRangeIndexOffset(
+                (SlangReflectionTypeLayout*) this,
+                index);
+        }
+
+        SlangInt getBindingRangeSpaceOffset(SlangInt index)
+        {
+            return spReflectionTypeLayout_getBindingRangeSpaceOffset(
+                (SlangReflectionTypeLayout*) this,
+                index);
+        }
+        */
+
+        SlangInt getFieldBindingRangeOffset(SlangInt fieldIndex)
+        {
+            return spReflectionTypeLayout_getFieldBindingRangeOffset(
+                (SlangReflectionTypeLayout*) this,
+                fieldIndex);
+        }
+
+        TypeLayoutReflection* getBindingRangeLeafTypeLayout(SlangInt index)
+        {
+            return (TypeLayoutReflection*) spReflectionTypeLayout_getBindingRangeLeafTypeLayout(
+                (SlangReflectionTypeLayout*) this,
+                index);
+        }
+
+        SlangInt getBindingRangeDescriptorSetIndex(SlangInt index)
+        {
+            return spReflectionTypeLayout_getBindingRangeDescriptorSetIndex(
+                (SlangReflectionTypeLayout*) this,
+                index);
+        }
+
+        SlangInt getBindingRangeFirstDescriptorRangeIndex(SlangInt index)
+        {
+            return spReflectionTypeLayout_getBindingRangeFirstDescriptorRangeIndex(
+                (SlangReflectionTypeLayout*) this,
+                index);
+        }
+
+
+        SlangInt getDescriptorSetCount()
+        {
+            return spReflectionTypeLayout_getDescriptorSetCount(
+                (SlangReflectionTypeLayout*) this);
+        }
+
+        SlangInt getDescriptorSetSpaceOffset(SlangInt setIndex)
+        {
+            return spReflectionTypeLayout_getDescriptorSetSpaceOffset(
+                (SlangReflectionTypeLayout*) this,
+                setIndex);
+        }
+
+        SlangInt getDescriptorSetDescriptorRangeCount(SlangInt setIndex)
+        {
+            return spReflectionTypeLayout_getDescriptorSetDescriptorRangeCount(
+                (SlangReflectionTypeLayout*) this,
+                setIndex);
+        }
+
+        SlangInt getDescriptorSetDescriptorRangeIndexOffset(SlangInt setIndex, SlangInt rangeIndex)
+        {
+            return spReflectionTypeLayout_getDescriptorSetDescriptorRangeIndexOffset(
+                (SlangReflectionTypeLayout*) this,
+                setIndex,
+                rangeIndex);
+        }
+
+        SlangInt getDescriptorSetDescriptorRangeDescriptorCount(SlangInt setIndex, SlangInt rangeIndex)
+        {
+            return spReflectionTypeLayout_getDescriptorSetDescriptorRangeDescriptorCount(
+                (SlangReflectionTypeLayout*) this,
+                setIndex,
+                rangeIndex);
+        }
+
+        BindingType getDescriptorSetDescriptorRangeType(SlangInt setIndex, SlangInt rangeIndex)
+        {
+            return (BindingType) spReflectionTypeLayout_getDescriptorSetDescriptorRangeType(
+                (SlangReflectionTypeLayout*) this,
+                setIndex,
+                rangeIndex);
+        }
+
+        ParameterCategory getDescriptorSetDescriptorRangeCategory(SlangInt setIndex, SlangInt rangeIndex)
+        {
+            return (ParameterCategory) spReflectionTypeLayout_getDescriptorSetDescriptorRangeCategory(
+                (SlangReflectionTypeLayout*) this,
+                setIndex,
+                rangeIndex);
+        }
+
+        SlangInt getSubObjectRangeCount()
+        {
+            return spReflectionTypeLayout_getSubObjectRangeCount(
+                (SlangReflectionTypeLayout*) this);
+        }
+
+        SlangInt getSubObjectRangeBindingRangeIndex(SlangInt subObjectRangeIndex)
+        {
+            return spReflectionTypeLayout_getSubObjectRangeBindingRangeIndex(
+                (SlangReflectionTypeLayout*) this,
+                subObjectRangeIndex);
         }
     };
 
@@ -2653,6 +2916,10 @@ namespace slang
             return (TypeLayoutReflection*) spReflection_getGlobalParamsTypeLayout((SlangReflection*) this);
         }
 
+        VariableLayoutReflection* getGlobalParamsVarLayout()
+        {
+            return (VariableLayoutReflection*) spReflection_getGlobalParamsVarLayout((SlangReflection*) this);
+        }
     };
 
     typedef ISlangBlob IBlob;

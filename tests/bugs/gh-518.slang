@@ -8,11 +8,11 @@
 // Confirm that we can handle arrays of resources
 // being passed to a function.
 
-//TEST_INPUT:ubuffer(data=[0 0 0 0], stride=4):out
+//TEST_INPUT:ubuffer(data=[0 0 0 0], stride=4):out,name gBuffer
 RWStructuredBuffer<int> gBuffer;
 
-//TEST_INPUT: Texture2D(size=4, content=one):
-//TEST_INPUT: Texture2D(size=4, content=one):
+//TEST_INPUT: Texture2D(size=4, content=one):name gTextures[0]
+//TEST_INPUT: Texture2D(size=4, content=one):name gTextures[1]
 Texture2D gTextures[2];
 
 float broken(Texture2D t[2])

@@ -47,6 +47,10 @@ struct BindingStateImpl : public Slang::RefObject
     int m_numRenderTargets = 1;
 };
 
+RefPtr<SamplerState> _createSamplerState(
+    Renderer*               renderer,
+    const InputSamplerDesc& srcDesc);
+
 /// Utility class containing functions that construct items on the renderer using the ShaderInputLayout representation
 struct ShaderRendererUtil
 {

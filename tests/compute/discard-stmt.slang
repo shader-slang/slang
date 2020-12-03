@@ -1,7 +1,7 @@
 //TEST(compute):COMPARE_RENDER_COMPUTE:
-//TEST_INPUT: Texture2D(size=4, content = one):
-//TEST_INPUT: Sampler:
-//TEST_INPUT: ubuffer(data=[0 0], stride=4):out
+//TEST_INPUT: Texture2D(size=4, content = one):name tex
+//TEST_INPUT: Sampler:name samp
+//TEST_INPUT: ubuffer(data=[0 0], stride=4):out,name outputBuffer
 
 
 Texture2D tex;
