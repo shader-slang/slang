@@ -187,16 +187,12 @@
   </ItemDefinitionGroup>
   <ItemGroup>
     <ClInclude Include="..\..\slang.h" />
-    <ClInclude Include="core.meta.slang.h" />
-    <ClInclude Include="hlsl.meta.slang.h" />
     <ClInclude Include="slang-ast-all.h" />
     <ClInclude Include="slang-ast-base.h" />
     <ClInclude Include="slang-ast-builder.h" />
     <ClInclude Include="slang-ast-decl.h" />
     <ClInclude Include="slang-ast-dump.h" />
     <ClInclude Include="slang-ast-expr.h" />
-    <ClInclude Include="slang-ast-generated-macro.h" />
-    <ClInclude Include="slang-ast-generated.h" />
     <ClInclude Include="slang-ast-modifier.h" />
     <ClInclude Include="slang-ast-reflect.h" />
     <ClInclude Include="slang-ast-stmt.h" />
@@ -217,12 +213,6 @@
     <ClInclude Include="slang-emit-source-writer.h" />
     <ClInclude Include="slang-emit.h" />
     <ClInclude Include="slang-file-system.h" />
-    <ClInclude Include="slang-generated-ast-macro.h" />
-    <ClInclude Include="slang-generated-ast.h" />
-    <ClInclude Include="slang-generated-obj-macro.h" />
-    <ClInclude Include="slang-generated-obj.h" />
-    <ClInclude Include="slang-generated-value-macro.h" />
-    <ClInclude Include="slang-generated-value.h" />
     <ClInclude Include="slang-glsl-extension-tracker.h" />
     <ClInclude Include="slang-hlsl-intrinsic-set.h" />
     <ClInclude Include="slang-image-format-defs.h" />
@@ -289,8 +279,6 @@
     <ClInclude Include="slang-preprocessor.h" />
     <ClInclude Include="slang-profile-defs.h" />
     <ClInclude Include="slang-profile.h" />
-    <ClInclude Include="slang-ref-object-generated-macro.h" />
-    <ClInclude Include="slang-ref-object-generated.h" />
     <ClInclude Include="slang-ref-object-reflect.h" />
     <ClInclude Include="slang-reflection.h" />
     <ClInclude Include="slang-repro.h" />
@@ -313,8 +301,6 @@
     <ClInclude Include="slang-token.h" />
     <ClInclude Include="slang-type-layout.h" />
     <ClInclude Include="slang-type-system-shared.h" />
-    <ClInclude Include="slang-value-generated-macro.h" />
-    <ClInclude Include="slang-value-generated.h" />
     <ClInclude Include="slang-value-reflect.h" />
     <ClInclude Include="slang-visitor.h" />
   </ItemGroup>

@@ -302,6 +302,16 @@ function addSourceDir(path)
         path .. "/*.hpp",       -- C++ style headers (for glslang)
         path .. "/*.natvis",    -- Visual Studio debugger visualization files
     }
+    removefiles
+    {
+        "**/*.meta.slang.h",
+        "**/slang-generated-*",
+        "**/slang-ast-generated*",
+        "**/slang-ref-object-generated*",
+        "**/*generated.h",
+        "**/*generated-macro.h"
+
+    }
 end
 
 --
