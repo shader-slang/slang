@@ -17,7 +17,6 @@
 #include "slang-parser.h"
 #include "slang-preprocessor.h"
 #include "slang-type-layout.h"
-#include "slang-reflection.h"
 #include "slang-emit.h"
 
 #include "slang-glsl-extension-tracker.h"
