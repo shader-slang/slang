@@ -1409,6 +1409,10 @@ static LegalVal legalizeInst(
         break;
     }
 
+    if(as<IRAttr>(inst))
+        return LegalVal::simple(inst);
+
+
     // We will iterate over all the operands, extract the legalized
     // value of each, and collect them in an array for subsequent use.
     //
