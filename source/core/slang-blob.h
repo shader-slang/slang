@@ -191,6 +191,34 @@ protected:
 
 };
 
+/** A Blob that has no ref counting and exists typically for entire execution.
+The memory it references is *not* owned by the blob.
+This is useful when a Blob is useful to represent some global immutable chunk of memory.
+*/
+class StaticBlob : public ISlangBlob
+{
+public:
+
+    // ISlangUnknown
+    SLANG_NO_THROW SlangResult SLANG_MCALL queryInterface(SlangUUID const& uuid, void** outObject) SLANG_OVERRIDE;
+    SLANG_NO_THROW uint32_t SLANG_MCALL addRef() SLANG_OVERRIDE { return 1; }
+    SLANG_NO_THROW uint32_t SLANG_MCALL release() SLANG_OVERRIDE { return 1; }
+
+    // ISlangBlob
+    SLANG_NO_THROW void const* SLANG_MCALL getBufferPointer() SLANG_OVERRIDE { return m_data; }
+    SLANG_NO_THROW size_t SLANG_MCALL getBufferSize() SLANG_OVERRIDE { return m_dataCount; }
+
+    StaticBlob(const void* data, size_t dataCount):
+        m_data(data),
+        m_dataCount(dataCount)
+    {
+    }
+
+protected:
+    const void* m_data;
+    size_t m_dataCount;
+};
+
 /// Create a blob that will retain (a copy of) raw data.
 ///
 inline ComPtr<ISlangBlob> createRawBlob(void const* inData, size_t size)

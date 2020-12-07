@@ -16,6 +16,7 @@
 #include "slang-serialize-ir.h"
 
 #include "../core/slang-type-text-util.h"
+#include "../core/slang-hex-dump-util.h"
 
 #include <assert.h>
 
@@ -443,7 +444,13 @@ struct OptionsParser
                 }
                 else if (argStr == "-load-stdlib")
                 {
-                    SLANG_RETURN_ON_FAIL(session->loadStdLib());
+                    String fileName;
+                    SLANG_RETURN_ON_FAIL(tryReadCommandLineArgument(sink, arg, &argCursor, argEnd, fileName));
+
+                    // Load the file
+                    ScopedAllocation contents;
+                    SLANG_RETURN_ON_FAIL(File::readAllBytes(fileName, contents));
+                    SLANG_RETURN_ON_FAIL(session->loadStdLib(contents.getData(), contents.getSizeInBytes()));
                 }
                 else if (argStr == "-compile-stdlib")
                 {
@@ -451,7 +458,29 @@ struct OptionsParser
                 }
                 else if (argStr == "-save-stdlib")
                 {
-                    SLANG_RETURN_ON_FAIL(session->saveStdLib());
+                    String fileName;
+                    SLANG_RETURN_ON_FAIL(tryReadCommandLineArgument(sink, arg, &argCursor, argEnd, fileName));
+
+                    ComPtr<ISlangBlob> blob;
+
+                    SLANG_RETURN_ON_FAIL(session->saveStdLib(blob.writeRef()));
+                    SLANG_RETURN_ON_FAIL(File::writeAllBytes(fileName, blob->getBufferPointer(), blob->getBufferSize()));
+                }
+                else if (argStr == "-save-stdlib-bin-source")
+                {
+                    String fileName;
+                    SLANG_RETURN_ON_FAIL(tryReadCommandLineArgument(sink, arg, &argCursor, argEnd, fileName));
+
+                    ComPtr<ISlangBlob> blob;
+
+                    SLANG_RETURN_ON_FAIL(session->saveStdLib(blob.writeRef()));
+
+                    StringBuilder builder;
+                    StringWriter writer(&builder, 0);
+
+                    SLANG_RETURN_ON_FAIL(HexDumpUtil::dumpSourceBytes((const uint8_t*)blob->getBufferPointer(), blob->getBufferSize(), 16, &writer));
+
+                    File::writeAllText(fileName, builder);
                 }
                 else if (argStr == "-no-codegen")
                 {

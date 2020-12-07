@@ -2145,8 +2145,8 @@ namespace Slang
         SLANG_NO_THROW SlangResult SLANG_MCALL checkPassThroughSupport(SlangPassThrough passThrough) override;
 
         SLANG_NO_THROW SlangResult SLANG_MCALL compileStdLib() override;
-        SLANG_NO_THROW SlangResult SLANG_MCALL loadStdLib() override;
-        SLANG_NO_THROW SlangResult SLANG_MCALL saveStdLib() override;
+        SLANG_NO_THROW SlangResult SLANG_MCALL loadStdLib(const void* stdLib, size_t stdLibSizeInBytes) override;
+        SLANG_NO_THROW SlangResult SLANG_MCALL saveStdLib(ISlangBlob** outBlob) override;
 
             /// Get the default compiler for a language
         DownstreamCompiler* getDefaultDownstreamCompiler(SourceLanguage sourceLanguage);
@@ -2244,7 +2244,7 @@ namespace Slang
 
     private:
 
-        SlangResult _readBuiltinModule(Scope* scope, String moduleName);
+        SlangResult _readBuiltinModule(ISlangFileSystem* fileSystem, Scope* scope, String moduleName);
 
         SlangResult _loadRequest(EndToEndCompileRequest* request, const void* data, size_t size);
 

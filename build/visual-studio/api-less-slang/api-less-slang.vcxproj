@@ -175,8 +175,6 @@
   </ItemDefinitionGroup>
   <ItemGroup>
     <ClInclude Include="..\..\..\slang.h" />
-    <ClInclude Include="..\..\..\source\slang\core.meta.slang.h" />
-    <ClInclude Include="..\..\..\source\slang\hlsl.meta.slang.h" />
     <ClInclude Include="..\..\..\source\slang\slang-ast-all.h" />
     <ClInclude Include="..\..\..\source\slang\slang-ast-base.h" />
     <ClInclude Include="..\..\..\source\slang\slang-ast-builder.h" />
@@ -203,12 +201,6 @@
     <ClInclude Include="..\..\..\source\slang\slang-emit-source-writer.h" />
     <ClInclude Include="..\..\..\source\slang\slang-emit.h" />
     <ClInclude Include="..\..\..\source\slang\slang-file-system.h" />
-    <ClInclude Include="..\..\..\source\slang\slang-generated-ast-macro.h" />
-    <ClInclude Include="..\..\..\source\slang\slang-generated-ast.h" />
-    <ClInclude Include="..\..\..\source\slang\slang-generated-obj-macro.h" />
-    <ClInclude Include="..\..\..\source\slang\slang-generated-obj.h" />
-    <ClInclude Include="..\..\..\source\slang\slang-generated-value-macro.h" />
-    <ClInclude Include="..\..\..\source\slang\slang-generated-value.h" />
     <ClInclude Include="..\..\..\source\slang\slang-glsl-extension-tracker.h" />
     <ClInclude Include="..\..\..\source\slang\slang-hlsl-intrinsic-set.h" />
     <ClInclude Include="..\..\..\source\slang\slang-image-format-defs.h" />

@@ -537,7 +537,7 @@ function generatorProject(name, sourcePath)
     --
     group "generator"
 
-    -- Set up the project, but do NOT add any source files.
+    -- Set up the project
     baseSlangProject(name, sourcePath)
 
     -- For now we just use static lib to force something
@@ -804,6 +804,7 @@ standardProject("slangc", "source/slangc")
     kind "ConsoleApp"
     links { "core", "slang" }
     
+       
 generatorProject("run-generators", nil)
     
     -- We make 'source/slang' the location of the source, to make paths to source
@@ -977,6 +978,7 @@ standardProject("api-less-slang", "source/slang")
     removefiles {
         "source/slang/slang-api.cpp",
         "source/slang/slang-reflection-api.cpp",
+        "source/slang/slang-stdlib-api.cpp",
     }
 
     -- 
@@ -990,36 +992,69 @@ standardProject("api-less-slang", "source/slang")
     filter { "system:linux" }
         -- might be able to do pic(true)
         buildoptions{"-fPIC"}
-
---
--- A static library version of Slang --
---  
-  
-standardProject("static-slang", nil)
-    uuid "3F15CD52-035A-46E3-8A26-A5AA3BD725CF"
-    kind "StaticLib"
-    links { "core", "api-less-slang" }
-    warnings "Extra"
-    flags { "FatalWarnings" }
-
-    -- 
-    -- Defined such that linkage for API functions is static.
-    --
-    defines { "SLANG_STATIC" }
-
+        
+standardProject("slangc-bootstrap", "source/slangc")
+    uuid "6339BF31-AC99-4819-B719-679B63451EF0"
+    kind "ConsoleApp"
+    links { "core", "api-less-slang", "miniz" }
+    
+    defines {
+        "SLANG_STATIC",
+        "SLANG_WITHOUT_EMBEDDED_STD_LIB"
+    }
+    
     -- Add the API files
-    files { 
+    files {
         "slang.h",
         "source/slang/slang-api.cpp",
-        "source/slang/slang-reflection-api.cpp" 
+        "source/slang/slang-reflection-api.cpp",
+        "source/slang/slang-stdlib-api.cpp"
     }
-
-    files { "source/core/core.natvis" }
-   
-    filter { "system:linux" }
-        -- might be able to do pic(true)
-        buildoptions{"-fPIC"}    
     
+generatorProject("embed-stdlib-generator", nil)
+    
+    -- We include these, even though they are not really part of the dummy 
+    -- build, so that the filters below can pick up the appropriate locations.
+    
+    defines {
+        "SLANG_STATIC",
+        "SLANG_WITHOUT_EMBEDDED_STD_LIB"
+    }
+    
+    files
+    {
+        --
+        -- To build we need to have some source! It has to be a source file that 
+        -- does not depend on anything that is generated, so we take something
+        -- from core that will compile without any generation. 
+        --
+          
+        "source/slang/slang-stdlib-api.cpp",
+    }
+    
+    local executableSuffix = getExecutableSuffix()
+    
+    -- First, we need to ensure that `slang-generate`/`slang-cpp-extactor` 
+    -- gets built before `slang`, so we declare a non-linking dependency between
+    -- the projects here:
+    --
+    dependson { "slangc-bootstrap" }
+    
+    local absDirectory = path.getabsolute("source/slang")   
+    local absOutputPath = absDirectory .. "/slang-stdlib-generated.h"
+    
+    -- I don't know why I need a filter, but without it nothing works (!)   
+    filter "files:source/slang/slang-stdlib-api.cpp"
+        
+        -- Note! Has to be an absolute path else doesn't work(!)
+        buildoutputs { absOutputPath }
+      
+        buildinputs { "%{cfg.targetdir}/slangc-bootstrap" .. executableSuffix }
+            
+        local buildcmd = '"%{cfg.targetdir}/slangc-bootstrap" -save-stdlib-bin-source %{file.directory}/slang-stdlib-generated.h'
+        
+        buildcommands { buildcmd }
+
 --
 -- TODO: Slang's current `Makefile` build does some careful incantations
 -- to make sure that the binaries it generates use a "relative `RPATH`"
@@ -1039,9 +1074,11 @@ standardProject("static-slang", nil)
 standardProject("slang", nil)
     uuid "DB00DA62-0533-4AFD-B59F-A67D5B3A0808"
     kind "SharedLib"
-    links { "core", "api-less-slang" }
+    links { "core", "api-less-slang", "miniz" }
     warnings "Extra"
     flags { "FatalWarnings" }
+
+    dependson { "embed-stdlib-generator", "slangc-bootstrap" }
 
     -- The way that we currently configure things through `slang.h`,
     -- we need to set a preprocessor definitions to ensure that
@@ -1053,7 +1090,8 @@ standardProject("slang", nil)
     files { 
         "slang.h",
         "source/slang/slang-api.cpp",
-        "source/slang/slang-reflection-api.cpp" 
+        "source/slang/slang-reflection-api.cpp",
+        "source/slang/slang-stdlib-api.cpp",
     }
 
     files { "source/core/core.natvis" }

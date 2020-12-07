@@ -23,7 +23,18 @@ SLANG_API SlangResult slang_createGlobalSession(
 {
     Slang::ComPtr<slang::IGlobalSession> globalSession;
     SLANG_RETURN_ON_FAIL(slang_createGlobalSessionWithoutStdLib(apiVersion, globalSession.writeRef()));
-    SLANG_RETURN_ON_FAIL(globalSession->compileStdLib());
+
+    // If we have the embedded stdlib, load from that, else compile it
+    ISlangBlob* stdLibBlob = slang_getEmbeddedStdLib();
+    if (stdLibBlob)
+    {
+        SLANG_RETURN_ON_FAIL(globalSession->loadStdLib(stdLibBlob->getBufferPointer(), stdLibBlob->getBufferSize()));
+    }
+    else
+    {
+        SLANG_RETURN_ON_FAIL(globalSession->compileStdLib());
+    }
+
     *outGlobalSession = globalSession.detach();
     return SLANG_OK;
 }

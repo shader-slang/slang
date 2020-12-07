@@ -19,7 +19,7 @@ public:
     };
 
         /// Get as an archive (that can be saved to disk)
-    virtual ArrayView<uint8_t> getArchive() = 0;
+    virtual ConstArrayView<uint8_t> getArchive() = 0;
         /// Set the compression - used for any subsequent items added
     virtual void setCompressionType(CompressionType type) = 0;
 

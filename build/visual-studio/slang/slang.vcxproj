@@ -99,7 +99,6 @@
       <WarningLevel>Level4</WarningLevel>
       <TreatWarningAsError>true</TreatWarningAsError>
       <PreprocessorDefinitions>_DEBUG;SLANG_DYNAMIC_EXPORT;%(PreprocessorDefinitions)</PreprocessorDefinitions>
-      <AdditionalIncludeDirectories>..\..\..\external\spirv-headers\include;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
       <DebugInformationFormat>EditAndContinue</DebugInformationFormat>
       <Optimization>Disabled</Optimization>
       <RuntimeLibrary>MultiThreadedDebug</RuntimeLibrary>
@@ -120,7 +119,6 @@
       <WarningLevel>Level4</WarningLevel>
       <TreatWarningAsError>true</TreatWarningAsError>
       <PreprocessorDefinitions>_DEBUG;SLANG_DYNAMIC_EXPORT;%(PreprocessorDefinitions)</PreprocessorDefinitions>
-      <AdditionalIncludeDirectories>..\..\..\external\spirv-headers\include;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
       <DebugInformationFormat>EditAndContinue</DebugInformationFormat>
       <Optimization>Disabled</Optimization>
       <RuntimeLibrary>MultiThreadedDebug</RuntimeLibrary>
@@ -141,7 +139,6 @@
       <WarningLevel>Level4</WarningLevel>
       <TreatWarningAsError>true</TreatWarningAsError>
       <PreprocessorDefinitions>NDEBUG;SLANG_DYNAMIC_EXPORT;%(PreprocessorDefinitions)</PreprocessorDefinitions>
-      <AdditionalIncludeDirectories>..\..\..\external\spirv-headers\include;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
       <Optimization>Full</Optimization>
       <FunctionLevelLinking>true</FunctionLevelLinking>
       <IntrinsicFunctions>true</IntrinsicFunctions>
@@ -166,7 +163,6 @@
       <WarningLevel>Level4</WarningLevel>
       <TreatWarningAsError>true</TreatWarningAsError>
       <PreprocessorDefinitions>NDEBUG;SLANG_DYNAMIC_EXPORT;%(PreprocessorDefinitions)</PreprocessorDefinitions>
-      <AdditionalIncludeDirectories>..\..\..\external\spirv-headers\include;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
       <Optimization>Full</Optimization>
       <FunctionLevelLinking>true</FunctionLevelLinking>
       <IntrinsicFunctions>true</IntrinsicFunctions>
@@ -187,254 +183,24 @@
   </ItemDefinitionGroup>
   <ItemGroup>
     <ClInclude Include="..\..\..\slang.h" />
-    <ClInclude Include="..\..\..\source\slang\slang-ast-all.h" />
-    <ClInclude Include="..\..\..\source\slang\slang-ast-base.h" />
-    <ClInclude Include="..\..\..\source\slang\slang-ast-builder.h" />
-    <ClInclude Include="..\..\..\source\slang\slang-ast-decl.h" />
-    <ClInclude Include="..\..\..\source\slang\slang-ast-dump.h" />
-    <ClInclude Include="..\..\..\source\slang\slang-ast-expr.h" />
-    <ClInclude Include="..\..\..\source\slang\slang-ast-modifier.h" />
-    <ClInclude Include="..\..\..\source\slang\slang-ast-reflect.h" />
-    <ClInclude Include="..\..\..\source\slang\slang-ast-stmt.h" />
-    <ClInclude Include="..\..\..\source\slang\slang-ast-support-types.h" />
-    <ClInclude Include="..\..\..\source\slang\slang-ast-type.h" />
-    <ClInclude Include="..\..\..\source\slang\slang-ast-val.h" />
-    <ClInclude Include="..\..\..\source\slang\slang-check-impl.h" />
-    <ClInclude Include="..\..\..\source\slang\slang-check.h" />
-    <ClInclude Include="..\..\..\source\slang\slang-compiler.h" />
-    <ClInclude Include="..\..\..\source\slang\slang-diagnostic-defs.h" />
-    <ClInclude Include="..\..\..\source\slang\slang-diagnostics.h" />
-    <ClInclude Include="..\..\..\source\slang\slang-emit-c-like.h" />
-    <ClInclude Include="..\..\..\source\slang\slang-emit-cpp.h" />
-    <ClInclude Include="..\..\..\source\slang\slang-emit-cuda.h" />
-    <ClInclude Include="..\..\..\source\slang\slang-emit-glsl.h" />
-    <ClInclude Include="..\..\..\source\slang\slang-emit-hlsl.h" />
-    <ClInclude Include="..\..\..\source\slang\slang-emit-precedence.h" />
-    <ClInclude Include="..\..\..\source\slang\slang-emit-source-writer.h" />
-    <ClInclude Include="..\..\..\source\slang\slang-emit.h" />
-    <ClInclude Include="..\..\..\source\slang\slang-file-system.h" />
-    <ClInclude Include="..\..\..\source\slang\slang-glsl-extension-tracker.h" />
-    <ClInclude Include="..\..\..\source\slang\slang-hlsl-intrinsic-set.h" />
-    <ClInclude Include="..\..\..\source\slang\slang-image-format-defs.h" />
-    <ClInclude Include="..\..\..\source\slang\slang-include-system.h" />
-    <ClInclude Include="..\..\..\source\slang\slang-ir-any-value-marshalling.h" />
-    <ClInclude Include="..\..\..\source\slang\slang-ir-augment-make-existential.h" />
-    <ClInclude Include="..\..\..\source\slang\slang-ir-bind-existentials.h" />
-    <ClInclude Include="..\..\..\source\slang\slang-ir-byte-address-legalize.h" />
-    <ClInclude Include="..\..\..\source\slang\slang-ir-clone.h" />
-    <ClInclude Include="..\..\..\source\slang\slang-ir-collect-global-uniforms.h" />
-    <ClInclude Include="..\..\..\source\slang\slang-ir-constexpr.h" />
-    <ClInclude Include="..\..\..\source\slang\slang-ir-dce.h" />
-    <ClInclude Include="..\..\..\source\slang\slang-ir-dominators.h" />
-    <ClInclude Include="..\..\..\source\slang\slang-ir-entry-point-raw-ptr-params.h" />
-    <ClInclude Include="..\..\..\source\slang\slang-ir-entry-point-uniforms.h" />
-    <ClInclude Include="..\..\..\source\slang\slang-ir-explicit-global-context.h" />
-    <ClInclude Include="..\..\..\source\slang\slang-ir-explicit-global-init.h" />
-    <ClInclude Include="..\..\..\source\slang\slang-ir-generics-lowering-context.h" />
-    <ClInclude Include="..\..\..\source\slang\slang-ir-glsl-legalize.h" />
-    <ClInclude Include="..\..\..\source\slang\slang-ir-hoist-local-types.h" />
-    <ClInclude Include="..\..\..\source\slang\slang-ir-inline.h" />
-    <ClInclude Include="..\..\..\source\slang\slang-ir-inst-defs.h" />
-    <ClInclude Include="..\..\..\source\slang\slang-ir-insts.h" />
-    <ClInclude Include="..\..\..\source\slang\slang-ir-layout.h" />
-    <ClInclude Include="..\..\..\source\slang\slang-ir-legalize-varying-params.h" />
-    <ClInclude Include="..\..\..\source\slang\slang-ir-link.h" />
-    <ClInclude Include="..\..\..\source\slang\slang-ir-lower-existential.h" />
-    <ClInclude Include="..\..\..\source\slang\slang-ir-lower-generic-call.h" />
-    <ClInclude Include="..\..\..\source\slang\slang-ir-lower-generic-function.h" />
-    <ClInclude Include="..\..\..\source\slang\slang-ir-lower-generic-type.h" />
-    <ClInclude Include="..\..\..\source\slang\slang-ir-lower-generics.h" />
-    <ClInclude Include="..\..\..\source\slang\slang-ir-lower-tuple-types.h" />
-    <ClInclude Include="..\..\..\source\slang\slang-ir-missing-return.h" />
-    <ClInclude Include="..\..\..\source\slang\slang-ir-restructure-scoping.h" />
-    <ClInclude Include="..\..\..\source\slang\slang-ir-restructure.h" />
-    <ClInclude Include="..\..\..\source\slang\slang-ir-sccp.h" />
-    <ClInclude Include="..\..\..\source\slang\slang-ir-specialize-arrays.h" />
-    <ClInclude Include="..\..\..\source\slang\slang-ir-specialize-dispatch.h" />
-    <ClInclude Include="..\..\..\source\slang\slang-ir-specialize-dynamic-associatedtype-lookup.h" />
-    <ClInclude Include="..\..\..\source\slang\slang-ir-specialize-function-call.h" />
-    <ClInclude Include="..\..\..\source\slang\slang-ir-specialize-resources.h" />
-    <ClInclude Include="..\..\..\source\slang\slang-ir-specialize.h" />
-    <ClInclude Include="..\..\..\source\slang\slang-ir-ssa.h" />
-    <ClInclude Include="..\..\..\source\slang\slang-ir-string-hash.h" />
-    <ClInclude Include="..\..\..\source\slang\slang-ir-strip-witness-tables.h" />
-    <ClInclude Include="..\..\..\source\slang\slang-ir-strip.h" />
-    <ClInclude Include="..\..\..\source\slang\slang-ir-synthesize-active-mask.h" />
-    <ClInclude Include="..\..\..\source\slang\slang-ir-type-set.h" />
-    <ClInclude Include="..\..\..\source\slang\slang-ir-union.h" />
-    <ClInclude Include="..\..\..\source\slang\slang-ir-validate.h" />
-    <ClInclude Include="..\..\..\source\slang\slang-ir-witness-table-wrapper.h" />
-    <ClInclude Include="..\..\..\source\slang\slang-ir-wrap-structured-buffers.h" />
-    <ClInclude Include="..\..\..\source\slang\slang-ir.h" />
-    <ClInclude Include="..\..\..\source\slang\slang-legalize-types.h" />
-    <ClInclude Include="..\..\..\source\slang\slang-lexer.h" />
-    <ClInclude Include="..\..\..\source\slang\slang-lookup.h" />
-    <ClInclude Include="..\..\..\source\slang\slang-lower-to-ir.h" />
-    <ClInclude Include="..\..\..\source\slang\slang-mangle.h" />
-    <ClInclude Include="..\..\..\source\slang\slang-mangled-lexer.h" />
-    <ClInclude Include="..\..\..\source\slang\slang-name.h" />
-    <ClInclude Include="..\..\..\source\slang\slang-options.h" />
-    <ClInclude Include="..\..\..\source\slang\slang-parameter-binding.h" />
-    <ClInclude Include="..\..\..\source\slang\slang-parser.h" />
-    <ClInclude Include="..\..\..\source\slang\slang-preprocessor.h" />
-    <ClInclude Include="..\..\..\source\slang\slang-profile-defs.h" />
-    <ClInclude Include="..\..\..\source\slang\slang-profile.h" />
-    <ClInclude Include="..\..\..\source\slang\slang-ref-object-reflect.h" />
-    <ClInclude Include="..\..\..\source\slang\slang-repro.h" />
-    <ClInclude Include="..\..\..\source\slang\slang-serialize-ast-type-info.h" />
-    <ClInclude Include="..\..\..\source\slang\slang-serialize-ast.h" />
-    <ClInclude Include="..\..\..\source\slang\slang-serialize-container.h" />
-    <ClInclude Include="..\..\..\source\slang\slang-serialize-factory.h" />
-    <ClInclude Include="..\..\..\source\slang\slang-serialize-ir-types.h" />
-    <ClInclude Include="..\..\..\source\slang\slang-serialize-ir.h" />
-    <ClInclude Include="..\..\..\source\slang\slang-serialize-misc-type-info.h" />
-    <ClInclude Include="..\..\..\source\slang\slang-serialize-reflection.h" />
-    <ClInclude Include="..\..\..\source\slang\slang-serialize-source-loc.h" />
-    <ClInclude Include="..\..\..\source\slang\slang-serialize-type-info.h" />
-    <ClInclude Include="..\..\..\source\slang\slang-serialize-types.h" />
-    <ClInclude Include="..\..\..\source\slang\slang-serialize-value-type-info.h" />
-    <ClInclude Include="..\..\..\source\slang\slang-serialize.h" />
-    <ClInclude Include="..\..\..\source\slang\slang-source-loc.h" />
-    <ClInclude Include="..\..\..\source\slang\slang-syntax.h" />
-    <ClInclude Include="..\..\..\source\slang\slang-token-defs.h" />
-    <ClInclude Include="..\..\..\source\slang\slang-token.h" />
-    <ClInclude Include="..\..\..\source\slang\slang-type-layout.h" />
-    <ClInclude Include="..\..\..\source\slang\slang-type-system-shared.h" />
-    <ClInclude Include="..\..\..\source\slang\slang-value-reflect.h" />
-    <ClInclude Include="..\..\..\source\slang\slang-visitor.h" />
   </ItemGroup>
   <ItemGroup>
-    <ClCompile Include="..\..\..\prelude\slang-cpp-prelude.h.cpp" />
-    <ClCompile Include="..\..\..\prelude\slang-cuda-prelude.h.cpp" />
-    <ClCompile Include="..\..\..\prelude\slang-hlsl-prelude.h.cpp" />
     <ClCompile Include="..\..\..\source\slang\slang-api.cpp" />
-    <ClCompile Include="..\..\..\source\slang\slang-ast-builder.cpp" />
-    <ClCompile Include="..\..\..\source\slang\slang-ast-decl.cpp" />
-    <ClCompile Include="..\..\..\source\slang\slang-ast-dump.cpp" />
-    <ClCompile Include="..\..\..\source\slang\slang-ast-reflect.cpp" />
-    <ClCompile Include="..\..\..\source\slang\slang-ast-substitutions.cpp" />
-    <ClCompile Include="..\..\..\source\slang\slang-ast-type.cpp" />
-    <ClCompile Include="..\..\..\source\slang\slang-ast-val.cpp" />
-    <ClCompile Include="..\..\..\source\slang\slang-check-conformance.cpp" />
-    <ClCompile Include="..\..\..\source\slang\slang-check-constraint.cpp" />
-    <ClCompile Include="..\..\..\source\slang\slang-check-conversion.cpp" />
-    <ClCompile Include="..\..\..\source\slang\slang-check-decl.cpp" />
-    <ClCompile Include="..\..\..\source\slang\slang-check-expr.cpp" />
-    <ClCompile Include="..\..\..\source\slang\slang-check-modifier.cpp" />
-    <ClCompile Include="..\..\..\source\slang\slang-check-overload.cpp" />
-    <ClCompile Include="..\..\..\source\slang\slang-check-shader.cpp" />
-    <ClCompile Include="..\..\..\source\slang\slang-check-stmt.cpp" />
-    <ClCompile Include="..\..\..\source\slang\slang-check-type.cpp" />
-    <ClCompile Include="..\..\..\source\slang\slang-check.cpp" />
-    <ClCompile Include="..\..\..\source\slang\slang-compiler.cpp" />
-    <ClCompile Include="..\..\..\source\slang\slang-diagnostics.cpp" />
-    <ClCompile Include="..\..\..\source\slang\slang-dxc-support.cpp" />
-    <ClCompile Include="..\..\..\source\slang\slang-emit-c-like.cpp" />
-    <ClCompile Include="..\..\..\source\slang\slang-emit-cpp.cpp" />
-    <ClCompile Include="..\..\..\source\slang\slang-emit-cuda.cpp" />
-    <ClCompile Include="..\..\..\source\slang\slang-emit-glsl.cpp" />
-    <ClCompile Include="..\..\..\source\slang\slang-emit-hlsl.cpp" />
-    <ClCompile Include="..\..\..\source\slang\slang-emit-precedence.cpp" />
-    <ClCompile Include="..\..\..\source\slang\slang-emit-source-writer.cpp" />
-    <ClCompile Include="..\..\..\source\slang\slang-emit-spirv.cpp" />
-    <ClCompile Include="..\..\..\source\slang\slang-emit.cpp" />
-    <ClCompile Include="..\..\..\source\slang\slang-file-system.cpp" />
-    <ClCompile Include="..\..\..\source\slang\slang-glsl-extension-tracker.cpp" />
-    <ClCompile Include="..\..\..\source\slang\slang-hlsl-intrinsic-set.cpp" />
-    <ClCompile Include="..\..\..\source\slang\slang-include-system.cpp" />
-    <ClCompile Include="..\..\..\source\slang\slang-ir-any-value-marshalling.cpp" />
-    <ClCompile Include="..\..\..\source\slang\slang-ir-augment-make-existential.cpp" />
-    <ClCompile Include="..\..\..\source\slang\slang-ir-bind-existentials.cpp" />
-    <ClCompile Include="..\..\..\source\slang\slang-ir-byte-address-legalize.cpp" />
-    <ClCompile Include="..\..\..\source\slang\slang-ir-clone.cpp" />
-    <ClCompile Include="..\..\..\source\slang\slang-ir-collect-global-uniforms.cpp" />
-    <ClCompile Include="..\..\..\source\slang\slang-ir-constexpr.cpp" />
-    <ClCompile Include="..\..\..\source\slang\slang-ir-dce.cpp" />
-    <ClCompile Include="..\..\..\source\slang\slang-ir-deduplicate.cpp" />
-    <ClCompile Include="..\..\..\source\slang\slang-ir-dominators.cpp" />
-    <ClCompile Include="..\..\..\source\slang\slang-ir-entry-point-raw-ptr-params.cpp" />
-    <ClCompile Include="..\..\..\source\slang\slang-ir-entry-point-uniforms.cpp" />
-    <ClCompile Include="..\..\..\source\slang\slang-ir-explicit-global-context.cpp" />
-    <ClCompile Include="..\..\..\source\slang\slang-ir-explicit-global-init.cpp" />
-    <ClCompile Include="..\..\..\source\slang\slang-ir-generics-lowering-context.cpp" />
-    <ClCompile Include="..\..\..\source\slang\slang-ir-glsl-legalize.cpp" />
-    <ClCompile Include="..\..\..\source\slang\slang-ir-hoist-local-types.cpp" />
-    <ClCompile Include="..\..\..\source\slang\slang-ir-inline.cpp" />
-    <ClCompile Include="..\..\..\source\slang\slang-ir-layout.cpp" />
-    <ClCompile Include="..\..\..\source\slang\slang-ir-legalize-types.cpp" />
-    <ClCompile Include="..\..\..\source\slang\slang-ir-legalize-varying-params.cpp" />
-    <ClCompile Include="..\..\..\source\slang\slang-ir-link.cpp" />
-    <ClCompile Include="..\..\..\source\slang\slang-ir-lower-existential.cpp" />
-    <ClCompile Include="..\..\..\source\slang\slang-ir-lower-generic-call.cpp" />
-    <ClCompile Include="..\..\..\source\slang\slang-ir-lower-generic-function.cpp" />
-    <ClCompile Include="..\..\..\source\slang\slang-ir-lower-generic-type.cpp" />
-    <ClCompile Include="..\..\..\source\slang\slang-ir-lower-generics.cpp" />
-    <ClCompile Include="..\..\..\source\slang\slang-ir-lower-tuple-types.cpp" />
-    <ClCompile Include="..\..\..\source\slang\slang-ir-missing-return.cpp" />
-    <ClCompile Include="..\..\..\source\slang\slang-ir-restructure-scoping.cpp" />
-    <ClCompile Include="..\..\..\source\slang\slang-ir-restructure.cpp" />
-    <ClCompile Include="..\..\..\source\slang\slang-ir-sccp.cpp" />
-    <ClCompile Include="..\..\..\source\slang\slang-ir-specialize-arrays.cpp" />
-    <ClCompile Include="..\..\..\source\slang\slang-ir-specialize-dispatch.cpp" />
-    <ClCompile Include="..\..\..\source\slang\slang-ir-specialize-dynamic-associatedtype-lookup.cpp" />
-    <ClCompile Include="..\..\..\source\slang\slang-ir-specialize-function-call.cpp" />
-    <ClCompile Include="..\..\..\source\slang\slang-ir-specialize-resources.cpp" />
-    <ClCompile Include="..\..\..\source\slang\slang-ir-specialize.cpp" />
-    <ClCompile Include="..\..\..\source\slang\slang-ir-ssa.cpp" />
-    <ClCompile Include="..\..\..\source\slang\slang-ir-string-hash.cpp" />
-    <ClCompile Include="..\..\..\source\slang\slang-ir-strip-witness-tables.cpp" />
-    <ClCompile Include="..\..\..\source\slang\slang-ir-strip.cpp" />
-    <ClCompile Include="..\..\..\source\slang\slang-ir-synthesize-active-mask.cpp" />
-    <ClCompile Include="..\..\..\source\slang\slang-ir-type-set.cpp" />
-    <ClCompile Include="..\..\..\source\slang\slang-ir-union.cpp" />
-    <ClCompile Include="..\..\..\source\slang\slang-ir-validate.cpp" />
-    <ClCompile Include="..\..\..\source\slang\slang-ir-witness-table-wrapper.cpp" />
-    <ClCompile Include="..\..\..\source\slang\slang-ir-wrap-structured-buffers.cpp" />
-    <ClCompile Include="..\..\..\source\slang\slang-ir.cpp" />
-    <ClCompile Include="..\..\..\source\slang\slang-legalize-types.cpp" />
-    <ClCompile Include="..\..\..\source\slang\slang-lexer.cpp" />
-    <ClCompile Include="..\..\..\source\slang\slang-lookup.cpp" />
-    <ClCompile Include="..\..\..\source\slang\slang-lower-to-ir.cpp" />
-    <ClCompile Include="..\..\..\source\slang\slang-mangle.cpp" />
-    <ClCompile Include="..\..\..\source\slang\slang-mangled-lexer.cpp" />
-    <ClCompile Include="..\..\..\source\slang\slang-name.cpp" />
-    <ClCompile Include="..\..\..\source\slang\slang-options.cpp" />
-    <ClCompile Include="..\..\..\source\slang\slang-parameter-binding.cpp" />
-    <ClCompile Include="..\..\..\source\slang\slang-parser.cpp" />
-    <ClCompile Include="..\..\..\source\slang\slang-preprocessor.cpp" />
-    <ClCompile Include="..\..\..\source\slang\slang-profile.cpp" />
-    <ClCompile Include="..\..\..\source\slang\slang-ref-object-reflect.cpp" />
     <ClCompile Include="..\..\..\source\slang\slang-reflection-api.cpp" />
-    <ClCompile Include="..\..\..\source\slang\slang-repro.cpp" />
-    <ClCompile Include="..\..\..\source\slang\slang-serialize-ast.cpp" />
-    <ClCompile Include="..\..\..\source\slang\slang-serialize-container.cpp" />
-    <ClCompile Include="..\..\..\source\slang\slang-serialize-factory.cpp" />
-    <ClCompile Include="..\..\..\source\slang\slang-serialize-ir-types.cpp" />
-    <ClCompile Include="..\..\..\source\slang\slang-serialize-ir.cpp" />
-    <ClCompile Include="..\..\..\source\slang\slang-serialize-reflection.cpp" />
-    <ClCompile Include="..\..\..\source\slang\slang-serialize-source-loc.cpp" />
-    <ClCompile Include="..\..\..\source\slang\slang-serialize-types.cpp" />
-    <ClCompile Include="..\..\..\source\slang\slang-serialize.cpp" />
-    <ClCompile Include="..\..\..\source\slang\slang-source-loc.cpp" />
-    <ClCompile Include="..\..\..\source\slang\slang-stdlib.cpp" />
-    <ClCompile Include="..\..\..\source\slang\slang-syntax.cpp" />
-    <ClCompile Include="..\..\..\source\slang\slang-token.cpp" />
-    <ClCompile Include="..\..\..\source\slang\slang-type-layout.cpp" />
-    <ClCompile Include="..\..\..\source\slang\slang-type-system-shared.cpp" />
-    <ClCompile Include="..\..\..\source\slang\slang-value-reflect.cpp" />
-    <ClCompile Include="..\..\..\source\slang\slang.cpp" />
-  </ItemGroup>
-  <ItemGroup>
-    <None Include="..\..\..\source\slang\core.meta.slang" />
-    <None Include="..\..\..\source\slang\hlsl.meta.slang" />
+    <ClCompile Include="..\..\..\source\slang\slang-stdlib-api.cpp" />
   </ItemGroup>
   <ItemGroup>
     <Natvis Include="..\..\..\source\core\core.natvis" />
-    <Natvis Include="..\..\..\source\slang\slang.natvis" />
   </ItemGroup>
   <ItemGroup>
     <ProjectReference Include="..\core\core.vcxproj">
       <Project>{F9BE7957-8399-899E-0C49-E714FDDD4B65}</Project>
+    </ProjectReference>
+    <ProjectReference Include="..\api-less-slang\api-less-slang.vcxproj">
+      <Project>{E2EA7B60-414C-4347-8A00-C4654F6D43AC}</Project>
+    </ProjectReference>
+    <ProjectReference Include="..\miniz\miniz.vcxproj">
+      <Project>{E76ACB11-4A12-4F0A-BE1E-CE0B8836EB7F}</Project>
     </ProjectReference>
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
