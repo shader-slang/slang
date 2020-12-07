@@ -234,7 +234,7 @@ workspace "slang"
 
 
     filter { "toolset:clang or gcc*" }
-        buildoptions { "-Wno-unused-parameter", "-Wno-type-limits", "-Wno-sign-compare", "-Wno-unused-variable", "-Wno-reorder", "-Wno-switch", "-Wno-return-type", "-Wno-unused-local-typedefs", "-Wno-parentheses",  "-fvisibility=hidden" , "-Wno-ignored-optimization-argument", "-Wno-unknown-warning-option", "-Wno-class-memaccess"} 
+        buildoptions { "-Wno-unused-parameter", "-Wno-type-limits", "-Wno-sign-compare", "-Wno-unused-variable", "-Wno-reorder", "-Wno-switch", "-Wno-return-type", "-Wno-unused-local-typedefs", "-Wno-parentheses",  "-fvisibility=hidden" , "-Wno-ignored-optimization-argument", "-Wno-unknown-warning-option", "-Wno-class-memaccess", "-mcmodel=medium"} 
         
     filter { "toolset:gcc*"}
         buildoptions { "-Wno-unused-but-set-variable", "-Wno-implicit-fallthrough"  }
@@ -497,6 +497,9 @@ function toolSharedLibrary(name)
     defines { "SLANG_SHARED_LIBRARY_TOOL" }
    
     kind "SharedLib"
+    -- Position independent 
+    pic "On"
+
 end
 
 -- Finally we have the example programs that show how to use Slang.
@@ -596,7 +599,9 @@ example "cpu-hello-world"
 standardProject("core", "source/core")
     uuid "F9BE7957-8399-899E-0C49-E714FDDD4B65"
     kind "StaticLib"
-
+    -- Position independent 
+    pic "On"
+   
     -- For our core implementation, we want to use the most
     -- aggressive warning level supported by the target, and
     -- to treat every warning as an error to make sure we
@@ -611,10 +616,7 @@ standardProject("core", "source/core")
         addSourceDir "source/core/unix"
     end
     
-    -- We need the core library to be relocatable to be able to link with slang.so
-    filter { "system:linux" }
-        buildoptions{"-fPIC"}
-
+   
 --
 -- The cpp extractor is a tool that scans C++ header files to extract
 -- reflection like information, and generate files to handle 
@@ -706,7 +708,7 @@ toolSharedLibrary "render-test"
     
     includedirs { ".", "external", "source", "tools/gfx" }
     links { "core", "slang", "gfx" }
-   
+    
     if isTargetWindows then    
         addSourceDir "tools/render-test/windows"
         
@@ -751,6 +753,8 @@ tool "gfx"
     -- Unlike most of the code under `tools/`, this is a library
     -- rather than a stand-alone executable.
     kind "StaticLib"
+    -- Position independent 
+    pic "On"
     
     includedirs { ".", "external", "source", "external/imgui" }
 
@@ -806,9 +810,7 @@ tool "gfx"
             
     end
     
-    filter { "system:linux" }
-        -- might be able to do pic(true)
-        buildoptions{"-fPIC"}
+    
     
 --
 -- The `slangc` command-line application is just a very thin wrapper
@@ -969,6 +971,7 @@ standardProject("api-less-slang", "source/slang")
     kind "StaticLib"
     warnings "Extra"
     flags { "FatalWarnings" }
+    pic "On"
     
     includedirs { "external/spirv-headers/include" }
 
@@ -1008,10 +1011,6 @@ standardProject("api-less-slang", "source/slang")
     
     dependson { "run-generators" }
     
-    filter { "system:linux" }
-        -- might be able to do pic(true)
-        buildoptions{"-fPIC"}
-        
 standardProject("slangc-bootstrap", "source/slangc")
     uuid "6339BF31-AC99-4819-B719-679B63451EF0"
     kind "ConsoleApp"
@@ -1098,6 +1097,7 @@ standardProject("slang", nil)
     links { "core", "api-less-slang", "miniz" }
     warnings "Extra"
     flags { "FatalWarnings" }
+    pic "On"
 
     if enableEmbedStdLib then
         -- We only have this dependency if we are embedding stdlib
@@ -1137,12 +1137,7 @@ standardProject("slang", nil)
             }
     end
 
-    filter { "system:linux" }
-        -- might be able to do pic(true)
-        buildoptions{"-fPIC"}
-       
-  
-  
+         
 if enableProfile then
     tool "slang-profile"
         uuid "375CC87D-F34A-4DF1-9607-C5C990FD6227"
@@ -1188,6 +1183,8 @@ end
 standardProject("miniz", nil)
     uuid "E76ACB11-4A12-4F0A-BE1E-CE0B8836EB7F"
     kind "StaticLib"
+    -- Position independent 
+    pic "On"
 
     -- Add the files explicitly
     files
@@ -1198,16 +1195,16 @@ standardProject("miniz", nil)
         "external/miniz/miniz_zip.c"
     }
     
-    filter { "system:linux or macosx" }
-        links { "dl"}
-        buildoptions{"-fPIC"}
-
-
+    --filter { "system:linux or macosx" }
+    --    links { "dl"}
+       
 if buildGlslang then
 
 standardProject("slang-spirv-tools", nil)
     uuid "C36F6185-49B3-467E-8388-D0E9BF5F7BB8"
     kind "StaticLib"
+    pic "On"
+    
     includedirs { "external/spirv-tools", "external/spirv-tools/include", "external/spirv-headers/include",  "external/spirv-tools-generated"}
 
     addSourceDir("external/spirv-tools/source")
@@ -1215,9 +1212,8 @@ standardProject("slang-spirv-tools", nil)
     addSourceDir("external/spirv-tools/source/util")
     addSourceDir("external/spirv-tools/source/val")
 
-    filter { "system:linux or macosx" }
-        links { "dl"}
-        buildoptions{"-fPIC"}
+    --filter { "system:linux or macosx" }
+    --    links { "dl"}
 
 --
 -- The single most complicated part of our build is our custom version of glslang.
@@ -1235,6 +1231,7 @@ standardProject("slang-glslang", nil)
     uuid "C495878A-832C-485B-B347-0998A90CC936"
     kind "SharedLib"
     includedirs { "external/glslang", "external/spirv-tools", "external/spirv-tools/include", "external/spirv-headers/include",  "external/spirv-tools-generated", "external/glslang-generated" }
+    pic "On"
 
     defines
     {
@@ -1276,9 +1273,9 @@ standardProject("slang-glslang", nil)
         -- and we don't want the default glslang one.
         removefiles { "external/glslang/glslang/OSDependent/Windows/main.cpp" }
 
-    filter { "system:linux or macosx" }
-        links { "dl" }
-        buildoptions{"-fPIC"}
+    --filter { "system:linux or macosx" }
+    --    links { "dl" }
+        
         
     
         
