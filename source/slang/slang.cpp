@@ -370,6 +370,8 @@ SlangResult Session::_readBuiltinModule(ISlangFileSystem* fileSystem, Scope* sco
         RefPtr<Module> module(new Module(linkage, srcModule.astBuilder));
 
         ModuleDecl* moduleDecl = as<ModuleDecl>(srcModule.astRootNode);
+        // Set the module back reference on the decl
+        moduleDecl->module = module;
 
         if (moduleDecl)
         {
