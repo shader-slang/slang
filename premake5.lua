@@ -508,6 +508,10 @@ function example(name)
     -- They have their source code under `examples/<project-name>/`
     baseSlangProject(name, "examples/" .. name)
 
+    -- Set up working directory to be the source directory
+
+    debugdir("examples/" .. name)
+
     -- By default, all of our examples are GUI applications. One some
     -- platforms there is no meaningful distinction between GUI and
     -- command-line applications, but it is significant on Windows and MacOS
@@ -660,6 +664,12 @@ tool "slang-embed"
 tool "slang-test"
     uuid "0C768A18-1D25-4000-9F37-DA5FE99E3B64"
     includedirs { "." }
+    
+    -- We want to set to the root of the project, but that doesn't seem to work with '.'. 
+    -- So set a path that resolves to the same place.
+    
+    debugdir("source/..")
+    
     links { "core", "slang", "miniz" }
 
 --
