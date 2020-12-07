@@ -26,6 +26,7 @@ protected:
 };
 
 /** A blob that uses a `String` for its storage.
+NOTE! Returns length *WITHOUT* terminating 0, even though there is one.
 */
 class StringBlob : public BlobBase
 {

@@ -37,10 +37,6 @@ EndProject
 Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "miniz", "build\visual-studio\miniz\miniz.vcxproj", "{E76ACB11-4A12-4F0A-BE1E-CE0B8836EB7F}"
 EndProject
 Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "slang", "build\visual-studio\slang\slang.vcxproj", "{DB00DA62-0533-4AFD-B59F-A67D5B3A0808}"
-	ProjectSection(ProjectDependencies) = postProject
-		{6555B4D9-514F-DD2B-3ABC-733C26554398} = {6555B4D9-514F-DD2B-3ABC-733C26554398}
-		{6339BF31-AC99-4819-B719-679B63451EF0} = {6339BF31-AC99-4819-B719-679B63451EF0}
-	EndProjectSection
 EndProject
 Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "slangc", "build\visual-studio\slangc\slangc.vcxproj", "{D56CBCEB-1EB5-4CA8-AEC4-48EA35ED61C7}"
 EndProject

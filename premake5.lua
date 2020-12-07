@@ -127,6 +127,14 @@ newoption {
    allowed     = { { "true", "True"}, { "false", "False" } }
 }
 
+newoption {
+   trigger     = "enable-embed-stdlib",
+   description = "(Optional) If true build slang with an embedded version of the stdlib",
+   value       = "bool",
+   default     = "false",
+   allowed     = { { "true", "True"}, { "false", "False" } }
+}
+
 buildLocation = _OPTIONS["build-location"]
 executeBinary = (_OPTIONS["execute-binary"] == "true")
 targetDetail = _OPTIONS["target-detail"]
@@ -136,6 +144,7 @@ enableProfile = (_OPTIONS["enable-profile"] == "true")
 optixPath = _OPTIONS["optix-sdk-path"]
 enableOptix = not not (_OPTIONS["enable-optix"] == "true" or optixPath)
 enableProfile = (_OPTIONS["enable-profile"] == "true")
+enableEmbedStdLib = (_OPTIONS["enable-embed-stdlib"] == "true")
 
 -- This is the path where nvapi is expected to be found
 
@@ -1032,6 +1041,8 @@ generatorProject("embed-stdlib-generator", nil)
         "source/slang/slang-stdlib-api.cpp",
     }
     
+    -- Only produce the embedded stdlib if that option is enabled
+    
     local executableSuffix = getExecutableSuffix()
     
     -- First, we need to ensure that `slang-generate`/`slang-cpp-extactor` 
@@ -1078,7 +1089,13 @@ standardProject("slang", nil)
     warnings "Extra"
     flags { "FatalWarnings" }
 
-    dependson { "embed-stdlib-generator", "slangc-bootstrap" }
+    if enableEmbedStdLib then
+        -- We only have this dependency if we are embedding stdlib
+        dependson { "embed-stdlib-generator" }
+    else
+        -- Disable StdLib embedding
+        defines { "SLANG_WITHOUT_EMBEDDED_STD_LIB" }
+    end
 
     -- The way that we currently configure things through `slang.h`,
     -- we need to set a preprocessor definitions to ensure that
