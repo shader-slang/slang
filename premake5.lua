@@ -146,6 +146,12 @@ enableOptix = not not (_OPTIONS["enable-optix"] == "true" or optixPath)
 enableProfile = (_OPTIONS["enable-profile"] == "true")
 enableEmbedStdLib = (_OPTIONS["enable-embed-stdlib"] == "true")
 
+-- Notes
+--
+-- Using pic "On" is the same as -fPIC. NOTE! That -fPIC is the most capable form of position independent code
+-- but might not be the smallest/fastest. There is another pic option -fpic for example.
+--
+
 -- This is the path where nvapi is expected to be found
 
 nvapiPath = "external/nvapi"
@@ -231,10 +237,8 @@ workspace "slang"
     filter { "platforms:aarch64"}
         architecture "ARM"
 
-
-
     filter { "toolset:clang or gcc*" }
-        buildoptions { "-Wno-unused-parameter", "-Wno-type-limits", "-Wno-sign-compare", "-Wno-unused-variable", "-Wno-reorder", "-Wno-switch", "-Wno-return-type", "-Wno-unused-local-typedefs", "-Wno-parentheses",  "-fvisibility=hidden" , "-Wno-ignored-optimization-argument", "-Wno-unknown-warning-option", "-Wno-class-memaccess", "-mcmodel=medium"} 
+        buildoptions { "-Wno-unused-parameter", "-Wno-type-limits", "-Wno-sign-compare", "-Wno-unused-variable", "-Wno-reorder", "-Wno-switch", "-Wno-return-type", "-Wno-unused-local-typedefs", "-Wno-parentheses",  "-fvisibility=hidden", "-Wno-ignored-optimization-argument", "-Wno-unknown-warning-option", "-Wno-class-memaccess", "-mcmodel=medium"} 
         
     filter { "toolset:gcc*"}
         buildoptions { "-Wno-unused-but-set-variable", "-Wno-implicit-fallthrough"  }
@@ -972,6 +976,8 @@ standardProject("api-less-slang", "source/slang")
     warnings "Extra"
     flags { "FatalWarnings" }
     pic "On"
+    
+    links { "core" }
     
     includedirs { "external/spirv-headers/include" }
 

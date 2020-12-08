@@ -195,7 +195,12 @@ convention for interface methods.
 #if defined(_MSC_VER)
 #   define SLANG_DLL_EXPORT __declspec(dllexport)
 #else
-#   define SLANG_DLL_EXPORT __attribute__((__visibility__("default")))
+// https://gcc.gnu.org/wiki/Visibility
+#   if __GNUC__ >= 4
+#       define SLANG_DLL_EXPORT __attribute__ ((dllexport))
+#   else
+#       define SLANG_DLL_EXPORT __attribute__((__visibility__("default")))
+#   endif
 #endif
 
 #if defined(SLANG_DYNAMIC)
