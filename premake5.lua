@@ -1128,8 +1128,11 @@ if enableProfile then
 
         includedirs { "external/spirv-headers/include" }
 
-        defines { "SLANG_STATIC" }
-
+        defines { "SLANG_STATIC", 
+            -- Disable StdLib embedding
+            "SLANG_WITHOUT_EMBEDDED_STD_LIB"    
+        }
+        
         -- The `standardProject` operation already added all the code in
         -- `source/slang/*`, but we also want to incldue the umbrella
         -- `slang.h` header in this prject, so we do that manually here.
@@ -1151,7 +1154,7 @@ if enableProfile then
         addSourceDir "source/slang"
 
         includedirs { "." }
-        links { "core"}
+        links { "core", "miniz"}
         
         filter { "system:linux" }
             linkoptions{  "-pg" }
