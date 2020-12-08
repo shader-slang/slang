@@ -210,6 +210,7 @@
     <ClCompile Include="..\..\..\tools\gfx\open-gl\render-gl.cpp" />
     <ClCompile Include="..\..\..\tools\gfx\render-graphics-common.cpp" />
     <ClCompile Include="..\..\..\tools\gfx\render.cpp" />
+    <ClCompile Include="..\..\..\tools\gfx\shader-cursor.cpp" />
     <ClCompile Include="..\..\..\tools\gfx\surface.cpp" />
     <ClCompile Include="..\..\..\tools\gfx\vulkan\render-vk.cpp" />
     <ClCompile Include="..\..\..\tools\gfx\vulkan\vk-api.cpp" />

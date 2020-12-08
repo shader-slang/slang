@@ -122,6 +122,9 @@
     <ClCompile Include="..\..\..\tools\gfx\render.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
+    <ClCompile Include="..\..\..\tools\gfx\shader-cursor.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
     <ClCompile Include="..\..\..\tools\gfx\surface.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
