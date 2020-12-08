@@ -84,8 +84,8 @@ public:
     Result createDescriptorSet(DescriptorSetLayout* layout, DescriptorSet** outDescriptorSet) override;
 
     Result createProgram(const ShaderProgram::Desc& desc, ShaderProgram** outProgram) override;
-    Result createGraphicsPipelineState(GraphicsPipelineStateDesc& desc, PipelineState** outState) override;
-    Result createComputePipelineState(ComputePipelineStateDesc& desc, PipelineState** outState) override;
+    Result createGraphicsPipelineState(const GraphicsPipelineStateDesc& desc, PipelineState** outState) override;
+    Result createComputePipelineState(const ComputePipelineStateDesc& desc, PipelineState** outState) override;
 
     virtual SlangResult captureScreenSurface(Surface& surfaceOut) override;
 
@@ -1777,8 +1777,9 @@ D3D11_COLOR_WRITE_ENABLE translateRenderTargetWriteMask(RenderTargetWriteMaskT m
     return D3D11_COLOR_WRITE_ENABLE(result);
 }
 
-Result D3D11Renderer::createGraphicsPipelineState(GraphicsPipelineStateDesc& desc, PipelineState** outState)
+Result D3D11Renderer::createGraphicsPipelineState(const GraphicsPipelineStateDesc& inDesc, PipelineState** outState)
 {
+    GraphicsPipelineStateDesc desc = inDesc;
     preparePipelineDesc(desc);
 
     auto programImpl = (ShaderProgramImpl*) desc.program;
@@ -1908,8 +1909,9 @@ Result D3D11Renderer::createGraphicsPipelineState(GraphicsPipelineStateDesc& des
     return SLANG_OK;
 }
 
-Result D3D11Renderer::createComputePipelineState(ComputePipelineStateDesc& desc, PipelineState** outState)
+Result D3D11Renderer::createComputePipelineState(const ComputePipelineStateDesc& inDesc, PipelineState** outState)
 {
+    ComputePipelineStateDesc desc = inDesc;
     preparePipelineDesc(desc);
 
     auto programImpl = (ShaderProgramImpl*) desc.program;

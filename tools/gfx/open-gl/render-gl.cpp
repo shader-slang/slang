@@ -103,8 +103,8 @@ public:
     Result createDescriptorSet(DescriptorSetLayout* layout, DescriptorSet** outDescriptorSet) override;
 
     Result createProgram(const ShaderProgram::Desc& desc, ShaderProgram** outProgram) override;
-    Result createGraphicsPipelineState(GraphicsPipelineStateDesc& desc, PipelineState** outState) override;
-    Result createComputePipelineState(ComputePipelineStateDesc& desc, PipelineState** outState) override;
+    Result createGraphicsPipelineState(const GraphicsPipelineStateDesc& desc, PipelineState** outState) override;
+    Result createComputePipelineState(const ComputePipelineStateDesc& desc, PipelineState** outState) override;
 
     virtual SlangResult captureScreenSurface(Surface& surfaceOut) override;
 
@@ -1377,8 +1377,9 @@ Result GLRenderer::createProgram(const ShaderProgram::Desc& desc, ShaderProgram*
     return SLANG_OK;
 }
 
-Result GLRenderer::createGraphicsPipelineState(GraphicsPipelineStateDesc& desc, PipelineState** outState)
+Result GLRenderer::createGraphicsPipelineState(const GraphicsPipelineStateDesc& inDesc, PipelineState** outState)
 {
+    GraphicsPipelineStateDesc desc = inDesc;
     preparePipelineDesc(desc);
 
     auto programImpl        = (ShaderProgramImpl*)  desc.program;
@@ -1393,8 +1394,9 @@ Result GLRenderer::createGraphicsPipelineState(GraphicsPipelineStateDesc& desc, 
     return SLANG_OK;
 }
 
-Result GLRenderer::createComputePipelineState(ComputePipelineStateDesc& desc, PipelineState** outState)
+Result GLRenderer::createComputePipelineState(const ComputePipelineStateDesc& inDesc, PipelineState** outState)
 {
+    ComputePipelineStateDesc desc = inDesc;
     preparePipelineDesc(desc);
 
     auto programImpl        = (ShaderProgramImpl*)  desc.program;

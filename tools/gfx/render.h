@@ -1013,11 +1013,11 @@ public:
     }
 
     virtual Result createGraphicsPipelineState(
-        GraphicsPipelineStateDesc&    desc,
+        const GraphicsPipelineStateDesc&    desc,
         PipelineState**                     outState) = 0;
 
     inline RefPtr<PipelineState> createGraphicsPipelineState(
-        GraphicsPipelineStateDesc& desc)
+        const GraphicsPipelineStateDesc& desc)
     {
         RefPtr<PipelineState> state;
         SLANG_RETURN_NULL_ON_FAIL(createGraphicsPipelineState(desc, state.writeRef()));
@@ -1025,11 +1025,11 @@ public:
     }
 
     virtual Result createComputePipelineState(
-        ComputePipelineStateDesc&    desc,
+        const ComputePipelineStateDesc&    desc,
         PipelineState**                     outState) = 0;
 
     inline RefPtr<PipelineState> createComputePipelineState(
-        ComputePipelineStateDesc& desc)
+        const ComputePipelineStateDesc& desc)
     {
         RefPtr<PipelineState> state;
         SLANG_RETURN_NULL_ON_FAIL(createComputePipelineState(desc, state.writeRef()));

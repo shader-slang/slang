@@ -63,8 +63,8 @@ public:
     Result createDescriptorSet(DescriptorSetLayout* layout, DescriptorSet** outDescriptorSet) override;
 
     Result createProgram(const ShaderProgram::Desc& desc, ShaderProgram** outProgram) override;
-    Result createGraphicsPipelineState(GraphicsPipelineStateDesc& desc, PipelineState** outState) override;
-    Result createComputePipelineState(ComputePipelineStateDesc& desc, PipelineState** outState) override;
+    Result createGraphicsPipelineState(const GraphicsPipelineStateDesc& desc, PipelineState** outState) override;
+    Result createComputePipelineState(const ComputePipelineStateDesc& desc, PipelineState** outState) override;
 
     virtual SlangResult captureScreenSurface(Surface& surface) override;
 
@@ -2722,8 +2722,9 @@ Result VKRenderer::createProgram(const ShaderProgram::Desc& desc, ShaderProgram*
     return SLANG_OK;
 }
 
-Result VKRenderer::createGraphicsPipelineState(GraphicsPipelineStateDesc& desc, PipelineState** outState)
+Result VKRenderer::createGraphicsPipelineState(const GraphicsPipelineStateDesc& inDesc, PipelineState** outState)
 {
+    GraphicsPipelineStateDesc desc = inDesc;
     preparePipelineDesc(desc);
 
     VkPipelineCache pipelineCache = VK_NULL_HANDLE;
@@ -2852,8 +2853,9 @@ Result VKRenderer::createGraphicsPipelineState(GraphicsPipelineStateDesc& desc, 
     return SLANG_OK;
 }
 
-Result VKRenderer::createComputePipelineState(ComputePipelineStateDesc& desc, PipelineState** outState)
+Result VKRenderer::createComputePipelineState(const ComputePipelineStateDesc& inDesc, PipelineState** outState)
 {
+    ComputePipelineStateDesc desc = inDesc;
     preparePipelineDesc(desc);
 
     VkPipelineCache pipelineCache = VK_NULL_HANDLE;
