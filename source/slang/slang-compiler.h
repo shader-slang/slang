@@ -602,10 +602,8 @@ namespace Slang
         Index getRequirementCount() SLANG_OVERRIDE;
         RefPtr<ComponentType> getRequirement(Index index) SLANG_OVERRIDE;
 
-            /// TODO: These should include requirements/dependencies for the types
-            /// referenced in the specialization arguments...
-        List<Module*> const& getModuleDependencies() SLANG_OVERRIDE { return m_base->getModuleDependencies(); }
-        List<String> const& getFilePathDependencies() SLANG_OVERRIDE { return m_base->getFilePathDependencies(); }
+        List<Module*> const& getModuleDependencies() SLANG_OVERRIDE { return m_moduleDependencies; }
+        List<String> const& getFilePathDependencies() SLANG_OVERRIDE { return m_filePathDependencies; }
 
                     /// Get a list of tagged-union types referenced by the specialization parameters.
         List<TaggedUnionType*> const& getTaggedUnionTypes() { return m_taggedUnionTypes; }
@@ -638,6 +636,9 @@ namespace Slang
         // Any tagged union types that were referenced by the specialization arguments.
         List<TaggedUnionType*> m_taggedUnionTypes;
 
+        List<Module*> m_moduleDependencies;
+        List<String> m_filePathDependencies;
+        List<RefPtr<ComponentType>> m_requirements;
     };
 
         /// Describes an entry point for the purposes of layout and code generation.
@@ -1365,6 +1366,7 @@ namespace Slang
             DiagnosticSink*     sink);
 
         void loadParsedModule(
+            RefPtr<FrontEndCompileRequest>  compileRequest,
             RefPtr<TranslationUnitRequest>  translationUnit,
             Name*                           name,
             PathInfo const&                 pathInfo);
@@ -1563,6 +1565,8 @@ namespace Slang
         // of the translation units in the program
         void checkAllTranslationUnits();
 
+        void checkEntryPoints();
+
         void generateIR();
 
         SlangResult executeActionsInner();
@@ -1578,6 +1582,8 @@ namespace Slang
             /// 
             /// @return The zero-based index of the translation unit in this compile request.
         int addTranslationUnit(SourceLanguage language, Name* moduleName);
+
+        int addTranslationUnit(TranslationUnitRequest* translationUnit);
 
         void addTranslationUnitSourceFile(
             int             translationUnitIndex,

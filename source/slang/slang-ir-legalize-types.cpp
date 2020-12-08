@@ -1409,6 +1409,10 @@ static LegalVal legalizeInst(
         break;
     }
 
+    if(as<IRAttr>(inst))
+        return LegalVal::simple(inst);
+
+
     // We will iterate over all the operands, extract the legalized
     // value of each, and collect them in an array for subsequent use.
     //
@@ -2616,6 +2620,18 @@ struct IRTypeLegalizationPass
 
     void processInst(IRInst* inst)
     {
+        // It is possible that an insturction we
+        // encounterer during the legalization process
+        // will be one that was already removed or
+        // otherwise made redundant.
+        //
+        // We want to skip such instructions since there
+        // would not be a valid location at which to
+        // store their replacements.
+        //
+        if(!inst->getParent() && inst->op != kIROp_Module)
+            return;
+
         // The main logic for legalizing an instruction is defined
         // earlier in this file.
         //
