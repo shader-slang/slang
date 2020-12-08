@@ -127,14 +127,6 @@ newoption {
    allowed     = { { "true", "True"}, { "false", "False" } }
 }
 
-newoption {
-   trigger     = "enable-embed-stdlib",
-   description = "(Optional) If true build slang with an embedded version of the stdlib",
-   value       = "bool",
-   default     = "false",
-   allowed     = { { "true", "True"}, { "false", "False" } }
-}
-
 buildLocation = _OPTIONS["build-location"]
 executeBinary = (_OPTIONS["execute-binary"] == "true")
 targetDetail = _OPTIONS["target-detail"]
@@ -144,13 +136,6 @@ enableProfile = (_OPTIONS["enable-profile"] == "true")
 optixPath = _OPTIONS["optix-sdk-path"]
 enableOptix = not not (_OPTIONS["enable-optix"] == "true" or optixPath)
 enableProfile = (_OPTIONS["enable-profile"] == "true")
-enableEmbedStdLib = (_OPTIONS["enable-embed-stdlib"] == "true")
-
--- Notes
---
--- Using pic "On" is the same as -fPIC. NOTE! That -fPIC is the most capable form of position independent code
--- but might not be the smallest/fastest. There is another pic option -fpic for example.
---
 
 -- This is the path where nvapi is expected to be found
 
@@ -237,8 +222,10 @@ workspace "slang"
     filter { "platforms:aarch64"}
         architecture "ARM"
 
+
+
     filter { "toolset:clang or gcc*" }
-        buildoptions { "-Wno-unused-parameter", "-Wno-type-limits", "-Wno-sign-compare", "-Wno-unused-variable", "-Wno-reorder", "-Wno-switch", "-Wno-return-type", "-Wno-unused-local-typedefs", "-Wno-parentheses",  "-fvisibility=hidden", "-Wno-ignored-optimization-argument", "-Wno-unknown-warning-option", "-Wno-class-memaccess", "-mcmodel=medium"} 
+        buildoptions { "-Wno-unused-parameter", "-Wno-type-limits", "-Wno-sign-compare", "-Wno-unused-variable", "-Wno-reorder", "-Wno-switch", "-Wno-return-type", "-Wno-unused-local-typedefs", "-Wno-parentheses",  "-fvisibility=hidden" , "-Wno-ignored-optimization-argument", "-Wno-unknown-warning-option", "-Wno-class-memaccess"} 
         
     filter { "toolset:gcc*"}
         buildoptions { "-Wno-unused-but-set-variable", "-Wno-implicit-fallthrough"  }
@@ -501,9 +488,6 @@ function toolSharedLibrary(name)
     defines { "SLANG_SHARED_LIBRARY_TOOL" }
    
     kind "SharedLib"
-    -- Position independent 
-    pic "On"
-
 end
 
 -- Finally we have the example programs that show how to use Slang.
@@ -516,7 +500,6 @@ function example(name)
     baseSlangProject(name, "examples/" .. name)
 
     -- Set up working directory to be the source directory
-
     debugdir("examples/" .. name)
 
     -- By default, all of our examples are GUI applications. One some
@@ -557,7 +540,7 @@ function generatorProject(name, sourcePath)
     --
     group "generator"
 
-    -- Set up the project
+    -- Set up the project, but do NOT add any source files.
     baseSlangProject(name, sourcePath)
 
     -- For now we just use static lib to force something
@@ -587,6 +570,8 @@ if isTargetWindows then
 
     example "gpu-printing"
         kind "ConsoleApp"
+
+    example "shader-toy"
 end
 
 example "cpu-hello-world"
@@ -603,9 +588,7 @@ example "cpu-hello-world"
 standardProject("core", "source/core")
     uuid "F9BE7957-8399-899E-0C49-E714FDDD4B65"
     kind "StaticLib"
-    -- Position independent 
-    pic "On"
-   
+
     -- For our core implementation, we want to use the most
     -- aggressive warning level supported by the target, and
     -- to treat every warning as an error to make sure we
@@ -620,7 +603,10 @@ standardProject("core", "source/core")
         addSourceDir "source/core/unix"
     end
     
-   
+    -- We need the core library to be relocatable to be able to link with slang.so
+    filter { "system:linux" }
+        buildoptions{"-fPIC"}
+
 --
 -- The cpp extractor is a tool that scans C++ header files to extract
 -- reflection like information, and generate files to handle 
@@ -670,13 +656,12 @@ tool "slang-embed"
 tool "slang-test"
     uuid "0C768A18-1D25-4000-9F37-DA5FE99E3B64"
     includedirs { "." }
+    links { "core", "slang", "miniz" }
     
     -- We want to set to the root of the project, but that doesn't seem to work with '.'. 
     -- So set a path that resolves to the same place.
     
     debugdir("source/..")
-    
-    links { "core", "slang", "miniz" }
 
 --
 -- The reflection test harness `slang-reflection-test` is pretty
@@ -712,7 +697,7 @@ toolSharedLibrary "render-test"
     
     includedirs { ".", "external", "source", "tools/gfx" }
     links { "core", "slang", "gfx" }
-    
+   
     if isTargetWindows then    
         addSourceDir "tools/render-test/windows"
         
@@ -757,8 +742,6 @@ tool "gfx"
     -- Unlike most of the code under `tools/`, this is a library
     -- rather than a stand-alone executable.
     kind "StaticLib"
-    -- Position independent 
-    pic "On"
     
     includedirs { ".", "external", "source", "external/imgui" }
 
@@ -814,7 +797,9 @@ tool "gfx"
             
     end
     
-    
+    filter { "system:linux" }
+        -- might be able to do pic(true)
+        buildoptions{"-fPIC"}
     
 --
 -- The `slangc` command-line application is just a very thin wrapper
@@ -829,7 +814,6 @@ standardProject("slangc", "source/slangc")
     kind "ConsoleApp"
     links { "core", "slang" }
     
-       
 generatorProject("run-generators", nil)
     
     -- We make 'source/slang' the location of the source, to make paths to source
@@ -970,15 +954,37 @@ generatorProject("run-generators", nil)
     end
     
     
-standardProject("api-less-slang", "source/slang")
-    uuid "E2EA7B60-414C-4347-8A00-C4654F6D43AC"
-    kind "StaticLib"
+--
+-- TODO: Slang's current `Makefile` build does some careful incantations
+-- to make sure that the binaries it generates use a "relative `RPATH`"
+-- for loading shared libraries, so that Slang is not dependent on
+-- being installed to a fixed path on end-user machines. Before we
+-- can use Premake for the Linux build (or eventually MacOS) we would
+-- need to figure out how to replicate this incantation in premake.
+--
+
+--
+-- Now that we've gotten all the simple projects out of the way, it is time
+-- to get into the more serious build steps.
+--
+-- First up is the `slang` dynamic library project:
+--
+
+standardProject("slang", "source/slang")
+    uuid "DB00DA62-0533-4AFD-B59F-A67D5B3A0808"
+    kind "SharedLib"
+    links { "core", "miniz"}
     warnings "Extra"
     flags { "FatalWarnings" }
-    pic "On"
-    
-    links { "core" }
-    
+
+    -- The way that we currently configure things through `slang.h`,
+    -- we need to set a preprocessor definitions to ensure that
+    -- we declare the Slang API functions for *export* and not *import*.
+    --
+    defines { "SLANG_DYNAMIC_EXPORT" }
+    -- Disable StdLib embedding
+    defines { "SLANG_WITHOUT_EMBEDDED_STD_LIB" }
+
     includedirs { "external/spirv-headers/include" }
 
     -- On some tests with MSBuild disabling these made build work.
@@ -1001,14 +1007,6 @@ standardProject("api-less-slang", "source/slang")
         "prelude/slang-cpp-prelude.h.cpp"
     }
 
-    -- This static library is 'API-less'
-
-    removefiles {
-        "source/slang/slang-api.cpp",
-        "source/slang/slang-reflection-api.cpp",
-        "source/slang/slang-stdlib-api.cpp",
-    }
-
     -- 
     -- The most challenging part of building `slang` is that we need
     -- to invoke generators such as slang-cpp-extractor and slang-generate
@@ -1016,118 +1014,6 @@ standardProject("api-less-slang", "source/slang")
     -- which produces the appropriate source 
     
     dependson { "run-generators" }
-    
-standardProject("slangc-bootstrap", "source/slangc")
-    uuid "6339BF31-AC99-4819-B719-679B63451EF0"
-    kind "ConsoleApp"
-    links { "core", "api-less-slang", "miniz" }
-    
-    defines {
-        "SLANG_STATIC",
-        "SLANG_WITHOUT_EMBEDDED_STD_LIB"
-    }
-    
-    -- Add the API files
-    files {
-        "slang.h",
-        "source/slang/slang-api.cpp",
-        "source/slang/slang-reflection-api.cpp",
-        "source/slang/slang-stdlib-api.cpp"
-    }
-    
-generatorProject("embed-stdlib-generator", nil)
-    
-    -- We include these, even though they are not really part of the dummy 
-    -- build, so that the filters below can pick up the appropriate locations.
-    
-    defines {
-        "SLANG_STATIC",
-        "SLANG_WITHOUT_EMBEDDED_STD_LIB"
-    }
-    
-    files
-    {
-        --
-        -- To build we need to have some source! It has to be a source file that 
-        -- does not depend on anything that is generated, so we take something
-        -- from core that will compile without any generation. 
-        --
-          
-        "source/slang/slang-stdlib-api.cpp",
-    }
-    
-    -- Only produce the embedded stdlib if that option is enabled
-    
-    local executableSuffix = getExecutableSuffix()
-    
-    -- First, we need to ensure that `slang-generate`/`slang-cpp-extactor` 
-    -- gets built before `slang`, so we declare a non-linking dependency between
-    -- the projects here:
-    --
-    dependson { "slangc-bootstrap" }
-    
-    local absDirectory = path.getabsolute("source/slang")   
-    local absOutputPath = absDirectory .. "/slang-stdlib-generated.h"
-    
-    -- I don't know why I need a filter, but without it nothing works (!)   
-    filter "files:source/slang/slang-stdlib-api.cpp"
-        
-        -- Note! Has to be an absolute path else doesn't work(!)
-        buildoutputs { absOutputPath }
-      
-        buildinputs { "%{cfg.targetdir}/slangc-bootstrap" .. executableSuffix }
-            
-        local buildcmd = '"%{cfg.targetdir}/slangc-bootstrap" -save-stdlib-bin-source %{file.directory}/slang-stdlib-generated.h'
-        
-        buildcommands { buildcmd }
-
---
--- TODO: Slang's current `Makefile` build does some careful incantations
--- to make sure that the binaries it generates use a "relative `RPATH`"
--- for loading shared libraries, so that Slang is not dependent on
--- being installed to a fixed path on end-user machines. Before we
--- can use Premake for the Linux build (or eventually MacOS) we would
--- need to figure out how to replicate this incantation in premake.
---
-
---
--- Now that we've gotten all the simple projects out of the way, it is time
--- to get into the more serious build steps.
---
--- First up is the `slang` dynamic library project:
---
-
-standardProject("slang", nil)
-    uuid "DB00DA62-0533-4AFD-B59F-A67D5B3A0808"
-    kind "SharedLib"
-    links { "core", "api-less-slang", "miniz" }
-    warnings "Extra"
-    flags { "FatalWarnings" }
-    pic "On"
-
-    if enableEmbedStdLib then
-        -- We only have this dependency if we are embedding stdlib
-        dependson { "embed-stdlib-generator" }
-    else
-        -- Disable StdLib embedding
-        defines { "SLANG_WITHOUT_EMBEDDED_STD_LIB" }
-    end
-
-    -- The way that we currently configure things through `slang.h`,
-    -- we need to set a preprocessor definitions to ensure that
-    -- we declare the Slang API functions for *export* and not *import*.
-    --
-    defines { "SLANG_DYNAMIC_EXPORT" }
-
-    -- Add slang.h and the API files
-    files { 
-        "slang.h",
-        "source/slang/slang-api.cpp",
-        "source/slang/slang-reflection-api.cpp",
-        "source/slang/slang-stdlib-api.cpp",
-    }
-
-    files { "source/core/core.natvis" }
     
     -- If we are not building glslang from source, then be
     -- sure to copy a binary copy over to the output directory
@@ -1143,7 +1029,11 @@ standardProject("slang", nil)
             }
     end
 
-         
+    filter { "system:linux" }
+        -- might be able to do pic(true)
+        buildoptions{"-fPIC"}
+       
+    
 if enableProfile then
     tool "slang-profile"
         uuid "375CC87D-F34A-4DF1-9607-C5C990FD6227"
@@ -1189,8 +1079,6 @@ end
 standardProject("miniz", nil)
     uuid "E76ACB11-4A12-4F0A-BE1E-CE0B8836EB7F"
     kind "StaticLib"
-    -- Position independent 
-    pic "On"
 
     -- Add the files explicitly
     files
@@ -1201,16 +1089,16 @@ standardProject("miniz", nil)
         "external/miniz/miniz_zip.c"
     }
     
-    --filter { "system:linux or macosx" }
-    --    links { "dl"}
-       
+    filter { "system:linux or macosx" }
+        links { "dl"}
+        buildoptions{"-fPIC"}
+
+
 if buildGlslang then
 
 standardProject("slang-spirv-tools", nil)
     uuid "C36F6185-49B3-467E-8388-D0E9BF5F7BB8"
     kind "StaticLib"
-    pic "On"
-    
     includedirs { "external/spirv-tools", "external/spirv-tools/include", "external/spirv-headers/include",  "external/spirv-tools-generated"}
 
     addSourceDir("external/spirv-tools/source")
@@ -1218,8 +1106,9 @@ standardProject("slang-spirv-tools", nil)
     addSourceDir("external/spirv-tools/source/util")
     addSourceDir("external/spirv-tools/source/val")
 
-    --filter { "system:linux or macosx" }
-    --    links { "dl"}
+    filter { "system:linux or macosx" }
+        links { "dl"}
+        buildoptions{"-fPIC"}
 
 --
 -- The single most complicated part of our build is our custom version of glslang.
@@ -1237,7 +1126,6 @@ standardProject("slang-glslang", nil)
     uuid "C495878A-832C-485B-B347-0998A90CC936"
     kind "SharedLib"
     includedirs { "external/glslang", "external/spirv-tools", "external/spirv-tools/include", "external/spirv-headers/include",  "external/spirv-tools-generated", "external/glslang-generated" }
-    pic "On"
 
     defines
     {
@@ -1279,9 +1167,9 @@ standardProject("slang-glslang", nil)
         -- and we don't want the default glslang one.
         removefiles { "external/glslang/glslang/OSDependent/Windows/main.cpp" }
 
-    --filter { "system:linux or macosx" }
-    --    links { "dl" }
-        
+    filter { "system:linux or macosx" }
+        links { "dl" }
+        buildoptions{"-fPIC"}
         
     
         
