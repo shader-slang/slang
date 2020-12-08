@@ -9,6 +9,9 @@
     </Filter>
   </ItemGroup>
   <ItemGroup>
+    <ClInclude Include="..\..\..\tools\gfx\cuda\render-cuda.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
     <ClInclude Include="..\..\..\tools\gfx\d3d\d3d-util.h">
       <Filter>Header Files</Filter>
     </ClInclude>
@@ -83,6 +86,9 @@
     </ClInclude>
   </ItemGroup>
   <ItemGroup>
+    <ClCompile Include="..\..\..\tools\gfx\cuda\render-cuda.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
     <ClCompile Include="..\..\..\tools\gfx\d3d\d3d-util.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>

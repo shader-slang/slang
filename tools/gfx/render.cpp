@@ -7,6 +7,7 @@
 #include "d3d12/render-d3d12.h"
 #include "open-gl/render-gl.h"
 #include "vulkan/render-vk.h"
+#include "cuda/render-cuda.h"
 
 namespace gfx {
 using namespace Slang;
@@ -431,6 +432,10 @@ ProjectionStyle RendererUtil::getProjectionStyle(RendererType type)
         case RendererType::Vulkan:
         {
             return &createVKRenderer;
+        }
+        case RendererType::CUDA:
+        {
+            return &createCUDARenderer;
         }
 #endif
 
