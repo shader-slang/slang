@@ -127,6 +127,14 @@ newoption {
    allowed     = { { "true", "True"}, { "false", "False" } }
 }
 
+newoption {
+   trigger     = "enable-embed-stdlib",
+   description = "(Optional) If true build slang with an embedded version of the stdlib",
+   value       = "bool",
+   default     = "false",
+   allowed     = { { "true", "True"}, { "false", "False" } }
+}
+
 buildLocation = _OPTIONS["build-location"]
 executeBinary = (_OPTIONS["execute-binary"] == "true")
 targetDetail = _OPTIONS["target-detail"]
@@ -136,6 +144,7 @@ enableProfile = (_OPTIONS["enable-profile"] == "true")
 optixPath = _OPTIONS["optix-sdk-path"]
 enableOptix = not not (_OPTIONS["enable-optix"] == "true" or optixPath)
 enableProfile = (_OPTIONS["enable-profile"] == "true")
+enableEmbedStdLib = (_OPTIONS["enable-embed-stdlib"] == "true")
 
 -- This is the path where nvapi is expected to be found
 
@@ -308,12 +317,7 @@ function addSourceDir(path)
     removefiles
     {
         "**/*.meta.slang.h",
-        "**/slang-generated-*",
-        "**/slang-ast-generated*",
-        "**/slang-ref-object-generated*",
-        "**/*generated.h",
-        "**/*generated-macro.h"
-
+        "**/slang-*generated*.h"
     }
 end
 
@@ -952,8 +956,81 @@ generatorProject("run-generators", nil)
         buildoutputs { "%{file.abspath}.cpp" }
         buildinputs { "%{cfg.targetdir}/slang-embed" .. executableSuffix }
     end
+ 
+
+standardProject("slangc-bootstrap", "source/slangc")
+    uuid "6339BF31-AC99-4819-B719-679B63451EF0"
+    kind "ConsoleApp"
+    links { "core", "miniz" }
     
+    defines {
+        "SLANG_STATIC",
+        "SLANG_WITHOUT_EMBEDDED_STD_LIB"
+    }
     
+    includedirs { "external/spirv-headers/include" }
+
+    -- Add all of the slang source
+    addSourceDir "source/slang"
+
+    -- On some tests with MSBuild disabling these made build work.
+    -- flags { "NoIncrementalLink", "NoPCH", "NoMinimalRebuild" }
+
+    -- The `standardProject` operation already added all the code in
+    -- `source/slang/*`, but we also want to incldue the umbrella
+    -- `slang.h` header in this prject, so we do that manually here.
+    files { "slang.h" }
+
+    files { "source/core/core.natvis" }
+ 
+    -- We explicitly name the prelude file(s) that we need to
+    -- compile for their embedded code, since they will not
+    -- exist at the time projects/makefiles are generated,
+    -- and thus a glob would not match anything.
+    files {
+        "prelude/slang-cuda-prelude.h.cpp",
+        "prelude/slang-hlsl-prelude.h.cpp",
+        "prelude/slang-cpp-prelude.h.cpp"
+    }
+    
+generatorProject("embed-stdlib-generator", nil)
+    
+    -- We include these, even though they are not really part of the dummy 
+    -- build, so that the filters below can pick up the appropriate locations.    
+ 
+    files
+    {
+        --
+        -- To build we need to have some source! It has to be a source file that 
+        -- does not depend on anything that is generated, so we take something
+        -- from core that will compile without any generation. 
+        --
+          
+        "source/slang/slang-stdlib-api.cpp",
+    }
+    
+    -- Only produce the embedded stdlib if that option is enabled
+    
+    local executableSuffix = getExecutableSuffix()
+    
+    -- We need slangc-bootstrap to build the embedded stdlib
+    dependson { "slangc-bootstrap" }
+    
+    local absDirectory = path.getabsolute("source/slang")   
+    local absOutputPath = absDirectory .. "/slang-stdlib-generated.h"
+    
+    -- I don't know why I need a filter, but without it nothing works (!)   
+    filter "files:source/slang/slang-stdlib-api.cpp"
+        
+        -- Note! Has to be an absolute path else doesn't work(!)
+        buildoutputs { absOutputPath }
+      
+        buildinputs { "%{cfg.targetdir}/slangc-bootstrap" .. executableSuffix }
+            
+        local buildcmd = '"%{cfg.targetdir}/slangc-bootstrap" -save-stdlib-bin-source %{file.directory}/slang-stdlib-generated.h'
+        
+        buildcommands { buildcmd }
+ 
 --
 -- TODO: Slang's current `Makefile` build does some careful incantations
 -- to make sure that the binaries it generates use a "relative `RPATH`"
@@ -982,9 +1059,15 @@ standardProject("slang", "source/slang")
     -- we declare the Slang API functions for *export* and not *import*.
     --
     defines { "SLANG_DYNAMIC_EXPORT" }
-    -- Disable StdLib embedding
-    defines { "SLANG_WITHOUT_EMBEDDED_STD_LIB" }
-
+    
+    if enableEmbedStdLib then
+        -- We only have this dependency if we are embedding stdlib
+        dependson { "embed-stdlib-generator" }
+    else
+        -- Disable StdLib embedding
+        defines { "SLANG_WITHOUT_EMBEDDED_STD_LIB" }
+    end
+    
     includedirs { "external/spirv-headers/include" }
 
     -- On some tests with MSBuild disabling these made build work.
