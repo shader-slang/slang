@@ -5,6 +5,7 @@
 
 //WORKING:#include "options.h"
 #include "../render.h"
+#include "../render-graphics-common.h"
 
 #include "../surface.h"
 
@@ -61,7 +62,7 @@ struct ID3D12GraphicsCommandList1 {};
 namespace gfx {
 using namespace Slang;
 
-class D3D12Renderer : public Renderer
+class D3D12Renderer : public GraphicsAPIRenderer
 {
 public:
     // Renderer    implementation
@@ -86,8 +87,8 @@ public:
     Result createDescriptorSet(DescriptorSetLayout* layout, DescriptorSet** outDescriptorSet) override;
 
     Result createProgram(const ShaderProgram::Desc& desc, ShaderProgram** outProgram) override;
-    Result createGraphicsPipelineState(const GraphicsPipelineStateDesc& desc, PipelineState** outState) override;
-    Result createComputePipelineState(const ComputePipelineStateDesc& desc, PipelineState** outState) override;
+    Result createGraphicsPipelineState(GraphicsPipelineStateDesc& desc, PipelineState** outState) override;
+    Result createComputePipelineState(ComputePipelineStateDesc& desc, PipelineState** outState) override;
 
     virtual SlangResult captureScreenSurface(Surface& surfaceOut) override;
 
@@ -3520,8 +3521,10 @@ Result D3D12Renderer::createDescriptorSet(DescriptorSetLayout* layout, Descripto
     return SLANG_OK;
 }
 
-Result D3D12Renderer::createGraphicsPipelineState(const GraphicsPipelineStateDesc& desc, PipelineState** outState)
+Result D3D12Renderer::createGraphicsPipelineState(GraphicsPipelineStateDesc& desc, PipelineState** outState)
 {
+    preparePipelineDesc(desc);
+
     auto pipelineLayoutImpl = (PipelineLayoutImpl*) desc.pipelineLayout;
     auto programImpl = (ShaderProgramImpl*) desc.program;
     auto inputLayoutImpl = (InputLayoutImpl*) desc.inputLayout;
@@ -3618,8 +3621,10 @@ Result D3D12Renderer::createGraphicsPipelineState(const GraphicsPipelineStateDes
     return SLANG_OK;
 }
 
-Result D3D12Renderer::createComputePipelineState(const ComputePipelineStateDesc& desc, PipelineState** outState)
+Result D3D12Renderer::createComputePipelineState(ComputePipelineStateDesc& desc, PipelineState** outState)
 {
+    preparePipelineDesc(desc);
+
     auto pipelineLayoutImpl = (PipelineLayoutImpl*) desc.pipelineLayout;
     auto programImpl = (ShaderProgramImpl*) desc.program;
 

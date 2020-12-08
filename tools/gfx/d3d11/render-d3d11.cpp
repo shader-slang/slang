@@ -6,6 +6,7 @@
 
 //WORKING: #include "options.h"
 #include "../render.h"
+#include "../render-graphics-common.h"
 #include "../d3d/d3d-util.h"
 #include "../nvapi/nvapi-util.h"
 
@@ -51,7 +52,7 @@ using namespace Slang;
 
 namespace gfx {
 
-class D3D11Renderer : public Renderer
+class D3D11Renderer : public GraphicsAPIRenderer
 {
 public:
     enum
@@ -83,8 +84,8 @@ public:
     Result createDescriptorSet(DescriptorSetLayout* layout, DescriptorSet** outDescriptorSet) override;
 
     Result createProgram(const ShaderProgram::Desc& desc, ShaderProgram** outProgram) override;
-    Result createGraphicsPipelineState(const GraphicsPipelineStateDesc& desc, PipelineState** outState) override;
-    Result createComputePipelineState(const ComputePipelineStateDesc& desc, PipelineState** outState) override;
+    Result createGraphicsPipelineState(GraphicsPipelineStateDesc& desc, PipelineState** outState) override;
+    Result createComputePipelineState(ComputePipelineStateDesc& desc, PipelineState** outState) override;
 
     virtual SlangResult captureScreenSurface(Surface& surfaceOut) override;
 
@@ -1776,8 +1777,10 @@ D3D11_COLOR_WRITE_ENABLE translateRenderTargetWriteMask(RenderTargetWriteMaskT m
     return D3D11_COLOR_WRITE_ENABLE(result);
 }
 
-Result D3D11Renderer::createGraphicsPipelineState(const GraphicsPipelineStateDesc& desc, PipelineState** outState)
+Result D3D11Renderer::createGraphicsPipelineState(GraphicsPipelineStateDesc& desc, PipelineState** outState)
 {
+    preparePipelineDesc(desc);
+
     auto programImpl = (ShaderProgramImpl*) desc.program;
 
     ComPtr<ID3D11DepthStencilState> depthStencilState;
@@ -1905,8 +1908,10 @@ Result D3D11Renderer::createGraphicsPipelineState(const GraphicsPipelineStateDes
     return SLANG_OK;
 }
 
-Result D3D11Renderer::createComputePipelineState(const ComputePipelineStateDesc& desc, PipelineState** outState)
+Result D3D11Renderer::createComputePipelineState(ComputePipelineStateDesc& desc, PipelineState** outState)
 {
+    preparePipelineDesc(desc);
+
     auto programImpl = (ShaderProgramImpl*) desc.program;
     auto pipelineLayoutImpl = (PipelineLayoutImpl*) desc.pipelineLayout;
 

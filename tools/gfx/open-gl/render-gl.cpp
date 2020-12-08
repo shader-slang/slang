@@ -5,6 +5,7 @@
 
 //WORKING:#include "options.h"
 #include "../render.h"
+#include "../render-graphics-common.h"
 
 #include <stdio.h>
 #include <stdlib.h>
@@ -76,7 +77,7 @@ using namespace Slang;
 
 namespace gfx {
 
-class GLRenderer : public Renderer
+class GLRenderer : public GraphicsAPIRenderer
 {
 public:
 
@@ -102,8 +103,8 @@ public:
     Result createDescriptorSet(DescriptorSetLayout* layout, DescriptorSet** outDescriptorSet) override;
 
     Result createProgram(const ShaderProgram::Desc& desc, ShaderProgram** outProgram) override;
-    Result createGraphicsPipelineState(const GraphicsPipelineStateDesc& desc, PipelineState** outState) override;
-    Result createComputePipelineState(const ComputePipelineStateDesc& desc, PipelineState** outState) override;
+    Result createGraphicsPipelineState(GraphicsPipelineStateDesc& desc, PipelineState** outState) override;
+    Result createComputePipelineState(ComputePipelineStateDesc& desc, PipelineState** outState) override;
 
     virtual SlangResult captureScreenSurface(Surface& surfaceOut) override;
 
@@ -1376,8 +1377,10 @@ Result GLRenderer::createProgram(const ShaderProgram::Desc& desc, ShaderProgram*
     return SLANG_OK;
 }
 
-Result GLRenderer::createGraphicsPipelineState(const GraphicsPipelineStateDesc& desc, PipelineState** outState)
+Result GLRenderer::createGraphicsPipelineState(GraphicsPipelineStateDesc& desc, PipelineState** outState)
 {
+    preparePipelineDesc(desc);
+
     auto programImpl        = (ShaderProgramImpl*)  desc.program;
     auto pipelineLayoutImpl = (PipelineLayoutImpl*) desc.pipelineLayout;
     auto inputLayoutImpl    = (InputLayoutImpl*)    desc.inputLayout;
@@ -1390,8 +1393,10 @@ Result GLRenderer::createGraphicsPipelineState(const GraphicsPipelineStateDesc& 
     return SLANG_OK;
 }
 
-Result GLRenderer::createComputePipelineState(const ComputePipelineStateDesc& desc, PipelineState** outState)
+Result GLRenderer::createComputePipelineState(ComputePipelineStateDesc& desc, PipelineState** outState)
 {
+    preparePipelineDesc(desc);
+
     auto programImpl        = (ShaderProgramImpl*)  desc.program;
     auto pipelineLayoutImpl = (PipelineLayoutImpl*) desc.pipelineLayout;
 
