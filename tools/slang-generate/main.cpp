@@ -47,6 +47,8 @@ struct Node
 struct SourceFile : public RefObject
 {
     String inputPath;
+    String linePath;            ///< The path to this file for #line output
+
     StringSpan   text;
     Node* node = nullptr;
     SourceFile() = default;
@@ -658,7 +660,7 @@ void emitTemplateNodes(
             if (lineIndex >= 0)
             {
                 StringBuilder buf;
-                buf << "SLANG_RAW(\"#line " << (lineIndex + 1) << " \\\"" << sourceFile->inputPath << "\\\"\")\n";
+                buf << "SLANG_RAW(\"#line " << (lineIndex + 1) << " \\\"" << sourceFile->linePath << "\\\"\")\n";
 
                 emit(stream, buf.getUnownedSlice());
             }
@@ -806,7 +808,13 @@ SourceFile* parseSourceFile(const String& path)
     StringSpan span = StringSpan(input, inputEnd);
 
     SourceFile* sourceFile = new SourceFile();
+
     sourceFile->inputPath = path;
+
+    // We use the fileName as the line path, as the path as passed to the command could contain a complicated
+    // depending on the project location.
+    sourceFile->linePath = Path::getFileName(path);
+
     sourceFile->text = span;
 
     Node* node = parseSourceFile(sourceFile);

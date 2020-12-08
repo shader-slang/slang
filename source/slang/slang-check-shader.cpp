@@ -784,30 +784,10 @@ namespace Slang
         return fillRequirements(globalComponentType);
     }
 
-        /// Create a component type that represents the global scope for a compile request,
-        /// along with any entry point functions.
-        ///
-        /// The resulting component type will include the global-scope information
-        /// first, so its layout will be compatible with the result of
-        /// `createUnspecializedGlobalComponentType`.
-        ///
-        /// The new component type will also add on any entry-point functions
-        /// that were requested and will thus include space for their `uniform` parameters.
-        /// If multiple entry points were requested then they will be given non-overlapping
-        /// parameter bindings, consistent with them being used together in
-        /// a single pipeline state, hit group, etc.
-        ///
-        /// The result of this function is unspecialized and doesn't take into
-        /// account any specialization arguments the user might have supplied.
-        ///
-    RefPtr<ComponentType> createUnspecializedGlobalAndEntryPointsComponentType(
-        FrontEndCompileRequest*         compileRequest,
-        List<RefPtr<ComponentType>>&    outUnspecializedEntryPoints)
+    void FrontEndCompileRequest::checkEntryPoints()
     {
-        auto linkage = compileRequest->getLinkage();
-        auto sink = compileRequest->getSink();
-
-        auto globalComponentType = compileRequest->getGlobalComponentType();
+        auto linkage = getLinkage();
+        auto sink = getSink();
 
         // The validation of entry points here will be modal, and controlled
         // by whether the user specified any entry points directly via
@@ -818,17 +798,14 @@ namespace Slang
         // First, check if the user requested any entry points explicitly via
         // the API or command line.
         //
-        bool anyExplicitEntryPoints = compileRequest->getEntryPointReqCount() != 0;
-
-        List<RefPtr<ComponentType>> allComponentTypes;
-        allComponentTypes.add(globalComponentType);
+        bool anyExplicitEntryPoints = getEntryPointReqCount() != 0;
 
         if( anyExplicitEntryPoints )
         {
             // If there were any explicit requests for entry points to be
             // checked, then we will *only* check those.
             //
-            for(auto entryPointReq : compileRequest->getEntryPointReqs())
+            for(auto entryPointReq : getEntryPointReqs())
             {
                 auto entryPoint = findAndValidateEntryPoint(
                     entryPointReq);
@@ -841,9 +818,6 @@ namespace Slang
                     // compilation API doesn't allow for grouping).
                     //
                     entryPointReq->getTranslationUnit()->module->_addEntryPoint(entryPoint);
-
-                    outUnspecializedEntryPoints.add(entryPoint);
-                    allComponentTypes.add(entryPoint);
                 }
             }
 
@@ -868,10 +842,10 @@ namespace Slang
             // For now we'll start with an extremely basic approach that
             // should work for typical HLSL code.
             //
-            Index translationUnitCount = compileRequest->translationUnits.getCount();
+            Index translationUnitCount = translationUnits.getCount();
             for(Index tt = 0; tt < translationUnitCount; ++tt)
             {
-                auto translationUnit = compileRequest->translationUnits[tt];
+                auto translationUnit = translationUnits[tt];
                 for( auto globalDecl : translationUnit->getModuleDecl()->members )
                 {
                     auto maybeFuncDecl = globalDecl;
@@ -920,10 +894,49 @@ namespace Slang
                     // independent of the others.
                     //
                     translationUnit->module->_addEntryPoint(entryPoint);
-
-                    outUnspecializedEntryPoints.add(entryPoint);
-                    allComponentTypes.add(entryPoint);
                 }
+            }
+        }
+    }
+
+
+        /// Create a component type that represents the global scope for a compile request,
+        /// along with any entry point functions.
+        ///
+        /// The resulting component type will include the global-scope information
+        /// first, so its layout will be compatible with the result of
+        /// `createUnspecializedGlobalComponentType`.
+        ///
+        /// The new component type will also add on any entry-point functions
+        /// that were requested and will thus include space for their `uniform` parameters.
+        /// If multiple entry points were requested then they will be given non-overlapping
+        /// parameter bindings, consistent with them being used together in
+        /// a single pipeline state, hit group, etc.
+        ///
+        /// The result of this function is unspecialized and doesn't take into
+        /// account any specialization arguments the user might have supplied.
+        ///
+    RefPtr<ComponentType> createUnspecializedGlobalAndEntryPointsComponentType(
+        FrontEndCompileRequest*         compileRequest,
+        List<RefPtr<ComponentType>>&    outUnspecializedEntryPoints)
+    {
+        auto linkage = compileRequest->getLinkage();
+
+        auto globalComponentType = compileRequest->getGlobalComponentType();
+
+        List<RefPtr<ComponentType>> allComponentTypes;
+        allComponentTypes.add(globalComponentType);
+
+        Index translationUnitCount = compileRequest->translationUnits.getCount();
+        for(Index tt = 0; tt < translationUnitCount; ++tt)
+        {
+            auto translationUnit = compileRequest->translationUnits[tt];
+            auto module = translationUnit->getModule();
+
+            for(auto entryPoint : module->getEntryPoints() )
+            {
+                outUnspecializedEntryPoints.add(entryPoint);
+                allComponentTypes.add(entryPoint);
             }
         }
 

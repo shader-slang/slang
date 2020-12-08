@@ -154,7 +154,7 @@ if enableCuda then
 end
 
 -- Is true when the target is really windows (ie not something on top of windows like cygwin)
-local isTargetWindows = (os.target() == "windows") and not (targetDetail == "mingw" or targetDetail == "cygwin")
+isTargetWindows = (os.target() == "windows") and not (targetDetail == "mingw" or targetDetail == "cygwin")
 
 -- Even if we have the nvapi path, we only want to currently enable on windows targets
 
@@ -163,7 +163,6 @@ enableNvapi = not not (os.isdir(nvapiPath) and isTargetWindows and _OPTIONS["ena
 if enableNvapi then
     printf("Enabled NVAPI")
 end
-
 overrideModule = {}
 local overrideModulePath = _OPTIONS["override-module"]
 if overrideModulePath then
@@ -201,9 +200,13 @@ workspace "slang"
     -- and configuration options, e.g. `bin/windows-x64/debug/`
     targetdir("bin/" .. targetName .. "/%{cfg.buildcfg:lower()}")
 
+    -- C++11 
+    cppdialect "C++11"
     -- Statically link to the C/C++ runtime rather than create a DLL dependency.
-    flags { "StaticRuntime", "C++11" }
-
+    staticruntime "On"
+    
+    -- Statically link to the C/C++ runtime rather than create a DLL dependency.
+    
     -- Once we've set up the common settings, we will make some tweaks
     -- that only apply in a subset of cases. Each call to `filter()`
     -- changes the "active" filter for subsequent commands. In
@@ -302,6 +305,34 @@ function addSourceDir(path)
         path .. "/*.hpp",       -- C++ style headers (for glslang)
         path .. "/*.natvis",    -- Visual Studio debugger visualization files
     }
+    removefiles
+    {
+        "**/*.meta.slang.h",
+        "**/slang-generated-*",
+        "**/slang-ast-generated*",
+        "**/slang-ref-object-generated*",
+        "**/*generated.h",
+        "**/*generated-macro.h"
+
+    }
+end
+
+--
+-- A function to return a name to place project files under 
+-- in build directory
+--
+-- This is complicated in so far as when this is used (with location for example)
+-- we can't use Tokens 
+-- https://github.com/premake/premake-core/wiki/Tokens
+
+function getBuildLocationName()
+    if not not targetDetail then
+        return targetDetail
+    elseif isTargetWindows then
+        return "visual-studio"
+    else
+        return os.target()
+    end 
 end
 
 --
@@ -316,10 +347,8 @@ end
 --
 --      baseSlangProject("slangc", "source/slangc")
 --
--- NOTE! This function does not add any source from the sourceDir
--- add the source after calling this function with 'addSourceDir', or 
--- use `baseSlangProjectAddFiles`
---
+-- NOTE! This function will add any source from the sourceDir, *if* it's specified. 
+-- Pass nil if adding files is not wanted.
 function baseSlangProject(name, sourceDir)
 
     -- Start a new project in premake. This switches
@@ -334,30 +363,24 @@ function baseSlangProject(name, sourceDir)
     -- projects. If we don't have a stable UUID, then the
     -- output files might have spurious diffs whenever we
     -- re-run premake generation.
-    uuid(os.uuid(name .. '|' .. sourceDir))
-
-    -- Set the location where the project file will be placed.
-    -- We set the project files to reside in their source
-    -- directory, because in Visual Studio the default
-    -- working directory when launching a project in the
-    -- debugger is its project directory. This ensures that
-    -- examples will work as expected for VS users.
-    --
-    -- TODO: consider only setting this for examples, since
-    -- it is less relevant to other projects.
-    --
-
-    location(sourceDir)
     
-    if os.target() == "windows" then
+    if sourceDir then
+        uuid(os.uuid(name .. '|' .. sourceDir))
     else
-        location "intermediate/project/%{prj.name}"
+        -- If we don't have a sourceDir, the name will have to be enough
+        uuid(os.uuid(name))
     end
+
+    -- Location could do with a better name than 'other' - but it seems as if %{cfg.buildcfg:lower()} and similar variables
+    -- is not available for location to expand. 
+    location("build/" .. getBuildLocationName() .. "/" .. name)
+
     
     -- The intermediate ("object") directory will use a similar
     -- naming scheme to the output directory, but will also use
     -- the project name to avoid cases where multiple projects
     -- have source files with the same name.
+    --
     objdir("intermediate/" .. targetName .. "/%{cfg.buildcfg:lower()}/%{prj.name}")
     
     -- All of our projects are written in C++.
@@ -394,25 +417,19 @@ function baseSlangProject(name, sourceDir)
     if overrideModule.addBaseProjectOptions then
         overrideModule.addBaseProjectOptions()
     end
-end
-
-function baseSlangProjectAddFiles(name, sourceDir)
-    
-    --
-    -- Set up the base project
-    --
-
-    baseSlangProject(name, sourceDir)
     
     --
     -- Add the files in the sourceDir
     -- NOTE! This doesn't recursively add files in subdirectories
     --
     
-    addSourceDir(sourceDir)
+    if not not sourceDir then
+        addSourceDir(sourceDir)
+    end
 end
 
--- We can now use the `baseSlangProjectAddFiles()` subroutine to
+
+-- We can now use the `baseSlangProject()` subroutine to
 -- define helpers for the different categories of project
 -- in our source tree.
 --
@@ -435,7 +452,7 @@ function tool(name)
     -- Now we invoke our shared project configuration logic,
     -- specifying that the project lives under the `tools/` path.
     --
-    baseSlangProjectAddFiles(name, "tools/" .. name)
+    baseSlangProject(name, "tools/" .. name)
     
     -- Finally, we set the project "kind" to produce a console
     -- application. This is a reasonable default for tools,
@@ -449,7 +466,7 @@ end
 -- "Standard" projects will be those that go to make the binary
 -- packages for slang: the shared libraries and executables.
 --
-function standardProject(name)
+function standardProject(name, sourceDir)
     -- Because Premake is stateful, any `group()` call by another
     -- project would still be in effect when we create a project
     -- here (e.g., if somebody had called `tool()` before
@@ -458,16 +475,15 @@ function standardProject(name)
     --
     group ""
 
-    -- A standard project has its code under `source/`
-    --
-    baseSlangProjectAddFiles(name, "source/" .. name)
+    baseSlangProject(name, sourceDir)
 end
+
 
 function toolSharedLibrary(name)
     group "test-tool"
     -- specifying that the project lives under the `tools/` path.
     --
-    baseSlangProjectAddFiles(name .. "-tool", "tools/" .. name)
+    baseSlangProject(name .. "-tool", "tools/" .. name)
     
     defines { "SLANG_SHARED_LIBRARY_TOOL" }
    
@@ -481,7 +497,7 @@ function example(name)
     group "examples"
 
     -- They have their source code under `examples/<project-name>/`
-    baseSlangProjectAddFiles(name, "examples/" .. name)
+    baseSlangProject(name, "examples/" .. name)
 
     -- By default, all of our examples are GUI applications. One some
     -- platforms there is no meaningful distinction between GUI and
@@ -551,6 +567,8 @@ if isTargetWindows then
 
     example "gpu-printing"
         kind "ConsoleApp"
+
+    example "shader-toy"
 end
 
 example "cpu-hello-world"
@@ -564,7 +582,7 @@ example "cpu-hello-world"
 -- and the various tool projects. It's build is pretty simple:
 --
 
-standardProject "core"
+standardProject("core", "source/core")
     uuid "F9BE7957-8399-899E-0C49-E714FDDD4B65"
     kind "StaticLib"
 
@@ -783,12 +801,12 @@ tool "gfx"
 -- it also depends on `core`:
 --
 
-standardProject "slangc"
+standardProject("slangc", "source/slangc")
     uuid "D56CBCEB-1EB5-4CA8-AEC4-48EA35ED61C7"
     kind "ConsoleApp"
     links { "core", "slang" }
     
-generatorProject("run-generators", "source/slang/")
+generatorProject("run-generators", nil)
     
     -- We make 'source/slang' the location of the source, to make paths to source
     -- relative to that
@@ -944,7 +962,7 @@ generatorProject("run-generators", "source/slang/")
 -- First up is the `slang` dynamic library project:
 --
 
-standardProject "slang"
+standardProject("slang", "source/slang")
     uuid "DB00DA62-0533-4AFD-B59F-A67D5B3A0808"
     kind "SharedLib"
     links { "core" }
@@ -992,7 +1010,7 @@ standardProject "slang"
     if not buildGlslang then
         filter { "system:windows" }
             postbuildcommands {
-                "{COPY} ../../external/slang-binaries/bin/" .. targetName .. "/slang-glslang.dll %{cfg.targetdir}"
+                "{COPY} ../../../external/slang-binaries/bin/" .. targetName .. "/slang-glslang.dll %{cfg.targetdir}"
             }
 
         filter { "system:linux" }
@@ -1048,10 +1066,11 @@ if enableProfile then
 
 end
 
-standardProject "miniz"
+standardProject("miniz", nil)
     uuid "E76ACB11-4A12-4F0A-BE1E-CE0B8836EB7F"
     kind "StaticLib"
 
+    -- Add the files explicitly
     files
     {
         "external/miniz/miniz.c",
@@ -1067,7 +1086,7 @@ standardProject "miniz"
 
 if buildGlslang then
 
-standardProject "slang-spirv-tools"
+standardProject("slang-spirv-tools", nil)
     uuid "C36F6185-49B3-467E-8388-D0E9BF5F7BB8"
     kind "StaticLib"
     includedirs { "external/spirv-tools", "external/spirv-tools/include", "external/spirv-headers/include",  "external/spirv-tools-generated"}
@@ -1093,7 +1112,7 @@ standardProject "slang-spirv-tools"
 -- The following is a tailored build of glslang that pulls in the pieces we care
 -- about whle trying to leave out the rest:
 --
-standardProject "slang-glslang"
+standardProject("slang-glslang", nil)
     uuid "C495878A-832C-485B-B347-0998A90CC936"
     kind "SharedLib"
     includedirs { "external/glslang", "external/spirv-tools", "external/spirv-tools/include", "external/spirv-headers/include",  "external/spirv-tools-generated", "external/glslang-generated" }

@@ -4034,7 +4034,7 @@ namespace slang
 @param apiVersion Pass in SLANG_API_VERSION
 @param outGlobalSession (out)The created global session. 
 */
-SLANG_API SlangResult slang_createGlobalSession(
+SLANG_EXTERN_C SLANG_API SlangResult slang_createGlobalSession(
     SlangInt                apiVersion,
     slang::IGlobalSession** outGlobalSession);
 
@@ -4046,7 +4046,7 @@ then be loaded via loadStdLib or compileStdLib
 
 NOTE! API is experimental and not ready for production code 
 */
-SLANG_API SlangResult slang_createGlobalSessionWithoutStdLib(
+SLANG_EXTERN_C SLANG_API SlangResult slang_createGlobalSessionWithoutStdLib(
     SlangInt                apiVersion,
     slang::IGlobalSession** outGlobalSession);
 
@@ -4061,27 +4061,27 @@ namespace slang
 
 /** @see slang::ICompileRequest::getProgram
 */
-SLANG_API SlangResult spCompileRequest_getProgram(
+SLANG_EXTERN_C SLANG_API SlangResult spCompileRequest_getProgram(
     SlangCompileRequest*    request,
     slang::IComponentType** outProgram);
 
 /** @see slang::ICompileRequest::getEntryPoint
 */
-SLANG_API SlangResult spCompileRequest_getEntryPoint(
+SLANG_EXTERN_C SLANG_API SlangResult spCompileRequest_getEntryPoint(
     SlangCompileRequest*    request,
     SlangInt                entryPointIndex,
     slang::IComponentType** outEntryPoint);
 
 /** @see slang::ICompileRequest::getModule
 */
-SLANG_API SlangResult spCompileRequest_getModule(
+SLANG_EXTERN_C SLANG_API SlangResult spCompileRequest_getModule(
     SlangCompileRequest*    request,
     SlangInt                translationUnitIndex,
     slang::IModule**        outModule);
 
 /** @see slang::ICompileRequest::getSession
 */
-SLANG_API SlangResult spCompileRequest_getSession(
+SLANG_EXTERN_C SLANG_API SlangResult spCompileRequest_getSession(
     SlangCompileRequest* request,
     slang::ISession** outSession);
 #endif
