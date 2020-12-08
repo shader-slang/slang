@@ -195,8 +195,9 @@ convention for interface methods.
 #if defined(_MSC_VER)
 #   define SLANG_DLL_EXPORT __declspec(dllexport)
 #else
+#   if 0 && __GNUC__ >= 4
+// Didn't work on latest gcc on linux.. so disable for now
 // https://gcc.gnu.org/wiki/Visibility
-#   if __GNUC__ >= 4
 #       define SLANG_DLL_EXPORT __attribute__ ((dllexport))
 #   else
 #       define SLANG_DLL_EXPORT __attribute__((__visibility__("default")))
