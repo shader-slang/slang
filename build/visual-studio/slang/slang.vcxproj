@@ -199,6 +199,8 @@
     <ClInclude Include="..\..\..\source\slang\slang-ast-support-types.h" />
     <ClInclude Include="..\..\..\source\slang\slang-ast-type.h" />
     <ClInclude Include="..\..\..\source\slang\slang-ast-val.h" />
+    <ClInclude Include="..\..\..\source\slang\slang-capability-defs.h" />
+    <ClInclude Include="..\..\..\source\slang\slang-capability.h" />
     <ClInclude Include="..\..\..\source\slang\slang-check-impl.h" />
     <ClInclude Include="..\..\..\source\slang\slang-check.h" />
     <ClInclude Include="..\..\..\source\slang\slang-compiler.h" />
@@ -315,6 +317,7 @@
     <ClCompile Include="..\..\..\source\slang\slang-ast-substitutions.cpp" />
     <ClCompile Include="..\..\..\source\slang\slang-ast-type.cpp" />
     <ClCompile Include="..\..\..\source\slang\slang-ast-val.cpp" />
+    <ClCompile Include="..\..\..\source\slang\slang-capability.cpp" />
     <ClCompile Include="..\..\..\source\slang\slang-check-conformance.cpp" />
     <ClCompile Include="..\..\..\source\slang\slang-check-constraint.cpp" />
     <ClCompile Include="..\..\..\source\slang\slang-check-conversion.cpp" />

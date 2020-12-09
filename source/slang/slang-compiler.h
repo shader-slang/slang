@@ -8,6 +8,7 @@
 
 #include "../../slang-com-ptr.h"
 
+#include "slang-capability.h"
 #include "slang-diagnostics.h"
 #include "slang-name.h"
 #include "slang-preprocessor.h"
@@ -1145,6 +1146,8 @@ namespace Slang
         SlangTargetFlags    targetFlags = 0;
         Slang::Profile      targetProfile = Slang::Profile();
         FloatingPointMode   floatingPointMode = FloatingPointMode::Default;
+        CapabilitySet       targetCaps = CapabilitySet::makeInvalid();
+
         bool isWholeProgramRequest()
         {
             return (targetFlags & SLANG_TARGET_FLAG_GENERATE_WHOLE_PROGRAM) != 0;
@@ -1154,6 +1157,7 @@ namespace Slang
         CodeGenTarget getTarget() { return target; }
         Profile getTargetProfile() { return targetProfile; }
         FloatingPointMode getFloatingPointMode() { return floatingPointMode; }
+        CapabilitySet getTargetCaps();
 
         Session* getSession();
         MatrixLayoutMode getDefaultMatrixLayoutMode();

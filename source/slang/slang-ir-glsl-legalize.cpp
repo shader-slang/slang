@@ -1431,7 +1431,7 @@ void legalizeEntryPointParameterForGLSL(
                     // HACK: we will identify the operation based
                     // on the target-intrinsic definition that was
                     // given to it.
-                    auto decoration = findTargetIntrinsicDecoration(callee, "glsl");
+                    auto decoration = as<IRTargetIntrinsicDecoration>(findBestTargetDecoration(callee, CapabilityAtom::GLSL));
                     if(!decoration)
                         continue;
 
