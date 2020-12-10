@@ -5,6 +5,7 @@
 
 //WORKING:#include "options.h"
 #include "../render.h"
+#include "../render-graphics-common.h"
 
 #include <stdio.h>
 #include <stdlib.h>
@@ -76,7 +77,7 @@ using namespace Slang;
 
 namespace gfx {
 
-class GLRenderer : public Renderer
+class GLRenderer : public GraphicsAPIRenderer
 {
 public:
 
@@ -1376,8 +1377,11 @@ Result GLRenderer::createProgram(const ShaderProgram::Desc& desc, ShaderProgram*
     return SLANG_OK;
 }
 
-Result GLRenderer::createGraphicsPipelineState(const GraphicsPipelineStateDesc& desc, PipelineState** outState)
+Result GLRenderer::createGraphicsPipelineState(const GraphicsPipelineStateDesc& inDesc, PipelineState** outState)
 {
+    GraphicsPipelineStateDesc desc = inDesc;
+    preparePipelineDesc(desc);
+
     auto programImpl        = (ShaderProgramImpl*)  desc.program;
     auto pipelineLayoutImpl = (PipelineLayoutImpl*) desc.pipelineLayout;
     auto inputLayoutImpl    = (InputLayoutImpl*)    desc.inputLayout;
@@ -1390,8 +1394,11 @@ Result GLRenderer::createGraphicsPipelineState(const GraphicsPipelineStateDesc& 
     return SLANG_OK;
 }
 
-Result GLRenderer::createComputePipelineState(const ComputePipelineStateDesc& desc, PipelineState** outState)
+Result GLRenderer::createComputePipelineState(const ComputePipelineStateDesc& inDesc, PipelineState** outState)
 {
+    ComputePipelineStateDesc desc = inDesc;
+    preparePipelineDesc(desc);
+
     auto programImpl        = (ShaderProgramImpl*)  desc.program;
     auto pipelineLayoutImpl = (PipelineLayoutImpl*) desc.pipelineLayout;
 

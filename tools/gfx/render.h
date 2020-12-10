@@ -634,6 +634,38 @@ public:
         void const* data) = 0;
 };
 
+struct ShaderOffset
+{
+    SlangInt uniformOffset = 0;
+    SlangInt bindingRangeIndex = 0;
+    SlangInt bindingArrayIndex = 0;
+};
+
+class ShaderObjectLayout : public Slang::RefObject
+{};
+
+class ShaderObject : public Slang::RefObject
+{
+public:
+    ShaderObject* getObject(ShaderOffset const& offset)
+    {
+        ShaderObject* object = nullptr;
+        SLANG_RETURN_NULL_ON_FAIL(getObject(offset, &object));
+        return object;
+    }
+
+    virtual slang::TypeLayoutReflection* getElementTypeLayout() = 0;
+    virtual Slang::Index getEntryPointCount() = 0;
+    virtual ShaderObject* getEntryPoint(Slang::Index index) = 0;
+    virtual SlangResult setData(ShaderOffset const& offset, void const* data, size_t size) = 0;
+    virtual SlangResult getObject(ShaderOffset const& offset, ShaderObject** object) = 0;
+    virtual SlangResult setObject(ShaderOffset const& offset, ShaderObject* object) = 0;
+    virtual SlangResult setResource(ShaderOffset const& offset, ResourceView* resourceView) = 0;
+    virtual SlangResult setSampler(ShaderOffset const& offset, SamplerState* sampler) = 0;
+    virtual SlangResult setCombinedTextureSampler(
+        ShaderOffset const& offset, ResourceView* textureView, SamplerState* sampler) = 0;
+};
+
 enum class StencilOp : uint8_t
 {
     Keep,
@@ -779,11 +811,14 @@ struct BlendDesc
 struct GraphicsPipelineStateDesc
 {
     ShaderProgram*      program;
-    PipelineLayout*     pipelineLayout;
+    // Application should set either pipelineLayout or rootShaderObjectLayout, but not both.
+    PipelineLayout* pipelineLayout = nullptr;
+    // Application should set either pipelineLayout or rootShaderObjectLayout, but not both.
+    ShaderObjectLayout* rootShaderObjectLayout = nullptr;
     InputLayout*        inputLayout;
     UInt                framebufferWidth;
     UInt                framebufferHeight;
-    UInt                renderTargetCount;
+    UInt                renderTargetCount = 0; // Not used if rootShaderObjectLayout is set.
     DepthStencilDesc    depthStencil;
     RasterizerDesc      rasterizer;
     BlendDesc           blend;
@@ -792,7 +827,8 @@ struct GraphicsPipelineStateDesc
 struct ComputePipelineStateDesc
 {
     ShaderProgram*  program;
-    PipelineLayout* pipelineLayout;
+    PipelineLayout* pipelineLayout = nullptr;
+    ShaderObjectLayout* rootShaderObjectLayout = nullptr;
 };
 
 class PipelineState : public Slang::RefObject
@@ -909,6 +945,45 @@ public:
         SLANG_RETURN_NULL_ON_FAIL(createDescriptorSetLayout(desc, layout.writeRef()));
         return layout;
     }
+
+    virtual Result createShaderObjectLayout(
+        slang::TypeLayoutReflection* typeLayout, ShaderObjectLayout** outLayout) = 0;
+
+    inline RefPtr<ShaderObjectLayout> createShaderObjectLayout(slang::TypeLayoutReflection* typeLayout)
+    {
+        RefPtr<ShaderObjectLayout> layout;
+        SLANG_RETURN_NULL_ON_FAIL(createShaderObjectLayout(typeLayout, layout.writeRef()));
+        return layout;
+    }
+
+    virtual Result createRootShaderObjectLayout(slang::ProgramLayout* layout, ShaderObjectLayout** outLayout) = 0;
+
+    inline RefPtr<ShaderObjectLayout> createRootShaderObjectLayout(slang::ProgramLayout* layout)
+    {
+        RefPtr<ShaderObjectLayout> result;
+        SLANG_RETURN_NULL_ON_FAIL(createRootShaderObjectLayout(layout, result.writeRef()));
+        return result;
+    }
+
+    virtual Result createShaderObject(ShaderObjectLayout* layout, ShaderObject** outObject) = 0;
+
+    inline RefPtr<ShaderObject> createShaderObject(ShaderObjectLayout* layout)
+    {
+        RefPtr<ShaderObject> object;
+        SLANG_RETURN_NULL_ON_FAIL(createShaderObject(layout, object.writeRef()));
+        return object;
+    }
+
+    virtual Result createRootShaderObject(ShaderObjectLayout* layout, ShaderObject** outObject) = 0;
+
+    inline RefPtr<ShaderObject> createRootShaderObject(ShaderObjectLayout* layout)
+    {
+        RefPtr<ShaderObject> object;
+        SLANG_RETURN_NULL_ON_FAIL(createRootShaderObject(layout, object.writeRef()));
+        return object;
+    }
+
+    virtual Result bindRootShaderObject(PipelineType pipelineType, ShaderObject* object) = 0;
 
     virtual Result createPipelineLayout(const PipelineLayout::Desc& desc, PipelineLayout** outLayout) = 0;
 

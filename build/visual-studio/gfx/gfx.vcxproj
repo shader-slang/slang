@@ -183,7 +183,9 @@
     <ClInclude Include="..\..\..\tools\gfx\nvapi\nvapi-include.h" />
     <ClInclude Include="..\..\..\tools\gfx\nvapi\nvapi-util.h" />
     <ClInclude Include="..\..\..\tools\gfx\open-gl\render-gl.h" />
+    <ClInclude Include="..\..\..\tools\gfx\render-graphics-common.h" />
     <ClInclude Include="..\..\..\tools\gfx\render.h" />
+    <ClInclude Include="..\..\..\tools\gfx\shader-cursor.h" />
     <ClInclude Include="..\..\..\tools\gfx\surface.h" />
     <ClInclude Include="..\..\..\tools\gfx\vector-math.h" />
     <ClInclude Include="..\..\..\tools\gfx\vulkan\render-vk.h" />
@@ -206,7 +208,9 @@
     <ClCompile Include="..\..\..\tools\gfx\model.cpp" />
     <ClCompile Include="..\..\..\tools\gfx\nvapi\nvapi-util.cpp" />
     <ClCompile Include="..\..\..\tools\gfx\open-gl\render-gl.cpp" />
+    <ClCompile Include="..\..\..\tools\gfx\render-graphics-common.cpp" />
     <ClCompile Include="..\..\..\tools\gfx\render.cpp" />
+    <ClCompile Include="..\..\..\tools\gfx\shader-cursor.cpp" />
     <ClCompile Include="..\..\..\tools\gfx\surface.cpp" />
     <ClCompile Include="..\..\..\tools\gfx\vulkan\render-vk.cpp" />
     <ClCompile Include="..\..\..\tools\gfx\vulkan\vk-api.cpp" />
