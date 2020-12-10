@@ -1009,6 +1009,16 @@ bool isBetterForTarget(
     CapabilitySet newCaps = _getBestSpecializationCaps(newVal, targetCaps);
     CapabilitySet oldCaps = _getBestSpecializationCaps(oldVal, targetCaps);
 
+    // If either value returned an invalid capability set, it implies
+    // that it cannot be used on this target at all, and the other
+    // value should be considered better by default.
+    //
+    // Note: if both of the candidate values we have are incompatible
+    // with our target, then it doesn't matter which we favor.
+    //
+    if(newCaps.isInvalid()) return false;
+    if(oldCaps.isInvalid()) return true;
+
     if(newCaps != oldCaps)
         return newCaps.implies(oldCaps);
 
