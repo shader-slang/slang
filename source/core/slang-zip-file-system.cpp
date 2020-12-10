@@ -49,7 +49,7 @@ public:
     virtual SLANG_NO_THROW SlangResult SLANG_MCALL createDirectory(const char* path) SLANG_OVERRIDE;
 
     // CompressedFileSystem
-    virtual ArrayView<uint8_t> getArchive() SLANG_OVERRIDE;
+    virtual ConstArrayView<uint8_t> getArchive() SLANG_OVERRIDE;
     virtual void setCompressionType(CompressionType type) SLANG_OVERRIDE;
 
     ZipFileSystem();
@@ -834,7 +834,7 @@ SlangResult ZipFileSystem::createDirectory(const char* path)
     return SLANG_OK;
 }
 
-ArrayView<uint8_t> ZipFileSystem::getArchive()
+ConstArrayView<uint8_t> ZipFileSystem::getArchive()
 {
     // If we have anything deleted in 'Read', we need to convert to 'Write' and then back to read
     if (m_mode == Mode::Read && !m_removedSet.isEmpty())

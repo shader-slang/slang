@@ -17,7 +17,7 @@ static bool _equals(const char (&text)[SIZE], ISlangBlob* blob)
     return _equals(text, SIZE, blob);
 }
 
-static List<String> _getContents(ISlangFileSystemExt* fileSystem, char* path)
+static List<String> _getContents(ISlangFileSystemExt* fileSystem, const char* path)
 {
     List<String> objs;
 

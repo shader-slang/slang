@@ -53,6 +53,46 @@ static const char s_hex[] = "0123456789abcdef";
     return dump(data.getBuffer(), data.getCount(), maxBytesPerLine, writer);
 }
 
+SlangResult HexDumpUtil::dumpSourceBytes(const uint8_t* data, size_t dataCount, int maxBytesPerLine, ISlangWriter* writer)
+{
+    const uint8_t* cur = data;
+    const uint8_t* end = data + dataCount;
+
+    while (cur < end)
+    {
+        size_t count = size_t(end - cur);
+        count = (count > size_t(maxBytesPerLine)) ? size_t(maxBytesPerLine) : count;
+
+        // each byte is output as "0xAA, "
+        // Ends with '\n"
+        const size_t lineBytes = count * (4 + 1 + 1) * count + 1;
+
+        char* startDst = writer->beginAppendBuffer(lineBytes);
+        char* dst = startDst;
+
+        for (size_t i = 0; i < count; ++i)
+        {
+            uint8_t byte = cur[i];
+            dst[0] = '0';
+            dst[1] = 'x';
+            dst[2] = s_hex[byte >> 4];
+            dst[3] = s_hex[byte & 0xf];
+            dst[4] = ',';
+            dst[5] = ' ';
+
+            dst += 6;
+        }
+
+        *dst++ = '\n';
+
+        SLANG_RETURN_ON_FAIL(writer->endAppendBuffer(startDst, size_t(dst - startDst)));
+
+        cur += count;
+    }
+
+    return SLANG_OK;
+}
+
 /* static */SlangResult HexDumpUtil::dump(const uint8_t* data, size_t dataCount, int maxBytesPerLine, ISlangWriter* writer)
 {
     int maxCharsPerLine = 2 * maxBytesPerLine + 1 + maxBytesPerLine + 1;
