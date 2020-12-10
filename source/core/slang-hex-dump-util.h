@@ -12,6 +12,10 @@ namespace Slang
 
 struct HexDumpUtil
 {
+        /// Dump out bytes in source format - as in 
+        /// 0x10, 0xab, 
+    static SlangResult dumpSourceBytes(const uint8_t* data, size_t dataCount, int maxBytesPerLine, ISlangWriter* writer);
+
         /// Dump data to writer, with lines starting with hex data
     static SlangResult dump(const List<uint8_t>& data, int numBytesPerLine, ISlangWriter* writer);
 

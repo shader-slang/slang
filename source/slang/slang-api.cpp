@@ -4,8 +4,6 @@
 
 #include "slang-repro.h"
 
-#include "../../slang-tag-version.h"
-
 // implementation of C interface
 
 SLANG_API SlangSession* spCreateSession(const char*)
@@ -25,7 +23,18 @@ SLANG_API SlangResult slang_createGlobalSession(
 {
     Slang::ComPtr<slang::IGlobalSession> globalSession;
     SLANG_RETURN_ON_FAIL(slang_createGlobalSessionWithoutStdLib(apiVersion, globalSession.writeRef()));
-    SLANG_RETURN_ON_FAIL(globalSession->compileStdLib());
+
+    // If we have the embedded stdlib, load from that, else compile it
+    ISlangBlob* stdLibBlob = slang_getEmbeddedStdLib();
+    if (stdLibBlob)
+    {
+        SLANG_RETURN_ON_FAIL(globalSession->loadStdLib(stdLibBlob->getBufferPointer(), stdLibBlob->getBufferSize()));
+    }
+    else
+    {
+        SLANG_RETURN_ON_FAIL(globalSession->compileStdLib());
+    }
+
     *outGlobalSession = globalSession.detach();
     return SLANG_OK;
 }
@@ -64,7 +73,7 @@ SLANG_API void spDestroySession(
 
 SLANG_API const char* spGetBuildTagString()
 {
-    return SLANG_TAG_VERSION;
+    return Slang::getBuildTagString();
 }
 
 SLANG_API void spAddBuiltins(

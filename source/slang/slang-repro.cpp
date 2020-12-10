@@ -881,13 +881,13 @@ struct LoadContext
     // Try to set state through API - as doing so means if state stored in multiple places it will be ok
 
     {
-        spSetCompileFlags(externalRequest, (SlangCompileFlags)requestState->compileFlags);
-        spSetDumpIntermediates(externalRequest, int(requestState->shouldDumpIntermediates));
-        spSetLineDirectiveMode(externalRequest, SlangLineDirectiveMode(requestState->lineDirectiveMode));
-        spSetDebugInfoLevel(externalRequest, SlangDebugInfoLevel(requestState->debugInfoLevel));
-        spSetOptimizationLevel(externalRequest, SlangOptimizationLevel(requestState->optimizationLevel));
-        spSetOutputContainerFormat(externalRequest, SlangContainerFormat(requestState->containerFormat));
-        spSetPassThrough(externalRequest, SlangPassThrough(request->m_passThrough));
+        externalRequest->setCompileFlags((SlangCompileFlags)requestState->compileFlags);
+        externalRequest->setDumpIntermediates(int(requestState->shouldDumpIntermediates));
+        externalRequest->setLineDirectiveMode(SlangLineDirectiveMode(requestState->lineDirectiveMode));
+        externalRequest->setDebugInfoLevel(SlangDebugInfoLevel(requestState->debugInfoLevel));
+        externalRequest->setOptimizationLevel(SlangOptimizationLevel(requestState->optimizationLevel));
+        externalRequest->setOutputContainerFormat(SlangContainerFormat(requestState->containerFormat));
+        externalRequest->setPassThrough(SlangPassThrough(request->m_passThrough));
 
         request->getBackEndReq()->useUnknownImageFormatAsDefault = requestState->useUnknownImageFormatAsDefault;
         linkage->m_obfuscateCode = requestState->obfuscateCode;
@@ -900,7 +900,7 @@ struct LoadContext
         for (Index i = 0; i < requestState->targetRequests.getCount(); ++i)
         {
             TargetRequestState& src = base.asRaw(requestState->targetRequests[i]);
-            int index = spAddCodeGenTarget(externalRequest, SlangCompileTarget(src.target));
+            int index = externalRequest->addCodeGenTarget(SlangCompileTarget(src.target));
             SLANG_ASSERT(index == i);
 
             auto dstTarget = linkage->targets[index];
@@ -1005,7 +1005,7 @@ struct LoadContext
 
             List<const char*> args = context.toList(srcEntryPoint.specializationArgStrings);
 
-            spAddEntryPointEx(externalRequest, int(srcEntryPoint.translationUnitIndex), name, SlangStage(stage), int(args.getCount()), args.getBuffer());
+            externalRequest->addEntryPointEx(int(srcEntryPoint.translationUnitIndex), name, SlangStage(stage), int(args.getCount()), args.getBuffer());
         }
     }
 
@@ -1372,10 +1372,9 @@ static SlangResult _calcCommandLine(OffsetBase& base, ReproUtil::RequestState* r
             //cmd.addArg("-profile");
             //cmd.addArg(Profile(srcEntryPoint.profile).getName());
 
-
             //List<const char*> args = context.toList(srcEntryPoint.specializationArgStrings);
 
-            //spAddEntryPointEx(externalRequest, int(srcEntryPoint.translationUnitIndex), name, SlangStage(stage), int(args.getCount()), args.getBuffer());
+            //externalRequest->addEntryPointEx(int(srcEntryPoint.translationUnitIndex), name, SlangStage(stage), int(args.getCount()), args.getBuffer());
         }
     }
 

@@ -77,6 +77,9 @@ public:
     virtual bool canWrite() SLANG_OVERRIDE { return (int(m_access) & int(FileAccess::Write)) != 0; }
     virtual void close() SLANG_OVERRIDE { m_access = FileAccess::None; }
 
+        /// Get the contents
+    ConstArrayView<uint8_t> getContents() const { return ConstArrayView<uint8_t>(m_contents, m_contentsSize); }
+
     MemoryStreamBase(FileAccess access = FileAccess::Read, const void* contents = nullptr, size_t contentsSize = 0):
         m_access(access)
     {

@@ -704,6 +704,9 @@
     <ClCompile Include="..\..\..\source\slang\slang-source-loc.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
+    <ClCompile Include="..\..\..\source\slang\slang-stdlib-api.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
     <ClCompile Include="..\..\..\source\slang\slang-stdlib.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>

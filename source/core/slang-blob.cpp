@@ -11,4 +11,14 @@ ISlangUnknown* BlobBase::getInterface(const Guid& guid)
     return (guid == IID_ISlangUnknown || guid == IID_ISlangBlob) ? static_cast<ISlangBlob*>(this) : nullptr;
 }
 
+SlangResult StaticBlob::queryInterface(SlangUUID const& guid, void** outObject) 
+{
+    if (guid == IID_ISlangUnknown || guid == IID_ISlangBlob)
+    {
+        *outObject = static_cast<ISlangBlob*>(this);
+        return SLANG_OK;
+    }
+    return SLANG_E_NO_INTERFACE;
+}
+ 
 } // namespace Slang

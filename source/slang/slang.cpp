@@ -4,6 +4,8 @@
 #include "../core/slang-string-util.h"
 #include "../core/slang-shared-library.h"
 
+#include "../core/slang-zip-file-system.h"
+
 #include "slang-check.h"
 #include "slang-parameter-binding.h"
 #include "slang-lower-to-ir.h"
@@ -30,6 +32,8 @@
 #include "slang-serialize-container.h"
 
 #include "slang-check-impl.h"
+
+#include "../../slang-tag-version.h"
 
 // Used to print exception type names in internal-compiler-error messages
 #include <typeinfo>
@@ -116,6 +120,11 @@ static const Guid IID_ICompileRequest   = SLANG_UUID_ICompileRequest;
 
 // Available to other modules so not static
 const Guid IID_EndToEndCompileRequest   = SLANG_UUID_EndToEndCompileRequest;
+
+const char* getBuildTagString()
+{
+    return SLANG_TAG_VERSION;
+}
 
 void Session::init()
 {
@@ -248,7 +257,7 @@ SlangResult Session::compileStdLib()
     return SLANG_OK;
 }
 
-SlangResult Session::loadStdLib()
+SlangResult Session::loadStdLib(const void* stdLib, size_t stdLibSizeInBytes)
 {
     if (m_builtinLinkage->mapNameToLoadedModules.Count())
     {
@@ -256,19 +265,27 @@ SlangResult Session::loadStdLib()
         return SLANG_FAIL;
     }
 
+    // Make a file system to read it from
+    RefPtr<CompressedFileSystem> fileSystem;
+    SLANG_RETURN_ON_FAIL(CompressedFileSystem::createZip(stdLib, stdLibSizeInBytes, fileSystem));
+
     // Let's try loading serialized modules and adding them
-    SLANG_RETURN_ON_FAIL(_readBuiltinModule(coreLanguageScope, "core"));
-    SLANG_RETURN_ON_FAIL(_readBuiltinModule(hlslLanguageScope, "hlsl"));
+    SLANG_RETURN_ON_FAIL(_readBuiltinModule(fileSystem, coreLanguageScope, "core"));
+    SLANG_RETURN_ON_FAIL(_readBuiltinModule(fileSystem, hlslLanguageScope, "hlsl"));
     return SLANG_OK;
 }
 
-SlangResult Session::saveStdLib()
+SlangResult Session::saveStdLib(ISlangBlob** outBlob)
 {
     if (m_builtinLinkage->mapNameToLoadedModules.Count() == 0)
     {
         // There is no standard lib loaded
         return SLANG_FAIL;
     }
+
+    // Make a file system to read it from
+    RefPtr<CompressedFileSystem> fileSystem;
+    SLANG_RETURN_ON_FAIL(CompressedFileSystem::createZip(fileSystem));
 
     for (auto& pair : m_builtinLinkage->mapNameToLoadedModules)
     {
@@ -287,30 +304,44 @@ SlangResult Session::saveStdLib()
         StringBuilder builder;
         builder << moduleName->text << ".slang-module";
 
-        FileStream stream(builder.ProduceString(), FileMode::Create, FileAccess::Write, FileShare::ReadWrite);
+        OwnedMemoryStream stream(FileAccess::Write);
+
         SLANG_RETURN_ON_FAIL(SerialContainerUtil::write(module, options, &stream));
+
+        auto contents = stream.getContents();
+
+        // Write into the file system
+        SLANG_RETURN_ON_FAIL(fileSystem->saveFile(builder.getBuffer(), contents.getBuffer(), contents.getCount()));
     }
+
+    // Now need to convert into a blob
+    auto archiveContents = fileSystem->getArchive();
+
+    ComPtr<ISlangBlob> blob(new RawBlob(archiveContents.getBuffer(), archiveContents.getCount()));
+    *outBlob = blob.detach();
 
     return SLANG_OK;
 }
 
-SlangResult Session::_readBuiltinModule(Scope* scope, String moduleName)
+SlangResult Session::_readBuiltinModule(ISlangFileSystem* fileSystem, Scope* scope, String moduleName)
 {
+    // Get the name of the module
     StringBuilder moduleFilename;
     moduleFilename << moduleName << ".slang-module";
 
     RiffContainer riffContainer;
-    try
     {
-        FileStream stream(moduleFilename.ProduceString(), FileMode::Open, FileAccess::Read, FileShare::ReadOnly);
+        // Load it
+        ComPtr<ISlangBlob> blob;
+        SLANG_RETURN_ON_FAIL(fileSystem->loadFile(moduleFilename.getBuffer(), blob.writeRef()));
+
+        // Set up a stream
+        MemoryStreamBase stream(FileAccess::Read, blob->getBufferPointer(), blob->getBufferSize());
+
         // Load the riff container
         SLANG_RETURN_ON_FAIL(RiffUtil::read(&stream, riffContainer));
     }
-    catch (const IOException&)
-    {
-        return SLANG_FAIL;
-    }
-
+    
     // Load up the module
     
     SerialContainerData containerData;
@@ -339,6 +370,8 @@ SlangResult Session::_readBuiltinModule(Scope* scope, String moduleName)
         RefPtr<Module> module(new Module(linkage, srcModule.astBuilder));
 
         ModuleDecl* moduleDecl = as<ModuleDecl>(srcModule.astRootNode);
+        // Set the module back reference on the decl
+        moduleDecl->module = module;
 
         if (moduleDecl)
         {
@@ -510,7 +543,7 @@ SLANG_NO_THROW void SLANG_MCALL Session::getLanguagePrelude(
 
 SLANG_NO_THROW const char* SLANG_MCALL Session::getBuildTagString()
 {
-    return spGetBuildTagString();
+    return ::Slang::getBuildTagString();
 }
 
 SLANG_NO_THROW SlangResult SLANG_MCALL Session::setDefaultDownstreamCompiler(SlangSourceLanguage sourceLanguage, SlangPassThrough defaultCompiler)
