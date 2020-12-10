@@ -959,12 +959,15 @@ if enableEmbedStdLib then
         kind "ConsoleApp"
         links { "core", "miniz" }
         
-        -- We need to run all the generators first such that we can embed
-        
+        -- We need to run all the generators to be able to build the main 
+        -- slang source in source/slang
+      
         dependson { "run-generators" }
         
         defines {
+            -- We are going statically link Slang compiler with the slangc command line
             "SLANG_STATIC",
+            -- This is the bootstrap to produce the embedded stdlib, so we disable to be able to bootstrap
             "SLANG_WITHOUT_EMBEDDED_STD_LIB"
         }
         
