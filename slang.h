@@ -195,7 +195,13 @@ convention for interface methods.
 #if defined(_MSC_VER)
 #   define SLANG_DLL_EXPORT __declspec(dllexport)
 #else
-#   define SLANG_DLL_EXPORT __attribute__((__visibility__("default")))
+#   if 0 && __GNUC__ >= 4
+// Didn't work on latest gcc on linux.. so disable for now
+// https://gcc.gnu.org/wiki/Visibility
+#       define SLANG_DLL_EXPORT __attribute__ ((dllexport))
+#   else
+#       define SLANG_DLL_EXPORT __attribute__((__visibility__("default")))
+#   endif
 #endif
 
 #if defined(SLANG_DYNAMIC)
@@ -3092,14 +3098,19 @@ namespace slang
             */
         virtual SLANG_NO_THROW SlangResult SLANG_MCALL compileStdLib() = 0;
 
-            /** Load the StdLib. Currently loads modules from the file system
-            NOTE! API is experimental and not ready for production code 
+            /** Load the StdLib. Currently loads modules from the file system. 
+            @param stdLib Start address of the serialized stdlib
+            @param stdLibSizeInBytes The size in bytes of the serialized stdlib
+
+            NOTE! API is experimental and not ready for production code
             */
-        virtual SLANG_NO_THROW SlangResult SLANG_MCALL loadStdLib() = 0;
+        virtual SLANG_NO_THROW SlangResult SLANG_MCALL loadStdLib(const void* stdLib, size_t stdLibSizeInBytes) = 0;
 
             /** Save the StdLib modules to the file system
+            @param outBlob The serialized blob containing the standard library
+
             NOTE! API is experimental and not ready for production code  */
-        virtual SLANG_NO_THROW SlangResult SLANG_MCALL saveStdLib() = 0;
+        virtual SLANG_NO_THROW SlangResult SLANG_MCALL saveStdLib(ISlangBlob** outBlob) = 0;
     };
 
     #define SLANG_UUID_IGlobalSession { 0xc140b5fd, 0xc78, 0x452e, { 0xba, 0x7c, 0x1a, 0x1e, 0x70, 0xc7, 0xf7, 0x1c } };
@@ -4049,6 +4060,11 @@ NOTE! API is experimental and not ready for production code
 SLANG_EXTERN_C SLANG_API SlangResult slang_createGlobalSessionWithoutStdLib(
     SlangInt                apiVersion,
     slang::IGlobalSession** outGlobalSession);
+
+/* Returns a blob that contains the serialized stdlib.
+Returns nullptr if there isn't an embedded stdlib.
+*/
+SLANG_API ISlangBlob* slang_getEmbeddedStdLib();
 
 namespace slang
 {

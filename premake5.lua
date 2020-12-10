@@ -127,6 +127,14 @@ newoption {
    allowed     = { { "true", "True"}, { "false", "False" } }
 }
 
+newoption {
+   trigger     = "enable-embed-stdlib",
+   description = "(Optional) If true build slang with an embedded version of the stdlib",
+   value       = "bool",
+   default     = "false",
+   allowed     = { { "true", "True"}, { "false", "False" } }
+}
+
 buildLocation = _OPTIONS["build-location"]
 executeBinary = (_OPTIONS["execute-binary"] == "true")
 targetDetail = _OPTIONS["target-detail"]
@@ -136,6 +144,7 @@ enableProfile = (_OPTIONS["enable-profile"] == "true")
 optixPath = _OPTIONS["optix-sdk-path"]
 enableOptix = not not (_OPTIONS["enable-optix"] == "true" or optixPath)
 enableProfile = (_OPTIONS["enable-profile"] == "true")
+enableEmbedStdLib = (_OPTIONS["enable-embed-stdlib"] == "true")
 
 -- This is the path where nvapi is expected to be found
 
@@ -308,12 +317,7 @@ function addSourceDir(path)
     removefiles
     {
         "**/*.meta.slang.h",
-        "**/slang-generated-*",
-        "**/slang-ast-generated*",
-        "**/slang-ref-object-generated*",
-        "**/*generated.h",
-        "**/*generated-macro.h"
-
+        "**/slang-*generated*.h"
     }
 end
 
@@ -499,6 +503,9 @@ function example(name)
     -- They have their source code under `examples/<project-name>/`
     baseSlangProject(name, "examples/" .. name)
 
+    -- Set up working directory to be the source directory
+    debugdir("examples/" .. name)
+
     -- By default, all of our examples are GUI applications. One some
     -- platforms there is no meaningful distinction between GUI and
     -- command-line applications, but it is significant on Windows and MacOS
@@ -585,6 +592,8 @@ example "cpu-hello-world"
 standardProject("core", "source/core")
     uuid "F9BE7957-8399-899E-0C49-E714FDDD4B65"
     kind "StaticLib"
+    -- We need the core library to be relocatable to be able to link with slang.so
+    pic "On"
 
     -- For our core implementation, we want to use the most
     -- aggressive warning level supported by the target, and
@@ -600,10 +609,6 @@ standardProject("core", "source/core")
         addSourceDir "source/core/unix"
     end
     
-    -- We need the core library to be relocatable to be able to link with slang.so
-    filter { "system:linux" }
-        buildoptions{"-fPIC"}
-
 --
 -- The cpp extractor is a tool that scans C++ header files to extract
 -- reflection like information, and generate files to handle 
@@ -654,6 +659,11 @@ tool "slang-test"
     uuid "0C768A18-1D25-4000-9F37-DA5FE99E3B64"
     includedirs { "." }
     links { "core", "slang", "miniz" }
+    
+    -- We want to set to the root of the project, but that doesn't seem to work with '.'. 
+    -- So set a path that resolves to the same place.
+    
+    debugdir("source/..")
 
 --
 -- The reflection test harness `slang-reflection-test` is pretty
@@ -734,6 +744,7 @@ tool "gfx"
     -- Unlike most of the code under `tools/`, this is a library
     -- rather than a stand-alone executable.
     kind "StaticLib"
+    pic "On"
     
     includedirs { ".", "external", "source", "external/imgui" }
 
@@ -789,9 +800,6 @@ tool "gfx"
             
     end
     
-    filter { "system:linux" }
-        -- might be able to do pic(true)
-        buildoptions{"-fPIC"}
     
 --
 -- The `slangc` command-line application is just a very thin wrapper
@@ -944,8 +952,92 @@ generatorProject("run-generators", nil)
         buildoutputs { "%{file.abspath}.cpp" }
         buildinputs { "%{cfg.targetdir}/slang-embed" .. executableSuffix }
     end
-    
-    
+ 
+if enableEmbedStdLib then
+    standardProject("slangc-bootstrap", "source/slangc")
+        uuid "6339BF31-AC99-4819-B719-679B63451EF0"
+        kind "ConsoleApp"
+        links { "core", "miniz" }
+        
+        -- We need to run all the generators to be able to build the main 
+        -- slang source in source/slang
+      
+        dependson { "run-generators" }
+        
+        defines {
+            -- We are going statically link Slang compiler with the slangc command line
+            "SLANG_STATIC",
+            -- This is the bootstrap to produce the embedded stdlib, so we disable to be able to bootstrap
+            "SLANG_WITHOUT_EMBEDDED_STD_LIB"
+        }
+        
+        includedirs { "external/spirv-headers/include" }
+
+        -- Add all of the slang source
+        addSourceDir "source/slang"
+
+        -- On some tests with MSBuild disabling these made build work.
+        -- flags { "NoIncrementalLink", "NoPCH", "NoMinimalRebuild" }
+
+        -- The `standardProject` operation already added all the code in
+        -- `source/slang/*`, but we also want to incldue the umbrella
+        -- `slang.h` header in this prject, so we do that manually here.
+        files { "slang.h" }
+
+        files { "source/core/core.natvis" }
+     
+        -- We explicitly name the prelude file(s) that we need to
+        -- compile for their embedded code, since they will not
+        -- exist at the time projects/makefiles are generated,
+        -- and thus a glob would not match anything.
+        files {
+            "prelude/slang-cuda-prelude.h.cpp",
+            "prelude/slang-hlsl-prelude.h.cpp",
+            "prelude/slang-cpp-prelude.h.cpp"
+        }
+end        
+        
+if enableEmbedStdLib then
+    generatorProject("embed-stdlib-generator", nil)
+        
+        -- We include these, even though they are not really part of the dummy 
+        -- build, so that the filters below can pick up the appropriate locations.    
+     
+        files
+        {
+            --
+            -- To build we need to have some source! It has to be a source file that 
+            -- does not depend on anything that is generated, so we take something
+            -- from core that will compile without any generation. 
+            --
+              
+            "source/slang/slang-stdlib-api.cpp",
+        }
+        
+        -- Only produce the embedded stdlib if that option is enabled
+        
+        local executableSuffix = getExecutableSuffix()
+        
+        -- We need slangc-bootstrap to build the embedded stdlib
+        dependson { "slangc-bootstrap" }
+        
+        local absDirectory = path.getabsolute("source/slang")   
+        local absOutputPath = absDirectory .. "/slang-stdlib-generated.h"
+        
+        -- I don't know why I need a filter, but without it nothing works (!)   
+        filter "files:source/slang/slang-stdlib-api.cpp"
+            
+            -- Note! Has to be an absolute path else doesn't work(!)
+            buildoutputs { absOutputPath }
+          
+            buildinputs { "%{cfg.targetdir}/slangc-bootstrap" .. executableSuffix }
+                
+            local buildcmd = '"%{cfg.targetdir}/slangc-bootstrap" -save-stdlib-bin-source %{file.directory}/slang-stdlib-generated.h'
+            
+            buildcommands { buildcmd }
+end
+ 
+ 
 --
 -- TODO: Slang's current `Makefile` build does some careful incantations
 -- to make sure that the binaries it generates use a "relative `RPATH`"
@@ -965,16 +1057,25 @@ generatorProject("run-generators", nil)
 standardProject("slang", "source/slang")
     uuid "DB00DA62-0533-4AFD-B59F-A67D5B3A0808"
     kind "SharedLib"
-    links { "core" }
+    links { "core", "miniz"}
     warnings "Extra"
     flags { "FatalWarnings" }
+    pic "On"
 
     -- The way that we currently configure things through `slang.h`,
     -- we need to set a preprocessor definitions to ensure that
     -- we declare the Slang API functions for *export* and not *import*.
     --
     defines { "SLANG_DYNAMIC_EXPORT" }
-
+    
+    if enableEmbedStdLib then
+        -- We only have this dependency if we are embedding stdlib
+        dependson { "embed-stdlib-generator" }
+    else
+        -- Disable StdLib embedding
+        defines { "SLANG_WITHOUT_EMBEDDED_STD_LIB" }
+    end
+    
     includedirs { "external/spirv-headers/include" }
 
     -- On some tests with MSBuild disabling these made build work.
@@ -1018,10 +1119,6 @@ standardProject("slang", "source/slang")
                 "{COPY} ../../../external/slang-binaries/bin/" .. targetName .. "/libslang-glslang.so %{cfg.targetdir}"
             }
     end
-
-    filter { "system:linux" }
-        -- might be able to do pic(true)
-        buildoptions{"-fPIC"}
        
     
 if enableProfile then
@@ -1035,8 +1132,11 @@ if enableProfile then
 
         includedirs { "external/spirv-headers/include" }
 
-        defines { "SLANG_STATIC" }
-
+        defines { "SLANG_STATIC", 
+            -- Disable StdLib embedding
+            "SLANG_WITHOUT_EMBEDDED_STD_LIB"    
+        }
+        
         -- The `standardProject` operation already added all the code in
         -- `source/slang/*`, but we also want to incldue the umbrella
         -- `slang.h` header in this prject, so we do that manually here.
@@ -1058,7 +1158,7 @@ if enableProfile then
         addSourceDir "source/slang"
 
         includedirs { "." }
-        links { "core"}
+        links { "core", "miniz"}
         
         filter { "system:linux" }
             linkoptions{  "-pg" }
@@ -1069,6 +1169,7 @@ end
 standardProject("miniz", nil)
     uuid "E76ACB11-4A12-4F0A-BE1E-CE0B8836EB7F"
     kind "StaticLib"
+    pic "On"
 
     -- Add the files explicitly
     files
@@ -1081,14 +1182,15 @@ standardProject("miniz", nil)
     
     filter { "system:linux or macosx" }
         links { "dl"}
-        buildoptions{"-fPIC"}
-
+        
 
 if buildGlslang then
 
 standardProject("slang-spirv-tools", nil)
     uuid "C36F6185-49B3-467E-8388-D0E9BF5F7BB8"
     kind "StaticLib"
+    pic "On"
+    
     includedirs { "external/spirv-tools", "external/spirv-tools/include", "external/spirv-headers/include",  "external/spirv-tools-generated"}
 
     addSourceDir("external/spirv-tools/source")
@@ -1098,8 +1200,6 @@ standardProject("slang-spirv-tools", nil)
 
     filter { "system:linux or macosx" }
         links { "dl"}
-        buildoptions{"-fPIC"}
-
 --
 -- The single most complicated part of our build is our custom version of glslang.
 -- Is not really set up to produce a shared library with a usable API, so we have
@@ -1115,6 +1215,8 @@ standardProject("slang-spirv-tools", nil)
 standardProject("slang-glslang", nil)
     uuid "C495878A-832C-485B-B347-0998A90CC936"
     kind "SharedLib"
+    pic "On"
+        
     includedirs { "external/glslang", "external/spirv-tools", "external/spirv-tools/include", "external/spirv-headers/include",  "external/spirv-tools-generated", "external/glslang-generated" }
 
     defines
@@ -1159,7 +1261,6 @@ standardProject("slang-glslang", nil)
 
     filter { "system:linux or macosx" }
         links { "dl" }
-        buildoptions{"-fPIC"}
         
     
         

@@ -3,6 +3,7 @@
 
 //WORKING:#include "options.h"
 #include "../render.h"
+#include "../render-graphics-common.h"
 
 #include "../../source/core/slang-smart-pointer.h"
 
@@ -29,7 +30,7 @@
 namespace gfx {
 using namespace Slang;
 
-class VKRenderer : public Renderer
+class VKRenderer : public GraphicsAPIRenderer
 {
 public:
     enum
@@ -2721,8 +2722,11 @@ Result VKRenderer::createProgram(const ShaderProgram::Desc& desc, ShaderProgram*
     return SLANG_OK;
 }
 
-Result VKRenderer::createGraphicsPipelineState(const GraphicsPipelineStateDesc& desc, PipelineState** outState)
+Result VKRenderer::createGraphicsPipelineState(const GraphicsPipelineStateDesc& inDesc, PipelineState** outState)
 {
+    GraphicsPipelineStateDesc desc = inDesc;
+    preparePipelineDesc(desc);
+
     VkPipelineCache pipelineCache = VK_NULL_HANDLE;
 
     auto programImpl = (ShaderProgramImpl*) desc.program;
@@ -2849,8 +2853,11 @@ Result VKRenderer::createGraphicsPipelineState(const GraphicsPipelineStateDesc& 
     return SLANG_OK;
 }
 
-Result VKRenderer::createComputePipelineState(const ComputePipelineStateDesc& desc, PipelineState** outState)
+Result VKRenderer::createComputePipelineState(const ComputePipelineStateDesc& inDesc, PipelineState** outState)
 {
+    ComputePipelineStateDesc desc = inDesc;
+    preparePipelineDesc(desc);
+
     VkPipelineCache pipelineCache = VK_NULL_HANDLE;
 
     auto programImpl = (ShaderProgramImpl*) desc.program;

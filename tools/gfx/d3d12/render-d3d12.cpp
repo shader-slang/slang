@@ -5,6 +5,7 @@
 
 //WORKING:#include "options.h"
 #include "../render.h"
+#include "../render-graphics-common.h"
 
 #include "../surface.h"
 
@@ -61,7 +62,7 @@ struct ID3D12GraphicsCommandList1 {};
 namespace gfx {
 using namespace Slang;
 
-class D3D12Renderer : public Renderer
+class D3D12Renderer : public GraphicsAPIRenderer
 {
 public:
     // Renderer    implementation
@@ -3520,8 +3521,11 @@ Result D3D12Renderer::createDescriptorSet(DescriptorSetLayout* layout, Descripto
     return SLANG_OK;
 }
 
-Result D3D12Renderer::createGraphicsPipelineState(const GraphicsPipelineStateDesc& desc, PipelineState** outState)
+Result D3D12Renderer::createGraphicsPipelineState(const GraphicsPipelineStateDesc& inDesc, PipelineState** outState)
 {
+    GraphicsPipelineStateDesc desc = inDesc;
+    preparePipelineDesc(desc);
+
     auto pipelineLayoutImpl = (PipelineLayoutImpl*) desc.pipelineLayout;
     auto programImpl = (ShaderProgramImpl*) desc.program;
     auto inputLayoutImpl = (InputLayoutImpl*) desc.inputLayout;
@@ -3618,8 +3622,11 @@ Result D3D12Renderer::createGraphicsPipelineState(const GraphicsPipelineStateDes
     return SLANG_OK;
 }
 
-Result D3D12Renderer::createComputePipelineState(const ComputePipelineStateDesc& desc, PipelineState** outState)
+Result D3D12Renderer::createComputePipelineState(const ComputePipelineStateDesc& inDesc, PipelineState** outState)
 {
+    ComputePipelineStateDesc desc = inDesc;
+    preparePipelineDesc(desc);
+
     auto pipelineLayoutImpl = (PipelineLayoutImpl*) desc.pipelineLayout;
     auto programImpl = (ShaderProgramImpl*) desc.program;
 
