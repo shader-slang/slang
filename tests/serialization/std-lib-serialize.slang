@@ -1,7 +1,5 @@
 //TEST:COMPILE: -save-stdlib slang-std-lib.zip
-//TEST:COMPILE: -save-stdlib-bin-source source/slang/slang-stdlib-generated.h
 //TEST:COMPARE_COMPUTE: -compile-arg -load-stdlib -compile-arg slang-std-lib.zip
-
 
 struct A
 {
