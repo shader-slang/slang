@@ -50,5 +50,6 @@ void computeMain(
 	val = val*16 + stuff.b;
 	val = val*16 + things.c;
 	val = val*16 + tid;
+
 	outputBuffer[tid] = val;
 }
