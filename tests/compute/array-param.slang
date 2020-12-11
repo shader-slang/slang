@@ -1,3 +1,4 @@
+//TEST(compute):COMPARE_COMPUTE_EX:-cuda -compute -shaderobj
 //TEST(compute):COMPARE_COMPUTE_EX:-cpu -compute -compile-arg -O3
 //TEST(compute):COMPARE_COMPUTE_EX:-slang -compute -shaderobj
 //TEST(compute):COMPARE_COMPUTE_EX:-slang -compute -dx12
