@@ -530,6 +530,9 @@ bool isEffectivelyStatic(
     Decl*           decl,
     ContainerDecl*  parentDecl);
 
+bool isStdLibMemberFuncDecl(
+    Decl*   decl);
+
 // Ensure that a version of the given declaration has been emitted to the IR
 LoweredValInfo ensureDecl(
     IRGenContext*   context,
@@ -6522,7 +6525,15 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
             }
             else
             {
-                definition = decl->getName()->text;
+                if( isStdLibMemberFuncDecl(decl) )
+                {
+                    // We will mark member functions by appending a `.` to the
+                    // start of their name.
+                    //
+                    definition.append(".");
+                }
+
+                definition.append(decl->getName()->text);
             }
 
             UnownedStringSlice targetName;
@@ -6532,7 +6543,19 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
                 targetName = targetToken.getContent();
             }
 
-            builder->addTargetIntrinsicDecoration(irInst, targetName, definition.getUnownedSlice());
+            CapabilitySet targetCaps;
+            if( targetName.getLength() == 0 )
+            {
+                targetCaps = CapabilitySet::makeEmpty();
+            }
+            else
+            {
+                CapabilityAtom targetCap = findCapabilityAtom(targetName);
+                SLANG_ASSERT(targetCap != CapabilityAtom::Invalid);
+                targetCaps = CapabilitySet(targetCap);
+            }
+
+            builder->addTargetIntrinsicDecoration(irInst, targetCaps, definition.getUnownedSlice());
         }
 
         if(auto nvapiMod = decl->findModifier<NVAPIMagicModifier>())
@@ -6543,8 +6566,12 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
 
         /// Is `decl` a member function (or effectively a member function) when considered as a stdlib declaration?
     bool isStdLibMemberFuncDecl(
-        CallableDecl*   decl)
+        Decl*   inDecl)
     {
+        auto decl = as<CallableDecl>(inDecl);
+        if(!decl)
+            return false;
+
         // Constructors aren't really member functions, insofar
         // as they aren't called with a `this` parameter.
         //
@@ -6655,7 +6682,7 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
 
         definition.append(getText(declForName->getName()));
 
-        getBuilder()->addTargetIntrinsicDecoration(irInst, UnownedStringSlice(), definition.getUnownedSlice());
+        getBuilder()->addTargetIntrinsicDecoration(irInst, CapabilitySet::makeEmpty(), definition.getUnownedSlice());
     }
 
     void addParamNameHint(IRInst* inst, IRLoweringParameterInfo const& info)
@@ -6974,7 +7001,10 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
             // a specialized definition of the particular function for the given
             // target, and we need to reflect that at the IR level.
 
-            getBuilder()->addTargetDecoration(irFunc, targetMod->targetToken.getContent());
+            auto targetName = targetMod->targetToken.getContent();
+            auto targetCap = findCapabilityAtom(targetName);
+
+            getBuilder()->addTargetDecoration(irFunc, CapabilitySet(targetCap));
         }
 
         // If this declaration was marked as having a target-specific lowering

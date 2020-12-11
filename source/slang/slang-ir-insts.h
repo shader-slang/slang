@@ -8,6 +8,7 @@
 //
 // TODO: the builder probably needs its own file.
 
+#include "slang-capability.h"
 #include "slang-compiler.h"
 #include "slang-ir.h"
 #include "slang-syntax.h"
@@ -16,6 +17,13 @@
 namespace Slang {
 
 class Decl;
+
+struct IRCapabilitySet : IRInst
+{
+    IR_LEAF_ISA(CapabilitySet);
+
+    CapabilitySet getCaps();
+};
 
 struct IRDecoration : IRInst
 {
@@ -63,12 +71,9 @@ struct IRTargetSpecificDecoration : IRDecoration
 {
     IR_PARENT_ISA(TargetSpecificDecoration)
 
-    IRStringLit* getTargetNameOperand() { return cast<IRStringLit>(getOperand(0)); }
+    IRCapabilitySet* getTargetCapsOperand() { return cast<IRCapabilitySet>(getOperand(0)); }
 
-    UnownedStringSlice getTargetName()
-    {
-        return getTargetNameOperand()->getStringSlice();
-    }
+    CapabilitySet getTargetCaps() { return getTargetCapsOperand()->getCaps(); }
 };
 
 struct IRTargetDecoration : IRTargetSpecificDecoration
@@ -1822,6 +1827,7 @@ struct IRBuilder
     IRInst* getFloatValue(IRType* type, IRFloatingPointValue value);
     IRStringLit* getStringValue(const UnownedStringSlice& slice);
     IRPtrLit* getPtrValue(void* value);
+    IRInst* getCapabilityValue(CapabilitySet const& caps);
 
     IRBasicType* getBasicType(BaseType baseType);
     IRBasicType* getVoidType();
@@ -1830,6 +1836,7 @@ struct IRBuilder
     IRBasicType* getUIntType();
     IRBasicType* getUInt64Type();
     IRStringType* getStringType();
+    IRType* getCapabilitySetType();
 
     IRAssociatedType* getAssociatedType(ArrayView<IRInterfaceType*> constraintTypes);
     IRThisType* getThisType(IRInterfaceType* interfaceType);
@@ -2483,14 +2490,24 @@ struct IRBuilder
         addDecoration(value, kIROp_SemanticDecoration, getStringValue(text), getIntValue(getIntType(), index));
     }
 
-    void addTargetIntrinsicDecoration(IRInst* value, UnownedStringSlice const& target, UnownedStringSlice const& definition)
+    void addTargetIntrinsicDecoration(IRInst* value, IRInst* caps, UnownedStringSlice const& definition)
     {
-        addDecoration(value, kIROp_TargetIntrinsicDecoration, getStringValue(target), getStringValue(definition));
+        addDecoration(value, kIROp_TargetIntrinsicDecoration, caps, getStringValue(definition));
     }
 
-    void addTargetDecoration(IRInst* value, UnownedStringSlice const& target)
+    void addTargetIntrinsicDecoration(IRInst* value, CapabilitySet const& caps, UnownedStringSlice const& definition)
     {
-        addDecoration(value, kIROp_TargetDecoration, getStringValue(target));
+        addTargetIntrinsicDecoration(value, getCapabilityValue(caps), definition);
+    }
+
+    void addTargetDecoration(IRInst* value, IRInst* caps)
+    {
+        addDecoration(value, kIROp_TargetDecoration, caps);
+    }
+
+    void addTargetDecoration(IRInst* value, CapabilitySet const& caps)
+    {
+        addTargetDecoration(value, getCapabilityValue(caps));
     }
 
     void addRequireGLSLExtensionDecoration(IRInst* value, UnownedStringSlice const& extensionName)
@@ -2640,9 +2657,16 @@ void markConstExpr(
 
 //
 
-IRTargetIntrinsicDecoration* findTargetIntrinsicDecoration(
-        IRInst*        val,
-        String const&   targetName);
+IRTargetIntrinsicDecoration* findAnyTargetIntrinsicDecoration(
+        IRInst*                 val);
+
+IRTargetSpecificDecoration* findBestTargetDecoration(
+        IRInst*                 val,
+        CapabilitySet const&    targetCaps);
+
+IRTargetSpecificDecoration* findBestTargetDecoration(
+        IRInst*         val,
+        CapabilityAtom  targetCapabilityAtom);
 
 }
 

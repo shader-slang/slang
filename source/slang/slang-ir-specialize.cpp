@@ -756,27 +756,20 @@ struct SpecializationContext
         }
     }
 
-    // Finds any `IRTargetDecoration` from `inst`. Recursively chasing `specialize` chains.
-    IRTargetIntrinsicDecoration* findTargetIntrinsicDecorationRec(IRInst* inst)
-    {
-        while (auto specialize = as<IRSpecialize>(inst))
-        {
-            inst = specialize->getBase();
-        }
-        while (auto genericInst = as<IRGeneric>(inst))
-        {
-            inst = findGenericReturnVal(genericInst);
-        }
-        if (auto decor = inst->findDecoration<IRTargetIntrinsicDecoration>())
-            return decor;
-        return nullptr;
-    }
-
     // Returns true if the call inst represents a call to
     // StructuredBuffer::operator[]/Load/Consume methods.
     bool isBufferLoadCall(IRCall* inst)
     {
-        if (auto targetIntrinsic = findTargetIntrinsicDecorationRec(inst->getCallee()))
+        // TODO: We should have something like a `[knownSemantics(...)]` decoration
+        // that can identify that an `IRFunc` has semantics that are consistent
+        // with a list of compiler-known behaviors. The operand to `knownSemantics`
+        // could come from a `KnownSemantics` enumeration or something similar,
+        // so that we don't have to make string-based checks here.
+        //
+        // Note that `[knownSemantics(...)]` would be independent of any targets,
+        // and could even apply to functions that are implemented entirely in Slang.
+
+        if (auto targetIntrinsic = findAnyTargetIntrinsicDecoration(inst->getCallee()))
         {
             auto name = targetIntrinsic->getDefinition();
             if (name == ".operator[]" || name == ".Load" || name == ".Consume")

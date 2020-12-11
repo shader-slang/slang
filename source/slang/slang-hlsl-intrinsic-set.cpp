@@ -514,10 +514,10 @@ HLSLIntrinsic::Op HLSLIntrinsicOpLookup::getOpFromTargetDecoration(IRInst* inIns
             // not a targets transformation)
             // 
             // It turns out that addCatchAllIntrinsicDecorationIfNeeded will add a target intrinsic with the
-            // original HLSL name, which has a target of ""
+            // original HLSL name, which has an empty `CapabilitySet`.
             // 
             // It's not 100% clear this covers all the cases, but for now lets go with that
-            if (decor->getTargetName().getLength() == 0)
+            if (decor->getTargetCaps().isEmpty())
             {
                 Op op = getOpByName(decor->getDefinition());
                 if (op != Op::Invalid)
