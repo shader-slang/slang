@@ -26,6 +26,8 @@ INST(Nop, nop, 0, 0)
 
     INST(StringType, String, 0, 0)
 
+    INST(CapabilitySetType, CapabilitySet, 0, 0)
+
     INST(DynamicType, DynamicType, 0, 0)
 
     INST(AnyValueType, AnyValueType, 1, 0)
@@ -235,6 +237,8 @@ INST(Block, block, 0, PARENT)
     INST(PtrLit, ptr_constant, 0, 0)
     INST(StringLit, string_constant, 0, 0)
 INST_RANGE(Constant, BoolLit, StringLit)
+
+INST(CapabilitySet, capabilitySet, 0, 0)
 
 INST(undefined, undefined, 0, 0)
 

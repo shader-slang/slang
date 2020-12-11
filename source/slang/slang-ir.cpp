@@ -234,6 +234,23 @@ namespace Slang
         }
     }
 
+    // IRCapabilitySet
+
+    CapabilitySet IRCapabilitySet::getCaps()
+    {
+        List<CapabilityAtom> atoms;
+
+        Index count = (Index) getOperandCount();
+        for(Index i = 0; i < count; ++i)
+        {
+            auto operand = cast<IRIntLit>(getOperand(i));
+            atoms.add(CapabilityAtom(operand->getValue()));
+        }
+
+        return CapabilitySet(atoms.getCount(), atoms.getBuffer());
+    }
+
+
     // IRParam
 
     IRParam* IRParam::getNextParam()
@@ -2138,6 +2155,21 @@ namespace Slang
         return (IRPtrLit*) findOrEmitConstant(this, keyInst);
     }
 
+    IRInst* IRBuilder::getCapabilityValue(CapabilitySet const& caps)
+    {
+        IRType* capabilityAtomType = getIntType();
+        IRType* capabilitySetType = getCapabilitySetType();
+
+        List<IRInst*> args;
+        for( auto atom : caps.getAtoms() )
+        {
+            args.add(getIntValue(capabilityAtomType, Int(atom)));
+        }
+
+        return findOrEmitHoistableInst(
+            capabilitySetType, kIROp_CapabilitySet, args.getCount(), args.getBuffer());
+    }
+
     IRInst* IRBuilder::findOrEmitHoistableInst(
         IRType*                 type,
         IROp                    op,
@@ -2404,6 +2436,11 @@ namespace Slang
     IRStringType* IRBuilder::getStringType()
     {
         return (IRStringType*)getType(kIROp_StringType);
+    }
+
+    IRType* IRBuilder::getCapabilitySetType()
+    {
+        return getType(kIROp_CapabilitySetType);
     }
 
     IRDynamicType* IRBuilder::getDynamicType() { return (IRDynamicType*)getType(kIROp_DynamicType); }
@@ -5615,22 +5652,75 @@ namespace Slang
         return t;
     }
 
-    IRTargetIntrinsicDecoration* findTargetIntrinsicDecoration(
-        IRInst*        val,
-        String const&   targetName)
+    //
+    // IRTargetIntrinsicDecoration
+    //
+
+    static bool _areIntrinsicCapsBetterForTarget(
+        CapabilitySet const& candidateCaps,
+        CapabilitySet const& existingCaps,
+        CapabilitySet const& targetCaps)
     {
-        for(auto dd : val->getDecorations())
+        bool candidateIsAvailable = targetCaps.implies(candidateCaps);
+        bool existingIsAvailable = targetCaps.implies(existingCaps);
+        if(candidateIsAvailable != existingIsAvailable)
+            return candidateIsAvailable;
+
+        if(candidateCaps.implies(existingCaps))
+            return true;
+
+        return false;
+    }
+
+    IRTargetIntrinsicDecoration* findAnyTargetIntrinsicDecoration(
+            IRInst*                 val)
+    {
+        IRInst* inst = getResolvedInstForDecorations(val);
+        return inst->findDecoration<IRTargetIntrinsicDecoration>();
+    }
+
+    IRTargetSpecificDecoration* findBestTargetDecoration(
+        IRInst*                 inInst,
+        CapabilitySet const&    targetCaps)
+    {
+        IRInst* inst = getResolvedInstForDecorations(inInst);
+
+        // We will search through all the `IRTargetIntrinsicDecoration`s on
+        // the instruction, looking for those that are applicable to the
+        // current code generation target. Among the application decorations
+        // we will try to find one that is "best" in the sense that it is
+        // more (or at least as) specialized for the target than the
+        // others.
+        //
+        IRTargetSpecificDecoration* bestDecoration = nullptr;
+        CapabilitySet bestCaps;
+        for(auto dd : inst->getDecorations())
         {
-            if(dd->op != kIROp_TargetIntrinsicDecoration)
+            auto decoration = as<IRTargetSpecificDecoration>(dd);
+            if(!decoration)
                 continue;
 
-            auto decoration = (IRTargetIntrinsicDecoration*) dd;
-            if(String(decoration->getTargetName()) == targetName)
-                return decoration;
+            auto decorationCaps = decoration->getTargetCaps();
+            if (decorationCaps.isIncompatibleWith(targetCaps))
+                continue;
+
+            if(!bestDecoration || _areIntrinsicCapsBetterForTarget(decorationCaps, bestCaps, targetCaps))
+            {
+                bestDecoration = decoration;
+                bestCaps = decorationCaps;
+            }
         }
 
-        return nullptr;
+        return bestDecoration;
     }
+
+    IRTargetSpecificDecoration* findBestTargetDecoration(
+            IRInst*         val,
+            CapabilityAtom  targetCapabilityAtom)
+    {
+        return findBestTargetDecoration(val, CapabilitySet(targetCapabilityAtom));
+    }
+
 
 #if 0
     IRFunc* cloneSimpleFuncWithoutRegistering(IRSpecContextBase* context, IRFunc* originalFunc)
@@ -5671,29 +5761,46 @@ namespace Slang
 
     IRInst* findSpecializeReturnVal(IRSpecialize* specialize)
     {
-        auto generic = findSpecializedGeneric(specialize);
-        if(!generic)
-            return nullptr;
+        auto base = specialize->getBase();
 
-        return findGenericReturnVal(generic);
+        while( auto baseSpec = as<IRSpecialize>(base) )
+        {
+            auto returnVal = findSpecializeReturnVal(baseSpec);
+            if(!returnVal)
+                break;
+
+            base = returnVal;
+        }
+
+        if( auto generic = as<IRGeneric>(base) )
+        {
+            return findGenericReturnVal(generic);
+        }
+
+        return nullptr;
     }
 
     IRInst* getResolvedInstForDecorations(IRInst* inst)
     {
         IRInst* candidate = inst;
-        while(auto specInst = as<IRSpecialize>(candidate))
+        for(;;)
         {
-            auto genericInst = as<IRGeneric>(specInst->getBase());
-            if(!genericInst)
-                break;
+            if(auto specInst = as<IRSpecialize>(candidate))
+            {
+                candidate = specInst->getBase();
+                continue;
+            }
+            if( auto genericInst = as<IRGeneric>(candidate) )
+            {
+                if( auto returnVal = findGenericReturnVal(genericInst) )
+                {
+                    candidate = returnVal;
+                    continue;
+                }
+            }
 
-            auto returnVal = findGenericReturnVal(genericInst);
-            if(!returnVal)
-                break;
-
-            candidate = returnVal;
+            return candidate;
         }
-        return candidate;
     }
 
     bool isDefinition(

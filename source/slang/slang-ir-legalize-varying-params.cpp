@@ -1092,15 +1092,15 @@ struct CUDAEntryPointVaryingParamLegalizeContext : EntryPointVaryingParamLegaliz
         // a unique name).
 
         threadIdxGlobalParam = builder.createGlobalParam(uint3Type);
-        builder.addTargetIntrinsicDecoration(threadIdxGlobalParam, UnownedTerminatedStringSlice(""), UnownedTerminatedStringSlice("threadIdx"));
+        builder.addTargetIntrinsicDecoration(threadIdxGlobalParam, CapabilitySet::makeEmpty(), UnownedTerminatedStringSlice("threadIdx"));
         builder.addLayoutDecoration(threadIdxGlobalParam, varLayout);
 
         blockIdxGlobalParam = builder.createGlobalParam(uint3Type);
-        builder.addTargetIntrinsicDecoration(blockIdxGlobalParam, UnownedTerminatedStringSlice(""), UnownedTerminatedStringSlice("blockIdx"));
+        builder.addTargetIntrinsicDecoration(blockIdxGlobalParam, CapabilitySet::makeEmpty(), UnownedTerminatedStringSlice("blockIdx"));
         builder.addLayoutDecoration(blockIdxGlobalParam, varLayout);
 
         blockDimGlobalParam = builder.createGlobalParam(uint3Type);
-        builder.addTargetIntrinsicDecoration(blockDimGlobalParam, UnownedTerminatedStringSlice(""), UnownedTerminatedStringSlice("blockDim"));
+        builder.addTargetIntrinsicDecoration(blockDimGlobalParam, CapabilitySet::makeEmpty(), UnownedTerminatedStringSlice("blockDim"));
         builder.addLayoutDecoration(blockDimGlobalParam, varLayout);
     }
 
@@ -1220,14 +1220,14 @@ struct CPUEntryPointVaryingParamLegalizeContext : EntryPointVaryingParamLegalize
         varyingInputStructType = builder.createStructType();
         varyingInputStructPtrType = builder.getPtrType(varyingInputStructType);
 
-        builder.addTargetIntrinsicDecoration(varyingInputStructType, UnownedTerminatedStringSlice(""), UnownedTerminatedStringSlice("ComputeThreadVaryingInput"));
+        builder.addTargetIntrinsicDecoration(varyingInputStructType, CapabilitySet::makeEmpty(), UnownedTerminatedStringSlice("ComputeThreadVaryingInput"));
 
         groupIDKey = builder.createStructKey();
-        builder.addTargetIntrinsicDecoration(groupIDKey, UnownedTerminatedStringSlice(""), UnownedTerminatedStringSlice("groupID"));
+        builder.addTargetIntrinsicDecoration(groupIDKey, CapabilitySet::makeEmpty(), UnownedTerminatedStringSlice("groupID"));
         builder.createStructField(varyingInputStructType, groupIDKey, uint3Type);
 
         groupThreadIDKey = builder.createStructKey();
-        builder.addTargetIntrinsicDecoration(groupThreadIDKey, UnownedTerminatedStringSlice(""), UnownedTerminatedStringSlice("groupThreadID"));
+        builder.addTargetIntrinsicDecoration(groupThreadIDKey, CapabilitySet::makeEmpty(), UnownedTerminatedStringSlice("groupThreadID"));
         builder.createStructField(varyingInputStructType, groupThreadIDKey, uint3Type);
     }
 
