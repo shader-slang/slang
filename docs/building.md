@@ -4,7 +4,9 @@
 
 Clone [this](https://github.com/shader-slang/slang) repository, and then run:
 
-    git submodule update --init
+```
+% git submodule update --init
+```
 
 The submodule update step is required to pull in dependencies used for testing infrastructure as well as the `glslang` compiler that we currently use for generating SPIR-V. 
 
@@ -103,7 +105,19 @@ To create a release build use
 
 Note that OSX isn't an official target. 
 
-First download and install [`premake5`](https://premake.github.io/) on your build system. Open up a command line and go to the root directory of the slang source tree (ie the directory containing `slang.h`).
+After doing `git submodule update --init`, this should have made `slang-binaries` available within `external`. This contains a suitable `premake5` version for OSX. Currently the path is 
+
+`external\slang-binaries\premake\premake-5.0.0-alpha13\bin\osx`
+
+Initially the premake5 binary in this directory is not executable, you can make it so by typing 
+
+```
+% chmod u+x premake5
+```
+
+in that directory. 
+
+Alternatively you can download and install [`premake5`](https://premake.github.io/) on your build system. Open up a command line and go to the root directory of the slang source tree (ie the directory containing `slang.h`).
  
 Assuming premake5 is in your `PATH`, you can create a `Makefile` to build slang and tests components with
 
@@ -111,7 +125,13 @@ Assuming premake5 is in your `PATH`, you can create a `Makefile` to build slang 
 % premake5 gmake 
 ```
 
-To build with
+If you want to build `glslang` (necessary for Slang to output SPIR-V for example), then the additional `build-glslang` option should be given to premake
+
+```
+% premake5 gmake --build-glslang=true
+```
+
+To build for release you can use...
 
 ```
 % make config=release_x64
