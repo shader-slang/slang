@@ -1171,7 +1171,7 @@ static SlangResult _innerMain(Slang::StdWriters* stdWriters, SlangSession* sessi
         return SLANG_OK;
     }
 
-    if (options.rendererType == RendererType::CUDA)
+    if (options.rendererType == RendererType::CUDA && !options.useShaderObjects)
     {        
 #if RENDER_TEST_CUDA
         // Check we have all the required features

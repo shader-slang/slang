@@ -971,6 +971,74 @@ MatrixLayoutMode TargetRequest::getDefaultMatrixLayoutMode()
     return linkage->getDefaultMatrixLayoutMode();
 }
 
+CapabilitySet TargetRequest::getTargetCaps()
+{
+    if(!targetCaps.isInvalid())
+        return targetCaps;
+
+    // The full `CapabilitySet` for the target will be computed
+    // from the combination of the code generation format, and
+    // the profile.
+    //
+    // Note: the preofile might have been set in a way that is
+    // inconsistent with the output code format of SPIR-V, but
+    // a profile of Direct3D Shader Model 5.1. In those cases,
+    // the format should always override the implications in
+    // the profile.
+    //
+    // TODO: This logic isn't currently taking int account
+    // the information in the profile, because the current
+    // `CapabilityAtom`s that we support don't include any
+    // of the details there (e.g., the shader model versions).
+    //
+    // Eventually, we'd want to have a rich set of capability
+    // atoms, so that most of the information about what operations
+    // are available where can be directly encoded on the declarations.
+
+    List<CapabilityAtom> atoms;
+    switch(target)
+    {
+    case CodeGenTarget::GLSL:
+    case CodeGenTarget::GLSL_Vulkan:
+    case CodeGenTarget::GLSL_Vulkan_OneDesc:
+    case CodeGenTarget::SPIRV:
+    case CodeGenTarget::SPIRVAssembly:
+        atoms.add(CapabilityAtom::GLSL);
+        break;
+
+    case CodeGenTarget::HLSL:
+    case CodeGenTarget::DXBytecode:
+    case CodeGenTarget::DXBytecodeAssembly:
+    case CodeGenTarget::DXIL:
+    case CodeGenTarget::DXILAssembly:
+        atoms.add(CapabilityAtom::HLSL);
+        break;
+
+    case CodeGenTarget::CSource:
+        atoms.add(CapabilityAtom::C);
+        break;
+
+    case CodeGenTarget::CPPSource:
+    case CodeGenTarget::Executable:
+    case CodeGenTarget::SharedLibrary:
+    case CodeGenTarget::HostCallable:
+        atoms.add(CapabilityAtom::CPP);
+        break;
+
+    case CodeGenTarget::CUDASource:
+    case CodeGenTarget::PTX:
+        atoms.add(CapabilityAtom::CUDA);
+        break;
+
+    default:
+        break;
+    }
+
+    targetCaps = CapabilitySet(atoms);
+    return targetCaps;
+}
+
+
 TypeLayout* TargetRequest::getTypeLayout(Type* type)
 {
     // TODO: We are not passing in a `ProgramLayout` here, although one

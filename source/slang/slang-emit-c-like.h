@@ -22,13 +22,19 @@ public:
     struct Desc
     {
         BackEndCompileRequest* compileRequest = nullptr;
-            // The target language we want to generate code for
+
+        /// The target language we want to generate code for
         CodeGenTarget target = CodeGenTarget::Unknown;
-            // The stage for the entry point we are being asked to compile
+
+            /// The stage for the entry point we are being asked to compile
         Stage entryPointStage = Stage::Unknown;
-            // The "effective" profile that is being used to emit code,
-            // combining information from the target and entry point.
+
+            /// The "effective" profile that is being used to emit code,
+            /// combining information from the target and entry point.
         Profile effectiveProfile = Profile::RawEnum::Unknown;
+
+            /// The capabilities of the target
+        CapabilitySet targetCaps;
 
         SourceWriter* sourceWriter = nullptr;
     };
@@ -105,6 +111,8 @@ public:
 
     void noteInternalErrorLoc(SourceLoc loc) { return getSink()->noteInternalErrorLoc(loc); }
 
+    CapabilitySet getTargetCaps() { return m_targetCaps; }
+
     //
     // Types
     //
@@ -125,13 +133,6 @@ public:
     bool maybeEmitParens(EmitOpInfo& outerPrec, const EmitOpInfo& prec);
 
     void maybeCloseParens(bool needClose);
-
-    bool isTargetIntrinsicModifierApplicable(String const& targetName);
-    
-    bool isTargetIntrinsicModifierApplicable(IRTargetIntrinsicDecoration* decoration);
-
-        /// Is the `candidate` decoration more specialized for the current target than `existing`?
-    bool isTargetIntrinsicModifierBetter(IRTargetIntrinsicDecoration* candidate, IRTargetIntrinsicDecoration* existing);
 
     void emitStringLiteral(const String& value);
 
@@ -174,7 +175,8 @@ public:
 
     void emitInstResultDecl(IRInst* inst);
 
-    IRTargetIntrinsicDecoration* findTargetIntrinsicDecoration(IRInst* inst);
+    IRTargetSpecificDecoration* findBestTargetDecoration(IRInst* inst);
+    IRTargetIntrinsicDecoration* findBestTargetIntrinsicDecorationXXX(IRInst* inst);
 
     // Check if the string being used to define a target intrinsic
     // is an "ordinary" name, such that we can simply emit a call
@@ -381,6 +383,10 @@ public:
 
     // The target language we want to generate code for
     CodeGenTarget m_target;
+
+        /// The capabilities of the target
+    CapabilitySet m_targetCaps;
+
     // Source language (based on the more nuanced m_target)
     SourceLanguage m_sourceLanguage;
 

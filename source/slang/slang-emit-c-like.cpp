@@ -130,6 +130,7 @@ CLikeSourceEmitter::CLikeSourceEmitter(const Desc& desc)
     SLANG_ASSERT(m_sourceLanguage != SourceLanguage::Unknown);
 
     m_target = desc.target;
+    m_targetCaps = desc.targetCaps;
 
     m_compileRequest = desc.compileRequest;
     m_entryPointStage = desc.entryPointStage;
@@ -392,46 +393,6 @@ void CLikeSourceEmitter::maybeCloseParens(bool needClose)
     if(needClose) m_writer->emit(")");
 }
 
-bool CLikeSourceEmitter::isTargetIntrinsicModifierApplicable(const String& targetName)
-{
-    switch(getSourceLanguage())
-    {
-    default:
-        SLANG_DIAGNOSE_UNEXPECTED(getSink(), SourceLoc(), "unhandled code generation target");
-        return false;
-
-    case SourceLanguage::C:    return targetName == "c";
-    case SourceLanguage::CPP:  return targetName == "cpp";
-    case SourceLanguage::GLSL: return targetName == "glsl";
-    case SourceLanguage::HLSL: return targetName == "hlsl";
-    case SourceLanguage::CUDA: return targetName == "cuda";
-    }
-}
-
-bool CLikeSourceEmitter::isTargetIntrinsicModifierApplicable(IRTargetIntrinsicDecoration* decoration)
-{
-    auto targetName = String(decoration->getTargetName());
-
-    // If no target name was specified, then the modifier implicitly
-    // applies to all targets.
-    if(targetName.getLength() == 0)
-        return true;
-
-    return isTargetIntrinsicModifierApplicable(targetName);
-}
-
-bool CLikeSourceEmitter::isTargetIntrinsicModifierBetter(IRTargetIntrinsicDecoration* candidate, IRTargetIntrinsicDecoration* existing)
-{
-    // For now, the rule is that an empty string represents a catch-all
-    // definition, which is worse than any target-specific declaration.
-    // Therefore, if the new `candidate` has a non-empty target name
-    // specified, then it is automatically better (or at least as
-    // good) as `existing`.
-    //
-    SLANG_UNUSED(existing);
-    return candidate->getTargetName().getLength() != 0;
-}
-
 void CLikeSourceEmitter::emitStringLiteral(String const& value)
 {
     m_writer->emit("\"");
@@ -669,7 +630,7 @@ String CLikeSourceEmitter::generateName(IRInst* inst)
     // If the instruction names something
     // that should be emitted as a target intrinsic,
     // then use that name instead.
-    if(auto intrinsicDecoration = findTargetIntrinsicDecoration(inst))
+    if(auto intrinsicDecoration = findBestTargetIntrinsicDecorationXXX(inst))
     {
         return String(intrinsicDecoration->getDefinition());
     }
@@ -940,6 +901,7 @@ bool CLikeSourceEmitter::shouldFoldInstIntoUseSites(IRInst* inst)
     case kIROp_IntLit:
     case kIROp_FloatLit:
     case kIROp_BoolLit:
+    case kIROp_CapabilitySet:
         return true;
 
     // Always fold these in, because their results
@@ -1130,7 +1092,7 @@ bool CLikeSourceEmitter::shouldFoldInstIntoUseSites(IRInst* inst)
         // This is significant, because we can within a target intrinsics definition multiple accesses to the same
         // parameter. This is not indicated into the call, and can lead to output code computes something multiple
         // times as it is folding into the expression of the the target intrinsic, which we don't want.
-        if (auto targetIntrinsicDecoration = findTargetIntrinsicDecoration(funcValue))
+        if (auto targetIntrinsicDecoration = findBestTargetIntrinsicDecorationXXX(funcValue))
         {         
             // Find the index of the original instruction, to see if it's multiply used.
             IRUse* args = callInst->getArgs();
@@ -1333,50 +1295,14 @@ void CLikeSourceEmitter::emitInstResultDecl(IRInst* inst)
     m_writer->emit(" = ");
 }
 
-IRTargetIntrinsicDecoration* CLikeSourceEmitter::findTargetIntrinsicDecoration(IRInst* inInst)
+IRTargetSpecificDecoration* CLikeSourceEmitter::findBestTargetDecoration(IRInst* inInst)
 {
-    // An intrinsic generic function will be invoked through a `specialize` instruction,
-    // so the callee won't directly be the thing that is decorated. We will look up
-    // through specializations until we can see the actual thing being called.
-    //
-    IRInst* inst = inInst;
-    while (auto specInst = as<IRSpecialize>(inst))
-    {
-        inst = getSpecializedValue(specInst);
+    return Slang::findBestTargetDecoration(inInst, getTargetCaps());
+}
 
-        // If `getSpecializedValue` can't find the result value
-        // of the generic being specialized, then it returns
-        // the original instruction. This would be a disaster
-        // for use because this loop would go on forever.
-        //
-        // This case should never happen if the stdlib is well-formed
-        // and the compiler is doing its job right.
-        //
-        SLANG_ASSERT(inst != specInst);
-    }
-
-    // We will search through all the `IRTargetIntrinsicDecoration`s on
-    // the instruction, looking for those that are applicable to the
-    // current code generation target. Among the application decorations
-    // we will try to find one that is "best" in the sense that it is
-    // more (or at least as) specialized for the target than the
-    // others.
-    //
-    IRTargetIntrinsicDecoration* best = nullptr;
-    for(auto dd : inst->getDecorations())
-    {
-        if (dd->op != kIROp_TargetIntrinsicDecoration)
-            continue;
-
-        auto targetIntrinsic = (IRTargetIntrinsicDecoration*)dd;
-        if (!isTargetIntrinsicModifierApplicable(targetIntrinsic))
-            continue;
-
-        if(!best || isTargetIntrinsicModifierBetter(targetIntrinsic, best))
-            best = targetIntrinsic;
-    }
-
-    return best;
+IRTargetIntrinsicDecoration* CLikeSourceEmitter::findBestTargetIntrinsicDecorationXXX(IRInst* inInst)
+{
+    return as<IRTargetIntrinsicDecoration>(findBestTargetDecoration(inInst));
 }
 
 /* static */bool CLikeSourceEmitter::isOrdinaryName(UnownedStringSlice const& name)
@@ -2029,7 +1955,7 @@ void CLikeSourceEmitter::emitCallExpr(IRCall* inst, EmitOpInfo outerPrec)
 
     // We want to detect any call to an intrinsic operation,
     // that we can emit it directly without mangling, etc.
-    if(auto targetIntrinsic = findTargetIntrinsicDecoration(funcValue))
+    if(auto targetIntrinsic = findBestTargetIntrinsicDecorationXXX(funcValue))
     {
         emitIntrinsicCallExpr(inst, targetIntrinsic, outerPrec);
     }
@@ -3408,7 +3334,7 @@ bool CLikeSourceEmitter::isTargetIntrinsic(IRFunc* func)
     // it has a suitable decoration marking it as a
     // target intrinsic for the current compilation target.
     //
-    return findTargetIntrinsicDecoration(func) != nullptr;
+    return findBestTargetIntrinsicDecorationXXX(func) != nullptr;
 }
 
 void CLikeSourceEmitter::emitFunc(IRFunc* func)
@@ -3441,7 +3367,7 @@ void CLikeSourceEmitter::emitStruct(IRStructType* structType)
 {
     // If the selected `struct` type is actually an intrinsic
     // on our target, then we don't want to emit anything at all.
-    if(auto intrinsicDecoration = findTargetIntrinsicDecoration(structType))
+    if(auto intrinsicDecoration = findBestTargetIntrinsicDecorationXXX(structType))
     {
         return;
     }

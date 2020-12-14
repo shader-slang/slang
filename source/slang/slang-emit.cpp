@@ -722,6 +722,12 @@ SlangResult emitEntryPointsSourceFromIR(
         desc.entryPointStage = entryPoint->getStage();
         desc.effectiveProfile = getEffectiveProfile(entryPoint, targetRequest);
     }
+    else
+    {
+        desc.entryPointStage = Stage::Unknown;
+        desc.effectiveProfile = targetRequest->getTargetProfile();
+    }
+    desc.targetCaps = targetRequest->getTargetCaps();
     desc.sourceWriter = &sourceWriter;
 
     // Define here, because must be in scope longer than the sourceEmitter, as sourceEmitter might reference

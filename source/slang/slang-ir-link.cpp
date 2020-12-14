@@ -1,6 +1,7 @@
 // slang-ir-link.cpp
 #include "slang-ir-link.h"
 
+#include "slang-capability.h"
 #include "slang-ir.h"
 #include "slang-ir-insts.h"
 #include "slang-mangle.h"
@@ -36,6 +37,9 @@ struct IRSharedSpecContext
 {
     // The code-generation target in use
     CodeGenTarget target;
+
+    // The API-level target request
+    TargetRequest* targetReq = nullptr;
 
     // The specialized module we are building
     RefPtr<IRModule>   module;
@@ -915,79 +919,35 @@ IRFunc* specializeIRForEntryPoint(
 // Get a string form of the target so that we can
 // use it to match against target-specialization modifiers
 //
-// TODO: We shouldn't be using strings for this.
-String getTargetName(IRSpecContext* context)
+CapabilitySet getTargetCapabilities(IRSpecContext* context)
 {
-    switch( context->shared->target )
-    {
-    case CodeGenTarget::HLSL:
-        return "hlsl";
-
-    case CodeGenTarget::GLSL:
-        return "glsl";
-
-    case CodeGenTarget::CSource:
-        return "c";
-
-    case CodeGenTarget::CPPSource:
-        return "cpp";
-
-    case CodeGenTarget::CUDASource:
-        return "cuda";
-
-    case CodeGenTarget::SPIRV:
-        return "spirv";
-
-
-    default:
-        SLANG_UNEXPECTED("unhandled case");
-        UNREACHABLE_RETURN("unknown");
-    }
+    return context->getShared()->targetReq->getTargetCaps();
 }
 
-// How specialized is a given declaration for the chosen target?
-enum class TargetSpecializationLevel
+    /// Get the most appropriate ("best") capability requirements for `inVal` based on the `targetCaps`.
+static CapabilitySet _getBestSpecializationCaps(
+    IRInst*                 inVal,
+    CapabilitySet const&    targetCaps)
 {
-    specializedForOtherTarget = 0,
-    notSpecialized,
-    specializedForTarget,
-};
+    IRInst* val = getResolvedInstForDecorations(inVal);
 
-TargetSpecializationLevel getTargetSpecialiationLevel(
-    IRInst*         inVal,
-    String const&   targetName)
-{
-    // HACK: Currently the front-end is placing modifiers related
-    // to target specialization on nodes like functions, even when
-    // those functions are being returned by a generic. This
-    // means that we need to try and inspect the value being
-    // returned by the generic if we are looking at a generic.
-    IRInst* val = inVal;
-    while( auto genericVal = as<IRGeneric>(val) )
+    // If the instruction has no target-related decorations,
+    // then it is implied to be an unspecialized, target-independent
+    // declaration.
+    //
+    // Such a declaration amounts to an empty set of capabilities.
+    //
+    if(!val->findDecoration<IRTargetDecoration>())
+        return CapabilitySet::makeEmpty();
+
+    if( auto targetDecoration = findBestTargetDecoration(inVal, targetCaps) )
     {
-        auto firstBlock = genericVal->getFirstBlock();
-        if(!firstBlock) break;
-
-        auto returnInst = as<IRReturnVal>(firstBlock->getLastInst());
-        if(!returnInst) break;
-
-        val = returnInst->getVal();
+        return targetDecoration->getTargetCaps();
     }
-
-    TargetSpecializationLevel result = TargetSpecializationLevel::notSpecialized;
-    for(auto dd : val->getDecorations())
+    else
     {
-        if(dd->op != kIROp_TargetDecoration)
-            continue;
-
-        auto decoration = (IRTargetDecoration*) dd;
-        if(String(decoration->getTargetName()) == targetName)
-            return TargetSpecializationLevel::specializedForTarget;
-
-        result = TargetSpecializationLevel::specializedForOtherTarget;
+        return CapabilitySet::makeInvalid();
     }
-
-    return result;
 }
 
 // Is `newVal` marked as being a better match for our
@@ -1006,43 +966,61 @@ bool isBetterForTarget(
         return true;
     }
 
-    String targetName = getTargetName(context);
-
     // For right now every declaration might have zero or more
-    // modifiers, representing the targets for which it is specialized.
-    // Each modifier has a single string "tag" to represent a target.
-    // We thus decide that a declaration is "more specialized" by:
+    // decorations, representing the capabilities for which it is specialized.
+    // Each decorations has a `CapabilitySet` to represent what it requires of a target.
     //
-    // - Does it have a modifier with a tag with the string for the current target?
-    //   If yes, it is the most specialized it can be.
+    // We need to look at all the candidate declarations for a symbol
+    // and pick the one that has the "most specialized" set of capabilities
+    // for our chosen target.
     //
-    // - Does it have a no tags? Then it is "unspecialized" and that is okay.
+    // In principle, this should be as simple as:
     //
-    // - Does it have a modifier with a tag for a *different* target?
-    //   If yes, then it shouldn't even be usable on this target.
+    // * Ignore all decorations with capability sets that aren't subsets
+    //   of the capabilities of our target.
     //
-    // Longer term a better approach is to think of this in terms
-    // of a "disjunction of conjunctions" that is:
+    // * From the remaining decorations, pick the one that is a superset
+    //   of all the others (and give an ambiguity error if there is
+    //   no unique "best" option).
     //
-    //     (A and B and C) or (A and D) or (E) or (F and G) ...
+    // In practice, the choice is complicated by the way that we currently
+    // have the compiler automatically deduce dependencies on extensions
+    // or other features that were not included as part of the target
+    // description by the user.
     //
-    // A code generation target would then consist of a
-    // conjunction of individual tags:
+    // In order to preserve the ability to infer more specialized requirements
+    // than what the target includes, we change the two steps slightly:
     //
-    //    (HLSL and SM_4_0 and Vertex and ...)
+    // * Ignore all decorations with capability sets that are *incompatible*
+    //   with the capabilities of our target, such that they could never be
+    //   used together.
     //
-    // A declaration is *applicable* on a target if one of
-    // its conjunctions of tags is a subset of the target's.
+    // * From all the remaining decorations, pick the one that is "better"
+    //   than all the others in that it is either a supserset of each other
+    //   candidate, or for each feature that another candidate requires,
+    //   it requires a "better" feature that covers the same ground.
     //
-    // One declaration is *better* than another on a target
-    // if it is applicable and its tags are a superset
-    // of the other's.
+    // Note: This approach isn't really sound, so we are likely to have
+    // to tweak it over time. Most notably, we probably need/want to
+    // push back on the automatic inference of extensions/versions in
+    // the compiler as much as possible.
+    //
+    CapabilitySet targetCaps = getTargetCapabilities(context);
+    CapabilitySet newCaps = _getBestSpecializationCaps(newVal, targetCaps);
+    CapabilitySet oldCaps = _getBestSpecializationCaps(oldVal, targetCaps);
 
-    auto newLevel = getTargetSpecialiationLevel(newVal, targetName);
-    
-    auto oldLevel = getTargetSpecialiationLevel(oldVal, targetName);
-    if(newLevel != oldLevel)
-        return UInt(newLevel) > UInt(oldLevel);
+    // If either value returned an invalid capability set, it implies
+    // that it cannot be used on this target at all, and the other
+    // value should be considered better by default.
+    //
+    // Note: if both of the candidate values we have are incompatible
+    // with our target, then it doesn't matter which we favor.
+    //
+    if(newCaps.isInvalid()) return false;
+    if(oldCaps.isInvalid()) return true;
+
+    if(newCaps != oldCaps)
+        return newCaps.implies(oldCaps);
 
     // All preceding factors being equal, an `[export]` is better
     // than an `[import]`.
@@ -1300,7 +1278,8 @@ void initializeSharedSpecContext(
     IRSharedSpecContext*    sharedContext,
     Session*                session,
     IRModule*               module,
-    CodeGenTarget           target)
+    CodeGenTarget           target,
+    TargetRequest*          targetReq)
 {
 
     SharedIRBuilder* sharedBuilder = &sharedContext->sharedBuilderStorage;
@@ -1318,6 +1297,7 @@ void initializeSharedSpecContext(
     sharedBuilder->module = module;
     sharedContext->module = module;
     sharedContext->target = target;
+    sharedContext->targetReq = targetReq;
 }
 
 struct IRSpecializationState
@@ -1372,7 +1352,8 @@ LinkedIR linkIR(
         sharedContext,
         compileRequest->getSession(),
         nullptr,
-        target);
+        target,
+        targetReq);
 
     state->irModule = sharedContext->module;
 

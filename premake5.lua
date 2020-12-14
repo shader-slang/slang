@@ -723,8 +723,6 @@ toolSharedLibrary "render-test"
             includedirs { optixPath .. "include/" }
         end
         
-        links { "cuda", "cudart" }   
-        
         filter { "platforms:x86" }
             libdirs { cudaPath .. "/lib/Win32/" }
            
@@ -767,9 +765,23 @@ tool "gfx"
         addSourceDir "tools/gfx/d3d" 
         addSourceDir "tools/gfx/d3d11"
         addSourceDir "tools/gfx/d3d12"
-        
+        addSourceDir "tools/gfx/cuda"
         addSourceDir "tools/gfx/windows"
-        
+
+        if type(cudaPath) == "string" then
+            defines { "GFX_ENABLE_CUDA" }
+            includedirs { cudaPath .. "/include" }
+            includedirs { cudaPath .. "/include", cudaPath .. "/common/inc" }
+            if optixPath then
+                defines { "GFX_OPTIX" }
+                includedirs { optixPath .. "include/" }
+            end
+            links { "cuda", "cudart" }   
+            filter { "platforms:x86" }
+                libdirs { cudaPath .. "/lib/Win32/" }
+            filter { "platforms:x64" }
+                libdirs { cudaPath .. "/lib/x64/" }
+        end
     elseif targetDetail == "mingw" or targetDetail == "cygwin" then
         -- Don't support any render techs...
     elseif os.target() == "macosx" then
