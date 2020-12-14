@@ -233,6 +233,15 @@ SLANG_API void spSetTargetFloatingPointMode(
     request->setTargetFloatingPointMode(targetIndex, mode);
 }
 
+SLANG_API void spAddTargetCapability(
+    slang::ICompileRequest* request,
+    int                     targetIndex,
+    SlangCapabilityID       capability)
+{
+    SLANG_ASSERT(request);
+    request->addTargetCapability(targetIndex, capability);
+}
+
 SLANG_API void spSetMatrixLayoutMode(
     slang::ICompileRequest*    request,
     SlangMatrixLayoutMode   mode)

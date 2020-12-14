@@ -474,6 +474,12 @@ SLANG_NO_THROW SlangProfileID SLANG_MCALL Session::findProfile(
     return Slang::Profile::lookUp(name).raw;
 }
 
+SLANG_NO_THROW SlangCapabilityID SLANG_MCALL Session::findCapability(
+    char const* name)
+{
+    return SlangCapabilityID(findCapability(name));
+}
+
 SLANG_NO_THROW void SLANG_MCALL Session::setDownstreamCompilerPath(
     SlangPassThrough inPassThrough,
     char const* path)
@@ -571,7 +577,7 @@ DownstreamCompiler* Session::getDefaultDownstreamCompiler(SourceLanguage sourceL
 Profile getEffectiveProfile(EntryPoint* entryPoint, TargetRequest* target)
 {
     auto entryPointProfile = entryPoint->getProfile();
-    auto targetProfile = target->targetProfile;
+    auto targetProfile = target->getTargetProfile();
 
     // Depending on the target *format* we might have to restrict the
     // profile family to one that makes sense.
@@ -579,7 +585,7 @@ Profile getEffectiveProfile(EntryPoint* entryPoint, TargetRequest* target)
     // TODO: Some of this should really be handled as validation at
     // the front-end. People shouldn't be allowed to ask for SPIR-V
     // output with Shader Model 5.0...
-    switch(target->target)
+    switch(target->getTarget())
     {
     default:
         break;
@@ -747,9 +753,9 @@ void Linkage::addTarget(
     auto targetIndex = addTarget(CodeGenTarget(desc.format));
     auto target = targets[targetIndex];
 
-    target->floatingPointMode = FloatingPointMode(desc.floatingPointMode);
-    target->targetFlags = desc.flags;
-    target->targetProfile = Profile(desc.profile);
+    target->setFloatingPointMode(FloatingPointMode(desc.floatingPointMode));
+    target->addTargetFlags(desc.flags);
+    target->setTargetProfile(Profile(desc.profile));
 }
 
 #if 0
@@ -961,6 +967,12 @@ SlangResult Linkage::setMatrixLayoutMode(
 // TargetRequest
 //
 
+TargetRequest::TargetRequest(Linkage* linkage, CodeGenTarget format)
+    : linkage(linkage)
+    , format(format)
+{}
+
+
 Session* TargetRequest::getSession()
 {
     return linkage->getSessionImpl();
@@ -971,10 +983,17 @@ MatrixLayoutMode TargetRequest::getDefaultMatrixLayoutMode()
     return linkage->getDefaultMatrixLayoutMode();
 }
 
+void TargetRequest::addCapability(CapabilityAtom capability)
+{
+    rawCapabilities.add(capability);
+    cookedCapabilities = CapabilitySet::makeEmpty();
+}
+
+
 CapabilitySet TargetRequest::getTargetCaps()
 {
-    if(!targetCaps.isInvalid())
-        return targetCaps;
+    if(!cookedCapabilities.isEmpty())
+        return cookedCapabilities;
 
     // The full `CapabilitySet` for the target will be computed
     // from the combination of the code generation format, and
@@ -996,7 +1015,7 @@ CapabilitySet TargetRequest::getTargetCaps()
     // are available where can be directly encoded on the declarations.
 
     List<CapabilityAtom> atoms;
-    switch(target)
+    switch(format)
     {
     case CodeGenTarget::GLSL:
     case CodeGenTarget::GLSL_Vulkan:
@@ -1033,9 +1052,11 @@ CapabilitySet TargetRequest::getTargetCaps()
     default:
         break;
     }
+    for(auto atom : rawCapabilities)
+        atoms.add(atom);
 
-    targetCaps = CapabilitySet(atoms);
-    return targetCaps;
+    cookedCapabilities = CapabilitySet(atoms);
+    return cookedCapabilities;
 }
 
 
@@ -2136,9 +2157,7 @@ int EndToEndCompileRequest::addEntryPoint(
 UInt Linkage::addTarget(
     CodeGenTarget   target)
 {
-    RefPtr<TargetRequest> targetReq = new TargetRequest();
-    targetReq->linkage = this;
-    targetReq->target = target;
+    RefPtr<TargetRequest> targetReq = new TargetRequest(this, target);
 
     Index result = targets.getCount();
     targets.add(targetReq);
@@ -3681,17 +3700,17 @@ int EndToEndCompileRequest::addCodeGenTarget(SlangCompileTarget target)
 
 void EndToEndCompileRequest::setTargetProfile(int targetIndex, SlangProfileID profile)
 {
-    getLinkage()->targets[targetIndex]->targetProfile = Profile(profile);
+    getLinkage()->targets[targetIndex]->setTargetProfile(Profile(profile));
 }
 
 void EndToEndCompileRequest::setTargetFlags(int targetIndex, SlangTargetFlags flags)
 {
-    getLinkage()->targets[targetIndex]->targetFlags = flags;
+    getLinkage()->targets[targetIndex]->addTargetFlags(flags);
 }
 
 void EndToEndCompileRequest::setTargetFloatingPointMode(int targetIndex, SlangFloatingPointMode  mode)
 {
-    getLinkage()->targets[targetIndex]->floatingPointMode = FloatingPointMode(mode);
+    getLinkage()->targets[targetIndex]->setFloatingPointMode(FloatingPointMode(mode));
 }
 
 void EndToEndCompileRequest::setMatrixLayoutMode(SlangMatrixLayoutMode mode)
@@ -3703,6 +3722,15 @@ void EndToEndCompileRequest::setTargetMatrixLayoutMode(int targetIndex, SlangMat
 {
     SLANG_UNUSED(targetIndex);
     setMatrixLayoutMode(mode);
+}
+
+SlangResult EndToEndCompileRequest::addTargetCapability(SlangInt targetIndex, SlangCapabilityID capability)
+{
+    auto& targets = getLinkage()->targets;
+    if(targetIndex < 0 || targetIndex >= targets.getCount())
+        return SLANG_E_INVALID_ARG;
+    targets[targetIndex]->addCapability(CapabilityAtom(capability));
+    return SLANG_OK;
 }
 
 void EndToEndCompileRequest::setDebugInfoLevel(SlangDebugInfoLevel level)

@@ -542,7 +542,7 @@ Result linkAndOptimizeIR(
         {
         case CodeGenTarget::HLSL:
             {
-                auto profile = targetRequest->targetProfile;
+                auto profile = targetRequest->getTargetProfile();
                 if( profile.getFamily() == ProfileFamily::DX )
                 {
                     if(profile.getVersion() <= ProfileVersion::DX_5_0)

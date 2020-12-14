@@ -4158,19 +4158,21 @@ struct BuiltInTriangleIntersectionAttributes
 
 // 10.3.1
 
+__target_intrinsic(hlsl)
 void CallShader<Payload>(uint shaderIndex, inout Payload payload);
 
 // `executeCallableNV` is the GLSL intrinsic that will be used to implement
 // `CallShader()` for GLSL-based targets.
 //
-__target_intrinsic(glsl, "executeCallableNV")
-void __executeCallableNV(uint shaderIndex, int payloadLocation);
+__target_intrinsic(GL_NV_ray_tracing, "executeCallableNV")
+__target_intrinsic(GL_EXT_ray_tracing, "executeCallableEXT")
+void __executeCallable(uint shaderIndex, int payloadLocation);
 
 // Next is the custom intrinsic that will compute the payload location
 // for a type being used in a `CallShader()` call for GLSL-based targets.
 //
 __generic<Payload>
-__target_intrinsic(glsl, "$XC")
+__target_intrinsic(__glslRayTracing, "$XC")
 [__readNone]
 int __callablePayloadLocation(Payload payload);
 
@@ -4186,11 +4188,12 @@ void CallShader(uint shaderIndex, inout Payload payload)
     static Payload p;
 
     p = payload;
-    __executeCallableNV(shaderIndex, __callablePayloadLocation(p));
+    __executeCallable(shaderIndex, __callablePayloadLocation(p));
     payload = p;
 }
 
 // 10.3.2
+__target_intrinsic(hlsl)
 void TraceRay<payload_t>(
     RaytracingAccelerationStructure AccelerationStructure,
     uint                            RayFlags,
@@ -4201,8 +4204,9 @@ void TraceRay<payload_t>(
     RayDesc                         Ray,
     inout payload_t                 Payload);
 
-__target_intrinsic(glsl, "traceNV")
-void __traceNV(
+__target_intrinsic(GL_NV_ray_tracing, "traceNV")
+__target_intrinsic(GL_EXT_ray_tracing, "traceRayEXT")
+void __traceRay(
     RaytracingAccelerationStructure AccelerationStructure,
     uint                            RayFlags,
     uint                            InstanceInclusionMask,
@@ -4222,7 +4226,7 @@ void __traceNV(
 // syntax works in a pinch.
 //
 __generic<Payload>
-__target_intrinsic(glsl, "$XP")
+__target_intrinsic(__glslRayTracing, "$XP")
 [__readNone]
 int __rayPayloadLocation(Payload payload);
 
@@ -4242,7 +4246,7 @@ void TraceRay(
     static payload_t p;
 
     p = Payload;
-    __traceNV(
+    __traceRay(
         AccelerationStructure,
         RayFlags,
         InstanceInclusionMask,
@@ -4258,10 +4262,12 @@ void TraceRay(
 }
 
 // 10.3.3
+__target_intrinsic(hlsl)
 bool ReportHit<A>(float tHit, uint hitKind, A attributes);
 
-__target_intrinsic(glsl, "reportIntersectionNV")
-bool __reportIntersectionNV(float tHit, uint hitKind);
+__target_intrinsic(GL_NV_ray_tracing, "reportIntersectionNV")
+__target_intrinsic(GL_EXT_ray_tracing, "reportIntersectionEXT")
+bool __reportIntersection(float tHit, uint hitKind);
 
 __generic<A>
 __specialized_for_target(glsl)
@@ -4271,15 +4277,19 @@ bool ReportHit(float tHit, uint hitKind, A attributes)
     static A a;
 
     a = attributes;
-    return __reportIntersectionNV(tHit, hitKind);
+    return __reportIntersection(tHit, hitKind);
 }
 
 // 10.3.4
-__target_intrinsic(glsl, ignoreIntersectionNV)
+__target_intrinsic(hlsl)
+__target_intrinsic(GL_NV_ray_tracing, ignoreIntersectionNV)
+__target_intrinsic(GL_EXT_ray_tracing, ignoreIntersectionEXT)
 void IgnoreHit();
 
 // 10.3.5
-__target_intrinsic(glsl, terminateRayNV)
+__target_intrinsic(hlsl)
+__target_intrinsic(GL_NV_ray_tracing, terminateRayNV)
+__target_intrinsic(GL_EXT_ray_tracing, terminateRayEXT)
 void AcceptHitAndEndSearch();
 
 // 10.4 - System Values and Special Semantics
@@ -4289,22 +4299,27 @@ void AcceptHitAndEndSearch();
 
 // 10.4.1 - Ray Dispatch System Values
 
-__target_intrinsic(glsl, "(gl_LaunchIDNV)")
+__target_intrinsic(GL_NV_ray_tracing, "(gl_LaunchIDNV)")
+__target_intrinsic(GL_EXT_ray_tracing, "(gl_LaunchIDEXT)")
 __target_intrinsic(cuda, "optixGetLaunchIndex")
 uint3 DispatchRaysIndex();
 
-__target_intrinsic(glsl, "(gl_LaunchSizeNV)")
+__target_intrinsic(GL_NV_ray_tracing, "(gl_LaunchSizeNV)")
+__target_intrinsic(GL_EXT_ray_tracing, "(gl_LaunchSizeEXT)")
 uint3 DispatchRaysDimensions();
 
 // 10.4.2 - Ray System Values
 
-__target_intrinsic(glsl, "(gl_WorldRayOriginNV)")
+__target_intrinsic(GL_NV_ray_tracing, "(gl_WorldRayOriginNV)")
+__target_intrinsic(GL_EXT_ray_tracing, "(gl_WorldRayOriginEXT)")
 float3 WorldRayOrigin();
 
-__target_intrinsic(glsl, "(gl_WorldRayDirectionNV)")
+__target_intrinsic(GL_NV_ray_tracing, "(gl_WorldRayDirectionNV)")
+__target_intrinsic(GL_EXT_ray_tracing, "(gl_WorldRayDirectionEXT)")
 float3 WorldRayDirection();
 
-__target_intrinsic(glsl, "(gl_RayTminNV)")
+__target_intrinsic(GL_NV_ray_tracing, "(gl_RayTminNV)")
+__target_intrinsic(GL_EXT_ray_tracing, "(gl_RayTminEXT)")
 float RayTMin();
 
 // Note: The `RayTCurrent()` intrinsic should translate to
@@ -4317,39 +4332,48 @@ float RayTMin();
 // we should simply provide two overloads here, specialized
 // to the appropriate Vulkan stages.
 //
-__target_intrinsic(glsl, "$XT")
+__target_intrinsic(GL_NV_ray_tracing, "(gl_RayTmaxNV)")
+__target_intrinsic(GL_EXT_ray_tracing, "(gl_RayTmaxEXT)")
 float RayTCurrent();
 
-__target_intrinsic(glsl, "(gl_IncomingRayFlagsNV)")
+__target_intrinsic(GL_NV_ray_tracing, "(gl_IncomingRayFlagsNV)")
+__target_intrinsic(GL_EXT_ray_tracing, "(gl_IncomingRayFlagsEXT)")
 uint RayFlags();
 
 // 10.4.3 - Primitive/Object Space System Values
 
-__target_intrinsic(glsl, "(gl_InstanceCustomIndexNV)")
+__target_intrinsic(GL_NV_ray_tracing, "(gl_InstanceCustomIndexNV)")
+__target_intrinsic(GL_EXT_ray_tracing, "(gl_InstanceCustomIndexEXT)")
 uint InstanceIndex();
 
-__target_intrinsic(glsl, "(gl_InstanceID)")
+__target_intrinsic(__glslRayTracing, "(gl_InstanceID)")
 uint InstanceID();
 
-__target_intrinsic(glsl, "(gl_PrimitiveID)")
+__target_intrinsic(__glslRayTracing, "(gl_PrimitiveID)")
 uint PrimitiveIndex();
 
-__target_intrinsic(glsl, "(gl_ObjectRayOriginNV)")
+__target_intrinsic(GL_NV_ray_tracing, "(gl_ObjectRayOriginNV)")
+__target_intrinsic(GL_EXT_ray_tracing, "(gl_ObjectRayOriginEXT)")
 float3 ObjectRayOrigin();
 
-__target_intrinsic(glsl, "(gl_ObjectRayDirectionNV)")
+__target_intrinsic(GL_NV_ray_tracing, "(gl_ObjectRayDirectionNV)")
+__target_intrinsic(GL_EXT_ray_tracing, "(gl_ObjectRayDirectionEXT)")
 float3 ObjectRayDirection();
 
-__target_intrinsic(glsl, "transpose(gl_ObjectToWorldNV)")
+__target_intrinsic(GL_NV_ray_tracing, "transpose(gl_ObjectToWorldNV)")
+__target_intrinsic(GL_EXT_ray_tracing, "transpose(gl_ObjectToWorldEXT)")
 float3x4 ObjectToWorld3x4();
 
-__target_intrinsic(glsl, "transpose(gl_WorldToObjectNV)")
+__target_intrinsic(GL_NV_ray_tracing, "transpose(gl_WorldToObjectNV)")
+__target_intrinsic(GL_EXT_ray_tracing, "transpose(gl_WorldToObjectEXT)")
 float3x4 WorldToObject3x4();
 
-__target_intrinsic(glsl, "(gl_ObjectToWorldNV)")
+__target_intrinsic(GL_NV_ray_tracing, "(gl_ObjectToWorldNV)")
+__target_intrinsic(GL_EXT_ray_tracing, "(gl_ObjectToWorld3x4EXT)")
 float4x3 ObjectToWorld4x3();
 
-__target_intrinsic(glsl, "(gl_WorldToObjectNV)")
+__target_intrinsic(GL_NV_ray_tracing, "(gl_WorldToObjectNV)")
+__target_intrinsic(GL_EXT_ray_tracing, "(gl_WorldToObject3x4EXT)")
 float4x3 WorldToObject4x3();
 
 // Note: The provisional DXR spec included these unadorned
@@ -4365,7 +4389,8 @@ float3x4 ObjectToWorld() { return ObjectToWorld3x4(); }
 float3x4 WorldToObject() { return WorldToObject3x4(); }
 
 // 10.4.4 - Hit Specific System values
-__target_intrinsic(glsl, "(gl_HitKindNV)")
+__target_intrinsic(GL_NV_ray_tracing, "(gl_HitKindNV)")
+__target_intrinsic(GL_EXT_ray_tracing, "(gl_HitKindEXT)")
 uint HitKind();
 
 // Pre-defined hit kinds (not documented explicitly)
@@ -4543,6 +4568,7 @@ struct FeedbackTexture2DArray<T : __BuiltinSamplerFeedbackType>
 //
 
 // Get the index of the geometry that was hit in an intersection, any-hit, or closest-hit shader
+__target_intrinsic(GL_EXT_ray_tracing, "(gl_GeometryIndexEXT)")
 uint GeometryIndex();
 
 // Status of whether a (closest) hit has been committed in a `RayQuery`.

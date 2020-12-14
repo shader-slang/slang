@@ -1,6 +1,15 @@
 // anyhit.slang.glsl
 #version 460
+
+#if USE_NV_RT
 #extension GL_NV_ray_tracing : require
+#define hitAttributeEXT hitAttributeNV
+#define rayPayloadInEXT rayPayloadInNV
+#define terminateRayEXT terminateRayNV
+#define ignoreIntersectionEXT ignoreIntersectionNV
+#else
+#extension GL_EXT_ray_tracing : require
+#endif
 
 struct Params_0
 {
@@ -23,13 +32,13 @@ struct SphereHitAttributes_0
 {
     vec3 normal_0;
 };
-hitAttributeNV SphereHitAttributes_0 _S2;
+hitAttributeEXT SphereHitAttributes_0 _S2;
 
 struct ShadowRay_0
 {
     vec4 hitDistance_0;
 };
-rayPayloadInNV ShadowRay_0 _S3;
+rayPayloadInEXT ShadowRay_0 _S3;
 
 void main()
 {
@@ -43,11 +52,11 @@ void main()
 
         if(val_0 > float(0))
         {
-            terminateRayNV();
+            terminateRayEXT();
         }
         else
         {
-            ignoreIntersectionNV();
+            ignoreIntersectionEXT();
         }
     }
 

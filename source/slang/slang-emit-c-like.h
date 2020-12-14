@@ -176,7 +176,7 @@ public:
     void emitInstResultDecl(IRInst* inst);
 
     IRTargetSpecificDecoration* findBestTargetDecoration(IRInst* inst);
-    IRTargetIntrinsicDecoration* findBestTargetIntrinsicDecorationXXX(IRInst* inst);
+    IRTargetIntrinsicDecoration* findBestTargetIntrinsicDecoration(IRInst* inst);
 
     // Check if the string being used to define a target intrinsic
     // is an "ordinary" name, such that we can simply emit a call

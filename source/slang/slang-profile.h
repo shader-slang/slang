@@ -103,6 +103,7 @@ namespace Slang
 
         ProfileFamily getFamily() const { return getProfileFamily(getVersion()); }
 
+        static Profile lookUp(UnownedStringSlice const& name);
         static Profile lookUp(char const* name);
         char const* getName();
 

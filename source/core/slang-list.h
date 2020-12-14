@@ -498,12 +498,12 @@ namespace Slang
         }
 
         template<typename T2, typename Comparer>
-        Index binarySearch(const T2& obj, Comparer comparer)
+        Index binarySearch(const T2& obj, Comparer comparer) const
         {
             Index imin = 0, imax = m_count - 1;
             while (imax >= imin)
             {
-                Index imid = (imin + imax) >> 1;
+                Index imid = imin + ((imax - imin)>>1);
                 int compareResult = comparer(m_buffer[imid], obj);
                 if (compareResult == 0)
                     return imid;
@@ -512,6 +512,9 @@ namespace Slang
                 else
                     imax = imid - 1;
             }
+            // TODO: The return value on a failed search should be
+            // the bitwise negation of the index where `obj` should
+            // be inserted to be in the proper sorted location.
             return -1;
         }
 

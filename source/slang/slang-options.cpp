@@ -162,6 +162,8 @@ struct OptionsParser
         int                 targetID = -1;
         FloatingPointMode   floatingPointMode = FloatingPointMode::Default;
 
+        List<CapabilityAtom> capabilityAtoms;
+
         // State for tracking command-line errors
         bool conflictingProfilesSet = false;
         bool redundantProfileSet = false;
@@ -391,6 +393,11 @@ struct OptionsParser
             }
         }
         rawTarget->profileVersion = profileVersion;
+    }
+
+    void addCapabilityAtom(RawTarget* rawTarget, CapabilityAtom atom)
+    {
+        rawTarget->capabilityAtoms.add(atom);
     }
 
     void setFloatingPointMode(RawTarget* rawTarget, FloatingPointMode mode)
@@ -655,13 +662,28 @@ struct OptionsParser
                 // specific stage to use for an entry point.
                 else if (argStr == "-profile")
                 {
-                    String name;
-                    SLANG_RETURN_ON_FAIL(tryReadCommandLineArgument(sink, arg, &argCursor, argEnd, name));
+                    String operand;
+                    SLANG_RETURN_ON_FAIL(tryReadCommandLineArgument(sink, arg, &argCursor, argEnd, operand));
 
-                    SlangProfileID profileID = session->findProfile(name.begin());
+                    // A a convenience, the `-profile` option supporst an operand that consists
+                    // of multiple tokens separated with `+`. The eventual goal is that each
+                    // of these tokens will represent a capability that should be assumed to
+                    // be present on the target.
+                    //
+                    List<UnownedStringSlice> slices;
+                    StringUtil::split(operand.getUnownedSlice(), '+', slices);
+                    Index sliceCount = slices.getCount();
+
+                    // For now, we will require that the *first* capability in the list is
+                    // special, and reprsents the traditional `Profile` to compile for in
+                    // the existing Slang model.
+                    //
+                    UnownedStringSlice profileName = sliceCount >= 1 ? slices[0] : UnownedTerminatedStringSlice("");
+
+                    SlangProfileID profileID = Slang::Profile::lookUp(profileName).raw;
                     if( profileID == SLANG_PROFILE_UNKNOWN )
                     {
-                        sink->diagnose(SourceLoc(), Diagnostics::unknownProfile, name);
+                        sink->diagnose(SourceLoc(), Diagnostics::unknownProfile, profileName);
                         return SLANG_FAIL;
                     }
                     else
@@ -677,6 +699,22 @@ struct OptionsParser
                         {
                             setStage(getCurrentEntryPoint(), stage);
                         }
+                    }
+
+                    // Any additional capability tokens will be assumed to represent `CapabilityAtom`s.
+                    // Those atoms will need to be added to the supported capabilities of the target.
+                    // 
+                    for(Index i = 1; i < sliceCount; ++i)
+                    {
+                        UnownedStringSlice atomName = slices[i];
+                        CapabilityAtom atom = findCapabilityAtom(atomName);
+                        if( atom == CapabilityAtom::Invalid )
+                        {
+                            sink->diagnose(SourceLoc(), Diagnostics::unknownProfile, atomName);
+                            return SLANG_FAIL;
+                        }
+
+                        addCapabilityAtom(getCurrentTarget(), atom);
                     }
                 }
                 else if (argStr == "-stage")
@@ -1329,6 +1367,10 @@ struct OptionsParser
             {
                 setProfileVersion(getCurrentTarget(), defaultTarget.profileVersion);
             }
+            for( auto atom : defaultTarget.capabilityAtoms )
+            {
+                addCapabilityAtom(getCurrentTarget(), atom);
+            }
 
             getCurrentTarget()->targetFlags |= defaultTarget.targetFlags;
 
@@ -1411,6 +1453,10 @@ struct OptionsParser
             if( rawTarget.profileVersion != ProfileVersion::Unknown )
             {
                 compileRequest->setTargetProfile(targetID, Profile(rawTarget.profileVersion).raw);
+            }
+            for( auto atom : rawTarget.capabilityAtoms )
+            {
+                requestImpl->addTargetCapability(targetID, SlangCapabilityID(atom));
             }
 
             if( rawTarget.targetFlags )
@@ -1539,7 +1585,7 @@ struct OptionsParser
                 }
                 else
                 {
-                    target->targetFlags |= SLANG_TARGET_FLAG_GENERATE_WHOLE_PROGRAM;
+                    target->addTargetFlags(SLANG_TARGET_FLAG_GENERATE_WHOLE_PROGRAM);
                     targetInfo->wholeTargetOutputPath = rawOutput.path;
                 }
             }

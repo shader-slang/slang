@@ -38,7 +38,23 @@ SlangResult GLSLSourceEmitter::init()
 
 void GLSLSourceEmitter::_requireRayTracing()
 {
-    m_glslExtensionTracker->requireExtension(UnownedStringSlice::fromLiteral("GL_NV_ray_tracing"));
+    // There is more than one extension that provides ray-tracing capabilities,
+    // and we need to pick which one to enable.
+    //
+    // By default, we will use the `GL_EXT_ray_tracing` extension, but if
+    // the user has explicitly opted in to the `GL_NV_ray_tracing` extension
+    // we will use that one instead.
+    //
+    if( getTargetCaps().implies(CapabilityAtom::GL_NV_ray_tracing) )
+    {
+        m_glslExtensionTracker->requireExtension(UnownedStringSlice::fromLiteral("GL_NV_ray_tracing"));
+    }
+    else
+    {
+        m_glslExtensionTracker->requireExtension(UnownedStringSlice::fromLiteral("GL_EXT_ray_tracing"));
+        m_glslExtensionTracker->requireSPIRVVersion(SemanticVersion(1, 4));
+    }
+
     m_glslExtensionTracker->requireVersion(ProfileVersion::GLSL_460);
 }
 
@@ -542,7 +558,14 @@ bool GLSLSourceEmitter::_emitGLSLLayoutQualifier(LayoutResourceKind kind, EmitVa
             m_writer->emit("layout(push_constant)\n");
             break;
         case LayoutResourceKind::ShaderRecord:
-            m_writer->emit("layout(shaderRecordNV)\n");
+            if( getTargetCaps().implies(CapabilityAtom::GL_NV_ray_tracing) )
+            {
+                m_writer->emit("layout(shaderRecordNV)\n");
+            }
+            else
+            {
+                m_writer->emit("layout(shaderRecordEXT)\n");
+            }
             break;
 
     }
@@ -1029,19 +1052,40 @@ void GLSLSourceEmitter::emitLayoutQualifiersImpl(IRVarLayout* layout)
 
             case LayoutResourceKind::RayPayload:
             {
-                m_writer->emit("rayPayloadInNV ");
+                if( getTargetCaps().implies(CapabilityAtom::GL_NV_ray_tracing) )
+                {
+                    m_writer->emit("rayPayloadInNV ");
+                }
+                else
+                {
+                    m_writer->emit("rayPayloadInEXT ");
+                }
             }
             break;
 
             case LayoutResourceKind::CallablePayload:
             {
-                m_writer->emit("callableDataInNV ");
+                if( getTargetCaps().implies(CapabilityAtom::GL_NV_ray_tracing) )
+                {
+                    m_writer->emit("callableDataInNV ");
+                }
+                else
+                {
+                    m_writer->emit("callableDataInEXT ");
+                }
             }
             break;
 
             case LayoutResourceKind::HitAttributes:
             {
-                m_writer->emit("hitAttributeNV ");
+                if( getTargetCaps().implies(CapabilityAtom::GL_NV_ray_tracing) )
+                {
+                    m_writer->emit("hitAttributeNV ");
+                }
+                else
+                {
+                    m_writer->emit("hitAttributeEXT ");
+                }
             }
             break;
 
@@ -1704,7 +1748,15 @@ void GLSLSourceEmitter::emitSimpleTypeImpl(IRType* type)
             case kIROp_RaytracingAccelerationStructureType:
             {
                 _requireRayTracing();
-                m_writer->emit("accelerationStructureNV");
+
+                if( getTargetCaps().implies(CapabilityAtom::GL_NV_ray_tracing) )
+                {
+                    m_writer->emit("accelerationStructureNV");
+                }
+                else
+                {
+                    m_writer->emit("accelerationStructureEXT");
+                }
                 break;
             }
 
@@ -1806,19 +1858,40 @@ void GLSLSourceEmitter::emitVarDecorationsImpl(IRInst* varDecl)
         m_writer->emit("layout(location = ");
         m_writer->emit(getRayPayloadLocation(varDecl));
         m_writer->emit(")\n");
-        m_writer->emit("rayPayloadNV\n");
+        if( getTargetCaps().implies(CapabilityAtom::GL_NV_ray_tracing) )
+        {
+            m_writer->emit("rayPayloadNV\n");
+        }
+        else
+        {
+            m_writer->emit("rayPayloadEXT\n");
+        }
     }
     if (varDecl->findDecoration<IRVulkanCallablePayloadDecoration>())
     {
         m_writer->emit("layout(location = ");
         m_writer->emit(getCallablePayloadLocation(varDecl));
         m_writer->emit(")\n");
-        m_writer->emit("callableDataNV\n");
+        if( getTargetCaps().implies(CapabilityAtom::GL_NV_ray_tracing) )
+        {
+            m_writer->emit("callableDataNV\n");
+        }
+        else
+        {
+            m_writer->emit("callableDataEXT\n");
+        }
     }
 
     if (varDecl->findDecoration<IRVulkanHitAttributesDecoration>())
     {
-        m_writer->emit("hitAttributeNV\n");
+        if( getTargetCaps().implies(CapabilityAtom::GL_NV_ray_tracing) )
+        {
+            m_writer->emit("hitAttributeNV\n");
+        }
+        else
+        {
+            m_writer->emit("hitAttributeEXT\n");
+        }
     }
 
     if (varDecl->findDecoration<IRGloballyCoherentDecoration>())

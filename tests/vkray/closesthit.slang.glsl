@@ -59,7 +59,7 @@ void main()
 
     vec4 color_1 = colors_0._data[tmp_add_1 + tmp_hitkind + ShaderRecord_0._data.shaderRecordID_0];
 
-    float tmp_hitt = gl_HitTNV;
+    float tmp_hitt = gl_RayTmaxNV;
     float tmp_tmin = gl_RayTminNV;
 
     tmp_payload.color_0 = color_1 * (tmp_hitt - tmp_tmin);
