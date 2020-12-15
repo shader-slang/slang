@@ -3892,12 +3892,14 @@ void CLikeSourceEmitter::executeEmitActions(List<EmitAction> const& actions)
     }
 }
 
-void CLikeSourceEmitter::emitModuleImpl(IRModule* module)
+void CLikeSourceEmitter::emitModuleImpl(IRModule* module, DiagnosticSink* sink)
 {
     // The IR will usually come in an order that respects
     // dependencies between global declarations, but this
     // isn't guaranteed, so we need to be careful about
     // the order in which we emit things.
+
+    SLANG_UNUSED(sink);
 
     List<EmitAction> actions;
 

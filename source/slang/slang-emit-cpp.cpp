@@ -2553,7 +2553,7 @@ void CPPSourceEmitter::_emitForwardDeclarations(const List<EmitAction>& actions)
     }
 }
 
-void CPPSourceEmitter::emitModuleImpl(IRModule* module)
+void CPPSourceEmitter::emitModuleImpl(IRModule* module, DiagnosticSink* sink)
 {
     // If we are emitting a heterogeneous program
     // Emit the binary blob of each non-CPP target
@@ -2589,34 +2589,43 @@ void CPPSourceEmitter::emitModuleImpl(IRModule* module)
                             default:
 
                                 auto targetProgram = program->getTargetProgram(targetRequest);
-                                DiagnosticSink sink(linkage->getSourceManager());
+                                //DiagnosticSink sink(linkage->getSourceManager());
                                 CompileResult result =
-                                    targetProgram->getOrCreateEntryPointResult(index, &sink);
+                                    targetProgram->getOrCreateEntryPointResult(index, sink);
 
                                 Slang::ComPtr<ISlangBlob> blob;
                                 if (SLANG_FAILED(result.getBlob(blob)))
                                 {
-                                    SLANG_UNEXPECTED("No blob to emit");
-                                    return;
+                                    StringBuilder builder;
+                                    sink->diagnoseRaw(Severity::Error, UnownedStringSlice
+                                        ("Slang heterogeneous error: No blob to emit\n"));
+                                    m_writer->emit("size_t __");
+                                    m_writer->emit(entryPointName);
+                                    m_writer->emit("Size = 0;\n");
+                                    m_writer->emit("unsigned char __");
+                                    m_writer->emit(entryPointName);
+                                    m_writer->emit("[];\n");
                                 }
 
-                                auto ptr = (const unsigned char*)blob->getBufferPointer();
+                                else {
+                                    auto ptr = (const unsigned char*)blob->getBufferPointer();
 
-                                m_writer->emit("size_t __");
-                                m_writer->emit(entryPointName );
-                                m_writer->emit("Size = ");
-                                m_writer->emitInt64(blob->getBufferSize());
-                                m_writer->emit(";\n");
+                                    m_writer->emit("size_t __");
+                                    m_writer->emit(entryPointName);
+                                    m_writer->emit("Size = ");
+                                    m_writer->emitInt64(blob->getBufferSize());
+                                    m_writer->emit(";\n");
 
-                                m_writer->emit("unsigned char __");
-                                m_writer->emit(entryPointName );
-                                m_writer->emit("[] = {");
-                                for (unsigned int i = 0; i < blob->getBufferSize() - 1; i++) {
-                                    m_writer->emitUInt64(ptr[i]);
-                                    m_writer->emit(", ");
+                                    m_writer->emit("unsigned char __");
+                                    m_writer->emit(entryPointName);
+                                    m_writer->emit("[] = {");
+                                    for (unsigned int i = 0; i < blob->getBufferSize() - 1; i++) {
+                                        m_writer->emitUInt64(ptr[i]);
+                                        m_writer->emit(", ");
+                                    }
+                                    m_writer->emitUInt64(ptr[blob->getBufferSize() - 1]);
+                                    m_writer->emit("};\n");
                                 }
-                                m_writer->emitUInt64(ptr[blob->getBufferSize() - 1]);
-                                m_writer->emit("};\n");
                             }
                         }
                         // Emit a wrapper function for calling the shader blob
