@@ -27,10 +27,12 @@ Some targets below are described as 'unofficial'. In practice this means that th
 
 ### Generated Files
 
-Slang as part of it's build process generates header files, which are then used to compile the main Slang project. If you use `premake` to create your project, it will automatically generate these files before compiling the rest of the Slang. These are the current header generations which are created via the `slang-generate` tool... 
+Slang as part of it's build process generates header files, which are then used to compile the main Slang project. If you use `premake` to create your project, it will automatically generate these files before compiling the rest of the Slang. These are the current header generations which are created via the `slang-generate` and other tools... 
 
 * core.meta.slang -> core.meta.slang.h
 * hlsl.meta.slang -> hlsl.meta.slang.h 
+
+Other files that are generated have `generated` as part of their name.
 
 It may be necessary or desirable to create a build of Slang without using `premake`. 
 
@@ -38,13 +40,41 @@ One way to do this would be to first compile slang-generate and then invoke it d
 
 ## Premake
 
-Slang uses the tool [`premake5`](https://premake.github.io/) in order to generate projects that can be built on different targets. On Linux premake will generate Makefile/s and on windows it will generate a Visual Studio solution. Information on invoking premake for different kinds of targets can be found [here](https://github.com/premake/premake-core/wiki/Using-Premake). You can also run with `--help` to see available command line options
+Slang uses the tool [`premake5`](https://premake.github.io/) in order to generate projects that can be built on different targets. On Linux premake will generate Makefile/s and on windows it will generate a Visual Studio solution. Information on invoking premake for different kinds of targets can be found [here](https://github.com/premake/premake-core/wiki/Using-Premake). 
 
+Slang includes `premake5` as part of `slang-binaries` which is in the `external` directory. For the external directory to be setup it is necessary to have updated submodules with `git submodule update --init`. 
+
+If you are on a unix-like operating system such as OSX/Linux, it may be necesary to make premake5 executable. Use 
+
+```
+% chmod u+x external/slang-binaries/premake/***path to premake version and os***/premake5
+```
+
+Alternatively you can download and install [`premake5`](https://premake.github.io/) on your build system. 
+
+You can run `premake5` with `--help` to see available command line options (assuming premake5 is in your `PATH`):
+ 
 ```
 % premake5 --help
 ```
 
+For Unix like targets that might have `clang` or `gcc` compilers available you can select which one via the `-cc` option. For example...
+
+```
+% premake5 gmake --cc=clang
+```
+
+or 
+
+```
+% premake5 gmake --cc=clang
+```
+
+If you want to build the [`glslang`](https://github.com/KhronosGroup/glslang) library that Slang uses, add the option `--build-glslang=true`.
+
 # Projects using `make`
+
+The Slang project does not include Makefiles by default - they need to be generated via `premake`. Please read the section on your target operating system on how to use `premake` to create Makefiles. 
 
 If building a Makefile based project, for example on Linux, OSX or [Cygwin](https://cygwin.com/), the configuration needs to be specified when invoking make, the following are typical...
 
@@ -83,16 +113,12 @@ These should create a slang.sln in the same directory and which you can then ope
 
 ### Linux 
 
-First download and install [`premake5`](https://premake.github.io/) on your build system. In the terminal go to the root directory of the slang source tree (ie the directory containing `slang.h`). Assuming premake5 is in your `PATH` use  
+On Linux we need to generate Makefiles using `premake`. Please read the `premake` section for more details. 
+
+In the terminal go to the root directory of the slang source tree (ie the directory containing `slang.h`). Assuming `premake5` is in your `PATH` use  
 
 ```
 % premake5 gmake 
-```
- 
-You can vary the compiler to use via the --cc option with 'gcc' or 'clang' for example
-
-```
-% premake5 gmake --cc=clang
 ```
 
 To create a release build use
@@ -100,32 +126,20 @@ To create a release build use
 ```
 % make config=release_x64
 ```
+ 
+You can vary the compiler to use via the --cc option with 'gcc' or 'clang' for example
 
 ### Mac OSX
 
 Note that OSX isn't an official target. 
 
-After doing `git submodule update --init`, this should have made `slang-binaries` available within `external`. This contains a suitable `premake5` version for OSX. Currently the path is 
-
-`external\slang-binaries\premake\premake-5.0.0-alpha13\bin\osx`
-
-Initially the premake5 binary in this directory is not executable, you can make it so by typing 
-
-```
-% chmod u+x premake5
-```
-
-in that directory. 
-
-Alternatively you can download and install [`premake5`](https://premake.github.io/) on your build system. Open up a command line and go to the root directory of the slang source tree (ie the directory containing `slang.h`).
- 
-Assuming premake5 is in your `PATH`, you can create a `Makefile` to build slang and tests components with
+On Mac OSX to generate Makefiles or an XCode project we use `premake`. Please read the `premake` section for more details. 
 
 ```
 % premake5 gmake 
 ```
 
-If you want to build `glslang` (necessary for Slang to output SPIR-V for example), then the additional `build-glslang` option should be given to premake
+If you want to build `glslang` (necessary for Slang to output SPIR-V for example), then the additional `--build-glslang` option should be used
 
 ```
 % premake5 gmake --build-glslang=true
@@ -154,8 +168,6 @@ One issue with building on [Cygwin](https://cygwin.com/), is that there isn't a 
 ```
 % premake5 --target-detail=cygwin gmake
 ```
-
-If you want to specify the toolset use `--cc=gcc` or `--cc=clang` on the command line. 
 
 ## Testing
 
