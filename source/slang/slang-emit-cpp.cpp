@@ -2589,25 +2589,24 @@ void CPPSourceEmitter::emitModuleImpl(IRModule* module, DiagnosticSink* sink)
                             default:
 
                                 auto targetProgram = program->getTargetProgram(targetRequest);
-                                //DiagnosticSink sink(linkage->getSourceManager());
                                 CompileResult result =
                                     targetProgram->getOrCreateEntryPointResult(index, sink);
 
                                 Slang::ComPtr<ISlangBlob> blob;
                                 if (SLANG_FAILED(result.getBlob(blob)))
                                 {
-                                    StringBuilder builder;
-                                    sink->diagnoseRaw(Severity::Error, UnownedStringSlice
-                                        ("Slang heterogeneous error: No blob to emit\n"));
+                                    sink->diagnoseRaw(Severity::Error,
+                                        "Slang heterogeneous error: No blob to emit\n");
                                     m_writer->emit("size_t __");
                                     m_writer->emit(entryPointName);
                                     m_writer->emit("Size = 0;\n");
                                     m_writer->emit("unsigned char __");
                                     m_writer->emit(entryPointName);
-                                    m_writer->emit("[];\n");
+                                    m_writer->emit("[1];\n");
                                 }
 
-                                else {
+                                else
+                                {
                                     auto ptr = (const unsigned char*)blob->getBufferPointer();
 
                                     m_writer->emit("size_t __");
@@ -2619,11 +2618,18 @@ void CPPSourceEmitter::emitModuleImpl(IRModule* module, DiagnosticSink* sink)
                                     m_writer->emit("unsigned char __");
                                     m_writer->emit(entryPointName);
                                     m_writer->emit("[] = {");
-                                    for (unsigned int i = 0; i < blob->getBufferSize() - 1; i++) {
+                                    // every 20 bytes, emit a newline
+                                    size_t j = 0;
+                                    for (size_t i = 0; i < blob->getBufferSize(); i++) {
                                         m_writer->emitUInt64(ptr[i]);
                                         m_writer->emit(", ");
+                                        if (j == 20)
+                                        {
+                                            m_writer->emit("\n");
+                                            j = 0;
+                                        }
+                                        j++;
                                     }
-                                    m_writer->emitUInt64(ptr[blob->getBufferSize() - 1]);
                                     m_writer->emit("};\n");
                                 }
                             }
