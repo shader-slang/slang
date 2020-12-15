@@ -23,9 +23,11 @@ jobs:
       run: 
         CC=${{matrix.compiler}}
         CONFIGURATION=${{matrix.configuration}}
+        OS=linux-64
         source ./github_build.sh
     - name: test
       run: 
         CONFIGURATION=${{matrix.configuration}}
         CC=${{matrix.compiler}}
+        OS=linux-64
         source ./github_test.sh

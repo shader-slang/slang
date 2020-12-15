@@ -22,9 +22,11 @@ jobs:
       run: 
         CC=clang
         CONFIGURATION=${{matrix.configuration}}
+        OS=osx
         source ./github_build.sh
     - name: test
       run: 
         CONFIGURATION=${{matrix.configuration}}
         CC=clang
+        OS=osx
         source ./github_test.sh
