@@ -1,0 +1,30 @@
+name: MacOS
+
+on:
+  push:
+    branches: [ master ]
+  pull_request:
+    branches: [ master ]
+
+jobs:
+  build:
+
+    runs-on: macos-latest
+    strategy:
+      matrix:
+        configuration: ['debug', 'release']
+    steps:
+    - uses: actions/checkout@v2.3.4
+      with:
+        submodules: 'true'
+        fetch-depth: '0'
+    - name: build
+      run: 
+        CC=clang
+        CONFIGURATION=${{matrix.configuration}}
+        source ./github_build.sh
+    - name: test
+      run: 
+        CONFIGURATION=${{matrix.configuration}}
+        CC=clang
+        source ./github_test.sh
