@@ -1251,7 +1251,7 @@ private:
         }
         //
         // The argument data for the entry-point parameters are already
-        // stored in host memory in a CUDARootShaderObject, as expected by cuLaunchKernel.
+        // stored in host memory in a CUDAEntryPointShaderObject, as expected by cuLaunchKernel.
         //
         auto entryPointBuffer = currentRootObject->entryPointObjects[kernelId]->getBuffer();
         auto entryPointDataSize = currentRootObject->entryPointObjects[kernelId]->getBufferSize();
