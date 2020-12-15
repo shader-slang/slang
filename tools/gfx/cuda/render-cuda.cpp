@@ -293,7 +293,6 @@ public:
 
     CUDAShaderObjectLayout(slang::TypeLayoutReflection* layout)
     {
-        Index resourceCount = 0;
         Index subObjectCount = 0;
 
         typeLayout = unwrapParameterGroups(layout);
