@@ -530,17 +530,11 @@ public:
     }
 };
 
-class CUDARootShaderObject : public CUDAShaderObject
+class CUDAEntryPointShaderObject : public CUDAShaderObject
 {
 public:
     void* hostBuffer = nullptr;
     size_t uniformBufferSize = 0;
-
-    List<RefPtr<CUDAShaderObject>> entryPointObjects;
-    virtual SlangResult init(Renderer* renderer, CUDAShaderObjectLayout* typeLayout) override;
-    virtual Slang::Index getEntryPointCount() override { return entryPointObjects.getCount(); }
-    virtual ShaderObject* getEntryPoint(Slang::Index index) override { return entryPointObjects[index].Ptr(); }
-
     // Override buffer allocation so we store all uniform data on host memory instead of device memory.
     virtual SlangResult initBuffer(Renderer* renderer, size_t bufferSize) override
     {
@@ -569,10 +563,20 @@ public:
         return uniformBufferSize;
     }
 
-    ~CUDARootShaderObject()
+    ~CUDAEntryPointShaderObject()
     {
         free(hostBuffer);
     }
+};
+
+class CUDARootShaderObject : public CUDAShaderObject
+{
+public:
+    List<RefPtr<CUDAEntryPointShaderObject>> entryPointObjects;
+    virtual SlangResult init(Renderer* renderer, CUDAShaderObjectLayout* typeLayout) override;
+    virtual Slang::Index getEntryPointCount() override { return entryPointObjects.getCount(); }
+    virtual ShaderObject* getEntryPoint(Slang::Index index) override { return entryPointObjects[index].Ptr(); }
+
 };
 
 class CUDARenderer : public Renderer
@@ -1479,7 +1483,7 @@ SlangResult CUDARootShaderObject::init(Renderer* renderer, CUDAShaderObjectLayou
     auto programLayout = dynamic_cast<CUDAProgramLayout*>(typeLayout);
     for (auto& entryPoint : programLayout->entryPointLayouts)
     {
-        RefPtr<CUDAShaderObject> object = new CUDAShaderObject();
+        RefPtr<CUDAEntryPointShaderObject> object = new CUDAEntryPointShaderObject();
         SLANG_RETURN_ON_FAIL(object->init(renderer, entryPoint));
         entryPointObjects.add(object);
     }
