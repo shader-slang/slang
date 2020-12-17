@@ -477,7 +477,7 @@ SLANG_NO_THROW SlangProfileID SLANG_MCALL Session::findProfile(
 SLANG_NO_THROW SlangCapabilityID SLANG_MCALL Session::findCapability(
     char const* name)
 {
-    return SlangCapabilityID(findCapability(name));
+    return SlangCapabilityID(Slang::findCapabilityAtom(UnownedTerminatedStringSlice(name)));
 }
 
 SLANG_NO_THROW void SLANG_MCALL Session::setDownstreamCompilerPath(
