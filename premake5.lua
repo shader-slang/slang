@@ -1224,7 +1224,7 @@ standardProject("slang-spirv-tools", nil)
 -- The following is a tailored build of glslang that pulls in the pieces we care
 -- about whle trying to leave out the rest:
 --
-standardProject("slang-glslang", nil)
+standardProject("slang-glslang", "source/slang-glslang")
     uuid "C495878A-832C-485B-B347-0998A90CC936"
     kind "SharedLib"
     pic "On"

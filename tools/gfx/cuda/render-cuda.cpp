@@ -255,11 +255,8 @@ public:
     {
         slang::BindingType bindingType;
         Index count;
-        Index baseIndex;
-        Index descriptorSetIndex;
-        Index rangeIndexInDescriptorSet;
-        Index uniformOffset;
-        //        Index   subObjectRangeIndex = -1;
+        Index baseIndex; // Flat index for sub-ojects
+        Index uniformOffset; // Uniform offset for a resource typed field.
     };
 
     struct SubObjectRangeInfo
@@ -270,13 +267,6 @@ public:
 
     List<SubObjectRangeInfo> subObjectRanges;
     List<BindingRangeInfo> m_bindingRanges;
-
-    Index m_resourceViewCount = 0;
-    Index m_samplerCount = 0;
-    Index m_combinedTextureSamplerCount = 0;
-    Index m_subObjectCount = 0;
-    Index m_varyingInputCount = 0;
-    Index m_varyingOutputCount = 0;
 
     slang::TypeLayoutReflection* unwrapParameterGroups(slang::TypeLayoutReflection* typeLayout)
     {
@@ -303,6 +293,8 @@ public:
 
     CUDAShaderObjectLayout(slang::TypeLayoutReflection* layout)
     {
+        Index subObjectCount = 0;
+
         typeLayout = unwrapParameterGroups(layout);
 
         // Compute the binding ranges that are used to store
@@ -331,45 +323,18 @@ public:
             case slang::BindingType::ConstantBuffer:
             case slang::BindingType::ParameterBlock:
             case slang::BindingType::ExistentialValue:
-                baseIndex = m_subObjectCount;
-                m_subObjectCount += count;
-                break;
-
-            case slang::BindingType::Sampler:
-                baseIndex = m_samplerCount;
-                m_samplerCount += count;
-                break;
-
-            case slang::BindingType::CombinedTextureSampler:
-                baseIndex = m_combinedTextureSamplerCount;
-                m_combinedTextureSamplerCount += count;
-                break;
-
-            case slang::BindingType::VaryingInput:
-                baseIndex = m_varyingInputCount;
-                m_varyingInputCount += count;
-                break;
-
-            case slang::BindingType::VaryingOutput:
-                baseIndex = m_varyingOutputCount;
-                m_varyingOutputCount += count;
+                baseIndex = subObjectCount;
+                subObjectCount += count;
                 break;
 
             default:
-                baseIndex = m_resourceViewCount;
-                m_resourceViewCount += count;
                 break;
             }
 
             BindingRangeInfo bindingRangeInfo;
             bindingRangeInfo.bindingType = slangBindingType;
             bindingRangeInfo.count = count;
-            //                bindingRangeInfo.descriptorSetIndex = descriptorSetIndex;
-            //                bindingRangeInfo.rangeIndexInDescriptorSet = slotRangeIndex;
-            //                bindingRangeInfo.subObjectRangeIndex = subObjectRangeIndex;
             bindingRangeInfo.baseIndex = baseIndex;
-            bindingRangeInfo.descriptorSetIndex = descriptorSetIndex;
-            bindingRangeInfo.rangeIndexInDescriptorSet = rangeIndexInDescriptorSet;
             bindingRangeInfo.uniformOffset = uniformOffset;
             m_bindingRanges.add(bindingRangeInfo);
         }
@@ -451,10 +416,33 @@ public:
 
     virtual SlangResult init(Renderer* renderer, CUDAShaderObjectLayout* typeLayout);
 
+    virtual SlangResult initBuffer(Renderer* renderer, size_t bufferSize)
+    {
+        BufferResource::Desc bufferDesc;
+        bufferDesc.init(bufferSize);
+        bufferDesc.cpuAccessFlags |= Resource::AccessFlag::Write;
+        RefPtr<BufferResource> constantBuffer;
+        SLANG_RETURN_ON_FAIL(renderer->createBufferResource(
+            Resource::Usage::ConstantBuffer, bufferDesc, nullptr, constantBuffer.writeRef()));
+        bufferResource = dynamic_cast<MemoryCUDAResource*>(constantBuffer.Ptr());
+        return SLANG_OK;
+    }
+
+    virtual void* getBuffer()
+    {
+        return bufferResource ? bufferResource->m_cudaMemory : nullptr;
+    }
+
+    virtual size_t getBufferSize()
+    {
+        return bufferResource ? bufferResource->getDesc().sizeInBytes : 0;
+    }
+
     virtual slang::TypeLayoutReflection* getElementTypeLayout() override
     {
         return layout->typeLayout;
     }
+
     virtual Slang::Index getEntryPointCount() override { return 0; }
     virtual ShaderObject* getEntryPoint(Slang::Index index) override { return nullptr; }
     virtual SlangResult setData(ShaderOffset const& offset, void const* data, size_t size)
@@ -542,13 +530,53 @@ public:
     }
 };
 
+class CUDAEntryPointShaderObject : public CUDAShaderObject
+{
+public:
+    void* hostBuffer = nullptr;
+    size_t uniformBufferSize = 0;
+    // Override buffer allocation so we store all uniform data on host memory instead of device memory.
+    virtual SlangResult initBuffer(Renderer* renderer, size_t bufferSize) override
+    {
+        uniformBufferSize = bufferSize;
+        hostBuffer = malloc(bufferSize);
+        return SLANG_OK;
+    }
+
+    virtual SlangResult setData(ShaderOffset const& offset, void const* data, size_t size) override
+    {
+        size = Math::Min(size, uniformBufferSize - offset.uniformOffset);
+        memcpy(
+            (uint8_t*)hostBuffer + offset.uniformOffset,
+            data,
+            size);
+        return SLANG_OK;
+    }
+
+    virtual void* getBuffer() override
+    {
+        return hostBuffer;
+    }
+
+    virtual size_t getBufferSize() override
+    {
+        return uniformBufferSize;
+    }
+
+    ~CUDAEntryPointShaderObject()
+    {
+        free(hostBuffer);
+    }
+};
+
 class CUDARootShaderObject : public CUDAShaderObject
 {
 public:
-    List<RefPtr<CUDAShaderObject>> entryPointObjects;
+    List<RefPtr<CUDAEntryPointShaderObject>> entryPointObjects;
     virtual SlangResult init(Renderer* renderer, CUDAShaderObjectLayout* typeLayout) override;
     virtual Slang::Index getEntryPointCount() override { return entryPointObjects.getCount(); }
     virtual ShaderObject* getEntryPoint(Slang::Index index) override { return entryPointObjects[index].Ptr(); }
+
 };
 
 class CUDARenderer : public Renderer
@@ -1222,45 +1250,15 @@ private:
                 0);
         }
         //
-        // In the case of the entry-point parameters, we have to deal with
-        // two different wrinkles.
+        // The argument data for the entry-point parameters are already
+        // stored in host memory in a CUDAEntryPointShaderObject, as expected by cuLaunchKernel.
         //
-        // First, the `bindRoot` will have the entry-point argument data
-        // stored in a GPU-memory buffer, but we actually need it to be
-        // in host CPU memory. We handle that for now by allocating a
-        // temporary host memory buffer (if needed) and copying the data
-        // from device to host.
-        //
-        auto entryPointBuffer = currentRootObject->entryPointObjects[kernelId]->bufferResource.Ptr();
-        size_t entryPointDataSize = entryPointBuffer ? entryPointBuffer->getDesc().sizeInBytes : 0;
-        void* entryPointHostData = nullptr;
-        if (entryPointDataSize)
-        {
-            entryPointHostData = alloca(entryPointDataSize);
-            cudaMemcpy(
-                entryPointHostData,
-                (void*)entryPointBuffer->getBindlessHandle(),
-                entryPointDataSize,
-                cudaMemcpyDeviceToHost);
-        }
-        //
-        // Second, the argument data for the entry-point parameters has
-        // been allocated and filled in as a single buffer, but `cuLaunchKernel`
-        // defaults to taking pointers to each of the kernel arguments.
-        //
-        // We could loop over the entry-point parameters using the refleciton
-        // information, and set up a pointer to each using the offset stored
-        // for it in the reflection data. Such an approach would require
-        // us to create and fill in a dynamically-sized array here.
-        //
-        // Instead, we take advantage of a documented but seldom-used feature
-        // of `cuLaunchKernel` that allows the argument data for all of the
-        // kernel "launch parameters" to be specified as a single buffer.
-        //
+        auto entryPointBuffer = currentRootObject->entryPointObjects[kernelId]->getBuffer();
+        auto entryPointDataSize = currentRootObject->entryPointObjects[kernelId]->getBufferSize();
         
         void* extraOptions[] = {
             CU_LAUNCH_PARAM_BUFFER_POINTER,
-            (void*)entryPointHostData,
+            entryPointBuffer,
             CU_LAUNCH_PARAM_BUFFER_SIZE,
             &entryPointDataSize,
             CU_LAUNCH_PARAM_END,
@@ -1438,13 +1436,7 @@ SlangResult CUDAShaderObject::init(Renderer* renderer, CUDAShaderObjectLayout* t
     size_t uniformSize = layout->typeLayout->getSize();
     if (uniformSize)
     {
-        BufferResource::Desc bufferDesc;
-        bufferDesc.init(uniformSize);
-        bufferDesc.cpuAccessFlags |= Resource::AccessFlag::Write;
-        RefPtr<BufferResource> constantBuffer;
-        SLANG_RETURN_ON_FAIL(renderer->createBufferResource(
-            Resource::Usage::ConstantBuffer, bufferDesc, nullptr, constantBuffer.writeRef()));
-        bufferResource = dynamic_cast<MemoryCUDAResource*>(constantBuffer.Ptr());
+        initBuffer(renderer, uniformSize);
     }
 
     // If the layout specifies that we have any sub-objects, then
@@ -1491,7 +1483,7 @@ SlangResult CUDARootShaderObject::init(Renderer* renderer, CUDAShaderObjectLayou
     auto programLayout = dynamic_cast<CUDAProgramLayout*>(typeLayout);
     for (auto& entryPoint : programLayout->entryPointLayouts)
     {
-        RefPtr<CUDAShaderObject> object = new CUDAShaderObject();
+        RefPtr<CUDAEntryPointShaderObject> object = new CUDAEntryPointShaderObject();
         SLANG_RETURN_ON_FAIL(object->init(renderer, entryPoint));
         entryPointObjects.add(object);
     }
