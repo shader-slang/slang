@@ -3,6 +3,7 @@
 //TEST_INPUT:ubuffer(random(float, 4096, -1.0, 1.0), stride=4):name=ioBuffer
 RWStructuredBuffer<float> convertBuffer(Ptr<gfx::BufferResource> x);
 
+[shader("compute")]
 [numthreads(4, 1, 1)]
 void computeMain(uniform RWStructuredBuffer<float> ioBuffer, uint3 dispatchThreadID : SV_DispatchThreadID)
 {

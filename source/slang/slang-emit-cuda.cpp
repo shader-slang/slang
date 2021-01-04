@@ -729,7 +729,7 @@ bool CUDASourceEmitter::tryEmitGlobalParamImpl(IRGlobalParam* varDecl, IRType* v
 }
 
 
-void CUDASourceEmitter::emitModuleImpl(IRModule* module)
+void CUDASourceEmitter::emitModuleImpl(IRModule* module, DiagnosticSink* sink)
 {
     // Setup all built in types used in the module
     m_typeSet.addAllBuiltinTypes(module);
@@ -747,7 +747,7 @@ void CUDASourceEmitter::emitModuleImpl(IRModule* module)
 
     // TODO(JS): We may need to generate types (for example for matrices)
 
-    CLikeSourceEmitter::emitModuleImpl(module);
+    CLikeSourceEmitter::emitModuleImpl(module, sink);
 
     // Emit all witness table definitions.
     _emitWitnessTableDefinitions();

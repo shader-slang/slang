@@ -71,7 +71,7 @@ protected:
 
     virtual void emitPreprocessorDirectivesImpl() SLANG_OVERRIDE;
 
-    virtual void emitModuleImpl(IRModule* module) SLANG_OVERRIDE;
+    virtual void emitModuleImpl(IRModule* module, DiagnosticSink* sink) SLANG_OVERRIDE;
 
     // CPPSourceEmitter overrides 
     virtual SlangResult calcTypeName(IRType* type, CodeGenTarget target, StringBuilder& out) SLANG_OVERRIDE;

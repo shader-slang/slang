@@ -283,7 +283,8 @@ public:
     void computeEmitActions(IRModule* module, List<EmitAction>& ioActions);
 
     void executeEmitActions(List<EmitAction> const& actions);
-    void emitModule(IRModule* module) { m_irModule = module; emitModuleImpl(module); }
+    void emitModule(IRModule* module, DiagnosticSink* sink)
+        { m_irModule = module; emitModuleImpl(module, sink); }
 
         /// Emit any preprocessor directives that should come *before* the prelude code
         ///
@@ -331,7 +332,7 @@ public:
     virtual void emitMatrixLayoutModifiersImpl(IRVarLayout* layout) { SLANG_UNUSED(layout);  }
     virtual void emitTypeImpl(IRType* type, const StringSliceLoc* nameLoc);
     virtual void emitSimpleValueImpl(IRInst* inst);
-    virtual void emitModuleImpl(IRModule* module);
+    virtual void emitModuleImpl(IRModule* module, DiagnosticSink* sink);
     virtual void emitSimpleFuncImpl(IRFunc* func);
     virtual void emitVarExpr(IRInst* inst, EmitOpInfo const& outerPrec);
     virtual void emitOperandImpl(IRInst* inst, EmitOpInfo const& outerPrec);

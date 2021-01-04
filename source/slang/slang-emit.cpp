@@ -806,7 +806,7 @@ SlangResult emitEntryPointsSourceFromIR(
 #if 0
         dumpIR(compileRequest, irModule, "PRE-EMIT");
 #endif
-        sourceEmitter->emitModule(irModule);
+        sourceEmitter->emitModule(irModule, sink);
     }
 
     String code = sourceWriter.getContent();
