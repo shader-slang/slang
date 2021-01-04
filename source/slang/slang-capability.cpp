@@ -343,7 +343,7 @@ bool CapabilitySet::isIncompatibleWith(CapabilitySet const& that) const
     // Equivalently, we can say that the two are in conflict if
     //
     // * One of the two sets contains an atom A with conflict mask M
-    // * The other set contains at least one atom that overlaps with M
+    // * The other set contains at least one atom that conflicts with M
     // * The other set does not contain A
     //
     // Our approach here is all about minimizing the number of
