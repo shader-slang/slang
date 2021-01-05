@@ -658,7 +658,7 @@ tool "slang-embed"
 tool "slang-test"
     uuid "0C768A18-1D25-4000-9F37-DA5FE99E3B64"
     includedirs { "." }
-    links { "core", "slang", "miniz" }
+    links { "core", "slang", "miniz", "lz4" }
     
     -- We want to set to the root of the project, but that doesn't seem to work with '.'. 
     -- So set a path that resolves to the same place.
@@ -1195,6 +1195,20 @@ standardProject("miniz", nil)
     filter { "system:linux or macosx" }
         links { "dl"}
         
+standardProject("lz4", nil)
+    uuid "E1EC8075-823E-46E5-BC38-C124CCCDF878"
+    kind "StaticLib"
+    pic "On"
+
+    -- Add the files explicitly
+    files
+    {
+        "external/lz4/lib/lz4.c",
+        "external/lz4/lib/lz4.h",
+    }
+    
+    filter { "system:linux or macosx" }
+        links { "dl"}
 
 if buildGlslang then
 

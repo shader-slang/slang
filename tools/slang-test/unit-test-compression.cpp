@@ -4,6 +4,8 @@
 
 #include "../../source/core/slang-zip-file-system.h"
 
+#include "../../external/lz4/lib/lz4.h"
+
 using namespace Slang;
 
 static bool _equals(const void* data, size_t size, ISlangBlob* blob)
@@ -127,6 +129,32 @@ static void compressionUnitTest()
 
         SLANG_CHECK(SLANG_SUCCEEDED(fileSystem->loadFile("file2.txt", blob.writeRef())));
         SLANG_CHECK(_equals(contents3, blob));
+    }
+
+    {
+        // Lets try lz4
+
+        const char src[] = "Some text to compress";
+        size_t srcSize = sizeof(src);
+
+        int compressedDataBound = LZ4_compressBound(int(srcSize));
+
+        List<char> compressedData;
+        compressedData.setCount(compressedDataBound);
+
+        const int compressedSize = LZ4_compress_default(src, compressedData.getBuffer(), int(srcSize), int(compressedDataBound));
+        compressedData.setCount(compressedSize);
+
+        // Now lets decompress
+
+        List<char> decompressedData;
+        decompressedData.setCount(srcSize);
+
+        const int decompressedSize = LZ4_decompress_safe(compressedData.getBuffer(), decompressedData.getBuffer(), compressedSize, int(decompressedData.getCount()));
+
+        SLANG_CHECK(decompressedSize == srcSize);
+        SLANG_CHECK(memcmp(src, decompressedData.getBuffer(), srcSize) == 0);
+
     }
 }
 
