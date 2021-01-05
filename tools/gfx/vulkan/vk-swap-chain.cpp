@@ -3,7 +3,7 @@
 
 #include "vk-util.h"
 
-#include "../../source/core/slang-list.h"
+#include "core/slang-list.h"
 
 #include <stdlib.h>
 #include <stdio.h>

@@ -1,7 +1,7 @@
 // vk-api.cpp
 #include "vk-api.h"
 
-#include "../../source/core/slang-list.h"
+#include "core/slang-list.h"
 
 namespace gfx {
 using namespace Slang;

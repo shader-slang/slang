@@ -1,8 +1,6 @@
 // render.h
 #pragma once
 
-#include "window.h"
-
 //#include "shader-input-layout.h"
 
 #include <float.h>

@@ -1,6 +1,8 @@
 // model.cpp
 #include "model.h"
 
+#include "window.h"
+
 #define TINYOBJLOADER_IMPLEMENTATION
 #include "../../external/tinyobjloader/tiny_obj_loader.h"
 

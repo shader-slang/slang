@@ -33,12 +33,6 @@
     <ClInclude Include="..\..\..\tools\gfx\flag-combiner.h">
       <Filter>Header Files</Filter>
     </ClInclude>
-    <ClInclude Include="..\..\..\tools\gfx\gui.h">
-      <Filter>Header Files</Filter>
-    </ClInclude>
-    <ClInclude Include="..\..\..\tools\gfx\model.h">
-      <Filter>Header Files</Filter>
-    </ClInclude>
     <ClInclude Include="..\..\..\tools\gfx\nvapi\nvapi-include.h">
       <Filter>Header Files</Filter>
     </ClInclude>
@@ -60,9 +54,6 @@
     <ClInclude Include="..\..\..\tools\gfx\surface.h">
       <Filter>Header Files</Filter>
     </ClInclude>
-    <ClInclude Include="..\..\..\tools\gfx\vector-math.h">
-      <Filter>Header Files</Filter>
-    </ClInclude>
     <ClInclude Include="..\..\..\tools\gfx\vulkan\render-vk.h">
       <Filter>Header Files</Filter>
     </ClInclude>
@@ -79,9 +70,6 @@
       <Filter>Header Files</Filter>
     </ClInclude>
     <ClInclude Include="..\..\..\tools\gfx\vulkan\vk-util.h">
-      <Filter>Header Files</Filter>
-    </ClInclude>
-    <ClInclude Include="..\..\..\tools\gfx\window.h">
       <Filter>Header Files</Filter>
     </ClInclude>
   </ItemGroup>
@@ -108,12 +96,6 @@
       <Filter>Source Files</Filter>
     </ClCompile>
     <ClCompile Include="..\..\..\tools\gfx\flag-combiner.cpp">
-      <Filter>Source Files</Filter>
-    </ClCompile>
-    <ClCompile Include="..\..\..\tools\gfx\gui.cpp">
-      <Filter>Source Files</Filter>
-    </ClCompile>
-    <ClCompile Include="..\..\..\tools\gfx\model.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
     <ClCompile Include="..\..\..\tools\gfx\nvapi\nvapi-util.cpp">
@@ -150,9 +132,6 @@
       <Filter>Source Files</Filter>
     </ClCompile>
     <ClCompile Include="..\..\..\tools\gfx\vulkan\vk-util.cpp">
-      <Filter>Source Files</Filter>
-    </ClCompile>
-    <ClCompile Include="..\..\..\tools\gfx\windows\win-window.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
   </ItemGroup>

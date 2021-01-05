@@ -35,7 +35,7 @@ struct ID3D12GraphicsCommandList1 {};
 #   include "../nvapi/nvapi-include.h"
 #endif
 
-#include "../../slang-com-ptr.h"
+#include "slang-com-ptr.h"
 #include "../flag-combiner.h"
 
 #include "resource-d3d12.h"
