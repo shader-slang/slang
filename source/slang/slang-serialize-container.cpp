@@ -123,10 +123,10 @@ namespace Slang {
 
             auto& dstTarget = targetComponent.target;
 
-            dstTarget.floatingPointMode = target->floatingPointMode;
-            dstTarget.profile = target->targetProfile;
-            dstTarget.flags = target->targetFlags;
-            dstTarget.codeGenTarget = target->target;
+            dstTarget.floatingPointMode = target->getFloatingPointMode();
+            dstTarget.profile = target->getTargetProfile();
+            dstTarget.flags = target->getTargetFlags();
+            dstTarget.codeGenTarget = target->getTarget();
 
             out.targetComponents.add(targetComponent);
         }

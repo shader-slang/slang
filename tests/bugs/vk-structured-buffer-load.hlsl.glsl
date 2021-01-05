@@ -40,7 +40,7 @@ hitAttributeNV BuiltInTriangleIntersectionAttributes_0 Attributes;
 
 void main()
 {
-    float HitT_0 = (gl_HitTNV);
+    float HitT_0 = (gl_RayTmaxNV);
     RayData.PackedHitInfoA_0.x = HitT_0;
 
     const uint use_rcp_0 = uint(0);

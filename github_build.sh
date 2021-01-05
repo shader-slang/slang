@@ -8,7 +8,7 @@ git describe --tags | sed -e "s/\(.*\)/\#define SLANG_TAG_VERSION \"\1\"/" > sla
 cat slang-tag-version.h 
 
 # Create the makefile
-./premake5 gmake --cc=${CC}
+./premake5 gmake --cc=${CC} --enable-embed-stdlib=true
 
 # Build the configuration
 make config=${CONFIGURATION}_x64 -j`nproc`

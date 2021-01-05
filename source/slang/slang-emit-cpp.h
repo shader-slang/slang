@@ -61,7 +61,7 @@ protected:
     virtual void emitPreprocessorDirectivesImpl() SLANG_OVERRIDE;
     virtual void emitSimpleValueImpl(IRInst* value) SLANG_OVERRIDE;
     virtual void emitSimpleFuncParamImpl(IRParam* param) SLANG_OVERRIDE;
-    virtual void emitModuleImpl(IRModule* module) SLANG_OVERRIDE;
+    virtual void emitModuleImpl(IRModule* module, DiagnosticSink* sink) SLANG_OVERRIDE;
     virtual void emitSimpleFuncImpl(IRFunc* func) SLANG_OVERRIDE;
     virtual void emitOperandImpl(IRInst* inst, EmitOpInfo const&  outerPrec) SLANG_OVERRIDE;
     virtual void emitParamTypeImpl(IRType* type, String const& name) SLANG_OVERRIDE;

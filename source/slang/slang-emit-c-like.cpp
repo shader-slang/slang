@@ -630,7 +630,7 @@ String CLikeSourceEmitter::generateName(IRInst* inst)
     // If the instruction names something
     // that should be emitted as a target intrinsic,
     // then use that name instead.
-    if(auto intrinsicDecoration = findBestTargetIntrinsicDecorationXXX(inst))
+    if(auto intrinsicDecoration = findBestTargetIntrinsicDecoration(inst))
     {
         return String(intrinsicDecoration->getDefinition());
     }
@@ -1092,7 +1092,7 @@ bool CLikeSourceEmitter::shouldFoldInstIntoUseSites(IRInst* inst)
         // This is significant, because we can within a target intrinsics definition multiple accesses to the same
         // parameter. This is not indicated into the call, and can lead to output code computes something multiple
         // times as it is folding into the expression of the the target intrinsic, which we don't want.
-        if (auto targetIntrinsicDecoration = findBestTargetIntrinsicDecorationXXX(funcValue))
+        if (auto targetIntrinsicDecoration = findBestTargetIntrinsicDecoration(funcValue))
         {         
             // Find the index of the original instruction, to see if it's multiply used.
             IRUse* args = callInst->getArgs();
@@ -1300,7 +1300,7 @@ IRTargetSpecificDecoration* CLikeSourceEmitter::findBestTargetDecoration(IRInst*
     return Slang::findBestTargetDecoration(inInst, getTargetCaps());
 }
 
-IRTargetIntrinsicDecoration* CLikeSourceEmitter::findBestTargetIntrinsicDecorationXXX(IRInst* inInst)
+IRTargetIntrinsicDecoration* CLikeSourceEmitter::findBestTargetIntrinsicDecoration(IRInst* inInst)
 {
     return as<IRTargetIntrinsicDecoration>(findBestTargetDecoration(inInst));
 }
@@ -1834,25 +1834,6 @@ void CLikeSourceEmitter::emitIntrinsicCallExprImpl(
                         }
                         break;
 
-                    case 'T':
-                        {
-                            // The `$XT` case handles selecting between
-                            // the `gl_HitTNV` and `gl_RayTmaxNV` builtins,
-                            // based on what stage we are using:
-                            switch( m_entryPointStage )
-                            {
-                            default:
-                                m_writer->emit("gl_RayTmaxNV");
-                                break;
-
-                            case Stage::AnyHit:
-                            case Stage::ClosestHit:
-                                m_writer->emit("gl_HitTNV");
-                                break;
-                            }
-                        }
-                        break;
-
                     default:
                         SLANG_RELEASE_ASSERT(false);
                         break;
@@ -1955,7 +1936,7 @@ void CLikeSourceEmitter::emitCallExpr(IRCall* inst, EmitOpInfo outerPrec)
 
     // We want to detect any call to an intrinsic operation,
     // that we can emit it directly without mangling, etc.
-    if(auto targetIntrinsic = findBestTargetIntrinsicDecorationXXX(funcValue))
+    if(auto targetIntrinsic = findBestTargetIntrinsicDecoration(funcValue))
     {
         emitIntrinsicCallExpr(inst, targetIntrinsic, outerPrec);
     }
@@ -3334,7 +3315,7 @@ bool CLikeSourceEmitter::isTargetIntrinsic(IRFunc* func)
     // it has a suitable decoration marking it as a
     // target intrinsic for the current compilation target.
     //
-    return findBestTargetIntrinsicDecorationXXX(func) != nullptr;
+    return findBestTargetIntrinsicDecoration(func) != nullptr;
 }
 
 void CLikeSourceEmitter::emitFunc(IRFunc* func)
@@ -3367,7 +3348,7 @@ void CLikeSourceEmitter::emitStruct(IRStructType* structType)
 {
     // If the selected `struct` type is actually an intrinsic
     // on our target, then we don't want to emit anything at all.
-    if(auto intrinsicDecoration = findBestTargetIntrinsicDecorationXXX(structType))
+    if(auto intrinsicDecoration = findBestTargetIntrinsicDecoration(structType))
     {
         return;
     }
@@ -3892,12 +3873,14 @@ void CLikeSourceEmitter::executeEmitActions(List<EmitAction> const& actions)
     }
 }
 
-void CLikeSourceEmitter::emitModuleImpl(IRModule* module)
+void CLikeSourceEmitter::emitModuleImpl(IRModule* module, DiagnosticSink* sink)
 {
     // The IR will usually come in an order that respects
     // dependencies between global declarations, but this
     // isn't guaranteed, so we need to be careful about
     // the order in which we emit things.
+
+    SLANG_UNUSED(sink);
 
     List<EmitAction> actions;
 

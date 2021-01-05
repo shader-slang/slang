@@ -1,5 +1,11 @@
 // closesthit.slang
-//TEST:CROSS_COMPILE: -profile sm_6_3 -stage anyhit -entry main -target spirv-assembly
+
+// Note: explicitly requesting `spirv_1_4` as part of the compiler
+// options is for the benefit of the glslang pass-through path,
+// where we cannot infer the required SPIR-V version from the code
+// (and glslang doesn't include any such inference ability).
+
+//TEST:CROSS_COMPILE: -profile glsl_460+spirv_1_4 -stage anyhit -entry main -target spirv-assembly
 
 struct SphereHitAttributes
 {

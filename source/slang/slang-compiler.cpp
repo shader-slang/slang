@@ -335,13 +335,18 @@ namespace Slang
 
     //
 
-    Profile Profile::lookUp(char const* name)
+    Profile Profile::lookUp(UnownedStringSlice const& name)
     {
-        #define PROFILE(TAG, NAME, STAGE, VERSION)	if(strcmp(name, #NAME) == 0) return Profile::TAG;
-        #define PROFILE_ALIAS(TAG, DEF, NAME)		if(strcmp(name, #NAME) == 0) return Profile::TAG;
+        #define PROFILE(TAG, NAME, STAGE, VERSION)	if(name == UnownedTerminatedStringSlice(#NAME)) return Profile::TAG;
+        #define PROFILE_ALIAS(TAG, DEF, NAME)		if(name == UnownedTerminatedStringSlice(#NAME)) return Profile::TAG;
         #include "slang-profile-defs.h"
 
         return Profile::Unknown;
+    }
+
+    Profile Profile::lookUp(char const* name)
+    {
+        return lookUp(UnownedTerminatedStringSlice(name));
     }
 
     char const* Profile::getName()
@@ -968,7 +973,7 @@ namespace Slang
 
         DWORD flags = 0;
 
-        switch( targetReq->floatingPointMode )
+        switch( targetReq->getFloatingPointMode() )
         {
         default:
             break;
@@ -1237,7 +1242,7 @@ SlangResult dissassembleDXILUsingDXC(
         // If we are not in pass through, lookup the default compiler for the emitted source type
         if (downstreamCompiler == PassThroughMode::None)
         {
-            auto target = targetReq->target;
+            auto target = targetReq->getTarget();
             switch (target)
             {
                 case CodeGenTarget::PTX:
@@ -1387,7 +1392,7 @@ SlangResult dissassembleDXILUsingDXC(
         options.flags &= ~(CompileOptions::Flag::EnableExceptionHandling | CompileOptions::Flag::EnableSecurityChecks);
 
         // Set what kind of target we should build
-        switch (targetReq->target)
+        switch (targetReq->getTarget())
         {
             case CodeGenTarget::HostCallable:
             case CodeGenTarget::SharedLibrary:
@@ -1434,7 +1439,7 @@ SlangResult dissassembleDXILUsingDXC(
                 default: SLANG_ASSERT(!"Unhandled debug level"); break;
             }
 
-            switch( targetReq->floatingPointMode )
+            switch( targetReq->getFloatingPointMode() )
             {
                 case FloatingPointMode::Default:    options.floatingPointMode = DownstreamCompiler::FloatingPointMode::Default; break;
                 case FloatingPointMode::Precise:    options.floatingPointMode = DownstreamCompiler::FloatingPointMode::Precise; break;
@@ -1628,6 +1633,20 @@ SlangResult dissassembleDXILUsingDXC(
             request.spirvVersion.minor = spirvLanguageVersion.m_minor;
             request.spirvVersion.patch = spirvLanguageVersion.m_patch;
         }
+        else
+        {
+            // HACK: look at the requested capabilities of the target,
+            // and see if they specify a SPIR-V version that we should
+            // pass down.
+            //
+            auto targetCaps = targetReq->getTargetCaps();
+            if(targetCaps.implies(CapabilityAtom::SPIRV_1_4))
+            {
+                request.spirvVersion.major = 1;
+                request.spirvVersion.minor = 4;
+                request.spirvVersion.patch = 0;
+            }
+        }
 
         request.outputFunc = outputFunc;
         request.outputUserData = &spirvOut;
@@ -1698,7 +1717,7 @@ SlangResult dissassembleDXILUsingDXC(
     {
         CompileResult result;
 
-        auto target = targetReq->target;
+        auto target = targetReq->getTarget();
 
         switch (target)
         {
@@ -2041,7 +2060,7 @@ SlangResult dissassembleDXILUsingDXC(
                 {
                     // Writing to console, so we need to generate text output.
 
-                    switch (targetReq->target)
+                    switch (targetReq->getTarget())
                     {
                 #if SLANG_ENABLE_DXBC_SUPPORT
                     case CodeGenTarget::DXBytecode:
