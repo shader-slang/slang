@@ -93,6 +93,15 @@ public:
         }
         m_sizeInBytes = 0;
     }
+    // Reallocate so the buffer is the specified size. Contents of buffer up to size remain intact.
+    void reallocate(size_t size)
+    {
+        if (size != m_sizeInBytes)
+        {
+            m_data = ::realloc(m_data, size); 
+            m_sizeInBytes = size;
+        }
+    }
     /// Makes this no longer own the allocation. Returns the allocated data (or nullptr if no allocation)
     void* detach()
     {
