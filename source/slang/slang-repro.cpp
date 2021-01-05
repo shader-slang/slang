@@ -418,8 +418,8 @@ static bool _isStorable(const PathInfo::Type type)
                 auto& dst = base[dstTargets[i]];
                 dst.target = srcTargetRequest->getTarget();
                 dst.profile = srcTargetRequest->getTargetProfile();
-                dst.targetFlags = srcTargetRequest->targetFlags;
-                dst.floatingPointMode = srcTargetRequest->floatingPointMode;
+                dst.targetFlags = srcTargetRequest->getTargetFlags();
+                dst.floatingPointMode = srcTargetRequest->getFloatingPointMode();
             }
 
             // Copy the entry point/target output names
@@ -906,9 +906,9 @@ struct LoadContext
             auto dstTarget = linkage->targets[index];
 
             SLANG_ASSERT(dstTarget->getTarget() == src.target);
-            dstTarget->targetProfile = src.profile;
-            dstTarget->targetFlags = src.targetFlags;
-            dstTarget->floatingPointMode = src.floatingPointMode;
+            dstTarget->setTargetProfile(src.profile);
+            dstTarget->addTargetFlags(src.targetFlags);
+            dstTarget->setFloatingPointMode(src.floatingPointMode);
 
             // If there is output state (like output filenames) add here
             if (src.outputStates.getCount())

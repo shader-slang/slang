@@ -463,6 +463,7 @@ extern "C"
     */
 
     typedef uint32_t    SlangUInt32;
+    typedef int32_t     SlangInt32;
 
     // Use SLANG_PTR_ macros to determine SlangInt/SlangUInt types.
     // This is used over say using size_t/ptrdiff_t/intptr_t/uintptr_t, because on some targets, these types are distinct from
@@ -639,6 +640,8 @@ extern "C"
     {
         SLANG_PROFILE_UNKNOWN,
     };
+
+    typedef SlangInt32 SlangCapabilityID;
 
     typedef unsigned int SlangMatrixLayoutMode;
     enum
@@ -1294,6 +1297,12 @@ extern "C"
         int                     targetIndex,
         SlangFloatingPointMode  mode);
 
+    /*! @see slang::ICompileRequest::addTargetCapability */
+    SLANG_API void spAddTargetCapability(
+        slang::ICompileRequest* request,
+        int                     targetIndex,
+        SlangCapabilityID       capability);
+
     /* DEPRECATED: use `spSetMatrixLayoutMode` instead. */
     SLANG_API void spSetTargetMatrixLayoutMode(
         SlangCompileRequest*    request,
@@ -1416,8 +1425,13 @@ extern "C"
         char const*             path,
         ISlangBlob*             sourceBlob);
 
-    /*! @see slang::ICompileRequest::findProfile */
+    /*! @see slang::IGlobalSession::findProfile */
     SLANG_API SlangProfileID spFindProfile(
+        SlangSession*   session,
+        char const*     name);
+
+    /*! @see slang::IGlobalSession::findCapability */
+    SLANG_API SlangCapabilityID spFindCapability(
         SlangSession*   session,
         char const*     name);
 
@@ -3111,6 +3125,15 @@ namespace slang
 
             NOTE! API is experimental and not ready for production code  */
         virtual SLANG_NO_THROW SlangResult SLANG_MCALL saveStdLib(ISlangBlob** outBlob) = 0;
+
+            /** Look up the internal ID of a capability by its `name`.
+
+            Capability IDs are *not* guaranteed to be stable across versions
+            of the Slang library, so clients are expected to look up
+            capabilities by name at runtime.
+            */
+        virtual SLANG_NO_THROW SlangCapabilityID SLANG_MCALL findCapability(
+            char const*     name) = 0;
     };
 
     #define SLANG_UUID_IGlobalSession { 0xc140b5fd, 0xc78, 0x452e, { 0xba, 0x7c, 0x1a, 0x1e, 0x70, 0xc7, 0xf7, 0x1c } };
@@ -3646,6 +3669,11 @@ namespace slang
 
             /** Make output specially handled for command line output */
         virtual SLANG_NO_THROW void SLANG_MCALL setCommandLineCompilerMode() = 0;
+
+            /** Add a defined capability that should be assumed available on the target */
+        virtual SLANG_NO_THROW SlangResult SLANG_MCALL addTargetCapability(
+            SlangInt            targetIndex,
+            SlangCapabilityID   capability) = 0;
     };
 
     #define SLANG_UUID_ICompileRequest { 0x96d33993, 0x317c, 0x4db5, { 0xaf, 0xd8, 0x66, 0x6e, 0xe7, 0x72, 0x48, 0xe2 } };

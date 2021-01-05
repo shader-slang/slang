@@ -1450,7 +1450,7 @@ static RefPtr<TypeLayout> processSimpleEntryPointParameter(
             //
             if( isD3DTarget(context->getTargetRequest()) )
             {
-                auto version = context->getTargetRequest()->targetProfile.getVersion();
+                auto version = context->getTargetRequest()->getTargetProfile().getVersion();
                 if( version <= ProfileVersion::DX_5_0 )
                 {
                     // We will address the conflict here by claiming the corresponding
@@ -3486,7 +3486,7 @@ RefPtr<ProgramLayout> generateParameterBindings(
     // On a CPU target, it's okay to have global scope parameters that use Uniform resources (because on CPU
     // all resources are 'Uniform')
     // TODO(JS): We'll just assume the same with CUDA target for now..
-    if (!_isCPUTarget(targetReq->target) && !_isPTXTarget(targetReq->target))
+    if (!_isCPUTarget(targetReq->getTarget()) && !_isPTXTarget(targetReq->getTarget()))
     {
         for( auto& parameterInfo : sharedContext.parameters )
         {

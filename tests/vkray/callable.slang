@@ -1,6 +1,6 @@
 // callable.slang
 
-//TEST:CROSS_COMPILE: -profile sm_6_3 -stage callable -entry main -target spirv-assembly
+//TEST:CROSS_COMPILE: -profile glsl_460+spirv_1_4 -stage callable -entry main -target spirv-assembly
 
 import callable_shared;
 

@@ -2160,8 +2160,24 @@ namespace Slang
         IRType* capabilityAtomType = getIntType();
         IRType* capabilitySetType = getCapabilitySetType();
 
+        // Not: Our `CapabilitySet` representation consists of a list
+        // of `CapabilityAtom`s, and by default the list is stored
+        // "expanded" so that it includes atoms that are transitively
+        // implied by one another.
+        //
+        // For representation in the IR, it is preferable to include
+        // as few atoms as possible, so that we don't store anything
+        // redundant in, e.g., serialized modules.
+        //
+        // We thus requqest a list of "compacted" atoms which should
+        // be a minimal list of atoms such that they will produce
+        // the same `CapabilitySet` when expanded.
+
+        List<CapabilityAtom> compactedAtoms;
+        caps.calcCompactedAtoms(compactedAtoms);
+
         List<IRInst*> args;
-        for( auto atom : caps.getAtoms() )
+        for( auto atom : compactedAtoms )
         {
             args.add(getIntValue(capabilityAtomType, Int(atom)));
         }
@@ -5656,22 +5672,6 @@ namespace Slang
     // IRTargetIntrinsicDecoration
     //
 
-    static bool _areIntrinsicCapsBetterForTarget(
-        CapabilitySet const& candidateCaps,
-        CapabilitySet const& existingCaps,
-        CapabilitySet const& targetCaps)
-    {
-        bool candidateIsAvailable = targetCaps.implies(candidateCaps);
-        bool existingIsAvailable = targetCaps.implies(existingCaps);
-        if(candidateIsAvailable != existingIsAvailable)
-            return candidateIsAvailable;
-
-        if(candidateCaps.implies(existingCaps))
-            return true;
-
-        return false;
-    }
-
     IRTargetIntrinsicDecoration* findAnyTargetIntrinsicDecoration(
             IRInst*                 val)
     {
@@ -5704,7 +5704,7 @@ namespace Slang
             if (decorationCaps.isIncompatibleWith(targetCaps))
                 continue;
 
-            if(!bestDecoration || _areIntrinsicCapsBetterForTarget(decorationCaps, bestCaps, targetCaps))
+            if(!bestDecoration || decorationCaps.isBetterForTarget(bestCaps, targetCaps))
             {
                 bestDecoration = decoration;
                 bestCaps = decorationCaps;

@@ -1141,12 +1141,22 @@ namespace Slang
     class TargetRequest : public RefObject
     {
     public:
-        Linkage*            linkage;
-        CodeGenTarget       target;
-        SlangTargetFlags    targetFlags = 0;
-        Slang::Profile      targetProfile = Slang::Profile();
-        FloatingPointMode   floatingPointMode = FloatingPointMode::Default;
-        CapabilitySet       targetCaps = CapabilitySet::makeInvalid();
+        TargetRequest(Linkage* linkage, CodeGenTarget format);
+
+        void addTargetFlags(SlangTargetFlags flags)
+        {
+            targetFlags |= flags;
+        }
+        void setTargetProfile(Slang::Profile profile)
+        {
+            targetProfile = profile;
+        }
+        void setFloatingPointMode(FloatingPointMode mode)
+        {
+            floatingPointMode = mode;
+        }
+        void addCapability(CapabilityAtom capability);
+
 
         bool isWholeProgramRequest()
         {
@@ -1154,9 +1164,10 @@ namespace Slang
         }
 
         Linkage* getLinkage() { return linkage; }
-        CodeGenTarget getTarget() { return target; }
+        CodeGenTarget getTarget() { return format; }
         Profile getTargetProfile() { return targetProfile; }
         FloatingPointMode getFloatingPointMode() { return floatingPointMode; }
+        SlangTargetFlags getTargetFlags() { return targetFlags; }
         CapabilitySet getTargetCaps();
 
         Session* getSession();
@@ -1168,6 +1179,15 @@ namespace Slang
         Dictionary<Type*, RefPtr<TypeLayout>>& getTypeLayouts() { return typeLayouts; }
 
         TypeLayout* getTypeLayout(Type* type);
+
+    private:
+        Linkage*                linkage = nullptr;
+        CodeGenTarget           format = CodeGenTarget::Unknown;
+        SlangTargetFlags        targetFlags = 0;
+        Slang::Profile          targetProfile = Slang::Profile();
+        FloatingPointMode       floatingPointMode = FloatingPointMode::Default;
+        List<CapabilityAtom>    rawCapabilities;
+        CapabilitySet           cookedCapabilities;
     };
 
         /// Are we generating code for a D3D API?
@@ -1898,6 +1918,8 @@ namespace Slang
         virtual SLANG_NO_THROW SlangResult SLANG_MCALL getSession(slang::ISession** outSession) SLANG_OVERRIDE;
         virtual SLANG_NO_THROW SlangReflection* SLANG_MCALL getReflection() SLANG_OVERRIDE;
         virtual SLANG_NO_THROW void SLANG_MCALL setCommandLineCompilerMode() SLANG_OVERRIDE;
+        virtual SLANG_NO_THROW SlangResult SLANG_MCALL addTargetCapability(SlangInt targetIndex, SlangCapabilityID capability) SLANG_OVERRIDE;
+
 
         EndToEndCompileRequest(
             Session* session);
@@ -2157,6 +2179,8 @@ namespace Slang
         SLANG_NO_THROW SlangResult SLANG_MCALL compileStdLib() override;
         SLANG_NO_THROW SlangResult SLANG_MCALL loadStdLib(const void* stdLib, size_t stdLibSizeInBytes) override;
         SLANG_NO_THROW SlangResult SLANG_MCALL saveStdLib(ISlangBlob** outBlob) override;
+
+        SLANG_NO_THROW SlangCapabilityID SLANG_MCALL findCapability(char const* name) override;
 
             /// Get the default compiler for a language
         DownstreamCompiler* getDefaultDownstreamCompiler(SourceLanguage sourceLanguage);
