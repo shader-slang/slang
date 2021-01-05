@@ -575,6 +575,17 @@ GLSLSystemValueInfo* getGLSLSystemValueInfo(
 //            globalVarExpr = createGLSLBuiltinRef("gl_ViewportMaskPerViewNV",
 //                getUnsizedArrayType(getIntType()));
     }
+    else if (semanticName == "sv_barycentrics")
+    {
+        context->requireGLSLVersion(ProfileVersion::GLSL_450);
+        context->requireGLSLExtension(UnownedStringSlice::fromLiteral("GL_NV_fragment_shader_barycentric"));
+
+        name = "gl_BaryCoordNV";
+
+        // TODO: There is also the `gl_BaryCoordNoPerspNV` builtin, which
+        // we ought to use if the `noperspective` modifier has been
+        // applied to this varying input.
+    }
 
     if( name )
     {
