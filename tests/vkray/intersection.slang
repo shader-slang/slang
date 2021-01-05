@@ -1,5 +1,5 @@
 // intersection.slang
-//TEST:CROSS_COMPILE: -profile sm_6_3 -stage intersection -entry main -target spirv-assembly
+//TEST:CROSS_COMPILE: -profile glsl_460+GL_NV_ray_tracing -stage intersection -entry main -target spirv-assembly
 
 struct Sphere
 {

@@ -34,7 +34,7 @@ enum class CapabilityAtom : int32_t
     //
     Invalid = -1,
 
-#define SLANG_CAPABILITY_ATOM(ENUMERATOR, NAME, FLAGS, BASE0, BASE1, BASE2, BASE3) \
+#define SLANG_CAPABILITY_ATOM(ENUMERATOR, NAME, FLAVOR, CONFLICT, RANK, BASE0, BASE1, BASE2, BASE3) \
     ENUMERATOR,
 
 #include "slang-capability-defs.h"
@@ -127,22 +127,27 @@ public:
     bool operator==(CapabilitySet const& that) const;
 
         /// Get access to the raw atomic capabilities that define this set.
-    List<CapabilityAtom> const& getAtoms() const { return m_atoms; }
+    List<CapabilityAtom> const& getExpandedAtoms() const { return m_expandedAtoms; }
+
+        /// Calculate a list of "compacted" atoms, which excludes any atoms from the expanded list that are implies by another item in the list.
+    void calcCompactedAtoms(List<CapabilityAtom>& outAtoms) const;
+
+    Int countIntersectionWith(CapabilitySet const& that) const;
+
+    bool isBetterForTarget(CapabilitySet const& that, CapabilitySet const& targetCaps);
 
 private:
+    void _init(Int atomCount, CapabilityAtom const* atoms);
 
-    // The underlying representation we are using is currently very simple:
-    // a capability set is stored as a list of the atoms that were passed
-    // in at the time the set was constructed.
+    uint32_t _calcConflictMask() const;
+    uint32_t _calcDifferenceScoreWith(CapabilitySet const& other) const;
+
+    // The underlying representation we use is a sorted and deduplicated
+    // list of all the (non-alias) atoms that are present in the set.
+    // This "expanded" list uses the transitive closure over the inheritnace
+    // relationship between the atoms.
     //
-    // Currently, no effort is made to sort the atoms, remove duplicates,
-    // or to expand the list when one atom entails another.
-    //
-    // TODO: Much more efficient representations are possible, and we
-    // should consider them if the performance of `CapabilitySet` ever
-    // prooves to be an issue.
-    //
-    List<CapabilityAtom> m_atoms;
+    List<CapabilityAtom> m_expandedAtoms;
 };
 
     /// Are the `left` and `right` capability sets unequal?

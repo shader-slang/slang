@@ -1,4 +1,4 @@
-//TEST:CROSS_COMPILE: -profile lib_6_3 -entry HitMain -stage closesthit -target spirv-assembly
+//TEST:CROSS_COMPILE: -profile glsl_460+GL_NV_ray_tracing -entry HitMain -stage closesthit -target spirv-assembly
 
 #define USE_RCP 0
 

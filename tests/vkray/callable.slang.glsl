@@ -1,6 +1,15 @@
 #version 460
 
+#if USE_NV_RT
 #extension GL_NV_ray_tracing : require
+#define callableDataInEXT callableDataInNV
+#define hitAttributeEXT hitAttributeNV
+#define ignoreIntersectionEXT ignoreIntersectionNV
+#define rayPayloadInEXT rayPayloadInNV
+#define terminateRayEXT terminateRayNV
+#else
+#extension GL_EXT_ray_tracing : require
+#endif
 
 layout(binding = 0) uniform texture2D gAlbedoMap_0;
 layout(binding = 1) uniform sampler gSampler_0;
@@ -11,7 +20,7 @@ struct MaterialPayload_0
     vec2 uv_0;
 };
 
-callableDataInNV MaterialPayload_0 _S1;
+callableDataInEXT MaterialPayload_0 _S1;
 
 void main()
 {

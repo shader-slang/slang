@@ -1,5 +1,5 @@
 // closesthit.slang
-//TEST:CROSS_COMPILE: -profile sm_6_3 -stage closesthit -entry main -target spirv-assembly
+//TEST:CROSS_COMPILE: -profile glsl_460+GL_NV_ray_tracing -stage closesthit -entry main -target spirv-assembly
 
 struct ReflectionRay
 {
