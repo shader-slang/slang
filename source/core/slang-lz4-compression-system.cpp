@@ -24,10 +24,8 @@ public:
     SLANG_NO_THROW uint32_t SLANG_MCALL release() SLANG_OVERRIDE { return 1; }
 
     // ICompressionSystem
-    virtual SLANG_NO_THROW SlangResult SLANG_MCALL compress(const CompressionStyle* style, const void* src, size_t srcSizeInBytes, size_t compressedCapacity, void* outCompressed, size_t* outCompressedSizeInBytes) SLANG_OVERRIDE;
-    virtual SLANG_NO_THROW SlangResult SLANG_MCALL compressToBlob(const CompressionStyle* style, const void* src, size_t srcSizeInBytes, ISlangBlob** outBlob) SLANG_OVERRIDE;
-    virtual SLANG_NO_THROW size_t SLANG_MCALL calcCompressedBound(size_t srcSizeInBytes) SLANG_OVERRIDE;
-    virtual SLANG_NO_THROW SlangResult SLANG_MCALL decompress(const void* compressed, size_t compressedSizeInBytes, size_t dstCapacity, void* outDecompressed, size_t* outDecompressedSize) SLANG_OVERRIDE;
+    virtual SLANG_NO_THROW SlangResult SLANG_MCALL compress(const CompressionStyle* style, const void* src, size_t srcSizeInBytes, ISlangBlob** outBlob) SLANG_OVERRIDE;
+    virtual SLANG_NO_THROW SlangResult SLANG_MCALL decompress(const void* compressed, size_t compressedSizeInBytes, size_t decompressedSizeInBytes, void* outDecompressed) SLANG_OVERRIDE;
 
 protected:
 
@@ -39,25 +37,15 @@ ICompressionSystem* LZ4CompressionSystemImpl::getInterface(const Guid& guid)
     return (guid == IID_ISlangUnknown || guid == IID_ICompressionSystem) ? static_cast<ICompressionSystem*>(this) : nullptr;
 }
 
-SlangResult LZ4CompressionSystemImpl::compress(const CompressionStyle* style, const void* src, size_t srcSizeInBytes, size_t compressedCapacity, void* outCompressed, size_t* outCompressedSizeInBytes)
+SlangResult LZ4CompressionSystemImpl::compress(const CompressionStyle* style, const void* src, size_t srcSizeInBytes, ISlangBlob** outBlob)
 {
     SLANG_UNUSED(style);
-
-    const int compressedSize = LZ4_compress_default((const char*)src, (char*)outCompressed, int(srcSizeInBytes), int(compressedCapacity));
-    *outCompressedSizeInBytes = size_t(compressedSize);
-    return SLANG_OK;
-}
-
-SlangResult LZ4CompressionSystemImpl::compressToBlob(const CompressionStyle* style, const void* src, size_t srcSizeInBytes, ISlangBlob** outBlob)
-{
-    SLANG_UNUSED(style);
-    const size_t compressedBound = calcCompressedBound(srcSizeInBytes);
+    const size_t compressedBound = LZ4_compressBound(int(srcSizeInBytes));
 
     ScopedAllocation alloc;
     void* compressedData = alloc.allocate(compressedBound);
 
-    size_t compressedSize;
-    SLANG_RETURN_ON_FAIL(compress(style, src, srcSizeInBytes, compressedBound, compressedData, &compressedSize));
+    const int compressedSize = LZ4_compress_default((const char*)src, (char*)compressedData, int(srcSizeInBytes), int(compressedBound));
     alloc.reallocate(compressedSize);
 
     auto blob = RawBlob::moveCreate(alloc);
@@ -66,16 +54,10 @@ SlangResult LZ4CompressionSystemImpl::compressToBlob(const CompressionStyle* sty
     return SLANG_OK;
 }
 
-size_t LZ4CompressionSystemImpl::calcCompressedBound(size_t srcSizeInBytes)
+SlangResult LZ4CompressionSystemImpl::decompress(const void* compressed, size_t compressedSizeInBytes, size_t decompressedSizeInBytes, void* outDecompressed)
 {
-    return LZ4_compressBound(int(srcSizeInBytes));
-}
-
-SlangResult LZ4CompressionSystemImpl::decompress(const void* compressed, size_t compressedSizeInBytes, size_t dstCapacity, void* outDecompressed, size_t* outDecompressedSize)
-{
-    const int decompressedSize = LZ4_decompress_safe((const char*)compressed, (char*)outDecompressed, int(compressedSizeInBytes), int(dstCapacity));
-
-    *outDecompressedSize = decompressedSize;
+    const int decompressedSize = LZ4_decompress_safe((const char*)compressed, (char*)outDecompressed, int(compressedSizeInBytes), int(decompressedSizeInBytes));
+    SLANG_ASSERT(decompressedSize == decompressedSizeInBytes);
     return SLANG_OK;
 }
 

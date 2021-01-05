@@ -3,7 +3,9 @@
 #include "test-context.h"
 
 #include "../../source/core/slang-zip-file-system.h"
+
 #include "../../source/core/slang-lz4-compression-system.h"
+#include "../../source/core/slang-deflate-compression-system.h"
 
 using namespace Slang;
 
@@ -130,34 +132,35 @@ static void compressionUnitTest()
         SLANG_CHECK(_equals(contents3, blob));
     }
 
+    for (Index i = 0; i < 2; ++i)
     {
         // Lets try lz4
 
-        ICompressionSystem* system = LZ4CompressionSystem::getSingleton();
+        ICompressionSystem* system = nullptr;
+        if (i == 0)
+        {
+            system = LZ4CompressionSystem::getSingleton();
+        }
+        else
+        {
+            system = DeflateCompressionSystem::getSingleton();
+        }
 
         const char src[] = "Some text to compress";
         size_t srcSize = sizeof(src);
 
-        const size_t compressedDataBound = system->calcCompressedBound(srcSize);
-
-        List<char> compressedData;
-        compressedData.setCount(Index(compressedDataBound));
+        ComPtr<ISlangBlob> compressedBlob;
 
         CompressionStyle style;
 
-        size_t compressedSize;
-        SLANG_CHECK(SLANG_SUCCEEDED(system->compress(&style, src, srcSize, compressedDataBound, compressedData.getBuffer(), &compressedSize)));
-        compressedData.setCount(Index(compressedSize));
-
+        SLANG_CHECK(SLANG_SUCCEEDED(system->compress(&style, src, srcSize, compressedBlob.writeRef()))); 
+        
         // Now lets decompress
 
         List<char> decompressedData;
         decompressedData.setCount(srcSize);
 
-        size_t decompressedSize;
-        SLANG_CHECK(SLANG_SUCCEEDED(system->decompress(compressedData.getBuffer(), compressedData.getCount(), srcSize, decompressedData.getBuffer(), &decompressedSize)));
-
-        SLANG_CHECK(decompressedSize == srcSize);
+        SLANG_CHECK(SLANG_SUCCEEDED(system->decompress(compressedBlob->getBufferPointer(), compressedBlob->getBufferSize(), srcSize, decompressedData.getBuffer())));
         SLANG_CHECK(memcmp(src, decompressedData.getBuffer(), srcSize) == 0);
     }
 }

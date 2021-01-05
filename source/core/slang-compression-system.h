@@ -25,32 +25,17 @@ public:
         /** compress
         @param src Points to the start of the data to compress
         @param srcSizeInBytes The size of the source data to compress in bytes
-        @param compressedCapactity The size of the outCompressed buffer. Must be large enough to hold all the compressed data
-        @param outCompressed Compressed data is written to this buffer
-        @param outCompressedSizeInBytes The amount of actual data compressed
-        @return SLANG_OK if successful */
-    virtual SLANG_NO_THROW SlangResult SLANG_MCALL compress(const CompressionStyle* style, const void* src, size_t srcSizeInBytes, size_t compressedCapacity, void* outCompressed, size_t* outCompressedSizeInBytes) = 0;
-
-        /** compressToBlob
-        @param src Points to the start of the data to compress
-        @param srcSizeInBytes The size of the source data to compress in bytes
         @param outBlob The input data compressed
         @return SLANG_OK if successful */
-    virtual SLANG_NO_THROW SlangResult SLANG_MCALL compressToBlob(const CompressionStyle* style, const void* src, size_t srcSizeInBytes, ISlangBlob** outBlob) = 0;
-
-        /* calcCompressedBound
-        @param srcSizeInBytes
-        @return The maximum compression buffer that is required to hold input data of the specified size. 
-        */
-    virtual SLANG_NO_THROW size_t SLANG_MCALL calcCompressedBound(size_t srcSizeInBytes) = 0;
+    virtual SLANG_NO_THROW SlangResult SLANG_MCALL compress(const CompressionStyle* style, const void* src, size_t srcSizeInBytes, ISlangBlob** outBlob) = 0;
 
         /* decompress
         @param compressed The start of the compressed data
         @param compressedSizeInBytes The compressed size in bytes
-        @param dst Where decompressed data is written
-        @param dstSizeInBytes The size of the decompressed buffer. MUST be exactly the same as the original source size.
+        @param decompressedSizeInBytes The size of the decompressed buffer. MUST be exactly the same as the original source size.
+        @param outDecompressed Where decompressed data is written
         @return SLANG_OK if successful */
-    virtual SLANG_NO_THROW SlangResult SLANG_MCALL decompress(const void* compressed, size_t compressedSizeInBytes, size_t dstCapacity, void* outDecompressed, size_t* outDecompressedSize) = 0;
+    virtual SLANG_NO_THROW SlangResult SLANG_MCALL decompress(const void* compressed, size_t compressedSizeInBytes, size_t decompressedSizeInBytes, void* outDecompressed) = 0;
 };
 
 #define SLANG_UUID_ICompressionSystem { 0xcc935840, 0xe059, 0x4bb8, { 0xa2, 0x2d, 0x92, 0x7b, 0x3c, 0x73, 0x8f, 0x85 } };
