@@ -178,6 +178,7 @@
     <ClInclude Include="..\..\..\source\core\slang-byte-encode-util.h" />
     <ClInclude Include="..\..\..\source\core\slang-char-util.h" />
     <ClInclude Include="..\..\..\source\core\slang-common.h" />
+    <ClInclude Include="..\..\..\source\core\slang-compressed-file-system.h" />
     <ClInclude Include="..\..\..\source\core\slang-compression-system.h" />
     <ClInclude Include="..\..\..\source\core\slang-deflate-compression-system.h" />
     <ClInclude Include="..\..\..\source\core\slang-dictionary.h" />
@@ -226,6 +227,7 @@
     <ClCompile Include="..\..\..\source\core\slang-blob.cpp" />
     <ClCompile Include="..\..\..\source\core\slang-byte-encode-util.cpp" />
     <ClCompile Include="..\..\..\source\core\slang-char-util.cpp" />
+    <ClCompile Include="..\..\..\source\core\slang-compressed-file-system.cpp" />
     <ClCompile Include="..\..\..\source\core\slang-deflate-compression-system.cpp" />
     <ClCompile Include="..\..\..\source\core\slang-downstream-compiler.cpp" />
     <ClCompile Include="..\..\..\source\core\slang-free-list.cpp" />

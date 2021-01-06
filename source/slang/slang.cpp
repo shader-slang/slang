@@ -267,7 +267,7 @@ SlangResult Session::loadStdLib(const void* stdLib, size_t stdLibSizeInBytes)
 
     // Make a file system to read it from
     RefPtr<CompressedFileSystem> fileSystem;
-    SLANG_RETURN_ON_FAIL(CompressedFileSystem::createZip(stdLib, stdLibSizeInBytes, fileSystem));
+    SLANG_RETURN_ON_FAIL(ZipFileSystem::create(stdLib, stdLibSizeInBytes, fileSystem));
 
     // Let's try loading serialized modules and adding them
     SLANG_RETURN_ON_FAIL(_readBuiltinModule(fileSystem, coreLanguageScope, "core"));
@@ -285,7 +285,7 @@ SlangResult Session::saveStdLib(ISlangBlob** outBlob)
 
     // Make a file system to read it from
     RefPtr<CompressedFileSystem> fileSystem;
-    SLANG_RETURN_ON_FAIL(CompressedFileSystem::createZip(fileSystem));
+    SLANG_RETURN_ON_FAIL(ZipFileSystem::create(fileSystem));
 
     for (auto& pair : m_builtinLinkage->mapNameToLoadedModules)
     {

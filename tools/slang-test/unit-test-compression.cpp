@@ -36,7 +36,7 @@ static void compressionUnitTest()
 {
     // Create a zip to add stuff to
     RefPtr<CompressedFileSystem> buildFileSystem;
-    CompressedFileSystem::createZip(buildFileSystem);
+    ZipFileSystem::create(buildFileSystem);
 
     const char contents[] = "I'm compressed";
     const char contents2[] = "Some more stuff";
@@ -121,7 +121,7 @@ static void compressionUnitTest()
         const auto archive = buildFileSystem->getArchive();
 
         RefPtr<CompressedFileSystem> fileSystem;
-        CompressedFileSystem::createZip(archive.getBuffer(), archive.getCount(), fileSystem);
+        ZipFileSystem::create(archive.getBuffer(), archive.getCount(), fileSystem);
 
         ComPtr<ISlangBlob> blob;
 

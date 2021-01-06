@@ -104,6 +104,12 @@ namespace Slang
         static String simplify(const UnownedStringSlice& path);
         static String simplify(const String& path) { return simplify(path.getUnownedSlice()); }
 
+            /// Simplifies the path split up
+        static void simplify(List<UnownedStringSlice>& ioSplit);
+
+            /// Join the parts of the path to produce an output path
+        static void join(const UnownedStringSlice* slices, Index count, StringBuilder& out);
+
             /// Returns true if the path is absolute
         static bool isAbsolute(const UnownedStringSlice& path);
         static bool isAbsolute(const String& path) { return isAbsolute(path.getUnownedSlice()); }

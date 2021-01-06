@@ -3,6 +3,8 @@
 
 #include "../../slang-com-helper.h"
 
+#include "slang-string-util.h"
+
 #ifndef __STDC__
 #   define __STDC__ 1
 #endif
@@ -400,52 +402,56 @@ namespace Slang
         return false;
     }
 
-    /* static */String Path::simplify(const UnownedStringSlice& path)
+    /* static */void Path::simplify(List<UnownedStringSlice>& ioSplit)
     {
-        List<UnownedStringSlice> splitPath;
-        split(path, splitPath);
-
         // Strictly speaking we could do something about case on platforms like window, but here we won't worry about that
-        for (Index i = 0; i < splitPath.getCount(); i++)
+        for (Index i = 0; i < ioSplit.getCount(); i++)
         {
-            const UnownedStringSlice& cur = splitPath[i];
-            if (cur == "." && splitPath.getCount() > 1)
+            const UnownedStringSlice& cur = ioSplit[i];
+            if (cur == "." && ioSplit.getCount() > 1)
             {
                 // Just remove it 
-                splitPath.removeAt(i);
+                ioSplit.removeAt(i);
                 i--;
             }
             else if (cur == ".." && i > 0)
             {
                 // Can we remove this and the one before ?
-                UnownedStringSlice& before = splitPath[i - 1];
+                UnownedStringSlice& before = ioSplit[i - 1];
                 if (before == ".." || (i == 1 && isDriveSpecification(before)))
                 {
-                    // Can't do it
+                    // Can't do it, but we allow relative, so just leave for now
                     continue;
                 }
-                splitPath.removeRange(i - 1, 2);
+                ioSplit.removeRange(i - 1, 2);
                 i -= 2;
             }
         }
+    }
 
-        // If its empty it must be .
-        if (splitPath.getCount() == 0)
+    /* static */void Path::join(const UnownedStringSlice* slices, Index count, StringBuilder& out)
+    {
+        out.Clear();
+
+        if (count == 0)
         {
-            splitPath.add(UnownedStringSlice::fromLiteral("."));
+            out << ".";
+            return;
         }
-   
+
+        StringUtil::join(slices, count, kPathDelimiter, out);
+    }
+
+
+    /* static */String Path::simplify(const UnownedStringSlice& path)
+    {
+        List<UnownedStringSlice> splitPath;
+        split(path, splitPath);
+        simplify(splitPath);
+
         // Reconstruct the string
         StringBuilder builder;
-        for (Index i = 0; i < splitPath.getCount(); i++)
-        {
-            if (i > 0)
-            {
-                builder.Append(kPathDelimiter);
-            }
-            builder.Append(splitPath[i]);
-        }
-
+        join(splitPath.getBuffer(), splitPath.getCount(), builder);
         return builder.ToString();
     }
 
