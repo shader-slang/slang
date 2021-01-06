@@ -5,7 +5,7 @@
 #include "../render.h"
 #include "../render-graphics-common.h"
 
-#include "../../source/core/slang-smart-pointer.h"
+#include "core/slang-smart-pointer.h"
 
 #include "vk-api.h"
 #include "vk-util.h"

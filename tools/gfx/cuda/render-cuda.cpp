@@ -4,7 +4,7 @@
 #include "../render.h"
 #include <cuda.h>
 #include <cuda_runtime_api.h>
-#include "../../source/core/slang-std-writers.h"
+#include "core/slang-std-writers.h"
 #include "slang.h"
 #endif
 

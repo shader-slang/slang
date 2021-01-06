@@ -34,7 +34,7 @@
 //
 #include "gfx/render.h"
 #include "gfx/d3d11/render-d3d11.h"
-#include "gfx/window.h"
+#include "tools/graphics-app-framework/window.h"
 #include "../../prelude/slang-cpp-types.h"
 using namespace gfx;
 
