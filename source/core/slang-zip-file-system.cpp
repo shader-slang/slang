@@ -78,8 +78,9 @@ protected:
     SlangResult _copyToAndInitWriter(mz_zip_archive& outWriter);
 
         /// Returns SLANG_E_NOT_FOUND if no directory or contents found
+        /// terminationState controls when search terminates. If State::Undefined, will enumerate everything.
         /// If outContents not set, will just determine if the directory exists
-    SlangResult _getPathContents(const String& fixedPath, SubStringIndexMap* outContents);
+    SlangResult _getPathContents(ImplicitDirectoryCollector::State terminationState, ImplicitDirectoryCollector* outCollector);
 
     void _rebuildMap();
 
@@ -505,7 +506,9 @@ SlangResult ZipFileSystemImpl::getPathType(const char* path, SlangPathType* outP
     else
     {
         // It could be an *implicit* directory (ie as part of a path). So lets look for that...
-        if (SLANG_SUCCEEDED(_getPathContents(fixedPath, nullptr)))
+        ImplicitDirectoryCollector collector(fixedPath);
+        SLANG_RETURN_ON_FAIL(_getPathContents(ImplicitDirectoryCollector::State::DirectoryExists, &collector));
+        if (collector.getDirectoryExists())
         {
             *outPathType = SLANG_PATH_TYPE_DIRECTORY;
             return SLANG_OK;
@@ -563,21 +566,18 @@ SlangResult ZipFileSystemImpl::getSimplifiedPath(const char* path, ISlangBlob** 
     return SLANG_OK;
 }
 
-SlangResult ZipFileSystemImpl::_getPathContents(const String& inFixedPath, SubStringIndexMap* outContents)
+SlangResult ZipFileSystemImpl::_getPathContents(ImplicitDirectoryCollector::State terminationState, ImplicitDirectoryCollector* outCollector)
 {
     if (!_hasArchive())
     {
         return SLANG_E_NOT_FOUND;
     }
 
-    String prefix = ImplicitDirectoryUtil::getPathPrefix(inFixedPath.getUnownedSlice());
-
-    bool foundDirectory = false;
-
     // Okay - I want to iterate through all of the entries and look for the ones with this prefix
     const Index entryCount = Index(mz_zip_reader_get_num_files(&m_archive));
     for (Index i = 0; i < entryCount; ++i)
     {
+
         // Skip if it's been deleted.
         if (m_removedSet.contains(i))
         {
@@ -591,28 +591,17 @@ SlangResult ZipFileSystemImpl::_getPathContents(const String& inFixedPath, SubSt
         }
 
         UnownedStringSlice currentPath(fileStat.m_filename);
-        if (!currentPath.startsWith(prefix.getUnownedSlice()))
+        SlangPathType pathType = fileStat.m_is_directory ? SLANG_PATH_TYPE_DIRECTORY : SLANG_PATH_TYPE_FILE;
+        outCollector->addPath(pathType, currentPath);
+
+        // If a termination state is defined, and we reach it, we are done
+        if (terminationState != ImplicitDirectoryCollector::State::Undefined && outCollector->hasState(terminationState))
         {
-            continue;
-        }
-        
-        if (!outContents)
-        {
-            // We found the directory, as we found contents. And since we aren't adding to map, we are done
             return SLANG_OK;
         }
-
-        // We found the directory (either implicitly or explicitly)
-        foundDirectory = true;
-
-        UnownedStringSlice remainder = ImplicitDirectoryUtil::getRemainder(prefix.getUnownedSlice(), currentPath);
-
-        SlangPathType pathType = fileStat.m_is_directory ? SLANG_PATH_TYPE_DIRECTORY : SLANG_PATH_TYPE_FILE;
-        ImplicitDirectoryUtil::addRemainingPath(pathType, remainder, *outContents);
     }
-
     // Check we found the directory at all...
-    return foundDirectory ? SLANG_OK : SLANG_E_NOT_FOUND;
+    return outCollector->getDirectoryExists() ? SLANG_OK : SLANG_E_NOT_FOUND;
 }
 
 SlangResult ZipFileSystemImpl::enumeratePathContents(const char* path, FileSystemContentsCallBack callback, void* userData)
@@ -624,13 +613,9 @@ SlangResult ZipFileSystemImpl::enumeratePathContents(const char* path, FileSyste
 
     String fixedPath;
     SLANG_RETURN_ON_FAIL(_getFixedPath(path, fixedPath));
-
-    // Maps the name to the SLANG_PATH_TYPE
-    SubStringIndexMap map;
-    SLANG_RETURN_ON_FAIL(_getPathContents(fixedPath, &map));
-
-    ImplicitDirectoryUtil::enumerate(map, callback, userData);
-    return SLANG_OK;
+    ImplicitDirectoryCollector collector(fixedPath);
+    SLANG_RETURN_ON_FAIL(_getPathContents(ImplicitDirectoryCollector::State::Undefined, &collector));
+    return collector.enumerate(callback, userData);
 }
 
 SlangResult ZipFileSystemImpl::saveFile(const char* path, const void* data, size_t size)
@@ -693,10 +678,10 @@ SlangResult ZipFileSystemImpl::remove(const char* path)
     if (fileStat.m_is_directory)
     {
         // Find the directory contents
-        SubStringIndexMap map;
-        SLANG_RETURN_ON_FAIL(_getPathContents(fixedPath, &map));
+        ImplicitDirectoryCollector collector(fixedPath); 
+        SLANG_RETURN_ON_FAIL(_getPathContents(ImplicitDirectoryCollector::State::HasContent, &collector));
 
-        if (map.getCount() > 0)
+        if (collector.hasContent())
         {
             // If it contains children we can't remove it
             return SLANG_FAIL;

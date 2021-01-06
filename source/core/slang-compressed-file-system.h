@@ -142,9 +142,10 @@ struct SubStringIndexMap
 /* This finds the contents of a directory. It's somewhat complicated because it allows for implicit paths
 defined by the existence of a directory in a path */
 
-struct ImplicitDirectoryUtil
+struct ImplicitDirectoryCollector
 {
-    static String getPathPrefix(const UnownedStringSlice& canonicalPath)
+    ImplicitDirectoryCollector(const String& canonicalPath, bool directoryExists = false):
+        m_directoryExists(directoryExists)
     {
         StringBuilder buffer;
         if (canonicalPath != ".")
@@ -152,28 +153,49 @@ struct ImplicitDirectoryUtil
             buffer << canonicalPath;
             buffer.append('/');
         }
-        return buffer.ProduceString();
+        m_prefix = buffer.ProduceString();
     }
 
-    static UnownedStringSlice getRemainder(const String& prefix, const UnownedStringSlice& path)
+    enum class State
     {
-        // path must
-        SLANG_ASSERT(path.startsWith(prefix.getUnownedSlice()));
-        return UnownedStringSlice(path.begin() + prefix.getLength(), path.end());
+        Undefined,                ///< 
+        DirectoryExists,        ///< The directory exists
+        HasContent,             ///< If it has content, the directory must exist
+    };
+
+    State getState() const { return (m_map.getCount() > 0) ? State::HasContent : (m_directoryExists ? State::DirectoryExists : State::Undefined); }
+    bool hasState(State state) { return Index(getState()) >= Index(state); }
+
+        /// Set that it exists
+    void setDirectoryExists(bool directoryExists) { m_directoryExists = directoryExists; }
+        /// Get if it exists (implicitly or explicitly)
+    bool getDirectoryExists() const { return m_directoryExists || m_map.getCount() > 0; }
+
+        /// True if the path matches the prefix
+    bool hasPrefix(const UnownedStringSlice& path) const { return path.startsWith(m_prefix.getUnownedSlice()); }
+
+        /// True if the directory has content
+    bool hasContent() const { return m_map.getCount() > 0; }
+
+        /// Gets the remainder or path after the prefix
+    UnownedStringSlice getRemainder(const UnownedStringSlice& path) const
+    {
+        SLANG_ASSERT(hasPrefix(path));
+        return UnownedStringSlice(path.begin() + m_prefix.getLength(), path.end());
     }
 
         /// Add a remaining path
-    static void addRemainingPath(SlangPathType pathType, const UnownedStringSlice& inPathRemainder, SubStringIndexMap& pathMap)
+    void addRemainingPath(SlangPathType pathType, const UnownedStringSlice& inPathRemainder)
     {
-        // Get the remainder
+        // If it's zero length we probably don't want to add it
         if (inPathRemainder.getLength() == 0)
         {
-            // It's empty so don't add
+            // It's empty so don't add normal way - implies the directory exists
+            m_directoryExists = true;
             return;
         }
 
         UnownedStringSlice pathRemainder(inPathRemainder);
-
         const Index slashIndex = pathRemainder.indexOf('/');
 
         // If we have a following / that means it's an implicit directory.
@@ -183,39 +205,29 @@ struct ImplicitDirectoryUtil
             pathRemainder = UnownedStringSlice(pathRemainder.begin(), pathRemainder.begin() + slashIndex);
         }
 
-        const Index index = pathMap.findOrAdd(pathRemainder, pathType);
+        const Index index = m_map.findOrAdd(pathRemainder, pathType);
         // Make sure they are the same type
         SLANG_ASSERT(pathMap.getIndexAt(Index) == pathType);
     }
 
         /// Add a path
-    static void addPath(SlangPathType pathType, const String& prefix, const UnownedStringSlice& slice, SubStringIndexMap& pathMap)
+    void addPath(SlangPathType pathType, const UnownedStringSlice& canonicalPath)
     {
-        if (!slice.startsWith(prefix.getUnownedSlice()))
+        if (hasPrefix(canonicalPath))
         {
-            return;
+            UnownedStringSlice remainder = getRemainder(canonicalPath);
+            addRemainingPath(pathType, remainder);
         }
-
-        UnownedStringSlice remainder = getRemainder(prefix, slice);
-
-        // Get the remainder
-        if (remainder.getLength() == 0)
-        {
-            // It's empty so don't add
-            return;
-        }
-
-        addRemainingPath(pathType, remainder, pathMap);
     }
 
         /// Enumerate the contents
-    static void enumerate(const SubStringIndexMap& map, FileSystemContentsCallBack callback, void* userData)
+    SlangResult enumerate(FileSystemContentsCallBack callback, void* userData)
     {
-        const Int count = map.getCount(); 
+        const Int count = m_map.getCount(); 
 
         for (Index i = 0; i < count; ++i)
         {
-            const auto& pair = map.getAt(i);
+            const auto& pair = m_map.getAt(i);
 
             UnownedStringSlice path = pair.Key;
             SlangPathType pathType = SlangPathType(pair.Value);
@@ -225,7 +237,13 @@ struct ImplicitDirectoryUtil
             SLANG_ASSERT(path.begin()[path.getCount()] == 0);
             callback(pathType, path.begin(), userData);
         }
+
+        return getDirectoryExists() ? SLANG_OK : SLANG_E_NOT_FOUND;
     }
+
+    SubStringIndexMap m_map;
+    String m_prefix;
+    bool m_directoryExists;
 };
 
 }

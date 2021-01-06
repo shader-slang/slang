@@ -126,11 +126,29 @@ SlangResult SimpleCompressedFileSystem::calcCombinedPath(SlangPathType fromPathT
 
 SlangResult SimpleCompressedFileSystem::getPathType(const char* path, SlangPathType* outPathType)
 {
-    Entry* entry = _getEntryFromPath(path);
+    String canonicalPath;
+    Entry* entry = _getEntryFromPath(path, &canonicalPath);
     if (entry == nullptr)
     {
+        // Could be an implicit path
+        ImplicitDirectoryCollector collector(canonicalPath);
+        for (const auto& pair : m_entries)
+        {
+            Entry* childEntry = pair.Value;
+            collector.addPath(childEntry->m_type, childEntry->m_canonicalPath.getUnownedSlice());
+            // If on adding a path we determine a directory exists, then we are done
+            if (collector.getDirectoryExists())
+            {
+                *outPathType = SLANG_PATH_TYPE_DIRECTORY;
+                return SLANG_OK;
+            }
+        }
+
+        // If not implicit or explicit we are done.
         return SLANG_E_NOT_FOUND;
     }
+
+    // Explicit type
     *outPathType = entry->m_type;
     return SLANG_OK;
 }
@@ -161,26 +179,16 @@ SlangResult SimpleCompressedFileSystem::enumeratePathContents(const char* path, 
     }
 
     // If we didn't find an explicit directory, lets handle an implicit one
-    SubStringIndexMap map;
-    String prefixPath = ImplicitDirectoryUtil::getPathPrefix(canonicalPath.getUnownedSlice());
+    ImplicitDirectoryCollector collector(canonicalPath);
 
     // If it is a directory, we need to see if there is anything in it
     for (const auto& pair : m_entries)
     {
-        const String& entryCanonicalPath = pair.Key;
-        if (entryCanonicalPath.startsWith(prefixPath))
-        {
-            // Directory is not empty;
-            return SLANG_FAIL;
-        }
-
         Entry* childEntry = pair.Value;
-        ImplicitDirectoryUtil::addPath(childEntry->m_type, prefixPath, pair.Key.getUnownedSlice(), map);
+        collector.addPath(childEntry->m_type, childEntry->m_canonicalPath.getUnownedSlice());
     }
 
-    ImplicitDirectoryUtil::enumerate(map, callback, userData);
-
-    return (map.getCount() == 0) ? SLANG_E_NOT_FOUND : SLANG_OK;
+    return collector.enumerate(callback, userData);
 }
 
 SlangResult SimpleCompressedFileSystem::saveFile(const char* path, const void* data, size_t size)
@@ -224,20 +232,16 @@ SlangResult SimpleCompressedFileSystem::remove(const char* path)
             return SLANG_OK;
         }
 
-        // It's a directory - make sure it's empty
-
-        // Add the / at the end
-        StringBuilder prefix;
-        prefix.append(canonicalPath);
-        prefix.append('/');
+        ImplicitDirectoryCollector collector(canonicalPath);
 
         // If it is a directory, we need to see if there is anything in it
         for (const auto& pair : m_entries)
         {
-            const String& entryCanonicalPath = pair.Key;
-            if (entryCanonicalPath.startsWith(prefix))
+            Entry* childEntry = pair.Value;
+            collector.addPath(childEntry->m_type, childEntry->m_canonicalPath.getUnownedSlice());
+            if (collector.hasContent())
             {
-                // Directory is not empty;
+                // Directory is not empty
                 return SLANG_FAIL;
             }
         }
