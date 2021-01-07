@@ -813,7 +813,7 @@ void VKRenderer::_endRender()
     m_deviceQueue.flush();
 }
 
-Renderer* createVKRenderer()
+IRenderer* createVKRenderer()
 {
     return new VKRenderer;
 }

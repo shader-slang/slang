@@ -3,8 +3,8 @@
 
 namespace gfx {
 
-class Renderer;
+class IRenderer;
 
-Renderer* createD3D12Renderer();
+IRenderer* createD3D12Renderer();
 
 } // gfx

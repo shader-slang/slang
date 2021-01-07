@@ -5,9 +5,10 @@
 namespace gfx
 {
 
-class GraphicsAPIRenderer : public Renderer
+class GraphicsAPIRenderer : public IRenderer, public Slang::RefObject
 {
 public:
+    SLANG_REF_OBJECT_IUNKNOWN_ALL
     virtual Result createShaderObjectLayout(
         slang::TypeLayoutReflection* typeLayout, ShaderObjectLayout** outLayout) SLANG_OVERRIDE;
     virtual Result createRootShaderObjectLayout(
@@ -17,6 +18,7 @@ public:
     virtual Result bindRootShaderObject(PipelineType pipelineType,  ShaderObject* object) SLANG_OVERRIDE;
     void preparePipelineDesc(GraphicsPipelineStateDesc& desc);
     void preparePipelineDesc(ComputePipelineStateDesc& desc);
+    IRenderer* getInterface(const Slang::Guid& guid);
 };
 
 }

@@ -2,7 +2,7 @@
 
 namespace gfx
 {
-class Renderer;
+class IRenderer;
 
-Renderer* createCUDARenderer();
+IRenderer* createCUDARenderer();
 }

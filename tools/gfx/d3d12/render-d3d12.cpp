@@ -706,7 +706,7 @@ protected:
     bool m_nvapi = false;
 };
 
-Renderer* createD3D12Renderer()
+IRenderer* createD3D12Renderer()
 {
     return new D3D12Renderer;
 }

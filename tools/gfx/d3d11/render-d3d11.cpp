@@ -417,7 +417,7 @@ public:
     bool m_nvapi = false;
 };
 
-Renderer* createD3D11Renderer()
+IRenderer* createD3D11Renderer()
 {
     return new D3D11Renderer();
 }

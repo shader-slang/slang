@@ -4,6 +4,9 @@ using namespace Slang;
 namespace gfx
 {
 
+static const Slang::Guid IID_ISlangUnknown = SLANG_UUID_ISlangUnknown;
+static const Slang::Guid IID_IRenderer = SLANG_UUID_IRenderer;
+
 gfx::StageType translateStage(SlangStage slangStage)
 {
     switch (slangStage)
@@ -65,7 +68,7 @@ public:
     struct Builder
     {
     public:
-        Builder(Renderer* renderer)
+        Builder(IRenderer* renderer)
             : m_renderer(renderer)
         {}
 
@@ -339,12 +342,12 @@ public:
             return SLANG_OK;
         }
 
-        Renderer* m_renderer = nullptr;
+        IRenderer* m_renderer = nullptr;
         slang::TypeLayoutReflection* m_elementTypeLayout = nullptr;
     };
 
     static Result createForElementType(
-        Renderer* renderer,
+        IRenderer* renderer,
         slang::TypeLayoutReflection* elementType,
         GraphicsCommonShaderObjectLayout** outLayout)
     {
@@ -371,7 +374,7 @@ public:
     SubObjectRangeInfo const& getSubObjectRange(Index index) { return m_subObjectRanges[index]; }
     List<SubObjectRangeInfo> const& getSubObjectRanges() { return m_subObjectRanges; }
 
-    Renderer* getRenderer() { return m_renderer; }
+    IRenderer* getRenderer() { return m_renderer; }
 
 protected:
     Result _init(Builder const* builder)
@@ -410,7 +413,7 @@ protected:
         return SLANG_OK;
     }
 
-    Renderer* m_renderer;
+    IRenderer* m_renderer;
     List<RefPtr<DescriptorSetInfo>> m_descriptorSets;
     List<BindingRangeInfo> m_bindingRanges;
     slang::TypeLayoutReflection* m_elementTypeLayout;
@@ -434,7 +437,7 @@ public:
 
     struct Builder : Super::Builder
     {
-        Builder(Renderer* renderer)
+        Builder(IRenderer* renderer)
             : Super::Builder(renderer)
         {}
 
@@ -539,7 +542,7 @@ public:
 
     struct Builder : Super::Builder
     {
-        Builder(Renderer* renderer)
+        Builder(IRenderer* renderer)
             : Super::Builder(renderer)
         {}
 
@@ -670,7 +673,7 @@ class GraphicsCommonShaderObject : public ShaderObject
 {
 public:
     static Result create(
-        Renderer* renderer,
+        IRenderer* renderer,
         GraphicsCommonShaderObjectLayout* layout,
         GraphicsCommonShaderObject** outShaderObject)
     {
@@ -681,7 +684,7 @@ public:
         return SLANG_OK;
     }
 
-    Renderer* getRenderer() { return m_layout->getRenderer(); }
+    IRenderer* getRenderer() { return m_layout->getRenderer(); }
 
     Index getEntryPointCount() { return 0; }
 
@@ -693,7 +696,7 @@ public:
 
     SlangResult setData(ShaderOffset const& offset, void const* data, size_t size)
     {
-        Renderer* renderer = getRenderer();
+        IRenderer* renderer = getRenderer();
 
         char* dest = (char*)renderer->map(m_buffer, MapFlavor::HostWrite);
         memcpy(dest + offset.uniformOffset, data, size);
@@ -807,7 +810,7 @@ public:
 protected:
     friend class ProgramVars;
 
-    Result init(Renderer* renderer, GraphicsCommonShaderObjectLayout* layout)
+    Result init(IRenderer* renderer, GraphicsCommonShaderObjectLayout* layout)
     {
         m_layout = layout;
 
@@ -883,7 +886,7 @@ protected:
     }
 
     Result apply(
-        Renderer* renderer,
+        IRenderer* renderer,
         PipelineType pipelineType,
         PipelineLayout* pipelineLayout,
         Index& ioRootIndex)
@@ -1093,7 +1096,7 @@ class EntryPointVars : public GraphicsCommonShaderObject
 
 public:
     static Result
-    create(Renderer* renderer, EntryPointLayout* layout, EntryPointVars** outShaderObject)
+    create(IRenderer* renderer, EntryPointLayout* layout, EntryPointVars** outShaderObject)
     {
         RefPtr<EntryPointVars> object = new EntryPointVars();
         SLANG_RETURN_ON_FAIL(object->init(renderer, layout));
@@ -1105,7 +1108,7 @@ public:
     EntryPointLayout* getLayout() { return static_cast<EntryPointLayout*>(m_layout.Ptr()); }
 
 protected:
-    Result init(Renderer* renderer, EntryPointLayout* layout)
+    Result init(IRenderer* renderer, EntryPointLayout* layout)
     {
         SLANG_RETURN_ON_FAIL(Super::init(renderer, layout));
         return SLANG_OK;
@@ -1117,7 +1120,7 @@ class ProgramVars : public GraphicsCommonShaderObject
     typedef GraphicsCommonShaderObject Super;
 
 public:
-    static Result create(Renderer* renderer, GraphicsCommonProgramLayout* layout, ProgramVars** outShaderObject)
+    static Result create(IRenderer* renderer, GraphicsCommonProgramLayout* layout, ProgramVars** outShaderObject)
     {
         RefPtr<ProgramVars> object = new ProgramVars();
         SLANG_RETURN_ON_FAIL(object->init(renderer, layout));
@@ -1128,7 +1131,7 @@ public:
 
     GraphicsCommonProgramLayout* getLayout() { return static_cast<GraphicsCommonProgramLayout*>(m_layout.Ptr()); }
 
-    void apply(Renderer* renderer, PipelineType pipelineType)
+    void apply(IRenderer* renderer, PipelineType pipelineType)
     {
         auto pipelineLayout = getLayout()->getPipelineLayout();
 
@@ -1177,7 +1180,7 @@ protected:
         return SLANG_OK;
     }
 
-    Result init(Renderer* renderer, GraphicsCommonProgramLayout* layout)
+    Result init(IRenderer* renderer, GraphicsCommonProgramLayout* layout)
     {
         SLANG_RETURN_ON_FAIL(Super::init(renderer, layout));
 
@@ -1284,6 +1287,13 @@ void GraphicsAPIRenderer::preparePipelineDesc(ComputePipelineStateDesc& desc)
         auto rootLayout = dynamic_cast<GraphicsCommonProgramLayout*>(desc.rootShaderObjectLayout);
         desc.pipelineLayout = rootLayout->getPipelineLayout();
     }
+}
+
+IRenderer* gfx::GraphicsAPIRenderer::getInterface(const Guid& guid)
+{
+    return (guid == IID_ISlangUnknown || guid == IID_IRenderer)
+               ? static_cast<IRenderer*>(this)
+               : nullptr;
 }
 
 }

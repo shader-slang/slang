@@ -13,6 +13,9 @@ namespace gfx
 #ifdef GFX_ENABLE_CUDA
 using namespace Slang;
 
+static const Guid IID_ISlangUnknown = SLANG_UUID_ISlangUnknown;
+static const Guid IID_IRenderer = SLANG_UUID_IRenderer;
+
 SLANG_FORCE_INLINE static bool _isError(CUresult result) { return result != 0; }
 SLANG_FORCE_INLINE static bool _isError(cudaError_t result) { return result != 0; }
 
@@ -414,9 +417,9 @@ public:
     List<RefPtr<CUDAShaderObject>> objects;
     List<RefPtr<CUDAResourceView>> resources;
 
-    virtual SlangResult init(Renderer* renderer, CUDAShaderObjectLayout* typeLayout);
+    virtual SlangResult init(IRenderer* renderer, CUDAShaderObjectLayout* typeLayout);
 
-    virtual SlangResult initBuffer(Renderer* renderer, size_t bufferSize)
+    virtual SlangResult initBuffer(IRenderer* renderer, size_t bufferSize)
     {
         BufferResource::Desc bufferDesc;
         bufferDesc.init(bufferSize);
@@ -536,7 +539,7 @@ public:
     void* hostBuffer = nullptr;
     size_t uniformBufferSize = 0;
     // Override buffer allocation so we store all uniform data on host memory instead of device memory.
-    virtual SlangResult initBuffer(Renderer* renderer, size_t bufferSize) override
+    virtual SlangResult initBuffer(IRenderer* renderer, size_t bufferSize) override
     {
         uniformBufferSize = bufferSize;
         hostBuffer = malloc(bufferSize);
@@ -573,14 +576,22 @@ class CUDARootShaderObject : public CUDAShaderObject
 {
 public:
     List<RefPtr<CUDAEntryPointShaderObject>> entryPointObjects;
-    virtual SlangResult init(Renderer* renderer, CUDAShaderObjectLayout* typeLayout) override;
+    virtual SlangResult init(IRenderer* renderer, CUDAShaderObjectLayout* typeLayout) override;
     virtual Slang::Index getEntryPointCount() override { return entryPointObjects.getCount(); }
     virtual ShaderObject* getEntryPoint(Slang::Index index) override { return entryPointObjects[index].Ptr(); }
 
 };
 
-class CUDARenderer : public Renderer
+class CUDARenderer : public IRenderer, public RefObject
 {
+public:
+    SLANG_REF_OBJECT_IUNKNOWN_ALL
+    IRenderer* getInterface(const Guid& guid)
+    {
+        return (guid == IID_ISlangUnknown || guid == IID_IRenderer) ? static_cast<IRenderer*>(this)
+                                                                    : nullptr;
+    }
+
 private:
     static const CUDAReportStyle reportType = CUDAReportStyle::Normal;
     static int _calcSMCountPerMultiProcessor(int major, int minor)
@@ -1419,7 +1430,7 @@ public:
     }
 };
 
-SlangResult CUDAShaderObject::init(Renderer* renderer, CUDAShaderObjectLayout* typeLayout)
+SlangResult CUDAShaderObject::init(IRenderer* renderer, CUDAShaderObjectLayout* typeLayout)
 {
     this->layout = typeLayout;
     
@@ -1477,7 +1488,7 @@ SlangResult CUDAShaderObject::init(Renderer* renderer, CUDAShaderObjectLayout* t
     return SLANG_OK;
 }
 
-SlangResult CUDARootShaderObject::init(Renderer* renderer, CUDAShaderObjectLayout* typeLayout)
+SlangResult CUDARootShaderObject::init(IRenderer* renderer, CUDAShaderObjectLayout* typeLayout)
 {
     SLANG_RETURN_ON_FAIL(CUDAShaderObject::init(renderer, typeLayout));
     auto programLayout = dynamic_cast<CUDAProgramLayout*>(typeLayout);
@@ -1490,9 +1501,9 @@ SlangResult CUDARootShaderObject::init(Renderer* renderer, CUDAShaderObjectLayou
     return SLANG_OK;
 }
 
-Renderer* createCUDARenderer() { return new CUDARenderer(); }
+IRenderer* createCUDARenderer() { return new CUDARenderer(); }
 #else
-Renderer* createCUDARenderer() { return nullptr; }
+IRenderer* createCUDARenderer() { return nullptr; }
 #endif
 
 }

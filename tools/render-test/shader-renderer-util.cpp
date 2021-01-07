@@ -7,7 +7,7 @@ namespace renderer_test {
 using namespace Slang;
 using Slang::Result;
 
-void BindingStateImpl::apply(Renderer* renderer, PipelineType pipelineType)
+void BindingStateImpl::apply(IRenderer* renderer, PipelineType pipelineType)
 {
     renderer->setDescriptorSet(
         pipelineType,
@@ -16,14 +16,23 @@ void BindingStateImpl::apply(Renderer* renderer, PipelineType pipelineType)
         descriptorSet);
 }
 
-/* static */Result ShaderRendererUtil::generateTextureResource(const InputTextureDesc& inputDesc, int bindFlags, Renderer* renderer, RefPtr<TextureResource>& textureOut)
+/* static */ Result ShaderRendererUtil::generateTextureResource(
+    const InputTextureDesc& inputDesc,
+    int bindFlags,
+    IRenderer* renderer,
+    RefPtr<TextureResource>& textureOut)
 {
     TextureData texData;
     generateTextureData(texData, inputDesc);
     return createTextureResource(inputDesc, texData, bindFlags, renderer, textureOut);
 }
 
-/* static */Result ShaderRendererUtil::createTextureResource(const InputTextureDesc& inputDesc, const TextureData& texData, int bindFlags, Renderer* renderer, RefPtr<TextureResource>& textureOut)
+/* static */ Result ShaderRendererUtil::createTextureResource(
+    const InputTextureDesc& inputDesc,
+    const TextureData& texData,
+    int bindFlags,
+    IRenderer* renderer,
+    RefPtr<TextureResource>& textureOut)
 {
     TextureResource::Desc textureResourceDesc;
     textureResourceDesc.init(Resource::Type::Unknown);
@@ -99,7 +108,13 @@ void BindingStateImpl::apply(Renderer* renderer, PipelineType pipelineType)
     return textureOut ? SLANG_OK : SLANG_FAIL;
 }
 
-/* static */Result ShaderRendererUtil::createBufferResource(const InputBufferDesc& inputDesc, bool isOutput, size_t bufferSize, const void* initData, Renderer* renderer, Slang::RefPtr<BufferResource>& bufferOut)
+/* static */ Result ShaderRendererUtil::createBufferResource(
+    const InputBufferDesc& inputDesc,
+    bool isOutput,
+    size_t bufferSize,
+    const void* initData,
+    IRenderer* renderer,
+    Slang::RefPtr<BufferResource>& bufferOut)
 {
     Resource::Usage initialUsage = Resource::Usage::GenericRead;
 
@@ -149,14 +164,17 @@ static SamplerState::Desc _calcSamplerDesc(const InputSamplerDesc& srcDesc)
     return dstDesc;
 }
 
-RefPtr<SamplerState> _createSamplerState(
-    Renderer*               renderer,
+RefPtr<SamplerState> _createSamplerState(IRenderer* renderer,
     const InputSamplerDesc& srcDesc)
 {
     return renderer->createSamplerState(_calcSamplerDesc(srcDesc));
 }
 
-/* static */Result ShaderRendererUtil::createBindingState(const ShaderInputLayout& layout, Renderer* renderer, BufferResource* addedConstantBuffer, BindingStateImpl** outBindingState)
+/* static */ Result ShaderRendererUtil::createBindingState(
+    const ShaderInputLayout& layout,
+    IRenderer* renderer,
+    BufferResource* addedConstantBuffer,
+    BindingStateImpl** outBindingState)
 {
     auto srcEntries = layout.entries.getBuffer();
     auto numEntries = layout.entries.getCount();

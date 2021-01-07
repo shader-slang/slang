@@ -36,7 +36,7 @@ void setNativeWindowHook(Window* window, WNDPROC proc);
 #endif
 
 
-GUI::GUI(Window* window, Renderer* inRenderer)
+GUI::GUI(Window* window, IRenderer* inRenderer)
     : renderer(inRenderer)
 {
      ImGui::CreateContext();

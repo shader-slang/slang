@@ -15,6 +15,9 @@
     <ClInclude Include="..\..\..\tools\render-test\cpu-compute-util.h">
       <Filter>Header Files</Filter>
     </ClInclude>
+    <ClInclude Include="..\..\..\tools\render-test\cuda\cuda-compute-util.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
     <ClInclude Include="..\..\..\tools\render-test\options.h">
       <Filter>Header Files</Filter>
     </ClInclude>
@@ -39,6 +42,9 @@
       <Filter>Source Files</Filter>
     </ClCompile>
     <ClCompile Include="..\..\..\tools\render-test\cpu-compute-util.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\..\tools\render-test\cuda\cuda-compute-util.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
     <ClCompile Include="..\..\..\tools\render-test\options.cpp">

@@ -395,7 +395,7 @@ public:
     SLANG_COMPILE_TIME_ASSERT(SLANG_COUNT_OF(s_pixelFormatInfos) == int(GlPixelFormat::CountOf));
 }
 
-Renderer* createGLRenderer()
+IRenderer* createGLRenderer()
 {
     return new GLRenderer();
 }
