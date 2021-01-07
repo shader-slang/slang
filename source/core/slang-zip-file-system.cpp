@@ -92,7 +92,7 @@ protected:
     void _initReadWrite(mz_zip_archive& outWriter);
 
     // Maps from a path to an index in the m_archive
-    SubStringIndexMap m_pathMap;
+    StringSliceIndexMap m_pathMap;
     // If bit is set (at the archive index) this index has been deleted.
     UIntSet m_removedSet;
 
@@ -202,7 +202,7 @@ void ZipFileSystemImpl::_rebuildMap()
         // Get rid of '/'
         currentName = currentName.trim('/');
 
-        m_pathMap.set(currentName, Index(i));
+        m_pathMap.add(currentName, Index(i));
     }
 }
 
@@ -430,7 +430,7 @@ SlangResult ZipFileSystemImpl::_getFixedPath(const char* path, String& outPath)
 
 SlangResult ZipFileSystemImpl::_findEntryIndexFromFixedPath(const String& fixedPath, mz_uint& outIndex)
 {
-    const Index index = m_pathMap.get(fixedPath.getUnownedSlice());
+    const Index index = m_pathMap.getValue(fixedPath.getUnownedSlice());
 
     // If not in list or deleted - it is removed
     if (index < 0 || m_removedSet.contains(index))
@@ -657,7 +657,7 @@ SlangResult ZipFileSystemImpl::saveFile(const char* path, const void* data, size
     SLANG_ASSERT(_getPathAtIndex(entryCount) == fixedPath.getUnownedSlice());
 
     // Set in the map
-    m_pathMap.set(fixedPath.getUnownedSlice(), entryCount);
+    m_pathMap.add(fixedPath.getUnownedSlice(), entryCount);
     return SLANG_OK;
 }
 
@@ -723,7 +723,7 @@ SlangResult ZipFileSystemImpl::createDirectory(const char* path)
     SLANG_ASSERT(_getPathAtIndex(entryCount) == fixedPath.getUnownedSlice());
 
     // Set the index, that we added at end
-    m_pathMap.set(fixedPath.getUnownedSlice(), entryCount); 
+    m_pathMap.add(fixedPath.getUnownedSlice(), entryCount); 
     return SLANG_OK;
 }
 

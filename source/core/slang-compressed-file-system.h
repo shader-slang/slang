@@ -70,52 +70,65 @@ protected:
     ComPtr<ICompressionSystem> m_compressionSystem;
 };
 
-/// Maps a SubString (owned) to an index
-struct SubStringIndexMap
+/* Maps an UnownedStringSlice to an index. All substrings are held internally in a StringSlicePool, and so
+owned by the type. */
+class StringSliceIndexMap
 {
-    void set(const UnownedStringSlice& slice, Index index)
+public:
+        /// An index that identifies a key value pair. 
+    typedef Index CountIndex;
+
+        /// Adds a key, value pair. Returns the CountIndex of the pair.
+        /// If there is already a value stored for the key it is replaced.
+    CountIndex add(const UnownedStringSlice& key, Index valueIndex)
     {
         StringSlicePool::Handle handle;
-        m_pool.findOrAdd(slice, handle);
-        const Index poolIndex = StringSlicePool::asIndex(handle);
-
-        if (poolIndex >= m_indexMap.getCount())
+        m_pool.findOrAdd(key, handle);
+        const CountIndex countIndex = StringSlicePool::asIndex(handle);
+        if (countIndex >= m_indexMap.getCount())
         {
-            SLANG_ASSERT(poolIndex == m_indexMap.getCount());
-            m_indexMap.add(index);
+            SLANG_ASSERT(countIndex == m_indexMap.getCount());
+            m_indexMap.add(valueIndex);
         }
         else
         {
-            m_indexMap[poolIndex] = index;
+            m_indexMap[countIndex] = valueIndex;
         }
+        return countIndex;
     }
-    Index findOrAdd(const UnownedStringSlice& slice, Index indexForSlice)
+
+        /// Finds or adds the slice. If the slice is added the defaultValueIndex is set.
+        /// If not the index associated with the slice remains the same.
+        /// Returns the CountIndex where the key,value pair are stored
+    CountIndex findOrAdd(const UnownedStringSlice& key, Index defaultValueIndex)
     {
         StringSlicePool::Handle handle;
-        m_pool.findOrAdd(slice, handle);
-        const Index poolIndex = StringSlicePool::asIndex(handle);
-
-        if (poolIndex >= m_indexMap.getCount())
+        m_pool.findOrAdd(key, handle);
+        const CountIndex countIndex = StringSlicePool::asIndex(handle);
+        if (countIndex >= m_indexMap.getCount())
         {
             SLANG_ASSERT(poolIndex == m_indexMap.getCount());
-            m_indexMap.add(indexForSlice);
+            m_indexMap.add(defaultValueIndex);
         }
-        return poolIndex;
+        return countIndex;
     }
 
-    Index get(const UnownedStringSlice& slice)
+        /// Gets the index associated with the key. Returns -1 if there is no associated index.
+    Index getValue(const UnownedStringSlice& key)
     {
-        const Index poolIndex = m_pool.findIndex(slice);
+        const Index poolIndex = m_pool.findIndex(key);
         return (poolIndex >= 0) ? m_indexMap[poolIndex] : -1;
     }
 
+        /// Get the amount of pairs in the map
     Index getCount() const { return m_indexMap.getCount(); }
 
-    KeyValuePair<UnownedStringSlice, Index> getAt(Index index) const
+        /// Get the slice and the index at the specified index
+    KeyValuePair<UnownedStringSlice, Index> getAt(CountIndex countIndex) const
     {
         KeyValuePair<UnownedStringSlice, Index> pair;
-        pair.Key = m_pool.getSlice(StringSlicePool::Handle(index));
-        pair.Value = m_indexMap[index];
+        pair.Key = m_pool.getSlice(StringSlicePool::Handle(countIndex));
+        pair.Value = m_indexMap[countIndex];
         return pair;
     }
 
@@ -125,23 +138,30 @@ struct SubStringIndexMap
         m_indexMap.clear();
     }
 
-    UnownedStringSlice getSliceAt(Index index) { return m_pool.getSlice(StringSlicePool::Handle(index)); }
-    Index& getIndexAt(Index index) { return m_indexMap[index]; }
+        /// Get the key at the specified index
+    UnownedStringSlice getKeyAt(CountIndex index) const { return m_pool.getSlice(StringSlicePool::Handle(index)); }
+        /// Get the value at the specified index
+    Index& getValueAt(CountIndex index) { return m_indexMap[index]; }
 
+        /// Get the amount of key,value pairs
     Index getCount() { return m_indexMap.getCount(); }
 
-    SubStringIndexMap() :
+        /// Ctor
+    StringSliceIndexMap() :
         m_pool(StringSlicePool::Style::Empty)
     {
     }
 
+protected:
     StringSlicePool m_pool;     ///< Pool holds the substrings
     List<Index> m_indexMap;     ///< Maps a pool index to the output index
 };
 
-/* This finds the contents of a directory. It's somewhat complicated because it allows for implicit paths
-defined by the existence of a directory in a path */
+/* This class helps to find the contents and/or existence of an implicit directory.This finds the contents of a directory.
 
+This is achieved by using a path prefix that any contained path must at least match. If the remainder of the path contains a folder
+ - detectable because it's not a leaf and so contains a delimiter - that directory is added. As a sub folder may contain many
+ files, and the directory itself may also be defined, it is necessary to dedup. The deduping is handled by the StringSliceIndexMap. */
 struct ImplicitDirectoryCollector
 {
     ImplicitDirectoryCollector(const String& canonicalPath, bool directoryExists = false):
@@ -241,7 +261,7 @@ struct ImplicitDirectoryCollector
         return getDirectoryExists() ? SLANG_OK : SLANG_E_NOT_FOUND;
     }
 
-    SubStringIndexMap m_map;
+    StringSliceIndexMap m_map;
     String m_prefix;
     bool m_directoryExists;
 };
