@@ -2179,7 +2179,7 @@ namespace Slang
 
         SLANG_NO_THROW SlangResult SLANG_MCALL compileStdLib() override;
         SLANG_NO_THROW SlangResult SLANG_MCALL loadStdLib(const void* stdLib, size_t stdLibSizeInBytes) override;
-        SLANG_NO_THROW SlangResult SLANG_MCALL saveStdLib(ISlangBlob** outBlob) override;
+        SLANG_NO_THROW SlangResult SLANG_MCALL saveStdLib(SlangArchiveType archiveType, ISlangBlob** outBlob) override;
 
         SLANG_NO_THROW SlangCapabilityID SLANG_MCALL findCapability(char const* name) override;
 
@@ -2282,8 +2282,6 @@ namespace Slang
         SlangResult _readBuiltinModule(ISlangFileSystem* fileSystem, Scope* scope, String moduleName);
 
         SlangResult _loadRequest(EndToEndCompileRequest* request, const void* data, size_t size);
-
-        CompressedFileSystemType m_defaultFileSystemType = CompressedFileSystemType::RIFFLZ4;
 
             /// Linkage used for all built-in (stdlib) code.
         RefPtr<Linkage> m_builtinLinkage;

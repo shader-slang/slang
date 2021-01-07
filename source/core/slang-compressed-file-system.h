@@ -231,16 +231,10 @@ public:
 };
 
 
-SlangResult loadCompressedFileSystem(const void* data, size_t dataSizeInBytes, RefPtr<CompressedFileSystem>& outFileSystem);
+SlangResult loadArchiveFileSystem(const void* data, size_t dataSizeInBytes, RefPtr<CompressedFileSystem>& outFileSystem);
 
-enum CompressedFileSystemType
-{
-    Zip,
-    RIFFDeflate,
-    RIFFLZ4,
-};
 
-SlangResult createCompressedFileSystem(CompressedFileSystemType type, RefPtr<CompressedFileSystem>& outFileSystem);
+SlangResult createArchiveFileSystem(SlangArchiveType type, RefPtr<CompressedFileSystem>& outFileSystem);
 
 }
 

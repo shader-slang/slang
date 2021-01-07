@@ -434,6 +434,9 @@ struct OptionsParser
 
         SlangMatrixLayoutMode defaultMatrixLayoutMode = SLANG_MATRIX_LAYOUT_MODE_UNKNOWN;
 
+        // The default archive type is zip
+        SlangArchiveType archiveType = SLANG_ARCHIVE_TYPE_ZIP;
+
         bool hasLoadedRepro = false;
 
         char const* const* argCursor = &argv[0];
@@ -463,6 +466,18 @@ struct OptionsParser
                 {
                     SLANG_RETURN_ON_FAIL(session->compileStdLib());
                 }
+                else if (argStr == "-archive-type")
+                {
+                    String archiveTypeName;
+                    SLANG_RETURN_ON_FAIL(tryReadCommandLineArgument(sink, arg, &argCursor, argEnd, archiveTypeName));
+
+                    archiveType = TypeTextUtil::findArchiveType(archiveTypeName.getUnownedSlice());
+                    if (archiveType == SLANG_ARCHIVE_TYPE_UNDEFINED)
+                    {
+                        sink->diagnose(SourceLoc(), Diagnostics::unknownArchiveType, archiveTypeName);
+                        return SLANG_FAIL;
+                    }
+                }
                 else if (argStr == "-save-stdlib")
                 {
                     String fileName;
@@ -470,7 +485,7 @@ struct OptionsParser
 
                     ComPtr<ISlangBlob> blob;
 
-                    SLANG_RETURN_ON_FAIL(session->saveStdLib(blob.writeRef()));
+                    SLANG_RETURN_ON_FAIL(session->saveStdLib(archiveType, blob.writeRef()));
                     SLANG_RETURN_ON_FAIL(File::writeAllBytes(fileName, blob->getBufferPointer(), blob->getBufferSize()));
                 }
                 else if (argStr == "-save-stdlib-bin-source")
@@ -480,7 +495,7 @@ struct OptionsParser
 
                     ComPtr<ISlangBlob> blob;
 
-                    SLANG_RETURN_ON_FAIL(session->saveStdLib(blob.writeRef()));
+                    SLANG_RETURN_ON_FAIL(session->saveStdLib(archiveType, blob.writeRef()));
 
                     StringBuilder builder;
                     StringWriter writer(&builder, 0);

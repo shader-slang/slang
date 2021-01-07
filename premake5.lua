@@ -969,7 +969,7 @@ if enableEmbedStdLib then
     standardProject("slangc-bootstrap", "source/slangc")
         uuid "6339BF31-AC99-4819-B719-679B63451EF0"
         kind "ConsoleApp"
-        links { "core", "miniz" }
+        links { "core", "miniz", "lz4" }
         
         -- We need to run all the generators to be able to build the main 
         -- slang source in source/slang
@@ -1044,7 +1044,7 @@ if enableEmbedStdLib then
           
             buildinputs { "%{cfg.targetdir}/slangc-bootstrap" .. executableSuffix }
                 
-            local buildcmd = '"%{cfg.targetdir}/slangc-bootstrap" -save-stdlib-bin-source %{file.directory}/slang-stdlib-generated.h'
+            local buildcmd = '"%{cfg.targetdir}/slangc-bootstrap" -archive-type riff-lz4 -save-stdlib-bin-source %{file.directory}/slang-stdlib-generated.h'
             
             buildcommands { buildcmd }
 end
@@ -1170,7 +1170,7 @@ if enableProfile then
         addSourceDir "source/slang"
 
         includedirs { "." }
-        links { "core", "miniz"}
+        links { "core", "miniz", "lz4"}
         
         filter { "system:linux" }
             linkoptions{  "-pg" }

@@ -547,7 +547,7 @@ SlangResult RiffCompressedFileSystem::storeArchive(bool blobOwnsContent, ISlangB
     return SLANG_OK;
 }
 
-SlangResult loadCompressedFileSystem(const void* data, size_t dataSizeInBytes, RefPtr<CompressedFileSystem>& outFileSystem)
+SlangResult loadArchiveFileSystem(const void* data, size_t dataSizeInBytes, RefPtr<CompressedFileSystem>& outFileSystem)
 {
     if (dataSizeInBytes < sizeof(FourCC))
     {
@@ -596,20 +596,20 @@ SlangResult loadCompressedFileSystem(const void* data, size_t dataSizeInBytes, R
 }
 
 
-SlangResult createCompressedFileSystem(CompressedFileSystemType type, RefPtr<CompressedFileSystem>& outFileSystem)
+SlangResult createArchiveFileSystem(SlangArchiveType type, RefPtr<CompressedFileSystem>& outFileSystem)
 {
     switch (type)
     {
-        case CompressedFileSystemType::Zip:
+        case SLANG_ARCHIVE_TYPE_ZIP:
         {
             return ZipFileSystem::create(outFileSystem);
         }
-        case CompressedFileSystemType::RIFFDeflate:
+        case SLANG_ARCHIVE_TYPE_RIFF_DEFLATE:
         {
             outFileSystem = new RiffCompressedFileSystem(DeflateCompressionSystem::getSingleton());
             return SLANG_OK;
         }
-        case CompressedFileSystemType::RIFFLZ4:
+        case SLANG_ARCHIVE_TYPE_RIFF_LZ4:
         {
             outFileSystem = new RiffCompressedFileSystem(LZ4CompressionSystem::getSingleton());
             return SLANG_OK;
