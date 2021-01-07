@@ -266,6 +266,7 @@ IR_SIMPLE_DECORATION(PreciseDecoration)
 IR_SIMPLE_DECORATION(PublicDecoration)
 IR_SIMPLE_DECORATION(KeepAliveDecoration)
 IR_SIMPLE_DECORATION(RequiresNVAPIDecoration)
+IR_SIMPLE_DECORATION(NoInlineDecoration)
 
 struct IRNVAPIMagicDecoration : IRDecoration
 {

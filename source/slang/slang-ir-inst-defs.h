@@ -599,6 +599,9 @@ INST(HighLevelDeclDecoration,               highLevelDecl,          1, 0)
         /// that the NVAPI shader parameter intends to use.
     INST(NVAPISlotDecoration, nvapiSlot, 2, 0)
 
+        /// Applie to an IR function and signals that inlining should not be performed unless unavoidable.
+    INST(NoInlineDecoration, noInline, 0, 0)
+
     INST(SemanticDecoration, semantic, 2, 0)
 
     INST_RANGE(Decoration, HighLevelDeclDecoration, SemanticDecoration)

@@ -937,4 +937,16 @@ class NVAPISlotModifier : public Modifier
     String spaceName;
 };
 
+    /// A `[noinline]` attribute represents a request by the application that,
+    /// to the extent possible, a function should not be inlined into call sites.
+    ///
+    /// Note that due to various limitations of different targets, it is entirely
+    /// possible for such functions to be inlined or specialized to call sites.
+    ///
+class NoInlineAttribute : public Attribute
+{
+    SLANG_AST_CLASS(NoInlineAttribute)
+};
+
+
 } // namespace Slang
