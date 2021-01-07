@@ -851,6 +851,13 @@ void RiffContainer::endChunk()
     SLANG_ASSERT(isChunkOk(chunk));
 }
 
+void RiffContainer::addDataChunk(FourCC dataFourCC, const void* data, size_t dataSizeInBytes)
+{
+    startChunk(Chunk::Kind::Data, dataFourCC);
+    write(data, dataSizeInBytes);
+    endChunk();
+}
+
 void RiffContainer::setPayload(Data* data, const void* payload, size_t size)
 {
     // We must be in a data chunk

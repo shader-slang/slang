@@ -1069,7 +1069,7 @@ end
 standardProject("slang", "source/slang")
     uuid "DB00DA62-0533-4AFD-B59F-A67D5B3A0808"
     kind "SharedLib"
-    links { "core", "miniz"}
+    links { "core", "miniz", "lz4"}
     warnings "Extra"
     flags { "FatalWarnings" }
     pic "On"

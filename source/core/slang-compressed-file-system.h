@@ -5,6 +5,8 @@
 
 #include "../../slang-com-ptr.h"
 
+#include "slang-riff.h"
+
 #include "slang-compression-system.h"
 #include "slang-io.h"
 
@@ -16,13 +18,41 @@ namespace Slang
 class CompressedFileSystem : public RefObject, public ISlangMutableFileSystem
 {
 public:
+
+        /// Loads an archive. 
+    virtual SlangResult loadArchive(const void* archive, size_t archiveSizeInBytes) = 0;
         /// Get as an archive (that can be saved to disk)
-    virtual ConstArrayView<uint8_t> getArchive() = 0;
+        /// NOTE! If the blob is not owned, it's contents can be invalidated by any call to a method of the file system or loss of scope
+    virtual SlangResult storeArchive(bool blobOwnsContent, ISlangBlob** outBlob) = 0;
         /// Set the compression - used for any subsequent items added
     virtual void setCompressionStyle(const CompressionStyle& style) = 0;
 };
 
-class SimpleCompressedFileSystem : public CompressedFileSystem
+// The riff information used for 
+struct RiffFileSystemBinary
+{
+    static const FourCC kContainerFourCC = SLANG_FOUR_CC('S', 'c', 'o', 'n');
+    static const FourCC kEntryFourCC = SLANG_FOUR_CC('S', 'f', 'i', 'l');
+    static const FourCC kHeaderFourCC = SLANG_FOUR_CC('S', 'h', 'e', 'a');
+
+    struct Header
+    {
+        uint32_t compressionSystemType;         /// One of CompressionSystemType
+    };
+
+    struct Entry
+    {
+        uint32_t compressedSize;
+        uint32_t uncompressedSize;
+        uint32_t pathSize;                  ///< The size of the path in bytes, including terminating 0
+        uint32_t pathType;                  ///< One of SlangPathType
+
+        // Followed by the path (including terminating0)
+        // Followed by the compressed data
+    };
+};
+
+class RiffCompressedFileSystem : public CompressedFileSystem
 {
 public:
 
@@ -46,7 +76,13 @@ public:
     virtual SLANG_NO_THROW SlangResult SLANG_MCALL remove(const char* path) SLANG_OVERRIDE;
     virtual SLANG_NO_THROW SlangResult SLANG_MCALL createDirectory(const char* path) SLANG_OVERRIDE;
 
-    SimpleCompressedFileSystem(ICompressionSystem* compressionSystem);
+    // CompressedFileSystem
+
+    virtual SlangResult loadArchive(const void* archive, size_t archiveSizeInBytes) SLANG_OVERRIDE;
+    virtual SlangResult storeArchive(bool blobOwnsContent, ISlangBlob** outBlob) SLANG_OVERRIDE;
+    virtual void setCompressionStyle(const CompressionStyle& style) SLANG_OVERRIDE { m_compressionStyle = style; }
+
+    RiffCompressedFileSystem(ICompressionSystem* compressionSystem);
 
 protected:
 
@@ -64,10 +100,14 @@ protected:
     Entry* _getEntryFromPath(const char* path, String* outPath = nullptr);
     Entry* _getEntryFromCanonicalPath(const String& canonicalPath);
 
+    void _clear() { m_entries.Clear(); }
+
     // Maps a path to an entry
     Dictionary<String, RefPtr<Entry>> m_entries;
 
     ComPtr<ICompressionSystem> m_compressionSystem;
+
+    CompressionStyle m_compressionStyle;
 };
 
 /* Maps an UnownedStringSlice to an index. All substrings are held internally in a StringSlicePool, and so
@@ -80,63 +120,24 @@ public:
 
         /// Adds a key, value pair. Returns the CountIndex of the pair.
         /// If there is already a value stored for the key it is replaced.
-    CountIndex add(const UnownedStringSlice& key, Index valueIndex)
-    {
-        StringSlicePool::Handle handle;
-        m_pool.findOrAdd(key, handle);
-        const CountIndex countIndex = StringSlicePool::asIndex(handle);
-        if (countIndex >= m_indexMap.getCount())
-        {
-            SLANG_ASSERT(countIndex == m_indexMap.getCount());
-            m_indexMap.add(valueIndex);
-        }
-        else
-        {
-            m_indexMap[countIndex] = valueIndex;
-        }
-        return countIndex;
-    }
+    CountIndex add(const UnownedStringSlice& key, Index valueIndex);
 
         /// Finds or adds the slice. If the slice is added the defaultValueIndex is set.
         /// If not the index associated with the slice remains the same.
         /// Returns the CountIndex where the key,value pair are stored
-    CountIndex findOrAdd(const UnownedStringSlice& key, Index defaultValueIndex)
-    {
-        StringSlicePool::Handle handle;
-        m_pool.findOrAdd(key, handle);
-        const CountIndex countIndex = StringSlicePool::asIndex(handle);
-        if (countIndex >= m_indexMap.getCount())
-        {
-            SLANG_ASSERT(poolIndex == m_indexMap.getCount());
-            m_indexMap.add(defaultValueIndex);
-        }
-        return countIndex;
-    }
+    CountIndex findOrAdd(const UnownedStringSlice& key, Index defaultValueIndex);
 
         /// Gets the index associated with the key. Returns -1 if there is no associated index.
-    Index getValue(const UnownedStringSlice& key)
-    {
-        const Index poolIndex = m_pool.findIndex(key);
-        return (poolIndex >= 0) ? m_indexMap[poolIndex] : -1;
-    }
+    SLANG_FORCE_INLINE Index getValue(const UnownedStringSlice& key);
 
         /// Get the amount of pairs in the map
     Index getCount() const { return m_indexMap.getCount(); }
 
         /// Get the slice and the index at the specified index
-    KeyValuePair<UnownedStringSlice, Index> getAt(CountIndex countIndex) const
-    {
-        KeyValuePair<UnownedStringSlice, Index> pair;
-        pair.Key = m_pool.getSlice(StringSlicePool::Handle(countIndex));
-        pair.Value = m_indexMap[countIndex];
-        return pair;
-    }
-
-    void clear()
-    {
-        m_pool.clear();
-        m_indexMap.clear();
-    }
+    SLANG_INLINE KeyValuePair<UnownedStringSlice, Index> getAt(CountIndex countIndex) const;
+    
+        /// Clear the contents of the map
+    void clear();
 
         /// Get the key at the specified index
     UnownedStringSlice getKeyAt(CountIndex index) const { return m_pool.getSlice(StringSlicePool::Handle(index)); }
@@ -157,33 +158,42 @@ protected:
     List<Index> m_indexMap;     ///< Maps a pool index to the output index
 };
 
+// ---------------------------------------------------------------------------
+Index StringSliceIndexMap::getValue(const UnownedStringSlice& key)
+{
+    const Index poolIndex = m_pool.findIndex(key);
+    return (poolIndex >= 0) ? m_indexMap[poolIndex] : -1;
+}
+
+// ---------------------------------------------------------------------------
+KeyValuePair<UnownedStringSlice, Index> StringSliceIndexMap::getAt(CountIndex countIndex) const
+{
+    KeyValuePair<UnownedStringSlice, Index> pair;
+    pair.Key = m_pool.getSlice(StringSlicePool::Handle(countIndex));
+    pair.Value = m_indexMap[countIndex];
+    return pair;
+}
+
+
 /* This class helps to find the contents and/or existence of an implicit directory.This finds the contents of a directory.
 
 This is achieved by using a path prefix that any contained path must at least match. If the remainder of the path contains a folder
  - detectable because it's not a leaf and so contains a delimiter - that directory is added. As a sub folder may contain many
  files, and the directory itself may also be defined, it is necessary to dedup. The deduping is handled by the StringSliceIndexMap. */
-struct ImplicitDirectoryCollector
+class ImplicitDirectoryCollector
 {
-    ImplicitDirectoryCollector(const String& canonicalPath, bool directoryExists = false):
-        m_directoryExists(directoryExists)
-    {
-        StringBuilder buffer;
-        if (canonicalPath != ".")
-        {
-            buffer << canonicalPath;
-            buffer.append('/');
-        }
-        m_prefix = buffer.ProduceString();
-    }
-
+public:
+    
     enum class State
     {
-        Undefined,                ///< 
+        None,                   ///< Neither the directory or content have been found
         DirectoryExists,        ///< The directory exists
         HasContent,             ///< If it has content, the directory must exist
     };
 
-    State getState() const { return (m_map.getCount() > 0) ? State::HasContent : (m_directoryExists ? State::DirectoryExists : State::Undefined); }
+        /// Get the current state
+    State getState() const { return (m_map.getCount() > 0) ? State::HasContent : (m_directoryExists ? State::DirectoryExists : State::None); }
+        /// True if collector at least has the specified state
     bool hasState(State state) { return Index(getState()) >= Index(state); }
 
         /// Set that it exists
@@ -205,66 +215,32 @@ struct ImplicitDirectoryCollector
     }
 
         /// Add a remaining path
-    void addRemainingPath(SlangPathType pathType, const UnownedStringSlice& inPathRemainder)
-    {
-        // If it's zero length we probably don't want to add it
-        if (inPathRemainder.getLength() == 0)
-        {
-            // It's empty so don't add normal way - implies the directory exists
-            m_directoryExists = true;
-            return;
-        }
-
-        UnownedStringSlice pathRemainder(inPathRemainder);
-        const Index slashIndex = pathRemainder.indexOf('/');
-
-        // If we have a following / that means it's an implicit directory.
-        if (slashIndex >= 0)
-        {
-            pathType = SLANG_PATH_TYPE_DIRECTORY;
-            pathRemainder = UnownedStringSlice(pathRemainder.begin(), pathRemainder.begin() + slashIndex);
-        }
-
-        const Index index = m_map.findOrAdd(pathRemainder, pathType);
-        // Make sure they are the same type
-        SLANG_ASSERT(pathMap.getIndexAt(Index) == pathType);
-    }
-
+    void addRemainingPath(SlangPathType pathType, const UnownedStringSlice& inPathRemainder);
         /// Add a path
-    void addPath(SlangPathType pathType, const UnownedStringSlice& canonicalPath)
-    {
-        if (hasPrefix(canonicalPath))
-        {
-            UnownedStringSlice remainder = getRemainder(canonicalPath);
-            addRemainingPath(pathType, remainder);
-        }
-    }
-
+    void addPath(SlangPathType pathType, const UnownedStringSlice& canonicalPath);
         /// Enumerate the contents
-    SlangResult enumerate(FileSystemContentsCallBack callback, void* userData)
-    {
-        const Int count = m_map.getCount(); 
+    SlangResult enumerate(FileSystemContentsCallBack callback, void* userData);
 
-        for (Index i = 0; i < count; ++i)
-        {
-            const auto& pair = m_map.getAt(i);
+        /// Ctor
+    ImplicitDirectoryCollector(const String& canonicalPath, bool directoryExists = false);
 
-            UnownedStringSlice path = pair.Key;
-            SlangPathType pathType = SlangPathType(pair.Value);
-
-            // Note *is* 0 terminated in the pool
-            // Let's check tho
-            SLANG_ASSERT(path.begin()[path.getCount()] == 0);
-            callback(pathType, path.begin(), userData);
-        }
-
-        return getDirectoryExists() ? SLANG_OK : SLANG_E_NOT_FOUND;
-    }
-
+    protected:
     StringSliceIndexMap m_map;
     String m_prefix;
     bool m_directoryExists;
 };
+
+
+SlangResult loadCompressedFileSystem(const void* data, size_t dataSizeInBytes, RefPtr<CompressedFileSystem>& outFileSystem);
+
+enum CompressedFileSystemType
+{
+    Zip,
+    RIFFDeflate,
+    RIFFLZ4,
+};
+
+SlangResult createCompressedFileSystem(CompressedFileSystemType type, RefPtr<CompressedFileSystem>& outFileSystem);
 
 }
 

@@ -3,8 +3,7 @@
 #include "../core/slang-io.h"
 #include "../core/slang-string-util.h"
 #include "../core/slang-shared-library.h"
-
-#include "../core/slang-zip-file-system.h"
+#include "../core/slang-compressed-file-system.h"
 
 #include "slang-check.h"
 #include "slang-parameter-binding.h"
@@ -267,7 +266,7 @@ SlangResult Session::loadStdLib(const void* stdLib, size_t stdLibSizeInBytes)
 
     // Make a file system to read it from
     RefPtr<CompressedFileSystem> fileSystem;
-    SLANG_RETURN_ON_FAIL(ZipFileSystem::create(stdLib, stdLibSizeInBytes, fileSystem));
+    SLANG_RETURN_ON_FAIL(loadCompressedFileSystem(stdLib, stdLibSizeInBytes, fileSystem));
 
     // Let's try loading serialized modules and adding them
     SLANG_RETURN_ON_FAIL(_readBuiltinModule(fileSystem, coreLanguageScope, "core"));
@@ -283,9 +282,13 @@ SlangResult Session::saveStdLib(ISlangBlob** outBlob)
         return SLANG_FAIL;
     }
 
+    //const CompressedFileSystemType type = m_defaultFileSystemType;
+
+    const CompressedFileSystemType type = CompressedFileSystemType::RIFFLZ4;
+
     // Make a file system to read it from
     RefPtr<CompressedFileSystem> fileSystem;
-    SLANG_RETURN_ON_FAIL(ZipFileSystem::create(fileSystem));
+    SLANG_RETURN_ON_FAIL(createCompressedFileSystem(type, fileSystem));
 
     for (auto& pair : m_builtinLinkage->mapNameToLoadedModules)
     {
@@ -315,11 +318,7 @@ SlangResult Session::saveStdLib(ISlangBlob** outBlob)
     }
 
     // Now need to convert into a blob
-    auto archiveContents = fileSystem->getArchive();
-
-    ComPtr<ISlangBlob> blob(new RawBlob(archiveContents.getBuffer(), archiveContents.getCount()));
-    *outBlob = blob.detach();
-
+    SLANG_RETURN_ON_FAIL(fileSystem->storeArchive(true, outBlob));
     return SLANG_OK;
 }
 

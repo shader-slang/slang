@@ -9,6 +9,15 @@
 #include "slang-string-slice-pool.h"
 #include "slang-uint-set.h"
 
+// Compression systems
+#include "slang-deflate-compression-system.h"
+#include "slang-lz4-compression-system.h"
+
+// Zip file system
+#include "slang-zip-file-system.h"
+
+#include "slang-riff.h"
+
 namespace Slang
 {
 
@@ -18,17 +27,126 @@ static const Guid IID_ISlangFileSystem = SLANG_UUID_ISlangFileSystem;
 static const Guid IID_ISlangFileSystemExt = SLANG_UUID_ISlangFileSystemExt;
 static const Guid IID_ISlangMutableFileSystem = SLANG_UUID_ISlangMutableFileSystem;
 
-SimpleCompressedFileSystem::SimpleCompressedFileSystem(ICompressionSystem* compressionSystem):
+// !!!!!!!!!!!!!!!!!!!!!!!!!!!!!! StringSliceIndexMap !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+
+StringSliceIndexMap::CountIndex StringSliceIndexMap::add(const UnownedStringSlice& key, Index valueIndex)
+{
+    StringSlicePool::Handle handle;
+    m_pool.findOrAdd(key, handle);
+    const CountIndex countIndex = StringSlicePool::asIndex(handle);
+    if (countIndex >= m_indexMap.getCount())
+    {
+        SLANG_ASSERT(countIndex == m_indexMap.getCount());
+        m_indexMap.add(valueIndex);
+    }
+    else
+    {
+        m_indexMap[countIndex] = valueIndex;
+    }
+    return countIndex;
+}
+
+StringSliceIndexMap::CountIndex StringSliceIndexMap::findOrAdd(const UnownedStringSlice& key, Index defaultValueIndex)
+{
+    StringSlicePool::Handle handle;
+    m_pool.findOrAdd(key, handle);
+    const CountIndex countIndex = StringSlicePool::asIndex(handle);
+    if (countIndex >= m_indexMap.getCount())
+    {
+        SLANG_ASSERT(countIndex == m_indexMap.getCount());
+        m_indexMap.add(defaultValueIndex);
+    }
+    return countIndex;
+}
+
+void StringSliceIndexMap::clear()
+{
+    m_pool.clear();
+    m_indexMap.clear();
+}
+
+// !!!!!!!!!!!!!!!!!!!!!!!!!!!!!! ImplicitDirectoryCollector !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+
+ImplicitDirectoryCollector::ImplicitDirectoryCollector(const String& canonicalPath, bool directoryExists) :
+    m_directoryExists(directoryExists)
+{
+    StringBuilder buffer;
+    if (canonicalPath != ".")
+    {
+        buffer << canonicalPath;
+        buffer.append('/');
+    }
+    m_prefix = buffer.ProduceString();
+}
+
+void ImplicitDirectoryCollector::addRemainingPath(SlangPathType pathType, const UnownedStringSlice& inPathRemainder)
+{
+    // If it's zero length we probably don't want to add it
+    if (inPathRemainder.getLength() == 0)
+    {
+        // It's empty so don't add normal way - implies the directory exists
+        m_directoryExists = true;
+        return;
+    }
+
+    UnownedStringSlice pathRemainder(inPathRemainder);
+    const Index slashIndex = pathRemainder.indexOf('/');
+
+    // If we have a following / that means it's an implicit directory.
+    if (slashIndex >= 0)
+    {
+        pathType = SLANG_PATH_TYPE_DIRECTORY;
+        pathRemainder = UnownedStringSlice(pathRemainder.begin(), pathRemainder.begin() + slashIndex);
+    }
+
+    const Index countIndex = m_map.findOrAdd(pathRemainder, pathType);
+    // Make sure they are the same type
+    SLANG_ASSERT(m_map.getValueAt(countIndex) == pathType);
+}
+
+void ImplicitDirectoryCollector::addPath(SlangPathType pathType, const UnownedStringSlice& canonicalPath)
+{
+    if (hasPrefix(canonicalPath))
+    {
+        UnownedStringSlice remainder = getRemainder(canonicalPath);
+        addRemainingPath(pathType, remainder);
+    }
+}
+
+SlangResult ImplicitDirectoryCollector::enumerate(FileSystemContentsCallBack callback, void* userData)
+{
+    const Int count = m_map.getCount();
+
+    for (Index i = 0; i < count; ++i)
+    {
+        const auto& pair = m_map.getAt(i);
+
+        UnownedStringSlice path = pair.Key;
+        SlangPathType pathType = SlangPathType(pair.Value);
+
+        // Note *is* 0 terminated in the pool
+        // Let's check tho
+        SLANG_ASSERT(path.begin()[path.getLength()] == 0);
+        callback(pathType, path.begin(), userData);
+    }
+
+    return getDirectoryExists() ? SLANG_OK : SLANG_E_NOT_FOUND;
+}
+
+// !!!!!!!!!!!!!!!!!!!!!!!!!!!!!! SimpleCompressedFileSystem !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+
+
+RiffCompressedFileSystem::RiffCompressedFileSystem(ICompressionSystem* compressionSystem):
     m_compressionSystem(compressionSystem)
 {
 }
 
-ISlangMutableFileSystem* SimpleCompressedFileSystem::getInterface(const Guid& guid)
+ISlangMutableFileSystem* RiffCompressedFileSystem::getInterface(const Guid& guid)
 {
     return (guid == IID_ISlangUnknown || guid == IID_ISlangFileSystem || guid == IID_ISlangFileSystemExt || guid == IID_ISlangMutableFileSystem) ? static_cast<ISlangMutableFileSystem*>(this) : nullptr;
 }
 
-SlangResult SimpleCompressedFileSystem::_calcCanonicalPath(const char* path, StringBuilder& out)
+SlangResult RiffCompressedFileSystem::_calcCanonicalPath(const char* path, StringBuilder& out)
 {
     List<UnownedStringSlice> splitPath;
     Path::split(UnownedStringSlice(path), splitPath);
@@ -56,13 +174,13 @@ SlangResult SimpleCompressedFileSystem::_calcCanonicalPath(const char* path, Str
     return SLANG_OK;
 }
 
-SimpleCompressedFileSystem::Entry* SimpleCompressedFileSystem::_getEntryFromCanonicalPath(const String& canonicalPath)
+RiffCompressedFileSystem::Entry* RiffCompressedFileSystem::_getEntryFromCanonicalPath(const String& canonicalPath)
 {
     RefPtr<Entry>* entryPtr = m_entries.TryGetValue(canonicalPath);
     return  entryPtr ? *entryPtr : nullptr;
 }
 
-SimpleCompressedFileSystem::Entry* SimpleCompressedFileSystem::_getEntryFromPath(const char* path, String* outPath)
+RiffCompressedFileSystem::Entry* RiffCompressedFileSystem::_getEntryFromPath(const char* path, String* outPath)
 {
     StringBuilder buffer;
     if (SLANG_FAILED(_calcCanonicalPath(path, buffer)))
@@ -77,7 +195,7 @@ SimpleCompressedFileSystem::Entry* SimpleCompressedFileSystem::_getEntryFromPath
     return _getEntryFromCanonicalPath(buffer);
 }
 
-SlangResult SimpleCompressedFileSystem::loadFile(char const* path, ISlangBlob** outBlob)
+SlangResult RiffCompressedFileSystem::loadFile(char const* path, ISlangBlob** outBlob)
 {
     Entry* entry = _getEntryFromPath(path);
     if (entry == nullptr || entry->m_type != SLANG_PATH_TYPE_FILE)
@@ -98,12 +216,12 @@ SlangResult SimpleCompressedFileSystem::loadFile(char const* path, ISlangBlob** 
     return SLANG_OK;
 }
 
-SlangResult SimpleCompressedFileSystem::getFileUniqueIdentity(const char* path, ISlangBlob** outUniqueIdentity)
+SlangResult RiffCompressedFileSystem::getFileUniqueIdentity(const char* path, ISlangBlob** outUniqueIdentity)
 {
     return getCanonicalPath(path, outUniqueIdentity);
 }
 
-SlangResult SimpleCompressedFileSystem::calcCombinedPath(SlangPathType fromPathType, const char* fromPath, const char* path, ISlangBlob** pathOut)
+SlangResult RiffCompressedFileSystem::calcCombinedPath(SlangPathType fromPathType, const char* fromPath, const char* path, ISlangBlob** pathOut)
 {
     String combinedPath;
     switch (fromPathType)
@@ -124,7 +242,7 @@ SlangResult SimpleCompressedFileSystem::calcCombinedPath(SlangPathType fromPathT
     return SLANG_OK;
 }
 
-SlangResult SimpleCompressedFileSystem::getPathType(const char* path, SlangPathType* outPathType)
+SlangResult RiffCompressedFileSystem::getPathType(const char* path, SlangPathType* outPathType)
 {
     String canonicalPath;
     Entry* entry = _getEntryFromPath(path, &canonicalPath);
@@ -153,14 +271,14 @@ SlangResult SimpleCompressedFileSystem::getPathType(const char* path, SlangPathT
     return SLANG_OK;
 }
 
-SlangResult SimpleCompressedFileSystem::getSimplifiedPath(const char* path, ISlangBlob** outSimplifiedPath)
+SlangResult RiffCompressedFileSystem::getSimplifiedPath(const char* path, ISlangBlob** outSimplifiedPath)
 {
     String simplifiedPath = Path::simplify(path);
     *outSimplifiedPath = StringUtil::createStringBlob(simplifiedPath).detach();
     return SLANG_OK;
 }
 
-SlangResult SimpleCompressedFileSystem::getCanonicalPath(const char* path, ISlangBlob** outCanonicalPath)
+SlangResult RiffCompressedFileSystem::getCanonicalPath(const char* path, ISlangBlob** outCanonicalPath)
 {
     StringBuilder buffer;
     SLANG_RETURN_ON_FAIL(_calcCanonicalPath(path, buffer));
@@ -169,7 +287,7 @@ SlangResult SimpleCompressedFileSystem::getCanonicalPath(const char* path, ISlan
 }
 
 
-SlangResult SimpleCompressedFileSystem::enumeratePathContents(const char* path, FileSystemContentsCallBack callback, void* userData)
+SlangResult RiffCompressedFileSystem::enumeratePathContents(const char* path, FileSystemContentsCallBack callback, void* userData)
 {
     String canonicalPath;
     Entry* entry = _getEntryFromPath(path, &canonicalPath);
@@ -191,16 +309,14 @@ SlangResult SimpleCompressedFileSystem::enumeratePathContents(const char* path, 
     return collector.enumerate(callback, userData);
 }
 
-SlangResult SimpleCompressedFileSystem::saveFile(const char* path, const void* data, size_t size)
+SlangResult RiffCompressedFileSystem::saveFile(const char* path, const void* data, size_t size)
 {
     StringBuilder canonicalPath;
     SLANG_RETURN_ON_FAIL(_calcCanonicalPath(path, canonicalPath));
 
-    CompressionStyle style;
-
     // Lets try compressing the input
     ComPtr<ISlangBlob> blob;
-    SLANG_RETURN_ON_FAIL(m_compressionSystem->compress(&style, data, size, blob.writeRef()));
+    SLANG_RETURN_ON_FAIL(m_compressionSystem->compress(&m_compressionStyle, data, size, blob.writeRef()));
 
     Entry* entry = _getEntryFromCanonicalPath(canonicalPath);
     if (!entry)
@@ -219,7 +335,7 @@ SlangResult SimpleCompressedFileSystem::saveFile(const char* path, const void* d
     return SLANG_OK;
 }
 
-SlangResult SimpleCompressedFileSystem::remove(const char* path)
+SlangResult RiffCompressedFileSystem::remove(const char* path)
 {
     String canonicalPath;
     Entry* entry = _getEntryFromPath(path, &canonicalPath);
@@ -253,7 +369,7 @@ SlangResult SimpleCompressedFileSystem::remove(const char* path)
     return SLANG_E_NOT_FOUND;
 }
 
-SlangResult SimpleCompressedFileSystem::createDirectory(const char* path)
+SlangResult RiffCompressedFileSystem::createDirectory(const char* path)
 {
     String canonicalPath;
     Entry* entry = _getEntryFromPath(path, &canonicalPath);
@@ -269,6 +385,238 @@ SlangResult SimpleCompressedFileSystem::createDirectory(const char* path)
 
     m_entries.Add(canonicalPath, entry);
     return SLANG_OK;
+}
+
+
+
+
+SlangResult RiffCompressedFileSystem::loadArchive(const void* archive, size_t archiveSizeInBytes)
+{
+    // Load the riff
+    RiffContainer container;
+
+    MemoryStreamBase stream(FileAccess::Read, archive, archiveSizeInBytes);
+    SLANG_RETURN_ON_FAIL(RiffUtil::read(&stream, container));
+
+    RiffContainer::ListChunk* rootList = container.getRoot();
+    // Make sure it's the right type
+    if (rootList == nullptr || rootList->m_fourCC != RiffFileSystemBinary::kContainerFourCC)
+    {
+        return SLANG_FAIL;
+    }
+
+    // Clear the contents
+    _clear();
+
+    // Find the header
+    const auto header = rootList->findContainedData<RiffFileSystemBinary::Header>(RiffFileSystemBinary::kHeaderFourCC);
+
+    CompressionSystemType compressionType = CompressionSystemType(header->compressionSystemType);
+    switch (compressionType)
+    {
+        case CompressionSystemType::Deflate:
+        {
+            m_compressionSystem = DeflateCompressionSystem::getSingleton();
+            break;
+        }
+        case CompressionSystemType::LZ4:
+        {
+            m_compressionSystem = LZ4CompressionSystem::getSingleton();
+            break;
+        }
+        default: return SLANG_FAIL;
+    }
+
+    // Read all of the contained data
+
+    {
+        List<RiffContainer::DataChunk*> srcEntries;
+        rootList->findContained(RiffFileSystemBinary::kEntryFourCC, srcEntries);
+
+        for (auto chunk : srcEntries)
+        {
+            auto data = chunk->getSingleData();
+
+            const uint8_t* srcData = (const uint8_t*)data->getPayload();
+            const size_t dataSize = data->getSize();
+
+            if (dataSize < sizeof(RiffFileSystemBinary::Entry))
+            {
+                return SLANG_FAIL;
+            }
+
+            auto srcEntry = (const RiffFileSystemBinary::Entry*)srcData;
+            srcData += sizeof(*srcEntry);
+
+            // Check if seems plausible
+            if (sizeof(RiffFileSystemBinary::Entry) + srcEntry->compressedSize + srcEntry->pathSize != dataSize)
+            {
+                return SLANG_FAIL;
+            }
+
+            RefPtr<Entry> dstEntry = new Entry;
+
+            const char* path = (const char*)srcData;
+            srcData += srcEntry->pathSize;
+
+            dstEntry->m_canonicalPath = UnownedStringSlice(path, srcEntry->pathSize - 1);
+            dstEntry->m_type = (SlangPathType)srcEntry->pathType;
+            dstEntry->m_uncompressedSizeInBytes = srcEntry->uncompressedSize;
+            
+            switch (dstEntry->m_type)
+            {
+                case SLANG_PATH_TYPE_FILE:
+                {
+                    if (srcData + srcEntry->compressedSize != data->getPayloadEnd())
+                    {
+                        return SLANG_FAIL;
+                    }
+
+                    // Get the compressed data
+                    dstEntry->m_compressedData = new RawBlob(srcData, srcEntry->compressedSize);
+                    break;
+                }
+                case SLANG_PATH_TYPE_DIRECTORY: break;
+                default: return SLANG_FAIL;
+            }
+
+            // Add to the list of entries
+            m_entries.Add(dstEntry->m_canonicalPath, dstEntry);
+        }
+    }
+
+    return SLANG_OK;
+}
+
+SlangResult RiffCompressedFileSystem::storeArchive(bool blobOwnsContent, ISlangBlob** outBlob)
+{
+    // All blobs are owned in this style
+    SLANG_UNUSED(blobOwnsContent)
+
+    RiffContainer container;
+    RiffContainer::ScopeChunk scopeContainer(&container, RiffContainer::Chunk::Kind::List, RiffFileSystemBinary::kContainerFourCC);
+
+    {
+        RiffFileSystemBinary::Header header;
+        header.compressionSystemType = uint32_t(m_compressionSystem->getSystemType());
+        container.addDataChunk(RiffFileSystemBinary::kHeaderFourCC, &header, sizeof(header));
+    }
+
+    for (const auto& pair : m_entries)
+    {
+        RiffContainer::ScopeChunk scopeData(&container, RiffContainer::Chunk::Kind::Data, RiffFileSystemBinary::kEntryFourCC);
+
+        const Entry* srcEntry = pair.Value;
+
+        RiffFileSystemBinary::Entry dstEntry;
+        dstEntry.uncompressedSize = 0;
+        dstEntry.compressedSize = 0;
+        dstEntry.pathSize = uint32_t(srcEntry->m_canonicalPath.getLength() + 1);
+        dstEntry.pathType = srcEntry->m_type;
+
+        ISlangBlob* blob = srcEntry->m_compressedData;
+
+        if (srcEntry->m_type == SLANG_PATH_TYPE_FILE)
+        {
+            dstEntry.compressedSize = uint32_t(blob->getBufferSize());
+            dstEntry.uncompressedSize = uint32_t(srcEntry->m_uncompressedSizeInBytes);
+        }
+
+        // Entry header
+        container.write(&dstEntry, sizeof(dstEntry));
+
+        // Path
+        container.write(srcEntry->m_canonicalPath.getBuffer(), srcEntry->m_canonicalPath.getLength() + 1);
+
+        // Add the contained data without copying
+        if (blob)
+        {
+            RiffContainer::Data* data = container.addData();
+            container.setUnowned(data, const_cast<void*>(blob->getBufferPointer()), blob->getBufferSize());
+        }
+    }
+
+    OwnedMemoryStream stream(FileAccess::Write);
+    // We now write the RiffContainer to the stream
+    SLANG_RETURN_ON_FAIL(RiffUtil::write(container.getRoot(), true, &stream));
+
+    RefPtr<ListBlob> blob = new ListBlob;
+    stream.swapContents(blob->m_data);
+
+    *outBlob = blob.detach();
+    return SLANG_OK;
+}
+
+SlangResult loadCompressedFileSystem(const void* data, size_t dataSizeInBytes, RefPtr<CompressedFileSystem>& outFileSystem)
+{
+    if (dataSizeInBytes < sizeof(FourCC))
+    {
+        return SLANG_FAIL;
+    }
+
+    FourCC fourCC = 0;
+    ::memcpy(&fourCC, data, sizeof(FourCC));
+
+    RefPtr<CompressedFileSystem> fileSystem;
+
+    // https://en.wikipedia.org/wiki/List_of_file_signatures
+    switch (fourCC)
+    {
+        case SLANG_FOUR_CC(0x50, 0x4B, 0x03, 0x04):
+        case SLANG_FOUR_CC(0x50, 0x4B, 0x05, 0x06):
+        case SLANG_FOUR_CC(0x50, 0x4B, 0x07, 0x08):
+        {
+            // It's a zip
+            SLANG_RETURN_ON_FAIL(ZipFileSystem::create(fileSystem));
+            break;
+        }
+        case RiffFourCC::kRiff:
+        {
+            MemoryStreamBase stream(FileAccess::Read, data, dataSizeInBytes);
+
+            RiffListHeader header;
+            SLANG_RETURN_ON_FAIL(RiffUtil::readHeader(&stream, header));
+
+            if (header.subType != RiffFileSystemBinary::kContainerFourCC)
+            {
+                return SLANG_FAIL;
+            }
+
+            // It's riff contained (Slang specific)
+            fileSystem = new RiffCompressedFileSystem(nullptr);
+            break;
+        }
+        default: return SLANG_FAIL;
+    }
+
+    SLANG_RETURN_ON_FAIL(fileSystem->loadArchive(data, dataSizeInBytes));
+
+    outFileSystem = fileSystem;
+    return SLANG_OK;
+}
+
+
+SlangResult createCompressedFileSystem(CompressedFileSystemType type, RefPtr<CompressedFileSystem>& outFileSystem)
+{
+    switch (type)
+    {
+        case CompressedFileSystemType::Zip:
+        {
+            return ZipFileSystem::create(outFileSystem);
+        }
+        case CompressedFileSystemType::RIFFDeflate:
+        {
+            outFileSystem = new RiffCompressedFileSystem(DeflateCompressionSystem::getSingleton());
+            return SLANG_OK;
+        }
+        case CompressedFileSystemType::RIFFLZ4:
+        {
+            outFileSystem = new RiffCompressedFileSystem(LZ4CompressionSystem::getSingleton());
+            return SLANG_OK;
+        }
+    }
+
+    return SLANG_FAIL;
 }
 
 } // namespace Slang

@@ -118,11 +118,14 @@ static void compressionUnitTest()
 
     // Load and check its okay
     {
-        const auto archive = buildFileSystem->getArchive();
+        ComPtr<ISlangBlob> archiveBlob;
+        SLANG_CHECK(SLANG_SUCCEEDED(buildFileSystem->storeArchive(false, archiveBlob.writeRef())));
 
         RefPtr<CompressedFileSystem> fileSystem;
-        ZipFileSystem::create(archive.getBuffer(), archive.getCount(), fileSystem);
+        ZipFileSystem::create(fileSystem);
 
+        SLANG_CHECK(SLANG_SUCCEEDED(fileSystem->loadArchive(archiveBlob->getBufferPointer(), archiveBlob->getBufferSize())));
+        
         ComPtr<ISlangBlob> blob;
 
         SLANG_CHECK(SLANG_SUCCEEDED(fileSystem->loadFile("file.txt", blob.writeRef())));

@@ -31,6 +31,7 @@ public:
     SLANG_NO_THROW uint32_t SLANG_MCALL release() SLANG_OVERRIDE { return 1; }
 
     // ICompressionSystem
+    virtual SLANG_NO_THROW CompressionSystemType SLANG_MCALL getSystemType() SLANG_OVERRIDE { return CompressionSystemType::Deflate; }
     virtual SLANG_NO_THROW SlangResult SLANG_MCALL compress(const CompressionStyle* style, const void* src, size_t srcSizeInBytes, ISlangBlob** outBlob) SLANG_OVERRIDE;
     virtual SLANG_NO_THROW SlangResult SLANG_MCALL decompress(const void* compressed, size_t compressedSizeInBytes, size_t decompressedSizeInBytes, void* outDecompressed) SLANG_OVERRIDE;
 

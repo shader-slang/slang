@@ -49,13 +49,12 @@ public:
     virtual SLANG_NO_THROW SlangResult SLANG_MCALL createDirectory(const char* path) SLANG_OVERRIDE;
 
     // CompressedFileSystem
-    virtual ConstArrayView<uint8_t> getArchive() SLANG_OVERRIDE;
+    SlangResult loadArchive(const void* archive, size_t archiveSizeInBytes) SLANG_OVERRIDE;
+    virtual SlangResult storeArchive(bool blobOwnsContent, ISlangBlob** outBlob) SLANG_OVERRIDE;
     virtual void setCompressionStyle(const CompressionStyle& style) SLANG_OVERRIDE;
 
     ZipFileSystemImpl();
     ~ZipFileSystemImpl();
-
-    SlangResult init(const uint8_t* archive, size_t size);
 
 protected:
 
@@ -153,33 +152,6 @@ ZipFileSystemImpl::ZipFileSystemImpl():
  {
      _requireMode(Mode::None);
  }
-
-SlangResult ZipFileSystemImpl::init(const uint8_t* archive, size_t size)
-{
-     SLANG_RETURN_ON_FAIL(_requireMode(Mode::None));
-
-     // Store a copy
-     if (!m_data.set(archive, size))
-     {
-         return SLANG_E_OUT_OF_MEMORY;
-     }
-
-    // Initialize archive
-    mz_zip_zero_struct(&m_archive);
-
-    // Read the contents of the archive, and make m_archive own it
-    if (!mz_zip_reader_init_mem(&m_archive, m_data.getData(), size, 0))
-    {
-        return SLANG_FAIL;
-    }
-
-     m_mode = Mode::Read;
-
-     // Set up the mapping from paths to indices
-     _rebuildMap();
-
-     return SLANG_OK;
-}
 
 void ZipFileSystemImpl::_rebuildMap()
 {
@@ -595,7 +567,7 @@ SlangResult ZipFileSystemImpl::_getPathContents(ImplicitDirectoryCollector::Stat
         outCollector->addPath(pathType, currentPath);
 
         // If a termination state is defined, and we reach it, we are done
-        if (terminationState != ImplicitDirectoryCollector::State::Undefined && outCollector->hasState(terminationState))
+        if (terminationState != ImplicitDirectoryCollector::State::None && outCollector->hasState(terminationState))
         {
             return SLANG_OK;
         }
@@ -614,7 +586,7 @@ SlangResult ZipFileSystemImpl::enumeratePathContents(const char* path, FileSyste
     String fixedPath;
     SLANG_RETURN_ON_FAIL(_getFixedPath(path, fixedPath));
     ImplicitDirectoryCollector collector(fixedPath);
-    SLANG_RETURN_ON_FAIL(_getPathContents(ImplicitDirectoryCollector::State::Undefined, &collector));
+    SLANG_RETURN_ON_FAIL(_getPathContents(ImplicitDirectoryCollector::State::None, &collector));
     return collector.enumerate(callback, userData);
 }
 
@@ -635,7 +607,7 @@ SlangResult ZipFileSystemImpl::saveFile(const char* path, const void* data, size
 
     // TODO(JS):
     // We may want to check the directory exists that holds the path exists
-    // Which is easy to do. Without this check it allows directories to come into exisitance
+    // Which is easy to do. Without this check it allows directories to come into existence
     // when the path to the file is used.
     // This behaviour *isn't* strictly the same as the file system, which requires the path
     // to a file to exist before it is written.
@@ -727,7 +699,7 @@ SlangResult ZipFileSystemImpl::createDirectory(const char* path)
     return SLANG_OK;
 }
 
-ConstArrayView<uint8_t> ZipFileSystemImpl::getArchive()
+SlangResult ZipFileSystemImpl::storeArchive(bool blobOwnsContent, ISlangBlob** outBlob)
 {
     // If we have anything deleted in 'Read', we need to convert to 'Write' and then back to read
     if (m_mode == Mode::Read && !m_removedSet.isEmpty())
@@ -736,7 +708,49 @@ ConstArrayView<uint8_t> ZipFileSystemImpl::getArchive()
     }
         
     _requireMode(Mode::Read);
-    return ArrayView<uint8_t>((uint8_t*)m_data.getData(), Index(m_data.getSizeInBytes()));
+
+    ComPtr<ISlangBlob> blob;
+
+    if (blobOwnsContent)
+    {
+        // Takes a copy
+        blob = new RawBlob(m_data.getData(), Index(m_data.getSizeInBytes()));
+    }
+    else
+    {
+        // Doesn't take a copy... Must use with care(!)
+        blob = new UnownedRawBlob(m_data.getData(), Index(m_data.getSizeInBytes()));
+    }
+    *outBlob = blob.detach();
+    return SLANG_OK;
+}
+
+SlangResult ZipFileSystemImpl::loadArchive(const void* archive, size_t archiveSizeInBytes)
+{
+    // Making the mode None empties the archive 
+    SLANG_RETURN_ON_FAIL(_requireMode(Mode::None));
+
+    // Store a copy of the archive contents
+    if (!m_data.set(archive, archiveSizeInBytes))
+    {
+        return SLANG_E_OUT_OF_MEMORY;
+    }
+
+    // Initialize archive
+    mz_zip_zero_struct(&m_archive);
+
+    // Read the contents of the archive, and make m_archive own it
+    if (!mz_zip_reader_init_mem(&m_archive, m_data.getData(), archiveSizeInBytes, 0))
+    {
+        return SLANG_FAIL;
+    }
+
+    m_mode = Mode::Read;
+
+    // Set up the mapping from paths to indices
+    _rebuildMap();
+
+    return SLANG_OK;
 }
 
 void ZipFileSystemImpl::setCompressionStyle(const CompressionStyle& style)
@@ -755,15 +769,6 @@ void ZipFileSystemImpl::setCompressionStyle(const CompressionStyle& style)
             break;
         }
     }
-}
-
-/* static */SlangResult ZipFileSystem::create(const void* data, size_t size, RefPtr<CompressedFileSystem>& out)
-{
-    RefPtr<ZipFileSystemImpl> fileSystem(new ZipFileSystemImpl);
-    SLANG_RETURN_ON_FAIL(fileSystem->init((const uint8_t*)data, size));
-
-    out = fileSystem;
-    return SLANG_OK;
 }
 
 /* static */SlangResult ZipFileSystem::create(RefPtr<CompressedFileSystem>& out)

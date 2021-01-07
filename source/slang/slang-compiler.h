@@ -5,6 +5,7 @@
 #include "../core/slang-shared-library.h"
 
 #include "../core/slang-downstream-compiler.h"
+#include "../core/slang-compressed-file-system.h"
 
 #include "../../slang-com-ptr.h"
 
@@ -2281,6 +2282,8 @@ namespace Slang
         SlangResult _readBuiltinModule(ISlangFileSystem* fileSystem, Scope* scope, String moduleName);
 
         SlangResult _loadRequest(EndToEndCompileRequest* request, const void* data, size_t size);
+
+        CompressedFileSystemType m_defaultFileSystemType = CompressedFileSystemType::RIFFLZ4;
 
             /// Linkage used for all built-in (stdlib) code.
         RefPtr<Linkage> m_builtinLinkage;

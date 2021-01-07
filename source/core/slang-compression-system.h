@@ -19,9 +19,21 @@ struct CompressionStyle
     float m_level = 1.0f;                  ///< 0 lowest compression, 1 highest compression (Ignored if m_type != Type::Level)
 };
 
+enum class CompressionSystemType
+{
+    Deflate,
+    LZ4,
+    CountOf,
+};
+
 class ICompressionSystem : public ISlangUnknown
 {
 public:
+
+        /** Get the compression system type
+        @return The compression system type */
+    virtual SLANG_NO_THROW CompressionSystemType SLANG_MCALL getSystemType() = 0;
+
         /** compress
         @param src Points to the start of the data to compress
         @param srcSizeInBytes The size of the source data to compress in bytes
