@@ -1,6 +1,6 @@
 // callable-caller.slang
 
-//TEST:CROSS_COMPILE: -profile glsl_460+GL_NV_ray_tracing -stage raygeneration -entry main -target spirv-assembly
+//TEST:CROSS_COMPILE: -profile glsl_460 -capability GL_NV_ray_tracing -stage raygeneration -entry main -target spirv-assembly
 
 import callable_shared;
 
