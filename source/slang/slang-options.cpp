@@ -717,6 +717,35 @@ struct OptionsParser
                         addCapabilityAtom(getCurrentTarget(), atom);
                     }
                 }
+                else if( argStr == "-capability" )
+                {
+                    // The `-capability` option is similar to `-profile` but does not set the actual profile
+                    // for a target (it just adds capabilities).
+                    //
+                    // TODO: Once profiles are treated as capabilities themselves, it might be possible
+                    // to treat `-profile` and `-capability` as aliases, although there might still be
+                    // value in only allowing a single `-profile` option per target while still allowing
+                    // zero or more `-capability` options.
+
+                    String operand;
+                    SLANG_RETURN_ON_FAIL(tryReadCommandLineArgument(sink, arg, &argCursor, argEnd, operand));
+
+                    List<UnownedStringSlice> slices;
+                    StringUtil::split(operand.getUnownedSlice(), '+', slices);
+                    Index sliceCount = slices.getCount();
+                    for(Index i = 0; i < sliceCount; ++i)
+                    {
+                        UnownedStringSlice atomName = slices[i];
+                        CapabilityAtom atom = findCapabilityAtom(atomName);
+                        if( atom == CapabilityAtom::Invalid )
+                        {
+                            sink->diagnose(SourceLoc(), Diagnostics::unknownProfile, atomName);
+                            return SLANG_FAIL;
+                        }
+
+                        addCapabilityAtom(getCurrentTarget(), atom);
+                    }
+                }
                 else if (argStr == "-stage")
                 {
                     String name;
