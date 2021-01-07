@@ -3160,6 +3160,7 @@ void CLikeSourceEmitter::emitSimpleFuncImpl(IRFunc* func)
 
     auto name = getName(func);
 
+    emitFuncDecorations(func);
     emitType(resultType, name);
     emitSimpleFuncParamsImpl(func);
     emitSemantics(func);
@@ -3268,6 +3269,7 @@ void CLikeSourceEmitter::emitFuncDecl(IRFunc* func)
 
     auto name = getName(func);
 
+    emitFuncDecorations(func);
     emitType(resultType, name);
 
     m_writer->emit("(");
@@ -3343,6 +3345,15 @@ void CLikeSourceEmitter::emitFunc(IRFunc* func)
         emitSimpleFunc(func);
     }
 }
+
+void CLikeSourceEmitter::emitFuncDecorations(IRFunc* func)
+{
+    for(auto decoration : func->getDecorations())
+    {
+        emitFuncDecorationImpl(decoration);
+    }
+}
+
 
 void CLikeSourceEmitter::emitStruct(IRStructType* structType)
 {
