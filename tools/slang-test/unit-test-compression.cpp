@@ -34,106 +34,118 @@ static List<String> _getContents(ISlangFileSystemExt* fileSystem, const char* pa
 
 static void compressionUnitTest()
 {
-    // Test out archive file systems
-    RefPtr<ArchiveFileSystem> buildFileSystem;
-    ZipFileSystem::create(buildFileSystem);
-
-    const char contents[] = "I'm compressed";
-    const char contents2[] = "Some more stuff";
-    const char contents3[] = "Replace it";
-
+    const SlangArchiveType archiveTypes[] =
     {
-        ISlangMutableFileSystem* fileSystem = buildFileSystem;
+        SLANG_ARCHIVE_TYPE_RIFF,
+        SLANG_ARCHIVE_TYPE_RIFF_DEFLATE,
+        SLANG_ARCHIVE_TYPE_RIFF_LZ4,
+        SLANG_ARCHIVE_TYPE_ZIP
+    };
 
-        SLANG_CHECK(SLANG_SUCCEEDED(fileSystem->createDirectory("hello")));
-        SLANG_CHECK(SLANG_SUCCEEDED(fileSystem->createDirectory("hello2")));
-        SLANG_CHECK(SLANG_SUCCEEDED(fileSystem->remove("hello")));
-        SLANG_CHECK(SLANG_SUCCEEDED(fileSystem->createDirectory("hello")));
-
-        SLANG_CHECK(SLANG_SUCCEEDED(fileSystem->saveFile("file.txt", contents, SLANG_COUNT_OF(contents))));
-
-        SLANG_CHECK(SLANG_SUCCEEDED(fileSystem->saveFile("file2.txt", contents2, SLANG_COUNT_OF(contents2))));
-
-        ComPtr<ISlangBlob> blob;
-        SLANG_CHECK(SLANG_SUCCEEDED(fileSystem->loadFile("file.txt", blob.writeRef())));
-        SLANG_CHECK(_equals(contents, blob));
-
-        SLANG_CHECK(SLANG_SUCCEEDED(fileSystem->loadFile("file2.txt", blob.writeRef())));
-        SLANG_CHECK(_equals(contents2, blob));
-
-        SLANG_CHECK(SLANG_SUCCEEDED(fileSystem->saveFile("file2.txt", contents3, SLANG_COUNT_OF(contents3))));
-
-        SLANG_CHECK(SLANG_SUCCEEDED(fileSystem->loadFile("file2.txt", blob.writeRef())));
-        SLANG_CHECK(_equals(contents3, blob));
-
-        // Check the path type
-        {
-            SlangPathType pathType;
-            SLANG_CHECK(SLANG_SUCCEEDED(fileSystem->getPathType("file2.txt", &pathType)));
-            SLANG_CHECK(pathType == SLANG_PATH_TYPE_FILE);
-
-            SLANG_CHECK(SLANG_SUCCEEDED(fileSystem->getPathType("hello", &pathType)));
-            SLANG_CHECK(pathType == SLANG_PATH_TYPE_DIRECTORY);
-        }
-
-        // Enumerate
-        {
-            for (const auto& obj : _getContents(fileSystem, ""))
-            {
-                // All of these should exist
-                SlangPathType pathType;
-                SLANG_CHECK(SLANG_SUCCEEDED(fileSystem->getPathType(obj.getBuffer(), &pathType)));
-            }
-        }
-
-        SLANG_CHECK(SLANG_SUCCEEDED(fileSystem->saveFile("implicit-path/file2.txt", contents3, SLANG_COUNT_OF(contents3))));
-
-        {
-            SlangPathType pathType;
-            SLANG_CHECK(SLANG_SUCCEEDED(fileSystem->getPathType("implicit-path", &pathType)));
-
-            SLANG_CHECK(pathType == SLANG_PATH_TYPE_DIRECTORY);
-
-            List<String> objs = _getContents(fileSystem, "implicit-path");
-
-            // It contains a file
-            SLANG_CHECK(objs.getCount() == 1);
-
-            for (const auto& obj : objs)
-            {
-                String path = Path::combine("implicit-path", obj);
-
-                // All of these should exist
-                SlangPathType pathType;
-                SLANG_CHECK(SLANG_SUCCEEDED(fileSystem->getPathType(path.getBuffer(), &pathType)));
-            }
-
-            // Make an explicit path, and see whe have the same results
-            fileSystem->createDirectory("implicit-path");
-
-            objs = _getContents(fileSystem, "implicit-path");
-            SLANG_CHECK(objs.getCount() == 1);
-        }
-    }
-
-    // Load and check its okay
+    for (auto archiveType : archiveTypes)
     {
-        ComPtr<ISlangBlob> archiveBlob;
-        SLANG_CHECK(SLANG_SUCCEEDED(buildFileSystem->storeArchive(false, archiveBlob.writeRef())));
-
-        RefPtr<ArchiveFileSystem> fileSystem;
-        ZipFileSystem::create(fileSystem);
-
-        SLANG_CHECK(SLANG_SUCCEEDED(fileSystem->loadArchive(archiveBlob->getBufferPointer(), archiveBlob->getBufferSize())));
+        // Test out archive file systems
+        RefPtr<ArchiveFileSystem> archiveFileSystem;
+        SLANG_CHECK(SLANG_SUCCEEDED(createArchiveFileSystem(archiveType, archiveFileSystem)));
         
-        ComPtr<ISlangBlob> blob;
+        const char contents[] = "I'm compressed";
+        const char contents2[] = "Some more stuff";
+        const char contents3[] = "Replace it";
 
-        SLANG_CHECK(SLANG_SUCCEEDED(fileSystem->loadFile("file.txt", blob.writeRef())));
-        SLANG_CHECK(_equals(contents, blob));
+        {
+            ISlangMutableFileSystem* fileSystem = archiveFileSystem;
 
-        SLANG_CHECK(SLANG_SUCCEEDED(fileSystem->loadFile("file2.txt", blob.writeRef())));
-        SLANG_CHECK(_equals(contents3, blob));
-    }
+            SLANG_CHECK(SLANG_SUCCEEDED(fileSystem->createDirectory("hello")));
+            SLANG_CHECK(SLANG_SUCCEEDED(fileSystem->createDirectory("hello2")));
+            SLANG_CHECK(SLANG_SUCCEEDED(fileSystem->remove("hello")));
+            SLANG_CHECK(SLANG_SUCCEEDED(fileSystem->createDirectory("hello")));
+
+            SLANG_CHECK(SLANG_SUCCEEDED(fileSystem->saveFile("file.txt", contents, SLANG_COUNT_OF(contents))));
+
+            SLANG_CHECK(SLANG_SUCCEEDED(fileSystem->saveFile("file2.txt", contents2, SLANG_COUNT_OF(contents2))));
+
+            ComPtr<ISlangBlob> blob;
+            SLANG_CHECK(SLANG_SUCCEEDED(fileSystem->loadFile("file.txt", blob.writeRef())));
+            SLANG_CHECK(_equals(contents, blob));
+
+            SLANG_CHECK(SLANG_SUCCEEDED(fileSystem->loadFile("file2.txt", blob.writeRef())));
+            SLANG_CHECK(_equals(contents2, blob));
+
+            SLANG_CHECK(SLANG_SUCCEEDED(fileSystem->saveFile("file2.txt", contents3, SLANG_COUNT_OF(contents3))));
+
+            SLANG_CHECK(SLANG_SUCCEEDED(fileSystem->loadFile("file2.txt", blob.writeRef())));
+            SLANG_CHECK(_equals(contents3, blob));
+
+            // Check the path type
+            {
+                SlangPathType pathType;
+                SLANG_CHECK(SLANG_SUCCEEDED(fileSystem->getPathType("file2.txt", &pathType)));
+                SLANG_CHECK(pathType == SLANG_PATH_TYPE_FILE);
+
+                SLANG_CHECK(SLANG_SUCCEEDED(fileSystem->getPathType("hello", &pathType)));
+                SLANG_CHECK(pathType == SLANG_PATH_TYPE_DIRECTORY);
+            }
+
+            // Enumerate
+            {
+                for (const auto& obj : _getContents(fileSystem, ""))
+                {
+                    // All of these should exist
+                    SlangPathType pathType;
+                    SLANG_CHECK(SLANG_SUCCEEDED(fileSystem->getPathType(obj.getBuffer(), &pathType)));
+                }
+            }
+
+            SLANG_CHECK(SLANG_SUCCEEDED(fileSystem->saveFile("implicit-path/file2.txt", contents3, SLANG_COUNT_OF(contents3))));
+
+            {
+                SlangPathType pathType;
+                SLANG_CHECK(SLANG_SUCCEEDED(fileSystem->getPathType("implicit-path", &pathType)));
+
+                SLANG_CHECK(pathType == SLANG_PATH_TYPE_DIRECTORY);
+
+                List<String> objs = _getContents(fileSystem, "implicit-path");
+
+                // It contains a file
+                SLANG_CHECK(objs.getCount() == 1);
+
+                for (const auto& obj : objs)
+                {
+                    String path = Path::combine("implicit-path", obj);
+
+                    // All of these should exist
+                    SlangPathType pathType;
+                    SLANG_CHECK(SLANG_SUCCEEDED(fileSystem->getPathType(path.getBuffer(), &pathType)));
+                }
+
+                // Make an explicit path, and see whe have the same results
+                fileSystem->createDirectory("implicit-path");
+
+                objs = _getContents(fileSystem, "implicit-path");
+                SLANG_CHECK(objs.getCount() == 1);
+            }
+        }
+    
+
+        // Load and check its okay
+        {
+            ComPtr<ISlangBlob> archiveBlob;
+            SLANG_CHECK(SLANG_SUCCEEDED(archiveFileSystem->storeArchive(false, archiveBlob.writeRef())));
+
+            RefPtr<ArchiveFileSystem> fileSystem;
+            ZipFileSystem::create(fileSystem);
+
+            SLANG_CHECK(SLANG_SUCCEEDED(fileSystem->loadArchive(archiveBlob->getBufferPointer(), archiveBlob->getBufferSize())));
+        
+            ComPtr<ISlangBlob> blob;
+
+            SLANG_CHECK(SLANG_SUCCEEDED(fileSystem->loadFile("file.txt", blob.writeRef())));
+            SLANG_CHECK(_equals(contents, blob));
+
+            SLANG_CHECK(SLANG_SUCCEEDED(fileSystem->loadFile("file2.txt", blob.writeRef())));
+            SLANG_CHECK(_equals(contents3, blob));
+        }
+       }
 
     // Test out compression systems
     for (Index i = 0; i < 2; ++i)
