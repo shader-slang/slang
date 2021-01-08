@@ -1,10 +1,12 @@
 // render-vk.h
 #pragma once
 
+#include <cstdint>
+
 namespace gfx {
 
 class IRenderer;
 
-IRenderer* createVKRenderer();
+int32_t createVKRenderer(IRenderer** outRenderer);
 
 } // gfx

@@ -122,7 +122,7 @@ gfx::IRenderer* createRenderer(
     // A future version of this example may support multiple
     // platforms/APIs.
     //
-    gRenderer.attach(createD3D11Renderer());
+    createD3D11Renderer(gRenderer.writeRef());
     IRenderer::Desc rendererDesc;
     rendererDesc.width = windowWidth;
     rendererDesc.height = windowHeight;

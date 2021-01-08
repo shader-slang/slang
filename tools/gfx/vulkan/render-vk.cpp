@@ -858,11 +858,11 @@ void VKRenderer::_endRender()
     m_deviceQueue.flush();
 }
 
-IRenderer* createVKRenderer()
+SlangResult createVKRenderer(IRenderer** outRenderer)
 {
-    auto result = new VKRenderer();
-    result->addRef();
-    return result;
+    *outRenderer = new VKRenderer();
+    (*outRenderer)->addRef();
+    return SLANG_OK;
 }
 
 VKRenderer::~VKRenderer()

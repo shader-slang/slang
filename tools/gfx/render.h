@@ -1121,7 +1121,7 @@ inline void IRenderer::setVertexBuffer(UInt slot, BufferResource* buffer, UInt s
 /// Functions that are around Renderer and it's types
 struct RendererUtil
 {
-    typedef IRenderer* (*CreateFunc)();
+    typedef SlangResult (*CreateFunc)(IRenderer** outRenderer);
 
         /// Gets the size in bytes of a Format type. Returns 0 if a size is not defined/invalid
     SLANG_FORCE_INLINE static size_t getFormatSize(Format format) { return s_formatSize[int(format)]; }

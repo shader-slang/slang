@@ -748,11 +748,11 @@ protected:
     bool m_nvapi = false;
 };
 
-IRenderer* createD3D12Renderer()
+SlangResult createD3D12Renderer(IRenderer** outRenderer)
 {
-    auto result = new D3D12Renderer();
-    result->addRef();
-    return result;
+    *outRenderer = new D3D12Renderer();
+    (*outRenderer)->addRef();
+    return SLANG_OK;
 }
 
 /* static */PROC D3D12Renderer::loadProc(HMODULE module, char const* name)

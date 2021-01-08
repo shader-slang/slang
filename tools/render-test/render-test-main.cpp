@@ -1220,7 +1220,7 @@ static SlangResult _innerMain(Slang::StdWriters* stdWriters, SlangSession* sessi
         RendererUtil::CreateFunc createFunc = RendererUtil::getCreateFunc(options.rendererType);
         if (createFunc)
         {
-            renderer.attach(createFunc());
+            createFunc(renderer.writeRef());
         }
 
         if (!renderer)

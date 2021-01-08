@@ -460,11 +460,11 @@ public:
     bool m_nvapi = false;
 };
 
-IRenderer* createD3D11Renderer()
+SlangResult createD3D11Renderer(IRenderer** outRenderer)
 {
-    auto result = new D3D11Renderer();
-    result->addRef();
-    return result;
+    *outRenderer = new D3D11Renderer();
+    (*outRenderer)->addRef();
+    return SLANG_OK;
 }
 
 // !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!ScopeNVAPI !!!!!!!!!!!!!!!!!!!!!!!!!!!!!

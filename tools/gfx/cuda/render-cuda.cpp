@@ -1,11 +1,11 @@
 #include "render-cuda.h"
+#include "slang.h"
 
 #ifdef GFX_ENABLE_CUDA
 #include "../render.h"
 #include <cuda.h>
 #include <cuda_runtime_api.h>
 #include "core/slang-std-writers.h"
-#include "slang.h"
 #endif
 
 namespace gfx
@@ -1521,14 +1521,18 @@ SlangResult CUDARootShaderObject::init(IRenderer* renderer, CUDAShaderObjectLayo
     return SLANG_OK;
 }
 
-IRenderer* createCUDARenderer()
+SlangResult createCUDARenderer(IRenderer** outRenderer)
 {
-    auto result = new CUDARenderer();
-    result->addRef();
-    return result;
+    *outRenderer = new CUDARenderer();
+    (*outRenderer)->addRef();
+    return SLANG_OK;
 }
 #else
-IRenderer* createCUDARenderer() { return nullptr; }
+SlangResult createCUDARenderer(IRenderer** outRenderer)
+{
+    *outRenderer = nullptr;
+    return SLANG_OK;
+}
 #endif
 
 }

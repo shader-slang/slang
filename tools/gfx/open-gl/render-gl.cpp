@@ -438,11 +438,11 @@ public:
     SLANG_COMPILE_TIME_ASSERT(SLANG_COUNT_OF(s_pixelFormatInfos) == int(GlPixelFormat::CountOf));
 }
 
-IRenderer* createGLRenderer()
+SlangResult createGLRenderer(IRenderer** outRenderer)
 {
-    auto result = new GLRenderer();
-    result->addRef();
-    return result;
+    *outRenderer = new GLRenderer();
+    (*outRenderer)->addRef();
+    return SLANG_OK;
 }
 
 void GLRenderer::debugCallback(GLenum source, GLenum type, GLuint id, GLenum severity, GLsizei length, const GLchar* message)
