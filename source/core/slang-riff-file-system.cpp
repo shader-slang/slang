@@ -407,7 +407,8 @@ SlangResult RiffArchiveFileSystem::storeArchive(bool blobOwnsContent, ISlangBlob
 
     {
         RiffFileSystemBinary::Header header;
-        header.compressionSystemType = uint32_t(m_compressionSystem->getSystemType());
+        CompressionSystemType compressionSystemType = m_compressionSystem ? m_compressionSystem->getSystemType() : CompressionSystemType::None;
+        header.compressionSystemType = uint32_t(compressionSystemType);
         container.addDataChunk(RiffFileSystemBinary::kHeaderFourCC, &header, sizeof(header));
     }
 
