@@ -64,6 +64,9 @@ public:
 
     RiffArchiveFileSystem(ICompressionSystem* compressionSystem);
 
+        /// True if this appears to be Riff archive
+    static bool isArchive(const void* data, size_t sizeInBytes);
+
 protected:
 
     struct Entry : RefObject

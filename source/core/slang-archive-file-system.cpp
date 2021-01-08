@@ -131,52 +131,27 @@ SlangResult ImplicitDirectoryCollector::enumerate(FileSystemContentsCallBack cal
 
 SlangResult loadArchiveFileSystem(const void* data, size_t dataSizeInBytes, RefPtr<ArchiveFileSystem>& outFileSystem)
 {
-    if (dataSizeInBytes < sizeof(FourCC))
+    RefPtr<ArchiveFileSystem> fileSystem;
+    if (ZipFileSystem::isArchive(data, dataSizeInBytes))
+    {
+        // It's a zip
+        SLANG_RETURN_ON_FAIL(ZipFileSystem::create(fileSystem));
+    }
+    else if (RiffArchiveFileSystem::isArchive(data, dataSizeInBytes))
+    {
+        // It's riff contained (Slang specific)
+       fileSystem = new RiffArchiveFileSystem(nullptr);
+    }
+    else
     {
         return SLANG_FAIL;
     }
-
-    FourCC fourCC = 0;
-    ::memcpy(&fourCC, data, sizeof(FourCC));
-
-    RefPtr<ArchiveFileSystem> fileSystem;
-
-    // https://en.wikipedia.org/wiki/List_of_file_signatures
-    switch (fourCC)
-    {
-        case SLANG_FOUR_CC(0x50, 0x4B, 0x03, 0x04):
-        case SLANG_FOUR_CC(0x50, 0x4B, 0x05, 0x06):
-        case SLANG_FOUR_CC(0x50, 0x4B, 0x07, 0x08):
-        {
-            // It's a zip
-            SLANG_RETURN_ON_FAIL(ZipFileSystem::create(fileSystem));
-            break;
-        }
-        case RiffFourCC::kRiff:
-        {
-            MemoryStreamBase stream(FileAccess::Read, data, dataSizeInBytes);
-
-            RiffListHeader header;
-            SLANG_RETURN_ON_FAIL(RiffUtil::readHeader(&stream, header));
-
-            if (header.subType != RiffFileSystemBinary::kContainerFourCC)
-            {
-                return SLANG_FAIL;
-            }
-
-            // It's riff contained (Slang specific)
-            fileSystem = new RiffArchiveFileSystem(nullptr);
-            break;
-        }
-        default: return SLANG_FAIL;
-    }
-
     SLANG_RETURN_ON_FAIL(fileSystem->loadArchive(data, dataSizeInBytes));
 
     outFileSystem = fileSystem;
     return SLANG_OK;
 }
-
+    
 SlangResult createArchiveFileSystem(SlangArchiveType type, RefPtr<ArchiveFileSystem>& outFileSystem)
 {
     switch (type)

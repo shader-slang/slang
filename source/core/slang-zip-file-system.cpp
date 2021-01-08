@@ -8,6 +8,7 @@
 #include "slang-blob.h"
 #include "slang-string-slice-pool.h"
 #include "slang-uint-set.h"
+#include "slang-riff.h"
 
 #include "../../external/miniz/miniz.h"
 #include "../../external/miniz/miniz_common.h"
@@ -775,6 +776,30 @@ void ZipFileSystemImpl::setCompressionStyle(const CompressionStyle& style)
 {
     out = new ZipFileSystemImpl;
     return SLANG_OK;
+}
+
+/* static */bool ZipFileSystem::isArchive(const void* data, size_t dataSizeInBytes)
+{
+    if (dataSizeInBytes < sizeof(FourCC))
+    {
+        return false;
+    }
+
+    FourCC fourCC = 0;
+    ::memcpy(&fourCC, data, sizeof(FourCC));
+
+    // https://en.wikipedia.org/wiki/List_of_file_signatures
+    switch (fourCC)
+    {
+        case SLANG_FOUR_CC(0x50, 0x4B, 0x03, 0x04):
+        case SLANG_FOUR_CC(0x50, 0x4B, 0x05, 0x06):
+        case SLANG_FOUR_CC(0x50, 0x4B, 0x07, 0x08):
+        {
+            // It's a zip
+            return true;
+        }
+    }
+    return false;
 }
 
 } // namespace Slang

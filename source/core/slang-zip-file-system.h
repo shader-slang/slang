@@ -12,6 +12,8 @@ struct ZipFileSystem
 {
         /// Create an empty zip
     static SlangResult create(RefPtr<ArchiveFileSystem>& out);
+        /// True if this appears to be a zip archive
+    static bool isArchive(const void* data, size_t size);
 };
 
 }

@@ -457,4 +457,11 @@ SlangResult RiffArchiveFileSystem::storeArchive(bool blobOwnsContent, ISlangBlob
     return SLANG_OK;
 }
 
+/* static */bool RiffArchiveFileSystem::isArchive(const void* data, size_t sizeInBytes)
+{
+    MemoryStreamBase stream(FileAccess::Read, data, sizeInBytes);
+    RiffListHeader header;
+    return SLANG_SUCCEEDED(RiffUtil::readHeader(&stream, header)) && header.subType == RiffFileSystemBinary::kContainerFourCC;
+}
+
 } // namespace Slang

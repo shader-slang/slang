@@ -128,15 +128,21 @@ static void compressionUnitTest()
     
 
         // Load and check its okay
+ 
         {
             ComPtr<ISlangBlob> archiveBlob;
             SLANG_CHECK(SLANG_SUCCEEDED(archiveFileSystem->storeArchive(false, archiveBlob.writeRef())));
 
+
             RefPtr<ArchiveFileSystem> fileSystem;
+#if 0
             SLANG_CHECK(SLANG_SUCCEEDED(createArchiveFileSystem(archiveType, fileSystem)));
 
             SLANG_CHECK(SLANG_SUCCEEDED(fileSystem->loadArchive(archiveBlob->getBufferPointer(), archiveBlob->getBufferSize())));
-        
+#else
+            SLANG_CHECK(SLANG_SUCCEEDED(loadArchiveFileSystem(archiveBlob->getBufferPointer(), archiveBlob->getBufferSize(), fileSystem)));
+#endif
+
             ComPtr<ISlangBlob> blob;
 
             SLANG_CHECK(SLANG_SUCCEEDED(fileSystem->loadFile("file.txt", blob.writeRef())));
@@ -145,7 +151,7 @@ static void compressionUnitTest()
             SLANG_CHECK(SLANG_SUCCEEDED(fileSystem->loadFile("file2.txt", blob.writeRef())));
             SLANG_CHECK(_equals(contents3, blob));
         }
-       }
+    }
 
     // Test out compression systems
     for (Index i = 0; i < 2; ++i)
