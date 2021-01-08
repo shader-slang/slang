@@ -33,7 +33,7 @@ struct RiffFileSystemBinary
     };
 };
 
-class RiffArchiveFileSystem : public ArchiveFileSystem
+class RiffFileSystem : public ArchiveFileSystem
 {
 public:
 
@@ -62,7 +62,7 @@ public:
     virtual SlangResult storeArchive(bool blobOwnsContent, ISlangBlob** outBlob) SLANG_OVERRIDE;
     virtual void setCompressionStyle(const CompressionStyle& style) SLANG_OVERRIDE { m_compressionStyle = style; }
 
-    RiffArchiveFileSystem(ICompressionSystem* compressionSystem);
+    RiffFileSystem(ICompressionSystem* compressionSystem);
 
         /// True if this appears to be Riff archive
     static bool isArchive(const void* data, size_t sizeInBytes);

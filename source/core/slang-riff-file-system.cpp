@@ -22,17 +22,17 @@ static const Guid IID_ISlangFileSystem = SLANG_UUID_ISlangFileSystem;
 static const Guid IID_ISlangFileSystemExt = SLANG_UUID_ISlangFileSystemExt;
 static const Guid IID_ISlangMutableFileSystem = SLANG_UUID_ISlangMutableFileSystem;
 
-RiffArchiveFileSystem::RiffArchiveFileSystem(ICompressionSystem* compressionSystem):
+RiffFileSystem::RiffFileSystem(ICompressionSystem* compressionSystem):
     m_compressionSystem(compressionSystem)
 {
 }
 
-ISlangMutableFileSystem* RiffArchiveFileSystem::getInterface(const Guid& guid)
+ISlangMutableFileSystem* RiffFileSystem::getInterface(const Guid& guid)
 {
     return (guid == IID_ISlangUnknown || guid == IID_ISlangFileSystem || guid == IID_ISlangFileSystemExt || guid == IID_ISlangMutableFileSystem) ? static_cast<ISlangMutableFileSystem*>(this) : nullptr;
 }
 
-SlangResult RiffArchiveFileSystem::_calcCanonicalPath(const char* path, StringBuilder& out)
+SlangResult RiffFileSystem::_calcCanonicalPath(const char* path, StringBuilder& out)
 {
     List<UnownedStringSlice> splitPath;
     Path::split(UnownedStringSlice(path), splitPath);
@@ -60,13 +60,13 @@ SlangResult RiffArchiveFileSystem::_calcCanonicalPath(const char* path, StringBu
     return SLANG_OK;
 }
 
-RiffArchiveFileSystem::Entry* RiffArchiveFileSystem::_getEntryFromCanonicalPath(const String& canonicalPath)
+RiffFileSystem::Entry* RiffFileSystem::_getEntryFromCanonicalPath(const String& canonicalPath)
 {
     RefPtr<Entry>* entryPtr = m_entries.TryGetValue(canonicalPath);
     return  entryPtr ? *entryPtr : nullptr;
 }
 
-RiffArchiveFileSystem::Entry* RiffArchiveFileSystem::_getEntryFromPath(const char* path, String* outPath)
+RiffFileSystem::Entry* RiffFileSystem::_getEntryFromPath(const char* path, String* outPath)
 {
     StringBuilder buffer;
     if (SLANG_FAILED(_calcCanonicalPath(path, buffer)))
@@ -81,7 +81,7 @@ RiffArchiveFileSystem::Entry* RiffArchiveFileSystem::_getEntryFromPath(const cha
     return _getEntryFromCanonicalPath(buffer);
 }
 
-SlangResult RiffArchiveFileSystem::loadFile(char const* path, ISlangBlob** outBlob)
+SlangResult RiffFileSystem::loadFile(char const* path, ISlangBlob** outBlob)
 {
     Entry* entry = _getEntryFromPath(path);
     if (entry == nullptr || entry->m_type != SLANG_PATH_TYPE_FILE)
@@ -113,12 +113,12 @@ SlangResult RiffArchiveFileSystem::loadFile(char const* path, ISlangBlob** outBl
     return SLANG_OK;
 }
 
-SlangResult RiffArchiveFileSystem::getFileUniqueIdentity(const char* path, ISlangBlob** outUniqueIdentity)
+SlangResult RiffFileSystem::getFileUniqueIdentity(const char* path, ISlangBlob** outUniqueIdentity)
 {
     return getCanonicalPath(path, outUniqueIdentity);
 }
 
-SlangResult RiffArchiveFileSystem::calcCombinedPath(SlangPathType fromPathType, const char* fromPath, const char* path, ISlangBlob** pathOut)
+SlangResult RiffFileSystem::calcCombinedPath(SlangPathType fromPathType, const char* fromPath, const char* path, ISlangBlob** pathOut)
 {
     String combinedPath;
     switch (fromPathType)
@@ -139,7 +139,7 @@ SlangResult RiffArchiveFileSystem::calcCombinedPath(SlangPathType fromPathType, 
     return SLANG_OK;
 }
 
-SlangResult RiffArchiveFileSystem::getPathType(const char* path, SlangPathType* outPathType)
+SlangResult RiffFileSystem::getPathType(const char* path, SlangPathType* outPathType)
 {
     String canonicalPath;
     Entry* entry = _getEntryFromPath(path, &canonicalPath);
@@ -168,14 +168,14 @@ SlangResult RiffArchiveFileSystem::getPathType(const char* path, SlangPathType* 
     return SLANG_OK;
 }
 
-SlangResult RiffArchiveFileSystem::getSimplifiedPath(const char* path, ISlangBlob** outSimplifiedPath)
+SlangResult RiffFileSystem::getSimplifiedPath(const char* path, ISlangBlob** outSimplifiedPath)
 {
     String simplifiedPath = Path::simplify(path);
     *outSimplifiedPath = StringUtil::createStringBlob(simplifiedPath).detach();
     return SLANG_OK;
 }
 
-SlangResult RiffArchiveFileSystem::getCanonicalPath(const char* path, ISlangBlob** outCanonicalPath)
+SlangResult RiffFileSystem::getCanonicalPath(const char* path, ISlangBlob** outCanonicalPath)
 {
     StringBuilder buffer;
     SLANG_RETURN_ON_FAIL(_calcCanonicalPath(path, buffer));
@@ -184,7 +184,7 @@ SlangResult RiffArchiveFileSystem::getCanonicalPath(const char* path, ISlangBlob
 }
 
 
-SlangResult RiffArchiveFileSystem::enumeratePathContents(const char* path, FileSystemContentsCallBack callback, void* userData)
+SlangResult RiffFileSystem::enumeratePathContents(const char* path, FileSystemContentsCallBack callback, void* userData)
 {
     String canonicalPath;
     Entry* entry = _getEntryFromPath(path, &canonicalPath);
@@ -206,7 +206,7 @@ SlangResult RiffArchiveFileSystem::enumeratePathContents(const char* path, FileS
     return collector.enumerate(callback, userData);
 }
 
-SlangResult RiffArchiveFileSystem::saveFile(const char* path, const void* data, size_t size)
+SlangResult RiffFileSystem::saveFile(const char* path, const void* data, size_t size)
 {
     StringBuilder canonicalPath;
     SLANG_RETURN_ON_FAIL(_calcCanonicalPath(path, canonicalPath));
@@ -241,7 +241,7 @@ SlangResult RiffArchiveFileSystem::saveFile(const char* path, const void* data, 
     return SLANG_OK;
 }
 
-SlangResult RiffArchiveFileSystem::remove(const char* path)
+SlangResult RiffFileSystem::remove(const char* path)
 {
     String canonicalPath;
     Entry* entry = _getEntryFromPath(path, &canonicalPath);
@@ -275,7 +275,7 @@ SlangResult RiffArchiveFileSystem::remove(const char* path)
     return SLANG_E_NOT_FOUND;
 }
 
-SlangResult RiffArchiveFileSystem::createDirectory(const char* path)
+SlangResult RiffFileSystem::createDirectory(const char* path)
 {
     String canonicalPath;
     Entry* entry = _getEntryFromPath(path, &canonicalPath);
@@ -293,7 +293,7 @@ SlangResult RiffArchiveFileSystem::createDirectory(const char* path)
     return SLANG_OK;
 }
 
-SlangResult RiffArchiveFileSystem::loadArchive(const void* archive, size_t archiveSizeInBytes)
+SlangResult RiffFileSystem::loadArchive(const void* archive, size_t archiveSizeInBytes)
 {
     // Load the riff
     RiffContainer container;
@@ -397,7 +397,7 @@ SlangResult RiffArchiveFileSystem::loadArchive(const void* archive, size_t archi
     return SLANG_OK;
 }
 
-SlangResult RiffArchiveFileSystem::storeArchive(bool blobOwnsContent, ISlangBlob** outBlob)
+SlangResult RiffFileSystem::storeArchive(bool blobOwnsContent, ISlangBlob** outBlob)
 {
     // All blobs are owned in this style
     SLANG_UNUSED(blobOwnsContent)
@@ -457,7 +457,7 @@ SlangResult RiffArchiveFileSystem::storeArchive(bool blobOwnsContent, ISlangBlob
     return SLANG_OK;
 }
 
-/* static */bool RiffArchiveFileSystem::isArchive(const void* data, size_t sizeInBytes)
+/* static */bool RiffFileSystem::isArchive(const void* data, size_t sizeInBytes)
 {
     MemoryStreamBase stream(FileAccess::Read, data, sizeInBytes);
     RiffListHeader header;

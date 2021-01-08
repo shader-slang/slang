@@ -137,10 +137,10 @@ SlangResult loadArchiveFileSystem(const void* data, size_t dataSizeInBytes, RefP
         // It's a zip
         SLANG_RETURN_ON_FAIL(ZipFileSystem::create(fileSystem));
     }
-    else if (RiffArchiveFileSystem::isArchive(data, dataSizeInBytes))
+    else if (RiffFileSystem::isArchive(data, dataSizeInBytes))
     {
         // It's riff contained (Slang specific)
-       fileSystem = new RiffArchiveFileSystem(nullptr);
+       fileSystem = new RiffFileSystem(nullptr);
     }
     else
     {
@@ -162,17 +162,17 @@ SlangResult createArchiveFileSystem(SlangArchiveType type, RefPtr<ArchiveFileSys
         }
         case SLANG_ARCHIVE_TYPE_RIFF:
         {
-            outFileSystem = new RiffArchiveFileSystem(nullptr);
+            outFileSystem = new RiffFileSystem(nullptr);
             return SLANG_OK;
         }
         case SLANG_ARCHIVE_TYPE_RIFF_DEFLATE:
         {
-            outFileSystem = new RiffArchiveFileSystem(DeflateCompressionSystem::getSingleton());
+            outFileSystem = new RiffFileSystem(DeflateCompressionSystem::getSingleton());
             return SLANG_OK;
         }
         case SLANG_ARCHIVE_TYPE_RIFF_LZ4:
         {
-            outFileSystem = new RiffArchiveFileSystem(LZ4CompressionSystem::getSingleton());
+            outFileSystem = new RiffFileSystem(LZ4CompressionSystem::getSingleton());
             return SLANG_OK;
         }
     }
