@@ -127,6 +127,13 @@ SLANG_API SlangProfileID spFindProfile(
     return session->findProfile(name);
 }
 
+SLANG_API SlangCapabilityID spFindCapability(
+    SlangSession*   session,
+    char const*     name)
+{
+    return session->findCapability(name);
+}
+
 /* !!!!!!!!!!!!!!!!!!SlangCompileRequest API!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! */
 
 /*!

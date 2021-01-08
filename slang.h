@@ -642,6 +642,10 @@ extern "C"
     };
 
     typedef SlangInt32 SlangCapabilityID;
+    enum
+    {
+        SLANG_CAPABILITY_UNKNOWN = 0,
+    };
 
     typedef unsigned int SlangMatrixLayoutMode;
     enum
