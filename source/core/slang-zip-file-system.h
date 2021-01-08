@@ -3,7 +3,7 @@
 
 #include "slang-basic.h"
 
-#include "slang-compressed-file-system.h"
+#include "slang-archive-file-system.h"
 
 namespace Slang
 {
@@ -11,7 +11,7 @@ namespace Slang
 struct ZipFileSystem
 {
         /// Create an empty zip
-    static SlangResult create(RefPtr<CompressedFileSystem>& out);
+    static SlangResult create(RefPtr<ArchiveFileSystem>& out);
 };
 
 }

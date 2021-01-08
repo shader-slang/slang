@@ -24,7 +24,7 @@ static const Guid IID_ISlangFileSystem = SLANG_UUID_ISlangFileSystem;
 static const Guid IID_ISlangFileSystemExt = SLANG_UUID_ISlangFileSystemExt;
 static const Guid IID_ISlangMutableFileSystem = SLANG_UUID_ISlangMutableFileSystem;
 
-class ZipFileSystemImpl : public CompressedFileSystem 
+class ZipFileSystemImpl : public ArchiveFileSystem 
 {
 public:
     // ISlangUnknown 
@@ -48,7 +48,7 @@ public:
     virtual SLANG_NO_THROW SlangResult SLANG_MCALL remove(const char* path) SLANG_OVERRIDE;
     virtual SLANG_NO_THROW SlangResult SLANG_MCALL createDirectory(const char* path) SLANG_OVERRIDE;
 
-    // CompressedFileSystem
+    // ArchiveFileSystem
     SlangResult loadArchive(const void* archive, size_t archiveSizeInBytes) SLANG_OVERRIDE;
     virtual SlangResult storeArchive(bool blobOwnsContent, ISlangBlob** outBlob) SLANG_OVERRIDE;
     virtual void setCompressionStyle(const CompressionStyle& style) SLANG_OVERRIDE;
@@ -771,7 +771,7 @@ void ZipFileSystemImpl::setCompressionStyle(const CompressionStyle& style)
     }
 }
 
-/* static */SlangResult ZipFileSystem::create(RefPtr<CompressedFileSystem>& out)
+/* static */SlangResult ZipFileSystem::create(RefPtr<ArchiveFileSystem>& out)
 {
     out = new ZipFileSystemImpl;
     return SLANG_OK;

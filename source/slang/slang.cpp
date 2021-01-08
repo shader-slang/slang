@@ -3,7 +3,7 @@
 #include "../core/slang-io.h"
 #include "../core/slang-string-util.h"
 #include "../core/slang-shared-library.h"
-#include "../core/slang-compressed-file-system.h"
+#include "../core/slang-archive-file-system.h"
 
 #include "slang-check.h"
 #include "slang-parameter-binding.h"
@@ -265,7 +265,7 @@ SlangResult Session::loadStdLib(const void* stdLib, size_t stdLibSizeInBytes)
     }
 
     // Make a file system to read it from
-    RefPtr<CompressedFileSystem> fileSystem;
+    RefPtr<ArchiveFileSystem> fileSystem;
     SLANG_RETURN_ON_FAIL(loadArchiveFileSystem(stdLib, stdLibSizeInBytes, fileSystem));
 
     // Let's try loading serialized modules and adding them
@@ -283,7 +283,7 @@ SlangResult Session::saveStdLib(SlangArchiveType archiveType, ISlangBlob** outBl
     }
 
     // Make a file system to read it from
-    RefPtr<CompressedFileSystem> fileSystem;
+    RefPtr<ArchiveFileSystem> fileSystem;
     SLANG_RETURN_ON_FAIL(createArchiveFileSystem(archiveType, fileSystem));
 
     for (auto& pair : m_builtinLinkage->mapNameToLoadedModules)

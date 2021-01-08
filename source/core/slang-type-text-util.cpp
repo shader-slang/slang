@@ -80,16 +80,15 @@ struct ArchiveTypeInfo
     UnownedStringSlice text;
 };
 
-
 static const ArchiveTypeInfo s_archiveTypeInfos[] =
 {
     { SLANG_ARCHIVE_TYPE_RIFF_DEFLATE, UnownedStringSlice::fromLiteral("riff-deflate")},
     { SLANG_ARCHIVE_TYPE_RIFF_LZ4, UnownedStringSlice::fromLiteral("riff-lz4")},
     { SLANG_ARCHIVE_TYPE_ZIP, UnownedStringSlice::fromLiteral("zip")},
+    { SLANG_ARCHIVE_TYPE_RIFF, UnownedStringSlice::fromLiteral("riff")},
 };
 
 } // anonymous
-
 
 /* static */SlangArchiveType TypeTextUtil::findArchiveType(const UnownedStringSlice& slice)
 {

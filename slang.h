@@ -565,6 +565,7 @@ extern "C"
     {
         SLANG_ARCHIVE_TYPE_UNDEFINED,
         SLANG_ARCHIVE_TYPE_ZIP,
+        SLANG_ARCHIVE_TYPE_RIFF,                ///< Riff container with no compression
         SLANG_ARCHIVE_TYPE_RIFF_DEFLATE,
         SLANG_ARCHIVE_TYPE_RIFF_LZ4,
         SLANG_ARCHIVE_TYPE_COUNT_OF,

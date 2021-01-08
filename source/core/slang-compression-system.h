@@ -21,6 +21,7 @@ struct CompressionStyle
 
 enum class CompressionSystemType
 {
+    None,
     Deflate,
     LZ4,
     CountOf,

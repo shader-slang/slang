@@ -5,7 +5,7 @@
 #include "../core/slang-shared-library.h"
 
 #include "../core/slang-downstream-compiler.h"
-#include "../core/slang-compressed-file-system.h"
+#include "../core/slang-archive-file-system.h"
 
 #include "../../slang-com-ptr.h"
 

@@ -34,8 +34,8 @@ static List<String> _getContents(ISlangFileSystemExt* fileSystem, const char* pa
 
 static void compressionUnitTest()
 {
-    // Create a zip to add stuff to
-    RefPtr<CompressedFileSystem> buildFileSystem;
+    // Test out archive file systems
+    RefPtr<ArchiveFileSystem> buildFileSystem;
     ZipFileSystem::create(buildFileSystem);
 
     const char contents[] = "I'm compressed";
@@ -121,7 +121,7 @@ static void compressionUnitTest()
         ComPtr<ISlangBlob> archiveBlob;
         SLANG_CHECK(SLANG_SUCCEEDED(buildFileSystem->storeArchive(false, archiveBlob.writeRef())));
 
-        RefPtr<CompressedFileSystem> fileSystem;
+        RefPtr<ArchiveFileSystem> fileSystem;
         ZipFileSystem::create(fileSystem);
 
         SLANG_CHECK(SLANG_SUCCEEDED(fileSystem->loadArchive(archiveBlob->getBufferPointer(), archiveBlob->getBufferSize())));
@@ -135,6 +135,7 @@ static void compressionUnitTest()
         SLANG_CHECK(_equals(contents3, blob));
     }
 
+    // Test out compression systems
     for (Index i = 0; i < 2; ++i)
     {
         // Lets try lz4

@@ -171,6 +171,7 @@
   </ItemDefinitionGroup>
   <ItemGroup>
     <ClInclude Include="..\..\..\source\core\slang-allocator.h" />
+    <ClInclude Include="..\..\..\source\core\slang-archive-file-system.h" />
     <ClInclude Include="..\..\..\source\core\slang-array-view.h" />
     <ClInclude Include="..\..\..\source\core\slang-array.h" />
     <ClInclude Include="..\..\..\source\core\slang-basic.h" />
@@ -178,7 +179,6 @@
     <ClInclude Include="..\..\..\source\core\slang-byte-encode-util.h" />
     <ClInclude Include="..\..\..\source\core\slang-char-util.h" />
     <ClInclude Include="..\..\..\source\core\slang-common.h" />
-    <ClInclude Include="..\..\..\source\core\slang-compressed-file-system.h" />
     <ClInclude Include="..\..\..\source\core\slang-compression-system.h" />
     <ClInclude Include="..\..\..\source\core\slang-deflate-compression-system.h" />
     <ClInclude Include="..\..\..\source\core\slang-dictionary.h" />
@@ -201,6 +201,7 @@
     <ClInclude Include="..\..\..\source\core\slang-process-util.h" />
     <ClInclude Include="..\..\..\source\core\slang-random-generator.h" />
     <ClInclude Include="..\..\..\source\core\slang-render-api-util.h" />
+    <ClInclude Include="..\..\..\source\core\slang-riff-file-system.h" />
     <ClInclude Include="..\..\..\source\core\slang-riff.h" />
     <ClInclude Include="..\..\..\source\core\slang-secure-crt.h" />
     <ClInclude Include="..\..\..\source\core\slang-semantic-version.h" />
@@ -224,10 +225,10 @@
     <ClInclude Include="..\..\..\source\core\windows\slang-win-visual-studio-util.h" />
   </ItemGroup>
   <ItemGroup>
+    <ClCompile Include="..\..\..\source\core\slang-archive-file-system.cpp" />
     <ClCompile Include="..\..\..\source\core\slang-blob.cpp" />
     <ClCompile Include="..\..\..\source\core\slang-byte-encode-util.cpp" />
     <ClCompile Include="..\..\..\source\core\slang-char-util.cpp" />
-    <ClCompile Include="..\..\..\source\core\slang-compressed-file-system.cpp" />
     <ClCompile Include="..\..\..\source\core\slang-deflate-compression-system.cpp" />
     <ClCompile Include="..\..\..\source\core\slang-downstream-compiler.cpp" />
     <ClCompile Include="..\..\..\source\core\slang-free-list.cpp" />
@@ -242,6 +243,7 @@
     <ClCompile Include="..\..\..\source\core\slang-platform.cpp" />
     <ClCompile Include="..\..\..\source\core\slang-random-generator.cpp" />
     <ClCompile Include="..\..\..\source\core\slang-render-api-util.cpp" />
+    <ClCompile Include="..\..\..\source\core\slang-riff-file-system.cpp" />
     <ClCompile Include="..\..\..\source\core\slang-riff.cpp" />
     <ClCompile Include="..\..\..\source\core\slang-semantic-version.cpp" />
     <ClCompile Include="..\..\..\source\core\slang-shared-library.cpp" />
