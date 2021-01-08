@@ -1521,7 +1521,12 @@ SlangResult CUDARootShaderObject::init(IRenderer* renderer, CUDAShaderObjectLayo
     return SLANG_OK;
 }
 
-IRenderer* createCUDARenderer() { return new CUDARenderer(); }
+IRenderer* createCUDARenderer()
+{
+    auto result = new CUDARenderer();
+    result->addRef();
+    return result;
+}
 #else
 IRenderer* createCUDARenderer() { return nullptr; }
 #endif

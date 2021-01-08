@@ -860,7 +860,9 @@ void VKRenderer::_endRender()
 
 IRenderer* createVKRenderer()
 {
-    return new VKRenderer;
+    auto result = new VKRenderer();
+    result->addRef();
+    return result;
 }
 
 VKRenderer::~VKRenderer()

@@ -750,7 +750,9 @@ protected:
 
 IRenderer* createD3D12Renderer()
 {
-    return new D3D12Renderer;
+    auto result = new D3D12Renderer();
+    result->addRef();
+    return result;
 }
 
 /* static */PROC D3D12Renderer::loadProc(HMODULE module, char const* name)

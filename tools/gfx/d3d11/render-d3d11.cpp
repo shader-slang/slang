@@ -462,7 +462,9 @@ public:
 
 IRenderer* createD3D11Renderer()
 {
-    return new D3D11Renderer();
+    auto result = new D3D11Renderer();
+    result->addRef();
+    return result;
 }
 
 // !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!ScopeNVAPI !!!!!!!!!!!!!!!!!!!!!!!!!!!!!

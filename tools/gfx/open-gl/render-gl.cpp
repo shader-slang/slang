@@ -440,7 +440,9 @@ public:
 
 IRenderer* createGLRenderer()
 {
-    return new GLRenderer();
+    auto result = new GLRenderer();
+    result->addRef();
+    return result;
 }
 
 void GLRenderer::debugCallback(GLenum source, GLenum type, GLuint id, GLenum severity, GLsizei length, const GLchar* message)
