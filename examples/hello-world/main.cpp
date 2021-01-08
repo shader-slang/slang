@@ -34,7 +34,7 @@
 //
 #include "gfx/render.h"
 #include "gfx/d3d11/render-d3d11.h"
-#include "gfx/window.h"
+#include "tools/graphics-app-framework/window.h"
 using namespace gfx;
 
 // For the purposes of a small example, we will define the vertex data for a

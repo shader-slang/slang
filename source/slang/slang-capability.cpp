@@ -97,11 +97,7 @@ struct CapabilityAtomInfo
     CapabilityAtom              bases[kCapabilityAtom_MaxBases];
 };
 //
-// The array is going to be sized to include an entry for `CapabilityAtom::Invalid`
-// which as a value of -1, so we need to size the array one larger than the `Count`
-// value.
-//
-static const CapabilityAtomInfo kCapabilityAtoms[Int(CapabilityAtom::Count) + 1] =
+static const CapabilityAtomInfo kCapabilityAtoms[Int(CapabilityAtom::Count)] =
 {
     { "invalid", CapabilityAtomFlavor::Concrete, CapabilityAtomConflictMask::None, 0, { CapabilityAtom::Invalid, CapabilityAtom::Invalid, CapabilityAtom::Invalid, CapabilityAtom::Invalid } },
 
@@ -114,7 +110,7 @@ static const CapabilityAtomInfo kCapabilityAtoms[Int(CapabilityAtom::Count) + 1]
 static CapabilityAtomInfo const& _getInfo(CapabilityAtom atom)
 {
     SLANG_ASSERT(Int(atom) < Int(CapabilityAtom::Count));
-    return kCapabilityAtoms[Int(atom) + 1];
+    return kCapabilityAtoms[Int(atom)];
 }
 
 CapabilityAtom findCapabilityAtom(UnownedStringSlice const& name)
@@ -124,11 +120,6 @@ CapabilityAtom findCapabilityAtom(UnownedStringSlice const& name)
     //
     for( Index i = 0; i < Index(CapabilityAtom::Count); ++i )
     {
-        // Note: using `_getInfo` here instead of accessing
-        // the `kCapabilityAtoms` array directly lets us
-        // avoid dealing with the offset-by-one indexing
-        // choice.
-        //
         auto& capInfo = _getInfo(CapabilityAtom(i));
         if(name == UnownedTerminatedStringSlice(capInfo.name))
             return CapabilityAtom(i);

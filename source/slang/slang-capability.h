@@ -32,7 +32,7 @@ enum class CapabilityAtom : int32_t
     // function needs the invalid capability, it would be reasonable
     // to report that situation as an error.
     //
-    Invalid = -1,
+    Invalid = 0,
 
 #define SLANG_CAPABILITY_ATOM(ENUMERATOR, NAME, FLAVOR, CONFLICT, RANK, BASE0, BASE1, BASE2, BASE3) \
     ENUMERATOR,

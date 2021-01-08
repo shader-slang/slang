@@ -16,12 +16,12 @@
 // We will again make use of a simple graphics API abstraction
 // layer, just to keep the examples short and to the point.
 //
-#include "gfx/model.h"
+#include "graphics-app-framework/model.h"
 #include "gfx/render.h"
 #include "gfx/d3d11/render-d3d11.h"
-#include "gfx/vector-math.h"
-#include "gfx/window.h"
-#include "gfx/gui.h"
+#include "graphics-app-framework/vector-math.h"
+#include "graphics-app-framework/window.h"
+#include "graphics-app-framework/gui.h"
 using namespace gfx;
 
 // We will use a few utilities from the C++ standard library,
