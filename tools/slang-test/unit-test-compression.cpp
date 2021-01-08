@@ -133,7 +133,7 @@ static void compressionUnitTest()
             SLANG_CHECK(SLANG_SUCCEEDED(archiveFileSystem->storeArchive(false, archiveBlob.writeRef())));
 
             RefPtr<ArchiveFileSystem> fileSystem;
-            ZipFileSystem::create(fileSystem);
+            SLANG_CHECK(SLANG_SUCCEEDED(createArchiveFileSystem(archiveType, fileSystem)));
 
             SLANG_CHECK(SLANG_SUCCEEDED(fileSystem->loadArchive(archiveBlob->getBufferPointer(), archiveBlob->getBufferSize())));
         
