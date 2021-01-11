@@ -35,6 +35,8 @@
 #include "gfx/render.h"
 #include "gfx/d3d11/render-d3d11.h"
 #include "tools/graphics-app-framework/window.h"
+#include "slang-com-ptr.h"
+
 using namespace gfx;
 
 // For the purposes of a small example, we will define the vertex data for a
@@ -70,7 +72,7 @@ struct HelloWorld
 // Slang API. This function is representative of code that a user
 // might write to integrate Slang into their renderer/engine.
 //
-RefPtr<gfx::ShaderProgram> loadShaderProgram(gfx::Renderer* renderer)
+RefPtr<gfx::ShaderProgram> loadShaderProgram(gfx::IRenderer* renderer)
 {
     // First, we need to create a "session" for interacting with the Slang
     // compiler. This scopes all of our application's interactions
@@ -227,7 +229,7 @@ int gWindowHeight = 768;
 //
 gfx::ApplicationContext*    gAppContext;
 gfx::Window*                gWindow;
-RefPtr<gfx::Renderer>       gRenderer;
+Slang::ComPtr<gfx::IRenderer>       gRenderer;
 RefPtr<gfx::BufferResource> gConstantBuffer;
 
 RefPtr<gfx::PipelineLayout> gPipelineLayout;
@@ -257,8 +259,8 @@ Result initialize()
     // A future version of this example may support multiple
     // platforms/APIs.
     //
-    gRenderer = createD3D11Renderer();
-    Renderer::Desc rendererDesc;
+    createD3D11Renderer(gRenderer.writeRef());
+    IRenderer::Desc rendererDesc;
     rendererDesc.width = gWindowWidth;
     rendererDesc.height = gWindowHeight;
     {

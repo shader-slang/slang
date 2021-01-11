@@ -88,7 +88,7 @@ void diagnoseIfNeeded(slang::IBlob* diagnosticsBlob)
 // The main interesting part of the host application code is where we
 // load, compile, inspect, and compose the Slang shader code.
 //
-Result loadShaderProgram(gfx::Renderer* renderer, RefPtr<gfx::ShaderProgram>& outShaderProgram)
+Result loadShaderProgram(gfx::IRenderer* renderer, RefPtr<gfx::ShaderProgram>& outShaderProgram)
 {
     // The first step in interacting with the Slang API is to create a "global session,"
     // which represents an instance of the Slang API loaded from the library.
@@ -366,7 +366,7 @@ int gWindowHeight = 768;
 
 gfx::ApplicationContext*    gAppContext;
 gfx::Window*                gWindow;
-RefPtr<gfx::Renderer>       gRenderer;
+Slang::ComPtr<gfx::IRenderer> gRenderer;
 RefPtr<gfx::BufferResource> gConstantBuffer;
 
 RefPtr<gfx::PipelineLayout> gPipelineLayout;
@@ -385,8 +385,8 @@ Result initialize()
     windowDesc.userData = this;
     gWindow = createWindow(windowDesc);
 
-    gRenderer = createD3D11Renderer();
-    Renderer::Desc rendererDesc;
+    createD3D11Renderer(gRenderer.writeRef());
+    IRenderer::Desc rendererDesc;
     rendererDesc.width = gWindowWidth;
     rendererDesc.height = gWindowHeight;
     {

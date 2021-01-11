@@ -98,7 +98,7 @@ namespace gfx
 {
 
 RefPtr<TextureResource> loadTextureImage(
-    Renderer*   renderer,
+    IRenderer*   renderer,
     char const* path)
 {
     int extentX = 0;

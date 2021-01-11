@@ -3,7 +3,7 @@
 
 #include "tools/gfx/render.h"
 #include "vector-math.h"
-
+#include "slang-com-ptr.h"
 #include <vector>
 #include <string>
 
@@ -65,10 +65,10 @@ struct ModelLoader
         FlipWinding = 1 << 0,
     };
 
-    ICallbacks*         callbacks = nullptr;
-    RefPtr<Renderer>    renderer;
-    LoadFlags           loadFlags = 0;
-    float               scale = 1.0f;
+    ICallbacks*              callbacks = nullptr;
+    Slang::ComPtr<IRenderer> renderer;
+    LoadFlags                loadFlags = 0;
+    float                    scale = 1.0f;
 
     Result load(char const* inputPath, void** outModel);
 };
