@@ -14,7 +14,7 @@ using namespace gfx;
 
 #include "gpu-printing.h"
 
-ComPtr<slang::ISession> createSlangSession(gfx::Renderer* renderer)
+ComPtr<slang::ISession> createSlangSession(gfx::IRenderer* renderer)
 {
     ComPtr<slang::IGlobalSession> slangGlobalSession;
     slangGlobalSession.attach(spCreateSession(NULL));
@@ -65,7 +65,7 @@ int gWindowHeight = 480;
 
 gfx::ApplicationContext*    gAppContext;
 gfx::Window*                gWindow;
-RefPtr<gfx::Renderer>       gRenderer;
+ComPtr<gfx::IRenderer>      gRenderer;
 
 ComPtr<slang::ISession> gSlangSession;
 ComPtr<slang::IModule>   gSlangModule;
@@ -118,8 +118,8 @@ Result execute()
     windowDesc.height = gWindowHeight;
     gWindow = createWindow(windowDesc);
 
-    gRenderer = createD3D11Renderer();
-    Renderer::Desc rendererDesc;
+    createD3D11Renderer(gRenderer.writeRef());
+    IRenderer::Desc rendererDesc;
     rendererDesc.width = gWindowWidth;
     rendererDesc.height = gWindowHeight;
     {

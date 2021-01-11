@@ -42,50 +42,95 @@ public:
     };
 
     // Renderer    implementation
-    virtual SlangResult initialize(const Desc& desc, void* inWindowHandle) override;
-    virtual const List<String>& getFeatures() override { return m_features; }
-    virtual void setClearColor(const float color[4]) override;
-    virtual void clearFrame() override;
-    virtual void presentFrame() override;
-    TextureResource::Desc getSwapChainTextureDesc() override;
+    virtual SLANG_NO_THROW SlangResult SLANG_MCALL initialize(const Desc& desc, void* inWindowHandle) override;
+    virtual SLANG_NO_THROW const List<String>& SLANG_MCALL getFeatures() override
+    {
+        return m_features;
+    }
+    virtual SLANG_NO_THROW void SLANG_MCALL setClearColor(const float color[4]) override;
+    virtual SLANG_NO_THROW void SLANG_MCALL clearFrame() override;
+    virtual SLANG_NO_THROW void SLANG_MCALL presentFrame() override;
+    virtual SLANG_NO_THROW TextureResource::Desc SLANG_MCALL getSwapChainTextureDesc() override;
 
-    Result createTextureResource(Resource::Usage initialUsage, const TextureResource::Desc& desc, const TextureResource::Data* initData, TextureResource** outResource) override;
-    Result createBufferResource(Resource::Usage initialUsage, const BufferResource::Desc& desc, const void* initData, BufferResource** outResource) override;
-    Result createSamplerState(SamplerState::Desc const& desc, SamplerState** outSampler) override;
+    virtual SLANG_NO_THROW Result SLANG_MCALL createTextureResource(
+        Resource::Usage initialUsage,
+        const TextureResource::Desc& desc,
+        const TextureResource::Data* initData,
+        TextureResource** outResource) override;
+    virtual SLANG_NO_THROW Result SLANG_MCALL createBufferResource(
+        Resource::Usage initialUsage,
+        const BufferResource::Desc& desc,
+        const void* initData,
+        BufferResource** outResource) override;
+    virtual SLANG_NO_THROW Result SLANG_MCALL
+        createSamplerState(SamplerState::Desc const& desc, SamplerState** outSampler) override;
 
-    Result createTextureView(TextureResource* texture, ResourceView::Desc const& desc, ResourceView** outView) override;
-    Result createBufferView(BufferResource* buffer, ResourceView::Desc const& desc, ResourceView** outView) override;
+    virtual SLANG_NO_THROW Result SLANG_MCALL createTextureView(
+        TextureResource* texture, ResourceView::Desc const& desc, ResourceView** outView) override;
+    virtual SLANG_NO_THROW Result SLANG_MCALL createBufferView(
+        BufferResource* buffer, ResourceView::Desc const& desc, ResourceView** outView) override;
 
-    Result createInputLayout(const InputElementDesc* inputElements, UInt inputElementCount, InputLayout** outLayout) override;
+    virtual SLANG_NO_THROW Result SLANG_MCALL createInputLayout(
+        const InputElementDesc* inputElements,
+        UInt inputElementCount,
+        InputLayout** outLayout) override;
 
-    Result createDescriptorSetLayout(const DescriptorSetLayout::Desc& desc, DescriptorSetLayout** outLayout) override;
-    Result createPipelineLayout(const PipelineLayout::Desc& desc, PipelineLayout** outLayout) override;
-    Result createDescriptorSet(DescriptorSetLayout* layout, DescriptorSet** outDescriptorSet) override;
+    virtual SLANG_NO_THROW Result SLANG_MCALL createDescriptorSetLayout(
+        const DescriptorSetLayout::Desc& desc,
+        DescriptorSetLayout** outLayout) override;
+    virtual SLANG_NO_THROW Result SLANG_MCALL
+        createPipelineLayout(const PipelineLayout::Desc& desc, PipelineLayout** outLayout) override;
+    virtual SLANG_NO_THROW Result SLANG_MCALL
+        createDescriptorSet(DescriptorSetLayout* layout, DescriptorSet** outDescriptorSet) override;
 
-    Result createProgram(const ShaderProgram::Desc& desc, ShaderProgram** outProgram) override;
-    Result createGraphicsPipelineState(const GraphicsPipelineStateDesc& desc, PipelineState** outState) override;
-    Result createComputePipelineState(const ComputePipelineStateDesc& desc, PipelineState** outState) override;
+    virtual SLANG_NO_THROW Result SLANG_MCALL
+        createProgram(const ShaderProgram::Desc& desc, ShaderProgram** outProgram) override;
+    virtual SLANG_NO_THROW Result SLANG_MCALL createGraphicsPipelineState(
+        const GraphicsPipelineStateDesc& desc,
+        PipelineState** outState) override;
+    virtual SLANG_NO_THROW Result SLANG_MCALL createComputePipelineState(
+        const ComputePipelineStateDesc& desc,
+        PipelineState** outState) override;
 
-    virtual SlangResult captureScreenSurface(Surface& surface) override;
+    virtual SLANG_NO_THROW SlangResult SLANG_MCALL captureScreenSurface(Surface& surface) override;
 
-    virtual void* map(BufferResource* buffer, MapFlavor flavor) override;
-    virtual void unmap(BufferResource* buffer) override;
-    virtual void setPrimitiveTopology(PrimitiveTopology topology) override;
+    virtual SLANG_NO_THROW void* SLANG_MCALL map(BufferResource* buffer, MapFlavor flavor) override;
+    virtual SLANG_NO_THROW void SLANG_MCALL unmap(BufferResource* buffer) override;
+    virtual SLANG_NO_THROW void SLANG_MCALL
+        setPrimitiveTopology(PrimitiveTopology topology) override;
 
-    virtual void setDescriptorSet(PipelineType pipelineType, PipelineLayout* layout, UInt index, DescriptorSet* descriptorSet) override;
+    virtual SLANG_NO_THROW void SLANG_MCALL setDescriptorSet(
+        PipelineType pipelineType,
+        PipelineLayout* layout,
+        UInt index,
+        DescriptorSet* descriptorSet) override;
 
-    virtual void setVertexBuffers(UInt startSlot, UInt slotCount, BufferResource*const* buffers, const UInt* strides, const UInt* offsets) override;
-    virtual void setIndexBuffer(BufferResource* buffer, Format indexFormat, UInt offset) override;
-    virtual void setDepthStencilTarget(ResourceView* depthStencilView) override;
-    void setViewports(UInt count, Viewport const* viewports) override;
-    void setScissorRects(UInt count, ScissorRect const* rects) override;
-    virtual void setPipelineState(PipelineType pipelineType, PipelineState* state) override;
-    virtual void draw(UInt vertexCount, UInt startVertex) override;
-    virtual void drawIndexed(UInt indexCount, UInt startIndex, UInt baseVertex) override;
-    virtual void dispatchCompute(int x, int y, int z) override;
-    virtual void submitGpuWork() override;
-    virtual void waitForGpu() override;
-    virtual RendererType getRendererType() const override { return RendererType::Vulkan; }
+    virtual SLANG_NO_THROW void SLANG_MCALL setVertexBuffers(
+        UInt startSlot,
+        UInt slotCount,
+        BufferResource* const* buffers,
+        const UInt* strides,
+        const UInt* offsets) override;
+    virtual SLANG_NO_THROW void SLANG_MCALL
+        setIndexBuffer(BufferResource* buffer, Format indexFormat, UInt offset) override;
+    virtual SLANG_NO_THROW void SLANG_MCALL
+        setDepthStencilTarget(ResourceView* depthStencilView) override;
+    virtual SLANG_NO_THROW void SLANG_MCALL
+        setViewports(UInt count, Viewport const* viewports) override;
+    virtual SLANG_NO_THROW void SLANG_MCALL
+        setScissorRects(UInt count, ScissorRect const* rects) override;
+    virtual SLANG_NO_THROW void SLANG_MCALL
+        setPipelineState(PipelineType pipelineType, PipelineState* state) override;
+    virtual SLANG_NO_THROW void SLANG_MCALL draw(UInt vertexCount, UInt startVertex) override;
+    virtual SLANG_NO_THROW void SLANG_MCALL
+        drawIndexed(UInt indexCount, UInt startIndex, UInt baseVertex) override;
+    virtual SLANG_NO_THROW void SLANG_MCALL dispatchCompute(int x, int y, int z) override;
+    virtual SLANG_NO_THROW void SLANG_MCALL submitGpuWork() override;
+    virtual SLANG_NO_THROW void SLANG_MCALL waitForGpu() override;
+    virtual SLANG_NO_THROW RendererType SLANG_MCALL getRendererType() const override
+    {
+        return RendererType::Vulkan;
+    }
 
         /// Dtor
     ~VKRenderer();
@@ -813,9 +858,11 @@ void VKRenderer::_endRender()
     m_deviceQueue.flush();
 }
 
-Renderer* createVKRenderer()
+SlangResult createVKRenderer(IRenderer** outRenderer)
 {
-    return new VKRenderer;
+    *outRenderer = new VKRenderer();
+    (*outRenderer)->addRef();
+    return SLANG_OK;
 }
 
 VKRenderer::~VKRenderer()

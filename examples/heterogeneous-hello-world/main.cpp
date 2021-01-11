@@ -32,6 +32,7 @@
 // with Slang may depend on an application/engine making certain
 // design choices in their abstraction layer.
 //
+#include "slang-com-ptr.h"
 #include "gfx/render.h"
 #include "gfx/d3d11/render-d3d11.h"
 #include "tools/graphics-app-framework/window.h"
@@ -42,7 +43,7 @@ using namespace gfx;
 //
 RefPtr<gfx::ShaderProgram>         gShaderProgram;
 RefPtr<gfx::ApplicationContext>    gAppContext;
-RefPtr<gfx::Renderer>              gRenderer;
+Slang::ComPtr<gfx::IRenderer>      gRenderer;
 
 RefPtr<gfx::BufferResource>        gStructuredBuffer;
 
@@ -66,7 +67,7 @@ bool executeComputation_0();
 extern unsigned char __computeMain[];
 extern size_t __computeMainSize;
 
-gfx::ShaderProgram* loadShaderProgram(gfx::Renderer* renderer, unsigned char computeCode[], size_t computeCodeSize)
+gfx::ShaderProgram* loadShaderProgram(gfx::IRenderer* renderer, unsigned char computeCode[], size_t computeCodeSize)
 {
     // We extract the begin/end pointers to the output code buffers directly
     //
@@ -109,7 +110,7 @@ gfx::Window* createWindow(int windowWidth, int windowHeight)
     //return globalWindow;
 }
 
-gfx::Renderer* createRenderer(
+gfx::IRenderer* createRenderer(
     int windowWidth,
     int windowHeight,
     gfx::Window* window)
@@ -121,8 +122,8 @@ gfx::Renderer* createRenderer(
     // A future version of this example may support multiple
     // platforms/APIs.
     //
-    gRenderer = createD3D11Renderer();
-    Renderer::Desc rendererDesc;
+    createD3D11Renderer(gRenderer.writeRef());
+    IRenderer::Desc rendererDesc;
     rendererDesc.width = windowWidth;
     rendererDesc.height = windowHeight;
     {
@@ -132,7 +133,7 @@ gfx::Renderer* createRenderer(
     return gRenderer;
 }
 
-gfx::BufferResource* createStructuredBuffer(gfx::Renderer* renderer, float* initialArray)
+gfx::BufferResource* createStructuredBuffer(gfx::IRenderer* renderer, float* initialArray)
 {
     // Create a structured buffer for storing the data for computation
     //
@@ -151,7 +152,7 @@ gfx::BufferResource* createStructuredBuffer(gfx::Renderer* renderer, float* init
     return gStructuredBuffer;
 }
 
-gfx::DescriptorSetLayout* buildDescriptorSetLayout(gfx::Renderer* renderer)
+gfx::DescriptorSetLayout* buildDescriptorSetLayout(gfx::IRenderer* renderer)
 {
     // Our example graphics API usess a "modern" D3D12/Vulkan style
     // of resource binding, so now we will dive into describing and
@@ -170,7 +171,7 @@ gfx::DescriptorSetLayout* buildDescriptorSetLayout(gfx::Renderer* renderer)
     return gDescriptorSetLayout;
 }
 
-gfx::PipelineLayout* buildPipeline(gfx::Renderer* renderer, gfx::DescriptorSetLayout* descriptorSetLayout)
+gfx::PipelineLayout* buildPipeline(gfx::IRenderer* renderer, gfx::DescriptorSetLayout* descriptorSetLayout)
 {
     // Next we will allocate a pipeline layout, which specifies
     // that we will render with only a single descriptor set bound.
@@ -190,7 +191,7 @@ gfx::PipelineLayout* buildPipeline(gfx::Renderer* renderer, gfx::DescriptorSetLa
 }
 
 gfx::DescriptorSet* buildDescriptorSet(
-    gfx::Renderer* renderer,
+    gfx::IRenderer* renderer,
     gfx::DescriptorSetLayout* descriptorSetLayout,
     gfx::BufferResource* structuredBuffer)
 {
@@ -213,7 +214,7 @@ gfx::DescriptorSet* buildDescriptorSet(
 
 gfx::PipelineState* buildPipelineState(
     gfx::ShaderProgram* shaderProgram,
-    gfx::Renderer* renderer,
+    gfx::IRenderer* renderer,
     gfx::PipelineLayout* pipelineLayout)
 {
     // Following the D3D12/Vulkan style of API, we need a pipeline state object
@@ -238,7 +239,7 @@ void printInitialValues(float* initialArray, int length)
 }
 
 void dispatchComputation(
-    gfx::Renderer* gRenderer,
+    gfx::IRenderer* gRenderer,
     gfx::PipelineState* gPipelineState,
     gfx::PipelineLayout* gPipelineLayout,
     gfx::DescriptorSet* gDescriptorSet,
@@ -254,7 +255,7 @@ void dispatchComputation(
 }
 
 void print_output(
-    gfx::Renderer* renderer,
+    gfx::IRenderer* renderer,
     gfx::BufferResource* structuredBuffer,
     int length)
 {
@@ -285,28 +286,28 @@ gfx_Renderer_0* createRenderer_0(int32_t _0, int32_t _1, gfx_Window_0* _2)
 
 gfx_BufferResource_0* createStructuredBuffer_0(gfx_Renderer_0* _0, FixedArray<float, 4> _1)
 {
-    return (gfx_BufferResource_0*)createStructuredBuffer((gfx::Renderer*)_0, (float*)&_1);
+    return (gfx_BufferResource_0*)createStructuredBuffer((gfx::IRenderer*)_0, (float*)&_1);
 }
 
 gfx_ShaderProgram_0* loadShaderProgram_0(gfx_Renderer_0* _0, unsigned char _1[], size_t _2)
 {
-    return (gfx_ShaderProgram_0*)loadShaderProgram((gfx::Renderer*)_0, _1, _2);
+    return (gfx_ShaderProgram_0*)loadShaderProgram((gfx::IRenderer*)_0, _1, _2);
 }
 
 gfx_DescriptorSetLayout_0* buildDescriptorSetLayout_0(gfx_Renderer_0* _0)
 {
-    return (gfx_DescriptorSetLayout_0*)buildDescriptorSetLayout((gfx::Renderer*)_0);
+    return (gfx_DescriptorSetLayout_0*)buildDescriptorSetLayout((gfx::IRenderer*)_0);
 }
 
 gfx_PipelineLayout_0* buildPipeline_0(gfx_Renderer_0* _0, gfx_DescriptorSetLayout_0* _1)
 {
-    return (gfx_PipelineLayout_0*)buildPipeline((gfx::Renderer*)_0, (gfx::DescriptorSetLayout*)_1);
+    return (gfx_PipelineLayout_0*)buildPipeline((gfx::IRenderer*)_0, (gfx::DescriptorSetLayout*)_1);
 }
 
 gfx_DescriptorSet_0* buildDescriptorSet_0(gfx_Renderer_0* _0, gfx_DescriptorSetLayout_0* _1, gfx_BufferResource_0* _2)
 {
     return (gfx_DescriptorSet_0*)buildDescriptorSet(
-        (gfx::Renderer*)_0,
+        (gfx::IRenderer*)_0,
         (gfx::DescriptorSetLayout*)_1,
         (gfx::BufferResource*)_2);
 }
@@ -314,8 +315,7 @@ gfx_DescriptorSet_0* buildDescriptorSet_0(gfx_Renderer_0* _0, gfx_DescriptorSetL
 gfx_PipelineState_0* buildPipelineState_0(gfx_ShaderProgram_0* _0, gfx_Renderer_0* _1, gfx_PipelineLayout_0* _2)
 {
     return (gfx_PipelineState_0*)buildPipelineState(
-        (gfx::ShaderProgram*)_0,
-        (gfx::Renderer*)_1,
+        (gfx::ShaderProgram*)_0, (gfx::IRenderer*)_1,
         (gfx::PipelineLayout*)_2);
 }
 
@@ -327,7 +327,7 @@ void printInitialValues_0(FixedArray<float, 4> _0, int32_t _1)
 void dispatchComputation_0(gfx_Renderer_0* _0, gfx_PipelineState_0* _1, gfx_PipelineLayout_0* _2, gfx_DescriptorSet_0* _3, unsigned int gridDimsX, unsigned int gridDimsY, unsigned int gridDimsZ)
 {
     dispatchComputation(
-        (gfx::Renderer*)_0,
+        (gfx::IRenderer*)_0,
         (gfx::PipelineState*)_1,
         (gfx::PipelineLayout*)_2,
         (gfx::DescriptorSet*)_3,
@@ -348,7 +348,7 @@ gfx_BufferResource_0* unconvertBuffer_0(RWStructuredBuffer<float> _0) {
 
 void print_output_0(gfx_Renderer_0* _0, gfx_BufferResource_0* _1, int32_t _2)
 {
-    print_output((gfx::Renderer*)_0, (gfx::BufferResource*)_1, _2);
+    print_output((gfx::IRenderer*)_0, (gfx::BufferResource*)_1, _2);
 }
 
 // This "inner" main function is used by the platform abstraction

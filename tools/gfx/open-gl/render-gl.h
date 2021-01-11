@@ -1,10 +1,12 @@
 // render-d3d11.h
 #pragma once
 
+#include <cstdint>
+
 namespace gfx {
 
-class Renderer;
+class IRenderer;
 
-Renderer* createGLRenderer();
+int32_t createGLRenderer(IRenderer** outRenderer);
 
 } // gfx

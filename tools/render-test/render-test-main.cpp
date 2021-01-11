@@ -90,7 +90,7 @@ public:
     // code, and then create the API objects we need for rendering.
     virtual Result initialize(
         SlangSession* session,
-        Renderer* renderer,
+        IRenderer* renderer,
         const Options& options,
         const ShaderCompilerUtil::Input& input) = 0;
     void runCompute();
@@ -107,7 +107,7 @@ protected:
     /// Called in initialize
     Result _initializeShaders(
         SlangSession* session,
-        Renderer* renderer,
+        IRenderer* renderer,
         Options::ShaderProgramType shaderType,
         const ShaderCompilerUtil::Input& input);
 
@@ -116,7 +116,7 @@ protected:
     // variables for state to be used for rendering...
     uintptr_t m_constantBufferSize;
 
-    RefPtr<Renderer> m_renderer;
+    ComPtr<IRenderer> m_renderer;
 
     RefPtr<InputLayout> m_inputLayout;
     RefPtr<BufferResource> m_vertexBuffer;
@@ -137,7 +137,7 @@ public:
     virtual void setProjectionMatrix() SLANG_OVERRIDE;
     virtual Result initialize(
         SlangSession* session,
-        Renderer* renderer,
+        IRenderer* renderer,
         const Options& options,
         const ShaderCompilerUtil::Input& input) SLANG_OVERRIDE;
 
@@ -159,7 +159,7 @@ public:
     virtual void setProjectionMatrix() SLANG_OVERRIDE;
     virtual Result initialize(
         SlangSession* session,
-        Renderer* renderer,
+        IRenderer* renderer,
         const Options& options,
         const ShaderCompilerUtil::Input& input) SLANG_OVERRIDE;
     virtual Result writeBindingOutput(BindRoot* bindRoot, const char* fileName) override;
@@ -170,7 +170,7 @@ protected:
 };
 
 SlangResult _assignVarsFromLayout(
-    Renderer*                   renderer,
+    IRenderer*                   renderer,
     ShaderObject*               shaderObject,
     ShaderInputLayout const&    layout,
     ShaderOutputPlan&           ioOutputPlan,
@@ -421,7 +421,7 @@ SlangResult _assignVarsFromLayout(
 
 void LegacyRenderTestApp::applyBinding(PipelineType pipelineType)
 {
-    m_bindingState->apply(m_renderer.Ptr(), pipelineType);
+    m_bindingState->apply(m_renderer.get(), pipelineType);
 }
 
 void ShaderObjectRenderTestApp::applyBinding(PipelineType pipelineType)
@@ -431,7 +431,7 @@ void ShaderObjectRenderTestApp::applyBinding(PipelineType pipelineType)
 
 SlangResult LegacyRenderTestApp::initialize(
     SlangSession* session,
-    Renderer* renderer,
+    IRenderer* renderer,
     const Options& options,
     const ShaderCompilerUtil::Input& input)
 {
@@ -536,7 +536,7 @@ SlangResult LegacyRenderTestApp::initialize(
 
 SlangResult ShaderObjectRenderTestApp::initialize(
     SlangSession* session,
-    Renderer* renderer,
+    IRenderer* renderer,
     const Options& options,
     const ShaderCompilerUtil::Input& input)
 {
@@ -631,7 +631,11 @@ SlangResult ShaderObjectRenderTestApp::initialize(
     return m_pipelineState ? SLANG_OK : SLANG_FAIL;
 }
 
-Result RenderTestApp::_initializeShaders(SlangSession* session, Renderer* renderer, Options::ShaderProgramType shaderType, const ShaderCompilerUtil::Input& input)
+Result RenderTestApp::_initializeShaders(
+    SlangSession* session,
+    IRenderer* renderer,
+    Options::ShaderProgramType shaderType,
+    const ShaderCompilerUtil::Input& input)
 {
     SLANG_RETURN_ON_FAIL(ShaderCompilerUtil::compileWithLayout(session, m_options, input,  m_compilationOutput));
     m_shaderInputLayout = m_compilationOutput.layout;
@@ -1211,12 +1215,12 @@ static SlangResult _innerMain(Slang::StdWriters* stdWriters, SlangSession* sessi
 #endif
     }
 
-    Slang::RefPtr<Renderer> renderer;
+    Slang::ComPtr<IRenderer> renderer;
     {
         RendererUtil::CreateFunc createFunc = RendererUtil::getCreateFunc(options.rendererType);
         if (createFunc)
         {
-            renderer = createFunc();
+            createFunc(renderer.writeRef());
         }
 
         if (!renderer)
@@ -1228,7 +1232,7 @@ static SlangResult _innerMain(Slang::StdWriters* stdWriters, SlangSession* sessi
             return SLANG_FAIL;
         }
 
-        Renderer::Desc desc;
+        IRenderer::Desc desc;
         desc.width = gWindowWidth;
         desc.height = gWindowHeight;
         desc.adapter = options.adapter;

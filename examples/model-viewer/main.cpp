@@ -12,7 +12,7 @@
 // We still need to include the Slang header to use the Slang API
 //
 #include <slang.h>
-
+#include "slang-com-helper.h"
 // We will again make use of a simple graphics API abstraction
 // layer, just to keep the examples short and to the point.
 //
@@ -67,7 +67,7 @@ struct ShaderModule : RefObject
 
     // Reference to the renderer, used to service requests
     // that load graphics API objects based on the module.
-    RefPtr<gfx::Renderer>       renderer;
+    Slang::ComPtr<gfx::IRenderer>       renderer;
 };
 //
 // In order to load a shader module from a `.slang` file on
@@ -78,7 +78,7 @@ struct ShaderModule : RefObject
 // example's `loadShaderProgram()` function, and how this function
 // loads a module for reflection purposes.
 //
-RefPtr<ShaderModule> loadShaderModule(Renderer* renderer, char const* inputPath)
+RefPtr<ShaderModule> loadShaderModule(IRenderer* renderer, char const* inputPath)
 {
     auto slangSession = getSlangSession();
     SlangCompileRequest* slangRequest = spCreateCompileRequest(slangSession);
@@ -361,7 +361,7 @@ struct ParameterBlockLayout : RefObject
     // The graphics API device that should be used to allocate parameter
     // block instances.
     //
-    RefPtr<gfx::Renderer>                renderer;
+    Slang::ComPtr<gfx::IRenderer> renderer;
 
     // The name of the type, as it appears in Slang code.
     //
@@ -640,7 +640,7 @@ struct ParameterBlockEncoder
 struct ParameterBlock : RefObject
 {
     // The graphics API device used to allocate this block.
-    RefPtr<gfx::Renderer>           renderer;
+    Slang::ComPtr<gfx::IRenderer>   renderer;
 
     // The associated parameter block layout.
     RefPtr<ParameterBlockLayout>    layout;
@@ -1100,7 +1100,7 @@ private:
     // Our current abstraction layer lumps this all together
     // with the "device."
     //
-    RefPtr<gfx::Renderer>               renderer;
+    Slang::ComPtr<gfx::IRenderer> renderer;
 
     // We also retain a pointer to the shader cache, which
     // will be used to implement lookup of the right
@@ -1165,7 +1165,7 @@ private:
 public:
     // Initializing a render context just sets its pointer to the GPU API device
     RenderContext(
-        gfx::Renderer*  renderer,
+        gfx::IRenderer*  renderer,
         ShaderCache*    shaderCache)
         : renderer(renderer)
         , shaderCache(shaderCache)
@@ -1386,7 +1386,7 @@ struct Model : RefObject
 // used for its representation.
 //
 RefPtr<Model> loadModel(
-    Renderer*               renderer,
+    IRenderer*               renderer,
     char const*             inputPath,
     ModelLoader::LoadFlags  loadFlags = 0,
     float                   scale = 1.0f)
@@ -1910,7 +1910,7 @@ struct LightEnv : public RefObject
 struct ModelViewer {
 
 Window* gWindow;
-RefPtr<gfx::Renderer> gRenderer;
+Slang::ComPtr<gfx::IRenderer> gRenderer;
 RefPtr<gfx::ResourceView> gDepthTarget;
 
 // We keep a pointer to the one effect we are using (for a forward
@@ -2050,8 +2050,8 @@ Result initialize()
     windowDesc.userData = this;
     gWindow = createWindow(windowDesc);
 
-    gRenderer = createD3D11Renderer();
-    Renderer::Desc rendererDesc;
+    createD3D11Renderer(gRenderer.writeRef());
+    IRenderer::Desc rendererDesc;
     rendererDesc.width = gWindowWidth;
     rendererDesc.height = gWindowHeight;
     gRenderer->initialize(rendererDesc, getPlatformWindowHandle(gWindow));
