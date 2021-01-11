@@ -93,6 +93,15 @@ public:
         }
         m_sizeInBytes = 0;
     }
+    // Reallocate so the buffer is the specified size. Contents of buffer up to size remain intact.
+    void reallocate(size_t size)
+    {
+        if (size != m_sizeInBytes)
+        {
+            m_data = ::realloc(m_data, size); 
+            m_sizeInBytes = size;
+        }
+    }
     /// Makes this no longer own the allocation. Returns the allocated data (or nullptr if no allocation)
     void* detach()
     {
@@ -189,7 +198,28 @@ protected:
     RawBlob() = default;
 
     ScopedAllocation m_data;
+};
 
+// A blob that does not own it's contained data.
+class UnownedRawBlob : public BlobBase
+{
+public:
+    // ISlangBlob
+    SLANG_NO_THROW void const* SLANG_MCALL getBufferPointer() SLANG_OVERRIDE { return m_data; }
+    SLANG_NO_THROW size_t SLANG_MCALL getBufferSize() SLANG_OVERRIDE { return m_dataSizeInBytes; }
+
+    // Ctor
+    UnownedRawBlob(const void* data, size_t size):
+        m_data(data),
+        m_dataSizeInBytes(size)
+    {
+    }
+
+protected:
+    UnownedRawBlob() = default;
+
+    const void* m_data;
+    size_t m_dataSizeInBytes;
 };
 
 /** A Blob that has no ref counting and exists typically for entire execution.

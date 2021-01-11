@@ -658,7 +658,7 @@ tool "slang-embed"
 tool "slang-test"
     uuid "0C768A18-1D25-4000-9F37-DA5FE99E3B64"
     includedirs { "." }
-    links { "core", "slang", "miniz" }
+    links { "core", "slang", "miniz", "lz4" }
     
     -- We want to set to the root of the project, but that doesn't seem to work with '.'. 
     -- So set a path that resolves to the same place.
@@ -982,7 +982,7 @@ if enableEmbedStdLib then
     standardProject("slangc-bootstrap", "source/slangc")
         uuid "6339BF31-AC99-4819-B719-679B63451EF0"
         kind "ConsoleApp"
-        links { "core", "miniz" }
+        links { "core", "miniz", "lz4" }
         
         -- We need to run all the generators to be able to build the main 
         -- slang source in source/slang
@@ -1057,7 +1057,7 @@ if enableEmbedStdLib then
           
             buildinputs { "%{cfg.targetdir}/slangc-bootstrap" .. executableSuffix }
                 
-            local buildcmd = '"%{cfg.targetdir}/slangc-bootstrap" -save-stdlib-bin-source %{file.directory}/slang-stdlib-generated.h'
+            local buildcmd = '"%{cfg.targetdir}/slangc-bootstrap" -archive-type riff-lz4 -save-stdlib-bin-source %{file.directory}/slang-stdlib-generated.h'
             
             buildcommands { buildcmd }
 end
@@ -1082,7 +1082,7 @@ end
 standardProject("slang", "source/slang")
     uuid "DB00DA62-0533-4AFD-B59F-A67D5B3A0808"
     kind "SharedLib"
-    links { "core", "miniz"}
+    links { "core", "miniz", "lz4"}
     warnings "Extra"
     flags { "FatalWarnings" }
     pic "On"
@@ -1183,7 +1183,7 @@ if enableProfile then
         addSourceDir "source/slang"
 
         includedirs { "." }
-        links { "core", "miniz"}
+        links { "core", "miniz", "lz4"}
         
         filter { "system:linux" }
             linkoptions{  "-pg" }
@@ -1208,6 +1208,20 @@ standardProject("miniz", nil)
     filter { "system:linux or macosx" }
         links { "dl"}
         
+standardProject("lz4", nil)
+    uuid "E1EC8075-823E-46E5-BC38-C124CCCDF878"
+    kind "StaticLib"
+    pic "On"
+
+    -- Add the files explicitly
+    files
+    {
+        "external/lz4/lib/lz4.c",
+        "external/lz4/lib/lz4.h",
+    }
+    
+    filter { "system:linux or macosx" }
+        links { "dl"}
 
 if buildGlslang then
 

@@ -41,6 +41,9 @@ struct TypeTextUtil
 
         /// Given a target returns the associated name.
     static UnownedStringSlice getCompileTargetName(SlangCompileTarget target);
+
+        /// Returns SLANG_ARCHIVE_TYPE_UNKNOWN if a match is not found
+    static SlangArchiveType findArchiveType(const UnownedStringSlice& slice);
 };
 
 }

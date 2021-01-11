@@ -196,6 +196,9 @@
     <ProjectReference Include="..\miniz\miniz.vcxproj">
       <Project>{E76ACB11-4A12-4F0A-BE1E-CE0B8836EB7F}</Project>
     </ProjectReference>
+    <ProjectReference Include="..\lz4\lz4.vcxproj">
+      <Project>{E1EC8075-823E-46E5-BC38-C124CCCDF878}</Project>
+    </ProjectReference>
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">
