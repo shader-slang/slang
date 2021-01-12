@@ -1,11 +1,11 @@
 // NOTE we can't test on VK/gl because we will output imat3 - and imat3 is not supported by glsl.
 // NOTE we also can't do this test on fxc - as it does not allow runtime non constant indexing.
 
-//TEST(compute):COMPARE_COMPUTE_EX:-cpu -compute 
-//DISABLE_TEST(compute):COMPARE_COMPUTE_EX:-slang -compute
-//TEST(compute):COMPARE_COMPUTE_EX:-slang -compute -dx12 -use-dxil
-//DISABLE_TEST(compute, vulkan):COMPARE_COMPUTE_EX:-vk -compute
-//TEST(compute, vulkan):COMPARE_COMPUTE_EX:-cuda -compute
+//TEST(compute):COMPARE_COMPUTE_EX:-cpu -compute -shaderobj
+//DISABLE_TEST(compute):COMPARE_COMPUTE_EX:-slang -compute -shaderobj
+//TEST(compute):COMPARE_COMPUTE_EX:-slang -compute -dx12 -use-dxil -shaderobj
+//DISABLE_TEST(compute, vulkan):COMPARE_COMPUTE_EX:-vk -compute -shaderobj
+//TEST(compute, vulkan):COMPARE_COMPUTE_EX:-cuda -compute -shaderobj
 
 //TEST_INPUT:ubuffer(data=[0 0 0 0], stride=4):out,name outputBuffer
 RWStructuredBuffer<int> outputBuffer;

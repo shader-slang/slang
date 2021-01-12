@@ -7,8 +7,8 @@
 
 // This has a compatibility issue on Windows 10.0.10586 on Dx12 - dxcompiler will crash (can remove form tests with -exclude compatibility-issue)
 
-//TEST(compute):COMPARE_COMPUTE_EX:-slang -compute -xslang -matrix-layout-row-major
-//TEST(compute,compatibility-issue):COMPARE_COMPUTE_EX:-slang -compute -dx12 -use-dxil -xslang -matrix-layout-row-major
+//TEST(compute):COMPARE_COMPUTE_EX:-slang -compute -xslang -matrix-layout-row-major -shaderobj
+//TEST(compute,compatibility-issue):COMPARE_COMPUTE_EX:-slang -compute -dx12 -use-dxil -xslang -matrix-layout-row-major -shaderobj
 
 // Not testing on Vulkan because of lack of support
 // for integer matrices in GLSL. Slang needs to

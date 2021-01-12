@@ -1,6 +1,6 @@
 // modern-syntax.slang
-//TEST(compute):COMPARE_COMPUTE_EX:-slang -compute
-//TEST(compute):COMPARE_COMPUTE_EX:-cpu -slang -compute
+//TEST(compute):COMPARE_COMPUTE_EX:-slang -compute -shaderobj
+//TEST(compute):COMPARE_COMPUTE_EX:-cpu -slang -compute -shaderobj
 
 // This file exists to confirm that declarations using "modern"
 // syntax are handled correctly by the compiler front-end.

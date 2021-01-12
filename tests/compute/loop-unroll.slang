@@ -1,11 +1,11 @@
-//TEST(compute):COMPARE_COMPUTE:
-//TEST(compute):COMPARE_COMPUTE:-dx12 
+//TEST(compute):COMPARE_COMPUTE: -shaderobj
+//TEST(compute):COMPARE_COMPUTE:-dx12  -shaderobj
 //TODO(JS): This test fails with a crash in CreateComputePipelineState, so disabled for now
-//DISABLE_TEST(compute):COMPARE_COMPUTE:-dx12 -use-dxil
-//TEST(compute):COMPARE_COMPUTE:-cpu
-//TEST(compute):COMPARE_COMPUTE:-cuda
+//DISABLE_TEST(compute):COMPARE_COMPUTE:-dx12 -use-dxil -shaderobj
+//TEST(compute):COMPARE_COMPUTE:-cpu -shaderobj
+//TEST(compute):COMPARE_COMPUTE:-cuda -shaderobj
 // Note VK output is not loop unrolled
-//TEST(compute):COMPARE_COMPUTE:-vk
+//TEST(compute):COMPARE_COMPUTE:-vk -shaderobj
 
 //TEST_INPUT:ubuffer(data=[0 0 0 0], stride=4):out, name buffers[0]
 //TEST_INPUT:ubuffer(data=[0 1 2 3], stride=4):name buffers[1]

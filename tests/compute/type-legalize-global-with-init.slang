@@ -4,12 +4,12 @@
 // with a resource type or a type that recursively contains
 // resources.
 //
-//TEST(compute):COMPARE_COMPUTE:
+//TEST(compute):COMPARE_COMPUTE: -shaderobj
 //
-//TEST_INPUT:ubuffer(data=[0 0 0 0], stride=4):out
+//TEST_INPUT:ubuffer(data=[0 0 0 0], stride=4):out,name=outputBuffer
 RWStructuredBuffer<uint> outputBuffer;
 
-//TEST_INPUT:ubuffer(data=[1 2 3 4 5 6 7 8], stride=4):
+//TEST_INPUT:ubuffer(data=[1 2 3 4 5 6 7 8], stride=4):name=inputBuffer
 RWStructuredBuffer<uint> inputBuffer;
 
 static const RWStructuredBuffer<uint> gBuffer = inputBuffer;

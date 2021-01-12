@@ -2,7 +2,7 @@
 
 // Test enums defined nested in a struct work as expected. 
 
-//TEST(compute):COMPARE_COMPUTE:
+//TEST(compute):COMPARE_COMPUTE: -shaderobj
 
 struct Outer
 {

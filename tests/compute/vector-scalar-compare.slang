@@ -1,8 +1,9 @@
-//TEST(compute):COMPARE_COMPUTE:-dx12 -compute 
-//TEST(compute):COMPARE_COMPUTE:-vk -compute 
-//TEST_INPUT:ubuffer(data=[0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0], stride=4):out
+//TEST(compute):COMPARE_COMPUTE:-dx12 -compute -shaderobj 
+//TEST(compute):COMPARE_COMPUTE:-vk -compute  -shaderobj
 
 // Test doing vector comparisons 
+
+//TEST_INPUT:ubuffer(data=[0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0], stride=4):out,name=outputBuffer
 RWStructuredBuffer<int> outputBuffer;
 
 [numthreads(4, 4, 1)]

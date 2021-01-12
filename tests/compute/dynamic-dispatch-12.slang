@@ -1,9 +1,9 @@
 // Test using interface typed shader parameters with dynamic dispatch.
 
-//TEST(compute):COMPARE_COMPUTE:-dx11
-//TEST(compute):COMPARE_COMPUTE:-cpu
-//TEST(compute):COMPARE_COMPUTE:-vk
-//TEST(compute):COMPARE_COMPUTE:-cuda
+//TEST(compute):COMPARE_COMPUTE:-dx11 -shaderobj
+//TEST(compute):COMPARE_COMPUTE:-cpu -shaderobj
+//TEST(compute):COMPARE_COMPUTE:-vk -shaderobj
+//TEST(compute):COMPARE_COMPUTE:-cuda -shaderobj
 
 [anyValueSize(8)]
 interface IInterface

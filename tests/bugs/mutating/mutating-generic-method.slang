@@ -1,5 +1,5 @@
-//TEST(compute):COMPARE_COMPUTE_EX:-slang -compute
-//TEST(compute,vulkan):COMPARE_COMPUTE_EX:-vk -slang -compute
+//TEST(compute):COMPARE_COMPUTE_EX:-slang -compute -shaderobj
+//TEST(compute,vulkan):COMPARE_COMPUTE_EX:-vk -slang -compute -shaderobj
 
 // Confirm that a generic method marked `[mutating]`
 // produces an `inout` parameter for `this`.
@@ -38,7 +38,7 @@ int test(int val)
     return r.state;
 }
 
-//TEST_INPUT:ubuffer(data=[0 0 0 0], stride=4):out
+//TEST_INPUT:ubuffer(data=[0 0 0 0], stride=4):out, name outputBuffer
 RWStructuredBuffer<int> outputBuffer;
 
 [numthreads(4, 1, 1)]

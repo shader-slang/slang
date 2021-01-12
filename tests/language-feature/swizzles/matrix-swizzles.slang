@@ -1,6 +1,6 @@
 // matrix-swizzle.slang
 
-//TEST(compute):COMPARE_COMPUTE:
+//TEST(compute):COMPARE_COMPUTE: -shaderobj
 
 // Test that matrix swizzle works correctly
 // Matrix swizzles can either be one or zero indexed

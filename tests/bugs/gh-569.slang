@@ -1,5 +1,5 @@
 // gh-569.slang
-//TEST(compute):COMPARE_COMPUTE:
+//TEST(compute):COMPARE_COMPUTE: -shaderobj
 
 // Test that correct scoping is used in generated HLSL/GLSL,
 // even when dominator tree and structured control flow disagree.

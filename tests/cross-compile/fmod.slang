@@ -3,8 +3,8 @@
 // Ensure that HLSL `fmod` works and produces
 // expected output on Vulkan/GLSL.
 
-//TEST(compute):COMPARE_COMPUTE:-dx11 -compute
-//TEST(compute):COMPARE_COMPUTE:-vk -compute
+//TEST(compute):COMPARE_COMPUTE:-dx11 -compute -shaderobj
+//TEST(compute):COMPARE_COMPUTE:-vk -compute -shaderobj
 
 //TEST_INPUT:cbuffer(data=[4 0 0 0]):name=C
 cbuffer C

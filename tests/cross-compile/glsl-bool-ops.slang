@@ -3,8 +3,8 @@
 // This test exists to ensure that binary operations on
 // vectors of `bool` produce correct GLSL/SPIR-V output.
 
-//TEST(compute):COMPARE_COMPUTE:-dx11 -compute
-//TEST(compute):COMPARE_COMPUTE:-vk -compute
+//TEST(compute):COMPARE_COMPUTE:-dx11 -compute -shaderobj
+//TEST(compute):COMPARE_COMPUTE:-vk -compute -shaderobj
 
 uint test(uint val)
 {

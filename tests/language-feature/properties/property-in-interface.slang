@@ -1,6 +1,6 @@
 // property-in-interface.slang
 
-//TEST(compute):COMPARE_COMPUTE:
+//TEST(compute):COMPARE_COMPUTE: -shaderobj
 
 // Test that interfaces can include property declarations.
 

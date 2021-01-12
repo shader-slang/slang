@@ -549,12 +549,12 @@ public:
         {
             if (cudaView->desc.type == IResourceView::Type::UnorderedAccess)
             {
-                auto handle = cudaView->textureResource->getBindlessHandle();
+                auto handle = cudaView->textureResource->m_cudaSurfObj;
                 setData(offset, &handle, sizeof(uint64_t));
             }
             else
             {
-                auto handle = cudaView->textureResource->m_cudaSurfObj;
+                auto handle = cudaView->textureResource->getBindlessHandle();
                 setData(offset, &handle, sizeof(uint64_t));
             }
         }
@@ -814,6 +814,31 @@ private:
         CUresourcetype resourceType;
         size_t elementSize = 0;
 
+        // CUDA wants the unused dimensions to be 0.
+        // Might need to specially handle elsewhere
+        int width = desc.size.width;
+        int height = desc.size.height;
+        int depth = desc.size.depth;
+
+        switch (desc.type)
+        {
+        case IResource::Type::Texture1D:
+            height = 0;
+            depth = 0;
+            break;
+
+        case IResource::Type::Texture2D:
+            depth = 0;
+            break;
+
+        case IResource::Type::Texture3D:
+            break;
+
+        case IResource::Type::TextureCube:
+            depth = 1;
+            break;
+        }
+
         {
             CUarray_format format = CU_AD_FORMAT_FLOAT;
             int numChannels = 0;
@@ -848,9 +873,9 @@ private:
                 CUDA_ARRAY3D_DESCRIPTOR arrayDesc;
                 memset(&arrayDesc, 0, sizeof(arrayDesc));
 
-                arrayDesc.Width = desc.size.width;
-                arrayDesc.Height = desc.size.height;
-                arrayDesc.Depth = desc.size.depth;
+                arrayDesc.Width = width;
+                arrayDesc.Height = height;
+                arrayDesc.Depth = depth;
                 arrayDesc.Format = format;
                 arrayDesc.NumChannels = numChannels;
                 arrayDesc.Flags = 0;
@@ -904,8 +929,8 @@ private:
                         arrayDesc.Depth *= 6;
                     }
 
-                    arrayDesc.Height = desc.size.height;
-                    arrayDesc.Width = desc.size.width;
+                    arrayDesc.Height = height;
+                    arrayDesc.Width = width;
                     arrayDesc.Format = format;
                     arrayDesc.NumChannels = numChannels;
 
@@ -922,9 +947,9 @@ private:
                     CUDA_ARRAY3D_DESCRIPTOR arrayDesc;
                     memset(&arrayDesc, 0, sizeof(arrayDesc));
 
-                    arrayDesc.Depth = desc.size.depth;
-                    arrayDesc.Height = desc.size.height;
-                    arrayDesc.Width = desc.size.width;
+                    arrayDesc.Depth = depth;
+                    arrayDesc.Height = height;
+                    arrayDesc.Width = width;
                     arrayDesc.Format = format;
                     arrayDesc.NumChannels = numChannels;
 
@@ -944,8 +969,8 @@ private:
                     CUDA_ARRAY_DESCRIPTOR arrayDesc;
                     memset(&arrayDesc, 0, sizeof(arrayDesc));
 
-                    arrayDesc.Height = desc.size.height;
-                    arrayDesc.Width = desc.size.width;
+                    arrayDesc.Height = height;
+                    arrayDesc.Width = width;
                     arrayDesc.Format = format;
                     arrayDesc.NumChannels = numChannels;
 
@@ -957,9 +982,6 @@ private:
 
         // Work space for holding data for uploading if it needs to be rearranged
         List<uint8_t> workspace;
-        auto width = desc.size.width;
-        auto height = desc.size.height;
-        auto depth = desc.size.depth;
         for (int mipLevel = 0; mipLevel < desc.numMipLevels; ++mipLevel)
         {
             int mipWidth = width >> mipLevel;
@@ -1153,7 +1175,11 @@ private:
             }
 
             // Create handle for uav.
-            SLANG_CUDA_RETURN_ON_FAIL(cuSurfObjectCreate(&tex->m_cudaSurfObj, &resDesc));
+            if( desc.bindFlags & IResource::BindFlag::UnorderedAccess )
+            {
+                SLANG_CUDA_RETURN_ON_FAIL(cuSurfObjectCreate(&tex->m_cudaSurfObj, &resDesc));
+            }
+
             
             // Create handle for sampling.
             CUDA_TEXTURE_DESC texDesc;

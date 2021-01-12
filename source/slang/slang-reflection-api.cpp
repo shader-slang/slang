@@ -1149,7 +1149,7 @@ namespace Slang
         }
         else
         {
-            SLANG_UNEXPECTED("unhandled resource binding type");
+            return SLANG_BINDING_TYPE_UNKNOWN;
         }
     }
 
@@ -1167,7 +1167,7 @@ namespace Slang
         }
         else
         {
-            SLANG_UNEXPECTED("unhandled resource binding type");
+            return SLANG_BINDING_TYPE_UNKNOWN;
         }
     }
 
@@ -1176,6 +1176,12 @@ namespace Slang
         Slang::TypeLayout*  typeLayout,
         LayoutResourceKind  kind)
     {
+        if( auto bindingType = _calcResourceBindingType(typeLayout) )
+        {
+            if(bindingType != SLANG_BINDING_TYPE_UNKNOWN)
+                return bindingType;
+        }
+
         switch( kind )
         {
         default:
@@ -1194,14 +1200,10 @@ namespace Slang
         CASE(VaryingOutput, VARYING_OUTPUT);
         CASE(ExistentialObjectParam, EXISTENTIAL_VALUE);
         CASE(PushConstantBuffer, PUSH_CONSTANT);
+        CASE(Uniform,               INLINE_UNIFORM_DATA);
         // TODO: register space
 
     #undef CASE
-
-        case LayoutResourceKind::ShaderResource:
-        case LayoutResourceKind::UnorderedAccess:
-        case LayoutResourceKind::DescriptorTableSlot:
-            return _calcResourceBindingType(typeLayout);
         }
     }
 
@@ -1311,6 +1313,7 @@ namespace Slang
                     case LayoutResourceKind::PushConstantBuffer:
                     case LayoutResourceKind::RegisterSpace:
                     case LayoutResourceKind::DescriptorTableSlot:
+                    case LayoutResourceKind::Uniform:
                         break;
                     }
 
@@ -1358,7 +1361,7 @@ namespace Slang
                     switch(kind)
                     {
                     case LayoutResourceKind::RegisterSpace:
-                    case LayoutResourceKind::Uniform:
+//                    case LayoutResourceKind::Uniform:
                     case LayoutResourceKind::None:
                         break;
 
@@ -1377,7 +1380,7 @@ namespace Slang
                                 switch( resInfo.kind )
                                 {
                                 case LayoutResourceKind::RegisterSpace:
-                                case LayoutResourceKind::Uniform:
+//                                case LayoutResourceKind::Uniform:
                                     continue;
 
                                 default:
@@ -1489,7 +1492,8 @@ namespace Slang
                     auto& resInfo = typeLayout->resourceInfos[0];
                     LayoutResourceKind kind = resInfo.kind;
 
-                    if(kind == LayoutResourceKind::Uniform)
+                    auto bindingType = _calcBindingType(typeLayout, kind);
+                    if(bindingType == SLANG_BINDING_TYPE_INLINE_UNIFORM_DATA)
                     {
                         // We do not consider uniform resource usage
                         // in the ranges we compute.
@@ -1504,7 +1508,6 @@ namespace Slang
                     // This leaf field will map to a single binding range and,
                     // if it is appropriate, a single descriptor range.
                     //
-                    auto bindingType = _calcBindingType(typeLayout, kind);
                     auto count = resInfo.count * multiplier;
                     auto indexOffset = _calcIndexOffset(path, kind);
                     auto spaceOffset = _calcSpaceOffset(path, kind);

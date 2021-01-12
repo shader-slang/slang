@@ -392,8 +392,28 @@ SlangResult _assignVarsFromLayout(
         case ShaderInputType::Object:
             {
                 auto typeName = entry.objectDesc.typeName;
-                auto slangType = slangReflection->findTypeByName(typeName.getBuffer());
-                auto slangTypeLayout = slangReflection->getTypeLayout(slangType);
+                slang::TypeLayoutReflection* slangTypeLayout = nullptr;
+                if(typeName.getLength() != 0)
+                {
+                    auto slangType = slangReflection->findTypeByName(typeName.getBuffer());
+                    slangTypeLayout = slangReflection->getTypeLayout(slangType);
+                }
+                else
+                {
+                    // We want to infer the type to use from the type of the destination.
+                    //
+                    slangTypeLayout = entryCursor.getTypeLayout();
+                    switch(slangTypeLayout->getKind())
+                    {
+                    default:
+                        break;
+
+                    case slang::TypeReflection::Kind::ConstantBuffer:
+                    case slang::TypeReflection::Kind::ParameterBlock:
+                        slangTypeLayout = slangTypeLayout->getElementTypeLayout();
+                        break;
+                    }
+                }
 
                 ComPtr<IShaderObjectLayout> shaderObjectLayout = renderer->createShaderObjectLayout(slangTypeLayout);
                 ComPtr<IShaderObject> shaderObject =
