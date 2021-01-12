@@ -1,8 +1,10 @@
 #pragma once
 
+#include <cstdint>
+
 namespace gfx
 {
-class Renderer;
+class IRenderer;
 
-Renderer* createCUDARenderer();
+int32_t createCUDARenderer(IRenderer** outRenderer);
 }

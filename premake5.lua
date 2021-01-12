@@ -525,7 +525,7 @@ function example(name)
     -- and the `gfx` abstraction layer (which in turn
     -- depends on the `core` library). We specify all of that here,
     -- rather than in each example.
-    links { "slang", "core", "gfx" }
+    links { "slang", "core", "gfx", "graphics-app-framework" }
 end
 
 --
@@ -658,7 +658,7 @@ tool "slang-embed"
 tool "slang-test"
     uuid "0C768A18-1D25-4000-9F37-DA5FE99E3B64"
     includedirs { "." }
-    links { "core", "slang", "miniz" }
+    links { "core", "slang", "miniz", "lz4" }
     
     -- We want to set to the root of the project, but that doesn't seem to work with '.'. 
     -- So set a path that resolves to the same place.
@@ -697,8 +697,8 @@ toolSharedLibrary "slang-reflection-test"
 toolSharedLibrary "render-test"
     uuid "61F7EB00-7281-4BF3-9470-7C2EA92620C3"
     
-    includedirs { ".", "external", "source", "tools/gfx" }
-    links { "core", "slang", "gfx" }
+    includedirs { ".", "external", "source", "tools/gfx", "tools/graphics-app-framework" }
+    links { "core", "slang", "gfx", "graphics-app-framework" }
    
     if isTargetWindows then    
         addSourceDir "tools/render-test/windows"
@@ -732,9 +732,7 @@ toolSharedLibrary "render-test"
     end
   
 --
--- `gfx` is a utility library for doing GPU rendering
--- and compute, which is used by both our testing and exmaples.
--- It depends on teh `core` library, so we need to declare that:
+-- `gfx` is a abstraction layer for different GPU platforms.
 --
 
 tool "gfx" 
@@ -744,7 +742,7 @@ tool "gfx"
     kind "StaticLib"
     pic "On"
     
-    includedirs { ".", "external", "source", "external/imgui" }
+    includedirs { ".", "external", "source" }
 
     -- Will compile across targets
     addSourceDir "tools/gfx/nvapi"
@@ -766,7 +764,6 @@ tool "gfx"
         addSourceDir "tools/gfx/d3d11"
         addSourceDir "tools/gfx/d3d12"
         addSourceDir "tools/gfx/cuda"
-        addSourceDir "tools/gfx/windows"
 
         if type(cudaPath) == "string" then
             defines { "GFX_ENABLE_CUDA" }
@@ -791,7 +788,6 @@ tool "gfx"
         --addSourceDir "tools/gfx/vulkan"
         --addSourceDir "tools/gfx/open-gl"
     end
-        
 
     -- If NVAPI is enabled
     if enableNvapi then
@@ -811,8 +807,25 @@ tool "gfx"
             links { "nvapi64" }
             
     end
+
+--
+-- `graphics-app-framework` contains all the utils for a simple graphics application.
+--
+tool "graphics-app-framework" 
+    uuid "3565fe5e-4fa3-11eb-ae93-0242ac130002"
+    kind "StaticLib"
+    pic "On"
     
-    
+    includedirs { ".", "external", "source", "external/imgui", "tools/gfx" }
+
+    addSourceDir "tools/graphics-app-framework"
+
+    -- Include windowing support on Windows.
+    if isTargetWindows then
+        systemversion "10.0.14393.0"
+        addSourceDir "tools/graphics-app-framework/windows"
+    end
+
 --
 -- The `slangc` command-line application is just a very thin wrapper
 -- around the Slang dynamic library, so its build is extermely simple.
@@ -969,7 +982,7 @@ if enableEmbedStdLib then
     standardProject("slangc-bootstrap", "source/slangc")
         uuid "6339BF31-AC99-4819-B719-679B63451EF0"
         kind "ConsoleApp"
-        links { "core", "miniz" }
+        links { "core", "miniz", "lz4" }
         
         -- We need to run all the generators to be able to build the main 
         -- slang source in source/slang
@@ -1044,7 +1057,7 @@ if enableEmbedStdLib then
           
             buildinputs { "%{cfg.targetdir}/slangc-bootstrap" .. executableSuffix }
                 
-            local buildcmd = '"%{cfg.targetdir}/slangc-bootstrap" -save-stdlib-bin-source %{file.directory}/slang-stdlib-generated.h'
+            local buildcmd = '"%{cfg.targetdir}/slangc-bootstrap" -archive-type riff-lz4 -save-stdlib-bin-source %{file.directory}/slang-stdlib-generated.h'
             
             buildcommands { buildcmd }
 end
@@ -1069,7 +1082,7 @@ end
 standardProject("slang", "source/slang")
     uuid "DB00DA62-0533-4AFD-B59F-A67D5B3A0808"
     kind "SharedLib"
-    links { "core", "miniz"}
+    links { "core", "miniz", "lz4"}
     warnings "Extra"
     flags { "FatalWarnings" }
     pic "On"
@@ -1170,7 +1183,7 @@ if enableProfile then
         addSourceDir "source/slang"
 
         includedirs { "." }
-        links { "core", "miniz"}
+        links { "core", "miniz", "lz4"}
         
         filter { "system:linux" }
             linkoptions{  "-pg" }
@@ -1195,6 +1208,20 @@ standardProject("miniz", nil)
     filter { "system:linux or macosx" }
         links { "dl"}
         
+standardProject("lz4", nil)
+    uuid "E1EC8075-823E-46E5-BC38-C124CCCDF878"
+    kind "StaticLib"
+    pic "On"
+
+    -- Add the files explicitly
+    files
+    {
+        "external/lz4/lib/lz4.c",
+        "external/lz4/lib/lz4.h",
+    }
+    
+    filter { "system:linux or macosx" }
+        links { "dl"}
 
 if buildGlslang then
 

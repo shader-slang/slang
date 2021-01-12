@@ -1,8 +1,8 @@
 #pragma once
 
-#include "../../slang-com-ptr.h"
-#include "../../source/core/slang-list.h"
-#include "../../source/core/slang-free-list.h"
+#include "slang-com-ptr.h"
+#include "core/slang-list.h"
+#include "core/slang-free-list.h"
 
 #include "resource-d3d12.h"
 

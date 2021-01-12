@@ -120,6 +120,7 @@ DIAGNOSTIC(    86, Error, unableToCreateModuleContainer, "unable to create modul
 
 DIAGNOSTIC(    87, Error, unableToSetDefaultDownstreamCompiler, "unable to set default downstream compiler for source language '%0' to '%1'")
 
+DIAGNOSTIC(    88, Error, unknownArchiveType, "archive type '%0' is unknown")
 
 //
 // 001xx - Downstream Compilers

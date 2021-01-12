@@ -195,6 +195,8 @@ public:
     {
             /// Get the payload
         void* getPayload() { return m_payload; }
+            /// Get the end pointer
+        void* getPayloadEnd() { return (void*)((uint8_t*)m_payload + m_size); }
             /// Get the size of the payload
         size_t getSize() const { return m_size; }
             /// Get the ownership of the data held in the payload
@@ -360,6 +362,10 @@ public:
         virtual SlangResult handleData(DataChunk* data) = 0;
         virtual SlangResult leaveList(ListChunk* list) = 0;
     };
+
+
+        /// Add a complete data chunk
+    void addDataChunk(FourCC dataFourCC, const void* data, size_t dataSizeInBytes);
 
         /// Start a chunk
     void startChunk(Chunk::Kind kind, FourCC type);

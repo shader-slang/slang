@@ -183,6 +183,9 @@
     <ProjectReference Include="..\gfx\gfx.vcxproj">
       <Project>{222F7498-B40C-4F3F-A704-DDEB91A4484A}</Project>
     </ProjectReference>
+    <ProjectReference Include="..\graphics-app-framework\graphics-app-framework.vcxproj">
+      <Project>{3565FE5E-4FA3-11EB-AE93-0242AC130002}</Project>
+    </ProjectReference>
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">

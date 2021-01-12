@@ -693,6 +693,20 @@ void HLSLSourceEmitter::emitLoopControlDecorationImpl(IRLoopControlDecoration* d
     }
 }
 
+void HLSLSourceEmitter::emitFuncDecorationImpl(IRDecoration* decoration)
+{
+    switch( decoration->op )
+    {
+    case kIROp_NoInlineDecoration:
+        m_writer->emit("[noinline]\n");
+        break;
+
+    default:
+        break;
+    }
+}
+
+
 void HLSLSourceEmitter::emitSimpleValueImpl(IRInst* inst)
 {
     switch (inst->op)

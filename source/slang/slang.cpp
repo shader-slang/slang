@@ -3,8 +3,7 @@
 #include "../core/slang-io.h"
 #include "../core/slang-string-util.h"
 #include "../core/slang-shared-library.h"
-
-#include "../core/slang-zip-file-system.h"
+#include "../core/slang-archive-file-system.h"
 
 #include "slang-check.h"
 #include "slang-parameter-binding.h"
@@ -266,8 +265,8 @@ SlangResult Session::loadStdLib(const void* stdLib, size_t stdLibSizeInBytes)
     }
 
     // Make a file system to read it from
-    RefPtr<CompressedFileSystem> fileSystem;
-    SLANG_RETURN_ON_FAIL(CompressedFileSystem::createZip(stdLib, stdLibSizeInBytes, fileSystem));
+    RefPtr<ArchiveFileSystem> fileSystem;
+    SLANG_RETURN_ON_FAIL(loadArchiveFileSystem(stdLib, stdLibSizeInBytes, fileSystem));
 
     // Let's try loading serialized modules and adding them
     SLANG_RETURN_ON_FAIL(_readBuiltinModule(fileSystem, coreLanguageScope, "core"));
@@ -275,7 +274,7 @@ SlangResult Session::loadStdLib(const void* stdLib, size_t stdLibSizeInBytes)
     return SLANG_OK;
 }
 
-SlangResult Session::saveStdLib(ISlangBlob** outBlob)
+SlangResult Session::saveStdLib(SlangArchiveType archiveType, ISlangBlob** outBlob)
 {
     if (m_builtinLinkage->mapNameToLoadedModules.Count() == 0)
     {
@@ -284,8 +283,8 @@ SlangResult Session::saveStdLib(ISlangBlob** outBlob)
     }
 
     // Make a file system to read it from
-    RefPtr<CompressedFileSystem> fileSystem;
-    SLANG_RETURN_ON_FAIL(CompressedFileSystem::createZip(fileSystem));
+    RefPtr<ArchiveFileSystem> fileSystem;
+    SLANG_RETURN_ON_FAIL(createArchiveFileSystem(archiveType, fileSystem));
 
     for (auto& pair : m_builtinLinkage->mapNameToLoadedModules)
     {
@@ -315,11 +314,7 @@ SlangResult Session::saveStdLib(ISlangBlob** outBlob)
     }
 
     // Now need to convert into a blob
-    auto archiveContents = fileSystem->getArchive();
-
-    ComPtr<ISlangBlob> blob(new RawBlob(archiveContents.getBuffer(), archiveContents.getCount()));
-    *outBlob = blob.detach();
-
+    SLANG_RETURN_ON_FAIL(fileSystem->storeArchive(true, outBlob));
     return SLANG_OK;
 }
 

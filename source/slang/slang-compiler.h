@@ -5,6 +5,7 @@
 #include "../core/slang-shared-library.h"
 
 #include "../core/slang-downstream-compiler.h"
+#include "../core/slang-archive-file-system.h"
 
 #include "../../slang-com-ptr.h"
 
@@ -2178,7 +2179,7 @@ namespace Slang
 
         SLANG_NO_THROW SlangResult SLANG_MCALL compileStdLib() override;
         SLANG_NO_THROW SlangResult SLANG_MCALL loadStdLib(const void* stdLib, size_t stdLibSizeInBytes) override;
-        SLANG_NO_THROW SlangResult SLANG_MCALL saveStdLib(ISlangBlob** outBlob) override;
+        SLANG_NO_THROW SlangResult SLANG_MCALL saveStdLib(SlangArchiveType archiveType, ISlangBlob** outBlob) override;
 
         SLANG_NO_THROW SlangCapabilityID SLANG_MCALL findCapability(char const* name) override;
 

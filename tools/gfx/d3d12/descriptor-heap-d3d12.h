@@ -4,8 +4,8 @@
 #include <dxgi.h>
 #include <d3d12.h>
 
-#include "../../slang-com-ptr.h"
-#include "../../source/core/slang-list.h"
+#include "slang-com-ptr.h"
+#include "core/slang-list.h"
 
 namespace gfx {
 

@@ -434,6 +434,9 @@ struct OptionsParser
 
         SlangMatrixLayoutMode defaultMatrixLayoutMode = SLANG_MATRIX_LAYOUT_MODE_UNKNOWN;
 
+        // The default archive type is zip
+        SlangArchiveType archiveType = SLANG_ARCHIVE_TYPE_ZIP;
+
         bool hasLoadedRepro = false;
 
         char const* const* argCursor = &argv[0];
@@ -463,6 +466,18 @@ struct OptionsParser
                 {
                     SLANG_RETURN_ON_FAIL(session->compileStdLib());
                 }
+                else if (argStr == "-archive-type")
+                {
+                    String archiveTypeName;
+                    SLANG_RETURN_ON_FAIL(tryReadCommandLineArgument(sink, arg, &argCursor, argEnd, archiveTypeName));
+
+                    archiveType = TypeTextUtil::findArchiveType(archiveTypeName.getUnownedSlice());
+                    if (archiveType == SLANG_ARCHIVE_TYPE_UNDEFINED)
+                    {
+                        sink->diagnose(SourceLoc(), Diagnostics::unknownArchiveType, archiveTypeName);
+                        return SLANG_FAIL;
+                    }
+                }
                 else if (argStr == "-save-stdlib")
                 {
                     String fileName;
@@ -470,7 +485,7 @@ struct OptionsParser
 
                     ComPtr<ISlangBlob> blob;
 
-                    SLANG_RETURN_ON_FAIL(session->saveStdLib(blob.writeRef()));
+                    SLANG_RETURN_ON_FAIL(session->saveStdLib(archiveType, blob.writeRef()));
                     SLANG_RETURN_ON_FAIL(File::writeAllBytes(fileName, blob->getBufferPointer(), blob->getBufferSize()));
                 }
                 else if (argStr == "-save-stdlib-bin-source")
@@ -480,7 +495,7 @@ struct OptionsParser
 
                     ComPtr<ISlangBlob> blob;
 
-                    SLANG_RETURN_ON_FAIL(session->saveStdLib(blob.writeRef()));
+                    SLANG_RETURN_ON_FAIL(session->saveStdLib(archiveType, blob.writeRef()));
 
                     StringBuilder builder;
                     StringWriter writer(&builder, 0);
@@ -705,6 +720,35 @@ struct OptionsParser
                     // Those atoms will need to be added to the supported capabilities of the target.
                     // 
                     for(Index i = 1; i < sliceCount; ++i)
+                    {
+                        UnownedStringSlice atomName = slices[i];
+                        CapabilityAtom atom = findCapabilityAtom(atomName);
+                        if( atom == CapabilityAtom::Invalid )
+                        {
+                            sink->diagnose(SourceLoc(), Diagnostics::unknownProfile, atomName);
+                            return SLANG_FAIL;
+                        }
+
+                        addCapabilityAtom(getCurrentTarget(), atom);
+                    }
+                }
+                else if( argStr == "-capability" )
+                {
+                    // The `-capability` option is similar to `-profile` but does not set the actual profile
+                    // for a target (it just adds capabilities).
+                    //
+                    // TODO: Once profiles are treated as capabilities themselves, it might be possible
+                    // to treat `-profile` and `-capability` as aliases, although there might still be
+                    // value in only allowing a single `-profile` option per target while still allowing
+                    // zero or more `-capability` options.
+
+                    String operand;
+                    SLANG_RETURN_ON_FAIL(tryReadCommandLineArgument(sink, arg, &argCursor, argEnd, operand));
+
+                    List<UnownedStringSlice> slices;
+                    StringUtil::split(operand.getUnownedSlice(), '+', slices);
+                    Index sliceCount = slices.getCount();
+                    for(Index i = 0; i < sliceCount; ++i)
                     {
                         UnownedStringSlice atomName = slices[i];
                         CapabilityAtom atom = findCapabilityAtom(atomName);

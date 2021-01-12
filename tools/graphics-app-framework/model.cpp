@@ -1,6 +1,8 @@
 // model.cpp
 #include "model.h"
 
+#include "window.h"
+
 #define TINYOBJLOADER_IMPLEMENTATION
 #include "../../external/tinyobjloader/tiny_obj_loader.h"
 
@@ -96,7 +98,7 @@ namespace gfx
 {
 
 RefPtr<TextureResource> loadTextureImage(
-    Renderer*   renderer,
+    IRenderer*   renderer,
     char const* path)
 {
     int extentX = 0;
