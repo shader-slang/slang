@@ -37,17 +37,17 @@ struct BindingStateImpl : public Slang::RefObject
 
     struct OutputBinding
     {
-        RefPtr<Resource>    resource;
+        ComPtr<IResource>    resource;
         Slang::UInt         entryIndex;
     };
     List<OutputBinding> outputBindings;
 
-    RefPtr<PipelineLayout>  pipelineLayout;
-    RefPtr<DescriptorSet>   descriptorSet;
+    ComPtr<IPipelineLayout>  pipelineLayout;
+    ComPtr<IDescriptorSet> descriptorSet;
     int m_numRenderTargets = 1;
 };
 
-RefPtr<SamplerState> _createSamplerState(
+ComPtr<ISamplerState> _createSamplerState(
     IRenderer*               renderer,
     const InputSamplerDesc& srcDesc);
 
@@ -55,7 +55,7 @@ RefPtr<SamplerState> _createSamplerState(
 struct ShaderRendererUtil
 {
         /// Generate a texture using the InputTextureDesc and construct a TextureResource using the Renderer with the contents
-    static Slang::Result generateTextureResource(const InputTextureDesc& inputDesc, int bindFlags, IRenderer* renderer, Slang::RefPtr<TextureResource>& textureOut);
+    static Slang::Result generateTextureResource(const InputTextureDesc& inputDesc, int bindFlags, IRenderer* renderer, ComPtr<ITextureResource>& textureOut);
 
         /// Create texture resource using inputDesc, and texData to describe format, and contents
     static Slang::Result createTextureResource(
@@ -63,7 +63,7 @@ struct ShaderRendererUtil
         const TextureData& texData,
         int bindFlags,
         IRenderer* renderer,
-        Slang::RefPtr<TextureResource>& textureOut);
+        ComPtr<ITextureResource>& textureOut);
 
         /// Create the BufferResource using the renderer from the contents of inputDesc
     static Slang::Result createBufferResource(
@@ -72,13 +72,13 @@ struct ShaderRendererUtil
         size_t bufferSize,
         const void* initData,
         IRenderer* renderer,
-        Slang::RefPtr<BufferResource>& bufferOut);
+        ComPtr<IBufferResource>& bufferOut);
 
         /// Create BindingState::Desc from the contents of layout
     static Slang::Result createBindingState(
         const ShaderInputLayout& layout,
         IRenderer* renderer,
-        BufferResource* addedConstantBuffer,
+        IBufferResource* addedConstantBuffer,
         BindingStateImpl** outBindingState);
 
 private:
@@ -87,7 +87,7 @@ private:
         ShaderInputLayoutEntry* srcEntries,
         int numEntries,
         IRenderer* renderer,
-        BufferResource* addedConstantBuffer,
+        IBufferResource* addedConstantBuffer,
         BindingStateImpl** outBindingState);
 };
 

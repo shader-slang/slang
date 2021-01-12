@@ -3,6 +3,7 @@
 
 #include <stdlib.h>
 #include <stdio.h>
+#include <string.h>
 
 #include "../../source/core/slang-list.h"
 
@@ -72,7 +73,7 @@ void MallocSurfaceAllocator::deallocate(Surface& surface)
 
 /* static */int Surface::calcRowSize(Format format, int width)
 {
-    size_t pixelSize = RendererUtil::getFormatSize(format);
+    size_t pixelSize = gfxGetFormatSize(format);
     if (pixelSize == 0)
     {
         return 0;

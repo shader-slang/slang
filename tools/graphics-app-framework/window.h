@@ -57,6 +57,7 @@ struct WindowDesc
 };
 
 Window* createWindow(WindowDesc const& desc);
+void destroyWindow(Window* window);
 void showWindow(Window* window);
 
 void* getPlatformWindowHandle(Window* window);
@@ -104,13 +105,23 @@ int runWindowsApplication(
     void*               instance,
     int                 showCommand);
 
+#ifdef _MSC_VER
+#ifdef _DEBUG
+#        define GFX_DUMP_LEAK _CrtDumpMemoryLeaks();
+#endif
+#endif
+#ifndef GFX_DUMP_LEAK
+#define GFX_DUMP_LEAK
+#endif
 #define GFX_UI_MAIN(APPLICATION_ENTRY)   \
     int __stdcall WinMain(              \
         void*   instance,               \
         void*   /* prevInstance */,     \
         void*   /* commandLine */,      \
         int     showCommand) {          \
-        return gfx::runWindowsApplication(&(APPLICATION_ENTRY), instance, showCommand); \
+        auto result = gfx::runWindowsApplication(&(APPLICATION_ENTRY), instance, showCommand); \
+        GFX_DUMP_LEAK                   \
+        return result; \
     }
 
 #else

@@ -140,7 +140,7 @@ public:
     static SlangResult writeBinding(BindRoot* bindRoot, const ShaderInputLayoutEntry& entry, const void* data, size_t sizeInBytes, Slang::WriterHelper writer);
 
         /// Write all bindings, using data from buffers
-    static SlangResult writeBindings(BindRoot* bindRoot, const ShaderInputLayout& layout, const List<BindSet::Value*>& buffers, Slang::WriterHelper writer);
+    static SlangResult writeBindings(BindRoot* bindRoot, const ShaderInputLayout& layout, const Slang::List<BindSet::Value*>& buffers, Slang::WriterHelper writer);
 
         /// Write bindings from values in memory from buffers
     static SlangResult writeBindings(BindRoot* bindRoot, const ShaderInputLayout& layout, const Slang::List<BindSet::Value*>& buffers, const Slang::String& fileName);

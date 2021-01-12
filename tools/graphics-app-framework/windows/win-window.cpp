@@ -293,6 +293,12 @@ Window* createWindow(WindowDesc const& desc)
     return window;
 }
 
+void destroyWindow(Window* window)
+{
+    DestroyWindow(window->handle);
+    delete window;
+}
+
 void showWindow(Window* window)
 {
     ShowWindow(window->handle, SW_SHOW);

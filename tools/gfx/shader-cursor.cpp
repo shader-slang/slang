@@ -13,7 +13,7 @@ Result gfx::ShaderCursor::getDereferenced(ShaderCursor& outCursor) const
     case slang::TypeReflection::Kind::ConstantBuffer:
     case slang::TypeReflection::Kind::ParameterBlock:
         {
-            ShaderObject* subObject = m_baseObject->getObject(m_offset);
+            auto subObject = m_baseObject->getObject(m_offset);
             outCursor = ShaderCursor(subObject);
             return SLANG_OK;
         }

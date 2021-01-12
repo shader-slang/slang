@@ -133,13 +133,13 @@ GUI::GUI(Window* window, IRenderer* inRenderer)
     spDestroyCompileRequest(slangRequest);
     spDestroySession(slangSession);
 
-    gfx::ShaderProgram::KernelDesc kernelDescs[] =
+    gfx::IShaderProgram::KernelDesc kernelDescs[] =
     {
         { gfx::StageType::Vertex,    vertexCode,     vertexCodeEnd },
         { gfx::StageType::Fragment,  fragmentCode,   fragmentCodeEnd },
     };
 
-    gfx::ShaderProgram::Desc programDesc;
+    gfx::IShaderProgram::Desc programDesc;
     programDesc.pipelineType = gfx::PipelineType::Graphics;
     programDesc.kernels = &kernelDescs[0];
     programDesc.kernelCount = 2;
@@ -160,21 +160,21 @@ GUI::GUI(Window* window, IRenderer* inRenderer)
 
     //
 
-    List<DescriptorSetLayout::SlotRangeDesc> descriptorSetRanges;
-    descriptorSetRanges.add(DescriptorSetLayout::SlotRangeDesc(DescriptorSlotType::UniformBuffer));
-    descriptorSetRanges.add(DescriptorSetLayout::SlotRangeDesc(DescriptorSlotType::SampledImage));
-    descriptorSetRanges.add(DescriptorSetLayout::SlotRangeDesc(DescriptorSlotType::Sampler));
+    Slang::List<IDescriptorSetLayout::SlotRangeDesc> descriptorSetRanges;
+    descriptorSetRanges.add(IDescriptorSetLayout::SlotRangeDesc(DescriptorSlotType::UniformBuffer));
+    descriptorSetRanges.add(IDescriptorSetLayout::SlotRangeDesc(DescriptorSlotType::SampledImage));
+    descriptorSetRanges.add(IDescriptorSetLayout::SlotRangeDesc(DescriptorSlotType::Sampler));
 
-    DescriptorSetLayout::Desc descriptorSetLayoutDesc;
+    IDescriptorSetLayout::Desc descriptorSetLayoutDesc;
     descriptorSetLayoutDesc.slotRangeCount = descriptorSetRanges.getCount();
     descriptorSetLayoutDesc.slotRanges = descriptorSetRanges.getBuffer();
 
     descriptorSetLayout = renderer->createDescriptorSetLayout(descriptorSetLayoutDesc);
 
-    List<PipelineLayout::DescriptorSetDesc> pipelineDescriptorSets;
-    pipelineDescriptorSets.add(PipelineLayout::DescriptorSetDesc(descriptorSetLayout));
+    Slang::List<IPipelineLayout::DescriptorSetDesc> pipelineDescriptorSets;
+    pipelineDescriptorSets.add(IPipelineLayout::DescriptorSetDesc(descriptorSetLayout));
 
-    PipelineLayout::Desc pipelineLayoutDesc;
+    IPipelineLayout::Desc pipelineLayoutDesc;
     pipelineLayoutDesc.descriptorSetCount = pipelineDescriptorSets.getCount();
     pipelineLayoutDesc.descriptorSets = pipelineDescriptorSets.getBuffer();
     pipelineLayoutDesc.renderTargetCount = 1;
@@ -209,31 +209,31 @@ GUI::GUI(Window* window, IRenderer* inRenderer)
     io.Fonts->GetTexDataAsRGBA32(&pixels, &width, &height);
 
     {
-        gfx::TextureResource::Desc desc;
-        desc.init2D(Resource::Type::Texture2D, Format::RGBA_Unorm_UInt8, width, height, 1);
-        desc.setDefaults(Resource::Usage::PixelShaderResource);
+        gfx::ITextureResource::Desc desc;
+        desc.init2D(IResource::Type::Texture2D, Format::RGBA_Unorm_UInt8, width, height, 1);
+        desc.setDefaults(IResource::Usage::PixelShaderResource);
 
 
         ptrdiff_t mipRowStrides[] = { ptrdiff_t(width * 4 * sizeof(unsigned char)) };
         void* subResourceData[] = { pixels };
-        TextureResource::Data initData;
+        ITextureResource::Data initData;
         initData.mipRowStrides = mipRowStrides;
         initData.numMips = 1;
         initData.numSubResources = 1;
         initData.subResources = subResourceData;
 
-        auto texture = renderer->createTextureResource(Resource::Usage::PixelShaderResource, desc, &initData);
+        auto texture = renderer->createTextureResource(IResource::Usage::PixelShaderResource, desc, &initData);
 
-        gfx::ResourceView::Desc viewDesc;
+        gfx::IResourceView::Desc viewDesc;
         viewDesc.format = desc.format;
-        viewDesc.type = ResourceView::Type::ShaderResource;
+        viewDesc.type = IResourceView::Type::ShaderResource;
         auto textureView = renderer->createTextureView(texture, viewDesc);
 
         io.Fonts->TexID = (void*) textureView.detach();
     }
 
     {
-        SamplerState::Desc desc;
+        ISamplerState::Desc desc;
         samplerState = renderer->createSamplerState(desc);
     }
 }
@@ -263,20 +263,20 @@ void GUI::endFrame()
 
     // Allocate transient vertex/index buffers to hold the data for this frame.
 
-    gfx::BufferResource::Desc vertexBufferDesc;
+    gfx::IBufferResource::Desc vertexBufferDesc;
     vertexBufferDesc.init(vertexCount * sizeof(ImDrawVert));
-    vertexBufferDesc.setDefaults(Resource::Usage::VertexBuffer);
-    vertexBufferDesc.cpuAccessFlags = Resource::AccessFlag::Write;
+    vertexBufferDesc.setDefaults(IResource::Usage::VertexBuffer);
+    vertexBufferDesc.cpuAccessFlags = IResource::AccessFlag::Write;
     auto vertexBuffer = renderer->createBufferResource(
-        Resource::Usage::VertexBuffer,
+        IResource::Usage::VertexBuffer,
         vertexBufferDesc);
 
-    gfx::BufferResource::Desc indexBufferDesc;
+    gfx::IBufferResource::Desc indexBufferDesc;
     indexBufferDesc.init(indexCount * sizeof(ImDrawIdx));
-    indexBufferDesc.setDefaults(Resource::Usage::IndexBuffer);
-    indexBufferDesc.cpuAccessFlags = Resource::AccessFlag::Write;
+    indexBufferDesc.setDefaults(IResource::Usage::IndexBuffer);
+    indexBufferDesc.cpuAccessFlags = IResource::AccessFlag::Write;
     auto indexBuffer = renderer->createBufferResource(
-        Resource::Usage::IndexBuffer,
+        IResource::Usage::IndexBuffer,
         indexBufferDesc);
 
     {
@@ -297,12 +297,12 @@ void GUI::endFrame()
     }
 
     // Allocate a transient constant buffer for projection matrix
-    gfx::BufferResource::Desc constantBufferDesc;
+    gfx::IBufferResource::Desc constantBufferDesc;
     constantBufferDesc.init(sizeof(glm::mat4x4));
-    constantBufferDesc.setDefaults(Resource::Usage::ConstantBuffer);
-    constantBufferDesc.cpuAccessFlags = Resource::AccessFlag::Write;
+    constantBufferDesc.setDefaults(IResource::Usage::ConstantBuffer);
+    constantBufferDesc.cpuAccessFlags = IResource::AccessFlag::Write;
     auto constantBuffer = renderer->createBufferResource(
-        Resource::Usage::ConstantBuffer,
+        IResource::Usage::ConstantBuffer,
         constantBufferDesc);
 
     {
@@ -371,7 +371,7 @@ void GUI::endFrame()
                 auto descriptorSet = renderer->createDescriptorSet(descriptorSetLayout);
                 descriptorSet->setConstantBuffer(0, 0, constantBuffer);
                 descriptorSet->setResource(1, 0,
-                    (gfx::ResourceView*) command->TextureId);
+                    (gfx::IResourceView*) command->TextureId);
                 descriptorSet->setSampler(2, 0,
                     samplerState);
 
@@ -394,8 +394,8 @@ GUI::~GUI()
     auto& io = ImGui::GetIO();
 
     {
-        RefPtr<ResourceView> textureView;
-        textureView.attach((ResourceView*) io.Fonts->TexID);
+        ComPtr<IResourceView> textureView;
+        textureView.attach((IResourceView*) io.Fonts->TexID);
         textureView = nullptr;
     }
 

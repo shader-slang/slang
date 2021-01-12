@@ -205,7 +205,7 @@ gfx::StageType translateStage(SlangStage slangStage)
         actualEntryPoints = request.entryPoints;
     }
 
-    List<ShaderProgram::KernelDesc> kernelDescs;
+    Slang::List<IShaderProgram::KernelDesc> kernelDescs;
 
     Index actualEntryPointCount = actualEntryPoints.getCount();
     for(Index ee = 0; ee < actualEntryPointCount; ++ee)
@@ -217,7 +217,7 @@ gfx::StageType translateStage(SlangStage slangStage)
 
         auto gfxStage = translateStage(actualEntryPoint.slangStage);
 
-        ShaderProgram::KernelDesc kernelDesc;
+        IShaderProgram::KernelDesc kernelDesc;
         kernelDesc.stage = gfxStage;
         kernelDesc.codeBegin = code;
         kernelDesc.codeEnd = code + codeSize;

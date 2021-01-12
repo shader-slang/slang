@@ -2,11 +2,12 @@
 #pragma once
 
 #include <cstdint>
+#include "slang.h"
 
 namespace gfx {
 
 class IRenderer;
 
-int32_t createD3D12Renderer(IRenderer** outRenderer);
+SlangResult SLANG_MCALL createD3D12Renderer(IRenderer** outRenderer);
 
 } // gfx

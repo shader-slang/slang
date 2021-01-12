@@ -25,7 +25,7 @@ namespace gfx
 ///
 struct ShaderCursor
 {
-    ShaderObject* m_baseObject = nullptr;
+    IShaderObject* m_baseObject = nullptr;
     slang::TypeLayoutReflection* m_typeLayout = nullptr;
     ShaderOffset m_offset;
 
@@ -90,7 +90,7 @@ struct ShaderCursor
 
     ShaderCursor() {}
 
-    ShaderCursor(ShaderObject* object)
+    ShaderCursor(IShaderObject* object)
         : m_baseObject(object)
         , m_typeLayout(object->getElementTypeLayout())
     {}
@@ -100,22 +100,22 @@ struct ShaderCursor
         return m_baseObject->setData(m_offset, data, size);
     }
 
-    SlangResult setObject(ShaderObject* object)
+    SlangResult setObject(IShaderObject* object)
     {
         return m_baseObject->setObject(m_offset, object);
     }
 
-    SlangResult setResource(ResourceView* resourceView)
+    SlangResult setResource(IResourceView* resourceView)
     {
         return m_baseObject->setResource(m_offset, resourceView);
     }
 
-    SlangResult setSampler(SamplerState* sampler)
+    SlangResult setSampler(ISamplerState* sampler)
     {
         return m_baseObject->setSampler(m_offset, sampler);
     }
 
-    SlangResult setCombinedTextureSampler(ResourceView* textureView, SamplerState* sampler)
+    SlangResult setCombinedTextureSampler(IResourceView* textureView, ISamplerState* sampler)
     {
         return m_baseObject->setCombinedTextureSampler(m_offset, textureView, sampler);
     }

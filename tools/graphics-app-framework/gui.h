@@ -6,10 +6,11 @@
 #include "window.h"
 #include "slang-com-ptr.h"
 #include "external/imgui/imgui.h"
+#include "source/core/slang-basic.h"
 
 namespace gfx {
 
-struct GUI : RefObject
+struct GUI : Slang::RefObject
 {
     GUI(Window* window, IRenderer* renderer);
     ~GUI();
@@ -19,10 +20,10 @@ struct GUI : RefObject
 
 private:
     Slang::ComPtr<IRenderer>    renderer;
-    RefPtr<PipelineState>       pipelineState;
-    RefPtr<DescriptorSetLayout> descriptorSetLayout;
-    RefPtr<PipelineLayout>      pipelineLayout;
-    RefPtr<SamplerState>        samplerState;
+    Slang::ComPtr<IPipelineState>       pipelineState;
+    Slang::ComPtr<IDescriptorSetLayout> descriptorSetLayout;
+    Slang::ComPtr<IPipelineLayout>      pipelineLayout;
+    Slang::ComPtr<ISamplerState>        samplerState;
 };
 
 } // gfx
