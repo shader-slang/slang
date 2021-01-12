@@ -1,11 +1,11 @@
 //TEST_CATEGORY(wave-mask, compute)
-//DISABLE_TEST:COMPARE_COMPUTE_EX:-cpu -compute 
-//DISABLE_TEST:COMPARE_COMPUTE_EX:-slang -compute
+//DISABLE_TEST:COMPARE_COMPUTE_EX:-cpu -compute -shaderobj
+//DISABLE_TEST:COMPARE_COMPUTE_EX:-slang -compute -shaderobj
 //Disabled on D3D, because in general WaveShuffle requires hardware that doesn't have the 'uniform laneId across Wave' restriction. 
-//DISABLE_TEST:COMPARE_COMPUTE_EX:-slang -compute -dx12 -use-dxil -profile cs_6_0
+//DISABLE_TEST:COMPARE_COMPUTE_EX:-slang -compute -dx12 -use-dxil -profile cs_6_0 -shaderobj
 // Disabled because vk doesn't currently support matrix types. See wave-shuffle-vk.slang
-//DISABLE_TEST(vulkan):COMPARE_COMPUTE_EX:-vk -compute
-//TEST:COMPARE_COMPUTE_EX:-cuda -compute
+//DISABLE_TEST(vulkan):COMPARE_COMPUTE_EX:-vk -compute -shaderobj
+//TEST:COMPARE_COMPUTE_EX:-cuda -compute -shaderobj
 
 //TEST_INPUT:ubuffer(data=[0 0 0 0], stride=4):out,name outputBuffer
 RWStructuredBuffer<int> outputBuffer;

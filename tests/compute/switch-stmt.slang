@@ -1,5 +1,4 @@
-//TEST(compute):COMPARE_COMPUTE:
-//TEST_INPUT:ubuffer(data=[0 1 2 3 4 5 6 7], stride=4):out
+//TEST(compute):COMPARE_COMPUTE: -shaderobj
 
 // Test that `swith` statement works
 
@@ -30,6 +29,7 @@ int test(int inVal)
 	return result;
 }
 
+//TEST_INPUT:ubuffer(data=[0 1 2 3 4 5 6 7], stride=4):out,name=outputBuffer
 RWStructuredBuffer<int> outputBuffer : register(u0);
 
 [numthreads(8, 1, 1)]

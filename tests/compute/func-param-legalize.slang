@@ -1,4 +1,4 @@
-//TEST(compute):COMPARE_COMPUTE:
+//TEST(compute):COMPARE_COMPUTE: -shaderobj
 
 struct Param
 {

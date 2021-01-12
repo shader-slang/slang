@@ -1,5 +1,5 @@
 //TEST(compute):COMPARE_COMPUTE:-cpu
-//TEST(compute):COMPARE_COMPUTE:
+//TEST(compute):COMPARE_COMPUTE: -shaderobj
 
 //TEST_INPUT:ubuffer(data=[0 0 0 0], stride=4):out,name=outputBuffer
 //TEST_INPUT:ubuffer(data=[0 2 3 3]):name=s[0].a

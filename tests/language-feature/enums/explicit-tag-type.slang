@@ -2,7 +2,7 @@
 
 // Test that the underlying "tag type" of an `enum` can be set.
 
-//TEST(compute):COMPARE_COMPUTE:
+//TEST(compute):COMPARE_COMPUTE: -shaderobj
 
 enum Channel : uint
 {

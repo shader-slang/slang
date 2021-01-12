@@ -1,14 +1,14 @@
 // atomics-buffer.slang
 
-//TEST(compute):COMPARE_COMPUTE_EX:-slang -compute
-//TEST(compute):COMPARE_COMPUTE_EX:-slang -compute -dx12
+//TEST(compute):COMPARE_COMPUTE_EX:-slang -compute -shaderobj
+//TEST(compute):COMPARE_COMPUTE_EX:-slang -compute -dx12 -shaderobj
 // Doesn't work on VK - GLSL output doesn't replace InterlockedAdd.  
-//DISABLE_TEST(compute):COMPARE_COMPUTE_EX:-slang -compute -vk
+//DISABLE_TEST(compute):COMPARE_COMPUTE_EX:-slang -compute -vk -shaderobj
 // Cannot work on CUDA, as outputBuffer becomes a CUsurfObject - which do not appear to have atomics available.
 // If the buffer was a StructuredBuffer this would work on CUDA.
-//DISABLE_TEST(compute):COMPARE_COMPUTE_EX:-slang -compute -cuda
+//DISABLE_TEST(compute):COMPARE_COMPUTE_EX:-slang -compute -cuda -shaderobj
 // Atomics not available on CPU currently
-//DISABLE_TEST(compute):COMPARE_COMPUTE_EX:-slang -compute -cpu
+//DISABLE_TEST(compute):COMPARE_COMPUTE_EX:-slang -compute -cpu -shaderobj
 
 //TEST_INPUT:ubuffer(format=R_UInt32, data=[0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0]):out,name outputBuffer
 

@@ -1,8 +1,8 @@
 // static-const-array.slang
 
-//TEST(compute):COMPARE_COMPUTE_EX:-slang -compute -output-using-type
-//TEST(compute, vulkan):COMPARE_COMPUTE_EX:-vk -compute -output-using-type
-//TEST(compute):COMPARE_COMPUTE_EX:-cpu -slang -compute -output-using-type
+//TEST(compute):COMPARE_COMPUTE_EX:-slang -compute -output-using-type -shaderobj
+//TEST(compute, vulkan):COMPARE_COMPUTE_EX:-vk -compute -output-using-type -shaderobj
+//TEST(compute):COMPARE_COMPUTE_EX:-cpu -slang -compute -output-using-type -shaderobj
 
 //TEST_INPUT:ubuffer(data=[0 0 0 0  0 0 0 0], stride=4):out, name outputBuffer
 RWStructuredBuffer<float> outputBuffer;
