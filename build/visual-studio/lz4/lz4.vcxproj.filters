@@ -1,0 +1,27 @@
+<?xml version="1.0" encoding="utf-8"?>
+<Project ToolsVersion="4.0" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+  <ItemGroup>
+    <Filter Include="Header Files">
+      <UniqueIdentifier>{21EB8090-0D4E-1035-B6D3-48EBA215DCB7}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="external">
+      <UniqueIdentifier>{2839F3DC-1406-4EE8-3D1F-3C90294B8376}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="external\lz4">
+      <UniqueIdentifier>{512ED728-3D91-66CD-E616-9F83D2583250}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="external\lz4\lib">
+      <UniqueIdentifier>{F78D9302-E386-B254-0CB9-97D9F8109260}</UniqueIdentifier>
+    </Filter>
+  </ItemGroup>
+  <ItemGroup>
+    <ClInclude Include="..\..\..\external\lz4\lib\lz4.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+  </ItemGroup>
+  <ItemGroup>
+    <ClCompile Include="..\..\..\external\lz4\lib\lz4.c">
+      <Filter>external\lz4\lib</Filter>
+    </ClCompile>
+  </ItemGroup>
+</Project>
