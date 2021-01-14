@@ -1,7 +1,7 @@
 #ifndef SLANG_CORE_MATH_H
 #define SLANG_CORE_MATH_H
 
-#include <math.h>
+#include <cmath>
 
 namespace Slang
 {
@@ -82,16 +82,12 @@ namespace Slang
 
 		static inline int IsNaN(float x)
 		{
-#ifdef _M_X64
-			return _isnanf(x);
-#else
-			return isnan(x);
-#endif
+			return std::isnan(x);
 		}
 
 		static inline int IsInf(float x)
 		{
-			return isinf(x);
+			return std::isinf(x);
 		}
 
 		static inline unsigned int Ones32(unsigned int x)

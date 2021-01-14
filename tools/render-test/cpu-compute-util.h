@@ -20,7 +20,7 @@ struct CPUComputeUtil
         GroupRange,
     };
 
-    struct Resource : public RefObject
+    struct Resource : public Slang::RefObject
     {
         void* getInterface() const { return m_interface; }
         void* m_interface;
@@ -33,10 +33,10 @@ struct CPUComputeUtil
         CPULikeBindRoot m_bindRoot;
 
             /// Buffers are held in same order as entries in layout (useful for dumping out bindings)
-        List<BindSet::Value*> m_buffers;
+        Slang::List<BindSet::Value*> m_buffers;
 
             /// Bindless resource objects
-        Slang::OrderedDictionary<Slang::String, RefPtr<Resource>> m_bindlessResources;
+        Slang::OrderedDictionary<Slang::String, Slang::RefPtr<Resource>> m_bindlessResources;
     };
 
     struct ExecuteInfo

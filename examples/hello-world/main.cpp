@@ -36,8 +36,10 @@
 #include "gfx/d3d11/render-d3d11.h"
 #include "tools/graphics-app-framework/window.h"
 #include "slang-com-ptr.h"
+#include "source/core/slang-basic.h"
 
 using namespace gfx;
+using namespace Slang;
 
 // For the purposes of a small example, we will define the vertex data for a
 // single triangle directly in the source file. It should be easy to extend
@@ -72,7 +74,7 @@ struct HelloWorld
 // Slang API. This function is representative of code that a user
 // might write to integrate Slang into their renderer/engine.
 //
-RefPtr<gfx::ShaderProgram> loadShaderProgram(gfx::IRenderer* renderer)
+ComPtr<gfx::IShaderProgram> loadShaderProgram(gfx::IRenderer* renderer)
 {
     // First, we need to create a "session" for interacting with the Slang
     // compiler. This scopes all of our application's interactions
@@ -183,13 +185,13 @@ RefPtr<gfx::ShaderProgram> loadShaderProgram(gfx::IRenderer* renderer)
     // Reminder: this section does not involve the Slang API at all.
     //
 
-    gfx::ShaderProgram::KernelDesc kernelDescs[] =
+    gfx::IShaderProgram::KernelDesc kernelDescs[] =
     {
         { gfx::StageType::Vertex,    vertexCode,     vertexCodeEnd },
         { gfx::StageType::Fragment,  fragmentCode,   fragmentCodeEnd },
     };
 
-    gfx::ShaderProgram::Desc programDesc;
+    gfx::IShaderProgram::Desc programDesc;
     programDesc.pipelineType = gfx::PipelineType::Graphics;
     programDesc.kernels = &kernelDescs[0];
     programDesc.kernelCount = 2;
@@ -230,19 +232,19 @@ int gWindowHeight = 768;
 gfx::ApplicationContext*    gAppContext;
 gfx::Window*                gWindow;
 Slang::ComPtr<gfx::IRenderer>       gRenderer;
-RefPtr<gfx::BufferResource> gConstantBuffer;
+ComPtr<gfx::IBufferResource> gConstantBuffer;
 
-RefPtr<gfx::PipelineLayout> gPipelineLayout;
-RefPtr<gfx::PipelineState>  gPipelineState;
-RefPtr<gfx::DescriptorSet>  gDescriptorSet;
+ComPtr<gfx::IPipelineLayout> gPipelineLayout;
+ComPtr<gfx::IPipelineState> gPipelineState;
+ComPtr<gfx::IDescriptorSet> gDescriptorSet;
 
-RefPtr<gfx::BufferResource> gVertexBuffer;
+ComPtr<gfx::IBufferResource> gVertexBuffer;
 
 // Now that we've covered the function that actually loads and
 // compiles our Slang shade code, we can go through the rest
 // of the application code without as much commentary.
 //
-Result initialize()
+Slang::Result initialize()
 {
     // Create a window for our application to render into.
     //
@@ -264,7 +266,7 @@ Result initialize()
     rendererDesc.width = gWindowWidth;
     rendererDesc.height = gWindowHeight;
     {
-        Result res = gRenderer->initialize(rendererDesc, getPlatformWindowHandle(gWindow));
+        gfx::Result res = gRenderer->initialize(rendererDesc, getPlatformWindowHandle(gWindow));
         if(SLANG_FAILED(res)) return res;
     }
 
@@ -278,13 +280,13 @@ Result initialize()
     //
     int constantBufferSize = 16 * sizeof(float);
 
-    BufferResource::Desc constantBufferDesc;
+    IBufferResource::Desc constantBufferDesc;
     constantBufferDesc.init(constantBufferSize);
-    constantBufferDesc.setDefaults(Resource::Usage::ConstantBuffer);
-    constantBufferDesc.cpuAccessFlags = Resource::AccessFlag::Write;
+    constantBufferDesc.setDefaults(IResource::Usage::ConstantBuffer);
+    constantBufferDesc.cpuAccessFlags = IResource::AccessFlag::Write;
 
     gConstantBuffer = gRenderer->createBufferResource(
-        Resource::Usage::ConstantBuffer,
+        IResource::Usage::ConstantBuffer,
         constantBufferDesc);
     if(!gConstantBuffer) return SLANG_FAIL;
 
@@ -305,11 +307,11 @@ Result initialize()
     // Next we allocate a vertex buffer for our pre-initialized
     // vertex data.
     //
-    BufferResource::Desc vertexBufferDesc;
+    IBufferResource::Desc vertexBufferDesc;
     vertexBufferDesc.init(kVertexCount * sizeof(Vertex));
-    vertexBufferDesc.setDefaults(Resource::Usage::VertexBuffer);
+    vertexBufferDesc.setDefaults(IResource::Usage::VertexBuffer);
     gVertexBuffer = gRenderer->createBufferResource(
-        Resource::Usage::VertexBuffer,
+        IResource::Usage::VertexBuffer,
         vertexBufferDesc,
         &kVertexData[0]);
     if(!gVertexBuffer) return SLANG_FAIL;
@@ -317,7 +319,7 @@ Result initialize()
     // Now we will use our `loadShaderProgram` function to load
     // the code from `shaders.slang` into the graphics API.
     //
-    RefPtr<ShaderProgram> shaderProgram = loadShaderProgram(gRenderer);
+    ComPtr<IShaderProgram> shaderProgram = loadShaderProgram(gRenderer);
     if(!shaderProgram) return SLANG_FAIL;
 
     // Our example graphics API usess a "modern" D3D12/Vulkan style
@@ -326,11 +328,11 @@ Result initialize()
     //
     // First, we need to construct a descriptor set *layout*.
     //
-    DescriptorSetLayout::SlotRangeDesc slotRanges[] =
+    IDescriptorSetLayout::SlotRangeDesc slotRanges[] =
     {
-        DescriptorSetLayout::SlotRangeDesc(DescriptorSlotType::UniformBuffer),
+        IDescriptorSetLayout::SlotRangeDesc(DescriptorSlotType::UniformBuffer),
     };
-    DescriptorSetLayout::Desc descriptorSetLayoutDesc;
+    IDescriptorSetLayout::Desc descriptorSetLayoutDesc;
     descriptorSetLayoutDesc.slotRangeCount = 1;
     descriptorSetLayoutDesc.slotRanges = &slotRanges[0];
     auto descriptorSetLayout = gRenderer->createDescriptorSetLayout(descriptorSetLayoutDesc);
@@ -340,11 +342,11 @@ Result initialize()
     // that we will render with only a single descriptor set bound.
     //
 
-    PipelineLayout::DescriptorSetDesc descriptorSets[] =
+    IPipelineLayout::DescriptorSetDesc descriptorSets[] =
     {
-        PipelineLayout::DescriptorSetDesc( descriptorSetLayout ),
+        IPipelineLayout::DescriptorSetDesc( descriptorSetLayout ),
     };
-    PipelineLayout::Desc pipelineLayoutDesc;
+    IPipelineLayout::Desc pipelineLayoutDesc;
     pipelineLayoutDesc.renderTargetCount = 1;
     pipelineLayoutDesc.descriptorSetCount = 1;
     pipelineLayoutDesc.descriptorSets = &descriptorSets[0];

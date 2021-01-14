@@ -1,9 +1,10 @@
-﻿#ifndef SLANG_COM_PTR_H
+#ifndef SLANG_COM_PTR_H
 #define SLANG_COM_PTR_H
 
 #include "slang-com-helper.h"
 
 #include <assert.h>
+#include <cstddef>
 
 namespace Slang {
 
@@ -54,6 +55,7 @@ public:
 		/// Constructors
 		/// Default Ctor. Sets to nullptr
 	SLANG_FORCE_INLINE ComPtr() :m_ptr(nullptr) {}
+    SLANG_FORCE_INLINE ComPtr(std::nullptr_t) : m_ptr(nullptr) {}
 		/// Sets, and ref counts.
 	SLANG_FORCE_INLINE explicit ComPtr(T* ptr) :m_ptr(ptr) { if (ptr) ((Ptr)ptr)->addRef(); }
 		/// The copy ctor

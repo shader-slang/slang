@@ -8,6 +8,7 @@
 *.ilk
 *.obj
 *.slang-module
+*.zip
 .clang-format
 bin/
 intermediate/
