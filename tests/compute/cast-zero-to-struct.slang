@@ -3,8 +3,8 @@
 // Test that HLSL legacy syntax for casting from literal zero
 // to a `struct` type works.
 
-//TEST(compute):COMPARE_COMPUTE:
-//TEST(compute):COMPARE_COMPUTE:-cpu
+//TEST(compute):COMPARE_COMPUTE: -shaderobj
+//TEST(compute):COMPARE_COMPUTE:-cpu -shaderobj
 
 struct S
 {

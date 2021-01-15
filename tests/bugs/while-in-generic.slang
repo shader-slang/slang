@@ -1,4 +1,4 @@
-//TEST(compute):COMPARE_COMPUTE_EX:-slang -compute
+//TEST(compute):COMPARE_COMPUTE_EX:-slang -compute -shaderobj
 struct Context
 {
     int genFunc<TGenType>(TGenType t)

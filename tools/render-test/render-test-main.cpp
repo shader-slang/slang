@@ -392,8 +392,38 @@ SlangResult _assignVarsFromLayout(
         case ShaderInputType::Object:
             {
                 auto typeName = entry.objectDesc.typeName;
-                auto slangType = slangReflection->findTypeByName(typeName.getBuffer());
-                auto slangTypeLayout = slangReflection->getTypeLayout(slangType);
+                slang::TypeLayoutReflection* slangTypeLayout = nullptr;
+                if(typeName.getLength() != 0)
+                {
+                    // If the input line specified the name of the type
+                    // to allocate, then we use it directly.
+                    //
+                    auto slangType = slangReflection->findTypeByName(typeName.getBuffer());
+                    slangTypeLayout = slangReflection->getTypeLayout(slangType);
+                }
+                else
+                {
+                    // if the user did not specify what type to allocate,
+                    // then we will infer the type from the type of the
+                    // value pointed to by `entryCursor`.
+                    //
+                    slangTypeLayout = entryCursor.getTypeLayout();
+                    switch(slangTypeLayout->getKind())
+                    {
+                    default:
+                        break;
+
+                    case slang::TypeReflection::Kind::ConstantBuffer:
+                    case slang::TypeReflection::Kind::ParameterBlock:
+                        // If the cursor is pointing at a constant buffer
+                        // or parameter block, then we assume the user
+                        // actually means to allocate an object based on
+                        // the element type of the block.
+                        //
+                        slangTypeLayout = slangTypeLayout->getElementTypeLayout();
+                        break;
+                    }
+                }
 
                 ComPtr<IShaderObjectLayout> shaderObjectLayout = renderer->createShaderObjectLayout(slangTypeLayout);
                 ComPtr<IShaderObject> shaderObject =

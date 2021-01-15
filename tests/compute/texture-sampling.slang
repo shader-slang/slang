@@ -1,14 +1,14 @@
-//TEST(compute):COMPARE_RENDER_COMPUTE:
+//TEST(compute):COMPARE_RENDER_COMPUTE: -shaderobj
 
-//TEST_INPUT: Texture1D(size=4, content = one):
-//TEST_INPUT: Texture2D(size=4, content = one):
-//TEST_INPUT: Texture3D(size=4, content = one):
-//TEST_INPUT: TextureCube(size=4, content = one):
-//TEST_INPUT: Texture1D(size=4, content = one, arrayLength=2):
-//TEST_INPUT: Texture2D(size=4, content = one, arrayLength=2):
-//TEST_INPUT: TextureCube(size=4, content = one, arrayLength=2):
-//TEST_INPUT: Sampler:
-//TEST_INPUT: ubuffer(data=[0], stride=4):out
+//TEST_INPUT: Texture1D(size=4, content = one):name=t1D
+//TEST_INPUT: Texture2D(size=4, content = one):name=t2D
+//TEST_INPUT: Texture3D(size=4, content = one):name=t3D
+//TEST_INPUT: TextureCube(size=4, content = one):name=tCube
+//TEST_INPUT: Texture1D(size=4, content = one, arrayLength=2):name=t1dArray
+//TEST_INPUT: Texture2D(size=4, content = one, arrayLength=2):name=t2dArray
+//TEST_INPUT: TextureCube(size=4, content = one, arrayLength=2):name=tCubeArray
+//TEST_INPUT: Sampler:name=samplerState
+//TEST_INPUT: ubuffer(data=[0], stride=4):out,name=outputBuffer
 
 Texture1D t1D;
 Texture2D t2D;

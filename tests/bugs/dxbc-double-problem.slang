@@ -1,8 +1,8 @@
-//TEST(compute):COMPARE_COMPUTE_EX:-slang -compute -output-using-type
-//TEST(compute, vulkan):COMPARE_COMPUTE_EX:-vk -compute -output-using-type
-//TEST(compute):COMPARE_COMPUTE_EX:-cpu -compute -output-using-type
-//TEST(compute):COMPARE_COMPUTE_EX:-dx12 -compute -use-dxil -output-using-type
-//DISABLE_TEST(compute):COMPARE_COMPUTE_EX:-dx12 -compute -output-using-type
+//TEST(compute):COMPARE_COMPUTE_EX:-slang -compute -output-using-type -shaderobj
+//TEST(compute, vulkan):COMPARE_COMPUTE_EX:-vk -compute -output-using-type -shaderobj
+//TEST(compute):COMPARE_COMPUTE_EX:-cpu -compute -output-using-type -shaderobj
+//TEST(compute):COMPARE_COMPUTE_EX:-dx12 -compute -use-dxil -output-using-type -shaderobj
+//DISABLE_TEST(compute):COMPARE_COMPUTE_EX:-dx12 -compute -output-using-type -shaderobj
 
 // The problem this test shows is around handling of double with dxbc on D3D12. In that combination
 // this code does not write the correct value into the first element - it appears as 0, where 

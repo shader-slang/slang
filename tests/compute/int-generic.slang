@@ -1,4 +1,4 @@
-//TEST(compute):COMPARE_COMPUTE:
+//TEST(compute):COMPARE_COMPUTE: -shaderobj
 
 //TEST_INPUT:type Material<1,2>
 

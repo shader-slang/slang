@@ -1,4 +1,4 @@
-//TEST(compute):COMPARE_COMPUTE:
+//TEST(compute):COMPARE_COMPUTE: -shaderobj
 //TEST_INPUT:ubuffer(data=[0 1 2 3], stride=4):out,name outputBuffer
 
 // Test that "operator comma" works as expected

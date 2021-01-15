@@ -1,8 +1,8 @@
 // enum-conversion2.slang
 
-//TEST(compute):COMPARE_COMPUTE_EX:-slang -compute
-//TEST(compute, vulkan):COMPARE_COMPUTE_EX:-vk -compute
-//TEST(compute):COMPARE_COMPUTE_EX:-cpu -compute
+//TEST(compute):COMPARE_COMPUTE_EX:-slang -compute -shaderobj
+//TEST(compute, vulkan):COMPARE_COMPUTE_EX:-vk -compute -shaderobj
+//TEST(compute):COMPARE_COMPUTE_EX:-cpu -compute -shaderobj
 
 // More significant stress testing of `enum` types
 

@@ -3,7 +3,7 @@
 // Test that equality (and inequality) of `enum`
 // types works as expected.
 
-//TEST(compute):COMPARE_COMPUTE:
+//TEST(compute):COMPARE_COMPUTE: -shaderobj
 
 enum Channel
 {

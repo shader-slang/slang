@@ -1,10 +1,10 @@
 // This test is to see what intrinsics are available on VK
 
-//TEST(compute):COMPARE_COMPUTE_EX:-cpu -compute -output-using-type
-//TEST(compute, vulkan):COMPARE_COMPUTE_EX:-vk -compute -output-using-type
+//TEST(compute):COMPARE_COMPUTE_EX:-cpu -compute -output-using-type -shaderobj
+//TEST(compute, vulkan):COMPARE_COMPUTE_EX:-vk -compute -output-using-type -shaderobj
 
 // We don't want to run a cuda test here...
-//DISABLE_TEST(compute):COMPARE_COMPUTE_EX:-cuda -compute
+//DISABLE_TEST(compute):COMPARE_COMPUTE_EX:-cuda -compute -shaderobj
 
 //TEST_INPUT:ubuffer(data=[0 0 0 0 0 0 0 0], stride=4):out,name outputBuffer
 RWStructuredBuffer<double> outputBuffer;
