@@ -182,6 +182,7 @@ ComPtr<ISamplerState> _createSamplerState(IRenderer* renderer,
     const int textureBindFlags = IResource::BindFlag::NonPixelShaderResource | IResource::BindFlag::PixelShaderResource;
 
     List<IDescriptorSetLayout::SlotRangeDesc> slotRangeDescs;
+    List<Index> mapEntryToSlotRange;
 
     if(addedConstantBuffer)
     {
@@ -196,6 +197,7 @@ ComPtr<ISamplerState> _createSamplerState(IRenderer* renderer,
         const ShaderInputLayoutEntry& srcEntry = srcEntries[i];
         SLANG_ASSERT(srcEntry.onlyCPULikeBinding == false);
 
+        mapEntryToSlotRange.add(slotRangeDescs.getCount());
         IDescriptorSetLayout::SlotRangeDesc slotRangeDesc;
 
         switch (srcEntry.type)
@@ -252,6 +254,10 @@ ComPtr<ISamplerState> _createSamplerState(IRenderer* renderer,
                 slotRangeDesc.type = DescriptorSlotType::Sampler;
                 break;
 
+            case ShaderInputType::Object:
+                // We ignore the `Object` case here, knowing that it is meant for the shader-object path.
+                continue;
+
             default:
                 assert(!"Unhandled type");
                 return SLANG_FAIL;
@@ -290,7 +296,7 @@ ComPtr<ISamplerState> _createSamplerState(IRenderer* renderer,
     {
         const ShaderInputLayoutEntry& srcEntry = srcEntries[i];
 
-        auto rangeIndex = i + (addedConstantBuffer ? 1 : 0);
+        auto rangeIndex = mapEntryToSlotRange[i];
 
         switch (srcEntry.type)
         {
@@ -405,6 +411,9 @@ ComPtr<ISamplerState> _createSamplerState(IRenderer* renderer,
                     auto sampler = _createSamplerState(renderer, srcEntry.samplerDesc);
                     descriptorSet->setSampler(rangeIndex, 0, sampler);
                 }
+                break;
+
+            case ShaderInputType::Object:
                 break;
 
             default:

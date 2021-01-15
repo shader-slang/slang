@@ -1,4 +1,4 @@
-//TEST(smoke,compute):COMPARE_COMPUTE:
+//TEST(smoke,compute):COMPARE_COMPUTE: -shaderobj
 
 //TEST_INPUT:type Wrapper<Impl>
 

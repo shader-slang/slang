@@ -592,6 +592,10 @@ public:
             {
                 info.rangeOffset = m_descriptorSetBuildInfos[0]->slotRangeDescs.getCount();
             }
+            else
+            {
+                info.rangeOffset = 0;
+            }
 
             auto slangEntryPointLayout = entryPointLayout->getSlangLayout();
             _addDescriptorSets(
@@ -647,7 +651,20 @@ protected:
         }
 
         IPipelineLayout::Desc pipelineLayoutDesc;
-        pipelineLayoutDesc.renderTargetCount = m_renderTargetCount;
+
+        // HACK: we set `renderTargetCount` to zero here becasue otherwise the D3D12
+        // render back-end will adjust all UAV registers by this value to account
+        // for the `SV_Target<N>` outputs implicitly consuming `u<N>` registers for
+        // Shader Model 5.0.
+        //
+        // When using the shader object path, all registers are being set via Slang
+        // reflection information, and we do not need/want the automatic adjustment.
+        //
+        // TODO: Once we eliminate the non-shader-object path, this whole issue should
+        // be moot, because the `ProgramLayout` should own/be the pipeline layout anyway.
+        //
+        pipelineLayoutDesc.renderTargetCount = 0;
+
         pipelineLayoutDesc.descriptorSetCount = pipelineDescriptorSets.getCount();
         pipelineLayoutDesc.descriptorSets = pipelineDescriptorSets.getBuffer();
 

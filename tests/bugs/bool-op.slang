@@ -1,6 +1,6 @@
 // enum.slang
-//TEST(compute):COMPARE_COMPUTE_EX:-slang -compute
-//TEST(compute, vulkan):COMPARE_COMPUTE_EX:-vk -compute
+//TEST(compute):COMPARE_COMPUTE_EX:-slang -compute -shaderobj
+//TEST(compute, vulkan):COMPARE_COMPUTE_EX:-vk -compute -shaderobj
 
 // Confirm operations that produce bools - such as comparisons, or && ||, ! work correctly
 

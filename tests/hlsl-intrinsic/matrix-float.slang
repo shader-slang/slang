@@ -1,11 +1,11 @@
 // TODO(JS):
 // NOTE we can't test on VK/gl at the moment because we don't support intrinsics over matrices on that target currently
 
-//TEST(compute):COMPARE_COMPUTE_EX:-cpu -compute -output-using-type
-//TEST(compute):COMPARE_COMPUTE_EX:-slang -compute -output-using-type
-//TEST(compute):COMPARE_COMPUTE_EX:-slang -compute -dx12 -use-dxil -output-using-type
-//DISABLE_TEST(compute, vulkan):COMPARE_COMPUTE_EX:-vk -compute -output-using-type
-//TEST(compute, vulkan):COMPARE_COMPUTE_EX:-cuda -compute -output-using-type
+//TEST(compute):COMPARE_COMPUTE_EX:-cpu -compute -output-using-type -shaderobj
+//TEST(compute):COMPARE_COMPUTE_EX:-slang -compute -output-using-type -shaderobj
+//TEST(compute):COMPARE_COMPUTE_EX:-slang -compute -dx12 -use-dxil -output-using-type -shaderobj
+//DISABLE_TEST(compute, vulkan):COMPARE_COMPUTE_EX:-vk -compute -output-using-type -shaderobj
+//TEST(compute, vulkan):COMPARE_COMPUTE_EX:-cuda -compute -output-using-type -shaderobj
 
 //TEST_INPUT:ubuffer(data=[0 0 0 0], stride=4):out,name outputBuffer
 RWStructuredBuffer<float> outputBuffer;

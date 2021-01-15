@@ -1,5 +1,5 @@
-//TEST(smoke,compute):COMPARE_COMPUTE:
-//TEST(smoke,compute):COMPARE_COMPUTE:-cpu
+//TEST(smoke,compute):COMPARE_COMPUTE: -shaderobj
+//TEST(smoke,compute):COMPARE_COMPUTE:-cpu -shaderobj
 
 // Use interface constraints on a generic parameter
 

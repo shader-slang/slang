@@ -549,12 +549,12 @@ public:
         {
             if (cudaView->desc.type == IResourceView::Type::UnorderedAccess)
             {
-                auto handle = cudaView->textureResource->getBindlessHandle();
+                auto handle = cudaView->textureResource->m_cudaSurfObj;
                 setData(offset, &handle, sizeof(uint64_t));
             }
             else
             {
-                auto handle = cudaView->textureResource->m_cudaSurfObj;
+                auto handle = cudaView->textureResource->getBindlessHandle();
                 setData(offset, &handle, sizeof(uint64_t));
             }
         }
@@ -814,6 +814,38 @@ private:
         CUresourcetype resourceType;
         size_t elementSize = 0;
 
+        // Our `ITextureResource::Desc` uses an enumeration to specify
+        // the "shape"/rank of a texture (1D, 2D, 3D, Cube), but CUDA's
+        // `cuMipmappedArrayCreate` seemingly relies on a policy where
+        // the extents of the array in dimenions above the rank are
+        // specified as zero (e.g., a 1D texture requires `height==0`).
+        //
+        // We will start by massaging the extents as specified by the
+        // user into a form that CUDA wants/expects, based on the
+        // texture shape as specified in the `desc`.
+        //
+        int width = desc.size.width;
+        int height = desc.size.height;
+        int depth = desc.size.depth;
+        switch (desc.type)
+        {
+        case IResource::Type::Texture1D:
+            height = 0;
+            depth = 0;
+            break;
+
+        case IResource::Type::Texture2D:
+            depth = 0;
+            break;
+
+        case IResource::Type::Texture3D:
+            break;
+
+        case IResource::Type::TextureCube:
+            depth = 1;
+            break;
+        }
+
         {
             CUarray_format format = CU_AD_FORMAT_FLOAT;
             int numChannels = 0;
@@ -848,9 +880,9 @@ private:
                 CUDA_ARRAY3D_DESCRIPTOR arrayDesc;
                 memset(&arrayDesc, 0, sizeof(arrayDesc));
 
-                arrayDesc.Width = desc.size.width;
-                arrayDesc.Height = desc.size.height;
-                arrayDesc.Depth = desc.size.depth;
+                arrayDesc.Width = width;
+                arrayDesc.Height = height;
+                arrayDesc.Depth = depth;
                 arrayDesc.Format = format;
                 arrayDesc.NumChannels = numChannels;
                 arrayDesc.Flags = 0;
@@ -904,8 +936,8 @@ private:
                         arrayDesc.Depth *= 6;
                     }
 
-                    arrayDesc.Height = desc.size.height;
-                    arrayDesc.Width = desc.size.width;
+                    arrayDesc.Height = height;
+                    arrayDesc.Width = width;
                     arrayDesc.Format = format;
                     arrayDesc.NumChannels = numChannels;
 
@@ -922,9 +954,9 @@ private:
                     CUDA_ARRAY3D_DESCRIPTOR arrayDesc;
                     memset(&arrayDesc, 0, sizeof(arrayDesc));
 
-                    arrayDesc.Depth = desc.size.depth;
-                    arrayDesc.Height = desc.size.height;
-                    arrayDesc.Width = desc.size.width;
+                    arrayDesc.Depth = depth;
+                    arrayDesc.Height = height;
+                    arrayDesc.Width = width;
                     arrayDesc.Format = format;
                     arrayDesc.NumChannels = numChannels;
 
@@ -944,8 +976,8 @@ private:
                     CUDA_ARRAY_DESCRIPTOR arrayDesc;
                     memset(&arrayDesc, 0, sizeof(arrayDesc));
 
-                    arrayDesc.Height = desc.size.height;
-                    arrayDesc.Width = desc.size.width;
+                    arrayDesc.Height = height;
+                    arrayDesc.Width = width;
                     arrayDesc.Format = format;
                     arrayDesc.NumChannels = numChannels;
 
@@ -957,9 +989,6 @@ private:
 
         // Work space for holding data for uploading if it needs to be rearranged
         List<uint8_t> workspace;
-        auto width = desc.size.width;
-        auto height = desc.size.height;
-        auto depth = desc.size.depth;
         for (int mipLevel = 0; mipLevel < desc.numMipLevels; ++mipLevel)
         {
             int mipWidth = width >> mipLevel;
@@ -1152,8 +1181,22 @@ private:
                 resDesc.res.mipmap.hMipmappedArray = tex->m_cudaMipMappedArray;
             }
 
-            // Create handle for uav.
-            SLANG_CUDA_RETURN_ON_FAIL(cuSurfObjectCreate(&tex->m_cudaSurfObj, &resDesc));
+            // If the texture might be used as a UAV, then we need to allocate
+            // a CUDA "surface" for it.
+            //
+            // Note: We cannot do this unconditionally, because it will fail
+            // on surfaces that are not usable as UAVs (e.g., those with
+            // mipmaps).
+            //
+            // TODO: We should really only be allocating the array at the
+            // time we create a resource, and then allocate the surface or
+            // texture objects as part of view creation.
+            //
+            if( desc.bindFlags & IResource::BindFlag::UnorderedAccess )
+            {
+                SLANG_CUDA_RETURN_ON_FAIL(cuSurfObjectCreate(&tex->m_cudaSurfObj, &resDesc));
+            }
+
             
             // Create handle for sampling.
             CUDA_TEXTURE_DESC texDesc;

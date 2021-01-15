@@ -4,21 +4,21 @@
 // byte-address buffers works as expected, on targets
 // that support it.
 
-//TEST(compute):COMPARE_COMPUTE_EX:-slang -compute -cpu
+//TEST(compute):COMPARE_COMPUTE_EX:-slang -compute -cpu -shaderobj
 
 // Note: disabled on D3D12 because some of the CI services don't have
 // a recent enough build of dxc to support generic load/store.
 //
-//DISABLE_TEST(compute):COMPARE_COMPUTE_EX:-slang -compute -dx12 -use-dxil -profile cs_6_2 -render-features half
+//DISABLE_TEST(compute):COMPARE_COMPUTE_EX:-slang -compute -dx12 -use-dxil -profile cs_6_2 -render-features half -shaderobj
 
-//TEST(compute, vulkan):COMPARE_COMPUTE_EX:-slang -vk -compute -profile cs_6_2 -render-features half
-//TEST(compute):COMPARE_COMPUTE_EX:-slang -cuda -compute
+//TEST(compute, vulkan):COMPARE_COMPUTE_EX:-slang -vk -compute -profile cs_6_2 -render-features half -shaderobj
+//TEST(compute):COMPARE_COMPUTE_EX:-slang -cuda -compute -shaderobj
 
 // Unavailable on D3D and fxc-based targets, because fxc doesn't
 // support loading anything besides `uint` from a byte-address
 // buffer.
 //
-//TEST_DISABLED(compute):COMPARE_COMPUTE_EX:-slang -compute
+//TEST_DISABLED(compute):COMPARE_COMPUTE_EX:-slang -compute -shaderobj
 
 
 //TEST_INPUT:ubuffer(data=[0x00010002 0x00030004 0x00050006 0x00070008]):name=inputBuffer

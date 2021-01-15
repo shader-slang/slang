@@ -1,9 +1,9 @@
 // byte-address-buffer.slang
 
-//TEST(compute):COMPARE_COMPUTE_EX:-cpu -compute
-//TEST(compute):COMPARE_COMPUTE_EX:-slang -compute
-//TEST(compute, vulkan):COMPARE_COMPUTE_EX:-vk -compute
-//TEST(compute):COMPARE_COMPUTE_EX:-d3d12 -compute
+//TEST(compute):COMPARE_COMPUTE_EX:-cpu -compute -shaderobj
+//TEST(compute):COMPARE_COMPUTE_EX:-slang -compute -shaderobj
+//TEST(compute, vulkan):COMPARE_COMPUTE_EX:-vk -compute -shaderobj
+//TEST(compute):COMPARE_COMPUTE_EX:-d3d12 -compute -shaderobj
 
 // Confirm cross-compilation of `(RW)ByteAddressBuffer`
 //

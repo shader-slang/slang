@@ -1,10 +1,10 @@
-//TEST(compute):COMPARE_COMPUTE_EX:-cpu -compute -output-using-type
+//TEST(compute):COMPARE_COMPUTE_EX:-cpu -compute -output-using-type -shaderobj
 // TODO(JS):
 // On CI systems DX11 test failed, so disable for now
-//DISABLE_TEST(compute):COMPARE_COMPUTE_EX:-slang -compute -output-using-type
-//TEST(compute):COMPARE_COMPUTE_EX:-slang -compute -dx12 -use-dxil -output-using-type
-//TEST(compute, vulkan):COMPARE_COMPUTE_EX:-vk -compute -output-using-type
-//TEST(compute, vulkan):COMPARE_COMPUTE_EX:-cuda -compute -output-using-type
+//DISABLE_TEST(compute):COMPARE_COMPUTE_EX:-slang -compute -output-using-type -shaderobj
+//TEST(compute):COMPARE_COMPUTE_EX:-slang -compute -dx12 -use-dxil -output-using-type -shaderobj
+//TEST(compute, vulkan):COMPARE_COMPUTE_EX:-vk -compute -output-using-type -shaderobj
+//TEST(compute, vulkan):COMPARE_COMPUTE_EX:-cuda -compute -output-using-type -shaderobj
 
 //TEST_INPUT:ubuffer(data=[0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0], stride=4):out,name outputBuffer
 RWStructuredBuffer<double4> outputBuffer;

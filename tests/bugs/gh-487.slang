@@ -1,5 +1,5 @@
 // gh-487.slang
-//TEST(compute):COMPARE_COMPUTE_EX:-slang -compute
+//TEST(compute):COMPARE_COMPUTE_EX:-slang -compute -shaderobj
 
 // This test is to confirm that we can apply builtin functions taht expect
 // a floating-point argument to an integer, with the compiler filling

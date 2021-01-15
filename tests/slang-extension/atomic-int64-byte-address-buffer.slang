@@ -1,13 +1,13 @@
 // No atomic support on CPU
-//DISABLE_TEST(compute):COMPARE_COMPUTE_EX:-cpu -compute 
+//DISABLE_TEST(compute):COMPARE_COMPUTE_EX:-cpu -compute -shaderobj
 // No support for int64_t on DX11
-//DISABLE_TEST(compute):COMPARE_COMPUTE_EX:-slang -compute
+//DISABLE_TEST(compute):COMPARE_COMPUTE_EX:-slang -compute -shaderobj
 // No support for int64_t on fxc - we need SM6.0 and dxil
 // https://docs.microsoft.com/en-us/windows/win32/direct3dhlsl/hlsl-shader-model-6-0-features-for-direct3d-12
-//DISABLE_TEST(compute):COMPARE_COMPUTE_EX:-slang -compute -dx12 -nvapi-slot u0
-//TEST(compute):COMPARE_COMPUTE_EX:-slang -compute -dx12 -profile cs_6_0 -use-dxil -render-features atomic-int64 -nvapi-slot u0 -compile-arg -O2
-//TEST(compute, vulkan):COMPARE_COMPUTE_EX:-vk -compute -render-features atomic-int64
-//TEST(compute):COMPARE_COMPUTE_EX:-cuda -compute
+//DISABLE_TEST(compute):COMPARE_COMPUTE_EX:-slang -compute -dx12 -nvapi-slot u0 -shaderobj
+//TEST(compute):COMPARE_COMPUTE_EX:-slang -compute -dx12 -profile cs_6_0 -use-dxil -render-features atomic-int64 -nvapi-slot u0 -compile-arg -O2 -shaderobj
+//TEST(compute, vulkan):COMPARE_COMPUTE_EX:-vk -compute -render-features atomic-int64 -shaderobj
+//TEST(compute):COMPARE_COMPUTE_EX:-cuda -compute -shaderobj
 
 // The test doesn't directly use this, but having this defined makes the 0 slot available if NVAPI is going to be used
 // Only strictly necessary on the D3D12 path

@@ -1,5 +1,5 @@
 // gh-775-ext.slang
-//TEST(compute):COMPARE_COMPUTE:
+//TEST(compute):COMPARE_COMPUTE: -shaderobj
 
 int test(int inVal)
 {

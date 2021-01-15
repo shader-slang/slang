@@ -1,4 +1,4 @@
-//TEST(compute):COMPARE_COMPUTE:-cpu
+//TEST(compute):COMPARE_COMPUTE:-cpu -shaderobj
 //TEST(compute):COMPARE_COMPUTE:-shaderobj
 
 //TEST_INPUT: Uniform(data=[1 2 3 4]):name=C.p.c

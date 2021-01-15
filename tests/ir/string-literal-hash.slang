@@ -1,5 +1,5 @@
-//TEST(compute):COMPARE_COMPUTE:
-//TEST(compute):COMPARE_COMPUTE: -vk
+//TEST(compute):COMPARE_COMPUTE: -shaderobj
+//TEST(compute):COMPARE_COMPUTE: -vk -shaderobj
 
 // Note: disabled on CPU target until we can fill
 // in a more correct/complete `String` and `getStringHash`
