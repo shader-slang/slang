@@ -13,8 +13,6 @@
 #include "core/slang-secure-crt.h"
 #include "external/stb/stb_image_write.h"
 
-#include "../surface.h"
-
 // TODO(tfoley): eventually we should be able to run these
 // tests on non-Windows targets to confirm that cross-compilation
 // at least *works* on those platforms...
@@ -125,8 +123,8 @@ public:
     virtual SLANG_NO_THROW Result SLANG_MCALL createComputePipelineState(
         const ComputePipelineStateDesc& desc, IPipelineState** outState) override;
 
-    virtual SLANG_NO_THROW SlangResult SLANG_MCALL
-        captureScreenSurface(Surface& surfaceOut) override;
+    virtual SLANG_NO_THROW SlangResult SLANG_MCALL captureScreenSurface(
+        void* buffer, size_t* inOutBufferSize, size_t* outRowPitch, size_t* outPixelSize) override;
 
     virtual SLANG_NO_THROW void* SLANG_MCALL map(IBufferResource* buffer, MapFlavor flavor) override;
     virtual SLANG_NO_THROW void SLANG_MCALL unmap(IBufferResource* buffer) override;
@@ -882,11 +880,36 @@ SLANG_NO_THROW TextureResource::Desc SLANG_MCALL GLRenderer::getSwapChainTexture
     return desc;
 }
 
-SLANG_NO_THROW Result SLANG_MCALL GLRenderer::captureScreenSurface(Surface& surfaceOut)
+SLANG_NO_THROW Result SLANG_MCALL GLRenderer::captureScreenSurface(
+    void* buffer, size_t* inOutBufferSize, size_t* outRowPitch, size_t* outPixelSize)
 {
-    SLANG_RETURN_ON_FAIL(surfaceOut.allocate(m_desc.width, m_desc.height, Format::RGBA_Unorm_UInt8, 1, SurfaceAllocator::getMallocAllocator()));
-    glReadPixels(0, 0, m_desc.width, m_desc.height, GL_RGBA, GL_UNSIGNED_BYTE, surfaceOut.m_data);
-    surfaceOut.flipInplaceVertically();
+    size_t requiredSize = m_desc.width * m_desc.height * sizeof(uint32_t);
+    if (outRowPitch)
+        *outRowPitch = m_desc.height * sizeof(uint32_t);
+    if (outPixelSize)
+        *outPixelSize = sizeof(uint32_t);
+
+    if (!buffer || *inOutBufferSize == 0)
+    {
+        *inOutBufferSize = requiredSize;
+        return SLANG_OK;
+    }
+    if (*inOutBufferSize < requiredSize)
+        return SLANG_ERROR_INSUFFICIENT_BUFFER;
+
+    glReadPixels(0, 0, m_desc.width, m_desc.height, GL_RGBA, GL_UNSIGNED_BYTE, buffer);
+
+    // Flip pixels vertically in-place.
+    for (int y = 0; y < m_desc.height / 2; y++)
+    {
+        for (int x = 0; x < m_desc.width; x++)
+        {
+            std::swap(
+                *((uint32_t*)buffer + y * m_desc.width + x),
+                *((uint32_t*)buffer + (m_desc.height - y - 1) * m_desc.width + x));
+        }
+    }
+
     return SLANG_OK;
 }
 

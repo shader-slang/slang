@@ -34,7 +34,6 @@
 //
 #include "slang-com-ptr.h"
 #include "gfx/render.h"
-#include "gfx/d3d11/render-d3d11.h"
 #include "tools/graphics-app-framework/window.h"
 #include "../../prelude/slang-cpp-types.h"
 #include "source/core/slang-basic.h"
@@ -124,7 +123,7 @@ gfx::IRenderer* createRenderer(
     // A future version of this example may support multiple
     // platforms/APIs.
     //
-    createD3D11Renderer(gRenderer.writeRef());
+    gfxGetCreateFunc(gfx::RendererType::DirectX11)(gRenderer.writeRef());
     IRenderer::Desc rendererDesc;
     rendererDesc.width = windowWidth;
     rendererDesc.height = windowHeight;

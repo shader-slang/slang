@@ -1450,8 +1450,8 @@ public:
         SLANG_UNUSED(outState);
         return SLANG_E_NOT_AVAILABLE;
     }
-    virtual SLANG_NO_THROW SlangResult SLANG_MCALL
-        captureScreenSurface(Surface& surfaceOut) override
+    virtual SLANG_NO_THROW SlangResult SLANG_MCALL captureScreenSurface(
+        void* buffer, size_t* inOutBufferSize, size_t* outRowPitch, size_t* outPixelSize) override
     {
         SLANG_UNUSED(surfaceOut);
         return SLANG_E_NOT_AVAILABLE;

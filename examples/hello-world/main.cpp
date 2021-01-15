@@ -33,7 +33,6 @@
 // design choices in their abstraction layer.
 //
 #include "gfx/render.h"
-#include "gfx/d3d11/render-d3d11.h"
 #include "tools/graphics-app-framework/window.h"
 #include "slang-com-ptr.h"
 #include "source/core/slang-basic.h"
@@ -261,7 +260,7 @@ Slang::Result initialize()
     // A future version of this example may support multiple
     // platforms/APIs.
     //
-    createD3D11Renderer(gRenderer.writeRef());
+    gfxGetCreateFunc(gfx::RendererType::DirectX11)(gRenderer.writeRef());
     IRenderer::Desc rendererDesc;
     rendererDesc.width = gWindowWidth;
     rendererDesc.height = gWindowHeight;

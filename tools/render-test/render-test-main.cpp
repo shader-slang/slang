@@ -4,7 +4,7 @@
 
 #include "options.h"
 #include "render.h"
-#include "shader-cursor.h"
+#include "tools/gfx-util/shader-cursor.h"
 #include "slang-support.h"
 #include "surface.h"
 #include "png-serialize-util.h"
@@ -797,8 +797,23 @@ Result ShaderObjectRenderTestApp::writeBindingOutput(BindRoot* bindRoot, const c
 
 Result RenderTestApp::writeScreen(const char* filename)
 {
+    size_t rowPitch, bufferSize, pixelSize;
+    List<uint8_t> buffer;
+
+    SLANG_RETURN_ON_FAIL(m_renderer->captureScreenSurface(nullptr, &bufferSize, &rowPitch, &pixelSize));
+    buffer.setCount(bufferSize);
+    SLANG_RETURN_ON_FAIL(
+        m_renderer->captureScreenSurface(buffer.getBuffer(), &bufferSize, &rowPitch, &pixelSize));
+
     Surface surface;
-    SLANG_RETURN_ON_FAIL(m_renderer->captureScreenSurface(surface));
+    size_t width = rowPitch / pixelSize;
+    size_t height = bufferSize / rowPitch;
+    surface.setUnowned(
+        width,
+        height,
+        gfx::Format::RGBA_Unorm_UInt8,
+        rowPitch,
+        buffer.getBuffer());
     return PngSerializeUtil::write(filename, surface);
 }
 

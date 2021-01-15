@@ -18,7 +18,6 @@
 //
 #include "graphics-app-framework/model.h"
 #include "gfx/render.h"
-#include "gfx/d3d11/render-d3d11.h"
 #include "graphics-app-framework/vector-math.h"
 #include "graphics-app-framework/window.h"
 #include "graphics-app-framework/gui.h"
@@ -2051,7 +2050,7 @@ Result initialize()
     windowDesc.userData = this;
     gWindow = createWindow(windowDesc);
 
-    createD3D11Renderer(gRenderer.writeRef());
+    gfxGetCreateFunc(gfx::RendererType::DirectX11)(gRenderer.writeRef());
     IRenderer::Desc rendererDesc;
     rendererDesc.width = gWindowWidth;
     rendererDesc.height = gWindowHeight;

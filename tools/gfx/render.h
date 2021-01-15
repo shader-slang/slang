@@ -38,9 +38,6 @@ typedef SlangResult Result;
 typedef SlangInt Int;
 typedef SlangUInt UInt;
 
-// pre declare types
-class Surface;
-
 // Declare opaque type
 class IInputLayout: public ISlangUnknown
 {
@@ -1281,7 +1278,7 @@ public:
     }
 
         /// Captures the back buffer and stores the result in surfaceOut. If the surface contains data - it will either be overwritten (if same size and format), or freed and a re-allocated.
-    virtual SLANG_NO_THROW SlangResult SLANG_MCALL captureScreenSurface(Surface& surfaceOut) = 0;
+    virtual SLANG_NO_THROW SlangResult SLANG_MCALL captureScreenSurface(void* buffer, size_t *inOutBufferSize, size_t* outRowPitch, size_t* outPixelSize) = 0;
 
     virtual SLANG_NO_THROW void* SLANG_MCALL map(IBufferResource* buffer, MapFlavor flavor) = 0;
     virtual SLANG_NO_THROW void SLANG_MCALL unmap(IBufferResource* buffer) = 0;
