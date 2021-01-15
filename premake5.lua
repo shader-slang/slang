@@ -717,7 +717,7 @@ toolSharedLibrary "render-test"
         defines { "RENDER_TEST_CUDA" }
         includedirs { cudaPath .. "/include" }
         includedirs { cudaPath .. "/include", cudaPath .. "/common/inc" }
-        
+        links { "cuda", "cudart" }
         if optixPath then
             defines { "RENDER_TEST_OPTIX" }
             includedirs { optixPath .. "include/" }
