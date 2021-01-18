@@ -7,7 +7,6 @@
 #include "../renderer-shared.h"
 #include "../render-graphics-common.h"
 
-#include "../surface.h"
 #include "core/slang-basic.h"
 
 // In order to use the Slang API, we need to include its header
@@ -112,8 +111,8 @@ public:
     virtual SLANG_NO_THROW Result SLANG_MCALL createComputePipelineState(
         const ComputePipelineStateDesc& desc, IPipelineState** outState) override;
 
-    virtual SLANG_NO_THROW SlangResult SLANG_MCALL
-        captureScreenSurface(Surface& surfaceOut) override;
+    virtual SLANG_NO_THROW SlangResult SLANG_MCALL captureScreenSurface(
+        void* buffer, size_t* inOutBufferSize, size_t* outRowPitch, size_t* outPixelSize) override;
 
     virtual SLANG_NO_THROW void* SLANG_MCALL
         map(IBufferResource* buffer, MapFlavor flavor) override;
@@ -648,7 +647,12 @@ protected:
     void submitGpuWorkAndWait();
     void _resetCommandList();
 
-    Result captureTextureToSurface(D3D12Resource& resource, Surface& surfaceOut);
+    Result captureTextureToSurface(
+        D3D12Resource& resource,
+        void* buffer,
+        size_t* inOutBufferSize,
+        size_t* outRowPitch,
+        size_t* outPixelSize);
 
     FrameInfo& getFrame() { return m_frameInfos[m_frameIndex]; }
     const FrameInfo& getFrame() const { return m_frameInfos[m_frameIndex]; }
@@ -1063,7 +1067,12 @@ void D3D12Renderer::submitGpuWorkAndWait()
     waitForGpu();
 }
 
-Result D3D12Renderer::captureTextureToSurface(D3D12Resource& resource, Surface& surfaceOut)
+Result D3D12Renderer::captureTextureToSurface(
+    D3D12Resource& resource,
+    void* buffer,
+    size_t* inOutBufferSize,
+    size_t* outRowPitch,
+    size_t* outPixelSize)
 {
     const D3D12_RESOURCE_STATES initialState = resource.getState();
 
@@ -1079,7 +1088,17 @@ Result D3D12Renderer::captureTextureToSurface(D3D12Resource& resource, Surface& 
     size_t bytesPerPixel = sizeof(uint32_t);
     size_t rowPitch = int(desc.Width) * bytesPerPixel;
     size_t bufferSize = rowPitch * int(desc.Height);
-
+    if (outRowPitch)
+        *outRowPitch = rowPitch;
+    if (outPixelSize)
+        *outPixelSize = bytesPerPixel;
+    if (!buffer || *inOutBufferSize == 0)
+    {
+        *inOutBufferSize = bufferSize;
+        return SLANG_OK;
+    }
+    if (*inOutBufferSize < bufferSize)
+        return SLANG_ERROR_INSUFFICIENT_BUFFER;
     D3D12Resource stagingResource;
     {
         D3D12_RESOURCE_DESC stagingDesc;
@@ -1136,10 +1155,10 @@ Result D3D12Renderer::captureTextureToSurface(D3D12Resource& resource, Surface& 
 
         SLANG_RETURN_ON_FAIL(dxResource->Map(0, &readRange, reinterpret_cast<void**>(&data)));
 
-        Result res = surfaceOut.set(int(desc.Width), int(desc.Height), Format::RGBA_Unorm_UInt8, int(rowPitch), data, SurfaceAllocator::getMallocAllocator());
+        memcpy(buffer, data, bufferSize);
 
         dxResource->Unmap(0, nullptr);
-        return res;
+        return SLANG_OK;
     }
 }
 
@@ -1800,9 +1819,10 @@ TextureResource::Desc D3D12Renderer::getSwapChainTextureDesc()
     return desc;
 }
 
-SlangResult D3D12Renderer::captureScreenSurface(Surface& surfaceOut)
+SlangResult D3D12Renderer::captureScreenSurface(
+    void* buffer, size_t* inOutBufferSize, size_t* outRowPitch, size_t* outPixelSize)
 {
-    return captureTextureToSurface(*m_renderTargets[m_renderTargetIndex], surfaceOut);
+    return captureTextureToSurface(*m_renderTargets[m_renderTargetIndex], buffer, inOutBufferSize, outRowPitch, outPixelSize);
 }
 
 static D3D12_RESOURCE_STATES _calcResourceState(IResource::Usage usage)

@@ -12,8 +12,6 @@
 #include "vk-device-queue.h"
 #include "vk-swap-chain.h"
 
-#include "../surface.h"
-
 // Vulkan has a different coordinate system to ogl
 // http://anki3d.org/vulkan-coordinate-system/
 
@@ -88,7 +86,8 @@ public:
         const ComputePipelineStateDesc& desc,
         IPipelineState** outState) override;
 
-    virtual SLANG_NO_THROW SlangResult SLANG_MCALL captureScreenSurface(Surface& surface) override;
+    virtual SLANG_NO_THROW SlangResult SLANG_MCALL captureScreenSurface(
+        void* buffer, size_t* inOutBufferSize, size_t* outRowPitch, size_t* outPixelSize) override;
 
     virtual SLANG_NO_THROW void* SLANG_MCALL map(IBufferResource* buffer, MapFlavor flavor) override;
     virtual SLANG_NO_THROW void SLANG_MCALL unmap(IBufferResource* buffer) override;
@@ -1439,8 +1438,13 @@ TextureResource::Desc VKRenderer::getSwapChainTextureDesc()
     return desc;
 }
 
-SlangResult VKRenderer::captureScreenSurface(Surface& surfaceOut)
+SlangResult VKRenderer::captureScreenSurface(
+    void* buffer, size_t* inOutBufferSize, size_t* outRowPitch, size_t* outPixelSize)
 {
+    SLANG_UNUSED(buffer);
+    SLANG_UNUSED(inOutBufferSize);
+    SLANG_UNUSED(outRowPitch);
+    SLANG_UNUSED(outPixelSize);
     return SLANG_FAIL;
 }
 
@@ -1594,6 +1598,21 @@ void VKRenderer::_transitionImageLayout(VkImage image, VkFormat format, const Te
     m_api.vkCmdPipelineBarrier(commandBuffer, sourceStage, destinationStage, 0, 0, nullptr, 0, nullptr, 1, &barrier);
 }
 
+size_t calcRowSize(Format format, int width)
+{
+    size_t pixelSize = gfxGetFormatSize(format);
+    if (pixelSize == 0)
+    {
+        return 0;
+    }
+    return size_t(pixelSize * width);
+}
+
+size_t calcNumRows(Format format, int height)
+{
+    return (size_t)height;
+}
+
 Result VKRenderer::createTextureResource(IResource::Usage initialUsage, const ITextureResource::Desc& descIn, const ITextureResource::Data* initData, ITextureResource** outResource)
 {
     TextureResource::Desc desc(descIn);
@@ -1704,8 +1723,8 @@ Result VKRenderer::createTextureResource(IResource::Usage initialUsage, const IT
         {
             const TextureResource::Size mipSize = desc.size.calcMipSize(j);
 
-            const int rowSizeInBytes = Surface::calcRowSize(desc.format, mipSize.width);
-            const int numRows =  Surface::calcNumRows(desc.format, mipSize.height);
+            const int rowSizeInBytes = calcRowSize(desc.format, mipSize.width);
+            const int numRows = calcNumRows(desc.format, mipSize.height);
 
             mipSizes.add(mipSize);
 
@@ -1735,8 +1754,8 @@ Result VKRenderer::createTextureResource(IResource::Usage initialUsage, const IT
                     const auto& mipSize = mipSizes[j];
 
                     const ptrdiff_t srcRowStride = initData->mipRowStrides[j];
-                    const int dstRowSizeInBytes = Surface::calcRowSize(desc.format, mipSize.width);
-                    const int numRows = Surface::calcNumRows(desc.format, mipSize.height);
+                    const int dstRowSizeInBytes = calcRowSize(desc.format, mipSize.width);
+                    const int numRows = calcNumRows(desc.format, mipSize.height);
 
                     for (int k = 0; k < mipSize.depth; k++)
                     {
@@ -1768,8 +1787,8 @@ Result VKRenderer::createTextureResource(IResource::Usage initialUsage, const IT
                 {
                     const auto& mipSize = mipSizes[j];
 
-                    const int rowSizeInBytes = Surface::calcRowSize(desc.format, mipSize.width);
-                    const int numRows = Surface::calcNumRows(desc.format, mipSize.height);
+                    const int rowSizeInBytes = calcRowSize(desc.format, mipSize.width);
+                    const int numRows = calcNumRows(desc.format, mipSize.height);
 
                     // https://www.khronos.org/registry/vulkan/specs/1.1-extensions/man/html/VkBufferImageCopy.html
                     // bufferRowLength and bufferImageHeight specify the data in buffer memory as a subregion of a larger two- or three-dimensional image,

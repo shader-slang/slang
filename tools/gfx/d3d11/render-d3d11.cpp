@@ -11,8 +11,6 @@
 #include "../d3d/d3d-util.h"
 #include "../nvapi/nvapi-util.h"
 
-#include "../surface.h"
-
 // In order to use the Slang API, we need to include its header
 
 //#include <slang.h>
@@ -106,8 +104,8 @@ public:
     virtual SLANG_NO_THROW Result SLANG_MCALL createComputePipelineState(
         const ComputePipelineStateDesc& desc, IPipelineState** outState) override;
 
-    virtual SLANG_NO_THROW SlangResult SLANG_MCALL
-        captureScreenSurface(Surface& surfaceOut) override;
+    virtual SLANG_NO_THROW SlangResult SLANG_MCALL captureScreenSurface(
+        void* buffer, size_t* inOutBufferSize, size_t* outRowPitch, size_t* outPixelSize) override;
 
     virtual SLANG_NO_THROW void* SLANG_MCALL map(IBufferResource* buffer, MapFlavor flavor) override;
     virtual SLANG_NO_THROW void SLANG_MCALL unmap(IBufferResource* buffer) override;
@@ -491,7 +489,14 @@ public:
     };
 
         /// Capture a texture to a file
-    static HRESULT captureTextureToSurface(ID3D11Device* device, ID3D11DeviceContext* context, ID3D11Texture2D* texture, Surface& surfaceOut);
+    static HRESULT captureTextureToSurface(
+        ID3D11Device* device,
+        ID3D11DeviceContext* context,
+        TextureResourceImpl* texture,
+        void* buffer,
+        size_t* inOutBufferSize,
+        size_t* outRowPitch,
+        size_t* outPixelSize);
 
     void _flushGraphicsState();
     void _flushComputeState();
@@ -569,27 +574,50 @@ D3D11Renderer::ScopeNVAPI::~ScopeNVAPI()
 
 // !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!D3D11Renderer !!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 
-/* static */HRESULT D3D11Renderer::captureTextureToSurface(ID3D11Device* device, ID3D11DeviceContext* context, ID3D11Texture2D* texture, Surface& surfaceOut)
+/* static */ HRESULT D3D11Renderer::captureTextureToSurface(
+    ID3D11Device* device,
+    ID3D11DeviceContext* context,
+    TextureResourceImpl* texture,
+    void* buffer,
+    size_t* inOutBufferSize,
+    size_t* outRowPitch,
+    size_t* outPixelSize)
 {
     if (!context) return E_INVALIDARG;
     if (!texture) return E_INVALIDARG;
 
-    D3D11_TEXTURE2D_DESC textureDesc;
-    texture->GetDesc(&textureDesc);
-
     // Don't bother supporting MSAA for right now
-    if (textureDesc.SampleDesc.Count > 1)
+    if (texture->getDesc()->sampleDesc.numSamples > 1)
     {
         fprintf(stderr, "ERROR: cannot capture multi-sample texture\n");
         return E_INVALIDARG;
     }
+
+    size_t bytesPerPixel = sizeof(uint32_t);
+    size_t rowPitch = int(texture->getDesc()->size.width) * bytesPerPixel;
+    size_t bufferSize = rowPitch * int(texture->getDesc()->size.height);
+    if (outRowPitch)
+        *outRowPitch = rowPitch;
+    if (outPixelSize)
+        *outPixelSize = bytesPerPixel;
+    if (!buffer || *inOutBufferSize == 0)
+    {
+        *inOutBufferSize = bufferSize;
+        return S_OK;
+    }
+    if (*inOutBufferSize < bufferSize)
+        return SLANG_ERROR_INSUFFICIENT_BUFFER;
+
+    D3D11_TEXTURE2D_DESC textureDesc;
+    auto d3d11Texture = ((ID3D11Texture2D*)texture->m_resource.get());
+    d3d11Texture->GetDesc(&textureDesc);
 
     HRESULT hr = S_OK;
     ComPtr<ID3D11Texture2D> stagingTexture;
 
     if (textureDesc.Usage == D3D11_USAGE_STAGING && (textureDesc.CPUAccessFlags & D3D11_CPU_ACCESS_READ))
     {
-        stagingTexture = texture;
+        stagingTexture = d3d11Texture;
     }
     else
     {
@@ -606,7 +634,7 @@ D3D11Renderer::ScopeNVAPI::~ScopeNVAPI()
             return hr;
         }
 
-        context->CopyResource(stagingTexture, texture);
+        context->CopyResource(stagingTexture, d3d11Texture);
     }
 
     // Now just read back texels from the staging textures
@@ -614,11 +642,16 @@ D3D11Renderer::ScopeNVAPI::~ScopeNVAPI()
         D3D11_MAPPED_SUBRESOURCE mappedResource;
         SLANG_RETURN_ON_FAIL(context->Map(stagingTexture, 0, D3D11_MAP_READ, 0, &mappedResource));
 
-        Result res = surfaceOut.set(textureDesc.Width, textureDesc.Height, Format::RGBA_Unorm_UInt8, mappedResource.RowPitch, mappedResource.pData, SurfaceAllocator::getMallocAllocator());
-
+        for (size_t y = 0; y < textureDesc.Height; y++)
+        {
+            memcpy(
+                (char*)buffer + y * (*outRowPitch),
+                (char*)mappedResource.pData + y * mappedResource.RowPitch,
+                *outRowPitch);
+        }
         // Make sure to unmap
         context->Unmap(stagingTexture, 0);
-        return res;
+        return SLANG_OK;
     }
 }
 
@@ -891,9 +924,17 @@ TextureResource::Desc D3D11Renderer::getSwapChainTextureDesc()
     return desc;
 }
 
-SlangResult D3D11Renderer::captureScreenSurface(Surface& surfaceOut)
+SlangResult D3D11Renderer::captureScreenSurface(
+    void* buffer, size_t* inOutBufferSize, size_t* outRowPitch, size_t* outPixelSize)
 {
-    return captureTextureToSurface(m_device, m_immediateContext, (ID3D11Texture2D*) m_primaryRenderTargetTexture->m_resource.get(), surfaceOut);
+    return captureTextureToSurface(
+        m_device,
+        m_immediateContext,
+        m_primaryRenderTargetTexture.Ptr(),
+        buffer,
+        inOutBufferSize,
+        outRowPitch,
+        outPixelSize);
 }
 
 static D3D11_BIND_FLAG _calcResourceFlag(IResource::BindFlag::Enum bindFlag)
