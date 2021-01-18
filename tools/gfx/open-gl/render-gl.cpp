@@ -885,7 +885,7 @@ SLANG_NO_THROW Result SLANG_MCALL GLRenderer::captureScreenSurface(
 {
     size_t requiredSize = m_desc.width * m_desc.height * sizeof(uint32_t);
     if (outRowPitch)
-        *outRowPitch = m_desc.height * sizeof(uint32_t);
+        *outRowPitch = m_desc.width * sizeof(uint32_t);
     if (outPixelSize)
         *outPixelSize = sizeof(uint32_t);
 
