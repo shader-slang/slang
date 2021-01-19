@@ -1723,8 +1723,8 @@ Result VKRenderer::createTextureResource(IResource::Usage initialUsage, const IT
         {
             const TextureResource::Size mipSize = desc.size.calcMipSize(j);
 
-            const int rowSizeInBytes = calcRowSize(desc.format, mipSize.width);
-            const int numRows = calcNumRows(desc.format, mipSize.height);
+            auto rowSizeInBytes = calcRowSize(desc.format, mipSize.width);
+            auto numRows = calcNumRows(desc.format, mipSize.height);
 
             mipSizes.add(mipSize);
 
@@ -1754,8 +1754,8 @@ Result VKRenderer::createTextureResource(IResource::Usage initialUsage, const IT
                     const auto& mipSize = mipSizes[j];
 
                     const ptrdiff_t srcRowStride = initData->mipRowStrides[j];
-                    const int dstRowSizeInBytes = calcRowSize(desc.format, mipSize.width);
-                    const int numRows = calcNumRows(desc.format, mipSize.height);
+                    auto dstRowSizeInBytes = calcRowSize(desc.format, mipSize.width);
+                    auto numRows = calcNumRows(desc.format, mipSize.height);
 
                     for (int k = 0; k < mipSize.depth; k++)
                     {
@@ -1787,8 +1787,8 @@ Result VKRenderer::createTextureResource(IResource::Usage initialUsage, const IT
                 {
                     const auto& mipSize = mipSizes[j];
 
-                    const int rowSizeInBytes = calcRowSize(desc.format, mipSize.width);
-                    const int numRows = calcNumRows(desc.format, mipSize.height);
+                    auto rowSizeInBytes = calcRowSize(desc.format, mipSize.width);
+                    auto numRows = calcNumRows(desc.format, mipSize.height);
 
                     // https://www.khronos.org/registry/vulkan/specs/1.1-extensions/man/html/VkBufferImageCopy.html
                     // bufferRowLength and bufferImageHeight specify the data in buffer memory as a subregion of a larger two- or three-dimensional image,

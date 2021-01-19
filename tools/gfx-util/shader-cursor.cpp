@@ -233,7 +233,9 @@ Result ShaderCursor::followPath(const char* path, ShaderCursor& ioCursor)
                 break;
             }
             char const* nameEnd = rest;
-            cursor.getField(nameBegin, nameEnd, cursor);
+            ShaderCursor newCursor;
+            cursor.getField(nameBegin, nameEnd, newCursor);
+            cursor = newCursor;
             state = ALLOW_DOT | ALLOW_SUBSCRIPT;
             continue;
         }
