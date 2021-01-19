@@ -1,7 +1,6 @@
 #pragma once
 
 #include "tools/gfx/render.h"
-#include "core/slang-basic.h"
 
 namespace gfx
 {
@@ -54,34 +53,20 @@ struct ShaderCursor
     /// points at.
     ///
     /// If the operation succeeds, then the field cursor is written to `outCursor`.
-    Result getField(Slang::UnownedStringSlice const& name, ShaderCursor& outCursor);
+    Result getField(const char* nameBegin, const char* nameEnd, ShaderCursor& outCursor);
 
-    ShaderCursor getField(Slang::UnownedStringSlice const& name)
+    ShaderCursor getField(const char* name)
     {
         ShaderCursor cursor;
-        getField(name, cursor);
+        getField(name, nullptr, cursor);
         return cursor;
     }
 
-    ShaderCursor getField(Slang::String const& name) { return getField(name.getUnownedSlice()); }
+    ShaderCursor getElement(SlangInt index);
 
-    ShaderCursor getElement(Slang::Index index);
+    static Result followPath(const char* path, ShaderCursor& ioCursor);
 
-    static Result followPath(Slang::UnownedStringSlice const& path, ShaderCursor& ioCursor);
-
-    static Result followPath(Slang::String const& path, ShaderCursor& ioCursor)
-    {
-        return followPath(path.getUnownedSlice(), ioCursor);
-    }
-
-    ShaderCursor getPath(Slang::UnownedStringSlice const& path)
-    {
-        ShaderCursor result(*this);
-        followPath(path, result);
-        return result;
-    }
-
-    ShaderCursor getPath(Slang::String const& path)
+    ShaderCursor getPath(const char* path)
     {
         ShaderCursor result(*this);
         followPath(path, result);

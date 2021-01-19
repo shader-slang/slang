@@ -190,13 +190,13 @@ SlangResult _assignVarsFromLayout(
             return SLANG_E_INVALID_ARG;
         }
 
-        auto entryCursor = rootCursor.getPath(entry.name);
+        auto entryCursor = rootCursor.getPath(entry.name.getBuffer());
 
         if(!entryCursor.isValid())
         {
             for(gfx::UInt i = 0; i < shaderObject->getEntryPointCount(); i++)
             {
-                entryCursor = ShaderCursor(shaderObject->getEntryPoint(i)).getPath(entry.name);
+                entryCursor = ShaderCursor(shaderObject->getEntryPoint(i)).getPath(entry.name.getBuffer());
                 if(entryCursor.isValid())
                     break;
             }
@@ -839,10 +839,10 @@ Result RenderTestApp::writeScreen(const char* filename)
     size_t width = rowPitch / pixelSize;
     size_t height = bufferSize / rowPitch;
     surface.setUnowned(
-        width,
-        height,
+        (int)width,
+        (int)height,
         gfx::Format::RGBA_Unorm_UInt8,
-        rowPitch,
+        (int)rowPitch,
         buffer.getBuffer());
     return PngSerializeUtil::write(filename, surface);
 }
@@ -1286,7 +1286,7 @@ static SlangResult _innerMain(Slang::StdWriters* stdWriters, SlangSession* sessi
         for (auto & name : options.renderFeatures)
             requiredFeatureList.add(name.getBuffer());
         desc.requiredFeatures = requiredFeatureList.getBuffer();
-        desc.requiredFeatureCount = requiredFeatureList.getCount();
+        desc.requiredFeatureCount = (int)requiredFeatureList.getCount();
         desc.nvapiExtnSlot = int(nvapiExtnSlot);
 
         window = renderer_test::Window::create();
