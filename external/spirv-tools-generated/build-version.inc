@@ -1,1 +1,1 @@
-"v2020.5", "SPIRV-Tools v2020.5 v2020.4-23-gf9b088fe"
+"v2020.7-dev", "SPIRV-Tools v2020.7-dev v2020.6-11-gad898cb9"
