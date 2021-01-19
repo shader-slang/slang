@@ -20,7 +20,7 @@ Result gfx::ShaderCursor::getDereferenced(ShaderCursor& outCursor) const
     }
 }
 
-Result ShaderCursor::getField(const char* name, ShaderCursor& outCursor)
+Result ShaderCursor::getField(const char* name, const char* nameEnd, ShaderCursor& outCursor)
 {
     // If this cursor is invalid, then can't possible fetch a field.
     //
@@ -40,7 +40,7 @@ Result ShaderCursor::getField(const char* name, ShaderCursor& outCursor)
             //
             // If there is no such field, we have an error.
             //
-            SlangInt fieldIndex = m_typeLayout->findFieldIndexByName(name, nullptr);
+            SlangInt fieldIndex = m_typeLayout->findFieldIndexByName(name, nameEnd);
             if (fieldIndex == -1)
                 return SLANG_E_INVALID_ARG;
 
@@ -110,7 +110,7 @@ Result ShaderCursor::getField(const char* name, ShaderCursor& outCursor)
             // to the *contents* of the constant buffer.
             //
             ShaderCursor d = getDereferenced();
-            return d.getField(name, outCursor);
+            return d.getField(name, nameEnd, outCursor);
         }
         break;
     }
@@ -232,7 +232,8 @@ Result ShaderCursor::followPath(const char* path, ShaderCursor& ioCursor)
                 }
                 break;
             }
-            cursor.getField(nameBegin, cursor);
+            char const* nameEnd = rest;
+            cursor.getField(nameBegin, nameEnd, cursor);
             state = ALLOW_DOT | ALLOW_SUBSCRIPT;
             continue;
         }

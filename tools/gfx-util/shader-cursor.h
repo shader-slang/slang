@@ -53,12 +53,12 @@ struct ShaderCursor
     /// points at.
     ///
     /// If the operation succeeds, then the field cursor is written to `outCursor`.
-    Result getField(const char* name, ShaderCursor& outCursor);
+    Result getField(const char* nameBegin, const char* nameEnd, ShaderCursor& outCursor);
 
     ShaderCursor getField(const char* name)
     {
         ShaderCursor cursor;
-        getField(name, cursor);
+        getField(name, nullptr, cursor);
         return cursor;
     }
 
