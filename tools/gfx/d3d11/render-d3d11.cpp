@@ -331,16 +331,8 @@ public:
         List<ComPtr<ID3D11SamplerState>>        m_samplers;
     };
 
-    class ShaderProgramImpl : public IShaderProgram, public RefObject
+    class ShaderProgramImpl : public GraphicsCommonShaderProgram
     {
-    public:
-        SLANG_REF_OBJECT_IUNKNOWN_ALL
-        IShaderProgram* getInterface(const Guid& guid)
-        {
-            if (guid == GfxGUID::IID_ISlangUnknown || guid == GfxGUID::IID_IShaderProgram)
-                return static_cast<IShaderProgram*>(this);
-            return nullptr;
-        }
     public:
         ComPtr<ID3D11VertexShader> m_vertexShader;
         ComPtr<ID3D11PixelShader> m_pixelShader;
@@ -1785,6 +1777,11 @@ void D3D11Renderer::drawIndexed(UInt indexCount, UInt startIndex, UInt baseVerte
 
 Result D3D11Renderer::createProgram(const IShaderProgram::Desc& desc, IShaderProgram** outProgram)
 {
+    if( desc.kernelCount == 0 )
+    {
+        return createProgramFromSlang(this, desc, outProgram);
+    }
+
     if (desc.pipelineType == PipelineType::Compute)
     {
         auto computeKernel = desc.findKernel(StageType::Compute);
@@ -1799,6 +1796,7 @@ Result D3D11Renderer::createProgram(const IShaderProgram::Desc& desc, IShaderPro
 
         RefPtr<ShaderProgramImpl> shaderProgram = new ShaderProgramImpl();
         shaderProgram->m_computeShader.swap(computeShader);
+        initProgramCommon(shaderProgram, desc);
 
         *outProgram = shaderProgram.detach();
         return SLANG_OK;
@@ -1822,6 +1820,7 @@ Result D3D11Renderer::createProgram(const IShaderProgram::Desc& desc, IShaderPro
         RefPtr<ShaderProgramImpl> shaderProgram = new ShaderProgramImpl();
         shaderProgram->m_vertexShader.swap(vertexShader);
         shaderProgram->m_pixelShader.swap(pixelShader);
+        initProgramCommon(shaderProgram, desc);
 
         *outProgram = shaderProgram.detach();
         return SLANG_OK;

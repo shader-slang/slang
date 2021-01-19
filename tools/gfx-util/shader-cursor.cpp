@@ -20,7 +20,7 @@ Result gfx::ShaderCursor::getDereferenced(ShaderCursor& outCursor) const
     }
 }
 
-Result ShaderCursor::getField(const char* name, const char* nameEnd, ShaderCursor& outCursor)
+Result ShaderCursor::getField(const char* name, const char* nameEnd, ShaderCursor& outCursor) const
 {
     // If this cursor is invalid, then can't possible fetch a field.
     //
@@ -118,7 +118,7 @@ Result ShaderCursor::getField(const char* name, const char* nameEnd, ShaderCurso
     return SLANG_E_INVALID_ARG;
 }
 
-ShaderCursor ShaderCursor::getElement(SlangInt index)
+ShaderCursor ShaderCursor::getElement(SlangInt index) const
 {
     // TODO: need to auto-dereference various buffer types...
 

@@ -202,16 +202,8 @@ protected:
         UINT64 m_fenceValue;                                        ///< The fence value when rendering this Frame is complete
     };
 
-    class ShaderProgramImpl : public IShaderProgram, public RefObject
+    class ShaderProgramImpl : public GraphicsCommonShaderProgram
     {
-    public:
-        SLANG_REF_OBJECT_IUNKNOWN_ALL
-        IShaderProgram* getInterface(const Guid& guid)
-        {
-            if (guid == GfxGUID::IID_ISlangUnknown || guid == GfxGUID::IID_IShaderProgram)
-                return static_cast<IShaderProgram*>(this);
-            return nullptr;
-        }
     public:
         PipelineType m_pipelineType;
         List<uint8_t> m_vertexShader;
@@ -2955,6 +2947,11 @@ void D3D12Renderer::setDescriptorSet(PipelineType pipelineType, IPipelineLayout*
 
 Result D3D12Renderer::createProgram(const IShaderProgram::Desc& desc, IShaderProgram** outProgram)
 {
+    if( desc.kernelCount == 0 )
+    {
+        return createProgramFromSlang(this, desc, outProgram);
+    }
+
     RefPtr<ShaderProgramImpl> program(new ShaderProgramImpl());
     program->m_pipelineType = desc.pipelineType;
 
@@ -2971,6 +2968,7 @@ Result D3D12Renderer::createProgram(const IShaderProgram::Desc& desc, IShaderPro
         program->m_vertexShader.insertRange(0, (const uint8_t*) vertexKernel->codeBegin, vertexKernel->getCodeSize());
         program->m_pixelShader.insertRange(0, (const uint8_t*) fragmentKernel->codeBegin, fragmentKernel->getCodeSize());
     }
+    initProgramCommon(program, desc);
 
     *outProgram = program.detach();
     return SLANG_OK;

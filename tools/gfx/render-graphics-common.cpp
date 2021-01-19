@@ -1287,26 +1287,35 @@ Result SLANG_MCALL
 }
 
 Result SLANG_MCALL GraphicsAPIRenderer::createRootShaderObject(
-    IShaderObjectLayout* rootLayout, IShaderObject** outObject)
+    IShaderProgram* program,
+    IShaderObject** outObject)
 {
+    auto commonProgram = dynamic_cast<GraphicsCommonShaderProgram*>(program);
+
     RefPtr<ProgramVars> shaderObject;
     SLANG_RETURN_ON_FAIL(ProgramVars::create(this,
-        dynamic_cast<GraphicsCommonProgramLayout*>(rootLayout),
+        commonProgram->getLayout(),
         shaderObject.writeRef()));
     *outObject = shaderObject.detach();
     return SLANG_OK;
 }
 
-Result SLANG_MCALL GraphicsAPIRenderer::createRootShaderObjectLayout(
-    slang::ProgramLayout* layout, IShaderObjectLayout** outLayout)
+Result GraphicsAPIRenderer::initProgramCommon(
+    GraphicsCommonShaderProgram*    program,
+    IShaderProgram::Desc const&     desc)
 {
+    auto slangProgram = desc.slangProgram;
+    if(!slangProgram)
+        return SLANG_OK;
+
+    auto slangReflection = slangProgram->getLayout(0);
+    if(!slangReflection)
+        return SLANG_FAIL;
+
     RefPtr<GraphicsCommonProgramLayout> programLayout;
-    auto slangReflection = layout;
     {
         GraphicsCommonProgramLayout::Builder builder(this);
         builder.addGlobalParams(slangReflection->getGlobalParamsVarLayout());
-
-        // TODO: Also need to reflect entry points here.
 
         SlangInt entryPointCount = slangReflection->getEntryPointCount();
         for (SlangInt e = 0; e < entryPointCount; ++e)
@@ -1324,7 +1333,10 @@ Result SLANG_MCALL GraphicsAPIRenderer::createRootShaderObjectLayout(
 
         SLANG_RETURN_ON_FAIL(builder.build(programLayout.writeRef()));
     }
-    *outLayout = programLayout.detach();
+
+    program->m_slangProgram = slangProgram;
+    program->m_layout = programLayout;
+
     return SLANG_OK;
 }
 
@@ -1360,11 +1372,44 @@ SLANG_NO_THROW bool SLANG_MCALL gfx::GraphicsAPIRenderer::hasFeature(const char*
     return m_features.findFirstIndex([&](Slang::String x) { return x == featureName; }) != -1;
 }
 
+GraphicsCommonShaderProgram::~GraphicsCommonShaderProgram()
+{
+    // Note: It might not seem like this destructor is needed at all, since
+    // it is empty.
+    //
+    // In pratice, though, it seems to be required because the `m_layout`
+    // field is declared in the coresponding header before the `GraphicsCommonProgramLayout`
+    // is declared (we only have a forward declaration).
+    //
+    // `m_layout` is a `RefPtr`, and it seems that the compiler (or at least
+    // the Visual Studio compiler) either cannot synthesize a destructor for
+    // the type that properly destructs the field, or it simply synthesizes
+    // an incorect destructor.
+    //
+    // I suspect that part of the problem stems from the way that `GraphicsCommonProgramLayout`
+    // inherits from `RefObject` via multiple inheritance.
+    //
+    // No matter what, defining the destructor here in a file where
+    // the declaration of `GraphicsCommonProgramLayout` is visible
+    // seems to result in a correct destructor being emitted.
+    //
+    // TODO: Ther simpler and more robust fix would be to move the declaration
+    // of `GraphicsCommonProgramLayout` and related types to the header.
+}
+
+IShaderProgram* GraphicsCommonShaderProgram::getInterface(const Guid& guid)
+{
+    if (guid == GfxGUID::IID_ISlangUnknown || guid == GfxGUID::IID_IShaderProgram)
+        return static_cast<IShaderProgram*>(this);
+    return nullptr;
+}
+
 void GraphicsAPIRenderer::preparePipelineDesc(GraphicsPipelineStateDesc& desc)
 {
-    if (desc.rootShaderObjectLayout)
+    if (!desc.pipelineLayout)
     {
-        auto rootLayout = dynamic_cast<GraphicsCommonProgramLayout*>(desc.rootShaderObjectLayout);
+        auto program = dynamic_cast<GraphicsCommonShaderProgram*>(desc.program);
+        auto rootLayout = program->getLayout();
         desc.renderTargetCount = rootLayout->getRenderTargetCount();
         desc.pipelineLayout = rootLayout->getPipelineLayout();
     }
@@ -1372,9 +1417,10 @@ void GraphicsAPIRenderer::preparePipelineDesc(GraphicsPipelineStateDesc& desc)
 
 void GraphicsAPIRenderer::preparePipelineDesc(ComputePipelineStateDesc& desc)
 {
-    if (desc.rootShaderObjectLayout)
+    if (!desc.pipelineLayout)
     {
-        auto rootLayout = dynamic_cast<GraphicsCommonProgramLayout*>(desc.rootShaderObjectLayout);
+        auto program = dynamic_cast<GraphicsCommonShaderProgram*>(desc.program);
+        auto rootLayout = program->getLayout();
         desc.pipelineLayout = rootLayout->getPipelineLayout();
     }
 }

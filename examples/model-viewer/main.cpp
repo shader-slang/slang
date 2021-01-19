@@ -960,7 +960,7 @@ RefPtr<EffectVariant> createEffectVaraint(
     spDestroyCompileRequest(slangRequest);
 
     // We use the graphics API to load a program into the GPU
-    gfx::IShaderProgram::Desc programDesc;
+    gfx::IShaderProgram::Desc programDesc = {};
     programDesc.pipelineType = gfx::PipelineType::Graphics;
     programDesc.kernels = kernelDescs.data();
     programDesc.kernelCount = kernelDescs.size();

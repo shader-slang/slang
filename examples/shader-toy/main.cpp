@@ -351,7 +351,7 @@ Result loadShaderProgram(gfx::IRenderer* renderer, ComPtr<gfx::IShaderProgram>& 
         { gfx::StageType::Fragment,  fragmentCode,   fragmentCodeEnd },
     };
 
-    gfx::IShaderProgram::Desc programDesc;
+    gfx::IShaderProgram::Desc programDesc = {};
     programDesc.pipelineType = gfx::PipelineType::Graphics;
     programDesc.kernels = &kernelDescs[0];
     programDesc.kernelCount = 2;

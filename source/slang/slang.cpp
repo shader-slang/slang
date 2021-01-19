@@ -4324,6 +4324,13 @@ SlangResult EndToEndCompileRequest::getProgram(slang::IComponentType** outProgra
     return SLANG_OK;
 }
 
+SlangResult EndToEndCompileRequest::getProgramWithEntryPoints(slang::IComponentType** outProgram)
+{
+    auto program = getSpecializedGlobalAndEntryPointsComponentType();
+    *outProgram = Slang::ComPtr<slang::IComponentType>(program).detach();
+    return SLANG_OK;
+}
+
 SlangResult EndToEndCompileRequest::getModule(SlangInt translationUnitIndex, slang::IModule** outModule)
 {
     auto module = getFrontEndReq()->getTranslationUnit(translationUnitIndex)->getModule();

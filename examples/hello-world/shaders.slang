@@ -38,6 +38,8 @@ struct VertexStageOutput
     CoarseVertex    coarseVertex    : CoarseVertex;
     float4          sv_position     : SV_Position;
 };
+
+[shader("vertex")]
 VertexStageOutput vertexMain(
     AssembledVertex assembledVertex)
 {
@@ -54,6 +56,7 @@ VertexStageOutput vertexMain(
 
 // Fragment Shader
 
+[shader("fragment")]
 float4 fragmentMain(
     CoarseVertex coarseVertex : CoarseVertex) : SV_Target
 {

@@ -100,7 +100,7 @@ ComPtr<gfx::IShaderProgram> loadComputeProgram(slang::IModule* slangModule, char
         { gfx::StageType::Compute,    code,     codeEnd },
     };
 
-    gfx::IShaderProgram::Desc programDesc;
+    gfx::IShaderProgram::Desc programDesc = {};
     programDesc.pipelineType = gfx::PipelineType::Compute;
     programDesc.kernels = &kernelDescs[0];
     programDesc.kernelCount = 2;

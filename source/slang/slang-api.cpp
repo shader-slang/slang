@@ -620,6 +620,14 @@ SLANG_API SlangResult spCompileRequest_getProgram(
     return request->getProgram(outProgram);
 }
 
+SLANG_API SlangResult spCompileRequest_getProgramWithEntryPoints(
+    slang::ICompileRequest*    request,
+    slang::IComponentType** outProgram)
+{
+    SLANG_ASSERT(request);
+    return request->getProgramWithEntryPoints(outProgram);
+}
+
 SLANG_API SlangResult spCompileRequest_getModule(
     slang::ICompileRequest*    request,
     SlangInt                translationUnitIndex,

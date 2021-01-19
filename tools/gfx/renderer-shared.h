@@ -67,4 +67,7 @@ public:
 protected:
     Desc m_desc;
 };
+
+Result createProgramFromSlang(IRenderer* renderer, IShaderProgram::Desc const& desc, IShaderProgram** outProgram);
+
 }
