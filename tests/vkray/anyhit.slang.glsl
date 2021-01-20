@@ -52,11 +52,11 @@ void main()
 
         if(val_0 > float(0))
         {
-            terminateRayEXT();
+            terminateRayEXT;
         }
         else
         {
-            ignoreIntersectionEXT();
+            ignoreIntersectionEXT;
         }
     }
 
