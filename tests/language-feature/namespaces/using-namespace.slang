@@ -2,7 +2,7 @@
 
 // Test that `using` can bring declarations from a namespace into scope
 
-//TEST(compute):COMPARE_COMPUTE:
+//TEST(compute):COMPARE_COMPUTE: -shaderobj
 
 namespace X
 {

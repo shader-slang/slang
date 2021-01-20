@@ -27,25 +27,25 @@
   </PropertyGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.Default.props" />
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'" Label="Configuration">
-    <ConfigurationType>StaticLibrary</ConfigurationType>
+    <ConfigurationType>DynamicLibrary</ConfigurationType>
     <UseDebugLibraries>true</UseDebugLibraries>
     <CharacterSet>Unicode</CharacterSet>
     <PlatformToolset>v140</PlatformToolset>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'" Label="Configuration">
-    <ConfigurationType>StaticLibrary</ConfigurationType>
+    <ConfigurationType>DynamicLibrary</ConfigurationType>
     <UseDebugLibraries>true</UseDebugLibraries>
     <CharacterSet>Unicode</CharacterSet>
     <PlatformToolset>v140</PlatformToolset>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|Win32'" Label="Configuration">
-    <ConfigurationType>StaticLibrary</ConfigurationType>
+    <ConfigurationType>DynamicLibrary</ConfigurationType>
     <UseDebugLibraries>false</UseDebugLibraries>
     <CharacterSet>Unicode</CharacterSet>
     <PlatformToolset>v140</PlatformToolset>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'" Label="Configuration">
-    <ConfigurationType>StaticLibrary</ConfigurationType>
+    <ConfigurationType>DynamicLibrary</ConfigurationType>
     <UseDebugLibraries>false</UseDebugLibraries>
     <CharacterSet>Unicode</CharacterSet>
     <PlatformToolset>v140</PlatformToolset>
@@ -67,34 +67,38 @@
   </ImportGroup>
   <PropertyGroup Label="UserMacros" />
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">
+    <LinkIncremental>true</LinkIncremental>
     <OutDir>..\..\..\bin\windows-x86\debug\</OutDir>
     <IntDir>..\..\..\intermediate\windows-x86\debug\gfx\</IntDir>
     <TargetName>gfx</TargetName>
-    <TargetExt>.lib</TargetExt>
+    <TargetExt>.dll</TargetExt>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">
+    <LinkIncremental>true</LinkIncremental>
     <OutDir>..\..\..\bin\windows-x64\debug\</OutDir>
     <IntDir>..\..\..\intermediate\windows-x64\debug\gfx\</IntDir>
     <TargetName>gfx</TargetName>
-    <TargetExt>.lib</TargetExt>
+    <TargetExt>.dll</TargetExt>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">
+    <LinkIncremental>false</LinkIncremental>
     <OutDir>..\..\..\bin\windows-x86\release\</OutDir>
     <IntDir>..\..\..\intermediate\windows-x86\release\gfx\</IntDir>
     <TargetName>gfx</TargetName>
-    <TargetExt>.lib</TargetExt>
+    <TargetExt>.dll</TargetExt>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'">
+    <LinkIncremental>false</LinkIncremental>
     <OutDir>..\..\..\bin\windows-x64\release\</OutDir>
     <IntDir>..\..\..\intermediate\windows-x64\release\gfx\</IntDir>
     <TargetName>gfx</TargetName>
-    <TargetExt>.lib</TargetExt>
+    <TargetExt>.dll</TargetExt>
   </PropertyGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">
     <ClCompile>
       <PrecompiledHeader>NotUsing</PrecompiledHeader>
       <WarningLevel>Level3</WarningLevel>
-      <PreprocessorDefinitions>_DEBUG;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+      <PreprocessorDefinitions>_DEBUG;SLANG_GFX_DYNAMIC;SLANG_GFX_DYNAMIC_EXPORT;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <AdditionalIncludeDirectories>..\..\..;..\..\..\external;..\..\..\source;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
       <DebugInformationFormat>EditAndContinue</DebugInformationFormat>
       <Optimization>Disabled</Optimization>
@@ -103,6 +107,7 @@
     <Link>
       <SubSystem>Windows</SubSystem>
       <GenerateDebugInformation>true</GenerateDebugInformation>
+      <ImportLibrary>..\..\..\bin\windows-x86\debug\gfx.lib</ImportLibrary>
     </Link>
     <PostBuildEvent>
       <Command>"$(SolutionDir)tools\copy-hlsl-libs.bat" "$(WindowsSdkDir)Redist/D3D/x86/" "../../../bin/windows-x86/debug/"</Command>
@@ -112,7 +117,7 @@
     <ClCompile>
       <PrecompiledHeader>NotUsing</PrecompiledHeader>
       <WarningLevel>Level3</WarningLevel>
-      <PreprocessorDefinitions>_DEBUG;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+      <PreprocessorDefinitions>_DEBUG;SLANG_GFX_DYNAMIC;SLANG_GFX_DYNAMIC_EXPORT;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <AdditionalIncludeDirectories>..\..\..;..\..\..\external;..\..\..\source;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
       <DebugInformationFormat>EditAndContinue</DebugInformationFormat>
       <Optimization>Disabled</Optimization>
@@ -121,6 +126,7 @@
     <Link>
       <SubSystem>Windows</SubSystem>
       <GenerateDebugInformation>true</GenerateDebugInformation>
+      <ImportLibrary>..\..\..\bin\windows-x64\debug\gfx.lib</ImportLibrary>
     </Link>
     <PostBuildEvent>
       <Command>"$(SolutionDir)tools\copy-hlsl-libs.bat" "$(WindowsSdkDir)Redist/D3D/x64/" "../../../bin/windows-x64/debug/"</Command>
@@ -130,7 +136,7 @@
     <ClCompile>
       <PrecompiledHeader>NotUsing</PrecompiledHeader>
       <WarningLevel>Level3</WarningLevel>
-      <PreprocessorDefinitions>NDEBUG;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+      <PreprocessorDefinitions>NDEBUG;SLANG_GFX_DYNAMIC;SLANG_GFX_DYNAMIC_EXPORT;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <AdditionalIncludeDirectories>..\..\..;..\..\..\external;..\..\..\source;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
       <Optimization>Full</Optimization>
       <FunctionLevelLinking>true</FunctionLevelLinking>
@@ -143,6 +149,7 @@
       <SubSystem>Windows</SubSystem>
       <EnableCOMDATFolding>true</EnableCOMDATFolding>
       <OptimizeReferences>true</OptimizeReferences>
+      <ImportLibrary>..\..\..\bin\windows-x86\release\gfx.lib</ImportLibrary>
     </Link>
     <PostBuildEvent>
       <Command>"$(SolutionDir)tools\copy-hlsl-libs.bat" "$(WindowsSdkDir)Redist/D3D/x86/" "../../../bin/windows-x86/release/"</Command>
@@ -152,7 +159,7 @@
     <ClCompile>
       <PrecompiledHeader>NotUsing</PrecompiledHeader>
       <WarningLevel>Level3</WarningLevel>
-      <PreprocessorDefinitions>NDEBUG;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+      <PreprocessorDefinitions>NDEBUG;SLANG_GFX_DYNAMIC;SLANG_GFX_DYNAMIC_EXPORT;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <AdditionalIncludeDirectories>..\..\..;..\..\..\external;..\..\..\source;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
       <Optimization>Full</Optimization>
       <FunctionLevelLinking>true</FunctionLevelLinking>
@@ -165,6 +172,7 @@
       <SubSystem>Windows</SubSystem>
       <EnableCOMDATFolding>true</EnableCOMDATFolding>
       <OptimizeReferences>true</OptimizeReferences>
+      <ImportLibrary>..\..\..\bin\windows-x64\release\gfx.lib</ImportLibrary>
     </Link>
     <PostBuildEvent>
       <Command>"$(SolutionDir)tools\copy-hlsl-libs.bat" "$(WindowsSdkDir)Redist/D3D/x64/" "../../../bin/windows-x64/release/"</Command>
@@ -184,8 +192,7 @@
     <ClInclude Include="..\..\..\tools\gfx\open-gl\render-gl.h" />
     <ClInclude Include="..\..\..\tools\gfx\render-graphics-common.h" />
     <ClInclude Include="..\..\..\tools\gfx\render.h" />
-    <ClInclude Include="..\..\..\tools\gfx\shader-cursor.h" />
-    <ClInclude Include="..\..\..\tools\gfx\surface.h" />
+    <ClInclude Include="..\..\..\tools\gfx\renderer-shared.h" />
     <ClInclude Include="..\..\..\tools\gfx\vulkan\render-vk.h" />
     <ClInclude Include="..\..\..\tools\gfx\vulkan\vk-api.h" />
     <ClInclude Include="..\..\..\tools\gfx\vulkan\vk-device-queue.h" />
@@ -206,14 +213,21 @@
     <ClCompile Include="..\..\..\tools\gfx\open-gl\render-gl.cpp" />
     <ClCompile Include="..\..\..\tools\gfx\render-graphics-common.cpp" />
     <ClCompile Include="..\..\..\tools\gfx\render.cpp" />
-    <ClCompile Include="..\..\..\tools\gfx\shader-cursor.cpp" />
-    <ClCompile Include="..\..\..\tools\gfx\surface.cpp" />
+    <ClCompile Include="..\..\..\tools\gfx\renderer-shared.cpp" />
     <ClCompile Include="..\..\..\tools\gfx\vulkan\render-vk.cpp" />
     <ClCompile Include="..\..\..\tools\gfx\vulkan\vk-api.cpp" />
     <ClCompile Include="..\..\..\tools\gfx\vulkan\vk-device-queue.cpp" />
     <ClCompile Include="..\..\..\tools\gfx\vulkan\vk-module.cpp" />
     <ClCompile Include="..\..\..\tools\gfx\vulkan\vk-swap-chain.cpp" />
     <ClCompile Include="..\..\..\tools\gfx\vulkan\vk-util.cpp" />
+  </ItemGroup>
+  <ItemGroup>
+    <ProjectReference Include="..\core\core.vcxproj">
+      <Project>{F9BE7957-8399-899E-0C49-E714FDDD4B65}</Project>
+    </ProjectReference>
+    <ProjectReference Include="..\slang\slang.vcxproj">
+      <Project>{DB00DA62-0533-4AFD-B59F-A67D5B3A0808}</Project>
+    </ProjectReference>
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">

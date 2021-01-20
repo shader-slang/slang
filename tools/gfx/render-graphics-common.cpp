@@ -1,11 +1,26 @@
 #include "render-graphics-common.h"
+#include "core/slang-basic.h"
+
 using namespace Slang;
 
 namespace gfx
 {
 
-static const Slang::Guid IID_ISlangUnknown = SLANG_UUID_ISlangUnknown;
-static const Slang::Guid IID_IRenderer = SLANG_UUID_IRenderer;
+const Slang::Guid GfxGUID::IID_ISlangUnknown = SLANG_UUID_ISlangUnknown;
+const Slang::Guid GfxGUID::IID_IDescriptorSetLayout = SLANG_UUID_IDescriptorSetLayout;
+const Slang::Guid GfxGUID::IID_IDescriptorSet = SLANG_UUID_IDescriptorSet;
+const Slang::Guid GfxGUID::IID_IShaderProgram = SLANG_UUID_IShaderProgram;
+const Slang::Guid GfxGUID::IID_IPipelineLayout = SLANG_UUID_IPipelineLayout;
+const Slang::Guid GfxGUID::IID_IInputLayout = SLANG_UUID_IInputLayout;
+const Slang::Guid GfxGUID::IID_IPipelineState = SLANG_UUID_IPipelineState;
+const Slang::Guid GfxGUID::IID_IResourceView = SLANG_UUID_IResourceView;
+const Slang::Guid GfxGUID::IID_ISamplerState = SLANG_UUID_ISamplerState;
+const Slang::Guid GfxGUID::IID_IResource = SLANG_UUID_IResource;
+const Slang::Guid GfxGUID::IID_IBufferResource = SLANG_UUID_IBufferResource;
+const Slang::Guid GfxGUID::IID_ITextureResource = SLANG_UUID_ITextureResource;
+const Slang::Guid GfxGUID::IID_IRenderer = SLANG_UUID_IRenderer;
+const Slang::Guid GfxGUID::IID_IShaderObjectLayout = SLANG_UUID_IShaderObjectLayout;
+const Slang::Guid GfxGUID::IID_IShaderObject = SLANG_UUID_IShaderObject;
 
 gfx::StageType translateStage(SlangStage slangStage)
 {
@@ -38,8 +53,16 @@ gfx::StageType translateStage(SlangStage slangStage)
     }
 }
 
-class GraphicsCommonShaderObjectLayout : public ShaderObjectLayout
+class GraphicsCommonShaderObjectLayout : public IShaderObjectLayout, public RefObject
 {
+public:
+    SLANG_REF_OBJECT_IUNKNOWN_ALL
+    IShaderObjectLayout* getInterface(const Guid& guid)
+    {
+        if (guid == GfxGUID::IID_ISlangUnknown || guid == GfxGUID::IID_IShaderObjectLayout)
+            return static_cast<IShaderObjectLayout*>(this);
+        return nullptr;
+    }
 public:
     struct BindingRangeInfo
     {
@@ -53,7 +76,7 @@ public:
 
     struct SubObjectRangeInfo
     {
-        RefPtr<GraphicsCommonShaderObjectLayout> layout;
+        ComPtr<GraphicsCommonShaderObjectLayout> layout;
         //        Index                       baseIndex;
         //        Index                       count;
         Index bindingRangeIndex;
@@ -61,7 +84,7 @@ public:
 
     struct DescriptorSetInfo : public RefObject
     {
-        RefPtr<DescriptorSetLayout> layout;
+        ComPtr<IDescriptorSetLayout> layout;
         Slang::Int space = -1;
     };
 
@@ -84,7 +107,7 @@ public:
 
         struct DescriptorSetBuildInfo : public RefObject
         {
-            List<DescriptorSetLayout::SlotRangeDesc> slotRangeDescs;
+            List<IDescriptorSetLayout::SlotRangeDesc> slotRangeDescs;
             Index space;
         };
         List<RefPtr<DescriptorSetBuildInfo>> m_descriptorSetBuildInfos;
@@ -175,7 +198,7 @@ public:
                     auto slangBindingType = typeLayout->getDescriptorSetDescriptorRangeType(s, r);
                     auto gfxDescriptorType = _mapDescriptorType(slangBindingType);
 
-                    DescriptorSetLayout::SlotRangeDesc descriptorRangeDesc;
+                    IDescriptorSetLayout::SlotRangeDesc descriptorRangeDesc;
                     descriptorRangeDesc.binding =
                         typeLayout->getDescriptorSetDescriptorRangeIndexOffset(s, r);
                     descriptorRangeDesc.count =
@@ -334,8 +357,8 @@ public:
 
         SlangResult build(GraphicsCommonShaderObjectLayout** outLayout)
         {
-            RefPtr<GraphicsCommonShaderObjectLayout> layout =
-                new GraphicsCommonShaderObjectLayout();
+            auto layout =
+                ComPtr<GraphicsCommonShaderObjectLayout>(new GraphicsCommonShaderObjectLayout());
             SLANG_RETURN_ON_FAIL(layout->_init(this));
 
             *outLayout = layout.detach();
@@ -388,11 +411,11 @@ protected:
         for (auto descriptorSetBuildInfo : builder->m_descriptorSetBuildInfos)
         {
             auto& slotRangeDescs = descriptorSetBuildInfo->slotRangeDescs;
-            DescriptorSetLayout::Desc desc;
+            IDescriptorSetLayout::Desc desc;
             desc.slotRangeCount = slotRangeDescs.getCount();
             desc.slotRanges = slotRangeDescs.getBuffer();
 
-            RefPtr<DescriptorSetLayout> descriptorSetLayout;
+            ComPtr<IDescriptorSetLayout> descriptorSetLayout;
             SLANG_RETURN_ON_FAIL(
                 m_renderer->createDescriptorSetLayout(desc, descriptorSetLayout.writeRef()));
 
@@ -569,6 +592,10 @@ public:
             {
                 info.rangeOffset = m_descriptorSetBuildInfos[0]->slotRangeDescs.getCount();
             }
+            else
+            {
+                info.rangeOffset = 0;
+            }
 
             auto slangEntryPointLayout = entryPointLayout->getSlangLayout();
             _addDescriptorSets(
@@ -582,7 +609,7 @@ public:
 
     Slang::Int getRenderTargetCount() { return m_renderTargetCount; }
 
-    PipelineLayout* getPipelineLayout() { return m_pipelineLayout; }
+    IPipelineLayout* getPipelineLayout() { return m_pipelineLayout; }
 
     Index findEntryPointIndex(gfx::StageType stage)
     {
@@ -609,7 +636,7 @@ protected:
 
         m_entryPoints = builder->m_entryPoints;
 
-        List<PipelineLayout::DescriptorSetDesc> pipelineDescriptorSets;
+        List<IPipelineLayout::DescriptorSetDesc> pipelineDescriptorSets;
         _addDescriptorSetsRec(this, pipelineDescriptorSets);
 
 #if 0
@@ -623,8 +650,21 @@ protected:
             m_renderTargetCount = fragmentEntryPoint.layout->getVaryingOutputs().getCount();
         }
 
-        PipelineLayout::Desc pipelineLayoutDesc;
-        pipelineLayoutDesc.renderTargetCount = m_renderTargetCount;
+        IPipelineLayout::Desc pipelineLayoutDesc;
+
+        // HACK: we set `renderTargetCount` to zero here becasue otherwise the D3D12
+        // render back-end will adjust all UAV registers by this value to account
+        // for the `SV_Target<N>` outputs implicitly consuming `u<N>` registers for
+        // Shader Model 5.0.
+        //
+        // When using the shader object path, all registers are being set via Slang
+        // reflection information, and we do not need/want the automatic adjustment.
+        //
+        // TODO: Once we eliminate the non-shader-object path, this whole issue should
+        // be moot, because the `ProgramLayout` should own/be the pipeline layout anyway.
+        //
+        pipelineLayoutDesc.renderTargetCount = 0;
+
         pipelineLayoutDesc.descriptorSetCount = pipelineDescriptorSets.getCount();
         pipelineLayoutDesc.descriptorSets = pipelineDescriptorSets.getBuffer();
 
@@ -636,11 +676,11 @@ protected:
 
     static void _addDescriptorSetsRec(
         GraphicsCommonShaderObjectLayout* layout,
-        List<PipelineLayout::DescriptorSetDesc>& ioPipelineDescriptorSets)
+        List<IPipelineLayout::DescriptorSetDesc>& ioPipelineDescriptorSets)
     {
         for (auto descriptorSetInfo : layout->getDescriptorSets())
         {
-            PipelineLayout::DescriptorSetDesc pipelineDescriptorSet;
+            IPipelineLayout::DescriptorSetDesc pipelineDescriptorSet;
             pipelineDescriptorSet.layout = descriptorSetInfo->layout;
             pipelineDescriptorSet.space = descriptorSetInfo->space;
 
@@ -666,18 +706,27 @@ protected:
     List<EntryPointInfo> m_entryPoints;
     gfx::UInt m_renderTargetCount = 0;
 
-    RefPtr<PipelineLayout> m_pipelineLayout;
+    ComPtr<IPipelineLayout> m_pipelineLayout;
 };
 
-class GraphicsCommonShaderObject : public ShaderObject
+class GraphicsCommonShaderObject : public IShaderObject, public RefObject
 {
+public:
+    SLANG_REF_OBJECT_IUNKNOWN_ALL
+    IShaderObject* getInterface(const Guid& guid)
+    {
+        if (guid == GfxGUID::IID_ISlangUnknown || guid == GfxGUID::IID_IShaderObject)
+            return static_cast<IShaderObject*>(this);
+        return nullptr;
+    }
+
 public:
     static Result create(
         IRenderer* renderer,
         GraphicsCommonShaderObjectLayout* layout,
         GraphicsCommonShaderObject** outShaderObject)
     {
-        RefPtr<GraphicsCommonShaderObject> object = new GraphicsCommonShaderObject();
+        auto object = ComPtr<GraphicsCommonShaderObject>(new GraphicsCommonShaderObject());
         SLANG_RETURN_ON_FAIL(object->init(renderer, layout));
 
         *outShaderObject = object.detach();
@@ -686,15 +735,27 @@ public:
 
     IRenderer* getRenderer() { return m_layout->getRenderer(); }
 
-    Index getEntryPointCount() { return 0; }
+    SLANG_NO_THROW UInt SLANG_MCALL getEntryPointCount() SLANG_OVERRIDE { return 0; }
 
-    ShaderObject* getEntryPoint(Index index) { return nullptr; }
+    SLANG_NO_THROW Result SLANG_MCALL getEntryPoint(UInt index, IShaderObject** outEntryPoint)
+        SLANG_OVERRIDE
+    {
+        *outEntryPoint = nullptr;
+        return SLANG_OK;
+    }
 
-    GraphicsCommonShaderObjectLayout* getLayout() { return m_layout; }
+    GraphicsCommonShaderObjectLayout* getLayout()
+    {
+        return m_layout;
+    }
 
-    slang::TypeLayoutReflection* getElementTypeLayout() { return m_layout->getElementTypeLayout(); }
+    SLANG_NO_THROW slang::TypeLayoutReflection* SLANG_MCALL getElementTypeLayout() SLANG_OVERRIDE
+    {
+        return m_layout->getElementTypeLayout();
+    }
 
-    SlangResult setData(ShaderOffset const& offset, void const* data, size_t size)
+    SLANG_NO_THROW Result SLANG_MCALL
+        setData(ShaderOffset const& offset, void const* data, size_t size) SLANG_OVERRIDE
     {
         IRenderer* renderer = getRenderer();
 
@@ -705,7 +766,9 @@ public:
         return SLANG_OK;
     }
 
-    virtual SlangResult setObject(ShaderOffset const& offset, ShaderObject* object) SLANG_OVERRIDE
+    virtual SLANG_NO_THROW Result SLANG_MCALL
+        setObject(ShaderOffset const& offset, IShaderObject* object)
+        SLANG_OVERRIDE
     {
         if (offset.bindingRangeIndex < 0)
             return SLANG_E_INVALID_ARG;
@@ -734,7 +797,9 @@ public:
 #endif
     }
 
-    virtual SlangResult getObject(ShaderOffset const& offset, ShaderObject** outObject) SLANG_OVERRIDE
+    virtual SLANG_NO_THROW Result SLANG_MCALL
+        getObject(ShaderOffset const& offset, IShaderObject** outObject)
+        SLANG_OVERRIDE
     {
         SLANG_ASSERT(outObject);
         if (offset.bindingRangeIndex < 0)
@@ -743,7 +808,9 @@ public:
             return SLANG_E_INVALID_ARG;
         auto& bindingRange = m_layout->getBindingRange(offset.bindingRangeIndex);
 
-        *outObject = m_objects[bindingRange.baseIndex + offset.bindingArrayIndex];
+        auto object = m_objects[bindingRange.baseIndex + offset.bindingArrayIndex].Ptr();
+        object->addRef();
+        *outObject = object;
 
         //        auto& subObjectRange =
         //        m_layout->getSubObjectRange(bindingRange.subObjectRangeIndex); *outObject =
@@ -761,14 +828,8 @@ public:
 #endif
     }
 
-    ShaderObject* getObject(ShaderOffset const& offset)
-    {
-        ShaderObject* object = nullptr;
-        SLANG_RETURN_NULL_ON_FAIL(getObject(offset, &object));
-        return object;
-    }
-
-    SlangResult setResource(ShaderOffset const& offset, ResourceView* resourceView)
+    SLANG_NO_THROW Result SLANG_MCALL
+        setResource(ShaderOffset const& offset, IResourceView* resourceView) SLANG_OVERRIDE
     {
         if (offset.bindingRangeIndex < 0)
             return SLANG_E_INVALID_ARG;
@@ -780,7 +841,8 @@ public:
         return SLANG_OK;
     }
 
-    SlangResult setSampler(ShaderOffset const& offset, SamplerState* sampler)
+    SLANG_NO_THROW Result SLANG_MCALL setSampler(ShaderOffset const& offset, ISamplerState* sampler)
+        SLANG_OVERRIDE
     {
         if (offset.bindingRangeIndex < 0)
             return SLANG_E_INVALID_ARG;
@@ -792,8 +854,8 @@ public:
         return SLANG_OK;
     }
 
-    SlangResult setCombinedTextureSampler(
-        ShaderOffset const& offset, ResourceView* textureView, SamplerState* sampler)
+    SLANG_NO_THROW Result SLANG_MCALL setCombinedTextureSampler(
+        ShaderOffset const& offset, IResourceView* textureView, ISamplerState* sampler) SLANG_OVERRIDE
     {
         if (offset.bindingRangeIndex < 0)
             return SLANG_E_INVALID_ARG;
@@ -826,11 +888,11 @@ protected:
         size_t uniformSize = layout->getElementTypeLayout()->getSize();
         if (uniformSize)
         {
-            BufferResource::Desc bufferDesc;
+            IBufferResource::Desc bufferDesc;
             bufferDesc.init(uniformSize);
-            bufferDesc.cpuAccessFlags |= Resource::AccessFlag::Write;
+            bufferDesc.cpuAccessFlags |= IResource::AccessFlag::Write;
             SLANG_RETURN_ON_FAIL(renderer->createBufferResource(
-                Resource::Usage::ConstantBuffer, bufferDesc, nullptr, m_buffer.writeRef()));
+                IResource::Usage::ConstantBuffer, bufferDesc, nullptr, m_buffer.writeRef()));
         }
 
 #if 0
@@ -857,7 +919,7 @@ protected:
 
         for (auto subObjectRangeInfo : layout->getSubObjectRanges())
         {
-            RefPtr<GraphicsCommonShaderObjectLayout> subObjectLayout = subObjectRangeInfo.layout;
+            auto subObjectLayout = subObjectRangeInfo.layout;
 
             // In the case where the sub-object range represents an
             // existential-type leaf field (e.g., an `IBar`), we
@@ -888,17 +950,17 @@ protected:
     Result apply(
         IRenderer* renderer,
         PipelineType pipelineType,
-        PipelineLayout* pipelineLayout,
+        IPipelineLayout* pipelineLayout,
         Index& ioRootIndex)
     {
         GraphicsCommonShaderObjectLayout* layout = m_layout;
 
         // Create the descritpor sets required by the layout...
         //
-        List<RefPtr<DescriptorSet>> descriptorSets;
+        List<ComPtr<IDescriptorSet>> descriptorSets;
         for (auto descriptorSetInfo : layout->getDescriptorSets())
         {
-            RefPtr<DescriptorSet> descriptorSet;
+            ComPtr<IDescriptorSet> descriptorSet;
             SLANG_RETURN_ON_FAIL(
                 renderer->createDescriptorSet(descriptorSetInfo->layout, descriptorSet.writeRef()));
             descriptorSets.add(descriptorSet);
@@ -915,7 +977,7 @@ protected:
     }
 
     Result _bindIntoDescriptorSet(
-        DescriptorSet* descriptorSet, Index baseRangeIndex, Index subObjectRangeArrayIndex)
+        IDescriptorSet* descriptorSet, Index baseRangeIndex, Index subObjectRangeArrayIndex)
     {
         GraphicsCommonShaderObjectLayout* layout = m_layout;
 
@@ -999,7 +1061,7 @@ protected:
     }
 
 public:
-    virtual Result _bindIntoDescriptorSets(RefPtr<DescriptorSet>* descriptorSets)
+    virtual Result _bindIntoDescriptorSets(ComPtr<IDescriptorSet>* descriptorSets)
     {
         GraphicsCommonShaderObjectLayout* layout = m_layout;
 
@@ -1013,7 +1075,7 @@ public:
         //
         for (auto bindingRangeInfo : layout->getBindingRanges())
         {
-            DescriptorSet* descriptorSet = descriptorSets[bindingRangeInfo.descriptorSetIndex];
+            auto descriptorSet = descriptorSets[bindingRangeInfo.descriptorSetIndex];
             auto rangeIndex = bindingRangeInfo.rangeIndexInDescriptorSet;
             auto baseIndex = bindingRangeInfo.baseIndex;
             auto count = bindingRangeInfo.count;
@@ -1073,16 +1135,16 @@ public:
     }
 
     RefPtr<GraphicsCommonShaderObjectLayout> m_layout = nullptr;
-    RefPtr<BufferResource> m_buffer;
+    ComPtr<IBufferResource> m_buffer;
 
-    List<RefPtr<ResourceView>> m_resourceViews;
+    List<ComPtr<IResourceView>> m_resourceViews;
 
-    List<RefPtr<SamplerState>> m_samplers;
+    List<ComPtr<ISamplerState>> m_samplers;
 
     struct CombinedTextureSamplerSlot
     {
-        RefPtr<ResourceView> textureView;
-        RefPtr<SamplerState> sampler;
+        ComPtr<IResourceView> textureView;
+        ComPtr<ISamplerState> sampler;
     };
     List<CombinedTextureSamplerSlot> m_combinedTextureSamplers;
 
@@ -1158,12 +1220,17 @@ public:
     List<RefPtr<EntryPointVars>> const& getEntryPoints() const { return m_entryPoints; }
 
     
-    Index getEntryPointCount() { return m_entryPoints.getCount(); }
-    ShaderObject* getEntryPoint(Index index) { return m_entryPoints[index]; }
+    UInt SLANG_MCALL getEntryPointCount() SLANG_OVERRIDE { return (UInt)m_entryPoints.getCount(); }
+    SlangResult SLANG_MCALL getEntryPoint(UInt index, IShaderObject** outEntryPoint) SLANG_OVERRIDE
+    {
+        *outEntryPoint = m_entryPoints[index];
+        m_entryPoints[index]->addRef();
+        return SLANG_OK;
+    }
 
 
 protected:
-    virtual Result _bindIntoDescriptorSets(RefPtr<DescriptorSet>* descriptorSets)
+    virtual Result _bindIntoDescriptorSets(ComPtr<IDescriptorSet>* descriptorSets) override
     {
         SLANG_RETURN_ON_FAIL(Super::_bindIntoDescriptorSets(descriptorSets));
 
@@ -1199,8 +1266,8 @@ protected:
 };
 
 
-Result GraphicsAPIRenderer::createShaderObjectLayout(
-    slang::TypeLayoutReflection* typeLayout, ShaderObjectLayout** outLayout)
+Result SLANG_MCALL GraphicsAPIRenderer::createShaderObjectLayout(
+    slang::TypeLayoutReflection* typeLayout, IShaderObjectLayout** outLayout)
 {
     RefPtr<GraphicsCommonShaderObjectLayout> layout;
     SLANG_RETURN_ON_FAIL(GraphicsCommonShaderObjectLayout::createForElementType(
@@ -1209,7 +1276,8 @@ Result GraphicsAPIRenderer::createShaderObjectLayout(
     return SLANG_OK;
 }
 
-Result GraphicsAPIRenderer::createShaderObject(ShaderObjectLayout* layout, ShaderObject** outObject)
+Result SLANG_MCALL
+    GraphicsAPIRenderer::createShaderObject(IShaderObjectLayout* layout, IShaderObject** outObject)
 {
     RefPtr<GraphicsCommonShaderObject> shaderObject;
     SLANG_RETURN_ON_FAIL(GraphicsCommonShaderObject::create(this,
@@ -1218,8 +1286,8 @@ Result GraphicsAPIRenderer::createShaderObject(ShaderObjectLayout* layout, Shade
     return SLANG_OK;
 }
 
-Result GraphicsAPIRenderer::createRootShaderObject(
-    ShaderObjectLayout* rootLayout, ShaderObject** outObject)
+Result SLANG_MCALL GraphicsAPIRenderer::createRootShaderObject(
+    IShaderObjectLayout* rootLayout, IShaderObject** outObject)
 {
     RefPtr<ProgramVars> shaderObject;
     SLANG_RETURN_ON_FAIL(ProgramVars::create(this,
@@ -1229,8 +1297,8 @@ Result GraphicsAPIRenderer::createRootShaderObject(
     return SLANG_OK;
 }
 
-Result GraphicsAPIRenderer::createRootShaderObjectLayout(
-    slang::ProgramLayout* layout, ShaderObjectLayout** outLayout)
+Result SLANG_MCALL GraphicsAPIRenderer::createRootShaderObjectLayout(
+    slang::ProgramLayout* layout, IShaderObjectLayout** outLayout)
 {
     RefPtr<GraphicsCommonProgramLayout> programLayout;
     auto slangReflection = layout;
@@ -1260,7 +1328,8 @@ Result GraphicsAPIRenderer::createRootShaderObjectLayout(
     return SLANG_OK;
 }
 
-Result GraphicsAPIRenderer::bindRootShaderObject(PipelineType pipelineType, ShaderObject* object)
+Result SLANG_MCALL
+    GraphicsAPIRenderer::bindRootShaderObject(PipelineType pipelineType, IShaderObject* object)
 {
     auto programVars = dynamic_cast<ProgramVars*>(object);
     if (!programVars)
@@ -1268,6 +1337,27 @@ Result GraphicsAPIRenderer::bindRootShaderObject(PipelineType pipelineType, Shad
 
     programVars->apply(this, pipelineType);
     return SLANG_OK;
+}
+
+SLANG_NO_THROW Result SLANG_MCALL
+    gfx::GraphicsAPIRenderer::getFeatures(
+        const char** outFeatures, UInt bufferSize, UInt* outFeatureCount)
+{
+    if (bufferSize >= (UInt)m_features.getCount())
+    {
+        for (Index i = 0; i < m_features.getCount(); i++)
+        {
+            outFeatures[i] = m_features[i].getUnownedSlice().begin();
+        }
+    }
+    if (outFeatureCount)
+        *outFeatureCount = (UInt)m_features.getCount();
+    return SLANG_OK;
+}
+
+SLANG_NO_THROW bool SLANG_MCALL gfx::GraphicsAPIRenderer::hasFeature(const char* featureName)
+{
+    return m_features.findFirstIndex([&](Slang::String x) { return x == featureName; }) != -1;
 }
 
 void GraphicsAPIRenderer::preparePipelineDesc(GraphicsPipelineStateDesc& desc)
@@ -1291,7 +1381,7 @@ void GraphicsAPIRenderer::preparePipelineDesc(ComputePipelineStateDesc& desc)
 
 IRenderer* gfx::GraphicsAPIRenderer::getInterface(const Guid& guid)
 {
-    return (guid == IID_ISlangUnknown || guid == IID_IRenderer)
+    return (guid == GfxGUID::IID_ISlangUnknown || guid == GfxGUID::IID_IRenderer)
                ? static_cast<IRenderer*>(this)
                : nullptr;
 }

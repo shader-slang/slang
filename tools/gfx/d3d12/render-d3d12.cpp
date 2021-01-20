@@ -4,10 +4,10 @@
 #include "render-d3d12.h"
 
 //WORKING:#include "options.h"
-#include "../render.h"
+#include "../renderer-shared.h"
 #include "../render-graphics-common.h"
 
-#include "../surface.h"
+#include "core/slang-basic.h"
 
 // In order to use the Slang API, we need to include its header
 
@@ -67,82 +67,81 @@ class D3D12Renderer : public GraphicsAPIRenderer
 public:
     // Renderer    implementation
     virtual SLANG_NO_THROW SlangResult SLANG_MCALL initialize(const Desc& desc, void* inWindowHandle) override;
-    virtual SLANG_NO_THROW const List<String>& SLANG_MCALL getFeatures() override
-    {
-        return m_features;
-    }
     virtual SLANG_NO_THROW void SLANG_MCALL setClearColor(const float color[4]) override;
     virtual SLANG_NO_THROW void SLANG_MCALL clearFrame() override;
     virtual SLANG_NO_THROW void SLANG_MCALL presentFrame() override;
-    virtual SLANG_NO_THROW TextureResource::Desc SLANG_MCALL getSwapChainTextureDesc() override;
+    virtual SLANG_NO_THROW ITextureResource::Desc SLANG_MCALL getSwapChainTextureDesc() override;
 
     virtual SLANG_NO_THROW Result SLANG_MCALL createTextureResource(
-        Resource::Usage initialUsage,
-        const TextureResource::Desc& desc,
-        const TextureResource::Data* initData,
-        TextureResource** outResource) override;
+        IResource::Usage initialUsage,
+        const ITextureResource::Desc& desc,
+        const ITextureResource::Data* initData,
+        ITextureResource** outResource) override;
     virtual SLANG_NO_THROW Result SLANG_MCALL createBufferResource(
-        Resource::Usage initialUsage,
-        const BufferResource::Desc& desc,
+        IResource::Usage initialUsage,
+        const IBufferResource::Desc& desc,
         const void* initData,
-        BufferResource** outResource) override;
+        IBufferResource** outResource) override;
     virtual SLANG_NO_THROW Result SLANG_MCALL
-        createSamplerState(SamplerState::Desc const& desc, SamplerState** outSampler) override;
+        createSamplerState(ISamplerState::Desc const& desc, ISamplerState** outSampler) override;
 
     virtual SLANG_NO_THROW Result SLANG_MCALL createTextureView(
-        TextureResource* texture, ResourceView::Desc const& desc, ResourceView** outView) override;
+        ITextureResource* texture,
+        IResourceView::Desc const& desc,
+        IResourceView** outView) override;
     virtual SLANG_NO_THROW Result SLANG_MCALL createBufferView(
-        BufferResource* buffer, ResourceView::Desc const& desc, ResourceView** outView) override;
+        IBufferResource* buffer, IResourceView::Desc const& desc, IResourceView** outView) override;
 
     virtual SLANG_NO_THROW Result SLANG_MCALL createInputLayout(
         const InputElementDesc* inputElements,
         UInt inputElementCount,
-        InputLayout** outLayout) override;
+        IInputLayout** outLayout) override;
 
     virtual SLANG_NO_THROW Result SLANG_MCALL createDescriptorSetLayout(
-        const DescriptorSetLayout::Desc& desc, DescriptorSetLayout** outLayout) override;
-    virtual SLANG_NO_THROW Result SLANG_MCALL
-        createPipelineLayout(const PipelineLayout::Desc& desc, PipelineLayout** outLayout) override;
-    virtual SLANG_NO_THROW Result SLANG_MCALL
-        createDescriptorSet(DescriptorSetLayout* layout, DescriptorSet** outDescriptorSet) override;
+        const IDescriptorSetLayout::Desc& desc, IDescriptorSetLayout** outLayout) override;
+    virtual SLANG_NO_THROW Result SLANG_MCALL createPipelineLayout(
+        const IPipelineLayout::Desc& desc, IPipelineLayout** outLayout) override;
+    virtual SLANG_NO_THROW Result SLANG_MCALL createDescriptorSet(
+        IDescriptorSetLayout* layout, IDescriptorSet** outDescriptorSet) override;
 
     virtual SLANG_NO_THROW Result SLANG_MCALL
-        createProgram(const ShaderProgram::Desc& desc, ShaderProgram** outProgram) override;
+        createProgram(const IShaderProgram::Desc& desc, IShaderProgram** outProgram) override;
     virtual SLANG_NO_THROW Result SLANG_MCALL createGraphicsPipelineState(
-        const GraphicsPipelineStateDesc& desc, PipelineState** outState) override;
+        const GraphicsPipelineStateDesc& desc, IPipelineState** outState) override;
     virtual SLANG_NO_THROW Result SLANG_MCALL createComputePipelineState(
-        const ComputePipelineStateDesc& desc, PipelineState** outState) override;
+        const ComputePipelineStateDesc& desc, IPipelineState** outState) override;
 
-    virtual SLANG_NO_THROW SlangResult SLANG_MCALL
-        captureScreenSurface(Surface& surfaceOut) override;
+    virtual SLANG_NO_THROW SlangResult SLANG_MCALL captureScreenSurface(
+        void* buffer, size_t* inOutBufferSize, size_t* outRowPitch, size_t* outPixelSize) override;
 
-    virtual SLANG_NO_THROW void* SLANG_MCALL map(BufferResource* buffer, MapFlavor flavor) override;
-    virtual SLANG_NO_THROW void SLANG_MCALL unmap(BufferResource* buffer) override;
+    virtual SLANG_NO_THROW void* SLANG_MCALL
+        map(IBufferResource* buffer, MapFlavor flavor) override;
+    virtual SLANG_NO_THROW void SLANG_MCALL unmap(IBufferResource* buffer) override;
     //    virtual void setInputLayout(InputLayout* inputLayout) override;
     virtual SLANG_NO_THROW void SLANG_MCALL
         setPrimitiveTopology(PrimitiveTopology topology) override;
 
     virtual SLANG_NO_THROW void SLANG_MCALL setDescriptorSet(
         PipelineType pipelineType,
-        PipelineLayout* layout,
+        IPipelineLayout* layout,
         UInt index,
-        DescriptorSet* descriptorSet) override;
+        IDescriptorSet* descriptorSet) override;
 
     virtual SLANG_NO_THROW void SLANG_MCALL setVertexBuffers(
         UInt startSlot,
         UInt slotCount,
-        BufferResource* const* buffers,
+        IBufferResource* const* buffers,
         const UInt* strides,
         const UInt* offsets) override;
-    virtual SLANG_NO_THROW void
-        SLANG_MCALL setIndexBuffer(BufferResource* buffer, Format indexFormat, UInt offset) override;
-    virtual void SLANG_MCALL setDepthStencilTarget(ResourceView* depthStencilView) override;
+    virtual SLANG_NO_THROW void SLANG_MCALL
+        setIndexBuffer(IBufferResource* buffer, Format indexFormat, UInt offset) override;
+    virtual void SLANG_MCALL setDepthStencilTarget(IResourceView* depthStencilView) override;
     virtual SLANG_NO_THROW void SLANG_MCALL
         setViewports(UInt count, Viewport const* viewports) override;
     virtual SLANG_NO_THROW void SLANG_MCALL
         setScissorRects(UInt count, ScissorRect const* rects) override;
     virtual SLANG_NO_THROW void SLANG_MCALL
-        setPipelineState(PipelineType pipelineType, PipelineState* state) override;
+        setPipelineState(PipelineType pipelineType, IPipelineState* state) override;
     virtual SLANG_NO_THROW void SLANG_MCALL draw(UInt vertexCount, UInt startVertex) override;
     virtual SLANG_NO_THROW void SLANG_MCALL
         drawIndexed(UInt indexCount, UInt startIndex, UInt baseVertex) override;
@@ -203,18 +202,26 @@ protected:
         UINT64 m_fenceValue;                                        ///< The fence value when rendering this Frame is complete
     };
 
-    class ShaderProgramImpl: public ShaderProgram
+    class ShaderProgramImpl : public IShaderProgram, public RefObject
     {
-        public:
+    public:
+        SLANG_REF_OBJECT_IUNKNOWN_ALL
+        IShaderProgram* getInterface(const Guid& guid)
+        {
+            if (guid == GfxGUID::IID_ISlangUnknown || guid == GfxGUID::IID_IShaderProgram)
+                return static_cast<IShaderProgram*>(this);
+            return nullptr;
+        }
+    public:
         PipelineType m_pipelineType;
         List<uint8_t> m_vertexShader;
         List<uint8_t> m_pixelShader;
         List<uint8_t> m_computeShader;
     };
 
-    class BufferResourceImpl: public BufferResource
+    class BufferResourceImpl: public gfx::BufferResource
     {
-        public:
+    public:
         typedef BufferResource Parent;
 
         enum class BackingStyle
@@ -247,7 +254,7 @@ protected:
             }
         }
 
-        BufferResourceImpl(Resource::Usage initialUsage, const Desc& desc):
+        BufferResourceImpl(IResource::Usage initialUsage, const Desc& desc):
             Parent(desc),
             m_mapFlavor(MapFlavor::HostRead),
             m_initialUsage(initialUsage)
@@ -292,7 +299,7 @@ protected:
 
     class TextureResourceImpl: public TextureResource
     {
-        public:
+    public:
         typedef TextureResource Parent;
 
         TextureResourceImpl(const Desc& desc):
@@ -303,58 +310,60 @@ protected:
         D3D12Resource m_resource;
     };
 
-    class SamplerStateImpl : public SamplerState
+    class SamplerStateImpl : public ISamplerState, public RefObject
     {
+    public:
+        SLANG_REF_OBJECT_IUNKNOWN_ALL
+        ISamplerState* getInterface(const Guid& guid)
+        {
+            if (guid == GfxGUID::IID_ISlangUnknown || guid == GfxGUID::IID_ISamplerState)
+                return static_cast<ISamplerState*>(this);
+            return nullptr;
+        }
     public:
         D3D12_CPU_DESCRIPTOR_HANDLE m_cpuHandle;
     };
 
-    class ResourceViewImpl : public ResourceView
+    class ResourceViewImpl : public IResourceView, public RefObject
     {
+    public:
+        SLANG_REF_OBJECT_IUNKNOWN_ALL
+        IResourceView* getInterface(const Guid& guid)
+        {
+            if (guid == GfxGUID::IID_ISlangUnknown || guid == GfxGUID::IID_IResourceView)
+                return static_cast<IResourceView*>(this);
+            return nullptr;
+        }
     public:
         RefPtr<Resource>            m_resource;
         D3D12HostVisibleDescriptor  m_descriptor;
     };
 
-    class InputLayoutImpl: public InputLayout
-    {
-        public:
+    class InputLayoutImpl: public IInputLayout, public RefObject
+	{
+    public:
+        SLANG_REF_OBJECT_IUNKNOWN_ALL
+        IInputLayout* getInterface(const Guid& guid)
+        {
+            if (guid == GfxGUID::IID_ISlangUnknown || guid == GfxGUID::IID_IInputLayout)
+                return static_cast<IInputLayout*>(this);
+            return nullptr;
+        }
+    public:
         List<D3D12_INPUT_ELEMENT_DESC> m_elements;
         List<char> m_text;                              ///< Holds all strings to keep in scope
     };
 
-#if 0
-    struct BindingDetail
+    class DescriptorSetLayoutImpl : public IDescriptorSetLayout, public RefObject
     {
-        int m_srvIndex = -1;
-        int m_uavIndex = -1;
-        int m_samplerIndex = -1;
-    };
-
-    class BindingStateImpl: public BindingState
-    {
-        public:
-        typedef BindingState Parent;
-
-        Result init(ID3D12Device* device)
+    public:
+        SLANG_REF_OBJECT_IUNKNOWN_ALL
+        IDescriptorSetLayout* getInterface(const Guid& guid)
         {
-            // Set up descriptor heaps
-            SLANG_RETURN_ON_FAIL(m_viewHeap.init(device, 256, D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV, D3D12_DESCRIPTOR_HEAP_FLAG_SHADER_VISIBLE));
-            SLANG_RETURN_ON_FAIL(m_samplerHeap.init(device, 16, D3D12_DESCRIPTOR_HEAP_TYPE_SAMPLER, D3D12_DESCRIPTOR_HEAP_FLAG_SHADER_VISIBLE));
-            return SLANG_OK;
+            if (guid == GfxGUID::IID_ISlangUnknown || guid == GfxGUID::IID_IDescriptorSetLayout)
+                return static_cast<IDescriptorSetLayout*>(this);
+            return nullptr;
         }
-
-            /// Ctor
-        BindingStateImpl(const Desc& desc) :
-            Parent(desc)
-        {}
-
-        List<BindingDetail> m_bindingDetails;       ///< These match 1-1 to the bindings in the m_desc
-    };
-#endif
-
-    class DescriptorSetLayoutImpl : public DescriptorSetLayout
-    {
     public:
         // A "descriptor set" at the level of the `Renderer` API
         // is similar to a D3D12 "descriptor table," but the match
@@ -443,25 +452,47 @@ protected:
         Int m_samplerCount;
     };
 
-    class PipelineLayoutImpl : public PipelineLayout
+    class PipelineLayoutImpl : public IPipelineLayout, public RefObject
     {
+    public:
+        SLANG_REF_OBJECT_IUNKNOWN_ALL
+        IPipelineLayout* getInterface(const Guid& guid)
+        {
+            if (guid == GfxGUID::IID_ISlangUnknown || guid == GfxGUID::IID_IPipelineLayout)
+            {
+                return static_cast<IPipelineLayout*>(this);
+            }
+            return nullptr;
+        }
     public:
         ComPtr<ID3D12RootSignature> m_rootSignature;
         UInt                        m_descriptorSetCount;
     };
 
-    class DescriptorSetImpl : public DescriptorSet
+    class DescriptorSetImpl : public IDescriptorSet, public RefObject
     {
     public:
-        virtual void setConstantBuffer(UInt range, UInt index, BufferResource* buffer) override;
-        virtual void setResource(UInt range, UInt index, ResourceView* view) override;
-        virtual void setSampler(UInt range, UInt index, SamplerState* sampler) override;
-        virtual void setCombinedTextureSampler(
+        SLANG_REF_OBJECT_IUNKNOWN_ALL
+        IDescriptorSet* getInterface(const Guid& guid)
+        {
+            if (guid == GfxGUID::IID_ISlangUnknown || guid == GfxGUID::IID_IDescriptorSet)
+                return static_cast<IDescriptorSet*>(this);
+            return nullptr;
+        }
+    public:
+        virtual SLANG_NO_THROW void SLANG_MCALL
+            setConstantBuffer(UInt range, UInt index, IBufferResource* buffer) override;
+        virtual SLANG_NO_THROW void SLANG_MCALL
+            setResource(UInt range, UInt index, IResourceView* view) override;
+        virtual SLANG_NO_THROW void SLANG_MCALL
+            setSampler(UInt range, UInt index, ISamplerState* sampler) override;
+        virtual SLANG_NO_THROW void SLANG_MCALL setCombinedTextureSampler(
             UInt range,
             UInt index,
-            ResourceView*   textureView,
-            SamplerState*   sampler) override;
-        virtual void setRootConstants(
+            IResourceView*   textureView,
+            ISamplerState*   sampler) override;
+        virtual SLANG_NO_THROW void SLANG_MCALL
+            setRootConstants(
             UInt range,
             UInt offset,
             UInt size,
@@ -517,8 +548,16 @@ protected:
     D3D12DescriptorHeap m_cpuViewHeap;          ///< Cbv, Srv, Uav
     D3D12DescriptorHeap m_cpuSamplerHeap;       ///< Heap for samplers
 
-    class PipelineStateImpl : public PipelineState
+    class PipelineStateImpl : public IPipelineState, public RefObject
     {
+    public:
+        SLANG_REF_OBJECT_IUNKNOWN_ALL
+        IPipelineState* getInterface(const Guid& guid)
+        {
+            if (guid == GfxGUID::IID_ISlangUnknown || guid == GfxGUID::IID_IPipelineState)
+                return static_cast<IPipelineState*>(this);
+            return nullptr;
+        }
     public:
         PipelineType                m_pipelineType;
         RefPtr<PipelineLayoutImpl>  m_pipelineLayout;
@@ -531,30 +570,6 @@ protected:
         int m_stride;
         int m_offset;
     };
-
-#if 0
-    struct BindParameters
-    {
-        enum
-        {
-            kMaxRanges = 16,
-            kMaxParameters = 32
-        };
-
-        D3D12_DESCRIPTOR_RANGE& nextRange() { return m_ranges[m_rangeIndex++]; }
-        D3D12_ROOT_PARAMETER& nextParameter() { return m_parameters[m_paramIndex++]; }
-
-        BindParameters():
-            m_rangeIndex(0),
-            m_paramIndex(0)
-        {}
-
-        D3D12_DESCRIPTOR_RANGE m_ranges[kMaxRanges];
-        int m_rangeIndex;
-        D3D12_ROOT_PARAMETER m_parameters[kMaxParameters];
-        int m_paramIndex;
-    };
-#endif
 
     struct GraphicsSubmitter : public Submitter
     {
@@ -632,7 +647,12 @@ protected:
     void submitGpuWorkAndWait();
     void _resetCommandList();
 
-    Result captureTextureToSurface(D3D12Resource& resource, Surface& surfaceOut);
+    Result captureTextureToSurface(
+        D3D12Resource& resource,
+        void* buffer,
+        size_t* inOutBufferSize,
+        size_t* outRowPitch,
+        size_t* outPixelSize);
 
     FrameInfo& getFrame() { return m_frameInfos[m_frameIndex]; }
     const FrameInfo& getFrame() const { return m_frameInfos[m_frameIndex]; }
@@ -748,7 +768,7 @@ protected:
     bool m_nvapi = false;
 };
 
-SlangResult createD3D12Renderer(IRenderer** outRenderer)
+SlangResult SLANG_MCALL createD3D12Renderer(IRenderer** outRenderer)
 {
     *outRenderer = new D3D12Renderer();
     (*outRenderer)->addRef();
@@ -801,7 +821,7 @@ D3D12Renderer::~D3D12Renderer()
     }
 }
 
-static void _initSrvDesc(Resource::Type resourceType, const TextureResource::Desc& textureDesc, const D3D12_RESOURCE_DESC& desc, DXGI_FORMAT pixelFormat, D3D12_SHADER_RESOURCE_VIEW_DESC& descOut)
+static void _initSrvDesc(IResource::Type resourceType, const ITextureResource::Desc& textureDesc, const D3D12_RESOURCE_DESC& desc, DXGI_FORMAT pixelFormat, D3D12_SHADER_RESOURCE_VIEW_DESC& descOut)
 {
     // create SRV
     descOut = D3D12_SHADER_RESOURCE_VIEW_DESC();
@@ -823,7 +843,7 @@ static void _initSrvDesc(Resource::Type resourceType, const TextureResource::Des
         descOut.Texture2D.PlaneSlice = 0;
         descOut.Texture2D.ResourceMinLODClamp = 0.0f;
     }
-    else if (resourceType == Resource::Type::TextureCube)
+    else if (resourceType == IResource::Type::TextureCube)
     {
         if (textureDesc.arraySize > 1)
         {
@@ -1047,7 +1067,12 @@ void D3D12Renderer::submitGpuWorkAndWait()
     waitForGpu();
 }
 
-Result D3D12Renderer::captureTextureToSurface(D3D12Resource& resource, Surface& surfaceOut)
+Result D3D12Renderer::captureTextureToSurface(
+    D3D12Resource& resource,
+    void* buffer,
+    size_t* inOutBufferSize,
+    size_t* outRowPitch,
+    size_t* outPixelSize)
 {
     const D3D12_RESOURCE_STATES initialState = resource.getState();
 
@@ -1063,7 +1088,17 @@ Result D3D12Renderer::captureTextureToSurface(D3D12Resource& resource, Surface& 
     size_t bytesPerPixel = sizeof(uint32_t);
     size_t rowPitch = int(desc.Width) * bytesPerPixel;
     size_t bufferSize = rowPitch * int(desc.Height);
-
+    if (outRowPitch)
+        *outRowPitch = rowPitch;
+    if (outPixelSize)
+        *outPixelSize = bytesPerPixel;
+    if (!buffer || *inOutBufferSize == 0)
+    {
+        *inOutBufferSize = bufferSize;
+        return SLANG_OK;
+    }
+    if (*inOutBufferSize < bufferSize)
+        return SLANG_ERROR_INSUFFICIENT_BUFFER;
     D3D12Resource stagingResource;
     {
         D3D12_RESOURCE_DESC stagingDesc;
@@ -1120,10 +1155,10 @@ Result D3D12Renderer::captureTextureToSurface(D3D12Resource& resource, Surface& 
 
         SLANG_RETURN_ON_FAIL(dxResource->Map(0, &readRange, reinterpret_cast<void**>(&data)));
 
-        Result res = surfaceOut.set(int(desc.Width), int(desc.Height), Format::RGBA_Unorm_UInt8, int(rowPitch), data, SurfaceAllocator::getMallocAllocator());
+        memcpy(buffer, data, bufferSize);
 
         dxResource->Unmap(0, nullptr);
-        return res;
+        return SLANG_OK;
     }
 }
 
@@ -1384,7 +1419,7 @@ Result D3D12Renderer::initialize(const Desc& desc, void* inWindowHandle)
     const int numCombinations = combiner.getNumCombinations();
     for (int i = 0; i < numCombinations; ++i)
     {
-        if (SLANG_SUCCEEDED(_createDevice(combiner.getCombination(i), desc.adapter.getUnownedSlice(), featureLevel, m_deviceInfo)))
+        if (SLANG_SUCCEEDED(_createDevice(combiner.getCombination(i), UnownedStringSlice(desc.adapter), featureLevel, m_deviceInfo)))
         {
             break;
         }
@@ -1779,19 +1814,20 @@ void D3D12Renderer::presentFrame()
 TextureResource::Desc D3D12Renderer::getSwapChainTextureDesc()
 {
     TextureResource::Desc desc;
-    desc.init2D(Resource::Type::Texture2D, Format::Unknown, m_desc.width, m_desc.height, 1);
+    desc.init2D(IResource::Type::Texture2D, Format::Unknown, m_desc.width, m_desc.height, 1);
 
     return desc;
 }
 
-SlangResult D3D12Renderer::captureScreenSurface(Surface& surfaceOut)
+SlangResult D3D12Renderer::captureScreenSurface(
+    void* buffer, size_t* inOutBufferSize, size_t* outRowPitch, size_t* outPixelSize)
 {
-    return captureTextureToSurface(*m_renderTargets[m_renderTargetIndex], surfaceOut);
+    return captureTextureToSurface(*m_renderTargets[m_renderTargetIndex], buffer, inOutBufferSize, outRowPitch, outPixelSize);
 }
 
-static D3D12_RESOURCE_STATES _calcResourceState(Resource::Usage usage)
+static D3D12_RESOURCE_STATES _calcResourceState(IResource::Usage usage)
 {
-    typedef Resource::Usage Usage;
+    typedef IResource::Usage Usage;
     switch (usage)
     {
         case Usage::VertexBuffer:           return D3D12_RESOURCE_STATE_VERTEX_AND_CONSTANT_BUFFER;
@@ -1809,9 +1845,9 @@ static D3D12_RESOURCE_STATES _calcResourceState(Resource::Usage usage)
     }
 }
 
-static D3D12_RESOURCE_FLAGS _calcResourceFlag(Resource::BindFlag::Enum bindFlag)
+static D3D12_RESOURCE_FLAGS _calcResourceFlag(IResource::BindFlag::Enum bindFlag)
 {
-    typedef Resource::BindFlag BindFlag;
+    typedef IResource::BindFlag BindFlag;
     switch (bindFlag)
     {
         case BindFlag::RenderTarget:        return D3D12_RESOURCE_FLAG_ALLOW_RENDER_TARGET;
@@ -1821,36 +1857,36 @@ static D3D12_RESOURCE_FLAGS _calcResourceFlag(Resource::BindFlag::Enum bindFlag)
     }
 }
 
-static D3D12_RESOURCE_FLAGS _calcResourceBindFlags(Resource::Usage initialUsage, int bindFlags)
+static D3D12_RESOURCE_FLAGS _calcResourceBindFlags(IResource::Usage initialUsage, int bindFlags)
 {
     int dstFlags = 0;
     while (bindFlags)
     {
         int lsb = bindFlags & -bindFlags;
 
-        dstFlags |= _calcResourceFlag(Resource::BindFlag::Enum(lsb));
+        dstFlags |= _calcResourceFlag(IResource::BindFlag::Enum(lsb));
         bindFlags &= ~lsb;
     }
     return D3D12_RESOURCE_FLAGS(dstFlags);
 }
 
-static D3D12_RESOURCE_DIMENSION _calcResourceDimension(Resource::Type type)
+static D3D12_RESOURCE_DIMENSION _calcResourceDimension(IResource::Type type)
 {
     switch (type)
     {
-        case Resource::Type::Buffer:        return D3D12_RESOURCE_DIMENSION_BUFFER;
-        case Resource::Type::Texture1D:     return D3D12_RESOURCE_DIMENSION_TEXTURE1D;
-        case Resource::Type::TextureCube:
-        case Resource::Type::Texture2D:
+        case IResource::Type::Buffer:        return D3D12_RESOURCE_DIMENSION_BUFFER;
+        case IResource::Type::Texture1D:     return D3D12_RESOURCE_DIMENSION_TEXTURE1D;
+        case IResource::Type::TextureCube:
+        case IResource::Type::Texture2D:
         {
             return D3D12_RESOURCE_DIMENSION_TEXTURE2D;
         }
-        case Resource::Type::Texture3D:     return D3D12_RESOURCE_DIMENSION_TEXTURE3D;
+        case IResource::Type::Texture3D:     return D3D12_RESOURCE_DIMENSION_TEXTURE3D;
         default:                            return D3D12_RESOURCE_DIMENSION_UNKNOWN;
     }
 }
 
-Result D3D12Renderer::createTextureResource(Resource::Usage initialUsage, const TextureResource::Desc& descIn, const TextureResource::Data* initData, TextureResource** outResource)
+Result D3D12Renderer::createTextureResource(IResource::Usage initialUsage, const ITextureResource::Desc& descIn, const ITextureResource::Data* initData, ITextureResource** outResource)
 {
     // Description of uploading on Dx12
     // https://msdn.microsoft.com/en-us/library/windows/desktop/dn899215%28v=vs.85%29.aspx
@@ -2035,7 +2071,7 @@ Result D3D12Renderer::createTextureResource(Resource::Usage initialUsage, const 
     return SLANG_OK;
 }
 
-Result D3D12Renderer::createBufferResource(Resource::Usage initialUsage, const BufferResource::Desc& descIn, const void* initData, BufferResource** outResource)
+Result D3D12Renderer::createBufferResource(IResource::Usage initialUsage, const IBufferResource::Desc& descIn, const void* initData, IBufferResource** outResource)
 {
     typedef BufferResourceImpl::BackingStyle Style;
 
@@ -2165,7 +2201,7 @@ static D3D12_COMPARISON_FUNC translateComparisonFunc(ComparisonFunc func)
     }
 }
 
-Result D3D12Renderer::createSamplerState(SamplerState::Desc const& desc, SamplerState** outSampler)
+Result D3D12Renderer::createSamplerState(ISamplerState::Desc const& desc, ISamplerState** outSampler)
 {
     D3D12_FILTER_REDUCTION_TYPE dxReduction = translateFilterReduction(desc.reductionOp);
     D3D12_FILTER dxFilter;
@@ -2222,7 +2258,7 @@ Result D3D12Renderer::createSamplerState(SamplerState::Desc const& desc, Sampler
     return SLANG_OK;
 }
 
-Result D3D12Renderer::createTextureView(TextureResource* texture, ResourceView::Desc const& desc, ResourceView** outView)
+Result D3D12Renderer::createTextureView(ITextureResource* texture, IResourceView::Desc const& desc, IResourceView** outView)
 {
     auto resourceImpl = (TextureResourceImpl*) texture;
 
@@ -2234,21 +2270,21 @@ Result D3D12Renderer::createTextureView(TextureResource* texture, ResourceView::
     default:
         return SLANG_FAIL;
 
-    case ResourceView::Type::RenderTarget:
+    case IResourceView::Type::RenderTarget:
         {
             SLANG_RETURN_ON_FAIL(m_rtvAllocator.allocate(&viewImpl->m_descriptor));
             m_device->CreateRenderTargetView(resourceImpl->m_resource, nullptr, viewImpl->m_descriptor.cpuHandle);
         }
         break;
 
-    case ResourceView::Type::DepthStencil:
+    case IResourceView::Type::DepthStencil:
         {
             SLANG_RETURN_ON_FAIL(m_dsvAllocator.allocate(&viewImpl->m_descriptor));
             m_device->CreateDepthStencilView(resourceImpl->m_resource, nullptr, viewImpl->m_descriptor.cpuHandle);
         }
         break;
 
-    case ResourceView::Type::UnorderedAccess:
+    case IResourceView::Type::UnorderedAccess:
         {
             // TODO: need to support the separate "counter resource" for the case
             // of append/consume buffers with attached counters.
@@ -2258,7 +2294,7 @@ Result D3D12Renderer::createTextureView(TextureResource* texture, ResourceView::
         }
         break;
 
-    case ResourceView::Type::ShaderResource:
+    case IResourceView::Type::ShaderResource:
         {
             SLANG_RETURN_ON_FAIL(m_viewAllocator.allocate(&viewImpl->m_descriptor));
 
@@ -2268,7 +2304,7 @@ Result D3D12Renderer::createTextureView(TextureResource* texture, ResourceView::
             const DXGI_FORMAT pixelFormat = resourceDesc.Format;
 
             D3D12_SHADER_RESOURCE_VIEW_DESC srvDesc;
-            _initSrvDesc(resourceImpl->getType(), resourceImpl->getDesc(), resourceDesc, pixelFormat, srvDesc);
+            _initSrvDesc(resourceImpl->getType(), *resourceImpl->getDesc(), resourceDesc, pixelFormat, srvDesc);
 
             m_device->CreateShaderResourceView(resourceImpl->m_resource, &srvDesc, viewImpl->m_descriptor.cpuHandle);
         }
@@ -2279,10 +2315,10 @@ Result D3D12Renderer::createTextureView(TextureResource* texture, ResourceView::
     return SLANG_OK;
 }
 
-Result D3D12Renderer::createBufferView(BufferResource* buffer, ResourceView::Desc const& desc, ResourceView** outView)
+Result D3D12Renderer::createBufferView(IBufferResource* buffer, IResourceView::Desc const& desc, IResourceView** outView)
 {
     auto resourceImpl = (BufferResourceImpl*) buffer;
-    auto resourceDesc = resourceImpl->getDesc();
+    auto resourceDesc = *resourceImpl->getDesc();
 
     RefPtr<ResourceViewImpl> viewImpl = new ResourceViewImpl();
     viewImpl->m_resource = resourceImpl;
@@ -2292,7 +2328,7 @@ Result D3D12Renderer::createBufferView(BufferResource* buffer, ResourceView::Des
     default:
         return SLANG_FAIL;
 
-    case ResourceView::Type::UnorderedAccess:
+    case IResourceView::Type::UnorderedAccess:
         {
             D3D12_UNORDERED_ACCESS_VIEW_DESC uavDesc = {};
             uavDesc.ViewDimension = D3D12_UAV_DIMENSION_BUFFER;
@@ -2312,7 +2348,7 @@ Result D3D12Renderer::createBufferView(BufferResource* buffer, ResourceView::Des
             }
             else
             {
-                uavDesc.Buffer.NumElements = UINT(resourceDesc.sizeInBytes / RendererUtil::getFormatSize(desc.format));
+                uavDesc.Buffer.NumElements = UINT(resourceDesc.sizeInBytes / gfxGetFormatSize(desc.format));
             }
 
 
@@ -2324,7 +2360,7 @@ Result D3D12Renderer::createBufferView(BufferResource* buffer, ResourceView::Des
         }
         break;
 
-    case ResourceView::Type::ShaderResource:
+    case IResourceView::Type::ShaderResource:
         {
             D3D12_SHADER_RESOURCE_VIEW_DESC srvDesc = {};
             srvDesc.ViewDimension = D3D12_SRV_DIMENSION_BUFFER;
@@ -2345,7 +2381,7 @@ Result D3D12Renderer::createBufferView(BufferResource* buffer, ResourceView::Des
             }
             else
             {
-                srvDesc.Buffer.NumElements = UINT(resourceDesc.sizeInBytes / RendererUtil::getFormatSize(desc.format));
+                srvDesc.Buffer.NumElements = UINT(resourceDesc.sizeInBytes / gfxGetFormatSize(desc.format));
             }
 
             SLANG_RETURN_ON_FAIL(m_viewAllocator.allocate(&viewImpl->m_descriptor));
@@ -2358,7 +2394,7 @@ Result D3D12Renderer::createBufferView(BufferResource* buffer, ResourceView::Des
     return SLANG_OK;
 }
 
-Result D3D12Renderer::createInputLayout(const InputElementDesc* inputElements, UInt inputElementCount, InputLayout** outLayout)
+Result D3D12Renderer::createInputLayout(const InputElementDesc* inputElements, UInt inputElementCount, IInputLayout** outLayout)
 {
     RefPtr<InputLayoutImpl> layout(new InputLayoutImpl);
 
@@ -2405,14 +2441,14 @@ Result D3D12Renderer::createInputLayout(const InputElementDesc* inputElements, U
     return SLANG_OK;
 }
 
-void* D3D12Renderer::map(BufferResource* bufferIn, MapFlavor flavor)
+void* D3D12Renderer::map(IBufferResource* bufferIn, MapFlavor flavor)
 {
     typedef BufferResourceImpl::BackingStyle Style;
 
     BufferResourceImpl* buffer = static_cast<BufferResourceImpl*>(bufferIn);
     buffer->m_mapFlavor = flavor;
 
-    const size_t bufferSize = buffer->getDesc().sizeInBytes;
+    const size_t bufferSize = buffer->getDesc()->sizeInBytes;
 
     switch (buffer->m_backingStyle)
     {
@@ -2503,7 +2539,7 @@ void* D3D12Renderer::map(BufferResource* bufferIn, MapFlavor flavor)
     return nullptr;
 }
 
-void D3D12Renderer::unmap(BufferResource* bufferIn)
+void D3D12Renderer::unmap(IBufferResource* bufferIn)
 {
     typedef BufferResourceImpl::BackingStyle Style;
     BufferResourceImpl* buffer = static_cast<BufferResourceImpl*>(bufferIn);
@@ -2537,7 +2573,7 @@ void D3D12Renderer::unmap(BufferResource* bufferIn)
                         buffer->m_resource.transition(D3D12_RESOURCE_STATE_COPY_DEST, submitter);
                     }
 
-                    m_commandList->CopyBufferRegion(resource, 0, uploadResource, 0, buffer->getDesc().sizeInBytes);
+                    m_commandList->CopyBufferRegion(resource, 0, uploadResource, 0, buffer->getDesc()->sizeInBytes);
 
                     {
                         D3D12BarrierSubmitter submitter(m_commandList);
@@ -2578,7 +2614,7 @@ void D3D12Renderer::setPrimitiveTopology(PrimitiveTopology topology)
     }
 }
 
-void D3D12Renderer::setVertexBuffers(UInt startSlot, UInt slotCount, BufferResource*const* buffers, const UInt* strides, const UInt* offsets)
+void D3D12Renderer::setVertexBuffers(UInt startSlot, UInt slotCount, IBufferResource*const* buffers, const UInt* strides, const UInt* offsets)
 {
     {
         const Index num = startSlot + slotCount;
@@ -2593,7 +2629,7 @@ void D3D12Renderer::setVertexBuffers(UInt startSlot, UInt slotCount, BufferResou
         BufferResourceImpl* buffer = static_cast<BufferResourceImpl*>(buffers[i]);
         if (buffer)
         {
-            assert(buffer->m_initialUsage == Resource::Usage::VertexBuffer);
+            assert(buffer->m_initialUsage == IResource::Usage::VertexBuffer);
         }
 
         BoundVertexBuffer& boundBuffer = m_boundVertexBuffers[startSlot + i];
@@ -2603,14 +2639,14 @@ void D3D12Renderer::setVertexBuffers(UInt startSlot, UInt slotCount, BufferResou
     }
 }
 
-void D3D12Renderer::setIndexBuffer(BufferResource* buffer, Format indexFormat, UInt offset)
+void D3D12Renderer::setIndexBuffer(IBufferResource* buffer, Format indexFormat, UInt offset)
 {
     m_boundIndexBuffer = (BufferResourceImpl*) buffer;
     m_boundIndexFormat = D3DUtil::getMapFormat(indexFormat);
     m_boundIndexOffset = UINT(offset);
 }
 
-void D3D12Renderer::setDepthStencilTarget(ResourceView* depthStencilView)
+void D3D12Renderer::setDepthStencilTarget(IResourceView* depthStencilView)
 {
 }
 
@@ -2656,7 +2692,7 @@ void D3D12Renderer::setScissorRects(UInt count, ScissorRect const* rects)
     m_commandList->RSSetScissorRects(UINT(count), dxRects);
 }
 
-void D3D12Renderer::setPipelineState(PipelineType pipelineType, PipelineState* state)
+void D3D12Renderer::setPipelineState(PipelineType pipelineType, IPipelineState* state)
 {
     m_currentPipelineState = (PipelineStateImpl*)state;
 }
@@ -2693,7 +2729,7 @@ void D3D12Renderer::draw(UInt vertexCount, UInt startVertex)
                 D3D12_VERTEX_BUFFER_VIEW& vertexView = vertexViews[numVertexViews++];
                 vertexView.BufferLocation = buffer->m_resource.getResource()->GetGPUVirtualAddress()
                     + boundVertexBuffer.m_offset;
-                vertexView.SizeInBytes = UINT(buffer->getDesc().sizeInBytes - boundVertexBuffer.m_offset);
+                vertexView.SizeInBytes = UINT(buffer->getDesc()->sizeInBytes - boundVertexBuffer.m_offset);
                 vertexView.StrideInBytes = UINT(boundVertexBuffer.m_stride);
             }
         }
@@ -2706,7 +2742,7 @@ void D3D12Renderer::draw(UInt vertexCount, UInt startVertex)
         D3D12_INDEX_BUFFER_VIEW indexBufferView;
         indexBufferView.BufferLocation = m_boundIndexBuffer->m_resource.getResource()->GetGPUVirtualAddress()
             + m_boundIndexOffset;
-        indexBufferView.SizeInBytes = UINT(m_boundIndexBuffer->getDesc().sizeInBytes - m_boundIndexOffset);
+        indexBufferView.SizeInBytes = UINT(m_boundIndexBuffer->getDesc()->sizeInBytes - m_boundIndexOffset);
         indexBufferView.Format = m_boundIndexFormat;
 
         commandList->IASetIndexBuffer(&indexBufferView);
@@ -2733,7 +2769,7 @@ void D3D12Renderer::dispatchCompute(int x, int y, int z)
     commandList->Dispatch(x, y, z);
 }
 
-void D3D12Renderer::DescriptorSetImpl::setConstantBuffer(UInt range, UInt index, BufferResource* buffer)
+void D3D12Renderer::DescriptorSetImpl::setConstantBuffer(UInt range, UInt index, IBufferResource* buffer)
 {
     auto dxDevice = m_renderer->m_device;
 
@@ -2741,7 +2777,7 @@ void D3D12Renderer::DescriptorSetImpl::setConstantBuffer(UInt range, UInt index,
     auto resourceDesc = resourceImpl->getDesc();
 
     // Constant buffer view size must be a multiple of 256 bytes, so we round it up here.
-    const size_t alignedSizeInBytes = D3DUtil::calcAligned(resourceDesc.sizeInBytes, 256);
+    const size_t alignedSizeInBytes = D3DUtil::calcAligned(resourceDesc->sizeInBytes, 256);
 
     D3D12_CONSTANT_BUFFER_VIEW_DESC cbvDesc = {};
     cbvDesc.BufferLocation = resourceImpl->m_resource.getResource()->GetGPUVirtualAddress();
@@ -2771,7 +2807,7 @@ void D3D12Renderer::DescriptorSetImpl::setConstantBuffer(UInt range, UInt index,
         m_resourceHeap->getCpuHandle(int(descriptorIndex)));
 }
 
-void D3D12Renderer::DescriptorSetImpl::setResource(UInt range, UInt index, ResourceView* view)
+void D3D12Renderer::DescriptorSetImpl::setResource(UInt range, UInt index, IResourceView* view)
 {
     auto dxDevice = m_renderer->m_device;
 
@@ -2792,7 +2828,7 @@ void D3D12Renderer::DescriptorSetImpl::setResource(UInt range, UInt index, Resou
         D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV);
 }
 
-void D3D12Renderer::DescriptorSetImpl::setSampler(UInt range, UInt index, SamplerState* sampler)
+void D3D12Renderer::DescriptorSetImpl::setSampler(UInt range, UInt index, ISamplerState* sampler)
 {
     auto dxDevice = m_renderer->m_device;
 
@@ -2826,8 +2862,8 @@ void D3D12Renderer::DescriptorSetImpl::setSampler(UInt range, UInt index, Sample
 void D3D12Renderer::DescriptorSetImpl::setCombinedTextureSampler(
     UInt range,
     UInt index,
-    ResourceView*   textureView,
-    SamplerState*   sampler)
+    IResourceView*   textureView,
+    ISamplerState*   sampler)
 {
     auto dxDevice = m_renderer->m_device;
 
@@ -2896,7 +2932,7 @@ void D3D12Renderer::DescriptorSetImpl::setRootConstants(
     memcpy((char*)m_rootConstantData.getBuffer() + rootConstantRangeInfo.offset + offset, data, size);
 }
 
-void D3D12Renderer::setDescriptorSet(PipelineType pipelineType, PipelineLayout* layout, UInt index, DescriptorSet* descriptorSet)
+void D3D12Renderer::setDescriptorSet(PipelineType pipelineType, IPipelineLayout* layout, UInt index, IDescriptorSet* descriptorSet)
 {
     // In D3D12, unlike Vulkan, binding a root signature invalidates *all* descriptor table
     // bindings (rather than preserving those that are part of the longest common prefix
@@ -2912,7 +2948,7 @@ void D3D12Renderer::setDescriptorSet(PipelineType pipelineType, PipelineLayout* 
     m_boundDescriptorSets[int(pipelineType)][index] = descriptorSetImpl;
 }
 
-Result D3D12Renderer::createProgram(const ShaderProgram::Desc& desc, ShaderProgram** outProgram)
+Result D3D12Renderer::createProgram(const IShaderProgram::Desc& desc, IShaderProgram** outProgram)
 {
     RefPtr<ShaderProgramImpl> program(new ShaderProgramImpl());
     program->m_pipelineType = desc.pipelineType;
@@ -2935,7 +2971,7 @@ Result D3D12Renderer::createProgram(const ShaderProgram::Desc& desc, ShaderProgr
     return SLANG_OK;
 }
 
-Result D3D12Renderer::createDescriptorSetLayout(const DescriptorSetLayout::Desc& desc, DescriptorSetLayout** outLayout)
+Result D3D12Renderer::createDescriptorSetLayout(const IDescriptorSetLayout::Desc& desc, IDescriptorSetLayout** outLayout)
 {
     Int rangeCount = desc.slotRangeCount;
 
@@ -3367,7 +3403,7 @@ Result D3D12Renderer::createDescriptorSetLayout(const DescriptorSetLayout::Desc&
     return SLANG_OK;
 }
 
-Result D3D12Renderer::createPipelineLayout(const PipelineLayout::Desc& desc, PipelineLayout** outLayout)
+Result D3D12Renderer::createPipelineLayout(const IPipelineLayout::Desc& desc, IPipelineLayout** outLayout)
 {
     static const UInt kMaxRanges = 16;
     static const UInt kMaxRootParameters = 32;
@@ -3527,7 +3563,7 @@ Result D3D12Renderer::createPipelineLayout(const PipelineLayout::Desc& desc, Pip
     return SLANG_OK;
 }
 
-Result D3D12Renderer::createDescriptorSet(DescriptorSetLayout* layout, DescriptorSet** outDescriptorSet)
+Result D3D12Renderer::createDescriptorSet(IDescriptorSetLayout* layout, IDescriptorSet** outDescriptorSet)
 {
     auto layoutImpl = (DescriptorSetLayoutImpl*) layout;
 
@@ -3565,7 +3601,7 @@ Result D3D12Renderer::createDescriptorSet(DescriptorSetLayout* layout, Descripto
     return SLANG_OK;
 }
 
-Result D3D12Renderer::createGraphicsPipelineState(const GraphicsPipelineStateDesc& inDesc, PipelineState** outState)
+Result D3D12Renderer::createGraphicsPipelineState(const GraphicsPipelineStateDesc& inDesc, IPipelineState** outState)
 {
     GraphicsPipelineStateDesc desc = inDesc;
     preparePipelineDesc(desc);
@@ -3666,7 +3702,7 @@ Result D3D12Renderer::createGraphicsPipelineState(const GraphicsPipelineStateDes
     return SLANG_OK;
 }
 
-Result D3D12Renderer::createComputePipelineState(const ComputePipelineStateDesc& inDesc, PipelineState** outState)
+Result D3D12Renderer::createComputePipelineState(const ComputePipelineStateDesc& inDesc, IPipelineState** outState)
 {
     ComputePipelineStateDesc desc = inDesc;
     preparePipelineDesc(desc);

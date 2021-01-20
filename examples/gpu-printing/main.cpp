@@ -6,8 +6,8 @@
 using Slang::ComPtr;
 
 #include "gfx/render.h"
-#include "gfx/d3d11/render-d3d11.h"
 #include "tools/graphics-app-framework/window.h"
+#include "source/core/slang-basic.h"
 using namespace gfx;
 
 #include <string>
@@ -69,17 +69,17 @@ ComPtr<gfx::IRenderer>      gRenderer;
 
 ComPtr<slang::ISession> gSlangSession;
 ComPtr<slang::IModule>   gSlangModule;
-RefPtr<gfx::ShaderProgram>  gProgram;
+ComPtr<gfx::IShaderProgram> gProgram;
 
-RefPtr<gfx::PipelineLayout> gPipelineLayout;
-RefPtr<gfx::PipelineState>  gPipelineState;
-RefPtr<gfx::DescriptorSet>  gDescriptorSet;
+ComPtr<gfx::IPipelineLayout> gPipelineLayout;
+ComPtr<gfx::IPipelineState> gPipelineState;
+ComPtr<gfx::IDescriptorSet> gDescriptorSet;
 
-Dictionary<int, std::string> gHashedStrings;
+Slang::Dictionary<int, std::string> gHashedStrings;
 
 GPUPrinting gGPUPrinting;
 
-RefPtr<gfx::ShaderProgram> loadComputeProgram(slang::IModule* slangModule, char const* entryPointName)
+ComPtr<gfx::IShaderProgram> loadComputeProgram(slang::IModule* slangModule, char const* entryPointName)
 {
     ComPtr<slang::IEntryPoint> entryPoint;
     slangModule->findEntryPointByName(entryPointName, entryPoint.writeRef());
@@ -95,12 +95,12 @@ RefPtr<gfx::ShaderProgram> loadComputeProgram(slang::IModule* slangModule, char 
     char const* code = (char const*) codeBlob->getBufferPointer();
     char const* codeEnd = code + codeBlob->getBufferSize();
 
-    gfx::ShaderProgram::KernelDesc kernelDescs[] =
+    gfx::IShaderProgram::KernelDesc kernelDescs[] =
     {
         { gfx::StageType::Compute,    code,     codeEnd },
     };
 
-    gfx::ShaderProgram::Desc programDesc;
+    gfx::IShaderProgram::Desc programDesc;
     programDesc.pipelineType = gfx::PipelineType::Compute;
     programDesc.kernels = &kernelDescs[0];
     programDesc.kernelCount = 2;
@@ -118,7 +118,7 @@ Result execute()
     windowDesc.height = gWindowHeight;
     gWindow = createWindow(windowDesc);
 
-    createD3D11Renderer(gRenderer.writeRef());
+    gfxGetCreateFunc(gfx::RendererType::DirectX11)(gRenderer.writeRef());
     IRenderer::Desc rendererDesc;
     rendererDesc.width = gWindowWidth;
     rendererDesc.height = gWindowHeight;
@@ -133,21 +133,21 @@ Result execute()
     gProgram = loadComputeProgram(gSlangModule, "computeMain");
     if(!gProgram) return SLANG_FAIL;
 
-    DescriptorSetLayout::SlotRangeDesc slotRanges[] =
+    IDescriptorSetLayout::SlotRangeDesc slotRanges[] =
     {
-        DescriptorSetLayout::SlotRangeDesc(DescriptorSlotType::StorageBuffer),
+        IDescriptorSetLayout::SlotRangeDesc(DescriptorSlotType::StorageBuffer),
     };
-    DescriptorSetLayout::Desc descriptorSetLayoutDesc;
+    IDescriptorSetLayout::Desc descriptorSetLayoutDesc;
     descriptorSetLayoutDesc.slotRangeCount = 1;
     descriptorSetLayoutDesc.slotRanges = &slotRanges[0];
     auto descriptorSetLayout = gRenderer->createDescriptorSetLayout(descriptorSetLayoutDesc);
     if(!descriptorSetLayout) return SLANG_FAIL;
 
-    PipelineLayout::DescriptorSetDesc descriptorSets[] =
+    IPipelineLayout::DescriptorSetDesc descriptorSets[] =
     {
-        PipelineLayout::DescriptorSetDesc( descriptorSetLayout ),
+        IPipelineLayout::DescriptorSetDesc( descriptorSetLayout ),
     };
-    PipelineLayout::Desc pipelineLayoutDesc;
+    IPipelineLayout::Desc pipelineLayoutDesc;
     pipelineLayoutDesc.renderTargetCount = 1;
     pipelineLayoutDesc.descriptorSetCount = 1;
     pipelineLayoutDesc.descriptorSets = &descriptorSets[0];
@@ -176,14 +176,14 @@ Result execute()
 
     size_t printBufferSize = 4 * 1024; // use a small-ish (4KB) buffer for print output
 
-    BufferResource::Desc printBufferDesc;
+    IBufferResource::Desc printBufferDesc;
     printBufferDesc.init(printBufferSize);
     printBufferDesc.elementSize = sizeof(uint32_t);
-    printBufferDesc.cpuAccessFlags = Resource::AccessFlag::Read; // | Resource::AccessFlag::Write;
-    auto printBuffer = gRenderer->createBufferResource(Resource::Usage::UnorderedAccess, printBufferDesc);
+    printBufferDesc.cpuAccessFlags = IResource::AccessFlag::Read; // | Resource::AccessFlag::Write;
+    auto printBuffer = gRenderer->createBufferResource(IResource::Usage::UnorderedAccess, printBufferDesc);
 
-    ResourceView::Desc printBufferViewDesc;
-    printBufferViewDesc.type = ResourceView::Type::UnorderedAccess;
+    IResourceView::Desc printBufferViewDesc;
+    printBufferViewDesc.type = IResourceView::Type::UnorderedAccess;
     auto printBufferView = gRenderer->createBufferView(printBuffer, printBufferViewDesc);
 
     // TODO: need to copy a zero into the start of the print buffer!

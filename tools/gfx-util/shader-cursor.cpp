@@ -13,14 +13,14 @@ Result gfx::ShaderCursor::getDereferenced(ShaderCursor& outCursor) const
     case slang::TypeReflection::Kind::ConstantBuffer:
     case slang::TypeReflection::Kind::ParameterBlock:
         {
-            ShaderObject* subObject = m_baseObject->getObject(m_offset);
+            auto subObject = m_baseObject->getObject(m_offset);
             outCursor = ShaderCursor(subObject);
             return SLANG_OK;
         }
     }
 }
 
-Result ShaderCursor::getField(Slang::UnownedStringSlice const& name, ShaderCursor& outCursor)
+Result ShaderCursor::getField(const char* name, const char* nameEnd, ShaderCursor& outCursor)
 {
     // If this cursor is invalid, then can't possible fetch a field.
     //
@@ -40,7 +40,7 @@ Result ShaderCursor::getField(Slang::UnownedStringSlice const& name, ShaderCurso
             //
             // If there is no such field, we have an error.
             //
-            SlangInt fieldIndex = m_typeLayout->findFieldIndexByName(name.begin(), name.end());
+            SlangInt fieldIndex = m_typeLayout->findFieldIndexByName(name, nameEnd);
             if (fieldIndex == -1)
                 return SLANG_E_INVALID_ARG;
 
@@ -110,7 +110,7 @@ Result ShaderCursor::getField(Slang::UnownedStringSlice const& name, ShaderCurso
             // to the *contents* of the constant buffer.
             //
             ShaderCursor d = getDereferenced();
-            return d.getField(name, outCursor);
+            return d.getField(name, nameEnd, outCursor);
         }
         break;
     }
@@ -118,7 +118,7 @@ Result ShaderCursor::getField(Slang::UnownedStringSlice const& name, ShaderCurso
     return SLANG_E_INVALID_ARG;
 }
 
-ShaderCursor ShaderCursor::getElement(Slang::Index index)
+ShaderCursor ShaderCursor::getElement(SlangInt index)
 {
     // TODO: need to auto-dereference various buffer types...
 
@@ -140,27 +140,25 @@ ShaderCursor ShaderCursor::getElement(Slang::Index index)
 }
 
 
-static int _peek(Slang::UnownedStringSlice const& slice)
+static int _peek(const char* slice)
 {
-    const char* b = slice.begin();
-    const char* e = slice.end();
-    if (b == e)
+    const char* b = slice;
+    if (!b || !*b)
         return -1;
     return *b;
 }
 
-static int _get(Slang::UnownedStringSlice& slice)
+static int _get(const char*& slice)
 {
-    const char* b = slice.begin();
-    const char* e = slice.end();
-    if (b == e)
+    const char* b = slice;
+    if (!b || !*b)
         return -1;
     auto result = *b++;
-    slice = Slang::UnownedStringSlice(b, e);
+    slice = b;
     return result;
 }
 
-Result ShaderCursor::followPath(Slang::UnownedStringSlice const& path, ShaderCursor& ioCursor)
+Result ShaderCursor::followPath(const char* path, ShaderCursor& ioCursor)
 {
     ShaderCursor cursor = ioCursor;
 
@@ -172,7 +170,7 @@ Result ShaderCursor::followPath(Slang::UnownedStringSlice const& path, ShaderCur
     };
     int state = ALLOW_NAME | ALLOW_SUBSCRIPT;
 
-    Slang::UnownedStringSlice rest = path;
+    const char* rest = path;
     for (;;)
     {
         int c = _peek(rest);
@@ -194,7 +192,7 @@ Result ShaderCursor::followPath(Slang::UnownedStringSlice const& path, ShaderCur
                 return SLANG_E_INVALID_ARG;
 
             _get(rest);
-            Slang::Index index = 0;
+            SlangInt index = 0;
             while (_peek(rest) != ']')
             {
                 int d = _get(rest);
@@ -218,7 +216,7 @@ Result ShaderCursor::followPath(Slang::UnownedStringSlice const& path, ShaderCur
         }
         else
         {
-            const char* nameBegin = rest.begin();
+            const char* nameBegin = rest;
             for (;;)
             {
                 switch (_peek(rest))
@@ -234,9 +232,10 @@ Result ShaderCursor::followPath(Slang::UnownedStringSlice const& path, ShaderCur
                 }
                 break;
             }
-            char const* nameEnd = rest.begin();
-            Slang::UnownedStringSlice name(nameBegin, nameEnd);
-            cursor = cursor.getField(name);
+            char const* nameEnd = rest;
+            ShaderCursor newCursor;
+            cursor.getField(nameBegin, nameEnd, newCursor);
+            cursor = newCursor;
             state = ALLOW_DOT | ALLOW_SUBSCRIPT;
             continue;
         }

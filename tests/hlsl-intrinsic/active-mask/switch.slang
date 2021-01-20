@@ -2,10 +2,10 @@
 
 // Test active mask synthesis for a trivial `switch` statement
 
-//DISABLE_TEST(compute):COMPARE_COMPUTE_EX:-cpu -compute 
-//DISABLE_TEST(compute):COMPARE_COMPUTE_EX:-slang -compute
-//DISABLE_TEST(compute):COMPARE_COMPUTE_EX:-slang -compute -dx12 -use-dxil -profile cs_6_0 -xslang -DHACK
-//TEST(compute, vulkan):COMPARE_COMPUTE_EX:-vk -compute -xslang -DHACK
+//DISABLE_TEST(compute):COMPARE_COMPUTE_EX:-cpu -compute -shaderobj
+//DISABLE_TEST(compute):COMPARE_COMPUTE_EX:-slang -compute -shaderobj
+//DISABLE_TEST(compute):COMPARE_COMPUTE_EX:-slang -compute -dx12 -use-dxil -profile cs_6_0 -xslang -DHACK -shaderobj
+//TEST(compute, vulkan):COMPARE_COMPUTE_EX:-vk -compute -xslang -DHACK -shaderobj
 
 // Note: this test is currently disabled on the CUDA
 // target because we do not synthesize the active

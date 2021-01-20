@@ -1,11 +1,11 @@
-//TEST(compute):COMPARE_COMPUTE_EX:-cpu -compute 
+//TEST(compute):COMPARE_COMPUTE_EX:-cpu -compute -shaderobj
 // No support for int64_t on D3D11 (no sm 6.0)
-//DISABLE_TEST(compute):COMPARE_COMPUTE_EX:-slang -compute
+//DISABLE_TEST(compute):COMPARE_COMPUTE_EX:-slang -compute -shaderobj
 // No support with Dx12 with dxbc. Needs SM6.0 + dxil
-//DISABLE_TEST(compute):COMPARE_COMPUTE_EX:-slang -compute -dx12 
-//TEST(compute):COMPARE_COMPUTE_EX:-slang -compute -profile cs_6_0 -dx12 -use-dxil
-//TEST(compute, vulkan):COMPARE_COMPUTE_EX:-vk -compute
-//TEST(compute):COMPARE_COMPUTE_EX:-cuda -compute
+//DISABLE_TEST(compute):COMPARE_COMPUTE_EX:-slang -compute -dx12 -shaderobj
+//TEST(compute):COMPARE_COMPUTE_EX:-slang -compute -profile cs_6_0 -dx12 -use-dxil -shaderobj
+//TEST(compute, vulkan):COMPARE_COMPUTE_EX:-vk -compute -shaderobj
+//TEST(compute):COMPARE_COMPUTE_EX:-cuda -compute -shaderobj
 
 //TEST_INPUT:ubuffer(data=[0 0 0 0], stride=4):out,name outputBuffer
 RWStructuredBuffer<int> outputBuffer;

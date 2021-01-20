@@ -1,8 +1,8 @@
 //DISABLE_TEST:REFLECTION: -profile cs_5_0 -entry computeMain -target cpp 
-//TEST(compute):COMPARE_COMPUTE_EX:-vk -compute 
-//TEST(compute):COMPARE_COMPUTE_EX:-d3d12 -compute
-//TEST(compute):COMPARE_COMPUTE_EX:-d3d11 -compute  
-//TEST(compute):COMPARE_COMPUTE_EX:-cpu -compute 
+//TEST(compute):COMPARE_COMPUTE_EX:-vk -compute -shaderobj
+//TEST(compute):COMPARE_COMPUTE_EX:-d3d12 -compute -shaderobj
+//TEST(compute):COMPARE_COMPUTE_EX:-d3d11 -compute -shaderobj
+//TEST(compute):COMPARE_COMPUTE_EX:-cpu -compute -shaderobj
 
 struct Thing
 {

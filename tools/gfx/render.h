@@ -1,28 +1,36 @@
 // render.h
 #pragma once
 
-//#include "shader-input-layout.h"
-
 #include <float.h>
+#include <assert.h>
 
-#include "../../slang-com-helper.h"
+#include "slang.h"
+#include "slang-com-ptr.h"
+#include "slang-com-helper.h"
 
-#include "../../source/core/slang-smart-pointer.h"
-#include "../../source/core/slang-list.h"
-#include "../../source/core/slang-dictionary.h"
-#include "../../source/core/slang-process-util.h"
 
-#include "../../slang.h"
+#if defined(SLANG_GFX_DYNAMIC)
+#    if defined(_MSC_VER)
+#        ifdef SLANG_GFX_DYNAMIC_EXPORT
+#            define SLANG_GFX_API SLANG_DLL_EXPORT
+#        else
+#            define SLANG_GFX_API __declspec(dllimport)
+#        endif
+#    else
+// TODO: need to consider compiler capabilities
+//#     ifdef SLANG_DYNAMIC_EXPORT
+#        define SLANG_GFX_API SLANG_DLL_EXPORT
+//#     endif
+#    endif
+#endif
+
+#ifndef SLANG_GFX_API
+#    define SLANG_GFX_API
+#endif
 
 namespace gfx {
 
-using Slang::RefObject;
-using Slang::RefPtr;
-using Slang::Dictionary;
-using Slang::List;
-
-using Slang::getHashCode;
-using Slang::combineHash;
+using Slang::ComPtr;
 
 typedef SlangResult Result;
 
@@ -30,14 +38,14 @@ typedef SlangResult Result;
 typedef SlangInt Int;
 typedef SlangUInt UInt;
 
-// pre declare types
-class Surface;
-
 // Declare opaque type
-class InputLayout: public Slang::RefObject
+class IInputLayout: public ISlangUnknown
 {
-	public:
 };
+#define SLANG_UUID_IInputLayout                                                         \
+    {                                                                                  \
+        0x45223711, 0xa84b, 0x455c, { 0xbe, 0xfa, 0x49, 0x37, 0x42, 0x1e, 0x8e, 0x2e } \
+    }
 
 enum class PipelineType
 {
@@ -99,7 +107,7 @@ enum class BindingStyle
     CountOf,
 };
 
-class ShaderProgram: public Slang::RefObject
+class IShaderProgram: public ISlangUnknown
 {
 public:
 
@@ -129,36 +137,10 @@ public:
         }
     };
 };
-
-struct ShaderCompileRequest
-{
-    struct SourceInfo
-    {
-        char const* path;
-
-        // The data may either be source text (in which
-        // case it can be assumed to be nul-terminated with
-        // `dataEnd` pointing at the terminator), or
-        // raw binary data (in which case `dataEnd` points
-        // at the end of the buffer).
-        char const* dataBegin;
-        char const* dataEnd;
-    };
-
-    struct EntryPoint
-    {
-        char const* name = nullptr;
-        SlangStage  slangStage;
-    };
-
-    SourceInfo source;
-    Slang::List<EntryPoint> entryPoints;
-
-    Slang::List<Slang::String> globalSpecializationArgs;
-    Slang::List<Slang::String> entryPointSpecializationArgs;
-
-    Slang::List<Slang::CommandLine::Arg> compileArgs;
-};
+#define SLANG_UUID_IShaderProgram                                                       \
+    {                                                                                  \
+        0x9d32d0ad, 0x915c, 0x4ffd, { 0x91, 0xe2, 0x50, 0x85, 0x54, 0xa0, 0x4a, 0x76 } \
+    }
 
 /// Different formats of things like pixels or elements of vertices
 /// NOTE! Any change to this type (adding, removing, changing order) - must also be reflected in changes to RendererUtil
@@ -203,10 +185,9 @@ enum class PrimitiveTopology
     TriangleList,
 };
 
-class Resource: public Slang::RefObject
+class IResource: public ISlangUnknown
 {
-    public:
-
+public:
         /// The type of resource.
         /// NOTE! The order needs to be such that all texture types are at or after Texture1D (otherwise isTexture won't work correctly)
     enum class Type
@@ -277,36 +258,48 @@ class Resource: public Slang::RefObject
         int cpuAccessFlags = 0;     ///< Combination of Resource::AccessFlag
     };
 
-        /// Get the type
-    SLANG_FORCE_INLINE Type getType() const { return m_type; }
-        /// True if it's a texture derived type
-    SLANG_FORCE_INLINE bool isTexture() const { return int(m_type) >= int(Type::Texture1D); }
-        /// True if it's a buffer derived type
-    SLANG_FORCE_INLINE bool isBuffer() const { return m_type == Type::Buffer; }
+    inline static BindFlag::Enum getDefaultBindFlagsFromUsage(IResource::Usage usage)
+    {
+        switch (usage)
+        {
+        case Usage::VertexBuffer:
+            return BindFlag::VertexBuffer;
+        case Usage::IndexBuffer:
+            return BindFlag::IndexBuffer;
+        case Usage::ConstantBuffer:
+            return BindFlag::ConstantBuffer;
+        case Usage::StreamOutput:
+            return BindFlag::StreamOutput;
+        case Usage::RenderTarget:
+            return BindFlag::RenderTarget;
+        case Usage::DepthRead:
+        case Usage::DepthWrite:
+            return BindFlag::DepthStencil;
+        case Usage::UnorderedAccess:
+            return BindFlag::UnorderedAccess;
+        case Usage::PixelShaderResource:
+            return BindFlag::PixelShaderResource;
+        case Usage::NonPixelShaderResource:
+            return BindFlag::NonPixelShaderResource;
+        case Usage::GenericRead:
+            return BindFlag::Enum(
+                BindFlag::PixelShaderResource |
+                BindFlag::NonPixelShaderResource);
+        default:
+            return BindFlag::Enum(-1);
+        }
+    }
 
-        /// Get the descBase
-    const DescBase& getDescBase() const;
-        /// Returns true if can bind with flag
-    bool canBind(BindFlag::Enum bindFlag) const { return getDescBase().canBind(bindFlag); }
-
-        /// For a usage gives the required binding flags
-    static const BindFlag::Enum s_requiredBinding[];    /// Maps Usage to bind flags required
-
-    protected:
-    Resource(Type type):
-        m_type(type)
-    {}
-
-    static void compileTimeAsserts();
-
-    Type m_type;
+    virtual SLANG_NO_THROW Type SLANG_MCALL getType() = 0;
 };
+#define SLANG_UUID_IResource                                                           \
+    {                                                                                  \
+        0xa0e39f34, 0x8398, 0x4522, { 0x95, 0xc2, 0xeb, 0xc0, 0xf9, 0x84, 0xef, 0x3f } \
+    }
 
-class BufferResource: public Resource
+class IBufferResource: public IResource
 {
-    public:
-    typedef Resource Parent;
-
+public:
     struct Desc: public DescBase
     {
         void init(size_t sizeInBytesIn)
@@ -315,33 +308,53 @@ class BufferResource: public Resource
             elementSize = 0;
             format = Format::Unknown;
         }
-            /// Set up default parameters based on usage
-        void setDefaults(Usage initialUsage);
-
+        void setDefaults(Usage initialUsage)
+        {
+            if (bindFlags == 0)
+            {
+                bindFlags = getDefaultBindFlagsFromUsage(initialUsage);
+            }
+        }
         size_t sizeInBytes;     ///< Total size in bytes
         int elementSize;        ///< Get the element stride. If > 0, this is a structured buffer
         Format format;
     };
-
-        /// Get the buffer description
-    SLANG_FORCE_INLINE const Desc& getDesc() const { return m_desc; }
-
-        /// Ctor
-    BufferResource(const Desc& desc):
-        Parent(Type::Buffer),
-        m_desc(desc)
-    {
+    virtual SLANG_NO_THROW Desc* SLANG_MCALL getDesc() = 0;
+};
+#define SLANG_UUID_IBufferResource                                                     \
+    {                                                                                  \
+        0x1b274efe, 0x5e37, 0x492b, { 0x82, 0x6e, 0x7e, 0xe7, 0xe8, 0xf5, 0xa4, 0x9b } \
     }
 
-    protected:
-    Desc m_desc;
-};
+template <typename T> T _slang_gfx_max(T v0, T v1) { return v0 > v1 ? v0 : v1; }
 
-class TextureResource: public Resource
+static inline unsigned int _slang_gfx_ones32(unsigned int x)
 {
-    public:
-    typedef Resource Parent;
+    /* 32-bit recursive reduction using SWAR...
+            but first step is mapping 2-bit values
+            into sum of 2 1-bit values in sneaky way
+    */
+    x -= ((x >> 1) & 0x55555555);
+    x = (((x >> 2) & 0x33333333) + (x & 0x33333333));
+    x = (((x >> 4) + x) & 0x0f0f0f0f);
+    x += (x >> 8);
+    x += (x >> 16);
+    return (x & 0x0000003f);
+}
 
+static inline unsigned int _slang_gfx_log2Floor(unsigned int x)
+{
+    x |= (x >> 1);
+    x |= (x >> 2);
+    x |= (x >> 4);
+    x |= (x >> 8);
+    x |= (x >> 16);
+    return (_slang_gfx_ones32(x >> 1));
+}
+
+class ITextureResource: public IResource
+{
+public:
     struct SampleDesc
     {
         void init()
@@ -366,9 +379,38 @@ class TextureResource: public Resource
             depth = depthIn;
         }
             /// Given the type works out the maximum dimension size
-        int calcMaxDimension(Type type) const;
+        int calcMaxDimension(Type type) const
+        {
+            switch (type)
+            {
+            case IResource::Type::Texture1D:
+                return this->width;
+            case IResource::Type::Texture3D:
+                return _slang_gfx_max(_slang_gfx_max(this->width, this->height), this->depth);
+            case IResource::Type::TextureCube: // fallthru
+            case IResource::Type::Texture2D:
+                {
+                    return _slang_gfx_max(this->width, this->height);
+                }
+            default:
+                return 0;
+            }
+        }
+
+        SLANG_FORCE_INLINE static int calcMipSize(int width, int mipLevel)
+        {
+            width = width >> mipLevel;
+            return width > 0 ? width : 1;
+        }
             /// Given a size, calculates the size at a mip level
-        Size calcMipSize(int mipLevel) const;
+        Size calcMipSize(int mipLevel) const
+        {
+            Size size;
+            size.width = calcMipSize(this->width, mipLevel);
+            size.height = calcMipSize(this->height, mipLevel);
+            size.depth = calcMipSize(this->depth, mipLevel);
+            return size;
+        }
 
         int width;              ///< Width in pixels
         int height;             ///< Height in pixels (if 2d or 3d)
@@ -378,28 +420,165 @@ class TextureResource: public Resource
     struct Desc: public DescBase
     {
             /// Initialize with default values
-        void init(Type typeIn);
+        void init(Type typeIn)
+        {
+            this->type = typeIn;
+            this->size.init();
+
+            this->format = Format::Unknown;
+            this->arraySize = 0;
+            this->numMipLevels = 0;
+            this->sampleDesc.init();
+
+            this->bindFlags = 0;
+            this->cpuAccessFlags = 0;
+        }
             /// Initialize different dimensions. For cubemap, use init2D
-        void init1D(Format format, int width, int numMipMaps = 0);
-        void init2D(Type typeIn, Format format, int width, int height, int numMipMaps = 0);
-        void init3D(Format format, int width, int height, int depth, int numMipMaps = 0);
+        void init1D(Format formatIn, int widthIn, int numMipMapsIn = 0)
+        {
+            this->type = Type::Texture1D;
+            this->size.init(widthIn);
+
+            this->format = formatIn;
+            this->arraySize = 0;
+            this->numMipLevels = numMipMapsIn;
+            this->sampleDesc.init();
+
+            this->bindFlags = 0;
+            this->cpuAccessFlags = 0;
+        }
+
+        void init2D(Type typeIn, Format formatIn, int widthIn, int heightIn, int numMipMapsIn = 0)
+        {
+            assert(typeIn == Type::Texture2D || typeIn == Type::TextureCube);
+
+            this->type = typeIn;
+            this->size.init(widthIn, heightIn);
+
+            this->format = formatIn;
+            this->arraySize = 0;
+            this->numMipLevels = numMipMapsIn;
+            this->sampleDesc.init();
+
+            this->bindFlags = 0;
+            this->cpuAccessFlags = 0;
+        }
+
+        void init3D(Format formatIn, int widthIn, int heightIn, int depthIn, int numMipMapsIn = 0)
+        {
+            this->type = Type::Texture3D;
+            this->size.init(widthIn, heightIn, depthIn);
+
+            this->format = formatIn;
+            this->arraySize = 0;
+            this->numMipLevels = numMipMapsIn;
+            this->sampleDesc.init();
+
+            this->bindFlags = 0;
+            this->cpuAccessFlags = 0;
+        }
 
             /// Given the type, calculates the number of mip maps. 0 on error
-        int calcNumMipLevels() const;
+        int calcNumMipLevels() const
+        {
+            const int maxDimensionSize = this->size.calcMaxDimension(type);
+            return (maxDimensionSize > 0) ? (_slang_gfx_log2Floor(maxDimensionSize) + 1) : 0;
+        }
             /// Calculate the total number of sub resources. 0 on error.
-        int calcNumSubResources() const;
+        int calcNumSubResources() const
+        {
+            const int numMipMaps =
+                (this->numMipLevels > 0) ? this->numMipLevels : calcNumMipLevels();
+            const int arrSize = (this->arraySize > 0) ? this->arraySize : 1;
+
+            switch (type)
+            {
+            case IResource::Type::Texture1D:
+            case IResource::Type::Texture2D:
+                {
+                    return numMipMaps * arrSize;
+                }
+            case IResource::Type::Texture3D:
+                {
+                    // can't have arrays of 3d textures
+                    assert(this->arraySize <= 1);
+                    return numMipMaps * this->size.depth;
+                }
+            case IResource::Type::TextureCube:
+                {
+                    // There are 6 faces to a cubemap
+                    return numMipMaps * arrSize * 6;
+                }
+            default:
+                return 0;
+            }
+        }
 
             /// Calculate the effective array size - in essence the amount if mip map sets needed.
             /// In practice takes into account if the arraySize is 0 (it's not an array, but it will still have at least one mip set)
             /// and if the type is a cubemap (multiplies the amount of mip sets by 6)
-        int calcEffectiveArraySize() const;
+        int calcEffectiveArraySize() const
+        {
+            const int arrSize = (this->arraySize > 0) ? this->arraySize : 1;
+
+            switch (type)
+            {
+            case IResource::Type::Texture1D: // fallthru
+            case IResource::Type::Texture2D:
+                {
+                    return arrSize;
+                }
+            case IResource::Type::TextureCube:
+                return arrSize * 6;
+            case IResource::Type::Texture3D:
+                return 1;
+            default:
+                return 0;
+            }
+        }
 
             /// Use type to fix the size values (and array size).
             /// For example a 1d texture, should have height and depth set to 1.
-        void fixSize();
+        void fixSize()
+        {
+            switch (type)
+            {
+            case IResource::Type::Texture1D:
+                {
+                    this->size.height = 1;
+                    this->size.depth = 1;
+                    break;
+                }
+            case IResource::Type::TextureCube:
+            case IResource::Type::Texture2D:
+                {
+                    this->size.depth = 1;
+                    break;
+                }
+            case IResource::Type::Texture3D:
+                {
+                    // Can't have an array
+                    this->arraySize = 0;
+                    break;
+                }
+            default:
+                break;
+            }
+        }
 
             /// Set up default parameters based on type and usage
-        void setDefaults(Usage initialUsage);
+        void setDefaults(Usage initialUsage)
+        {
+            fixSize();
+            if (this->bindFlags == 0)
+            {
+                this->bindFlags = getDefaultBindFlagsFromUsage(initialUsage);
+            }
+            if (this->numMipLevels <= 0)
+            {
+                this->numMipLevels = calcNumMipLevels();
+            }
+        }
 
         Size size;
 
@@ -422,25 +601,12 @@ class TextureResource: public Resource
         int numSubResources;                ///< The total amount of subResources. Typically = numMips * depth * arraySize
     };
 
-        /// Get the description of the texture
-    SLANG_FORCE_INLINE const Desc& getDesc() const { return m_desc; }
-
-        /// Ctor
-    TextureResource(const Desc& desc):
-        Parent(desc.type),
-        m_desc(desc)
-    {
-    }
-
-    SLANG_FORCE_INLINE static int calcMipSize(int width, int mipLevel)
-    {
-        width = width >> mipLevel;
-        return width > 0 ? width : 1;
-    }
-
-    protected:
-    Desc m_desc;
+    virtual SLANG_NO_THROW Desc* SLANG_MCALL getDesc() = 0;
 };
+#define SLANG_UUID_ITextureResource                                                    \
+    {                                                                                  \
+        0xcf88a31c, 0x6187, 0x46c5, { 0xa4, 0xb7, 0xeb, 0x58, 0xc7, 0x33, 0x40, 0x17 } \
+    } 
 
 // Needed for building on cygwin with gcc
 #undef Always
@@ -481,7 +647,7 @@ enum class TextureReductionOp
     Maximum,
 };
 
-class SamplerState : public Slang::RefObject
+class ISamplerState : public ISlangUnknown
 {
 public:
     struct Desc
@@ -501,6 +667,11 @@ public:
         float                   maxLOD          = FLT_MAX;
     };
 };
+#define SLANG_UUID_ISamplerState                                                        \
+    {                                                                                  \
+        0x8b8055df, 0x9377, 0x401d, { 0x91, 0xff, 0x3f, 0xa3, 0xbf, 0x66, 0x64, 0xf4 } \
+    }
+
 
 enum class DescriptorSlotType
 {
@@ -522,7 +693,7 @@ enum class DescriptorSlotType
     RayTracingAccelerationStructure,
 };
 
-class DescriptorSetLayout : public Slang::RefObject
+class IDescriptorSetLayout : public ISlangUnknown
 {
 public:
     struct SlotRangeDesc
@@ -558,13 +729,18 @@ public:
         SlotRangeDesc const*    slotRanges      = nullptr;
     };
 };
+#define SLANG_UUID_IDescriptorSetLayout                                                 \
+    {                                                                                  \
+        0x9fe39a2f, 0xdf8b, 0x4690, { 0x90, 0x6a, 0x10, 0x1e, 0xed, 0xf9, 0xbe, 0xc0 } \
+    }
 
-class PipelineLayout : public Slang::RefObject
+
+class IPipelineLayout : public ISlangUnknown
 {
 public:
     struct DescriptorSetDesc
     {
-        DescriptorSetLayout*    layout          = nullptr;
+        IDescriptorSetLayout*    layout          = nullptr;
 
             /// The underlying API-specific space/set number to use for this set.
             ///
@@ -581,7 +757,7 @@ public:
         {}
 
         DescriptorSetDesc(
-            DescriptorSetLayout*    layout)
+            IDescriptorSetLayout*    layout)
             : layout(layout)
         {}
     };
@@ -593,8 +769,12 @@ public:
         DescriptorSetDesc const*    descriptorSets      = nullptr;
     };
 };
+#define SLANG_UUID_IPipelineLayout                                                      \
+    {                                                                                  \
+        0x9d644a9a, 0x3e6f, 0x4350, { 0xa3, 0x5a, 0xe8, 0xe3, 0xbc, 0xef, 0xb9, 0xcf } \
+    }
 
-class ResourceView : public Slang::RefObject
+class IResourceView : public ISlangUnknown
 {
 public:
     enum class Type
@@ -613,24 +793,37 @@ public:
         Format  format;
     };
 };
+#define SLANG_UUID_IResourceView                                                       \
+    {                                                                                 \
+        0x7b6c4926, 0x884, 0x408c, { 0xad, 0x8a, 0x50, 0x3a, 0x8e, 0x23, 0x98, 0xa4 } \
+    }
 
-class DescriptorSet : public Slang::RefObject
+
+class IDescriptorSet : public ISlangUnknown
 {
 public:
-    virtual void setConstantBuffer(UInt range, UInt index, BufferResource* buffer) = 0;
-    virtual void setResource(UInt range, UInt index, ResourceView* view) = 0;
-    virtual void setSampler(UInt range, UInt index, SamplerState* sampler) = 0;
-    virtual void setCombinedTextureSampler(
+    virtual SLANG_NO_THROW void SLANG_MCALL setConstantBuffer(UInt range, UInt index, IBufferResource* buffer) = 0;
+    virtual SLANG_NO_THROW void SLANG_MCALL
+        setResource(UInt range, UInt index, IResourceView* view) = 0;
+    virtual SLANG_NO_THROW void SLANG_MCALL
+        setSampler(UInt range, UInt index, ISamplerState* sampler) = 0;
+    virtual SLANG_NO_THROW void SLANG_MCALL setCombinedTextureSampler(
         UInt range,
         UInt index,
-        ResourceView*   textureView,
-        SamplerState*   sampler) = 0;
-    virtual void setRootConstants(
+        IResourceView*   textureView,
+        ISamplerState*   sampler) = 0;
+    virtual SLANG_NO_THROW void SLANG_MCALL
+        setRootConstants(
         UInt range,
         UInt offset,
         UInt size,
         void const* data) = 0;
 };
+#define SLANG_UUID_IDescriptorSet                                                     \
+    {                                                                                \
+        0x29a881ea, 0xd7, 0x41d4, { 0xa3, 0x2d, 0x6c, 0x78, 0x4b, 0x79, 0xda, 0x2e } \
+    }
+
 
 struct ShaderOffset
 {
@@ -639,30 +832,53 @@ struct ShaderOffset
     SlangInt bindingArrayIndex = 0;
 };
 
-class ShaderObjectLayout : public Slang::RefObject
+class IShaderObjectLayout : public ISlangUnknown
 {};
+#define SLANG_UUID_IShaderObjectLayout                                                 \
+    {                                                                                 \
+        0x27f3f67e, 0xa49d, 0x4aae, { 0xa6, 0xd, 0xfa, 0xc2, 0x6b, 0x1c, 0x10, 0x7c } \
+    }
 
-class ShaderObject : public Slang::RefObject
+
+class IShaderObject : public ISlangUnknown
 {
 public:
-    ShaderObject* getObject(ShaderOffset const& offset)
+    SLANG_NO_THROW ComPtr<IShaderObject> SLANG_MCALL getObject(ShaderOffset const& offset)
     {
-        ShaderObject* object = nullptr;
-        SLANG_RETURN_NULL_ON_FAIL(getObject(offset, &object));
+        ComPtr<IShaderObject> object = nullptr;
+        SLANG_RETURN_NULL_ON_FAIL(getObject(offset, object.writeRef()));
         return object;
     }
 
-    virtual slang::TypeLayoutReflection* getElementTypeLayout() = 0;
-    virtual Slang::Index getEntryPointCount() = 0;
-    virtual ShaderObject* getEntryPoint(Slang::Index index) = 0;
-    virtual SlangResult setData(ShaderOffset const& offset, void const* data, size_t size) = 0;
-    virtual SlangResult getObject(ShaderOffset const& offset, ShaderObject** object) = 0;
-    virtual SlangResult setObject(ShaderOffset const& offset, ShaderObject* object) = 0;
-    virtual SlangResult setResource(ShaderOffset const& offset, ResourceView* resourceView) = 0;
-    virtual SlangResult setSampler(ShaderOffset const& offset, SamplerState* sampler) = 0;
-    virtual SlangResult setCombinedTextureSampler(
-        ShaderOffset const& offset, ResourceView* textureView, SamplerState* sampler) = 0;
+    virtual SLANG_NO_THROW slang::TypeLayoutReflection* SLANG_MCALL getElementTypeLayout() = 0;
+    virtual SLANG_NO_THROW UInt SLANG_MCALL getEntryPointCount() = 0;
+
+    ComPtr<IShaderObject> getEntryPoint(UInt index)
+    {
+        ComPtr<IShaderObject> entryPoint = nullptr;
+        SLANG_RETURN_NULL_ON_FAIL(getEntryPoint(index, entryPoint.writeRef()));
+        return entryPoint;
+    }
+    virtual SLANG_NO_THROW Result SLANG_MCALL
+        getEntryPoint(UInt index, IShaderObject** entryPoint) = 0;
+    virtual SLANG_NO_THROW Result SLANG_MCALL
+        setData(ShaderOffset const& offset, void const* data, size_t size) = 0;
+    virtual SLANG_NO_THROW Result SLANG_MCALL
+        getObject(ShaderOffset const& offset, IShaderObject** object) = 0;
+    virtual SLANG_NO_THROW Result SLANG_MCALL
+        setObject(ShaderOffset const& offset, IShaderObject* object) = 0;
+    virtual SLANG_NO_THROW Result SLANG_MCALL
+        setResource(ShaderOffset const& offset, IResourceView* resourceView) = 0;
+    virtual SLANG_NO_THROW Result SLANG_MCALL
+        setSampler(ShaderOffset const& offset, ISamplerState* sampler) = 0;
+    virtual SLANG_NO_THROW Result SLANG_MCALL setCombinedTextureSampler(
+        ShaderOffset const& offset, IResourceView* textureView, ISamplerState* sampler) = 0;
 };
+#define SLANG_UUID_IShaderObject                                                       \
+    {                                                                                 \
+        0xc1fa997e, 0x5ca2, 0x45ae, { 0x9b, 0xcb, 0xc4, 0x35, 0x9e, 0x85, 0x5, 0x85 } \
+    }
+
 
 enum class StencilOp : uint8_t
 {
@@ -808,12 +1024,12 @@ struct BlendDesc
 
 struct GraphicsPipelineStateDesc
 {
-    ShaderProgram*      program;
+    IShaderProgram*      program;
     // Application should set either pipelineLayout or rootShaderObjectLayout, but not both.
-    PipelineLayout* pipelineLayout = nullptr;
+    IPipelineLayout* pipelineLayout = nullptr;
     // Application should set either pipelineLayout or rootShaderObjectLayout, but not both.
-    ShaderObjectLayout* rootShaderObjectLayout = nullptr;
-    InputLayout*        inputLayout;
+    IShaderObjectLayout* rootShaderObjectLayout = nullptr;
+    IInputLayout*        inputLayout;
     UInt                framebufferWidth;
     UInt                framebufferHeight;
     UInt                renderTargetCount = 0; // Not used if rootShaderObjectLayout is set.
@@ -824,15 +1040,19 @@ struct GraphicsPipelineStateDesc
 
 struct ComputePipelineStateDesc
 {
-    ShaderProgram*  program;
-    PipelineLayout* pipelineLayout = nullptr;
-    ShaderObjectLayout* rootShaderObjectLayout = nullptr;
+    IShaderProgram*  program;
+    IPipelineLayout* pipelineLayout = nullptr;
+    IShaderObjectLayout* rootShaderObjectLayout = nullptr;
 };
 
-class PipelineState : public Slang::RefObject
+class IPipelineState : public ISlangUnknown
 {
-public:
 };
+#define SLANG_UUID_IPipelineState                                                      \
+    {                                                                                 \
+        0xca7e57d, 0x8a90, 0x44f3, { 0xbd, 0xb1, 0xfe, 0x9b, 0x35, 0x3f, 0x5a, 0x72 } \
+    }
+
 
 struct ScissorRect
 {
@@ -860,223 +1080,229 @@ public:
     {
         int width = 0;                                  ///< Width in pixels
         int height = 0;                                 ///< height in pixels
-        Slang::String adapter;                          ///< Name to identify the adapter to use
-        Slang::List<Slang::String> requiredFeatures;    ///< List of required feature names. 
+        const char* adapter = nullptr;                  ///< Name to identify the adapter to use
+        int requiredFeatureCount = 0;                   ///< Number of required features.
+        const char** requiredFeatures = nullptr;        ///< Array of required feature names, whose size is `requiredFeatureCount`.
         int nvapiExtnSlot = -1;                         ///< The slot (typically UAV) used to identify NVAPI intrinsics. If >=0 NVAPI is required.
     };
 
         // Will return with SLANG_E_NOT_AVAILABLE if NVAPI can't be initialized and nvapiExtnSlot >= 0
-    virtual SLANG_NO_THROW SlangResult SLANG_MCALL initialize(const Desc& desc, void* inWindowHandle) = 0;
+    virtual SLANG_NO_THROW Result SLANG_MCALL initialize(const Desc& desc, void* inWindowHandle) = 0;
 
-    bool hasFeature(const Slang::UnownedStringSlice& feature) { return getFeatures().indexOf(Slang::String(feature)) != Slang::Index(-1); }
-    virtual SLANG_NO_THROW const Slang::List<Slang::String>& SLANG_MCALL getFeatures() = 0;
+    virtual SLANG_NO_THROW bool SLANG_MCALL hasFeature(const char* feature) = 0;
+
+        /// Returns a list of features supported by the renderer.
+    virtual SLANG_NO_THROW Result SLANG_MCALL getFeatures(const char** outFeatures, UInt bufferSize, UInt* outFeatureCount) = 0;
 
     virtual SLANG_NO_THROW void SLANG_MCALL setClearColor(const float color[4]) = 0;
     virtual SLANG_NO_THROW void SLANG_MCALL clearFrame() = 0;
 
     virtual SLANG_NO_THROW void SLANG_MCALL presentFrame() = 0;
 
-    virtual SLANG_NO_THROW TextureResource::Desc SLANG_MCALL getSwapChainTextureDesc() = 0;
+    virtual SLANG_NO_THROW ITextureResource::Desc SLANG_MCALL getSwapChainTextureDesc() = 0;
 
         /// Create a texture resource. initData holds the initialize data to set the contents of the texture when constructed.
     virtual SLANG_NO_THROW Result SLANG_MCALL createTextureResource(
-        Resource::Usage initialUsage,
-        const TextureResource::Desc& desc,
-        const TextureResource::Data* initData,
-        TextureResource** outResource) = 0;
+        IResource::Usage initialUsage,
+        const ITextureResource::Desc& desc,
+        const ITextureResource::Data* initData,
+        ITextureResource** outResource) = 0;
 
         /// Create a texture resource. initData holds the initialize data to set the contents of the texture when constructed.
-    inline SLANG_NO_THROW RefPtr<TextureResource> SLANG_MCALL createTextureResource(
-        Resource::Usage initialUsage,
-        const TextureResource::Desc& desc,
-        const TextureResource::Data* initData = nullptr)
+    inline SLANG_NO_THROW ComPtr<ITextureResource> createTextureResource(
+        IResource::Usage initialUsage,
+        const ITextureResource::Desc& desc,
+        const ITextureResource::Data* initData = nullptr)
     {
-        RefPtr<TextureResource> resource;
+        ComPtr<ITextureResource> resource;
         SLANG_RETURN_NULL_ON_FAIL(createTextureResource(initialUsage, desc, initData, resource.writeRef()));
         return resource;
     }
 
         /// Create a buffer resource
     virtual SLANG_NO_THROW Result SLANG_MCALL createBufferResource(
-        Resource::Usage initialUsage,
-        const BufferResource::Desc& desc,
+        IResource::Usage initialUsage,
+        const IBufferResource::Desc& desc,
         const void* initData,
-        BufferResource** outResource) = 0;
+        IBufferResource** outResource) = 0;
 
-    inline SLANG_NO_THROW RefPtr<BufferResource> SLANG_MCALL createBufferResource(
-        Resource::Usage initialUsage,
-        const BufferResource::Desc& desc,
+    inline SLANG_NO_THROW ComPtr<IBufferResource> createBufferResource(
+        IResource::Usage initialUsage,
+        const IBufferResource::Desc& desc,
         const void* initData = nullptr)
     {
-        RefPtr<BufferResource> resource;
+        ComPtr<IBufferResource> resource;
         SLANG_RETURN_NULL_ON_FAIL(createBufferResource(initialUsage, desc, initData, resource.writeRef()));
         return resource;
     }
 
-    virtual SLANG_NO_THROW Result SLANG_MCALL createSamplerState(SamplerState::Desc const& desc, SamplerState** outSampler) = 0;
+    virtual SLANG_NO_THROW Result SLANG_MCALL
+        createSamplerState(ISamplerState::Desc const& desc, ISamplerState** outSampler) = 0;
 
-    inline RefPtr<SamplerState> createSamplerState(SamplerState::Desc const& desc)
+    inline ComPtr<ISamplerState> createSamplerState(ISamplerState::Desc const& desc)
     {
-        RefPtr<SamplerState> sampler;
+        ComPtr<ISamplerState> sampler;
         SLANG_RETURN_NULL_ON_FAIL(createSamplerState(desc, sampler.writeRef()));
         return sampler;
     }
 
     virtual SLANG_NO_THROW Result SLANG_MCALL createTextureView(
-        TextureResource* texture, ResourceView::Desc const& desc, ResourceView** outView) = 0;
+        ITextureResource* texture, IResourceView::Desc const& desc, IResourceView** outView) = 0;
 
-    inline RefPtr<ResourceView> createTextureView(TextureResource* texture, ResourceView::Desc const& desc)
+    inline ComPtr<IResourceView> createTextureView(ITextureResource* texture, IResourceView::Desc const& desc)
     {
-        RefPtr<ResourceView> view;
+        ComPtr<IResourceView> view;
         SLANG_RETURN_NULL_ON_FAIL(createTextureView(texture, desc, view.writeRef()));
         return view;
     }
 
     virtual SLANG_NO_THROW Result SLANG_MCALL createBufferView(
-        BufferResource* buffer, ResourceView::Desc const& desc, ResourceView** outView) = 0;
+        IBufferResource* buffer, IResourceView::Desc const& desc, IResourceView** outView) = 0;
 
-    inline RefPtr<ResourceView> createBufferView(BufferResource* buffer, ResourceView::Desc const& desc)
+    inline ComPtr<IResourceView> createBufferView(IBufferResource* buffer, IResourceView::Desc const& desc)
     {
-        RefPtr<ResourceView> view;
+        ComPtr<IResourceView> view;
         SLANG_RETURN_NULL_ON_FAIL(createBufferView(buffer, desc, view.writeRef()));
         return view;
     }
 
     virtual SLANG_NO_THROW Result SLANG_MCALL createInputLayout(
-        const InputElementDesc* inputElements, UInt inputElementCount, InputLayout** outLayout) = 0;
+        const InputElementDesc* inputElements, UInt inputElementCount, IInputLayout** outLayout) = 0;
 
-    inline RefPtr<InputLayout> createInputLayout(const InputElementDesc* inputElements, UInt inputElementCount)
+    inline ComPtr<IInputLayout> createInputLayout(const InputElementDesc* inputElements, UInt inputElementCount)
     {
-        RefPtr<InputLayout> layout;
+        ComPtr<IInputLayout> layout;
         SLANG_RETURN_NULL_ON_FAIL(createInputLayout(inputElements, inputElementCount, layout.writeRef()));
         return layout;
     }
 
     virtual SLANG_NO_THROW Result SLANG_MCALL createDescriptorSetLayout(
-        const DescriptorSetLayout::Desc& desc, DescriptorSetLayout** outLayout) = 0;
+        const IDescriptorSetLayout::Desc& desc, IDescriptorSetLayout** outLayout) = 0;
 
-    inline RefPtr<DescriptorSetLayout> createDescriptorSetLayout(const DescriptorSetLayout::Desc& desc)
+    inline ComPtr<IDescriptorSetLayout> createDescriptorSetLayout(const IDescriptorSetLayout::Desc& desc)
     {
-        RefPtr<DescriptorSetLayout> layout;
+        ComPtr<IDescriptorSetLayout> layout;
         SLANG_RETURN_NULL_ON_FAIL(createDescriptorSetLayout(desc, layout.writeRef()));
         return layout;
     }
 
     virtual SLANG_NO_THROW Result SLANG_MCALL createShaderObjectLayout(
-        slang::TypeLayoutReflection* typeLayout, ShaderObjectLayout** outLayout) = 0;
+        slang::TypeLayoutReflection* typeLayout, IShaderObjectLayout** outLayout) = 0;
 
-    inline RefPtr<ShaderObjectLayout> createShaderObjectLayout(slang::TypeLayoutReflection* typeLayout)
+    inline ComPtr<IShaderObjectLayout> createShaderObjectLayout(slang::TypeLayoutReflection* typeLayout)
     {
-        RefPtr<ShaderObjectLayout> layout;
+        ComPtr<IShaderObjectLayout> layout;
         SLANG_RETURN_NULL_ON_FAIL(createShaderObjectLayout(typeLayout, layout.writeRef()));
         return layout;
     }
 
-    virtual SLANG_NO_THROW Result SLANG_MCALL createRootShaderObjectLayout(slang::ProgramLayout* layout, ShaderObjectLayout** outLayout) = 0;
+    virtual SLANG_NO_THROW Result SLANG_MCALL createRootShaderObjectLayout(
+        slang::ProgramLayout* layout, IShaderObjectLayout** outLayout) = 0;
 
-    inline RefPtr<ShaderObjectLayout> createRootShaderObjectLayout(slang::ProgramLayout* layout)
+    inline ComPtr<IShaderObjectLayout> createRootShaderObjectLayout(slang::ProgramLayout* layout)
     {
-        RefPtr<ShaderObjectLayout> result;
+        ComPtr<IShaderObjectLayout> result;
         SLANG_RETURN_NULL_ON_FAIL(createRootShaderObjectLayout(layout, result.writeRef()));
         return result;
     }
 
-    virtual SLANG_NO_THROW Result SLANG_MCALL createShaderObject(ShaderObjectLayout* layout, ShaderObject** outObject) = 0;
+    virtual SLANG_NO_THROW Result SLANG_MCALL createShaderObject(IShaderObjectLayout* layout, IShaderObject** outObject) = 0;
 
-    inline RefPtr<ShaderObject> createShaderObject(ShaderObjectLayout* layout)
+    inline ComPtr<IShaderObject> createShaderObject(IShaderObjectLayout* layout)
     {
-        RefPtr<ShaderObject> object;
+        ComPtr<IShaderObject> object;
         SLANG_RETURN_NULL_ON_FAIL(createShaderObject(layout, object.writeRef()));
         return object;
     }
 
-    virtual SLANG_NO_THROW Result SLANG_MCALL createRootShaderObject(ShaderObjectLayout* layout, ShaderObject** outObject) = 0;
+    virtual SLANG_NO_THROW Result SLANG_MCALL createRootShaderObject(IShaderObjectLayout* layout, IShaderObject** outObject) = 0;
 
-    inline RefPtr<ShaderObject> createRootShaderObject(ShaderObjectLayout* layout)
+    inline ComPtr<IShaderObject> createRootShaderObject(IShaderObjectLayout* layout)
     {
-        RefPtr<ShaderObject> object;
+        ComPtr<IShaderObject> object;
         SLANG_RETURN_NULL_ON_FAIL(createRootShaderObject(layout, object.writeRef()));
         return object;
     }
 
-    virtual SLANG_NO_THROW Result SLANG_MCALL bindRootShaderObject(PipelineType pipelineType, ShaderObject* object) = 0;
+    virtual SLANG_NO_THROW Result SLANG_MCALL bindRootShaderObject(PipelineType pipelineType, IShaderObject* object) = 0;
 
-    virtual SLANG_NO_THROW Result SLANG_MCALL createPipelineLayout(const PipelineLayout::Desc& desc, PipelineLayout** outLayout) = 0;
+    virtual SLANG_NO_THROW Result SLANG_MCALL createPipelineLayout(const IPipelineLayout::Desc& desc, IPipelineLayout** outLayout) = 0;
 
-    inline RefPtr<PipelineLayout> createPipelineLayout(const PipelineLayout::Desc& desc)
+    inline ComPtr<IPipelineLayout> createPipelineLayout(const IPipelineLayout::Desc& desc)
     {
-        RefPtr<PipelineLayout> layout;
+        ComPtr<IPipelineLayout> layout;
         SLANG_RETURN_NULL_ON_FAIL(createPipelineLayout(desc, layout.writeRef()));
         return layout;
     }
 
-    virtual SLANG_NO_THROW Result SLANG_MCALL createDescriptorSet(DescriptorSetLayout* layout, DescriptorSet** outDescriptorSet) = 0;
+    virtual SLANG_NO_THROW Result SLANG_MCALL createDescriptorSet(IDescriptorSetLayout* layout, IDescriptorSet** outDescriptorSet) = 0;
 
-    inline RefPtr<DescriptorSet> createDescriptorSet(DescriptorSetLayout* layout)
+    inline ComPtr<IDescriptorSet> createDescriptorSet(IDescriptorSetLayout* layout)
     {
-        RefPtr<DescriptorSet> descriptorSet;
+        ComPtr<IDescriptorSet> descriptorSet;
         SLANG_RETURN_NULL_ON_FAIL(createDescriptorSet(layout, descriptorSet.writeRef()));
         return descriptorSet;
     }
 
-    virtual SLANG_NO_THROW Result SLANG_MCALL createProgram(const ShaderProgram::Desc& desc, ShaderProgram** outProgram) = 0;
+    virtual SLANG_NO_THROW Result SLANG_MCALL createProgram(const IShaderProgram::Desc& desc, IShaderProgram** outProgram) = 0;
 
-    inline RefPtr<ShaderProgram> createProgram(const ShaderProgram::Desc& desc)
+    inline ComPtr<IShaderProgram> createProgram(const IShaderProgram::Desc& desc)
     {
-        RefPtr<ShaderProgram> program;
+        ComPtr<IShaderProgram> program;
         SLANG_RETURN_NULL_ON_FAIL(createProgram(desc, program.writeRef()));
         return program;
     }
 
     virtual SLANG_NO_THROW Result SLANG_MCALL createGraphicsPipelineState(
         const GraphicsPipelineStateDesc&    desc,
-        PipelineState**                     outState) = 0;
+        IPipelineState**                    outState) = 0;
 
-    inline RefPtr<PipelineState> createGraphicsPipelineState(
+    inline ComPtr<IPipelineState> createGraphicsPipelineState(
         const GraphicsPipelineStateDesc& desc)
     {
-        RefPtr<PipelineState> state;
+        ComPtr<IPipelineState> state;
         SLANG_RETURN_NULL_ON_FAIL(createGraphicsPipelineState(desc, state.writeRef()));
         return state;
     }
 
     virtual SLANG_NO_THROW Result SLANG_MCALL createComputePipelineState(
         const ComputePipelineStateDesc&    desc,
-        PipelineState**                     outState) = 0;
+        IPipelineState**                     outState) = 0;
 
-    inline RefPtr<PipelineState> createComputePipelineState(
+    inline ComPtr<IPipelineState> createComputePipelineState(
         const ComputePipelineStateDesc& desc)
     {
-        RefPtr<PipelineState> state;
+        ComPtr<IPipelineState> state;
         SLANG_RETURN_NULL_ON_FAIL(createComputePipelineState(desc, state.writeRef()));
         return state;
     }
 
         /// Captures the back buffer and stores the result in surfaceOut. If the surface contains data - it will either be overwritten (if same size and format), or freed and a re-allocated.
-    virtual SLANG_NO_THROW SlangResult SLANG_MCALL captureScreenSurface(Surface& surfaceOut) = 0;
+    virtual SLANG_NO_THROW SlangResult SLANG_MCALL captureScreenSurface(void* buffer, size_t *inOutBufferSize, size_t* outRowPitch, size_t* outPixelSize) = 0;
 
-    virtual SLANG_NO_THROW void* SLANG_MCALL map(BufferResource* buffer, MapFlavor flavor) = 0;
-    virtual SLANG_NO_THROW void SLANG_MCALL unmap(BufferResource* buffer) = 0;
+    virtual SLANG_NO_THROW void* SLANG_MCALL map(IBufferResource* buffer, MapFlavor flavor) = 0;
+    virtual SLANG_NO_THROW void SLANG_MCALL unmap(IBufferResource* buffer) = 0;
 
     virtual SLANG_NO_THROW void SLANG_MCALL setPrimitiveTopology(PrimitiveTopology topology) = 0;
 
     virtual SLANG_NO_THROW void SLANG_MCALL setDescriptorSet(
         PipelineType pipelineType,
-        PipelineLayout* layout,
+        IPipelineLayout* layout,
         UInt index,
-        DescriptorSet* descriptorSet) = 0;
+        IDescriptorSet* descriptorSet) = 0;
 
     virtual SLANG_NO_THROW void SLANG_MCALL setVertexBuffers(
         UInt startSlot,
         UInt slotCount,
-        BufferResource* const* buffers,
+        IBufferResource* const* buffers,
         const UInt* strides,
         const UInt* offsets) = 0;
-    inline void setVertexBuffer(UInt slot, BufferResource* buffer, UInt stride, UInt offset = 0);
+    inline void setVertexBuffer(UInt slot, IBufferResource* buffer, UInt stride, UInt offset = 0);
 
-    virtual SLANG_NO_THROW void SLANG_MCALL setIndexBuffer(BufferResource* buffer, Format indexFormat, UInt offset = 0) = 0;
+    virtual SLANG_NO_THROW void SLANG_MCALL
+        setIndexBuffer(IBufferResource* buffer, Format indexFormat, UInt offset = 0) = 0;
 
-    virtual SLANG_NO_THROW void SLANG_MCALL setDepthStencilTarget(ResourceView* depthStencilView) = 0;
+    virtual SLANG_NO_THROW void SLANG_MCALL setDepthStencilTarget(IResourceView* depthStencilView) = 0;
 
     virtual SLANG_NO_THROW void SLANG_MCALL setViewports(UInt count, Viewport const* viewports) = 0;
     inline void setViewport(Viewport const& viewport)
@@ -1090,7 +1316,7 @@ public:
         setScissorRects(1, &rect);
     }
 
-    virtual SLANG_NO_THROW void SLANG_MCALL setPipelineState(PipelineType pipelineType, PipelineState* state) = 0;
+    virtual SLANG_NO_THROW void SLANG_MCALL setPipelineState(PipelineType pipelineType, IPipelineState* state) = 0;
 
     virtual SLANG_NO_THROW void SLANG_MCALL draw(UInt vertexCount, UInt startVertex = 0) = 0;
     virtual SLANG_NO_THROW void SLANG_MCALL drawIndexed(UInt indexCount, UInt startIndex = 0, UInt baseVertex = 0) = 0;
@@ -1113,37 +1339,36 @@ public:
     }
 
 // ----------------------------------------------------------------------------------------
-inline void IRenderer::setVertexBuffer(UInt slot, BufferResource* buffer, UInt stride, UInt offset)
+inline void IRenderer::setVertexBuffer(UInt slot, IBufferResource* buffer, UInt stride, UInt offset)
 {
     setVertexBuffers(slot, 1, &buffer, &stride, &offset);
 }
 
-/// Functions that are around Renderer and it's types
-struct RendererUtil
+// Global public functions
+
+extern "C"
 {
-    typedef SlangResult (*CreateFunc)(IRenderer** outRenderer);
+    typedef SlangResult(SLANG_MCALL * SGRendererCreateFunc)(IRenderer** outRenderer);
 
-        /// Gets the size in bytes of a Format type. Returns 0 if a size is not defined/invalid
-    SLANG_FORCE_INLINE static size_t getFormatSize(Format format) { return s_formatSize[int(format)]; }
-        /// Given a renderer type, gets a projection style
-    static ProjectionStyle getProjectionStyle(RendererType type);
+    /// Gets the size in bytes of a Format type. Returns 0 if a size is not defined/invalid
+    SLANG_GFX_API size_t SLANG_MCALL gfxGetFormatSize(Format format);
 
-        /// Given the projection style returns an 'identity' matrix, which ensures x,y mapping to pixels is the same on all targets
-    static void getIdentityProjection(ProjectionStyle style, float projMatrix[16]);
+    /// Gets the binding style from the type
+    SLANG_GFX_API BindingStyle SLANG_MCALL gfxGetBindingStyle(RendererType type);
 
-        /// Get the binding style from the type
-    static BindingStyle getBindingStyle(RendererType type) { return s_rendererTypeToBindingStyle[int(type)]; }
+    /// Given a renderer type, gets a projection style
+    SLANG_GFX_API ProjectionStyle SLANG_MCALL gfxGetProjectionStyle(RendererType type);
 
-        /// Get as text
-    static Slang::UnownedStringSlice toText(RendererType type);
+    /// Given the projection style returns an 'identity' matrix, which ensures x,y mapping to pixels
+    /// is the same on all targets
+    SLANG_GFX_API void SLANG_MCALL
+        gfxGetIdentityProjection(ProjectionStyle style, float projMatrix[16]);
 
-        /// Given a type returns a function that can construct it, or nullptr if there isn't one
-    static CreateFunc getCreateFunc(RendererType type);
+    /// Get the name of the renderer
+    SLANG_GFX_API const char* SLANG_MCALL gfxGetRendererName(RendererType type);
 
-    private:
-    static void compileTimeAsserts();
-    static const uint8_t s_formatSize[]; // Maps Format::XXX to a size in bytes;
-    static const BindingStyle s_rendererTypeToBindingStyle[];           ///< Maps a RendererType to a BindingStyle
-};
+    /// Given a type returns a function that can construct it, or nullptr if there isn't one
+    SLANG_GFX_API SGRendererCreateFunc SLANG_MCALL gfxGetCreateFunc(RendererType type);
+}
 
-} // renderer_test
+}// renderer_test

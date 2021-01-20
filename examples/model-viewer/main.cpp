@@ -18,12 +18,12 @@
 //
 #include "graphics-app-framework/model.h"
 #include "gfx/render.h"
-#include "gfx/d3d11/render-d3d11.h"
 #include "graphics-app-framework/vector-math.h"
 #include "graphics-app-framework/window.h"
 #include "graphics-app-framework/gui.h"
 using namespace gfx;
-
+using Slang::RefObject;
+using Slang::RefPtr;
 // We will use a few utilities from the C++ standard library,
 // just to keep the code short. Note that the Slang API does
 // not use or require any C++ standard library features.
@@ -382,7 +382,7 @@ struct ParameterBlockLayout : RefObject
 
     // API-specific layout information computes from `slangTypelayout`.
     //
-    RefPtr<gfx::DescriptorSetLayout>     descriptorSetLayout;
+    ComPtr<gfx::IDescriptorSetLayout>     descriptorSetLayout;
 };
 //
 // A parameter block layout can be computed for any `struct` type
@@ -423,7 +423,7 @@ RefPtr<ParameterBlockLayout> getParameterBlockLayout(
     // create a graphics-API-level descriptor-set layout that
     // is compatible with the original declaration.
     //
-    std::vector<gfx::DescriptorSetLayout::SlotRangeDesc> slotRanges;
+    std::vector<gfx::IDescriptorSetLayout::SlotRangeDesc> slotRanges;
 
     // If the type has any ordinary data, then the descriptor set
     // will need a constant buffer to be the first thing it stores.
@@ -438,7 +438,7 @@ RefPtr<ParameterBlockLayout> getParameterBlockLayout(
     if(primaryConstantBufferSize)
     {
         slotRanges.push_back(
-            gfx::DescriptorSetLayout::SlotRangeDesc(
+            gfx::IDescriptorSetLayout::SlotRangeDesc(
                 gfx::DescriptorSlotType::UniformBuffer));
     }
 
@@ -453,7 +453,7 @@ RefPtr<ParameterBlockLayout> getParameterBlockLayout(
     // Now that we've collected the graphics-API level binding
     // information, we can construct a graphics API descriptor set
     // layout.
-    gfx::DescriptorSetLayout::Desc descriptorSetLayoutDesc;
+    gfx::IDescriptorSetLayout::Desc descriptorSetLayoutDesc;
     descriptorSetLayoutDesc.slotRangeCount = slotRanges.size();
     descriptorSetLayoutDesc.slotRanges = slotRanges.data();
     auto descriptorSetLayout = renderer->createDescriptorSetLayout(descriptorSetLayoutDesc);
@@ -552,7 +552,7 @@ struct ParameterBlockEncoder
 
     // The underlying descriptor set being filled in.
     //
-    gfx::DescriptorSet* descriptorSet = nullptr;
+    gfx::IDescriptorSet* descriptorSet = nullptr;
 
     // The Slang type information for the part of the
     // block that we are filling in. This might be the
@@ -648,11 +648,11 @@ struct ParameterBlock : RefObject
     // The (optional) constant buffer that holds the values
     // for any ordinay fields. This will be null if
     // `layout->primaryConstantBufferSize` is zero.
-    RefPtr<BufferResource>          primaryConstantBuffer;
+    ComPtr<IBufferResource>          primaryConstantBuffer;
 
     // The graphics-API descriptor set that provides storage
     // for any resource fields.
-    RefPtr<gfx::DescriptorSet>           descriptorSet;
+    ComPtr<gfx::IDescriptorSet> descriptorSet;
 
     ParameterBlockEncoder beginEncoding();
 };
@@ -674,15 +674,15 @@ RefPtr<ParameterBlock> allocateParameterBlockImpl(
     // If the parameter block has any ordinary data, then it requires
     // a "primary" constant buffer to hold that data.
     //
-    RefPtr<gfx::BufferResource> primaryConstantBuffer = nullptr;
+    ComPtr<gfx::IBufferResource> primaryConstantBuffer = nullptr;
     if(auto primaryConstantBufferSize = layout->primaryConstantBufferSize)
     {
-        gfx::BufferResource::Desc bufferDesc;
+        gfx::IBufferResource::Desc bufferDesc;
         bufferDesc.init(primaryConstantBufferSize);
-        bufferDesc.setDefaults(gfx::Resource::Usage::ConstantBuffer);
-        bufferDesc.cpuAccessFlags = gfx::Resource::AccessFlag::Write;
+        bufferDesc.setDefaults(gfx::IResource::Usage::ConstantBuffer);
+        bufferDesc.cpuAccessFlags = gfx::IResource::AccessFlag::Write;
         primaryConstantBuffer = renderer->createBufferResource(
-            gfx::Resource::Usage::ConstantBuffer,
+            gfx::IResource::Usage::ConstantBuffer,
             bufferDesc);
 
         // The primary constant buffer will always be the first thing
@@ -774,7 +774,7 @@ struct Effect : RefObject
 
     // Additional state corresponding to the data needed
     // to create a graphics-API pipeline state object.
-    RefPtr<gfx::InputLayout>    inputLayout;
+    ComPtr<gfx::IInputLayout>    inputLayout;
     Int                         renderTargetCount;
 };
 
@@ -791,8 +791,8 @@ struct EffectVariant : RefObject
     // that need to be bound in order to use this
     // effect.
     //
-    RefPtr<gfx::PipelineLayout>  pipelineLayout;
-    RefPtr<gfx::PipelineState>   pipelineState;
+    ComPtr<gfx::IPipelineLayout>  pipelineLayout;
+    ComPtr<gfx::IPipelineState> pipelineState;
 };
 //
 // A specialized variant is created based on a base effect
@@ -839,13 +839,13 @@ RefPtr<EffectVariant> createEffectVaraint(
     // be determined based on the descriptor-set layouts
     // already cached in the given parameter block layouts.
     //
-    std::vector<PipelineLayout::DescriptorSetDesc> descriptorSets;
+    std::vector<IPipelineLayout::DescriptorSetDesc> descriptorSets;
     for(UInt pp = 0; pp < parameterBlockCount; ++pp)
     {
         descriptorSets.emplace_back(
             parameterBlockLayouts[pp]->descriptorSetLayout);
     }
-    PipelineLayout::Desc pipelineLayoutDesc;
+    IPipelineLayout::Desc pipelineLayoutDesc;
     pipelineLayoutDesc.renderTargetCount = 1;
     pipelineLayoutDesc.descriptorSetCount = descriptorSets.size();
     pipelineLayoutDesc.descriptorSets = descriptorSets.data();
@@ -927,7 +927,7 @@ RefPtr<EffectVariant> createEffectVaraint(
     // to the graphics APIs loading logic.
     //
     std::vector<ISlangBlob*> kernelBlobs;
-    std::vector<gfx::ShaderProgram::KernelDesc> kernelDescs;
+    std::vector<gfx::IShaderProgram::KernelDesc> kernelDescs;
     for(int ii = 0; ii < entryPointCount; ++ii)
     {
         auto entryPoint = program->entryPoints[ii];
@@ -937,7 +937,7 @@ RefPtr<EffectVariant> createEffectVaraint(
 
         kernelBlobs.push_back(blob);
 
-        ShaderProgram::KernelDesc kernelDesc;
+        IShaderProgram::KernelDesc kernelDesc;
 
         char const* codeBegin = (char const*) blob->getBufferPointer();
         char const* codeEnd = codeBegin + blob->getBufferSize();
@@ -960,7 +960,7 @@ RefPtr<EffectVariant> createEffectVaraint(
     spDestroyCompileRequest(slangRequest);
 
     // We use the graphics API to load a program into the GPU
-    gfx::ShaderProgram::Desc programDesc;
+    gfx::IShaderProgram::Desc programDesc;
     programDesc.pipelineType = gfx::PipelineType::Graphics;
     programDesc.kernels = kernelDescs.data();
     programDesc.kernelCount = kernelDescs.size();
@@ -1020,11 +1020,11 @@ struct ShaderCache : RefObject
 
         Slang::HashCode getHashCode() const
         {
-            auto hash = ::getHashCode(effect);
-            hash = combineHash(hash, ::getHashCode(parameterBlockCount));
+            auto hash = Slang::getHashCode(effect);
+            hash = Slang::combineHash(hash, Slang::getHashCode(parameterBlockCount));
             for( UInt ii = 0; ii < parameterBlockCount; ++ii )
             {
-                hash = combineHash(hash, ::getHashCode(parameterBlockLayouts[ii]));
+                hash = Slang::combineHash(hash, Slang::getHashCode(parameterBlockLayouts[ii]));
             }
             return hash;
         }
@@ -1033,7 +1033,7 @@ struct ShaderCache : RefObject
     // The shader cache is mostly just a dictionary mapping
     // variant keys to the associated variant, generated on-demand.
     //
-    Dictionary<VariantKey, RefPtr<EffectVariant> > variants;
+    Slang::Dictionary<VariantKey, RefPtr<EffectVariant> > variants;
 
     // Getting a variant is just a matter of looking for an
     // existing entry in the dictionary, and creating one
@@ -1372,8 +1372,8 @@ struct Model : RefObject
 {
     typedef ModelLoader::Vertex Vertex;
 
-    RefPtr<BufferResource>      vertexBuffer;
-    RefPtr<BufferResource>      indexBuffer;
+    ComPtr<IBufferResource>     vertexBuffer;
+    ComPtr<IBufferResource>     indexBuffer;
     PrimitiveTopology           primitiveTopology;
     int                         vertexCount;
     int                         indexCount;
@@ -1911,7 +1911,7 @@ struct ModelViewer {
 
 Window* gWindow;
 Slang::ComPtr<gfx::IRenderer> gRenderer;
-RefPtr<gfx::ResourceView> gDepthTarget;
+ComPtr<gfx::IResourceView> gDepthTarget;
 
 // We keep a pointer to the one effect we are using (for a forward
 // rendering pass), plus the parameter-block layouts for our `PerView`
@@ -2050,7 +2050,7 @@ Result initialize()
     windowDesc.userData = this;
     gWindow = createWindow(windowDesc);
 
-    createD3D11Renderer(gRenderer.writeRef());
+    gfxGetCreateFunc(gfx::RendererType::DirectX11)(gRenderer.writeRef());
     IRenderer::Desc rendererDesc;
     rendererDesc.width = gWindowWidth;
     rendererDesc.height = gWindowHeight;
@@ -2069,16 +2069,16 @@ Result initialize()
     // Because we are rendering more than a single triangle this time, we
     // require a depth buffer to resolve visibility.
     //
-    TextureResource::Desc depthBufferDesc = gRenderer->getSwapChainTextureDesc();
+    ITextureResource::Desc depthBufferDesc = gRenderer->getSwapChainTextureDesc();
     depthBufferDesc.format = Format::D_Float32;
-    depthBufferDesc.setDefaults(Resource::Usage::DepthWrite);
+    depthBufferDesc.setDefaults(IResource::Usage::DepthWrite);
     auto depthTexture = gRenderer->createTextureResource(
-        Resource::Usage::DepthWrite,
+        IResource::Usage::DepthWrite,
         depthBufferDesc);
     if(!depthTexture) return SLANG_FAIL;
 
-    ResourceView::Desc textureViewDesc;
-    textureViewDesc.type = ResourceView::Type::DepthStencil;
+    IResourceView::Desc textureViewDesc;
+    textureViewDesc.type = IResourceView::Type::DepthStencil;
     auto depthTarget = gRenderer->createTextureView(depthTexture, textureViewDesc);
     if (!depthTarget) return SLANG_FAIL;
 

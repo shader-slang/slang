@@ -10,7 +10,7 @@ namespace renderer_test {
 
 // Base class for CUDA resources. This includes textures but also
 // memory allocations
-class CUDAResource : public RefObject
+class CUDAResource : public Slang::RefObject
 {
 public:
     virtual uint64_t getBindlessHandle() = 0;
@@ -44,8 +44,8 @@ struct CUDAComputeUtil
         BindSet m_bindSet;
         CPULikeBindRoot m_bindRoot;
             /// Buffers are held in same order as entries in layout (useful for dumping out bindings)
-        List<BindSet::Value*> m_buffers;
-        Slang::OrderedDictionary<Slang::String, RefPtr<CUDAResource>> m_bindlessResources;
+        Slang::List<BindSet::Value*> m_buffers;
+        Slang::OrderedDictionary<Slang::String, Slang::RefPtr<CUDAResource>> m_bindlessResources;
         void releaseBindlessResources();
     };
 
@@ -53,7 +53,10 @@ struct CUDAComputeUtil
 
     static bool hasFeature(const Slang::UnownedStringSlice& feature);
 
-    static SlangResult createTextureResource(const ShaderInputLayoutEntry& srcEntry, slang::TypeLayoutReflection* typeLayout, RefPtr<CUDAResource>& outResource);
+    static SlangResult createTextureResource(
+        const ShaderInputLayoutEntry& srcEntry,
+        slang::TypeLayoutReflection* typeLayout,
+        Slang::RefPtr<CUDAResource>& outResource);
 
     static SlangResult execute(const ShaderCompilerUtil::OutputAndLayout& outputAndLayout, const uint32_t dispatchSize[3], Context& outContext);
 

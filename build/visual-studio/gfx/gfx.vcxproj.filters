@@ -48,10 +48,7 @@
     <ClInclude Include="..\..\..\tools\gfx\render.h">
       <Filter>Header Files</Filter>
     </ClInclude>
-    <ClInclude Include="..\..\..\tools\gfx\shader-cursor.h">
-      <Filter>Header Files</Filter>
-    </ClInclude>
-    <ClInclude Include="..\..\..\tools\gfx\surface.h">
+    <ClInclude Include="..\..\..\tools\gfx\renderer-shared.h">
       <Filter>Header Files</Filter>
     </ClInclude>
     <ClInclude Include="..\..\..\tools\gfx\vulkan\render-vk.h">
@@ -110,10 +107,7 @@
     <ClCompile Include="..\..\..\tools\gfx\render.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
-    <ClCompile Include="..\..\..\tools\gfx\shader-cursor.cpp">
-      <Filter>Source Files</Filter>
-    </ClCompile>
-    <ClCompile Include="..\..\..\tools\gfx\surface.cpp">
+    <ClCompile Include="..\..\..\tools\gfx\renderer-shared.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
     <ClCompile Include="..\..\..\tools\gfx\vulkan\render-vk.cpp">

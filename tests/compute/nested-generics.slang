@@ -1,5 +1,5 @@
-//TEST(compute):COMPARE_COMPUTE:
-//TEST(compute):COMPARE_COMPUTE:-cpu
+//TEST(compute):COMPARE_COMPUTE: -shaderobj
+//TEST(compute):COMPARE_COMPUTE:-cpu -shaderobj
 
 // test specialization of nested generic functions
 

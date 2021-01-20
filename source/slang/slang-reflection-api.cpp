@@ -1149,7 +1149,7 @@ namespace Slang
         }
         else
         {
-            SLANG_UNEXPECTED("unhandled resource binding type");
+            return SLANG_BINDING_TYPE_UNKNOWN;
         }
     }
 
@@ -1167,7 +1167,7 @@ namespace Slang
         }
         else
         {
-            SLANG_UNEXPECTED("unhandled resource binding type");
+            return SLANG_BINDING_TYPE_UNKNOWN;
         }
     }
 
@@ -1176,6 +1176,22 @@ namespace Slang
         Slang::TypeLayout*  typeLayout,
         LayoutResourceKind  kind)
     {
+        // If the type or type layout implies a specific binding type
+        // (e.g., a `Texture2D` implies a texture binding), then we
+        // will always favor the binding type implied.
+        //
+        if( auto bindingType = _calcResourceBindingType(typeLayout) )
+        {
+            if(bindingType != SLANG_BINDING_TYPE_UNKNOWN)
+                return bindingType;
+        }
+
+        // As a fallback, we may look at the kind of resources consumed
+        // by a type layout, and use that to infer the type of binding
+        // used. Note that, for example, a `float4` might represent
+        // multiple different kinds of binding, depending on where/how
+        // it is used (e.g., as a varying parameter, a root constant, etc.).
+        //
         switch( kind )
         {
         default:
@@ -1194,14 +1210,10 @@ namespace Slang
         CASE(VaryingOutput, VARYING_OUTPUT);
         CASE(ExistentialObjectParam, EXISTENTIAL_VALUE);
         CASE(PushConstantBuffer, PUSH_CONSTANT);
+        CASE(Uniform,               INLINE_UNIFORM_DATA);
         // TODO: register space
 
     #undef CASE
-
-        case LayoutResourceKind::ShaderResource:
-        case LayoutResourceKind::UnorderedAccess:
-        case LayoutResourceKind::DescriptorTableSlot:
-            return _calcResourceBindingType(typeLayout);
         }
     }
 
@@ -1299,6 +1311,10 @@ namespace Slang
                 SlangBindingType bindingType = SLANG_BINDING_TYPE_CONSTANT_BUFFER;
                 Index spaceOffset = -1;
                 LayoutResourceKind kind = LayoutResourceKind::None;
+
+                // TODO: It is unclear if this should be looking at the resource
+                // usage of the parameter group, or of its "container" layout.
+                //
                 for(auto& resInfo : parameterGroupTypeLayout->resourceInfos)
                 {
                     kind = resInfo.kind;
@@ -1307,10 +1323,18 @@ namespace Slang
                     default:
                         continue;
 
+                        // Note: the only case where a parameter group should
+                        // reflect as consuming `Uniform` storage is on CPU/CUDA,
+                        // where that will be the only resource it contains.
+                        //
+                        // TODO: If we ever support targets that don't have
+                        // constant buffers at all, this logic would be questionable.
+                        //
                     case LayoutResourceKind::ConstantBuffer:
                     case LayoutResourceKind::PushConstantBuffer:
                     case LayoutResourceKind::RegisterSpace:
                     case LayoutResourceKind::DescriptorTableSlot:
+                    case LayoutResourceKind::Uniform:
                         break;
                     }
 
@@ -1345,39 +1369,79 @@ namespace Slang
                 // It is possible that the sub-object has descriptor ranges
                 // that will need to be exposed upward, into the parent.
                 //
+                // Note: it is a subtle point, but we are only going to expose
+                // *descriptor ranges* upward and not *binding ranges*. The
+                // distinction here comes down to:
+                //
+                // * Descriptor ranges are used to describe the entries that
+                //   must be allocated in one or more API descriptor sets to
+                //   physically hold a value of a given type (layout).
+                //
+                // * Binding ranges are used to describe the entries that must
+                //   be allocated in an application shader object to logically
+                //   hold a value of a given type (layout).
+                //
+                // In practice, a binding range might logically belong to a
+                // sub-object, but physically belong to a parent. Consider:
+                //
+                //    cbuffer C { Texture2D a; float b; }
+                //
+                // Independent of the API we compile for, we expect the global
+                // scope to have a sub-object for `C`, and for that sub-object
+                // to have a binding range for `a` (that is, we bind the texture
+                // into the sub-object).
+                //
+                // When compiling for D3D12 or Vulkan, we expect that the global
+                // scope must have two descriptor ranges for `C`: one for the
+                // constant buffer itself, and another for the texture `a`.
+                // The reason for this is that `a` needs to be bound as part
+                // of a descriptor set, and `C` doesn't create/allocate its own
+                // descriptor set(s).
+                //
+                // When compiling for CPU or CUDA, we expect that the global scope
+                // will have a descriptor range for `C` but *not* one for `C.a`,
+                // because the physical storage for `C.a` is provided by the
+                // memory allocation for `C` itself.
+
                 if( spaceOffset != -1 )
                 {
+                    // The logic here assumes that when a parameter group consumes
+                    // resources that must "leak" into the outer scope (including
+                    // reosurces consumed by the group "container"), those resources
+                    // will amount to descriptor ranges that are part of the same
+                    // descriptor set.
+                    //
+                    // (If the contents of a group consume whole spaces/sets, then
+                    // those resources will be accounted for separately).
+                    //
                     Int descriptorSetIndex = _findOrAddDescriptorSet(spaceOffset);
                     auto descriptorSet = m_extendedInfo->m_descriptorSets[descriptorSetIndex];
                     auto firstDescriptorRangeIndex = descriptorSet->descriptorRanges.getCount();
 
-                    // TODO: We need to recursively add descriptor ranges (but not binding
-                    // ranges!) for anything in the element type that "leaks" into
-                    // the surrounding context.
+                    // First, we need to deal with any descriptor ranges that are
+                    // introduced by the "container" type itself.
                     //
                     switch(kind)
                     {
+                        // If the parameter group was allocated to consume one or
+                        // more whole register spaces/sets, then nothing should
+                        // leak through that is measured in descriptor sets.
+                        //
                     case LayoutResourceKind::RegisterSpace:
-                    case LayoutResourceKind::Uniform:
                     case LayoutResourceKind::None:
                         break;
 
                     default:
                         {
-                            // This means we are in the constant-buffer-like case
-                            // (even if the user wrote `ParameterBlock<T>`), and any
-                            // resource usage inside the element type should "leak"
-                            // out to the parent scope.
-                            //
-                            // It *also* means we should add a suitable descriptor
-                            // range if one is required for the "container" type.
+                            // In a constant-buffer-like case, then all the (non-space/set) resource
+                            // usage of the "container" should be reflected as descriptor
+                            // ranges in the parent scope.
                             //
                             for(auto resInfo : parameterGroupTypeLayout->containerVarLayout->typeLayout->resourceInfos)
                             {
                                 switch( resInfo.kind )
                                 {
                                 case LayoutResourceKind::RegisterSpace:
-                                case LayoutResourceKind::Uniform:
                                     continue;
 
                                 default:
@@ -1400,14 +1464,53 @@ namespace Slang
 
                                 descriptorSet->descriptorRanges.add(descriptorRange);
                             }
+                        }
 
-                            // Now we need to recursively walk the element type and add all its
-                            // descriptor ranges, so that they can be used for binding in
-                            // the parent.
+                    }
+
+                    // Second, we need to consider resource usage from the "element"
+                    // type that might leak through to the parent.
+                    //
+                    switch(kind)
+                    {
+                        // If the parameter group was allocated as a full register space/set,
+                        // *or* if it was allocated as ordinary uniform storage (likely
+                        // because it was compiled for CPU/CUDA), then there should
+                        // be no "leakage" of descriptor ranges from the element type
+                        // to the parent.
+                        //
+                    case LayoutResourceKind::RegisterSpace:
+                    case LayoutResourceKind::Uniform:
+                    case LayoutResourceKind::None:
+                        break;
+
+                    default:
+                        {
+                            // If we are in the constant-buffer-like case, on an API
+                            // where constant bufers "leak" resource usage to the
+                            // outer context, then we need to add the descriptor ranges
+                            // implied by the element type.
                             //
-                            // We have this a bit by collecting both binding ranges and
-                            // descriptor ranges, and then throwing away the binding ranges
-                            // from the element type.
+                            // HACK: We enumerate these nested ranges by recurisvely
+                            // calling `addRangesRec`, which adds all of descriptor ranges,
+                            // binding ranges, and sub-object ranges, and then we trim
+                            // the lists we don't actually care about as a post-process.
+                            //
+                            // TODO: We could try to consider a model where we first
+                            // query the extended layout information of the element
+                            // type (which might already be cached) and then enumerate
+                            // the descriptor ranges and copy them over.
+                            //
+                            // TODO: It is possible that there could be cases where
+                            // some, but not all, of the nested descriptor ranges ought
+                            // to be enumerated here. In that case we might have to introduce
+                            // a kind of "mask" parameter that is passed down into
+                            // the recursive call so that only the appropriate ranges
+                            // get added.
+
+                            // We need to add a link to the "path" that is used when looking
+                            // up binding information, to ensure that the descriptor ranges
+                            // that get enumerated here have correct register/binding offsets.
                             //
                             BindingRangePathLink elementPath(path, parameterGroupTypeLayout->elementVarLayout);
 
@@ -1489,7 +1592,8 @@ namespace Slang
                     auto& resInfo = typeLayout->resourceInfos[0];
                     LayoutResourceKind kind = resInfo.kind;
 
-                    if(kind == LayoutResourceKind::Uniform)
+                    auto bindingType = _calcBindingType(typeLayout, kind);
+                    if(bindingType == SLANG_BINDING_TYPE_INLINE_UNIFORM_DATA)
                     {
                         // We do not consider uniform resource usage
                         // in the ranges we compute.
@@ -1504,7 +1608,6 @@ namespace Slang
                     // This leaf field will map to a single binding range and,
                     // if it is appropriate, a single descriptor range.
                     //
-                    auto bindingType = _calcBindingType(typeLayout, kind);
                     auto count = resInfo.count * multiplier;
                     auto indexOffset = _calcIndexOffset(path, kind);
                     auto spaceOffset = _calcSpaceOffset(path, kind);

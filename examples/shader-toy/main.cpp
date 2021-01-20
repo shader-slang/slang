@@ -20,8 +20,9 @@ using Slang::ComPtr;
 // compiler, and API.
 //
 #include "gfx/render.h"
-#include "gfx/d3d11/render-d3d11.h"
 #include "tools/graphics-app-framework/window.h"
+#include "source/core/slang-basic.h"
+
 using namespace gfx;
 
 // In order to display a shader toy effect using rasterization-based shader
@@ -88,7 +89,7 @@ void diagnoseIfNeeded(slang::IBlob* diagnosticsBlob)
 // The main interesting part of the host application code is where we
 // load, compile, inspect, and compose the Slang shader code.
 //
-Result loadShaderProgram(gfx::IRenderer* renderer, RefPtr<gfx::ShaderProgram>& outShaderProgram)
+Result loadShaderProgram(gfx::IRenderer* renderer, ComPtr<gfx::IShaderProgram>& outShaderProgram)
 {
     // The first step in interacting with the Slang API is to create a "global session,"
     // which represents an instance of the Slang API loaded from the library.
@@ -192,7 +193,7 @@ Result loadShaderProgram(gfx::IRenderer* renderer, RefPtr<gfx::ShaderProgram>& o
     // other pieces, and that is what we are going to do with our module
     // and entry points.
     //
-    List<slang::IComponentType*> componentTypes;
+    Slang::List<slang::IComponentType*> componentTypes;
     componentTypes.add(module);
 
     // Later on when we go to extract compiled kernel code for our vertex
@@ -266,7 +267,7 @@ Result loadShaderProgram(gfx::IRenderer* renderer, RefPtr<gfx::ShaderProgram>& o
     // Because a shader program could have zero or more specialization parameters,
     // we need to build up an array of specialization arguments.
     //
-    List<slang::SpecializationArg> specializationArgs;
+    Slang::List<slang::SpecializationArg> specializationArgs;
 
     {
         // In our case, we only have a single specialization argument we plan
@@ -344,13 +345,13 @@ Result loadShaderProgram(gfx::IRenderer* renderer, RefPtr<gfx::ShaderProgram>& o
     char const* fragmentCode = (char const*) fragmentShaderBlob->getBufferPointer();
     char const* fragmentCodeEnd = fragmentCode + fragmentShaderBlob->getBufferSize();
 
-    gfx::ShaderProgram::KernelDesc kernelDescs[] =
+    gfx::IShaderProgram::KernelDesc kernelDescs[] =
     {
         { gfx::StageType::Vertex,    vertexCode,     vertexCodeEnd },
         { gfx::StageType::Fragment,  fragmentCode,   fragmentCodeEnd },
     };
 
-    gfx::ShaderProgram::Desc programDesc;
+    gfx::IShaderProgram::Desc programDesc;
     programDesc.pipelineType = gfx::PipelineType::Graphics;
     programDesc.kernels = &kernelDescs[0];
     programDesc.kernelCount = 2;
@@ -367,13 +368,11 @@ int gWindowHeight = 768;
 gfx::ApplicationContext*    gAppContext;
 gfx::Window*                gWindow;
 Slang::ComPtr<gfx::IRenderer> gRenderer;
-RefPtr<gfx::BufferResource> gConstantBuffer;
-
-RefPtr<gfx::PipelineLayout> gPipelineLayout;
-RefPtr<gfx::PipelineState>  gPipelineState;
-RefPtr<gfx::DescriptorSet>  gDescriptorSet;
-
-RefPtr<gfx::BufferResource> gVertexBuffer;
+ComPtr<gfx::IBufferResource> gConstantBuffer;
+ComPtr<gfx::IPipelineLayout> gPipelineLayout;
+ComPtr<gfx::IPipelineState> gPipelineState;
+ComPtr<gfx::IDescriptorSet> gDescriptorSet;
+ComPtr<gfx::IBufferResource> gVertexBuffer;
 
 Result initialize()
 {
@@ -385,7 +384,7 @@ Result initialize()
     windowDesc.userData = this;
     gWindow = createWindow(windowDesc);
 
-    createD3D11Renderer(gRenderer.writeRef());
+    gfxGetCreateFunc(gfx::RendererType::DirectX11)(gRenderer.writeRef());
     IRenderer::Desc rendererDesc;
     rendererDesc.width = gWindowWidth;
     rendererDesc.height = gWindowHeight;
@@ -396,13 +395,13 @@ Result initialize()
 
     int constantBufferSize = sizeof(Uniforms);
 
-    BufferResource::Desc constantBufferDesc;
+    IBufferResource::Desc constantBufferDesc;
     constantBufferDesc.init(constantBufferSize);
-    constantBufferDesc.setDefaults(Resource::Usage::ConstantBuffer);
-    constantBufferDesc.cpuAccessFlags = Resource::AccessFlag::Write;
+    constantBufferDesc.setDefaults(IResource::Usage::ConstantBuffer);
+    constantBufferDesc.cpuAccessFlags = IResource::AccessFlag::Write;
 
     gConstantBuffer = gRenderer->createBufferResource(
-        Resource::Usage::ConstantBuffer,
+        IResource::Usage::ConstantBuffer,
         constantBufferDesc);
     if(!gConstantBuffer) return SLANG_FAIL;
 
@@ -414,33 +413,33 @@ Result initialize()
         SLANG_COUNT_OF(inputElements));
     if(!inputLayout) return SLANG_FAIL;
 
-    BufferResource::Desc vertexBufferDesc;
+    IBufferResource::Desc vertexBufferDesc;
     vertexBufferDesc.init(FullScreenTriangle::kVertexCount * sizeof(FullScreenTriangle::Vertex));
-    vertexBufferDesc.setDefaults(Resource::Usage::VertexBuffer);
+    vertexBufferDesc.setDefaults(IResource::Usage::VertexBuffer);
     gVertexBuffer = gRenderer->createBufferResource(
-        Resource::Usage::VertexBuffer,
+        IResource::Usage::VertexBuffer,
         vertexBufferDesc,
         &FullScreenTriangle::kVertices[0]);
     if(!gVertexBuffer) return SLANG_FAIL;
 
-    RefPtr<ShaderProgram> shaderProgram;
+    ComPtr<IShaderProgram> shaderProgram;
     SLANG_RETURN_ON_FAIL(loadShaderProgram(gRenderer, shaderProgram));
 
-    DescriptorSetLayout::SlotRangeDesc slotRanges[] =
+    IDescriptorSetLayout::SlotRangeDesc slotRanges[] =
     {
-        DescriptorSetLayout::SlotRangeDesc(DescriptorSlotType::UniformBuffer),
+        IDescriptorSetLayout::SlotRangeDesc(DescriptorSlotType::UniformBuffer),
     };
-    DescriptorSetLayout::Desc descriptorSetLayoutDesc;
+    IDescriptorSetLayout::Desc descriptorSetLayoutDesc;
     descriptorSetLayoutDesc.slotRangeCount = 1;
     descriptorSetLayoutDesc.slotRanges = &slotRanges[0];
     auto descriptorSetLayout = gRenderer->createDescriptorSetLayout(descriptorSetLayoutDesc);
     if(!descriptorSetLayout) return SLANG_FAIL;
 
-    PipelineLayout::DescriptorSetDesc descriptorSets[] =
+    IPipelineLayout::DescriptorSetDesc descriptorSets[] =
     {
-        PipelineLayout::DescriptorSetDesc( descriptorSetLayout ),
+        IPipelineLayout::DescriptorSetDesc( descriptorSetLayout ),
     };
-    PipelineLayout::Desc pipelineLayoutDesc;
+    IPipelineLayout::Desc pipelineLayoutDesc;
     pipelineLayoutDesc.renderTargetCount = 1;
     pipelineLayoutDesc.descriptorSetCount = 1;
     pipelineLayoutDesc.descriptorSets = &descriptorSets[0];
@@ -526,9 +525,7 @@ void renderFrame()
     gRenderer->presentFrame();
 }
 
-void finalize()
-{
-}
+void finalize() { destroyWindow(gWindow); }
 
 void handleEvent(Event const& event)
 {

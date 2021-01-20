@@ -2,8 +2,8 @@
 
 // Confirm that that `This` type works as expected
 
-//TEST(compute):COMPARE_COMPUTE:
-//TEST(compute):COMPARE_COMPUTE:-cpu
+//TEST(compute):COMPARE_COMPUTE: -shaderobj
+//TEST(compute):COMPARE_COMPUTE:-cpu -shaderobj
 
 interface IFrobable
 {

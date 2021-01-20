@@ -12,6 +12,37 @@ namespace renderer_test {
 
 gfx::StageType translateStage(SlangStage slangStage);
 
+struct ShaderCompileRequest
+{
+    struct SourceInfo
+    {
+        char const* path;
+
+        // The data may either be source text (in which
+        // case it can be assumed to be nul-terminated with
+        // `dataEnd` pointing at the terminator), or
+        // raw binary data (in which case `dataEnd` points
+        // at the end of the buffer).
+        char const* dataBegin;
+        char const* dataEnd;
+    };
+
+    struct EntryPoint
+    {
+        char const* name = nullptr;
+        SlangStage slangStage;
+    };
+
+    SourceInfo source;
+    Slang::List<EntryPoint> entryPoints;
+
+    Slang::List<Slang::String> globalSpecializationArgs;
+    Slang::List<Slang::String> entryPointSpecializationArgs;
+
+    Slang::List<Slang::CommandLine::Arg> compileArgs;
+};
+
+
 struct ShaderCompilerUtil
 {
     struct Input
@@ -27,7 +58,7 @@ struct ShaderCompilerUtil
 
     struct Output
     {
-        void set(PipelineType pipelineType, const ShaderProgram::KernelDesc* inKernelDescs, Slang::Index kernelDescCount)
+        void set(PipelineType pipelineType, const IShaderProgram::KernelDesc* inKernelDescs, Slang::Index kernelDescCount)
         {
             kernelDescs.clear();
             kernelDescs.addRange(inKernelDescs, kernelDescCount);
@@ -73,8 +104,8 @@ struct ShaderCompilerUtil
             return -1;
         }
 
-        List<ShaderProgram::KernelDesc> kernelDescs;
-        ShaderProgram::Desc desc;
+        Slang::List<IShaderProgram::KernelDesc> kernelDescs;
+        IShaderProgram::Desc desc;
 
             /// Compile request that owns the lifetime of compiled kernel code.
         SlangCompileRequest* m_requestForKernels = nullptr;
@@ -98,7 +129,7 @@ struct ShaderCompilerUtil
 
     static SlangResult compileWithLayout(SlangSession* session, const Options& options, const ShaderCompilerUtil::Input& input, OutputAndLayout& output);
 
-    static SlangResult readSource(const Slang::String& inSourcePath, List<char>& outSourceText);
+    static SlangResult readSource(const Slang::String& inSourcePath, Slang::List<char>& outSourceText);
 
     static SlangResult _compileProgramImpl(SlangSession* session, const Options& options, const Input& input, const ShaderCompileRequest& request, Output& out);
     static SlangResult compileProgram(SlangSession* session, const Options& options, const Input& input, const ShaderCompileRequest& request, Output& out);

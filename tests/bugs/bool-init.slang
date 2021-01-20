@@ -1,5 +1,5 @@
-//TEST(compute):COMPARE_COMPUTE_EX:-slang -compute
-//TEST(compute,vulkan):COMPARE_COMPUTE_EX:-vk -slang -compute
+//TEST(compute):COMPARE_COMPUTE_EX:-slang -compute -shaderobj
+//TEST(compute,vulkan):COMPARE_COMPUTE_EX:-vk -slang -compute -shaderobj
 
 struct Thing
 {

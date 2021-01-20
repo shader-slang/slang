@@ -97,7 +97,7 @@ namespace std
 namespace gfx
 {
 
-RefPtr<TextureResource> loadTextureImage(
+ComPtr<ITextureResource> loadTextureImage(
     IRenderer*   renderer,
     char const* path)
 {
@@ -178,17 +178,17 @@ RefPtr<TextureResource> loadTextureImage(
 
     int mipCount = (int) mipRowStrides.size();
 
-    TextureResource::Desc desc;
-    desc.init2D(Resource::Type::Texture2D, format, extentX, extentY, mipCount);
+    ITextureResource::Desc desc;
+    desc.init2D(IResource::Type::Texture2D, format, extentX, extentY, mipCount);
 
-    TextureResource::Data initData;
+    ITextureResource::Data initData;
     initData.numSubResources = mipCount;
     initData.numMips = mipCount;
     initData.subResources = &subresourceInitData[0];
     initData.mipRowStrides = &mipRowStrides[0];
 
     auto texture = renderer->createTextureResource(
-        Resource::Usage::PixelShaderResource,
+        IResource::Usage::PixelShaderResource,
         desc,
         &initData);
 
@@ -538,22 +538,22 @@ Result ModelLoader::load(
     modelData.meshCount = int(meshes.size());
     modelData.meshes = meshes.data();
 
-    BufferResource::Desc vertexBufferDesc;
+    IBufferResource::Desc vertexBufferDesc;
     vertexBufferDesc.init(modelData.vertexCount * sizeof(Vertex));
-    vertexBufferDesc.setDefaults(Resource::Usage::VertexBuffer);
+    vertexBufferDesc.setDefaults(IResource::Usage::VertexBuffer);
 
     modelData.vertexBuffer = renderer->createBufferResource(
-        Resource::Usage::VertexBuffer,
+        IResource::Usage::VertexBuffer,
         vertexBufferDesc,
         flatVertices.data());
     if(!modelData.vertexBuffer) return SLANG_FAIL;
 
-    BufferResource::Desc indexBufferDesc;
+    IBufferResource::Desc indexBufferDesc;
     indexBufferDesc.init(modelData.indexCount * sizeof(Index));
-    vertexBufferDesc.setDefaults(Resource::Usage::IndexBuffer);
+    vertexBufferDesc.setDefaults(IResource::Usage::IndexBuffer);
 
     modelData.indexBuffer = renderer->createBufferResource(
-        Resource::Usage::IndexBuffer,
+        IResource::Usage::IndexBuffer,
         indexBufferDesc,
         flatIndices.data());
     if(!modelData.indexBuffer) return SLANG_FAIL;

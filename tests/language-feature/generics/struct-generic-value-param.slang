@@ -16,7 +16,7 @@
 // it can reproduce a bug that was encountered by a user
 // when trying out the feature.
 
-//TEST(compute):COMPARE_COMPUTE:
+//TEST(compute):COMPARE_COMPUTE: -shaderobj
 
 import struct_generic_value_param_import;
 

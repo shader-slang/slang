@@ -6,7 +6,7 @@
 #include "slang-com-helper.h"
 
 #include "slang-com-ptr.h"
-#include "core/slang-list.h"
+#include "core/slang-basic.h"
 
 #include "../flag-combiner.h"
 

@@ -1,4 +1,4 @@
-//TEST(compute):COMPARE_COMPUTE:-cpu
+//TEST(compute):COMPARE_COMPUTE:-cpu -shaderobj
 // Test emitting logic of pointer types.
 
 

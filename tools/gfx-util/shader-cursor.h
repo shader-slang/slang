@@ -1,7 +1,6 @@
 #pragma once
 
 #include "tools/gfx/render.h"
-#include "core/slang-basic.h"
 
 namespace gfx
 {
@@ -25,7 +24,7 @@ namespace gfx
 ///
 struct ShaderCursor
 {
-    ShaderObject* m_baseObject = nullptr;
+    IShaderObject* m_baseObject = nullptr;
     slang::TypeLayoutReflection* m_typeLayout = nullptr;
     ShaderOffset m_offset;
 
@@ -54,34 +53,20 @@ struct ShaderCursor
     /// points at.
     ///
     /// If the operation succeeds, then the field cursor is written to `outCursor`.
-    Result getField(Slang::UnownedStringSlice const& name, ShaderCursor& outCursor);
+    Result getField(const char* nameBegin, const char* nameEnd, ShaderCursor& outCursor);
 
-    ShaderCursor getField(Slang::UnownedStringSlice const& name)
+    ShaderCursor getField(const char* name)
     {
         ShaderCursor cursor;
-        getField(name, cursor);
+        getField(name, nullptr, cursor);
         return cursor;
     }
 
-    ShaderCursor getField(Slang::String const& name) { return getField(name.getUnownedSlice()); }
+    ShaderCursor getElement(SlangInt index);
 
-    ShaderCursor getElement(Slang::Index index);
+    static Result followPath(const char* path, ShaderCursor& ioCursor);
 
-    static Result followPath(Slang::UnownedStringSlice const& path, ShaderCursor& ioCursor);
-
-    static Result followPath(Slang::String const& path, ShaderCursor& ioCursor)
-    {
-        return followPath(path.getUnownedSlice(), ioCursor);
-    }
-
-    ShaderCursor getPath(Slang::UnownedStringSlice const& path)
-    {
-        ShaderCursor result(*this);
-        followPath(path, result);
-        return result;
-    }
-
-    ShaderCursor getPath(Slang::String const& path)
+    ShaderCursor getPath(const char* path)
     {
         ShaderCursor result(*this);
         followPath(path, result);
@@ -90,7 +75,7 @@ struct ShaderCursor
 
     ShaderCursor() {}
 
-    ShaderCursor(ShaderObject* object)
+    ShaderCursor(IShaderObject* object)
         : m_baseObject(object)
         , m_typeLayout(object->getElementTypeLayout())
     {}
@@ -100,22 +85,22 @@ struct ShaderCursor
         return m_baseObject->setData(m_offset, data, size);
     }
 
-    SlangResult setObject(ShaderObject* object)
+    SlangResult setObject(IShaderObject* object)
     {
         return m_baseObject->setObject(m_offset, object);
     }
 
-    SlangResult setResource(ResourceView* resourceView)
+    SlangResult setResource(IResourceView* resourceView)
     {
         return m_baseObject->setResource(m_offset, resourceView);
     }
 
-    SlangResult setSampler(SamplerState* sampler)
+    SlangResult setSampler(ISamplerState* sampler)
     {
         return m_baseObject->setSampler(m_offset, sampler);
     }
 
-    SlangResult setCombinedTextureSampler(ResourceView* textureView, SamplerState* sampler)
+    SlangResult setCombinedTextureSampler(IResourceView* textureView, ISamplerState* sampler)
     {
         return m_baseObject->setCombinedTextureSampler(m_offset, textureView, sampler);
     }

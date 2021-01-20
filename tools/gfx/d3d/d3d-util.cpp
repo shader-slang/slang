@@ -8,6 +8,8 @@
 // We will use the C standard library just for printing error messages.
 #include <stdio.h>
 
+#include "core/slang-basic.h"
+
 namespace gfx {
 using namespace Slang;
 
@@ -397,7 +399,7 @@ static bool _isMatch(IDXGIAdapter* adapter, const Slang::UnownedStringSlice& low
 
 /* static */SlangResult D3DUtil::findAdapters(DeviceCheckFlags flags, const UnownedStringSlice& adapterName, IDXGIFactory* dxgiFactory, List<ComPtr<IDXGIAdapter>>& outDxgiAdapters)
 {
-    String lowerAdapterName = String(adapterName).toLower();
+    Slang::String lowerAdapterName = Slang::String(adapterName).toLower();
 
     outDxgiAdapters.clear();
 

@@ -4,11 +4,11 @@
 // buffer can be translated into per-field loads on
 // all targets that support loads of the field types.
 
-//TEST(compute):COMPARE_COMPUTE_EX:-slang -compute -cpu
-//TEST(compute):COMPARE_COMPUTE_EX:-slang -compute
-//TEST(compute):COMPARE_COMPUTE_EX:-slang -compute -dx12 -use-dxil
-//TEST(compute, vulkan):COMPARE_COMPUTE_EX:-slang -vk -compute
-//TEST(compute):COMPARE_COMPUTE_EX:-slang -cuda -compute
+//TEST(compute):COMPARE_COMPUTE_EX:-slang -compute -cpu -shaderobj
+//TEST(compute):COMPARE_COMPUTE_EX:-slang -compute -shaderobj
+//TEST(compute):COMPARE_COMPUTE_EX:-slang -compute -dx12 -use-dxil -shaderobj
+//TEST(compute, vulkan):COMPARE_COMPUTE_EX:-slang -vk -compute -shaderobj
+//TEST(compute):COMPARE_COMPUTE_EX:-slang -cuda -compute -shaderobj
 
 // Note: This input should really be just a `ByteAddressBuffer`,
 // so that we can confirm that the functionality works in the

@@ -2,11 +2,12 @@
 #pragma once
 
 #include <cstdint>
+#include "slang.h"
 
 namespace gfx {
 
 class IRenderer;
 
-int32_t createVKRenderer(IRenderer** outRenderer);
+SlangResult SLANG_MCALL createVKRenderer(IRenderer** outRenderer);
 
 } // gfx

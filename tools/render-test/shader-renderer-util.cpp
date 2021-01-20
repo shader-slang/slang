@@ -20,7 +20,7 @@ void BindingStateImpl::apply(IRenderer* renderer, PipelineType pipelineType)
     const InputTextureDesc& inputDesc,
     int bindFlags,
     IRenderer* renderer,
-    RefPtr<TextureResource>& textureOut)
+    ComPtr<ITextureResource>& textureOut)
 {
     TextureData texData;
     generateTextureData(texData, inputDesc);
@@ -32,10 +32,10 @@ void BindingStateImpl::apply(IRenderer* renderer, PipelineType pipelineType)
     const TextureData& texData,
     int bindFlags,
     IRenderer* renderer,
-    RefPtr<TextureResource>& textureOut)
+    ComPtr<ITextureResource>& textureOut)
 {
-    TextureResource::Desc textureResourceDesc;
-    textureResourceDesc.init(Resource::Type::Unknown);
+    ITextureResource::Desc textureResourceDesc;
+    textureResourceDesc.init(IResource::Type::Unknown);
 
     // Default to RGBA_Unorm_UInt8
     const Format format = (inputDesc.format == Format::Unknown) ? Format::RGBA_Unorm_UInt8 : inputDesc.format;
@@ -50,19 +50,19 @@ void BindingStateImpl::apply(IRenderer* renderer, PipelineType pipelineType)
     {
         case 1:
         {
-            textureResourceDesc.type = Resource::Type::Texture1D;
+            textureResourceDesc.type = IResource::Type::Texture1D;
             textureResourceDesc.size.init(inputDesc.size);
             break;
         }
         case 2:
         {
-            textureResourceDesc.type = inputDesc.isCube ? Resource::Type::TextureCube : Resource::Type::Texture2D;
+            textureResourceDesc.type = inputDesc.isCube ? IResource::Type::TextureCube : IResource::Type::Texture2D;
             textureResourceDesc.size.init(inputDesc.size, inputDesc.size);
             break;
         }
         case 3:
         {
-            textureResourceDesc.type = Resource::Type::Texture3D;
+            textureResourceDesc.type = IResource::Type::Texture3D;
             textureResourceDesc.size.init(inputDesc.size, inputDesc.size, inputDesc.size);
             break;
         }
@@ -71,8 +71,8 @@ void BindingStateImpl::apply(IRenderer* renderer, PipelineType pipelineType)
     const int effectiveArraySize = textureResourceDesc.calcEffectiveArraySize();
     const int numSubResources = textureResourceDesc.calcNumSubResources();
 
-    Resource::Usage initialUsage = Resource::Usage::GenericRead;
-    TextureResource::Data initData;
+    IResource::Usage initialUsage = IResource::Usage::GenericRead;
+    ITextureResource::Data initData;
 
     List<ptrdiff_t> mipRowStrides;
     mipRowStrides.setCount(textureResourceDesc.numMipLevels);
@@ -82,7 +82,7 @@ void BindingStateImpl::apply(IRenderer* renderer, PipelineType pipelineType)
     // Set up the src row strides
     for (int i = 0; i < textureResourceDesc.numMipLevels; i++)
     {
-        const int mipWidth = TextureResource::calcMipSize(textureResourceDesc.size.width, i);
+        const int mipWidth = ITextureResource::Size::calcMipSize(textureResourceDesc.size.width, i);
         mipRowStrides[i] = mipWidth * sizeof(uint32_t);
     }
 
@@ -103,7 +103,7 @@ void BindingStateImpl::apply(IRenderer* renderer, PipelineType pipelineType)
     initData.numSubResources = numSubResources;
     initData.subResources = subResources.getBuffer();
 
-    textureOut = renderer->createTextureResource(Resource::Usage::GenericRead, textureResourceDesc, &initData);
+    textureOut = renderer->createTextureResource(IResource::Usage::GenericRead, textureResourceDesc, &initData);
 
     return textureOut ? SLANG_OK : SLANG_FAIL;
 }
@@ -114,36 +114,36 @@ void BindingStateImpl::apply(IRenderer* renderer, PipelineType pipelineType)
     size_t bufferSize,
     const void* initData,
     IRenderer* renderer,
-    Slang::RefPtr<BufferResource>& bufferOut)
+    Slang::ComPtr<IBufferResource>& bufferOut)
 {
-    Resource::Usage initialUsage = Resource::Usage::GenericRead;
+    IResource::Usage initialUsage = IResource::Usage::GenericRead;
 
-    BufferResource::Desc srcDesc;
+    IBufferResource::Desc srcDesc;
     srcDesc.init(bufferSize);
     srcDesc.format = inputDesc.format;
 
     int bindFlags = 0;
     if (inputDesc.type == InputBufferType::ConstantBuffer)
     {
-        bindFlags |= Resource::BindFlag::ConstantBuffer;
-        srcDesc.cpuAccessFlags |= Resource::AccessFlag::Write;
-        initialUsage = Resource::Usage::ConstantBuffer;
+        bindFlags |= IResource::BindFlag::ConstantBuffer;
+        srcDesc.cpuAccessFlags |= IResource::AccessFlag::Write;
+        initialUsage = IResource::Usage::ConstantBuffer;
     }
     else
     {
-        bindFlags |= Resource::BindFlag::UnorderedAccess | Resource::BindFlag::PixelShaderResource | Resource::BindFlag::NonPixelShaderResource;
+        bindFlags |= IResource::BindFlag::UnorderedAccess | IResource::BindFlag::PixelShaderResource | IResource::BindFlag::NonPixelShaderResource;
         srcDesc.elementSize = inputDesc.stride;
-        initialUsage = Resource::Usage::UnorderedAccess;
+        initialUsage = IResource::Usage::UnorderedAccess;
     }
 
     if (isOutput)
     {
-        srcDesc.cpuAccessFlags |= Resource::AccessFlag::Read;
+        srcDesc.cpuAccessFlags |= IResource::AccessFlag::Read;
     }
 
     srcDesc.bindFlags = bindFlags;
 
-    RefPtr<BufferResource> bufferResource = renderer->createBufferResource(initialUsage, srcDesc, initData);
+    ComPtr<IBufferResource> bufferResource = renderer->createBufferResource(initialUsage, srcDesc, initData);
     if (!bufferResource)
     {
         return SLANG_FAIL;
@@ -153,9 +153,9 @@ void BindingStateImpl::apply(IRenderer* renderer, PipelineType pipelineType)
     return SLANG_OK;
 }
 
-static SamplerState::Desc _calcSamplerDesc(const InputSamplerDesc& srcDesc)
+static ISamplerState::Desc _calcSamplerDesc(const InputSamplerDesc& srcDesc)
 {
-    SamplerState::Desc dstDesc;
+    ISamplerState::Desc dstDesc;
     if (srcDesc.isCompareSampler)
     {
         dstDesc.reductionOp = TextureReductionOp::Comparison;
@@ -164,7 +164,7 @@ static SamplerState::Desc _calcSamplerDesc(const InputSamplerDesc& srcDesc)
     return dstDesc;
 }
 
-RefPtr<SamplerState> _createSamplerState(IRenderer* renderer,
+ComPtr<ISamplerState> _createSamplerState(IRenderer* renderer,
     const InputSamplerDesc& srcDesc)
 {
     return renderer->createSamplerState(_calcSamplerDesc(srcDesc));
@@ -173,19 +173,20 @@ RefPtr<SamplerState> _createSamplerState(IRenderer* renderer,
 /* static */ Result ShaderRendererUtil::createBindingState(
     const ShaderInputLayout& layout,
     IRenderer* renderer,
-    BufferResource* addedConstantBuffer,
+    IBufferResource* addedConstantBuffer,
     BindingStateImpl** outBindingState)
 {
     auto srcEntries = layout.entries.getBuffer();
     auto numEntries = layout.entries.getCount();
 
-    const int textureBindFlags = Resource::BindFlag::NonPixelShaderResource | Resource::BindFlag::PixelShaderResource;
+    const int textureBindFlags = IResource::BindFlag::NonPixelShaderResource | IResource::BindFlag::PixelShaderResource;
 
-    List<DescriptorSetLayout::SlotRangeDesc> slotRangeDescs;
+    List<IDescriptorSetLayout::SlotRangeDesc> slotRangeDescs;
+    List<Index> mapEntryToSlotRange;
 
     if(addedConstantBuffer)
     {
-        DescriptorSetLayout::SlotRangeDesc slotRangeDesc;
+        IDescriptorSetLayout::SlotRangeDesc slotRangeDesc;
         slotRangeDesc.type = DescriptorSlotType::UniformBuffer;
 
         slotRangeDescs.add(slotRangeDesc);
@@ -196,7 +197,8 @@ RefPtr<SamplerState> _createSamplerState(IRenderer* renderer,
         const ShaderInputLayoutEntry& srcEntry = srcEntries[i];
         SLANG_ASSERT(srcEntry.onlyCPULikeBinding == false);
 
-        DescriptorSetLayout::SlotRangeDesc slotRangeDesc;
+        mapEntryToSlotRange.add(slotRangeDescs.getCount());
+        IDescriptorSetLayout::SlotRangeDesc slotRangeDesc;
 
         switch (srcEntry.type)
         {
@@ -252,6 +254,10 @@ RefPtr<SamplerState> _createSamplerState(IRenderer* renderer,
                 slotRangeDesc.type = DescriptorSlotType::Sampler;
                 break;
 
+            case ShaderInputType::Object:
+                // We ignore the `Object` case here, knowing that it is meant for the shader-object path.
+                continue;
+
             default:
                 assert(!"Unhandled type");
                 return SLANG_FAIL;
@@ -259,17 +265,17 @@ RefPtr<SamplerState> _createSamplerState(IRenderer* renderer,
         slotRangeDescs.add(slotRangeDesc);
     }
 
-    DescriptorSetLayout::Desc descriptorSetLayoutDesc;
+    IDescriptorSetLayout::Desc descriptorSetLayoutDesc;
     descriptorSetLayoutDesc.slotRangeCount = slotRangeDescs.getCount();
     descriptorSetLayoutDesc.slotRanges = slotRangeDescs.getBuffer();
 
     auto descriptorSetLayout = renderer->createDescriptorSetLayout(descriptorSetLayoutDesc);
     if(!descriptorSetLayout) return SLANG_FAIL;
 
-    List<PipelineLayout::DescriptorSetDesc> pipelineDescriptorSets;
-    pipelineDescriptorSets.add(PipelineLayout::DescriptorSetDesc(descriptorSetLayout));
+    List<IPipelineLayout::DescriptorSetDesc> pipelineDescriptorSets;
+    pipelineDescriptorSets.add(IPipelineLayout::DescriptorSetDesc(descriptorSetLayout));
 
-    PipelineLayout::Desc pipelineLayoutDesc;
+    IPipelineLayout::Desc pipelineLayoutDesc;
     pipelineLayoutDesc.renderTargetCount = layout.numRenderTargets;
     pipelineLayoutDesc.descriptorSetCount = pipelineDescriptorSets.getCount();
     pipelineLayoutDesc.descriptorSets = pipelineDescriptorSets.getBuffer();
@@ -290,7 +296,7 @@ RefPtr<SamplerState> _createSamplerState(IRenderer* renderer,
     {
         const ShaderInputLayoutEntry& srcEntry = srcEntries[i];
 
-        auto rangeIndex = i + (addedConstantBuffer ? 1 : 0);
+        auto rangeIndex = mapEntryToSlotRange[i];
 
         switch (srcEntry.type)
         {
@@ -313,7 +319,7 @@ RefPtr<SamplerState> _createSamplerState(IRenderer* renderer,
                         break;
                     }
 
-                    RefPtr<BufferResource> bufferResource;
+                    ComPtr<IBufferResource> bufferResource;
                     SLANG_RETURN_ON_FAIL(createBufferResource(srcEntry.bufferDesc, srcEntry.isOutput, bufferSize, srcEntry.bufferData.getBuffer(), renderer, bufferResource));
 
                     switch(srcBuffer.type)
@@ -324,8 +330,8 @@ RefPtr<SamplerState> _createSamplerState(IRenderer* renderer,
 
                     case InputBufferType::StorageBuffer:
                         {
-                            ResourceView::Desc viewDesc;
-                            viewDesc.type = ResourceView::Type::UnorderedAccess;
+                            IResourceView::Desc viewDesc;
+                            viewDesc.type = IResourceView::Type::UnorderedAccess;
                             viewDesc.format = srcBuffer.format;
                             auto bufferView = renderer->createBufferView(
                                 bufferResource,
@@ -347,13 +353,13 @@ RefPtr<SamplerState> _createSamplerState(IRenderer* renderer,
 
             case ShaderInputType::CombinedTextureSampler:
                 {
-                    RefPtr<TextureResource> texture;
+                    ComPtr<ITextureResource> texture;
                     SLANG_RETURN_ON_FAIL(generateTextureResource(srcEntry.textureDesc, textureBindFlags, renderer, texture));
 
                     auto sampler = _createSamplerState(renderer, srcEntry.samplerDesc);
 
-                    ResourceView::Desc viewDesc;
-                    viewDesc.type = ResourceView::Type::ShaderResource;
+                    IResourceView::Desc viewDesc;
+                    viewDesc.type = IResourceView::Type::ShaderResource;
                     auto textureView = renderer->createTextureView(
                         texture,
                         viewDesc);
@@ -372,13 +378,13 @@ RefPtr<SamplerState> _createSamplerState(IRenderer* renderer,
 
             case ShaderInputType::Texture:
                 {
-                    RefPtr<TextureResource> texture;
+                    ComPtr<ITextureResource> texture;
                     SLANG_RETURN_ON_FAIL(generateTextureResource(srcEntry.textureDesc, textureBindFlags, renderer, texture));
 
                     // TODO: support UAV textures...
 
-                    ResourceView::Desc viewDesc;
-                    viewDesc.type = ResourceView::Type::ShaderResource;
+                    IResourceView::Desc viewDesc;
+                    viewDesc.type = IResourceView::Type::ShaderResource;
                     auto textureView = renderer->createTextureView(
                         texture,
                         viewDesc);
@@ -405,6 +411,9 @@ RefPtr<SamplerState> _createSamplerState(IRenderer* renderer,
                     auto sampler = _createSamplerState(renderer, srcEntry.samplerDesc);
                     descriptorSet->setSampler(rangeIndex, 0, sampler);
                 }
+                break;
+
+            case ShaderInputType::Object:
                 break;
 
             default:

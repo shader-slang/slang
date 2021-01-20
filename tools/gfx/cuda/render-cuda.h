@@ -1,10 +1,11 @@
 #pragma once
 
 #include <cstdint>
+#include "slang.h"
 
 namespace gfx
 {
 class IRenderer;
 
-int32_t createCUDARenderer(IRenderer** outRenderer);
+SlangResult SLANG_MCALL createCUDARenderer(IRenderer** outRenderer);
 }

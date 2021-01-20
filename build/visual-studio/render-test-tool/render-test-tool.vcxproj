@@ -186,6 +186,7 @@
     <ClInclude Include="..\..\..\tools\render-test\shader-input-layout.h" />
     <ClInclude Include="..\..\..\tools\render-test\shader-renderer-util.h" />
     <ClInclude Include="..\..\..\tools\render-test\slang-support.h" />
+    <ClInclude Include="..\..\..\tools\render-test\surface.h" />
     <ClInclude Include="..\..\..\tools\render-test\window.h" />
   </ItemGroup>
   <ItemGroup>
@@ -197,6 +198,7 @@
     <ClCompile Include="..\..\..\tools\render-test\shader-input-layout.cpp" />
     <ClCompile Include="..\..\..\tools\render-test\shader-renderer-util.cpp" />
     <ClCompile Include="..\..\..\tools\render-test\slang-support.cpp" />
+    <ClCompile Include="..\..\..\tools\render-test\surface.cpp" />
     <ClCompile Include="..\..\..\tools\render-test\window.cpp" />
     <ClCompile Include="..\..\..\tools\render-test\windows\win-window.cpp" />
   </ItemGroup>
@@ -209,6 +211,9 @@
     </ProjectReference>
     <ProjectReference Include="..\gfx\gfx.vcxproj">
       <Project>{222F7498-B40C-4F3F-A704-DDEB91A4484A}</Project>
+    </ProjectReference>
+    <ProjectReference Include="..\gfx-util\gfx-util.vcxproj">
+      <Project>{F5ADB74E-02A7-44FB-AA3B-FC02F8AC7A4B}</Project>
     </ProjectReference>
     <ProjectReference Include="..\graphics-app-framework\graphics-app-framework.vcxproj">
       <Project>{3565FE5E-4FA3-11EB-AE93-0242AC130002}</Project>

@@ -1,5 +1,5 @@
-//TEST(compute):COMPARE_COMPUTE:-cpu
-//TEST(compute):COMPARE_COMPUTE:
+//TEST(compute):COMPARE_COMPUTE:-cpu -shaderobj
+//TEST(compute):COMPARE_COMPUTE: -shaderobj
 
 // Test that `break` from a loop works.
 
