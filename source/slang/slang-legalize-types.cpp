@@ -1201,6 +1201,11 @@ LegalType legalizeTypeImpl(
         //
         auto legalConcreteType = legalizeType(context, pseudoPtrType->getValueType());
 
+        // If element type hasn't change, return original type.
+        if (legalConcreteType.flavor == LegalType::Flavor::simple &&
+            legalConcreteType.getSimple() == pseudoPtrType->getValueType())
+            return LegalType::simple(pseudoPtrType);
+
         // TODO: If/when we change our generation of pseudo-pointers
         // so that use-site code emits a "pseudo-load" then we may
         // need to change the logic here so that we return
@@ -1216,6 +1221,10 @@ LegalType legalizeTypeImpl(
     else if (auto ptrType = as<IRPtrTypeBase>(type))
     {
         auto legalValueType = legalizeType(context, ptrType->getValueType());
+        // If element type hasn't change, return original type.
+        if (legalValueType.flavor == LegalType::Flavor::simple &&
+            legalValueType.getSimple() == ptrType->getValueType())
+            return LegalType::simple(ptrType);
         return createLegalPtrType(context, ptrType->op, legalValueType);
     }
     else if(auto structType = as<IRStructType>(type))
@@ -1294,6 +1303,11 @@ LegalType legalizeTypeImpl(
         auto legalElementType = legalizeType(
             context,
             arrayType->getElementType());
+
+        // If element type hasn't change, return original type.
+        if (legalElementType.flavor == LegalType::Flavor::simple &&
+            legalElementType.getSimple() == arrayType->getElementType())
+            return LegalType::simple(arrayType);
 
         ArrayLegalTypeWrapper wrapper;
         wrapper.arrayType = arrayType;
