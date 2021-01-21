@@ -2849,7 +2849,7 @@ void D3D12Renderer::DescriptorSetImpl::setSampler(UInt range, UInt index, ISampl
 #endif
 
     auto arrayIndex = rangeInfo.arrayIndex + index;
-    auto descriptorIndex = m_resourceTable + arrayIndex;
+    auto descriptorIndex = m_samplerTable + arrayIndex;
 
     m_samplerObjects[arrayIndex] = samplerImpl;
     dxDevice->CopyDescriptorsSimple(
