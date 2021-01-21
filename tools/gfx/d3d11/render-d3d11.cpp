@@ -692,6 +692,15 @@ SlangResult D3D11Renderer::initialize(const Desc& desc, void* inWindowHandle)
         return SLANG_FAIL;
     }
 
+    PFN_D3D11_CREATE_DEVICE D3D11CreateDevice_ =
+        (PFN_D3D11_CREATE_DEVICE)GetProcAddress(d3dModule, "D3D11CreateDevice");
+    if (!D3D11CreateDevice_)
+    {
+        fprintf(stderr,
+            "error: failed load symbol 'D3D11CreateDevice'\n");
+        return SLANG_FAIL;
+    }
+
     // Our swap chain uses RGBA8 with sRGB, with double buffering.
     DXGI_SWAP_CHAIN_DESC swapChainDesc = { 0 };
     swapChainDesc.BufferUsage = DXGI_USAGE_RENDER_TARGET_OUTPUT;
@@ -773,20 +782,36 @@ SlangResult D3D11Renderer::initialize(const Desc& desc, void* inWindowHandle)
             const int startFeatureIndex = (deviceCheckFlags & DeviceCheckFlag::UseFullFeatureLevel) ? 0 : 1; 
             const UINT deviceFlags = (deviceCheckFlags & DeviceCheckFlag::UseDebug) ? D3D11_CREATE_DEVICE_DEBUG : 0;
 
-            res = D3D11CreateDeviceAndSwapChain_(
-                adapter,                   
-                driverType,
-                nullptr,                    // software
-                deviceFlags,
-                &featureLevels[startFeatureIndex],
-                totalNumFeatureLevels - startFeatureIndex,
-                D3D11_SDK_VERSION,
-                &swapChainDesc,
-                m_swapChain.writeRef(),
-                m_device.writeRef(),
-                &featureLevel,
-                m_immediateContext.writeRef());
-
+            if (windowHandle)
+            {
+                res = D3D11CreateDeviceAndSwapChain_(
+                    adapter,
+                    driverType,
+                    nullptr,                    // software
+                    deviceFlags,
+                    &featureLevels[startFeatureIndex],
+                    totalNumFeatureLevels - startFeatureIndex,
+                    D3D11_SDK_VERSION,
+                    &swapChainDesc,
+                    m_swapChain.writeRef(),
+                    m_device.writeRef(),
+                    &featureLevel,
+                    m_immediateContext.writeRef());
+            }
+            else
+            {
+                res = D3D11CreateDevice_(
+                    adapter,
+                    driverType,
+                    nullptr,
+                    deviceFlags,
+                    &featureLevels[startFeatureIndex],
+                    totalNumFeatureLevels - startFeatureIndex,
+                    D3D11_SDK_VERSION,
+                    m_device.writeRef(),
+                    &featureLevel,
+                    m_immediateContext.writeRef());
+            }
             // Check if successfully constructed - if so we are done. 
             if (SLANG_SUCCEEDED(res))
             {
@@ -799,7 +824,8 @@ SlangResult D3D11Renderer::initialize(const Desc& desc, void* inWindowHandle)
             return res;
         }
         // Check we have a swap chain, context and device
-        SLANG_ASSERT(m_immediateContext && m_swapChain && m_device);
+        SLANG_ASSERT(m_immediateContext && m_device);
+        SLANG_ASSERT(!windowHandle || m_swapChain);
     }
 
     // NVAPI
@@ -841,54 +867,55 @@ SlangResult D3D11Renderer::initialize(const Desc& desc, void* inWindowHandle)
     static const IID kIID_ID3D11Texture2D = {
         0x6f15aaf2, 0xd208, 0x4e89, 0x9a, 0xb4, 0x48,
         0x95, 0x35, 0xd3, 0x4f, 0x9c };
-
-    SLANG_RETURN_ON_FAIL(m_swapChain->GetBuffer(0, kIID_ID3D11Texture2D, (void**)m_backBufferTexture.writeRef()));
-
-//    for (int i = 0; i < 8; i++)
+    if (m_swapChain)
     {
-        ComPtr<ID3D11Texture2D> texture;
-        D3D11_TEXTURE2D_DESC textureDesc;
-        m_backBufferTexture->GetDesc(&textureDesc);
-        SLANG_RETURN_ON_FAIL(m_device->CreateTexture2D(&textureDesc, nullptr, texture.writeRef()));
+        SLANG_RETURN_ON_FAIL(m_swapChain->GetBuffer(0, kIID_ID3D11Texture2D, (void**)m_backBufferTexture.writeRef()));
 
-        ComPtr<ID3D11RenderTargetView> rtv;
-        D3D11_RENDER_TARGET_VIEW_DESC rtvDesc;
-        rtvDesc.Format = DXGI_FORMAT_R8G8B8A8_UNORM;
-        rtvDesc.Texture2D.MipSlice = 0;
-        rtvDesc.ViewDimension = D3D11_RTV_DIMENSION_TEXTURE2D;
-        SLANG_RETURN_ON_FAIL(m_device->CreateRenderTargetView(texture, &rtvDesc, rtv.writeRef()));
+        //    for (int i = 0; i < 8; i++)
+        {
+            ComPtr<ID3D11Texture2D> texture;
+            D3D11_TEXTURE2D_DESC textureDesc;
+            m_backBufferTexture->GetDesc(&textureDesc);
+            SLANG_RETURN_ON_FAIL(m_device->CreateTexture2D(&textureDesc, nullptr, texture.writeRef()));
 
-        TextureResource::Desc resourceDesc;
-        resourceDesc.init2D(IResource::Type::Texture2D, Format::RGBA_Unorm_UInt8, textureDesc.Width, textureDesc.Height, 1);
+            ComPtr<ID3D11RenderTargetView> rtv;
+            D3D11_RENDER_TARGET_VIEW_DESC rtvDesc;
+            rtvDesc.Format = DXGI_FORMAT_R8G8B8A8_UNORM;
+            rtvDesc.Texture2D.MipSlice = 0;
+            rtvDesc.ViewDimension = D3D11_RTV_DIMENSION_TEXTURE2D;
+            SLANG_RETURN_ON_FAIL(m_device->CreateRenderTargetView(texture, &rtvDesc, rtv.writeRef()));
 
-        ComPtr<ITextureResource> primaryRenderTargetTexture;
-        SLANG_RETURN_ON_FAIL(createTextureResource(IResource::Usage::RenderTarget, resourceDesc, nullptr, primaryRenderTargetTexture.writeRef()));
+            TextureResource::Desc resourceDesc;
+            resourceDesc.init2D(IResource::Type::Texture2D, Format::RGBA_Unorm_UInt8, textureDesc.Width, textureDesc.Height, 1);
 
-        IResourceView::Desc viewDesc;
-        viewDesc.format = resourceDesc.format;
-        viewDesc.type = IResourceView::Type::RenderTarget;
-        ComPtr<IResourceView> primaryRenderTargetView;
-        SLANG_RETURN_ON_FAIL(createTextureView(primaryRenderTargetTexture, viewDesc, primaryRenderTargetView.writeRef()));
+            ComPtr<ITextureResource> primaryRenderTargetTexture;
+            SLANG_RETURN_ON_FAIL(createTextureResource(IResource::Usage::RenderTarget, resourceDesc, nullptr, primaryRenderTargetTexture.writeRef()));
 
-        m_primaryRenderTargetTexture = dynamic_cast<TextureResourceImpl*>(primaryRenderTargetTexture.get());
-        m_primaryRenderTargetView = dynamic_cast<RenderTargetViewImpl*>(primaryRenderTargetView.get());
+            IResourceView::Desc viewDesc;
+            viewDesc.format = resourceDesc.format;
+            viewDesc.type = IResourceView::Type::RenderTarget;
+            ComPtr<IResourceView> primaryRenderTargetView;
+            SLANG_RETURN_ON_FAIL(createTextureView(primaryRenderTargetTexture, viewDesc, primaryRenderTargetView.writeRef()));
+
+            m_primaryRenderTargetTexture = dynamic_cast<TextureResourceImpl*>(primaryRenderTargetTexture.get());
+            m_primaryRenderTargetView = dynamic_cast<RenderTargetViewImpl*>(primaryRenderTargetView.get());
+        }
+
+        //    m_immediateContext->OMSetRenderTargets(1, m_primaryRenderTargetView->m_rtv.readRef(), nullptr);
+        m_rtvBindings[0] = m_primaryRenderTargetView->m_rtv;
+        m_targetBindingsDirty[int(PipelineType::Graphics)] = true;
+
+        // Similarly, we are going to set up a viewport once, and then never
+        // switch, since this is a simple test app.
+        D3D11_VIEWPORT viewport;
+        viewport.TopLeftX = 0;
+        viewport.TopLeftY = 0;
+        viewport.Width = (float)desc.width;
+        viewport.Height = (float)desc.height;
+        viewport.MaxDepth = 1; // TODO(tfoley): use reversed depth
+        viewport.MinDepth = 0;
+        m_immediateContext->RSSetViewports(1, &viewport);
     }
-
-//    m_immediateContext->OMSetRenderTargets(1, m_primaryRenderTargetView->m_rtv.readRef(), nullptr);
-    m_rtvBindings[0] = m_primaryRenderTargetView->m_rtv;
-    m_targetBindingsDirty[int(PipelineType::Graphics)] = true;
-
-    // Similarly, we are going to set up a viewport once, and then never
-    // switch, since this is a simple test app.
-    D3D11_VIEWPORT viewport;
-    viewport.TopLeftX = 0;
-    viewport.TopLeftY = 0;
-    viewport.Width = (float)desc.width;
-    viewport.Height = (float)desc.height;
-    viewport.MaxDepth = 1; // TODO(tfoley): use reversed depth
-    viewport.MinDepth = 0;
-    m_immediateContext->RSSetViewports(1, &viewport);
-
     return SLANG_OK;
 }
 
@@ -2123,6 +2150,7 @@ Result D3D11Renderer::createDescriptorSetLayout(const IDescriptorSetLayout::Desc
         case DescriptorSlotType::SampledImage:
         case DescriptorSlotType::UniformTexelBuffer:
         case DescriptorSlotType::InputAttachment:
+        case DescriptorSlotType::ReadOnlyStorageBuffer:
             rangeInfo.type = D3D11DescriptorSlotType::ShaderResourceView;
             break;
 

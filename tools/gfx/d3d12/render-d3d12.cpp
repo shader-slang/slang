@@ -992,6 +992,7 @@ void D3D12Renderer::beginRender()
     _resetCommandList();
 
     // Indicate that the render target needs to be writable
+    if (m_swapChain)
     {
         D3D12BarrierSubmitter submitter(m_commandList);
         m_renderTargets[m_renderTargetIndex]->transition(D3D12_RESOURCE_STATE_RENDER_TARGET, submitter);
@@ -1008,30 +1009,31 @@ void D3D12Renderer::endRender()
         const UInt64 signalValue = m_fence.nextSignal(m_commandQueue);
         m_circularResourceHeap.addSync(signalValue);
     }
-
-    D3D12Resource& backBuffer = *m_backBuffers[m_renderTargetIndex];
-    if (m_isMultiSampled)
+    if (m_swapChain)
     {
-        // MSAA resolve
-        D3D12Resource& renderTarget = *m_renderTargets[m_renderTargetIndex];
-        assert(&renderTarget != &backBuffer);
-        // Barriers to wait for the render target, and the backbuffer to be in correct state
+        D3D12Resource& backBuffer = *m_backBuffers[m_renderTargetIndex];
+        if (m_isMultiSampled)
         {
-            D3D12BarrierSubmitter submitter(m_commandList);
-            renderTarget.transition(D3D12_RESOURCE_STATE_RESOLVE_SOURCE, submitter);
-            backBuffer.transition(D3D12_RESOURCE_STATE_RESOLVE_DEST, submitter);
+            // MSAA resolve
+            D3D12Resource& renderTarget = *m_renderTargets[m_renderTargetIndex];
+            assert(&renderTarget != &backBuffer);
+            // Barriers to wait for the render target, and the backbuffer to be in correct state
+            {
+                D3D12BarrierSubmitter submitter(m_commandList);
+                renderTarget.transition(D3D12_RESOURCE_STATE_RESOLVE_SOURCE, submitter);
+                backBuffer.transition(D3D12_RESOURCE_STATE_RESOLVE_DEST, submitter);
+            }
+
+            // Do the resolve...
+            m_commandList->ResolveSubresource(backBuffer, 0, renderTarget, 0, m_targetFormat);
         }
 
-        // Do the resolve...
-        m_commandList->ResolveSubresource(backBuffer, 0, renderTarget, 0, m_targetFormat);
+        // Make the back buffer presentable
+        {
+            D3D12BarrierSubmitter submitter(m_commandList);
+            backBuffer.transition(D3D12_RESOURCE_STATE_PRESENT, submitter);
+        }
     }
-
-    // Make the back buffer presentable
-    {
-        D3D12BarrierSubmitter submitter(m_commandList);
-        backBuffer.transition(D3D12_RESOURCE_STATE_PRESENT, submitter);
-    }
-
     SLANG_ASSERT_VOID_ON_FAIL(m_commandList->Close());
 
     {
@@ -1523,51 +1525,54 @@ Result D3D12Renderer::initialize(const Desc& desc, void* inWindowHandle)
 
     SLANG_RETURN_ON_FAIL(m_device->CreateCommandQueue(&queueDesc, IID_PPV_ARGS(m_commandQueue.writeRef())));
 
-    // Describe the swap chain.
-    DXGI_SWAP_CHAIN_DESC swapChainDesc = {};
-    swapChainDesc.BufferCount = m_numRenderTargets;
-    swapChainDesc.BufferDesc.Width = m_desc.width;
-    swapChainDesc.BufferDesc.Height = m_desc.height;
-    swapChainDesc.BufferDesc.Format = m_targetFormat;
-    swapChainDesc.BufferUsage = DXGI_USAGE_RENDER_TARGET_OUTPUT;
-    swapChainDesc.SwapEffect = DXGI_SWAP_EFFECT_FLIP_DISCARD;
-    swapChainDesc.OutputWindow = m_hwnd;
-    swapChainDesc.SampleDesc.Count = 1;
-    swapChainDesc.Windowed = TRUE;
-
-    if (m_isFullSpeed)
+    if (inWindowHandle)
     {
-        m_hasVsync = false;
-        m_allowFullScreen = false;
+        // Describe the swap chain.
+        DXGI_SWAP_CHAIN_DESC swapChainDesc = {};
+        swapChainDesc.BufferCount = m_numRenderTargets;
+        swapChainDesc.BufferDesc.Width = m_desc.width;
+        swapChainDesc.BufferDesc.Height = m_desc.height;
+        swapChainDesc.BufferDesc.Format = m_targetFormat;
+        swapChainDesc.BufferUsage = DXGI_USAGE_RENDER_TARGET_OUTPUT;
+        swapChainDesc.SwapEffect = DXGI_SWAP_EFFECT_FLIP_DISCARD;
+        swapChainDesc.OutputWindow = m_hwnd;
+        swapChainDesc.SampleDesc.Count = 1;
+        swapChainDesc.Windowed = TRUE;
+
+        if (m_isFullSpeed)
+        {
+            m_hasVsync = false;
+            m_allowFullScreen = false;
+        }
+
+        if (!m_hasVsync)
+        {
+            swapChainDesc.Flags |= DXGI_SWAP_CHAIN_FLAG_FRAME_LATENCY_WAITABLE_OBJECT;
+        }
+
+        // Swap chain needs the queue so that it can force a flush on it.
+        ComPtr<IDXGISwapChain> swapChain;
+        SLANG_RETURN_ON_FAIL(m_deviceInfo.m_dxgiFactory->CreateSwapChain(m_commandQueue, &swapChainDesc, swapChain.writeRef()));
+        SLANG_RETURN_ON_FAIL(swapChain->QueryInterface(m_swapChain.writeRef()));
+
+        if (!m_hasVsync)
+        {
+            m_swapChainWaitableObject = m_swapChain->GetFrameLatencyWaitableObject();
+
+            int maxLatency = m_numRenderTargets - 2;
+
+            // Make sure the maximum latency is in the range required by dx12 runtime
+            maxLatency = (maxLatency < 1) ? 1 : maxLatency;
+            maxLatency = (maxLatency > DXGI_MAX_SWAP_CHAIN_BUFFERS) ? DXGI_MAX_SWAP_CHAIN_BUFFERS : maxLatency;
+
+            m_swapChain->SetMaximumFrameLatency(maxLatency);
+        }
+
+        // This sample does not support fullscreen transitions.
+        SLANG_RETURN_ON_FAIL(m_deviceInfo.m_dxgiFactory->MakeWindowAssociation(m_hwnd, DXGI_MWA_NO_ALT_ENTER));
+
+        m_renderTargetIndex = m_swapChain->GetCurrentBackBufferIndex();
     }
-
-    if (!m_hasVsync)
-    {
-        swapChainDesc.Flags |= DXGI_SWAP_CHAIN_FLAG_FRAME_LATENCY_WAITABLE_OBJECT;
-    }
-
-    // Swap chain needs the queue so that it can force a flush on it.
-    ComPtr<IDXGISwapChain> swapChain;
-    SLANG_RETURN_ON_FAIL(m_deviceInfo.m_dxgiFactory->CreateSwapChain(m_commandQueue, &swapChainDesc, swapChain.writeRef()));
-    SLANG_RETURN_ON_FAIL(swapChain->QueryInterface(m_swapChain.writeRef()));
-
-    if (!m_hasVsync)
-    {
-        m_swapChainWaitableObject = m_swapChain->GetFrameLatencyWaitableObject();
-
-        int maxLatency = m_numRenderTargets - 2;
-
-        // Make sure the maximum latency is in the range required by dx12 runtime
-        maxLatency = (maxLatency < 1) ? 1 : maxLatency;
-        maxLatency = (maxLatency > DXGI_MAX_SWAP_CHAIN_BUFFERS) ? DXGI_MAX_SWAP_CHAIN_BUFFERS : maxLatency;
-
-        m_swapChain->SetMaximumFrameLatency(maxLatency);
-    }
-
-    // This sample does not support fullscreen transitions.
-    SLANG_RETURN_ON_FAIL(m_deviceInfo.m_dxgiFactory->MakeWindowAssociation(m_hwnd, DXGI_MWA_NO_ALT_ENTER));
-
-    m_renderTargetIndex = m_swapChain->GetCurrentBackBufferIndex();
 
     // Create descriptor heaps.
 
@@ -1583,9 +1588,7 @@ Result D3D12Renderer::initialize(const Desc& desc, void* inWindowHandle)
     SLANG_RETURN_ON_FAIL(m_samplerAllocator.init(m_device, 16, D3D12_DESCRIPTOR_HEAP_TYPE_SAMPLER));
 
     // Setup frame resources
-    {
-        SLANG_RETURN_ON_FAIL(createFrameResources());
-    }
+    SLANG_RETURN_ON_FAIL(createFrameResources());
 
     // Setup fence, and close the command list (as default state without begin/endRender is closed)
     {
@@ -1614,7 +1617,15 @@ Result D3D12Renderer::initialize(const Desc& desc, void* inWindowHandle)
 
 Result D3D12Renderer::createFrameResources()
 {
+    // Set up frames
+    for (int i = 0; i < m_numRenderFrames; i++)
+    {
+        FrameInfo& frame = m_frameInfos[i];
+        SLANG_RETURN_ON_FAIL(m_device->CreateCommandAllocator(D3D12_COMMAND_LIST_TYPE_DIRECT, IID_PPV_ARGS(frame.m_commandAllocator.writeRef())));
+    }
+
     // Create back buffers
+    if (m_swapChain)
     {
 //        D3D12_CPU_DESCRIPTOR_HANDLE rtvStart(m_rtvHeap->GetCPUDescriptorHandleForHeapStart());
 
@@ -1678,13 +1689,7 @@ Result D3D12Renderer::createFrameResources()
         }
     }
 
-    // Set up frames
-    for (int i = 0; i < m_numRenderFrames; i++)
-    {
-        FrameInfo& frame = m_frameInfos[i];
-        SLANG_RETURN_ON_FAIL(m_device->CreateCommandAllocator(D3D12_COMMAND_LIST_TYPE_DIRECT, IID_PPV_ARGS(frame.m_commandAllocator.writeRef())));
-    }
-
+    if (m_swapChain)
     {
         D3D12_RESOURCE_DESC desc = m_backBuffers[0]->getResource()->GetDesc();
         assert(desc.Width == UINT64(m_desc.width) && desc.Height == UINT64(m_desc.height));
@@ -2367,7 +2372,7 @@ Result D3D12Renderer::createBufferView(IBufferResource* buffer, IResourceView::D
             srvDesc.Format = D3DUtil::getMapFormat(desc.format);
             srvDesc.Buffer.StructureByteStride = 0;
             srvDesc.Buffer.FirstElement = 0;
-
+            srvDesc.Shader4ComponentMapping = D3D12_DEFAULT_SHADER_4_COMPONENT_MAPPING;
             if(resourceDesc.elementSize)
             {
                 srvDesc.Buffer.StructureByteStride = resourceDesc.elementSize;
@@ -3374,7 +3379,21 @@ Result D3D12Renderer::createDescriptorSetLayout(const IDescriptorSetLayout::Desc
                     dxRange.OffsetInDescriptorsFromTableStart = D3D12_DESCRIPTOR_RANGE_OFFSET_APPEND;
                 }
                 break;
+            case DescriptorSlotType::ReadOnlyStorageBuffer:
+            {
+                if (dxRegister < 0)
+                {
+                    dxRegister = srvRegisterCounter;
+                }
+                srvRegisterCounter = dxRegister + bindingCount;
 
+                dxRange.RangeType = D3D12_DESCRIPTOR_RANGE_TYPE_SRV;
+                dxRange.NumDescriptors = UINT(bindingCount);
+                dxRange.BaseShaderRegister = UINT(dxRegister);
+                dxRange.RegisterSpace = UINT(bindingSpace);
+                dxRange.OffsetInDescriptorsFromTableStart = D3D12_DESCRIPTOR_RANGE_OFFSET_APPEND;
+            }
+            break;
             case DescriptorSlotType::UniformBuffer:
             case DescriptorSlotType::DynamicUniformBuffer:
                 {
