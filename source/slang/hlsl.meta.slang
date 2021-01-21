@@ -4283,13 +4283,13 @@ bool ReportHit(float tHit, uint hitKind, A attributes)
 // 10.3.4
 __target_intrinsic(hlsl)
 __target_intrinsic(GL_NV_ray_tracing, ignoreIntersectionNV)
-__target_intrinsic(GL_EXT_ray_tracing, ignoreIntersectionEXT)
+__target_intrinsic(GL_EXT_ray_tracing, "ignoreIntersectionEXT;")
 void IgnoreHit();
 
 // 10.3.5
 __target_intrinsic(hlsl)
 __target_intrinsic(GL_NV_ray_tracing, terminateRayNV)
-__target_intrinsic(GL_EXT_ray_tracing, terminateRayEXT)
+__target_intrinsic(GL_EXT_ray_tracing, "terminateRayEXT;")
 void AcceptHitAndEndSearch();
 
 // 10.4 - System Values and Special Semantics
