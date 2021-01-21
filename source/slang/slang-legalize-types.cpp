@@ -246,7 +246,8 @@ struct TupleTypeBuilder
         IRStructKey*    fieldKey,
         LegalType       legalFieldType,
         LegalType       legalLeafType,
-        bool            isSpecial)
+        bool            isSpecial,
+        IRType*         originalFieldType)
     {
         LegalType ordinaryType;
         LegalType specialType;
@@ -292,7 +293,8 @@ struct TupleTypeBuilder
                     fieldKey,
                     legalFieldType,
                     legalLeafType.getImplicitDeref()->valueType,
-                    isSpecial);
+                    isSpecial,
+                    originalFieldType);
                 return;
             }
             break;
@@ -356,6 +358,14 @@ struct TupleTypeBuilder
 
             if(ot.flavor == LegalType::Flavor::simple)
             {
+                // If the field type is changed after legalization
+                // (e.g. the field has empty struct type), we want
+                // to propagate this change through the enclosing
+                // struct type, forcing a new type to be created for
+                // the enclosing struct.
+                if (ot.getSimple() != originalFieldType)
+                    anyComplex = true;
+
                 ordinaryElement.type = ot.getSimple();
             }
             else
@@ -394,7 +404,9 @@ struct TupleTypeBuilder
             field->getKey(),
             legalFieldType,
             legalFieldType,
-            isSpecialField);
+            isSpecialField,
+            fieldType);
+
     }
 
     LegalType getResult()
@@ -485,13 +497,13 @@ struct TupleTypeBuilder
             ordinaryType = LegalType::simple((IRType*) ordinaryStructType);
         }
 
+        if (!anySpecial)
+            return ordinaryType;
+
         LegalType specialType;
-        if (anySpecial)
-        {
-            RefPtr<TuplePseudoType> specialTuple = new TuplePseudoType();
-            specialTuple->elements = specialElements;
-            specialType = LegalType::tuple(specialTuple);
-        }
+        RefPtr<TuplePseudoType> specialTuple = new TuplePseudoType();
+        specialTuple->elements = specialElements;
+        specialType = LegalType::tuple(specialTuple);
 
         RefPtr<PairInfo> pairInfo;
         if (anyOrdinary && anySpecial)
