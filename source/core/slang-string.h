@@ -72,7 +72,7 @@ namespace Slang
 
         explicit UnownedStringSlice(char const* a) :
             m_begin(a),
-            m_end(a + strlen(a))
+            m_end(a ? a + strlen(a) : nullptr)
         {}
         UnownedStringSlice(char const* b, char const* e)
             : m_begin(b)
