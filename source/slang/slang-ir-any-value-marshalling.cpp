@@ -308,7 +308,16 @@ namespace Slang
             context.uintPtrType = builder.getPtrType(builder.getUIntType());
             context.anyValueVar = resultVar;
             emitMarshallingCode(&builder, &context, concreteTypedVar);
+
             context.validateAnyTypeSize(sharedContext->sink, type);
+
+            // Initialize the rest of unused fields to 0 to prevent downstream compiler error.
+            for (uint32_t offset = context.fieldOffset; offset < (uint32_t)anyValInfo->fieldKeys.getCount(); offset++)
+            {
+                auto fieldAddr = builder.emitFieldAddress(builder.getUIntType(), resultVar, context.anyValInfo->fieldKeys[offset]);
+                builder.emitStore(fieldAddr, builder.getIntValue(builder.getUIntType(), 0));
+            }
+
             auto load = builder.emitLoad(resultVar);
             builder.emitReturn(load);
             return func;
