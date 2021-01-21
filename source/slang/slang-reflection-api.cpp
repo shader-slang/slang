@@ -1587,8 +1587,13 @@ namespace Slang
                     //
                     return;
                 }
-                else if(resourceKindCount == 1)
+                else
                 {
+                    // `resourceKindCount` should be 1 in most cases.
+                    // However if this field is a buffer of existential type,
+                    // the resourceInfo array will contain additional ExistentialTypeParam
+                    // and ExistentialObjectParam entries. These entries doesn't affect the
+                    // logic here, so we only need to care about the first entry.
                     auto& resInfo = typeLayout->resourceInfos[0];
                     LayoutResourceKind kind = resInfo.kind;
 
@@ -1672,15 +1677,6 @@ namespace Slang
                     bindingRange.descriptorRangeCount = 1;
 
                     m_extendedInfo->m_bindingRanges.add(bindingRange);
-                }
-                else
-                {
-                    // This type appears to be one that consumes multiple
-                    // resource kinds, but was not handled by any of
-                    // the special-case logic above. In such a case we
-                    // are in trouble.
-                    //
-                    return;
                 }
             }
         }
