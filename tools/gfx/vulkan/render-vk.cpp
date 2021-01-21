@@ -2418,6 +2418,7 @@ static VkDescriptorType translateDescriptorType(DescriptorSlotType type)
         CASE(UniformTexelBuffer,    UNIFORM_TEXEL_BUFFER);
         CASE(StorageTexelBuffer,    STORAGE_TEXEL_BUFFER);
         CASE(UniformBuffer,         UNIFORM_BUFFER);
+        CASE(ReadOnlyStorageBuffer, STORAGE_BUFFER);
         CASE(StorageBuffer,         STORAGE_BUFFER);
         CASE(DynamicUniformBuffer,  UNIFORM_BUFFER_DYNAMIC);
         CASE(DynamicStorageBuffer,  STORAGE_BUFFER_DYNAMIC);
