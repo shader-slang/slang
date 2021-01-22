@@ -1311,9 +1311,11 @@ standardProject("slang-glslang", "source/slang-glslang")
         -- On Windows we need to add the platform-specific sources and then
         -- remove the `main.cpp` file since it tries to define a `DllMain`
         -- and we don't want the default glslang one.
+        addSourceDir( "external/glslang/glslang/OSDependent/Windows")
         removefiles { "external/glslang/glslang/OSDependent/Windows/main.cpp" }
 
     filter { "system:linux or macosx" }
+        addSourceDir( "external/glslang/glslang/OSDependent/Unix")
         links { "dl" }
         
     

@@ -1003,7 +1003,17 @@ namespace Slang
     };
 
     template <typename T> class OrderedHashSet : public HashSetBase<T, OrderedDictionary<T, _DummyClass>>
-    {};
+    {
+    public:
+        T& getLast()
+        {
+            return this->dict.Last().Key;
+        }
+        void removeLast()
+        {
+            this->Remove(getLast());
+        }
+    };
 }
 
 #endif

@@ -684,6 +684,7 @@ enum class DescriptorSlotType
     UniformTexelBuffer,
     StorageTexelBuffer,
     UniformBuffer,
+    ReadOnlyStorageBuffer,
     StorageBuffer,
     DynamicUniformBuffer,
     DynamicStorageBuffer,

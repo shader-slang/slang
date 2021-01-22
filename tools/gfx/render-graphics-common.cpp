@@ -146,7 +146,7 @@ public:
                 CASE(MutableTexture, StorageImage);
                 CASE(TypedBuffer, UniformTexelBuffer);
                 CASE(MutableTypedBuffer, StorageTexelBuffer);
-                CASE(RawBuffer, UniformBuffer);
+                CASE(RawBuffer, ReadOnlyStorageBuffer);
                 CASE(MutableRawBuffer, StorageBuffer);
                 CASE(InputRenderTarget, InputAttachment);
                 CASE(InlineUniformData, InlineUniformBlock);
