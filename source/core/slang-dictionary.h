@@ -1011,7 +1011,7 @@ namespace Slang
         }
         void removeLast()
         {
-            Remove(getLast());
+            this->Remove(getLast());
         }
     };
 }
