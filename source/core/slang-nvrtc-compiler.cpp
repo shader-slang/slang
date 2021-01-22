@@ -504,7 +504,6 @@ SlangResult NVRTCDownstreamCompiler::compile(const CompileOptions& options, RefP
         //
         // It would probably be good to support 32- and 64-bit here, and also
         // to deal with any variation in the shared library name across platforms
-        // (
         //
         static const char* kNVRTCLibraryNames[]
         {
@@ -512,7 +511,16 @@ SlangResult NVRTCDownstreamCompiler::compile(const CompileOptions& options, RefP
             // a library simply named `nvrtc` (well, `libnvrtc`) which
             // is expected to match whatever the user has installed.
             //
+
+            // A list of versions is here
+            // https://developer.nvidia.com/cuda-toolkit-archive
+
             "nvrtc",
+
+            "nvrtc64_112_0",
+
+            "nvrtc64_111_1",
+            "nvrtc64_111_0",
 
             "nvrtc64_110_0",
             "nvrtc64_102_0",
