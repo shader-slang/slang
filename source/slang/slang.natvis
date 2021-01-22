@@ -124,15 +124,13 @@
 			    </If>
 			    <If Condition="child->op == Slang::kIROp_ExportDecoration &amp;&amp; (nameDecoration == 0 || nameDecoration->op != Slang::kIROp_NameHintDecoration)">
 				    <Exec>nameDecoration = child</Exec>
-				    <Break/>
 			    </If>
 			    <If Condition="child->op == Slang::kIROp_ImportDecoration &amp;&amp; (nameDecoration == 0 || nameDecoration->op != Slang::kIROp_NameHintDecoration)">
 				    <Exec>nameDecoration = child</Exec>
-				    <Break/>
 			    </If>
 			    <Exec>child = child->next</Exec>
 		    </Loop>
-		    <Item Condition="nameDecoration != 0" Name="[operand{index} : {((Slang::IRStringLit*)(((Slang::IRUse*)(nameDecoration + 1))->usedValue))->value.stringVal.chars,[((Slang::IRStringLit*)(((Slang::IRUse*)(nameDecoration + 1))->usedValue))->value.stringVal.numChars]s8}]">*pOperandInst</Item>
+		    <Item Condition="nameDecoration != 0" Name="[operand{index}] : {((Slang::IRStringLit*)(((Slang::IRUse*)(nameDecoration + 1))->usedValue))->value.stringVal.chars,[((Slang::IRStringLit*)(((Slang::IRUse*)(nameDecoration + 1))->usedValue))->value.stringVal.numChars]s8}">*pOperandInst</Item>
 		    <Item Condition="nameDecoration == 0" Name="[operand{index}]">*pOperandInst</Item>
 		    <Exec>index = index + 1</Exec>
 	    </Loop>
@@ -143,6 +141,7 @@
 			  <Variable Name="pItem" InitialValue="m_decorationsAndChildren.first"/>
 			  <Variable Name="nameDecoration" InitialValue="(IRInst*)nullptr"/>
 			  <Variable Name="child" InitialValue="(IRInst*)nullptr"/>
+			  <Variable Name="index" InitialValue="0"/>
 			  <Loop Condition="pItem != 0">
 				  <Exec>child = pItem->m_decorationsAndChildren.first </Exec>
 			      <Exec>nameDecoration = 0</Exec>
@@ -153,17 +152,16 @@
 				      </If>
 				      <If Condition="child->op == Slang::kIROp_ExportDecoration &amp;&amp; (nameDecoration == 0 || nameDecoration->op != Slang::kIROp_NameHintDecoration)">
 						  <Exec>nameDecoration = child</Exec>
-						  <Break/>
 				      </If>
 					  <If Condition="child->op == Slang::kIROp_ImportDecoration &amp;&amp; (nameDecoration == 0 || nameDecoration->op != Slang::kIROp_NameHintDecoration)">
 						  <Exec>nameDecoration = child</Exec>
-						  <Break/>
 					  </If>
 				      <Exec>child = child->next</Exec>
 				  </Loop>      
-			      <Item Condition="nameDecoration != 0" Name="{((Slang::IRStringLit*)(((Slang::IRUse*)(nameDecoration + 1))->usedValue))->value.stringVal.chars,[((Slang::IRStringLit*)(((Slang::IRUse*)(nameDecoration + 1))->usedValue))->value.stringVal.numChars]s8}">*pItem</Item>
+			      <Item Condition="nameDecoration != 0" Name="[{index}] : {((Slang::IRStringLit*)(((Slang::IRUse*)(nameDecoration + 1))->usedValue))->value.stringVal.chars,[((Slang::IRStringLit*)(((Slang::IRUse*)(nameDecoration + 1))->usedValue))->value.stringVal.numChars]s8}">*pItem</Item>
 			      <Item Condition="nameDecoration == 0">*pItem</Item>
 				  <Exec>pItem = pItem->next</Exec>
+				  <Exec>index = index + 1</Exec>
 			  </Loop>
 		  </CustomListItems>
         </Expand>
