@@ -107,9 +107,7 @@ struct SpecializationContext
     // to be considered for specialization or simplification,
     // whether generic, existential, etc.
     //
-    List<IRInst*> workList;
-    HashSet<IRInst*> workListSet;
-
+    OrderedHashSet<IRInst*> workList;
     HashSet<IRInst*> cleanInsts;
 
     void addToWorkList(
@@ -125,14 +123,12 @@ struct SpecializationContext
                 return;
         }
 
-        if(workListSet.Contains(inst))
-            return;
+        if (workList.Add(inst))
+        {
+            cleanInsts.Remove(inst);
 
-        workList.add(inst);
-        workListSet.Add(inst);
-        cleanInsts.Remove(inst);
-
-        addUsersToWorkList(inst);
+            addUsersToWorkList(inst);
+        }
     }
 
     // When a transformation makes a change to an instruction,
@@ -682,17 +678,17 @@ struct SpecializationContext
         //
         addToWorkList(module->getModuleInst());
 
-        while(workList.getCount() != 0)
+        while(workList.Count() != 0)
         {
 
         // We will then iterate until our work list goes dry.
         //
-        while(workList.getCount() != 0)
+        while(workList.Count() != 0)
         {
             IRInst* inst = workList.getLast();
 
             workList.removeLast();
-            workListSet.Remove(inst);
+
             cleanInsts.Add(inst);
 
             // For each instruction we process, we want to perform
@@ -838,15 +834,29 @@ struct SpecializationContext
                     // we should update it to be `specialize(.operator[], elementType)`, so the return type
                     // of the load call is `elementType`.
                     auto oldCallee = inst->getCallee();
-                    auto newCallee = getNewSpecializedBufferLoadCallee(inst->getCallee(), sbType, elementType);
-                    auto newCall = builder.emitCallInst(elementType, newCallee, args);
+
+                    // A subscript operation on mutable buffers returns a ptr type instead of a value type.
+                    // We need to make sure the pointer-ness is preserved correctly.
+                    auto innerResultType = elementType;
+                    if (auto ptrResultType = as<IRPtrType>(inst->getDataType()))
+                    {
+                        innerResultType = builder.getPtrType(elementType);
+                    }
+                    auto newCallee = getNewSpecializedBufferLoadCallee(inst->getCallee(), sbType, innerResultType);
+                    auto newCall = builder.emitCallInst(innerResultType, newCallee, args);
                     auto newWrapExistential = builder.emitWrapExistential(
                         resultType, newCall, slotOperandCount, slotOperands.getBuffer());
                     inst->replaceUsesWith(newWrapExistential);
+                    workList.Remove(inst);
                     inst->removeAndDeallocate();
                     SLANG_ASSERT(!oldCallee->hasUses());
+                    workList.Remove(oldCallee);
                     oldCallee->removeAndDeallocate();
                     addUsersToWorkList(newWrapExistential);
+
+                    workList.Remove(wrapExistential);
+                    SLANG_ASSERT(!wrapExistential->hasUses());
+                    wrapExistential->removeAndDeallocate();
                     return true;
                 }
             }
