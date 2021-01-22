@@ -484,73 +484,212 @@ SlangResult NVRTCDownstreamCompiler::compile(const CompileOptions& options, RefP
     return SLANG_OK;
 }
 
+struct NVRTCPathVisitor : Path::Visitor
+{
+    // Okay, we want to look for files starting with nvrtc64. On windows only 64 bit is supported.
+    struct Candidate
+    {
+        typedef Candidate ThisType;
+
+        bool operator<(const ThisType& rhs) const
+        {
+            return version < rhs.version;
+        }
+        static Candidate make(const String& path, Int major, Int minor, Int patch)
+        {
+            Candidate can;
+            can.version = SemanticVersion(int(major), int(minor), int(patch));
+            can.path = path;
+            return can;
+        }
+        String path;
+        SemanticVersion version;
+    };
+
+    void accept(Path::Type type, const UnownedStringSlice& filename) SLANG_OVERRIDE
+    {
+        // Lets make sure it start's with nvrtc64, but not worry about case
+        if (type == Path::Type::File)
+        {
+            // If there is a defined extension, make sure it has it
+            if (m_extension.getLength())
+            {
+                // We test without case - really for windows
+                UnownedStringSlice ext = Path::getPathExt(filename);
+                if (!ext.caseInsensitiveEquals(m_extension.getUnownedSlice()))
+                {
+                    return;
+                }
+            }
+
+            if (filename.getLength() >= m_prefix.getLength() &&
+                filename.subString(0, m_prefix.getLength()).caseInsensitiveEquals(m_prefix.getUnownedSlice()))
+            {
+                // Versions are typically (on windows) of the form
+                // nvrtc64_110_2.dll
+                //          11 - Major
+                //           0 Minor
+                //           2 Patch
+                Index endIndex = filename.indexOf('.');
+                endIndex = (endIndex < 0) ? filename.getLength() : endIndex;
+
+                UnownedStringSlice versionSlice = UnownedStringSlice(filename.begin() + m_prefix.getLength(), filename.begin() + endIndex);
+
+                Int patch = 0;
+                UnownedStringSlice majorMinorSlice;
+                {
+                    List<UnownedStringSlice> slices;
+                    StringUtil::split(versionSlice, '_', slices);
+                    if (slices.getCount() >= 2)
+                    {
+                        // We don't bother checking for error here, if it's not parsable, it will be 0
+                        StringUtil::parseInt(slices[1], patch);
+                    }
+                    majorMinorSlice = slices[0];
+                }
+
+                if (majorMinorSlice.getLength() < 2)
+                {
+                    // Must be a major and minor
+                    return;
+                }
+
+                UnownedStringSlice majorSlice = majorMinorSlice.subString(0, majorMinorSlice.getLength() - 1);
+                UnownedStringSlice minorSlice = majorMinorSlice.subString(majorMinorSlice.getLength() - 1, 1);
+
+                Int major;
+                Int minor;
+
+                if (SLANG_FAILED(StringUtil::parseInt(majorSlice, major)) ||
+                    SLANG_FAILED(StringUtil::parseInt(minorSlice, minor)))
+                {
+                    return;
+                }
+
+                // NOTE! On other platforms we probably need a way to turn a platform specific shared lib name
+                // into something that can be loaded. Ie the opposite of
+                // SharedLibrary::appendPlatformFileName
+                // For now assume windows... 
+                String filenameWithoutExt = Path::getPathWithoutExt(filename);
+
+                // Add to the list of candidates
+                m_candidates.add(Candidate::make(Path::combine(m_basePath, filenameWithoutExt), major, minor, patch));
+            }
+        }
+    }
+
+    void setBasePath(const String& basePath) { m_basePath = basePath; }
+
+    NVRTCPathVisitor(String prefix, String ext):
+        m_prefix(prefix),
+        m_extension(ext)
+    {
+    }
+
+    String m_prefix;
+    String m_extension;
+    String m_basePath;
+
+    List<Candidate> m_candidates;
+};
+
+static SlangResult _findAndLoadNVRTC(ISlangSharedLibraryLoader* loader, ComPtr<ISlangSharedLibrary>& outLibrary)
+{
+#if SLANG_WINDOWS_FAMILY
+    StringBuilder buf;
+    if (SLANG_SUCCEEDED(PlatformUtil::getEnvironmentVariable(UnownedStringSlice::fromLiteral("CUDA_PATH"), buf)))
+    {
+        NVRTCPathVisitor visitor("nvrtc64_", "dll");
+
+        const String binPath = Path::combine(buf, "bin");
+        visitor.setBasePath(binPath);
+
+        Path::find(binPath, nullptr, &visitor);
+
+        // Put into version order with oldest first. 
+        visitor.m_candidates.sort();
+
+        // We want to start with the newest version...
+        for (Index i = visitor.m_candidates.getCount() - 1; i >= 0; --i)
+        {
+            const auto& candidate = visitor.m_candidates[i];
+            if (SLANG_SUCCEEDED(loader->loadSharedLibrary(candidate.path.getBuffer(), outLibrary.writeRef())))
+            {
+                return SLANG_OK;
+            }
+        }
+    }
+
+#endif
+
+    // TODO: The list here was cobbled together from what NRTC releases I
+    // could easily identify. It would be good to ver this against some
+    // kind of official list.
+    // https://developer.nvidia.com/cuda-toolkit-archive
+    //
+    // It would probably be good to support 32- and 64-bit here, and also
+    // to deal with any variation in the shared library name across platforms
+    //
+    static const char* kNVRTCLibraryNames[]
+    {
+        "nvrtc64_112_0",
+
+        "nvrtc64_111_1",
+        "nvrtc64_111_0",
+
+        "nvrtc64_110_0",
+        "nvrtc64_102_0",
+        "nvrtc64_101_0",
+        "nvrtc64_100_0",
+        "nvrtc64_92",
+        "nvrtc64_91",
+        "nvrtc64_90",
+        "nvrtc64_80",
+        "nvrtc64_75",
+    };
+
+    for (auto libraryName : kNVRTCLibraryNames)
+    {
+        // If we succeed at loading one of the library versions
+        // from our list, we will not continue to search; this
+        // approach assumes that the `kNVRTCLibraryNames` array
+        // has been sorted so that earlier entries are preferable.
+        //
+        if (SLANG_SUCCEEDED(loader->loadSharedLibrary(libraryName, outLibrary.writeRef())))
+        {
+            return SLANG_OK;
+        }
+    }
+
+    return SLANG_E_NOT_FOUND;
+}
+
 /* static */SlangResult NVRTCDownstreamCompilerUtil::locateCompilers(const String& path, ISlangSharedLibraryLoader* loader, DownstreamCompilerSet* set)
 {
     ComPtr<ISlangSharedLibrary> library;
 
+    // If the user supplies a path to their preferred version of NVRTC,
+    // we just use this.
     if (path.getLength() != 0)
     {
         SLANG_RETURN_ON_FAIL(loader->loadSharedLibrary(path.getBuffer(), library.writeRef()));
     }
     else
     {
-        // If the user doesn't supply a path to their preferred version of NVRTC,
-        // we will search for a suitable library version, proceeding from more
-        // recent versions to less recent ones.
-        //
-        // TODO: The list here was cobbled together from what NRTC releases I
-        // could easily identify. It would be good to ver this against some
-        // kind of official list.
-        //
-        // It would probably be good to support 32- and 64-bit here, and also
-        // to deal with any variation in the shared library name across platforms
-        //
-        static const char* kNVRTCLibraryNames[]
+        // As a catch-all for non-Windows platforms, we search for
+        // a library simply named `nvrtc` (well, `libnvrtc`) which
+        // is expected to match whatever the user has installed.
+        if (SLANG_FAILED(loader->loadSharedLibrary("nvrtc", library.writeRef())))
         {
-            // As a catch-all for non-Windows platforms, we search for
-            // a library simply named `nvrtc` (well, `libnvrtc`) which
-            // is expected to match whatever the user has installed.
-            //
-
-            // A list of versions is here
-            // https://developer.nvidia.com/cuda-toolkit-archive
-
-            "nvrtc",
-
-            "nvrtc64_112_0",
-
-            "nvrtc64_111_1",
-            "nvrtc64_111_0",
-
-            "nvrtc64_110_0",
-            "nvrtc64_102_0",
-            "nvrtc64_101_0",
-            "nvrtc64_100_0",
-            "nvrtc64_92",
-            "nvrtc64_91",
-            "nvrtc64_90",
-            "nvrtc64_80",
-            "nvrtc64_75",
-        };
-
-        SlangResult result = SLANG_FAIL;
-        for( auto libraryName : kNVRTCLibraryNames )
-        {
-            // If we succeed at loading one of the library versions
-            // from our list, we will not continue to search; this
-            // approach assumes that the `kNVRTCLibraryNames` array
-            // has been sorted so that earlier entries are preferable.
-            //
-            result = loader->loadSharedLibrary(libraryName, library.writeRef());
-            if(!SLANG_FAILED(result))
-                break;
+            // Try something more sophisticated to locate NVRTC
+            SLANG_RETURN_ON_FAIL(_findAndLoadNVRTC(loader, library));
         }
+    }
 
-        // If we tried to load all of the candidate versions and none
-        // was successful, then we report back a failure.
-        //
-        if(SLANG_FAILED(result))
-            return result;
+    SLANG_ASSERT(library);
+    if (!library)
+    {
+        return SLANG_FAIL;
     }
 
     RefPtr<NVRTCDownstreamCompiler> compiler(new NVRTCDownstreamCompiler);
