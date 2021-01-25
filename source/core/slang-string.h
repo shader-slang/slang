@@ -116,8 +116,13 @@ namespace Slang
             /// The returned length might be truncated, if len extends beyond slice.
         UnownedStringSlice subString(Index idx, Index len) const;
 
+            /// Return a head of the slice - everything up to the index
+        SLANG_FORCE_INLINE UnownedStringSlice head(Index idx) const { SLANG_ASSERT(idx >= 0 && idx <= getLength()); return UnownedStringSlice(m_begin, idx); }
+            /// Return a tail of the slice - everything from the index to the end of the slice
+        SLANG_FORCE_INLINE UnownedStringSlice tail(Index idx) const { SLANG_ASSERT(idx >= 0 && idx <= getLength()); return UnownedStringSlice(m_begin + idx, m_end); }
+
             /// True if rhs and this are equal without having to take into account case
-            /// Note 'case' here is *not* local specific - it is only A-Z and a-z
+            /// Note 'case' here is *not* locale specific - it is only A-Z and a-z
         bool caseInsensitiveEquals(const ThisType& rhs) const;
 
         Index lastIndexOf(char c) const
