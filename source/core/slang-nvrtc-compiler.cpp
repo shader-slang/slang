@@ -486,9 +486,9 @@ SlangResult NVRTCDownstreamCompiler::compile(const CompileOptions& options, RefP
     return SLANG_OK;
 }
 
+/* An implementation of Path::Visitor that can be used for finding NVRTC shared library installations. */
 struct NVRTCPathVisitor : Path::Visitor
 {
-    // Okay, we want to look for files starting with nvrtc64. On windows only 64 bit is supported.
     struct Candidate
     {
         typedef Candidate ThisType;
