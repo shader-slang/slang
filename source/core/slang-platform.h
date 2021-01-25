@@ -106,6 +106,7 @@ namespace Slang
         static String calcPlatformPath(const UnownedStringSlice& path);
         static void calcPlatformPath(const UnownedStringSlice& path, StringBuilder& outBuilder);
 
+        
         private:
             /// Not constructible!
         SharedLibrary();
@@ -131,6 +132,10 @@ namespace Slang
             /// Given an environment name returns the set system variable.
             /// Will return SLANG_E_NOT_FOUND if the variable is not set
         static SlangResult getEnvironmentVariable(const UnownedStringSlice& name, StringBuilder& out);
+
+            /// Get the path to this instance (the path to the dll/executable/shared library the call is in)
+            /// NOTE! This is not supported on all platforms, and will return SLANG_E_NOT_IMPLEMENTED in that scenario
+        static SlangResult getInstancePath(StringBuilder& out);
     };
 
 #ifndef _MSC_VER

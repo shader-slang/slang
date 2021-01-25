@@ -650,8 +650,15 @@ static SlangResult _findAndLoadNVRTC(ISlangSharedLibraryLoader* loader, ComPtr<I
     // We only need to search 64 bit versions on windows
     NVRTCPathVisitor visitor(UnownedStringSlice::fromLiteral("nvrtc64_"));
 
-    // First try CUDA_PATH
-    if (SLANG_SUCCEEDED(PlatformUtil::getEnvironmentVariable(UnownedStringSlice::fromLiteral("CUDA_PATH"), buf)))
+    // First try the instance path (if supported on platform)
+    StringBuilder instancePath;
+    if (SLANG_SUCCEEDED(PlatformUtil::getInstancePath(instancePath)))
+    {
+        visitor.findInDirectory(instancePath);
+    }
+
+    // If we don't have a candidate try CUDA_PATH
+    if (!visitor.hasCandidates() && SLANG_SUCCEEDED(PlatformUtil::getEnvironmentVariable(UnownedStringSlice::fromLiteral("CUDA_PATH"), buf)))
     {    
         // Look for candidates in the directory
         visitor.findInDirectory(Path::combine(buf, "bin"));
