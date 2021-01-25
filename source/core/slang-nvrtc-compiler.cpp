@@ -645,31 +645,35 @@ struct NVRTCPathVisitor : Path::Visitor
 static SlangResult _findAndLoadNVRTC(ISlangSharedLibraryLoader* loader, ComPtr<ISlangSharedLibrary>& outLibrary)
 {
 #if SLANG_WINDOWS_FAMILY
-    StringBuilder buf;
-
     // We only need to search 64 bit versions on windows
     NVRTCPathVisitor visitor(UnownedStringSlice::fromLiteral("nvrtc64_"));
 
     // First try the instance path (if supported on platform)
-    StringBuilder instancePath;
-    if (SLANG_SUCCEEDED(PlatformUtil::getInstancePath(instancePath)))
     {
-        visitor.findInDirectory(instancePath);
+        StringBuilder instancePath;
+        if (SLANG_SUCCEEDED(PlatformUtil::getInstancePath(instancePath)))
+        {
+            visitor.findInDirectory(instancePath);
+        }
     }
 
     // If we don't have a candidate try CUDA_PATH
-    if (!visitor.hasCandidates() && SLANG_SUCCEEDED(PlatformUtil::getEnvironmentVariable(UnownedStringSlice::fromLiteral("CUDA_PATH"), buf)))
-    {    
-        // Look for candidates in the directory
-        visitor.findInDirectory(Path::combine(buf, "bin"));
+    if (!visitor.hasCandidates())
+    {
+        StringBuilder buf;
+        if (!SLANG_SUCCEEDED(PlatformUtil::getEnvironmentVariable(UnownedStringSlice::fromLiteral("CUDA_PATH"), buf)))
+        {    
+            // Look for candidates in the directory
+            visitor.findInDirectory(Path::combine(buf, "bin"));
+        }
     }
 
-    // If we've found a candidate via CUDA_PATH, we assume that is the best default candidate.
     // If we haven't we go searching through PATH
     if (!visitor.hasCandidates())
     {
         List<UnownedStringSlice> splitPath;
-        buf.Clear();
+
+        StringBuilder buf;
         if (SLANG_SUCCEEDED(PlatformUtil::getEnvironmentVariable(UnownedStringSlice::fromLiteral("PATH"), buf)))
         {
             // Split so we get individual paths
