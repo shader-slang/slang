@@ -247,9 +247,12 @@ namespace Slang
         }
         else
         {
-            // TODO(JS): Hmm this is problematic. It means a filename with just a
-            // . at the end returns the same result as one *without* a dot.
-            return UnownedStringSlice::fromLiteral("");
+            // Note that the caller can identify if path has no extension or just a .
+            // as if it's a dot a zero length slice is returned in path
+            // If it's not then a default slice is returned (which doesn't point into path).
+            //
+            // Granted this is a little obscure and perhaps should be improved.
+            return UnownedStringSlice();
         }
     }
 
