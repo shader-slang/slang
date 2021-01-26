@@ -68,14 +68,19 @@ namespace Slang
         static SlangResult find(const String& directoryPath, const char* pattern, Visitor* visitor);
 
             /// Returns -1 if no separator is found
-        static Index findLastSeparatorIndex(String const& path);
+        static Index findLastSeparatorIndex(String const& path) { return findLastSeparatorIndex(path.getUnownedSlice()); }
+        static Index findLastSeparatorIndex(UnownedStringSlice const& path);
             /// Finds the index of the last dot in a path, else returns -1
-        static Index findExtIndex(String const& path);
+        static Index findExtIndex(String const& path) { return findExtIndex(path.getUnownedSlice()); }
+        static Index findExtIndex(UnownedStringSlice const& path);
 
         static String replaceExt(const String& path, const char* newExt);
         static String getFileName(const String& path);
         static String getPathWithoutExt(const String& path);
-        static String getPathExt(const String& path);
+
+        static String getPathExt(const String& path) { return getPathExt(path.getUnownedSlice()); }
+        static UnownedStringSlice getPathExt(const UnownedStringSlice& path);
+
         static String getParentDirectory(const String& path);
 
         static String getFileNameWithoutExt(const String& path);

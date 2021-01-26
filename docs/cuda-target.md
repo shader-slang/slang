@@ -26,13 +26,35 @@ The following are a work in progress or not implemented but are planned to be so
 
 # How it works
 
-For producing PTX binaries Slang uses nvrtc. Nvrtc dll/shared library has to be available to Slang (in the appropriate PATH for example) for it to be able to produce PTX. The nvrtc compiler can be accessed directly through
+For producing PTX binaries Slang uses NVRTC. NVRTC dll/shared library has to be available to Slang (for example in the appropriate PATH for example) for it to be able to produce PTX.
 
-```
-SLANG_PASS_THROUGH_NVRTC,  
-```
+The NVRTC compiler can be accessed directly via the pass through mechanism and is identifed by the enum value `SLANG_PASS_THROUGH_NVRTC`.
 
-Much like other targets that use downstream compilers Slang can be used to compile CUDA source directly to PTX via the pass through mechansism. That the Slang command line options will broadly be mapped down to the appropriate options for the nvrtc compilation. In the API the `SlangCompileTarget` for CUDA is `SLANG_CUDA_SOURCE` and for PTX is `SLANG_PTX`. These can also be specified on the Slang command line as `-target cuda` and `-target ptx`. 
+Much like other targets that use downstream compilers Slang can be used to compile CUDA source directly to PTX via the pass through mechansism. The Slang command line options will broadly be mapped down to the appropriate options for the NVRTC compilation. In the API the `SlangCompileTarget` for CUDA is `SLANG_CUDA_SOURCE` and for PTX is `SLANG_PTX`. These can also be specified on the Slang command line as `-target cuda` and `-target ptx`. 
+
+## Locating NVRTC
+
+Finding NVRTC can require some nuance if a specific version is required. On the command line the `-nvrtc-path` option can be used to set the `path` to NVRTC. Also `spProcessCommandLineArguments`/`processCommandLineArguments` with `-nvrtc-path` or `setDownstreamCompilerPath` with `SLANG_PASS_THROUGH_NVRTC` can be used to set the location and/or name of NVRTC via the API. Important points of note are
+
+* The name of the shared library should *not* include any extension (such as `.dll`/`.so`/`.dynlib`) or prefix (such as `lib`).
+* The path also *doesn't* have to be path, it can just be the shared library name. Doing so will mean it will be searched for by whatever the default mechanism is on the target. 
+* If a path and/or name is specified for NVRTC - this will be the *only* version searched for.
+ 
+If a path/name is *not* specified for NVRTC, Slang will attempt to load a shared library called `nvrtc`. For non windows targets this should be enough to find and load the latest version.
+ 
+On windows NVRTC dlls have a name the contains the version number (such as `nvrtc64_102_0.dll`) which means the load of just `nvrtc` will fail. One way to get around this is to place the dll and associated files in the same directory as slang.dll. Then rename the nvrtc dll to `nvrtc.dll`. Another way would be to specify directly on the command line, as previously discussed. For example  
+
+`-nvrtc-path nvrtc64_102_0` 
+ 
+will load NVRTC 10.2 assuming that version of the dll can be found via the normal lookup mechanism.
+
+On Windows if NVRTC is not loadable directly as 'nvrtc' Slang will attempt to search for the newest version of NVRTC on your system. The places searched are...
+
+* The instance directory (where the slang.dll and/or program exe is)
+* The CUDA_PATH enivonment variable (if set)
+* Directories in PATH that look like a CUDA installation.
+
+If a candidate is found via via an earlier mechanism, subsequent searches are not performed. If multiple candidates are found, Slang tries the newest version first.
 
 Binding 
 =======
