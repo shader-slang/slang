@@ -175,9 +175,9 @@ namespace Slang
         return sb.ProduceString();
     }
 
-    /* static */ Index Path::findLastSeparatorIndex(String const& path)
+    /* static */ Index Path::findLastSeparatorIndex(UnownedStringSlice const& path)
     {
-        const char* chars = path.getBuffer();
+        const char* chars = path.begin();
         for (Index i = path.getLength() - 1; i >= 0; --i)
         {
             const char c = chars[i];
@@ -189,7 +189,7 @@ namespace Slang
         return -1;
     }
 
-    /* static */Index Path::findExtIndex(String const& path)
+    /* static */Index Path::findExtIndex(UnownedStringSlice const& path)
     {
         const Index sepIndex = findLastSeparatorIndex(path);
 
@@ -238,13 +238,22 @@ namespace Slang
             return path;
     }
 
-    String Path::getPathExt(const String& path)
+    UnownedStringSlice Path::getPathExt(const UnownedStringSlice& path)
     {
         const Index dotPos = findExtIndex(path);
         if (dotPos >= 0)
+        {
             return path.subString(dotPos + 1, path.getLength() - dotPos - 1);
+        }
         else
-            return "";
+        {
+            // Note that the caller can identify if path has no extension or just a .
+            // as if it's a dot a zero length slice is returned in path
+            // If it's not then a default slice is returned (which doesn't point into path).
+            //
+            // Granted this is a little obscure and perhaps should be improved.
+            return UnownedStringSlice();
+        }
     }
 
     String Path::getParentDirectory(const String& path)

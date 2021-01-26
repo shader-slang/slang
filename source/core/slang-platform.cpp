@@ -66,6 +66,19 @@ SLANG_COMPILE_TIME_ASSERT(E_NOTIMPL == SLANG_E_NOT_IMPLEMENTED);
 SLANG_COMPILE_TIME_ASSERT(E_INVALIDARG == SLANG_E_INVALID_ARG);
 SLANG_COMPILE_TIME_ASSERT(E_OUTOFMEMORY == SLANG_E_OUT_OF_MEMORY);
 
+/* static */SlangResult PlatformUtil::getInstancePath(StringBuilder& out)
+{
+    wchar_t path[_MAX_PATH];
+    ::GetModuleFileName(::GetModuleHandle(NULL), path, SLANG_COUNT_OF(path));
+    String pathString = String::fromWString(path);
+
+    // We don't want the instance name, just the path to it
+    out.Clear();
+    out.append(Path::getParentDirectory(pathString));
+
+    return out.getLength() > 0 ? SLANG_OK : SLANG_FAIL;
+}
+
 /* static */SlangResult PlatformUtil::appendResult(SlangResult res, StringBuilder& builderOut)
 {
     if (SLANG_FAILED(res) && res != SLANG_FAIL)
@@ -141,6 +154,13 @@ SLANG_COMPILE_TIME_ASSERT(E_OUTOFMEMORY == SLANG_E_OUT_OF_MEMORY);
 }
 
 #else // _WIN32
+
+/* static */SlangResult PlatformUtil::getInstancePath(StringBuilder& out)
+{
+    // On non Windows it's typically hard to get the instance path, so we'll say not implemented.
+    // The meaning is also somewhat more ambiguous - is it the exe or the shared library path?
+    return SLANG_E_NOT_IMPLEMENTED;
+}
 
 /* static */SlangResult PlatformUtil::appendResult(SlangResult res, StringBuilder& builderOut)
 {
@@ -259,5 +279,7 @@ static const PlatformFlags s_familyFlags[int(PlatformFamily::CountOf)] =
 {
     return s_familyFlags[int(family)];
 }
+
+
 
 }

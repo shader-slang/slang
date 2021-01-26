@@ -362,15 +362,25 @@ namespace Slang
         }
     }
 
-    void String::append(char chr)
+    void String::appendChar(char c)
     {
-        append(&chr, &chr + 1);
+        const auto oldLength = getLength();
+        const auto newLength = oldLength + 1;
+
+        ensureUniqueStorageWithCapacity(newLength);
+
+        // Since there must be space for at least one character, m_buffer cannot be nullptr
+        SLANG_ASSERT(m_buffer);
+        char* data = m_buffer->getData();
+        data[oldLength] = c;
+        data[newLength] = 0;
+
+        m_buffer->length = newLength;
     }
 
-
-    void String::appendChar(char chr)
+    void String::append(char chr)
     {
-        append(&chr, &chr + 1);
+        appendChar(chr);
     }
 
     void String::append(String const& str)
@@ -490,6 +500,68 @@ namespace Slang
         }
 
         return -1;
+    }
+
+    UnownedStringSlice UnownedStringSlice::subString(Index idx, Index len) const
+    {
+        const Index totalLen = getLength();
+        SLANG_ASSERT(idx >= 0 && len >= 0 && idx <= totalLen);
+
+        // If too large, we truncate
+        len = (idx + len > totalLen) ? (totalLen - idx) : len;
+
+        // Return the substring
+        return UnownedStringSlice(m_begin + idx, m_begin + idx + len);
+    }
+
+    bool UnownedStringSlice::operator==(ThisType const& other) const
+    {
+        // Note that memcmp is undefined when passed in null ptrs, so if we want to handle
+        // we need to cover that case.
+        // Can only be nullptr if size is 0.
+        auto thisSize = getLength();
+        auto otherSize = other.getLength();
+
+        if (thisSize != otherSize)
+        {
+            return false;
+        }
+
+        const char*const thisChars = begin();
+        const char*const otherChars = other.begin();
+        if (thisChars == otherChars || thisSize == 0)
+        {
+            return true;
+        }
+        SLANG_ASSERT(thisChars && otherChars);
+        return memcmp(thisChars, otherChars, thisSize) == 0;
+    }
+
+    bool UnownedStringSlice::caseInsensitiveEquals(const ThisType& rhs) const
+    {
+        const auto length = getLength();
+        if (length != rhs.getLength())
+        {
+            return false;
+        }
+
+        const char* a = m_begin;
+        const char* b = rhs.m_begin;
+
+        // Assuming this is a faster test
+        if (memcmp(a, b, length) != 0)
+        {
+            // They aren't identical so compare character by character
+            for (Index i = 0; i < length; ++i)
+            {
+                if (CharUtil::toLower(a[i]) != CharUtil::toLower(b[i]))
+                {
+                    return false;
+                }
+            }
+        }
+
+        return true;
     }
 
 }
