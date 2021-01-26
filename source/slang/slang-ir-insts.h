@@ -460,17 +460,6 @@ struct IRBuiltinDecoration : IRDecoration
     IR_LEAF_ISA(BuiltinDecoration)
 };
 
-/* The associated instruction if it has linkage should use the linkage name directly (ie without any modification). Typically
-useful if the linkage name is actually a built in for a target. */
-struct IRUseLinkageNameDecoration : IRDecoration
-{
-    enum
-    {
-        kOp = kIROp_UseLinkageNameDecoration
-    };
-    IR_LEAF_ISA(UseLinkageNameDecoration)
-};
-
 struct IRSequentialIDDecoration : IRDecoration
 {
     enum

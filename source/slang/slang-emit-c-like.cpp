@@ -717,18 +717,11 @@ String CLikeSourceEmitter::generateName(IRInst* inst)
         return _generateUniqueName(nameHintDecoration->getName());
     }
 
-    // If the instruction has a mangled name, then use that as the basis. 
+    // If the instruction has a linkage decoration, just use that. 
     if(auto linkageDecoration = inst->findDecoration<IRLinkageDecoration>())
     {
-        if (inst->findDecoration<IRUseLinkageNameDecoration>())
-        {
-            // Just use the linkage name directly
-            return linkageDecoration->getMangledName();
-        }
-        else
-        {
-            return _generateUniqueName(linkageDecoration->getMangledName());
-        }
+        // Just use the linkages mangled name directly.
+        return linkageDecoration->getMangledName();
     }
 
     // Otherwise fall back to a construct temporary name

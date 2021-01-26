@@ -762,6 +762,44 @@ struct FunctionParameterSpecializationContext
             oldFunc,
             newFunc);
 
+
+        // If we have added an Linkage decoration, we want to remove and destroy it,
+        // because the linkage should only be on the original function and
+        // not on the "torn off" copies made in this function.
+        //
+        // It *could* be argued that we don't want to duplicate the decoration instructions
+        // to begin with, just to throw them away. That may be true, but it's simpler to just remove
+        // them than filter out in cloning.
+
+        {
+            auto decorationList = newFunc->getDecorations();
+
+            const auto end = decorationList.end();
+            auto cur = decorationList.begin();
+
+            while(cur != end)
+            {
+                IRDecoration* decoration = *cur;
+
+                // We step before before the test/destroying to ensure cur is not pointing
+                // to a now destroyed instruction
+                ++cur;
+
+                if (as<IRLinkageDecoration>(decoration))
+                {   
+                    decoration->removeFromParent();
+                    decoration->removeArguments();
+
+                    // We DON'T deallocate the children/decorations, as they will be used on the original
+                    // This is okay as it stands, because linkage decorations just contain a string literal  
+
+                    // Run destructor to be sure...
+                    decoration->~IRDecoration();
+                }
+            }
+        }
+
+
         // We are almost done at this point, except that `newFunc`
         // is lacking its parameters, as well as any of the body
         // instructions that we decided were needed during
