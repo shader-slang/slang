@@ -785,6 +785,8 @@ void GLRenderer::destroyBindingEntries(const BindingState::Desc& desc, const Bin
 
 SLANG_NO_THROW Result SLANG_MCALL GLRenderer::initialize(const Desc& desc, void* inWindowHandle)
 {
+    SLANG_RETURN_ON_FAIL(slangContext.initialize(desc.slang, SLANG_GLSL, "sm_5_0"));
+
     auto windowHandle = (HWND)inWindowHandle;
     m_desc = desc;
 

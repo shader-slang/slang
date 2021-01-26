@@ -1033,6 +1033,8 @@ VkPipelineShaderStageCreateInfo VKRenderer::compileEntryPoint(
 
 SlangResult VKRenderer::initialize(const Desc& desc, void* inWindowHandle)
 {
+    SLANG_RETURN_ON_FAIL(slangContext.initialize(desc.slang, SLANG_SPIRV, "sm_5_1"));
+
     SLANG_RETURN_ON_FAIL(m_module.init());
     SLANG_RETURN_ON_FAIL(m_api.initGlobalProcs(m_module));
 
