@@ -362,15 +362,25 @@ namespace Slang
         }
     }
 
-    void String::append(char chr)
+    void String::appendChar(char c)
     {
-        append(&chr, &chr + 1);
+        const auto oldLength = getLength();
+        const auto newLength = oldLength + 1;
+
+        ensureUniqueStorageWithCapacity(newLength);
+
+        // Since there must be space for at least one character, m_buffer cannot be nullptr
+        SLANG_ASSERT(m_buffer);
+        char* data = m_buffer->getData();
+        data[oldLength] = c;
+        data[newLength] = 0;
+
+        m_buffer->length = newLength;
     }
 
-
-    void String::appendChar(char chr)
+    void String::append(char chr)
     {
-        append(&chr, &chr + 1);
+        appendChar(chr);
     }
 
     void String::append(String const& str)
