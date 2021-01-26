@@ -3165,11 +3165,6 @@ void CLikeSourceEmitter::emitSimpleFuncImpl(IRFunc* func)
 
     auto name = getName(func);
 
-    if (name == "_Sh291BB9E8AC54869A")
-    {
-        SLANG_BREAKPOINT(0);
-    }
-
     emitFuncDecorations(func);
     emitType(resultType, name);
     emitSimpleFuncParamsImpl(func);
