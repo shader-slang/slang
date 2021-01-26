@@ -65,6 +65,8 @@ namespace Slang
     struct UnownedStringSlice
     {
     public:
+        typedef UnownedStringSlice ThisType;
+
         UnownedStringSlice()
             : m_begin(nullptr)
             , m_end(nullptr)
@@ -109,6 +111,20 @@ namespace Slang
             /// Find first index of slice. If not found returns -1
         Index indexOf(const UnownedStringSlice& slice) const;
 
+            /// Returns a substring. idx is the start index, and len
+            /// is the amount of characters.
+            /// The returned length might be truncated, if len extends beyond slice.
+        UnownedStringSlice subString(Index idx, Index len) const;
+
+            /// Return a head of the slice - everything up to the index
+        SLANG_FORCE_INLINE UnownedStringSlice head(Index idx) const { SLANG_ASSERT(idx >= 0 && idx <= getLength()); return UnownedStringSlice(m_begin, idx); }
+            /// Return a tail of the slice - everything from the index to the end of the slice
+        SLANG_FORCE_INLINE UnownedStringSlice tail(Index idx) const { SLANG_ASSERT(idx >= 0 && idx <= getLength()); return UnownedStringSlice(m_begin + idx, m_end); }
+
+            /// True if rhs and this are equal without having to take into account case
+            /// Note 'case' here is *not* locale specific - it is only A-Z and a-z
+        bool caseInsensitiveEquals(const ThisType& rhs) const;
+
         Index lastIndexOf(char c) const
         {
             const Index size = Index(m_end - m_begin);
@@ -128,43 +144,11 @@ namespace Slang
             return m_begin[i];
         }
 
-        bool operator==(UnownedStringSlice const& other) const
-        {
-            // Note that memcmp is undefined when passed in null ptrs, so if we want to handle
-            // we need to cover that case.
-            // Can only be nullptr if size is 0.
-            auto thisSize = getLength();
-            auto otherSize = other.getLength();
+        bool operator==(ThisType const& other) const;
+        bool operator!=(UnownedStringSlice const& other) const { return !(*this == other);  }
 
-            if (thisSize != otherSize)
-            {
-                return false;
-            }
-
-            const char*const thisChars = begin();
-            const char*const otherChars = other.begin();
-            if (thisChars == otherChars || thisSize == 0)
-            {
-                return true;
-            }
-            SLANG_ASSERT(thisChars && otherChars);
-            return memcmp(thisChars, otherChars, thisSize) == 0;
-        }
-
-        bool operator==(char const* str) const
-        {
-            return (*this) == UnownedStringSlice(str, str + ::strlen(str));
-        }
-
-        bool operator!=(UnownedStringSlice const& other) const
-        {
-            return !(*this == other);
-        }
-
-        bool operator!=(char const* str) const
-        {
-            return (*this) != UnownedStringSlice(str, str + ::strlen(str));
-        }
+        bool operator==(char const* str) const { return (*this) == UnownedStringSlice(str); }
+        bool operator!=(char const* str) const { return !(*this == str); }
 
             /// True if contents is a single char of c
         SLANG_FORCE_INLINE bool isChar(char c) const { return getLength() == 1 && m_begin[0] == c; }
