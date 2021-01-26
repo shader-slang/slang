@@ -33,6 +33,7 @@
 // design choices in their abstraction layer.
 //
 #include "gfx/render.h"
+#include "gfx-util/shader-cursor.h"
 #include "tools/graphics-app-framework/window.h"
 #include "slang-com-ptr.h"
 #include "source/core/slang-basic.h"
@@ -64,146 +65,185 @@ static const Vertex kVertexData[kVertexCount] =
 struct HelloWorld
 {
 
-// We will start with a function that will invoke the Slang compiler
-// to generate target-specific code from a shader file, and then
-// use that to initialize an API shader program.
+// We will start with the code related to loading and using the Slang compiler.
 //
-// Note that `Renderer` and `ShaderProgram` here are types from
-// the graphics API abstraction layer, and *not* part of the
-// Slang API. This function is representative of code that a user
-// might write to integrate Slang into their renderer/engine.
+// Applications interact with the Slang compiler through a "session" object.
+// There are actually two types of session:
 //
-ComPtr<gfx::IShaderProgram> loadShaderProgram(gfx::IRenderer* renderer)
+// * The *global session* represents a loaded instance of the Slang library
+//   (e.g., `slang.dll` and is used to scope allocations/resources that are
+//   truly global across all compiles, such as the Slang "standard library")
+//
+// * A *session* is used to scope one or more compile actions such as
+//   loading modules, generating code, and performing reflection.
+//
+// For our simple application, we will allocate a single session that is used
+// for all compilation.
+//
+ComPtr<slang::IGlobalSession> slangGlobalSession;
+ComPtr<slang::ISession> slangSession;
+
+// Many Slang API functions return detailed diagnostic information
+// (error messages, warnings, etc.) as a "blob" of data, or return
+// a null blob pointer instead if there were no issues.
+//
+// For convenience, we define a subroutine that will dump the information
+// in a diagnostic blob if one is produced, and skip it otherwise.
+//
+void diagnoseIfNeeded(slang::IBlob* diagnosticsBlob)
 {
-    // First, we need to create a "session" for interacting with the Slang
-    // compiler. This scopes all of our application's interactions
-    // with the Slang library. At the moment, creating a session causes
-    // Slang to load and validate its standard library, so this is a
-    // somewhat heavy-weight operation. When possible, an application
-    // should try to re-use the same session across multiple compiles.
-    //
-    SlangSession* slangSession = spCreateSession(NULL);
-
-    // A compile request represents a single invocation of the compiler,
-    // to process some inputs and produce outputs (or errors).
-    //
-    SlangCompileRequest* slangRequest = spCreateCompileRequest(slangSession);
-
-    // We would like to request a single target (output) format: DirectX shader bytecode (DXBC)
-    int targetIndex = spAddCodeGenTarget(slangRequest, SLANG_DXBC);
-
-    // We will specify the desired "profile" for this one target in terms of the
-    // DirectX "shader model" that should be supported.
-    //
-    spSetTargetProfile(slangRequest, targetIndex, spFindProfile(slangSession, "sm_4_0"));
-
-    // A compile request can include one or more "translation units," which more or
-    // less amount to individual source files (think `.c` files, not the `.h` files they
-    // might include).
-    //
-    // For this example, our code will all be in the Slang language. The user may
-    // also specify HLSL input here, but that currently doesn't affect the compiler's
-    // behavior much.
-    //
-    int translationUnitIndex = spAddTranslationUnit(slangRequest, SLANG_SOURCE_LANGUAGE_SLANG, nullptr);
-
-    // We will load source code for our translation unit from the file `shaders.slang`.
-    // There are also variations of this API for adding source code from application-provided buffers.
-    //
-    spAddTranslationUnitSourceFile(slangRequest, translationUnitIndex, "shaders.slang");
-
-    // Next we will specify the entry points we'd like to compile.
-    // It is often convenient to put more than one entry point in the same file,
-    // and the Slang API makes it convenient to use a single run of the compiler
-    // to compile all entry points.
-    //
-    // For each entry point, we need to specify the name of a function, the
-    // translation unit in which that function can be found, and the stage
-    // that we need to compile for (e.g., vertex, fragment, geometry, ...).
-    //
-    char const* vertexEntryPointName    = "vertexMain";
-    char const* fragmentEntryPointName  = "fragmentMain";
-    int vertexIndex   = spAddEntryPoint(slangRequest, translationUnitIndex, vertexEntryPointName,   SLANG_STAGE_VERTEX);
-    int fragmentIndex = spAddEntryPoint(slangRequest, translationUnitIndex, fragmentEntryPointName, SLANG_STAGE_FRAGMENT);
-
-    // Once all of the input options for the compiler have been specified,
-    // we can invoke `spCompile` to run the compiler and see if any errors
-    // were detected.
-    //
-    const SlangResult compileRes = spCompile(slangRequest);
-
-    // Even if there were no errors that forced compilation to fail, the
-    // compiler may have produced "diagnostic" output such as warnings.
-    // We will go ahead and print that output here.
-    //
-    if(auto diagnostics = spGetDiagnosticOutput(slangRequest))
+    if( diagnosticsBlob != nullptr )
     {
-        reportError("%s", diagnostics);
+        reportError("%s", (const char*) diagnosticsBlob->getBufferPointer());
+    }
+}
+
+// The main task an application cares about is compiling shader code
+// from souce (if needed) and loading it through the chosen graphics API.
+//
+// In addition, an application may want to receive reflection information
+// about the program, which is what a `slang::ProgramLayout` provides.
+//
+gfx::Result loadShaderProgram(
+    gfx::IRenderer*         renderer,
+    gfx::IShaderProgram**   outProgram)
+{
+    // The first step in interacting with the Slang API is to create a "global session,"
+    // which represents an instance of the Slang API loaded from the library.
+    //
+    if( !slangGlobalSession )
+    {
+        SLANG_RETURN_ON_FAIL(slang_createGlobalSession(SLANG_API_VERSION, slangGlobalSession.writeRef()));
     }
 
-    // If compilation failed, there is no point in continuing any further.
-    if(SLANG_FAILED(compileRes))
+    // Next, we need to create a compilation session (`slang::ISession`) that will provide
+    // a scope to all the compilation and loading of code we do.
+    //
+    // In an application like this, which doesn't make use of preprocessor-based specialization,
+    // we can create a single session and use it for the duration of the application.
+    // One important service the session provides is re-use of modules that have already
+    // been compiled, so that if two Slang files `import` the same module, the compiler
+    // will only load and check that module once.
+    //
+    if( !slangSession )
     {
-        spDestroyCompileRequest(slangRequest);
-        spDestroySession(slangSession);
-        return nullptr;
+        // When creating a session we need to tell it what code generation targets we may
+        // want code generated for. It is valid to have zero or more targets, but many
+        // applications will only want one, corresponding to the graphics API they plan to use.
+        // This application is currently hard-coded to use D3D11, so we set up for compilation
+        // to DX bytecode.
+        //
+        // Note: the `TargetDesc` can also be used to set things like optimization settings
+        // for each target, but this application doesn't care to set any of that stuff.
+        //
+        slang::TargetDesc targetDesc = {};
+        targetDesc.format = SLANG_DXBC;
+        targetDesc.profile = spFindProfile(slangGlobalSession, "sm_4_0");
+
+        // The session can be set up with a few other options, notably:
+        //
+        // * Any search paths that should be used when resolving `import` or `#include` directives.
+        //
+        // * Any preprocessor macros to pre-define when reading in files.
+        //
+        // This application doesn't plan to make heavy use of the preprocessor, and all its
+        // shader files are in the same directory, so we just use the default options (which
+        // will lead to the only search path being the current working directory).
+        //
+        slang::SessionDesc sessionDesc = {};
+        sessionDesc.targetCount = 1;
+        sessionDesc.targets = &targetDesc;
+
+        SLANG_RETURN_ON_FAIL(slangGlobalSession->createSession(sessionDesc, slangSession.writeRef()));
     }
 
-    // If compilation was successful, then we will extract the code for
-    // our two entry points as "blobs".
+    // Once the session has been created, we can start loading code into it.
     //
-    // If you are using a D3D API, then your application may want to
-    // take advantage of the fact taht these blobs are binary compatible
-    // with the `ID3DBlob`, `ID3D10Blob`, etc. interfaces.
+    // The simplest way to load code is by calling `loadModule` with the name of a Slang
+    // module. A call to `loadModule("MyStuff")` will behave more or less as if you
+    // wrote:
     //
-
-    ISlangBlob* vertexShaderBlob = nullptr;
-    spGetEntryPointCodeBlob(slangRequest, vertexIndex, 0, &vertexShaderBlob);
-
-    ISlangBlob* fragmentShaderBlob = nullptr;
-    spGetEntryPointCodeBlob(slangRequest, fragmentIndex, 0, &fragmentShaderBlob);
-
-    // We extract the begin/end pointers to the output code buffers
-    // using operations on the `ISlangBlob` interface.
+    //      import MyStuff;
     //
-    char const* vertexCode = (char const*) vertexShaderBlob->getBufferPointer();
-    char const* vertexCodeEnd = vertexCode + vertexShaderBlob->getBufferSize();
-
-    char const* fragmentCode = (char const*) fragmentShaderBlob->getBufferPointer();
-    char const* fragmentCodeEnd = fragmentCode + fragmentShaderBlob->getBufferSize();
-
-    // Once we have extracted the output blobs, it is safe to destroy
-    // the compile request and even the session.
+    // In a Slang shader file. The compiler will use its search paths to try to locate
+    // `MyModule.slang`, then compile and load that file. If a matching module had
+    // already been loaded previously, that would be used directly.
     //
-    spDestroyCompileRequest(slangRequest);
-    spDestroySession(slangSession);
+    ComPtr<slang::IBlob> diagnosticsBlob;
+    slang::IModule* module = slangSession->loadModule("shaders", diagnosticsBlob.writeRef());
+    diagnoseIfNeeded(diagnosticsBlob);
+    if(!module)
+        return SLANG_FAIL;
 
-    // Now we use the operations of the example graphics API abstraction
-    // layer to load shader code into the underlying API.
+    // Loading the `shaders` module will compile and check all the shader code in it,
+    // including the shader entry points we want to use. Now that the module is loaded
+    // we can look up those entry points by name.
     //
-    // Reminder: this section does not involve the Slang API at all.
+    // Note: If you are using this `loadModule` approach to load your shader code it is
+    // important to tag your entry point functions with the `[shader("...")]` attribute
+    // (e.g., `[shader("vertex")] void vertexMain(...)`). Without that information there
+    // is no umambiguous way for the compiler to know which functions represent entry
+    // points when it parses your code via `loadModule()`.
     //
+    ComPtr<slang::IEntryPoint> vertexEntryPoint;
+    SLANG_RETURN_ON_FAIL(module->findEntryPointByName("vertexMain", vertexEntryPoint.writeRef()));
+    //
+    ComPtr<slang::IEntryPoint> fragmentEntryPoint;
+    SLANG_RETURN_ON_FAIL(module->findEntryPointByName("fragmentMain", fragmentEntryPoint.writeRef()));
 
-    gfx::IShaderProgram::KernelDesc kernelDescs[] =
-    {
-        { gfx::StageType::Vertex,    vertexCode,     vertexCodeEnd },
-        { gfx::StageType::Fragment,  fragmentCode,   fragmentCodeEnd },
-    };
+    // At this point we have a few different Slang API objects that represent
+    // pieces of our code: `module`, `vertexEntryPoint`, and `fragmentEntryPoint`.
+    //
+    // A single Slang module could contain many different entry points (e.g.,
+    // four vertex entry points, three fragment entry points, and two compute
+    // shaders), and before we try to generate output code for our target API
+    // we need to identify which entry points we plan to use together.
+    //
+    // Modules and entry points are both examples of *component types* in the
+    // Slang API. The API also provides a way to build a *composite* out of
+    // other pieces, and that is what we are going to do with our module
+    // and entry points.
+    //
+    Slang::List<slang::IComponentType*> componentTypes;
+    componentTypes.add(module);
 
-    gfx::IShaderProgram::Desc programDesc;
+    // Later on when we go to extract compiled kernel code for our vertex
+    // and fragment shaders, we will need to make use of their order within
+    // the composition, so we will record the relative ordering of the entry
+    // points here as we add them.
+    int entryPointCount = 0;
+    int vertexEntryPointIndex = entryPointCount++;
+    componentTypes.add(vertexEntryPoint);
+
+    int fragmentEntryPointIndex = entryPointCount++;
+    componentTypes.add(fragmentEntryPoint);
+
+    // Actually creating the composite component type is a single operation
+    // on the Slang session, but the operation could potentially fail if
+    // something about the composite was invalid (e.g., you are trying to
+    // combine multiple copies of the same module), so we need to deal
+    // with the possibility of diagnostic output.
+    //
+    ComPtr<slang::IComponentType> linkedProgram;
+    SlangResult result = slangSession->createCompositeComponentType(
+        componentTypes.getBuffer(),
+        componentTypes.getCount(),
+        linkedProgram.writeRef(),
+        diagnosticsBlob.writeRef());
+    diagnoseIfNeeded(diagnosticsBlob);
+    SLANG_RETURN_ON_FAIL(result);
+
+    // Once we've described the particular composition of entry points
+    // that we want to compile, we defer to the graphics API layer
+    // to extract compiled kernel code and load it into the API-specific
+    // program representation.
+    //
+    gfx::IShaderProgram::Desc programDesc = {};
     programDesc.pipelineType = gfx::PipelineType::Graphics;
-    programDesc.kernels = &kernelDescs[0];
-    programDesc.kernelCount = 2;
+    programDesc.slangProgram = linkedProgram;
+    SLANG_RETURN_ON_FAIL(renderer->createProgram(programDesc, outProgram));
 
-    auto shaderProgram = renderer->createProgram(programDesc);
-
-    // Once we've used the output blobs from the Slang compiler to initialize
-    // the API-specific shader program, we can release their memory.
-    //
-    vertexShaderBlob->release();
-    fragmentShaderBlob->release();
-
-    return shaderProgram;
+    return SLANG_OK;
 }
 
 //
@@ -231,11 +271,10 @@ int gWindowHeight = 768;
 gfx::ApplicationContext*    gAppContext;
 gfx::Window*                gWindow;
 Slang::ComPtr<gfx::IRenderer>       gRenderer;
-ComPtr<gfx::IBufferResource> gConstantBuffer;
 
-ComPtr<gfx::IPipelineLayout> gPipelineLayout;
+//ComPtr<gfx::IShaderObjectLayout> gRootLayout;
 ComPtr<gfx::IPipelineState> gPipelineState;
-ComPtr<gfx::IDescriptorSet> gDescriptorSet;
+ComPtr<gfx::IShaderObject> gRootObject;
 
 ComPtr<gfx::IBufferResource> gVertexBuffer;
 
@@ -269,26 +308,6 @@ Slang::Result initialize()
         if(SLANG_FAILED(res)) return res;
     }
 
-    // Create a constant buffer for passing the model-view-projection matrix.
-    //
-    // Note: the Slang API supports reflection which could be used
-    // to query the size of the `Uniform` constant buffer, but we
-    // will not deal with that here because Slang also supports
-    // applications that want to hard-code things like memory
-    // layout and parameter locations.
-    //
-    int constantBufferSize = 16 * sizeof(float);
-
-    IBufferResource::Desc constantBufferDesc;
-    constantBufferDesc.init(constantBufferSize);
-    constantBufferDesc.setDefaults(IResource::Usage::ConstantBuffer);
-    constantBufferDesc.cpuAccessFlags = IResource::AccessFlag::Write;
-
-    gConstantBuffer = gRenderer->createBufferResource(
-        IResource::Usage::ConstantBuffer,
-        constantBufferDesc);
-    if(!gConstantBuffer) return SLANG_FAIL;
-
     // Now we will create objects needed to configur the "input assembler"
     // (IA) stage of the D3D pipeline.
     //
@@ -318,57 +337,45 @@ Slang::Result initialize()
     // Now we will use our `loadShaderProgram` function to load
     // the code from `shaders.slang` into the graphics API.
     //
-    ComPtr<IShaderProgram> shaderProgram = loadShaderProgram(gRenderer);
-    if(!shaderProgram) return SLANG_FAIL;
+    ComPtr<IShaderProgram> shaderProgram;
+    SLANG_RETURN_ON_FAIL(loadShaderProgram(gRenderer, shaderProgram.writeRef()));
 
-    // Our example graphics API usess a "modern" D3D12/Vulkan style
-    // of resource binding, so now we will dive into describing and
-    // allocating "descriptor sets."
+    // In order to bind shader parameters to the pipeline, we need
+    // to know how those parameters were assigned to locations/bindings/registers
+    // for the target graphics API.
     //
-    // First, we need to construct a descriptor set *layout*.
+    // The Slang compiler assigns locations to parameters in a deterministic
+    // fashion, so it is possible for a programmer to hard-code locations
+    // into their application code that will match up with their shaders.
     //
-    IDescriptorSetLayout::SlotRangeDesc slotRanges[] =
-    {
-        IDescriptorSetLayout::SlotRangeDesc(DescriptorSlotType::UniformBuffer),
-    };
-    IDescriptorSetLayout::Desc descriptorSetLayoutDesc;
-    descriptorSetLayoutDesc.slotRangeCount = 1;
-    descriptorSetLayoutDesc.slotRanges = &slotRanges[0];
-    auto descriptorSetLayout = gRenderer->createDescriptorSetLayout(descriptorSetLayoutDesc);
-    if(!descriptorSetLayout) return SLANG_FAIL;
-
-    // Next we will allocate a pipeline layout, which specifies
-    // that we will render with only a single descriptor set bound.
+    // Hard-coding of locations can become intractable as an application needs
+    // to support more different target platforms and graphics APIs, as well
+    // as more shaders with different specialized variants.
     //
-
-    IPipelineLayout::DescriptorSetDesc descriptorSets[] =
-    {
-        IPipelineLayout::DescriptorSetDesc( descriptorSetLayout ),
-    };
-    IPipelineLayout::Desc pipelineLayoutDesc;
-    pipelineLayoutDesc.renderTargetCount = 1;
-    pipelineLayoutDesc.descriptorSetCount = 1;
-    pipelineLayoutDesc.descriptorSets = &descriptorSets[0];
-    auto pipelineLayout = gRenderer->createPipelineLayout(pipelineLayoutDesc);
-    if(!pipelineLayout) return SLANG_FAIL;
-
-    gPipelineLayout = pipelineLayout;
-
-    // Once we have the descriptor set layout, we can allocate
-    // and fill in a descriptor set to hold our parameters.
+    // Rather than rely on hard-coded locations, our examples will make use of
+    // reflection information provided by the Slang compiler (see `programLayout`
+    // above), and our example graphics API layer will translate that reflection
+    // information into a layout for a "root shader object."
     //
-    auto descriptorSet = gRenderer->createDescriptorSet(descriptorSetLayout);
-    if(!descriptorSet) return SLANG_FAIL;
-
-    descriptorSet->setConstantBuffer(0, 0, gConstantBuffer);
-
-    gDescriptorSet = descriptorSet;
+    // The root object will store values/bindings for all of the parameters in
+    // the `shaderProgram`. At a conceptual level we can think of `rootObject` as
+    // representing the "global scope" of the shader program that was loaded;
+    // it has entries for each global shader parameter that was declared.
+    //
+    // Multiple root objects can be created from the same program, and will have
+    // separate storage for parameter values.
+    //
+    // Readers who are familiar with D3D12 or Vulkan might think of this root
+    // layout as being similar in spirit to a "root signature" or "pipeline layout."
+    //
+    ComPtr<IShaderObject> rootObject;
+    SLANG_RETURN_ON_FAIL(gRenderer->createRootShaderObject(shaderProgram, rootObject.writeRef()));
+    gRootObject = rootObject;
 
     // Following the D3D12/Vulkan style of API, we need a pipeline state object
     // (PSO) to encapsulate the configuration of the overall graphics pipeline.
     //
     GraphicsPipelineStateDesc desc;
-    desc.pipelineLayout = gPipelineLayout;
     desc.inputLayout = inputLayout;
     desc.program = shaderProgram;
     desc.renderTargetCount = 1;
@@ -398,34 +405,85 @@ void renderFrame()
     gRenderer->setClearColor(kClearColor);
     gRenderer->clearFrame();
 
-    // We update our constant buffer per-frame, just for the purposes
-    // of the example, but we don't actually load different data
-    // per-frame (we always use an identity projection).
+    // We will update the model-view-projection matrix that is passed
+    // into the shader code via the `Uniforms` buffer on a per-frame
+    // basis, even though the data that is loaded does not change
+    // per-frame (we always use an identity matrix).
     //
-    if(float* data = (float*) gRenderer->map(gConstantBuffer, MapFlavor::WriteDiscard))
+    static const float kIdentity[] =
     {
-        static const float kIdentity[] =
-        {
-            1, 0, 0, 0,
-            0, 1, 0, 0,
-            0, 0, 1, 0,
-            0, 0, 0, 1 };
-        memcpy(data, kIdentity, sizeof(kIdentity));
-
-        gRenderer->unmap(gConstantBuffer);
-    }
+        1, 0, 0, 0,
+        0, 1, 0, 0,
+        0, 0, 1, 0,
+        0, 0, 0, 1,
+    };
+    //
+    // We know that `gRootObject` is a root shader object created
+    // from our program, and that it is set up to hold values for
+    // all the parameter of that program. In order to actually
+    // set values, we need to be able to look up the location
+    // of speciic parameter that we want to set.
+    //
+    // Our example graphics API layer supports this operation
+    // with the idea of a *shader cursor* which can be thought
+    // of as pointing "into" a particular shader object at
+    // some location/offset. This design choice abstracts over
+    // the many ways that different platforms and APIs represent
+    // the necessary offset information.
+    //
+    // We construct an initial shader cursor that points at the
+    // entire shader program. You can think of this as akin to
+    // a diretory path of `/` for the root directory in a file
+    // system.
+    //
+    ShaderCursor rootCursor(gRootObject);
+    //
+    // Next, we use a convenience overload of `operator[]` to
+    // navigate from the root cursor down to the parameter we
+    // want to set.
+    //
+    // The operation `rootCursor["Uniforms"]` looks up the
+    // offset/location of the global shader parameter `Uniforms`
+    // (which is a uniform/constant buffer), and the subsequent
+    // `["modelViewProjection"]` step navigates from there down
+    // to the member named `modelViewProjection` in that buffer.
+    //
+    // Once we have formed a cursor that "points" at the
+    // model-view projection matrix, we can set its data directly.
+    //
+    rootCursor["Uniforms"]["modelViewProjection"].setData(kIdentity, sizeof(kIdentity));
+    //
+    // Some readers might be concerned about the performance o
+    // the above operations because of the use of strings. For
+    // those readers, here are two things to note:
+    //
+    // * While these `operator[]` steps do need to perform string
+    //   comparisons, they do *not* make copies of the strings or
+    //   perform any heap allocation.
+    //
+    // * There are other overloads of `operator[]` that use the
+    //   *index* of a parameter/field instead of its name, and those
+    //   operations have fixed/constant overhead and perform no
+    //   string comparisons. The indices used are independent of
+    //   the target platform and graphics API, and can thus be
+    //   hard-coded even in cross-platform code.
+    //
 
     // Now we configure our graphics pipeline state by setting the
-    // PSO, binding our descriptor set (which references the
-    // constant buffer that we wrote to above), and setting
-    // some additional bits of state, before drawing our triangle.
+    // PSO, binding our root shader object to it (which references
+    // the `Uniforms` buffer that will filled in above).
     //
     gRenderer->setPipelineState(PipelineType::Graphics, gPipelineState);
-    gRenderer->setDescriptorSet(PipelineType::Graphics, gPipelineLayout, 0, gDescriptorSet);
+    gRenderer->bindRootShaderObject(PipelineType::Graphics, gRootObject);
 
+    // We also need to set up a few pieces of fixed-function pipeline
+    // state that are not bound by the pipeline state above.
+    //
     gRenderer->setVertexBuffer(0, gVertexBuffer, sizeof(Vertex));
     gRenderer->setPrimitiveTopology(PrimitiveTopology::TriangleList);
 
+    // Finally, we are ready to issue a draw call for a single triangle.
+    //
     gRenderer->draw(3);
 
     // With that, we are done drawing for one frame, and ready for the next.

@@ -381,16 +381,8 @@ public:
         List<RefPtr<SamplerStateImpl>>      m_samplers;
     };
 
-	class ShaderProgramImpl : public IShaderProgram, public RefObject
+	class ShaderProgramImpl : public GraphicsCommonShaderProgram
     {
-    public:
-        SLANG_REF_OBJECT_IUNKNOWN_ALL
-        IShaderProgram* getInterface(const Guid& guid)
-        {
-            if (guid == GfxGUID::IID_ISlangUnknown || guid == GfxGUID::IID_IShaderProgram)
-                return static_cast<IShaderProgram*>(this);
-            return nullptr;
-        }
 	public:
 		ShaderProgramImpl(WeakSink<GLRenderer>* renderer, GLuint id):
 			m_renderer(renderer),
@@ -1485,6 +1477,11 @@ SLANG_NO_THROW Result SLANG_MCALL
 
 Result GLRenderer::createProgram(const IShaderProgram::Desc& desc, IShaderProgram** outProgram)
 {
+    if( desc.kernelCount == 0 )
+    {
+        return createProgramFromSlang(this, desc, outProgram);
+    }
+
     auto programID = glCreateProgram();
     if(desc.pipelineType == PipelineType::Compute )
     {
@@ -1534,7 +1531,9 @@ Result GLRenderer::createProgram(const IShaderProgram::Desc& desc, IShaderProgra
         return SLANG_FAIL;
     }
 
-    *outProgram = new ShaderProgramImpl(m_weakRenderer, programID);
+    RefPtr<ShaderProgramImpl> program = new ShaderProgramImpl(m_weakRenderer, programID);
+    initProgramCommon(program, desc);
+    *outProgram = program.detach();
     return SLANG_OK;
 }
 

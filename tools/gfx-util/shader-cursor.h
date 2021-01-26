@@ -42,7 +42,7 @@ struct ShaderCursor
 
     Result getDereferenced(ShaderCursor& outCursor) const;
 
-    ShaderCursor getDereferenced()
+    ShaderCursor getDereferenced() const
     {
         ShaderCursor result;
         getDereferenced(result);
@@ -53,20 +53,20 @@ struct ShaderCursor
     /// points at.
     ///
     /// If the operation succeeds, then the field cursor is written to `outCursor`.
-    Result getField(const char* nameBegin, const char* nameEnd, ShaderCursor& outCursor);
+    Result getField(const char* nameBegin, const char* nameEnd, ShaderCursor& outCursor) const;
 
-    ShaderCursor getField(const char* name)
+    ShaderCursor getField(const char* name) const
     {
         ShaderCursor cursor;
         getField(name, nullptr, cursor);
         return cursor;
     }
 
-    ShaderCursor getElement(SlangInt index);
+    ShaderCursor getElement(SlangInt index) const;
 
     static Result followPath(const char* path, ShaderCursor& ioCursor);
 
-    ShaderCursor getPath(const char* path)
+    ShaderCursor getPath(const char* path) const
     {
         ShaderCursor result(*this);
         followPath(path, result);
@@ -80,29 +80,45 @@ struct ShaderCursor
         , m_typeLayout(object->getElementTypeLayout())
     {}
 
-    SlangResult setData(void const* data, size_t size)
+    SlangResult setData(void const* data, size_t size) const
     {
         return m_baseObject->setData(m_offset, data, size);
     }
 
-    SlangResult setObject(IShaderObject* object)
+    SlangResult setObject(IShaderObject* object) const
     {
         return m_baseObject->setObject(m_offset, object);
     }
 
-    SlangResult setResource(IResourceView* resourceView)
+    SlangResult setResource(IResourceView* resourceView) const
     {
         return m_baseObject->setResource(m_offset, resourceView);
     }
 
-    SlangResult setSampler(ISamplerState* sampler)
+    SlangResult setSampler(ISamplerState* sampler) const
     {
         return m_baseObject->setSampler(m_offset, sampler);
     }
 
-    SlangResult setCombinedTextureSampler(IResourceView* textureView, ISamplerState* sampler)
+    SlangResult setCombinedTextureSampler(IResourceView* textureView, ISamplerState* sampler) const
     {
         return m_baseObject->setCombinedTextureSampler(m_offset, textureView, sampler);
+    }
+
+        /// Produce a cursor to the field with the given `name`.
+        ///
+        /// This is a convenience wrapper around `getField()`.
+    ShaderCursor operator[](const char* name) const
+    {
+        return getField(name);
+    }
+
+        /// Produce a cursor to the element or field with the given `index`.
+        ///
+        /// This is a convenience wrapper around `getElement()`.
+    ShaderCursor operator[](SlangInt index) const
+    {
+        return getElement(index);
     }
 };
 }

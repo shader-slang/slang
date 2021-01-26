@@ -5,6 +5,25 @@
 
 namespace gfx
 {
+class GraphicsCommonProgramLayout;
+
+class GraphicsCommonShaderProgram : public IShaderProgram, public Slang::RefObject
+{
+public:
+    SLANG_REF_OBJECT_IUNKNOWN_ALL
+
+    IShaderProgram* getInterface(const Slang::Guid& guid);
+
+    GraphicsCommonProgramLayout* getLayout() const { return m_layout; }
+
+protected:
+    ~GraphicsCommonShaderProgram();
+
+private:
+    friend class GraphicsAPIRenderer;
+    ComPtr<slang::IComponentType>       m_slangProgram;
+    Slang::RefPtr<GraphicsCommonProgramLayout> m_layout;
+};
 
 class GraphicsAPIRenderer : public IRenderer, public Slang::RefObject
 {
@@ -15,17 +34,20 @@ public:
     virtual SLANG_NO_THROW bool SLANG_MCALL hasFeature(const char* featureName) SLANG_OVERRIDE;
     virtual SLANG_NO_THROW Result SLANG_MCALL createShaderObjectLayout(
         slang::TypeLayoutReflection* typeLayout, IShaderObjectLayout** outLayout) SLANG_OVERRIDE;
-    virtual SLANG_NO_THROW Result SLANG_MCALL createRootShaderObjectLayout(
-        slang::ProgramLayout* programLayout, IShaderObjectLayout** outLayout) SLANG_OVERRIDE;
     virtual SLANG_NO_THROW Result SLANG_MCALL
         createShaderObject(IShaderObjectLayout* layout, IShaderObject** outObject) SLANG_OVERRIDE;
     virtual SLANG_NO_THROW Result SLANG_MCALL createRootShaderObject(
-        IShaderObjectLayout* rootLayout, IShaderObject** outObject) SLANG_OVERRIDE;
+        IShaderProgram* program,
+        IShaderObject** outObject) SLANG_OVERRIDE;
     virtual SLANG_NO_THROW Result SLANG_MCALL
         bindRootShaderObject(PipelineType pipelineType, IShaderObject* object) SLANG_OVERRIDE;
     void preparePipelineDesc(GraphicsPipelineStateDesc& desc);
     void preparePipelineDesc(ComputePipelineStateDesc& desc);
     IRenderer* getInterface(const Slang::Guid& guid);
+
+    Result initProgramCommon(
+        GraphicsCommonShaderProgram*    program,
+        IShaderProgram::Desc const&     desc);
 
 protected:
     Slang::List<Slang::String> m_features;
