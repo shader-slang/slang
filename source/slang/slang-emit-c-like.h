@@ -154,7 +154,7 @@ public:
     UInt getID(IRInst* value);
 
         /// "Scrub" a name so that it complies with restrictions of the target language.
-    String scrubName(const String& name);
+    void appendScrubbedName(const UnownedStringSlice& name, StringBuilder& out);
 
     String generateName(IRInst* inst);
     virtual String generateEntryPointNameImpl(IREntryPointDecoration* entryPointDecor);
@@ -368,6 +368,9 @@ public:
 
         // Emit the argument list (including paranthesis) in a `CallInst`
     void _emitCallArgList(IRCall* call);
+
+
+    String _generateUniqueName(const UnownedStringSlice& slice);
 
         // Sort witnessTable entries according to the order defined in the witnessed interface type.
     List<IRWitnessTableEntry*> getSortedWitnessTableEntries(IRWitnessTable* witnessTable);

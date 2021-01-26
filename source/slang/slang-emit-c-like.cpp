@@ -502,22 +502,24 @@ UInt CLikeSourceEmitter::getID(IRInst* value)
     return id;
 }
 
-String CLikeSourceEmitter::scrubName(const String& name)
+void CLikeSourceEmitter::appendScrubbedName(const UnownedStringSlice& name, StringBuilder& out)
 {
     // We will use a plain `U` as a dummy character to insert
     // whenever we need to insert things to make a string into
     // valid name.
     //
-    char const* dummyChar = "U";
+    const char dummyChar = 'U';
 
     // Special case a name that is the empty string, just in case.
     if(name.getLength() == 0)
-        return dummyChar;
-
+    {
+        out.appendChar(dummyChar);
+        return;
+    }
+     
     // Otherwise, we are going to walk over the name byte by byte
     // and write some legal characters to the output as we go.
-    StringBuilder sb;
-
+    
     if(getSourceLanguage() == SourceLanguage::GLSL)
     {
         // GLSL reserves all names that start with `gl_`,
@@ -525,7 +527,7 @@ String CLikeSourceEmitter::scrubName(const String& name)
         // our name start with a dummy character instead.
         if(name.startsWith("gl_"))
         {
-            sb.append(dummyChar);
+            out.appendChar(dummyChar);
         }
     }
 
@@ -534,7 +536,7 @@ String CLikeSourceEmitter::scrubName(const String& name)
     // to avoid an possible collision.
     if(name.startsWith("_S"))
     {
-        sb.Append(dummyChar);
+        out.appendChar(dummyChar);
     }
 
     // TODO: This is where we might want to consult
@@ -577,7 +579,7 @@ String CLikeSourceEmitter::scrubName(const String& name)
             // be a valid identifier in many target languages.
             if(prevChar == -1)
             {
-                sb.append(dummyChar);
+                out.appendChar(dummyChar);
             }
         }
         else if(c == '_')
@@ -604,8 +606,8 @@ String CLikeSourceEmitter::scrubName(const String& name)
             // Our solution for now will be very clumsy: we will
             // emit `x` and then the hexadecimal version of
             // the byte we were given.
-            sb.append("x");
-            sb.append(uint32_t((unsigned char) c), 16);
+            out.appendChar('x');
+            out.append(uint32_t((unsigned char) c), 16);
 
             // We don't want to apply the default handling below,
             // so skip to the top of the loop now.
@@ -613,16 +615,58 @@ String CLikeSourceEmitter::scrubName(const String& name)
             continue;
         }
 
-        sb.append(c);
+        out.appendChar(c);
         prevChar = c;
     }
-
-    return sb.ProduceString();
 }
 
 String CLikeSourceEmitter::generateEntryPointNameImpl(IREntryPointDecoration* entryPointDecor)
 {
     return entryPointDecor->getName()->getStringSlice();
+}
+
+String CLikeSourceEmitter::_generateUniqueName(const UnownedStringSlice& name)
+{
+    //
+    // We need to be careful that the name follows the rules of the target language,
+    // so there is a "scrubbing" step that needs to be applied here.
+    //
+    // We also need to make sure that the name won't collide with other declarations
+    // that might have the same name hint applied, so we will still unique
+    // them by appending the numeric ID of the instruction.
+    //
+    // TODO: Find cases where we can drop the suffix safely.
+    //
+    // TODO: When we start having to handle symbols with external linkage for
+    // things like DXIL libraries, we will need to *not* use the friendly
+    // names for stuff that should be link-able.
+    //
+    // The name we output will basically be:
+    //
+    //      <name>_<uniqueID>
+    //
+    // Except that we will "scrub" the name first,
+    // and we will omit the underscore if the (scrubbed)
+    // name hint already ends with one.
+    
+    StringBuilder sb;
+
+    appendScrubbedName(name, sb);
+
+    // Avoid introducing a double underscore
+    if (!sb.endsWith("_"))
+    {
+        sb.append("_");
+    }
+
+    String key = sb.ProduceString();
+    
+    UInt& countRef = m_uniqueNameCounters.GetOrAddValue(key, 0);
+    const UInt count = countRef;
+    countRef = count + 1;
+
+    sb.append(Int32(count));
+    return sb.ProduceString();
 }
 
 String CLikeSourceEmitter::generateName(IRInst* inst)
@@ -667,62 +711,16 @@ String CLikeSourceEmitter::generateName(IRInst* inst)
     }
 
     // If we have a name hint on the instruction, then we will try to use that
-    // to provide the actual name in the output code.
-    //
-    // We need to be careful that the name follows the rules of the target language,
-    // so there is a "scrubbing" step that needs to be applied here.
-    //
-    // We also need to make sure that the name won't collide with other declarations
-    // that might have the same name hint applied, so we will still unique
-    // them by appending the numeric ID of the instruction.
-    //
-    // TODO: Find cases where we can drop the suffix safely.
-    //
-    // TODO: When we start having to handle symbols with external linkage for
-    // things like DXIL libraries, we will need to *not* use the friendly
-    // names for stuff that should be link-able.
-    //
+    // to provide the basis for the actual name in the output code.
     if(auto nameHintDecoration = inst->findDecoration<IRNameHintDecoration>())
     {
-        // The (non-obfuscated) name we output will basically be:
-        //
-        //      <nameHint>_<uniqueID>
-        //
-        // Except that we will "scrub" the name hint first,
-        // and we will omit the underscore if the (scrubbed)
-        // name hint already ends with one.
-        //
-        // The obfuscated name we output will simply be:
-        //
-        //      _<uniqueID>
-        //
-
-        StringBuilder sb;
-
-        String nameHint = nameHintDecoration->getName();
-        nameHint = scrubName(nameHint);
-
-        sb.append(nameHint);
-
-        // Avoid introducing a double underscore
-        if (!nameHint.endsWith("_"))
-        {
-            sb.append("_");
-        }
-        
-        String key = sb.ProduceString();
-        UInt count = 0;
-        m_uniqueNameCounters.TryGetValue(key, count);
-
-        m_uniqueNameCounters[key] = count+1;
-
-        sb.append(Int32(count));
-        return sb.ProduceString();
+        return _generateUniqueName(nameHintDecoration->getName());
     }
 
-    // If the instruction has a mangled name, then emit using that.
+    // If the instruction has a linkage decoration, just use that. 
     if(auto linkageDecoration = inst->findDecoration<IRLinkageDecoration>())
     {
+        // Just use the linkages mangled name directly.
         return linkageDecoration->getMangledName();
     }
 
