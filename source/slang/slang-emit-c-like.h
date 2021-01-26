@@ -369,6 +369,9 @@ public:
         // Emit the argument list (including paranthesis) in a `CallInst`
     void _emitCallArgList(IRCall* call);
 
+
+    String _generateUniqueName(const UnownedStringSlice& slice);
+
         // Sort witnessTable entries according to the order defined in the witnessed interface type.
     List<IRWitnessTableEntry*> getSortedWitnessTableEntries(IRWitnessTable* witnessTable);
     

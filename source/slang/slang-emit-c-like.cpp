@@ -625,6 +625,51 @@ String CLikeSourceEmitter::generateEntryPointNameImpl(IREntryPointDecoration* en
     return entryPointDecor->getName()->getStringSlice();
 }
 
+String CLikeSourceEmitter::_generateUniqueName(const UnownedStringSlice& name)
+{
+    //
+    // We need to be careful that the name follows the rules of the target language,
+    // so there is a "scrubbing" step that needs to be applied here.
+    //
+    // We also need to make sure that the name won't collide with other declarations
+    // that might have the same name hint applied, so we will still unique
+    // them by appending the numeric ID of the instruction.
+    //
+    // TODO: Find cases where we can drop the suffix safely.
+    //
+    // TODO: When we start having to handle symbols with external linkage for
+    // things like DXIL libraries, we will need to *not* use the friendly
+    // names for stuff that should be link-able.
+    //
+    // The (non-obfuscated) name we output will basically be:
+    //
+    //      <name>_<uniqueID>
+    //
+    // Except that we will "scrub" the name first,
+    // and we will omit the underscore if the (scrubbed)
+    // name hint already ends with one.
+    
+    StringBuilder sb;
+
+    String nameHint = scrubName(name);
+    sb.append(nameHint);
+
+    // Avoid introducing a double underscore
+    if (!nameHint.endsWith("_"))
+    {
+        sb.append("_");
+    }
+
+    String key = sb.ProduceString();
+    UInt count = 0;
+    m_uniqueNameCounters.TryGetValue(key, count);
+
+    m_uniqueNameCounters[key] = count + 1;
+
+    sb.append(Int32(count));
+    return sb.ProduceString();
+}
+
 String CLikeSourceEmitter::generateName(IRInst* inst)
 {
     // If the instruction names something
@@ -667,63 +712,24 @@ String CLikeSourceEmitter::generateName(IRInst* inst)
     }
 
     // If we have a name hint on the instruction, then we will try to use that
-    // to provide the actual name in the output code.
-    //
-    // We need to be careful that the name follows the rules of the target language,
-    // so there is a "scrubbing" step that needs to be applied here.
-    //
-    // We also need to make sure that the name won't collide with other declarations
-    // that might have the same name hint applied, so we will still unique
-    // them by appending the numeric ID of the instruction.
-    //
-    // TODO: Find cases where we can drop the suffix safely.
-    //
-    // TODO: When we start having to handle symbols with external linkage for
-    // things like DXIL libraries, we will need to *not* use the friendly
-    // names for stuff that should be link-able.
-    //
+    // to provide the basis for the actual name in the output code.
     if(auto nameHintDecoration = inst->findDecoration<IRNameHintDecoration>())
     {
-        // The (non-obfuscated) name we output will basically be:
-        //
-        //      <nameHint>_<uniqueID>
-        //
-        // Except that we will "scrub" the name hint first,
-        // and we will omit the underscore if the (scrubbed)
-        // name hint already ends with one.
-        //
-        // The obfuscated name we output will simply be:
-        //
-        //      _<uniqueID>
-        //
-
-        StringBuilder sb;
-
-        String nameHint = nameHintDecoration->getName();
-        nameHint = scrubName(nameHint);
-
-        sb.append(nameHint);
-
-        // Avoid introducing a double underscore
-        if (!nameHint.endsWith("_"))
-        {
-            sb.append("_");
-        }
-        
-        String key = sb.ProduceString();
-        UInt count = 0;
-        m_uniqueNameCounters.TryGetValue(key, count);
-
-        m_uniqueNameCounters[key] = count+1;
-
-        sb.append(Int32(count));
-        return sb.ProduceString();
+        return _generateUniqueName(nameHintDecoration->getName());
     }
 
-    // If the instruction has a mangled name, then emit using that.
+    // If the instruction has a mangled name, then use that as the basis. 
     if(auto linkageDecoration = inst->findDecoration<IRLinkageDecoration>())
     {
-        return linkageDecoration->getMangledName();
+        if (inst->findDecoration<IRUseLinkageNameDecoration>())
+        {
+            // Just use the linkage name directly
+            return linkageDecoration->getMangledName();
+        }
+        else
+        {
+            return _generateUniqueName(linkageDecoration->getMangledName());
+        }
     }
 
     // Otherwise fall back to a construct temporary name
@@ -3159,6 +3165,11 @@ void CLikeSourceEmitter::emitSimpleFuncImpl(IRFunc* func)
     emitFunctionPreambleImpl(func);
 
     auto name = getName(func);
+
+    if (name == "_Sh291BB9E8AC54869A")
+    {
+        SLANG_BREAKPOINT(0);
+    }
 
     emitFuncDecorations(func);
     emitType(resultType, name);

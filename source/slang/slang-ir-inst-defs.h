@@ -578,15 +578,16 @@ INST(HighLevelDeclDecoration,               highLevelDecl,          1, 0)
     /* LinkageDecoration */
         INST(ImportDecoration, import, 1, 0)
         INST(ExportDecoration, export, 1, 0)
+    INST_RANGE(LinkageDecoration, ImportDecoration, ExportDecoration)
 
     /* Decorations for RTTI objects */
-        INST(RTTITypeSizeDecoration, RTTI_typeSize, 1, 0)
+    INST(RTTITypeSizeDecoration, RTTI_typeSize, 1, 0)
     INST(AnyValueSizeDecoration, AnyValueSize, 1, 0)
     INST(SequentialIDDecoration, SequentialIDDecoration, 1, 0)
 
     INST(TypeConstraintDecoration, TypeConstraintDecoration, 1, 0)
-    INST_RANGE(LinkageDecoration, ImportDecoration, ExportDecoration)
 
+    
     INST(BuiltinDecoration, BuiltinDecoration, 0, 0)
 
         /// The decorated instruction requires NVAPI to be included via prelude when compiling for D3D.
@@ -594,6 +595,9 @@ INST(HighLevelDeclDecoration,               highLevelDecl,          1, 0)
 
         /// The decorated instruction is part of the NVAPI "magic" and should always use its original name
     INST(NVAPIMagicDecoration, nvapiMagic, 1, 0)
+
+        /// If set on an instruction, it's linkage name can be used *as is*
+    INST(UseLinkageNameDecoration, useLinkageName, 0, 0)
 
         /// A decoration that applies to an entire IR module, and indicates the register/space binding
         /// that the NVAPI shader parameter intends to use.

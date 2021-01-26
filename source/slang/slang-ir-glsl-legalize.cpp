@@ -691,6 +691,9 @@ ScalarizedVal createSimpleGLSLGlobalVarying(
     {
         builder->addImportDecoration(globalParam, UnownedTerminatedStringSlice(systemValueInfo->name));
 
+        // Marks the instruction as using the import decorations name as is.
+        builder->addDecoration(globalParam, kIROp_UseLinkageNameDecoration);
+
         if( auto fromType = systemValueInfo->requiredType )
         {
             // We may need to adapt from the declared type to/from
