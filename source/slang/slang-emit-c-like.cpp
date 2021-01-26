@@ -579,7 +579,7 @@ void CLikeSourceEmitter::appendScrubbedName(const UnownedStringSlice& name, Stri
             // be a valid identifier in many target languages.
             if(prevChar == -1)
             {
-                out.append(dummyChar);
+                out.appendChar(dummyChar);
             }
         }
         else if(c == '_')
@@ -641,7 +641,7 @@ String CLikeSourceEmitter::_generateUniqueName(const UnownedStringSlice& name)
     // things like DXIL libraries, we will need to *not* use the friendly
     // names for stuff that should be link-able.
     //
-    // The (non-obfuscated) name we output will basically be:
+    // The name we output will basically be:
     //
     //      <name>_<uniqueID>
     //
