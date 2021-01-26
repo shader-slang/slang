@@ -762,7 +762,6 @@ struct FunctionParameterSpecializationContext
             oldFunc,
             newFunc);
 
-
         // If we have added an Linkage decoration, we want to remove and destroy it,
         // because the linkage should only be on the original function and
         // not on the "torn off" copies made in this function.
@@ -782,19 +781,12 @@ struct FunctionParameterSpecializationContext
                 IRDecoration* decoration = *cur;
 
                 // We step before before the test/destroying to ensure cur is not pointing
-                // to a now destroyed instruction
+                // to a potentially destroyed instruction
                 ++cur;
 
                 if (as<IRLinkageDecoration>(decoration))
-                {   
-                    decoration->removeFromParent();
-                    decoration->removeArguments();
-
-                    // We DON'T deallocate the children/decorations, as they will be used on the original
-                    // This is okay as it stands, because linkage decorations just contain a string literal  
-
-                    // Run destructor to be sure...
-                    decoration->~IRDecoration();
+                {
+                    decoration->removeAndDeallocate();
                 }
             }
         }
