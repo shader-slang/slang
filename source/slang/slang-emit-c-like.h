@@ -154,7 +154,7 @@ public:
     UInt getID(IRInst* value);
 
         /// "Scrub" a name so that it complies with restrictions of the target language.
-    String scrubName(const String& name);
+    void appendScrubbedName(const UnownedStringSlice& name, StringBuilder& out);
 
     String generateName(IRInst* inst);
     virtual String generateEntryPointNameImpl(IREntryPointDecoration* entryPointDecor);

@@ -502,22 +502,24 @@ UInt CLikeSourceEmitter::getID(IRInst* value)
     return id;
 }
 
-String CLikeSourceEmitter::scrubName(const String& name)
+void CLikeSourceEmitter::appendScrubbedName(const UnownedStringSlice& name, StringBuilder& out)
 {
     // We will use a plain `U` as a dummy character to insert
     // whenever we need to insert things to make a string into
     // valid name.
     //
-    char const* dummyChar = "U";
+    const char dummyChar = 'U';
 
     // Special case a name that is the empty string, just in case.
     if(name.getLength() == 0)
-        return dummyChar;
-
+    {
+        out.appendChar(dummyChar);
+        return;
+    }
+     
     // Otherwise, we are going to walk over the name byte by byte
     // and write some legal characters to the output as we go.
-    StringBuilder sb;
-
+    
     if(getSourceLanguage() == SourceLanguage::GLSL)
     {
         // GLSL reserves all names that start with `gl_`,
@@ -525,7 +527,7 @@ String CLikeSourceEmitter::scrubName(const String& name)
         // our name start with a dummy character instead.
         if(name.startsWith("gl_"))
         {
-            sb.append(dummyChar);
+            out.appendChar(dummyChar);
         }
     }
 
@@ -534,7 +536,7 @@ String CLikeSourceEmitter::scrubName(const String& name)
     // to avoid an possible collision.
     if(name.startsWith("_S"))
     {
-        sb.Append(dummyChar);
+        out.appendChar(dummyChar);
     }
 
     // TODO: This is where we might want to consult
@@ -577,7 +579,7 @@ String CLikeSourceEmitter::scrubName(const String& name)
             // be a valid identifier in many target languages.
             if(prevChar == -1)
             {
-                sb.append(dummyChar);
+                out.append(dummyChar);
             }
         }
         else if(c == '_')
@@ -604,8 +606,8 @@ String CLikeSourceEmitter::scrubName(const String& name)
             // Our solution for now will be very clumsy: we will
             // emit `x` and then the hexadecimal version of
             // the byte we were given.
-            sb.append("x");
-            sb.append(uint32_t((unsigned char) c), 16);
+            out.appendChar('x');
+            out.append(uint32_t((unsigned char) c), 16);
 
             // We don't want to apply the default handling below,
             // so skip to the top of the loop now.
@@ -613,11 +615,9 @@ String CLikeSourceEmitter::scrubName(const String& name)
             continue;
         }
 
-        sb.append(c);
+        out.appendChar(c);
         prevChar = c;
     }
-
-    return sb.ProduceString();
 }
 
 String CLikeSourceEmitter::generateEntryPointNameImpl(IREntryPointDecoration* entryPointDecor)
@@ -651,20 +651,19 @@ String CLikeSourceEmitter::_generateUniqueName(const UnownedStringSlice& name)
     
     StringBuilder sb;
 
-    String nameHint = scrubName(name);
-    sb.append(nameHint);
+    appendScrubbedName(name, sb);
 
     // Avoid introducing a double underscore
-    if (!nameHint.endsWith("_"))
+    if (!sb.endsWith("_"))
     {
         sb.append("_");
     }
 
     String key = sb.ProduceString();
-    UInt count = 0;
-    m_uniqueNameCounters.TryGetValue(key, count);
-
-    m_uniqueNameCounters[key] = count + 1;
+    
+    UInt& countRef = m_uniqueNameCounters.GetOrAddValue(key, 0);
+    const UInt count = countRef;
+    countRef = count + 1;
 
     sb.append(Int32(count));
     return sb.ProduceString();
