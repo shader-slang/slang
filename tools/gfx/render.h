@@ -71,6 +71,8 @@ enum class StageType
     ClosestHit,
     Miss,
     Callable,
+    Amplification,
+    Mesh,
     CountOf,
 };
 
@@ -124,8 +126,12 @@ public:
     struct Desc
     {
         PipelineType        pipelineType;
+
         KernelDesc const*   kernels;
         Int                 kernelCount;
+
+            /// Use instead of `kernels`/`kernelCount` if loading a Slang program.
+        slang::IComponentType*  slangProgram;
 
             /// Find and return the kernel for `stage`, if present.
         KernelDesc const* findKernel(StageType stage) const
@@ -1026,14 +1032,15 @@ struct BlendDesc
 struct GraphicsPipelineStateDesc
 {
     IShaderProgram*      program;
-    // Application should set either pipelineLayout or rootShaderObjectLayout, but not both.
+
+    // If `pipelineLayout` is null, then layout information will be extracted
+    // from `program`, which must have been created with Slang reflection info.
     IPipelineLayout* pipelineLayout = nullptr;
-    // Application should set either pipelineLayout or rootShaderObjectLayout, but not both.
-    IShaderObjectLayout* rootShaderObjectLayout = nullptr;
+
     IInputLayout*        inputLayout;
     UInt                framebufferWidth;
     UInt                framebufferHeight;
-    UInt                renderTargetCount = 0; // Not used if rootShaderObjectLayout is set.
+    UInt                renderTargetCount = 0; // Only used if `pipelineLayout` is non-null
     DepthStencilDesc    depthStencil;
     RasterizerDesc      rasterizer;
     BlendDesc           blend;
@@ -1042,8 +1049,10 @@ struct GraphicsPipelineStateDesc
 struct ComputePipelineStateDesc
 {
     IShaderProgram*  program;
+
+    // If `pipelineLayout` is null, then layout information will be extracted
+    // from `program`, which must have been created with Slang reflection info.
     IPipelineLayout* pipelineLayout = nullptr;
-    IShaderObjectLayout* rootShaderObjectLayout = nullptr;
 };
 
 class IPipelineState : public ISlangUnknown
@@ -1197,16 +1206,6 @@ public:
         return layout;
     }
 
-    virtual SLANG_NO_THROW Result SLANG_MCALL createRootShaderObjectLayout(
-        slang::ProgramLayout* layout, IShaderObjectLayout** outLayout) = 0;
-
-    inline ComPtr<IShaderObjectLayout> createRootShaderObjectLayout(slang::ProgramLayout* layout)
-    {
-        ComPtr<IShaderObjectLayout> result;
-        SLANG_RETURN_NULL_ON_FAIL(createRootShaderObjectLayout(layout, result.writeRef()));
-        return result;
-    }
-
     virtual SLANG_NO_THROW Result SLANG_MCALL createShaderObject(IShaderObjectLayout* layout, IShaderObject** outObject) = 0;
 
     inline ComPtr<IShaderObject> createShaderObject(IShaderObjectLayout* layout)
@@ -1216,12 +1215,12 @@ public:
         return object;
     }
 
-    virtual SLANG_NO_THROW Result SLANG_MCALL createRootShaderObject(IShaderObjectLayout* layout, IShaderObject** outObject) = 0;
+    virtual SLANG_NO_THROW Result SLANG_MCALL createRootShaderObject(IShaderProgram* program, IShaderObject** outObject) = 0;
 
-    inline ComPtr<IShaderObject> createRootShaderObject(IShaderObjectLayout* layout)
+    inline ComPtr<IShaderObject> createRootShaderObject(IShaderProgram* program)
     {
         ComPtr<IShaderObject> object;
-        SLANG_RETURN_NULL_ON_FAIL(createRootShaderObject(layout, object.writeRef()));
+        SLANG_RETURN_NULL_ON_FAIL(createRootShaderObject(program, object.writeRef()));
         return object;
     }
 

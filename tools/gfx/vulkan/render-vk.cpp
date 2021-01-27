@@ -307,16 +307,8 @@ public:
         VkDeviceSize                size;
     };
 
-    class ShaderProgramImpl: public IShaderProgram, public RefObject
+    class ShaderProgramImpl: public GraphicsCommonShaderProgram
     {
-    public:
-        SLANG_REF_OBJECT_IUNKNOWN_ALL
-        IShaderProgram* getInterface(const Guid& guid)
-        {
-            if (guid == GfxGUID::IID_ISlangUnknown || guid == GfxGUID::IID_IShaderProgram)
-                return static_cast<IShaderProgram*>(this);
-            return nullptr;
-        }
     public:
 
         ShaderProgramImpl(const VulkanApi& api, PipelineType pipelineType):
@@ -2835,6 +2827,11 @@ void VKRenderer::setDescriptorSet(PipelineType pipelineType, IPipelineLayout* la
 
 Result VKRenderer::createProgram(const IShaderProgram::Desc& desc, IShaderProgram** outProgram)
 {
+    if( desc.kernelCount == 0 )
+    {
+        return createProgramFromSlang(this, desc, outProgram);
+    }
+
     RefPtr<ShaderProgramImpl> impl = new ShaderProgramImpl(m_api, desc.pipelineType);
     if( desc.pipelineType == PipelineType::Compute)
     {
@@ -2849,6 +2846,7 @@ Result VKRenderer::createProgram(const IShaderProgram::Desc& desc, IShaderProgra
         impl->m_vertex = compileEntryPoint(*vertexKernel, VK_SHADER_STAGE_VERTEX_BIT, impl->m_buffers[0], impl->m_modules[0]);
         impl->m_fragment = compileEntryPoint(*fragmentKernel, VK_SHADER_STAGE_FRAGMENT_BIT, impl->m_buffers[1], impl->m_modules[1]);
     }
+    initProgramCommon(impl, desc);
     *outProgram = impl.detach();
     return SLANG_OK;
 }

@@ -111,6 +111,8 @@ protected:
         Options::ShaderProgramType shaderType,
         const ShaderCompilerUtil::Input& input);
 
+    virtual void finalizeImpl();
+
     uint64_t m_startTicks;
 
     // variables for state to be used for rendering...
@@ -165,6 +167,8 @@ public:
     virtual Result writeBindingOutput(BindRoot* bindRoot, const char* fileName) override;
 
 protected:
+    virtual void finalizeImpl() SLANG_OVERRIDE;
+
     ComPtr<IShaderObject> m_programVars;
     ShaderOutputPlan m_outputPlan;
 };
@@ -586,12 +590,11 @@ SlangResult ShaderObjectRenderTestApp::initialize(
     // Slang's reflection API to tell us what the parameters of the program are.
     //
     auto slangReflection = (slang::ProgramLayout*) spGetReflection(m_compilationOutput.output.getRequestForReflection());
-    ComPtr<IShaderObjectLayout> programLayout = renderer->createRootShaderObjectLayout(slangReflection);
 
     // Once we have determined the layout of all the parameters we need to bind,
     // we will create a shader object to use for storing and binding those parameters.
     //
-    m_programVars = renderer->createRootShaderObject(programLayout);
+    m_programVars = renderer->createRootShaderObject(m_shaderProgram);
 
     // Now we need to assign from the input parameter data that was parsed into
     // the program vars we allocated.
@@ -600,9 +603,6 @@ SlangResult ShaderObjectRenderTestApp::initialize(
         renderer, m_programVars, m_compilationOutput.layout, m_outputPlan, slangReflection));
 
 	m_renderer = renderer;
-
-    // TODO(tfoley): use each API's reflection interface to query the constant-buffer size needed
-//    m_constantBufferSize = 16 * sizeof(float);
 
     {
         switch(m_options.shaderType)
@@ -614,7 +614,6 @@ SlangResult ShaderObjectRenderTestApp::initialize(
         case Options::ShaderProgramType::Compute:
             {
                 ComputePipelineStateDesc desc;
-                desc.rootShaderObjectLayout = programLayout.get();
                 desc.program = m_shaderProgram;
 
                 m_pipelineState = renderer->createComputePipelineState(desc);
@@ -648,7 +647,6 @@ SlangResult ShaderObjectRenderTestApp::initialize(
                 SLANG_RETURN_ON_FAIL(renderer->createBufferResource(IResource::Usage::VertexBuffer, vertexBufferDesc, kVertexData, m_vertexBuffer.writeRef()));
 
                 GraphicsPipelineStateDesc desc;
-                desc.rootShaderObjectLayout = programLayout.get();
                 desc.program = m_shaderProgram;
                 desc.inputLayout = inputLayout;
 
@@ -660,6 +658,12 @@ SlangResult ShaderObjectRenderTestApp::initialize(
 
     // If success must have a pipeline state
     return m_pipelineState ? SLANG_OK : SLANG_FAIL;
+}
+
+void ShaderObjectRenderTestApp::finalizeImpl()
+{
+    m_programVars = nullptr;
+    RenderTestApp::finalizeImpl();
 }
 
 Result RenderTestApp::_initializeShaders(
@@ -729,6 +733,18 @@ void RenderTestApp::runCompute()
 }
 
 void RenderTestApp::finalize()
+{
+    finalizeImpl();
+
+    m_inputLayout = nullptr;
+    m_vertexBuffer = nullptr;
+    m_shaderProgram = nullptr;
+    m_pipelineState = nullptr;
+
+    m_renderer = nullptr;
+}
+
+void RenderTestApp::finalizeImpl()
 {
 }
 
@@ -1328,7 +1344,9 @@ static SlangResult _innerMain(Slang::StdWriters* stdWriters, SlangSession* sessi
             app = new LegacyRenderTestApp();
 		SLANG_RETURN_ON_FAIL(app->initialize(session, renderer, options, input));
         window->show();
-        return window->runLoop(app);
+        SLANG_RETURN_ON_FAIL(window->runLoop(app));
+        app->finalize();
+        return SLANG_OK;
 	}
 }
 

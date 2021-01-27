@@ -85,7 +85,7 @@ gfx::IShaderProgram* loadShaderProgram(gfx::IRenderer* renderer, unsigned char c
         { gfx::StageType::Compute,    computeCode,     computeCodeEnd },
     };
 
-    gfx::IShaderProgram::Desc programDesc;
+    gfx::IShaderProgram::Desc programDesc = {};
     programDesc.pipelineType = gfx::PipelineType::Compute;
     programDesc.kernels = &kernelDescs[0];
     programDesc.kernelCount = 1;

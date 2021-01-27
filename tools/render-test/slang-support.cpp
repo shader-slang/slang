@@ -50,6 +50,44 @@ gfx::StageType translateStage(SlangStage slangStage)
     }
 }
 
+void ShaderCompilerUtil::Output::set(
+    PipelineType                        pipelineType,
+    const IShaderProgram::KernelDesc*   inKernelDescs,
+    Slang::Index                        kernelDescCount,
+    slang::IComponentType*              inSlangProgram)
+{
+    kernelDescs.clear();
+    kernelDescs.addRange(inKernelDescs, kernelDescCount);
+    slangProgram = inSlangProgram;
+    desc.pipelineType = pipelineType;
+    desc.kernels = kernelDescs.getBuffer();
+    desc.kernelCount = kernelDescCount;
+    desc.slangProgram = inSlangProgram;
+}
+
+void ShaderCompilerUtil::Output::reset()
+{
+    {
+        desc.pipelineType = PipelineType::Unknown;
+        desc.slangProgram = nullptr;
+        desc.kernels = nullptr;
+        desc.kernelCount = 0;
+    }
+
+    kernelDescs.clear();
+    if (m_requestForKernels && session)
+    {
+        spDestroyCompileRequest(m_requestForKernels);
+    }
+    if (m_extraRequestForReflection && session)
+    {
+        spDestroyCompileRequest(m_extraRequestForReflection);
+    }
+    session = nullptr;
+    m_requestForKernels = nullptr;
+    m_extraRequestForReflection = nullptr;
+}
+
 /* static */ SlangResult ShaderCompilerUtil::_compileProgramImpl(SlangSession* session, const Options& options, const Input& input, const ShaderCompileRequest& request, Output& out)
 {
     out.reset();
@@ -168,7 +206,8 @@ gfx::StageType translateStage(SlangStage slangStage)
 
     SLANG_RETURN_ON_FAIL(res);
 
-    
+    ComPtr<slang::IComponentType> linkedSlangProgram;
+
     List<ShaderCompileRequest::EntryPoint> actualEntryPoints;
     if(input.passThrough == SLANG_PASS_THROUGH_NONE)
     {
@@ -178,6 +217,7 @@ gfx::StageType translateStage(SlangStage slangStage)
         // loading of code.
         //
         auto reflection = slang::ProgramLayout::get(slangRequest);
+        SLANG_RETURN_ON_FAIL(spCompileRequest_getProgramWithEntryPoints(slangRequest, linkedSlangProgram.writeRef()));
 
         // Get the amount of entry points in reflection
         Index entryPointCount = Index(reflection->getEntryPointCount());
@@ -226,7 +266,7 @@ gfx::StageType translateStage(SlangStage slangStage)
         kernelDescs.add(kernelDesc);
     }
 
-    out.set(input.pipelineType, kernelDescs.getBuffer(), kernelDescs.getCount());
+    out.set(input.pipelineType, kernelDescs.getBuffer(), kernelDescs.getCount(), linkedSlangProgram);
 
     return SLANG_OK;
 }
@@ -277,6 +317,7 @@ gfx::StageType translateStage(SlangStage slangStage)
         SLANG_RETURN_ON_FAIL(_compileProgramImpl(session, options, input, request, out));
 
         out.m_extraRequestForReflection = slangOutput.getRequestForReflection();
+        out.desc.slangProgram = slangOutput.desc.slangProgram;
         slangOutput.m_requestForKernels = nullptr;
 
         return SLANG_OK;
