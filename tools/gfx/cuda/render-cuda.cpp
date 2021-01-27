@@ -6,6 +6,7 @@
 
 #include "../renderer-shared.h"
 #include "../render-graphics-common.h"
+#include "../slang-context.h"
 
 #ifdef GFX_ENABLE_CUDA
 #include <cuda.h>
@@ -782,6 +783,7 @@ private:
     CUcontext m_context = nullptr;
     CUDAPipelineState* currentPipeline = nullptr;
     CUDARootShaderObject* currentRootObject = nullptr;
+    SlangContext slangContext;
  public:
     ~CUDARenderer()
     {
@@ -792,6 +794,8 @@ private:
     }
     virtual SLANG_NO_THROW SlangResult SLANG_MCALL initialize(const Desc& desc, void* inWindowHandle) override
     {
+        SLANG_RETURN_ON_FAIL(slangContext.initialize(desc.slang, SLANG_PTX, "sm_5_1"));
+
         SLANG_RETURN_ON_FAIL(_initCuda(reportType));
 
         SLANG_RETURN_ON_FAIL(_findMaxFlopsDeviceIndex(&m_deviceIndex));
@@ -806,6 +810,13 @@ private:
         SLANG_CUDA_RETURN_ON_FAIL(cuDeviceGet(&m_device, m_deviceIndex));
 
         SLANG_CUDA_RETURN_WITH_REPORT_ON_FAIL(cuCtxCreate(&m_context, 0, m_device), reportType);
+        return SLANG_OK;
+    }
+
+    virtual SLANG_NO_THROW Result SLANG_MCALL getSlangSession(slang::ISession** outSlangSession) override
+    {
+        *outSlangSession = slangContext.session.get();
+        slangContext.session->addRef();
         return SLANG_OK;
     }
 

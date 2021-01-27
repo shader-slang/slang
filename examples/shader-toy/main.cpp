@@ -91,52 +91,15 @@ void diagnoseIfNeeded(slang::IBlob* diagnosticsBlob)
 //
 Result loadShaderProgram(gfx::IRenderer* renderer, ComPtr<gfx::IShaderProgram>& outShaderProgram)
 {
-    // The first step in interacting with the Slang API is to create a "global session,"
-    // which represents an instance of the Slang API loaded from the library.
-    //
-    ComPtr<slang::IGlobalSession> slangGlobalSession;
-    SLANG_RETURN_ON_FAIL(slang_createGlobalSession(SLANG_API_VERSION, slangGlobalSession.writeRef()));
-
-    // Next, we need to create a compilation session (`slang::ISession`) that will provide
+    // We need to obatin a compilation session (`slang::ISession`) that will provide
     // a scope to all the compilation and loading of code we do.
     //
-    // In an application like this, which doesn't make use of preprocessor-based specialization,
-    // we can create a single session and use it for the duration of the application.
-    // One important service the session provides is re-use of modules that have already
-    // been compiled, so that if two Slang files `import` the same module, the compiler
-    // will only load and check that module once.
-    //
-    // When creating a session we need to tell it what code generation targets we may
-    // want code generated for. It is valid to have zero or more targets, but many
-    // applications will only want one, corresponding to the graphics API they plan to use.
-    // This application is currently hard-coded to use D3D11, so we set up for compilation
-    // to DX bytecode.
-    //
-    // Note: the `TargetDesc` can also be used to set things like optimization settings
-    // for each target, but this application doesn't care to set any of that stuff.
-    //
-    slang::TargetDesc targetDesc = {};
-    targetDesc.format = SLANG_DXBC;
-    targetDesc.profile = spFindProfile(slangGlobalSession, "sm_4_0");
-
-    // The session can be set up with a few other options, notably:
-    //
-    // * Any search paths that should be used when resolving `import` or `#include` directives.
-    //
-    // * Any preprocessor macros to pre-define when reading in files.
-    //
-    // This application doesn't plan to make heavy use of the preprocessor, and all its
-    // shader files are in the same directory, so we just use the default options (which
-    // will lead to the only search path being the current working directory).
-    //
-    slang::SessionDesc sessionDesc = {};
-    sessionDesc.targetCount = 1;
-    sessionDesc.targets = &targetDesc;
-
+    // Our example application uses the `gfx` graphics API abstraction layer, which already
+    // creates a Slang compilation session for us, so we just grab and use it here.
     ComPtr<slang::ISession> slangSession;
-    SLANG_RETURN_ON_FAIL(slangGlobalSession->createSession(sessionDesc, slangSession.writeRef()));
-
-    // Once the session has been created, we can start loading code into it.
+    SLANG_RETURN_ON_FAIL(renderer->getSlangSession(slangSession.writeRef()));
+    
+    // Once the session has been obtained, we can start loading code into it.
     //
     // The simplest way to load code is by calling `loadModule` with the name of a Slang
     // module. A call to `loadModule("MyStuff")` will behave more or less as if you

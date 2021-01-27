@@ -1085,15 +1085,32 @@ struct Viewport
 class IRenderer: public ISlangUnknown
 {
 public:
+    struct SlangDesc
+    {
+        slang::IGlobalSession* slangGlobalSession = nullptr; // (optional) A slang global session object. If null will create automatically.
+
+        SlangMatrixLayoutMode defaultMatrixLayoutMode = SLANG_MATRIX_LAYOUT_ROW_MAJOR;
+
+        char const* const* searchPaths = nullptr;
+        SlangInt            searchPathCount = 0;
+
+        slang::PreprocessorMacroDesc const* preprocessorMacros = nullptr;
+        SlangInt                        preprocessorMacroCount = 0;
+
+        const char* targetProfile = nullptr; // (optional) Target shader profile. If null this will be set to platform dependent default.
+        SlangFloatingPointMode floatingPointMode = SLANG_FLOATING_POINT_MODE_DEFAULT;
+        SlangOptimizationLevel optimizationLevel = SLANG_OPTIMIZATION_LEVEL_DEFAULT;
+    };
 
     struct Desc
     {
-        int width = 0;                                  ///< Width in pixels
-        int height = 0;                                 ///< height in pixels
-        const char* adapter = nullptr;                  ///< Name to identify the adapter to use
-        int requiredFeatureCount = 0;                   ///< Number of required features.
-        const char** requiredFeatures = nullptr;        ///< Array of required feature names, whose size is `requiredFeatureCount`.
-        int nvapiExtnSlot = -1;                         ///< The slot (typically UAV) used to identify NVAPI intrinsics. If >=0 NVAPI is required.
+        int width = 0;                                  // Width in pixels
+        int height = 0;                                 // height in pixels
+        const char* adapter = nullptr;                  // Name to identify the adapter to use
+        int requiredFeatureCount = 0;                   // Number of required features.
+        const char** requiredFeatures = nullptr;        // Array of required feature names, whose size is `requiredFeatureCount`.
+        int nvapiExtnSlot = -1;                         // The slot (typically UAV) used to identify NVAPI intrinsics. If >=0 NVAPI is required.
+        SlangDesc slang = {};                           // Configurations for Slang.
     };
 
         // Will return with SLANG_E_NOT_AVAILABLE if NVAPI can't be initialized and nvapiExtnSlot >= 0
@@ -1103,6 +1120,15 @@ public:
 
         /// Returns a list of features supported by the renderer.
     virtual SLANG_NO_THROW Result SLANG_MCALL getFeatures(const char** outFeatures, UInt bufferSize, UInt* outFeatureCount) = 0;
+
+    virtual SLANG_NO_THROW Result SLANG_MCALL getSlangSession(slang::ISession** outSlangSession) = 0;
+
+    inline ComPtr<slang::ISession> getSlangSession()
+    {
+        ComPtr<slang::ISession> result;
+        getSlangSession(result.writeRef());
+        return result;
+    }
 
     virtual SLANG_NO_THROW void SLANG_MCALL setClearColor(const float color[4]) = 0;
     virtual SLANG_NO_THROW void SLANG_MCALL clearFrame() = 0;

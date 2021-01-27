@@ -1348,7 +1348,10 @@ static bool _isSupportedNVAPIOp(ID3D12Device* dev, uint32_t op)
 
 Result D3D12Renderer::initialize(const Desc& desc, void* inWindowHandle)
 {
+    SLANG_RETURN_ON_FAIL(slangContext.initialize(desc.slang, SLANG_DXBC, "sm_5_1"));
+
     m_hwnd = (HWND)inWindowHandle;
+    
     // Rather than statically link against D3D, we load it dynamically.
 
     HMODULE d3dModule = LoadLibraryA("d3d12.dll");
