@@ -2,9 +2,11 @@
 
 #include "tools/gfx/render.h"
 #include "core/slang-basic.h"
+#include "tools/gfx/slang-context.h"
 
 namespace gfx
 {
+
 class GraphicsCommonProgramLayout;
 
 class GraphicsCommonShaderProgram : public IShaderProgram, public Slang::RefObject
@@ -32,6 +34,8 @@ public:
     virtual SLANG_NO_THROW Result SLANG_MCALL getFeatures(
         const char** outFeatures, UInt bufferSize, UInt* outFeatureCount) SLANG_OVERRIDE;
     virtual SLANG_NO_THROW bool SLANG_MCALL hasFeature(const char* featureName) SLANG_OVERRIDE;
+    virtual SLANG_NO_THROW Result SLANG_MCALL getSlangSession(slang::ISession** outSlangSession) SLANG_OVERRIDE;
+
     virtual SLANG_NO_THROW Result SLANG_MCALL createShaderObjectLayout(
         slang::TypeLayoutReflection* typeLayout, IShaderObjectLayout** outLayout) SLANG_OVERRIDE;
     virtual SLANG_NO_THROW Result SLANG_MCALL
@@ -51,6 +55,7 @@ public:
 
 protected:
     Slang::List<Slang::String> m_features;
+    SlangContext slangContext;
 };
 
 struct GfxGUID

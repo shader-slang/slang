@@ -664,6 +664,8 @@ static bool _isSupportedNVAPIOp(IUnknown* dev, uint32_t op)
 
 SlangResult D3D11Renderer::initialize(const Desc& desc, void* inWindowHandle)
 {
+    SLANG_RETURN_ON_FAIL(slangContext.initialize(desc.slang, SLANG_DXBC, "sm_5_0"));
+
     auto windowHandle = (HWND)inWindowHandle;
     m_desc = desc;
 
