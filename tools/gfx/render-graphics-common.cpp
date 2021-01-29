@@ -1372,6 +1372,13 @@ SLANG_NO_THROW bool SLANG_MCALL gfx::GraphicsAPIRenderer::hasFeature(const char*
     return m_features.findFirstIndex([&](Slang::String x) { return x == featureName; }) != -1;
 }
 
+SLANG_NO_THROW Result SLANG_MCALL gfx::GraphicsAPIRenderer::getSlangSession(slang::ISession** outSlangSession)
+{
+    *outSlangSession = slangContext.session.get();
+    slangContext.session->addRef();
+    return SLANG_OK;
+}
+
 GraphicsCommonShaderProgram::~GraphicsCommonShaderProgram()
 {
     // Note: It might not seem like this destructor is needed at all, since

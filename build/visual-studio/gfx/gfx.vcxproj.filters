@@ -51,6 +51,9 @@
     <ClInclude Include="..\..\..\tools\gfx\renderer-shared.h">
       <Filter>Header Files</Filter>
     </ClInclude>
+    <ClInclude Include="..\..\..\tools\gfx\slang-context.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
     <ClInclude Include="..\..\..\tools\gfx\vulkan\render-vk.h">
       <Filter>Header Files</Filter>
     </ClInclude>
