@@ -894,6 +894,12 @@ bool CLikeSourceEmitter::shouldFoldInstIntoUseSites(IRInst* inst)
     case kIROp_Alloca:
         return false;
 
+    // Never fold these, because their result cannot be computed
+    // as a sub-expression (they must be emitted as a declaration
+    // or statement).
+    case kIROp_DefaultConstruct:
+        return false;
+
     // Always fold these in, because they are trivial
     //
     case kIROp_IntLit:
