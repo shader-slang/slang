@@ -676,4 +676,22 @@ class ThisType : public Type
     Val* _substituteImplOverride(ASTBuilder* astBuilder, SubstitutionSet subst, int* ioDiff);
 };
 
+    /// The type of `A & B` where `A` and `B` are types
+    ///
+    /// A value `v` is of type `A & B` if it is both of type `A` and of type `B`.
+class AndType : public Type
+{
+    SLANG_AST_CLASS(AndType)
+
+    Type* left;
+    Type* right;
+
+    // Overrides should be public so base classes can access
+    String _toStringOverride();
+    bool _equalsImplOverride(Type* type);
+    HashCode _getHashCodeOverride();
+    Type* _createCanonicalTypeOverride();
+    Val* _substituteImplOverride(ASTBuilder* astBuilder, SubstitutionSet subst, int* ioDiff);
+};
+
 } // namespace Slang

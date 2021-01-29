@@ -174,16 +174,38 @@ namespace Slang
     public:
         Hasher() {}
 
+            /// Hash the given `value` and combine it into this hash state
         template<typename T>
         void hashValue(T const& value)
         {
+            // TODO: Eventually, we should replace `getHashCode`
+            // with a "hash into" operation that takes the value
+            // and a `Hasher`.
+
             m_hashCode = combineHash(m_hashCode, getHashCode(value));
         }
 
+            /// Hash the given `object` and combine it into this hash state
         template<typename T>
         void hashObject(T const& object)
         {
+            // TODO: Eventually, we should replace `getHashCode`
+            // with a "hash into" operation that takes the value
+            // and a `Hasher`.
+
             m_hashCode = combineHash(m_hashCode, object->getHashCode());
+        }
+
+            /// Combine the given `hash` code into the hash state.
+            ///
+            /// Note: users should prefer to use `hashValue` or `hashObject`
+            /// when possible, as they may be able to ensure a higher-quality
+            /// hash result (e.g., by using more bits to represent the state
+            /// during hashing than are used for the final hash code).
+            ///
+        void addHash(HashCode hash)
+        {
+            m_hashCode = combineHash(m_hashCode, hash);
         }
 
         HashCode getResult() const

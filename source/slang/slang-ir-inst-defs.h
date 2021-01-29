@@ -51,6 +51,8 @@ INST(Nop, nop, 0, 0)
 
     INST(TaggedUnionType, TaggedUnion, 0, 0)
 
+    INST(ConjunctionType, Conjunction, 0, 0)
+
     /* BindExistentialsTypeBase */
 
         // A `BindExistentials<B, T0,w0, T1,w1, ...>` represents
