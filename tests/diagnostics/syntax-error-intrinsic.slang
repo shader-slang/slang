@@ -1,10 +1,10 @@
 // syntax-error-intrinsic.slang
 
-//DIAGNOSTIC_TEST:SIMPLE:-target spirv -entry computeMain
-//DIAGNOSTIC_TEST:SIMPLE:-target dxil -profile cs_6_0 -entry computeMain
-//DIAGNOSTIC_TEST:SIMPLE:-target dxbc -entry computeMain
-//DIAGNOSTIC_TEST:SIMPLE:-target dll -entry computeMain
-//DIAGNOSTIC_TEST:SIMPLE:-target ptx -entry computeMain
+//DIAGNOSTIC_TEST:SIMPLE_LINE:-entry computeMain -target spirv 
+//DIAGNOSTIC_TEST:SIMPLE_LINE:-entry computeMain -target dxil -profile cs_6_0 
+//DIAGNOSTIC_TEST:SIMPLE_LINE:-entry computeMain -target dxbc 
+//DIAGNOSTIC_TEST:SIMPLE_LINE:-entry computeMain -target dll 
+//DIAGNOSTIC_TEST:SIMPLE_LINE:-entry computeMain -target ptx 
 
 [shader("compute")]
 [numthreads(4, 1, 1)]
