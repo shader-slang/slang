@@ -32,9 +32,9 @@ namespace Slang {
     return areAllEqual(slicesA, slicesB, equalFn);
 }
 
-/* static */void StringUtil::split(const UnownedStringSlice& in, char splitChar, List<UnownedStringSlice>& slicesOut)
+/* static */void StringUtil::split(const UnownedStringSlice& in, char splitChar, List<UnownedStringSlice>& outSlices)
 {
-    slicesOut.clear();
+    outSlices.clear();
 
     const char* start = in.begin();
     const char* end = in.end();
@@ -49,7 +49,7 @@ namespace Slang {
         }
 
         // Add to output
-        slicesOut.add(UnownedStringSlice(start, cur));
+        outSlices.add(UnownedStringSlice(start, cur));
 
         // Skip the split character, if at end we are okay anyway
         start = cur + 1;

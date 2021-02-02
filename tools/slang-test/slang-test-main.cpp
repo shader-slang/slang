@@ -10,6 +10,7 @@
 
 #include "../../source/core/slang-string-util.h"
 #include "../../source/core/slang-byte-encode-util.h"
+#include "../../source/core/slang-char-util.h"
 
 using namespace Slang;
 
@@ -19,6 +20,7 @@ using namespace Slang;
 #include "test-reporter.h"
 #include "options.h"
 #include "slangc-tool.h"
+#include "parse-diagnostic-util.h"
 
 #include "../../source/core/slang-downstream-compiler.h"
 
@@ -1219,6 +1221,86 @@ TestResult runSimpleTest(TestContext* context, TestInput& input)
     if (expectedOutput.getLength() == 0)
     {
         expectedOutput = "result code = 0\nstandard error = {\n}\nstandard output = {\n}\n";
+    }
+
+    TestResult result = TestResult::Pass;
+
+    // Otherwise we compare to the expected output
+    if (!_areResultsEqual(input.testOptions->type, expectedOutput, actualOutput))
+    {
+        context->reporter->dumpOutputDifference(expectedOutput, actualOutput);
+        result = TestResult::Fail;
+    }
+
+    // If the test failed, then we write the actual output to a file
+    // so that we can easily diff it from the command line and
+    // diagnose the problem.
+    if (result == TestResult::Fail)
+    {
+        String actualOutputPath = outputStem + ".actual";
+        Slang::File::writeAllText(actualOutputPath, actualOutput);
+
+        context->reporter->dumpOutputDifference(expectedOutput, actualOutput);
+    }
+
+    return result;
+}
+
+TestResult runSimpleLineTest(TestContext* context, TestInput& input)
+{
+    // need to execute the stand-alone Slang compiler on the file, and compare its output to what we expect
+    auto outputStem = input.outputStem;
+
+    CommandLine cmdLine;
+    _initSlangCompiler(context, cmdLine);
+
+    cmdLine.addArg(input.filePath);
+
+    for (auto arg : input.testOptions->args)
+    {
+        cmdLine.addArg(arg);
+    }
+
+    ExecuteResult exeRes;
+    TEST_RETURN_ON_DONE(spawnAndWait(context, outputStem, input.spawnType, cmdLine, exeRes));
+
+    if (context->isCollectingRequirements())
+    {
+        return TestResult::Pass;
+    }
+
+    // Parse all the diagnostics so we can extract line numbers
+    List<DownstreamDiagnostic> diagnostics;
+    if (SLANG_FAILED(ParseDiagnosticUtil::parseDiagnostics(exeRes.standardError.getUnownedSlice(), diagnostics)) || diagnostics.getCount() <= 0)
+    {
+        // Write out the diagnostics which couldn't be parsed.
+
+        String actualOutputPath = outputStem + ".actual";
+        Slang::File::writeAllText(actualOutputPath, exeRes.standardError);
+
+        return TestResult::Fail;
+    }
+
+    StringBuilder actualOutput;
+
+    if (diagnostics.getCount() > 0)
+    {
+        actualOutput << diagnostics[0].fileLine << "\n";
+    }
+    else
+    {
+        actualOutput << "No output diagnostics\n";
+    }
+
+
+    String expectedOutputPath = outputStem + ".expected";
+    String expectedOutput;
+    try
+    {
+        expectedOutput = Slang::File::readAllText(expectedOutputPath);
+    }
+    catch (const Slang::IOException&)
+    {
     }
 
     TestResult result = TestResult::Pass;
@@ -2688,6 +2770,7 @@ static const TestCommandInfo s_testCommandInfos[] =
 {
     { "SIMPLE",                                 &runSimpleTest,                             0 },
     { "SIMPLE_EX",                              &runSimpleTest,                             0 },
+    { "SIMPLE_LINE",                            &runSimpleLineTest,                         0 },
     { "REFLECTION",                             &runReflectionTest,                         0 },
     { "CPU_REFLECTION",                         &runReflectionTest,                         0 },
     { "COMMAND_LINE_SIMPLE",                    &runSimpleCompareCommandLineTest,           0 },

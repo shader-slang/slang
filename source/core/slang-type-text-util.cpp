@@ -128,20 +128,32 @@ static const ArchiveTypeInfo s_archiveTypeInfos[] =
     return slang::TypeReflection::ScalarType::None;
 }
 
+#define SLANG_PASS_THROUGH_HUMAN_TEXT(x) \
+    x(NONE,             "Unknown") \
+    x(VISUAL_STUDIO,    "Visual Studio") \
+    x(GCC,              "GCC") \
+    x(CLANG,            "Clang") \
+    x(NVRTC,            "NVRTC") \
+    x(FXC,              "fxc") \
+    x(DXC,              "dxc") \
+    x(GLSLANG,          "glslang")
+
 /* static */UnownedStringSlice TypeTextUtil::getPassThroughAsHumanText(SlangPassThrough type)
 {
+#define SLANG_PASS_THROUGH_HUMAN_CASE(value, text)  case SLANG_PASS_THROUGH_##value: return UnownedStringSlice::fromLiteral(text); 
+
     switch (type)
     {
-        default:
-        case SLANG_PASS_THROUGH_NONE:           return UnownedStringSlice::fromLiteral("Unknown");
-        case SLANG_PASS_THROUGH_VISUAL_STUDIO:  return UnownedStringSlice::fromLiteral("Visual Studio");
-        case SLANG_PASS_THROUGH_GCC:            return UnownedStringSlice::fromLiteral("GCC");
-        case SLANG_PASS_THROUGH_CLANG:          return UnownedStringSlice::fromLiteral("Clang");
-        case SLANG_PASS_THROUGH_NVRTC:          return UnownedStringSlice::fromLiteral("NVRTC");
-        case SLANG_PASS_THROUGH_FXC:            return UnownedStringSlice::fromLiteral("fxc");
-        case SLANG_PASS_THROUGH_DXC:            return UnownedStringSlice::fromLiteral("dxc");
-        case SLANG_PASS_THROUGH_GLSLANG:        return UnownedStringSlice::fromLiteral("glslang");
+        default:    /* fall-through to none */
+        SLANG_PASS_THROUGH_HUMAN_TEXT(SLANG_PASS_THROUGH_HUMAN_CASE)
     }
+}
+
+/* static */SlangResult TypeTextUtil::findPassThroughFromHumanText(const UnownedStringSlice& inText, SlangPassThrough& outPassThrough)
+{
+    #define SLANG_PASS_THROUGH_HUMAN_IF(value, text)  if (inText == UnownedStringSlice::fromLiteral(text)) { outPassThrough = SLANG_PASS_THROUGH_##value; return SLANG_OK; } else
+    SLANG_PASS_THROUGH_HUMAN_TEXT(SLANG_PASS_THROUGH_HUMAN_IF)
+    return SLANG_FAIL;
 }
 
 /* static */SlangSourceLanguage TypeTextUtil::findSourceLanguage(const UnownedStringSlice& text)

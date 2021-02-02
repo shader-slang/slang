@@ -164,6 +164,7 @@
   <ItemGroup>
     <ClInclude Include="..\..\..\tools\slang-test\directory-util.h" />
     <ClInclude Include="..\..\..\tools\slang-test\options.h" />
+    <ClInclude Include="..\..\..\tools\slang-test\parse-diagnostic-util.h" />
     <ClInclude Include="..\..\..\tools\slang-test\slangc-tool.h" />
     <ClInclude Include="..\..\..\tools\slang-test\test-context.h" />
     <ClInclude Include="..\..\..\tools\slang-test\test-reporter.h" />
@@ -171,6 +172,7 @@
   <ItemGroup>
     <ClCompile Include="..\..\..\tools\slang-test\directory-util.cpp" />
     <ClCompile Include="..\..\..\tools\slang-test\options.cpp" />
+    <ClCompile Include="..\..\..\tools\slang-test\parse-diagnostic-util.cpp" />
     <ClCompile Include="..\..\..\tools\slang-test\slang-test-main.cpp" />
     <ClCompile Include="..\..\..\tools\slang-test\slangc-tool.cpp" />
     <ClCompile Include="..\..\..\tools\slang-test\test-context.cpp" />
