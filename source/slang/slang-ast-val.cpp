@@ -258,21 +258,6 @@ Val* DeclaredSubtypeWitness::_substituteImplOverride(ASTBuilder* astBuilder, Sub
                     return genericSubst->args[index + ordinaryParamCount];
                 }
             }
-            else if (auto globalGenericSubst = as<GlobalGenericParamSubstitution>(s))
-            {
-                // check if the substitution is really about this global generic type parameter
-                if (globalGenericSubst->paramDecl != genConstraintDecl->parentDecl)
-                    continue;
-
-                for (auto constraintArg : globalGenericSubst->constraintArgs)
-                {
-                    if (constraintArg.decl != genConstraintDecl)
-                        continue;
-
-                    (*ioDiff)++;
-                    return constraintArg.val;
-                }
-            }
         }
     }
 

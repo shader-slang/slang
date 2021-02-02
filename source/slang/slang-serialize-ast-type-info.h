@@ -144,9 +144,6 @@ struct SerialTypeInfo<LookupResult>
     }
 };
 
-// GlobalGenericParamSubstitution::ConstraintArg
-SLANG_VALUE_TYPE_INFO(GlobalGenericParamSubstitution_ConstraintArg)
-
 // SpecializationArg
 SLANG_VALUE_TYPE_INFO(SpecializationArg)
 // ExpandedSpecializationArg
