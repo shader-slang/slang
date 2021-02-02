@@ -1028,90 +1028,11 @@ static SlangResult _executeBinary(const UnownedStringSlice& hexDump, ExecuteResu
     return ProcessUtil::execute(cmdLine, outExeRes);
 }
 
-static UnownedStringSlice _removeDiagnosticPrefix(const UnownedStringSlice& prefix, const UnownedStringSlice& in)
-{
-    SLANG_ASSERT(in.startsWith(prefix));
-
-    UnownedStringSlice remaining(in.begin() + prefix.getLength(), in.end());
-    const Index index = remaining.indexOf(':');
-
-    if (index >= 0)
-    {
-        // Ok strip everything before the colon
-        return UnownedStringSlice(remaining.begin() + index, remaining.end());
-    }
-    else
-    {
-        // Couldn't strip, just return the whole string as is
-        return in;
-    }
-}
-
-static bool _isUnsignedInteger(const UnownedStringSlice& a)
-{
-    const char* end = a.end();
-    for (const char* cur = a.begin(); cur < end; ++cur)
-    {
-        if (!(*cur >= '0' && *cur <= '9'))
-        {
-            return false;
-        }
-    }
-    return true;
-}
-
-static bool _isDXCLineSplitEqual(const UnownedStringSlice& a, const UnownedStringSlice& b)
-{
-    return a == b || (_isUnsignedInteger(a.trim()) && _isUnsignedInteger(b.trim()));
-}
-
-// Returns true if a and b are output from dxc (prefixed with dxc:.
-// Ignores line number/column number differences from the dxc specific line format. 
-static bool _isDXCLineEqual(const UnownedStringSlice& a, const UnownedStringSlice& b)
-{
-    // We are going to ignore the line number/column number.
-    // To do this if we find any sub strings inbetween : that are just all digits we'll assume it's a line number/column number
-    // and ignore
-
-    // dxc: tests/cross-compile/dxc-error.hlsl:9:2: error: use of undeclared identifier 'gOutputBuffer'
-    const UnownedStringSlice dxcPrefix = UnownedStringSlice::fromLiteral("dxc:");
-    return a.startsWith(dxcPrefix) && b.startsWith(dxcPrefix) && StringUtil::areAllEqualWithSplit(a, b, ':', _isDXCLineSplitEqual);
-}
-
-static bool _isLineEqual(const UnownedStringSlice& a, const UnownedStringSlice& b)
-{
-    if (a == b)
-    {
-        return true;
-    }
-
-    static const UnownedStringSlice stdLibNames[] =
-    {
-        UnownedStringSlice::fromLiteral("core.meta.slang"),
-        UnownedStringSlice::fromLiteral("hlsl.meta.slang"),
-        UnownedStringSlice::fromLiteral("slang-stdlib.cpp"),
-    };
-
-    // Look for if a line starts with a stdlib name
-    for (const auto& stdLibName : stdLibNames)
-    {
-        if (a.startsWith(stdLibName) && b.startsWith(stdLibName))
-        {
-            // If the text after the diagnostic prefix is equal then the line is equal
-            if (_removeDiagnosticPrefix(stdLibName, a) == _removeDiagnosticPrefix(stdLibName, b))
-            {
-                return true;
-            }
-        }
-    }
-
-    return _isDXCLineEqual(a, b);
-}
-
-static bool _areDiagnosticsEqualNew(const UnownedStringSlice& a, const UnownedStringSlice& b)
+static bool _areDiagnosticsEqual(const UnownedStringSlice& a, const UnownedStringSlice& b)
 {
     ParseDiagnosticUtil::OutputInfo outA, outB;
 
+    // If we can't parse, we can't match, so fail.
     if (SLANG_FAILED(ParseDiagnosticUtil::parseOutputInfo(a, outA)) ||
         SLANG_FAILED(ParseDiagnosticUtil::parseOutputInfo(b, outB)))
     {
@@ -1125,57 +1046,11 @@ static bool _areDiagnosticsEqualNew(const UnownedStringSlice& a, const UnownedSt
         return false;
     }
 
+    // Parse the compiler diagnostics and make sure they are the same.
+    // Ignores line number differences 
     return ParseDiagnosticUtil::areEqual(outA.stdError.getUnownedSlice(), outB.stdError.getUnownedSlice(), ParseDiagnosticUtil::EqualityFlag::IgnoreLineNos);
 }
-    
-
-static bool _areDiagnosticsEqualOld(const UnownedStringSlice& a, const UnownedStringSlice& b)
-{
-    // If they are identical we are done
-    if (a == b)
-    {
-        return true;
-    }
-
-    // Okay we are going to go line by line
-    // If the lines are equal thats ok.
-    // If they are not.. we will check if the only difference is line numbers from the stdlib
-
-    List<UnownedStringSlice> linesA;
-    List<UnownedStringSlice> linesB;
-
-    StringUtil::calcLines(a, linesA);
-    StringUtil::calcLines(b, linesB);
-
-    if (linesA.getCount() != linesB.getCount())
-    {
-        return false;
-    }
-
-    for (Index i = 0; i < linesA.getCount(); ++i)
-    {
-        if (!_isLineEqual(linesA[i], linesB[i]))
-        {
-            return false;
-        }
-    }
-
-    return true;
-}
-
-static bool _areDiagnosticsEqual(const UnownedStringSlice& a, const UnownedStringSlice& b)
-{
-    bool newRes = _areDiagnosticsEqualNew(a, b);
-    bool oldRes = _areDiagnosticsEqualOld(a, b);
-
-    if (newRes != oldRes)
-    {
-        SLANG_BREAKPOINT(0);
-    }
-
-    return (newRes == oldRes) && newRes;
-}
-
+   
 static bool _areResultsEqual(TestOptions::Type type, const String& a, const String& b)
 {
     switch (type)

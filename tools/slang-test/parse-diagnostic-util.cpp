@@ -547,6 +547,21 @@ static UnownedStringSlice _getEquals(const UnownedStringSlice& in)
     SlangResult resA = ParseDiagnosticUtil::parseDiagnostics(a, diagsA);
     SlangResult resB = ParseDiagnosticUtil::parseDiagnostics(b, diagsB);
 
+    /*
+        TODO(JS): In the past we needed special handling of the stdlib, when
+        in some builds the path contains the stdlib.
+
+        For now we don't seem to need this, this is for future reference, if there
+        is an issue with needing to specially handle this.
+
+       static const UnownedStringSlice stdLibNames[] =
+        {
+            UnownedStringSlice::fromLiteral("core.meta.slang"),
+            UnownedStringSlice::fromLiteral("hlsl.meta.slang"),
+            UnownedStringSlice::fromLiteral("slang-stdlib.cpp"),
+        };
+        */
+
     // Must have both succeeded, and have the same amount of lines
     if (SLANG_SUCCEEDED(resA) && SLANG_SUCCEEDED(resB) &&
         diagsA.getCount() == diagsB.getCount())
