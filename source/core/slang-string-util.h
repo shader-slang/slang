@@ -39,11 +39,11 @@ struct StringUtil
 
         /// Equivalent to doing a split and then finding the index of 'find' on the array
         /// Returns -1 if not found
-    static int indexOfInSplit(const UnownedStringSlice& in, char splitChar, const UnownedStringSlice& find);
+    static Index indexOfInSplit(const UnownedStringSlice& in, char splitChar, const UnownedStringSlice& find);
 
         /// Given the entry at the split index specified.
         /// Will return slice with begin() == nullptr if not found or input has begin() == nullptr)
-    static UnownedStringSlice getAtInSplit(const UnownedStringSlice& in, char splitChar, int index);
+    static UnownedStringSlice getAtInSplit(const UnownedStringSlice& in, char splitChar, Index index);
 
         /// Returns the size in bytes needed to hold the formatted string using the specified args, NOT including a terminating 0
         /// NOTE! The caller *should* assume this will consume the va_list (use va_copy to make a copy to be consumed)
