@@ -34,15 +34,17 @@ Much like other targets that use downstream compilers Slang can be used to compi
 
 ## Locating NVRTC
 
-Finding NVRTC can require some nuance if a specific version is required. On the command line the `-nvrtc-path` option can be used to set the `path` to NVRTC. Also `spProcessCommandLineArguments`/`processCommandLineArguments` with `-nvrtc-path` or `setDownstreamCompilerPath` with `SLANG_PASS_THROUGH_NVRTC` can be used to set the location and/or name of NVRTC via the API. Important points of note are
+Finding NVRTC can require some nuance if a specific version is required. On the command line the `-nvrtc-path` option can be used to set the `path` to NVRTC. Also `spProcessCommandLineArguments`/`processCommandLineArguments` with `-nvrtc-path` or `setDownstreamCompilerPath` with `SLANG_PASS_THROUGH_NVRTC` can be used to set the location and/or name of NVRTC via the API. 
+
+Important points of note are
 
 * The name of the shared library should *not* include any extension (such as `.dll`/`.so`/`.dynlib`) or prefix (such as `lib`).
 * The path also *doesn't* have to be path, it can just be the shared library name. Doing so will mean it will be searched for by whatever the default mechanism is on the target. 
 * If a path and/or name is specified for NVRTC - this will be the *only* version searched for.
  
-If a path/name is *not* specified for NVRTC, Slang will attempt to load a shared library called `nvrtc`. For non windows targets this should be enough to find and load the latest version.
+If a path/name is *not* specified for NVRTC, Slang will attempt to load a shared library called `nvrtc`. For non Windows targets this should be enough to find and load the latest version.
  
-On windows NVRTC dlls have a name the contains the version number (such as `nvrtc64_102_0.dll`) which means the load of just `nvrtc` will fail. One way to get around this is to place the dll and associated files in the same directory as slang.dll. Then rename the nvrtc dll to `nvrtc.dll`. Another way would be to specify directly on the command line, as previously discussed. For example  
+On Windows NVRTC dlls have a name the contains the version number, for example `nvrtc64_102_0.dll`. This will lead to the load of just `nvrtc` to fail. One approach to fix this is to place the NVRTC dll and associated files in the same directory as slang.dll, and rename the main dll to `nvrtc.dll`. Another approach is to specify directly on the command line the name including the version, as previously discussed. For example  
 
 `-nvrtc-path nvrtc64_102_0` 
  
@@ -54,7 +56,7 @@ On Windows if NVRTC is not loadable directly as 'nvrtc' Slang will attempt to se
 * The CUDA_PATH enivonment variable (if set)
 * Directories in PATH that look like a CUDA installation.
 
-If a candidate is found via via an earlier mechanism, subsequent searches are not performed. If multiple candidates are found, Slang tries the newest version first.
+If a candidate is found via an earlier mechanism, subsequent searches are not performed. If multiple candidates are found, Slang tries the newest version first.
 
 Binding 
 =======
