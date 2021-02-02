@@ -18,6 +18,44 @@ struct ParseDiagnosticUtil
         Slang::String stdOut;
     };
 
+        /// We need a way to identify Slang. Ideally we'd have an enum that included SLANG
+        /// But that doesn't really work with SlangPassThrough, although perhaps makes
+        /// some sort of sense as a 'DownstreamCompiler'.
+    struct CompilerIdentity
+    {
+        typedef CompilerIdentity ThisType;
+
+        enum Type
+        {
+            Unknown,
+            Slang,
+            DownstreamCompiler,
+        };
+
+        static CompilerIdentity make(Type type, SlangPassThrough downstreamCompiler) { CompilerIdentity ident; ident.m_type = type; ident.m_downstreamCompiler = downstreamCompiler; return ident; }
+        static CompilerIdentity make(SlangPassThrough downstreamCompiler) { return make(Type::DownstreamCompiler, downstreamCompiler); }
+        static CompilerIdentity makeSlang() { return make(Type::Slang, SLANG_PASS_THROUGH_NONE); }
+
+        bool operator==(const ThisType& rhs) const { return m_type == rhs.m_type && m_downstreamCompiler == rhs.m_downstreamCompiler; }
+        bool operator!=(const ThisType& rhs) const { return !(*this == rhs); }
+
+        Type m_type = Type::Unknown; 
+        SlangPassThrough m_downstreamCompiler = SLANG_PASS_THROUGH_NONE;
+    };
+
+    typedef uint32_t EqualityFlags;
+    struct EqualityFlag
+    {
+        enum Enum : EqualityFlags
+        {
+            IgnoreLineNos = 0x1,
+        };
+    };
+
+    typedef SlangResult (*LineParser)(const Slang::UnownedStringSlice& line, Slang::List<Slang::UnownedStringSlice>& lineSlices, Slang::DownstreamDiagnostic& outDiagnostic);
+
+    static LineParser getLineParser(const CompilerIdentity& compilerIdentity);
+
         /// Given a path, that holds line number and potentially column number in () after path, writes result into outDiagnostic
     static SlangResult splitPathLocation(const Slang::UnownedStringSlice& pathLocation, Slang::DownstreamDiagnostic& outDiagnostic);
 
@@ -42,6 +80,14 @@ struct ParseDiagnosticUtil
         /// Given the file output style used by tests, get components of the output into Diagnostic
     static SlangResult parseOutputInfo(const Slang::UnownedStringSlice& in, OutputInfo& out);
 
+        /// Given a line split it into slices - taking into account compiler output, path considerations, and potentially line prefixing
+    static SlangResult splitDiagnosticLine(const CompilerIdentity& compilerIdentity, const Slang::UnownedStringSlice& line, Slang::UnownedStringSlice& linePrefix, Slang::List<Slang::UnownedStringSlice>& outSlices);
+
+        /// Give text of diagnostic determine which compiler the output is from
+    static SlangResult identifyCompiler(const Slang::UnownedStringSlice& in, CompilerIdentity& outIdentity);
+
+        /// Determines if equal taking into account flags
+    static bool areEqual(const Slang::UnownedStringSlice& a, const Slang::UnownedStringSlice& b, EqualityFlags flags);
 };
 
 #endif // PARSE_DIAGNOSTIC_UTIL_H

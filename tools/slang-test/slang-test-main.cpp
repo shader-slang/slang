@@ -1108,57 +1108,29 @@ static bool _isLineEqual(const UnownedStringSlice& a, const UnownedStringSlice& 
     return _isDXCLineEqual(a, b);
 }
 
-static bool _areDiagnosticsEqual(const UnownedStringSlice& a, const UnownedStringSlice& b)
+static bool _areDiagnosticsEqualNew(const UnownedStringSlice& a, const UnownedStringSlice& b)
 {
-    // Lets try parsing both
+    ParseDiagnosticUtil::OutputInfo outA, outB;
+
+    if (SLANG_FAILED(ParseDiagnosticUtil::parseOutputInfo(a, outA)) ||
+        SLANG_FAILED(ParseDiagnosticUtil::parseOutputInfo(b, outB)))
     {
-        ParseDiagnosticUtil::OutputInfo outA, outB;
-
-        if (SLANG_FAILED(ParseDiagnosticUtil::parseOutputInfo(a, outA)) ||
-            SLANG_FAILED(ParseDiagnosticUtil::parseOutputInfo(b, outB)))
-        {
-            return false;
-        }
-
-        // The result codes must match, and std out
-        if (outA.resultCode != outB.resultCode ||
-            !StringUtil::areLinesEqual(outA.stdOut.getUnownedSlice(), outB.stdOut.getUnownedSlice()))
-        {
-            return false;
-        }
-
-        List<DownstreamDiagnostic> diagsA, diagsB;
-        SlangResult resA = ParseDiagnosticUtil::parseDiagnostics(outA.stdError.getUnownedSlice(), diagsA);
-        SlangResult resB = ParseDiagnosticUtil::parseDiagnostics(outB.stdError.getUnownedSlice(), diagsB);
-
-        if (SLANG_SUCCEEDED(resA) && SLANG_SUCCEEDED(resB))
-        {
-            // We can compare and ignore the line numbers
-            if (diagsA.getCount() != diagsB.getCount())
-            {
-                return false;
-            }
-
-            for (Index i = 0; i < diagsA.getCount(); ++i)
-            {
-                DownstreamDiagnostic diagA = diagsA[i];
-                DownstreamDiagnostic diagB = diagsB[i];
-
-                // We don't bother (here anyway) to compare the line numbers
-                diagA.fileLine = 0;
-                diagB.fileLine = 0;
-
-                if (diagA != diagB)
-                {
-                    return false;
-                }
-            }
-
-            return true;
-        }
+        return false;
     }
 
+    // The result codes must match, and std out
+    if (outA.resultCode != outB.resultCode ||
+        !StringUtil::areLinesEqual(outA.stdOut.getUnownedSlice(), outB.stdOut.getUnownedSlice()))
+    {
+        return false;
+    }
 
+    return ParseDiagnosticUtil::areEqual(outA.stdError.getUnownedSlice(), outB.stdError.getUnownedSlice(), ParseDiagnosticUtil::EqualityFlag::IgnoreLineNos);
+}
+    
+
+static bool _areDiagnosticsEqualOld(const UnownedStringSlice& a, const UnownedStringSlice& b)
+{
     // If they are identical we are done
     if (a == b)
     {
@@ -1189,6 +1161,19 @@ static bool _areDiagnosticsEqual(const UnownedStringSlice& a, const UnownedStrin
     }
 
     return true;
+}
+
+static bool _areDiagnosticsEqual(const UnownedStringSlice& a, const UnownedStringSlice& b)
+{
+    bool newRes = _areDiagnosticsEqualNew(a, b);
+    bool oldRes = _areDiagnosticsEqualOld(a, b);
+
+    if (newRes != oldRes)
+    {
+        SLANG_BREAKPOINT(0);
+    }
+
+    return (newRes == oldRes) && newRes;
 }
 
 static bool _areResultsEqual(TestOptions::Type type, const String& a, const String& b)
