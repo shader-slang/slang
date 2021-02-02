@@ -157,7 +157,112 @@ using namespace Slang;
     return SLANG_OK;
 }
 
-/* static */ SlangResult ParseDiagnosticUtil::splitCompilerDiagnosticLine(SlangPassThrough downstreamCompiler, const UnownedStringSlice& line, UnownedStringSlice& linePrefix, List<UnownedStringSlice>& outSlices)
+static SlangResult _getSlangDiagnosticType(const UnownedStringSlice& type, DownstreamDiagnostic::Type& outType, Int& outCode)
+{
+    static const UnownedStringSlice prefixes[] =
+    {
+        UnownedStringSlice::fromLiteral("note"),
+        UnownedStringSlice::fromLiteral("warning"),
+        UnownedStringSlice::fromLiteral("error"),
+        UnownedStringSlice::fromLiteral("fatal error"),
+        UnownedStringSlice::fromLiteral("internal error"),
+        UnownedStringSlice::fromLiteral("unknown error")
+    };
+
+    Int index = -1;
+
+    for (Index i = 0; i < SLANG_COUNT_OF(prefixes); ++i)
+    {
+        const auto& prefix = prefixes[i];
+        if (type.startsWith(prefix))
+        {
+            index = i;
+            break;
+        }
+    }
+
+    
+    switch (index)
+    {
+        case -1:    return SLANG_FAIL;
+        case 0:     outType = DownstreamDiagnostic::Type::Info; break;
+        case 1:     outType = DownstreamDiagnostic::Type::Warning; break;
+        default:    outType = DownstreamDiagnostic::Type::Error; break;
+    }
+
+    outCode = 0;
+
+    UnownedStringSlice tail = type.tail(prefixes[index].getLength()).trim();
+    if (tail.getLength() > 0)
+    {
+        SLANG_RETURN_ON_FAIL(StringUtil::parseInt(tail, outCode));
+    }
+
+    return SLANG_OK;
+}
+
+static bool _isSlangDiagnostic(const UnownedStringSlice& line)
+{
+    /*
+    tests/diagnostics/accessors.slang(11): error 31101: accessors other than 'set' must not have parameters
+    */
+
+    UnownedStringSlice initial = StringUtil::getAtInSplit(line, ':', 0);
+
+    // Handle if path has : 
+    const Index typeIndex = (initial.getLength() == 1 && CharUtil::isAlpha(initial[0])) ? 2 : 1;
+    // Extract the type/code slice
+    UnownedStringSlice typeSlice = StringUtil::getAtInSplit(line, ':', typeIndex).trim();
+
+    DownstreamDiagnostic::Type type;
+    Int code;
+    return SLANG_SUCCEEDED(_getSlangDiagnosticType(typeSlice, type, code));
+}
+
+/* static */SlangResult ParseDiagnosticUtil::parseSlangLine(const UnownedStringSlice& line, List<UnownedStringSlice>& lineSlices, DownstreamDiagnostic& outDiagnostic)
+{
+    /*
+    tests/diagnostics/accessors.slang(11): error 31101: accessors other than 'set' must not have parameters
+    */
+
+    // Can be larger than 3, because might be : in the actual error text
+    if (lineSlices.getCount() < 3)
+    {
+        return SLANG_FAIL;
+    }
+
+    SLANG_RETURN_ON_FAIL(splitPathLocation(lineSlices[0], outDiagnostic));
+    Int code;
+    SLANG_RETURN_ON_FAIL(_getSlangDiagnosticType(lineSlices[1], outDiagnostic.type, code));
+
+    if (code != 0)
+    {
+        StringBuilder buf;
+        buf << code;
+        outDiagnostic.code = buf.ProduceString();
+    }
+
+    outDiagnostic.text = UnownedStringSlice(lineSlices[2].begin(), line.end());
+    return SLANG_OK;
+}
+
+/* static */ SlangResult _splitSlangDiagnosticLine(const UnownedStringSlice& line, List<UnownedStringSlice>& outSlices)
+{
+    StringUtil::split(line, ':', outSlices);
+
+    const Int pathIndex = 0;
+    UnownedStringSlice pathStart = outSlices[pathIndex].trim();
+    if (pathStart.getLength() == 1 && CharUtil::isAlpha(pathStart[0]))
+    {
+        // Splice back together
+        outSlices[pathIndex] = UnownedStringSlice(outSlices[pathIndex].begin(), outSlices[pathIndex + 1].end());
+        outSlices.removeAt(pathIndex + 1);
+    }
+    return SLANG_OK;
+}
+
+/* Given a downstream comoiler, handle special cases when splitting the diagnostic line (such as handling : in path) */
+/* static */ SlangResult _splitCompilerDiagnosticLine(SlangPassThrough downstreamCompiler, const UnownedStringSlice& line, UnownedStringSlice& linePrefix, List<UnownedStringSlice>& outSlices)
 {
     /*
     glslang: ERROR: tests/diagnostics/syntax-error-intrinsic.slang:13: '@' : unexpected token
@@ -236,8 +341,7 @@ static SlangResult _findDownstreamCompiler(const UnownedStringSlice& slice, Slan
     // we should have a function that will parse the standardized output
     // Currently dxc/fxc/glslang, use a different downstream path
 
-    // We look for the first l
-
+    bool isSlang = false;
     SlangPassThrough downstreamCompiler = SLANG_PASS_THROUGH_NONE;
     UnownedStringSlice linePrefix;
 
@@ -247,35 +351,55 @@ static SlangResult _findDownstreamCompiler(const UnownedStringSlice& slice, Slan
     while (StringUtil::extractLine(text, line))
     {
         UnownedStringSlice initial = StringUtil::getAtInSplit(line, ':', 0);
-       
-        if (downstreamCompiler == SLANG_PASS_THROUGH_NONE)
+
+        if (isSlang == false && downstreamCompiler == SLANG_PASS_THROUGH_NONE)
         {
-            // First entry that begins with a numeral indicates the version number
-            if (SLANG_FAILED(_findDownstreamCompiler(initial, downstreamCompiler)))
+            if (_isSlangDiagnostic(line))
             {
+                isSlang = true;
+            }
+            else
+            {
+                // First entry that begins with a numeral indicates the version number
+                if (SLANG_FAILED(_findDownstreamCompiler(initial, downstreamCompiler)))
+                {
+                    continue;
+                }
+  
+                linePrefix = TypeTextUtil::getPassThroughAsHumanText(downstreamCompiler);
+            }
+        }
+
+        if (!isSlang)
+        {
+            // If it's not slang then, we must have a defined downstream compiler
+            SLANG_ASSERT(downstreamCompiler != SLANG_PASS_THROUGH_NONE);
+
+            if (line.indexOf(':') < 0 )
+            {
+                _addDiagnosticNote(line, outDiagnostics);
                 continue;
             }
-         
-            linePrefix = TypeTextUtil::getPassThroughAsHumanText(downstreamCompiler);
-        }
 
-        if (line.indexOf(':') < 0 )
-        {
-            _addDiagnosticNote(line, outDiagnostics);
-            continue;
+            if (SLANG_FAILED(_splitCompilerDiagnosticLine(downstreamCompiler, line, linePrefix, splitLine)))
+            {
+                _addDiagnosticNote(line, outDiagnostics);
+                continue;
+            }
+            // If doesn't have prefix, just add as note
+            if (!splitLine[0].trim().startsWith(linePrefix))
+            {
+                _addDiagnosticNote(line, outDiagnostics);
+                continue;
+            }
         }
-
-        if (SLANG_FAILED(splitCompilerDiagnosticLine(downstreamCompiler, line, linePrefix, splitLine)))
+        else
         {
-            _addDiagnosticNote(line, outDiagnostics);
-            continue;
-        }
-
-        // If doesn't have prefix, just add as note
-        if (!splitLine[0].trim().startsWith(linePrefix))
-        {
-            _addDiagnosticNote(line, outDiagnostics);
-            continue;
+           if (SLANG_FAILED(_splitSlangDiagnosticLine(line, splitLine)))
+           {
+               _addDiagnosticNote(line, outDiagnostics);
+               continue;
+           }
         }
 
         DownstreamDiagnostic diagnostic;
@@ -304,7 +428,14 @@ static SlangResult _findDownstreamCompiler(const UnownedStringSlice& slice, Slan
             }
             default:
             {
-                parseRes = parseGenericLine(line, splitLine, diagnostic);
+                if (isSlang)
+                {
+                    parseRes = parseSlangLine(line, splitLine, diagnostic);
+                }
+                else
+                {
+                    parseRes = parseGenericLine(line, splitLine, diagnostic);
+                }
                 break;
             }
         }
@@ -322,3 +453,98 @@ static SlangResult _findDownstreamCompiler(const UnownedStringSlice& slice, Slan
 
     return SLANG_OK;
 }
+
+static UnownedStringSlice _getEquals(const UnownedStringSlice& in)
+{
+    Index equalsIndex = in.indexOf('=');
+    if (equalsIndex < 0)
+    {
+        return UnownedStringSlice();
+    }
+    return in.tail(equalsIndex + 1).trim();
+}
+
+/* static */SlangResult ParseDiagnosticUtil::parseOutputInfo(const UnownedStringSlice& inText, OutputInfo& out)
+{
+    enum State
+    {
+        Normal,
+        InStdError,
+        InStdOut,
+    };
+
+    UnownedStringSlice resultCodePrefix = UnownedStringSlice::fromLiteral("result code");
+    UnownedStringSlice stdErrorPrefix = UnownedStringSlice::fromLiteral("standard error");
+    UnownedStringSlice stdOutputPrefix = UnownedStringSlice::fromLiteral("standard output");
+
+    
+    List<UnownedStringSlice> lines;
+
+    State state = State::Normal;
+
+    UnownedStringSlice text(inText), line;
+    while (StringUtil::extractLine(text, line))
+    {
+        switch (state)
+        {
+            case State::Normal:
+            {
+                if (line.startsWith(resultCodePrefix))
+                {
+                    // Split past the equal
+                    const UnownedStringSlice valueSlice = _getEquals(line.tail(resultCodePrefix.getLength()));
+                    Int value;
+                    SLANG_RETURN_ON_FAIL(StringUtil::parseInt(valueSlice, value));
+                    out.resultCode = int(value);
+                }
+                else
+                {
+                    UnownedStringSlice* startsWith = nullptr;
+                    if (line.startsWith(stdErrorPrefix))
+                    {
+                        startsWith = &stdErrorPrefix;
+                    }
+                    else if (line.startsWith(stdOutputPrefix))
+                    {
+                        startsWith = &stdOutputPrefix;
+                    }
+
+                    if (startsWith)
+                    {
+                        // Clear the lines buffer
+                        lines.clear();
+
+                        UnownedStringSlice valueSlice = _getEquals(line.tail(startsWith->getLength()));
+                        if (!valueSlice.isChar('{'))
+                        {
+                            return SLANG_FAIL;
+                        }
+                        // Okay we now inside std out or std error, so update the state
+                        state = (startsWith == &stdErrorPrefix) ? State::InStdError : State::InStdOut;
+                    }
+                }
+                break;
+            }
+            case State::InStdError:
+            case State::InStdOut:
+            {
+                if (line == "}")
+                {
+                    String& dst = state == State::InStdError ? out.stdError : out.stdOut;
+                    if (lines.getCount() > 0)
+                    {
+                        dst = UnownedStringSlice(lines[0].begin(), lines.getLast().end());
+                    }
+                    state = State::Normal;
+                }
+                else
+                {
+                    lines.add(line);
+                }
+            }
+        }
+    }
+
+    return (state == State::Normal) ? SLANG_OK : SLANG_FAIL;
+}
+

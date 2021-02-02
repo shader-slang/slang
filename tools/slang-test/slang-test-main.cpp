@@ -1110,6 +1110,55 @@ static bool _isLineEqual(const UnownedStringSlice& a, const UnownedStringSlice& 
 
 static bool _areDiagnosticsEqual(const UnownedStringSlice& a, const UnownedStringSlice& b)
 {
+    // Lets try parsing both
+    {
+        ParseDiagnosticUtil::OutputInfo outA, outB;
+
+        if (SLANG_FAILED(ParseDiagnosticUtil::parseOutputInfo(a, outA)) ||
+            SLANG_FAILED(ParseDiagnosticUtil::parseOutputInfo(b, outB)))
+        {
+            return false;
+        }
+
+        // The result codes must match, and std out
+        if (outA.resultCode != outB.resultCode ||
+            !StringUtil::areLinesEqual(outA.stdOut.getUnownedSlice(), outB.stdOut.getUnownedSlice()))
+        {
+            return false;
+        }
+
+        List<DownstreamDiagnostic> diagsA, diagsB;
+        SlangResult resA = ParseDiagnosticUtil::parseDiagnostics(outA.stdError.getUnownedSlice(), diagsA);
+        SlangResult resB = ParseDiagnosticUtil::parseDiagnostics(outB.stdError.getUnownedSlice(), diagsB);
+
+        if (SLANG_SUCCEEDED(resA) && SLANG_SUCCEEDED(resB))
+        {
+            // We can compare and ignore the line numbers
+            if (diagsA.getCount() != diagsB.getCount())
+            {
+                return false;
+            }
+
+            for (Index i = 0; i < diagsA.getCount(); ++i)
+            {
+                DownstreamDiagnostic diagA = diagsA[i];
+                DownstreamDiagnostic diagB = diagsB[i];
+
+                // We don't bother (here anyway) to compare the line numbers
+                diagA.fileLine = 0;
+                diagB.fileLine = 0;
+
+                if (diagA != diagB)
+                {
+                    return false;
+                }
+            }
+
+            return true;
+        }
+    }
+
+
     // If they are identical we are done
     if (a == b)
     {
