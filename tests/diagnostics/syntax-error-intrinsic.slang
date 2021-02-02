@@ -1,10 +1,14 @@
 // syntax-error-intrinsic.slang
 
-//DIAGNOSTIC_TEST:SIMPLE_LINE:-entry computeMain -target spirv 
-//DIAGNOSTIC_TEST:SIMPLE_LINE:-entry computeMain -target dxil -profile cs_6_0 
-//DIAGNOSTIC_TEST:SIMPLE_LINE:-entry computeMain -target dxbc 
-//DIAGNOSTIC_TEST:SIMPLE_LINE:-entry computeMain -target dll 
-//DIAGNOSTIC_TEST:SIMPLE_LINE:-entry computeMain -target ptx 
+// NOTE! That although this is a 'diagnostic' like test, it tests using downstream compiler
+// the downstream compiler being present is a requirement, so we mark as a 'TEST' so that 
+// those tests are made.
+
+//TEST:SIMPLE_LINE:-entry computeMain -target spirv 
+//TEST:SIMPLE_LINE:-entry computeMain -target dxil -profile cs_6_0 
+//TEST:SIMPLE_LINE:-entry computeMain -target dxbc 
+//TEST:SIMPLE_LINE:-entry computeMain -target dll 
+//TEST:SIMPLE_LINE:-entry computeMain -target ptx 
 
 [shader("compute")]
 [numthreads(4, 1, 1)]
