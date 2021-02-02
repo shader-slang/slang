@@ -1273,6 +1273,11 @@ TestResult runSimpleLineTest(TestContext* context, TestInput& input)
     List<DownstreamDiagnostic> diagnostics;
     if (SLANG_FAILED(ParseDiagnosticUtil::parseDiagnostics(exeRes.standardError.getUnownedSlice(), diagnostics)) || diagnostics.getCount() <= 0)
     {
+        // Write out the diagnostics which couldn't be parsed.
+
+        String actualOutputPath = outputStem + ".actual";
+        Slang::File::writeAllText(actualOutputPath, exeRes.standardError);
+
         return TestResult::Fail;
     }
 
