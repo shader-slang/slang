@@ -59,7 +59,9 @@ public:
         kMaxUAVs = 64,
         kMaxRTVs = 8,
     };
-    
+
+    ~D3D11Renderer() {}
+
     // Renderer    implementation
     virtual SLANG_NO_THROW SlangResult SLANG_MCALL initialize(const Desc& desc, void* inWindowHandle) override;
     virtual SLANG_NO_THROW void SLANG_MCALL setClearColor(const float color[4]) override;
@@ -132,8 +134,7 @@ public:
         setViewports(UInt count, Viewport const* viewports) override;
     virtual SLANG_NO_THROW void SLANG_MCALL
         setScissorRects(UInt count, ScissorRect const* rects) override;
-    virtual SLANG_NO_THROW void SLANG_MCALL
-        setPipelineState(PipelineType pipelineType, IPipelineState* state) override;
+    virtual SLANG_NO_THROW void SLANG_MCALL setPipelineState(IPipelineState* state) override;
     virtual SLANG_NO_THROW void SLANG_MCALL draw(UInt vertexCount, UInt startVertex) override;
     virtual SLANG_NO_THROW void SLANG_MCALL
         drawIndexed(UInt indexCount, UInt startIndex, UInt baseVertex) override;
@@ -144,9 +145,10 @@ public:
     {
         return RendererType::DirectX11;
     }
-
-    ~D3D11Renderer() {}
-
+    virtual PipelineStateBase* getCurrentPipeline() override
+    {
+        return m_currentPipelineState;
+    }
     protected:
 
     class ScopeNVAPI
@@ -444,16 +446,8 @@ public:
 		ComPtr<ID3D11InputLayout> m_layout;
 	};
 
-    class PipelineStateImpl : public IPipelineState, public RefObject
+    class PipelineStateImpl : public PipelineStateBase
     {
-    public:
-        SLANG_REF_OBJECT_IUNKNOWN_ALL
-        IPipelineState* getInterface(const Guid& guid)
-        {
-            if (guid == GfxGUID::IID_ISlangUnknown || guid == GfxGUID::IID_IPipelineState)
-                return static_cast<IPipelineState*>(this);
-            return nullptr;
-        }
     public:
         RefPtr<ShaderProgramImpl>   m_program;
         RefPtr<PipelineLayoutImpl>  m_pipelineLayout;
@@ -473,11 +467,26 @@ public:
         UINT                            m_stencilRef;
         float                           m_blendColor[4];
         UINT                            m_sampleMask;
+
+        void init(const GraphicsPipelineStateDesc& inDesc)
+        {
+            PipelineStateBase::PipelineStateDesc pipelineDesc;
+            pipelineDesc.graphics = inDesc;
+            pipelineDesc.type = PipelineType::Graphics;
+            initializeBase(pipelineDesc);
+        }
     };
 
     class ComputePipelineStateImpl : public PipelineStateImpl
     {
     public:
+        void init(const ComputePipelineStateDesc& inDesc)
+        {
+            PipelineStateBase::PipelineStateDesc pipelineDesc;
+            pipelineDesc.compute = inDesc;
+            pipelineDesc.type = PipelineType::Compute;
+            initializeBase(pipelineDesc);
+        }
     };
 
         /// Capture a texture to a file
@@ -506,8 +515,7 @@ public:
 
     bool m_renderTargetBindingsDirty = false;
 
-    ComPtr<GraphicsPipelineStateImpl> m_currentGraphicsState;
-    ComPtr<ComputePipelineStateImpl> m_currentComputeState;
+    ComPtr<PipelineStateImpl> m_currentPipelineState;
 
     ComPtr<ID3D11RenderTargetView>      m_rtvBindings[kMaxRTVs];
     ComPtr<ID3D11DepthStencilView>      m_dsvBinding;
@@ -521,10 +529,11 @@ public:
     bool m_nvapi = false;
 };
 
-SlangResult SLANG_MCALL createD3D11Renderer(IRenderer** outRenderer)
+SlangResult SLANG_MCALL createD3D11Renderer(const IRenderer::Desc* desc, void* windowHandle, IRenderer** outRenderer)
 {
-    *outRenderer = new D3D11Renderer();
-    (*outRenderer)->addRef();
+    RefPtr<D3D11Renderer> result = new D3D11Renderer();
+    SLANG_RETURN_ON_FAIL(result->initialize(*desc, windowHandle));
+    *outRenderer = result.detach();
     return SLANG_OK;
 }
 
@@ -665,6 +674,8 @@ static bool _isSupportedNVAPIOp(IUnknown* dev, uint32_t op)
 SlangResult D3D11Renderer::initialize(const Desc& desc, void* inWindowHandle)
 {
     SLANG_RETURN_ON_FAIL(slangContext.initialize(desc.slang, SLANG_DXBC, "sm_5_0"));
+
+    SLANG_RETURN_ON_FAIL(GraphicsAPIRenderer::initialize(desc, inWindowHandle));
 
     auto windowHandle = (HWND)inWindowHandle;
     m_desc = desc;
@@ -1698,8 +1709,10 @@ void D3D11Renderer::setScissorRects(UInt count, ScissorRect const* rects)
 }
 
 
-void D3D11Renderer::setPipelineState(PipelineType pipelineType, IPipelineState* state)
+void D3D11Renderer::setPipelineState(IPipelineState* state)
 {
+    auto pipelineType = static_cast<PipelineStateBase*>(state)->desc.type;
+
     switch(pipelineType)
     {
     default:
@@ -1722,8 +1735,8 @@ void D3D11Renderer::setPipelineState(PipelineType pipelineType, IPipelineState* 
             m_immediateContext->IASetInputLayout(stateImpl->m_inputLayout->m_layout);
 
             // VS
-
-            m_immediateContext->VSSetShader(programImpl->m_vertexShader, nullptr, 0);
+            if (programImpl->m_vertexShader)
+                m_immediateContext->VSSetShader(programImpl->m_vertexShader, nullptr, 0);
 
             // HS
 
@@ -1736,15 +1749,15 @@ void D3D11Renderer::setPipelineState(PipelineType pipelineType, IPipelineState* 
             m_immediateContext->RSSetState(stateImpl->m_rasterizerState);
 
             // PS
-
-            m_immediateContext->PSSetShader(programImpl->m_pixelShader, nullptr, 0);
+            if (programImpl->m_pixelShader)
+                m_immediateContext->PSSetShader(programImpl->m_pixelShader, nullptr, 0);
 
             // OM
 
             m_immediateContext->OMSetBlendState(stateImpl->m_blendState, stateImpl->m_blendColor, stateImpl->m_sampleMask);
             m_immediateContext->OMSetDepthStencilState(stateImpl->m_depthStencilState, stateImpl->m_stencilRef);
 
-            m_currentGraphicsState = stateImpl;
+            m_currentPipelineState = stateImpl;
         }
         break;
 
@@ -1756,8 +1769,7 @@ void D3D11Renderer::setPipelineState(PipelineType pipelineType, IPipelineState* 
             // CS
 
             m_immediateContext->CSSetShader(programImpl->m_computeShader, nullptr, 0);
-
-            m_currentComputeState = stateImpl;
+            m_currentPipelineState = stateImpl;
         }
         break;
     }
@@ -2083,7 +2095,7 @@ Result D3D11Renderer::createGraphicsPipelineState(const GraphicsPipelineStateDes
     state->m_blendColor[2] = 0;
     state->m_blendColor[3] = 0;
     state->m_sampleMask = 0xFFFFFFFF;
-
+    state->init(desc);
     *outState = state.detach();
     return SLANG_OK;
 }
@@ -2099,7 +2111,7 @@ Result D3D11Renderer::createComputePipelineState(const ComputePipelineStateDesc&
     RefPtr<ComputePipelineStateImpl> state = new ComputePipelineStateImpl();
     state->m_program = programImpl;
     state->m_pipelineLayout = pipelineLayoutImpl;
-
+    state->init(desc);
     *outState = state.detach();
     return SLANG_OK;
 }
@@ -2303,7 +2315,7 @@ void D3D11Renderer::_flushGraphicsState()
     {
         m_targetBindingsDirty[pipelineType] = false;
 
-        auto pipelineState = m_currentGraphicsState.get();
+        auto pipelineState = static_cast<GraphicsPipelineStateImpl*>(m_currentPipelineState.get());
 
         auto rtvCount = pipelineState->m_rtvCount;
         auto uavCount = pipelineState->m_pipelineLayout->m_uavCount;
@@ -2326,7 +2338,7 @@ void D3D11Renderer::_flushComputeState()
     {
         m_targetBindingsDirty[pipelineType] = false;
 
-        auto pipelineState = m_currentComputeState.get();
+        auto pipelineState = static_cast<ComputePipelineStateImpl*>(m_currentPipelineState.get());
 
         auto uavCount = pipelineState->m_pipelineLayout->m_uavCount;
 

@@ -711,7 +711,7 @@ void RenderTestApp::renderFrame()
 
     auto pipelineType = PipelineType::Graphics;
 
-    m_renderer->setPipelineState(pipelineType, m_pipelineState);
+    m_renderer->setPipelineState(m_pipelineState);
 
 	m_renderer->setPrimitiveTopology(PrimitiveTopology::TriangleList);
 	m_renderer->setVertexBuffer(0, m_vertexBuffer, sizeof(Vertex));
@@ -724,7 +724,7 @@ void RenderTestApp::renderFrame()
 void RenderTestApp::runCompute()
 {
     auto pipelineType = PipelineType::Compute;
-    m_renderer->setPipelineState(pipelineType, m_pipelineState);
+    m_renderer->setPipelineState(m_pipelineState);
     applyBinding(pipelineType);
 
     m_startTicks = ProcessUtil::getClockTick();
@@ -1279,22 +1279,8 @@ static SlangResult _innerMain(Slang::StdWriters* stdWriters, SlangSession* sessi
 
     Slang::ComPtr<IRenderer> renderer;
     {
-        SGRendererCreateFunc createFunc = gfxGetCreateFunc(options.rendererType);
-        if (createFunc)
-        {
-            createFunc(renderer.writeRef());
-        }
-
-        if (!renderer)
-        {
-            if (!options.onlyStartup)
-            {
-                fprintf(stderr, "Unable to create renderer %s\n", rendererName.getBuffer());
-            }
-            return SLANG_FAIL;
-        }
-
-        IRenderer::Desc desc;
+        IRenderer::Desc desc = {};
+        desc.rendererType = options.rendererType;
         desc.width = gWindowWidth;
         desc.height = gWindowHeight;
         desc.adapter = options.adapter.getBuffer();
@@ -1308,16 +1294,15 @@ static SlangResult _innerMain(Slang::StdWriters* stdWriters, SlangSession* sessi
         window = renderer_test::Window::create();
         SLANG_RETURN_ON_FAIL(window->initialize(gWindowWidth, gWindowHeight));
 
-        SlangResult res = renderer->initialize(desc, window->getHandle());
-        if (SLANG_FAILED(res))
+        gfxCreateRenderer(&desc, window->getHandle(), renderer.writeRef());
+
+        if (!renderer)
         {
-            // Returns E_NOT_AVAILABLE only when specified features are not available.
-            // Will cause to be ignored.
-            if (!options.onlyStartup && res != SLANG_E_NOT_AVAILABLE)
+            if (!options.onlyStartup)
             {
-                fprintf(stderr, "Unable to initialize renderer %s\n", rendererName.getBuffer());
+                fprintf(stderr, "Unable to create renderer %s\n", rendererName.getBuffer());
             }
-            return res;
+            return SLANG_FAIL;
         }
 
         for (const auto& feature : requiredFeatureList)

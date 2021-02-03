@@ -47,6 +47,13 @@ namespace Slang
             return *this;
         }
 
+        ThisType& operator=(const ThisType& other)
+        {
+            clearAndDeallocate();
+            addRange(other);
+            return *this;
+        }
+
         ThisType& operator=(ThisType&& list)
         {
             // Could just do a swap here, and memory would be freed on rhs dtor

@@ -135,15 +135,17 @@ namespace Slang
 			}
 
 		};
-		inline int GetHashPos(TKey& key) const
+        template<typename KeyType>
+		inline int GetHashPos(KeyType& key) const
         {
             SLANG_ASSERT(bucketSizeMinusOne > 0);
             const unsigned int hash = (unsigned int)getHashCode(key);
             return (hash * 2654435761u) % (unsigned int)(bucketSizeMinusOne);
 		}
-		FindPositionResult FindPosition(const TKey& key) const
+        template<typename KeyType>
+		FindPositionResult FindPosition(const KeyType& key) const
 		{
-			int hashPos = GetHashPos(const_cast<TKey&>(key));
+			int hashPos = GetHashPos(const_cast<KeyType&>(key));
 			int insertPos = -1;
 			int numProbes = 0;
 			while (numProbes <= bucketSizeMinusOne)
@@ -380,14 +382,16 @@ namespace Slang
                 throw InvalidOperationException("Inconsistent find result returned. This is a bug in Dictionary implementation.");
         }
 
-		bool ContainsKey(const TKey& key) const
+        template<typename KeyType>
+		bool ContainsKey(const KeyType& key) const
 		{
 			if (bucketSizeMinusOne == -1)
 				return false;
 			auto pos = FindPosition(key);
 			return pos.ObjectPosition != -1;
 		}
-		bool TryGetValue(const TKey& key, TValue& value) const
+        template<typename KeyType>
+		bool TryGetValue(const KeyType& key, TValue& value) const
 		{
 			if (bucketSizeMinusOne == -1)
 				return false;
@@ -399,7 +403,8 @@ namespace Slang
 			}
 			return false;
 		}
-		TValue* TryGetValue(const TKey& key) const
+        template<typename KeyType>
+		TValue* TryGetValue(const KeyType& key) const
 		{
 			if (bucketSizeMinusOne == -1)
 				return nullptr;

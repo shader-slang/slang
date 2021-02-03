@@ -118,14 +118,12 @@ Result execute()
     windowDesc.height = gWindowHeight;
     gWindow = createWindow(windowDesc);
 
-    gfxGetCreateFunc(gfx::RendererType::DirectX11)(gRenderer.writeRef());
     IRenderer::Desc rendererDesc;
+    rendererDesc.rendererType = gfx::RendererType::DirectX11;
     rendererDesc.width = gWindowWidth;
     rendererDesc.height = gWindowHeight;
-    {
-        Result res = gRenderer->initialize(rendererDesc, getPlatformWindowHandle(gWindow));
-        if(SLANG_FAILED(res)) return res;
-    }
+    Result res = gfxCreateRenderer(&rendererDesc, getPlatformWindowHandle(gWindow), gRenderer.writeRef());
+    if(SLANG_FAILED(res)) return res;
 
     gSlangSession = createSlangSession(gRenderer);
     gSlangModule = compileShaderModuleFromFile(gSlangSession, "kernels.slang");
@@ -191,7 +189,7 @@ Result execute()
     gDescriptorSet->setResource(0, 0, printBufferView);
     gRenderer->setDescriptorSet(PipelineType::Compute, gPipelineLayout, 0, gDescriptorSet);
 
-    gRenderer->setPipelineState(PipelineType::Compute, gPipelineState);
+    gRenderer->setPipelineState(gPipelineState);
     gRenderer->dispatchCompute(1, 1, 1);
 
     // TODO: need to copy from the print buffer to a staging buffer...

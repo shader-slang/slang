@@ -3991,6 +3991,10 @@ namespace slang
             SlangInt    targetIndex = 0,
             IBlob**     outDiagnostics = nullptr) = 0;
 
+            /** Get the number of (unspecialized) specialization parameters for the component type.
+            */
+        virtual SLANG_NO_THROW SlangInt SLANG_MCALL getSpecializationParamCount() = 0;
+
             /** Get the compiled code for the entry point at `entryPointIndex` for the chosen `targetIndex`
 
             Entry point code can only be computed for a component type that

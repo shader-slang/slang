@@ -2,12 +2,10 @@
 #pragma once
 
 #include <cstdint>
-#include "slang.h"
+#include "../renderer-shared.h"
 
 namespace gfx {
 
-class IRenderer;
-
-SlangResult SLANG_MCALL createVKRenderer(IRenderer** outRenderer);
+SlangResult SLANG_MCALL createVKRenderer(const IRenderer::Desc* desc, void* windowHandle, IRenderer** outRenderer);
 
 } // gfx
