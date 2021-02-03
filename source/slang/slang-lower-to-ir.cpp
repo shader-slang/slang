@@ -7339,11 +7339,6 @@ LoweredValInfo emitDeclRef(
     // We need to proceed by considering the specializations that
     // have been put in place.
 
-    // Ignore any global generic type substitutions during lowering.
-    // Really, we don't even expect these to appear.
-    while(auto globalGenericSubst = as<GlobalGenericParamSubstitution>(subst))
-        subst = globalGenericSubst->outer;
-
     // If the declaration would not get wrapped in a `IRGeneric`,
     // even if it is nested inside of an AST `GenericDecl`, then
     // we should also ignore any generic substitutions.
