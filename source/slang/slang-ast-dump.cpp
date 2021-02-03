@@ -500,19 +500,6 @@ struct ASTDumpContext
         m_writer->dedent();
         m_writer->emit("}");
     }
-    void dump(const GlobalGenericParamSubstitution::ConstraintArg& arg)
-    {
-        m_writer->emit(" { \n");
-        m_writer->indent();
-
-        dump(arg.decl);
-        m_writer->emit(",\n");
-        dump(arg.val);
-        m_writer->emit("\n");
-
-        m_writer->dedent();
-        m_writer->emit("}");
-    }
     void dump(const TypeExp& exp)
     {
         m_writer->emit(" { \n");

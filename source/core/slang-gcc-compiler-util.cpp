@@ -92,21 +92,21 @@ SlangResult GCCDownstreamCompilerUtil::calcVersion(const String& exeName, Downst
     return SLANG_FAIL;
 }
 
-static SlangResult _parseErrorType(const UnownedStringSlice& in, DownstreamDiagnostic::Type& outType)
+static SlangResult _parseSeverity(const UnownedStringSlice& in, DownstreamDiagnostic::Severity& outSeverity)
 {
-    typedef DownstreamDiagnostic::Type Type;
+    typedef DownstreamDiagnostic::Severity Severity;
 
     if (in == "error" || in == "fatal error")
     {
-        outType = Type::Error;
+        outSeverity = Severity::Error;
     }
     else if (in == "warning")
     {
-        outType = Type::Warning;
+        outSeverity = Severity::Warning;
     }
     else if (in == "info" || in == "note")
     {
-        outType = Type::Info;
+        outSeverity = Severity::Info;
     }
     else
     {
@@ -130,7 +130,7 @@ enum class LineParseResult
 static SlangResult _parseGCCFamilyLine(const UnownedStringSlice& line, LineParseResult& outLineParseResult, DownstreamDiagnostic& outDiagnostic)
 {
     typedef DownstreamDiagnostic Diagnostic;
-    typedef Diagnostic::Type Type;
+    typedef Diagnostic::Severity Severity;
     
     // Set to default case
     outLineParseResult = LineParseResult::Ignore;
@@ -197,13 +197,13 @@ static SlangResult _parseGCCFamilyLine(const UnownedStringSlice& line, LineParse
         {
             // We'll ignore for now
             outDiagnostic.stage = Diagnostic::Stage::Link;
-            outDiagnostic.type = Type::Info;
+            outDiagnostic.severity = Severity::Info;
             outDiagnostic.text = split[1].trim();
             outLineParseResult = LineParseResult::Start;
             return SLANG_OK;
         }
 
-        if (SLANG_SUCCEEDED(_parseErrorType(split0, outDiagnostic.type)))
+        if (SLANG_SUCCEEDED(_parseSeverity(split0, outDiagnostic.severity)))
         {
             // Command line errors can be just contain 'error:' etc. Can be seen on apple/clang
             outDiagnostic.stage = Diagnostic::Stage::Compile;
@@ -226,7 +226,7 @@ static SlangResult _parseGCCFamilyLine(const UnownedStringSlice& line, LineParse
             split0.startsWith(UnownedStringSlice::fromLiteral("Clang")) )
         {
             // Extract the type
-            SLANG_RETURN_ON_FAIL(_parseErrorType(split[1].trim(), outDiagnostic.type));
+            SLANG_RETURN_ON_FAIL(_parseSeverity(split[1].trim(), outDiagnostic.severity));
 
             if (text.startsWith("linker command failed"))
             {
@@ -241,7 +241,7 @@ static SlangResult _parseGCCFamilyLine(const UnownedStringSlice& line, LineParse
         {
             // This is a little weak... but looks like it's a link error
             outDiagnostic.filePath = split[0];
-            outDiagnostic.type = Type::Error;
+            outDiagnostic.severity = Severity::Error;
             outDiagnostic.stage = Diagnostic::Stage::Link;
             outDiagnostic.text = text;
             outLineParseResult = LineParseResult::Single;
@@ -250,7 +250,7 @@ static SlangResult _parseGCCFamilyLine(const UnownedStringSlice& line, LineParse
         else if (text.startsWith("ld returned"))
         {
             outDiagnostic.stage = DownstreamDiagnostic::Stage::Link;
-            SLANG_RETURN_ON_FAIL(_parseErrorType(split[1].trim(), outDiagnostic.type));
+            SLANG_RETURN_ON_FAIL(_parseSeverity(split[1].trim(), outDiagnostic.severity));
             outDiagnostic.text = line;
             outLineParseResult = LineParseResult::Single;
             return SLANG_OK;
@@ -277,7 +277,7 @@ static SlangResult _parseGCCFamilyLine(const UnownedStringSlice& line, LineParse
         {
             outDiagnostic.filePath = split[1];
             outDiagnostic.fileLine = 0;
-            outDiagnostic.type = Diagnostic::Type::Error;
+            outDiagnostic.severity = Diagnostic::Severity::Error;
             outDiagnostic.stage = Diagnostic::Stage::Link;
             outDiagnostic.text = split[3];
             
@@ -288,7 +288,7 @@ static SlangResult _parseGCCFamilyLine(const UnownedStringSlice& line, LineParse
     else if (split.getCount() >= 5)
     {
         // Probably a regular error line
-        SLANG_RETURN_ON_FAIL(_parseErrorType(split[3].trim(), outDiagnostic.type));
+        SLANG_RETURN_ON_FAIL(_parseSeverity(split[3].trim(), outDiagnostic.severity));
 
         outDiagnostic.filePath = split[0];
         SLANG_RETURN_ON_FAIL(StringUtil::parseInt(split[1], outDiagnostic.fileLine));
@@ -361,7 +361,7 @@ static SlangResult _parseGCCFamilyLine(const UnownedStringSlice& line, LineParse
         }
     }
 
-    if (outOutput.has(Diagnostic::Type::Error) || exeRes.resultCode != 0)
+    if (outOutput.has(Diagnostic::Severity::Error) || exeRes.resultCode != 0)
     {
         outOutput.result = SLANG_FAIL;
     }

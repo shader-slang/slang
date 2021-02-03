@@ -219,22 +219,6 @@ Val* DeclRefType::_substituteImplOverride(ASTBuilder* astBuilder, SubstitutionSe
             }
         }
     }
-    else if (auto globalGenParam = as<GlobalGenericParamDecl>(declRef.getDecl()))
-    {
-        // search for a substitution that might apply to us
-        for (auto s = subst.substitutions; s; s = s->outer)
-        {
-            auto genericSubst = as<GlobalGenericParamSubstitution>(s);
-            if (!genericSubst)
-                continue;
-
-            if (genericSubst->paramDecl == globalGenParam)
-            {
-                (*ioDiff)++;
-                return genericSubst->actualType;
-            }
-        }
-    }
     int diff = 0;
     DeclRef<Decl> substDeclRef = declRef.substituteImpl(astBuilder, subst, &diff);
 
