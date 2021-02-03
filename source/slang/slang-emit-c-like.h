@@ -313,6 +313,15 @@ public:
 
     protected:
 
+    struct IntrinsicExpandState
+    {
+        const char* start = nullptr;
+        const char* end = nullptr;
+        IRUse* args = nullptr;
+        Int argCount = 0;
+        Index openParenCount = 0;
+    };
+
     virtual bool doesTargetSupportPtrTypes() { return false; }
     virtual void emitLayoutSemanticsImpl(IRInst* inst, char const* uniformSemanticSpelling = "register") { SLANG_UNUSED(inst); SLANG_UNUSED(uniformSemanticSpelling); }
     virtual void emitParameterGroupImpl(IRGlobalParam* varDecl, IRUniformParameterGroupType* type) = 0;
@@ -369,9 +378,8 @@ public:
         // Emit the argument list (including paranthesis) in a `CallInst`
     void _emitCallArgList(IRCall* call);
 
-        
-        /// Used for special case parts of an intrinsic, typically indicated via the $ prefix.
-    const char* _emitIntrinsicSpecial(const char* cur, const char* end, IRUse* args, Int argCount);
+        /// Expand a single 'special' . Returns the cursor position. 
+    const char* _emitIntrinsicExpandSpecial(const char* cursor, IntrinsicExpandState& ioState);
     
     String _generateUniqueName(const UnownedStringSlice& slice);
 
@@ -401,9 +409,6 @@ public:
 
     // Where source is written to
     SourceWriter* m_writer;
-
-    // The amount of open parens in output of intrinsic expansion
-    Index m_openParenCount = 0;
 
     UInt m_uniqueIDCounter = 1;
     Dictionary<IRInst*, UInt> m_mapIRValueToID;

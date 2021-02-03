@@ -1338,8 +1338,12 @@ void CLikeSourceEmitter::emitIntrinsicCallExpr(IRCall* inst, IRTargetIntrinsicDe
     emitIntrinsicCallExprImpl(inst, targetIntrinsic, inOuterPrec);
 }
 
-const char* CLikeSourceEmitter::_emitIntrinsicSpecial(const char* cursor, const char* end, IRUse* args, Int argCount)
+const char* CLikeSourceEmitter::_emitIntrinsicExpandSpecial(const char* cursor, IntrinsicExpandState& ioState)
 {
+    const char*const end = ioState.end;
+    const auto args = ioState.args;
+    const auto argCount = ioState.argCount;
+
     // Check we are at start of 'special' sequence
     SLANG_ASSERT(*cursor == '$');
     cursor++;
@@ -1473,7 +1477,7 @@ const char* CLikeSourceEmitter::_emitIntrinsicSpecial(const char* cursor, const 
                 {
                     emitSimpleType(elementType);
                     m_writer->emit("(");
-                    m_openParenCount++;
+                    ioState.openParenCount++;
                 }
             }
         }
@@ -1872,7 +1876,12 @@ void CLikeSourceEmitter::emitIntrinsicCallExprImpl(
     }
     else
     {
-        m_openParenCount = 0;
+        IntrinsicExpandState state;
+
+        state.argCount = argCount;
+        state.args = args;
+        state.end = name.end();
+        state.start = name.begin();
 
         const auto returnType = inst->getDataType();
 
@@ -1880,44 +1889,49 @@ void CLikeSourceEmitter::emitIntrinsicCallExprImpl(
         if (as<IRVoidType>(returnType) == nullptr)
         {
             m_writer->emit("(");
-            m_openParenCount++;
+            state.openParenCount++;
         }
 
-        const char* unescapedStart = name.begin();
-        char const* cursor = unescapedStart;
-        char const* end = name.end();
-
-        while(cursor < end)
         {
-            const char c = *cursor++;
-            // Indicates the start of a 'special' sequence
-            if( c == '$' )
-            {
-                // Flush any chars not yet output
-                if (unescapedStart < cursor)
-                {
-                    m_writer->emit(unescapedStart, cursor);
-                }
+            char const* start = state.start;
+            char const* cursor = start;
+            char const* end = state.end;
 
-                // We have to deal with outputting something more complex/general and 'special'
-                cursor = _emitIntrinsicSpecial(cursor - 1, end, args, argCount);
-                unescapedStart = cursor;
+            while(cursor < end)
+            {
+                // Indicates the start of a 'special' sequence
+                if( *cursor == '$' )
+                {
+                    // Flush any chars not yet output
+                    if (start < cursor)
+                    {
+                        m_writer->emit(start, cursor);
+                    }
+
+                    // Requires special processing for output (ie we don't just copy chars verbatim)
+                    cursor = _emitIntrinsicExpandSpecial(cursor, state);
+                    // The start is now after 'special' handling
+                    start = cursor;
+                }
+                else
+                {
+                    cursor++;
+                }
+            }
+
+            // Flush any non escaped
+            if (start < end)
+            {
+                m_writer->emit(start, end);
+                start = cursor;
             }
         }
 
-        // Flush any non escaped
-        if (unescapedStart < cursor)
-        {
-            m_writer->emit(unescapedStart, cursor);
-            unescapedStart = cursor;
-        }
-
         // Close any remaining open parens
-        for (Index i = 0; i < m_openParenCount; ++i)
+        for (Index i = 0; i < state.openParenCount; ++i)
         {
             m_writer->emit(")");
         }
-        m_openParenCount = 0;
     }
 }
 
