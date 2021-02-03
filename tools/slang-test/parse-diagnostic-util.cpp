@@ -52,107 +52,114 @@ using namespace Slang;
 
 /* static */SlangResult ParseDiagnosticUtil::parseFXCLine(const UnownedStringSlice& line,  List<UnownedStringSlice>& lineSlices, DownstreamDiagnostic& outDiagnostic)
 {
-    SLANG_RETURN_ON_FAIL(splitPathLocation(lineSlices[1], outDiagnostic));
-
-    if (lineSlices.getCount() > 2)
+    /* tests/diagnostics/syntax-error-intrinsic.slang(14,2): error X3000: syntax error: unexpected token '@' */
+    if (lineSlices.getCount() < 3)
     {
-        UnownedStringSlice errorSlice = lineSlices[2].trim();
-        Index spaceIndex = errorSlice.indexOf(' ');
-        if (spaceIndex >= 0)
-        {
-            UnownedStringSlice diagnosticType = errorSlice.head(spaceIndex);
-            UnownedStringSlice code = errorSlice.tail(spaceIndex + 1).trim();
+        return SLANG_FAIL;
+    }
 
-            if (diagnosticType == "warning")
-            {
-                outDiagnostic.type = DownstreamDiagnostic::Type::Warning;
-            }
+    SLANG_RETURN_ON_FAIL(splitPathLocation(lineSlices[0], outDiagnostic));
 
-            outDiagnostic.code = code;
-        }
-        else
-        {
-            outDiagnostic.code = errorSlice;
-        }
+    {
+        const UnownedStringSlice errorSlice = lineSlices[1].trim();
 
-        if (lineSlices.getCount() > 3)
+        const UnownedStringSlice errorTypeName = StringUtil::getAtInSplit(errorSlice, ' ', 0);
+        outDiagnostic.code = StringUtil::getAtInSplit(errorSlice, ' ', 1);
+
+        outDiagnostic.type = DownstreamDiagnostic::Type::Error;
+        if (errorTypeName == "warning")
         {
-            outDiagnostic.text = UnownedStringSlice(lineSlices[3].begin(), line.end());
+            outDiagnostic.type = DownstreamDiagnostic::Type::Warning;
         }
     }
 
+    outDiagnostic.text = UnownedStringSlice(lineSlices[2].begin(), line.end());
     return SLANG_OK;
 }
 
 /* static */SlangResult ParseDiagnosticUtil::parseDXCLine(const UnownedStringSlice& line,  List<UnownedStringSlice>& lineSlices, DownstreamDiagnostic& outDiagnostic)
 {
-    /*     dxc: tests/diagnostics/syntax-error-intrinsic.slang:14:2: error: expected expression */
+    /* tests/diagnostics/syntax-error-intrinsic.slang:14:2: error: expected expression */
+    if (lineSlices.getCount() < 5)
+    {
+        return SLANG_FAIL;
+    }
 
-    outDiagnostic.filePath = lineSlices[1];
+    outDiagnostic.filePath = lineSlices[0];
 
-    SLANG_RETURN_ON_FAIL(StringUtil::parseInt(lineSlices[2], outDiagnostic.fileLine));
+    SLANG_RETURN_ON_FAIL(StringUtil::parseInt(lineSlices[1], outDiagnostic.fileLine));
 
     Int lineCol;
-    SLANG_RETURN_ON_FAIL(StringUtil::parseInt(lineSlices[3], lineCol));
+    SLANG_RETURN_ON_FAIL(StringUtil::parseInt(lineSlices[2], lineCol));
 
-    UnownedStringSlice typeSlice = lineSlices[4].trim();
+    UnownedStringSlice typeSlice = lineSlices[3].trim();
 
+    outDiagnostic.type = DownstreamDiagnostic::Type::Error;
     if (typeSlice == UnownedStringSlice::fromLiteral("warning"))
     {
         outDiagnostic.type = DownstreamDiagnostic::Type::Warning;
     }
 
     // The rest of the line
-    outDiagnostic.text = UnownedStringSlice(lineSlices[5].begin(), line.end());
+    outDiagnostic.text = UnownedStringSlice(lineSlices[4].begin(), line.end());
     return SLANG_OK;
 }
 
 /* static */ SlangResult ParseDiagnosticUtil::parseGlslangLine(const UnownedStringSlice& line, List<UnownedStringSlice>& lineSlices, DownstreamDiagnostic& outDiagnostic)
 {
-    if (lineSlices.getCount() < 5)
+    /* ERROR: tests/diagnostics/syntax-error-intrinsic.slang:13: '@' : unexpected token */
+
+    if (lineSlices.getCount() < 4)
     {
         return SLANG_FAIL;
     }
-
-    /*  glslang: ERROR: tests/diagnostics/syntax-error-intrinsic.slang:13: '@' : unexpected token
-    */
-
-    UnownedStringSlice typeSlice = lineSlices[1].trim();
-    if (typeSlice.caseInsensitiveEquals(UnownedStringSlice::fromLiteral("warning")))
     {
-        outDiagnostic.type = DownstreamDiagnostic::Type::Warning;
+        const UnownedStringSlice typeSlice = lineSlices[0].trim();
+
+        outDiagnostic.type = DownstreamDiagnostic::Type::Error;
+        if (typeSlice.caseInsensitiveEquals(UnownedStringSlice::fromLiteral("warning")))
+        {
+            outDiagnostic.type = DownstreamDiagnostic::Type::Warning;
+        }
     }
 
-    outDiagnostic.filePath = lineSlices[2];
+    outDiagnostic.filePath = lineSlices[1];
 
-    SLANG_RETURN_ON_FAIL(StringUtil::parseInt(lineSlices[3], outDiagnostic.fileLine));
-    outDiagnostic.text = UnownedStringSlice(lineSlices[4].begin(), line.end());
+    SLANG_RETURN_ON_FAIL(StringUtil::parseInt(lineSlices[2], outDiagnostic.fileLine));
+    outDiagnostic.text = UnownedStringSlice(lineSlices[3].begin(), line.end());
     return SLANG_OK;
 }
 
 /* static */SlangResult ParseDiagnosticUtil::parseGenericLine(const UnownedStringSlice& line, List<UnownedStringSlice>& lineSlices, DownstreamDiagnostic& outDiagnostic)
 {
-    /* Visual Studio 14.0: e:\git\somewhere\tests\diagnostics\syntax-error-intrinsic.slang(13): error C2018:  unknown character '0x40' */
-
-    UnownedStringSlice errorSlice = lineSlices[2].trim();
-    UnownedStringSlice typeSlice = StringUtil::getAtInSplit(errorSlice, ' ', 0);
-    if (typeSlice == UnownedStringSlice::fromLiteral("warning"))
+    /* e:\git\somewhere\tests\diagnostics\syntax-error-intrinsic.slang(13): error C2018:  unknown character '0x40' */
+    if (lineSlices.getCount() < 3)
     {
-        outDiagnostic.type = DownstreamDiagnostic::Type::Warning;
-    }
-    else if (typeSlice == UnownedStringSlice::fromLiteral("info"))
-    {
-        outDiagnostic.type = DownstreamDiagnostic::Type::Info;
+        return SLANG_FAIL;
     }
 
-    // Get the code
-    outDiagnostic.code = StringUtil::getAtInSplit(errorSlice, ' ', 1);
+    {
+        const UnownedStringSlice errorSlice = lineSlices[1].trim();
+        // Get the code
+        outDiagnostic.code = StringUtil::getAtInSplit(errorSlice, ' ', 1).trim();
+
+        const UnownedStringSlice typeSlice = StringUtil::getAtInSplit(errorSlice, ' ', 0);
+
+        outDiagnostic.type = DownstreamDiagnostic::Type::Error;
+        if (typeSlice == UnownedStringSlice::fromLiteral("warning"))
+        {
+            outDiagnostic.type = DownstreamDiagnostic::Type::Warning;
+        }
+        else if (typeSlice == UnownedStringSlice::fromLiteral("info"))
+        {
+            outDiagnostic.type = DownstreamDiagnostic::Type::Info;
+        }
+    }
 
     // Get the location info
-    SLANG_RETURN_ON_FAIL(splitPathLocation(lineSlices[1], outDiagnostic));
+    SLANG_RETURN_ON_FAIL(splitPathLocation(lineSlices[0], outDiagnostic));
 
-    outDiagnostic.text = UnownedStringSlice(lineSlices[3].begin(), line.end());
-
+    outDiagnostic.text = UnownedStringSlice(lineSlices[2].begin(), line.end());
     return SLANG_OK;
 }
 
@@ -182,7 +189,6 @@ static SlangResult _getSlangDiagnosticType(const UnownedStringSlice& inText, Dow
         }
     }
 
-    
     switch (index)
     {
         case -1:    return SLANG_FAIL;
@@ -247,8 +253,17 @@ static bool _isSlangDiagnostic(const UnownedStringSlice& line)
     return SLANG_OK;
 }
 
-/* static */ SlangResult ParseDiagnosticUtil::splitDiagnosticLine(const CompilerIdentity& compilerIdentity, const UnownedStringSlice& line, UnownedStringSlice& linePrefix, List<UnownedStringSlice>& outSlices)
+/* static */ SlangResult ParseDiagnosticUtil::splitDiagnosticLine(const CompilerIdentity& compilerIdentity, const UnownedStringSlice& line, const UnownedStringSlice& linePrefix, List<UnownedStringSlice>& outSlices)
 {
+    StringUtil::split(line, ':', outSlices);
+
+    // If we have a prefix (typically identifying the compiler), remove so same code can be used for output with prefixes and without
+    if (linePrefix.getLength())
+    {
+        SLANG_ASSERT(outSlices[0].startsWith(linePrefix));
+        outSlices.removeAt(0);
+    }
+
     /*
     glslang: ERROR: tests/diagnostics/syntax-error-intrinsic.slang:13: '@' : unexpected token
     dxc: tests/diagnostics/syntax-error-intrinsic.slang:14:2: error: expected expression
@@ -258,33 +273,14 @@ static bool _isSlangDiagnostic(const UnownedStringSlice& line)
     tests/diagnostics/accessors.slang(11): error 31101: accessors other than 'set' must not have parameters
     */
 
-
     // Need to determine where the path is located, and that depends on the compiler
-    Int pathIndex = 1;
-
-    StringUtil::split(line, ':', outSlices);
-    if (compilerIdentity.m_type == CompilerIdentity::Slang)
-    {
-        pathIndex = 0;
-    }
-    else if (compilerIdentity.m_type == CompilerIdentity::DownstreamCompiler)
-    {
-        if (compilerIdentity.m_downstreamCompiler == SLANG_PASS_THROUGH_GLSLANG)
-        {
-            // We need to special case GLSL output for lines without the prefix, we add it
-            if (!outSlices[0].trim().startsWith(linePrefix))
-            {
-                outSlices.insert(0, linePrefix);
-            }
-            pathIndex = 2;
-        }
-    }
+    const Int pathIndex = (compilerIdentity == CompilerIdentity::make(SLANG_PASS_THROUGH_GLSLANG)) ? 1 : 0;
 
     // Now we want to fix up a path as might have drive letter, and therefore :
-    // Make sure this seems plausible
+    // If this is the situation then we need to have a slice after the one at the index
     if (outSlices.getCount() > pathIndex + 1)
     {
-        UnownedStringSlice pathStart = outSlices[pathIndex].trim();
+        const UnownedStringSlice pathStart = outSlices[pathIndex].trim();
         if (pathStart.getLength() == 1 && CharUtil::isAlpha(pathStart[0]))
         {
             // Splice back together
@@ -338,6 +334,11 @@ static SlangResult _findDownstreamCompiler(const UnownedStringSlice& slice, Slan
 /* static */SlangResult ParseDiagnosticUtil::identifyCompiler(const UnownedStringSlice& inText, CompilerIdentity& outIdentity)
 {
     outIdentity = CompilerIdentity();
+
+    // This might be overkill - we should be able to identify the compiler from the first line, of the diagnostics.
+    // Here, we go through each line trying to identify the compiler.
+    // For downstream compilers, the only way to identify unambiguously is via the compiler name prefix.
+    // For Slang we *assume* if there isn't such a prefix, and it 'looks like' a Slang diagnostic that it is
 
     UnownedStringSlice text(inText), line;
     while (StringUtil::extractLine(text, line))
@@ -393,35 +394,50 @@ static SlangResult _findDownstreamCompiler(const UnownedStringSlice& slice, Slan
     CompilerIdentity compilerIdentity;
     SLANG_RETURN_ON_FAIL(ParseDiagnosticUtil::identifyCompiler(inText, compilerIdentity));
 
+    UnownedStringSlice linePrefix;
+
+    if (compilerIdentity.m_type == CompilerIdentity::Type::DownstreamCompiler)
+    {
+        linePrefix = TypeTextUtil::getPassThroughAsHumanText(compilerIdentity.m_downstreamCompiler);
+    }
+    else
+    {
+        // For Slang there isn't *currently* a prefix ever used, but that might change in the future
+        // For now we assume no prefix.
+    }
+
+    return parseDiagnostics(inText, compilerIdentity, linePrefix, outDiagnostics);
+}
+
+/* static */SlangResult ParseDiagnosticUtil::parseDiagnostics(const UnownedStringSlice& inText, const CompilerIdentity& compilerIdentity, const UnownedStringSlice& linePrefix, List<DownstreamDiagnostic>& outDiagnostics)
+{
     auto lineParser = getLineParser(compilerIdentity);
     if (!lineParser)
     {
         return SLANG_FAIL;
     }
 
-    UnownedStringSlice linePrefix = TypeTextUtil::getPassThroughAsHumanText(compilerIdentity.m_downstreamCompiler);
-
     List<UnownedStringSlice> splitLine;
 
     UnownedStringSlice text(inText), line;
     while (StringUtil::extractLine(text, line))
     {
-        // Downstream compilers have prefix on lines, if they start a diagnostic
-        if (compilerIdentity.m_type == CompilerIdentity::Type::DownstreamCompiler)
+        bool isValidSplit = false;
+        // And the first entry must contain the prefix, else assume it's a note
+        if (linePrefix.getLength() > 0 && line.startsWith(linePrefix))
         {
-            // If it's not slang then, we must have a defined downstream compiler
-            SLANG_ASSERT(compilerIdentity.m_downstreamCompiler != SLANG_PASS_THROUGH_NONE);
-            
-            // And the first entry must contain the prefix, else assume it's a note
-            if (!line.startsWith(linePrefix))
-            {
-                _addDiagnosticNote(line, outDiagnostics);
-                continue;
-            }
+            // Try with the line prefix
+            isValidSplit = SLANG_SUCCEEDED(splitDiagnosticLine(compilerIdentity, line, linePrefix, splitLine));
         }
 
-        // Try splitting, if we can't assume it's a note from a previous error
-        if (SLANG_FAILED(splitDiagnosticLine(compilerIdentity, line, linePrefix, splitLine)))
+        if (!isValidSplit)
+        {
+            // Try without the prefix, as some output output's only some lines with the prefix (GLSL for example)
+            isValidSplit = SLANG_SUCCEEDED(splitDiagnosticLine(compilerIdentity, line, UnownedStringSlice(), splitLine));
+        }
+
+        // If we don't have a valid split then just assume it's a note
+        if (!isValidSplit)
         {
             _addDiagnosticNote(line, outDiagnostics);
             continue;
