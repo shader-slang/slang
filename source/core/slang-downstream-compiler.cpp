@@ -63,14 +63,14 @@ void DownstreamCompiler::Desc::appendAsText(StringBuilder& out) const
 
 /* !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! DownstreamDiagnostic !!!!!!!!!!!!!!!!!!!!!!!!*/
 
-/* static */UnownedStringSlice DownstreamDiagnostic::getTypeText(Type type)
+/* static */UnownedStringSlice DownstreamDiagnostic::getSeverityText(Severity severity)
 {
-    switch (type)
+    switch (severity)
     {
-        default:            return UnownedStringSlice::fromLiteral("Unknown");
-        case Type::Info:    return UnownedStringSlice::fromLiteral("Info");
-        case Type::Warning: return UnownedStringSlice::fromLiteral("Warning");
-        case Type::Error:   return UnownedStringSlice::fromLiteral("Error");
+        default:                return UnownedStringSlice::fromLiteral("Unknown");
+        case Severity::Info:    return UnownedStringSlice::fromLiteral("Info");
+        case Severity::Warning: return UnownedStringSlice::fromLiteral("Warning");
+        case Severity::Error:   return UnownedStringSlice::fromLiteral("Error");
     }
 }
 
@@ -98,59 +98,59 @@ void DownstreamCompiler::Desc::appendAsText(StringBuilder& out) const
 
 /* !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! DownstreamDiagnostics !!!!!!!!!!!!!!!!!!!!!!*/
 
-Index DownstreamDiagnostics::getCountByType(Diagnostic::Type type) const
+Index DownstreamDiagnostics::getCountBySeverity(Diagnostic::Severity severity) const
 {
     Index count = 0;
     for (const auto& msg : diagnostics)
     {
-        count += Index(msg.type == type);
+        count += Index(msg.severity == severity);
     }
     return count;
 }
 
-Int DownstreamDiagnostics::countByStage(Diagnostic::Stage stage, Index counts[Int(Diagnostic::Type::CountOf)]) const
+Int DownstreamDiagnostics::countByStage(Diagnostic::Stage stage, Index counts[Int(Diagnostic::Severity::CountOf)]) const
 {
     Int count = 0;
-    ::memset(counts, 0, sizeof(Index) * Int(Diagnostic::Type::CountOf));
+    ::memset(counts, 0, sizeof(Index) * Int(Diagnostic::Severity::CountOf));
     for (const auto& diagnostic : diagnostics)
     {
         if (diagnostic.stage == stage)
         {
             count++;
-            counts[Index(diagnostic.type)]++;
+            counts[Index(diagnostic.severity)]++;
         }
     }
     return count++;
 }
 
-static void _appendCounts(const Index counts[Int(DownstreamDiagnostic::Type::CountOf)], StringBuilder& out)
+static void _appendCounts(const Index counts[Int(DownstreamDiagnostic::Severity::CountOf)], StringBuilder& out)
 {
-    typedef DownstreamDiagnostic::Type Type;
+    typedef DownstreamDiagnostic::Severity Severity;
 
-    for (Index i = 0; i < Int(Type::CountOf); i++)
+    for (Index i = 0; i < Int(Severity::CountOf); i++)
     {
         if (counts[i] > 0)
         {
-            out << DownstreamDiagnostic::getTypeText(Type(i)) << "(" << counts[i] << ") ";
+            out << DownstreamDiagnostic::getSeverityText(Severity(i)) << "(" << counts[i] << ") ";
         }
     }
 }
 
-static void _appendSimplified(const Index counts[Int(DownstreamDiagnostic::Type::CountOf)], StringBuilder& out)
+static void _appendSimplified(const Index counts[Int(DownstreamDiagnostic::Severity::CountOf)], StringBuilder& out)
 {
-    typedef DownstreamDiagnostic::Type Type;
-    for (Index i = 0; i < Int(Type::CountOf); i++)
+    typedef DownstreamDiagnostic::Severity Severity;
+    for (Index i = 0; i < Int(Severity::CountOf); i++)
     {
         if (counts[i] > 0)
         {
-            out << DownstreamDiagnostic::getTypeText(Type(i)) << " ";
+            out << DownstreamDiagnostic::getSeverityText(Severity(i)) << " ";
         }
     }
 }
 
 void DownstreamDiagnostics::appendSummary(StringBuilder& out) const
 {
-    Index counts[Int(Diagnostic::Type::CountOf)];
+    Index counts[Int(Diagnostic::Severity::CountOf)];
     if (countByStage(Diagnostic::Stage::Compile, counts) > 0)
     {
         out << "Compile: ";
@@ -167,7 +167,7 @@ void DownstreamDiagnostics::appendSummary(StringBuilder& out) const
 
 void DownstreamDiagnostics::appendSimplifiedSummary(StringBuilder& out) const
 {
-    Index counts[Int(Diagnostic::Type::CountOf)];
+    Index counts[Int(Diagnostic::Severity::CountOf)];
     if (countByStage(Diagnostic::Stage::Compile, counts) > 0)
     {
         out << "Compile: ";
@@ -182,12 +182,12 @@ void DownstreamDiagnostics::appendSimplifiedSummary(StringBuilder& out) const
     }
 }
 
-void DownstreamDiagnostics::removeByType(Diagnostic::Type type)
+void DownstreamDiagnostics::removeBySeverity(Diagnostic::Severity severity)
 {
     Index count = diagnostics.getCount();
     for (Index i = 0; i < count; ++i)
     {
-        if (diagnostics[i].type == type)
+        if (diagnostics[i].severity == severity)
         {
             diagnostics.removeAt(i);
             i--;
@@ -435,7 +435,7 @@ const DownstreamCompiler::Desc& DownstreamCompilerUtil::getCompiledWithDesc()
 
     Int bestIndex = -1;
 
-    const SlangPassThrough type = desc.type;
+    const SlangPassThrough compilerType = desc.type;
 
     Int maxVersionValue = 0;
     Int minVersionDiff = 0x7fffffff;
@@ -454,7 +454,7 @@ const DownstreamCompiler::Desc& DownstreamCompilerUtil::getCompiledWithDesc()
         DownstreamCompiler* compiler = compilers[i];
         auto compilerDesc = compiler->getDesc();
 
-        if (type == compilerDesc.type)
+        if (compilerType == compilerDesc.type)
         {
             const Int versionValue = compilerDesc.getVersionValue();
             switch (matchType)

@@ -258,9 +258,9 @@ namespace Slang
     return SLANG_OK;
 }
 
-static SlangResult _parseErrorType(const UnownedStringSlice& in, DownstreamDiagnostics::Diagnostic::Type& outType)
+static SlangResult _parseSeverityType(const UnownedStringSlice& in, DownstreamDiagnostics::Diagnostic::Severity& outType)
 {
-    typedef DownstreamDiagnostics::Diagnostic::Type Type;
+    typedef DownstreamDiagnostics::Diagnostic::Severity Type;
 
     if (in == "error" || in == "fatal error")
     {
@@ -289,7 +289,7 @@ static SlangResult _parseVisualStudioLine(const UnownedStringSlice& line, Downst
     if (line.startsWith(linkPrefix))
     {
         outDiagnostic.stage = Diagnostic::Stage::Link;
-        outDiagnostic.type = Diagnostic::Type::Info;
+        outDiagnostic.severity = Diagnostic::Severity::Info;
 
         outDiagnostic.text = UnownedStringSlice(line.begin() + linkPrefix.getLength(), line.end());
 
@@ -394,7 +394,7 @@ static SlangResult _parseVisualStudioLine(const UnownedStringSlice& line, Downst
         }
 
         // Extract the bit before the code
-        SLANG_RETURN_ON_FAIL(_parseErrorType(UnownedStringSlice(errorSection.begin(), errorSection.begin() + errorCodeIndex).trim(), outDiagnostic.type));
+        SLANG_RETURN_ON_FAIL(_parseSeverityType(UnownedStringSlice(errorSection.begin(), errorSection.begin() + errorCodeIndex).trim(), outDiagnostic.severity));
 
         // Link codes start with LNK prefix
         postError = UnownedStringSlice(postPath.begin() + errorColonIndex + 1, end); 
@@ -426,7 +426,7 @@ static SlangResult _parseVisualStudioLine(const UnownedStringSlice& line, Downst
     }
 
     // if it has a compilation error.. set on output
-    if (outDiagnostics.has(Diagnostic::Type::Error))
+    if (outDiagnostics.has(Diagnostic::Severity::Error))
     {
         outDiagnostics.result = SLANG_FAIL;
     }

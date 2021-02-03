@@ -61,15 +61,15 @@ using namespace Slang;
     SLANG_RETURN_ON_FAIL(splitPathLocation(lineSlices[0], outDiagnostic));
 
     {
-        const UnownedStringSlice errorSlice = lineSlices[1].trim();
+        const UnownedStringSlice severityAndCodeSlice = lineSlices[1].trim();
+        const UnownedStringSlice severitySlice = StringUtil::getAtInSplit(severityAndCodeSlice, ' ', 0);
 
-        const UnownedStringSlice errorTypeName = StringUtil::getAtInSplit(errorSlice, ' ', 0);
-        outDiagnostic.code = StringUtil::getAtInSplit(errorSlice, ' ', 1);
+        outDiagnostic.code = StringUtil::getAtInSplit(severityAndCodeSlice, ' ', 1);
 
-        outDiagnostic.type = DownstreamDiagnostic::Type::Error;
-        if (errorTypeName == "warning")
+        outDiagnostic.severity = DownstreamDiagnostic::Severity::Error;
+        if (severitySlice == "warning")
         {
-            outDiagnostic.type = DownstreamDiagnostic::Type::Warning;
+            outDiagnostic.severity = DownstreamDiagnostic::Severity::Warning;
         }
     }
 
@@ -92,12 +92,12 @@ using namespace Slang;
     Int lineCol;
     SLANG_RETURN_ON_FAIL(StringUtil::parseInt(lineSlices[2], lineCol));
 
-    UnownedStringSlice typeSlice = lineSlices[3].trim();
+    UnownedStringSlice severitySlice = lineSlices[3].trim();
 
-    outDiagnostic.type = DownstreamDiagnostic::Type::Error;
-    if (typeSlice == UnownedStringSlice::fromLiteral("warning"))
+    outDiagnostic.severity = DownstreamDiagnostic::Severity::Error;
+    if (severitySlice == UnownedStringSlice::fromLiteral("warning"))
     {
-        outDiagnostic.type = DownstreamDiagnostic::Type::Warning;
+        outDiagnostic.severity = DownstreamDiagnostic::Severity::Warning;
     }
 
     // The rest of the line
@@ -114,12 +114,12 @@ using namespace Slang;
         return SLANG_FAIL;
     }
     {
-        const UnownedStringSlice typeSlice = lineSlices[0].trim();
+        const UnownedStringSlice severitySlice = lineSlices[0].trim();
 
-        outDiagnostic.type = DownstreamDiagnostic::Type::Error;
-        if (typeSlice.caseInsensitiveEquals(UnownedStringSlice::fromLiteral("warning")))
+        outDiagnostic.severity = DownstreamDiagnostic::Severity::Error;
+        if (severitySlice.caseInsensitiveEquals(UnownedStringSlice::fromLiteral("warning")))
         {
-            outDiagnostic.type = DownstreamDiagnostic::Type::Warning;
+            outDiagnostic.severity = DownstreamDiagnostic::Severity::Warning;
         }
     }
 
@@ -139,20 +139,20 @@ using namespace Slang;
     }
 
     {
-        const UnownedStringSlice errorSlice = lineSlices[1].trim();
+        const UnownedStringSlice severityAndCodeSlice = lineSlices[1].trim();
         // Get the code
-        outDiagnostic.code = StringUtil::getAtInSplit(errorSlice, ' ', 1).trim();
+        outDiagnostic.code = StringUtil::getAtInSplit(severityAndCodeSlice, ' ', 1).trim();
 
-        const UnownedStringSlice typeSlice = StringUtil::getAtInSplit(errorSlice, ' ', 0);
+        const UnownedStringSlice severitySlice = StringUtil::getAtInSplit(severityAndCodeSlice, ' ', 0);
 
-        outDiagnostic.type = DownstreamDiagnostic::Type::Error;
-        if (typeSlice == UnownedStringSlice::fromLiteral("warning"))
+        outDiagnostic.severity = DownstreamDiagnostic::Severity::Error;
+        if (severitySlice == UnownedStringSlice::fromLiteral("warning"))
         {
-            outDiagnostic.type = DownstreamDiagnostic::Type::Warning;
+            outDiagnostic.severity = DownstreamDiagnostic::Severity::Warning;
         }
-        else if (typeSlice == UnownedStringSlice::fromLiteral("info"))
+        else if (severitySlice == UnownedStringSlice::fromLiteral("info"))
         {
-            outDiagnostic.type = DownstreamDiagnostic::Type::Info;
+            outDiagnostic.severity = DownstreamDiagnostic::Severity::Info;
         }
     }
 
@@ -163,7 +163,7 @@ using namespace Slang;
     return SLANG_OK;
 }
 
-static SlangResult _getSlangDiagnosticType(const UnownedStringSlice& inText, DownstreamDiagnostic::Type& outType, Int& outCode)
+static SlangResult _getSlangDiagnosticSeverity(const UnownedStringSlice& inText, DownstreamDiagnostic::Severity& outSeverity, Int& outCode)
 {
     UnownedStringSlice text(inText.trim());
 
@@ -192,9 +192,9 @@ static SlangResult _getSlangDiagnosticType(const UnownedStringSlice& inText, Dow
     switch (index)
     {
         case -1:    return SLANG_FAIL;
-        case 0:     outType = DownstreamDiagnostic::Type::Info; break;
-        case 1:     outType = DownstreamDiagnostic::Type::Warning; break;
-        default:    outType = DownstreamDiagnostic::Type::Error; break;
+        case 0:     outSeverity = DownstreamDiagnostic::Severity::Info; break;
+        case 1:     outSeverity = DownstreamDiagnostic::Severity::Warning; break;
+        default:    outSeverity = DownstreamDiagnostic::Severity::Error; break;
     }
 
     outCode = 0;
@@ -221,9 +221,9 @@ static bool _isSlangDiagnostic(const UnownedStringSlice& line)
     // Extract the type/code slice
     UnownedStringSlice typeSlice = StringUtil::getAtInSplit(line, ':', typeIndex);
 
-    DownstreamDiagnostic::Type type;
+    DownstreamDiagnostic::Severity type;
     Int code;
-    return SLANG_SUCCEEDED(_getSlangDiagnosticType(typeSlice, type, code));
+    return SLANG_SUCCEEDED(_getSlangDiagnosticSeverity(typeSlice, type, code));
 }
 
 /* static */SlangResult ParseDiagnosticUtil::parseSlangLine(const UnownedStringSlice& line, List<UnownedStringSlice>& lineSlices, DownstreamDiagnostic& outDiagnostic)
@@ -240,7 +240,7 @@ static bool _isSlangDiagnostic(const UnownedStringSlice& line)
 
     SLANG_RETURN_ON_FAIL(splitPathLocation(lineSlices[0], outDiagnostic));
     Int code;
-    SLANG_RETURN_ON_FAIL(_getSlangDiagnosticType(lineSlices[1], outDiagnostic.type, code));
+    SLANG_RETURN_ON_FAIL(_getSlangDiagnosticSeverity(lineSlices[1], outDiagnostic.severity, code));
 
     if (code != 0)
     {
@@ -310,7 +310,7 @@ static void _addDiagnosticNote(const UnownedStringSlice& in, List<DownstreamDiag
     // Make it a note on the output
     DownstreamDiagnostic diagnostic;
     diagnostic.reset();
-    diagnostic.type = DownstreamDiagnostic::Type::Info;
+    diagnostic.severity = DownstreamDiagnostic::Severity::Info;
     diagnostic.text = in;
     outDiagnostics.add(diagnostic);
 }
@@ -444,7 +444,7 @@ static SlangResult _findDownstreamCompiler(const UnownedStringSlice& slice, Slan
         }
 
         DownstreamDiagnostic diagnostic;
-        diagnostic.type = DownstreamDiagnostic::Type::Error;
+        diagnostic.severity = DownstreamDiagnostic::Severity::Error;
         diagnostic.stage = DownstreamDiagnostic::Stage::Compile;
         diagnostic.fileLine = 0;
         

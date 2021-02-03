@@ -1409,9 +1409,9 @@ static String _calcSummary(const DownstreamDiagnostics& inOutput)
 {
     DownstreamDiagnostics output(inOutput);
 
-    // We only want to analyse errors for now
-    output.removeByType(DownstreamDiagnostics::Diagnostic::Type::Info);
-    output.removeByType(DownstreamDiagnostics::Diagnostic::Type::Warning);
+    // We only want to analyze errors for now
+    output.removeBySeverity(DownstreamDiagnostic::Severity::Info);
+    output.removeBySeverity(DownstreamDiagnostic::Severity::Warning);
 
     StringBuilder builder;
 

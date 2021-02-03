@@ -1541,22 +1541,22 @@ SlangResult dissassembleDXILUsingDXC(
                 // 
                 Severity severity = Severity::Error;
                 
-                switch (diagnostic.type)
+                switch (diagnostic.severity)
                 {
-                    case Diagnostic::Type::Unknown:
-                    case Diagnostic::Type::Error:
+                    case Diagnostic::Severity::Unknown:
+                    case Diagnostic::Severity::Error:
                     {
                         severity = Severity::Error;
                         builder << "error";
                         break;
                     }
-                    case Diagnostic::Type::Warning:
+                    case Diagnostic::Severity::Warning:
                     {
                         severity = Severity::Warning;
                         builder << "warning";
                         break;
                     }
-                    case Diagnostic::Type::Info:
+                    case Diagnostic::Severity::Info:
                     {
                         severity = Severity::Note;
                         builder << "info";
@@ -1572,7 +1572,7 @@ SlangResult dissassembleDXILUsingDXC(
         }
 
         // If any errors are emitted, then we are done
-        if (diagnostics.has(DownstreamDiagnostic::Type::Error))
+        if (diagnostics.has(DownstreamDiagnostic::Severity::Error))
         {
             return SLANG_FAIL;
         }
