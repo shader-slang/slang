@@ -18,6 +18,8 @@ namespace Slang
 
 struct DownstreamDiagnostic
 {
+    typedef DownstreamDiagnostic ThisType;
+
     enum class Type
     {
         Unknown,
@@ -38,6 +40,18 @@ struct DownstreamDiagnostic
         stage = Stage::Compile;
         fileLine = 0;
     }
+
+    bool operator==(const ThisType& rhs) const
+    {
+        return type == rhs.type &&
+            stage == rhs.stage &&
+            text == rhs.text &&
+            code == rhs.code &&
+            filePath == rhs.filePath &&
+            fileLine == rhs.fileLine;
+    }
+    bool operator!=(const ThisType& rhs) const { return !(*this == rhs); }
+
     static UnownedStringSlice getTypeText(Type type);
 
     Type type;                      ///< The type of error
