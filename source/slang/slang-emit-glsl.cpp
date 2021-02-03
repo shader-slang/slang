@@ -848,7 +848,7 @@ void GLSLSourceEmitter::emitEntryPointAttributesImpl(IRFunc* irFunc, IREntryPoin
                 m_writer->emit(" = ");
                 m_writer->emit(sizeAlongAxis[ii]);
             }
-            m_writer->emit(") in;");
+            m_writer->emit(") in;\n");
         }
         break;
         case Stage::Geometry:
