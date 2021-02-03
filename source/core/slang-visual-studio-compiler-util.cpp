@@ -258,21 +258,21 @@ namespace Slang
     return SLANG_OK;
 }
 
-static SlangResult _parseSeverityType(const UnownedStringSlice& in, DownstreamDiagnostics::Diagnostic::Severity& outType)
+static SlangResult _parseSeverity(const UnownedStringSlice& in, DownstreamDiagnostics::Diagnostic::Severity& outSeverity)
 {
     typedef DownstreamDiagnostics::Diagnostic::Severity Type;
 
     if (in == "error" || in == "fatal error")
     {
-        outType = Type::Error;
+        outSeverity = Type::Error;
     }
     else if (in == "warning")
     {
-        outType = Type::Warning;
+        outSeverity = Type::Warning;
     }
     else if (in == "info")
     {
-        outType = Type::Info;
+        outSeverity = Type::Info;
     }
     else
     {
@@ -394,7 +394,7 @@ static SlangResult _parseVisualStudioLine(const UnownedStringSlice& line, Downst
         }
 
         // Extract the bit before the code
-        SLANG_RETURN_ON_FAIL(_parseSeverityType(UnownedStringSlice(errorSection.begin(), errorSection.begin() + errorCodeIndex).trim(), outDiagnostic.severity));
+        SLANG_RETURN_ON_FAIL(_parseSeverity(UnownedStringSlice(errorSection.begin(), errorSection.begin() + errorCodeIndex).trim(), outDiagnostic.severity));
 
         // Link codes start with LNK prefix
         postError = UnownedStringSlice(postPath.begin() + errorColonIndex + 1, end); 
