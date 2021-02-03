@@ -369,7 +369,10 @@ public:
         // Emit the argument list (including paranthesis) in a `CallInst`
     void _emitCallArgList(IRCall* call);
 
-
+        
+        /// Used for special case parts of an intrinsic, typically indicated via the $ prefix.
+    const char* _emitIntrinsicSpecial(const char* cur, const char* end, IRUse* args, Int argCount);
+    
     String _generateUniqueName(const UnownedStringSlice& slice);
 
         // Sort witnessTable entries according to the order defined in the witnessed interface type.
@@ -398,6 +401,9 @@ public:
 
     // Where source is written to
     SourceWriter* m_writer;
+
+    // The amount of open parens in output of intrinsic expansion
+    Index m_openParenCount = 0;
 
     UInt m_uniqueIDCounter = 1;
     Dictionary<IRInst*, UInt> m_mapIRValueToID;
