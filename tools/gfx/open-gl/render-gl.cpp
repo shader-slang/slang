@@ -151,8 +151,7 @@ public:
         setViewports(UInt count, Viewport const* viewports) override;
     virtual SLANG_NO_THROW void SLANG_MCALL
         setScissorRects(UInt count, ScissorRect const* rects) override;
-    virtual SLANG_NO_THROW void SLANG_MCALL
-        setPipelineState(PipelineType pipelineType, IPipelineState* state) override;
+    virtual SLANG_NO_THROW void SLANG_MCALL setPipelineState(IPipelineState* state) override;
     virtual SLANG_NO_THROW void SLANG_MCALL draw(UInt vertexCount, UInt startVertex) override;
     virtual void SLANG_MCALL
         drawIndexed(UInt indexCount, UInt startIndex, UInt baseVertex) override;
@@ -163,7 +162,10 @@ public:
     {
         return RendererType::OpenGl;
     }
-
+    virtual PipelineStateBase* getCurrentPipeline() override
+    {
+        return m_currentPipelineState.Ptr();
+    }
     GLRenderer();
     ~GLRenderer();
 
@@ -401,20 +403,26 @@ public:
 		RefPtr<WeakSink<GLRenderer> > m_renderer;
 	};
 
-    class PipelineStateImpl : public IPipelineState, public RefObject
+    class PipelineStateImpl : public PipelineStateBase
     {
-    public:
-        SLANG_REF_OBJECT_IUNKNOWN_ALL
-        IPipelineState* getInterface(const Guid& guid)
-        {
-            if (guid == GfxGUID::IID_ISlangUnknown || guid == GfxGUID::IID_IPipelineState)
-                return static_cast<IPipelineState*>(this);
-            return nullptr;
-        }
     public:
         RefPtr<ShaderProgramImpl>   m_program;
         RefPtr<PipelineLayoutImpl>  m_pipelineLayout;
         RefPtr<InputLayoutImpl>     m_inputLayout;
+        void init(const GraphicsPipelineStateDesc& inDesc)
+        {
+            PipelineStateDesc pipelineDesc;
+            pipelineDesc.type = PipelineType::Graphics;
+            pipelineDesc.graphics = inDesc;
+            initializeBase(pipelineDesc);
+        }
+        void init(const ComputePipelineStateDesc& inDesc)
+        {
+            PipelineStateDesc pipelineDesc;
+            pipelineDesc.type = PipelineType::Compute;
+            pipelineDesc.compute = inDesc;
+            initializeBase(pipelineDesc);
+        }
     };
 
     enum class GlPixelFormat
@@ -494,10 +502,11 @@ public:
     SLANG_COMPILE_TIME_ASSERT(SLANG_COUNT_OF(s_pixelFormatInfos) == int(GlPixelFormat::CountOf));
 }
 
-SlangResult SLANG_MCALL createGLRenderer(IRenderer** outRenderer)
+SlangResult SLANG_MCALL createGLRenderer(const IRenderer::Desc* desc, void* windowHandle, IRenderer** outRenderer)
 {
-    *outRenderer = new GLRenderer();
-    (*outRenderer)->addRef();
+    RefPtr<GLRenderer> result = new GLRenderer();
+    SLANG_RETURN_ON_FAIL(result->initialize(*desc, windowHandle));
+    *outRenderer = result.detach();
     return SLANG_OK;
 }
 
@@ -785,7 +794,9 @@ void GLRenderer::destroyBindingEntries(const BindingState::Desc& desc, const Bin
 
 SLANG_NO_THROW Result SLANG_MCALL GLRenderer::initialize(const Desc& desc, void* inWindowHandle)
 {
-    SLANG_RETURN_ON_FAIL(slangContext.initialize(desc.slang, SLANG_GLSL, "sm_5_0"));
+    SLANG_RETURN_ON_FAIL(slangContext.initialize(desc.slang, SLANG_GLSL, "glsl_440"));
+
+    SLANG_RETURN_ON_FAIL(GraphicsAPIRenderer::initialize(desc, inWindowHandle));
 
     auto windowHandle = (HWND)inWindowHandle;
     m_desc = desc;
@@ -1270,8 +1281,7 @@ SLANG_NO_THROW void SLANG_MCALL GLRenderer::setScissorRects(UInt count, ScissorR
     }
 }
 
-SLANG_NO_THROW void SLANG_MCALL
-    GLRenderer::setPipelineState(PipelineType pipelineType, IPipelineState* state)
+SLANG_NO_THROW void SLANG_MCALL GLRenderer::setPipelineState(IPipelineState* state)
 {
     auto pipelineStateImpl = (PipelineStateImpl*) state;
 
@@ -1552,6 +1562,7 @@ Result GLRenderer::createGraphicsPipelineState(const GraphicsPipelineStateDesc& 
     pipelineStateImpl->m_program = programImpl;
     pipelineStateImpl->m_pipelineLayout = pipelineLayoutImpl;
     pipelineStateImpl->m_inputLayout = inputLayoutImpl;
+    pipelineStateImpl->init(desc);
     *outState = pipelineStateImpl.detach();
     return SLANG_OK;
 }
@@ -1567,6 +1578,7 @@ Result GLRenderer::createComputePipelineState(const ComputePipelineStateDesc& in
     RefPtr<PipelineStateImpl> pipelineStateImpl = new PipelineStateImpl();
     pipelineStateImpl->m_program = programImpl;
     pipelineStateImpl->m_pipelineLayout = pipelineLayoutImpl;
+    pipelineStateImpl->init(desc);
     *outState = pipelineStateImpl.detach();
     return SLANG_OK;
 }
