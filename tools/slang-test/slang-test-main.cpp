@@ -1155,6 +1155,47 @@ TestResult runSimpleTest(TestContext* context, TestInput& input)
     return result;
 }
 
+SlangResult _readText(const UnownedStringSlice& path, String& out)
+{
+    try
+    {
+        out = Slang::File::readAllText(path);
+    }
+    catch (const Slang::IOException&)
+    {
+        return SLANG_FAIL;
+    }
+    return SLANG_OK;
+}
+
+static SlangResult _readExpected(const UnownedStringSlice& stem, String& out)
+{
+    StringBuilder buf;
+
+    // See if we have a trailing . index, and try *without* that first
+    const Index dotIndex = stem.lastIndexOf('.');
+    if (dotIndex >= 0)
+    {
+        const UnownedStringSlice postfix = stem.tail(dotIndex + 1);
+
+        Int value;
+        if (SLANG_SUCCEEDED(StringUtil::parseInt(postfix, value)))
+        {
+            UnownedStringSlice head = stem.head(dotIndex);
+
+            buf << head << ".expected";
+
+            if (SLANG_SUCCEEDED(_readText(buf.getUnownedSlice(), out)))
+            {
+                return SLANG_OK;
+            }
+        }
+    }
+
+    buf << stem << ".expected";
+    return _readText(buf.getUnownedSlice(), out);
+}
+
 TestResult runSimpleLineTest(TestContext* context, TestInput& input)
 {
     // need to execute the stand-alone Slang compiler on the file, and compare its output to what we expect
@@ -1201,24 +1242,26 @@ TestResult runSimpleLineTest(TestContext* context, TestInput& input)
         actualOutput << "No output diagnostics\n";
     }
 
+    TestResult result = TestResult::Fail;
 
-    String expectedOutputPath = outputStem + ".expected";
     String expectedOutput;
-    try
-    {
-        expectedOutput = Slang::File::readAllText(expectedOutputPath);
-    }
-    catch (const Slang::IOException&)
-    {
-    }
 
-    TestResult result = TestResult::Pass;
-
-    // Otherwise we compare to the expected output
-    if (!_areResultsEqual(input.testOptions->type, expectedOutput, actualOutput))
+    if (SLANG_SUCCEEDED(_readExpected(outputStem.getUnownedSlice(), expectedOutput)))
     {
-        context->reporter->dumpOutputDifference(expectedOutput, actualOutput);
-        result = TestResult::Fail;
+        if (StringUtil::areLinesEqual(expectedOutput.getUnownedSlice(), actualOutput.getUnownedSlice()))
+        {
+            result = TestResult::Pass;
+        }
+        else
+        {
+            context->reporter->dumpOutputDifference(expectedOutput, actualOutput);
+        }
+    }
+    else
+    {
+        StringBuilder buf;
+        buf << "Unable to find expected output for '" << outputStem << "'";
+        context->reporter->message(TestMessageType::TestFailure, buf);
     }
 
     // If the test failed, then we write the actual output to a file
@@ -1228,8 +1271,6 @@ TestResult runSimpleLineTest(TestContext* context, TestInput& input)
     {
         String actualOutputPath = outputStem + ".actual";
         Slang::File::writeAllText(actualOutputPath, actualOutput);
-
-        context->reporter->dumpOutputDifference(expectedOutput, actualOutput);
     }
 
     return result;
@@ -3397,3 +3438,4 @@ int main(int argc, char** argv)
 #endif
     return SLANG_SUCCEEDED(res) ? 0 : 1;
 }
+
