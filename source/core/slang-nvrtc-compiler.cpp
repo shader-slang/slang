@@ -190,7 +190,7 @@ static bool _hasDriveLetter(const UnownedStringSlice& line)
 static SlangResult _parseNVRTCLine(const UnownedStringSlice& line, DownstreamDiagnostic& outDiagnostic)
 {
     typedef DownstreamDiagnostic Diagnostic;
-    typedef Diagnostic::Type Type;
+    typedef Diagnostic::Severity Severity;
 
     outDiagnostic.stage = Diagnostic::Stage::Compile;
 
@@ -215,11 +215,11 @@ static SlangResult _parseNVRTCLine(const UnownedStringSlice& line, DownstreamDia
 
         if (split1 == "error")
         {
-            outDiagnostic.type = Type::Error;
+            outDiagnostic.severity = Severity::Error;
         }
         else if (split1 == "warning")
         {
-            outDiagnostic.type = Type::Warning;
+            outDiagnostic.severity = Severity::Warning;
         }
         outDiagnostic.text = split[2].trim();
 
@@ -461,7 +461,7 @@ SlangResult NVRTCDownstreamCompiler::compile(const CompileOptions& options, RefP
         }
 
         // if it has a compilation error.. set on output
-        if (diagnostics.has(DownstreamDiagnostic::Type::Error))
+        if (diagnostics.has(DownstreamDiagnostic::Severity::Error))
         {
             diagnostics.result = SLANG_FAIL;
         }
