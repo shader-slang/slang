@@ -1292,9 +1292,13 @@ static SlangResult _innerMain(Slang::StdWriters* stdWriters, SlangSession* sessi
         desc.nvapiExtnSlot = int(nvapiExtnSlot);
         desc.slang.slangGlobalSession = session;
         window = renderer_test::Window::create();
-        SLANG_RETURN_ON_FAIL(window->initialize(gWindowWidth, gWindowHeight));
-
-        gfxCreateRenderer(&desc, window->getHandle(), renderer.writeRef());
+        void* windowHandle = nullptr;
+        if (window)
+        {
+            SLANG_RETURN_ON_FAIL(window->initialize(gWindowWidth, gWindowHeight));
+            windowHandle = window->getHandle();
+        }
+        gfxCreateRenderer(&desc, windowHandle, renderer.writeRef());
 
         if (!renderer)
         {
