@@ -319,7 +319,7 @@ struct OwningComponentKey
             return false;
         if (specializationArgs.getCount() != other.specializationArgs.getCount())
             return false;
-        for (Index i = 0; i < other.specializationArgs.getCount(); i++)
+        for (Slang::Index i = 0; i < other.specializationArgs.getCount(); i++)
         {
             if (specializationArgs[i] != other.specializationArgs[i])
                 return false;
