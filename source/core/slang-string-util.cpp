@@ -136,12 +136,12 @@ namespace Slang {
     }
 }
 
-/* static */int StringUtil::indexOfInSplit(const UnownedStringSlice& in, char splitChar, const UnownedStringSlice& find)
+/* static */Index StringUtil::indexOfInSplit(const UnownedStringSlice& in, char splitChar, const UnownedStringSlice& find)
 {
     const char* start = in.begin();
     const char* end = in.end();
 
-    for (int i = 0; start < end; ++i)
+    for (Index i = 0; start < end; ++i)
     {
         // Move cur so it's either at the end or at next split character
         const char* cur = start;
@@ -162,12 +162,12 @@ namespace Slang {
     return -1;
 }
 
-UnownedStringSlice StringUtil::getAtInSplit(const UnownedStringSlice& in, char splitChar, int index)
+UnownedStringSlice StringUtil::getAtInSplit(const UnownedStringSlice& in, char splitChar, Index index)
 {
     const char* start = in.begin();
     const char* end = in.end();
 
-    for (int i = 0; start < end; ++i)
+    for (Index i = 0; start < end; ++i)
     {
         // Move cur so it's either at the end or at next split character
         const char* cur = start;
