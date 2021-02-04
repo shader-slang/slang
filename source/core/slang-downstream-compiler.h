@@ -69,12 +69,12 @@ struct DownstreamDiagnostics
         /// Reset to an initial empty state
     void reset() { diagnostics.clear(); rawDiagnostics = String(); result = SLANG_OK; }
 
-        /// Get the number of diagnostics by type
+        /// Get the number of diagnostics by severity
     Index getCountBySeverity(Diagnostic::Severity severity) const;
-        /// True if there are any diagnostics  of the type
+        /// True if there are any diagnostics  of severity
     bool has(Diagnostic::Severity severity) const { return getCountBySeverity(severity) > 0; }
 
-        /// Stores in outCounts, the amount of diagnostics for the stage of each type
+        /// Stores in outCounts, the amount of diagnostics for the stage of each severity
     Int countByStage(Diagnostic::Stage stage, Index outCounts[Int(Diagnostic::Severity::CountOf)]) const;
 
         /// Append a summary to out
