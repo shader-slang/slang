@@ -335,8 +335,7 @@ void GUI::endFrame()
 
     renderer->setViewport(viewport);
 
-    auto pipelineType = PipelineType::Graphics;
-    renderer->setPipelineState(pipelineType, pipelineState);
+    renderer->setPipelineState(pipelineState);
 
     renderer->setVertexBuffer(0, vertexBuffer, sizeof(ImDrawVert));
     renderer->setIndexBuffer(indexBuffer, sizeof(ImDrawIdx) == 2 ? Format::R_UInt16 : Format::R_UInt32);
@@ -376,7 +375,7 @@ void GUI::endFrame()
                     samplerState);
 
                 renderer->setDescriptorSet(
-                    pipelineType,
+                    PipelineType::Graphics,
                     pipelineLayout,
                     0,
                     descriptorSet);

@@ -114,8 +114,7 @@ public:
         setViewports(UInt count, Viewport const* viewports) override;
     virtual SLANG_NO_THROW void SLANG_MCALL
         setScissorRects(UInt count, ScissorRect const* rects) override;
-    virtual SLANG_NO_THROW void SLANG_MCALL
-        setPipelineState(PipelineType pipelineType, IPipelineState* state) override;
+    virtual SLANG_NO_THROW void SLANG_MCALL setPipelineState(IPipelineState* state) override;
     virtual SLANG_NO_THROW void SLANG_MCALL draw(UInt vertexCount, UInt startVertex) override;
     virtual SLANG_NO_THROW void SLANG_MCALL
         drawIndexed(UInt indexCount, UInt startIndex, UInt baseVertex) override;
@@ -126,7 +125,10 @@ public:
     {
         return RendererType::Vulkan;
     }
-
+    virtual PipelineStateBase* getCurrentPipeline() override
+    {
+        return m_currentPipeline.Ptr();
+    }
         /// Dtor
     ~VKRenderer();
 
@@ -515,16 +517,8 @@ public:
         int m_offset;
     };
 
-    class PipelineStateImpl : public IPipelineState, public RefObject
+    class PipelineStateImpl : public PipelineStateBase
     {
-    public:
-        SLANG_REF_OBJECT_IUNKNOWN_ALL
-        IPipelineState* getInterface(const Guid& guid)
-        {
-            if (guid == GfxGUID::IID_ISlangUnknown || guid == GfxGUID::IID_IPipelineState)
-                return static_cast<IPipelineState*>(this);
-            return nullptr;
-        }
     public:
         PipelineStateImpl(const VulkanApi& api):
             m_api(&api)
@@ -536,6 +530,21 @@ public:
             {
                 m_api->vkDestroyPipeline(m_api->m_device, m_pipeline, nullptr);
             }
+        }
+
+        void init(const GraphicsPipelineStateDesc& inDesc)
+        {
+            PipelineStateDesc pipelineDesc;
+            pipelineDesc.type = PipelineType::Graphics;
+            pipelineDesc.graphics = inDesc;
+            initializeBase(pipelineDesc);
+        }
+        void init(const ComputePipelineStateDesc& inDesc)
+        {
+            PipelineStateDesc pipelineDesc;
+            pipelineDesc.type = PipelineType::Compute;
+            pipelineDesc.compute = inDesc;
+            initializeBase(pipelineDesc);
         }
 
         const VulkanApi* m_api;
@@ -913,10 +922,11 @@ void VKRenderer::_endRender()
     m_deviceQueue.flush();
 }
 
-Result SLANG_MCALL createVKRenderer(IRenderer** outRenderer)
+Result SLANG_MCALL createVKRenderer(const IRenderer::Desc* desc, void* windowHandle, IRenderer** outRenderer)
 {
-    *outRenderer = new VKRenderer();
-    (*outRenderer)->addRef();
+    RefPtr<VKRenderer> result = new VKRenderer();
+    SLANG_RETURN_ON_FAIL(result->initialize(*desc, windowHandle));
+    *outRenderer = result.detach();
     return SLANG_OK;
 }
 
@@ -1034,6 +1044,8 @@ VkPipelineShaderStageCreateInfo VKRenderer::compileEntryPoint(
 SlangResult VKRenderer::initialize(const Desc& desc, void* inWindowHandle)
 {
     SLANG_RETURN_ON_FAIL(slangContext.initialize(desc.slang, SLANG_SPIRV, "sm_5_1"));
+
+    SLANG_RETURN_ON_FAIL(GraphicsAPIRenderer::initialize(desc, inWindowHandle));
 
     SLANG_RETURN_ON_FAIL(m_module.init());
     SLANG_RETURN_ON_FAIL(m_api.initGlobalProcs(m_module));
@@ -2274,9 +2286,9 @@ void VKRenderer::setScissorRects(UInt count, ScissorRect const* rects)
     m_api.vkCmdSetScissor(commandBuffer, 0, uint32_t(count), vkRects);
 }
 
-void VKRenderer::setPipelineState(PipelineType pipelineType, IPipelineState* state)
+void VKRenderer::setPipelineState(IPipelineState* state)
 {
-    m_currentPipeline = (PipelineStateImpl*)state;
+    m_currentPipeline = static_cast<PipelineStateImpl*>(state);
 }
 
 void VKRenderer::_flushBindingState(VkCommandBuffer commandBuffer, VkPipelineBindPoint pipelineBindPoint)
@@ -2980,6 +2992,7 @@ Result VKRenderer::createGraphicsPipelineState(const GraphicsPipelineStateDesc& 
     pipelineStateImpl->m_pipeline = pipeline;
     pipelineStateImpl->m_pipelineLayout = pipelineLayoutImpl;
     pipelineStateImpl->m_shaderProgram = programImpl;
+    pipelineStateImpl->init(desc);
     *outState = pipelineStateImpl.detach();
     return SLANG_OK;
 }
@@ -3005,6 +3018,7 @@ Result VKRenderer::createComputePipelineState(const ComputePipelineStateDesc& in
     pipelineStateImpl->m_pipeline = pipeline;
     pipelineStateImpl->m_pipelineLayout = pipelineLayoutImpl;
     pipelineStateImpl->m_shaderProgram = programImpl;
+    pipelineStateImpl->init(desc);
     *outState = pipelineStateImpl.detach();
     return SLANG_OK;
 }

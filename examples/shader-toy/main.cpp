@@ -347,14 +347,12 @@ Result initialize()
     windowDesc.userData = this;
     gWindow = createWindow(windowDesc);
 
-    gfxGetCreateFunc(gfx::RendererType::DirectX11)(gRenderer.writeRef());
     IRenderer::Desc rendererDesc;
+    rendererDesc.rendererType = RendererType::DirectX11;
     rendererDesc.width = gWindowWidth;
     rendererDesc.height = gWindowHeight;
-    {
-        Result res = gRenderer->initialize(rendererDesc, getPlatformWindowHandle(gWindow));
-        if(SLANG_FAILED(res)) return res;
-    }
+    Result res = gfxCreateRenderer(&rendererDesc, getPlatformWindowHandle(gWindow), gRenderer.writeRef());
+    if(SLANG_FAILED(res)) return res;
 
     int constantBufferSize = sizeof(Uniforms);
 
@@ -477,7 +475,7 @@ void renderFrame()
         gRenderer->unmap(gConstantBuffer);
     }
 
-    gRenderer->setPipelineState(PipelineType::Graphics, gPipelineState);
+    gRenderer->setPipelineState(gPipelineState);
     gRenderer->setDescriptorSet(PipelineType::Graphics, gPipelineLayout, 0, gDescriptorSet);
 
     gRenderer->setVertexBuffer(0, gVertexBuffer, sizeof(FullScreenTriangle::Vertex));

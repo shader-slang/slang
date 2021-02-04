@@ -1,13 +1,10 @@
 // render-d3d11.h
 #pragma once
 
-#include <cstdint>
-#include "slang.h"
+#include "../renderer-shared.h"
 
 namespace gfx {
 
-class IRenderer;
-
-SlangResult SLANG_MCALL createGLRenderer(IRenderer** outRenderer);
+SlangResult SLANG_MCALL createGLRenderer(const IRenderer::Desc* desc, void* windowHandle, IRenderer** outRenderer);
 
 } // gfx
