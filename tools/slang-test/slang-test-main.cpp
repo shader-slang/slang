@@ -1242,19 +1242,26 @@ TestResult runSimpleLineTest(TestContext* context, TestInput& input)
         actualOutput << "No output diagnostics\n";
     }
 
+    TestResult result = TestResult::Fail;
+
     String expectedOutput;
-    if (SLANG_FAILED(_readExpected(outputStem.getUnownedSlice(), expectedOutput)))
+
+    if (SLANG_SUCCEEDED(_readExpected(outputStem.getUnownedSlice(), expectedOutput)))
     {
-        return TestResult::Fail;
+        if (StringUtil::areLinesEqual(expectedOutput.getUnownedSlice(), actualOutput.getUnownedSlice()))
+        {
+            result = TestResult::Pass;
+        }
+        else
+        {
+            context->reporter->dumpOutputDifference(expectedOutput, actualOutput);
+        }
     }
-
-    TestResult result = TestResult::Pass;
-
-    // Otherwise we compare to the expected output
-    if (!StringUtil::areLinesEqual(expectedOutput.getUnownedSlice(), actualOutput.getUnownedSlice()))
+    else
     {
-        context->reporter->dumpOutputDifference(expectedOutput, actualOutput);
-        result = TestResult::Fail;
+        StringBuilder buf;
+        buf << "Unable to find expected output for '" << outputStem << "'";
+        context->reporter->message(TestMessageType::TestFailure, buf);
     }
 
     // If the test failed, then we write the actual output to a file
@@ -1264,8 +1271,6 @@ TestResult runSimpleLineTest(TestContext* context, TestInput& input)
     {
         String actualOutputPath = outputStem + ".actual";
         Slang::File::writeAllText(actualOutputPath, actualOutput);
-
-        context->reporter->dumpOutputDifference(expectedOutput, actualOutput);
     }
 
     return result;
@@ -3433,3 +3438,4 @@ int main(int argc, char** argv)
 #endif
     return SLANG_SUCCEEDED(res) ? 0 : 1;
 }
+
