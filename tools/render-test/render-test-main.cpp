@@ -1306,9 +1306,13 @@ static SlangResult _innerMain(Slang::StdWriters* stdWriters, SlangSession* sessi
             SlangResult res = gfxCreateRenderer(&desc, windowHandle, renderer.writeRef());
             if (SLANG_FAILED(res))
             {
-                // If it is not available just report that. This can happen when features are requested that are not available.
-                // In that case we don't want to report as an error - for testing purposes this means we can't run this
-                // specific test because of it's features, so it should be ignored.
+                // We need to be careful here about SLANG_E_NOT_AVAILABLE. This return value means that the renderer couldn't
+                // be created because it required *features* that were *not available*. It does not mean the renderer in general couldn't
+                // be constructed.
+                //
+                // Returning SLANG_E_NOT_AVAILABLE will lead to the test infrastructure ignoring this test.
+                //
+                // We also don't want to output the 'Unable to create renderer' error, as this isn't an error.
                 if (res == SLANG_E_NOT_AVAILABLE)
                 {
                     return res;
