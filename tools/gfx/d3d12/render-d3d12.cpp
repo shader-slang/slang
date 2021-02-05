@@ -762,8 +762,6 @@ protected:
 
     HWND m_hwnd = nullptr;
 
-    List<String> m_features;
-
     bool m_nvapi = false;
 };
 
@@ -1441,6 +1439,7 @@ Result D3D12Renderer::initialize(const Desc& desc, void* inWindowHandle)
     // Set the device
     m_device = m_deviceInfo.m_device;
 
+#ifdef GFX_NVAPI
     // NVAPI
     if (desc.nvapiExtnSlot >= 0)
     {
@@ -1449,7 +1448,6 @@ Result D3D12Renderer::initialize(const Desc& desc, void* inWindowHandle)
             return SLANG_E_NOT_AVAILABLE;
         }
 
-#ifdef GFX_NVAPI
         // From DOCS: Applications are expected to bind null UAV to this slot.
         // NOTE! We don't currently do this, but doesn't seem to be a problem.
 
@@ -1470,8 +1468,8 @@ Result D3D12Renderer::initialize(const Desc& desc, void* inWindowHandle)
         }
 
         m_nvapi = true;
-#endif
     }
+#endif
 
     // Find what features are supported
     {

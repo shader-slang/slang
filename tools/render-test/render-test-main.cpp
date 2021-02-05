@@ -1284,11 +1284,14 @@ static SlangResult _innerMain(Slang::StdWriters* stdWriters, SlangSession* sessi
         desc.width = gWindowWidth;
         desc.height = gWindowHeight;
         desc.adapter = options.adapter.getBuffer();
+
         List<const char*> requiredFeatureList;
-        for (auto & name : options.renderFeatures)
+        for (auto& name : options.renderFeatures)
             requiredFeatureList.add(name.getBuffer());
+
         desc.requiredFeatures = requiredFeatureList.getBuffer();
         desc.requiredFeatureCount = (int)requiredFeatureList.getCount();
+
         desc.nvapiExtnSlot = int(nvapiExtnSlot);
         desc.slang.slangGlobalSession = session;
         window = renderer_test::Window::create();
