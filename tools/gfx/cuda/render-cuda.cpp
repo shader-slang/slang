@@ -242,36 +242,6 @@ public:
     RefPtr<TextureCUDAResource> textureResource = nullptr;
 };
 
-class CUDAProgramLayout;
-
-class CUDAShaderProgram : public ShaderProgramBase
-{
-public:
-    CUmodule cudaModule = nullptr;
-    CUfunction cudaKernel;
-    String kernelName;
-    RefPtr<CUDAProgramLayout> layout;
-
-    ~CUDAShaderProgram()
-    {
-        if (cudaModule)
-            cuModuleUnload(cudaModule);
-    }
-};
-
-class CUDAPipelineState : public PipelineStateBase
-{
-public:
-    RefPtr<CUDAShaderProgram> shaderProgram;
-    void init(const ComputePipelineStateDesc& inDesc)
-    {
-        PipelineStateDesc pipelineDesc;
-        pipelineDesc.type = PipelineType::Compute;
-        pipelineDesc.compute = inDesc;
-        initializeBase(pipelineDesc);
-    }
-};
-
 class CUDAShaderObjectLayout : public ShaderObjectLayoutBase
 {
 public:
@@ -578,8 +548,6 @@ public:
         // TODO: the logic here is a copy-paste of `GraphicsCommonShaderObject::collectSpecializationArgs`,
         // consider moving the implementation to `ShaderObjectBase` and share the logic among different implementations.
 
-        if (!m_bindingFinalized)
-            return SLANG_FAIL;
         auto& subObjectRanges = getLayout()->subObjectRanges;
         // The following logic is built on the assumption that all fields that involve existential types (and
         // therefore require specialization) will results in a sub-object range in the type layout.
@@ -677,7 +645,42 @@ public:
         entryPointObjects[index]->addRef();
         return SLANG_OK;
     }
+    virtual Result collectSpecializationArgs(ExtendedShaderObjectTypeList& args) override
+    {
+        SLANG_RETURN_ON_FAIL(CUDAShaderObject::collectSpecializationArgs(args));
+        for (auto& entryPoint : entryPointObjects)
+        {
+            SLANG_RETURN_ON_FAIL(entryPoint->collectSpecializationArgs(args));
+        }
+        return SLANG_OK;
+    }
+};
 
+class CUDAShaderProgram : public ShaderProgramBase
+{
+public:
+    CUmodule cudaModule = nullptr;
+    CUfunction cudaKernel;
+    String kernelName;
+    RefPtr<CUDAProgramLayout> layout;
+    ~CUDAShaderProgram()
+    {
+        if (cudaModule)
+            cuModuleUnload(cudaModule);
+    }
+};
+
+class CUDAPipelineState : public PipelineStateBase
+{
+public:
+    RefPtr<CUDAShaderProgram> shaderProgram;
+    void init(const ComputePipelineStateDesc& inDesc)
+    {
+        PipelineStateDesc pipelineDesc;
+        pipelineDesc.type = PipelineType::Compute;
+        pipelineDesc.compute = inDesc;
+        initializeBase(pipelineDesc);
+    }
 };
 
 class CUDARenderer : public RendererBase
@@ -802,7 +805,6 @@ private:
     CUcontext m_context = nullptr;
     RefPtr<CUDAPipelineState> currentPipeline = nullptr;
     RefPtr<CUDARootShaderObject> currentRootObject = nullptr;
-    SlangContext slangContext;
  public:
     ~CUDARenderer()
     {
@@ -1332,6 +1334,7 @@ private:
         {
             RefPtr<CUDAShaderProgram> cudaProgram = new CUDAShaderProgram();
             cudaProgram->slangProgram = desc.slangProgram;
+            cudaProgram->layout = new CUDAProgramLayout(this, desc.slangProgram->getLayout());
             *outProgram = cudaProgram.detach();
             return SLANG_OK;
         }
