@@ -240,14 +240,12 @@ Slang::Result initialize()
     // A future version of this example may support multiple
     // platforms/APIs.
     //
-    gfxGetCreateFunc(gfx::RendererType::DirectX11)(gRenderer.writeRef());
-    IRenderer::Desc rendererDesc;
+    IRenderer::Desc rendererDesc = {};
+    rendererDesc.rendererType = gfx::RendererType::DirectX11;
     rendererDesc.width = gWindowWidth;
     rendererDesc.height = gWindowHeight;
-    {
-        gfx::Result res = gRenderer->initialize(rendererDesc, getPlatformWindowHandle(gWindow));
-        if(SLANG_FAILED(res)) return res;
-    }
+    gfx::Result res = gfxCreateRenderer(&rendererDesc, getPlatformWindowHandle(gWindow), gRenderer.writeRef());
+    if(SLANG_FAILED(res)) return res;
 
     // Now we will create objects needed to configur the "input assembler"
     // (IA) stage of the D3D pipeline.
@@ -414,7 +412,7 @@ void renderFrame()
     // PSO, binding our root shader object to it (which references
     // the `Uniforms` buffer that will filled in above).
     //
-    gRenderer->setPipelineState(PipelineType::Graphics, gPipelineState);
+    gRenderer->setPipelineState(gPipelineState);
     gRenderer->bindRootShaderObject(PipelineType::Graphics, gRootObject);
 
     // We also need to set up a few pieces of fixed-function pipeline

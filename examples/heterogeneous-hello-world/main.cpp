@@ -43,7 +43,6 @@ using namespace gfx;
 // We create global ref pointers to avoid dereferencing values
 //
 ComPtr<gfx::IShaderProgram>         gShaderProgram;
-Slang::RefPtr<gfx::ApplicationContext> gAppContext;
 Slang::ComPtr<gfx::IRenderer>      gRenderer;
 
 ComPtr<gfx::IBufferResource> gStructuredBuffer;
@@ -123,14 +122,12 @@ gfx::IRenderer* createRenderer(
     // A future version of this example may support multiple
     // platforms/APIs.
     //
-    gfxGetCreateFunc(gfx::RendererType::DirectX11)(gRenderer.writeRef());
-    IRenderer::Desc rendererDesc;
+    IRenderer::Desc rendererDesc = {};
+    rendererDesc.rendererType = gfx::RendererType::DirectX11;
     rendererDesc.width = windowWidth;
     rendererDesc.height = windowHeight;
-    {
-        Result res = gRenderer->initialize(rendererDesc, getPlatformWindowHandle(window));
-        if (SLANG_FAILED(res)) return nullptr;
-    }
+    Result res = gfxCreateRenderer(&rendererDesc, getPlatformWindowHandle(window), gRenderer.writeRef());
+    if (SLANG_FAILED(res)) return nullptr;
     return gRenderer;
 }
 
@@ -249,7 +246,7 @@ void dispatchComputation(
     unsigned int gridDimsZ)
 {
 
-    gRenderer->setPipelineState(PipelineType::Compute, gPipelineState);
+    gRenderer->setPipelineState(gPipelineState);
     gRenderer->setDescriptorSet(PipelineType::Compute, gPipelineLayout, 0, gDescriptorSet);
 
     gRenderer->dispatchCompute(gridDimsX, gridDimsY, gridDimsZ);

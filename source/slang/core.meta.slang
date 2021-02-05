@@ -1914,11 +1914,19 @@ ${{{{
 }}}}
 
 
-
 // Specialized function
 
 __intrinsic_op
 int getStringHash(String string);
+
+// Use will produce a syntax error in downstream compiler
+// Useful for testing diagnostics around compilation errors of downstream compiler
+// It 'returns' an int so can be used in expressions without the front end complaining.
+__target_intrinsic(hlsl, " @ ")
+__target_intrinsic(glsl, " @ ")
+__target_intrinsic(cuda, " @ ")
+__target_intrinsic(cpp, " @ ")
+int __SyntaxError();
 
 // Operators to apply to `enum` types
 

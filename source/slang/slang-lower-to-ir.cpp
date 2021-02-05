@@ -5676,79 +5676,6 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
         return false;
     }
 
-    IRInst* defaultSpecializeOuterGeneric(
-        IRInst*         outerVal,
-        IRType*         type,
-        GenericDecl*    genericDecl)
-    {
-        auto builder = getBuilder();
-
-        // We need to specialize any generics that are further out...
-        auto specialiedOuterVal = defaultSpecializeOuterGenerics(
-            outerVal,
-            builder->getGenericKind(),
-            genericDecl);
-
-        List<IRInst*> genericArgs;
-
-        // Walk the parameters of the generic, and emit an argument for each,
-        // which will be a reference to binding for that parameter in the
-        // current scope.
-        //
-        // First we start with type and value parameters,
-        // in the order they were declared.
-        for (auto member : genericDecl->members)
-        {
-            if (auto typeParamDecl = as<GenericTypeParamDecl>(member))
-            {
-                genericArgs.add(getSimpleVal(context, ensureDecl(context, typeParamDecl)));
-            }
-            else if (auto valDecl = as<GenericValueParamDecl>(member))
-            {
-                genericArgs.add(getSimpleVal(context, ensureDecl(context, valDecl)));
-            }
-        }
-        // Then we emit constraint parameters, again in
-        // declaration order.
-        for (auto member : genericDecl->members)
-        {
-            if (auto constraintDecl = as<GenericTypeConstraintDecl>(member))
-            {
-                genericArgs.add(getSimpleVal(context, ensureDecl(context, constraintDecl)));
-            }
-        }
-
-        return builder->emitSpecializeInst(type, specialiedOuterVal, genericArgs.getCount(), genericArgs.getBuffer());
-    }
-
-    IRInst* defaultSpecializeOuterGenerics(
-        IRInst* val,
-        IRType* type,
-        Decl*   decl)
-    {
-        if(!val) return nullptr;
-
-        auto parentVal = val->getParent();
-        while(parentVal)
-        {
-            if(as<IRGeneric>(parentVal))
-                break;
-            parentVal = parentVal->getParent();
-        }
-        if(!parentVal)
-            return val;
-
-        for(auto pp = decl->parentDecl; pp; pp = pp->parentDecl)
-        {
-            if(auto genericAncestor = as<GenericDecl>(pp))
-            {
-                return defaultSpecializeOuterGeneric(parentVal, type, genericAncestor);
-            }
-        }
-
-        return val;
-    }
-
     struct NestedContext
     {
         IRGenEnv        subEnvStorage;
@@ -5798,16 +5725,30 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
         if(decl->hasModifier<ConstModifier>())
             return lowerFunctionStaticConstVarDecl(decl);
 
-        // A global variable may need to be generic, if one
-        // of the outer declarations is generic.
+        // A function-scope `static` variable is effectively a global,
+        // and a simple solution here would be to try to emit this
+        // variable directly into the global scope.
+        //
+        // The one major wrinkle we need to deal with is the way that
+        // a function-scope `static` variable could be nested under
+        // a generic, leading to the situation that different instances
+        // of that same generic would need distinct storage for that
+        // variable declaration.
+        //
+        // We will handle that constraint by carefully nesting the
+        // IR global variable under the parent of its containing
+        // function.
+        //
+        auto parent = getBuilder()->insertIntoParent;
+        if(auto block = as<IRBlock>(parent))
+            parent = block->getParent();
+
         NestedContext nestedContext(this);
         auto subBuilder = nestedContext.getBuilder();
         auto subContext = nestedContext.getContext();
-        subBuilder->setInsertInto(subBuilder->getModule()->getModuleInst());
-        auto outerGeneric = emitOuterGenerics(subContext, decl, decl);
+        subBuilder->setInsertBefore(parent);
 
         IRType* subVarType = lowerType(subContext, decl->getType());
-
         IRGlobalValueWithCode* irGlobal = subBuilder->createGlobalVar(subVarType);
         addVarDecorations(subContext, irGlobal, decl);
 
@@ -5816,46 +5757,14 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
 
         subBuilder->addHighLevelDeclDecoration(irGlobal, decl);
 
-        // We are inside of a function, and that function might be generic,
-        // in which case the `static` variable will be lowered to another
-        // generic. Let's start with a terrible example:
-        //
-        //      interface IHasCount { int getCount(); }
-        //      int incrementCounter<T : IHasCount >(T val) {
-        //          static int counter = 0;
-        //          counter += val.getCount();
-        //          return counter;
-        //      }
-        //
-        // In this case, `incrementCounter` will lower to a function
-        // nested in a generic, while `counter` will be lowered to
-        // a global variable nested in a *different* generic.
-        // The net result is something like this:
-        //
-        //      int counter<T:IHasCount> = 0;
-        //
-        //      int incrementCounter<T:IHasCount>(T val) {
-        //          counter<T> += val.getCount();
-        //          return counter<T>;
-        //
-        // The references to `counter` inside of `incrementCounter`
-        // become references to `counter<T>`.
-        //
-        // At the IR level, this means that the value we install
-        // for `decl` needs to be a specialized reference to `irGlobal`,
-        // for any outer generics.
-        //
-        IRType* varType = lowerType(context, decl->getType());
-        IRType* varPtrType = getBuilder()->getPtrType(varType);
-        auto irSpecializedGlobal = defaultSpecializeOuterGenerics(irGlobal, varPtrType, decl);
-        LoweredValInfo globalVal = LoweredValInfo::ptr(irSpecializedGlobal);
+        LoweredValInfo globalVal = LoweredValInfo::ptr(irGlobal);
         setValue(context, decl, globalVal);
 
         // A `static` variable with an initializer needs special handling,
         // at least if the initializer isn't a compile-time constant.
         if( auto initExpr = decl->initExpr )
         {
-            // We must create an ordinary global `bool isInitialized = false`
+            // We must create another global `bool isInitialized = false`
             // to represent whether we've initialized this before.
             // Then emit code like:
             //
@@ -5867,14 +5776,7 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
             // or not generating it in the first place. That is a bit
             // more complexity than I'm ready for at the moment.
             //
-
-            // Of course, if we are under a generic, then the Boolean
-            // variable need to be generic as well!
-            NestedContext nestedBoolContext(this);
-            auto boolBuilder = nestedBoolContext.getBuilder();
-            auto boolContext = nestedBoolContext.getContext();
-            boolBuilder->setInsertInto(boolBuilder->getModule()->getModuleInst());
-            emitOuterGenerics(boolContext, decl, decl);
+            auto boolBuilder = subBuilder;
 
             auto irBoolType = boolBuilder->getBoolType();
             auto irBool = boolBuilder->createGlobalVar(irBoolType);
@@ -5882,7 +5784,7 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
             boolBuilder->setInsertInto(boolBuilder->createBlock());
             boolBuilder->emitReturn(boolBuilder->getBoolValue(false));
 
-            auto boolVal = LoweredValInfo::ptr(defaultSpecializeOuterGenerics(irBool, irBoolType, decl));
+            auto boolVal = LoweredValInfo::ptr(irBool);
 
 
             // Okay, with our global Boolean created, we can move on to
@@ -5904,8 +5806,6 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
             builder->insertBlock(afterBlock);
         }
 
-        irGlobal->moveToEnd();
-        finishOuterGenerics(subBuilder, irGlobal, outerGeneric);
         return globalVal;
     }
 
@@ -7338,11 +7238,6 @@ LoweredValInfo emitDeclRef(
 {
     // We need to proceed by considering the specializations that
     // have been put in place.
-
-    // Ignore any global generic type substitutions during lowering.
-    // Really, we don't even expect these to appear.
-    while(auto globalGenericSubst = as<GlobalGenericParamSubstitution>(subst))
-        subst = globalGenericSubst->outer;
 
     // If the declaration would not get wrapped in a `IRGeneric`,
     // even if it is nested inside of an AST `GenericDecl`, then

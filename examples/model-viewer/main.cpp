@@ -1254,7 +1254,7 @@ public:
             // we simply bind its PSO into the GPU state, and
             // remember the variant we've selected.
             //
-            renderer->setPipelineState(PipelineType::Graphics, variant->pipelineState);
+            renderer->setPipelineState(variant->pipelineState);
             currentEffectVariant = variant;
         }
 
@@ -2050,11 +2050,11 @@ Result initialize()
     windowDesc.userData = this;
     gWindow = createWindow(windowDesc);
 
-    gfxGetCreateFunc(gfx::RendererType::DirectX11)(gRenderer.writeRef());
-    IRenderer::Desc rendererDesc;
+    IRenderer::Desc rendererDesc = {};
+    rendererDesc.rendererType = gfx::RendererType::DirectX11;
     rendererDesc.width = gWindowWidth;
     rendererDesc.height = gWindowHeight;
-    gRenderer->initialize(rendererDesc, getPlatformWindowHandle(gWindow));
+    gfxCreateRenderer(&rendererDesc, getPlatformWindowHandle(gWindow), gRenderer.writeRef());
 
     InputElementDesc inputElements[] = {
         {"POSITION", 0, Format::RGB_Float32, offsetof(Model::Vertex, position) },

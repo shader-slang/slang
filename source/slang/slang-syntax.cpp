@@ -667,25 +667,6 @@ Index getFilterCountImpl(const ReflectClassInfo& clsInfo, MemberFilterStyle filt
         return nullptr;
     }
 
-    GlobalGenericParamSubstitution* findGlobalGenericSubst(
-        Substitutions*   substs,
-        GlobalGenericParamDecl* paramDecl)
-    {
-        for(auto s = substs; s; s = s->outer)
-        {
-            auto gSubst = as<GlobalGenericParamSubstitution>(s);
-            if(!gSubst)
-                continue;
-
-            if(gSubst->paramDecl != paramDecl)
-                continue;
-
-            return gSubst;
-        }
-
-        return nullptr;
-    }
-
     Substitutions* specializeSubstitutionsShallow(
         ASTBuilder*             astBuilder, 
         Substitutions*   substToSpecialize,
@@ -696,105 +677,6 @@ Index getFilterCountImpl(const ReflectClassInfo& clsInfo, MemberFilterStyle filt
         SLANG_ASSERT(substToSpecialize);
         return substToSpecialize->applySubstitutionsShallow(astBuilder, substsToApply, restSubst, ioDiff);
     }
-
-    Substitutions* specializeGlobalGenericSubstitutions(
-        ASTBuilder*                         astBuilder,
-        Decl*                               declToSpecialize,
-        Substitutions*               substsToSpecialize,
-        Substitutions*               substsToApply,
-        int*                                ioDiff,
-        HashSet<GlobalGenericParamDecl*>&   ioParametersFound)
-    {
-        // Any existing global-generic substitutions will trigger
-        // a recursive case that skips the rest of the function.
-        for(auto specSubst = substsToSpecialize; specSubst; specSubst = specSubst->outer)
-        {
-            auto specGlobalGenericSubst = as<GlobalGenericParamSubstitution>(specSubst);
-            if(!specGlobalGenericSubst)
-                continue;
-
-            ioParametersFound.Add(specGlobalGenericSubst->paramDecl);
-
-            int diff = 0;
-            auto restSubst = specializeGlobalGenericSubstitutions(
-                astBuilder,
-                declToSpecialize,
-                specSubst->outer,
-                substsToApply,
-                &diff,
-                ioParametersFound);
-
-            auto firstSubst = specializeSubstitutionsShallow(
-                astBuilder,
-                specGlobalGenericSubst,
-                substsToApply,
-                restSubst,
-                &diff);
-
-            *ioDiff += diff;
-            return firstSubst;
-        }
-
-        // No more existing substitutions, so we know we can apply
-        // our global generic substitutions without any special work.
-
-        // We expect global generic substitutions to come at
-        // the end of the list in all cases, so lets advance
-        // until we see them.
-        Substitutions* appGlobalGenericSubsts = substsToApply;
-        while(appGlobalGenericSubsts && !as<GlobalGenericParamSubstitution>(appGlobalGenericSubsts))
-            appGlobalGenericSubsts = appGlobalGenericSubsts->outer;
-
-
-        // If there is nothing to apply, then we are done
-        if(!appGlobalGenericSubsts)
-            return nullptr;
-
-        // Otherwise, it seems like something has to change.
-        (*ioDiff)++;
-
-        // If there were no parameters bound by the existing substitution,
-        // then we can safely use the global generics from the to-apply set.
-        if(ioParametersFound.Count() == 0)
-            return appGlobalGenericSubsts;
-
-        Substitutions* resultSubst = nullptr;
-        Substitutions** link = &resultSubst;
-        for(auto appSubst = appGlobalGenericSubsts; appSubst; appSubst = appSubst->outer)
-        {
-            auto appGlobalGenericSubst = as<GlobalGenericParamSubstitution>(appSubst);
-            if(!appSubst)
-                continue;
-
-            // Don't include substitutions for parameters already handled.
-            if(ioParametersFound.Contains(appGlobalGenericSubst->paramDecl))
-                continue;
-
-            GlobalGenericParamSubstitution* newSubst = astBuilder->create<GlobalGenericParamSubstitution>();
-            newSubst->paramDecl = appGlobalGenericSubst->paramDecl;
-            newSubst->actualType = appGlobalGenericSubst->actualType;
-            newSubst->constraintArgs = appGlobalGenericSubst->constraintArgs;
-
-            *link = newSubst;
-            link = &newSubst->outer;
-        }
-
-        return resultSubst;
-    }
-
-    Substitutions* specializeGlobalGenericSubstitutions(
-        ASTBuilder*             astBuilder,
-        Decl*                   declToSpecialize,
-        Substitutions*   substsToSpecialize,
-        Substitutions*   substsToApply,
-        int*                    ioDiff)
-    {
-        // Keep track of any parameters already present in the
-        // existing substitution.
-        HashSet<GlobalGenericParamDecl*> parametersFound;
-        return specializeGlobalGenericSubstitutions(astBuilder, declToSpecialize, substsToSpecialize, substsToApply, ioDiff, parametersFound);
-    }
-
 
     // Construct new substitutions to apply to a declaration,
     // based on a provided substitution set to be applied
@@ -965,21 +847,11 @@ Index getFilterCountImpl(const ReflectClassInfo& clsInfo, MemberFilterStyle filt
         // would be specializations that don't actually apply to the given
         // declaration.
         //
-        // The remaining substitutions to apply, if any, should thus be
-        // global-generic substitutions. And similarly, those are the
-        // only remaining substitutions we really care about in
-        // `substsToApply`.
-        //
         // Note: this does *not* mean that `substsToApply` doesn't have
         // any generic or this-type substitutions; it just means that none
         // of them were applicable.
         //
-        return specializeGlobalGenericSubstitutions(
-            astBuilder,
-            declToSpecialize,
-            substsToSpecialize,
-            substsToApply,
-            ioDiff);
+        return nullptr;
     }
 
     DeclRefBase DeclRefBase::substituteImpl(ASTBuilder* astBuilder, SubstitutionSet substSet, int* ioDiff)

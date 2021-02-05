@@ -10,6 +10,7 @@
 
 #include "../../source/core/slang-string-util.h"
 #include "../../source/core/slang-byte-encode-util.h"
+#include "../../source/core/slang-char-util.h"
 
 using namespace Slang;
 
@@ -19,6 +20,7 @@ using namespace Slang;
 #include "test-reporter.h"
 #include "options.h"
 #include "slangc-tool.h"
+#include "parse-diagnostic-util.h"
 
 #include "../../source/core/slang-downstream-compiler.h"
 
@@ -1026,120 +1028,29 @@ static SlangResult _executeBinary(const UnownedStringSlice& hexDump, ExecuteResu
     return ProcessUtil::execute(cmdLine, outExeRes);
 }
 
-static UnownedStringSlice _removeDiagnosticPrefix(const UnownedStringSlice& prefix, const UnownedStringSlice& in)
-{
-    SLANG_ASSERT(in.startsWith(prefix));
-
-    UnownedStringSlice remaining(in.begin() + prefix.getLength(), in.end());
-    const Index index = remaining.indexOf(':');
-
-    if (index >= 0)
-    {
-        // Ok strip everything before the colon
-        return UnownedStringSlice(remaining.begin() + index, remaining.end());
-    }
-    else
-    {
-        // Couldn't strip, just return the whole string as is
-        return in;
-    }
-}
-
-static bool _isUnsignedInteger(const UnownedStringSlice& a)
-{
-    const char* end = a.end();
-    for (const char* cur = a.begin(); cur < end; ++cur)
-    {
-        if (!(*cur >= '0' && *cur <= '9'))
-        {
-            return false;
-        }
-    }
-    return true;
-}
-
-static bool _isDXCLineSplitEqual(const UnownedStringSlice& a, const UnownedStringSlice& b)
-{
-    return a == b || (_isUnsignedInteger(a.trim()) && _isUnsignedInteger(b.trim()));
-}
-
-// Returns true if a and b are output from dxc (prefixed with dxc:.
-// Ignores line number/column number differences from the dxc specific line format. 
-static bool _isDXCLineEqual(const UnownedStringSlice& a, const UnownedStringSlice& b)
-{
-    // We are going to ignore the line number/column number.
-    // To do this if we find any sub strings inbetween : that are just all digits we'll assume it's a line number/column number
-    // and ignore
-
-    // dxc: tests/cross-compile/dxc-error.hlsl:9:2: error: use of undeclared identifier 'gOutputBuffer'
-    const UnownedStringSlice dxcPrefix = UnownedStringSlice::fromLiteral("dxc:");
-    return a.startsWith(dxcPrefix) && b.startsWith(dxcPrefix) && StringUtil::areAllEqualWithSplit(a, b, ':', _isDXCLineSplitEqual);
-}
-
-static bool _isLineEqual(const UnownedStringSlice& a, const UnownedStringSlice& b)
-{
-    if (a == b)
-    {
-        return true;
-    }
-
-    static const UnownedStringSlice stdLibNames[] =
-    {
-        UnownedStringSlice::fromLiteral("core.meta.slang"),
-        UnownedStringSlice::fromLiteral("hlsl.meta.slang"),
-        UnownedStringSlice::fromLiteral("slang-stdlib.cpp"),
-    };
-
-    // Look for if a line starts with a stdlib name
-    for (const auto& stdLibName : stdLibNames)
-    {
-        if (a.startsWith(stdLibName) && b.startsWith(stdLibName))
-        {
-            // If the text after the diagnostic prefix is equal then the line is equal
-            if (_removeDiagnosticPrefix(stdLibName, a) == _removeDiagnosticPrefix(stdLibName, b))
-            {
-                return true;
-            }
-        }
-    }
-
-    return _isDXCLineEqual(a, b);
-}
-
 static bool _areDiagnosticsEqual(const UnownedStringSlice& a, const UnownedStringSlice& b)
 {
-    // If they are identical we are done
-    if (a == b)
-    {
-        return true;
-    }
+    ParseDiagnosticUtil::OutputInfo outA, outB;
 
-    // Okay we are going to go line by line
-    // If the lines are equal thats ok.
-    // If they are not.. we will check if the only difference is line numbers from the stdlib
-
-    List<UnownedStringSlice> linesA;
-    List<UnownedStringSlice> linesB;
-
-    StringUtil::calcLines(a, linesA);
-    StringUtil::calcLines(b, linesB);
-
-    if (linesA.getCount() != linesB.getCount())
+    // If we can't parse, we can't match, so fail.
+    if (SLANG_FAILED(ParseDiagnosticUtil::parseOutputInfo(a, outA)) ||
+        SLANG_FAILED(ParseDiagnosticUtil::parseOutputInfo(b, outB)))
     {
         return false;
     }
 
-    for (Index i = 0; i < linesA.getCount(); ++i)
+    // The result codes must match, and std out
+    if (outA.resultCode != outB.resultCode ||
+        !StringUtil::areLinesEqual(outA.stdOut.getUnownedSlice(), outB.stdOut.getUnownedSlice()))
     {
-        if (!_isLineEqual(linesA[i], linesB[i]))
-        {
-            return false;
-        }
+        return false;
     }
 
-    return true;
+    // Parse the compiler diagnostics and make sure they are the same.
+    // Ignores line number differences 
+    return ParseDiagnosticUtil::areEqual(outA.stdError.getUnownedSlice(), outB.stdError.getUnownedSlice(), ParseDiagnosticUtil::EqualityFlag::IgnoreLineNos);
 }
-
+   
 static bool _areResultsEqual(TestOptions::Type type, const String& a, const String& b)
 {
     switch (type)
@@ -1239,6 +1150,127 @@ TestResult runSimpleTest(TestContext* context, TestInput& input)
         Slang::File::writeAllText(actualOutputPath, actualOutput);
 
         context->reporter->dumpOutputDifference(expectedOutput, actualOutput);
+    }
+
+    return result;
+}
+
+SlangResult _readText(const UnownedStringSlice& path, String& out)
+{
+    try
+    {
+        out = Slang::File::readAllText(path);
+    }
+    catch (const Slang::IOException&)
+    {
+        return SLANG_FAIL;
+    }
+    return SLANG_OK;
+}
+
+static SlangResult _readExpected(const UnownedStringSlice& stem, String& out)
+{
+    StringBuilder buf;
+
+    // See if we have a trailing . index, and try *without* that first
+    const Index dotIndex = stem.lastIndexOf('.');
+    if (dotIndex >= 0)
+    {
+        const UnownedStringSlice postfix = stem.tail(dotIndex + 1);
+
+        Int value;
+        if (SLANG_SUCCEEDED(StringUtil::parseInt(postfix, value)))
+        {
+            UnownedStringSlice head = stem.head(dotIndex);
+
+            buf << head << ".expected";
+
+            if (SLANG_SUCCEEDED(_readText(buf.getUnownedSlice(), out)))
+            {
+                return SLANG_OK;
+            }
+        }
+    }
+
+    buf << stem << ".expected";
+    return _readText(buf.getUnownedSlice(), out);
+}
+
+TestResult runSimpleLineTest(TestContext* context, TestInput& input)
+{
+    // need to execute the stand-alone Slang compiler on the file, and compare its output to what we expect
+    auto outputStem = input.outputStem;
+
+    CommandLine cmdLine;
+    _initSlangCompiler(context, cmdLine);
+
+    cmdLine.addArg(input.filePath);
+
+    for (auto arg : input.testOptions->args)
+    {
+        cmdLine.addArg(arg);
+    }
+
+    ExecuteResult exeRes;
+    TEST_RETURN_ON_DONE(spawnAndWait(context, outputStem, input.spawnType, cmdLine, exeRes));
+
+    if (context->isCollectingRequirements())
+    {
+        return TestResult::Pass;
+    }
+
+    // Parse all the diagnostics so we can extract line numbers
+    List<DownstreamDiagnostic> diagnostics;
+    if (SLANG_FAILED(ParseDiagnosticUtil::parseDiagnostics(exeRes.standardError.getUnownedSlice(), diagnostics)) || diagnostics.getCount() <= 0)
+    {
+        // Write out the diagnostics which couldn't be parsed.
+
+        String actualOutputPath = outputStem + ".actual";
+        Slang::File::writeAllText(actualOutputPath, exeRes.standardError);
+
+        return TestResult::Fail;
+    }
+
+    StringBuilder actualOutput;
+
+    if (diagnostics.getCount() > 0)
+    {
+        actualOutput << diagnostics[0].fileLine << "\n";
+    }
+    else
+    {
+        actualOutput << "No output diagnostics\n";
+    }
+
+    TestResult result = TestResult::Fail;
+
+    String expectedOutput;
+
+    if (SLANG_SUCCEEDED(_readExpected(outputStem.getUnownedSlice(), expectedOutput)))
+    {
+        if (StringUtil::areLinesEqual(expectedOutput.getUnownedSlice(), actualOutput.getUnownedSlice()))
+        {
+            result = TestResult::Pass;
+        }
+        else
+        {
+            context->reporter->dumpOutputDifference(expectedOutput, actualOutput);
+        }
+    }
+    else
+    {
+        StringBuilder buf;
+        buf << "Unable to find expected output for '" << outputStem << "'";
+        context->reporter->message(TestMessageType::TestFailure, buf);
+    }
+
+    // If the test failed, then we write the actual output to a file
+    // so that we can easily diff it from the command line and
+    // diagnose the problem.
+    if (result == TestResult::Fail)
+    {
+        String actualOutputPath = outputStem + ".actual";
+        Slang::File::writeAllText(actualOutputPath, actualOutput);
     }
 
     return result;
@@ -1418,9 +1450,9 @@ static String _calcSummary(const DownstreamDiagnostics& inOutput)
 {
     DownstreamDiagnostics output(inOutput);
 
-    // We only want to analyse errors for now
-    output.removeByType(DownstreamDiagnostics::Diagnostic::Type::Info);
-    output.removeByType(DownstreamDiagnostics::Diagnostic::Type::Warning);
+    // We only want to analyze errors for now
+    output.removeBySeverity(DownstreamDiagnostic::Severity::Info);
+    output.removeBySeverity(DownstreamDiagnostic::Severity::Warning);
 
     StringBuilder builder;
 
@@ -2688,6 +2720,7 @@ static const TestCommandInfo s_testCommandInfos[] =
 {
     { "SIMPLE",                                 &runSimpleTest,                             0 },
     { "SIMPLE_EX",                              &runSimpleTest,                             0 },
+    { "SIMPLE_LINE",                            &runSimpleLineTest,                         0 },
     { "REFLECTION",                             &runReflectionTest,                         0 },
     { "CPU_REFLECTION",                         &runReflectionTest,                         0 },
     { "COMMAND_LINE_SIMPLE",                    &runSimpleCompareCommandLineTest,           0 },
@@ -3405,3 +3438,4 @@ int main(int argc, char** argv)
 #endif
     return SLANG_SUCCEEDED(res) ? 0 : 1;
 }
+

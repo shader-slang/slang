@@ -18,7 +18,9 @@ namespace Slang
 
 struct DownstreamDiagnostic
 {
-    enum class Type
+    typedef DownstreamDiagnostic ThisType;
+
+    enum class Severity
     {
         Unknown,
         Info,
@@ -34,13 +36,25 @@ struct DownstreamDiagnostic
 
     void reset()
     {
-        type = Type::Unknown;
+        severity = Severity::Unknown;
         stage = Stage::Compile;
         fileLine = 0;
     }
-    static UnownedStringSlice getTypeText(Type type);
 
-    Type type;                      ///< The type of error
+    bool operator==(const ThisType& rhs) const
+    {
+        return severity == rhs.severity &&
+            stage == rhs.stage &&
+            text == rhs.text &&
+            code == rhs.code &&
+            filePath == rhs.filePath &&
+            fileLine == rhs.fileLine;
+    }
+    bool operator!=(const ThisType& rhs) const { return !(*this == rhs); }
+
+    static UnownedStringSlice getSeverityText(Severity severity);
+
+    Severity severity;              ///< The severity of error
     Stage stage;                    ///< The stage the error came from
     String text;                    ///< The text of the error
     String code;                    ///< The compiler specific error code
@@ -52,24 +66,24 @@ struct DownstreamDiagnostics
 {
     typedef DownstreamDiagnostic Diagnostic;
 
-    /// Reset to an initial empty state
+        /// Reset to an initial empty state
     void reset() { diagnostics.clear(); rawDiagnostics = String(); result = SLANG_OK; }
 
-    /// Get the number of diagnostics by type
-    Index getCountByType(Diagnostic::Type type) const;
-    /// True if there are any diagnostics  of the type
-    bool has(Diagnostic::Type type) const { return getCountByType(type) > 0; }
+        /// Get the number of diagnostics by severity
+    Index getCountBySeverity(Diagnostic::Severity severity) const;
+        /// True if there are any diagnostics  of severity
+    bool has(Diagnostic::Severity severity) const { return getCountBySeverity(severity) > 0; }
 
-    /// Stores in outCounts, the amount of diagnostics for the stage of each type
-    Int countByStage(Diagnostic::Stage stage, Index outCounts[Int(Diagnostic::Type::CountOf)]) const;
+        /// Stores in outCounts, the amount of diagnostics for the stage of each severity
+    Int countByStage(Diagnostic::Stage stage, Index outCounts[Int(Diagnostic::Severity::CountOf)]) const;
 
-    /// Append a summary to out
+        /// Append a summary to out
     void appendSummary(StringBuilder& out) const;
-    /// Appends a summary that just identifies if there is an error of a type (not a count)
+        /// Appends a summary that just identifies if there is an error of a type (not a count)
     void appendSimplifiedSummary(StringBuilder& out) const;
 
-    /// Remove all diagnostics of the type
-    void removeByType(Diagnostic::Type type);
+        /// Remove all diagnostics of the type
+    void removeBySeverity(Diagnostic::Severity severity);
 
     String rawDiagnostics;
 
@@ -168,7 +182,7 @@ public:
             /// Ctor
         explicit Desc(SlangPassThrough inType = SLANG_PASS_THROUGH_NONE, Int inMajorVersion = 0, Int inMinorVersion = 0):type(inType), majorVersion(inMajorVersion), minorVersion(inMinorVersion) {}
 
-        SlangPassThrough type;                      ///< The type of the compiler
+        SlangPassThrough type;          ///< The type of the compiler
         Int majorVersion;               ///< Major version (interpretation is type specific)
         Int minorVersion;               ///< Minor version
     };

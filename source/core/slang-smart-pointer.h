@@ -114,9 +114,9 @@ namespace Slang
         template <typename U>
         RefPtr(RefPtr<U> const& p,
             typename EnableIf<IsConvertible<T*, U*>::Value, void>::type * = 0)
-            : pointer((U*) p)
+            : pointer(static_cast<U*>(p))
         {
-            addReference((U*) p);
+            addReference(static_cast<U*>(p));
         }
 
 #if 0
@@ -200,7 +200,7 @@ namespace Slang
 
         ~RefPtr()
         {
-            releaseReference((Slang::RefObject*) pointer);
+            releaseReference(static_cast<Slang::RefObject*>(pointer));
         }
 
         T& operator*() const

@@ -85,35 +85,35 @@ extern "C"
         }
     }
 
-    SGRendererCreateFunc SLANG_MCALL gfxGetCreateFunc(RendererType type)
+    SLANG_GFX_API SlangResult SLANG_MCALL gfxCreateRenderer(const IRenderer::Desc* desc, void* windowHandle, IRenderer** outRenderer)
     {
-        switch (type)
+        switch (desc->rendererType)
         {
 #if SLANG_WINDOWS_FAMILY
         case RendererType::DirectX11:
             {
-                return &createD3D11Renderer;
+                return createD3D11Renderer(desc, windowHandle, outRenderer);
             }
         case RendererType::DirectX12:
             {
-                return &createD3D12Renderer;
+                return createD3D12Renderer(desc, windowHandle, outRenderer);
             }
         case RendererType::OpenGl:
             {
-                return &createGLRenderer;
+                return createGLRenderer(desc, windowHandle, outRenderer);
             }
         case RendererType::Vulkan:
             {
-                return &createVKRenderer;
+                return createVKRenderer(desc, windowHandle, outRenderer);
             }
         case RendererType::CUDA:
             {
-                return &createCUDARenderer;
+                return createCUDARenderer(desc, windowHandle, outRenderer);
             }
 #endif
 
         default:
-            return nullptr;
+            return SLANG_FAIL;
         }
     }
 
