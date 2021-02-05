@@ -257,6 +257,14 @@ VectorExpressionType* ASTBuilder::getVectorType(
     return as<VectorExpressionType>(DeclRefType::create(this, declRef));
 }
 
+Type* ASTBuilder::getAndType(Type* left, Type* right)
+{
+    auto type = create<AndType>();
+    type->left = left;
+    type->right = right;
+    return type;
+}
+
 TypeType* ASTBuilder::getTypeType(Type* type)
 {
     return create<TypeType>(type);

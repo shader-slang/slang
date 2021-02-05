@@ -659,6 +659,21 @@ namespace Slang
         return false;
     }
 
+    bool SemanticsVisitor::TryUnifyConjunctionType(
+        ConstraintSystem&   constraints,
+        AndType*            fst,
+        Type*               snd)
+    {
+        // Unifying a type `T` with `A & B` amounts to unifying
+        // `T` with `A` and also `T` with `B`.
+        //
+        // If either unification is impossible, then the full
+        // case is also impossible.
+        //
+        return TryUnifyTypes(constraints, fst->left, snd)
+            && TryUnifyTypes(constraints, fst->right, snd);
+    }
+
     bool SemanticsVisitor::TryUnifyTypes(
         ConstraintSystem&       constraints,
         Type*  fst,
@@ -673,6 +688,24 @@ namespace Slang
 
         if (auto sndErrorType = as<ErrorType>(snd))
             return true;
+
+        // If one or the other of the types is a conjunction `X & Y`,
+        // then we want to recurse on both `X` and `Y`.
+        //
+        // Note that we check this case *before* we check if one of
+        // the types is a generic parameter below, so that we should
+        // never end up trying to match up a type parameter with
+        // a conjunction directly, and will instead find all of the
+        // "leaf" types we need to constrain it to.
+        //
+        if( auto fstAndType = as<AndType>(fst) )
+        {
+            return TryUnifyConjunctionType(constraints, fstAndType, snd);
+        }
+        if( auto sndAndType = as<AndType>(snd) )
+        {
+            return TryUnifyConjunctionType(constraints, sndAndType, fst);
+        }
 
         // A generic parameter type can unify with anything.
         // TODO: there actually needs to be some kind of "occurs check" sort
