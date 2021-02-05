@@ -1306,7 +1306,9 @@ static SlangResult _innerMain(Slang::StdWriters* stdWriters, SlangSession* sessi
             SlangResult res = gfxCreateRenderer(&desc, windowHandle, renderer.writeRef());
             if (SLANG_FAILED(res))
             {
-                // If it is not available just report that
+                // If it is not available just report that. This can happen when features are requested that are not available.
+                // In that case we don't want to report as an error - for testing purposes this means we can't run this
+                // specific test because of it's features, so it should be ignored.
                 if (res == SLANG_E_NOT_AVAILABLE)
                 {
                     return res;
