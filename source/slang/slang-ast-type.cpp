@@ -938,5 +938,98 @@ Val* ThisType::_substituteImplOverride(ASTBuilder* astBuilder, SubstitutionSet s
     return substType;
 }
 
+// !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! AndType !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+
+String AndType::_toStringOverride()
+{
+    String result;
+    result.append(left->toString());
+    result.append(" & ");
+    result.append(right->toString());
+    return result;
+}
+
+bool AndType::_equalsImplOverride(Type * type)
+{
+    auto other = as<AndType>(type);
+    if (!other)
+        return false;
+
+    if(!left->equals(other->left))
+        return false;
+    if(!right->equals(other->right))
+        return false;
+
+    return true;
+}
+
+HashCode AndType::_getHashCodeOverride()
+{
+    Hasher hasher;
+    hasher.hashObject(left);
+    hasher.hashObject(right);
+    return hasher.getResult();
+}
+
+Type* AndType::_createCanonicalTypeOverride()
+{
+    AndType* canType = m_astBuilder->create<AndType>();
+
+    // TODO: proper canonicalization of an `&` type relies on
+    // several different things:
+    //
+    // * We need to re-associate types that might involve
+    //   nesting of `&`, such as `(A & B) & (C & D)`, into
+    //   a canonical form where the nesting is consistent
+    //   (i.e., always left- or right-associative).
+    //
+    // * We need to commute types so that they are in a
+    //   consistent order, so that `A & B` and `B & A` both
+    //   result in the same canonicalization. This requirement
+    //   implies that we must invent a total order on types.
+    //
+    // * We need to canonicalize `&` types where one of the
+    //   elements might be implied by another. E.g., if we
+    //   have `interface IDerived : IBase`, then a type like
+    //   `IDerived & IBase` is equivalent to just `IDerived`
+    //   because the presence of an `IBase` conformance is
+    //   implied. A special case of the above is the possibility
+    //   of duplicates in the list of types (e.g., `A & B & A`).
+    //
+    // * The previous requirement raises the problem that
+    //   the relationships between `interface`s might either
+    //   evolve over time, or be subject to `extension`
+    //   declarations in other modules. The canonicalization
+    //   algorithm must be clear about what information it
+    //   is allowed to make use of, as this can/will affect
+    //   binary interfaces (via mangled names).
+    //
+    // We are going to completely ignore these issues for
+    // right now, in the name of getting something up and running.
+    //
+    canType->left = left->getCanonicalType();
+    canType->right = right->getCanonicalType();
+
+    return canType;
+}
+
+Val* AndType::_substituteImplOverride(ASTBuilder* astBuilder, SubstitutionSet subst, int* ioDiff)
+{
+    int diff = 0;
+
+    auto substLeft  = as<Type>(left ->substituteImpl(astBuilder, subst, &diff));
+    auto substRight = as<Type>(right->substituteImpl(astBuilder, subst, &diff));
+
+    if(!diff)
+        return this;
+
+    (*ioDiff)++;
+
+    AndType* substType = m_astBuilder->create<AndType>();
+    substType->left = substLeft;
+    substType->right = substRight;
+    return substType;
+}
+
 
 } // namespace Slang

@@ -2112,4 +2112,31 @@ namespace Slang
         return CreateErrorExpr(expr);
     }
 
+    Expr* SemanticsExprVisitor::visitAndTypeExpr(AndTypeExpr* expr)
+    {
+        // The left and right sides of an `&` for types must both be types.
+        //
+        expr->left = CheckProperType(expr->left);
+        expr->right = CheckProperType(expr->right);
+
+        // TODO: We should enforce some rules here about what is allowed
+        // for the `left` and `right` types.
+        //
+        // For now, the right rule is that they probably need to either
+        // be interfaces, or conjunctions thereof.
+        //
+        // Eventually it may be valuable to support more flexible
+        // types in conjunctions, especialy in cases where inheritance
+        // gets involved.
+
+        // The result of this expression is an `AndType`, which we need
+        // to wrap in a `TypeType` to indicate that the result is the type
+        // itself and not a value of  that type.
+        //
+        auto andType = m_astBuilder->getAndType(expr->left.type, expr->right.type);
+        expr->type = m_astBuilder->getTypeType(andType);
+
+        return expr;
+    }
+
 }

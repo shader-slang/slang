@@ -115,6 +115,8 @@
 		<Variable Name="pOperandInst" InitialValue="(IRInst*)nullptr"/>
 	    <Loop Condition="index &lt; operandCount">
 		    <Exec>pOperandInst = ((IRUse*)(&amp;(typeUse) + 1 + index))->usedValue </Exec>
+        <Item Condition="pOperandInst == 0" Name="[operand{index}]">pOperandInst</Item>
+        <If Condition="pOperandInst != 0">
 			<Exec>child = pOperandInst->m_decorationsAndChildren.first</Exec>
 		    <Exec>nameDecoration = 0</Exec>
 		    <Loop Condition="child != 0">
@@ -132,7 +134,8 @@
 		    </Loop>
 		    <Item Condition="nameDecoration != 0" Name="[operand{index}] : {((Slang::IRStringLit*)(((Slang::IRUse*)(nameDecoration + 1))->usedValue))->value.stringVal.chars,[((Slang::IRStringLit*)(((Slang::IRUse*)(nameDecoration + 1))->usedValue))->value.stringVal.numChars]s8}">*pOperandInst</Item>
 		    <Item Condition="nameDecoration == 0" Name="[operand{index}]">*pOperandInst</Item>
-		    <Exec>index = index + 1</Exec>
+        </If>
+        <Exec>index = index + 1</Exec>
 	    </Loop>
       </CustomListItems>
       <Synthetic Name="[decorations/children]">

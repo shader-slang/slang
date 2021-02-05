@@ -4066,21 +4066,67 @@ namespace Slang
         return parameter;
     }
 
-    Expr* Parser::ParseType()
+        /// Parse an "atomic" type expression.
+        ///
+        /// An atomic type expression is a type specifier followed by an optional
+        /// body in the case of a `struct`, `enum`, etc.
+        ///
+    static Expr* _parseAtomicTypeExpr(Parser* parser)
     {
-        auto typeSpec = parseTypeSpec(this);
+        auto typeSpec = parseTypeSpec(parser);
         if( typeSpec.decl )
         {
-            AddMember(currentScope, typeSpec.decl);
+            AddMember(parser->currentScope, typeSpec.decl);
         }
-        auto typeExpr = typeSpec.expr;
-
-        typeExpr = parsePostfixTypeSuffix(this, typeExpr);
-
-        return typeExpr;
+        return typeSpec.expr;
     }
 
+        /// Parse a postfix type expression.
+        ///
+        /// A postfix type expression is an atomic type expression followed
+        /// by zero or more postifx suffixes like array brackets.
+        ///
+    static Expr* _parsePostfixTypeExpr(Parser* parser)
+    {
+        auto typeExpr = _parseAtomicTypeExpr(parser);
+        return parsePostfixTypeSuffix(parser, typeExpr);
+    }
 
+        /// Parse an infix type expression.
+        ///
+        /// Currently, the only infix type expression we support is the `&`
+        /// operator for forming interface conjunctions.
+        ///
+    static Expr* _parseInfixTypeExpr(Parser* parser)
+    {
+        auto leftExpr = _parsePostfixTypeExpr(parser);
+
+        for(;;)
+        {
+            // As long as the next token is an `&`, we will try
+            // to gobble up another type expression and form
+            // a conjunction type expression.
+
+            auto loc = peekToken(parser).loc;
+            if(!AdvanceIf(parser, TokenType::OpBitAnd))
+                break;
+
+            auto rightExpr = _parsePostfixTypeExpr(parser);
+
+            auto andExpr = parser->astBuilder->create<AndTypeExpr>();
+            andExpr->loc = loc;
+            andExpr->left = TypeExp(leftExpr);
+            andExpr->right = TypeExp(rightExpr);
+            leftExpr = andExpr;
+        }
+
+        return leftExpr;
+    }
+
+    Expr* Parser::ParseType()
+    {
+        return _parseInfixTypeExpr(this);
+    }
 
     TypeExp Parser::ParseTypeExp()
     {

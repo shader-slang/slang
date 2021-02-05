@@ -159,22 +159,30 @@ namespace Slang
             {
                 if (auto entry = as<IRInterfaceRequirementEntry>(interfaceType->getOperand(i)))
                 {
+                    // Note: The logic that creates the `IRInterfaceRequirementEntry`s does
+                    // not currently guarantee that the *value* part of each key-value pair
+                    // gets filled in. We thus need to defend against a null `requirementVal`
+                    // here, at least until the underlying issue gets resolved.
+                    //
+                    IRInst* requirementVal = entry->getRequirementVal();
                     IRInst* loweredVal = nullptr;
-                    if (auto funcType = as<IRFuncType>(entry->getRequirementVal()))
+                    if(!requirementVal)
+                    {}
+                    else if (auto funcType = as<IRFuncType>(requirementVal))
                     {
                         loweredVal = lowerFuncType(&builder, funcType, Dictionary<IRInst*, IRInst*>(), ArrayView<IRInst*>());
                     }
-                    else if (auto genericFuncType = as<IRGeneric>(entry->getRequirementVal()))
+                    else if (auto genericFuncType = as<IRGeneric>(requirementVal))
                     {
                         loweredVal = lowerGenericFuncType(&builder, genericFuncType);
                     }
-                    else if (entry->getRequirementVal()->op == kIROp_AssociatedType)
+                    else if (requirementVal->op == kIROp_AssociatedType)
                     {
                         loweredVal = builder.getRTTIHandleType();
                     }
                     else
                     {
-                        loweredVal = entry->getRequirementVal();
+                        loweredVal = requirementVal;
                     }
                     auto newEntry = builder.createInterfaceRequirementEntry(entry->getRequirementKey(), loweredVal);
                     newEntries.add(newEntry);
