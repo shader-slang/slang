@@ -429,6 +429,24 @@ namespace Slang
                 }
             }
         }
+        else if( auto andType = as<AndType>(sup) )
+        {
+            // A type `T` is a subtype of `A & B` if `T` is a
+            // subtype of `A` and `T` is a subtype of `B`.
+            //
+            auto leftWitness = tryGetSubtypeWitness(sub, andType->left);
+            if(!leftWitness) return nullptr;
+
+            auto rightWitness = tryGetSubtypeWitness(sub, andType->right);
+            if(!rightWitness) return nullptr;
+
+            ConjunctionSubtypeWitness* w = m_astBuilder->create<ConjunctionSubtypeWitness>();
+            w->leftWitness = leftWitness;
+            w->rightWitness = rightWitness;
+            w->sub = sub;
+            w->sup = sup;
+            return w;
+        }
 
         return nullptr;
     }
