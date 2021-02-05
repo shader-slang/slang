@@ -325,4 +325,13 @@ class ThisTypeExpr: public Expr
     RefPtr<Scope> scope;
 };
 
+    /// A type expression of the form `Left & Right`.
+class AndTypeExpr : public Expr
+{
+    SLANG_AST_CLASS(AndTypeExpr);
+
+    TypeExp left;
+    TypeExp right;
+};
+
 } // namespace Slang

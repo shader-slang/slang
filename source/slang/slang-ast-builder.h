@@ -153,6 +153,8 @@ public:
 
     VectorExpressionType* getVectorType(Type* elementType, IntVal* elementCount);
 
+    Type* getAndType(Type* left, Type* right);
+
     TypeType* getTypeType(Type* type);
 
         /// Helpers to get type info from the SharedASTBuilder

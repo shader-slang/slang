@@ -1850,6 +1850,11 @@ struct IRBuilder
     IRDynamicType* getDynamicType();
 
     IRTupleType* getTupleType(UInt count, IRType* const* types);
+    IRTupleType* getTupleType(List<IRType*> const& types)
+    {
+        return getTupleType(types.getCount(), types.getBuffer());
+    }
+
     IRTupleType* getTupleType(IRType* type0, IRType* type1);
     IRTupleType* getTupleType(IRType* type0, IRType* type1, IRType* type2);
     IRTupleType* getTupleType(IRType* type0, IRType* type1, IRType* type2, IRType* type3);
@@ -1940,6 +1945,18 @@ struct IRBuilder
     IRType* getPseudoPtrType(
         IRType* concreteType);
 
+    IRType* getConjunctionType(
+        UInt            typeCount,
+        IRType* const*  types);
+
+    IRType* getConjunctionType(
+        IRType* type0,
+        IRType* type1)
+    {
+        IRType* types[] = { type0, type1 };
+        return getConjunctionType(2, types);
+    }
+
     // Set the data type of an instruction, while preserving
     // its rate, if any.
     void setDataType(IRInst* inst, IRType* dataType);
@@ -2018,6 +2035,23 @@ struct IRBuilder
     IRInst* emitMakeRTTIObject(IRInst* typeInst);
 
     IRInst* emitMakeTuple(IRType* type, UInt count, IRInst* const* args);
+    IRInst* emitMakeTuple(UInt count, IRInst* const* args);
+
+    IRInst* emitMakeTuple(IRType* type, List<IRInst*> const& args)
+    {
+        return emitMakeTuple(type, args.getCount(), args.getBuffer());
+    }
+
+    IRInst* emitMakeTuple(List<IRInst*> const& args)
+    {
+        return emitMakeTuple(args.getCount(), args.getBuffer());
+    }
+
+    IRInst* emitMakeTuple(IRInst* arg0, IRInst* arg1)
+    {
+        IRInst* args[] = { arg0, arg1 };
+        return emitMakeTuple(SLANG_COUNT_OF(args), args);
+    }
 
     IRInst* emitGetTupleElement(IRType* type, IRInst* tuple, UInt element);
 
