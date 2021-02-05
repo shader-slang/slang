@@ -1301,15 +1301,25 @@ static SlangResult _innerMain(Slang::StdWriters* stdWriters, SlangSession* sessi
             SLANG_RETURN_ON_FAIL(window->initialize(gWindowWidth, gWindowHeight));
             windowHandle = window->getHandle();
         }
-        gfxCreateRenderer(&desc, windowHandle, renderer.writeRef());
 
-        if (!renderer)
         {
-            if (!options.onlyStartup)
+            SlangResult res = gfxCreateRenderer(&desc, windowHandle, renderer.writeRef());
+            if (SLANG_FAILED(res))
             {
-                fprintf(stderr, "Unable to create renderer %s\n", rendererName.getBuffer());
+                // If it is not available just report that
+                if (res == SLANG_E_NOT_AVAILABLE)
+                {
+                    return res;
+                }
+
+                if (!options.onlyStartup)
+                {
+                    fprintf(stderr, "Unable to create renderer %s\n", rendererName.getBuffer());
+                }
+
+                return res;
             }
-            return SLANG_FAIL;
+            SLANG_ASSERT(renderer);
         }
 
         for (const auto& feature : requiredFeatureList)
