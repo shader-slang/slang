@@ -161,9 +161,6 @@ protected:
     // The shader object layout used to create this shader object.
     Slang::RefPtr<ShaderObjectLayoutBase> m_layout = nullptr;
 
-    // Indicates whether all bindings have been finalized.
-    bool m_bindingFinalized = false;
-
     // The specialized shader object type.
     ExtendedShaderObjectType shaderObjectType = { nullptr, kInvalidComponentID };
 public:
@@ -200,8 +197,6 @@ public:
     {
         return m_layout->getElementTypeLayout();
     }
-
-    SLANG_NO_THROW Result SLANG_MCALL finalizeBindings() SLANG_OVERRIDE;
 
     virtual Result collectSpecializationArgs(ExtendedShaderObjectTypeList& args) = 0;
 };
@@ -338,20 +333,21 @@ public:
 
     void init(ISlangFileSystem* cacheFileSystem);
     void writeToFileSystem(ISlangMutableFileSystem* outputFileSystem);
-    Slang::RefPtr<PipelineStateBase> getSpecializedPipelineState(PipelineKey programKey)
+    Slang::ComPtr<IPipelineState> getSpecializedPipelineState(PipelineKey programKey)
     {
-        Slang::RefPtr<PipelineStateBase> result;
+        Slang::ComPtr<IPipelineState> result;
         if (specializedPipelines.TryGetValue(programKey, result))
             return result;
         return nullptr;
     }
     Slang::RefPtr<ShaderBinary> tryLoadShaderBinary(ShaderComponentID componentId);
     void addShaderBinary(ShaderComponentID componentId, ShaderBinary* binary);
-    void addSpecializedPipeline(PipelineKey key, Slang::RefPtr<PipelineStateBase> specializedPipeline);
+    void addSpecializedPipeline(PipelineKey key, Slang::ComPtr<IPipelineState> specializedPipeline);
+
 protected:
     Slang::ComPtr<ISlangFileSystem> fileSystem;
     Slang::OrderedDictionary<OwningComponentKey, ShaderComponentID> componentIds;
-    Slang::OrderedDictionary<PipelineKey, Slang::RefPtr<PipelineStateBase>> specializedPipelines;
+    Slang::OrderedDictionary<PipelineKey, Slang::ComPtr<IPipelineState>> specializedPipelines;
     Slang::OrderedDictionary<ShaderComponentID, Slang::RefPtr<ShaderBinary>> shaderBinaries;
 };
 

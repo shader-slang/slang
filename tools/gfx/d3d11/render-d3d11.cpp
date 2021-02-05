@@ -1173,7 +1173,8 @@ Result D3D11Renderer::createBufferResource(IResource::Usage initialUsage, const 
     bufferDesc.Usage = D3D11_USAGE_DEFAULT;
 
     // If written by CPU, make it dynamic
-    if (descIn.cpuAccessFlags & IResource::AccessFlag::Write)
+    if ((descIn.cpuAccessFlags & IResource::AccessFlag::Write) &&
+        ((descIn.bindFlags & IResource::BindFlag::UnorderedAccess) == 0))
     {
         bufferDesc.Usage = D3D11_USAGE_DYNAMIC;
     }
@@ -1203,7 +1204,7 @@ Result D3D11Renderer::createBufferResource(IResource::Usage initialUsage, const 
         }
     }
 
-    if( bufferDesc.Usage == D3D11_USAGE_DYNAMIC )
+    if (srcDesc.cpuAccessFlags & IResource::AccessFlag::Write)
     {
         bufferDesc.CPUAccessFlags |= D3D11_CPU_ACCESS_WRITE;
     }
@@ -1791,6 +1792,15 @@ void D3D11Renderer::drawIndexed(UInt indexCount, UInt startIndex, UInt baseVerte
 
 Result D3D11Renderer::createProgram(const IShaderProgram::Desc& desc, IShaderProgram** outProgram)
 {
+    if (desc.slangProgram && desc.slangProgram->getSpecializationParamCount() != 0)
+    {
+        // For a specializable program, we don't invoke any actual slang compilation yet.
+        RefPtr<ShaderProgramImpl> shaderProgram = new ShaderProgramImpl();
+        initProgramCommon(shaderProgram, desc);
+        *outProgram = shaderProgram.detach();
+        return SLANG_OK;
+    }
+
     if( desc.kernelCount == 0 )
     {
         return createProgramFromSlang(this, desc, outProgram);
