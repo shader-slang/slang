@@ -1284,11 +1284,14 @@ static SlangResult _innerMain(Slang::StdWriters* stdWriters, SlangSession* sessi
         desc.width = gWindowWidth;
         desc.height = gWindowHeight;
         desc.adapter = options.adapter.getBuffer();
+
         List<const char*> requiredFeatureList;
-        for (auto & name : options.renderFeatures)
+        for (auto& name : options.renderFeatures)
             requiredFeatureList.add(name.getBuffer());
+
         desc.requiredFeatures = requiredFeatureList.getBuffer();
         desc.requiredFeatureCount = (int)requiredFeatureList.getCount();
+
         desc.nvapiExtnSlot = int(nvapiExtnSlot);
         desc.slang.slangGlobalSession = session;
         window = renderer_test::Window::create();
@@ -1298,15 +1301,31 @@ static SlangResult _innerMain(Slang::StdWriters* stdWriters, SlangSession* sessi
             SLANG_RETURN_ON_FAIL(window->initialize(gWindowWidth, gWindowHeight));
             windowHandle = window->getHandle();
         }
-        gfxCreateRenderer(&desc, windowHandle, renderer.writeRef());
 
-        if (!renderer)
         {
-            if (!options.onlyStartup)
+            SlangResult res = gfxCreateRenderer(&desc, windowHandle, renderer.writeRef());
+            if (SLANG_FAILED(res))
             {
-                fprintf(stderr, "Unable to create renderer %s\n", rendererName.getBuffer());
+                // We need to be careful here about SLANG_E_NOT_AVAILABLE. This return value means that the renderer couldn't
+                // be created because it required *features* that were *not available*. It does not mean the renderer in general couldn't
+                // be constructed.
+                //
+                // Returning SLANG_E_NOT_AVAILABLE will lead to the test infrastructure ignoring this test.
+                //
+                // We also don't want to output the 'Unable to create renderer' error, as this isn't an error.
+                if (res == SLANG_E_NOT_AVAILABLE)
+                {
+                    return res;
+                }
+
+                if (!options.onlyStartup)
+                {
+                    fprintf(stderr, "Unable to create renderer %s\n", rendererName.getBuffer());
+                }
+
+                return res;
             }
-            return SLANG_FAIL;
+            SLANG_ASSERT(renderer);
         }
 
         for (const auto& feature : requiredFeatureList)
