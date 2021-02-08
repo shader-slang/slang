@@ -724,8 +724,6 @@ public:
             return SLANG_E_INVALID_ARG;
 
         auto subObject = static_cast<GraphicsCommonShaderObject*>(object);
-        if (!subObject->m_bindingFinalized)
-            return SLANG_E_INVALID_ARG;
 
         auto& bindingRange = layout->getBindingRange(offset.bindingRangeIndex);
 
@@ -815,8 +813,6 @@ public:
     // Appends all types that are used to specialize the element type of this shader object in `args` list.
     virtual Result collectSpecializationArgs(ExtendedShaderObjectTypeList& args) override
     {
-        if (!m_bindingFinalized)
-            return SLANG_FAIL;
         auto& subObjectRanges = getLayout()->getSubObjectRanges();
         // The following logic is built on the assumption that all fields that involve existential types (and
         // therefore require specialization) will results in a sub-object range in the type layout.
@@ -914,7 +910,7 @@ protected:
 
             // In the case where the sub-object range represents an
             // existential-type leaf field (e.g., an `IBar`), we
-            // cannot pre-allocate the objet(s) to go into that
+            // cannot pre-allocate the object(s) to go into that
             // range, since we can't possibly know what to allocate
             // at this point.
             //
@@ -1218,6 +1214,15 @@ public:
         return SLANG_OK;
     }
 
+    virtual Result collectSpecializationArgs(ExtendedShaderObjectTypeList& args) override
+    {
+        SLANG_RETURN_ON_FAIL(GraphicsCommonShaderObject::collectSpecializationArgs(args));
+        for (auto& entryPoint : m_entryPoints)
+        {
+            SLANG_RETURN_ON_FAIL(entryPoint->collectSpecializationArgs(args));
+        }
+        return SLANG_OK;
+    }
 
 protected:
     virtual Result _bindIntoDescriptorSets(ComPtr<IDescriptorSet>* descriptorSets) override

@@ -282,7 +282,8 @@ public:
         case Usage::DepthWrite:
             return BindFlag::DepthStencil;
         case Usage::UnorderedAccess:
-            return BindFlag::UnorderedAccess;
+            return BindFlag::Enum(BindFlag::UnorderedAccess | BindFlag::PixelShaderResource |
+                BindFlag::NonPixelShaderResource);
         case Usage::PixelShaderResource:
             return BindFlag::PixelShaderResource;
         case Usage::NonPixelShaderResource:
@@ -880,7 +881,6 @@ public:
         setSampler(ShaderOffset const& offset, ISamplerState* sampler) = 0;
     virtual SLANG_NO_THROW Result SLANG_MCALL setCombinedTextureSampler(
         ShaderOffset const& offset, IResourceView* textureView, ISamplerState* sampler) = 0;
-    virtual SLANG_NO_THROW Result SLANG_MCALL finalizeBindings() = 0;
 };
 #define SLANG_UUID_IShaderObject                                                       \
     {                                                                                 \

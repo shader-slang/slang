@@ -2959,6 +2959,15 @@ void D3D12Renderer::setDescriptorSet(PipelineType pipelineType, IPipelineLayout*
 
 Result D3D12Renderer::createProgram(const IShaderProgram::Desc& desc, IShaderProgram** outProgram)
 {
+    if (desc.slangProgram && desc.slangProgram->getSpecializationParamCount() != 0)
+    {
+        // For a specializable program, we don't invoke any actual slang compilation yet.
+        RefPtr<ShaderProgramImpl> shaderProgram = new ShaderProgramImpl();
+        initProgramCommon(shaderProgram, desc);
+        *outProgram = shaderProgram.detach();
+        return SLANG_OK;
+    }
+
     if( desc.kernelCount == 0 )
     {
         return createProgramFromSlang(this, desc, outProgram);
@@ -3739,43 +3748,54 @@ Result D3D12Renderer::createComputePipelineState(const ComputePipelineStateDesc&
     auto pipelineLayoutImpl = (PipelineLayoutImpl*) desc.pipelineLayout;
     auto programImpl = (ShaderProgramImpl*) desc.program;
 
-    // Describe and create the compute pipeline state object
-    D3D12_COMPUTE_PIPELINE_STATE_DESC computeDesc = {};
-    computeDesc.pRootSignature = pipelineLayoutImpl->m_rootSignature;
-    computeDesc.CS = { programImpl->m_computeShader.getBuffer(), SIZE_T(programImpl->m_computeShader.getCount()) };
-
+    // Only actually create a D3D12 pipeline state if the pipeline is fully specialized.
     ComPtr<ID3D12PipelineState> pipelineState;
+    if (!programImpl->slangProgram || programImpl->slangProgram->getSpecializationParamCount() == 0)
+    {
+        // Describe and create the compute pipeline state object
+        D3D12_COMPUTE_PIPELINE_STATE_DESC computeDesc = {};
+        computeDesc.pRootSignature = pipelineLayoutImpl->m_rootSignature;
+        computeDesc.CS = {
+            programImpl->m_computeShader.getBuffer(),
+            SIZE_T(programImpl->m_computeShader.getCount())};
 
 #ifdef GFX_NVAPI
-    if (m_nvapi)
-    {
-        // Also fill the extension structure. 
-        // Use the same UAV slot index and register space that are declared in the shader.
-
-        // For simplicities sake we just use u0
-        NVAPI_D3D12_PSO_SET_SHADER_EXTENSION_SLOT_DESC extensionDesc;
-        extensionDesc.baseVersion = NV_PSO_EXTENSION_DESC_VER;
-        extensionDesc.version = NV_SET_SHADER_EXTENSION_SLOT_DESC_VER;
-        extensionDesc.uavSlot = 0;
-        extensionDesc.registerSpace = 0;
-
-        // Put the pointer to the extension into an array - there can be multiple extensions enabled at once.
-        const NVAPI_D3D12_PSO_EXTENSION_DESC* extensions[] = { &extensionDesc };
-
-        // Now create the PSO.
-        const NvAPI_Status nvapiStatus = NvAPI_D3D12_CreateComputePipelineState(m_device, &computeDesc, SLANG_COUNT_OF(extensions), extensions, pipelineState.writeRef());
-
-        if (nvapiStatus != NVAPI_OK)
+        if (m_nvapi)
         {
-            return SLANG_FAIL;
+            // Also fill the extension structure.
+            // Use the same UAV slot index and register space that are declared in the shader.
+
+            // For simplicities sake we just use u0
+            NVAPI_D3D12_PSO_SET_SHADER_EXTENSION_SLOT_DESC extensionDesc;
+            extensionDesc.baseVersion = NV_PSO_EXTENSION_DESC_VER;
+            extensionDesc.version = NV_SET_SHADER_EXTENSION_SLOT_DESC_VER;
+            extensionDesc.uavSlot = 0;
+            extensionDesc.registerSpace = 0;
+
+            // Put the pointer to the extension into an array - there can be multiple extensions
+            // enabled at once.
+            const NVAPI_D3D12_PSO_EXTENSION_DESC* extensions[] = {&extensionDesc};
+
+            // Now create the PSO.
+            const NvAPI_Status nvapiStatus = NvAPI_D3D12_CreateComputePipelineState(
+                m_device,
+                &computeDesc,
+                SLANG_COUNT_OF(extensions),
+                extensions,
+                pipelineState.writeRef());
+
+            if (nvapiStatus != NVAPI_OK)
+            {
+                return SLANG_FAIL;
+            }
+        }
+        else
+#endif
+        {
+            SLANG_RETURN_ON_FAIL(m_device->CreateComputePipelineState(
+                &computeDesc, IID_PPV_ARGS(pipelineState.writeRef())));
         }
     }
-    else
-#endif
-    {
-        SLANG_RETURN_ON_FAIL(m_device->CreateComputePipelineState(&computeDesc, IID_PPV_ARGS(pipelineState.writeRef())));
-    }
-
     RefPtr<PipelineStateImpl> pipelineStateImpl = new PipelineStateImpl();
     pipelineStateImpl->m_pipelineLayout = pipelineLayoutImpl;
     pipelineStateImpl->m_pipelineState = pipelineState;

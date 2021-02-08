@@ -355,6 +355,52 @@ struct InliningPassBase
         return true;
     }
 
+        // When instructions are cloned, with cloneInst no sourceLoc information is copied over by default.
+        // Here we attempt some policy about copying sourceLocs when inlining.
+        //
+        // An assumption here is that [__unsafeForceInlineEarly] will not be in user code (when we have more
+        // general inlining this will not follow).
+        //
+        // Therefore we probably *don't* want to copy sourceLoc from the original definition in the stdlib because
+        //
+        // * That won't be much use to the user (they can't easily see stdlib code currently for example)
+        // * That the definitions in stdlib are currently 'mundane' and largely exist to flesh out language features - such that
+        //   their being in the stdlib would likely be surprising to users
+        //
+        // That being the case, we actually copy the call sites sourceLoc if it's defined, and only fall back
+        // onto the originating loc, if that's not defined.
+        //
+        // We *could* vary behavior if we knew if the function was defined in the stdlib. There doesn't appear 
+        // to be a decoration for this.
+        // We could find out by looking at the source loc and checking if it's in the range of stdlib - this would actually be
+        // a fast and easy but to do properly this way you'd want a way to mark that source range that would also work across
+        // serialization.
+        // 
+        // For now this punts on this, and just assumes [__unsafeForceInlineEarly] is not in user code.
+    static IRInst* _cloneInstWithSourceLoc(CallSiteInfo const& callSite,
+        IRCloneEnv*     env,
+        IRBuilder*      builder,
+        IRInst*         inst)
+    {
+        IRInst* clonedInst = cloneInst(env, builder, inst);
+
+        SourceLoc sourceLoc;
+
+        if (callSite.call->sourceLoc.isValid())
+        {
+            // Default to using the source loc at the call site
+            sourceLoc = callSite.call->sourceLoc;
+        }
+        else if (inst->sourceLoc.isValid())
+        {
+            // If we don't have that copy the inst being cloned sourceLoc
+            sourceLoc = inst->sourceLoc;
+        }
+
+        clonedInst->sourceLoc = sourceLoc;
+        return clonedInst;
+    }
+
         /// Inline the body of the callee for `callSite`, where the callee is trivial as tested by `isTrivialFunc`
     void inlineTrivialFuncBody(CallSiteInfo const& callSite, IRCloneEnv* env, IRBuilder* builder)
     {
@@ -381,7 +427,8 @@ struct InliningPassBase
                 // the existing cloning infrastructure and the `env`
                 // we have already set up.
                 //
-                cloneInst(env, builder, inst);
+                // SourceLoc information is copied if there is appropriate data available.
+                _cloneInstWithSourceLoc(callSite, env, builder, inst);
                 break;
 
             case kIROp_Param:
