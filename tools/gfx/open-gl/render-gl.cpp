@@ -470,8 +470,6 @@ public:
 
     Desc m_desc;
 
-    List<String> m_features;
-
     // Declare a function pointer for each OpenGL
     // extension function we need to load
 #define DECLARE_GL_EXTENSION_FUNC(NAME, TYPE) TYPE NAME;
