@@ -1252,6 +1252,14 @@ struct IRTaggedUnionType : IRType
     IR_LEAF_ISA(TaggedUnionType)
 };
 
+struct IRConjunctionType : IRType
+{
+    IR_LEAF_ISA(ConjunctionType)
+
+    Int getCaseCount() { return getOperandCount(); }
+    IRType* getCaseType(Int index) { return (IRType*) getOperand(index); }
+};
+
 /// Represents a tuple. Tuples are created by `IRMakeTuple` and its elements
 /// are accessed via `GetTupleElement(tupleValue, IRIntLit)`.
 struct IRTupleType : IRType

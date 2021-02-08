@@ -1387,6 +1387,11 @@ namespace Slang
             Type*  fst,
             Type*  snd);
 
+        bool TryUnifyConjunctionType(
+            ConstraintSystem&   constraints,
+            AndType*            fst,
+            Type*               snd);
+
         // Is the candidate extension declaration actually applicable to the given type
         DeclRef<ExtensionDecl> ApplyExtensionToType(
             ExtensionDecl*  extDecl,
@@ -1573,6 +1578,7 @@ namespace Slang
 
         Expr* visitThisExpr(ThisExpr* expr);
         Expr* visitThisTypeExpr(ThisTypeExpr* expr);
+        Expr* visitAndTypeExpr(AndTypeExpr* expr);
     };
 
     struct SemanticsStmtVisitor

@@ -2841,6 +2841,15 @@ void VKRenderer::setDescriptorSet(PipelineType pipelineType, IPipelineLayout* la
 
 Result VKRenderer::createProgram(const IShaderProgram::Desc& desc, IShaderProgram** outProgram)
 {
+    if (desc.slangProgram && desc.slangProgram->getSpecializationParamCount() != 0)
+    {
+        // For a specializable program, we don't invoke any actual slang compilation yet.
+        RefPtr<ShaderProgramImpl> shaderProgram = new ShaderProgramImpl(m_api, desc.pipelineType);
+        initProgramCommon(shaderProgram, desc);
+        *outProgram = shaderProgram.detach();
+        return SLANG_OK;
+    }
+
     if( desc.kernelCount == 0 )
     {
         return createProgramFromSlang(this, desc, outProgram);

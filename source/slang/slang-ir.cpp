@@ -2774,6 +2774,14 @@ namespace Slang
         return getType(kIROp_PseudoPtrType, SLANG_COUNT_OF(operands), operands);
     }
 
+    IRType* IRBuilder::getConjunctionType(
+        UInt            typeCount,
+        IRType* const*  types)
+    {
+        return getType(kIROp_ConjunctionType, typeCount, (IRInst* const*)types);
+    }
+
+
 
     void IRBuilder::setDataType(IRInst* inst, IRType* dataType)
     {
@@ -3043,8 +3051,30 @@ namespace Slang
         return emitIntrinsicInst(type, kIROp_MakeTuple, count, args);
     }
 
+    IRInst* IRBuilder::emitMakeTuple(UInt count, IRInst* const* args)
+    {
+        List<IRType*> types;
+        for(UInt i = 0; i < count; ++i)
+            types.add(args[i]->getFullType());
+
+        auto type = getTupleType(types);
+        return emitMakeTuple(type, count, args);
+    }
+
     IRInst* IRBuilder::emitGetTupleElement(IRType* type, IRInst* tuple, UInt element)
     {
+        // As a quick simplification/optimization, if the user requests
+        // `getTupleElement(makeTuple(a_0, a_1, ... a_N), i)` then we should
+        // just return `a_i`, provided that the index is properly in range.
+        //
+        if( auto makeTuple = as<IRMakeTuple>(tuple) )
+        {
+            if( element < makeTuple->getOperandCount() )
+            {
+                return makeTuple->getOperand(element);
+            }
+        }
+
         IRInst* args[] = { tuple, getIntValue(getIntType(), element) };
         return emitIntrinsicInst(type, kIROp_GetTupleElement, 2, args);
     }

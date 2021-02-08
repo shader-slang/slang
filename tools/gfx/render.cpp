@@ -69,7 +69,7 @@ extern "C"
         case RendererType::DirectX11:
             return "DirectX11";
         case RendererType::DirectX12:
-            return "DirectX11";
+            return "DirectX12";
         case RendererType::OpenGl:
             return "OpenGL";
         case RendererType::Vulkan:

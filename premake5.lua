@@ -578,6 +578,9 @@ if isTargetWindows then
     example "shader-toy"
 end
 
+example "shader-object"
+    kind "ConsoleApp"
+
 example "cpu-hello-world"
     kind "ConsoleApp"
 

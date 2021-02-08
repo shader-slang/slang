@@ -319,7 +319,7 @@ void ShaderCache::addShaderBinary(ShaderComponentID componentId, ShaderBinary* b
     shaderBinaries[componentId] = binary;
 }
 
-void ShaderCache::addSpecializedPipeline(PipelineKey key, Slang::RefPtr<PipelineStateBase> specializedPipeline)
+void ShaderCache::addSpecializedPipeline(PipelineKey key, Slang::ComPtr<IPipelineState> specializedPipeline)
 {
     specializedPipelines[key] = specializedPipeline;
 }
@@ -377,21 +377,8 @@ void ShaderObjectLayoutBase::initBase(RendererBase* renderer, slang::TypeLayoutR
     m_componentID = m_renderer->shaderCache.getComponentId(m_elementTypeLayout->getType());
 }
 
-SLANG_NO_THROW Result SLANG_MCALL ShaderObjectBase::finalizeBindings()
-{
-    m_bindingFinalized = true;
-
-    // With all binding fixed, the shader object's type can be determined by specializing the
-    // shader object's type with the type of bound sub objects.
-    // Now obtain a componentID for the specialized shader object type from the shader cache.
-    SLANG_RETURN_ON_FAIL(getSpecializedShaderObjectType(&shaderObjectType));
-    return SLANG_OK;
-}
-
-
 // Get the final type this shader object represents. If the shader object's type has existential fields,
 // this function will return a specialized type using the bound sub-objects' type as specialization argument.
-
 Result ShaderObjectBase::getSpecializedShaderObjectType(ExtendedShaderObjectType* outType)
 {
     if (shaderObjectType.slangType)
@@ -432,7 +419,7 @@ Result RendererBase::maybeSpecializePipeline(ShaderObjectBase* rootObject)
         pipelineKey.specializationArgs.addRange(specializationArgs.componentIDs);
         pipelineKey.updateHash();
 
-        auto specializedPipelineState = shaderCache.getSpecializedPipelineState(pipelineKey);
+        ComPtr<gfx::IPipelineState> specializedPipelineState = shaderCache.getSpecializedPipelineState(pipelineKey);
         // Try to find specialized pipeline from shader cache.
         if (!specializedPipelineState)
         {
@@ -493,6 +480,7 @@ Result RendererBase::maybeSpecializePipeline(ShaderObjectBase* rootObject)
             IShaderProgram::Desc specializedProgramDesc = {};
             specializedProgramDesc.kernelCount = unspecializedProgramLayout->getEntryPointCount();
             ShortList<IShaderProgram::KernelDesc> kernelDescs;
+            kernelDescs.setCount(entryPointBinaries.getCount());
             for (Slang::Index i = 0; i < entryPointBinaries.getCount(); i++)
             {
                 auto entryPoint = unspecializedProgramLayout->getEntryPointByIndex(i);;
@@ -507,7 +495,6 @@ Result RendererBase::maybeSpecializePipeline(ShaderObjectBase* rootObject)
             SLANG_RETURN_ON_FAIL(createProgram(specializedProgramDesc, specializedProgram.writeRef()));
 
             // Create specialized pipeline state.
-            ComPtr<IPipelineState> specializedPipelineState;
             switch (pipelineType)
             {
             case PipelineType::Compute:
@@ -529,7 +516,7 @@ Result RendererBase::maybeSpecializePipeline(ShaderObjectBase* rootObject)
             }
             auto specializedPipelineStateBase = static_cast<PipelineStateBase*>(specializedPipelineState.get());
             specializedPipelineStateBase->unspecializedPipelineState = currentPipeline;
-            shaderCache.addSpecializedPipeline(pipelineKey, specializedPipelineStateBase);
+            shaderCache.addSpecializedPipeline(pipelineKey, specializedPipelineState);
         }
         setPipelineState(specializedPipelineState);
     }
