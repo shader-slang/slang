@@ -1,7 +1,11 @@
 result code = -1
 standard error = {
 tests/bugs/glsl-layout-define.hlsl(4): error 20001: unexpected identifier, expected integer literal
+    binding = UNDEFINED_VK_BINDING,
+              ^~~~~~~~~~~~~~~~~~~~
 tests/bugs/glsl-layout-define.hlsl(5): error 20001: unexpected identifier, expected integer literal
+    set = UNDEFINED_VK_SET)
+          ^~~~~~~~~~~~~~~~
 }
 standard output = {
 }
