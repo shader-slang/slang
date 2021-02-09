@@ -1,8 +1,8 @@
 result code = -1
 standard error = {
 tests/diagnostics/register-bindings.slang(7): error 39007: unknown register class: 'DOESNT_EXIST'
-Texture2D    a : register(DOESNT_EXIST);
-                          ^~~~~~~~~~~~
+Texture2D   a : register(DOESNT_EXIST);
+                         ^~~~~~~~~~~~
 tests/diagnostics/register-bindings.slang(10): error 39008: expected a register index after 't'
 TextureCube b : register(t);
                          ^
