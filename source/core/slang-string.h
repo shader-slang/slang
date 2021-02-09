@@ -100,6 +100,10 @@ namespace Slang
         {
             return slice.m_begin >= m_begin && slice.m_end <= m_end; 
         }
+        bool isMemoryContained(const char* pos) const
+        {
+            return pos >= m_begin && pos <= m_end;
+        }
 
         Index getLength() const
         {

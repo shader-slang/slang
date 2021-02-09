@@ -140,7 +140,8 @@ namespace Slang
         {
             enum Enum: Flags
             {
-                VerbosePath = 0x1,              ///< Will display a more verbose path (if available) - such as a canonical or absolute path
+                VerbosePath = 0x1,                  ///< Will display a more verbose path (if available) - such as a canonical or absolute path
+                SourceLocationLine = 0x2,           ///< If set will display the location line if source is available
             };
         };
 
@@ -227,7 +228,7 @@ namespace Slang
         int m_errorCount = 0;
         int m_internalErrorLocsNoted = 0;
 
-        Flags m_flags = 0;
+        Flags m_flags = Flag::SourceLocationLine;
 
         // The source manager to use when mapping source locations to file+line info
         SourceManager* m_sourceManager = nullptr;

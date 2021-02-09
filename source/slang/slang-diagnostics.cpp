@@ -6,6 +6,7 @@
 #include "../core/slang-memory-arena.h"
 #include "../core/slang-dictionary.h"
 #include "../core/slang-string-util.h"
+#include "../core/slang-char-util.h"
 #include "../core/slang-name-convention-util.h"
 
 #include <assert.h>
@@ -160,6 +161,132 @@ static void formatDiagnostic(const HumaneSourceLoc& humaneLoc, Diagnostic const&
     outBuilder << "\n";
 }
 
+static void _replaceTabWithSpaces(const UnownedStringSlice& slice, Int tabSize, StringBuilder& out)
+{
+    const char* start = slice.begin();
+    const char*const end = slice.end();
+
+    for (const char* cur = start; cur < end; cur++)
+    {
+        if (*cur == '\t')
+        {
+            if (start < cur)
+            {
+                out.append(start, cur);
+            }
+
+            // Add the spaces
+            char* spaces = out.prepareForAppend(tabSize);
+            memset(spaces, ' ', tabSize);
+            out.appendInPlace(spaces, tabSize);
+
+            // Set the start at the first character past
+            start = cur + 1;
+        }
+    }
+
+    if (start < end)
+    {
+        out.append(start, end);
+    }
+}
+
+// Given multi-line text, and a position within the text (as a pointer into the memory of text)
+// extract the line that contains pos
+static UnownedStringSlice _extractLineContainingPosition(const UnownedStringSlice& text, const char* pos)
+{
+    SLANG_ASSERT(text.isMemoryContained(pos));
+
+    const char*const contentStart = text.begin();
+    const char*const contentEnd = text.end();
+
+    // We want to determine the start of the line, and the end of the line
+    const char* start = pos;
+    for (; start > contentStart; --start)
+    {
+        const char c = *start;
+        if (c == '\n' || c == '\r')
+        {
+            // We want the character after, but we can only do this if not already at pos
+            start += int(start < pos);
+            break;
+        }
+    }
+    const char* end = pos;
+    for (; end < contentEnd; ++end)
+    {
+        const char c = *end;
+        if (c == '\n' || c == '\r')
+        {
+            break;
+        }
+    }
+
+    return UnownedStringSlice(start, end);
+}
+
+static void _sourceLocationNoteDiagnostic(SourceView* sourceView, SourceLoc sourceLoc, StringBuilder& sb)
+{
+    SourceFile* sourceFile = sourceView->getSourceFile();
+
+    if (!sourceFile)
+    {
+        return;
+    }
+    UnownedStringSlice content = sourceFile->getContent();
+
+    // Make sure the offset is within content.
+    // This is important because it's possible to have a 'SourceFile' that doesn't contain any content
+    // (for example when reconstructed via serialization with just line offsets, the actual source text 'content' isn't available).
+    const int offset = sourceView->getRange().getOffset(sourceLoc);
+    if (offset < 0 || offset >= content.getLength())
+    {
+        return;
+    }
+
+    const char*const pos = content.begin() + offset;
+
+    UnownedStringSlice line = _extractLineContainingPosition(content, pos);
+
+    // Trim any trailing white space
+    line = UnownedStringSlice(line.begin(), line.trim().end());
+
+    const Index tabSize = 4;
+    
+    StringBuilder sourceLine;
+    StringBuilder caretLine;
+
+    // First output the line
+    {
+        _replaceTabWithSpaces(line, tabSize, sourceLine);
+    }
+
+    // Now we want the caret position
+    {
+        // Produce the text up to the caret position (at pos), taking into account tabs
+        _replaceTabWithSpaces(UnownedStringSlice(line.begin(), pos), tabSize, caretLine);
+
+        // Now make all spaces
+        {
+            const Index length = caretLine.getLength();
+            caretLine.Clear();
+            char* chars = caretLine.prepareForAppend(length);
+            ::memset(chars, ' ', length);
+            caretLine.appendInPlace(chars, length);
+        }
+
+        // Add caret
+        caretLine << "^";
+    }
+
+    // We could have handling here for if the line is too long, that we surround the important section
+    // will ellipsis for example.
+    // For now we just output.
+
+    sb << sourceLine << "\n";
+    sb << caretLine << "\n";
+}
+
 static void formatDiagnostic(
     DiagnosticSink*     sink,
     Diagnostic const&   diagnostic,
@@ -214,7 +341,14 @@ static void formatDiagnostic(
             }
         }
     }
-     
+
+    // We don't don't output source line information if this is a 'note' as a note is extra information for one
+    // of the other main severity types, and so the information should already be output on the initial line
+    if (sourceView && sink->isFlagSet(DiagnosticSink::Flag::SourceLocationLine) && diagnostic.severity != Severity::Note)
+    {
+       _sourceLocationNoteDiagnostic(sourceView, sourceLoc, sb);
+    }
+
     if (sourceView && sink->isFlagSet(DiagnosticSink::Flag::VerbosePath))
     {
         auto actualHumaneLoc = sourceView->getHumaneLoc(diagnostic.loc, SourceLocType::Actual);
