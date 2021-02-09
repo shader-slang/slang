@@ -131,6 +131,9 @@ namespace Slang
         {}
     };
 
+        /// If defined will be called to try and expand the caret to be a whole of a token
+    typedef UnownedStringSlice (*DiagnosticLexer)(const UnownedStringSlice& text);
+
     class DiagnosticSink
     {
     public:
@@ -210,10 +213,22 @@ namespace Slang
             /// Test if flag is set
         bool isFlagSet(Flag::Enum flag) { return (m_flags & Flags(flag)) != 0; }
 
+            /// Get the (optional) diagnostic lexer. This is used to
+            /// improve quality of highlighting a locations token. If not set, will just have a single
+            /// character caret at location
+        DiagnosticLexer getDiagnosticLexer() const { return m_diagnosticLexer; }
+
             /// Ctor
-        DiagnosticSink(SourceManager* sourceManager)
-            : m_sourceManager(sourceManager)
-        {}
+        DiagnosticSink(SourceManager* sourceManager, DiagnosticLexer diagnosticLexer)
+            : m_sourceManager(sourceManager),
+              m_diagnosticLexer(diagnosticLexer)
+        {
+            // If we have a diagnostic lexer, we'll by default enable location output
+            if (diagnosticLexer)
+            {
+                setFlag(Flag::SourceLocationLine);
+            }
+        }
 
         // Public members
 
@@ -228,10 +243,12 @@ namespace Slang
         int m_errorCount = 0;
         int m_internalErrorLocsNoted = 0;
 
-        Flags m_flags = Flag::SourceLocationLine;
+        Flags m_flags = 0;
 
         // The source manager to use when mapping source locations to file+line info
         SourceManager* m_sourceManager = nullptr;
+
+        DiagnosticLexer m_diagnosticLexer;
     };
 
         /// An `ISlangWriter` that writes directly to a diagnostic sink.

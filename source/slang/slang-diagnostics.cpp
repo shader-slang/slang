@@ -225,7 +225,7 @@ static UnownedStringSlice _extractLineContainingPosition(const UnownedStringSlic
     return UnownedStringSlice(start, end);
 }
 
-static void _sourceLocationNoteDiagnostic(SourceView* sourceView, SourceLoc sourceLoc, StringBuilder& sb)
+static void _sourceLocationNoteDiagnostic(SourceView* sourceView, SourceLoc sourceLoc, DiagnosticLexer lexer, StringBuilder& sb)
 {
     SourceFile* sourceFile = sourceView->getSourceFile();
 
@@ -275,8 +275,22 @@ static void _sourceLocationNoteDiagnostic(SourceView* sourceView, SourceLoc sour
             caretLine.appendInPlace(chars, length);
         }
 
+        
         // Add caret
         caretLine << "^";
+
+        if (lexer)
+        {
+            UnownedStringSlice token = lexer(UnownedStringSlice(pos, line.end()));
+
+            if (token.getLength() > 1)
+            {
+                const Index underLength = token.getLength() - 1;
+                char* chars = caretLine.prepareForAppend(underLength);
+                ::memset(chars, '~', sizeof(char) * underLength);
+                caretLine.appendInPlace(chars, underLength);
+            }
+        }
     }
 
     // We could have handling here for if the line is too long, that we surround the important section
@@ -346,7 +360,7 @@ static void formatDiagnostic(
     // of the other main severity types, and so the information should already be output on the initial line
     if (sourceView && sink->isFlagSet(DiagnosticSink::Flag::SourceLocationLine) && diagnostic.severity != Severity::Note)
     {
-       _sourceLocationNoteDiagnostic(sourceView, sourceLoc, sb);
+       _sourceLocationNoteDiagnostic(sourceView, sourceLoc, sink->getDiagnosticLexer(), sb);
     }
 
     if (sourceView && sink->isFlagSet(DiagnosticSink::Flag::VerbosePath))

@@ -106,6 +106,8 @@ namespace Slang
 
         ~Lexer();
 
+        static UnownedStringSlice diagnosticLexer(const UnownedStringSlice& in);
+
         Token lexToken(LexerFlags extraFlags = 0);
 
         TokenList lexAllTokens();
@@ -128,6 +130,7 @@ namespace Slang
         MemoryArena*    m_memoryArena;
     };
 
+    
     // Helper routines for extracting values from tokens
     String getStringLiteralTokenValue(Token const& token);
     String getFileNameTokenValue(Token const& token);
