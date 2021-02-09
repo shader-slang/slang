@@ -762,8 +762,6 @@ protected:
 
     HWND m_hwnd = nullptr;
 
-    List<String> m_features;
-
     bool m_nvapi = false;
 };
 
@@ -1471,6 +1469,7 @@ Result D3D12Renderer::initialize(const Desc& desc, void* inWindowHandle)
 
         m_nvapi = true;
 #endif
+
     }
 
     // Find what features are supported
