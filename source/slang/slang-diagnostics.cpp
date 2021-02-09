@@ -166,6 +166,8 @@ static void _replaceTabWithSpaces(const UnownedStringSlice& slice, Int tabSize, 
     const char* start = slice.begin();
     const char*const end = slice.end();
 
+    const Index startLength = out.getLength();
+
     for (const char* cur = start; cur < end; cur++)
     {
         if (*cur == '\t')
@@ -175,10 +177,30 @@ static void _replaceTabWithSpaces(const UnownedStringSlice& slice, Int tabSize, 
                 out.append(start, cur);
             }
 
+            // The amount of spaces we add depends on the current position.
+            const Index lastPosition = out.getLength() - startLength;
+            Index tabPosition = lastPosition;
+
+            // Strip the tabPosition so it's back to the tab stop
+            // Special case if tabSize is a power of 2
+            if ((tabSize & (tabSize - 1)) == 0)
+            {
+                tabPosition = tabPosition & ~Index(tabSize - 1);
+            }
+            else
+            {
+                tabPosition -= tabPosition % tabSize;
+            }
+
+            // Move to next tab
+            tabPosition += tabSize;
+
+            const Index spacesCount = tabPosition - lastPosition;
+
             // Add the spaces
-            char* spaces = out.prepareForAppend(tabSize);
-            memset(spaces, ' ', tabSize);
-            out.appendInPlace(spaces, tabSize);
+            char* spaces = out.prepareForAppend(spacesCount);
+            memset(spaces, ' ', spacesCount);
+            out.appendInPlace(spaces, spacesCount);
 
             // Set the start at the first character past
             start = cur + 1;
