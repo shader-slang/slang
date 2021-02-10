@@ -6048,8 +6048,6 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
                     // function types.
                     auto reqType = requirementVal->getFullType();
                     entry->setRequirementVal(reqType);
-                    if (!requirementVal->hasUses())
-                        requirementVal->removeAndDeallocate();
                     break;
                 }
                 default:
