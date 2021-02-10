@@ -443,6 +443,9 @@ namespace Slang
             /// Append a character (to remove ambiguity with other integral types)
         void appendChar(char chr);
 
+            /// Append the specified char count times
+        void appendRepeatedChar(char chr, Index count);
+
         String(const char* str)
         {
             append(str);

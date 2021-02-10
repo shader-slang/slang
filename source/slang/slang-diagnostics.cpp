@@ -195,12 +195,11 @@ static void _replaceTabWithSpaces(const UnownedStringSlice& slice, Int tabSize, 
             // Move to next tab
             tabPosition += tabSize;
 
+            // The amount of spaces to simulate the tab
             const Index spacesCount = tabPosition - lastPosition;
 
             // Add the spaces
-            char* spaces = out.prepareForAppend(spacesCount);
-            memset(spaces, ' ', spacesCount);
-            out.appendInPlace(spaces, spacesCount);
+            out.appendRepeatedChar(' ', spacesCount);
 
             // Set the start at the first character past
             start = cur + 1;
@@ -250,11 +249,11 @@ static UnownedStringSlice _extractLineContainingPosition(const UnownedStringSlic
 static void _sourceLocationNoteDiagnostic(SourceView* sourceView, SourceLoc sourceLoc, DiagnosticSink::SourceLocationLexer lexer, StringBuilder& sb)
 {
     SourceFile* sourceFile = sourceView->getSourceFile();
-
     if (!sourceFile)
     {
         return;
     }
+
     UnownedStringSlice content = sourceFile->getContent();
 
     // Make sure the offset is within content.
@@ -266,6 +265,7 @@ static void _sourceLocationNoteDiagnostic(SourceView* sourceView, SourceLoc sour
         return;
     }
 
+    // Work out the position of the SourceLoc in the source
     const char*const pos = content.begin() + offset;
 
     UnownedStringSlice line = _extractLineContainingPosition(content, pos);
@@ -273,30 +273,25 @@ static void _sourceLocationNoteDiagnostic(SourceView* sourceView, SourceLoc sour
     // Trim any trailing white space
     line = UnownedStringSlice(line.begin(), line.trim().end());
 
+    // TODO(JS): The tab size should ideally be configurable from command line.
+    // For now just go with 4.
     const Index tabSize = 4;
     
     StringBuilder sourceLine;
     StringBuilder caretLine;
 
-    // First output the line
-    {
-        _replaceTabWithSpaces(line, tabSize, sourceLine);
-    }
-
-    // Now we want the caret position
+    // First work out the sourceLine
+    _replaceTabWithSpaces(line, tabSize, sourceLine);
+    
+    // Now the caretLine which appears underneath the sourceLine
     {
         // Produce the text up to the caret position (at pos), taking into account tabs
         _replaceTabWithSpaces(UnownedStringSlice(line.begin(), pos), tabSize, caretLine);
 
         // Now make all spaces
-        {
-            const Index length = caretLine.getLength();
-            caretLine.Clear();
-            char* chars = caretLine.prepareForAppend(length);
-            ::memset(chars, ' ', length);
-            caretLine.appendInPlace(chars, length);
-        }
-
+        const Index length = caretLine.getLength();
+        caretLine.Clear();
+        caretLine.appendRepeatedChar(' ', length);
         
         // Add caret
         caretLine << "^";
@@ -307,10 +302,7 @@ static void _sourceLocationNoteDiagnostic(SourceView* sourceView, SourceLoc sour
 
             if (token.getLength() > 1)
             {
-                const Index underLength = token.getLength() - 1;
-                char* chars = caretLine.prepareForAppend(underLength);
-                ::memset(chars, '~', sizeof(char) * underLength);
-                caretLine.appendInPlace(chars, underLength);
+                caretLine.appendRepeatedChar('~', token.getLength() - 1);
             }
         }
     }
