@@ -131,9 +131,7 @@ namespace Slang
         {}
     };
 
-        /// If defined will be called to try and expand the caret to be a whole of a token
-    typedef UnownedStringSlice (*DiagnosticLexer)(const UnownedStringSlice& text);
-
+    
     class DiagnosticSink
     {
     public:
@@ -147,6 +145,10 @@ namespace Slang
                 SourceLocationLine = 0x2,           ///< If set will display the location line if source is available
             };
         };
+
+            /// Used by diagnostic sink to be able to underline tokens. If not defined on the DiagnosticSink,
+            /// will only display a caret at the SourceLoc
+        typedef UnownedStringSlice(*SourceLocationLexer)(const UnownedStringSlice& text);
 
             /// Get the total amount of errors that have taken place on this DiagnosticSink
         SLANG_FORCE_INLINE int getErrorCount() { return m_errorCount; }
@@ -213,18 +215,18 @@ namespace Slang
             /// Test if flag is set
         bool isFlagSet(Flag::Enum flag) { return (m_flags & Flags(flag)) != 0; }
 
-            /// Get the (optional) diagnostic lexer. This is used to
+            /// Get the (optional) diagnostic sink lexer. This is used to
             /// improve quality of highlighting a locations token. If not set, will just have a single
             /// character caret at location
-        DiagnosticLexer getDiagnosticLexer() const { return m_diagnosticLexer; }
+        SourceLocationLexer getSourceLocationLexer() const { return m_sourceLocationLexer; }
 
             /// Ctor
-        DiagnosticSink(SourceManager* sourceManager, DiagnosticLexer diagnosticLexer)
+        DiagnosticSink(SourceManager* sourceManager, SourceLocationLexer sourceLocationLexer)
             : m_sourceManager(sourceManager),
-              m_diagnosticLexer(diagnosticLexer)
+              m_sourceLocationLexer(sourceLocationLexer)
         {
-            // If we have a diagnostic lexer, we'll by default enable location output
-            if (diagnosticLexer)
+            // If we have a source location lexer, we'll by default enable source location output
+            if (sourceLocationLexer)
             {
                 setFlag(Flag::SourceLocationLine);
             }
@@ -248,7 +250,7 @@ namespace Slang
         // The source manager to use when mapping source locations to file+line info
         SourceManager* m_sourceManager = nullptr;
 
-        DiagnosticLexer m_diagnosticLexer;
+        SourceLocationLexer m_sourceLocationLexer;
     };
 
         /// An `ISlangWriter` that writes directly to a diagnostic sink.

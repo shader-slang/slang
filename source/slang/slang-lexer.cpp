@@ -1341,7 +1341,7 @@ namespace Slang
     }
 
 
-    /* static */UnownedStringSlice Lexer::diagnosticLexer(const UnownedStringSlice& in)
+    /* static */UnownedStringSlice Lexer::sourceLocationLexer(const UnownedStringSlice& in)
     {
         Lexer lexer;
 

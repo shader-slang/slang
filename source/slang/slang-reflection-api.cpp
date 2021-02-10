@@ -719,7 +719,7 @@ SLANG_API SlangReflectionType * spReflection_FindTypeByName(SlangReflection * re
     //
     Slang::DiagnosticSink sink(
         programLayout->getTargetReq()->getLinkage()->getSourceManager(),
-        Lexer::diagnosticLexer);
+        Lexer::sourceLocationLexer);
 
     try
     {
@@ -2561,7 +2561,7 @@ SLANG_API  SlangReflectionType* spReflection_specializeType(
 
     auto linkage = programLayout->getProgram()->getLinkage();
 
-    DiagnosticSink sink(linkage->getSourceManager(), Lexer::diagnosticLexer);
+    DiagnosticSink sink(linkage->getSourceManager(), Lexer::sourceLocationLexer);
 
     auto specializedType = linkage->specializeType(unspecializedType, specializationArgCount, (Type* const*) specializationArgs, &sink);
 

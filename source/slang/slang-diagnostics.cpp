@@ -247,7 +247,7 @@ static UnownedStringSlice _extractLineContainingPosition(const UnownedStringSlic
     return UnownedStringSlice(start, end);
 }
 
-static void _sourceLocationNoteDiagnostic(SourceView* sourceView, SourceLoc sourceLoc, DiagnosticLexer lexer, StringBuilder& sb)
+static void _sourceLocationNoteDiagnostic(SourceView* sourceView, SourceLoc sourceLoc, DiagnosticSink::SourceLocationLexer lexer, StringBuilder& sb)
 {
     SourceFile* sourceFile = sourceView->getSourceFile();
 
@@ -382,7 +382,7 @@ static void formatDiagnostic(
     // of the other main severity types, and so the information should already be output on the initial line
     if (sourceView && sink->isFlagSet(DiagnosticSink::Flag::SourceLocationLine) && diagnostic.severity != Severity::Note)
     {
-       _sourceLocationNoteDiagnostic(sourceView, sourceLoc, sink->getDiagnosticLexer(), sb);
+       _sourceLocationNoteDiagnostic(sourceView, sourceLoc, sink->getSourceLocationLexer(), sb);
     }
 
     if (sourceView && sink->isFlagSet(DiagnosticSink::Flag::VerbosePath))
