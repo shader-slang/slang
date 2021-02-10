@@ -1340,7 +1340,6 @@ namespace Slang
         }
     }
 
-
     /* static */UnownedStringSlice Lexer::sourceLocationLexer(const UnownedStringSlice& in)
     {
         Lexer lexer;
@@ -1371,7 +1370,7 @@ namespace Slang
         const int offset = sourceView->getRange().getOffset(tok.loc);
 
         SLANG_ASSERT(offset >= 0 && offset <= in.getLength());
-        SLANG_ASSERT(offset + tok.charsCount <= in.getLength());
+        SLANG_ASSERT(Index(offset + tok.charsCount) <= in.getLength());
 
         return UnownedStringSlice(in.begin() + offset, in.begin() + offset + tok.charsCount);
     }
