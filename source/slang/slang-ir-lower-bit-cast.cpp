@@ -231,6 +231,10 @@ struct BitCastLoweringContext
         {
             return;
         }
+        if (as<IRSamplerStateTypeBase>(fromType) || as<IRSamplerStateTypeBase>(toType))
+        {
+            return;
+        }
         // Enumerate all fields in to-type and obtain its value from operand object.
         IRBuilder builder;
         builder.sharedBuilder = &sharedBuilderStorage;
