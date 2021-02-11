@@ -107,7 +107,8 @@ FindLeafValueResult findLeafValueAtOffset(
             auto elementType = vectorType->getElementType();
             IRSizeAndAlignment elementLayout;
             CHECK(getNaturalSizeAndAlignment(targetReq, elementType, &elementLayout));
-            uint32_t index = (uint32_t)(offset / elementLayout.getStride());
+            uint32_t index =
+                elementLayout.getStride() == 0 ? 0 : (uint32_t)(offset / elementLayout.getStride());
             auto elementValue = builder.emitElementExtract(
                 elementType, src, builder.getIntValue(builder.getUIntType(), index));
             return findLeafValueAtOffset(
@@ -129,7 +130,9 @@ FindLeafValueResult findLeafValueAtOffset(
             auto rowType = builder.getVectorType(elementType, matrixType->getColumnCount());
             IRSizeAndAlignment rowLayout;
             CHECK(getNaturalSizeAndAlignment(targetReq, rowType, &rowLayout));
-            uint32_t rowIndex = (uint32_t)(offset / (columnCount * rowLayout.getStride()));
+            uint32_t rowIndex = rowLayout.getStride() == 0
+                                    ? 0
+                                    : (uint32_t)(offset / (columnCount * rowLayout.getStride()));
             auto rowValue = builder.emitElementExtract(
                 rowType, src, builder.getIntValue(builder.getUIntType(), rowIndex));
             return findLeafValueAtOffset(
