@@ -214,11 +214,20 @@ struct BitCastLoweringContext
             // Both fromType and toType are basic types, no processing needed.
             return;
         }
+        // Ignore cases we cannot handle yet.
         if (as<IRPtrType>(fromType) || as<IRPtrType>(toType))
         {
             return;
         }
         if (as<IRRawPointerType>(fromType) || as<IRRawPointerType>(toType))
+        {
+            return;
+        }
+        if (as<IRResourceTypeBase>(fromType) || as<IRResourceTypeBase>(toType))
+        {
+            return;
+        }
+        if (as<IRPointerLikeType>(fromType) || as<IRPointerLikeType>(toType))
         {
             return;
         }
