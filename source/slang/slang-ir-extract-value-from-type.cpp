@@ -1,7 +1,7 @@
 #include "slang-ir-extract-value-from-type.h"
 #include "slang-ir-layout.h"
 #include "slang-ir-insts.h"
-#define CHECK(x) SLANG_ASSERT((x) == SLANG_OK)
+#define CHECK(x) SLANG_RELEASE_ASSERT((x) == SLANG_OK)
 
 namespace Slang
 {
@@ -125,7 +125,7 @@ FindLeafValueResult findLeafValueAtOffset(
             // Note: this code is assuming row major odering.
             auto matrixType = as<IRMatrixType>(dataType);
             auto elementType = matrixType->getElementType();
-            SLANG_ASSERT(matrixType->getColumnCount()->op == kIROp_IntLit);
+            SLANG_RELEASE_ASSERT(matrixType->getColumnCount()->op == kIROp_IntLit);
             auto columnCount = as<IRIntLit>(matrixType->getColumnCount())->value.intVal;
             auto rowType = builder.getVectorType(elementType, matrixType->getColumnCount());
             IRSizeAndAlignment rowLayout;

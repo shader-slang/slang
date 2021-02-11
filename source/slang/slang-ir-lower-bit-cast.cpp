@@ -79,7 +79,8 @@ struct BitCastLoweringContext
                 for (auto field : structType->getFields())
                 {
                     IRIntegerValue fieldOffset = 0;
-                    SLANG_ASSERT(getNaturalOffset(targetReq, field, &fieldOffset) == SLANG_OK);
+                    SLANG_RELEASE_ASSERT(
+                        getNaturalOffset(targetReq, field, &fieldOffset) == SLANG_OK);
                     auto fieldType = field->getFieldType();
                     auto fieldValue =
                         readObject(builder, src, fieldType, (uint32_t)(fieldOffset + offset));
@@ -92,10 +93,11 @@ struct BitCastLoweringContext
             {
                 auto arrayType = as<IRArrayType>(type);
                 auto arrayCount = as<IRIntLit>(arrayType->getElementCount());
-                SLANG_ASSERT(arrayCount && "bit_cast: array size must be fixed.");
+                SLANG_RELEASE_ASSERT(arrayCount && "bit_cast: array size must be fixed.");
                 List<IRInst*> elements;
                 IRSizeAndAlignment elementLayout;
-                SLANG_ASSERT(getNaturalSizeAndAlignment(
+                SLANG_RELEASE_ASSERT(
+                    getNaturalSizeAndAlignment(
                     targetReq, arrayType->getElementType(), &elementLayout) == SLANG_OK);
                 for (IRIntegerValue i = 0; i < arrayCount->value.intVal; i++)
                 {
@@ -112,10 +114,10 @@ struct BitCastLoweringContext
             {
                 auto vectorType = as<IRVectorType>(type);
                 auto elementCount = as<IRIntLit>(vectorType->getElementCount());
-                SLANG_ASSERT(elementCount && "bit_cast: vector size must be int literal.");
+                SLANG_RELEASE_ASSERT(elementCount && "bit_cast: vector size must be int literal.");
                 List<IRInst*> elements;
                 IRSizeAndAlignment elementLayout;
-                SLANG_ASSERT(
+                SLANG_RELEASE_ASSERT(
                     getNaturalSizeAndAlignment(
                         targetReq, vectorType->getElementType(), &elementLayout) == SLANG_OK);
                 for (IRIntegerValue i = 0; i < elementCount->value.intVal; i++)
@@ -135,12 +137,13 @@ struct BitCastLoweringContext
                 // Assuming row-major order
                 auto matrixType = as<IRMatrixType>(type);
                 auto elementCount = as<IRIntLit>(matrixType->getRowCount());
-                SLANG_ASSERT(elementCount && "bit_cast: vector size must be int literal.");
+                SLANG_RELEASE_ASSERT(
+                    elementCount && "bit_cast: vector size must be int literal.");
                 List<IRInst*> elements;
                 auto elementType = builder.getVectorType(
                     matrixType->getElementType(), matrixType->getColumnCount());
                 IRSizeAndAlignment elementLayout;
-                SLANG_ASSERT(
+                SLANG_RELEASE_ASSERT(
                     getNaturalSizeAndAlignment(targetReq, elementType, &elementLayout) == SLANG_OK);
                 for (IRIntegerValue i = 0; i < elementCount->value.intVal; i++)
                 {
