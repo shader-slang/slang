@@ -5065,7 +5065,7 @@ namespace Slang
                     const HumaneSourceLoc humaneLoc = sourceManager->getHumaneLoc(inst->sourceLoc, sourceLocType);
                     if (humaneLoc.line >= 0)
                     {
-                        buf << humaneLoc.line;
+                        buf << humaneLoc.line << "," << humaneLoc.column;
 
                         if (humaneLoc.pathInfo != context->lastPathInfo)
                         {
