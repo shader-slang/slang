@@ -10,9 +10,9 @@ namespace Slang
 // the entirety or the first half of the requested value at the specified offset.
 struct FindLeafValueResult
 {
-    IRInst* leafValue; // The leaf-level value.
-    uint32_t valueSize; // The size of the leaf-level value.
-    uint32_t offsetInValue; // The offset in bytes within `leafValue` that contains the requested value.
+    IRInst* leafValue = nullptr; // The leaf-level value.
+    uint32_t valueSize = 0; // The size of the leaf-level value.
+    uint32_t offsetInValue = 0; // The offset in bytes within `leafValue` that contains the requested value.
 };
 
 FindLeafValueResult findLeafValueAtOffset(
@@ -23,7 +23,7 @@ FindLeafValueResult findLeafValueAtOffset(
     IRInst* src,
     uint32_t offset)
 {
-    FindLeafValueResult result = {};
+    FindLeafValueResult result;
     if (offset >= layout.size && offset < layout.getStride())
     {
         // We are extracting bits beyond the type size but within the stride boundary,
