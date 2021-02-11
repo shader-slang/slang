@@ -18,6 +18,7 @@
 #include "slang-ir-link.h"
 #include "slang-ir-lower-generics.h"
 #include "slang-ir-lower-tuple-types.h"
+#include "slang-ir-lower-bit-cast.h"
 #include "slang-ir-restructure.h"
 #include "slang-ir-restructure-scoping.h"
 #include "slang-ir-specialize.h"
@@ -680,6 +681,12 @@ Result linkAndOptimizeIR(
 #if 0
     dumpIRIfEnabled(compileRequest, irModule, "AFTER DCE");
 #endif
+    validateIRModuleIfEnabled(compileRequest, irModule);
+
+    // Lower all bit_cast operations on complex types into leaf-level
+    // bit_cast on basic types.
+    lowerBitCast(targetRequest, irModule);
+    eliminateDeadCode(irModule);
     validateIRModuleIfEnabled(compileRequest, irModule);
 
     return SLANG_OK;
