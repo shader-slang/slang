@@ -214,6 +214,10 @@ struct BitCastLoweringContext
             // Both fromType and toType are basic types, no processing needed.
             return;
         }
+        if (as<IRPtrType>(fromType) || as<IRPtrType>(toType))
+        {
+            return;
+        }
         // Enumerate all fields in to-type and obtain its value from operand object.
         IRBuilder builder;
         builder.sharedBuilder = &sharedBuilderStorage;
