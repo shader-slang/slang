@@ -218,6 +218,10 @@ struct BitCastLoweringContext
         {
             return;
         }
+        if (as<IRRawPointerType>(fromType) || as<IRRawPointerType>(toType))
+        {
+            return;
+        }
         // Enumerate all fields in to-type and obtain its value from operand object.
         IRBuilder builder;
         builder.sharedBuilder = &sharedBuilderStorage;
