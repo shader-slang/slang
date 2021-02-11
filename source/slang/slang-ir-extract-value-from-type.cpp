@@ -40,7 +40,7 @@ FindLeafValueResult findLeafValueAtOffset(
             auto structType = as<IRStructType>(dataType);
             for (auto field : structType->getFields())
             {
-                IRIntegerValue fieldOffset;
+                IRIntegerValue fieldOffset = 0;
                 IRSizeAndAlignment fieldLayout;
                 CHECK(getNaturalSizeAndAlignment(targetReq, field->getFieldType(), &fieldLayout));
                 CHECK(getNaturalOffset(targetReq, field, &fieldOffset));
