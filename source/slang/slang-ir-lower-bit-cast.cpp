@@ -105,7 +105,7 @@ struct BitCastLoweringContext
                         arrayType->getElementType(),
                         (uint32_t)(offset + elementLayout.getStride() * i)));
                 }
-                return builder.emitMakeArray(arrayType, arrayCount->value.intVal, elements.getBuffer());
+                return builder.emitMakeArray(arrayType, (UInt)arrayCount->value.intVal, elements.getBuffer());
             }
             break;
         case kIROp_VectorType:
@@ -127,7 +127,7 @@ struct BitCastLoweringContext
                         (uint32_t)(offset + elementLayout.getStride() * i)));
                 }
                 return builder.emitMakeVector(
-                    vectorType, elementCount->value.intVal, elements.getBuffer());
+                    vectorType, (UInt)elementCount->value.intVal, elements.getBuffer());
             }
             break;
         case kIROp_MatrixType:
@@ -151,7 +151,7 @@ struct BitCastLoweringContext
                         (uint32_t)(offset + elementLayout.getStride() * i)));
                 }
                 return builder.emitMakeMatrix(
-                    matrixType, elementCount->value.intVal, elements.getBuffer());
+                    matrixType, (UInt)elementCount->value.intVal, elements.getBuffer());
             }
             break;
         case kIROp_HalfType:
