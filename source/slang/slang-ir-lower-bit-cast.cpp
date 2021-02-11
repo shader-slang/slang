@@ -78,7 +78,7 @@ struct BitCastLoweringContext
                 List<IRInst*> fieldValues;
                 for (auto field : structType->getFields())
                 {
-                    IRIntegerValue fieldOffset;
+                    IRIntegerValue fieldOffset = 0;
                     SLANG_ASSERT(getNaturalOffset(targetReq, field, &fieldOffset) == SLANG_OK);
                     auto fieldType = field->getFieldType();
                     auto fieldValue =
