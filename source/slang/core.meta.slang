@@ -1913,6 +1913,11 @@ ${{{{
 
 }}}}
 
+// Bit cast
+__generic<T, U>
+[__unsafeForceInlineEarly]
+__intrinsic_op($(kIROp_BitCast))
+T bit_cast(U value);
 
 // Specialized function
 
