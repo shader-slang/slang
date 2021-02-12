@@ -1,0 +1,68 @@
+// struct-bit-cast.slang
+
+//TEST(compute):COMPARE_COMPUTE: -shaderobj
+
+// Test that bit_cast works for bit-reinterpreting one struct type as another.
+
+struct Foo
+{
+    uint a;
+    float b;
+    float2 fvec;
+}
+
+struct Inner
+{
+    int v;
+    uint s;
+}
+
+struct Bar
+{
+    int u;
+    Inner i;
+    uint t;
+}
+
+int test0(int val)
+{
+    Bar b;
+    b.u = val;
+    b.i.v = asint(2.0f);
+    b.i.s = asuint(1.25);
+    b.t = asuint(0.25);
+    Foo f = bit_cast<Foo, Bar>(b);
+    return f.a + (int)f.b + int(float(f.fvec.x / f.fvec.y)); // val + 2 + 5
+}
+
+struct Smaller
+{
+    int s;
+}
+
+struct Larger
+{
+    int x, y;
+}
+
+int test1()
+{
+    Smaller s = {1};
+    int v0 = bit_cast<Larger, Smaller>(s).y; // 0.
+    Larger l = {1, 2};
+    int v1 = bit_cast<Smaller, Larger>(l).s; // 1.
+    return v0 + v1;
+}
+
+
+//TEST_INPUT:ubuffer(data=[0 0 0 0], stride=4):out,name=outputBuffer
+RWStructuredBuffer<int> outputBuffer;
+
+[numthreads(4, 1, 1)]
+void computeMain(uint3 dispatchThreadID : SV_DispatchThreadID)
+{
+    uint tid = dispatchThreadID.x;
+    int inVal = tid;
+    int outVal = test0(inVal) + test1();
+    outputBuffer[tid] = outVal;
+}

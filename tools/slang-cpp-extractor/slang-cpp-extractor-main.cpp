@@ -2706,7 +2706,7 @@ int main(int argc, const char*const* argv)
         SourceManager sourceManager;
         sourceManager.initialize(nullptr, nullptr);
 
-        DiagnosticSink sink(&sourceManager);
+        DiagnosticSink sink(&sourceManager, Lexer::sourceLocationLexer);
         sink.writer = writer;
 
         CPPExtractorApp app(&sink, &sourceManager, &rootNamePool);

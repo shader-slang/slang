@@ -1,7 +1,11 @@
 result code = 0
 standard error = {
 tests/diagnostics/int-literal.slang(6): warning 39999: integer literal '0x800000000' too large for type 'int' truncated to '0'
+    int c0 = 0x800000000;
+             ^~~~~~~~~~~
 tests/diagnostics/int-literal.slang(18): warning 39999: integer literal '0xfffffffff' too large for type 'int' truncated to '-1'
+    int c4 = -0xfffffffff;
+              ^~~~~~~~~~~
 }
 standard output = {
 }
