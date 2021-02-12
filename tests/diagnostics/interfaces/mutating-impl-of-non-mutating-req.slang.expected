@@ -1,6 +1,8 @@
 result code = -1
 standard error = {
 tests/diagnostics/interfaces/mutating-impl-of-non-mutating-req.slang(10): error 38100: type 'Counter' does not provide required interface member 'processValue'
+struct Counter : IThing
+                 ^~~~~~
 }
 standard output = {
 }

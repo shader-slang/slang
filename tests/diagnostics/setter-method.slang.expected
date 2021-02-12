@@ -1,8 +1,12 @@
 result code = -1
 standard error = {
 tests/diagnostics/setter-method.slang(16): error 30011: left of '=' is not an l-value.
+        center = value;
+               ^
 tests/diagnostics/setter-method.slang(16): note 30049: a 'this' parameter is an immutable parameter by default in Slang; apply the `[mutating]` attribute to the function declaration to opt in to a mutable `this`
 tests/diagnostics/setter-method.slang(21): error 30011: left of '=' is not an l-value.
+        this.radius = value;
+                    ^
 tests/diagnostics/setter-method.slang(21): note 30049: a 'this' parameter is an immutable parameter by default in Slang; apply the `[mutating]` attribute to the function declaration to opt in to a mutable `this`
 }
 standard output = {
