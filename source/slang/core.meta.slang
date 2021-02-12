@@ -2093,3 +2093,6 @@ attribute_syntax [__requiresNVAPI] : RequiresNVAPIAttribute;
 
 __attributeTarget(FunctionDeclBase)
 attribute_syntax [noinline] : NoInlineAttribute;
+
+__attributeTarget(StructDecl)
+attribute_syntax [payload] : PayloadAttribute;

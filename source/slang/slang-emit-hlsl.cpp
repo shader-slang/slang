@@ -915,6 +915,11 @@ void HLSLSourceEmitter::emitSemanticsImpl(IRInst* inst)
         return;
     }
 
+    if( auto readAccessSemantic = inst->findDecoration<IRStageReadAccessDecoration>())
+        _emitStageAccessSemantic(readAccessSemantic, "read");
+    if( auto writeAccessSemantic = inst->findDecoration<IRStageWriteAccessDecoration>())
+        _emitStageAccessSemantic(writeAccessSemantic, "write");
+
     if (auto layoutDecoration = inst->findDecoration<IRLayoutDecoration>())
     {
         auto layout = layoutDecoration->getLayout();
@@ -931,6 +936,32 @@ void HLSLSourceEmitter::emitSemanticsImpl(IRInst* inst)
         }
     }
 }
+
+void HLSLSourceEmitter::_emitStageAccessSemantic(IRStageAccessDecoration* decoration, const char* name)
+{
+    Int stageCount = decoration->getStageCount();
+    if(stageCount == 0)
+        return;
+
+    m_writer->emit(" : ");
+    m_writer->emit(name);
+    m_writer->emit("(");
+    for( Int i = 0; i < stageCount; ++i )
+    {
+        if(i != 0) m_writer->emit(", ");
+        m_writer->emit(decoration->getStageName(i));
+    }
+    m_writer->emit(")");
+}
+
+void HLSLSourceEmitter::emitPostKeywordTypeAttributesImpl(IRInst* inst)
+{
+    if( auto payloadDecoration = inst->findDecoration<IRPayloadDecoration>() )
+    {
+        m_writer->emit("[payload] ");
+    }
+}
+
 
 void HLSLSourceEmitter::emitSimpleFuncParamImpl(IRParam* param)
 {

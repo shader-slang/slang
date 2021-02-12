@@ -2898,6 +2898,9 @@ void CLikeSourceEmitter::emitStruct(IRStructType* structType)
     }
 
     m_writer->emit("struct ");
+
+    emitPostKeywordTypeAttributes(structType);
+
     m_writer->emit(getName(structType));
     m_writer->emit("\n{\n");
     m_writer->indent();

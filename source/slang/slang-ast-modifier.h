@@ -292,6 +292,24 @@ class HLSLSimpleSemantic : public HLSLSemantic
     SLANG_AST_CLASS(HLSLSimpleSemantic)
 };
 
+// A semantic applied to a field of a ray-payload type, to control access
+class RayPayloadAccessSemantic : public HLSLSemantic
+{
+    SLANG_AST_CLASS(RayPayloadAccessSemantic)
+
+    List<Token> stageNameTokens;
+};
+
+class RayPayloadReadSemantic : public RayPayloadAccessSemantic
+{
+    SLANG_AST_CLASS(RayPayloadReadSemantic)
+};
+
+class RayPayloadWriteSemantic : public RayPayloadAccessSemantic
+{
+    SLANG_AST_CLASS(RayPayloadWriteSemantic)
+};
+
 
 // GLSL
 
@@ -948,5 +966,14 @@ class NoInlineAttribute : public Attribute
     SLANG_AST_CLASS(NoInlineAttribute)
 };
 
+    /// A `[payload]` attribute indicates that a `struct` type will be used as
+    /// a ray payload for `TraceRay()` calls, and thus also as input/output
+    /// for shaders in the ray tracing pipeline that might be invoked for
+    /// such a ray.
+    ///
+class PayloadAttribute : public Attribute
+{
+    SLANG_AST_CLASS(PayloadAttribute)
+};
 
 } // namespace Slang
