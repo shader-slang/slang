@@ -7,8 +7,12 @@ standard error = {
 (0): note: include   'tests/preprocessor/include-a.slang.h'
 (0): note: include   'tests/preprocessor/include-a.slang.h'
 tests/preprocessor/include-a.slang.h(3): error 30201: function 'bar' already has a body
+int bar() { return foo(); }
+    ^~~
 tests/preprocessor/include-a.slang.h(3): note: see previous definition of 'bar'
 tests/preprocessor/include-a.slang.h(3): error 30201: function 'bar' already has a body
+int bar() { return foo(); }
+    ^~~
 tests/preprocessor/include-a.slang.h(3): note: see previous definition of 'bar'
 }
 standard output = {

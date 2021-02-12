@@ -1339,4 +1339,40 @@ namespace Slang
                 return tokenList;
         }
     }
+
+    /* static */UnownedStringSlice Lexer::sourceLocationLexer(const UnownedStringSlice& in)
+    {
+        Lexer lexer;
+
+        SourceManager sourceManager;
+        sourceManager.initialize(nullptr, nullptr);
+
+        auto sourceFile = sourceManager.createSourceFileWithString(PathInfo::makeUnknown(), in);
+        auto sourceView = sourceManager.createSourceView(sourceFile, nullptr, SourceLoc::fromRaw(0));
+
+        DiagnosticSink sink(&sourceManager, nullptr);
+
+        MemoryArena arena;
+
+        RootNamePool rootNamePool;
+        NamePool namePool;
+        namePool.setRootNamePool(&rootNamePool);
+
+        lexer.initialize(sourceView, &sink, &namePool, &arena);
+
+        Token tok = lexer.lexToken();
+
+        if (tok.type == TokenType::Invalid)
+        {
+            return UnownedStringSlice();
+        }
+
+        const int offset = sourceView->getRange().getOffset(tok.loc);
+
+        SLANG_ASSERT(offset >= 0 && offset <= in.getLength());
+        SLANG_ASSERT(Index(offset + tok.charsCount) <= in.getLength());
+
+        return UnownedStringSlice(in.begin() + offset, in.begin() + offset + tok.charsCount);
+    }
+
 }
