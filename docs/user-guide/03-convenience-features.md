@@ -185,7 +185,7 @@ int test()
 }
 ```
 
-Slang currently supports overloading the following operators: `+`, `-`, `*`, `/`, `%`, `&`, `&&`, `|`, `||`, `<`, `>`, `<=`, `>=`, `==`, `!=`, unary `-`, `~` and `!`.
+Slang currently supports overloading the following operators: `+`, `-`, `*`, `/`, `%`, `&`, `|`, `<`, `>`, `<=`, `>=`, `==`, `!=`, unary `-`, `~` and `!`. Please note that the `&&` and `||` operators are not supported.
 
 ## `struct` inheritance (limited)
 
