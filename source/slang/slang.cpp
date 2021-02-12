@@ -773,7 +773,7 @@ SLANG_NO_THROW slang::IModule* SLANG_MCALL Linkage::loadModule(
 {
     auto name = getNamePool()->getName(moduleName);
 
-    DiagnosticSink sink(getSourceManager());
+    DiagnosticSink sink(getSourceManager(), Lexer::sourceLocationLexer);
     auto module = findOrImportModule(name, SourceLoc(), &sink);
     sink.getBlobIfNeeded(outDiagnostics);
 
@@ -797,7 +797,7 @@ SLANG_NO_THROW SlangResult SLANG_MCALL Linkage::createCompositeComponentType(
         return SLANG_OK;
     }
 
-    DiagnosticSink sink(getSourceManager());
+    DiagnosticSink sink(getSourceManager(), Lexer::sourceLocationLexer);
 
     List<RefPtr<ComponentType>> childComponents;
     for( Int cc = 0; cc < componentTypeCount; ++cc )
@@ -834,7 +834,7 @@ SLANG_NO_THROW slang::TypeReflection* SLANG_MCALL Linkage::specializeType(
         typeArgs.add(asInternal(arg.type));
     }
 
-    DiagnosticSink sink(getSourceManager());
+    DiagnosticSink sink(getSourceManager(), Lexer::sourceLocationLexer);
     auto specializedType = specializeType(unspecializedType, typeArgs.getCount(), typeArgs.getBuffer(), &sink);
     sink.getBlobIfNeeded(outDiagnostics);
 
@@ -1185,7 +1185,7 @@ Expr* Linkage::parseTermString(String typeStr, RefPtr<Scope> scope)
     Slang::SourceFile* srcFile = localSourceManager.createSourceFileWithString(PathInfo::makeTypeParse(), typeStr);
     
     // We'll use a temporary diagnostic sink  
-    DiagnosticSink sink(&localSourceManager);
+    DiagnosticSink sink(&localSourceManager, nullptr);
 
     // RAII type to make make sure current SourceManager is restored after parse.
     // Use RAII - to make sure everything is reset even if an exception is thrown.
@@ -1845,7 +1845,7 @@ BackEndCompileRequest::BackEndCompileRequest(
 EndToEndCompileRequest::EndToEndCompileRequest(
     Session* session)
     : m_session(session)
-    , m_sink(nullptr)
+    , m_sink(nullptr, Lexer::sourceLocationLexer)
 {
     RefPtr<ASTBuilder> astBuilder(new ASTBuilder(session->m_sharedASTBuilder, "EndToEnd::Linkage::astBuilder"));
     m_linkage = new Linkage(session, astBuilder, session->getBuiltinLinkage());
@@ -1856,7 +1856,7 @@ EndToEndCompileRequest::EndToEndCompileRequest(
     Linkage* linkage)
     : m_session(linkage->getSessionImpl())
     , m_linkage(linkage)
-    , m_sink(nullptr)
+    , m_sink(nullptr, Lexer::sourceLocationLexer)
 {
     init();
 }
@@ -2627,7 +2627,7 @@ SLANG_NO_THROW slang::ProgramLayout* SLANG_MCALL ComponentType::getLayout(
         return nullptr;
     auto target = linkage->targets[targetIndex];
 
-    DiagnosticSink sink(linkage->getSourceManager());
+    DiagnosticSink sink(linkage->getSourceManager(), Lexer::sourceLocationLexer);
     auto programLayout = getTargetProgram(target)->getOrCreateLayout(&sink);
     sink.getBlobIfNeeded(outDiagnostics);
 
@@ -2647,7 +2647,7 @@ SLANG_NO_THROW SlangResult SLANG_MCALL ComponentType::getEntryPointCode(
 
     auto targetProgram = getTargetProgram(target);
 
-    DiagnosticSink sink(linkage->getSourceManager());
+    DiagnosticSink sink(linkage->getSourceManager(), Lexer::sourceLocationLexer);
     auto& entryPointResult = targetProgram->getOrCreateEntryPointResult(entryPointIndex, &sink);
     sink.getBlobIfNeeded(outDiagnostics);
 
@@ -2698,7 +2698,7 @@ SLANG_NO_THROW SlangResult SLANG_MCALL ComponentType::specialize(
     slang::IComponentType**         outSpecializedComponentType,
     ISlangBlob**                    outDiagnostics)
 {
-    DiagnosticSink sink(getLinkage()->getSourceManager());
+    DiagnosticSink sink(getLinkage()->getSourceManager(), Lexer::sourceLocationLexer);
 
     // First let's check if the number of arguments given matches
     // the number of parameters that are present on this component type.
@@ -3575,7 +3575,7 @@ void Session::addBuiltinSource(
 {
     SourceManager* sourceManager = getBuiltinSourceManager();
 
-    DiagnosticSink sink(sourceManager);
+    DiagnosticSink sink(sourceManager, Lexer::sourceLocationLexer);
     RefPtr<FrontEndCompileRequest> compileRequest = new FrontEndCompileRequest(
         m_builtinLinkage,
         &sink);

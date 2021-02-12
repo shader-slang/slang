@@ -1762,7 +1762,11 @@ namespace Slang
         TokenSpan tokenSpan;
         tokenSpan.m_begin = parser->tokenReader.m_cursor;
         tokenSpan.m_end = parser->tokenReader.m_end;
-        DiagnosticSink newSink(parser->sink->getSourceManager());
+
+        // Setup without diagnostic lexer, or SourceLocationLine output
+        // as this sink is just to *try* generic application
+        DiagnosticSink newSink(parser->sink->getSourceManager(), nullptr);
+
         Parser newParser(*parser);
         newParser.sink = &newSink;
 
