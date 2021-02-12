@@ -1,6 +1,8 @@
 result code = -1
 standard error = {
 tests/diagnostics/local-used-before-declared.slang(14): fatal error 39999: local variable 'd' is being used before its declaration.
+    int d = 0;
+        ^
 }
 standard output = {
 }

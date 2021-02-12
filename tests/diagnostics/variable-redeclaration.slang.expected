@@ -1,14 +1,24 @@
 result code = -1
 standard error = {
 tests/diagnostics/variable-redeclaration.slang(14): error 30200: declaration of 'gA' conflicts with existing declaration
+static Texture2D gA;
+                 ^~
 tests/diagnostics/variable-redeclaration.slang(12): note: see previous declaration of 'gA'
 tests/diagnostics/variable-redeclaration.slang(44): error 30200: declaration of 'f' conflicts with existing declaration
+    float f;
+          ^
 tests/diagnostics/variable-redeclaration.slang(43): note: see previous declaration of 'f'
 tests/diagnostics/variable-redeclaration.slang(51): error 30200: declaration of 'size' conflicts with existing declaration
+    float   size)
+            ^~~~
 tests/diagnostics/variable-redeclaration.slang(50): note: see previous declaration of 'size'
 tests/diagnostics/variable-redeclaration.slang(21): error 30200: declaration of 'y' conflicts with existing declaration
+    int y = x;
+        ^
 tests/diagnostics/variable-redeclaration.slang(20): note: see previous declaration of 'y'
 tests/diagnostics/variable-redeclaration.slang(53): error 39999: ambiguous reference to 'size'
+    return size;
+           ^~~~
 tests/diagnostics/variable-redeclaration.slang(51): note 39999: candidate: size
 tests/diagnostics/variable-redeclaration.slang(50): note 39999: candidate: size
 }

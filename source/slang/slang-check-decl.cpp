@@ -1888,7 +1888,7 @@ namespace Slang
         // a temporary one.
         //
         DiagnosticSink* savedSink = m_shared->m_sink;
-        DiagnosticSink tempSink(savedSink->getSourceManager());
+        DiagnosticSink tempSink(savedSink->getSourceManager(), nullptr);
         m_shared->m_sink = &tempSink;
 
         // With our temporary diagnostic sink soaking up any messages
@@ -2177,7 +2177,7 @@ namespace Slang
             // of diagnostics more easily.
             //
             DiagnosticSink* savedSink = m_shared->m_sink;
-            DiagnosticSink tempSink(savedSink->getSourceManager());
+            DiagnosticSink tempSink(savedSink->getSourceManager(), nullptr);
             m_shared->m_sink = &tempSink;
 
             // We start by constructing an expression that represents

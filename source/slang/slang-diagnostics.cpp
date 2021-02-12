@@ -6,6 +6,7 @@
 #include "../core/slang-memory-arena.h"
 #include "../core/slang-dictionary.h"
 #include "../core/slang-string-util.h"
+#include "../core/slang-char-util.h"
 #include "../core/slang-name-convention-util.h"
 
 #include <assert.h>
@@ -160,6 +161,160 @@ static void formatDiagnostic(const HumaneSourceLoc& humaneLoc, Diagnostic const&
     outBuilder << "\n";
 }
 
+static void _replaceTabWithSpaces(const UnownedStringSlice& slice, Int tabSize, StringBuilder& out)
+{
+    const char* start = slice.begin();
+    const char*const end = slice.end();
+
+    const Index startLength = out.getLength();
+
+    for (const char* cur = start; cur < end; cur++)
+    {
+        if (*cur == '\t')
+        {
+            if (start < cur)
+            {
+                out.append(start, cur);
+            }
+
+            // The amount of spaces we add depends on the current position.
+            const Index lastPosition = out.getLength() - startLength;
+            Index tabPosition = lastPosition;
+
+            // Strip the tabPosition so it's back to the tab stop
+            // Special case if tabSize is a power of 2
+            if ((tabSize & (tabSize - 1)) == 0)
+            {
+                tabPosition = tabPosition & ~Index(tabSize - 1);
+            }
+            else
+            {
+                tabPosition -= tabPosition % tabSize;
+            }
+
+            // Move to next tab
+            tabPosition += tabSize;
+
+            // The amount of spaces to simulate the tab
+            const Index spacesCount = tabPosition - lastPosition;
+
+            // Add the spaces
+            out.appendRepeatedChar(' ', spacesCount);
+
+            // Set the start at the first character past
+            start = cur + 1;
+        }
+    }
+
+    if (start < end)
+    {
+        out.append(start, end);
+    }
+}
+
+// Given multi-line text, and a position within the text (as a pointer into the memory of text)
+// extract the line that contains pos
+static UnownedStringSlice _extractLineContainingPosition(const UnownedStringSlice& text, const char* pos)
+{
+    SLANG_ASSERT(text.isMemoryContained(pos));
+
+    const char*const contentStart = text.begin();
+    const char*const contentEnd = text.end();
+
+    // We want to determine the start of the line, and the end of the line
+    const char* start = pos;
+    for (; start > contentStart; --start)
+    {
+        const char c = *start;
+        if (c == '\n' || c == '\r')
+        {
+            // We want the character after, but we can only do this if not already at pos
+            start += int(start < pos);
+            break;
+        }
+    }
+    const char* end = pos;
+    for (; end < contentEnd; ++end)
+    {
+        const char c = *end;
+        if (c == '\n' || c == '\r')
+        {
+            break;
+        }
+    }
+
+    return UnownedStringSlice(start, end);
+}
+
+static void _sourceLocationNoteDiagnostic(SourceView* sourceView, SourceLoc sourceLoc, DiagnosticSink::SourceLocationLexer lexer, StringBuilder& sb)
+{
+    SourceFile* sourceFile = sourceView->getSourceFile();
+    if (!sourceFile)
+    {
+        return;
+    }
+
+    UnownedStringSlice content = sourceFile->getContent();
+
+    // Make sure the offset is within content.
+    // This is important because it's possible to have a 'SourceFile' that doesn't contain any content
+    // (for example when reconstructed via serialization with just line offsets, the actual source text 'content' isn't available).
+    const int offset = sourceView->getRange().getOffset(sourceLoc);
+    if (offset < 0 || offset >= content.getLength())
+    {
+        return;
+    }
+
+    // Work out the position of the SourceLoc in the source
+    const char*const pos = content.begin() + offset;
+
+    UnownedStringSlice line = _extractLineContainingPosition(content, pos);
+
+    // Trim any trailing white space
+    line = UnownedStringSlice(line.begin(), line.trim().end());
+
+    // TODO(JS): The tab size should ideally be configurable from command line.
+    // For now just go with 4.
+    const Index tabSize = 4;
+    
+    StringBuilder sourceLine;
+    StringBuilder caretLine;
+
+    // First work out the sourceLine
+    _replaceTabWithSpaces(line, tabSize, sourceLine);
+    
+    // Now the caretLine which appears underneath the sourceLine
+    {
+        // Produce the text up to the caret position (at pos), taking into account tabs
+        _replaceTabWithSpaces(UnownedStringSlice(line.begin(), pos), tabSize, caretLine);
+
+        // Now make all spaces
+        const Index length = caretLine.getLength();
+        caretLine.Clear();
+        caretLine.appendRepeatedChar(' ', length);
+        
+        // Add caret
+        caretLine << "^";
+
+        if (lexer)
+        {
+            UnownedStringSlice token = lexer(UnownedStringSlice(pos, line.end()));
+
+            if (token.getLength() > 1)
+            {
+                caretLine.appendRepeatedChar('~', token.getLength() - 1);
+            }
+        }
+    }
+
+    // We could have handling here for if the line is too long, that we surround the important section
+    // will ellipsis for example.
+    // For now we just output.
+
+    sb << sourceLine << "\n";
+    sb << caretLine << "\n";
+}
+
 static void formatDiagnostic(
     DiagnosticSink*     sink,
     Diagnostic const&   diagnostic,
@@ -214,7 +369,14 @@ static void formatDiagnostic(
             }
         }
     }
-     
+
+    // We don't don't output source line information if this is a 'note' as a note is extra information for one
+    // of the other main severity types, and so the information should already be output on the initial line
+    if (sourceView && sink->isFlagSet(DiagnosticSink::Flag::SourceLocationLine) && diagnostic.severity != Severity::Note)
+    {
+       _sourceLocationNoteDiagnostic(sourceView, sourceLoc, sink->getSourceLocationLexer(), sb);
+    }
+
     if (sourceView && sink->isFlagSet(DiagnosticSink::Flag::VerbosePath))
     {
         auto actualHumaneLoc = sourceView->getHumaneLoc(diagnostic.loc, SourceLocType::Actual);

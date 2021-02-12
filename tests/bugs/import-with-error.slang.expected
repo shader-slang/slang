@@ -1,7 +1,11 @@
 result code = -1
 standard error = {
 tests/bugs/import-with-error-extra.slang(10): error 30015: undefined identifier 'b'.
+    int a = b;
+            ^
 tests/bugs/import-with-error.slang(6): fatal error 39999: error in imported module, compilation ceased.
+import import_with_error_extra;
+       ^~~~~~~~~~~~~~~~~~~~~~~
 }
 standard output = {
 }

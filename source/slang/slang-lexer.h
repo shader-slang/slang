@@ -106,6 +106,16 @@ namespace Slang
 
         ~Lexer();
 
+            /// Runs the lexer to try and extract a single token, which is returned.
+            /// This can be used by the DiagnosticSink to be able to display more appropriate
+            /// information when displaying a source location - such as underscoring the
+            /// token at that location.
+            ///
+            /// NOTE! This function is relatively slow, and is designed for use around this specific
+            /// purpose. It does not return a token or a token type, because that information is
+            /// not needed by the DiagnosticSink.
+        static UnownedStringSlice sourceLocationLexer(const UnownedStringSlice& in);
+
         Token lexToken(LexerFlags extraFlags = 0);
 
         TokenList lexAllTokens();
@@ -128,6 +138,7 @@ namespace Slang
         MemoryArena*    m_memoryArena;
     };
 
+    
     // Helper routines for extracting values from tokens
     String getStringLiteralTokenValue(Token const& token);
     String getFileNameTokenValue(Token const& token);

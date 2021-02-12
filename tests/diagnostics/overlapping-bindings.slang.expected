@@ -1,6 +1,8 @@
 result code = 0
 standard error = {
 tests/diagnostics/overlapping-bindings.slang(9): warning 39001: explicit binding for parameter 'b' overlaps with parameter 'a'
+Texture2D b : register(t0);
+          ^
 tests/diagnostics/overlapping-bindings.slang(7): note: see declaration of 'a'
 }
 standard output = {
