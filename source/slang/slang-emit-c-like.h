@@ -253,6 +253,9 @@ public:
 
     void emitStruct(IRStructType* structType);
 
+        /// Emit type attributes that should appear after, e.g., a `struct` keyword
+    void emitPostKeywordTypeAttributes(IRInst* inst) { emitPostKeywordTypeAttributesImpl(inst); }
+
     void emitInterpolationModifiers(IRInst* varInst, IRType* valueType, IRVarLayout* layout);
 
     UInt getRayPayloadLocation(IRInst* inst);
@@ -367,6 +370,9 @@ public:
         /// target-specific extension tracker.
     void handleRequiredCapabilities(IRInst* inst);
     virtual void handleRequiredCapabilitiesImpl(IRInst* inst) { SLANG_UNUSED(inst); }
+
+    virtual void emitPostKeywordTypeAttributesImpl(IRInst* inst) { SLANG_UNUSED(inst); }
+
 
     void _emitArrayType(IRArrayType* arrayType, EDeclarator* declarator);
     void _emitUnsizedArrayType(IRUnsizedArrayType* arrayType, EDeclarator* declarator);

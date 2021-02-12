@@ -2202,6 +2202,40 @@ namespace Slang
         parser->sink->diagnose(semantic, Diagnostics::packOffsetNotSupported);
     }
 
+    static RayPayloadAccessSemantic* _parseRayPayloadAccessSemantic(Parser* parser, RayPayloadAccessSemantic* semantic)
+    {
+        parser->FillPosition(semantic);
+
+        // Read the keyword that introduced the semantic
+        semantic->name = parser->ReadToken(TokenType::Identifier);
+
+        parser->ReadToken(TokenType::LParent);
+
+        for(;;)
+        {
+            if(AdvanceIfMatch(parser, TokenType::RParent))
+                break;
+
+            auto stageName = parser->ReadToken(TokenType::Identifier);
+            semantic->stageNameTokens.add(stageName);
+
+            if(AdvanceIfMatch(parser, TokenType::RParent))
+                break;
+
+            expect(parser, TokenType::Comma);
+        }
+
+        return semantic;
+    }
+
+    template<typename T>
+    static T* _parseRayPayloadAccessSemantic(Parser* parser)
+    {
+        T* semantic = parser->astBuilder->create<T>();
+        _parseRayPayloadAccessSemantic(parser, semantic);
+        return semantic;
+    }
+
     //
     // semantic ::= identifier ( '(' args ')' )?
     //
@@ -2221,6 +2255,14 @@ namespace Slang
             parser->FillPosition(semantic);
             parseHLSLPackOffsetSemantic(parser, semantic);
             return semantic;
+        }
+        else if( parser->LookAheadToken("read") && parser->LookAheadToken(TokenType::LParent, 1) )
+        {
+            return _parseRayPayloadAccessSemantic<RayPayloadReadSemantic>(parser);
+        }
+        else if( parser->LookAheadToken("write") && parser->LookAheadToken(TokenType::LParent, 1) )
+        {
+            return _parseRayPayloadAccessSemantic<RayPayloadWriteSemantic>(parser);
         }
         else if (parser->LookAheadToken(TokenType::Identifier))
         {
@@ -3413,6 +3455,21 @@ namespace Slang
         StructDecl* rs = astBuilder->create<StructDecl>();
         FillPosition(rs);
         ReadToken("struct");
+
+        // The `struct` keyword may optionally be followed by
+        // attributes that appertain to the struct declaration
+        // itself, and not to any variables declared using this
+        // type specifier.
+        //
+        // TODO: We don't yet correctly associate attributes with
+        // a variable decarlation vs. a struct type when a variable
+        // is declared with a struct type specified.
+        //
+        if(LookAheadToken(TokenType::LBracket))
+        {
+            Modifier** modifierLink = &rs->modifiers.first;
+            ParseSquareBracketAttributes(this, &modifierLink);
+        }
 
         // TODO: support `struct` declaration without tag
         rs->nameAndLoc = expectIdentifier(this);

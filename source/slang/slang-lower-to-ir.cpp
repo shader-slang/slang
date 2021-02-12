@@ -6191,6 +6191,11 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
         addNameHint(context, irStruct, decl);
         addLinkageDecoration(context, irStruct, decl);
 
+        if( auto payloadAttribute = decl->findModifier<PayloadAttribute>() )
+        {
+            subBuilder->addDecoration(irStruct, kIROp_PayloadDecoration);
+        }
+
         subBuilder->setInsertInto(irStruct);
 
         // A `struct` that inherits from another `struct` must start
@@ -6261,6 +6266,20 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
         return LoweredValInfo::simple(finishOuterGenerics(subBuilder, irStruct, outerGeneric));
     }
 
+    void lowerRayPayloadAccessModifier(IRInst* inst, RayPayloadAccessSemantic* semantic, IROp op)
+    {
+        auto builder = getBuilder();
+
+        List<IRInst*> operands;
+        for(auto stageNameToken : semantic->stageNameTokens)
+        {
+            IRInst* stageName = builder->getStringValue(stageNameToken.getContent());
+            operands.add(stageName);
+        }
+
+        builder->addDecoration(inst, op, operands.getBuffer(), operands.getCount());
+    }
+
     LoweredValInfo lowerMemberVarDecl(VarDecl* fieldDecl)
     {
         // Each field declaration in the AST translates into
@@ -6283,6 +6302,15 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
         if (auto semanticModifier = fieldDecl->findModifier<HLSLSimpleSemantic>())
         {
             builder->addSemanticDecoration(irFieldKey, semanticModifier->name.getName()->text.getUnownedSlice());
+        }
+
+        if( auto readModifier = fieldDecl->findModifier<RayPayloadReadSemantic>() )
+        {
+            lowerRayPayloadAccessModifier(irFieldKey, readModifier, kIROp_StageReadAccessDecoration);
+        }
+        if( auto writeModifier = fieldDecl->findModifier<RayPayloadWriteSemantic>())
+        {
+            lowerRayPayloadAccessModifier(irFieldKey, writeModifier, kIROp_StageWriteAccessDecoration);
         }
 
         // We allow a field to be marked as a target intrinsic,
