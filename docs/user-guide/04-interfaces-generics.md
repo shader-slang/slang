@@ -14,7 +14,7 @@ interface IFoo
 }
 ```
 
-Slang's syntax for defining interfaces are similar to C# and Swift. In this example, the `IFoo` interface establishes a contract that any type conforming to this interface must provide a method named `myMethod` that accepts a `float` argument and returns an `int` value.
+Slang's syntax for defining interfaces are similar to `interface`s in C# and `protocal`s in Swift. In this example, the `IFoo` interface establishes a contract that any type conforming to this interface must provide a method named `myMethod` that accepts a `float` argument and returns an `int` value.
 
 A `struct` type may declare its conformance to an `interface` via the following syntax:
 ```C#
@@ -204,3 +204,239 @@ void g<T:IFoo>()
     T obj = {1, 2}; // OK, invoking the initializer on T.
 }
 ```
+
+Associated Types
+-------------------------
+
+When writing code using interfaces and generics, there are some situations where the an interface method needs to return an object whose type is implementation-dependent. For example, consider the following `IFloatContainer` interface that represents a container of `float` values:
+```C#
+// Represents a container of float values.
+interface IFloatContainer
+{
+    // Returns the number of elements in this container.
+    uint getCount();
+    // Returns an iterator representing the start of the container.
+    Iterator begin();
+    // Returns an iterator representing the end of the container.
+    Iterator end();
+    // Return the element at the location represented by `iter`.
+    float getElementAt(Iterator iter);
+}
+```
+An implementation of the `IFloatContainer` interface may use different types of iterators. For example, an implementation that is simply an array of `float`s can expose `Iterator` as a simple integer index:
+```C#
+struct ArrayFloatContainer : IFloatContainer
+{
+    float content[10];
+    uint getCount() { return 10; }
+    uint begin() { return 0; }
+    uint end() { return 10; }
+    float getElementAt(uint iter) { return content[iter]; }
+}
+```
+On the other hand, an implementation that uses multiple buffers as the backing storage may use a more complex type to locate an element:
+```C#
+// Exposes values in two `StructuredBuffer`s as a single container.
+struct MultiArrayFloatContainer : IFloatContainer
+{
+    StructuredBuffer<float> firstBuffer;
+    StructuredBuffer<float> secondBuffer;
+    uint getCount() { return getBufferSize(firstBuffer) + getBufferSize(secondBuffer); }
+
+    // `uint2.x` indicates which buffer, `uint2.y` indicates the index within the buffer.
+    uint2 begin() { return uint2(0,0); }
+    uint2 end() { return uint2 (1, getBufferSize(secondBuffer)); }
+    float getElementAt(uint2 iter)
+    {
+        if (iter.x == 0) return firstBuffer[iter.y];
+        else return secondBuffer[iter.y];
+    }
+}
+```
+
+Ideally, a generic function that wishes to enumerate values in a `IFloatContainer` shouldn't need to care about the implementation details on what the concrete type of `Iterator` is, and we would like to be able to write the following:
+```C#
+float sum<T:IFloatContainer>(T container)
+{
+    float result = 0.0f;
+    for (T.Iterator iter = container.begin(); iter != container.end(); iter=iter.next())
+    {
+        float val = container.getElementAt(iter);
+        result += val;
+    }
+    return result;
+}
+```
+Here the `sum` function simply wants to access all the elements and sum them up. The details of what the `Iterator` type actually is does not matter to the definition of `sum`.
+
+The problem is that the `IFloatContainer` interface definition requires methods like `begin()`, `end()` and `getElementAt()` to refer to a iterator type that is implementation dependent. How should the signature of these methods be defined in the interface? The answer is to use _associated types_.
+
+In addition to constructs listed in the previous section, Slang also supports defining associated types in an `interface` definition. An associated type can be defined as following.
+```C#
+// The interface for an iterator type.
+interface IIterator
+{
+    // An iterator needs to know how to move to the next element.
+    This next();
+}
+
+interface IFloatContainer
+{
+    // Requires an implementation to define a typed named `Iterator` that
+    // conforms to the `IIterator` interface.
+    associatedtype Iterator : IIterator;
+
+    // Returns the number of elements in this container.
+    uint getCount();
+    // Returns an iterator representing the start of the container.
+    Iterator begin();
+    // Returns an iterator representing the end of the container.
+    Iterator end();
+    // Return the element at the location represented by `iter`.
+    float getElementAt(Iterator iter);
+};
+```
+
+This `associatedtype` definition in `IFloatContainer` requires that all types conforming to this interface must also define a type in its scope named `Iterator`, and this iterator type must conform to the `IIterator` interface. An implementation to the `IFloatContainer` interface by using either a `typedef` declaration or a `struct` definition inside its scope to satisfy the associated type requirement. For example, the `ArrayFloatContainer` can be implemented as following:
+```C#
+struct ArrayIterator : IIterator
+{
+    uint index;
+    __init(int x) { index = x; }
+    ArrayIterator next()
+    {
+        return ArrayIterator(index + 1);
+    }
+}
+struct ArrayFloatContainer : IFloatContainer
+{
+    float content[10];
+
+    // Specify that the associated `Iterator` type is `ArrayIterator`.
+    typedef ArrayIterator Iterator;
+
+    Iterator getCount() { return 10; }
+    Iterator begin() { return ArrayIterator(0); }
+    Iterator end() { return ArrayIterator(10); }
+    float getElementAt(Iterator iter) { return content[iter.index]; }
+}
+```
+
+Alternatively, you may also define the `Iterator` type directly inside a `struct` implementation, as in the following definition for `MultiArrayFloatContainer`:
+```C#
+// Exposes values in two `StructuredBuffer`s as a single container.
+struct MultiArrayFloatContainer : IFloatContainer
+{
+    // Represents an iterator of this container
+    struct Iterator : IIterator
+    {
+        // `index.x` indicates which buffer the element is located in.
+        // `index.y` indicates which the index of the element inside the buffer.
+        uint2 index;
+
+        // We also need to keep a size of the first buffer so we know when to
+        // switch to the second buffer.
+        uint firstBufferSize;
+
+        // Implementation of IIterator.next()
+        Iterator next()
+        {
+            Iterator result;
+            result.index.x = index.x;
+            result.index.y = index.y + 1;
+            // If we are at the end of the first buffer,
+            // move to the head of the second buffer
+            if (result.index.x == 0 && result.index.y == firstBufferSize)
+            {
+                result.index = uint2(1, 0);
+            }
+            return result;
+        }
+    }
+
+    StructuredBuffer<float> firstBuffer;
+    StructuredBuffer<float> secondBuffer;
+    uint getCount() { return getBufferSize(firstBuffer) + getBufferSize(secondBuffer); }
+
+    Iterator begin()
+    {
+        Iterator iter;
+        iter.index = uint2(0, 0);
+        iter.firstBufferSize = getBufferSize(firstBuffer);
+        return iter;
+    }
+    Iterator end()
+    {
+        Iterator iter;
+        iter.index = uint2(1, getBufferSize(secondBuffer));
+        iter.firstBufferSize = 0;
+        return iter;
+    }
+    float getElementAt(Iterator iter)
+    {
+        if (ite.indexr.x == 0) return firstBuffer[iter.index.y];
+        else return secondBuffer[iter.index.y];
+    }
+}
+```
+
+In summary, an `asssociatedtype` requirement in an interface is similar to other types of requirements: a method requirement means that an implementation must provide a method matching the interface signature, while an `associatedtype` requirement means that an implementation must provide a type in its scope with the matching name and interface constraint. In general, when defining an interface that is producing and consuming an object whose actual type is implementation-dependent, the type of this object can often be modeled as an associated type in the interface.
+
+### Comparison to the C++ Approach
+Readers who are familiar with C++ could easily relate the `Iterator` example in previous subsection to the implementation of STL. In C++, the `sum` function can be easily written with templates:
+```C++
+template<typename TContainer>
+float sum(const TContainer& container)
+{
+    float result = 0.0f;
+    // Assumes `TContainer` has a type `Iterator` that supports `operator++`.
+    for (TContainer::Iterator iter = container.begin(); iter != container.end(); ++iter)
+    {
+        result += container.getElementAt(iter);
+    }
+    return result;
+}
+```
+
+A C++ programmer can implement `ArrayFloatContainer` as following:
+```C++
+struct ArrayFloatContainer
+{
+    float content[10];
+
+    typedef uint32_t Iterator;
+
+    Iterator getCount() { return 10; }
+    Iterator begin() { return 0; }
+    Iterator end() { return 10; }
+    float getElementAt(Iterator iter) { return content[iter]; }
+};
+```
+Because C++ does not require a template function to define _constraints_ on the templated type, there are no interfaces or inheritances involved in the definition of `ArrayFloatContainer`. However `ArrayFloatContainer` still needs to define what its `Iterator` type is, so the `sum` function can be successfully specialized with an `ArrayFloatContainer`.
+
+Note that the biggest difference between C++ templates and generics is that templates are not type-checked prior to specialization, and therefore the code that consumes a templated type (`TContainer` in this example) can simply assume `container` has a method named `getElementAt`, and the `TContainer` scope provides a type definition for `TContainer::Iterator`. Compiler error only arises when the programming is attempting to specailize the `sum` function with a type that does not meet these assumptions. Contrarily, Slang requires all possible uses of a generic type be declared through an interface. By stating that `TContainer:IContainer` in the generics declaration, the Slang compiler can verify that `container.getElementAt` is calling a valid function. Similarily, the interface also tells the compiler that `TContainer.Iterator` is a valid type and enables the compiler to fully type check the `sum` function without specializing it first.
+
+### Similarity to Swift and Rust
+
+Slang's `associatedtype` shares the same semantic meaning with `associatedtype` in a Swift `protocol` or `type` in a Rust `trait`, except that Slang currently does not support the more general `where` clause in these languages. C# does not have an equivalent to `associatedtype`, and programmers need to resort to generic interfaces to achieve similar goals.
+
+Generic Value Parameters
+==========================
+
+So far we demonstrated generics with _type parameters_. Additionally, Slang also supports generic _value_ parameters.
+The following listing shows an example of generic value parameters.
+```C#
+struct Array<T, let N : int>
+{
+    T arrayContent[N];
+}
+```
+In this example, the `Array` type has a generic type parameter, `T`, that is used as the element type of the `arrayContent` array, and a generic value parameter `N` of integer type.
+
+Note that the builtin `vector<float, N>` type also has an generic value parameter `N`.
+
+> #### Note ####
+> The only type of generic value parameters are integer values. `bool`, `float` and
+> other types cannot be used in a generic value parameter. Computations in a type
+> expression are not supported, for example, `vector<float, 1+1>` is not allowed.
+
