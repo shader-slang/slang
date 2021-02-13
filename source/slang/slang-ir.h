@@ -541,7 +541,7 @@ T* dynamicCast(IRInst* inst)
 template<typename T>
 const T* dynamicCast(const IRInst* inst)
 {
-    if (inst && T::isaImpl(inst->op))
+    if (inst && T::isaImpl(inst->getOp()))
         return static_cast<const T*>(inst);
     return nullptr;
 }
