@@ -79,7 +79,7 @@ IRInst* cloneInstAndOperands(
     UInt operandCount = oldInst->getOperandCount();
     auto newInst = builder->emitIntrinsicInst(
         newType,
-        oldInst->op,
+        oldInst->getOp(),
         operandCount,
         nullptr);
 

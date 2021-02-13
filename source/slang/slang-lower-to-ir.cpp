@@ -5963,7 +5963,7 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
         for (auto constraintDecl : decl->getMembersOfType<GenericTypeConstraintDecl>())
         {
             auto baseType = lowerType(context, constraintDecl->sup.type);
-            SLANG_ASSERT(baseType && baseType->op == kIROp_InterfaceType);
+            SLANG_ASSERT(baseType && baseType->getOp() == kIROp_InterfaceType);
             constraintInterfaces.add((IRInterfaceType*)baseType);
         }
         auto assocType = context->irBuilder->getAssociatedType(
@@ -6039,7 +6039,7 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
             IRInst* requirementVal = ensureDecl(subContext, requirementDecl).val;
             if (requirementVal)
             {
-                switch (requirementVal->op)
+                switch (requirementVal->getOp())
                 {
                 case kIROp_Func:
                 case kIROp_Generic:
@@ -8038,7 +8038,7 @@ struct SpecializedComponentTypeIRGenContext : ComponentTypeVisitor
                     auto irType = lowerSimpleVal(context, specializationArg.val);
                     auto irWitness = lowerSimpleVal(context, specializationArg.witness);
 
-                    if (irType->op != kIROp_DynamicType)
+                    if (irType->getOp() != kIROp_DynamicType)
                         hasConcreteTypeArg = true;
 
                     irSlotArgs.add(irType);

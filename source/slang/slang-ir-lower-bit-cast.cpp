@@ -30,7 +30,7 @@ struct BitCastLoweringContext
 
     void processInst(IRInst* inst)
     {
-        switch (inst->op)
+        switch (inst->getOp())
         {
         case kIROp_BitCast:
             processBitCast(inst);
@@ -70,7 +70,7 @@ struct BitCastLoweringContext
     // Extract an object of `type` from `offset` in `src`.
     IRInst* readObject(IRBuilder& builder, IRInst* src, IRType* type, uint32_t offset)
     {
-        switch (type->op)
+        switch (type->getOp())
         {
         case kIROp_StructType:
             {
@@ -187,7 +187,7 @@ struct BitCastLoweringContext
                         builder.getUInt64Type(),
                         high,
                         builder.getIntValue(builder.getUIntType(), 32)));
-                if (type->op == kIROp_UInt64Type)
+                if (type->getOp() == kIROp_UInt64Type)
                     return combined;
                 return builder.emitBitCast(type, combined);
             }

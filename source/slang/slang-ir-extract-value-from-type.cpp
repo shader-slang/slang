@@ -33,7 +33,7 @@ FindLeafValueResult findLeafValueAtOffset(
         result.offsetInValue = (uint32_t)(offset - layout.size);
         return result;
     }
-    switch (dataType->op)
+    switch (dataType->getOp())
     {
     case kIROp_StructType:
         {
@@ -125,7 +125,7 @@ FindLeafValueResult findLeafValueAtOffset(
             // Note: this code is assuming row major odering.
             auto matrixType = as<IRMatrixType>(dataType);
             auto elementType = matrixType->getElementType();
-            SLANG_RELEASE_ASSERT(matrixType->getColumnCount()->op == kIROp_IntLit);
+            SLANG_RELEASE_ASSERT(matrixType->getColumnCount()->getOp() == kIROp_IntLit);
             auto columnCount = as<IRIntLit>(matrixType->getColumnCount())->value.intVal;
             auto rowType = builder.getVectorType(elementType, matrixType->getColumnCount());
             IRSizeAndAlignment rowLayout;

@@ -909,7 +909,7 @@ ScalarizedVal extractField(
             auto ptrType = as<IRPtrTypeBase>(val.irValue->getDataType());
             auto valType = ptrType->getValueType();
             auto fieldType = getFieldType(valType, fieldKey);
-            auto fieldPtrType = builder->getPtrType(ptrType->op, fieldType);
+            auto fieldPtrType = builder->getPtrType(ptrType->getOp(), fieldType);
             return ScalarizedVal::address(
                 builder->emitFieldAddress(
                     fieldPtrType,
@@ -1314,7 +1314,7 @@ void legalizeEntryPointParameterForGLSL(
     {
         if (!func->findDecoration<IRGeometryInputPrimitiveTypeDecoration>())
         {
-            builder->addDecoration(func, geomDecor->op);
+            builder->addDecoration(func, geomDecor->getOp());
         }
         else
         {
@@ -1336,7 +1336,7 @@ void legalizeEntryPointParameterForGLSL(
             if (auto decor = func->findDecoration<IRStreamOutputTypeDecoration>())
             {
                 // If it has the same stream out type, we *may* be ok (might not work for all types of streams)
-                SLANG_ASSERT(decor->getStreamType()->op == streamType->op);
+                SLANG_ASSERT(decor->getStreamType()->getOp() == streamType->getOp());
             }
             else
             {
@@ -1393,7 +1393,7 @@ void legalizeEntryPointParameterForGLSL(
                 for( auto ii = bb->getFirstInst(); ii; ii = ii->getNextInst() )
                 {
                     // Is it a call?
-                    if(ii->op != kIROp_Call)
+                    if(ii->getOp() != kIROp_Call)
                         continue;
 
                     // Is it calling the append operation?
@@ -1413,7 +1413,7 @@ void legalizeEntryPointParameterForGLSL(
                         // that decorations are added to the generic instead of the
                         // value it returns.
                         //
-                        switch(callee->op)
+                        switch(callee->getOp())
                         {
                         case kIROp_Specialize:
                             {
@@ -1436,7 +1436,7 @@ void legalizeEntryPointParameterForGLSL(
                         }
                         break;
                     }
-                    if(callee->op != kIROp_Func)
+                    if(callee->getOp() != kIROp_Func)
                         continue;
 
                     // HACK: we will identify the operation based
@@ -1558,7 +1558,7 @@ void legalizeEntryPointParameterForGLSL(
             if(!terminatorInst)
                 continue;
 
-            switch( terminatorInst->op )
+            switch( terminatorInst->getOp() )
             {
             default:
                 continue;
@@ -1702,7 +1702,7 @@ void legalizeEntryPointForGLSL(
             // terminator...
             for( auto ii = bb->getFirstInst(); ii; ii = ii->getNextInst() )
             {
-                if(ii->op != kIROp_ReturnVal)
+                if(ii->getOp() != kIROp_ReturnVal)
                     continue;
 
                 IRReturnVal* returnInst = (IRReturnVal*) ii;

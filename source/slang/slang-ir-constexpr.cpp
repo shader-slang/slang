@@ -44,7 +44,7 @@ bool isConstExpr(IRInst* value)
     //
     // TODO: should we just go ahead and make that explicit
     // in the type system?
-    switch(value->op)
+    switch(value->getOp())
     {
     case kIROp_IntLit:
     case kIROp_FloatLit:
@@ -95,7 +95,7 @@ bool opCanBeConstExpr(IRInst* value)
     // callee function is fixed/known, and if it is
     // whether it has been decoared as constant-foldable
 
-    return opCanBeConstExpr(value->op);
+    return opCanBeConstExpr(value->getOp());
 }
 
 void markConstExpr(
@@ -186,7 +186,7 @@ bool maybeMarkConstExpr(
     // (Or eventually we'd have a rule that only non-`public` symbols
     // can have this kind of propagation applied).
 
-    if(value->op == kIROp_Param)
+    if(value->getOp() == kIROp_Param)
     {
         auto param = (IRParam*) value;
         auto block = (IRBlock*) param->parent;
@@ -203,7 +203,7 @@ bool maybeMarkConstExpr(
             {
                 auto user = u->getUser();
 
-                switch( user->op )
+                switch( user->getOp() )
                 {
                 case kIROp_Call:
                     {
@@ -272,7 +272,7 @@ bool propagateConstExprBackward(
                         }
                     }
                 }
-                else if( ii->op == kIROp_Call )
+                else if( ii->getOp() == kIROp_Call )
                 {
                     // A non-constexpr call might be calling a function with one or
                     // more constexpr parameters. We should check if we can resolve
@@ -391,7 +391,7 @@ bool propagateConstExprBackward(
                     for(auto pred : bb->getPredecessors())
                     {
                         auto terminator = pred->getLastInst();
-                        if(terminator->op != kIROp_unconditionalBranch)
+                        if(terminator->getOp() != kIROp_unconditionalBranch)
                             continue;
 
                         UInt operandIndex = paramIndex + 1;
@@ -496,7 +496,7 @@ void propagateConstExpr(
         context.workList.fastRemoveAt(0);
         context.onWorkList.Remove(gv);
 
-        switch( gv->op )
+        switch( gv->getOp() )
         {
         default:
             break;
@@ -532,7 +532,7 @@ void propagateConstExpr(
 
     for(auto ii : module->getGlobalInsts())
     {
-        switch( ii->op )
+        switch( ii->getOp() )
         {
         default:
             break;

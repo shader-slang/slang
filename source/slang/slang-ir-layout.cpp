@@ -79,7 +79,7 @@ static Result _calcNaturalArraySizeAndAlignment(
 
 IRIntegerValue getIntegerValueFromInst(IRInst* inst)
 {
-    SLANG_ASSERT(inst->op == kIROp_IntLit);
+    SLANG_ASSERT(inst->getOp() == kIROp_IntLit);
     return as<IRIntLit>(inst)->value.intVal;
 }
 
@@ -88,7 +88,7 @@ static Result _calcNaturalSizeAndAlignment(
     IRType*             type,
     IRSizeAndAlignment* outSizeAndAlignment)
 {
-    switch( type->op )
+    switch( type->getOp() )
     {
 
 #define CASE(TYPE, SIZE, ALIGNMENT)                                 \
