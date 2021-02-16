@@ -150,7 +150,7 @@ IRInst* getDefaultInitVal(
     IRBuilder*  builder,
     IRType*     type)
 {
-    switch( type->op )
+    switch( type->getOp() )
     {
     default:
         return nullptr;
@@ -181,7 +181,7 @@ void defaultInitializeVar(
     IRType*     type)
 {
     IRInst* initVal = nullptr;
-    switch( type->op )
+    switch( type->getOp() )
     {
     case kIROp_VoidType:
     default:
@@ -217,7 +217,7 @@ static void fixValueScopingForInst(
     // because the emit logic will already create variables for them.
     // We could consider folding the logic to move out of SSA form
     // into this function, but that would add a lot of complexity for now.
-    if(def->op == kIROp_Param)
+    if(def->getOp() == kIROp_Param)
         return;
 
     // We would have a scoping violation if there exists some

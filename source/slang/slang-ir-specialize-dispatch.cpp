@@ -24,7 +24,7 @@ IRFunc* specializeDispatchFunction(SharedGenericsLoweringContext* sharedContext,
     IRReturn* returnInst = nullptr;
     for (auto inst : block->getOrdinaryInsts())
     {
-        switch (inst->op)
+        switch (inst->getOp())
         {
         case kIROp_Call:
             callInst = cast<IRCall>(inst);
@@ -114,7 +114,7 @@ IRFunc* specializeDispatchFunction(SharedGenericsLoweringContext* sharedContext,
         auto callee = sharedContext->findWitnessTableEntry(witnessTable, requirementKey);
         SLANG_ASSERT(callee);
         auto specializedCallInst = builder->emitCallInst(callInst->getFullType(), callee, params);
-        if (callInst->getDataType()->op == kIROp_VoidType)
+        if (callInst->getDataType()->getOp() == kIROp_VoidType)
             builder->emitReturn();
         else
             builder->emitReturn(specializedCallInst);
@@ -163,7 +163,7 @@ void ensureWitnessTableSequentialIDs(SharedGenericsLoweringContext* sharedContex
     auto linkage = sharedContext->targetReq->getLinkage();
     for (auto inst : sharedContext->module->getGlobalInsts())
     {
-        if (inst->op == kIROp_WitnessTable)
+        if (inst->getOp() == kIROp_WitnessTable)
         {
             UnownedStringSlice witnessTableMangledName;
             if (auto instLinkage = inst->findDecoration<IRLinkageDecoration>())

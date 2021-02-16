@@ -420,7 +420,7 @@ struct InliningPassBase
         //
         for( auto inst : firstBlock->getChildren() )
         {
-            switch( inst->op )
+            switch( inst->getOp() )
             {
             default:
                 // The default value is to clone the instruction using

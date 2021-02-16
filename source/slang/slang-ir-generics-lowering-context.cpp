@@ -10,7 +10,7 @@ namespace Slang
     {
         if (as<IRParam>(typeInst) && as<IRTypeType>(typeInst->getDataType()))
             return true;
-        switch (typeInst->op)
+        switch (typeInst->getOp())
         {
         case kIROp_ThisType:
         case kIROp_AssociatedType:
@@ -40,7 +40,7 @@ namespace Slang
     {
         if (typeInst)
         {
-            switch (typeInst->op)
+            switch (typeInst->getOp())
             {
             case kIROp_TypeType:
             case kIROp_TypeKind:
@@ -107,7 +107,7 @@ namespace Slang
 
     IRType* SharedGenericsLoweringContext::lowerAssociatedType(IRBuilder* builder, IRInst* type)
     {
-        if (type->op != kIROp_AssociatedType)
+        if (type->getOp() != kIROp_AssociatedType)
             return (IRType*)type;
         IRIntegerValue anyValueSize = kInvalidAnyValueSize;
         for (UInt i = 0; i < type->getOperandCount(); i++)
@@ -144,7 +144,7 @@ namespace Slang
             return builder->getRTTIHandleType();
         }
 
-        switch (paramType->op)
+        switch (paramType->getOp())
         {
         case kIROp_WitnessTableType:
         case kIROp_WitnessTableIDType:
@@ -295,7 +295,7 @@ namespace Slang
             auto reqVal = findInterfaceRequirementVal(
                 interfaceType,
                 lookupInterface->getRequirementKey());
-            SLANG_ASSERT(reqVal && reqVal->op == kIROp_AssociatedType);
+            SLANG_ASSERT(reqVal && reqVal->getOp() == kIROp_AssociatedType);
             return lowerType(builder, reqVal, typeMapping, nullptr);
         }
         case kIROp_BoundInterfaceType:
@@ -322,7 +322,7 @@ namespace Slang
                     translated = true;
             }
             if (translated)
-                return builder->getType(paramType->op, loweredOperands.getCount(), loweredOperands.getBuffer());
+                return builder->getType(paramType->getOp(), loweredOperands.getCount(), loweredOperands.getBuffer());
             return (IRType*)paramType;
         }
         }
@@ -333,7 +333,7 @@ namespace Slang
         List<IRWitnessTable*> witnessTables;
         for (auto globalInst : module->getGlobalInsts())
         {
-            if (globalInst->op == kIROp_WitnessTable &&
+            if (globalInst->getOp() == kIROp_WitnessTable &&
                 cast<IRWitnessTableType>(globalInst->getDataType())->getConformanceType() ==
                     interfaceType)
             {

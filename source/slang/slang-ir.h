@@ -312,7 +312,9 @@ public:
 struct IRInst
 {
     // The operation that this value represents
-    IROp op;
+    IROp m_op;
+
+    IROp getOp() const { return m_op; }
 
     // The total number of operands of this instruction.
     //
@@ -531,7 +533,7 @@ struct IRInst
 template<typename T>
 T* dynamicCast(IRInst* inst)
 {
-    if (inst && T::isaImpl(inst->op))
+    if (inst && T::isaImpl(inst->getOp()))
         return static_cast<T*>(inst);
     return nullptr;
 }
@@ -539,7 +541,7 @@ T* dynamicCast(IRInst* inst)
 template<typename T>
 const T* dynamicCast(const IRInst* inst)
 {
-    if (inst && T::isaImpl(inst->op))
+    if (inst && T::isaImpl(inst->getOp()))
         return static_cast<const T*>(inst);
     return nullptr;
 }
@@ -609,7 +611,7 @@ IRType* unwrapArray(IRType* type);
 
 struct IRBasicType : IRType
 {
-    BaseType getBaseType() { return BaseType(op - kIROp_FirstBasicType); }
+    BaseType getBaseType() { return BaseType(getOp() - kIROp_FirstBasicType); }
 
     IR_PARENT_ISA(BasicType)
 };
@@ -930,7 +932,7 @@ struct IRResourceTypeBase : IRType
 {
     TextureFlavor getFlavor() const
     {
-        return TextureFlavor((op >> kIROpMeta_OtherShift) & 0xFFFF);
+        return TextureFlavor((getOp() >> kIROpMeta_OtherShift) & 0xFFFF);
     }
 
     TextureFlavor::Shape GetBaseShape() const

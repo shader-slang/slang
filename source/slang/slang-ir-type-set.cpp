@@ -77,7 +77,7 @@ IRInst* IRTypeSet::cloneInst(IRInst* inst)
         return inst;
     }
 
-    if (isNominalOp(inst->op))
+    if (isNominalOp(inst->getOp()))
     {
         // We can clone without any definition, and add the linkage
 
@@ -100,7 +100,7 @@ IRInst* IRTypeSet::cloneInst(IRInst* inst)
     // it's no use
 
     IRInst* clone = nullptr;
-    switch (inst->op)
+    switch (inst->getOp())
     {
         case kIROp_IntLit:
         {
@@ -143,9 +143,9 @@ IRInst* IRTypeSet::cloneInst(IRInst* inst)
 
     if (!clone)
     {
-        if (IRBasicType::isaImpl(inst->op))
+        if (IRBasicType::isaImpl(inst->getOp()))
         {
-            clone = m_builder.getType(inst->op);
+            clone = m_builder.getType(inst->getOp());
         }
         else
         {
@@ -168,7 +168,7 @@ IRInst* IRTypeSet::cloneInst(IRInst* inst)
                 UInt operandCounts[1] = { UInt(operandCount) };
                 IRInst*const* listOperands[1] = { cloneOperands.getBuffer() };
 
-                clone = m_builder.findOrAddInst(clonedType, inst->op, 1, operandCounts, listOperands);
+                clone = m_builder.findOrAddInst(clonedType, inst->getOp(), 1, operandCounts, listOperands);
             }
             else
             {
@@ -176,7 +176,7 @@ IRInst* IRTypeSet::cloneInst(IRInst* inst)
                 auto clonedType = cloneType(inst->getFullType());
 
                 Index operandCount = Index(inst->getOperandCount());
-                clone = m_builder.emitIntrinsicInst(clonedType, inst->op, operandCount, nullptr);
+                clone = m_builder.emitIntrinsicInst(clonedType, inst->getOp(), operandCount, nullptr);
                 for (Index i = 0; i < operandCount; ++i)
                 {
                     auto cloneOperand = cloneInst(inst->getOperand(i));
@@ -278,7 +278,7 @@ static bool _hasNominalOperand(IRInst* inst)
     for (Index i = 0; i < operandCount; ++i)
     {
         IRInst* operand = operands[i].get();
-        if (isNominalOp(operand->op))
+        if (isNominalOp(operand->getOp()))
         {
             return true;
         }

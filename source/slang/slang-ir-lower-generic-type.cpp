@@ -38,7 +38,7 @@ namespace Slang
             if (newType != inst->getFullType())
                 inst->setFullType((IRType*)newType);
 
-            switch (inst->op)
+            switch (inst->getOp())
             {
             default:
                 break;

@@ -602,7 +602,7 @@ void GLSLSourceEmitter::_emitGLSLLayoutQualifiers(IRVarLayout* layout, EmitVarCh
 
 void GLSLSourceEmitter::_emitGLSLTextureOrTextureSamplerType(IRTextureTypeBase*  type, char const* baseName)
 {
-    if (type->getElementType()->op == kIROp_HalfType)
+    if (type->getElementType()->getOp() == kIROp_HalfType)
     {
         // Texture access is always as float types if half is specified
 
@@ -637,7 +637,7 @@ void GLSLSourceEmitter::_emitGLSLTextureOrTextureSamplerType(IRTextureTypeBase* 
 
 void GLSLSourceEmitter::_emitGLSLTypePrefix(IRType* type, bool promoteHalfToFloat)
 {
-    switch (type->op)
+    switch (type->getOp())
     {
         case kIROp_FloatType:
             // no prefix
@@ -708,7 +708,7 @@ void GLSLSourceEmitter::_maybeEmitGLSLFlatModifier(IRType* valueType)
     if (auto vecType = as<IRMatrixType>(tt))
         tt = vecType->getElementType();
 
-    switch (tt->op)
+    switch (tt->getOp())
     {
         default:
             break;
@@ -738,7 +738,7 @@ void GLSLSourceEmitter::emitLoopControlDecorationImpl(IRLoopControlDecoration* d
 
 void GLSLSourceEmitter::emitSimpleValueImpl(IRInst* inst) 
 {
-    switch (inst->op)
+    switch (inst->getOp())
     {
         case kIROp_IntLit:
         {
@@ -873,7 +873,7 @@ void GLSLSourceEmitter::emitEntryPointAttributesImpl(IRFunc* irFunc, IREntryPoin
             // The actual parameters have become potentially multiple global parameters.
             if (auto decor = irFunc->findDecoration<IRGeometryInputPrimitiveTypeDecoration>())
             {
-                switch (decor->op)
+                switch (decor->getOp())
                 {
                     case kIROp_TriangleInputPrimitiveTypeDecoration:       m_writer->emit("layout(triangles) in;\n"); break;
                     case kIROp_LineInputPrimitiveTypeDecoration:           m_writer->emit("layout(lines) in;\n"); break;
@@ -891,7 +891,7 @@ void GLSLSourceEmitter::emitEntryPointAttributesImpl(IRFunc* irFunc, IREntryPoin
             {
                 IRType* type = decor->getStreamType();
 
-                switch (type->op)
+                switch (type->getOp())
                 {
                     case kIROp_HLSLPointStreamType:     m_writer->emit("layout(points) out;\n"); break;
                     case kIROp_HLSLLineStreamType:      m_writer->emit("layout(line_strip) out;\n"); break;
@@ -1232,7 +1232,7 @@ bool GLSLSourceEmitter::_tryEmitBitBinOp(IRInst* inst, const EmitOpInfo& bitOp, 
 
 bool GLSLSourceEmitter::tryEmitInstExprImpl(IRInst* inst, const EmitOpInfo& inOuterPrec)
 {
-    switch (inst->op)
+    switch (inst->getOp())
     {
         case kIROp_constructVectorFromScalar:
         {
@@ -1273,7 +1273,7 @@ bool GLSLSourceEmitter::tryEmitInstExprImpl(IRInst* inst, const EmitOpInfo& inOu
         }
         case kIROp_Select:
         {
-            if (inst->getOperand(0)->getDataType()->op != kIROp_BoolType)
+            if (inst->getOperand(0)->getDataType()->getOp() != kIROp_BoolType)
             {
                 // For GLSL, emit a call to `mix` if condition is a vector
                 m_writer->emit("mix(");
@@ -1376,7 +1376,7 @@ bool GLSLSourceEmitter::tryEmitInstExprImpl(IRInst* inst, const EmitOpInfo& inOu
             // If either side is a vector handle as a vector
             if (leftVectorType || rightVectorType)
             {
-                const char* funcName = _getGLSLVectorCompareFunctionName(inst->op);
+                const char* funcName = _getGLSLVectorCompareFunctionName(inst->getOp());
                 SLANG_ASSERT(funcName);
 
                 // Determine the vector type
@@ -1503,7 +1503,7 @@ void GLSLSourceEmitter::handleRequiredCapabilitiesImpl(IRInst* inst)
 
     for (auto decoration : inst->getDecorations())
     {
-        switch (decoration->op)
+        switch (decoration->getOp())
         {
             default:
                 break;
@@ -1625,18 +1625,18 @@ void GLSLSourceEmitter::emitVectorTypeNameImpl(IRType* elementType, IRIntegerVal
 
 void GLSLSourceEmitter::emitSimpleTypeImpl(IRType* type)
 {
-    switch (type->op)
+    switch (type->getOp())
     {
         case kIROp_Int64Type:
         {
             _requireBaseType(BaseType::Int64);
-            m_writer->emit(getDefaultBuiltinTypeName(type->op));
+            m_writer->emit(getDefaultBuiltinTypeName(type->getOp()));
             return;
         }
         case kIROp_UInt64Type:
         {
             _requireBaseType(BaseType::UInt64);
-            m_writer->emit(getDefaultBuiltinTypeName(type->op));
+            m_writer->emit(getDefaultBuiltinTypeName(type->getOp()));
             return;
         }
         case kIROp_VoidType:
@@ -1651,7 +1651,7 @@ void GLSLSourceEmitter::emitSimpleTypeImpl(IRType* type)
         case kIROp_DoubleType:
         {
             _requireBaseType(cast<IRBasicType>(type)->getBaseType());
-            m_writer->emit(getDefaultBuiltinTypeName(type->op));
+            m_writer->emit(getDefaultBuiltinTypeName(type->getOp()));
             return;
         }
         case kIROp_HalfType:
@@ -1687,7 +1687,7 @@ void GLSLSourceEmitter::emitSimpleTypeImpl(IRType* type)
         case kIROp_SamplerComparisonStateType:
         {
             auto samplerStateType = cast<IRSamplerStateTypeBase>(type);
-            switch (samplerStateType->op)
+            switch (samplerStateType->getOp())
             {
                 case kIROp_SamplerStateType:			m_writer->emit("sampler");		break;
                 case kIROp_SamplerComparisonStateType:	m_writer->emit("samplerShadow");	break;
@@ -1743,7 +1743,7 @@ void GLSLSourceEmitter::emitSimpleTypeImpl(IRType* type)
     }
     else if (auto untypedBufferType = as<IRUntypedBufferResourceType>(type))
     {
-        switch (untypedBufferType->op)
+        switch (untypedBufferType->getOp())
         {
             case kIROp_RaytracingAccelerationStructureType:
             {
@@ -1808,7 +1808,7 @@ void GLSLSourceEmitter::emitInterpolationModifiersImpl(IRInst* varInst, IRType* 
 
     for (auto dd : varInst->getDecorations())
     {
-        if (dd->op != kIROp_InterpolationModeDecoration)
+        if (dd->getOp() != kIROp_InterpolationModeDecoration)
             continue;
 
         auto decoration = (IRInterpolationModeDecoration*)dd;

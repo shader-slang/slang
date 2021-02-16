@@ -187,7 +187,7 @@ struct SCCPContext
         // Instructions that represent constant values should always
         // have a lattice value that reflects this.
         //
-        switch( inst->op )
+        switch( inst->getOp() )
         {
         case kIROp_IntLit:
         case kIROp_FloatLit:
@@ -237,7 +237,7 @@ struct SCCPContext
 
         // Certain instruction always produce constants, and we
         // want to special-case them here.
-        switch( inst->op )
+        switch( inst->getOp() )
         {
         case kIROp_IntLit:
         case kIROp_FloatLit:

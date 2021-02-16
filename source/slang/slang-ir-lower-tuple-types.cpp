@@ -42,7 +42,7 @@ namespace Slang
 
             if (!type)
                 return nullptr;
-            if (type->op != kIROp_TupleType)
+            if (type->getOp() != kIROp_TupleType)
                 return nullptr;
 
             RefPtr<LoweredTupleInfo> info = new LoweredTupleInfo();
@@ -123,7 +123,7 @@ namespace Slang
 
         void processInst(IRInst* inst)
         {
-            switch (inst->op)
+            switch (inst->getOp())
             {
             case kIROp_MakeTuple:
                 processMakeTuple((IRMakeTuple*)inst);
