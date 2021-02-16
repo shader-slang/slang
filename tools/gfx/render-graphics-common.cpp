@@ -153,6 +153,7 @@ public:
                     switch (slangBindingType)
                     {
                     case slang::BindingType::ExistentialValue:
+                    case slang::BindingType::InlineUniformData:
                         continue;
                     default:
                         break;
@@ -172,7 +173,6 @@ public:
                         auto category = typeLayout->getDescriptorSetDescriptorRangeCategory(s, r);
                         descriptorRangeDesc.binding += varLayout->getOffset(category);
                     }
-
                     descriptorSetInfo->slotRangeDescs.add(descriptorRangeDesc);
                 }
             }
