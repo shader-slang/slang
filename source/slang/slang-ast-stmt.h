@@ -28,6 +28,8 @@ class BlockStmt : public ScopeStmt
 {
     SLANG_AST_CLASS(BlockStmt)
 
+    SourceLoc closingSourceLoc;         ///< The source location of the closing brace
+
     Stmt* body = nullptr;
 };
 

@@ -7017,7 +7017,16 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
                 {
                     // `void`-returning function can get an implicit
                     // return on exit of the body statement.
-                    subContext->irBuilder->emitReturn();
+                    IRInst* returnInst = subContext->irBuilder->emitReturn();
+
+                    if (BlockStmt* blockStmt = as<BlockStmt>(decl->body))
+                    {
+                        returnInst->sourceLoc = blockStmt->closingSourceLoc;
+                    }
+                    else
+                    {
+                        returnInst->sourceLoc = SourceLoc();
+                    }
                 }
                 else
                 {
