@@ -5127,9 +5127,9 @@ namespace Slang
         writer->flush();
     }
 
-    void dumpIR(IRModule* module, const IRDumpOptions& options, ISlangWriter* slangWriter, char const* label)
+    void dumpIR(IRModule* module, const IRDumpOptions& options, char const* label, ISlangWriter* inWriter)
     {
-        WriterHelper writer(slangWriter);
+        WriterHelper writer(inWriter);
 
         if (label)
         {
@@ -5138,7 +5138,7 @@ namespace Slang
             writer.put(":\n");
         }
 
-        dumpIR(module, options, slangWriter);
+        dumpIR(module, options, inWriter);
 
         if (label)
         {

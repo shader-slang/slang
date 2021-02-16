@@ -1524,7 +1524,7 @@ String getSlangIRAssembly(IRModule* module, const IRDumpOptions& options);
 
 void dumpIR(IRModule* module, const IRDumpOptions& options, ISlangWriter* writer);
 void dumpIR(IRInst* globalVal, const IRDumpOptions& options, ISlangWriter* writer);
-void dumpIR(IRModule* module, const IRDumpOptions& options, ISlangWriter* slangWriter, char const* label);
+void dumpIR(IRModule* module, const IRDumpOptions& options, char const* label, ISlangWriter* writer);
 
 IRInst* createEmptyInst(
     IRModule*   module,

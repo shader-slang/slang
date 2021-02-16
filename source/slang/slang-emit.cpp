@@ -140,7 +140,7 @@ static void dumpIRIfEnabled(
         IRDumpOptions options;
         options.sourceManager = compileRequest->getSourceManager();
 
-        dumpIR(irModule, options, &writer, label);
+        dumpIR(irModule, options, label, &writer);
     }
 }
 

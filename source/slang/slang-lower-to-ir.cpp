@@ -7951,7 +7951,7 @@ IRModule* generateIRForTranslationUnit(
         IRDumpOptions options;
         options.sourceManager = compileRequest->getSourceManager();
 
-        dumpIR(module, options, &writer, "LOWER-TO-IR");
+        dumpIR(module, options, "LOWER-TO-IR", &writer);
     }
 
     return module;
