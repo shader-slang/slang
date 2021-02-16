@@ -251,8 +251,6 @@ void SourceWriter::emit(double value)
     emit(stream.str().c_str());
 }
 
-#if 1
-
 void SourceWriter::advanceToSourceLocationIfValid(const SourceLoc& sourceLocation)
 {
     if (sourceLocation.isValid())
@@ -294,24 +292,6 @@ void SourceWriter::advanceToSourceLocation(const SourceLoc& sourceLocation)
     // Either way set this as the current source location.
     m_nextSourceLoc = sourceLocation;
 }
-
-#else
-void SourceWriter::advanceToSourceLocation(const SourceLoc& sourceLocation)
-{
-    advanceToSourceLocation(getSourceManager()->getHumaneLoc(sourceLocation));
-}
-
-void SourceWriter::advanceToSourceLocation(const HumaneSourceLoc& sourceLocation)
-{
-    // Skip invalid locations
-    if (sourceLocation.line <= 0)
-        return;
-
-    m_needToUpdateSourceLocation = true;
-    m_nextHumaneSourceLocation = sourceLocation;
-}
-
-#endif
 
 void SourceWriter::_flushSourceLocationChange()
 {
