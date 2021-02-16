@@ -178,7 +178,7 @@ struct DesugarUnionTypesContext
     //
     void processInst(IRInst* inst)
     {
-        switch( inst->op )
+        switch( inst->getOp() )
         {
         default:
             // Any instruction not listed below either doesn't involve union types,

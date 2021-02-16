@@ -38,7 +38,7 @@ namespace Slang
                 rttiObject = builder->emitGetAddress(rttiType, rttiObject);
             }
             IRInst* packedValue = value;
-            if (valueType->op != kIROp_AnyValueType)
+            if (valueType->getOp() != kIROp_AnyValueType)
                 packedValue = builder->emitPackAnyValue(anyValueType, value);
             IRInst* tupleArgs[] = {rttiObject, inst->getWitnessTable(), packedValue};
             auto tuple = builder->emitMakeTuple(tupleType, 3, tupleArgs);

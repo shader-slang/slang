@@ -37,7 +37,7 @@ namespace Slang
             for (auto use = rtti.Value->firstUse; use; use = nextUse)
             {
                 nextUse = use->nextUse;
-                if (use->getUser()->op == kIROp_getAddr)
+                if (use->getUser()->getOp() == kIROp_getAddr)
                 {
                     use->getUser()->replaceUsesWith(idOperand);
                 }
@@ -51,7 +51,7 @@ namespace Slang
         List<IRInst*> instsToRemove;
         for (auto inst : sharedContext->module->getGlobalInsts())
         {
-            switch (inst->op)
+            switch (inst->getOp())
             {
             case kIROp_WitnessTableIDType:
             case kIROp_RTTIHandleType:
@@ -81,7 +81,7 @@ namespace Slang
         List<IRInst*> interfaceInsts;
         for (auto inst : sharedContext->module->getGlobalInsts())
         {
-            if (inst->op == kIROp_InterfaceType)
+            if (inst->getOp() == kIROp_InterfaceType)
             {
                 interfaceInsts.add(inst);
             }

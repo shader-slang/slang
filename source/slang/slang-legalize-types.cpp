@@ -876,7 +876,7 @@ static LegalType createLegalUniformBufferType(
 {
     return createLegalUniformBufferType(
         context,
-        uniformBufferType->op,
+        uniformBufferType->getOp(),
         legalElementType);
 }
 
@@ -990,7 +990,7 @@ struct ArrayLegalTypeWrapper : LegalTypeWrapper
     LegalType wrap(TypeLegalizationContext* context, IRType* type)
     {
         return LegalType::simple(context->getBuilder()->getArrayTypeBase(
-            arrayType->op,
+            arrayType->getOp(),
             type,
             arrayType->getElementCount()));
     }
@@ -1151,7 +1151,7 @@ LegalType legalizeTypeImpl(
             // be handled by the pass-specific logic in the context.
             //
             return context->createLegalUniformBufferType(
-                uniformBufferType->op,
+                uniformBufferType->getOp(),
                 legalElementType);
         }
 
@@ -1225,7 +1225,7 @@ LegalType legalizeTypeImpl(
         if (legalValueType.flavor == LegalType::Flavor::simple &&
             legalValueType.getSimple() == ptrType->getValueType())
             return LegalType::simple(ptrType);
-        return createLegalPtrType(context, ptrType->op, legalValueType);
+        return createLegalPtrType(context, ptrType->getOp(), legalValueType);
     }
     else if(auto structType = as<IRStructType>(type))
     {

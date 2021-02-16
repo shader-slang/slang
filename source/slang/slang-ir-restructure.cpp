@@ -241,7 +241,7 @@ namespace Slang
             //
             auto terminator = block->getTerminator();
             SLANG_ASSERT(terminator != nullptr);
-            switch (terminator->op)
+            switch (terminator->getOp())
             {
             default:
             case kIROp_conditionalBranch:
