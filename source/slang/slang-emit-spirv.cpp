@@ -788,7 +788,7 @@ struct SPIRVEmitContext
         ///
     SpvInst* emitGlobalInst(IRInst* inst)
     {
-        switch( inst->op )
+        switch( inst->getOp() )
         {
         // [3.32.6: Type-Declaration Instructions]
         //
@@ -1036,7 +1036,7 @@ struct SPIRVEmitContext
         /// Emit an instruction that is local to the body of the given `parent`.
     SpvInst* emitLocalInst(SpvInstParent* parent, IRInst* inst)
     {
-        switch( inst->op )
+        switch( inst->getOp() )
         {
         default:
             SLANG_UNIMPLEMENTED_X("unhandled instruction opcode");
@@ -1087,7 +1087,7 @@ struct SPIRVEmitContext
         // this code path is a catch-all for stuff that only needs to
         // be emitted if the owning instruction gets emitted.
 
-        switch( decoration->op )
+        switch( decoration->getOp() )
         {
         default:
             break;

@@ -39,7 +39,7 @@ struct IntroduceExplicitGlobalContextPass
         //
         for( auto inst : m_module->getGlobalInsts() )
         {
-            switch( inst->op )
+            switch( inst->getOp() )
             {
             case kIROp_GlobalVar:
                 {

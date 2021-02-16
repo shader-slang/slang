@@ -122,7 +122,7 @@ namespace Slang
             auto callee = builder->emitLookupInterfaceMethodInst(
                 reqFuncType, witnessTableParam, requirementKey);
             auto call = (IRCall*)builder->emitCallInst(reqFuncType->getResultType(), callee, params);
-            if (call->getDataType()->op == kIROp_VoidType)
+            if (call->getDataType()->getOp() == kIROp_VoidType)
                 builder->emitReturn();
             else
                 builder->emitReturn(call);
@@ -195,14 +195,14 @@ namespace Slang
                             builder->getRTTIHandleType(),
                             rttiObject);
                     }
-                    else if (arg->op == kIROp_Specialize)
+                    else if (arg->getOp() == kIROp_Specialize)
                     {
                         // The type argument used to specialize a callee is itself a
                         // specialization of some generic type.
                         // TODO: generate RTTI object for specializations of generic types.
                         SLANG_UNIMPLEMENTED_X("RTTI object generation for generic types");
                     }
-                    else if (arg->op == kIROp_RTTIObject)
+                    else if (arg->getOp() == kIROp_RTTIObject)
                     {
                         // We are inside a generic function and using a generic parameter
                         // to specialize another callee. The generic parameter of the caller
@@ -247,17 +247,17 @@ namespace Slang
             // All callees should have already been lowered in lower-generic-functions pass.
             // For intrinsic generic functions, they are left as is, and we also need to ignore
             // them here.
-            if (loweredFunc->op == kIROp_Generic)
+            if (loweredFunc->getOp() == kIROp_Generic)
             {
                 return;
             }
-            else if (loweredFunc->op == kIROp_Specialize)
+            else if (loweredFunc->getOp() == kIROp_Specialize)
             {
                 // All nested generic functions are supposed to be flattend before this pass.
                 // If they are not, they represent an intrinsic function that should not be
                 // modified in this pass.
                 auto innerMostFunc = findInnerMostSpecializingBase(static_cast<IRSpecialize*>(loweredFunc));
-                if (innerMostFunc && innerMostFunc->op == kIROp_Generic)
+                if (innerMostFunc && innerMostFunc->getOp() == kIROp_Generic)
                 {
                     innerMostFunc =
                         findInnerMostGenericReturnVal(static_cast<IRGeneric*>(innerMostFunc));
@@ -266,7 +266,7 @@ namespace Slang
                     return;
                 SLANG_UNEXPECTED("Nested generics specialization.");
             }
-            else if (loweredFunc->op == kIROp_lookup_interface_method)
+            else if (loweredFunc->getOp() == kIROp_lookup_interface_method)
             {
                 lowerCallToInterfaceMethod(
                     callInst, cast<IRLookupWitnessMethod>(loweredFunc), specializeInst);

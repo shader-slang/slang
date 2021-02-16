@@ -211,7 +211,7 @@ struct FunctionParameterSpecializationContext
             // of the indexing operation is also
             // suitable for specialization.
             //
-            if( arg->op == kIROp_getElement || arg->op == kIROp_Load )
+            if( arg->getOp() == kIROp_getElement || arg->getOp() == kIROp_Load )
             {
                 auto base = arg->getOperand(0);
 
@@ -493,7 +493,7 @@ struct FunctionParameterSpecializationContext
             //
             ioInfo.key.vals.add(oldGlobalParam);
         }
-        else if( oldArg->op == kIROp_getElement )
+        else if( oldArg->getOp() == kIROp_getElement )
         {
             // This is the case where the `oldArg` is
             // in the form `oldBase[oldIndex]`
@@ -519,7 +519,7 @@ struct FunctionParameterSpecializationContext
             //
             ioInfo.newArgs.add(oldIndex);
         }
-        else if (oldArg->op == kIROp_Load)
+        else if (oldArg->getOp() == kIROp_Load)
         {
             auto oldBase = oldArg->getOperand(0);
             getCallInfoForArg(ioInfo, oldBase);
@@ -614,7 +614,7 @@ struct FunctionParameterSpecializationContext
             //
             return globalParam;
         }
-        else if( oldArg->op == kIROp_getElement )
+        else if( oldArg->getOp() == kIROp_getElement )
         {
             // This is the case where the argument is
             // in the form `oldBase[oldIndex]`.
@@ -677,7 +677,7 @@ struct FunctionParameterSpecializationContext
 
             return newVal;
         }
-        else if (oldArg->op == kIROp_Load)
+        else if (oldArg->getOp() == kIROp_Load)
         {
             return getSpecializedValueForArg(ioInfo, oldArg->getOperand(0));
         }

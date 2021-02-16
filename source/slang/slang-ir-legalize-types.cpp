@@ -1205,7 +1205,7 @@ static LegalVal legalizeInst(
     LegalType                   type,
     LegalVal const*             args)
 {
-    switch (inst->op)
+    switch (inst->getOp())
     {
     case kIROp_Load:
         return legalizeLoad(context, args[0]);
@@ -1381,7 +1381,7 @@ static LegalVal legalizeInst(
     context->builder->setInsertBefore(inst);
 
     // Special-case certain operations
-    switch (inst->op)
+    switch (inst->getOp())
     {
     case kIROp_Var:
         return legalizeLocalVar(context, cast<IRVar>(inst));
@@ -1649,7 +1649,7 @@ static LegalVal declareSimpleVar(
         {
             for( auto decoration : leafVar->getDecorations() )
             {
-                switch( decoration->op )
+                switch( decoration->getOp() )
                 {
                 case kIROp_FormatDecoration:
                     cloneDecoration(decoration, irVar);
@@ -2557,7 +2557,7 @@ struct IRTypeLegalizationPass
         // as having already been processed, since there is no particular
         // need for us to handle them as part of legalization.
         //
-        if(inst->op == kIROp_InterfaceRequirementEntry) return true;
+        if(inst->getOp() == kIROp_InterfaceRequirementEntry) return true;
 
         return addedToWorkListSet.Contains(inst);
     }
@@ -2629,7 +2629,7 @@ struct IRTypeLegalizationPass
         // would not be a valid location at which to
         // store their replacements.
         //
-        if(!inst->getParent() && inst->op != kIROp_Module)
+        if(!inst->getParent() && inst->getOp() != kIROp_Module)
             return;
 
         // The main logic for legalizing an instruction is defined

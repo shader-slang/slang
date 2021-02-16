@@ -53,7 +53,7 @@ struct ByteAddressBufferLegalizationContext
     //
     void processInstRec(IRInst* inst)
     {
-        switch( inst->op )
+        switch( inst->getOp() )
         {
         case kIROp_ByteAddressBufferLoad:
             processLoad(inst);
@@ -592,7 +592,7 @@ struct ByteAddressBufferLegalizationContext
     }
     IRBasicType* getSameSizeUIntType(IRType* type)
     {
-        auto unsignedBaseType = getSameSizeUIntBaseType(type->op);
+        auto unsignedBaseType = getSameSizeUIntBaseType(type->getOp());
         if(unsignedBaseType == BaseType::Void)
             return nullptr;
 
@@ -623,7 +623,7 @@ struct ByteAddressBufferLegalizationContext
             return getEquivalentStructuredBufferParam(elementType, byteAddressBufferParam);
         }
 
-        if( byteAddressBuffer->op == kIROp_getElement )
+        if( byteAddressBuffer->getOp() == kIROp_getElement )
         {
             // If the code is fetching the byte-address buffer from an
             // array, then we need to create an "equivalent" structured
@@ -727,7 +727,7 @@ struct ByteAddressBufferLegalizationContext
         // a structure buffer that is equivalent to `byteAddressBufferType`,
         // but with the given `elementType`.
 
-        switch( byteAddressBufferType->op )
+        switch( byteAddressBufferType->getOp() )
         {
             // The basic `*ByteAddressBuffer` types map directly to the `*StructuredBuffer<elementType>` cases.
         case kIROp_HLSLByteAddressBufferType:                   return m_builder.getType(kIROp_HLSLStructuredBufferType, elementType);
@@ -743,7 +743,7 @@ struct ByteAddressBufferLegalizationContext
                 //
                 auto arrayType = cast<IRArrayTypeBase>(byteAddressBufferType);
                 return m_builder.getArrayTypeBase(
-                    byteAddressBufferType->op,
+                    byteAddressBufferType->getOp(),
                     getEquivalentStructuredBufferParamType(elementType, arrayType->getElementType()),
                     arrayType->getElementCount());
             }
