@@ -1039,8 +1039,6 @@ struct GraphicsPipelineStateDesc
     IPipelineLayout* pipelineLayout = nullptr;
 
     IInputLayout*        inputLayout;
-    UInt                framebufferWidth;
-    UInt                framebufferHeight;
     UInt                renderTargetCount = 0; // Only used if `pipelineLayout` is non-null
     DepthStencilDesc    depthStencil;
     RasterizerDesc      rasterizer;

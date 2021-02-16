@@ -1148,6 +1148,10 @@ namespace Slang
         {
             return SLANG_BINDING_TYPE_CONSTANT_BUFFER;
         }
+        else if( as<SamplerStateType>(type) )
+        {
+            return SLANG_BINDING_TYPE_SAMPLER;
+        }
         else
         {
             return SLANG_BINDING_TYPE_UNKNOWN;

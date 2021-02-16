@@ -357,6 +357,7 @@ SlangResult _assignVarsFromLayout(
 
                 IResourceView::Desc viewDesc;
                 viewDesc.type = IResourceView::Type::ShaderResource;
+                viewDesc.format = texture->getDesc()->format;
                 auto textureView = renderer->createTextureView(
                     texture,
                     viewDesc);
@@ -719,6 +720,7 @@ void RenderTestApp::renderFrame()
     applyBinding(pipelineType);
 
 	m_renderer->draw(3);
+    m_renderer->presentFrame();
 }
 
 void RenderTestApp::runCompute()
