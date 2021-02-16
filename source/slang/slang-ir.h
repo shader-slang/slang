@@ -1512,9 +1512,9 @@ struct IRDumpOptions
 
     Mode mode = Mode::Simplified;
         /// Flags to control output
-    //Flags flags = 0;
-    Flags flags = Flag::SourceLocations;
-
+        /// Add Flag::SourceLocations to output source locations set on IR
+    Flags flags = 0;
+    
         /// Must be set if source location output is desired
     SourceManager* sourceManager = nullptr;         
 };
